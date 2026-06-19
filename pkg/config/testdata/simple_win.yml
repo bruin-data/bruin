@@ -532,6 +532,10 @@ environments:
           api_key: "test-api-key"
           competition: "WC"
           season: "2026"
+      balldontlie:
+        - name: "balldontlie-1"
+          api_key: "test-api-key"
+          season: "2026"
 
   prod:
     connections:

@@ -24,6 +24,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/asana"
 	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/attio"
+	"github.com/bruin-data/bruin/pkg/balldontlie"
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/bruincloud"
 	"github.com/bruin-data/bruin/pkg/cassandra"
@@ -259,6 +260,7 @@ type Manager struct {
 	Espn                 map[string]*espn.Client
 	APIFootball          map[string]*apifootball.Client
 	FootballData         map[string]*footballdata.Client
+	BallDontLie          map[string]*balldontlie.Client
 	Generic              map[string]*config.GenericConnection
 	mutex                sync.Mutex
 	availableConnections map[string]any
@@ -3216,6 +3218,27 @@ func (m *Manager) AddFootballDataConnectionFromConfig(connection *config.Footbal
 	return nil
 }
 
+func (m *Manager) AddBallDontLieConnectionFromConfig(connection *config.BallDontLieConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.BallDontLie == nil {
+		m.BallDontLie = make(map[string]*balldontlie.Client)
+	}
+
+	client, err := balldontlie.NewClient(balldontlie.Config{
+		APIKey:  connection.APIKey,
+		Season:  connection.Season,
+		BaseURL: connection.BaseURL,
+	})
+	if err != nil {
+		return err
+	}
+	m.BallDontLie[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddDuneConnectionFromConfig(connection *config.DuneConnection) error {
 	m.mutex.Lock()
 	if m.Dune == nil {
@@ -3671,6 +3694,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Espn, connectionManager.AddEspnConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.APIFootball, connectionManager.AddAPIFootballConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.FootballData, connectionManager.AddFootballDataConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.BallDontLie, connectionManager.AddBallDontLieConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Dune, connectionManager.AddDuneConnectionFromConfig, &wg, &errList, &mu)
 	wg.Wait()
 	return connectionManager, errList

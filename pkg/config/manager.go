@@ -145,6 +145,7 @@ type Connections struct {
 	Espn                []EspnConnection                `yaml:"espn,omitempty" json:"espn,omitempty" mapstructure:"espn"`
 	APIFootball         []APIFootballConnection         `yaml:"apifootball,omitempty" json:"apifootball,omitempty" mapstructure:"apifootball"`
 	FootballData        []FootballDataConnection        `yaml:"footballdata,omitempty" json:"footballdata,omitempty" mapstructure:"footballdata"`
+	BallDontLie         []BallDontLieConnection         `yaml:"balldontlie,omitempty" json:"balldontlie,omitempty" mapstructure:"balldontlie"`
 	Vertica             []VerticaConnection             `yaml:"vertica,omitempty" json:"vertica,omitempty" mapstructure:"vertica"`
 	SurveyMonkey        []SurveyMonkeyConnection        `yaml:"surveymonkey,omitempty" json:"surveymonkey,omitempty" mapstructure:"surveymonkey"`
 	Dune                []DuneConnection                `yaml:"dune,omitempty" json:"dune,omitempty" mapstructure:"dune"`
@@ -1345,6 +1346,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.FootballData = append(env.Connections.FootballData, conn)
+	case "balldontlie":
+		var conn BallDontLieConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.BallDontLie = append(env.Connections.BallDontLie, conn)
 	case "vertica":
 		var conn VerticaConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1631,6 +1639,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.APIFootball = removeConnection(env.Connections.APIFootball, connectionName)
 	case "footballdata":
 		env.Connections.FootballData = removeConnection(env.Connections.FootballData, connectionName)
+	case "balldontlie":
+		env.Connections.BallDontLie = removeConnection(env.Connections.BallDontLie, connectionName)
 	case "vertica":
 		env.Connections.Vertica = removeConnection(env.Connections.Vertica, connectionName)
 	case "surveymonkey":
@@ -1814,6 +1824,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Espn, source.Espn)
 	mergeConnectionList(&c.APIFootball, source.APIFootball)
 	mergeConnectionList(&c.FootballData, source.FootballData)
+	mergeConnectionList(&c.BallDontLie, source.BallDontLie)
 	mergeConnectionList(&c.Vertica, source.Vertica)
 	mergeConnectionList(&c.SurveyMonkey, source.SurveyMonkey)
 	mergeConnectionList(&c.Dune, source.Dune)

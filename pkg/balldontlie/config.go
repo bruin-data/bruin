@@ -1,0 +1,21 @@
+package balldontlie
+
+import "net/url"
+
+type Config struct {
+	APIKey  string
+	Season  string
+	BaseURL string
+}
+
+func (c *Config) GetIngestrURI() string {
+	params := url.Values{}
+	params.Set("api_key", c.APIKey)
+	if c.Season != "" {
+		params.Set("season", c.Season)
+	}
+	if c.BaseURL != "" {
+		params.Set("base_url", c.BaseURL)
+	}
+	return "balldontlie://?" + params.Encode()
+}
