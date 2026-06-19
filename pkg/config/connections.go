@@ -1823,6 +1823,26 @@ func (c EspnConnection) GetName() string {
 	return c.Name
 }
 
+type FootballDataConnection struct {
+	Name           string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey         string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	Competition    string `yaml:"competition,omitempty" json:"competition,omitempty" mapstructure:"competition"`
+	Season         string `yaml:"season,omitempty" json:"season,omitempty" mapstructure:"season"`
+	BaseURL        string `yaml:"base_url,omitempty" json:"base_url,omitempty" mapstructure:"base_url"`
+	Matchday       string `yaml:"matchday,omitempty" json:"matchday,omitempty" mapstructure:"matchday"`
+	Status         string `yaml:"status,omitempty" json:"status,omitempty" mapstructure:"status"`
+	Stage          string `yaml:"stage,omitempty" json:"stage,omitempty" mapstructure:"stage"`
+	Group          string `yaml:"group,omitempty" json:"group,omitempty" mapstructure:"group"`
+	UnfoldGoals    bool   `yaml:"unfold_goals,omitempty" json:"unfold_goals,omitempty" mapstructure:"unfold_goals"`
+	UnfoldBookings bool   `yaml:"unfold_bookings,omitempty" json:"unfold_bookings,omitempty" mapstructure:"unfold_bookings"`
+	UnfoldSubs     bool   `yaml:"unfold_subs,omitempty" json:"unfold_subs,omitempty" mapstructure:"unfold_subs"`
+	UnfoldLineups  bool   `yaml:"unfold_lineups,omitempty" json:"unfold_lineups,omitempty" mapstructure:"unfold_lineups"`
+}
+
+func (c FootballDataConnection) GetName() string {
+	return c.Name
+}
+
 type VerticaConnection struct {
 	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`

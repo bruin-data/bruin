@@ -1269,6 +1269,12 @@
           },
           "type": "array"
         },
+        "footballdata": {
+          "items": {
+            "$ref": "#/$defs/FootballDataConnection"
+          },
+          "type": "array"
+        },
         "vertica": {
           "items": {
             "$ref": "#/$defs/VerticaConnection"
@@ -1865,6 +1871,55 @@
         "instance",
         "client_id",
         "client_secret"
+      ]
+    },
+    "FootballDataConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "competition": {
+          "type": "string"
+        },
+        "season": {
+          "type": "string"
+        },
+        "base_url": {
+          "type": "string"
+        },
+        "matchday": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "stage": {
+          "type": "string"
+        },
+        "group": {
+          "type": "string"
+        },
+        "unfold_goals": {
+          "type": "boolean"
+        },
+        "unfold_bookings": {
+          "type": "boolean"
+        },
+        "unfold_subs": {
+          "type": "boolean"
+        },
+        "unfold_lineups": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
       ]
     },
     "FrankfurterConnection": {
