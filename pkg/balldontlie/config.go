@@ -1,6 +1,9 @@
 package balldontlie
 
-import "net/url"
+import (
+	"errors"
+	"net/url"
+)
 
 type Config struct {
 	APIKey  string
@@ -8,7 +11,11 @@ type Config struct {
 	BaseURL string
 }
 
-func (c *Config) GetIngestrURI() string {
+func (c *Config) GetIngestrURI() (string, error) {
+	if c.APIKey == "" {
+		return "", errors.New("balldontlie: api_key must be provided")
+	}
+
 	params := url.Values{}
 	params.Set("api_key", c.APIKey)
 	if c.Season != "" {
@@ -17,5 +24,5 @@ func (c *Config) GetIngestrURI() string {
 	if c.BaseURL != "" {
 		params.Set("base_url", c.BaseURL)
 	}
-	return "balldontlie://?" + params.Encode()
+	return "balldontlie://?" + params.Encode(), nil
 }
