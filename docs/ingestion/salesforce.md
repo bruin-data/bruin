@@ -88,7 +88,7 @@ parameters:
 | `pricebook_entry` | id | - | replace | Represents a specific price for a product in a price book. |
 | `task` | id | last_timestamp | merge | Used to track and manage various activities and tasks within the Salesforce platform. |
 | `event` | id | last_timestamp | merge | Used to track and manage calendar-based events, such as meetings, appointments, or calls. |
-| `custom:<custom_object_name>` | - | - | replace | Track and store data that's unique to your organization. For more information about custom objects in Salesforce, read `here`. |
+| `custom:<custom_object_name>` | - | - | replace | Track and store data that's unique to your organization. |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 

@@ -54,11 +54,11 @@ parameters:
 
 | Table | PK | Inc Key | Inc Strategy | Details |
 |-------|----|---------|--------------|---------|
-| `customers` | id | lastupdatedtime | merge | Retrives list of customers. |
-| `invoices` | id | lastupdatedtime | merge | Retrives sales invoices. |
-| `accounts` | id | lastupdatedtime | merge | Retrives details of accounts. |
-| `vendors` | id | lastupdatedtime | merge | Retrives vendor records. |
-| `payments` | id | lastupdatedtime | merge | Retrives payments recorded. |
+| `customers` | id | lastupdatedtime | merge | Retrieves list of customers. |
+| `invoices` | id | lastupdatedtime | merge | Retrieves sales invoices. |
+| `accounts` | id | lastupdatedtime | merge | Retrieves details of accounts. |
+| `vendors` | id | lastupdatedtime | merge | Retrieves vendor records. |
+| `payments` | id | lastupdatedtime | merge | Retrieves payments recorded. |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 

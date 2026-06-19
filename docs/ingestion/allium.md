@@ -57,8 +57,7 @@ parameters:
 | Table | PK | Inc Key | Inc Strategy | Details |
 |-------|----|---------|--------------| ------- |
 | `query:<query_id>` | - | - | replace | The query ID from Allium explorer. Example: `query:abc123def456` |
-| `query:<query_id>:<params>` | - | - | replace | Query ID with custom parameters. Example: `query:abc123def456:network=ethereum&min_value=1000` |
-| `query:<query_id>:<params>` | - | - | replace | Query ID with run_config parameters. Example: `query:abc123def456:limit=5000&compute_profile=standard` |
+| `query:<query_id>:<params>` | - | - | replace | Query ID with URL-encoded parameters. Custom parameters example: `query:abc123def456:network=ethereum&min_value=1000`. Run-config parameters example: `query:abc123def456:limit=5000&compute_profile=standard`. |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 

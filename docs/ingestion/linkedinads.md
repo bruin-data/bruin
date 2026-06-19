@@ -59,9 +59,9 @@ LinkedIn Ads source allows ingesting the following sources:
 | `conversions` | id | – | replace | Retrieves conversion rules for each ad account. |
 | `lead_forms` | id | – | replace | Retrieves lead generation forms for each ad account. |
 | `lead_form_responses` | id | date (interval) | merge | Retrieves lead form responses for each ad account. |
-| dmp_segments | id | – | replace | Retrieves matched/retargeting audience segments (sizes, match rates, rules) for each ad account. |
-| insight_tags | id | – | replace | Retrieves Insight Tag configuration and installation status for each ad account. |
-| insight_tag_domains | domainName, account_id | – | replace | Retrieves domains associated with Insight Tags for each ad account. |
+| `dmp_segments` | id | – | replace | Retrieves matched/retargeting audience segments (sizes, match rates, rules) for each ad account. |
+| `insight_tags` | id | – | replace | Retrieves Insight Tag configuration and installation status for each ad account. |
+| `insight_tag_domains` | domainName, account_id | – | replace | Retrieves domains associated with Insight Tags for each ad account. |
 | `custom` | [dimension, date] or [dimension, start_date, end_date] | date (daily) or start_date (monthly) | merge | Custom reports allow you to retrieve data based on specific dimensions and metrics. |
 
 ### Example
