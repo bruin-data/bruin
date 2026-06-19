@@ -2634,9 +2634,6 @@ func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 	asset.Upstreams = appendMissingUpstreams(asset.Upstreams, defaults.Upstreams)
 	mergeColumnDefaults(asset, defaults.Columns)
 	mergeCustomCheckDefaults(asset, defaults.CustomChecks)
-	if asset.Name != "" {
-		refreshAssetCheckIDs(asset)
-	}
 
 	// merge secrets from the default values to asset secrets
 	existingSecrets := make(map[string]bool)
@@ -3040,19 +3037,6 @@ func cloneCustomCheckForAsset(check CustomCheck, assetName string) CustomCheck {
 	return clone
 }
 
-func refreshAssetCheckIDs(asset *Asset) {
-	for columnIndex := range asset.Columns {
-		for checkIndex := range asset.Columns[columnIndex].Checks {
-			check := &asset.Columns[columnIndex].Checks[checkIndex]
-			check.ID = hash(fmt.Sprintf("%s-%s-%s", asset.Name, asset.Columns[columnIndex].Name, check.Name))
-		}
-	}
-	for checkIndex := range asset.CustomChecks {
-		check := &asset.CustomChecks[checkIndex]
-		check.ID = hash(fmt.Sprintf("%s-%s", asset.Name, check.Name))
-	}
-}
-
 func mergeNotificationDefaults(target *Notifications, defaults *Notifications) *Notifications {
 	if defaults == nil {
 		return target
@@ -3421,7 +3405,6 @@ func (b *Builder) SetNameFromPath(ctx context.Context, asset *Asset, foundPipeli
 
 	asset.Name = name
 	asset.ID = hash(name)
-	refreshAssetCheckIDs(asset)
 	return asset, nil
 }
 

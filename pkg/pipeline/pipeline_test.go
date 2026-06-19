@@ -2026,6 +2026,44 @@ func TestBuilder_SetNameFromPath(t *testing.T) {
 	}
 }
 
+func TestBuilder_SetNameFromPathDoesNotRecalculateCheckIDs(t *testing.T) {
+	t.Parallel()
+
+	builder := &pipeline.Builder{}
+	p := &pipeline.Pipeline{
+		DefinitionFile: pipeline.DefinitionFile{
+			Path: filepath.Join(os.TempDir(), "project", "pipeline.yml"),
+		},
+	}
+
+	columnCheckID := hash("-id-not_null")
+	customCheckID := hash("-row_count")
+	asset := &pipeline.Asset{
+		DefinitionFile: pipeline.TaskDefinitionFile{
+			Path: filepath.Join(os.TempDir(), "project", "assets", "orders.asset.yml"),
+		},
+		Columns: []pipeline.Column{
+			{
+				Name: "id",
+				Checks: []pipeline.ColumnCheck{
+					{ID: columnCheckID, Name: "not_null"},
+				},
+			},
+		},
+		CustomChecks: []pipeline.CustomCheck{
+			{ID: customCheckID, Name: "row_count"},
+		},
+	}
+
+	got, err := builder.SetNameFromPath(t.Context(), asset, p)
+	require.NoError(t, err)
+
+	assert.Equal(t, "orders", got.Name)
+	assert.Equal(t, hash("orders"), got.ID)
+	assert.Equal(t, columnCheckID, got.Columns[0].Checks[0].ID)
+	assert.Equal(t, customCheckID, got.CustomChecks[0].ID)
+}
+
 func hash(s string) string {
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(s)))[:64]
 }
