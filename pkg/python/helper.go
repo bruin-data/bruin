@@ -40,7 +40,7 @@ var ingestrBoolParameterFlags = []string{
 func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs []string, columnOpts *ColumnHintOptions) ([]string, error) {
 	cmdArgs = appendIngestrParameterFlags(asset.Parameters, cmdArgs)
 
-	if value, exists := asset.Parameters["incremental_key"]; exists && value != "" {
+	if value, exists := asset.Parameters.GetString("incremental_key"); exists && value != "" {
 		// Check if the incremental key column exists and is of date type
 		for _, column := range asset.Columns {
 			if column.Name == value && strings.ToLower(column.Type) == "date" {
@@ -99,7 +99,7 @@ func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs 
 	// Handle column hints based on enforce_schema parameter
 	if columnOpts != nil && len(asset.Columns) > 0 {
 		shouldEnforce := columnOpts.EnforceSchemaByDefault
-		if value, exists := asset.Parameters["enforce_schema"]; exists {
+		if value, exists := asset.Parameters.GetString("enforce_schema"); exists {
 			shouldEnforce = value == "true"
 		}
 
@@ -114,15 +114,15 @@ func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs 
 	return cmdArgs, nil
 }
 
-func appendIngestrParameterFlags(params map[string]string, cmdArgs []string) []string {
+func appendIngestrParameterFlags(params pipeline.ParameterMap, cmdArgs []string) []string {
 	for _, param := range ingestrValueParameterFlags {
-		if value, exists := params[param]; exists && value != "" {
+		if value, exists := params.GetString(param); exists && value != "" {
 			cmdArgs = append(cmdArgs, "--"+strings.ReplaceAll(param, "_", "-"), value)
 		}
 	}
 
 	for _, param := range ingestrBoolParameterFlags {
-		if value, exists := params[param]; exists && value == "true" {
+		if value, exists := params.GetString(param); exists && value == "true" {
 			cmdArgs = append(cmdArgs, "--"+strings.ReplaceAll(param, "_", "-"))
 		}
 	}

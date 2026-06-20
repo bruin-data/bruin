@@ -897,7 +897,7 @@ type Asset struct { //nolint:recvcheck
 	Tier              int                `json:"tier,omitempty" yaml:"tier,omitempty" mapstructure:"tier"`
 	ExecutableFile    ExecutableFile     `json:"executable_file" yaml:"-" mapstructure:"-"`
 	DefinitionFile    TaskDefinitionFile `json:"definition_file" yaml:"-" mapstructure:"-"`
-	Parameters        EmptyStringMap     `json:"parameters" yaml:"parameters,omitempty" mapstructure:"parameters"`
+	Parameters        ParameterMap       `json:"parameters" yaml:"parameters,omitempty" mapstructure:"parameters"`
 	Secrets           []SecretMapping    `json:"secrets" yaml:"secrets,omitempty" mapstructure:"secrets"`
 	Extends           []string           `json:"extends" yaml:"extends,omitempty" mapstructure:"extends"`
 	Columns           []Column           `json:"columns" yaml:"columns,omitempty" mapstructure:"columns"`
@@ -1383,10 +1383,10 @@ func (a Asset) Persist(fs afero.Fs, pipeline ...*Pipeline) error {
 	// Remove parameters that match pipeline defaults
 	// pipeline is optional - if provided and has defaults, filter them out
 	if len(pipeline) > 0 && pipeline[0] != nil && pipeline[0].DefaultValues != nil && len(pipeline[0].DefaultValues.Parameters) > 0 {
-		filteredParams := EmptyStringMap{}
+		filteredParams := ParameterMap{}
 		for key, value := range a.Parameters {
 			// Only keep parameters that are NOT in defaults or have different values
-			if defaultValue, existsInDefaults := pipeline[0].DefaultValues.Parameters[key]; !existsInDefaults || defaultValue != value {
+			if defaultValue, existsInDefaults := pipeline[0].DefaultValues.Parameters[key]; !existsInDefaults || !reflect.DeepEqual(defaultValue, value) {
 				filteredParams[key] = value
 			}
 		}
@@ -1542,6 +1542,78 @@ func (b *EmptyStringMap) UnmarshalJSON(data []byte) error {
 
 	*b = v
 	return nil
+}
+
+// ParameterMap stores asset parameters with arbitrary value types, allowing
+// parameters to hold strings, numbers, booleans, or nested structures.
+type ParameterMap map[string]interface{} //nolint:recvcheck
+
+func (m ParameterMap) MarshalJSON() ([]byte, error) { //nolint:recvcheck
+	if m == nil {
+		return []byte{'{', '}'}, nil
+	}
+	return json.Marshal(map[string]interface{}(m))
+}
+
+func (m *ParameterMap) UnmarshalJSON(data []byte) error {
+	if data == nil {
+		return nil
+	}
+	var v map[string]interface{}
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	if len(v) == 0 {
+		return nil
+	}
+	*m = v
+	return nil
+}
+
+// GetString returns the value for key as a string. Scalar primitives are
+// coerced to their string representations so that YAML configs with unquoted
+// values continue to work. Structured values intentionally do not stringify.
+// Returns ("", false) if the key is absent or the value is nil.
+func (m ParameterMap) GetString(key string) (string, bool) {
+	v, ok := m[key]
+	if !ok || v == nil {
+		return "", false
+	}
+	switch val := v.(type) {
+	case string:
+		return val, true
+	case int8:
+		return strconv.FormatInt(int64(val), 10), true
+	case int16:
+		return strconv.FormatInt(int64(val), 10), true
+	case int32:
+		return strconv.FormatInt(int64(val), 10), true
+	case int:
+		return strconv.Itoa(val), true
+	case int64:
+		return strconv.FormatInt(val, 10), true
+	case uint:
+		return strconv.FormatUint(uint64(val), 10), true
+	case uint8:
+		return strconv.FormatUint(uint64(val), 10), true
+	case uint16:
+		return strconv.FormatUint(uint64(val), 10), true
+	case uint32:
+		return strconv.FormatUint(uint64(val), 10), true
+	case uint64:
+		return strconv.FormatUint(val, 10), true
+	case float32:
+		return strconv.FormatFloat(float64(val), 'f', -1, 32), true
+	case float64:
+		if val == float64(int64(val)) {
+			return strconv.FormatInt(int64(val), 10), true
+		}
+		return strconv.FormatFloat(val, 'f', -1, 64), true
+	case bool:
+		return strconv.FormatBool(val), true
+	default:
+		return "", false
+	}
 }
 
 type EmptyStringArray []string
@@ -1779,7 +1851,7 @@ type DefaultValues struct {
 	Instance          string            `json:"instance,omitempty" yaml:"instance,omitempty" mapstructure:"instance"`
 	Owner             string            `json:"owner,omitempty" yaml:"owner,omitempty" mapstructure:"owner"`
 	Tier              int               `json:"tier,omitempty" yaml:"tier,omitempty" mapstructure:"tier"`
-	Parameters        map[string]string `json:"parameters" yaml:"parameters" mapstructure:"parameters"`
+	Parameters        ParameterMap      `json:"parameters" yaml:"parameters" mapstructure:"parameters"`
 	Secrets           []secretMapping   `json:"secrets" yaml:"secrets" mapstructure:"secrets"`
 	Extends           []string          `json:"extends,omitempty" yaml:"extends,omitempty" mapstructure:"extends"`
 	Columns           []Column          `json:"columns,omitempty" yaml:"columns,omitempty" mapstructure:"columns"`
@@ -1868,20 +1940,21 @@ func (p *Pipeline) GetAllConnectionNamesForAsset(asset *Asset) ([]string, error)
 		}
 		return secretKeys, nil
 	} else if assetType == AssetTypeIngestr {
-		ingestrSource, ok := asset.Parameters["source_connection"]
+		ingestrSource, ok := asset.Parameters.GetString("source_connection")
 		if !ok {
 			return []string{}, errors.Errorf("No source connection in asset")
 		}
 
-		ingestrDestination, ok := asset.Parameters["destination_connection"]
+		ingestrDestination, ok := asset.Parameters.GetString("destination_connection")
 		if ok {
 			return []string{ingestrDestination, ingestrSource}, nil
 		}
 
 		// if destination connection not specified, we infer from destination type
-		assetType, ok = IngestrTypeConnectionMapping[asset.Parameters["destination"]]
+		ingestrDest, _ := asset.Parameters.GetString("destination")
+		assetType, ok = IngestrTypeConnectionMapping[ingestrDest]
 		if !ok {
-			return []string{}, errors.Errorf("connection type could not be inferred for destination '%s', please specify a `connection` key in the asset", asset.Parameters["destination"])
+			return []string{}, errors.Errorf("connection type could not be inferred for destination '%s', please specify a `connection` key in the asset", ingestrDest)
 		}
 
 		mapping, ok := AssetTypeConnectionMapping[assetType]
@@ -1919,9 +1992,10 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 	var ok bool
 	switch assetType {
 	case AssetTypeIngestr:
-		assetType, ok = IngestrTypeConnectionMapping[asset.Parameters["destination"]]
+		ingestrDest, _ := asset.Parameters.GetString("destination")
+		assetType, ok = IngestrTypeConnectionMapping[ingestrDest]
 		if !ok {
-			return "", errors.Errorf("connection type could not be inferred for destination '%s', please specify a `connection` key in the asset", asset.Parameters["destination"])
+			return "", errors.Errorf("connection type could not be inferred for destination '%s', please specify a `connection` key in the asset", ingestrDest)
 		}
 	case AssetTypePython, AssetTypeEmpty:
 		assetType = p.GetMajorityAssetTypesFromSQLAssets(AssetTypeBigqueryQuery)
@@ -1983,7 +2057,7 @@ func (p *Pipeline) GetMajorityAssetTypesFromSQLAssets(defaultIfNone AssetType) A
 		assetType := asset.Type
 
 		if assetType == AssetTypeIngestr {
-			ingestrDestination, ok := asset.Parameters["destination"]
+			ingestrDestination, ok := asset.Parameters.GetString("destination")
 			if !ok {
 				continue
 			}
@@ -2615,7 +2689,7 @@ func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 
 	// merge parameters from the default values to asset parameters
 	if len(asset.Parameters) == 0 {
-		asset.Parameters = EmptyStringMap{}
+		asset.Parameters = ParameterMap{}
 	}
 
 	for key, value := range defaults.Parameters {

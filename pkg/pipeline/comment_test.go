@@ -68,7 +68,7 @@ func Test_createTaskFromFile(t *testing.T) {
 					Path:    path.AbsPathForTests(t, "testdata/comments/test.sql"),
 					Content: "select *\nfrom foo;",
 				},
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"param1":       "first-parameter",
 					"param2":       "second-parameter",
 					"s3_file_path": "s3://bucket/path",
@@ -120,7 +120,7 @@ func Test_createTaskFromFile(t *testing.T) {
 					Path:    path.AbsPathForTests(t, "testdata/comments/embeddedyaml.sql"),
 					Content: "select *\nfrom foo;",
 				},
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"param1":       "first-parameter",
 					"param2":       "second-parameter",
 					"s3_file_path": "s3://bucket/path",
@@ -172,7 +172,7 @@ func Test_createTaskFromFile(t *testing.T) {
 					Path:    path.AbsPathForTests(t, "testdata/comments/test.py"),
 					Content: "print('hello world')",
 				},
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"param1": "first-parameter",
 					"param2": "second-parameter",
 					"param3": "third-parameter",
@@ -245,7 +245,7 @@ func Test_createTaskFromFile(t *testing.T) {
 					Path:    path.AbsPathForTests(t, "testdata/comments/testblockcomments.py"),
 					Content: "print('hello world')",
 				},
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"param1": "first-parameter",
 					"param2": "second-parameter",
 					"param3": "third-parameter",
@@ -342,7 +342,7 @@ func Test_createTaskFromFile(t *testing.T) {
 					Path:    path.AbsPathForTests(t, "testdata/comments/test.r"),
 					Content: "cat(\"Hello from R!\\n\")\nprint(\"This is an R script\")",
 				},
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"param1": "first-parameter",
 					"param2": "second-parameter",
 					"param3": "third-parameter",

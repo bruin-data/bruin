@@ -346,7 +346,7 @@ type taskDefinition struct {
 	Type                  string            `yaml:"type"`
 	RunFile               string            `yaml:"run"`
 	Depends               depends           `yaml:"depends"`
-	Parameters            map[string]string `yaml:"parameters"`
+	Parameters            ParameterMap      `yaml:"parameters"`
 	Connections           map[string]string `yaml:"connections"`
 	Secrets               []secretMapping   `yaml:"secrets"`
 	Connection            string            `yaml:"connection"`

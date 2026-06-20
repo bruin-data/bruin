@@ -1553,7 +1553,7 @@ func TestEnsureSnowflakeSensorHasQueryParameter(t *testing.T) {
 					{
 						Name: "task1",
 						Type: pipeline.AssetTypeSnowflakeQuerySensor,
-						Parameters: map[string]string{
+						Parameters: pipeline.ParameterMap{
 							"query": "",
 						},
 					},
@@ -1569,7 +1569,7 @@ func TestEnsureSnowflakeSensorHasQueryParameter(t *testing.T) {
 					{
 						Name: "task1",
 						Type: pipeline.AssetTypeSnowflakeQuerySensor,
-						Parameters: map[string]string{
+						Parameters: pipeline.ParameterMap{
 							"query": "SELECT 1",
 						},
 					},
@@ -1632,7 +1632,7 @@ func TestEnsureBigqueryQuerySensorHasQueryParameter(t *testing.T) {
 					{
 						Name: "task1",
 						Type: pipeline.AssetTypeBigqueryQuerySensor,
-						Parameters: map[string]string{
+						Parameters: pipeline.ParameterMap{
 							"query": "",
 						},
 					},
@@ -1648,7 +1648,7 @@ func TestEnsureBigqueryQuerySensorHasQueryParameter(t *testing.T) {
 					{
 						Name: "task1",
 						Type: pipeline.AssetTypeBigqueryQuerySensor,
-						Parameters: map[string]string{
+						Parameters: pipeline.ParameterMap{
 							"query": "SELECT 1",
 						},
 					},
@@ -1698,7 +1698,7 @@ func TestValidateSensorTimeout(t *testing.T) {
 					{
 						Name: "task1",
 						Type: pipeline.AssetTypeBigqueryQuery,
-						Parameters: map[string]string{
+						Parameters: pipeline.ParameterMap{
 							"timeout": "bogus",
 						},
 					},
@@ -1725,7 +1725,7 @@ func TestValidateSensorTimeout(t *testing.T) {
 					{
 						Name: "task1",
 						Type: pipeline.AssetTypeBigqueryQuerySensor,
-						Parameters: map[string]string{
+						Parameters: pipeline.ParameterMap{
 							"timeout": "",
 						},
 					},
@@ -1740,7 +1740,7 @@ func TestValidateSensorTimeout(t *testing.T) {
 					{
 						Name: "task1",
 						Type: pipeline.AssetTypeBigqueryQuerySensor,
-						Parameters: map[string]string{
+						Parameters: pipeline.ParameterMap{
 							"timeout": "1h",
 						},
 					},
@@ -1755,7 +1755,7 @@ func TestValidateSensorTimeout(t *testing.T) {
 					{
 						Name: "task1",
 						Type: pipeline.AssetTypeDuckDBQuerySensor,
-						Parameters: map[string]string{
+						Parameters: pipeline.ParameterMap{
 							"timeout": "2d",
 						},
 					},
@@ -1770,7 +1770,7 @@ func TestValidateSensorTimeout(t *testing.T) {
 					{
 						Name: "task1",
 						Type: pipeline.AssetTypeBigqueryQuerySensor,
-						Parameters: map[string]string{
+						Parameters: pipeline.ParameterMap{
 							"timeout": "1M",
 						},
 					},
@@ -1786,7 +1786,7 @@ func TestValidateSensorTimeout(t *testing.T) {
 					{
 						Name: "task1",
 						Type: pipeline.AssetTypeBigqueryQuerySensor,
-						Parameters: map[string]string{
+						Parameters: pipeline.ParameterMap{
 							"timeout": "-1h",
 						},
 					},
@@ -1802,7 +1802,7 @@ func TestValidateSensorTimeout(t *testing.T) {
 					{
 						Name: "task1",
 						Type: pipeline.AssetTypeS3KeySensor,
-						Parameters: map[string]string{
+						Parameters: pipeline.ParameterMap{
 							"timeout": "0s",
 						},
 					},
@@ -1818,7 +1818,7 @@ func TestValidateSensorTimeout(t *testing.T) {
 					{
 						Name: "task1",
 						Type: pipeline.AssetTypeBigqueryQuerySensor,
-						Parameters: map[string]string{
+						Parameters: pipeline.ParameterMap{
 							"timeout": "foo",
 						},
 					},
@@ -1873,7 +1873,7 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 			name: "asset with some params missing",
 			asset: &pipeline.Asset{
 				Type: pipeline.AssetTypeIngestr,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"source": "source",
 				},
 			},
@@ -1884,7 +1884,7 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 			name: "asset with all params there but has some update-on-merge columns",
 			asset: &pipeline.Asset{
 				Type: pipeline.AssetTypeIngestr,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"source_connection":      "source_connection",
 					"source_table":           "source_table",
 					"destination":            "destination",
@@ -1903,7 +1903,7 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 			name: "asset with all params there",
 			asset: &pipeline.Asset{
 				Type: pipeline.AssetTypeIngestr,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"source_connection":      "source_connection",
 					"source_table":           "source_table",
 					"destination":            "destination",
@@ -1918,7 +1918,7 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 			name: "ingestr asset with merge strategy but no primary key",
 			asset: &pipeline.Asset{
 				Type: pipeline.AssetTypeIngestr,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"source_connection":    "conn1",
 					"source_table":         "table1",
 					"destination":          "dest1",
@@ -1936,7 +1936,7 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 			name: "valid ingestr asset with merge strategy and primary key",
 			asset: &pipeline.Asset{
 				Type: pipeline.AssetTypeIngestr,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"source_connection":    "conn1",
 					"source_table":         "table1",
 					"destination":          "dest1",
@@ -1954,7 +1954,7 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 			name: "CDC ingestr asset with merge strategy but no primary key should pass",
 			asset: &pipeline.Asset{
 				Type: pipeline.AssetTypeIngestr,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"source_connection":    "conn1",
 					"source_table":         "table1",
 					"destination":          "dest1",
@@ -1969,7 +1969,7 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 			name: "CDC ingestr asset with cdc_mode stream should pass",
 			asset: &pipeline.Asset{
 				Type: pipeline.AssetTypeIngestr,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"source_connection":    "conn1",
 					"source_table":         "table1",
 					"destination":          "dest1",
@@ -1985,7 +1985,7 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 			name: "CDC ingestr asset with cdc_mode batch should pass",
 			asset: &pipeline.Asset{
 				Type: pipeline.AssetTypeIngestr,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"source_connection":    "conn1",
 					"source_table":         "table1",
 					"destination":          "dest1",
@@ -2001,7 +2001,7 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 			name: "CDC ingestr asset with invalid cdc_mode should fail",
 			asset: &pipeline.Asset{
 				Type: pipeline.AssetTypeIngestr,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"source_connection":    "conn1",
 					"source_table":         "table1",
 					"destination":          "dest1",
@@ -2017,7 +2017,7 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 			name: "CDC ingestr asset with publication and slot params should pass",
 			asset: &pipeline.Asset{
 				Type: pipeline.AssetTypeIngestr,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"source_connection":    "conn1",
 					"source_table":         "table1",
 					"destination":          "dest1",
@@ -2034,7 +2034,7 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 			name: "valid version v0",
 			asset: &pipeline.Asset{
 				Type: pipeline.AssetTypeIngestr,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"source_connection": "sf",
 					"source_table":      "t",
 					"destination":       "bigquery",
@@ -2048,7 +2048,7 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 			name: "valid version v0.14.2",
 			asset: &pipeline.Asset{
 				Type: pipeline.AssetTypeIngestr,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"source_connection": "sf",
 					"source_table":      "t",
 					"destination":       "bigquery",
@@ -2062,7 +2062,7 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 			name: "valid version v1",
 			asset: &pipeline.Asset{
 				Type: pipeline.AssetTypeIngestr,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"source_connection": "sf",
 					"source_table":      "t",
 					"destination":       "bigquery",
@@ -2076,7 +2076,7 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 			name: "valid future major v2.0.0",
 			asset: &pipeline.Asset{
 				Type: pipeline.AssetTypeIngestr,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"source_connection": "sf",
 					"source_table":      "t",
 					"destination":       "bigquery",
@@ -2090,7 +2090,7 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 			name: "rejected partial version v0.14",
 			asset: &pipeline.Asset{
 				Type: pipeline.AssetTypeIngestr,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"source_connection": "sf",
 					"source_table":      "t",
 					"destination":       "bigquery",
@@ -2104,7 +2104,7 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 			name: "rejected leading-zero major",
 			asset: &pipeline.Asset{
 				Type: pipeline.AssetTypeIngestr,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"source_connection": "sf",
 					"source_table":      "t",
 					"destination":       "bigquery",
@@ -2118,7 +2118,7 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 			name: "rejected version latest",
 			asset: &pipeline.Asset{
 				Type: pipeline.AssetTypeIngestr,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"source_connection": "sf",
 					"source_table":      "t",
 					"destination":       "bigquery",
@@ -3924,7 +3924,7 @@ func TestValidateAssetSeedValidation_CaseInsensitive(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "test_seed",
 				Type: "duckdb.seed",
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"path": "./test.csv",
 				},
 				Columns: []pipeline.Column{
@@ -3943,7 +3943,7 @@ func TestValidateAssetSeedValidation_CaseInsensitive(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "test_seed",
 				Type: "duckdb.seed",
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"path": "./test.csv",
 				},
 				Columns: []pipeline.Column{
@@ -3991,7 +3991,7 @@ func TestValidateAssetSeedValidation_URLSupport(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "test_seed",
 				Type: "duckdb.seed",
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"path": "https://example.com/data.csv",
 				},
 				DefinitionFile: pipeline.TaskDefinitionFile{
@@ -4005,7 +4005,7 @@ func TestValidateAssetSeedValidation_URLSupport(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "test_seed",
 				Type: "duckdb.seed",
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"path": "http://example.com/data.csv",
 				},
 				DefinitionFile: pipeline.TaskDefinitionFile{
@@ -4019,7 +4019,7 @@ func TestValidateAssetSeedValidation_URLSupport(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "test_seed",
 				Type: "duckdb.seed",
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"path": "https://d37ci6vzurychx.cloudfront.net/misc/taxi_zone_lookup.csv",
 				},
 				DefinitionFile: pipeline.TaskDefinitionFile{
@@ -4033,7 +4033,7 @@ func TestValidateAssetSeedValidation_URLSupport(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "test_seed",
 				Type: "duckdb.seed",
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"path": "HTTPS://example.com/data.csv",
 				},
 				DefinitionFile: pipeline.TaskDefinitionFile{
@@ -4047,7 +4047,7 @@ func TestValidateAssetSeedValidation_URLSupport(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "test_seed",
 				Type: "duckdb.seed",
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"path": "Http://example.com/data.csv",
 				},
 				DefinitionFile: pipeline.TaskDefinitionFile{
@@ -4061,7 +4061,7 @@ func TestValidateAssetSeedValidation_URLSupport(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "test_seed",
 				Type: "duckdb.seed",
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"path": "",
 				},
 				DefinitionFile: pipeline.TaskDefinitionFile{
@@ -4073,7 +4073,7 @@ func TestValidateAssetSeedValidation_URLSupport(t *testing.T) {
 					Task: &pipeline.Asset{
 						Name: "test_seed",
 						Type: "duckdb.seed",
-						Parameters: map[string]string{
+						Parameters: pipeline.ParameterMap{
 							"path": "",
 						},
 						DefinitionFile: pipeline.TaskDefinitionFile{
@@ -4089,7 +4089,7 @@ func TestValidateAssetSeedValidation_URLSupport(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name:       "test_seed",
 				Type:       "duckdb.seed",
-				Parameters: map[string]string{},
+				Parameters: pipeline.ParameterMap{},
 				DefinitionFile: pipeline.TaskDefinitionFile{
 					Path: "/test/assets/test.asset.yml",
 				},
@@ -4099,7 +4099,7 @@ func TestValidateAssetSeedValidation_URLSupport(t *testing.T) {
 					Task: &pipeline.Asset{
 						Name:       "test_seed",
 						Type:       "duckdb.seed",
-						Parameters: map[string]string{},
+						Parameters: pipeline.ParameterMap{},
 						DefinitionFile: pipeline.TaskDefinitionFile{
 							Path: "/test/assets/test.asset.yml",
 						},
@@ -4130,7 +4130,7 @@ func TestValidateAssetSeedValidation_InvalidFileType(t *testing.T) {
 	asset := &pipeline.Asset{
 		Name: "test_seed",
 		Type: "duckdb.seed",
-		Parameters: map[string]string{
+		Parameters: pipeline.ParameterMap{
 			"path":      "data.dat",
 			"file_type": "xml",
 		},
@@ -4177,7 +4177,7 @@ func TestValidateAssetSeedValidation_NonCSVFormats(t *testing.T) {
 			asset := &pipeline.Asset{
 				Name: "test_seed",
 				Type: "duckdb.seed",
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"path": tt.seedPath,
 				},
 				Columns: []pipeline.Column{
@@ -4223,7 +4223,7 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "task1",
 				Type: pipeline.AssetTypeBigqueryTableSensor,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"table": "",
 				},
 			},
@@ -4235,7 +4235,7 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "task1",
 				Type: pipeline.AssetTypeBigqueryTableSensor,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"table": "dataset",
 				},
 			},
@@ -4247,7 +4247,7 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "task1",
 				Type: pipeline.AssetTypeBigqueryTableSensor,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"table": "project.dataset.table.extra",
 				},
 			},
@@ -4259,7 +4259,7 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "task1",
 				Type: pipeline.AssetTypeBigqueryTableSensor,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"table": "dataset.table",
 				},
 			},
@@ -4271,7 +4271,7 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "task1",
 				Type: pipeline.AssetTypeBigqueryTableSensor,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"table": "project.dataset.table",
 				},
 			},
@@ -4294,7 +4294,7 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "task1",
 				Type: pipeline.AssetTypeSnowflakeTableSensor,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"table": "schema",
 				},
 			},
@@ -4306,7 +4306,7 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "task1",
 				Type: pipeline.AssetTypeSnowflakeTableSensor,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"table": "schema.table",
 				},
 			},
@@ -4318,7 +4318,7 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "task1",
 				Type: pipeline.AssetTypeSnowflakeTableSensor,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"table": "database.schema.table",
 				},
 			},
@@ -4341,7 +4341,7 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "task1",
 				Type: pipeline.AssetTypeDatabricksTableSensor,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"table": "table",
 				},
 			},
@@ -4353,7 +4353,7 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "task1",
 				Type: pipeline.AssetTypeDatabricksTableSensor,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"table": "schema.table",
 				},
 			},
@@ -4376,7 +4376,7 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "task1",
 				Type: pipeline.AssetTypeAthenaTableSensor,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"table": "database.table",
 				},
 			},
@@ -4388,7 +4388,7 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "task1",
 				Type: pipeline.AssetTypeAthenaTableSensor,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"table": "table",
 				},
 			},
@@ -4411,7 +4411,7 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "task1",
 				Type: pipeline.AssetTypePostgresTableSensor,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"table": "schema.table.extra",
 				},
 			},
@@ -4423,7 +4423,7 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "task1",
 				Type: pipeline.AssetTypePostgresTableSensor,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"table": "table",
 				},
 			},
@@ -4435,7 +4435,7 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "task1",
 				Type: pipeline.AssetTypePostgresTableSensor,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"table": "schema.table",
 				},
 			},
@@ -4458,7 +4458,7 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "task1",
 				Type: pipeline.AssetTypeRedshiftTableSensor,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"table": "table",
 				},
 			},
@@ -4470,7 +4470,7 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "task1",
 				Type: pipeline.AssetTypeRedshiftTableSensor,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"table": "schema.table",
 				},
 			},
@@ -4493,7 +4493,7 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "task1",
 				Type: pipeline.AssetTypeMsSQLTableSensor,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"table": "table",
 				},
 			},
@@ -4505,7 +4505,7 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "task1",
 				Type: pipeline.AssetTypeMsSQLTableSensor,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"table": "schema.table",
 				},
 			},
@@ -4528,7 +4528,7 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "task1",
 				Type: pipeline.AssetTypeClickHouseTableSensor,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"table": "database.table.extra",
 				},
 			},
@@ -4540,7 +4540,7 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "task1",
 				Type: pipeline.AssetTypeClickHouseTableSensor,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"table": "table",
 				},
 			},
@@ -4552,7 +4552,7 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "task1",
 				Type: pipeline.AssetTypeClickHouseTableSensor,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"table": "schema.table",
 				},
 			},
@@ -4575,7 +4575,7 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "task1",
 				Type: pipeline.AssetTypeMySQLTableSensor,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"table": "analytics.",
 				},
 			},
@@ -4587,7 +4587,7 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "task1",
 				Type: pipeline.AssetTypeMySQLTableSensor,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"table": "analytics.sales.daily",
 				},
 			},
@@ -4599,7 +4599,7 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "task1",
 				Type: pipeline.AssetTypeMySQLTableSensor,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"table": "orders",
 				},
 			},
@@ -4611,7 +4611,7 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "task1",
 				Type: pipeline.AssetTypeMySQLTableSensor,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"table": "analytics.orders",
 				},
 			},
@@ -4634,7 +4634,7 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "task1",
 				Type: pipeline.AssetTypeSynapseTableSensor,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"table": "table",
 				},
 			},
@@ -4646,7 +4646,7 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "task1",
 				Type: pipeline.AssetTypeSynapseTableSensor,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"table": "schema.table",
 				},
 			},
@@ -4671,7 +4671,7 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "task1",
 				Type: pipeline.AssetTypeBigqueryTableSensor,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"table": "dataset..table",
 				},
 			},
@@ -4683,7 +4683,7 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "task1",
 				Type: pipeline.AssetTypeBigqueryTableSensor,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"table": ".dataset.table",
 				},
 			},

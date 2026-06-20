@@ -54,7 +54,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 					Path:    path.AbsPathForTests(t, filepath.Join("testdata", "yaml", "task1", "hello.sql")),
 					Content: mustRead(t, filepath.Join("testdata", "yaml", "task1", "hello.sql")),
 				},
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"param1": "value1",
 					"param2": "value2",
 				},
@@ -135,7 +135,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 					Path:    path.AbsPathForTests(t, filepath.Join("testdata", "yaml", "task-with-nested", "some", "dir", "hello.sh")),
 					Content: mustRead(t, filepath.Join("testdata", "yaml", "task-with-nested", "some", "dir", "hello.sh")),
 				},
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"param1": "value1",
 					"param2": "value2",
 				},
@@ -168,7 +168,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 					Path:    path.AbsPathForTests(t, filepath.Join("testdata", "yaml", "task-with-toplevel-runfile", "hello.sh")),
 					Content: mustRead(t, filepath.Join("testdata", "yaml", "task-with-toplevel-runfile", "hello.sh")),
 				},
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"param1": "value1",
 					"param2": "value2",
 				},
@@ -201,7 +201,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 					Path:    path.AbsPathForTests(t, filepath.Join("testdata", "yaml", "task-with-no-runfile", "task.yml")),
 					Content: mustReadWithoutReplacement(t, filepath.Join("testdata", "yaml", "task-with-no-runfile", "task.yml")),
 				},
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"param1": "value1",
 					"param2": "value2",
 				},

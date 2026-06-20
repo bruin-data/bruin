@@ -58,13 +58,17 @@ type JobRunParams struct {
 	MetastoreService string
 }
 
-func parseParams(cfg *Client, params map[string]string) *JobRunParams {
+func parseParams(cfg *Client, params pipeline.ParameterMap) *JobRunParams {
+	runtimeVersion, _ := params.GetString("runtime_version")
+	containerImage, _ := params.GetString("container_image")
+	config, _ := params.GetString("config")
+
 	jobParams := JobRunParams{
 		Project:          cfg.ProjectID,
 		Region:           cfg.Region,
-		RuntimeVersion:   params["runtime_version"],
-		ContainerImage:   params["container_image"],
-		Config:           params["config"],
+		RuntimeVersion:   runtimeVersion,
+		ContainerImage:   containerImage,
+		Config:           config,
 		Workspace:        cfg.Workspace,
 		ExecutionRole:    cfg.ExecutionRole,
 		SubnetworkURI:    cfg.SubnetworkURI,
@@ -79,14 +83,14 @@ func parseParams(cfg *Client, params map[string]string) *JobRunParams {
 		jobParams.RuntimeVersion = "2.2"
 	}
 
-	if params["timeout"] != "" {
-		t, err := time.ParseDuration(params["timeout"])
+	if timeout, _ := params.GetString("timeout"); timeout != "" {
+		t, err := time.ParseDuration(timeout)
 		if err == nil {
 			jobParams.Timeout = t
 		}
 	}
-	if params["args"] != "" {
-		arglist := strings.Split(strings.TrimSpace(params["args"]), " ")
+	if args, _ := params.GetString("args"); args != "" {
+		arglist := strings.Split(strings.TrimSpace(args), " ")
 		for _, arg := range arglist {
 			arg = strings.TrimSpace(arg)
 			if arg != "" {

@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -72,6 +74,65 @@ func TestRenderAssetHooks_Error(t *testing.T) {
 	err := renderAssetHooks(t.Context(), &pipeline.Pipeline{Name: "pipe"}, asset, jinja.NewRenderer(jinja.Context{}))
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "error rendering hooks for asset schema.asset")
+}
+
+func TestRenderAssetParamsMutatorPreservesStructuredParameters(t *testing.T) {
+	t.Parallel()
+
+	asset := &pipeline.Asset{
+		Name: "schema.asset",
+		Parameters: pipeline.ParameterMap{
+			"string":  "{{ this }} ",
+			"number":  3,
+			"enabled": true,
+			"nested": map[string]interface{}{
+				"value": "{{ start_date }}",
+				"count": 2,
+			},
+			"list": []interface{}{
+				"{{ end_date }}",
+				4,
+				map[string]interface{}{"inner": "{{ run_id }}"},
+			},
+			"string_list": []string{
+				"{{ start_datetime }}",
+				"{{ this }}",
+			},
+			"string_map": map[string]string{
+				"value": "{{ end_datetime }}",
+				"asset": "{{ this }}",
+			},
+		},
+	}
+
+	mutator := renderAssetParamsMutator(jinja.NewRenderer(jinja.Context{}))
+	startDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	endDate := time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)
+	executionDate := time.Date(2024, 1, 1, 6, 0, 0, 0, time.UTC)
+	ctx := context.WithValue(t.Context(), pipeline.RunConfigStartDate, startDate)
+	ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, endDate)
+	ctx = context.WithValue(ctx, pipeline.RunConfigExecutionDate, executionDate)
+	ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run-id")
+	_, err := mutator(ctx, asset, &pipeline.Pipeline{Name: "pipe"})
+	require.NoError(t, err)
+
+	assert.Equal(t, "schema.asset", asset.Parameters["string"])
+	assert.Equal(t, 3, asset.Parameters["number"])
+	assert.Equal(t, true, asset.Parameters["enabled"])
+	assert.Equal(t, map[string]interface{}{
+		"value": "2024-01-01",
+		"count": 2,
+	}, asset.Parameters["nested"])
+	assert.Equal(t, []interface{}{
+		"2024-01-02",
+		4,
+		map[string]interface{}{"inner": "test-run-id"},
+	}, asset.Parameters["list"])
+	assert.Equal(t, []string{"2024-01-01T00:00:00", "schema.asset"}, asset.Parameters["string_list"])
+	assert.Equal(t, map[string]string{
+		"value": "2024-01-02T00:00:00",
+		"asset": "schema.asset",
+	}, asset.Parameters["string_map"])
 }
 
 func TestVariableOverridesMutator_VariantWinsOnOverlap(t *testing.T) {

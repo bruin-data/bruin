@@ -52,7 +52,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return fmt.Errorf("connection '%s' is not a quicksight connection", connName)
 	}
 
-	if t.Parameters["refresh"] != "true" {
+	if refreshVal, _ := t.Parameters.GetString("refresh"); refreshVal != "true" {
 		return nil
 	}
 
@@ -67,7 +67,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 }
 
 func (o BasicOperator) handleDatasetRefresh(ctx context.Context, client *Client, t *pipeline.Asset) error {
-	datasetID, ok := t.Parameters["dataset_id"]
+	datasetID, ok := t.Parameters.GetString("dataset_id")
 	if !ok || datasetID == "" {
 		return errors.New("quicksight.dataset asset requires 'dataset_id' parameter when 'refresh' is true")
 	}
@@ -138,7 +138,7 @@ func pollIngestionStatus(ctx context.Context, client *Client, datasetID, ingesti
 	}
 }
 
-func resolveIncrementalRefresh(ctx context.Context, params map[string]string) bool {
+func resolveIncrementalRefresh(ctx context.Context, params pipeline.ParameterMap) bool {
 	fullRefresh, _ := ctx.Value(pipeline.RunConfigFullRefresh).(bool)
 	if fullRefresh {
 		return false
@@ -151,7 +151,7 @@ func resolveIncrementalRefresh(ctx context.Context, params map[string]string) bo
 	return true
 }
 
-func resolveRefreshTimeout(params map[string]string) time.Duration {
+func resolveRefreshTimeout(params pipeline.ParameterMap) time.Duration {
 	timeoutMinutes, ok := getIntParam(params, "refresh_timeout_minutes")
 	if !ok || timeoutMinutes <= 0 {
 		return defaultRefreshTimeout
@@ -173,8 +173,8 @@ func isIncrementalNotSupported(err error) bool {
 	return strings.Contains(msg, "incremental")
 }
 
-func getBoolParam(params map[string]string, key string) (bool, bool) {
-	value, ok := params[key]
+func getBoolParam(params pipeline.ParameterMap, key string) (bool, bool) {
+	value, ok := params.GetString(key)
 	if !ok {
 		return false, false
 	}
@@ -189,8 +189,8 @@ func getBoolParam(params map[string]string, key string) (bool, bool) {
 	return parsed, true
 }
 
-func getIntParam(params map[string]string, key string) (int, bool) {
-	value, ok := params[key]
+func getIntParam(params pipeline.ParameterMap, key string) (int, bool) {
+	value, ok := params.GetString(key)
 	if !ok {
 		return 0, false
 	}
