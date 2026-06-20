@@ -7,7 +7,7 @@ description: Add Bruin CLI support for a new ingestr source. Use when a task ask
 
 ## Workflow
 
-1. Read the upstream ingestr source docs or PR first. Capture the source URI scheme, required URI parameters, optional URI parameters, supported `source_table` values, incremental behavior, primary keys, and any file/table hints.
+1. Read the ingestr docs first: https://getbruin.com/docs/ingestr/. Then read the upstream source-specific docs or PR. Capture the source URI scheme, required URI parameters, optional URI parameters, supported `source_table` values, incremental behavior, primary keys, and any file/table hints.
 2. Inspect similar Bruin sources before editing. Prefer an existing package with the same shape: API/table source, OAuth/API-key source, database-like source, or file/path source.
 3. Implement the connection config and URI builder.
 4. Wire the connection into config loading, connection manager registration, and ingestr asset source discovery.
