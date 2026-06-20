@@ -2364,6 +2364,7 @@ func TestDefaultValues_CoversAssetConfigFields(t *testing.T) {
 		"ID":             true,
 		"Name":           true,
 		"URI":            true,
+		"Enabled":        true,
 		"ExecutableFile": true,
 		"DefinitionFile": true,
 		"RetriesDelay":   true,

@@ -1,6 +1,6 @@
 name: enabled-template-pipeline
 default_connections:
-  duckdb: duckdb-enabled-template
+  duckdb: duckdb-default
 variables:
   upstream_enabled:
     type: boolean

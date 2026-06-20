@@ -175,7 +175,7 @@ variant-example/
     └─ users_summary.sql      # aggregates within forecast_days window
 ```
 
-Three variants are declared (`client_alpha`, `client_beta`, `client_gamma`) — each pins a different `client`, `region`, `schedule`, and (for two of them) `forecast_days`. The `client_beta` variant also enables an optional regional snapshot asset with `enabled: "{{ var.include_regional_snapshot }}"`.
+Three variants are declared (`client_alpha`, `client_beta`, `client_gamma`) — each pins a different `client`, `region`, `schedule`, and (for two of them) `forecast_days`. The `client_beta` variant also enables an optional regional snapshot asset with a templated `enabled` value.
 
 ### Trying It Locally — End-to-End
 

@@ -10,7 +10,7 @@ Short answers to common Bruin Cloud questions, including patterns that look plau
 
 ### Can I skip a single asset from scheduled runs?
 
-Yes. Set [`enabled: false`](/assets/definition-schema#enabled) in the asset definition. Bruin marks that asset as skipped instead of executing it, and downstream assets can continue running. You can also template this value, for example `enabled: "{{ var.asset_enabled }}"`, as long as it renders to `true` or `false`.
+Yes. Set [`enabled: false`](/assets/definition-schema#enabled) in the asset definition. Bruin marks that asset as skipped instead of executing it, and downstream assets can continue running. You can also template this value from a variable, as long as it renders to `true` or `false`.
 
 Other supported patterns are:
 
