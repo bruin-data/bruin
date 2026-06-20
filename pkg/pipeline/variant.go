@@ -294,7 +294,7 @@ func assetFromDefaultValues(dv *DefaultValues) *Asset {
 		Instance:          dv.Instance,
 		Owner:             dv.Owner,
 		Tier:              dv.Tier,
-		Parameters:        dv.Parameters,
+		Parameters:        ParameterMap(dv.Parameters),
 		Secrets:           secrets,
 		Extends:           dv.Extends,
 		Columns:           dv.Columns,
@@ -331,7 +331,7 @@ func copyAssetToDefaultValues(dv *DefaultValues, asset *Asset) {
 	dv.Instance = asset.Instance
 	dv.Owner = asset.Owner
 	dv.Tier = asset.Tier
-	dv.Parameters = asset.Parameters
+	dv.Parameters = map[string]interface{}(asset.Parameters)
 	dv.Secrets = secrets
 	dv.Extends = asset.Extends
 	dv.Columns = asset.Columns

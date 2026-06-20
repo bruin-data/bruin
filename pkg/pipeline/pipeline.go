@@ -1838,34 +1838,34 @@ func (p *Pipeline) UnmarshalJSON(data []byte) error {
 }
 
 type DefaultValues struct {
-	Type              string            `json:"type" yaml:"type" mapstructure:"type"`
-	Description       string            `json:"description,omitempty" yaml:"description,omitempty" mapstructure:"description"`
-	StartDate         string            `json:"start_date,omitempty" yaml:"start_date,omitempty" mapstructure:"start_date"`
-	Connection        string            `json:"connection,omitempty" yaml:"connection,omitempty" mapstructure:"connection"`
-	Tags              EmptyStringArray  `json:"tags,omitempty" yaml:"tags,omitempty" mapstructure:"tags"`
-	Domains           EmptyStringArray  `json:"domains,omitempty" yaml:"domains,omitempty" mapstructure:"domains"`
-	Meta              EmptyStringMap    `json:"meta,omitempty" yaml:"meta,omitempty" mapstructure:"meta"`
-	Materialization   Materialization   `json:"materialization,omitempty" yaml:"materialization,omitempty" mapstructure:"materialization"`
-	Upstreams         []Upstream        `json:"upstreams,omitempty" yaml:"depends,omitempty" mapstructure:"depends"`
-	Image             string            `json:"image,omitempty" yaml:"image,omitempty" mapstructure:"image"`
-	Instance          string            `json:"instance,omitempty" yaml:"instance,omitempty" mapstructure:"instance"`
-	Owner             string            `json:"owner,omitempty" yaml:"owner,omitempty" mapstructure:"owner"`
-	Tier              int               `json:"tier,omitempty" yaml:"tier,omitempty" mapstructure:"tier"`
-	Parameters        ParameterMap      `json:"parameters" yaml:"parameters" mapstructure:"parameters"`
-	Secrets           []secretMapping   `json:"secrets" yaml:"secrets" mapstructure:"secrets"`
-	Extends           []string          `json:"extends,omitempty" yaml:"extends,omitempty" mapstructure:"extends"`
-	Columns           []Column          `json:"columns,omitempty" yaml:"columns,omitempty" mapstructure:"columns"`
-	CustomChecks      []CustomCheck     `json:"custom_checks,omitempty" yaml:"custom_checks,omitempty" mapstructure:"custom_checks"`
-	Hooks             Hooks             `json:"hooks" yaml:"hooks" mapstructure:"hooks"`
-	Metadata          EmptyStringMap    `json:"metadata,omitempty" yaml:"metadata,omitempty" mapstructure:"metadata"`
-	Snowflake         SnowflakeConfig   `json:"snowflake,omitempty" yaml:"snowflake,omitempty" mapstructure:"snowflake"`
-	Athena            AthenaConfig      `json:"athena,omitempty" yaml:"athena,omitempty" mapstructure:"athena"`
-	Routing           *RoutingConfig    `json:"routing,omitempty" yaml:"routing,omitempty" mapstructure:"routing"`
-	IntervalModifiers IntervalModifiers `json:"interval_modifiers" yaml:"interval_modifiers" mapstructure:"interval_modifiers"`
-	RerunCooldown     *int              `json:"rerun_cooldown,omitempty" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
-	Retries           *int              `json:"retries,omitempty" yaml:"retries,omitempty" mapstructure:"retries"`
-	RefreshRestricted *bool             `json:"refresh_restricted,omitempty" yaml:"refresh_restricted,omitempty" mapstructure:"refresh_restricted"`
-	Notifications     *Notifications    `json:"notifications,omitempty" yaml:"notifications,omitempty" mapstructure:"notifications"`
+	Type              string                 `json:"type" yaml:"type" mapstructure:"type"`
+	Description       string                 `json:"description,omitempty" yaml:"description,omitempty" mapstructure:"description"`
+	StartDate         string                 `json:"start_date,omitempty" yaml:"start_date,omitempty" mapstructure:"start_date"`
+	Connection        string                 `json:"connection,omitempty" yaml:"connection,omitempty" mapstructure:"connection"`
+	Tags              EmptyStringArray       `json:"tags,omitempty" yaml:"tags,omitempty" mapstructure:"tags"`
+	Domains           EmptyStringArray       `json:"domains,omitempty" yaml:"domains,omitempty" mapstructure:"domains"`
+	Meta              EmptyStringMap         `json:"meta,omitempty" yaml:"meta,omitempty" mapstructure:"meta"`
+	Materialization   Materialization        `json:"materialization,omitempty" yaml:"materialization,omitempty" mapstructure:"materialization"`
+	Upstreams         []Upstream             `json:"upstreams,omitempty" yaml:"depends,omitempty" mapstructure:"depends"`
+	Image             string                 `json:"image,omitempty" yaml:"image,omitempty" mapstructure:"image"`
+	Instance          string                 `json:"instance,omitempty" yaml:"instance,omitempty" mapstructure:"instance"`
+	Owner             string                 `json:"owner,omitempty" yaml:"owner,omitempty" mapstructure:"owner"`
+	Tier              int                    `json:"tier,omitempty" yaml:"tier,omitempty" mapstructure:"tier"`
+	Parameters        map[string]interface{} `json:"parameters" yaml:"parameters" mapstructure:"parameters"`
+	Secrets           []secretMapping        `json:"secrets" yaml:"secrets" mapstructure:"secrets"`
+	Extends           []string               `json:"extends,omitempty" yaml:"extends,omitempty" mapstructure:"extends"`
+	Columns           []Column               `json:"columns,omitempty" yaml:"columns,omitempty" mapstructure:"columns"`
+	CustomChecks      []CustomCheck          `json:"custom_checks,omitempty" yaml:"custom_checks,omitempty" mapstructure:"custom_checks"`
+	Hooks             Hooks                  `json:"hooks" yaml:"hooks" mapstructure:"hooks"`
+	Metadata          EmptyStringMap         `json:"metadata,omitempty" yaml:"metadata,omitempty" mapstructure:"metadata"`
+	Snowflake         SnowflakeConfig        `json:"snowflake,omitempty" yaml:"snowflake,omitempty" mapstructure:"snowflake"`
+	Athena            AthenaConfig           `json:"athena,omitempty" yaml:"athena,omitempty" mapstructure:"athena"`
+	Routing           *RoutingConfig         `json:"routing,omitempty" yaml:"routing,omitempty" mapstructure:"routing"`
+	IntervalModifiers IntervalModifiers      `json:"interval_modifiers" yaml:"interval_modifiers" mapstructure:"interval_modifiers"`
+	RerunCooldown     *int                   `json:"rerun_cooldown,omitempty" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
+	Retries           *int                   `json:"retries,omitempty" yaml:"retries,omitempty" mapstructure:"retries"`
+	RefreshRestricted *bool                  `json:"refresh_restricted,omitempty" yaml:"refresh_restricted,omitempty" mapstructure:"refresh_restricted"`
+	Notifications     *Notifications         `json:"notifications,omitempty" yaml:"notifications,omitempty" mapstructure:"notifications"`
 }
 
 func (d *DefaultValues) UnmarshalYAML(value *yaml.Node) error {
