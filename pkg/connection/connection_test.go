@@ -19,6 +19,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/notion"
 	"github.com/bruin-data/bruin/pkg/personio"
 	"github.com/bruin-data/bruin/pkg/postgres"
+	"github.com/bruin-data/bruin/pkg/sharepoint"
 	"github.com/bruin-data/bruin/pkg/shopify"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/stretchr/testify/assert"
@@ -383,6 +384,40 @@ func Test_AddEMRServerlessConnectionFromConfig(t *testing.T) {
 	res, ok := m.GetConnection("test").(*emr_serverless.Client)
 	assert.True(t, ok)
 	assert.NotNil(t, res)
+}
+
+func Test_AddSharePointConnectionFromConfig(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
+
+	maxFiles := int64(0)
+	configuration := &config.SharePointConnection{
+		Name:         "test",
+		TenantID:     "tenant-id",
+		ClientID:     "client-id",
+		ClientSecret: "client-secret",
+		Hostname:     "example.sharepoint.com",
+		Site:         "sites/Example",
+		Library:      "Documents",
+		MaxFiles:     &maxFiles,
+	}
+
+	err := m.AddSharePointConnectionFromConfig(configuration)
+	require.NoError(t, err)
+
+	res, ok := m.GetConnection("test").(*sharepoint.Client)
+	require.True(t, ok)
+	require.NotNil(t, res)
+
+	uri, err := res.GetIngestrURI()
+	require.NoError(t, err)
+	assert.Contains(t, uri, "sharepoint://?")
+	assert.Contains(t, uri, "max_files=0")
+	assert.Equal(t, configuration, m.GetConnectionDetails("test"))
 }
 
 func TestNewManagerFromConfig(t *testing.T) {

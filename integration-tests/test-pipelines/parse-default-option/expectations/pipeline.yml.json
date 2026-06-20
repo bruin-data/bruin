@@ -293,6 +293,7 @@
   "max_active_steps": null,
   "default": {
     "type": "ingestr",
+    "materialization": null,
     "parameters": {
       "destination": "duckdb",
       "source_connection": "chess-run-default-option"
@@ -315,6 +316,8 @@
         }
       ]
     },
+    "snowflake": null,
+    "athena": null,
     "interval_modifiers": null
   },
   "commit": "",

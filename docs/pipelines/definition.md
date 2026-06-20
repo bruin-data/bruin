@@ -406,7 +406,12 @@ max_active_steps: 8
 ### Default (pipeline-level defaults)
 
 Set sensible defaults for all assets in the pipeline so you don't repeat yourself. Override at the asset level only when
-a task needs something different.
+a task needs something different. The `default` block accepts asset definition fields except file-derived/runtime-only
+fields such as `id`, `run`/executable file details, definition file details, and derived `retries_delay`.
+
+Scalar defaults fill only empty asset fields. Maps such as `parameters`, `meta`, and `metadata` are merged without
+overwriting asset keys. Repeated fields such as `tags`, `domains`, `depends`, `extends`, `columns`, `custom_checks`,
+and `notifications` are added when they are not already present.
 
 Example:
 
@@ -430,11 +435,36 @@ Fields:
 | Field              | Type                       | Default | Notes                            |
 |--------------------|----------------------------|---------|----------------------------------|
 | type               | String                     | —       | Default asset type (e.g., "sql") |
+| description        | String                     | —       | Default asset description        |
+| start_date         | String                     | —       | Default asset start date         |
+| connection         | String                     | —       | Default connection name          |
+| image              | String                     | —       | Default container image          |
+| instance           | String                     | —       | Default Bruin Cloud instance type |
+| owner              | String                     | —       | Default owner                    |
+| tier               | Integer                    | —       | Default asset tier               |
+| tags               | Array of strings           | []      | Tags added to every asset        |
+| domains            | Array of strings           | []      | Domains added to every asset     |
+| meta               | Object (map[string]string) | {}      | Custom metadata defaults         |
+| metadata           | Object (map[string]string) | {}      | Additional metadata defaults     |
 | parameters         | Object (map[string]string) | {}      | Arbitrary key/value defaults     |
 | secrets            | Array of objects           | []      | See below                        |
+| depends            | Array/string/object        | []      | Default upstream dependencies    |
+| extends            | Array of strings           | []      | Default extensions               |
+| columns            | Array of objects           | []      | Default column metadata/checks   |
+| custom_checks      | Array of objects           | []      | Default custom checks            |
+| materialization    | Object                     | —       | Default materialization config   |
+| snowflake          | Object                     | —       | Snowflake-specific defaults      |
+| athena             | Object                     | —       | Athena-specific defaults         |
 | routing            | Object                     | —       | Runtime routing defaults for assets |
 | interval_modifiers | Object                     | —       | See [Interval Modifiers](/assets/interval-modifiers) |
 | hooks              | Object                     | —       | See [Hooks](/assets/definition-schema#hooks) |
+| retries            | Integer                    | —       | Default asset retries            |
+| rerun_cooldown     | Integer                    | —       | Default retry delay/cooldown     |
+| refresh_restricted | Boolean                    | —       | Default full-refresh restriction |
+| notifications      | Object                     | —       | Default asset notifications      |
+
+Asset identity/runtime fields such as `name`, `uri`, executable file metadata, definition file metadata, and `retries_delay`
+are not supported in pipeline defaults.
 
 Secrets item:
 

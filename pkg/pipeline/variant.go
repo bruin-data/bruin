@@ -265,19 +265,88 @@ func renderDefaultValues(render RenderFunc, dv *DefaultValues) error {
 	if dv.Type, err = maybeRender(render, "default.type", dv.Type); err != nil {
 		return err
 	}
-	for i := range dv.Secrets {
-		s := &dv.Secrets[i]
-		if s.SecretKey, err = maybeRender(render, fmt.Sprintf("default.secrets[%d].key", i), s.SecretKey); err != nil {
-			return err
-		}
-		if s.InjectedKey, err = maybeRender(render, fmt.Sprintf("default.secrets[%d].inject_as", i), s.InjectedKey); err != nil {
-			return err
-		}
-	}
-	if err := renderRoutingConfig(render, "default.routing", dv.Routing); err != nil {
+
+	asset := assetFromDefaultValues(dv)
+	if err := renderAssetStrings(render, asset); err != nil {
 		return err
 	}
+	copyAssetToDefaultValues(dv, asset)
+
 	return nil
+}
+
+func assetFromDefaultValues(dv *DefaultValues) *Asset {
+	secrets := make([]SecretMapping, 0, len(dv.Secrets))
+	for _, secret := range dv.Secrets {
+		secrets = append(secrets, SecretMapping(secret))
+	}
+
+	return &Asset{
+		Type:              AssetType(dv.Type),
+		Description:       dv.Description,
+		StartDate:         dv.StartDate,
+		Connection:        dv.Connection,
+		Tags:              dv.Tags,
+		Domains:           dv.Domains,
+		Meta:              dv.Meta,
+		Materialization:   dv.Materialization,
+		Upstreams:         dv.Upstreams,
+		Image:             dv.Image,
+		Instance:          dv.Instance,
+		Owner:             dv.Owner,
+		Tier:              dv.Tier,
+		Parameters:        EmptyStringMap(dv.Parameters),
+		Secrets:           secrets,
+		Extends:           dv.Extends,
+		Columns:           dv.Columns,
+		CustomChecks:      dv.CustomChecks,
+		Hooks:             dv.Hooks,
+		Metadata:          dv.Metadata,
+		Snowflake:         dv.Snowflake,
+		Athena:            dv.Athena,
+		Routing:           dv.Routing,
+		IntervalModifiers: dv.IntervalModifiers,
+		RerunCooldown:     dv.RerunCooldown,
+		Retries:           dv.Retries,
+		RefreshRestricted: dv.RefreshRestricted,
+		Notifications:     dv.Notifications,
+	}
+}
+
+func copyAssetToDefaultValues(dv *DefaultValues, asset *Asset) {
+	secrets := make([]secretMapping, 0, len(asset.Secrets))
+	for _, secret := range asset.Secrets {
+		secrets = append(secrets, secretMapping(secret))
+	}
+
+	dv.Type = string(asset.Type)
+	dv.Description = asset.Description
+	dv.StartDate = asset.StartDate
+	dv.Connection = asset.Connection
+	dv.Tags = asset.Tags
+	dv.Domains = asset.Domains
+	dv.Meta = asset.Meta
+	dv.Materialization = asset.Materialization
+	dv.Upstreams = asset.Upstreams
+	dv.Image = asset.Image
+	dv.Instance = asset.Instance
+	dv.Owner = asset.Owner
+	dv.Tier = asset.Tier
+	dv.Parameters = map[string]string(asset.Parameters)
+	dv.Secrets = secrets
+	dv.Extends = asset.Extends
+	dv.Columns = asset.Columns
+	dv.CustomChecks = asset.CustomChecks
+	dv.Hooks = asset.Hooks
+	dv.Metadata = asset.Metadata
+	dv.Snowflake = asset.Snowflake
+	dv.Athena = asset.Athena
+	dv.Routing = asset.Routing
+	dv.IntervalModifiers = asset.IntervalModifiers
+	dv.RerunCooldown = asset.RerunCooldown
+	dv.Retries = asset.Retries
+	dv.RefreshRestricted = asset.RefreshRestricted
+	dv.Notifications = asset.Notifications
 }
 
 func renderAssetStrings(render RenderFunc, a *Asset) error {

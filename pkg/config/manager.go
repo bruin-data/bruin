@@ -91,6 +91,7 @@ type Connections struct {
 	RevenueCat          []RevenueCatConnection          `yaml:"revenuecat,omitempty" json:"revenuecat,omitempty" mapstructure:"revenuecat"`
 	Linear              []LinearConnection              `yaml:"linear,omitempty" json:"linear,omitempty" mapstructure:"linear"`
 	GCS                 []GCSConnection                 `yaml:"gcs,omitempty" json:"gcs,omitempty" mapstructure:"gcs"`
+	SharePoint          []SharePointConnection          `yaml:"sharepoint,omitempty" json:"sharepoint,omitempty" mapstructure:"sharepoint"`
 	ApplovinMax         []ApplovinMaxConnection         `yaml:"applovinmax,omitempty" json:"applovinmax,omitempty" mapstructure:"applovinmax"`
 	Personio            []PersonioConnection            `yaml:"personio,omitempty" json:"personio,omitempty" mapstructure:"personio"`
 	Kinesis             []KinesisConnection             `yaml:"kinesis,omitempty" json:"kinesis,omitempty" mapstructure:"kinesis"`
@@ -142,6 +143,9 @@ type Connections struct {
 	CustomerIo          []CustomerIoConnection          `yaml:"customerio,omitempty" json:"customerio,omitempty" mapstructure:"customerio"`
 	Sendgrid            []SendgridConnection            `yaml:"sendgrid,omitempty" json:"sendgrid,omitempty" mapstructure:"sendgrid"`
 	Espn                []EspnConnection                `yaml:"espn,omitempty" json:"espn,omitempty" mapstructure:"espn"`
+	APIFootball         []APIFootballConnection         `yaml:"apifootball,omitempty" json:"apifootball,omitempty" mapstructure:"apifootball"`
+	FootballData        []FootballDataConnection        `yaml:"footballdata,omitempty" json:"footballdata,omitempty" mapstructure:"footballdata"`
+	BallDontLie         []BallDontLieConnection         `yaml:"balldontlie,omitempty" json:"balldontlie,omitempty" mapstructure:"balldontlie"`
 	Vertica             []VerticaConnection             `yaml:"vertica,omitempty" json:"vertica,omitempty" mapstructure:"vertica"`
 	SurveyMonkey        []SurveyMonkeyConnection        `yaml:"surveymonkey,omitempty" json:"surveymonkey,omitempty" mapstructure:"surveymonkey"`
 	Dune                []DuneConnection                `yaml:"dune,omitempty" json:"dune,omitempty" mapstructure:"dune"`
@@ -955,6 +959,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.GCS = append(env.Connections.GCS, conn)
+	case "sharepoint":
+		var conn SharePointConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.SharePoint = append(env.Connections.SharePoint, conn)
 	case "clickhouse":
 		var conn ClickHouseConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1321,6 +1332,27 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Espn = append(env.Connections.Espn, conn)
+	case "apifootball":
+		var conn APIFootballConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.APIFootball = append(env.Connections.APIFootball, conn)
+	case "footballdata":
+		var conn FootballDataConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.FootballData = append(env.Connections.FootballData, conn)
+	case "balldontlie":
+		var conn BallDontLieConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.BallDontLie = append(env.Connections.BallDontLie, conn)
 	case "vertica":
 		var conn VerticaConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1497,6 +1529,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Linear = removeConnection(env.Connections.Linear, connectionName)
 	case "gcs":
 		env.Connections.GCS = removeConnection(env.Connections.GCS, connectionName)
+	case "sharepoint":
+		env.Connections.SharePoint = removeConnection(env.Connections.SharePoint, connectionName)
 	case "clickhouse":
 		env.Connections.ClickHouse = removeConnection(env.Connections.ClickHouse, connectionName)
 	case "applovinmax":
@@ -1601,6 +1635,12 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Sendgrid = removeConnection(env.Connections.Sendgrid, connectionName)
 	case "espn":
 		env.Connections.Espn = removeConnection(env.Connections.Espn, connectionName)
+	case "apifootball":
+		env.Connections.APIFootball = removeConnection(env.Connections.APIFootball, connectionName)
+	case "footballdata":
+		env.Connections.FootballData = removeConnection(env.Connections.FootballData, connectionName)
+	case "balldontlie":
+		env.Connections.BallDontLie = removeConnection(env.Connections.BallDontLie, connectionName)
 	case "vertica":
 		env.Connections.Vertica = removeConnection(env.Connections.Vertica, connectionName)
 	case "surveymonkey":
@@ -1730,6 +1770,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.RevenueCat, source.RevenueCat)
 	mergeConnectionList(&c.Linear, source.Linear)
 	mergeConnectionList(&c.GCS, source.GCS)
+	mergeConnectionList(&c.SharePoint, source.SharePoint)
 	mergeConnectionList(&c.ApplovinMax, source.ApplovinMax)
 	mergeConnectionList(&c.Personio, source.Personio)
 	mergeConnectionList(&c.Kinesis, source.Kinesis)
@@ -1781,6 +1822,9 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.CustomerIo, source.CustomerIo)
 	mergeConnectionList(&c.Sendgrid, source.Sendgrid)
 	mergeConnectionList(&c.Espn, source.Espn)
+	mergeConnectionList(&c.APIFootball, source.APIFootball)
+	mergeConnectionList(&c.FootballData, source.FootballData)
+	mergeConnectionList(&c.BallDontLie, source.BallDontLie)
 	mergeConnectionList(&c.Vertica, source.Vertica)
 	mergeConnectionList(&c.SurveyMonkey, source.SurveyMonkey)
 	mergeConnectionList(&c.Dune, source.Dune)

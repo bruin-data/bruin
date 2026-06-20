@@ -9,6 +9,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 // fakeRender is a minimal stand-in for jinja: replaces {{ var.<name> }} with
@@ -319,6 +320,35 @@ func TestPipeline_MaterializeVariant(t *testing.T) {
 		assert.Equal(t, "select '{{ end_date }}'", pl.DefaultValues.Hooks.Post[0].Query)
 	})
 
+	t.Run("renders default secrets", func(t *testing.T) {
+		t.Parallel()
+		var pl pipeline.Pipeline
+		require.NoError(t, yaml.Unmarshal([]byte(`
+name: p
+default:
+  secrets:
+    - key: "{{ var.secret_name }}"
+      inject_as: "{{ var.inject_as }}"
+variables:
+  secret_name:
+    type: string
+    default: raw_secret
+  inject_as:
+    type: string
+    default: RAW_SECRET
+variants:
+  only:
+    secret_name: rendered_secret
+    inject_as: RENDERED_SECRET
+`), &pl))
+
+		require.NoError(t, pl.MaterializeVariant("only", makeFakeRenderer))
+
+		require.Len(t, pl.DefaultValues.Secrets, 1)
+		assert.Equal(t, "rendered_secret", pl.DefaultValues.Secrets[0].SecretKey)
+		assert.Equal(t, "RENDERED_SECRET", pl.DefaultValues.Secrets[0].InjectedKey)
+	})
+
 	t.Run("merges variant overrides into Variables", func(t *testing.T) {
 		t.Parallel()
 		pl := build()
@@ -421,23 +451,36 @@ func TestVariantVisitorCoversStringFields(t *testing.T) {
 		"Pipeline.Assets[].Hooks.Post[].Query":     true,
 
 		// Enum-typed strings on Asset.
-		"Pipeline.Assets[].Materialization.Type":            true,
-		"Pipeline.Assets[].Materialization.Strategy":        true,
-		"Pipeline.Assets[].Materialization.TimeGranularity": true,
-		"Pipeline.Assets[].Upstreams[].Type":                true,
-		"Pipeline.Assets[].Upstreams[].Mode":                true,
+		"Pipeline.Assets[].Materialization.Type":                 true,
+		"Pipeline.Assets[].Materialization.Strategy":             true,
+		"Pipeline.Assets[].Materialization.TimeGranularity":      true,
+		"Pipeline.Assets[].Upstreams[].Type":                     true,
+		"Pipeline.Assets[].Upstreams[].Mode":                     true,
+		"Pipeline.DefaultValues.Materialization.Type":            true,
+		"Pipeline.DefaultValues.Materialization.Strategy":        true,
+		"Pipeline.DefaultValues.Materialization.TimeGranularity": true,
+		"Pipeline.DefaultValues.Upstreams[].Type":                true,
+		"Pipeline.DefaultValues.Upstreams[].Mode":                true,
 
 		// Column structural fields (parse-time linkage, lineage tracking).
-		"Pipeline.Assets[].Columns[].EntityAttribute.Entity":    true,
-		"Pipeline.Assets[].Columns[].EntityAttribute.Attribute": true,
-		"Pipeline.Assets[].Columns[].Extends":                   true,
-		"Pipeline.Assets[].Columns[].Upstreams[].Column":        true,
-		"Pipeline.Assets[].Columns[].Upstreams[].Table":         true,
-		"Pipeline.Assets[].Columns[].Checks[].ID":               true,
-		"Pipeline.Assets[].CustomChecks[].ID":                   true,
-		"Pipeline.Assets[].CustomChecks[].Query":                true,
-		"Pipeline.DefaultValues.Hooks.Pre[].Query":              true,
-		"Pipeline.DefaultValues.Hooks.Post[].Query":             true,
+		"Pipeline.Assets[].Columns[].EntityAttribute.Entity":         true,
+		"Pipeline.Assets[].Columns[].EntityAttribute.Attribute":      true,
+		"Pipeline.Assets[].Columns[].Extends":                        true,
+		"Pipeline.Assets[].Columns[].Upstreams[].Column":             true,
+		"Pipeline.Assets[].Columns[].Upstreams[].Table":              true,
+		"Pipeline.Assets[].Columns[].Checks[].ID":                    true,
+		"Pipeline.Assets[].CustomChecks[].ID":                        true,
+		"Pipeline.Assets[].CustomChecks[].Query":                     true,
+		"Pipeline.DefaultValues.Columns[].EntityAttribute.Entity":    true,
+		"Pipeline.DefaultValues.Columns[].EntityAttribute.Attribute": true,
+		"Pipeline.DefaultValues.Columns[].Extends":                   true,
+		"Pipeline.DefaultValues.Columns[].Upstreams[].Column":        true,
+		"Pipeline.DefaultValues.Columns[].Upstreams[].Table":         true,
+		"Pipeline.DefaultValues.Columns[].Checks[].ID":               true,
+		"Pipeline.DefaultValues.CustomChecks[].ID":                   true,
+		"Pipeline.DefaultValues.CustomChecks[].Query":                true,
+		"Pipeline.DefaultValues.Hooks.Pre[].Query":                   true,
+		"Pipeline.DefaultValues.Hooks.Post[].Query":                  true,
 
 		// Parameter values frequently embed runtime variables (e.g. {{ start_date }})
 		// and are resolved at execution time by the per-asset renderer.
@@ -451,10 +494,14 @@ func TestVariantVisitorCoversStringFields(t *testing.T) {
 		"Pipeline.DefaultValues.IntervalModifiers.End.Template":   true,
 
 		// Asset-level notifications mirror pipeline notifications.
-		"Pipeline.Assets[].Notifications.Slack[].Channel":      true,
-		"Pipeline.Assets[].Notifications.MSTeams[].Connection": true,
-		"Pipeline.Assets[].Notifications.Discord[].Connection": true,
-		"Pipeline.Assets[].Notifications.Webhook[].Connection": true,
+		"Pipeline.Assets[].Notifications.Slack[].Channel":           true,
+		"Pipeline.Assets[].Notifications.MSTeams[].Connection":      true,
+		"Pipeline.Assets[].Notifications.Discord[].Connection":      true,
+		"Pipeline.Assets[].Notifications.Webhook[].Connection":      true,
+		"Pipeline.DefaultValues.Notifications.Slack[].Channel":      true,
+		"Pipeline.DefaultValues.Notifications.MSTeams[].Connection": true,
+		"Pipeline.DefaultValues.Notifications.Discord[].Connection": true,
+		"Pipeline.DefaultValues.Notifications.Webhook[].Connection": true,
 	}
 
 	pl := buildFullyPopulatedPipelineForVisitorTest()
@@ -522,12 +569,50 @@ func buildFullyPopulatedPipelineForVisitorTest() *pipeline.Pipeline {
 		Meta:               map[string]string{"k": "v"},
 		DefaultConnections: map[string]string{"k": "v"},
 		DefaultValues: &pipeline.DefaultValues{
+			Type:        "type",
+			Description: "desc",
+			StartDate:   "start",
+			Connection:  "conn",
+			Tags:        []string{"a"},
+			Domains:     []string{"a"},
+			Meta:        map[string]string{"k": "v"},
+			Materialization: pipeline.Materialization{
+				ClusterBy:      []string{"a"},
+				PartitionBy:    "p",
+				IncrementalKey: "i",
+			},
+			Upstreams: []pipeline.Upstream{
+				{Type: "asset", Value: "x", Metadata: map[string]string{"k": "v"}, Columns: []pipeline.DependsColumn{{Name: "n", Usage: "u"}}},
+			},
+			Image:      "image",
+			Instance:   "instance",
+			Owner:      "owner",
 			Parameters: map[string]string{"k": "v"},
+			Extends:    []string{"x"},
+			Columns: []pipeline.Column{
+				{
+					Name:    "c",
+					Tags:    []string{"a"},
+					Domains: []string{"a"},
+					Meta:    map[string]string{"k": "v"},
+					Checks:  []pipeline.ColumnCheck{{Name: "ck"}},
+				},
+			},
+			CustomChecks: []pipeline.CustomCheck{{Name: "cc", Query: "q"}},
 			Hooks: pipeline.Hooks{
 				Pre:  []pipeline.Hook{{Query: "q"}},
 				Post: []pipeline.Hook{{Query: "q"}},
 			},
-			Routing: &pipeline.RoutingConfig{EgressGateway: "gw"},
+			Metadata:  map[string]string{"k": "v"},
+			Snowflake: pipeline.SnowflakeConfig{Warehouse: "wh"},
+			Athena:    pipeline.AthenaConfig{Location: "loc"},
+			Routing:   &pipeline.RoutingConfig{EgressGateway: "gw"},
+			Notifications: &pipeline.Notifications{
+				Slack:   []pipeline.SlackNotification{{Channel: "c"}},
+				MSTeams: []pipeline.MSTeamsNotification{{Connection: "c"}},
+				Discord: []pipeline.DiscordNotification{{Connection: "c"}},
+				Webhook: []pipeline.WebhookNotification{{Connection: "c"}},
+			},
 		},
 		Variables: pipeline.Variables{
 			"sentinel": map[string]any{"type": "string", "default": "RENDERED"},
