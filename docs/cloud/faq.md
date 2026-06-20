@@ -10,12 +10,12 @@ Short answers to common Bruin Cloud questions, including patterns that look plau
 
 ### Can I skip a single asset from scheduled runs?
 
-Short answer: no. When an enabled pipeline runs on its schedule, every asset in that pipeline is included. There is no per-asset "exclude from schedule" setting and no tag that the cloud scheduler interprets as "skip this one."
+Yes. Set [`enabled: false`](/assets/definition-schema#enabled) in the asset definition. Bruin marks that asset as skipped instead of executing it, and downstream assets can continue running. You can also template this value, for example `enabled: "{{ var.asset_enabled }}"`, as long as it renders to `true` or `false`.
 
-The supported patterns are:
+Other supported patterns are:
 
-- **Long-term:** move the asset to its own pipeline. Give it a different schedule, or leave it disabled and trigger it manually with **New run**. This is the cleanest solution for assets that should refresh on demand. See [Pipelines](/cloud/pipelines#enable-a-pipeline).
 - **One-off:** mark the asset as successful before the run starts. Open the pipeline page, find the asset for the next interval, and mark it successful. Downstream assets treat it as completed.
+- **Different cadence:** move the asset to its own pipeline. Give it a different schedule, or leave that pipeline disabled and trigger it manually with **New run**. See [Pipelines](/cloud/pipelines#enable-a-pipeline).
 
 ### Can I run different assets on different schedules within one pipeline?
 

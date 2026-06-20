@@ -242,6 +242,113 @@ type DefaultTrueBool struct { //nolint:recvcheck
 	Value *bool
 }
 
+type TemplatedBool struct { //nolint:recvcheck
+	Value    *bool
+	Template string
+}
+
+func NewTemplatedBool(value bool) *TemplatedBool {
+	return &TemplatedBool{Value: &value}
+}
+
+func ParseTemplatedBool(raw string) (*TemplatedBool, error) {
+	trimmed := strings.TrimSpace(raw)
+	if parsed, err := strconv.ParseBool(trimmed); err == nil {
+		return NewTemplatedBool(parsed), nil
+	}
+	if strings.Contains(trimmed, "{{") || strings.Contains(trimmed, "{%") {
+		return &TemplatedBool{Template: trimmed}, nil
+	}
+	return nil, fmt.Errorf("expected boolean or Jinja template, got %q", raw)
+}
+
+func (b *TemplatedBool) UnmarshalJSON(data []byte) error {
+	if data == nil || string(data) == "null" {
+		return nil
+	}
+
+	var value bool
+	if err := json.Unmarshal(data, &value); err == nil {
+		b.Value = &value
+		b.Template = ""
+		return nil
+	}
+
+	var raw string
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	parsed, err := ParseTemplatedBool(raw)
+	if err != nil {
+		return err
+	}
+	*b = *parsed
+	return nil
+}
+
+func (b TemplatedBool) MarshalJSON() ([]byte, error) {
+	if b.Template != "" {
+		return json.Marshal(b.Template)
+	}
+	if b.Value == nil {
+		return []byte("true"), nil
+	}
+	return json.Marshal(*b.Value)
+}
+
+func (b *TemplatedBool) UnmarshalYAML(value *yaml.Node) error {
+	if value == nil || value.Kind == yaml.DocumentNode {
+		return nil
+	}
+
+	if value.Kind != yaml.ScalarNode {
+		return errors.New("expected scalar boolean or Jinja template")
+	}
+
+	if value.Tag == "!!bool" {
+		var parsed bool
+		if err := value.Decode(&parsed); err != nil {
+			return err
+		}
+		b.Value = &parsed
+		b.Template = ""
+		return nil
+	}
+
+	var raw string
+	if err := value.Decode(&raw); err != nil {
+		return err
+	}
+
+	parsed, err := ParseTemplatedBool(raw)
+	if err != nil {
+		return err
+	}
+	*b = *parsed
+	return nil
+}
+
+func (b *TemplatedBool) Bool() (bool, error) {
+	if b == nil || b.Value == nil && b.Template == "" {
+		return true, nil
+	}
+	if b.Template != "" {
+		return true, fmt.Errorf("enabled contains unresolved template %q", b.Template)
+	}
+	return *b.Value, nil
+}
+
+func (b TemplatedBool) MarshalYAML() (interface{}, error) {
+	if b.Template != "" {
+		return b.Template, nil
+	}
+	if b.Value == nil {
+		return nil, nil
+	}
+	return *b.Value, nil
+}
+
 func (b *DefaultTrueBool) UnmarshalJSON(data []byte) error {
 	if data == nil {
 		return nil
@@ -883,6 +990,7 @@ type Asset struct { //nolint:recvcheck
 	URI               string             `json:"uri" yaml:"uri,omitempty" mapstructure:"uri"`
 	Name              string             `json:"name" yaml:"name,omitempty" mapstructure:"name"`
 	Type              AssetType          `json:"type" yaml:"type,omitempty" mapstructure:"type"`
+	Enabled           *TemplatedBool     `json:"enabled,omitempty" yaml:"enabled,omitempty" mapstructure:"enabled"`
 	Description       string             `json:"description" yaml:"description,omitempty" mapstructure:"description"`
 	StartDate         string             `json:"start_date" yaml:"start_date,omitempty" mapstructure:"start_date"`
 	Connection        string             `json:"connection" yaml:"connection,omitempty" mapstructure:"connection"`
@@ -916,6 +1024,21 @@ type Asset struct { //nolint:recvcheck
 
 	upstream   []*Asset
 	downstream []*Asset
+}
+
+func (a *Asset) IsEnabled() bool {
+	enabled, err := a.EnabledValue()
+	if err != nil {
+		return true
+	}
+	return enabled
+}
+
+func (a *Asset) EnabledValue() (bool, error) {
+	if a == nil || a.Enabled == nil {
+		return true, nil
+	}
+	return a.Enabled.Bool()
 }
 
 type Hook struct {
@@ -1781,6 +1904,11 @@ func (p *Pipeline) GetCompatibilityHash() string {
 	for _, asset := range p.Assets {
 		var assetBuilder strings.Builder
 		fmt.Fprintf(&assetBuilder, ":%s{", asset.Name)
+		if enabled, err := asset.EnabledValue(); err == nil && !enabled {
+			assetBuilder.WriteString(":enabled:false")
+		} else if err != nil && asset.Enabled != nil && asset.Enabled.Template != "" {
+			fmt.Fprintf(&assetBuilder, ":enabled:%s", asset.Enabled.Template)
+		}
 		for _, upstream := range asset.Upstreams {
 			fmt.Fprintf(&assetBuilder, ":%s:%s:", upstream.Value, upstream.Type)
 		}

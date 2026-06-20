@@ -1,0 +1,12 @@
+name: enabled-template-pipeline
+default_connections:
+  duckdb: duckdb-enabled-template
+variables:
+  upstream_enabled:
+    type: boolean
+    default: true
+variants:
+  disabled:
+    upstream_enabled: false
+  enabled:
+    upstream_enabled: true

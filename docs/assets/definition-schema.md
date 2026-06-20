@@ -138,6 +138,24 @@ The type of the asset determines how execution will happen. Must be one of the t
 
 - **Type:** `String`
 
+## `enabled`
+
+Controls whether Bruin should execute the asset. Defaults to `true`.
+
+When set to `false`, Bruin marks the asset as skipped instead of executing it. This is not treated as a failure, and downstream assets can continue running.
+
+```yaml
+enabled: false
+```
+
+`enabled` can also be a Jinja template. The rendered value must be `true` or `false`.
+
+```yaml
+enabled: "{{ var.asset_enabled }}"
+```
+
+- **Type:** `Boolean` or templated boolean
+
 ## `connection`
 
 The connection name used to run this asset. If omitted, Bruin uses the pipeline-level `default_connections` value for the asset platform in most cases.

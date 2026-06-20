@@ -1447,6 +1447,29 @@ func TestPipeline_GetCompatibilityHash(t *testing.T) {
 			}(),
 		},
 		{
+			name: "disabled asset",
+			pipeline: &pipeline.Pipeline{
+				Name: "test-pipeline",
+				Assets: []*pipeline.Asset{
+					{
+						Name:    "asset1",
+						Enabled: pipeline.NewTemplatedBool(false),
+					},
+				},
+			},
+			expected: func() string {
+				parts := make([]string, 0, 5)
+				parts = append(parts, "test-pipeline")
+				parts = append(parts, ":asset1{")
+				parts = append(parts, ":enabled:false")
+				parts = append(parts, "}")
+				parts = append(parts, ":")
+				hash := sha256.New()
+				hash.Write([]byte(strings.Join(parts, "")))
+				return hex.EncodeToString(hash.Sum(nil))
+			}(),
+		},
+		{
 			name: "multiple assets with multiple upstreams",
 			pipeline: &pipeline.Pipeline{
 				Name: "complex-pipeline",
