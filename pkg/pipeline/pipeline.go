@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -1605,7 +1606,8 @@ func (m ParameterMap) GetString(key string) (string, bool) {
 	case float32:
 		return strconv.FormatFloat(float64(val), 'f', -1, 32), true
 	case float64:
-		if val == float64(int64(val)) {
+		const maxInt64Float = float64(1 << 63)
+		if val >= -maxInt64Float && val < maxInt64Float && val == math.Trunc(val) {
 			return strconv.FormatInt(int64(val), 10), true
 		}
 		return strconv.FormatFloat(val, 'f', -1, 64), true

@@ -108,7 +108,9 @@ parameters:
 	assert.Equal(t, "value", asset.Parameters["string"])
 	assert.Equal(t, 3, asset.Parameters["count"])
 	assert.Equal(t, true, asset.Parameters["enabled"])
-	assert.Equal(t, pipeline.ParameterMap{"key": "value"}, asset.Parameters["nested"])
+	nested, ok := asset.Parameters["nested"].(pipeline.ParameterMap)
+	require.True(t, ok)
+	assert.Equal(t, map[string]interface{}{"key": "value"}, map[string]interface{}(nested))
 	assert.Equal(t, []interface{}{"one", 2}, asset.Parameters["list"])
 }
 
