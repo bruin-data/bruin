@@ -1,0 +1,4 @@
+interface:
+  display_name: "Add Ingestr Source"
+  short_description: "Add Bruin support for new ingestr sources"
+  default_prompt: "Use $add-ingestr-source to add Bruin support for a new ingestr source."
