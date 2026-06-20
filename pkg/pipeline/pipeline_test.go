@@ -1446,6 +1446,37 @@ func TestDefaultTrueBool_MarshalYAML(t *testing.T) {
 	}
 }
 
+func TestTemplatedBool_ZeroValueMarshalConsistency(t *testing.T) {
+	t.Parallel()
+
+	var value pipeline.TemplatedBool
+
+	jsonValue, err := json.Marshal(value)
+	require.NoError(t, err)
+	assert.JSONEq(t, "true", string(jsonValue))
+
+	yamlValue, err := yaml.Marshal(value)
+	require.NoError(t, err)
+	assert.YAMLEq(t, "true\n", string(yamlValue))
+}
+
+func TestAsset_IsEnabledPanicsOnUnresolvedTemplate(t *testing.T) {
+	t.Parallel()
+
+	asset := &pipeline.Asset{
+		Name:    "templated",
+		Enabled: &pipeline.TemplatedBool{Template: "{{ var.asset_enabled }}"},
+	}
+
+	require.PanicsWithError(t, `enabled contains unresolved template "{{ var.asset_enabled }}"`, func() {
+		asset.IsEnabled()
+	})
+
+	enabled, err := asset.EnabledValue()
+	require.Error(t, err)
+	assert.True(t, enabled)
+}
+
 func TestPipeline_GetCompatibilityHash(t *testing.T) {
 	t.Parallel()
 

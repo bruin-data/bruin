@@ -344,7 +344,7 @@ func (b TemplatedBool) MarshalYAML() (interface{}, error) {
 		return b.Template, nil
 	}
 	if b.Value == nil {
-		return nil, nil
+		return true, nil
 	}
 	return *b.Value, nil
 }
@@ -1026,10 +1026,12 @@ type Asset struct { //nolint:recvcheck
 	downstream []*Asset
 }
 
+// IsEnabled returns the asset's resolved enabled value. It panics if enabled
+// still contains an unresolved template; use EnabledValue to handle that error.
 func (a *Asset) IsEnabled() bool {
 	enabled, err := a.EnabledValue()
 	if err != nil {
-		return true
+		panic(err)
 	}
 	return enabled
 }
