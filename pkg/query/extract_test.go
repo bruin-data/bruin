@@ -291,6 +291,33 @@ insert into audit_log values ('done');
 	mr.AssertExpectations(t)
 }
 
+func TestOracleScriptExtractor_IgnoresPLSQLKeywordsInQQuotedStringLiterals(t *testing.T) {
+	t.Parallel()
+
+	mr := new(mockNoOpRenderer)
+	mr.On("Render", mock.Anything).Return("default", nil)
+
+	f := OracleScriptExtractor{
+		Renderer: mr,
+	}
+
+	got, err := f.ExtractQueriesFromString(`
+BEGIN
+  v_msg := q'[BEGIN isn't END; still text]';
+END;
+/
+
+insert into audit_log values ('done');
+`)
+	require.NoError(t, err)
+
+	assert.Equal(t, []*Query{
+		{Query: "BEGIN\n  v_msg := q'[BEGIN isn't END; still text]';\nEND;"},
+		{Query: "insert into audit_log values ('done');"},
+	}, got)
+	mr.AssertExpectations(t)
+}
+
 func TestOracleScriptExtractor_HandlesTrailingLineCommentBeforePLSQLTerminator(t *testing.T) {
 	t.Parallel()
 

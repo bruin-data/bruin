@@ -227,6 +227,8 @@ func splitOracleStatements(fileContent string) []string {
 	var current strings.Builder
 	inSingleQuote := false
 	inDoubleQuote := false
+	inQQuote := false
+	var qQuoteEnd byte
 	inLineComment := false
 	inBlockComment := false
 
@@ -236,6 +238,7 @@ func splitOracleStatements(fileContent string) []string {
 		if i+1 < len(fileContent) {
 			next = fileContent[i+1]
 		}
+		qQuoteEndAtIndex := oracleQQuoteEndDelimiterAt(fileContent, i)
 
 		switch {
 		case inLineComment:
@@ -274,6 +277,14 @@ func splitOracleStatements(fileContent string) []string {
 				inDoubleQuote = false
 			}
 			continue
+		case inQQuote:
+			current.WriteByte(ch)
+			if ch == qQuoteEnd && next == '\'' {
+				current.WriteByte(next)
+				i++
+				inQQuote = false
+			}
+			continue
 		}
 
 		switch {
@@ -288,6 +299,14 @@ func splitOracleStatements(fileContent string) []string {
 			current.WriteByte(next)
 			i++
 			inBlockComment = true
+			continue
+		case qQuoteEndAtIndex != 0:
+			current.WriteByte(ch)
+			current.WriteByte(next)
+			current.WriteByte(fileContent[i+2])
+			qQuoteEnd = qQuoteEndAtIndex
+			i += 2
+			inQQuote = true
 			continue
 		case ch == '\'':
 			current.WriteByte(ch)
@@ -383,9 +402,30 @@ func oracleMaskOracleQuotedText(statement string) string {
 	masked.Grow(len(statement))
 
 	var quote byte
+	var qQuoteEnd byte
 	for i := 0; i < len(statement); i++ {
 		ch := statement[i]
-		if quote == 0 {
+		switch {
+		case qQuoteEnd != 0:
+			if ch == qQuoteEnd && i+1 < len(statement) && statement[i+1] == '\'' {
+				masked.WriteString("  ")
+				i++
+				qQuoteEnd = 0
+				continue
+			}
+			if ch == '\n' || ch == '\r' {
+				masked.WriteByte(ch)
+			} else {
+				masked.WriteByte(' ')
+			}
+			continue
+		case quote == 0:
+			if endDelimiter := oracleQQuoteEndDelimiterAt(statement, i); endDelimiter != 0 {
+				masked.WriteString("   ")
+				qQuoteEnd = endDelimiter
+				i += 2
+				continue
+			}
 			if ch == '\'' || ch == '"' {
 				quote = ch
 				masked.WriteByte(' ')
@@ -410,6 +450,33 @@ func oracleMaskOracleQuotedText(statement string) string {
 	}
 
 	return masked.String()
+}
+
+func oracleQQuoteEndDelimiterAt(statement string, index int) byte {
+	if index+2 >= len(statement) {
+		return 0
+	}
+	ch := statement[index]
+	if ch != 'q' && ch != 'Q' {
+		return 0
+	}
+	if statement[index+1] != '\'' {
+		return 0
+	}
+	switch opener := statement[index+2]; opener {
+	case '[':
+		return ']'
+	case '{':
+		return '}'
+	case '(':
+		return ')'
+	case '<':
+		return '>'
+	case '\'', ' ', '\t', '\n', '\r':
+		return 0
+	default:
+		return opener
+	}
 }
 
 func oraclePLSQLDDLBodyName(statement string) string {

@@ -80,21 +80,20 @@ type Step struct {
 }
 
 type Task struct {
-	StepNumber      int
-	TaskNumber      int
-	Order           int
-	ParentTask      int
-	Name1           string
-	Name2           string
-	Name3           string
-	Type            string
-	DefText         string
-	ColText         string
-	DefLschema      string
-	ColLschema      string
-	DefTechnology   string
-	ColTechnology   string
-	OriginalCommand string
+	StepNumber    int
+	TaskNumber    int
+	Order         int
+	ParentTask    int
+	Name1         string
+	Name2         string
+	Name3         string
+	Type          string
+	DefText       string
+	ColText       string
+	DefLschema    string
+	ColLschema    string
+	DefTechnology string
+	ColTechnology string
 }
 
 type Variable struct {
