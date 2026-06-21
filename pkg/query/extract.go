@@ -359,8 +359,8 @@ func oraclePLSQLBlockComplete(statement string) bool {
 
 func oraclePLSQLComparableText(statement string) string {
 	withoutComments := queryCommentRegex.ReplaceAllLiteralString(statement+"\n", "\n")
-	withoutStrings := oracleMaskSingleQuotedStrings(withoutComments)
-	return strings.ToUpper(strings.TrimSpace(withoutStrings))
+	withoutQuotedText := oracleMaskOracleQuotedText(withoutComments)
+	return strings.ToUpper(strings.TrimSpace(withoutQuotedText))
 }
 
 func oracleHasAnonymousPLSQLPrefix(statement, prefix string) bool {
@@ -378,16 +378,16 @@ func oracleHasAnonymousPLSQLPrefix(statement, prefix string) bool {
 	}
 }
 
-func oracleMaskSingleQuotedStrings(statement string) string {
+func oracleMaskOracleQuotedText(statement string) string {
 	var masked strings.Builder
 	masked.Grow(len(statement))
 
-	inString := false
+	var quote byte
 	for i := 0; i < len(statement); i++ {
 		ch := statement[i]
-		if !inString {
-			if ch == '\'' {
-				inString = true
+		if quote == 0 {
+			if ch == '\'' || ch == '"' {
+				quote = ch
 				masked.WriteByte(' ')
 				continue
 			}
@@ -396,11 +396,11 @@ func oracleMaskSingleQuotedStrings(statement string) string {
 		}
 
 		switch {
-		case ch == '\'' && i+1 < len(statement) && statement[i+1] == '\'':
+		case ch == quote && i+1 < len(statement) && statement[i+1] == quote:
 			masked.WriteString("  ")
 			i++
-		case ch == '\'':
-			inString = false
+		case ch == quote:
+			quote = 0
 			masked.WriteByte(' ')
 		case ch == '\n' || ch == '\r':
 			masked.WriteByte(ch)

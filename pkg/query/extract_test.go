@@ -261,6 +261,36 @@ insert into audit_log values ('done');
 	mr.AssertExpectations(t)
 }
 
+func TestOracleScriptExtractor_IgnoresPLSQLKeywordsInDoubleQuotedIdentifiers(t *testing.T) {
+	t.Parallel()
+
+	mr := new(mockNoOpRenderer)
+	mr.On("Render", mock.Anything).Return("default", nil)
+
+	f := OracleScriptExtractor{
+		Renderer: mr,
+	}
+
+	got, err := f.ExtractQueriesFromString(`
+create or replace procedure rebuild_users as
+  v_end date;
+begin
+  select max("END") into v_end from users;
+  null;
+end rebuild_users;
+/
+
+insert into audit_log values ('done');
+`)
+	require.NoError(t, err)
+
+	assert.Equal(t, []*Query{
+		{Query: "create or replace procedure rebuild_users as\n  v_end date;\nbegin\n  select max(\"END\") into v_end from users;\n  null;\nend rebuild_users;"},
+		{Query: "insert into audit_log values ('done');"},
+	}, got)
+	mr.AssertExpectations(t)
+}
+
 func TestOracleScriptExtractor_HandlesTrailingLineCommentBeforePLSQLTerminator(t *testing.T) {
 	t.Parallel()
 
