@@ -1934,8 +1934,12 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeSailQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 	}
 	if s.WillRunTaskOfType(pipeline.AssetTypeOracleQuery) || s.WillRunTaskOfType(pipeline.AssetTypeOracleSource) || estimateCustomCheckType == pipeline.AssetTypeOracleQuery {
+		oracleFileExtractor := &query.OracleScriptExtractor{
+			Fs:       fs,
+			Renderer: renderer,
+		}
 		oracleCheckRunner := oracle.NewColumnCheckOperator(conn)
-		oracleOperator := oracle.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
+		oracleOperator := oracle.NewBasicOperator(conn, oracleFileExtractor, pipeline.HookWrapperMaterializer{
 			Mat:     oracle.NewMaterializer(fullRefresh),
 			Hoister: hoister,
 		}, parser)

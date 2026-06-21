@@ -76,28 +76,9 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, asset 
 		return errors.New("oracle operator can only handle a single query when materialization is enabled")
 	}
 
-	q := queries[0]
-	materialized, err := o.materializer.Render(asset, q.String())
-	if err != nil {
-		return err
-	}
-
 	writer := ctx.Value(executor.KeyPrinter)
 	if err := o.materializer.LogIfFullRefreshAndDDL(writer, asset); err != nil {
 		return err
-	}
-
-	q.Query = materialized
-
-	if asset.Materialization.Strategy == pipeline.MaterializationStrategyTimeInterval {
-		renderedQueries, err := extractor.ExtractQueriesFromString(materialized)
-		if err != nil {
-			return fmt.Errorf("cannot re-extract rendered query for time_interval strategy: %w", err)
-		}
-		if len(renderedQueries) == 0 {
-			return errors.New("rendered queries unexpectedly empty")
-		}
-		q.Query = renderedQueries[0].Query
 	}
 
 	connName, err := p.GetConnectionNameForAsset(asset)
@@ -112,23 +93,46 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, asset 
 
 	// We don't have CreateSchemaIfNotExist required in the interface implemented natively yet on Oracle.
 
-	if o.devEnv == nil {
-		ansisql.LogQueryIfVerbose(ctx, writer, q.Query)
-		return conn.RunQueryWithoutResult(ctx, q)
+	var lastQuery *query.Query
+	for _, q := range queries {
+		materialized, err := o.materializer.Render(asset, q.String())
+		if err != nil {
+			return err
+		}
+
+		q.Query = materialized
+
+		if asset.Materialization.Strategy == pipeline.MaterializationStrategyTimeInterval {
+			renderedQueries, err := extractor.ExtractQueriesFromString(materialized)
+			if err != nil {
+				return fmt.Errorf("cannot re-extract rendered query for time_interval strategy: %w", err)
+			}
+			if len(renderedQueries) == 0 {
+				return errors.New("rendered queries unexpectedly empty")
+			}
+			q.Query = renderedQueries[0].Query
+		}
+
+		queryToRun := q
+		if o.devEnv != nil {
+			queryToRun, err = o.devEnv.Modify(ctx, p, asset, q)
+			if err != nil {
+				return err
+			}
+		}
+
+		ansisql.LogQueryIfVerbose(ctx, writer, queryToRun.Query)
+		if err := conn.RunQueryWithoutResult(ctx, queryToRun); err != nil {
+			return err
+		}
+		lastQuery = queryToRun
 	}
 
-	q, err = o.devEnv.Modify(ctx, p, asset, q)
-	if err != nil {
-		return err
+	if o.devEnv == nil || lastQuery == nil {
+		return nil
 	}
 
-	ansisql.LogQueryIfVerbose(ctx, writer, q.Query)
-
-	if err := conn.RunQueryWithoutResult(ctx, q); err != nil {
-		return err
-	}
-
-	if err := o.devEnv.RegisterAssetForSchemaCache(ctx, p, asset, q); err != nil {
+	if err := o.devEnv.RegisterAssetForSchemaCache(ctx, p, asset, lastQuery); err != nil {
 		return fmt.Errorf("cannot register asset for schema cache: %w", err)
 	}
 

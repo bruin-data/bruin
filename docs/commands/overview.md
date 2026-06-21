@@ -54,7 +54,7 @@ bruin validate --help
 
 | Command | Description |
 |---------|-------------|
-| [`import`](/commands/import) | Import existing database tables as Bruin assets |
+| [`import`](/commands/import) | Import existing resources as Bruin assets |
 | [`patch`](/commands/patch) | Apply patches to asset definitions |
 | [`ai enhance`](/commands/ai-enhance) | Enhance asset metadata using AI |
 
