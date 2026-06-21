@@ -166,3 +166,4 @@ logs/queries
 *.py[cod]
 
 .devcontainer
+.codex/
