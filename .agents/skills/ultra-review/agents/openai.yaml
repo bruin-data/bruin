@@ -1,0 +1,7 @@
+interface:
+  display_name: "Ultra Review"
+  short_description: "Strict maintainability code review"
+  default_prompt: "Use $ultra-review to perform a strict maintainability review of the current branch changes."
+
+policy:
+  allow_implicit_invocation: false
