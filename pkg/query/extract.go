@@ -319,12 +319,12 @@ func splitOracleStatements(fileContent string) []string {
 }
 
 func oracleStatementStartsPLSQLBlock(statement string) bool {
-	normalized := strings.ToUpper(strings.TrimSpace(queryCommentRegex.ReplaceAllLiteralString(statement, "\n")))
-	return strings.HasPrefix(normalized, "BEGIN") || strings.HasPrefix(normalized, "DECLARE") || oraclePLSQLDDLStartRegex.MatchString(normalized)
+	normalized := oraclePLSQLComparableText(statement)
+	return oracleHasAnonymousPLSQLPrefix(normalized, "BEGIN") || oracleHasAnonymousPLSQLPrefix(normalized, "DECLARE") || oraclePLSQLDDLStartRegex.MatchString(normalized)
 }
 
 func oraclePLSQLBlockComplete(statement string) bool {
-	normalized := strings.ToUpper(strings.TrimSpace(queryCommentRegex.ReplaceAllLiteralString(statement, "\n")))
+	normalized := oraclePLSQLComparableText(statement)
 	normalized = strings.TrimSuffix(normalized, ";")
 	matches := oraclePLSQLBlockEndRegex.FindStringSubmatch(normalized)
 	if len(matches) == 0 {
@@ -347,6 +347,61 @@ func oraclePLSQLBlockComplete(statement string) bool {
 	}
 
 	return depth <= 0
+}
+
+func oraclePLSQLComparableText(statement string) string {
+	withoutComments := queryCommentRegex.ReplaceAllLiteralString(statement, "\n")
+	withoutStrings := oracleMaskSingleQuotedStrings(withoutComments)
+	return strings.ToUpper(strings.TrimSpace(withoutStrings))
+}
+
+func oracleHasAnonymousPLSQLPrefix(statement, prefix string) bool {
+	if !strings.HasPrefix(statement, prefix) {
+		return false
+	}
+	if len(statement) == len(prefix) {
+		return true
+	}
+	switch statement[len(prefix)] {
+	case ' ', '\n', '\r', '\t':
+		return true
+	default:
+		return false
+	}
+}
+
+func oracleMaskSingleQuotedStrings(statement string) string {
+	var masked strings.Builder
+	masked.Grow(len(statement))
+
+	inString := false
+	for i := 0; i < len(statement); i++ {
+		ch := statement[i]
+		if !inString {
+			if ch == '\'' {
+				inString = true
+				masked.WriteByte(' ')
+				continue
+			}
+			masked.WriteByte(ch)
+			continue
+		}
+
+		switch {
+		case ch == '\'' && i+1 < len(statement) && statement[i+1] == '\'':
+			masked.WriteString("  ")
+			i++
+		case ch == '\'':
+			inString = false
+			masked.WriteByte(' ')
+		case ch == '\n' || ch == '\r':
+			masked.WriteByte(ch)
+		default:
+			masked.WriteByte(' ')
+		}
+	}
+
+	return masked.String()
 }
 
 func oracleEndLabelIsControlKeyword(label string) bool {

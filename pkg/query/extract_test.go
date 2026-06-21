@@ -234,6 +234,56 @@ insert into users values ('semi;colon');
 	mr.AssertExpectations(t)
 }
 
+func TestOracleScriptExtractor_IgnoresPLSQLKeywordsInStringLiterals(t *testing.T) {
+	t.Parallel()
+
+	mr := new(mockNoOpRenderer)
+	mr.On("Render", mock.Anything).Return("default", nil)
+
+	f := OracleScriptExtractor{
+		Renderer: mr,
+	}
+
+	got, err := f.ExtractQueriesFromString(`
+BEGIN
+  v_msg := 'Marking BEGIN of run';
+END;
+/
+
+insert into audit_log values ('done');
+`)
+	require.NoError(t, err)
+
+	assert.Equal(t, []*Query{
+		{Query: "BEGIN\n  v_msg := 'Marking BEGIN of run';\nEND;"},
+		{Query: "insert into audit_log values ('done');"},
+	}, got)
+	mr.AssertExpectations(t)
+}
+
+func TestOracleScriptExtractor_DoesNotTreatBeginPrefixIdentifierAsPLSQLBlock(t *testing.T) {
+	t.Parallel()
+
+	mr := new(mockNoOpRenderer)
+	mr.On("Render", mock.Anything).Return("default", nil)
+
+	f := OracleScriptExtractor{
+		Renderer: mr,
+	}
+
+	got, err := f.ExtractQueriesFromString(`
+BEGINDATE_CALC('USERS');
+insert into audit_log values ('done');
+`)
+	require.NoError(t, err)
+
+	assert.Equal(t, []*Query{
+		{Query: "BEGINDATE_CALC('USERS');"},
+		{Query: "insert into audit_log values ('done');"},
+	}, got)
+	mr.AssertExpectations(t)
+}
+
 func TestOracleScriptExtractor_KeepsPLSQLDDLAsSingleQuery(t *testing.T) {
 	t.Parallel()
 
