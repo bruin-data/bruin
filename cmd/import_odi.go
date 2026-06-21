@@ -86,9 +86,12 @@ func printODIImportResult(pipelinePath string, result *odi.ImportResult) {
 	if result.PipelineCreated {
 		fmt.Println("  Created pipeline.yml")
 	}
-	if result.VariableMacrosWritten {
+	switch {
+	case result.VariableMacrosUpdated:
+		fmt.Printf("  Updated variable macros: %s\n", result.VariableMacrosPath)
+	case result.VariableMacrosWritten:
 		fmt.Printf("  Created variable macros: %s\n", result.VariableMacrosPath)
-	} else if result.VariableMacrosSkipped {
+	case result.VariableMacrosSkipped:
 		fmt.Printf("  Existing variable macros skipped: %s\n", result.VariableMacrosPath)
 	}
 	if len(result.ControlFlowWarnings) > 0 {

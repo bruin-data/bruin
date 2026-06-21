@@ -34,6 +34,7 @@ func TestImportCreatesPipelineSQLAssetMacrosAndSourceAssets(t *testing.T) {
 	assert.Equal(t, 1, result.SourceAssets)
 	assert.Equal(t, 1, result.VariableMacros)
 	assert.True(t, result.VariableMacrosWritten)
+	assert.False(t, result.VariableMacrosUpdated)
 	require.Len(t, result.ControlFlowWarnings, 1)
 	assert.Equal(t, "scenario_call", result.ControlFlowWarnings[0].Kind)
 	assert.True(t, result.ControlFlowReportWritten)
@@ -151,6 +152,7 @@ func TestImportAppendsMissingVariableMacros(t *testing.T) {
 	result, err := Import(context.Background(), fs, ImportOptions{SourcePath: sourceDir, PipelinePath: "/out"})
 	require.NoError(t, err)
 	assert.True(t, result.VariableMacrosWritten)
+	assert.True(t, result.VariableMacrosUpdated)
 	assert.False(t, result.VariableMacrosSkipped)
 
 	macrosBytes, err := afero.ReadFile(fs, "/out/macros/odi_variables.sql")
@@ -162,6 +164,7 @@ func TestImportAppendsMissingVariableMacros(t *testing.T) {
 	result, err = Import(context.Background(), fs, ImportOptions{SourcePath: sourceDir, PipelinePath: "/out"})
 	require.NoError(t, err)
 	assert.False(t, result.VariableMacrosWritten)
+	assert.False(t, result.VariableMacrosUpdated)
 	assert.True(t, result.VariableMacrosSkipped)
 }
 

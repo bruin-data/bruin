@@ -37,6 +37,7 @@ type ImportResult struct {
 	ScenarioCallsResolved    int
 	VariableMacrosPath       string
 	VariableMacrosWritten    bool
+	VariableMacrosUpdated    bool
 	VariableMacrosSkipped    bool
 	ControlFlowWarnings      []ControlFlowWarning
 	ControlFlowReportPath    string
@@ -221,7 +222,7 @@ func Import(ctx context.Context, fs afero.Fs, opts ImportOptions) (*ImportResult
 		return nil, err
 	}
 
-	macrosPath, macrosWritten, macrosSkipped, err := ensureVariableMacrosFile(fs, pipelinePath, project.VariableMacros, opts.Overwrite)
+	macrosPath, macrosWritten, macrosUpdated, macrosSkipped, err := ensureVariableMacrosFile(fs, pipelinePath, project.VariableMacros, opts.Overwrite)
 	if err != nil {
 		return nil, err
 	}
@@ -238,6 +239,7 @@ func Import(ctx context.Context, fs afero.Fs, opts ImportOptions) (*ImportResult
 		VariableMacros:           len(project.VariableMacros),
 		VariableMacrosPath:       macrosPath,
 		VariableMacrosWritten:    macrosWritten,
+		VariableMacrosUpdated:    macrosUpdated,
 		VariableMacrosSkipped:    macrosSkipped,
 		ControlFlowWarnings:      project.ControlFlowWarnings,
 		ControlFlowReportPath:    reportPath,
@@ -1062,12 +1064,12 @@ func detectControlFlowWarnings(scenarios []Scenario, index scenarioIndex) []Cont
 			return steps[i].Number < steps[j].Number
 		})
 
-		for index, step := range steps {
+		for stepIdx, step := range steps {
 			if step.KoNextStep != "" {
 				warnings = append(warnings, newControlFlowWarning(scenario, step, "failure_branch", "failure route via KoNextStep="+step.KoNextStep+" requires manual migration review"))
 			}
 			if step.OkNextStep != "" {
-				warnings = append(warnings, successRouteWarnings(scenario, steps, index)...)
+				warnings = append(warnings, successRouteWarnings(scenario, steps, stepIdx)...)
 			}
 			if step.VarOp != "" && step.VarOp != "=" {
 				warnings = append(warnings, newControlFlowWarning(scenario, step, "variable_operation", "unsupported ODI variable operation "+step.VarOp+" requires manual migration review"))
@@ -1775,24 +1777,24 @@ func yamlNodeForValue(value any) (*yaml.Node, error) {
 	return doc.Content[0], nil
 }
 
-func ensureVariableMacrosFile(fs afero.Fs, pipelinePath string, macros map[string]VariableMacro, overwrite bool) (string, bool, bool, error) {
+func ensureVariableMacrosFile(fs afero.Fs, pipelinePath string, macros map[string]VariableMacro, overwrite bool) (string, bool, bool, bool, error) {
 	if len(macros) == 0 {
-		return "", false, false, nil
+		return "", false, false, false, nil
 	}
 
 	macrosFile := filepath.Join(pipelinePath, "macros", "odi_variables.sql")
 	exists, err := afero.Exists(fs, macrosFile)
 	if err != nil {
-		return "", false, false, errors.Wrapf(err, "failed to check if ODI variable macros file exists: %s", macrosFile)
+		return "", false, false, false, errors.Wrapf(err, "failed to check if ODI variable macros file exists: %s", macrosFile)
 	}
 	if exists && !overwrite {
 		existingContent, err := afero.ReadFile(fs, macrosFile)
 		if err != nil {
-			return "", false, false, errors.Wrapf(err, "failed to read existing ODI variable macros file: %s", macrosFile)
+			return "", false, false, false, errors.Wrapf(err, "failed to read existing ODI variable macros file: %s", macrosFile)
 		}
 		missingMacros := missingVariableMacros(macros, string(existingContent))
 		if len(missingMacros) == 0 {
-			return macrosFile, false, true, nil
+			return macrosFile, false, false, true, nil
 		}
 
 		content := string(existingContent)
@@ -1801,20 +1803,20 @@ func ensureVariableMacrosFile(fs afero.Fs, pipelinePath string, macros map[strin
 		}
 		content += "\n" + renderVariableMacros(missingMacros)
 		if err := afero.WriteFile(fs, macrosFile, []byte(content), 0o644); err != nil {
-			return "", false, false, errors.Wrapf(err, "failed to append ODI variable macros file: %s", macrosFile)
+			return "", false, false, false, errors.Wrapf(err, "failed to append ODI variable macros file: %s", macrosFile)
 		}
 
-		return macrosFile, true, false, nil
+		return macrosFile, true, true, false, nil
 	}
 
 	if err := fs.MkdirAll(filepath.Dir(macrosFile), 0o755); err != nil {
-		return "", false, false, errors.Wrapf(err, "failed to create ODI variable macros directory: %s", filepath.Dir(macrosFile))
+		return "", false, false, false, errors.Wrapf(err, "failed to create ODI variable macros directory: %s", filepath.Dir(macrosFile))
 	}
 	if err := afero.WriteFile(fs, macrosFile, []byte(renderVariableMacros(macros)), 0o644); err != nil {
-		return "", false, false, errors.Wrapf(err, "failed to write ODI variable macros file: %s", macrosFile)
+		return "", false, false, false, errors.Wrapf(err, "failed to write ODI variable macros file: %s", macrosFile)
 	}
 
-	return macrosFile, true, false, nil
+	return macrosFile, true, exists, false, nil
 }
 
 func missingVariableMacros(macros map[string]VariableMacro, existingContent string) map[string]VariableMacro {
