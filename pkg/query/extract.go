@@ -82,6 +82,7 @@ var (
 	queryCommentRegex        = regexp.MustCompile(`(?m)(?s)\/\*.*?\*\/|(^|\s)--.*?\n`)
 	oraclePLSQLDDLStartRegex = regexp.MustCompile(`(?is)^CREATE\s+(?:OR\s+REPLACE\s+)?(?:(?:NON)?EDITIONABLE\s+)?(?:PROCEDURE|FUNCTION|PACKAGE(?:\s+BODY)?|TRIGGER|TYPE\s+BODY)\b`)
 	oraclePLSQLDDLBodyRegex  = regexp.MustCompile(`(?is)^CREATE\s+(?:OR\s+REPLACE\s+)?(?:(?:NON)?EDITIONABLE\s+)?(?:PACKAGE(?:\s+BODY)?|TYPE\s+BODY)\b`)
+	oraclePLSQLDDLNameRegex  = regexp.MustCompile(`(?is)^CREATE\s+(?:OR\s+REPLACE\s+)?(?:(?:NON)?EDITIONABLE\s+)?(?:PACKAGE(?:\s+BODY)?|TYPE\s+BODY)\s+([A-Z0-9_$#".]+)\b`)
 	oraclePLSQLBeginRegex    = regexp.MustCompile(`\bBEGIN\b`)
 	oraclePLSQLEndRegex      = regexp.MustCompile(`\bEND(?:\s+([A-Z0-9_$#".]+))?\b`)
 	oraclePLSQLBlockEndRegex = regexp.MustCompile(`(?s)\bEND(?:\s+([A-Z0-9_$#".]+))?\s*$`)
@@ -333,9 +334,10 @@ func oraclePLSQLBlockComplete(statement string) bool {
 	if len(matches) > 1 && oracleEndLabelIsControlKeyword(matches[1]) {
 		return false
 	}
+	ddlBodyName := oraclePLSQLDDLBodyName(normalized)
 
 	depth := 0
-	if oraclePLSQLDDLBodyRegex.MatchString(normalized) {
+	if ddlBodyName != "" || oraclePLSQLDDLBodyRegex.MatchString(normalized) {
 		depth++
 	}
 	depth += len(oraclePLSQLBeginRegex.FindAllString(normalized, -1))
@@ -346,7 +348,13 @@ func oraclePLSQLBlockComplete(statement string) bool {
 		depth--
 	}
 
-	return depth <= 0
+	if depth <= 0 {
+		return true
+	}
+	if depth == 1 && ddlBodyName != "" && len(matches) > 1 {
+		return oracleEndLabelMatchesObjectName(matches[1], ddlBodyName)
+	}
+	return false
 }
 
 func oraclePLSQLComparableText(statement string) string {
@@ -402,6 +410,24 @@ func oracleMaskSingleQuotedStrings(statement string) string {
 	}
 
 	return masked.String()
+}
+
+func oraclePLSQLDDLBodyName(statement string) string {
+	match := oraclePLSQLDDLNameRegex.FindStringSubmatch(statement)
+	if len(match) < 2 {
+		return ""
+	}
+	return match[1]
+}
+
+func oracleEndLabelMatchesObjectName(label, objectName string) bool {
+	label = strings.Trim(label, `"`)
+	if label == "" {
+		return false
+	}
+	nameParts := strings.Split(objectName, ".")
+	objectName = strings.Trim(nameParts[len(nameParts)-1], `"`)
+	return label == objectName
 }
 
 func oracleEndLabelIsControlKeyword(label string) bool {

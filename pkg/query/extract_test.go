@@ -350,6 +350,38 @@ insert into audit_log values ('done');
 	mr.AssertExpectations(t)
 }
 
+func TestOracleScriptExtractor_KeepsPackageBodyWithInitializationAsSingleQuery(t *testing.T) {
+	t.Parallel()
+
+	mr := new(mockNoOpRenderer)
+	mr.On("Render", mock.Anything).Return("default", nil)
+
+	f := OracleScriptExtractor{
+		Renderer: mr,
+	}
+
+	got, err := f.ExtractQueriesFromString(`
+create or replace package body pkg as
+  procedure p as
+  begin
+    null;
+  end;
+begin
+  null;
+end pkg;
+/
+
+insert into audit_log values ('done');
+`)
+	require.NoError(t, err)
+
+	assert.Equal(t, []*Query{
+		{Query: "create or replace package body pkg as\n  procedure p as\n  begin\n    null;\n  end;\nbegin\n  null;\nend pkg;"},
+		{Query: "insert into audit_log values ('done');"},
+	}, got)
+	mr.AssertExpectations(t)
+}
+
 func TestOracleScriptExtractor_SplitsPlainCreateTypeSpec(t *testing.T) {
 	t.Parallel()
 
