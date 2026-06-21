@@ -475,7 +475,7 @@ When procedural control flow is detected, the importer still writes the SQL, sou
 
 ### Notes
 
-- ODI variable references are converted to generated macro calls. For example, `#GLOBAL.VAR_ETL_DATE` becomes `{{ odi_global_var_etl_date() }}` in asset SQL.
+- ODI variable references are converted to generated macro calls. For example, `#GLOBAL.VAR_ETL_DATE` becomes <code v-pre>{{ odi_global_var_etl_date() }}</code> in asset SQL.
 - Variable defaults found in ODI scenario exports are added to `pipeline.yml`, and generated macros wrap those defaults when no ODI variable-step SQL expression is available.
 - ODI variable steps are not generated as standalone assets; simple `SELECT ... FROM DUAL` assignments are converted into macro bodies instead.
 - ODI control-flow is not emulated as a procedural runner. Linear steps and resolvable scenario calls are flattened into Bruin assets, while non-linear routing and unresolved calls are reported for manual conversion into Bruin-native pipelines or orchestration.
