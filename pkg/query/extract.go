@@ -358,7 +358,7 @@ func oraclePLSQLBlockComplete(statement string) bool {
 }
 
 func oraclePLSQLComparableText(statement string) string {
-	withoutComments := queryCommentRegex.ReplaceAllLiteralString(statement, "\n")
+	withoutComments := queryCommentRegex.ReplaceAllLiteralString(statement+"\n", "\n")
 	withoutStrings := oracleMaskSingleQuotedStrings(withoutComments)
 	return strings.ToUpper(strings.TrimSpace(withoutStrings))
 }

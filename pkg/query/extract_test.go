@@ -261,6 +261,34 @@ insert into audit_log values ('done');
 	mr.AssertExpectations(t)
 }
 
+func TestOracleScriptExtractor_HandlesTrailingLineCommentBeforePLSQLTerminator(t *testing.T) {
+	t.Parallel()
+
+	mr := new(mockNoOpRenderer)
+	mr.On("Render", mock.Anything).Return("default", nil)
+
+	f := OracleScriptExtractor{
+		Renderer: mr,
+	}
+
+	got, err := f.ExtractQueriesFromString(`
+BEGIN
+  NULL;
+END -- closes block
+;
+/
+
+insert into audit_log values ('done');
+`)
+	require.NoError(t, err)
+
+	assert.Equal(t, []*Query{
+		{Query: "BEGIN\n  NULL;\nEND -- closes block\n;"},
+		{Query: "insert into audit_log values ('done');"},
+	}, got)
+	mr.AssertExpectations(t)
+}
+
 func TestOracleScriptExtractor_DoesNotTreatBeginPrefixIdentifierAsPLSQLBlock(t *testing.T) {
 	t.Parallel()
 
