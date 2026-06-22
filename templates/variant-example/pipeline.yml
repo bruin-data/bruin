@@ -22,6 +22,9 @@ variables:
     minimum: 7
     maximum: 90
     default: 30
+  include_regional_snapshot:
+    type: boolean
+    default: false
 
 variants:
   client_alpha:
@@ -34,6 +37,7 @@ variants:
     region: eu
     schedule: "0 6 * * *"
     forecast_days: 60
+    include_regional_snapshot: true
   client_gamma:
     client: gamma
     region: ap

@@ -214,6 +214,40 @@ func TestIndividualTasks(t *testing.T) {
 			},
 		},
 		{
+			name: "parse-templated-enabled-disabled",
+			task: e2e.Task{
+				Name:    "parse-templated-enabled-disabled",
+				Command: binary,
+				Args:    []string{"internal", "parse-pipeline", "--variant", "disabled", filepath.Join(currentFolder, "test-pipelines/enabled-template-pipeline")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{`"name":"templated_upstream"`, `"enabled":false`},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "parse-templated-enabled-enabled",
+			task: e2e.Task{
+				Name:    "parse-templated-enabled-enabled",
+				Command: binary,
+				Args:    []string{"internal", "parse-pipeline", "--variant", "enabled", filepath.Join(currentFolder, "test-pipelines/enabled-template-pipeline")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{`"name":"templated_upstream"`, `"enabled":true`},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
 			name: "validate-happy-path",
 			task: e2e.Task{
 				Name:    "validate-happy-path",
@@ -1476,6 +1510,40 @@ func TestIndividualTasks(t *testing.T) {
 				Expected: e2e.Output{
 					ExitCode: 0,
 					Contains: []string{"Successfully validated 3 assets", "bruin run completed", "Finished: render_this.my_asset_2"},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "run-templated-enabled-disabled",
+			task: e2e.Task{
+				Name:    "run-templated-enabled-disabled",
+				Command: binary,
+				Args:    []string{"run", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--variant", "disabled", filepath.Join(currentFolder, "test-pipelines/enabled-template-pipeline")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"Successfully validated 2 assets", "bruin run completed", "Finished: templated_downstream"},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "run-templated-enabled-enabled",
+			task: e2e.Task{
+				Name:    "run-templated-enabled-enabled",
+				Command: binary,
+				Args:    []string{"run", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--variant", "enabled", filepath.Join(currentFolder, "test-pipelines/enabled-template-pipeline")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 1,
+					Contains: []string{"Successfully validated 2 assets", "Failed: templated_upstream", "upstream_should_not_run"},
 				},
 				Asserts: []func(*e2e.Task) error{
 					e2e.AssertByExitCode,

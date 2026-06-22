@@ -1516,6 +1516,37 @@ func TestDefaultTrueBool_MarshalYAML(t *testing.T) {
 	}
 }
 
+func TestTemplatedBool_ZeroValueMarshalConsistency(t *testing.T) {
+	t.Parallel()
+
+	var value pipeline.TemplatedBool
+
+	jsonValue, err := json.Marshal(value)
+	require.NoError(t, err)
+	assert.JSONEq(t, "true", string(jsonValue))
+
+	yamlValue, err := yaml.Marshal(value)
+	require.NoError(t, err)
+	assert.YAMLEq(t, "true\n", string(yamlValue))
+}
+
+func TestAsset_IsEnabledPanicsOnUnresolvedTemplate(t *testing.T) {
+	t.Parallel()
+
+	asset := &pipeline.Asset{
+		Name:    "templated",
+		Enabled: &pipeline.TemplatedBool{Template: "{{ var.asset_enabled }}"},
+	}
+
+	require.PanicsWithError(t, `enabled contains unresolved template "{{ var.asset_enabled }}"`, func() {
+		asset.IsEnabled()
+	})
+
+	enabled, err := asset.EnabledValue()
+	require.Error(t, err)
+	assert.True(t, enabled)
+}
+
 func TestPipeline_GetCompatibilityHash(t *testing.T) {
 	t.Parallel()
 
@@ -1542,6 +1573,29 @@ func TestPipeline_GetCompatibilityHash(t *testing.T) {
 				parts = append(parts, "test-pipeline")
 				parts = append(parts, ":asset1{")
 				parts = append(parts, ":upstream1:type1:")
+				parts = append(parts, "}")
+				parts = append(parts, ":")
+				hash := sha256.New()
+				hash.Write([]byte(strings.Join(parts, "")))
+				return hex.EncodeToString(hash.Sum(nil))
+			}(),
+		},
+		{
+			name: "disabled asset",
+			pipeline: &pipeline.Pipeline{
+				Name: "test-pipeline",
+				Assets: []*pipeline.Asset{
+					{
+						Name:    "asset1",
+						Enabled: pipeline.NewTemplatedBool(false),
+					},
+				},
+			},
+			expected: func() string {
+				parts := make([]string, 0, 5)
+				parts = append(parts, "test-pipeline")
+				parts = append(parts, ":asset1{")
+				parts = append(parts, ":enabled:false")
 				parts = append(parts, "}")
 				parts = append(parts, ":")
 				hash := sha256.New()
@@ -2411,6 +2465,7 @@ func TestDefaultValues_CoversAssetConfigFields(t *testing.T) {
 		"ID":             true,
 		"Name":           true,
 		"URI":            true,
+		"Enabled":        true,
 		"ExecutableFile": true,
 		"DefinitionFile": true,
 		"RetriesDelay":   true,

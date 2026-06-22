@@ -209,18 +209,20 @@ func TestPipeline_MaterializeVariant(t *testing.T) {
 			Schedule:  "{{ var.schedule }}",
 			StartDate: "{{ var.start_date }}",
 			Variables: pipeline.Variables{
-				"client":     map[string]any{"type": "string", "default": "default_client"},
-				"region":     map[string]any{"type": "string", "default": "us"},
-				"schedule":   map[string]any{"type": "string", "default": "@daily"},
-				"start_date": map[string]any{"type": "string", "default": "2024-01-01"},
+				"asset_enabled": map[string]any{"type": "boolean", "default": false},
+				"client":        map[string]any{"type": "string", "default": "default_client"},
+				"region":        map[string]any{"type": "string", "default": "us"},
+				"schedule":      map[string]any{"type": "string", "default": "@daily"},
+				"start_date":    map[string]any{"type": "string", "default": "2024-01-01"},
 			},
 			Variants: pipeline.VariantSet{
-				"client1": {"client": "alpha", "schedule": "@hourly"},
+				"client1": {"asset_enabled": true, "client": "alpha", "schedule": "@hourly"},
 				"client2": {"client": "beta", "region": "eu", "start_date": "2024-06-01"},
 			},
 			Assets: []*pipeline.Asset{
 				{
 					Name:        "{{ var.client }}_users",
+					Enabled:     &pipeline.TemplatedBool{Template: "{{ var.asset_enabled }}"},
 					Description: "users for {{ var.client }} in {{ var.region }}",
 					Connection:  "{{ var.client }}_db",
 					ExecutableFile: pipeline.ExecutableFile{
@@ -258,6 +260,8 @@ func TestPipeline_MaterializeVariant(t *testing.T) {
 		assert.Equal(t, "alpha_raw", pl.Assets[0].Upstreams[0].Value)
 		assert.Equal(t, "alpha_check", pl.Assets[0].CustomChecks[0].Name)
 		assert.Equal(t, "img/alpha", pl.Assets[1].Image)
+		assert.True(t, pl.Assets[0].IsEnabled())
+		assert.Empty(t, pl.Assets[0].Enabled.Template)
 	})
 
 	t.Run("variant overrides apply to schedule and start_date", func(t *testing.T) {
@@ -266,6 +270,7 @@ func TestPipeline_MaterializeVariant(t *testing.T) {
 		require.NoError(t, pl.MaterializeVariant("client2", makeFakeRenderer))
 		assert.Equal(t, pipeline.Schedule("@daily"), pl.Schedule) // variant didn't override schedule, default kept
 		assert.Equal(t, "2024-06-01", pl.StartDate)               // variant overrode start_date
+		assert.False(t, pl.Assets[0].IsEnabled())                 // default enabled variable kept
 	})
 
 	t.Run("does NOT render asset bodies", func(t *testing.T) {
@@ -383,6 +388,17 @@ variants:
 		pl := build()
 		err := pl.MaterializeVariant("", makeFakeRenderer)
 		require.Error(t, err)
+	})
+
+	t.Run("errors when enabled renders to non-boolean", func(t *testing.T) {
+		t.Parallel()
+		pl := build()
+		pl.Variables["asset_enabled"] = map[string]any{"type": "string", "default": "not-a-bool"}
+		pl.Variants["client1"]["asset_enabled"] = "not-a-bool"
+		err := pl.MaterializeVariant("client1", makeFakeRenderer)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "asset[{{ var.client }}_users].enabled")
+		assert.Contains(t, err.Error(), "expected boolean")
 	})
 }
 

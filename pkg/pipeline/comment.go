@@ -239,6 +239,14 @@ func commentRowsToTask(commentRows []string) (*Asset, error) {
 			task.Type = AssetType(value)
 
 			continue
+		case "enabled":
+			enabled, err := ParseTemplatedBool(value)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to parse enabled value '%s'", value)
+			}
+			task.Enabled = enabled
+
+			continue
 		case "connection":
 			task.Connection = value
 

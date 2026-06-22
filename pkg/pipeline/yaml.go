@@ -342,6 +342,7 @@ func notificationsOrNil(n Notifications) *Notifications {
 type taskDefinition struct {
 	Name                  string            `yaml:"name"`
 	URI                   string            `yaml:"uri"`
+	Enabled               *TemplatedBool    `yaml:"enabled"`
 	Description           string            `yaml:"description"`
 	Type                  string            `yaml:"type"`
 	RunFile               string            `yaml:"run"`
@@ -557,6 +558,7 @@ func taskDefinitionToAsset(definition taskDefinition) (*Asset, error) {
 		ID:                hash(definition.Name),
 		URI:               definition.URI,
 		Name:              definition.Name,
+		Enabled:           definition.Enabled,
 		Description:       definition.Description,
 		Type:              AssetType(definition.Type),
 		Parameters:        definition.Parameters,

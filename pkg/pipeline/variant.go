@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -351,6 +352,9 @@ func copyAssetToDefaultValues(dv *DefaultValues, asset *Asset) {
 func renderAssetStrings(render RenderFunc, a *Asset) error {
 	var err error
 	originalName := a.Name
+	if err := renderTemplatedBool(render, fmt.Sprintf("asset[%s].enabled", originalName), a.Enabled); err != nil {
+		return err
+	}
 	if a.Name, err = maybeRender(render, fmt.Sprintf("asset[%s].name", originalName), a.Name); err != nil {
 		return err
 	}
@@ -525,6 +529,26 @@ func renderAssetStrings(render RenderFunc, a *Asset) error {
 		}
 	}
 
+	return nil
+}
+
+func renderTemplatedBool(render RenderFunc, fieldPath string, value *TemplatedBool) error {
+	if value == nil || value.Template == "" {
+		return nil
+	}
+
+	rendered, err := maybeRender(render, fieldPath, value.Template)
+	if err != nil {
+		return err
+	}
+
+	parsed, err := strconv.ParseBool(strings.TrimSpace(rendered))
+	if err != nil {
+		return fmt.Errorf("rendering %s: expected boolean, got %q", fieldPath, rendered)
+	}
+
+	value.Value = &parsed
+	value.Template = ""
 	return nil
 }
 
