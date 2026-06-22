@@ -4,9 +4,232 @@ Bruin supports Snowflake as a data platform.
 
 ## Connection
 
-In order to set up a Snowflake connection, you need to add a configuration item to `connections` in the `.bruin.yml` file.
+To set up a Snowflake connection, add a `snowflake` connection to the `connections` section of your `.bruin.yml` file. The examples below show the supported fields, followed by how to obtain each value.
 
-There's 2 different ways to fill it in
+Snowflake connections support two authentication methods:
+
+- Password authentication: provide `username` and `password`.
+- Key-pair authentication: provide `username` and either `private_key_path` or `private_key`.
+
+Both methods use the same Snowflake account, database, schema, warehouse, role, and region fields. Choose one authentication method and configure it as shown below.
+
+### Connection Parameters
+
+Each parameter has a short heading for the page outline. Expand the details below a parameter to see where to find it in Snowflake and how to get it with a command or query.
+
+#### `name`
+
+<details>
+<summary>How to choose this value</summary>
+
+This is the Bruin connection name, not a Snowflake value. Choose a stable name such as `snowflake-default`; you will use it when selecting this connection from pipelines or commands.
+
+Programmatic method: list the Snowflake connection names already configured in Bruin, then choose a new unique name or reuse an existing one.
+
+```bash
+bruin connections list
+```
+
+</details>
+
+#### `username`
+
+<details>
+<summary>How to find this value</summary>
+
+Use the Snowflake username that Bruin should connect as. In the Snowflake UI, you can find users under **Admin** > **Users & Roles**.
+
+Programmatic method: if you are logged in as the same user, run:
+
+```sql
+SELECT CURRENT_USER();
+```
+
+If you are an admin checking a specific user, run:
+
+```sql
+SHOW USERS LIKE '<username>';
+```
+
+</details>
+
+#### `password`
+
+<details>
+<summary>How to set this value</summary>
+
+Use this only for password authentication. Snowflake does not let you retrieve an existing password, so use the password that was set for the user or reset it.
+
+Programmatic method: an admin can set a new password with:
+
+```sql
+ALTER USER <username> SET PASSWORD = '<new_password>';
+```
+
+</details>
+
+#### `account`
+
+<details>
+<summary>How to find this value</summary>
+
+This is the Snowflake account identifier, usually in the format `<organization_name>-<account_name>`. In the Snowflake UI, you can find it under **Account Details**:
+
+![Snowflake Account](/snowflake.png)
+
+Programmatic method: run this in a Snowflake SQL worksheet/file:
+
+```sql
+SELECT CURRENT_ORGANIZATION_NAME() || '-' || CURRENT_ACCOUNT_NAME() AS account_identifier;
+```
+
+</details>
+
+#### `database`
+
+<details>
+<summary>How to find this value</summary>
+
+Use the database that contains, or should contain, the schemas and tables Bruin will work with. In the Snowflake UI, go to **Data** > **Databases**.
+
+Programmatic method: list the databases you can access:
+
+```sql
+SHOW DATABASES;
+```
+
+If your worksheet already has a database selected, you can also run:
+
+```sql
+SELECT CURRENT_DATABASE();
+```
+
+</details>
+
+#### `schema`
+
+<details>
+<summary>How to find or create this value</summary>
+
+Use the schema where Bruin should create or read objects. In the Snowflake UI, go to **Data** > **Databases**, open your database, and look under **Schemas**. You can use an existing schema such as `PUBLIC`, or create generic project schemas such as `RAW`, `SILVER`, and `GOLD`.
+
+Programmatic method: list schemas in a database:
+
+```sql
+SHOW SCHEMAS IN DATABASE <database_name>;
+```
+
+For a simple demo setup, use `RAW`. To create it, run:
+
+```sql
+CREATE SCHEMA IF NOT EXISTS raw;
+```
+
+If Snowflake says the session does not have a current database, use a qualified schema name:
+
+```sql
+CREATE SCHEMA IF NOT EXISTS <database_name>.raw;
+```
+
+Or set the database first:
+
+```sql
+USE DATABASE <database_name>;
+CREATE SCHEMA IF NOT EXISTS raw;
+```
+
+</details>
+
+#### `warehouse`
+
+<details>
+<summary>How to find this value</summary>
+
+Use the warehouse Bruin should use for query execution. In the Snowflake UI, go to **Admin** > **Warehouses**. Common names include `COMPUTE_WH`, `XSMALL_WH`, and `LOAD_WH`.
+
+Programmatic method: list warehouses available to you:
+
+```sql
+SHOW WAREHOUSES;
+```
+
+If your worksheet already has a warehouse selected, you can also run:
+
+```sql
+SELECT CURRENT_WAREHOUSE();
+```
+
+For a simple demo setup, `COMPUTE_WH` is often the easiest value to try.
+
+</details>
+
+#### `role`
+
+<details>
+<summary>How to find this value</summary>
+
+This is optional. Use it when Bruin should run with a specific Snowflake role. In the Snowflake UI, go to **Admin** > **Users & Roles** > **Roles**.
+
+Programmatic method: show the role currently active in your worksheet:
+
+```sql
+SELECT CURRENT_ROLE();
+```
+
+To inspect roles granted to a user, run:
+
+```sql
+SHOW GRANTS TO USER <username>;
+```
+
+</details>
+
+#### `region`
+
+<details>
+<summary>How to find this value</summary>
+
+This is the Snowflake account region. In the Snowflake UI, you can find it under **Account Details**.
+
+Programmatic method: run:
+
+```sql
+SELECT CURRENT_REGION();
+```
+
+</details>
+
+#### `private_key_path`
+
+<details>
+<summary>How to get this value</summary>
+
+Use this only for key-pair authentication. It is the local path to the private key file generated for Bruin, such as `rsa_key.p8`.
+
+Programmatic method: after generating the key, print its absolute path from your terminal:
+
+```bash
+realpath rsa_key.p8
+```
+
+</details>
+
+#### `private_key`
+
+<details>
+<summary>How to get this value</summary>
+
+Use this only for key-pair authentication when you want to paste the private key contents directly into `.bruin.yml` instead of referencing a file path.
+
+Programmatic method: print the private key contents from your terminal:
+
+```bash
+cat rsa_key.p8
+```
+
+</details>
+
+### Password Authentication
 
 ```yaml
     connections:
@@ -14,49 +237,72 @@ There's 2 different ways to fill it in
         - name: "connection_name"
           username: "sfuser"
           password: "XXXXXXXXXX"
-          account: "AAAAAAA-AA00000"
+          account: "organization-account"
           database: "dev"
           schema: "schema_name" # optional
           warehouse: "warehouse_name" # optional
           role: "data_analyst" # optional
           region: "eu-west1" # required
-          private_key_path: "path/to/private_key" # optional
 ```
 
-Where account is the identifier that you can copy here:
+### Key-Pair Authentication
 
-![Snowflake Account](/snowflake.png)
+For key-pair authentication, first generate a private/public key pair and register the public key with your Snowflake user. Then configure Bruin with the private key. Bruin can read the private key from a file path or directly from the `.bruin.yml` file.
 
-### Key-based Authentication
+#### Step 1: Generate a key pair
 
-Snowflake currently supports both password-based authentication as well as key-based authentication.
+Open your terminal and run the following command to create a key pair. If you’re using a Mac, OpenSSL should be installed by default, so no additional setup is required. For Linux or Windows, you may need to [install OpenSSL first](https://docs.openssl.org/3.4/man7/ossl-guide-introduction/).
 
-You can configure the private key in two ways:
+```bash
+openssl genrsa 2048 | openssl pkcs8 -topk8 -inform PEM -out rsa_key.p8 -nocrypt
+openssl rsa -in rsa_key.p8 -pubout -out rsa_key.pub
+```
 
-#### Option 1: Private Key File Path
+#### Step 2: Set the public key for your Snowflake user
+
+Log into Snowflake as an admin, create a new SQL worksheet/file, and run the following command (don't forget the single quotes around the key). When pasting the public key from the `.pub` file, exclude the `-----BEGIN PUBLIC KEY-----` and `-----END PUBLIC KEY-----` lines:
+
+```sql
+ALTER USER your_snowflake_username
+SET RSA_PUBLIC_KEY='your_public_key_here';
+```
+
+#### Step 3: Verify the public key in Snowflake
+
+```sql
+DESC USER your_snowflake_username;
+```
+
+This will show a column named `RSA_PUBLIC_KEY`. You should see your actual key there.
+
+#### Step 4: Configure Bruin with the private key
+
+Choose one of the following private-key options in your `.bruin.yml` file.
+
+##### Option 1: Private key file path
 
 ```yaml
     connections:
       snowflake:
         - name: "connection_name"
           username: "sfuser"
-          account: "AAAAAAA-AA00000"
+          account: "organization-account"
           database: "dev"
           schema: "schema_name" # optional
           warehouse: "warehouse_name" # optional
           role: "data_analyst" # optional
           region: "eu-west1" # required
-          private_key_path: "path/to/private_key" # optional
+          private_key_path: "path/to/private_key" # required for this option
 ```
 
-#### Option 2: Private Key Content (Direct)
+##### Option 2: Private key content
 
 ```yaml
     connections:
       snowflake:
         - name: "connection_name"
           username: "sfuser"
-          account: "AAAAAAA-AA00000"
+          account: "organization-account"
           database: "dev"
           schema: "schema_name" # optional
           warehouse: "warehouse_name" # optional
@@ -69,52 +315,7 @@ You can configure the private key in two ways:
             -----END PRIVATE KEY-----
 ```
 
-In order to set up key-based authentication, follow the following steps.
-
-#### Step 1: Generate a key-pair
-
-Open your terminal and run the following command to create a key pair. If you’re using a mac, OpenSSL should be installed by default, so no additional setup is required. For Linux or Windows, you may need to [install OpenSSL first](https://docs.openssl.org/3.4/man7/ossl-guide-introduction/).
-
-```bash
-openssl genrsa 2048 | openssl pkcs8 -topk8 -inform PEM -out rsa_key.p8 -nocrypt
-openssl rsa -in rsa_key.p8 -pubout -out rsa_key.pub
-```
-
-#### Step 2: Set public key for Snowflake user
-
-Log into Snowflake as an admin, create a new worksheet and run the following command (don't forget the single quotes around the key):
-
-```sql
-ALTER USER your_snowflake_username
-SET RSA_PUBLIC_KEY='your_public_key_here';
-```
-
-#### Step 3: Verify
-
-```sql
-DESC USER your_snowflake_username;
-```
-
-This will show a column named `RSA_PUBLIC_KEY`. You should see your actual key there.
-
-#### Step 4: Update Bruin configuration
-
-In your `.bruin.yml` file, update the Snowflake connection configuration to include the `private_key_path` parameter pointing to your private key file. For example:
-
-```yaml
-            snowflake:
-                - name: snowflake-default
-                  username: JOHN_DOE
-                  account: EXAMPLE-ACCOUNT
-                  database: dev
-                  schema: schema_name
-                  warehouse: warehouse_name
-                  role: data_analyst
-                  region: eu-west1
-                  private_key_path: /Users/johndoe/rsa_key.pem
-```
-
-For more details on how to set up key-based authentication, see [this guide](https://select.dev/docs/snowflake-developer-guide/snowflake-key-pair).
+For more details on how to set up key-pair authentication, see [this guide](https://select.dev/docs/snowflake-developer-guide/snowflake-key-pair).
 
 ## Query Tags
 
