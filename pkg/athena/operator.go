@@ -180,7 +180,7 @@ func (o *QuerySensor) Run(ctx context.Context, ti scheduler.TaskInstance) error 
 }
 
 func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) error {
-	qq, ok := t.Parameters["query"]
+	qq, ok := t.Parameters.GetString("query")
 	if !ok {
 		return errors.New("query sensor requires a parameter named 'query'")
 	}

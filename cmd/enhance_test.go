@@ -24,7 +24,7 @@ func TestGetAssetConnectionName(t *testing.T) {
 		{
 			name: "returns connection from parameters when connection field is empty",
 			asset: &pipeline.Asset{
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"connection": "param_database",
 				},
 			},
@@ -34,7 +34,7 @@ func TestGetAssetConnectionName(t *testing.T) {
 			name: "prefers connection field over parameters",
 			asset: &pipeline.Asset{
 				Connection: "my_database",
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"connection": "param_database",
 				},
 			},
@@ -58,7 +58,7 @@ func TestGetAssetConnectionName(t *testing.T) {
 		{
 			name: "returns empty string when connection parameter is empty",
 			asset: &pipeline.Asset{
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"connection": "",
 				},
 			},
@@ -67,7 +67,7 @@ func TestGetAssetConnectionName(t *testing.T) {
 		{
 			name: "returns empty string when parameters has other keys but not connection",
 			asset: &pipeline.Asset{
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"other_param": "value",
 				},
 			},

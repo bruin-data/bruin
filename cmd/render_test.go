@@ -355,7 +355,7 @@ func TestRenderCommand_Run_QuerySensors(t *testing.T) { //nolint:paralleltest
 			task: &pipeline.Asset{
 				Name: "bq-sensor",
 				Type: pipeline.AssetTypeBigqueryQuerySensor,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"query": "SELECT COUNT(*) FROM `project.dataset.table` WHERE created_at > '{{ start_date }}'",
 				},
 				ExecutableFile: pipeline.ExecutableFile{
@@ -378,7 +378,7 @@ func TestRenderCommand_Run_QuerySensors(t *testing.T) { //nolint:paralleltest
 			task: &pipeline.Asset{
 				Name: "bq-sensor",
 				Type: pipeline.AssetTypeBigqueryQuerySensor,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"query": "SELECT COUNT(*) FROM `project.dataset.table` WHERE created_at > '{{ start_date }}'",
 				},
 				Hooks: pipeline.Hooks{
@@ -412,7 +412,7 @@ func TestRenderCommand_Run_QuerySensors(t *testing.T) { //nolint:paralleltest
 			task: &pipeline.Asset{
 				Name: "sf-sensor",
 				Type: pipeline.AssetTypeSnowflakeQuerySensor,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"query": "SELECT * FROM sensor_table WHERE timestamp > '{{ start_date }}'",
 				},
 				ExecutableFile: pipeline.ExecutableFile{
@@ -435,7 +435,7 @@ func TestRenderCommand_Run_QuerySensors(t *testing.T) { //nolint:paralleltest
 			task: &pipeline.Asset{
 				Name: "bq-sensor",
 				Type: pipeline.AssetTypeBigqueryQuerySensor,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"project_id": "my-project",
 				},
 				ExecutableFile: pipeline.ExecutableFile{

@@ -36,7 +36,7 @@ func TestExtractParameters(t *testing.T) {
 			name: "minimal valid parameters",
 			asset: &pipeline.Asset{
 				Name: "test_asset",
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"prompt": "Test prompt",
 				},
 				DefinitionFile: pipeline.TaskDefinitionFile{
@@ -57,7 +57,7 @@ func TestExtractParameters(t *testing.T) {
 				DefinitionFile: pipeline.TaskDefinitionFile{
 					Path: absAssetPath,
 				},
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"prompt":              "Test prompt",
 					"model":               "sonnet",
 					"fallback_model":      "haiku",
@@ -100,7 +100,7 @@ func TestExtractParameters(t *testing.T) {
 				DefinitionFile: pipeline.TaskDefinitionFile{
 					Path: absAssetPath,
 				},
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"model": "sonnet",
 				},
 			},
@@ -114,7 +114,7 @@ func TestExtractParameters(t *testing.T) {
 				DefinitionFile: pipeline.TaskDefinitionFile{
 					Path: absAssetPath,
 				},
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"prompt": "  ",
 				},
 			},
@@ -137,7 +137,7 @@ func TestExtractParameters(t *testing.T) {
 			name: "with absolute working_dir",
 			asset: &pipeline.Asset{
 				Name: "test_asset",
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"prompt":      "Test prompt",
 					"working_dir": absWorkingDir,
 				},
@@ -157,7 +157,7 @@ func TestExtractParameters(t *testing.T) {
 			name: "with relative working_dir",
 			asset: &pipeline.Asset{
 				Name: "test_asset",
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"prompt":      "Test prompt",
 					"working_dir": "../data",
 				},
@@ -177,7 +177,7 @@ func TestExtractParameters(t *testing.T) {
 			name: "with relative dot working_dir",
 			asset: &pipeline.Asset{
 				Name: "test_asset",
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"prompt":      "Test prompt",
 					"working_dir": "./subdir",
 				},
@@ -388,7 +388,7 @@ func TestClaudeCodeOperator_Run_MissingPrompt(t *testing.T) {
 	asset := &pipeline.Asset{
 		Name:       "test_claude_asset",
 		Type:       pipeline.AssetTypeAgentClaudeCode,
-		Parameters: map[string]string{},
+		Parameters: pipeline.ParameterMap{},
 	}
 
 	instance := &scheduler.AssetInstance{

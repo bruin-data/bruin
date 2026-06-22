@@ -1716,7 +1716,7 @@ func TestCanRunTaskInstances(t *testing.T) {
 					{
 						Type:       pipeline.AssetTypeIngestr,
 						Connection: "conn2",
-						Parameters: map[string]string{"source_connection": "conn3"},
+						Parameters: pipeline.ParameterMap{"source_connection": "conn3"},
 					},
 				},
 			},
@@ -1754,7 +1754,7 @@ func TestCanRunTaskInstances(t *testing.T) {
 					},
 					{
 						Type: pipeline.AssetTypeIngestr,
-						Parameters: map[string]string{
+						Parameters: pipeline.ParameterMap{
 							"source_connection": "conn3",
 							"destination":       "snowflake",
 						},
@@ -1795,7 +1795,7 @@ func TestCanRunTaskInstances(t *testing.T) {
 					},
 					{
 						Type: pipeline.AssetTypeIngestr,
-						Parameters: map[string]string{
+						Parameters: pipeline.ParameterMap{
 							"source_connection": "conn3",
 							"destination":       "snowflake",
 						},
@@ -1849,7 +1849,7 @@ func TestCanRunTaskInstances(t *testing.T) {
 					},
 					{
 						Type: pipeline.AssetTypeIngestr,
-						Parameters: map[string]string{
+						Parameters: pipeline.ParameterMap{
 							"source_connection": "conn3",
 							"destination":       "snowflake",
 						},
@@ -1899,7 +1899,7 @@ func TestCanRunTaskInstances(t *testing.T) {
 					},
 					{
 						Type: pipeline.AssetTypeIngestr,
-						Parameters: map[string]string{
+						Parameters: pipeline.ParameterMap{
 							"source_connection": "conn3",
 							"destination":       "snowflake",
 						},

@@ -30,29 +30,29 @@ func TestResolveIncrementalRefresh(t *testing.T) {
 
 	t.Run("default is incremental", func(t *testing.T) {
 		t.Parallel()
-		assert.True(t, resolveIncrementalRefresh(context.Background(), map[string]string{}))
+		assert.True(t, resolveIncrementalRefresh(context.Background(), pipeline.ParameterMap{}))
 	})
 
 	t.Run("explicit incremental true", func(t *testing.T) {
 		t.Parallel()
-		assert.True(t, resolveIncrementalRefresh(context.Background(), map[string]string{"incremental": "true"}))
+		assert.True(t, resolveIncrementalRefresh(context.Background(), pipeline.ParameterMap{"incremental": "true"}))
 	})
 
 	t.Run("explicit incremental false", func(t *testing.T) {
 		t.Parallel()
-		assert.False(t, resolveIncrementalRefresh(context.Background(), map[string]string{"incremental": "false"}))
+		assert.False(t, resolveIncrementalRefresh(context.Background(), pipeline.ParameterMap{"incremental": "false"}))
 	})
 
 	t.Run("full refresh flag overrides incremental", func(t *testing.T) {
 		t.Parallel()
 		ctx := context.WithValue(context.Background(), pipeline.RunConfigFullRefresh, true)
-		assert.False(t, resolveIncrementalRefresh(ctx, map[string]string{"incremental": "true"}))
+		assert.False(t, resolveIncrementalRefresh(ctx, pipeline.ParameterMap{"incremental": "true"}))
 	})
 
 	t.Run("full refresh flag overrides default", func(t *testing.T) {
 		t.Parallel()
 		ctx := context.WithValue(context.Background(), pipeline.RunConfigFullRefresh, true)
-		assert.False(t, resolveIncrementalRefresh(ctx, map[string]string{}))
+		assert.False(t, resolveIncrementalRefresh(ctx, pipeline.ParameterMap{}))
 	})
 }
 
@@ -61,32 +61,32 @@ func TestResolveRefreshTimeout(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		params   map[string]string
+		params   pipeline.ParameterMap
 		expected time.Duration
 	}{
 		{
 			name:     "default timeout",
-			params:   map[string]string{},
+			params:   pipeline.ParameterMap{},
 			expected: 60 * time.Minute,
 		},
 		{
 			name:     "custom timeout",
-			params:   map[string]string{"refresh_timeout_minutes": "30"},
+			params:   pipeline.ParameterMap{"refresh_timeout_minutes": "30"},
 			expected: 30 * time.Minute,
 		},
 		{
 			name:     "invalid timeout uses default",
-			params:   map[string]string{"refresh_timeout_minutes": "abc"},
+			params:   pipeline.ParameterMap{"refresh_timeout_minutes": "abc"},
 			expected: 60 * time.Minute,
 		},
 		{
 			name:     "zero timeout uses default",
-			params:   map[string]string{"refresh_timeout_minutes": "0"},
+			params:   pipeline.ParameterMap{"refresh_timeout_minutes": "0"},
 			expected: 60 * time.Minute,
 		},
 		{
 			name:     "negative timeout uses default",
-			params:   map[string]string{"refresh_timeout_minutes": "-5"},
+			params:   pipeline.ParameterMap{"refresh_timeout_minutes": "-5"},
 			expected: 60 * time.Minute,
 		},
 	}
@@ -105,16 +105,16 @@ func TestGetBoolParam(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		params    map[string]string
+		params    pipeline.ParameterMap
 		key       string
 		wantValue bool
 		wantOk    bool
 	}{
-		{"missing key", map[string]string{}, "key", false, false},
-		{"empty value", map[string]string{"key": ""}, "key", false, false},
-		{"true", map[string]string{"key": "true"}, "key", true, true},
-		{"false", map[string]string{"key": "false"}, "key", false, true},
-		{"invalid", map[string]string{"key": "maybe"}, "key", false, false},
+		{"missing key", pipeline.ParameterMap{}, "key", false, false},
+		{"empty value", pipeline.ParameterMap{"key": ""}, "key", false, false},
+		{"true", pipeline.ParameterMap{"key": "true"}, "key", true, true},
+		{"false", pipeline.ParameterMap{"key": "false"}, "key", false, true},
+		{"invalid", pipeline.ParameterMap{"key": "maybe"}, "key", false, false},
 	}
 
 	for _, tt := range tests {
@@ -132,15 +132,15 @@ func TestGetIntParam(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		params    map[string]string
+		params    pipeline.ParameterMap
 		key       string
 		wantValue int
 		wantOk    bool
 	}{
-		{"missing key", map[string]string{}, "key", 0, false},
-		{"empty value", map[string]string{"key": ""}, "key", 0, false},
-		{"valid int", map[string]string{"key": "42"}, "key", 42, true},
-		{"invalid", map[string]string{"key": "abc"}, "key", 0, false},
+		{"missing key", pipeline.ParameterMap{}, "key", 0, false},
+		{"empty value", pipeline.ParameterMap{"key": ""}, "key", 0, false},
+		{"valid int", pipeline.ParameterMap{"key": "42"}, "key", 42, true},
+		{"invalid", pipeline.ParameterMap{"key": "abc"}, "key", 0, false},
 	}
 
 	for _, tt := range tests {

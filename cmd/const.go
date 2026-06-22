@@ -60,14 +60,77 @@ func renderAssetParamsMutator(renderer jinja.RendererInterface) pipeline.AssetMu
 			return nil, fmt.Errorf("error creating renderer for asset %s: %w", a.Name, err)
 		}
 		for key, value := range a.Parameters {
-			renderedValue, err := renderer.Render(value)
+			renderedValue, err := renderParameterValue(renderer, value)
 			if err != nil {
 				return nil, fmt.Errorf("error rendering parameter %q: %w", key, err)
 			}
-			a.Parameters[key] = strings.TrimSpace(renderedValue)
+			a.Parameters[key] = renderedValue
 		}
 
 		return a, nil
+	}
+}
+
+func renderParameterValue(renderer jinja.RendererInterface, value interface{}) (interface{}, error) {
+	switch typed := value.(type) {
+	case string:
+		renderedValue, err := renderer.Render(typed)
+		if err != nil {
+			return nil, err
+		}
+		return strings.TrimSpace(renderedValue), nil
+	case []interface{}:
+		renderedValues := make([]interface{}, len(typed))
+		for i, item := range typed {
+			renderedItem, err := renderParameterValue(renderer, item)
+			if err != nil {
+				return nil, err
+			}
+			renderedValues[i] = renderedItem
+		}
+		return renderedValues, nil
+	case []string:
+		renderedValues := make([]string, len(typed))
+		for i, item := range typed {
+			renderedItem, err := renderParameterValue(renderer, item)
+			if err != nil {
+				return nil, err
+			}
+			renderedValues[i] = renderedItem.(string)
+		}
+		return renderedValues, nil
+	case map[string]interface{}:
+		renderedValues := make(map[string]interface{}, len(typed))
+		for key, item := range typed {
+			renderedItem, err := renderParameterValue(renderer, item)
+			if err != nil {
+				return nil, err
+			}
+			renderedValues[key] = renderedItem
+		}
+		return renderedValues, nil
+	case map[string]string:
+		renderedValues := make(map[string]string, len(typed))
+		for key, item := range typed {
+			renderedItem, err := renderParameterValue(renderer, item)
+			if err != nil {
+				return nil, err
+			}
+			renderedValues[key] = renderedItem.(string)
+		}
+		return renderedValues, nil
+	case pipeline.ParameterMap:
+		renderedValues := make(pipeline.ParameterMap, len(typed))
+		for key, item := range typed {
+			renderedItem, err := renderParameterValue(renderer, item)
+			if err != nil {
+				return nil, err
+			}
+			renderedValues[key] = renderedItem
+		}
+		return renderedValues, nil
+	default:
+		return value, nil
 	}
 }
 

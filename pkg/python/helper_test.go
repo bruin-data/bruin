@@ -20,7 +20,7 @@ func Test_uvPythonRunner_ingestrLoaderFileFormat(t *testing.T) {
 		{
 			name: "should append loader file format when parameter exists",
 			asset: &pipeline.Asset{
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"loader_file_format": "parquet",
 				},
 			},
@@ -30,7 +30,7 @@ func Test_uvPythonRunner_ingestrLoaderFileFormat(t *testing.T) {
 		{
 			name: "should not append loader file format when parameter is empty",
 			asset: &pipeline.Asset{
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"loader_file_format": "",
 				},
 			},
@@ -40,7 +40,7 @@ func Test_uvPythonRunner_ingestrLoaderFileFormat(t *testing.T) {
 		{
 			name: "should not append loader file format when parameter doesn't exist",
 			asset: &pipeline.Asset{
-				Parameters: map[string]string{},
+				Parameters: pipeline.ParameterMap{},
 			},
 			cmdArgs:  []string{"--existing", "arg"},
 			expected: []string{"--existing", "arg"},
@@ -61,7 +61,7 @@ func TestConsolidatedParameters_IngestrFlagPassthrough(t *testing.T) {
 	t.Parallel()
 
 	asset := &pipeline.Asset{
-		Parameters: map[string]string{
+		Parameters: pipeline.ParameterMap{
 			"incremental_key":      "updated_at",
 			"incremental_strategy": "merge",
 			"partition_by":         "event_date",
@@ -123,26 +123,26 @@ func TestConsolidatedParameters_TrimWhitespace(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		params   map[string]string
+		params   pipeline.ParameterMap
 		expected []string
 	}{
 		{
 			name: "true appends trim whitespace flag",
-			params: map[string]string{
+			params: pipeline.ParameterMap{
 				"trim_whitespace": "true",
 			},
 			expected: []string{"--existing", "--trim-whitespace"},
 		},
 		{
 			name: "false does not append trim whitespace flag",
-			params: map[string]string{
+			params: pipeline.ParameterMap{
 				"trim_whitespace": "false",
 			},
 			expected: []string{"--existing"},
 		},
 		{
 			name:     "missing does not append trim whitespace flag",
-			params:   map[string]string{},
+			params:   pipeline.ParameterMap{},
 			expected: []string{"--existing"},
 		},
 	}
@@ -298,7 +298,7 @@ func TestConsolidatedParameters_EnforceSchema(t *testing.T) {
 		{
 			name: "enforce_schema=true adds columns",
 			asset: &pipeline.Asset{
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"enforce_schema": "true",
 				},
 				Columns: []pipeline.Column{
@@ -314,7 +314,7 @@ func TestConsolidatedParameters_EnforceSchema(t *testing.T) {
 		{
 			name: "enforce_schema=false does not add columns",
 			asset: &pipeline.Asset{
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"enforce_schema": "false",
 				},
 				Columns: []pipeline.Column{
@@ -330,7 +330,7 @@ func TestConsolidatedParameters_EnforceSchema(t *testing.T) {
 		{
 			name: "default enforces when EnforceSchemaByDefault=true",
 			asset: &pipeline.Asset{
-				Parameters: map[string]string{},
+				Parameters: pipeline.ParameterMap{},
 				Columns: []pipeline.Column{
 					{Name: "id", Type: "integer"},
 				},
@@ -344,7 +344,7 @@ func TestConsolidatedParameters_EnforceSchema(t *testing.T) {
 		{
 			name: "default does not enforce when EnforceSchemaByDefault=false",
 			asset: &pipeline.Asset{
-				Parameters: map[string]string{},
+				Parameters: pipeline.ParameterMap{},
 				Columns: []pipeline.Column{
 					{Name: "id", Type: "integer"},
 				},
@@ -358,7 +358,7 @@ func TestConsolidatedParameters_EnforceSchema(t *testing.T) {
 		{
 			name: "nil columnOpts does not add columns",
 			asset: &pipeline.Asset{
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"enforce_schema": "true",
 				},
 				Columns: []pipeline.Column{
@@ -371,7 +371,7 @@ func TestConsolidatedParameters_EnforceSchema(t *testing.T) {
 		{
 			name: "normalizes column names when NormalizeColumnNames=true",
 			asset: &pipeline.Asset{
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"enforce_schema": "true",
 				},
 				Columns: []pipeline.Column{
@@ -387,7 +387,7 @@ func TestConsolidatedParameters_EnforceSchema(t *testing.T) {
 		{
 			name: "seed asset with path parameter can disable enforce_schema",
 			asset: &pipeline.Asset{
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"path":           "./seed.csv",
 					"enforce_schema": "false",
 				},
@@ -405,7 +405,7 @@ func TestConsolidatedParameters_EnforceSchema(t *testing.T) {
 		{
 			name: "seed asset without enforce_schema uses default (true)",
 			asset: &pipeline.Asset{
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"path": "./seed.csv",
 				},
 				Columns: []pipeline.Column{
@@ -444,7 +444,7 @@ func TestConsolidatedParameters_SourceColumn(t *testing.T) {
 	t.Run("source_column with enforce_schema=true emits dest:type:source", func(t *testing.T) {
 		t.Parallel()
 		asset := &pipeline.Asset{
-			Parameters: map[string]string{
+			Parameters: pipeline.ParameterMap{
 				"enforce_schema": "true",
 			},
 			Columns: []pipeline.Column{
@@ -468,7 +468,7 @@ func TestConsolidatedParameters_SourceColumn(t *testing.T) {
 	t.Run("source_column without enforce_schema does not emit --columns", func(t *testing.T) {
 		t.Parallel()
 		asset := &pipeline.Asset{
-			Parameters: map[string]string{},
+			Parameters: pipeline.ParameterMap{},
 			Columns: []pipeline.Column{
 				{Name: "id", SourceColumn: "sourceid", Type: "integer"},
 			},

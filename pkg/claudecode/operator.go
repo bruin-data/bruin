@@ -260,34 +260,34 @@ func (o *ClaudeCodeOperator) extractParameters(asset *pipeline.Asset) (*ClaudePa
 	}
 
 	// Required: prompt
-	prompt, exists := asset.Parameters[ParamPrompt]
+	prompt, exists := asset.Parameters.GetString(ParamPrompt)
 	if !exists || strings.TrimSpace(prompt) == "" {
 		return nil, errors.New("'prompt' parameter is required and cannot be empty")
 	}
 	params.Prompt = prompt
 
 	// Optional: model
-	if model, exists := asset.Parameters[ParamModel]; exists && model != "" {
+	if model, exists := asset.Parameters.GetString(ParamModel); exists && model != "" {
 		params.Model = model
 	}
 
 	// Optional: fallback_model
-	if fallbackModel, exists := asset.Parameters[ParamFallbackModel]; exists && fallbackModel != "" {
+	if fallbackModel, exists := asset.Parameters.GetString(ParamFallbackModel); exists && fallbackModel != "" {
 		params.FallbackModel = fallbackModel
 	}
 
 	// Optional: output_format
-	if format, exists := asset.Parameters[ParamOutputFormat]; exists && format != "" {
+	if format, exists := asset.Parameters.GetString(ParamOutputFormat); exists && format != "" {
 		params.OutputFormat = format
 	}
 
 	// Optional: system_prompt
-	if systemPrompt, exists := asset.Parameters[ParamSystemPrompt]; exists && systemPrompt != "" {
+	if systemPrompt, exists := asset.Parameters.GetString(ParamSystemPrompt); exists && systemPrompt != "" {
 		params.SystemPrompt = systemPrompt
 	}
 
 	// Optional: allowed_directories (comma-separated)
-	if dirs, exists := asset.Parameters[ParamAllowedDirs]; exists && dirs != "" {
+	if dirs, exists := asset.Parameters.GetString(ParamAllowedDirs); exists && dirs != "" {
 		params.AllowedDirs = strings.Split(dirs, ",")
 		for i := range params.AllowedDirs {
 			params.AllowedDirs[i] = strings.TrimSpace(params.AllowedDirs[i])
@@ -295,47 +295,47 @@ func (o *ClaudeCodeOperator) extractParameters(asset *pipeline.Asset) (*ClaudePa
 	}
 
 	// Optional: allowed_tools
-	if tools, exists := asset.Parameters[ParamAllowedTools]; exists && tools != "" {
+	if tools, exists := asset.Parameters.GetString(ParamAllowedTools); exists && tools != "" {
 		params.AllowedTools = tools
 	}
 
 	// Optional: disallowed_tools
-	if tools, exists := asset.Parameters[ParamDisallowedTools]; exists && tools != "" {
+	if tools, exists := asset.Parameters.GetString(ParamDisallowedTools); exists && tools != "" {
 		params.DisallowedTools = tools
 	}
 
 	// Optional: skip_permissions
-	if skip, exists := asset.Parameters[ParamSkipPermissions]; exists {
+	if skip, exists := asset.Parameters.GetString(ParamSkipPermissions); exists {
 		params.SkipPermissions = skip == "true" || skip == "yes" || skip == "1"
 	}
 
 	// Optional: permission_mode
-	if mode, exists := asset.Parameters[ParamPermissionMode]; exists && mode != "" {
+	if mode, exists := asset.Parameters.GetString(ParamPermissionMode); exists && mode != "" {
 		params.PermissionMode = mode
 	}
 
 	// Optional: session_id
-	if sessionID, exists := asset.Parameters[ParamSessionID]; exists && sessionID != "" {
+	if sessionID, exists := asset.Parameters.GetString(ParamSessionID); exists && sessionID != "" {
 		params.SessionID = sessionID
 	}
 
 	// Optional: continue_session
-	if continueSession, exists := asset.Parameters[ParamContinueSession]; exists {
+	if continueSession, exists := asset.Parameters.GetString(ParamContinueSession); exists {
 		params.ContinueSession = continueSession == "true" || continueSession == "yes" || continueSession == "1"
 	}
 
 	// Optional: debug
-	if debug, exists := asset.Parameters[ParamDebug]; exists {
+	if debug, exists := asset.Parameters.GetString(ParamDebug); exists {
 		params.Debug = debug == "true" || debug == "yes" || debug == "1"
 	}
 
 	// Optional: verbose
-	if verbose, exists := asset.Parameters[ParamVerbose]; exists {
+	if verbose, exists := asset.Parameters.GetString(ParamVerbose); exists {
 		params.Verbose = verbose == "true" || verbose == "yes" || verbose == "1"
 	}
 
 	// Optional: working_dir
-	if workingDir, exists := asset.Parameters[ParamWorkingDir]; exists && workingDir != "" {
+	if workingDir, exists := asset.Parameters.GetString(ParamWorkingDir); exists && workingDir != "" {
 		// If working_dir is relative, make it absolute relative to the asset definition file
 		if !filepath.IsAbs(workingDir) {
 			assetDir := filepath.Dir(asset.DefinitionFile.Path)

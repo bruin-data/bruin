@@ -229,6 +229,43 @@ func TestIndividualTasks(t *testing.T) {
 			},
 		},
 		{
+			name: "validate-nested-params-rendering",
+			task: e2e.Task{
+				Name:    "validate-nested-params-rendering",
+				Command: binary,
+				Args:    []string{"validate", filepath.Join(currentFolder, "test-pipelines/nested-params-rendering")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"Successfully validated 1 assets across 1 pipeline"},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "validate-nested-params-do-not-expose-parameters-to-jinja",
+			task: e2e.Task{
+				Name:    "validate-nested-params-do-not-expose-parameters-to-jinja",
+				Command: binary,
+				Args:    []string{"validate", filepath.Join(currentFolder, "test-pipelines/nested-params-no-jinja-access")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 1,
+					Contains: []string{
+						`error rendering parameter "nested"`,
+						`missing variable 'parameters'`,
+					},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
 			name: "policy-variables",
 			task: e2e.Task{
 				Name:    "policy-variables",

@@ -86,8 +86,9 @@ type connectionRemapper struct {
 }
 
 func (cr *connectionRemapper) GetConnection(string) any {
+	athenaConn, _ := cr.ti.GetAsset().Parameters.GetString("athena_connection")
 	name := cmp.Or(
-		cr.ti.GetAsset().Parameters["athena_connection"],
+		athenaConn,
 		cr.ti.GetPipeline().DefaultConnections["athena"],
 	)
 	return cr.connGetter.GetConnection(name)

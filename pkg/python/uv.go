@@ -438,7 +438,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 	_, _ = output.Write([]byte("Successfully collected the data from the asset, uploading to the destination...\n"))
 
 	if len(asset.Parameters) == 0 {
-		asset.Parameters = make(map[string]string)
+		asset.Parameters = make(pipeline.ParameterMap)
 	}
 
 	if mat.Strategy != "" {
@@ -510,7 +510,8 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 	}
 
 	ingestrCtx := ctx
-	showLogs := asset.Parameters["show_ingestr_logs"] == "true"
+	showLogsVal, _ := asset.Parameters.GetString("show_ingestr_logs")
+	showLogs := showLogsVal == "true"
 	var logBuffer *tailBuffer
 	if !showLogs {
 		logBuffer = newTailBuffer(1 << 20) // 1MB cap

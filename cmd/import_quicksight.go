@@ -440,7 +440,7 @@ func createQuickSightDatasetAsset(
 	fileName := assetName + ".asset.yml"
 	filePath := filepath.Join(assetsPath, fileName)
 
-	parameters := map[string]string{
+	parameters := pipeline.ParameterMap{
 		"dataset_id":   detail.ID,
 		"dataset_name": detail.Name,
 		"import_mode":  detail.ImportMode,
@@ -509,7 +509,7 @@ func createQuickSightDashboardAsset(
 	fileName := assetName + ".asset.yml"
 	filePath := filepath.Join(assetsPath, fileName)
 
-	parameters := map[string]string{
+	parameters := pipeline.ParameterMap{
 		"dashboard_id":   detail.ID,
 		"dashboard_name": detail.Name,
 	}

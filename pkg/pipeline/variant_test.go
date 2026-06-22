@@ -287,13 +287,13 @@ func TestPipeline_MaterializeVariant(t *testing.T) {
 		// correctly at run time.
 		pl := build()
 		pl.DefaultValues = &pipeline.DefaultValues{
-			Parameters: map[string]string{"region": "{{ var.region }}"},
+			Parameters: pipeline.ParameterMap{"region": "{{ var.region }}"},
 			Hooks: pipeline.Hooks{
 				Pre:  []pipeline.Hook{{Query: "select '{{ start_date }}'"}},
 				Post: []pipeline.Hook{{Query: "select '{{ end_date }}'"}},
 			},
 		}
-		pl.Assets[0].Parameters = map[string]string{
+		pl.Assets[0].Parameters = pipeline.ParameterMap{
 			"database": "{{ var.client }}_db",
 			"query":    "select '{{ start_date }}'",
 		}
@@ -526,7 +526,7 @@ func buildFullyPopulatedPipelineForVisitorTest() *pipeline.Pipeline {
 		Upstreams: []pipeline.Upstream{
 			{Type: "asset", Value: "x", Metadata: map[string]string{"k": "v"}, Columns: []pipeline.DependsColumn{{Name: "n", Usage: "u"}}},
 		},
-		Parameters: map[string]string{"k": "v"},
+		Parameters: pipeline.ParameterMap{"k": "v"},
 		Secrets:    []pipeline.SecretMapping{{SecretKey: "k", InjectedKey: "i"}},
 		Extends:    []string{"x"},
 		Columns: []pipeline.Column{
@@ -571,7 +571,7 @@ func buildFullyPopulatedPipelineForVisitorTest() *pipeline.Pipeline {
 			Image:      "image",
 			Instance:   "instance",
 			Owner:      "owner",
-			Parameters: map[string]string{"k": "v"},
+			Parameters: pipeline.ParameterMap{"k": "v"},
 			Extends:    []string{"x"},
 			Columns: []pipeline.Column{
 				{

@@ -39,7 +39,7 @@ func (r *DryRunner) DryRun(ctx context.Context, p pipeline.Pipeline, a pipeline.
 	case pipeline.AssetTypeBigqueryQuery:
 		queryString = a.ExecutableFile.Content
 	case pipeline.AssetTypeBigqueryQuerySensor:
-		queryParam, ok := a.Parameters["query"]
+		queryParam, ok := a.Parameters.GetString("query")
 		if !ok {
 			return nil, errors.New("query sensor requires a parameter named 'query'")
 		}

@@ -209,7 +209,7 @@ func singleLineCommentsToTask(scanner *bufio.Scanner, commentMarker, filePath st
 
 func commentRowsToTask(commentRows []string) (*Asset, error) {
 	task := Asset{
-		Parameters:   make(map[string]string),
+		Parameters:   make(ParameterMap),
 		Columns:      make([]Column, 0),
 		CustomChecks: make([]CustomCheck, 0),
 		Secrets:      make([]SecretMapping, 0),

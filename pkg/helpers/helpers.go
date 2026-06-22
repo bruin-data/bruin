@@ -20,7 +20,7 @@ import (
 )
 
 func GetIngestrDestinationType(asset *pipeline.Asset) (pipeline.AssetType, error) {
-	ingestrDestination, ok := asset.Parameters["destination"]
+	ingestrDestination, ok := asset.Parameters.GetString("destination")
 	if !ok {
 		return "", errors.New("`destination` parameter not found")
 	}
@@ -240,7 +240,7 @@ func TrimToLength(s string, maxLength int) string {
 }
 
 func GetPokeInterval(ctx context.Context, t *pipeline.Asset) int64 {
-	pokeIntervalStr, ok := t.Parameters["poke_interval"]
+	pokeIntervalStr, ok := t.Parameters.GetString("poke_interval")
 	var pokeInterval int64
 	if ok {
 		var err error
@@ -315,7 +315,7 @@ func ParseSensorDuration(raw string) (time.Duration, error) {
 // GetSensorTimeout returns the configured sensor timeout for an asset, falling
 // back to DefaultSensorTimeout when unset, invalid, or non-positive.
 func GetSensorTimeout(t *pipeline.Asset) time.Duration {
-	raw, ok := t.Parameters["timeout"]
+	raw, ok := t.Parameters.GetString("timeout")
 	if !ok || strings.TrimSpace(raw) == "" {
 		return DefaultSensorTimeout
 	}

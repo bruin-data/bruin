@@ -44,6 +44,76 @@ func (m *mockGlossaryReader) GetEntities(pathToPipeline string) ([]*glossary.Ent
 	return m.entities, nil
 }
 
+func TestParameterMapGetString(t *testing.T) {
+	t.Parallel()
+
+	params := pipeline.ParameterMap{
+		"string": "value",
+		"int":    3,
+		"float":  1.5,
+		"bool":   true,
+		"nested": map[string]interface{}{"key": "value"},
+		"list":   []interface{}{"value"},
+		"nil":    nil,
+	}
+
+	got, ok := params.GetString("string")
+	require.True(t, ok)
+	assert.Equal(t, "value", got)
+
+	got, ok = params.GetString("int")
+	require.True(t, ok)
+	assert.Equal(t, "3", got)
+
+	got, ok = params.GetString("float")
+	require.True(t, ok)
+	assert.Equal(t, "1.5", got)
+
+	got, ok = params.GetString("bool")
+	require.True(t, ok)
+	assert.Equal(t, "true", got)
+
+	_, ok = params.GetString("nested")
+	assert.False(t, ok)
+
+	_, ok = params.GetString("list")
+	assert.False(t, ok)
+
+	_, ok = params.GetString("nil")
+	assert.False(t, ok)
+
+	_, ok = params.GetString("missing")
+	assert.False(t, ok)
+}
+
+func TestAssetParametersYAMLSupportStructuredValues(t *testing.T) {
+	t.Parallel()
+
+	var asset pipeline.Asset
+	err := yaml.Unmarshal([]byte(`
+name: structured-params
+type: duckdb.sql
+parameters:
+  string: value
+  count: 3
+  enabled: true
+  nested:
+    key: value
+  list:
+    - one
+    - 2
+`), &asset)
+	require.NoError(t, err)
+
+	assert.Equal(t, "value", asset.Parameters["string"])
+	assert.Equal(t, 3, asset.Parameters["count"])
+	assert.Equal(t, true, asset.Parameters["enabled"])
+	nested, ok := asset.Parameters["nested"].(pipeline.ParameterMap)
+	require.True(t, ok)
+	assert.Equal(t, map[string]interface{}{"key": "value"}, map[string]interface{}(nested))
+	assert.Equal(t, []interface{}{"one", 2}, asset.Parameters["list"])
+}
+
 func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 	t.Parallel()
 
@@ -72,7 +142,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 			Path: path.AbsPathForTests(t, "testdata/pipeline/first-pipeline/tasks/task1/task.yml"),
 			Type: pipeline.YamlTask,
 		},
-		Parameters: map[string]string{
+		Parameters: pipeline.ParameterMap{
 			"param1": "value1",
 			"param2": "value2",
 		},
@@ -96,7 +166,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 		ID:   "c69409a1840ddb3639a4acbaaec46c238c63b6431cc74ee5254b6dcef7b88c4b",
 		Name: "second-task",
 		Type: "bq.transfer",
-		Parameters: map[string]string{
+		Parameters: pipeline.ParameterMap{
 			"transfer_config_id": "some-uuid",
 			"project_id":         "a-new-project-id",
 			"location":           "europe-west1",
@@ -132,7 +202,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 			Path: path.AbsPathForTests(t, "testdata/pipeline/first-pipeline/tasks/test.py"),
 			Type: pipeline.CommentTask,
 		},
-		Parameters: map[string]string{
+		Parameters: pipeline.ParameterMap{
 			"param1": "first-parameter",
 			"param2": "second-parameter",
 			"param3": "third-parameter",
@@ -170,7 +240,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 			Path: path.AbsPathForTests(t, "testdata/pipeline/first-pipeline/tasks/test.sql"),
 			Type: pipeline.CommentTask,
 		},
-		Parameters: map[string]string{
+		Parameters: pipeline.ParameterMap{
 			"param1": "first-parameter",
 			"param2": "second-parameter",
 		},
@@ -654,7 +724,7 @@ func TestPipeline_GetConnectionNameForAsset(t *testing.T) {
 		t.Parallel()
 		found, err := pipeline1.GetConnectionNameForAsset(&pipeline.Asset{
 			Type:       "ingestr",
-			Parameters: map[string]string{"destination": "bigquery"},
+			Parameters: pipeline.ParameterMap{"destination": "bigquery"},
 		})
 		require.NoError(t, err)
 		assert.Equal(t, "default-gcp-connection", found)
@@ -2092,7 +2162,7 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 			},
 			want: &pipeline.Asset{
 				Name:       "test-asset",
-				Parameters: pipeline.EmptyStringMap{},
+				Parameters: pipeline.ParameterMap{},
 				IntervalModifiers: pipeline.IntervalModifiers{
 					Start: pipeline.TimeModifier{Days: 1},
 					End:   pipeline.TimeModifier{Days: -1},
@@ -2118,7 +2188,7 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 			},
 			want: &pipeline.Asset{
 				Name:       "test-asset",
-				Parameters: pipeline.EmptyStringMap{},
+				Parameters: pipeline.ParameterMap{},
 				IntervalModifiers: pipeline.IntervalModifiers{
 					Start: pipeline.TimeModifier{Hours: 2},
 					End:   pipeline.TimeModifier{Hours: -2},
@@ -2145,7 +2215,7 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 			want: &pipeline.Asset{
 				Name:       "test-asset",
 				Type:       pipeline.AssetTypeBigqueryQuery,
-				Parameters: pipeline.EmptyStringMap{},
+				Parameters: pipeline.ParameterMap{},
 				ExecutableFile: pipeline.ExecutableFile{
 					Path: "/tmp/test-asset.sql",
 				},
@@ -2175,7 +2245,7 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 			want: &pipeline.Asset{
 				Name:       "test-asset",
 				Type:       pipeline.AssetTypePython,
-				Parameters: pipeline.EmptyStringMap{},
+				Parameters: pipeline.ParameterMap{},
 				ExecutableFile: pipeline.ExecutableFile{
 					Path: "/tmp/test-asset.py",
 				},
@@ -2201,7 +2271,7 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 			want: &pipeline.Asset{
 				Name:       "test-asset",
 				Type:       pipeline.AssetTypeBigqueryQuery,
-				Parameters: pipeline.EmptyStringMap{},
+				Parameters: pipeline.ParameterMap{},
 				ExecutableFile: pipeline.ExecutableFile{
 					Path: "/tmp/test-asset.asset.yml",
 				},
@@ -2231,7 +2301,7 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 			want: &pipeline.Asset{
 				Name:       "test-asset",
 				Type:       pipeline.AssetTypeIngestr,
-				Parameters: pipeline.EmptyStringMap{},
+				Parameters: pipeline.ParameterMap{},
 				ExecutableFile: pipeline.ExecutableFile{
 					Path: "/tmp/test-asset.sql",
 				},
@@ -2256,7 +2326,7 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 			},
 			want: &pipeline.Asset{
 				Name:       "test-asset",
-				Parameters: pipeline.EmptyStringMap{},
+				Parameters: pipeline.ParameterMap{},
 				Hooks: pipeline.Hooks{
 					Pre:  []pipeline.Hook{{Query: "select 9"}},
 					Post: []pipeline.Hook{{Query: "select 10"}},
@@ -2275,7 +2345,7 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 			},
 			want: &pipeline.Asset{
 				Name:       "test-asset",
-				Parameters: pipeline.EmptyStringMap{},
+				Parameters: pipeline.ParameterMap{},
 				Routing:    &pipeline.RoutingConfig{EgressGateway: "wg-shared-ams3"},
 			},
 		},
@@ -2292,7 +2362,7 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 			},
 			want: &pipeline.Asset{
 				Name:       "test-asset",
-				Parameters: pipeline.EmptyStringMap{},
+				Parameters: pipeline.ParameterMap{},
 				Routing:    &pipeline.RoutingConfig{EgressGateway: "wg-vendor-us"},
 			},
 		},
@@ -2309,7 +2379,7 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 			},
 			want: &pipeline.Asset{
 				Name:       "test-asset",
-				Parameters: pipeline.EmptyStringMap{},
+				Parameters: pipeline.ParameterMap{},
 				Routing:    &pipeline.RoutingConfig{EgressGateway: "wg-shared-ams3"},
 			},
 		},
@@ -2398,7 +2468,7 @@ func TestBuilder_SetupDefaultsFromPipelineAppliesAssetFieldDefaults(t *testing.T
 			Strategy: pipeline.MaterializationStrategyAppend,
 		},
 		Upstreams: []pipeline.Upstream{{Type: "asset", Value: "asset-upstream"}},
-		Parameters: pipeline.EmptyStringMap{
+		Parameters: pipeline.ParameterMap{
 			"shared": "asset",
 		},
 		Extends: []string{"asset.extend"},
@@ -2442,7 +2512,7 @@ func TestBuilder_SetupDefaultsFromPipelineAppliesAssetFieldDefaults(t *testing.T
 		Instance:   "b1.small",
 		Owner:      "data",
 		Tier:       2,
-		Parameters: map[string]string{"shared": "default", "default": "yes"},
+		Parameters: pipeline.ParameterMap{"shared": "default", "default": "yes"},
 		Extends:    []string{"default.extend", "asset.extend"},
 		Columns: []pipeline.Column{
 			{
@@ -2510,7 +2580,7 @@ func TestBuilder_SetupDefaultsFromPipelineAppliesAssetFieldDefaults(t *testing.T
 	assert.Equal(t, "b1.small", got.Instance)
 	assert.Equal(t, "data", got.Owner)
 	assert.Equal(t, 2, got.Tier)
-	assert.Equal(t, pipeline.EmptyStringMap{"shared": "asset", "default": "yes"}, got.Parameters)
+	assert.Equal(t, pipeline.ParameterMap{"shared": "asset", "default": "yes"}, got.Parameters)
 	assert.Equal(t, []string{"asset.extend", "default.extend"}, got.Extends)
 	assert.Equal(t, pipeline.EmptyStringMap{"catalog": "default"}, got.Metadata)
 	assert.Equal(t, "default-wh", got.Snowflake.Warehouse)
