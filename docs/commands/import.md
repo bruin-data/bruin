@@ -1,11 +1,12 @@
 # `import` Command
 
-The `import` commands allow you to automatically import existing resources from your data warehouse as Bruin assets. This includes database tables, BigQuery scheduled queries, Tableau dashboards, and QuickSight assets.
+The `import` commands allow you to automatically import existing resources as Bruin assets. This includes database tables, BigQuery scheduled queries, ODI XML exports, Tableau dashboards, and QuickSight assets.
 
 ## Available Subcommands
 
 - `bruin import database` - Import database tables as Bruin assets
 - `bruin import bq-scheduled-queries` - Import BigQuery scheduled queries as Bruin assets
+- `bruin import odi` - Import Oracle Data Integrator XML exports as Bruin assets
 - `bruin import tableau` - Import Tableau dashboards, workbooks, and data sources as Bruin assets
 - `bruin import quicksight` - Import QuickSight datasets and dashboards as Bruin assets
 
@@ -368,6 +369,124 @@ Common issues and solutions:
 - [`bruin run`](./run.md) - Execute the imported query assets
 - [`bruin validate`](./validate.md) - Validate the imported pipeline structure
 - [`bruin import database`](#import-database) - Import database tables as assets
+
+---
+
+## `import odi`
+
+Import Oracle Data Integrator (ODI/Sunopsis) XML exports as Bruin Oracle assets.
+
+```bash
+bruin import odi [FLAGS] [ODI XML file or directory] [pipeline path]
+```
+
+### Overview
+
+The ODI importer converts exported scenario XML into a Bruin pipeline by:
+
+- Reading ODI scenario files (`SnpScen`, `SnpScenStep`, and `SnpScenTask`)
+- Reading logical schema exports (`SnpLschema`) and mapping ODI logical schemas to Oracle schemas
+- Creating `oracle.sql` assets for executable ODI scenario steps
+- Creating `oracle.source` assets for referenced upstream Oracle tables
+- Creating `empty` control assets for `OdiStartScen` scenario calls when the called scenario is present in the same import
+- Translating common ODI expressions such as `odiRef.getObjectName`, `odiRef.getSchemaName`, and `#GLOBAL.VAR_NAME`
+- Creating ODI variable macros in `macros/odi_variables.sql` and using them from imported SQL assets
+- Detecting ODI control-flow constructs such as failure branches, success jumps, loops, unsupported variable operations, and unresolved scenario calls
+- Creating `pipeline.yml` when the target pipeline path does not already contain one
+
+### Arguments
+
+| Argument | Description |
+|----------|-------------|
+| `ODI XML file or directory` | **Required.** A single ODI XML export or a directory containing ODI XML exports. Directories are scanned recursively for `.xml` files. |
+| `pipeline path` | **Required.** Path where the Bruin pipeline and generated assets should be written. |
+
+### Flags
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--connection`, `-c` | string | - | Optional Oracle connection name to set on imported assets. |
+| `--overwrite` | bool | `false` | Overwrite existing generated asset files. By default, existing files are skipped. |
+
+### Examples
+
+Import a directory of ODI exports into a new pipeline:
+
+```bash
+bruin import odi ./odi-export ./bruin-odi-pipeline
+```
+
+Import with an Oracle connection:
+
+```bash
+bruin import odi ./odi-export ./bruin-odi-pipeline --connection oracle-prod
+```
+
+Overwrite previously generated files:
+
+```bash
+bruin import odi ./odi-export ./bruin-odi-pipeline --overwrite
+```
+
+### Generated Asset Structure
+
+For a mapping step targeting `LGC_STG.STG_D_LOAN_1`, where `LGC_STG` maps to Oracle schema `STG`, the importer creates:
+
+```text
+my-pipeline/
+├─ pipeline.yml
+├─ odi_control_flow_report.yml
+├─ macros/
+│  └─ odi_variables.sql
+└─ assets/
+   ├─ odi/
+   │  └─ pkg_parent/
+   │     └─ 010_start_child_v001_task_1.asset.yml
+   ├─ stg/
+   │  └─ stg_d_loan_1.sql
+   └─ tb/
+      └─ kredi.asset.yml
+```
+
+The generated SQL asset uses the Oracle asset type:
+
+```sql
+/* @bruin
+name: stg.stg_d_loan_1
+type: oracle.sql
+connection: oracle-prod
+depends:
+  - tb.kredi
+meta:
+  importer: odi
+  odi_scenario: PKG_D_LOAN_STG_1
+  odi_step: MAP_STG_D_LOAN_1
+@bruin */
+
+-- ODI task: Insert new rows / IKM Oracle (task_no=80, order=80, type=J)
+insert into "STG"."STG_D_LOAN_1"
+select *
+from "TB"."KREDI";
+```
+
+When an `OdiStartScen` command targets another scenario included in the same import, the importer creates an `empty` Bruin asset for that call. The call asset depends on the generated assets from the called scenario, and later assets in the caller scenario depend on the call asset.
+If the called scenario is missing from the import, the runtime command is preserved as a SQL comment so it remains visible during migration review.
+When procedural control flow is detected, the importer still writes the SQL, source, and macro assets it can safely flatten, and writes `odi_control_flow_report.yml` with the constructs that need manual migration review.
+
+### Notes
+
+- ODI variable references are converted to generated macro calls. For example, `#GLOBAL.VAR_ETL_DATE` becomes <code v-pre>{{ odi_global_var_etl_date() }}</code> in asset SQL.
+- Variable defaults found in ODI scenario exports are added to `pipeline.yml`, and generated macros wrap those defaults when no ODI variable-step SQL expression is available.
+- ODI variable steps are not generated as standalone assets; simple `SELECT ... FROM DUAL` assignments are converted into macro bodies instead.
+- ODI control-flow is not emulated as a procedural runner. Linear steps and resolvable scenario calls are flattened into Bruin assets, while non-linear routing and unresolved calls are reported for manual conversion into Bruin-native pipelines or orchestration.
+- Logical schemas without a matching export use a simple fallback: `LGC_STG` becomes `STG`.
+- Review generated assets before running them. ODI exports can contain multi-statement operational SQL, PL/SQL blocks, and ODI runtime commands that may need manual adjustment for your Oracle connection and Bruin execution model.
+
+### Related Commands
+
+- [`bruin run`](./run.md) - Execute the imported ODI assets
+- [`bruin validate`](./validate.md) - Validate the imported pipeline structure
+- [`bruin render`](./render.md) - Preview rendered variables in imported SQL assets
 
 ---
 

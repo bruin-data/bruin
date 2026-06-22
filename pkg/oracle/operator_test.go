@@ -195,6 +195,36 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "multiple queries successfully executed",
+			setup: func(f *fields) {
+				f.e.On("ExtractQueriesFromString", "some query").
+					Return([]*query.Query{
+						{Query: "create table users (id number)"},
+						{Query: "insert into users values (1)"},
+					}, nil)
+
+				f.m.On("Render", mock.Anything, "create table users (id number)").
+					Return("create table users (id number)", nil)
+				f.m.On("Render", mock.Anything, "insert into users values (1)").
+					Return("insert into users values (1)", nil)
+
+				f.q.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "create table users (id number)"}).
+					Return(nil)
+				f.q.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "insert into users values (1)"}).
+					Return(nil)
+			},
+			args: args{
+				t: &pipeline.Asset{
+					Type: pipeline.AssetTypeOracleQuery,
+					ExecutableFile: pipeline.ExecutableFile{
+						Path:    "test-file.sql",
+						Content: "some query",
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
 			name: "query successfully executed with materialization",
 			setup: func(f *fields) {
 				f.e.On("ExtractQueriesFromString", "some query").
