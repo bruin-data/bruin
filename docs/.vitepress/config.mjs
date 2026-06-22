@@ -517,6 +517,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     },
 
     markdown: {
+        headers: {
+            level: [2, 3, 4],
+        },
         languages: ["sql", "yaml", "shell", "python", "json", jinja2Grammar, bruinSqlGrammar, bruinPythonGrammar],
     },
 
