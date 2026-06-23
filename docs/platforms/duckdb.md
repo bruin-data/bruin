@@ -46,6 +46,8 @@ This is useful when you only need to read from a shared DuckDB database and want
 DuckDB assets should use the type `duckdb.sql` and if you specify a connection it must be of the `duckdb` type.
 For detailed parameters, you can check [Definition Schema](../assets/definition-schema.md) page.
 
+Asset names may be `table`, `schema.table`, or `catalog.schema.table`. A three-part name targets an attached database (catalog); Bruin creates the schema in that catalog automatically, but the catalog must already be attached.
+
 ### Examples
 
 Create a view with orders per country

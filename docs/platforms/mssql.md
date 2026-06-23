@@ -123,6 +123,12 @@ For a complete list of available parameters, see the [go-mssqldb documentation](
 
 Runs a materialized SQL Server asset or an SQL script. For detailed parameters, you can check [Definition Schema](../assets/definition-schema.md) page.
 
+Asset names may be `table`, `schema.table`, or `database.schema.table`. A three-part name lets you target a database other than the one in your connection config.
+
+::: warning Three-part `ddl` assets across databases
+With the `ddl` materialization strategy, Bruin auto-creates the asset's schema in the connection's *current* database. If a `database.schema.table` asset targets a different database, the schema must already exist there or the run fails with a "schema does not exist" error. Other strategies (e.g. `create+replace`) create the table directly and are unaffected.
+:::
+
 #### Examples
 
 Run an MS SQL script to generate sales report
@@ -170,7 +176,7 @@ parameters:
 
 **Parameters**:
 
-- `table`: `schema_id.table_id` or (for default schema `dbo`) `table_id` format.
+- `table`: `database_id.schema_id.table_id`, `schema_id.table_id`, or (for default schema `dbo`) `table_id` format.
 - `poke_interval`: The interval between retries in seconds (default 30 seconds).
 - `timeout`: How long to wait before the sensor fails. Uses single-unit duration syntax (`s`, `m`, `h`, `d`, `ms`, `ns`), e.g. `1h` or `90m`. Defaults to `24h`. See [Sensor Timeout](/assets/sensor#timeout).
 
