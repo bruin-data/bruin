@@ -655,12 +655,12 @@ In your `.bruin.yml`:
 
 ```yaml
 connections:
-  tableau-prod:
-    type: tableau
-    base_url: https://prod-useast-b.online.tableau.com
-    site_id: internetsociety
-    personal_access_token: ${TABLEAU_PAT_TOKEN}
-    personal_access_token_name: ${TABLEAU_PAT_NAME}
+  tableau:
+    - name: tableau-prod
+      host: prod-useast-b.online.tableau.com # hostname only, without https://
+      site_id: internetsociety
+      personal_access_token_name: ${TABLEAU_PAT_NAME}
+      personal_access_token_secret: ${TABLEAU_PAT_TOKEN}
 ```
 
 ### Output

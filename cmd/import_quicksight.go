@@ -722,7 +722,12 @@ Example:
 			configFile := c.String("config-file")
 			importAll := c.Bool("all")
 
-			return runQuickSightImport(ctx, pipelinePath, connectionName, environment, configFile, importAll)
+			if err := runQuickSightImport(ctx, pipelinePath, connectionName, environment, configFile, importAll); err != nil {
+				errorPrinter.Printf("Failed to import QuickSight assets: %s\n", err)
+				return cli.Exit("", 1)
+			}
+
+			return nil
 		},
 	}
 }
