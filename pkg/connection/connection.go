@@ -26,6 +26,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/attio"
 	"github.com/bruin-data/bruin/pkg/balldontlie"
 	"github.com/bruin-data/bruin/pkg/bigquery"
+	"github.com/bruin-data/bruin/pkg/braze"
 	"github.com/bruin-data/bruin/pkg/bruincloud"
 	"github.com/bruin-data/bruin/pkg/cassandra"
 	"github.com/bruin-data/bruin/pkg/chess"
@@ -259,6 +260,7 @@ type Manager struct {
 	CustomerIo           map[string]*customerio.Client
 	Sendgrid             map[string]*sendgrid.Client
 	Twilio               map[string]*twilio.Client
+	Braze                map[string]*braze.Client
 	Espn                 map[string]*espn.Client
 	APIFootball          map[string]*apifootball.Client
 	FootballData         map[string]*footballdata.Client
@@ -3166,6 +3168,26 @@ func (m *Manager) AddTwilioConnectionFromConfig(connection *config.TwilioConnect
 	return nil
 }
 
+func (m *Manager) AddBrazeConnectionFromConfig(connection *config.BrazeConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.Braze == nil {
+		m.Braze = make(map[string]*braze.Client)
+	}
+
+	client, err := braze.NewClient(braze.Config{
+		APIKey:   connection.APIKey,
+		Endpoint: connection.Endpoint,
+	})
+	if err != nil {
+		return err
+	}
+	m.Braze[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddEspnConnectionFromConfig(connection *config.EspnConnection) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -3716,6 +3738,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.CustomerIo, connectionManager.AddCustomerIoConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Sendgrid, connectionManager.AddSendgridConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Twilio, connectionManager.AddTwilioConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Braze, connectionManager.AddBrazeConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Espn, connectionManager.AddEspnConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.APIFootball, connectionManager.AddAPIFootballConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.FootballData, connectionManager.AddFootballDataConnectionFromConfig, &wg, &errList, &mu)

@@ -1810,6 +1810,16 @@ func (c SendgridConnection) GetName() string {
 	return c.Name
 }
 
+type BrazeConnection struct {
+	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey   string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	Endpoint string `yaml:"endpoint,omitempty" json:"endpoint" mapstructure:"endpoint"`
+}
+
+func (c BrazeConnection) GetName() string {
+	return c.Name
+}
+
 type TwilioConnection struct {
 	Name       string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	AccountSID string `yaml:"account_sid,omitempty" json:"account_sid" mapstructure:"account_sid"`

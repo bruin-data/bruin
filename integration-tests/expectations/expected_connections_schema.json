@@ -365,6 +365,26 @@
         "api_key"
       ]
     },
+    "BrazeConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "endpoint": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key",
+        "endpoint"
+      ]
+    },
     "BruinCloudConnection": {
       "properties": {
         "name": {
@@ -1316,6 +1336,12 @@
         "twilio": {
           "items": {
             "$ref": "#/$defs/TwilioConnection"
+          },
+          "type": "array"
+        },
+        "braze": {
+          "items": {
+            "$ref": "#/$defs/BrazeConnection"
           },
           "type": "array"
         },

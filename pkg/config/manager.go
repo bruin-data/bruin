@@ -143,6 +143,7 @@ type Connections struct {
 	CustomerIo          []CustomerIoConnection          `yaml:"customerio,omitempty" json:"customerio,omitempty" mapstructure:"customerio"`
 	Sendgrid            []SendgridConnection            `yaml:"sendgrid,omitempty" json:"sendgrid,omitempty" mapstructure:"sendgrid"`
 	Twilio              []TwilioConnection              `yaml:"twilio,omitempty" json:"twilio,omitempty" mapstructure:"twilio"`
+	Braze               []BrazeConnection               `yaml:"braze,omitempty" json:"braze,omitempty" mapstructure:"braze"`
 	Espn                []EspnConnection                `yaml:"espn,omitempty" json:"espn,omitempty" mapstructure:"espn"`
 	APIFootball         []APIFootballConnection         `yaml:"apifootball,omitempty" json:"apifootball,omitempty" mapstructure:"apifootball"`
 	FootballData        []FootballDataConnection        `yaml:"footballdata,omitempty" json:"footballdata,omitempty" mapstructure:"footballdata"`
@@ -1333,6 +1334,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Twilio = append(env.Connections.Twilio, conn)
+	case "braze":
+		var conn BrazeConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Braze = append(env.Connections.Braze, conn)
 	case "espn":
 		var conn EspnConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1643,6 +1651,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Sendgrid = removeConnection(env.Connections.Sendgrid, connectionName)
 	case "twilio":
 		env.Connections.Twilio = removeConnection(env.Connections.Twilio, connectionName)
+	case "braze":
+		env.Connections.Braze = removeConnection(env.Connections.Braze, connectionName)
 	case "espn":
 		env.Connections.Espn = removeConnection(env.Connections.Espn, connectionName)
 	case "apifootball":
@@ -1832,6 +1842,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.CustomerIo, source.CustomerIo)
 	mergeConnectionList(&c.Sendgrid, source.Sendgrid)
 	mergeConnectionList(&c.Twilio, source.Twilio)
+	mergeConnectionList(&c.Braze, source.Braze)
 	mergeConnectionList(&c.Espn, source.Espn)
 	mergeConnectionList(&c.APIFootball, source.APIFootball)
 	mergeConnectionList(&c.FootballData, source.FootballData)

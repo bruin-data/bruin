@@ -822,6 +822,18 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "incoming_phone_numbers", PrimaryKey: "sid", IncKey: "", IncStrategy: "replace"},
 		{Name: "usage_records", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
 	},
+	// Braze - Customer engagement platform (campaigns, canvases, KPIs)
+	"braze": {
+		{Name: "campaigns", PrimaryKey: "id", IncKey: "last_edited", IncStrategy: "merge"},
+		{Name: "canvases", PrimaryKey: "id", IncKey: "last_edited", IncStrategy: "merge"},
+		{Name: "segments", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "events", PrimaryKey: "event_name", IncKey: "", IncStrategy: "replace"},
+		{Name: "products", PrimaryKey: "product_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "kpi_dau", PrimaryKey: "time", IncKey: "time", IncStrategy: "merge"},
+		{Name: "kpi_mau", PrimaryKey: "time", IncKey: "time", IncStrategy: "merge"},
+		{Name: "kpi_new_users", PrimaryKey: "time", IncKey: "time", IncStrategy: "merge"},
+		{Name: "kpi_uninstalls", PrimaryKey: "time", IncKey: "time", IncStrategy: "merge"},
+	},
 
 	// SFTP (user-defined paths)
 	"sftp": {},
