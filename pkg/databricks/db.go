@@ -10,6 +10,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/tablename"
 	_ "github.com/databricks/databricks-sql-go"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
@@ -389,24 +390,27 @@ ORDER BY t.table_schema, t.table_name;
 }
 
 func (db *DB) BuildTableExistsQuery(tableName string) (string, error) {
-	tableComponents := strings.Split(tableName, ".")
-	for _, component := range tableComponents {
-		if component == "" {
-			return "", fmt.Errorf("table name must be in format schema.table, '%s' given", tableName)
-		}
+	cb, ok := tablename.For("databricks")
+	if !ok {
+		return "", errors.New("databricks table-name capability not found")
+	}
+	tn, err := cb.Parse(tableName, tablename.Defaults{})
+	if err != nil {
+		return "", err
 	}
 
-	if len(tableComponents) != 2 {
-		return "", fmt.Errorf("table name must be in format schema.table, '%s' given", tableName)
+	// information_schema is catalog-scoped in Unity Catalog; qualify the lookup
+	// with the catalog when the name carries one.
+	infoSchema := "information_schema"
+	if tn.Catalog != "" {
+		infoSchema = tn.Catalog + ".information_schema"
 	}
-
-	schemaName := tableComponents[0]
-	targetTable := tableComponents[1]
 
 	query := fmt.Sprintf(
-		"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '%s' AND table_name = '%s'",
-		schemaName,
-		targetTable,
+		"SELECT COUNT(*) FROM %s.tables WHERE table_schema = '%s' AND table_name = '%s'",
+		infoSchema,
+		tn.Schema,
+		tn.Table,
 	)
 
 	return strings.TrimSpace(query), nil

@@ -23,6 +23,53 @@ import (
 
 var noIssues = make([]*Issue, 0)
 
+func TestEnsureAssetNameComponentCountIsValid(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		assetName string
+		assetType pipeline.AssetType
+		wantIssue bool
+	}{
+		// enabled three-level platforms accept three components
+		{name: "snowflake three-part valid", assetName: "raw.analytics.events", assetType: pipeline.AssetTypeSnowflakeQuery},
+		{name: "bigquery three-part valid", assetName: "proj.ds.tbl", assetType: pipeline.AssetTypeBigqueryQuery},
+		{name: "databricks three-part valid", assetName: "main.silver.orders", assetType: pipeline.AssetTypeDatabricksQuery},
+		{name: "duckdb three-part valid", assetName: "cat.main.t", assetType: pipeline.AssetTypeDuckDBQuery},
+		// two-level engines reject three components
+		{name: "mssql three-part rejected (deferred)", assetName: "db.dbo.t", assetType: pipeline.AssetTypeMsSQLQuery, wantIssue: true},
+		{name: "postgres three-part rejected", assetName: "db.public.users", assetType: pipeline.AssetTypePostgresQuery, wantIssue: true},
+		{name: "clickhouse three-part rejected", assetName: "cat.db.t", assetType: pipeline.AssetTypeClickHouse, wantIssue: true},
+		{name: "mysql three-part rejected", assetName: "a.b.c", assetType: pipeline.AssetTypeMySQLQuery, wantIssue: true},
+		// two-part still valid on two-level engines
+		{name: "postgres two-part valid", assetName: "public.users", assetType: pipeline.AssetTypePostgresQuery},
+		// bigquery requires at least two components
+		{name: "bigquery one-part rejected", assetName: "tbl", assetType: pipeline.AssetTypeBigqueryQuery, wantIssue: true},
+		// empty components rejected
+		{name: "empty component rejected", assetName: "raw..events", assetType: pipeline.AssetTypeSnowflakeQuery, wantIssue: true},
+		// non-database asset types are out of scope (no capability) -> no-op even with many dots
+		{name: "python dotted name no-op", assetName: "a.b.c.d", assetType: pipeline.AssetTypePython},
+		{name: "ingestr dotted name no-op", assetName: "a.b.c.d", assetType: pipeline.AssetTypeIngestr},
+		// empty name handled elsewhere -> no-op here
+		{name: "empty name no-op", assetName: "", assetType: pipeline.AssetTypeSnowflakeQuery},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			asset := &pipeline.Asset{Name: tt.assetName, Type: tt.assetType}
+			issues, err := EnsureAssetNameComponentCountIsValid(context.Background(), &pipeline.Pipeline{}, asset)
+			require.NoError(t, err)
+			if tt.wantIssue {
+				assert.Len(t, issues, 1)
+			} else {
+				assert.Empty(t, issues)
+			}
+		})
+	}
+}
+
 func TestEnsureTaskNameIsNotEmpty(t *testing.T) {
 	t.Parallel()
 
@@ -4290,15 +4337,15 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 		{
-			name: "Snowflake - invalid format (single component)",
+			name: "Snowflake - valid single component (table only, db+schema from config)",
 			asset: &pipeline.Asset{
 				Name: "task1",
 				Type: pipeline.AssetTypeSnowflakeTableSensor,
 				Parameters: pipeline.ParameterMap{
-					"table": "schema",
+					"table": "table",
 				},
 			},
-			want:    []string{"Snowflake table sensor `table` parameter must be in format `schema.table` or `database.schema.table`, 'schema' given"},
+			want:    []string{},
 			wantErr: assert.NoError,
 		},
 		{
@@ -4345,7 +4392,7 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 					"table": "table",
 				},
 			},
-			want:    []string{"Databricks table sensor `table` parameter must be in format `schema.table`, 'table' given"},
+			want:    []string{"Databricks table sensor `table` parameter must be in format `schema.table` or `catalog.schema.table`, 'table' given"},
 			wantErr: assert.NoError,
 		},
 		{
@@ -4355,6 +4402,18 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 				Type: pipeline.AssetTypeDatabricksTableSensor,
 				Parameters: pipeline.ParameterMap{
 					"table": "schema.table",
+				},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Databricks - valid catalog.schema.table format",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeDatabricksTableSensor,
+				Parameters: pipeline.ParameterMap{
+					"table": "catalog.schema.table",
 				},
 			},
 			want:    []string{},

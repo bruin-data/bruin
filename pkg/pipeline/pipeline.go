@@ -811,6 +811,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeSynapseQuery:              "synapse",
 	AssetTypeSynapseSeed:               "synapse",
 	AssetTypeSynapseQuerySensor:        "synapse",
+	AssetTypeSynapseTableSensor:        "synapse",
 	AssetTypeSynapseSource:             "synapse",
 	AssetTypeAthenaQuery:               "athena",
 	AssetTypeAthenaSeed:                "athena",
@@ -1200,15 +1201,29 @@ func (a *Asset) AddUpstream(asset *Asset) {
 	})
 }
 
+// prefixSchemaComponent applies the dev-environment schema prefix to the schema
+// component of a (possibly multi-part) table name. The schema is always the
+// component immediately before the table, so for `schema.table` it prefixes the
+// first component and for `catalog.schema.table` it prefixes the middle one,
+// leaving the catalog/database untouched. This matches the dev-environment query
+// rewriter (see pkg/devenv). Single-component names have no schema to prefix and
+// are returned unchanged.
+func prefixSchemaComponent(name, prefix string) string {
+	nameParts := strings.Split(name, ".")
+	if len(nameParts) < 2 {
+		return name
+	}
+	schemaIdx := len(nameParts) - 2
+	nameParts[schemaIdx] = prefix + nameParts[schemaIdx]
+	return strings.Join(nameParts, ".")
+}
+
 func (a *Asset) PrefixSchema(prefix string) {
 	if prefix == "" {
 		return
 	}
 
-	nameParts := strings.Split(a.Name, ".")
-	if len(nameParts) == 2 {
-		a.Name = prefix + nameParts[0] + "." + nameParts[1]
-	}
+	a.Name = prefixSchemaComponent(a.Name, prefix)
 }
 
 func (a *Asset) PrefixUpstreams(prefix string) {
@@ -1221,10 +1236,7 @@ func (a *Asset) PrefixUpstreams(prefix string) {
 			continue
 		}
 
-		nameParts := strings.Split(u.Value, ".")
-		if len(nameParts) == 2 {
-			a.Upstreams[i].Value = prefix + nameParts[0] + "." + nameParts[1]
-		}
+		a.Upstreams[i].Value = prefixSchemaComponent(u.Value, prefix)
 	}
 }
 

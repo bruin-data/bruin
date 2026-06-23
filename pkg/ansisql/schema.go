@@ -7,6 +7,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/tablename"
 	"github.com/pkg/errors"
 )
 
@@ -25,20 +26,14 @@ type queryRunner interface {
 }
 
 func (sc *SchemaCreator) CreateSchemaIfNotExist(ctx context.Context, qr queryRunner, asset *pipeline.Asset) error {
-	tableComponents := strings.Split(asset.Name, ".")
-	var schemaName string
-	switch len(tableComponents) {
-	case 2:
-		schemaName = strings.ToUpper(tableComponents[0])
-	case 3:
-		// Three-part names are `database.schema.table` (Snowflake) or
-		// `catalog.schema.table` (Databricks). Qualify the schema with the
-		// first component so it is created in the database/catalog named in the
-		// asset rather than the connection's default database. Keeping the
-		// qualifier in the cache key also stops the same schema name in two
-		// different databases from being deduped into a single creation.
-		schemaName = strings.ToUpper(tableComponents[0]) + "." + strings.ToUpper(tableComponents[1])
-	default:
+	// Three-part names are `database.schema.table` (Snowflake) or
+	// `catalog.schema.table` (Databricks). SchemaToCreate qualifies the schema
+	// with the first component so it is created in the database/catalog named in
+	// the asset rather than the connection's default. The qualifier is also part
+	// of the cache key, so the same schema name in two different databases is not
+	// deduped into a single creation.
+	schemaName, ok := tablename.SchemaToCreate(asset.Name, strings.ToUpper)
+	if !ok {
 		return nil
 	}
 	// Check the cache for the database

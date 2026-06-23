@@ -21,6 +21,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/python"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
+	"github.com/bruin-data/bruin/pkg/tablename"
 	"github.com/pkg/errors"
 	"github.com/robfig/cron/v3"
 	"github.com/spf13/afero"
@@ -1564,86 +1565,65 @@ func ValidateTableSensorTableParameter(ctx context.Context, p *pipeline.Pipeline
 	return issues, nil
 }
 
-type TableNameValidationRule struct {
-	MinComponents int
-	MaxComponents int
-	FormatDesc    string
-}
-
-var tableNameValidationRules = map[string]TableNameValidationRule{
-	"BigQuery": {
-		MinComponents: 2,
-		MaxComponents: 3,
-		FormatDesc:    "`dataset.table` or `project.dataset.table`",
-	},
-	"Snowflake": {
-		MinComponents: 2,
-		MaxComponents: 3,
-		FormatDesc:    "`schema.table` or `database.schema.table`",
-	},
-	"Databricks": {
-		MinComponents: 2,
-		MaxComponents: 2,
-		FormatDesc:    "`schema.table`",
-	},
-	"Athena": {
-		MinComponents: 1,
-		MaxComponents: 1,
-		FormatDesc:    "`table`",
-	},
-	"PostgreSQL": {
-		MinComponents: 1,
-		MaxComponents: 2,
-		FormatDesc:    "`table` or `schema.table`",
-	},
-	"Redshift": {
-		MinComponents: 1,
-		MaxComponents: 2,
-		FormatDesc:    "`table` or `schema.table`",
-	},
-	"MS SQL": {
-		MinComponents: 1,
-		MaxComponents: 2,
-		FormatDesc:    "`table` or `schema.table`",
-	},
-	"ClickHouse": {
-		MinComponents: 1,
-		MaxComponents: 2,
-		FormatDesc:    "`table` or `schema.table`",
-	},
-	"Synapse": {
-		MinComponents: 1,
-		MaxComponents: 2,
-		FormatDesc:    "`table` or `schema.table`",
-	},
-	"MySQL": {
-		MinComponents: 1,
-		MaxComponents: 2,
-		FormatDesc:    "`table` or `schema.table`",
-	},
-}
-
+// validateTableNameFormat validates a table sensor's `table` parameter against
+// the platform's table-name capability (the single source of truth shared with
+// asset-name validation, see EnsureAssetNameComponentCountIsValid). It returns an
+// empty string when the name is valid.
 func validateTableNameFormat(assetType pipeline.AssetType, tableName string) string {
-	tableItems := strings.Split(tableName, ".")
 	platformName := platformNames[assetType]
 
-	for _, component := range tableItems {
+	platformKey, ok := pipeline.AssetTypeConnectionMapping[assetType]
+	if !ok {
+		return fmt.Sprintf("Table sensor is not supported for this asset type %s", assetType)
+	}
+	capability, ok := tablename.For(platformKey)
+	if !ok {
+		return fmt.Sprintf("Table sensor is not supported for this asset type %s", assetType)
+	}
+
+	for _, component := range strings.Split(tableName, ".") {
 		if component == "" {
 			return fmt.Sprintf("%s table sensor `table` parameter contains empty components, '%s' given", platformName, tableName)
 		}
 	}
 
-	rule, exists := tableNameValidationRules[platformName]
-	if !exists {
-		return fmt.Sprintf("Table sensor is not supported for this asset type %s", assetType)
-	}
-
-	componentCount := len(tableItems)
-	if componentCount < rule.MinComponents || componentCount > rule.MaxComponents {
-		return fmt.Sprintf("%s table sensor `table` parameter must be in format %s, '%s' given", platformName, rule.FormatDesc, tableName)
+	if err := capability.CheckName(tableName); err != nil {
+		return fmt.Sprintf("%s table sensor `table` parameter must be in format %s, '%s' given", platformName, capability.FormatDesc, tableName)
 	}
 
 	return ""
+}
+
+// EnsureAssetNameComponentCountIsValid validates that an asset's own name has a
+// component count supported by its target platform (e.g. rejecting
+// `catalog.schema.table` on Postgres, which has no third level). It no-ops for
+// asset types with no table-name capability (Python, ingestr, EMR/Spark, etc.),
+// keeping non-database assets out of scope.
+func EnsureAssetNameComponentCountIsValid(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+
+	if asset.Name == "" {
+		// Emptiness is reported by the task-name-valid rule.
+		return issues, nil
+	}
+
+	platformKey, ok := pipeline.AssetTypeConnectionMapping[asset.Type]
+	if !ok {
+		return issues, nil
+	}
+	capability, ok := tablename.For(platformKey)
+	if !ok {
+		return issues, nil
+	}
+
+	if err := capability.CheckName(asset.Name); err != nil {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("Asset name '%s' is not valid for %s: it must be in format %s", asset.Name, platformKey, capability.FormatDesc),
+		})
+	}
+
+	return issues, nil
 }
 
 // ValidateSensorTimeout validates the optional `timeout` parameter on sensor
