@@ -814,6 +814,14 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "lists", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
 		{Name: "single_sends", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
 	},
+	// Twilio - Cloud communications (messaging, voice, phone numbers)
+	"twilio": {
+		{Name: "messages", PrimaryKey: "sid", IncKey: "", IncStrategy: "replace"},
+		{Name: "calls", PrimaryKey: "sid", IncKey: "date_updated", IncStrategy: "merge"},
+		{Name: "recordings", PrimaryKey: "sid", IncKey: "date_updated", IncStrategy: "merge"},
+		{Name: "incoming_phone_numbers", PrimaryKey: "sid", IncKey: "", IncStrategy: "replace"},
+		{Name: "usage_records", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+	},
 
 	// SFTP (user-defined paths)
 	"sftp": {},
