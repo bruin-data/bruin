@@ -356,7 +356,7 @@ type taskDefinition struct {
 	Domains               []string          `yaml:"domains"`
 	Meta                  map[string]string `yaml:"meta"`
 	RerunCooldown         *int              `yaml:"rerun_cooldown"`
-	Retries               *int              `yaml:"retries,omitempty"`
+	Retries               *int              `yaml:"retries"`
 	RefreshRestricted     *bool             `yaml:"refresh_restricted,omitempty"`
 	FullRefreshRestricted *bool             `yaml:"full_refresh_restricted,omitempty"`
 	Notifications         Notifications     `yaml:"notifications"`
