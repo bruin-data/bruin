@@ -194,15 +194,21 @@ func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 	// `schema.table` and `database.schema.table`. The schema is created in the
 	// session's current database, so a three-part name's schema is auto-created
 	// only when the database component is the connection's current database.
+	cb, ok := tablename.For("mssql")
+	if !ok {
+		return "", errors.New("mssql table-name capability not found")
+	}
+	tn, err := cb.Parse(asset.Name, tablename.Defaults{})
+	if err != nil {
+		return "", err
+	}
 	queries := make([]string, 0, 2)
-	if cb, ok := tablename.For("mssql"); ok {
-		if tn, err := cb.Parse(asset.Name, tablename.Defaults{}); err == nil && tn.Schema != "" {
-			queries = append(queries, fmt.Sprintf(
-				"IF SCHEMA_ID(%s) IS NULL\n    EXEC(N'CREATE SCHEMA %s')",
-				sqlStringLiteral(tn.Schema),
-				strings.ReplaceAll(quoteIdentifier(tn.Schema), "'", "''"),
-			))
-		}
+	if tn.Schema != "" {
+		queries = append(queries, fmt.Sprintf(
+			"IF SCHEMA_ID(%s) IS NULL\n    EXEC(N'CREATE SCHEMA %s')",
+			sqlStringLiteral(tn.Schema),
+			strings.ReplaceAll(quoteIdentifier(tn.Schema), "'", "''"),
+		))
 	}
 
 	columnDefs := make([]string, 0, len(asset.Columns)+1)
