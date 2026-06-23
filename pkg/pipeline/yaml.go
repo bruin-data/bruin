@@ -289,6 +289,7 @@ type column struct {
 	Name          string            `yaml:"name"`
 	SourceColumn  string            `yaml:"source_column"`
 	Type          string            `yaml:"type"`
+	Mask          string            `yaml:"mask"`
 	Description   string            `yaml:"description"`
 	Tests         []columnCheck     `yaml:"checks"`
 	PrimaryKey    bool              `yaml:"primary_key"`
@@ -513,6 +514,7 @@ func taskDefinitionToAsset(definition taskDefinition) (*Asset, error) {
 			Name:            column.Name,
 			SourceColumn:    column.SourceColumn,
 			Type:            strings.TrimSpace(column.Type),
+			Mask:            strings.TrimSpace(column.Mask),
 			Description:     column.Description,
 			Checks:          tests,
 			PrimaryKey:      column.PrimaryKey,
