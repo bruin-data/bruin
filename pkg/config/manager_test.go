@@ -269,6 +269,12 @@ func TestLoadFromFile(t *testing.T) {
 					APIKey: "paddlekey",
 				},
 			},
+			GitLab: []GitLabConnection{
+				{
+					Name:        "conn-gitlab",
+					AccessToken: "gitlabtoken",
+				},
+			},
 			Dune: []DuneConnection{
 				{
 					Name:   "dune-1",
@@ -2153,6 +2159,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				FacebookAds:         []FacebookAdsConnection{{Name: "facebookads1"}},
 				Stripe:              []StripeConnection{{Name: "stripe1"}},
 				Paddle:              []PaddleConnection{{Name: "paddle1"}},
+				GitLab:              []GitLabConnection{{Name: "gitlab1"}},
 				Appsflyer:           []AppsflyerConnection{{Name: "appsflyer1"}},
 				Kafka:               []KafkaConnection{{Name: "kafka1"}},
 				RabbitMQ:            []RabbitMQConnection{{Name: "rabbitmq1"}},
@@ -2278,6 +2285,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				FacebookAds:         []FacebookAdsConnection{{Name: "facebookads1"}},
 				Stripe:              []StripeConnection{{Name: "stripe1"}},
 				Paddle:              []PaddleConnection{{Name: "paddle1"}},
+				GitLab:              []GitLabConnection{{Name: "gitlab1"}},
 				Appsflyer:           []AppsflyerConnection{{Name: "appsflyer1"}},
 				Kafka:               []KafkaConnection{{Name: "kafka1"}},
 				RabbitMQ:            []RabbitMQConnection{{Name: "rabbitmq1"}},

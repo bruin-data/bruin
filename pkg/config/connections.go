@@ -738,6 +738,16 @@ func (c PaddleConnection) GetName() string {
 	return c.Name
 }
 
+type GitLabConnection struct {
+	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	AccessToken string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
+	BaseURL     string `yaml:"base_url,omitempty" json:"base_url,omitempty" mapstructure:"base_url"`
+}
+
+func (c GitLabConnection) GetName() string {
+	return c.Name
+}
+
 type DuneConnection struct {
 	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`

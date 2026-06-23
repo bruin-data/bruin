@@ -59,6 +59,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/g2"
 	"github.com/bruin-data/bruin/pkg/gcs"
 	"github.com/bruin-data/bruin/pkg/github"
+	"github.com/bruin-data/bruin/pkg/gitlab"
 	"github.com/bruin-data/bruin/pkg/googleads"
 	"github.com/bruin-data/bruin/pkg/googleanalytics"
 	"github.com/bruin-data/bruin/pkg/gorgias"
@@ -172,6 +173,7 @@ type Manager struct {
 	FacebookAds          map[string]*facebookads.Client
 	Stripe               map[string]*stripe.Client
 	Paddle               map[string]*paddle.Client
+	GitLab               map[string]*gitlab.Client
 	SurveyMonkey         map[string]*surveymonkey.Client
 	Appsflyer            map[string]*appsflyer.Client
 	Kafka                map[string]*kafka.Client
@@ -1536,6 +1538,30 @@ func (m *Manager) AddPaddleConnectionFromConfig(connection *config.PaddleConnect
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Paddle[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddGitLabConnectionFromConfig(connection *config.GitLabConnection) error {
+	m.mutex.Lock()
+	if m.GitLab == nil {
+		m.GitLab = make(map[string]*gitlab.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := gitlab.NewClient(&gitlab.Config{
+		AccessToken: connection.AccessToken,
+		BaseURL:     connection.BaseURL,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.GitLab[connection.Name] = client
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 
@@ -3606,6 +3632,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.FacebookAds, connectionManager.AddFacebookAdsConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Stripe, connectionManager.AddStripeConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Paddle, connectionManager.AddPaddleConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.GitLab, connectionManager.AddGitLabConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Appsflyer, connectionManager.AddAppsflyerConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Kafka, connectionManager.AddKafkaConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.RabbitMQ, connectionManager.AddRabbitMQConnectionFromConfig, &wg, &errList, &mu)
