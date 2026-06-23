@@ -66,13 +66,13 @@ connections:
       username: "user_123"
       password: "pass_123"
       token: "token_123"
-      domain: "https://your-domain.my.salesforce.com"
+      domain: "your-domain.my.salesforce.com"
 ```
 
 - `username` is your Salesforce account username.
 - `password` is your Salesforce account password.
 - `token` is your Salesforce security token. Do not append the security token to the password.
-- `domain` is your Salesforce domain, for example `https://your-domain.my.salesforce.com`. For sandboxes, use the sandbox My Domain URL.
+- `domain` is your Salesforce domain. You can pass either the host, such as `your-domain.my.salesforce.com`, or the full URL, such as `https://your-domain.my.salesforce.com`. For sandboxes, use the sandbox My Domain URL.
 
 If SOAP API login is not enabled or username/password auth is blocked, use a static access token:
 
@@ -81,18 +81,18 @@ connections:
   salesforce:
     - name: "salesforce"
       access_token: "00D...!AQ...your_salesforce_access_token"
-      domain: "https://your-domain.my.salesforce.com"
+      domain: "your-domain.my.salesforce.com"
 ```
 
 - `access_token` must be valid for the Salesforce org and user.
 - Bruin does not refresh this token when it expires.
-- `domain` is the Salesforce instance domain for the same org as the token.
+- `domain` is the Salesforce instance domain for the same org as the token. You can pass either the host or the full URL.
 
 When `access_token` is set it takes precedence over `username`/`password`/`token`.
 
 Do not commit `.bruin.yml` if it contains Salesforce credentials.
 
-### Bruin Cloud connection setup
+### Step 5: Create a Bruin Cloud connection
 
 In Bruin Cloud:
 
@@ -137,7 +137,7 @@ then the Bruin Cloud connection name must be:
 salesforce
 ```
 
-### Step 5: Create an asset file for data ingestion
+### Step 6: Create an asset file for data ingestion
 
 To ingest data from Salesforce, you need to create an [asset configuration](/assets/ingestr#asset-structure) file. This file defines the data flow from the source to the destination. Create a YAML file, such as `salesforce_ingestion.yml`, inside the assets folder and add the following content:
 
@@ -190,7 +190,7 @@ Ingestion completed successfully
 | `event` | id | last_timestamp | merge | Used to track and manage calendar-based events, such as meetings, appointments, or calls. |
 | `custom:<custom_object_name>` | - | - | replace | Track and store data that's unique to your organization. |
 
-### Step 6: [Run](/commands/run) asset to ingest data
+### Step 7: [Run](/commands/run) asset to ingest data
 
 ```bash
 bruin run assets/salesforce_asset.yml
