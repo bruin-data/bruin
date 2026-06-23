@@ -104,7 +104,6 @@ func TestConsolidatedParameters_IngestrFlagPassthrough(t *testing.T) {
 		"--sql-reflection-level", "full",
 		"--sql-limit", "500",
 		"--sql-exclude-columns", "internal_notes",
-		"--mask", "email:hash",
 		"--pipelines-dir", ".ingestr",
 		"--staging-bucket", "gs://bucket/path",
 		"--staging-dataset", "scratch",
@@ -115,6 +114,7 @@ func TestConsolidatedParameters_IngestrFlagPassthrough(t *testing.T) {
 		"--no-inference",
 		"--trim-whitespace",
 		"--stream",
+		"--mask", "email:hash",
 	}, result)
 }
 
@@ -151,6 +151,78 @@ func TestConsolidatedParameters_TrimWhitespace(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			result, err := ConsolidatedParameters(t.Context(), &pipeline.Asset{Parameters: tt.params}, []string{"--existing"}, nil)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestConsolidatedParameters_ColumnMasks(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		params     pipeline.ParameterMap
+		columns    []pipeline.Column
+		columnOpts *ColumnHintOptions
+		expected   []string
+	}{
+		{
+			name: "column mask method emits column-qualified mask flag",
+			columns: []pipeline.Column{
+				{Name: "email", Mask: "hash"},
+				{Name: "phone", Mask: "sha256"},
+			},
+			expected: []string{"--existing", "--mask", "email:hash", "--mask", "phone:sha256"},
+		},
+		{
+			name: "full mask rule is preserved",
+			columns: []pipeline.Column{
+				{Name: "email", Mask: "contact_email:hash"},
+			},
+			expected: []string{"--existing", "--mask", "contact_email:hash"},
+		},
+		{
+			name: "column names are normalized when requested",
+			columns: []pipeline.Column{
+				{Name: "Contact Email", Mask: "hash"},
+			},
+			columnOpts: &ColumnHintOptions{
+				NormalizeColumnNames: true,
+			},
+			expected: []string{"--existing", "--mask", "contact_email:hash"},
+		},
+		{
+			name: "asset mask is preserved and duplicate column mask is skipped",
+			params: pipeline.ParameterMap{
+				"mask": "email:hash",
+			},
+			columns: []pipeline.Column{
+				{Name: "email", Mask: "hash"},
+				{Name: "phone", Mask: "sha256"},
+			},
+			expected: []string{"--existing", "--mask", "email:hash", "--mask", "phone:sha256"},
+		},
+		{
+			name: "empty masks are ignored",
+			columns: []pipeline.Column{
+				{Name: "email", Mask: " "},
+			},
+			expected: []string{"--existing"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			params := tt.params
+			if params == nil {
+				params = pipeline.ParameterMap{}
+			}
+			result, err := ConsolidatedParameters(t.Context(), &pipeline.Asset{
+				Parameters: params,
+				Columns:    tt.columns,
+			}, []string{"--existing"}, tt.columnOpts)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
 		})

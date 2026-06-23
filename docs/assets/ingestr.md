@@ -105,7 +105,7 @@ parameters:
 
 ### Column metadata
 
-Define columns on the asset to enrich the metadata passed to Ingestr. Columns flagged as `primary_key: true` are translated into repeated `--primary-key` flags, and date-typed incremental keys automatically surface through `--columns`. See [Column metadata](./columns.md) for the syntax.
+Define columns on the asset to enrich the metadata passed to Ingestr. Columns flagged as `primary_key: true` are translated into repeated `--primary-key` flags, columns with `mask` are translated into repeated `--mask` flags, and date-typed incremental keys automatically surface through `--columns`. See [Column metadata](./columns.md) for the syntax.
 
 ### Custom SQL queries
 
@@ -205,6 +205,7 @@ columns:
     type: string
   - name: email
     type: string
+    mask: hash
   - name: age
     type: integer
   - name: created_at
