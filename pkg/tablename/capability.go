@@ -78,16 +78,13 @@ var registry = map[string]Capability{
 		Labels:     [3]string{"catalog", "schema", "table"},
 		FormatDesc: "`table`, `schema.table`, or `catalog.schema.table`",
 	},
-	// --- two-level engines (3-part rejected) ---
-	// NOTE: MSSQL is a genuine three-level engine (database.schema.table) and is
-	// a planned next step, but its metadata path (GetColumns takes the database
-	// separately via `USE [db]`) needs a caller-spanning change before 3-part can
-	// be enabled end-to-end, so it is capped at 2 for now.
 	"mssql": {
-		Platform: "mssql", MinComponents: 1, MaxComponents: 2,
-		Labels:     [3]string{"", "schema", "table"},
-		FormatDesc: "`table` or `schema.table`",
+		Platform: "mssql", MinComponents: 1, MaxComponents: 3,
+		Labels:     [3]string{"database", "schema", "table"},
+		FormatDesc: "`table`, `schema.table`, or `database.schema.table`",
 	},
+
+	// --- two-level engines (3-part rejected) ---
 	"postgres": {
 		Platform: "postgres", MinComponents: 1, MaxComponents: 2,
 		Labels:     [3]string{"", "schema", "table"},

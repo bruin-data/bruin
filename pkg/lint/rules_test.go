@@ -37,8 +37,8 @@ func TestEnsureAssetNameComponentCountIsValid(t *testing.T) {
 		{name: "bigquery three-part valid", assetName: "proj.ds.tbl", assetType: pipeline.AssetTypeBigqueryQuery},
 		{name: "databricks three-part valid", assetName: "main.silver.orders", assetType: pipeline.AssetTypeDatabricksQuery},
 		{name: "duckdb three-part valid", assetName: "cat.main.t", assetType: pipeline.AssetTypeDuckDBQuery},
+		{name: "mssql three-part valid", assetName: "db.dbo.t", assetType: pipeline.AssetTypeMsSQLQuery},
 		// two-level engines reject three components
-		{name: "mssql three-part rejected (deferred)", assetName: "db.dbo.t", assetType: pipeline.AssetTypeMsSQLQuery, wantIssue: true},
 		{name: "postgres three-part rejected", assetName: "db.public.users", assetType: pipeline.AssetTypePostgresQuery, wantIssue: true},
 		{name: "clickhouse three-part rejected", assetName: "cat.db.t", assetType: pipeline.AssetTypeClickHouse, wantIssue: true},
 		{name: "mysql three-part rejected", assetName: "a.b.c", assetType: pipeline.AssetTypeMySQLQuery, wantIssue: true},
