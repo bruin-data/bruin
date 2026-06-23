@@ -285,6 +285,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                                     {text: "Asana", link: "/ingestion/asana"},
                                     {text: "Attio", link: "/ingestion/attio"},
                                     {text: "BallDontLie FIFA", link: "/ingestion/balldontlie"},
+                                    {text: "Braze", link: "/ingestion/braze"},
                                     {text: "Bruin", link: "/ingestion/bruin"},
                                     {text: "Chess", link: "/ingestion/chess"},
                                     {text: "ClickUp", link: "/ingestion/clickup"},

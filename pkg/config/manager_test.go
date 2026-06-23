@@ -822,6 +822,13 @@ func TestLoadFromFile(t *testing.T) {
 					APISecret:  "test-api-secret",
 				},
 			},
+			Braze: []BrazeConnection{
+				{
+					Name:     "braze-1",
+					APIKey:   "test-api-key",
+					Endpoint: "rest.iad-01.braze.com",
+				},
+			},
 			Espn: []EspnConnection{
 				{
 					Name:   "espn-1",
@@ -2252,6 +2259,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				CustomerIo:          []CustomerIoConnection{{Name: "customerio1"}},
 				Sendgrid:            []SendgridConnection{{Name: "sendgrid1"}},
 				Twilio:              []TwilioConnection{{Name: "twilio1"}},
+				Braze:               []BrazeConnection{{Name: "braze1"}},
 				Espn:                []EspnConnection{{Name: "espn1"}},
 				APIFootball:         []APIFootballConnection{{Name: "apifootball1"}},
 				FootballData:        []FootballDataConnection{{Name: "footballdata1"}},
@@ -2379,6 +2387,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				CustomerIo:          []CustomerIoConnection{{Name: "customerio1"}},
 				Sendgrid:            []SendgridConnection{{Name: "sendgrid1"}},
 				Twilio:              []TwilioConnection{{Name: "twilio1"}},
+				Braze:               []BrazeConnection{{Name: "braze1"}},
 				Espn:                []EspnConnection{{Name: "espn1"}},
 				APIFootball:         []APIFootballConnection{{Name: "apifootball1"}},
 				FootballData:        []FootballDataConnection{{Name: "footballdata1"}},

@@ -515,6 +515,10 @@ environments:
           auth_token: "test-auth-token"
           api_key: "test-api-key"
           api_secret: "test-api-secret"
+      braze:
+        - name: "braze-1"
+          api_key: "test-api-key"
+          endpoint: "rest.iad-01.braze.com"
       espn:
         - name: "espn-1"
           sport: "football"
