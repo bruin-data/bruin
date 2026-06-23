@@ -269,8 +269,8 @@ func TestGenerateAssetsPreservesLinearOrderAndDuplicateTargetSteps(t *testing.T)
 	require.Contains(t, assetsByName, "odi.pkg_linear.002_load_stage_again")
 	require.Contains(t, assetsByName, "stg.audit_table")
 
-	assert.Equal(t, "/out/assets/stg/stage_table.sql", assetsByName["stg.stage_table"].Asset.ExecutableFile.Path)
-	assert.Equal(t, "/out/assets/odi/pkg_linear/002_load_stage_again.sql", assetsByName["odi.pkg_linear.002_load_stage_again"].Asset.ExecutableFile.Path)
+	assert.Equal(t, filepath.Join("/out/assets", "stg", "stage_table.sql"), assetsByName["stg.stage_table"].Asset.ExecutableFile.Path)
+	assert.Equal(t, filepath.Join("/out/assets", "odi", "pkg_linear", "002_load_stage_again.sql"), assetsByName["odi.pkg_linear.002_load_stage_again"].Asset.ExecutableFile.Path)
 	assert.Equal(t, []string{"stg.stage_table"}, upstreamValues(assetsByName["odi.pkg_linear.002_load_stage_again"].Asset.Upstreams))
 	assert.Equal(t, []string{"odi.pkg_linear.002_load_stage_again"}, upstreamValues(assetsByName["stg.audit_table"].Asset.Upstreams))
 }
