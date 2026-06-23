@@ -522,13 +522,16 @@ func (db *DB) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset)
 
 func (db *DB) RecreateTableOnMaterializationTypeMismatch(ctx context.Context, asset *pipeline.Asset) error {
 	tableComponents := strings.Split(asset.Name, ".")
+	var databaseName string
 	var schemaName string
 	var tableName string
 	switch len(tableComponents) {
 	case 2:
+		databaseName = db.config.Database
 		schemaName = strings.ToUpper(tableComponents[0])
 		tableName = strings.ToUpper(tableComponents[1])
 	case 3:
+		databaseName = strings.ToUpper(tableComponents[0])
 		schemaName = strings.ToUpper(tableComponents[1])
 		tableName = strings.ToUpper(tableComponents[2])
 	default:
@@ -537,7 +540,7 @@ func (db *DB) RecreateTableOnMaterializationTypeMismatch(ctx context.Context, as
 
 	queryStr := fmt.Sprintf(
 		`SELECT TABLE_TYPE FROM %s.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'`,
-		db.config.Database, schemaName, tableName,
+		databaseName, schemaName, tableName,
 	)
 
 	result, err := db.Select(ctx, &query.Query{Query: queryStr})
@@ -569,11 +572,11 @@ func (db *DB) RecreateTableOnMaterializationTypeMismatch(ctx context.Context, as
 	}
 	if dbMaterializationType != asset.Materialization.Type {
 		dropQuery := query.Query{
-			Query: fmt.Sprintf("DROP %s IF EXISTS %s.%s", materializationType, schemaName, tableName),
+			Query: fmt.Sprintf("DROP %s IF EXISTS %s.%s.%s", materializationType, databaseName, schemaName, tableName),
 		}
 
 		if dropErr := db.RunQueryWithoutResult(ctx, &dropQuery); dropErr != nil {
-			return errors.Wrapf(dropErr, "failed to drop existing %s: %s.%s", materializationType, schemaName, tableName)
+			return errors.Wrapf(dropErr, "failed to drop existing %s: %s.%s.%s", materializationType, databaseName, schemaName, tableName)
 		}
 	}
 
@@ -582,13 +585,16 @@ func (db *DB) RecreateTableOnMaterializationTypeMismatch(ctx context.Context, as
 
 func (db *DB) PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset) error {
 	tableComponents := strings.Split(asset.Name, ".")
+	var databaseName string
 	var schemaName string
 	var tableName string
 	switch len(tableComponents) {
 	case 2:
+		databaseName = db.config.Database
 		schemaName = strings.ToUpper(tableComponents[0])
 		tableName = strings.ToUpper(tableComponents[1])
 	case 3:
+		databaseName = strings.ToUpper(tableComponents[0])
 		schemaName = strings.ToUpper(tableComponents[1])
 		tableName = strings.ToUpper(tableComponents[2])
 	default:
@@ -600,10 +606,10 @@ func (db *DB) PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset)
 	}
 
 	queryStr := fmt.Sprintf(
-		`SELECT COLUMN_NAME, COMMENT 
-          FROM %s.INFORMATION_SCHEMA.COLUMNS 
+		`SELECT COLUMN_NAME, COMMENT
+          FROM %s.INFORMATION_SCHEMA.COLUMNS
           WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'`,
-		db.config.Database, schemaName, tableName,
+		databaseName, schemaName, tableName,
 	)
 
 	rows, err := db.Select(ctx, &query.Query{Query: queryStr})
@@ -627,7 +633,7 @@ func (db *DB) PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset)
 		if col.Description != "" && existingComments[col.Name] != col.Description {
 			query := fmt.Sprintf(
 				`ALTER TABLE %s.%s.%s MODIFY COLUMN %s COMMENT '%s'`,
-				db.config.Database, schemaName, tableName, col.Name, escapeSQLString(col.Description),
+				databaseName, schemaName, tableName, col.Name, escapeSQLString(col.Description),
 			)
 			updateQueries = append(updateQueries, query)
 		}
@@ -642,7 +648,7 @@ func (db *DB) PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset)
 	if asset.Description != "" {
 		updateTableQuery := fmt.Sprintf(
 			`COMMENT ON TABLE %s.%s.%s IS '%s'`,
-			db.config.Database, schemaName, tableName, escapeSQLString(asset.Description),
+			databaseName, schemaName, tableName, escapeSQLString(asset.Description),
 		)
 		if err := db.RunQueryWithoutResult(ctx, &query.Query{Query: updateTableQuery}); err != nil {
 			return errors.Wrap(err, "failed to update table description")

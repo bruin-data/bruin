@@ -31,7 +31,13 @@ func (sc *SchemaCreator) CreateSchemaIfNotExist(ctx context.Context, qr queryRun
 	case 2:
 		schemaName = strings.ToUpper(tableComponents[0])
 	case 3:
-		schemaName = strings.ToUpper(tableComponents[1])
+		// Three-part names are `database.schema.table` (Snowflake) or
+		// `catalog.schema.table` (Databricks). Qualify the schema with the
+		// first component so it is created in the database/catalog named in the
+		// asset rather than the connection's default database. Keeping the
+		// qualifier in the cache key also stops the same schema name in two
+		// different databases from being deduped into a single creation.
+		schemaName = strings.ToUpper(tableComponents[0]) + "." + strings.ToUpper(tableComponents[1])
 	default:
 		return nil
 	}

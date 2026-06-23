@@ -63,6 +63,29 @@ func TestSchemaCreator_CreateSchemaIfNotExist(t *testing.T) {
 			expectedError: "failed to create or ensure database: TEST_SCHEMA: creation failed",
 		},
 		{
+			name: "three-part name qualifies schema with the database/catalog",
+			asset: &pipeline.Asset{
+				Name: "other_db.test_schema.test_table",
+			},
+			mockSetup: func(db *mockDB, cache *sync.Map) {
+				// The schema must be created in the database/catalog named in the
+				// asset, not the connection's default, so it has to be qualified.
+				db.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "CREATE SCHEMA IF NOT EXISTS OTHER_DB.TEST_SCHEMA"}).Return(nil)
+			},
+		},
+		{
+			name: "same schema name in different databases is not deduped by the cache",
+			asset: &pipeline.Asset{
+				Name: "other_db.test_schema.test_table",
+			},
+			mockSetup: func(db *mockDB, cache *sync.Map) {
+				// A bare "TEST_SCHEMA" was already created in the default database;
+				// the cache must not skip creating it in OTHER_DB.
+				cache.Store("TEST_SCHEMA", true)
+				db.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "CREATE SCHEMA IF NOT EXISTS OTHER_DB.TEST_SCHEMA"}).Return(nil)
+			},
+		},
+		{
 			name: "asset name with 1 component",
 			asset: &pipeline.Asset{
 				Name: "test_table",
