@@ -147,7 +147,7 @@ func TestTableName_Helpers(t *testing.T) {
 	assert.Equal(t, "public.users", noCatalog.String("."))
 
 	bare := TableName{Table: "events"}
-	assert.Equal(t, "", bare.QualifiedSchema("."))
+	assert.Empty(t, bare.QualifiedSchema("."))
 	assert.Equal(t, "events", bare.String("."))
 }
 
