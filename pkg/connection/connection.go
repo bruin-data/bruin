@@ -127,6 +127,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/tiktokads"
 	"github.com/bruin-data/bruin/pkg/trino"
 	"github.com/bruin-data/bruin/pkg/trustpilot"
+	"github.com/bruin-data/bruin/pkg/twilio"
 	"github.com/bruin-data/bruin/pkg/vertica"
 	"github.com/bruin-data/bruin/pkg/wise"
 	"github.com/bruin-data/bruin/pkg/wistia"
@@ -257,6 +258,7 @@ type Manager struct {
 	Vertica              map[string]*vertica.DB
 	CustomerIo           map[string]*customerio.Client
 	Sendgrid             map[string]*sendgrid.Client
+	Twilio               map[string]*twilio.Client
 	Espn                 map[string]*espn.Client
 	APIFootball          map[string]*apifootball.Client
 	FootballData         map[string]*footballdata.Client
@@ -3142,6 +3144,28 @@ func (m *Manager) AddSendgridConnectionFromConfig(connection *config.SendgridCon
 	return nil
 }
 
+func (m *Manager) AddTwilioConnectionFromConfig(connection *config.TwilioConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.Twilio == nil {
+		m.Twilio = make(map[string]*twilio.Client)
+	}
+
+	client, err := twilio.NewClient(twilio.Config{
+		AccountSID: connection.AccountSID,
+		AuthToken:  connection.AuthToken,
+		APIKey:     connection.APIKey,
+		APISecret:  connection.APISecret,
+	})
+	if err != nil {
+		return err
+	}
+	m.Twilio[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddEspnConnectionFromConfig(connection *config.EspnConnection) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -3691,6 +3715,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Vertica, connectionManager.AddVerticaConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.CustomerIo, connectionManager.AddCustomerIoConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Sendgrid, connectionManager.AddSendgridConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Twilio, connectionManager.AddTwilioConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Espn, connectionManager.AddEspnConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.APIFootball, connectionManager.AddAPIFootballConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.FootballData, connectionManager.AddFootballDataConnectionFromConfig, &wg, &errList, &mu)

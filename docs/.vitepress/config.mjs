@@ -360,6 +360,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                                     {text: "SQLite", link: "/ingestion/sqlite"},
                                     {text: "SurveyMonkey", link: "/ingestion/surveymonkey"},
                                     {text: "TikTok Ads", link: "/ingestion/tiktokads"},
+                                    {text: "Twilio", link: "/ingestion/twilio"},
                                     {text: "Wise", link: "/ingestion/wise"},
                                     {text: "Zendesk", link: "/ingestion/zendesk"},
                                     {text: "Zoom", link: "/ingestion/zoom"},

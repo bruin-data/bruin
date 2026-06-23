@@ -1810,6 +1810,18 @@ func (c SendgridConnection) GetName() string {
 	return c.Name
 }
 
+type TwilioConnection struct {
+	Name       string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	AccountSID string `yaml:"account_sid,omitempty" json:"account_sid" mapstructure:"account_sid"`
+	AuthToken  string `yaml:"auth_token,omitempty" json:"auth_token,omitempty" mapstructure:"auth_token"`
+	APIKey     string `yaml:"api_key,omitempty" json:"api_key,omitempty" mapstructure:"api_key"`
+	APISecret  string `yaml:"api_secret,omitempty" json:"api_secret,omitempty" mapstructure:"api_secret"`
+}
+
+func (c TwilioConnection) GetName() string {
+	return c.Name
+}
+
 type EspnConnection struct {
 	Name    string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	Sport   string `yaml:"sport,omitempty" json:"sport,omitempty" mapstructure:"sport"`

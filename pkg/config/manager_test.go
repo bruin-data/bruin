@@ -807,6 +807,15 @@ func TestLoadFromFile(t *testing.T) {
 					OnBehalfOf: "test-subuser",
 				},
 			},
+			Twilio: []TwilioConnection{
+				{
+					Name:       "twilio-1",
+					AccountSID: "test-account-sid",
+					AuthToken:  "test-auth-token",
+					APIKey:     "test-api-key",
+					APISecret:  "test-api-secret",
+				},
+			},
 			Espn: []EspnConnection{
 				{
 					Name:   "espn-1",
@@ -2235,6 +2244,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Indeed:              []IndeedConnection{{Name: "indeed1"}},
 				CustomerIo:          []CustomerIoConnection{{Name: "customerio1"}},
 				Sendgrid:            []SendgridConnection{{Name: "sendgrid1"}},
+				Twilio:              []TwilioConnection{{Name: "twilio1"}},
 				Espn:                []EspnConnection{{Name: "espn1"}},
 				APIFootball:         []APIFootballConnection{{Name: "apifootball1"}},
 				FootballData:        []FootballDataConnection{{Name: "footballdata1"}},
@@ -2360,6 +2370,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Indeed:              []IndeedConnection{{Name: "indeed1"}},
 				CustomerIo:          []CustomerIoConnection{{Name: "customerio1"}},
 				Sendgrid:            []SendgridConnection{{Name: "sendgrid1"}},
+				Twilio:              []TwilioConnection{{Name: "twilio1"}},
 				Espn:                []EspnConnection{{Name: "espn1"}},
 				APIFootball:         []APIFootballConnection{{Name: "apifootball1"}},
 				FootballData:        []FootballDataConnection{{Name: "footballdata1"}},
