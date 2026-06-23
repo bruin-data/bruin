@@ -411,6 +411,8 @@ func handleColumnEntry(columnFields []string, task *Asset, value string) error {
 		}
 	case "type":
 		task.Columns[columnIndex].Type = strings.ToLower(strings.TrimSpace(value))
+	case "mask":
+		task.Columns[columnIndex].Mask = strings.TrimSpace(value)
 	case "primary_key":
 		boolValue, err := strconv.ParseBool(value)
 		if err != nil {

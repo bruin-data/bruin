@@ -449,14 +449,17 @@ columns:
   - name: first_name
     source_column: fname
     type: string
+    mask: hash
   - name: email
     type: string
-`)))
+	`)))
 	require.NoError(t, err)
 	require.Len(t, task.Columns, 2)
 	require.Equal(t, "first_name", task.Columns[0].Name)
 	require.Equal(t, "fname", task.Columns[0].SourceColumn)
+	require.Equal(t, "hash", task.Columns[0].Mask)
 	require.Empty(t, task.Columns[1].SourceColumn)
+	require.Empty(t, task.Columns[1].Mask)
 }
 
 func TestConvertYamlToTask_ColumnMetadata(t *testing.T) {
