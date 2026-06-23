@@ -833,6 +833,7 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "kpi_mau", PrimaryKey: "time", IncKey: "time", IncStrategy: "merge"},
 		{Name: "kpi_new_users", PrimaryKey: "time", IncKey: "time", IncStrategy: "merge"},
 		{Name: "kpi_uninstalls", PrimaryKey: "time", IncKey: "time", IncStrategy: "merge"},
+		{Name: "user_data", PrimaryKey: "braze_id, segment_id", IncKey: "", IncStrategy: "replace"},
 	},
 
 	// SFTP (user-defined paths)

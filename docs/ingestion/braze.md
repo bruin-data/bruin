@@ -59,8 +59,11 @@ parameters:
 | `kpi_mau` | time | time | merge | Monthly active users (rolling 30-day) by date. |
 | `kpi_new_users` | time | time | merge | New users by date. |
 | `kpi_uninstalls` | time | time | merge | App uninstalls by date. |
+| `user_data` | braze_id, segment_id | - | replace | Users of a segment with their email/push subscription state and profile fields (a point-in-time snapshot). |
 
 The `kpi_*` tables aggregate across all apps by default. Append a comma-separated list of app identifiers to break a KPI down by app, e.g. `source_table: 'kpi_dau:app-one-id,app-two-id'`; each row then carries an `app_id` column.
+
+The `user_data` table requires one or more segment ids, passed as a comma-separated suffix, e.g. `source_table: 'user_data:<segment_id>'` or `'user_data:<segment_id_1>,<segment_id_2>'`. Each row is tagged with the `segment_id` it came from.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 
