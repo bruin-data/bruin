@@ -470,6 +470,9 @@ func renderAssetStrings(render RenderFunc, a *Asset) error {
 		if c.Type, err = maybeRender(render, fmt.Sprintf("asset[%s].columns[%d].type", originalName, i), c.Type); err != nil {
 			return err
 		}
+		if c.Mask, err = maybeRender(render, fmt.Sprintf("asset[%s].columns[%d].mask", originalName, i), c.Mask); err != nil {
+			return err
+		}
 		if c.Description, err = maybeRender(render, fmt.Sprintf("asset[%s].columns[%d].description", originalName, i), c.Description); err != nil {
 			return err
 		}

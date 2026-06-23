@@ -41,6 +41,7 @@ Each column will have the following keys:
 | `name`            | String  | yes  | The name of the column                                                          |
 | `source_column`   | String  | no   | For ingestr assets, the source column name to map onto `name`. See [Column name mapping](#column-name-mapping-ingestr-assets). |
 | `type`            | String  | no   | The column type in the DB                                                       |
+| `mask`            | String  | no   | For ingestr assets, a masking rule or method. See [Column masking](#column-masking-ingestr-assets). |
 | `description`     | String  | no   | The description for the column                                                  |
 | `tags`            | String[]| no   | Tags applied to the column for categorization and filtering                     |
 | `primary_key`     | Bool    | no   | Whether the column is a primary key                                             |
@@ -161,4 +162,26 @@ columns:
     type: string
   - name: email
     source_column: eml          # type omitted: ingestr just renames, no type enforcement
+```
+
+### Column masking (ingestr assets)
+
+For ingestr assets, you can define a column mask next to the column metadata. If `mask`
+contains only the masking method, Bruin qualifies it with the column name before passing
+it to ingestr:
+
+```yaml
+columns:
+  - name: email
+    type: string
+    mask: hash
+```
+
+The example above is passed to ingestr as `--mask email:hash`. You can also provide the
+full ingestr mask rule directly:
+
+```yaml
+columns:
+  - name: email
+    mask: email:hash
 ```
