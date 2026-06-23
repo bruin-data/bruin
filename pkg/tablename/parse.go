@@ -81,6 +81,11 @@ func (c Capability) Parse(raw string, d Defaults) (TableName, error) {
 // target and the dedup cache key — matches how the platform stores identifiers.
 func SchemaToCreate(name string, transform func(string) string) (string, bool) {
 	parts := strings.Split(name, ".")
+	for _, p := range parts {
+		if strings.TrimSpace(p) == "" {
+			return "", false
+		}
+	}
 	for i, p := range parts {
 		parts[i] = transform(p)
 	}

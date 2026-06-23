@@ -175,6 +175,7 @@ func TestSchemaToCreate(t *testing.T) {
 		{name: "three-part lower (duckdb)", raw: "cat.main.t", transform: lower, want: "cat.main", wantOK: true},
 		{name: "single component has no schema", raw: "events", transform: upper, wantOK: false},
 		{name: "four components skipped", raw: "a.b.c.d", transform: upper, wantOK: false},
+		{name: "empty component rejected", raw: "raw..events", transform: upper, wantOK: false},
 	}
 
 	for _, tt := range tests {
