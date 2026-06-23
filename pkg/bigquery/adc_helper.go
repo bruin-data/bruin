@@ -163,7 +163,7 @@ func CheckADCCredentialsForPipeline(ctx context.Context, p *pipeline.Pipeline, a
 		// Check ingestr assets for BigQuery source or destination
 		if asset.Type == pipeline.AssetTypeIngestr {
 			// Check if source connection is BigQuery
-			if sourceConn, ok := asset.Parameters["source_connection"]; ok {
+			if sourceConn, ok := asset.Parameters.GetString("source_connection"); ok {
 				if conn := connGetter.GetConnection(sourceConn); conn != nil {
 					if _, isBQ := conn.(DB); isBQ {
 						bigQueryConnections[sourceConn] = true
@@ -172,9 +172,9 @@ func CheckADCCredentialsForPipeline(ctx context.Context, p *pipeline.Pipeline, a
 			}
 
 			// Check if destination is BigQuery
-			if dest, ok := asset.Parameters["destination"]; ok && dest == "bigquery" {
+			if dest, ok := asset.Parameters.GetString("destination"); ok && dest == "bigquery" {
 				// Get destination connection name
-				if destConn, ok := asset.Parameters["destination_connection"]; ok {
+				if destConn, ok := asset.Parameters.GetString("destination_connection"); ok {
 					bigQueryConnections[destConn] = true
 				} else {
 					// Infer from pipeline defaults

@@ -55,17 +55,16 @@ parameters:
 
 | Table | PK | Inc Key | Inc Strategy | Details |
 | ----- | -- | ------- | ------------ | ------- |
-| `projects` | - | - | replace | Fetches all projects from your Jira instance. |
+| `projects` | id | - | replace | Fetches all projects from your Jira instance. |
 | `issues` | id | fields.updated | merge | Fetches all issues with support for incremental loading based on updated timestamp. |
-| `users` | - | - | replace | Fetches users from your Jira instance. |
-| `issue_types` | - | - | replace | Fetches all issue types configured in your Jira instance. |
-| `statuses` | - | - | replace | Fetches all workflow statuses from your Jira instance. |
-| `priorities` | - | - | replace | Fetches all issue priorities from your Jira instance. |
-| `resolutions` | - | - | replace | Fetches all issue resolutions from your Jira instance. |
-| `project_versions` | - | - | replace | Fetches versions for each project. |
-| `project_components` | - | - | replace | Fetches components for each project. |
-| `events` | - | - | replace | Fetches all issue events (created, updated, etc.) from your Jira instance. |
-| `issue_changelogs` | - | - | replace | Fetches changelog history for all issues across all projects. |
+| `users` | accountId | - | replace | Fetches users from your Jira instance. |
+| `issue_types` | id | - | replace | Fetches all issue types configured in your Jira instance. |
+| `statuses` | id | - | replace | Fetches all workflow statuses from your Jira instance. |
+| `priorities` | id | - | replace | Fetches all issue priorities from your Jira instance. |
+| `resolutions` | id | - | replace | Fetches all issue resolutions from your Jira instance. |
+| `project_versions` | id | - | replace | Fetches versions for each project. |
+| `project_components` | id | - | replace | Fetches components for each project. |
+| `issue_changelogs` | id | - | replace | Fetches changelog entries for all issues across all projects. |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 

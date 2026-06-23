@@ -15,6 +15,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/airtable"
 	"github.com/bruin-data/bruin/pkg/allium"
 	"github.com/bruin-data/bruin/pkg/anthropic"
+	"github.com/bruin-data/bruin/pkg/apifootball"
 	"github.com/bruin-data/bruin/pkg/appleads"
 	"github.com/bruin-data/bruin/pkg/applovin"
 	"github.com/bruin-data/bruin/pkg/applovinmax"
@@ -23,6 +24,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/asana"
 	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/attio"
+	"github.com/bruin-data/bruin/pkg/balldontlie"
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/bruincloud"
 	"github.com/bruin-data/bruin/pkg/cassandra"
@@ -45,10 +47,12 @@ import (
 	"github.com/bruin-data/bruin/pkg/dynamodb"
 	"github.com/bruin-data/bruin/pkg/elasticsearch"
 	"github.com/bruin-data/bruin/pkg/emr_serverless"
+	"github.com/bruin-data/bruin/pkg/espn"
 	fabric "github.com/bruin-data/bruin/pkg/fabric"
 	"github.com/bruin-data/bruin/pkg/facebookads"
 	"github.com/bruin-data/bruin/pkg/fireflies"
 	"github.com/bruin-data/bruin/pkg/fluxx"
+	"github.com/bruin-data/bruin/pkg/footballdata"
 	"github.com/bruin-data/bruin/pkg/frankfurter"
 	"github.com/bruin-data/bruin/pkg/freshdesk"
 	"github.com/bruin-data/bruin/pkg/fundraiseup"
@@ -105,7 +109,9 @@ import (
 	"github.com/bruin-data/bruin/pkg/s3"
 	"github.com/bruin-data/bruin/pkg/sail"
 	"github.com/bruin-data/bruin/pkg/salesforce"
+	"github.com/bruin-data/bruin/pkg/sendgrid"
 	"github.com/bruin-data/bruin/pkg/sftp"
+	"github.com/bruin-data/bruin/pkg/sharepoint"
 	"github.com/bruin-data/bruin/pkg/shopify"
 	"github.com/bruin-data/bruin/pkg/slack"
 	"github.com/bruin-data/bruin/pkg/smartsheet"
@@ -121,6 +127,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/tiktokads"
 	"github.com/bruin-data/bruin/pkg/trino"
 	"github.com/bruin-data/bruin/pkg/trustpilot"
+	"github.com/bruin-data/bruin/pkg/twilio"
 	"github.com/bruin-data/bruin/pkg/vertica"
 	"github.com/bruin-data/bruin/pkg/wise"
 	"github.com/bruin-data/bruin/pkg/wistia"
@@ -177,6 +184,7 @@ type Manager struct {
 	GoogleSheets         map[string]*gsheets.Client
 	Chess                map[string]*chess.Client
 	S3                   map[string]*s3.Client
+	SharePoint           map[string]*sharepoint.Client
 	Slack                map[string]*slack.Client
 	Socrata              map[string]*socrata.Client
 	Asana                map[string]*asana.Client
@@ -249,6 +257,12 @@ type Manager struct {
 	Dune                 map[string]*dune.Client
 	Vertica              map[string]*vertica.DB
 	CustomerIo           map[string]*customerio.Client
+	Sendgrid             map[string]*sendgrid.Client
+	Twilio               map[string]*twilio.Client
+	Espn                 map[string]*espn.Client
+	APIFootball          map[string]*apifootball.Client
+	FootballData         map[string]*footballdata.Client
+	BallDontLie          map[string]*balldontlie.Client
 	Generic              map[string]*config.GenericConnection
 	mutex                sync.Mutex
 	availableConnections map[string]any
@@ -793,6 +807,36 @@ func (m *Manager) AddWistiaConnectionFromConfig(connection *config.WistiaConnect
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Wistia[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddSharePointConnectionFromConfig(connection *config.SharePointConnection) error {
+	m.mutex.Lock()
+	if m.SharePoint == nil {
+		m.SharePoint = make(map[string]*sharepoint.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := sharepoint.NewClient(sharepoint.Config{
+		TenantID:     connection.TenantID,
+		ClientID:     connection.ClientID,
+		ClientSecret: connection.ClientSecret,
+		Hostname:     connection.Hostname,
+		Site:         connection.Site,
+		Library:      connection.Library,
+		MaxFileSize:  connection.MaxFileSize,
+		MaxFiles:     connection.MaxFiles,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.SharePoint[connection.Name] = client
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 
@@ -2649,10 +2693,11 @@ func (m *Manager) AddSalesforceConnectionFromConfig(connection *config.Salesforc
 	m.mutex.Unlock()
 
 	client, err := salesforce.NewClient(salesforce.Config{
-		Username: connection.Username,
-		Password: connection.Password,
-		Token:    connection.Token,
-		Domain:   connection.Domain,
+		Username:    connection.Username,
+		Password:    connection.Password,
+		Token:       connection.Token,
+		AccessToken: connection.AccessToken,
+		Domain:      connection.Domain,
 	})
 	if err != nil {
 		return err
@@ -3079,6 +3124,145 @@ func (m *Manager) AddCustomerIoConnectionFromConfig(connection *config.CustomerI
 	return nil
 }
 
+func (m *Manager) AddSendgridConnectionFromConfig(connection *config.SendgridConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.Sendgrid == nil {
+		m.Sendgrid = make(map[string]*sendgrid.Client)
+	}
+
+	client, err := sendgrid.NewClient(sendgrid.Config{
+		APIKey:     connection.APIKey,
+		OnBehalfOf: connection.OnBehalfOf,
+	})
+	if err != nil {
+		return err
+	}
+	m.Sendgrid[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
+func (m *Manager) AddTwilioConnectionFromConfig(connection *config.TwilioConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.Twilio == nil {
+		m.Twilio = make(map[string]*twilio.Client)
+	}
+
+	client, err := twilio.NewClient(twilio.Config{
+		AccountSID: connection.AccountSID,
+		AuthToken:  connection.AuthToken,
+		APIKey:     connection.APIKey,
+		APISecret:  connection.APISecret,
+	})
+	if err != nil {
+		return err
+	}
+	m.Twilio[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
+func (m *Manager) AddEspnConnectionFromConfig(connection *config.EspnConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.Espn == nil {
+		m.Espn = make(map[string]*espn.Client)
+	}
+
+	client, err := espn.NewClient(espn.Config{
+		Sport:   connection.Sport,
+		League:  connection.League,
+		Season:  connection.Season,
+		Limit:   connection.Limit,
+		BaseURL: connection.BaseURL,
+	})
+	if err != nil {
+		return err
+	}
+	m.Espn[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
+func (m *Manager) AddAPIFootballConnectionFromConfig(connection *config.APIFootballConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.APIFootball == nil {
+		m.APIFootball = make(map[string]*apifootball.Client)
+	}
+
+	client, err := apifootball.NewClient(apifootball.Config{
+		APIKey:   connection.APIKey,
+		League:   connection.League,
+		Season:   connection.Season,
+		Timezone: connection.Timezone,
+		BaseURL:  connection.BaseURL,
+	})
+	if err != nil {
+		return err
+	}
+	m.APIFootball[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
+func (m *Manager) AddFootballDataConnectionFromConfig(connection *config.FootballDataConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.FootballData == nil {
+		m.FootballData = make(map[string]*footballdata.Client)
+	}
+
+	client, err := footballdata.NewClient(footballdata.Config{
+		APIKey:         connection.APIKey,
+		Competition:    connection.Competition,
+		Season:         connection.Season,
+		BaseURL:        connection.BaseURL,
+		Matchday:       connection.Matchday,
+		Status:         connection.Status,
+		Stage:          connection.Stage,
+		Group:          connection.Group,
+		UnfoldGoals:    connection.UnfoldGoals,
+		UnfoldBookings: connection.UnfoldBookings,
+		UnfoldSubs:     connection.UnfoldSubs,
+		UnfoldLineups:  connection.UnfoldLineups,
+	})
+	if err != nil {
+		return err
+	}
+	m.FootballData[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
+func (m *Manager) AddBallDontLieConnectionFromConfig(connection *config.BallDontLieConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.BallDontLie == nil {
+		m.BallDontLie = make(map[string]*balldontlie.Client)
+	}
+
+	client, err := balldontlie.NewClient(balldontlie.Config{
+		APIKey:  connection.APIKey,
+		Season:  connection.Season,
+		BaseURL: connection.BaseURL,
+	})
+	if err != nil {
+		return err
+	}
+	m.BallDontLie[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddDuneConnectionFromConfig(connection *config.DuneConnection) error {
 	m.mutex.Lock()
 	if m.Dune == nil {
@@ -3492,6 +3676,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.QuickBooks, connectionManager.AddQuickBooksConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Wise, connectionManager.AddWiseConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Wistia, connectionManager.AddWistiaConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.SharePoint, connectionManager.AddSharePointConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Zoom, connectionManager.AddZoomConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.EMRServerless, connectionManager.AddEMRServerlessConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.DataprocServerless, connectionManager.AddDataprocServerlessConnectionFromConfig, &wg, &errList, &mu)
@@ -3529,6 +3714,12 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Sail, connectionManager.AddSailConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Vertica, connectionManager.AddVerticaConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.CustomerIo, connectionManager.AddCustomerIoConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Sendgrid, connectionManager.AddSendgridConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Twilio, connectionManager.AddTwilioConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Espn, connectionManager.AddEspnConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.APIFootball, connectionManager.AddAPIFootballConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.FootballData, connectionManager.AddFootballDataConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.BallDontLie, connectionManager.AddBallDontLieConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Dune, connectionManager.AddDuneConnectionFromConfig, &wg, &errList, &mu)
 	wg.Wait()
 	return connectionManager, errList

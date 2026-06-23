@@ -272,7 +272,7 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 			return issues, nil
 		}
 
-		value, exists := asset.Parameters[key]
+		value, exists := asset.Parameters.GetString(key)
 		if !exists || value == "" {
 			issues = append(issues, &Issue{
 				Task:        asset,
@@ -283,7 +283,7 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 		}
 	}
 
-	if value, exists := asset.Parameters["incremental_strategy"]; exists && value != "" {
+	if value, exists := asset.Parameters.GetString("incremental_strategy"); exists && value != "" {
 		if !python.IsIngestrStrategySupported(value) {
 			issues = append(issues, &Issue{
 				Task:        asset,
@@ -299,21 +299,21 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 			Description: "Ingestr assets do not support the 'update_on_merge' field, the strategy used decide the update behavior",
 		})
 	}
-	if mode, exists := asset.Parameters["cdc_mode"]; exists && mode != "stream" && mode != "batch" {
+	if mode, exists := asset.Parameters.GetString("cdc_mode"); exists && mode != "stream" && mode != "batch" {
 		issues = append(issues, &Issue{
 			Task:        asset,
 			Description: "Invalid 'cdc_mode' value: must be 'stream' or 'batch'",
 		})
 	}
-	if v, exists := asset.Parameters["version"]; exists && v != "" && !ingestrVersionPattern.MatchString(v) {
+	if v, exists := asset.Parameters.GetString("version"); exists && v != "" && !ingestrVersionPattern.MatchString(v) {
 		issues = append(issues, &Issue{
 			Task:        asset,
 			Description: fmt.Sprintf("Invalid 'version' value %q: must be 'vMAJOR' or fully-qualified 'vMAJOR.MINOR.PATCH'", v),
 		})
 	}
-	if value, exists := asset.Parameters["incremental_strategy"]; exists && value == "merge" {
+	if value, exists := asset.Parameters.GetString("incremental_strategy"); exists && value == "merge" {
 		// Skip PK validation for CDC mode - PKs are determined by the source
-		if asset.Parameters["cdc"] != "true" {
+		if cdcVal, _ := asset.Parameters.GetString("cdc"); cdcVal != "true" {
 			primaryKeys := asset.ColumnNamesWithPrimaryKey()
 			if len(primaryKeys) == 0 {
 				issues = append(issues, &Issue{
@@ -563,7 +563,7 @@ func ValidateAssetSeedValidation(ctx context.Context, p *pipeline.Pipeline, asse
 				Description: "Materialization is not allowed on a seed asset",
 			})
 		}
-		seedPath := asset.Parameters["path"]
+		seedPath, _ := asset.Parameters.GetString("path")
 		if seedPath == "" {
 			issues = append(issues, &Issue{
 				Task:        asset,
@@ -578,11 +578,12 @@ func ValidateAssetSeedValidation(ctx context.Context, p *pipeline.Pipeline, asse
 			return issues, nil
 		}
 
-		fileType := strings.ToLower(strings.TrimSpace(asset.Parameters["file_type"]))
+		seedFileTypeRaw, _ := asset.Parameters.GetString("file_type")
+		fileType := strings.ToLower(strings.TrimSpace(seedFileTypeRaw))
 		if fileType != "" && !supportedSeedFileTypes[fileType] {
 			issues = append(issues, &Issue{
 				Task:        asset,
-				Description: fmt.Sprintf("Unsupported seed file_type %q (supported: csv, parquet, pq, json, jsonl, ndjson, avro)", asset.Parameters["file_type"]),
+				Description: fmt.Sprintf("Unsupported seed file_type %q (supported: csv, parquet, pq, json, jsonl, ndjson, avro)", seedFileTypeRaw),
 			})
 			return issues, nil
 		}
@@ -597,7 +598,7 @@ func ValidateAssetSeedValidation(ctx context.Context, p *pipeline.Pipeline, asse
 			return issues, nil
 		}
 
-		if !isCSVSeed(seedPath, asset.Parameters["file_type"]) {
+		if !isCSVSeed(seedPath, seedFileTypeRaw) {
 			// For parquet/json/jsonl/ndjson/avro the schema is binary or
 			// semi-structured; column-vs-header validation is left to ingestr
 			// at runtime, just like the URL case above.
@@ -713,7 +714,8 @@ func ValidateEMRServerlessAsset(ctx context.Context, p *pipeline.Pipeline, asset
 	}
 
 	for _, key := range required {
-		value := strings.TrimSpace(asset.Parameters[key])
+		rawVal, _ := asset.Parameters.GetString(key)
+		value := strings.TrimSpace(rawVal)
 		if value == "" {
 			issues = append(issues, &Issue{
 				Task: asset,
@@ -734,7 +736,8 @@ func ValidateEMRServerlessAsset(ctx context.Context, p *pipeline.Pipeline, asset
 		}
 	}
 
-	timeoutSpec := strings.TrimSpace(asset.Parameters["timeout"])
+	timeoutRaw, _ := asset.Parameters.GetString("timeout")
+	timeoutSpec := strings.TrimSpace(timeoutRaw)
 	if timeoutSpec != "" {
 		timeout, err := time.ParseDuration(timeoutSpec)
 		if err != nil {
@@ -751,7 +754,8 @@ func ValidateEMRServerlessAsset(ctx context.Context, p *pipeline.Pipeline, asset
 		}
 	}
 
-	executionRole := strings.TrimSpace(asset.Parameters["execution_role"])
+	executionRoleRaw, _ := asset.Parameters.GetString("execution_role")
+	executionRole := strings.TrimSpace(executionRoleRaw)
 	if executionRole != "" && !arnPattern.MatchString(executionRole) {
 		issues = append(issues, &Issue{
 			Task:        asset,
@@ -759,7 +763,8 @@ func ValidateEMRServerlessAsset(ctx context.Context, p *pipeline.Pipeline, asset
 		})
 	}
 
-	logLocation := strings.TrimSpace(asset.Parameters["logs"])
+	logLocationRaw, _ := asset.Parameters.GetString("logs")
+	logLocation := strings.TrimSpace(logLocationRaw)
 	if logLocation != "" {
 		logURI, err := url.Parse(logLocation)
 		if err != nil {
@@ -806,6 +811,100 @@ func ValidateDuplicateColumnNames(ctx context.Context, p *pipeline.Pipeline, ass
 		}
 	}
 	return issues, nil
+}
+
+// ValidateColumnMetadata checks that optional column metadata fields, when set,
+// are well-formed: foreign keys must reference an existing asset (and, when that
+// asset declares its columns, an existing column on it), and numeric type-detail
+// (precision/scale/length) must hold sane values.
+func ValidateColumnMetadata(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0, len(asset.Columns))
+
+	for _, column := range asset.Columns {
+		issues = append(issues, validateColumnForeignKey(p, asset, &column)...)
+		issues = append(issues, validateColumnTypeDetail(asset, &column)...)
+	}
+
+	return issues, nil
+}
+
+func validateColumnForeignKey(p *pipeline.Pipeline, asset *pipeline.Asset, column *pipeline.Column) []*Issue {
+	fk := column.ForeignKey
+	if fk == nil {
+		return nil
+	}
+
+	issues := make([]*Issue, 0)
+
+	if fk.Table == "" {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("Column '%s' has a foreign key without a referenced table", column.Name),
+		})
+	}
+	if fk.Column == "" {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("Column '%s' has a foreign key without a referenced column", column.Name),
+		})
+	}
+	if fk.Table == "" || fk.Column == "" {
+		return issues
+	}
+
+	referenced := p.GetAssetByName(fk.Table)
+	if referenced == nil {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("Column '%s' has a foreign key referencing asset '%s', which does not exist in the pipeline", column.Name, fk.Table),
+		})
+		return issues
+	}
+
+	// Columns are optional in Bruin, so we can only verify the referenced column
+	// when the target asset actually declares its columns; otherwise we have no
+	// schema to check against and skip rather than emit a false positive.
+	if len(referenced.Columns) > 0 && referenced.GetColumnWithName(fk.Column) == nil {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("Column '%s' has a foreign key referencing column '%s.%s', which does not exist", column.Name, fk.Table, fk.Column),
+		})
+	}
+
+	return issues
+}
+
+func validateColumnTypeDetail(asset *pipeline.Asset, column *pipeline.Column) []*Issue {
+	issues := make([]*Issue, 0)
+
+	if column.Precision != nil && *column.Precision <= 0 {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("Column '%s' has an invalid precision '%d'; it must be a positive integer", column.Name, *column.Precision),
+		})
+	}
+	if column.Length != nil && *column.Length <= 0 {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("Column '%s' has an invalid length '%d'; it must be a positive integer", column.Name, *column.Length),
+		})
+	}
+	if column.Scale != nil && *column.Scale < 0 {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("Column '%s' has an invalid scale '%d'; it must not be negative", column.Name, *column.Scale),
+		})
+	}
+	// Only compare scale against precision when precision is itself valid;
+	// otherwise the user already gets the more actionable "invalid precision" error.
+	if column.Precision != nil && *column.Precision > 0 && column.Scale != nil && *column.Scale > *column.Precision {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("Column '%s' has a scale '%d' greater than its precision '%d'", column.Name, *column.Scale, *column.Precision),
+		})
+	}
+
+	return issues
 }
 
 // ValidateDuplicateTags checks for duplicate tags within an asset and its columns.
@@ -1393,7 +1492,7 @@ func EnsureSnowflakeSensorHasQueryParameterForASingleAsset(ctx context.Context, 
 		return issues, nil
 	}
 
-	query, ok := asset.Parameters["query"]
+	query, ok := asset.Parameters.GetString("query")
 	if !ok {
 		issues = append(issues, &Issue{
 			Task:        asset,
@@ -1444,7 +1543,7 @@ func ValidateTableSensorTableParameter(ctx context.Context, p *pipeline.Pipeline
 		return issues, nil
 	}
 
-	table, ok := asset.Parameters["table"]
+	table, ok := asset.Parameters.GetString("table")
 	if !ok {
 		platformName := platformNames[asset.Type]
 		issues = append(issues, &Issue{
@@ -1557,7 +1656,7 @@ func ValidateSensorTimeout(ctx context.Context, p *pipeline.Pipeline, asset *pip
 		return issues, nil
 	}
 
-	raw, ok := asset.Parameters["timeout"]
+	raw, ok := asset.Parameters.GetString("timeout")
 	if !ok || strings.TrimSpace(raw) == "" {
 		return issues, nil
 	}
@@ -1578,7 +1677,7 @@ func EnsureBigQueryQuerySensorHasQueryParameterForASingleAsset(ctx context.Conte
 		return issues, nil
 	}
 
-	query, ok := asset.Parameters["query"]
+	query, ok := asset.Parameters.GetString("query")
 	if !ok {
 		issues = append(issues, &Issue{
 			Task:        asset,

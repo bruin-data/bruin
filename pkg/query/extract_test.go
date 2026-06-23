@@ -201,6 +201,299 @@ set min_level_req = 22;
 	}
 }
 
+func TestOracleScriptExtractor_ExtractQueriesFromString(t *testing.T) {
+	t.Parallel()
+
+	mr := new(mockNoOpRenderer)
+	mr.On("Render", mock.Anything).Return("default", nil)
+
+	f := OracleScriptExtractor{
+		Renderer: mr,
+	}
+
+	got, err := f.ExtractQueriesFromString(`
+create table users (id number);
+
+BEGIN
+  IF 1 = 1 THEN
+    NULL;
+  END IF;
+  app_etl.rebuild_index('USERS');
+END;
+/
+
+insert into users values ('semi;colon');
+`)
+	require.NoError(t, err)
+
+	assert.Equal(t, []*Query{
+		{Query: "create table users (id number);"},
+		{Query: "BEGIN\n  IF 1 = 1 THEN\n    NULL;\n  END IF;\n  app_etl.rebuild_index('USERS');\nEND;"},
+		{Query: "insert into users values ('semi;colon');"},
+	}, got)
+	mr.AssertExpectations(t)
+}
+
+func TestOracleScriptExtractor_IgnoresPLSQLKeywordsInStringLiterals(t *testing.T) {
+	t.Parallel()
+
+	mr := new(mockNoOpRenderer)
+	mr.On("Render", mock.Anything).Return("default", nil)
+
+	f := OracleScriptExtractor{
+		Renderer: mr,
+	}
+
+	got, err := f.ExtractQueriesFromString(`
+BEGIN
+  v_msg := 'Marking BEGIN of run';
+END;
+/
+
+insert into audit_log values ('done');
+`)
+	require.NoError(t, err)
+
+	assert.Equal(t, []*Query{
+		{Query: "BEGIN\n  v_msg := 'Marking BEGIN of run';\nEND;"},
+		{Query: "insert into audit_log values ('done');"},
+	}, got)
+	mr.AssertExpectations(t)
+}
+
+func TestOracleScriptExtractor_IgnoresPLSQLKeywordsInDoubleQuotedIdentifiers(t *testing.T) {
+	t.Parallel()
+
+	mr := new(mockNoOpRenderer)
+	mr.On("Render", mock.Anything).Return("default", nil)
+
+	f := OracleScriptExtractor{
+		Renderer: mr,
+	}
+
+	got, err := f.ExtractQueriesFromString(`
+create or replace procedure rebuild_users as
+  v_end date;
+begin
+  select max("END") into v_end from users;
+  null;
+end rebuild_users;
+/
+
+insert into audit_log values ('done');
+`)
+	require.NoError(t, err)
+
+	assert.Equal(t, []*Query{
+		{Query: "create or replace procedure rebuild_users as\n  v_end date;\nbegin\n  select max(\"END\") into v_end from users;\n  null;\nend rebuild_users;"},
+		{Query: "insert into audit_log values ('done');"},
+	}, got)
+	mr.AssertExpectations(t)
+}
+
+func TestOracleScriptExtractor_IgnoresPLSQLKeywordsInQQuotedStringLiterals(t *testing.T) {
+	t.Parallel()
+
+	mr := new(mockNoOpRenderer)
+	mr.On("Render", mock.Anything).Return("default", nil)
+
+	f := OracleScriptExtractor{
+		Renderer: mr,
+	}
+
+	got, err := f.ExtractQueriesFromString(`
+BEGIN
+  v_msg := q'[BEGIN isn't END; still text]';
+END;
+/
+
+insert into audit_log values ('done');
+`)
+	require.NoError(t, err)
+
+	assert.Equal(t, []*Query{
+		{Query: "BEGIN\n  v_msg := q'[BEGIN isn't END; still text]';\nEND;"},
+		{Query: "insert into audit_log values ('done');"},
+	}, got)
+	mr.AssertExpectations(t)
+}
+
+func TestOracleScriptExtractor_HandlesTrailingLineCommentBeforePLSQLTerminator(t *testing.T) {
+	t.Parallel()
+
+	mr := new(mockNoOpRenderer)
+	mr.On("Render", mock.Anything).Return("default", nil)
+
+	f := OracleScriptExtractor{
+		Renderer: mr,
+	}
+
+	got, err := f.ExtractQueriesFromString(`
+BEGIN
+  NULL;
+END -- closes block
+;
+/
+
+insert into audit_log values ('done');
+`)
+	require.NoError(t, err)
+
+	assert.Equal(t, []*Query{
+		{Query: "BEGIN\n  NULL;\nEND -- closes block\n;"},
+		{Query: "insert into audit_log values ('done');"},
+	}, got)
+	mr.AssertExpectations(t)
+}
+
+func TestOracleScriptExtractor_DoesNotTreatBeginPrefixIdentifierAsPLSQLBlock(t *testing.T) {
+	t.Parallel()
+
+	mr := new(mockNoOpRenderer)
+	mr.On("Render", mock.Anything).Return("default", nil)
+
+	f := OracleScriptExtractor{
+		Renderer: mr,
+	}
+
+	got, err := f.ExtractQueriesFromString(`
+BEGINDATE_CALC('USERS');
+insert into audit_log values ('done');
+`)
+	require.NoError(t, err)
+
+	assert.Equal(t, []*Query{
+		{Query: "BEGINDATE_CALC('USERS');"},
+		{Query: "insert into audit_log values ('done');"},
+	}, got)
+	mr.AssertExpectations(t)
+}
+
+func TestOracleScriptExtractor_KeepsPLSQLDDLAsSingleQuery(t *testing.T) {
+	t.Parallel()
+
+	mr := new(mockNoOpRenderer)
+	mr.On("Render", mock.Anything).Return("default", nil)
+
+	f := OracleScriptExtractor{
+		Renderer: mr,
+	}
+
+	got, err := f.ExtractQueriesFromString(`
+create or replace procedure rebuild_users as
+begin
+  execute immediate 'truncate table USERS_STAGE';
+  if 1 = 1 then
+    null;
+  end if;
+end rebuild_users;
+/
+
+insert into audit_log values ('done');
+`)
+	require.NoError(t, err)
+
+	assert.Equal(t, []*Query{
+		{Query: "create or replace procedure rebuild_users as\nbegin\n  execute immediate 'truncate table USERS_STAGE';\n  if 1 = 1 then\n    null;\n  end if;\nend rebuild_users;"},
+		{Query: "insert into audit_log values ('done');"},
+	}, got)
+	mr.AssertExpectations(t)
+}
+
+func TestOracleScriptExtractor_KeepsPackageBodyAsSingleQuery(t *testing.T) {
+	t.Parallel()
+
+	mr := new(mockNoOpRenderer)
+	mr.On("Render", mock.Anything).Return("default", nil)
+
+	f := OracleScriptExtractor{
+		Renderer: mr,
+	}
+
+	got, err := f.ExtractQueriesFromString(`
+create or replace package body pkg_users as
+  procedure rebuild as
+  begin
+    null;
+  end;
+
+  function user_count return number as
+  begin
+    return 1;
+  end user_count;
+end pkg_users;
+/
+
+insert into audit_log values ('done');
+`)
+	require.NoError(t, err)
+
+	assert.Equal(t, []*Query{
+		{Query: "create or replace package body pkg_users as\n  procedure rebuild as\n  begin\n    null;\n  end;\n\n  function user_count return number as\n  begin\n    return 1;\n  end user_count;\nend pkg_users;"},
+		{Query: "insert into audit_log values ('done');"},
+	}, got)
+	mr.AssertExpectations(t)
+}
+
+func TestOracleScriptExtractor_KeepsPackageBodyWithInitializationAsSingleQuery(t *testing.T) {
+	t.Parallel()
+
+	mr := new(mockNoOpRenderer)
+	mr.On("Render", mock.Anything).Return("default", nil)
+
+	f := OracleScriptExtractor{
+		Renderer: mr,
+	}
+
+	got, err := f.ExtractQueriesFromString(`
+create or replace package body pkg as
+  procedure p as
+  begin
+    null;
+  end;
+begin
+  null;
+end pkg;
+/
+
+insert into audit_log values ('done');
+`)
+	require.NoError(t, err)
+
+	assert.Equal(t, []*Query{
+		{Query: "create or replace package body pkg as\n  procedure p as\n  begin\n    null;\n  end;\nbegin\n  null;\nend pkg;"},
+		{Query: "insert into audit_log values ('done');"},
+	}, got)
+	mr.AssertExpectations(t)
+}
+
+func TestOracleScriptExtractor_SplitsPlainCreateTypeSpec(t *testing.T) {
+	t.Parallel()
+
+	mr := new(mockNoOpRenderer)
+	mr.On("Render", mock.Anything).Return("default", nil)
+
+	f := OracleScriptExtractor{
+		Renderer: mr,
+	}
+
+	got, err := f.ExtractQueriesFromString(`
+create type user_row as object (
+  id number,
+  name varchar2(100)
+);
+
+insert into audit_log values ('done');
+`)
+	require.NoError(t, err)
+
+	assert.Equal(t, []*Query{
+		{Query: "create type user_row as object (\n  id number,\n  name varchar2(100)\n);"},
+		{Query: "insert into audit_log values ('done');"},
+	}, got)
+	mr.AssertExpectations(t)
+}
+
 func TestWholeFileExtractor_ExtractQueriesFromString(t *testing.T) {
 	t.Parallel()
 

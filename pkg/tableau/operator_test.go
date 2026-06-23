@@ -12,7 +12,7 @@ import (
 type incrementalTestCase struct {
 	name       string
 	ctxFunc    func(t *testing.T) context.Context
-	parameters map[string]string
+	parameters pipeline.ParameterMap
 	want       bool
 }
 
@@ -22,13 +22,13 @@ func TestResolveIncrementalRefresh(t *testing.T) {
 	tests := []incrementalTestCase{
 		{
 			name:       "defaults to incremental",
-			parameters: map[string]string{},
+			parameters: pipeline.ParameterMap{},
 			want:       true,
 			ctxFunc:    func(t *testing.T) context.Context { return t.Context() },
 		},
 		{
 			name: "uses explicit incremental true",
-			parameters: map[string]string{
+			parameters: pipeline.ParameterMap{
 				"incremental": "true",
 			},
 			want:    true,
@@ -36,7 +36,7 @@ func TestResolveIncrementalRefresh(t *testing.T) {
 		},
 		{
 			name: "uses explicit incremental false",
-			parameters: map[string]string{
+			parameters: pipeline.ParameterMap{
 				"incremental": "false",
 			},
 			want:    false,
@@ -44,7 +44,7 @@ func TestResolveIncrementalRefresh(t *testing.T) {
 		},
 		{
 			name: "run full refresh overrides incremental true",
-			parameters: map[string]string{
+			parameters: pipeline.ParameterMap{
 				"incremental": "true",
 			},
 			want: false,
@@ -54,7 +54,7 @@ func TestResolveIncrementalRefresh(t *testing.T) {
 		},
 		{
 			name: "invalid incremental falls back to default",
-			parameters: map[string]string{
+			parameters: pipeline.ParameterMap{
 				"incremental": "maybe",
 			},
 			want:    true,
@@ -62,7 +62,7 @@ func TestResolveIncrementalRefresh(t *testing.T) {
 		},
 		{
 			name: "empty incremental falls back to default",
-			parameters: map[string]string{
+			parameters: pipeline.ParameterMap{
 				"incremental": " ",
 			},
 			want:    true,
@@ -83,31 +83,31 @@ func TestResolveRefreshTimeout(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		parameters map[string]string
+		parameters pipeline.ParameterMap
 		want       time.Duration
 	}{
 		{
 			name:       "defaults to sixty minutes",
-			parameters: map[string]string{},
+			parameters: pipeline.ParameterMap{},
 			want:       60 * time.Minute,
 		},
 		{
 			name: "uses explicit timeout value",
-			parameters: map[string]string{
+			parameters: pipeline.ParameterMap{
 				"refresh_timeout_minutes": "90",
 			},
 			want: 90 * time.Minute,
 		},
 		{
 			name: "invalid timeout falls back to default",
-			parameters: map[string]string{
+			parameters: pipeline.ParameterMap{
 				"refresh_timeout_minutes": "abc",
 			},
 			want: 60 * time.Minute,
 		},
 		{
 			name: "non-positive timeout falls back to default",
-			parameters: map[string]string{
+			parameters: pipeline.ParameterMap{
 				"refresh_timeout_minutes": "0",
 			},
 			want: 60 * time.Minute,

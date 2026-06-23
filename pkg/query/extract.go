@@ -78,7 +78,15 @@ func (q Query) String() string {
 	return q.Query
 }
 
-var queryCommentRegex = regexp.MustCompile(`(?m)(?s)\/\*.*?\*\/|(^|\s)--.*?\n`)
+var (
+	queryCommentRegex        = regexp.MustCompile(`(?m)(?s)\/\*.*?\*\/|(^|\s)--.*?\n`)
+	oraclePLSQLDDLStartRegex = regexp.MustCompile(`(?is)^CREATE\s+(?:OR\s+REPLACE\s+)?(?:(?:NON)?EDITIONABLE\s+)?(?:PROCEDURE|FUNCTION|PACKAGE(?:\s+BODY)?|TRIGGER|TYPE\s+BODY)\b`)
+	oraclePLSQLDDLBodyRegex  = regexp.MustCompile(`(?is)^CREATE\s+(?:OR\s+REPLACE\s+)?(?:(?:NON)?EDITIONABLE\s+)?(?:PACKAGE(?:\s+BODY)?|TYPE\s+BODY)\b`)
+	oraclePLSQLDDLNameRegex  = regexp.MustCompile(`(?is)^CREATE\s+(?:OR\s+REPLACE\s+)?(?:(?:NON)?EDITIONABLE\s+)?(?:PACKAGE(?:\s+BODY)?|TYPE\s+BODY)\s+([A-Z0-9_$#".]+)\b`)
+	oraclePLSQLBeginRegex    = regexp.MustCompile(`\bBEGIN\b`)
+	oraclePLSQLEndRegex      = regexp.MustCompile(`\bEND(?:\s+([A-Z0-9_$#".]+))?\b`)
+	oraclePLSQLBlockEndRegex = regexp.MustCompile(`(?s)\bEND(?:\s+([A-Z0-9_$#".]+))?\s*$`)
+)
 
 // FileQuerySplitterExtractor is a regular file extractor, but it splits the queries in the given file into multiple
 // instances. For usecases that require EXPLAIN statements, such as validating Snowflake queries, it is not possible
@@ -153,6 +161,361 @@ func (f FileQuerySplitterExtractor) CloneForAsset(ctx context.Context, p *pipeli
 
 func (f FileQuerySplitterExtractor) ReextractQueriesFromSlice(content []string) ([]string, error) {
 	return nil, errors.New("not implemented")
+}
+
+// OracleScriptExtractor splits Oracle SQL scripts into executable statements.
+// Oracle drivers execute one SQL or PL/SQL unit per call, unlike SQL*Plus-style
+// clients that understand semicolon-delimited scripts and standalone slash
+// block terminators.
+type OracleScriptExtractor struct {
+	Fs       afero.Fs
+	Renderer jinja.RendererInterface
+}
+
+func (f OracleScriptExtractor) ExtractQueriesFromString(content string) ([]*Query, error) {
+	rendered, err := f.Renderer.Render(strings.TrimSpace(content))
+	if err != nil {
+		return nil, errors.Wrap(err, "could not render file while extracting Oracle script queries")
+	}
+
+	return splitOracleQueries(rendered), nil
+}
+
+func (f OracleScriptExtractor) CloneForAsset(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) (QueryExtractor, error) {
+	renderer, err := f.Renderer.CloneForAsset(ctx, p, t)
+	if err != nil {
+		return nil, err
+	}
+
+	return &OracleScriptExtractor{
+		Renderer: renderer,
+		Fs:       f.Fs,
+	}, nil
+}
+
+func (f OracleScriptExtractor) ReextractQueriesFromSlice(content []string) ([]string, error) {
+	allQueries := make([]string, 0, len(content))
+	for _, query := range content {
+		rendered, err := f.Renderer.Render(strings.TrimSpace(query))
+		if err != nil {
+			return nil, errors.Wrap(err, "could not render file while re-extracting Oracle script queries")
+		}
+		for _, extracted := range splitOracleQueries(rendered) {
+			allQueries = append(allQueries, extracted.Query)
+		}
+	}
+
+	return allQueries, nil
+}
+
+func splitOracleQueries(fileContent string) []*Query {
+	statements := splitOracleStatements(fileContent)
+	queries := make([]*Query, 0, len(statements))
+	for _, statement := range statements {
+		statement = strings.TrimSpace(removeStandaloneOracleSlash(statement))
+		if statement == "" || strings.TrimSpace(queryCommentRegex.ReplaceAllLiteralString(statement, "\n")) == "" {
+			continue
+		}
+		queries = append(queries, &Query{Query: statement})
+	}
+
+	return queries
+}
+
+func splitOracleStatements(fileContent string) []string {
+	statements := make([]string, 0)
+	var current strings.Builder
+	inSingleQuote := false
+	inDoubleQuote := false
+	inQQuote := false
+	var qQuoteEnd byte
+	inLineComment := false
+	inBlockComment := false
+
+	for i := 0; i < len(fileContent); i++ {
+		ch := fileContent[i]
+		var next byte
+		if i+1 < len(fileContent) {
+			next = fileContent[i+1]
+		}
+		qQuoteEndAtIndex := oracleQQuoteEndDelimiterAt(fileContent, i)
+
+		switch {
+		case inLineComment:
+			current.WriteByte(ch)
+			if ch == '\n' || ch == '\r' {
+				inLineComment = false
+			}
+			continue
+		case inBlockComment:
+			current.WriteByte(ch)
+			if ch == '*' && next == '/' {
+				current.WriteByte(next)
+				i++
+				inBlockComment = false
+			}
+			continue
+		case inSingleQuote:
+			current.WriteByte(ch)
+			if ch == '\'' {
+				if next == '\'' {
+					current.WriteByte(next)
+					i++
+					continue
+				}
+				inSingleQuote = false
+			}
+			continue
+		case inDoubleQuote:
+			current.WriteByte(ch)
+			if ch == '"' {
+				if next == '"' {
+					current.WriteByte(next)
+					i++
+					continue
+				}
+				inDoubleQuote = false
+			}
+			continue
+		case inQQuote:
+			current.WriteByte(ch)
+			if ch == qQuoteEnd && next == '\'' {
+				current.WriteByte(next)
+				i++
+				inQQuote = false
+			}
+			continue
+		}
+
+		switch {
+		case ch == '-' && next == '-':
+			current.WriteByte(ch)
+			current.WriteByte(next)
+			i++
+			inLineComment = true
+			continue
+		case ch == '/' && next == '*':
+			current.WriteByte(ch)
+			current.WriteByte(next)
+			i++
+			inBlockComment = true
+			continue
+		case qQuoteEndAtIndex != 0:
+			current.WriteByte(ch)
+			current.WriteByte(next)
+			current.WriteByte(fileContent[i+2])
+			qQuoteEnd = qQuoteEndAtIndex
+			i += 2
+			inQQuote = true
+			continue
+		case ch == '\'':
+			current.WriteByte(ch)
+			inSingleQuote = true
+			continue
+		case ch == '"':
+			current.WriteByte(ch)
+			inDoubleQuote = true
+			continue
+		case ch == ';':
+			statementBeforeTerminator := strings.TrimSpace(current.String())
+			if oracleStatementStartsPLSQLBlock(statementBeforeTerminator) && !oraclePLSQLBlockComplete(statementBeforeTerminator) {
+				current.WriteByte(ch)
+				continue
+			}
+			current.WriteByte(ch)
+			statements = append(statements, current.String())
+			current.Reset()
+			continue
+		}
+
+		current.WriteByte(ch)
+	}
+
+	if strings.TrimSpace(current.String()) != "" {
+		statements = append(statements, current.String())
+	}
+
+	return statements
+}
+
+func oracleStatementStartsPLSQLBlock(statement string) bool {
+	normalized := oraclePLSQLComparableText(statement)
+	return oracleHasAnonymousPLSQLPrefix(normalized, "BEGIN") || oracleHasAnonymousPLSQLPrefix(normalized, "DECLARE") || oraclePLSQLDDLStartRegex.MatchString(normalized)
+}
+
+func oraclePLSQLBlockComplete(statement string) bool {
+	normalized := oraclePLSQLComparableText(statement)
+	normalized = strings.TrimSuffix(normalized, ";")
+	matches := oraclePLSQLBlockEndRegex.FindStringSubmatch(normalized)
+	if len(matches) == 0 {
+		return false
+	}
+	if len(matches) > 1 && oracleEndLabelIsControlKeyword(matches[1]) {
+		return false
+	}
+	ddlBodyName := oraclePLSQLDDLBodyName(normalized)
+
+	depth := 0
+	if ddlBodyName != "" || oraclePLSQLDDLBodyRegex.MatchString(normalized) {
+		depth++
+	}
+	depth += len(oraclePLSQLBeginRegex.FindAllString(normalized, -1))
+	for _, match := range oraclePLSQLEndRegex.FindAllStringSubmatch(normalized, -1) {
+		if len(match) > 1 && oracleEndLabelIsControlKeyword(match[1]) {
+			continue
+		}
+		depth--
+	}
+
+	if depth <= 0 {
+		return true
+	}
+	if depth == 1 && ddlBodyName != "" && len(matches) > 1 {
+		return oracleEndLabelMatchesObjectName(matches[1], ddlBodyName)
+	}
+	return false
+}
+
+func oraclePLSQLComparableText(statement string) string {
+	withoutComments := queryCommentRegex.ReplaceAllLiteralString(statement+"\n", "\n")
+	withoutQuotedText := oracleMaskOracleQuotedText(withoutComments)
+	return strings.ToUpper(strings.TrimSpace(withoutQuotedText))
+}
+
+func oracleHasAnonymousPLSQLPrefix(statement, prefix string) bool {
+	if !strings.HasPrefix(statement, prefix) {
+		return false
+	}
+	if len(statement) == len(prefix) {
+		return true
+	}
+	switch statement[len(prefix)] {
+	case ' ', '\n', '\r', '\t':
+		return true
+	default:
+		return false
+	}
+}
+
+func oracleMaskOracleQuotedText(statement string) string {
+	var masked strings.Builder
+	masked.Grow(len(statement))
+
+	var quote byte
+	var qQuoteEnd byte
+	for i := 0; i < len(statement); i++ {
+		ch := statement[i]
+		switch {
+		case qQuoteEnd != 0:
+			if ch == qQuoteEnd && i+1 < len(statement) && statement[i+1] == '\'' {
+				masked.WriteString("  ")
+				i++
+				qQuoteEnd = 0
+				continue
+			}
+			if ch == '\n' || ch == '\r' {
+				masked.WriteByte(ch)
+			} else {
+				masked.WriteByte(' ')
+			}
+			continue
+		case quote == 0:
+			if endDelimiter := oracleQQuoteEndDelimiterAt(statement, i); endDelimiter != 0 {
+				masked.WriteString("   ")
+				qQuoteEnd = endDelimiter
+				i += 2
+				continue
+			}
+			if ch == '\'' || ch == '"' {
+				quote = ch
+				masked.WriteByte(' ')
+				continue
+			}
+			masked.WriteByte(ch)
+			continue
+		}
+
+		switch {
+		case ch == quote && i+1 < len(statement) && statement[i+1] == quote:
+			masked.WriteString("  ")
+			i++
+		case ch == quote:
+			quote = 0
+			masked.WriteByte(' ')
+		case ch == '\n' || ch == '\r':
+			masked.WriteByte(ch)
+		default:
+			masked.WriteByte(' ')
+		}
+	}
+
+	return masked.String()
+}
+
+func oracleQQuoteEndDelimiterAt(statement string, index int) byte {
+	if index+2 >= len(statement) {
+		return 0
+	}
+	ch := statement[index]
+	if ch != 'q' && ch != 'Q' {
+		return 0
+	}
+	if statement[index+1] != '\'' {
+		return 0
+	}
+	switch opener := statement[index+2]; opener {
+	case '[':
+		return ']'
+	case '{':
+		return '}'
+	case '(':
+		return ')'
+	case '<':
+		return '>'
+	case '\'', ' ', '\t', '\n', '\r':
+		return 0
+	default:
+		return opener
+	}
+}
+
+func oraclePLSQLDDLBodyName(statement string) string {
+	match := oraclePLSQLDDLNameRegex.FindStringSubmatch(statement)
+	if len(match) < 2 {
+		return ""
+	}
+	return match[1]
+}
+
+func oracleEndLabelMatchesObjectName(label, objectName string) bool {
+	label = strings.Trim(label, `"`)
+	if label == "" {
+		return false
+	}
+	nameParts := strings.Split(objectName, ".")
+	objectName = strings.Trim(nameParts[len(nameParts)-1], `"`)
+	return label == objectName
+}
+
+func oracleEndLabelIsControlKeyword(label string) bool {
+	switch label {
+	case "IF", "LOOP", "CASE":
+		return true
+	default:
+		return false
+	}
+}
+
+func removeStandaloneOracleSlash(statement string) string {
+	lines := strings.Split(strings.TrimSpace(statement), "\n")
+	filtered := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "/" {
+			continue
+		}
+		filtered = append(filtered, line)
+	}
+	return strings.Join(filtered, "\n")
 }
 
 // WholeFileExtractor is a regular file extractor that returns the whole file content as the query string. It is useful

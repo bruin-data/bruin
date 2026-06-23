@@ -1259,6 +1259,10 @@ func Run(isDebug *bool) *cli.Command {
 					errorPrinter.Printf("Failed to restore state: %v\n", err)
 					return cli.Exit("", 1)
 				}
+				if err := SkipDisabledAssets(context.Background(), filter, s, foundPipeline); err != nil { //nolint:contextcheck
+					errorPrinter.Printf("Failed to skip disabled assets: %v\n", err)
+					return cli.Exit("", 1)
+				}
 			}
 
 			if !c.Bool("continue") {
@@ -1934,8 +1938,12 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeSailQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 	}
 	if s.WillRunTaskOfType(pipeline.AssetTypeOracleQuery) || s.WillRunTaskOfType(pipeline.AssetTypeOracleSource) || estimateCustomCheckType == pipeline.AssetTypeOracleQuery {
+		oracleFileExtractor := &query.OracleScriptExtractor{
+			Fs:       fs,
+			Renderer: renderer,
+		}
 		oracleCheckRunner := oracle.NewColumnCheckOperator(conn)
-		oracleOperator := oracle.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
+		oracleOperator := oracle.NewBasicOperator(conn, oracleFileExtractor, pipeline.HookWrapperMaterializer{
 			Mat:     oracle.NewMaterializer(fullRefresh),
 			Hoister: hoister,
 		}, parser)
@@ -2744,6 +2752,23 @@ func FilterTaskTypes(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *
 	return nil
 }
 
+func SkipDisabledAssets(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
+	for _, asset := range p.Assets {
+		enabled, err := asset.EnabledValue()
+		if err != nil {
+			return errors.Wrapf(err, "failed to resolve enabled for asset %q", asset.Name)
+		}
+
+		if enabled {
+			continue
+		}
+
+		s.MarkAsset(asset, scheduler.Skipped, false)
+	}
+
+	return nil
+}
+
 type FilterMutator func(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error
 
 func ApplyAllFilters(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
@@ -2757,6 +2782,7 @@ func ApplyAllFilters(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *
 		HandleExcludeTags,
 		FilterTaskTypes,
 		SkipAllTasksIfSingleCheck,
+		SkipDisabledAssets,
 	}
 
 	for _, filterFunc := range funcs {

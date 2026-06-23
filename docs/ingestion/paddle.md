@@ -32,7 +32,7 @@ parameters:
 - `source_connection`: the Paddle connection defined in `.bruin.yml`.
 - `source_table`: the Paddle table to ingest (see below).
 
-## Tables
+## Available Source Tables
 
 Paddle source allows ingesting the following resources:
 

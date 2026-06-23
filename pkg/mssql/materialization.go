@@ -202,25 +202,38 @@ func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 
 	columnDefs := make([]string, 0, len(asset.Columns)+1)
 	primaryKeys := make([]string, 0)
+	foreignKeys := make([]string, 0)
 	for _, col := range asset.Columns {
 		if col.Type == "" {
 			return "", fmt.Errorf("materialization strategy %s requires column %q to have a type", asset.Materialization.Strategy, col.Name)
 		}
 
-		def := fmt.Sprintf("    %s %s", quoteIdentifier(col.Name), col.Type)
+		def := fmt.Sprintf("    %s %s", quoteIdentifier(col.Name), col.SQLType())
+		if col.Collation != "" {
+			def += " COLLATE " + col.Collation
+		}
 		if col.PrimaryKey || !col.Nullable.Bool() {
 			def += " NOT NULL"
+		}
+		if col.Default != "" {
+			def += " DEFAULT " + col.Default
 		}
 		columnDefs = append(columnDefs, def)
 
 		if col.PrimaryKey {
 			primaryKeys = append(primaryKeys, quoteIdentifier(col.Name))
 		}
+		if col.ForeignKey != nil && col.ForeignKey.Table != "" && col.ForeignKey.Column != "" {
+			foreignKeys = append(foreignKeys, fmt.Sprintf("    FOREIGN KEY (%s) REFERENCES %s (%s)",
+				quoteIdentifier(col.Name), quoteIdentifier(col.ForeignKey.Table), quoteIdentifier(col.ForeignKey.Column)))
+		}
 	}
 
 	if len(primaryKeys) > 0 {
 		columnDefs = append(columnDefs, fmt.Sprintf("    PRIMARY KEY (%s)", strings.Join(primaryKeys, ", ")))
 	}
+
+	columnDefs = append(columnDefs, foreignKeys...)
 
 	createTable := fmt.Sprintf(
 		"IF OBJECT_ID(%s, N'U') IS NULL\nBEGIN\nCREATE TABLE %s (\n%s\n)\nEND",

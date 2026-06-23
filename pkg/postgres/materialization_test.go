@@ -424,6 +424,22 @@ WHEN NOT MATCHED THEN INSERT\("id", "col_a"\) VALUES\("id", "col_a"\);$`,
 			},
 			want: `CREATE TABLE IF NOT EXISTS "my_composite_primary_key_table" \(\s*"id" INT64,\s*"category" STRING,\s*primary key \("id", "category"\)\s*\);\s*COMMENT ON COLUMN "my_composite_primary_key_table"\."category" IS 'Category of the item';`,
 		},
+		{
+			name: "table with type detail, default, collation and foreign key",
+			task: &pipeline.Asset{
+				Name: "orders",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyDDL,
+				},
+				Columns: []pipeline.Column{
+					{Name: "amount", Type: "numeric", Precision: intp(10), Scale: intp(2), Default: "0"},
+					{Name: "name", Type: "varchar", Length: intp(255), Collation: "en_US"},
+					{Name: "customer_id", Type: "int", ForeignKey: &pipeline.ColumnReference{Table: "customers", Column: "id"}},
+				},
+			},
+			want: `CREATE TABLE IF NOT EXISTS "orders" \(\s*"amount" numeric\(10, 2\) DEFAULT 0,\s*"name" varchar\(255\) COLLATE "en_US",\s*"customer_id" int,\s*foreign key \("customer_id"\) references "customers" \("id"\)\s*\)`,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1771,3 +1787,5 @@ func TestBuildRedshiftSCD2ByColumnQuery(t *testing.T) {
 		})
 	}
 }
+
+func intp(i int) *int { return &i }

@@ -234,6 +234,12 @@
           "tags": [],
           "primary_key": false,
           "update_on_merge": false,
+          "default": "",
+          "precision": null,
+          "scale": null,
+          "length": null,
+          "collation": "",
+          "foreign_key": null,
           "merge_sql": "",
           "nullable": true,
           "owner": "",
@@ -278,8 +284,7 @@
     "discord": [],
     "webhook": []
   },
-  "catchup": false,
-  "catchup_mode": "",
+  "catchup": "",
   "metadata_push": {
     "bigquery": false
   },
@@ -288,6 +293,7 @@
   "max_active_steps": null,
   "default": {
     "type": "ingestr",
+    "materialization": null,
     "parameters": {
       "destination": "duckdb",
       "source_connection": "chess-run-default-option"
@@ -310,6 +316,8 @@
         }
       ]
     },
+    "snowflake": null,
+    "athena": null,
     "interval_modifiers": null
   },
   "commit": "",

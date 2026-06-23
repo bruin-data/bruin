@@ -47,17 +47,19 @@ parameters:
 - `type`: Specifies the type of the asset. Set this to `ingestr` to use the ingestr data pipeline.
 - `connection`: This is the destination connection, which defines where the data should be stored. For example: `postgres` indicates that the ingested data will be stored in a Postgres database.
 - `source_connection`: The name of the Freshdesk connection defined in `.bruin.yml`.
-- `source_table`: The name of the data table in Freshdesk that you want to ingest. Available tables:
+- `source_table`: The name of the data table in Freshdesk that you want to ingest.
+
+## Available Source Tables
 
 | Table | PK | Inc Key | Inc Strategy | Details |
 |-------|----|---------|--------------|---------|
-| agents | id | updated_at | merge | Retrieves users responsible for managing and resolving customer inquiries and support tickets |
-| companies | id | updated_at | merge | Retrieves customer organizations or groups that agents support |
-| contacts | id | updated_at | merge | Retrieves individuals or customers who reach out for support |
-| groups | id | updated_at | merge | Retrieves agents organized based on specific criteria |
-| roles | id | updated_at | merge | Retrieves predefined sets of permissions that determine what actions an agent can perform |
-| tickets | id | updated_at | merge | Retrieves customer inquiries or issues submitted via various channels like email, chat, phone, etc. |
-| tickets:\<query\> | id | updated_at | merge | Executes the Freshdesk ticket filter query while preserving incremental sync |
+| `agents` | id | updated_at | merge | Retrieves users responsible for managing and resolving customer inquiries and support tickets |
+| `companies` | id | updated_at | merge | Retrieves customer organizations or groups that agents support |
+| `contacts` | id | updated_at | merge | Retrieves individuals or customers who reach out for support |
+| `groups` | id | updated_at | merge | Retrieves agents organized based on specific criteria |
+| `roles` | id | updated_at | merge | Retrieves predefined sets of permissions that determine what actions an agent can perform |
+| `tickets` | id | updated_at | merge | Retrieves customer inquiries or issues submitted via various channels like email, chat, phone, etc. |
+| `tickets:<query>` | id | updated_at | merge | Executes the Freshdesk ticket filter query while preserving incremental sync. Maximum results: 300 tickets. |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 

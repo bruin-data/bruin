@@ -86,19 +86,19 @@ func TestApplyClickHouseEngineParams(t *testing.T) {
 	tests := []struct {
 		name   string
 		uri    string
-		params map[string]string
+		params pipeline.ParameterMap
 		want   string
 	}{
 		{
 			name:   "no engine params",
 			uri:    "clickhouse://user:pass@localhost:9000",
-			params: map[string]string{},
+			params: pipeline.ParameterMap{},
 			want:   "clickhouse://user:pass@localhost:9000",
 		},
 		{
 			name: "engine only",
 			uri:  "clickhouse://user:pass@localhost:9000",
-			params: map[string]string{
+			params: pipeline.ParameterMap{
 				"engine": "merge_tree",
 			},
 			want: "clickhouse://user:pass@localhost:9000?engine=merge_tree",
@@ -106,7 +106,7 @@ func TestApplyClickHouseEngineParams(t *testing.T) {
 		{
 			name: "engine with settings",
 			uri:  "clickhouse://user:pass@localhost:9000",
-			params: map[string]string{
+			params: pipeline.ParameterMap{
 				"engine":                   "merge_tree",
 				"engine.index_granularity": "8125",
 			},
@@ -115,7 +115,7 @@ func TestApplyClickHouseEngineParams(t *testing.T) {
 		{
 			name: "engine settings without engine",
 			uri:  "clickhouse://user:pass@localhost:9000",
-			params: map[string]string{
+			params: pipeline.ParameterMap{
 				"engine.index_granularity": "8125",
 			},
 			want: "clickhouse://user:pass@localhost:9000?engine.index_granularity=8125",
@@ -123,7 +123,7 @@ func TestApplyClickHouseEngineParams(t *testing.T) {
 		{
 			name: "preserves existing query params",
 			uri:  "clickhouse://user:pass@localhost:9000?http_port=8123",
-			params: map[string]string{
+			params: pipeline.ParameterMap{
 				"engine": "merge_tree",
 			},
 			want: "clickhouse://user:pass@localhost:9000?engine=merge_tree&http_port=8123",
@@ -131,7 +131,7 @@ func TestApplyClickHouseEngineParams(t *testing.T) {
 		{
 			name: "empty engine value is ignored",
 			uri:  "clickhouse://user:pass@localhost:9000",
-			params: map[string]string{
+			params: pipeline.ParameterMap{
 				"engine": "",
 			},
 			want: "clickhouse://user:pass@localhost:9000",
@@ -139,7 +139,7 @@ func TestApplyClickHouseEngineParams(t *testing.T) {
 		{
 			name: "empty engine setting value is ignored",
 			uri:  "clickhouse://user:pass@localhost:9000",
-			params: map[string]string{
+			params: pipeline.ParameterMap{
 				"engine.index_granularity": "",
 			},
 			want: "clickhouse://user:pass@localhost:9000",
@@ -147,7 +147,7 @@ func TestApplyClickHouseEngineParams(t *testing.T) {
 		{
 			name: "non-engine params are not added",
 			uri:  "clickhouse://user:pass@localhost:9000",
-			params: map[string]string{
+			params: pipeline.ParameterMap{
 				"source_connection": "sf",
 				"source_table":      "some_table",
 				"engine":            "merge_tree",
@@ -200,7 +200,7 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name:       "public.table",
 				Connection: "ch",
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"source_connection":        "sf",
 					"source_table":             "source-table",
 					"engine":                   "merge_tree",
@@ -222,7 +222,7 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name:       "asset-name",
 				Connection: "bq",
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"source_connection": "sf",
 					"source_table":      "source-table",
 					"destination":       "bigquery",
@@ -231,11 +231,25 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 			want: []string{"ingest", "--source-uri", "snowflake://uri-here", "--source-table", "source-table", "--dest-uri", "bigquery://uri-here", "--dest-table", "asset-name", "--yes", "--progress", "log"},
 		},
 		{
+			name: "trim whitespace",
+			asset: &pipeline.Asset{
+				Name:       "asset-name",
+				Connection: "bq",
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "sf",
+					"source_table":      "source-table",
+					"destination":       "bigquery",
+					"trim_whitespace":   "true",
+				},
+			},
+			want: []string{"ingest", "--source-uri", "snowflake://uri-here", "--source-table", "source-table", "--dest-uri", "bigquery://uri-here", "--dest-table", "asset-name", "--yes", "--progress", "log", "--trim-whitespace"},
+		},
+		{
 			name: "duck db source, basic scenario",
 			asset: &pipeline.Asset{
 				Name:       "asset-name",
 				Connection: "bq",
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"source_connection": "duck",
 					"source_table":      "source-table",
 					"destination":       "bigquery",
@@ -254,7 +268,7 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name:       "asset-name",
 				Connection: "duck",
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"source_connection": "sf",
 					"source_table":      "source-table",
 					"destination":       "duckdb",
@@ -267,7 +281,7 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name:       "asset-name",
 				Connection: "sf",
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"source_connection": "bq",
 					"source":            "gsheets",
 					"source_table":      "source-table",
@@ -281,7 +295,7 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name:       "asset-name",
 				Connection: "bq",
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"source_connection":    "sf",
 					"source_table":         "source-table",
 					"destination":          "bigquery",
@@ -311,7 +325,7 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 					{Name: "name"},
 					{Name: "updated_at"},
 				},
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"source_connection":    "sf",
 					"source_table":         "source-table",
 					"destination":          "bigquery",
@@ -343,7 +357,7 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 					{Name: "name"},
 					{Name: "updated_at"},
 				},
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"source_connection":    "sf",
 					"source_table":         "source-table",
 					"destination":          "bigquery",
@@ -377,7 +391,7 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 					{Name: "name"},
 					{Name: "updated_at"},
 				},
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"source_connection":    "sf",
 					"source_table":         "source-table",
 					"destination":          "bigquery",
@@ -474,7 +488,7 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand_IntervalStartAndEnd(t
 			Name:       "asset-name",
 			Type:       pipeline.AssetTypeMsSQLQuery,
 			Connection: "ms",
-			Parameters: map[string]string{
+			Parameters: pipeline.ParameterMap{
 				"source_connection": "sf",
 				"source_table":      "source-table",
 				"destination":       "mssql",
@@ -533,7 +547,7 @@ func TestBasicOperator_ConvertSeedTaskInstanceToIngestrCommand(t *testing.T) {
 				Name:       "asset-name",
 				Connection: "bq",
 				Type:       pipeline.AssetTypeBigquerySeed,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"path": "seed.csv",
 				},
 			},
@@ -545,7 +559,7 @@ func TestBasicOperator_ConvertSeedTaskInstanceToIngestrCommand(t *testing.T) {
 				Name:       "asset-name",
 				Type:       pipeline.AssetTypeDuckDBSeed,
 				Connection: "duck",
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"path": "seed.csv",
 				},
 			},
@@ -556,7 +570,7 @@ func TestBasicOperator_ConvertSeedTaskInstanceToIngestrCommand(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name:       "asset-name",
 				Connection: "duck",
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"path": "seed.csv",
 				},
 				Columns: []pipeline.Column{
@@ -597,7 +611,7 @@ func TestBasicOperator_ConvertSeedTaskInstanceToIngestrCommand(t *testing.T) {
 				Name:       "events",
 				Connection: "athena",
 				Type:       pipeline.AssetTypeAthenaSeed,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"path": "seed.csv",
 				},
 			},
@@ -622,7 +636,7 @@ func TestBasicOperator_ConvertSeedTaskInstanceToIngestrCommand(t *testing.T) {
 				Name:       "asset-name",
 				Connection: "duck",
 				Type:       pipeline.AssetTypeDuckDBSeed,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"path": "seed.parquet",
 				},
 			},
@@ -634,7 +648,7 @@ func TestBasicOperator_ConvertSeedTaskInstanceToIngestrCommand(t *testing.T) {
 				Name:       "asset-name",
 				Connection: "duck",
 				Type:       pipeline.AssetTypeDuckDBSeed,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"path": "seed.jsonl",
 				},
 			},
@@ -646,7 +660,7 @@ func TestBasicOperator_ConvertSeedTaskInstanceToIngestrCommand(t *testing.T) {
 				Name:       "asset-name",
 				Connection: "duck",
 				Type:       pipeline.AssetTypeDuckDBSeed,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"path": "seed.ndjson",
 				},
 			},
@@ -658,7 +672,7 @@ func TestBasicOperator_ConvertSeedTaskInstanceToIngestrCommand(t *testing.T) {
 				Name:       "asset-name",
 				Connection: "duck",
 				Type:       pipeline.AssetTypeDuckDBSeed,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"path": "seed.json",
 				},
 			},
@@ -670,7 +684,7 @@ func TestBasicOperator_ConvertSeedTaskInstanceToIngestrCommand(t *testing.T) {
 				Name:       "asset-name",
 				Connection: "duck",
 				Type:       pipeline.AssetTypeDuckDBSeed,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"path": "seed.avro",
 				},
 			},
@@ -682,7 +696,7 @@ func TestBasicOperator_ConvertSeedTaskInstanceToIngestrCommand(t *testing.T) {
 				Name:       "asset-name",
 				Connection: "duck",
 				Type:       pipeline.AssetTypeDuckDBSeed,
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"path":      "seed.dat",
 					"file_type": "parquet",
 				},
@@ -905,7 +919,7 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name:       "cdc-asset",
 				Connection: "bq",
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"source_connection": "pg",
 					"source_table":      "public.users",
 					"destination":       "bigquery",
@@ -928,7 +942,7 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name:       "cdc-asset-with-params",
 				Connection: "bq",
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"source_connection": "pg",
 					"source_table":      "public.users",
 					"destination":       "bigquery",
@@ -953,7 +967,7 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name:       "cdc-wildcard-asset",
 				Connection: "bq",
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"source_connection": "pg",
 					"source_table":      "*",
 					"destination":       "bigquery",
@@ -975,7 +989,7 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name:       "cdc-asset-stream-mode",
 				Connection: "bq",
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"source_connection": "pg",
 					"source_table":      "public.users",
 					"destination":       "bigquery",
@@ -999,7 +1013,7 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name:       "cdc-asset-explicit-strategy",
 				Connection: "bq",
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"source_connection":    "pg",
 					"source_table":         "public.users",
 					"destination":          "bigquery",
@@ -1127,7 +1141,7 @@ func TestBasicOperator_Run_MissingConnectionError(t *testing.T) {
 				Asset: &pipeline.Asset{
 					Name:       "asset-name",
 					Connection: tt.assetConnection,
-					Parameters: map[string]string{
+					Parameters: pipeline.ParameterMap{
 						"source_connection": tt.sourceConnection,
 						"source_table":      "source-table",
 						"destination":       "bigquery",
@@ -1159,63 +1173,63 @@ func TestResolveIngestrEngine(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		params    map[string]string
+		params    pipeline.ParameterMap
 		want      resolvedEngine
 		expectErr string
 	}{
 		{
 			name:   "unset defaults to v1 (latest)",
-			params: map[string]string{},
+			params: pipeline.ParameterMap{},
 			want:   resolvedEngine{family: versionFamilyV1, ingestrVersion: python.IngestrVersionV1},
 		},
 		{
 			name:   "bare v0 pins to legacy version",
-			params: map[string]string{"version": "v0"},
+			params: pipeline.ParameterMap{"version": "v0"},
 			want:   resolvedEngine{family: versionFamilyV0, ingestrVersion: python.IngestrVersionV0},
 		},
 		{
 			name:   "bare v1 pins to latest version",
-			params: map[string]string{"version": "v1"},
+			params: pipeline.ParameterMap{"version": "v1"},
 			want:   resolvedEngine{family: versionFamilyV1, ingestrVersion: python.IngestrVersionV1},
 		},
 		{
 			name:   "v0.14.2 selects exact version in v0 family",
-			params: map[string]string{"version": "v0.14.2"},
+			params: pipeline.ParameterMap{"version": "v0.14.2"},
 			want:   resolvedEngine{family: versionFamilyV0, ingestrVersion: "0.14.2"},
 		},
 		{
 			name:   "v1.0.5 selects exact version in v1 family",
-			params: map[string]string{"version": "v1.0.5"},
+			params: pipeline.ParameterMap{"version": "v1.0.5"},
 			want:   resolvedEngine{family: versionFamilyV1, ingestrVersion: "1.0.5"},
 		},
 		{
 			name:   "future major v2 maps to v1 family with v1 pin",
-			params: map[string]string{"version": "v2"},
+			params: pipeline.ParameterMap{"version": "v2"},
 			want:   resolvedEngine{family: versionFamilyV1, ingestrVersion: python.IngestrVersionV1},
 		},
 		{
 			name:   "future major v2.0.0 keeps exact pin in v1 family",
-			params: map[string]string{"version": "v2.0.0"},
+			params: pipeline.ParameterMap{"version": "v2.0.0"},
 			want:   resolvedEngine{family: versionFamilyV1, ingestrVersion: "2.0.0"},
 		},
 		{
 			name:      "v0.14 partial is rejected",
-			params:    map[string]string{"version": "v0.14"},
+			params:    pipeline.ParameterMap{"version": "v0.14"},
 			expectErr: "invalid parameters.version",
 		},
 		{
 			name:      "leading-zero major is rejected",
-			params:    map[string]string{"version": "v01"},
+			params:    pipeline.ParameterMap{"version": "v01"},
 			expectErr: "invalid parameters.version",
 		},
 		{
 			name:      "non-prefixed version is rejected",
-			params:    map[string]string{"version": "0.14.2"},
+			params:    pipeline.ParameterMap{"version": "0.14.2"},
 			expectErr: "invalid parameters.version",
 		},
 		{
 			name:      "latest is rejected",
-			params:    map[string]string{"version": "latest"},
+			params:    pipeline.ParameterMap{"version": "latest"},
 			expectErr: "invalid parameters.version",
 		},
 	}
@@ -1263,8 +1277,8 @@ func TestBasicOperator_Version(t *testing.T) {
 		}
 	}
 
-	makeAsset := func(extra map[string]string) *pipeline.Asset {
-		params := map[string]string{
+	makeAsset := func(extra pipeline.ParameterMap) *pipeline.Asset {
+		params := pipeline.ParameterMap{
 			"source_connection": "sf",
 			"source_table":      "source-table",
 		}
@@ -1280,14 +1294,14 @@ func TestBasicOperator_Version(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		params      map[string]string
+		params      pipeline.ParameterMap
 		wantVersion string
 	}{
 		{name: "unset defaults to v1", params: nil, wantVersion: python.IngestrVersionV1},
-		{name: "bare v0 pins legacy", params: map[string]string{"version": "v0"}, wantVersion: python.IngestrVersionV0},
-		{name: "bare v1 pins latest", params: map[string]string{"version": "v1"}, wantVersion: python.IngestrVersionV1},
-		{name: "exact v0.14.2 honors pin", params: map[string]string{"version": "v0.14.2"}, wantVersion: "0.14.2"},
-		{name: "exact v1.0.5 honors pin", params: map[string]string{"version": "v1.0.5"}, wantVersion: "1.0.5"},
+		{name: "bare v0 pins legacy", params: pipeline.ParameterMap{"version": "v0"}, wantVersion: python.IngestrVersionV0},
+		{name: "bare v1 pins latest", params: pipeline.ParameterMap{"version": "v1"}, wantVersion: python.IngestrVersionV1},
+		{name: "exact v0.14.2 honors pin", params: pipeline.ParameterMap{"version": "v0.14.2"}, wantVersion: "0.14.2"},
+		{name: "exact v1.0.5 honors pin", params: pipeline.ParameterMap{"version": "v1.0.5"}, wantVersion: "1.0.5"},
 	}
 
 	for _, tt := range tests {
@@ -1311,7 +1325,7 @@ func TestBasicOperator_Version(t *testing.T) {
 
 		runner := new(mockRunner)
 		o := makeOperator(runner)
-		ti := scheduler.AssetInstance{Pipeline: &pipeline.Pipeline{}, Asset: makeAsset(map[string]string{"version": "latest"})}
+		ti := scheduler.AssetInstance{Pipeline: &pipeline.Pipeline{}, Asset: makeAsset(pipeline.ParameterMap{"version": "latest"})}
 		ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, false)
 
 		err := o.Run(ctx, &ti)

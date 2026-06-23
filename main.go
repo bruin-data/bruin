@@ -6,6 +6,7 @@ import (
 
 	"github.com/bruin-data/bruin/cmd"
 	"github.com/bruin-data/bruin/cmd/mcp"
+	_ "github.com/bruin-data/bruin/internal/bootstrap"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	v "github.com/bruin-data/bruin/pkg/version"
 	"github.com/fatih/color"
@@ -17,14 +18,6 @@ var (
 	commit       = ""
 	telemetryKey string
 )
-
-func init() { //nolint:gochecknoinits
-	// Disable the Snowflake driver's platform detection which runs in a background goroutine on import.
-	// It tries to contact EC2 IMDS, Azure, and GCP metadata services, producing noisy warnings on non-cloud machines.
-	if os.Getenv("SNOWFLAKE_DISABLE_PLATFORM_DETECTION") == "" {
-		os.Setenv("SNOWFLAKE_DISABLE_PLATFORM_DETECTION", "true")
-	}
-}
 
 func main() {
 	isDebug := false

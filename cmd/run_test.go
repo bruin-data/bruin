@@ -1323,6 +1323,59 @@ func TestApplyAllFilters_CyclicDownstreamDoesNotLoop(t *testing.T) {
 	assert.Equal(t, 2, s.InstanceCountByStatus(scheduler.Pending))
 }
 
+func TestApplyAllFilters_SkipsDisabledAssetsAndAllowsDownstream(t *testing.T) {
+	t.Parallel()
+
+	p := &pipeline.Pipeline{
+		Name: "TestPipeline",
+		Assets: []*pipeline.Asset{
+			{
+				Name:    "Task1",
+				Type:    pipeline.AssetTypeBigqueryQuery,
+				Enabled: pipeline.NewTemplatedBool(false),
+				Columns: []pipeline.Column{
+					{Name: "id", Checks: []pipeline.ColumnCheck{{Name: "not_null"}}},
+				},
+			},
+			{
+				Name:      "Task2",
+				Type:      pipeline.AssetTypePython,
+				Upstreams: []pipeline.Upstream{{Type: "asset", Value: "Task1"}},
+			},
+		},
+	}
+
+	s := scheduler.NewScheduler(zap.NewNop().Sugar(), p, "test")
+	err := ApplyAllFilters(t.Context(), &Filter{}, s, p)
+	require.NoError(t, err)
+
+	humanIDs := func(instances []scheduler.TaskInstance) []string {
+		ids := make([]string, 0, len(instances))
+		for _, inst := range instances {
+			ids = append(ids, inst.GetHumanID())
+		}
+		return ids
+	}
+
+	pending := humanIDs(s.GetTaskInstancesByStatus(scheduler.Pending))
+	assert.Contains(t, pending, "Task2")
+	assert.NotContains(t, pending, "Task1")
+	assert.NotContains(t, pending, "Task1:id:not_null")
+
+	skipped := humanIDs(s.GetTaskInstancesByStatus(scheduler.Skipped))
+	assert.Contains(t, skipped, "Task1")
+	assert.Contains(t, skipped, "Task1:id:not_null")
+
+	s.Tick(&scheduler.TaskExecutionResult{
+		Instance: &scheduler.AssetInstance{Asset: &pipeline.Asset{Name: "start"}},
+	})
+
+	queued := humanIDs(s.GetTaskInstancesByStatus(scheduler.Queued))
+	assert.Contains(t, queued, "Task2")
+	assert.NotContains(t, queued, "Task1")
+	assert.NotContains(t, queued, "Task1:id:not_null")
+}
+
 func TestValidation(t *testing.T) {
 	t.Parallel()
 	logger := zaptest.NewLogger(t).Sugar()

@@ -36,21 +36,22 @@ connections:
       region: "us"
 ```
 
-## Supported Data Assets
+## Available Source Tables
 
 Intercom assets will be ingested to your data warehouse as defined in the `destination` table.
 
-| Asset | Table Name | Incremental Key | Description |
-|-------|------------|-----------------|-------------|
-| Contacts | `contacts` | updated_at | Customer contacts with their attributes, tags, and company associations |
-| Companies | `companies` | updated_at | Company information including custom attributes and tags |
-| Conversations | `conversations` | updated_at | Customer conversations with messages, state, and metadata |
-| Articles | `articles` | updated_at | Help center articles and knowledge base content |
-| Tags | `tags` | replace | All available tags in your Intercom workspace |
-| Segments | `segments` | replace | Customer segments and their definitions |
-| Teams | `teams` | replace | Support and sales teams configuration |
-| Admins | `admins` | replace | Admin users and their permissions |
-| Data Attributes | `data_attributes` | replace | Custom data attributes definitions for contacts and companies |
+
+| Table | PK | Inc Key | Inc Strategy | Details |
+|-------|----|---------|--------------|---------|
+| `contacts` | id | updated_at | merge | Retrieves information about contacts (visitors, users, and leads) |
+| `companies` | id | updated_at | merge | Retrieves information about companies |
+| `conversations` | id | updated_at | merge | Retrieves conversation data |
+| `articles` | id | updated_at | merge | Retrieves help center articles |
+| `tags` | id | - | replace | Retrieves tags used to organize contacts and companies |
+| `segments` | id | - | replace | Retrieves segments for filtering contacts and companies |
+| `admins` | id | - | replace | Retrieves admin user information |
+| `teams` | id | - | replace | Retrieves team information |
+| `data_attributes` | name | - | replace | Retrieves data attributes (both built-in and custom attributes) |
 
 ## Asset-Specific Configuration
 

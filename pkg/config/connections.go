@@ -1151,6 +1151,22 @@ func (c GCSConnection) GetName() string {
 	return c.Name
 }
 
+type SharePointConnection struct {
+	Name         string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	TenantID     string `yaml:"tenant_id" json:"tenant_id" mapstructure:"tenant_id"`
+	ClientID     string `yaml:"client_id" json:"client_id" mapstructure:"client_id"`
+	ClientSecret string `yaml:"client_secret" json:"client_secret" mapstructure:"client_secret"`
+	Hostname     string `yaml:"hostname" json:"hostname" mapstructure:"hostname"`
+	Site         string `yaml:"site" json:"site" mapstructure:"site"`
+	Library      string `yaml:"library,omitempty" json:"library,omitempty" mapstructure:"library"`
+	MaxFileSize  *int64 `yaml:"max_file_size,omitempty" json:"max_file_size,omitempty" mapstructure:"max_file_size"`
+	MaxFiles     *int64 `yaml:"max_files,omitempty" json:"max_files,omitempty" mapstructure:"max_files"`
+}
+
+func (c SharePointConnection) GetName() string {
+	return c.Name
+}
+
 type KinesisConnection struct {
 	Name            string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	AccessKeyID     string `yaml:"access_key_id,omitempty" json:"access_key_id" mapstructure:"access_key_id"`
@@ -1330,11 +1346,12 @@ func (c FrankfurterConnection) GetName() string {
 }
 
 type SalesforceConnection struct {
-	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
-	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
-	Password string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
-	Token    string `yaml:"token,omitempty" json:"token" mapstructure:"token"`
-	Domain   string `yaml:"domain" json:"domain" mapstructure:"domain"`
+	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Username    string `yaml:"username,omitempty" json:"username,omitempty" mapstructure:"username"`
+	Password    string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password"`
+	Token       string `yaml:"token,omitempty" json:"token,omitempty" mapstructure:"token"`
+	AccessToken string `yaml:"access_token,omitempty" json:"access_token,omitempty" mapstructure:"access_token"`
+	Domain      string `yaml:"domain" json:"domain" mapstructure:"domain"`
 }
 
 func (c SalesforceConnection) GetName() string {
@@ -1780,6 +1797,85 @@ type CustomerIoConnection struct {
 }
 
 func (c CustomerIoConnection) GetName() string {
+	return c.Name
+}
+
+type SendgridConnection struct {
+	Name       string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey     string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	OnBehalfOf string `yaml:"on_behalf_of,omitempty" json:"on_behalf_of,omitempty" mapstructure:"on_behalf_of"`
+}
+
+func (c SendgridConnection) GetName() string {
+	return c.Name
+}
+
+type TwilioConnection struct {
+	Name       string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	AccountSID string `yaml:"account_sid,omitempty" json:"account_sid" mapstructure:"account_sid"`
+	AuthToken  string `yaml:"auth_token,omitempty" json:"auth_token,omitempty" mapstructure:"auth_token"`
+	APIKey     string `yaml:"api_key,omitempty" json:"api_key,omitempty" mapstructure:"api_key"`
+	APISecret  string `yaml:"api_secret,omitempty" json:"api_secret,omitempty" mapstructure:"api_secret"`
+}
+
+func (c TwilioConnection) GetName() string {
+	return c.Name
+}
+
+type EspnConnection struct {
+	Name    string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Sport   string `yaml:"sport,omitempty" json:"sport,omitempty" mapstructure:"sport"`
+	League  string `yaml:"league,omitempty" json:"league,omitempty" mapstructure:"league"`
+	Season  string `yaml:"season,omitempty" json:"season,omitempty" mapstructure:"season"`
+	Limit   int    `yaml:"limit,omitempty" json:"limit,omitempty" mapstructure:"limit"`
+	BaseURL string `yaml:"base_url,omitempty" json:"base_url,omitempty" mapstructure:"base_url"`
+}
+
+func (c EspnConnection) GetName() string {
+	return c.Name
+}
+
+type APIFootballConnection struct {
+	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey   string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	League   string `yaml:"league,omitempty" json:"league,omitempty" mapstructure:"league"`
+	Season   string `yaml:"season,omitempty" json:"season,omitempty" mapstructure:"season"`
+	Timezone string `yaml:"timezone,omitempty" json:"timezone,omitempty" mapstructure:"timezone"`
+	BaseURL  string `yaml:"base_url,omitempty" json:"base_url,omitempty" mapstructure:"base_url"`
+}
+
+func (c APIFootballConnection) GetName() string {
+	return c.Name
+}
+
+type FootballDataConnection struct {
+	Name           string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey         string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	Competition    string `yaml:"competition,omitempty" json:"competition,omitempty" mapstructure:"competition"`
+	Season         string `yaml:"season,omitempty" json:"season,omitempty" mapstructure:"season"`
+	BaseURL        string `yaml:"base_url,omitempty" json:"base_url,omitempty" mapstructure:"base_url"`
+	Matchday       string `yaml:"matchday,omitempty" json:"matchday,omitempty" mapstructure:"matchday"`
+	Status         string `yaml:"status,omitempty" json:"status,omitempty" mapstructure:"status"`
+	Stage          string `yaml:"stage,omitempty" json:"stage,omitempty" mapstructure:"stage"`
+	Group          string `yaml:"group,omitempty" json:"group,omitempty" mapstructure:"group"`
+	UnfoldGoals    bool   `yaml:"unfold_goals,omitempty" json:"unfold_goals,omitempty" mapstructure:"unfold_goals"`
+	UnfoldBookings bool   `yaml:"unfold_bookings,omitempty" json:"unfold_bookings,omitempty" mapstructure:"unfold_bookings"`
+	UnfoldSubs     bool   `yaml:"unfold_subs,omitempty" json:"unfold_subs,omitempty" mapstructure:"unfold_subs"`
+	UnfoldLineups  bool   `yaml:"unfold_lineups,omitempty" json:"unfold_lineups,omitempty" mapstructure:"unfold_lineups"`
+}
+
+func (c FootballDataConnection) GetName() string {
+	return c.Name
+}
+
+type BallDontLieConnection struct {
+	Name    string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey  string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	Season  string `yaml:"season,omitempty" json:"season,omitempty" mapstructure:"season"`
+	BaseURL string `yaml:"base_url,omitempty" json:"base_url,omitempty" mapstructure:"base_url"`
+}
+
+func (c BallDontLieConnection) GetName() string {
 	return c.Name
 }
 

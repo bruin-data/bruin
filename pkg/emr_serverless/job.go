@@ -52,25 +52,28 @@ type JobRunParams struct {
 	Workspace     string
 }
 
-func parseParams(cfg *Client, params map[string]string) *JobRunParams {
+func parseParams(cfg *Client, params pipeline.ParameterMap) *JobRunParams {
+	entrypoint, _ := params.GetString("entrypoint")
+	config, _ := params.GetString("config")
+	logs, _ := params.GetString("logs")
 	jobParams := JobRunParams{
 		ApplicationID: cfg.ApplicationID,
 		ExecutionRole: cfg.ExecutionRole,
 		Region:        cfg.Region,
-		Entrypoint:    params["entrypoint"],
-		Config:        params["config"],
-		Logs:          params["logs"],
+		Entrypoint:    entrypoint,
+		Config:        config,
+		Logs:          logs,
 		Workspace:     cfg.Workspace,
 	}
 
-	if params["timeout"] != "" {
-		t, err := time.ParseDuration(params["timeout"])
+	if timeoutVal, _ := params.GetString("timeout"); timeoutVal != "" {
+		t, err := time.ParseDuration(timeoutVal)
 		if err == nil {
 			jobParams.Timeout = t
 		}
 	}
-	if params["args"] != "" {
-		arglist := strings.Split(strings.TrimSpace(params["args"]), " ")
+	if argsVal, _ := params.GetString("args"); argsVal != "" {
+		arglist := strings.Split(strings.TrimSpace(argsVal), " ")
 		for _, arg := range arglist {
 			arg = strings.TrimSpace(arg)
 			if arg != "" {

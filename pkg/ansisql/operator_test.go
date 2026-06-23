@@ -121,7 +121,7 @@ func TestNewTableSensorNoConnectionForAsset(t *testing.T) {
 			Path:    "test-file.sql",
 			Content: "some content",
 		},
-		Parameters: pipeline.EmptyStringMap{
+		Parameters: pipeline.ParameterMap{
 			"table": "test_table",
 		},
 	})
@@ -146,7 +146,7 @@ func TestNewTableSensorConnectionNotFound(t *testing.T) {
 			Path:    "test-file.sql",
 			Content: "some content",
 		},
-		Parameters: pipeline.EmptyStringMap{
+		Parameters: pipeline.ParameterMap{
 			"table": "test_table",
 		},
 	})
@@ -170,7 +170,7 @@ func TestNewTableSensorNoTableExistsChecker(t *testing.T) {
 			Path:    "test-file.sql",
 			Content: "some content",
 		},
-		Parameters: pipeline.EmptyStringMap{
+		Parameters: pipeline.ParameterMap{
 			"table": "test.table",
 		},
 	})
@@ -196,7 +196,7 @@ func TestNewTableSensorBuildTableExistsQueryError(t *testing.T) {
 			Path:    "test-file.sql",
 			Content: "some content",
 		},
-		Parameters: pipeline.EmptyStringMap{
+		Parameters: pipeline.ParameterMap{
 			"table": "test.table",
 		},
 	})
@@ -223,7 +223,7 @@ func TestNewTableSensorExtractQueriesFromStringError(t *testing.T) {
 			Path:    "test-file.sql",
 			Content: "some content",
 		},
-		Parameters: pipeline.EmptyStringMap{
+		Parameters: pipeline.ParameterMap{
 			"table": "database.test.table",
 		},
 	})
@@ -253,7 +253,7 @@ func TestTableSensorTimesOutWhenConfigured(t *testing.T) {
 			Path:    "test-file.sql",
 			Content: "some content",
 		},
-		Parameters: pipeline.EmptyStringMap{
+		Parameters: pipeline.ParameterMap{
 			"table":         "database.test.table",
 			"timeout":       "100ms",
 			"poke_interval": "0",
@@ -284,7 +284,7 @@ func TestNewTableSensorgNoQueries(t *testing.T) {
 			Path:    "test-file.sql",
 			Content: "some content",
 		},
-		Parameters: pipeline.EmptyStringMap{
+		Parameters: pipeline.ParameterMap{
 			"table": "database.test.table",
 		},
 	})

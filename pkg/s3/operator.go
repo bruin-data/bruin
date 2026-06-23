@@ -137,12 +137,12 @@ func (ks *KeySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipel
 		return nil
 	}
 
-	bucketName, ok := t.Parameters["bucket_name"]
+	bucketName, ok := t.Parameters.GetString("bucket_name")
 	if !ok {
 		return errors.New("S3 key sensor requires a parameter named 'bucket_name'")
 	}
 
-	bucketKey, ok := t.Parameters["bucket_key"]
+	bucketKey, ok := t.Parameters.GetString("bucket_key")
 	if !ok {
 		return errors.New("S3 key sensor requires a parameter named 'bucket_key'")
 	}

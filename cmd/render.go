@@ -397,7 +397,7 @@ func (r *RenderCommand) Run(pl *pipeline.Pipeline, task *pipeline.Asset, modifie
 	// For query sensor assets, extract query from Parameters instead of ExecutableFile.Content
 	var queryString string
 	if isQuerySensorAsset(task.Type) {
-		queryParam, ok := task.Parameters["query"]
+		queryParam, ok := task.Parameters.GetString("query")
 		if !ok {
 			r.printErrorOrJSON("query sensor asset requires a parameter named 'query'")
 			return cli.Exit("", 1)

@@ -267,7 +267,7 @@ func TestQuerySensorTimesOutWhenConfigured(t *testing.T) {
 			Path:    "test-file.sql",
 			Content: "select 1",
 		},
-		Parameters: pipeline.EmptyStringMap{
+		Parameters: pipeline.ParameterMap{
 			"query":   "select 1",
 			"timeout": "100ms",
 		},

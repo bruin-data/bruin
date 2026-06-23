@@ -277,12 +277,14 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                                     {text: "Airtable", link: "/ingestion/airtable"},
                                     {text: "Anthropic", link: "/ingestion/anthropic"},
                                     {text: "Allium", link: "/ingestion/allium"},
+                                    {text: "API-Football", link: "/ingestion/api-football"},
                                     {text: "Apple Ads", link: "/ingestion/apple-ads"},
                                     {text: "AppStore", link: "/ingestion/appstore"},
                                     {text: "AppLovin", link: "/ingestion/applovin"},
                                     {text: "AppLovin Max", link: "/ingestion/applovin_max"},
                                     {text: "Asana", link: "/ingestion/asana"},
                                     {text: "Attio", link: "/ingestion/attio"},
+                                    {text: "BallDontLie FIFA", link: "/ingestion/balldontlie"},
                                     {text: "Bruin", link: "/ingestion/bruin"},
                                     {text: "Chess", link: "/ingestion/chess"},
                                     {text: "ClickUp", link: "/ingestion/clickup"},
@@ -294,9 +296,11 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                                     {text: "Dune", link: "/ingestion/dune"},
                                     {text: "DynamoDB", link: "/ingestion/dynamodb"},
                                     {text: "Elasticsearch", link: "/ingestion/elasticsearch"},
+                                    {text: "ESPN", link: "/ingestion/espn"},
                                     {text: "Facebook", link: "/ingestion/facebook-ads"},
                                     {text: "Fireflies", link: "/ingestion/fireflies"},
                                     {text: "Fluxx", link: "/ingestion/fluxx"},
+                                    {text: "football-data.org", link: "/ingestion/footballdata"},
                                     {text: "Frankfurter", link: "/ingestion/frankfurter"},
                                     {text: "FundraiseUp", link: "/ingestion/fundraiseup"},
                                     {text: "Freshdesk", link: "/ingestion/freshdesk"},
@@ -343,7 +347,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                                     {text: "Salesforce", link: "/ingestion/salesforce"},
                                     {text: "SAP HANA", link: "/ingestion/sap_hana"},
                                     {text: "S3", link: "/ingestion/s3"},
+                                    {text: "SendGrid", link: "/ingestion/sendgrid"},
                                     {text: "SFTP", link: "/ingestion/sftp"},
+                                    {text: "SharePoint", link: "/ingestion/sharepoint"},
                                     {text: "Shopify", link: "/ingestion/shopify"},
                                     {text: "Smartsheet", link: "/ingestion/smartsheet"},
                                     {text: "Snapchat Ads", link: "/ingestion/snapchat-ads"},
@@ -354,6 +360,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                                     {text: "SQLite", link: "/ingestion/sqlite"},
                                     {text: "SurveyMonkey", link: "/ingestion/surveymonkey"},
                                     {text: "TikTok Ads", link: "/ingestion/tiktokads"},
+                                    {text: "Twilio", link: "/ingestion/twilio"},
                                     {text: "Wise", link: "/ingestion/wise"},
                                     {text: "Zendesk", link: "/ingestion/zendesk"},
                                     {text: "Zoom", link: "/ingestion/zoom"},
@@ -511,6 +518,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     },
 
     markdown: {
+        headers: {
+            level: [2, 3, 4],
+        },
         languages: ["sql", "yaml", "shell", "python", "json", jinja2Grammar, bruinSqlGrammar, bruinPythonGrammar],
     },
 
@@ -520,5 +530,10 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     // optionally set additional config for plugin itself with MermaidPluginConfig
     mermaidPlugin: {
         class: "mermaid my-class", // set additional css classes for parent container
+    },
+    vite: {
+        build: {
+            target: ["chrome107", "edge107", "firefox104", "safari16"],
+        },
     },
 });

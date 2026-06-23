@@ -52,15 +52,15 @@ parameters:
 
 | Table | PK | Inc Key | Inc Strategy | Details |
 |-------|----|---------|--------------|---------|
-| orders | id | updated_at | merge | Retrieves Shopify order data including customer info, line items, and shipping details |
-| customers | id | updated_at | merge | Retrieves Shopify customer data including contact info and order history |
-| discounts | id | updated_at | merge | Retrieves Shopify discount data using GraphQL API (use instead of deprecated price_rules) |
-| products | id | updated_at | merge | Retrieves Shopify product information including variants, images, and inventory |
-| inventory_items | id | updated_at | merge | Retrieves Shopify inventory item details and stock levels |
-| transactions | id | id | merge | Retrieves Shopify transaction data for payments and refunds |
-| balance | currency | - | merge | Retrieves Shopify balance information for financial tracking |
-| events | id | created_at | merge | Retrieves Shopify event data for audit trails and activity tracking |
-| price_rules | id | updated_at | merge | DEPRECATED - Use discounts table instead |
+| `orders` | id | updated_at | merge | Retrieves Shopify order data including customer info, line items, and shipping details |
+| `customers` | id | updated_at | merge | Retrieves Shopify customer data including contact info and order history |
+| `discounts` | id | updated_at | merge | Retrieves Shopify discount data using GraphQL API (use instead of deprecated price_rules) |
+| `products` | id | updated_at | merge | Retrieves Shopify product information including variants, images, and inventory |
+| `inventory_items` | id | updated_at | merge | Retrieves Shopify inventory item details and stock levels |
+| `transactions` | id | id | merge | Retrieves Shopify transaction data for payments and refunds |
+| `balance` | currency | - | merge | Retrieves Shopify balance information for financial tracking |
+| `events` | id | created_at | merge | Retrieves Shopify event data for audit trails and activity tracking |
+| `price_rules` | id | updated_at | merge | **DEPRECATED** - Use `discounts` table instead |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 

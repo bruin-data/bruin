@@ -42,7 +42,8 @@ type resolvedEngine struct {
 // Bare family markers (v0, v1, ...) resolve to the corresponding pinned PyPI
 // version; fully-qualified vMAJOR.MINOR.PATCH overrides to an exact PyPI version.
 func resolveIngestrEngine(asset *pipeline.Asset) (resolvedEngine, error) {
-	versionParam := strings.TrimSpace(asset.Parameters["version"])
+	versionRaw, _ := asset.Parameters.GetString("version")
+	versionParam := strings.TrimSpace(versionRaw)
 
 	if versionParam == "" {
 		return resolvedEngine{family: versionFamilyV1, ingestrVersion: python.IngestrVersionV1}, nil
@@ -202,7 +203,7 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	}
 
 	// Source connection
-	sourceConnectionName, ok := asset.Parameters["source_connection"]
+	sourceConnectionName, ok := asset.Parameters.GetString("source_connection")
 	if !ok {
 		return errors.New("source connection not configured")
 	}
@@ -230,12 +231,12 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 
 	// some connection types can be shared among sources, therefore inferring source URI from the connection type is not
 	// always feasible. In the case of GSheets, we have to reuse the same GCP credentials, but change the prefix with gsheets://
-	if asset.Parameters["source"] == "gsheets" {
+	if sourceVal, _ := asset.Parameters.GetString("source"); sourceVal == "gsheets" {
 		sourceURI = strings.ReplaceAll(sourceURI, "bigquery://", "gsheets://")
 	}
 
 	// Handle CDC mode - transform PostgreSQL URI to CDC format and auto-set merge strategy
-	if asset.Parameters["cdc"] == "true" {
+	if cdcVal, _ := asset.Parameters.GetString("cdc"); cdcVal == "true" {
 		parsedURI, err := url.Parse(sourceURI)
 		if err != nil {
 			return fmt.Errorf("failed to parse source URI for CDC: %w", err)
@@ -244,16 +245,16 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		parsedURI.Scheme = strings.ReplaceAll(parsedURI.Scheme, "postgresql", "postgres+cdc")
 
 		q := parsedURI.Query()
-		if pub := asset.Parameters["cdc_publication"]; pub != "" {
+		if pub, _ := asset.Parameters.GetString("cdc_publication"); pub != "" {
 			q.Set("publication", pub)
 		}
-		if slot := asset.Parameters["cdc_slot"]; slot != "" {
+		if slot, _ := asset.Parameters.GetString("cdc_slot"); slot != "" {
 			q.Set("slot", slot)
 		}
-		if mode := asset.Parameters["cdc_mode"]; mode != "" {
+		if mode, _ := asset.Parameters.GetString("cdc_mode"); mode != "" {
 			q.Set("mode", mode)
 		}
-		if destSchema := asset.Parameters["cdc_dest_schema"]; destSchema != "" {
+		if destSchema, _ := asset.Parameters.GetString("cdc_dest_schema"); destSchema != "" {
 			q.Set("dest_schema", destSchema)
 		}
 		parsedURI.RawQuery = q.Encode()
@@ -266,12 +267,12 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		}
 	}
 
-	sourceTable, ok := asset.Parameters["source_table"]
+	sourceTable, ok := asset.Parameters.GetString("source_table")
 	if !ok {
 		return errors.New("source table not configured")
 	}
 
-	fileType, ok := asset.Parameters["file_type"]
+	fileType, ok := asset.Parameters.GetString("file_type")
 	if ok {
 		sourceTable = sourceTable + "#" + fileType
 	}
@@ -310,7 +311,7 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	}
 
 	// Omit --source-table for CDC wildcard mode so ingestr replicates all tables
-	if asset.Parameters["cdc"] != "true" || sourceTable != "*" {
+	if cdcWild, _ := asset.Parameters.GetString("cdc"); cdcWild != "true" || sourceTable != "*" {
 		baseArgs = append(baseArgs, "--source-table", sourceTable)
 	}
 
@@ -411,7 +412,7 @@ func resolveSeedSourceURI(seedPath, fileType, assetDir string) (string, error) {
 	return scheme + "://" + filepath.Join(assetDir, seedPath), nil
 }
 
-func applyClickHouseEngineParams(destURI string, params map[string]string) string {
+func applyClickHouseEngineParams(destURI string, params pipeline.ParameterMap) string {
 	parsedURI, err := url.Parse(destURI)
 	if err != nil {
 		return destURI
@@ -419,12 +420,13 @@ func applyClickHouseEngineParams(destURI string, params map[string]string) strin
 
 	q := parsedURI.Query()
 
-	if engine, exists := params["engine"]; exists && engine != "" {
+	if engine, exists := params.GetString("engine"); exists && engine != "" {
 		q.Set("engine", engine)
 	}
 
-	for key, value := range params {
+	for key := range params {
 		key = strings.TrimSpace(key)
+		value, _ := params.GetString(key)
 		if strings.HasPrefix(key, "engine.") && value != "" {
 			q.Set(
 				key,
@@ -474,12 +476,13 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 		asset.IntervalModifiers.End = renderedEnd
 	}
 
-	sourceConnectionPath, ok := asset.Parameters["path"]
+	sourceConnectionPath, ok := asset.Parameters.GetString("path")
 	if !ok {
 		return errors.New("source connection not configured")
 	}
 
-	sourceURI, err := resolveSeedSourceURI(sourceConnectionPath, asset.Parameters["file_type"], filepath.Dir(asset.ExecutableFile.Path))
+	seedFileType, _ := asset.Parameters.GetString("file_type")
+	sourceURI, err := resolveSeedSourceURI(sourceConnectionPath, seedFileType, filepath.Dir(asset.ExecutableFile.Path))
 	if err != nil {
 		return err
 	}

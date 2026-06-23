@@ -206,6 +206,12 @@
           "tags": [],
           "primary_key": false,
           "update_on_merge": false,
+          "default": "",
+          "precision": null,
+          "scale": null,
+          "length": null,
+          "collation": "",
+          "foreign_key": null,
           "merge_sql": "",
           "nullable": true,
           "owner": "",
@@ -239,8 +245,7 @@
     "discord": [],
     "webhook": []
   },
-  "catchup": false,
-  "catchup_mode": "",
+  "catchup": "",
   "metadata_push": {
     "bigquery": false
   },

@@ -49,6 +49,10 @@ func Query() *cli.Command {
 		Name:   "query",
 		Usage:  "Execute a query on a specified connection and retrieve results",
 		Before: telemetry.BeforeCommand,
+		// Slice flags such as --var and --filter accept JSON values that contain
+		// commas (e.g. --var filters='{"start_date":"x","end_date":"y"}'). Disable
+		// the default comma separator so those values are not split into fragments.
+		DisableSliceFlagSeparator: true,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:     "connection",
@@ -151,7 +155,7 @@ func Query() *cli.Command {
 			},
 			&cli.StringSliceFlag{
 				Name:    "var",
-				Usage:   "set Jinja template variables for query rendering (e.g. --var key=value)",
+				Usage:   "set Jinja template variables for query rendering. Supports flat (--var key=value), dot-notation nested (--var filters.start_date=2026-05-20) and JSON object/array values (--var filters='{\"start_date\":\"2026-05-20\"}').",
 				Sources: cli.EnvVars("BRUIN_VARS"),
 			},
 		},
@@ -1600,8 +1604,15 @@ func injectAgentName(annotations string) string {
 	return string(b)
 }
 
-// parseQueryVars parses --var flags into a map of string values.
-// Values are always treated as literal strings, matching how pipeline variables work in YAML.
+// parseQueryVars parses --var flags into a (possibly nested) map of values.
+//
+// It supports three forms, matching how the dashboard runtime injects variables:
+//   - flat:         --var start_date=2026-05-20            => {"start_date": "2026-05-20"}
+//   - dot-notation: --var filters.start_date=2026-05-20    => {"filters": {"start_date": "2026-05-20"}}
+//   - JSON values:  --var filters='{"start_date":"x"}'     => {"filters": {"start_date": "x"}}
+//
+// Scalar values are kept as literal strings (matching how pipeline variables work
+// in YAML); only values that look like a JSON object or array are parsed as JSON.
 func parseQueryVars(rawVars []string) (map[string]any, error) {
 	vars := make(map[string]any)
 
@@ -1614,10 +1625,88 @@ func parseQueryVars(rawVars []string) (map[string]any, error) {
 		if key == "" {
 			return nil, fmt.Errorf("invalid variable %q: key must not be empty", v)
 		}
-		vars[key] = strings.TrimSpace(parts[1])
+
+		value := parseQueryVarValue(strings.TrimSpace(parts[1]))
+		if err := setNestedVar(vars, key, value); err != nil {
+			return nil, fmt.Errorf("invalid variable %q: %w", v, err)
+		}
 	}
 
 	return vars, nil
+}
+
+// parseQueryVarValue parses a raw --var value. Values that look like a JSON object
+// or array are parsed as JSON so callers can pass nested structures; everything else
+// is kept as a literal string.
+func parseQueryVarValue(value string) any {
+	if value == "" {
+		return value
+	}
+
+	switch value[0] {
+	case '{', '[':
+		var parsed any
+		if err := json.Unmarshal([]byte(value), &parsed); err == nil {
+			return parsed
+		}
+	}
+
+	return value
+}
+
+// mergeVarValue merges an incoming value onto an existing one. When both are
+// objects they are deep-merged (so dot-notation and JSON assignments to the same
+// key combine in either order), with incoming leaf values winning on conflicts.
+// Otherwise the incoming value replaces the existing one.
+func mergeVarValue(existing, incoming any) any {
+	existingMap, ok := existing.(map[string]any)
+	if !ok {
+		return incoming
+	}
+	incomingMap, ok := incoming.(map[string]any)
+	if !ok {
+		return incoming
+	}
+
+	for key, value := range incomingMap {
+		existingMap[key] = mergeVarValue(existingMap[key], value)
+	}
+	return existingMap
+}
+
+// setNestedVar assigns value to a dot-notation key inside vars, creating
+// intermediate maps as needed and merging into existing ones.
+func setNestedVar(vars map[string]any, key string, value any) error {
+	segments := strings.Split(key, ".")
+	current := vars
+
+	for i, segment := range segments {
+		segment = strings.TrimSpace(segment)
+		if segment == "" {
+			return fmt.Errorf("key %q has an empty segment", key)
+		}
+
+		if i == len(segments)-1 {
+			current[segment] = mergeVarValue(current[segment], value)
+			return nil
+		}
+
+		existing, ok := current[segment]
+		if !ok {
+			next := make(map[string]any)
+			current[segment] = next
+			current = next
+			continue
+		}
+
+		next, ok := existing.(map[string]any)
+		if !ok {
+			return fmt.Errorf("key segment %q is already set to a non-object value", segment)
+		}
+		current = next
+	}
+
+	return nil
 }
 
 func trimDecimalString(value string) string {

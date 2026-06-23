@@ -33,21 +33,16 @@ connections:
       api_key: ${FUNDRAISEUP_API_KEY}
 ```
 
-## Supported Data Assets
+## Available Source Tables
 
-FundraiseUp assets will be ingested to your data warehouse as defined in the `destination` table.
-
-| Asset | Table Name | Incremental Key | Description |
-|-------|------------|-----------------|-------------|
-| Donations | `donations` | replace | All donation records including amounts, supporters, and payment details |
-| Events | `events` | replace | Audit log events for tracking changes and activities |
-| Fundraisers | `fundraisers` | replace | Fundraiser campaigns (requires appropriate API permissions) |
-| Recurring Plans | `recurring_plans` | replace | Recurring donation plans and subscription details |
-| Supporters | `supporters` | replace | Donor/supporter information including contact details |
-
-## Asset-Specific Configuration
-
-All FundraiseUp assets use the full refresh strategy (replace) as incremental loading is not supported by the FundraiseUp API.
+| Table | PK | Inc Key | Inc Strategy | Details |
+|-------|----|---------|--------------|---------|
+| `donations` | id | - | replace | All donation records including amounts, supporters, and payment details |
+| `donations:incremental` | id | - | merge | All donation records including amounts, supporters, and payment details. Loads records incrementally. |
+| `events` | id | - | replace | Audit log events for tracking changes and activities |
+| `fundraisers` | id | - | replace | Fundraiser campaigns (requires appropriate API permissions) |
+| `recurring_plans` | id | - | replace | Recurring donation plans and subscription details |
+| `supporters` | id | - | replace | Donor/supporter information including contact details |
 
 ## Notes
 

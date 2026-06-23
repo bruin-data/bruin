@@ -43,7 +43,7 @@ const (
 	// IngestrVersionV0 is the legacy ingestr release pinned for parameters.version=v0.
 	IngestrVersionV0 = "0.14.155"
 	// IngestrVersionV1 is the current ingestr release used by default and for parameters.version=v1.
-	IngestrVersionV1 = "1.0.34"
+	IngestrVersionV1 = "1.0.39"
 	sqlfluffVersion  = "3.4.1"
 )
 
@@ -438,7 +438,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 	_, _ = output.Write([]byte("Successfully collected the data from the asset, uploading to the destination...\n"))
 
 	if len(asset.Parameters) == 0 {
-		asset.Parameters = make(map[string]string)
+		asset.Parameters = make(pipeline.ParameterMap)
 	}
 
 	if mat.Strategy != "" {
@@ -510,7 +510,8 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 	}
 
 	ingestrCtx := ctx
-	showLogs := asset.Parameters["show_ingestr_logs"] == "true"
+	showLogsVal, _ := asset.Parameters.GetString("show_ingestr_logs")
+	showLogs := showLogsVal == "true"
 	var logBuffer *tailBuffer
 	if !showLogs {
 		logBuffer = newTailBuffer(1 << 20) // 1MB cap
@@ -635,7 +636,6 @@ const PythonArrowTemplate = `
 
 import sys
 import importlib.util
-import itertools
 from pathlib import Path
 
 def import_module_from_path(module_path: str, module_name: str):
@@ -721,26 +721,58 @@ def convert_and_write(df):
         table = pa.Table.from_pylist(list(df))
     elif hasattr(df, '__iter__') and not isinstance(df, (str, bytes)):
         # Handle generators and other iterables (but not strings/bytes).
-        # Generators can yield in two ways:
-        #   1. yield individual dicts:  yield {"col": val}
-        #   2. yield batches (lists of dicts): yield [{"col": val}, ...]
-        # The second pattern is common with paginated APIs where each page
-        # returns a list of records. We detect this by checking if the first
-        # collected element is a list/tuple and flatten one level if so.
-        iterator = iter(df)
-        try:
-            first_row = next(iterator)
-        except StopIteration:
-            return
+        # Each yielded value is written as its own Arrow batch, as-is, so a
+        # generator never has to hold the full dataset in memory. A value can be:
+        #   1. an individual dict:        yield {"col": val}         -> a one-row batch
+        #   2. a batch (list of dicts):   yield [{"col": val}, ...]  -> one batch per page
+        #   3. a pyarrow Table:           yield pa.table(...)         -> written directly
+        # The batch granularity is whatever materialize() yields; we do not
+        # re-chunk. This mirrors how yielded pyarrow Tables are handled.
+        #
+        # The Arrow IPC file has a single schema fixed when the first batch is
+        # written, so every yielded batch must share one schema. If each yield
+        # inferred its own schema, a None in one yield would produce a 'null'-typed
+        # column that mismatches a typed value in the next yield (a common
+        # database-cursor pattern: "for row in cursor: yield row"). To handle this
+        # we buffer only the leading rows until their inferred schema has no
+        # null-typed columns, lock that schema, then stream every later batch
+        # against it so nullable values and missing optional keys conform instead
+        # of raising. The buffer is just the warm-up window; if a column stays
+        # entirely None we cannot infer its type and fall back to buffering it.
+        def rows_to_tables(items):
+            locked_schema = None
+            pending = []
+            for item in items:
+                if isinstance(item, pa.Table):
+                    # A yielded pa.Table carries an explicit schema, so use it to
+                    # flush any buffered rows (whose own inference may have left
+                    # null-typed columns) and to lock the schema for later rows.
+                    # This keeps the table and the surrounding dict batches in
+                    # agreement, whether the table comes before or after them.
+                    if pending:
+                        yield pa.Table.from_pylist(pending, schema=item.schema)
+                        pending = []
+                    if locked_schema is None:
+                        locked_schema = item.schema
+                    yield item
+                    continue
+                rows = item if isinstance(item, (list, tuple)) else [item]
+                if not rows:  # skip empty pages so we never emit a zero-row batch
+                    continue
+                if locked_schema is not None:
+                    yield pa.Table.from_pylist(list(rows), schema=locked_schema)
+                    continue
+                pending.extend(rows)
+                table = pa.Table.from_pylist(pending)
+                if not any(pa.types.is_null(field.type) for field in table.schema):
+                    locked_schema = table.schema
+                    yield table
+                    pending = []
+            if pending:  # a column stayed all-None through the end of the stream
+                yield pa.Table.from_pylist(pending)
 
-        if isinstance(first_row, pa.Table):
-            write_arrow_tables(itertools.chain([first_row], iterator))
-            return
-
-        rows = [first_row, *iterator]
-        if isinstance(rows[0], (list, tuple)):
-            rows = [item for batch in rows for item in batch]
-        table = pa.Table.from_pylist(rows)
+        write_arrow_tables(rows_to_tables(df))
+        return
     else:
         raise TypeError(f"Unsupported return type: {type(df)}")
 

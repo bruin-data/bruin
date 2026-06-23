@@ -27,7 +27,7 @@ func TestGetIngestrDestinationType(t *testing.T) {
 		{
 			name: "postgres",
 			asset: &pipeline.Asset{
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"destination": "postgres",
 				},
 			},
@@ -36,7 +36,7 @@ func TestGetIngestrDestinationType(t *testing.T) {
 		{
 			name: "gcp",
 			asset: &pipeline.Asset{
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"destination": "bigquery",
 				},
 			},
@@ -45,7 +45,7 @@ func TestGetIngestrDestinationType(t *testing.T) {
 		{
 			name: "not found",
 			asset: &pipeline.Asset{
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"destination": "sqlite",
 				},
 			},
@@ -307,25 +307,25 @@ func TestGetSensorTimeout(t *testing.T) {
 
 	tests := []struct {
 		name   string
-		params map[string]string
+		params pipeline.ParameterMap
 		want   time.Duration
 	}{
 		{name: "unset returns default", params: nil, want: DefaultSensorTimeout},
-		{name: "empty returns default", params: map[string]string{"timeout": ""}, want: DefaultSensorTimeout},
-		{name: "blank returns default", params: map[string]string{"timeout": "   "}, want: DefaultSensorTimeout},
-		{name: "valid 1h", params: map[string]string{"timeout": "1h"}, want: time.Hour},
-		{name: "valid 90m", params: map[string]string{"timeout": "90m"}, want: 90 * time.Minute},
-		{name: "valid 1d", params: map[string]string{"timeout": "1d"}, want: 24 * time.Hour},
-		{name: "invalid falls back to default", params: map[string]string{"timeout": "foo"}, want: DefaultSensorTimeout},
-		{name: "month suffix falls back to default", params: map[string]string{"timeout": "1M"}, want: DefaultSensorTimeout},
-		{name: "zero falls back to default", params: map[string]string{"timeout": "0s"}, want: DefaultSensorTimeout},
-		{name: "negative falls back to default", params: map[string]string{"timeout": "-1h"}, want: DefaultSensorTimeout},
+		{name: "empty returns default", params: pipeline.ParameterMap{"timeout": ""}, want: DefaultSensorTimeout},
+		{name: "blank returns default", params: pipeline.ParameterMap{"timeout": "   "}, want: DefaultSensorTimeout},
+		{name: "valid 1h", params: pipeline.ParameterMap{"timeout": "1h"}, want: time.Hour},
+		{name: "valid 90m", params: pipeline.ParameterMap{"timeout": "90m"}, want: 90 * time.Minute},
+		{name: "valid 1d", params: pipeline.ParameterMap{"timeout": "1d"}, want: 24 * time.Hour},
+		{name: "invalid falls back to default", params: pipeline.ParameterMap{"timeout": "foo"}, want: DefaultSensorTimeout},
+		{name: "month suffix falls back to default", params: pipeline.ParameterMap{"timeout": "1M"}, want: DefaultSensorTimeout},
+		{name: "zero falls back to default", params: pipeline.ParameterMap{"timeout": "0s"}, want: DefaultSensorTimeout},
+		{name: "negative falls back to default", params: pipeline.ParameterMap{"timeout": "-1h"}, want: DefaultSensorTimeout},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			asset := &pipeline.Asset{Parameters: pipeline.EmptyStringMap{}}
+			asset := &pipeline.Asset{Parameters: pipeline.ParameterMap{}}
 			for k, v := range tt.params {
 				asset.Parameters[k] = v
 			}

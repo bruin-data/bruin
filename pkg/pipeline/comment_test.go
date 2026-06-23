@@ -70,7 +70,7 @@ func Test_createTaskFromFile(t *testing.T) {
 					Path:    path.AbsPathForTests(t, "testdata/comments/test.sql"),
 					Content: "select *\nfrom foo;",
 				},
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"param1":       "first-parameter",
 					"param2":       "second-parameter",
 					"s3_file_path": "s3://bucket/path",
@@ -94,8 +94,8 @@ func Test_createTaskFromFile(t *testing.T) {
 					ClusterBy:      []string{"event_name"},
 				},
 				Columns: []pipeline.Column{
-					{Name: "some_column", PrimaryKey: true, Checks: make([]pipeline.ColumnCheck, 0)},
-					{Name: "some_other_column", PrimaryKey: false, Checks: make([]pipeline.ColumnCheck, 0)},
+					{Name: "some_column", PrimaryKey: true, Type: "numeric", Precision: ptrInt(10), Scale: ptrInt(2), Checks: make([]pipeline.ColumnCheck, 0)},
+					{Name: "some_other_column", PrimaryKey: false, Default: "'active'", Collation: "en_US", Length: ptrInt(255), Checks: make([]pipeline.ColumnCheck, 0)},
 				},
 				CustomChecks: make([]pipeline.CustomCheck, 0),
 			},
@@ -122,7 +122,7 @@ func Test_createTaskFromFile(t *testing.T) {
 					Path:    path.AbsPathForTests(t, "testdata/comments/embeddedyaml.sql"),
 					Content: "select *\nfrom foo;",
 				},
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"param1":       "first-parameter",
 					"param2":       "second-parameter",
 					"s3_file_path": "s3://bucket/path",
@@ -174,7 +174,7 @@ func Test_createTaskFromFile(t *testing.T) {
 					Path:    path.AbsPathForTests(t, "testdata/comments/test.py"),
 					Content: "print('hello world')",
 				},
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"param1": "first-parameter",
 					"param2": "second-parameter",
 					"param3": "third-parameter",
@@ -247,7 +247,7 @@ func Test_createTaskFromFile(t *testing.T) {
 					Path:    path.AbsPathForTests(t, "testdata/comments/testblockcomments.py"),
 					Content: "print('hello world')",
 				},
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"param1": "first-parameter",
 					"param2": "second-parameter",
 					"param3": "third-parameter",
@@ -344,7 +344,7 @@ func Test_createTaskFromFile(t *testing.T) {
 					Path:    path.AbsPathForTests(t, "testdata/comments/test.r"),
 					Content: "cat(\"Hello from R!\\n\")\nprint(\"This is an R script\")",
 				},
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"param1": "first-parameter",
 					"param2": "second-parameter",
 					"param3": "third-parameter",

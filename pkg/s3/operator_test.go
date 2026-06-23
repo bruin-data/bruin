@@ -175,7 +175,7 @@ func TestKeySensor_RunTask_MissingBucketName(t *testing.T) {
 
 	ks := NewKeySensor(&mockConnectionGetter{}, "once")
 	asset := &pipeline.Asset{
-		Parameters: map[string]string{},
+		Parameters: pipeline.ParameterMap{},
 	}
 	err := ks.RunTask(t.Context(), &pipeline.Pipeline{}, asset)
 	require.Error(t, err)
@@ -187,7 +187,7 @@ func TestKeySensor_RunTask_MissingBucketKey(t *testing.T) {
 
 	ks := NewKeySensor(&mockConnectionGetter{}, "once")
 	asset := &pipeline.Asset{
-		Parameters: map[string]string{
+		Parameters: pipeline.ParameterMap{
 			"bucket_name": "my-bucket",
 		},
 	}
@@ -205,7 +205,7 @@ func TestKeySensor_RunTask_ConnectionNotFound(t *testing.T) {
 	ks := NewKeySensor(conn, "once")
 	asset := &pipeline.Asset{
 		Connection: "my-conn",
-		Parameters: map[string]string{
+		Parameters: pipeline.ParameterMap{
 			"bucket_name": "my-bucket",
 			"bucket_key":  "path/to/file.csv",
 		},
@@ -224,7 +224,7 @@ func TestKeySensor_RunTask_WrongConnectionType(t *testing.T) {
 	ks := NewKeySensor(conn, "once")
 	asset := &pipeline.Asset{
 		Connection: "my-conn",
-		Parameters: map[string]string{
+		Parameters: pipeline.ParameterMap{
 			"bucket_name": "my-bucket",
 			"bucket_key":  "path/to/file.csv",
 		},
@@ -248,7 +248,7 @@ func TestKeySensor_RunTask_AwsConnectionUsesCorrectCredentials(t *testing.T) {
 	ks := NewKeySensor(conn, "once")
 	asset := &pipeline.Asset{
 		Connection: "my-conn",
-		Parameters: map[string]string{
+		Parameters: pipeline.ParameterMap{
 			"bucket_name": "my-bucket",
 			"bucket_key":  "path/to/file.csv",
 		},
@@ -278,7 +278,7 @@ func TestKeySensor_RunTask_S3ConnectionUsesCorrectCredentials(t *testing.T) {
 	ks := NewKeySensor(conn, "once")
 	asset := &pipeline.Asset{
 		Connection: "my-s3-conn",
-		Parameters: map[string]string{
+		Parameters: pipeline.ParameterMap{
 			"bucket_name": "my-bucket",
 			"bucket_key":  "path/to/file.csv",
 		},

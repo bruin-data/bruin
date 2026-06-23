@@ -461,6 +461,8 @@ def materialize():
 
 :::
 
+Each yielded value is written to disk as its own Arrow batch as it is produced, so a generator never has to hold the full dataset in memory at once. The batch granularity is exactly what you yield: yielding individual dicts produces one row per batch, while yielding a list of dicts writes that whole page as a single batch. This makes generators the recommended way to materialize large datasets that would otherwise exhaust memory. All yielded rows must share the same schema, just like yielded PyArrow tables.
+
 If `materialize()` returns `None`, Bruin will skip materialization with a warning instead of failing the pipeline. This is useful when there is no data to materialize for a given run.
 
 ### Under the hood

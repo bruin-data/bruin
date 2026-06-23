@@ -395,6 +395,7 @@ environments:
           username: "username-123"
           password: "password-123"
           token: "token-123"
+          access_token: "access-token-123"
           domain: "mydomain.my.salesforce.com"
       sqlite:
         - name: "sqlite-1"
@@ -500,6 +501,46 @@ environments:
         - name: "customerio-1"
           api_key: "test-api-key"
           region: "us"
+      sendgrid:
+        - name: "sendgrid-1"
+          api_key: "test-api-key"
+          on_behalf_of: "test-subuser"
+      twilio:
+        - name: "twilio-1"
+          account_sid: "test-account-sid"
+          auth_token: "test-auth-token"
+          api_key: "test-api-key"
+          api_secret: "test-api-secret"
+      espn:
+        - name: "espn-1"
+          sport: "football"
+          league: "nfl"
+          season: "2026"
+          limit: 50
+      sharepoint:
+        - name: "sharepoint-1"
+          tenant_id: "test-tenant-id"
+          client_id: "test-client-id"
+          client_secret: "test-client-secret"
+          hostname: "example.sharepoint.com"
+          site: "sites/Example"
+          library: "Documents"
+          max_file_size: 104857600
+          max_files: 10000
+      apifootball:
+        - name: "apifootball-1"
+          api_key: "test-api-key"
+          league: "1"
+          season: "2026"
+      footballdata:
+        - name: "footballdata-1"
+          api_key: "test-api-key"
+          competition: "WC"
+          season: "2026"
+      balldontlie:
+        - name: "balldontlie-1"
+          api_key: "test-api-key"
+          season: "2026"
 
   prod:
     connections:

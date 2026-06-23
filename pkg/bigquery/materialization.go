@@ -211,14 +211,28 @@ func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 	columnDefs := make([]string, 0, len(asset.Columns))
 	primaryKeys := []string{}
 
-	for _, col := range asset.Columns {
-		def := fmt.Sprintf("%s %s", col.Name, col.Type)
+	foreignKeys := []string{}
 
+	for _, col := range asset.Columns {
+		def := fmt.Sprintf("%s %s", col.Name, col.SQLType())
+
+		if col.Collation != "" {
+			def += fmt.Sprintf(" COLLATE %q", col.Collation)
+		}
+		if col.Default != "" {
+			def += " DEFAULT " + col.Default
+		}
 		if col.Description != "" {
 			def += fmt.Sprintf(` OPTIONS(description=%q)`, col.Description)
 		}
 		if col.PrimaryKey {
 			primaryKeys = append(primaryKeys, col.Name)
+		}
+		if col.ForeignKey != nil && col.ForeignKey.Table != "" && col.ForeignKey.Column != "" {
+			foreignKeys = append(foreignKeys, fmt.Sprintf(
+				"FOREIGN KEY (%s) REFERENCES %s(%s) NOT ENFORCED",
+				col.Name, col.ForeignKey.Table, col.ForeignKey.Column,
+			))
 		}
 		columnDefs = append(columnDefs, def)
 	}
@@ -227,6 +241,8 @@ func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 		primaryKeyClause := fmt.Sprintf("PRIMARY KEY (%s) NOT ENFORCED", strings.Join(primaryKeys, ", "))
 		columnDefs = append(columnDefs, primaryKeyClause)
 	}
+
+	columnDefs = append(columnDefs, foreignKeys...)
 
 	q := fmt.Sprintf(
 		"CREATE TABLE IF NOT EXISTS %s (\n  %s\n)",

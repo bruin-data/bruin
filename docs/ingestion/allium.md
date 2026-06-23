@@ -56,7 +56,8 @@ parameters:
 
 | Table | PK | Inc Key | Inc Strategy | Details |
 |-------|----|---------|--------------| ------- |
-| `query:<query_id>` | - | - | replace | Allium source uses query IDs as table identifiers. Format must be `query:abc123def456` where the query ID is from your Allium explorer. |
+| `query:<query_id>` | - | - | replace | The query ID from Allium explorer. Example: `query:abc123def456` |
+| `query:<query_id>:<params>` | - | - | replace | Query ID with URL-encoded parameters. Custom parameters example: `query:abc123def456:network=ethereum&min_value=1000`. Run-config parameters example: `query:abc123def456:limit=5000&compute_profile=standard`. |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 
@@ -69,6 +70,6 @@ As a result of this command, Bruin will ingest data from the given Allium query 
 ## Notes
 
 - Query execution is asynchronous and may take time depending on the complexity of your query
-- The connector will wait up to 5 minutes for query completion
+- The connector will wait up to 12 hours for query completion
 - Make sure your query ID is valid and accessible with your API key
 - The source table format must be `query:your_query_id`

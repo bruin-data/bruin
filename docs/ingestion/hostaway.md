@@ -66,36 +66,34 @@ curl -X DELETE 'https://api.hostaway.com/v1/accessTokens?token=YOUR_ACCESS_TOKEN
   -H 'Content-type: application/x-www-form-urlencoded'
 ```
 
-## Supported Data Assets
+## Available Source Tables
 
-Hostaway assets will be ingested to your data warehouse as defined in the `destination` table.
-
-| Asset | Table Name | Incremental Key | Description |
-|-------|------------|-----------------|-------------|
-| Listings | `listings` | latestActivityOn | Property listings managed in Hostaway |
-| Listing Fee Settings | `listing_fee_settings` | updatedOn | Fee settings configured for each listing |
-| Listing Pricing Settings | `listing_pricing_settings` | replace | Pricing rules and settings for listings |
-| Listing Agreements | `listing_agreements` | replace | Rental agreements associated with listings |
-| Listing Calendars | `listing_calendars` | replace | Calendar availability data for each listing |
-| Cancellation Policies | `cancellation_policies` | replace | General cancellation policies |
-| Cancellation Policies Airbnb | `cancellation_policies_airbnb` | replace | Airbnb-specific cancellation policies |
-| Cancellation Policies Marriott | `cancellation_policies_marriott` | replace | Marriott-specific cancellation policies |
-| Cancellation Policies VRBO | `cancellation_policies_vrbo` | replace | VRBO-specific cancellation policies |
-| Reservations | `reservations` | replace | Booking reservations across all channels |
-| Finance Fields | `finance_fields` | replace | Financial data for each reservation |
-| Reservation Payment Methods | `reservation_payment_methods` | replace | Available payment methods for reservations |
-| Reservation Rental Agreements | `reservation_rental_agreements` | replace | Rental agreements for specific reservations |
-| Conversations | `conversations` | replace | Guest communication threads |
-| Message Templates | `message_templates` | replace | Pre-configured message templates |
-| Bed Types | `bed_types` | replace | Available bed type configurations |
-| Property Types | `property_types` | replace | Property type classifications |
-| Countries | `countries` | replace | Supported countries and their codes |
-| Account Tax Settings | `account_tax_settings` | replace | Tax configuration for the account |
-| User Groups | `user_groups` | replace | User groups and permissions |
-| Guest Payment Charges | `guest_payment_charges` | replace | Guest payment transaction records |
-| Coupons | `coupons` | replace | Discount coupons and promotional codes |
-| Webhook Reservations | `webhook_reservations` | replace | Webhook configurations for reservation events |
-| Tasks | `tasks` | replace | Tasks and to-dos within the system |
+| Table | PK | Inc Key | Inc Strategy | Details |
+|-------|----|---------|--------------|---------|
+| `listings` | id | latestActivityOn | merge | Property listings managed in Hostaway |
+| `listing_fee_settings` | id | updatedOn | merge | Fee settings configured for each listing |
+| `listing_pricing_settings` | - | - | replace | Pricing rules and settings for listings |
+| `listing_agreements` | - | - | replace | Rental agreements associated with listings |
+| `listing_calendars` | - | - | replace | Calendar availability data for each listing. Uses parallelization for performance |
+| `cancellation_policies` | - | - | replace | General cancellation policies |
+| `cancellation_policies_airbnb` | - | - | replace | Airbnb-specific cancellation policies |
+| `cancellation_policies_marriott` | - | - | replace | Marriott-specific cancellation policies |
+| `cancellation_policies_vrbo` | - | - | replace | VRBO-specific cancellation policies |
+| `reservations` | - | - | replace | Booking reservations across all channels |
+| `finance_fields` | - | - | replace | Financial data for each reservation. Uses parallelization for performance |
+| `reservation_payment_methods` | - | - | replace | Available payment methods for reservations |
+| `reservation_rental_agreements` | - | - | replace | Rental agreements for specific reservations. Uses parallelization for performance |
+| `conversations` | - | - | replace | Guest communication threads |
+| `message_templates` | - | - | replace | Pre-configured message templates |
+| `bed_types` | - | - | replace | Available bed type configurations |
+| `property_types` | - | - | replace | Property type classifications |
+| `countries` | - | - | replace | Supported countries and their codes |
+| `account_tax_settings` | - | - | replace | Tax configuration for the account |
+| `user_groups` | - | - | replace | User groups and permissions |
+| `guest_payment_charges` | - | - | replace | Guest payment transaction records |
+| `coupons` | - | - | replace | Discount coupons and promotional codes |
+| `webhook_reservations` | - | - | replace | Webhook configurations for reservation events |
+| `tasks` | - | - | replace | Tasks and to-dos within the system |
 
 ## Notes
 

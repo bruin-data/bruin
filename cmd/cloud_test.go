@@ -143,7 +143,7 @@ func TestCloudCommand_Help(t *testing.T) {
 	cmd := Cloud(&isDebug)
 	require.NotNil(t, cmd)
 	assert.Equal(t, "cloud", cmd.Name)
-	assert.Len(t, cmd.Commands, 7)
+	assert.Len(t, cmd.Commands, 8)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
@@ -156,6 +156,7 @@ func TestCloudCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "instances")
 	assert.Contains(t, subNames, "glossary")
 	assert.Contains(t, subNames, "agents")
+	assert.Contains(t, subNames, "connections")
 }
 
 func TestCloudProjectsCommand_Help(t *testing.T) {
@@ -323,4 +324,86 @@ func TestCloudRunsDiagnoseCommand_Flags(t *testing.T) {
 	assert.Contains(t, flagNames, "pipeline")
 	assert.Contains(t, flagNames, "run-id")
 	assert.Contains(t, flagNames, "latest")
+}
+
+func TestValidateSplitFlags(t *testing.T) {
+	t.Parallel()
+
+	t.Run("no split, no chunk-size is valid", func(t *testing.T) {
+		t.Parallel()
+		require.NoError(t, validateSplitFlags("", false, 1))
+	})
+
+	t.Run("chunk-size without split errors", func(t *testing.T) {
+		t.Parallel()
+		err := validateSplitFlags("", true, 7)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "--chunk-size requires --split")
+	})
+
+	t.Run("valid split unit", func(t *testing.T) {
+		t.Parallel()
+		require.NoError(t, validateSplitFlags("month", true, 2))
+	})
+
+	t.Run("invalid split unit errors", func(t *testing.T) {
+		t.Parallel()
+		err := validateSplitFlags("fortnight", false, 1)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid --split")
+	})
+
+	t.Run("chunk-size below one errors", func(t *testing.T) {
+		t.Parallel()
+		err := validateSplitFlags("day", true, 0)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "at least 1")
+	})
+}
+
+func TestParseRunVariables(t *testing.T) {
+	t.Parallel()
+
+	t.Run("empty input returns nil", func(t *testing.T) {
+		t.Parallel()
+		got, err := parseRunVariables(nil)
+		require.NoError(t, err)
+		assert.Nil(t, got)
+	})
+
+	t.Run("quoted string value", func(t *testing.T) {
+		t.Parallel()
+		got, err := parseRunVariables([]string{`env="prod"`})
+		require.NoError(t, err)
+		assert.Equal(t, map[string]any{"env": "prod"}, got)
+	})
+
+	t.Run("boolean value", func(t *testing.T) {
+		t.Parallel()
+		got, err := parseRunVariables([]string{"debug=true"})
+		require.NoError(t, err)
+		assert.Equal(t, map[string]any{"debug": true}, got)
+	})
+
+	t.Run("json object form sets multiple keys", func(t *testing.T) {
+		t.Parallel()
+		got, err := parseRunVariables([]string{`{"region":"eu","retries":3}`})
+		require.NoError(t, err)
+		assert.Equal(t, "eu", got["region"])
+		assert.EqualValues(t, 3, got["retries"])
+	})
+
+	t.Run("multiple flags are merged", func(t *testing.T) {
+		t.Parallel()
+		got, err := parseRunVariables([]string{`a="x"`, "b=true"})
+		require.NoError(t, err)
+		assert.Equal(t, map[string]any{"a": "x", "b": true}, got)
+	})
+
+	t.Run("unquoted bareword value errors", func(t *testing.T) {
+		t.Parallel()
+		_, err := parseRunVariables([]string{"env=prod"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid variable override")
+	})
 }

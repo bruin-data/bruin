@@ -561,6 +561,21 @@ func TestBuildDDLQuery(t *testing.T) {
 			},
 			want: "CREATE TABLE IF NOT EXISTS my_table_with_multiple_pks (\n  id INT64,\n  category STRING,\n  name STRING OPTIONS(description=\"The name of the person\"),\n  PRIMARY KEY (id, category) NOT ENFORCED\n)",
 		},
+		{
+			name: "table with type detail, default, collation and foreign key",
+			asset: &pipeline.Asset{
+				Name: "orders",
+				Columns: []pipeline.Column{
+					{Name: "amount", Type: "NUMERIC", Precision: intp(10), Scale: intp(2), Default: "0"},
+					{Name: "name", Type: "STRING", Collation: "und:ci"},
+					{Name: "customer_id", Type: "INT64", ForeignKey: &pipeline.ColumnReference{Table: "customers", Column: "id"}},
+				},
+				Materialization: pipeline.Materialization{
+					Type: pipeline.MaterializationTypeTable,
+				},
+			},
+			want: "CREATE TABLE IF NOT EXISTS orders (\n  amount NUMERIC(10, 2) DEFAULT 0,\n  name STRING COLLATE \"und:ci\",\n  customer_id INT64,\n  FOREIGN KEY (customer_id) REFERENCES customers(id) NOT ENFORCED\n)",
+		},
 	}
 
 	for _, tt := range tests {
@@ -1081,3 +1096,5 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 		})
 	}
 }
+
+func intp(i int) *int { return &i }

@@ -730,7 +730,7 @@ func getAssetConnectionName(asset *pipeline.Asset) string {
 	}
 
 	// Check if there's a connection in parameters
-	if conn, ok := asset.Parameters["connection"]; ok && conn != "" {
+	if conn, ok := asset.Parameters.GetString("connection"); ok && conn != "" {
 		return conn
 	}
 

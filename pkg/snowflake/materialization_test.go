@@ -399,6 +399,22 @@ func TestMaterializer_Render(t *testing.T) {
 				"primary key \\(id, category\\)\n" +
 				"\\)",
 		},
+		{
+			name: "table with type detail, default, collation and foreign key",
+			task: &pipeline.Asset{
+				Name: "orders",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyDDL,
+				},
+				Columns: []pipeline.Column{
+					{Name: "amount", Type: "NUMBER", Precision: intp(10), Scale: intp(2), Default: "0"},
+					{Name: "name", Type: "STRING", Collation: "en_US"},
+					{Name: "customer_id", Type: "INT64", ForeignKey: &pipeline.ColumnReference{Table: "customers", Column: "id"}},
+				},
+			},
+			want: `CREATE TABLE IF NOT EXISTS orders \(\s*amount NUMBER\(10, 2\) DEFAULT 0,\s*name STRING COLLATE 'en_US',\s*customer_id INT64,\s*foreign key \(customer_id\) references customers \(id\)\s*\)`,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1040,3 +1056,5 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 		})
 	}
 }
+
+func intp(i int) *int { return &i }

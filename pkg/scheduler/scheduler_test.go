@@ -711,7 +711,7 @@ func TestScheduler_WillRunTaskOfType(t *testing.T) {
 	t1000 := &pipeline.Asset{
 		Name:       "task4000",
 		Type:       "ingestr",
-		Parameters: map[string]string{"destination": "postgres"},
+		Parameters: pipeline.ParameterMap{"destination": "postgres"},
 	}
 
 	p := &pipeline.Pipeline{
