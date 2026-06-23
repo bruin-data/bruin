@@ -809,6 +809,12 @@
           },
           "type": "array"
         },
+        "gitlab": {
+          "items": {
+            "$ref": "#/$defs/GitLabConnection"
+          },
+          "type": "array"
+        },
         "appsflyer": {
           "items": {
             "$ref": "#/$defs/AppsflyerConnection"
@@ -2132,6 +2138,25 @@
         "name",
         "owner",
         "repo"
+      ]
+    },
+    "GitLabConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "access_token": {
+          "type": "string"
+        },
+        "base_url": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "access_token"
       ]
     },
     "GoogleAdsConnection": {

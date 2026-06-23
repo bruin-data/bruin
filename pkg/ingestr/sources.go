@@ -946,6 +946,15 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "adjustments", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
 	},
 
+	// GitLab - DevOps and code hosting
+	"gitlab": {
+		{Name: "projects", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "groups", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "users", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "issues", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "merge_requests", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+	},
+
 	// SurveyMonkey - Survey and feedback platform
 	"surveymonkey": {
 		{Name: "surveys", PrimaryKey: "id", IncKey: "date_modified", IncStrategy: "merge"},

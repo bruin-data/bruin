@@ -306,6 +306,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                                     {text: "Freshdesk", link: "/ingestion/freshdesk"},
                                     {text: "GCP Spanner", link: "/ingestion/spanner"},
                                     {text: "GitHub", link: "/ingestion/github"},
+                                    {text: "GitLab", link: "/ingestion/gitlab"},
                                     {text: "Google Cloud Storage", link: "/ingestion/gcs"},
                                     {text: "Google Sheets", link: "/ingestion/google_sheets"},
                                     {text: "Google Ads", link: "/ingestion/google-ads"},
