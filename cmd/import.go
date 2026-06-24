@@ -185,7 +185,12 @@ Example:
 			projectID := c.String("project-id")
 			location := c.String("location")
 
-			return runScheduledQueriesImport(ctx, pipelinePath, connectionName, environment, configFile, projectID, location)
+			if err := runScheduledQueriesImport(ctx, pipelinePath, connectionName, environment, configFile, projectID, location); err != nil {
+				errorPrinter.Printf("Failed to import scheduled queries: %s\n", err)
+				return cli.Exit("", 1)
+			}
+
+			return nil
 		},
 	}
 }
@@ -2686,7 +2691,12 @@ Example:
 			projectFilter := c.String("project")
 			importAll := c.Bool("all")
 
-			return runTableauImport(ctx, pipelinePath, connectionName, environment, configFile, workbookFilter, projectFilter, importAll)
+			if err := runTableauImport(ctx, pipelinePath, connectionName, environment, configFile, workbookFilter, projectFilter, importAll); err != nil {
+				errorPrinter.Printf("Failed to import Tableau dashboards: %s\n", err)
+				return cli.Exit("", 1)
+			}
+
+			return nil
 		},
 	}
 }

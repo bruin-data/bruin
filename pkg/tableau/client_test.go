@@ -104,6 +104,46 @@ func TestNewClient_MissingRequiredFields(t *testing.T) {
 	}
 }
 
+func TestNormalizeHost(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		host string
+		want string
+	}{
+		{name: "bare hostname unchanged", host: "tableau.example.com", want: "tableau.example.com"},
+		{name: "strips https scheme", host: "https://tableau.example.com", want: "tableau.example.com"},
+		{name: "strips http scheme", host: "http://tableau.example.com", want: "tableau.example.com"},
+		{name: "strips scheme case-insensitively", host: "HTTPS://tableau.example.com", want: "tableau.example.com"},
+		{name: "strips trailing slash", host: "https://tableau.example.com/", want: "tableau.example.com"},
+		{name: "trims surrounding whitespace", host: "  https://tableau.example.com  ", want: "tableau.example.com"},
+		{name: "empty stays empty", host: "", want: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			require.Equal(t, tt.want, normalizeHost(tt.host))
+		})
+	}
+}
+
+func TestNewClient_NormalizesHost(t *testing.T) {
+	t.Parallel()
+	config := Config{
+		Host:                      "https://tableau.example.com/",
+		PersonalAccessTokenName:   "my-token",
+		PersonalAccessTokenSecret: "my-secret",
+		SiteID:                    "site123",
+		APIVersion:                "3.4",
+	}
+
+	client, err := NewClient(config)
+	require.NoError(t, err)
+	require.NotNil(t, client)
+	require.Equal(t, "tableau.example.com", client.GetHost())
+}
+
 func TestNewClient_DefaultAPIVersion(t *testing.T) {
 	t.Parallel()
 	config := Config{

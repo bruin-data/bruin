@@ -822,6 +822,19 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "incoming_phone_numbers", PrimaryKey: "sid", IncKey: "", IncStrategy: "replace"},
 		{Name: "usage_records", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
 	},
+	// Braze - Customer engagement platform (campaigns, canvases, KPIs)
+	"braze": {
+		{Name: "campaigns", PrimaryKey: "id", IncKey: "last_edited", IncStrategy: "merge"},
+		{Name: "canvases", PrimaryKey: "id", IncKey: "last_edited", IncStrategy: "merge"},
+		{Name: "segments", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "events", PrimaryKey: "event_name", IncKey: "", IncStrategy: "replace"},
+		{Name: "products", PrimaryKey: "product_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "kpi_dau", PrimaryKey: "time", IncKey: "time", IncStrategy: "merge"},
+		{Name: "kpi_mau", PrimaryKey: "time", IncKey: "time", IncStrategy: "merge"},
+		{Name: "kpi_new_users", PrimaryKey: "time", IncKey: "time", IncStrategy: "merge"},
+		{Name: "kpi_uninstalls", PrimaryKey: "time", IncKey: "time", IncStrategy: "merge"},
+		{Name: "user_data:<segment_id>", PrimaryKey: "braze_id, segment_id", IncKey: "", IncStrategy: "replace"},
+	},
 
 	// SFTP (user-defined paths)
 	"sftp": {},
@@ -944,6 +957,15 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "transactions", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
 		{Name: "subscriptions", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
 		{Name: "adjustments", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+	},
+
+	// GitLab - DevOps and code hosting
+	"gitlab": {
+		{Name: "projects", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "groups", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "users", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "issues", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "merge_requests", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
 	},
 
 	// SurveyMonkey - Survey and feedback platform
