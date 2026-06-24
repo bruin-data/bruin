@@ -189,3 +189,36 @@ func TestSchemaToCreate(t *testing.T) {
 		})
 	}
 }
+
+func TestContainerToCreate(t *testing.T) {
+	t.Parallel()
+
+	upper := strings.ToUpper
+	lower := strings.ToLower
+
+	tests := []struct {
+		name      string
+		raw       string
+		transform func(string) string
+		want      string
+		wantOK    bool
+	}{
+		{name: "three-part returns the catalog/database (upper)", raw: "raw.analytics.events", transform: upper, want: "RAW", wantOK: true},
+		{name: "three-part lower (databricks-ish)", raw: "Main.Silver.Orders", transform: lower, want: "main", wantOK: true},
+		{name: "two-part has no parent container", raw: "analytics.events", transform: upper, wantOK: false},
+		{name: "single component has no parent container", raw: "events", transform: upper, wantOK: false},
+		{name: "four components skipped", raw: "a.b.c.d", transform: upper, wantOK: false},
+		{name: "empty component rejected", raw: "raw..events", transform: upper, wantOK: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, ok := ContainerToCreate(tt.raw, tt.transform)
+			assert.Equal(t, tt.wantOK, ok)
+			if tt.wantOK {
+				assert.Equal(t, tt.want, got)
+			}
+		})
+	}
+}

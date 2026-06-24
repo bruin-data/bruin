@@ -60,7 +60,7 @@ func TestSchemaCreator_CreateSchemaIfNotExist(t *testing.T) {
 				db.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "CREATE SCHEMA IF NOT EXISTS TEST_SCHEMA"}).
 					Return(errors.New("creation failed"))
 			},
-			expectedError: "failed to create or ensure database: TEST_SCHEMA: creation failed",
+			expectedError: "failed to create or ensure schema: TEST_SCHEMA: creation failed",
 		},
 		{
 			name: "three-part name qualifies schema with the database/catalog",
@@ -132,4 +132,67 @@ func TestSchemaCreator_CreateSchemaIfNotExist(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSchemaCreator_CreateSchemaIfNotExist_WithContainer(t *testing.T) {
+	t.Parallel()
+
+	t.Run("three-part name creates the database then the schema", func(t *testing.T) {
+		t.Parallel()
+		db := new(mockDB)
+		db.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "CREATE DATABASE IF NOT EXISTS OTHER_DB"}).Return(nil).Once()
+		db.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "CREATE SCHEMA IF NOT EXISTS OTHER_DB.TEST_SCHEMA"}).Return(nil).Once()
+
+		creator := NewSchemaCreatorWithContainer("DATABASE")
+		require.NoError(t, creator.CreateSchemaIfNotExist(t.Context(), db, &pipeline.Asset{Name: "other_db.test_schema.test_table"}))
+		db.AssertExpectations(t)
+	})
+
+	t.Run("two-part name does not create a database", func(t *testing.T) {
+		t.Parallel()
+		db := new(mockDB)
+		db.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "CREATE SCHEMA IF NOT EXISTS TEST_SCHEMA"}).Return(nil).Once()
+
+		creator := NewSchemaCreatorWithContainer("DATABASE")
+		require.NoError(t, creator.CreateSchemaIfNotExist(t.Context(), db, &pipeline.Asset{Name: "test_schema.test_table"}))
+		db.AssertExpectations(t)
+		db.AssertNotCalled(t, "RunQueryWithoutResult", mock.Anything, &query.Query{Query: "CREATE DATABASE IF NOT EXISTS TEST_SCHEMA"})
+	})
+
+	t.Run("catalog keyword is used for databricks-style platforms", func(t *testing.T) {
+		t.Parallel()
+		db := new(mockDB)
+		db.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "CREATE CATALOG IF NOT EXISTS MAIN"}).Return(nil).Once()
+		db.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "CREATE SCHEMA IF NOT EXISTS MAIN.SILVER"}).Return(nil).Once()
+
+		creator := NewSchemaCreatorWithContainer("CATALOG")
+		require.NoError(t, creator.CreateSchemaIfNotExist(t.Context(), db, &pipeline.Asset{Name: "main.silver.orders"}))
+		db.AssertExpectations(t)
+	})
+
+	t.Run("database creation is cached across assets in the same database", func(t *testing.T) {
+		t.Parallel()
+		db := new(mockDB)
+		// CREATE DATABASE must run only once for two assets in the same database.
+		db.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "CREATE DATABASE IF NOT EXISTS RAW"}).Return(nil).Once()
+		db.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "CREATE SCHEMA IF NOT EXISTS RAW.S1"}).Return(nil).Once()
+		db.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "CREATE SCHEMA IF NOT EXISTS RAW.S2"}).Return(nil).Once()
+
+		creator := NewSchemaCreatorWithContainer("DATABASE")
+		require.NoError(t, creator.CreateSchemaIfNotExist(t.Context(), db, &pipeline.Asset{Name: "raw.s1.t1"}))
+		require.NoError(t, creator.CreateSchemaIfNotExist(t.Context(), db, &pipeline.Asset{Name: "raw.s2.t2"}))
+		db.AssertExpectations(t)
+		db.AssertNumberOfCalls(t, "RunQueryWithoutResult", 3)
+	})
+
+	t.Run("default creator does not create a database", func(t *testing.T) {
+		t.Parallel()
+		db := new(mockDB)
+		db.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "CREATE SCHEMA IF NOT EXISTS OTHER_DB.TEST_SCHEMA"}).Return(nil).Once()
+
+		creator := NewSchemaCreator()
+		require.NoError(t, creator.CreateSchemaIfNotExist(t.Context(), db, &pipeline.Asset{Name: "other_db.test_schema.test_table"}))
+		db.AssertExpectations(t)
+		db.AssertNumberOfCalls(t, "RunQueryWithoutResult", 1)
+	})
 }

@@ -49,7 +49,7 @@ func NewDB(c *Config) (*DB, error) {
 
 	return &DB{
 		config:        c,
-		schemaCreator: ansisql.NewSchemaCreator(),
+		schemaCreator: ansisql.NewSchemaCreatorWithContainer("DATABASE"),
 		dsn:           dsn,
 		mutex:         sync.Mutex{},
 		typeMapper:    diff.NewSnowflakeTypeMapper(),

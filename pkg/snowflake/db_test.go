@@ -883,14 +883,16 @@ func TestDB_CreateSchemaIfNotExist(t *testing.T) {
 				mock.ExpectQuery("CREATE SCHEMA IF NOT EXISTS TEST_SCHEMA").
 					WillReturnError(errors.New("creation failed"))
 			},
-			expectedError: "failed to create or ensure database: TEST_SCHEMA: creation failed",
+			expectedError: "failed to create or ensure schema: TEST_SCHEMA: creation failed",
 		},
 		{
-			name: "three-part name creates the schema in the named database",
+			name: "three-part name creates the database then the schema",
 			asset: &pipeline.Asset{
 				Name: "other_db.test_schema.test_table",
 			},
 			mockSetup: func(mock sqlmock.Sqlmock, cache *sync.Map) {
+				mock.ExpectQuery("CREATE DATABASE IF NOT EXISTS OTHER_DB").
+					WillReturnRows(sqlmock.NewRows(nil))
 				mock.ExpectQuery("CREATE SCHEMA IF NOT EXISTS OTHER_DB.TEST_SCHEMA").
 					WillReturnRows(sqlmock.NewRows(nil))
 			},
@@ -929,7 +931,7 @@ func TestDB_CreateSchemaIfNotExist(t *testing.T) {
 			cache := &sync.Map{}
 			db := &DB{
 				conn:          sqlxDB,
-				schemaCreator: ansisql.NewSchemaCreator(),
+				schemaCreator: ansisql.NewSchemaCreatorWithContainer("DATABASE"),
 			}
 
 			// Apply the mock setup

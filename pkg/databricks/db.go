@@ -33,7 +33,7 @@ type DB struct {
 func NewDB(c *Config) (*DB, error) {
 	return &DB{
 		config:        c,
-		schemaCreator: ansisql.NewSchemaCreator(),
+		schemaCreator: ansisql.NewSchemaCreatorWithContainer("CATALOG"),
 	}, nil
 }
 

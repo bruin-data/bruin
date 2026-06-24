@@ -99,6 +99,27 @@ func SchemaToCreate(name string, transform func(string) string) (string, bool) {
 	}
 }
 
+// ContainerToCreate returns the catalog/database component (the first segment)
+// that should be ensured to exist for a three-part name (catalog.schema.table),
+// with transform applied. ok is false for names with fewer than three components
+// — there is no parent container to create — or for names with empty components.
+//
+// This is the parent of the schema returned by SchemaToCreate, and is only
+// meaningful for platforms whose top-level container can be created with SQL
+// (e.g. Snowflake `CREATE DATABASE`, Databricks `CREATE CATALOG`).
+func ContainerToCreate(name string, transform func(string) string) (string, bool) {
+	parts := strings.Split(name, ".")
+	for _, p := range parts {
+		if strings.TrimSpace(p) == "" {
+			return "", false
+		}
+	}
+	if len(parts) != 3 {
+		return "", false
+	}
+	return transform(parts[0]), true
+}
+
 // Upper returns a copy with every present component upper-cased. Snowflake and
 // MSSQL information_schema lookups compare against upper-cased identifiers.
 func (t TableName) Upper() TableName {

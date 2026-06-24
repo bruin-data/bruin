@@ -125,6 +125,21 @@ If you are using **Snowflake** with the same structure, it would be interpreted 
 
 For databases that only support two segments (like PostgreSQL or MySQL), use a single folder level under `assets/` (e.g. `assets/public/users.sql` → `public.users`). A three-segment name on these platforms is rejected during validation.
 
+### Auto-creation of the database/catalog
+
+For a three-segment name, Bruin ensures the parent container exists before creating the table, where the platform supports it via SQL:
+
+| Platform | Auto-creates the first segment? |
+|----------|--------------------------------|
+| **Snowflake** | Yes — `CREATE DATABASE IF NOT EXISTS` (needs the `CREATE DATABASE` privilege) |
+| **Databricks** | Yes — `CREATE CATALOG IF NOT EXISTS` (needs the `CREATE CATALOG` privilege) |
+| **BigQuery** | No — projects are managed outside SQL; the project must already exist |
+| **Trino** | No — catalogs are connector configuration; must already exist |
+| **DuckDB / MotherDuck** | No — the catalog is an attached database; must already be attached |
+| **MSSQL** | No — the database must already exist |
+
+The schema (middle segment) is auto-created on all three-level platforms. Where the database/catalog is not auto-created and does not exist, the run fails with a clear "does not exist" error rather than creating it implicitly.
+
 ::: warning Three-segment `ddl` assets that target another database (MSSQL)
 A three-segment name can point at a database/catalog other than the one in your connection config, and Bruin writes the table there directly. On **MSSQL** with the `ddl` materialization strategy, schema auto-creation runs in the connection's *current* database, so a `database.schema.table` asset whose database differs from the connection's default requires the target schema to already exist in that database — otherwise the run fails with a "schema does not exist" error. Strategies that create the table directly (e.g. `create+replace`) are unaffected.
 :::

@@ -113,7 +113,7 @@ For more details on OAuth M2M authentication, see the [Databricks documentation]
 
 Runs a materialized Databricks asset or a Databricks SQL script. For detailed parameters, you can check [Definition Schema](../assets/definition-schema.md) page.
 
-Asset names may be `schema.table` or `catalog.schema.table` (Unity Catalog). With a three-part name Bruin creates the schema in the named catalog automatically, but the catalog itself must already exist.
+Asset names may be `schema.table` or `catalog.schema.table` (Unity Catalog). With a three-part name Bruin auto-creates both the catalog (`CREATE CATALOG IF NOT EXISTS`) and the schema within it, so the connection's principal needs the `CREATE CATALOG` privilege on the metastore.
 
 #### Example: Create a table using table materialization
 
