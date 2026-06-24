@@ -53,9 +53,13 @@ parameters:
 | `campaigns` | id | last_edited | merge | Marketing campaigns (including archived) with their name, tags, and API flags. |
 | `canvases` | id | last_edited | merge | Canvas (journey) definitions (including archived) with their name and tags. |
 | `segments` | id | - | replace | Audience segments with their name and analytics-tracking flag. |
+| `segment_series` | time, segment_id | time | merge | Daily size per segment. Fetches all segments by default; an optional `segment_series:<id>[,<id>]` filter limits it. |
 | `events` | name | - | replace | Custom events catalog: name, description, status, tags, and analytics-report flag. |
 | `event_series` | time, event_name | time | merge | Daily occurrence count per custom event. Fetches all events by default; an optional `event_series:<name>[,<name>]` filter limits it. |
 | `products` | product_id | - | replace | Product IDs seen in purchase events. |
+| `sessions` | time | time | merge | Daily session count. |
+| `purchase_quantity` | time | time | merge | Daily total number of purchases. |
+| `purchase_revenue` | time | time | merge | Daily total revenue. |
 | `kpi_dau` | time | time | merge | Daily active users by date. |
 | `kpi_mau` | time | time | merge | Monthly active users (rolling 30-day) by date. |
 | `kpi_new_users` | time | time | merge | New users by date. |
@@ -65,6 +69,9 @@ parameters:
 The `kpi_*` tables aggregate across all apps by default. Append a comma-separated list of app identifiers to break a KPI down by app, e.g. `source_table: 'kpi_dau:app-one-id,app-two-id'`; each row then carries an `app_id` column.
 
 The `user_data` table requires one or more segment ids, passed as a comma-separated suffix, e.g. `source_table: 'user_data:<segment_id>'` or `'user_data:<segment_id_1>,<segment_id_2>'`. Each row is tagged with the `segment_id` it came from.
+
+> [!NOTE]
+> The `events` table now uses the `name` column as its primary key (previously `event_name`). If you ingested `events` before this change, drop the destination table once so it is recreated with the new column.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 
