@@ -371,6 +371,40 @@ func AssetTypeToDialect(assetType pipeline.AssetType) (string, error) {
 	return dialect, nil
 }
 
+// connectionTypeDialectMap maps the connection type identifier used in the
+// connection manager (the yaml tag of each connection field in
+// config.Connections) to the dialect string the rust SQL parser understands.
+// This is used to pick a dialect for queries that are run directly against a
+// connection without going through a Bruin asset (where we'd otherwise know
+// the asset type).
+var connectionTypeDialectMap = map[string]string{
+	"google_cloud_platform": "bigquery",
+	"snowflake":             "snowflake",
+	"postgres":              "postgres",
+	"mysql":                 "mysql",
+	"redshift":              "redshift",
+	"athena":                "athena",
+	"trino":                 "trino",
+	"dremio":                "trino",
+	"sail":                  "trino",
+	"clickhouse":            "clickhouse",
+	"databricks":            "databricks",
+	"mssql":                 "tsql",
+	"synapse":               "tsql",
+	"duckdb":                "duckdb",
+	"motherduck":            "duckdb",
+	"oracle":                "oracle",
+	"fabric":                "fabric",
+	"vertica":               "postgres",
+}
+
+// ConnectionTypeToDialect maps a connection type identifier (e.g. "clickhouse")
+// to the dialect string used by the rust SQL parser. Returns the empty string
+// when no dialect is registered for the type.
+func ConnectionTypeToDialect(connectionType string) string {
+	return connectionTypeDialectMap[connectionType]
+}
+
 func (s *SQLParser) AddLimit(sql string, limit int, dialect string) (string, error) {
 	err := s.Start()
 	if err != nil {
