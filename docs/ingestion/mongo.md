@@ -74,3 +74,14 @@ bruin run assets/mongo_ingestion.yml
 As a result of this command, Bruin will ingest data from the given MongoDB table into your Postgres database.
 
 <img width="1017" alt="image" src="https://github.com/user-attachments/assets/2bad9131-baa1-4f20-8e3d-eed4329e7f90">
+
+## Querying
+
+Beyond ingestion, you can run ad-hoc queries against a MongoDB connection with the [`query` command](/commands/query) and verify it with [`bruin connections test`](/commands/connections). Because MongoDB is not SQL, the query is a JSON object describing a find or aggregation against one collection:
+
+```bash
+bruin query --connection localMongo \
+  --query '{"collection":"users","filter":{"age":{"$gt":21}},"sort":{"age":-1},"limit":10}'
+```
+
+See [Querying MongoDB](/commands/query#querying-mongodb) for the full envelope syntax.
