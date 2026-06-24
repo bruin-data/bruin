@@ -348,6 +348,12 @@ func installBundledSkill(skillsDir string, skill bundledSkill) (SkillInstallResu
 		return result, nil
 	}
 
+	if status == skillStatusUpdated {
+		if err := os.RemoveAll(skillPath); err != nil {
+			return SkillInstallResult{}, errors.Wrapf(err, "failed to remove old skill files from %s", skillPath)
+		}
+	}
+
 	if err := ensureSkillDirectory(skillPath); err != nil {
 		return SkillInstallResult{}, err
 	}
@@ -593,7 +599,7 @@ func compareSkillVersions(left, right string) (int, error) {
 func parseSkillVersion(version string) ([3]int, error) {
 	version = strings.TrimPrefix(strings.TrimSpace(version), "v")
 	parts := strings.Split(version, ".")
-	if len(parts) == 0 || len(parts) > 3 {
+	if len(parts) > 3 {
 		return [3]int{}, fmt.Errorf("invalid version %q", version)
 	}
 
