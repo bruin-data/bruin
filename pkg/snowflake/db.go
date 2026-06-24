@@ -17,6 +17,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/tablename"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/snowflakedb/gosnowflake"
@@ -1446,43 +1447,31 @@ ORDER BY t.table_schema, t.table_name;
 }
 
 func (db *DB) BuildTableExistsQuery(tableName string) (string, error) {
-	tableComponents := strings.Split(tableName, ".")
-	for _, component := range tableComponents {
-		if component == "" {
-			return "", fmt.Errorf("table name must be in schema.table or database.schema.table format, '%s' given", tableName)
-		}
+	cb, ok := tablename.For("snowflake")
+	if !ok {
+		return "", errors.New("snowflake table-name capability not found")
 	}
-
-	var databaseName string
-	var schemaRef, targetTable string
-
-	switch len(tableComponents) {
-	case 2:
-		// schema.table → use default database from config.
-		if db.config.Database == "" {
-			return "", errors.New("no database name provided")
-		}
-		databaseName = strings.ToUpper(db.config.Database)
-		schemaRef = databaseName + ".INFORMATION_SCHEMA.TABLES"
-		targetTable = tableComponents[1]
-	case 3:
-		// database.schema.table
-		databaseName = strings.ToUpper(tableComponents[0])
-		schemaRef = databaseName + ".INFORMATION_SCHEMA.TABLES"
-		targetTable = tableComponents[2]
-	default:
-		return "", fmt.Errorf("table name must be in schema.table or database.schema.table format, '%s' given", tableName)
+	// A bare table or `schema.table` name fills the missing leading components
+	// from the connection config (matching GetTableSummary).
+	tn, err := cb.Parse(tableName, tablename.Defaults{
+		Catalog: db.config.Database,
+		Schema:  db.config.Schema,
+	})
+	if err != nil {
+		return "", err
+	}
+	if tn.Catalog == "" {
+		return "", errors.New("no database name provided")
 	}
 
 	// Snowflake stores unquoted identifiers in uppercase.
-	schemaName := strings.ToUpper(tableComponents[len(tableComponents)-2])
-	targetTable = strings.ToUpper(targetTable)
+	tn = tn.Upper()
 
 	query := fmt.Sprintf(
-		"SELECT COUNT(*) FROM %s WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'",
-		schemaRef,
-		schemaName,
-		targetTable,
+		"SELECT COUNT(*) FROM %s.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'",
+		tn.Catalog,
+		tn.Schema,
+		tn.Table,
 	)
 
 	return strings.TrimSpace(query), nil
