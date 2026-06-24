@@ -53,7 +53,8 @@ parameters:
 | `campaigns` | id | last_edited | merge | Marketing campaigns (including archived) with their name, tags, and API flags. |
 | `canvases` | id | last_edited | merge | Canvas (journey) definitions (including archived) with their name and tags. |
 | `segments` | id | - | replace | Audience segments with their name and analytics-tracking flag. |
-| `events` | event_name | - | replace | Names of the custom events tracked in the workspace. |
+| `events` | name | - | replace | Custom events catalog: name, description, status, tags, and analytics-report flag. |
+| `event_series` | time, event_name | time | merge | Daily occurrence count per custom event. Fetches all events by default; an optional `event_series:<name>[,<name>]` filter limits it. |
 | `products` | product_id | - | replace | Product IDs seen in purchase events. |
 | `kpi_dau` | time | time | merge | Daily active users by date. |
 | `kpi_mau` | time | time | merge | Monthly active users (rolling 30-day) by date. |
