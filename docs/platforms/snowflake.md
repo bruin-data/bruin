@@ -379,6 +379,8 @@ order by start_time desc;
 
 Runs a materialized Snowflake asset or a Snowflake script. For detailed parameters, you can check [Definition Schema](../assets/definition-schema.md) page.
 
+Asset names may be `table`, `schema.table`, or `database.schema.table`. With a three-part name Bruin auto-creates both the database (`CREATE DATABASE IF NOT EXISTS`) and the schema within it, so the connection's role needs the `CREATE DATABASE` privilege.
+
 #### Example: Create a table using table materialization
 
 ```bruin-sql

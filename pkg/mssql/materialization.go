@@ -8,6 +8,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/tablename"
 )
 
 var matMap = pipeline.AssetMaterializationMap{
@@ -189,14 +190,24 @@ func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 		return "", fmt.Errorf("materialization strategy %s requires the `columns` field to be set", asset.Materialization.Strategy)
 	}
 
-	nameParts := strings.Split(asset.Name, ".")
+	// Derive the schema component, which is the second-to-last for both
+	// `schema.table` and `database.schema.table`. The schema is created in the
+	// session's current database, so a three-part name's schema is auto-created
+	// only when the database component is the connection's current database.
+	cb, ok := tablename.For("mssql")
+	if !ok {
+		return "", errors.New("mssql table-name capability not found")
+	}
+	tn, err := cb.Parse(asset.Name, tablename.Defaults{})
+	if err != nil {
+		return "", err
+	}
 	queries := make([]string, 0, 2)
-	if len(nameParts) == 2 {
-		schemaName := nameParts[0]
+	if tn.Schema != "" {
 		queries = append(queries, fmt.Sprintf(
 			"IF SCHEMA_ID(%s) IS NULL\n    EXEC(N'CREATE SCHEMA %s')",
-			sqlStringLiteral(schemaName),
-			strings.ReplaceAll(quoteIdentifier(schemaName), "'", "''"),
+			sqlStringLiteral(tn.Schema),
+			strings.ReplaceAll(quoteIdentifier(tn.Schema), "'", "''"),
 		))
 	}
 

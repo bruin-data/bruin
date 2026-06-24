@@ -1,5 +1,5 @@
 /* @bruin
-name: bq_summary
+name: analytics.bq_summary
 type: bq.sql
 
 materialization:

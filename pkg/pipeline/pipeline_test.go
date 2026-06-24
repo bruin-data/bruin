@@ -3185,3 +3185,45 @@ func TestColumn_SQLType(t *testing.T) {
 		})
 	}
 }
+
+func TestAsset_PrefixSchema(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		asset  string
+		prefix string
+		want   string
+	}{
+		{name: "empty prefix is a no-op", asset: "schema.table", prefix: "", want: "schema.table"},
+		{name: "two-part prefixes the schema", asset: "analytics.events", prefix: "dev_", want: "dev_analytics.events"},
+		{name: "three-part prefixes the middle (schema), keeps catalog", asset: "raw.analytics.events", prefix: "dev_", want: "raw.dev_analytics.events"},
+		{name: "single component has no schema to prefix", asset: "events", prefix: "dev_", want: "events"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			a := &pipeline.Asset{Name: tt.asset}
+			a.PrefixSchema(tt.prefix)
+			assert.Equal(t, tt.want, a.Name)
+		})
+	}
+}
+
+func TestAsset_PrefixUpstreams(t *testing.T) {
+	t.Parallel()
+
+	a := &pipeline.Asset{
+		Upstreams: []pipeline.Upstream{
+			{Type: "asset", Value: "analytics.events"},
+			{Type: "asset", Value: "raw.analytics.events"},
+			{Type: "uri", Value: "raw.analytics.events"}, // non-asset deps are untouched
+		},
+	}
+	a.PrefixUpstreams("dev_")
+
+	assert.Equal(t, "dev_analytics.events", a.Upstreams[0].Value)
+	assert.Equal(t, "raw.dev_analytics.events", a.Upstreams[1].Value)
+	assert.Equal(t, "raw.analytics.events", a.Upstreams[2].Value)
+}
