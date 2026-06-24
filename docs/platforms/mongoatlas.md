@@ -5,7 +5,7 @@ MongoDB Atlas is a fully-managed cloud database service built on MongoDB. It pro
 Bruin supports MongoDB Atlas as a data platform for both ingestion sources and destinations.
 
 > [!NOTE]
-> MongoDB Atlas is supported as both a source and destination for ingestion using [Ingestr Assets](../assets/ingestr.md). It cannot be used for SQL-based transformations or other asset types.
+> MongoDB Atlas is supported as both a source and destination for ingestion using [Ingestr Assets](../assets/ingestr.md). It cannot be used for SQL-based transformations or other asset types, but you can run ad-hoc queries against it with [`bruin query`](../commands/query.md) and verify it with [`bruin connections test`](../commands/connections.md).
 
 ## Connection
 
@@ -38,6 +38,17 @@ mongodb+srv://your-username:your-password@cluster0.example.mongodb.net
 ```
 
 If your username or password contains special characters, Bruin URL-encodes them when it builds the URI.
+
+## Querying
+
+You can run ad-hoc queries against a MongoDB Atlas connection with the [`query` command](../commands/query.md). Because MongoDB is not SQL, the query is a JSON object describing a find or aggregation against one collection:
+
+```bash
+bruin query --connection connection_name \
+  --query '{"collection":"users","filter":{"age":{"$gt":21}},"sort":{"age":-1},"limit":10}'
+```
+
+See [Querying MongoDB](../commands/query.md#querying-mongodb) for the full envelope syntax.
 
 ## Using MongoDB Atlas as a Destination
 
