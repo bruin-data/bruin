@@ -352,6 +352,47 @@ func NewSnowflakeTypeMapper() *DatabaseTypeMapper {
 	return mapper
 }
 
+// NewMongoTypeMapper provides MongoDB type mapping. The keys are the BSON type
+// aliases reported by the aggregation `$type` operator (e.g. "double", "string",
+// "objectId"), since MongoDB has no static catalog and types are inferred from
+// the documents themselves.
+func NewMongoTypeMapper() *DatabaseTypeMapper {
+	mapper := NewDatabaseTypeMapper()
+
+	// Numeric BSON types
+	mapper.AddNumericTypes(
+		"double", "int", "long", "decimal",
+	)
+
+	// String-like BSON types. ObjectIds are stringified for comparison so they
+	// surface useful distinct/length statistics.
+	mapper.AddStringTypes(
+		"string", "objectId",
+	)
+
+	// Boolean BSON type
+	mapper.AddBooleanTypes(
+		"bool",
+	)
+
+	// DateTime BSON types
+	mapper.AddDateTimeTypes(
+		"date", "timestamp",
+	)
+
+	// Binary BSON type
+	mapper.AddBinaryTypes(
+		"binData",
+	)
+
+	// Nested document/array BSON types are treated as JSON.
+	mapper.AddJSONTypes(
+		"object", "array",
+	)
+
+	return mapper
+}
+
 type Table struct {
 	Name    string
 	Columns []*Column

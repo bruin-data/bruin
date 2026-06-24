@@ -45,6 +45,7 @@ table td:first-child {
 | `--fail-if-diff` | bool | `false` | Return a non-zero exit code if differences are found |
 | `--target-dialect` | str | auto-detect | Target SQL dialect for ALTER TABLE statements (postgresql, snowflake, bigquery, duckdb, generic). Auto-detected from connection types if not specified |
 | `--reverse` | bool | `false` | Reverse the direction of ALTER statements (transform Table1 to match Table2 instead of Table2 to match Table1) |
+| `--sample` | int | `0` | For MongoDB sources, sample at most N documents per collection instead of scanning the whole collection (statistics become approximate). `0` scans everything. Ignored by other connection types |
 
 ## Table Identifier Format
 
@@ -262,6 +263,24 @@ The `data-diff` command includes specialized type mapping support for the follow
 - **BigQuery** - Native support for BigQuery types including `INT64`, `FLOAT64`, `BIGNUMERIC`, and BigQuery-specific formatting
 - **PostgreSQL & AWS Redshift** - Complete support for PostgreSQL types including `SERIAL` types, `MONEY`, network types (`CIDR`, `INET`), and `JSONB`
 - **Snowflake** - Full support for Snowflake types including `NUMBER`, `VARIANT`, and timezone-aware timestamp types
+- **MongoDB & MongoDB Atlas** - Schema is inferred from the documents themselves (see [MongoDB Collections](#mongodb-collections) below), mapping BSON types such as `objectId`, `double`, `decimal`, `date`, and nested `object`/`array` fields to common categories
+
+### MongoDB Collections
+
+MongoDB has no fixed schema, so for MongoDB connections the `data-diff` command infers the schema by scanning the collection's documents. A "table" is a collection, and a "column" is a top-level field.
+
+- **Schema inference:** Field names, types, and nullability are derived from the documents. A field's type is the most common BSON type observed for it; a field is reported as nullable when it is absent or `null` in any scanned document.
+- **Identifier format:** Use the collection name (resolved against the connection's `database`), or qualify it as `database.collection` to compare across databases — e.g. `mongo:users` or `mongo:analytics.events`.
+- **Top-level fields only:** Nested documents and arrays are compared as `object`/`array` (JSON) fields — count and fill rate — rather than being flattened into dotted paths. `ObjectId` fields (such as `_id`) are compared as strings.
+- **Sampling large collections:** A full scan is exact but can be expensive on very large collections. Pass `--sample N` to base type inference and statistics on at most `N` randomly sampled documents instead. Row counts always reflect the true collection size; per-column statistics become approximate when sampling.
+
+```bash
+# Compare two collections in the connection's default database
+bruin data-diff -c mongo orders_v1 orders_v2 --full
+
+# Compare collections across databases, sampling 10k docs each
+bruin data-diff -c mongo prod.orders staging.orders --full --sample 10000
+```
 
 ### Type Mapping Features
 
