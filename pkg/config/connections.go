@@ -1537,12 +1537,12 @@ func (c InfluxDBConnection) GetName() string {
 type TableauConnection struct {
 	Name                      string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	Host                      string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
-	Username                  string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
-	Password                  string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
-	PersonalAccessTokenName   string `yaml:"personal_access_token_name,omitempty" json:"personal_access_token_name" mapstructure:"personal_access_token_name"`
-	PersonalAccessTokenSecret string `yaml:"personal_access_token_secret,omitempty" json:"personal_access_token_secret" mapstructure:"personal_access_token_secret"`
+	Username                  string `yaml:"username,omitempty" json:"username,omitempty" mapstructure:"username" jsonschema:"oneof_required=username_password"`
+	Password                  string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password" jsonschema:"oneof_required=username_password"`
+	PersonalAccessTokenName   string `yaml:"personal_access_token_name,omitempty" json:"personal_access_token_name,omitempty" mapstructure:"personal_access_token_name" jsonschema:"oneof_required=personal_access_token"`
+	PersonalAccessTokenSecret string `yaml:"personal_access_token_secret,omitempty" json:"personal_access_token_secret,omitempty" mapstructure:"personal_access_token_secret" jsonschema:"oneof_required=personal_access_token"`
 	SiteID                    string `yaml:"site_id,omitempty" json:"site_id" mapstructure:"site_id"`
-	APIVersion                string `yaml:"api_version,omitempty" json:"api_version" mapstructure:"api_version"`
+	APIVersion                string `yaml:"api_version,omitempty" json:"api_version,omitempty" mapstructure:"api_version"`
 }
 
 type QuickSightConnection struct {
