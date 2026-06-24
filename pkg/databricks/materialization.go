@@ -7,6 +7,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/tablename"
 )
 
 type (
@@ -134,17 +135,21 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query string) ([]string, erro
 		return buildSCD2ByColumnfullRefresh(task, query)
 	}
 
-	assetNameParts := strings.Split(task.Name, ".")
-	if len(assetNameParts) != 2 {
-		return []string{}, errors.New("databricks asset names must be in the format `database.table`")
+	cb, ok := tablename.For("databricks")
+	if !ok {
+		return []string{}, errors.New("databricks table-name capability not found")
 	}
-	databaseName := assetNameParts[0]
+	tn, err := cb.Parse(task.Name, tablename.Defaults{})
+	if err != nil {
+		return []string{}, fmt.Errorf("databricks asset names must be in the format `schema.table` or `catalog.schema.table`: %w", err)
+	}
 
 	if len(mat.ClusterBy) > 0 {
 		return []string{}, errors.New("databricks assets do not support `cluster_by`")
 	}
 
-	tempTableName := databaseName + ".__bruin_tmp_" + helpers.PrefixGenerator()
+	// Stage the temp table in the same catalog/schema as the target.
+	tempTableName := tn.QualifiedSchema(".") + ".__bruin_tmp_" + helpers.PrefixGenerator()
 
 	query = strings.TrimSuffix(query, ";")
 

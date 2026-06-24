@@ -9,6 +9,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/tablename"
 	"github.com/pkg/errors"
 )
 
@@ -27,14 +28,12 @@ type queryRunner interface {
 }
 
 func (sc *DuckDBSchemaCreator) CreateSchemaIfNotExist(ctx context.Context, qr queryRunner, asset *pipeline.Asset) error {
-	tableComponents := strings.Split(asset.Name, ".")
-	var schemaName string
-	switch len(tableComponents) {
-	case 2:
-		schemaName = strings.ToLower(tableComponents[0])
-	case 3:
-		schemaName = strings.ToLower(tableComponents[1])
-	default:
+	// Three-part DuckDB names are `catalog.schema.table` (attached databases).
+	// Qualify the schema with the catalog so it is created in the named catalog,
+	// and keep the qualifier in the cache key so the same schema name in two
+	// catalogs is not deduped into a single creation.
+	schemaName, ok := tablename.SchemaToCreate(asset.Name, strings.ToLower)
+	if !ok {
 		return nil
 	}
 	// Check the cache for the schema
