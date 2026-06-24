@@ -34,7 +34,6 @@ func TestLoadBundledBruinSkillsFromMarkdownFiles(t *testing.T) {
 	}
 
 	assert.Equal(t, "bruin-semantic-layer", skill.Name)
-	assert.Equal(t, "1.1.0", skill.Version)
 
 	var skillFile bundledSkillFile
 	for _, file := range skill.Files {
@@ -45,6 +44,13 @@ func TestLoadBundledBruinSkillsFromMarkdownFiles(t *testing.T) {
 	}
 	assert.Equal(t, "SKILL.md", skillFile.Path)
 	assert.Contains(t, skillFile.Content, "# Bruin Semantic Layer")
+
+	metadata, ok, err := parseSkillFrontmatter(skillFile.Content)
+	require.NoError(t, err)
+	require.True(t, ok)
+	assert.Equal(t, metadata.Version, skill.Version)
+	_, err = parseSkillVersion(skill.Version)
+	require.NoError(t, err)
 }
 
 func TestSkillsInitCommand_RunCreatesAgentsHomeByDefault(t *testing.T) {
@@ -62,7 +68,7 @@ func TestSkillsInitCommand_RunCreatesAgentsHomeByDefault(t *testing.T) {
 
 	content := readRequiredFile(t, filepath.Join(skill.Path, "SKILL.md"))
 	assert.Contains(t, content, "name: bruin-semantic-layer")
-	assert.Contains(t, content, "version: 1.1.0")
+	assert.Contains(t, content, "version: "+semanticLayerSkillVersion(t))
 
 	_, err = os.Stat(filepath.Join(root, ".claude"))
 	assert.True(t, os.IsNotExist(err))
@@ -136,6 +142,7 @@ version: 0.1.0
 
 old marker
 `), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(skillPath, "stale.md"), []byte("stale"), 0o644))
 
 	result, err := (SkillsInitCommand{}).Run(root)
 	require.NoError(t, err)
@@ -145,8 +152,10 @@ old marker
 	assert.Equal(t, "0.1.0", result.Skills[0].PreviousVersion)
 
 	content := readRequiredFile(t, filepath.Join(skillPath, "SKILL.md"))
-	assert.Contains(t, content, "version: 1.1.0")
+	assert.Contains(t, content, "version: "+semanticLayerSkillVersion(t))
 	assert.NotContains(t, content, "old marker")
+	_, err = os.Stat(filepath.Join(skillPath, "stale.md"))
+	assert.True(t, os.IsNotExist(err))
 }
 
 func TestSkillsInitCommand_RunSkipsNewerSkillVersion(t *testing.T) {
@@ -180,4 +189,18 @@ func readRequiredFile(t *testing.T, path string) string {
 	content, err := os.ReadFile(path)
 	require.NoError(t, err)
 	return string(content)
+}
+
+func semanticLayerSkillVersion(t *testing.T) string {
+	t.Helper()
+
+	skills, err := loadBundledBruinSkills()
+	require.NoError(t, err)
+	for _, skill := range skills {
+		if skill.Name == "bruin-semantic-layer" {
+			return skill.Version
+		}
+	}
+	t.Fatal("bruin semantic layer skill not found")
+	return ""
 }
