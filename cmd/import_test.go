@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/mongo"
+	mongoatlas "github.com/bruin-data/bruin/pkg/mongo_atlas"
 	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/postgres"
@@ -393,6 +395,24 @@ func TestDetermineAssetTypeFromConnection(t *testing.T) {
 			want:           pipeline.AssetTypeMsSQLSource,
 		},
 		{
+			name:           "mongo connection type overrides name",
+			connectionName: "prod",
+			conn:           &mongo.DB{},
+			want:           pipeline.AssetTypeMongoSource,
+		},
+		{
+			name:           "mongo atlas connection type overrides name",
+			connectionName: "prod",
+			conn:           &mongoatlas.DB{},
+			want:           pipeline.AssetTypeMongoSource,
+		},
+		{
+			name:           "mongo by name",
+			connectionName: "mongo-prod",
+			conn:           &mockConnection{},
+			want:           pipeline.AssetTypeMongoSource,
+		},
+		{
 			name:           "unknown connection defaults to empty",
 			connectionName: "unknown-db",
 			conn:           &mockConnection{},
@@ -546,6 +566,32 @@ func TestFillAssetColumnsFromDB(t *testing.T) {
 				{Name: "name", Type: "VARCHAR", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{}},
 				{Name: "status", Type: "VARCHAR", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{}},
 			},
+		},
+		{
+			name: "mongo connection is skipped without columns or error",
+			setupConn: func() interface{} {
+				// MongoDB is schemaless; column filling must be skipped silently
+				// instead of falling through to SelectWithSchema.
+				return &mongo.DB{}
+			},
+			setupAsset: func() *pipeline.Asset {
+				return &pipeline.Asset{Name: "test_asset"}
+			},
+			schemaName: "test_schema",
+			tableName:  "test_table",
+			wantCols:   nil,
+		},
+		{
+			name: "mongo atlas connection is skipped without columns or error",
+			setupConn: func() interface{} {
+				return &mongoatlas.DB{}
+			},
+			setupAsset: func() *pipeline.Asset {
+				return &pipeline.Asset{Name: "test_asset"}
+			},
+			schemaName: "test_schema",
+			tableName:  "test_table",
+			wantCols:   nil,
 		},
 	}
 

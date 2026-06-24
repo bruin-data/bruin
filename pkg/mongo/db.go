@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/pkg/errors"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -59,4 +60,13 @@ func (db *DB) Ping(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// GetDatabaseSummary enumerates the databases and collections on the server so
+// `bruin import database` can turn them into assets.
+func (db *DB) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
+	if err := db.initClient(ctx); err != nil {
+		return nil, err
+	}
+	return DatabaseSummary(ctx, db.client, db.config.Database)
 }

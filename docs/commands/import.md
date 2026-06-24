@@ -68,6 +68,13 @@ table td:first-child {
 - **ClickHouse** → `clickhouse`
 - **Azure Synapse** → `synapse`
 - **MS SQL Server** → `mssql`
+- **MongoDB** → `mongo`, `mongo_atlas`
+
+#### MongoDB
+
+MongoDB is schemaless and has no `database → schema → table` hierarchy, so it maps as **database → schema** and **collection → table**. The import scans every database on the server (excluding the internal `admin`, `local`, and `config` databases) and creates one `mongo.source` asset per collection under `assets/<database>/`. Use `--schema <database>` to import a single database.
+
+Because collections have no fixed schema, imported MongoDB assets are created **without columns** — they are name + metadata stubs (the `--no-columns` flag has no additional effect). You can add column definitions yourself afterwards, for example when turning a collection into an `ingestr` asset, where columns drive schema enforcement, masking, and primary keys.
 
 ### How It Works
 

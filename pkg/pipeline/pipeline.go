@@ -70,6 +70,7 @@ const (
 	AssetTypeLookerStudio              = AssetType("looker_studio")
 	AssetTypeMetabase                  = AssetType("metabase")
 	AssetTypeModeBI                    = AssetType("modebi")
+	AssetTypeMongoSource               = AssetType("mongo.source")
 	AssetTypeMotherduckQuery           = AssetType("motherduck.sql")
 	AssetTypeMsSQLQuery                = AssetType("ms.sql")
 	AssetTypeMsSQLQuerySensor          = AssetType("ms.sensor.query")
@@ -786,6 +787,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeMySQLSeed:                 "mysql",
 	AssetTypeMySQLQuerySensor:          "mysql",
 	AssetTypeMySQLTableSensor:          "mysql",
+	AssetTypeMongoSource:               "mongo",
 	AssetTypeRedshiftQuery:             "redshift",
 	AssetTypeRedshiftSeed:              "redshift",
 	AssetTypeRedshiftQuerySensor:       "redshift",

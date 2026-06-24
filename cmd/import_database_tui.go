@@ -36,6 +36,8 @@ var supportedImportConnectionTypes = map[string]bool{
 	"synapse":               true,
 	"redshift":              true,
 	"sqlite":                true,
+	"mongo":                 true,
+	"mongo_atlas":           true,
 }
 
 const (
