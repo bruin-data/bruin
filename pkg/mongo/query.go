@@ -137,6 +137,9 @@ func openCursor(ctx context.Context, coll *mongo.Collection, mq *mongoQuery) (*m
 		if err := bson.UnmarshalExtJSON(mq.Aggregate, false, &pipeline); err != nil {
 			return nil, errors.Wrap(err, `invalid "aggregate" pipeline`)
 		}
+		if mq.Skip != nil {
+			pipeline = append(pipeline, bson.D{{Key: "$skip", Value: *mq.Skip}})
+		}
 		if mq.Limit != nil {
 			pipeline = append(pipeline, bson.D{{Key: "$limit", Value: *mq.Limit}})
 		}
