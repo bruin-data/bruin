@@ -4119,6 +4119,22 @@
       ]
     },
     "TableauConnection": {
+      "oneOf": [
+        {
+          "required": [
+            "username",
+            "password"
+          ],
+          "title": "username_password"
+        },
+        {
+          "required": [
+            "personal_access_token_name",
+            "personal_access_token_secret"
+          ],
+          "title": "personal_access_token"
+        }
+      ],
       "properties": {
         "name": {
           "type": "string"
@@ -4150,12 +4166,7 @@
       "required": [
         "name",
         "host",
-        "username",
-        "password",
-        "personal_access_token_name",
-        "personal_access_token_secret",
-        "site_id",
-        "api_version"
+        "site_id"
       ]
     },
     "TikTokAdsConnection": {
