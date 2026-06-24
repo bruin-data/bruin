@@ -259,15 +259,18 @@ func formatMongoValue(v interface{}) interface{} {
 
 // marshalExtJSONValue serializes a single BSON value to relaxed Extended JSON.
 // bson.MarshalExtJSON requires a top-level document, so the value is wrapped in
-// a one-key document and the wrapper is stripped back off.
+// a one-key document and the inner value is extracted back out. The wrapper is
+// valid JSON, so it is unmarshalled rather than string-stripped.
 func marshalExtJSONValue(v interface{}) interface{} {
 	b, err := bson.MarshalExtJSON(bson.D{{Key: "v", Value: v}}, false, false)
 	if err != nil {
 		return fmt.Sprintf("%v", v)
 	}
-	s := strings.TrimPrefix(string(b), `{"v":`)
-	s = strings.TrimSuffix(s, "}")
-	return s
+	var wrapper map[string]json.RawMessage
+	if err := json.Unmarshal(b, &wrapper); err != nil {
+		return fmt.Sprintf("%v", v)
+	}
+	return string(wrapper["v"])
 }
 
 func mongoTypeName(v interface{}) string {
