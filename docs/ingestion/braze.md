@@ -51,7 +51,9 @@ parameters:
 | Table | PK | Inc Key | Inc Strategy | Details |
 |-------|----|---------|--------------| ------- |
 | `campaigns` | id | last_edited | merge | Marketing campaigns (including archived) with their name, tags, and API flags. |
+| `campaign_series` | time, campaign_id | time | merge | Daily per-campaign stats (conversions, revenue, unique recipients; per-channel detail in a `messages` column). Fetches all campaigns by default; an optional `campaign_series:<id>[,<id>]` filter limits it. |
 | `canvases` | id | last_edited | merge | Canvas (journey) definitions (including archived) with their name and tags. |
+| `canvas_series` | time, canvas_id | time | merge | Daily per-canvas (journey) stats (entries, conversions, revenue). Fetches all canvases by default; an optional `canvas_series:<id>[,<id>]` filter limits it. |
 | `segments` | id | - | replace | Audience segments with their name and analytics-tracking flag. |
 | `segment_series` | time, segment_id | time | merge | Daily size per segment. Fetches all segments by default; an optional `segment_series:<id>[,<id>]` filter limits it. |
 | `events` | name | - | replace | Custom events catalog: name, description, status, tags, and analytics-report flag. |

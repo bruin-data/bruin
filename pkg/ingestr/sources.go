@@ -825,7 +825,9 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 	// Braze - Customer engagement platform (campaigns, canvases, KPIs)
 	"braze": {
 		{Name: "campaigns", PrimaryKey: "id", IncKey: "last_edited", IncStrategy: "merge"},
+		{Name: "campaign_series", PrimaryKey: "time, campaign_id", IncKey: "time", IncStrategy: "merge"},
 		{Name: "canvases", PrimaryKey: "id", IncKey: "last_edited", IncStrategy: "merge"},
+		{Name: "canvas_series", PrimaryKey: "time, canvas_id", IncKey: "time", IncStrategy: "merge"},
 		{Name: "segments", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
 		{Name: "segment_series", PrimaryKey: "time, segment_id", IncKey: "time", IncStrategy: "merge"},
 		{Name: "events", PrimaryKey: "name", IncKey: "", IncStrategy: "replace"},
