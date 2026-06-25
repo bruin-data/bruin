@@ -94,6 +94,7 @@ type dbSummaryLoadedMsg struct {
 type importCompleteMsg struct {
 	importedCount int
 	mergedCount   int
+	skippedCount  int
 	warnings      []importWarning
 	err           error
 }
@@ -179,6 +180,8 @@ type importDatabaseModel struct {
 	environment  string
 	configFile   string
 	fillColumns  bool
+	asIngestr    bool
+	destination  string
 
 	step int
 
@@ -198,6 +201,7 @@ type importDatabaseModel struct {
 
 	importedCount  int
 	mergedCount    int
+	skippedCount   int
 	importWarnings []importWarning
 	importError    error
 	importDone     bool
@@ -250,6 +254,7 @@ func (m *importDatabaseModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case importCompleteMsg:
 		m.importedCount = msg.importedCount
 		m.mergedCount = msg.mergedCount
+		m.skippedCount = msg.skippedCount
 		m.importWarnings = msg.warnings
 		m.importError = msg.err
 		m.importDone = true
@@ -545,6 +550,8 @@ func (m *importDatabaseModel) executeImportCmd() tea.Cmd {
 	connName := m.selectedConnName
 	conn := m.conn
 	fillColumns := m.fillColumns
+	asIngestr := m.asIngestr
+	destination := m.destination
 	summary := m.dbSummary
 
 	selectedSchemaIdxs := make(map[int]bool)
@@ -573,9 +580,10 @@ func (m *importDatabaseModel) executeImportCmd() tea.Cmd {
 		assetType := determineAssetTypeFromConnection(connName, conn)
 
 		var (
-			totalTables      int
-			mergedTableCount int
-			warnings         []importWarning
+			totalTables       int
+			mergedTableCount  int
+			skippedTableCount int
+			warnings          []importWarning
 		)
 
 		for i, schema := range summary.Schemas {
@@ -585,7 +593,13 @@ func (m *importDatabaseModel) executeImportCmd() tea.Cmd {
 			for _, table := range schema.Tables {
 				fullName := fmt.Sprintf("%s.%s", schema.Name, table.Name)
 
-				createdAsset, warning := createAsset(ctx, assetsPath, schema.Name, table.Name, assetType, conn, fillColumns, table)
+				var createdAsset *pipeline.Asset
+				var warning string
+				if asIngestr {
+					createdAsset = createIngestrAsset(assetsPath, schema.Name, table.Name, connName, destination, table)
+				} else {
+					createdAsset, warning = createAsset(ctx, assetsPath, schema.Name, table.Name, assetType, conn, fillColumns, table)
+				}
 				if warning != "" {
 					warnings = append(warnings, importWarning{tableName: fullName, message: warning})
 				}
@@ -594,7 +608,8 @@ func (m *importDatabaseModel) executeImportCmd() tea.Cmd {
 				}
 
 				assetName := fmt.Sprintf("%s.%s", strings.ToLower(schema.Name), strings.ToLower(table.Name))
-				if existingAssets[assetName] == nil {
+				switch {
+				case existingAssets[assetName] == nil:
 					schemaFolder := filepath.Join(assetsPath, strings.ToLower(schema.Name))
 					if mkErr := fs.MkdirAll(schemaFolder, 0o755); mkErr != nil {
 						return importCompleteMsg{err: fmt.Errorf("failed to create directory %s: %w", schemaFolder, mkErr)}
@@ -604,7 +619,12 @@ func (m *importDatabaseModel) executeImportCmd() tea.Cmd {
 					}
 					existingAssets[assetName] = createdAsset
 					totalTables++
-				} else {
+				case asIngestr:
+					// ingestr assets carry no columns, so there is nothing to
+					// merge into an existing asset; skip it without re-persisting
+					// to avoid a misleading "merged" count on re-runs.
+					skippedTableCount++
+				default:
 					existingAsset := existingAssets[assetName]
 					existingColumns := make(map[string]pipeline.Column, len(existingAsset.Columns))
 					for _, column := range existingAsset.Columns {
@@ -626,12 +646,13 @@ func (m *importDatabaseModel) executeImportCmd() tea.Cmd {
 		return importCompleteMsg{
 			importedCount: totalTables,
 			mergedCount:   mergedTableCount,
+			skippedCount:  skippedTableCount,
 			warnings:      warnings,
 		}
 	}
 }
 
-func runImportDatabaseTUI(ctx context.Context, pipelinePath, environment, configFile string, fillColumns bool) error {
+func runImportDatabaseTUI(ctx context.Context, pipelinePath, environment, configFile string, fillColumns, asIngestr bool, destination string) error {
 	fs := afero.NewOsFs()
 
 	repoRoot, err := git.FindRepoFromPath(".")
@@ -662,12 +683,21 @@ func runImportDatabaseTUI(ctx context.Context, pipelinePath, environment, config
 
 	var connItems []importConnectionItem
 	for name, connType := range connSummary {
-		if supportedImportConnectionTypes[connType] {
-			connItems = append(connItems, importConnectionItem{name: name, connType: connType})
+		if !supportedImportConnectionTypes[connType] {
+			continue
 		}
+		// --as-ingestr is only supported for MongoDB connections, so restrict
+		// the selectable connections to mongo / mongo_atlas in that mode.
+		if asIngestr && connType != "mongo" && connType != "mongo_atlas" {
+			continue
+		}
+		connItems = append(connItems, importConnectionItem{name: name, connType: connType})
 	}
 
 	if len(connItems) == 0 {
+		if asIngestr {
+			return errors.New("--as-ingestr requires a MongoDB connection, but none were found")
+		}
 		return errors.New("no database connections found that support import")
 	}
 
@@ -693,6 +723,8 @@ func runImportDatabaseTUI(ctx context.Context, pipelinePath, environment, config
 		environment:  environment,
 		configFile:   configFile,
 		fillColumns:  fillColumns,
+		asIngestr:    asIngestr,
+		destination:  destination,
 		step:         dbtuiStepConnection,
 		cfg:          cfg,
 		connList:     connList,
@@ -719,6 +751,10 @@ func runImportDatabaseTUI(ctx context.Context, pipelinePath, environment, config
 		successStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(colorSuccess)).Bold(true)
 		fmt.Println(successStyle.Render(fmt.Sprintf("✓ Imported %d tables, merged %d from '%s' into '%s'",
 			fm.importedCount, fm.mergedCount, fm.selectedConnName, pipelinePath)))
+
+		if fm.skippedCount > 0 {
+			fmt.Println(dbtuiDimStyle.Render(fmt.Sprintf("  Skipped %d existing assets (already present in the pipeline)", fm.skippedCount)))
+		}
 
 		if len(fm.importWarnings) > 0 {
 			fmt.Printf("\nWarnings (%d):\n", len(fm.importWarnings))
