@@ -65,7 +65,7 @@ parameters:
 
 ### Attribution Types
 
-The `campaigns` and `creatives` tables default to `click,engaged_ad` attribution. You can override which attribution types are included with the `attribution_types` query parameter. Valid values are `click`, `impression`, and `engaged_ad`, comma-separated.
+The `campaigns` and `creatives` tables default to `click,engaged_ad` attribution. You can override which attribution types are included with the `attribution_types` query parameter, given as a comma-separated list of the [attribution types supported by Adjust](https://dev.adjust.com/en/api/rs-api/reports/).
 
 ```yaml
 parameters:
