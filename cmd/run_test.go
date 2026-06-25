@@ -59,7 +59,7 @@ func TestBuildStandalonePythonPipelinePlainScript(t *testing.T) {
 	require.Len(t, pl.Assets, 1)
 
 	asset := pl.Assets[0]
-	assert.Equal(t, "standalone-python", pl.Name)
+	assert.Equal(t, "standalone-python-hello", pl.Name)
 	assert.Equal(t, "hello", asset.Name)
 	assert.Equal(t, pipeline.AssetTypePython, asset.Type)
 	assert.Equal(t, "hello.py", asset.ExecutableFile.Name)
@@ -101,6 +101,15 @@ func TestGetPipelineFallsBackToStandalonePythonScript(t *testing.T) {
 	assert.True(t, info.StandalonePythonScript)
 	assert.True(t, info.ValidateOnlyAssetLevel)
 	assert.Equal(t, "not-in-a-pipeline", info.Pipeline.Assets[0].Name)
+}
+
+func TestStandalonePythonAssetIDUsesFullPath(t *testing.T) {
+	t.Parallel()
+
+	firstScript := writeStandalonePythonTestScript(t, filepath.Join("first", "hello.py"), "print('first')\n")
+	secondScript := writeStandalonePythonTestScript(t, filepath.Join("second", "hello.py"), "print('second')\n")
+
+	assert.NotEqual(t, standalonePythonAssetID(firstScript), standalonePythonAssetID(secondScript))
 }
 
 func writeStandalonePythonTestScript(t *testing.T, relPath, content string) string {

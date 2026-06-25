@@ -1630,7 +1630,7 @@ func buildStandalonePythonPipeline(ctx context.Context, inputPath string) (*pipe
 
 	scriptDir := filepath.Dir(absPath)
 	pl := &pipeline.Pipeline{
-		Name:        "standalone-python",
+		Name:        "standalone-python-" + standalonePythonAssetName(absPath),
 		Assets:      make([]*pipeline.Asset, 0, 1),
 		TasksByType: make(map[pipeline.AssetType][]*pipeline.Asset),
 		DefinitionFile: pipeline.DefinitionFile{
@@ -1660,7 +1660,7 @@ func buildStandalonePythonPipeline(ctx context.Context, inputPath string) (*pipe
 		asset.Name = standalonePythonAssetName(absPath)
 	}
 	if asset.ID == "" {
-		asset.ID = standalonePythonAssetID(asset.Name)
+		asset.ID = standalonePythonAssetID(absPath)
 	}
 	if asset.Type == "" {
 		asset.Type = pipeline.AssetTypePython
@@ -1686,7 +1686,7 @@ func plainPythonScriptAsset(absPath string) (*pipeline.Asset, error) {
 	fileName := filepath.Base(absPath)
 	assetName := standalonePythonAssetName(absPath)
 	return &pipeline.Asset{
-		ID:           standalonePythonAssetID(assetName),
+		ID:           standalonePythonAssetID(absPath),
 		Name:         assetName,
 		Type:         pipeline.AssetTypePython,
 		Parameters:   pipeline.ParameterMap{},
@@ -1711,8 +1711,8 @@ func standalonePythonAssetName(absPath string) string {
 	return strings.TrimSuffix(filepath.Base(absPath), filepath.Ext(absPath))
 }
 
-func standalonePythonAssetID(assetName string) string {
-	hash := sha256.Sum256([]byte(assetName))
+func standalonePythonAssetID(absPath string) string {
+	hash := sha256.Sum256([]byte(absPath))
 	return hex.EncodeToString(hash[:])
 }
 
@@ -1818,7 +1818,7 @@ func CheckLint(ctx context.Context, foundPipeline *pipeline.Pipeline, pipelinePa
 	return nil
 }
 
-func CheckLintAssetOnly(ctx context.Context, foundPipeline *pipeline.Pipeline, pipelinePath string, logger logger.Logger, validateOnlyAssetLevel bool) error {
+func CheckLintAssetOnly(ctx context.Context, foundPipeline *pipeline.Pipeline, pipelinePath string, logger logger.Logger, _ bool) error {
 	return CheckLint(ctx, foundPipeline, pipelinePath, logger, true)
 }
 
