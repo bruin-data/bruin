@@ -70,6 +70,7 @@ const (
 	AssetTypeLookerStudio              = AssetType("looker_studio")
 	AssetTypeMetabase                  = AssetType("metabase")
 	AssetTypeModeBI                    = AssetType("modebi")
+	AssetTypeMongoSource               = AssetType("mongo.source")
 	AssetTypeMotherduckQuery           = AssetType("motherduck.sql")
 	AssetTypeMsSQLQuery                = AssetType("ms.sql")
 	AssetTypeMsSQLQuerySensor          = AssetType("ms.sensor.query")
@@ -786,6 +787,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeMySQLSeed:                 "mysql",
 	AssetTypeMySQLQuerySensor:          "mysql",
 	AssetTypeMySQLTableSensor:          "mysql",
+	AssetTypeMongoSource:               "mongo",
 	AssetTypeRedshiftQuery:             "redshift",
 	AssetTypeRedshiftSeed:              "redshift",
 	AssetTypeRedshiftQuerySensor:       "redshift",
@@ -850,6 +852,27 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeVerticaSource:             "vertica",
 	AssetTypeQuicksightDataset:         "quicksight",
 	AssetTypeQuicksightDashboard:       "quicksight",
+}
+
+// assetTypeConnectionAlternates lists every connection platform key that can back
+// an asset type, in priority order, for the asset types that more than one
+// connection type can serve. A mongo.source asset, for example, can be backed by
+// either a "mongo" or a "mongo_atlas" connection, so resolving its default
+// connection must consider both keys. Asset types absent here resolve through
+// their single AssetTypeConnectionMapping entry.
+var assetTypeConnectionAlternates = map[AssetType][]string{
+	AssetTypeMongoSource: {"mongo", "mongo_atlas"},
+}
+
+// connectionPlatformsForAssetType returns the connection platform keys to try when
+// resolving an asset's default connection, in priority order. It falls back to the
+// asset type's single AssetTypeConnectionMapping entry (passed as primary) when the
+// type has no alternates.
+func connectionPlatformsForAssetType(assetType AssetType, primary string) []string {
+	if alternates, ok := assetTypeConnectionAlternates[assetType]; ok {
+		return alternates
+	}
+	return []string{primary}
 }
 
 var IngestrTypeConnectionMapping = map[string]AssetType{
@@ -2153,9 +2176,14 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 		return "", errors.Errorf("no connection mapping found for asset type '%s'", assetType)
 	}
 
-	conn, ok := p.DefaultConnections[mapping]
-	if ok {
-		return conn, nil
+	// Some asset types can be served by more than one connection platform (e.g. a
+	// mongo.source asset accepts either a "mongo" or a "mongo_atlas" connection), so
+	// check every candidate platform's explicit default connection before falling
+	// back to the magic default name.
+	for _, platform := range connectionPlatformsForAssetType(assetType, mapping) {
+		if conn, ok := p.DefaultConnections[platform]; ok {
+			return conn, nil
+		}
 	}
 
 	defaultConn, ok := defaultMapping[mapping]

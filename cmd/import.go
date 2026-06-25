@@ -18,6 +18,8 @@ import (
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/logger"
+	"github.com/bruin-data/bruin/pkg/mongo"
+	mongoatlas "github.com/bruin-data/bruin/pkg/mongo_atlas"
 	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/oracle"
 	"github.com/bruin-data/bruin/pkg/path"
@@ -430,6 +432,14 @@ func resolvePipelinePath(pipelinePath string) string {
 }
 
 func fillAssetColumnsFromDB(ctx context.Context, asset *pipeline.Asset, conn interface{}, schemaName, tableName string) error {
+	// MongoDB collections are schemaless, so there is no column metadata to import.
+	// Skip silently rather than falling through to SelectWithSchema, which would
+	// receive a SQL string it cannot parse and surface a confusing warning.
+	switch conn.(type) {
+	case *mongo.DB, *mongoatlas.DB:
+		return nil
+	}
+
 	// Prefer database-native column metadata when available. PostgreSQL supports
 	// this through information_schema, which avoids relying on SELECT field
 	// descriptions that are not always returned by the driver.
@@ -895,6 +905,9 @@ func determineAssetTypeFromConnection(connectionName string, conn interface{}) p
 		if strings.Contains(connType, "synapse") {
 			return pipeline.AssetTypeSynapseSource
 		}
+		if strings.Contains(connType, "mongo") {
+			return pipeline.AssetTypeMongoSource
+		}
 	}
 
 	// Fallback: try to detect the connection type from the connection name
@@ -932,6 +945,9 @@ func determineAssetTypeFromConnection(connectionName string, conn interface{}) p
 	}
 	if strings.Contains(connectionLower, "oracle") {
 		return pipeline.AssetTypeOracleSource
+	}
+	if strings.Contains(connectionLower, "mongo") {
+		return pipeline.AssetTypeMongoSource
 	}
 
 	// Default to empty if we can't determine the type

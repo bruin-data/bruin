@@ -748,6 +748,32 @@ func TestPipeline_GetConnectionNameForAsset(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "postgres-default", found)
 	})
+
+	t.Run("mongo.source resolves a mongo default connection", func(t *testing.T) {
+		t.Parallel()
+		mongoPipeline := &pipeline.Pipeline{
+			Name:               "mongo-pipeline",
+			DefaultConnections: map[string]string{"mongo": "my-mongo"},
+		}
+		found, err := mongoPipeline.GetConnectionNameForAsset(&pipeline.Asset{
+			Type: pipeline.AssetTypeMongoSource,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "my-mongo", found)
+	})
+
+	t.Run("mongo.source falls back to a mongo_atlas default connection", func(t *testing.T) {
+		t.Parallel()
+		atlasPipeline := &pipeline.Pipeline{
+			Name:               "atlas-pipeline",
+			DefaultConnections: map[string]string{"mongo_atlas": "my-atlas"},
+		}
+		found, err := atlasPipeline.GetConnectionNameForAsset(&pipeline.Asset{
+			Type: pipeline.AssetTypeMongoSource,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "my-atlas", found)
+	})
 }
 
 func intPointer(i int) *int {
