@@ -82,7 +82,7 @@ A fully managed option where Bruin takes care of job setup, configuration, and e
 
 * Supports PySpark scripts.
 * Handles artifact deployment to GCS.
-* Automatic log streaming via Cloud Logging.
+* Automatic streaming of the job's driver output.
 * Concurrent-safe by default.
 * Bundles internal dependencies and configures your job to use them.
 
@@ -260,7 +260,13 @@ The service account used for authentication requires the following IAM roles:
 
 * **Dataproc Editor** (`roles/dataproc.editor`): To create and manage batch jobs
 * **Storage Object Admin** (`roles/storage.objectAdmin`): To upload files to the workspace bucket
-* **Logs Viewer** (`roles/logging.viewer`): To stream job logs
+
+Bruin streams job logs by reading the Spark driver output that Dataproc Serverless writes to the batch's staging bucket. The authenticating credentials therefore also need **read access to that staging bucket** (`roles/storage.objectViewer`, or the read portion of the Storage Object Admin role above if it is granted on the same bucket):
+
+* If you set `staging_bucket`, grant read access on that bucket.
+* Otherwise, Dataproc auto-creates a `dataproc-staging-<region>-<project-number>-<hash>` bucket and the credentials need read access there.
+
+When the credentials already have a broad role such as Owner or Editor on the project, no additional grant is required.
 
 Additional roles may be required depending on optional features:
 
