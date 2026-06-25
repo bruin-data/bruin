@@ -157,6 +157,7 @@ func DataDiffCmd() *cli.Command {
 	var reverse bool
 	var outputFormat string
 	var dryRun bool
+	var sampleSize int64
 
 	return &cli.Command{
 		Name:    "data-diff",
@@ -215,9 +216,18 @@ func DataDiffCmd() *cli.Command {
 				Usage:       "Estimate the cost of the comparison without executing it (outputs JSON). Only supported for BigQuery connections.",
 				Destination: &dryRun,
 			},
+			&cli.Int64Flag{
+				Name:        "sample",
+				Usage:       "For MongoDB sources, sample at most N documents instead of scanning the whole collection (statistics become approximate). 0 (default) scans everything. Ignored by other connection types.",
+				Destination: &sampleSize,
+				Value:       0,
+			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			ctx = query.WithQueryType(ctx, query.QueryTypeDiff)
+			if sampleSize > 0 {
+				ctx = diff.WithSampleSize(ctx, sampleSize)
+			}
 			if c.NArg() != 2 {
 				return errors.New("incorrect number of arguments, please provide two table names")
 			}
