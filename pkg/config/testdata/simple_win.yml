@@ -523,6 +523,12 @@ environments:
         - name: "braze-1"
           api_key: "test-api-key"
           endpoint: "rest.iad-01.braze.com"
+      reddit_ads:
+        - name: "redditads-1"
+          access_token: "test-access-token"
+          client_id: "test-client-id"
+          client_secret: "test-client-secret"
+          refresh_token: "test-refresh-token"
       espn:
         - name: "espn-1"
           sport: "football"

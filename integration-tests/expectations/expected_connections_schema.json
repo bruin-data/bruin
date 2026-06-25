@@ -3522,16 +3522,20 @@
         "access_token": {
           "type": "string"
         },
-        "account_ids": {
+        "client_id": {
+          "type": "string"
+        },
+        "client_secret": {
+          "type": "string"
+        },
+        "refresh_token": {
           "type": "string"
         }
       },
       "additionalProperties": false,
       "type": "object",
       "required": [
-        "name",
-        "access_token",
-        "account_ids"
+        "name"
       ]
     },
     "RedshiftConnection": {

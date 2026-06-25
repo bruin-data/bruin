@@ -776,8 +776,10 @@ func (m *Manager) AddRedditAdsConnectionFromConfig(connection *config.RedditAdsC
 	m.mutex.Unlock()
 
 	client, err := redditads.NewClient(redditads.Config{
-		AccessToken: connection.AccessToken,
-		AccountIds:  connection.AccountIds,
+		AccessToken:  connection.AccessToken,
+		ClientID:     connection.ClientID,
+		ClientSecret: connection.ClientSecret,
+		RefreshToken: connection.RefreshToken,
 	})
 	if err != nil {
 		return err
