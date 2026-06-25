@@ -419,7 +419,8 @@ func runImport(ctx context.Context, log logger.Logger, pipelinePath, connectionN
 			}
 
 			assetName := fmt.Sprintf("%s.%s", strings.ToLower(schemaObj.Name), strings.ToLower(table.Name))
-			if existingAssets[assetName] == nil {
+			switch {
+			case existingAssets[assetName] == nil:
 				schemaFolder := filepath.Join(assetsPath, strings.ToLower(schemaObj.Name))
 				if err := fs.MkdirAll(schemaFolder, 0o755); err != nil {
 					return errors2.Wrapf(err, "failed to create schema directory %s", schemaFolder)
@@ -431,12 +432,12 @@ func runImport(ctx context.Context, log logger.Logger, pipelinePath, connectionN
 				}
 				existingAssets[assetName] = createdAsset
 				totalTables++
-			} else if asIngestr {
+			case asIngestr:
 				// ingestr assets carry no columns, so there is nothing to merge
 				// into an existing asset; skip it without re-persisting to avoid
 				// a misleading "Merged" count on re-runs.
 				skippedTableCount++
-			} else {
+			default:
 				existingAsset := existingAssets[assetName]
 				existingColumns := make(map[string]pipeline.Column, len(existingAsset.Columns))
 				for _, column := range existingAsset.Columns {
