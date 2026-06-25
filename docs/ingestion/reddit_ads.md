@@ -4,7 +4,7 @@ Reddit Ads is an advertising platform for creating, managing, and analyzing adve
 
 Bruin supports Reddit Ads as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Reddit Ads into your data warehouse.
 
-To set up a Reddit Ads connection, add a configuration item to `.bruin.yml` and reference it from an ingestr asset. You need an OAuth `access_token` and a comma-separated list of `account_ids`. See the [official ingestr Reddit Ads documentation](https://getbruin.com/docs/ingestr/supported-sources/reddit_ads.html) for the OAuth flow and account ID discovery steps.
+To set up a Reddit Ads connection, add a configuration item to `.bruin.yml` and reference it from an ingestr asset. You need OAuth credentials — either an `access_token`, or `client_id` + `client_secret` + `refresh_token` (recommended, since access tokens expire). See the [official ingestr Reddit Ads documentation](https://getbruin.com/docs/ingestr/supported-sources/reddit_ads.html) for the OAuth flow. Account selection is done per asset via the source table name (e.g. `campaigns:id_123`); by default all accessible accounts are synced.
 
 ## Configuration
 
