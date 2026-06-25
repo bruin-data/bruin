@@ -833,7 +833,6 @@ func TestLoadFromFile(t *testing.T) {
 				{
 					Name:         "redditads-1",
 					AccessToken:  "test-access-token",
-					AccountIds:   "test-account-id-1,test-account-id-2",
 					ClientID:     "test-client-id",
 					ClientSecret: "test-client-secret",
 					RefreshToken: "test-refresh-token",

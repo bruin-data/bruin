@@ -1646,8 +1646,7 @@ func (c FreshdeskConnection) GetName() string {
 
 type RedditAdsConnection struct {
 	Name         string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
-	AccessToken  string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
-	AccountIds   string `yaml:"account_ids,omitempty" json:"account_ids" mapstructure:"account_ids"`
+	AccessToken  string `yaml:"access_token,omitempty" json:"access_token,omitempty" mapstructure:"access_token"`
 	ClientID     string `yaml:"client_id,omitempty" json:"client_id,omitempty" mapstructure:"client_id"`
 	ClientSecret string `yaml:"client_secret,omitempty" json:"client_secret,omitempty" mapstructure:"client_secret"`
 	RefreshToken string `yaml:"refresh_token,omitempty" json:"refresh_token,omitempty" mapstructure:"refresh_token"`

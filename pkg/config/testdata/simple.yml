@@ -521,7 +521,6 @@ environments:
       reddit_ads:
         - name: "redditads-1"
           access_token: "test-access-token"
-          account_ids: "test-account-id-1,test-account-id-2"
           client_id: "test-client-id"
           client_secret: "test-client-secret"
           refresh_token: "test-refresh-token"

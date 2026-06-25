@@ -7,7 +7,6 @@ import (
 
 type Config struct {
 	AccessToken  string `yaml:"access_token" json:"access_token" mapstructure:"access_token"`
-	AccountIds   string `yaml:"account_ids" json:"account_ids" mapstructure:"account_ids"`
 	ClientID     string `yaml:"client_id" json:"client_id" mapstructure:"client_id"`
 	ClientSecret string `yaml:"client_secret" json:"client_secret" mapstructure:"client_secret"`
 	RefreshToken string `yaml:"refresh_token" json:"refresh_token" mapstructure:"refresh_token"`
@@ -23,9 +22,6 @@ func (c *Config) GetIngestrURI() (string, error) {
 	params := url.Values{}
 	if c.AccessToken != "" {
 		params.Set("access_token", c.AccessToken)
-	}
-	if c.AccountIds != "" {
-		params.Set("account_ids", c.AccountIds)
 	}
 	if c.ClientID != "" {
 		params.Set("client_id", c.ClientID)

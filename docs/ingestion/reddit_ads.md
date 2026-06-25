@@ -16,19 +16,19 @@ To connect to Reddit Ads as a source, add a `reddit_ads` connection to the conne
 connections:
   reddit_ads:
     - name: my-reddit-ads
-      account_ids: "id_123,id_456"
       client_id: "app_client_id"
       client_secret: "app_client_secret"
       refresh_token: "refresh_token_123"
 ```
 
-- `account_ids` (required): Comma-separated Reddit Ads account IDs to retrieve data for.
 - `access_token` (optional): OAuth2 access token used to authenticate with the Reddit Ads API. Access tokens expire (~24h), so prefer supplying `client_id` + `client_secret` + `refresh_token` instead, which lets Bruin mint a fresh access token automatically on each run.
 - `client_id` (optional): OAuth application client ID.
 - `client_secret` (optional): OAuth application client secret.
 - `refresh_token` (optional): Permanent OAuth refresh token. Provide this together with `client_id` and `client_secret` to obtain a fresh access token on every run without manual re-authentication.
 
 You must provide **either** an `access_token`, **or** `client_id` + `client_secret` + `refresh_token`. The refresh-token approach is recommended because access tokens expire, whereas the refresh token is long-lived.
+
+By default, all ad accounts the authenticated user can access are synced. To restrict an asset to specific accounts, scope them in the asset's source table — e.g. `campaigns:id_123,id_456` (see below).
 
 Bruin uses the `reddit_ads` connection key in `.bruin.yml`. The underlying ingestr source URI scheme is `redditads://`, as required by ingestr.
 
