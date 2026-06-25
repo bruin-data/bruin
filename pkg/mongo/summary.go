@@ -2,6 +2,8 @@ package mongo
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"sort"
 	"strings"
 
@@ -31,6 +33,7 @@ func DatabaseSummary(ctx context.Context, client *mongo.Client, summaryName stri
 	}
 
 	collectionsByDB := make(map[string][]string, len(dbNames))
+	var skipped []string
 	for _, dbName := range dbNames {
 		if systemDatabases[dbName] {
 			continue
@@ -39,10 +42,19 @@ func DatabaseSummary(ctx context.Context, client *mongo.Client, summaryName stri
 		collections, err := client.Database(dbName).ListCollectionNames(ctx, bson.D{})
 		if err != nil {
 			// Skip databases we cannot introspect (e.g. missing privileges) rather
-			// than failing the whole import.
+			// than failing the whole import, but record them so the partial result
+			// is not mistaken for a complete one.
+			skipped = append(skipped, fmt.Sprintf("%s (%v)", dbName, err))
 			continue
 		}
 		collectionsByDB[dbName] = collections
+	}
+
+	// Surface skipped databases instead of failing silently, so an import that
+	// omits collections (commonly because of missing privileges) is visible.
+	if len(skipped) > 0 {
+		fmt.Fprintf(os.Stderr, "warning: skipped %d MongoDB database(s) that could not be introspected: %s\n",
+			len(skipped), strings.Join(skipped, ", "))
 	}
 
 	if summaryName == "" {
