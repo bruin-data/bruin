@@ -59,11 +59,14 @@ parameters:
 | `kpi_mau` | time | time | merge | Monthly active users (rolling 30-day) by date. |
 | `kpi_new_users` | time | time | merge | New users by date. |
 | `kpi_uninstalls` | time | time | merge | App uninstalls by date. |
-| `user_data` | braze_id, segment_id | - | replace | Users of a segment with their email/push subscription state and profile fields (a point-in-time snapshot). |
+| `user_data` | braze_id, segment_id | - | replace | Segment users with their email/push subscription state and profile fields (a point-in-time snapshot). Exports all segments by default; an optional `user_data:<id>[,<id>]` filter limits it. |
 
 The `kpi_*` tables aggregate across all apps by default. Append a comma-separated list of app identifiers to break a KPI down by app, e.g. `source_table: 'kpi_dau:app-one-id,app-two-id'`; each row then carries an `app_id` column.
 
-The `user_data` table requires one or more segment ids, passed as a comma-separated suffix, e.g. `source_table: 'user_data:<segment_id>'` or `'user_data:<segment_id_1>,<segment_id_2>'`. Each row is tagged with the `segment_id` it came from.
+The `user_data` table exports segment users along with their subscription state. By default it exports **every** segment; pass a comma-separated list of segment ids to limit it, e.g. `source_table: 'user_data:<segment_id>'` or `'user_data:<segment_id_1>,<segment_id_2>'`. Find segment ids by ingesting the `segments` table (its `id` column) or in the Braze dashboard. Each row is tagged with the `segment_id` it came from.
+
+> [!WARNING]
+> Exporting all segments runs one async export per segment (each can take minutes to materialize) and can produce a very large, heavily duplicated dataset (the same user appears in every segment they belong to). Prefer naming the specific segments you need.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 
