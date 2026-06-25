@@ -829,6 +829,16 @@ func TestLoadFromFile(t *testing.T) {
 					Endpoint: "rest.iad-01.braze.com",
 				},
 			},
+			RedditAds: []RedditAdsConnection{
+				{
+					Name:         "redditads-1",
+					AccessToken:  "test-access-token",
+					AccountIds:   "test-account-id-1,test-account-id-2",
+					ClientID:     "test-client-id",
+					ClientSecret: "test-client-secret",
+					RefreshToken: "test-refresh-token",
+				},
+			},
 			Espn: []EspnConnection{
 				{
 					Name:   "espn-1",
