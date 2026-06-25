@@ -825,10 +825,17 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 	// Braze - Customer engagement platform (campaigns, canvases, KPIs)
 	"braze": {
 		{Name: "campaigns", PrimaryKey: "id", IncKey: "last_edited", IncStrategy: "merge"},
+		{Name: "campaign_series", PrimaryKey: "time, campaign_id", IncKey: "time", IncStrategy: "merge"},
 		{Name: "canvases", PrimaryKey: "id", IncKey: "last_edited", IncStrategy: "merge"},
+		{Name: "canvas_series", PrimaryKey: "time, canvas_id", IncKey: "time", IncStrategy: "merge"},
 		{Name: "segments", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
-		{Name: "events", PrimaryKey: "event_name", IncKey: "", IncStrategy: "replace"},
+		{Name: "segment_series", PrimaryKey: "time, segment_id", IncKey: "time", IncStrategy: "merge"},
+		{Name: "events", PrimaryKey: "name", IncKey: "", IncStrategy: "replace"},
+		{Name: "event_series", PrimaryKey: "time, event_name", IncKey: "time", IncStrategy: "merge"},
 		{Name: "products", PrimaryKey: "product_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "sessions", PrimaryKey: "time", IncKey: "time", IncStrategy: "merge"},
+		{Name: "purchase_quantity", PrimaryKey: "time", IncKey: "time", IncStrategy: "merge"},
+		{Name: "purchase_revenue", PrimaryKey: "time", IncKey: "time", IncStrategy: "merge"},
 		{Name: "kpi_dau", PrimaryKey: "time", IncKey: "time", IncStrategy: "merge"},
 		{Name: "kpi_mau", PrimaryKey: "time", IncKey: "time", IncStrategy: "merge"},
 		{Name: "kpi_new_users", PrimaryKey: "time", IncKey: "time", IncStrategy: "merge"},
