@@ -269,6 +269,13 @@ func TestLoadFromFile(t *testing.T) {
 					APIKey: "paddlekey",
 				},
 			},
+			Chargebee: []ChargebeeConnection{
+				{
+					Name:   "conn-chargebee",
+					Site:   "chargebeesite",
+					APIKey: "chargebeekey",
+				},
+			},
 			GitLab: []GitLabConnection{
 				{
 					Name:        "conn-gitlab",
@@ -2175,6 +2182,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				FacebookAds:         []FacebookAdsConnection{{Name: "facebookads1"}},
 				Stripe:              []StripeConnection{{Name: "stripe1"}},
 				Paddle:              []PaddleConnection{{Name: "paddle1"}},
+				Chargebee:           []ChargebeeConnection{{Name: "chargebee1"}},
 				GitLab:              []GitLabConnection{{Name: "gitlab1"}},
 				Appsflyer:           []AppsflyerConnection{{Name: "appsflyer1"}},
 				Kafka:               []KafkaConnection{{Name: "kafka1"}},
@@ -2303,6 +2311,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				FacebookAds:         []FacebookAdsConnection{{Name: "facebookads1"}},
 				Stripe:              []StripeConnection{{Name: "stripe1"}},
 				Paddle:              []PaddleConnection{{Name: "paddle1"}},
+				Chargebee:           []ChargebeeConnection{{Name: "chargebee1"}},
 				GitLab:              []GitLabConnection{{Name: "gitlab1"}},
 				Appsflyer:           []AppsflyerConnection{{Name: "appsflyer1"}},
 				Kafka:               []KafkaConnection{{Name: "kafka1"}},

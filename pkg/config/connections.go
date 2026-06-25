@@ -738,6 +738,16 @@ func (c PaddleConnection) GetName() string {
 	return c.Name
 }
 
+type ChargebeeConnection struct {
+	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Site   string `yaml:"site,omitempty" json:"site" mapstructure:"site"`
+	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+}
+
+func (c ChargebeeConnection) GetName() string {
+	return c.Name
+}
+
 type GitLabConnection struct {
 	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	AccessToken string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
