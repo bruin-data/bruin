@@ -173,7 +173,6 @@ var defaultMapping = map[string]string{
 	"paddle":                "paddle-default",
 	"chargebee":             "chargebee-default",
 	"appsflyer":             "appsflyer-default",
-	"reddit_ads":            "reddit_ads-default",
 	"kafka":                 "kafka-default",
 	"duckdb":                "duckdb-default",
 	"clickhouse":            "clickhouse-default",
