@@ -162,6 +162,10 @@ environments:
       paddle:
         - name: conn-paddle
           api_key: "paddlekey"
+      chargebee:
+        - name: conn-chargebee
+          site: "chargebeesite"
+          api_key: "chargebeekey"
       gitlab:
         - name: conn-gitlab
           access_token: "gitlabtoken"

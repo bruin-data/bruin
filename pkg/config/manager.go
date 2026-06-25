@@ -58,6 +58,7 @@ type Connections struct {
 	FacebookAds         []FacebookAdsConnection         `yaml:"facebookads,omitempty" json:"facebookads,omitempty" mapstructure:"facebookads"`
 	Stripe              []StripeConnection              `yaml:"stripe,omitempty" json:"stripe,omitempty" mapstructure:"stripe"`
 	Paddle              []PaddleConnection              `yaml:"paddle,omitempty" json:"paddle,omitempty" mapstructure:"paddle"`
+	Chargebee           []ChargebeeConnection           `yaml:"chargebee,omitempty" json:"chargebee,omitempty" mapstructure:"chargebee"`
 	GitLab              []GitLabConnection              `yaml:"gitlab,omitempty" json:"gitlab,omitempty" mapstructure:"gitlab"`
 	Appsflyer           []AppsflyerConnection           `yaml:"appsflyer,omitempty" json:"appsflyer,omitempty" mapstructure:"appsflyer"`
 	Kafka               []KafkaConnection               `yaml:"kafka,omitempty" json:"kafka,omitempty" mapstructure:"kafka"`
@@ -745,6 +746,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Paddle = append(env.Connections.Paddle, conn)
+	case "chargebee":
+		var conn ChargebeeConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Chargebee = append(env.Connections.Chargebee, conn)
 	case "gitlab":
 		var conn GitLabConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1497,6 +1505,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Stripe = removeConnection(env.Connections.Stripe, connectionName)
 	case "paddle":
 		env.Connections.Paddle = removeConnection(env.Connections.Paddle, connectionName)
+	case "chargebee":
+		env.Connections.Chargebee = removeConnection(env.Connections.Chargebee, connectionName)
 	case "gitlab":
 		env.Connections.GitLab = removeConnection(env.Connections.GitLab, connectionName)
 	case "appsflyer":
@@ -1767,6 +1777,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.FacebookAds, source.FacebookAds)
 	mergeConnectionList(&c.Stripe, source.Stripe)
 	mergeConnectionList(&c.Paddle, source.Paddle)
+	mergeConnectionList(&c.Chargebee, source.Chargebee)
 	mergeConnectionList(&c.GitLab, source.GitLab)
 	mergeConnectionList(&c.Appsflyer, source.Appsflyer)
 	mergeConnectionList(&c.Kafka, source.Kafka)

@@ -966,6 +966,16 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "adjustments", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
 	},
 
+	// Chargebee - Subscription billing
+	"chargebee": {
+		{Name: "customers", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "subscriptions", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "invoices", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "transactions", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "orders", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "events", PrimaryKey: "id", IncKey: "occurred_at", IncStrategy: "merge"},
+	},
+
 	// GitLab - DevOps and code hosting
 	"gitlab": {
 		{Name: "projects", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},

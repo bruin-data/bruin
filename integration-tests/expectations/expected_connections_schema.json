@@ -532,6 +532,26 @@
         "type"
       ]
     },
+    "ChargebeeConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "site": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "site",
+        "api_key"
+      ]
+    },
     "ChessConnection": {
       "properties": {
         "name": {
@@ -826,6 +846,12 @@
         "paddle": {
           "items": {
             "$ref": "#/$defs/PaddleConnection"
+          },
+          "type": "array"
+        },
+        "chargebee": {
+          "items": {
+            "$ref": "#/$defs/ChargebeeConnection"
           },
           "type": "array"
         },

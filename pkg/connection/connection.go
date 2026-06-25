@@ -29,6 +29,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/braze"
 	"github.com/bruin-data/bruin/pkg/bruincloud"
 	"github.com/bruin-data/bruin/pkg/cassandra"
+	"github.com/bruin-data/bruin/pkg/chargebee"
 	"github.com/bruin-data/bruin/pkg/chess"
 	"github.com/bruin-data/bruin/pkg/clickhouse"
 	"github.com/bruin-data/bruin/pkg/clickup"
@@ -175,6 +176,7 @@ type Manager struct {
 	FacebookAds          map[string]*facebookads.Client
 	Stripe               map[string]*stripe.Client
 	Paddle               map[string]*paddle.Client
+	Chargebee            map[string]*chargebee.Client
 	GitLab               map[string]*gitlab.Client
 	SurveyMonkey         map[string]*surveymonkey.Client
 	Appsflyer            map[string]*appsflyer.Client
@@ -1542,6 +1544,30 @@ func (m *Manager) AddPaddleConnectionFromConfig(connection *config.PaddleConnect
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Paddle[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddChargebeeConnectionFromConfig(connection *config.ChargebeeConnection) error {
+	m.mutex.Lock()
+	if m.Chargebee == nil {
+		m.Chargebee = make(map[string]*chargebee.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := chargebee.NewClient(&chargebee.Config{
+		Site:   connection.Site,
+		APIKey: connection.APIKey,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Chargebee[connection.Name] = client
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 
@@ -3678,6 +3704,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.FacebookAds, connectionManager.AddFacebookAdsConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Stripe, connectionManager.AddStripeConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Paddle, connectionManager.AddPaddleConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Chargebee, connectionManager.AddChargebeeConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.GitLab, connectionManager.AddGitLabConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Appsflyer, connectionManager.AddAppsflyerConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Kafka, connectionManager.AddKafkaConnectionFromConfig, &wg, &errList, &mu)
