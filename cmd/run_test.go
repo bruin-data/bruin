@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -45,6 +46,82 @@ func BenchmarkClean(b *testing.B) {
 		// Clean("\u001B[0m\u001B[94m[2023-12-05 19:11:25] [hello_python] >> [2023-12-05 19:11:25 - INFO] Starting extractor: gcs_bucket_files")
 		Clean("\u001B[0m\u001B[94m[2023-12-05 19:11:26] [hello_python] >>   File \"/Users/burak/.bruin/virtualenvs/77ef9663d804ac96afe6fb2a10d2b2b817a07fd82875759af8910b4fe31a7149/lib/python3.9/site-packages/google/api_core/page_iterator.py\", line 208, in _items_iter")
 	}
+}
+
+func TestBuildStandalonePythonPipelinePlainScript(t *testing.T) {
+	t.Parallel()
+
+	scriptPath := writeStandalonePythonTestScript(t, filepath.Join("scripts", "hello.py"), "print('hello')\n")
+
+	pl, err := buildStandalonePythonPipeline(t.Context(), scriptPath)
+	require.NoError(t, err)
+	require.NotNil(t, pl)
+	require.Len(t, pl.Assets, 1)
+
+	asset := pl.Assets[0]
+	assert.Equal(t, "standalone-python-hello", pl.Name)
+	assert.Equal(t, "hello", asset.Name)
+	assert.Equal(t, pipeline.AssetTypePython, asset.Type)
+	assert.Equal(t, "hello.py", asset.ExecutableFile.Name)
+	assert.Equal(t, "print('hello')", asset.ExecutableFile.Content)
+	assert.Equal(t, asset, pl.TasksByType[pipeline.AssetTypePython][0])
+}
+
+func TestBuildStandalonePythonPipelineUsesBruinMetadata(t *testing.T) {
+	t.Parallel()
+
+	scriptPath := writeStandalonePythonTestScript(t, "script.py", `# @bruin.name: custom_asset
+# @bruin.type: python
+# @bruin.image: python:3.13
+print("hello")
+`)
+
+	pl, err := buildStandalonePythonPipeline(t.Context(), scriptPath)
+	require.NoError(t, err)
+	require.Len(t, pl.Assets, 1)
+
+	asset := pl.Assets[0]
+	assert.Equal(t, "custom_asset", asset.Name)
+	assert.Equal(t, pipeline.AssetTypePython, asset.Type)
+	assert.Equal(t, "python:3.13", asset.Image)
+	assert.Equal(t, `print("hello")`, asset.ExecutableFile.Content)
+}
+
+func TestGetPipelineFallsBackToStandalonePythonScript(t *testing.T) {
+	t.Parallel()
+
+	scriptPath := writeStandalonePythonTestScript(t, "not-in-a-pipeline.py", "print('hello')\n")
+
+	info, err := GetPipeline(t.Context(), scriptPath, &scheduler.RunConfig{}, zaptest.NewLogger(t).Sugar())
+	require.NoError(t, err)
+	require.NotNil(t, info)
+	require.NotNil(t, info.Pipeline)
+
+	assert.True(t, info.RunningForAnAsset)
+	assert.True(t, info.StandalonePythonScript)
+	assert.True(t, info.ValidateOnlyAssetLevel)
+	assert.Equal(t, "not-in-a-pipeline", info.Pipeline.Assets[0].Name)
+}
+
+func TestStandalonePythonAssetIDUsesFullPath(t *testing.T) {
+	t.Parallel()
+
+	firstScript := writeStandalonePythonTestScript(t, filepath.Join("first", "hello.py"), "print('first')\n")
+	secondScript := writeStandalonePythonTestScript(t, filepath.Join("second", "hello.py"), "print('second')\n")
+
+	assert.NotEqual(t, standalonePythonAssetID(firstScript), standalonePythonAssetID(secondScript))
+}
+
+func writeStandalonePythonTestScript(t *testing.T, relPath, content string) string {
+	t.Helper()
+
+	repoRoot := t.TempDir()
+	require.NoError(t, os.Mkdir(filepath.Join(repoRoot, ".git"), 0o755))
+
+	scriptPath := filepath.Join(repoRoot, relPath)
+	require.NoError(t, os.MkdirAll(filepath.Dir(scriptPath), 0o755))
+	require.NoError(t, os.WriteFile(scriptPath, []byte(content), 0o644))
+	return scriptPath
 }
 
 var (
