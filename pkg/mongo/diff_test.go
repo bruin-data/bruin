@@ -171,33 +171,37 @@ func TestParseStatsResult(t *testing.T) {
 	}
 
 	doc := map[string]interface{}{
-		// _id (string) at index 0
-		"0_present":  int32(100),
-		"0_distinct": primitive.A{"a", "b", "c", nil},
-		"0_empty":    int32(0),
-		"0_minlen":   int32(24),
-		"0_maxlen":   int32(24),
-		"0_avglen":   float64(24),
-		// age (numeric) at index 1
-		"1_present": int64(95),
-		"1_min":     int32(18),
-		"1_max":     int32(80),
-		"1_avg":     float64(42.5),
-		"1_sum":     int64(4037),
-		"1_std":     float64(10.1),
-		// active (boolean) at index 2
-		"2_present": int32(100),
-		"2_true":    int32(60),
-		"2_false":   int32(40),
-		// created (datetime) at index 3
-		"3_present":  int32(100),
-		"3_min":      primitive.NewDateTimeFromTime(created),
-		"3_max":      primitive.NewDateTimeFromTime(created.Add(48 * time.Hour)),
-		"3_distinct": primitive.A{primitive.NewDateTimeFromTime(created), primitive.NewDateTimeFromTime(created.Add(48 * time.Hour))},
-		// address (json) at index 4
-		"4_present": int32(90),
-		// blob (binary) at index 5
-		"5_present": int32(10),
+		// Scalar accumulators live in the "stats" $facet branch, keyed by index.
+		"stats": bson.A{bson.M{
+			// _id (string) at index 0
+			"0_present": int32(100),
+			"0_empty":   int32(0),
+			"0_minlen":  int32(24),
+			"0_maxlen":  int32(24),
+			"0_avglen":  float64(24),
+			// age (numeric) at index 1
+			"1_present": int64(95),
+			"1_min":     int32(18),
+			"1_max":     int32(80),
+			"1_avg":     float64(42.5),
+			"1_sum":     int64(4037),
+			"1_std":     float64(10.1),
+			// active (boolean) at index 2
+			"2_present": int32(100),
+			"2_true":    int32(60),
+			"2_false":   int32(40),
+			// created (datetime) at index 3
+			"3_present": int32(100),
+			"3_min":     primitive.NewDateTimeFromTime(created),
+			"3_max":     primitive.NewDateTimeFromTime(created.Add(48 * time.Hour)),
+			// address (json) at index 4
+			"4_present": int32(90),
+			// blob (binary) at index 5
+			"5_present": int32(10),
+		}},
+		// Distinct counts each have their own [..., {$count: "n"}] branch.
+		"0_distinct": bson.A{bson.M{"n": int32(3)}},
+		"3_distinct": bson.A{bson.M{"n": int32(2)}},
 	}
 
 	parseStatsResult(doc, columns, 100)
@@ -244,7 +248,7 @@ func TestParseStatsResultNullNumeric(t *testing.T) {
 
 	// A numeric field that is null/missing in every document yields nil pointers.
 	columns := []*diff.Column{{Name: "x", NormalizedType: diff.CommonTypeNumeric}}
-	doc := map[string]interface{}{"0_present": int32(0)}
+	doc := map[string]interface{}{"stats": bson.A{bson.M{"0_present": int32(0)}}}
 
 	parseStatsResult(doc, columns, 50)
 
@@ -254,6 +258,47 @@ func TestParseStatsResultNullNumeric(t *testing.T) {
 	assert.Equal(t, int64(50), stats.NullCount)
 	assert.Nil(t, stats.Min)
 	assert.Nil(t, stats.Avg)
+}
+
+func TestGetTimePtr(t *testing.T) {
+	t.Parallel()
+
+	when := time.Date(2024, 3, 4, 5, 6, 7, 0, time.UTC)
+
+	// BSON date.
+	got := getTimePtr(primitive.NewDateTimeFromTime(when))
+	require.NotNil(t, got)
+	assert.Equal(t, when, got.UTC())
+
+	// BSON timestamp: seconds since the epoch are carried in T.
+	ts := getTimePtr(primitive.Timestamp{T: uint32(when.Unix()), I: 1})
+	require.NotNil(t, ts)
+	assert.Equal(t, when, ts.UTC())
+
+	// Unrelated types yield nil.
+	assert.Nil(t, getTimePtr("not a time"))
+	assert.Nil(t, getTimePtr(nil))
+}
+
+func TestFacetCount(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, int64(7), facetCount(bson.A{bson.M{"n": int32(7)}}))
+	// An empty branch (no matching documents) means zero distinct values.
+	assert.Equal(t, int64(0), facetCount(bson.A{}))
+	assert.Equal(t, int64(0), facetCount(nil))
+}
+
+func TestDistinctExpr(t *testing.T) {
+	t.Parallel()
+
+	_, ok := distinctExpr(&diff.Column{Name: "name", NormalizedType: diff.CommonTypeString})
+	assert.True(t, ok)
+	_, ok = distinctExpr(&diff.Column{Name: "created", NormalizedType: diff.CommonTypeDateTime})
+	assert.True(t, ok)
+	// Numeric, boolean and json columns do not carry a distinct count.
+	_, ok = distinctExpr(&diff.Column{Name: "age", NormalizedType: diff.CommonTypeNumeric})
+	assert.False(t, ok)
 }
 
 func TestBuildSchemaPipeline(t *testing.T) {
@@ -280,11 +325,26 @@ func TestBuildStatsPipeline(t *testing.T) {
 
 	pipeline := buildStatsPipeline(columns, 0)
 	require.Len(t, pipeline, 1)
-	group := pipeline[0].(bson.D)
-	assert.Equal(t, "$group", group[0].Key)
+	facet := pipeline[0].(bson.D)
+	assert.Equal(t, "$facet", facet[0].Key)
+
+	// The facet carries the scalar "stats" branch plus one distinct-count branch
+	// for the string column (index 1); the numeric column has no distinct branch.
+	branches := facet[0].Value.(bson.D)
+	keys := make([]string, len(branches))
+	for i, b := range branches {
+		keys[i] = b.Key
+	}
+	assert.Equal(t, []string{"stats", "1_distinct"}, keys)
+
+	// The distinct branch ends in a $count stage so it returns only a number.
+	distinct := branches[1].Value.(bson.A)
+	last := distinct[len(distinct)-1].(bson.D)
+	assert.Equal(t, "$count", last[0].Key)
 
 	// With sampling: leading $sample stage.
 	sampled := buildStatsPipeline(columns, 100)
 	require.Len(t, sampled, 2)
 	assert.Equal(t, "$sample", sampled[0].(bson.D)[0].Key)
+	assert.Equal(t, "$facet", sampled[1].(bson.D)[0].Key)
 }

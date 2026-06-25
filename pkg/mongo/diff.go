@@ -23,8 +23,9 @@ var mongoTypeMapper = diff.NewMongoTypeMapper()
 // BSON type groupings used both for type inference and for coercing values when
 // computing statistics. They mirror the categories in NewMongoTypeMapper.
 var (
-	numericBSONTypes = []string{"double", "int", "long", "decimal"}
-	stringBSONTypes  = []string{"string", "objectId"}
+	numericBSONTypes  = []string{"double", "int", "long", "decimal"}
+	stringBSONTypes   = []string{"string", "objectId"}
+	datetimeBSONTypes = []string{"date", "timestamp"}
 )
 
 // GetTableSummary implements diff.TableSummarizer for MongoDB collections. The
@@ -259,9 +260,13 @@ func dominantType(counts map[string]int64) string {
 
 // ---- statistics ------------------------------------------------------------
 
-// buildStatsPipeline builds a single $group that computes, for every column, the
-// statistics appropriate to its inferred type. Each column's accumulators are
-// keyed by its positional index to avoid any clash with user field names.
+// buildStatsPipeline builds a $facet that computes, for every column, the
+// statistics appropriate to its inferred type. A single "stats" branch holds the
+// scalar accumulators (keyed by positional index to avoid clashing with user
+// field names). Distinct counts get their own branch per column: rather than
+// accumulating every distinct value into one array (which can exceed MongoDB's
+// 16 MB document limit on large collections), each branch groups by value and
+// returns only the count.
 func buildStatsPipeline(columns []*diff.Column, sampleSize int64) bson.A {
 	group := make(bson.D, 0, 1+len(columns)*6)
 	group = append(group, bson.E{Key: "_id", Value: nil})
@@ -269,12 +274,42 @@ func buildStatsPipeline(columns []*diff.Column, sampleSize int64) bson.A {
 		group = append(group, statAccumulators(i, col)...)
 	}
 
+	facet := make(bson.D, 0, 1+len(columns))
+	facet = append(facet, bson.E{Key: "stats", Value: bson.A{bson.D{{Key: "$group", Value: group}}}})
+	for i, col := range columns {
+		expr, ok := distinctExpr(col)
+		if !ok {
+			continue
+		}
+		facet = append(facet, bson.E{Key: strconv.Itoa(i) + "_distinct", Value: bson.A{
+			bson.D{{Key: "$group", Value: bson.D{{Key: "_id", Value: expr}}}},
+			bson.D{{Key: "$match", Value: bson.D{{Key: "_id", Value: bson.D{{Key: "$ne", Value: nil}}}}}},
+			bson.D{{Key: "$count", Value: "n"}},
+		}})
+	}
+
 	pipeline := bson.A{}
 	if sampleSize > 0 {
 		pipeline = append(pipeline, bson.D{{Key: "$sample", Value: bson.D{{Key: "size", Value: sampleSize}}}})
 	}
-	pipeline = append(pipeline, bson.D{{Key: "$group", Value: group}})
+	pipeline = append(pipeline, bson.D{{Key: "$facet", Value: facet}})
 	return pipeline
+}
+
+// distinctExpr returns the value expression whose distinct, non-null count is
+// tracked for a column, and whether the column has one. Only string and datetime
+// columns carry a distinct count; the expression matches the coercion used for
+// the column's other statistics so the count covers the same values.
+func distinctExpr(col *diff.Column) (bson.D, bool) {
+	fieldRef := "$" + col.Name
+	switch col.NormalizedType {
+	case diff.CommonTypeString:
+		return stringCoerce(fieldRef), true
+	case diff.CommonTypeDateTime:
+		return coerce(fieldRef, datetimeBSONTypes), true
+	default:
+		return nil, false
+	}
 }
 
 func statAccumulators(i int, col *diff.Column) []bson.E {
@@ -302,7 +337,6 @@ func statAccumulators(i int, col *diff.Column) []bson.E {
 		}}}
 		return []bson.E{
 			present,
-			{Key: p + "_distinct", Value: accumulator("$addToSet", str)},
 			{Key: p + "_empty", Value: sum(ifThen(eq(str, ""), 1, 0))},
 			{Key: p + "_minlen", Value: accumulator("$min", strLen)},
 			{Key: p + "_maxlen", Value: accumulator("$max", strLen)},
@@ -315,12 +349,11 @@ func statAccumulators(i int, col *diff.Column) []bson.E {
 			{Key: p + "_false", Value: sum(ifThen(eq(fieldRef, false), 1, 0))},
 		}
 	case diff.CommonTypeDateTime:
-		dt := coerce(fieldRef, []string{"date"})
+		dt := coerce(fieldRef, datetimeBSONTypes)
 		return []bson.E{
 			present,
 			{Key: p + "_min", Value: accumulator("$min", dt)},
 			{Key: p + "_max", Value: accumulator("$max", dt)},
-			{Key: p + "_distinct", Value: accumulator("$addToSet", dt)},
 		}
 	default:
 		// json, binary and unknown types only track presence.
@@ -351,9 +384,10 @@ func runStats(ctx context.Context, coll *mongo.Collection, columns []*diff.Colum
 // computed over; Count is reported as scanned and NullCount as the documents that
 // were missing or null for that field, mirroring the SQL summarizers.
 func parseStatsResult(doc bson.M, columns []*diff.Column, scanned int64) {
+	stats := firstFacetDoc(doc["stats"])
 	for i, col := range columns {
 		p := strconv.Itoa(i)
-		present := getInt64(doc[p+"_present"])
+		present := getInt64(stats[p+"_present"])
 		nullCount := scanned - present
 
 		switch col.NormalizedType {
@@ -361,36 +395,36 @@ func parseStatsResult(doc bson.M, columns []*diff.Column, scanned int64) {
 			col.Stats = &diff.NumericalStatistics{
 				Count:     scanned,
 				NullCount: nullCount,
-				Min:       getFloatPtr(doc[p+"_min"]),
-				Max:       getFloatPtr(doc[p+"_max"]),
-				Avg:       getFloatPtr(doc[p+"_avg"]),
-				Sum:       getFloatPtr(doc[p+"_sum"]),
-				StdDev:    getFloatPtr(doc[p+"_std"]),
+				Min:       getFloatPtr(stats[p+"_min"]),
+				Max:       getFloatPtr(stats[p+"_max"]),
+				Avg:       getFloatPtr(stats[p+"_avg"]),
+				Sum:       getFloatPtr(stats[p+"_sum"]),
+				StdDev:    getFloatPtr(stats[p+"_std"]),
 			}
 		case diff.CommonTypeString:
 			col.Stats = &diff.StringStatistics{
 				Count:         scanned,
 				NullCount:     nullCount,
-				DistinctCount: distinctCount(doc[p+"_distinct"]),
-				EmptyCount:    getInt64(doc[p+"_empty"]),
-				MinLength:     int(getInt64(doc[p+"_minlen"])),
-				MaxLength:     int(getInt64(doc[p+"_maxlen"])),
-				AvgLength:     getFloat(doc[p+"_avglen"]),
+				DistinctCount: facetCount(doc[p+"_distinct"]),
+				EmptyCount:    getInt64(stats[p+"_empty"]),
+				MinLength:     int(getInt64(stats[p+"_minlen"])),
+				MaxLength:     int(getInt64(stats[p+"_maxlen"])),
+				AvgLength:     getFloat(stats[p+"_avglen"]),
 			}
 		case diff.CommonTypeBoolean:
 			col.Stats = &diff.BooleanStatistics{
 				Count:      scanned,
 				NullCount:  nullCount,
-				TrueCount:  getInt64(doc[p+"_true"]),
-				FalseCount: getInt64(doc[p+"_false"]),
+				TrueCount:  getInt64(stats[p+"_true"]),
+				FalseCount: getInt64(stats[p+"_false"]),
 			}
 		case diff.CommonTypeDateTime:
 			col.Stats = &diff.DateTimeStatistics{
 				Count:        scanned,
 				NullCount:    nullCount,
-				UniqueCount:  distinctCount(doc[p+"_distinct"]),
-				EarliestDate: getTimePtr(doc[p+"_min"]),
-				LatestDate:   getTimePtr(doc[p+"_max"]),
+				UniqueCount:  facetCount(doc[p+"_distinct"]),
+				EarliestDate: getTimePtr(stats[p+"_min"]),
+				LatestDate:   getTimePtr(stats[p+"_max"]),
 			}
 		case diff.CommonTypeJSON:
 			col.Stats = &diff.JSONStatistics{
@@ -508,6 +542,10 @@ func getTimePtr(v interface{}) *time.Time {
 	case primitive.DateTime:
 		tm := t.Time().UTC()
 		return &tm
+	case primitive.Timestamp:
+		// BSON timestamps carry seconds since the Unix epoch in T.
+		tm := time.Unix(int64(t.T), 0).UTC()
+		return &tm
 	case time.Time:
 		tm := t.UTC()
 		return &tm
@@ -516,18 +554,21 @@ func getTimePtr(v interface{}) *time.Time {
 	}
 }
 
-// distinctCount counts the non-null entries of an $addToSet result.
-func distinctCount(v interface{}) int64 {
-	arr, ok := v.(primitive.A)
-	if !ok {
-		return 0
+// firstFacetDoc returns the first document of a $facet sub-pipeline result, or an
+// empty document when the branch produced no rows.
+func firstFacetDoc(v interface{}) bson.M {
+	arr, ok := v.(bson.A)
+	if !ok || len(arr) == 0 {
+		return bson.M{}
 	}
-	var count int64
-	for _, item := range arr {
-		if item == nil {
-			continue
-		}
-		count++
+	if m, ok := arr[0].(bson.M); ok {
+		return m
 	}
-	return count
+	return bson.M{}
+}
+
+// facetCount reads the {n: <count>} document produced by a [..., {$count: "n"}]
+// $facet sub-pipeline. A branch that matched no documents yields 0.
+func facetCount(v interface{}) int64 {
+	return getInt64(firstFacetDoc(v)["n"])
 }
