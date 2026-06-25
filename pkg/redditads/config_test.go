@@ -23,13 +23,23 @@ func TestConfig_GetIngestrURI(t *testing.T) {
 			expected: "redditads://?access_token=token_123",
 		},
 		{
-			name: "with oauth app credentials",
+			name: "incomplete oauth credentials are not forwarded",
 			config: Config{
 				AccessToken:  "token_123",
 				ClientID:     "cid",
 				ClientSecret: "csec",
 			},
-			expected: "redditads://?access_token=token_123&client_id=cid&client_secret=csec",
+			expected: "redditads://?access_token=token_123",
+		},
+		{
+			name: "access token with complete oauth credentials",
+			config: Config{
+				AccessToken:  "token_123",
+				ClientID:     "cid",
+				ClientSecret: "csec",
+				RefreshToken: "rtok",
+			},
+			expected: "redditads://?access_token=token_123&client_id=cid&client_secret=csec&refresh_token=rtok",
 		},
 		{
 			name: "with refresh credentials and no access token",
