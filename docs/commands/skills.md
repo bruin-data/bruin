@@ -11,7 +11,7 @@ Use `bruin skills init` to install or update bundled skills under the repository
 - If both exist as separate directories, `.agents/skills` is the primary location and `.claude/skills/<skill>` is symlinked to it.
 - If neither exists, Bruin creates `.agents/skills`.
 
-Existing bundled skills are updated only when their `SKILL.md` frontmatter has an older `version` value. Newer local versions are left unchanged.
+Existing bundled skills are updated when their installed files differ from the bundled Bruin skill content. Updates cleanly rewrite the skill directory, which removes stale files from older bundled skill definitions.
 
 ## Usage
 
@@ -41,5 +41,5 @@ Example output:
 
 ```plaintext
 Bruin skills initialized in /path/to/repo/.agents/skills
-- installed bruin-semantic-layer v1.1.0
+- installed bruin-semantic-layer
 ```

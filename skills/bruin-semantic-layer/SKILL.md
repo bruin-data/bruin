@@ -1,7 +1,6 @@
 ---
 name: bruin-semantic-layer
 description: Use when creating, editing, reviewing, or troubleshooting Bruin semantic layer models, semantic query CLI usage, metric and dimension definitions, joins, segments, filters, windows, or semantic-layer tests and docs in a Bruin repository.
-version: 1.1.0
 ---
 
 # Bruin Semantic Layer
