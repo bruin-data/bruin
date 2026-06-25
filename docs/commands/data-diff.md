@@ -129,6 +129,8 @@ The command generates several detailed tables:
 
 When schema differences are detected, the command automatically generates ALTER TABLE SQL statements to synchronize the schemas. These statements are output to stdout (separate from the comparison tables which go to stderr), making it easy to capture and review them.
 
+ALTER TABLE statements are only generated for sources with a fixed, DDL-managed schema. They are skipped when either side is a schemaless source such as MongoDB, where there is no schema to alter (see [MongoDB Collections](#mongodb-collections)).
+
 The generated statements can:
 
 - Add missing columns
@@ -273,6 +275,7 @@ MongoDB has no fixed schema, so for MongoDB connections the `data-diff` command 
 - **Identifier format:** Use the collection name (resolved against the connection's `database`), or qualify it as `database.collection` to compare across databases — e.g. `mongo:users` or `mongo:analytics.events`.
 - **Top-level fields only:** Nested documents and arrays are compared as `object`/`array` (JSON) fields — count and fill rate — rather than being flattened into dotted paths. `ObjectId` fields (such as `_id`) are compared as strings.
 - **Sampling large collections:** A full scan is exact but can be expensive on very large collections. Pass `--sample N` to base type inference and statistics on at most `N` randomly sampled documents instead. Row counts always reflect the true collection size; per-column statistics become approximate when sampling.
+- **No ALTER TABLE statements:** Because collections have no fixed schema to alter, the [ALTER TABLE generation](#alter-table-statement-generation) (and the `--target-dialect` / `--reverse` flags) is skipped whenever either side is a MongoDB collection. The schema and statistics comparison tables are still produced.
 
 ```bash
 # Compare two collections in the connection's default database

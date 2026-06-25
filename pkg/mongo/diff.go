@@ -38,6 +38,11 @@ func (db *DB) GetTableSummary(ctx context.Context, tableName string, schemaOnly 
 	return BuildTableSummary(ctx, db.client, db.config.Database, tableName, schemaOnly, diff.SampleSizeFromContext(ctx))
 }
 
+// IsSchemaless reports that MongoDB has no fixed, catalog-defined schema; the
+// schema is inferred from documents. It implements diff.SchemalessSummarizer so
+// data-diff skips ALTER TABLE statement generation for MongoDB sources.
+func (db *DB) IsSchemaless() bool { return true }
+
 // BuildTableSummary produces a diff.TableSummaryResult for a MongoDB collection.
 // MongoDB has no static schema, so the field set, types and nullability are
 // inferred by scanning the documents. When sampleSize > 0 at most that many

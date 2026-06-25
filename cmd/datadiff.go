@@ -66,6 +66,14 @@ func compareTables(ctx context.Context, summarizer1, summarizer2 diff.TableSumma
 	return &result, nil
 }
 
+// isSchemalessConnection reports whether a connection's schema is inferred from
+// its data rather than declared in a catalog (e.g. MongoDB). ALTER TABLE
+// statements are not generated for such connections.
+func isSchemalessConnection(conn any) bool {
+	s, ok := conn.(diff.SchemalessSummarizer)
+	return ok && s.IsSchemaless()
+}
+
 // generateAlterStatements generates ALTER TABLE SQL statements based on schema comparison.
 func generateAlterStatements(schemaComparison diff.SchemaComparisonResult, conn1Name, conn2Name, targetDialect string, reverse bool) []string {
 	var dialect diff.DatabaseDialect
@@ -355,9 +363,11 @@ func DataDiffCmd() *cli.Command {
 			}
 
 			if schemaComparison != nil {
-				// Generate ALTER TABLE statements
+				// Generate ALTER TABLE statements, unless either side is a
+				// schemaless source (e.g. MongoDB) where DDL is meaningless.
+				ddlSupported := !isSchemalessConnection(conn1) && !isSchemalessConnection(conn2)
 				var alterStatements []string
-				if schemaComparison.HasSchemaDifferences {
+				if schemaComparison.HasSchemaDifferences && ddlSupported {
 					alterStatements = generateAlterStatements(*schemaComparison, conn1Name, conn2Name, targetDialect, reverse)
 				}
 
