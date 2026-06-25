@@ -8,7 +8,6 @@ import (
 	"time"
 
 	dataproc "cloud.google.com/go/dataproc/v2/apiv1"
-	"cloud.google.com/go/logging/logadmin"
 	"cloud.google.com/go/storage"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/env"
@@ -62,12 +61,6 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 	}
 	defer storageClient.Close()
 
-	logClient, err := logadmin.NewClient(ctx, conn.ProjectID, clientOptions...)
-	if err != nil {
-		return fmt.Errorf("error creating logging client: %w", err)
-	}
-	defer logClient.Close()
-
 	envVars, err := env.SetupVariables(ctx, ti.GetPipeline(), asset, cloneEnv(op.env))
 	if err != nil {
 		return fmt.Errorf("error setting up environment variables: %w", err)
@@ -77,7 +70,6 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 		logger:        logger,
 		batchClient:   batchClient,
 		storageClient: storageClient,
-		logClient:     logClient,
 		params:        params,
 		asset:         asset,
 		pipeline:      ti.GetPipeline(),
