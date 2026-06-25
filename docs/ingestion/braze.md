@@ -51,10 +51,17 @@ parameters:
 | Table | PK | Inc Key | Inc Strategy | Details |
 |-------|----|---------|--------------| ------- |
 | `campaigns` | id | last_edited | merge | Marketing campaigns (including archived) with their name, tags, and API flags. |
+| `campaign_series` | time, campaign_id | time | merge | Daily per-campaign stats (conversions, revenue, unique recipients; per-channel detail in a `messages` column). Fetches all campaigns by default; an optional `campaign_series:<id>[,<id>]` filter limits it. |
 | `canvases` | id | last_edited | merge | Canvas (journey) definitions (including archived) with their name and tags. |
+| `canvas_series` | time, canvas_id | time | merge | Daily per-canvas (journey) stats (entries, conversions, revenue). Fetches all canvases by default; an optional `canvas_series:<id>[,<id>]` filter limits it. |
 | `segments` | id | - | replace | Audience segments with their name and analytics-tracking flag. |
-| `events` | event_name | - | replace | Names of the custom events tracked in the workspace. |
+| `segment_series` | time, segment_id | time | merge | Daily size per segment. Fetches all segments by default; an optional `segment_series:<id>[,<id>]` filter limits it. |
+| `events` | name | - | replace | Custom events catalog: name, description, status, tags, and analytics-report flag. |
+| `event_series` | time, event_name | time | merge | Daily occurrence count per custom event. Fetches all events by default; an optional `event_series:<name>[,<name>]` filter limits it. |
 | `products` | product_id | - | replace | Product IDs seen in purchase events. |
+| `sessions` | time | time | merge | Daily session count. |
+| `purchase_quantity` | time | time | merge | Daily total number of purchases. |
+| `purchase_revenue` | time | time | merge | Daily total revenue. |
 | `kpi_dau` | time | time | merge | Daily active users by date. |
 | `kpi_mau` | time | time | merge | Monthly active users (rolling 30-day) by date. |
 | `kpi_new_users` | time | time | merge | New users by date. |
@@ -67,6 +74,9 @@ The `user_data` table exports segment users along with their subscription state.
 
 > [!WARNING]
 > Exporting all segments runs one async export per segment (each can take minutes to materialize) and can produce a very large, heavily duplicated dataset (the same user appears in every segment they belong to). Prefer naming the specific segments you need.
+
+> [!NOTE]
+> The `events` table now uses the `name` column as its primary key (previously `event_name`). If you ingested `events` before this change, drop the destination table once so it is recreated with the new column.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 
