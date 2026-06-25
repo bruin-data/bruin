@@ -1009,9 +1009,15 @@ func TestValidateIngestrImportFlags(t *testing.T) {
 		wantErr     string
 	}{
 		{
-			name:        "not as-ingestr ignores destination",
+			name:        "not as-ingestr with no destination is fine",
 			asIngestr:   false,
 			destination: "",
+		},
+		{
+			name:        "destination without as-ingestr is rejected",
+			asIngestr:   false,
+			destination: "duckdb",
+			wantErr:     "--destination has no effect without --as-ingestr",
 		},
 		{
 			name:      "as-ingestr requires destination",

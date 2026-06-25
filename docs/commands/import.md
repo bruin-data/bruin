@@ -99,7 +99,8 @@ parameters:
 
 Running the pipeline (`bruin run ./my-pipeline`) then replicates every collection into the destination via ingestr. The destination *connection* is resolved from the pipeline's default connection for that platform. Notes:
 
-- `--destination` is **required** with `--as-ingestr` and must be a supported ingestr destination (e.g. `duckdb`, `postgres`, `bigquery`, `snowflake`, `redshift`, `clickhouse`).
+- `--destination` is **required** with `--as-ingestr` and must be a supported ingestr destination (e.g. `duckdb`, `postgres`, `bigquery`, `snowflake`, `redshift`, `clickhouse`). Passing `--destination` without `--as-ingestr` is rejected so a forgotten `--as-ingestr` does not silently produce `mongo.source` placeholders.
+- Re-running the import skips collections whose assets already exist (it never overwrites them); the summary reports how many were skipped.
 - `--as-ingestr` is currently **MongoDB only**; using it with a non-MongoDB connection is rejected. In the interactive TUI (when `--connection` is omitted) only MongoDB connections are offered.
 - The asset name and file path are lowercased, but `source_table` preserves the original database/collection casing because MongoDB identifiers are case-sensitive.
 

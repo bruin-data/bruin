@@ -142,9 +142,14 @@ func ImportDatabase(isDebug *bool) *cli.Command {
 
 // validateIngestrImportFlags validates the --as-ingestr / --destination flag
 // combination. The destination is required (and must be a known ingestr
-// destination platform) so the generated ingestr assets are runnable.
+// destination platform) so the generated ingestr assets are runnable, and it
+// is rejected without --as-ingestr so a forgotten --as-ingestr does not
+// silently fall back to plain source placeholders.
 func validateIngestrImportFlags(asIngestr bool, destination string) error {
 	if !asIngestr {
+		if destination != "" {
+			return errors.New("--destination has no effect without --as-ingestr")
+		}
 		return nil
 	}
 
@@ -389,6 +394,7 @@ func runImport(ctx context.Context, log logger.Logger, pipelinePath, connectionN
 
 	totalTables := 0
 	mergedTableCount := 0
+	skippedTableCount := 0
 	var warnings []importWarning
 
 	for _, schemaObj := range summary.Schemas {
@@ -425,6 +431,11 @@ func runImport(ctx context.Context, log logger.Logger, pipelinePath, connectionN
 				}
 				existingAssets[assetName] = createdAsset
 				totalTables++
+			} else if asIngestr {
+				// ingestr assets carry no columns, so there is nothing to merge
+				// into an existing asset; skip it without re-persisting to avoid
+				// a misleading "Merged" count on re-runs.
+				skippedTableCount++
 			} else {
 				existingAsset := existingAssets[assetName]
 				existingColumns := make(map[string]pipeline.Column, len(existingAsset.Columns))
@@ -454,6 +465,10 @@ func runImport(ctx context.Context, log logger.Logger, pipelinePath, connectionN
 
 	fmt.Printf("Imported %d tables and Merged %d from data warehouse '%s'%s into pipeline '%s'\n",
 		totalTables, mergedTableCount, summary.Name, filterDesc, pipelinePath)
+
+	if skippedTableCount > 0 {
+		fmt.Printf("Skipped %d existing assets (already present in the pipeline)\n", skippedTableCount)
+	}
 
 	if len(warnings) > 0 {
 		fmt.Printf("\nWarnings encountered during import (%d tables affected):\n", len(warnings))
