@@ -10,7 +10,6 @@ tool (
 require (
 	cloud.google.com/go/bigquery v1.72.0
 	cloud.google.com/go/dataproc/v2 v2.11.2
-	cloud.google.com/go/logging v1.13.0
 	cloud.google.com/go/longrunning v0.6.7
 	cloud.google.com/go/storage v1.56.0
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.18.0
