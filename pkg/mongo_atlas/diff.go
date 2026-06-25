@@ -16,3 +16,8 @@ func (db *DB) GetTableSummary(ctx context.Context, tableName string, schemaOnly 
 	}
 	return bruinmongo.BuildTableSummary(ctx, db.client, db.config.Database, tableName, schemaOnly, diff.SampleSizeFromContext(ctx))
 }
+
+// IsSchemaless reports that MongoDB Atlas has no fixed, catalog-defined schema;
+// the schema is inferred from documents. It implements diff.SchemalessSummarizer
+// so data-diff skips ALTER TABLE statement generation for MongoDB Atlas sources.
+func (db *DB) IsSchemaless() bool { return true }
