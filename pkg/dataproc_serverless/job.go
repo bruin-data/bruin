@@ -383,7 +383,8 @@ func (job Job) drainLogs(ctx context.Context, jobLogs LogConsumer) []LogLine {
 
 	lines := []LogLine{}
 	emptyRounds := 0
-	for i := 0; i < maxRounds; i++ {
+drain:
+	for range maxRounds {
 		batch := jobLogs.Next()
 		lines = append(lines, batch...)
 
@@ -398,11 +399,13 @@ func (job Job) drainLogs(ctx context.Context, jobLogs LogConsumer) []LogLine {
 
 		select {
 		case <-ctx.Done():
-			i = maxRounds
+			break drain
 		case <-time.After(graceWait):
 		}
 	}
 
+	// Flush drains any buffered partial line; it works even if ctx is already
+	// cancelled because it falls back to the in-memory buffers.
 	return append(lines, jobLogs.Flush()...)
 }
 

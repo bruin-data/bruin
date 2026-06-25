@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSplitLines(t *testing.T) {
@@ -110,5 +111,50 @@ func TestGCSLogConsumer_SetOutputURI(t *testing.T) {
 		c := newGCSLogConsumer(t.Context(), nil)
 		assert.Nil(t, c.Next())
 		assert.Nil(t, c.Flush())
+	})
+}
+
+// TestGCSLogConsumer_DrainBuffers covers the buffer-draining path that runs
+// regardless of GCS access. This is what guarantees a final Flush emits any
+// buffered partial line even when the object listing fails (e.g. the context
+// has been cancelled).
+func TestGCSLogConsumer_DrainBuffers(t *testing.T) {
+	t.Parallel()
+
+	t.Run("emits complete lines in lexical order, keeps partial tail", func(t *testing.T) {
+		t.Parallel()
+		c := newGCSLogConsumer(t.Context(), nil)
+		c.partial = map[string][]byte{
+			"driveroutput.000000001": []byte("two\n"),
+			"driveroutput.000000000": []byte("one\npartial"),
+		}
+
+		lines := c.drainBuffers(false)
+
+		got := make([]string, len(lines))
+		for i, l := range lines {
+			assert.Equal(t, "DRIVER", l.Source)
+			got[i] = l.Message
+		}
+		assert.Equal(t, []string{"one", "two"}, got)
+		// The non-terminated tail is held back for a later read.
+		assert.Equal(t, "partial", string(c.partial["driveroutput.000000000"]))
+		// A fully consumed buffer is dropped.
+		_, ok := c.partial["driveroutput.000000001"]
+		assert.False(t, ok)
+	})
+
+	t.Run("flush emits the buffered partial tail without touching GCS", func(t *testing.T) {
+		t.Parallel()
+		c := newGCSLogConsumer(t.Context(), nil)
+		c.partial = map[string][]byte{"driveroutput.000000000": []byte("last line no newline")}
+
+		// drainBuffers is the GCS-free path read() falls through to; on a final
+		// Flush it must emit the buffered partial even when the listing failed.
+		lines := c.drainBuffers(true)
+
+		require.Len(t, lines, 1)
+		assert.Equal(t, "last line no newline", lines[0].Message)
+		assert.Empty(t, c.partial)
 	})
 }

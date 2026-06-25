@@ -87,9 +87,14 @@ func (l *GCSLogConsumer) read(flush bool) []LogLine {
 	bucket := l.storageClient.Bucket(l.bucket)
 
 	// Driver output is split across objects named "<prefix>.000000000",
-	// "<prefix>.000000001", ... Read them in lexical order, which matches the
-	// order in which Dataproc writes them.
-	names := []string{}
+	// "<prefix>.000000001", ... List them and pull any new bytes into the
+	// per-object buffers. The listing already reports each object's size, so we
+	// avoid a second Attrs call per object on every poll.
+	//
+	// Listing is best-effort: if it fails (e.g. the context was cancelled), we
+	// still fall through to drainBuffers so that any bytes already buffered are
+	// emitted — in particular a final Flush must never drop a buffered partial
+	// line just because the listing failed.
 	it := bucket.Objects(l.ctx, &storage.Query{Prefix: l.prefix})
 	for {
 		attrs, err := it.Next()
@@ -97,38 +102,55 @@ func (l *GCSLogConsumer) read(flush bool) []LogLine {
 			break
 		}
 		if err != nil {
-			// Listing is best-effort; try again on the next poll.
 			break
 		}
-		names = append(names, attrs.Name)
+		l.fetch(bucket, attrs.Name, attrs.Size)
+	}
+
+	return l.drainBuffers(flush)
+}
+
+// fetch reads the bytes appended to an output object since the last read into
+// the per-object buffer, advancing the object's offset.
+func (l *GCSLogConsumer) fetch(bucket *storage.BucketHandle, name string, size int64) {
+	off := l.offsets[name]
+	if size <= off {
+		return
+	}
+
+	reader, err := bucket.Object(name).NewRangeReader(l.ctx, off, -1)
+	if err != nil {
+		return
+	}
+	defer reader.Close()
+
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return
+	}
+
+	l.offsets[name] = off + int64(len(data))
+	l.partial[name] = append(l.partial[name], data...)
+}
+
+// drainBuffers emits complete lines from every buffered object in lexical order
+// (which matches the order Dataproc writes them). It does not touch GCS, so it
+// always flushes whatever is buffered regardless of listing failures.
+func (l *GCSLogConsumer) drainBuffers(flush bool) []LogLine {
+	names := make([]string, 0, len(l.partial))
+	for name := range l.partial {
+		names = append(names, name)
 	}
 	sort.Strings(names)
 
 	lines := []LogLine{}
 	for _, name := range names {
-		off := l.offsets[name]
-		obj := bucket.Object(name)
-
-		attrs, err := obj.Attrs(l.ctx)
-		if err != nil {
-			continue
-		}
-		if attrs.Size > off {
-			reader, err := obj.NewRangeReader(l.ctx, off, -1)
-			if err != nil {
-				continue
-			}
-			data, err := io.ReadAll(reader)
-			reader.Close()
-			if err != nil {
-				continue
-			}
-			l.offsets[name] = off + int64(len(data))
-			l.partial[name] = append(l.partial[name], data...)
-		}
-
 		complete, rest := splitLines(l.partial[name], flush)
-		l.partial[name] = rest
+		if len(rest) == 0 {
+			delete(l.partial, name)
+		} else {
+			l.partial[name] = rest
+		}
 		for _, msg := range complete {
 			lines = append(lines, LogLine{Source: "DRIVER", Message: msg})
 		}
