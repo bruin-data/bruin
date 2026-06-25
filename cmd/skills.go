@@ -6,7 +6,6 @@ import (
 	iofs "io/fs"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/git"
@@ -24,13 +23,11 @@ const (
 	skillStatusInstalled = "installed"
 	skillStatusUpdated   = "updated"
 	skillStatusCurrent   = "current"
-	skillStatusNewer     = "newer"
 )
 
 type bundledSkill struct {
-	Name    string
-	Version string
-	Files   []bundledSkillFile
+	Name  string
+	Files []bundledSkillFile
 }
 
 type bundledSkillFile struct {
@@ -41,7 +38,6 @@ type bundledSkillFile struct {
 type skillFrontmatter struct {
 	Name        string `yaml:"name"`
 	Description string `yaml:"description"`
-	Version     string `yaml:"version"`
 }
 
 type skillInstallPlan struct {
@@ -59,12 +55,10 @@ type SkillsInitResult struct {
 }
 
 type SkillInstallResult struct {
-	Name            string
-	Version         string
-	Path            string
-	Status          string
-	PreviousVersion string
-	Links           []string
+	Name   string
+	Path   string
+	Status string
+	Links  []string
 }
 
 func loadBundledBruinSkills() ([]bundledSkill, error) {
@@ -113,13 +107,8 @@ func loadBundledSkill(dir string) (bundledSkill, error) {
 	if metadata.Name != dir {
 		return bundledSkill{}, fmt.Errorf("bundled skill directory %q does not match frontmatter name %q", dir, metadata.Name)
 	}
-	if metadata.Version == "" {
-		return bundledSkill{}, fmt.Errorf("bundled skill %s is missing frontmatter version", skillFile)
-	}
-
 	skill := bundledSkill{
-		Name:    metadata.Name,
-		Version: metadata.Version,
+		Name: metadata.Name,
 	}
 	err = iofs.WalkDir(bundledskills.Files, dir, func(path string, d iofs.DirEntry, err error) error {
 		if err != nil {
@@ -331,20 +320,18 @@ func sameAgentHome(left, right string) (bool, error) {
 
 func installBundledSkill(skillsDir string, skill bundledSkill) (SkillInstallResult, error) {
 	skillPath := filepath.Join(skillsDir, skill.Name)
-	status, previousVersion, err := bundledSkillStatus(skillPath, skill)
+	status, err := bundledSkillStatus(skillPath, skill)
 	if err != nil {
 		return SkillInstallResult{}, err
 	}
 
 	result := SkillInstallResult{
-		Name:            skill.Name,
-		Version:         skill.Version,
-		Path:            skillPath,
-		Status:          status,
-		PreviousVersion: previousVersion,
+		Name:   skill.Name,
+		Path:   skillPath,
+		Status: status,
 	}
 
-	if status == skillStatusCurrent || status == skillStatusNewer {
+	if status == skillStatusCurrent {
 		return result, nil
 	}
 
@@ -376,40 +363,86 @@ func installBundledSkill(skillsDir string, skill bundledSkill) (SkillInstallResu
 	return result, nil
 }
 
-func bundledSkillStatus(skillPath string, skill bundledSkill) (string, string, error) {
+func bundledSkillStatus(skillPath string, skill bundledSkill) (string, error) {
 	exists, err := pathExists(skillPath)
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
 	if !exists {
-		return skillStatusInstalled, "", nil
+		return skillStatusInstalled, nil
 	}
 
 	metadata, hasMetadata, err := readSkillFrontmatter(filepath.Join(skillPath, "SKILL.md"))
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
 	if hasMetadata && metadata.Name != "" && metadata.Name != skill.Name {
-		return "", "", fmt.Errorf("refusing to overwrite %s: existing skill name is %q", skillPath, metadata.Name)
+		return "", fmt.Errorf("refusing to overwrite %s: existing skill name is %q", skillPath, metadata.Name)
 	}
 
-	if metadata.Version == "" {
-		return skillStatusUpdated, "", nil
-	}
-
-	comparison, err := compareSkillVersions(metadata.Version, skill.Version)
+	matches, err := skillContentMatches(skillPath, skill)
 	if err != nil {
-		return "", "", errors.Wrapf(err, "failed to compare version for %s", skillPath)
+		return "", err
+	}
+	if matches {
+		return skillStatusCurrent, nil
 	}
 
-	switch {
-	case comparison < 0:
-		return skillStatusUpdated, metadata.Version, nil
-	case comparison > 0:
-		return skillStatusNewer, metadata.Version, nil
-	default:
-		return skillStatusCurrent, metadata.Version, nil
+	return skillStatusUpdated, nil
+}
+
+func skillContentMatches(skillPath string, skill bundledSkill) (bool, error) {
+	expected := make(map[string]string, len(skill.Files))
+	for _, file := range skill.Files {
+		target, err := skillFileTarget(skillPath, file.Path)
+		if err != nil {
+			return false, err
+		}
+
+		relativePath, err := filepath.Rel(skillPath, target)
+		if err != nil {
+			return false, err
+		}
+
+		expectedPath := filepath.ToSlash(relativePath)
+		expected[expectedPath] = file.Content
+
+		content, err := os.ReadFile(target)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return false, nil
+			}
+			return false, errors.Wrapf(err, "failed to read installed skill file %s", target)
+		}
+		if string(content) != file.Content {
+			return false, nil
+		}
 	}
+
+	installedFileCount, err := countSkillFiles(skillPath)
+	if err != nil {
+		return false, err
+	}
+
+	return installedFileCount == len(expected), nil
+}
+
+func countSkillFiles(skillPath string) (int, error) {
+	count := 0
+	err := filepath.WalkDir(skillPath, func(_ string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() {
+			count++
+		}
+		return nil
+	})
+	if err != nil {
+		return 0, errors.Wrapf(err, "failed to inspect installed skill files from %s", skillPath)
+	}
+
+	return count, nil
 }
 
 func pathExists(path string) (bool, error) {
@@ -502,16 +535,6 @@ func prepareExistingSkillLink(linkPath, primarySkillPath string, skill bundledSk
 		return false, fmt.Errorf("refusing to replace %s: existing skill name is %q", linkPath, metadata.Name)
 	}
 
-	if metadata.Version != "" {
-		comparison, err := compareSkillVersions(metadata.Version, skill.Version)
-		if err != nil {
-			return false, errors.Wrapf(err, "failed to compare version for %s", linkPath)
-		}
-		if comparison > 0 {
-			return false, fmt.Errorf("refusing to replace %s because it has newer version %s", linkPath, metadata.Version)
-		}
-	}
-
 	return false, os.RemoveAll(linkPath)
 }
 
@@ -574,67 +597,16 @@ func parseSkillFrontmatter(content string) (skillFrontmatter, bool, error) {
 	return skillFrontmatter{}, false, nil
 }
 
-func compareSkillVersions(left, right string) (int, error) {
-	leftParts, err := parseSkillVersion(left)
-	if err != nil {
-		return 0, err
-	}
-	rightParts, err := parseSkillVersion(right)
-	if err != nil {
-		return 0, err
-	}
-
-	for i := range leftParts {
-		if leftParts[i] < rightParts[i] {
-			return -1, nil
-		}
-		if leftParts[i] > rightParts[i] {
-			return 1, nil
-		}
-	}
-
-	return 0, nil
-}
-
-func parseSkillVersion(version string) ([3]int, error) {
-	version = strings.TrimPrefix(strings.TrimSpace(version), "v")
-	parts := strings.Split(version, ".")
-	if len(parts) > 3 {
-		return [3]int{}, fmt.Errorf("invalid version %q", version)
-	}
-
-	var parsed [3]int
-	for i, part := range parts {
-		if part == "" {
-			return [3]int{}, fmt.Errorf("invalid version %q", version)
-		}
-
-		value, err := strconv.Atoi(part)
-		if err != nil {
-			return [3]int{}, fmt.Errorf("invalid version %q", version)
-		}
-		parsed[i] = value
-	}
-
-	return parsed, nil
-}
-
 func printSkillsInitResult(result *SkillsInitResult) {
 	successPrinter.Printf("Bruin skills initialized in %s\n", result.PrimarySkillsDir)
 	for _, skill := range result.Skills {
 		switch skill.Status {
 		case skillStatusInstalled:
-			infoPrinter.Printf("- installed %s v%s\n", skill.Name, skill.Version)
+			infoPrinter.Printf("- installed %s\n", skill.Name)
 		case skillStatusUpdated:
-			if skill.PreviousVersion == "" {
-				infoPrinter.Printf("- updated %s to v%s\n", skill.Name, skill.Version)
-			} else {
-				infoPrinter.Printf("- updated %s from v%s to v%s\n", skill.Name, skill.PreviousVersion, skill.Version)
-			}
-		case skillStatusNewer:
-			infoPrinter.Printf("- kept %s at newer v%s\n", skill.Name, skill.PreviousVersion)
+			infoPrinter.Printf("- updated %s\n", skill.Name)
 		default:
-			infoPrinter.Printf("- %s already current at v%s\n", skill.Name, skill.Version)
+			infoPrinter.Printf("- %s already current\n", skill.Name)
 		}
 
 		for _, link := range skill.Links {

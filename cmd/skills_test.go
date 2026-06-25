@@ -48,9 +48,8 @@ func TestLoadBundledBruinSkillsFromMarkdownFiles(t *testing.T) {
 	metadata, ok, err := parseSkillFrontmatter(skillFile.Content)
 	require.NoError(t, err)
 	require.True(t, ok)
-	assert.Equal(t, metadata.Version, skill.Version)
-	_, err = parseSkillVersion(skill.Version)
-	require.NoError(t, err)
+	assert.Equal(t, skill.Name, metadata.Name)
+	assert.NotEmpty(t, skill.Files)
 }
 
 func TestSkillsInitCommand_RunCreatesAgentsHomeByDefault(t *testing.T) {
@@ -68,7 +67,6 @@ func TestSkillsInitCommand_RunCreatesAgentsHomeByDefault(t *testing.T) {
 
 	content := readRequiredFile(t, filepath.Join(skill.Path, "SKILL.md"))
 	assert.Contains(t, content, "name: bruin-semantic-layer")
-	assert.Contains(t, content, "version: "+semanticLayerSkillVersion(t))
 
 	_, err = os.Stat(filepath.Join(root, ".claude"))
 	assert.True(t, os.IsNotExist(err))
@@ -128,7 +126,7 @@ func TestSkillsInitCommand_RunLinksClaudeToAgentsWhenBothHomesExist(t *testing.T
 	assert.FileExists(t, filepath.Join(linkPath, "SKILL.md"))
 }
 
-func TestSkillsInitCommand_RunUpdatesOlderSkillVersion(t *testing.T) {
+func TestSkillsInitCommand_RunUpdatesChangedSkillContent(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
@@ -149,16 +147,31 @@ old marker
 
 	require.Len(t, result.Skills, 1)
 	assert.Equal(t, skillStatusUpdated, result.Skills[0].Status)
-	assert.Equal(t, "0.1.0", result.Skills[0].PreviousVersion)
 
 	content := readRequiredFile(t, filepath.Join(skillPath, "SKILL.md"))
-	assert.Contains(t, content, "version: "+semanticLayerSkillVersion(t))
+	assert.Contains(t, content, "name: bruin-semantic-layer")
 	assert.NotContains(t, content, "old marker")
 	_, err = os.Stat(filepath.Join(skillPath, "stale.md"))
 	assert.True(t, os.IsNotExist(err))
 }
 
-func TestSkillsInitCommand_RunSkipsNewerSkillVersion(t *testing.T) {
+func TestSkillsInitCommand_RunKeepsCurrentSkillContent(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+
+	firstResult, err := (SkillsInitCommand{}).Run(root)
+	require.NoError(t, err)
+	require.Len(t, firstResult.Skills, 1)
+	assert.Equal(t, skillStatusInstalled, firstResult.Skills[0].Status)
+
+	secondResult, err := (SkillsInitCommand{}).Run(root)
+	require.NoError(t, err)
+	require.Len(t, secondResult.Skills, 1)
+	assert.Equal(t, skillStatusCurrent, secondResult.Skills[0].Status)
+}
+
+func TestSkillsInitCommand_RunUpdatesChangedSkillEvenWithNewerVersion(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
@@ -178,9 +191,8 @@ newer marker
 	require.NoError(t, err)
 
 	require.Len(t, result.Skills, 1)
-	assert.Equal(t, skillStatusNewer, result.Skills[0].Status)
-	assert.Equal(t, "9.0.0", result.Skills[0].PreviousVersion)
-	assert.Equal(t, newerSkill, readRequiredFile(t, filepath.Join(skillPath, "SKILL.md")))
+	assert.Equal(t, skillStatusUpdated, result.Skills[0].Status)
+	assert.NotEqual(t, newerSkill, readRequiredFile(t, filepath.Join(skillPath, "SKILL.md")))
 }
 
 func readRequiredFile(t *testing.T, path string) string {
@@ -189,18 +201,4 @@ func readRequiredFile(t *testing.T, path string) string {
 	content, err := os.ReadFile(path)
 	require.NoError(t, err)
 	return string(content)
-}
-
-func semanticLayerSkillVersion(t *testing.T) string {
-	t.Helper()
-
-	skills, err := loadBundledBruinSkills()
-	require.NoError(t, err)
-	for _, skill := range skills {
-		if skill.Name == "bruin-semantic-layer" {
-			return skill.Version
-		}
-	}
-	t.Fatal("bruin semantic layer skill not found")
-	return ""
 }
