@@ -179,6 +179,8 @@ type importDatabaseModel struct {
 	environment  string
 	configFile   string
 	fillColumns  bool
+	asIngestr    bool
+	destination  string
 
 	step int
 
@@ -545,6 +547,8 @@ func (m *importDatabaseModel) executeImportCmd() tea.Cmd {
 	connName := m.selectedConnName
 	conn := m.conn
 	fillColumns := m.fillColumns
+	asIngestr := m.asIngestr
+	destination := m.destination
 	summary := m.dbSummary
 
 	selectedSchemaIdxs := make(map[int]bool)
@@ -585,7 +589,13 @@ func (m *importDatabaseModel) executeImportCmd() tea.Cmd {
 			for _, table := range schema.Tables {
 				fullName := fmt.Sprintf("%s.%s", schema.Name, table.Name)
 
-				createdAsset, warning := createAsset(ctx, assetsPath, schema.Name, table.Name, assetType, conn, fillColumns, table)
+				var createdAsset *pipeline.Asset
+				var warning string
+				if asIngestr {
+					createdAsset = createIngestrAsset(assetsPath, schema.Name, table.Name, connName, destination, table)
+				} else {
+					createdAsset, warning = createAsset(ctx, assetsPath, schema.Name, table.Name, assetType, conn, fillColumns, table)
+				}
 				if warning != "" {
 					warnings = append(warnings, importWarning{tableName: fullName, message: warning})
 				}
@@ -631,7 +641,7 @@ func (m *importDatabaseModel) executeImportCmd() tea.Cmd {
 	}
 }
 
-func runImportDatabaseTUI(ctx context.Context, pipelinePath, environment, configFile string, fillColumns bool) error {
+func runImportDatabaseTUI(ctx context.Context, pipelinePath, environment, configFile string, fillColumns, asIngestr bool, destination string) error {
 	fs := afero.NewOsFs()
 
 	repoRoot, err := git.FindRepoFromPath(".")
@@ -662,12 +672,21 @@ func runImportDatabaseTUI(ctx context.Context, pipelinePath, environment, config
 
 	var connItems []importConnectionItem
 	for name, connType := range connSummary {
-		if supportedImportConnectionTypes[connType] {
-			connItems = append(connItems, importConnectionItem{name: name, connType: connType})
+		if !supportedImportConnectionTypes[connType] {
+			continue
 		}
+		// --as-ingestr is only supported for MongoDB connections, so restrict
+		// the selectable connections to mongo / mongo_atlas in that mode.
+		if asIngestr && connType != "mongo" && connType != "mongo_atlas" {
+			continue
+		}
+		connItems = append(connItems, importConnectionItem{name: name, connType: connType})
 	}
 
 	if len(connItems) == 0 {
+		if asIngestr {
+			return errors.New("--as-ingestr requires a MongoDB connection, but none were found")
+		}
 		return errors.New("no database connections found that support import")
 	}
 
@@ -693,6 +712,8 @@ func runImportDatabaseTUI(ctx context.Context, pipelinePath, environment, config
 		environment:  environment,
 		configFile:   configFile,
 		fillColumns:  fillColumns,
+		asIngestr:    asIngestr,
+		destination:  destination,
 		step:         dbtuiStepConnection,
 		cfg:          cfg,
 		connList:     connList,

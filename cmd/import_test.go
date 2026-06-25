@@ -962,3 +962,108 @@ func TestGetPipelinefromPath(t *testing.T) {
 		})
 	}
 }
+
+func TestCreateIngestrAsset(t *testing.T) {
+	t.Parallel()
+
+	testAssetsPath := filepath.Join("test", "assets")
+
+	// Mixed-case database/collection names verify that the asset name and file
+	// path are lowercased while source_table preserves the original case
+	// (MongoDB identifiers are case-sensitive).
+	table := &ansisql.DBTable{
+		Name: "Users",
+		Type: ansisql.DBTableTypeTable,
+	}
+
+	got := createIngestrAsset(testAssetsPath, "myDB", "Users", "localMongo", "duckdb", table)
+
+	want := &pipeline.Asset{
+		Name: "mydb.users",
+		Type: pipeline.AssetTypeIngestr,
+		ExecutableFile: pipeline.ExecutableFile{
+			Name: "users.asset.yml",
+			Path: filepath.Join(testAssetsPath, "mydb", "users.asset.yml"),
+		},
+		Parameters: pipeline.ParameterMap{
+			"source_connection": "localMongo",
+			"source_table":      "myDB.Users",
+			"destination":       "duckdb",
+		},
+	}
+
+	assert.Contains(t, got.Description, "Imported table: myDB.Users")
+	assert.Contains(t, got.Description, "Extracted at:")
+
+	want.Description = got.Description
+	assert.Equal(t, want, got)
+}
+
+func TestValidateIngestrImportFlags(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		asIngestr   bool
+		destination string
+		wantErr     string
+	}{
+		{
+			name:        "not as-ingestr ignores destination",
+			asIngestr:   false,
+			destination: "",
+		},
+		{
+			name:      "as-ingestr requires destination",
+			asIngestr: true,
+			wantErr:   "--destination is required",
+		},
+		{
+			name:        "as-ingestr rejects unknown destination",
+			asIngestr:   true,
+			destination: "bogus",
+			wantErr:     "invalid --destination",
+		},
+		{
+			name:        "as-ingestr accepts valid destination",
+			asIngestr:   true,
+			destination: "duckdb",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := validateIngestrImportFlags(tt.asIngestr, tt.destination)
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestIsMongoConnection(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		conn interface{}
+		want bool
+	}{
+		{name: "mongo connection", conn: &mongo.DB{}, want: true},
+		{name: "mongo atlas connection", conn: &mongoatlas.DB{}, want: true},
+		{name: "mssql connection", conn: &mssql.DB{}, want: false},
+		{name: "nil connection", conn: nil, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, isMongoConnection(tt.conn))
+		})
+	}
+}
