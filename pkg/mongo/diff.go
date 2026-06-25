@@ -263,7 +263,8 @@ func dominantType(counts map[string]int64) string {
 // statistics appropriate to its inferred type. Each column's accumulators are
 // keyed by its positional index to avoid any clash with user field names.
 func buildStatsPipeline(columns []*diff.Column, sampleSize int64) bson.A {
-	group := bson.D{{Key: "_id", Value: nil}}
+	group := make(bson.D, 0, 1+len(columns)*6)
+	group = append(group, bson.E{Key: "_id", Value: nil})
 	for i, col := range columns {
 		group = append(group, statAccumulators(i, col)...)
 	}

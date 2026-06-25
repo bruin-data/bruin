@@ -33,7 +33,6 @@ func TestSplitCollectionName(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			gotDB, gotColl, err := splitCollectionName(tt.identifier, tt.defaultDB)
@@ -65,7 +64,6 @@ func TestDominantType(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			assert.Equal(t, tt.want, dominantType(tt.counts))
