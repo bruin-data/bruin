@@ -49,6 +49,13 @@ def replace_table_references(
                 table_node.set("db", dest_schema)
                 if dest_catalog is not None:
                     table_node.set("catalog", dest_catalog)
+                elif dest_schema is None:
+                    # The destination is a single identifier (e.g. a fixture CTE
+                    # name), so clear the stale source catalog too and let a
+                    # 3-part source collapse to one name. A 2-part destination
+                    # intentionally keeps the source catalog (only schema.table
+                    # was remapped).
+                    table_node.set("catalog", None)
                 if not table_node.alias and source_table != dest_table:
                     table_node.set("alias", source_table)
 

@@ -115,9 +115,7 @@ func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment, connectionOverride 
 		}
 	}
 
-	querier, ok := conn.(interface {
-		SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error)
-	})
+	querier, ok := conn.(schemaQuerier)
 	if !ok {
 		return fillStatusFailed, fmt.Errorf("connection for asset '%s' does not support schema introspection", pp.Asset.Name)
 	}

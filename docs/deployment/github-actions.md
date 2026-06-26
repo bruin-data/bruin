@@ -245,7 +245,11 @@ jobs:
       - name: Validate Pipeline
         run: bruin validate .
 
-      # Only run if validation succeeds
+      # Then run the unit tests
+      - name: Unit Test Pipeline
+        run: bruin unit-test .
+
+      # Only run if validation and unit tests succeed
       - name: Run Pipeline
         if: success()
         run: bruin run . --environment production

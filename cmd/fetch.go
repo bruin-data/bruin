@@ -240,9 +240,7 @@ func Query() *cli.Command {
 			}
 
 			//nolint:nestif
-			if querier, ok := conn.(interface {
-				SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error)
-			}); ok {
+			if querier, ok := conn.(schemaQuerier); ok {
 				ctx, cancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 				defer cancel()
 				ctx = query.WithQueryType(ctx, query.QueryTypeQuery)

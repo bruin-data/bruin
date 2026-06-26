@@ -525,9 +525,7 @@ func fillAssetColumnsFromDB(ctx context.Context, asset *pipeline.Asset, conn int
 	}
 
 	// Check if connection supports schema introspection
-	querier, ok := conn.(interface {
-		SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error)
-	})
+	querier, ok := conn.(schemaQuerier)
 	if !ok {
 		return errors2.New("connection does not support schema introspection")
 	}
@@ -2208,10 +2206,6 @@ func createAssetFromScheduledQuery(query ScheduledQuery, assetsPath string) *pip
 	return asset
 }
 
-type snowflakeTaskSelector interface {
-	SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error)
-}
-
 type SnowflakeTask struct {
 	Database                  string
 	Schema                    string
@@ -2239,7 +2233,7 @@ func runSnowflakeTasksImport(ctx context.Context, pipelinePath, connectionName, 
 		return fmt.Errorf("connection '%s' is not a Snowflake connection", connectionName)
 	}
 
-	selector, ok := conn.(snowflakeTaskSelector)
+	selector, ok := conn.(schemaQuerier)
 	if !ok {
 		return fmt.Errorf("connection '%s' does not support Snowflake task metadata queries", connectionName)
 	}
@@ -2268,7 +2262,7 @@ func runSnowflakeTasksImport(ctx context.Context, pipelinePath, connectionName, 
 	return importSelectedSnowflakeTasks(ctx, pipelinePath, tasks, fs)
 }
 
-func getCurrentSnowflakeDatabase(ctx context.Context, selector snowflakeTaskSelector) (string, error) {
+func getCurrentSnowflakeDatabase(ctx context.Context, selector schemaQuerier) (string, error) {
 	result, err := selector.SelectWithSchema(ctx, &query.Query{Query: "SELECT CURRENT_DATABASE()"})
 	if err != nil {
 		return "", err
@@ -2281,7 +2275,7 @@ func getCurrentSnowflakeDatabase(ctx context.Context, selector snowflakeTaskSele
 	return snowflakeValueAsString(result.Rows[0][0]), nil
 }
 
-func listSnowflakeTasks(ctx context.Context, selector snowflakeTaskSelector, database, schema, taskPattern string) ([]SnowflakeTask, error) {
+func listSnowflakeTasks(ctx context.Context, selector schemaQuerier, database, schema, taskPattern string) ([]SnowflakeTask, error) {
 	queryString, err := buildShowSnowflakeTasksQuery(database, schema, taskPattern)
 	if err != nil {
 		return nil, err

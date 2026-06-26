@@ -999,6 +999,66 @@ type CustomCheck struct {
 	Notifications *Notifications  `json:"notifications,omitempty" yaml:"notifications,omitempty" mapstructure:"notifications"`
 }
 
+// UnitTest pins an asset's transformation logic by running it against mocked
+// input rows and asserting the produced output, independent of production data.
+// Unlike quality checks (which validate real data after a run), a unit test
+// substitutes the tables the query reads with fixtures. See
+// docs/proposals/sql-unit-tests.md.
+type UnitTest struct {
+	Name          string                 `json:"name" yaml:"name" mapstructure:"name"`
+	Description   string                 `json:"description,omitempty" yaml:"description,omitempty" mapstructure:"description"`
+	Inputs        []UnitTestInput        `json:"inputs,omitempty" yaml:"inputs,omitempty" mapstructure:"inputs"`
+	Fixtures      []string               `json:"fixtures,omitempty" yaml:"fixtures,omitempty" mapstructure:"fixtures"`
+	Variables     map[string]interface{} `json:"variables,omitempty" yaml:"variables,omitempty" mapstructure:"variables"`
+	ExecutionTime string                 `json:"execution_time,omitempty" yaml:"execution_time,omitempty" mapstructure:"execution_time"`
+	Expected      UnitTestExpected       `json:"expected" yaml:"expected,omitempty" mapstructure:"expected"`
+}
+
+// Fixture is a named, reusable set of mock rows for one asset, defined at the
+// pipeline level and pulled into a unit test by name (UnitTest.Fixtures). It
+// lets many tests share a baseline set of input rows (typically lookup or
+// dimension tables) instead of repeating them in every test. A test's own
+// inputs take precedence over a referenced fixture for the same asset.
+type Fixture struct {
+	Name  string                   `json:"name" yaml:"name" mapstructure:"name"`
+	Asset string                   `json:"asset" yaml:"asset" mapstructure:"asset"`
+	Rows  []map[string]interface{} `json:"rows,omitempty" yaml:"rows,omitempty" mapstructure:"rows"`
+}
+
+// UnitTestInput is a mocked table the asset's query reads from, identified by
+// the upstream asset name as it appears in the SQL. Rows are sparse: any column
+// not listed defaults to NULL.
+type UnitTestInput struct {
+	Asset string                   `json:"asset" yaml:"asset" mapstructure:"asset"`
+	Rows  []map[string]interface{} `json:"rows,omitempty" yaml:"rows,omitempty" mapstructure:"rows"`
+}
+
+// UnitTestExpected describes the output a unit test asserts. Count and Rows are
+// independent: a test may set either or both, and when both are set both must
+// hold. Count asserts the total number of produced rows. Rows compares the
+// produced rows against the listed ones. Match is "subset" (the default: every
+// expected row must appear, extra rows allowed) or "exact"; Order is "any" (the
+// default) or "strict".
+type UnitTestExpected struct {
+	Rows  []map[string]interface{} `json:"rows,omitempty" yaml:"rows,omitempty" mapstructure:"rows"`
+	Count *int64                   `json:"count,omitempty" yaml:"count,omitempty" mapstructure:"count"`
+	Match string                   `json:"match,omitempty" yaml:"match,omitempty" mapstructure:"match"`
+	Order string                   `json:"order,omitempty" yaml:"order,omitempty" mapstructure:"order"`
+	// CTEs asserts the output of named intermediate CTEs inside the asset's
+	// query, keyed by CTE name, so sub-logic can be pinned without asserting the
+	// whole result.
+	CTEs map[string]UnitTestCTEExpected `json:"ctes,omitempty" yaml:"ctes,omitempty" mapstructure:"ctes"`
+}
+
+// UnitTestCTEExpected asserts the rows produced by one named CTE in the asset's
+// query. Same row/count/match/order semantics as the top-level expectation.
+type UnitTestCTEExpected struct {
+	Rows  []map[string]interface{} `json:"rows,omitempty" yaml:"rows,omitempty" mapstructure:"rows"`
+	Count *int64                   `json:"count,omitempty" yaml:"count,omitempty" mapstructure:"count"`
+	Match string                   `json:"match,omitempty" yaml:"match,omitempty" mapstructure:"match"`
+	Order string                   `json:"order,omitempty" yaml:"order,omitempty" mapstructure:"order"`
+}
+
 type DependsColumn struct {
 	Name  string `json:"name" yaml:"name" mapstructure:"name"`
 	Usage string `json:"usage" yaml:"usage" mapstructure:"usage"`
@@ -1109,6 +1169,7 @@ type Asset struct { //nolint:recvcheck
 	Extends           []string           `json:"extends" yaml:"extends,omitempty" mapstructure:"extends"`
 	Columns           []Column           `json:"columns" yaml:"columns,omitempty" mapstructure:"columns"`
 	CustomChecks      []CustomCheck      `json:"custom_checks" yaml:"custom_checks,omitempty" mapstructure:"custom_checks"`
+	UnitTests         []UnitTest         `json:"unit_tests,omitempty" yaml:"unit_tests,omitempty" mapstructure:"unit_tests"`
 	Hooks             Hooks              `json:"hooks,omitempty" yaml:"hooks,omitempty" mapstructure:"hooks"`
 	Metadata          EmptyStringMap     `json:"metadata" yaml:"metadata,omitempty" mapstructure:"metadata"`
 	Snowflake         SnowflakeConfig    `json:"snowflake" yaml:"snowflake,omitempty" mapstructure:"snowflake"`
@@ -2033,6 +2094,7 @@ type Pipeline struct {
 	tasksByName        map[string]*Asset      `yaml:"-"`
 	MacrosPath         string                 `json:"-" yaml:"-"`
 	Macros             []Macro                `json:"macros" yaml:"macros,omitempty" mapstructure:"macros"`
+	Fixtures           []Fixture              `json:"fixtures,omitempty" yaml:"fixtures,omitempty" mapstructure:"fixtures"`
 }
 
 func (p *Pipeline) UnmarshalYAML(unmarshal func(interface{}) error) error {
