@@ -116,6 +116,28 @@ func TestCompareExpectation(t *testing.T) {
 		}
 		require.True(t, compareExpectation(ok, twoRows).Passed)
 	})
+
+	t.Run("overlapping partial rows match via maximum matching, not greedily", func(t *testing.T) {
+		t.Parallel()
+		// A broad expected row {id:1} and a narrower {id:1, status:paid}. Greedy
+		// binding lets {id:1} consume the paid row, leaving the narrower one with
+		// only the refunded row and a false miss. A maximum matching pairs them.
+		actual := []map[string]interface{}{
+			{"id": int64(1), "status": "paid"},
+			{"id": int64(1), "status": "refunded"},
+		}
+		res := compareExpectation(pipeline.UnitTestExpected{
+			Rows: []map[string]interface{}{{"id": 1}, {"id": 1, "status": "paid"}},
+		}, actual)
+		require.True(t, res.Passed, res.Message)
+
+		// But two expected rows that both need the single paid row still fail:
+		// there is no assignment to distinct actual rows.
+		res = compareExpectation(pipeline.UnitTestExpected{
+			Rows: []map[string]interface{}{{"status": "paid"}, {"status": "paid"}},
+		}, actual)
+		require.False(t, res.Passed)
+	})
 }
 
 // stringValuer mimics a driver type (like pgtype.Numeric) whose Value() returns

@@ -55,12 +55,10 @@ func compareRowSet(expectedRows []map[string]interface{}, count *int64, match, o
 }
 
 // compareRows checks that every expected row appears in actual; in exact mode it
-// additionally requires the row counts to be equal. In unordered mode it greedily
-// binds each expected row to the first unused actual row it matches. Greedy
-// matching is not maximal, so with partial-column expected rows that are
-// column-subsets of one another it can report a miss even when a valid assignment
-// exists; in practice expected rows are fully specified, so this does not arise.
-// Fully specify expected rows (or use a count assertion) if you hit it.
+// additionally requires the row counts to be equal. In unordered mode it binds
+// expected rows to distinct actual rows with a maximum bipartite matching, so a
+// broad partial-column expected row never claims the only actual row that a
+// narrower expected row needs.
 func compareRows(expected, actual []map[string]interface{}, ordered, exact bool) *UnitTestResult {
 	if exact && len(expected) != len(actual) {
 		return fail(fmt.Sprintf(
@@ -82,24 +80,37 @@ func compareRows(expected, actual []map[string]interface{}, ordered, exact bool)
 		return pass()
 	}
 
-	used := make([]bool, len(actual))
-	for _, exp := range expected {
-		matched := false
-		for i, act := range actual {
-			if used[i] {
-				continue
-			}
-			if rowMatches(exp, act) {
-				used[i] = true
-				matched = true
-				break
-			}
-		}
-		if !matched {
-			return fail(fmt.Sprintf("expected row not found: %s\n%s", formatRow(exp), describeRows("actual rows", actual)))
+	// Bind each expected row to a distinct actual row via a maximum bipartite
+	// matching (augmenting paths). A greedy first-match bind can fail when a
+	// broad expected row claims the only actual row a narrower expected row needs.
+	matchedBy := make([]int, len(actual)) // actual index -> expected index, or -1
+	for i := range matchedBy {
+		matchedBy[i] = -1
+	}
+	for ei := range expected {
+		seen := make([]bool, len(actual))
+		if !augmentMatch(ei, expected, actual, matchedBy, seen) {
+			return fail(fmt.Sprintf("expected row not found: %s\n%s", formatRow(expected[ei]), describeRows("actual rows", actual)))
 		}
 	}
 	return pass()
+}
+
+// augmentMatch tries to bind expected row ei to an actual row, possibly bumping
+// an already-bound expected row onto a different match (an augmenting path).
+// It returns false when no actual row can be freed for ei.
+func augmentMatch(ei int, expected, actual []map[string]interface{}, matchedBy []int, seen []bool) bool {
+	for ai := range actual {
+		if seen[ai] || !rowMatches(expected[ei], actual[ai]) {
+			continue
+		}
+		seen[ai] = true
+		if matchedBy[ai] == -1 || augmentMatch(matchedBy[ai], expected, actual, matchedBy, seen) {
+			matchedBy[ai] = ei
+			return true
+		}
+	}
+	return false
 }
 
 // rowMatches reports whether every column asserted in expected matches actual,

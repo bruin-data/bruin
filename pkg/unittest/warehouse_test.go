@@ -98,6 +98,25 @@ func TestBuildWarehouseQuery(t *testing.T) {
 		}
 	})
 
+	t.Run("rewrite targets the query's table spelling, not the mock's", func(t *testing.T) {
+		t.Parallel()
+		// The mock is declared with different casing than the query writes the
+		// table. RenameTables matches case-sensitively, so the rewrite key must be
+		// the query's spelling (from used), or the real table would leak through.
+		mixedCase := pipeline.UnitTestInput{Asset: "Analytics.Orders", Rows: orders.Rows}
+		f := &fakeRewriter{used: []string{"analytics.orders"}}
+		_, err := BuildWarehouseQuery(f, "duckdb",
+			"SELECT SUM(amount) AS revenue FROM analytics.orders",
+			pipeline.UnitTest{Inputs: []pipeline.UnitTestInput{mixedCase}}, nil)
+		require.NoError(t, err)
+
+		// The mock still applies (matched by normalized name), but the rewrite is
+		// keyed by the query's exact spelling so RenameTables finds it.
+		require.Len(t, f.gotCTEs, 1)
+		require.Equal(t, "__bruin_ut_analytics_orders", f.gotRemap["analytics.orders"])
+		require.NotContains(t, f.gotRemap, "Analytics.Orders")
+	})
+
 	t.Run("a DDL-wrapped asset is reduced to its inner SELECT, no CREATE reaches the target", func(t *testing.T) {
 		t.Parallel()
 		// A materialization: none asset whose body is CREATE ... AS SELECT. The

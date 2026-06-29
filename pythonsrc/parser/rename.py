@@ -1,7 +1,6 @@
 from sqlglot import parse, exp
 
 
-# todo: this implementation does not support columns in select where they specify the schema as well, e.g. select raw.table1.col1, col2 from raw.table1
 def replace_table_references(
     query: str, dialect: str, table_references: dict[str, str]
 ):
@@ -58,6 +57,51 @@ def replace_table_references(
                     table_node.set("catalog", None)
                 if not table_node.alias and source_table != dest_table:
                     table_node.set("alias", source_table)
+
+        # A renamed table loses its original schema/catalog (a fixture CTE is a
+        # single identifier, a dev rename keeps only the leaf), so a column still
+        # qualified by the old schema — e.g. analytics.orders.amount — would no
+        # longer resolve. Drop that qualifier to the leaf table, which the renamed
+        # table is always reachable by, via its explicit or implicit alias.
+        for column_node in parsed_query.find_all(exp.Column):
+            col_table = column_node.text("table")
+            if not col_table:
+                continue
+            col_schema = column_node.text("db")
+            col_catalog = column_node.text("catalog")
+            if not col_schema and not col_catalog:
+                continue  # already leaf-qualified; resolves to the alias
+            for table_name in table_references:
+                parts = table_name.split(".")
+                source_catalog = None
+                source_schema = None
+                source_table = table_name
+                if len(parts) == 3:
+                    source_catalog = parts[0]
+                    source_schema = parts[1]
+                    source_table = parts[2]
+                elif len(parts) == 2:
+                    source_schema = parts[0]
+                    source_table = parts[1]
+
+                if col_table != source_table:
+                    continue
+                if (
+                    source_schema is not None
+                    and col_schema
+                    and col_schema != source_schema
+                ):
+                    continue
+                if (
+                    source_catalog is not None
+                    and col_catalog
+                    and col_catalog != source_catalog
+                ):
+                    continue
+
+                column_node.set("db", None)
+                column_node.set("catalog", None)
+                break
 
     return {
         "query": "; ".join([q.sql(dialect=dialect) for q in parsed_queries]),

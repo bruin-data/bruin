@@ -92,22 +92,30 @@ func buildInjected(p Rewriter, dialect, renderedSQL string, test pipeline.UnitTe
 		normalizedSchemas[normalizeName(name)] = cols
 	}
 
-	// Each table the query reads maps to the fixture CTE that replaces it, keyed
-	// by the normalized read name so mocked inputs and discovered reads share one
-	// key space. ref keeps the name as written in the query, for the rewrite.
-	fixtures := make(map[string]fixtureCTE)
-
+	// Fixture bodies for the mocked inputs, keyed by normalized name so a mock
+	// matches the read it stands in for regardless of case or quoting.
+	mockedBodies := make(map[string]string, len(test.Inputs))
 	for _, in := range test.Inputs {
 		body, err := fixtureSelect(in, normalizedSchemas[normalizeName(in.Asset)])
 		if err != nil {
 			return "", err
 		}
-		fixtures[normalizeName(in.Asset)] = fixtureCTE{ref: in.Asset, body: body}
+		mockedBodies[normalizeName(in.Asset)] = body
 	}
+
+	// Each table the query reads maps to the fixture CTE that replaces it. The
+	// map is keyed by the normalized read name, but ref is the name exactly as
+	// the query wrote it (from used): RenameTables matches case-sensitively, so a
+	// mock declared as analytics.Orders must still rewrite a FROM analytics.orders.
+	fixtures := make(map[string]fixtureCTE)
 	for _, t := range used {
 		key := normalizeName(t)
 		if _, ok := fixtures[key]; ok {
-			continue // already mocked by an input above
+			continue // a table can be read more than once
+		}
+		if body, ok := mockedBodies[key]; ok {
+			fixtures[key] = fixtureCTE{ref: t, body: body}
+			continue
 		}
 		cols, ok := normalizedSchemas[key]
 		if !ok {
