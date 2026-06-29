@@ -358,6 +358,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                                     {text: "Smartsheet", link: "/ingestion/smartsheet"},
                                     {text: "Snapchat Ads", link: "/ingestion/snapchat-ads"},
                                     {text: "Solidgate", link: "/ingestion/solidgate"},
+                                    {text: "Square", link: "/ingestion/square"},
                                     {text: "Stripe", link: "/ingestion/stripe"},
                                     {text: "Slack", link: "/ingestion/slack"},
                                     {text: "Socrata", link: "/ingestion/socrata"},

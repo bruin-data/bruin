@@ -907,6 +907,23 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "financial_entries", PrimaryKey: "id", IncKey: "created_at", IncStrategy: "merge"},
 	},
 
+	// Square - Payments and commerce platform
+	"square": {
+		{Name: "payments", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "refunds", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "orders", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "customers", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "catalog_objects", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "team_members", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "inventory", PrimaryKey: "catalog_object_id, location_id, state", IncKey: "calculated_at", IncStrategy: "merge"},
+		{Name: "locations", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "team_member_wages", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "shifts", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "bank_accounts", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "cash_drawers", PrimaryKey: "id, location_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "loyalty", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+	},
+
 	// GCP Spanner (user-defined tables)
 	"spanner": {},
 

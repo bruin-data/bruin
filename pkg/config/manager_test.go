@@ -709,6 +709,13 @@ func TestLoadFromFile(t *testing.T) {
 					PublicKey: "public-key-123",
 				},
 			},
+			Square: []SquareConnection{
+				{
+					Name:        "square-1",
+					AccessToken: "EAAA-test-access-token",
+					Environment: "sandbox",
+				},
+			},
 			Smartsheet: []SmartsheetConnection{
 				{
 					Name:         "smartsheet-1",
@@ -2254,6 +2261,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Phantombuster:       []PhantombusterConnection{{Name: "phantombuster1"}},
 				Elasticsearch:       []ElasticsearchConnection{{Name: "elasticsearch1"}},
 				Solidgate:           []SolidgateConnection{{Name: "solidgate1"}},
+				Square:              []SquareConnection{{Name: "square1"}},
 				Spanner:             []SpannerConnection{{Name: "spanner1"}},
 				Smartsheet:          []SmartsheetConnection{{Name: "smartsheet1"}},
 				Attio:               []AttioConnection{{Name: "attio1"}},
@@ -2383,6 +2391,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Phantombuster:       []PhantombusterConnection{{Name: "phantombuster1"}},
 				Elasticsearch:       []ElasticsearchConnection{{Name: "elasticsearch1"}},
 				Solidgate:           []SolidgateConnection{{Name: "solidgate1"}},
+				Square:              []SquareConnection{{Name: "square1"}},
 				Spanner:             []SpannerConnection{{Name: "spanner1"}},
 				Smartsheet:          []SmartsheetConnection{{Name: "smartsheet1"}},
 				Attio:               []AttioConnection{{Name: "attio1"}},
