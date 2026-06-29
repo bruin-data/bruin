@@ -172,6 +172,7 @@ var defaultMapping = map[string]string{
 	"stripe":                "stripe-default",
 	"paddle":                "paddle-default",
 	"chargebee":             "chargebee-default",
+	"recurly":               "recurly-default",
 	"appsflyer":             "appsflyer-default",
 	"kafka":                 "kafka-default",
 	"duckdb":                "duckdb-default",

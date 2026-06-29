@@ -276,6 +276,13 @@ func TestLoadFromFile(t *testing.T) {
 					APIKey: "chargebeekey",
 				},
 			},
+			Recurly: []RecurlyConnection{
+				{
+					Name:   "conn-recurly",
+					APIKey: "recurlykey",
+					Region: "us",
+				},
+			},
 			GitLab: []GitLabConnection{
 				{
 					Name:        "conn-gitlab",
@@ -2199,6 +2206,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Stripe:              []StripeConnection{{Name: "stripe1"}},
 				Paddle:              []PaddleConnection{{Name: "paddle1"}},
 				Chargebee:           []ChargebeeConnection{{Name: "chargebee1"}},
+				Recurly:             []RecurlyConnection{{Name: "recurly1"}},
 				GitLab:              []GitLabConnection{{Name: "gitlab1"}},
 				Appsflyer:           []AppsflyerConnection{{Name: "appsflyer1"}},
 				Kafka:               []KafkaConnection{{Name: "kafka1"}},
@@ -2329,6 +2337,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Stripe:              []StripeConnection{{Name: "stripe1"}},
 				Paddle:              []PaddleConnection{{Name: "paddle1"}},
 				Chargebee:           []ChargebeeConnection{{Name: "chargebee1"}},
+				Recurly:             []RecurlyConnection{{Name: "recurly1"}},
 				GitLab:              []GitLabConnection{{Name: "gitlab1"}},
 				Appsflyer:           []AppsflyerConnection{{Name: "appsflyer1"}},
 				Kafka:               []KafkaConnection{{Name: "kafka1"}},

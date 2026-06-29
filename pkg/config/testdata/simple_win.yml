@@ -166,6 +166,10 @@ environments:
         - name: conn-chargebee
           site: "chargebeesite"
           api_key: "chargebeekey"
+      recurly:
+        - name: conn-recurly
+          api_key: "recurlykey"
+          region: "us"
       gitlab:
         - name: conn-gitlab
           access_token: "gitlabtoken"

@@ -59,6 +59,7 @@ type Connections struct {
 	Stripe              []StripeConnection              `yaml:"stripe,omitempty" json:"stripe,omitempty" mapstructure:"stripe"`
 	Paddle              []PaddleConnection              `yaml:"paddle,omitempty" json:"paddle,omitempty" mapstructure:"paddle"`
 	Chargebee           []ChargebeeConnection           `yaml:"chargebee,omitempty" json:"chargebee,omitempty" mapstructure:"chargebee"`
+	Recurly             []RecurlyConnection             `yaml:"recurly,omitempty" json:"recurly,omitempty" mapstructure:"recurly"`
 	GitLab              []GitLabConnection              `yaml:"gitlab,omitempty" json:"gitlab,omitempty" mapstructure:"gitlab"`
 	Appsflyer           []AppsflyerConnection           `yaml:"appsflyer,omitempty" json:"appsflyer,omitempty" mapstructure:"appsflyer"`
 	Kafka               []KafkaConnection               `yaml:"kafka,omitempty" json:"kafka,omitempty" mapstructure:"kafka"`
@@ -754,6 +755,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Chargebee = append(env.Connections.Chargebee, conn)
+	case "recurly":
+		var conn RecurlyConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Recurly = append(env.Connections.Recurly, conn)
 	case "gitlab":
 		var conn GitLabConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1515,6 +1523,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Paddle = removeConnection(env.Connections.Paddle, connectionName)
 	case "chargebee":
 		env.Connections.Chargebee = removeConnection(env.Connections.Chargebee, connectionName)
+	case "recurly":
+		env.Connections.Recurly = removeConnection(env.Connections.Recurly, connectionName)
 	case "gitlab":
 		env.Connections.GitLab = removeConnection(env.Connections.GitLab, connectionName)
 	case "appsflyer":
@@ -1788,6 +1798,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Stripe, source.Stripe)
 	mergeConnectionList(&c.Paddle, source.Paddle)
 	mergeConnectionList(&c.Chargebee, source.Chargebee)
+	mergeConnectionList(&c.Recurly, source.Recurly)
 	mergeConnectionList(&c.GitLab, source.GitLab)
 	mergeConnectionList(&c.Appsflyer, source.Appsflyer)
 	mergeConnectionList(&c.Kafka, source.Kafka)

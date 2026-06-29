@@ -855,6 +855,12 @@
           },
           "type": "array"
         },
+        "recurly": {
+          "items": {
+            "$ref": "#/$defs/RecurlyConnection"
+          },
+          "type": "array"
+        },
         "gitlab": {
           "items": {
             "$ref": "#/$defs/GitLabConnection"
@@ -3518,6 +3524,25 @@
         "host",
         "username",
         "password"
+      ]
+    },
+    "RecurlyConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
       ]
     },
     "RedditAdsConnection": {
