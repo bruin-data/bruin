@@ -107,6 +107,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/quickbooks"
 	"github.com/bruin-data/bruin/pkg/quicksight"
 	"github.com/bruin-data/bruin/pkg/rabbitmq"
+	"github.com/bruin-data/bruin/pkg/recurly"
 	redditads "github.com/bruin-data/bruin/pkg/redditads"
 	"github.com/bruin-data/bruin/pkg/revenuecat"
 	"github.com/bruin-data/bruin/pkg/s3"
@@ -177,6 +178,7 @@ type Manager struct {
 	Stripe               map[string]*stripe.Client
 	Paddle               map[string]*paddle.Client
 	Chargebee            map[string]*chargebee.Client
+	Recurly              map[string]*recurly.Client
 	GitLab               map[string]*gitlab.Client
 	SurveyMonkey         map[string]*surveymonkey.Client
 	Appsflyer            map[string]*appsflyer.Client
@@ -1570,6 +1572,30 @@ func (m *Manager) AddChargebeeConnectionFromConfig(connection *config.ChargebeeC
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Chargebee[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddRecurlyConnectionFromConfig(connection *config.RecurlyConnection) error {
+	m.mutex.Lock()
+	if m.Recurly == nil {
+		m.Recurly = make(map[string]*recurly.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := recurly.NewClient(&recurly.Config{
+		APIKey: connection.APIKey,
+		Region: connection.Region,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Recurly[connection.Name] = client
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 
@@ -3707,6 +3733,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Stripe, connectionManager.AddStripeConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Paddle, connectionManager.AddPaddleConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Chargebee, connectionManager.AddChargebeeConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Recurly, connectionManager.AddRecurlyConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.GitLab, connectionManager.AddGitLabConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Appsflyer, connectionManager.AddAppsflyerConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Kafka, connectionManager.AddKafkaConnectionFromConfig, &wg, &errList, &mu)

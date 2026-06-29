@@ -976,6 +976,15 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "events", PrimaryKey: "id", IncKey: "occurred_at", IncStrategy: "merge"},
 	},
 
+	// Recurly - Subscription billing
+	"recurly": {
+		{Name: "accounts", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "subscriptions", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "invoices", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "transactions", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "plans", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+	},
+
 	// GitLab - DevOps and code hosting
 	"gitlab": {
 		{Name: "projects", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
