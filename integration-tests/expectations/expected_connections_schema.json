@@ -855,6 +855,12 @@
           },
           "type": "array"
         },
+        "recurly": {
+          "items": {
+            "$ref": "#/$defs/RecurlyConnection"
+          },
+          "type": "array"
+        },
         "gitlab": {
           "items": {
             "$ref": "#/$defs/GitLabConnection"
@@ -1224,6 +1230,12 @@
         "solidgate": {
           "items": {
             "$ref": "#/$defs/SolidgateConnection"
+          },
+          "type": "array"
+        },
+        "square": {
+          "items": {
+            "$ref": "#/$defs/SquareConnection"
           },
           "type": "array"
         },
@@ -3514,6 +3526,25 @@
         "password"
       ]
     },
+    "RecurlyConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
+      ]
+    },
     "RedditAdsConnection": {
       "properties": {
         "name": {
@@ -4000,6 +4031,25 @@
         "name",
         "public_key",
         "secret_key"
+      ]
+    },
+    "SquareConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "access_token": {
+          "type": "string"
+        },
+        "environment": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "access_token"
       ]
     },
     "SpannerConnection": {

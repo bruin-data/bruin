@@ -59,6 +59,7 @@ type Connections struct {
 	Stripe              []StripeConnection              `yaml:"stripe,omitempty" json:"stripe,omitempty" mapstructure:"stripe"`
 	Paddle              []PaddleConnection              `yaml:"paddle,omitempty" json:"paddle,omitempty" mapstructure:"paddle"`
 	Chargebee           []ChargebeeConnection           `yaml:"chargebee,omitempty" json:"chargebee,omitempty" mapstructure:"chargebee"`
+	Recurly             []RecurlyConnection             `yaml:"recurly,omitempty" json:"recurly,omitempty" mapstructure:"recurly"`
 	GitLab              []GitLabConnection              `yaml:"gitlab,omitempty" json:"gitlab,omitempty" mapstructure:"gitlab"`
 	Appsflyer           []AppsflyerConnection           `yaml:"appsflyer,omitempty" json:"appsflyer,omitempty" mapstructure:"appsflyer"`
 	Kafka               []KafkaConnection               `yaml:"kafka,omitempty" json:"kafka,omitempty" mapstructure:"kafka"`
@@ -121,6 +122,7 @@ type Connections struct {
 	Phantombuster       []PhantombusterConnection       `yaml:"phantombuster,omitempty" json:"phantombuster,omitempty" mapstructure:"phantombuster"`
 	Elasticsearch       []ElasticsearchConnection       `yaml:"elasticsearch,omitempty" json:"elasticsearch,omitempty" mapstructure:"elasticsearch"`
 	Solidgate           []SolidgateConnection           `yaml:"solidgate,omitempty" json:"solidgate,omitempty" mapstructure:"solidgate"`
+	Square              []SquareConnection              `yaml:"square,omitempty" json:"square,omitempty" mapstructure:"square"`
 	Spanner             []SpannerConnection             `yaml:"spanner,omitempty" json:"spanner,omitempty" mapstructure:"spanner"`
 	Smartsheet          []SmartsheetConnection          `yaml:"smartsheet,omitempty" json:"smartsheet,omitempty" mapstructure:"smartsheet"`
 	Attio               []AttioConnection               `yaml:"attio,omitempty" json:"attio,omitempty" mapstructure:"attio"`
@@ -753,6 +755,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Chargebee = append(env.Connections.Chargebee, conn)
+	case "recurly":
+		var conn RecurlyConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Recurly = append(env.Connections.Recurly, conn)
 	case "gitlab":
 		var conn GitLabConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1231,6 +1240,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Solidgate = append(env.Connections.Solidgate, conn)
+	case "square":
+		var conn SquareConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Square = append(env.Connections.Square, conn)
 	case "smartsheet":
 		var conn SmartsheetConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1507,6 +1523,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Paddle = removeConnection(env.Connections.Paddle, connectionName)
 	case "chargebee":
 		env.Connections.Chargebee = removeConnection(env.Connections.Chargebee, connectionName)
+	case "recurly":
+		env.Connections.Recurly = removeConnection(env.Connections.Recurly, connectionName)
 	case "gitlab":
 		env.Connections.GitLab = removeConnection(env.Connections.GitLab, connectionName)
 	case "appsflyer":
@@ -1637,6 +1655,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Spanner = removeConnection(env.Connections.Spanner, connectionName)
 	case "solidgate":
 		env.Connections.Solidgate = removeConnection(env.Connections.Solidgate, connectionName)
+	case "square":
+		env.Connections.Square = removeConnection(env.Connections.Square, connectionName)
 	case "smartsheet":
 		env.Connections.Smartsheet = removeConnection(env.Connections.Smartsheet, connectionName)
 	case "attio":
@@ -1778,6 +1798,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Stripe, source.Stripe)
 	mergeConnectionList(&c.Paddle, source.Paddle)
 	mergeConnectionList(&c.Chargebee, source.Chargebee)
+	mergeConnectionList(&c.Recurly, source.Recurly)
 	mergeConnectionList(&c.GitLab, source.GitLab)
 	mergeConnectionList(&c.Appsflyer, source.Appsflyer)
 	mergeConnectionList(&c.Kafka, source.Kafka)
@@ -1840,6 +1861,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Phantombuster, source.Phantombuster)
 	mergeConnectionList(&c.Elasticsearch, source.Elasticsearch)
 	mergeConnectionList(&c.Solidgate, source.Solidgate)
+	mergeConnectionList(&c.Square, source.Square)
 	mergeConnectionList(&c.Spanner, source.Spanner)
 	mergeConnectionList(&c.Smartsheet, source.Smartsheet)
 	mergeConnectionList(&c.Attio, source.Attio)

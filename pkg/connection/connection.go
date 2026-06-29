@@ -107,6 +107,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/quickbooks"
 	"github.com/bruin-data/bruin/pkg/quicksight"
 	"github.com/bruin-data/bruin/pkg/rabbitmq"
+	"github.com/bruin-data/bruin/pkg/recurly"
 	redditads "github.com/bruin-data/bruin/pkg/redditads"
 	"github.com/bruin-data/bruin/pkg/revenuecat"
 	"github.com/bruin-data/bruin/pkg/s3"
@@ -124,6 +125,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/solidgate"
 	"github.com/bruin-data/bruin/pkg/spanner"
 	"github.com/bruin-data/bruin/pkg/sqlite"
+	"github.com/bruin-data/bruin/pkg/square"
 	"github.com/bruin-data/bruin/pkg/stripe"
 	"github.com/bruin-data/bruin/pkg/surveymonkey"
 	"github.com/bruin-data/bruin/pkg/tableau"
@@ -177,6 +179,7 @@ type Manager struct {
 	Stripe               map[string]*stripe.Client
 	Paddle               map[string]*paddle.Client
 	Chargebee            map[string]*chargebee.Client
+	Recurly              map[string]*recurly.Client
 	GitLab               map[string]*gitlab.Client
 	SurveyMonkey         map[string]*surveymonkey.Client
 	Appsflyer            map[string]*appsflyer.Client
@@ -249,6 +252,7 @@ type Manager struct {
 	Elasticsearch        map[string]*elasticsearch.Client
 	Spanner              map[string]*spanner.Client
 	Solidgate            map[string]*solidgate.Client
+	Square               map[string]*square.Client
 	Smartsheet           map[string]*smartsheet.Client
 	Attio                map[string]*attio.Client
 	Sftp                 map[string]*sftp.Client
@@ -1576,6 +1580,30 @@ func (m *Manager) AddChargebeeConnectionFromConfig(connection *config.ChargebeeC
 	return nil
 }
 
+func (m *Manager) AddRecurlyConnectionFromConfig(connection *config.RecurlyConnection) error {
+	m.mutex.Lock()
+	if m.Recurly == nil {
+		m.Recurly = make(map[string]*recurly.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := recurly.NewClient(&recurly.Config{
+		APIKey: connection.APIKey,
+		Region: connection.Region,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Recurly[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
 func (m *Manager) AddGitLabConnectionFromConfig(connection *config.GitLabConnection) error {
 	m.mutex.Lock()
 	if m.GitLab == nil {
@@ -1713,6 +1741,26 @@ func (m *Manager) AddSolidgateConnectionFromConfig(connection *config.SolidgateC
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 
+	return nil
+}
+
+func (m *Manager) AddSquareConnectionFromConfig(connection *config.SquareConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.Square == nil {
+		m.Square = make(map[string]*square.Client)
+	}
+
+	client, err := square.NewClient(square.Config{
+		AccessToken: connection.AccessToken,
+		Environment: connection.Environment,
+	})
+	if err != nil {
+		return err
+	}
+	m.Square[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
 	return nil
 }
 
@@ -3707,6 +3755,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Stripe, connectionManager.AddStripeConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Paddle, connectionManager.AddPaddleConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Chargebee, connectionManager.AddChargebeeConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Recurly, connectionManager.AddRecurlyConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.GitLab, connectionManager.AddGitLabConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Appsflyer, connectionManager.AddAppsflyerConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Kafka, connectionManager.AddKafkaConnectionFromConfig, &wg, &errList, &mu)
@@ -3779,6 +3828,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Elasticsearch, connectionManager.AddElasticsearchConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Spanner, connectionManager.AddSpannerConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Solidgate, connectionManager.AddSolidgateConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Square, connectionManager.AddSquareConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Smartsheet, connectionManager.AddSmartsheetConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Attio, connectionManager.AddAttioConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Sftp, connectionManager.AddSftpConnectionFromConfig, &wg, &errList, &mu)

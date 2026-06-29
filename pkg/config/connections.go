@@ -748,6 +748,16 @@ func (c ChargebeeConnection) GetName() string {
 	return c.Name
 }
 
+type RecurlyConnection struct {
+	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	Region string `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
+}
+
+func (c RecurlyConnection) GetName() string {
+	return c.Name
+}
+
 type GitLabConnection struct {
 	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	AccessToken string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
@@ -1463,6 +1473,16 @@ type SolidgateConnection struct {
 }
 
 func (c SolidgateConnection) GetName() string {
+	return c.Name
+}
+
+type SquareConnection struct {
+	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	AccessToken string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
+	Environment string `yaml:"environment,omitempty" json:"environment,omitempty" mapstructure:"environment"`
+}
+
+func (c SquareConnection) GetName() string {
 	return c.Name
 }
 

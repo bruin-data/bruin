@@ -276,6 +276,13 @@ func TestLoadFromFile(t *testing.T) {
 					APIKey: "chargebeekey",
 				},
 			},
+			Recurly: []RecurlyConnection{
+				{
+					Name:   "conn-recurly",
+					APIKey: "recurlykey",
+					Region: "us",
+				},
+			},
 			GitLab: []GitLabConnection{
 				{
 					Name:        "conn-gitlab",
@@ -707,6 +714,13 @@ func TestLoadFromFile(t *testing.T) {
 					Name:      "solidgate-1",
 					SecretKey: "secret-key-123",
 					PublicKey: "public-key-123",
+				},
+			},
+			Square: []SquareConnection{
+				{
+					Name:        "square-1",
+					AccessToken: "EAAA-test-access-token",
+					Environment: "sandbox",
 				},
 			},
 			Smartsheet: []SmartsheetConnection{
@@ -2192,6 +2206,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Stripe:              []StripeConnection{{Name: "stripe1"}},
 				Paddle:              []PaddleConnection{{Name: "paddle1"}},
 				Chargebee:           []ChargebeeConnection{{Name: "chargebee1"}},
+				Recurly:             []RecurlyConnection{{Name: "recurly1"}},
 				GitLab:              []GitLabConnection{{Name: "gitlab1"}},
 				Appsflyer:           []AppsflyerConnection{{Name: "appsflyer1"}},
 				Kafka:               []KafkaConnection{{Name: "kafka1"}},
@@ -2254,6 +2269,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Phantombuster:       []PhantombusterConnection{{Name: "phantombuster1"}},
 				Elasticsearch:       []ElasticsearchConnection{{Name: "elasticsearch1"}},
 				Solidgate:           []SolidgateConnection{{Name: "solidgate1"}},
+				Square:              []SquareConnection{{Name: "square1"}},
 				Spanner:             []SpannerConnection{{Name: "spanner1"}},
 				Smartsheet:          []SmartsheetConnection{{Name: "smartsheet1"}},
 				Attio:               []AttioConnection{{Name: "attio1"}},
@@ -2321,6 +2337,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Stripe:              []StripeConnection{{Name: "stripe1"}},
 				Paddle:              []PaddleConnection{{Name: "paddle1"}},
 				Chargebee:           []ChargebeeConnection{{Name: "chargebee1"}},
+				Recurly:             []RecurlyConnection{{Name: "recurly1"}},
 				GitLab:              []GitLabConnection{{Name: "gitlab1"}},
 				Appsflyer:           []AppsflyerConnection{{Name: "appsflyer1"}},
 				Kafka:               []KafkaConnection{{Name: "kafka1"}},
@@ -2383,6 +2400,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Phantombuster:       []PhantombusterConnection{{Name: "phantombuster1"}},
 				Elasticsearch:       []ElasticsearchConnection{{Name: "elasticsearch1"}},
 				Solidgate:           []SolidgateConnection{{Name: "solidgate1"}},
+				Square:              []SquareConnection{{Name: "square1"}},
 				Spanner:             []SpannerConnection{{Name: "spanner1"}},
 				Smartsheet:          []SmartsheetConnection{{Name: "smartsheet1"}},
 				Attio:               []AttioConnection{{Name: "attio1"}},
