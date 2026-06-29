@@ -1466,6 +1466,16 @@ func (c SolidgateConnection) GetName() string {
 	return c.Name
 }
 
+type SquareConnection struct {
+	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	AccessToken string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
+	Environment string `yaml:"environment,omitempty" json:"environment,omitempty" mapstructure:"environment"`
+}
+
+func (c SquareConnection) GetName() string {
+	return c.Name
+}
+
 type SmartsheetConnection struct {
 	Name         string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	AccessToken  string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`

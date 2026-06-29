@@ -199,6 +199,7 @@ var defaultMapping = map[string]string{
 	"applovin":              "applovin-default",
 	"salesforce":            "salesforce-default",
 	"solidgate":             "solidgate-default",
+	"square":                "square-default",
 	"smartsheet":            "smartsheet-default",
 	"sftp":                  "sftp-default",
 	"motherduck":            "motherduck-default",

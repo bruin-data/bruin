@@ -124,6 +124,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/solidgate"
 	"github.com/bruin-data/bruin/pkg/spanner"
 	"github.com/bruin-data/bruin/pkg/sqlite"
+	"github.com/bruin-data/bruin/pkg/square"
 	"github.com/bruin-data/bruin/pkg/stripe"
 	"github.com/bruin-data/bruin/pkg/surveymonkey"
 	"github.com/bruin-data/bruin/pkg/tableau"
@@ -249,6 +250,7 @@ type Manager struct {
 	Elasticsearch        map[string]*elasticsearch.Client
 	Spanner              map[string]*spanner.Client
 	Solidgate            map[string]*solidgate.Client
+	Square               map[string]*square.Client
 	Smartsheet           map[string]*smartsheet.Client
 	Attio                map[string]*attio.Client
 	Sftp                 map[string]*sftp.Client
@@ -1713,6 +1715,26 @@ func (m *Manager) AddSolidgateConnectionFromConfig(connection *config.SolidgateC
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 
+	return nil
+}
+
+func (m *Manager) AddSquareConnectionFromConfig(connection *config.SquareConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.Square == nil {
+		m.Square = make(map[string]*square.Client)
+	}
+
+	client, err := square.NewClient(square.Config{
+		AccessToken: connection.AccessToken,
+		Environment: connection.Environment,
+	})
+	if err != nil {
+		return err
+	}
+	m.Square[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
 	return nil
 }
 
@@ -3779,6 +3801,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Elasticsearch, connectionManager.AddElasticsearchConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Spanner, connectionManager.AddSpannerConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Solidgate, connectionManager.AddSolidgateConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Square, connectionManager.AddSquareConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Smartsheet, connectionManager.AddSmartsheetConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Attio, connectionManager.AddAttioConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Sftp, connectionManager.AddSftpConnectionFromConfig, &wg, &errList, &mu)
