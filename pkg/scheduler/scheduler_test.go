@@ -498,6 +498,7 @@ func TestScheduler_ConnectionLimitsFromDetailsIgnoresConnectionlessMainTasks(t *
 		{Name: "appsflyer-export", Type: pipeline.AssetType("appsflyer.export.bq")},
 		{Name: "dashboard", Type: pipeline.AssetTypeMetabase},
 		{Name: "dbt-task", Type: pipeline.AssetType("dbt")},
+		{Name: "mongo-source", Type: pipeline.AssetTypeMongoSource},
 		{Name: "python-beta", Type: pipeline.AssetType("python.beta")},
 		{Name: "python-legacy", Type: pipeline.AssetType("python.legacy")},
 	}}, "test")
@@ -507,7 +508,7 @@ func TestScheduler_ConnectionLimitsFromDetailsIgnoresConnectionlessMainTasks(t *
 	assert.Empty(t, limits)
 
 	require.NoError(t, s.SetConnectionLimits(map[string]int{"unrelated": 1}))
-	assert.Equal(t, []string{"appsflyer-export", "dashboard", "dbt-task", "python-beta", "python-legacy"}, scheduleableHumanIDs(s))
+	assert.Equal(t, []string{"appsflyer-export", "dashboard", "dbt-task", "mongo-source", "python-beta", "python-legacy"}, scheduleableHumanIDs(s))
 }
 
 func TestScheduler_getScheduleableTasksLimitsRefreshableDashboardMainTasks(t *testing.T) {

@@ -2226,6 +2226,7 @@ func assetMainTaskIsConnectionless(assetType AssetType) bool {
 		AssetTypeClickHouseSource,
 		AssetTypeDatabricksSource,
 		AssetTypeDuckDBSource,
+		AssetTypeMongoSource,
 		AssetTypeMsSQLSource,
 		AssetTypeOracleSource,
 		AssetTypePostgresSource,
