@@ -66,6 +66,8 @@ StarRocks organizes tables as `catalog.database.table`. The `source_table` accep
 | `database.table` | uses the default catalog from the connection |
 | `catalog.database.table` | fully qualified — reads from any internal or external catalog |
 
+Anything specified in the `source_table` takes priority over the catalog/database defaults from the connection.
+
 Examples:
 
 - `analytics.events` — the `events` table in the `analytics` database (internal catalog).
