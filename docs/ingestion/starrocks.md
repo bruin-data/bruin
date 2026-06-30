@@ -19,12 +19,12 @@ To connect to StarRocks, you need to add a configuration item to the connections
       starrocks:
         - name: "my_starrocks"
           host: "localhost"
-          port: 9030
           username: "root"
-          password: "YOUR_PASSWORD"
-          database: "analytics"
-          catalog: "iceberg_catalog"
-          ssl: "true"
+          port: 9030                    # optional, defaults to 9030
+          password: "YOUR_PASSWORD"     # optional
+          database: "analytics"         # optional
+          catalog: "iceberg_catalog"    # optional
+          ssl: "true"                   # optional
 ```
 
 - `host`: the StarRocks FE (frontend) hostname or IP address. Required.
