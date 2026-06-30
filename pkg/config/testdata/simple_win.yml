@@ -567,6 +567,15 @@ environments:
         - name: "balldontlie-1"
           api_key: "test-api-key"
           season: "2026"
+      starrocks:
+        - name: "starrocks-1"
+          host: "localhost"
+          port: 9030
+          username: "root"
+          password: "pass123"
+          database: "analytics"
+          catalog: "iceberg_catalog"
+          ssl: "true"
 
   prod:
     connections:

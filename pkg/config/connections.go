@@ -1602,6 +1602,21 @@ func (c TrinoConnection) GetName() string {
 	return c.Name
 }
 
+type StarRocksConnection struct {
+	Name     string `yaml:"name" json:"name" mapstructure:"name"`
+	Host     string `yaml:"host" json:"host" mapstructure:"host"`
+	Username string `yaml:"username" json:"username" mapstructure:"username"`
+	Password string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password"`
+	Port     int    `yaml:"port,omitempty" json:"port,omitempty" mapstructure:"port"`
+	Database string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
+	Catalog  string `yaml:"catalog,omitempty" json:"catalog,omitempty" mapstructure:"catalog"`
+	SSL      string `yaml:"ssl,omitempty" json:"ssl,omitempty" mapstructure:"ssl"`
+}
+
+func (c StarRocksConnection) GetName() string {
+	return c.Name
+}
+
 type KalshiConnection struct {
 	Name        string            `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	QueryParams map[string]string `yaml:"query_params,omitempty" json:"query_params,omitempty" mapstructure:"query_params"`
