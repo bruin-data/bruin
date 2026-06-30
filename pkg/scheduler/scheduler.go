@@ -324,6 +324,9 @@ type Scheduler struct {
 	taskInstances []TaskInstance
 	taskNameMap   map[string]InstancesByType
 
+	connectionLimits    map[string]int
+	taskConnectionNames map[TaskInstance][]string
+
 	WorkQueue chan TaskInstance
 	Results   chan *TaskExecutionResult
 
@@ -334,6 +337,14 @@ type Scheduler struct {
 
 	runID          string
 	onStatusChange func(StatusChangeEvent)
+}
+
+type ConnectionDetailsGetter interface {
+	GetConnectionDetails(name string) any
+}
+
+type MaxConcurrentAssetsGetter interface {
+	GetMaxConcurrentAssets() *int
 }
 
 // SetOnStatusChange registers a callback that fires whenever a task instance status changes.
@@ -371,6 +382,114 @@ func (s *Scheduler) InstanceCountByStatus(status TaskInstanceStatus) int {
 	}
 
 	return count
+}
+
+func (s *Scheduler) SetConnectionLimits(limits map[string]int) error {
+	if len(limits) == 0 {
+		return s.setConnectionLimits(nil, nil)
+	}
+
+	taskConnectionNames, err := s.resolveConnectionNamesForActiveTasks()
+	if err != nil {
+		return err
+	}
+
+	return s.setConnectionLimits(limits, taskConnectionNames)
+}
+
+func (s *Scheduler) SetConnectionLimitsFromDetails(baseLimits map[string]int, getter ConnectionDetailsGetter) error {
+	if len(baseLimits) == 0 && getter == nil {
+		return s.setConnectionLimits(nil, nil)
+	}
+
+	taskConnectionNames, err := s.resolveConnectionNamesForActiveTasks()
+	if err != nil {
+		return err
+	}
+
+	limits, err := s.connectionLimitsFromDetails(baseLimits, getter, taskConnectionNames)
+	if err != nil {
+		return err
+	}
+
+	return s.setConnectionLimits(limits, taskConnectionNames)
+}
+
+func (s *Scheduler) setConnectionLimits(limits map[string]int, taskConnectionNames map[TaskInstance][]string) error {
+	if len(limits) == 0 {
+		s.connectionLimits = nil
+		s.taskConnectionNames = nil
+		return nil
+	}
+
+	connectionLimits := make(map[string]int, len(limits))
+	for name, limit := range limits {
+		if limit <= 0 {
+			return fmt.Errorf("connection %q has concurrency limit %d, must be greater than 0", name, limit)
+		}
+		connectionLimits[name] = limit
+	}
+
+	s.connectionLimits = connectionLimits
+	s.taskConnectionNames = taskConnectionNames
+
+	return nil
+}
+
+func (s *Scheduler) ConnectionLimitsFromDetails(baseLimits map[string]int, getter ConnectionDetailsGetter) (map[string]int, error) {
+	var taskConnectionNames map[TaskInstance][]string
+	if getter != nil {
+		var err error
+		taskConnectionNames, err = s.resolveConnectionNamesForActiveTasks()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return s.connectionLimitsFromDetails(baseLimits, getter, taskConnectionNames)
+}
+
+func (s *Scheduler) connectionLimitsFromDetails(baseLimits map[string]int, getter ConnectionDetailsGetter, taskConnectionNames map[TaskInstance][]string) (map[string]int, error) {
+	limits := make(map[string]int, len(baseLimits))
+	for name, limit := range baseLimits {
+		if limit <= 0 {
+			return nil, fmt.Errorf("connection %q has concurrency limit %d, must be greater than 0", name, limit)
+		}
+		limits[name] = limit
+	}
+
+	if getter == nil {
+		return limits, nil
+	}
+
+	seen := make(map[string]struct{})
+	for _, names := range taskConnectionNames {
+		for _, name := range names {
+			if name == "" {
+				continue
+			}
+			if _, ok := seen[name]; ok {
+				continue
+			}
+			seen[name] = struct{}{}
+
+			details := getter.GetConnectionDetails(name)
+			limited, ok := details.(MaxConcurrentAssetsGetter)
+			if !ok {
+				continue
+			}
+			limit := limited.GetMaxConcurrentAssets()
+			if limit == nil {
+				continue
+			}
+			if *limit <= 0 {
+				return nil, fmt.Errorf("connection %q has max_concurrent_assets %d, must be greater than 0", name, *limit)
+			}
+			limits[name] = *limit
+		}
+	}
+
+	return limits, nil
 }
 
 func (s *Scheduler) MarkAll(status TaskInstanceStatus) {
@@ -873,6 +992,7 @@ func (s *Scheduler) Kickstart() {
 
 func (s *Scheduler) getScheduleableTasks() []TaskInstance {
 	tasks := make([]TaskInstance, 0)
+	connectionUsage := s.currentConnectionUsage()
 	for _, task := range s.taskInstances {
 		if task.GetStatus() != Pending {
 			continue
@@ -882,10 +1002,126 @@ func (s *Scheduler) getScheduleableTasks() []TaskInstance {
 			continue
 		}
 
+		if !s.canAcquireConnectionSlots(task, connectionUsage) {
+			continue
+		}
+
 		tasks = append(tasks, task)
+		s.reserveConnectionSlots(task, connectionUsage)
 	}
 
 	return tasks
+}
+
+func (s *Scheduler) currentConnectionUsage() map[string]int {
+	usage := make(map[string]int)
+	if len(s.connectionLimits) == 0 {
+		return usage
+	}
+
+	for _, task := range s.taskInstances {
+		status := task.GetStatus()
+		if status != Queued && status != Running {
+			continue
+		}
+		s.reserveConnectionSlots(task, usage)
+	}
+
+	return usage
+}
+
+func (s *Scheduler) canAcquireConnectionSlots(task TaskInstance, usage map[string]int) bool {
+	for _, connName := range s.limitedConnectionNamesForTask(task) {
+		limit := s.connectionLimits[connName]
+		if usage[connName] >= limit {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (s *Scheduler) reserveConnectionSlots(task TaskInstance, usage map[string]int) {
+	for _, connName := range s.limitedConnectionNamesForTask(task) {
+		usage[connName]++
+	}
+}
+
+func (s *Scheduler) limitedConnectionNamesForTask(task TaskInstance) []string {
+	if len(s.connectionLimits) == 0 {
+		return nil
+	}
+
+	names := s.taskConnectionNames[task]
+	if len(names) == 0 {
+		return nil
+	}
+
+	limited := make([]string, 0, len(names))
+	for _, name := range names {
+		if _, ok := s.connectionLimits[name]; ok {
+			limited = append(limited, name)
+		}
+	}
+
+	return limited
+}
+
+func (s *Scheduler) resolveConnectionNamesForTask(task TaskInstance) ([]string, error) {
+	return ResolveConnectionNamesForTask(task.GetPipeline(), task)
+}
+
+func ResolveConnectionNamesForTask(p *pipeline.Pipeline, task TaskInstance) ([]string, error) {
+	if task.GetType() == TaskInstanceTypeMain {
+		return p.GetAllConnectionNamesForAsset(task.GetAsset())
+	}
+
+	connName, err := p.GetConnectionNameForAsset(task.GetAsset())
+	if err != nil {
+		if task.GetType() == TaskInstanceTypeMetadataPush {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return []string{connName}, nil
+}
+
+func (s *Scheduler) resolveConnectionNamesForActiveTasks() (map[TaskInstance][]string, error) {
+	taskConnectionNames := make(map[TaskInstance][]string, len(s.taskInstances))
+	for _, instance := range s.taskInstances {
+		if !connectionSlotStatus(instance.GetStatus()) {
+			continue
+		}
+
+		names, err := s.resolveConnectionNamesForTask(instance)
+		if err != nil {
+			return nil, fmt.Errorf("could not resolve connection names for task %q: %w", instance.GetHumanID(), err)
+		}
+		taskConnectionNames[instance] = uniqueNonEmptyStrings(names)
+	}
+
+	return taskConnectionNames, nil
+}
+
+func connectionSlotStatus(status TaskInstanceStatus) bool {
+	return status == Pending || status == Queued || status == Running
+}
+
+func uniqueNonEmptyStrings(values []string) []string {
+	seen := make(map[string]struct{}, len(values))
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	return out
 }
 
 func (s *Scheduler) allDependenciesSucceededForTask(t TaskInstance) bool {

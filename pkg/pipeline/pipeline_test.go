@@ -730,6 +730,19 @@ func TestPipeline_GetConnectionNameForAsset(t *testing.T) {
 		assert.Equal(t, "default-gcp-connection", found)
 	})
 
+	t.Run("ingestr destination_connection parameter overrides destination type default", func(t *testing.T) {
+		t.Parallel()
+		found, err := pipeline1.GetConnectionNameForAsset(&pipeline.Asset{
+			Type: "ingestr",
+			Parameters: pipeline.ParameterMap{
+				"destination":            "bigquery",
+				"destination_connection": "custom-destination",
+			},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "custom-destination", found)
+	})
+
 	t.Run("should return the right connection if the asset type is known", func(t *testing.T) {
 		t.Parallel()
 		found, err := pipeline1.GetConnectionNameForAsset(&pipeline.Asset{

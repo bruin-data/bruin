@@ -219,8 +219,8 @@ func TestAzureKeyVaultClient_GetConnectionDetails_ReturnsFromCache(t *testing.T)
 		},
 		logger: &mockLogger{},
 		cacheConnectionsDetails: map[string]any{"test-connection": config.AthenaConnection{
-			Name:      "test-connection",
-			SecretKey: "test-secret-key",
+			ConnectionMetadata: config.ConnectionMetadata{Name: "test-connection"},
+			SecretKey:          "test-secret-key",
 		}},
 	}
 
@@ -229,8 +229,8 @@ func TestAzureKeyVaultClient_GetConnectionDetails_ReturnsFromCache(t *testing.T)
 	require.Equal(
 		t,
 		config.AthenaConnection{
-			Name:      "test-connection",
-			SecretKey: "test-secret-key",
+			ConnectionMetadata: config.ConnectionMetadata{Name: "test-connection"},
+			SecretKey:          "test-secret-key",
 		},
 		deets,
 	)

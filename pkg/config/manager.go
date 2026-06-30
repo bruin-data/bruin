@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/git"
@@ -285,7 +286,7 @@ func (c *Config) Path() string {
 func (c *Config) CanRunTaskInstances(p *pipeline.Pipeline, tasks []scheduler.TaskInstance) error {
 	for _, task := range tasks {
 		asset := task.GetAsset()
-		connNames, err := p.GetAllConnectionNamesForAsset(asset)
+		connNames, err := scheduler.ResolveConnectionNamesForTask(p, task)
 		if err != nil {
 			return errors2.Wrap(err, "Could not find connection name for asset "+asset.Name)
 		}
@@ -520,6 +521,9 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 	env, exists := c.Environments[environmentName]
 	if !exists {
 		return fmt.Errorf("environment '%s' does not exist", environmentName)
+	}
+	if err := validateMaxConcurrentAssetsCredential(creds); err != nil {
+		return err
 	}
 
 	// todo(turtledev): refactor this. It's full of unnecessary repetition
@@ -1444,6 +1448,61 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 	return nil
 }
 
+func validateMaxConcurrentAssetsCredential(creds map[string]interface{}) error {
+	raw, ok := creds["max_concurrent_assets"]
+	if !ok || raw == nil {
+		return nil
+	}
+
+	var limit int
+	switch v := raw.(type) {
+	case int:
+		limit = v
+	case int8:
+		limit = int(v)
+	case int16:
+		limit = int(v)
+	case int32:
+		limit = int(v)
+	case int64:
+		limit = int(v)
+	case float32:
+		if v != float32(int(v)) {
+			return errors.New("max_concurrent_assets must be an integer")
+		}
+		limit = int(v)
+	case float64:
+		if v != float64(int(v)) {
+			return errors.New("max_concurrent_assets must be an integer")
+		}
+		limit = int(v)
+	case json.Number:
+		n, err := v.Int64()
+		if err != nil {
+			return errors.New("max_concurrent_assets must be an integer")
+		}
+		limit = int(n)
+	case string:
+		n, err := strconv.Atoi(strings.TrimSpace(v))
+		if err != nil {
+			return errors.New("max_concurrent_assets must be an integer")
+		}
+		limit = n
+	default:
+		return errors.New("max_concurrent_assets must be an integer")
+	}
+
+	return validateMaxConcurrentAssetsLimit(limit)
+}
+
+func validateMaxConcurrentAssetsLimit(limit int) error {
+	if limit <= 0 {
+		return errors.New("max_concurrent_assets must be greater than 0")
+	}
+
+	return nil
+}
+
 func (c *Config) DeleteConnection(environmentName, connectionName string) error {
 	err := c.SelectEnvironment(environmentName)
 	if err != nil {
@@ -1735,6 +1794,53 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 
 type Named interface {
 	GetName() string
+}
+
+type ConcurrencyLimitedConnection interface {
+	GetName() string
+	GetMaxConcurrentAssets() *int
+}
+
+func (c *Connections) ConnectionConcurrencyLimits() (map[string]int, error) {
+	limits := make(map[string]int)
+	if c == nil {
+		return limits, nil
+	}
+
+	connections := reflect.ValueOf(c).Elem()
+	connectionsType := connections.Type()
+	for i := range connectionsType.NumField() {
+		field := connections.Field(i)
+		if field.Type().Kind() != reflect.Slice {
+			continue
+		}
+
+		for i := range field.Len() {
+			fieldItem := field.Index(i)
+			connection, ok := fieldItem.Interface().(ConcurrencyLimitedConnection)
+			if !ok && fieldItem.CanAddr() {
+				connection, ok = fieldItem.Addr().Interface().(ConcurrencyLimitedConnection)
+			}
+			if !ok {
+				continue
+			}
+
+			limit := connection.GetMaxConcurrentAssets()
+			if limit == nil {
+				continue
+			}
+			if connection.GetName() == "" {
+				return nil, fmt.Errorf("connection with empty name has max_concurrent_assets %d", *limit)
+			}
+			if err := validateMaxConcurrentAssetsLimit(*limit); err != nil {
+				return nil, fmt.Errorf("connection %q has max_concurrent_assets %d, must be greater than 0", connection.GetName(), *limit)
+			}
+
+			limits[connection.GetName()] = *limit
+		}
+	}
+
+	return limits, nil
 }
 
 func removeConnection[T interface{ GetName() string }](connections []T, name string) []T {

@@ -2178,45 +2178,37 @@ func (p *Pipeline) GetCompatibilityHash() string {
 func (p *Pipeline) GetAllConnectionNamesForAsset(asset *Asset) ([]string, error) {
 	assetType := asset.Type
 	if assetType == AssetTypePython { //nolint
-		secretKeys := make([]string, 0, len(asset.Secrets))
-		for _, secret := range asset.Secrets {
-			secretKeys = append(secretKeys, secret.SecretKey)
+		connectionNames := assetSecretConnectionNames(asset)
+		if asset.Connection != "" {
+			connectionNames = append(connectionNames, asset.Connection)
+		} else if asset.Materialization.Type != "" {
+			conn, err := p.GetConnectionNameForAsset(asset)
+			if err != nil {
+				return []string{}, err
+			}
+			connectionNames = append(connectionNames, conn)
 		}
-		return secretKeys, nil
+		return connectionNames, nil
+	} else if assetType == AssetTypeR {
+		connectionNames := assetSecretConnectionNames(asset)
+		if asset.Connection != "" {
+			connectionNames = append(connectionNames, asset.Connection)
+		}
+		return connectionNames, nil
 	} else if assetType == AssetTypeIngestr {
 		ingestrSource, ok := asset.Parameters.GetString("source_connection")
 		if !ok {
 			return []string{}, errors.Errorf("No source connection in asset")
 		}
 
-		ingestrDestination, ok := asset.Parameters.GetString("destination_connection")
-		if ok {
-			return []string{ingestrDestination, ingestrSource}, nil
+		ingestrDestination, err := p.GetConnectionNameForAsset(asset)
+		if err != nil {
+			return []string{}, err
 		}
 
-		// if destination connection not specified, we infer from destination type
-		ingestrDest, _ := asset.Parameters.GetString("destination")
-		assetType, ok = IngestrTypeConnectionMapping[ingestrDest]
-		if !ok {
-			return []string{}, errors.Errorf("connection type could not be inferred for destination '%s', please specify a `connection` key in the asset", ingestrDest)
-		}
-
-		mapping, ok := AssetTypeConnectionMapping[assetType]
-		if !ok {
-			return []string{}, errors.Errorf("No connection mapping found for asset type:'%s' (%s)", assetType, asset.Name)
-		}
-		conn, ok := p.DefaultConnections[mapping]
-		if ok {
-			ingestrDestination = conn
-			return []string{ingestrDestination, ingestrSource}, nil
-		}
-
-		ingestrDestination, ok = defaultMapping[mapping]
-		if ok {
-			return []string{ingestrDestination, ingestrSource}, nil
-		}
-
-		return []string{}, errors.Errorf("No default connection for type: '%s'", assetType)
+		return []string{ingestrDestination, ingestrSource}, nil
+	} else if assetMainTaskIsConnectionless(assetType) {
+		return nil, nil
 	} else {
 		conn, err := p.GetConnectionNameForAsset(asset)
 		if err != nil {
@@ -2225,6 +2217,59 @@ func (p *Pipeline) GetAllConnectionNamesForAsset(asset *Asset) ([]string, error)
 
 		return []string{conn}, nil
 	}
+}
+
+func assetMainTaskIsConnectionless(assetType AssetType) bool {
+	switch assetType {
+	case AssetTypeAthenaSource,
+		AssetTypeBigquerySource,
+		AssetTypeClickHouseSource,
+		AssetTypeDatabricksSource,
+		AssetTypeDuckDBSource,
+		AssetTypeMsSQLSource,
+		AssetTypeOracleSource,
+		AssetTypePostgresSource,
+		AssetTypeRedshiftSource,
+		AssetTypeSnowflakeSource,
+		AssetTypeSynapseSource,
+		AssetTypeVerticaSource,
+		AssetTypeEmpty,
+		AssetTypeAgentClaudeCode,
+		AssetTypeDomo,
+		AssetTypeGoodData,
+		AssetTypeGrafana,
+		AssetTypeLooker,
+		AssetTypeLookerStudio,
+		AssetTypeMetabase,
+		AssetTypeModeBI,
+		AssetTypePowerBI,
+		AssetTypeQlikSense,
+		AssetTypeQlikView,
+		AssetTypeQuicksight,
+		AssetTypeRedash,
+		AssetTypeSisense,
+		AssetTypeSuperset,
+		AssetTypeTableauDashboard,
+		AssetTypeTableauWorksheet,
+		AssetType("appsflyer.export.bq"),
+		AssetType("dbt"),
+		AssetType("dbt.test"),
+		AssetType("gcs.sensor.object"),
+		AssetType("gcs.sensor.object_sensor_with_prefix"),
+		AssetType("python.beta"),
+		AssetType("python.legacy"):
+		return true
+	default:
+		return false
+	}
+}
+
+func assetSecretConnectionNames(asset *Asset) []string {
+	secretKeys := make([]string, 0, len(asset.Secrets))
+	for _, secret := range asset.Secrets {
+		secretKeys = append(secretKeys, secret.SecretKey)
+	}
+	return secretKeys
 }
 
 func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
@@ -2236,6 +2281,10 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 	var ok bool
 	switch assetType {
 	case AssetTypeIngestr:
+		if conn, ok := asset.Parameters.GetString("destination_connection"); ok && conn != "" {
+			return conn, nil
+		}
+
 		ingestrDest, _ := asset.Parameters.GetString("destination")
 		assetType, ok = IngestrTypeConnectionMapping[ingestrDest]
 		if !ok {

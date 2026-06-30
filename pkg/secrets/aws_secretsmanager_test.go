@@ -286,8 +286,8 @@ func TestAWSSecretsManagerClient_GetConnectionDetails_ReturnsFromCache(t *testin
 		},
 		logger: &mockLogger{},
 		cacheConnectionsDetails: map[string]any{"test-connection": config.AthenaConnection{
-			Name:      "test-connection",
-			SecretKey: "test-secret-key",
+			ConnectionMetadata: config.ConnectionMetadata{Name: "test-connection"},
+			SecretKey:          "test-secret-key",
 		}},
 	}
 
@@ -296,8 +296,8 @@ func TestAWSSecretsManagerClient_GetConnectionDetails_ReturnsFromCache(t *testin
 	require.Equal(
 		t,
 		config.AthenaConnection{
-			Name:      "test-connection",
-			SecretKey: "test-secret-key",
+			ConnectionMetadata: config.ConnectionMetadata{Name: "test-connection"},
+			SecretKey:          "test-secret-key",
 		},
 		deets,
 	)

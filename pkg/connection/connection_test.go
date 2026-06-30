@@ -90,8 +90,8 @@ func TestManager_AddBqConnectionFromConfig(t *testing.T) {
 	assert.Nil(t, res)
 
 	connection := &config.GoogleCloudPlatformConnection{
-		Name:      "test",
-		ProjectID: "test",
+		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
+		ProjectID:          "test",
 	}
 	connection.SetCredentials(&google.Credentials{
 		ProjectID: "some-project-id",
@@ -121,14 +121,14 @@ func TestManager_AddPgConnectionFromConfig(t *testing.T) {
 	assert.Nil(t, res)
 
 	configuration := &config.PostgresConnection{
-		Name:         "test",
-		Host:         "somehost",
-		Username:     "user",
-		Password:     "pass",
-		Database:     "db",
-		Port:         15432,
-		SslMode:      "disable",
-		PoolMaxConns: 10,
+		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
+		Host:               "somehost",
+		Username:           "user",
+		Password:           "pass",
+		Database:           "db",
+		Port:               15432,
+		SslMode:            "disable",
+		PoolMaxConns:       10,
 	}
 
 	err := m.AddPgConnectionFromConfig(t.Context(), configuration)
@@ -152,13 +152,13 @@ func TestManager_AddRedshiftConnectionFromConfig(t *testing.T) {
 	assert.Nil(t, res)
 
 	configuration := &config.RedshiftConnection{
-		Name:     "test",
-		Host:     "somehost",
-		Username: "user",
-		Password: "pass",
-		Database: "db",
-		Port:     15432,
-		SslMode:  "disable",
+		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
+		Host:               "somehost",
+		Username:           "user",
+		Password:           "pass",
+		Database:           "db",
+		Port:               15432,
+		SslMode:            "disable",
 	}
 
 	err := m.AddRedshiftConnectionFromConfig(t.Context(), configuration)
@@ -181,12 +181,12 @@ func TestManager_AddMsSQLConnectionFromConfigConnectionFromConfig(t *testing.T) 
 	assert.Nil(t, res)
 
 	configuration := &config.MsSQLConnection{
-		Name:     "test",
-		Host:     "somehost",
-		Username: "user",
-		Password: "pass",
-		Database: "db",
-		Port:     15432,
+		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
+		Host:               "somehost",
+		Username:           "user",
+		Password:           "pass",
+		Database:           "db",
+		Port:               15432,
 	}
 
 	err := m.AddMsSQLConnectionFromConfig(configuration)
@@ -211,12 +211,12 @@ func TestManager_AddMongoConnectionFromConfigConnectionFromConfig(t *testing.T) 
 	assert.Nil(t, res)
 
 	configuration := &config.MongoConnection{
-		Name:     "test",
-		Host:     "somehost",
-		Username: "user",
-		Password: "pass",
-		Database: "db",
-		Port:     15432,
+		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
+		Host:               "somehost",
+		Username:           "user",
+		Password:           "pass",
+		Database:           "db",
+		Port:               15432,
 	}
 
 	err := m.AddMongoConnectionFromConfig(configuration)
@@ -240,12 +240,12 @@ func TestManager_AddMySqlConnectionFromConfigConnectionFromConfig(t *testing.T) 
 	assert.Nil(t, res)
 
 	configuration := &config.MySQLConnection{
-		Name:     "test",
-		Host:     "somehost",
-		Username: "user",
-		Password: "pass",
-		Database: "db",
-		Port:     15432,
+		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
+		Host:               "somehost",
+		Username:           "user",
+		Password:           "pass",
+		Database:           "db",
+		Port:               15432,
 	}
 
 	m.Mysql[configuration.Name] = new(mysql.Client)
@@ -268,8 +268,8 @@ func TestManager_AddNotionConnectionFromConfigConnectionFromConfig(t *testing.T)
 	assert.Nil(t, res)
 
 	configuration := &config.NotionConnection{
-		Name:   "test",
-		APIKey: "xXXXXxxxxxYYY	",
+		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
+		APIKey:             "xXXXXxxxxxYYY	",
 	}
 
 	err := m.AddNotionConnectionFromConfig(configuration)
@@ -292,9 +292,9 @@ func TestManager_AddShopiyConnectionFromConfigConnectionFromConfig(t *testing.T)
 	assert.Nil(t, res)
 
 	configuration := &config.ShopifyConnection{
-		Name:   "test",
-		APIKey: "xXXXXxxxxxYYY",
-		URL:    "testxxx",
+		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
+		APIKey:             "xXXXXxxxxxYYY",
+		URL:                "testxxx",
 	}
 
 	err := m.AddShopifyConnectionFromConfig(configuration)
@@ -317,10 +317,10 @@ func TestManager_AddGorgiasConnectionFromConfigConnectionFromConfig(t *testing.T
 	assert.Nil(t, res)
 
 	configuration := &config.GorgiasConnection{
-		Name:   "test",
-		APIKey: "xXXXXxxxxxYYY",
-		Domain: "domain",
-		Email:  "email",
+		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
+		APIKey:             "xXXXXxxxxxYYY",
+		Domain:             "domain",
+		Email:              "email",
 	}
 
 	err := m.AddGorgiasConnectionFromConfig(configuration)
@@ -343,12 +343,12 @@ func TestManager_AddHANAConnectionFromConfigConnectionFromConfig(t *testing.T) {
 	assert.Nil(t, res)
 
 	configuration := &config.HANAConnection{
-		Name:     "test",
-		Username: "user",
-		Password: "pass",
-		Host:     "somehost",
-		Port:     15432,
-		Database: "db",
+		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
+		Username:           "user",
+		Password:           "pass",
+		Host:               "somehost",
+		Port:               15432,
+		Database:           "db",
 	}
 
 	err := m.AddHANAConnectionFromConfig(configuration)
@@ -370,12 +370,12 @@ func Test_AddEMRServerlessConnectionFromConfig(t *testing.T) {
 	assert.Nil(t, res)
 
 	cfg := &config.EMRServerlessConnection{
-		Name:          "test",
-		AccessKey:     "AKIAEXAMPLE",
-		SecretKey:     "SECRETKEYEXAMPLE",
-		ApplicationID: "application-id",
-		ExecutionRole: "execution-role",
-		Region:        "us-east-1",
+		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
+		AccessKey:          "AKIAEXAMPLE",
+		SecretKey:          "SECRETKEYEXAMPLE",
+		ApplicationID:      "application-id",
+		ExecutionRole:      "execution-role",
+		Region:             "us-east-1",
 	}
 
 	err := m.AddEMRServerlessConnectionFromConfig(cfg)
@@ -396,14 +396,14 @@ func Test_AddSharePointConnectionFromConfig(t *testing.T) {
 
 	maxFiles := int64(0)
 	configuration := &config.SharePointConnection{
-		Name:         "test",
-		TenantID:     "tenant-id",
-		ClientID:     "client-id",
-		ClientSecret: "client-secret",
-		Hostname:     "example.sharepoint.com",
-		Site:         "sites/Example",
-		Library:      "Documents",
-		MaxFiles:     &maxFiles,
+		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
+		TenantID:           "tenant-id",
+		ClientID:           "client-id",
+		ClientSecret:       "client-secret",
+		Hostname:           "example.sharepoint.com",
+		Site:               "sites/Example",
+		Library:            "Documents",
+		MaxFiles:           &maxFiles,
 	}
 
 	err := m.AddSharePointConnectionFromConfig(configuration)
@@ -437,19 +437,19 @@ func TestNewManagerFromConfig(t *testing.T) {
 					Connections: &config.Connections{
 						Personio: []config.PersonioConnection{
 							{
-								Name:         "key1",
-								ClientID:     "id1",
-								ClientSecret: "secret1",
+								ConnectionMetadata: config.ConnectionMetadata{Name: "key1"},
+								ClientID:           "id1",
+								ClientSecret:       "secret1",
 							},
 							{
-								Name:         "key2",
-								ClientID:     "val1_${PERSONIO_CLIENT_ID}_val2",
-								ClientSecret: "${PERSONIO_CLIENT_SECRET}",
+								ConnectionMetadata: config.ConnectionMetadata{Name: "key2"},
+								ClientID:           "val1_${PERSONIO_CLIENT_ID}_val2",
+								ClientSecret:       "${PERSONIO_CLIENT_SECRET}",
 							},
 							{
-								Name:         "key3",
-								ClientID:     "${MISSING_PERSONIO_CLIENT_ID}",
-								ClientSecret: "${MISSING_PERSONIO_CLIENT_SECRET}",
+								ConnectionMetadata: config.ConnectionMetadata{Name: "key3"},
+								ClientID:           "${MISSING_PERSONIO_CLIENT_ID}",
+								ClientSecret:       "${MISSING_PERSONIO_CLIENT_SECRET}",
 							},
 						},
 					},
@@ -462,19 +462,19 @@ func TestNewManagerFromConfig(t *testing.T) {
 			want: &Manager{
 				AllConnectionDetails: map[string]any{
 					"key1": &config.PersonioConnection{
-						Name:         "key1",
-						ClientID:     "id1",
-						ClientSecret: "secret1",
+						ConnectionMetadata: config.ConnectionMetadata{Name: "key1"},
+						ClientID:           "id1",
+						ClientSecret:       "secret1",
 					},
 					"key2": &config.PersonioConnection{
-						Name:         "key2",
-						ClientID:     "val1_id2_val2",
-						ClientSecret: "secret2",
+						ConnectionMetadata: config.ConnectionMetadata{Name: "key2"},
+						ClientID:           "val1_id2_val2",
+						ClientSecret:       "secret2",
 					},
 					"key3": &config.PersonioConnection{
-						Name:         "key3",
-						ClientID:     "",
-						ClientSecret: "",
+						ConnectionMetadata: config.ConnectionMetadata{Name: "key3"},
+						ClientID:           "",
+						ClientSecret:       "",
 					},
 				},
 				availableConnections: map[string]any{
@@ -584,8 +584,8 @@ func TestManager_AddGenericConnectionFromConfig(t *testing.T) {
 	assert.Nil(t, res)
 
 	configuration := &config.GenericConnection{
-		Name:  "test",
-		Value: "somevalue",
+		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
+		Value:              "somevalue",
 	}
 
 	err := m.AddGenericConnectionFromConfig(configuration)
@@ -594,6 +594,35 @@ func TestManager_AddGenericConnectionFromConfig(t *testing.T) {
 	res, ok := m.GetConnection("test").(*config.GenericConnection)
 	assert.True(t, ok)
 	assert.NotNil(t, res)
+}
+
+func TestManager_AddInfluxDBConnectionFromConfigStoresConnectionDetails(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
+
+	limit := 2
+	configuration := &config.InfluxDBConnection{
+		ConnectionMetadata: config.ConnectionMetadata{
+			Name:                "test",
+			MaxConcurrentAssets: &limit,
+		},
+		Host:   "localhost",
+		Port:   8086,
+		Token:  "token",
+		Org:    "org",
+		Bucket: "metrics",
+		Secure: "false",
+	}
+
+	err := m.AddInfluxDBConnectionFromConfig(configuration)
+	require.NoError(t, err)
+
+	assert.NotNil(t, m.GetConnection("test"))
+	assert.Same(t, configuration, m.GetConnectionDetails("test"))
 }
 
 func TestManager_AddAwsConnectionFromConfig(t *testing.T) {
@@ -608,9 +637,9 @@ func TestManager_AddAwsConnectionFromConfig(t *testing.T) {
 	assert.Nil(t, res)
 
 	configuration := &config.AwsConnection{
-		Name:      "test",
-		AccessKey: "AKIAEXAMPLE",
-		SecretKey: "SECRETKEYEXAMPLE",
+		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
+		AccessKey:          "AKIAEXAMPLE",
+		SecretKey:          "SECRETKEYEXAMPLE",
 	}
 
 	err := m.AddAwsConnectionFromConfig(configuration)
