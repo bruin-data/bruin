@@ -15,8 +15,10 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 # Set working directory
 WORKDIR /src
 
-# Copy go mod files
+# Copy go mod files (including the nested semantic-engine module referenced
+# by a local replace directive, so `go mod download` can resolve it)
 COPY go.mod go.sum ./
+COPY semantic-engine/go.mod semantic-engine/go.sum semantic-engine/
 
 # Download Go dependencies with cache mount
 RUN --mount=type=cache,target=/root/.cache/go-build \
