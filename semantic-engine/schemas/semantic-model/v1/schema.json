@@ -6,7 +6,11 @@
   "required": ["name", "source"],
   "properties": {
     "schema": {
-      "const": "v1"
+      "comment": "v1 is canonical; the getbruin.com URL is the legacy dac identifier, accepted for backward compatibility.",
+      "enum": [
+        "v1",
+        "https://getbruin.com/schemas/dac/semantic-model/v1"
+      ]
     },
     "name": {
       "type": "string",
