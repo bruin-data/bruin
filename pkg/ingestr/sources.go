@@ -1034,6 +1034,9 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 	// Trino - Distributed SQL query engine (user-defined tables)
 	"trino": {},
 
+	// StarRocks - OLAP database, incl. lakehouse catalogs (user-defined tables)
+	"starrocks": {},
+
 	// Wise - Money transfers
 	"wise": {
 		{Name: "profiles", PrimaryKey: "id", IncKey: "", IncStrategy: "merge"},

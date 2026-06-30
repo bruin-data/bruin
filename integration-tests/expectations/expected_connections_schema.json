@@ -1293,6 +1293,12 @@
           },
           "type": "array"
         },
+        "starrocks": {
+          "items": {
+            "$ref": "#/$defs/StarRocksConnection"
+          },
+          "type": "array"
+        },
         "dremio": {
           "items": {
             "$ref": "#/$defs/DremioConnection"
@@ -4050,6 +4056,41 @@
       "required": [
         "name",
         "access_token"
+      ]
+    },
+    "StarRocksConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "database": {
+          "type": "string"
+        },
+        "catalog": {
+          "type": "string"
+        },
+        "ssl": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "host",
+        "username"
       ]
     },
     "SpannerConnection": {

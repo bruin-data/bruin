@@ -904,6 +904,18 @@ func TestLoadFromFile(t *testing.T) {
 					Season: "2026",
 				},
 			},
+			StarRocks: []StarRocksConnection{
+				{
+					Name:     "starrocks-1",
+					Host:     "localhost",
+					Port:     9030,
+					Username: "root",
+					Password: "pass123",
+					Database: "analytics",
+					Catalog:  "iceberg_catalog",
+					SSL:      "true",
+				},
+			},
 		},
 	}
 
@@ -2279,6 +2291,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Tableau:             []TableauConnection{{Name: "tableau1"}},
 				QuickSight:          []QuickSightConnection{{Name: "quicksight1"}},
 				Trino:               []TrinoConnection{{Name: "trino1"}},
+				StarRocks:           []StarRocksConnection{{Name: "starrocks1"}},
 				Fluxx:               []FluxxConnection{{Name: "fluxx1"}},
 				Freshdesk:           []FreshdeskConnection{{Name: "freshdesk1"}},
 				FundraiseUp:         []FundraiseUpConnection{{Name: "fundraiseup1"}},
@@ -2410,6 +2423,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Tableau:             []TableauConnection{{Name: "tableau1"}},
 				QuickSight:          []QuickSightConnection{{Name: "quicksight1"}},
 				Trino:               []TrinoConnection{{Name: "trino1"}},
+				StarRocks:           []StarRocksConnection{{Name: "starrocks1"}},
 				Fluxx:               []FluxxConnection{{Name: "fluxx1"}},
 				Freshdesk:           []FreshdeskConnection{{Name: "freshdesk1"}},
 				FundraiseUp:         []FundraiseUpConnection{{Name: "fundraiseup1"}},

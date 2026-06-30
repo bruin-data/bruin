@@ -126,6 +126,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/spanner"
 	"github.com/bruin-data/bruin/pkg/sqlite"
 	"github.com/bruin-data/bruin/pkg/square"
+	"github.com/bruin-data/bruin/pkg/starrocks"
 	"github.com/bruin-data/bruin/pkg/stripe"
 	"github.com/bruin-data/bruin/pkg/surveymonkey"
 	"github.com/bruin-data/bruin/pkg/tableau"
@@ -261,6 +262,7 @@ type Manager struct {
 	Tableau              map[string]*tableau.Client
 	QuickSight           map[string]*quicksight.Client
 	Trino                map[string]*trino.Client
+	StarRocks            map[string]*starrocks.Client
 	Dremio               map[string]*dremio.Client
 	Sail                 map[string]*sail.Client
 	Dune                 map[string]*dune.Client
@@ -3565,6 +3567,35 @@ func (m *Manager) AddTrinoConnectionFromConfig(connection *config.TrinoConnectio
 	return nil
 }
 
+func (m *Manager) AddStarRocksConnectionFromConfig(connection *config.StarRocksConnection) error {
+	m.mutex.Lock()
+	if m.StarRocks == nil {
+		m.StarRocks = make(map[string]*starrocks.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := starrocks.NewClient(starrocks.Config{
+		Username: connection.Username,
+		Password: connection.Password,
+		Host:     connection.Host,
+		Port:     connection.Port,
+		Database: connection.Database,
+		Catalog:  connection.Catalog,
+		SSL:      connection.SSL,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.StarRocks[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
 func (m *Manager) AddDremioConnectionFromConfig(connection *config.DremioConnection) error {
 	m.mutex.Lock()
 	if m.Dremio == nil {
@@ -3838,6 +3869,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.QuickSight, connectionManager.AddQuickSightConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Generic, connectionManager.AddGenericConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Trino, connectionManager.AddTrinoConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.StarRocks, connectionManager.AddStarRocksConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Dremio, connectionManager.AddDremioConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Sail, connectionManager.AddSailConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Vertica, connectionManager.AddVerticaConnectionFromConfig, &wg, &errList, &mu)

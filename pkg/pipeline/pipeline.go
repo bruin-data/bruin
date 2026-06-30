@@ -193,6 +193,7 @@ var defaultMapping = map[string]string{
 	"emr_serverless":        "emr_serverless-default",
 	"dataproc_serverless":   "dataproc_serverless-default",
 	"trino":                 "trino-default",
+	"starrocks":             "starrocks-default",
 	"dremio":                "dremio-default",
 	"sail":                  "sail-default",
 	"oracle":                "oracle-default",
