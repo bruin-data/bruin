@@ -89,6 +89,8 @@ test-unit:
 	@echo "$(OK_COLOR)==> Running the unit tests$(NO_COLOR)"
 	@$(MAKE) rustsqlparser-lib
 	@go test -tags="no_duckdb_arrow" -race -p 50 -vet=off -timeout 10m ./cmd/... ./pkg/...
+	@echo "$(OK_COLOR)==> Running the semantic-engine module tests$(NO_COLOR)"
+	@cd semantic-engine && go test -race -timeout 10m ./...
 
 RUST_LIB = pkg/sqlparser/rustffi/target/release/libbruin_rustsqlparser.a
 
@@ -103,13 +105,14 @@ format: lint-python
 	go vet -tags="no_duckdb_arrow" ./... & 
 
 	@echo "$(OK_COLOR)>> [gci] running$(NO_COLOR)" & \
-	go tool gci write cmd pkg schemas integration-tests/integration_test.go main.go &
+	go tool gci write cmd pkg semantic-engine integration-tests/integration_test.go main.go &
 
 	@echo "$(OK_COLOR)>> [gofumpt] running$(NO_COLOR)" & \
-	go tool gofumpt -w cmd pkg schemas &
+	go tool gofumpt -w cmd pkg semantic-engine &
 
 	@echo "$(OK_COLOR)>> [golangci-lint] running$(NO_COLOR)" & \
 	golangci-lint run --timeout 10m60s --build-tags="no_duckdb_arrow" ./...  & \
+	cd semantic-engine && golangci-lint run --timeout 10m60s & \
 	wait
 
 tools-update:
