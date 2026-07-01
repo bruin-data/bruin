@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
@@ -15,6 +16,11 @@ type Client struct {
 	conn   *sql.DB
 	config *Config
 }
+
+var (
+	plsqlUnitStartRegex = regexp.MustCompile(`(?is)^CREATE\s+(?:OR\s+REPLACE\s+)?(?:(?:NON)?EDITIONABLE\s+)?(?:PROCEDURE|FUNCTION|PACKAGE(?:\s+BODY)?|TRIGGER|TYPE\s+BODY)\b`)
+	plsqlUnitEndRegex   = regexp.MustCompile(`(?is)\bEND(?:\s+[A-Z0-9_$#".]+)?;\s*$`)
+)
 
 func NewClient(c Config) (*Client, error) {
 	dsn, err := c.DSN()
@@ -45,12 +51,11 @@ func (db *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query)
 	return nil
 }
 
-// isPLSQLBlock detects PL/SQL anonymous blocks that require the trailing semicolon.
-// It checks for a word boundary after BEGIN/DECLARE to avoid false positives
-// on identifiers like BEGINDATE.
+// isPLSQLBlock detects PL/SQL units that require the trailing semicolon.
+// It checks for a word boundary after BEGIN/DECLARE to avoid false positives on identifiers like BEGINDATE.
 func isPLSQLBlock(q string) bool {
 	upper := strings.ToUpper(trimTrailingSQLComments(q))
-	if !strings.HasSuffix(upper, "END;") {
+	if !plsqlUnitEndRegex.MatchString(upper) {
 		return false
 	}
 	for _, prefix := range []string{"BEGIN", "DECLARE"} {
@@ -62,7 +67,7 @@ func isPLSQLBlock(q string) bool {
 			}
 		}
 	}
-	return false
+	return plsqlUnitStartRegex.MatchString(upper)
 }
 
 func trimTrailingSQLComments(q string) string {

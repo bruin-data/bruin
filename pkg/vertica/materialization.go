@@ -185,6 +185,7 @@ func buildDDLQuery(asset *pipeline.Asset, _ string) (string, error) {
 
 	columnDefs := make([]string, 0, len(asset.Columns)+1)
 	primaryKeys := make([]string, 0)
+	foreignKeys := make([]string, 0)
 	columnComments := make([]string, 0)
 	for _, col := range asset.Columns {
 		if col.Type == "" {
@@ -192,7 +193,13 @@ func buildDDLQuery(asset *pipeline.Asset, _ string) (string, error) {
 		}
 
 		quotedColName := QuoteIdentifier(col.Name)
-		definition := fmt.Sprintf("%s %s", quotedColName, col.Type)
+		definition := fmt.Sprintf("%s %s", quotedColName, col.SQLType())
+		if col.Collation != "" {
+			definition += " COLLATE " + QuoteIdentifier(col.Collation)
+		}
+		if col.Default != "" {
+			definition += " DEFAULT " + col.Default
+		}
 		if col.PrimaryKey || !col.Nullable.Bool() {
 			definition += " NOT NULL"
 		}
@@ -200,6 +207,10 @@ func buildDDLQuery(asset *pipeline.Asset, _ string) (string, error) {
 
 		if col.PrimaryKey {
 			primaryKeys = append(primaryKeys, quotedColName)
+		}
+		if col.ForeignKey != nil && col.ForeignKey.Table != "" && col.ForeignKey.Column != "" {
+			foreignKeys = append(foreignKeys, fmt.Sprintf("FOREIGN KEY (%s) REFERENCES %s (%s)",
+				quotedColName, QuoteIdentifier(col.ForeignKey.Table), QuoteIdentifier(col.ForeignKey.Column)))
 		}
 		if col.Description != "" {
 			columnComments = append(columnComments, fmt.Sprintf(
@@ -214,6 +225,8 @@ func buildDDLQuery(asset *pipeline.Asset, _ string) (string, error) {
 	if len(primaryKeys) > 0 {
 		columnDefs = append(columnDefs, fmt.Sprintf("PRIMARY KEY (%s)", strings.Join(primaryKeys, ", ")))
 	}
+
+	columnDefs = append(columnDefs, foreignKeys...)
 
 	queries := make([]string, 0, 1+len(columnComments))
 	queries = append(queries, fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (\n%s\n)", QuoteIdentifier(asset.Name), strings.Join(columnDefs, ",\n")))

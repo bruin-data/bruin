@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
@@ -43,6 +44,76 @@ func (m *mockGlossaryReader) GetEntities(pathToPipeline string) ([]*glossary.Ent
 	return m.entities, nil
 }
 
+func TestParameterMapGetString(t *testing.T) {
+	t.Parallel()
+
+	params := pipeline.ParameterMap{
+		"string": "value",
+		"int":    3,
+		"float":  1.5,
+		"bool":   true,
+		"nested": map[string]interface{}{"key": "value"},
+		"list":   []interface{}{"value"},
+		"nil":    nil,
+	}
+
+	got, ok := params.GetString("string")
+	require.True(t, ok)
+	assert.Equal(t, "value", got)
+
+	got, ok = params.GetString("int")
+	require.True(t, ok)
+	assert.Equal(t, "3", got)
+
+	got, ok = params.GetString("float")
+	require.True(t, ok)
+	assert.Equal(t, "1.5", got)
+
+	got, ok = params.GetString("bool")
+	require.True(t, ok)
+	assert.Equal(t, "true", got)
+
+	_, ok = params.GetString("nested")
+	assert.False(t, ok)
+
+	_, ok = params.GetString("list")
+	assert.False(t, ok)
+
+	_, ok = params.GetString("nil")
+	assert.False(t, ok)
+
+	_, ok = params.GetString("missing")
+	assert.False(t, ok)
+}
+
+func TestAssetParametersYAMLSupportStructuredValues(t *testing.T) {
+	t.Parallel()
+
+	var asset pipeline.Asset
+	err := yaml.Unmarshal([]byte(`
+name: structured-params
+type: duckdb.sql
+parameters:
+  string: value
+  count: 3
+  enabled: true
+  nested:
+    key: value
+  list:
+    - one
+    - 2
+`), &asset)
+	require.NoError(t, err)
+
+	assert.Equal(t, "value", asset.Parameters["string"])
+	assert.Equal(t, 3, asset.Parameters["count"])
+	assert.Equal(t, true, asset.Parameters["enabled"])
+	nested, ok := asset.Parameters["nested"].(pipeline.ParameterMap)
+	require.True(t, ok)
+	assert.Equal(t, map[string]interface{}{"key": "value"}, map[string]interface{}(nested))
+	assert.Equal(t, []interface{}{"one", 2}, asset.Parameters["list"])
+}
+
 func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 	t.Parallel()
 
@@ -71,7 +142,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 			Path: path.AbsPathForTests(t, "testdata/pipeline/first-pipeline/tasks/task1/task.yml"),
 			Type: pipeline.YamlTask,
 		},
-		Parameters: map[string]string{
+		Parameters: pipeline.ParameterMap{
 			"param1": "value1",
 			"param2": "value2",
 		},
@@ -95,7 +166,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 		ID:   "c69409a1840ddb3639a4acbaaec46c238c63b6431cc74ee5254b6dcef7b88c4b",
 		Name: "second-task",
 		Type: "bq.transfer",
-		Parameters: map[string]string{
+		Parameters: pipeline.ParameterMap{
 			"transfer_config_id": "some-uuid",
 			"project_id":         "a-new-project-id",
 			"location":           "europe-west1",
@@ -131,7 +202,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 			Path: path.AbsPathForTests(t, "testdata/pipeline/first-pipeline/tasks/test.py"),
 			Type: pipeline.CommentTask,
 		},
-		Parameters: map[string]string{
+		Parameters: pipeline.ParameterMap{
 			"param1": "first-parameter",
 			"param2": "second-parameter",
 			"param3": "third-parameter",
@@ -169,7 +240,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 			Path: path.AbsPathForTests(t, "testdata/pipeline/first-pipeline/tasks/test.sql"),
 			Type: pipeline.CommentTask,
 		},
-		Parameters: map[string]string{
+		Parameters: pipeline.ParameterMap{
 			"param1": "first-parameter",
 			"param2": "second-parameter",
 		},
@@ -204,7 +275,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 			"slack":           "slack-connection",
 			"gcpConnectionId": "gcp-connection-id-here",
 		},
-		Retries: 3,
+		Retries: ptrInt(3),
 		Assets:  []*pipeline.Asset{asset1, asset2, asset3, asset4},
 	}
 	fs := afero.NewOsFs()
@@ -653,7 +724,7 @@ func TestPipeline_GetConnectionNameForAsset(t *testing.T) {
 		t.Parallel()
 		found, err := pipeline1.GetConnectionNameForAsset(&pipeline.Asset{
 			Type:       "ingestr",
-			Parameters: map[string]string{"destination": "bigquery"},
+			Parameters: pipeline.ParameterMap{"destination": "bigquery"},
 		})
 		require.NoError(t, err)
 		assert.Equal(t, "default-gcp-connection", found)
@@ -676,6 +747,32 @@ func TestPipeline_GetConnectionNameForAsset(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.Equal(t, "postgres-default", found)
+	})
+
+	t.Run("mongo.source resolves a mongo default connection", func(t *testing.T) {
+		t.Parallel()
+		mongoPipeline := &pipeline.Pipeline{
+			Name:               "mongo-pipeline",
+			DefaultConnections: map[string]string{"mongo": "my-mongo"},
+		}
+		found, err := mongoPipeline.GetConnectionNameForAsset(&pipeline.Asset{
+			Type: pipeline.AssetTypeMongoSource,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "my-mongo", found)
+	})
+
+	t.Run("mongo.source falls back to a mongo_atlas default connection", func(t *testing.T) {
+		t.Parallel()
+		atlasPipeline := &pipeline.Pipeline{
+			Name:               "atlas-pipeline",
+			DefaultConnections: map[string]string{"mongo_atlas": "my-atlas"},
+		}
+		found, err := atlasPipeline.GetConnectionNameForAsset(&pipeline.Asset{
+			Type: pipeline.AssetTypeMongoSource,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "my-atlas", found)
 	})
 }
 
@@ -783,6 +880,38 @@ func TestColumnCheckValue_UnmarshalJSON(t *testing.T) {
 			tt.wantErr(t, err)
 
 			assert.Equal(t, tt.want, &got)
+		})
+	}
+}
+
+func TestMaterialization_MarshalJSON(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name            string
+		materialization pipeline.Materialization
+		want            string
+	}{
+		{
+			name: "empty materialization marshals to null",
+			want: "null",
+		},
+		{
+			name: "time granularity only materialization is preserved",
+			materialization: pipeline.Materialization{
+				TimeGranularity: pipeline.MaterializationTimeGranularityDate,
+			},
+			want: `{"type":"","strategy":"","partition_by":"","cluster_by":null,"incremental_key":"","time_granularity":"date"}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := tt.materialization.MarshalJSON()
+			require.NoError(t, err)
+			assert.JSONEq(t, tt.want, string(got))
 		})
 	}
 }
@@ -1204,9 +1333,9 @@ func TestPipeline_FormatContent_ErrorHandling(t *testing.T) {
 			Name:               "complex-test",
 			Schedule:           "daily",
 			StartDate:          "2024-01-01",
-			Retries:            3,
+			Retries:            ptrInt(3),
 			Concurrency:        5,
-			Catchup:            true,
+			Catchup:            pipeline.CatchupActive,
 			Agent:              true,
 			Tags:               pipeline.EmptyStringArray{"production", "critical"},
 			Domains:            pipeline.EmptyStringArray{"analytics"},
@@ -1233,7 +1362,7 @@ func TestPipeline_FormatContent_ErrorHandling(t *testing.T) {
 		assert.Contains(t, contentStr, "schedule: daily")
 		assert.Contains(t, contentStr, "retries: 3")
 		assert.Contains(t, contentStr, "concurrency: 5")
-		assert.Contains(t, contentStr, "catchup: true")
+		assert.Contains(t, contentStr, "catchup: active")
 		assert.Contains(t, contentStr, "agent: true")
 		assert.Contains(t, contentStr, "tags:")
 		assert.Contains(t, contentStr, "- production")
@@ -1413,6 +1542,37 @@ func TestDefaultTrueBool_MarshalYAML(t *testing.T) {
 	}
 }
 
+func TestTemplatedBool_ZeroValueMarshalConsistency(t *testing.T) {
+	t.Parallel()
+
+	var value pipeline.TemplatedBool
+
+	jsonValue, err := json.Marshal(value)
+	require.NoError(t, err)
+	assert.JSONEq(t, "true", string(jsonValue))
+
+	yamlValue, err := yaml.Marshal(value)
+	require.NoError(t, err)
+	assert.YAMLEq(t, "true\n", string(yamlValue))
+}
+
+func TestAsset_IsEnabledPanicsOnUnresolvedTemplate(t *testing.T) {
+	t.Parallel()
+
+	asset := &pipeline.Asset{
+		Name:    "templated",
+		Enabled: &pipeline.TemplatedBool{Template: "{{ var.asset_enabled }}"},
+	}
+
+	require.PanicsWithError(t, `enabled contains unresolved template "{{ var.asset_enabled }}"`, func() {
+		asset.IsEnabled()
+	})
+
+	enabled, err := asset.EnabledValue()
+	require.Error(t, err)
+	assert.True(t, enabled)
+}
+
 func TestPipeline_GetCompatibilityHash(t *testing.T) {
 	t.Parallel()
 
@@ -1439,6 +1599,29 @@ func TestPipeline_GetCompatibilityHash(t *testing.T) {
 				parts = append(parts, "test-pipeline")
 				parts = append(parts, ":asset1{")
 				parts = append(parts, ":upstream1:type1:")
+				parts = append(parts, "}")
+				parts = append(parts, ":")
+				hash := sha256.New()
+				hash.Write([]byte(strings.Join(parts, "")))
+				return hex.EncodeToString(hash.Sum(nil))
+			}(),
+		},
+		{
+			name: "disabled asset",
+			pipeline: &pipeline.Pipeline{
+				Name: "test-pipeline",
+				Assets: []*pipeline.Asset{
+					{
+						Name:    "asset1",
+						Enabled: pipeline.NewTemplatedBool(false),
+					},
+				},
+			},
+			expected: func() string {
+				parts := make([]string, 0, 5)
+				parts = append(parts, "test-pipeline")
+				parts = append(parts, ":asset1{")
+				parts = append(parts, ":enabled:false")
 				parts = append(parts, "}")
 				parts = append(parts, ":")
 				hash := sha256.New()
@@ -1993,6 +2176,44 @@ func TestBuilder_SetNameFromPath(t *testing.T) {
 	}
 }
 
+func TestBuilder_SetNameFromPathDoesNotRecalculateCheckIDs(t *testing.T) {
+	t.Parallel()
+
+	builder := &pipeline.Builder{}
+	p := &pipeline.Pipeline{
+		DefinitionFile: pipeline.DefinitionFile{
+			Path: filepath.Join(os.TempDir(), "project", "pipeline.yml"),
+		},
+	}
+
+	columnCheckID := hash("-id-not_null")
+	customCheckID := hash("-row_count")
+	asset := &pipeline.Asset{
+		DefinitionFile: pipeline.TaskDefinitionFile{
+			Path: filepath.Join(os.TempDir(), "project", "assets", "orders.asset.yml"),
+		},
+		Columns: []pipeline.Column{
+			{
+				Name: "id",
+				Checks: []pipeline.ColumnCheck{
+					{ID: columnCheckID, Name: "not_null"},
+				},
+			},
+		},
+		CustomChecks: []pipeline.CustomCheck{
+			{ID: customCheckID, Name: "row_count"},
+		},
+	}
+
+	got, err := builder.SetNameFromPath(t.Context(), asset, p)
+	require.NoError(t, err)
+
+	assert.Equal(t, "orders", got.Name)
+	assert.Equal(t, hash("orders"), got.ID)
+	assert.Equal(t, columnCheckID, got.Columns[0].Checks[0].ID)
+	assert.Equal(t, customCheckID, got.CustomChecks[0].ID)
+}
+
 func hash(s string) string {
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(s)))[:64]
 }
@@ -2021,7 +2242,7 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 			},
 			want: &pipeline.Asset{
 				Name:       "test-asset",
-				Parameters: pipeline.EmptyStringMap{},
+				Parameters: pipeline.ParameterMap{},
 				IntervalModifiers: pipeline.IntervalModifiers{
 					Start: pipeline.TimeModifier{Days: 1},
 					End:   pipeline.TimeModifier{Days: -1},
@@ -2047,7 +2268,7 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 			},
 			want: &pipeline.Asset{
 				Name:       "test-asset",
-				Parameters: pipeline.EmptyStringMap{},
+				Parameters: pipeline.ParameterMap{},
 				IntervalModifiers: pipeline.IntervalModifiers{
 					Start: pipeline.TimeModifier{Hours: 2},
 					End:   pipeline.TimeModifier{Hours: -2},
@@ -2074,7 +2295,7 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 			want: &pipeline.Asset{
 				Name:       "test-asset",
 				Type:       pipeline.AssetTypeBigqueryQuery,
-				Parameters: pipeline.EmptyStringMap{},
+				Parameters: pipeline.ParameterMap{},
 				ExecutableFile: pipeline.ExecutableFile{
 					Path: "/tmp/test-asset.sql",
 				},
@@ -2104,7 +2325,7 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 			want: &pipeline.Asset{
 				Name:       "test-asset",
 				Type:       pipeline.AssetTypePython,
-				Parameters: pipeline.EmptyStringMap{},
+				Parameters: pipeline.ParameterMap{},
 				ExecutableFile: pipeline.ExecutableFile{
 					Path: "/tmp/test-asset.py",
 				},
@@ -2130,7 +2351,7 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 			want: &pipeline.Asset{
 				Name:       "test-asset",
 				Type:       pipeline.AssetTypeBigqueryQuery,
-				Parameters: pipeline.EmptyStringMap{},
+				Parameters: pipeline.ParameterMap{},
 				ExecutableFile: pipeline.ExecutableFile{
 					Path: "/tmp/test-asset.asset.yml",
 				},
@@ -2160,7 +2381,7 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 			want: &pipeline.Asset{
 				Name:       "test-asset",
 				Type:       pipeline.AssetTypeIngestr,
-				Parameters: pipeline.EmptyStringMap{},
+				Parameters: pipeline.ParameterMap{},
 				ExecutableFile: pipeline.ExecutableFile{
 					Path: "/tmp/test-asset.sql",
 				},
@@ -2185,7 +2406,7 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 			},
 			want: &pipeline.Asset{
 				Name:       "test-asset",
-				Parameters: pipeline.EmptyStringMap{},
+				Parameters: pipeline.ParameterMap{},
 				Hooks: pipeline.Hooks{
 					Pre:  []pipeline.Hook{{Query: "select 9"}},
 					Post: []pipeline.Hook{{Query: "select 10"}},
@@ -2204,7 +2425,7 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 			},
 			want: &pipeline.Asset{
 				Name:       "test-asset",
-				Parameters: pipeline.EmptyStringMap{},
+				Parameters: pipeline.ParameterMap{},
 				Routing:    &pipeline.RoutingConfig{EgressGateway: "wg-shared-ams3"},
 			},
 		},
@@ -2221,7 +2442,7 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 			},
 			want: &pipeline.Asset{
 				Name:       "test-asset",
-				Parameters: pipeline.EmptyStringMap{},
+				Parameters: pipeline.ParameterMap{},
 				Routing:    &pipeline.RoutingConfig{EgressGateway: "wg-vendor-us"},
 			},
 		},
@@ -2238,7 +2459,7 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 			},
 			want: &pipeline.Asset{
 				Name:       "test-asset",
-				Parameters: pipeline.EmptyStringMap{},
+				Parameters: pipeline.ParameterMap{},
 				Routing:    &pipeline.RoutingConfig{EgressGateway: "wg-shared-ams3"},
 			},
 		},
@@ -2254,6 +2475,214 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func TestDefaultValues_CoversAssetConfigFields(t *testing.T) {
+	t.Parallel()
+
+	assetType := reflect.TypeOf(pipeline.Asset{})
+	defaultType := reflect.TypeOf(pipeline.DefaultValues{})
+	defaultFields := make(map[string]bool, defaultType.NumField())
+	for i := range defaultType.NumField() {
+		defaultFields[defaultType.Field(i).Name] = true
+	}
+
+	nonDefaultable := map[string]bool{
+		"ID":             true,
+		"Name":           true,
+		"URI":            true,
+		"Enabled":        true,
+		"ExecutableFile": true,
+		"DefinitionFile": true,
+		"RetriesDelay":   true,
+	}
+
+	for i := range assetType.NumField() {
+		field := assetType.Field(i)
+		if !field.IsExported() || nonDefaultable[field.Name] {
+			continue
+		}
+
+		assert.Truef(t, defaultFields[field.Name], "Asset.%s should be represented in DefaultValues or explicitly marked non-defaultable", field.Name)
+	}
+}
+
+func TestDefaultValues_UnmarshalYAMLDoesNotSupportName(t *testing.T) {
+	t.Parallel()
+
+	var p pipeline.Pipeline
+	err := yaml.Unmarshal([]byte(`
+name: test-pipeline
+default:
+  name: should-not-default
+  description: default description
+`), &p)
+	require.NoError(t, err)
+	require.NotNil(t, p.DefaultValues)
+
+	builder := &pipeline.Builder{}
+	got, err := builder.SetupDefaultsFromPipeline(t.Context(), &pipeline.Asset{}, &p)
+	require.NoError(t, err)
+
+	assert.Empty(t, got.Name)
+	assert.Empty(t, got.ID)
+	assert.Equal(t, "default description", got.Description)
+}
+
+func TestBuilder_SetupDefaultsFromPipelineAppliesAssetFieldDefaults(t *testing.T) {
+	t.Parallel()
+
+	falseValue := false
+	retries := 3
+	rerunCooldown := 45
+	customCount := int64(1)
+
+	asset := &pipeline.Asset{
+		ID:          hash("asset"),
+		Name:        "asset",
+		Type:        pipeline.AssetTypeBigqueryQuery,
+		Description: "asset description",
+		Tags:        []string{"asset-tag"},
+		Domains:     []string{"asset-domain"},
+		Meta:        pipeline.EmptyStringMap{"shared": "asset", "asset": "yes"},
+		Materialization: pipeline.Materialization{
+			Strategy: pipeline.MaterializationStrategyAppend,
+		},
+		Upstreams: []pipeline.Upstream{{Type: "asset", Value: "asset-upstream"}},
+		Parameters: pipeline.ParameterMap{
+			"shared": "asset",
+		},
+		Extends: []string{"asset.extend"},
+		Columns: []pipeline.Column{
+			{
+				Name:        "id",
+				Description: "asset column",
+				Checks: []pipeline.ColumnCheck{
+					{Name: "not_null"},
+				},
+			},
+		},
+		CustomChecks: []pipeline.CustomCheck{
+			{Name: "row_count", Query: "select asset", Value: 1},
+		},
+		Notifications: &pipeline.Notifications{
+			Slack: []pipeline.SlackNotification{{Channel: "#asset"}},
+		},
+	}
+
+	defaults := &pipeline.DefaultValues{
+		Type:        string(pipeline.AssetTypeSnowflakeQuery),
+		Description: "default description",
+		StartDate:   "2024-01-01",
+		Connection:  "default-connection",
+		Tags:        []string{"default-tag", "asset-tag"},
+		Domains:     []string{"default-domain", "asset-domain"},
+		Meta:        pipeline.EmptyStringMap{"shared": "default", "default": "yes"},
+		Materialization: pipeline.Materialization{
+			Type:           pipeline.MaterializationTypeTable,
+			Strategy:       pipeline.MaterializationStrategyCreateReplace,
+			PartitionBy:    "dt",
+			ClusterBy:      []string{"tenant"},
+			IncrementalKey: "updated_at",
+		},
+		Upstreams: []pipeline.Upstream{
+			{Type: "asset", Value: "default-upstream"},
+			{Type: "asset", Value: "asset-upstream"},
+		},
+		Image:      "python:3.12",
+		Instance:   "b1.small",
+		Owner:      "data",
+		Tier:       2,
+		Parameters: pipeline.ParameterMap{"shared": "default", "default": "yes"},
+		Extends:    []string{"default.extend", "asset.extend"},
+		Columns: []pipeline.Column{
+			{
+				Name:        "id",
+				Type:        "integer",
+				Description: "default column",
+				Checks: []pipeline.ColumnCheck{
+					{Name: "unique"},
+					{Name: "not_null", Description: "default not null"},
+				},
+			},
+			{
+				Name: "loaded_at",
+				Type: "timestamp",
+			},
+		},
+		CustomChecks: []pipeline.CustomCheck{
+			{Name: "row_count", Description: "default row count", Query: "select default", Value: 2},
+			{Name: "freshness", Query: "select 0", Count: &customCount},
+		},
+		Metadata: pipeline.EmptyStringMap{"catalog": "default"},
+		Snowflake: pipeline.SnowflakeConfig{
+			Warehouse: "default-wh",
+		},
+		Athena: pipeline.AthenaConfig{
+			Location: "s3://default/results",
+		},
+		Routing: &pipeline.RoutingConfig{
+			EgressGateway: "default-gateway",
+		},
+		IntervalModifiers: pipeline.IntervalModifiers{
+			Start: pipeline.TimeModifier{Days: -1},
+			End:   pipeline.TimeModifier{Days: 1},
+		},
+		RerunCooldown:     &rerunCooldown,
+		Retries:           &retries,
+		RefreshRestricted: &falseValue,
+		Notifications: &pipeline.Notifications{
+			Slack: []pipeline.SlackNotification{{Channel: "#default"}},
+		},
+	}
+
+	builder := &pipeline.Builder{}
+	got, err := builder.SetupDefaultsFromPipeline(t.Context(), asset, &pipeline.Pipeline{DefaultValues: defaults})
+	require.NoError(t, err)
+
+	assert.Equal(t, "asset", got.Name)
+	assert.Empty(t, got.URI)
+	assert.Equal(t, pipeline.AssetTypeBigqueryQuery, got.Type)
+	assert.Equal(t, "asset description", got.Description)
+	assert.Equal(t, "2024-01-01", got.StartDate)
+	assert.Equal(t, "default-connection", got.Connection)
+	assert.Equal(t, []string{"asset-tag", "default-tag"}, []string(got.Tags))
+	assert.Equal(t, []string{"asset-domain", "default-domain"}, []string(got.Domains))
+	assert.Equal(t, pipeline.EmptyStringMap{"shared": "asset", "asset": "yes", "default": "yes"}, got.Meta)
+	assert.Equal(t, pipeline.MaterializationTypeTable, got.Materialization.Type)
+	assert.Equal(t, pipeline.MaterializationStrategyAppend, got.Materialization.Strategy)
+	assert.Equal(t, "dt", got.Materialization.PartitionBy)
+	assert.Equal(t, []string{"tenant"}, got.Materialization.ClusterBy)
+	assert.Equal(t, []pipeline.Upstream{
+		{Type: "asset", Value: "asset-upstream"},
+		{Type: "asset", Value: "default-upstream"},
+	}, got.Upstreams)
+	assert.Equal(t, "python:3.12", got.Image)
+	assert.Equal(t, "b1.small", got.Instance)
+	assert.Equal(t, "data", got.Owner)
+	assert.Equal(t, 2, got.Tier)
+	assert.Equal(t, pipeline.ParameterMap{"shared": "asset", "default": "yes"}, got.Parameters)
+	assert.Equal(t, []string{"asset.extend", "default.extend"}, got.Extends)
+	assert.Equal(t, pipeline.EmptyStringMap{"catalog": "default"}, got.Metadata)
+	assert.Equal(t, "default-wh", got.Snowflake.Warehouse)
+	assert.Equal(t, "s3://default/results", got.Athena.Location)
+	assert.Equal(t, &pipeline.RoutingConfig{EgressGateway: "default-gateway"}, got.Routing)
+	assert.Equal(t, &rerunCooldown, got.RerunCooldown)
+	assert.Equal(t, &retries, got.Retries)
+	assert.Equal(t, &falseValue, got.RefreshRestricted)
+	assert.Len(t, got.Columns, 2)
+	assert.Equal(t, "asset column", got.Columns[0].Description)
+	assert.Equal(t, "integer", got.Columns[0].Type)
+	assert.True(t, got.Columns[0].HasCheck("not_null"))
+	assert.True(t, got.Columns[0].HasCheck("unique"))
+	assert.Equal(t, "loaded_at", got.Columns[1].Name)
+	assert.Len(t, got.CustomChecks, 2)
+	assert.Equal(t, "select asset", got.CustomChecks[0].Query)
+	assert.Equal(t, "default row count", got.CustomChecks[0].Description)
+	assert.Equal(t, "freshness", got.CustomChecks[1].Name)
+	assert.Len(t, got.Notifications.Slack, 2)
+	assert.Equal(t, "#asset", got.Notifications.Slack[0].Channel)
+	assert.Equal(t, "#default", got.Notifications.Slack[1].Channel)
 }
 
 func TestBuilder_InjectConnectionAsSecret(t *testing.T) {
@@ -2618,18 +3047,20 @@ func TestIntervalModifiers_JSON_Integration(t *testing.T) {
 	assert.Equal(t, modifiers, result)
 }
 
-func TestPipeline_ValidateCatchupMode(t *testing.T) {
+func TestPipeline_CatchupNormalization(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name    string
-		yaml    string
-		wantErr bool
+		name string
+		yaml string
+		want pipeline.CatchupMode
 	}{
-		{name: "empty is valid", yaml: "name: test\n", wantErr: false},
-		{name: "active is valid", yaml: "name: test\ncatchup_mode: active\n", wantErr: false},
-		{name: "all is valid", yaml: "name: test\ncatchup_mode: all\n", wantErr: false},
-		{name: "invalid value", yaml: "name: test\ncatchup_mode: invalid\n", wantErr: true},
+		{name: "missing is none", yaml: "name: test\n", want: pipeline.CatchupNone},
+		{name: "bool true is active", yaml: "name: test\ncatchup: true\n", want: pipeline.CatchupActive},
+		{name: "bool false is none", yaml: "name: test\ncatchup: false\n", want: pipeline.CatchupNone},
+		{name: "string active stays active", yaml: "name: test\ncatchup: active\n", want: pipeline.CatchupActive},
+		{name: "string all stays all", yaml: "name: test\ncatchup: all\n", want: pipeline.CatchupAll},
+		{name: "unknown string collapses to none", yaml: "name: test\ncatchup: invalid\n", want: pipeline.CatchupNone},
 	}
 
 	for _, tt := range tests {
@@ -2637,11 +3068,34 @@ func TestPipeline_ValidateCatchupMode(t *testing.T) {
 			t.Parallel()
 			var p pipeline.Pipeline
 			err := yaml.Unmarshal([]byte(tt.yaml), &p)
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, p.Catchup)
+		})
+	}
+}
+
+func TestPipeline_CatchupJSONNormalization(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		json string
+		want pipeline.CatchupMode
+	}{
+		{name: "bool true is active", json: `{"name":"t","catchup":true}`, want: pipeline.CatchupActive},
+		{name: "bool false is none", json: `{"name":"t","catchup":false}`, want: pipeline.CatchupNone},
+		{name: "string active", json: `{"name":"t","catchup":"active"}`, want: pipeline.CatchupActive},
+		{name: "string all", json: `{"name":"t","catchup":"all"}`, want: pipeline.CatchupAll},
+		{name: "unknown string collapses to none", json: `{"name":"t","catchup":"weird"}`, want: pipeline.CatchupNone},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var p pipeline.Pipeline
+			err := json.Unmarshal([]byte(tt.json), &p)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, p.Catchup)
 		})
 	}
 }
@@ -2729,4 +3183,73 @@ func TestAsset_FormatContent_DeduplicatesTags(t *testing.T) {
 			assert.Equal(t, tt.wantColumn, asset.Columns[0].Tags)
 		})
 	}
+}
+
+func ptrInt(i int) *int { return &i }
+
+func TestColumn_SQLType(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		col  pipeline.Column
+		want string
+	}{
+		{name: "plain type", col: pipeline.Column{Type: "integer"}, want: "integer"},
+		{name: "empty type", col: pipeline.Column{Type: ""}, want: ""},
+		{name: "precision and scale", col: pipeline.Column{Type: "decimal", Precision: ptrInt(10), Scale: ptrInt(2)}, want: "decimal(10, 2)"},
+		{name: "precision only", col: pipeline.Column{Type: "number", Precision: ptrInt(38)}, want: "number(38)"},
+		{name: "length only", col: pipeline.Column{Type: "varchar", Length: ptrInt(255)}, want: "varchar(255)"},
+		{name: "already parameterized type is untouched", col: pipeline.Column{Type: "decimal(5,2)", Precision: ptrInt(10), Scale: ptrInt(2)}, want: "decimal(5,2)"},
+		{name: "no modifiers", col: pipeline.Column{Type: "timestamp"}, want: "timestamp"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, tt.col.SQLType())
+		})
+	}
+}
+
+func TestAsset_PrefixSchema(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		asset  string
+		prefix string
+		want   string
+	}{
+		{name: "empty prefix is a no-op", asset: "schema.table", prefix: "", want: "schema.table"},
+		{name: "two-part prefixes the schema", asset: "analytics.events", prefix: "dev_", want: "dev_analytics.events"},
+		{name: "three-part prefixes the middle (schema), keeps catalog", asset: "raw.analytics.events", prefix: "dev_", want: "raw.dev_analytics.events"},
+		{name: "single component has no schema to prefix", asset: "events", prefix: "dev_", want: "events"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			a := &pipeline.Asset{Name: tt.asset}
+			a.PrefixSchema(tt.prefix)
+			assert.Equal(t, tt.want, a.Name)
+		})
+	}
+}
+
+func TestAsset_PrefixUpstreams(t *testing.T) {
+	t.Parallel()
+
+	a := &pipeline.Asset{
+		Upstreams: []pipeline.Upstream{
+			{Type: "asset", Value: "analytics.events"},
+			{Type: "asset", Value: "raw.analytics.events"},
+			{Type: "uri", Value: "raw.analytics.events"}, // non-asset deps are untouched
+		},
+	}
+	a.PrefixUpstreams("dev_")
+
+	assert.Equal(t, "dev_analytics.events", a.Upstreams[0].Value)
+	assert.Equal(t, "raw.dev_analytics.events", a.Upstreams[1].Value)
+	assert.Equal(t, "raw.analytics.events", a.Upstreams[2].Value)
 }

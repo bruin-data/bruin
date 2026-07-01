@@ -51,18 +51,18 @@ LinkedIn Ads source allows ingesting the following sources:
 
 | Table | PK | Inc Key | Inc Strategy | Details |
 |-------|----|---------|--------------| ------- |
-| [ad_accounts](https://learn.microsoft.com/en-us/linkedin/marketing/integrations/ads/account-structure/create-and-manage-accounts?view=li-lms-2024-11&tabs=http) | id | – | replace | Retrieves all ad accounts accessible by the authenticated user. |
-| [ad_account_users](https://learn.microsoft.com/en-us/linkedin/marketing/integrations/ads/account-structure/create-and-manage-account-users?view=li-lms-2024-11&tabs=http) | user, account | – | replace | Retrieves users associated with each ad account. |
-| [campaign_groups](https://learn.microsoft.com/en-us/linkedin/marketing/integrations/ads/account-structure/create-and-manage-campaign-groups?view=li-lms-2024-11&tabs=http) | id | – | replace | Retrieves campaign groups for each ad account. |
-| [campaigns](https://learn.microsoft.com/en-us/linkedin/marketing/integrations/ads/account-structure/create-and-manage-campaigns?view=li-lms-2024-11&tabs=http) | id | – | replace | Retrieves campaigns for each ad account. |
-| [creatives](https://learn.microsoft.com/en-us/linkedin/marketing/integrations/ads/account-structure/create-and-manage-creatives?view=li-lms-2024-11&tabs=http) | id | – | replace | Retrieves creatives for each ad account. |
-| [conversions](https://learn.microsoft.com/en-us/linkedin/marketing/integrations/ads-reporting/conversion-tracking?view=li-lms-2024-11&tabs=http) | id | – | replace | Retrieves conversion rules for each ad account. |
-| [lead_forms](https://learn.microsoft.com/en-us/linkedin/marketing/lead-sync/leadsync?view=li-lms-2025-11&viewFallbackFrom=li-lms-2024-06&tabs=http#lead-forms-1) | id | – | replace | Retrieves lead generation forms for each ad account. |
-| [lead_form_responses](https://learn.microsoft.com/en-us/linkedin/marketing/lead-sync/leadsync?view=li-lms-2025-11&viewFallbackFrom=li-lms-2024-06&tabs=http#get-lead-form-responses) | id | date (interval) | merge | Retrieves lead form responses for each ad account. |
-| dmp_segments | id | – | replace | Retrieves matched/retargeting audience segments (sizes, match rates, rules) for each ad account. |
-| insight_tags | id | – | replace | Retrieves Insight Tag configuration and installation status for each ad account. |
-| insight_tag_domains | domainName, account_id | – | replace | Retrieves domains associated with Insight Tags for each ad account. |
-| [custom](https://learn.microsoft.com/en-us/linkedin/marketing/integrations/ads-reporting/ads-reporting?view=li-lms-2024-11&tabs=http#analytics-finder) | [dimension, date] or [dimension, start_date, end_date] | date (daily) or start_date (monthly) | merge | Custom reports allow you to retrieve data based on specific dimensions and metrics. |
+| `ad_accounts` | id | – | replace | Retrieves all ad accounts accessible by the authenticated user. |
+| `ad_account_users` | user, account | – | replace | Retrieves users associated with each ad account. |
+| `campaign_groups` | id | – | replace | Retrieves campaign groups for each ad account. |
+| `campaigns` | id | – | replace | Retrieves campaigns for each ad account. |
+| `creatives` | id | – | replace | Retrieves creatives for each ad account. |
+| `conversions` | id | – | replace | Retrieves conversion rules for each ad account. |
+| `lead_forms` | id | – | replace | Retrieves lead generation forms for each ad account. |
+| `lead_form_responses` | id | date (interval) | merge | Retrieves lead form responses for each ad account. |
+| `dmp_segments` | id | – | replace | Retrieves matched/retargeting audience segments (sizes, match rates, rules) for each ad account. |
+| `insight_tags` | id | – | replace | Retrieves Insight Tag configuration and installation status for each ad account. |
+| `insight_tag_domains` | domainName, account_id | – | replace | Retrieves domains associated with Insight Tags for each ad account. |
+| `custom` | [dimension, date] or [dimension, start_date, end_date] | date (daily) or start_date (monthly) | merge | Custom reports allow you to retrieve data based on specific dimensions and metrics. |
 
 ### Example
 

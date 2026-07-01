@@ -40,6 +40,12 @@
         "tags": [],
         "primary_key": false,
         "update_on_merge": false,
+        "default": "",
+        "precision": null,
+        "scale": null,
+        "length": null,
+        "collation": "",
+        "foreign_key": null,
         "merge_sql": "",
         "nullable": true,
         "owner": "",
@@ -51,7 +57,8 @@
             "name": "not_null",
             "value": null,
             "blocking": true,
-            "description": ""
+            "description": "",
+            "retries": null
           }
         ],
         "upstreams": []
@@ -65,6 +72,12 @@
         "tags": [],
         "primary_key": false,
         "update_on_merge": false,
+        "default": "",
+        "precision": null,
+        "scale": null,
+        "length": null,
+        "collation": "",
+        "foreign_key": null,
         "merge_sql": "",
         "nullable": true,
         "owner": "",
@@ -76,7 +89,8 @@
             "name": "not_null",
             "value": null,
             "blocking": true,
-            "description": ""
+            "description": "",
+            "retries": null
           },
           {
             "id": "5d4569e858cbc6f56cf8ca9d934b743f4fa3b9b870d24f99dab7a390b1bb5168",
@@ -88,7 +102,8 @@
               "Instagram"
             ],
             "blocking": true,
-            "description": ""
+            "description": "",
+            "retries": null
           }
         ],
         "upstreams": []
@@ -102,6 +117,12 @@
         "tags": [],
         "primary_key": false,
         "update_on_merge": false,
+        "default": "",
+        "precision": null,
+        "scale": null,
+        "length": null,
+        "collation": "",
+        "foreign_key": null,
         "merge_sql": "",
         "nullable": true,
         "owner": "",
@@ -113,7 +134,8 @@
             "name": "not_null",
             "value": null,
             "blocking": true,
-            "description": ""
+            "description": "",
+            "retries": null
           }
         ],
         "upstreams": []
@@ -127,6 +149,12 @@
         "tags": [],
         "primary_key": false,
         "update_on_merge": false,
+        "default": "",
+        "precision": null,
+        "scale": null,
+        "length": null,
+        "collation": "",
+        "foreign_key": null,
         "merge_sql": "",
         "nullable": true,
         "owner": "",
@@ -141,7 +169,8 @@
     "metadata": {},
     "snowflake": null,
     "athena": null,
-    "interval_modifiers": null
+    "interval_modifiers": null,
+    "retries": null
   },
   "pipeline": {
     "name": "bruin-init",

@@ -28,6 +28,8 @@ func TestLoadFromFile(t *testing.T) {
 	}
 
 	clickhouseSecureValue := 0
+	sharePointMaxFileSize := int64(104857600)
+	sharePointMaxFiles := int64(10000)
 
 	devEnv := Environment{
 		Connections: &Connections{
@@ -265,6 +267,26 @@ func TestLoadFromFile(t *testing.T) {
 				{
 					Name:   "conn-paddle",
 					APIKey: "paddlekey",
+				},
+			},
+			Chargebee: []ChargebeeConnection{
+				{
+					Name:   "conn-chargebee",
+					Site:   "chargebeesite",
+					APIKey: "chargebeekey",
+				},
+			},
+			Recurly: []RecurlyConnection{
+				{
+					Name:   "conn-recurly",
+					APIKey: "recurlykey",
+					Region: "us",
+				},
+			},
+			GitLab: []GitLabConnection{
+				{
+					Name:        "conn-gitlab",
+					AccessToken: "gitlabtoken",
 				},
 			},
 			Dune: []DuneConnection{
@@ -607,6 +629,13 @@ func TestLoadFromFile(t *testing.T) {
 					PropertyID:         "12345",
 				},
 			},
+			GSC: []GSCConnection{
+				{
+					Name:               "conn-gsc",
+					ServiceAccountFile: "path/to/service_account.json",
+					SiteURL:            "sc-domain:example.com",
+				},
+			},
 			Frankfurter: []FrankfurterConnection{
 				{
 					Name: "frankfurter-1",
@@ -620,11 +649,12 @@ func TestLoadFromFile(t *testing.T) {
 			},
 			Salesforce: []SalesforceConnection{
 				{
-					Name:     "salesforce-1",
-					Username: "username-123",
-					Password: "password-123",
-					Token:    "token-123",
-					Domain:   "mydomain.my.salesforce.com",
+					Name:        "salesforce-1",
+					Username:    "username-123",
+					Password:    "password-123",
+					Token:       "token-123",
+					AccessToken: "access-token-123",
+					Domain:      "mydomain.my.salesforce.com",
 				},
 			},
 			SQLite: []SQLiteConnection{
@@ -691,6 +721,13 @@ func TestLoadFromFile(t *testing.T) {
 					Name:      "solidgate-1",
 					SecretKey: "secret-key-123",
 					PublicKey: "public-key-123",
+				},
+			},
+			Square: []SquareConnection{
+				{
+					Name:        "square-1",
+					AccessToken: "EAAA-test-access-token",
+					Environment: "sandbox",
 				},
 			},
 			Smartsheet: []SmartsheetConnection{
@@ -795,6 +832,95 @@ func TestLoadFromFile(t *testing.T) {
 					Name:   "customerio-1",
 					APIKey: "test-api-key",
 					Region: "us",
+				},
+			},
+			Sendgrid: []SendgridConnection{
+				{
+					Name:       "sendgrid-1",
+					APIKey:     "test-api-key",
+					OnBehalfOf: "test-subuser",
+				},
+			},
+			Twilio: []TwilioConnection{
+				{
+					Name:       "twilio-1",
+					AccountSID: "test-account-sid",
+					AuthToken:  "test-auth-token",
+					APIKey:     "test-api-key",
+					APISecret:  "test-api-secret",
+				},
+			},
+			Braze: []BrazeConnection{
+				{
+					Name:     "braze-1",
+					APIKey:   "test-api-key",
+					Endpoint: "rest.iad-01.braze.com",
+				},
+			},
+			RedditAds: []RedditAdsConnection{
+				{
+					Name:         "redditads-1",
+					AccessToken:  "test-access-token",
+					ClientID:     "test-client-id",
+					ClientSecret: "test-client-secret",
+					RefreshToken: "test-refresh-token",
+				},
+			},
+			Espn: []EspnConnection{
+				{
+					Name:   "espn-1",
+					Sport:  "football",
+					League: "nfl",
+					Season: "2026",
+					Limit:  50,
+				},
+			},
+			SharePoint: []SharePointConnection{
+				{
+					Name:         "sharepoint-1",
+					TenantID:     "test-tenant-id",
+					ClientID:     "test-client-id",
+					ClientSecret: "test-client-secret",
+					Hostname:     "example.sharepoint.com",
+					Site:         "sites/Example",
+					Library:      "Documents",
+					MaxFileSize:  &sharePointMaxFileSize,
+					MaxFiles:     &sharePointMaxFiles,
+				},
+			},
+			APIFootball: []APIFootballConnection{
+				{
+					Name:   "apifootball-1",
+					APIKey: "test-api-key",
+					League: "1",
+					Season: "2026",
+				},
+			},
+			FootballData: []FootballDataConnection{
+				{
+					Name:        "footballdata-1",
+					APIKey:      "test-api-key",
+					Competition: "WC",
+					Season:      "2026",
+				},
+			},
+			BallDontLie: []BallDontLieConnection{
+				{
+					Name:   "balldontlie-1",
+					APIKey: "test-api-key",
+					Season: "2026",
+				},
+			},
+			StarRocks: []StarRocksConnection{
+				{
+					Name:     "starrocks-1",
+					Host:     "localhost",
+					Port:     9030,
+					Username: "root",
+					Password: "pass123",
+					Database: "analytics",
+					Catalog:  "iceberg_catalog",
+					SSL:      "true",
 				},
 			},
 		},
@@ -1270,6 +1396,21 @@ func TestConfig_AddConnection(t *testing.T) {
 			expectedErr: false,
 		},
 		{
+			name:     "Add SharePoint connection",
+			envName:  "default",
+			connType: "sharepoint",
+			connName: "sharepoint-conn",
+			creds: map[string]interface{}{
+				"tenant_id":     "tenant-id",
+				"client_id":     "client-id",
+				"client_secret": "client-secret",
+				"hostname":      "example.sharepoint.com",
+				"site":          "sites/Example",
+				"library":       "Documents",
+			},
+			expectedErr: false,
+		},
+		{
 			name:        "Add Invalid connection",
 			envName:     "default",
 			connType:    "invalid",
@@ -1357,6 +1498,15 @@ func TestConfig_AddConnection(t *testing.T) {
 					assert.Equal(t, tt.creds["client_id"], env.Connections.Fabric[0].ClientID)
 					assert.Equal(t, tt.creds["client_secret"], env.Connections.Fabric[0].ClientSecret)
 					assert.Equal(t, tt.creds["tenant_id"], env.Connections.Fabric[0].TenantID)
+				case "sharepoint":
+					assert.Len(t, env.Connections.SharePoint, 1)
+					assert.Equal(t, tt.connName, env.Connections.SharePoint[0].Name)
+					assert.Equal(t, tt.creds["tenant_id"], env.Connections.SharePoint[0].TenantID)
+					assert.Equal(t, tt.creds["client_id"], env.Connections.SharePoint[0].ClientID)
+					assert.Equal(t, tt.creds["client_secret"], env.Connections.SharePoint[0].ClientSecret)
+					assert.Equal(t, tt.creds["hostname"], env.Connections.SharePoint[0].Hostname)
+					assert.Equal(t, tt.creds["site"], env.Connections.SharePoint[0].Site)
+					assert.Equal(t, tt.creds["library"], env.Connections.SharePoint[0].Library)
 				}
 			}
 		})
@@ -1431,6 +1581,25 @@ func TestDeleteConnection(t *testing.T) {
 			expectedErr: false,
 		},
 		{
+			name:     "Delete existing SharePoint connection",
+			envName:  "default",
+			connName: "sharepoint-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{
+						"default": {
+							Connections: &Connections{
+								SharePoint: []SharePointConnection{
+									{Name: "sharepoint-conn", TenantID: "tenant-id", ClientID: "client-id", ClientSecret: "secret", Hostname: "example.sharepoint.com", Site: "sites/Example"},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedErr: false,
+		},
+		{
 			name:     "Delete non-existent connection",
 			envName:  "staging",
 			connName: "non-existent-conn",
@@ -1478,6 +1647,8 @@ func TestDeleteConnection(t *testing.T) {
 					assert.Empty(t, env.Connections.AwsConnection)
 				case "fabric-conn":
 					assert.Empty(t, env.Connections.Fabric)
+				case "sharepoint-conn":
+					assert.Empty(t, env.Connections.SharePoint)
 				}
 
 				assert.False(t, env.Connections.Exists(tt.connName))
@@ -1616,7 +1787,7 @@ func TestCanRunTaskInstances(t *testing.T) {
 					{
 						Type:       pipeline.AssetTypeIngestr,
 						Connection: "conn2",
-						Parameters: map[string]string{"source_connection": "conn3"},
+						Parameters: pipeline.ParameterMap{"source_connection": "conn3"},
 					},
 				},
 			},
@@ -1654,7 +1825,7 @@ func TestCanRunTaskInstances(t *testing.T) {
 					},
 					{
 						Type: pipeline.AssetTypeIngestr,
-						Parameters: map[string]string{
+						Parameters: pipeline.ParameterMap{
 							"source_connection": "conn3",
 							"destination":       "snowflake",
 						},
@@ -1695,7 +1866,7 @@ func TestCanRunTaskInstances(t *testing.T) {
 					},
 					{
 						Type: pipeline.AssetTypeIngestr,
-						Parameters: map[string]string{
+						Parameters: pipeline.ParameterMap{
 							"source_connection": "conn3",
 							"destination":       "snowflake",
 						},
@@ -1749,7 +1920,7 @@ func TestCanRunTaskInstances(t *testing.T) {
 					},
 					{
 						Type: pipeline.AssetTypeIngestr,
-						Parameters: map[string]string{
+						Parameters: pipeline.ParameterMap{
 							"source_connection": "conn3",
 							"destination":       "snowflake",
 						},
@@ -1799,7 +1970,7 @@ func TestCanRunTaskInstances(t *testing.T) {
 					},
 					{
 						Type: pipeline.AssetTypeIngestr,
-						Parameters: map[string]string{
+						Parameters: pipeline.ParameterMap{
 							"source_connection": "conn3",
 							"destination":       "snowflake",
 						},
@@ -2053,6 +2224,9 @@ func TestConnections_MergeFrom(t *testing.T) {
 				FacebookAds:         []FacebookAdsConnection{{Name: "facebookads1"}},
 				Stripe:              []StripeConnection{{Name: "stripe1"}},
 				Paddle:              []PaddleConnection{{Name: "paddle1"}},
+				Chargebee:           []ChargebeeConnection{{Name: "chargebee1"}},
+				Recurly:             []RecurlyConnection{{Name: "recurly1"}},
+				GitLab:              []GitLabConnection{{Name: "gitlab1"}},
 				Appsflyer:           []AppsflyerConnection{{Name: "appsflyer1"}},
 				Kafka:               []KafkaConnection{{Name: "kafka1"}},
 				RabbitMQ:            []RabbitMQConnection{{Name: "rabbitmq1"}},
@@ -2086,6 +2260,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				RevenueCat:          []RevenueCatConnection{{Name: "revenuecat1"}},
 				Linear:              []LinearConnection{{Name: "linear1"}},
 				GCS:                 []GCSConnection{{Name: "gcs1"}},
+				SharePoint:          []SharePointConnection{{Name: "sharepoint1"}},
 				ApplovinMax:         []ApplovinMaxConnection{{Name: "applovinmax1"}},
 				Personio:            []PersonioConnection{{Name: "personio1"}},
 				Kinesis:             []KinesisConnection{{Name: "kinesis1"}},
@@ -2104,6 +2279,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				EMRServerless:       []EMRServerlessConnection{{Name: "emr1"}},
 				DataprocServerless:  []DataprocServerlessConnection{{Name: "dataproc1"}},
 				GoogleAnalytics:     []GoogleAnalyticsConnection{{Name: "googleanalytics1"}},
+				GSC:                 []GSCConnection{{Name: "gsc1"}},
 				AppLovin:            []AppLovinConnection{{Name: "applovin1"}},
 				Frankfurter:         []FrankfurterConnection{{Name: "frankfurter1"}},
 				Salesforce:          []SalesforceConnection{{Name: "salesforce1"}},
@@ -2113,6 +2289,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Phantombuster:       []PhantombusterConnection{{Name: "phantombuster1"}},
 				Elasticsearch:       []ElasticsearchConnection{{Name: "elasticsearch1"}},
 				Solidgate:           []SolidgateConnection{{Name: "solidgate1"}},
+				Square:              []SquareConnection{{Name: "square1"}},
 				Spanner:             []SpannerConnection{{Name: "spanner1"}},
 				Smartsheet:          []SmartsheetConnection{{Name: "smartsheet1"}},
 				Attio:               []AttioConnection{{Name: "attio1"}},
@@ -2122,6 +2299,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Tableau:             []TableauConnection{{Name: "tableau1"}},
 				QuickSight:          []QuickSightConnection{{Name: "quicksight1"}},
 				Trino:               []TrinoConnection{{Name: "trino1"}},
+				StarRocks:           []StarRocksConnection{{Name: "starrocks1"}},
 				Fluxx:               []FluxxConnection{{Name: "fluxx1"}},
 				Freshdesk:           []FreshdeskConnection{{Name: "freshdesk1"}},
 				FundraiseUp:         []FundraiseUpConnection{{Name: "fundraiseup1"}},
@@ -2133,6 +2311,13 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Primer:              []PrimerConnection{{Name: "primer1"}},
 				Indeed:              []IndeedConnection{{Name: "indeed1"}},
 				CustomerIo:          []CustomerIoConnection{{Name: "customerio1"}},
+				Sendgrid:            []SendgridConnection{{Name: "sendgrid1"}},
+				Twilio:              []TwilioConnection{{Name: "twilio1"}},
+				Braze:               []BrazeConnection{{Name: "braze1"}},
+				Espn:                []EspnConnection{{Name: "espn1"}},
+				APIFootball:         []APIFootballConnection{{Name: "apifootball1"}},
+				FootballData:        []FootballDataConnection{{Name: "footballdata1"}},
+				BallDontLie:         []BallDontLieConnection{{Name: "balldontlie1"}},
 				Vertica:             []VerticaConnection{{Name: "vertica1"}},
 				Dune:                []DuneConnection{{Name: "dune1"}},
 			},
@@ -2172,6 +2357,9 @@ func TestConnections_MergeFrom(t *testing.T) {
 				FacebookAds:         []FacebookAdsConnection{{Name: "facebookads1"}},
 				Stripe:              []StripeConnection{{Name: "stripe1"}},
 				Paddle:              []PaddleConnection{{Name: "paddle1"}},
+				Chargebee:           []ChargebeeConnection{{Name: "chargebee1"}},
+				Recurly:             []RecurlyConnection{{Name: "recurly1"}},
+				GitLab:              []GitLabConnection{{Name: "gitlab1"}},
 				Appsflyer:           []AppsflyerConnection{{Name: "appsflyer1"}},
 				Kafka:               []KafkaConnection{{Name: "kafka1"}},
 				RabbitMQ:            []RabbitMQConnection{{Name: "rabbitmq1"}},
@@ -2205,6 +2393,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				RevenueCat:          []RevenueCatConnection{{Name: "revenuecat1"}},
 				Linear:              []LinearConnection{{Name: "linear1"}},
 				GCS:                 []GCSConnection{{Name: "gcs1"}},
+				SharePoint:          []SharePointConnection{{Name: "sharepoint1"}},
 				ApplovinMax:         []ApplovinMaxConnection{{Name: "applovinmax1"}},
 				Personio:            []PersonioConnection{{Name: "personio1"}},
 				Kinesis:             []KinesisConnection{{Name: "kinesis1"}},
@@ -2223,6 +2412,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				EMRServerless:       []EMRServerlessConnection{{Name: "emr1"}},
 				DataprocServerless:  []DataprocServerlessConnection{{Name: "dataproc1"}},
 				GoogleAnalytics:     []GoogleAnalyticsConnection{{Name: "googleanalytics1"}},
+				GSC:                 []GSCConnection{{Name: "gsc1"}},
 				AppLovin:            []AppLovinConnection{{Name: "applovin1"}},
 				Frankfurter:         []FrankfurterConnection{{Name: "frankfurter1"}},
 				Salesforce:          []SalesforceConnection{{Name: "salesforce1"}},
@@ -2232,6 +2422,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Phantombuster:       []PhantombusterConnection{{Name: "phantombuster1"}},
 				Elasticsearch:       []ElasticsearchConnection{{Name: "elasticsearch1"}},
 				Solidgate:           []SolidgateConnection{{Name: "solidgate1"}},
+				Square:              []SquareConnection{{Name: "square1"}},
 				Spanner:             []SpannerConnection{{Name: "spanner1"}},
 				Smartsheet:          []SmartsheetConnection{{Name: "smartsheet1"}},
 				Attio:               []AttioConnection{{Name: "attio1"}},
@@ -2241,6 +2432,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Tableau:             []TableauConnection{{Name: "tableau1"}},
 				QuickSight:          []QuickSightConnection{{Name: "quicksight1"}},
 				Trino:               []TrinoConnection{{Name: "trino1"}},
+				StarRocks:           []StarRocksConnection{{Name: "starrocks1"}},
 				Fluxx:               []FluxxConnection{{Name: "fluxx1"}},
 				Freshdesk:           []FreshdeskConnection{{Name: "freshdesk1"}},
 				FundraiseUp:         []FundraiseUpConnection{{Name: "fundraiseup1"}},
@@ -2252,6 +2444,13 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Primer:              []PrimerConnection{{Name: "primer1"}},
 				Indeed:              []IndeedConnection{{Name: "indeed1"}},
 				CustomerIo:          []CustomerIoConnection{{Name: "customerio1"}},
+				Sendgrid:            []SendgridConnection{{Name: "sendgrid1"}},
+				Twilio:              []TwilioConnection{{Name: "twilio1"}},
+				Braze:               []BrazeConnection{{Name: "braze1"}},
+				Espn:                []EspnConnection{{Name: "espn1"}},
+				APIFootball:         []APIFootballConnection{{Name: "apifootball1"}},
+				FootballData:        []FootballDataConnection{{Name: "footballdata1"}},
+				BallDontLie:         []BallDontLieConnection{{Name: "balldontlie1"}},
 				Vertica:             []VerticaConnection{{Name: "vertica1"}},
 				Dune:                []DuneConnection{{Name: "dune1"}},
 			},

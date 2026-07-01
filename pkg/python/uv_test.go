@@ -193,7 +193,7 @@ func TestPythonArrowTemplate_UsesNativePolarsIPC(t *testing.T) {
 	assert.Less(t, polarsWriteIndex, pandasCheckIndex)
 	assert.Less(t, pandasCheckIndex, arrowTableIndex)
 	assert.NotContains(t, PythonArrowTemplate, "df.to_arrow()")
-	assert.Contains(t, PythonArrowTemplate, "write_arrow_tables(itertools.chain([first_row], iterator))")
+	assert.Contains(t, PythonArrowTemplate, "write_arrow_tables(rows_to_tables(df))")
 }
 
 func TestPythonArrowTemplate_PreservesNoDataAndIterableHandling(t *testing.T) {
@@ -201,10 +201,22 @@ func TestPythonArrowTemplate_PreservesNoDataAndIterableHandling(t *testing.T) {
 
 	assert.Contains(t, PythonArrowTemplate, "if df is None:")
 	assert.Contains(t, PythonArrowTemplate, "if not df:")
-	assert.Contains(t, PythonArrowTemplate, "first_row = next(iterator)")
 	assert.Contains(t, PythonArrowTemplate, "except StopIteration:")
-	assert.Contains(t, PythonArrowTemplate, "rows = [first_row, *iterator]")
-	assert.Contains(t, PythonArrowTemplate, "rows = [item for batch in rows for item in batch]")
+
+	// Generators are streamed: each yielded value becomes its own Arrow batch
+	// without buffering the whole dataset first.
+	assert.Contains(t, PythonArrowTemplate, "def rows_to_tables(items):")
+	// Leading rows are buffered until a null-free schema is found, then locked so
+	// nullable fields and missing optional keys in later yields conform instead of
+	// raising "All yielded pyarrow Tables must have the same schema."
+	assert.Contains(t, PythonArrowTemplate, "locked_schema = None")
+	assert.Contains(t, PythonArrowTemplate, "pa.types.is_null(field.type)")
+	assert.Contains(t, PythonArrowTemplate, "pa.Table.from_pylist(list(rows), schema=locked_schema)")
+	// A yielded pa.Table's explicit schema flushes pending rows and locks the
+	// schema, so a table next to nullable dict rows agrees in either order.
+	assert.Contains(t, PythonArrowTemplate, "pa.Table.from_pylist(pending, schema=item.schema)")
+	// The old buffer-everything path must be gone.
+	assert.NotContains(t, PythonArrowTemplate, "rows = [first_row, *iterator]")
 }
 
 func Test_uvPythonRunner_Run(t *testing.T) {

@@ -699,7 +699,7 @@ func createDataSourceAsset(dataSource *tableau.DataSourceInfo, assetsPath string
 	filePath := filepath.Join(assetsPath, fileName)
 
 	// Build parameters map
-	parameters := map[string]string{
+	parameters := pipeline.ParameterMap{
 		"datasource_id":   dataSource.ID,
 		"datasource_name": dataSource.Name,
 		"refresh":         "false", // Default to not auto-refreshing
@@ -737,7 +737,7 @@ func createWorkbookAsset(dashboardInfo *TableauDashboard, assetsPath string, cli
 	filePath := filepath.Join(assetsPath, fileName)
 
 	// Build parameters map
-	parameters := map[string]string{
+	parameters := pipeline.ParameterMap{
 		"workbook_id":   dashboardInfo.WorkbookID,
 		"workbook_name": dashboardInfo.WorkbookName,
 		"refresh":       "false", // Default to not auto-refreshing
@@ -842,7 +842,7 @@ func createEnhancedAssetFromTableauDashboard(dashboard TableauDashboard, assetsP
 	filePath := filepath.Join(assetsPath, fileName)
 
 	// Build parameters map
-	parameters := map[string]string{
+	parameters := pipeline.ParameterMap{
 		"dashboard_id":   dashboard.ViewID,
 		"dashboard_name": dashboard.ViewName,
 		"refresh":        "false",

@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/mongo"
+	mongoatlas "github.com/bruin-data/bruin/pkg/mongo_atlas"
 	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/postgres"
@@ -393,6 +395,24 @@ func TestDetermineAssetTypeFromConnection(t *testing.T) {
 			want:           pipeline.AssetTypeMsSQLSource,
 		},
 		{
+			name:           "mongo connection type overrides name",
+			connectionName: "prod",
+			conn:           &mongo.DB{},
+			want:           pipeline.AssetTypeMongoSource,
+		},
+		{
+			name:           "mongo atlas connection type overrides name",
+			connectionName: "prod",
+			conn:           &mongoatlas.DB{},
+			want:           pipeline.AssetTypeMongoSource,
+		},
+		{
+			name:           "mongo by name",
+			connectionName: "mongo-prod",
+			conn:           &mockConnection{},
+			want:           pipeline.AssetTypeMongoSource,
+		},
+		{
 			name:           "unknown connection defaults to empty",
 			connectionName: "unknown-db",
 			conn:           &mockConnection{},
@@ -546,6 +566,32 @@ func TestFillAssetColumnsFromDB(t *testing.T) {
 				{Name: "name", Type: "VARCHAR", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{}},
 				{Name: "status", Type: "VARCHAR", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{}},
 			},
+		},
+		{
+			name: "mongo connection is skipped without columns or error",
+			setupConn: func() interface{} {
+				// MongoDB is schemaless; column filling must be skipped silently
+				// instead of falling through to SelectWithSchema.
+				return &mongo.DB{}
+			},
+			setupAsset: func() *pipeline.Asset {
+				return &pipeline.Asset{Name: "test_asset"}
+			},
+			schemaName: "test_schema",
+			tableName:  "test_table",
+			wantCols:   nil,
+		},
+		{
+			name: "mongo atlas connection is skipped without columns or error",
+			setupConn: func() interface{} {
+				return &mongoatlas.DB{}
+			},
+			setupAsset: func() *pipeline.Asset {
+				return &pipeline.Asset{Name: "test_asset"}
+			},
+			schemaName: "test_schema",
+			tableName:  "test_table",
+			wantCols:   nil,
 		},
 	}
 
@@ -913,6 +959,117 @@ func TestGetPipelinefromPath(t *testing.T) {
 
 			require.NoError(t, err)
 			require.NotNil(t, got)
+		})
+	}
+}
+
+func TestCreateIngestrAsset(t *testing.T) {
+	t.Parallel()
+
+	testAssetsPath := filepath.Join("test", "assets")
+
+	// Mixed-case database/collection names verify that the asset name and file
+	// path are lowercased while source_table preserves the original case
+	// (MongoDB identifiers are case-sensitive).
+	table := &ansisql.DBTable{
+		Name: "Users",
+		Type: ansisql.DBTableTypeTable,
+	}
+
+	got := createIngestrAsset(testAssetsPath, "myDB", "Users", "localMongo", "duckdb", table)
+
+	want := &pipeline.Asset{
+		Name: "mydb.users",
+		Type: pipeline.AssetTypeIngestr,
+		ExecutableFile: pipeline.ExecutableFile{
+			Name: "users.asset.yml",
+			Path: filepath.Join(testAssetsPath, "mydb", "users.asset.yml"),
+		},
+		Parameters: pipeline.ParameterMap{
+			"source_connection": "localMongo",
+			"source_table":      "myDB.Users",
+			"destination":       "duckdb",
+		},
+	}
+
+	assert.Contains(t, got.Description, "Imported table: myDB.Users")
+	assert.Contains(t, got.Description, "Extracted at:")
+
+	want.Description = got.Description
+	assert.Equal(t, want, got)
+}
+
+func TestValidateIngestrImportFlags(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		asIngestr   bool
+		destination string
+		wantErr     string
+	}{
+		{
+			name:        "not as-ingestr with no destination is fine",
+			asIngestr:   false,
+			destination: "",
+		},
+		{
+			name:        "destination without as-ingestr is rejected",
+			asIngestr:   false,
+			destination: "duckdb",
+			wantErr:     "--destination has no effect without --as-ingestr",
+		},
+		{
+			name:      "as-ingestr requires destination",
+			asIngestr: true,
+			wantErr:   "--destination is required",
+		},
+		{
+			name:        "as-ingestr rejects unknown destination",
+			asIngestr:   true,
+			destination: "bogus",
+			wantErr:     "invalid --destination",
+		},
+		{
+			name:        "as-ingestr accepts valid destination",
+			asIngestr:   true,
+			destination: "duckdb",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := validateIngestrImportFlags(tt.asIngestr, tt.destination)
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestIsMongoConnection(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		conn interface{}
+		want bool
+	}{
+		{name: "mongo connection", conn: &mongo.DB{}, want: true},
+		{name: "mongo atlas connection", conn: &mongoatlas.DB{}, want: true},
+		{name: "mssql connection", conn: &mssql.DB{}, want: false},
+		{name: "nil connection", conn: nil, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, isMongoConnection(tt.conn))
 		})
 	}
 }

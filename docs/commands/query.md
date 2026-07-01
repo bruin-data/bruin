@@ -25,6 +25,7 @@ You can run it in three modes:
 | `--filter`           |       | Semantic filter as JSON, for example `{"dimension":"country","operator":"equals","value":"US"}`. Can be passed multiple times. |
 | `--segment`          |       | Semantic segment to apply. Can be passed multiple times.                   |
 | `--sort`             |       | Semantic sort field. Use `name:asc` or `name:desc`. Can be passed multiple times. |
+| `--var`              |       | Set a Jinja template variable for query rendering. Supports flat, dot-notation nested, and JSON values. Can be passed multiple times. See [Template variables](#template-variables). |
 | `--start-date`       |       | Start date for query variables in `YYYY-MM-DD` or `YYYY-MM-DD HH:MM:SS`.    |
 | `--end-date`         |       | End date for query variables in `YYYY-MM-DD` or `YYYY-MM-DD HH:MM:SS`.      |
 | `--limit`            | `-l`  | Limit the number of rows returned.                                         |
@@ -75,6 +76,96 @@ If your query returns 1,000,000 rows with `--split-rows 400000`, you'll get 3 fi
 - `query_result_<timestamp>_part3.csv` (200,000 rows)
 
 Each file includes the header row with column names.
+
+## Template variables
+
+You can inject Jinja template variables into a query with `--var`. The flag can be passed
+multiple times and supports flat, nested, and JSON values, so you can test dashboard-style
+SQL — including nested `filters.*` variables — directly from the CLI.
+
+**Flat variables:**
+
+```bash
+bruin query --connection my_connection \
+  --query "SELECT * FROM events WHERE date >= '{{ start_date }}'" \
+  --var start_date=2026-05-20
+```
+
+**Nested variables (dot-notation):**
+
+Use a dotted key to build a nested object. This matches the nested `filters` object the
+dashboard runtime injects, so <span v-pre>`{{ filters.start_date }}`</span> resolves as expected:
+
+```bash
+bruin query --connection my_connection \
+  --query "SELECT * FROM events WHERE date >= '{{ filters.start_date }}'" \
+  --var filters.start_date=2026-05-20 \
+  --var filters.end_date=2026-05-27
+```
+
+**Nested variables (JSON):**
+
+You can also pass a whole object (or array) as a JSON value:
+
+```bash
+bruin query --connection my_connection \
+  --query "SELECT * FROM events WHERE date >= '{{ filters.start_date }}'" \
+  --var filters='{"start_date":"2026-05-20","end_date":"2026-05-27"}'
+```
+
+Scalar values are kept as literal strings (matching how pipeline variables work in YAML);
+only values that look like a JSON object or array are parsed as JSON.
+
+## Querying MongoDB
+
+MongoDB connections (`mongo` and `mongo_atlas`) are not SQL, so the `--query` value is a JSON
+object describing a single **find** or **aggregation** against one collection instead of a SQL
+statement. The returned documents are flattened into a table: columns are the union of the
+top-level fields (in first-seen order), and nested documents and arrays are shown as JSON.
+
+The envelope fields are:
+
+| Field        | Description                                                                 |
+|--------------|-----------------------------------------------------------------------------|
+| `collection` | **Required.** The collection to query.                                      |
+| `filter`     | Find filter document. Defaults to `{}` (all documents).                     |
+| `projection` | Find projection, e.g. `{"name":1,"_id":0}`.                                 |
+| `sort`       | Find sort, e.g. `{"age":-1}`.                                               |
+| `limit`      | Maximum number of documents to return.                                      |
+| `skip`       | Number of documents to skip.                                                |
+| `aggregate`  | Aggregation pipeline (an array of stages). Mutually exclusive with `filter`/`projection`/`sort`. |
+| `database`   | Override the connection's configured database for this query.               |
+
+Values are parsed as [MongoDB Extended JSON](https://www.mongodb.com/docs/manual/reference/mongodb-extended-json/),
+so query operators such as `$gt`, `$and`, and `$match` pass through unchanged while type wrappers
+such as `{"$oid":"..."}` and `{"$date":"..."}` are interpreted as the corresponding BSON types.
+
+> [!NOTE]
+> The SQL-oriented `--limit` flag does not apply to MongoDB queries. Set `"limit"` inside the
+> envelope instead.
+
+**Find example:**
+
+```bash
+bruin query --connection my_mongo \
+  --query '{"collection":"users","filter":{"age":{"$gt":21}},"sort":{"age":-1},"limit":10}'
+```
+
+```plaintext
++--------------------------+-------+-----+-----------+----------------+
+|           _id            | name  | age |   tags    |    address     |
++--------------------------+-------+-----+-----------+----------------+
+| 6a3bb9d9ca6a1b41199df8a5 | carol | 41  | ["x"]     |                |
+| 6a3bb9d9ca6a1b41199df8a3 | alice | 30  | ["a","b"] | {"city":"NYC"} |
++--------------------------+-------+-----+-----------+----------------+
+```
+
+**Aggregation example:**
+
+```bash
+bruin query --connection my_mongo \
+  --query '{"collection":"orders","aggregate":[{"$group":{"_id":"$status","n":{"$sum":1}}}]}'
+```
 
 ## Semantic Queries
 

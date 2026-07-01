@@ -44,7 +44,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return errors.Errorf("connection '%s' is not a tableau connection", connName)
 	}
 
-	if t.Parameters["refresh"] == "" {
+	if refreshVal, _ := t.Parameters.GetString("refresh"); refreshVal == "" {
 		return nil
 	}
 
@@ -64,16 +64,16 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 
 // nolint
 func (o BasicOperator) handleDatasourceRefresh(ctx context.Context, client *Client, t *pipeline.Asset) error {
-	refreshVal, ok := t.Parameters["refresh"]
+	refreshVal, ok := t.Parameters.GetString("refresh")
 	refresh := refreshVal == "true"
 	// if refresh is false, or if the parameter is not present, we treat
 	if !ok || !refresh {
 		return nil
 	}
 
-	datasourceID, ok := t.Parameters["datasource_id"]
+	datasourceID, ok := t.Parameters.GetString("datasource_id")
 	if !ok || datasourceID == "" {
-		name, hasName := t.Parameters["datasource_name"]
+		name, hasName := t.Parameters.GetString("datasource_name")
 		if !hasName || name == "" {
 			return errors.New("tableau.datasource asset requires either 'datasource_id' or 'datasource_name' parameter when 'refresh' is true")
 		}
@@ -101,16 +101,16 @@ func (o BasicOperator) handleDatasourceRefresh(ctx context.Context, client *Clie
 
 // nolint
 func (o BasicOperator) handleWorkbookRefresh(ctx context.Context, client *Client, t *pipeline.Asset) error {
-	refreshVal, ok := t.Parameters["refresh"]
+	refreshVal, ok := t.Parameters.GetString("refresh")
 	refresh := refreshVal == "true"
 	// if refresh is false, or if the parameter is not present, we treat
 	if !ok || !refresh {
 		return nil
 	}
 
-	workbookID, ok := t.Parameters["workbook_id"]
+	workbookID, ok := t.Parameters.GetString("workbook_id")
 	if !ok || workbookID == "" {
-		name, hasName := t.Parameters["workbook_name"]
+		name, hasName := t.Parameters.GetString("workbook_name")
 		if !hasName || name == "" {
 			return errors.New("tableau.workbook asset requires either 'workbook_id' or 'workbook_name' parameter when 'refresh' is true")
 		}
@@ -136,7 +136,7 @@ func (o BasicOperator) handleWorkbookRefresh(ctx context.Context, client *Client
 	return nil
 }
 
-func resolveIncrementalRefresh(ctx context.Context, params map[string]string) bool {
+func resolveIncrementalRefresh(ctx context.Context, params pipeline.ParameterMap) bool {
 	fullRefresh, _ := ctx.Value(pipeline.RunConfigFullRefresh).(bool)
 	if fullRefresh {
 		return false
@@ -150,7 +150,7 @@ func resolveIncrementalRefresh(ctx context.Context, params map[string]string) bo
 	return true
 }
 
-func resolveRefreshTimeout(params map[string]string) time.Duration {
+func resolveRefreshTimeout(params pipeline.ParameterMap) time.Duration {
 	timeoutMinutes, ok := getIntParam(params, "refresh_timeout_minutes")
 	if !ok || timeoutMinutes <= 0 {
 		return defaultRefreshTimeout
@@ -159,8 +159,8 @@ func resolveRefreshTimeout(params map[string]string) time.Duration {
 	return time.Duration(timeoutMinutes) * time.Minute
 }
 
-func getBoolParam(params map[string]string, key string) (bool, bool) {
-	value, ok := params[key]
+func getBoolParam(params pipeline.ParameterMap, key string) (bool, bool) {
+	value, ok := params.GetString(key)
 	if !ok {
 		return false, false
 	}
@@ -178,8 +178,8 @@ func getBoolParam(params map[string]string, key string) (bool, bool) {
 	return parsed, true
 }
 
-func getIntParam(params map[string]string, key string) (int, bool) {
-	value, ok := params[key]
+func getIntParam(params pipeline.ParameterMap, key string) (int, bool) {
+	value, ok := params.GetString(key)
 	if !ok {
 		return 0, false
 	}

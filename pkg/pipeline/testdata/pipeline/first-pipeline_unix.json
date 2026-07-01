@@ -22,6 +22,7 @@
             "name": "task1",
             "type": "bash",
             "description": "This is a hello world task",
+            "start_date": "",
             "connection": "conn1",
             "tags": [],
             "domains": [],
@@ -38,7 +39,6 @@
             "image": "",
             "instance": "",
             "owner": "",
-            "start_date": "",
             "executable_file": {
                 "name": "hello.sh",
                 "path": "__BASEDIR__/testdata/pipeline/first-pipeline/tasks/task1/hello.sh",
@@ -66,7 +66,8 @@
             "metadata": {},
             "snowflake": null,
             "athena": null,
-            "interval_modifiers": null
+            "interval_modifiers": null,
+            "retries": null
         },
         {
             "id": "c69409a1840ddb3639a4acbaaec46c238c63b6431cc74ee5254b6dcef7b88c4b",
@@ -74,6 +75,7 @@
             "name": "second-task",
             "type": "bq.transfer",
             "description": "",
+            "start_date": "",
             "connection": "",
             "tags": [],
             "domains": [],
@@ -83,7 +85,6 @@
             "image": "",
             "instance": "",
             "owner": "",
-            "start_date": "",
             "executable_file": {
                 "name": "task.yaml",
                 "path": "__BASEDIR__/testdata/pipeline/first-pipeline/tasks/task2/task.yaml",
@@ -107,7 +108,8 @@
             "metadata": {},
             "snowflake": null,
             "athena": null,
-            "interval_modifiers": null
+            "interval_modifiers": null,
+            "retries": null
         },
         {
             "id": "21f2fa1b09d584a6b4fe30cd82b4540b769fd777da7c547353386e2930291ef9",
@@ -115,6 +117,7 @@
             "name": "some-python-task",
             "type": "python",
             "description": "some description goes here",
+            "start_date": "",
             "connection": "first-connection",
             "tags": [],
             "domains": [],
@@ -161,7 +164,6 @@
             "image": "",
             "instance": "",
             "owner": "",
-            "start_date": "",
             "executable_file": {
                 "name": "test.py",
                 "path": "__BASEDIR__/testdata/pipeline/first-pipeline/tasks/test.py",
@@ -190,7 +192,8 @@
             "metadata": {},
             "snowflake": null,
             "athena": null,
-            "interval_modifiers": null
+            "interval_modifiers": null,
+            "retries": null
         },
         {
             "id": "5812ba61bb0f08ce192bf074c9de21c19355e08cd52e75d008bbff59e5729e5b",
@@ -198,6 +201,7 @@
             "name": "some-sql-task",
             "type": "bq.sql",
             "description": "some description goes here",
+            "start_date": "",
             "connection": "conn2",
             "tags": [],
             "domains": [],
@@ -244,7 +248,6 @@
             "image": "",
             "instance": "",
             "owner": "",
-            "start_date": "",
             "executable_file": {
                 "name": "test.sql",
                 "path": "__BASEDIR__/testdata/pipeline/first-pipeline/tasks/test.sql",
@@ -272,7 +275,8 @@
             "metadata": {},
             "snowflake": null,
             "athena": null,
-            "interval_modifiers": null
+            "interval_modifiers": null,
+            "retries": null
         }
     ],
     "notifications": {
@@ -299,8 +303,7 @@
         ],
         "webhook": []
     },
-    "catchup": false,
-    "catchup_mode": "",
+    "catchup": "",
     "metadata_push": {
         "bigquery": false
     },
@@ -312,5 +315,5 @@
     "agent": false,
     "variables": null,
     "selected_variant": "",
-  "macros": []
+    "macros": []
 }

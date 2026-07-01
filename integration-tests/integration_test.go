@@ -214,6 +214,40 @@ func TestIndividualTasks(t *testing.T) {
 			},
 		},
 		{
+			name: "parse-templated-enabled-disabled",
+			task: e2e.Task{
+				Name:    "parse-templated-enabled-disabled",
+				Command: binary,
+				Args:    []string{"internal", "parse-pipeline", "--variant", "disabled", filepath.Join(currentFolder, "test-pipelines/enabled-template-pipeline")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{`"name":"templated_upstream"`, `"enabled":false`},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "parse-templated-enabled-enabled",
+			task: e2e.Task{
+				Name:    "parse-templated-enabled-enabled",
+				Command: binary,
+				Args:    []string{"internal", "parse-pipeline", "--variant", "enabled", filepath.Join(currentFolder, "test-pipelines/enabled-template-pipeline")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{`"name":"templated_upstream"`, `"enabled":true`},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
 			name: "validate-happy-path",
 			task: e2e.Task{
 				Name:    "validate-happy-path",
@@ -225,6 +259,43 @@ func TestIndividualTasks(t *testing.T) {
 				},
 				Asserts: []func(*e2e.Task) error{
 					e2e.AssertByExitCode,
+				},
+			},
+		},
+		{
+			name: "validate-nested-params-rendering",
+			task: e2e.Task{
+				Name:    "validate-nested-params-rendering",
+				Command: binary,
+				Args:    []string{"validate", filepath.Join(currentFolder, "test-pipelines/nested-params-rendering")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"Successfully validated 1 assets across 1 pipeline"},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "validate-nested-params-do-not-expose-parameters-to-jinja",
+			task: e2e.Task{
+				Name:    "validate-nested-params-do-not-expose-parameters-to-jinja",
+				Command: binary,
+				Args:    []string{"validate", filepath.Join(currentFolder, "test-pipelines/nested-params-no-jinja-access")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 1,
+					Contains: []string{
+						`error rendering parameter "nested"`,
+						`missing variable 'parameters'`,
+					},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
 				},
 			},
 		},
@@ -1439,6 +1510,40 @@ func TestIndividualTasks(t *testing.T) {
 				Expected: e2e.Output{
 					ExitCode: 0,
 					Contains: []string{"Successfully validated 3 assets", "bruin run completed", "Finished: render_this.my_asset_2"},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "run-templated-enabled-disabled",
+			task: e2e.Task{
+				Name:    "run-templated-enabled-disabled",
+				Command: binary,
+				Args:    []string{"run", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--variant", "disabled", filepath.Join(currentFolder, "test-pipelines/enabled-template-pipeline")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"Successfully validated 2 assets", "bruin run completed", "Finished: templated_downstream"},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "run-templated-enabled-enabled",
+			task: e2e.Task{
+				Name:    "run-templated-enabled-enabled",
+				Command: binary,
+				Args:    []string{"run", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--variant", "enabled", filepath.Join(currentFolder, "test-pipelines/enabled-template-pipeline")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 1,
+					Contains: []string{"Successfully validated 2 assets", "Failed: templated_upstream", "upstream_should_not_run"},
 				},
 				Asserts: []func(*e2e.Task) error{
 					e2e.AssertByExitCode,
@@ -3658,7 +3763,7 @@ func TestWorkflowTasks(t *testing.T) {
 						},
 					},
 					{
-						Name:    "start-date-ignored: run with full-refresh uses pipeline start_date",
+						Name:    "start-date-ignored: run with full-refresh still uses CLI start-date",
 						Command: binary,
 						Args:    []string{"run", "--env", "env-start-date-flags", "--full-refresh", "--start-date", "2024-01-15", "--end-date", "2024-01-31", filepath.Join(currentFolder, "test-pipelines/start-date-flags-test")},
 						Env:     []string{},
@@ -3672,13 +3777,13 @@ func TestWorkflowTasks(t *testing.T) {
 						},
 					},
 					{
-						Name:    "start-date-ignored: validate full-refresh uses pipeline start_date",
+						Name:    "start-date-ignored: validate full-refresh uses CLI start-date, not pipeline start_date",
 						Command: binary,
 						Args:    []string{"query", "--connection", "duckdb-start-date-flags", "--query", "SELECT captured_start_date, captured_end_date FROM date_capture", "--output", "csv"},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
-							Contains: []string{"2023-06-15", "2024-01-31"},
+							Contains: []string{"2024-01-15", "2024-01-31"},
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
@@ -3775,6 +3880,9 @@ func TestWorkflowTasks(t *testing.T) {
 							Contains: []string{
 								"Finished: mat.yield_dicts",
 								"Finished: mat.yield_batches",
+								"Finished: mat.nullable_dicts",
+								"Finished: mat.table_after_dict",
+								"Finished: mat.table_before_dict",
 								"Finished: mat.pandas_df",
 								"Finished: mat.polars_df",
 								"Finished: mat.pyarrow_table",
@@ -3899,6 +4007,120 @@ func TestWorkflowTasks(t *testing.T) {
 						Expected: e2e.Output{
 							ExitCode: 0,
 							Output:   "┌─────┐\n│ CNT │\n├─────┤\n│ 4   │\n└─────┘\n",
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByOutputString,
+						},
+					},
+					{
+						Name:    "python_mat: verify nullable_dicts row count",
+						Command: binary,
+						Args: []string{
+							"query",
+							"--env", "env-python-mat",
+							"--connection", "duckdb-python-mat",
+							"--query", "SELECT count(*) AS cnt FROM mat.nullable_dicts",
+						},
+						WorkingDir: currentFolder,
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   "┌─────┐\n│ CNT │\n├─────┤\n│ 3   │\n└─────┘\n",
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByOutputString,
+						},
+					},
+					{
+						Name:    "python_mat: verify nullable_dicts typed values survive null-first yield",
+						Command: binary,
+						Args: []string{
+							"query",
+							"--env", "env-python-mat",
+							"--connection", "duckdb-python-mat",
+							"--query", "SELECT sum(score) AS s FROM mat.nullable_dicts",
+						},
+						WorkingDir: currentFolder,
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   "┌─────┐\n│ S   │\n├─────┤\n│ 149 │\n└─────┘\n",
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByOutputString,
+						},
+					},
+					{
+						Name:    "python_mat: verify table_after_dict row count",
+						Command: binary,
+						Args: []string{
+							"query",
+							"--env", "env-python-mat",
+							"--connection", "duckdb-python-mat",
+							"--query", "SELECT count(*) AS cnt FROM mat.table_after_dict",
+						},
+						WorkingDir: currentFolder,
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   "┌─────┐\n│ CNT │\n├─────┤\n│ 2   │\n└─────┘\n",
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByOutputString,
+						},
+					},
+					{
+						Name:    "python_mat: verify table_after_dict typed value",
+						Command: binary,
+						Args: []string{
+							"query",
+							"--env", "env-python-mat",
+							"--connection", "duckdb-python-mat",
+							"--query", "SELECT sum(col_a) AS s FROM mat.table_after_dict",
+						},
+						WorkingDir: currentFolder,
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   "┌───┐\n│ S │\n├───┤\n│ 1 │\n└───┘\n",
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByOutputString,
+						},
+					},
+					{
+						Name:    "python_mat: verify table_before_dict row count",
+						Command: binary,
+						Args: []string{
+							"query",
+							"--env", "env-python-mat",
+							"--connection", "duckdb-python-mat",
+							"--query", "SELECT count(*) AS cnt FROM mat.table_before_dict",
+						},
+						WorkingDir: currentFolder,
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   "┌─────┐\n│ CNT │\n├─────┤\n│ 2   │\n└─────┘\n",
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByOutputString,
+						},
+					},
+					{
+						Name:    "python_mat: verify table_before_dict typed value",
+						Command: binary,
+						Args: []string{
+							"query",
+							"--env", "env-python-mat",
+							"--connection", "duckdb-python-mat",
+							"--query", "SELECT sum(col_a) AS s FROM mat.table_before_dict",
+						},
+						WorkingDir: currentFolder,
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   "┌───┐\n│ S │\n├───┤\n│ 1 │\n└───┘\n",
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
@@ -4350,7 +4572,7 @@ func TestMacros(t *testing.T) {
 					ExitCode: 0,
 					Contains: []string{
 						// Pipeline default rerun_cooldown
-						`"default":{"type":"","parameters":null,"secrets":null,"hooks":{},"interval_modifiers":null,"rerun_cooldown":300}`, `"retries_delay":300`,
+						`"default":{"type":"","materialization":null,"parameters":null,"secrets":null,"hooks":{},"snowflake":null,"athena":null,"interval_modifiers":null,"rerun_cooldown":300}`, `"retries_delay":300`,
 						// Asset with explicit rerun_cooldown
 						`"name":"test_asset"`, `"rerun_cooldown":600`, `"retries_delay":600`,
 						// Asset that inherits from pipeline

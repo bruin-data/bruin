@@ -279,17 +279,29 @@ type columnUpstream struct {
 	Table  string `yaml:"table"`
 }
 
+type columnForeignKey struct {
+	Table  string `yaml:"table"`
+	Column string `yaml:"column"`
+}
+
 type column struct {
 	Extends       string            `yaml:"extends"`
 	Name          string            `yaml:"name"`
 	SourceColumn  string            `yaml:"source_column"`
 	Type          string            `yaml:"type"`
+	Mask          string            `yaml:"mask"`
 	Description   string            `yaml:"description"`
 	Tests         []columnCheck     `yaml:"checks"`
 	PrimaryKey    bool              `yaml:"primary_key"`
 	UpdateOnMerge bool              `yaml:"update_on_merge"`
 	MergeSQL      string            `yaml:"merge_sql"`
 	Nullable      *bool             `yaml:"nullable"`
+	Default       string            `yaml:"default"`
+	Precision     *int              `yaml:"precision"`
+	Scale         *int              `yaml:"scale"`
+	Length        *int              `yaml:"length"`
+	Collation     string            `yaml:"collation"`
+	ForeignKey    *columnForeignKey `yaml:"foreign_key"`
 	Upstreams     []columnUpstream  `yaml:"upstreams"`
 	Tags          []string          `yaml:"tags"`
 	Domains       []string          `yaml:"domains"`
@@ -331,11 +343,12 @@ func notificationsOrNil(n Notifications) *Notifications {
 type taskDefinition struct {
 	Name                  string            `yaml:"name"`
 	URI                   string            `yaml:"uri"`
+	Enabled               *TemplatedBool    `yaml:"enabled"`
 	Description           string            `yaml:"description"`
 	Type                  string            `yaml:"type"`
 	RunFile               string            `yaml:"run"`
 	Depends               depends           `yaml:"depends"`
-	Parameters            map[string]string `yaml:"parameters"`
+	Parameters            ParameterMap      `yaml:"parameters"`
 	Connections           map[string]string `yaml:"connections"`
 	Secrets               []secretMapping   `yaml:"secrets"`
 	Connection            string            `yaml:"connection"`
@@ -343,6 +356,7 @@ type taskDefinition struct {
 	Instance              string            `yaml:"instance"`
 	Materialization       materialization   `yaml:"materialization"`
 	Owner                 string            `yaml:"owner"`
+	Tier                  int               `yaml:"tier"`
 	StartDate             string            `yaml:"start_date"`
 	Extends               []string          `yaml:"extends"`
 	Columns               []column          `yaml:"columns"`
@@ -355,6 +369,8 @@ type taskDefinition struct {
 	IntervalModifiers     IntervalModifiers `yaml:"interval_modifiers"`
 	Domains               []string          `yaml:"domains"`
 	Meta                  map[string]string `yaml:"meta"`
+	Metadata              map[string]string `yaml:"metadata"`
+	Retries               *int              `yaml:"retries"`
 	RerunCooldown         *int              `yaml:"rerun_cooldown"`
 	RefreshRestricted     *bool             `yaml:"refresh_restricted,omitempty"`
 	FullRefreshRestricted *bool             `yaml:"full_refresh_restricted,omitempty"`
@@ -486,16 +502,31 @@ func taskDefinitionToAsset(definition taskDefinition) (*Asset, error) {
 			}
 		}
 
+		var foreignKey *ColumnReference
+		if column.ForeignKey != nil {
+			foreignKey = &ColumnReference{
+				Table:  strings.TrimSpace(column.ForeignKey.Table),
+				Column: strings.TrimSpace(column.ForeignKey.Column),
+			}
+		}
+
 		columns[index] = Column{
 			Name:            column.Name,
 			SourceColumn:    column.SourceColumn,
 			Type:            strings.TrimSpace(column.Type),
+			Mask:            strings.TrimSpace(column.Mask),
 			Description:     column.Description,
 			Checks:          tests,
 			PrimaryKey:      column.PrimaryKey,
 			UpdateOnMerge:   column.UpdateOnMerge,
 			MergeSQL:        column.MergeSQL,
 			Nullable:        DefaultTrueBool{Value: column.Nullable},
+			Default:         column.Default,
+			Precision:       column.Precision,
+			Scale:           column.Scale,
+			Length:          column.Length,
+			Collation:       column.Collation,
+			ForeignKey:      foreignKey,
 			EntityAttribute: entityDefinition,
 			Extends:         column.Extends,
 			Upstreams:       upstreamColumns,
@@ -529,6 +560,7 @@ func taskDefinitionToAsset(definition taskDefinition) (*Asset, error) {
 		ID:                hash(definition.Name),
 		URI:               definition.URI,
 		Name:              definition.Name,
+		Enabled:           definition.Enabled,
 		Description:       definition.Description,
 		Type:              AssetType(definition.Type),
 		Parameters:        definition.Parameters,
@@ -540,6 +572,7 @@ func taskDefinitionToAsset(definition taskDefinition) (*Asset, error) {
 		Image:             definition.Image,
 		Instance:          definition.Instance,
 		Owner:             definition.Owner,
+		Tier:              definition.Tier,
 		StartDate:         definition.StartDate,
 		Tags:              definition.Tags,
 		Extends:           definition.Extends,
@@ -552,6 +585,8 @@ func taskDefinitionToAsset(definition taskDefinition) (*Asset, error) {
 		IntervalModifiers: definition.IntervalModifiers,
 		Domains:           definition.Domains,
 		Meta:              definition.Meta,
+		Metadata:          definition.Metadata,
+		Retries:           definition.Retries,
 		RerunCooldown:     definition.RerunCooldown,
 		RefreshRestricted: definition.refreshRestricted(),
 		Notifications:     notificationsOrNil(definition.Notifications),

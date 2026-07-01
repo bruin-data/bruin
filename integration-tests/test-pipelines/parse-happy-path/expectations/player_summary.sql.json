@@ -58,6 +58,12 @@
         "tags": [],
         "primary_key": false,
         "update_on_merge": false,
+        "default": "",
+        "precision": null,
+        "scale": null,
+        "length": null,
+        "collation": "",
+        "foreign_key": null,
         "merge_sql": "",
         "nullable": true,
         "owner": "",
@@ -69,7 +75,8 @@
             "name": "positive",
             "value": null,
             "blocking": true,
-            "description": ""
+            "description": "",
+            "retries": null
           }
         ],
         "upstreams": []
@@ -94,7 +101,8 @@
     "metadata": {},
     "snowflake": null,
     "athena": null,
-    "interval_modifiers": null
+    "interval_modifiers": null,
+    "retries": null
   },
   "pipeline": {
     "name": "integration_test",

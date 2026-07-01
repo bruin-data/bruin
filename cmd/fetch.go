@@ -23,10 +23,10 @@ import (
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
-	"github.com/bruin-data/bruin/pkg/semantic"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/telemetry"
+	semantic "github.com/bruin-data/bruin/semantic-engine"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/pkg/errors"
 	gosnowflake "github.com/snowflakedb/gosnowflake"
@@ -49,6 +49,10 @@ func Query() *cli.Command {
 		Name:   "query",
 		Usage:  "Execute a query on a specified connection and retrieve results",
 		Before: telemetry.BeforeCommand,
+		// Slice flags such as --var and --filter accept JSON values that contain
+		// commas (e.g. --var filters='{"start_date":"x","end_date":"y"}'). Disable
+		// the default comma separator so those values are not split into fragments.
+		DisableSliceFlagSeparator: true,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:     "connection",
@@ -151,7 +155,7 @@ func Query() *cli.Command {
 			},
 			&cli.StringSliceFlag{
 				Name:    "var",
-				Usage:   "set Jinja template variables for query rendering (e.g. --var key=value)",
+				Usage:   "set Jinja template variables for query rendering. Supports flat (--var key=value), dot-notation nested (--var filters.start_date=2026-05-20) and JSON object/array values (--var filters='{\"start_date\":\"2026-05-20\"}').",
 				Sources: cli.EnvVars("BRUIN_VARS"),
 			},
 		},
@@ -166,14 +170,9 @@ func Query() *cli.Command {
 				return handleError(c.String("output"), err)
 			}
 
-			connName, conn, queryStr, assetType, pipelineInfo, err := prepareQueryExecution(ctx, c, fs, vars)
+			connName, conn, queryStr, dialect, pipelineInfo, err := prepareQueryExecution(ctx, c, fs, vars)
 			if err != nil {
 				return handleError(c.String("output"), err)
-			}
-
-			dialect, err := sqlparser.AssetTypeToDialect(assetType)
-			if err != nil {
-				dialect = ""
 			}
 
 			var parser *sqlparser.SQLParser
@@ -458,7 +457,7 @@ func validateFlags(connection, query, asset, pipelinePath string, hasSemanticFla
 	}
 }
 
-func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, vars map[string]any) (string, interface{}, string, pipeline.AssetType, *ppInfo, error) {
+func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, vars map[string]any) (string, interface{}, string, string, *ppInfo, error) {
 	assetPath := c.String("asset")
 	queryStr := c.String("query")
 	env := c.String("environment")
@@ -483,7 +482,7 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, var
 
 	// Direct query mode (no asset path)
 	if assetPath == "" {
-		conn, err := getConnectionFromConfigWithContext(ctx, env, connectionName, fs, c.String("config-file"))
+		conn, connType, err := getConnectionAndTypeFromConfigWithContext(ctx, env, connectionName, fs, c.String("config-file"))
 		if err != nil {
 			return "", nil, "", "", nil, err
 		}
@@ -491,7 +490,7 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, var
 		if err != nil {
 			return "", nil, "", "", nil, err
 		}
-		return connectionName, conn, queryStr, "", nil, nil
+		return connectionName, conn, queryStr, sqlparser.ConnectionTypeToDialect(connType), nil, nil
 	}
 
 	if queryStr != "" {
@@ -533,7 +532,7 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, var
 			return "", nil, "", "", nil, err
 		}
 
-		return connName, conn, queryStr, pipelineInfo.Asset.Type, pipelineInfo, nil
+		return connName, conn, queryStr, dialectForAssetType(pipelineInfo.Asset.Type), pipelineInfo, nil
 	}
 	// Asset query mode (only asset path)
 	pipelineInfo, err := GetPipelineAndAsset(ctx, assetPath, fs, c.String("config-file"))
@@ -577,10 +576,20 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, var
 		return "", nil, "", "", nil, err
 	}
 
-	return connName, conn, queryStr, pipelineInfo.Asset.Type, pipelineInfo, nil
+	return connName, conn, queryStr, dialectForAssetType(pipelineInfo.Asset.Type), pipelineInfo, nil
 }
 
-func prepareSemanticQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, vars map[string]any, startDate time.Time, endDate time.Time) (string, interface{}, string, pipeline.AssetType, *ppInfo, error) {
+// dialectForAssetType returns the SQL parser dialect for the given asset type,
+// or the empty string when the asset type has no registered dialect.
+func dialectForAssetType(assetType pipeline.AssetType) string {
+	dialect, err := sqlparser.AssetTypeToDialect(assetType)
+	if err != nil {
+		return ""
+	}
+	return dialect
+}
+
+func prepareSemanticQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, vars map[string]any, startDate time.Time, endDate time.Time) (string, interface{}, string, string, *ppInfo, error) {
 	semanticModelName := c.String("semantic-model")
 	assetPath := c.String("asset")
 	pipelinePath := c.String("pipeline")
@@ -658,7 +667,7 @@ func prepareSemanticQueryExecution(ctx context.Context, c *cli.Command, fs afero
 			return "", nil, "", "", nil, err
 		}
 
-		return connName, conn, queryStr, pipelineInfo.Asset.Type, pipelineInfo, nil
+		return connName, conn, queryStr, dialectForAssetType(pipelineInfo.Asset.Type), pipelineInfo, nil
 	} else {
 		renderer := newSemanticRenderer(pipelineInfo, vars, startDate, endDate)
 		extractor := &query.WholeFileExtractor{
@@ -669,7 +678,8 @@ func prepareSemanticQueryExecution(ctx context.Context, c *cli.Command, fs afero
 		if err != nil {
 			return "", nil, "", "", nil, err
 		}
-		return connName, conn, queryStr, "", pipelineInfo, nil
+		dialect := sqlparser.ConnectionTypeToDialect(pipelineInfo.Config.SelectedEnvironment.Connections.ConnectionsSummaryList()[connName])
+		return connName, conn, queryStr, dialect, pipelineInfo, nil
 	}
 }
 
@@ -882,9 +892,14 @@ func parseSemanticSortSpec(raw string) (semantic.SortSpec, error) {
 }
 
 func getConnectionFromConfigWithContext(ctx context.Context, env string, connectionName string, fs afero.Fs, configFilePath string) (interface{}, error) {
+	conn, _, err := getConnectionAndTypeFromConfigWithContext(ctx, env, connectionName, fs, configFilePath)
+	return conn, err
+}
+
+func getConnectionAndTypeFromConfigWithContext(ctx context.Context, env string, connectionName string, fs afero.Fs, configFilePath string) (interface{}, string, error) {
 	repoRoot, err := git.FindRepoFromPath(".")
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to find the git repository root")
+		return nil, "", errors.Wrap(err, "failed to find the git repository root")
 	}
 
 	if configFilePath == "" {
@@ -892,31 +907,31 @@ func getConnectionFromConfigWithContext(ctx context.Context, env string, connect
 	}
 	cm, err := config.LoadOrCreate(fs, configFilePath)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to load or create config")
+		return nil, "", errors.Wrap(err, "failed to load or create config")
 	}
 
 	if env != "" {
 		err := cm.SelectEnvironment(env)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to use the environment '%s'", env)
+			return nil, "", errors.Wrapf(err, "failed to use the environment '%s'", env)
 		}
 	}
 
 	manager, errs := connection.NewManagerFromConfigWithContext(ctx, cm)
 	if len(errs) > 0 {
-		return nil, errors.Wrap(errs[0], "failed to create connection manager")
+		return nil, "", errors.Wrap(errs[0], "failed to create connection manager")
 	}
 
 	conn := manager.GetConnection(connectionName)
 	if conn == nil {
-		return nil, &config.MissingConnectionError{
+		return nil, "", &config.MissingConnectionError{
 			Name:            connectionName,
 			ConfigFilePath:  configFilePath,
 			EnvironmentName: cm.SelectedEnvironmentName,
 		}
 	}
 
-	return conn, nil
+	return conn, manager.GetConnectionType(connectionName), nil
 }
 
 func extractQuery(content string, extractor query.QueryExtractor) (string, error) {
@@ -1600,8 +1615,15 @@ func injectAgentName(annotations string) string {
 	return string(b)
 }
 
-// parseQueryVars parses --var flags into a map of string values.
-// Values are always treated as literal strings, matching how pipeline variables work in YAML.
+// parseQueryVars parses --var flags into a (possibly nested) map of values.
+//
+// It supports three forms, matching how the dashboard runtime injects variables:
+//   - flat:         --var start_date=2026-05-20            => {"start_date": "2026-05-20"}
+//   - dot-notation: --var filters.start_date=2026-05-20    => {"filters": {"start_date": "2026-05-20"}}
+//   - JSON values:  --var filters='{"start_date":"x"}'     => {"filters": {"start_date": "x"}}
+//
+// Scalar values are kept as literal strings (matching how pipeline variables work
+// in YAML); only values that look like a JSON object or array are parsed as JSON.
 func parseQueryVars(rawVars []string) (map[string]any, error) {
 	vars := make(map[string]any)
 
@@ -1614,10 +1636,88 @@ func parseQueryVars(rawVars []string) (map[string]any, error) {
 		if key == "" {
 			return nil, fmt.Errorf("invalid variable %q: key must not be empty", v)
 		}
-		vars[key] = strings.TrimSpace(parts[1])
+
+		value := parseQueryVarValue(strings.TrimSpace(parts[1]))
+		if err := setNestedVar(vars, key, value); err != nil {
+			return nil, fmt.Errorf("invalid variable %q: %w", v, err)
+		}
 	}
 
 	return vars, nil
+}
+
+// parseQueryVarValue parses a raw --var value. Values that look like a JSON object
+// or array are parsed as JSON so callers can pass nested structures; everything else
+// is kept as a literal string.
+func parseQueryVarValue(value string) any {
+	if value == "" {
+		return value
+	}
+
+	switch value[0] {
+	case '{', '[':
+		var parsed any
+		if err := json.Unmarshal([]byte(value), &parsed); err == nil {
+			return parsed
+		}
+	}
+
+	return value
+}
+
+// mergeVarValue merges an incoming value onto an existing one. When both are
+// objects they are deep-merged (so dot-notation and JSON assignments to the same
+// key combine in either order), with incoming leaf values winning on conflicts.
+// Otherwise the incoming value replaces the existing one.
+func mergeVarValue(existing, incoming any) any {
+	existingMap, ok := existing.(map[string]any)
+	if !ok {
+		return incoming
+	}
+	incomingMap, ok := incoming.(map[string]any)
+	if !ok {
+		return incoming
+	}
+
+	for key, value := range incomingMap {
+		existingMap[key] = mergeVarValue(existingMap[key], value)
+	}
+	return existingMap
+}
+
+// setNestedVar assigns value to a dot-notation key inside vars, creating
+// intermediate maps as needed and merging into existing ones.
+func setNestedVar(vars map[string]any, key string, value any) error {
+	segments := strings.Split(key, ".")
+	current := vars
+
+	for i, segment := range segments {
+		segment = strings.TrimSpace(segment)
+		if segment == "" {
+			return fmt.Errorf("key %q has an empty segment", key)
+		}
+
+		if i == len(segments)-1 {
+			current[segment] = mergeVarValue(current[segment], value)
+			return nil
+		}
+
+		existing, ok := current[segment]
+		if !ok {
+			next := make(map[string]any)
+			current[segment] = next
+			current = next
+			continue
+		}
+
+		next, ok := existing.(map[string]any)
+		if !ok {
+			return fmt.Errorf("key segment %q is already set to a non-object value", segment)
+		}
+		current = next
+	}
+
+	return nil
 }
 
 func trimDecimalString(value string) string {

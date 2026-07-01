@@ -112,24 +112,24 @@ The Polymarket connection can include these optional URI fields. Some source tab
 
 ## Available Source Tables
 
-| Table | Required connection fields | Optional connection fields | PK | Inc Key | Inc Strategy | Details |
-| ----- | -------------------------- | -------------------------- | -- | ------- | ------------ | ------- |
-| `events` | - | `order`, `ascending`, `slug`, `closed`, `live`, `active`, `archived`, `featured`, `tag_id`, `tag_slug`, `series_id`, `include_chat`, `include_template`, `include_markets` | `id` | `updatedAt` | merge | Polymarket events from Gamma keyset pagination. |
-| `markets` | - | `order`, `ascending`, `slug`, `closed`, `active`, `archived`, `clob_token_ids`, `condition_ids`, `question_ids`, `tag_id`, `related_tags`, `include_tag`, `rfq_enabled` | `id` | `updatedAt` | merge | Polymarket markets from Gamma keyset pagination. |
-| `tags` | - | `limit`, `offset`, `order`, `ascending`, `include_template` | `id` | `updatedAt` | merge | Tags and categories. |
-| `series` | - | `limit`, `offset`, `order`, `ascending`, `closed`, `active`, `archived` | `id` | `updatedAt` | merge | Event series metadata. |
-| `comments` | `parent_entity_id`, `parent_entity_type` | `market`, `user` | `id` | `createdAt` | merge | Public comments. Event comments use `parent_entity_type: "Event"`. |
-| `search` | - | `q`, `events_status`, `markets_status` | - | - | replace | Public search results. |
-| `orderbook` | `token_id` | - | `asset_id` | - | merge | CLOB order book for one token. |
-| `price` | `token_id`, `side` | - | - | - | replace | Best price for one token side, `BUY` or `SELL`. |
-| `midpoint` | `token_id` | - | - | - | replace | Current midpoint price. |
-| `spread` | `token_id` | - | - | - | replace | Current bid/ask spread. |
-| `last_trade_price` | `token_id` | - | - | - | replace | Last trade price and side. |
-| `price_history` | `market` | `interval`, `fidelity` | `t` | `t` | merge | Historical price points for a CLOB asset id. |
-| `trades` | - | `taker_only`, `filter_type`, `filter_amount`, `market`, `event_id`, `user`, `side` | `transactionHash` | `timestamp` | merge | Public trade history from the Data API. |
-| `positions` | `user` | `market` | - | - | replace | Current positions for a public wallet. |
-| `closed_positions` | `user` | `market` | - | - | replace | Closed positions for a public wallet. |
-| `activity` | `user` | `type` | `transactionHash` | `timestamp` | merge | Public wallet activity. |
+| Table | PK | Inc Key | Inc Strategy | Details |
+|-------|----|---------|--------------|---------|
+| `events` | `id` | `updatedAt` | merge | Polymarket events from Gamma keyset pagination. Optional connection fields: `order`, `ascending`, `slug`, `closed`, `live`, `active`, `archived`, `featured`, `tag_id`, `tag_slug`, `series_id`, `include_chat`, `include_template`, `include_markets`. |
+| `markets` | `id` | `updatedAt` | merge | Polymarket markets from Gamma keyset pagination. Optional connection fields: `order`, `ascending`, `slug`, `closed`, `active`, `archived`, `clob_token_ids`, `condition_ids`, `question_ids`, `tag_id`, `related_tags`, `include_tag`, `rfq_enabled`. |
+| `tags` | `id` | `updatedAt` | merge | Tags and categories. Optional connection fields: `limit`, `offset`, `order`, `ascending`, `include_template`. |
+| `series` | `id` | `updatedAt` | merge | Event series metadata. Optional connection fields: `limit`, `offset`, `order`, `ascending`, `closed`, `active`, `archived`. |
+| `comments` | `id` | `createdAt` | merge | Public comments. Event comments use `parent_entity_type: "Event"`. Required connection fields: `parent_entity_id`, `parent_entity_type`. Optional connection fields: `market`, `user`. |
+| `search` | - | - | replace | Public search results. Optional connection fields: `q`, `events_status`, `markets_status`. |
+| `orderbook` | `asset_id` | - | merge | CLOB order book for one token. Required connection field: `token_id`. |
+| `price` | - | - | replace | Best price for one token side, `BUY` or `SELL`. Required connection fields: `token_id`, `side`. |
+| `midpoint` | - | - | replace | Current midpoint price. Required connection field: `token_id`. |
+| `spread` | - | - | replace | Current bid/ask spread. Required connection field: `token_id`. |
+| `last_trade_price` | - | - | replace | Last trade price and side. Required connection field: `token_id`. |
+| `price_history` | `t` | `t` | merge | Historical price points for a CLOB asset id. Required connection field: `market`. Optional connection fields: `interval`, `fidelity`. |
+| `trades` | `transactionHash` | `timestamp` | merge | Public trade history from the Data API. Optional connection fields: `taker_only`, `filter_type`, `filter_amount`, `market`, `event_id`, `user`, `side`. |
+| `positions` | - | - | replace | Current positions for a public wallet. Required connection field: `user`. Optional connection field: `market`. |
+| `closed_positions` | - | - | replace | Closed positions for a public wallet. Required connection field: `user`. Optional connection field: `market`. |
+| `activity` | `transactionHash` | `timestamp` | merge | Public wallet activity. Required connection field: `user`. Optional connection field: `type`. |
 
 ## Notes
 

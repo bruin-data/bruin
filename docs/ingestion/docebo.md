@@ -60,24 +60,24 @@ parameters:
 
 ## Available Source Tables
 
-| Table | Inc Strategy | Details |
-|-------|--------------|---------|
-| `branches` | replace | Organization branches and departments structure. |
-| `categories` | replace | Course categories for organizing learning content. |
-| `certifications` | replace | Certification records and achievement data. |
-| `course_enrollments` | replace | Course enrollment data including user progress. |
-| `course_fields` | replace | Custom fields defined for courses. |
-| `course_learning_objects` | replace | Learning objects and materials within courses. |
-| `courses` | replace | Course information including metadata and settings. |
-| `external_training` | replace | External training records tracked in the system. |
-| `group_members` | replace | User group membership assignments. |
-| `groups` | replace | User groups for organizing learners. |
-| `learning_plan_course_enrollments` | replace | Course enrollments within learning plans. |
-| `learning_plan_enrollments` | replace | User enrollments in learning plans. |
-| `learning_plans` | replace | Learning plan definitions and structure. |
-| `sessions` | replace | Training session information and schedules. |
-| `user_fields` | replace | Custom fields defined for user profiles. |
-| `users` | replace | User profiles and account information. |
+| Table | PK | Inc Key | Inc Strategy | Details |
+|-------|----|---------|--------------|---------|
+| `branches` | - | - | replace | Organizational units/branches in the org chart. Full reload on each run. |
+| `categories` | - | - | replace | Course categories for organizing content. Full reload on each run. |
+| `certifications` | - | - | replace | Certification programs and their configurations. Full reload on each run. |
+| `course_enrollments` | - | - | replace | All course enrollment records with completion status. Full reload on each run. |
+| `course_fields` | - | - | replace | Custom course field definitions. Full reload on each run. |
+| `course_learning_objects` | - | - | replace | Learning objects (modules) within all courses. Full reload on each run. |
+| `courses` | - | - | replace | All courses in the platform including e-learning, ILT, and webinars. Full reload on each run. |
+| `external_training` | - | - | replace | External training records tracked in Docebo. Full reload on each run. |
+| `group_members` | - | - | replace | Membership records for all groups. Full reload on each run. |
+| `groups` | - | - | replace | User groups/audiences for organizing learners. Full reload on each run. |
+| `learning_plan_course_enrollments` | - | - | replace | Course enrollments within learning plans. Full reload on each run. |
+| `learning_plan_enrollments` | - | - | replace | User enrollments in learning plans. Full reload on each run. |
+| `learning_plans` | - | - | replace | Learning plans (learning paths) that group courses. Full reload on each run. |
+| `sessions` | - | - | replace | ILT/classroom sessions for instructor-led courses. Full reload on each run. |
+| `user_fields` | - | - | replace | Custom user field definitions. Full reload on each run. |
+| `users` | - | - | replace | All platform users including learners, instructors, and administrators. Full reload on each run. |
 
 ## Example: Ingesting User Data
 

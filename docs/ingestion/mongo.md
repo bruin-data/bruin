@@ -21,16 +21,27 @@ To connect to MongoDB, you need to add a configuration item to the connections s
           username: "testUser"
           password: "testPass123"
           host: "localhost"
-          port: 27018
-          database: "testDB"
+          port: 27017
 ```
 
 - `name`: The name to identify this MongoDB connection
 - `username`: The MongoDB username with access to the database
 - `password`: The password for the specified username
-- `host`: The host address of the MongoDB server (e.g., localhost or an IP address)
-- `port`: The port number the database server is listening on (default: 27017)
-- `database`:  The name of the database to connect to
+- `host`: The host address of the MongoDB server, without the `mongodb://` protocol or port (for example, `localhost` or `mongo.example.com`)
+- `port`: The port number the database server is listening on. Use `27017` for the MongoDB default port.
+- `database`: Optional. If set, Bruin appends it to the connection URI path. For ingestr assets, the target database is usually provided in `source_table` as `database.collection`.
+
+Bruin turns this configuration into a MongoDB URI in the following form:
+
+```text
+mongodb://testUser:testPass123@localhost:27017
+```
+
+If `username` is empty, Bruin omits the username and password from the URI.
+If your username or password contains special characters, Bruin URL-encodes them when it builds the URI.
+
+> [!CAUTION]
+> Always set `port` for `mongo` connections. The current configuration loader does not apply the schema default when reading `.bruin.yml`, so omitting `port` will build a URI with port `0`.
 
 ### Step 2: Create an asset file for data ingestion
 
@@ -52,7 +63,7 @@ parameters:
 - `type`: Specifies the type of the asset. Set this to ingestr to use the ingestr data pipeline.
 - `connection`: This is the destination connection, which defines where the data should be stored. For example: `postgres` indicates that the ingested data will be stored in a Postgres database.
 - `source_connection`: The name of the MongoDB connection defined in .bruin.yml.
-- `source_table`: The name of the data table in MongoDB that you want to ingest.
+- `source_table`: The MongoDB collection to ingest, in `database.collection` format.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 
@@ -62,4 +73,24 @@ bruin run assets/mongo_ingestion.yml
 
 As a result of this command, Bruin will ingest data from the given MongoDB table into your Postgres database.
 
+> [!TIP]
+> Instead of writing one asset per collection by hand, you can scaffold them automatically with
+> [`bruin import database --as-ingestr`](/commands/import#mongodb). It scans the MongoDB connection
+> and generates a runnable ingestr asset for every collection, so you can replicate the whole
+> database by running the generated pipeline:
+> ```bash
+> bruin import database --connection localMongo --as-ingestr --destination duckdb ./my-pipeline
+> ```
+
 <img width="1017" alt="image" src="https://github.com/user-attachments/assets/2bad9131-baa1-4f20-8e3d-eed4329e7f90">
+
+## Querying
+
+Beyond ingestion, you can run ad-hoc queries against a MongoDB connection with the [`query` command](/commands/query) and verify it with [`bruin connections test`](/commands/connections). Because MongoDB is not SQL, the query is a JSON object describing a find or aggregation against one collection:
+
+```bash
+bruin query --connection localMongo \
+  --query '{"collection":"users","filter":{"age":{"$gt":21}},"sort":{"age":-1},"limit":10}'
+```
+
+See [Querying MongoDB](/commands/query#querying-mongodb) for the full envelope syntax.

@@ -711,7 +711,7 @@ func TestScheduler_WillRunTaskOfType(t *testing.T) {
 	t1000 := &pipeline.Asset{
 		Name:       "task4000",
 		Type:       "ingestr",
-		Parameters: map[string]string{"destination": "postgres"},
+		Parameters: pipeline.ParameterMap{"destination": "postgres"},
 	}
 
 	p := &pipeline.Pipeline{
@@ -872,7 +872,7 @@ func TestScheduler_RestoreState(t *testing.T) {
 		ExcludeTag:   "exclude",
 		StartDate:    time.Now().AddDate(0, 0, -1).Format("2006-01-02"),
 		EndDate:      time.Now().Format("2006-01-02"),
-	}, "2024_12_19_22_59_13", stateFilePath)
+	}, "", 0, "2024_12_19_22_59_13", stateFilePath)
 	require.NoError(t, err, "SavePipelineState should not return an error")
 
 	pipelineState, err := ReadState(fs, stateFilePath)
@@ -920,6 +920,69 @@ func TestScheduler_RestoreState(t *testing.T) {
 	assert.Equal(t, expectedState.RunID, pipelineState.RunID, "RunID should match")
 	assert.Equal(t, expectedState.Version, pipelineState.Version, "Version should match")
 	assert.Equal(t, expectedState.Cmdline, pipelineState.Cmdline, "Cmdline should match")
+}
+
+func TestScheduler_SavePipelineStateBackfill(t *testing.T) {
+	t.Parallel()
+
+	foundPipeline := &pipeline.Pipeline{
+		Name: "test",
+		Assets: []*pipeline.Asset{
+			{Name: "task1", Type: "bq.sql"},
+		},
+	}
+
+	t.Run("persists the backfill id and total when provided", func(t *testing.T) {
+		t.Parallel()
+		fs := afero.NewMemMapFs()
+		s := NewScheduler(zap.NewNop().Sugar(), foundPipeline, "run_a")
+
+		err := s.SavePipelineState(fs, []string{"bruin", "run"}, &RunConfig{}, "bf_123", 24, "run_a", "logs/runs")
+		require.NoError(t, err)
+
+		state, err := ReadState(fs, "logs/runs")
+		require.NoError(t, err)
+		require.Equal(t, "bf_123", state.BackfillID)
+		require.Equal(t, 24, state.BackfillTotal)
+	})
+
+	t.Run("omits the backfill fields from the JSON when unset", func(t *testing.T) {
+		t.Parallel()
+		fs := afero.NewMemMapFs()
+		s := NewScheduler(zap.NewNop().Sugar(), foundPipeline, "run_b")
+
+		err := s.SavePipelineState(fs, []string{"bruin", "run"}, &RunConfig{}, "", 0, "run_b", "logs/runs")
+		require.NoError(t, err)
+
+		raw, err := afero.ReadFile(fs, filepath.Join("logs/runs", "run_b.json"))
+		require.NoError(t, err)
+		require.NotContains(t, string(raw), "backfill_id")
+		require.NotContains(t, string(raw), "backfill_total")
+
+		state, err := ReadState(fs, "logs/runs")
+		require.NoError(t, err)
+		require.Empty(t, state.BackfillID)
+		require.Zero(t, state.BackfillTotal)
+	})
+
+	t.Run("round-trips start/end dates verbatim including fractional exclusive ends", func(t *testing.T) {
+		t.Parallel()
+		fs := afero.NewMemMapFs()
+		s := NewScheduler(zap.NewNop().Sugar(), foundPipeline, "run_c")
+
+		const start = "2024-01-01T00:00:00Z"
+		const end = "2024-01-01T23:59:59.999999999Z"
+		err := s.SavePipelineState(fs, []string{"bruin", "run"}, &RunConfig{
+			StartDate: start,
+			EndDate:   end,
+		}, "", 0, "run_c", "logs/runs")
+		require.NoError(t, err)
+
+		state, err := ReadState(fs, "logs/runs")
+		require.NoError(t, err)
+		require.Equal(t, start, state.Parameters.StartDate)
+		require.Equal(t, end, state.Parameters.EndDate)
+	})
 }
 
 func TestScheduler_MarkAssetWithCustomChecks(t *testing.T) {

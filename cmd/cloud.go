@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"os"
 	path2 "path"
+	"path/filepath"
 	"regexp"
 	"sort"
+	"strings"
 
 	"github.com/bruin-data/bruin/pkg/bruincloud"
 	"github.com/bruin-data/bruin/pkg/config"
@@ -32,6 +34,7 @@ func Cloud(isDebug *bool) *cli.Command {
 			CloudInstances(),
 			CloudGlossary(),
 			CloudAgents(),
+			CloudConnections(),
 		},
 	}
 }
@@ -728,6 +731,46 @@ func cloudRunsGet() *cli.Command {
 	}
 }
 
+var validSplitUnits = map[string]bool{
+	"minute": true, "hour": true, "day": true,
+	"week": true, "month": true, "year": true,
+}
+
+// validateSplitFlags checks the --split / --chunk-size combination.
+func validateSplitFlags(split string, chunkSizeSet bool, chunkSize int) error {
+	if split == "" {
+		if chunkSizeSet {
+			return errors.New("--chunk-size requires --split")
+		}
+		return nil
+	}
+	if !validSplitUnits[split] {
+		return fmt.Errorf("invalid --split %q (valid: minute, hour, day, week, month, year)", split)
+	}
+	if chunkSize < 1 {
+		return errors.New("--chunk-size must be at least 1")
+	}
+	return nil
+}
+
+// parseRunVariables parses --var key=value pairs (JSON values) into a variables map.
+func parseRunVariables(pairs []string) (map[string]any, error) {
+	if len(pairs) == 0 {
+		return nil, nil
+	}
+	vars := make(map[string]any, len(pairs))
+	for _, variable := range pairs {
+		parsed, err := parseVariable(variable)
+		if err != nil {
+			return nil, fmt.Errorf("invalid variable override %q: %w", variable, err)
+		}
+		for key, value := range parsed {
+			vars[key] = value
+		}
+	}
+	return vars, nil
+}
+
 func cloudRunsTrigger() *cli.Command {
 	return &cli.Command{
 		Name:  "trigger",
@@ -747,6 +790,42 @@ func cloudRunsTrigger() *cli.Command {
 				Usage:    "end date for the run (e.g. 2026-01-02T00:00:00Z)",
 				Required: true,
 			},
+			&cli.StringSliceFlag{
+				Name:    "asset",
+				Aliases: []string{"assets"},
+				Usage:   "select specific assets to run by name; repeat or comma-separate for multiple",
+			},
+			&cli.BoolFlag{
+				Name:  "downstream",
+				Usage: "also run everything downstream of the selected --asset(s)",
+			},
+			&cli.StringSliceFlag{
+				Name:    "tag",
+				Aliases: []string{"t"},
+				Usage:   "tag the run; repeat for multiple.",
+			},
+			&cli.BoolFlag{
+				Name:    "full-refresh",
+				Aliases: []string{"r"},
+				Usage:   "full-refresh the assets in the run: the --asset selection if given, otherwise every asset",
+			},
+			&cli.StringSliceFlag{
+				Name:  "var",
+				Usage: "override pipeline variables with custom values (key=value)",
+			},
+			&cli.StringFlag{
+				Name:  "note",
+				Usage: "attach a note to the run.",
+			},
+			&cli.StringFlag{
+				Name:  "split",
+				Usage: "split the date range into batches by unit: minute, hour, day, week, month, year (one run per batch)",
+			},
+			&cli.IntFlag{
+				Name:  "chunk-size",
+				Usage: "number of split units per batch (used with --split)",
+				Value: 1,
+			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			defer RecoverFromPanic()
@@ -765,13 +844,52 @@ func cloudRunsTrigger() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			err = client.TriggerRun(ctx, project, pipeline, c.String("start-date"), c.String("end-date"))
+			// With --split the run becomes a backfill
+			split := c.String("split")
+			chunkSize := c.Int("chunk-size")
+			if err := validateSplitFlags(split, c.IsSet("chunk-size"), chunkSize); err != nil {
+				printError(err, output, "Invalid flags")
+				return cli.Exit("", 1)
+			}
+
+			vars, err := parseRunVariables(c.StringSlice("var"))
 			if err != nil {
+				printError(err, output, "Invalid flag")
+				return cli.Exit("", 1)
+			}
+
+			if c.Args().Len() > 0 {
+				printError(fmt.Errorf("unexpected argument(s): %s", strings.Join(c.Args().Slice(), " ")), output, "Invalid arguments")
+				return cli.Exit("", 1)
+			}
+
+			if c.Bool("downstream") && len(c.StringSlice("asset")) == 0 {
+				printError(errors.New("--downstream requires --asset"), output, "Invalid flags")
+				return cli.Exit("", 1)
+			}
+
+			opts := bruincloud.TriggerRunOptions{
+				Assets:      c.StringSlice("asset"),
+				Downstream:  c.Bool("downstream"),
+				FullRefresh: c.Bool("full-refresh"),
+				Split:       split,
+				ChunkSize:   chunkSize,
+				Variables:   vars,
+				Note:        c.String("note"),
+				Tags:        c.StringSlice("tag"),
+			}
+
+			startDate, endDate := c.String("start-date"), c.String("end-date")
+			if err := client.TriggerRun(ctx, project, pipeline, startDate, endDate, opts); err != nil {
 				printError(err, output, "Failed to trigger run")
 				return cli.Exit("", 1)
 			}
 
-			printSuccessForOutput(output, fmt.Sprintf("Successfully triggered run for pipeline '%s' in project '%s'", pipeline, project))
+			if split == "" {
+				printSuccessForOutput(output, fmt.Sprintf("Successfully triggered run for pipeline '%s' in project '%s'", pipeline, project))
+			} else {
+				printSuccessForOutput(output, fmt.Sprintf("Successfully triggered backfill (split by %s, chunk size %d) for pipeline '%s' in project '%s'", split, chunkSize, pipeline, project))
+			}
 			return nil
 		},
 	}
@@ -2287,6 +2405,239 @@ func cloudAgentsMessages() *cli.Command {
 				t.AppendRow(table.Row{m.ID, m.Status, outputMsg, m.CreatedAt})
 			}
 			t.Render()
+			return nil
+		},
+	}
+}
+
+func CloudConnections() *cli.Command {
+	return &cli.Command{
+		Name:  "connections",
+		Usage: "Manage Bruin Cloud connections",
+		Commands: []*cli.Command{
+			cloudConnectionsList(),
+			cloudConnectionsAdd(),
+			cloudConnectionsDelete(),
+		},
+	}
+}
+
+func cloudConnectionsList() *cli.Command {
+	return &cli.Command{
+		Name:  "list",
+		Usage: "List all connections",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			connections, err := client.ListConnections(ctx)
+			if err != nil {
+				printError(err, output, "Failed to list connections")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(connections, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"Name", "Type"})
+			for _, conn := range connections {
+				t.AppendRow(table.Row{conn.Name, conn.Type})
+			}
+			t.Render()
+			return nil
+		},
+	}
+}
+
+// connectionFromConfig loads a named connection from the local .bruin.yml and
+// returns its type and credentials as a snake_case map (the cloud wire format).
+// The struct's JSON tags already match the wire format, so a marshal round-trip
+// avoids any per-type mapping.
+func connectionFromConfig(name, environment, configFile string) (string, map[string]any, error) {
+	configFilePath := configFile
+	if configFilePath == "" {
+		repoRoot, err := git.FindRepoFromPath(".")
+		if err != nil {
+			return "", nil, errors.New("could not locate .bruin.yml (not in a git repo); pass --config-file or --credentials")
+		}
+		configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
+	}
+
+	cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to load %s: %w", configFilePath, err)
+	}
+
+	env := cm.SelectedEnvironment
+	if environment != "" {
+		e, ok := cm.Environments[environment]
+		if !ok {
+			return "", nil, fmt.Errorf("environment '%s' not found in config", environment)
+		}
+		env = &e
+	}
+	if env == nil || env.Connections == nil || !env.Connections.Exists(name) {
+		return "", nil, fmt.Errorf("connection '%s' not found in config", name)
+	}
+
+	connType := env.Connections.ConnectionsSummaryList()[name]
+	data, err := json.Marshal(env.Connections.GetConnection(name))
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to serialize connection: %w", err)
+	}
+	var credentials map[string]any
+	if err := json.Unmarshal(data, &credentials); err != nil {
+		return "", nil, fmt.Errorf("failed to serialize connection: %w", err)
+	}
+	delete(credentials, "name")
+
+	// A relative service_account_file in .bruin.yml is relative to the config
+	// file, not the CWD the command runs from. Resolve it against the config dir.
+	if p, ok := credentials["service_account_file"].(string); ok && p != "" && !filepath.IsAbs(p) {
+		credentials["service_account_file"] = filepath.Join(filepath.Dir(configFilePath), p)
+	}
+
+	return connType, credentials, nil
+}
+
+func cloudConnectionsAdd() *cli.Command {
+	return &cli.Command{
+		Name:  "add",
+		Usage: "Add a connection to Bruin Cloud (from local .bruin.yml by default)",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.StringFlag{
+				Name:  "name",
+				Usage: "the name of the connection",
+			},
+			&cli.StringFlag{
+				Name:  "environment",
+				Usage: "the .bruin.yml environment to read the connection from (default: selected environment)",
+			},
+			&cli.StringFlag{
+				Name:  "config-file",
+				Usage: "path to the .bruin.yml file",
+			},
+			&cli.StringFlag{
+				Name:  "type",
+				Usage: "connection type; required only with --credentials (otherwise read from .bruin.yml)",
+			},
+			&cli.StringFlag{
+				Name:  "credentials",
+				Usage: "JSON credentials; if omitted, the connection is read from .bruin.yml",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			name := c.String("name")
+			if name == "" {
+				printError(errors.New("--name is required"), output, "Missing required flags")
+				return cli.Exit("", 1)
+			}
+
+			connType := c.String("type")
+			creds := c.String("credentials")
+			var credentials map[string]any
+
+			if creds != "" {
+				if connType == "" {
+					printError(errors.New("--type is required when --credentials is provided"), output, "Missing required flags")
+					return cli.Exit("", 1)
+				}
+				if err := json.Unmarshal([]byte(creds), &credentials); err != nil {
+					printError(err, output, "Invalid --credentials JSON")
+					return cli.Exit("", 1)
+				}
+			} else {
+				t, cr, err := connectionFromConfig(name, c.String("environment"), c.String("config-file"))
+				if err != nil {
+					printError(err, output, "Failed to read connection from .bruin.yml")
+					return cli.Exit("", 1)
+				}
+				connType, credentials = t, cr
+			}
+
+			// The cloud runner can't read local files, so resolve a local
+			// service_account_file path into the service_account_json content here.
+			if path, ok := credentials["service_account_file"].(string); ok && path != "" {
+				data, err := os.ReadFile(path)
+				if err != nil {
+					printError(err, output, "Failed to read service_account_file")
+					return cli.Exit("", 1)
+				}
+				credentials["service_account_json"] = string(data)
+				delete(credentials, "service_account_file")
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			if err := client.CreateConnection(ctx, name, connType, credentials); err != nil {
+				printError(err, output, "Failed to create connection")
+				return cli.Exit("", 1)
+			}
+
+			printSuccessForOutput(output, fmt.Sprintf("Successfully created connection '%s' of type '%s'", name, connType))
+			return nil
+		},
+	}
+}
+
+func cloudConnectionsDelete() *cli.Command {
+	return &cli.Command{
+		Name:  "delete",
+		Usage: "Delete a connection",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.StringFlag{
+				Name:  "name",
+				Usage: "the name of the connection to delete",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			name := c.String("name")
+			if name == "" {
+				printError(errors.New("--name is required"), output, "Missing required flags")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			if err := client.DeleteConnection(ctx, name); err != nil {
+				printError(err, output, "Failed to delete connection")
+				return cli.Exit("", 1)
+			}
+
+			printSuccessForOutput(output, fmt.Sprintf("Successfully deleted connection '%s'", name))
 			return nil
 		},
 	}

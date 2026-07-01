@@ -1314,3 +1314,23 @@ func TestBuildSCD2ByTimeFullRefreshQuery(t *testing.T) {
 		})
 	}
 }
+
+func intp(i int) *int { return &i }
+
+func TestColumnMetadataDDL(t *testing.T) {
+	t.Parallel()
+	asset := &pipeline.Asset{
+		Name:            "orders",
+		Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeTable, Strategy: pipeline.MaterializationStrategyDDL},
+		Columns: []pipeline.Column{
+			{Name: "amount", Type: "decimal", Precision: intp(10), Scale: intp(2)},
+			{Name: "name", Type: "varchar", Length: intp(255)},
+		},
+	}
+	parts, err := NewMaterializer(false).Render(asset, "SELECT 1", "s3://bucket/loc")
+	require.NoError(t, err)
+	require.NotEmpty(t, parts)
+	createTable := parts[len(parts)-1]
+	require.Contains(t, createTable, "decimal(10, 2)")
+	require.Contains(t, createTable, "varchar(255)")
+}

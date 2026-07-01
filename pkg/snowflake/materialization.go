@@ -174,10 +174,23 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 	columnDefs := make([]string, 0, len(asset.Columns))
 	primaryKeys := make([]string, 0)
+	foreignKeys := make([]string, 0)
 	for _, col := range asset.Columns {
-		def := fmt.Sprintf("%s %s", col.Name, col.Type)
+		def := fmt.Sprintf("%s %s", col.Name, col.SQLType())
+		if col.Collation != "" {
+			def += fmt.Sprintf(" COLLATE '%s'", col.Collation)
+		}
+		if col.Default != "" {
+			def += " DEFAULT " + col.Default
+		}
 		if col.PrimaryKey {
 			primaryKeys = append(primaryKeys, col.Name)
+		}
+		if col.ForeignKey != nil && col.ForeignKey.Table != "" && col.ForeignKey.Column != "" {
+			foreignKeys = append(foreignKeys, fmt.Sprintf(
+				"foreign key (%s) references %s (%s)",
+				col.Name, col.ForeignKey.Table, col.ForeignKey.Column,
+			))
 		}
 		if col.Description != "" {
 			desc := strings.ReplaceAll(col.Description, `'`, `''`)
@@ -193,14 +206,19 @@ func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 	if len(primaryKeys) > 0 {
 		primaryKeyClause = fmt.Sprintf(",\nprimary key (%s)", strings.Join(primaryKeys, ", "))
 	}
+	foreignKeyClause := ""
+	if len(foreignKeys) > 0 {
+		foreignKeyClause = ",\n" + strings.Join(foreignKeys, ",\n")
+	}
 	ddl := fmt.Sprintf(
 		"CREATE TABLE IF NOT EXISTS %s %s(\n"+
-			"%s%s\n"+
+			"%s%s%s\n"+
 			")",
 		asset.Name,
 		clusterByClause,
 		strings.Join(columnDefs, ",\n"),
 		primaryKeyClause,
+		foreignKeyClause,
 	)
 
 	return ddl, nil

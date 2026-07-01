@@ -86,6 +86,12 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 		scheduler.TaskInstanceTypeColumnCheck:  NoOpOperator{},
 		scheduler.TaskInstanceTypeCustomCheck:  NoOpOperator{},
 	},
+	pipeline.AssetTypeMongoSource: {
+		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
+		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
+		scheduler.TaskInstanceTypeColumnCheck:  NoOpOperator{},
+		scheduler.TaskInstanceTypeCustomCheck:  NoOpOperator{},
+	},
 	pipeline.AssetTypeBigquerySeed: {
 		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
 		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},

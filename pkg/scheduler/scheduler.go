@@ -123,6 +123,10 @@ type PipelineState struct {
 	TimeStamp         time.Time             `json:"timestamp"`
 	RunID             string                `json:"run_id"`
 	CompatibilityHash string                `json:"compatibility_hash"`
+	// BackfillID groups the per-run logs of one backfill (--backfill-id).
+	BackfillID string `json:"backfill_id,omitempty"`
+	// BackfillTotal is the backfill's chunk count, for progress (--backfill-total).
+	BackfillTotal int `json:"backfill_total,omitempty"`
 }
 
 type RunConfig struct {
@@ -909,7 +913,7 @@ func (s *Scheduler) hasPipelineFinished() bool {
 	return true
 }
 
-func (s *Scheduler) SavePipelineState(fs afero.Fs, cmd []string, param *RunConfig, runID, statePath string) error {
+func (s *Scheduler) SavePipelineState(fs afero.Fs, cmd []string, param *RunConfig, backfillID string, backfillTotal int, runID, statePath string) error {
 	dict := make(map[string][]TaskInstanceStatus)
 	for _, task := range s.taskInstances {
 		dict[task.GetAsset().Name] = append(dict[task.GetAsset().Name], task.GetStatus())
@@ -936,6 +940,8 @@ func (s *Scheduler) SavePipelineState(fs afero.Fs, cmd []string, param *RunConfi
 		TimeStamp:         time.Now(),
 		RunID:             runID,
 		CompatibilityHash: s.pipeline.GetCompatibilityHash(),
+		BackfillID:        backfillID,
+		BackfillTotal:     backfillTotal,
 	}
 	file := filepath.Join(statePath, runID+".json")
 	if err := helpers.WriteJSONToFile(fs, pipelineState, file); err != nil {

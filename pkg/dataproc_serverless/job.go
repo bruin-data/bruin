@@ -14,7 +14,6 @@ import (
 
 	dataproc "cloud.google.com/go/dataproc/v2/apiv1"
 	"cloud.google.com/go/dataproc/v2/apiv1/dataprocpb"
-	"cloud.google.com/go/logging/logadmin"
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"cloud.google.com/go/storage"
 	"github.com/bruin-data/bruin/pkg/git"
@@ -58,13 +57,17 @@ type JobRunParams struct {
 	MetastoreService string
 }
 
-func parseParams(cfg *Client, params map[string]string) *JobRunParams {
+func parseParams(cfg *Client, params pipeline.ParameterMap) *JobRunParams {
+	runtimeVersion, _ := params.GetString("runtime_version")
+	containerImage, _ := params.GetString("container_image")
+	config, _ := params.GetString("config")
+
 	jobParams := JobRunParams{
 		Project:          cfg.ProjectID,
 		Region:           cfg.Region,
-		RuntimeVersion:   params["runtime_version"],
-		ContainerImage:   params["container_image"],
-		Config:           params["config"],
+		RuntimeVersion:   runtimeVersion,
+		ContainerImage:   containerImage,
+		Config:           config,
 		Workspace:        cfg.Workspace,
 		ExecutionRole:    cfg.ExecutionRole,
 		SubnetworkURI:    cfg.SubnetworkURI,
@@ -79,14 +82,14 @@ func parseParams(cfg *Client, params map[string]string) *JobRunParams {
 		jobParams.RuntimeVersion = "2.2"
 	}
 
-	if params["timeout"] != "" {
-		t, err := time.ParseDuration(params["timeout"])
+	if timeout, _ := params.GetString("timeout"); timeout != "" {
+		t, err := time.ParseDuration(timeout)
 		if err == nil {
 			jobParams.Timeout = t
 		}
 	}
-	if params["args"] != "" {
-		arglist := strings.Split(strings.TrimSpace(params["args"]), " ")
+	if args, _ := params.GetString("args"); args != "" {
+		arglist := strings.Split(strings.TrimSpace(args), " ")
 		for _, arg := range arglist {
 			arg = strings.TrimSpace(arg)
 			if arg != "" {
@@ -101,7 +104,6 @@ type Job struct {
 	logger        *log.Logger
 	batchClient   *dataproc.BatchControllerClient
 	storageClient *storage.Client
-	logClient     *logadmin.Client
 	asset         *pipeline.Asset
 	pipeline      *pipeline.Pipeline
 	params        *JobRunParams
@@ -306,8 +308,14 @@ func (job Job) Run(ctx context.Context) (err error) {
 
 	var (
 		previousState = dataprocpb.Batch_STATE_UNSPECIFIED
-		jobLogs       = job.buildLogConsumer(ctx, req.GetBatchId())
+		jobLogs       = job.buildLogConsumer(ctx)
 	)
+
+	emit := func(lines []LogLine) {
+		for _, line := range lines {
+			job.logger.Printf("%s | %s", line.Source, line.Message)
+		}
+	}
 
 	for {
 		select {
@@ -333,22 +341,21 @@ func (job Job) Run(ctx context.Context) (err error) {
 				previousState = batch.GetState()
 			}
 
-			for _, line := range jobLogs.Next() {
-				job.logger.Printf("%s | %s", line.Source, line.Message)
-			}
+			// Dataproc populates the driver-output location once the batch
+			// starts running; keep feeding it to the consumer until it sticks.
+			jobLogs.SetOutputURI(batch.GetRuntimeInfo().GetOutputUri())
+			emit(jobLogs.Next())
 
 			switch batch.GetState() { //nolint:exhaustive
 			case dataprocpb.Batch_FAILED, dataprocpb.Batch_CANCELLED:
+				emit(job.drainLogs(ctx, jobLogs))
 				return batchError{
 					BatchID: req.GetBatchId(),
 					State:   batch.GetState(),
 					Details: batch.GetStateMessage(),
 				}
 			case dataprocpb.Batch_SUCCEEDED:
-				// Drain remaining logs
-				for _, line := range jobLogs.Next() {
-					job.logger.Printf("%s | %s", line.Source, line.Message)
-				}
+				emit(job.drainLogs(ctx, jobLogs))
 				return nil
 			}
 		}
@@ -356,18 +363,54 @@ func (job Job) Run(ctx context.Context) (err error) {
 }
 
 type LogConsumer interface {
+	// Next returns log lines produced since the previous call.
 	Next() []LogLine
+	// Flush returns any remaining buffered output, including a final line not
+	// terminated by a newline.
+	Flush() []LogLine
+	// SetOutputURI points the consumer at the GCS driver-output location.
+	SetOutputURI(uri string)
 }
 
-func (job Job) buildLogConsumer(ctx context.Context, batchID string) LogConsumer {
-	return &CloudLoggingConsumer{
-		ctx:       ctx,
-		client:    job.logClient,
-		project:   job.params.Project,
-		region:    job.params.Region,
-		batchID:   batchID,
-		lastFetch: time.Now(),
+// drainLogs reads any driver output that is still being flushed to GCS after the
+// batch has reached a terminal state, giving Dataproc a short grace period, then
+// flushes any trailing line that is not newline-terminated.
+func (job Job) drainLogs(ctx context.Context, jobLogs LogConsumer) []LogLine {
+	const (
+		maxRounds = 3
+		graceWait = 2 * time.Second
+	)
+
+	lines := []LogLine{}
+	emptyRounds := 0
+drain:
+	for range maxRounds {
+		batch := jobLogs.Next()
+		lines = append(lines, batch...)
+
+		if len(batch) == 0 {
+			emptyRounds++
+			if emptyRounds >= 2 {
+				break
+			}
+		} else {
+			emptyRounds = 0
+		}
+
+		select {
+		case <-ctx.Done():
+			break drain
+		case <-time.After(graceWait):
+		}
 	}
+
+	// Flush drains any buffered partial line; it works even if ctx is already
+	// cancelled because it falls back to the in-memory buffers.
+	return append(lines, jobLogs.Flush()...)
+}
+
+func (job Job) buildLogConsumer(ctx context.Context) LogConsumer {
+	return newGCSLogConsumer(ctx, job.storageClient)
 }
 
 func batchEnvironmentConfig(params *JobRunParams) *dataprocpb.EnvironmentConfig {

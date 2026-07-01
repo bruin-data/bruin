@@ -209,7 +209,7 @@ func singleLineCommentsToTask(scanner *bufio.Scanner, commentMarker, filePath st
 
 func commentRowsToTask(commentRows []string) (*Asset, error) {
 	task := Asset{
-		Parameters:   make(map[string]string),
+		Parameters:   make(ParameterMap),
 		Columns:      make([]Column, 0),
 		CustomChecks: make([]CustomCheck, 0),
 		Secrets:      make([]SecretMapping, 0),
@@ -237,6 +237,14 @@ func commentRowsToTask(commentRows []string) (*Asset, error) {
 			continue
 		case "type":
 			task.Type = AssetType(value)
+
+			continue
+		case "enabled":
+			enabled, err := ParseTemplatedBool(value)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to parse enabled value '%s'", value)
+			}
+			task.Enabled = enabled
 
 			continue
 		case "connection":
@@ -268,6 +276,14 @@ func commentRowsToTask(commentRows []string) (*Asset, error) {
 				return nil, errors.Wrapf(err, "failed to parse rerun_cooldown value '%s'", value)
 			}
 			task.RerunCooldown = &rerunCooldown
+
+			continue
+		case "retries":
+			retries, err := strconv.Atoi(value)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to parse retries value '%s'", value)
+			}
+			task.Retries = &retries
 
 			continue
 		case "refresh_restricted", "full_refresh_restricted":
@@ -403,12 +419,36 @@ func handleColumnEntry(columnFields []string, task *Asset, value string) error {
 		}
 	case "type":
 		task.Columns[columnIndex].Type = strings.ToLower(strings.TrimSpace(value))
+	case "mask":
+		task.Columns[columnIndex].Mask = strings.TrimSpace(value)
 	case "primary_key":
 		boolValue, err := strconv.ParseBool(value)
 		if err != nil {
 			return errors.Wrapf(err, "failed parsing primary_key for column %s", columnName)
 		}
 		task.Columns[columnIndex].PrimaryKey = boolValue
+	case "default":
+		task.Columns[columnIndex].Default = strings.TrimSpace(value)
+	case "collation":
+		task.Columns[columnIndex].Collation = strings.TrimSpace(value)
+	case "precision":
+		intValue, err := strconv.Atoi(strings.TrimSpace(value))
+		if err != nil {
+			return errors.Wrapf(err, "failed parsing precision for column %s", columnName)
+		}
+		task.Columns[columnIndex].Precision = &intValue
+	case "scale":
+		intValue, err := strconv.Atoi(strings.TrimSpace(value))
+		if err != nil {
+			return errors.Wrapf(err, "failed parsing scale for column %s", columnName)
+		}
+		task.Columns[columnIndex].Scale = &intValue
+	case "length":
+		intValue, err := strconv.Atoi(strings.TrimSpace(value))
+		if err != nil {
+			return errors.Wrapf(err, "failed parsing length for column %s", columnName)
+		}
+		task.Columns[columnIndex].Length = &intValue
 	}
 
 	return nil

@@ -10,7 +10,6 @@ tool (
 require (
 	cloud.google.com/go/bigquery v1.72.0
 	cloud.google.com/go/dataproc/v2 v2.11.2
-	cloud.google.com/go/logging v1.13.0
 	cloud.google.com/go/longrunning v0.6.7
 	cloud.google.com/go/storage v1.56.0
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.18.0
@@ -61,7 +60,7 @@ require (
 	github.com/rs/zerolog v1.28.0
 	github.com/rudderlabs/analytics-go/v4 v4.2.1
 	github.com/samber/lo v1.51.0
-	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
+	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2 // indirect
 	github.com/sergi/go-diff v1.4.0
 	github.com/sijms/go-ora/v2 v2.9.0
 	github.com/snowflakedb/gosnowflake v1.17.1
@@ -79,6 +78,7 @@ require (
 	go.mongodb.org/mongo-driver v1.17.6
 	go.uber.org/zap v1.27.0
 	golang.org/x/mod v0.35.0
+	golang.org/x/net v0.55.0
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.20.0
 	golang.org/x/term v0.43.0
@@ -275,7 +275,6 @@ require (
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/crypto v0.51.0 // indirect
 	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b // indirect
-	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/sys v0.45.0 // indirect
 	golang.org/x/telemetry v0.0.0-20260409153401-be6f6cb8b1fa // indirect
 	golang.org/x/text v0.37.0 // indirect
@@ -292,3 +291,7 @@ require (
 	howett.net/plist v0.0.0-20181124034731-591f970eefbb // indirect
 	mvdan.cc/gofumpt v0.10.0 // indirect
 )
+
+require github.com/bruin-data/bruin/semantic-engine v0.0.0
+
+replace github.com/bruin-data/bruin/semantic-engine => ./semantic-engine

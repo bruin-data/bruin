@@ -61,6 +61,25 @@ table td:first-child {
 | `--var` | []str | - | Override pipeline [variables](/variables/overview) with custom values. |
 | `--variant` | str | - | Materialize the named [variant](/pipelines/variants) of a variant-bearing pipeline. Required when the pipeline declares variants. |
 | `--query-annotations` | str | - | Add annotations to SQL queries as comments. Use `default` to add asset name, pipeline name, and execution step, or provide custom JSON for additional fields. |
+| `--backfill-id` | str | - | Tag this run as part of a backfill group; written to the run log as `backfill_id` so related runs can be grouped. |
+| `--backfill-total` | int | `0` | Total number of chunks in this backfill; written to the run log as `backfill_total` so progress can be reported. Informational only — it does not affect scheduling or execution. |
+
+### Backfill identity in the run log
+
+A backfill is run as several `bruin run` invocations, one per interval window. Passing the same `--backfill-id` (and `--backfill-total`) to each lets a consumer group them and report progress. Both are recorded as top-level fields in the run log (`logs/runs/<pipeline>/<run-id>.json`):
+
+```json
+{
+  "run_id": "bf_2024_q1__2024_01_01_00_00_00",
+  "backfill_id": "bf_2024_q1",
+  "backfill_total": 24,
+  "parameters": { "startDate": "2024-01-01", "endDate": "..." }
+}
+```
+
+Group `logs/runs/**/*.json` by `backfill_id`, use `backfill_total` as the denominator, and report `ranCount / total`.
+
+When `--backfill-id` is set, the `run_id` is composed as `<backfill-id>__<start-date>` (mirroring Bruin Cloud's per-chunk run ids); each chunk's distinct start date keeps it unique, so the logs never overwrite each other. Without the flags, behavior is unchanged: both fields are omitted and `run_id` keeps its normal timestamp format. `BRUIN_RUN_ID` still overrides the generated id.
 
 ### Continue from the last failed asset
 
@@ -98,6 +117,56 @@ bruin run --selector "@fct_orders"
 - Space-delimited unions and comma-delimited intersections
 
 `--selector` cannot be combined with `--tag`, `--downstream`, positional asset arguments, or single-asset runs. Use selector syntax directly for those cases.
+
+#### AND / OR logic with tags
+
+The selector grammar gives you both AND and OR when targeting assets by tag:
+
+- **Space = union (OR):** an asset matches if it satisfies *any* of the space-separated terms.
+- **Comma = intersection (AND):** an asset matches only if it satisfies *all* of the comma-separated terms.
+
+```bash
+# OR — assets tagged finance OR marketing
+bruin run --selector "tag:finance tag:marketing"
+
+# AND — assets tagged with BOTH daily AND critical
+bruin run --selector "tag:daily,tag:critical"
+
+# Mix — (daily AND critical) OR anything tagged adhoc
+bruin run --selector "tag:daily,tag:critical tag:adhoc"
+```
+
+Because comma is an intersection, an AND expression only matches when a single asset carries every listed tag. If no asset has all of them, the selector matches nothing.
+
+#### Combining tags with graph expansion
+
+Tag terms compose with the `+`, `n+`, and `@` graph operators, so you can pull in a tag's lineage as well:
+
+```bash
+# Everything tagged finance, plus all of their downstream assets
+bruin run --selector "tag:finance+"
+
+# Everything tagged finance, plus all of their upstream dependencies
+bruin run --selector "+tag:finance"
+
+# Upstream lineage of fct_orders, narrowed to only the finance-tagged assets in it
+bruin run --selector "+fct_orders,tag:finance"
+
+# Finance-tagged assets and their immediate (one level) downstream only
+bruin run --selector "tag:finance+1"
+```
+
+#### Tag wildcards
+
+Tag matching supports glob wildcards (`*`, `?`, `[...]`), which is handy for tag naming conventions:
+
+```bash
+# Any asset whose tag starts with "team_"
+bruin run --selector "tag:team_*"
+
+# Union of a wildcard tag and an exact tag
+bruin run --selector "tag:layer_* tag:critical"
+```
 
 ### Combining Tags and Execution Types
 

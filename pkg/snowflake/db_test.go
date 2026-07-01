@@ -726,11 +726,28 @@ func TestDB_RecreateTableOnMaterializationTypeMismatch(t *testing.T) {
 				mock.ExpectQuery(`SELECT TABLE_TYPE FROM MYDB.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`).
 					WillReturnRows(sqlmock.NewRows([]string{"TABLE_TYPE"}).AddRow("VIEW"))
 
-				mock.ExpectQuery(`DROP VIEW IF EXISTS TEST_SCHEMA.TEST_TABLE`).
+				mock.ExpectQuery(`DROP VIEW IF EXISTS MYDB.TEST_SCHEMA.TEST_TABLE`).
 					WillReturnRows(sqlmock.NewRows(nil))
 			},
 			asset: &pipeline.Asset{
 				Name: "test_schema.test_table",
+				Materialization: pipeline.Materialization{
+					Type: pipeline.MaterializationTypeTable,
+				},
+			},
+		},
+		{
+			name: "three-part name looks up and drops in the named database",
+			mockSetup: func(mock sqlmock.Sqlmock) {
+				// Must use OTHER_DB (from the asset name), not MYDB (the config default).
+				mock.ExpectQuery(`SELECT TABLE_TYPE FROM OTHER_DB.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`).
+					WillReturnRows(sqlmock.NewRows([]string{"TABLE_TYPE"}).AddRow("VIEW"))
+
+				mock.ExpectQuery(`DROP VIEW IF EXISTS OTHER_DB.TEST_SCHEMA.TEST_TABLE`).
+					WillReturnRows(sqlmock.NewRows(nil))
+			},
+			asset: &pipeline.Asset{
+				Name: "other_db.test_schema.test_table",
 				Materialization: pipeline.Materialization{
 					Type: pipeline.MaterializationTypeTable,
 				},
@@ -866,7 +883,19 @@ func TestDB_CreateSchemaIfNotExist(t *testing.T) {
 				mock.ExpectQuery("CREATE SCHEMA IF NOT EXISTS TEST_SCHEMA").
 					WillReturnError(errors.New("creation failed"))
 			},
-			expectedError: "failed to create or ensure database: TEST_SCHEMA: creation failed",
+			expectedError: "failed to create or ensure schema: TEST_SCHEMA: creation failed",
+		},
+		{
+			name: "three-part name creates the database then the schema",
+			asset: &pipeline.Asset{
+				Name: "other_db.test_schema.test_table",
+			},
+			mockSetup: func(mock sqlmock.Sqlmock, cache *sync.Map) {
+				mock.ExpectQuery("CREATE DATABASE IF NOT EXISTS OTHER_DB").
+					WillReturnRows(sqlmock.NewRows(nil))
+				mock.ExpectQuery("CREATE SCHEMA IF NOT EXISTS OTHER_DB.TEST_SCHEMA").
+					WillReturnRows(sqlmock.NewRows(nil))
+			},
 		},
 		{
 			name: "asset name with 1 component",
@@ -902,7 +931,7 @@ func TestDB_CreateSchemaIfNotExist(t *testing.T) {
 			cache := &sync.Map{}
 			db := &DB{
 				conn:          sqlxDB,
-				schemaCreator: ansisql.NewSchemaCreator(),
+				schemaCreator: ansisql.NewSchemaCreatorWithContainer("DATABASE"),
 			}
 
 			// Apply the mock setup
@@ -976,6 +1005,27 @@ func TestDB_PushColumnDescriptions(t *testing.T) {
 			},
 		},
 
+		{
+			name: "three-part name pushes metadata to the named database",
+			asset: &pipeline.Asset{
+				Name:        "other_db.test_schema.test_table",
+				Description: "",
+				Columns: []pipeline.Column{
+					{Name: "col1", Description: "Description 1"},
+				},
+			},
+			mockSetup: func(mock sqlmock.Sqlmock) {
+				// Lookup and ALTER must target OTHER_DB, not the MYDB config default.
+				mock.ExpectQuery(
+					`SELECT COLUMN_NAME, COMMENT FROM OTHER_DB.INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`,
+				).WillReturnRows(sqlmock.NewRows([]string{"COLUMN_NAME", "COMMENT"}).
+					AddRow("COL1", ""))
+
+				mock.ExpectQuery(
+					`ALTER TABLE OTHER_DB.TEST_SCHEMA.TEST_TABLE MODIFY COLUMN col1 COMMENT 'Description 1'`,
+				).WillReturnRows(sqlmock.NewRows(nil))
+			},
+		},
 		{
 			name: "successfully update table description",
 			asset: &pipeline.Asset{
@@ -1254,21 +1304,21 @@ func TestDB_BuildTableExistsQuery(t *testing.T) {
 			db:          &DB{config: &Config{Database: "test_db"}},
 			tableName:   ".test_table",
 			wantErr:     true,
-			errContains: "table name must be in schema.table or database.schema.table format, '.test_table' given",
+			errContains: "contains an empty component",
 		},
 		{
 			name:        "invalid format - empty component 2",
 			db:          &DB{config: &Config{Database: "test_db"}},
 			tableName:   ".",
 			wantErr:     true,
-			errContains: "table name must be in schema.table or database.schema.table format, '.' given",
+			errContains: "contains an empty component",
 		},
 		{
-			name:        "invalid format - too few components",
-			db:          &DB{config: &Config{Database: "test_db"}},
-			tableName:   "single",
-			wantErr:     true,
-			errContains: "table name must be in schema.table or database.schema.table format, 'single' given",
+			name:      "valid table only (db+schema from config)",
+			db:        &DB{config: &Config{Database: "test_db", Schema: "test_schema"}},
+			tableName: "single",
+			wantQuery: "SELECT COUNT(*) FROM TEST_DB.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'SINGLE'",
+			wantErr:   false,
 		},
 		{
 			name:        "invalid format - empty table name",
@@ -1276,7 +1326,7 @@ func TestDB_BuildTableExistsQuery(t *testing.T) {
 			tableName:   "",
 			wantQuery:   "",
 			wantErr:     true,
-			errContains: "table name must be in schema.table or database.schema.table format, '' given",
+			errContains: "contains an empty component",
 		},
 		{
 			name:        "invalid format - empty database name",
@@ -1290,7 +1340,7 @@ func TestDB_BuildTableExistsQuery(t *testing.T) {
 			db:          &DB{config: &Config{Database: "test_db"}},
 			tableName:   "a.b.c.d",
 			wantErr:     true,
-			errContains: "table name must be in schema.table or database.schema.table format, 'a.b.c.d' given",
+			errContains: "must be in format",
 		},
 		{
 			name:      "valid schema.table format",

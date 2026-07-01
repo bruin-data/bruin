@@ -86,6 +86,45 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "creatives", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
 	},
 
+	// API-Football - Soccer data from API-SPORTS (api-sports.io), supports any league/season
+	"apifootball": {
+		{Name: "teams", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "stadiums", PrimaryKey: "id", IncKey: "", IncStrategy: "merge"},
+		{Name: "group_standings", PrimaryKey: "league_id, season, group_name, team_id", IncKey: "", IncStrategy: "merge"},
+		{Name: "matches", PrimaryKey: "id", IncKey: "", IncStrategy: "merge"},
+		{Name: "players", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "match_events", PrimaryKey: "event_key", IncKey: "", IncStrategy: "merge"},
+	},
+
+	// football-data.org - FIFA World Cup soccer data
+	"footballdata": {
+		{Name: "teams", PrimaryKey: "id", IncKey: "", IncStrategy: "merge"},
+		{Name: "stadiums", PrimaryKey: "venue_key", IncKey: "", IncStrategy: "replace"},
+		{Name: "group_standings", PrimaryKey: "competition_id, season_id, stage, standing_type, group_name, team_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "matches", PrimaryKey: "id", IncKey: "", IncStrategy: "merge"},
+		{Name: "players", PrimaryKey: "team_id, id", IncKey: "", IncStrategy: "replace"},
+		{Name: "match_events", PrimaryKey: "event_key", IncKey: "", IncStrategy: "merge"},
+	},
+
+	// BallDontLie - FIFA World Cup data
+	"balldontlie": {
+		{Name: "teams", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "stadiums", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "group_standings", PrimaryKey: "season_year, team_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "matches", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "players", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "rosters", PrimaryKey: "season_year, team_id, player_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "match_lineups", PrimaryKey: "match_id, team_id, player_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "match_events", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "player_match_stats", PrimaryKey: "match_id, player_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "team_match_stats", PrimaryKey: "match_id, team_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "match_shots", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "match_momentum", PrimaryKey: "match_id, minute", IncKey: "", IncStrategy: "replace"},
+		{Name: "match_best_players", PrimaryKey: "match_id, player_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "match_avg_positions", PrimaryKey: "match_id, player_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "match_team_form", PrimaryKey: "match_id, team_id", IncKey: "", IncStrategy: "replace"},
+	},
+
 	// Apple Ads - Apple Search Ads campaign management
 	"appleads": {
 		{Name: "campaigns", PrimaryKey: "orgId,id", IncKey: "modificationTime", IncStrategy: "merge"},
@@ -273,6 +312,15 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 	// Elasticsearch - Search and analytics engine (user-defined indices)
 	"elasticsearch": {},
 
+	// ESPN - Public sports data (auth-less site API)
+	"espn": {
+		{Name: "teams", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "scoreboard", PrimaryKey: "id", IncKey: "", IncStrategy: "merge"},
+		{Name: "competitors", PrimaryKey: "event_id, competition_id, team_id", IncKey: "", IncStrategy: "merge"},
+		{Name: "standings", PrimaryKey: "league_id, group_id, season, team_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "news", PrimaryKey: "id", IncKey: "", IncStrategy: "merge"},
+	},
+
 	// Facebook Ads - Advertising platform
 	"facebookads": {
 		{Name: "campaigns", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
@@ -345,6 +393,14 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 	// Google Analytics
 	"googleanalytics": {
 		{Name: "custom:<dimensions>:<metrics>", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+	},
+
+	// Google Search Console
+	"gsc": {
+		{Name: "<granularity>:<dimensions>", PrimaryKey: "", IncKey: "date", IncStrategy: "merge"},
+		{Name: "searchAppearance", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "sites", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "sitemaps", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
 	},
 
 	// Google Sheets
@@ -751,8 +807,61 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 	// SAP HANA (user-defined tables)
 	"hana": {},
 
+	// SendGrid - Email delivery and marketing platform
+	"sendgrid": {
+		{Name: "messages", PrimaryKey: "msg_id", IncKey: "last_event_time", IncStrategy: "merge"},
+		{Name: "global_stats", PrimaryKey: "date", IncKey: "date", IncStrategy: "merge"},
+		{Name: "bounces", PrimaryKey: "email, created", IncKey: "created", IncStrategy: "merge"},
+		{Name: "blocks", PrimaryKey: "email, created", IncKey: "created", IncStrategy: "merge"},
+		{Name: "invalid_emails", PrimaryKey: "email, created", IncKey: "created", IncStrategy: "merge"},
+		{Name: "spam_reports", PrimaryKey: "email, created", IncKey: "created", IncStrategy: "merge"},
+		{Name: "unsubscribes", PrimaryKey: "email, created", IncKey: "created", IncStrategy: "merge"},
+		{Name: "suppression_groups", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "suppression_group_members", PrimaryKey: "group_id, email", IncKey: "", IncStrategy: "replace"},
+		{Name: "templates", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "lists", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "single_sends", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+	},
+	// Twilio - Cloud communications (messaging, voice, phone numbers)
+	"twilio": {
+		{Name: "messages", PrimaryKey: "sid", IncKey: "", IncStrategy: "replace"},
+		{Name: "calls", PrimaryKey: "sid", IncKey: "date_updated", IncStrategy: "merge"},
+		{Name: "recordings", PrimaryKey: "sid", IncKey: "date_updated", IncStrategy: "merge"},
+		{Name: "incoming_phone_numbers", PrimaryKey: "sid", IncKey: "", IncStrategy: "replace"},
+		{Name: "usage_records", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+	},
+	// Braze - Customer engagement platform (campaigns, canvases, KPIs)
+	"braze": {
+		{Name: "campaigns", PrimaryKey: "id", IncKey: "last_edited", IncStrategy: "merge"},
+		{Name: "campaign_series", PrimaryKey: "time, campaign_id", IncKey: "time", IncStrategy: "merge"},
+		{Name: "canvases", PrimaryKey: "id", IncKey: "last_edited", IncStrategy: "merge"},
+		{Name: "canvas_series", PrimaryKey: "time, canvas_id", IncKey: "time", IncStrategy: "merge"},
+		{Name: "segments", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "segment_series", PrimaryKey: "time, segment_id", IncKey: "time", IncStrategy: "merge"},
+		{Name: "events", PrimaryKey: "name", IncKey: "", IncStrategy: "replace"},
+		{Name: "event_series", PrimaryKey: "time, event_name", IncKey: "time", IncStrategy: "merge"},
+		{Name: "products", PrimaryKey: "product_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "sessions", PrimaryKey: "time", IncKey: "time", IncStrategy: "merge"},
+		{Name: "purchase_quantity", PrimaryKey: "time", IncKey: "time", IncStrategy: "merge"},
+		{Name: "purchase_revenue", PrimaryKey: "time", IncKey: "time", IncStrategy: "merge"},
+		{Name: "kpi_dau", PrimaryKey: "time", IncKey: "time", IncStrategy: "merge"},
+		{Name: "kpi_mau", PrimaryKey: "time", IncKey: "time", IncStrategy: "merge"},
+		{Name: "kpi_new_users", PrimaryKey: "time", IncKey: "time", IncStrategy: "merge"},
+		{Name: "kpi_uninstalls", PrimaryKey: "time", IncKey: "time", IncStrategy: "merge"},
+		{Name: "user_data", PrimaryKey: "braze_id, segment_id", IncKey: "", IncStrategy: "replace"},
+	},
+
 	// SFTP (user-defined paths)
 	"sftp": {},
+
+	// SharePoint (user-defined document library paths)
+	"sharepoint": {
+		{Name: "<path/to/file.xlsx>", PrimaryKey: "_source_file,_sheet_name,_row_idx", IncKey: "", IncStrategy: "replace"},
+		{Name: "<path/to/file.xlsx>#sheet=<sheet_name>", PrimaryKey: "_source_file,_sheet_name,_row_idx", IncKey: "", IncStrategy: "replace"},
+		{Name: "<path/to/file.xlsx>#sheets=<sheet_a>|<sheet_b>", PrimaryKey: "_source_file,_sheet_name,_row_idx", IncKey: "", IncStrategy: "replace"},
+		{Name: "<path/to/files/*.xlsx>#sheets=<sheet_a>|<sheet_b>", PrimaryKey: "_source_file,_sheet_name,_row_idx", IncKey: "", IncStrategy: "replace"},
+		{Name: "<path/to/file.csv>#csv,encoding=utf-16le,sep=tab", PrimaryKey: "_source_file,_row_idx", IncKey: "", IncStrategy: "replace"},
+	},
 
 	// Shopify - E-commerce
 	"shopify": {
@@ -804,6 +913,23 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "apm_orders", PrimaryKey: "order_id", IncKey: "updated_at", IncStrategy: "merge"},
 		{Name: "card_orders", PrimaryKey: "order_id", IncKey: "updated_at", IncStrategy: "merge"},
 		{Name: "financial_entries", PrimaryKey: "id", IncKey: "created_at", IncStrategy: "merge"},
+	},
+
+	// Square - Payments and commerce platform
+	"square": {
+		{Name: "payments", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "refunds", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "orders", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "customers", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "catalog_objects", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "team_members", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "inventory", PrimaryKey: "catalog_object_id, location_id, state", IncKey: "calculated_at", IncStrategy: "merge"},
+		{Name: "locations", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "team_member_wages", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "shifts", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "bank_accounts", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "cash_drawers", PrimaryKey: "id, location_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "loyalty", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
 	},
 
 	// GCP Spanner (user-defined tables)
@@ -865,6 +991,34 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "adjustments", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
 	},
 
+	// Chargebee - Subscription billing
+	"chargebee": {
+		{Name: "customers", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "subscriptions", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "invoices", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "transactions", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "orders", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "events", PrimaryKey: "id", IncKey: "occurred_at", IncStrategy: "merge"},
+	},
+
+	// Recurly - Subscription billing
+	"recurly": {
+		{Name: "accounts", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "subscriptions", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "invoices", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "transactions", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "plans", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+	},
+
+	// GitLab - DevOps and code hosting
+	"gitlab": {
+		{Name: "projects", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "groups", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "users", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "issues", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "merge_requests", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+	},
+
 	// SurveyMonkey - Survey and feedback platform
 	"surveymonkey": {
 		{Name: "surveys", PrimaryKey: "id", IncKey: "date_modified", IncStrategy: "merge"},
@@ -887,6 +1041,9 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 
 	// Trino - Distributed SQL query engine (user-defined tables)
 	"trino": {},
+
+	// StarRocks - OLAP database, incl. lakehouse catalogs (user-defined tables)
+	"starrocks": {},
 
 	// Wise - Money transfers
 	"wise": {

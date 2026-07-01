@@ -54,7 +54,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 					Path:    path.AbsPathForTests(t, filepath.Join("testdata", "yaml", "task1", "hello.sql")),
 					Content: mustRead(t, filepath.Join("testdata", "yaml", "task1", "hello.sql")),
 				},
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"param1": "value1",
 					"param2": "value2",
 				},
@@ -135,7 +135,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 					Path:    path.AbsPathForTests(t, filepath.Join("testdata", "yaml", "task-with-nested", "some", "dir", "hello.sh")),
 					Content: mustRead(t, filepath.Join("testdata", "yaml", "task-with-nested", "some", "dir", "hello.sh")),
 				},
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"param1": "value1",
 					"param2": "value2",
 				},
@@ -168,7 +168,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 					Path:    path.AbsPathForTests(t, filepath.Join("testdata", "yaml", "task-with-toplevel-runfile", "hello.sh")),
 					Content: mustRead(t, filepath.Join("testdata", "yaml", "task-with-toplevel-runfile", "hello.sh")),
 				},
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"param1": "value1",
 					"param2": "value2",
 				},
@@ -201,7 +201,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 					Path:    path.AbsPathForTests(t, filepath.Join("testdata", "yaml", "task-with-no-runfile", "task.yml")),
 					Content: mustReadWithoutReplacement(t, filepath.Join("testdata", "yaml", "task-with-no-runfile", "task.yml")),
 				},
-				Parameters: map[string]string{
+				Parameters: pipeline.ParameterMap{
 					"param1": "value1",
 					"param2": "value2",
 				},
@@ -409,6 +409,36 @@ routing:
 	require.Equal(t, &pipeline.RoutingConfig{EgressGateway: "wg-shared-ams3"}, task.Routing)
 }
 
+func TestConvertYamlToTask_Enabled(t *testing.T) {
+	t.Parallel()
+
+	task, err := pipeline.ConvertYamlToTask([]byte(strings.TrimSpace(`
+name: dataset.asset
+type: python
+enabled: false
+`)))
+	require.NoError(t, err)
+	require.NotNil(t, task.Enabled)
+	require.False(t, task.IsEnabled())
+
+	templatedTask, err := pipeline.ConvertYamlToTask([]byte(strings.TrimSpace(`
+name: dataset.templated_asset
+type: python
+enabled: "{{ var.asset_enabled }}"
+`)))
+	require.NoError(t, err)
+	require.NotNil(t, templatedTask.Enabled)
+	require.Equal(t, "{{ var.asset_enabled }}", templatedTask.Enabled.Template)
+
+	defaultTask, err := pipeline.ConvertYamlToTask([]byte(strings.TrimSpace(`
+name: dataset.default_asset
+type: python
+`)))
+	require.NoError(t, err)
+	require.Nil(t, defaultTask.Enabled)
+	require.True(t, defaultTask.IsEnabled())
+}
+
 func TestConvertYamlToTask_SourceColumn(t *testing.T) {
 	t.Parallel()
 
@@ -419,14 +449,57 @@ columns:
   - name: first_name
     source_column: fname
     type: string
+    mask: hash
   - name: email
     type: string
-`)))
+	`)))
 	require.NoError(t, err)
 	require.Len(t, task.Columns, 2)
 	require.Equal(t, "first_name", task.Columns[0].Name)
 	require.Equal(t, "fname", task.Columns[0].SourceColumn)
+	require.Equal(t, "hash", task.Columns[0].Mask)
 	require.Empty(t, task.Columns[1].SourceColumn)
+	require.Empty(t, task.Columns[1].Mask)
+}
+
+func TestConvertYamlToTask_ColumnMetadata(t *testing.T) {
+	t.Parallel()
+
+	task, err := pipeline.ConvertYamlToTask([]byte(strings.TrimSpace(`
+name: dataset.orders
+type: bq.sql
+columns:
+  - name: id
+    type: integer
+    primary_key: true
+  - name: customer_id
+    type: integer
+    foreign_key:
+      table: customers
+      column: id
+  - name: amount
+    type: numeric
+    precision: 10
+    scale: 2
+    default: "0"
+  - name: name
+    type: varchar
+    length: 255
+    collation: en_US
+`)))
+	require.NoError(t, err)
+	require.Len(t, task.Columns, 4)
+
+	require.Nil(t, task.Columns[0].ForeignKey)
+
+	require.Equal(t, &pipeline.ColumnReference{Table: "customers", Column: "id"}, task.Columns[1].ForeignKey)
+
+	require.Equal(t, 10, *task.Columns[2].Precision)
+	require.Equal(t, 2, *task.Columns[2].Scale)
+	require.Equal(t, "0", task.Columns[2].Default)
+
+	require.Equal(t, 255, *task.Columns[3].Length)
+	require.Equal(t, "en_US", task.Columns[3].Collation)
 }
 
 func TestCreateTaskFromFileComments_Routing(t *testing.T) {
@@ -447,12 +520,48 @@ select 1
 	require.Equal(t, &pipeline.RoutingConfig{EgressGateway: "wg-shared-ams3"}, task.Routing)
 }
 
+func TestCreateTaskFromFileComments_Enabled(t *testing.T) {
+	t.Parallel()
+
+	fs := afero.NewMemMapFs()
+	err := afero.WriteFile(fs, "asset.sql", []byte(strings.TrimSpace(`
+-- @bruin.name: dataset.asset
+-- @bruin.type: duckdb.sql
+-- @bruin.enabled: false
+select 1
+`)), 0o644)
+	require.NoError(t, err)
+
+	creator := pipeline.CreateTaskFromFileComments(fs)
+	task, err := creator("asset.sql")
+	require.NoError(t, err)
+	require.NotNil(t, task.Enabled)
+	require.False(t, task.IsEnabled())
+
+	err = afero.WriteFile(fs, "templated.sql", []byte(strings.TrimSpace(`
+-- @bruin.name: dataset.templated_asset
+-- @bruin.type: duckdb.sql
+-- @bruin.enabled: {{ var.asset_enabled }}
+select 1
+`)), 0o644)
+	require.NoError(t, err)
+
+	templatedTask, err := creator("templated.sql")
+	require.NoError(t, err)
+	require.NotNil(t, templatedTask.Enabled)
+	require.Equal(t, "{{ var.asset_enabled }}", templatedTask.Enabled.Template)
+}
+
 func TestCheckRetries(t *testing.T) {
 	t.Parallel()
 
 	creator := pipeline.CreateTaskFromYamlDefinition(afero.NewOsFs())
 	got, err := creator(filepath.Join("testdata", "yaml", "check-retries", "task.yml"))
 	require.NoError(t, err)
+
+	// asset-level retries is parsed from the definition.
+	require.NotNil(t, got.Retries)
+	require.Equal(t, 4, *got.Retries)
 
 	require.Len(t, got.Columns, 1)
 	checks := got.Columns[0].Checks

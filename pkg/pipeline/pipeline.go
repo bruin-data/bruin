@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -69,6 +70,7 @@ const (
 	AssetTypeLookerStudio              = AssetType("looker_studio")
 	AssetTypeMetabase                  = AssetType("metabase")
 	AssetTypeModeBI                    = AssetType("modebi")
+	AssetTypeMongoSource               = AssetType("mongo.source")
 	AssetTypeMotherduckQuery           = AssetType("motherduck.sql")
 	AssetTypeMsSQLQuery                = AssetType("ms.sql")
 	AssetTypeMsSQLQuerySensor          = AssetType("ms.sensor.query")
@@ -115,6 +117,7 @@ const (
 	AssetTypeSnowflakeSeed             = AssetType("sf.seed")
 	AssetTypeSnowflakeSource           = AssetType("sf.source")
 	AssetTypeSnowflakeTableSensor      = AssetType("sf.sensor.table")
+	AssetTypeStarRocks                 = AssetType("starrocks")
 	AssetTypeSuperset                  = AssetType("superset")
 	AssetTypeSynapseQuery              = AssetType("synapse.sql")
 	AssetTypeSynapseQuerySensor        = AssetType("synapse.sensor.query")
@@ -169,6 +172,8 @@ var defaultMapping = map[string]string{
 	"adjust":                "adjust-default",
 	"stripe":                "stripe-default",
 	"paddle":                "paddle-default",
+	"chargebee":             "chargebee-default",
+	"recurly":               "recurly-default",
 	"appsflyer":             "appsflyer-default",
 	"kafka":                 "kafka-default",
 	"duckdb":                "duckdb-default",
@@ -189,18 +194,93 @@ var defaultMapping = map[string]string{
 	"emr_serverless":        "emr_serverless-default",
 	"dataproc_serverless":   "dataproc_serverless-default",
 	"trino":                 "trino-default",
+	"starrocks":             "starrocks-default",
 	"dremio":                "dremio-default",
 	"sail":                  "sail-default",
 	"oracle":                "oracle-default",
 	"googleanalytics":       "googleanalytics-default",
+	"gsc":                   "gsc-default",
 	"applovin":              "applovin-default",
 	"salesforce":            "salesforce-default",
 	"solidgate":             "solidgate-default",
+	"square":                "square-default",
 	"smartsheet":            "smartsheet-default",
 	"sftp":                  "sftp-default",
 	"motherduck":            "motherduck-default",
 	"elasticsearch":         "elasticsearch-default",
 	"vertica":               "vertica-default",
+	"adls":                  "adls-default",
+	"allium":                "allium-default",
+	"anthropic":             "anthropic-default",
+	"apifootball":           "apifootball-default",
+	"appleads":              "appleads-default",
+	"applovinmax":           "applovinmax-default",
+	"attio":                 "attio-default",
+	"balldontlie":           "balldontlie-default",
+	"braze":                 "braze-default",
+	"bruin":                 "bruin-default",
+	"cassandra":             "cassandra-default",
+	"clickup":               "clickup-default",
+	"couchbase":             "couchbase-default",
+	"cratedb":               "cratedb-default",
+	"csv":                   "csv-default",
+	"cursor":                "cursor-default",
+	"customerio":            "customerio-default",
+	"db2":                   "db2-default",
+	"docebo":                "docebo-default",
+	"dune":                  "dune-default",
+	"espn":                  "espn-default",
+	"fireflies":             "fireflies-default",
+	"fluxx":                 "fluxx-default",
+	"footballdata":          "footballdata-default",
+	"frankfurter":           "frankfurter-default",
+	"freshdesk":             "freshdesk-default",
+	"fundraiseup":           "fundraiseup-default",
+	"g2":                    "g2-default",
+	"github":                "github-default",
+	"gitlab":                "gitlab-default",
+	"granola":               "granola-default",
+	"hostaway":              "hostaway-default",
+	"http":                  "http-default",
+	"indeed":                "indeed-default",
+	"influxdb":              "influxdb-default",
+	"intercom":              "intercom-default",
+	"isoc_pulse":            "isoc_pulse-default",
+	"jira":                  "jira-default",
+	"jobtread":              "jobtread-default",
+	"kalshi":                "kalshi-default",
+	"kinesis":               "kinesis-default",
+	"linear":                "linear-default",
+	"linkedinads":           "linkedinads-default",
+	"mailchimp":             "mailchimp-default",
+	"manifold":              "manifold-default",
+	"mixpanel":              "mixpanel-default",
+	"monday":                "monday-default",
+	"personio":              "personio-default",
+	"phantombuster":         "phantombuster-default",
+	"pinterest":             "pinterest-default",
+	"pipedrive":             "pipedrive-default",
+	"plusvibeai":            "plusvibeai-default",
+	"polymarket":            "polymarket-default",
+	"posthog":               "posthog-default",
+	"primer":                "primer-default",
+	"quickbooks":            "quickbooks-default",
+	"quicksight":            "quicksight-default",
+	"rabbitmq":              "rabbitmq-default",
+	"reddit_ads":            "reddit_ads-default",
+	"revenuecat":            "revenuecat-default",
+	"sendgrid":              "sendgrid-default",
+	"sharepoint":            "sharepoint-default",
+	"snapchatads":           "snapchatads-default",
+	"socrata":               "socrata-default",
+	"spanner":               "spanner-default",
+	"sqlite":                "sqlite-default",
+	"surveymonkey":          "surveymonkey-default",
+	"trustpilot":            "trustpilot-default",
+	"twilio":                "twilio-default",
+	"wise":                  "wise-default",
+	"wistia":                "wistia-default",
+	"zoom":                  "zoom-default",
 }
 
 var SupportedFileSuffixes = []string{"asset.yml", "asset.yaml", ".sql", ".py", ".r", "task.yml", "task.yaml"}
@@ -240,6 +320,113 @@ type Notifications struct {
 
 type DefaultTrueBool struct { //nolint:recvcheck
 	Value *bool
+}
+
+type TemplatedBool struct { //nolint:recvcheck
+	Value    *bool
+	Template string
+}
+
+func NewTemplatedBool(value bool) *TemplatedBool {
+	return &TemplatedBool{Value: &value}
+}
+
+func ParseTemplatedBool(raw string) (*TemplatedBool, error) {
+	trimmed := strings.TrimSpace(raw)
+	if parsed, err := strconv.ParseBool(trimmed); err == nil {
+		return NewTemplatedBool(parsed), nil
+	}
+	if strings.Contains(trimmed, "{{") || strings.Contains(trimmed, "{%") {
+		return &TemplatedBool{Template: trimmed}, nil
+	}
+	return nil, fmt.Errorf("expected boolean or Jinja template, got %q", raw)
+}
+
+func (b *TemplatedBool) UnmarshalJSON(data []byte) error {
+	if data == nil || string(data) == "null" {
+		return nil
+	}
+
+	var value bool
+	if err := json.Unmarshal(data, &value); err == nil {
+		b.Value = &value
+		b.Template = ""
+		return nil
+	}
+
+	var raw string
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	parsed, err := ParseTemplatedBool(raw)
+	if err != nil {
+		return err
+	}
+	*b = *parsed
+	return nil
+}
+
+func (b TemplatedBool) MarshalJSON() ([]byte, error) {
+	if b.Template != "" {
+		return json.Marshal(b.Template)
+	}
+	if b.Value == nil {
+		return []byte("true"), nil
+	}
+	return json.Marshal(*b.Value)
+}
+
+func (b *TemplatedBool) UnmarshalYAML(value *yaml.Node) error {
+	if value == nil || value.Kind == yaml.DocumentNode {
+		return nil
+	}
+
+	if value.Kind != yaml.ScalarNode {
+		return errors.New("expected scalar boolean or Jinja template")
+	}
+
+	if value.Tag == "!!bool" {
+		var parsed bool
+		if err := value.Decode(&parsed); err != nil {
+			return err
+		}
+		b.Value = &parsed
+		b.Template = ""
+		return nil
+	}
+
+	var raw string
+	if err := value.Decode(&raw); err != nil {
+		return err
+	}
+
+	parsed, err := ParseTemplatedBool(raw)
+	if err != nil {
+		return err
+	}
+	*b = *parsed
+	return nil
+}
+
+func (b *TemplatedBool) Bool() (bool, error) {
+	if b == nil || b.Value == nil && b.Template == "" {
+		return true, nil
+	}
+	if b.Template != "" {
+		return true, fmt.Errorf("enabled contains unresolved template %q", b.Template)
+	}
+	return *b.Value, nil
+}
+
+func (b TemplatedBool) MarshalYAML() (interface{}, error) {
+	if b.Template != "" {
+		return b.Template, nil
+	}
+	if b.Value == nil {
+		return true, nil
+	}
+	return *b.Value, nil
 }
 
 func (b *DefaultTrueBool) UnmarshalJSON(data []byte) error {
@@ -417,7 +604,7 @@ type Materialization struct {
 }
 
 func (m Materialization) MarshalJSON() ([]byte, error) {
-	if m.Type == "" && m.Strategy == "" && m.PartitionBy == "" && len(m.ClusterBy) == 0 && m.IncrementalKey == "" {
+	if m.Type == "" && m.Strategy == "" && m.PartitionBy == "" && len(m.ClusterBy) == 0 && m.IncrementalKey == "" && m.TimeGranularity == "" {
 		return []byte("null"), nil
 	}
 
@@ -564,7 +751,7 @@ type ColumnCheck struct {
 	Value         ColumnCheckValue `json:"value" yaml:"value,omitempty" mapstructure:"value"`
 	Blocking      DefaultTrueBool  `json:"blocking" yaml:"blocking,omitempty" mapstructure:"blocking"`
 	Description   string           `json:"description" yaml:"description,omitempty" mapstructure:"description"`
-	Retries       *int             `json:"retries,omitempty" yaml:"retries,omitempty" mapstructure:"retries"`
+	Retries       *int             `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
 	Notifications *Notifications   `json:"notifications,omitempty" yaml:"notifications,omitempty" mapstructure:"notifications"`
 }
 
@@ -588,17 +775,31 @@ type UpstreamColumn struct {
 	Table  string `json:"table" yaml:"table,omitempty" mapstructure:"table"`
 }
 
+// ColumnReference points to a column in another asset. It is used to describe a
+// foreign-key relationship between this column and the referenced table/column.
+type ColumnReference struct {
+	Table  string `json:"table" yaml:"table,omitempty" mapstructure:"table"`
+	Column string `json:"column" yaml:"column,omitempty" mapstructure:"column"`
+}
+
 type Column struct {
 	EntityAttribute *EntityAttribute  `json:"entity_attribute" yaml:"-" mapstructure:"-"`
 	Name            string            `json:"name" yaml:"name,omitempty" mapstructure:"name"`
 	SourceColumn    string            `json:"source_column" yaml:"source_column,omitempty" mapstructure:"source_column"`
 	Type            string            `json:"type" yaml:"type,omitempty" mapstructure:"type"`
+	Mask            string            `json:"mask,omitempty" yaml:"mask,omitempty" mapstructure:"mask"`
 	Description     string            `json:"description" yaml:"description,omitempty" mapstructure:"description"`
 	Tags            EmptyStringArray  `json:"tags" yaml:"tags,omitempty" mapstructure:"tags"`
 	PrimaryKey      bool              `json:"primary_key" yaml:"primary_key,omitempty" mapstructure:"primary_key"`
 	UpdateOnMerge   bool              `json:"update_on_merge" yaml:"update_on_merge,omitempty" mapstructure:"update_on_merge"`
 	MergeSQL        string            `json:"merge_sql" yaml:"merge_sql,omitempty" mapstructure:"merge_sql"`
 	Nullable        DefaultTrueBool   `json:"nullable" yaml:"nullable,omitempty" mapstructure:"nullable"`
+	Default         string            `json:"default" yaml:"default,omitempty" mapstructure:"default"`
+	Precision       *int              `json:"precision" yaml:"precision,omitempty" mapstructure:"precision"`
+	Scale           *int              `json:"scale" yaml:"scale,omitempty" mapstructure:"scale"`
+	Length          *int              `json:"length" yaml:"length,omitempty" mapstructure:"length"`
+	Collation       string            `json:"collation" yaml:"collation,omitempty" mapstructure:"collation"`
+	ForeignKey      *ColumnReference  `json:"foreign_key" yaml:"foreign_key,omitempty" mapstructure:"foreign_key"`
 	Owner           string            `json:"owner" yaml:"owner,omitempty" mapstructure:"owner"`
 	Domains         EmptyStringArray  `json:"domains" yaml:"domains,omitempty" mapstructure:"domains"`
 	Meta            EmptyStringMap    `json:"meta" yaml:"meta,omitempty" mapstructure:"meta"`
@@ -617,6 +818,30 @@ func (c *Column) HasCheck(check string) bool {
 	return false
 }
 
+// SQLType returns the column's SQL type, augmenting the declared Type with
+// precision/scale or length when those are provided as separate fields and the
+// type does not already encode them. For example, type "decimal" with precision
+// 10 and scale 2 becomes "decimal(10, 2)", and type "varchar" with length 255
+// becomes "varchar(255)". If Type is empty or already parameterized (contains a
+// parenthesis), it is returned unchanged.
+func (c *Column) SQLType() string {
+	t := strings.TrimSpace(c.Type)
+	if t == "" || strings.Contains(t, "(") {
+		return t
+	}
+
+	switch {
+	case c.Precision != nil && c.Scale != nil:
+		return fmt.Sprintf("%s(%d, %d)", t, *c.Precision, *c.Scale)
+	case c.Precision != nil:
+		return fmt.Sprintf("%s(%d)", t, *c.Precision)
+	case c.Length != nil:
+		return fmt.Sprintf("%s(%d)", t, *c.Length)
+	default:
+		return t
+	}
+}
+
 type AssetType string
 
 var AssetTypeConnectionMapping = map[AssetType]string{
@@ -631,6 +856,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeSnowflakeTableSensor:      "snowflake",
 	AssetTypeSnowflakeSeed:             "snowflake",
 	AssetTypeSnowflakeSource:           "snowflake",
+	AssetTypeStarRocks:                 "starrocks",
 	AssetTypePostgresQuery:             "postgres",
 	AssetTypePostgresSeed:              "postgres",
 	AssetTypePostgresQuerySensor:       "postgres",
@@ -640,6 +866,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeMySQLSeed:                 "mysql",
 	AssetTypeMySQLQuerySensor:          "mysql",
 	AssetTypeMySQLTableSensor:          "mysql",
+	AssetTypeMongoSource:               "mongo",
 	AssetTypeRedshiftQuery:             "redshift",
 	AssetTypeRedshiftSeed:              "redshift",
 	AssetTypeRedshiftQuerySensor:       "redshift",
@@ -666,6 +893,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeSynapseQuery:              "synapse",
 	AssetTypeSynapseSeed:               "synapse",
 	AssetTypeSynapseQuerySensor:        "synapse",
+	AssetTypeSynapseTableSensor:        "synapse",
 	AssetTypeSynapseSource:             "synapse",
 	AssetTypeAthenaQuery:               "athena",
 	AssetTypeAthenaSeed:                "athena",
@@ -705,6 +933,27 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeQuicksightDashboard:       "quicksight",
 }
 
+// assetTypeConnectionAlternates lists every connection platform key that can back
+// an asset type, in priority order, for the asset types that more than one
+// connection type can serve. A mongo.source asset, for example, can be backed by
+// either a "mongo" or a "mongo_atlas" connection, so resolving its default
+// connection must consider both keys. Asset types absent here resolve through
+// their single AssetTypeConnectionMapping entry.
+var assetTypeConnectionAlternates = map[AssetType][]string{
+	AssetTypeMongoSource: {"mongo", "mongo_atlas"},
+}
+
+// connectionPlatformsForAssetType returns the connection platform keys to try when
+// resolving an asset's default connection, in priority order. It falls back to the
+// asset type's single AssetTypeConnectionMapping entry (passed as primary) when the
+// type has no alternates.
+func connectionPlatformsForAssetType(assetType AssetType, primary string) []string {
+	if alternates, ok := assetTypeConnectionAlternates[assetType]; ok {
+		return alternates
+	}
+	return []string{primary}
+}
+
 var IngestrTypeConnectionMapping = map[string]AssetType{
 	"athena":        AssetTypeAthenaQuery,
 	"bigquery":      AssetTypeBigqueryQuery,
@@ -716,6 +965,7 @@ var IngestrTypeConnectionMapping = map[string]AssetType{
 	"synapse":       AssetTypeSynapseQuery,
 	"duckdb":        AssetTypeDuckDBQuery,
 	"clickhouse":    AssetTypeClickHouse,
+	"starrocks":     AssetTypeStarRocks,
 	"oracle":        AssetTypeOracleQuery,
 	"motherduck":    AssetTypeMotherduckQuery,
 	"dynamodb":      AssetTypeDynamoDB,
@@ -752,7 +1002,7 @@ type CustomCheck struct {
 	Count         *int64          `json:"count,omitempty" yaml:"count,omitempty" mapstructure:"count"`
 	Blocking      DefaultTrueBool `json:"blocking" yaml:"blocking,omitempty" mapstructure:"blocking"`
 	Query         string          `json:"query" yaml:"query" mapstructure:"query"`
-	Retries       *int            `json:"retries,omitempty" yaml:"retries,omitempty" mapstructure:"retries"`
+	Retries       *int            `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
 	Notifications *Notifications  `json:"notifications,omitempty" yaml:"notifications,omitempty" mapstructure:"notifications"`
 }
 
@@ -770,7 +1020,7 @@ type Upstream struct {
 }
 
 func (u Upstream) MarshalYAML() (interface{}, error) {
-	isAsset := u.Type == "" || u.Type == "asset"
+	isAsset := u.Type == "" || u.Type == selectorAssetDependencyType
 	if u.Mode == UpstreamModeFull && isAsset {
 		return u.Value, nil
 	}
@@ -778,7 +1028,7 @@ func (u Upstream) MarshalYAML() (interface{}, error) {
 	val := map[string]any{}
 	id := "uri"
 	if isAsset {
-		id = "asset"
+		id = selectorAssetDependencyType
 	}
 	val[id] = u.Value
 
@@ -846,6 +1096,7 @@ type Asset struct { //nolint:recvcheck
 	URI               string             `json:"uri" yaml:"uri,omitempty" mapstructure:"uri"`
 	Name              string             `json:"name" yaml:"name,omitempty" mapstructure:"name"`
 	Type              AssetType          `json:"type" yaml:"type,omitempty" mapstructure:"type"`
+	Enabled           *TemplatedBool     `json:"enabled,omitempty" yaml:"enabled,omitempty" mapstructure:"enabled"`
 	Description       string             `json:"description" yaml:"description,omitempty" mapstructure:"description"`
 	StartDate         string             `json:"start_date" yaml:"start_date,omitempty" mapstructure:"start_date"`
 	Connection        string             `json:"connection" yaml:"connection,omitempty" mapstructure:"connection"`
@@ -860,7 +1111,7 @@ type Asset struct { //nolint:recvcheck
 	Tier              int                `json:"tier,omitempty" yaml:"tier,omitempty" mapstructure:"tier"`
 	ExecutableFile    ExecutableFile     `json:"executable_file" yaml:"-" mapstructure:"-"`
 	DefinitionFile    TaskDefinitionFile `json:"definition_file" yaml:"-" mapstructure:"-"`
-	Parameters        EmptyStringMap     `json:"parameters" yaml:"parameters,omitempty" mapstructure:"parameters"`
+	Parameters        ParameterMap       `json:"parameters" yaml:"parameters,omitempty" mapstructure:"parameters"`
 	Secrets           []SecretMapping    `json:"secrets" yaml:"secrets,omitempty" mapstructure:"secrets"`
 	Extends           []string           `json:"extends" yaml:"extends,omitempty" mapstructure:"extends"`
 	Columns           []Column           `json:"columns" yaml:"columns,omitempty" mapstructure:"columns"`
@@ -872,12 +1123,30 @@ type Asset struct { //nolint:recvcheck
 	Routing           *RoutingConfig     `json:"routing,omitempty" yaml:"routing,omitempty" mapstructure:"routing"`
 	IntervalModifiers IntervalModifiers  `json:"interval_modifiers" yaml:"interval_modifiers,omitempty" mapstructure:"interval_modifiers"`
 	RerunCooldown     *int               `json:"rerun_cooldown,omitempty" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
+	Retries           *int               `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
 	RetriesDelay      *int               `json:"retries_delay,omitempty" yaml:"-" mapstructure:"-"`
 	RefreshRestricted *bool              `json:"refresh_restricted,omitempty" yaml:"refresh_restricted,omitempty" mapstructure:"refresh_restricted"`
 	Notifications     *Notifications     `json:"notifications,omitempty" yaml:"notifications,omitempty" mapstructure:"notifications"`
 
 	upstream   []*Asset
 	downstream []*Asset
+}
+
+// IsEnabled returns the asset's resolved enabled value. It panics if enabled
+// still contains an unresolved template; use EnabledValue to handle that error.
+func (a *Asset) IsEnabled() bool {
+	enabled, err := a.EnabledValue()
+	if err != nil {
+		panic(err)
+	}
+	return enabled
+}
+
+func (a *Asset) EnabledValue() (bool, error) {
+	if a == nil || a.Enabled == nil {
+		return true, nil
+	}
+	return a.Enabled.Bool()
 }
 
 type Hook struct {
@@ -1030,10 +1299,27 @@ func (a *Asset) AddUpstream(asset *Asset) {
 	}
 
 	a.Upstreams = append(a.Upstreams, Upstream{
-		Type:  "asset",
+		Type:  selectorAssetDependencyType,
 		Value: asset.Name,
 		Mode:  UpstreamModeFull,
 	})
+}
+
+// prefixSchemaComponent applies the dev-environment schema prefix to the schema
+// component of a (possibly multi-part) table name. The schema is always the
+// component immediately before the table, so for `schema.table` it prefixes the
+// first component and for `catalog.schema.table` it prefixes the middle one,
+// leaving the catalog/database untouched. This matches the dev-environment query
+// rewriter (see pkg/devenv). Single-component names have no schema to prefix and
+// are returned unchanged.
+func prefixSchemaComponent(name, prefix string) string {
+	nameParts := strings.Split(name, ".")
+	if len(nameParts) < 2 {
+		return name
+	}
+	schemaIdx := len(nameParts) - 2
+	nameParts[schemaIdx] = prefix + nameParts[schemaIdx]
+	return strings.Join(nameParts, ".")
 }
 
 func (a *Asset) PrefixSchema(prefix string) {
@@ -1041,10 +1327,7 @@ func (a *Asset) PrefixSchema(prefix string) {
 		return
 	}
 
-	nameParts := strings.Split(a.Name, ".")
-	if len(nameParts) == 2 {
-		a.Name = prefix + nameParts[0] + "." + nameParts[1]
-	}
+	a.Name = prefixSchemaComponent(a.Name, prefix)
 }
 
 func (a *Asset) PrefixUpstreams(prefix string) {
@@ -1053,14 +1336,11 @@ func (a *Asset) PrefixUpstreams(prefix string) {
 	}
 
 	for i, u := range a.Upstreams {
-		if u.Type != "asset" {
+		if u.Type != selectorAssetDependencyType {
 			continue
 		}
 
-		nameParts := strings.Split(u.Value, ".")
-		if len(nameParts) == 2 {
-			a.Upstreams[i].Value = prefix + nameParts[0] + "." + nameParts[1]
-		}
+		a.Upstreams[i].Value = prefixSchemaComponent(u.Value, prefix)
 	}
 }
 
@@ -1345,10 +1625,10 @@ func (a Asset) Persist(fs afero.Fs, pipeline ...*Pipeline) error {
 	// Remove parameters that match pipeline defaults
 	// pipeline is optional - if provided and has defaults, filter them out
 	if len(pipeline) > 0 && pipeline[0] != nil && pipeline[0].DefaultValues != nil && len(pipeline[0].DefaultValues.Parameters) > 0 {
-		filteredParams := EmptyStringMap{}
+		filteredParams := ParameterMap{}
 		for key, value := range a.Parameters {
 			// Only keep parameters that are NOT in defaults or have different values
-			if defaultValue, existsInDefaults := pipeline[0].DefaultValues.Parameters[key]; !existsInDefaults || defaultValue != value {
+			if defaultValue, existsInDefaults := pipeline[0].DefaultValues.Parameters[key]; !existsInDefaults || !reflect.DeepEqual(defaultValue, value) {
 				filteredParams[key] = value
 			}
 		}
@@ -1506,6 +1786,79 @@ func (b *EmptyStringMap) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// ParameterMap stores asset parameters with arbitrary value types, allowing
+// parameters to hold strings, numbers, booleans, or nested structures.
+type ParameterMap map[string]interface{} //nolint:recvcheck
+
+func (m ParameterMap) MarshalJSON() ([]byte, error) { //nolint:recvcheck
+	if m == nil {
+		return []byte{'{', '}'}, nil
+	}
+	return json.Marshal(map[string]interface{}(m))
+}
+
+func (m *ParameterMap) UnmarshalJSON(data []byte) error {
+	if data == nil {
+		return nil
+	}
+	var v map[string]interface{}
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	if len(v) == 0 {
+		return nil
+	}
+	*m = v
+	return nil
+}
+
+// GetString returns the value for key as a string. Scalar primitives are
+// coerced to their string representations so that YAML configs with unquoted
+// values continue to work. Structured values intentionally do not stringify.
+// Returns ("", false) if the key is absent or the value is nil.
+func (m ParameterMap) GetString(key string) (string, bool) {
+	v, ok := m[key]
+	if !ok || v == nil {
+		return "", false
+	}
+	switch val := v.(type) {
+	case string:
+		return val, true
+	case int8:
+		return strconv.FormatInt(int64(val), 10), true
+	case int16:
+		return strconv.FormatInt(int64(val), 10), true
+	case int32:
+		return strconv.FormatInt(int64(val), 10), true
+	case int:
+		return strconv.Itoa(val), true
+	case int64:
+		return strconv.FormatInt(val, 10), true
+	case uint:
+		return strconv.FormatUint(uint64(val), 10), true
+	case uint8:
+		return strconv.FormatUint(uint64(val), 10), true
+	case uint16:
+		return strconv.FormatUint(uint64(val), 10), true
+	case uint32:
+		return strconv.FormatUint(uint64(val), 10), true
+	case uint64:
+		return strconv.FormatUint(val, 10), true
+	case float32:
+		return strconv.FormatFloat(float64(val), 'f', -1, 32), true
+	case float64:
+		const maxInt64Float = float64(1 << 63)
+		if val >= -maxInt64Float && val < maxInt64Float && val == math.Trunc(val) {
+			return strconv.FormatInt(int64(val), 10), true
+		}
+		return strconv.FormatFloat(val, 'f', -1, 64), true
+	case bool:
+		return strconv.FormatBool(val), true
+	default:
+		return "", false
+	}
+}
+
 type EmptyStringArray []string
 
 func (a EmptyStringArray) MarshalJSON() ([]byte, error) {
@@ -1597,6 +1950,60 @@ func (mp *MetadataPush) HasAnyEnabled() bool {
 
 type Macro string
 
+type CatchupMode string
+
+const (
+	CatchupNone   CatchupMode = ""
+	CatchupActive CatchupMode = "active"
+	CatchupAll    CatchupMode = "all"
+)
+
+func (c *CatchupMode) UnmarshalYAML(node *yaml.Node) error {
+	var b bool
+	if err := node.Decode(&b); err == nil {
+		*c = boolToCatchup(b)
+		return nil
+	}
+	var s string
+	if err := node.Decode(&s); err == nil {
+		*c = normalizeCatchupString(s)
+		return nil
+	}
+	*c = CatchupNone
+	return nil
+}
+
+func (c *CatchupMode) UnmarshalJSON(data []byte) error {
+	var b bool
+	if err := json.Unmarshal(data, &b); err == nil {
+		*c = boolToCatchup(b)
+		return nil
+	}
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		*c = normalizeCatchupString(s)
+		return nil
+	}
+	*c = CatchupNone
+	return nil
+}
+
+func boolToCatchup(b bool) CatchupMode {
+	if b {
+		return CatchupActive
+	}
+	return CatchupNone
+}
+
+func normalizeCatchupString(s string) CatchupMode {
+	switch CatchupMode(s) {
+	case CatchupActive, CatchupAll:
+		return CatchupMode(s)
+	default:
+		return CatchupNone
+	}
+}
+
 // Pipeline is the in-memory representation of a pipeline.yml plus its loaded
 // assets. When adding a new exported field that may legitimately contain Jinja
 // (`{{ var.X }}`) — typically string-valued metadata fields — extend the
@@ -1616,10 +2023,9 @@ type Pipeline struct {
 	DefaultConnections EmptyStringMap         `json:"default_connections" yaml:"default_connections,omitempty" mapstructure:"default_connections"`
 	Assets             []*Asset               `json:"assets" yaml:"assets,omitempty"`
 	Notifications      Notifications          `json:"notifications" yaml:"notifications,omitempty" mapstructure:"notifications"`
-	Catchup            bool                   `json:"catchup" yaml:"catchup,omitempty" mapstructure:"catchup"`
-	CatchupMode        string                 `json:"catchup_mode" yaml:"catchup_mode,omitempty" mapstructure:"catchup_mode"`
+	Catchup            CatchupMode            `json:"catchup" yaml:"catchup,omitempty" mapstructure:"catchup"`
 	MetadataPush       MetadataPush           `json:"metadata_push" yaml:"metadata_push,omitempty" mapstructure:"metadata_push"`
-	Retries            int                    `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
+	Retries            *int                   `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
 	RetriesDelay       *int                   `json:"retries_delay,omitempty" yaml:"-" mapstructure:"-"`
 	Concurrency        int                    `json:"concurrency" yaml:"concurrency,omitempty" mapstructure:"concurrency"`
 	MaxActiveSteps     *int                   `json:"max_active_steps" yaml:"max_active_steps,omitempty" mapstructure:"max_active_steps"`
@@ -1636,15 +2042,6 @@ type Pipeline struct {
 	Macros             []Macro                `json:"macros" yaml:"macros,omitempty" mapstructure:"macros"`
 }
 
-func validateCatchupMode(mode string) error {
-	switch mode {
-	case "", "active", "all":
-		return nil
-	default:
-		return fmt.Errorf("invalid catchup_mode %q, must be one of: 'active', 'all'", mode)
-	}
-}
-
 func (p *Pipeline) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	type pipelineAlias Pipeline
 	aux := (*pipelineAlias)(p)
@@ -1655,10 +2052,6 @@ func (p *Pipeline) UnmarshalYAML(unmarshal func(interface{}) error) error {
 
 	if p.Concurrency == 0 {
 		p.Concurrency = 1
-	}
-
-	if err := validateCatchupMode(p.CatchupMode); err != nil {
-		return err
 	}
 
 	if err := p.Variants.Validate(p.Variables); err != nil {
@@ -1680,10 +2073,6 @@ func (p *Pipeline) UnmarshalJSON(data []byte) error {
 		p.Concurrency = 1
 	}
 
-	if err := validateCatchupMode(p.CatchupMode); err != nil {
-		return err
-	}
-
 	if err := p.Variants.Validate(p.Variables); err != nil {
 		return err
 	}
@@ -1692,13 +2081,79 @@ func (p *Pipeline) UnmarshalJSON(data []byte) error {
 }
 
 type DefaultValues struct {
-	Type              string            `json:"type" yaml:"type" mapstructure:"type"`
-	Parameters        map[string]string `json:"parameters" yaml:"parameters" mapstructure:"parameters"`
-	Secrets           []secretMapping   `json:"secrets" yaml:"secrets" mapstructure:"secrets"`
-	Hooks             Hooks             `json:"hooks" yaml:"hooks" mapstructure:"hooks"`
-	Routing           *RoutingConfig    `json:"routing,omitempty" yaml:"routing,omitempty" mapstructure:"routing"`
-	IntervalModifiers IntervalModifiers `json:"interval_modifiers" yaml:"interval_modifiers" mapstructure:"interval_modifiers"`
-	RerunCooldown     *int              `json:"rerun_cooldown,omitempty" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
+	Type              string                 `json:"type" yaml:"type" mapstructure:"type"`
+	Description       string                 `json:"description,omitempty" yaml:"description,omitempty" mapstructure:"description"`
+	StartDate         string                 `json:"start_date,omitempty" yaml:"start_date,omitempty" mapstructure:"start_date"`
+	Connection        string                 `json:"connection,omitempty" yaml:"connection,omitempty" mapstructure:"connection"`
+	Tags              EmptyStringArray       `json:"tags,omitempty" yaml:"tags,omitempty" mapstructure:"tags"`
+	Domains           EmptyStringArray       `json:"domains,omitempty" yaml:"domains,omitempty" mapstructure:"domains"`
+	Meta              EmptyStringMap         `json:"meta,omitempty" yaml:"meta,omitempty" mapstructure:"meta"`
+	Materialization   Materialization        `json:"materialization,omitempty" yaml:"materialization,omitempty" mapstructure:"materialization"`
+	Upstreams         []Upstream             `json:"upstreams,omitempty" yaml:"depends,omitempty" mapstructure:"depends"`
+	Image             string                 `json:"image,omitempty" yaml:"image,omitempty" mapstructure:"image"`
+	Instance          string                 `json:"instance,omitempty" yaml:"instance,omitempty" mapstructure:"instance"`
+	Owner             string                 `json:"owner,omitempty" yaml:"owner,omitempty" mapstructure:"owner"`
+	Tier              int                    `json:"tier,omitempty" yaml:"tier,omitempty" mapstructure:"tier"`
+	Parameters        map[string]interface{} `json:"parameters" yaml:"parameters" mapstructure:"parameters"`
+	Secrets           []secretMapping        `json:"secrets" yaml:"secrets" mapstructure:"secrets"`
+	Extends           []string               `json:"extends,omitempty" yaml:"extends,omitempty" mapstructure:"extends"`
+	Columns           []Column               `json:"columns,omitempty" yaml:"columns,omitempty" mapstructure:"columns"`
+	CustomChecks      []CustomCheck          `json:"custom_checks,omitempty" yaml:"custom_checks,omitempty" mapstructure:"custom_checks"`
+	Hooks             Hooks                  `json:"hooks" yaml:"hooks" mapstructure:"hooks"`
+	Metadata          EmptyStringMap         `json:"metadata,omitempty" yaml:"metadata,omitempty" mapstructure:"metadata"`
+	Snowflake         SnowflakeConfig        `json:"snowflake,omitempty" yaml:"snowflake,omitempty" mapstructure:"snowflake"`
+	Athena            AthenaConfig           `json:"athena,omitempty" yaml:"athena,omitempty" mapstructure:"athena"`
+	Routing           *RoutingConfig         `json:"routing,omitempty" yaml:"routing,omitempty" mapstructure:"routing"`
+	IntervalModifiers IntervalModifiers      `json:"interval_modifiers" yaml:"interval_modifiers" mapstructure:"interval_modifiers"`
+	RerunCooldown     *int                   `json:"rerun_cooldown,omitempty" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
+	Retries           *int                   `json:"retries,omitempty" yaml:"retries,omitempty" mapstructure:"retries"`
+	RefreshRestricted *bool                  `json:"refresh_restricted,omitempty" yaml:"refresh_restricted,omitempty" mapstructure:"refresh_restricted"`
+	Notifications     *Notifications         `json:"notifications,omitempty" yaml:"notifications,omitempty" mapstructure:"notifications"`
+}
+
+func (d *DefaultValues) UnmarshalYAML(value *yaml.Node) error {
+	var definition taskDefinition
+	if err := value.Decode(&definition); err != nil {
+		return err
+	}
+
+	asset, err := taskDefinitionToAsset(definition)
+	if err != nil {
+		return err
+	}
+
+	*d = DefaultValues{
+		Type:              string(asset.Type),
+		Description:       asset.Description,
+		StartDate:         asset.StartDate,
+		Connection:        asset.Connection,
+		Tags:              asset.Tags,
+		Domains:           asset.Domains,
+		Meta:              asset.Meta,
+		Materialization:   asset.Materialization,
+		Upstreams:         asset.Upstreams,
+		Image:             asset.Image,
+		Instance:          asset.Instance,
+		Owner:             asset.Owner,
+		Tier:              asset.Tier,
+		Parameters:        asset.Parameters,
+		Secrets:           definition.Secrets,
+		Extends:           asset.Extends,
+		Columns:           asset.Columns,
+		CustomChecks:      asset.CustomChecks,
+		Hooks:             asset.Hooks,
+		Metadata:          asset.Metadata,
+		Snowflake:         asset.Snowflake,
+		Athena:            asset.Athena,
+		Routing:           asset.Routing,
+		IntervalModifiers: asset.IntervalModifiers,
+		RerunCooldown:     asset.RerunCooldown,
+		Retries:           asset.Retries,
+		RefreshRestricted: asset.RefreshRestricted,
+		Notifications:     asset.Notifications,
+	}
+
+	return nil
 }
 
 func (p *Pipeline) GetCompatibilityHash() string {
@@ -1707,6 +2162,11 @@ func (p *Pipeline) GetCompatibilityHash() string {
 	for _, asset := range p.Assets {
 		var assetBuilder strings.Builder
 		fmt.Fprintf(&assetBuilder, ":%s{", asset.Name)
+		if enabled, err := asset.EnabledValue(); err == nil && !enabled {
+			assetBuilder.WriteString(":enabled:false")
+		} else if err != nil && asset.Enabled != nil && asset.Enabled.Template != "" {
+			fmt.Fprintf(&assetBuilder, ":enabled:%s", asset.Enabled.Template)
+		}
 		for _, upstream := range asset.Upstreams {
 			fmt.Fprintf(&assetBuilder, ":%s:%s:", upstream.Value, upstream.Type)
 		}
@@ -1728,20 +2188,21 @@ func (p *Pipeline) GetAllConnectionNamesForAsset(asset *Asset) ([]string, error)
 		}
 		return secretKeys, nil
 	} else if assetType == AssetTypeIngestr {
-		ingestrSource, ok := asset.Parameters["source_connection"]
+		ingestrSource, ok := asset.Parameters.GetString("source_connection")
 		if !ok {
 			return []string{}, errors.Errorf("No source connection in asset")
 		}
 
-		ingestrDestination, ok := asset.Parameters["destination_connection"]
+		ingestrDestination, ok := asset.Parameters.GetString("destination_connection")
 		if ok {
 			return []string{ingestrDestination, ingestrSource}, nil
 		}
 
 		// if destination connection not specified, we infer from destination type
-		assetType, ok = IngestrTypeConnectionMapping[asset.Parameters["destination"]]
+		ingestrDest, _ := asset.Parameters.GetString("destination")
+		assetType, ok = IngestrTypeConnectionMapping[ingestrDest]
 		if !ok {
-			return []string{}, errors.Errorf("connection type could not be inferred for destination '%s', please specify a `connection` key in the asset", asset.Parameters["destination"])
+			return []string{}, errors.Errorf("connection type could not be inferred for destination '%s', please specify a `connection` key in the asset", ingestrDest)
 		}
 
 		mapping, ok := AssetTypeConnectionMapping[assetType]
@@ -1779,9 +2240,10 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 	var ok bool
 	switch assetType {
 	case AssetTypeIngestr:
-		assetType, ok = IngestrTypeConnectionMapping[asset.Parameters["destination"]]
+		ingestrDest, _ := asset.Parameters.GetString("destination")
+		assetType, ok = IngestrTypeConnectionMapping[ingestrDest]
 		if !ok {
-			return "", errors.Errorf("connection type could not be inferred for destination '%s', please specify a `connection` key in the asset", asset.Parameters["destination"])
+			return "", errors.Errorf("connection type could not be inferred for destination '%s', please specify a `connection` key in the asset", ingestrDest)
 		}
 	case AssetTypePython, AssetTypeEmpty:
 		assetType = p.GetMajorityAssetTypesFromSQLAssets(AssetTypeBigqueryQuery)
@@ -1794,9 +2256,14 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 		return "", errors.Errorf("no connection mapping found for asset type '%s'", assetType)
 	}
 
-	conn, ok := p.DefaultConnections[mapping]
-	if ok {
-		return conn, nil
+	// Some asset types can be served by more than one connection platform (e.g. a
+	// mongo.source asset accepts either a "mongo" or a "mongo_atlas" connection), so
+	// check every candidate platform's explicit default connection before falling
+	// back to the magic default name.
+	for _, platform := range connectionPlatformsForAssetType(assetType, mapping) {
+		if conn, ok := p.DefaultConnections[platform]; ok {
+			return conn, nil
+		}
 	}
 
 	defaultConn, ok := defaultMapping[mapping]
@@ -1843,7 +2310,7 @@ func (p *Pipeline) GetMajorityAssetTypesFromSQLAssets(defaultIfNone AssetType) A
 		assetType := asset.Type
 
 		if assetType == AssetTypeIngestr {
-			ingestrDestination, ok := asset.Parameters["destination"]
+			ingestrDestination, ok := asset.Parameters.GetString("destination")
 			if !ok {
 				continue
 			}
@@ -2220,7 +2687,7 @@ func (b *Builder) CreatePipelineFromPath(ctx context.Context, pathToPipeline str
 				upstream.Mode = UpstreamModeFull
 			}
 
-			if upstream.Type != "asset" {
+			if upstream.Type != selectorAssetDependencyType {
 				continue
 			}
 			u, ok := pipeline.tasksByName[upstream.Value]
@@ -2451,7 +2918,8 @@ func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 		return asset, nil
 	}
 
-	if foundPipeline.DefaultValues == nil {
+	defaults := foundPipeline.DefaultValues
+	if defaults == nil {
 		return asset, nil
 	}
 
@@ -2459,53 +2927,638 @@ func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 		return asset, nil
 	}
 
-	if len(asset.Type) == 0 && len(foundPipeline.DefaultValues.Type) > 0 {
-		asset.Type = AssetType(foundPipeline.DefaultValues.Type)
+	applyStringDefault(&asset.Description, defaults.Description)
+	applyStringDefault(&asset.StartDate, defaults.StartDate)
+	applyStringDefault(&asset.Connection, defaults.Connection)
+	applyStringDefault(&asset.Image, defaults.Image)
+	applyStringDefault(&asset.Instance, defaults.Instance)
+	applyStringDefault(&asset.Owner, defaults.Owner)
+	if asset.Tier == 0 && defaults.Tier != 0 {
+		asset.Tier = defaults.Tier
+	}
+	if len(asset.Type) == 0 && len(defaults.Type) > 0 {
+		asset.Type = AssetType(defaults.Type)
 	}
 
 	// merge parameters from the default values to asset parameters
 	if len(asset.Parameters) == 0 {
-		asset.Parameters = EmptyStringMap{}
+		asset.Parameters = ParameterMap{}
 	}
 
-	for key, value := range foundPipeline.DefaultValues.Parameters {
+	for key, value := range defaults.Parameters {
 		if _, exists := asset.Parameters[key]; !exists {
 			asset.Parameters[key] = value
 		}
 	}
+
+	mergeEmptyStringMapDefaults(&asset.Meta, defaults.Meta)
+	mergeEmptyStringMapDefaults(&asset.Metadata, defaults.Metadata)
+
+	appendMissingStringValues(&asset.Tags, defaults.Tags)
+	appendMissingStringValues(&asset.Domains, defaults.Domains)
+	appendMissingStringValues(&asset.Extends, defaults.Extends)
+	mergeMaterializationDefaults(&asset.Materialization, defaults.Materialization)
+	asset.Upstreams = appendMissingUpstreams(asset.Upstreams, defaults.Upstreams)
+	mergeColumnDefaults(asset, defaults.Columns)
+	mergeCustomCheckDefaults(asset, defaults.CustomChecks)
+
 	// merge secrets from the default values to asset secrets
 	existingSecrets := make(map[string]bool)
 	for _, secret := range asset.Secrets {
 		existingSecrets[secret.SecretKey] = true
 	}
-	for _, secret := range foundPipeline.DefaultValues.Secrets {
+	for _, secret := range defaults.Secrets {
 		secretMap := SecretMapping(secret)
 		if !existingSecrets[secretMap.SecretKey] {
 			asset.Secrets = append(asset.Secrets, secretMap)
 		}
 	}
 	if (asset.IntervalModifiers.Start == TimeModifier{}) {
-		asset.IntervalModifiers.Start = foundPipeline.DefaultValues.IntervalModifiers.Start
+		asset.IntervalModifiers.Start = defaults.IntervalModifiers.Start
 	}
 	if (asset.IntervalModifiers.End == TimeModifier{}) {
-		asset.IntervalModifiers.End = foundPipeline.DefaultValues.IntervalModifiers.End
+		asset.IntervalModifiers.End = defaults.IntervalModifiers.End
 	}
 	acceptsDefaultHooks := assetAcceptsDefaultHooks(asset)
 	if acceptsDefaultHooks && len(asset.Hooks.Pre) == 0 {
-		asset.Hooks.Pre = append([]Hook(nil), foundPipeline.DefaultValues.Hooks.Pre...)
+		asset.Hooks.Pre = append([]Hook(nil), defaults.Hooks.Pre...)
 	}
 	if acceptsDefaultHooks && len(asset.Hooks.Post) == 0 {
-		asset.Hooks.Post = append([]Hook(nil), foundPipeline.DefaultValues.Hooks.Post...)
+		asset.Hooks.Post = append([]Hook(nil), defaults.Hooks.Post...)
 	}
-	if !foundPipeline.DefaultValues.Routing.IsZero() {
+	if asset.Snowflake.Warehouse == "" {
+		asset.Snowflake.Warehouse = defaults.Snowflake.Warehouse
+	}
+	if asset.Athena.Location == "" {
+		asset.Athena.Location = defaults.Athena.Location
+	}
+	if !defaults.Routing.IsZero() {
 		if asset.Routing == nil {
-			asset.Routing = foundPipeline.DefaultValues.Routing.Clone()
+			asset.Routing = defaults.Routing.Clone()
 		} else if asset.Routing.EgressGateway == "" {
-			asset.Routing.EgressGateway = foundPipeline.DefaultValues.Routing.EgressGateway
+			asset.Routing.EgressGateway = defaults.Routing.EgressGateway
 		}
 	}
+	if asset.RerunCooldown == nil && defaults.RerunCooldown != nil {
+		asset.RerunCooldown = cloneIntPtr(defaults.RerunCooldown)
+	}
+	if asset.Retries == nil && defaults.Retries != nil {
+		asset.Retries = cloneIntPtr(defaults.Retries)
+	}
+	if asset.RefreshRestricted == nil && defaults.RefreshRestricted != nil {
+		asset.RefreshRestricted = cloneBoolPtr(defaults.RefreshRestricted)
+	}
+	asset.Notifications = mergeNotificationDefaults(asset.Notifications, defaults.Notifications)
 
 	return asset, nil
+}
+
+func applyStringDefault(target *string, defaultValue string) {
+	if *target == "" && defaultValue != "" {
+		*target = defaultValue
+	}
+}
+
+func mergeEmptyStringMapDefaults(target *EmptyStringMap, defaults EmptyStringMap) {
+	if len(defaults) == 0 {
+		return
+	}
+	if *target == nil {
+		*target = EmptyStringMap{}
+	}
+	for key, value := range defaults {
+		if _, exists := (*target)[key]; !exists {
+			(*target)[key] = value
+		}
+	}
+}
+
+func appendMissingStringValues[S ~[]E, E ~string](target *S, defaults S) {
+	if len(defaults) == 0 {
+		return
+	}
+	merged := append(S(nil), (*target)...)
+	existing := make(map[E]bool, len(merged))
+	for _, value := range merged {
+		existing[value] = true
+	}
+	for _, value := range defaults {
+		if !existing[value] {
+			merged = append(merged, value)
+			existing[value] = true
+		}
+	}
+	*target = merged
+}
+
+func mergeMaterializationDefaults(target *Materialization, defaults Materialization) {
+	if target.Type == "" {
+		target.Type = defaults.Type
+	}
+	if target.Strategy == "" {
+		target.Strategy = defaults.Strategy
+	}
+	if target.PartitionBy == "" {
+		target.PartitionBy = defaults.PartitionBy
+	}
+	if len(target.ClusterBy) == 0 && len(defaults.ClusterBy) > 0 {
+		target.ClusterBy = append([]string(nil), defaults.ClusterBy...)
+	}
+	if target.IncrementalKey == "" {
+		target.IncrementalKey = defaults.IncrementalKey
+	}
+	if target.TimeGranularity == "" {
+		target.TimeGranularity = defaults.TimeGranularity
+	}
+}
+
+func appendMissingUpstreams(target []Upstream, defaults []Upstream) []Upstream {
+	if len(defaults) == 0 {
+		return target
+	}
+	merged := append([]Upstream(nil), target...)
+	existing := make(map[string]bool, len(merged))
+	for _, upstream := range merged {
+		existing[upstreamIdentity(upstream)] = true
+	}
+	for _, upstream := range defaults {
+		key := upstreamIdentity(upstream)
+		if !existing[key] {
+			merged = append(merged, cloneUpstream(upstream))
+			existing[key] = true
+		}
+	}
+	return merged
+}
+
+func upstreamIdentity(upstream Upstream) string {
+	upstreamType := upstream.Type
+	if upstreamType == "" {
+		upstreamType = selectorAssetDependencyType
+	}
+	return upstreamType + "\x00" + upstream.Value
+}
+
+func cloneUpstream(upstream Upstream) Upstream {
+	clone := upstream
+	clone.Metadata = cloneEmptyStringMap(upstream.Metadata)
+	clone.Columns = append([]DependsColumn(nil), upstream.Columns...)
+	return clone
+}
+
+func mergeColumnDefaults(asset *Asset, defaults []Column) {
+	if len(defaults) == 0 {
+		return
+	}
+	for _, defaultColumn := range defaults {
+		index := findColumnIndex(asset.Columns, defaultColumn.Name)
+		if index == -1 {
+			asset.Columns = append(asset.Columns, cloneColumnForAsset(defaultColumn, asset.Name))
+			continue
+		}
+		mergeColumnDefault(&asset.Columns[index], defaultColumn, asset.Name)
+	}
+}
+
+func findColumnIndex(columns []Column, name string) int {
+	for index, column := range columns {
+		if strings.EqualFold(column.Name, name) {
+			return index
+		}
+	}
+	return -1
+}
+
+func mergeColumnDefault(target *Column, defaults Column, assetName string) {
+	if target.EntityAttribute == nil {
+		target.EntityAttribute = cloneEntityAttribute(defaults.EntityAttribute)
+	}
+	applyStringDefault(&target.Name, defaults.Name)
+	applyStringDefault(&target.SourceColumn, defaults.SourceColumn)
+	applyStringDefault(&target.Type, defaults.Type)
+	applyStringDefault(&target.Mask, defaults.Mask)
+	applyStringDefault(&target.Description, defaults.Description)
+	appendMissingStringValues(&target.Tags, defaults.Tags)
+	if !target.PrimaryKey && defaults.PrimaryKey {
+		target.PrimaryKey = true
+	}
+	if !target.UpdateOnMerge && defaults.UpdateOnMerge {
+		target.UpdateOnMerge = true
+	}
+	applyStringDefault(&target.MergeSQL, defaults.MergeSQL)
+	if target.Nullable.Value == nil && defaults.Nullable.Value != nil {
+		target.Nullable = DefaultTrueBool{Value: cloneBoolPtr(defaults.Nullable.Value)}
+	}
+	applyStringDefault(&target.Default, defaults.Default)
+	if target.Precision == nil {
+		target.Precision = cloneIntPtr(defaults.Precision)
+	}
+	if target.Scale == nil {
+		target.Scale = cloneIntPtr(defaults.Scale)
+	}
+	if target.Length == nil {
+		target.Length = cloneIntPtr(defaults.Length)
+	}
+	applyStringDefault(&target.Collation, defaults.Collation)
+	if target.ForeignKey == nil {
+		target.ForeignKey = cloneColumnReference(defaults.ForeignKey)
+	}
+	applyStringDefault(&target.Owner, defaults.Owner)
+	appendMissingStringValues(&target.Domains, defaults.Domains)
+	mergeEmptyStringMapDefaults(&target.Meta, defaults.Meta)
+	applyStringDefault(&target.Extends, defaults.Extends)
+	target.Checks = mergeColumnCheckDefaults(target.Checks, defaults.Checks, assetName, target.Name)
+	target.Upstreams = appendMissingColumnUpstreams(target.Upstreams, defaults.Upstreams)
+}
+
+func cloneColumnForAsset(column Column, assetName string) Column {
+	clone := column
+	clone.EntityAttribute = cloneEntityAttribute(column.EntityAttribute)
+	clone.Tags = append(EmptyStringArray(nil), column.Tags...)
+	clone.Nullable = cloneDefaultTrueBool(column.Nullable)
+	clone.Precision = cloneIntPtr(column.Precision)
+	clone.Scale = cloneIntPtr(column.Scale)
+	clone.Length = cloneIntPtr(column.Length)
+	clone.ForeignKey = cloneColumnReference(column.ForeignKey)
+	clone.Domains = append(EmptyStringArray(nil), column.Domains...)
+	clone.Meta = cloneEmptyStringMap(column.Meta)
+	clone.Checks = cloneColumnChecksForAsset(column.Checks, assetName, column.Name)
+	clone.Upstreams = cloneColumnUpstreams(column.Upstreams)
+	return clone
+}
+
+func cloneEntityAttribute(value *EntityAttribute) *EntityAttribute {
+	if value == nil {
+		return nil
+	}
+	clone := *value
+	return &clone
+}
+
+func cloneColumnReference(value *ColumnReference) *ColumnReference {
+	if value == nil {
+		return nil
+	}
+	clone := *value
+	return &clone
+}
+
+func appendMissingColumnUpstreams(target []*UpstreamColumn, defaults []*UpstreamColumn) []*UpstreamColumn {
+	if len(defaults) == 0 {
+		return target
+	}
+	merged := cloneColumnUpstreams(target)
+	existing := make(map[string]bool, len(merged))
+	for _, upstream := range merged {
+		existing[columnUpstreamIdentity(upstream)] = true
+	}
+	for _, upstream := range defaults {
+		key := columnUpstreamIdentity(upstream)
+		if !existing[key] {
+			merged = append(merged, cloneColumnUpstream(upstream))
+			existing[key] = true
+		}
+	}
+	return merged
+}
+
+func columnUpstreamIdentity(upstream *UpstreamColumn) string {
+	if upstream == nil {
+		return ""
+	}
+	return upstream.Table + "\x00" + upstream.Column
+}
+
+func cloneColumnUpstreams(upstreams []*UpstreamColumn) []*UpstreamColumn {
+	if len(upstreams) == 0 {
+		return upstreams
+	}
+	clone := make([]*UpstreamColumn, 0, len(upstreams))
+	for _, upstream := range upstreams {
+		clone = append(clone, cloneColumnUpstream(upstream))
+	}
+	return clone
+}
+
+func cloneColumnUpstream(upstream *UpstreamColumn) *UpstreamColumn {
+	if upstream == nil {
+		return nil
+	}
+	clone := *upstream
+	return &clone
+}
+
+func mergeColumnCheckDefaults(target []ColumnCheck, defaults []ColumnCheck, assetName, columnName string) []ColumnCheck {
+	if len(defaults) == 0 {
+		return target
+	}
+	merged := append([]ColumnCheck(nil), target...)
+	for _, defaultCheck := range defaults {
+		index := findColumnCheckIndex(merged, defaultCheck.Name)
+		if index == -1 {
+			merged = append(merged, cloneColumnCheckForAsset(defaultCheck, assetName, columnName))
+			continue
+		}
+		mergeColumnCheckDefault(&merged[index], defaultCheck)
+	}
+	return merged
+}
+
+func findColumnCheckIndex(checks []ColumnCheck, name string) int {
+	for index, check := range checks {
+		if strings.EqualFold(check.Name, name) {
+			return index
+		}
+	}
+	return -1
+}
+
+func mergeColumnCheckDefault(target *ColumnCheck, defaults ColumnCheck) {
+	applyStringDefault(&target.Name, defaults.Name)
+	if isColumnCheckValueZero(target.Value) && !isColumnCheckValueZero(defaults.Value) {
+		target.Value = cloneColumnCheckValue(defaults.Value)
+	}
+	if target.Blocking.Value == nil && defaults.Blocking.Value != nil {
+		target.Blocking = cloneDefaultTrueBool(defaults.Blocking)
+	}
+	applyStringDefault(&target.Description, defaults.Description)
+	if target.Retries == nil {
+		target.Retries = cloneIntPtr(defaults.Retries)
+	}
+	if target.Notifications == nil {
+		target.Notifications = cloneNotifications(defaults.Notifications)
+	}
+}
+
+func cloneColumnChecksForAsset(checks []ColumnCheck, assetName, columnName string) []ColumnCheck {
+	if len(checks) == 0 {
+		return checks
+	}
+	clone := make([]ColumnCheck, 0, len(checks))
+	for _, check := range checks {
+		clone = append(clone, cloneColumnCheckForAsset(check, assetName, columnName))
+	}
+	return clone
+}
+
+func cloneColumnCheckForAsset(check ColumnCheck, assetName, columnName string) ColumnCheck {
+	clone := check
+	clone.ID = hash(fmt.Sprintf("%s-%s-%s", assetName, columnName, check.Name))
+	clone.Value = cloneColumnCheckValue(check.Value)
+	clone.Blocking = cloneDefaultTrueBool(check.Blocking)
+	clone.Retries = cloneIntPtr(check.Retries)
+	clone.Notifications = cloneNotifications(check.Notifications)
+	return clone
+}
+
+func mergeCustomCheckDefaults(asset *Asset, defaults []CustomCheck) {
+	if len(defaults) == 0 {
+		return
+	}
+	for _, defaultCheck := range defaults {
+		index := findCustomCheckIndex(asset.CustomChecks, defaultCheck.Name)
+		if index == -1 {
+			asset.CustomChecks = append(asset.CustomChecks, cloneCustomCheckForAsset(defaultCheck, asset.Name))
+			continue
+		}
+		mergeCustomCheckDefault(&asset.CustomChecks[index], defaultCheck)
+	}
+}
+
+func findCustomCheckIndex(checks []CustomCheck, name string) int {
+	for index, check := range checks {
+		if strings.EqualFold(check.Name, name) {
+			return index
+		}
+	}
+	return -1
+}
+
+func mergeCustomCheckDefault(target *CustomCheck, defaults CustomCheck) {
+	applyStringDefault(&target.Name, defaults.Name)
+	applyStringDefault(&target.Description, defaults.Description)
+	if target.Value == 0 && defaults.Value != 0 {
+		target.Value = defaults.Value
+	}
+	if target.Count == nil {
+		target.Count = cloneInt64Ptr(defaults.Count)
+	}
+	if target.Blocking.Value == nil && defaults.Blocking.Value != nil {
+		target.Blocking = cloneDefaultTrueBool(defaults.Blocking)
+	}
+	applyStringDefault(&target.Query, defaults.Query)
+	if target.Retries == nil {
+		target.Retries = cloneIntPtr(defaults.Retries)
+	}
+	if target.Notifications == nil {
+		target.Notifications = cloneNotifications(defaults.Notifications)
+	}
+}
+
+func cloneCustomCheckForAsset(check CustomCheck, assetName string) CustomCheck {
+	clone := check
+	clone.ID = hash(fmt.Sprintf("%s-%s", assetName, check.Name))
+	clone.Count = cloneInt64Ptr(check.Count)
+	clone.Blocking = cloneDefaultTrueBool(check.Blocking)
+	clone.Retries = cloneIntPtr(check.Retries)
+	clone.Notifications = cloneNotifications(check.Notifications)
+	return clone
+}
+
+func mergeNotificationDefaults(target *Notifications, defaults *Notifications) *Notifications {
+	if defaults == nil {
+		return target
+	}
+	if target == nil {
+		return cloneNotifications(defaults)
+	}
+	merged := cloneNotifications(target)
+	merged.Slack = appendMissingSlackNotifications(merged.Slack, defaults.Slack)
+	merged.MSTeams = appendMissingMSTeamsNotifications(merged.MSTeams, defaults.MSTeams)
+	merged.Discord = appendMissingDiscordNotifications(merged.Discord, defaults.Discord)
+	merged.Webhook = appendMissingWebhookNotifications(merged.Webhook, defaults.Webhook)
+	return merged
+}
+
+func appendMissingSlackNotifications(target []SlackNotification, defaults []SlackNotification) []SlackNotification {
+	merged := append([]SlackNotification(nil), target...)
+	existing := make(map[string]bool, len(merged))
+	for _, notification := range merged {
+		existing[notification.Channel] = true
+	}
+	for _, notification := range defaults {
+		if !existing[notification.Channel] {
+			merged = append(merged, cloneSlackNotification(notification))
+			existing[notification.Channel] = true
+		}
+	}
+	return merged
+}
+
+func appendMissingMSTeamsNotifications(target []MSTeamsNotification, defaults []MSTeamsNotification) []MSTeamsNotification {
+	merged := append([]MSTeamsNotification(nil), target...)
+	existing := make(map[string]bool, len(merged))
+	for _, notification := range merged {
+		existing[notification.Connection] = true
+	}
+	for _, notification := range defaults {
+		if !existing[notification.Connection] {
+			merged = append(merged, cloneMSTeamsNotification(notification))
+			existing[notification.Connection] = true
+		}
+	}
+	return merged
+}
+
+func appendMissingDiscordNotifications(target []DiscordNotification, defaults []DiscordNotification) []DiscordNotification {
+	merged := append([]DiscordNotification(nil), target...)
+	existing := make(map[string]bool, len(merged))
+	for _, notification := range merged {
+		existing[notification.Connection] = true
+	}
+	for _, notification := range defaults {
+		if !existing[notification.Connection] {
+			merged = append(merged, cloneDiscordNotification(notification))
+			existing[notification.Connection] = true
+		}
+	}
+	return merged
+}
+
+func appendMissingWebhookNotifications(target []WebhookNotification, defaults []WebhookNotification) []WebhookNotification {
+	merged := append([]WebhookNotification(nil), target...)
+	existing := make(map[string]bool, len(merged))
+	for _, notification := range merged {
+		existing[notification.Connection] = true
+	}
+	for _, notification := range defaults {
+		if !existing[notification.Connection] {
+			merged = append(merged, cloneWebhookNotification(notification))
+			existing[notification.Connection] = true
+		}
+	}
+	return merged
+}
+
+func cloneEmptyStringMap(value EmptyStringMap) EmptyStringMap {
+	if value == nil {
+		return nil
+	}
+	clone := make(EmptyStringMap, len(value))
+	for key, mapValue := range value {
+		clone[key] = mapValue
+	}
+	return clone
+}
+
+func cloneDefaultTrueBool(value DefaultTrueBool) DefaultTrueBool {
+	return DefaultTrueBool{Value: cloneBoolPtr(value.Value)}
+}
+
+func cloneColumnCheckValue(value ColumnCheckValue) ColumnCheckValue {
+	clone := ColumnCheckValue{}
+	if value.IntArray != nil {
+		clone.IntArray = ptrTo(append([]int(nil), (*value.IntArray)...))
+	}
+	if value.Int != nil {
+		clone.Int = cloneIntPtr(value.Int)
+	}
+	if value.Float != nil {
+		floatValue := *value.Float
+		clone.Float = &floatValue
+	}
+	if value.StringArray != nil {
+		clone.StringArray = ptrTo(append([]string(nil), (*value.StringArray)...))
+	}
+	if value.String != nil {
+		stringValue := *value.String
+		clone.String = &stringValue
+	}
+	if value.Bool != nil {
+		clone.Bool = cloneBoolPtr(value.Bool)
+	}
+	return clone
+}
+
+func isColumnCheckValueZero(value ColumnCheckValue) bool {
+	return value.IntArray == nil && value.Int == nil && value.Float == nil && value.StringArray == nil && value.String == nil && value.Bool == nil
+}
+
+func ptrTo[T any](value T) *T {
+	return &value
+}
+
+func cloneIntPtr(value *int) *int {
+	if value == nil {
+		return nil
+	}
+	clone := *value
+	return &clone
+}
+
+func cloneInt64Ptr(value *int64) *int64 {
+	if value == nil {
+		return nil
+	}
+	clone := *value
+	return &clone
+}
+
+func cloneBoolPtr(value *bool) *bool {
+	if value == nil {
+		return nil
+	}
+	clone := *value
+	return &clone
+}
+
+func cloneNotifications(value *Notifications) *Notifications {
+	if value == nil {
+		return nil
+	}
+	clone := &Notifications{
+		Slack:   make([]SlackNotification, 0, len(value.Slack)),
+		MSTeams: make([]MSTeamsNotification, 0, len(value.MSTeams)),
+		Discord: make([]DiscordNotification, 0, len(value.Discord)),
+		Webhook: make([]WebhookNotification, 0, len(value.Webhook)),
+	}
+	for _, notification := range value.Slack {
+		clone.Slack = append(clone.Slack, cloneSlackNotification(notification))
+	}
+	for _, notification := range value.MSTeams {
+		clone.MSTeams = append(clone.MSTeams, cloneMSTeamsNotification(notification))
+	}
+	for _, notification := range value.Discord {
+		clone.Discord = append(clone.Discord, cloneDiscordNotification(notification))
+	}
+	for _, notification := range value.Webhook {
+		clone.Webhook = append(clone.Webhook, cloneWebhookNotification(notification))
+	}
+	return clone
+}
+
+func cloneSlackNotification(value SlackNotification) SlackNotification {
+	value.Success = cloneDefaultTrueBool(value.Success)
+	value.Failure = cloneDefaultTrueBool(value.Failure)
+	return value
+}
+
+func cloneMSTeamsNotification(value MSTeamsNotification) MSTeamsNotification {
+	value.Success = cloneDefaultTrueBool(value.Success)
+	value.Failure = cloneDefaultTrueBool(value.Failure)
+	return value
+}
+
+func cloneDiscordNotification(value DiscordNotification) DiscordNotification {
+	value.Success = cloneDefaultTrueBool(value.Success)
+	value.Failure = cloneDefaultTrueBool(value.Failure)
+	return value
+}
+
+func cloneWebhookNotification(value WebhookNotification) WebhookNotification {
+	value.Success = cloneDefaultTrueBool(value.Success)
+	value.Failure = cloneDefaultTrueBool(value.Failure)
+	return value
 }
 
 func assetAcceptsDefaultHooks(asset *Asset) bool {

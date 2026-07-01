@@ -387,6 +387,17 @@ func TestClient_RunQueryWithoutResult(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "PL/SQL DDL preserves trailing semicolon",
+			mockConnection: func(mock sqlmock.Sqlmock) {
+				mock.ExpectExec("CREATE OR REPLACE PROCEDURE rebuild_users AS\nBEGIN\n   NULL;\nEND rebuild_users;").
+					WillReturnResult(sqlmock.NewResult(0, 0))
+			},
+			query: &query.Query{
+				Query: "CREATE OR REPLACE PROCEDURE rebuild_users AS\nBEGIN\n   NULL;\nEND rebuild_users;",
+			},
+			wantErr: false,
+		},
+		{
 			name: "invalid query returns error",
 			mockConnection: func(mock sqlmock.Sqlmock) {
 				mock.ExpectExec(`some broken query`).

@@ -391,3 +391,23 @@ func TestMaterializer_Render(t *testing.T) {
 		})
 	}
 }
+
+func intp(i int) *int { return &i }
+
+func TestColumnMetadataDDL(t *testing.T) {
+	t.Parallel()
+	asset := &pipeline.Asset{
+		Name:            "orders",
+		Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeTable, Strategy: pipeline.MaterializationStrategyDDL},
+		Columns: []pipeline.Column{
+			{Name: "amount", Type: "Decimal", Precision: intp(10), Scale: intp(2), Default: "0"},
+		},
+	}
+	parts, err := NewMaterializer(false).Render(asset, "SELECT 1")
+	require.NoError(t, err)
+	require.NotEmpty(t, parts)
+	createTable := parts[len(parts)-1]
+	require.Contains(t, createTable, "Decimal(10, 2)")
+	require.Contains(t, createTable, "DEFAULT 0")
+	require.NotContains(t, createTable, "REFERENCES")
+}

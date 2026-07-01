@@ -66,6 +66,14 @@ func compareTables(ctx context.Context, summarizer1, summarizer2 diff.TableSumma
 	return &result, nil
 }
 
+// isSchemalessConnection reports whether a connection's schema is inferred from
+// its data rather than declared in a catalog (e.g. MongoDB). ALTER TABLE
+// statements are not generated for such connections.
+func isSchemalessConnection(conn any) bool {
+	s, ok := conn.(diff.SchemalessSummarizer)
+	return ok && s.IsSchemaless()
+}
+
 // generateAlterStatements generates ALTER TABLE SQL statements based on schema comparison.
 func generateAlterStatements(schemaComparison diff.SchemaComparisonResult, conn1Name, conn2Name, targetDialect string, reverse bool) []string {
 	var dialect diff.DatabaseDialect
@@ -150,6 +158,7 @@ func DataDiffCmd() *cli.Command {
 	var connectionName string
 	// configFilePath is added to allow overriding the default .bruin.yml path, similar to other commands
 	var configFilePath string
+	var environment string
 	var tolerance float64
 	var full bool
 	var failIfDiff bool
@@ -157,6 +166,7 @@ func DataDiffCmd() *cli.Command {
 	var reverse bool
 	var outputFormat string
 	var dryRun bool
+	var sampleSize int64
 
 	return &cli.Command{
 		Name:    "data-diff",
@@ -175,6 +185,12 @@ func DataDiffCmd() *cli.Command {
 				Sources:     cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:       "the path to the .bruin.yml file",
 				Destination: &configFilePath,
+			},
+			&cli.StringFlag{
+				Name:        "environment",
+				Aliases:     []string{"env"},
+				Usage:       "the name of the environment to use for the connections (e.g., dev, prod). If not specified, the default environment will be used",
+				Destination: &environment,
 			},
 			&cli.Float64Flag{
 				Name:        "tolerance",
@@ -215,9 +231,18 @@ func DataDiffCmd() *cli.Command {
 				Usage:       "Estimate the cost of the comparison without executing it (outputs JSON). Only supported for BigQuery connections.",
 				Destination: &dryRun,
 			},
+			&cli.Int64Flag{
+				Name:        "sample",
+				Usage:       "For MongoDB sources, sample at most N documents instead of scanning the whole collection (statistics become approximate). 0 (default) scans everything. Ignored by other connection types.",
+				Destination: &sampleSize,
+				Value:       0,
+			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			ctx = query.WithQueryType(ctx, query.QueryTypeDiff)
+			if sampleSize > 0 {
+				ctx = diff.WithSampleSize(ctx, sampleSize)
+			}
 			if c.NArg() != 2 {
 				return errors.New("incorrect number of arguments, please provide two table names")
 			}
@@ -241,6 +266,15 @@ func DataDiffCmd() *cli.Command {
 			cm, err := config.LoadOrCreate(fs, configFilePath)
 			if err != nil {
 				return fmt.Errorf("failed to load or create config from '%s': %w", configFilePath, err)
+			}
+
+			// Select the environment for the connections, defaulting to the config's default environment
+			if environment == "" {
+				environment = cm.DefaultEnvironmentName
+			}
+			if err := cm.SelectEnvironment(environment); err != nil {
+				fmt.Fprintf(c.ErrWriter, "Failed to use the environment '%s': %v\n", environment, err)
+				return cli.Exit("", 1)
 			}
 
 			// Create connection manager
@@ -345,9 +379,11 @@ func DataDiffCmd() *cli.Command {
 			}
 
 			if schemaComparison != nil {
-				// Generate ALTER TABLE statements
+				// Generate ALTER TABLE statements, unless either side is a
+				// schemaless source (e.g. MongoDB) where DDL is meaningless.
+				ddlSupported := !isSchemalessConnection(conn1) && !isSchemalessConnection(conn2)
 				var alterStatements []string
-				if schemaComparison.HasSchemaDifferences {
+				if schemaComparison.HasSchemaDifferences && ddlSupported {
 					alterStatements = generateAlterStatements(*schemaComparison, conn1Name, conn2Name, targetDialect, reverse)
 				}
 

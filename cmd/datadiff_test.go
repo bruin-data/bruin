@@ -8,7 +8,26 @@ import (
 	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/urfave/cli/v3"
 )
+
+func TestDataDiffCmdHasEnvironmentFlag(t *testing.T) {
+	t.Parallel()
+	cmd := DataDiffCmd()
+
+	assert.Equal(t, "data-diff", cmd.Name)
+
+	var hasEnvironmentFlag bool
+	for _, flag := range cmd.Flags {
+		if f, ok := flag.(*cli.StringFlag); ok && f.Name == "environment" {
+			hasEnvironmentFlag = true
+			assert.Contains(t, f.Aliases, "env")
+			assert.Contains(t, f.Usage, "environment")
+		}
+	}
+
+	assert.True(t, hasEnvironmentFlag, "data-diff should have an environment flag")
+}
 
 func TestCalculatePercentageDiff(t *testing.T) {
 	t.Parallel()
@@ -438,6 +457,29 @@ func TestBuildColumnStatisticsDoesNotRenderNaNFillRateForEmptyCounts(t *testing.
 	assert.Equal(t, "0%", fillRate.Target)
 	assert.NotContains(t, fillRate.Diff, "NaN")
 	assert.NotContains(t, fillRate.DiffPercent, "NaN")
+}
+
+type fakeSchemalessConn struct{ schemaless bool }
+
+func (f fakeSchemalessConn) IsSchemaless() bool { return f.schemaless }
+
+func TestIsSchemalessConnection(t *testing.T) {
+	t.Parallel()
+
+	t.Run("connection that reports schemaless", func(t *testing.T) {
+		t.Parallel()
+		assert.True(t, isSchemalessConnection(fakeSchemalessConn{schemaless: true}))
+	})
+
+	t.Run("connection that implements the interface but is not schemaless", func(t *testing.T) {
+		t.Parallel()
+		assert.False(t, isSchemalessConnection(fakeSchemalessConn{schemaless: false}))
+	})
+
+	t.Run("connection that does not implement the interface", func(t *testing.T) {
+		t.Parallel()
+		assert.False(t, isSchemalessConnection(struct{}{}))
+	})
 }
 
 func TestGenerateAlterStatements(t *testing.T) {

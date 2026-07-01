@@ -162,6 +162,17 @@ environments:
       paddle:
         - name: conn-paddle
           api_key: "paddlekey"
+      chargebee:
+        - name: conn-chargebee
+          site: "chargebeesite"
+          api_key: "chargebeekey"
+      recurly:
+        - name: conn-recurly
+          api_key: "recurlykey"
+          region: "us"
+      gitlab:
+        - name: conn-gitlab
+          access_token: "gitlabtoken"
       dune:
         - name: "dune-1"
           api_key: "dune-api-key-123"
@@ -386,6 +397,10 @@ environments:
         - name: "googleanalytics-1"
           service_account_file: "path/to/service_account.json"
           property_id: "12345"
+      gsc:
+        - name: "conn-gsc"
+          service_account_file: "path/to/service_account.json"
+          site_url: "sc-domain:example.com"
       applovin:
         - name: "applovin-1"
           api_key: "key-123"
@@ -396,6 +411,7 @@ environments:
           username: "username-123"
           password: "password-123"
           token: "token-123"
+          access_token: "access-token-123"
           domain: "mydomain.my.salesforce.com"
       sqlite:
         - name: "sqlite-1"
@@ -440,6 +456,10 @@ environments:
         - name: "solidgate-1"
           secret_key: "secret-key-123"
           public_key: "public-key-123"
+      square:
+        - name: "square-1"
+          access_token: "EAAA-test-access-token"
+          environment: "sandbox"
       smartsheet:
         - name: "smartsheet-1"
           access_token: "access-token-123"
@@ -501,6 +521,65 @@ environments:
         - name: "customerio-1"
           api_key: "test-api-key"
           region: "us"
+      sendgrid:
+        - name: "sendgrid-1"
+          api_key: "test-api-key"
+          on_behalf_of: "test-subuser"
+      twilio:
+        - name: "twilio-1"
+          account_sid: "test-account-sid"
+          auth_token: "test-auth-token"
+          api_key: "test-api-key"
+          api_secret: "test-api-secret"
+      braze:
+        - name: "braze-1"
+          api_key: "test-api-key"
+          endpoint: "rest.iad-01.braze.com"
+      reddit_ads:
+        - name: "redditads-1"
+          access_token: "test-access-token"
+          client_id: "test-client-id"
+          client_secret: "test-client-secret"
+          refresh_token: "test-refresh-token"
+      espn:
+        - name: "espn-1"
+          sport: "football"
+          league: "nfl"
+          season: "2026"
+          limit: 50
+      sharepoint:
+        - name: "sharepoint-1"
+          tenant_id: "test-tenant-id"
+          client_id: "test-client-id"
+          client_secret: "test-client-secret"
+          hostname: "example.sharepoint.com"
+          site: "sites/Example"
+          library: "Documents"
+          max_file_size: 104857600
+          max_files: 10000
+      apifootball:
+        - name: "apifootball-1"
+          api_key: "test-api-key"
+          league: "1"
+          season: "2026"
+      footballdata:
+        - name: "footballdata-1"
+          api_key: "test-api-key"
+          competition: "WC"
+          season: "2026"
+      balldontlie:
+        - name: "balldontlie-1"
+          api_key: "test-api-key"
+          season: "2026"
+      starrocks:
+        - name: "starrocks-1"
+          host: "localhost"
+          port: 9030
+          username: "root"
+          password: "pass123"
+          database: "analytics"
+          catalog: "iceberg_catalog"
+          ssl: "true"
 
   prod:
     connections:

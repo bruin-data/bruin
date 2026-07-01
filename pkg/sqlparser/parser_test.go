@@ -1165,6 +1165,18 @@ func TestSqlParser_AddLimit(t *testing.T) { //nolint
 			dialect:  "",
 			expected: "SELECT id, name FROM users LIMIT 5",
 		},
+		{
+			// Regression for https://github.com/bruin-data/bruin/issues/2239:
+			// the rust parser's generic dialect uppercases function names,
+			// which breaks ClickHouse (case-sensitive function lookup).
+			// Round-tripping with the clickhouse dialect must preserve the
+			// original camelCase function names.
+			name:     "clickhouse dialect preserves camelCase function names",
+			query:    "SELECT toFloat64(amount_col) AS amount FROM my_db.my_table",
+			limit:    2,
+			dialect:  "clickhouse",
+			expected: "SELECT toFloat64(amount_col) AS amount FROM my_db.my_table LIMIT 2",
+		},
 	}
 
 	parser := sharedSQLParser
@@ -1178,6 +1190,28 @@ func TestSqlParser_AddLimit(t *testing.T) { //nolint
 				require.NoError(t, err)
 				require.Equal(t, tt.expected, got)
 			}
+		})
+	}
+}
+
+func TestConnectionTypeToDialect(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]string{
+		"clickhouse":            "clickhouse",
+		"postgres":              "postgres",
+		"google_cloud_platform": "bigquery",
+		"snowflake":             "snowflake",
+		"mssql":                 "tsql",
+		"vertica":               "postgres",
+		"":                      "",
+		"unknown":               "",
+	}
+
+	for connType, want := range tests {
+		t.Run(connType, func(t *testing.T) {
+			t.Parallel()
+			require.Equal(t, want, ConnectionTypeToDialect(connType))
 		})
 	}
 }

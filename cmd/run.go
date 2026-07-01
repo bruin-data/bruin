@@ -80,9 +80,11 @@ var pythonCacheGitignorePatterns = []string{
 var errUsePipDeprecated = errors.New("flag --use-pip is no longer supported: Bruin now always runs Python assets with uv")
 
 type PipelineInfo struct {
-	Pipeline           *pipeline.Pipeline
-	RunningForAnAsset  bool
-	RunDownstreamTasks bool
+	Pipeline               *pipeline.Pipeline
+	RunningForAnAsset      bool
+	RunDownstreamTasks     bool
+	StandalonePythonScript bool
+	ValidateOnlyAssetLevel bool
 }
 
 type ExecutionSummary struct {
@@ -721,6 +723,14 @@ func Run(isDebug *bool) *cli.Command {
 				Sources: cli.EnvVars("BRUIN_QUERY_ANNOTATIONS"),
 				Usage:   fmt.Sprintf("JSON string containing annotations to be added as comments to queries. Use '%s' to only include default annotations.", ansisql.DefaultQueryAnnotations),
 			},
+			&cli.StringFlag{
+				Name:  "backfill-id",
+				Usage: "tag this run as part of a backfill group; written to the run log so related runs can be grouped.",
+			},
+			&cli.IntFlag{
+				Name:  "backfill-total",
+				Usage: "total number of chunks in this backfill; written to the run log so progress can be reported. Informational only.",
+			},
 		},
 		DisableSliceFlagSeparator: true,
 		Action: func(ctx context.Context, c *cli.Command) error {
@@ -804,6 +814,21 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			runID := NewRunID()
+			backfillID := c.String("backfill-id")
+			backfillTotal := c.Int("backfill-total")
+			// The backfill id becomes part of the run id, which doubles as the
+			// run-log filename, so reject path separators to prevent writing the
+			// state file outside the logs directory via traversal.
+			if err := validateBackfillID(backfillID); err != nil {
+				errorPrinter.Println(err.Error())
+				return cli.Exit("", 1)
+			}
+			// For a backfill chunk, derive a unique, backfill-scoped run id from
+			// the backfill id and this chunk's start date (mirrors Bruin Cloud).
+			// An explicit BRUIN_RUN_ID still takes precedence.
+			if backfillID != "" && os.Getenv("BRUIN_RUN_ID") == "" {
+				runID = BackfillRunID(backfillID, startDate)
+			}
 			runCtx := context.WithValue(ctx, pipeline.RunConfigFullRefresh, runConfig.FullRefresh)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
@@ -852,19 +877,23 @@ func Run(isDebug *bool) *cli.Command {
 
 			var task *pipeline.Asset
 			if preview.RunningForAnAsset && c.Args().Len() == 1 {
-				task, err = DefaultPipelineBuilder.CreateAssetFromFile(inputPath, preview.Pipeline)
-				if err != nil {
-					errorPrinter.Printf("Failed to build asset: %v\n", err)
-					return cli.Exit("", 1)
-				}
-				task, err = DefaultPipelineBuilder.MutateAsset(runCtx, task, preview.Pipeline)
-				if err != nil {
-					errorPrinter.Printf("Failed to mutate asset: %v\n", err)
-					return cli.Exit("", 1)
-				}
-				if task == nil {
-					errorPrinter.Printf("Failed to create asset from file '%s'\n", inputPath)
-					return cli.Exit("", 1)
+				if preview.StandalonePythonScript {
+					task = firstPipelineAsset(preview.Pipeline)
+				} else {
+					task, err = DefaultPipelineBuilder.CreateAssetFromFile(inputPath, preview.Pipeline)
+					if err != nil {
+						errorPrinter.Printf("Failed to build asset: %v\n", err)
+						return cli.Exit("", 1)
+					}
+					task, err = DefaultPipelineBuilder.MutateAsset(runCtx, task, preview.Pipeline)
+					if err != nil {
+						errorPrinter.Printf("Failed to mutate asset: %v\n", err)
+						return cli.Exit("", 1)
+					}
+					if task == nil {
+						errorPrinter.Printf("Failed to create asset from file '%s'\n", inputPath)
+						return cli.Exit("", 1)
+					}
 				}
 
 				if preview.Pipeline.SelectedVariant != "" {
@@ -873,6 +902,11 @@ func Run(isDebug *bool) *cli.Command {
 						errorPrinter.Printf("Failed to render variant fields on asset: %v\n", err)
 						return cli.Exit("", 1)
 					}
+				}
+
+				if task == nil {
+					errorPrinter.Printf("Failed to create asset from file '%s'\n", inputPath)
+					return cli.Exit("", 1)
 				}
 			}
 
@@ -934,6 +968,15 @@ func Run(isDebug *bool) *cli.Command {
 				return err
 			}
 			applyEnvironmentRefreshRestriction(cm.SelectedEnvironment, pipelineInfo.Pipeline)
+			if pipelineInfo.StandalonePythonScript {
+				task = firstPipelineAsset(pipelineInfo.Pipeline)
+				if task == nil {
+					errorPrinter.Printf("Failed to create asset from file '%s'\n", inputPath)
+					return cli.Exit("", 1)
+				}
+				filter.SingleTask = task
+				filter.singleCheckID.Asset = task
+			}
 			applyEnvironmentRefreshRestrictionToAsset(cm.SelectedEnvironment, task)
 
 			// Load assets from positional arguments
@@ -1052,8 +1095,8 @@ func Run(isDebug *bool) *cli.Command {
 				filter.selectedBySelector = true
 			}
 
-			// Re-determine start date based on pipeline configuration and full-refresh flag
-			startDate, err = DetermineStartDate(runConfig.StartDate, pipelineInfo.Pipeline, runConfig.FullRefresh, logger)
+			// Parse start date directly from CLI
+			startDate, err = date.ParseTime(runConfig.StartDate)
 			if err != nil {
 				return err
 			}
@@ -1236,6 +1279,10 @@ func Run(isDebug *bool) *cli.Command {
 					errorPrinter.Printf("Failed to restore state: %v\n", err)
 					return cli.Exit("", 1)
 				}
+				if err := SkipDisabledAssets(context.Background(), filter, s, foundPipeline); err != nil { //nolint:contextcheck
+					errorPrinter.Printf("Failed to skip disabled assets: %v\n", err)
+					return cli.Exit("", 1)
+				}
 			}
 
 			if !c.Bool("continue") {
@@ -1252,7 +1299,11 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			shouldValidate := !c.Bool("no-validation")
-			if err := Validate(shouldValidate, s, CheckLint, runCtx, pipelineInfo.Pipeline, inputPath, logger); err != nil {
+			checkLint := CheckLint
+			if pipelineInfo.ValidateOnlyAssetLevel {
+				checkLint = CheckLintAssetOnly
+			}
+			if err := Validate(shouldValidate, s, checkLint, runCtx, pipelineInfo.Pipeline, inputPath, logger); err != nil {
 				return err
 			}
 
@@ -1375,7 +1426,7 @@ func Run(isDebug *bool) *cli.Command {
 				// cannot overwrite terminal output written by printTUISummary.
 				tui.Stop()
 
-				if err := s.SavePipelineState(afero.NewOsFs(), os.Args, runConfig, runID, statePath); err != nil {
+				if err := s.SavePipelineState(afero.NewOsFs(), os.Args, runConfig, backfillID, backfillTotal, runID, statePath); err != nil {
 					logger.Error("failed to save pipeline state", zap.Error(err))
 				}
 
@@ -1425,7 +1476,7 @@ func Run(isDebug *bool) *cli.Command {
 				results := s.Run(exeCtx)
 				duration := time.Since(start)
 
-				if err := s.SavePipelineState(afero.NewOsFs(), os.Args, runConfig, runID, statePath); err != nil {
+				if err := s.SavePipelineState(afero.NewOsFs(), os.Args, runConfig, backfillID, backfillTotal, runID, statePath); err != nil {
 					logger.Error("failed to save pipeline state", zap.Error(err))
 				}
 
@@ -1503,6 +1554,26 @@ func GetPipeline(ctx context.Context, inputPath string, runConfig *scheduler.Run
 	if runningForAnAsset {
 		pipelinePath, err = path.GetPipelineRootFromTask(inputPath, PipelineDefinitionFiles)
 		if err != nil {
+			if isPythonScriptPath(inputPath) {
+				foundPipeline, standaloneErr := buildStandalonePythonPipeline(ctx, inputPath)
+				if standaloneErr != nil {
+					errorPrinter.Printf("Failed to build standalone Python script asset: %v\n", standaloneErr)
+					return &PipelineInfo{
+						RunningForAnAsset:      runningForAnAsset,
+						RunDownstreamTasks:     runDownstreamTasks,
+						StandalonePythonScript: true,
+						ValidateOnlyAssetLevel: true,
+					}, standaloneErr
+				}
+
+				return &PipelineInfo{
+					Pipeline:               foundPipeline,
+					RunningForAnAsset:      true,
+					RunDownstreamTasks:     runConfig.Downstream,
+					StandalonePythonScript: true,
+					ValidateOnlyAssetLevel: true,
+				}, nil
+			}
 			errorPrinter.Printf("Failed to find the pipeline this task belongs to: '%s'\n", inputPath)
 			return &PipelineInfo{
 				RunningForAnAsset:  runningForAnAsset,
@@ -1531,6 +1602,120 @@ func GetPipeline(ctx context.Context, inputPath string, runConfig *scheduler.Run
 	}, nil
 }
 
+func isPythonScriptPath(inputPath string) bool {
+	return strings.EqualFold(filepath.Ext(inputPath), ".py")
+}
+
+func firstPipelineAsset(p *pipeline.Pipeline) *pipeline.Asset {
+	if p == nil || len(p.Assets) == 0 {
+		return nil
+	}
+
+	return p.Assets[0]
+}
+
+func buildStandalonePythonPipeline(ctx context.Context, inputPath string) (*pipeline.Pipeline, error) {
+	absPath, err := filepath.Abs(inputPath)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to resolve Python script path '%s'", inputPath)
+	}
+
+	info, err := os.Stat(absPath)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to inspect Python script '%s'", absPath)
+	}
+	if info.IsDir() {
+		return nil, fmt.Errorf("python script path '%s' is a directory", absPath)
+	}
+
+	scriptDir := filepath.Dir(absPath)
+	pl := &pipeline.Pipeline{
+		Name:        "standalone-python-" + standalonePythonAssetName(absPath),
+		Assets:      make([]*pipeline.Asset, 0, 1),
+		TasksByType: make(map[pipeline.AssetType][]*pipeline.Asset),
+		DefinitionFile: pipeline.DefinitionFile{
+			Name: "pipeline.yml",
+			Path: filepath.Join(scriptDir, "pipeline.yml"),
+		},
+		MacrosPath: filepath.Join(scriptDir, "macros"),
+	}
+
+	pl, err = DefaultPipelineBuilder.MutatePipeline(ctx, pl)
+	if err != nil {
+		return nil, err
+	}
+
+	asset, err := DefaultPipelineBuilder.CreateAssetFromFile(absPath, pl)
+	if err != nil {
+		return nil, err
+	}
+	if asset == nil {
+		asset, err = plainPythonScriptAsset(absPath)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if asset.Name == "" {
+		asset.Name = standalonePythonAssetName(absPath)
+	}
+	if asset.ID == "" {
+		asset.ID = standalonePythonAssetID(absPath)
+	}
+	if asset.Type == "" {
+		asset.Type = pipeline.AssetTypePython
+	}
+
+	asset, err = DefaultPipelineBuilder.MutateAsset(ctx, asset, pl)
+	if err != nil {
+		return nil, err
+	}
+
+	pl.Assets = append(pl.Assets, asset)
+	pl.TasksByType[asset.Type] = append(pl.TasksByType[asset.Type], asset)
+
+	return pl, nil
+}
+
+func plainPythonScriptAsset(absPath string) (*pipeline.Asset, error) {
+	content, err := os.ReadFile(absPath)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to read Python script '%s'", absPath)
+	}
+
+	fileName := filepath.Base(absPath)
+	assetName := standalonePythonAssetName(absPath)
+	return &pipeline.Asset{
+		ID:           standalonePythonAssetID(absPath),
+		Name:         assetName,
+		Type:         pipeline.AssetTypePython,
+		Parameters:   pipeline.ParameterMap{},
+		Columns:      []pipeline.Column{},
+		CustomChecks: []pipeline.CustomCheck{},
+		Secrets:      []pipeline.SecretMapping{},
+		Upstreams:    []pipeline.Upstream{},
+		ExecutableFile: pipeline.ExecutableFile{
+			Name:    fileName,
+			Path:    absPath,
+			Content: strings.TrimSpace(string(content)),
+		},
+		DefinitionFile: pipeline.TaskDefinitionFile{
+			Name: fileName,
+			Path: absPath,
+			Type: pipeline.CommentTask,
+		},
+	}, nil
+}
+
+func standalonePythonAssetName(absPath string) string {
+	return strings.TrimSuffix(filepath.Base(absPath), filepath.Ext(absPath))
+}
+
+func standalonePythonAssetID(absPath string) string {
+	hash := sha256.Sum256([]byte(absPath))
+	return hex.EncodeToString(hash[:])
+}
+
 func ParseDate(startDateStr, endDateStr string, logger logger.Logger) (time.Time, time.Time, error) {
 	startDate, err := date.ParseTime(startDateStr)
 	logger.Debug("given start date: ", startDate)
@@ -1553,40 +1738,6 @@ func ParseDate(startDateStr, endDateStr string, logger logger.Logger) (time.Time
 	}
 
 	return startDate, endDate, nil
-}
-
-func DetermineStartDate(cliStartDate string, pipeline *pipeline.Pipeline, fullRefresh bool, logger logger.Logger) (time.Time, error) {
-	var startDate time.Time
-	var err error
-
-	switch {
-	case !fullRefresh:
-		startDate, err = date.ParseTime(cliStartDate)
-		if err != nil {
-			return time.Time{}, err
-		}
-		logger.Debug("Using CLI start_date: ", cliStartDate)
-	case pipeline == nil:
-		startDate, err = date.ParseTime(cliStartDate)
-		if err != nil {
-			return time.Time{}, err
-		}
-		logger.Debug("Using CLI start_date: ", cliStartDate)
-	case pipeline.StartDate == "":
-		startDate, err = date.ParseTime(cliStartDate)
-		if err != nil {
-			return time.Time{}, err
-		}
-		logger.Debug("Using CLI start_date: ", cliStartDate)
-	default:
-		startDate, err = date.ParseTime(pipeline.StartDate)
-		if err != nil {
-			return time.Time{}, fmt.Errorf("invalid pipeline start_date '%s': %w", pipeline.StartDate, err)
-		}
-		logger.Debug("Using pipeline start_date: ", pipeline.StartDate)
-	}
-
-	return startDate, nil
 }
 
 func ValidateDateRange(startDate, endDate time.Time) error {
@@ -1631,6 +1782,10 @@ func CheckLint(ctx context.Context, foundPipeline *pipeline.Pipeline, pipelinePa
 	}
 
 	return nil
+}
+
+func CheckLintAssetOnly(ctx context.Context, foundPipeline *pipeline.Pipeline, pipelinePath string, logger logger.Logger, _ bool) error {
+	return CheckLint(ctx, foundPipeline, pipelinePath, logger, true)
 }
 
 func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, s *scheduler.Scheduler) { // nolint:unparam
@@ -1911,8 +2066,12 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeSailQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 	}
 	if s.WillRunTaskOfType(pipeline.AssetTypeOracleQuery) || s.WillRunTaskOfType(pipeline.AssetTypeOracleSource) || estimateCustomCheckType == pipeline.AssetTypeOracleQuery {
+		oracleFileExtractor := &query.OracleScriptExtractor{
+			Fs:       fs,
+			Renderer: renderer,
+		}
 		oracleCheckRunner := oracle.NewColumnCheckOperator(conn)
-		oracleOperator := oracle.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
+		oracleOperator := oracle.NewBasicOperator(conn, oracleFileExtractor, pipeline.HookWrapperMaterializer{
 			Mat:     oracle.NewMaterializer(fullRefresh),
 			Hoister: hoister,
 		}, parser)
@@ -2721,6 +2880,23 @@ func FilterTaskTypes(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *
 	return nil
 }
 
+func SkipDisabledAssets(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
+	for _, asset := range p.Assets {
+		enabled, err := asset.EnabledValue()
+		if err != nil {
+			return errors.Wrapf(err, "failed to resolve enabled for asset %q", asset.Name)
+		}
+
+		if enabled {
+			continue
+		}
+
+		s.MarkAsset(asset, scheduler.Skipped, false)
+	}
+
+	return nil
+}
+
 type FilterMutator func(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error
 
 func ApplyAllFilters(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
@@ -2734,6 +2910,7 @@ func ApplyAllFilters(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *
 		HandleExcludeTags,
 		FilterTaskTypes,
 		SkipAllTasksIfSingleCheck,
+		SkipDisabledAssets,
 	}
 
 	for _, filterFunc := range funcs {

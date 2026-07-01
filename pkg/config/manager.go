@@ -58,6 +58,9 @@ type Connections struct {
 	FacebookAds         []FacebookAdsConnection         `yaml:"facebookads,omitempty" json:"facebookads,omitempty" mapstructure:"facebookads"`
 	Stripe              []StripeConnection              `yaml:"stripe,omitempty" json:"stripe,omitempty" mapstructure:"stripe"`
 	Paddle              []PaddleConnection              `yaml:"paddle,omitempty" json:"paddle,omitempty" mapstructure:"paddle"`
+	Chargebee           []ChargebeeConnection           `yaml:"chargebee,omitempty" json:"chargebee,omitempty" mapstructure:"chargebee"`
+	Recurly             []RecurlyConnection             `yaml:"recurly,omitempty" json:"recurly,omitempty" mapstructure:"recurly"`
+	GitLab              []GitLabConnection              `yaml:"gitlab,omitempty" json:"gitlab,omitempty" mapstructure:"gitlab"`
 	Appsflyer           []AppsflyerConnection           `yaml:"appsflyer,omitempty" json:"appsflyer,omitempty" mapstructure:"appsflyer"`
 	Kafka               []KafkaConnection               `yaml:"kafka,omitempty" json:"kafka,omitempty" mapstructure:"kafka"`
 	RabbitMQ            []RabbitMQConnection            `yaml:"rabbitmq,omitempty" json:"rabbitmq,omitempty" mapstructure:"rabbitmq"`
@@ -91,6 +94,7 @@ type Connections struct {
 	RevenueCat          []RevenueCatConnection          `yaml:"revenuecat,omitempty" json:"revenuecat,omitempty" mapstructure:"revenuecat"`
 	Linear              []LinearConnection              `yaml:"linear,omitempty" json:"linear,omitempty" mapstructure:"linear"`
 	GCS                 []GCSConnection                 `yaml:"gcs,omitempty" json:"gcs,omitempty" mapstructure:"gcs"`
+	SharePoint          []SharePointConnection          `yaml:"sharepoint,omitempty" json:"sharepoint,omitempty" mapstructure:"sharepoint"`
 	ApplovinMax         []ApplovinMaxConnection         `yaml:"applovinmax,omitempty" json:"applovinmax,omitempty" mapstructure:"applovinmax"`
 	Personio            []PersonioConnection            `yaml:"personio,omitempty" json:"personio,omitempty" mapstructure:"personio"`
 	Kinesis             []KinesisConnection             `yaml:"kinesis,omitempty" json:"kinesis,omitempty" mapstructure:"kinesis"`
@@ -109,6 +113,7 @@ type Connections struct {
 	EMRServerless       []EMRServerlessConnection       `yaml:"emr_serverless,omitempty" json:"emr_serverless,omitempty" mapstructure:"emr_serverless"`
 	DataprocServerless  []DataprocServerlessConnection  `yaml:"dataproc_serverless,omitempty" json:"dataproc_serverless,omitempty" mapstructure:"dataproc_serverless"`
 	GoogleAnalytics     []GoogleAnalyticsConnection     `yaml:"googleanalytics,omitempty" json:"googleanalytics,omitempty" mapstructure:"googleanalytics"`
+	GSC                 []GSCConnection                 `yaml:"gsc,omitempty" json:"gsc,omitempty" mapstructure:"gsc"`
 	AppLovin            []AppLovinConnection            `yaml:"applovin,omitempty" json:"applovin,omitempty" mapstructure:"applovin"`
 	Frankfurter         []FrankfurterConnection         `yaml:"frankfurter,omitempty" json:"frankfurter,omitempty" mapstructure:"frankfurter"`
 	Salesforce          []SalesforceConnection          `yaml:"salesforce,omitempty" json:"salesforce,omitempty" mapstructure:"salesforce"`
@@ -118,6 +123,7 @@ type Connections struct {
 	Phantombuster       []PhantombusterConnection       `yaml:"phantombuster,omitempty" json:"phantombuster,omitempty" mapstructure:"phantombuster"`
 	Elasticsearch       []ElasticsearchConnection       `yaml:"elasticsearch,omitempty" json:"elasticsearch,omitempty" mapstructure:"elasticsearch"`
 	Solidgate           []SolidgateConnection           `yaml:"solidgate,omitempty" json:"solidgate,omitempty" mapstructure:"solidgate"`
+	Square              []SquareConnection              `yaml:"square,omitempty" json:"square,omitempty" mapstructure:"square"`
 	Spanner             []SpannerConnection             `yaml:"spanner,omitempty" json:"spanner,omitempty" mapstructure:"spanner"`
 	Smartsheet          []SmartsheetConnection          `yaml:"smartsheet,omitempty" json:"smartsheet,omitempty" mapstructure:"smartsheet"`
 	Attio               []AttioConnection               `yaml:"attio,omitempty" json:"attio,omitempty" mapstructure:"attio"`
@@ -127,6 +133,7 @@ type Connections struct {
 	Tableau             []TableauConnection             `yaml:"tableau,omitempty" json:"tableau,omitempty" mapstructure:"tableau"`
 	QuickSight          []QuickSightConnection          `yaml:"quicksight,omitempty" json:"quicksight,omitempty" mapstructure:"quicksight"`
 	Trino               []TrinoConnection               `yaml:"trino,omitempty" json:"trino,omitempty" mapstructure:"trino"`
+	StarRocks           []StarRocksConnection           `yaml:"starrocks,omitempty" json:"starrocks,omitempty" mapstructure:"starrocks"`
 	Dremio              []DremioConnection              `yaml:"dremio,omitempty" json:"dremio,omitempty" mapstructure:"dremio"`
 	Sail                []SailConnection                `yaml:"sail,omitempty" json:"sail,omitempty" mapstructure:"sail"`
 	Fluxx               []FluxxConnection               `yaml:"fluxx,omitempty" json:"fluxx,omitempty" mapstructure:"fluxx"`
@@ -140,6 +147,13 @@ type Connections struct {
 	Primer              []PrimerConnection              `yaml:"primer,omitempty" json:"primer,omitempty" mapstructure:"primer"`
 	Indeed              []IndeedConnection              `yaml:"indeed,omitempty" json:"indeed,omitempty" mapstructure:"indeed"`
 	CustomerIo          []CustomerIoConnection          `yaml:"customerio,omitempty" json:"customerio,omitempty" mapstructure:"customerio"`
+	Sendgrid            []SendgridConnection            `yaml:"sendgrid,omitempty" json:"sendgrid,omitempty" mapstructure:"sendgrid"`
+	Twilio              []TwilioConnection              `yaml:"twilio,omitempty" json:"twilio,omitempty" mapstructure:"twilio"`
+	Braze               []BrazeConnection               `yaml:"braze,omitempty" json:"braze,omitempty" mapstructure:"braze"`
+	Espn                []EspnConnection                `yaml:"espn,omitempty" json:"espn,omitempty" mapstructure:"espn"`
+	APIFootball         []APIFootballConnection         `yaml:"apifootball,omitempty" json:"apifootball,omitempty" mapstructure:"apifootball"`
+	FootballData        []FootballDataConnection        `yaml:"footballdata,omitempty" json:"footballdata,omitempty" mapstructure:"footballdata"`
+	BallDontLie         []BallDontLieConnection         `yaml:"balldontlie,omitempty" json:"balldontlie,omitempty" mapstructure:"balldontlie"`
 	Vertica             []VerticaConnection             `yaml:"vertica,omitempty" json:"vertica,omitempty" mapstructure:"vertica"`
 	SurveyMonkey        []SurveyMonkeyConnection        `yaml:"surveymonkey,omitempty" json:"surveymonkey,omitempty" mapstructure:"surveymonkey"`
 	Dune                []DuneConnection                `yaml:"dune,omitempty" json:"dune,omitempty" mapstructure:"dune"`
@@ -186,6 +200,17 @@ func (c *Connections) Exists(name string) bool {
 
 	_, ok := c.typeNameMap[name]
 	return ok
+}
+
+// GetConnection returns the connection object registered under the given name,
+// or nil if it does not exist. The returned value is a pointer to the typed
+// connection struct (e.g. *PostgresConnection).
+func (c *Connections) GetConnection(name string) any {
+	if c.byKey == nil {
+		c.buildConnectionKeyMap()
+	}
+
+	return c.byKey[name]
 }
 
 func (c *Connections) buildConnectionKeyMap() {
@@ -725,6 +750,27 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Paddle = append(env.Connections.Paddle, conn)
+	case "chargebee":
+		var conn ChargebeeConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Chargebee = append(env.Connections.Chargebee, conn)
+	case "recurly":
+		var conn RecurlyConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Recurly = append(env.Connections.Recurly, conn)
+	case "gitlab":
+		var conn GitLabConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.GitLab = append(env.Connections.GitLab, conn)
 	case "generic":
 		var conn GenericConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -942,6 +988,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.GCS = append(env.Connections.GCS, conn)
+	case "sharepoint":
+		var conn SharePointConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.SharePoint = append(env.Connections.SharePoint, conn)
 	case "clickhouse":
 		var conn ClickHouseConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1054,6 +1107,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Trino = append(env.Connections.Trino, conn)
+	case "starrocks":
+		var conn StarRocksConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.StarRocks = append(env.Connections.StarRocks, conn)
 	case "dremio":
 		var conn DremioConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1111,6 +1171,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.GoogleAnalytics = append(env.Connections.GoogleAnalytics, conn)
+	case "gsc":
+		var conn GSCConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.GSC = append(env.Connections.GSC, conn)
 	case "freshdesk":
 		var conn FreshdeskConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1189,6 +1256,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Solidgate = append(env.Connections.Solidgate, conn)
+	case "square":
+		var conn SquareConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Square = append(env.Connections.Square, conn)
 	case "smartsheet":
 		var conn SmartsheetConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1294,6 +1368,55 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.CustomerIo = append(env.Connections.CustomerIo, conn)
+	case "sendgrid":
+		var conn SendgridConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Sendgrid = append(env.Connections.Sendgrid, conn)
+	case "twilio":
+		var conn TwilioConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Twilio = append(env.Connections.Twilio, conn)
+	case "braze":
+		var conn BrazeConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Braze = append(env.Connections.Braze, conn)
+	case "espn":
+		var conn EspnConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Espn = append(env.Connections.Espn, conn)
+	case "apifootball":
+		var conn APIFootballConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.APIFootball = append(env.Connections.APIFootball, conn)
+	case "footballdata":
+		var conn FootballDataConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.FootballData = append(env.Connections.FootballData, conn)
+	case "balldontlie":
+		var conn BallDontLieConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.BallDontLie = append(env.Connections.BallDontLie, conn)
 	case "vertica":
 		var conn VerticaConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1414,6 +1537,12 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Stripe = removeConnection(env.Connections.Stripe, connectionName)
 	case "paddle":
 		env.Connections.Paddle = removeConnection(env.Connections.Paddle, connectionName)
+	case "chargebee":
+		env.Connections.Chargebee = removeConnection(env.Connections.Chargebee, connectionName)
+	case "recurly":
+		env.Connections.Recurly = removeConnection(env.Connections.Recurly, connectionName)
+	case "gitlab":
+		env.Connections.GitLab = removeConnection(env.Connections.GitLab, connectionName)
 	case "appsflyer":
 		env.Connections.Appsflyer = removeConnection(env.Connections.Appsflyer, connectionName)
 	case "jira":
@@ -1470,6 +1599,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Linear = removeConnection(env.Connections.Linear, connectionName)
 	case "gcs":
 		env.Connections.GCS = removeConnection(env.Connections.GCS, connectionName)
+	case "sharepoint":
+		env.Connections.SharePoint = removeConnection(env.Connections.SharePoint, connectionName)
 	case "clickhouse":
 		env.Connections.ClickHouse = removeConnection(env.Connections.ClickHouse, connectionName)
 	case "applovinmax":
@@ -1498,6 +1629,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Pinterest = removeConnection(env.Connections.Pinterest, connectionName)
 	case "trino":
 		env.Connections.Trino = removeConnection(env.Connections.Trino, connectionName)
+	case "starrocks":
+		env.Connections.StarRocks = removeConnection(env.Connections.StarRocks, connectionName)
 	case "dremio":
 		env.Connections.Dremio = removeConnection(env.Connections.Dremio, connectionName)
 	case "sail":
@@ -1518,6 +1651,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.DataprocServerless = removeConnection(env.Connections.DataprocServerless, connectionName)
 	case "googleanalytics":
 		env.Connections.GoogleAnalytics = removeConnection(env.Connections.GoogleAnalytics, connectionName)
+	case "gsc":
+		env.Connections.GSC = removeConnection(env.Connections.GSC, connectionName)
 	case "applovin":
 		env.Connections.AppLovin = removeConnection(env.Connections.AppLovin, connectionName)
 	case "freshdesk":
@@ -1540,6 +1675,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Spanner = removeConnection(env.Connections.Spanner, connectionName)
 	case "solidgate":
 		env.Connections.Solidgate = removeConnection(env.Connections.Solidgate, connectionName)
+	case "square":
+		env.Connections.Square = removeConnection(env.Connections.Square, connectionName)
 	case "smartsheet":
 		env.Connections.Smartsheet = removeConnection(env.Connections.Smartsheet, connectionName)
 	case "attio":
@@ -1570,6 +1707,20 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Indeed = removeConnection(env.Connections.Indeed, connectionName)
 	case "customerio":
 		env.Connections.CustomerIo = removeConnection(env.Connections.CustomerIo, connectionName)
+	case "sendgrid":
+		env.Connections.Sendgrid = removeConnection(env.Connections.Sendgrid, connectionName)
+	case "twilio":
+		env.Connections.Twilio = removeConnection(env.Connections.Twilio, connectionName)
+	case "braze":
+		env.Connections.Braze = removeConnection(env.Connections.Braze, connectionName)
+	case "espn":
+		env.Connections.Espn = removeConnection(env.Connections.Espn, connectionName)
+	case "apifootball":
+		env.Connections.APIFootball = removeConnection(env.Connections.APIFootball, connectionName)
+	case "footballdata":
+		env.Connections.FootballData = removeConnection(env.Connections.FootballData, connectionName)
+	case "balldontlie":
+		env.Connections.BallDontLie = removeConnection(env.Connections.BallDontLie, connectionName)
 	case "vertica":
 		env.Connections.Vertica = removeConnection(env.Connections.Vertica, connectionName)
 	case "surveymonkey":
@@ -1666,6 +1817,9 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.FacebookAds, source.FacebookAds)
 	mergeConnectionList(&c.Stripe, source.Stripe)
 	mergeConnectionList(&c.Paddle, source.Paddle)
+	mergeConnectionList(&c.Chargebee, source.Chargebee)
+	mergeConnectionList(&c.Recurly, source.Recurly)
+	mergeConnectionList(&c.GitLab, source.GitLab)
 	mergeConnectionList(&c.Appsflyer, source.Appsflyer)
 	mergeConnectionList(&c.Kafka, source.Kafka)
 	mergeConnectionList(&c.RabbitMQ, source.RabbitMQ)
@@ -1699,6 +1853,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.RevenueCat, source.RevenueCat)
 	mergeConnectionList(&c.Linear, source.Linear)
 	mergeConnectionList(&c.GCS, source.GCS)
+	mergeConnectionList(&c.SharePoint, source.SharePoint)
 	mergeConnectionList(&c.ApplovinMax, source.ApplovinMax)
 	mergeConnectionList(&c.Personio, source.Personio)
 	mergeConnectionList(&c.Kinesis, source.Kinesis)
@@ -1717,6 +1872,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.EMRServerless, source.EMRServerless)
 	mergeConnectionList(&c.DataprocServerless, source.DataprocServerless)
 	mergeConnectionList(&c.GoogleAnalytics, source.GoogleAnalytics)
+	mergeConnectionList(&c.GSC, source.GSC)
 	mergeConnectionList(&c.AppLovin, source.AppLovin)
 	mergeConnectionList(&c.Frankfurter, source.Frankfurter)
 	mergeConnectionList(&c.Salesforce, source.Salesforce)
@@ -1726,6 +1882,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Phantombuster, source.Phantombuster)
 	mergeConnectionList(&c.Elasticsearch, source.Elasticsearch)
 	mergeConnectionList(&c.Solidgate, source.Solidgate)
+	mergeConnectionList(&c.Square, source.Square)
 	mergeConnectionList(&c.Spanner, source.Spanner)
 	mergeConnectionList(&c.Smartsheet, source.Smartsheet)
 	mergeConnectionList(&c.Attio, source.Attio)
@@ -1735,6 +1892,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Tableau, source.Tableau)
 	mergeConnectionList(&c.QuickSight, source.QuickSight)
 	mergeConnectionList(&c.Trino, source.Trino)
+	mergeConnectionList(&c.StarRocks, source.StarRocks)
 	mergeConnectionList(&c.Dremio, source.Dremio)
 	mergeConnectionList(&c.Sail, source.Sail)
 	mergeConnectionList(&c.Fluxx, source.Fluxx)
@@ -1748,6 +1906,13 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Primer, source.Primer)
 	mergeConnectionList(&c.Indeed, source.Indeed)
 	mergeConnectionList(&c.CustomerIo, source.CustomerIo)
+	mergeConnectionList(&c.Sendgrid, source.Sendgrid)
+	mergeConnectionList(&c.Twilio, source.Twilio)
+	mergeConnectionList(&c.Braze, source.Braze)
+	mergeConnectionList(&c.Espn, source.Espn)
+	mergeConnectionList(&c.APIFootball, source.APIFootball)
+	mergeConnectionList(&c.FootballData, source.FootballData)
+	mergeConnectionList(&c.BallDontLie, source.BallDontLie)
 	mergeConnectionList(&c.Vertica, source.Vertica)
 	mergeConnectionList(&c.SurveyMonkey, source.SurveyMonkey)
 	mergeConnectionList(&c.Dune, source.Dune)

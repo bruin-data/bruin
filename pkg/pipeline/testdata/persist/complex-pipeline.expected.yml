@@ -14,7 +14,7 @@ start_date: "2024-01-01"
 default_connections:
   gcp: prod-connection
   snowflake: snow-connection
-catchup: true
+catchup: active
 retries: 3
 concurrency: 5
 agent: true

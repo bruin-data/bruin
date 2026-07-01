@@ -42,7 +42,7 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 	if o.sensorMode == "skip" {
 		return nil
 	}
-	qq, ok := t.Parameters["query"]
+	qq, ok := t.Parameters.GetString("query")
 	if !ok {
 		return errors.New("query sensor requires a parameter named 'query'")
 	}
@@ -147,7 +147,7 @@ func (ts *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return nil
 	}
 
-	tableName, ok := t.Parameters["table"]
+	tableName, ok := t.Parameters.GetString("table")
 	if !ok {
 		return errors.New("table sensor requires a parameter named 'table'")
 	}

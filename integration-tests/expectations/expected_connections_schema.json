@@ -37,6 +37,34 @@
         "account_name"
       ]
     },
+    "APIFootballConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "league": {
+          "type": "string"
+        },
+        "season": {
+          "type": "string"
+        },
+        "timezone": {
+          "type": "string"
+        },
+        "base_url": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
+      ]
+    },
     "AdjustConnection": {
       "properties": {
         "name": {
@@ -315,6 +343,48 @@
         "region"
       ]
     },
+    "BallDontLieConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "season": {
+          "type": "string"
+        },
+        "base_url": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
+      ]
+    },
+    "BrazeConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "endpoint": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key",
+        "endpoint"
+      ]
+    },
     "BruinCloudConnection": {
       "properties": {
         "name": {
@@ -460,6 +530,26 @@
       "type": "object",
       "required": [
         "type"
+      ]
+    },
+    "ChargebeeConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "site": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "site",
+        "api_key"
       ]
     },
     "ChessConnection": {
@@ -759,6 +849,24 @@
           },
           "type": "array"
         },
+        "chargebee": {
+          "items": {
+            "$ref": "#/$defs/ChargebeeConnection"
+          },
+          "type": "array"
+        },
+        "recurly": {
+          "items": {
+            "$ref": "#/$defs/RecurlyConnection"
+          },
+          "type": "array"
+        },
+        "gitlab": {
+          "items": {
+            "$ref": "#/$defs/GitLabConnection"
+          },
+          "type": "array"
+        },
         "appsflyer": {
           "items": {
             "$ref": "#/$defs/AppsflyerConnection"
@@ -957,6 +1065,12 @@
           },
           "type": "array"
         },
+        "sharepoint": {
+          "items": {
+            "$ref": "#/$defs/SharePointConnection"
+          },
+          "type": "array"
+        },
         "applovinmax": {
           "items": {
             "$ref": "#/$defs/ApplovinMaxConnection"
@@ -1065,6 +1179,12 @@
           },
           "type": "array"
         },
+        "gsc": {
+          "items": {
+            "$ref": "#/$defs/GSCConnection"
+          },
+          "type": "array"
+        },
         "applovin": {
           "items": {
             "$ref": "#/$defs/AppLovinConnection"
@@ -1119,6 +1239,12 @@
           },
           "type": "array"
         },
+        "square": {
+          "items": {
+            "$ref": "#/$defs/SquareConnection"
+          },
+          "type": "array"
+        },
         "spanner": {
           "items": {
             "$ref": "#/$defs/SpannerConnection"
@@ -1170,6 +1296,12 @@
         "trino": {
           "items": {
             "$ref": "#/$defs/TrinoConnection"
+          },
+          "type": "array"
+        },
+        "starrocks": {
+          "items": {
+            "$ref": "#/$defs/StarRocksConnection"
           },
           "type": "array"
         },
@@ -1248,6 +1380,48 @@
         "customerio": {
           "items": {
             "$ref": "#/$defs/CustomerIoConnection"
+          },
+          "type": "array"
+        },
+        "sendgrid": {
+          "items": {
+            "$ref": "#/$defs/SendgridConnection"
+          },
+          "type": "array"
+        },
+        "twilio": {
+          "items": {
+            "$ref": "#/$defs/TwilioConnection"
+          },
+          "type": "array"
+        },
+        "braze": {
+          "items": {
+            "$ref": "#/$defs/BrazeConnection"
+          },
+          "type": "array"
+        },
+        "espn": {
+          "items": {
+            "$ref": "#/$defs/EspnConnection"
+          },
+          "type": "array"
+        },
+        "apifootball": {
+          "items": {
+            "$ref": "#/$defs/APIFootballConnection"
+          },
+          "type": "array"
+        },
+        "footballdata": {
+          "items": {
+            "$ref": "#/$defs/FootballDataConnection"
+          },
+          "type": "array"
+        },
+        "balldontlie": {
+          "items": {
+            "$ref": "#/$defs/BallDontLieConnection"
           },
           "type": "array"
         },
@@ -1716,6 +1890,33 @@
         "verify_certs"
       ]
     },
+    "EspnConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "sport": {
+          "type": "string"
+        },
+        "league": {
+          "type": "string"
+        },
+        "season": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer"
+        },
+        "base_url": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name"
+      ]
+    },
     "FabricConnection": {
       "properties": {
         "name": {
@@ -1820,6 +2021,55 @@
         "instance",
         "client_id",
         "client_secret"
+      ]
+    },
+    "FootballDataConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "competition": {
+          "type": "string"
+        },
+        "season": {
+          "type": "string"
+        },
+        "base_url": {
+          "type": "string"
+        },
+        "matchday": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "stage": {
+          "type": "string"
+        },
+        "group": {
+          "type": "string"
+        },
+        "unfold_goals": {
+          "type": "boolean"
+        },
+        "unfold_bookings": {
+          "type": "boolean"
+        },
+        "unfold_subs": {
+          "type": "boolean"
+        },
+        "unfold_lineups": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
       ]
     },
     "FrankfurterConnection": {
@@ -1927,6 +2177,28 @@
         "name"
       ]
     },
+    "GSCConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "service_account_file": {
+          "type": "string"
+        },
+        "service_account_json": {
+          "type": "string"
+        },
+        "site_url": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "site_url"
+      ]
+    },
     "GenericConnection": {
       "properties": {
         "name": {
@@ -1964,6 +2236,25 @@
         "name",
         "owner",
         "repo"
+      ]
+    },
+    "GitLabConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "access_token": {
+          "type": "string"
+        },
+        "base_url": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "access_token"
       ]
     },
     "GoogleAdsConnection": {
@@ -3269,6 +3560,25 @@
         "password"
       ]
     },
+    "RecurlyConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
+      ]
+    },
     "RedditAdsConnection": {
       "properties": {
         "name": {
@@ -3277,16 +3587,20 @@
         "access_token": {
           "type": "string"
         },
-        "account_ids": {
+        "client_id": {
+          "type": "string"
+        },
+        "client_secret": {
+          "type": "string"
+        },
+        "refresh_token": {
           "type": "string"
         }
       },
       "additionalProperties": false,
       "type": "object",
       "required": [
-        "name",
-        "access_token",
-        "account_ids"
+        "name"
       ]
     },
     "RedshiftConnection": {
@@ -3481,6 +3795,9 @@
         "token": {
           "type": "string"
         },
+        "access_token": {
+          "type": "string"
+        },
         "domain": {
           "type": "string"
         }
@@ -3489,10 +3806,67 @@
       "type": "object",
       "required": [
         "name",
-        "username",
-        "password",
-        "token",
         "domain"
+      ]
+    },
+    "SendgridConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "on_behalf_of": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
+      ]
+    },
+    "SharePointConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "client_id": {
+          "type": "string"
+        },
+        "client_secret": {
+          "type": "string"
+        },
+        "hostname": {
+          "type": "string"
+        },
+        "site": {
+          "type": "string"
+        },
+        "library": {
+          "type": "string"
+        },
+        "max_file_size": {
+          "type": "integer"
+        },
+        "max_files": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "tenant_id",
+        "client_id",
+        "client_secret",
+        "hostname",
+        "site"
       ]
     },
     "ShopifyConnection": {
@@ -3723,6 +4097,66 @@
         "database"
       ]
     },
+    "SquareConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "access_token": {
+          "type": "string"
+        },
+        "environment": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "access_token"
+      ]
+    },
+    "StarRocksConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "database": {
+          "type": "string"
+        },
+        "catalog": {
+          "type": "string"
+        },
+        "ssl": {
+          "type": "string"
+        },
+        "http_port": {
+          "type": "integer"
+        },
+        "replication_num": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "host",
+        "username"
+      ]
+    },
     "StorageAuth": {
       "properties": {
         "access_key": {
@@ -3840,6 +4274,22 @@
       ]
     },
     "TableauConnection": {
+      "oneOf": [
+        {
+          "required": [
+            "username",
+            "password"
+          ],
+          "title": "username_password"
+        },
+        {
+          "required": [
+            "personal_access_token_name",
+            "personal_access_token_secret"
+          ],
+          "title": "personal_access_token"
+        }
+      ],
       "properties": {
         "name": {
           "type": "string"
@@ -3871,12 +4321,7 @@
       "required": [
         "name",
         "host",
-        "username",
-        "password",
-        "personal_access_token_name",
-        "personal_access_token_secret",
-        "site_id",
-        "api_version"
+        "site_id"
       ]
     },
     "TikTokAdsConnection": {
@@ -3955,6 +4400,31 @@
         "name",
         "business_unit_id",
         "api_key"
+      ]
+    },
+    "TwilioConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "account_sid": {
+          "type": "string"
+        },
+        "auth_token": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "api_secret": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "account_sid"
       ]
     },
     "VerticaConnection": {

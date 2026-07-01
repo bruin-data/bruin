@@ -8,64 +8,45 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
-func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs []string, columnOpts *ColumnHintOptions) ([]string, error) {
-	if value, exists := asset.Parameters["incremental_key"]; exists && value != "" {
-		cmdArgs = append(cmdArgs, "--incremental-key", value)
+var ingestrValueParameterFlags = []string{
+	"incremental_key",
+	"incremental_strategy",
+	"partition_by",
+	"cluster_by",
+	"schema_contract",
+	"schema_naming",
+	"page_size",
+	"loader_file_size",
+	"extract_parallelism",
+	"sql_reflection_level",
+	"sql_limit",
+	"sql_exclude_columns",
+	"pipelines_dir",
+	"staging_bucket",
+	"staging_dataset",
+	"flush_interval",
+	"flush_records",
+	"sql_backend",
+	"loader_file_format",
+}
 
+var ingestrBoolParameterFlags = []string{
+	"no_inference",
+	"trim_whitespace",
+	"stream",
+}
+
+func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs []string, columnOpts *ColumnHintOptions) ([]string, error) {
+	cmdArgs = appendIngestrParameterFlags(asset.Parameters, cmdArgs)
+	cmdArgs = appendIngestrMaskFlags(asset.Parameters, asset.Columns, cmdArgs, columnOpts != nil && columnOpts.NormalizeColumnNames)
+
+	if value, exists := asset.Parameters.GetString("incremental_key"); exists && value != "" {
 		// Check if the incremental key column exists and is of date type
 		for _, column := range asset.Columns {
 			if column.Name == value && strings.ToLower(column.Type) == "date" {
 				cmdArgs = append(cmdArgs, "--columns", column.Name+":"+column.Type)
 			}
 		}
-	}
-
-	if value, exists := asset.Parameters["incremental_strategy"]; exists && value != "" {
-		cmdArgs = append(cmdArgs, "--incremental-strategy", value)
-	}
-
-	if value, exists := asset.Parameters["loader_file_format"]; exists && value != "" {
-		cmdArgs = append(cmdArgs, "--loader-file-format", value)
-	}
-
-	if value, exists := asset.Parameters["partition_by"]; exists && value != "" {
-		cmdArgs = append(cmdArgs, "--partition-by", value)
-	}
-
-	if value, exists := asset.Parameters["cluster_by"]; exists && value != "" {
-		cmdArgs = append(cmdArgs, "--cluster-by", value)
-	}
-
-	if value, exists := asset.Parameters["sql_backend"]; exists && value != "" {
-		cmdArgs = append(cmdArgs, "--sql-backend", value)
-	}
-
-	if value, exists := asset.Parameters["loader_file_size"]; exists && value != "" {
-		cmdArgs = append(cmdArgs, "--loader-file-size", value)
-	}
-
-	if value, exists := asset.Parameters["schema_naming"]; exists && value != "" {
-		cmdArgs = append(cmdArgs, "--schema-naming", value)
-	}
-
-	if value, exists := asset.Parameters["extract_parallelism"]; exists && value != "" {
-		cmdArgs = append(cmdArgs, "--extract-parallelism", value)
-	}
-
-	if value, exists := asset.Parameters["sql_reflection_level"]; exists && value != "" {
-		cmdArgs = append(cmdArgs, "--sql-reflection-level", value)
-	}
-
-	if value, exists := asset.Parameters["sql_limit"]; exists && value != "" {
-		cmdArgs = append(cmdArgs, "--sql-limit", value)
-	}
-
-	if value, exists := asset.Parameters["sql_exclude_columns"]; exists && value != "" {
-		cmdArgs = append(cmdArgs, "--sql-exclude-columns", value)
-	}
-
-	if value, exists := asset.Parameters["staging_bucket"]; exists && value != "" {
-		cmdArgs = append(cmdArgs, "--staging-bucket", value)
 	}
 
 	// Handle primary keys
@@ -118,7 +99,7 @@ func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs 
 	// Handle column hints based on enforce_schema parameter
 	if columnOpts != nil && len(asset.Columns) > 0 {
 		shouldEnforce := columnOpts.EnforceSchemaByDefault
-		if value, exists := asset.Parameters["enforce_schema"]; exists {
+		if value, exists := asset.Parameters.GetString("enforce_schema"); exists {
 			shouldEnforce = value == "true"
 		}
 
@@ -131,6 +112,62 @@ func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs 
 	}
 
 	return cmdArgs, nil
+}
+
+func appendIngestrMaskFlags(params pipeline.ParameterMap, cols []pipeline.Column, cmdArgs []string, normalizeColumnNames bool) []string {
+	seen := make(map[string]struct{})
+	if mask, exists := params.GetString("mask"); exists {
+		cmdArgs = appendIngestrMaskRule(cmdArgs, seen, strings.TrimSpace(mask))
+	}
+
+	for _, col := range cols {
+		mask := strings.TrimSpace(col.Mask)
+		if mask == "" {
+			continue
+		}
+
+		rule := mask
+		if !strings.Contains(mask, ":") {
+			columnName := strings.TrimSpace(col.Name)
+			if columnName == "" {
+				continue
+			}
+			if normalizeColumnNames {
+				columnName = NormalizeColumnName(columnName)
+			}
+			rule = columnName + ":" + mask
+		}
+		cmdArgs = appendIngestrMaskRule(cmdArgs, seen, rule)
+	}
+
+	return cmdArgs
+}
+
+func appendIngestrMaskRule(cmdArgs []string, seen map[string]struct{}, rule string) []string {
+	if rule == "" {
+		return cmdArgs
+	}
+	if _, ok := seen[rule]; ok {
+		return cmdArgs
+	}
+	seen[rule] = struct{}{}
+	return append(cmdArgs, "--mask", rule)
+}
+
+func appendIngestrParameterFlags(params pipeline.ParameterMap, cmdArgs []string) []string {
+	for _, param := range ingestrValueParameterFlags {
+		if value, exists := params.GetString(param); exists && value != "" {
+			cmdArgs = append(cmdArgs, "--"+strings.ReplaceAll(param, "_", "-"), value)
+		}
+	}
+
+	for _, param := range ingestrBoolParameterFlags {
+		if value, exists := params.GetString(param); exists && value == "true" {
+			cmdArgs = append(cmdArgs, "--"+strings.ReplaceAll(param, "_", "-"))
+		}
+	}
+
+	return cmdArgs
 }
 
 func AddExtraPackages(destURI, sourceURI string, extraPackages []string) []string {

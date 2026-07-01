@@ -22,7 +22,8 @@ func (c *Config) GetIngestrURI() string {
 			return ""
 		}
 	default:
-		return ""
+		// No credentials provided: fall back to Application Default Credentials.
+		return "gsheets://"
 	}
 
 	return "gsheets://?credentials_base64=" + base64.StdEncoding.EncodeToString(creds)

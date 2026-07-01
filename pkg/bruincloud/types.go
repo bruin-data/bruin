@@ -237,3 +237,9 @@ type SendAgentMessageResponse struct {
 	ThreadID  int `json:"thread_id"`
 	MessageID int `json:"message_id"`
 }
+
+// Connection represents a Bruin Cloud connection (name and type only).
+type Connection struct {
+	Name string `json:"name"`
+	Type string `json:"type"`
+}

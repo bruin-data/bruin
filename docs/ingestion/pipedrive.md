@@ -41,18 +41,19 @@ parameters:
 - `name`: The name of the asset.
 - `type`: Specifies the asset’s type. Set this to `ingestr` to use the ingestr data pipeline. For Pipedrive, it will be always `ingestr`
 - `source_connection`: The name of the Pipedrive connection defined in `.bruin.yml`
-- `source_table`: The name of the table in Pipedrive to ingest. Available tables:
-
-| Table         | PK | Inc Key     | Inc Strategy | Details                                                                               |
-|---------------|----|-----------|--------------|---------------------------------------------------------------------------------------|
-| activities    | id | update_time | merge        | Refers to scheduled events or tasks associated with deals, contacts, or organizations |
-| deals         | id | update_time | merge        | Refers to potential sale or transaction that you can track through various stages    |
-| persons       | id | update_time | merge        | Refers individual contacts or leads that can be linked to sales deals                |
-| organizations | id | update_time | merge        | Refers to company or entity with which you have potential or existing business dealings |
-| products      | id | update_time | merge        | Refers to items or services offered for sale that can be associated with deals       |
-| users         | id | update_time | merge        | Refers to Individual with a unique login credential who can access and use the platform |
-
+- `source_table`: The name of the table in Pipedrive to ingest.
 - `destination`: The name of the destination connection.
+
+## Available Source Tables
+
+| Table | PK | Inc Key | Inc Strategy | Details |
+|-------|----|---------|--------------|---------|
+| `activities` | id | update_time | merge | Refers to scheduled events or tasks associated with deals, contacts, or organizations |
+| `deals` | id | update_time | merge | Refers to potential sale or transaction that you can track through various stages |
+| `persons` | id | update_time | merge | Refers individual contacts or leads that can be linked to sales deals |
+| `organizations` | id | update_time | merge | Refers to company or entity with which you have potential or existing business dealings |
+| `products` | id | update_time | merge | Refers to items or services offered for sale that can be associated with deals |
+| `users` | id | update_time | merge | Refers to Individual with a unique login credential who can access and use the platform |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 

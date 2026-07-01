@@ -47,11 +47,11 @@ parameters:
 
 ## Available Source Tables
 
-| Table | Description |
-|-------|-------------|
-| `campaigns` | Retrieves data for campaigns, detailing the app's costs, loyal users, total installs, and revenue over multiple days. |
-| `creatives` | Retrieves data for a creative asset, including revenue and cost. |
-| `custom:<dimensions>:<metrics>` | Retrieves data for custom tables, which can be specified by the user. |
+| Table | PK | Inc Key | Inc Strategy | Details |
+|-------|----|---------|--------------|---------|
+| `campaigns` | install_time | install_time | merge | Retrieves data for campaigns, detailing the app's costs, loyal users, total installs, and revenue over multiple days.`columns:`  app_id, campaign, geo, install_time, average_ecpi, clicks, cohort_day_1_revenue_per_user, cohort_day_1_total_revenue_per_user, cohort_day_14_revenue_per_user, cohort_day_14_total_revenue_per_user, cohort_day_21_revenue_per_user, cohort_day_21_total_revenue_per_user, cohort_day_3_revenue_per_user, cohort_day_3_total_revenue_per_user, cohort_day_7_revenue_per_user, cohort_day_7_total_revenue_per_user, cost, impressions, installs, loyal_users, retention_day_7, revenue, roi, uninstalls |
+| `creatives` | install_time | install_time | merge | Retrieves data for a creative asset, including revenue and cost. `columns:` geo, app_id, install_time, campaign, adset_id, adset, ad_id, impressions, clicks, installs, cost, revenue, average_ecpi, loyal_users, uninstalls, roi |
+| `custom:<dimensions>:<metrics>` | Dynamic (dimensions + install_time) | install_time | merge | Retrieves data for custom tables, which can be specified by the user. Please refer to the `custom Tables` section below for more information. |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 

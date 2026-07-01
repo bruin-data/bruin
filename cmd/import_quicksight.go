@@ -440,7 +440,7 @@ func createQuickSightDatasetAsset(
 	fileName := assetName + ".asset.yml"
 	filePath := filepath.Join(assetsPath, fileName)
 
-	parameters := map[string]string{
+	parameters := pipeline.ParameterMap{
 		"dataset_id":   detail.ID,
 		"dataset_name": detail.Name,
 		"import_mode":  detail.ImportMode,
@@ -509,7 +509,7 @@ func createQuickSightDashboardAsset(
 	fileName := assetName + ".asset.yml"
 	filePath := filepath.Join(assetsPath, fileName)
 
-	parameters := map[string]string{
+	parameters := pipeline.ParameterMap{
 		"dashboard_id":   detail.ID,
 		"dashboard_name": detail.Name,
 	}
@@ -722,7 +722,12 @@ Example:
 			configFile := c.String("config-file")
 			importAll := c.Bool("all")
 
-			return runQuickSightImport(ctx, pipelinePath, connectionName, environment, configFile, importAll)
+			if err := runQuickSightImport(ctx, pipelinePath, connectionName, environment, configFile, importAll); err != nil {
+				errorPrinter.Printf("Failed to import QuickSight assets: %s\n", err)
+				return cli.Exit("", 1)
+			}
+
+			return nil
 		},
 	}
 }

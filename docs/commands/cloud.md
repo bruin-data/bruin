@@ -176,6 +176,137 @@ bruin cloud runs trigger \
 |------|------|---------|-------------|
 | `--start-date` | str | - | Start date for the run (YYYY-MM-DD) |
 | `--end-date` | str | - | End date for the run (YYYY-MM-DD) |
+| `--asset`, `--assets` | []str | - | Select assets to run by their full name, e.g. `schema.table` (repeatable or comma-separated). |
+| `--downstream` | bool | `false` | Also run everything downstream of the selected `--asset`(s). Requires `--asset`. |
+| `--tag`, `-t` | []str | - | Tag the run (repeatable). A run-level label shown in the Cloud activity log — **not** an asset filter. |
+| `--full-refresh`, `-r` | bool | `false` | Full-refresh the assets in the run: the `--asset` selection if given, otherwise every asset. |
+| `--var` | []str | - | Override pipeline variables, as `key=value` where the value is JSON (strings need quotes, e.g. `'env="prod"'`). Can be used multiple times, or pass one JSON object. |
+| `--note` | str | - | Attach a note to the run; shown in the Cloud activity log. |
+| `--split` | str | - | Trigger a backfill, splitting the date range into one run per interval by unit: `minute`, `hour`, `day`, `week`, `month`, `year`. |
+| `--chunk-size` | int | `1` | Number of split units per batch (used with `--split`). |
+
+**Run only selected assets.** Select assets with `--asset` using their **full name**
+(`schema.table`, repeatable or comma-separated). Without a selection, the whole pipeline
+runs.
+
+```bash
+# Run a single asset (full schema.table name)
+bruin cloud runs trigger \
+  --project-id <project-id> --pipeline <pipeline-name> \
+  --start-date 2024-01-01 --end-date 2024-01-31 \
+  --asset analytics.raw_events
+
+# Select several assets at once (comma-separated or repeated --asset)
+bruin cloud runs trigger \
+  --project-id <project-id> --pipeline <pipeline-name> \
+  --start-date 2024-01-01 --end-date 2024-01-31 \
+  --asset analytics.raw_events,analytics.daily_summary
+```
+
+**Include downstream assets.** Add `--downstream` to also run everything that depends on
+the selected `--asset`(s), following the pipeline's dependency graph. It requires
+`--asset`.
+
+```bash
+# Run raw_events and everything downstream of it
+bruin cloud runs trigger \
+  --project-id <project-id> --pipeline <pipeline-name> \
+  --start-date 2024-01-01 --end-date 2024-01-31 \
+  --asset analytics.raw_events --downstream
+```
+
+**Full refresh.** Pass `--full-refresh` (bare, no value) to truncate assets before
+running. It covers the `--asset` selection when you give one, otherwise every asset in
+the pipeline.
+
+```bash
+# Full-refresh the whole pipeline (every asset)
+bruin cloud runs trigger \
+  --project-id <project-id> --pipeline <pipeline-name> \
+  --start-date 2024-01-01 --end-date 2024-01-31 \
+  --full-refresh
+
+# Run only one asset, with full refresh
+bruin cloud runs trigger \
+  --project-id <project-id> --pipeline <pipeline-name> \
+  --start-date 2024-01-01 --end-date 2024-01-31 \
+  --asset analytics.standalone_report --full-refresh
+
+# Run two assets and full-refresh both (the selection)
+bruin cloud runs trigger \
+  --project-id <project-id> --pipeline <pipeline-name> \
+  --start-date 2024-01-01 --end-date 2024-01-31 \
+  --asset analytics.raw_events,analytics.daily_summary --full-refresh
+```
+
+> [!NOTE]
+> `--full-refresh` truncates whatever the run covers: with `--asset` it refreshes only
+> the selected assets, without it the whole pipeline.
+
+**Override pipeline variables.** Each `--var` is `key=value`, where the **value is parsed
+as JSON**. So a string must be quoted (`"prod"`), while numbers and booleans are written
+bare. Repeat `--var` for multiple keys, or pass a whole JSON object at once.
+
+```bash
+# String value — note the JSON quotes (wrapped in single quotes for the shell)
+bruin cloud runs trigger \
+  --project-id <project-id> --pipeline <pipeline-name> \
+  --start-date 2024-01-01 --end-date 2024-01-31 \
+  --var 'env="prod"'
+
+# Several variables of different types
+bruin cloud runs trigger \
+  --project-id <project-id> --pipeline <pipeline-name> \
+  --start-date 2024-01-01 --end-date 2024-01-31 \
+  --var 'env="prod"' --var retries=3 --var debug=true
+
+# Or pass them all as one JSON object
+bruin cloud runs trigger \
+  --project-id <project-id> --pipeline <pipeline-name> \
+  --start-date 2024-01-01 --end-date 2024-01-31 \
+  --var '{"env":"prod","retries":3}'
+```
+
+**Split a range into batches (monthly, weekly, …).** With `--split`, the trigger
+becomes a **backfill**: the date range is split into one run per interval
+(by unit and chunk size) as a single backfill. This is
+how you backfill selected assets with monthly batches:
+
+```bash
+# One run per month across the quarter, for a single asset
+bruin cloud runs trigger \
+  --project-id <project-id> --pipeline <pipeline-name> \
+  --start-date 2024-01-01 --end-date 2024-04-01 \
+  --split month \
+  --asset my_asset
+```
+
+Use `--chunk-size` to group several split units into each batch. For example weekly
+batches via 7-day chunks, or two-month batches:
+
+```bash
+# One run per week (7-day chunks)
+bruin cloud runs trigger \
+  --project-id <project-id> --pipeline <pipeline-name> \
+  --start-date 2024-01-01 --end-date 2024-02-12 \
+  --split day --chunk-size 7
+
+# One run per two months across the year
+bruin cloud runs trigger \
+  --project-id <project-id> --pipeline <pipeline-name> \
+  --start-date 2024-01-01 --end-date 2025-01-01 \
+  --split month --chunk-size 2
+```
+
+> [!NOTE]
+> `--split` creates a backfill.
+> Without `--split`, the command triggers a single normal run.
+
+> [!NOTE]
+> For a backfill, `--end-date` is **exclusive**: the range is split as
+> `[start-date, end-date)`, so the last interval ends just before `--end-date`. To
+> include a final period, pass the date one period past it — e.g. `--end-date 2024-01-04`
+> to cover `2024-01-03` with `--split day`.
 
 #### `rerun`
 
@@ -410,6 +541,64 @@ bruin cloud agents messages \
   --thread-id <thread-id>
 ```
 
+### `connections`
+
+Manage the connections stored in Bruin Cloud. Connections live in your team's
+vault and are shared by your cloud pipelines.
+
+#### `add`
+
+Push a connection to Bruin Cloud. By default it reads the connection straight
+from your local `.bruin.yml`, so you don't have to retype credentials:
+
+```bash
+# Reads the "my_pg" connection from the selected environment in .bruin.yml
+bruin cloud connections add --name my_pg
+
+# Pick a specific environment
+bruin cloud connections add --name my_pg --environment prod
+
+# Point at a specific config file
+bruin cloud connections add --name my_pg --config-file ./path/to/.bruin.yml
+```
+
+When `--environment` is omitted, the `default_environment` from `.bruin.yml` is
+used (falling back to `default`).
+
+For service-account based connections (BigQuery, GCS, Spanner, …) the CLI reads
+the local `service_account_file` and uploads its contents, since the cloud
+runner can't reach your local disk. A relative `service_account_file` is
+resolved against the `.bruin.yml` directory.
+
+To add a connection without a local `.bruin.yml` (e.g. in CI), pass the
+credentials inline. `--type` is required in this mode:
+
+```bash
+bruin cloud connections add \
+  --name my_pg \
+  --type postgres \
+  --credentials '{"username":"u","password":"p","host":"db.example.com","port":5432,"database":"prod"}'
+```
+
+The credentials object uses the same snake_case field names as `.bruin.yml`.
+
+#### `list`
+
+List the connections in your team's cloud vault (name and type):
+
+```bash
+bruin cloud connections list
+bruin cloud connections list --output json
+```
+
+#### `delete`
+
+Delete a connection by name:
+
+```bash
+bruin cloud connections delete --name my_pg
+```
+
 ---
 
 ## Common Workflows
@@ -446,6 +635,21 @@ bruin cloud runs trigger \
   --pipeline my-pipeline \
   --start-date 2024-01-01 \
   --end-date 2024-01-31
+```
+
+To reprocess in batches — one run per month, week, or day — add `--split` (and
+optionally `--chunk-size`). Combine it with an `--asset` selection to backfill just
+part of the pipeline:
+
+```bash
+# One run per month across the year, for a single asset
+bruin cloud runs trigger \
+  --project-id my-project \
+  --pipeline my-pipeline \
+  --start-date 2024-01-01 \
+  --end-date 2025-01-01 \
+  --split month \
+  --asset reporting_summary
 ```
 
 ### Script it with JSON output
