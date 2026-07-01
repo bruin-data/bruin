@@ -85,7 +85,12 @@ func TestConfig_ToDBConnectionURI(t *testing.T) {
 	}
 	assert.Equal(t, "user:password@tcp(vtgate.internal:15306)/commerce?multiStatements=true", c.ToDBConnectionURI())
 
-	// TLS is requested when grpc TLS or any SSL path is configured.
+	// grpc_tls governs the vtgate gRPC transport, not the MySQL-protocol port, so it must not
+	// force TLS on the direct connection used by `connections test`.
 	c.GrpcTLS = true
+	assert.Equal(t, "user:password@tcp(vtgate.internal:15306)/commerce?multiStatements=true", c.ToDBConnectionURI())
+
+	// A MySQL-protocol SSL path does enable TLS on the DSN.
+	c.SslCaPath = "/path/to/ca.pem"
 	assert.Equal(t, "user:password@tcp(vtgate.internal:15306)/commerce?multiStatements=true&tls=true", c.ToDBConnectionURI())
 }

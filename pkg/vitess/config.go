@@ -84,7 +84,11 @@ func (c Config) ToDBConnectionURI() string {
 		c.Database,
 	)
 
-	if c.GrpcTLS || c.SslCaPath != "" || c.SslCertPath != "" || c.SslKeyPath != "" {
+	// Only the MySQL-protocol SSL settings govern TLS on this DSN. GrpcTLS is intentionally
+	// excluded: it configures the independent vtgate gRPC (VStream) transport, which has a
+	// separate port and TLS setup, so honoring it here would wrongly force TLS on the
+	// MySQL-protocol connection used by `bruin connections test`.
+	if c.SslCaPath != "" || c.SslCertPath != "" || c.SslKeyPath != "" {
 		dsn += "&tls=true"
 	}
 
