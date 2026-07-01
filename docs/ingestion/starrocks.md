@@ -25,6 +25,8 @@ To connect to StarRocks, you need to add a configuration item to the connections
           database: "analytics"         # optional
           catalog: "iceberg_catalog"    # optional
           ssl: "true"                   # optional
+          http_port: 8030               # optional, destination only
+          replication_num: 1            # optional, destination only
 ```
 
 - `host`: the StarRocks FE (frontend) hostname or IP address. Required.
@@ -34,6 +36,8 @@ To connect to StarRocks, you need to add a configuration item to the connections
 - `database`: the default database for unqualified table names. Optional.
 - `catalog`: the default catalog. Optional, defaults to the internal catalog (`default_catalog`). Set this to an external catalog name (e.g. an Iceberg/Hudi/Hive catalog configured in StarRocks) to read lakehouse tables.
 - `ssl`: enable a TLS-encrypted connection. Optional — use `true` to verify the server certificate, or `skip-verify` for TLS without verification.
+- `http_port`: the FE HTTP port used for Stream Load when StarRocks is the destination. Optional, defaults to `8030`.
+- `replication_num`: the replica count for tables created when StarRocks is the destination. Optional, defaults to the cluster default (set `1` for a single-backend cluster).
 
 ### Step 2: Create an asset file for data ingestion
 

@@ -9,13 +9,15 @@ import (
 const defaultPort = 9030
 
 type Config struct {
-	Username string // Required
-	Password string // Optional
-	Host     string // Required
-	Port     int    // Optional - defaults to 9030 (FE MySQL protocol port)
-	Database string // Optional - default database for unqualified table names
-	Catalog  string // Optional - external lakehouse catalog (Iceberg/Hudi/Hive/...)
-	SSL      string // Optional - "true" or "skip-verify" to enable TLS
+	Username       string // Required
+	Password       string // Optional
+	Host           string // Required
+	Port           int    // Optional - defaults to 9030 (FE MySQL protocol port)
+	Database       string // Optional - default database for unqualified table names
+	Catalog        string // Optional - external lakehouse catalog (Iceberg/Hudi/Hive/...)
+	SSL            string // Optional - "true" or "skip-verify" to enable TLS
+	HTTPPort       int    // Optional - FE HTTP port for Stream Load when used as a destination
+	ReplicationNum int    // Optional - replica count for tables created as a destination
 }
 
 // GetIngestrURI builds starrocks://user:pass@host:port/[catalog/]database?ssl=...
@@ -48,11 +50,18 @@ func (c Config) GetIngestrURI() string {
 		}
 	}
 
+	query := url.Values{}
 	if c.SSL != "" {
-		query := url.Values{}
 		query.Set("ssl", c.SSL)
-		u.RawQuery = query.Encode()
 	}
+	// Destination-only params; the source ignores them.
+	if c.HTTPPort != 0 {
+		query.Set("http_port", strconv.Itoa(c.HTTPPort))
+	}
+	if c.ReplicationNum != 0 {
+		query.Set("replication_num", strconv.Itoa(c.ReplicationNum))
+	}
+	u.RawQuery = query.Encode()
 
 	return u.String()
 }
