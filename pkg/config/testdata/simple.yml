@@ -395,6 +395,10 @@ environments:
         - name: "googleanalytics-1"
           service_account_file: "path/to/service_account.json"
           property_id: "12345"
+      gsc:
+        - name: "conn-gsc"
+          service_account_file: "path/to/service_account.json"
+          site_url: "sc-domain:example.com"
       applovin:
         - name: "applovin-1"
           api_key: "key-123"

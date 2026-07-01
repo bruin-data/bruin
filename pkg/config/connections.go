@@ -1358,6 +1358,17 @@ func (c GoogleAnalyticsConnection) GetName() string {
 	return c.Name
 }
 
+type GSCConnection struct {
+	Name               string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" mapstructure:"service_account_file"`
+	ServiceAccountJSON string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" mapstructure:"service_account_json"`
+	SiteURL            string `yaml:"site_url,omitempty" json:"site_url" mapstructure:"site_url"`
+}
+
+func (c GSCConnection) GetName() string {
+	return c.Name
+}
+
 type AppLovinConnection struct {
 	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
