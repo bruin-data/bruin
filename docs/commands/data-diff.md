@@ -37,6 +37,7 @@ table td:first-child {
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--connection`, `-c` | str | - | Name of the default connection to use when connection is not specified in table arguments |
+| `--environment`, `--env` | str | - | Name of the environment to use for resolving connections. If not specified, the default environment is used |
 | `--tolerance`, `-t` | float | `0.001` | Tolerance percentage for considering values equal. Values with percentage difference below this threshold are considered equal |
 | `--output`, `-o` | str | `plain` | Output format: `plain` for human-readable tables, `json` for machine-readable JSON. |
 | `--dry-run` | bool | `false` | Estimate the cost of the comparison without executing it (outputs JSON). Only supported for BigQuery connections. |
@@ -188,6 +189,16 @@ Use a higher tolerance for considering values equal (useful for floating-point c
 ```bash
 bruin data-diff --tolerance 0.1 prod_db:metrics staging_db:metrics
 ```
+
+### Selecting an Environment
+
+Resolve the connections from a specific environment defined in your `.bruin.yml`:
+
+```bash
+bruin data-diff --env production warehouse:staging.orders warehouse:dwh.orders
+```
+
+When `--environment` is omitted, the default environment is used.
 
 ### Custom Config File
 
