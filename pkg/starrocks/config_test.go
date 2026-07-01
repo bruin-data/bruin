@@ -40,6 +40,16 @@ func TestConfig_GetIngestrURI(t *testing.T) {
 			config: Config{Username: "root", Host: "fe", Port: 9030, Catalog: "iceberg_catalog"},
 			want:   "starrocks://root@fe:9030",
 		},
+		{
+			name:   "destination params http_port and replication_num",
+			config: Config{Username: "root", Host: "fe", Port: 9030, Database: "db", HTTPPort: 8030, ReplicationNum: 1},
+			want:   "starrocks://root@fe:9030/db?http_port=8030&replication_num=1",
+		},
+		{
+			name:   "destination params combine with ssl",
+			config: Config{Username: "root", Host: "fe", Port: 9030, SSL: "true", HTTPPort: 8040},
+			want:   "starrocks://root@fe:9030?http_port=8040&ssl=true",
+		},
 	}
 
 	for _, tt := range tests {

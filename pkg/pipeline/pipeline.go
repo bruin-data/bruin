@@ -117,6 +117,7 @@ const (
 	AssetTypeSnowflakeSeed             = AssetType("sf.seed")
 	AssetTypeSnowflakeSource           = AssetType("sf.source")
 	AssetTypeSnowflakeTableSensor      = AssetType("sf.sensor.table")
+	AssetTypeStarRocks                 = AssetType("starrocks")
 	AssetTypeSuperset                  = AssetType("superset")
 	AssetTypeSynapseQuery              = AssetType("synapse.sql")
 	AssetTypeSynapseQuerySensor        = AssetType("synapse.sensor.query")
@@ -855,6 +856,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeSnowflakeTableSensor:      "snowflake",
 	AssetTypeSnowflakeSeed:             "snowflake",
 	AssetTypeSnowflakeSource:           "snowflake",
+	AssetTypeStarRocks:                 "starrocks",
 	AssetTypePostgresQuery:             "postgres",
 	AssetTypePostgresSeed:              "postgres",
 	AssetTypePostgresQuerySensor:       "postgres",
@@ -963,6 +965,7 @@ var IngestrTypeConnectionMapping = map[string]AssetType{
 	"synapse":       AssetTypeSynapseQuery,
 	"duckdb":        AssetTypeDuckDBQuery,
 	"clickhouse":    AssetTypeClickHouse,
+	"starrocks":     AssetTypeStarRocks,
 	"oracle":        AssetTypeOracleQuery,
 	"motherduck":    AssetTypeMotherduckQuery,
 	"dynamodb":      AssetTypeDynamoDB,

@@ -1655,6 +1655,8 @@ type StarRocksConnection struct {
 	Database           string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
 	Catalog            string `yaml:"catalog,omitempty" json:"catalog,omitempty" mapstructure:"catalog"`
 	SSL                string `yaml:"ssl,omitempty" json:"ssl,omitempty" mapstructure:"ssl"`
+	HTTPPort           int    `yaml:"http_port,omitempty" json:"http_port,omitempty" mapstructure:"http_port"`
+	ReplicationNum     int    `yaml:"replication_num,omitempty" json:"replication_num,omitempty" mapstructure:"replication_num"`
 }
 
 func (c StarRocksConnection) GetName() string {

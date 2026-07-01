@@ -4501,6 +4501,12 @@
         },
         "ssl": {
           "type": "string"
+        },
+        "http_port": {
+          "type": "integer"
+        },
+        "replication_num": {
+          "type": "integer"
         }
       },
       "additionalProperties": false,

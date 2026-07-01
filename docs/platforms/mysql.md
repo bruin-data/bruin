@@ -150,3 +150,46 @@ type: my.sensor.query
 parameters:
     query: select exists(select 1 from orders where order_date = "{{ end_date }}")
 ```
+
+## CDC (Change Data Capture)
+
+Bruin supports MySQL-family CDC via the `ingestr` asset type. CDC captures row-level changes (inserts, updates, deletes) and replicates them to a destination. The same mechanism powers MySQL binary-log replication as well as [Vitess](/ingestion/vitess) (VStream) and [PlanetScale](/ingestion/planetscale) (psdbconnect).
+
+CDC is enabled by setting `cdc: "true"` on an ingestr asset with a MySQL (or Vitess/PlanetScale) source connection.
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `cdc` | Yes | Set to `"true"` to enable CDC mode |
+| `cdc_mode` | No | `"stream"` for real-time streaming or `"batch"` for batch replication |
+| `cdc_server_id` | No | Replication server identifier for MySQL binary-log CDC |
+| `cdc_grpc_port` | No | vtgate's gRPC port for Vitess VStream CDC (e.g. `15991`) |
+| `cdc_grpc_host` | No | Host override for the Vitess VStream gRPC connection |
+| `cdc_grpc_tls` | No | Set to `"true"` to use TLS for the Vitess VStream gRPC connection |
+| `cdc_backend` | No | Force the CDC backend: `vstream` (self-hosted Vitess) or `planetscale` (psdbconnect) |
+| `cdc_dest_schema` | No | Destination schema to use for multi-table CDC runs |
+| `incremental_strategy` | No | Defaults to `"merge"` when CDC is enabled; can be overridden to `"append"` |
+
+Requirements:
+
+- For MySQL binary-log CDC, the server must have `log_bin=ON`, `binlog_format=ROW`, and `binlog_row_image=FULL`.
+- Source tables must have primary keys, or `primary_key` must be set on the asset columns.
+- Source tables must not contain `ENUM`, `SET`, or `BIT` columns.
+
+> [!NOTE]
+> When CDC is enabled, primary key columns do not need to be specified in the asset definition — they are determined automatically from the source table.
+
+### Example: MySQL CDC
+
+```yaml
+name: public.orders
+type: ingestr
+connection: bigquery
+
+parameters:
+  source_connection: my_mysql
+  source_table: orders
+  destination: bigquery
+  cdc: "true"
+```
+
+For platform-specific details, see the [Vitess](/ingestion/vitess) and [PlanetScale](/ingestion/planetscale) ingestion guides.

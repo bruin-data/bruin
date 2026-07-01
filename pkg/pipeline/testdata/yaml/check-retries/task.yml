@@ -1,6 +1,7 @@
 name: check-retries
 type: bq.sql
 run: hello.sql
+retries: 4
 
 columns:
   - name: col1

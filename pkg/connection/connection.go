@@ -3602,13 +3602,15 @@ func (m *Manager) AddStarRocksConnectionFromConfig(connection *config.StarRocksC
 	m.mutex.Unlock()
 
 	client, err := starrocks.NewClient(starrocks.Config{
-		Username: connection.Username,
-		Password: connection.Password,
-		Host:     connection.Host,
-		Port:     connection.Port,
-		Database: connection.Database,
-		Catalog:  connection.Catalog,
-		SSL:      connection.SSL,
+		Username:       connection.Username,
+		Password:       connection.Password,
+		Host:           connection.Host,
+		Port:           connection.Port,
+		Database:       connection.Database,
+		Catalog:        connection.Catalog,
+		SSL:            connection.SSL,
+		HTTPPort:       connection.HTTPPort,
+		ReplicationNum: connection.ReplicationNum,
 	})
 	if err != nil {
 		return err
