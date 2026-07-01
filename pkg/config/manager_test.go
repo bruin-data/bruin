@@ -629,6 +629,13 @@ func TestLoadFromFile(t *testing.T) {
 					PropertyID:         "12345",
 				},
 			},
+			GSC: []GSCConnection{
+				{
+					Name:               "conn-gsc",
+					ServiceAccountFile: "path/to/service_account.json",
+					SiteURL:            "sc-domain:example.com",
+				},
+			},
 			Frankfurter: []FrankfurterConnection{
 				{
 					Name: "frankfurter-1",
@@ -2272,6 +2279,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				EMRServerless:       []EMRServerlessConnection{{Name: "emr1"}},
 				DataprocServerless:  []DataprocServerlessConnection{{Name: "dataproc1"}},
 				GoogleAnalytics:     []GoogleAnalyticsConnection{{Name: "googleanalytics1"}},
+				GSC:                 []GSCConnection{{Name: "gsc1"}},
 				AppLovin:            []AppLovinConnection{{Name: "applovin1"}},
 				Frankfurter:         []FrankfurterConnection{{Name: "frankfurter1"}},
 				Salesforce:          []SalesforceConnection{{Name: "salesforce1"}},
@@ -2404,6 +2412,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				EMRServerless:       []EMRServerlessConnection{{Name: "emr1"}},
 				DataprocServerless:  []DataprocServerlessConnection{{Name: "dataproc1"}},
 				GoogleAnalytics:     []GoogleAnalyticsConnection{{Name: "googleanalytics1"}},
+				GSC:                 []GSCConnection{{Name: "gsc1"}},
 				AppLovin:            []AppLovinConnection{{Name: "applovin1"}},
 				Frankfurter:         []FrankfurterConnection{{Name: "frankfurter1"}},
 				Salesforce:          []SalesforceConnection{{Name: "salesforce1"}},
