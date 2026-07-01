@@ -43,6 +43,8 @@ type Connections struct {
 	Cursor              []CursorConnection              `yaml:"cursor,omitempty" json:"cursor,omitempty" mapstructure:"cursor"`
 	MongoAtlas          []MongoAtlasConnection          `yaml:"mongo_atlas,omitempty" json:"mongo_atlas,omitempty" mapstructure:"mongo_atlas"`
 	MySQL               []MySQLConnection               `yaml:"mysql,omitempty" json:"mysql,omitempty" mapstructure:"mysql"`
+	Vitess              []VitessConnection              `yaml:"vitess,omitempty" json:"vitess,omitempty" mapstructure:"vitess"`
+	Planetscale         []PlanetScaleConnection         `yaml:"planetscale,omitempty" json:"planetscale,omitempty" mapstructure:"planetscale"`
 	Notion              []NotionConnection              `yaml:"notion,omitempty" json:"notion,omitempty" mapstructure:"notion"`
 	Allium              []AlliumConnection              `yaml:"allium,omitempty" json:"allium,omitempty" mapstructure:"allium"`
 	HANA                []HANAConnection                `yaml:"hana,omitempty" json:"hana,omitempty" mapstructure:"hana"`
@@ -405,6 +407,21 @@ func LoadFromFileOrEnv(fs afero.Fs, path string) (*Config, error) {
 			}
 		}
 
+		// Make Vitess SSL file paths absolute
+		for i, conn := range env.Connections.Vitess {
+			if conn.SslCaPath != "" && !filepath.IsAbs(conn.SslCaPath) {
+				env.Connections.Vitess[i].SslCaPath = filepath.Join(configLocation, conn.SslCaPath)
+			}
+
+			if conn.SslCertPath != "" && !filepath.IsAbs(conn.SslCertPath) {
+				env.Connections.Vitess[i].SslCertPath = filepath.Join(configLocation, conn.SslCertPath)
+			}
+
+			if conn.SslKeyPath != "" && !filepath.IsAbs(conn.SslKeyPath) {
+				env.Connections.Vitess[i].SslKeyPath = filepath.Join(configLocation, conn.SslKeyPath)
+			}
+		}
+
 		// Make Snowflake private key path absolute
 		for i, conn := range env.Connections.Snowflake {
 			if conn.PrivateKeyPath == "" {
@@ -659,6 +676,20 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.MySQL = append(env.Connections.MySQL, conn)
+	case "vitess":
+		var conn VitessConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Vitess = append(env.Connections.Vitess, conn)
+	case "planetscale":
+		var conn PlanetScaleConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Planetscale = append(env.Connections.Planetscale, conn)
 	case "notion":
 		var conn NotionConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1499,6 +1530,10 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Monday = removeConnection(env.Connections.Monday, connectionName)
 	case "mysql":
 		env.Connections.MySQL = removeConnection(env.Connections.MySQL, connectionName)
+	case "vitess":
+		env.Connections.Vitess = removeConnection(env.Connections.Vitess, connectionName)
+	case "planetscale":
+		env.Connections.Planetscale = removeConnection(env.Connections.Planetscale, connectionName)
 	case "notion":
 		env.Connections.Notion = removeConnection(env.Connections.Notion, connectionName)
 	case "hana":
@@ -1802,6 +1837,8 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Cursor, source.Cursor)
 	mergeConnectionList(&c.MongoAtlas, source.MongoAtlas)
 	mergeConnectionList(&c.MySQL, source.MySQL)
+	mergeConnectionList(&c.Vitess, source.Vitess)
+	mergeConnectionList(&c.Planetscale, source.Planetscale)
 	mergeConnectionList(&c.Notion, source.Notion)
 	mergeConnectionList(&c.Allium, source.Allium)
 	mergeConnectionList(&c.HANA, source.HANA)

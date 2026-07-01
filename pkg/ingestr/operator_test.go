@@ -1068,8 +1068,10 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 func TestBasicOperator_MySQLCDCMode(t *testing.T) {
 	t.Parallel()
 
-	// A bruin MySQL connection emits a mysql+pymysql:// URI; Vitess and PlanetScale
-	// use the same MySQL wire protocol, so they reuse a mysql connection.
+	// A bruin MySQL connection emits a mysql+pymysql:// URI. These cases also exercise the
+	// operator's generic CDC parameter plumbing (grpc_* / cdc_backend) on the MySQL family;
+	// the dedicated vitess:// / planetscale:// schemes are covered by
+	// TestBasicOperator_VitessPlanetScaleCDCMode.
 	mockMy := new(mockConnection)
 	mockMy.On("GetIngestrURI").Return("mysql+pymysql://user:pass@localhost:3306/db", nil)
 	mockBq := new(mockConnection)
@@ -1154,6 +1156,134 @@ func TestBasicOperator_MySQLCDCMode(t *testing.T) {
 			want: []string{
 				"ingest",
 				"--source-uri", "mysql+pymysql+cdc://user:pass@localhost:3306/db?cdc_backend=planetscale",
+				"--source-table", "orders",
+				"--dest-uri", "bigquery://uri-here",
+				"--dest-table", "cdc-planetscale-asset",
+				"--yes",
+				"--progress", "log",
+				"--incremental-strategy", "merge",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			runner := new(mockRunner)
+			runner.On("RunIngestr", mock.Anything, tt.want, []string(nil), repo).Return(nil)
+
+			startDate := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+			endDate := time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC)
+			executionDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+
+			o := &BasicOperator{
+				conn:          &fetcher,
+				finder:        finder,
+				runner:        runner,
+				jinjaRenderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, &executionDate, "ingestr-test", "ingestr-test", nil),
+			}
+
+			ti := scheduler.AssetInstance{
+				Pipeline: &pipeline.Pipeline{},
+				Asset:    tt.asset,
+			}
+
+			ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, false)
+
+			err := o.Run(ctx, &ti)
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestBasicOperator_VitessPlanetScaleCDCMode(t *testing.T) {
+	t.Parallel()
+
+	// Dedicated Vitess/PlanetScale connections emit the vitess:// / planetscale:// schemes.
+	// The vitess connection carries the vtgate gRPC port in the URI (from its config builder),
+	// so it survives into the derived vitess+cdc:// scheme without any asset-level parameters.
+	mockVitess := new(mockConnection)
+	mockVitess.On("GetIngestrURI").Return("vitess://user:pass@vtgate.internal:15306/commerce?grpc_port=15991", nil)
+	mockPS := new(mockConnection)
+	mockPS.On("GetIngestrURI").Return("planetscale://user:pass@aws.connect.psdb.cloud:3306/my_database", nil)
+	mockBq := new(mockConnection)
+	mockBq.On("GetIngestrURI").Return("bigquery://uri-here", nil)
+
+	fetcher := simpleConnectionFetcher{
+		connections: map[string]*mockConnection{
+			"vitess":      mockVitess,
+			"planetscale": mockPS,
+			"bq":          mockBq,
+		},
+	}
+
+	finder := new(mockFinder)
+
+	tests := []struct {
+		name  string
+		asset *pipeline.Asset
+		want  []string
+	}{
+		{
+			name: "Vitess source is left untouched when CDC is disabled",
+			asset: &pipeline.Asset{
+				Name:       "vitess-asset",
+				Connection: "bq",
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "vitess",
+					"source_table":      "orders",
+					"destination":       "bigquery",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "vitess://user:pass@vtgate.internal:15306/commerce?grpc_port=15991",
+				"--source-table", "orders",
+				"--dest-uri", "bigquery://uri-here",
+				"--dest-table", "vitess-asset",
+				"--yes",
+				"--progress", "log",
+			},
+		},
+		{
+			name: "Vitess CDC derives the vitess+cdc scheme and keeps grpc_port",
+			asset: &pipeline.Asset{
+				Name:       "cdc-vitess-asset",
+				Connection: "bq",
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "vitess",
+					"source_table":      "orders",
+					"destination":       "bigquery",
+					"cdc":               "true",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "vitess+cdc://user:pass@vtgate.internal:15306/commerce?grpc_port=15991",
+				"--source-table", "orders",
+				"--dest-uri", "bigquery://uri-here",
+				"--dest-table", "cdc-vitess-asset",
+				"--yes",
+				"--progress", "log",
+				"--incremental-strategy", "merge",
+			},
+		},
+		{
+			name: "PlanetScale CDC derives the planetscale+cdc scheme",
+			asset: &pipeline.Asset{
+				Name:       "cdc-planetscale-asset",
+				Connection: "bq",
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "planetscale",
+					"source_table":      "orders",
+					"destination":       "bigquery",
+					"cdc":               "true",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "planetscale+cdc://user:pass@aws.connect.psdb.cloud:3306/my_database",
 				"--source-table", "orders",
 				"--dest-uri", "bigquery://uri-here",
 				"--dest-table", "cdc-planetscale-asset",

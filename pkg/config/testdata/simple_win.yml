@@ -91,6 +91,23 @@ environments:
           port: 3306
           database: "mysqldb"
 
+      vitess:
+        - name: conn8b
+          username: "vitessuser"
+          password: "vitesspass"
+          host: "vtgatehost"
+          port: 15306
+          database: "commerce"
+          grpc_port: 15991
+
+      planetscale:
+        - name: conn8c
+          username: "psuser"
+          password: "pspass"
+          host: "aws.connect.psdb.cloud"
+          port: 3306
+          database: "psdb"
+
       notion:
         - name: conn9
           api_key: "XXXXYYYYZZZZ"
