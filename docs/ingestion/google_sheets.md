@@ -4,7 +4,7 @@
 
 Bruin supports Google Sheets as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Google Sheets into your data warehouse.
 
-To set up a Google Sheets connection, you need to add a configuration item in the `.bruin.yml` file and the `asset` file. You will need either the `service_account_file` or the `service_account_json`. For more information, please follow the [guide](https://dlthub.com/docs/dlt-ecosystem/verified-sources/google_sheets#google-service-account-credentials). Once you complete the guide, you should have a `service account JSON` file.
+To set up a Google Sheets connection, you need to add a configuration item in the `.bruin.yml` file and the `asset` file. You can provide either the `service_account_file` or the `service_account_json`; if you omit both, Application Default Credentials are used (e.g. after running `gcloud auth application-default login`). For more information, please follow the [guide](https://dlthub.com/docs/dlt-ecosystem/verified-sources/google_sheets#google-service-account-credentials). Once you complete the guide, you should have a `service account JSON` file.
 
 Follow the steps below to correctly set up Google Sheets as a data source and run ingestion.
 
@@ -27,8 +27,8 @@ Follow the steps below to correctly set up Google Sheets as a data source and ru
             }
 ```
 
-- `service_account_file`: The path to the service account JSON file
-- `service_account_json`: The service account JSON content itself
+- `service_account_file` (optional): The path to the service account JSON file. If omitted, Application Default Credentials are used (e.g. the `GOOGLE_APPLICATION_CREDENTIALS` env var, or the `gcloud auth application-default login` token on your machine).
+- `service_account_json` (optional): The service account JSON content itself (alternative to `service_account_file`).
 
 ### Step 2: Create an asset file for data ingestion
 
