@@ -2,7 +2,7 @@
 
 [StarRocks](https://www.starrocks.io/) is a high-performance analytical (OLAP) database. Besides its own internal storage, it can query open lakehouse table formats — Apache Iceberg, Hudi, Hive, and Delta Lake — through external catalogs.
 
-Bruin supports StarRocks as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from StarRocks (including lakehouse tables) into your data warehouse.
+Bruin supports StarRocks as both a source and a destination for [Ingestr assets](/assets/ingestr): you can ingest data from StarRocks (including lakehouse tables) into another warehouse, or load data from another source into StarRocks' internal storage.
 
 For more information, please refer [here](https://getbruin.com/docs/ingestr/supported-sources/starrocks.html).
 
@@ -25,6 +25,8 @@ To connect to StarRocks, you need to add a configuration item to the connections
           database: "analytics"         # optional
           catalog: "iceberg_catalog"    # optional
           ssl: "true"                   # optional
+          http_port: 8030               # optional, destination only
+          replication_num: 1            # optional, destination only
 ```
 
 - `host`: the StarRocks FE (frontend) hostname or IP address. Required.
@@ -34,6 +36,8 @@ To connect to StarRocks, you need to add a configuration item to the connections
 - `database`: the default database for unqualified table names. Optional.
 - `catalog`: the default catalog. Optional, defaults to the internal catalog (`default_catalog`). Set this to an external catalog name (e.g. an Iceberg/Hudi/Hive catalog configured in StarRocks) to read lakehouse tables.
 - `ssl`: enable a TLS-encrypted connection. Optional — use `true` to verify the server certificate, or `skip-verify` for TLS without verification.
+- `http_port`: the FE HTTP port used for Stream Load when StarRocks is the destination. Optional, defaults to `8030`.
+- `replication_num`: the replica count for tables created when StarRocks is the destination. Optional, defaults to the cluster default (set `1` for a single-backend cluster).
 
 ### Step 2: Create an asset file for data ingestion
 
@@ -87,3 +91,20 @@ bruin run assets/starrocks_ingestion.yml
 ```
 
 As a result of this command, Bruin will ingest data from the given StarRocks table into your Postgres database.
+
+## Using StarRocks as a destination
+
+StarRocks can also be the destination of an Ingestr asset. Set `destination: starrocks` and point `connection` (or `destination_connection`) at the StarRocks connection; the `name` of the asset is the fully qualified `database.table` written into StarRocks' internal catalog.
+
+```yaml
+name: analytics.events
+type: ingestr
+connection: my_starrocks
+
+parameters:
+  source_connection: my_postgres
+  source_table: 'public.events'
+  destination: starrocks
+```
+
+Bruin creates the destination table if it does not exist and loads rows via StarRocks [Stream Load](https://docs.starrocks.io/docs/loading/StreamLoad/). The `replace`, `append`, and `merge` strategies are supported; `merge` requires a primary key and produces a StarRocks PRIMARY KEY table. Only the internal catalog is writable — external lakehouse catalogs (Iceberg/Hudi/Hive) are read-only, so they can be used as a source but not a destination.
