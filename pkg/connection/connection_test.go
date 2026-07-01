@@ -256,6 +256,67 @@ func TestManager_AddMySqlConnectionFromConfigConnectionFromConfig(t *testing.T) 
 	assert.NotNil(t, res)
 }
 
+func TestManager_AddVitessConnectionFromConfig(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
+
+	configuration := &config.VitessConnection{
+		Name:     "test",
+		Host:     "vtgate.internal",
+		Username: "user",
+		Password: "pass",
+		Database: "commerce",
+		Port:     15306,
+		GrpcPort: 15991,
+	}
+
+	err := m.AddVitessConnectionFromConfig(configuration)
+	require.NoError(t, err)
+
+	res, ok := m.GetConnection("test").(*mysql.Client)
+	require.True(t, ok)
+	require.NotNil(t, res)
+
+	uri, err := res.GetIngestrURI()
+	require.NoError(t, err)
+	assert.Equal(t, "vitess://user:pass@vtgate.internal:15306/commerce?grpc_port=15991", uri)
+	assert.Equal(t, configuration, m.GetConnectionDetails("test"))
+}
+
+func TestManager_AddPlanetScaleConnectionFromConfig(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
+
+	configuration := &config.PlanetScaleConnection{
+		Name:     "test",
+		Host:     "aws.connect.psdb.cloud",
+		Username: "user",
+		Password: "pass",
+		Database: "psdb",
+		Port:     3306,
+	}
+
+	err := m.AddPlanetScaleConnectionFromConfig(configuration)
+	require.NoError(t, err)
+
+	res, ok := m.GetConnection("test").(*mysql.Client)
+	require.True(t, ok)
+	require.NotNil(t, res)
+
+	uri, err := res.GetIngestrURI()
+	require.NoError(t, err)
+	assert.Equal(t, "planetscale://user:pass@aws.connect.psdb.cloud:3306/psdb", uri)
+	assert.Equal(t, configuration, m.GetConnectionDetails("test"))
+}
+
 func TestManager_AddNotionConnectionFromConfigConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 

@@ -1,6 +1,6 @@
 # Vitess
 
-[Vitess](https://vitess.io/) is a MySQL-compatible database clustering and sharding system originally built at YouTube. Because it speaks the MySQL wire protocol through vtgate, Bruin connects to Vitess through a regular [`mysql` connection](/platforms/mysql), and it can be used as both a **source** and a **destination** for [Ingestr assets](/assets/ingestr). Vitess [change data capture](#change-data-capture-cdc) is also supported through VStream.
+[Vitess](https://vitess.io/) is a MySQL-compatible database clustering and sharding system originally built at YouTube. It speaks the MySQL wire protocol through vtgate, and Bruin connects to it through a dedicated `vitess` connection. Vitess can be used as both a **source** and a **destination** for [Ingestr assets](/assets/ingestr), and Vitess [change data capture](#change-data-capture-cdc) is also supported through VStream.
 
 > [!TIP]
 > If you use the managed [PlanetScale](/ingestion/planetscale) platform, follow the PlanetScale guide instead — it uses the hosted `psdbconnect` API rather than a directly reachable vtgate gRPC port.
@@ -11,16 +11,18 @@ Follow the steps below to set up Vitess and run ingestion.
 
 ### Step 1: Add a connection to .bruin.yml file
 
-Vitess uses the MySQL connector, so add a `mysql` connection to the `connections` section of your `.bruin.yml` file, pointing at your vtgate endpoint:
+Add a `vitess` connection to the `connections` section of your `.bruin.yml` file, pointing at your vtgate endpoint:
 
 ```yaml
-  mysql:
+  vitess:
     - name: "vitess"
       username: "user"
       password: "password"
       host: "vtgate.internal"
       port: 15306
       database: "commerce"
+      # Optional, required only for change data capture:
+      grpc_port: 15991
 ```
 
 - `name`: The name to identify this connection
@@ -29,6 +31,12 @@ Vitess uses the MySQL connector, so add a `mysql` connection to the `connections
 - `host`: The vtgate host
 - `port`: The vtgate MySQL protocol port (e.g. `15306`)
 - `database`: The Vitess keyspace to connect to
+- `grpc_port`: (Optional) vtgate's gRPC port, used by [CDC](#change-data-capture-cdc) (e.g. `15991`)
+- `grpc_host`: (Optional) Host override for the gRPC connection when it differs from the MySQL host
+- `grpc_tls`: (Optional) Set to `true` to use TLS for the gRPC connection
+- `ssl_ca_path`: (Optional) The path to the CA certificate file
+- `ssl_cert_path`: (Optional) The path to the client certificate file
+- `ssl_key_path`: (Optional) The path to the client key file
 
 ### Step 2: Create an asset file for data ingestion
 
@@ -48,7 +56,7 @@ parameters:
 - `name`: The name of the asset.
 - `type`: Set this to `ingestr` to use the ingestr data pipeline.
 - `connection`: The destination connection where the data should be stored.
-- `source_connection`: The name of the Vitess (`mysql`) connection defined in `.bruin.yml`.
+- `source_connection`: The name of the Vitess connection defined in `.bruin.yml`.
 - `source_table`: The name of the table in the keyspace that you want to ingest.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
@@ -61,7 +69,7 @@ As a result of this command, Bruin will ingest data from the given Vitess table 
 
 ## Vitess as a destination
 
-You can also use Vitess as a destination by pointing an ingestr asset's `connection` and `destination` at a Vitess `mysql` connection:
+You can also use Vitess as a destination by pointing an ingestr asset's `connection` and `destination` at a Vitess connection:
 
 ```yaml
 name: orders
@@ -81,15 +89,14 @@ When loading into Vitess, keep two things in mind:
 
 ## Change data capture (CDC)
 
-Vitess CDC streams inserts, updates, and deletes through vtgate's VStream gRPC API. It is enabled by setting `cdc: "true"` on an ingestr asset with a Vitess (`mysql`) source connection, and requires the vtgate gRPC port.
+Vitess CDC streams inserts, updates, and deletes through vtgate's VStream gRPC API. It is enabled by setting `cdc: "true"` on an ingestr asset with a Vitess source connection, and requires the vtgate gRPC port — configure it once as `grpc_port` on the connection (see [Step 1](#step-1-add-a-connection-to-bruin-yml-file)).
 
 | Parameter | Required | Description |
 |-----------|----------|-------------|
 | `cdc` | Yes | Set to `"true"` to enable CDC mode |
-| `cdc_grpc_port` | Yes (for VStream) | vtgate's gRPC port (e.g. `15991`) |
-| `cdc_grpc_host` | No | Host override for the gRPC connection when it differs from the MySQL host |
-| `cdc_grpc_tls` | No | Set to `"true"` to use TLS for the gRPC connection |
-| `cdc_backend` | No | Force the backend: `vstream` selects the self-hosted Vitess VStream path, `planetscale` selects PlanetScale's psdbconnect API |
+| `cdc_grpc_port` | No | Overrides the connection's `grpc_port` for this asset |
+| `cdc_grpc_host` | No | Overrides the connection's `grpc_host` for this asset |
+| `cdc_grpc_tls` | No | Overrides the connection's `grpc_tls` for this asset |
 | `cdc_dest_schema` | No | Destination schema to use for multi-table CDC runs |
 | `incremental_strategy` | No | Defaults to `"merge"` when CDC is enabled; can be overridden to `"append"` |
 
@@ -114,7 +121,6 @@ parameters:
   source_table: 'orders'
   destination: bigquery
   cdc: "true"
-  cdc_grpc_port: "15991"
 ```
 
-For the managed PlanetScale platform, see [PlanetScale](/ingestion/planetscale).
+The example above relies on `grpc_port` being set on the `vitess` connection. For the managed PlanetScale platform, see [PlanetScale](/ingestion/planetscale).

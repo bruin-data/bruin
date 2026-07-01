@@ -1,6 +1,6 @@
 # PlanetScale
 
-[PlanetScale](https://planetscale.com/) is a managed, MySQL-compatible database platform built on [Vitess](https://vitess.io/). Because it speaks the MySQL wire protocol, Bruin connects to PlanetScale through a regular [`mysql` connection](/platforms/mysql), and it can be used as both a **source** and a **destination** for [Ingestr assets](/assets/ingestr). PlanetScale [change data capture](#change-data-capture-cdc) is also supported.
+[PlanetScale](https://planetscale.com/) is a managed, MySQL-compatible database platform built on [Vitess](https://vitess.io/). Bruin connects to it through a dedicated `planetscale` connection, and it can be used as both a **source** and a **destination** for [Ingestr assets](/assets/ingestr). PlanetScale [change data capture](#change-data-capture-cdc) is also supported.
 
 Follow the steps below to set up PlanetScale and run ingestion.
 
@@ -8,10 +8,10 @@ Follow the steps below to set up PlanetScale and run ingestion.
 
 ### Step 1: Add a connection to .bruin.yml file
 
-PlanetScale uses the MySQL connector, so add a `mysql` connection to the `connections` section of your `.bruin.yml` file. Use the connection details from your PlanetScale branch's password:
+Add a `planetscale` connection to the `connections` section of your `.bruin.yml` file. Use the connection details from your PlanetScale branch's password:
 
 ```yaml
-  mysql:
+  planetscale:
     - name: "planetscale"
       username: "xxxxxxxxxxxxx"
       password: "pscale_pw_xxxxxxxxxxxx"
@@ -28,7 +28,7 @@ PlanetScale uses the MySQL connector, so add a `mysql` connection to the `connec
 - `database`: The PlanetScale database (keyspace) name
 
 > [!NOTE]
-> PlanetScale requires encrypted connections. TLS is enabled automatically for `*.psdb.cloud` hosts, so you do not need any extra configuration. For a custom domain or private endpoint that does not end in `.psdb.cloud`, set `?tls=true` on the connection or ingest through CDC's `cdc_backend`.
+> PlanetScale requires encrypted connections. TLS is enabled automatically for the `planetscale` connection, so you do not need any extra configuration.
 
 ### Step 2: Create an asset file for data ingestion
 
@@ -48,7 +48,7 @@ parameters:
 - `name`: The name of the asset.
 - `type`: Set this to `ingestr` to use the ingestr data pipeline.
 - `connection`: The destination connection where the data should be stored.
-- `source_connection`: The name of the PlanetScale (`mysql`) connection defined in `.bruin.yml`.
+- `source_connection`: The name of the PlanetScale connection defined in `.bruin.yml`.
 - `source_table`: The name of the table in PlanetScale that you want to ingest.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
@@ -61,7 +61,7 @@ As a result of this command, Bruin will ingest data from the given PlanetScale t
 
 ## PlanetScale as a destination
 
-Because PlanetScale speaks MySQL, you can also use it as a destination by pointing an ingestr asset's `connection` and `destination` at a PlanetScale `mysql` connection:
+You can also use PlanetScale as a destination by pointing an ingestr asset's `connection` and `destination` at a PlanetScale connection:
 
 ```yaml
 name: orders
@@ -81,14 +81,13 @@ When loading into PlanetScale, keep two things in mind:
 
 ## Change data capture (CDC)
 
-PlanetScale CDC streams inserts, updates, and deletes through PlanetScale's hosted `psdbconnect` API over TLS. It reuses the database credentials already in the connection — no separate token is required — and is selected automatically for `*.psdb.cloud` hosts.
+PlanetScale CDC streams inserts, updates, and deletes through PlanetScale's hosted `psdbconnect` API over TLS. It reuses the database credentials already in the connection — no separate token is required — and TLS is handled automatically.
 
-CDC is enabled by setting `cdc: "true"` on an ingestr asset with a PlanetScale (`mysql`) source connection.
+CDC is enabled by setting `cdc: "true"` on an ingestr asset with a PlanetScale source connection.
 
 | Parameter | Required | Description |
 |-----------|----------|-------------|
 | `cdc` | Yes | Set to `"true"` to enable CDC mode |
-| `cdc_backend` | No | Force the backend: `planetscale` selects psdbconnect (useful for custom domains / private endpoints), `vstream` selects the self-hosted Vitess VStream path |
 | `cdc_dest_schema` | No | Destination schema to use for multi-table CDC runs |
 | `incremental_strategy` | No | Defaults to `"merge"` when CDC is enabled; can be overridden to `"append"` |
 
@@ -113,23 +112,6 @@ parameters:
   source_table: 'orders'
   destination: bigquery
   cdc: "true"
-```
-
-### Example: CDC on a custom domain
-
-For a custom domain or private endpoint that does not end in `.psdb.cloud`, force the psdbconnect backend explicitly:
-
-```yaml
-name: orders
-type: ingestr
-connection: bigquery
-
-parameters:
-  source_connection: planetscale
-  source_table: 'orders'
-  destination: bigquery
-  cdc: "true"
-  cdc_backend: planetscale
 ```
 
 > [!NOTE]

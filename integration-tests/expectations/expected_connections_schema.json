@@ -759,6 +759,18 @@
           },
           "type": "array"
         },
+        "vitess": {
+          "items": {
+            "$ref": "#/$defs/VitessConnection"
+          },
+          "type": "array"
+        },
+        "planetscale": {
+          "items": {
+            "$ref": "#/$defs/PlanetScaleConnection"
+          },
+          "type": "array"
+        },
         "notion": {
           "items": {
             "$ref": "#/$defs/NotionConnection"
@@ -3234,6 +3246,39 @@
         "api_token"
       ]
     },
+    "PlanetScaleConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer",
+          "default": 3306
+        },
+        "database": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "username",
+        "password",
+        "host",
+        "port",
+        "database"
+      ]
+    },
     "PlusVibeAIConnection": {
       "properties": {
         "name": {
@@ -4449,6 +4494,57 @@
           "type": "string"
         },
         "schema": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "username",
+        "password",
+        "host",
+        "port",
+        "database"
+      ]
+    },
+    "VitessConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer",
+          "default": 15306
+        },
+        "database": {
+          "type": "string"
+        },
+        "grpc_port": {
+          "type": "integer"
+        },
+        "grpc_host": {
+          "type": "string"
+        },
+        "grpc_tls": {
+          "type": "boolean"
+        },
+        "ssl_ca_path": {
+          "type": "string"
+        },
+        "ssl_cert_path": {
+          "type": "string"
+        },
+        "ssl_key_path": {
           "type": "string"
         }
       },

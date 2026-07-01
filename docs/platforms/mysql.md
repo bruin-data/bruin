@@ -153,19 +153,15 @@ parameters:
 
 ## CDC (Change Data Capture)
 
-Bruin supports MySQL-family CDC via the `ingestr` asset type. CDC captures row-level changes (inserts, updates, deletes) and replicates them to a destination. The same mechanism powers MySQL binary-log replication as well as [Vitess](/ingestion/vitess) (VStream) and [PlanetScale](/ingestion/planetscale) (psdbconnect).
+Bruin supports MySQL CDC via the `ingestr` asset type. CDC captures row-level changes (inserts, updates, deletes) via MySQL binary-log replication and replicates them to a destination. [Vitess](/ingestion/vitess) (VStream) and [PlanetScale](/ingestion/planetscale) (psdbconnect) are MySQL-compatible but use their own dedicated connection types — see their ingestion guides for CDC.
 
-CDC is enabled by setting `cdc: "true"` on an ingestr asset with a MySQL (or Vitess/PlanetScale) source connection.
+CDC is enabled by setting `cdc: "true"` on an ingestr asset with a MySQL source connection.
 
 | Parameter | Required | Description |
 |-----------|----------|-------------|
 | `cdc` | Yes | Set to `"true"` to enable CDC mode |
 | `cdc_mode` | No | `"stream"` for real-time streaming or `"batch"` for batch replication |
 | `cdc_server_id` | No | Replication server identifier for MySQL binary-log CDC |
-| `cdc_grpc_port` | No | vtgate's gRPC port for Vitess VStream CDC (e.g. `15991`) |
-| `cdc_grpc_host` | No | Host override for the Vitess VStream gRPC connection |
-| `cdc_grpc_tls` | No | Set to `"true"` to use TLS for the Vitess VStream gRPC connection |
-| `cdc_backend` | No | Force the CDC backend: `vstream` (self-hosted Vitess) or `planetscale` (psdbconnect) |
 | `cdc_dest_schema` | No | Destination schema to use for multi-table CDC runs |
 | `incremental_strategy` | No | Defaults to `"merge"` when CDC is enabled; can be overridden to `"append"` |
 

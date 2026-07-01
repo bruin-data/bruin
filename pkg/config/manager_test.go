@@ -143,6 +143,27 @@ func TestLoadFromFile(t *testing.T) {
 					Port:     3306,
 				},
 			},
+			Vitess: []VitessConnection{
+				{
+					Name:     "conn8b",
+					Host:     "vtgatehost",
+					Username: "vitessuser",
+					Password: "vitesspass",
+					Database: "commerce",
+					Port:     15306,
+					GrpcPort: 15991,
+				},
+			},
+			Planetscale: []PlanetScaleConnection{
+				{
+					Name:     "conn8c",
+					Host:     "aws.connect.psdb.cloud",
+					Username: "psuser",
+					Password: "pspass",
+					Database: "psdb",
+					Port:     3306,
+				},
+			},
 			Notion: []NotionConnection{
 				{
 					Name:   "conn9",

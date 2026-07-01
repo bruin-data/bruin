@@ -236,8 +236,8 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	}
 
 	// Handle CDC mode - transform the source URI into ingestr's CDC scheme and auto-set merge strategy.
-	// Supported today: PostgreSQL (postgres+cdc) and the MySQL family (mysql+cdc / mariadb+cdc),
-	// which also covers Vitess (VStream) and PlanetScale (psdbconnect).
+	// Supported today: PostgreSQL (postgres+cdc), the MySQL family (mysql+cdc / mariadb+cdc),
+	// Vitess (vitess+cdc, VStream) and PlanetScale (planetscale+cdc, psdbconnect).
 	if cdcVal, _ := asset.Parameters.GetString("cdc"); cdcVal == "true" {
 		parsedURI, err := url.Parse(sourceURI)
 		if err != nil {
@@ -247,8 +247,9 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		switch {
 		case strings.Contains(parsedURI.Scheme, "postgresql"):
 			parsedURI.Scheme = strings.ReplaceAll(parsedURI.Scheme, "postgresql", "postgres+cdc")
-		case strings.HasPrefix(parsedURI.Scheme, "mysql"), strings.HasPrefix(parsedURI.Scheme, "mariadb"):
-			// mysql+cdc / mysql+pymysql+cdc / mariadb+cdc are all valid CDC schemes.
+		case strings.HasPrefix(parsedURI.Scheme, "mysql"), strings.HasPrefix(parsedURI.Scheme, "mariadb"),
+			strings.HasPrefix(parsedURI.Scheme, "vitess"), strings.HasPrefix(parsedURI.Scheme, "planetscale"):
+			// mysql+cdc / mariadb+cdc / vitess+cdc / planetscale+cdc are all valid CDC schemes.
 			if !strings.HasSuffix(parsedURI.Scheme, "+cdc") {
 				parsedURI.Scheme += "+cdc"
 			}

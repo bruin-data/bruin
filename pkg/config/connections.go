@@ -384,6 +384,45 @@ func (c MySQLConnection) GetName() string {
 	return c.Name
 }
 
+// VitessConnection describes a connection to a Vitess cluster via vtgate. Vitess speaks the MySQL
+// wire protocol, but ingestr now routes it through its own "vitess" scheme, so it is a dedicated
+// connection type rather than a MySQL connection. The grpc_* fields point at vtgate's VStream gRPC
+// endpoint and are only needed for change data capture.
+type VitessConnection struct {
+	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Username    string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password    string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Host        string `yaml:"host,omitempty"     json:"host" mapstructure:"host"`
+	Port        int    `yaml:"port,omitempty"     json:"port" mapstructure:"port" jsonschema:"default=15306"`
+	Database    string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
+	GrpcPort    int    `yaml:"grpc_port,omitempty" json:"grpc_port,omitempty" mapstructure:"grpc_port"`
+	GrpcHost    string `yaml:"grpc_host,omitempty" json:"grpc_host,omitempty" mapstructure:"grpc_host"`
+	GrpcTLS     bool   `yaml:"grpc_tls,omitempty" json:"grpc_tls,omitempty" mapstructure:"grpc_tls"`
+	SslCaPath   string `yaml:"ssl_ca_path,omitempty" json:"ssl_ca_path,omitempty" mapstructure:"ssl_ca_path"`
+	SslCertPath string `yaml:"ssl_cert_path,omitempty" json:"ssl_cert_path,omitempty" mapstructure:"ssl_cert_path"`
+	SslKeyPath  string `yaml:"ssl_key_path,omitempty" json:"ssl_key_path,omitempty" mapstructure:"ssl_key_path"`
+}
+
+func (c VitessConnection) GetName() string {
+	return c.Name
+}
+
+// PlanetScaleConnection describes a connection to PlanetScale, the managed Vitess platform. ingestr
+// routes it through its own "planetscale" scheme (hosted psdbconnect API) and enables TLS
+// automatically, so no SSL configuration is required.
+type PlanetScaleConnection struct {
+	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Host     string `yaml:"host,omitempty"     json:"host" mapstructure:"host"`
+	Port     int    `yaml:"port,omitempty"     json:"port" mapstructure:"port" jsonschema:"default=3306"`
+	Database string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
+}
+
+func (c PlanetScaleConnection) GetName() string {
+	return c.Name
+}
+
 type PostgresConnection struct {
 	Name         string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	Username     string `yaml:"username,omitempty" json:"username" mapstructure:"username"`

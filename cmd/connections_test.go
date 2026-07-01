@@ -34,6 +34,21 @@ environments:
           password: "pass"
           database: "db"
           port: 3306
+      vitess:
+        - name: "vitess_conn"
+          host: "vtgate.internal"
+          username: "user"
+          password: "pass"
+          database: "commerce"
+          port: 15306
+          grpc_port: 15991
+      planetscale:
+        - name: "planetscale_conn"
+          host: "aws.connect.psdb.cloud"
+          username: "user"
+          password: "pass"
+          database: "psdb"
+          port: 3306
     schema_prefix: "dev_"
   prod:
     connections:
