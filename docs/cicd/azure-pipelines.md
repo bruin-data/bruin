@@ -1,6 +1,6 @@
 # Azure Pipelines
 
-Azure Pipelines is part of Azure DevOps and uses YAML files to define CI/CD workflows. This guide shows how to set up Bruin in your Azure Pipeline to validate your Bruin pipelines.
+Azure Pipelines is part of Azure DevOps and uses YAML files to define CI/CD workflows. This guide shows how to set up Bruin in your Azure Pipeline to validate and unit-test your Bruin pipelines.
 
 ## Installation
 
@@ -35,6 +35,10 @@ steps:
 - bash: |
     bruin validate
   displayName: 'Validate Pipelines'
+
+- bash: |
+    bruin unit-test
+  displayName: 'Unit Test Pipelines'
 ```
 
 ## Configuration Options
@@ -61,6 +65,10 @@ steps:
 - bash: |
     bruin validate
   displayName: 'Validate Pipelines'
+
+- bash: |
+    bruin unit-test
+  displayName: 'Unit Test Pipelines'
 ```
 
 ### Run on Pull Requests Only
@@ -87,6 +95,10 @@ steps:
 - bash: |
     bruin validate
   displayName: 'Validate Pipelines'
+
+- bash: |
+    bruin unit-test
+  displayName: 'Unit Test Pipelines'
 ```
 
 ### Multi-Stage Pipeline
@@ -117,6 +129,10 @@ stages:
     - bash: |
         bruin validate
       displayName: 'Validate Pipelines'
+
+    - bash: |
+        bruin unit-test
+      displayName: 'Unit Test Pipelines'
 ```
 
 ### Windows Agent
@@ -142,4 +158,8 @@ steps:
 - pwsh: |
     bruin validate
   displayName: 'Validate Pipelines'
+
+- pwsh: |
+    bruin unit-test
+  displayName: 'Unit Test Pipelines'
 ```

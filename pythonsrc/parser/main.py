@@ -565,3 +565,208 @@ def is_single_select_query(query: str, dialect: str = None) -> dict:
 
     except Exception as e:
         return {"is_single_select": False, "error": str(e)}
+
+
+# Statement types that modify data. A unit test must never run one. These are
+# scanned for *inside* an otherwise-SELECT query to catch writes that hide
+# there, such as a Postgres data-modifying CTE (WITH x AS (DELETE ... RETURNING)
+# ...) or a writing subquery. A bare top-level write (DELETE / UPDATE / MERGE /
+# TRUNCATE / DROP / CALL) is already rejected by the "is it a Query" check.
+_WRITE_NODES = (exp.Insert, exp.Update, exp.Delete, exp.Merge)
+
+
+def extract_select(query: str, dialect: str = None) -> dict:
+    """Reduce an asset statement to the read-only SELECT that produces its rows.
+
+    A Bruin asset with `materialization: none` can be full DDL/DML, such as
+    `CREATE OR REPLACE VIEW x AS SELECT ...`, a `CREATE TABLE x AS SELECT ...`
+    (CTAS), or `INSERT INTO x SELECT ...`. A unit test only exercises the inner
+    SELECT, so this unwraps the CREATE/INSERT and returns that query; a
+    statement that is already a SELECT (with or without a WITH clause) is
+    returned unchanged.
+
+    This is also the feature's read-only guarantee: `bruin test` enforces
+    read-only by what it runs, not by the connection. Anything that would write
+    is rejected and never executed: a top-level DELETE/UPDATE/MERGE/TRUNCATE/DROP
+    (not a SELECT), a write hidden in a data-modifying CTE or subquery, and a
+    `SELECT ... INTO <table>` (the INTO is stripped so only the read runs).
+    Returns {"query": <sql>} or {"error": msg}.
+    """
+    dialect = normalize_sqlglot_dialect(dialect)
+
+    if not query or not query.strip():
+        return {"error": "cannot parse query"}
+
+    try:
+        parsed = parse_one(query, dialect=dialect or None)
+    except Exception as e:
+        return {"error": str(e)}
+
+    if parsed is None:
+        return {"error": "cannot parse query"}
+
+    inner = parsed
+    if isinstance(parsed, (exp.Create, exp.Insert)):
+        inner = parsed.expression
+        if inner is None:
+            return {"error": "asset has no SELECT to unit test"}
+
+    # exp.Query is the base for SELECT / UNION / etc. (a WITH ... SELECT is an
+    # exp.Select, which is an exp.Query). A top-level DELETE / UPDATE / MERGE /
+    # TRUNCATE / DROP / CALL is not a Query, so it is rejected here and never runs.
+    if not isinstance(inner, exp.Query):
+        return {"error": "asset is not a SELECT and has no inner SELECT to unit test"}
+
+    # SELECT ... INTO <table> writes a table; drop the INTO so only the read is
+    # tested (the same reduction applied to CREATE TABLE AS SELECT above).
+    if inner.args.get("into") is not None:
+        inner.set("into", None)
+
+    # Reject a write hidden inside the query (a data-modifying CTE or a writing
+    # subquery) so the test stays strictly read-only by construction.
+    if inner.find(*_WRITE_NODES) is not None:
+        return {
+            "error": "asset contains a write statement and cannot be unit tested read-only"
+        }
+
+    return {"query": inner.sql(dialect=dialect or None)}
+
+
+def select_cte(query: str, dialect: str = None, cte_name: str = None) -> dict:
+    """Rewrite a query to select all rows of one of its named CTEs.
+
+    Given `WITH a AS (...), b AS (...) SELECT ...`, returns
+    `WITH a AS (...), b AS (...) SELECT * FROM <cte_name>` so a unit test can
+    assert the output of an intermediate CTE rather than only the final result.
+    Errors when the query has no WITH clause or no CTE with that name.
+    """
+    dialect = normalize_sqlglot_dialect(dialect)
+
+    if not query or not query.strip():
+        return {"error": "cannot parse query"}
+
+    try:
+        parsed = parse_one(query, dialect=dialect or None)
+    except Exception as e:
+        return {"error": str(e)}
+
+    if parsed is None:
+        return {"error": "cannot parse query"}
+
+    with_ = parsed.args.get("with_") or parsed.args.get("with")
+    if with_ is None:
+        return {"error": "the query defines no CTEs to assert"}
+
+    target = None
+    available = []
+    for cte in with_.expressions:
+        name = cte.alias_or_name
+        available.append(name)
+        if name.lower() == (cte_name or "").lower():
+            target = name
+
+    if target is None:
+        return {
+            "error": f"no CTE named {cte_name!r} in the query (available: {available})"
+        }
+
+    # The WITH node renders reliably on its own; appending a trivial SELECT and
+    # re-parsing keeps the fixture/model CTEs intact and validates the result.
+    combined = f"{with_.sql(dialect=dialect or None)} SELECT * FROM {target}"
+    try:
+        final = parse_one(combined, dialect=dialect or None).sql(
+            dialect=dialect or None
+        )
+    except Exception as e:
+        return {"error": str(e)}
+
+    return {"query": final}
+
+
+def freeze_time(query: str, dialect: str = None, execution_time: str = None) -> dict:
+    """Pin the clock so a time-dependent model is deterministic under test.
+
+    Replaces CURRENT_TIMESTAMP / CURRENT_DATE / CURRENT_TIME (and their dialect
+    spellings that sqlglot normalizes to those nodes) with literals fixed at
+    `execution_time`, instead of letting them read the warehouse's real clock.
+    """
+    dialect = normalize_sqlglot_dialect(dialect)
+
+    if not execution_time:
+        return {"error": "execution_time is required"}
+    if not query or not query.strip():
+        return {"error": "cannot parse query"}
+
+    try:
+        parsed = parse_one(query, dialect=dialect or None)
+    except Exception as e:
+        return {"error": str(e)}
+
+    if parsed is None:
+        return {"error": "cannot parse query"}
+
+    pieces = execution_time.replace("T", " ").split(" ")
+    date_part = pieces[0]
+    time_part = pieces[1] if len(pieces) > 1 else "00:00:00"
+
+    def freeze(node):
+        if isinstance(node, exp.CurrentTimestamp):
+            return exp.cast(exp.Literal.string(execution_time), "TIMESTAMP")
+        if isinstance(node, exp.CurrentDate):
+            return exp.cast(exp.Literal.string(date_part), "DATE")
+        if isinstance(node, exp.CurrentTime):
+            return exp.cast(exp.Literal.string(time_part), "TIME")
+        return node
+
+    return {"query": parsed.transform(freeze).sql(dialect=dialect or None)}
+
+
+def add_ctes(query: str, dialect: str = None, ctes: list = None) -> dict:
+    """Prepend CTEs to a query, merging with any existing WITH clause.
+
+    ctes is a list of {"name": <cte name>, "query": <cte body SQL>}. They are
+    prepended (defined before any existing CTEs) so existing CTEs can reference
+    them, and kept in the given order. Returns {"query": <sql>} or {"error": msg}.
+    """
+    dialect = normalize_sqlglot_dialect(dialect)
+    ctes = ctes or []
+
+    if not query or not query.strip():
+        return {"error": "cannot parse query"}
+
+    try:
+        parsed = parse_one(query, dialect=dialect or None)
+    except Exception as e:
+        return {"error": str(e)}
+
+    if parsed is None:
+        return {"error": "cannot parse query"}
+
+    try:
+        # The top-level WITH is stored under "with_" in newer sqlglot and "with"
+        # in older versions; check both (and avoid find(), which could match a
+        # WITH nested in a subquery).
+        existing = parsed.args.get("with_") or parsed.args.get("with")
+        if existing is not None:
+            # Splice the fixture CTEs to the front of the existing WITH (prepending
+            # exp.CTE nodes into a rendered With works; building a fresh exp.With
+            # does not render in this sqlglot version). Front so existing CTEs can
+            # reference them.
+            new_nodes = [
+                exp.CTE(
+                    this=parse_one(cte["query"], dialect=dialect or None),
+                    alias=exp.TableAlias(this=exp.to_identifier(cte["name"])),
+                )
+                for cte in ctes
+            ]
+            existing.set("expressions", new_nodes + list(existing.expressions))
+        else:
+            # No WITH yet: with_ reliably creates one, appending in call order.
+            for cte in ctes:
+                parsed = parsed.with_(
+                    cte["name"], as_=cte["query"], dialect=dialect or None, copy=False
+                )
+    except Exception as e:
+        return {"error": str(e)}
+
+    return {"query": parsed.sql(dialect=dialect or None)}

@@ -388,6 +388,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                     {text: "Overview", link: "/commands/overview"},
                     {text: "Run", link: "/commands/run"},
                     {text: "Validate", link: "/commands/validate"},
+                    {text: "Unit Test", link: "/commands/unit-test"},
                     {text: "Init", link: "/commands/init"},
                     {text: "Clean", link: "/commands/clean"},
                     {text: "Connections", link: "/commands/connections"},
@@ -418,6 +419,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "Custom Checks", link: "/quality/custom"},
                         ],
                     },
+                    {text: "Unit Tests", link: "/quality/unit-tests"},
                 ],
             },
             {

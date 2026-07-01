@@ -2495,6 +2495,9 @@ func TestDefaultValues_CoversAssetConfigFields(t *testing.T) {
 		"ExecutableFile": true,
 		"DefinitionFile": true,
 		"RetriesDelay":   true,
+		// Unit tests are inherently per-asset (they pin one asset's logic against
+		// specific inputs), so they are not inherited from pipeline-level defaults.
+		"UnitTests": true,
 	}
 
 	for i := range assetType.NumField() {

@@ -325,6 +325,52 @@ type customCheck struct {
 	Notifications Notifications `yaml:"notifications"`
 }
 
+type unitTestInput struct {
+	Asset string                   `yaml:"asset"`
+	Rows  []map[string]interface{} `yaml:"rows"`
+}
+
+type unitTestCTEExpected struct {
+	Rows  []map[string]interface{} `yaml:"rows"`
+	Count *int64                   `yaml:"count"`
+	Match string                   `yaml:"match"`
+	Order string                   `yaml:"order"`
+}
+
+type unitTestExpected struct {
+	Rows  []map[string]interface{}       `yaml:"rows"`
+	Count *int64                         `yaml:"count"`
+	Match string                         `yaml:"match"`
+	Order string                         `yaml:"order"`
+	CTEs  map[string]unitTestCTEExpected `yaml:"ctes"`
+}
+
+type unitTest struct {
+	Name          string                 `yaml:"name"`
+	Description   string                 `yaml:"description"`
+	Inputs        []unitTestInput        `yaml:"inputs"`
+	Fixtures      []string               `yaml:"fixtures"`
+	Variables     map[string]interface{} `yaml:"variables"`
+	ExecutionTime string                 `yaml:"execution_time"`
+	Expected      unitTestExpected       `yaml:"expected"`
+}
+
+func convertUnitTestExpected(e unitTestExpected) UnitTestExpected {
+	out := UnitTestExpected{
+		Rows:  e.Rows,
+		Count: e.Count,
+		Match: e.Match,
+		Order: e.Order,
+	}
+	if len(e.CTEs) > 0 {
+		out.CTEs = make(map[string]UnitTestCTEExpected, len(e.CTEs))
+		for name, ce := range e.CTEs {
+			out.CTEs[name] = UnitTestCTEExpected(ce)
+		}
+	}
+	return out
+}
+
 type snowflake struct {
 	Warehouse string `yaml:"warehouse"`
 }
@@ -361,6 +407,7 @@ type taskDefinition struct {
 	Extends               []string          `yaml:"extends"`
 	Columns               []column          `yaml:"columns"`
 	CustomChecks          []customCheck     `yaml:"custom_checks"`
+	UnitTests             []unitTest        `yaml:"unit_tests"`
 	Hooks                 Hooks             `yaml:"hooks"`
 	Tags                  []string          `yaml:"tags"`
 	Snowflake             snowflake         `yaml:"snowflake"`
@@ -604,6 +651,28 @@ func taskDefinitionToAsset(definition taskDefinition) (*Asset, error) {
 			Blocking:      DefaultTrueBool{Value: check.Blocking},
 			Retries:       check.Retries,
 			Notifications: notificationsOrNil(check.Notifications),
+		}
+	}
+
+	// Leave UnitTests nil when none are defined so existing assets serialize
+	// unchanged (the field is omitempty); only allocate when tests are present.
+	if len(definition.UnitTests) > 0 {
+		task.UnitTests = make([]UnitTest, len(definition.UnitTests))
+		for index, ut := range definition.UnitTests {
+			inputs := make([]UnitTestInput, len(ut.Inputs))
+			for i, in := range ut.Inputs {
+				inputs[i] = UnitTestInput(in)
+			}
+
+			task.UnitTests[index] = UnitTest{
+				Name:          ut.Name,
+				Description:   ut.Description,
+				Inputs:        inputs,
+				Fixtures:      ut.Fixtures,
+				Variables:     ut.Variables,
+				ExecutionTime: ut.ExecutionTime,
+				Expected:      convertUnitTestExpected(ut.Expected),
+			}
 		}
 	}
 

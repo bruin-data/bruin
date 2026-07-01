@@ -1,6 +1,6 @@
 # CircleCI
 
-CircleCI uses a `.circleci/config.yml` file to define your pipeline. This guide shows how to set up Bruin in your CircleCI pipeline to validate your Bruin pipelines.
+CircleCI uses a `.circleci/config.yml` file to define your pipeline. This guide shows how to set up Bruin in your CircleCI pipeline to validate and unit-test your Bruin pipelines.
 
 ## Installation
 
@@ -40,6 +40,9 @@ jobs:
       - run:
           name: Validate Pipelines
           command: bruin validate
+      - run:
+          name: Unit Test Pipelines
+          command: bruin unit-test
 
 workflows:
   version: 2
@@ -71,6 +74,9 @@ jobs:
       - run:
           name: Validate Pipelines
           command: bruin validate
+      - run:
+          name: Unit Test Pipelines
+          command: bruin unit-test
 
 workflows:
   version: 2
@@ -100,6 +106,9 @@ jobs:
       - run:
           name: Validate Pipelines
           command: bruin validate
+      - run:
+          name: Unit Test Pipelines
+          command: bruin unit-test
 
 workflows:
   version: 2

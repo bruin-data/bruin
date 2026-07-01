@@ -33,4 +33,8 @@ jobs:
     # validate your pipeline
     - run: bruin validate ./bruin-pipeline/
       name: Validate Pipeline
+
+    # run the unit tests
+    - run: bruin unit-test ./bruin-pipeline/
+      name: Unit Test Pipeline
 ```

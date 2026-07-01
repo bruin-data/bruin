@@ -1,6 +1,6 @@
 # Jenkins
 
-Jenkins is a widely-used automation server that can be configured using Jenkinsfiles. This guide shows how to set up Bruin in your Jenkins pipeline to validate your Bruin pipelines.
+Jenkins is a widely-used automation server that can be configured using Jenkinsfiles. This guide shows how to set up Bruin in your Jenkins pipeline to validate and unit-test your Bruin pipelines.
 
 ## Installation
 
@@ -39,6 +39,15 @@ pipeline {
                 '''
             }
         }
+
+        stage('Unit Test Pipelines') {
+            steps {
+                sh '''
+                    export PATH=$HOME/.local/bin:$PATH
+                    bruin unit-test
+                '''
+            }
+        }
     }
 }
 ```
@@ -64,6 +73,13 @@ node {
         sh '''
             export PATH=$HOME/.local/bin:$PATH
             bruin validate
+        '''
+    }
+
+    stage('Unit Test Pipelines') {
+        sh '''
+            export PATH=$HOME/.local/bin:$PATH
+            bruin unit-test
         '''
     }
 }
@@ -94,6 +110,15 @@ pipeline {
                 sh '''
                     export PATH=$HOME/.local/bin:$PATH
                     bruin validate
+                '''
+            }
+        }
+
+        stage('Unit Test Pipelines') {
+            steps {
+                sh '''
+                    export PATH=$HOME/.local/bin:$PATH
+                    bruin unit-test
                 '''
             }
         }
@@ -132,6 +157,15 @@ pipeline {
                 '''
             }
         }
+
+        stage('Unit Test Pipelines') {
+            steps {
+                sh '''
+                    export PATH=$HOME/.local/bin:$PATH
+                    bruin unit-test
+                '''
+            }
+        }
     }
 }
 ```
@@ -163,6 +197,15 @@ pipeline {
                 sh '''
                     export PATH=$HOME/.local/bin:$PATH
                     bruin validate
+                '''
+            }
+        }
+
+        stage('Unit Test Pipelines') {
+            steps {
+                sh '''
+                    export PATH=$HOME/.local/bin:$PATH
+                    bruin unit-test
                 '''
             }
         }

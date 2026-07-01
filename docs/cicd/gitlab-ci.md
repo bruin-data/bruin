@@ -1,6 +1,6 @@
 # GitLab CI/CD
 
-GitLab CI/CD is built directly into GitLab and uses a `.gitlab-ci.yml` file to define your pipeline. This guide shows how to set up Bruin in your GitLab CI/CD pipeline to validate your Bruin pipelines.
+GitLab CI/CD is built directly into GitLab and uses a `.gitlab-ci.yml` file to define your pipeline. This guide shows how to set up Bruin in your GitLab CI/CD pipeline to validate and unit-test your Bruin pipelines.
 
 ## Installation
 
@@ -30,6 +30,7 @@ bruin-validate:
   script:
     # Validate your pipelines
     - bruin validate
+    - bruin unit-test
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -52,4 +53,5 @@ bruin-validate:
     - export PATH=$HOME/.local/bin:$PATH
   script:
     - bruin validate
+    - bruin unit-test
 ```

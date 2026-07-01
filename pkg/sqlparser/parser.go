@@ -234,22 +234,15 @@ func (s *SQLParser) UsedTables(sql, dialect string) ([]string, error) {
 	return tables.Tables, nil
 }
 
-func (s *SQLParser) RenameTables(sql string, dialect string, tableMapping map[string]string) (string, error) {
-	err := s.Start()
-	if err != nil {
+// sendQueryCommand runs a parser command whose response is a {query, error}
+// object and returns the resulting query string. It is the shared body for the
+// SQL-rewriting verbs (rename/limit/transpile).
+func (s *SQLParser) sendQueryCommand(command string, contents map[string]interface{}) (string, error) {
+	if err := s.Start(); err != nil {
 		return "", errors.Wrap(err, "failed to start sql parser")
 	}
 
-	command := parserCommand{
-		Command: "replace-table-references",
-		Contents: map[string]interface{}{
-			"query":         sql,
-			"dialect":       dialect,
-			"table_mapping": tableMapping,
-		},
-	}
-
-	responsePayload, err := s.sendCommand(&command)
+	responsePayload, err := s.sendCommand(&parserCommand{Command: command, Contents: contents})
 	if err != nil {
 		return "", errors.Wrap(err, "failed to send command")
 	}
@@ -258,16 +251,21 @@ func (s *SQLParser) RenameTables(sql string, dialect string, tableMapping map[st
 		Query string `json:"query"`
 		Error string `json:"error"`
 	}
-	err = json.Unmarshal([]byte(responsePayload), &resp)
-	if err != nil {
+	if err := json.Unmarshal([]byte(responsePayload), &resp); err != nil {
 		return "", errors.Wrap(err, "failed to unmarshal response")
 	}
-
 	if resp.Error != "" {
 		return "", errors.New(resp.Error)
 	}
-
 	return resp.Query, nil
+}
+
+func (s *SQLParser) RenameTables(sql string, dialect string, tableMapping map[string]string) (string, error) {
+	return s.sendQueryCommand("replace-table-references", map[string]interface{}{
+		"query":         sql,
+		"dialect":       dialect,
+		"table_mapping": tableMapping,
+	})
 }
 
 func (s *SQLParser) sendCommand(pc *parserCommand) (string, error) {
@@ -406,39 +404,69 @@ func ConnectionTypeToDialect(connectionType string) string {
 }
 
 func (s *SQLParser) AddLimit(sql string, limit int, dialect string) (string, error) {
-	err := s.Start()
-	if err != nil {
-		return "", errors.Wrap(err, "failed to start sql parser")
-	}
+	return s.sendQueryCommand("add-limit", map[string]interface{}{
+		"query":   sql,
+		"limit":   limit,
+		"dialect": dialect,
+	})
+}
 
-	command := parserCommand{
-		Command: "add-limit",
-		Contents: map[string]interface{}{
-			"query":   sql,
-			"limit":   limit,
-			"dialect": dialect,
-		},
-	}
+// ExtractSelect reduces an asset statement to the SELECT that produces its
+// rows. A CREATE OR REPLACE VIEW / CTAS / INSERT ... SELECT is unwrapped to its
+// inner SELECT, and a statement that is already a SELECT (with or without a
+// WITH clause) is returned unchanged. This lets a unit test exercise the read
+// logic of a `materialization: none` (full-DDL) asset without issuing the DDL,
+// keeping the test a single read-only SELECT. It errors when the statement has
+// no SELECT to test (e.g. a CREATE TABLE with a column list).
+func (s *SQLParser) ExtractSelect(sql string, dialect string) (string, error) {
+	return s.sendQueryCommand("extract-select", map[string]interface{}{
+		"query":   sql,
+		"dialect": dialect,
+	})
+}
 
-	responsePayload, err := s.sendCommand(&command)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to send command")
-	}
+// SelectFromCTE rewrites a query so it returns all rows of one of its own named
+// CTEs (WITH … SELECT * FROM <cteName>), keeping the other CTEs in place. It
+// lets a unit test assert the output of an intermediate CTE. Errors if the
+// query has no WITH clause or no CTE with that name.
+func (s *SQLParser) SelectFromCTE(sql string, dialect string, cteName string) (string, error) {
+	return s.sendQueryCommand("select-cte", map[string]interface{}{
+		"query":    sql,
+		"dialect":  dialect,
+		"cte_name": cteName,
+	})
+}
 
-	var resp struct {
-		Query string `json:"query"`
-		Error string `json:"error"`
-	}
-	err = json.Unmarshal([]byte(responsePayload), &resp)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to unmarshal response")
-	}
+// FreezeTime replaces CURRENT_TIMESTAMP / CURRENT_DATE / CURRENT_TIME in a query
+// with literals fixed at executionTime, so a unit test of a time-dependent
+// asset is deterministic instead of reading the warehouse clock.
+func (s *SQLParser) FreezeTime(sql string, dialect string, executionTime string) (string, error) {
+	return s.sendQueryCommand("freeze-time", map[string]interface{}{
+		"query":          sql,
+		"dialect":        dialect,
+		"execution_time": executionTime,
+	})
+}
 
-	if resp.Error != "" {
-		return "", errors.New(resp.Error)
-	}
+// CTE is a named common table expression to prepend to a query. The JSON tags
+// match the keys the parser's add-ctes verb reads, so a []CTE serializes
+// directly onto the wire.
+type CTE struct {
+	Name  string `json:"name"`
+	Query string `json:"query"`
+}
 
-	return resp.Query, nil
+// PrependCTEs adds the given CTEs to the front of a query's WITH clause (merging
+// with any existing one, so existing CTEs can reference the prepended ones) and
+// returns the rewritten SQL in the same dialect. It underpins connection-mode
+// unit tests, which substitute the tables a query reads with inline fixture CTEs
+// so the test runs as a single read-only SELECT with no DDL.
+func (s *SQLParser) PrependCTEs(sql string, dialect string, ctes []CTE) (string, error) {
+	return s.sendQueryCommand("add-ctes", map[string]interface{}{
+		"query":   sql,
+		"dialect": dialect,
+		"ctes":    ctes,
+	})
 }
 
 func (s *SQLParser) IsSingleSelectQuery(sql string, dialect string) (bool, error) {
