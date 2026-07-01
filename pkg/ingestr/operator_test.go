@@ -1065,6 +1065,136 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 	}
 }
 
+func TestBasicOperator_MySQLCDCMode(t *testing.T) {
+	t.Parallel()
+
+	// A bruin MySQL connection emits a mysql+pymysql:// URI; Vitess and PlanetScale
+	// use the same MySQL wire protocol, so they reuse a mysql connection.
+	mockMy := new(mockConnection)
+	mockMy.On("GetIngestrURI").Return("mysql+pymysql://user:pass@localhost:3306/db", nil)
+	mockBq := new(mockConnection)
+	mockBq.On("GetIngestrURI").Return("bigquery://uri-here", nil)
+
+	fetcher := simpleConnectionFetcher{
+		connections: map[string]*mockConnection{
+			"my": mockMy,
+			"bq": mockBq,
+		},
+	}
+
+	finder := new(mockFinder)
+
+	tests := []struct {
+		name  string
+		asset *pipeline.Asset
+		want  []string
+	}{
+		{
+			name: "MySQL CDC transforms URI and auto-sets merge strategy",
+			asset: &pipeline.Asset{
+				Name:       "cdc-mysql-asset",
+				Connection: "bq",
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "my",
+					"source_table":      "orders",
+					"destination":       "bigquery",
+					"cdc":               "true",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "mysql+pymysql+cdc://user:pass@localhost:3306/db",
+				"--source-table", "orders",
+				"--dest-uri", "bigquery://uri-here",
+				"--dest-table", "cdc-mysql-asset",
+				"--yes",
+				"--progress", "log",
+				"--incremental-strategy", "merge",
+			},
+		},
+		{
+			name: "Vitess CDC adds VStream grpc parameters",
+			asset: &pipeline.Asset{
+				Name:       "cdc-vitess-asset",
+				Connection: "bq",
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "my",
+					"source_table":      "orders",
+					"destination":       "bigquery",
+					"cdc":               "true",
+					"cdc_grpc_port":     "15991",
+					"cdc_grpc_host":     "vtgate.internal",
+					"cdc_grpc_tls":      "true",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "mysql+pymysql+cdc://user:pass@localhost:3306/db?grpc_host=vtgate.internal&grpc_port=15991&grpc_tls=true",
+				"--source-table", "orders",
+				"--dest-uri", "bigquery://uri-here",
+				"--dest-table", "cdc-vitess-asset",
+				"--yes",
+				"--progress", "log",
+				"--incremental-strategy", "merge",
+			},
+		},
+		{
+			name: "PlanetScale CDC forces the psdbconnect backend",
+			asset: &pipeline.Asset{
+				Name:       "cdc-planetscale-asset",
+				Connection: "bq",
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "my",
+					"source_table":      "orders",
+					"destination":       "bigquery",
+					"cdc":               "true",
+					"cdc_backend":       "planetscale",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "mysql+pymysql+cdc://user:pass@localhost:3306/db?cdc_backend=planetscale",
+				"--source-table", "orders",
+				"--dest-uri", "bigquery://uri-here",
+				"--dest-table", "cdc-planetscale-asset",
+				"--yes",
+				"--progress", "log",
+				"--incremental-strategy", "merge",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			runner := new(mockRunner)
+			runner.On("RunIngestr", mock.Anything, tt.want, []string(nil), repo).Return(nil)
+
+			startDate := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+			endDate := time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC)
+			executionDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+
+			o := &BasicOperator{
+				conn:          &fetcher,
+				finder:        finder,
+				runner:        runner,
+				jinjaRenderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, &executionDate, "ingestr-test", "ingestr-test", nil),
+			}
+
+			ti := scheduler.AssetInstance{
+				Pipeline: &pipeline.Pipeline{},
+				Asset:    tt.asset,
+			}
+
+			ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, false)
+
+			err := o.Run(ctx, &ti)
+			require.NoError(t, err)
+		})
+	}
+}
+
 func TestBasicOperator_Run_MissingConnectionError(t *testing.T) {
 	t.Parallel()
 
