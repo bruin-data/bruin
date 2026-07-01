@@ -28,6 +28,7 @@ func Test_createTaskFromFile(t *testing.T) {
 
 	falseValue := false
 	trueValue := true
+	retriesValue := 5
 
 	type args struct {
 		filePath string
@@ -63,6 +64,7 @@ func Test_createTaskFromFile(t *testing.T) {
 				Name:        "some-sql-task",
 				Description: "some description goes here",
 				Type:        "bq.sql",
+				Retries:     &retriesValue,
 				ExecutableFile: pipeline.ExecutableFile{
 					Name:    "test.sql",
 					Path:    path.AbsPathForTests(t, "testdata/comments/test.sql"),
