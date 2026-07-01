@@ -112,6 +112,13 @@ type AgentThread struct {
 	UpdatedAt string `json:"updated_at"`
 }
 
+// AgentPrompt represents an agent's system prompt.
+type AgentPrompt struct {
+	ID           int     `json:"id"`
+	Name         string  `json:"name"`
+	SystemPrompt *string `json:"system_prompt"`
+}
+
 // AgentMessage represents a message in an agent thread.
 type AgentMessage struct {
 	ID                int             `json:"id"`
