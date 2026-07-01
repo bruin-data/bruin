@@ -313,6 +313,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                                     {text: "Google Sheets", link: "/ingestion/google_sheets"},
                                     {text: "Google Ads", link: "/ingestion/google-ads"},
                                     {text: "Google Analytics", link: "/ingestion/google_analytics"},
+                                    {text: "Google Search Console", link: "/ingestion/gsc"},
                                     {text: "Gorgias", link: "/ingestion/gorgias"},
                                     {text: "G2", link: "/ingestion/g2"},
                                     {text: "Hostaway", link: "/ingestion/hostaway"},

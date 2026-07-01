@@ -195,6 +195,27 @@ func TestLoadFile_DefaultsModelSchemaToV1(t *testing.T) {
 	}
 }
 
+func TestLoadFile_AcceptsLegacyDacSchemaID(t *testing.T) {
+	t.Parallel()
+
+	// dac models written before the engine was shared declared this URL as
+	// their schema id; the engine must keep accepting it so those files do
+	// not need to be migrated.
+	path := filepath.Join(t.TempDir(), "sales.yml")
+	body := "schema: https://getbruin.com/schemas/dac/semantic-model/v1\nname: sales\nsource:\n  table: sales\n"
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+
+	model, err := LoadFile(path)
+	if err != nil {
+		t.Fatalf("load model with legacy schema id: %v", err)
+	}
+	if model.Schema != "https://getbruin.com/schemas/dac/semantic-model/v1" {
+		t.Fatalf("expected legacy schema id preserved, got %q", model.Schema)
+	}
+}
+
 func TestLoadDir_EmptyDirIsOk(t *testing.T) {
 	t.Parallel()
 

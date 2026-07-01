@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/bruin-data/bruin/schemas"
+	"github.com/bruin-data/bruin/semantic-engine/schemas"
 	"github.com/spf13/afero"
 	"gopkg.in/yaml.v3"
 )

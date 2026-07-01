@@ -104,6 +104,9 @@ linters:
     - wrapcheck
     - wsl
   settings:
+    gomoddirectives:
+      # the root module consumes the in-repo semantic-engine module via a local replace
+      replace-local: true
     goconst:
       min-len: 5
       min-occurrences: 5

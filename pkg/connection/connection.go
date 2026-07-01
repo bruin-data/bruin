@@ -66,6 +66,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/googleanalytics"
 	"github.com/bruin-data/bruin/pkg/gorgias"
 	"github.com/bruin-data/bruin/pkg/granola"
+	"github.com/bruin-data/bruin/pkg/gsc"
 	"github.com/bruin-data/bruin/pkg/gsheets"
 	"github.com/bruin-data/bruin/pkg/hana"
 	"github.com/bruin-data/bruin/pkg/hostaway"
@@ -244,6 +245,7 @@ type Manager struct {
 	EMRSeverless         map[string]*emr_serverless.Client
 	DataprocServerless   map[string]*dataprocserverless.Client
 	GoogleAnalytics      map[string]*googleanalytics.Client
+	GSC                  map[string]*gsc.Client
 	AppLovin             map[string]*applovin.Client
 	Salesforce           map[string]*salesforce.Client
 	SQLite               map[string]*sqlite.Client
@@ -2792,6 +2794,30 @@ func (m *Manager) AddGoogleAnalyticsConnectionFromConfig(connection *config.Goog
 	return nil
 }
 
+func (m *Manager) AddGSCConnectionFromConfig(connection *config.GSCConnection) error {
+	m.mutex.Lock()
+	if m.GSC == nil {
+		m.GSC = make(map[string]*gsc.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := gsc.NewClient(&gsc.Config{
+		ServiceAccountFile: connection.ServiceAccountFile,
+		ServiceAccountJSON: connection.ServiceAccountJSON,
+		SiteURL:            connection.SiteURL,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.GSC[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddSalesforceConnectionFromConfig(connection *config.SalesforceConnection) error {
 	m.mutex.Lock()
 	if m.Salesforce == nil {
@@ -3840,6 +3866,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.EMRServerless, connectionManager.AddEMRServerlessConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.DataprocServerless, connectionManager.AddDataprocServerlessConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.GoogleAnalytics, connectionManager.AddGoogleAnalyticsConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.GSC, connectionManager.AddGSCConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.AppLovin, connectionManager.AddAppLovinConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Frankfurter, connectionManager.AddFrankfurterConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Fluxx, connectionManager.AddFluxxConnectionFromConfig, &wg, &errList, &mu)

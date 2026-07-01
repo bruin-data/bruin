@@ -630,6 +630,13 @@ func TestLoadFromFile(t *testing.T) {
 					PropertyID:         "12345",
 				},
 			},
+			GSC: []GSCConnection{
+				{
+					Name:               "conn-gsc",
+					ServiceAccountFile: "path/to/service_account.json",
+					SiteURL:            "sc-domain:example.com",
+				},
+			},
 			Frankfurter: []FrankfurterConnection{
 				{
 					ConnectionMetadata: ConnectionMetadata{Name: "frankfurter-1"},
@@ -2412,6 +2419,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				EMRServerless:       []EMRServerlessConnection{{ConnectionMetadata: ConnectionMetadata{Name: "emr1"}}},
 				DataprocServerless:  []DataprocServerlessConnection{{ConnectionMetadata: ConnectionMetadata{Name: "dataproc1"}}},
 				GoogleAnalytics:     []GoogleAnalyticsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "googleanalytics1"}}},
+				GSC:                 []GSCConnection{{Name: "gsc1"}},
 				AppLovin:            []AppLovinConnection{{ConnectionMetadata: ConnectionMetadata{Name: "applovin1"}}},
 				Frankfurter:         []FrankfurterConnection{{ConnectionMetadata: ConnectionMetadata{Name: "frankfurter1"}}},
 				Salesforce:          []SalesforceConnection{{ConnectionMetadata: ConnectionMetadata{Name: "salesforce1"}}},
@@ -2544,6 +2552,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				EMRServerless:       []EMRServerlessConnection{{ConnectionMetadata: ConnectionMetadata{Name: "emr1"}}},
 				DataprocServerless:  []DataprocServerlessConnection{{ConnectionMetadata: ConnectionMetadata{Name: "dataproc1"}}},
 				GoogleAnalytics:     []GoogleAnalyticsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "googleanalytics1"}}},
+				GSC:                 []GSCConnection{{Name: "gsc1"}},
 				AppLovin:            []AppLovinConnection{{ConnectionMetadata: ConnectionMetadata{Name: "applovin1"}}},
 				Frankfurter:         []FrankfurterConnection{{ConnectionMetadata: ConnectionMetadata{Name: "frankfurter1"}}},
 				Salesforce:          []SalesforceConnection{{ConnectionMetadata: ConnectionMetadata{Name: "salesforce1"}}},

@@ -198,6 +198,7 @@ var defaultMapping = map[string]string{
 	"sail":                  "sail-default",
 	"oracle":                "oracle-default",
 	"googleanalytics":       "googleanalytics-default",
+	"gsc":                   "gsc-default",
 	"applovin":              "applovin-default",
 	"salesforce":            "salesforce-default",
 	"solidgate":             "solidgate-default",

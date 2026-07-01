@@ -1251,6 +1251,12 @@
           },
           "type": "array"
         },
+        "gsc": {
+          "items": {
+            "$ref": "#/$defs/GSCConnection"
+          },
+          "type": "array"
+        },
         "applovin": {
           "items": {
             "$ref": "#/$defs/AppLovinConnection"
@@ -2316,6 +2322,28 @@
       "type": "object",
       "required": [
         "name"
+      ]
+    },
+    "GSCConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "service_account_file": {
+          "type": "string"
+        },
+        "service_account_json": {
+          "type": "string"
+        },
+        "site_url": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "site_url"
       ]
     },
     "GenericConnection": {
