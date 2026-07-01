@@ -2768,6 +2768,7 @@ func (m *Manager) AddInfluxDBConnectionFromConfig(connection *config.InfluxDBCon
 	defer m.mutex.Unlock()
 	m.InfluxDB[connection.Name] = client
 	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
 	return nil
 }
 

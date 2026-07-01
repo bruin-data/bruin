@@ -143,8 +143,8 @@ func TestDopplerClient_GetConnectionDetails_ReturnsDetails(t *testing.T) {
 func TestDopplerClient_GetConnectionDetails_FromCache(t *testing.T) {
 	t.Parallel()
 	cachedConnection := config.GenericConnection{
-		Name:  "test-connection",
-		Value: "cached-value",
+		ConnectionMetadata: config.ConnectionMetadata{Name: "test-connection"},
+		Value:              "cached-value",
 	}
 	c := &DopplerClient{
 		client: &mockDopplerHTTPClient{

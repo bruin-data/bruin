@@ -526,8 +526,8 @@ func TestBasicOperator_ConvertSeedTaskInstanceToIngestrCommand(t *testing.T) {
 		},
 		connectionDetails: map[string]any{
 			"athena": &config.AthenaConnection{
-				Name:     "athena",
-				Database: "analytics",
+				ConnectionMetadata: config.ConnectionMetadata{Name: "athena"},
+				Database:           "analytics",
 			},
 		},
 	}
@@ -794,24 +794,24 @@ func TestSeedOperator_ResolveSeedDestinationTableName(t *testing.T) {
 	fetcher := simpleConnectionFetcher{
 		connectionDetails: map[string]any{
 			"athena": &config.AthenaConnection{
-				Name:     "athena",
-				Database: "analytics",
+				ConnectionMetadata: config.ConnectionMetadata{Name: "athena"},
+				Database:           "analytics",
 			},
 			"pg": &config.PostgresConnection{
-				Name:   "pg",
-				Schema: "mart",
+				ConnectionMetadata: config.ConnectionMetadata{Name: "pg"},
+				Schema:             "mart",
 			},
 			"rs": &config.RedshiftConnection{
-				Name:   "rs",
-				Schema: "warehouse",
+				ConnectionMetadata: config.ConnectionMetadata{Name: "rs"},
+				Schema:             "warehouse",
 			},
 			"sf": &config.SnowflakeConnection{
-				Name:   "sf",
-				Schema: "RAW",
+				ConnectionMetadata: config.ConnectionMetadata{Name: "sf"},
+				Schema:             "RAW",
 			},
 			"ch": &config.ClickHouseConnection{
-				Name:     "ch",
-				Database: "events",
+				ConnectionMetadata: config.ConnectionMetadata{Name: "ch"},
+				Database:           "events",
 			},
 		},
 	}

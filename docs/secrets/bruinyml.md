@@ -95,6 +95,28 @@ connections:
 
 Common use cases include API keys, passwords, and other secrets that don't fit a specific connection type.
 
+## Connection Concurrency Limits
+
+Connections can define `max_concurrent_assets` to cap how many assets can use that connection at the same time in a single pipeline run:
+
+```yaml
+environments:
+  default:
+    connections:
+      postgres:
+        - name: "postgres-main"
+          username: "${POSTGRES_USER}"
+          password: "${POSTGRES_PASSWORD}"
+          host: "db.example.com"
+          port: 5432
+          database: "analytics"
+          max_concurrent_assets: 2
+```
+
+The value must be a positive integer. When the limit is reached, Bruin waits to start additional assets that need the same connection until another asset using that connection finishes.
+
+This limit is separate from the `--workers` setting. `--workers` controls total asset concurrency for a run, while `max_concurrent_assets` controls concurrency for one named connection. For more detail, see [Concurrency & Resource Limits](../getting-started/concurrency.md#connection-concurrency-limits).
+
 ## Connection Types
 
 For the specific fields and configuration options for each connection type, refer to the dedicated documentation pages:
