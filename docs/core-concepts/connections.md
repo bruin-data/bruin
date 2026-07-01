@@ -77,6 +77,26 @@ default_connections:
 
 Assets automatically inherit these connections unless they specify a different one.
 
+## Limiting Connection Concurrency
+
+If a connection should only be used by a limited number of assets at once, set `max_concurrent_assets` on that connection in `.bruin.yml`:
+
+```yaml
+environments:
+  default:
+    connections:
+      snowflake:
+        - name: "sf-default"
+          account: "ABC12345"
+          username: "bruin_user"
+          private_key_path: "credentials/snowflake_key.p8"
+          database: "ANALYTICS"
+          warehouse: "COMPUTE_WH"
+          max_concurrent_assets: 4
+```
+
+Bruin will queue additional assets that need `sf-default` until a slot is available. This is useful when a database, warehouse, or API has a lower concurrency limit than the overall run's worker count. See [Concurrency & Resource Limits](/getting-started/concurrency#connection-concurrency-limits) for details.
+
 ## Data Platform Connections
 
 For specific connection fields and configuration options, see the dedicated documentation:
