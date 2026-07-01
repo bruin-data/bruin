@@ -158,6 +158,7 @@ func DataDiffCmd() *cli.Command {
 	var connectionName string
 	// configFilePath is added to allow overriding the default .bruin.yml path, similar to other commands
 	var configFilePath string
+	var environment string
 	var tolerance float64
 	var full bool
 	var failIfDiff bool
@@ -184,6 +185,12 @@ func DataDiffCmd() *cli.Command {
 				Sources:     cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:       "the path to the .bruin.yml file",
 				Destination: &configFilePath,
+			},
+			&cli.StringFlag{
+				Name:        "environment",
+				Aliases:     []string{"env"},
+				Usage:       "the name of the environment to use for the connections (e.g., dev, prod). If not specified, the default environment will be used",
+				Destination: &environment,
 			},
 			&cli.Float64Flag{
 				Name:        "tolerance",
@@ -259,6 +266,15 @@ func DataDiffCmd() *cli.Command {
 			cm, err := config.LoadOrCreate(fs, configFilePath)
 			if err != nil {
 				return fmt.Errorf("failed to load or create config from '%s': %w", configFilePath, err)
+			}
+
+			// Select the environment for the connections, defaulting to the config's default environment
+			if environment == "" {
+				environment = cm.DefaultEnvironmentName
+			}
+			if err := cm.SelectEnvironment(environment); err != nil {
+				fmt.Fprintf(c.ErrWriter, "Failed to use the environment '%s': %v\n", environment, err)
+				return cli.Exit("", 1)
 			}
 
 			// Create connection manager
