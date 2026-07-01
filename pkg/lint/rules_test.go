@@ -3565,6 +3565,66 @@ func TestEnsurePipelineConcurrencyIsValid(t *testing.T) {
 	}
 }
 
+func TestValidateDefaultHookApplicableTypes(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name            string
+		defaultValues   *pipeline.DefaultValues
+		applicableTypes []string
+		want            []*Issue
+	}{
+		{
+			name:          "no default values",
+			defaultValues: nil,
+			want:          noIssues,
+		},
+		{
+			name:            "empty applicable_type is valid",
+			applicableTypes: nil,
+			want:            noIssues,
+		},
+		{
+			name:            "all valid SQL types",
+			applicableTypes: []string{"duckdb.sql", "bq.sql", "ms.sql"},
+			want:            noIssues,
+		},
+		{
+			name:            "invalid type reported",
+			applicableTypes: []string{"bq.sql", "python"},
+			want: []*Issue{
+				{
+					Description: `Invalid applicable_type "python" in default hooks: hooks are only supported for SQL asset types`,
+				},
+			},
+		},
+		{
+			name:            "unknown type reported",
+			applicableTypes: []string{"totally.made.up"},
+			want: []*Issue{
+				{
+					Description: `Invalid applicable_type "totally.made.up" in default hooks: hooks are only supported for SQL asset types`,
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			p := &pipeline.Pipeline{}
+			if tt.name != "no default values" {
+				p.DefaultValues = &pipeline.DefaultValues{
+					Hooks: pipeline.Hooks{ApplicableTypes: tt.applicableTypes},
+				}
+			}
+			got, err := ValidateDefaultHookApplicableTypes(t.Context(), p)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestEnsurePipelineMaxActiveStepsIsValid(t *testing.T) {
 	t.Parallel()
 

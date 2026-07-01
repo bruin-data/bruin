@@ -2388,6 +2388,64 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 			},
 		},
 		{
+			name: "should apply default hooks when asset type is in applicable_type",
+			asset: &pipeline.Asset{
+				Name: "test-asset",
+				Type: pipeline.AssetTypeBigqueryQuery,
+				ExecutableFile: pipeline.ExecutableFile{
+					Path: "/tmp/test-asset.sql",
+				},
+			},
+			foundPipeline: &pipeline.Pipeline{
+				DefaultValues: &pipeline.DefaultValues{
+					Hooks: pipeline.Hooks{
+						ApplicableTypes: []string{"duckdb.sql", "bq.sql"},
+						Pre:             []pipeline.Hook{{Query: "select 1"}},
+						Post:            []pipeline.Hook{{Query: "select 2"}},
+					},
+				},
+			},
+			want: &pipeline.Asset{
+				Name:       "test-asset",
+				Type:       pipeline.AssetTypeBigqueryQuery,
+				Parameters: pipeline.ParameterMap{},
+				ExecutableFile: pipeline.ExecutableFile{
+					Path: "/tmp/test-asset.sql",
+				},
+				Hooks: pipeline.Hooks{
+					Pre:  []pipeline.Hook{{Query: "select 1"}},
+					Post: []pipeline.Hook{{Query: "select 2"}},
+				},
+			},
+		},
+		{
+			name: "should not apply default hooks when asset type is not in applicable_type",
+			asset: &pipeline.Asset{
+				Name: "test-asset",
+				Type: pipeline.AssetTypeBigqueryQuery,
+				ExecutableFile: pipeline.ExecutableFile{
+					Path: "/tmp/test-asset.sql",
+				},
+			},
+			foundPipeline: &pipeline.Pipeline{
+				DefaultValues: &pipeline.DefaultValues{
+					Hooks: pipeline.Hooks{
+						ApplicableTypes: []string{"duckdb.sql", "ms.sql"},
+						Pre:             []pipeline.Hook{{Query: "select 1"}},
+						Post:            []pipeline.Hook{{Query: "select 2"}},
+					},
+				},
+			},
+			want: &pipeline.Asset{
+				Name:       "test-asset",
+				Type:       pipeline.AssetTypeBigqueryQuery,
+				Parameters: pipeline.ParameterMap{},
+				ExecutableFile: pipeline.ExecutableFile{
+					Path: "/tmp/test-asset.sql",
+				},
+			},
+		},
+		{
 			name: "should not override existing hooks",
 			asset: &pipeline.Asset{
 				Name: "test-asset",
