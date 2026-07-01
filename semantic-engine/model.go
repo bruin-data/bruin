@@ -96,3 +96,15 @@ type SortSpec struct {
 	Name      string `json:"name"`
 	Direction string `json:"direction,omitempty"` // asc, desc
 }
+
+// QueryColumn describes a column in a compiled query's result set.
+//
+// Name is the column name as it appears in the generated SQL (and therefore in
+// the executed result). Qualified dimensions on joined models are sanitized
+// (e.g. "customers.country" becomes "customers_country"), so Name and Field can
+// differ. Field is the name the query referenced — a dimension ref name or a
+// metric name — which callers typically use to map results back to a request.
+type QueryColumn struct {
+	Name  string `json:"name"`
+	Field string `json:"field"`
+}

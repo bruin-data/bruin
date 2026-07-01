@@ -23,10 +23,10 @@ import (
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
-	"github.com/bruin-data/bruin/pkg/semantic"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/telemetry"
+	semantic "github.com/bruin-data/bruin/semantic-engine"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/pkg/errors"
 	gosnowflake "github.com/snowflakedb/gosnowflake"
@@ -170,14 +170,9 @@ func Query() *cli.Command {
 				return handleError(c.String("output"), err)
 			}
 
-			connName, conn, queryStr, assetType, pipelineInfo, err := prepareQueryExecution(ctx, c, fs, vars)
+			connName, conn, queryStr, dialect, pipelineInfo, err := prepareQueryExecution(ctx, c, fs, vars)
 			if err != nil {
 				return handleError(c.String("output"), err)
-			}
-
-			dialect, err := sqlparser.AssetTypeToDialect(assetType)
-			if err != nil {
-				dialect = ""
 			}
 
 			var parser *sqlparser.SQLParser
@@ -462,7 +457,7 @@ func validateFlags(connection, query, asset, pipelinePath string, hasSemanticFla
 	}
 }
 
-func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, vars map[string]any) (string, interface{}, string, pipeline.AssetType, *ppInfo, error) {
+func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, vars map[string]any) (string, interface{}, string, string, *ppInfo, error) {
 	assetPath := c.String("asset")
 	queryStr := c.String("query")
 	env := c.String("environment")
@@ -487,7 +482,7 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, var
 
 	// Direct query mode (no asset path)
 	if assetPath == "" {
-		conn, err := getConnectionFromConfigWithContext(ctx, env, connectionName, fs, c.String("config-file"))
+		conn, connType, err := getConnectionAndTypeFromConfigWithContext(ctx, env, connectionName, fs, c.String("config-file"))
 		if err != nil {
 			return "", nil, "", "", nil, err
 		}
@@ -495,7 +490,7 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, var
 		if err != nil {
 			return "", nil, "", "", nil, err
 		}
-		return connectionName, conn, queryStr, "", nil, nil
+		return connectionName, conn, queryStr, sqlparser.ConnectionTypeToDialect(connType), nil, nil
 	}
 
 	if queryStr != "" {
@@ -537,7 +532,7 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, var
 			return "", nil, "", "", nil, err
 		}
 
-		return connName, conn, queryStr, pipelineInfo.Asset.Type, pipelineInfo, nil
+		return connName, conn, queryStr, dialectForAssetType(pipelineInfo.Asset.Type), pipelineInfo, nil
 	}
 	// Asset query mode (only asset path)
 	pipelineInfo, err := GetPipelineAndAsset(ctx, assetPath, fs, c.String("config-file"))
@@ -581,10 +576,20 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, var
 		return "", nil, "", "", nil, err
 	}
 
-	return connName, conn, queryStr, pipelineInfo.Asset.Type, pipelineInfo, nil
+	return connName, conn, queryStr, dialectForAssetType(pipelineInfo.Asset.Type), pipelineInfo, nil
 }
 
-func prepareSemanticQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, vars map[string]any, startDate time.Time, endDate time.Time) (string, interface{}, string, pipeline.AssetType, *ppInfo, error) {
+// dialectForAssetType returns the SQL parser dialect for the given asset type,
+// or the empty string when the asset type has no registered dialect.
+func dialectForAssetType(assetType pipeline.AssetType) string {
+	dialect, err := sqlparser.AssetTypeToDialect(assetType)
+	if err != nil {
+		return ""
+	}
+	return dialect
+}
+
+func prepareSemanticQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, vars map[string]any, startDate time.Time, endDate time.Time) (string, interface{}, string, string, *ppInfo, error) {
 	semanticModelName := c.String("semantic-model")
 	assetPath := c.String("asset")
 	pipelinePath := c.String("pipeline")
@@ -662,7 +667,7 @@ func prepareSemanticQueryExecution(ctx context.Context, c *cli.Command, fs afero
 			return "", nil, "", "", nil, err
 		}
 
-		return connName, conn, queryStr, pipelineInfo.Asset.Type, pipelineInfo, nil
+		return connName, conn, queryStr, dialectForAssetType(pipelineInfo.Asset.Type), pipelineInfo, nil
 	} else {
 		renderer := newSemanticRenderer(pipelineInfo, vars, startDate, endDate)
 		extractor := &query.WholeFileExtractor{
@@ -673,7 +678,8 @@ func prepareSemanticQueryExecution(ctx context.Context, c *cli.Command, fs afero
 		if err != nil {
 			return "", nil, "", "", nil, err
 		}
-		return connName, conn, queryStr, "", pipelineInfo, nil
+		dialect := sqlparser.ConnectionTypeToDialect(pipelineInfo.Config.SelectedEnvironment.Connections.ConnectionsSummaryList()[connName])
+		return connName, conn, queryStr, dialect, pipelineInfo, nil
 	}
 }
 
@@ -886,9 +892,14 @@ func parseSemanticSortSpec(raw string) (semantic.SortSpec, error) {
 }
 
 func getConnectionFromConfigWithContext(ctx context.Context, env string, connectionName string, fs afero.Fs, configFilePath string) (interface{}, error) {
+	conn, _, err := getConnectionAndTypeFromConfigWithContext(ctx, env, connectionName, fs, configFilePath)
+	return conn, err
+}
+
+func getConnectionAndTypeFromConfigWithContext(ctx context.Context, env string, connectionName string, fs afero.Fs, configFilePath string) (interface{}, string, error) {
 	repoRoot, err := git.FindRepoFromPath(".")
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to find the git repository root")
+		return nil, "", errors.Wrap(err, "failed to find the git repository root")
 	}
 
 	if configFilePath == "" {
@@ -896,31 +907,31 @@ func getConnectionFromConfigWithContext(ctx context.Context, env string, connect
 	}
 	cm, err := config.LoadOrCreate(fs, configFilePath)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to load or create config")
+		return nil, "", errors.Wrap(err, "failed to load or create config")
 	}
 
 	if env != "" {
 		err := cm.SelectEnvironment(env)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to use the environment '%s'", env)
+			return nil, "", errors.Wrapf(err, "failed to use the environment '%s'", env)
 		}
 	}
 
 	manager, errs := connection.NewManagerFromConfigWithContext(ctx, cm)
 	if len(errs) > 0 {
-		return nil, errors.Wrap(errs[0], "failed to create connection manager")
+		return nil, "", errors.Wrap(errs[0], "failed to create connection manager")
 	}
 
 	conn := manager.GetConnection(connectionName)
 	if conn == nil {
-		return nil, &config.MissingConnectionError{
+		return nil, "", &config.MissingConnectionError{
 			Name:            connectionName,
 			ConfigFilePath:  configFilePath,
 			EnvironmentName: cm.SelectedEnvironmentName,
 		}
 	}
 
-	return conn, nil
+	return conn, manager.GetConnectionType(connectionName), nil
 }
 
 func extractQuery(content string, extractor query.QueryExtractor) (string, error) {

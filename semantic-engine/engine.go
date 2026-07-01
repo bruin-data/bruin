@@ -249,17 +249,52 @@ func (e *Engine) validateRefs(name string, visited map[string]bool) error {
 
 // GenerateSQL produces a SQL query string for the given Query.
 func (e *Engine) GenerateSQL(q *Query) (string, error) {
+	sql, _, err := e.GenerateSQLWithColumns(q)
+	return sql, err
+}
+
+// GenerateSQLWithColumns compiles the query and also returns the result set's
+// columns in SELECT order. Each column carries both the name as it appears in
+// the SQL (Name) and the dimension/metric the query referenced (Field), so
+// callers can map results back to the request without re-deriving the engine's
+// column aliasing (qualified joined dimensions are sanitized, e.g.
+// "customers.country" -> "customers_country").
+func (e *Engine) GenerateSQLWithColumns(q *Query) (string, []QueryColumn, error) {
 	plan, err := e.planQuery(q)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	if err := e.validateQuery(q, plan); err != nil {
-		return "", err
+		return "", nil, err
 	}
+
+	var sql string
 	if e.needsWindowWrap(q.Metrics) {
-		return e.generateWrapped(q, plan)
+		sql, err = e.generateWrapped(q, plan)
+	} else {
+		sql, err = e.generateSimple(q, plan)
 	}
-	return e.generateSimple(q, plan)
+	if err != nil {
+		return "", nil, err
+	}
+	return sql, e.outputColumns(q, plan), nil
+}
+
+// outputColumns reports the result columns in the same order the SELECT emits
+// them: dimensions (in query order) followed by metrics (in query order).
+func (e *Engine) outputColumns(q *Query, plan *queryPlan) []QueryColumn {
+	cols := make([]QueryColumn, 0, len(q.Dimensions)+len(q.Metrics))
+	for _, d := range q.Dimensions {
+		name := d.Name
+		if binding := plan.dimensionBinding(d); binding != nil {
+			name = binding.outputAlias
+		}
+		cols = append(cols, QueryColumn{Name: name, Field: d.Name})
+	}
+	for _, name := range q.Metrics {
+		cols = append(cols, QueryColumn{Name: name, Field: name})
+	}
+	return cols
 }
 
 func (e *Engine) validateQuery(q *Query, plan *queryPlan) error {

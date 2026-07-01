@@ -269,6 +269,26 @@ func TestLoadFromFile(t *testing.T) {
 					APIKey: "paddlekey",
 				},
 			},
+			Chargebee: []ChargebeeConnection{
+				{
+					Name:   "conn-chargebee",
+					Site:   "chargebeesite",
+					APIKey: "chargebeekey",
+				},
+			},
+			Recurly: []RecurlyConnection{
+				{
+					Name:   "conn-recurly",
+					APIKey: "recurlykey",
+					Region: "us",
+				},
+			},
+			GitLab: []GitLabConnection{
+				{
+					Name:        "conn-gitlab",
+					AccessToken: "gitlabtoken",
+				},
+			},
 			Dune: []DuneConnection{
 				{
 					Name:   "dune-1",
@@ -609,6 +629,13 @@ func TestLoadFromFile(t *testing.T) {
 					PropertyID:         "12345",
 				},
 			},
+			GSC: []GSCConnection{
+				{
+					Name:               "conn-gsc",
+					ServiceAccountFile: "path/to/service_account.json",
+					SiteURL:            "sc-domain:example.com",
+				},
+			},
 			Frankfurter: []FrankfurterConnection{
 				{
 					Name: "frankfurter-1",
@@ -694,6 +721,13 @@ func TestLoadFromFile(t *testing.T) {
 					Name:      "solidgate-1",
 					SecretKey: "secret-key-123",
 					PublicKey: "public-key-123",
+				},
+			},
+			Square: []SquareConnection{
+				{
+					Name:        "square-1",
+					AccessToken: "EAAA-test-access-token",
+					Environment: "sandbox",
 				},
 			},
 			Smartsheet: []SmartsheetConnection{
@@ -816,6 +850,22 @@ func TestLoadFromFile(t *testing.T) {
 					APISecret:  "test-api-secret",
 				},
 			},
+			Braze: []BrazeConnection{
+				{
+					Name:     "braze-1",
+					APIKey:   "test-api-key",
+					Endpoint: "rest.iad-01.braze.com",
+				},
+			},
+			RedditAds: []RedditAdsConnection{
+				{
+					Name:         "redditads-1",
+					AccessToken:  "test-access-token",
+					ClientID:     "test-client-id",
+					ClientSecret: "test-client-secret",
+					RefreshToken: "test-refresh-token",
+				},
+			},
 			Espn: []EspnConnection{
 				{
 					Name:   "espn-1",
@@ -859,6 +909,18 @@ func TestLoadFromFile(t *testing.T) {
 					Name:   "balldontlie-1",
 					APIKey: "test-api-key",
 					Season: "2026",
+				},
+			},
+			StarRocks: []StarRocksConnection{
+				{
+					Name:     "starrocks-1",
+					Host:     "localhost",
+					Port:     9030,
+					Username: "root",
+					Password: "pass123",
+					Database: "analytics",
+					Catalog:  "iceberg_catalog",
+					SSL:      "true",
 				},
 			},
 		},
@@ -2162,6 +2224,9 @@ func TestConnections_MergeFrom(t *testing.T) {
 				FacebookAds:         []FacebookAdsConnection{{Name: "facebookads1"}},
 				Stripe:              []StripeConnection{{Name: "stripe1"}},
 				Paddle:              []PaddleConnection{{Name: "paddle1"}},
+				Chargebee:           []ChargebeeConnection{{Name: "chargebee1"}},
+				Recurly:             []RecurlyConnection{{Name: "recurly1"}},
+				GitLab:              []GitLabConnection{{Name: "gitlab1"}},
 				Appsflyer:           []AppsflyerConnection{{Name: "appsflyer1"}},
 				Kafka:               []KafkaConnection{{Name: "kafka1"}},
 				RabbitMQ:            []RabbitMQConnection{{Name: "rabbitmq1"}},
@@ -2214,6 +2279,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				EMRServerless:       []EMRServerlessConnection{{Name: "emr1"}},
 				DataprocServerless:  []DataprocServerlessConnection{{Name: "dataproc1"}},
 				GoogleAnalytics:     []GoogleAnalyticsConnection{{Name: "googleanalytics1"}},
+				GSC:                 []GSCConnection{{Name: "gsc1"}},
 				AppLovin:            []AppLovinConnection{{Name: "applovin1"}},
 				Frankfurter:         []FrankfurterConnection{{Name: "frankfurter1"}},
 				Salesforce:          []SalesforceConnection{{Name: "salesforce1"}},
@@ -2223,6 +2289,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Phantombuster:       []PhantombusterConnection{{Name: "phantombuster1"}},
 				Elasticsearch:       []ElasticsearchConnection{{Name: "elasticsearch1"}},
 				Solidgate:           []SolidgateConnection{{Name: "solidgate1"}},
+				Square:              []SquareConnection{{Name: "square1"}},
 				Spanner:             []SpannerConnection{{Name: "spanner1"}},
 				Smartsheet:          []SmartsheetConnection{{Name: "smartsheet1"}},
 				Attio:               []AttioConnection{{Name: "attio1"}},
@@ -2232,6 +2299,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Tableau:             []TableauConnection{{Name: "tableau1"}},
 				QuickSight:          []QuickSightConnection{{Name: "quicksight1"}},
 				Trino:               []TrinoConnection{{Name: "trino1"}},
+				StarRocks:           []StarRocksConnection{{Name: "starrocks1"}},
 				Fluxx:               []FluxxConnection{{Name: "fluxx1"}},
 				Freshdesk:           []FreshdeskConnection{{Name: "freshdesk1"}},
 				FundraiseUp:         []FundraiseUpConnection{{Name: "fundraiseup1"}},
@@ -2245,6 +2313,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				CustomerIo:          []CustomerIoConnection{{Name: "customerio1"}},
 				Sendgrid:            []SendgridConnection{{Name: "sendgrid1"}},
 				Twilio:              []TwilioConnection{{Name: "twilio1"}},
+				Braze:               []BrazeConnection{{Name: "braze1"}},
 				Espn:                []EspnConnection{{Name: "espn1"}},
 				APIFootball:         []APIFootballConnection{{Name: "apifootball1"}},
 				FootballData:        []FootballDataConnection{{Name: "footballdata1"}},
@@ -2288,6 +2357,9 @@ func TestConnections_MergeFrom(t *testing.T) {
 				FacebookAds:         []FacebookAdsConnection{{Name: "facebookads1"}},
 				Stripe:              []StripeConnection{{Name: "stripe1"}},
 				Paddle:              []PaddleConnection{{Name: "paddle1"}},
+				Chargebee:           []ChargebeeConnection{{Name: "chargebee1"}},
+				Recurly:             []RecurlyConnection{{Name: "recurly1"}},
+				GitLab:              []GitLabConnection{{Name: "gitlab1"}},
 				Appsflyer:           []AppsflyerConnection{{Name: "appsflyer1"}},
 				Kafka:               []KafkaConnection{{Name: "kafka1"}},
 				RabbitMQ:            []RabbitMQConnection{{Name: "rabbitmq1"}},
@@ -2340,6 +2412,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				EMRServerless:       []EMRServerlessConnection{{Name: "emr1"}},
 				DataprocServerless:  []DataprocServerlessConnection{{Name: "dataproc1"}},
 				GoogleAnalytics:     []GoogleAnalyticsConnection{{Name: "googleanalytics1"}},
+				GSC:                 []GSCConnection{{Name: "gsc1"}},
 				AppLovin:            []AppLovinConnection{{Name: "applovin1"}},
 				Frankfurter:         []FrankfurterConnection{{Name: "frankfurter1"}},
 				Salesforce:          []SalesforceConnection{{Name: "salesforce1"}},
@@ -2349,6 +2422,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Phantombuster:       []PhantombusterConnection{{Name: "phantombuster1"}},
 				Elasticsearch:       []ElasticsearchConnection{{Name: "elasticsearch1"}},
 				Solidgate:           []SolidgateConnection{{Name: "solidgate1"}},
+				Square:              []SquareConnection{{Name: "square1"}},
 				Spanner:             []SpannerConnection{{Name: "spanner1"}},
 				Smartsheet:          []SmartsheetConnection{{Name: "smartsheet1"}},
 				Attio:               []AttioConnection{{Name: "attio1"}},
@@ -2358,6 +2432,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Tableau:             []TableauConnection{{Name: "tableau1"}},
 				QuickSight:          []QuickSightConnection{{Name: "quicksight1"}},
 				Trino:               []TrinoConnection{{Name: "trino1"}},
+				StarRocks:           []StarRocksConnection{{Name: "starrocks1"}},
 				Fluxx:               []FluxxConnection{{Name: "fluxx1"}},
 				Freshdesk:           []FreshdeskConnection{{Name: "freshdesk1"}},
 				FundraiseUp:         []FundraiseUpConnection{{Name: "fundraiseup1"}},
@@ -2371,6 +2446,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				CustomerIo:          []CustomerIoConnection{{Name: "customerio1"}},
 				Sendgrid:            []SendgridConnection{{Name: "sendgrid1"}},
 				Twilio:              []TwilioConnection{{Name: "twilio1"}},
+				Braze:               []BrazeConnection{{Name: "braze1"}},
 				Espn:                []EspnConnection{{Name: "espn1"}},
 				APIFootball:         []APIFootballConnection{{Name: "apifootball1"}},
 				FootballData:        []FootballDataConnection{{Name: "footballdata1"}},

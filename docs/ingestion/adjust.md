@@ -63,6 +63,28 @@ parameters:
   source_table: 'campaigns:abc123,def456'
 ```
 
+### Attribution Types
+
+The `campaigns` and `creatives` tables default to `click,engaged_ad` attribution. You can override which attribution types are included with the `attribution_types` query parameter, given as a comma-separated list of the [attribution types supported by Adjust](https://dev.adjust.com/en/api/rs-api/reports/).
+
+```yaml
+parameters:
+  source_connection: my_adjust
+  source_table: 'creatives?attribution_types=click,impression,engaged_ad'
+```
+
+```yaml
+# Combined with an app token
+parameters:
+  source_connection: my_adjust
+  source_table: 'creatives?app_token=abc123&attribution_types=click,engaged_ad'
+```
+
+The existing `creatives:abc123` colon form (app token only) continues to work. To set `attribution_types`, use the query-parameter form and pass the app token as `app_token` too — the two forms cannot be combined, so `creatives:abc123?attribution_types=...` is **not** valid. For custom tables, pass `attribution_types` in the filters section instead.
+
+> [!WARNING]
+> Adjust is changing its API-side default on **July 13, 2026** to include **all** attribution types (including `impression`). ingestr currently pins `click,engaged_ad` for these tables to preserve existing behavior. To keep your metrics stable regardless of Adjust's default, set `attribution_types` explicitly for the behavior you want.
+
 ## Available Source Tables
 
 | Table | PK | Inc Key | Inc Strategy | Details |

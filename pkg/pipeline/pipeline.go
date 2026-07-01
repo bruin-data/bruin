@@ -70,6 +70,7 @@ const (
 	AssetTypeLookerStudio              = AssetType("looker_studio")
 	AssetTypeMetabase                  = AssetType("metabase")
 	AssetTypeModeBI                    = AssetType("modebi")
+	AssetTypeMongoSource               = AssetType("mongo.source")
 	AssetTypeMotherduckQuery           = AssetType("motherduck.sql")
 	AssetTypeMsSQLQuery                = AssetType("ms.sql")
 	AssetTypeMsSQLQuerySensor          = AssetType("ms.sensor.query")
@@ -170,6 +171,8 @@ var defaultMapping = map[string]string{
 	"adjust":                "adjust-default",
 	"stripe":                "stripe-default",
 	"paddle":                "paddle-default",
+	"chargebee":             "chargebee-default",
+	"recurly":               "recurly-default",
 	"appsflyer":             "appsflyer-default",
 	"kafka":                 "kafka-default",
 	"duckdb":                "duckdb-default",
@@ -190,18 +193,93 @@ var defaultMapping = map[string]string{
 	"emr_serverless":        "emr_serverless-default",
 	"dataproc_serverless":   "dataproc_serverless-default",
 	"trino":                 "trino-default",
+	"starrocks":             "starrocks-default",
 	"dremio":                "dremio-default",
 	"sail":                  "sail-default",
 	"oracle":                "oracle-default",
 	"googleanalytics":       "googleanalytics-default",
+	"gsc":                   "gsc-default",
 	"applovin":              "applovin-default",
 	"salesforce":            "salesforce-default",
 	"solidgate":             "solidgate-default",
+	"square":                "square-default",
 	"smartsheet":            "smartsheet-default",
 	"sftp":                  "sftp-default",
 	"motherduck":            "motherduck-default",
 	"elasticsearch":         "elasticsearch-default",
 	"vertica":               "vertica-default",
+	"adls":                  "adls-default",
+	"allium":                "allium-default",
+	"anthropic":             "anthropic-default",
+	"apifootball":           "apifootball-default",
+	"appleads":              "appleads-default",
+	"applovinmax":           "applovinmax-default",
+	"attio":                 "attio-default",
+	"balldontlie":           "balldontlie-default",
+	"braze":                 "braze-default",
+	"bruin":                 "bruin-default",
+	"cassandra":             "cassandra-default",
+	"clickup":               "clickup-default",
+	"couchbase":             "couchbase-default",
+	"cratedb":               "cratedb-default",
+	"csv":                   "csv-default",
+	"cursor":                "cursor-default",
+	"customerio":            "customerio-default",
+	"db2":                   "db2-default",
+	"docebo":                "docebo-default",
+	"dune":                  "dune-default",
+	"espn":                  "espn-default",
+	"fireflies":             "fireflies-default",
+	"fluxx":                 "fluxx-default",
+	"footballdata":          "footballdata-default",
+	"frankfurter":           "frankfurter-default",
+	"freshdesk":             "freshdesk-default",
+	"fundraiseup":           "fundraiseup-default",
+	"g2":                    "g2-default",
+	"github":                "github-default",
+	"gitlab":                "gitlab-default",
+	"granola":               "granola-default",
+	"hostaway":              "hostaway-default",
+	"http":                  "http-default",
+	"indeed":                "indeed-default",
+	"influxdb":              "influxdb-default",
+	"intercom":              "intercom-default",
+	"isoc_pulse":            "isoc_pulse-default",
+	"jira":                  "jira-default",
+	"jobtread":              "jobtread-default",
+	"kalshi":                "kalshi-default",
+	"kinesis":               "kinesis-default",
+	"linear":                "linear-default",
+	"linkedinads":           "linkedinads-default",
+	"mailchimp":             "mailchimp-default",
+	"manifold":              "manifold-default",
+	"mixpanel":              "mixpanel-default",
+	"monday":                "monday-default",
+	"personio":              "personio-default",
+	"phantombuster":         "phantombuster-default",
+	"pinterest":             "pinterest-default",
+	"pipedrive":             "pipedrive-default",
+	"plusvibeai":            "plusvibeai-default",
+	"polymarket":            "polymarket-default",
+	"posthog":               "posthog-default",
+	"primer":                "primer-default",
+	"quickbooks":            "quickbooks-default",
+	"quicksight":            "quicksight-default",
+	"rabbitmq":              "rabbitmq-default",
+	"reddit_ads":            "reddit_ads-default",
+	"revenuecat":            "revenuecat-default",
+	"sendgrid":              "sendgrid-default",
+	"sharepoint":            "sharepoint-default",
+	"snapchatads":           "snapchatads-default",
+	"socrata":               "socrata-default",
+	"spanner":               "spanner-default",
+	"sqlite":                "sqlite-default",
+	"surveymonkey":          "surveymonkey-default",
+	"trustpilot":            "trustpilot-default",
+	"twilio":                "twilio-default",
+	"wise":                  "wise-default",
+	"wistia":                "wistia-default",
+	"zoom":                  "zoom-default",
 }
 
 var SupportedFileSuffixes = []string{"asset.yml", "asset.yaml", ".sql", ".py", ".r", "task.yml", "task.yaml"}
@@ -786,6 +864,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeMySQLSeed:                 "mysql",
 	AssetTypeMySQLQuerySensor:          "mysql",
 	AssetTypeMySQLTableSensor:          "mysql",
+	AssetTypeMongoSource:               "mongo",
 	AssetTypeRedshiftQuery:             "redshift",
 	AssetTypeRedshiftSeed:              "redshift",
 	AssetTypeRedshiftQuerySensor:       "redshift",
@@ -812,6 +891,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeSynapseQuery:              "synapse",
 	AssetTypeSynapseSeed:               "synapse",
 	AssetTypeSynapseQuerySensor:        "synapse",
+	AssetTypeSynapseTableSensor:        "synapse",
 	AssetTypeSynapseSource:             "synapse",
 	AssetTypeAthenaQuery:               "athena",
 	AssetTypeAthenaSeed:                "athena",
@@ -849,6 +929,27 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeVerticaSource:             "vertica",
 	AssetTypeQuicksightDataset:         "quicksight",
 	AssetTypeQuicksightDashboard:       "quicksight",
+}
+
+// assetTypeConnectionAlternates lists every connection platform key that can back
+// an asset type, in priority order, for the asset types that more than one
+// connection type can serve. A mongo.source asset, for example, can be backed by
+// either a "mongo" or a "mongo_atlas" connection, so resolving its default
+// connection must consider both keys. Asset types absent here resolve through
+// their single AssetTypeConnectionMapping entry.
+var assetTypeConnectionAlternates = map[AssetType][]string{
+	AssetTypeMongoSource: {"mongo", "mongo_atlas"},
+}
+
+// connectionPlatformsForAssetType returns the connection platform keys to try when
+// resolving an asset's default connection, in priority order. It falls back to the
+// asset type's single AssetTypeConnectionMapping entry (passed as primary) when the
+// type has no alternates.
+func connectionPlatformsForAssetType(assetType AssetType, primary string) []string {
+	if alternates, ok := assetTypeConnectionAlternates[assetType]; ok {
+		return alternates
+	}
+	return []string{primary}
 }
 
 var IngestrTypeConnectionMapping = map[string]AssetType{
@@ -1201,15 +1302,29 @@ func (a *Asset) AddUpstream(asset *Asset) {
 	})
 }
 
+// prefixSchemaComponent applies the dev-environment schema prefix to the schema
+// component of a (possibly multi-part) table name. The schema is always the
+// component immediately before the table, so for `schema.table` it prefixes the
+// first component and for `catalog.schema.table` it prefixes the middle one,
+// leaving the catalog/database untouched. This matches the dev-environment query
+// rewriter (see pkg/devenv). Single-component names have no schema to prefix and
+// are returned unchanged.
+func prefixSchemaComponent(name, prefix string) string {
+	nameParts := strings.Split(name, ".")
+	if len(nameParts) < 2 {
+		return name
+	}
+	schemaIdx := len(nameParts) - 2
+	nameParts[schemaIdx] = prefix + nameParts[schemaIdx]
+	return strings.Join(nameParts, ".")
+}
+
 func (a *Asset) PrefixSchema(prefix string) {
 	if prefix == "" {
 		return
 	}
 
-	nameParts := strings.Split(a.Name, ".")
-	if len(nameParts) == 2 {
-		a.Name = prefix + nameParts[0] + "." + nameParts[1]
-	}
+	a.Name = prefixSchemaComponent(a.Name, prefix)
 }
 
 func (a *Asset) PrefixUpstreams(prefix string) {
@@ -1222,10 +1337,7 @@ func (a *Asset) PrefixUpstreams(prefix string) {
 			continue
 		}
 
-		nameParts := strings.Split(u.Value, ".")
-		if len(nameParts) == 2 {
-			a.Upstreams[i].Value = prefix + nameParts[0] + "." + nameParts[1]
-		}
+		a.Upstreams[i].Value = prefixSchemaComponent(u.Value, prefix)
 	}
 }
 
@@ -2141,9 +2253,14 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 		return "", errors.Errorf("no connection mapping found for asset type '%s'", assetType)
 	}
 
-	conn, ok := p.DefaultConnections[mapping]
-	if ok {
-		return conn, nil
+	// Some asset types can be served by more than one connection platform (e.g. a
+	// mongo.source asset accepts either a "mongo" or a "mongo_atlas" connection), so
+	// check every candidate platform's explicit default connection before falling
+	// back to the magic default name.
+	for _, platform := range connectionPlatformsForAssetType(assetType, mapping) {
+		if conn, ok := p.DefaultConnections[platform]; ok {
+			return conn, nil
+		}
 	}
 
 	defaultConn, ok := defaultMapping[mapping]

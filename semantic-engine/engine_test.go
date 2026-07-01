@@ -195,6 +195,27 @@ func TestLoadFile_DefaultsModelSchemaToV1(t *testing.T) {
 	}
 }
 
+func TestLoadFile_AcceptsLegacyDacSchemaID(t *testing.T) {
+	t.Parallel()
+
+	// dac models written before the engine was shared declared this URL as
+	// their schema id; the engine must keep accepting it so those files do
+	// not need to be migrated.
+	path := filepath.Join(t.TempDir(), "sales.yml")
+	body := "schema: https://getbruin.com/schemas/dac/semantic-model/v1\nname: sales\nsource:\n  table: sales\n"
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+
+	model, err := LoadFile(path)
+	if err != nil {
+		t.Fatalf("load model with legacy schema id: %v", err)
+	}
+	if model.Schema != "https://getbruin.com/schemas/dac/semantic-model/v1" {
+		t.Fatalf("expected legacy schema id preserved, got %q", model.Schema)
+	}
+}
+
 func TestLoadDir_EmptyDirIsOk(t *testing.T) {
 	t.Parallel()
 
@@ -1645,5 +1666,52 @@ func TestRichFixtureSmoke(t *testing.T) {
 		"LIMIT 12",
 	} {
 		expectContains(t, sql, want)
+	}
+}
+
+func TestGenerateSQLWithColumns_JoinedDimensionAlias(t *testing.T) {
+	t.Parallel()
+
+	customers := &Model{
+		Name:       "customers",
+		Source:     Source{Table: "public.customers"},
+		PrimaryKey: "customer_id",
+		Dimensions: []Dimension{{Name: "country", Type: "string"}},
+	}
+	orders := &Model{
+		Name:       "orders",
+		Source:     Source{Table: "public.orders"},
+		PrimaryKey: "order_id",
+		Joins:      []Join{{Name: "customers", Relationship: "many_to_one", ForeignKey: "customer_id"}},
+		Metrics:    []Metric{{Name: "revenue", Expression: "sum(amount)"}},
+	}
+
+	engine, err := NewEngineWithModels(orders, map[string]*Model{"orders": orders, "customers": customers})
+	if err != nil {
+		t.Fatalf("new engine: %v", err)
+	}
+
+	sql, cols, err := engine.GenerateSQLWithColumns(&Query{
+		Dimensions: []DimensionRef{{Name: "customers.country"}},
+		Metrics:    []string{"revenue"},
+	})
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if !strings.Contains(sql, "AS customers_country") {
+		t.Fatalf("expected sanitized alias in SQL, got: %s", sql)
+	}
+
+	want := []QueryColumn{
+		{Name: "customers_country", Field: "customers.country"},
+		{Name: "revenue", Field: "revenue"},
+	}
+	if len(cols) != len(want) {
+		t.Fatalf("expected %d columns, got %d: %+v", len(want), len(cols), cols)
+	}
+	for i, c := range want {
+		if cols[i] != c {
+			t.Fatalf("column %d = %+v, want %+v", i, cols[i], c)
+		}
 	}
 }

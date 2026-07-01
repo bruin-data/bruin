@@ -738,6 +738,36 @@ func (c PaddleConnection) GetName() string {
 	return c.Name
 }
 
+type ChargebeeConnection struct {
+	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Site   string `yaml:"site,omitempty" json:"site" mapstructure:"site"`
+	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+}
+
+func (c ChargebeeConnection) GetName() string {
+	return c.Name
+}
+
+type RecurlyConnection struct {
+	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	Region string `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
+}
+
+func (c RecurlyConnection) GetName() string {
+	return c.Name
+}
+
+type GitLabConnection struct {
+	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	AccessToken string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
+	BaseURL     string `yaml:"base_url,omitempty" json:"base_url,omitempty" mapstructure:"base_url"`
+}
+
+func (c GitLabConnection) GetName() string {
+	return c.Name
+}
+
 type DuneConnection struct {
 	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
@@ -1328,6 +1358,17 @@ func (c GoogleAnalyticsConnection) GetName() string {
 	return c.Name
 }
 
+type GSCConnection struct {
+	Name               string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" mapstructure:"service_account_file"`
+	ServiceAccountJSON string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" mapstructure:"service_account_json"`
+	SiteURL            string `yaml:"site_url,omitempty" json:"site_url" mapstructure:"site_url"`
+}
+
+func (c GSCConnection) GetName() string {
+	return c.Name
+}
+
 type AppLovinConnection struct {
 	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
@@ -1446,6 +1487,16 @@ func (c SolidgateConnection) GetName() string {
 	return c.Name
 }
 
+type SquareConnection struct {
+	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	AccessToken string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
+	Environment string `yaml:"environment,omitempty" json:"environment,omitempty" mapstructure:"environment"`
+}
+
+func (c SquareConnection) GetName() string {
+	return c.Name
+}
+
 type SmartsheetConnection struct {
 	Name         string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	AccessToken  string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
@@ -1527,12 +1578,12 @@ func (c InfluxDBConnection) GetName() string {
 type TableauConnection struct {
 	Name                      string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	Host                      string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
-	Username                  string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
-	Password                  string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
-	PersonalAccessTokenName   string `yaml:"personal_access_token_name,omitempty" json:"personal_access_token_name" mapstructure:"personal_access_token_name"`
-	PersonalAccessTokenSecret string `yaml:"personal_access_token_secret,omitempty" json:"personal_access_token_secret" mapstructure:"personal_access_token_secret"`
+	Username                  string `yaml:"username,omitempty" json:"username,omitempty" mapstructure:"username" jsonschema:"oneof_required=username_password"`
+	Password                  string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password" jsonschema:"oneof_required=username_password"`
+	PersonalAccessTokenName   string `yaml:"personal_access_token_name,omitempty" json:"personal_access_token_name,omitempty" mapstructure:"personal_access_token_name" jsonschema:"oneof_required=personal_access_token"`
+	PersonalAccessTokenSecret string `yaml:"personal_access_token_secret,omitempty" json:"personal_access_token_secret,omitempty" mapstructure:"personal_access_token_secret" jsonschema:"oneof_required=personal_access_token"`
 	SiteID                    string `yaml:"site_id,omitempty" json:"site_id" mapstructure:"site_id"`
-	APIVersion                string `yaml:"api_version,omitempty" json:"api_version" mapstructure:"api_version"`
+	APIVersion                string `yaml:"api_version,omitempty" json:"api_version,omitempty" mapstructure:"api_version"`
 }
 
 type QuickSightConnection struct {
@@ -1559,6 +1610,21 @@ type TrinoConnection struct {
 }
 
 func (c TrinoConnection) GetName() string {
+	return c.Name
+}
+
+type StarRocksConnection struct {
+	Name     string `yaml:"name" json:"name" mapstructure:"name"`
+	Host     string `yaml:"host" json:"host" mapstructure:"host"`
+	Username string `yaml:"username" json:"username" mapstructure:"username"`
+	Password string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password"`
+	Port     int    `yaml:"port,omitempty" json:"port,omitempty" mapstructure:"port"`
+	Database string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
+	Catalog  string `yaml:"catalog,omitempty" json:"catalog,omitempty" mapstructure:"catalog"`
+	SSL      string `yaml:"ssl,omitempty" json:"ssl,omitempty" mapstructure:"ssl"`
+}
+
+func (c StarRocksConnection) GetName() string {
 	return c.Name
 }
 
@@ -1635,9 +1701,11 @@ func (c FreshdeskConnection) GetName() string {
 }
 
 type RedditAdsConnection struct {
-	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
-	AccessToken string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
-	AccountIds  string `yaml:"account_ids,omitempty" json:"account_ids" mapstructure:"account_ids"`
+	Name         string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	AccessToken  string `yaml:"access_token,omitempty" json:"access_token,omitempty" mapstructure:"access_token"`
+	ClientID     string `yaml:"client_id,omitempty" json:"client_id,omitempty" mapstructure:"client_id"`
+	ClientSecret string `yaml:"client_secret,omitempty" json:"client_secret,omitempty" mapstructure:"client_secret"`
+	RefreshToken string `yaml:"refresh_token,omitempty" json:"refresh_token,omitempty" mapstructure:"refresh_token"`
 }
 
 func (c RedditAdsConnection) GetName() string {
@@ -1807,6 +1875,16 @@ type SendgridConnection struct {
 }
 
 func (c SendgridConnection) GetName() string {
+	return c.Name
+}
+
+type BrazeConnection struct {
+	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey   string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	Endpoint string `yaml:"endpoint,omitempty" json:"endpoint" mapstructure:"endpoint"`
+}
+
+func (c BrazeConnection) GetName() string {
 	return c.Name
 }
 

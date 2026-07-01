@@ -533,14 +533,14 @@ func TestClient_BuildTableExistsQuery(t *testing.T) {
 			c:           &DB{config: &Config{Database: "test_db"}},
 			tableName:   ".test_table",
 			wantErr:     true,
-			errContains: "table name must be in format schema.table or table, '.test_table' given",
+			errContains: "contains an empty component",
 		},
 		{
 			name:        "invalid format - empty component 2",
 			c:           &DB{config: &Config{Database: "test_db"}},
 			tableName:   ".",
 			wantErr:     true,
-			errContains: "table name must be in format schema.table or table, '.' given",
+			errContains: "contains an empty component",
 		},
 		{
 			name:        "invalid format - empty table name",
@@ -548,14 +548,14 @@ func TestClient_BuildTableExistsQuery(t *testing.T) {
 			tableName:   "",
 			wantQuery:   "",
 			wantErr:     true,
-			errContains: "table name must be in format schema.table or table, '' given",
+			errContains: "contains an empty component",
 		},
 		{
 			name:        "invalid format - too many components",
 			c:           &DB{config: &Config{Database: "test_db"}},
 			tableName:   "a.b.c.d",
 			wantErr:     true,
-			errContains: "table name must be in format schema.table or table, 'a.b.c.d' given",
+			errContains: "must be in format `table`, `schema.table`, or `database.schema.table`",
 		},
 		{
 			name:      "valid table format (defaults to dbo schema)",
@@ -576,6 +576,13 @@ func TestClient_BuildTableExistsQuery(t *testing.T) {
 			c:         &DB{config: &Config{Database: "test_db"}},
 			tableName: "TestSchema.TestTable",
 			wantQuery: "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'TestSchema' AND table_name = 'TestTable'",
+			wantErr:   false,
+		},
+		{
+			name:      "valid database.schema.table format scopes information_schema to the database",
+			c:         &DB{config: &Config{Database: "test_db"}},
+			tableName: "otherdb.test_schema.test_table",
+			wantQuery: "SELECT COUNT(*) FROM [otherdb].information_schema.tables WHERE table_schema = 'test_schema' AND table_name = 'test_table'",
 			wantErr:   false,
 		},
 	}

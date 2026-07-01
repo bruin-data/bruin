@@ -1,13 +1,15 @@
 package dataprocserverless
 
 import (
+	"bytes"
 	"context"
 	"errors"
-	"fmt"
+	"io"
+	"net/url"
+	"sort"
 	"strings"
-	"time"
 
-	"cloud.google.com/go/logging/logadmin"
+	"cloud.google.com/go/storage"
 	"google.golang.org/api/iterator"
 )
 
@@ -16,108 +18,172 @@ type LogLine struct {
 	Source  string
 }
 
-// CloudLoggingConsumer streams logs from Cloud Logging for a Dataproc Serverless batch job.
-type CloudLoggingConsumer struct {
-	ctx       context.Context //nolint:containedctx
-	client    *logadmin.Client
-	project   string
-	region    string
-	batchID   string
-	lastFetch time.Time
-	seenLogs  map[string]bool
+// GCSLogConsumer streams the Spark driver output that Dataproc Serverless writes
+// to the batch's staging bucket (RuntimeInfo.OutputUri). This is the same source
+// that `gcloud dataproc batches wait` streams.
+//
+// We deliberately do not read job logs from Cloud Logging: Dataproc Serverless
+// writes the driver/executor stdout, stderr and log4j output to this GCS
+// location, and that output does not reliably appear in Cloud Logging (only
+// control-plane logs such as the autoscaler do).
+type GCSLogConsumer struct {
+	ctx           context.Context //nolint:containedctx
+	storageClient *storage.Client
+
+	bucket   string
+	prefix   string
+	resolved bool
+
+	// offsets tracks, per output object, how many bytes have already been read.
+	offsets map[string]int64
+	// partial holds bytes that have been read but not yet terminated by a
+	// newline, per output object. They are completed on a subsequent read or
+	// emitted as-is on Flush.
+	partial map[string][]byte
 }
 
-func (l *CloudLoggingConsumer) Next() []LogLine {
-	if l.seenLogs == nil {
-		l.seenLogs = make(map[string]bool)
+func newGCSLogConsumer(ctx context.Context, client *storage.Client) *GCSLogConsumer {
+	return &GCSLogConsumer{
+		ctx:           ctx,
+		storageClient: client,
+		offsets:       map[string]int64{},
+		partial:       map[string][]byte{},
+	}
+}
+
+// SetOutputURI records the GCS location of the driver output. Dataproc only
+// populates RuntimeInfo.OutputUri once the batch starts running, so this is
+// called on every poll until a non-empty URI is observed.
+func (l *GCSLogConsumer) SetOutputURI(uri string) {
+	if uri == "" || l.resolved {
+		return
+	}
+	u, err := url.Parse(uri)
+	if err != nil {
+		return
+	}
+	l.bucket = u.Host
+	l.prefix = strings.TrimPrefix(u.Path, "/")
+	l.resolved = true
+}
+
+// Next returns any complete log lines written since the last call.
+func (l *GCSLogConsumer) Next() []LogLine {
+	return l.read(false)
+}
+
+// Flush returns any remaining buffered output, including a trailing line that is
+// not newline-terminated. It should be called once after the batch reaches a
+// terminal state.
+func (l *GCSLogConsumer) Flush() []LogLine {
+	return l.read(true)
+}
+
+func (l *GCSLogConsumer) read(flush bool) []LogLine {
+	if !l.resolved {
+		return nil
 	}
 
-	lines := []LogLine{}
+	bucket := l.storageClient.Bucket(l.bucket)
 
-	// Build filter for Dataproc Serverless batch logs
-	// Dataproc Serverless logs are written to Cloud Logging with resource type dataproc_batch
-	filter := fmt.Sprintf(
-		`resource.type="cloud_dataproc_batch" `+
-			`resource.labels.batch_id="%s" `+
-			`resource.labels.location="%s" `+
-			`timestamp >= "%s"`,
-		l.batchID,
-		l.region,
-		l.lastFetch.UTC().Format(time.RFC3339),
-	)
-
-	it := l.client.Entries(l.ctx, logadmin.Filter(filter))
-
+	// Driver output is split across objects named "<prefix>.000000000",
+	// "<prefix>.000000001", ... List them and pull any new bytes into the
+	// per-object buffers. The listing already reports each object's size, so we
+	// avoid a second Attrs call per object on every poll.
+	//
+	// Listing is best-effort: if it fails (e.g. the context was cancelled), we
+	// still fall through to drainBuffers so that any bytes already buffered are
+	// emitted — in particular a final Flush must never drop a buffered partial
+	// line just because the listing failed.
+	it := bucket.Objects(l.ctx, &storage.Query{Prefix: l.prefix})
 	for {
-		entry, err := it.Next()
+		attrs, err := it.Next()
 		if errors.Is(err, iterator.Done) {
 			break
 		}
 		if err != nil {
-			// Log errors silently and continue - logs are best effort
 			break
 		}
+		l.fetch(bucket, attrs.Name, attrs.Size)
+	}
 
-		// Create a unique key for this log entry to avoid duplicates
-		logKey := fmt.Sprintf("%s-%s", entry.InsertID, entry.Timestamp.String())
-		if l.seenLogs[logKey] {
-			continue
+	return l.drainBuffers(flush)
+}
+
+// fetch reads the bytes appended to an output object since the last read into
+// the per-object buffer, advancing the object's offset.
+func (l *GCSLogConsumer) fetch(bucket *storage.BucketHandle, name string, size int64) {
+	off := l.offsets[name]
+	if size <= off {
+		return
+	}
+
+	reader, err := bucket.Object(name).NewRangeReader(l.ctx, off, -1)
+	if err != nil {
+		return
+	}
+	defer reader.Close()
+
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return
+	}
+
+	l.offsets[name] = off + int64(len(data))
+	l.partial[name] = append(l.partial[name], data...)
+}
+
+// drainBuffers emits complete lines from every buffered object in lexical order
+// (which matches the order Dataproc writes them). It does not touch GCS, so it
+// always flushes whatever is buffered regardless of listing failures.
+func (l *GCSLogConsumer) drainBuffers(flush bool) []LogLine {
+	names := make([]string, 0, len(l.partial))
+	for name := range l.partial {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	lines := []LogLine{}
+	for _, name := range names {
+		complete, rest := splitLines(l.partial[name], flush)
+		if len(rest) == 0 {
+			delete(l.partial, name)
+		} else {
+			l.partial[name] = rest
 		}
-		l.seenLogs[logKey] = true
-
-		// Extract the message from the payload
-		message := extractMessage(entry.Payload)
-		if message == "" {
-			continue
-		}
-
-		// Determine the source (driver/executor) from labels
-		source := "SPARK"
-		if entry.Labels != nil {
-			if componentType, ok := entry.Labels["component_type"]; ok {
-				source = strings.ToUpper(componentType)
-			}
-		}
-
-		lines = append(lines, LogLine{
-			Message: message,
-			Source:  source,
-		})
-
-		// Update last fetch time to the latest entry we've seen
-		if entry.Timestamp.After(l.lastFetch) {
-			l.lastFetch = entry.Timestamp
+		for _, msg := range complete {
+			lines = append(lines, LogLine{Source: "DRIVER", Message: msg})
 		}
 	}
 
 	return lines
 }
 
-func extractMessage(payload interface{}) string {
-	switch p := payload.(type) {
-	case string:
-		return strings.TrimSpace(p)
-	case map[string]interface{}:
-		// Try common message fields
-		if msg, ok := p["message"].(string); ok {
-			return strings.TrimSpace(msg)
+// splitLines splits buffered bytes into complete (newline-terminated) lines.
+// When flush is false, bytes after the final newline are returned as rest so
+// they can be completed on a later read. When flush is true, any trailing bytes
+// are emitted as a final line.
+func splitLines(buf []byte, flush bool) (lines []string, rest []byte) {
+	for {
+		idx := bytes.IndexByte(buf, '\n')
+		if idx < 0 {
+			break
 		}
-		if msg, ok := p["textPayload"].(string); ok {
-			return strings.TrimSpace(msg)
-		}
-		// For structured logs, try to get the full content
-		if jsonPayload, ok := p["jsonPayload"].(map[string]interface{}); ok {
-			if msg, ok := jsonPayload["message"].(string); ok {
-				return strings.TrimSpace(msg)
-			}
-		}
+		lines = append(lines, strings.TrimRight(string(buf[:idx]), "\r"))
+		buf = buf[idx+1:]
 	}
-	return ""
+	if flush && len(buf) > 0 {
+		lines = append(lines, strings.TrimRight(string(buf), "\r"))
+		buf = nil
+	}
+	return lines, buf
 }
 
 // NoOpLogConsumer is a log consumer that does nothing.
 type NoOpLogConsumer struct{}
 
-func (l *NoOpLogConsumer) Next() []LogLine {
-	return nil
-}
+func (l *NoOpLogConsumer) Next() []LogLine { return nil }
+
+func (l *NoOpLogConsumer) Flush() []LogLine { return nil }
+
+func (l *NoOpLogConsumer) SetOutputURI(string) {}

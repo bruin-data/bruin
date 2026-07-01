@@ -440,6 +440,29 @@ func TestBuildColumnStatisticsDoesNotRenderNaNFillRateForEmptyCounts(t *testing.
 	assert.NotContains(t, fillRate.DiffPercent, "NaN")
 }
 
+type fakeSchemalessConn struct{ schemaless bool }
+
+func (f fakeSchemalessConn) IsSchemaless() bool { return f.schemaless }
+
+func TestIsSchemalessConnection(t *testing.T) {
+	t.Parallel()
+
+	t.Run("connection that reports schemaless", func(t *testing.T) {
+		t.Parallel()
+		assert.True(t, isSchemalessConnection(fakeSchemalessConn{schemaless: true}))
+	})
+
+	t.Run("connection that implements the interface but is not schemaless", func(t *testing.T) {
+		t.Parallel()
+		assert.False(t, isSchemalessConnection(fakeSchemalessConn{schemaless: false}))
+	})
+
+	t.Run("connection that does not implement the interface", func(t *testing.T) {
+		t.Parallel()
+		assert.False(t, isSchemalessConnection(struct{}{}))
+	})
+}
+
 func TestGenerateAlterStatements(t *testing.T) {
 	t.Parallel()
 

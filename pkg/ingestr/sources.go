@@ -395,6 +395,14 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "custom:<dimensions>:<metrics>", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
 	},
 
+	// Google Search Console
+	"gsc": {
+		{Name: "<granularity>:<dimensions>", PrimaryKey: "", IncKey: "date", IncStrategy: "merge"},
+		{Name: "searchAppearance", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "sites", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "sitemaps", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+	},
+
 	// Google Sheets
 	"google_sheets": {
 		{Name: "<spreadsheet_id>.<sheet_name>", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
@@ -822,6 +830,26 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "incoming_phone_numbers", PrimaryKey: "sid", IncKey: "", IncStrategy: "replace"},
 		{Name: "usage_records", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
 	},
+	// Braze - Customer engagement platform (campaigns, canvases, KPIs)
+	"braze": {
+		{Name: "campaigns", PrimaryKey: "id", IncKey: "last_edited", IncStrategy: "merge"},
+		{Name: "campaign_series", PrimaryKey: "time, campaign_id", IncKey: "time", IncStrategy: "merge"},
+		{Name: "canvases", PrimaryKey: "id", IncKey: "last_edited", IncStrategy: "merge"},
+		{Name: "canvas_series", PrimaryKey: "time, canvas_id", IncKey: "time", IncStrategy: "merge"},
+		{Name: "segments", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "segment_series", PrimaryKey: "time, segment_id", IncKey: "time", IncStrategy: "merge"},
+		{Name: "events", PrimaryKey: "name", IncKey: "", IncStrategy: "replace"},
+		{Name: "event_series", PrimaryKey: "time, event_name", IncKey: "time", IncStrategy: "merge"},
+		{Name: "products", PrimaryKey: "product_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "sessions", PrimaryKey: "time", IncKey: "time", IncStrategy: "merge"},
+		{Name: "purchase_quantity", PrimaryKey: "time", IncKey: "time", IncStrategy: "merge"},
+		{Name: "purchase_revenue", PrimaryKey: "time", IncKey: "time", IncStrategy: "merge"},
+		{Name: "kpi_dau", PrimaryKey: "time", IncKey: "time", IncStrategy: "merge"},
+		{Name: "kpi_mau", PrimaryKey: "time", IncKey: "time", IncStrategy: "merge"},
+		{Name: "kpi_new_users", PrimaryKey: "time", IncKey: "time", IncStrategy: "merge"},
+		{Name: "kpi_uninstalls", PrimaryKey: "time", IncKey: "time", IncStrategy: "merge"},
+		{Name: "user_data", PrimaryKey: "braze_id, segment_id", IncKey: "", IncStrategy: "replace"},
+	},
 
 	// SFTP (user-defined paths)
 	"sftp": {},
@@ -887,6 +915,23 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "financial_entries", PrimaryKey: "id", IncKey: "created_at", IncStrategy: "merge"},
 	},
 
+	// Square - Payments and commerce platform
+	"square": {
+		{Name: "payments", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "refunds", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "orders", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "customers", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "catalog_objects", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "team_members", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "inventory", PrimaryKey: "catalog_object_id, location_id, state", IncKey: "calculated_at", IncStrategy: "merge"},
+		{Name: "locations", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "team_member_wages", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "shifts", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "bank_accounts", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "cash_drawers", PrimaryKey: "id, location_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "loyalty", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+	},
+
 	// GCP Spanner (user-defined tables)
 	"spanner": {},
 
@@ -946,6 +991,34 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "adjustments", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
 	},
 
+	// Chargebee - Subscription billing
+	"chargebee": {
+		{Name: "customers", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "subscriptions", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "invoices", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "transactions", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "orders", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "events", PrimaryKey: "id", IncKey: "occurred_at", IncStrategy: "merge"},
+	},
+
+	// Recurly - Subscription billing
+	"recurly": {
+		{Name: "accounts", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "subscriptions", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "invoices", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "transactions", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "plans", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+	},
+
+	// GitLab - DevOps and code hosting
+	"gitlab": {
+		{Name: "projects", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "groups", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "users", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "issues", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "merge_requests", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+	},
+
 	// SurveyMonkey - Survey and feedback platform
 	"surveymonkey": {
 		{Name: "surveys", PrimaryKey: "id", IncKey: "date_modified", IncStrategy: "merge"},
@@ -968,6 +1041,9 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 
 	// Trino - Distributed SQL query engine (user-defined tables)
 	"trino": {},
+
+	// StarRocks - OLAP database, incl. lakehouse catalogs (user-defined tables)
+	"starrocks": {},
 
 	// Wise - Money transfers
 	"wise": {

@@ -17,6 +17,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/tablename"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/snowflakedb/gosnowflake"
@@ -49,7 +50,7 @@ func NewDB(c *Config) (*DB, error) {
 
 	return &DB{
 		config:        c,
-		schemaCreator: ansisql.NewSchemaCreator(),
+		schemaCreator: ansisql.NewSchemaCreatorWithContainer("DATABASE"),
 		dsn:           dsn,
 		mutex:         sync.Mutex{},
 		typeMapper:    diff.NewSnowflakeTypeMapper(),
@@ -522,13 +523,16 @@ func (db *DB) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset)
 
 func (db *DB) RecreateTableOnMaterializationTypeMismatch(ctx context.Context, asset *pipeline.Asset) error {
 	tableComponents := strings.Split(asset.Name, ".")
+	var databaseName string
 	var schemaName string
 	var tableName string
 	switch len(tableComponents) {
 	case 2:
+		databaseName = db.config.Database
 		schemaName = strings.ToUpper(tableComponents[0])
 		tableName = strings.ToUpper(tableComponents[1])
 	case 3:
+		databaseName = strings.ToUpper(tableComponents[0])
 		schemaName = strings.ToUpper(tableComponents[1])
 		tableName = strings.ToUpper(tableComponents[2])
 	default:
@@ -537,7 +541,7 @@ func (db *DB) RecreateTableOnMaterializationTypeMismatch(ctx context.Context, as
 
 	queryStr := fmt.Sprintf(
 		`SELECT TABLE_TYPE FROM %s.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'`,
-		db.config.Database, schemaName, tableName,
+		databaseName, schemaName, tableName,
 	)
 
 	result, err := db.Select(ctx, &query.Query{Query: queryStr})
@@ -569,11 +573,11 @@ func (db *DB) RecreateTableOnMaterializationTypeMismatch(ctx context.Context, as
 	}
 	if dbMaterializationType != asset.Materialization.Type {
 		dropQuery := query.Query{
-			Query: fmt.Sprintf("DROP %s IF EXISTS %s.%s", materializationType, schemaName, tableName),
+			Query: fmt.Sprintf("DROP %s IF EXISTS %s.%s.%s", materializationType, databaseName, schemaName, tableName),
 		}
 
 		if dropErr := db.RunQueryWithoutResult(ctx, &dropQuery); dropErr != nil {
-			return errors.Wrapf(dropErr, "failed to drop existing %s: %s.%s", materializationType, schemaName, tableName)
+			return errors.Wrapf(dropErr, "failed to drop existing %s: %s.%s.%s", materializationType, databaseName, schemaName, tableName)
 		}
 	}
 
@@ -582,13 +586,16 @@ func (db *DB) RecreateTableOnMaterializationTypeMismatch(ctx context.Context, as
 
 func (db *DB) PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset) error {
 	tableComponents := strings.Split(asset.Name, ".")
+	var databaseName string
 	var schemaName string
 	var tableName string
 	switch len(tableComponents) {
 	case 2:
+		databaseName = db.config.Database
 		schemaName = strings.ToUpper(tableComponents[0])
 		tableName = strings.ToUpper(tableComponents[1])
 	case 3:
+		databaseName = strings.ToUpper(tableComponents[0])
 		schemaName = strings.ToUpper(tableComponents[1])
 		tableName = strings.ToUpper(tableComponents[2])
 	default:
@@ -600,10 +607,10 @@ func (db *DB) PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset)
 	}
 
 	queryStr := fmt.Sprintf(
-		`SELECT COLUMN_NAME, COMMENT 
-          FROM %s.INFORMATION_SCHEMA.COLUMNS 
+		`SELECT COLUMN_NAME, COMMENT
+          FROM %s.INFORMATION_SCHEMA.COLUMNS
           WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'`,
-		db.config.Database, schemaName, tableName,
+		databaseName, schemaName, tableName,
 	)
 
 	rows, err := db.Select(ctx, &query.Query{Query: queryStr})
@@ -627,7 +634,7 @@ func (db *DB) PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset)
 		if col.Description != "" && existingComments[col.Name] != col.Description {
 			query := fmt.Sprintf(
 				`ALTER TABLE %s.%s.%s MODIFY COLUMN %s COMMENT '%s'`,
-				db.config.Database, schemaName, tableName, col.Name, escapeSQLString(col.Description),
+				databaseName, schemaName, tableName, col.Name, escapeSQLString(col.Description),
 			)
 			updateQueries = append(updateQueries, query)
 		}
@@ -642,7 +649,7 @@ func (db *DB) PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset)
 	if asset.Description != "" {
 		updateTableQuery := fmt.Sprintf(
 			`COMMENT ON TABLE %s.%s.%s IS '%s'`,
-			db.config.Database, schemaName, tableName, escapeSQLString(asset.Description),
+			databaseName, schemaName, tableName, escapeSQLString(asset.Description),
 		)
 		if err := db.RunQueryWithoutResult(ctx, &query.Query{Query: updateTableQuery}); err != nil {
 			return errors.Wrap(err, "failed to update table description")
@@ -1440,43 +1447,31 @@ ORDER BY t.table_schema, t.table_name;
 }
 
 func (db *DB) BuildTableExistsQuery(tableName string) (string, error) {
-	tableComponents := strings.Split(tableName, ".")
-	for _, component := range tableComponents {
-		if component == "" {
-			return "", fmt.Errorf("table name must be in schema.table or database.schema.table format, '%s' given", tableName)
-		}
+	cb, ok := tablename.For("snowflake")
+	if !ok {
+		return "", errors.New("snowflake table-name capability not found")
 	}
-
-	var databaseName string
-	var schemaRef, targetTable string
-
-	switch len(tableComponents) {
-	case 2:
-		// schema.table → use default database from config.
-		if db.config.Database == "" {
-			return "", errors.New("no database name provided")
-		}
-		databaseName = strings.ToUpper(db.config.Database)
-		schemaRef = databaseName + ".INFORMATION_SCHEMA.TABLES"
-		targetTable = tableComponents[1]
-	case 3:
-		// database.schema.table
-		databaseName = strings.ToUpper(tableComponents[0])
-		schemaRef = databaseName + ".INFORMATION_SCHEMA.TABLES"
-		targetTable = tableComponents[2]
-	default:
-		return "", fmt.Errorf("table name must be in schema.table or database.schema.table format, '%s' given", tableName)
+	// A bare table or `schema.table` name fills the missing leading components
+	// from the connection config (matching GetTableSummary).
+	tn, err := cb.Parse(tableName, tablename.Defaults{
+		Catalog: db.config.Database,
+		Schema:  db.config.Schema,
+	})
+	if err != nil {
+		return "", err
+	}
+	if tn.Catalog == "" {
+		return "", errors.New("no database name provided")
 	}
 
 	// Snowflake stores unquoted identifiers in uppercase.
-	schemaName := strings.ToUpper(tableComponents[len(tableComponents)-2])
-	targetTable = strings.ToUpper(targetTable)
+	tn = tn.Upper()
 
 	query := fmt.Sprintf(
-		"SELECT COUNT(*) FROM %s WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'",
-		schemaRef,
-		schemaName,
-		targetTable,
+		"SELECT COUNT(*) FROM %s.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'",
+		tn.Catalog,
+		tn.Schema,
+		tn.Table,
 	)
 
 	return strings.TrimSpace(query), nil
