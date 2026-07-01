@@ -1668,3 +1668,50 @@ func TestRichFixtureSmoke(t *testing.T) {
 		expectContains(t, sql, want)
 	}
 }
+
+func TestGenerateSQLWithColumns_JoinedDimensionAlias(t *testing.T) {
+	t.Parallel()
+
+	customers := &Model{
+		Name:       "customers",
+		Source:     Source{Table: "public.customers"},
+		PrimaryKey: "customer_id",
+		Dimensions: []Dimension{{Name: "country", Type: "string"}},
+	}
+	orders := &Model{
+		Name:       "orders",
+		Source:     Source{Table: "public.orders"},
+		PrimaryKey: "order_id",
+		Joins:      []Join{{Name: "customers", Relationship: "many_to_one", ForeignKey: "customer_id"}},
+		Metrics:    []Metric{{Name: "revenue", Expression: "sum(amount)"}},
+	}
+
+	engine, err := NewEngineWithModels(orders, map[string]*Model{"orders": orders, "customers": customers})
+	if err != nil {
+		t.Fatalf("new engine: %v", err)
+	}
+
+	sql, cols, err := engine.GenerateSQLWithColumns(&Query{
+		Dimensions: []DimensionRef{{Name: "customers.country"}},
+		Metrics:    []string{"revenue"},
+	})
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if !strings.Contains(sql, "AS customers_country") {
+		t.Fatalf("expected sanitized alias in SQL, got: %s", sql)
+	}
+
+	want := []QueryColumn{
+		{Name: "customers_country", Field: "customers.country"},
+		{Name: "revenue", Field: "revenue"},
+	}
+	if len(cols) != len(want) {
+		t.Fatalf("expected %d columns, got %d: %+v", len(want), len(cols), cols)
+	}
+	for i, c := range want {
+		if cols[i] != c {
+			t.Fatalf("column %d = %+v, want %+v", i, cols[i], c)
+		}
+	}
+}
