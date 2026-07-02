@@ -1131,7 +1131,7 @@ type GoogleAdsConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	CustomerID         string `yaml:"customer_id,omitempty" json:"customer_id" mapstructure:"customer_id"`
 	ServiceAccountJSON string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" mapstructure:"service_account_json" sensitive:"true"`
-	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" mapstructure:"service_account_file" sensitive_file:"true"`
+	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" mapstructure:"service_account_file"`
 	DeveloperToken     string `yaml:"dev_token,omitempty" json:"dev_token" mapstructure:"dev_token" sensitive:"true"`
 	LoginCustomerID    string `yaml:"login_customer_id,omitempty" json:"login_customer_id,omitempty" mapstructure:"login_customer_id"`
 }
@@ -1242,7 +1242,7 @@ func (c LinearConnection) GetName() string {
 
 type GCSConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" jsonschema:"oneof_required=service_account_file" mapstructure:"service_account_file" sensitive_file:"true"`
+	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" jsonschema:"oneof_required=service_account_file" mapstructure:"service_account_file"`
 	ServiceAccountJSON string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" jsonschema:"oneof_required=service_account_json" mapstructure:"service_account_json" sensitive:"true"`
 	BucketName         string `yaml:"bucket_name,omitempty" json:"bucket_name,omitempty" mapstructure:"bucket_name"`
 	PathToFile         string `yaml:"path_to_file,omitempty" json:"path_to_file,omitempty" mapstructure:"path_to_file"`
@@ -1402,7 +1402,7 @@ func (c EMRServerlessConnection) GetName() string {
 type DataprocServerlessConnection struct {
 	ConnectionMetadata               `yaml:",inline" mapstructure:",squash"`
 	ServiceAccountJSON               string   `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" mapstructure:"service_account_json" sensitive:"true"`
-	ServiceAccountFile               string   `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" mapstructure:"service_account_file" sensitive_file:"true"`
+	ServiceAccountFile               string   `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" mapstructure:"service_account_file"`
 	UseApplicationDefaultCredentials bool     `yaml:"use_application_default_credentials,omitempty" json:"use_application_default_credentials,omitempty" mapstructure:"use_application_default_credentials"`
 	ProjectID                        string   `yaml:"project_id,omitempty" json:"project_id" mapstructure:"project_id"`
 	Region                           string   `yaml:"region" json:"region" mapstructure:"region"`
@@ -1421,7 +1421,7 @@ func (c DataprocServerlessConnection) GetName() string {
 
 type GoogleAnalyticsConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" jsonschema:"oneof_required=service_account_file" mapstructure:"service_account_file" sensitive_file:"true"`
+	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" jsonschema:"oneof_required=service_account_file" mapstructure:"service_account_file"`
 	ServiceAccountJSON string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" jsonschema:"oneof_required=service_account_json" mapstructure:"service_account_json" sensitive:"true"`
 	PropertyID         string `yaml:"property_id,omitempty" json:"property_id" mapstructure:"property_id"`
 }
@@ -1432,7 +1432,7 @@ func (c GoogleAnalyticsConnection) GetName() string {
 
 type GSCConnection struct {
 	Name               string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
-	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" mapstructure:"service_account_file" sensitive_file:"true"`
+	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" mapstructure:"service_account_file"`
 	ServiceAccountJSON string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" mapstructure:"service_account_json" sensitive:"true"`
 	SiteURL            string `yaml:"site_url,omitempty" json:"site_url" mapstructure:"site_url"`
 }
@@ -1542,7 +1542,7 @@ type SpannerConnection struct {
 	InstanceID         string `yaml:"instance_id,omitempty" json:"instance_id" mapstructure:"instance_id"`
 	Database           string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
 	ServiceAccountJSON string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" mapstructure:"service_account_json" sensitive:"true"`
-	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" mapstructure:"service_account_file" sensitive_file:"true"`
+	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" mapstructure:"service_account_file"`
 }
 
 func (c SpannerConnection) GetName() string {

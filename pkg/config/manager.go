@@ -393,6 +393,14 @@ func LoadFromFileOrEnv(fs afero.Fs, path string) (*Config, error) {
 			}
 			env.Connections.GoogleCloudPlatform[i].ServiceAccountFile = filepath.Join(configLocation, conn.ServiceAccountFile)
 		}
+		// Make GoogleSheets service account file paths absolute (bruin reads and
+		// embeds these into the ingestr URI, so masking must find the same file).
+		for i, conn := range env.Connections.GoogleSheets {
+			if conn.ServiceAccountFile == "" || filepath.IsAbs(conn.ServiceAccountFile) {
+				continue
+			}
+			env.Connections.GoogleSheets[i].ServiceAccountFile = filepath.Join(configLocation, conn.ServiceAccountFile)
+		}
 		// Make MySQL SSL file paths absolute
 		for i, conn := range env.Connections.MySQL {
 			if conn.SslCaPath != "" && !filepath.IsAbs(conn.SslCaPath) {
