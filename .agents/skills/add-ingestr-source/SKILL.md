@@ -16,16 +16,23 @@ description: Add Bruin CLI support for a new ingestr source. Use when a task ask
 
 ## Implementation Checklist
 
-Add or update these areas for a new source named `<source>`:
+Add or update these files for a new source named `<source>`:
 
+- `pkg/<source>/config.go`: the `Config` struct and `GetIngestrURI()`.
+- `pkg/<source>/db.go` (or `client.go`, matching the package you copy from): the `Client` and `NewClient`.
 - `pkg/config/connections.go`: add `<Source>Connection` with YAML/JSON/mapstructure tags and `GetName()`.
 - `pkg/config/manager.go`: add the connection slice to `Connections`, then update `AddConnection`, `DeleteConnection`, and `MergeFrom`.
-- `pkg/<source>/`: add a small package with `Config`, `Client`, `NewClient`, and `GetIngestrURI()`.
 - `pkg/connection/connection.go`: import the package, add a `Manager` map, add `Add<Source>ConnectionFromConfig`, store it in `availableConnections` and `AllConnectionDetails`, and process it in `NewManagerFromConfigWithContext`.
+- `pkg/pipeline/pipeline.go`: add a `defaultMapping` entry `"<source>": "<source>-default"`.
 - `pkg/ingestr/sources.go`: add `SourceTablesRegistry["<source>"]`.
 - `docs/ingestion/<source>.md`: document `.bruin.yml` config, ingestr asset YAML, source tables, options, incremental behavior, and example assets.
 - `docs/.vitepress/config.mjs`: add the docs sidebar entry.
-- `integration-tests/expectations/expected_connections_schema.json`: regenerate if the connection schema changes.
+- `pkg/config/manager_test.go`: cover the new connection in `AddConnection`/`DeleteConnection`/`MergeFrom`.
+- `pkg/config/testdata/simple.yml`: add a sample connection block.
+- `pkg/config/testdata/simple_win.yml`: add the same block (keep in sync with `simple.yml`).
+- `integration-tests/expectations/expected_connections_schema.json`: regenerate after the connection schema changes.
+
+Add **every** required and optional parameter from the source URI — do not stop at the common ones. Take the authoritative list from the ingestr repo (`bruin-data/ingestr`) source code — the source's URI/DSN parser — not just the docs, and match each param's name and type exactly.
 
 For sources without fixed tables, add representative `source_table` formats instead of pretending the source has enumerated tables. File/path sources usually need examples for exact paths, globs, and format hints.
 
