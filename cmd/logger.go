@@ -1,12 +1,32 @@
 package cmd
 
 import (
+	"net/url"
+	"os"
+	"sync"
+
 	"github.com/bruin-data/bruin/pkg/logger"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
+// dynStdoutSink writes to the current os.Stdout at write time, so zap output
+// routes through the masking pipe that logOutput swaps in (not the raw fd).
+type dynStdoutSink struct{}
+
+func (dynStdoutSink) Write(p []byte) (int, error) { return os.Stdout.Write(p) }
+func (dynStdoutSink) Sync() error                 { return nil }
+func (dynStdoutSink) Close() error                { return nil }
+
+var registerSinkOnce sync.Once
+
 func makeLogger(isDebug bool) logger.Logger {
+	registerSinkOnce.Do(func() {
+		_ = zap.RegisterSink("bruinstdout", func(*url.URL) (zap.Sink, error) {
+			return dynStdoutSink{}, nil
+		})
+	})
+
 	config := zap.Config{
 		Level:       zap.NewAtomicLevelAt(zap.InfoLevel),
 		Development: false,
@@ -25,8 +45,8 @@ func makeLogger(isDebug bool) logger.Logger {
 			EncodeDuration: zapcore.StringDurationEncoder,
 			EncodeCaller:   zapcore.ShortCallerEncoder,
 		},
-		OutputPaths:      []string{"stdout"},
-		ErrorOutputPaths: []string{"stdout"},
+		OutputPaths:      []string{"bruinstdout://"},
+		ErrorOutputPaths: []string{"bruinstdout://"},
 	}
 
 	if isDebug {
