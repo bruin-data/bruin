@@ -68,3 +68,40 @@ func (e *MissingConnectionError) Error() string {
 		environmentName,
 	)
 }
+
+// ConnectionSetupError provides detailed error information for connection setup issues.
+type ConnectionSetupError struct {
+	ConnectionName string
+	ConnectionType string
+	Issue          string
+	Hint           string
+	OriginalErr    error
+}
+
+func (e *ConnectionSetupError) Error() string {
+	var sb strings.Builder
+
+	if e.ConnectionType != "" {
+		sb.WriteString(e.ConnectionType)
+		sb.WriteString(" ")
+	}
+	sb.WriteString("connection")
+	if e.ConnectionName != "" {
+		sb.WriteString(" '")
+		sb.WriteString(e.ConnectionName)
+		sb.WriteString("'")
+	}
+	sb.WriteString(": ")
+	sb.WriteString(e.Issue)
+
+	if e.Hint != "" {
+		sb.WriteString("\n\nHint: ")
+		sb.WriteString(e.Hint)
+	}
+
+	return sb.String()
+}
+
+func (e *ConnectionSetupError) Unwrap() error {
+	return e.OriginalErr
+}

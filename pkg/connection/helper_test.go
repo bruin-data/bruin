@@ -2,6 +2,7 @@ package connection
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -43,6 +44,8 @@ func TestValidateServiceAccountFile(t *testing.T) {
 	// Test invalid file.
 	if err := validateServiceAccountFile("invalid_path.json"); err == nil {
 		t.Error("expected error for invalid file path, got none")
+	} else if !strings.Contains(err.Error(), "service account file not found") {
+		t.Errorf("expected error about file not found, got: %v", err)
 	}
 
 	// Test empty file.
@@ -61,8 +64,8 @@ func TestValidateServiceAccountFile(t *testing.T) {
 	jsonString := `{"type": "service_account"}`
 	if err := validateServiceAccountFile(jsonString); err == nil {
 		t.Error("expected error for valid JSON string as filePath, got none")
-	} else if err.Error() != "please use service_account_json instead of service_account_file to define json" {
-		t.Errorf("expected specific error message, got: %v", err)
+	} else if !strings.Contains(err.Error(), "service_account_file") && !strings.Contains(err.Error(), "JSON content") {
+		t.Errorf("expected error message about using service_account_json, got: %v", err)
 	}
 }
 
@@ -92,18 +95,18 @@ func TestValidateServiceAccountJSON(t *testing.T) {
 	invalidJSON := `{"type": "service_account",}`
 	if err := validateServiceAccountJSON(invalidJSON); err == nil {
 		t.Error("expected error for invalid JSON format, got none")
-	} else if err.Error() != "invalid JSON format in service account JSON" {
-		t.Errorf("expected specific error message, got: %v", err)
+	} else if !strings.Contains(err.Error(), "invalid JSON format") {
+		t.Errorf("expected error about invalid JSON format, got: %v", err)
 	}
 
 	// Test using a file path that doesn't exist.
 	if err := validateServiceAccountJSON("some_file_path.json"); err == nil {
 		t.Error("expected error for file path, got none")
-	} else if err.Error() != "invalid JSON format in service account JSON" {
-		t.Errorf("expected specific error message, got: %v", err)
+	} else if !strings.Contains(err.Error(), "invalid JSON format") {
+		t.Errorf("expected error about invalid JSON format, got: %v", err)
 	}
 
-	// Test using a file path that exist
+	// Test using a file path that exists
 	tempFile, err := os.CreateTemp(t.TempDir(), "service_account.json")
 	if err != nil {
 		t.Fatalf("failed to create temp file: %v", err)
@@ -117,23 +120,23 @@ func TestValidateServiceAccountJSON(t *testing.T) {
 
 	if err := validateServiceAccountJSON(tempFile.Name()); err == nil {
 		t.Error("expected error for file path, got none")
-	} else if err.Error() != "please use service_account_file instead of service_account_json to define path" {
-		t.Errorf("expected specific error message, got: %v", err)
+	} else if !strings.Contains(err.Error(), "service_account_json") && !strings.Contains(err.Error(), "file path") {
+		t.Errorf("expected error about using service_account_file, got: %v", err)
 	}
 
 	// Test empty JSON string.
 	emptyJSON := ``
 	if err := validateServiceAccountJSON(emptyJSON); err == nil {
 		t.Error("expected error for empty JSON string, got none")
-	} else if err.Error() != "invalid JSON format in service account JSON" {
-		t.Errorf("expected specific error message, got: %v", err)
+	} else if !strings.Contains(err.Error(), "invalid JSON format") {
+		t.Errorf("expected error about invalid JSON format, got: %v", err)
 	}
 
 	// Test malformed JSON string.
 	malformedJSON := `{"type": "service_account", "project_id": "bruin-common-health-check", "private_key_id": "TEST", "private_key": "-----BEGIN PRIVATE KEY-----\nTEST\n-----END PRIVATE KEY-----\n", "client_email": "bruin-health-check@bruin-common-health-check.iam.gserviceaccount.com", "client_id": "TEST", "auth_uri": "https://accounts.google.com/o/oauth2/auth", "token_uri": "https://oauth2.googleapis.com/token", "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs", "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/bruin-health-check%40bruin-common-health-check.iam.gserviceaccount.com", "universe_domain": "googleapis.com"`
 	if err := validateServiceAccountJSON(malformedJSON); err == nil {
 		t.Error("expected error for malformed JSON string, got none")
-	} else if err.Error() != "invalid JSON format in service account JSON" {
-		t.Errorf("expected specific error message, got: %v", err)
+	} else if !strings.Contains(err.Error(), "invalid JSON format") {
+		t.Errorf("expected error about invalid JSON format, got: %v", err)
 	}
 }

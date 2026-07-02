@@ -1,4 +1,3 @@
-
 package data
 
 import (
