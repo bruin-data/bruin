@@ -3318,7 +3318,7 @@ func TestWarnAssetHookApplicableTypeIgnored(t *testing.T) {
 
 			require.Len(t, got, 1)
 			assert.Equal(t, tt.asset, got[0].Task)
-			assert.Equal(t, "applicable_type has no effect on asset-level hooks; it only filters which asset types inherit pipeline default hooks (default.hooks.applicable_type).", got[0].Description)
+			assert.Equal(t, "applicable_type has no effect on asset-level hooks; it only filters which asset types inherit pipeline default hooks.", got[0].Description)
 		})
 	}
 }
