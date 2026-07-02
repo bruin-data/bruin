@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -20,7 +21,7 @@ import (
 	"github.com/invopop/jsonschema"
 	errors2 "github.com/pkg/errors"
 	"github.com/spf13/afero"
-	"github.com/stretchr/testify/assert/yaml"
+	"gopkg.in/yaml.v3"
 )
 
 type Connections struct {
@@ -282,6 +283,8 @@ type Config struct {
 	Environments            map[string]Environment `yaml:"environments" json:"environments" mapstructure:"environments"`
 }
 
+var configEnvVarRegex = regexp.MustCompile(`\${([^}]+)}`)
+
 func (c *Config) Path() string {
 	return c.path
 }
@@ -344,16 +347,19 @@ func (c *Config) SelectEnvironment(name string) error {
 
 func LoadFromFileOrEnv(fs afero.Fs, path string) (*Config, error) {
 	var config Config
-	var err error
 	envConfig := os.Getenv("BRUIN_CONFIG_FILE_CONTENT")
 	if envConfig != "" {
-		err = yaml.Unmarshal([]byte(envConfig), &config)
+		if err := decodeConfigYAML([]byte(envConfig), &config); err != nil {
+			return nil, err
+		}
 	} else {
-		err = path2.ReadYaml(fs, path, &config)
-	}
-
-	if err != nil {
-		return nil, err
+		buf, err := readConfigYAML(fs, path)
+		if err != nil {
+			return nil, err
+		}
+		if err := decodeConfigYAML(buf, &config); err != nil {
+			return nil, err
+		}
 	}
 
 	config.fs = fs
@@ -445,6 +451,67 @@ func LoadFromFileOrEnv(fs afero.Fs, path string) (*Config, error) {
 	return &config, nil
 }
 
+func readConfigYAML(fs afero.Fs, path string) ([]byte, error) {
+	buf, err := afero.ReadFile(fs, path)
+	if err != nil {
+		return nil, errors2.Wrapf(err, "failed to read file %s", path)
+	}
+
+	return buf, nil
+}
+
+func decodeConfigYAML(buf []byte, config *Config) error {
+	var node yaml.Node
+	if err := yaml.Unmarshal(buf, &node); err != nil {
+		return err
+	}
+
+	expandEnvVarsInYAMLValues(&node)
+	return node.Decode(config)
+}
+
+func expandEnvVarsInYAMLValues(node *yaml.Node) {
+	if node == nil {
+		return
+	}
+
+	switch node.Kind {
+	case yaml.DocumentNode, yaml.SequenceNode:
+		for _, child := range node.Content {
+			expandEnvVarsInYAMLValues(child)
+		}
+	case yaml.MappingNode:
+		for i := 1; i < len(node.Content); i += 2 {
+			expandEnvVarsInYAMLValues(node.Content[i])
+		}
+	case yaml.AliasNode:
+		expandEnvVarsInYAMLValues(node.Alias)
+	case yaml.ScalarNode:
+		expanded, ok := expandEnvVarReferences(node.Value)
+		if !ok {
+			return
+		}
+
+		node.Value = expanded
+		node.Tag = ""
+	}
+}
+
+func expandEnvVarReferences(value string) (string, bool) {
+	matched := false
+	expanded := configEnvVarRegex.ReplaceAllStringFunc(value, func(match string) string {
+		matches := configEnvVarRegex.FindStringSubmatch(match)
+		if len(matches) != 2 {
+			return match
+		}
+
+		matched = true
+		return os.Getenv(matches[1])
+	})
+
+	return expanded, matched
+}
+
 func LoadOrCreate(fs afero.Fs, path string) (*Config, error) {
 	config, err := LoadFromFileOrEnv(fs, path)
 	if err != nil && !errors.Is(err, fs2.ErrNotExist) {
@@ -487,7 +554,10 @@ func ensureConfigIsInGitignore(fs afero.Fs, filePath string) error {
 func LoadOrCreateWithoutPathAbsolutization(fs afero.Fs, path string) (*Config, error) {
 	var config Config
 
-	err := path2.ReadYaml(fs, path, &config)
+	buf, err := readConfigYAML(fs, path)
+	if err == nil {
+		err = decodeConfigYAML(buf, &config)
+	}
 	if err != nil && !errors.Is(err, fs2.ErrNotExist) {
 		return nil, err
 	}

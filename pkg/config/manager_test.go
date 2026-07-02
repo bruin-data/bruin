@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -2899,6 +2900,72 @@ environments:
 	require.NotNil(t, got.SelectedEnvironment.Config)
 	assert.True(t, got.SelectedEnvironment.Config.RefreshRestricted)
 	assert.True(t, got.Environments["prod"].Config.RefreshRestricted)
+}
+
+func TestLoadFromFileOrEnv_ExpandsEnvironmentVariablesBeforeDecode(t *testing.T) {
+	t.Setenv("POSTGRES_HOST", "placeholder-host.invalid")
+	t.Setenv("POSTGRES_PORT", "5433")
+	t.Setenv("POSTGRES_DB", "dummy")
+	t.Setenv("POSTGRES_USER", "dummy_user")
+	t.Setenv("POSTGRES_PASSWORD", "dummy_password")
+	t.Setenv("DUCKLAKE_DATA_PATH", "s3://dummy/warehouse")
+	t.Setenv("AWS_REGION", "auto")
+	t.Setenv("R2_S3_ENDPOINT", "dummy.r2.cloudflarestorage.com")
+	t.Setenv("AWS_ACCESS_KEY_ID", "access:key # hash")
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "dummy_secret")
+
+	fs := afero.NewMemMapFs()
+	configPath := filepath.Join("repo", ".bruin.yml")
+	require.NoError(t, fs.MkdirAll(filepath.Dir(configPath), 0o755))
+	require.NoError(t, afero.WriteFile(fs, configPath, []byte(`default_environment: production
+environments:
+  production:
+    connections:
+      duckdb:
+        - name: ducklake
+          path: repro-ducklake.duckdb
+          lakehouse:
+            format: ducklake
+            catalog:
+              type: postgres
+              host: "${POSTGRES_HOST}"
+              port: ${POSTGRES_PORT}
+              database: "${POSTGRES_DB}"
+              auth:
+                username: "${POSTGRES_USER}"
+                password: "${POSTGRES_PASSWORD}"
+            storage:
+              type: s3
+              path: "${DUCKLAKE_DATA_PATH}"
+              region: "${AWS_REGION}"
+              endpoint: "${R2_S3_ENDPOINT}"
+              url_style: path
+              auth:
+                access_key: ${AWS_ACCESS_KEY_ID}
+                secret_key: "${AWS_SECRET_ACCESS_KEY}"
+`), 0o644))
+
+	got, err := LoadFromFileOrEnv(fs, configPath)
+	require.NoError(t, err)
+
+	require.Len(t, got.SelectedEnvironment.Connections.DuckDB, 1)
+	conn := got.SelectedEnvironment.Connections.DuckDB[0]
+	require.NotNil(t, conn.Lakehouse)
+
+	assert.Equal(t, LakehouseFormatDuckLake, conn.Lakehouse.Format)
+	assert.Equal(t, CatalogTypePostgres, conn.Lakehouse.Catalog.Type)
+	assert.Equal(t, "placeholder-host.invalid", conn.Lakehouse.Catalog.Host)
+	assert.Equal(t, 5433, conn.Lakehouse.Catalog.Port)
+	assert.Equal(t, "dummy", conn.Lakehouse.Catalog.Database)
+	assert.Equal(t, "dummy_user", conn.Lakehouse.Catalog.Auth.Username)
+	assert.Equal(t, "dummy_password", conn.Lakehouse.Catalog.Auth.Password)
+	assert.Equal(t, StorageTypeS3, conn.Lakehouse.Storage.Type)
+	assert.Equal(t, "s3://dummy/warehouse", conn.Lakehouse.Storage.Path)
+	assert.Equal(t, "auto", conn.Lakehouse.Storage.Region)
+	assert.Equal(t, "dummy.r2.cloudflarestorage.com", conn.Lakehouse.Storage.Endpoint)
+	assert.Equal(t, "path", conn.Lakehouse.Storage.URLStyle)
+	assert.Equal(t, "access:key # hash", conn.Lakehouse.Storage.Auth.AccessKey)
+	assert.Equal(t, "dummy_secret", conn.Lakehouse.Storage.Auth.SecretKey)
 }
 
 func TestSnowflakeConnection_MarshalYAML_PrivateKey(t *testing.T) {
