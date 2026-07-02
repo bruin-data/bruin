@@ -466,33 +466,35 @@ func decodeConfigYAML(buf []byte, config *Config) error {
 		return err
 	}
 
-	if err := expandEnvVarsInYAMLValues(&node); err != nil {
+	if err := expandEnvVarsInYAMLValues(&node, reflect.TypeOf(*config)); err != nil {
 		return err
 	}
 
 	return node.Decode(config)
 }
 
-func expandEnvVarsInYAMLValues(node *yaml.Node) error {
+func expandEnvVarsInYAMLValues(node *yaml.Node, targetType reflect.Type) error {
 	if node == nil {
 		return nil
 	}
+	targetType = dereferenceType(targetType)
 
 	switch node.Kind {
 	case yaml.DocumentNode, yaml.SequenceNode:
+		elementType := sequenceElementType(targetType)
 		for _, child := range node.Content {
-			if err := expandEnvVarsInYAMLValues(child); err != nil {
+			if err := expandEnvVarsInYAMLValues(child, elementType); err != nil {
 				return err
 			}
 		}
 	case yaml.MappingNode:
 		for i := 1; i < len(node.Content); i += 2 {
-			if err := expandEnvVarsInYAMLValues(node.Content[i]); err != nil {
+			if err := expandEnvVarsInYAMLValues(node.Content[i], mappingValueType(targetType, node.Content[i-1].Value)); err != nil {
 				return err
 			}
 		}
 	case yaml.AliasNode:
-		if err := expandEnvVarsInYAMLValues(node.Alias); err != nil {
+		if err := expandEnvVarsInYAMLValues(node.Alias, targetType); err != nil {
 			return err
 		}
 	case yaml.ScalarNode:
@@ -505,10 +507,104 @@ func expandEnvVarsInYAMLValues(node *yaml.Node) error {
 		}
 
 		node.Value = expanded
-		node.Tag = ""
+		if targetType != nil && targetType.Kind() == reflect.String {
+			node.Tag = "!!str"
+		} else {
+			node.Tag = ""
+			node.Style = 0
+		}
 	}
 
 	return nil
+}
+
+func dereferenceType(targetType reflect.Type) reflect.Type {
+	for targetType != nil && targetType.Kind() == reflect.Ptr {
+		targetType = targetType.Elem()
+	}
+
+	return targetType
+}
+
+func sequenceElementType(targetType reflect.Type) reflect.Type {
+	if targetType == nil {
+		return nil
+	}
+
+	switch targetType.Kind() {
+	case reflect.Slice, reflect.Array:
+		return targetType.Elem()
+	default:
+		return targetType
+	}
+}
+
+func mappingValueType(targetType reflect.Type, key string) reflect.Type {
+	if targetType == nil {
+		return nil
+	}
+
+	switch targetType.Kind() {
+	case reflect.Map:
+		return targetType.Elem()
+	case reflect.Struct:
+		fieldType, ok := yamlFieldType(targetType, key)
+		if !ok {
+			return nil
+		}
+		return fieldType
+	default:
+		return nil
+	}
+}
+
+func yamlFieldType(targetType reflect.Type, key string) (reflect.Type, bool) {
+	for i := range targetType.NumField() {
+		field := targetType.Field(i)
+		if !field.IsExported() {
+			continue
+		}
+
+		tagName, inline := yamlTagName(field)
+		if tagName == "-" {
+			continue
+		}
+
+		if tagName == key {
+			return field.Type, true
+		}
+
+		if inline {
+			if fieldType, ok := yamlFieldType(dereferenceType(field.Type), key); ok {
+				return fieldType, true
+			}
+		}
+	}
+
+	return nil, false
+}
+
+func yamlTagName(field reflect.StructField) (string, bool) {
+	tag := field.Tag.Get("yaml")
+	if tag == "-" {
+		return "-", false
+	}
+
+	parts := strings.Split(tag, ",")
+	name := parts[0]
+	inline := false
+	for _, option := range parts[1:] {
+		if option == "inline" {
+			inline = true
+			break
+		}
+	}
+
+	if name == "" && !inline {
+		name = strings.ToLower(field.Name)
+	}
+
+	return name, inline
 }
 
 func expandEnvVarReferences(value string) (string, bool, error) {

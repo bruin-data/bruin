@@ -2907,7 +2907,7 @@ func TestLoadFromFileOrEnv_ExpandsEnvironmentVariablesBeforeDecode(t *testing.T)
 	t.Setenv("POSTGRES_PORT", "5433")
 	t.Setenv("POSTGRES_DB", "dummy")
 	t.Setenv("POSTGRES_USER", "dummy_user")
-	t.Setenv("POSTGRES_PASSWORD", "dummy_password")
+	t.Setenv("POSTGRES_PASSWORD", "null")
 	t.Setenv("DUCKLAKE_DATA_PATH", "s3://dummy/warehouse")
 	t.Setenv("AWS_REGION", "auto")
 	t.Setenv("R2_S3_ENDPOINT", "dummy.r2.cloudflarestorage.com")
@@ -2929,7 +2929,7 @@ environments:
             catalog:
               type: postgres
               host: "${POSTGRES_HOST}"
-              port: ${POSTGRES_PORT}
+              port: "${POSTGRES_PORT}"
               database: "${POSTGRES_DB}"
               auth:
                 username: "${POSTGRES_USER}"
@@ -2958,7 +2958,7 @@ environments:
 	assert.Equal(t, 5433, conn.Lakehouse.Catalog.Port)
 	assert.Equal(t, "dummy", conn.Lakehouse.Catalog.Database)
 	assert.Equal(t, "dummy_user", conn.Lakehouse.Catalog.Auth.Username)
-	assert.Equal(t, "dummy_password", conn.Lakehouse.Catalog.Auth.Password)
+	assert.Equal(t, "null", conn.Lakehouse.Catalog.Auth.Password)
 	assert.Equal(t, StorageTypeS3, conn.Lakehouse.Storage.Type)
 	assert.Equal(t, "s3://dummy/warehouse", conn.Lakehouse.Storage.Path)
 	assert.Equal(t, "auto", conn.Lakehouse.Storage.Region)
