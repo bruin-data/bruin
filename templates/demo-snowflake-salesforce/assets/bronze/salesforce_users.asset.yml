@@ -1,0 +1,57 @@
+name: bronze.salesforce_users
+type: ingestr
+description: Ingests Salesforce User records for banker, branch, and owner attribution in credit union CRM demos.
+connection: snowflake-default
+tags:
+  - finance
+  - credit_union
+  - crm
+  - salesforce
+  - bronze
+  - raw_ingest
+domains:
+  - crm
+meta:
+  asset_grain: One row per Salesforce User after replace load.
+  load_pattern: Replace load per Bruin Salesforce connector documentation for user.
+  source_object: User
+  source_system: Salesforce Sales Cloud
+
+depends:
+  - bronze.seed_salesforce_demo_data
+
+parameters:
+  destination: snowflake
+  enforce_schema: "true"
+  incremental_strategy: replace
+  schema_contract: evolve
+  schema_naming: snake_case
+  source_connection: salesforce
+  source_table: user
+
+columns:
+  - name: id
+    type: VARCHAR
+    description: Salesforce User identifier.
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: name
+    type: VARCHAR
+    description: User display name.
+  - name: username
+    type: VARCHAR
+    description: Salesforce username.
+  - name: email
+    type: VARCHAR
+    description: User email address.
+  - name: title
+    type: VARCHAR
+    description: User title.
+  - name: department
+    type: VARCHAR
+    description: User department.
+  - name: is_active
+    type: BOOLEAN
+    description: Whether the user is active.

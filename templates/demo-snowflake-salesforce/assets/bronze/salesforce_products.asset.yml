@@ -1,0 +1,61 @@
+name: bronze.salesforce_products
+type: ingestr
+description: Ingests Salesforce Product records for credit union loan, deposit, card, and wellness catalog analysis.
+connection: snowflake-default
+tags:
+  - finance
+  - credit_union
+  - crm
+  - salesforce
+  - bronze
+  - raw_ingest
+domains:
+  - crm
+  - lending
+meta:
+  asset_grain: One row per Salesforce product after replace load.
+  load_pattern: Replace load per Bruin Salesforce connector documentation for product.
+  source_object: Product2
+  source_system: Salesforce Sales Cloud
+
+depends:
+  - bronze.seed_salesforce_demo_data
+
+parameters:
+  destination: snowflake
+  enforce_schema: "true"
+  incremental_strategy: replace
+  schema_contract: evolve
+  schema_naming: snake_case
+  source_connection: salesforce
+  source_table: product
+
+columns:
+  - name: id
+    type: VARCHAR
+    description: Salesforce Product2 identifier.
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: product_code
+    type: VARCHAR
+    description: Product code.
+  - name: name
+    type: VARCHAR
+    description: Product name.
+  - name: family
+    type: VARCHAR
+    description: Product family.
+  - name: is_active
+    type: BOOLEAN
+    description: Whether the product is active.
+  - name: created_date
+    type: TIMESTAMP
+    description: Product creation timestamp.
+  - name: last_modified_date
+    type: TIMESTAMP
+    description: Product last modification timestamp.
+  - name: system_modstamp
+    type: TIMESTAMP
+    description: Salesforce system modification timestamp.

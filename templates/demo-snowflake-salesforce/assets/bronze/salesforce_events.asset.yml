@@ -1,0 +1,75 @@
+name: bronze.salesforce_events
+type: ingestr
+description: Ingests Salesforce Event records for appointments, banker meetings, and community outreach activity analysis.
+connection: snowflake-default
+tags:
+  - finance
+  - credit_union
+  - crm
+  - salesforce
+  - bronze
+  - raw_ingest
+domains:
+  - crm
+  - member_relationships
+meta:
+  asset_grain: One row per Salesforce Event after merge by id.
+  load_pattern: Mutable merge on Salesforce SystemModstamp.
+  source_object: Event
+  source_system: Salesforce Sales Cloud
+
+depends:
+  - bronze.seed_salesforce_demo_data
+
+parameters:
+  cluster_by: system_modstamp,activity_date
+  destination: snowflake
+  enforce_schema: "true"
+  incremental_key: SystemModstamp
+  incremental_strategy: merge
+  schema_contract: evolve
+  schema_naming: snake_case
+  source_connection: salesforce
+  source_table: event
+
+columns:
+  - name: id
+    type: VARCHAR
+    description: Salesforce Event identifier.
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: what_id
+    type: VARCHAR
+    description: Related Salesforce object identifier, usually an Opportunity in this demo.
+  - name: owner_id
+    type: VARCHAR
+    description: Salesforce User identifier for the event owner.
+  - name: who_id
+    type: VARCHAR
+    description: Related Contact or Lead identifier.
+  - name: subject
+    type: VARCHAR
+    description: Event subject.
+  - name: activity_date
+    type: DATE
+    description: Event activity date.
+  - name: start_date_time
+    type: TIMESTAMP
+    description: Event start timestamp.
+  - name: end_date_time
+    type: TIMESTAMP
+    description: Event end timestamp.
+  - name: duration_in_minutes
+    type: INTEGER
+    description: Event duration in minutes.
+  - name: created_date
+    type: TIMESTAMP
+    description: Event creation timestamp.
+  - name: last_modified_date
+    type: TIMESTAMP
+    description: Event last modification timestamp.
+  - name: system_modstamp
+    type: TIMESTAMP
+    description: Salesforce system modification timestamp used as the incremental key.

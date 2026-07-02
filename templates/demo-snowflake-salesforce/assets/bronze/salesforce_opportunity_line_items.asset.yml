@@ -1,0 +1,66 @@
+name: bronze.salesforce_opportunity_line_items
+type: ingestr
+description: Ingests Salesforce OpportunityLineItem records for product-level lending and deposit pipeline analysis.
+connection: snowflake-default
+tags:
+  - finance
+  - credit_union
+  - crm
+  - salesforce
+  - bronze
+  - raw_ingest
+domains:
+  - crm
+  - lending
+meta:
+  asset_grain: One row per Salesforce OpportunityLineItem after merge by id.
+  load_pattern: Mutable merge on Salesforce SystemModstamp.
+  source_object: OpportunityLineItem
+  source_system: Salesforce Sales Cloud
+
+depends:
+  - bronze.seed_salesforce_demo_data
+
+parameters:
+  cluster_by: system_modstamp
+  destination: snowflake
+  enforce_schema: "true"
+  incremental_key: SystemModstamp
+  incremental_strategy: merge
+  schema_contract: evolve
+  schema_naming: snake_case
+  source_connection: salesforce
+  source_table: opportunity_line_item
+
+columns:
+  - name: id
+    type: VARCHAR
+    description: Salesforce OpportunityLineItem identifier.
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: opportunity_id
+    type: VARCHAR
+    description: Related Opportunity identifier.
+  - name: pricebook_entry_id
+    type: VARCHAR
+    description: Related PricebookEntry identifier.
+  - name: quantity
+    type: DOUBLE
+    description: Line item quantity.
+  - name: unit_price
+    type: DOUBLE
+    description: Unit price for the line item.
+  - name: total_price
+    type: DOUBLE
+    description: Total line item price.
+  - name: created_date
+    type: TIMESTAMP
+    description: OpportunityLineItem creation timestamp.
+  - name: last_modified_date
+    type: TIMESTAMP
+    description: OpportunityLineItem last modification timestamp.
+  - name: system_modstamp
+    type: TIMESTAMP
+    description: Salesforce system modification timestamp used as the incremental key.

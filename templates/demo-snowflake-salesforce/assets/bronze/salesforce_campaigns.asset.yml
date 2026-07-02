@@ -1,0 +1,64 @@
+name: bronze.salesforce_campaigns
+type: ingestr
+description: Ingests Salesforce Campaign records for credit union marketing and community outreach attribution.
+connection: snowflake-default
+tags:
+  - finance
+  - credit_union
+  - crm
+  - salesforce
+  - bronze
+  - raw_ingest
+domains:
+  - crm
+  - marketing
+meta:
+  asset_grain: One row per Salesforce Campaign after replace load.
+  load_pattern: Replace load per Bruin Salesforce connector documentation for campaign.
+  source_object: Campaign
+  source_system: Salesforce Sales Cloud
+
+depends:
+  - bronze.seed_salesforce_demo_data
+
+parameters:
+  destination: snowflake
+  enforce_schema: "true"
+  incremental_strategy: replace
+  schema_contract: evolve
+  schema_naming: snake_case
+  source_connection: salesforce
+  source_table: campaign
+
+columns:
+  - name: id
+    type: VARCHAR
+    description: Salesforce Campaign identifier.
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: name
+    type: VARCHAR
+    description: Campaign name.
+  - name: type
+    type: VARCHAR
+    description: Campaign type.
+  - name: status
+    type: VARCHAR
+    description: Campaign status.
+  - name: start_date
+    type: DATE
+    description: Campaign start date.
+  - name: end_date
+    type: DATE
+    description: Campaign end date.
+  - name: created_date
+    type: TIMESTAMP
+    description: Campaign creation timestamp.
+  - name: last_modified_date
+    type: TIMESTAMP
+    description: Campaign last modification timestamp.
+  - name: system_modstamp
+    type: TIMESTAMP
+    description: Salesforce system modification timestamp.

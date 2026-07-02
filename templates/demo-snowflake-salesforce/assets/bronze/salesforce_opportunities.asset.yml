@@ -1,0 +1,117 @@
+name: bronze.salesforce_opportunities
+type: ingestr
+description: |
+  Ingests Salesforce Opportunity records into Snowflake through Bruin's built-in
+  ingestr runner. Opportunities represent proposed loans, cards, and financial
+  wellness products in the credit union demo.
+connection: snowflake-default
+tags:
+  - finance
+  - credit_union
+  - crm
+  - salesforce
+  - snowflake
+  - bronze
+  - raw_ingest
+  - daily_batch
+domains:
+  - crm
+  - lending
+meta:
+  asset_grain: One row per Salesforce Opportunity record after merge by id.
+  load_pattern: Mutable merge on Salesforce SystemModstamp, not append-only.
+  pipeline_role: Bronze CRM source ingestion.
+  refresh_cadence: Daily batch pipeline.
+  source_object: Opportunity
+  source_system: Salesforce Sales Cloud
+
+depends:
+  - bronze.seed_salesforce_demo_data
+
+parameters:
+  cluster_by: system_modstamp,close_date
+  destination: snowflake
+  enforce_schema: "true"
+  incremental_key: SystemModstamp
+  incremental_strategy: merge
+  schema_contract: evolve
+  schema_naming: snake_case
+  source_connection: salesforce
+  source_table: opportunity
+
+columns:
+  - name: id
+    type: VARCHAR
+    description: Salesforce Opportunity identifier.
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: account_id
+    type: VARCHAR
+    description: Salesforce Account identifier associated with the opportunity.
+  - name: owner_id
+    type: VARCHAR
+    description: Salesforce User identifier for the opportunity owner.
+  - name: name
+    type: VARCHAR
+    description: Opportunity display name.
+  - name: type
+    type: VARCHAR
+    description: Salesforce opportunity type.
+  - name: lead_source
+    type: VARCHAR
+    description: Source channel for the opportunity.
+  - name: credit_union_agent_test_tier_june15__c
+    type: VARCHAR
+    description: Custom Opportunity tier field added for the June 15 additive schema-drift demo.
+  - name: credit_union_tier__c
+    type: VARCHAR
+    description: Custom Opportunity text tier used for credit union segmentation demos, populated with values such as Silver, Gold, and Platinum.
+  - name: stage_name
+    type: VARCHAR
+    description: Salesforce opportunity stage.
+    checks:
+      - name: not_null
+  - name: amount
+    type: DOUBLE
+    description: Opportunity amount in USD.
+    checks:
+      - name: non_negative
+  - name: probability
+    type: DOUBLE
+    description: Salesforce probability percentage for the opportunity.
+    checks:
+      - name: min
+        value: 0
+      - name: max
+        value: 100
+  - name: credit_union_agent_test_score__c
+    type: VARCHAR
+    description: Self-healing scenario score from Salesforce, preserved as source text.
+  - name: close_date
+    type: DATE
+    description: Expected or actual close date.
+    checks:
+      - name: not_null
+  - name: is_closed
+    type: BOOLEAN
+    description: Whether the opportunity is in a closed stage.
+  - name: is_won
+    type: BOOLEAN
+    description: Whether the opportunity is closed won.
+  - name: created_date
+    type: TIMESTAMP
+    description: Timestamp when the Opportunity was created in Salesforce.
+    checks:
+      - name: not_null
+  - name: last_modified_date
+    type: TIMESTAMP
+    description: Timestamp when the Opportunity was last modified in Salesforce.
+    checks:
+      - name: not_null
+  - name: system_modstamp
+    type: TIMESTAMP
+    description: Salesforce system modification timestamp used as the incremental key.
+    checks:
+      - name: not_null

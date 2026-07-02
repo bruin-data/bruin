@@ -43,6 +43,15 @@ func TestGetIngestrDestinationType(t *testing.T) {
 			want: pipeline.AssetTypeBigqueryQuery,
 		},
 		{
+			name: "google_sheets",
+			asset: &pipeline.Asset{
+				Parameters: pipeline.ParameterMap{
+					"destination": "gsheets",
+				},
+			},
+			want: pipeline.AssetTypeGoogleSheets,
+		},
+		{
 			name: "not found",
 			asset: &pipeline.Asset{
 				Parameters: pipeline.ParameterMap{

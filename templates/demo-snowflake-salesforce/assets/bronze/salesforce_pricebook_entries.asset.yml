@@ -1,0 +1,61 @@
+name: bronze.salesforce_pricebook_entries
+type: ingestr
+description: Ingests Salesforce PricebookEntry records for opportunity line item pricing.
+connection: snowflake-default
+tags:
+  - finance
+  - credit_union
+  - crm
+  - salesforce
+  - bronze
+  - raw_ingest
+domains:
+  - crm
+  - lending
+meta:
+  asset_grain: One row per Salesforce PricebookEntry after replace load.
+  load_pattern: Replace load per Bruin Salesforce connector documentation for pricebook_entry.
+  source_object: PricebookEntry
+  source_system: Salesforce Sales Cloud
+
+depends:
+  - bronze.seed_salesforce_demo_data
+
+parameters:
+  destination: snowflake
+  enforce_schema: "true"
+  incremental_strategy: replace
+  schema_contract: evolve
+  schema_naming: snake_case
+  source_connection: salesforce
+  source_table: pricebook_entry
+
+columns:
+  - name: id
+    type: VARCHAR
+    description: Salesforce PricebookEntry identifier.
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: pricebook2_id
+    type: VARCHAR
+    description: Related Pricebook2 identifier.
+  - name: product2_id
+    type: VARCHAR
+    description: Related Product2 identifier.
+  - name: unit_price
+    type: DOUBLE
+    description: Product unit price.
+  - name: is_active
+    type: BOOLEAN
+    description: Whether the pricebook entry is active.
+  - name: created_date
+    type: TIMESTAMP
+    description: PricebookEntry creation timestamp.
+  - name: last_modified_date
+    type: TIMESTAMP
+    description: PricebookEntry last modification timestamp.
+  - name: system_modstamp
+    type: TIMESTAMP
+    description: Salesforce system modification timestamp.

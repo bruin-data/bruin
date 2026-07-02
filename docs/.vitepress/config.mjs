@@ -483,6 +483,8 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                     {text: "athena", link: "/getting-started/templates-docs/athena-README"},
                     {text: "clickhouse", link: "/getting-started/templates-docs/clickhouse-README"},
                     {text: "chess", link: "/getting-started/templates-docs/chess-README"},
+                    {text: "demo-snowflake-sales-analytics", link: "/getting-started/templates-docs/demo-snowflake-sales-analytics-README"},
+                    {text: "demo-snowflake-salesforce", link: "/getting-started/templates-docs/demo-snowflake-salesforce-README"},
                     {text: "duckdb", link: "/getting-started/templates-docs/duckdb-README"},
                     {text: "ecommerce", link: "/getting-started/templates-docs/ecommerce-README"},
                     {text: "firebase", link: "/getting-started/templates-docs/firebase-README"},
