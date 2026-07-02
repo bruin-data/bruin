@@ -1,0 +1,58 @@
+name: bronze.salesforce_pricebooks
+type: ingestr
+description: Ingests Salesforce Pricebook records for CRM product pricing context.
+connection: snowflake-default
+tags:
+  - finance
+  - credit_union
+  - crm
+  - salesforce
+  - bronze
+  - raw_ingest
+domains:
+  - crm
+  - lending
+meta:
+  asset_grain: One row per Salesforce Pricebook after replace load.
+  load_pattern: Replace load per Bruin Salesforce connector documentation for pricebook.
+  source_object: Pricebook2
+  source_system: Salesforce Sales Cloud
+
+depends:
+  - bronze.seed_salesforce_demo_data
+
+parameters:
+  destination: snowflake
+  enforce_schema: "true"
+  incremental_strategy: replace
+  schema_contract: evolve
+  schema_naming: snake_case
+  source_connection: salesforce
+  source_table: pricebook
+
+columns:
+  - name: id
+    type: VARCHAR
+    description: Salesforce Pricebook2 identifier.
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: name
+    type: VARCHAR
+    description: Pricebook name.
+  - name: is_active
+    type: BOOLEAN
+    description: Whether the pricebook is active.
+  - name: is_standard
+    type: BOOLEAN
+    description: Whether the pricebook is the standard Salesforce pricebook.
+  - name: created_date
+    type: TIMESTAMP
+    description: Pricebook creation timestamp.
+  - name: last_modified_date
+    type: TIMESTAMP
+    description: Pricebook last modification timestamp.
+  - name: system_modstamp
+    type: TIMESTAMP
+    description: Salesforce system modification timestamp.

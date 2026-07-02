@@ -1286,7 +1286,8 @@ func TestSqlParser_ExtractSelect(t *testing.T) { //nolint
 
 	t.Run("a WITH clause is preserved when unwrapping", func(t *testing.T) {
 		got, err := parser.ExtractSelect(
-			"CREATE OR REPLACE VIEW analytics.v AS WITH e AS (SELECT id FROM orders) SELECT * FROM e", "duckdb")
+			"CREATE OR REPLACE VIEW analytics.v AS WITH e AS (SELECT id FROM orders) SELECT * FROM e", "duckdb",
+		)
 		require.NoError(t, err)
 		require.NotContains(t, strings.ToUpper(got), "CREATE")
 		require.Contains(t, strings.ToUpper(got), "WITH")
@@ -1320,7 +1321,8 @@ func TestSqlParser_ExtractSelect(t *testing.T) { //nolint
 		// Postgres lets a CTE write (DELETE ... RETURNING) while the outer
 		// statement is a SELECT. The write must still be caught.
 		_, err := parser.ExtractSelect(
-			"WITH gone AS (DELETE FROM orders WHERE status = 'void' RETURNING id) SELECT * FROM gone", "postgres")
+			"WITH gone AS (DELETE FROM orders WHERE status = 'void' RETURNING id) SELECT * FROM gone", "postgres",
+		)
 		require.Error(t, err)
 	})
 
@@ -1338,7 +1340,8 @@ func TestSqlParser_SelectFromCTE(t *testing.T) { //nolint
 
 	t.Run("selects a named CTE, keeping the other CTEs in place", func(t *testing.T) {
 		got, err := parser.SelectFromCTE(
-			"WITH a AS (SELECT 1 AS id), b AS (SELECT id + 1 AS id FROM a) SELECT * FROM b", "duckdb", "a")
+			"WITH a AS (SELECT 1 AS id), b AS (SELECT id + 1 AS id FROM a) SELECT * FROM b", "duckdb", "a",
+		)
 		require.NoError(t, err)
 		require.Contains(t, got, "a AS (")
 		require.Contains(t, got, "b AS (") // unused CTE is preserved
@@ -1403,7 +1406,8 @@ func TestSqlParser_RenameTablesClearsStaleCatalog(t *testing.T) { //nolint
 			got, err := parser.RenameTables(
 				"SELECT amount FROM myproj.analytics.orders",
 				dialect,
-				map[string]string{"myproj.analytics.orders": "cte_x"})
+				map[string]string{"myproj.analytics.orders": "cte_x"},
+			)
 			require.NoError(t, err)
 			require.Contains(t, got, "cte_x")
 			require.NotContains(t, got, "myproj")    // stale catalog cleared

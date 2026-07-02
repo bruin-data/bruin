@@ -1,0 +1,77 @@
+name: bronze.salesforce_leads
+type: ingestr
+description: Ingests Salesforce Lead records used for member acquisition and campaign funnel analysis.
+connection: snowflake-default
+tags:
+  - finance
+  - credit_union
+  - crm
+  - salesforce
+  - bronze
+  - raw_ingest
+  - potential_pii
+domains:
+  - crm
+  - member_relationships
+meta:
+  asset_grain: One row per Salesforce Lead after replace load.
+  load_pattern: Replace load per Bruin Salesforce connector documentation for lead.
+  source_object: Lead
+  source_system: Salesforce Sales Cloud
+
+depends:
+  - bronze.seed_salesforce_demo_data
+
+parameters:
+  destination: snowflake
+  enforce_schema: "true"
+  incremental_strategy: replace
+  schema_contract: evolve
+  schema_naming: snake_case
+  source_connection: salesforce
+  source_table: lead
+
+columns:
+  - name: id
+    type: VARCHAR
+    description: Salesforce Lead identifier.
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: first_name
+    type: VARCHAR
+    description: Lead first name.
+  - name: last_name
+    type: VARCHAR
+    description: Lead last name.
+  - name: company
+    type: VARCHAR
+    description: Lead company or household label.
+  - name: email
+    type: VARCHAR
+    description: Lead email address.
+  - name: lead_source
+    type: VARCHAR
+    description: Acquisition source.
+  - name: status
+    type: VARCHAR
+    description: Salesforce lead status.
+  - name: rating
+    type: VARCHAR
+    description: Salesforce lead rating.
+  - name: city
+    type: VARCHAR
+    description: Lead city.
+  - name: state
+    type: VARCHAR
+    description: Lead state.
+  - name: created_date
+    type: TIMESTAMP
+    description: Lead creation timestamp.
+  - name: last_modified_date
+    type: TIMESTAMP
+    description: Lead last modification timestamp.
+  - name: system_modstamp
+    type: TIMESTAMP
+    description: Salesforce system modification timestamp.

@@ -1,0 +1,82 @@
+name: bronze.salesforce_contacts
+type: ingestr
+description: |
+  Ingests Salesforce Contact records into Snowflake through Bruin's built-in
+  ingestr runner. Contacts link member-level people to CRM accounts.
+connection: snowflake-default
+tags:
+  - finance
+  - credit_union
+  - crm
+  - salesforce
+  - snowflake
+  - bronze
+  - raw_ingest
+  - daily_batch
+  - potential_pii
+domains:
+  - crm
+  - member_relationships
+meta:
+  asset_grain: One row per Salesforce Contact record after merge by id.
+  load_pattern: Mutable merge on Salesforce SystemModstamp, not append-only.
+  pipeline_role: Bronze CRM source ingestion.
+  refresh_cadence: Daily batch pipeline.
+  source_object: Contact
+  source_system: Salesforce Sales Cloud
+
+depends:
+  - bronze.seed_salesforce_demo_data
+
+parameters:
+  cluster_by: system_modstamp
+  destination: snowflake
+  enforce_schema: "true"
+  incremental_key: SystemModstamp
+  incremental_strategy: merge
+  schema_contract: evolve
+  schema_naming: snake_case
+  source_connection: salesforce
+  source_table: contact
+
+columns:
+  - name: id
+    type: VARCHAR
+    description: Salesforce Contact identifier.
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: account_id
+    type: VARCHAR
+    description: Salesforce Account identifier associated with the contact.
+  - name: first_name
+    type: VARCHAR
+    description: Contact first name.
+  - name: last_name
+    type: VARCHAR
+    description: Contact last name.
+  - name: email
+    type: VARCHAR
+    description: Contact email address.
+  - name: title
+    type: VARCHAR
+    description: Contact role or relationship title.
+  - name: lead_source
+    type: VARCHAR
+    description: Original lead source assigned in Salesforce.
+  - name: created_date
+    type: TIMESTAMP
+    description: Timestamp when the Contact was created in Salesforce.
+    checks:
+      - name: not_null
+  - name: last_modified_date
+    type: TIMESTAMP
+    description: Timestamp when the Contact was last modified in Salesforce.
+    checks:
+      - name: not_null
+  - name: system_modstamp
+    type: TIMESTAMP
+    description: Salesforce system modification timestamp used as the incremental key.
+    checks:
+      - name: not_null
