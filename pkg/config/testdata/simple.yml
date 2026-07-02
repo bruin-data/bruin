@@ -100,7 +100,7 @@ environments:
           database: "commerce"
           grpc_port: 15991
 
-      planetscale:
+      planetscale_mysql:
         - name: conn8c
           username: "psuser"
           password: "pspass"

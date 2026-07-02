@@ -1268,7 +1268,7 @@ func (m *Manager) AddVitessConnectionFromConfig(connection *config.VitessConnect
 
 // AddPlanetScaleConnectionFromConfig registers a PlanetScale connection. It reuses the shared
 // mysql.Client for direct connectivity (TLS is always on) while emitting ingestr's dedicated
-// "planetscale" scheme via planetscale.Config.GetIngestrURI.
+// "ps_mysql" scheme via planetscale.Config.GetIngestrURI.
 func (m *Manager) AddPlanetScaleConnectionFromConfig(connection *config.PlanetScaleConnection) error {
 	m.mutex.Lock()
 	if m.Planetscale == nil {

@@ -679,8 +679,8 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 	// Vitess - MySQL-compatible sharded database (user-defined tables)
 	"vitess": {},
 
-	// PlanetScale - Managed Vitess platform (user-defined tables)
-	"planetscale": {},
+	// PlanetScale MySQL - Managed Vitess platform (user-defined tables)
+	"planetscale_mysql": {},
 
 	// Notion - Workspace
 	"notion": {

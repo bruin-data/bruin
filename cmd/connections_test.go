@@ -42,7 +42,7 @@ environments:
           database: "commerce"
           port: 15306
           grpc_port: 15991
-      planetscale:
+      planetscale_mysql:
         - name: "planetscale_conn"
           host: "aws.connect.psdb.cloud"
           username: "user"

@@ -237,19 +237,27 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 
 	// Handle CDC mode - transform the source URI into ingestr's CDC scheme and auto-set merge strategy.
 	// Supported today: PostgreSQL (postgres+cdc), the MySQL family (mysql+cdc / mariadb+cdc),
-	// Vitess (vitess+cdc, VStream) and PlanetScale (planetscale+cdc, psdbconnect).
+	// Vitess (vitess+cdc, VStream) and PlanetScale (ps_mysql+cdc, psdbconnect).
 	if cdcVal, _ := asset.Parameters.GetString("cdc"); cdcVal == "true" {
-		parsedURI, err := url.Parse(sourceURI)
+		// url.Parse rejects schemes containing an underscore (PlanetScale's ps_mysql), so split
+		// the scheme off manually, parse the remainder under a placeholder, and restore the real
+		// scheme. This mirrors how ingestr parses its own MySQL-family URIs.
+		scheme, rest, found := strings.Cut(sourceURI, "://")
+		if !found {
+			return fmt.Errorf("source URI %q has no scheme, cannot enable CDC", sourceURI)
+		}
+		parsedURI, err := url.Parse("placeholder://" + rest)
 		if err != nil {
 			return fmt.Errorf("failed to parse source URI for CDC: %w", err)
 		}
+		parsedURI.Scheme = scheme
 
 		switch {
 		case strings.Contains(parsedURI.Scheme, "postgresql"):
 			parsedURI.Scheme = strings.ReplaceAll(parsedURI.Scheme, "postgresql", "postgres+cdc")
 		case strings.HasPrefix(parsedURI.Scheme, "mysql"), strings.HasPrefix(parsedURI.Scheme, "mariadb"),
-			strings.HasPrefix(parsedURI.Scheme, "vitess"), strings.HasPrefix(parsedURI.Scheme, "planetscale"):
-			// mysql+cdc / mariadb+cdc / vitess+cdc / planetscale+cdc are all valid CDC schemes.
+			strings.HasPrefix(parsedURI.Scheme, "vitess"), strings.HasPrefix(parsedURI.Scheme, "ps_mysql"):
+			// mysql+cdc / mariadb+cdc / vitess+cdc / ps_mysql+cdc are all valid CDC schemes.
 			if !strings.HasSuffix(parsedURI.Scheme, "+cdc") {
 				parsedURI.Scheme += "+cdc"
 			}
@@ -263,10 +271,8 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		if slot, _ := asset.Parameters.GetString("cdc_slot"); slot != "" {
 			q.Set("slot", slot)
 		}
-		// Vitess VStream / PlanetScale psdbconnect parameters.
-		if backend, _ := asset.Parameters.GetString("cdc_backend"); backend != "" {
-			q.Set("cdc_backend", backend)
-		}
+		// Vitess VStream parameters. The old cdc_backend selector is gone: ingestr routes
+		// Vitess/PlanetScale purely by scheme (vitess+cdc / ps_mysql+cdc) since v1.0.62.
 		if grpcPort, _ := asset.Parameters.GetString("cdc_grpc_port"); grpcPort != "" {
 			q.Set("grpc_port", grpcPort)
 		}

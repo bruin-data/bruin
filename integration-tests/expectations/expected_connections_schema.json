@@ -837,7 +837,7 @@
           },
           "type": "array"
         },
-        "planetscale": {
+        "planetscale_mysql": {
           "items": {
             "$ref": "#/$defs/PlanetScaleConnection"
           },

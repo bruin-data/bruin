@@ -1069,9 +1069,8 @@ func TestBasicOperator_MySQLCDCMode(t *testing.T) {
 	t.Parallel()
 
 	// A bruin MySQL connection emits a mysql+pymysql:// URI. These cases also exercise the
-	// operator's generic CDC parameter plumbing (grpc_* / cdc_backend) on the MySQL family;
-	// the dedicated vitess:// / planetscale:// schemes are covered by
-	// TestBasicOperator_VitessPlanetScaleCDCMode.
+	// operator's generic CDC parameter plumbing (grpc_*) on the MySQL family; the dedicated
+	// vitess:// / ps_mysql:// schemes are covered by TestBasicOperator_VitessPlanetScaleCDCMode.
 	mockMy := new(mockConnection)
 	mockMy.On("GetIngestrURI").Return("mysql+pymysql://user:pass@localhost:3306/db", nil)
 	mockBq := new(mockConnection)
@@ -1141,7 +1140,9 @@ func TestBasicOperator_MySQLCDCMode(t *testing.T) {
 			},
 		},
 		{
-			name: "PlanetScale CDC forces the psdbconnect backend",
+			// cdc_backend is obsolete (ingestr routes by scheme since v1.0.62); a stray value must
+			// not leak into the emitted URI.
+			name: "MySQL CDC ignores the obsolete cdc_backend parameter",
 			asset: &pipeline.Asset{
 				Name:       "cdc-planetscale-asset",
 				Connection: "bq",
@@ -1155,7 +1156,7 @@ func TestBasicOperator_MySQLCDCMode(t *testing.T) {
 			},
 			want: []string{
 				"ingest",
-				"--source-uri", "mysql+pymysql+cdc://user:pass@localhost:3306/db?cdc_backend=planetscale",
+				"--source-uri", "mysql+pymysql+cdc://user:pass@localhost:3306/db",
 				"--source-table", "orders",
 				"--dest-uri", "bigquery://uri-here",
 				"--dest-table", "cdc-planetscale-asset",
@@ -1200,13 +1201,15 @@ func TestBasicOperator_MySQLCDCMode(t *testing.T) {
 func TestBasicOperator_VitessPlanetScaleCDCMode(t *testing.T) {
 	t.Parallel()
 
-	// Dedicated Vitess/PlanetScale connections emit the vitess:// / planetscale:// schemes.
+	// Dedicated Vitess/PlanetScale connections emit the vitess:// / ps_mysql:// schemes.
 	// The vitess connection carries the vtgate gRPC port in the URI (from its config builder),
 	// so it survives into the derived vitess+cdc:// scheme without any asset-level parameters.
+	// The ps_mysql scheme also guards the underscore path: url.Parse can't parse it, so the
+	// operator must extract the scheme manually to derive ps_mysql+cdc://.
 	mockVitess := new(mockConnection)
 	mockVitess.On("GetIngestrURI").Return("vitess://user:pass@vtgate.internal:15306/commerce?grpc_port=15991", nil)
 	mockPS := new(mockConnection)
-	mockPS.On("GetIngestrURI").Return("planetscale://user:pass@aws.connect.psdb.cloud:3306/my_database", nil)
+	mockPS.On("GetIngestrURI").Return("ps_mysql://user:pass@aws.connect.psdb.cloud:3306/my_database", nil)
 	mockBq := new(mockConnection)
 	mockBq.On("GetIngestrURI").Return("bigquery://uri-here", nil)
 
@@ -1270,7 +1273,7 @@ func TestBasicOperator_VitessPlanetScaleCDCMode(t *testing.T) {
 			},
 		},
 		{
-			name: "PlanetScale CDC derives the planetscale+cdc scheme",
+			name: "PlanetScale CDC derives the ps_mysql+cdc scheme",
 			asset: &pipeline.Asset{
 				Name:       "cdc-planetscale-asset",
 				Connection: "bq",
@@ -1283,7 +1286,7 @@ func TestBasicOperator_VitessPlanetScaleCDCMode(t *testing.T) {
 			},
 			want: []string{
 				"ingest",
-				"--source-uri", "planetscale+cdc://user:pass@aws.connect.psdb.cloud:3306/my_database",
+				"--source-uri", "ps_mysql+cdc://user:pass@aws.connect.psdb.cloud:3306/my_database",
 				"--source-table", "orders",
 				"--dest-uri", "bigquery://uri-here",
 				"--dest-table", "cdc-planetscale-asset",

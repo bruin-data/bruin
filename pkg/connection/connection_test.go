@@ -313,7 +313,7 @@ func TestManager_AddPlanetScaleConnectionFromConfig(t *testing.T) {
 
 	uri, err := res.GetIngestrURI()
 	require.NoError(t, err)
-	assert.Equal(t, "planetscale://user:pass@aws.connect.psdb.cloud:3306/psdb", uri)
+	assert.Equal(t, "ps_mysql://user:pass@aws.connect.psdb.cloud:3306/psdb", uri)
 	assert.Equal(t, configuration, m.GetConnectionDetails("test"))
 }
 

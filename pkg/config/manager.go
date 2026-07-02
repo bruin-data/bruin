@@ -45,7 +45,7 @@ type Connections struct {
 	MongoAtlas          []MongoAtlasConnection          `yaml:"mongo_atlas,omitempty" json:"mongo_atlas,omitempty" mapstructure:"mongo_atlas"`
 	MySQL               []MySQLConnection               `yaml:"mysql,omitempty" json:"mysql,omitempty" mapstructure:"mysql"`
 	Vitess              []VitessConnection              `yaml:"vitess,omitempty" json:"vitess,omitempty" mapstructure:"vitess"`
-	Planetscale         []PlanetScaleConnection         `yaml:"planetscale,omitempty" json:"planetscale,omitempty" mapstructure:"planetscale"`
+	Planetscale         []PlanetScaleConnection         `yaml:"planetscale_mysql,omitempty" json:"planetscale_mysql,omitempty" mapstructure:"planetscale_mysql"`
 	Notion              []NotionConnection              `yaml:"notion,omitempty" json:"notion,omitempty" mapstructure:"notion"`
 	Allium              []AlliumConnection              `yaml:"allium,omitempty" json:"allium,omitempty" mapstructure:"allium"`
 	HANA                []HANAConnection                `yaml:"hana,omitempty" json:"hana,omitempty" mapstructure:"hana"`
@@ -687,7 +687,7 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Vitess = append(env.Connections.Vitess, conn)
-	case "planetscale":
+	case "planetscale_mysql":
 		var conn PlanetScaleConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
 			return fmt.Errorf("failed to decode credentials: %w", err)
@@ -1591,7 +1591,7 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.MySQL = removeConnection(env.Connections.MySQL, connectionName)
 	case "vitess":
 		env.Connections.Vitess = removeConnection(env.Connections.Vitess, connectionName)
-	case "planetscale":
+	case "planetscale_mysql":
 		env.Connections.Planetscale = removeConnection(env.Connections.Planetscale, connectionName)
 	case "notion":
 		env.Connections.Notion = removeConnection(env.Connections.Notion, connectionName)
