@@ -54,8 +54,8 @@ func appendConnectionMetadataYAML(node *yaml.Node, metadata ConnectionMetadata) 
 
 type AwsConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	AccessKey          string `yaml:"access_key,omitempty" json:"access_key" mapstructure:"access_key"`
-	SecretKey          string `yaml:"secret_key,omitempty" json:"secret_key" mapstructure:"secret_key"`
+	AccessKey          string `yaml:"access_key,omitempty" json:"access_key" mapstructure:"access_key" sensitive:"true"`
+	SecretKey          string `yaml:"secret_key,omitempty" json:"secret_key" mapstructure:"secret_key" sensitive:"true"`
 	Region             string `yaml:"region,omitempty" json:"region" mapstructure:"region"`
 }
 
@@ -65,8 +65,8 @@ func (c AwsConnection) GetName() string {
 
 type GoogleCloudPlatformConnection struct { //nolint:recvcheck
 	ConnectionMetadata               `yaml:",inline" mapstructure:",squash"`
-	ServiceAccountJSON               string   `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" mapstructure:"service_account_json"`
-	ServiceAccountFile               string   `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" mapstructure:"service_account_file"`
+	ServiceAccountJSON               string   `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" mapstructure:"service_account_json" sensitive:"true"`
+	ServiceAccountFile               string   `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" mapstructure:"service_account_file" sensitive_file:"true"`
 	ProjectID                        string   `yaml:"project_id,omitempty" json:"project_id" mapstructure:"project_id"`
 	Location                         string   `yaml:"location,omitempty" json:"location,omitempty" mapstructure:"location"`
 	UseApplicationDefaultCredentials bool     `yaml:"use_application_default_credentials,omitempty" json:"use_application_default_credentials,omitempty" mapstructure:"use_application_default_credentials"`
@@ -161,9 +161,9 @@ func (c GoogleCloudPlatformConnection) MarshalJSON() ([]byte, error) {
 
 type AthenaConnection struct { //nolint:recvcheck
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	AccessKey          string `yaml:"access_key_id,omitempty" json:"access_key_id" mapstructure:"access_key_id"`
-	SecretKey          string `yaml:"secret_access_key,omitempty" json:"secret_access_key" mapstructure:"secret_access_key"`
-	SessionToken       string `yaml:"session_token,omitempty" json:"session_token" mapstructure:"session_token"`
+	AccessKey          string `yaml:"access_key_id,omitempty" json:"access_key_id" mapstructure:"access_key_id" sensitive:"true"`
+	SecretKey          string `yaml:"secret_access_key,omitempty" json:"secret_access_key" mapstructure:"secret_access_key" sensitive:"true"`
+	SessionToken       string `yaml:"session_token,omitempty" json:"session_token" mapstructure:"session_token" sensitive:"true"`
 	QueryResultsPath   string `yaml:"query_results_path,omitempty" json:"query_results_path" mapstructure:"query_results_path"`
 	Region             string `yaml:"region,omitempty" json:"region" mapstructure:"region"`
 	Database           string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
@@ -237,7 +237,7 @@ func (c AthenaConnection) MarshalYAML() (interface{}, error) {
 type SynapseConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	Username           string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
-	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password" sensitive:"true"`
 	Host               string `yaml:"host,omitempty"     json:"host" mapstructure:"host"`
 	Port               int    `yaml:"port,omitempty"     json:"port" mapstructure:"port" jsonschema:"default=1433"`
 	Database           string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
@@ -254,11 +254,11 @@ type FabricConnection struct {
 	Port                      int    `yaml:"port,omitempty"     json:"port" mapstructure:"port" jsonschema:"default=1433"`
 	Database                  string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
 	Username                  string `yaml:"username,omitempty" json:"username,omitempty" mapstructure:"username"`
-	Password                  string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password"`
+	Password                  string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password" sensitive:"true"`
 	Options                   string `yaml:"options,omitempty"  json:"options,omitempty" mapstructure:"options"`
 	UseAzureDefaultCredential bool   `yaml:"use_azure_default_credential,omitempty" json:"use_azure_default_credential,omitempty" mapstructure:"use_azure_default_credential"`
 	ClientID                  string `yaml:"client_id,omitempty" json:"client_id,omitempty" mapstructure:"client_id"`
-	ClientSecret              string `yaml:"client_secret,omitempty" json:"client_secret,omitempty" mapstructure:"client_secret"`
+	ClientSecret              string `yaml:"client_secret,omitempty" json:"client_secret,omitempty" mapstructure:"client_secret" sensitive:"true"`
 	TenantID                  string `yaml:"tenant_id,omitempty" json:"tenant_id,omitempty" mapstructure:"tenant_id"`
 }
 
@@ -272,8 +272,8 @@ type OneLakeConnection struct {
 	LakehouseName             string `yaml:"lakehouse_name,omitempty" json:"lakehouse_name" mapstructure:"lakehouse_name"`
 	TenantID                  string `yaml:"tenant_id,omitempty" json:"tenant_id,omitempty" mapstructure:"tenant_id"`
 	ClientID                  string `yaml:"client_id,omitempty" json:"client_id,omitempty" mapstructure:"client_id"`
-	ClientSecret              string `yaml:"client_secret,omitempty" json:"client_secret,omitempty" mapstructure:"client_secret"`
-	SASToken                  string `yaml:"sas_token,omitempty" json:"sas_token,omitempty" mapstructure:"sas_token"`
+	ClientSecret              string `yaml:"client_secret,omitempty" json:"client_secret,omitempty" mapstructure:"client_secret" sensitive:"true"`
+	SASToken                  string `yaml:"sas_token,omitempty" json:"sas_token,omitempty" mapstructure:"sas_token" sensitive:"true"`
 	UseAzureDefaultCredential bool   `yaml:"use_azure_default_credential,omitempty" json:"use_azure_default_credential,omitempty" mapstructure:"use_azure_default_credential"`
 }
 
@@ -283,14 +283,14 @@ func (c OneLakeConnection) GetName() string {
 
 type DatabricksConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	Token              string `yaml:"token,omitempty" json:"token,omitempty" mapstructure:"token" jsonschema:"oneof_required=token"`
+	Token              string `yaml:"token,omitempty" json:"token,omitempty" mapstructure:"token" jsonschema:"oneof_required=token" sensitive:"true"`
 	Path               string `yaml:"path,omitempty"  json:"path" mapstructure:"path"`
 	Host               string `yaml:"host,omitempty"  json:"host" mapstructure:"host"`
 	Port               int    `yaml:"port,omitempty"  json:"port" mapstructure:"port" jsonschema:"default=443"`
 	Catalog            string `yaml:"catalog,omitempty"  json:"catalog" mapstructure:"catalog"`
 	Schema             string `yaml:"schema,omitempty"  json:"schema" mapstructure:"schema"`
 	ClientID           string `yaml:"client_id,omitempty" json:"client_id,omitempty" mapstructure:"client_id" jsonschema:"oneof_required=oauth"`
-	ClientSecret       string `yaml:"client_secret,omitempty" json:"client_secret,omitempty" mapstructure:"client_secret" jsonschema:"oneof_required=oauth"`
+	ClientSecret       string `yaml:"client_secret,omitempty" json:"client_secret,omitempty" mapstructure:"client_secret" jsonschema:"oneof_required=oauth" sensitive:"true"`
 }
 
 func (c DatabricksConnection) GetName() string {
@@ -300,7 +300,7 @@ func (c DatabricksConnection) GetName() string {
 type MongoConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	Username           string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
-	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password" sensitive:"true"`
 	Host               string `yaml:"host,omitempty"     json:"host" mapstructure:"host"`
 	Port               int    `yaml:"port,omitempty"     json:"port" mapstructure:"port" jsonschema:"default=27017"`
 	Database           string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
@@ -313,7 +313,7 @@ func (c MongoConnection) GetName() string {
 type CouchbaseConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	Username           string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
-	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password" sensitive:"true"`
 	Host               string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
 	Bucket             string `yaml:"bucket,omitempty" json:"bucket,omitempty" mapstructure:"bucket"`
 	SSL                bool   `yaml:"ssl,omitempty" json:"ssl,omitempty" mapstructure:"ssl"`
@@ -326,7 +326,7 @@ func (c CouchbaseConnection) GetName() string {
 type CassandraConnection struct {
 	ConnectionMetadata       `yaml:",inline" mapstructure:",squash"`
 	Username                 string   `yaml:"username,omitempty" json:"username" mapstructure:"username"`
-	Password                 string   `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Password                 string   `yaml:"password,omitempty" json:"password" mapstructure:"password" sensitive:"true"`
 	Host                     string   `yaml:"host,omitempty" json:"host" mapstructure:"host"`
 	Hosts                    []string `yaml:"hosts,omitempty" json:"hosts,omitempty" mapstructure:"hosts"`
 	Port                     int      `yaml:"port,omitempty" json:"port,omitempty" mapstructure:"port" jsonschema:"default=9042"`
@@ -346,7 +346,7 @@ func (c CassandraConnection) GetName() string {
 type CrateDBConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	Username           string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
-	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password" sensitive:"true"`
 	Host               string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
 	Port               int    `yaml:"port,omitempty" json:"port,omitempty" mapstructure:"port" jsonschema:"default=5432"`
 	SslMode            string `yaml:"ssl_mode,omitempty" json:"ssl_mode,omitempty" mapstructure:"ssl_mode"`
@@ -369,7 +369,7 @@ func (c CSVConnection) GetName() string {
 
 type CursorConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 }
 
 func (c CursorConnection) GetName() string {
@@ -379,7 +379,7 @@ func (c CursorConnection) GetName() string {
 type MongoAtlasConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	Username           string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
-	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password" sensitive:"true"`
 	Host               string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
 	Database           string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
 }
@@ -391,7 +391,7 @@ func (c MongoAtlasConnection) GetName() string {
 type MsSQLConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	Username           string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
-	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password" sensitive:"true"`
 	Host               string `yaml:"host,omitempty"     json:"host" mapstructure:"host"`
 	Port               int    `yaml:"port,omitempty"     json:"port" mapstructure:"port" jsonschema:"default=1433"`
 	Database           string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
@@ -405,7 +405,7 @@ func (c MsSQLConnection) GetName() string {
 type MySQLConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	Username           string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
-	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password" sensitive:"true"`
 	Host               string `yaml:"host,omitempty"     json:"host" mapstructure:"host"`
 	Port               int    `yaml:"port,omitempty"     json:"port" mapstructure:"port" jsonschema:"default=3306"`
 	Database           string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
@@ -426,7 +426,7 @@ func (c MySQLConnection) GetName() string {
 type VitessConnection struct {
 	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	Username    string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
-	Password    string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Password    string `yaml:"password,omitempty" json:"password" mapstructure:"password" sensitive:"true"`
 	Host        string `yaml:"host,omitempty"     json:"host" mapstructure:"host"`
 	Port        int    `yaml:"port,omitempty"     json:"port" mapstructure:"port" jsonschema:"default=15306"`
 	Database    string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
@@ -449,7 +449,7 @@ func (c VitessConnection) GetName() string {
 type PlanetScaleConnection struct {
 	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
-	Password string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Password string `yaml:"password,omitempty" json:"password" mapstructure:"password" sensitive:"true"`
 	Host     string `yaml:"host,omitempty"     json:"host" mapstructure:"host"`
 	Port     int    `yaml:"port,omitempty"     json:"port" mapstructure:"port" jsonschema:"default=3306"`
 	Database string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
@@ -462,7 +462,7 @@ func (c PlanetScaleConnection) GetName() string {
 type PostgresConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	Username           string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
-	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password" sensitive:"true"`
 	Host               string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
 	Port               int    `yaml:"port,omitempty" json:"port" mapstructure:"port" jsonschema:"default=5432"`
 	Database           string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
@@ -478,7 +478,7 @@ func (c PostgresConnection) GetName() string {
 type RedshiftConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	Username           string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
-	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password" sensitive:"true"`
 	Host               string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
 	Port               int    `yaml:"port,omitempty" json:"port" mapstructure:"port" jsonschema:"default=5439"`
 	Database           string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
@@ -494,14 +494,14 @@ type SnowflakeConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	Account            string `yaml:"account,omitempty" json:"account" mapstructure:"account"`
 	Username           string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
-	Password           string `yaml:"password,omitempty" json:"password,omitempty" jsonschema:"oneof_required=password" mapstructure:"password"`
+	Password           string `yaml:"password,omitempty" json:"password,omitempty" jsonschema:"oneof_required=password" mapstructure:"password" sensitive:"true"`
 	Region             string `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
 	Role               string `yaml:"role,omitempty" json:"role,omitempty" mapstructure:"role"`
 	Database           string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
 	Schema             string `yaml:"schema,omitempty" json:"schema,omitempty" mapstructure:"schema"`
 	Warehouse          string `yaml:"warehouse,omitempty" json:"warehouse,omitempty" mapstructure:"warehouse"`
-	PrivateKeyPath     string `yaml:"private_key_path,omitempty" json:"private_key_path,omitempty" jsonschema:"oneof_required=private_key_path" mapstructure:"private_key_path"`
-	PrivateKey         string `yaml:"private_key,omitempty" json:"private_key,omitempty" jsonschema:"oneof_required=private_key" mapstructure:"private_key"`
+	PrivateKeyPath     string `yaml:"private_key_path,omitempty" json:"private_key_path,omitempty" jsonschema:"oneof_required=private_key_path" mapstructure:"private_key_path" sensitive_file:"true"`
+	PrivateKey         string `yaml:"private_key,omitempty" json:"private_key,omitempty" jsonschema:"oneof_required=private_key" mapstructure:"private_key" sensitive:"true"`
 }
 
 func (c SnowflakeConnection) MarshalJSON() ([]byte, error) {
@@ -715,7 +715,7 @@ func normalizePrivateKey(key string) string {
 type HANAConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	Username           string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
-	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password" sensitive:"true"`
 	Host               string `yaml:"host,omitempty"     json:"host" mapstructure:"host"`
 	Port               int    `yaml:"port,omitempty"     json:"port" mapstructure:"port"`
 	Database           string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
@@ -727,7 +727,7 @@ func (c HANAConnection) GetName() string {
 
 type HostawayConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 }
 
 func (c HostawayConnection) GetName() string {
@@ -737,7 +737,7 @@ func (c HostawayConnection) GetName() string {
 type GorgiasConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	Domain             string `yaml:"domain,omitempty" json:"domain" mapstructure:"domain"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 	Email              string `yaml:"email,omitempty" json:"email" mapstructure:"email"`
 }
 
@@ -747,7 +747,7 @@ func (c GorgiasConnection) GetName() string {
 
 type G2Connection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIToken           string `yaml:"api_token,omitempty" json:"api_token" mapstructure:"api_token"`
+	APIToken           string `yaml:"api_token,omitempty" json:"api_token" mapstructure:"api_token" sensitive:"true"`
 }
 
 func (c G2Connection) GetName() string {
@@ -756,7 +756,7 @@ func (c G2Connection) GetName() string {
 
 type KlaviyoConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 }
 
 func (c KlaviyoConnection) GetName() string {
@@ -765,7 +765,7 @@ func (c KlaviyoConnection) GetName() string {
 
 type AdjustConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 }
 
 func (c AdjustConnection) GetName() string {
@@ -774,7 +774,7 @@ func (c AdjustConnection) GetName() string {
 
 type AnthropicConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 }
 
 func (c AnthropicConnection) GetName() string {
@@ -783,7 +783,7 @@ func (c AnthropicConnection) GetName() string {
 
 type FacebookAdsConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	AccessToken        string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
+	AccessToken        string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token" sensitive:"true"`
 	AccountID          string `yaml:"account_id,omitempty" json:"account_id" mapstructure:"account_id"`
 }
 
@@ -793,7 +793,7 @@ func (c FacebookAdsConnection) GetName() string {
 
 type StripeConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 }
 
 func (c StripeConnection) GetName() string {
@@ -802,7 +802,7 @@ func (c StripeConnection) GetName() string {
 
 type PaddleConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 }
 
 func (c PaddleConnection) GetName() string {
@@ -812,7 +812,7 @@ func (c PaddleConnection) GetName() string {
 type ChargebeeConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	Site               string `yaml:"site,omitempty" json:"site" mapstructure:"site"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 }
 
 func (c ChargebeeConnection) GetName() string {
@@ -821,7 +821,7 @@ func (c ChargebeeConnection) GetName() string {
 
 type RecurlyConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 	Region             string `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
 }
 
@@ -831,7 +831,7 @@ func (c RecurlyConnection) GetName() string {
 
 type GitLabConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	AccessToken        string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
+	AccessToken        string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token" sensitive:"true"`
 	BaseURL            string `yaml:"base_url,omitempty" json:"base_url,omitempty" mapstructure:"base_url"`
 }
 
@@ -841,7 +841,7 @@ func (c GitLabConnection) GetName() string {
 
 type DuneConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 }
 
 func (c DuneConnection) GetName() string {
@@ -850,7 +850,7 @@ func (c DuneConnection) GetName() string {
 
 type GranolaConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 }
 
 func (c GranolaConnection) GetName() string {
@@ -859,7 +859,7 @@ func (c GranolaConnection) GetName() string {
 
 type NotionConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 }
 
 func (c NotionConnection) GetName() string {
@@ -868,7 +868,7 @@ func (c NotionConnection) GetName() string {
 
 type AlliumConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 }
 
 func (c AlliumConnection) GetName() string {
@@ -878,9 +878,9 @@ func (c AlliumConnection) GetName() string {
 type ShopifyConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	URL                string `yaml:"url,omitempty" json:"url" mapstructure:"url"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 	ClientID           string `yaml:"client_id,omitempty" json:"client_id,omitempty" mapstructure:"client_id"`
-	ClientSecret       string `yaml:"client_secret,omitempty" json:"client_secret,omitempty" mapstructure:"client_secret"`
+	ClientSecret       string `yaml:"client_secret,omitempty" json:"client_secret,omitempty" mapstructure:"client_secret" sensitive:"true"`
 }
 
 func (c ShopifyConnection) GetName() string {
@@ -894,7 +894,7 @@ type KafkaConnection struct {
 	SecurityProtocol   string `yaml:"security_protocol,omitempty" json:"security_protocol,omitempty" mapstructure:"security_protocol"`
 	SaslMechanisms     string `yaml:"sasl_mechanisms,omitempty" json:"sasl_mechanisms,omitempty" mapstructure:"sasl_mechanisms"`
 	SaslUsername       string `yaml:"sasl_username,omitempty" json:"sasl_username,omitempty" mapstructure:"sasl_username"`
-	SaslPassword       string `yaml:"sasl_password,omitempty" json:"sasl_password,omitempty" mapstructure:"sasl_password"`
+	SaslPassword       string `yaml:"sasl_password,omitempty" json:"sasl_password,omitempty" mapstructure:"sasl_password" sensitive:"true"`
 	BatchSize          string `yaml:"batch_size,omitempty" json:"batch_size,omitempty" mapstructure:"batch_size"`
 	BatchTimeout       string `yaml:"batch_timeout,omitempty" json:"batch_timeout,omitempty" mapstructure:"batch_timeout"`
 }
@@ -908,7 +908,7 @@ type RabbitMQConnection struct {
 	Host               string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
 	Port               int    `yaml:"port,omitempty" json:"port,omitempty" mapstructure:"port"`
 	Username           string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
-	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password" sensitive:"true"`
 	Vhost              string `yaml:"vhost,omitempty" json:"vhost,omitempty" mapstructure:"vhost"`
 	TLS                bool   `yaml:"tls,omitempty" json:"tls,omitempty" mapstructure:"tls"`
 }
@@ -920,7 +920,7 @@ func (c RabbitMQConnection) GetName() string {
 type AirtableConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	BaseID             string `yaml:"base_id,omitempty" json:"base_id" mapstructure:"base_id"`
-	AccessToken        string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
+	AccessToken        string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token" sensitive:"true"`
 }
 
 func (c AirtableConnection) GetName() string {
@@ -940,7 +940,7 @@ func (d DuckDBConnection) GetName() string {
 
 type MotherduckConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	Token              string `yaml:"token,omitempty" json:"token" mapstructure:"token"`
+	Token              string `yaml:"token,omitempty" json:"token" mapstructure:"token" sensitive:"true"`
 	Database           string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
 }
 
@@ -951,7 +951,7 @@ func (m MotherduckConnection) GetName() string {
 type ClickHouseConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	Username           string `yaml:"username" json:"username" mapstructure:"username"`
-	Password           string `yaml:"password" json:"password" mapstructure:"password"`
+	Password           string `yaml:"password" json:"password" mapstructure:"password" sensitive:"true"`
 	Host               string `yaml:"host"     json:"host" mapstructure:"host"`
 	Port               int    `yaml:"port"     json:"port" mapstructure:"port"`
 	Database           string `yaml:"database" json:"database" mapstructure:"database"`
@@ -965,7 +965,7 @@ func (c ClickHouseConnection) GetName() string {
 
 type AppsflyerConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 }
 
 func (c AppsflyerConnection) GetName() string {
@@ -974,7 +974,7 @@ func (c AppsflyerConnection) GetName() string {
 
 type HubspotConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 }
 
 func (c HubspotConnection) GetName() string {
@@ -983,7 +983,7 @@ func (c HubspotConnection) GetName() string {
 
 type IntercomConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	AccessToken        string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
+	AccessToken        string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token" sensitive:"true"`
 	Region             string `yaml:"region,omitempty" json:"region" mapstructure:"region"`
 }
 
@@ -993,8 +993,8 @@ func (c IntercomConnection) GetName() string {
 
 type GoogleSheetsConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	ServiceAccountJSON string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" mapstructure:"service_account_json"`
-	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" mapstructure:"service_account_file"`
+	ServiceAccountJSON string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" mapstructure:"service_account_json" sensitive:"true"`
+	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" mapstructure:"service_account_file" sensitive_file:"true"`
 }
 
 func (c GoogleSheetsConnection) GetName() string {
@@ -1012,7 +1012,7 @@ func (c ChessConnection) GetName() string {
 
 type ApplovinMaxConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIKey             string `yaml:"api_key" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 }
 
 func (c ApplovinMaxConnection) GetName() string {
@@ -1041,8 +1041,8 @@ type S3Connection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	BucketName         string `yaml:"bucket_name,omitempty" json:"bucket_name" mapstructure:"bucket_name"`
 	PathToFile         string `yaml:"path_to_file,omitempty" json:"path_to_file" mapstructure:"path_to_file"`
-	AccessKeyID        string `yaml:"access_key_id,omitempty" json:"access_key_id" mapstructure:"access_key_id"`
-	SecretAccessKey    string `yaml:"secret_access_key,omitempty" json:"secret_access_key" mapstructure:"secret_access_key"`
+	AccessKeyID        string `yaml:"access_key_id,omitempty" json:"access_key_id" mapstructure:"access_key_id" sensitive:"true"`
+	SecretAccessKey    string `yaml:"secret_access_key,omitempty" json:"secret_access_key" mapstructure:"secret_access_key" sensitive:"true"`
 	EndpointURL        string `yaml:"endpoint_url,omitempty" json:"endpoint_url" mapstructure:"endpoint_url"`
 	Layout             string `yaml:"layout,omitempty" json:"layout" mapstructure:"layout"`
 }
@@ -1053,9 +1053,9 @@ func (c S3Connection) GetName() string {
 
 type ZendeskConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIToken           string `yaml:"api_token,omitempty" json:"api_token" mapstructure:"api_token"`
+	APIToken           string `yaml:"api_token,omitempty" json:"api_token" mapstructure:"api_token" sensitive:"true"`
 	Email              string `yaml:"email,omitempty" json:"email" mapstructure:"email"`
-	OAuthToken         string `yaml:"oauth_token,omitempty" json:"oauth_token" mapstructure:"oauth_token"`
+	OAuthToken         string `yaml:"oauth_token,omitempty" json:"oauth_token" mapstructure:"oauth_token" sensitive:"true"`
 	Subdomain          string `yaml:"sub_domain,omitempty" json:"sub_domain" mapstructure:"sub_domain"`
 }
 
@@ -1065,7 +1065,7 @@ func (c ZendeskConnection) GetName() string {
 
 type SlackConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIKey             string `yaml:"api_key" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 }
 
 func (c SlackConnection) GetName() string {
@@ -1075,9 +1075,9 @@ func (c SlackConnection) GetName() string {
 type SocrataConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	Domain             string `yaml:"domain,omitempty" json:"domain" mapstructure:"domain"`
-	AppToken           string `yaml:"app_token,omitempty" json:"app_token" mapstructure:"app_token"`
+	AppToken           string `yaml:"app_token,omitempty" json:"app_token" mapstructure:"app_token" sensitive:"true"`
 	Username           string `yaml:"username,omitempty" json:"username,omitempty" mapstructure:"username"`
-	Password           string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password"`
+	Password           string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password" sensitive:"true"`
 }
 
 func (c SocrataConnection) GetName() string {
@@ -1087,7 +1087,7 @@ func (c SocrataConnection) GetName() string {
 type PersonioConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	ClientID           string `yaml:"client_id" json:"client_id" mapstructure:"client_id"`
-	ClientSecret       string `yaml:"client_secret" json:"client_secret" mapstructure:"client_secret"`
+	ClientSecret       string `yaml:"client_secret" json:"client_secret" mapstructure:"client_secret" sensitive:"true"`
 }
 
 func (c PersonioConnection) GetName() string {
@@ -1096,7 +1096,7 @@ func (c PersonioConnection) GetName() string {
 
 type AsanaConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	AccessToken        string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
+	AccessToken        string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token" sensitive:"true"`
 	WorkspaceID        string `yaml:"workspace,omitempty" json:"workspace" mapstructure:"workspace"`
 }
 
@@ -1106,8 +1106,8 @@ func (c AsanaConnection) GetName() string {
 
 type DynamoDBConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	AccessKeyID        string `yaml:"access_key_id,omitempty" json:"access_key_id" mapstructure:"access_key_id"`
-	SecretAccessKey    string `yaml:"secret_access_key,omitempty" json:"secret_access_key" mapstructure:"secret_access_key"`
+	AccessKeyID        string `yaml:"access_key_id,omitempty" json:"access_key_id" mapstructure:"access_key_id" sensitive:"true"`
+	SecretAccessKey    string `yaml:"secret_access_key,omitempty" json:"secret_access_key" mapstructure:"secret_access_key" sensitive:"true"`
 	Region             string `yaml:"region,omitempty" json:"region" mapstructure:"region"`
 }
 
@@ -1119,9 +1119,9 @@ type DoceboConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	BaseURL            string `yaml:"base_url,omitempty" json:"base_url" mapstructure:"base_url"`
 	ClientID           string `yaml:"client_id,omitempty" json:"client_id" mapstructure:"client_id"`
-	ClientSecret       string `yaml:"client_secret,omitempty" json:"client_secret" mapstructure:"client_secret"`
+	ClientSecret       string `yaml:"client_secret,omitempty" json:"client_secret" mapstructure:"client_secret" sensitive:"true"`
 	Username           string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
-	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password" sensitive:"true"`
 }
 
 func (c DoceboConnection) GetName() string {
@@ -1131,9 +1131,9 @@ func (c DoceboConnection) GetName() string {
 type GoogleAdsConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	CustomerID         string `yaml:"customer_id,omitempty" json:"customer_id" mapstructure:"customer_id"`
-	ServiceAccountJSON string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" mapstructure:"service_account_json"`
+	ServiceAccountJSON string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" mapstructure:"service_account_json" sensitive:"true"`
 	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" mapstructure:"service_account_file"`
-	DeveloperToken     string `yaml:"dev_token,omitempty" json:"dev_token" mapstructure:"dev_token"`
+	DeveloperToken     string `yaml:"dev_token,omitempty" json:"dev_token" mapstructure:"dev_token" sensitive:"true"`
 	LoginCustomerID    string `yaml:"login_customer_id,omitempty" json:"login_customer_id,omitempty" mapstructure:"login_customer_id"`
 }
 
@@ -1143,7 +1143,7 @@ func (c GoogleAdsConnection) GetName() string {
 
 type TikTokAdsConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	AccessToken        string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
+	AccessToken        string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token" sensitive:"true"`
 	AdvertiserIDs      string `yaml:"advertiser_ids,omitempty" json:"advertiser_ids" mapstructure:"advertiser_ids"`
 	Timezone           string `yaml:"timezone,omitempty" json:"timezone,omitempty" mapstructure:"timezone"`
 }
@@ -1154,9 +1154,9 @@ func (c TikTokAdsConnection) GetName() string {
 
 type SnapchatAdsConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	RefreshToken       string `yaml:"refresh_token,omitempty" json:"refresh_token" mapstructure:"refresh_token"`
+	RefreshToken       string `yaml:"refresh_token,omitempty" json:"refresh_token" mapstructure:"refresh_token" sensitive:"true"`
 	ClientID           string `yaml:"client_id,omitempty" json:"client_id" mapstructure:"client_id"`
-	ClientSecret       string `yaml:"client_secret,omitempty" json:"client_secret" mapstructure:"client_secret"`
+	ClientSecret       string `yaml:"client_secret,omitempty" json:"client_secret" mapstructure:"client_secret" sensitive:"true"`
 	OrganizationID     string `yaml:"organization_id,omitempty" json:"organization_id,omitempty" mapstructure:"organization_id"`
 }
 
@@ -1167,7 +1167,7 @@ func (c SnapchatAdsConnection) GetName() string {
 // github://?access_token=<access_token>&owner=<owner>&repo=<repo>
 type GitHubConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	AccessToken        string `yaml:"access_token,omitempty" json:"access_token,omitempty" mapstructure:"access_token"`
+	AccessToken        string `yaml:"access_token,omitempty" json:"access_token,omitempty" mapstructure:"access_token" sensitive:"true"`
 	Owner              string `yaml:"owner,omitempty" json:"owner" mapstructure:"owner"`
 	Repo               string `yaml:"repo,omitempty" json:"repo" mapstructure:"repo"`
 }
@@ -1181,7 +1181,7 @@ type AppStoreConnection struct {
 	KeyID              string `yaml:"key_id,omitempty" json:"key_id" mapstructure:"key_id"`
 	IssuerID           string `yaml:"issuer_id,omitempty" json:"issuer_id" mapstructure:"issuer_id"`
 	KeyPath            string `yaml:"key_path,omitempty" json:"key_path" mapstructure:"key_path"`
-	Key                string `yaml:"key,omitempty" json:"key" mapstructure:"key"`
+	Key                string `yaml:"key,omitempty" json:"key" mapstructure:"key" sensitive:"true"`
 }
 
 func (c AppStoreConnection) GetName() string {
@@ -1195,7 +1195,7 @@ type AppleAdsConnection struct {
 	KeyID              string `yaml:"key_id,omitempty" json:"key_id" mapstructure:"key_id"`
 	OrgID              string `yaml:"org_id,omitempty" json:"org_id" mapstructure:"org_id"`
 	KeyPath            string `yaml:"key_path,omitempty" json:"key_path" mapstructure:"key_path"`
-	KeyBase64          string `yaml:"key_base64,omitempty" json:"key_base64" mapstructure:"key_base64"`
+	KeyBase64          string `yaml:"key_base64,omitempty" json:"key_base64" mapstructure:"key_base64" sensitive:"true"`
 }
 
 func (c AppleAdsConnection) GetName() string {
@@ -1204,7 +1204,7 @@ func (c AppleAdsConnection) GetName() string {
 
 type LinkedInAdsConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	AccessToken        string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
+	AccessToken        string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token" sensitive:"true"`
 	AccountIds         string `yaml:"account_ids,omitempty" json:"account_ids" mapstructure:"account_ids"`
 }
 
@@ -1214,7 +1214,7 @@ func (c LinkedInAdsConnection) GetName() string {
 
 type MailchimpConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 	Server             string `yaml:"server,omitempty" json:"server" mapstructure:"server"`
 }
 
@@ -1224,7 +1224,7 @@ func (c MailchimpConnection) GetName() string {
 
 type RevenueCatConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 	ProjectID          string `yaml:"project_id,omitempty" json:"project_id" mapstructure:"project_id"`
 }
 
@@ -1234,7 +1234,7 @@ func (c RevenueCatConnection) GetName() string {
 
 type LinearConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 }
 
 func (c LinearConnection) GetName() string {
@@ -1244,7 +1244,7 @@ func (c LinearConnection) GetName() string {
 type GCSConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" jsonschema:"oneof_required=service_account_file" mapstructure:"service_account_file"`
-	ServiceAccountJSON string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" jsonschema:"oneof_required=service_account_json" mapstructure:"service_account_json"`
+	ServiceAccountJSON string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" jsonschema:"oneof_required=service_account_json" mapstructure:"service_account_json" sensitive:"true"`
 	BucketName         string `yaml:"bucket_name,omitempty" json:"bucket_name,omitempty" mapstructure:"bucket_name"`
 	PathToFile         string `yaml:"path_to_file,omitempty" json:"path_to_file,omitempty" mapstructure:"path_to_file"`
 	Layout             string `yaml:"layout,omitempty" json:"layout,omitempty" mapstructure:"layout"`
@@ -1258,7 +1258,7 @@ type SharePointConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	TenantID           string `yaml:"tenant_id" json:"tenant_id" mapstructure:"tenant_id"`
 	ClientID           string `yaml:"client_id" json:"client_id" mapstructure:"client_id"`
-	ClientSecret       string `yaml:"client_secret" json:"client_secret" mapstructure:"client_secret"`
+	ClientSecret       string `yaml:"client_secret" json:"client_secret" mapstructure:"client_secret" sensitive:"true"`
 	Hostname           string `yaml:"hostname" json:"hostname" mapstructure:"hostname"`
 	Site               string `yaml:"site" json:"site" mapstructure:"site"`
 	Library            string `yaml:"library,omitempty" json:"library,omitempty" mapstructure:"library"`
@@ -1272,8 +1272,8 @@ func (c SharePointConnection) GetName() string {
 
 type KinesisConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	AccessKeyID        string `yaml:"access_key_id,omitempty" json:"access_key_id" mapstructure:"access_key_id"`
-	SecretAccessKey    string `yaml:"secret_access_key,omitempty" json:"secret_access_key" mapstructure:"secret_access_key"`
+	AccessKeyID        string `yaml:"access_key_id,omitempty" json:"access_key_id" mapstructure:"access_key_id" sensitive:"true"`
+	SecretAccessKey    string `yaml:"secret_access_key,omitempty" json:"secret_access_key" mapstructure:"secret_access_key" sensitive:"true"`
 	Region             string `yaml:"region,omitempty" json:"region" mapstructure:"region"`
 }
 
@@ -1283,7 +1283,7 @@ func (c KinesisConnection) GetName() string {
 
 type PipedriveConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIToken           string `yaml:"api_token,omitempty" json:"api_token" mapstructure:"api_token"`
+	APIToken           string `yaml:"api_token,omitempty" json:"api_token" mapstructure:"api_token" sensitive:"true"`
 }
 
 func (c PipedriveConnection) GetName() string {
@@ -1293,8 +1293,8 @@ func (c PipedriveConnection) GetName() string {
 type MixpanelConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	Username           string `yaml:"username,omitempty" json:"username,omitempty" mapstructure:"username"`
-	Password           string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password"`
-	APISecret          string `yaml:"api_secret,omitempty" json:"api_secret,omitempty" mapstructure:"api_secret"`
+	Password           string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password" sensitive:"true"`
+	APISecret          string `yaml:"api_secret,omitempty" json:"api_secret,omitempty" mapstructure:"api_secret" sensitive:"true"`
 	ProjectID          string `yaml:"project_id,omitempty" json:"project_id,omitempty" mapstructure:"project_id"`
 	Server             string `yaml:"server,omitempty" json:"server,omitempty" mapstructure:"server"`
 }
@@ -1305,7 +1305,7 @@ func (c MixpanelConnection) GetName() string {
 
 type ClickupConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIToken           string `yaml:"api_token,omitempty" json:"api_token" mapstructure:"api_token"`
+	APIToken           string `yaml:"api_token,omitempty" json:"api_token" mapstructure:"api_token" sensitive:"true"`
 }
 
 func (c ClickupConnection) GetName() string {
@@ -1314,7 +1314,7 @@ func (c ClickupConnection) GetName() string {
 
 type JobtreadConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	GrantKey           string `yaml:"grant_key,omitempty" json:"grant_key" mapstructure:"grant_key"`
+	GrantKey           string `yaml:"grant_key,omitempty" json:"grant_key" mapstructure:"grant_key" sensitive:"true"`
 	OrganizationID     string `yaml:"organization_id,omitempty" json:"organization_id" mapstructure:"organization_id"`
 }
 
@@ -1324,7 +1324,7 @@ func (c JobtreadConnection) GetName() string {
 
 type PosthogConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	PersonalAPIKey     string `yaml:"personal_api_key,omitempty" json:"personal_api_key" mapstructure:"personal_api_key"`
+	PersonalAPIKey     string `yaml:"personal_api_key,omitempty" json:"personal_api_key" mapstructure:"personal_api_key" sensitive:"true"`
 	ProjectID          string `yaml:"project_id,omitempty" json:"project_id" mapstructure:"project_id"`
 	BaseURL            string `yaml:"base_url,omitempty" json:"base_url,omitempty" mapstructure:"base_url"`
 }
@@ -1335,7 +1335,7 @@ func (c PosthogConnection) GetName() string {
 
 type PinterestConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	AccessToken        string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
+	AccessToken        string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token" sensitive:"true"`
 }
 
 func (c PinterestConnection) GetName() string {
@@ -1345,7 +1345,7 @@ func (c PinterestConnection) GetName() string {
 type TrustpilotConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	BusinessUnitID     string `yaml:"business_unit_id,omitempty" json:"business_unit_id" mapstructure:"business_unit_id"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 }
 
 func (c TrustpilotConnection) GetName() string {
@@ -1356,8 +1356,8 @@ type QuickBooksConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	CompanyID          string `yaml:"company_id,omitempty" json:"company_id" mapstructure:"company_id"`
 	ClientID           string `yaml:"client_id,omitempty" json:"client_id" mapstructure:"client_id"`
-	ClientSecret       string `yaml:"client_secret,omitempty" json:"client_secret" mapstructure:"client_secret"`
-	RefreshToken       string `yaml:"refresh_token,omitempty" json:"refresh_token" mapstructure:"refresh_token"`
+	ClientSecret       string `yaml:"client_secret,omitempty" json:"client_secret" mapstructure:"client_secret" sensitive:"true"`
+	RefreshToken       string `yaml:"refresh_token,omitempty" json:"refresh_token" mapstructure:"refresh_token" sensitive:"true"`
 	Environment        string `yaml:"environment,omitempty" json:"environment,omitempty" mapstructure:"environment"`
 	MinorVersion       string `yaml:"minor_version,omitempty" json:"minor_version,omitempty" mapstructure:"minor_version"`
 }
@@ -1368,7 +1368,7 @@ func (c QuickBooksConnection) GetName() string {
 
 type WiseConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 }
 
 func (c WiseConnection) GetName() string {
@@ -1378,7 +1378,7 @@ func (c WiseConnection) GetName() string {
 type ZoomConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	ClientID           string `yaml:"client_id,omitempty" json:"client_id" mapstructure:"client_id"`
-	ClientSecret       string `yaml:"client_secret,omitempty" json:"client_secret" mapstructure:"client_secret"`
+	ClientSecret       string `yaml:"client_secret,omitempty" json:"client_secret" mapstructure:"client_secret" sensitive:"true"`
 	AccountID          string `yaml:"account_id,omitempty" json:"account_id" mapstructure:"account_id"`
 }
 
@@ -1388,8 +1388,8 @@ func (c ZoomConnection) GetName() string {
 
 type EMRServerlessConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	AccessKey          string `yaml:"access_key" json:"access_key" mapstructure:"access_key"`
-	SecretKey          string `yaml:"secret_key" json:"secret_key" mapstructure:"secret_key"`
+	AccessKey          string `yaml:"access_key" json:"access_key" mapstructure:"access_key" sensitive:"true"`
+	SecretKey          string `yaml:"secret_key" json:"secret_key" mapstructure:"secret_key" sensitive:"true"`
 	ApplicationID      string `yaml:"application_id" json:"application_id" mapstructure:"application_id"`
 	ExecutionRole      string `yaml:"execution_role" json:"execution_role" mapstructure:"execution_role"`
 	Region             string `yaml:"region" json:"region" mapstructure:"region"`
@@ -1402,7 +1402,7 @@ func (c EMRServerlessConnection) GetName() string {
 
 type DataprocServerlessConnection struct {
 	ConnectionMetadata               `yaml:",inline" mapstructure:",squash"`
-	ServiceAccountJSON               string   `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" mapstructure:"service_account_json"`
+	ServiceAccountJSON               string   `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" mapstructure:"service_account_json" sensitive:"true"`
 	ServiceAccountFile               string   `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" mapstructure:"service_account_file"`
 	UseApplicationDefaultCredentials bool     `yaml:"use_application_default_credentials,omitempty" json:"use_application_default_credentials,omitempty" mapstructure:"use_application_default_credentials"`
 	ProjectID                        string   `yaml:"project_id,omitempty" json:"project_id" mapstructure:"project_id"`
@@ -1423,7 +1423,7 @@ func (c DataprocServerlessConnection) GetName() string {
 type GoogleAnalyticsConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" jsonschema:"oneof_required=service_account_file" mapstructure:"service_account_file"`
-	ServiceAccountJSON string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" jsonschema:"oneof_required=service_account_json" mapstructure:"service_account_json"`
+	ServiceAccountJSON string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" jsonschema:"oneof_required=service_account_json" mapstructure:"service_account_json" sensitive:"true"`
 	PropertyID         string `yaml:"property_id,omitempty" json:"property_id" mapstructure:"property_id"`
 }
 
@@ -1434,7 +1434,7 @@ func (c GoogleAnalyticsConnection) GetName() string {
 type GSCConnection struct {
 	Name               string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" mapstructure:"service_account_file"`
-	ServiceAccountJSON string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" mapstructure:"service_account_json"`
+	ServiceAccountJSON string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" mapstructure:"service_account_json" sensitive:"true"`
 	SiteURL            string `yaml:"site_url,omitempty" json:"site_url" mapstructure:"site_url"`
 }
 
@@ -1444,7 +1444,7 @@ func (c GSCConnection) GetName() string {
 
 type AppLovinConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 }
 
 func (c AppLovinConnection) GetName() string {
@@ -1462,9 +1462,9 @@ func (c FrankfurterConnection) GetName() string {
 type SalesforceConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	Username           string `yaml:"username,omitempty" json:"username,omitempty" mapstructure:"username"`
-	Password           string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password"`
-	Token              string `yaml:"token,omitempty" json:"token,omitempty" mapstructure:"token"`
-	AccessToken        string `yaml:"access_token,omitempty" json:"access_token,omitempty" mapstructure:"access_token"`
+	Password           string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password" sensitive:"true"`
+	Token              string `yaml:"token,omitempty" json:"token,omitempty" mapstructure:"token" sensitive:"true"`
+	AccessToken        string `yaml:"access_token,omitempty" json:"access_token,omitempty" mapstructure:"access_token" sensitive:"true"`
 	Domain             string `yaml:"domain" json:"domain" mapstructure:"domain"`
 }
 
@@ -1484,7 +1484,7 @@ func (c SQLiteConnection) GetName() string {
 type DB2Connection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	Username           string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
-	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password" sensitive:"true"`
 	Host               string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
 	Port               string `yaml:"port,omitempty" json:"port" mapstructure:"port"`
 	Database           string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
@@ -1497,7 +1497,7 @@ func (c DB2Connection) GetName() string {
 type OracleConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	Username           string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
-	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password" sensitive:"true"`
 	Host               string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
 	Port               string `yaml:"port,omitempty" json:"port" mapstructure:"port"`
 	ServiceName        string `yaml:"service_name,omitempty" json:"service_name" mapstructure:"service_name"`
@@ -1516,7 +1516,7 @@ func (c OracleConnection) GetName() string {
 
 type PhantombusterConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 }
 
 func (c PhantombusterConnection) GetName() string {
@@ -1526,7 +1526,7 @@ func (c PhantombusterConnection) GetName() string {
 type ElasticsearchConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	Username           string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
-	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password" sensitive:"true"`
 	Host               string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
 	Port               int    `yaml:"port,omitempty" json:"port" mapstructure:"port"`
 	Secure             string `yaml:"secure,omitempty" json:"secure" mapstructure:"secure" default:"true"`
@@ -1542,7 +1542,7 @@ type SpannerConnection struct {
 	ProjectID          string `yaml:"project_id,omitempty" json:"project_id" mapstructure:"project_id"`
 	InstanceID         string `yaml:"instance_id,omitempty" json:"instance_id" mapstructure:"instance_id"`
 	Database           string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
-	ServiceAccountJSON string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" mapstructure:"service_account_json"`
+	ServiceAccountJSON string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" mapstructure:"service_account_json" sensitive:"true"`
 	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" mapstructure:"service_account_file"`
 }
 
@@ -1553,7 +1553,7 @@ func (c SpannerConnection) GetName() string {
 type SolidgateConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	PublicKey          string `yaml:"public_key,omitempty" json:"public_key" mapstructure:"public_key"`
-	SecretKey          string `yaml:"secret_key,omitempty" json:"secret_key" mapstructure:"secret_key"`
+	SecretKey          string `yaml:"secret_key,omitempty" json:"secret_key" mapstructure:"secret_key" sensitive:"true"`
 }
 
 func (c SolidgateConnection) GetName() string {
@@ -1562,7 +1562,7 @@ func (c SolidgateConnection) GetName() string {
 
 type SquareConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	AccessToken        string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
+	AccessToken        string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token" sensitive:"true"`
 	Environment        string `yaml:"environment,omitempty" json:"environment,omitempty" mapstructure:"environment"`
 }
 
@@ -1572,7 +1572,7 @@ func (c SquareConnection) GetName() string {
 
 type SmartsheetConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	AccessToken        string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
+	AccessToken        string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token" sensitive:"true"`
 	SmartsheetID       string `yaml:"smartsheet_id,omitempty" json:"smartsheet_id,omitempty" mapstructure:"smartsheet_id"`
 }
 
@@ -1582,7 +1582,7 @@ func (c SmartsheetConnection) GetName() string {
 
 type AttioConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 }
 
 func (c AttioConnection) GetName() string {
@@ -1594,7 +1594,7 @@ type SFTPConnection struct {
 	Host               string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
 	Port               int    `yaml:"port,omitempty" json:"port" mapstructure:"port"`
 	Username           string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
-	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password" sensitive:"true"`
 }
 
 func (c SFTPConnection) GetName() string {
@@ -1606,9 +1606,9 @@ type ADLSConnection struct {
 	AccountName        string `yaml:"account_name,omitempty" json:"account_name" mapstructure:"account_name"`
 	TenantID           string `yaml:"tenant_id,omitempty" json:"tenant_id,omitempty" mapstructure:"tenant_id"`
 	ClientID           string `yaml:"client_id,omitempty" json:"client_id,omitempty" mapstructure:"client_id"`
-	ClientSecret       string `yaml:"client_secret,omitempty" json:"client_secret,omitempty" mapstructure:"client_secret"`
-	AccountKey         string `yaml:"account_key,omitempty" json:"account_key,omitempty" mapstructure:"account_key"`
-	SASToken           string `yaml:"sas_token,omitempty" json:"sas_token,omitempty" mapstructure:"sas_token"`
+	ClientSecret       string `yaml:"client_secret,omitempty" json:"client_secret,omitempty" mapstructure:"client_secret" sensitive:"true"`
+	AccountKey         string `yaml:"account_key,omitempty" json:"account_key,omitempty" mapstructure:"account_key" sensitive:"true"`
+	SASToken           string `yaml:"sas_token,omitempty" json:"sas_token,omitempty" mapstructure:"sas_token" sensitive:"true"`
 	Layout             string `yaml:"layout,omitempty" json:"layout,omitempty" mapstructure:"layout"`
 }
 
@@ -1627,7 +1627,7 @@ func (c HTTPConnection) GetName() string {
 
 type ISOCPulseConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	Token              string `yaml:"token,omitempty" json:"token" mapstructure:"token"`
+	Token              string `yaml:"token,omitempty" json:"token" mapstructure:"token" sensitive:"true"`
 }
 
 func (c ISOCPulseConnection) GetName() string {
@@ -1638,7 +1638,7 @@ type InfluxDBConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	Host               string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
 	Port               int    `yaml:"port,omitempty" json:"port,omitempty" mapstructure:"port"`
-	Token              string `yaml:"token,omitempty" json:"token" mapstructure:"token"`
+	Token              string `yaml:"token,omitempty" json:"token" mapstructure:"token" sensitive:"true"`
 	Org                string `yaml:"org,omitempty" json:"org" mapstructure:"org"`
 	Bucket             string `yaml:"bucket,omitempty" json:"bucket" mapstructure:"bucket"`
 	Secure             string `yaml:"secure,omitempty" json:"secure,omitempty" mapstructure:"secure" default:"true"`
@@ -1652,18 +1652,18 @@ type TableauConnection struct {
 	ConnectionMetadata        `yaml:",inline" mapstructure:",squash"`
 	Host                      string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
 	Username                  string `yaml:"username,omitempty" json:"username,omitempty" mapstructure:"username" jsonschema:"oneof_required=username_password"`
-	Password                  string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password" jsonschema:"oneof_required=username_password"`
+	Password                  string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password" jsonschema:"oneof_required=username_password" sensitive:"true"`
 	PersonalAccessTokenName   string `yaml:"personal_access_token_name,omitempty" json:"personal_access_token_name,omitempty" mapstructure:"personal_access_token_name" jsonschema:"oneof_required=personal_access_token"`
-	PersonalAccessTokenSecret string `yaml:"personal_access_token_secret,omitempty" json:"personal_access_token_secret,omitempty" mapstructure:"personal_access_token_secret" jsonschema:"oneof_required=personal_access_token"`
+	PersonalAccessTokenSecret string `yaml:"personal_access_token_secret,omitempty" json:"personal_access_token_secret,omitempty" mapstructure:"personal_access_token_secret" jsonschema:"oneof_required=personal_access_token" sensitive:"true"`
 	SiteID                    string `yaml:"site_id,omitempty" json:"site_id" mapstructure:"site_id"`
 	APIVersion                string `yaml:"api_version,omitempty" json:"api_version,omitempty" mapstructure:"api_version"`
 }
 
 type QuickSightConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	AwsAccessKeyID     string `yaml:"aws_access_key_id,omitempty" json:"aws_access_key_id" mapstructure:"aws_access_key_id"`
-	AwsSecretAccessKey string `yaml:"aws_secret_access_key,omitempty" json:"aws_secret_access_key" mapstructure:"aws_secret_access_key"`
-	AwsSessionToken    string `yaml:"aws_session_token,omitempty" json:"aws_session_token" mapstructure:"aws_session_token"`
+	AwsAccessKeyID     string `yaml:"aws_access_key_id,omitempty" json:"aws_access_key_id" mapstructure:"aws_access_key_id" sensitive:"true"`
+	AwsSecretAccessKey string `yaml:"aws_secret_access_key,omitempty" json:"aws_secret_access_key" mapstructure:"aws_secret_access_key" sensitive:"true"`
+	AwsSessionToken    string `yaml:"aws_session_token,omitempty" json:"aws_session_token" mapstructure:"aws_session_token" sensitive:"true"`
 	AwsRegion          string `yaml:"aws_region,omitempty" json:"aws_region" mapstructure:"aws_region"`
 	AwsAccountID       string `yaml:"aws_account_id,omitempty" json:"aws_account_id" mapstructure:"aws_account_id"`
 }
@@ -1677,7 +1677,7 @@ type TrinoConnection struct {
 	Host               string `yaml:"host" json:"host" mapstructure:"host"`
 	Port               int    `yaml:"port" json:"port" mapstructure:"port"`
 	Username           string `yaml:"username" json:"username" mapstructure:"username"`
-	Password           string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password"`
+	Password           string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password" sensitive:"true"`
 	Catalog            string `yaml:"catalog" json:"catalog" mapstructure:"catalog"`
 	Schema             string `yaml:"schema" json:"schema" mapstructure:"schema"`
 }
@@ -1690,7 +1690,7 @@ type StarRocksConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	Host               string `yaml:"host" json:"host" mapstructure:"host"`
 	Username           string `yaml:"username" json:"username" mapstructure:"username"`
-	Password           string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password"`
+	Password           string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password" sensitive:"true"`
 	Port               int    `yaml:"port,omitempty" json:"port,omitempty" mapstructure:"port"`
 	Database           string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
 	Catalog            string `yaml:"catalog,omitempty" json:"catalog,omitempty" mapstructure:"catalog"`
@@ -1720,8 +1720,8 @@ type DremioConnection struct {
 	Host               string `yaml:"host" json:"host" mapstructure:"host"`
 	Port               int    `yaml:"port" json:"port" mapstructure:"port"`
 	Username           string `yaml:"username,omitempty" json:"username,omitempty" mapstructure:"username"`
-	Password           string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password"`
-	Token              string `yaml:"token,omitempty" json:"token,omitempty" mapstructure:"token"`
+	Password           string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password" sensitive:"true"`
+	Token              string `yaml:"token,omitempty" json:"token,omitempty" mapstructure:"token" sensitive:"true"`
 	Database           string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
 	TLS                bool   `yaml:"tls,omitempty" json:"tls,omitempty" mapstructure:"tls"`
 	TLSSkipVerify      bool   `yaml:"tls_skip_verify,omitempty" json:"tls_skip_verify,omitempty" mapstructure:"tls_skip_verify"`
@@ -1739,8 +1739,8 @@ type SailConnection struct {
 	Host               string `yaml:"host" json:"host" mapstructure:"host"`
 	Port               int    `yaml:"port" json:"port" mapstructure:"port"`
 	Username           string `yaml:"username,omitempty" json:"username,omitempty" mapstructure:"username"`
-	Password           string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password"`
-	Token              string `yaml:"token,omitempty" json:"token,omitempty" mapstructure:"token"`
+	Password           string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password" sensitive:"true"`
+	Token              string `yaml:"token,omitempty" json:"token,omitempty" mapstructure:"token" sensitive:"true"`
 	Database           string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
 	TLS                bool   `yaml:"tls,omitempty" json:"tls,omitempty" mapstructure:"tls"`
 	TLSSkipVerify      bool   `yaml:"tls_skip_verify,omitempty" json:"tls_skip_verify,omitempty" mapstructure:"tls_skip_verify"`
@@ -1758,7 +1758,7 @@ type FluxxConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	Instance           string `yaml:"instance,omitempty" json:"instance" mapstructure:"instance"`
 	ClientID           string `yaml:"client_id,omitempty" json:"client_id" mapstructure:"client_id"`
-	ClientSecret       string `yaml:"client_secret,omitempty" json:"client_secret" mapstructure:"client_secret"`
+	ClientSecret       string `yaml:"client_secret,omitempty" json:"client_secret" mapstructure:"client_secret" sensitive:"true"`
 }
 
 func (c FluxxConnection) GetName() string {
@@ -1768,7 +1768,7 @@ func (c FluxxConnection) GetName() string {
 type FreshdeskConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	Domain             string `yaml:"domain,omitempty" json:"domain" mapstructure:"domain"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 }
 
 func (c FreshdeskConnection) GetName() string {
@@ -1777,10 +1777,10 @@ func (c FreshdeskConnection) GetName() string {
 
 type RedditAdsConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	AccessToken        string `yaml:"access_token,omitempty" json:"access_token,omitempty" mapstructure:"access_token"`
+	AccessToken        string `yaml:"access_token,omitempty" json:"access_token,omitempty" mapstructure:"access_token" sensitive:"true"`
 	ClientID           string `yaml:"client_id,omitempty" json:"client_id,omitempty" mapstructure:"client_id"`
-	ClientSecret       string `yaml:"client_secret,omitempty" json:"client_secret,omitempty" mapstructure:"client_secret"`
-	RefreshToken       string `yaml:"refresh_token,omitempty" json:"refresh_token,omitempty" mapstructure:"refresh_token"`
+	ClientSecret       string `yaml:"client_secret,omitempty" json:"client_secret,omitempty" mapstructure:"client_secret" sensitive:"true"`
+	RefreshToken       string `yaml:"refresh_token,omitempty" json:"refresh_token,omitempty" mapstructure:"refresh_token" sensitive:"true"`
 }
 
 func (c RedditAdsConnection) GetName() string {
@@ -1845,7 +1845,7 @@ func (c PolymarketConnection) GetName() string {
 
 type FundraiseUpConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 }
 
 func (c FundraiseUpConnection) GetName() string {
@@ -1854,7 +1854,7 @@ func (c FundraiseUpConnection) GetName() string {
 
 type FirefliesConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 }
 
 func (c FirefliesConnection) GetName() string {
@@ -1863,9 +1863,9 @@ func (c FirefliesConnection) GetName() string {
 
 type WistiaConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	AccessToken        string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key,omitempty" mapstructure:"api_key"`
-	Token              string `yaml:"token,omitempty" json:"token,omitempty" mapstructure:"token"`
+	AccessToken        string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token" sensitive:"true"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key,omitempty" mapstructure:"api_key" sensitive:"true"`
+	Token              string `yaml:"token,omitempty" json:"token,omitempty" mapstructure:"token" sensitive:"true"`
 	APIVersion         string `yaml:"api_version,omitempty" json:"api_version,omitempty" mapstructure:"api_version"`
 	BaseURL            string `yaml:"base_url,omitempty" json:"base_url,omitempty" mapstructure:"base_url"`
 }
@@ -1878,7 +1878,7 @@ type JiraConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	Domain             string `yaml:"domain,omitempty" json:"domain" mapstructure:"domain"`
 	Email              string `yaml:"email,omitempty" json:"email" mapstructure:"email"`
-	APIToken           string `yaml:"api_token,omitempty" json:"api_token" mapstructure:"api_token"`
+	APIToken           string `yaml:"api_token,omitempty" json:"api_token" mapstructure:"api_token" sensitive:"true"`
 }
 
 func (c JiraConnection) GetName() string {
@@ -1887,7 +1887,7 @@ func (c JiraConnection) GetName() string {
 
 type MondayConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIToken           string `yaml:"api_token,omitempty" json:"api_token" mapstructure:"api_token"`
+	APIToken           string `yaml:"api_token,omitempty" json:"api_token" mapstructure:"api_token" sensitive:"true"`
 }
 
 func (c MondayConnection) GetName() string {
@@ -1896,7 +1896,7 @@ func (c MondayConnection) GetName() string {
 
 type PlusVibeAIConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 	WorkspaceID        string `yaml:"workspace_id,omitempty" json:"workspace_id" mapstructure:"workspace_id"`
 }
 
@@ -1906,7 +1906,7 @@ func (c PlusVibeAIConnection) GetName() string {
 
 type BruinCloudConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIToken           string `yaml:"api_token,omitempty" json:"api_token" mapstructure:"api_token"`
+	APIToken           string `yaml:"api_token,omitempty" json:"api_token" mapstructure:"api_token" sensitive:"true"`
 }
 
 func (c BruinCloudConnection) GetName() string {
@@ -1915,7 +1915,7 @@ func (c BruinCloudConnection) GetName() string {
 
 type PrimerConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 }
 
 func (c PrimerConnection) GetName() string {
@@ -1925,7 +1925,7 @@ func (c PrimerConnection) GetName() string {
 type IndeedConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	ClientID           string `yaml:"client_id,omitempty" json:"client_id" mapstructure:"client_id"`
-	ClientSecret       string `yaml:"client_secret,omitempty" json:"client_secret" mapstructure:"client_secret"`
+	ClientSecret       string `yaml:"client_secret,omitempty" json:"client_secret" mapstructure:"client_secret" sensitive:"true"`
 	EmployerID         string `yaml:"employer_id,omitempty" json:"employer_id" mapstructure:"employer_id"`
 }
 
@@ -1935,7 +1935,7 @@ func (c IndeedConnection) GetName() string {
 
 type CustomerIoConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 	Region             string `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
 }
 
@@ -1945,7 +1945,7 @@ func (c CustomerIoConnection) GetName() string {
 
 type SendgridConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 	OnBehalfOf         string `yaml:"on_behalf_of,omitempty" json:"on_behalf_of,omitempty" mapstructure:"on_behalf_of"`
 }
 
@@ -1955,7 +1955,7 @@ func (c SendgridConnection) GetName() string {
 
 type BrazeConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 	Endpoint           string `yaml:"endpoint,omitempty" json:"endpoint" mapstructure:"endpoint"`
 }
 
@@ -1966,9 +1966,9 @@ func (c BrazeConnection) GetName() string {
 type TwilioConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	AccountSID         string `yaml:"account_sid,omitempty" json:"account_sid" mapstructure:"account_sid"`
-	AuthToken          string `yaml:"auth_token,omitempty" json:"auth_token,omitempty" mapstructure:"auth_token"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key,omitempty" mapstructure:"api_key"`
-	APISecret          string `yaml:"api_secret,omitempty" json:"api_secret,omitempty" mapstructure:"api_secret"`
+	AuthToken          string `yaml:"auth_token,omitempty" json:"auth_token,omitempty" mapstructure:"auth_token" sensitive:"true"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key,omitempty" mapstructure:"api_key" sensitive:"true"`
+	APISecret          string `yaml:"api_secret,omitempty" json:"api_secret,omitempty" mapstructure:"api_secret" sensitive:"true"`
 }
 
 func (c TwilioConnection) GetName() string {
@@ -1990,7 +1990,7 @@ func (c EspnConnection) GetName() string {
 
 type APIFootballConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 	League             string `yaml:"league,omitempty" json:"league,omitempty" mapstructure:"league"`
 	Season             string `yaml:"season,omitempty" json:"season,omitempty" mapstructure:"season"`
 	Timezone           string `yaml:"timezone,omitempty" json:"timezone,omitempty" mapstructure:"timezone"`
@@ -2003,7 +2003,7 @@ func (c APIFootballConnection) GetName() string {
 
 type FootballDataConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 	Competition        string `yaml:"competition,omitempty" json:"competition,omitempty" mapstructure:"competition"`
 	Season             string `yaml:"season,omitempty" json:"season,omitempty" mapstructure:"season"`
 	BaseURL            string `yaml:"base_url,omitempty" json:"base_url,omitempty" mapstructure:"base_url"`
@@ -2023,7 +2023,7 @@ func (c FootballDataConnection) GetName() string {
 
 type BallDontLieConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 	Season             string `yaml:"season,omitempty" json:"season,omitempty" mapstructure:"season"`
 	BaseURL            string `yaml:"base_url,omitempty" json:"base_url,omitempty" mapstructure:"base_url"`
 }
@@ -2035,7 +2035,7 @@ func (c BallDontLieConnection) GetName() string {
 type VerticaConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	Username           string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
-	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password" sensitive:"true"`
 	Host               string `yaml:"host,omitempty"     json:"host" mapstructure:"host"`
 	Port               int    `yaml:"port,omitempty"     json:"port" mapstructure:"port" jsonschema:"default=5433"`
 	Database           string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
@@ -2048,7 +2048,7 @@ func (c VerticaConnection) GetName() string {
 
 type SurveyMonkeyConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	AccessToken        string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
+	AccessToken        string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token" sensitive:"true"`
 	Region             string `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
 }
 
