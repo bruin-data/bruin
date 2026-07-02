@@ -17,6 +17,10 @@ import (
 // Mask is the placeholder written in place of a credential value.
 const Mask = "****"
 
+// maxSecretFileSize caps sensitive_file reads; real credential files (keys,
+// service-account JSON) are a few KB, so anything larger is skipped.
+const maxSecretFileSize = 1 << 20
+
 // forms returns the distinct string forms a secret can appear as in output.
 func forms(secret string) []string {
 	seen := map[string]struct{}{}
@@ -78,10 +82,12 @@ func collect(v reflect.Value, out *[]string) {
 					*out = append(*out, s)
 				}
 				// Path whose file CONTENTS are the secret (service_account_file,
-				// private_key_path): read the file and collect its contents.
+				// private_key_path): read it, skipping implausibly large files.
 				if s != "" && field.Tag.Get("sensitive_file") == "true" {
-					if b, err := os.ReadFile(s); err == nil && len(b) > 0 {
-						*out = append(*out, string(b))
+					if fi, err := os.Stat(s); err == nil && fi.Size() > 0 && fi.Size() <= maxSecretFileSize {
+						if b, err := os.ReadFile(s); err == nil && len(b) > 0 {
+							*out = append(*out, string(b))
+						}
 					}
 				}
 				// Strings never hold nested structs — nothing to recurse into.
@@ -142,8 +148,8 @@ func (r *Masker) Writer(w io.Writer) *LineWriter {
 // terminator cannot grow memory without bound.
 const maxLineBuffer = 1 << 20
 
-// LineWriter masks each complete line written through it, buffering a partial
-// trailing line so a secret split across writes is still caught.
+// LineWriter masks output written through it, flushing everything up to the last
+// newline at once (so multi-line secrets are caught) and buffering the partial tail.
 type LineWriter struct {
 	r   *Masker
 	w   io.Writer
@@ -155,15 +161,13 @@ func (lw *LineWriter) Write(p []byte) (int, error) {
 	lw.mu.Lock()
 	defer lw.mu.Unlock()
 	lw.buf = append(lw.buf, p...)
-	for {
-		i := bytes.IndexAny(lw.buf, "\r\n")
-		if i < 0 {
-			break
-		}
+	// Emit through the last line terminator as one block, so a multi-line secret
+	// (PEM key, service-account JSON) is masked as a whole, not leaked line by line.
+	if i := bytes.LastIndexAny(lw.buf, "\r\n"); i >= 0 {
 		if err := lw.emit(lw.buf[:i+1]); err != nil {
 			return 0, err
 		}
-		lw.buf = lw.buf[i+1:]
+		lw.buf = append(lw.buf[:0], lw.buf[i+1:]...)
 	}
 	if len(lw.buf) > maxLineBuffer {
 		if err := lw.emit(lw.buf); err != nil {

@@ -118,6 +118,44 @@ func TestWriter(t *testing.T) {
 	}
 }
 
+func TestWriterMultiLineSecret(t *testing.T) {
+	t.Parallel()
+	secret := "-----BEGIN PRIVATE KEY-----\nLINE1abc\nLINE2def\n-----END PRIVATE KEY-----"
+	r := New([]string{secret})
+	var buf bytes.Buffer
+	w := r.Writer(&buf)
+	// The whole multi-line secret arrives in one write, terminated by a newline.
+	if _, err := w.Write([]byte("key=" + secret + "\n")); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	for _, frag := range []string{"LINE1abc", "LINE2def"} {
+		if strings.Contains(buf.String(), frag) {
+			t.Errorf("multi-line secret leaked fragment %q: %s", frag, buf.String())
+		}
+	}
+	if !strings.Contains(buf.String(), Mask) {
+		t.Errorf("mask not present: %s", buf.String())
+	}
+}
+
+func TestSensitiveValues_FileTooLarge(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	fpath := dir + "/big.json"
+	if err := os.WriteFile(fpath, bytes.Repeat([]byte("x"), maxSecretFileSize+1), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	type conn struct {
+		SAFile string `mapstructure:"service_account_file" sensitive_file:"true"`
+	}
+	if vals := SensitiveValues(&conn{SAFile: fpath}); len(vals) != 0 {
+		t.Errorf("oversized file should be skipped, got %d values", len(vals))
+	}
+}
+
 func TestSensitiveValues_File(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()

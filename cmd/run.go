@@ -1221,10 +1221,21 @@ func Run(isDebug *bool) *cli.Command {
 			// worker writes to the os.Stdout tee that logOutput installs below, and
 			// Clean() strips ANSI escapes but not carriage returns). So this is gated
 			// on !runConfig.NoLogFile to ensure os.Stdout is still the bare terminal.
+			// Build the credential masker up front so both the log-file and the
+			// no-log-file paths below install it as the output sink.
+			var masker *mask.Masker
+			if c.Bool("mask-credentials") {
+				masker = mask.New(collectRunSecrets(foundPipeline, cm, connectionManager))
+			}
+			maskingActive := !masker.Empty()
+
+			// Also disabled when masking is active: the masking sink pipes os.Stdout,
+			// so it is no longer the bare terminal this passthrough needs.
 			interactivePythonLogs := interactiveTerminal &&
 				c.Int("workers") == 1 &&
 				!useTUI &&
-				runConfig.NoLogFile
+				runConfig.NoLogFile &&
+				!maskingActive
 
 			// Save the real terminal fd BEFORE logOutput replaces os.Stdout
 			var realTerminal *os.File
@@ -1252,10 +1263,6 @@ func Run(isDebug *bool) *cli.Command {
 				if useTUI {
 					termWriter = io.Discard
 				}
-				var masker *mask.Masker
-				if c.Bool("mask-credentials") {
-					masker = mask.New(collectRunSecrets(foundPipeline, cm, connectionManager))
-				}
 				fn, err2 := logOutput(logPath, termWriter, masker)
 				if err2 != nil {
 					errorPrinter.Printf("Failed to create log file: %v\n", err2)
@@ -1270,6 +1277,15 @@ func Run(isDebug *bool) *cli.Command {
 					errorPrinter.Printf("Failed to add the log file to .gitignore: %v\n", err)
 					return cli.Exit("", 1)
 				}
+			} else if maskingActive {
+				// No log file, but still redact credentials from terminal output.
+				fn, err2 := logOutput("", nil, masker)
+				if err2 != nil {
+					errorPrinter.Printf("Failed to set up credential masking: %v\n", err2)
+					return cli.Exit("", 1)
+				}
+				defer fn()
+				color.Output = os.Stdout
 			}
 
 			err = ensurePythonCacheGitignore(afero.NewOsFs(), repoRoot.Path)
@@ -2604,32 +2620,37 @@ func collectRunSecrets(p *pipeline.Pipeline, cfg *config.Config, connMgr config.
 	return secrets
 }
 
-// logOutput sets up log file piping. terminalWriter controls where terminal output goes:
-// nil = os.Stdout (real terminal, legacy behavior), io.Discard = log file only (TUI mode).
+// logOutput redirects os.Stdout/os.Stderr through a masking sink. A non-empty
+// logPath also tees output to that file; an empty logPath masks terminal output
+// only. terminalWriter selects the terminal destination: nil = os.Stdout (legacy),
+// io.Discard = suppressed (TUI mode).
 func logOutput(logPath string, terminalWriter io.Writer, masker *mask.Masker) (func(), error) {
-	err := os.MkdirAll(filepath.Dir(logPath), 0o755)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create log directory")
-	}
-
-	// open file read/write | create if not exist | clear file at open if exists
-	f, err := os.OpenFile(logPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o644)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to open log file")
-	}
-
-	// save existing stdout | MultiWriter writes to saved stdout and file
 	if terminalWriter == nil {
 		terminalWriter = os.Stdout
 	}
-	mw := io.MultiWriter(terminalWriter, &clearFileWriter{f, sync.Mutex{}})
+
+	var f *os.File
+	sinkTarget := terminalWriter
+	if logPath != "" {
+		if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
+			return nil, errors.Wrap(err, "failed to create log directory")
+		}
+		// open read/write | create if not exist | truncate at open
+		var err error
+		f, err = os.OpenFile(logPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o644)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to open log file")
+		}
+		// tee terminal output and the log file
+		sinkTarget = io.MultiWriter(terminalWriter, &clearFileWriter{f, sync.Mutex{}})
+	}
 
 	// when masking is enabled, redact credentials before they reach the terminal
 	// or the log file; everything written during the run funnels through this sink.
-	sink := mw
+	sink := sinkTarget
 	var lineMasker *mask.LineWriter
 	if !masker.Empty() {
-		lineMasker = masker.Writer(mw)
+		lineMasker = masker.Writer(sinkTarget)
 		sink = lineMasker
 	}
 
@@ -2665,11 +2686,13 @@ func logOutput(logPath string, terminalWriter io.Writer, masker *mask.Masker) (f
 
 	// function to be deferred in main until program exits
 	return func() {
-		// close writer then block on exit channel | this will let mw finish writing before the program exits
+		// close writer then block on exit channel | lets the sink finish writing before exit
 		_ = w.Close()
 		<-exit
 		// close file after all writes have finished
-		_ = f.Close()
+		if f != nil {
+			_ = f.Close()
+		}
 	}, nil
 }
 
