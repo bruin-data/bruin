@@ -63,6 +63,18 @@ func TestMask(t *testing.T) {
 			gone: base64.StdEncoding.EncodeToString([]byte(saJSON)),
 		},
 		{
+			name: "base64 secret in a path segment",
+			in:   "scheme://host/" + url.PathEscape(base64.StdEncoding.EncodeToString([]byte(saJSON))) + "/x",
+			want: "host/" + Mask + "/x",
+			gone: url.PathEscape(base64.StdEncoding.EncodeToString([]byte(saJSON))),
+		},
+		{
+			name: "base64 secret in userinfo",
+			in:   "scheme://" + strings.TrimPrefix(url.UserPassword("", base64.StdEncoding.EncodeToString([]byte(saJSON))).String(), ":") + "@host",
+			want: Mask + "@host",
+			gone: strings.TrimPrefix(url.UserPassword("", base64.StdEncoding.EncodeToString([]byte(saJSON))).String(), ":"),
+		},
+		{
 			name: "loose text verbatim secret",
 			in:   "authenticating with token " + apiKey + " now",
 			want: "token " + Mask + " now",
@@ -167,6 +179,35 @@ func TestWriterMultiLineSecretSplitAcrossWrites(t *testing.T) {
 		}
 	}
 	if !strings.Contains(buf.String(), Mask) {
+		t.Errorf("mask not present: %s", buf.String())
+	}
+}
+
+func TestWriterLongSecretSplitAcrossWrites(t *testing.T) {
+	t.Parallel()
+	// A long single-line secret (e.g. a base64 token) split into many small
+	// chunks, as io.Copy from the pipe would deliver it.
+	secret := "sk_live_" + strings.Repeat("aB3xZ9qP", 40) // ~328 bytes, no newlines
+	r := New([]string{secret})
+	var buf bytes.Buffer
+	w := r.Writer(&buf)
+	line := "Authorization: Bearer " + secret + "\n"
+	for i := 0; i < len(line); i += 7 { // 7-byte chunks straddle the secret repeatedly
+		end := i + 7
+		if end > len(line) {
+			end = len(line)
+		}
+		if _, err := w.Write([]byte(line[i:end])); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := w.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(buf.String(), secret) || strings.Contains(buf.String(), secret[:40]) {
+		t.Errorf("long secret leaked across chunked writes: %s", buf.String())
+	}
+	if !strings.Contains(buf.String(), "Bearer "+Mask) {
 		t.Errorf("mask not present: %s", buf.String())
 	}
 }

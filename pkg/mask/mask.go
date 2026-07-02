@@ -35,12 +35,16 @@ func forms(secret string) []string {
 		out = append(out, s)
 	}
 	b64 := base64.StdEncoding.EncodeToString([]byte(secret))
+	// The full matrix of {raw, base64} x {plain, query-, path-, userinfo-escaped},
+	// so a secret is masked in any URI position whether or not it was base64'd.
 	add(secret)
 	add(url.QueryEscape(secret))
 	add(url.PathEscape(secret))
 	add(strings.TrimPrefix(url.UserPassword("", secret).String(), ":"))
 	add(b64)
 	add(url.QueryEscape(b64))
+	add(url.PathEscape(b64))
+	add(strings.TrimPrefix(url.UserPassword("", b64).String(), ":"))
 	return out
 }
 
