@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -1215,12 +1216,13 @@ type Hook struct {
 }
 
 type Hooks struct {
-	Pre  []Hook `json:"pre,omitempty" yaml:"pre,omitempty" mapstructure:"pre"`
-	Post []Hook `json:"post,omitempty" yaml:"post,omitempty" mapstructure:"post"`
+	ApplicableTypes []string `json:"applicable_type,omitempty" yaml:"applicable_type,omitempty" mapstructure:"applicable_type"`
+	Pre             []Hook   `json:"pre,omitempty" yaml:"pre,omitempty" mapstructure:"pre"`
+	Post            []Hook   `json:"post,omitempty" yaml:"post,omitempty" mapstructure:"post"`
 }
 
 func (h Hooks) IsZero() bool {
-	return len(h.Pre) == 0 && len(h.Post) == 0
+	return len(h.Pre) == 0 && len(h.Post) == 0 && len(h.ApplicableTypes) == 0
 }
 
 //nolint:recvcheck
@@ -3091,7 +3093,7 @@ func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 	if (asset.IntervalModifiers.End == TimeModifier{}) {
 		asset.IntervalModifiers.End = defaults.IntervalModifiers.End
 	}
-	acceptsDefaultHooks := assetAcceptsDefaultHooks(asset)
+	acceptsDefaultHooks := assetAcceptsDefaultHooks(asset, defaults.Hooks)
 	if acceptsDefaultHooks && len(asset.Hooks.Pre) == 0 {
 		asset.Hooks.Pre = append([]Hook(nil), defaults.Hooks.Pre...)
 	}
@@ -3673,8 +3675,15 @@ func cloneWebhookNotification(value WebhookNotification) WebhookNotification {
 	return value
 }
 
-func assetAcceptsDefaultHooks(asset *Asset) bool {
-	return asset.IsSQLAsset()
+func assetAcceptsDefaultHooks(asset *Asset, defaults Hooks) bool {
+	if !asset.IsSQLAsset() {
+		return false
+	}
+	// When no applicable_type filter is set, every SQL asset inherits the defaults.
+	if len(defaults.ApplicableTypes) == 0 {
+		return true
+	}
+	return slices.Contains(defaults.ApplicableTypes, string(asset.Type))
 }
 
 func (b *Builder) InjectConnectionAsSecret(ctx context.Context, asset *Asset, foundPipeline *Pipeline) (*Asset, error) {
@@ -3772,7 +3781,11 @@ func (b *Builder) fillGlossaryStuff(ctx context.Context, asset *Asset, foundPipe
 }
 
 func (a *Asset) IsSQLAsset() bool {
-	switch a.Type {
+	return IsSQLAssetType(a.Type)
+}
+
+func IsSQLAssetType(t AssetType) bool {
+	switch t {
 	case AssetTypeBigqueryQuery,
 		AssetTypeSnowflakeQuery,
 		AssetTypePostgresQuery,

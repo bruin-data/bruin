@@ -335,6 +335,22 @@ Hooks are currently supported for SQL assets. Each hook entry supports a single 
 
 Hooks can also be set as pipeline defaults (see [pipeline defaults](/pipelines/definition#default-pipeline-level-defaults)). Assets inherit default `pre` and `post` hooks independently - defining only `pre` hooks on an asset will still inherit default `post` hooks.
 
+When set as pipeline defaults, hooks accept an optional `applicable_type` list that restricts which SQL asset types inherit them. When omitted, all SQL assets inherit the default hooks; when provided, only assets whose `type` matches an entry in the list inherit them:
+
+```yaml
+default:
+  hooks:
+    applicable_type:
+      - duckdb.sql
+      - bq.sql
+    pre:
+      - query: "SET my_var = 1"
+    post:
+      - query: "SET my_var = 0"
+```
+
+Only SQL asset types are valid entries; listing a non-SQL type raises a validation error. `applicable_type` has no effect when set on an individual asset's hooks.
+
 - **Type:** `Object`
 
 ## `columns`
