@@ -442,9 +442,10 @@ func (c VitessConnection) GetName() string {
 	return c.Name
 }
 
-// PlanetScaleConnection describes a connection to PlanetScale, the managed Vitess platform. ingestr
-// routes it through its own "planetscale" scheme (hosted psdbconnect API) and enables TLS
-// automatically, so no SSL configuration is required.
+// PlanetScaleConnection describes a connection to PlanetScale, the managed Vitess platform. It is
+// configured under the "planetscale_mysql" connection type (the "_mysql" suffix distinguishes it
+// from PlanetScale's Postgres offering). ingestr routes it through its "ps_mysql" scheme (hosted
+// psdbconnect API) and enables TLS automatically, so no SSL configuration is required.
 type PlanetScaleConnection struct {
 	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`

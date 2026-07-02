@@ -1,6 +1,6 @@
 # PlanetScale
 
-[PlanetScale](https://planetscale.com/) is a managed, MySQL-compatible database platform built on [Vitess](https://vitess.io/). Bruin connects to it through a dedicated `planetscale` connection, and it can be used as both a **source** and a **destination** for [Ingestr assets](/assets/ingestr). PlanetScale [change data capture](#change-data-capture-cdc) is also supported.
+[PlanetScale](https://planetscale.com/) is a managed, MySQL-compatible database platform built on [Vitess](https://vitess.io/). Bruin connects to it through a dedicated `planetscale_mysql` connection, and it can be used as both a **source** and a **destination** for [Ingestr assets](/assets/ingestr). PlanetScale [change data capture](#change-data-capture-cdc) is also supported.
 
 Follow the steps below to set up PlanetScale and run ingestion.
 
@@ -8,11 +8,11 @@ Follow the steps below to set up PlanetScale and run ingestion.
 
 ### Step 1: Add a connection to .bruin.yml file
 
-Add a `planetscale` connection to the `connections` section of your `.bruin.yml` file. Use the connection details from your PlanetScale branch's password:
+Add a `planetscale_mysql` connection to the `connections` section of your `.bruin.yml` file. Use the connection details from your PlanetScale branch's password:
 
 ```yaml
-  planetscale:
-    - name: "planetscale"
+  planetscale_mysql:
+    - name: "planetscale_mysql"
       username: "xxxxxxxxxxxxx"
       password: "pscale_pw_xxxxxxxxxxxx"
       host: "aws.connect.psdb.cloud"
@@ -28,7 +28,7 @@ Add a `planetscale` connection to the `connections` section of your `.bruin.yml`
 - `database`: The PlanetScale database (keyspace) name
 
 > [!NOTE]
-> PlanetScale requires encrypted connections. TLS is enabled automatically for the `planetscale` connection, so you do not need any extra configuration.
+> PlanetScale requires encrypted connections. TLS is enabled automatically for the `planetscale_mysql` connection, so you do not need any extra configuration.
 
 ### Step 2: Create an asset file for data ingestion
 
@@ -40,7 +40,7 @@ type: ingestr
 connection: bigquery
 
 parameters:
-  source_connection: planetscale
+  source_connection: planetscale_mysql
   source_table: 'orders'
   destination: bigquery
 ```
@@ -66,12 +66,12 @@ You can also use PlanetScale as a destination by pointing an ingestr asset's `co
 ```yaml
 name: orders
 type: ingestr
-connection: planetscale
+connection: planetscale_mysql
 
 parameters:
   source_connection: my_postgres
   source_table: 'public.orders'
-  destination: planetscale
+  destination: planetscale_mysql
 ```
 
 When loading into PlanetScale, keep two things in mind:
@@ -108,7 +108,7 @@ type: ingestr
 connection: bigquery
 
 parameters:
-  source_connection: planetscale
+  source_connection: planetscale_mysql
   source_table: 'orders'
   destination: bigquery
   cdc: "true"
