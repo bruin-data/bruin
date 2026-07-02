@@ -267,6 +267,72 @@ func TestDB_RunQueryWithoutResult(t *testing.T) {
 	}
 }
 
+// Regression test for BRU-5103: a job that submits as RUNNING then completes with a
+// retryable failure reason (rateLimitExceeded) must surface the error promptly
+// rather than being retried for hours via job.Read/getQueryResults.
+func TestDB_RunQueryWithoutResultSurfacesTerminalJobError(t *testing.T) {
+	t.Parallel()
+
+	projectID := testProjectID
+	jobID := testJobID
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/jobs", projectID)):
+			// jobs.insert: job accepted, still running.
+			writeBqTestJSON(t, w, &bigquery2.Job{
+				JobReference: &bigquery2.JobReference{JobId: jobID, ProjectId: projectID, Location: "US"},
+				Status:       &bigquery2.JobStatus{State: "RUNNING"},
+			})
+		case r.Method == http.MethodGet && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/jobs/%s", projectID, jobID)):
+			// jobs.get: job finished with a rate-limit error.
+			writeBqTestJSON(t, w, &bigquery2.Job{
+				JobReference: &bigquery2.JobReference{JobId: jobID, ProjectId: projectID, Location: "US"},
+				Status: &bigquery2.JobStatus{
+					State: "DONE",
+					ErrorResult: &bigquery2.ErrorProto{
+						Reason:  "rateLimitExceeded",
+						Message: "Exceeded rate limits: too many table update operations for this table",
+					},
+				},
+			})
+		default:
+			w.WriteHeader(http.StatusInternalServerError)
+			_, err := w.Write([]byte("unexpected request: " + r.Method + " " + r.RequestURI))
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	}))
+	defer server.Close()
+
+	client, err := bigquery.NewClient(
+		t.Context(),
+		projectID,
+		option.WithEndpoint(server.URL),
+		option.WithCredentials(&google.Credentials{
+			ProjectID: projectID,
+			TokenSource: oauth2.StaticTokenSource(&oauth2.Token{
+				AccessToken: "some-token",
+			}),
+		}),
+	)
+	require.NoError(t, err)
+	client.Location = "US"
+
+	d := Client{client: client}
+
+	err = d.RunQueryWithoutResult(t.Context(), &query.Query{Query: "CREATE TABLE IF NOT EXISTS dataset.t (id INT64)"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "Exceeded rate limits")
+	assert.NotContains(t, err.Error(), "Location:") // clean message, not the *bigquery.Error struct dump
+
+	// The structured error is preserved for classification.
+	var bqErr *bigquery.Error
+	require.ErrorAs(t, err, &bqErr)
+	assert.Equal(t, "rateLimitExceeded", bqErr.Reason)
+}
+
 func TestClientValidateQueryLimits(t *testing.T) {
 	t.Parallel()
 
@@ -462,41 +528,34 @@ type queryResultResponse struct {
 	statusCode int
 }
 
+// mockBqHandler serves the same jsr for jobs.insert and jobs.get, so jobs.insert
+// must report a terminal (DONE) state — a RUNNING jsr would make job.Status polling
+// loop forever. For a submit-RUNNING-then-complete flow, use a dedicated handler.
 func mockBqHandler(t *testing.T, projectID, jobID string, jsr jobSubmitResponse, qrr queryResultResponse) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/queries/%s?", projectID, jobID)) {
-			w.WriteHeader(qrr.statusCode)
-
-			response, err := json.Marshal(qrr.response)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			_, err = w.Write(response)
-			if err != nil {
-				t.Fatal(err)
-			}
-			return
-		} else if r.Method == http.MethodPost && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/jobs", projectID)) {
-			// Handle jobs.insert (used by q.Run)
-			w.WriteHeader(jsr.statusCode)
-
-			response, err := json.Marshal(jsr.response)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			_, err = w.Write(response)
-			if err != nil {
-				t.Fatal(err)
-			}
-			return
-		}
-
-		w.WriteHeader(http.StatusInternalServerError)
-		_, err := w.Write([]byte("there is no test definition found for the given request: " + r.Method + " " + r.RequestURI))
+	write := func(w http.ResponseWriter, statusCode int, body interface{}) {
+		w.WriteHeader(statusCode)
+		response, err := json.Marshal(body)
 		if err != nil {
 			t.Fatal(err)
+		}
+		if _, err := w.Write(response); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/queries/%s?", projectID, jobID)):
+			write(w, qrr.statusCode, qrr.response) // jobs.getQueryResults (job.Read)
+		case r.Method == http.MethodGet && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/jobs/%s", projectID, jobID)):
+			write(w, jsr.statusCode, jsr.response) // jobs.get (job.Status)
+		case r.Method == http.MethodPost && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/jobs", projectID)):
+			write(w, jsr.statusCode, jsr.response) // jobs.insert (q.Run)
+		default:
+			w.WriteHeader(http.StatusInternalServerError)
+			if _, err := w.Write([]byte("there is no test definition found for the given request: " + r.Method + " " + r.RequestURI)); err != nil {
+				t.Fatal(err)
+			}
 		}
 	})
 }
