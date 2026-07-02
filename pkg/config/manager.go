@@ -466,50 +466,75 @@ func decodeConfigYAML(buf []byte, config *Config) error {
 		return err
 	}
 
-	expandEnvVarsInYAMLValues(&node)
+	if err := expandEnvVarsInYAMLValues(&node); err != nil {
+		return err
+	}
+
 	return node.Decode(config)
 }
 
-func expandEnvVarsInYAMLValues(node *yaml.Node) {
+func expandEnvVarsInYAMLValues(node *yaml.Node) error {
 	if node == nil {
-		return
+		return nil
 	}
 
 	switch node.Kind {
 	case yaml.DocumentNode, yaml.SequenceNode:
 		for _, child := range node.Content {
-			expandEnvVarsInYAMLValues(child)
+			if err := expandEnvVarsInYAMLValues(child); err != nil {
+				return err
+			}
 		}
 	case yaml.MappingNode:
 		for i := 1; i < len(node.Content); i += 2 {
-			expandEnvVarsInYAMLValues(node.Content[i])
+			if err := expandEnvVarsInYAMLValues(node.Content[i]); err != nil {
+				return err
+			}
 		}
 	case yaml.AliasNode:
-		expandEnvVarsInYAMLValues(node.Alias)
+		if err := expandEnvVarsInYAMLValues(node.Alias); err != nil {
+			return err
+		}
 	case yaml.ScalarNode:
-		expanded, ok := expandEnvVarReferences(node.Value)
+		expanded, ok, err := expandEnvVarReferences(node.Value)
+		if err != nil {
+			return err
+		}
 		if !ok {
-			return
+			return nil
 		}
 
 		node.Value = expanded
 		node.Tag = ""
 	}
+
+	return nil
 }
 
-func expandEnvVarReferences(value string) (string, bool) {
+func expandEnvVarReferences(value string) (string, bool, error) {
 	matched := false
+	var missing []string
 	expanded := configEnvVarRegex.ReplaceAllStringFunc(value, func(match string) string {
 		matches := configEnvVarRegex.FindStringSubmatch(match)
 		if len(matches) != 2 {
 			return match
 		}
 
+		envValue, ok := os.LookupEnv(matches[1])
+		if !ok {
+			missing = append(missing, matches[1])
+			return match
+		}
+
 		matched = true
-		return os.Getenv(matches[1])
+		return envValue
 	})
 
-	return expanded, matched
+	if len(missing) > 0 {
+		return "", false, fmt.Errorf("environment variable %q is not set", missing[0])
+	}
+
+	return expanded, matched, nil
 }
 
 func LoadOrCreate(fs afero.Fs, path string) (*Config, error) {
