@@ -267,11 +267,9 @@ func TestDB_RunQueryWithoutResult(t *testing.T) {
 	}
 }
 
-// TestDB_RunQueryWithoutResultSurfacesTerminalJobError is a regression test for
-// BRU-5103: a job whose submit response is still RUNNING but which then completes
-// with a retryable failure reason (e.g. "rateLimitExceeded") must surface that
-// error promptly. Previously the code waited via job.Read/getQueryResults, whose
-// retryer treats a terminally-failed job as retryable and polled it for ~24h.
+// Regression test for BRU-5103: a job that submits as RUNNING then completes with a
+// retryable failure reason (rateLimitExceeded) must surface the error promptly
+// rather than being retried for hours via job.Read/getQueryResults.
 func TestDB_RunQueryWithoutResultSurfacesTerminalJobError(t *testing.T) {
 	t.Parallel()
 
@@ -525,54 +523,30 @@ type queryResultResponse struct {
 }
 
 func mockBqHandler(t *testing.T, projectID, jobID string, jsr jobSubmitResponse, qrr queryResultResponse) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/queries/%s?", projectID, jobID)) {
-			w.WriteHeader(qrr.statusCode)
-
-			response, err := json.Marshal(qrr.response)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			_, err = w.Write(response)
-			if err != nil {
-				t.Fatal(err)
-			}
-			return
-		} else if r.Method == http.MethodGet && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/jobs/%s", projectID, jobID)) {
-			// Handle jobs.get (used by job.Status / waitForJobCompletion)
-			w.WriteHeader(jsr.statusCode)
-
-			response, err := json.Marshal(jsr.response)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			_, err = w.Write(response)
-			if err != nil {
-				t.Fatal(err)
-			}
-			return
-		} else if r.Method == http.MethodPost && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/jobs", projectID)) {
-			// Handle jobs.insert (used by q.Run)
-			w.WriteHeader(jsr.statusCode)
-
-			response, err := json.Marshal(jsr.response)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			_, err = w.Write(response)
-			if err != nil {
-				t.Fatal(err)
-			}
-			return
-		}
-
-		w.WriteHeader(http.StatusInternalServerError)
-		_, err := w.Write([]byte("there is no test definition found for the given request: " + r.Method + " " + r.RequestURI))
+	write := func(w http.ResponseWriter, statusCode int, body interface{}) {
+		w.WriteHeader(statusCode)
+		response, err := json.Marshal(body)
 		if err != nil {
 			t.Fatal(err)
+		}
+		if _, err := w.Write(response); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/queries/%s?", projectID, jobID)):
+			write(w, qrr.statusCode, qrr.response) // jobs.getQueryResults (job.Read)
+		case r.Method == http.MethodGet && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/jobs/%s", projectID, jobID)):
+			write(w, jsr.statusCode, jsr.response) // jobs.get (job.Status)
+		case r.Method == http.MethodPost && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/jobs", projectID)):
+			write(w, jsr.statusCode, jsr.response) // jobs.insert (q.Run)
+		default:
+			w.WriteHeader(http.StatusInternalServerError)
+			if _, err := w.Write([]byte("there is no test definition found for the given request: " + r.Method + " " + r.RequestURI)); err != nil {
+				t.Fatal(err)
+			}
 		}
 	})
 }
