@@ -69,6 +69,7 @@ func main() {
 			cmd.CleanCmd(),
 			cmd.Format(&isDebug),
 			cmd.AI(&isDebug),
+			cmd.Skills(),
 			cmd.Docs(),
 			cmd.Init(),
 			cmd.Internal(),

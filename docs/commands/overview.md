@@ -31,6 +31,7 @@ bruin validate --help
 | Command | Description |
 |---------|-------------|
 | [`init`](/commands/init) | Create a new Bruin project from a template |
+| [`skills`](/commands/skills) | Install or update Bruin-provided agent skills |
 | [`clean`](/commands/clean) | Remove temporary files and build artifacts |
 | [`format`](/commands/format) | Format asset files for consistency |
 
