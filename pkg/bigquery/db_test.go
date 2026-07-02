@@ -326,6 +326,11 @@ func TestDB_RunQueryWithoutResultSurfacesTerminalJobError(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Exceeded rate limits")
 	assert.NotContains(t, err.Error(), "Location:") // clean message, not the *bigquery.Error struct dump
+
+	// The structured error is preserved for classification.
+	var bqErr *bigquery.Error
+	require.ErrorAs(t, err, &bqErr)
+	assert.Equal(t, "rateLimitExceeded", bqErr.Reason)
 }
 
 func TestClientValidateQueryLimits(t *testing.T) {

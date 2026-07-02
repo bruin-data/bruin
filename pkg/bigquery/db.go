@@ -770,14 +770,22 @@ func formatError(err error) error {
 	}
 
 	// Terminal job failures surface as *bigquery.Error (via job.Status), whose default
-	// string is a verbose struct dump; return its message for the same clean text as above.
+	// string is a verbose struct dump. Present its message cleanly while preserving the
+	// structured error so callers can still errors.As it for Reason/Location.
 	var bqError *bigquery.Error
 	if errors.As(err, &bqError) && bqError.Message != "" {
-		return fmt.Errorf("%s", bqError.Message)
+		return &jobError{err: bqError}
 	}
 
 	return err
 }
+
+// jobError presents a *bigquery.Error's message (its default string is a verbose
+// struct dump) while preserving the underlying error for errors.As.
+type jobError struct{ err *bigquery.Error }
+
+func (e *jobError) Error() string { return e.err.Message }
+func (e *jobError) Unwrap() error { return e.err }
 
 // Test runs a simple query (SELECT 1) to validate the connection.
 func (d *Client) Ping(ctx context.Context) error {
