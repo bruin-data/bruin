@@ -1158,7 +1158,7 @@ type Hooks struct {
 }
 
 func (h Hooks) IsZero() bool {
-	return len(h.Pre) == 0 && len(h.Post) == 0
+	return len(h.Pre) == 0 && len(h.Post) == 0 && len(h.ApplicableTypes) == 0
 }
 
 //nolint:recvcheck

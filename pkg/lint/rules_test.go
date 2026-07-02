@@ -3262,6 +3262,67 @@ func TestValidateScriptAssetHooksUnsupported(t *testing.T) {
 	}
 }
 
+func TestWarnAssetHookApplicableTypeIgnored(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		asset     *pipeline.Asset
+		wantIssue bool
+	}{
+		{
+			name: "asset hooks with applicable_type warns",
+			asset: &pipeline.Asset{
+				Name: "sql_asset",
+				Type: pipeline.AssetTypeDuckDBQuery,
+				Hooks: pipeline.Hooks{
+					ApplicableTypes: []string{"duckdb.sql"},
+					Pre:             []pipeline.Hook{{Query: "select 1"}},
+				},
+			},
+			wantIssue: true,
+		},
+		{
+			name: "asset hooks without applicable_type does not warn",
+			asset: &pipeline.Asset{
+				Name: "sql_asset",
+				Type: pipeline.AssetTypeDuckDBQuery,
+				Hooks: pipeline.Hooks{
+					Pre: []pipeline.Hook{{Query: "select 1"}},
+				},
+			},
+			wantIssue: false,
+		},
+		{
+			name: "asset without hooks does not warn",
+			asset: &pipeline.Asset{
+				Name: "sql_asset",
+				Type: pipeline.AssetTypeDuckDBQuery,
+			},
+			wantIssue: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			p := &pipeline.Pipeline{Assets: []*pipeline.Asset{tt.asset}}
+			got, err := WarnAssetHookApplicableTypeIgnored(t.Context(), p, tt.asset)
+			require.NoError(t, err)
+
+			if !tt.wantIssue {
+				assert.Empty(t, got)
+				return
+			}
+
+			require.Len(t, got, 1)
+			assert.Equal(t, tt.asset, got[0].Task)
+			assert.Equal(t, "applicable_type has no effect on asset-level hooks; it only filters which asset types inherit pipeline default hooks (default.hooks.applicable_type).", got[0].Description)
+		})
+	}
+}
+
 func TestWarnRegularYamlFiles_WarnRegularYamlFilesInRepo(t *testing.T) {
 	t.Parallel()
 
@@ -3569,10 +3630,9 @@ func TestValidateDefaultHookApplicableTypes(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name            string
-		defaultValues   *pipeline.DefaultValues
-		applicableTypes []string
-		want            []*Issue
+		name          string
+		defaultValues *pipeline.DefaultValues
+		want          []*Issue
 	}{
 		{
 			name:          "no default values",
@@ -3580,18 +3640,18 @@ func TestValidateDefaultHookApplicableTypes(t *testing.T) {
 			want:          noIssues,
 		},
 		{
-			name:            "empty applicable_type is valid",
-			applicableTypes: nil,
-			want:            noIssues,
+			name:          "empty applicable_type is valid",
+			defaultValues: &pipeline.DefaultValues{Hooks: pipeline.Hooks{ApplicableTypes: nil}},
+			want:          noIssues,
 		},
 		{
-			name:            "all valid SQL types",
-			applicableTypes: []string{"duckdb.sql", "bq.sql", "ms.sql"},
-			want:            noIssues,
+			name:          "all valid SQL types",
+			defaultValues: &pipeline.DefaultValues{Hooks: pipeline.Hooks{ApplicableTypes: []string{"duckdb.sql", "bq.sql", "ms.sql"}}},
+			want:          noIssues,
 		},
 		{
-			name:            "invalid type reported",
-			applicableTypes: []string{"bq.sql", "python"},
+			name:          "invalid type reported",
+			defaultValues: &pipeline.DefaultValues{Hooks: pipeline.Hooks{ApplicableTypes: []string{"bq.sql", "python"}}},
 			want: []*Issue{
 				{
 					Description: `Invalid applicable_type "python" in default hooks: hooks are only supported for SQL asset types`,
@@ -3599,8 +3659,8 @@ func TestValidateDefaultHookApplicableTypes(t *testing.T) {
 			},
 		},
 		{
-			name:            "unknown type reported",
-			applicableTypes: []string{"totally.made.up"},
+			name:          "unknown type reported",
+			defaultValues: &pipeline.DefaultValues{Hooks: pipeline.Hooks{ApplicableTypes: []string{"totally.made.up"}}},
 			want: []*Issue{
 				{
 					Description: `Invalid applicable_type "totally.made.up" in default hooks: hooks are only supported for SQL asset types`,
@@ -3613,10 +3673,8 @@ func TestValidateDefaultHookApplicableTypes(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			p := &pipeline.Pipeline{}
-			if tt.name != "no default values" {
-				p.DefaultValues = &pipeline.DefaultValues{
-					Hooks: pipeline.Hooks{ApplicableTypes: tt.applicableTypes},
-				}
+			if tt.defaultValues != nil {
+				p.DefaultValues = tt.defaultValues
 			}
 			got, err := ValidateDefaultHookApplicableTypes(t.Context(), p)
 			require.NoError(t, err)
