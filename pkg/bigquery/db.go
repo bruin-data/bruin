@@ -273,6 +273,52 @@ func (d *Client) IsValid(ctx context.Context, query *query.Query) (bool, error) 
 	return true, nil
 }
 
+// waitForJobCompletion blocks until the job reaches a terminal state and returns
+// the job's own error, if any.
+//
+// It polls job.Status (a jobs.get call) rather than going through job.Read/job.Wait,
+// which wait via jobs.getQueryResults. That distinction matters: getQueryResults
+// surfaces a job's terminal failure as a retryable API error, so the BigQuery
+// client's retryer keeps polling a job that has already failed for a retryable
+// reason (e.g. "rateLimitExceeded" from a table over its update quota) until the
+// context is cancelled — which, with no deadline, means it can hang for hours.
+// job.Status instead returns the failed job's state immediately, so the error
+// surfaces at once. Genuinely running queries keep being polled until they finish,
+// so this never cuts a legitimately long-running query short.
+func waitForJobCompletion(ctx context.Context, job *bigquery.Job) error {
+	const (
+		initialPollInterval = time.Second
+		maxPollInterval     = 10 * time.Second
+	)
+	wait := initialPollInterval
+	for {
+		// The submit response (or a prior poll) may already report a terminal state;
+		// use it to avoid an extra jobs.get round-trip.
+		status := job.LastStatus()
+		if status == nil || !status.Done() {
+			fresh, err := job.Status(ctx)
+			if err != nil {
+				return err
+			}
+			status = fresh
+		}
+		if status.Done() {
+			return status.Err()
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(wait):
+		}
+		if wait < maxPollInterval {
+			wait *= 2
+			if wait > maxPollInterval {
+				wait = maxPollInterval
+			}
+		}
+	}
+}
+
 func (d *Client) RunQueryWithoutResult(ctx context.Context, q *query.Query) error {
 	if err := d.ensureClientInitialized(ctx); err != nil {
 		return err
@@ -286,8 +332,7 @@ func (d *Client) RunQueryWithoutResult(ctx context.Context, q *query.Query) erro
 		return formatError(err)
 	}
 	query.LogOrSinkQueryID(ctx, "BigQuery", job.ID())
-	_, err = job.Read(ctx)
-	if err != nil {
+	if err := waitForJobCompletion(ctx, job); err != nil {
 		return formatError(err)
 	}
 
@@ -307,6 +352,12 @@ func (d *Client) Select(ctx context.Context, q *query.Query) ([][]interface{}, e
 		return nil, formatError(err)
 	}
 	query.LogOrSinkQueryID(ctx, "BigQuery", job.ID())
+	// Surface a failed job (e.g. a rate-limit error) immediately instead of letting
+	// job.Read poll a terminally-failed job indefinitely. Once the job is done and
+	// error-free, job.Read returns without retrying.
+	if err := waitForJobCompletion(ctx, job); err != nil {
+		return nil, formatError(err)
+	}
 	rows, err := job.Read(ctx)
 	if err != nil {
 		return nil, formatError(err)
@@ -347,6 +398,12 @@ func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 		return nil, fmt.Errorf("failed to run query: %w", formatError(err))
 	}
 	query.LogOrSinkQueryID(ctx, "BigQuery", job.ID())
+	// Surface a failed job (e.g. a rate-limit error) immediately instead of letting
+	// job.Read poll a terminally-failed job indefinitely. Once the job is done and
+	// error-free, job.Read returns without retrying.
+	if err := waitForJobCompletion(ctx, job); err != nil {
+		return nil, fmt.Errorf("failed to wait for query completion: %w", formatError(err))
+	}
 	rows, err := job.Read(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read query results: %w", formatError(err))

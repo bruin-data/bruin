@@ -267,6 +267,68 @@ func TestDB_RunQueryWithoutResult(t *testing.T) {
 	}
 }
 
+// TestDB_RunQueryWithoutResultSurfacesTerminalJobError is a regression test for
+// BRU-5103: a job whose submit response is still RUNNING but which then completes
+// with a retryable failure reason (e.g. "rateLimitExceeded") must surface that
+// error promptly. Previously the code waited via job.Read/getQueryResults, whose
+// retryer treats a terminally-failed job as retryable and polled it for ~24h.
+func TestDB_RunQueryWithoutResultSurfacesTerminalJobError(t *testing.T) {
+	t.Parallel()
+
+	projectID := testProjectID
+	jobID := testJobID
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/jobs", projectID)):
+			// jobs.insert: job accepted, still running.
+			writeBqTestJSON(t, w, &bigquery2.Job{
+				JobReference: &bigquery2.JobReference{JobId: jobID, ProjectId: projectID, Location: "US"},
+				Status:       &bigquery2.JobStatus{State: "RUNNING"},
+			})
+		case r.Method == http.MethodGet && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/jobs/%s", projectID, jobID)):
+			// jobs.get: job finished with a rate-limit error.
+			writeBqTestJSON(t, w, &bigquery2.Job{
+				JobReference: &bigquery2.JobReference{JobId: jobID, ProjectId: projectID, Location: "US"},
+				Status: &bigquery2.JobStatus{
+					State: "DONE",
+					ErrorResult: &bigquery2.ErrorProto{
+						Reason:  "rateLimitExceeded",
+						Message: "Exceeded rate limits: too many table update operations for this table",
+					},
+				},
+			})
+		default:
+			w.WriteHeader(http.StatusInternalServerError)
+			_, err := w.Write([]byte("unexpected request: " + r.Method + " " + r.RequestURI))
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	}))
+	defer server.Close()
+
+	client, err := bigquery.NewClient(
+		t.Context(),
+		projectID,
+		option.WithEndpoint(server.URL),
+		option.WithCredentials(&google.Credentials{
+			ProjectID: projectID,
+			TokenSource: oauth2.StaticTokenSource(&oauth2.Token{
+				AccessToken: "some-token",
+			}),
+		}),
+	)
+	require.NoError(t, err)
+	client.Location = "US"
+
+	d := Client{client: client}
+
+	err = d.RunQueryWithoutResult(t.Context(), &query.Query{Query: "CREATE TABLE IF NOT EXISTS dataset.t (id INT64)"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "Exceeded rate limits")
+}
+
 func TestClientValidateQueryLimits(t *testing.T) {
 	t.Parallel()
 
@@ -468,6 +530,20 @@ func mockBqHandler(t *testing.T, projectID, jobID string, jsr jobSubmitResponse,
 			w.WriteHeader(qrr.statusCode)
 
 			response, err := json.Marshal(qrr.response)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, err = w.Write(response)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return
+		} else if r.Method == http.MethodGet && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/jobs/%s", projectID, jobID)) {
+			// Handle jobs.get (used by job.Status / waitForJobCompletion)
+			w.WriteHeader(jsr.statusCode)
+
+			response, err := json.Marshal(jsr.response)
 			if err != nil {
 				t.Fatal(err)
 			}
