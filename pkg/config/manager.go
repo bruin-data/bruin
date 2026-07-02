@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -20,7 +21,7 @@ import (
 	"github.com/invopop/jsonschema"
 	errors2 "github.com/pkg/errors"
 	"github.com/spf13/afero"
-	"github.com/stretchr/testify/assert/yaml"
+	"gopkg.in/yaml.v3"
 )
 
 type Connections struct {
@@ -282,6 +283,8 @@ type Config struct {
 	Environments            map[string]Environment `yaml:"environments" json:"environments" mapstructure:"environments"`
 }
 
+var configEnvVarRegex = regexp.MustCompile(`\${([^}]+)}`)
+
 func (c *Config) Path() string {
 	return c.path
 }
@@ -344,16 +347,19 @@ func (c *Config) SelectEnvironment(name string) error {
 
 func LoadFromFileOrEnv(fs afero.Fs, path string) (*Config, error) {
 	var config Config
-	var err error
 	envConfig := os.Getenv("BRUIN_CONFIG_FILE_CONTENT")
 	if envConfig != "" {
-		err = yaml.Unmarshal([]byte(envConfig), &config)
+		if err := decodeConfigYAML([]byte(envConfig), &config); err != nil {
+			return nil, err
+		}
 	} else {
-		err = path2.ReadYaml(fs, path, &config)
-	}
-
-	if err != nil {
-		return nil, err
+		buf, err := readConfigYAML(fs, path)
+		if err != nil {
+			return nil, err
+		}
+		if err := decodeConfigYAML(buf, &config); err != nil {
+			return nil, err
+		}
 	}
 
 	config.fs = fs
@@ -445,6 +451,188 @@ func LoadFromFileOrEnv(fs afero.Fs, path string) (*Config, error) {
 	return &config, nil
 }
 
+func readConfigYAML(fs afero.Fs, path string) ([]byte, error) {
+	buf, err := afero.ReadFile(fs, path)
+	if err != nil {
+		return nil, errors2.Wrapf(err, "failed to read file %s", path)
+	}
+
+	return buf, nil
+}
+
+func decodeConfigYAML(buf []byte, config *Config) error {
+	var node yaml.Node
+	if err := yaml.Unmarshal(buf, &node); err != nil {
+		return err
+	}
+
+	if err := expandEnvVarsInYAMLValues(&node, reflect.TypeOf(*config)); err != nil {
+		return err
+	}
+
+	return node.Decode(config)
+}
+
+func expandEnvVarsInYAMLValues(node *yaml.Node, targetType reflect.Type) error {
+	if node == nil {
+		return nil
+	}
+	targetType = dereferenceType(targetType)
+
+	switch node.Kind {
+	case yaml.DocumentNode, yaml.SequenceNode:
+		elementType := sequenceElementType(targetType)
+		for _, child := range node.Content {
+			if err := expandEnvVarsInYAMLValues(child, elementType); err != nil {
+				return err
+			}
+		}
+	case yaml.MappingNode:
+		for i := 1; i < len(node.Content); i += 2 {
+			if err := expandEnvVarsInYAMLValues(node.Content[i], mappingValueType(targetType, node.Content[i-1].Value)); err != nil {
+				return err
+			}
+		}
+	case yaml.AliasNode:
+		if err := expandEnvVarsInYAMLValues(node.Alias, targetType); err != nil {
+			return err
+		}
+	case yaml.ScalarNode:
+		expanded, ok, err := expandEnvVarReferences(node.Value)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return nil
+		}
+
+		node.Value = expanded
+		if targetType != nil && targetType.Kind() == reflect.String {
+			node.Tag = "!!str"
+		} else {
+			node.Tag = ""
+			node.Style = 0
+		}
+	}
+
+	return nil
+}
+
+func dereferenceType(targetType reflect.Type) reflect.Type {
+	for targetType != nil && targetType.Kind() == reflect.Ptr {
+		targetType = targetType.Elem()
+	}
+
+	return targetType
+}
+
+func sequenceElementType(targetType reflect.Type) reflect.Type {
+	if targetType == nil {
+		return nil
+	}
+
+	switch targetType.Kind() {
+	case reflect.Slice, reflect.Array:
+		return targetType.Elem()
+	default:
+		return targetType
+	}
+}
+
+func mappingValueType(targetType reflect.Type, key string) reflect.Type {
+	if targetType == nil {
+		return nil
+	}
+
+	switch targetType.Kind() {
+	case reflect.Map:
+		return targetType.Elem()
+	case reflect.Struct:
+		fieldType, ok := yamlFieldType(targetType, key)
+		if !ok {
+			return nil
+		}
+		return fieldType
+	default:
+		return nil
+	}
+}
+
+func yamlFieldType(targetType reflect.Type, key string) (reflect.Type, bool) {
+	for i := range targetType.NumField() {
+		field := targetType.Field(i)
+		if !field.IsExported() {
+			continue
+		}
+
+		tagName, inline := yamlTagName(field)
+		if tagName == "-" {
+			continue
+		}
+
+		if tagName == key {
+			return field.Type, true
+		}
+
+		if inline {
+			if fieldType, ok := yamlFieldType(dereferenceType(field.Type), key); ok {
+				return fieldType, true
+			}
+		}
+	}
+
+	return nil, false
+}
+
+func yamlTagName(field reflect.StructField) (string, bool) {
+	tag := field.Tag.Get("yaml")
+	if tag == "-" {
+		return "-", false
+	}
+
+	parts := strings.Split(tag, ",")
+	name := parts[0]
+	inline := false
+	for _, option := range parts[1:] {
+		if option == "inline" {
+			inline = true
+			break
+		}
+	}
+
+	if name == "" && !inline {
+		name = strings.ToLower(field.Name)
+	}
+
+	return name, inline
+}
+
+func expandEnvVarReferences(value string) (string, bool, error) {
+	matched := false
+	var missing []string
+	expanded := configEnvVarRegex.ReplaceAllStringFunc(value, func(match string) string {
+		matches := configEnvVarRegex.FindStringSubmatch(match)
+		if len(matches) != 2 {
+			return match
+		}
+
+		envValue, ok := os.LookupEnv(matches[1])
+		if !ok {
+			missing = append(missing, matches[1])
+			return match
+		}
+
+		matched = true
+		return envValue
+	})
+
+	if len(missing) > 0 {
+		return "", false, fmt.Errorf("environment variable %q is not set", missing[0])
+	}
+
+	return expanded, matched, nil
+}
+
 func LoadOrCreate(fs afero.Fs, path string) (*Config, error) {
 	config, err := LoadFromFileOrEnv(fs, path)
 	if err != nil && !errors.Is(err, fs2.ErrNotExist) {
@@ -487,7 +675,10 @@ func ensureConfigIsInGitignore(fs afero.Fs, filePath string) error {
 func LoadOrCreateWithoutPathAbsolutization(fs afero.Fs, path string) (*Config, error) {
 	var config Config
 
-	err := path2.ReadYaml(fs, path, &config)
+	buf, err := readConfigYAML(fs, path)
+	if err == nil {
+		err = decodeConfigYAML(buf, &config)
+	}
 	if err != nil && !errors.Is(err, fs2.ErrNotExist) {
 		return nil, err
 	}
