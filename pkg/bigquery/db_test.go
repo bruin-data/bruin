@@ -522,6 +522,9 @@ type queryResultResponse struct {
 	statusCode int
 }
 
+// mockBqHandler serves the same jsr for jobs.insert and jobs.get, so jobs.insert
+// must report a terminal (DONE) state — a RUNNING jsr would make job.Status polling
+// loop forever. For a submit-RUNNING-then-complete flow, use a dedicated handler.
 func mockBqHandler(t *testing.T, projectID, jobID string, jsr jobSubmitResponse, qrr queryResultResponse) http.Handler {
 	write := func(w http.ResponseWriter, statusCode int, body interface{}) {
 		w.WriteHeader(statusCode)
