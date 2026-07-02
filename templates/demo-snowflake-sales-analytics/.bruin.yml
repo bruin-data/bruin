@@ -1,0 +1,13 @@
+default_environment: default
+environments:
+  default:
+    connections:
+      snowflake:
+        - name: "snowflake-default"
+          username: "YOUR_SNOWFLAKE_USERNAME"
+          password: "YOUR_SNOWFLAKE_PASSWORD"
+          account: "YOUR_SNOWFLAKE_ACCOUNT"
+          database: "SALES_ANALYTICS_DEMO"
+          schema: "BRONZE"
+          warehouse: "COMPUTE_WH"
+          role: "YOUR_SNOWFLAKE_ROLE"

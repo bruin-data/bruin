@@ -1,0 +1,63 @@
+name: bronze.salesforce_opportunity_contact_roles
+type: ingestr
+description: Ingests Salesforce OpportunityContactRole records linking members and business principals to opportunities.
+connection: snowflake-default
+tags:
+  - finance
+  - credit_union
+  - crm
+  - salesforce
+  - bronze
+  - raw_ingest
+domains:
+  - crm
+  - member_relationships
+meta:
+  asset_grain: One row per Salesforce OpportunityContactRole after merge by id.
+  load_pattern: Mutable merge on Salesforce SystemModstamp.
+  source_object: OpportunityContactRole
+  source_system: Salesforce Sales Cloud
+
+depends:
+  - bronze.seed_salesforce_demo_data
+
+parameters:
+  cluster_by: system_modstamp
+  destination: snowflake
+  enforce_schema: "true"
+  incremental_key: SystemModstamp
+  incremental_strategy: merge
+  schema_contract: evolve
+  schema_naming: snake_case
+  source_connection: salesforce
+  source_table: opportunity_contact_role
+
+columns:
+  - name: id
+    type: VARCHAR
+    description: Salesforce OpportunityContactRole identifier.
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: opportunity_id
+    type: VARCHAR
+    description: Related Opportunity identifier.
+  - name: contact_id
+    type: VARCHAR
+    description: Related Contact identifier.
+  - name: role
+    type: VARCHAR
+    description: Contact role on the opportunity.
+  - name: is_primary
+    type: BOOLEAN
+    description: Whether this is the primary opportunity contact.
+  - name: created_date
+    type: TIMESTAMP
+    description: OpportunityContactRole creation timestamp.
+  - name: last_modified_date
+    type: TIMESTAMP
+    description: OpportunityContactRole last modification timestamp.
+  - name: system_modstamp
+    type: TIMESTAMP
+    description: Salesforce system modification timestamp used as the incremental key.

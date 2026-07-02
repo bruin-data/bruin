@@ -1,0 +1,85 @@
+name: bronze.salesforce_tasks
+type: ingestr
+description: |
+  Ingests Salesforce Task records into Snowflake through Bruin's built-in
+  ingestr runner. Tasks capture banker follow-up activity linked to demo
+  opportunities.
+connection: snowflake-default
+tags:
+  - finance
+  - credit_union
+  - crm
+  - salesforce
+  - snowflake
+  - bronze
+  - raw_ingest
+  - daily_batch
+domains:
+  - crm
+  - member_relationships
+meta:
+  asset_grain: One row per Salesforce Task record after merge by id.
+  load_pattern: Mutable merge on Salesforce SystemModstamp, not append-only.
+  pipeline_role: Bronze CRM source ingestion.
+  refresh_cadence: Daily batch pipeline.
+  source_object: Task
+  source_system: Salesforce Sales Cloud
+
+depends:
+  - bronze.seed_salesforce_demo_data
+
+parameters:
+  cluster_by: system_modstamp,activity_date
+  destination: snowflake
+  enforce_schema: "true"
+  incremental_key: SystemModstamp
+  incremental_strategy: merge
+  schema_contract: evolve
+  schema_naming: snake_case
+  source_connection: salesforce
+  source_table: task
+
+columns:
+  - name: id
+    type: VARCHAR
+    description: Salesforce Task identifier.
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: what_id
+    type: VARCHAR
+    description: Related Salesforce object identifier, usually an Opportunity in this demo.
+  - name: owner_id
+    type: VARCHAR
+    description: Salesforce User identifier for the task owner.
+  - name: who_id
+    type: VARCHAR
+    description: Related Contact or Lead identifier when present.
+  - name: subject
+    type: VARCHAR
+    description: Task subject line.
+  - name: status
+    type: VARCHAR
+    description: Task status.
+  - name: priority
+    type: VARCHAR
+    description: Task priority.
+  - name: activity_date
+    type: DATE
+    description: Due or activity date.
+  - name: created_date
+    type: TIMESTAMP
+    description: Timestamp when the Task was created in Salesforce.
+    checks:
+      - name: not_null
+  - name: last_modified_date
+    type: TIMESTAMP
+    description: Timestamp when the Task was last modified in Salesforce.
+    checks:
+      - name: not_null
+  - name: system_modstamp
+    type: TIMESTAMP
+    description: Salesforce system modification timestamp used as the incremental key.
+    checks:
+      - name: not_null
