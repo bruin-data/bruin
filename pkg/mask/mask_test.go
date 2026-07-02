@@ -110,6 +110,9 @@ func TestWriter(t *testing.T) {
 	if n != len("connecting with topsecret done\n") {
 		t.Errorf("Write returned %d, want original length", n)
 	}
+	if err := w.Flush(); err != nil {
+		t.Fatal(err)
+	}
 	if strings.Contains(buf.String(), "topsecret") {
 		t.Errorf("secret leaked through writer: %s", buf.String())
 	}
@@ -134,6 +137,33 @@ func TestWriterMultiLineSecret(t *testing.T) {
 	for _, frag := range []string{"LINE1abc", "LINE2def"} {
 		if strings.Contains(buf.String(), frag) {
 			t.Errorf("multi-line secret leaked fragment %q: %s", frag, buf.String())
+		}
+	}
+	if !strings.Contains(buf.String(), Mask) {
+		t.Errorf("mask not present: %s", buf.String())
+	}
+}
+
+func TestWriterMultiLineSecretSplitAcrossWrites(t *testing.T) {
+	t.Parallel()
+	secret := "-----BEGIN PRIVATE KEY-----\nLINE1abc\nLINE2def\n-----END PRIVATE KEY-----"
+	r := New([]string{secret})
+	var buf bytes.Buffer
+	w := r.Writer(&buf)
+	// Split the secret in the middle, across two writes, as a pipe read would.
+	full := "key=" + secret + "\n"
+	mid := len("key=" + "-----BEGIN PRIVATE KEY-----\nLINE1abc")
+	for _, chunk := range []string{full[:mid], full[mid:]} {
+		if _, err := w.Write([]byte(chunk)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := w.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	for _, frag := range []string{"LINE1abc", "LINE2def", "BEGIN PRIVATE KEY"} {
+		if strings.Contains(buf.String(), frag) {
+			t.Errorf("split multi-line secret leaked %q: %s", frag, buf.String())
 		}
 	}
 	if !strings.Contains(buf.String(), Mask) {

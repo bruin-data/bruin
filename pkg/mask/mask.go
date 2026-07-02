@@ -3,7 +3,6 @@
 package mask
 
 import (
-	"bytes"
 	"encoding/base64"
 	"io"
 	"net/url"
@@ -101,6 +100,7 @@ func collect(v reflect.Value, out *[]string) {
 // Masker masks a fixed set of secret forms in arbitrary text.
 type Masker struct {
 	ordered []string // all secret forms, longest-first
+	maxLen  int      // length of the longest form
 }
 
 // New builds a Masker from raw secret values, expanding each into the forms
@@ -119,7 +119,11 @@ func New(values []string) *Masker {
 	}
 	// Longest first so a longer form is replaced before any shorter overlap.
 	sort.Slice(ordered, func(i, j int) bool { return len(ordered[i]) > len(ordered[j]) })
-	return &Masker{ordered: ordered}
+	maxLen := 0
+	if len(ordered) > 0 {
+		maxLen = len(ordered[0])
+	}
+	return &Masker{ordered: ordered, maxLen: maxLen}
 }
 
 // Empty reports whether there is nothing to mask.
@@ -138,18 +142,16 @@ func (r *Masker) Mask(s string) string {
 	return s
 }
 
-// Writer wraps w in a line-buffering masking writer. Call Flush once writing is
-// done to emit any buffered partial line.
+// Writer wraps w in a masking writer. Call Flush once writing is done to emit
+// the retained trailing bytes.
 func (r *Masker) Writer(w io.Writer) *LineWriter {
 	return &LineWriter{r: r, w: w}
 }
 
-// maxLineBuffer bounds the buffer so output that never includes a line
-// terminator cannot grow memory without bound.
-const maxLineBuffer = 1 << 20
-
-// LineWriter masks output written through it, flushing everything up to the last
-// newline at once (so multi-line secrets are caught) and buffering the partial tail.
+// LineWriter masks output written through it. It never emits the trailing window
+// the width of the longest secret form, so a secret split across writes (including
+// a multi-line PEM/JSON) is held until fully buffered and masked as a whole rather
+// than leaked as an unmatched fragment.
 type LineWriter struct {
 	r   *Masker
 	w   io.Writer
@@ -161,36 +163,35 @@ func (lw *LineWriter) Write(p []byte) (int, error) {
 	lw.mu.Lock()
 	defer lw.mu.Unlock()
 	lw.buf = append(lw.buf, p...)
-	// Emit through the last line terminator as one block, so a multi-line secret
-	// (PEM key, service-account JSON) is masked as a whole, not leaked line by line.
-	if i := bytes.LastIndexAny(lw.buf, "\r\n"); i >= 0 {
-		if err := lw.emit(lw.buf[:i+1]); err != nil {
-			return 0, err
-		}
-		lw.buf = append(lw.buf[:0], lw.buf[i+1:]...)
+	// Mask the whole buffer, then emit everything except a trailing window that
+	// could still be the start of a longer secret arriving in a later write. Any
+	// secret starting before that window is fully present here, so it is masked
+	// before it can be emitted. The retained bytes are already-masked, and Mask is
+	// idempotent, so re-masking them next write is safe.
+	masked := []byte(lw.r.Mask(string(lw.buf)))
+	keep := lw.r.maxLen - 1
+	if keep < 0 {
+		keep = 0
 	}
-	if len(lw.buf) > maxLineBuffer {
-		if err := lw.emit(lw.buf); err != nil {
+	if len(masked) > keep {
+		if _, err := lw.w.Write(masked[:len(masked)-keep]); err != nil {
 			return 0, err
 		}
-		lw.buf = lw.buf[:0]
+		lw.buf = append(lw.buf[:0], masked[len(masked)-keep:]...)
+	} else {
+		lw.buf = append(lw.buf[:0], masked...)
 	}
 	return len(p), nil
 }
 
-// Flush masks and writes any buffered partial line.
+// Flush masks and writes the retained trailing bytes.
 func (lw *LineWriter) Flush() error {
 	lw.mu.Lock()
 	defer lw.mu.Unlock()
 	if len(lw.buf) == 0 {
 		return nil
 	}
-	err := lw.emit(lw.buf)
+	_, err := io.WriteString(lw.w, lw.r.Mask(string(lw.buf)))
 	lw.buf = lw.buf[:0]
-	return err
-}
-
-func (lw *LineWriter) emit(line []byte) error {
-	_, err := io.WriteString(lw.w, lw.r.Mask(string(line)))
 	return err
 }
