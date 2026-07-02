@@ -65,6 +65,7 @@ const (
 	AssetTypeEMRServerlessPyspark      = AssetType("emr_serverless.pyspark")
 	AssetTypeEMRServerlessSpark        = AssetType("emr_serverless.spark")
 	AssetTypeGoodData                  = AssetType("gooddata")
+	AssetTypeGoogleSheets              = AssetType("gsheets")
 	AssetTypeGrafana                   = AssetType("grafana")
 	AssetTypeIngestr                   = AssetType("ingestr")
 	AssetTypeLooker                    = AssetType("looker")
@@ -925,6 +926,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeS3KeySensor:               "aws",
 	AssetTypeDynamoDB:                  "dynamodb",
 	AssetTypeElasticsearch:             "elasticsearch",
+	AssetTypeGoogleSheets:              "google_sheets",
 	AssetTypeVerticaQuery:              "vertica",
 	AssetTypeVerticaSeed:               "vertica",
 	AssetTypeVerticaQuerySensor:        "vertica",
@@ -971,6 +973,7 @@ var IngestrTypeConnectionMapping = map[string]AssetType{
 	"motherduck":    AssetTypeMotherduckQuery,
 	"dynamodb":      AssetTypeDynamoDB,
 	"elasticsearch": AssetTypeElasticsearch,
+	"gsheets":       AssetTypeGoogleSheets,
 	"vertica":       AssetTypeVerticaQuery,
 }
 
