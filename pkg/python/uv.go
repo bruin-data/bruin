@@ -43,7 +43,9 @@ const (
 	// IngestrVersionV0 is the legacy ingestr release pinned for parameters.version=v0.
 	IngestrVersionV0 = "0.14.155"
 	// IngestrVersionV1 is the current ingestr release used by default and for parameters.version=v1.
-	IngestrVersionV1 = "1.0.60"
+	// 1.0.62 renamed the PlanetScale source scheme to ps_mysql (from planetscale) and reworked
+	// Vitess/PlanetScale CDC; pkg/planetscale and pkg/ingestr emit the ps_mysql scheme accordingly.
+	IngestrVersionV1 = "1.0.62"
 	sqlfluffVersion  = "3.4.1"
 )
 
