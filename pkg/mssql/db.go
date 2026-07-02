@@ -9,6 +9,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/tablename"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/microsoft/go-mssqldb"
 	"github.com/pkg/errors"
@@ -511,30 +512,28 @@ ORDER BY t.TABLE_SCHEMA, t.TABLE_NAME;
 }
 
 func (db *DB) BuildTableExistsQuery(tableName string) (string, error) {
-	tableComponents := strings.Split(tableName, ".")
-	for _, component := range tableComponents {
-		if component == "" {
-			return "", fmt.Errorf("table name must be in format schema.table or table, '%s' given", tableName)
-		}
+	cb, ok := tablename.For("mssql")
+	if !ok {
+		return "", errors.New("mssql table-name capability not found")
+	}
+	// dbo is MSSQL's default schema when a bare table name is given.
+	tn, err := cb.Parse(tableName, tablename.Defaults{Schema: "dbo"})
+	if err != nil {
+		return "", err
 	}
 
-	var schemaName, targetTable string
-
-	switch len(tableComponents) {
-	case 1:
-		schemaName = "dbo"
-		targetTable = tableComponents[0]
-	case 2:
-		schemaName = tableComponents[0]
-		targetTable = tableComponents[1]
-	default:
-		return "", fmt.Errorf("table name must be in format schema.table or table, '%s' given", tableName)
+	// information_schema is database-scoped; qualify the lookup with the database
+	// when the name carries one (database.schema.table).
+	infoSchema := "information_schema"
+	if tn.Catalog != "" {
+		infoSchema = quoteIdentifier(tn.Catalog) + ".information_schema"
 	}
 
 	query := fmt.Sprintf(
-		"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '%s' AND table_name = '%s'",
-		schemaName,
-		targetTable,
+		"SELECT COUNT(*) FROM %s.tables WHERE table_schema = '%s' AND table_name = '%s'",
+		infoSchema,
+		tn.Schema,
+		tn.Table,
 	)
 
 	return strings.TrimSpace(query), nil

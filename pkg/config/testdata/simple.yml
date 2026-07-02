@@ -91,6 +91,23 @@ environments:
           port: 3306
           database: "mysqldb"
 
+      vitess:
+        - name: conn8b
+          username: "vitessuser"
+          password: "vitesspass"
+          host: "vtgatehost"
+          port: 15306
+          database: "commerce"
+          grpc_port: 15991
+
+      planetscale:
+        - name: conn8c
+          username: "psuser"
+          password: "pspass"
+          host: "aws.connect.psdb.cloud"
+          port: 3306
+          database: "psdb"
+
       notion:
         - name: conn9
           api_key: "XXXXYYYYZZZZ"
@@ -162,6 +179,17 @@ environments:
       paddle:
         - name: conn-paddle
           api_key: "paddlekey"
+      chargebee:
+        - name: conn-chargebee
+          site: "chargebeesite"
+          api_key: "chargebeekey"
+      recurly:
+        - name: conn-recurly
+          api_key: "recurlykey"
+          region: "us"
+      gitlab:
+        - name: conn-gitlab
+          access_token: "gitlabtoken"
       dune:
         - name: "dune-1"
           api_key: "dune-api-key-123"
@@ -384,6 +412,10 @@ environments:
         - name: "googleanalytics-1"
           service_account_file: "path/to/service_account.json"
           property_id: "12345"
+      gsc:
+        - name: "conn-gsc"
+          service_account_file: "path/to/service_account.json"
+          site_url: "sc-domain:example.com"
       applovin:
         - name: "applovin-1"
           api_key: "key-123"
@@ -440,6 +472,10 @@ environments:
         - name: "solidgate-1"
           secret_key: "secret-key-123"
           public_key: "public-key-123"
+      square:
+        - name: "square-1"
+          access_token: "EAAA-test-access-token"
+          environment: "sandbox"
       smartsheet:
         - name: "smartsheet-1"
           access_token: "access-token-123"
@@ -511,6 +547,16 @@ environments:
           auth_token: "test-auth-token"
           api_key: "test-api-key"
           api_secret: "test-api-secret"
+      braze:
+        - name: "braze-1"
+          api_key: "test-api-key"
+          endpoint: "rest.iad-01.braze.com"
+      reddit_ads:
+        - name: "redditads-1"
+          access_token: "test-access-token"
+          client_id: "test-client-id"
+          client_secret: "test-client-secret"
+          refresh_token: "test-refresh-token"
       espn:
         - name: "espn-1"
           sport: "football"
@@ -541,6 +587,15 @@ environments:
         - name: "balldontlie-1"
           api_key: "test-api-key"
           season: "2026"
+      starrocks:
+        - name: "starrocks-1"
+          host: "localhost"
+          port: 9030
+          username: "root"
+          password: "pass123"
+          database: "analytics"
+          catalog: "iceberg_catalog"
+          ssl: "true"
 
   prod:
     connections:

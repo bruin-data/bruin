@@ -278,6 +278,14 @@ func commentRowsToTask(commentRows []string) (*Asset, error) {
 			task.RerunCooldown = &rerunCooldown
 
 			continue
+		case "retries":
+			retries, err := strconv.Atoi(value)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to parse retries value '%s'", value)
+			}
+			task.Retries = &retries
+
+			continue
 		case "refresh_restricted", "full_refresh_restricted":
 			refreshRestricted, err := strconv.ParseBool(value)
 			if err != nil {
@@ -411,6 +419,8 @@ func handleColumnEntry(columnFields []string, task *Asset, value string) error {
 		}
 	case "type":
 		task.Columns[columnIndex].Type = strings.ToLower(strings.TrimSpace(value))
+	case "mask":
+		task.Columns[columnIndex].Mask = strings.TrimSpace(value)
 	case "primary_key":
 		boolValue, err := strconv.ParseBool(value)
 		if err != nil {

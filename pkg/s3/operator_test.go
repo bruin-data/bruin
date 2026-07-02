@@ -239,10 +239,10 @@ func TestKeySensor_RunTask_AwsConnectionUsesCorrectCredentials(t *testing.T) {
 
 	conn := &mockConnectionGetter{
 		details: &config.AwsConnection{
-			Name:      "my-conn",
-			AccessKey: "test-access-key",
-			SecretKey: "test-secret-key",
-			Region:    "us-west-2",
+			ConnectionMetadata: config.ConnectionMetadata{Name: "my-conn"},
+			AccessKey:          "test-access-key",
+			SecretKey:          "test-secret-key",
+			Region:             "us-west-2",
 		},
 	}
 	ks := NewKeySensor(conn, "once")
@@ -269,10 +269,10 @@ func TestKeySensor_RunTask_S3ConnectionUsesCorrectCredentials(t *testing.T) {
 
 	conn := &mockConnectionGetter{
 		details: &config.S3Connection{
-			Name:            "my-s3-conn",
-			AccessKeyID:     "test-access-key",
-			SecretAccessKey: "test-secret-key",
-			EndpointURL:     "http://localhost:9000",
+			ConnectionMetadata: config.ConnectionMetadata{Name: "my-s3-conn"},
+			AccessKeyID:        "test-access-key",
+			SecretAccessKey:    "test-secret-key",
+			EndpointURL:        "http://localhost:9000",
 		},
 	}
 	ks := NewKeySensor(conn, "once")

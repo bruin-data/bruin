@@ -9,6 +9,15 @@ type TableSummarizer interface {
 	GetTableSummary(ctx context.Context, tableName string, schemaOnly bool) (*TableSummaryResult, error)
 }
 
+// SchemalessSummarizer is implemented by TableSummarizers whose schema is
+// inferred from the underlying data (e.g. MongoDB) rather than declared in a
+// catalog. For such sources, data-diff omits ALTER TABLE statement generation,
+// which has no meaning without a fixed, DDL-managed schema.
+type SchemalessSummarizer interface {
+	// IsSchemaless reports whether the source lacks a fixed, catalog-defined schema.
+	IsSchemaless() bool
+}
+
 type CostEstimator interface {
 	EstimateTableDiffCost(ctx context.Context, tableName string, schemaOnly bool) (*TableDiffCostEstimate, error)
 }

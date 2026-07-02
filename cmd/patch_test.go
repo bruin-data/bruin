@@ -215,12 +215,12 @@ func TestFillColumnsFromDB(t *testing.T) {
 							Connections: &config.Connections{
 								Postgres: []config.PostgresConnection{
 									{
-										Name:     "test_connection",
-										Host:     "localhost",
-										Port:     5432,
-										Database: "testdb",
-										Username: "testuser",
-										Password: "testpass",
+										ConnectionMetadata: config.ConnectionMetadata{Name: "test_connection"},
+										Host:               "localhost",
+										Port:               5432,
+										Database:           "testdb",
+										Username:           "testuser",
+										Password:           "testpass",
 									},
 								},
 							},

@@ -24,6 +24,8 @@ In order to set up a Trino connection, you need to add a configuration item to `
 
 Runs a materialized Trino asset or a Trino script. For detailed parameters, you can check [Definition Schema](../assets/definition-schema.md) page. For information about materialization strategies, see the [Materialization](../assets/materialization.md) page.
 
+Asset names may be `schema.table` or `catalog.schema.table`. Trino does not create schemas automatically, so the target catalog and schema must already exist.
+
 > [!IMPORTANT]
 > Use a single SQL statement per `trino.sql` asset. Multi-statement queries are not supported by Trino.
 

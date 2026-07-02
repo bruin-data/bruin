@@ -163,6 +163,12 @@ join t2
 	using(col1)
         """,
     },
+    {
+        "name": "schema-qualified column follows its renamed table",
+        "query": "SELECT analytics.orders.amount FROM analytics.orders",
+        "table_references": {"analytics.orders": "__bruin_ut_orders"},
+        "expected": "SELECT orders.amount FROM __bruin_ut_orders AS orders",
+    },
 ]
 
 

@@ -21,7 +21,6 @@ var ingestrValueParameterFlags = []string{
 	"sql_reflection_level",
 	"sql_limit",
 	"sql_exclude_columns",
-	"mask",
 	"pipelines_dir",
 	"staging_bucket",
 	"staging_dataset",
@@ -39,6 +38,7 @@ var ingestrBoolParameterFlags = []string{
 
 func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs []string, columnOpts *ColumnHintOptions) ([]string, error) {
 	cmdArgs = appendIngestrParameterFlags(asset.Parameters, cmdArgs)
+	cmdArgs = appendIngestrMaskFlags(asset.Parameters, asset.Columns, cmdArgs, columnOpts != nil && columnOpts.NormalizeColumnNames)
 
 	if value, exists := asset.Parameters.GetString("incremental_key"); exists && value != "" {
 		// Check if the incremental key column exists and is of date type
@@ -112,6 +112,46 @@ func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs 
 	}
 
 	return cmdArgs, nil
+}
+
+func appendIngestrMaskFlags(params pipeline.ParameterMap, cols []pipeline.Column, cmdArgs []string, normalizeColumnNames bool) []string {
+	seen := make(map[string]struct{})
+	if mask, exists := params.GetString("mask"); exists {
+		cmdArgs = appendIngestrMaskRule(cmdArgs, seen, strings.TrimSpace(mask))
+	}
+
+	for _, col := range cols {
+		mask := strings.TrimSpace(col.Mask)
+		if mask == "" {
+			continue
+		}
+
+		rule := mask
+		if !strings.Contains(mask, ":") {
+			columnName := strings.TrimSpace(col.Name)
+			if columnName == "" {
+				continue
+			}
+			if normalizeColumnNames {
+				columnName = NormalizeColumnName(columnName)
+			}
+			rule = columnName + ":" + mask
+		}
+		cmdArgs = appendIngestrMaskRule(cmdArgs, seen, rule)
+	}
+
+	return cmdArgs
+}
+
+func appendIngestrMaskRule(cmdArgs []string, seen map[string]struct{}, rule string) []string {
+	if rule == "" {
+		return cmdArgs
+	}
+	if _, ok := seen[rule]; ok {
+		return cmdArgs
+	}
+	seen[rule] = struct{}{}
+	return append(cmdArgs, "--mask", rule)
 }
 
 func appendIngestrParameterFlags(params pipeline.ParameterMap, cmdArgs []string) []string {

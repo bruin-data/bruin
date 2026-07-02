@@ -7,6 +7,10 @@ from parser.main import (
     get_tables,
     add_limit,
     is_single_select_query,
+    add_ctes,
+    extract_select,
+    select_cte,
+    freeze_time,
 )
 
 from pathlib import Path
@@ -63,6 +67,24 @@ def main():
                 logging.info("got is-single-select command")
                 c = cmd["contents"]
                 result = is_single_select_query(c["query"], c["dialect"])
+            elif cmd["command"] == "add-ctes":
+                logging.info("got add-ctes command")
+                c = cmd["contents"]
+                result = add_ctes(c["query"], c.get("dialect"), c.get("ctes"))
+            elif cmd["command"] == "extract-select":
+                logging.info("got extract-select command")
+                c = cmd["contents"]
+                result = extract_select(c["query"], c.get("dialect"))
+            elif cmd["command"] == "select-cte":
+                logging.info("got select-cte command")
+                c = cmd["contents"]
+                result = select_cte(c["query"], c.get("dialect"), c.get("cte_name"))
+            elif cmd["command"] == "freeze-time":
+                logging.info("got freeze-time command")
+                c = cmd["contents"]
+                result = freeze_time(
+                    c["query"], c.get("dialect"), c.get("execution_time")
+                )
             elif cmd["command"] == "exit":
                 logging.info("got exit command amx")
                 break

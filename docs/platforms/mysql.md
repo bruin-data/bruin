@@ -150,3 +150,42 @@ type: my.sensor.query
 parameters:
     query: select exists(select 1 from orders where order_date = "{{ end_date }}")
 ```
+
+## CDC (Change Data Capture)
+
+Bruin supports MySQL CDC via the `ingestr` asset type. CDC captures row-level changes (inserts, updates, deletes) via MySQL binary-log replication and replicates them to a destination. [Vitess](/ingestion/vitess) (VStream) and [PlanetScale](/ingestion/planetscale) (psdbconnect) are MySQL-compatible but use their own dedicated connection types — see their ingestion guides for CDC.
+
+CDC is enabled by setting `cdc: "true"` on an ingestr asset with a MySQL source connection.
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `cdc` | Yes | Set to `"true"` to enable CDC mode |
+| `cdc_mode` | No | `"stream"` for real-time streaming or `"batch"` for batch replication |
+| `cdc_server_id` | No | Replication server identifier for MySQL binary-log CDC |
+| `cdc_dest_schema` | No | Destination schema to use for multi-table CDC runs |
+| `incremental_strategy` | No | Defaults to `"merge"` when CDC is enabled; can be overridden to `"append"` |
+
+Requirements:
+
+- For MySQL binary-log CDC, the server must have `log_bin=ON`, `binlog_format=ROW`, and `binlog_row_image=FULL`.
+- Source tables must have primary keys, or `primary_key` must be set on the asset columns.
+- Source tables must not contain `ENUM`, `SET`, or `BIT` columns.
+
+> [!NOTE]
+> When CDC is enabled, primary key columns do not need to be specified in the asset definition — they are determined automatically from the source table.
+
+### Example: MySQL CDC
+
+```yaml
+name: public.orders
+type: ingestr
+connection: bigquery
+
+parameters:
+  source_connection: my_mysql
+  source_table: orders
+  destination: bigquery
+  cdc: "true"
+```
+
+For platform-specific details, see the [Vitess](/ingestion/vitess) and [PlanetScale](/ingestion/planetscale) ingestion guides.

@@ -461,6 +461,25 @@ func (c *APIClient) ListAgentThreads(ctx context.Context, agentID int, limit, of
 	return resp.Threads, err
 }
 
+func (c *APIClient) GetAgentPrompt(ctx context.Context, agentID int) (*AgentPrompt, error) {
+	var result AgentPrompt
+	err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/agents/%d/prompt", agentID), nil, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func (c *APIClient) SetAgentPrompt(ctx context.Context, agentID int, systemPrompt string) (*AgentPrompt, error) {
+	body := map[string]any{"system_prompt": systemPrompt}
+	var result AgentPrompt
+	err := c.doRequest(ctx, http.MethodPut, fmt.Sprintf("/agents/%d/prompt", agentID), body, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 func (c *APIClient) ListAgentMessages(ctx context.Context, agentID, threadID int, limit, offset int) ([]AgentMessage, error) {
 	params := url.Values{}
 	if limit > 0 {

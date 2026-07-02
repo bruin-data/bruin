@@ -36,6 +36,13 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser sqlpa
 			ApplicableLevels: []Level{LevelAsset},
 		},
 		&SimpleRule{
+			Identifier:       "asset-name-component-count",
+			Fast:             true,
+			Severity:         ValidatorSeverityCritical,
+			AssetValidator:   EnsureAssetNameComponentCountIsValid,
+			ApplicableLevels: []Level{LevelAsset},
+		},
+		&SimpleRule{
 			Identifier:       "task-name-unique",
 			Fast:             true,
 			Severity:         ValidatorSeverityCritical,

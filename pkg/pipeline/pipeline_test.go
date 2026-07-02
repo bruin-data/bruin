@@ -730,6 +730,19 @@ func TestPipeline_GetConnectionNameForAsset(t *testing.T) {
 		assert.Equal(t, "default-gcp-connection", found)
 	})
 
+	t.Run("ingestr destination_connection parameter overrides destination type default", func(t *testing.T) {
+		t.Parallel()
+		found, err := pipeline1.GetConnectionNameForAsset(&pipeline.Asset{
+			Type: "ingestr",
+			Parameters: pipeline.ParameterMap{
+				"destination":            "bigquery",
+				"destination_connection": "custom-destination",
+			},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "custom-destination", found)
+	})
+
 	t.Run("should return the right connection if the asset type is known", func(t *testing.T) {
 		t.Parallel()
 		found, err := pipeline1.GetConnectionNameForAsset(&pipeline.Asset{
@@ -747,6 +760,32 @@ func TestPipeline_GetConnectionNameForAsset(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.Equal(t, "postgres-default", found)
+	})
+
+	t.Run("mongo.source resolves a mongo default connection", func(t *testing.T) {
+		t.Parallel()
+		mongoPipeline := &pipeline.Pipeline{
+			Name:               "mongo-pipeline",
+			DefaultConnections: map[string]string{"mongo": "my-mongo"},
+		}
+		found, err := mongoPipeline.GetConnectionNameForAsset(&pipeline.Asset{
+			Type: pipeline.AssetTypeMongoSource,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "my-mongo", found)
+	})
+
+	t.Run("mongo.source falls back to a mongo_atlas default connection", func(t *testing.T) {
+		t.Parallel()
+		atlasPipeline := &pipeline.Pipeline{
+			Name:               "atlas-pipeline",
+			DefaultConnections: map[string]string{"mongo_atlas": "my-atlas"},
+		}
+		found, err := atlasPipeline.GetConnectionNameForAsset(&pipeline.Asset{
+			Type: pipeline.AssetTypeMongoSource,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "my-atlas", found)
 	})
 }
 
@@ -2469,6 +2508,9 @@ func TestDefaultValues_CoversAssetConfigFields(t *testing.T) {
 		"ExecutableFile": true,
 		"DefinitionFile": true,
 		"RetriesDelay":   true,
+		// Unit tests are inherently per-asset (they pin one asset's logic against
+		// specific inputs), so they are not inherited from pipeline-level defaults.
+		"UnitTests": true,
 	}
 
 	for i := range assetType.NumField() {
@@ -3184,4 +3226,46 @@ func TestColumn_SQLType(t *testing.T) {
 			assert.Equal(t, tt.want, tt.col.SQLType())
 		})
 	}
+}
+
+func TestAsset_PrefixSchema(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		asset  string
+		prefix string
+		want   string
+	}{
+		{name: "empty prefix is a no-op", asset: "schema.table", prefix: "", want: "schema.table"},
+		{name: "two-part prefixes the schema", asset: "analytics.events", prefix: "dev_", want: "dev_analytics.events"},
+		{name: "three-part prefixes the middle (schema), keeps catalog", asset: "raw.analytics.events", prefix: "dev_", want: "raw.dev_analytics.events"},
+		{name: "single component has no schema to prefix", asset: "events", prefix: "dev_", want: "events"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			a := &pipeline.Asset{Name: tt.asset}
+			a.PrefixSchema(tt.prefix)
+			assert.Equal(t, tt.want, a.Name)
+		})
+	}
+}
+
+func TestAsset_PrefixUpstreams(t *testing.T) {
+	t.Parallel()
+
+	a := &pipeline.Asset{
+		Upstreams: []pipeline.Upstream{
+			{Type: "asset", Value: "analytics.events"},
+			{Type: "asset", Value: "raw.analytics.events"},
+			{Type: "uri", Value: "raw.analytics.events"}, // non-asset deps are untouched
+		},
+	}
+	a.PrefixUpstreams("dev_")
+
+	assert.Equal(t, "dev_analytics.events", a.Upstreams[0].Value)
+	assert.Equal(t, "raw.dev_analytics.events", a.Upstreams[1].Value)
+	assert.Equal(t, "raw.analytics.events", a.Upstreams[2].Value)
 }

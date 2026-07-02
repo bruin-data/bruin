@@ -1165,6 +1165,18 @@ func TestSqlParser_AddLimit(t *testing.T) { //nolint
 			dialect:  "",
 			expected: "SELECT id, name FROM users LIMIT 5",
 		},
+		{
+			// Regression for https://github.com/bruin-data/bruin/issues/2239:
+			// the rust parser's generic dialect uppercases function names,
+			// which breaks ClickHouse (case-sensitive function lookup).
+			// Round-tripping with the clickhouse dialect must preserve the
+			// original camelCase function names.
+			name:     "clickhouse dialect preserves camelCase function names",
+			query:    "SELECT toFloat64(amount_col) AS amount FROM my_db.my_table",
+			limit:    2,
+			dialect:  "clickhouse",
+			expected: "SELECT toFloat64(amount_col) AS amount FROM my_db.my_table LIMIT 2",
+		},
 	}
 
 	parser := sharedSQLParser
@@ -1178,6 +1190,246 @@ func TestSqlParser_AddLimit(t *testing.T) { //nolint
 				require.NoError(t, err)
 				require.Equal(t, tt.expected, got)
 			}
+		})
+	}
+}
+
+func TestSqlParser_PrependCTEs(t *testing.T) { //nolint
+	parser := sharedSQLParser
+
+	t.Run("prepends a cte to a plain select", func(t *testing.T) {
+		got, err := parser.PrependCTEs("SELECT id FROM orders", "duckdb", []CTE{
+			{Name: "orders", Query: "SELECT 1 AS id"},
+		})
+		require.NoError(t, err)
+		require.Contains(t, got, "orders AS (")
+		require.Contains(t, got, "SELECT 1 AS id")
+		// The result is one statement that still reads from orders (now the CTE).
+		require.Contains(t, got, "FROM orders")
+		require.Equal(t, 1, strings.Count(got, "SELECT id FROM orders"))
+	})
+
+	t.Run("prepends before an existing WITH so existing CTEs can reference it", func(t *testing.T) {
+		got, err := parser.PrependCTEs("WITH e AS (SELECT id FROM orders) SELECT * FROM e", "duckdb", []CTE{
+			{Name: "orders", Query: "SELECT 1 AS id"},
+		})
+		require.NoError(t, err)
+		require.Less(t, strings.Index(got, "orders AS ("), strings.Index(got, "e AS ("),
+			"the prepended fixture CTE must be defined before the existing CTE that references it")
+	})
+
+	t.Run("keeps multiple ctes in the given order", func(t *testing.T) {
+		got, err := parser.PrependCTEs("SELECT * FROM a JOIN b ON a.id = b.id", "duckdb", []CTE{
+			{Name: "a", Query: "SELECT 1 AS id"},
+			{Name: "b", Query: "SELECT 1 AS id"},
+		})
+		require.NoError(t, err)
+		require.Less(t, strings.Index(got, "a AS ("), strings.Index(got, "b AS ("))
+	})
+
+	t.Run("splices into a WITH RECURSIVE without dropping RECURSIVE", func(t *testing.T) {
+		// The fixture CTE is non-recursive, but it must be defined before the
+		// recursive CTE that references the (rewritten) source table, and the
+		// RECURSIVE keyword on the WITH must survive. This is what lets a unit
+		// test run a recursive asset as a single statement, never the
+		// SELECT * FROM (WITH RECURSIVE ...) wrapping that some engines reject.
+		got, err := parser.PrependCTEs(
+			"WITH RECURSIVE walk AS (SELECT id, parent_id FROM nodes WHERE parent_id IS NULL "+
+				"UNION ALL SELECT n.id, n.parent_id FROM nodes n JOIN walk w ON n.parent_id = w.id) "+
+				"SELECT * FROM walk",
+			"duckdb",
+			[]CTE{{Name: "nodes", Query: "SELECT 1 AS id, NULL AS parent_id"}},
+		)
+		require.NoError(t, err)
+		require.Contains(t, strings.ToUpper(got), "RECURSIVE")
+		require.Less(t, strings.Index(got, "nodes AS ("), strings.Index(got, "walk AS ("),
+			"the fixture CTE must precede the recursive CTE that reads from it")
+	})
+
+	t.Run("unparseable query returns an error", func(t *testing.T) {
+		_, err := parser.PrependCTEs("SELECT * FROM", "duckdb", []CTE{{Name: "x", Query: "SELECT 1"}})
+		require.Error(t, err)
+	})
+}
+
+func TestSqlParser_ExtractSelect(t *testing.T) { //nolint
+	parser := sharedSQLParser
+
+	t.Run("a plain SELECT is returned unchanged", func(t *testing.T) {
+		got, err := parser.ExtractSelect("SELECT id FROM orders", "duckdb")
+		require.NoError(t, err)
+		require.Contains(t, got, "FROM orders")
+		require.NotContains(t, strings.ToUpper(got), "CREATE")
+	})
+
+	t.Run("CREATE OR REPLACE VIEW is reduced to its inner SELECT", func(t *testing.T) {
+		got, err := parser.ExtractSelect("CREATE OR REPLACE VIEW analytics.v AS SELECT id FROM orders", "duckdb")
+		require.NoError(t, err)
+		require.NotContains(t, strings.ToUpper(got), "CREATE")
+		require.NotContains(t, strings.ToUpper(got), "VIEW")
+		require.Contains(t, got, "FROM orders")
+	})
+
+	t.Run("CREATE TABLE AS SELECT (CTAS) is reduced to its inner SELECT", func(t *testing.T) {
+		got, err := parser.ExtractSelect("CREATE TABLE analytics.t AS SELECT id FROM orders", "duckdb")
+		require.NoError(t, err)
+		require.NotContains(t, strings.ToUpper(got), "CREATE")
+		require.Contains(t, got, "FROM orders")
+	})
+
+	t.Run("INSERT ... SELECT is reduced to the SELECT", func(t *testing.T) {
+		got, err := parser.ExtractSelect("INSERT INTO analytics.t SELECT id FROM orders", "duckdb")
+		require.NoError(t, err)
+		require.NotContains(t, strings.ToUpper(got), "INSERT")
+		require.Contains(t, got, "FROM orders")
+	})
+
+	t.Run("a WITH clause is preserved when unwrapping", func(t *testing.T) {
+		got, err := parser.ExtractSelect(
+			"CREATE OR REPLACE VIEW analytics.v AS WITH e AS (SELECT id FROM orders) SELECT * FROM e", "duckdb")
+		require.NoError(t, err)
+		require.NotContains(t, strings.ToUpper(got), "CREATE")
+		require.Contains(t, strings.ToUpper(got), "WITH")
+	})
+
+	t.Run("DDL with no inner SELECT is an error", func(t *testing.T) {
+		_, err := parser.ExtractSelect("CREATE TABLE analytics.t (id BIGINT, name VARCHAR)", "duckdb")
+		require.Error(t, err)
+	})
+
+	// Read-only gate: a unit test must never run a write. extract-select is the
+	// guarantee (there is no read-only-connection enforcement), so every write
+	// shape is rejected and never reaches the connection.
+	t.Run("write statements are rejected, never reduced to something runnable", func(t *testing.T) {
+		writes := map[string]string{
+			"delete with a subquery": "DELETE FROM orders WHERE id IN (SELECT id FROM refunds)",
+			"update":                 "UPDATE orders SET status = 'void' WHERE id = 1",
+			"merge":                  "MERGE INTO orders t USING staged s ON t.id = s.id WHEN MATCHED THEN UPDATE SET t.amount = s.amount",
+			"truncate":               "TRUNCATE TABLE orders",
+			"drop":                   "DROP TABLE orders",
+		}
+		for name, sql := range writes {
+			t.Run(name, func(t *testing.T) {
+				_, err := parser.ExtractSelect(sql, "duckdb")
+				require.Error(t, err, "a %s must not be reducible to a runnable query", name)
+			})
+		}
+	})
+
+	t.Run("a data-modifying CTE is rejected even though the top level is a SELECT", func(t *testing.T) {
+		// Postgres lets a CTE write (DELETE ... RETURNING) while the outer
+		// statement is a SELECT. The write must still be caught.
+		_, err := parser.ExtractSelect(
+			"WITH gone AS (DELETE FROM orders WHERE status = 'void' RETURNING id) SELECT * FROM gone", "postgres")
+		require.Error(t, err)
+	})
+
+	t.Run("SELECT ... INTO is reduced to a plain read, dropping the table write", func(t *testing.T) {
+		got, err := parser.ExtractSelect("SELECT id, amount INTO archive FROM orders", "duckdb")
+		require.NoError(t, err)
+		require.NotContains(t, strings.ToUpper(got), "INTO")
+		require.NotContains(t, got, "archive")
+		require.Contains(t, got, "FROM orders")
+	})
+}
+
+func TestSqlParser_SelectFromCTE(t *testing.T) { //nolint
+	parser := sharedSQLParser
+
+	t.Run("selects a named CTE, keeping the other CTEs in place", func(t *testing.T) {
+		got, err := parser.SelectFromCTE(
+			"WITH a AS (SELECT 1 AS id), b AS (SELECT id + 1 AS id FROM a) SELECT * FROM b", "duckdb", "a")
+		require.NoError(t, err)
+		require.Contains(t, got, "a AS (")
+		require.Contains(t, got, "b AS (") // unused CTE is preserved
+		require.Contains(t, got, "FROM a")
+		require.NotContains(t, got, "FROM b") // the final select now targets a, not b
+	})
+
+	t.Run("matches the CTE name case-insensitively", func(t *testing.T) {
+		got, err := parser.SelectFromCTE("WITH filtered AS (SELECT 1 AS id) SELECT * FROM filtered", "duckdb", "FILTERED")
+		require.NoError(t, err)
+		require.Contains(t, got, "filtered AS (")
+	})
+
+	t.Run("an unknown CTE name is an error", func(t *testing.T) {
+		_, err := parser.SelectFromCTE("WITH a AS (SELECT 1 AS id) SELECT * FROM a", "duckdb", "nope")
+		require.Error(t, err)
+	})
+
+	t.Run("a query with no WITH clause is an error", func(t *testing.T) {
+		_, err := parser.SelectFromCTE("SELECT 1 AS id", "duckdb", "a")
+		require.Error(t, err)
+	})
+}
+
+func TestSqlParser_FreezeTime(t *testing.T) { //nolint
+	parser := sharedSQLParser
+
+	t.Run("CURRENT_TIMESTAMP becomes a fixed literal", func(t *testing.T) {
+		got, err := parser.FreezeTime("SELECT CURRENT_TIMESTAMP AS now_ts", "duckdb", "2023-01-01 12:05:03")
+		require.NoError(t, err)
+		require.NotContains(t, strings.ToUpper(got), "CURRENT_TIMESTAMP")
+		require.Contains(t, got, "2023-01-01 12:05:03")
+	})
+
+	t.Run("CURRENT_DATE becomes the date part", func(t *testing.T) {
+		got, err := parser.FreezeTime("SELECT CURRENT_DATE AS d", "duckdb", "2023-01-01 12:05:03")
+		require.NoError(t, err)
+		require.NotContains(t, strings.ToUpper(got), "CURRENT_DATE")
+		require.Contains(t, got, "2023-01-01")
+	})
+
+	t.Run("a query without time functions is left intact", func(t *testing.T) {
+		got, err := parser.FreezeTime("SELECT id FROM orders", "duckdb", "2023-01-01 12:05:03")
+		require.NoError(t, err)
+		require.Contains(t, got, "FROM orders")
+	})
+
+	t.Run("missing execution_time is an error", func(t *testing.T) {
+		_, err := parser.FreezeTime("SELECT CURRENT_TIMESTAMP", "duckdb", "")
+		require.Error(t, err)
+	})
+}
+
+func TestSqlParser_RenameTablesClearsStaleCatalog(t *testing.T) { //nolint
+	parser := sharedSQLParser
+
+	// Renaming a 3-part name (catalog.db.table) to a single identifier must clear
+	// the stale catalog and schema, not leave them behind. This is what lets a
+	// unit test rewrite db.schema.table to a one-part fixture CTE on any dialect.
+	for _, dialect := range []string{"bigquery", "snowflake", "duckdb"} {
+		t.Run(dialect, func(t *testing.T) {
+			got, err := parser.RenameTables(
+				"SELECT amount FROM myproj.analytics.orders",
+				dialect,
+				map[string]string{"myproj.analytics.orders": "cte_x"})
+			require.NoError(t, err)
+			require.Contains(t, got, "cte_x")
+			require.NotContains(t, got, "myproj")    // stale catalog cleared
+			require.NotContains(t, got, "analytics") // stale schema cleared
+		})
+	}
+}
+
+func TestConnectionTypeToDialect(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]string{
+		"clickhouse":            "clickhouse",
+		"postgres":              "postgres",
+		"google_cloud_platform": "bigquery",
+		"snowflake":             "snowflake",
+		"mssql":                 "tsql",
+		"vertica":               "postgres",
+		"":                      "",
+		"unknown":               "",
+	}
+
+	for connType, want := range tests {
+		t.Run(connType, func(t *testing.T) {
+			t.Parallel()
+			require.Equal(t, want, ConnectionTypeToDialect(connType))
 		})
 	}
 }

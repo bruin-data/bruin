@@ -113,6 +113,8 @@ For more details on OAuth M2M authentication, see the [Databricks documentation]
 
 Runs a materialized Databricks asset or a Databricks SQL script. For detailed parameters, you can check [Definition Schema](../assets/definition-schema.md) page.
 
+Asset names may be `schema.table` or `catalog.schema.table` (Unity Catalog). With a three-part name Bruin auto-creates both the catalog (`CREATE CATALOG IF NOT EXISTS`) and the schema within it, so the connection's principal needs the `CREATE CATALOG` privilege on the metastore.
+
 #### Example: Create a table using table materialization
 
 ```bruin-sql
@@ -194,7 +196,7 @@ parameters:
 
 **Parameters**:
 
-- `table`: `schema_id.table_id`.
+- `table`: `schema_id.table_id` or `catalog_id.schema_id.table_id` format.
 - `poke_interval`: The interval between retries in seconds (default 30 seconds).
 - `timeout`: How long to wait before the sensor fails. Uses single-unit duration syntax (`s`, `m`, `h`, `d`, `ms`, `ns`), e.g. `1h` or `90m`. Defaults to `24h`. See [Sensor Timeout](/assets/sensor#timeout).
 

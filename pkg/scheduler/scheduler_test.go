@@ -209,6 +209,465 @@ func TestScheduler_getScheduleableTasks(t *testing.T) {
 	}
 }
 
+func TestScheduler_getScheduleableTasksWithNoConnectionLimits(t *testing.T) {
+	t.Parallel()
+
+	s := newConnectionLimitTestScheduler(t, []*pipeline.Asset{
+		{Name: "first", Connection: "postgres"},
+		{Name: "second", Connection: "postgres"},
+	}, nil)
+
+	assert.Equal(t, []string{"first", "second"}, scheduleableHumanIDs(s))
+}
+
+func TestScheduler_getScheduleableTasksHonorsSingleConnectionLimit(t *testing.T) {
+	t.Parallel()
+
+	t.Run("reserves capacity within the same scheduling batch", func(t *testing.T) {
+		t.Parallel()
+
+		s := newConnectionLimitTestScheduler(t, []*pipeline.Asset{
+			{Name: "first", Connection: "postgres"},
+			{Name: "second", Connection: "postgres"},
+			{Name: "third", Connection: "postgres"},
+		}, map[string]int{"postgres": 1})
+
+		assert.Equal(t, []string{"first"}, scheduleableHumanIDs(s))
+	})
+
+	t.Run("queued tasks consume capacity", func(t *testing.T) {
+		t.Parallel()
+
+		s := newConnectionLimitTestScheduler(t, []*pipeline.Asset{
+			{Name: "first", Connection: "postgres"},
+			{Name: "second", Connection: "postgres"},
+		}, map[string]int{"postgres": 1})
+		markMainTaskStatus(s, "first", Queued)
+
+		assert.Empty(t, scheduleableHumanIDs(s))
+	})
+
+	t.Run("running tasks consume capacity", func(t *testing.T) {
+		t.Parallel()
+
+		s := newConnectionLimitTestScheduler(t, []*pipeline.Asset{
+			{Name: "first", Connection: "postgres"},
+			{Name: "second", Connection: "postgres"},
+		}, map[string]int{"postgres": 1})
+		markMainTaskStatus(s, "first", Running)
+
+		assert.Empty(t, scheduleableHumanIDs(s))
+	})
+}
+
+func TestScheduler_getScheduleableTasksDoesNotBlockUnrelatedConnections(t *testing.T) {
+	t.Parallel()
+
+	s := newConnectionLimitTestScheduler(t, []*pipeline.Asset{
+		{Name: "limited-first", Connection: "postgres"},
+		{Name: "unrelated", Connection: "snowflake"},
+		{Name: "limited-second", Connection: "postgres"},
+	}, map[string]int{"postgres": 1})
+
+	assert.Equal(t, []string{"limited-first", "unrelated"}, scheduleableHumanIDs(s))
+}
+
+func TestScheduler_getScheduleableTasksRequiresCapacityForEveryLimitedConnection(t *testing.T) {
+	t.Parallel()
+
+	s := newConnectionLimitTestScheduler(t, []*pipeline.Asset{
+		{Name: "source-holder", Connection: "source"},
+		{
+			Name: "python-task",
+			Type: pipeline.AssetTypePython,
+			Secrets: []pipeline.SecretMapping{
+				{SecretKey: "source", InjectedKey: "SOURCE"},
+				{SecretKey: "destination", InjectedKey: "DESTINATION"},
+			},
+		},
+	}, map[string]int{"source": 1, "destination": 1})
+	markMainTaskStatus(s, "source-holder", Running)
+
+	assert.Empty(t, scheduleableHumanIDs(s))
+
+	markMainTaskStatus(s, "source-holder", Succeeded)
+	assert.Equal(t, []string{"python-task"}, scheduleableHumanIDs(s))
+}
+
+func TestScheduler_getScheduleableTasksLimitsMaterializedPythonDestination(t *testing.T) {
+	t.Parallel()
+
+	materializedPythonAsset := func(name string) *pipeline.Asset {
+		return &pipeline.Asset{
+			Name: "python-" + name,
+			Type: pipeline.AssetTypePython,
+			Materialization: pipeline.Materialization{
+				Type: pipeline.MaterializationTypeTable,
+			},
+		}
+	}
+
+	s := newConnectionLimitTestScheduler(t, []*pipeline.Asset{
+		materializedPythonAsset("first"),
+		materializedPythonAsset("second"),
+	}, map[string]int{"gcp-default": 1})
+
+	assert.Equal(t, []string{"python-first"}, scheduleableHumanIDs(s))
+}
+
+func TestScheduler_getScheduleableTasksLimitsExplicitPythonAndRConnections(t *testing.T) {
+	t.Parallel()
+
+	t.Run("python", func(t *testing.T) {
+		t.Parallel()
+
+		s := newConnectionLimitTestScheduler(t, []*pipeline.Asset{
+			{Name: "python-first", Type: pipeline.AssetTypePython, Connection: "warehouse"},
+			{Name: "python-second", Type: pipeline.AssetTypePython, Connection: "warehouse"},
+		}, map[string]int{"warehouse": 1})
+
+		assert.Equal(t, []string{"python-first"}, scheduleableHumanIDs(s))
+	})
+
+	t.Run("r", func(t *testing.T) {
+		t.Parallel()
+
+		s := newConnectionLimitTestScheduler(t, []*pipeline.Asset{
+			{Name: "r-first", Type: pipeline.AssetTypeR, Connection: "warehouse"},
+			{Name: "r-second", Type: pipeline.AssetTypeR, Connection: "warehouse"},
+		}, map[string]int{"warehouse": 1})
+
+		assert.Equal(t, []string{"r-first"}, scheduleableHumanIDs(s))
+	})
+}
+
+func TestScheduler_getScheduleableTasksLimitsRSecrets(t *testing.T) {
+	t.Parallel()
+
+	rAsset := func(name string) *pipeline.Asset {
+		return &pipeline.Asset{
+			Name: "r-" + name,
+			Type: pipeline.AssetTypeR,
+			Secrets: []pipeline.SecretMapping{
+				{SecretKey: "r-source", InjectedKey: "R_SOURCE"},
+			},
+		}
+	}
+
+	s := newConnectionLimitTestScheduler(t, []*pipeline.Asset{
+		rAsset("first"),
+		rAsset("second"),
+	}, map[string]int{"r-source": 1})
+
+	assert.Equal(t, []string{"r-first"}, scheduleableHumanIDs(s))
+}
+
+func TestScheduler_ConnectionLimitsFromDetailsIgnoresConnectionlessMetadataPush(t *testing.T) {
+	t.Parallel()
+
+	s := NewScheduler(zap.NewNop().Sugar(), &pipeline.Pipeline{
+		MetadataPush: pipeline.MetadataPush{Global: true},
+		Assets: []*pipeline.Asset{
+			{Name: "r-task", Type: pipeline.AssetTypeR},
+		},
+	}, "test")
+
+	limits, err := s.ConnectionLimitsFromDetails(nil, connectionLimitDetailsGetter{})
+	require.NoError(t, err)
+	assert.Empty(t, limits)
+
+	require.NoError(t, s.SetConnectionLimits(map[string]int{"unrelated": 1}))
+}
+
+func TestScheduler_getScheduleableTasksIngestrConsumesSourceAndDestinationLimits(t *testing.T) {
+	t.Parallel()
+
+	ingestrAsset := func() *pipeline.Asset {
+		return &pipeline.Asset{
+			Name:       "ingestr-task",
+			Type:       pipeline.AssetTypeIngestr,
+			Connection: "destination",
+			Parameters: pipeline.ParameterMap{
+				"source_connection": "source",
+			},
+		}
+	}
+
+	t.Run("source at capacity blocks ingestr task", func(t *testing.T) {
+		t.Parallel()
+
+		s := newConnectionLimitTestScheduler(t, []*pipeline.Asset{
+			{Name: "source-holder", Connection: "source"},
+			ingestrAsset(),
+		}, map[string]int{"source": 1, "destination": 1})
+		markMainTaskStatus(s, "source-holder", Running)
+
+		assert.Empty(t, scheduleableHumanIDs(s))
+	})
+
+	t.Run("destination at capacity blocks ingestr task", func(t *testing.T) {
+		t.Parallel()
+
+		s := newConnectionLimitTestScheduler(t, []*pipeline.Asset{
+			{Name: "destination-holder", Connection: "destination"},
+			ingestrAsset(),
+		}, map[string]int{"source": 1, "destination": 1})
+		markMainTaskStatus(s, "destination-holder", Running)
+
+		assert.Empty(t, scheduleableHumanIDs(s))
+	})
+
+	t.Run("both connections free schedules ingestr task", func(t *testing.T) {
+		t.Parallel()
+
+		s := newConnectionLimitTestScheduler(t, []*pipeline.Asset{
+			ingestrAsset(),
+		}, map[string]int{"source": 1, "destination": 1})
+
+		assert.Equal(t, []string{"ingestr-task"}, scheduleableHumanIDs(s))
+	})
+}
+
+func TestScheduler_getScheduleableTasksIngestrUsesAssetConnectionAsDestination(t *testing.T) {
+	t.Parallel()
+
+	ingestrAsset := &pipeline.Asset{
+		Name:       "ingestr-task",
+		Type:       pipeline.AssetTypeIngestr,
+		Connection: "destination-override",
+		Parameters: pipeline.ParameterMap{
+			"source_connection":      "source",
+			"destination_connection": "destination-param",
+		},
+	}
+
+	s := newConnectionLimitTestScheduler(t, []*pipeline.Asset{
+		{Name: "destination-holder", Connection: "destination-override"},
+		ingestrAsset,
+	}, map[string]int{
+		"source":               1,
+		"destination-param":    1,
+		"destination-override": 1,
+	})
+	markMainTaskStatus(s, "destination-holder", Running)
+
+	assert.Empty(t, scheduleableHumanIDs(s))
+}
+
+func TestScheduler_getScheduleableTasksIngestrUsesDestinationConnectionParameter(t *testing.T) {
+	t.Parallel()
+
+	ingestrAsset := &pipeline.Asset{
+		Name: "ingestr-task",
+		Type: pipeline.AssetTypeIngestr,
+		Parameters: pipeline.ParameterMap{
+			"source_connection":      "source",
+			"destination":            "bigquery",
+			"destination_connection": "destination-param",
+		},
+	}
+
+	s := newConnectionLimitTestScheduler(t, []*pipeline.Asset{
+		{Name: "destination-holder", Connection: "destination-param"},
+		ingestrAsset,
+	}, map[string]int{
+		"source":            1,
+		"destination-param": 1,
+		"gcp-default":       1,
+	})
+	markMainTaskStatus(s, "destination-holder", Running)
+
+	assert.Empty(t, scheduleableHumanIDs(s))
+}
+
+func TestScheduler_getScheduleableTasksDoesNotLimitSourceMainTasks(t *testing.T) {
+	t.Parallel()
+
+	s := newConnectionLimitTestScheduler(t, []*pipeline.Asset{
+		{Name: "source-first", Type: pipeline.AssetTypeBigquerySource},
+		{Name: "source-second", Type: pipeline.AssetTypeBigquerySource},
+	}, map[string]int{"gcp-default": 1})
+
+	assert.Equal(t, []string{"source-first", "source-second"}, scheduleableHumanIDs(s))
+}
+
+func TestScheduler_ConnectionLimitsFromDetailsIgnoresConnectionlessMainTasks(t *testing.T) {
+	t.Parallel()
+
+	s := NewScheduler(zap.NewNop().Sugar(), &pipeline.Pipeline{Assets: []*pipeline.Asset{
+		{Name: "appsflyer-export", Type: pipeline.AssetType("appsflyer.export.bq")},
+		{Name: "dashboard", Type: pipeline.AssetTypeMetabase},
+		{Name: "dbt-task", Type: pipeline.AssetType("dbt")},
+		{Name: "mongo-source", Type: pipeline.AssetTypeMongoSource},
+		{Name: "python-beta", Type: pipeline.AssetType("python.beta")},
+		{Name: "python-legacy", Type: pipeline.AssetType("python.legacy")},
+	}}, "test")
+
+	limits, err := s.ConnectionLimitsFromDetails(nil, connectionLimitDetailsGetter{})
+	require.NoError(t, err)
+	assert.Empty(t, limits)
+
+	require.NoError(t, s.SetConnectionLimits(map[string]int{"unrelated": 1}))
+	assert.Equal(t, []string{"appsflyer-export", "dashboard", "dbt-task", "mongo-source", "python-beta", "python-legacy"}, scheduleableHumanIDs(s))
+}
+
+func TestScheduler_getScheduleableTasksLimitsRefreshableDashboardMainTasks(t *testing.T) {
+	t.Parallel()
+
+	t.Run("tableau", func(t *testing.T) {
+		t.Parallel()
+
+		s := newConnectionLimitTestScheduler(t, []*pipeline.Asset{
+			{Name: "tableau-first", Type: pipeline.AssetTypeTableauDatasource, Connection: "tableau-prod"},
+			{Name: "tableau-second", Type: pipeline.AssetTypeTableauWorkbook, Connection: "tableau-prod"},
+		}, map[string]int{"tableau-prod": 1})
+
+		assert.Equal(t, []string{"tableau-first"}, scheduleableHumanIDs(s))
+	})
+
+	t.Run("quicksight", func(t *testing.T) {
+		t.Parallel()
+
+		s := newConnectionLimitTestScheduler(t, []*pipeline.Asset{
+			{Name: "quicksight-first", Type: pipeline.AssetTypeQuicksightDataset, Connection: "quicksight-prod"},
+			{Name: "quicksight-second", Type: pipeline.AssetTypeQuicksightDashboard, Connection: "quicksight-prod"},
+		}, map[string]int{"quicksight-prod": 1})
+
+		assert.Equal(t, []string{"quicksight-first"}, scheduleableHumanIDs(s))
+	})
+}
+
+func TestScheduler_getScheduleableTasksChecksUsePrimaryConnectionOnly(t *testing.T) {
+	t.Parallel()
+
+	pythonAsset := func() *pipeline.Asset {
+		return &pipeline.Asset{
+			Name:       "python-task",
+			Type:       pipeline.AssetTypePython,
+			Connection: "warehouse",
+			Secrets: []pipeline.SecretMapping{
+				{SecretKey: "secret-source", InjectedKey: "SOURCE"},
+			},
+			CustomChecks: []pipeline.CustomCheck{{Name: "freshness"}},
+		}
+	}
+
+	t.Run("secret connection capacity does not block checks", func(t *testing.T) {
+		t.Parallel()
+
+		s := newConnectionLimitTestScheduler(t, []*pipeline.Asset{
+			{Name: "secret-holder", Connection: "secret-source"},
+			pythonAsset(),
+		}, map[string]int{"secret-source": 1, "warehouse": 1})
+		markMainTaskStatus(s, "secret-holder", Running)
+		markMainTaskStatus(s, "python-task", Succeeded)
+
+		assert.Equal(t, []string{"python-task:custom-check:freshness"}, scheduleableHumanIDs(s))
+	})
+
+	t.Run("primary connection capacity blocks checks", func(t *testing.T) {
+		t.Parallel()
+
+		s := newConnectionLimitTestScheduler(t, []*pipeline.Asset{
+			{Name: "warehouse-holder", Connection: "warehouse"},
+			pythonAsset(),
+		}, map[string]int{"secret-source": 1, "warehouse": 1})
+		markMainTaskStatus(s, "warehouse-holder", Running)
+		markMainTaskStatus(s, "python-task", Succeeded)
+
+		assert.Empty(t, scheduleableHumanIDs(s))
+	})
+}
+
+func TestScheduler_ConnectionLimitsFromDetails(t *testing.T) {
+	t.Parallel()
+
+	postgresLimit := 1
+	snowflakeLimit := 2
+
+	s := NewScheduler(zap.NewNop().Sugar(), &pipeline.Pipeline{Assets: []*pipeline.Asset{
+		{Name: "first", Connection: "postgres"},
+		{Name: "second", Connection: "postgres"},
+		{Name: "third", Connection: "snowflake"},
+	}}, "test")
+
+	limits, err := s.ConnectionLimitsFromDetails(nil, connectionLimitDetailsGetter{
+		"postgres":  connectionLimitDetails{limit: &postgresLimit},
+		"snowflake": connectionLimitDetails{limit: &snowflakeLimit},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, map[string]int{
+		"postgres":  1,
+		"snowflake": 2,
+	}, limits)
+
+	require.NoError(t, s.SetConnectionLimits(limits))
+	assert.Equal(t, []string{"first", "third"}, scheduleableHumanIDs(s))
+}
+
+func TestScheduler_ConnectionLimitsFromDetailsPreservesBaseLimits(t *testing.T) {
+	t.Parallel()
+
+	s := NewScheduler(zap.NewNop().Sugar(), &pipeline.Pipeline{Assets: []*pipeline.Asset{
+		{Name: "first", Connection: "postgres"},
+		{Name: "second", Connection: "snowflake"},
+	}}, "test")
+
+	limits, err := s.ConnectionLimitsFromDetails(map[string]int{"snowflake": 2}, connectionLimitDetailsGetter{})
+	require.NoError(t, err)
+	assert.Equal(t, map[string]int{"snowflake": 2}, limits)
+}
+
+func TestScheduler_ConnectionLimitsFromDetailsRejectsInvalidLimit(t *testing.T) {
+	t.Parallel()
+
+	invalidLimit := 0
+	s := NewScheduler(zap.NewNop().Sugar(), &pipeline.Pipeline{Assets: []*pipeline.Asset{
+		{Name: "first", Connection: "postgres"},
+	}}, "test")
+
+	_, err := s.ConnectionLimitsFromDetails(nil, connectionLimitDetailsGetter{
+		"postgres": connectionLimitDetails{limit: &invalidLimit},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "must be greater than 0")
+}
+
+type connectionLimitDetailsGetter map[string]any
+
+func (g connectionLimitDetailsGetter) GetConnectionDetails(name string) any {
+	return g[name]
+}
+
+type connectionLimitDetails struct {
+	limit *int
+}
+
+func (d connectionLimitDetails) GetMaxConcurrentAssets() *int {
+	return d.limit
+}
+
+func newConnectionLimitTestScheduler(t *testing.T, assets []*pipeline.Asset, limits map[string]int) *Scheduler {
+	t.Helper()
+
+	s := NewScheduler(zap.NewNop().Sugar(), &pipeline.Pipeline{Assets: assets}, "test")
+	require.NoError(t, s.SetConnectionLimits(limits))
+	return s
+}
+
+func markMainTaskStatus(s *Scheduler, assetName string, status TaskInstanceStatus) {
+	s.taskNameMap[assetName][TaskInstanceTypeMain][0].MarkAs(status)
+}
+
+func scheduleableHumanIDs(s *Scheduler) []string {
+	tasks := s.getScheduleableTasks()
+	ids := make([]string, 0, len(tasks))
+	for _, task := range tasks {
+		ids = append(ids, task.GetHumanID())
+	}
+	return ids
+}
+
 func TestScheduler_Run(t *testing.T) {
 	t.Parallel()
 

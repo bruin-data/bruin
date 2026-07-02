@@ -1,3 +1,10 @@
+# Enforce LF line endings in the working tree on every platform. Without this,
+# Windows checkouts (core.autocrlf=true) produce CRLF files that corrupt Go
+# formatter output — gci/gofumpt insert blank lines throughout CRLF files — and
+# create spurious whole-file diffs. All repo blobs are already LF, so this only
+# locks in the existing state.
+* text=auto eol=lf
+
 # Treat binary files as binary to prevent corruption
 *.png binary
 *.jpg binary

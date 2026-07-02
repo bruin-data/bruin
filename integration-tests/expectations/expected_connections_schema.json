@@ -8,6 +8,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "account_name": {
           "type": "string"
         },
@@ -42,6 +45,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "api_key": {
           "type": "string"
         },
@@ -70,6 +76,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "api_key": {
           "type": "string"
         }
@@ -85,6 +94,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "base_id": {
           "type": "string"
@@ -106,6 +118,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "api_key": {
           "type": "string"
         }
@@ -121,6 +136,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "api_key": {
           "type": "string"
@@ -138,6 +156,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "api_key": {
           "type": "string"
         }
@@ -153,6 +174,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "key_id": {
           "type": "string"
@@ -181,6 +205,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "client_id": {
           "type": "string"
@@ -218,6 +245,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "api_key": {
           "type": "string"
         }
@@ -234,6 +264,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "api_key": {
           "type": "string"
         }
@@ -249,6 +282,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "access_token": {
           "type": "string"
@@ -269,6 +305,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "access_key_id": {
           "type": "string"
@@ -308,6 +347,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "api_key": {
           "type": "string"
         }
@@ -323,6 +365,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "access_key": {
           "type": "string"
@@ -348,6 +393,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "api_key": {
           "type": "string"
         },
@@ -365,10 +413,36 @@
         "api_key"
       ]
     },
+    "BrazeConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "endpoint": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key",
+        "endpoint"
+      ]
+    },
     "BruinCloudConnection": {
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "api_token": {
           "type": "string"
@@ -385,6 +459,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "path": {
           "type": "string"
@@ -407,6 +484,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "username": {
           "type": "string"
@@ -512,10 +592,36 @@
         "type"
       ]
     },
+    "ChargebeeConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "site": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "site",
+        "api_key"
+      ]
+    },
     "ChessConnection": {
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "players": {
           "items": {
@@ -547,6 +653,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "username": {
           "type": "string"
@@ -585,6 +694,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "api_token": {
           "type": "string"
@@ -719,6 +831,18 @@
           },
           "type": "array"
         },
+        "vitess": {
+          "items": {
+            "$ref": "#/$defs/VitessConnection"
+          },
+          "type": "array"
+        },
+        "planetscale": {
+          "items": {
+            "$ref": "#/$defs/PlanetScaleConnection"
+          },
+          "type": "array"
+        },
         "notion": {
           "items": {
             "$ref": "#/$defs/NotionConnection"
@@ -806,6 +930,24 @@
         "paddle": {
           "items": {
             "$ref": "#/$defs/PaddleConnection"
+          },
+          "type": "array"
+        },
+        "chargebee": {
+          "items": {
+            "$ref": "#/$defs/ChargebeeConnection"
+          },
+          "type": "array"
+        },
+        "recurly": {
+          "items": {
+            "$ref": "#/$defs/RecurlyConnection"
+          },
+          "type": "array"
+        },
+        "gitlab": {
+          "items": {
+            "$ref": "#/$defs/GitLabConnection"
           },
           "type": "array"
         },
@@ -1121,6 +1263,12 @@
           },
           "type": "array"
         },
+        "gsc": {
+          "items": {
+            "$ref": "#/$defs/GSCConnection"
+          },
+          "type": "array"
+        },
         "applovin": {
           "items": {
             "$ref": "#/$defs/AppLovinConnection"
@@ -1175,6 +1323,12 @@
           },
           "type": "array"
         },
+        "square": {
+          "items": {
+            "$ref": "#/$defs/SquareConnection"
+          },
+          "type": "array"
+        },
         "spanner": {
           "items": {
             "$ref": "#/$defs/SpannerConnection"
@@ -1226,6 +1380,12 @@
         "trino": {
           "items": {
             "$ref": "#/$defs/TrinoConnection"
+          },
+          "type": "array"
+        },
+        "starrocks": {
+          "items": {
+            "$ref": "#/$defs/StarRocksConnection"
           },
           "type": "array"
         },
@@ -1319,6 +1479,12 @@
           },
           "type": "array"
         },
+        "braze": {
+          "items": {
+            "$ref": "#/$defs/BrazeConnection"
+          },
+          "type": "array"
+        },
         "espn": {
           "items": {
             "$ref": "#/$defs/EspnConnection"
@@ -1370,6 +1536,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "username": {
           "type": "string"
         },
@@ -1399,6 +1568,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "username": {
           "type": "string"
@@ -1431,6 +1603,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "api_key": {
           "type": "string"
         }
@@ -1446,6 +1621,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "api_key": {
           "type": "string"
@@ -1465,6 +1643,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "username": {
           "type": "string"
@@ -1513,6 +1694,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "token": {
           "type": "string"
         },
@@ -1554,6 +1738,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "service_account_json": {
           "type": "string"
@@ -1610,6 +1797,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "base_url": {
           "type": "string"
         },
@@ -1641,6 +1831,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "host": {
           "type": "string"
@@ -1680,6 +1873,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "path": {
           "type": "string"
         },
@@ -1702,6 +1898,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "api_key": {
           "type": "string"
         }
@@ -1717,6 +1916,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "access_key_id": {
           "type": "string"
@@ -1741,6 +1943,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "access_key": {
           "type": "string"
@@ -1776,6 +1981,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "username": {
           "type": "string"
@@ -1813,6 +2021,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "sport": {
           "type": "string"
         },
@@ -1839,6 +2050,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "host": {
           "type": "string"
@@ -1886,6 +2100,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "access_token": {
           "type": "string"
         },
@@ -1906,6 +2123,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "api_key": {
           "type": "string"
         }
@@ -1921,6 +2141,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "instance": {
           "type": "string"
@@ -1945,6 +2168,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "api_key": {
           "type": "string"
@@ -1994,6 +2220,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         }
       },
       "additionalProperties": false,
@@ -2006,6 +2235,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "domain": {
           "type": "string"
@@ -2027,6 +2259,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "api_key": {
           "type": "string"
         }
@@ -2042,6 +2277,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "api_token": {
           "type": "string"
@@ -2073,6 +2311,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "service_account_file": {
           "type": "string"
         },
@@ -2095,10 +2336,35 @@
         "name"
       ]
     },
+    "GSCConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "service_account_file": {
+          "type": "string"
+        },
+        "service_account_json": {
+          "type": "string"
+        },
+        "site_url": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "site_url"
+      ]
+    },
     "GenericConnection": {
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "value": {
           "type": "string"
@@ -2115,6 +2381,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "access_token": {
           "type": "string"
@@ -2134,10 +2403,35 @@
         "repo"
       ]
     },
+    "GitLabConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "access_token": {
+          "type": "string"
+        },
+        "base_url": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "access_token"
+      ]
+    },
     "GoogleAdsConnection": {
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "customer_id": {
           "type": "string"
@@ -2182,6 +2476,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "service_account_file": {
           "type": "string"
         },
@@ -2203,6 +2500,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "service_account_json": {
           "type": "string"
@@ -2244,6 +2544,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "service_account_json": {
           "type": "string"
         },
@@ -2261,6 +2564,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "domain": {
           "type": "string"
@@ -2286,6 +2592,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "api_key": {
           "type": "string"
         }
@@ -2301,6 +2610,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "username": {
           "type": "string"
@@ -2334,6 +2646,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "url": {
           "type": "string"
         }
@@ -2349,6 +2664,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "api_key": {
           "type": "string"
@@ -2366,6 +2684,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "api_key": {
           "type": "string"
         }
@@ -2382,6 +2703,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "token": {
           "type": "string"
         }
@@ -2397,6 +2721,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "client_id": {
           "type": "string"
@@ -2421,6 +2748,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "host": {
           "type": "string"
@@ -2456,6 +2786,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "access_token": {
           "type": "string"
         },
@@ -2475,6 +2808,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "domain": {
           "type": "string"
@@ -2500,6 +2836,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "grant_key": {
           "type": "string"
         },
@@ -2519,6 +2858,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "bootstrap_servers": {
           "type": "string"
@@ -2558,6 +2900,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "query_params": {
           "additionalProperties": {
             "type": "string"
@@ -2575,6 +2920,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "access_key_id": {
           "type": "string"
@@ -2599,6 +2947,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "api_key": {
           "type": "string"
@@ -2634,6 +2985,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "api_key": {
           "type": "string"
         }
@@ -2649,6 +3003,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "access_token": {
           "type": "string"
@@ -2670,6 +3027,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "api_key": {
           "type": "string"
         },
@@ -2689,6 +3049,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "query_params": {
           "additionalProperties": {
@@ -2717,6 +3080,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "username": {
           "type": "string"
         },
@@ -2744,6 +3110,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "api_token": {
           "type": "string"
         }
@@ -2759,6 +3128,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "username": {
           "type": "string"
@@ -2787,6 +3159,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "username": {
           "type": "string"
@@ -2821,6 +3196,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "token": {
           "type": "string"
         },
@@ -2839,6 +3217,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "username": {
           "type": "string"
@@ -2875,6 +3256,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "username": {
           "type": "string"
@@ -2921,6 +3305,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "api_key": {
           "type": "string"
         }
@@ -2936,6 +3323,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "workspace_name": {
           "type": "string"
@@ -2971,6 +3361,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "username": {
           "type": "string"
@@ -3032,6 +3425,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "api_key": {
           "type": "string"
         }
@@ -3047,6 +3443,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "client_id": {
           "type": "string"
@@ -3068,6 +3467,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "api_key": {
           "type": "string"
         }
@@ -3083,6 +3485,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "access_token": {
           "type": "string"
@@ -3100,6 +3505,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "api_token": {
           "type": "string"
         }
@@ -3111,10 +3519,46 @@
         "api_token"
       ]
     },
+    "PlanetScaleConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer",
+          "default": 3306
+        },
+        "database": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "username",
+        "password",
+        "host",
+        "port",
+        "database"
+      ]
+    },
     "PlusVibeAIConnection": {
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "api_key": {
           "type": "string"
@@ -3135,6 +3579,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "order": {
           "type": "string"
@@ -3262,6 +3709,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "username": {
           "type": "string"
         },
@@ -3304,6 +3754,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "personal_api_key": {
           "type": "string"
         },
@@ -3327,6 +3780,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "api_key": {
           "type": "string"
         }
@@ -3342,6 +3798,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "company_id": {
           "type": "string"
@@ -3377,6 +3836,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "aws_access_key_id": {
           "type": "string"
         },
@@ -3409,6 +3871,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "host": {
           "type": "string"
         },
@@ -3437,15 +3902,18 @@
         "password"
       ]
     },
-    "RedditAdsConnection": {
+    "RecurlyConnection": {
       "properties": {
         "name": {
           "type": "string"
         },
-        "access_token": {
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "api_key": {
           "type": "string"
         },
-        "account_ids": {
+        "region": {
           "type": "string"
         }
       },
@@ -3453,14 +3921,43 @@
       "type": "object",
       "required": [
         "name",
-        "access_token",
-        "account_ids"
+        "api_key"
+      ]
+    },
+    "RedditAdsConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "access_token": {
+          "type": "string"
+        },
+        "client_id": {
+          "type": "string"
+        },
+        "client_secret": {
+          "type": "string"
+        },
+        "refresh_token": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name"
       ]
     },
     "RedshiftConnection": {
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "username": {
           "type": "string"
@@ -3502,6 +3999,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "api_key": {
           "type": "string"
         },
@@ -3521,6 +4021,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "bucket_name": {
           "type": "string"
@@ -3558,6 +4061,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "host": {
           "type": "string"
         },
@@ -3586,6 +4092,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "path": {
           "type": "string"
         }
@@ -3601,6 +4110,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "host": {
           "type": "string"
@@ -3640,6 +4152,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "username": {
           "type": "string"
         },
@@ -3668,6 +4183,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "api_key": {
           "type": "string"
         },
@@ -3686,6 +4204,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "tenant_id": {
           "type": "string"
@@ -3728,6 +4249,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "url": {
           "type": "string"
         },
@@ -3754,6 +4278,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "api_key": {
           "type": "string"
         }
@@ -3769,6 +4296,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "access_token": {
           "type": "string"
@@ -3788,6 +4318,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "refresh_token": {
           "type": "string"
@@ -3836,6 +4369,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "account": {
           "type": "string"
         },
@@ -3880,6 +4416,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "domain": {
           "type": "string"
         },
@@ -3906,6 +4445,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "public_key": {
           "type": "string"
         },
@@ -3925,6 +4467,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "project_id": {
           "type": "string"
@@ -3949,6 +4494,72 @@
         "project_id",
         "instance_id",
         "database"
+      ]
+    },
+    "SquareConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "access_token": {
+          "type": "string"
+        },
+        "environment": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "access_token"
+      ]
+    },
+    "StarRocksConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "host": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "database": {
+          "type": "string"
+        },
+        "catalog": {
+          "type": "string"
+        },
+        "ssl": {
+          "type": "string"
+        },
+        "http_port": {
+          "type": "integer"
+        },
+        "replication_num": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "host",
+        "username"
       ]
     },
     "StorageAuth": {
@@ -4001,6 +4612,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "api_key": {
           "type": "string"
         }
@@ -4016,6 +4630,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "access_token": {
           "type": "string"
@@ -4035,6 +4652,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "username": {
           "type": "string"
@@ -4068,9 +4688,28 @@
       ]
     },
     "TableauConnection": {
+      "oneOf": [
+        {
+          "required": [
+            "username",
+            "password"
+          ],
+          "title": "username_password"
+        },
+        {
+          "required": [
+            "personal_access_token_name",
+            "personal_access_token_secret"
+          ],
+          "title": "personal_access_token"
+        }
+      ],
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "host": {
           "type": "string"
@@ -4099,18 +4738,16 @@
       "required": [
         "name",
         "host",
-        "username",
-        "password",
-        "personal_access_token_name",
-        "personal_access_token_secret",
-        "site_id",
-        "api_version"
+        "site_id"
       ]
     },
     "TikTokAdsConnection": {
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "access_token": {
           "type": "string"
@@ -4134,6 +4771,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "host": {
           "type": "string"
@@ -4170,6 +4810,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "business_unit_id": {
           "type": "string"
         },
@@ -4189,6 +4832,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "account_sid": {
           "type": "string"
@@ -4214,6 +4860,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "username": {
           "type": "string"
@@ -4246,10 +4895,64 @@
         "database"
       ]
     },
+    "VitessConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer",
+          "default": 15306
+        },
+        "database": {
+          "type": "string"
+        },
+        "grpc_port": {
+          "type": "integer"
+        },
+        "grpc_host": {
+          "type": "string"
+        },
+        "grpc_tls": {
+          "type": "boolean"
+        },
+        "ssl_ca_path": {
+          "type": "string"
+        },
+        "ssl_cert_path": {
+          "type": "string"
+        },
+        "ssl_key_path": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "username",
+        "password",
+        "host",
+        "port",
+        "database"
+      ]
+    },
     "WiseConnection": {
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "api_key": {
           "type": "string"
@@ -4266,6 +4969,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "access_token": {
           "type": "string"
@@ -4295,6 +5001,9 @@
         "name": {
           "type": "string"
         },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
         "api_token": {
           "type": "string"
         },
@@ -4322,6 +5031,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
         },
         "client_id": {
           "type": "string"

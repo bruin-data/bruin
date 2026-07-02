@@ -116,6 +116,57 @@ bruin query --connection my_connection \
 Scalar values are kept as literal strings (matching how pipeline variables work in YAML);
 only values that look like a JSON object or array are parsed as JSON.
 
+## Querying MongoDB
+
+MongoDB connections (`mongo` and `mongo_atlas`) are not SQL, so the `--query` value is a JSON
+object describing a single **find** or **aggregation** against one collection instead of a SQL
+statement. The returned documents are flattened into a table: columns are the union of the
+top-level fields (in first-seen order), and nested documents and arrays are shown as JSON.
+
+The envelope fields are:
+
+| Field        | Description                                                                 |
+|--------------|-----------------------------------------------------------------------------|
+| `collection` | **Required.** The collection to query.                                      |
+| `filter`     | Find filter document. Defaults to `{}` (all documents).                     |
+| `projection` | Find projection, e.g. `{"name":1,"_id":0}`.                                 |
+| `sort`       | Find sort, e.g. `{"age":-1}`.                                               |
+| `limit`      | Maximum number of documents to return.                                      |
+| `skip`       | Number of documents to skip.                                                |
+| `aggregate`  | Aggregation pipeline (an array of stages). Mutually exclusive with `filter`/`projection`/`sort`. |
+| `database`   | Override the connection's configured database for this query.               |
+
+Values are parsed as [MongoDB Extended JSON](https://www.mongodb.com/docs/manual/reference/mongodb-extended-json/),
+so query operators such as `$gt`, `$and`, and `$match` pass through unchanged while type wrappers
+such as `{"$oid":"..."}` and `{"$date":"..."}` are interpreted as the corresponding BSON types.
+
+> [!NOTE]
+> The SQL-oriented `--limit` flag does not apply to MongoDB queries. Set `"limit"` inside the
+> envelope instead.
+
+**Find example:**
+
+```bash
+bruin query --connection my_mongo \
+  --query '{"collection":"users","filter":{"age":{"$gt":21}},"sort":{"age":-1},"limit":10}'
+```
+
+```plaintext
++--------------------------+-------+-----+-----------+----------------+
+|           _id            | name  | age |   tags    |    address     |
++--------------------------+-------+-----+-----------+----------------+
+| 6a3bb9d9ca6a1b41199df8a5 | carol | 41  | ["x"]     |                |
+| 6a3bb9d9ca6a1b41199df8a3 | alice | 30  | ["a","b"] | {"city":"NYC"} |
++--------------------------+-------+-----+-----------+----------------+
+```
+
+**Aggregation example:**
+
+```bash
+bruin query --connection my_mongo \
+  --query '{"collection":"orders","aggregate":[{"$group":{"_id":"$status","n":{"$sum":1}}}]}'
+```
+
 ## Semantic Queries
 
 Semantic query mode compiles metrics, dimensions, segments, filters, joins, and windows from YAML models in the repository-level `semantic` directory. See the [semantic layer documentation](/core-concepts/semantic-layer) for model syntax.

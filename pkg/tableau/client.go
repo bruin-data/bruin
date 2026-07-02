@@ -93,6 +93,10 @@ const (
 )
 
 func NewClient(c Config) (*Client, error) {
+	// Normalize the host so URLs built via fmt.Sprintf("https://%s/...", host)
+	// never end up with a duplicated scheme (e.g. "https://https://...") when the
+	// user includes a scheme or trailing slash in the configured host.
+	c.Host = normalizeHost(c.Host)
 	if c.Host == "" {
 		return nil, errors.New("host is required for Tableau connection")
 	}
@@ -361,6 +365,21 @@ func shouldRetryWithoutIncremental(statusCode int, body []byte) bool {
 	}
 
 	return strings.Contains(response, "incremental")
+}
+
+// normalizeHost strips any URL scheme and trailing slashes from the configured
+// host. The client builds every request URL via fmt.Sprintf("https://%s/...", host),
+// so a host that already contains a scheme would otherwise produce an invalid URL
+// such as "https://https://...".
+func normalizeHost(host string) string {
+	host = strings.TrimSpace(host)
+	for _, scheme := range []string{"https://", "http://"} {
+		if len(host) >= len(scheme) && strings.EqualFold(host[:len(scheme)], scheme) {
+			host = host[len(scheme):]
+			break
+		}
+	}
+	return strings.TrimRight(host, "/")
 }
 
 // GetHost returns the Tableau host URL.
