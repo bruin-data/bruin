@@ -325,6 +325,7 @@ func TestDB_RunQueryWithoutResultSurfacesTerminalJobError(t *testing.T) {
 	err = d.RunQueryWithoutResult(t.Context(), &query.Query{Query: "CREATE TABLE IF NOT EXISTS dataset.t (id INT64)"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Exceeded rate limits")
+	assert.NotContains(t, err.Error(), "Location:") // clean message, not the *bigquery.Error struct dump
 }
 
 func TestClientValidateQueryLimits(t *testing.T) {

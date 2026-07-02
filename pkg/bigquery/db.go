@@ -762,15 +762,21 @@ func (d *Client) UpdateTableMetadataIfNotExist(ctx context.Context, asset *pipel
 
 func formatError(err error) error {
 	var googleError *googleapi.Error
-	if !errors.As(err, &googleError) {
-		return err
+	if errors.As(err, &googleError) {
+		if googleError.Code == 404 || googleError.Code == 400 {
+			return fmt.Errorf("%s", googleError.Message)
+		}
+		return googleError
 	}
 
-	if googleError.Code == 404 || googleError.Code == 400 {
-		return fmt.Errorf("%s", googleError.Message)
+	// Terminal job failures surface as *bigquery.Error (via job.Status), whose default
+	// string is a verbose struct dump; return its message for the same clean text as above.
+	var bqError *bigquery.Error
+	if errors.As(err, &bqError) && bqError.Message != "" {
+		return fmt.Errorf("%s", bqError.Message)
 	}
 
-	return googleError
+	return err
 }
 
 // Test runs a simple query (SELECT 1) to validate the connection.
