@@ -66,6 +66,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/googleanalytics"
 	"github.com/bruin-data/bruin/pkg/gorgias"
 	"github.com/bruin-data/bruin/pkg/granola"
+	"github.com/bruin-data/bruin/pkg/gsc"
 	"github.com/bruin-data/bruin/pkg/gsheets"
 	"github.com/bruin-data/bruin/pkg/hana"
 	"github.com/bruin-data/bruin/pkg/hostaway"
@@ -99,6 +100,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/phantombuster"
 	"github.com/bruin-data/bruin/pkg/pinterest"
 	"github.com/bruin-data/bruin/pkg/pipedrive"
+	"github.com/bruin-data/bruin/pkg/planetscale"
 	"github.com/bruin-data/bruin/pkg/plusvibeai"
 	"github.com/bruin-data/bruin/pkg/polymarket"
 	"github.com/bruin-data/bruin/pkg/postgres"
@@ -135,6 +137,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/trustpilot"
 	"github.com/bruin-data/bruin/pkg/twilio"
 	"github.com/bruin-data/bruin/pkg/vertica"
+	"github.com/bruin-data/bruin/pkg/vitess"
 	"github.com/bruin-data/bruin/pkg/wise"
 	"github.com/bruin-data/bruin/pkg/wistia"
 	"github.com/bruin-data/bruin/pkg/zendesk"
@@ -162,6 +165,8 @@ type Manager struct {
 	Cursor               map[string]*cursor.Client
 	MongoAtlas           map[string]*mongoatlas.DB
 	Mysql                map[string]*mysql.Client
+	Vitess               map[string]*mysql.Client
+	Planetscale          map[string]*mysql.Client
 	Notion               map[string]*notion.Client
 	Allium               map[string]*allium.Client
 	HANA                 map[string]*hana.Client
@@ -244,6 +249,7 @@ type Manager struct {
 	EMRSeverless         map[string]*emr_serverless.Client
 	DataprocServerless   map[string]*dataprocserverless.Client
 	GoogleAnalytics      map[string]*googleanalytics.Client
+	GSC                  map[string]*gsc.Client
 	AppLovin             map[string]*applovin.Client
 	Salesforce           map[string]*salesforce.Client
 	SQLite               map[string]*sqlite.Client
@@ -1218,6 +1224,72 @@ func (m *Manager) AddMySQLConnectionFromConfig(connection *config.MySQLConnectio
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Mysql[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+// AddVitessConnectionFromConfig registers a Vitess connection. Vitess speaks the MySQL wire
+// protocol, so it reuses the shared mysql.Client for direct connectivity (e.g. `connections test`)
+// while emitting ingestr's dedicated "vitess" scheme via vitess.Config.GetIngestrURI.
+func (m *Manager) AddVitessConnectionFromConfig(connection *config.VitessConnection) error {
+	m.mutex.Lock()
+	if m.Vitess == nil {
+		m.Vitess = make(map[string]*mysql.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := mysql.NewClient(&vitess.Config{
+		Username:    connection.Username,
+		Password:    connection.Password,
+		Host:        connection.Host,
+		Port:        connection.Port,
+		Database:    connection.Database,
+		GrpcPort:    connection.GrpcPort,
+		GrpcHost:    connection.GrpcHost,
+		GrpcTLS:     connection.GrpcTLS,
+		SslCaPath:   connection.SslCaPath,
+		SslCertPath: connection.SslCertPath,
+		SslKeyPath:  connection.SslKeyPath,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Vitess[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+// AddPlanetScaleConnectionFromConfig registers a PlanetScale connection. It reuses the shared
+// mysql.Client for direct connectivity (TLS is always on) while emitting ingestr's dedicated
+// "planetscale" scheme via planetscale.Config.GetIngestrURI.
+func (m *Manager) AddPlanetScaleConnectionFromConfig(connection *config.PlanetScaleConnection) error {
+	m.mutex.Lock()
+	if m.Planetscale == nil {
+		m.Planetscale = make(map[string]*mysql.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := mysql.NewClient(&planetscale.Config{
+		Username: connection.Username,
+		Password: connection.Password,
+		Host:     connection.Host,
+		Port:     connection.Port,
+		Database: connection.Database,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Planetscale[connection.Name] = client
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 
@@ -2696,6 +2768,7 @@ func (m *Manager) AddInfluxDBConnectionFromConfig(connection *config.InfluxDBCon
 	defer m.mutex.Unlock()
 	m.InfluxDB[connection.Name] = client
 	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
 	return nil
 }
 
@@ -2786,6 +2859,30 @@ func (m *Manager) AddGoogleAnalyticsConnectionFromConfig(connection *config.Goog
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.GoogleAnalytics[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
+func (m *Manager) AddGSCConnectionFromConfig(connection *config.GSCConnection) error {
+	m.mutex.Lock()
+	if m.GSC == nil {
+		m.GSC = make(map[string]*gsc.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := gsc.NewClient(&gsc.Config{
+		ServiceAccountFile: connection.ServiceAccountFile,
+		ServiceAccountJSON: connection.ServiceAccountJSON,
+		SiteURL:            connection.SiteURL,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.GSC[connection.Name] = client
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 	return nil
@@ -3575,13 +3672,15 @@ func (m *Manager) AddStarRocksConnectionFromConfig(connection *config.StarRocksC
 	m.mutex.Unlock()
 
 	client, err := starrocks.NewClient(starrocks.Config{
-		Username: connection.Username,
-		Password: connection.Password,
-		Host:     connection.Host,
-		Port:     connection.Port,
-		Database: connection.Database,
-		Catalog:  connection.Catalog,
-		SSL:      connection.SSL,
+		Username:       connection.Username,
+		Password:       connection.Password,
+		Host:           connection.Host,
+		Port:           connection.Port,
+		Database:       connection.Database,
+		Catalog:        connection.Catalog,
+		SSL:            connection.SSL,
+		HTTPPort:       connection.HTTPPort,
+		ReplicationNum: connection.ReplicationNum,
 	})
 	if err != nil {
 		return err
@@ -3769,6 +3868,8 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Cursor, connectionManager.AddCursorConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.MongoAtlas, connectionManager.AddMongoAtlasConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.MySQL, connectionManager.AddMySQLConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Vitess, connectionManager.AddVitessConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Planetscale, connectionManager.AddPlanetScaleConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Notion, connectionManager.AddNotionConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Allium, connectionManager.AddAlliumConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.HANA, connectionManager.AddHANAConnectionFromConfig, &wg, &errList, &mu)
@@ -3839,6 +3940,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.EMRServerless, connectionManager.AddEMRServerlessConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.DataprocServerless, connectionManager.AddDataprocServerlessConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.GoogleAnalytics, connectionManager.AddGoogleAnalyticsConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.GSC, connectionManager.AddGSCConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.AppLovin, connectionManager.AddAppLovinConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Frankfurter, connectionManager.AddFrankfurterConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Fluxx, connectionManager.AddFluxxConnectionFromConfig, &wg, &errList, &mu)

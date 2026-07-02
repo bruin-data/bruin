@@ -206,8 +206,8 @@ func TestClient_GetConnectionDetails_ReturnsDetails_FromCache(t *testing.T) {
 		path:      "path",
 		logger:    &mockLogger{},
 		cacheConnectionsDetails: map[string]any{"test-connection": config.AthenaConnection{
-			Name:      "test-connection",
-			SecretKey: "test-secret-key",
+			ConnectionMetadata: config.ConnectionMetadata{Name: "test-connection"},
+			SecretKey:          "test-secret-key",
 		}},
 	}
 
@@ -217,8 +217,8 @@ func TestClient_GetConnectionDetails_ReturnsDetails_FromCache(t *testing.T) {
 	require.Equal(
 		t,
 		config.AthenaConnection{
-			Name:      "test-connection",
-			SecretKey: "test-secret-key",
+			ConnectionMetadata: config.ConnectionMetadata{Name: "test-connection"},
+			SecretKey:          "test-secret-key",
 		},
 		deets,
 	)

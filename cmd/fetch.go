@@ -23,10 +23,10 @@ import (
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
-	"github.com/bruin-data/bruin/pkg/semantic"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/telemetry"
+	semantic "github.com/bruin-data/bruin/semantic-engine"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/pkg/errors"
 	gosnowflake "github.com/snowflakedb/gosnowflake"
@@ -240,9 +240,7 @@ func Query() *cli.Command {
 			}
 
 			//nolint:nestif
-			if querier, ok := conn.(interface {
-				SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error)
-			}); ok {
+			if querier, ok := conn.(schemaQuerier); ok {
 				ctx, cancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 				defer cancel()
 				ctx = query.WithQueryType(ctx, query.QueryTypeQuery)

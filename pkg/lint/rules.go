@@ -555,6 +555,38 @@ func ValidateScriptAssetHooksUnsupported(ctx context.Context, p *pipeline.Pipeli
 	return issues, nil
 }
 
+func ValidateDefaultHookApplicableTypes(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+	if p.DefaultValues == nil {
+		return issues, nil
+	}
+
+	for _, t := range p.DefaultValues.Hooks.ApplicableTypes {
+		if !pipeline.IsSQLAssetType(pipeline.AssetType(t)) {
+			issues = append(issues, &Issue{
+				Description: fmt.Sprintf("Invalid applicable_type %q in default hooks: hooks are only supported for SQL asset types", t),
+			})
+		}
+	}
+
+	return issues, nil
+}
+
+func WarnAssetHookApplicableTypeIgnored(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0, 1)
+
+	if len(asset.Hooks.ApplicableTypes) == 0 {
+		return issues, nil
+	}
+
+	issues = append(issues, &Issue{
+		Task:        asset,
+		Description: "applicable_type has no effect on asset-level hooks; it only filters which asset types inherit pipeline default hooks.",
+	})
+
+	return issues, nil
+}
+
 func ValidateAssetSeedValidation(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 	if strings.HasSuffix(string(asset.Type), ".seed") {

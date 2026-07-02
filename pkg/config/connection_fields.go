@@ -99,6 +99,17 @@ func extractFields(t reflect.Type) []ConnectionFieldDef {
 			continue
 		}
 
+		if sf.Anonymous {
+			embeddedType := sf.Type
+			if embeddedType.Kind() == reflect.Pointer {
+				embeddedType = embeddedType.Elem()
+			}
+			if embeddedType.Kind() == reflect.Struct {
+				fields = append(fields, extractFields(embeddedType)...)
+				continue
+			}
+		}
+
 		msTag := sf.Tag.Get("mapstructure")
 		if msTag == "" {
 			continue

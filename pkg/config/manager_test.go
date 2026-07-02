@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"runtime"
 	"strings"
 	"testing"
@@ -35,7 +36,7 @@ func TestLoadFromFile(t *testing.T) {
 		Connections: &Connections{
 			GoogleCloudPlatform: []GoogleCloudPlatformConnection{
 				{
-					Name:               "conn1",
+					ConnectionMetadata: ConnectionMetadata{Name: "conn1"},
 					ServiceAccountJSON: "{\"key1\": \"value1\"}",
 					ServiceAccountFile: servicefile,
 					ProjectID:          "my-project",
@@ -43,408 +44,429 @@ func TestLoadFromFile(t *testing.T) {
 			},
 			Snowflake: []SnowflakeConnection{
 				{
-					Name:      "conn2",
-					Username:  "user",
-					Password:  "pass",
-					Account:   "account",
-					Region:    "region",
-					Role:      "role",
-					Database:  "db",
-					Schema:    "schema",
-					Warehouse: "wh",
+					ConnectionMetadata: ConnectionMetadata{Name: "conn2"},
+					Username:           "user",
+					Password:           "pass",
+					Account:            "account",
+					Region:             "region",
+					Role:               "role",
+					Database:           "db",
+					Schema:             "schema",
+					Warehouse:          "wh",
 				},
 			},
 			Postgres: []PostgresConnection{
 				{
-					Name:         "conn3",
-					Host:         "somehost",
-					Username:     "pguser",
-					Password:     "pgpass",
-					Database:     "pgdb",
-					Schema:       "non_public_schema",
-					Port:         5432,
-					PoolMaxConns: 5,
-					SslMode:      "require",
+					ConnectionMetadata: ConnectionMetadata{Name: "conn3"},
+					Host:               "somehost",
+					Username:           "pguser",
+					Password:           "pgpass",
+					Database:           "pgdb",
+					Schema:             "non_public_schema",
+					Port:               5432,
+					PoolMaxConns:       5,
+					SslMode:            "require",
 				},
 			},
 			RedShift: []RedshiftConnection{
 				{
-					Name:     "conn4",
-					Host:     "someredshift",
-					Username: "rsuser",
-					Password: "rspass",
-					Database: "rsdb",
-					Port:     5433,
-					SslMode:  "disable",
+					ConnectionMetadata: ConnectionMetadata{Name: "conn4"},
+					Host:               "someredshift",
+					Username:           "rsuser",
+					Password:           "rspass",
+					Database:           "rsdb",
+					Port:               5433,
+					SslMode:            "disable",
 				},
 			},
 			MsSQL: []MsSQLConnection{
 				{
-					Name:     "conn5",
-					Host:     "somemssql",
-					Username: "msuser",
-					Password: "mspass",
-					Database: "mssqldb",
-					Port:     1433,
+					ConnectionMetadata: ConnectionMetadata{Name: "conn5"},
+					Host:               "somemssql",
+					Username:           "msuser",
+					Password:           "mspass",
+					Database:           "mssqldb",
+					Port:               1433,
 				},
 			},
 			Databricks: []DatabricksConnection{
 				{
-					Name:  "conn55",
-					Host:  "hostbricks",
-					Path:  "sql",
-					Token: "aaaaaaaa",
-					Port:  443,
+					ConnectionMetadata: ConnectionMetadata{Name: "conn55"},
+					Host:               "hostbricks",
+					Path:               "sql",
+					Token:              "aaaaaaaa",
+					Port:               443,
 				},
 			},
 			Synapse: []SynapseConnection{
 				{
-					Name:     "conn6",
-					Host:     "somemsynapse",
-					Username: "syuser",
-					Password: "sypass",
-					Database: "sydb",
-					Port:     1434,
+					ConnectionMetadata: ConnectionMetadata{Name: "conn6"},
+					Host:               "somemsynapse",
+					Username:           "syuser",
+					Password:           "sypass",
+					Database:           "sydb",
+					Port:               1434,
 				},
 			},
 			Mongo: []MongoConnection{
 				{
-					Name:     "conn7",
-					Host:     "mongohost",
-					Username: "mongouser",
-					Password: "mongopass",
-					Database: "mongodb",
-					Port:     27017,
+					ConnectionMetadata: ConnectionMetadata{Name: "conn7"},
+					Host:               "mongohost",
+					Username:           "mongouser",
+					Password:           "mongopass",
+					Database:           "mongodb",
+					Port:               27017,
 				},
 			},
 			Couchbase: []CouchbaseConnection{
 				{
-					Name:     "couchbase1",
-					Host:     "couchbasehost",
-					Username: "couchbaseuser",
-					Password: "couchbasepass",
-					Bucket:   "mybucket",
-					SSL:      false,
+					ConnectionMetadata: ConnectionMetadata{Name: "couchbase1"},
+					Host:               "couchbasehost",
+					Username:           "couchbaseuser",
+					Password:           "couchbasepass",
+					Bucket:             "mybucket",
+					SSL:                false,
 				},
 			},
 			Cursor: []CursorConnection{
 				{
-					Name:   "cursor1",
-					APIKey: "cursorapikey",
+					ConnectionMetadata: ConnectionMetadata{Name: "cursor1"},
+					APIKey:             "cursorapikey",
 				},
 			},
 			MySQL: []MySQLConnection{
 				{
-					Name:     "conn8",
-					Host:     "mysqlhost",
-					Username: "mysqluser",
-					Password: "mysqlpass",
-					Database: "mysqldb",
+					ConnectionMetadata: ConnectionMetadata{Name: "conn8"},
+					Host:               "mysqlhost",
+					Username:           "mysqluser",
+					Password:           "mysqlpass",
+					Database:           "mysqldb",
+					Port:               3306,
+				},
+			},
+			Vitess: []VitessConnection{
+				{
+					Name:     "conn8b",
+					Host:     "vtgatehost",
+					Username: "vitessuser",
+					Password: "vitesspass",
+					Database: "commerce",
+					Port:     15306,
+					GrpcPort: 15991,
+				},
+			},
+			Planetscale: []PlanetScaleConnection{
+				{
+					Name:     "conn8c",
+					Host:     "aws.connect.psdb.cloud",
+					Username: "psuser",
+					Password: "pspass",
+					Database: "psdb",
 					Port:     3306,
 				},
 			},
 			Notion: []NotionConnection{
 				{
-					Name:   "conn9",
-					APIKey: "XXXXYYYYZZZZ",
+					ConnectionMetadata: ConnectionMetadata{Name: "conn9"},
+					APIKey:             "XXXXYYYYZZZZ",
 				},
 			},
 			Allium: []AlliumConnection{
 				{
-					Name:   "allium-1",
-					APIKey: "allium-api-key",
+					ConnectionMetadata: ConnectionMetadata{Name: "allium-1"},
+					APIKey:             "allium-api-key",
 				},
 			},
 			HANA: []HANAConnection{
 				{
-					Name:     "conn10",
-					Host:     "hanahost",
-					Username: "hanauser",
-					Password: "hanapass",
-					Database: "hanadb",
-					Port:     39013,
+					ConnectionMetadata: ConnectionMetadata{Name: "conn10"},
+					Host:               "hanahost",
+					Username:           "hanauser",
+					Password:           "hanapass",
+					Database:           "hanadb",
+					Port:               39013,
 				},
 			},
 			Shopify: []ShopifyConnection{
 				{
-					Name:   "conn11",
-					APIKey: "shopifykey",
-					URL:    "shopifyurl",
+					ConnectionMetadata: ConnectionMetadata{Name: "conn11"},
+					APIKey:             "shopifykey",
+					URL:                "shopifyurl",
 				},
 			},
 			Gorgias: []GorgiasConnection{
 				{
-					Name:   "conn12",
-					APIKey: "gorgiaskey",
-					Domain: "gorgiasurl",
-					Email:  "gorgiasemail",
+					ConnectionMetadata: ConnectionMetadata{Name: "conn12"},
+					APIKey:             "gorgiaskey",
+					Domain:             "gorgiasurl",
+					Email:              "gorgiasemail",
 				},
 			},
 			G2: []G2Connection{
 				{
-					Name:     "conn-g2",
-					APIToken: "g2token",
+					ConnectionMetadata: ConnectionMetadata{Name: "conn-g2"},
+					APIToken:           "g2token",
 				},
 			},
 			Klaviyo: []KlaviyoConnection{
 				{
-					Name:   "conn15",
-					APIKey: "klaviyokey",
+					ConnectionMetadata: ConnectionMetadata{Name: "conn15"},
+					APIKey:             "klaviyokey",
 				},
 			},
 			Adjust: []AdjustConnection{
 				{
-					Name:   "conn16",
-					APIKey: "adjustokey",
+					ConnectionMetadata: ConnectionMetadata{Name: "conn16"},
+					APIKey:             "adjustokey",
 				},
 			},
 			SurveyMonkey: []SurveyMonkeyConnection{
 				{
-					Name:        "surveymonkey-default",
-					AccessToken: "test-token-123",
+					ConnectionMetadata: ConnectionMetadata{Name: "surveymonkey-default"},
+					AccessToken:        "test-token-123",
 				},
 			},
 			Anthropic: []AnthropicConnection{
 				{
-					Name:   "anthropic-1",
-					APIKey: "test-api-key",
+					ConnectionMetadata: ConnectionMetadata{Name: "anthropic-1"},
+					APIKey:             "test-api-key",
 				},
 			},
 			Hostaway: []HostawayConnection{
 				{
-					Name:   "hostaway-1",
-					APIKey: "test-api-key",
+					ConnectionMetadata: ConnectionMetadata{Name: "hostaway-1"},
+					APIKey:             "test-api-key",
 				},
 			},
 			Intercom: []IntercomConnection{
 				{
-					Name:        "intercom-1",
-					AccessToken: "test-access-token",
-					Region:      "us",
+					ConnectionMetadata: ConnectionMetadata{Name: "intercom-1"},
+					AccessToken:        "test-access-token",
+					Region:             "us",
 				},
 			},
 			AthenaConnection: []AthenaConnection{
 				{
-					Name:             "conn14",
-					AccessKey:        "athena_key",
-					SecretKey:        "athena_secret",
-					QueryResultsPath: "s3://bucket/prefix",
-					Region:           "us-west-2",
-					Database:         "athena_db",
+					ConnectionMetadata: ConnectionMetadata{Name: "conn14"},
+					AccessKey:          "athena_key",
+					SecretKey:          "athena_secret",
+					QueryResultsPath:   "s3://bucket/prefix",
+					Region:             "us-west-2",
+					Database:           "athena_db",
 				},
 			},
 			AwsConnection: []AwsConnection{
 				{
-					Name:      "conn13",
-					SecretKey: "awssecret",
-					AccessKey: "awskey",
+					ConnectionMetadata: ConnectionMetadata{Name: "conn13"},
+					SecretKey:          "awssecret",
+					AccessKey:          "awskey",
 				},
 			},
 			Generic: []GenericConnection{
 				{
-					Name:  "key1",
-					Value: "value1",
+					ConnectionMetadata: ConnectionMetadata{Name: "key1"},
+					Value:              "value1",
 				},
 				{
-					Name:  "key2",
-					Value: "value2",
+					ConnectionMetadata: ConnectionMetadata{Name: "key2"},
+					Value:              "value2",
 				},
 			},
 			FacebookAds: []FacebookAdsConnection{
 				{
-					Name:        "conn17",
-					AccessToken: "Facebookkey",
-					AccountID:   "Id123",
+					ConnectionMetadata: ConnectionMetadata{Name: "conn17"},
+					AccessToken:        "Facebookkey",
+					AccountID:          "Id123",
 				},
 			},
 			Stripe: []StripeConnection{
 				{
-					Name:   "conn18",
-					APIKey: "stripekey",
+					ConnectionMetadata: ConnectionMetadata{Name: "conn18"},
+					APIKey:             "stripekey",
 				},
 			},
 			Paddle: []PaddleConnection{
 				{
-					Name:   "conn-paddle",
-					APIKey: "paddlekey",
+					ConnectionMetadata: ConnectionMetadata{Name: "conn-paddle"},
+					APIKey:             "paddlekey",
 				},
 			},
 			Chargebee: []ChargebeeConnection{
 				{
-					Name:   "conn-chargebee",
-					Site:   "chargebeesite",
-					APIKey: "chargebeekey",
+					ConnectionMetadata: ConnectionMetadata{Name: "conn-chargebee"},
+					Site:               "chargebeesite",
+					APIKey:             "chargebeekey",
 				},
 			},
 			Recurly: []RecurlyConnection{
 				{
-					Name:   "conn-recurly",
-					APIKey: "recurlykey",
-					Region: "us",
+					ConnectionMetadata: ConnectionMetadata{Name: "conn-recurly"},
+					APIKey:             "recurlykey",
+					Region:             "us",
 				},
 			},
 			GitLab: []GitLabConnection{
 				{
-					Name:        "conn-gitlab",
-					AccessToken: "gitlabtoken",
+					ConnectionMetadata: ConnectionMetadata{Name: "conn-gitlab"},
+					AccessToken:        "gitlabtoken",
 				},
 			},
 			Dune: []DuneConnection{
 				{
-					Name:   "dune-1",
-					APIKey: "dune-api-key-123",
+					ConnectionMetadata: ConnectionMetadata{Name: "dune-1"},
+					APIKey:             "dune-api-key-123",
 				},
 			},
 			InfluxDB: []InfluxDBConnection{
 				{
-					Name:   "influxdb-1",
-					Host:   "influxdb-host",
-					Token:  "influxdb-token",
-					Org:    "influxdb-org",
-					Bucket: "influxdb-bucket",
-					Secure: "true",
+					ConnectionMetadata: ConnectionMetadata{Name: "influxdb-1"},
+					Host:               "influxdb-host",
+					Token:              "influxdb-token",
+					Org:                "influxdb-org",
+					Bucket:             "influxdb-bucket",
+					Secure:             "true",
 				},
 			},
 			Appsflyer: []AppsflyerConnection{
 				{
-					Name:   "conn19",
-					APIKey: "appsflyerkey",
+					ConnectionMetadata: ConnectionMetadata{Name: "conn19"},
+					APIKey:             "appsflyerkey",
 				},
 			},
 			Kafka: []KafkaConnection{
 				{
-					Name:             "conn20",
-					BootstrapServers: "localhost:9093",
-					GroupID:          "kafka123",
+					ConnectionMetadata: ConnectionMetadata{Name: "conn20"},
+					BootstrapServers:   "localhost:9093",
+					GroupID:            "kafka123",
 				},
 			},
 			RabbitMQ: []RabbitMQConnection{
 				{
-					Name:     "conn21",
-					Host:     "localhost",
-					Port:     5672,
-					Username: "guest",
-					Password: "guest",
+					ConnectionMetadata: ConnectionMetadata{Name: "conn21"},
+					Host:               "localhost",
+					Port:               5672,
+					Username:           "guest",
+					Password:           "guest",
 				},
 			},
 			DuckDB: []DuckDBConnection{
 				{
-					Name: "conn20",
-					Path: duckPath,
+					ConnectionMetadata: ConnectionMetadata{Name: "conn20"},
+					Path:               duckPath,
 				},
 			},
 
 			ClickHouse: []ClickHouseConnection{
 				{
-					Name:     "conn-clickhouse",
-					Host:     "clickhousehost",
-					Port:     8123,
-					Username: "clickhouseuser",
-					Password: "clickhousepass",
-					Database: "clickhousedb",
-					HTTPPort: 8124,
-					Secure:   &clickhouseSecureValue,
+					ConnectionMetadata: ConnectionMetadata{Name: "conn-clickhouse"},
+					Host:               "clickhousehost",
+					Port:               8123,
+					Username:           "clickhouseuser",
+					Password:           "clickhousepass",
+					Database:           "clickhousedb",
+					HTTPPort:           8124,
+					Secure:             &clickhouseSecureValue,
 				},
 			},
 			Hubspot: []HubspotConnection{
 				{
-					Name:   "conn21",
-					APIKey: "hubspotkey",
+					ConnectionMetadata: ConnectionMetadata{Name: "conn21"},
+					APIKey:             "hubspotkey",
 				},
 			},
 			GoogleSheets: []GoogleSheetsConnection{
 				{
-					Name:               "conn22",
+					ConnectionMetadata: ConnectionMetadata{Name: "conn22"},
 					ServiceAccountJSON: "{\"key1\": \"value1\"}",
 				},
 				{
-					Name:               "conn22-1",
+					ConnectionMetadata: ConnectionMetadata{Name: "conn22-1"},
 					ServiceAccountFile: servicefile,
 				},
 			},
 			Chess: []ChessConnection{
 				{
-					Name:    "conn24",
-					Players: []string{"FabianoCaruana", "Hikaru", "MagnusCarlsen", "GothamChess", "DanielNaroditsky", "AnishGiri", "Firouzja2003", "LevonAronian", "WesleySo", "GarryKasparov"},
+					ConnectionMetadata: ConnectionMetadata{Name: "conn24"},
+					Players:            []string{"FabianoCaruana", "Hikaru", "MagnusCarlsen", "GothamChess", "DanielNaroditsky", "AnishGiri", "Firouzja2003", "LevonAronian", "WesleySo", "GarryKasparov"},
 				},
 			},
 			Airtable: []AirtableConnection{
 				{
-					Name:        "conn23",
-					BaseID:      "123",
-					AccessToken: "accessKey",
+					ConnectionMetadata: ConnectionMetadata{Name: "conn23"},
+					BaseID:             "123",
+					AccessToken:        "accessKey",
 				},
 			},
 			Mailchimp: []MailchimpConnection{
 				{
-					Name:   "conn26",
-					APIKey: "mailchimpKey",
-					Server: "us10",
+					ConnectionMetadata: ConnectionMetadata{Name: "conn26"},
+					APIKey:             "mailchimpKey",
+					Server:             "us10",
 				},
 			},
 			S3: []S3Connection{
 				{
-					Name:            "conn25",
-					BucketName:      "my-bucket",
-					PathToFile:      "/folder1/file.csv",
-					AccessKeyID:     "123Key",
-					SecretAccessKey: "secretKey123",
+					ConnectionMetadata: ConnectionMetadata{Name: "conn25"},
+					BucketName:         "my-bucket",
+					PathToFile:         "/folder1/file.csv",
+					AccessKeyID:        "123Key",
+					SecretAccessKey:    "secretKey123",
 				},
 			},
 			Slack: []SlackConnection{
 				{
-					Name:   "conn26",
-					APIKey: "slackkey",
+					ConnectionMetadata: ConnectionMetadata{Name: "conn26"},
+					APIKey:             "slackkey",
 				},
 			},
 			Socrata: []SocrataConnection{
 				{
-					Name:     "socrata-test",
-					Domain:   "data.seattle.gov",
-					AppToken: "test_app_token",
+					ConnectionMetadata: ConnectionMetadata{Name: "socrata-test"},
+					Domain:             "data.seattle.gov",
+					AppToken:           "test_app_token",
 				},
 			},
 			Asana: []AsanaConnection{
 				{
-					Name:        "asana-workspace-1337",
-					AccessToken: "access_token_pawn3d",
-					WorkspaceID: "1337",
+					ConnectionMetadata: ConnectionMetadata{Name: "asana-workspace-1337"},
+					AccessToken:        "access_token_pawn3d",
+					WorkspaceID:        "1337",
 				},
 			},
 			DynamoDB: []DynamoDBConnection{
 				{
-					Name:            "dynamodb-432123",
-					AccessKeyID:     "access-key-786",
-					SecretAccessKey: "shhh,secret",
-					Region:          "ap-south-1",
+					ConnectionMetadata: ConnectionMetadata{Name: "dynamodb-432123"},
+					AccessKeyID:        "access-key-786",
+					SecretAccessKey:    "shhh,secret",
+					Region:             "ap-south-1",
 				},
 			},
 			Docebo: []DoceboConnection{
 				{
-					Name:         "docebo-test",
-					BaseURL:      "https://mycompany.docebosaas.com",
-					ClientID:     "test-client-id",
-					ClientSecret: "test-client-secret",
-					Username:     "admin",
-					Password:     "admin-password",
+					ConnectionMetadata: ConnectionMetadata{Name: "docebo-test"},
+					BaseURL:            "https://mycompany.docebosaas.com",
+					ClientID:           "test-client-id",
+					ClientSecret:       "test-client-secret",
+					Username:           "admin",
+					Password:           "admin-password",
 				},
 			},
 			Zendesk: []ZendeskConnection{
 				{
-					Name:      "conn25",
-					APIToken:  "zendeskKey",
-					Email:     "zendeskemail",
-					Subdomain: "zendeskUrl",
+					ConnectionMetadata: ConnectionMetadata{Name: "conn25"},
+					APIToken:           "zendeskKey",
+					Email:              "zendeskemail",
+					Subdomain:          "zendeskUrl",
 				},
 				{
-					Name:       "conn25-1",
-					OAuthToken: "zendeskToken",
-					Subdomain:  "zendeskUrl",
+					ConnectionMetadata: ConnectionMetadata{Name: "conn25-1"},
+					OAuthToken:         "zendeskToken",
+					Subdomain:          "zendeskUrl",
 				},
 			},
 			GoogleAds: []GoogleAdsConnection{
 				{
-					Name:               "googleads-0",
+					ConnectionMetadata: ConnectionMetadata{Name: "googleads-0"},
 					DeveloperToken:     "dev-0",
 					CustomerID:         "1234567890",
 					ServiceAccountJSON: `{"email": "no-reply@googleads-0.com"}`,
@@ -452,75 +474,75 @@ func TestLoadFromFile(t *testing.T) {
 			},
 			TikTokAds: []TikTokAdsConnection{
 				{
-					Name:          "tiktokads-1",
-					AccessToken:   "access-token-123",
-					AdvertiserIDs: "advertiser-id-123,advertiser-id-456",
-					Timezone:      "UTC",
+					ConnectionMetadata: ConnectionMetadata{Name: "tiktokads-1"},
+					AccessToken:        "access-token-123",
+					AdvertiserIDs:      "advertiser-id-123,advertiser-id-456",
+					Timezone:           "UTC",
 				},
 			},
 			SnapchatAds: []SnapchatAdsConnection{
 				{
-					Name:           "snapchatads-1",
-					RefreshToken:   "refresh-token-123",
-					ClientID:       "client-id-123",
-					ClientSecret:   "client-secret-123",
-					OrganizationID: "org-id-123",
+					ConnectionMetadata: ConnectionMetadata{Name: "snapchatads-1"},
+					RefreshToken:       "refresh-token-123",
+					ClientID:           "client-id-123",
+					ClientSecret:       "client-secret-123",
+					OrganizationID:     "org-id-123",
 				},
 			},
 			GitHub: []GitHubConnection{
 				{
-					Name:  "github-1",
-					Owner: "owner-456",
-					Repo:  "repo-456",
+					ConnectionMetadata: ConnectionMetadata{Name: "github-1"},
+					Owner:              "owner-456",
+					Repo:               "repo-456",
 				},
 				{
-					Name:        "github-2",
-					AccessToken: "token-123",
-					Owner:       "owner-456",
-					Repo:        "repo-456",
+					ConnectionMetadata: ConnectionMetadata{Name: "github-2"},
+					AccessToken:        "token-123",
+					Owner:              "owner-456",
+					Repo:               "repo-456",
 				},
 			},
 			AppStore: []AppStoreConnection{
 				{
-					Name:     "appstore-1",
-					IssuerID: "issuer-id-123",
-					KeyID:    "key-id-123",
-					KeyPath:  "/path/to/key.pem",
+					ConnectionMetadata: ConnectionMetadata{Name: "appstore-1"},
+					IssuerID:           "issuer-id-123",
+					KeyID:              "key-id-123",
+					KeyPath:            "/path/to/key.pem",
 				},
 			},
 			AppleAds: []AppleAdsConnection{
 				{
-					Name:     "appleads-1",
-					ClientID: "SEARCHADS.client-id-123",
-					TeamID:   "SEARCHADS.team-id-123",
-					KeyID:    "key-id-123",
-					OrgID:    "19371590",
-					KeyPath:  "/path/to/key.pem",
+					ConnectionMetadata: ConnectionMetadata{Name: "appleads-1"},
+					ClientID:           "SEARCHADS.client-id-123",
+					TeamID:             "SEARCHADS.team-id-123",
+					KeyID:              "key-id-123",
+					OrgID:              "19371590",
+					KeyPath:            "/path/to/key.pem",
 				},
 			},
 			LinkedInAds: []LinkedInAdsConnection{
 				{
-					Name:        "linkedinads-1",
-					AccessToken: "access-token-123",
-					AccountIds:  "account-id-123,account-id-456",
+					ConnectionMetadata: ConnectionMetadata{Name: "linkedinads-1"},
+					AccessToken:        "access-token-123",
+					AccountIds:         "account-id-123,account-id-456",
 				},
 			},
 			RevenueCat: []RevenueCatConnection{
 				{
-					Name:      "revenuecat-1",
-					APIKey:    "rc_api_key_123",
-					ProjectID: "proj_123456789",
+					ConnectionMetadata: ConnectionMetadata{Name: "revenuecat-1"},
+					APIKey:             "rc_api_key_123",
+					ProjectID:          "proj_123456789",
 				},
 			},
 			Linear: []LinearConnection{
 				{
-					Name:   "linear-1",
-					APIKey: "api-key-123",
+					ConnectionMetadata: ConnectionMetadata{Name: "linear-1"},
+					APIKey:             "api-key-123",
 				},
 			},
 			GCS: []GCSConnection{
 				{
-					Name:               "gcs-1",
+					ConnectionMetadata: ConnectionMetadata{Name: "gcs-1"},
 					ServiceAccountFile: "/path/to/service_account.json",
 					BucketName:         "my-bucket",
 					PathToFile:         "/folder1/file.csv",
@@ -529,180 +551,187 @@ func TestLoadFromFile(t *testing.T) {
 			},
 			ApplovinMax: []ApplovinMaxConnection{
 				{
-					Name:   "applovinmax-1",
-					APIKey: "api-key-123",
+					ConnectionMetadata: ConnectionMetadata{Name: "applovinmax-1"},
+					APIKey:             "api-key-123",
 				},
 			},
 			Personio: []PersonioConnection{
 				{
-					Name:         "personio-1",
-					ClientID:     "client-id-123",
-					ClientSecret: "client-secret-123",
+					ConnectionMetadata: ConnectionMetadata{Name: "personio-1"},
+					ClientID:           "client-id-123",
+					ClientSecret:       "client-secret-123",
 				},
 			},
 			Kinesis: []KinesisConnection{
 				{
-					Name:            "kinesis-1",
-					AccessKeyID:     "aws-access-key-id-123",
-					SecretAccessKey: "aws-secret-access-key-123",
-					Region:          "us-east-1",
+					ConnectionMetadata: ConnectionMetadata{Name: "kinesis-1"},
+					AccessKeyID:        "aws-access-key-id-123",
+					SecretAccessKey:    "aws-secret-access-key-123",
+					Region:             "us-east-1",
 				},
 			},
 			Pipedrive: []PipedriveConnection{
 				{
-					Name:     "pipedrive-1",
-					APIToken: "token-123",
+					ConnectionMetadata: ConnectionMetadata{Name: "pipedrive-1"},
+					APIToken:           "token-123",
 				},
 			},
 			Clickup: []ClickupConnection{
 				{
-					Name:     "clickup-1",
-					APIToken: "token_123",
+					ConnectionMetadata: ConnectionMetadata{Name: "clickup-1"},
+					APIToken:           "token_123",
 				},
 			},
 			Jobtread: []JobtreadConnection{
 				{
-					Name:           "jobtread-1",
-					GrantKey:       "grant_key_123",
-					OrganizationID: "org_123",
+					ConnectionMetadata: ConnectionMetadata{Name: "jobtread-1"},
+					GrantKey:           "grant_key_123",
+					OrganizationID:     "org_123",
 				},
 			},
 			Posthog: []PosthogConnection{
 				{
-					Name:           "posthog-1",
-					PersonalAPIKey: "phx_test123",
-					ProjectID:      "12345",
+					ConnectionMetadata: ConnectionMetadata{Name: "posthog-1"},
+					PersonalAPIKey:     "phx_test123",
+					ProjectID:          "12345",
 				},
 			},
 			QuickBooks: []QuickBooksConnection{
 				{
-					Name:         "quickbooks-1",
-					CompanyID:    "123456",
-					ClientID:     "cid",
-					ClientSecret: "csecret",
-					RefreshToken: "rtoken",
+					ConnectionMetadata: ConnectionMetadata{Name: "quickbooks-1"},
+					CompanyID:          "123456",
+					ClientID:           "cid",
+					ClientSecret:       "csecret",
+					RefreshToken:       "rtoken",
 				},
 			},
 			Pinterest: []PinterestConnection{
 				{
-					Name:        "pinterest-1",
-					AccessToken: "token",
+					ConnectionMetadata: ConnectionMetadata{Name: "pinterest-1"},
+					AccessToken:        "token",
 				},
 			},
 			Mixpanel: []MixpanelConnection{
 				{
-					Name:      "mixpanel-1",
-					Username:  "user-123",
-					Password:  "secret-123",
-					ProjectID: "12345",
-					Server:    "eu",
+					ConnectionMetadata: ConnectionMetadata{Name: "mixpanel-1"},
+					Username:           "user-123",
+					Password:           "secret-123",
+					ProjectID:          "12345",
+					Server:             "eu",
 				},
 			},
 			Wise: []WiseConnection{
 				{
-					Name:   "wise-1",
-					APIKey: "token-123",
+					ConnectionMetadata: ConnectionMetadata{Name: "wise-1"},
+					APIKey:             "token-123",
 				},
 			},
 			Trustpilot: []TrustpilotConnection{
 				{
-					Name:           "trustpilot-1",
-					BusinessUnitID: "unit123",
-					APIKey:         "apikey",
+					ConnectionMetadata: ConnectionMetadata{Name: "trustpilot-1"},
+					BusinessUnitID:     "unit123",
+					APIKey:             "apikey",
 				},
 			},
 			EMRServerless: []EMRServerlessConnection{
 				{
-					Name:          "emr_serverless-test",
-					AccessKey:     "AKIAEXAMPLE",
-					SecretKey:     "SECRETKEYEXAMPLE",
-					Region:        "us-west-2",
-					ApplicationID: "emr-app_123",
-					ExecutionRole: "arn:aws:iam::123456789012:role/example_role",
-					Workspace:     "s3://amzn-test-bucket/bruin-workspace/",
+					ConnectionMetadata: ConnectionMetadata{Name: "emr_serverless-test"},
+					AccessKey:          "AKIAEXAMPLE",
+					SecretKey:          "SECRETKEYEXAMPLE",
+					Region:             "us-west-2",
+					ApplicationID:      "emr-app_123",
+					ExecutionRole:      "arn:aws:iam::123456789012:role/example_role",
+					Workspace:          "s3://amzn-test-bucket/bruin-workspace/",
 				},
 			},
 			GoogleAnalytics: []GoogleAnalyticsConnection{
 				{
-					Name:               "googleanalytics-1",
+					ConnectionMetadata: ConnectionMetadata{Name: "googleanalytics-1"},
 					ServiceAccountFile: "path/to/service_account.json",
 					PropertyID:         "12345",
 				},
 			},
+			GSC: []GSCConnection{
+				{
+					Name:               "conn-gsc",
+					ServiceAccountFile: "path/to/service_account.json",
+					SiteURL:            "sc-domain:example.com",
+				},
+			},
 			Frankfurter: []FrankfurterConnection{
 				{
-					Name: "frankfurter-1",
+					ConnectionMetadata: ConnectionMetadata{Name: "frankfurter-1"},
 				},
 			},
 			AppLovin: []AppLovinConnection{
 				{
-					Name:   "applovin-1",
-					APIKey: "key-123",
+					ConnectionMetadata: ConnectionMetadata{Name: "applovin-1"},
+					APIKey:             "key-123",
 				},
 			},
 			Salesforce: []SalesforceConnection{
 				{
-					Name:        "salesforce-1",
-					Username:    "username-123",
-					Password:    "password-123",
-					Token:       "token-123",
-					AccessToken: "access-token-123",
-					Domain:      "mydomain.my.salesforce.com",
+					ConnectionMetadata: ConnectionMetadata{Name: "salesforce-1"},
+					Username:           "username-123",
+					Password:           "password-123",
+					Token:              "token-123",
+					AccessToken:        "access-token-123",
+					Domain:             "mydomain.my.salesforce.com",
 				},
 			},
 			SQLite: []SQLiteConnection{
 				{
-					Name: "sqlite-1",
-					Path: "C:\\path\\to\\sqlite.db",
+					ConnectionMetadata: ConnectionMetadata{Name: "sqlite-1"},
+					Path:               "C:\\path\\to\\sqlite.db",
 				},
 			},
 			DB2: []DB2Connection{
 				{
-					Name:     "db2-default",
-					Username: "username-123",
-					Password: "password-123",
-					Host:     "host-123",
-					Port:     "1234",
-					Database: "dbname-123",
+					ConnectionMetadata: ConnectionMetadata{Name: "db2-default"},
+					Username:           "username-123",
+					Password:           "password-123",
+					Host:               "host-123",
+					Port:               "1234",
+					Database:           "dbname-123",
 				},
 			},
 			Oracle: []OracleConnection{
 				{
-					Name:        "oracle-1",
-					Username:    "username-123",
-					Password:    "password-123",
-					Host:        "host-123",
-					Port:        "1234",
-					ServiceName: "service-123",
+					ConnectionMetadata: ConnectionMetadata{Name: "oracle-1"},
+					Username:           "username-123",
+					Password:           "password-123",
+					Host:               "host-123",
+					Port:               "1234",
+					ServiceName:        "service-123",
 				},
 			},
 			Phantombuster: []PhantombusterConnection{
 				{
-					Name:   "phantombuster-1",
-					APIKey: "api-key-123",
+					ConnectionMetadata: ConnectionMetadata{Name: "phantombuster-1"},
+					APIKey:             "api-key-123",
 				},
 			},
 			Elasticsearch: []ElasticsearchConnection{
 				{
-					Name:        "elasticsearch-1",
-					Username:    "username-123",
-					Password:    "password-123",
-					Host:        "host-123",
-					Port:        9200,
-					Secure:      "true",
-					VerifyCerts: "true",
+					ConnectionMetadata: ConnectionMetadata{Name: "elasticsearch-1"},
+					Username:           "username-123",
+					Password:           "password-123",
+					Host:               "host-123",
+					Port:               9200,
+					Secure:             "true",
+					VerifyCerts:        "true",
 				},
 			},
 			Spanner: []SpannerConnection{
 				{
-					Name:               "spanner-1",
+					ConnectionMetadata: ConnectionMetadata{Name: "spanner-1"},
 					ProjectID:          "project-id-123",
 					InstanceID:         "instance-id-123",
 					Database:           "database-id-123",
 					ServiceAccountJSON: "{\"key1\": \"value1\"}",
 				},
 				{
-					Name:               "spanner-2",
+					ConnectionMetadata: ConnectionMetadata{Name: "spanner-2"},
 					ProjectID:          "project-id-123",
 					InstanceID:         "instance-id-123",
 					Database:           "database-id-123",
@@ -711,209 +740,209 @@ func TestLoadFromFile(t *testing.T) {
 			},
 			Solidgate: []SolidgateConnection{
 				{
-					Name:      "solidgate-1",
-					SecretKey: "secret-key-123",
-					PublicKey: "public-key-123",
+					ConnectionMetadata: ConnectionMetadata{Name: "solidgate-1"},
+					SecretKey:          "secret-key-123",
+					PublicKey:          "public-key-123",
 				},
 			},
 			Square: []SquareConnection{
 				{
-					Name:        "square-1",
-					AccessToken: "EAAA-test-access-token",
-					Environment: "sandbox",
+					ConnectionMetadata: ConnectionMetadata{Name: "square-1"},
+					AccessToken:        "EAAA-test-access-token",
+					Environment:        "sandbox",
 				},
 			},
 			Smartsheet: []SmartsheetConnection{
 				{
-					Name:         "smartsheet-1",
-					AccessToken:  "access-token-123",
-					SmartsheetID: "1234567890",
+					ConnectionMetadata: ConnectionMetadata{Name: "smartsheet-1"},
+					AccessToken:        "access-token-123",
+					SmartsheetID:       "1234567890",
 				},
 			},
 			Attio: []AttioConnection{
 				{
-					Name:   "attio-1",
-					APIKey: "api-key-123",
+					ConnectionMetadata: ConnectionMetadata{Name: "attio-1"},
+					APIKey:             "api-key-123",
 				},
 			},
 			Sftp: []SFTPConnection{
 				{
-					Name:     "sftp-1",
-					Host:     "sftp-host",
-					Port:     22,
-					Username: "sftp-user",
-					Password: "sftp-password",
+					ConnectionMetadata: ConnectionMetadata{Name: "sftp-1"},
+					Host:               "sftp-host",
+					Port:               22,
+					Username:           "sftp-user",
+					Password:           "sftp-password",
 				},
 			},
 			ISOCPulse: []ISOCPulseConnection{
 				{
-					Name:  "isoc_pulse-1",
-					Token: "isoc-pulse-token-123",
+					ConnectionMetadata: ConnectionMetadata{Name: "isoc_pulse-1"},
+					Token:              "isoc-pulse-token-123",
 				},
 			},
 			Zoom: []ZoomConnection{
 				{
-					Name:         "zoom-1",
-					ClientID:     "zid",
-					ClientSecret: "zsecret",
-					AccountID:    "accid",
+					ConnectionMetadata: ConnectionMetadata{Name: "zoom-1"},
+					ClientID:           "zid",
+					ClientSecret:       "zsecret",
+					AccountID:          "accid",
 				},
 			},
 			Fluxx: []FluxxConnection{
 				{
-					Name:         "fluxx-1",
-					Instance:     "test-instance",
-					ClientID:     "test-client-id",
-					ClientSecret: "test-client-secret",
+					ConnectionMetadata: ConnectionMetadata{Name: "fluxx-1"},
+					Instance:           "test-instance",
+					ClientID:           "test-client-id",
+					ClientSecret:       "test-client-secret",
 				},
 			},
 			FundraiseUp: []FundraiseUpConnection{
 				{
-					Name:   "fundraiseup-1",
-					APIKey: "test-api-key",
+					ConnectionMetadata: ConnectionMetadata{Name: "fundraiseup-1"},
+					APIKey:             "test-api-key",
 				},
 			},
 			Fireflies: []FirefliesConnection{
 				{
-					Name:   "fireflies-1",
-					APIKey: "test-api-key",
+					ConnectionMetadata: ConnectionMetadata{Name: "fireflies-1"},
+					APIKey:             "test-api-key",
 				},
 			},
 			Jira: []JiraConnection{
 				{
-					Name:     "jira-1",
-					Domain:   "company.atlassian.net",
-					Email:    "user@company.com",
-					APIToken: "test-api-token",
+					ConnectionMetadata: ConnectionMetadata{Name: "jira-1"},
+					Domain:             "company.atlassian.net",
+					Email:              "user@company.com",
+					APIToken:           "test-api-token",
 				},
 			},
 			Monday: []MondayConnection{
 				{
-					Name:     "monday-1",
-					APIToken: "test-api-token",
+					ConnectionMetadata: ConnectionMetadata{Name: "monday-1"},
+					APIToken:           "test-api-token",
 				},
 			},
 			PlusVibeAI: []PlusVibeAIConnection{
 				{
-					Name:        "plusvibeai-1",
-					APIKey:      "test-api-key",
-					WorkspaceID: "test-workspace-id",
+					ConnectionMetadata: ConnectionMetadata{Name: "plusvibeai-1"},
+					APIKey:             "test-api-key",
+					WorkspaceID:        "test-workspace-id",
 				},
 			},
 			BruinCloud: []BruinCloudConnection{
 				{
-					Name:     "bruin-1",
-					APIToken: "test-api-token",
+					ConnectionMetadata: ConnectionMetadata{Name: "bruin-1"},
+					APIToken:           "test-api-token",
 				},
 			},
 			Primer: []PrimerConnection{
 				{
-					Name:   "primer-1",
-					APIKey: "test-api-key",
+					ConnectionMetadata: ConnectionMetadata{Name: "primer-1"},
+					APIKey:             "test-api-key",
 				},
 			},
 			Indeed: []IndeedConnection{
 				{
-					Name:         "indeed-1",
-					ClientID:     "test-client-id",
-					ClientSecret: "test-client-secret",
-					EmployerID:   "test-employer-id",
+					ConnectionMetadata: ConnectionMetadata{Name: "indeed-1"},
+					ClientID:           "test-client-id",
+					ClientSecret:       "test-client-secret",
+					EmployerID:         "test-employer-id",
 				},
 			},
 			CustomerIo: []CustomerIoConnection{
 				{
-					Name:   "customerio-1",
-					APIKey: "test-api-key",
-					Region: "us",
+					ConnectionMetadata: ConnectionMetadata{Name: "customerio-1"},
+					APIKey:             "test-api-key",
+					Region:             "us",
 				},
 			},
 			Sendgrid: []SendgridConnection{
 				{
-					Name:       "sendgrid-1",
-					APIKey:     "test-api-key",
-					OnBehalfOf: "test-subuser",
+					ConnectionMetadata: ConnectionMetadata{Name: "sendgrid-1"},
+					APIKey:             "test-api-key",
+					OnBehalfOf:         "test-subuser",
 				},
 			},
 			Twilio: []TwilioConnection{
 				{
-					Name:       "twilio-1",
-					AccountSID: "test-account-sid",
-					AuthToken:  "test-auth-token",
-					APIKey:     "test-api-key",
-					APISecret:  "test-api-secret",
+					ConnectionMetadata: ConnectionMetadata{Name: "twilio-1"},
+					AccountSID:         "test-account-sid",
+					AuthToken:          "test-auth-token",
+					APIKey:             "test-api-key",
+					APISecret:          "test-api-secret",
 				},
 			},
 			Braze: []BrazeConnection{
 				{
-					Name:     "braze-1",
-					APIKey:   "test-api-key",
-					Endpoint: "rest.iad-01.braze.com",
+					ConnectionMetadata: ConnectionMetadata{Name: "braze-1"},
+					APIKey:             "test-api-key",
+					Endpoint:           "rest.iad-01.braze.com",
 				},
 			},
 			RedditAds: []RedditAdsConnection{
 				{
-					Name:         "redditads-1",
-					AccessToken:  "test-access-token",
-					ClientID:     "test-client-id",
-					ClientSecret: "test-client-secret",
-					RefreshToken: "test-refresh-token",
+					ConnectionMetadata: ConnectionMetadata{Name: "redditads-1"},
+					AccessToken:        "test-access-token",
+					ClientID:           "test-client-id",
+					ClientSecret:       "test-client-secret",
+					RefreshToken:       "test-refresh-token",
 				},
 			},
 			Espn: []EspnConnection{
 				{
-					Name:   "espn-1",
-					Sport:  "football",
-					League: "nfl",
-					Season: "2026",
-					Limit:  50,
+					ConnectionMetadata: ConnectionMetadata{Name: "espn-1"},
+					Sport:              "football",
+					League:             "nfl",
+					Season:             "2026",
+					Limit:              50,
 				},
 			},
 			SharePoint: []SharePointConnection{
 				{
-					Name:         "sharepoint-1",
-					TenantID:     "test-tenant-id",
-					ClientID:     "test-client-id",
-					ClientSecret: "test-client-secret",
-					Hostname:     "example.sharepoint.com",
-					Site:         "sites/Example",
-					Library:      "Documents",
-					MaxFileSize:  &sharePointMaxFileSize,
-					MaxFiles:     &sharePointMaxFiles,
+					ConnectionMetadata: ConnectionMetadata{Name: "sharepoint-1"},
+					TenantID:           "test-tenant-id",
+					ClientID:           "test-client-id",
+					ClientSecret:       "test-client-secret",
+					Hostname:           "example.sharepoint.com",
+					Site:               "sites/Example",
+					Library:            "Documents",
+					MaxFileSize:        &sharePointMaxFileSize,
+					MaxFiles:           &sharePointMaxFiles,
 				},
 			},
 			APIFootball: []APIFootballConnection{
 				{
-					Name:   "apifootball-1",
-					APIKey: "test-api-key",
-					League: "1",
-					Season: "2026",
+					ConnectionMetadata: ConnectionMetadata{Name: "apifootball-1"},
+					APIKey:             "test-api-key",
+					League:             "1",
+					Season:             "2026",
 				},
 			},
 			FootballData: []FootballDataConnection{
 				{
-					Name:        "footballdata-1",
-					APIKey:      "test-api-key",
-					Competition: "WC",
-					Season:      "2026",
+					ConnectionMetadata: ConnectionMetadata{Name: "footballdata-1"},
+					APIKey:             "test-api-key",
+					Competition:        "WC",
+					Season:             "2026",
 				},
 			},
 			BallDontLie: []BallDontLieConnection{
 				{
-					Name:   "balldontlie-1",
-					APIKey: "test-api-key",
-					Season: "2026",
+					ConnectionMetadata: ConnectionMetadata{Name: "balldontlie-1"},
+					APIKey:             "test-api-key",
+					Season:             "2026",
 				},
 			},
 			StarRocks: []StarRocksConnection{
 				{
-					Name:     "starrocks-1",
-					Host:     "localhost",
-					Port:     9030,
-					Username: "root",
-					Password: "pass123",
-					Database: "analytics",
-					Catalog:  "iceberg_catalog",
-					SSL:      "true",
+					ConnectionMetadata: ConnectionMetadata{Name: "starrocks-1"},
+					Host:               "localhost",
+					Port:               9030,
+					Username:           "root",
+					Password:           "pass123",
+					Database:           "analytics",
+					Catalog:            "iceberg_catalog",
+					SSL:                "true",
 				},
 			},
 		},
@@ -950,7 +979,7 @@ func TestLoadFromFile(t *testing.T) {
 						Connections: &Connections{
 							GoogleCloudPlatform: []GoogleCloudPlatformConnection{
 								{
-									Name:               "conn1",
+									ConnectionMetadata: ConnectionMetadata{Name: "conn1"},
 									ServiceAccountFile: servicefile,
 									ProjectID:          "my-project",
 								},
@@ -1006,7 +1035,7 @@ func TestLoadOrCreate(t *testing.T) {
 		Connections: &Connections{
 			GoogleCloudPlatform: []GoogleCloudPlatformConnection{
 				{
-					Name:               "conn1",
+					ConnectionMetadata: ConnectionMetadata{Name: "conn1"},
 					ServiceAccountFile: servicefile,
 				},
 			},
@@ -1123,7 +1152,7 @@ func TestLoadOrCreateWithoutPathAbsolutization(t *testing.T) {
 		Connections: &Connections{
 			GoogleCloudPlatform: []GoogleCloudPlatformConnection{
 				{
-					Name:               "conn1",
+					ConnectionMetadata: ConnectionMetadata{Name: "conn1"},
 					ServiceAccountFile: servicefile,
 				},
 			},
@@ -1237,7 +1266,7 @@ func TestConfig_SelectEnvironment(t *testing.T) {
 		Connections: &Connections{
 			GoogleCloudPlatform: []GoogleCloudPlatformConnection{
 				{
-					Name:               "conn1",
+					ConnectionMetadata: ConnectionMetadata{Name: "conn1"},
 					ServiceAccountFile: "/path/to/service_account.json",
 				},
 			},
@@ -1248,7 +1277,7 @@ func TestConfig_SelectEnvironment(t *testing.T) {
 		Connections: &Connections{
 			GoogleCloudPlatform: []GoogleCloudPlatformConnection{
 				{
-					Name:               "conn1",
+					ConnectionMetadata: ConnectionMetadata{Name: "conn1"},
 					ServiceAccountFile: "/path/to/prod_service_account.json",
 				},
 			},
@@ -1526,7 +1555,7 @@ func TestDeleteConnection(t *testing.T) {
 						"default": {
 							Connections: &Connections{
 								GoogleCloudPlatform: []GoogleCloudPlatformConnection{
-									{Name: "gcp-conn", ServiceAccountFile: "file.json", ProjectID: "project"},
+									{ConnectionMetadata: ConnectionMetadata{Name: "gcp-conn"}, ServiceAccountFile: "file.json", ProjectID: "project"},
 								},
 							},
 						},
@@ -1545,7 +1574,7 @@ func TestDeleteConnection(t *testing.T) {
 						"prod": {
 							Connections: &Connections{
 								AwsConnection: []AwsConnection{
-									{Name: "aws-conn", AccessKey: "key", SecretKey: "secret"},
+									{ConnectionMetadata: ConnectionMetadata{Name: "aws-conn"}, AccessKey: "key", SecretKey: "secret"},
 								},
 							},
 						},
@@ -1564,7 +1593,7 @@ func TestDeleteConnection(t *testing.T) {
 						"default": {
 							Connections: &Connections{
 								Fabric: []FabricConnection{
-									{Name: "fabric-conn", Host: "fabric.example", Database: "warehouse", ClientID: "client-id"},
+									{ConnectionMetadata: ConnectionMetadata{Name: "fabric-conn"}, Host: "fabric.example", Database: "warehouse", ClientID: "client-id"},
 								},
 							},
 						},
@@ -1583,7 +1612,7 @@ func TestDeleteConnection(t *testing.T) {
 						"default": {
 							Connections: &Connections{
 								SharePoint: []SharePointConnection{
-									{Name: "sharepoint-conn", TenantID: "tenant-id", ClientID: "client-id", ClientSecret: "secret", Hostname: "example.sharepoint.com", Site: "sites/Example"},
+									{ConnectionMetadata: ConnectionMetadata{Name: "sharepoint-conn"}, TenantID: "tenant-id", ClientID: "client-id", ClientSecret: "secret", Hostname: "example.sharepoint.com", Site: "sites/Example"},
 								},
 							},
 						},
@@ -1675,7 +1704,7 @@ func TestCanRunTaskInstances(t *testing.T) {
 					Connections: &Connections{
 						GoogleCloudPlatform: []GoogleCloudPlatformConnection{
 							{
-								Name: "conn1",
+								ConnectionMetadata: ConnectionMetadata{Name: "conn1"},
 							},
 						},
 					},
@@ -1698,7 +1727,7 @@ func TestCanRunTaskInstances(t *testing.T) {
 					Connections: &Connections{
 						GoogleCloudPlatform: []GoogleCloudPlatformConnection{
 							{
-								Name: "conn1",
+								ConnectionMetadata: ConnectionMetadata{Name: "conn1"},
 							},
 						},
 					},
@@ -1721,7 +1750,7 @@ func TestCanRunTaskInstances(t *testing.T) {
 					Connections: &Connections{
 						GoogleCloudPlatform: []GoogleCloudPlatformConnection{
 							{
-								Name: "gcp-default",
+								ConnectionMetadata: ConnectionMetadata{Name: "gcp-default"},
 							},
 						},
 					},
@@ -1743,7 +1772,7 @@ func TestCanRunTaskInstances(t *testing.T) {
 					Connections: &Connections{
 						GoogleCloudPlatform: []GoogleCloudPlatformConnection{
 							{
-								Name: "gcp-default",
+								ConnectionMetadata: ConnectionMetadata{Name: "gcp-default"},
 							},
 						},
 					},
@@ -1765,7 +1794,7 @@ func TestCanRunTaskInstances(t *testing.T) {
 					Connections: &Connections{
 						GoogleCloudPlatform: []GoogleCloudPlatformConnection{
 							{
-								Name: "conn1",
+								ConnectionMetadata: ConnectionMetadata{Name: "conn1"},
 							},
 						},
 					},
@@ -1793,15 +1822,15 @@ func TestCanRunTaskInstances(t *testing.T) {
 					Connections: &Connections{
 						GoogleCloudPlatform: []GoogleCloudPlatformConnection{
 							{
-								Name: "conn1",
+								ConnectionMetadata: ConnectionMetadata{Name: "conn1"},
 							},
 						},
 						Snowflake: []SnowflakeConnection{
 							{
-								Name: "conn2",
+								ConnectionMetadata: ConnectionMetadata{Name: "conn2"},
 							},
 							{
-								Name: "conn3",
+								ConnectionMetadata: ConnectionMetadata{Name: "conn3"},
 							},
 						},
 					},
@@ -1834,15 +1863,15 @@ func TestCanRunTaskInstances(t *testing.T) {
 					Connections: &Connections{
 						GoogleCloudPlatform: []GoogleCloudPlatformConnection{
 							{
-								Name: "conn1",
+								ConnectionMetadata: ConnectionMetadata{Name: "conn1"},
 							},
 						},
 						Snowflake: []SnowflakeConnection{
 							{
-								Name: "conn2",
+								ConnectionMetadata: ConnectionMetadata{Name: "conn2"},
 							},
 							{
-								Name: "conn3",
+								ConnectionMetadata: ConnectionMetadata{Name: "conn3"},
 							},
 						},
 					},
@@ -1883,20 +1912,20 @@ func TestCanRunTaskInstances(t *testing.T) {
 					Connections: &Connections{
 						GoogleCloudPlatform: []GoogleCloudPlatformConnection{
 							{
-								Name: "conn1",
+								ConnectionMetadata: ConnectionMetadata{Name: "conn1"},
 							},
 						},
 						Snowflake: []SnowflakeConnection{
 							{
-								Name: "conn2",
+								ConnectionMetadata: ConnectionMetadata{Name: "conn2"},
 							},
 							{
-								Name: "conn3",
+								ConnectionMetadata: ConnectionMetadata{Name: "conn3"},
 							},
 						},
 						Generic: []GenericConnection{
 							{
-								Name: "some_key",
+								ConnectionMetadata: ConnectionMetadata{Name: "some_key"},
 							},
 						},
 					},
@@ -1931,26 +1960,106 @@ func TestCanRunTaskInstances(t *testing.T) {
 			expectedErr: false,
 		},
 		{
+			name: "explicit python connection missing",
+			config: Config{
+				SelectedEnvironment: &Environment{
+					Connections: &Connections{},
+				},
+			},
+			pipeline: pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Type:       pipeline.AssetTypePython,
+						Connection: "warehouse",
+					},
+				},
+			},
+			expectedErr: true,
+		},
+		{
+			name: "explicit python connection found",
+			config: Config{
+				SelectedEnvironment: &Environment{
+					Connections: &Connections{
+						Postgres: []PostgresConnection{
+							{
+								ConnectionMetadata: ConnectionMetadata{Name: "warehouse"},
+							},
+						},
+					},
+				},
+			},
+			pipeline: pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Type:       pipeline.AssetTypePython,
+						Connection: "warehouse",
+					},
+				},
+			},
+			expectedErr: false,
+		},
+		{
+			name: "explicit r connection missing",
+			config: Config{
+				SelectedEnvironment: &Environment{
+					Connections: &Connections{},
+				},
+			},
+			pipeline: pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Type:       pipeline.AssetTypeR,
+						Connection: "warehouse",
+					},
+				},
+			},
+			expectedErr: true,
+		},
+		{
+			name: "explicit r connection found",
+			config: Config{
+				SelectedEnvironment: &Environment{
+					Connections: &Connections{
+						Postgres: []PostgresConnection{
+							{
+								ConnectionMetadata: ConnectionMetadata{Name: "warehouse"},
+							},
+						},
+					},
+				},
+			},
+			pipeline: pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Type:       pipeline.AssetTypeR,
+						Connection: "warehouse",
+					},
+				},
+			},
+			expectedErr: false,
+		},
+		{
 			name: "defaults",
 			config: Config{
 				SelectedEnvironment: &Environment{
 					Connections: &Connections{
 						GoogleCloudPlatform: []GoogleCloudPlatformConnection{
 							{
-								Name: "gcp-default",
+								ConnectionMetadata: ConnectionMetadata{Name: "gcp-default"},
 							},
 						},
 						Snowflake: []SnowflakeConnection{
 							{
-								Name: "snowflake-default",
+								ConnectionMetadata: ConnectionMetadata{Name: "snowflake-default"},
 							},
 							{
-								Name: "conn3",
+								ConnectionMetadata: ConnectionMetadata{Name: "conn3"},
 							},
 						},
 						Generic: []GenericConnection{
 							{
-								Name: "some_key",
+								ConnectionMetadata: ConnectionMetadata{Name: "some_key"},
 							},
 						},
 					},
@@ -2002,6 +2111,65 @@ func TestCanRunTaskInstances(t *testing.T) {
 	}
 }
 
+func TestCanRunTaskInstancesUsesTaskTypeConnectionNames(t *testing.T) {
+	t.Parallel()
+
+	sourceAsset := &pipeline.Asset{
+		Name: "source",
+		Type: pipeline.AssetTypeBigquerySource,
+	}
+	emptyConfig := Config{
+		SelectedEnvironment: &Environment{Connections: &Connections{}},
+	}
+
+	t.Run("source main task is connectionless", func(t *testing.T) {
+		t.Parallel()
+
+		err := emptyConfig.CanRunTaskInstances(&pipeline.Pipeline{}, []scheduler.TaskInstance{
+			&scheduler.AssetInstance{Asset: sourceAsset},
+		})
+
+		require.NoError(t, err)
+	})
+
+	t.Run("source check task requires primary connection", func(t *testing.T) {
+		t.Parallel()
+
+		err := emptyConfig.CanRunTaskInstances(&pipeline.Pipeline{}, []scheduler.TaskInstance{
+			&scheduler.CustomCheckInstance{
+				AssetInstance: &scheduler.AssetInstance{Asset: sourceAsset},
+				Check:         &pipeline.CustomCheck{Name: "freshness"},
+			},
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "gcp-default")
+	})
+
+	t.Run("source check task accepts primary connection", func(t *testing.T) {
+		t.Parallel()
+
+		conf := Config{
+			SelectedEnvironment: &Environment{
+				Connections: &Connections{
+					GoogleCloudPlatform: []GoogleCloudPlatformConnection{
+						{ConnectionMetadata: ConnectionMetadata{Name: "gcp-default"}},
+					},
+				},
+			},
+		}
+
+		err := conf.CanRunTaskInstances(&pipeline.Pipeline{}, []scheduler.TaskInstance{
+			&scheduler.CustomCheckInstance{
+				AssetInstance: &scheduler.AssetInstance{Asset: sourceAsset},
+				Check:         &pipeline.CustomCheck{Name: "freshness"},
+			},
+		})
+
+		require.NoError(t, err)
+	})
+}
+
 func TestConnections_MergeFrom(t *testing.T) {
 	t.Parallel()
 
@@ -2022,13 +2190,13 @@ func TestConnections_MergeFrom(t *testing.T) {
 			name: "merge empty source should not change target",
 			target: &Connections{
 				GoogleCloudPlatform: []GoogleCloudPlatformConnection{
-					{Name: "existing-conn"},
+					{ConnectionMetadata: ConnectionMetadata{Name: "existing-conn"}},
 				},
 			},
 			source: &Connections{},
 			want: &Connections{
 				GoogleCloudPlatform: []GoogleCloudPlatformConnection{
-					{Name: "existing-conn"},
+					{ConnectionMetadata: ConnectionMetadata{Name: "existing-conn"}},
 				},
 			},
 			expectedErr: false,
@@ -2037,30 +2205,30 @@ func TestConnections_MergeFrom(t *testing.T) {
 			name: "merge multiple connection types",
 			target: &Connections{
 				GoogleCloudPlatform: []GoogleCloudPlatformConnection{
-					{Name: "gcp1"},
+					{ConnectionMetadata: ConnectionMetadata{Name: "gcp1"}},
 				},
 				Snowflake: []SnowflakeConnection{
-					{Name: "sf1"},
+					{ConnectionMetadata: ConnectionMetadata{Name: "sf1"}},
 				},
 			},
 			source: &Connections{
 				GoogleCloudPlatform: []GoogleCloudPlatformConnection{
-					{Name: "gcp2"},
+					{ConnectionMetadata: ConnectionMetadata{Name: "gcp2"}},
 				},
 				Postgres: []PostgresConnection{
-					{Name: "pg1"},
+					{ConnectionMetadata: ConnectionMetadata{Name: "pg1"}},
 				},
 			},
 			want: &Connections{
 				GoogleCloudPlatform: []GoogleCloudPlatformConnection{
-					{Name: "gcp1"},
-					{Name: "gcp2"},
+					{ConnectionMetadata: ConnectionMetadata{Name: "gcp1"}},
+					{ConnectionMetadata: ConnectionMetadata{Name: "gcp2"}},
 				},
 				Snowflake: []SnowflakeConnection{
-					{Name: "sf1"},
+					{ConnectionMetadata: ConnectionMetadata{Name: "sf1"}},
 				},
 				Postgres: []PostgresConnection{
-					{Name: "pg1"},
+					{ConnectionMetadata: ConnectionMetadata{Name: "pg1"}},
 				},
 			},
 			expectedErr: false,
@@ -2070,18 +2238,18 @@ func TestConnections_MergeFrom(t *testing.T) {
 			target: &Connections{},
 			source: &Connections{
 				GoogleCloudPlatform: []GoogleCloudPlatformConnection{
-					{Name: "gcp1"},
+					{ConnectionMetadata: ConnectionMetadata{Name: "gcp1"}},
 				},
 				Snowflake: []SnowflakeConnection{
-					{Name: "sf1"},
+					{ConnectionMetadata: ConnectionMetadata{Name: "sf1"}},
 				},
 			},
 			want: &Connections{
 				GoogleCloudPlatform: []GoogleCloudPlatformConnection{
-					{Name: "gcp1"},
+					{ConnectionMetadata: ConnectionMetadata{Name: "gcp1"}},
 				},
 				Snowflake: []SnowflakeConnection{
-					{Name: "sf1"},
+					{ConnectionMetadata: ConnectionMetadata{Name: "sf1"}},
 				},
 			},
 			expectedErr: false,
@@ -2090,20 +2258,20 @@ func TestConnections_MergeFrom(t *testing.T) {
 			name: "merge connections with same name but different types",
 			target: &Connections{
 				Snowflake: []SnowflakeConnection{
-					{Name: "prod-db"},
+					{ConnectionMetadata: ConnectionMetadata{Name: "prod-db"}},
 				},
 			},
 			source: &Connections{
 				Postgres: []PostgresConnection{
-					{Name: "prod-db"},
+					{ConnectionMetadata: ConnectionMetadata{Name: "prod-db"}},
 				},
 			},
 			want: &Connections{
 				Snowflake: []SnowflakeConnection{
-					{Name: "prod-db"},
+					{ConnectionMetadata: ConnectionMetadata{Name: "prod-db"}},
 				},
 				Postgres: []PostgresConnection{
-					{Name: "prod-db"},
+					{ConnectionMetadata: ConnectionMetadata{Name: "prod-db"}},
 				},
 			},
 			expectedErr: false,
@@ -2113,66 +2281,66 @@ func TestConnections_MergeFrom(t *testing.T) {
 			target: &Connections{
 				Snowflake: []SnowflakeConnection{
 					{
-						Name:     "dev-db",
-						Username: "dev_user",
-						Password: "dev_pass",
-						Database: "dev_db",
+						ConnectionMetadata: ConnectionMetadata{Name: "dev-db"},
+						Username:           "dev_user",
+						Password:           "dev_pass",
+						Database:           "dev_db",
 					},
 				},
 				Postgres: []PostgresConnection{
 					{
-						Name:     "dev-pg",
-						Username: "dev_pg_user",
-						Password: "dev_pg_pass",
-						Database: "dev_pg_db",
+						ConnectionMetadata: ConnectionMetadata{Name: "dev-pg"},
+						Username:           "dev_pg_user",
+						Password:           "dev_pg_pass",
+						Database:           "dev_pg_db",
 					},
 				},
 			},
 			source: &Connections{
 				Snowflake: []SnowflakeConnection{
 					{
-						Name:     "prod-db",
-						Username: "prod_user",
-						Password: "prod_pass",
-						Database: "prod_db",
+						ConnectionMetadata: ConnectionMetadata{Name: "prod-db"},
+						Username:           "prod_user",
+						Password:           "prod_pass",
+						Database:           "prod_db",
 					},
 				},
 				Postgres: []PostgresConnection{
 					{
-						Name:     "prod-pg",
-						Username: "prod_pg_user",
-						Password: "prod_pg_pass",
-						Database: "prod_pg_db",
+						ConnectionMetadata: ConnectionMetadata{Name: "prod-pg"},
+						Username:           "prod_pg_user",
+						Password:           "prod_pg_pass",
+						Database:           "prod_pg_db",
 					},
 				},
 			},
 			want: &Connections{
 				Snowflake: []SnowflakeConnection{
 					{
-						Name:     "dev-db",
-						Username: "dev_user",
-						Password: "dev_pass",
-						Database: "dev_db",
+						ConnectionMetadata: ConnectionMetadata{Name: "dev-db"},
+						Username:           "dev_user",
+						Password:           "dev_pass",
+						Database:           "dev_db",
 					},
 					{
-						Name:     "prod-db",
-						Username: "prod_user",
-						Password: "prod_pass",
-						Database: "prod_db",
+						ConnectionMetadata: ConnectionMetadata{Name: "prod-db"},
+						Username:           "prod_user",
+						Password:           "prod_pass",
+						Database:           "prod_db",
 					},
 				},
 				Postgres: []PostgresConnection{
 					{
-						Name:     "dev-pg",
-						Username: "dev_pg_user",
-						Password: "dev_pg_pass",
-						Database: "dev_pg_db",
+						ConnectionMetadata: ConnectionMetadata{Name: "dev-pg"},
+						Username:           "dev_pg_user",
+						Password:           "dev_pg_pass",
+						Database:           "dev_pg_db",
 					},
 					{
-						Name:     "prod-pg",
-						Username: "prod_pg_user",
-						Password: "prod_pg_pass",
-						Database: "prod_pg_db",
+						ConnectionMetadata: ConnectionMetadata{Name: "prod-pg"},
+						Username:           "prod_pg_user",
+						Password:           "prod_pg_pass",
+						Database:           "prod_pg_db",
 					},
 				},
 			},
@@ -2182,268 +2350,270 @@ func TestConnections_MergeFrom(t *testing.T) {
 			name:   "merge with all connection types",
 			target: &Connections{},
 			source: &Connections{
-				AwsConnection:       []AwsConnection{{Name: "aws1"}},
-				AthenaConnection:    []AthenaConnection{{Name: "athena1"}},
-				GoogleCloudPlatform: []GoogleCloudPlatformConnection{{Name: "gcp1"}},
-				Snowflake:           []SnowflakeConnection{{Name: "sf1"}},
-				Postgres:            []PostgresConnection{{Name: "pg1"}},
-				RedShift:            []RedshiftConnection{{Name: "rs1"}},
-				MsSQL:               []MsSQLConnection{{Name: "mssql1"}},
-				Databricks:          []DatabricksConnection{{Name: "db1"}},
-				ADLS:                []ADLSConnection{{Name: "adls1"}},
-				Synapse:             []SynapseConnection{{Name: "syn1"}},
-				Fabric:              []FabricConnection{{Name: "fabric1"}},
-				Mongo:               []MongoConnection{{Name: "mongo1"}},
-				Cassandra:           []CassandraConnection{{Name: "cassandra1"}},
-				Couchbase:           []CouchbaseConnection{{Name: "couchbase1"}},
-				CrateDB:             []CrateDBConnection{{Name: "cratedb1"}},
-				CSV:                 []CSVConnection{{Name: "csv1"}},
-				Cursor:              []CursorConnection{{Name: "cursor1"}},
-				MongoAtlas:          []MongoAtlasConnection{{Name: "mongoatlas1"}},
-				MySQL:               []MySQLConnection{{Name: "mysql1"}},
-				Notion:              []NotionConnection{{Name: "notion1"}},
-				Allium:              []AlliumConnection{{Name: "allium1"}},
-				HANA:                []HANAConnection{{Name: "hana1"}},
-				Hostaway:            []HostawayConnection{{Name: "hostaway1"}},
-				HTTP:                []HTTPConnection{{Name: "http1"}},
-				Shopify:             []ShopifyConnection{{Name: "shopify1"}},
-				Gorgias:             []GorgiasConnection{{Name: "gorgias1"}},
-				G2:                  []G2Connection{{Name: "g21"}},
-				Klaviyo:             []KlaviyoConnection{{Name: "klaviyo1"}},
-				Adjust:              []AdjustConnection{{Name: "adjust1"}},
-				SurveyMonkey:        []SurveyMonkeyConnection{{Name: "surveymonkey1"}},
-				Anthropic:           []AnthropicConnection{{Name: "anthropic1"}},
-				Generic:             []GenericConnection{{Name: "generic1"}},
-				FacebookAds:         []FacebookAdsConnection{{Name: "facebookads1"}},
-				Stripe:              []StripeConnection{{Name: "stripe1"}},
-				Paddle:              []PaddleConnection{{Name: "paddle1"}},
-				Chargebee:           []ChargebeeConnection{{Name: "chargebee1"}},
-				Recurly:             []RecurlyConnection{{Name: "recurly1"}},
-				GitLab:              []GitLabConnection{{Name: "gitlab1"}},
-				Appsflyer:           []AppsflyerConnection{{Name: "appsflyer1"}},
-				Kafka:               []KafkaConnection{{Name: "kafka1"}},
-				RabbitMQ:            []RabbitMQConnection{{Name: "rabbitmq1"}},
-				DuckDB:              []DuckDBConnection{{Name: "duckdb1"}},
-				MotherDuck:          []MotherduckConnection{{Name: "motherduck1"}},
-				ClickHouse:          []ClickHouseConnection{{Name: "clickhouse1"}},
-				Hubspot:             []HubspotConnection{{Name: "hubspot1"}},
-				Intercom:            []IntercomConnection{{Name: "intercom1"}},
-				GitHub:              []GitHubConnection{{Name: "github1"}},
-				GoogleSheets:        []GoogleSheetsConnection{{Name: "googlesheets1"}},
-				Chess:               []ChessConnection{{Name: "chess1"}},
-				Airtable:            []AirtableConnection{{Name: "airtable1"}},
-				Granola:             []GranolaConnection{{Name: "granola1"}},
-				Zendesk:             []ZendeskConnection{{Name: "zendesk1"}},
-				Kalshi:              []KalshiConnection{{Name: "kalshi1"}},
-				TikTokAds:           []TikTokAdsConnection{{Name: "tiktokads1"}},
-				SnapchatAds:         []SnapchatAdsConnection{{Name: "snapchatads1"}},
-				S3:                  []S3Connection{{Name: "s31"}},
-				Slack:               []SlackConnection{{Name: "slack1"}},
-				Socrata:             []SocrataConnection{{Name: "socrata1"}},
-				Asana:               []AsanaConnection{{Name: "asana1"}},
-				DynamoDB:            []DynamoDBConnection{{Name: "dynamodb1"}},
-				Docebo:              []DoceboConnection{{Name: "docebo1"}},
-				GoogleAds:           []GoogleAdsConnection{{Name: "googleads1"}},
-				AppStore:            []AppStoreConnection{{Name: "appstore1"}},
-				AppleAds:            []AppleAdsConnection{{Name: "appleads1"}},
-				LinkedInAds:         []LinkedInAdsConnection{{Name: "linkedinads1"}},
-				RedditAds:           []RedditAdsConnection{{Name: "redditads1"}},
-				Mailchimp:           []MailchimpConnection{{Name: "mailchimp1"}},
-				Manifold:            []ManifoldConnection{{Name: "manifold1"}},
-				RevenueCat:          []RevenueCatConnection{{Name: "revenuecat1"}},
-				Linear:              []LinearConnection{{Name: "linear1"}},
-				GCS:                 []GCSConnection{{Name: "gcs1"}},
-				SharePoint:          []SharePointConnection{{Name: "sharepoint1"}},
-				ApplovinMax:         []ApplovinMaxConnection{{Name: "applovinmax1"}},
-				Personio:            []PersonioConnection{{Name: "personio1"}},
-				Kinesis:             []KinesisConnection{{Name: "kinesis1"}},
-				Pipedrive:           []PipedriveConnection{{Name: "pipedrive1"}},
-				Polymarket:          []PolymarketConnection{{Name: "polymarket1"}},
-				Mixpanel:            []MixpanelConnection{{Name: "mixpanel1"}},
-				Clickup:             []ClickupConnection{{Name: "clickup1"}},
-				Jobtread:            []JobtreadConnection{{Name: "jobtread1"}},
-				Posthog:             []PosthogConnection{{Name: "posthog1"}},
-				Pinterest:           []PinterestConnection{{Name: "pinterest1"}},
-				Trustpilot:          []TrustpilotConnection{{Name: "trustpilot1"}},
-				QuickBooks:          []QuickBooksConnection{{Name: "quickbooks1"}},
-				Wise:                []WiseConnection{{Name: "wise1"}},
-				Wistia:              []WistiaConnection{{Name: "wistia1"}},
-				Zoom:                []ZoomConnection{{Name: "zoom1"}},
-				EMRServerless:       []EMRServerlessConnection{{Name: "emr1"}},
-				DataprocServerless:  []DataprocServerlessConnection{{Name: "dataproc1"}},
-				GoogleAnalytics:     []GoogleAnalyticsConnection{{Name: "googleanalytics1"}},
-				AppLovin:            []AppLovinConnection{{Name: "applovin1"}},
-				Frankfurter:         []FrankfurterConnection{{Name: "frankfurter1"}},
-				Salesforce:          []SalesforceConnection{{Name: "salesforce1"}},
-				SQLite:              []SQLiteConnection{{Name: "sqlite1"}},
-				DB2:                 []DB2Connection{{Name: "db21"}},
-				Oracle:              []OracleConnection{{Name: "oracle1"}},
-				Phantombuster:       []PhantombusterConnection{{Name: "phantombuster1"}},
-				Elasticsearch:       []ElasticsearchConnection{{Name: "elasticsearch1"}},
-				Solidgate:           []SolidgateConnection{{Name: "solidgate1"}},
-				Square:              []SquareConnection{{Name: "square1"}},
-				Spanner:             []SpannerConnection{{Name: "spanner1"}},
-				Smartsheet:          []SmartsheetConnection{{Name: "smartsheet1"}},
-				Attio:               []AttioConnection{{Name: "attio1"}},
-				Sftp:                []SFTPConnection{{Name: "sftp1"}},
-				ISOCPulse:           []ISOCPulseConnection{{Name: "isocpulse1"}},
-				InfluxDB:            []InfluxDBConnection{{Name: "influxdb1"}},
-				Tableau:             []TableauConnection{{Name: "tableau1"}},
-				QuickSight:          []QuickSightConnection{{Name: "quicksight1"}},
-				Trino:               []TrinoConnection{{Name: "trino1"}},
-				StarRocks:           []StarRocksConnection{{Name: "starrocks1"}},
-				Fluxx:               []FluxxConnection{{Name: "fluxx1"}},
-				Freshdesk:           []FreshdeskConnection{{Name: "freshdesk1"}},
-				FundraiseUp:         []FundraiseUpConnection{{Name: "fundraiseup1"}},
-				Fireflies:           []FirefliesConnection{{Name: "fireflies1"}},
-				Jira:                []JiraConnection{{Name: "jira1"}},
-				Monday:              []MondayConnection{{Name: "monday1"}},
-				PlusVibeAI:          []PlusVibeAIConnection{{Name: "plusvibeai1"}},
-				BruinCloud:          []BruinCloudConnection{{Name: "bruin1"}},
-				Primer:              []PrimerConnection{{Name: "primer1"}},
-				Indeed:              []IndeedConnection{{Name: "indeed1"}},
-				CustomerIo:          []CustomerIoConnection{{Name: "customerio1"}},
-				Sendgrid:            []SendgridConnection{{Name: "sendgrid1"}},
-				Twilio:              []TwilioConnection{{Name: "twilio1"}},
-				Braze:               []BrazeConnection{{Name: "braze1"}},
-				Espn:                []EspnConnection{{Name: "espn1"}},
-				APIFootball:         []APIFootballConnection{{Name: "apifootball1"}},
-				FootballData:        []FootballDataConnection{{Name: "footballdata1"}},
-				BallDontLie:         []BallDontLieConnection{{Name: "balldontlie1"}},
-				Vertica:             []VerticaConnection{{Name: "vertica1"}},
-				Dune:                []DuneConnection{{Name: "dune1"}},
+				AwsConnection:       []AwsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "aws1"}}},
+				AthenaConnection:    []AthenaConnection{{ConnectionMetadata: ConnectionMetadata{Name: "athena1"}}},
+				GoogleCloudPlatform: []GoogleCloudPlatformConnection{{ConnectionMetadata: ConnectionMetadata{Name: "gcp1"}}},
+				Snowflake:           []SnowflakeConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sf1"}}},
+				Postgres:            []PostgresConnection{{ConnectionMetadata: ConnectionMetadata{Name: "pg1"}}},
+				RedShift:            []RedshiftConnection{{ConnectionMetadata: ConnectionMetadata{Name: "rs1"}}},
+				MsSQL:               []MsSQLConnection{{ConnectionMetadata: ConnectionMetadata{Name: "mssql1"}}},
+				Databricks:          []DatabricksConnection{{ConnectionMetadata: ConnectionMetadata{Name: "db1"}}},
+				ADLS:                []ADLSConnection{{ConnectionMetadata: ConnectionMetadata{Name: "adls1"}}},
+				Synapse:             []SynapseConnection{{ConnectionMetadata: ConnectionMetadata{Name: "syn1"}}},
+				Fabric:              []FabricConnection{{ConnectionMetadata: ConnectionMetadata{Name: "fabric1"}}},
+				Mongo:               []MongoConnection{{ConnectionMetadata: ConnectionMetadata{Name: "mongo1"}}},
+				Cassandra:           []CassandraConnection{{ConnectionMetadata: ConnectionMetadata{Name: "cassandra1"}}},
+				Couchbase:           []CouchbaseConnection{{ConnectionMetadata: ConnectionMetadata{Name: "couchbase1"}}},
+				CrateDB:             []CrateDBConnection{{ConnectionMetadata: ConnectionMetadata{Name: "cratedb1"}}},
+				CSV:                 []CSVConnection{{ConnectionMetadata: ConnectionMetadata{Name: "csv1"}}},
+				Cursor:              []CursorConnection{{ConnectionMetadata: ConnectionMetadata{Name: "cursor1"}}},
+				MongoAtlas:          []MongoAtlasConnection{{ConnectionMetadata: ConnectionMetadata{Name: "mongoatlas1"}}},
+				MySQL:               []MySQLConnection{{ConnectionMetadata: ConnectionMetadata{Name: "mysql1"}}},
+				Notion:              []NotionConnection{{ConnectionMetadata: ConnectionMetadata{Name: "notion1"}}},
+				Allium:              []AlliumConnection{{ConnectionMetadata: ConnectionMetadata{Name: "allium1"}}},
+				HANA:                []HANAConnection{{ConnectionMetadata: ConnectionMetadata{Name: "hana1"}}},
+				Hostaway:            []HostawayConnection{{ConnectionMetadata: ConnectionMetadata{Name: "hostaway1"}}},
+				HTTP:                []HTTPConnection{{ConnectionMetadata: ConnectionMetadata{Name: "http1"}}},
+				Shopify:             []ShopifyConnection{{ConnectionMetadata: ConnectionMetadata{Name: "shopify1"}}},
+				Gorgias:             []GorgiasConnection{{ConnectionMetadata: ConnectionMetadata{Name: "gorgias1"}}},
+				G2:                  []G2Connection{{ConnectionMetadata: ConnectionMetadata{Name: "g21"}}},
+				Klaviyo:             []KlaviyoConnection{{ConnectionMetadata: ConnectionMetadata{Name: "klaviyo1"}}},
+				Adjust:              []AdjustConnection{{ConnectionMetadata: ConnectionMetadata{Name: "adjust1"}}},
+				SurveyMonkey:        []SurveyMonkeyConnection{{ConnectionMetadata: ConnectionMetadata{Name: "surveymonkey1"}}},
+				Anthropic:           []AnthropicConnection{{ConnectionMetadata: ConnectionMetadata{Name: "anthropic1"}}},
+				Generic:             []GenericConnection{{ConnectionMetadata: ConnectionMetadata{Name: "generic1"}}},
+				FacebookAds:         []FacebookAdsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "facebookads1"}}},
+				Stripe:              []StripeConnection{{ConnectionMetadata: ConnectionMetadata{Name: "stripe1"}}},
+				Paddle:              []PaddleConnection{{ConnectionMetadata: ConnectionMetadata{Name: "paddle1"}}},
+				Chargebee:           []ChargebeeConnection{{ConnectionMetadata: ConnectionMetadata{Name: "chargebee1"}}},
+				Recurly:             []RecurlyConnection{{ConnectionMetadata: ConnectionMetadata{Name: "recurly1"}}},
+				GitLab:              []GitLabConnection{{ConnectionMetadata: ConnectionMetadata{Name: "gitlab1"}}},
+				Appsflyer:           []AppsflyerConnection{{ConnectionMetadata: ConnectionMetadata{Name: "appsflyer1"}}},
+				Kafka:               []KafkaConnection{{ConnectionMetadata: ConnectionMetadata{Name: "kafka1"}}},
+				RabbitMQ:            []RabbitMQConnection{{ConnectionMetadata: ConnectionMetadata{Name: "rabbitmq1"}}},
+				DuckDB:              []DuckDBConnection{{ConnectionMetadata: ConnectionMetadata{Name: "duckdb1"}}},
+				MotherDuck:          []MotherduckConnection{{ConnectionMetadata: ConnectionMetadata{Name: "motherduck1"}}},
+				ClickHouse:          []ClickHouseConnection{{ConnectionMetadata: ConnectionMetadata{Name: "clickhouse1"}}},
+				Hubspot:             []HubspotConnection{{ConnectionMetadata: ConnectionMetadata{Name: "hubspot1"}}},
+				Intercom:            []IntercomConnection{{ConnectionMetadata: ConnectionMetadata{Name: "intercom1"}}},
+				GitHub:              []GitHubConnection{{ConnectionMetadata: ConnectionMetadata{Name: "github1"}}},
+				GoogleSheets:        []GoogleSheetsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "googlesheets1"}}},
+				Chess:               []ChessConnection{{ConnectionMetadata: ConnectionMetadata{Name: "chess1"}}},
+				Airtable:            []AirtableConnection{{ConnectionMetadata: ConnectionMetadata{Name: "airtable1"}}},
+				Granola:             []GranolaConnection{{ConnectionMetadata: ConnectionMetadata{Name: "granola1"}}},
+				Zendesk:             []ZendeskConnection{{ConnectionMetadata: ConnectionMetadata{Name: "zendesk1"}}},
+				Kalshi:              []KalshiConnection{{ConnectionMetadata: ConnectionMetadata{Name: "kalshi1"}}},
+				TikTokAds:           []TikTokAdsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "tiktokads1"}}},
+				SnapchatAds:         []SnapchatAdsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "snapchatads1"}}},
+				S3:                  []S3Connection{{ConnectionMetadata: ConnectionMetadata{Name: "s31"}}},
+				Slack:               []SlackConnection{{ConnectionMetadata: ConnectionMetadata{Name: "slack1"}}},
+				Socrata:             []SocrataConnection{{ConnectionMetadata: ConnectionMetadata{Name: "socrata1"}}},
+				Asana:               []AsanaConnection{{ConnectionMetadata: ConnectionMetadata{Name: "asana1"}}},
+				DynamoDB:            []DynamoDBConnection{{ConnectionMetadata: ConnectionMetadata{Name: "dynamodb1"}}},
+				Docebo:              []DoceboConnection{{ConnectionMetadata: ConnectionMetadata{Name: "docebo1"}}},
+				GoogleAds:           []GoogleAdsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "googleads1"}}},
+				AppStore:            []AppStoreConnection{{ConnectionMetadata: ConnectionMetadata{Name: "appstore1"}}},
+				AppleAds:            []AppleAdsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "appleads1"}}},
+				LinkedInAds:         []LinkedInAdsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "linkedinads1"}}},
+				RedditAds:           []RedditAdsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "redditads1"}}},
+				Mailchimp:           []MailchimpConnection{{ConnectionMetadata: ConnectionMetadata{Name: "mailchimp1"}}},
+				Manifold:            []ManifoldConnection{{ConnectionMetadata: ConnectionMetadata{Name: "manifold1"}}},
+				RevenueCat:          []RevenueCatConnection{{ConnectionMetadata: ConnectionMetadata{Name: "revenuecat1"}}},
+				Linear:              []LinearConnection{{ConnectionMetadata: ConnectionMetadata{Name: "linear1"}}},
+				GCS:                 []GCSConnection{{ConnectionMetadata: ConnectionMetadata{Name: "gcs1"}}},
+				SharePoint:          []SharePointConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sharepoint1"}}},
+				ApplovinMax:         []ApplovinMaxConnection{{ConnectionMetadata: ConnectionMetadata{Name: "applovinmax1"}}},
+				Personio:            []PersonioConnection{{ConnectionMetadata: ConnectionMetadata{Name: "personio1"}}},
+				Kinesis:             []KinesisConnection{{ConnectionMetadata: ConnectionMetadata{Name: "kinesis1"}}},
+				Pipedrive:           []PipedriveConnection{{ConnectionMetadata: ConnectionMetadata{Name: "pipedrive1"}}},
+				Polymarket:          []PolymarketConnection{{ConnectionMetadata: ConnectionMetadata{Name: "polymarket1"}}},
+				Mixpanel:            []MixpanelConnection{{ConnectionMetadata: ConnectionMetadata{Name: "mixpanel1"}}},
+				Clickup:             []ClickupConnection{{ConnectionMetadata: ConnectionMetadata{Name: "clickup1"}}},
+				Jobtread:            []JobtreadConnection{{ConnectionMetadata: ConnectionMetadata{Name: "jobtread1"}}},
+				Posthog:             []PosthogConnection{{ConnectionMetadata: ConnectionMetadata{Name: "posthog1"}}},
+				Pinterest:           []PinterestConnection{{ConnectionMetadata: ConnectionMetadata{Name: "pinterest1"}}},
+				Trustpilot:          []TrustpilotConnection{{ConnectionMetadata: ConnectionMetadata{Name: "trustpilot1"}}},
+				QuickBooks:          []QuickBooksConnection{{ConnectionMetadata: ConnectionMetadata{Name: "quickbooks1"}}},
+				Wise:                []WiseConnection{{ConnectionMetadata: ConnectionMetadata{Name: "wise1"}}},
+				Wistia:              []WistiaConnection{{ConnectionMetadata: ConnectionMetadata{Name: "wistia1"}}},
+				Zoom:                []ZoomConnection{{ConnectionMetadata: ConnectionMetadata{Name: "zoom1"}}},
+				EMRServerless:       []EMRServerlessConnection{{ConnectionMetadata: ConnectionMetadata{Name: "emr1"}}},
+				DataprocServerless:  []DataprocServerlessConnection{{ConnectionMetadata: ConnectionMetadata{Name: "dataproc1"}}},
+				GoogleAnalytics:     []GoogleAnalyticsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "googleanalytics1"}}},
+				GSC:                 []GSCConnection{{Name: "gsc1"}},
+				AppLovin:            []AppLovinConnection{{ConnectionMetadata: ConnectionMetadata{Name: "applovin1"}}},
+				Frankfurter:         []FrankfurterConnection{{ConnectionMetadata: ConnectionMetadata{Name: "frankfurter1"}}},
+				Salesforce:          []SalesforceConnection{{ConnectionMetadata: ConnectionMetadata{Name: "salesforce1"}}},
+				SQLite:              []SQLiteConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sqlite1"}}},
+				DB2:                 []DB2Connection{{ConnectionMetadata: ConnectionMetadata{Name: "db21"}}},
+				Oracle:              []OracleConnection{{ConnectionMetadata: ConnectionMetadata{Name: "oracle1"}}},
+				Phantombuster:       []PhantombusterConnection{{ConnectionMetadata: ConnectionMetadata{Name: "phantombuster1"}}},
+				Elasticsearch:       []ElasticsearchConnection{{ConnectionMetadata: ConnectionMetadata{Name: "elasticsearch1"}}},
+				Solidgate:           []SolidgateConnection{{ConnectionMetadata: ConnectionMetadata{Name: "solidgate1"}}},
+				Square:              []SquareConnection{{ConnectionMetadata: ConnectionMetadata{Name: "square1"}}},
+				Spanner:             []SpannerConnection{{ConnectionMetadata: ConnectionMetadata{Name: "spanner1"}}},
+				Smartsheet:          []SmartsheetConnection{{ConnectionMetadata: ConnectionMetadata{Name: "smartsheet1"}}},
+				Attio:               []AttioConnection{{ConnectionMetadata: ConnectionMetadata{Name: "attio1"}}},
+				Sftp:                []SFTPConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sftp1"}}},
+				ISOCPulse:           []ISOCPulseConnection{{ConnectionMetadata: ConnectionMetadata{Name: "isocpulse1"}}},
+				InfluxDB:            []InfluxDBConnection{{ConnectionMetadata: ConnectionMetadata{Name: "influxdb1"}}},
+				Tableau:             []TableauConnection{{ConnectionMetadata: ConnectionMetadata{Name: "tableau1"}}},
+				QuickSight:          []QuickSightConnection{{ConnectionMetadata: ConnectionMetadata{Name: "quicksight1"}}},
+				Trino:               []TrinoConnection{{ConnectionMetadata: ConnectionMetadata{Name: "trino1"}}},
+				StarRocks:           []StarRocksConnection{{ConnectionMetadata: ConnectionMetadata{Name: "starrocks1"}}},
+				Fluxx:               []FluxxConnection{{ConnectionMetadata: ConnectionMetadata{Name: "fluxx1"}}},
+				Freshdesk:           []FreshdeskConnection{{ConnectionMetadata: ConnectionMetadata{Name: "freshdesk1"}}},
+				FundraiseUp:         []FundraiseUpConnection{{ConnectionMetadata: ConnectionMetadata{Name: "fundraiseup1"}}},
+				Fireflies:           []FirefliesConnection{{ConnectionMetadata: ConnectionMetadata{Name: "fireflies1"}}},
+				Jira:                []JiraConnection{{ConnectionMetadata: ConnectionMetadata{Name: "jira1"}}},
+				Monday:              []MondayConnection{{ConnectionMetadata: ConnectionMetadata{Name: "monday1"}}},
+				PlusVibeAI:          []PlusVibeAIConnection{{ConnectionMetadata: ConnectionMetadata{Name: "plusvibeai1"}}},
+				BruinCloud:          []BruinCloudConnection{{ConnectionMetadata: ConnectionMetadata{Name: "bruin1"}}},
+				Primer:              []PrimerConnection{{ConnectionMetadata: ConnectionMetadata{Name: "primer1"}}},
+				Indeed:              []IndeedConnection{{ConnectionMetadata: ConnectionMetadata{Name: "indeed1"}}},
+				CustomerIo:          []CustomerIoConnection{{ConnectionMetadata: ConnectionMetadata{Name: "customerio1"}}},
+				Sendgrid:            []SendgridConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sendgrid1"}}},
+				Twilio:              []TwilioConnection{{ConnectionMetadata: ConnectionMetadata{Name: "twilio1"}}},
+				Braze:               []BrazeConnection{{ConnectionMetadata: ConnectionMetadata{Name: "braze1"}}},
+				Espn:                []EspnConnection{{ConnectionMetadata: ConnectionMetadata{Name: "espn1"}}},
+				APIFootball:         []APIFootballConnection{{ConnectionMetadata: ConnectionMetadata{Name: "apifootball1"}}},
+				FootballData:        []FootballDataConnection{{ConnectionMetadata: ConnectionMetadata{Name: "footballdata1"}}},
+				BallDontLie:         []BallDontLieConnection{{ConnectionMetadata: ConnectionMetadata{Name: "balldontlie1"}}},
+				Vertica:             []VerticaConnection{{ConnectionMetadata: ConnectionMetadata{Name: "vertica1"}}},
+				Dune:                []DuneConnection{{ConnectionMetadata: ConnectionMetadata{Name: "dune1"}}},
 			},
 			want: &Connections{
-				AwsConnection:       []AwsConnection{{Name: "aws1"}},
-				AthenaConnection:    []AthenaConnection{{Name: "athena1"}},
-				GoogleCloudPlatform: []GoogleCloudPlatformConnection{{Name: "gcp1"}},
-				Snowflake:           []SnowflakeConnection{{Name: "sf1"}},
-				Postgres:            []PostgresConnection{{Name: "pg1"}},
-				RedShift:            []RedshiftConnection{{Name: "rs1"}},
-				MsSQL:               []MsSQLConnection{{Name: "mssql1"}},
-				Databricks:          []DatabricksConnection{{Name: "db1"}},
-				ADLS:                []ADLSConnection{{Name: "adls1"}},
-				Synapse:             []SynapseConnection{{Name: "syn1"}},
-				Fabric:              []FabricConnection{{Name: "fabric1"}},
-				Mongo:               []MongoConnection{{Name: "mongo1"}},
-				Cassandra:           []CassandraConnection{{Name: "cassandra1"}},
-				Couchbase:           []CouchbaseConnection{{Name: "couchbase1"}},
-				CrateDB:             []CrateDBConnection{{Name: "cratedb1"}},
-				CSV:                 []CSVConnection{{Name: "csv1"}},
-				Cursor:              []CursorConnection{{Name: "cursor1"}},
-				MongoAtlas:          []MongoAtlasConnection{{Name: "mongoatlas1"}},
-				MySQL:               []MySQLConnection{{Name: "mysql1"}},
-				Notion:              []NotionConnection{{Name: "notion1"}},
-				Allium:              []AlliumConnection{{Name: "allium1"}},
-				HANA:                []HANAConnection{{Name: "hana1"}},
-				Hostaway:            []HostawayConnection{{Name: "hostaway1"}},
-				HTTP:                []HTTPConnection{{Name: "http1"}},
-				Shopify:             []ShopifyConnection{{Name: "shopify1"}},
-				Gorgias:             []GorgiasConnection{{Name: "gorgias1"}},
-				G2:                  []G2Connection{{Name: "g21"}},
-				Klaviyo:             []KlaviyoConnection{{Name: "klaviyo1"}},
-				Adjust:              []AdjustConnection{{Name: "adjust1"}},
-				SurveyMonkey:        []SurveyMonkeyConnection{{Name: "surveymonkey1"}},
-				Anthropic:           []AnthropicConnection{{Name: "anthropic1"}},
-				Generic:             []GenericConnection{{Name: "generic1"}},
-				FacebookAds:         []FacebookAdsConnection{{Name: "facebookads1"}},
-				Stripe:              []StripeConnection{{Name: "stripe1"}},
-				Paddle:              []PaddleConnection{{Name: "paddle1"}},
-				Chargebee:           []ChargebeeConnection{{Name: "chargebee1"}},
-				Recurly:             []RecurlyConnection{{Name: "recurly1"}},
-				GitLab:              []GitLabConnection{{Name: "gitlab1"}},
-				Appsflyer:           []AppsflyerConnection{{Name: "appsflyer1"}},
-				Kafka:               []KafkaConnection{{Name: "kafka1"}},
-				RabbitMQ:            []RabbitMQConnection{{Name: "rabbitmq1"}},
-				DuckDB:              []DuckDBConnection{{Name: "duckdb1"}},
-				MotherDuck:          []MotherduckConnection{{Name: "motherduck1"}},
-				ClickHouse:          []ClickHouseConnection{{Name: "clickhouse1"}},
-				Hubspot:             []HubspotConnection{{Name: "hubspot1"}},
-				Intercom:            []IntercomConnection{{Name: "intercom1"}},
-				GitHub:              []GitHubConnection{{Name: "github1"}},
-				GoogleSheets:        []GoogleSheetsConnection{{Name: "googlesheets1"}},
-				Chess:               []ChessConnection{{Name: "chess1"}},
-				Airtable:            []AirtableConnection{{Name: "airtable1"}},
-				Granola:             []GranolaConnection{{Name: "granola1"}},
-				Zendesk:             []ZendeskConnection{{Name: "zendesk1"}},
-				Kalshi:              []KalshiConnection{{Name: "kalshi1"}},
-				TikTokAds:           []TikTokAdsConnection{{Name: "tiktokads1"}},
-				SnapchatAds:         []SnapchatAdsConnection{{Name: "snapchatads1"}},
-				S3:                  []S3Connection{{Name: "s31"}},
-				Slack:               []SlackConnection{{Name: "slack1"}},
-				Socrata:             []SocrataConnection{{Name: "socrata1"}},
-				Asana:               []AsanaConnection{{Name: "asana1"}},
-				DynamoDB:            []DynamoDBConnection{{Name: "dynamodb1"}},
-				Docebo:              []DoceboConnection{{Name: "docebo1"}},
-				GoogleAds:           []GoogleAdsConnection{{Name: "googleads1"}},
-				AppStore:            []AppStoreConnection{{Name: "appstore1"}},
-				AppleAds:            []AppleAdsConnection{{Name: "appleads1"}},
-				LinkedInAds:         []LinkedInAdsConnection{{Name: "linkedinads1"}},
-				RedditAds:           []RedditAdsConnection{{Name: "redditads1"}},
-				Mailchimp:           []MailchimpConnection{{Name: "mailchimp1"}},
-				Manifold:            []ManifoldConnection{{Name: "manifold1"}},
-				RevenueCat:          []RevenueCatConnection{{Name: "revenuecat1"}},
-				Linear:              []LinearConnection{{Name: "linear1"}},
-				GCS:                 []GCSConnection{{Name: "gcs1"}},
-				SharePoint:          []SharePointConnection{{Name: "sharepoint1"}},
-				ApplovinMax:         []ApplovinMaxConnection{{Name: "applovinmax1"}},
-				Personio:            []PersonioConnection{{Name: "personio1"}},
-				Kinesis:             []KinesisConnection{{Name: "kinesis1"}},
-				Pipedrive:           []PipedriveConnection{{Name: "pipedrive1"}},
-				Polymarket:          []PolymarketConnection{{Name: "polymarket1"}},
-				Mixpanel:            []MixpanelConnection{{Name: "mixpanel1"}},
-				Clickup:             []ClickupConnection{{Name: "clickup1"}},
-				Jobtread:            []JobtreadConnection{{Name: "jobtread1"}},
-				Posthog:             []PosthogConnection{{Name: "posthog1"}},
-				Pinterest:           []PinterestConnection{{Name: "pinterest1"}},
-				Trustpilot:          []TrustpilotConnection{{Name: "trustpilot1"}},
-				QuickBooks:          []QuickBooksConnection{{Name: "quickbooks1"}},
-				Wise:                []WiseConnection{{Name: "wise1"}},
-				Wistia:              []WistiaConnection{{Name: "wistia1"}},
-				Zoom:                []ZoomConnection{{Name: "zoom1"}},
-				EMRServerless:       []EMRServerlessConnection{{Name: "emr1"}},
-				DataprocServerless:  []DataprocServerlessConnection{{Name: "dataproc1"}},
-				GoogleAnalytics:     []GoogleAnalyticsConnection{{Name: "googleanalytics1"}},
-				AppLovin:            []AppLovinConnection{{Name: "applovin1"}},
-				Frankfurter:         []FrankfurterConnection{{Name: "frankfurter1"}},
-				Salesforce:          []SalesforceConnection{{Name: "salesforce1"}},
-				SQLite:              []SQLiteConnection{{Name: "sqlite1"}},
-				DB2:                 []DB2Connection{{Name: "db21"}},
-				Oracle:              []OracleConnection{{Name: "oracle1"}},
-				Phantombuster:       []PhantombusterConnection{{Name: "phantombuster1"}},
-				Elasticsearch:       []ElasticsearchConnection{{Name: "elasticsearch1"}},
-				Solidgate:           []SolidgateConnection{{Name: "solidgate1"}},
-				Square:              []SquareConnection{{Name: "square1"}},
-				Spanner:             []SpannerConnection{{Name: "spanner1"}},
-				Smartsheet:          []SmartsheetConnection{{Name: "smartsheet1"}},
-				Attio:               []AttioConnection{{Name: "attio1"}},
-				Sftp:                []SFTPConnection{{Name: "sftp1"}},
-				ISOCPulse:           []ISOCPulseConnection{{Name: "isocpulse1"}},
-				InfluxDB:            []InfluxDBConnection{{Name: "influxdb1"}},
-				Tableau:             []TableauConnection{{Name: "tableau1"}},
-				QuickSight:          []QuickSightConnection{{Name: "quicksight1"}},
-				Trino:               []TrinoConnection{{Name: "trino1"}},
-				StarRocks:           []StarRocksConnection{{Name: "starrocks1"}},
-				Fluxx:               []FluxxConnection{{Name: "fluxx1"}},
-				Freshdesk:           []FreshdeskConnection{{Name: "freshdesk1"}},
-				FundraiseUp:         []FundraiseUpConnection{{Name: "fundraiseup1"}},
-				Fireflies:           []FirefliesConnection{{Name: "fireflies1"}},
-				Jira:                []JiraConnection{{Name: "jira1"}},
-				Monday:              []MondayConnection{{Name: "monday1"}},
-				PlusVibeAI:          []PlusVibeAIConnection{{Name: "plusvibeai1"}},
-				BruinCloud:          []BruinCloudConnection{{Name: "bruin1"}},
-				Primer:              []PrimerConnection{{Name: "primer1"}},
-				Indeed:              []IndeedConnection{{Name: "indeed1"}},
-				CustomerIo:          []CustomerIoConnection{{Name: "customerio1"}},
-				Sendgrid:            []SendgridConnection{{Name: "sendgrid1"}},
-				Twilio:              []TwilioConnection{{Name: "twilio1"}},
-				Braze:               []BrazeConnection{{Name: "braze1"}},
-				Espn:                []EspnConnection{{Name: "espn1"}},
-				APIFootball:         []APIFootballConnection{{Name: "apifootball1"}},
-				FootballData:        []FootballDataConnection{{Name: "footballdata1"}},
-				BallDontLie:         []BallDontLieConnection{{Name: "balldontlie1"}},
-				Vertica:             []VerticaConnection{{Name: "vertica1"}},
-				Dune:                []DuneConnection{{Name: "dune1"}},
+				AwsConnection:       []AwsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "aws1"}}},
+				AthenaConnection:    []AthenaConnection{{ConnectionMetadata: ConnectionMetadata{Name: "athena1"}}},
+				GoogleCloudPlatform: []GoogleCloudPlatformConnection{{ConnectionMetadata: ConnectionMetadata{Name: "gcp1"}}},
+				Snowflake:           []SnowflakeConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sf1"}}},
+				Postgres:            []PostgresConnection{{ConnectionMetadata: ConnectionMetadata{Name: "pg1"}}},
+				RedShift:            []RedshiftConnection{{ConnectionMetadata: ConnectionMetadata{Name: "rs1"}}},
+				MsSQL:               []MsSQLConnection{{ConnectionMetadata: ConnectionMetadata{Name: "mssql1"}}},
+				Databricks:          []DatabricksConnection{{ConnectionMetadata: ConnectionMetadata{Name: "db1"}}},
+				ADLS:                []ADLSConnection{{ConnectionMetadata: ConnectionMetadata{Name: "adls1"}}},
+				Synapse:             []SynapseConnection{{ConnectionMetadata: ConnectionMetadata{Name: "syn1"}}},
+				Fabric:              []FabricConnection{{ConnectionMetadata: ConnectionMetadata{Name: "fabric1"}}},
+				Mongo:               []MongoConnection{{ConnectionMetadata: ConnectionMetadata{Name: "mongo1"}}},
+				Cassandra:           []CassandraConnection{{ConnectionMetadata: ConnectionMetadata{Name: "cassandra1"}}},
+				Couchbase:           []CouchbaseConnection{{ConnectionMetadata: ConnectionMetadata{Name: "couchbase1"}}},
+				CrateDB:             []CrateDBConnection{{ConnectionMetadata: ConnectionMetadata{Name: "cratedb1"}}},
+				CSV:                 []CSVConnection{{ConnectionMetadata: ConnectionMetadata{Name: "csv1"}}},
+				Cursor:              []CursorConnection{{ConnectionMetadata: ConnectionMetadata{Name: "cursor1"}}},
+				MongoAtlas:          []MongoAtlasConnection{{ConnectionMetadata: ConnectionMetadata{Name: "mongoatlas1"}}},
+				MySQL:               []MySQLConnection{{ConnectionMetadata: ConnectionMetadata{Name: "mysql1"}}},
+				Notion:              []NotionConnection{{ConnectionMetadata: ConnectionMetadata{Name: "notion1"}}},
+				Allium:              []AlliumConnection{{ConnectionMetadata: ConnectionMetadata{Name: "allium1"}}},
+				HANA:                []HANAConnection{{ConnectionMetadata: ConnectionMetadata{Name: "hana1"}}},
+				Hostaway:            []HostawayConnection{{ConnectionMetadata: ConnectionMetadata{Name: "hostaway1"}}},
+				HTTP:                []HTTPConnection{{ConnectionMetadata: ConnectionMetadata{Name: "http1"}}},
+				Shopify:             []ShopifyConnection{{ConnectionMetadata: ConnectionMetadata{Name: "shopify1"}}},
+				Gorgias:             []GorgiasConnection{{ConnectionMetadata: ConnectionMetadata{Name: "gorgias1"}}},
+				G2:                  []G2Connection{{ConnectionMetadata: ConnectionMetadata{Name: "g21"}}},
+				Klaviyo:             []KlaviyoConnection{{ConnectionMetadata: ConnectionMetadata{Name: "klaviyo1"}}},
+				Adjust:              []AdjustConnection{{ConnectionMetadata: ConnectionMetadata{Name: "adjust1"}}},
+				SurveyMonkey:        []SurveyMonkeyConnection{{ConnectionMetadata: ConnectionMetadata{Name: "surveymonkey1"}}},
+				Anthropic:           []AnthropicConnection{{ConnectionMetadata: ConnectionMetadata{Name: "anthropic1"}}},
+				Generic:             []GenericConnection{{ConnectionMetadata: ConnectionMetadata{Name: "generic1"}}},
+				FacebookAds:         []FacebookAdsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "facebookads1"}}},
+				Stripe:              []StripeConnection{{ConnectionMetadata: ConnectionMetadata{Name: "stripe1"}}},
+				Paddle:              []PaddleConnection{{ConnectionMetadata: ConnectionMetadata{Name: "paddle1"}}},
+				Chargebee:           []ChargebeeConnection{{ConnectionMetadata: ConnectionMetadata{Name: "chargebee1"}}},
+				Recurly:             []RecurlyConnection{{ConnectionMetadata: ConnectionMetadata{Name: "recurly1"}}},
+				GitLab:              []GitLabConnection{{ConnectionMetadata: ConnectionMetadata{Name: "gitlab1"}}},
+				Appsflyer:           []AppsflyerConnection{{ConnectionMetadata: ConnectionMetadata{Name: "appsflyer1"}}},
+				Kafka:               []KafkaConnection{{ConnectionMetadata: ConnectionMetadata{Name: "kafka1"}}},
+				RabbitMQ:            []RabbitMQConnection{{ConnectionMetadata: ConnectionMetadata{Name: "rabbitmq1"}}},
+				DuckDB:              []DuckDBConnection{{ConnectionMetadata: ConnectionMetadata{Name: "duckdb1"}}},
+				MotherDuck:          []MotherduckConnection{{ConnectionMetadata: ConnectionMetadata{Name: "motherduck1"}}},
+				ClickHouse:          []ClickHouseConnection{{ConnectionMetadata: ConnectionMetadata{Name: "clickhouse1"}}},
+				Hubspot:             []HubspotConnection{{ConnectionMetadata: ConnectionMetadata{Name: "hubspot1"}}},
+				Intercom:            []IntercomConnection{{ConnectionMetadata: ConnectionMetadata{Name: "intercom1"}}},
+				GitHub:              []GitHubConnection{{ConnectionMetadata: ConnectionMetadata{Name: "github1"}}},
+				GoogleSheets:        []GoogleSheetsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "googlesheets1"}}},
+				Chess:               []ChessConnection{{ConnectionMetadata: ConnectionMetadata{Name: "chess1"}}},
+				Airtable:            []AirtableConnection{{ConnectionMetadata: ConnectionMetadata{Name: "airtable1"}}},
+				Granola:             []GranolaConnection{{ConnectionMetadata: ConnectionMetadata{Name: "granola1"}}},
+				Zendesk:             []ZendeskConnection{{ConnectionMetadata: ConnectionMetadata{Name: "zendesk1"}}},
+				Kalshi:              []KalshiConnection{{ConnectionMetadata: ConnectionMetadata{Name: "kalshi1"}}},
+				TikTokAds:           []TikTokAdsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "tiktokads1"}}},
+				SnapchatAds:         []SnapchatAdsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "snapchatads1"}}},
+				S3:                  []S3Connection{{ConnectionMetadata: ConnectionMetadata{Name: "s31"}}},
+				Slack:               []SlackConnection{{ConnectionMetadata: ConnectionMetadata{Name: "slack1"}}},
+				Socrata:             []SocrataConnection{{ConnectionMetadata: ConnectionMetadata{Name: "socrata1"}}},
+				Asana:               []AsanaConnection{{ConnectionMetadata: ConnectionMetadata{Name: "asana1"}}},
+				DynamoDB:            []DynamoDBConnection{{ConnectionMetadata: ConnectionMetadata{Name: "dynamodb1"}}},
+				Docebo:              []DoceboConnection{{ConnectionMetadata: ConnectionMetadata{Name: "docebo1"}}},
+				GoogleAds:           []GoogleAdsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "googleads1"}}},
+				AppStore:            []AppStoreConnection{{ConnectionMetadata: ConnectionMetadata{Name: "appstore1"}}},
+				AppleAds:            []AppleAdsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "appleads1"}}},
+				LinkedInAds:         []LinkedInAdsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "linkedinads1"}}},
+				RedditAds:           []RedditAdsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "redditads1"}}},
+				Mailchimp:           []MailchimpConnection{{ConnectionMetadata: ConnectionMetadata{Name: "mailchimp1"}}},
+				Manifold:            []ManifoldConnection{{ConnectionMetadata: ConnectionMetadata{Name: "manifold1"}}},
+				RevenueCat:          []RevenueCatConnection{{ConnectionMetadata: ConnectionMetadata{Name: "revenuecat1"}}},
+				Linear:              []LinearConnection{{ConnectionMetadata: ConnectionMetadata{Name: "linear1"}}},
+				GCS:                 []GCSConnection{{ConnectionMetadata: ConnectionMetadata{Name: "gcs1"}}},
+				SharePoint:          []SharePointConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sharepoint1"}}},
+				ApplovinMax:         []ApplovinMaxConnection{{ConnectionMetadata: ConnectionMetadata{Name: "applovinmax1"}}},
+				Personio:            []PersonioConnection{{ConnectionMetadata: ConnectionMetadata{Name: "personio1"}}},
+				Kinesis:             []KinesisConnection{{ConnectionMetadata: ConnectionMetadata{Name: "kinesis1"}}},
+				Pipedrive:           []PipedriveConnection{{ConnectionMetadata: ConnectionMetadata{Name: "pipedrive1"}}},
+				Polymarket:          []PolymarketConnection{{ConnectionMetadata: ConnectionMetadata{Name: "polymarket1"}}},
+				Mixpanel:            []MixpanelConnection{{ConnectionMetadata: ConnectionMetadata{Name: "mixpanel1"}}},
+				Clickup:             []ClickupConnection{{ConnectionMetadata: ConnectionMetadata{Name: "clickup1"}}},
+				Jobtread:            []JobtreadConnection{{ConnectionMetadata: ConnectionMetadata{Name: "jobtread1"}}},
+				Posthog:             []PosthogConnection{{ConnectionMetadata: ConnectionMetadata{Name: "posthog1"}}},
+				Pinterest:           []PinterestConnection{{ConnectionMetadata: ConnectionMetadata{Name: "pinterest1"}}},
+				Trustpilot:          []TrustpilotConnection{{ConnectionMetadata: ConnectionMetadata{Name: "trustpilot1"}}},
+				QuickBooks:          []QuickBooksConnection{{ConnectionMetadata: ConnectionMetadata{Name: "quickbooks1"}}},
+				Wise:                []WiseConnection{{ConnectionMetadata: ConnectionMetadata{Name: "wise1"}}},
+				Wistia:              []WistiaConnection{{ConnectionMetadata: ConnectionMetadata{Name: "wistia1"}}},
+				Zoom:                []ZoomConnection{{ConnectionMetadata: ConnectionMetadata{Name: "zoom1"}}},
+				EMRServerless:       []EMRServerlessConnection{{ConnectionMetadata: ConnectionMetadata{Name: "emr1"}}},
+				DataprocServerless:  []DataprocServerlessConnection{{ConnectionMetadata: ConnectionMetadata{Name: "dataproc1"}}},
+				GoogleAnalytics:     []GoogleAnalyticsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "googleanalytics1"}}},
+				GSC:                 []GSCConnection{{Name: "gsc1"}},
+				AppLovin:            []AppLovinConnection{{ConnectionMetadata: ConnectionMetadata{Name: "applovin1"}}},
+				Frankfurter:         []FrankfurterConnection{{ConnectionMetadata: ConnectionMetadata{Name: "frankfurter1"}}},
+				Salesforce:          []SalesforceConnection{{ConnectionMetadata: ConnectionMetadata{Name: "salesforce1"}}},
+				SQLite:              []SQLiteConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sqlite1"}}},
+				DB2:                 []DB2Connection{{ConnectionMetadata: ConnectionMetadata{Name: "db21"}}},
+				Oracle:              []OracleConnection{{ConnectionMetadata: ConnectionMetadata{Name: "oracle1"}}},
+				Phantombuster:       []PhantombusterConnection{{ConnectionMetadata: ConnectionMetadata{Name: "phantombuster1"}}},
+				Elasticsearch:       []ElasticsearchConnection{{ConnectionMetadata: ConnectionMetadata{Name: "elasticsearch1"}}},
+				Solidgate:           []SolidgateConnection{{ConnectionMetadata: ConnectionMetadata{Name: "solidgate1"}}},
+				Square:              []SquareConnection{{ConnectionMetadata: ConnectionMetadata{Name: "square1"}}},
+				Spanner:             []SpannerConnection{{ConnectionMetadata: ConnectionMetadata{Name: "spanner1"}}},
+				Smartsheet:          []SmartsheetConnection{{ConnectionMetadata: ConnectionMetadata{Name: "smartsheet1"}}},
+				Attio:               []AttioConnection{{ConnectionMetadata: ConnectionMetadata{Name: "attio1"}}},
+				Sftp:                []SFTPConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sftp1"}}},
+				ISOCPulse:           []ISOCPulseConnection{{ConnectionMetadata: ConnectionMetadata{Name: "isocpulse1"}}},
+				InfluxDB:            []InfluxDBConnection{{ConnectionMetadata: ConnectionMetadata{Name: "influxdb1"}}},
+				Tableau:             []TableauConnection{{ConnectionMetadata: ConnectionMetadata{Name: "tableau1"}}},
+				QuickSight:          []QuickSightConnection{{ConnectionMetadata: ConnectionMetadata{Name: "quicksight1"}}},
+				Trino:               []TrinoConnection{{ConnectionMetadata: ConnectionMetadata{Name: "trino1"}}},
+				StarRocks:           []StarRocksConnection{{ConnectionMetadata: ConnectionMetadata{Name: "starrocks1"}}},
+				Fluxx:               []FluxxConnection{{ConnectionMetadata: ConnectionMetadata{Name: "fluxx1"}}},
+				Freshdesk:           []FreshdeskConnection{{ConnectionMetadata: ConnectionMetadata{Name: "freshdesk1"}}},
+				FundraiseUp:         []FundraiseUpConnection{{ConnectionMetadata: ConnectionMetadata{Name: "fundraiseup1"}}},
+				Fireflies:           []FirefliesConnection{{ConnectionMetadata: ConnectionMetadata{Name: "fireflies1"}}},
+				Jira:                []JiraConnection{{ConnectionMetadata: ConnectionMetadata{Name: "jira1"}}},
+				Monday:              []MondayConnection{{ConnectionMetadata: ConnectionMetadata{Name: "monday1"}}},
+				PlusVibeAI:          []PlusVibeAIConnection{{ConnectionMetadata: ConnectionMetadata{Name: "plusvibeai1"}}},
+				BruinCloud:          []BruinCloudConnection{{ConnectionMetadata: ConnectionMetadata{Name: "bruin1"}}},
+				Primer:              []PrimerConnection{{ConnectionMetadata: ConnectionMetadata{Name: "primer1"}}},
+				Indeed:              []IndeedConnection{{ConnectionMetadata: ConnectionMetadata{Name: "indeed1"}}},
+				CustomerIo:          []CustomerIoConnection{{ConnectionMetadata: ConnectionMetadata{Name: "customerio1"}}},
+				Sendgrid:            []SendgridConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sendgrid1"}}},
+				Twilio:              []TwilioConnection{{ConnectionMetadata: ConnectionMetadata{Name: "twilio1"}}},
+				Braze:               []BrazeConnection{{ConnectionMetadata: ConnectionMetadata{Name: "braze1"}}},
+				Espn:                []EspnConnection{{ConnectionMetadata: ConnectionMetadata{Name: "espn1"}}},
+				APIFootball:         []APIFootballConnection{{ConnectionMetadata: ConnectionMetadata{Name: "apifootball1"}}},
+				FootballData:        []FootballDataConnection{{ConnectionMetadata: ConnectionMetadata{Name: "footballdata1"}}},
+				BallDontLie:         []BallDontLieConnection{{ConnectionMetadata: ConnectionMetadata{Name: "balldontlie1"}}},
+				Vertica:             []VerticaConnection{{ConnectionMetadata: ConnectionMetadata{Name: "vertica1"}}},
+				Dune:                []DuneConnection{{ConnectionMetadata: ConnectionMetadata{Name: "dune1"}}},
 			},
 			expectedErr: false,
 		},
@@ -2452,12 +2622,12 @@ func TestConnections_MergeFrom(t *testing.T) {
 			target: &Connections{
 				GoogleCloudPlatform: []GoogleCloudPlatformConnection{
 					{
-						Name:               "gcp-dev",
+						ConnectionMetadata: ConnectionMetadata{Name: "gcp-dev"},
 						ServiceAccountJSON: "{\"key\": \"dev-value\"}",
 						ProjectID:          "dev-project",
 					},
 					{
-						Name:               "gcp-staging",
+						ConnectionMetadata: ConnectionMetadata{Name: "gcp-staging"},
 						ServiceAccountJSON: "{\"key\": \"staging-value\"}",
 						ProjectID:          "staging-project",
 					},
@@ -2466,7 +2636,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 			source: &Connections{
 				GoogleCloudPlatform: []GoogleCloudPlatformConnection{
 					{
-						Name:               "gcp-prod",
+						ConnectionMetadata: ConnectionMetadata{Name: "gcp-prod"},
 						ServiceAccountJSON: "{\"key\": \"prod-value\"}",
 						ProjectID:          "prod-project",
 					},
@@ -2475,17 +2645,17 @@ func TestConnections_MergeFrom(t *testing.T) {
 			want: &Connections{
 				GoogleCloudPlatform: []GoogleCloudPlatformConnection{
 					{
-						Name:               "gcp-dev",
+						ConnectionMetadata: ConnectionMetadata{Name: "gcp-dev"},
 						ServiceAccountJSON: "{\"key\": \"dev-value\"}",
 						ProjectID:          "dev-project",
 					},
 					{
-						Name:               "gcp-staging",
+						ConnectionMetadata: ConnectionMetadata{Name: "gcp-staging"},
 						ServiceAccountJSON: "{\"key\": \"staging-value\"}",
 						ProjectID:          "staging-project",
 					},
 					{
-						Name:               "gcp-prod",
+						ConnectionMetadata: ConnectionMetadata{Name: "gcp-prod"},
 						ServiceAccountJSON: "{\"key\": \"prod-value\"}",
 						ProjectID:          "prod-project",
 					},
@@ -2498,82 +2668,82 @@ func TestConnections_MergeFrom(t *testing.T) {
 			target: &Connections{
 				Postgres: []PostgresConnection{
 					{
-						Name:     "pg-dev",
-						Host:     "dev-host",
-						Port:     5432,
-						Username: "dev-user",
-						Password: "dev-pass",
-						Database: "dev-db",
+						ConnectionMetadata: ConnectionMetadata{Name: "pg-dev"},
+						Host:               "dev-host",
+						Port:               5432,
+						Username:           "dev-user",
+						Password:           "dev-pass",
+						Database:           "dev-db",
 					},
 				},
 				MySQL: []MySQLConnection{
 					{
-						Name:     "mysql-dev",
-						Host:     "dev-host",
-						Port:     3306,
-						Username: "dev-user",
-						Password: "dev-pass",
-						Database: "dev-db",
+						ConnectionMetadata: ConnectionMetadata{Name: "mysql-dev"},
+						Host:               "dev-host",
+						Port:               3306,
+						Username:           "dev-user",
+						Password:           "dev-pass",
+						Database:           "dev-db",
 					},
 				},
 			},
 			source: &Connections{
 				Postgres: []PostgresConnection{
 					{
-						Name:     "pg-prod",
-						Host:     "prod-host",
-						Port:     5432,
-						Username: "prod-user",
-						Password: "prod-pass",
-						Database: "prod-db",
+						ConnectionMetadata: ConnectionMetadata{Name: "pg-prod"},
+						Host:               "prod-host",
+						Port:               5432,
+						Username:           "prod-user",
+						Password:           "prod-pass",
+						Database:           "prod-db",
 					},
 				},
 				MySQL: []MySQLConnection{
 					{
-						Name:     "mysql-prod",
-						Host:     "prod-host",
-						Port:     3306,
-						Username: "prod-user",
-						Password: "prod-pass",
-						Database: "prod-db",
+						ConnectionMetadata: ConnectionMetadata{Name: "mysql-prod"},
+						Host:               "prod-host",
+						Port:               3306,
+						Username:           "prod-user",
+						Password:           "prod-pass",
+						Database:           "prod-db",
 					},
 				},
 			},
 			want: &Connections{
 				Postgres: []PostgresConnection{
 					{
-						Name:     "pg-dev",
-						Host:     "dev-host",
-						Port:     5432,
-						Username: "dev-user",
-						Password: "dev-pass",
-						Database: "dev-db",
+						ConnectionMetadata: ConnectionMetadata{Name: "pg-dev"},
+						Host:               "dev-host",
+						Port:               5432,
+						Username:           "dev-user",
+						Password:           "dev-pass",
+						Database:           "dev-db",
 					},
 					{
-						Name:     "pg-prod",
-						Host:     "prod-host",
-						Port:     5432,
-						Username: "prod-user",
-						Password: "prod-pass",
-						Database: "prod-db",
+						ConnectionMetadata: ConnectionMetadata{Name: "pg-prod"},
+						Host:               "prod-host",
+						Port:               5432,
+						Username:           "prod-user",
+						Password:           "prod-pass",
+						Database:           "prod-db",
 					},
 				},
 				MySQL: []MySQLConnection{
 					{
-						Name:     "mysql-dev",
-						Host:     "dev-host",
-						Port:     3306,
-						Username: "dev-user",
-						Password: "dev-pass",
-						Database: "dev-db",
+						ConnectionMetadata: ConnectionMetadata{Name: "mysql-dev"},
+						Host:               "dev-host",
+						Port:               3306,
+						Username:           "dev-user",
+						Password:           "dev-pass",
+						Database:           "dev-db",
 					},
 					{
-						Name:     "mysql-prod",
-						Host:     "prod-host",
-						Port:     3306,
-						Username: "prod-user",
-						Password: "prod-pass",
-						Database: "prod-db",
+						ConnectionMetadata: ConnectionMetadata{Name: "mysql-prod"},
+						Host:               "prod-host",
+						Port:               3306,
+						Username:           "prod-user",
+						Password:           "prod-pass",
+						Database:           "prod-db",
 					},
 				},
 			},
@@ -2624,7 +2794,7 @@ environments:
 			Connections: &Connections{
 				GoogleCloudPlatform: []GoogleCloudPlatformConnection{
 					{
-						Name:               "conn1",
+						ConnectionMetadata: ConnectionMetadata{Name: "conn1"},
 						ServiceAccountJSON: "{\"key10\": \"value10\"}",
 						ProjectID:          "my-project",
 					},
@@ -2636,7 +2806,7 @@ environments:
 				Connections: &Connections{
 					GoogleCloudPlatform: []GoogleCloudPlatformConnection{
 						{
-							Name:               "conn1",
+							ConnectionMetadata: ConnectionMetadata{Name: "conn1"},
 							ServiceAccountJSON: "{\"key10\": \"value10\"}",
 							ProjectID:          "my-project",
 						},
@@ -2740,11 +2910,11 @@ Xy8kPq2jLmV9bN3oR6tUwVcXzA1bH2cY4eF5gH6jK7lM8nBvCxDsEwQrTyUiOp
 -----END PRIVATE KEY-----`
 
 	conn := SnowflakeConnection{
-		Name:       "test-snowflake",
-		Account:    "test-account",
-		Username:   "test-user",
-		Database:   "test-db",
-		PrivateKey: privateKey,
+		ConnectionMetadata: ConnectionMetadata{Name: "test-snowflake"},
+		Account:            "test-account",
+		Username:           "test-user",
+		Database:           "test-db",
+		PrivateKey:         privateKey,
 	}
 
 	// Marshal to YAML
@@ -2775,11 +2945,11 @@ func TestSnowflakeConnection_MarshalYAML_WithoutPrivateKey(t *testing.T) {
 	t.Parallel()
 
 	conn := SnowflakeConnection{
-		Name:     "test-snowflake",
-		Account:  "test-account",
-		Username: "test-user",
-		Password: "test-pass",
-		Database: "test-db",
+		ConnectionMetadata: ConnectionMetadata{Name: "test-snowflake"},
+		Account:            "test-account",
+		Username:           "test-user",
+		Password:           "test-pass",
+		Database:           "test-db",
 	}
 
 	// Marshal to YAML
@@ -2805,11 +2975,11 @@ func TestSnowflakeConnection_MarshalYAML_SingleLinePrivateKey(t *testing.T) {
 	singleLineKey := "-----BEGIN PRIVATE KEY----- MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7ZtFJp -----END PRIVATE KEY-----"
 
 	conn := SnowflakeConnection{
-		Name:       "test-snowflake",
-		Account:    "test-account",
-		Username:   "test-user",
-		Database:   "test-db",
-		PrivateKey: singleLineKey,
+		ConnectionMetadata: ConnectionMetadata{Name: "test-snowflake"},
+		Account:            "test-account",
+		Username:           "test-user",
+		Database:           "test-db",
+		PrivateKey:         singleLineKey,
 	}
 
 	// Marshal to YAML
@@ -2836,4 +3006,255 @@ func TestSnowflakeConnection_MarshalYAML_SingleLinePrivateKey(t *testing.T) {
 		contentLine := lines[1]
 		assert.NotContains(t, contentLine, " ", "content line should not contain spaces")
 	}
+}
+
+func TestConnectionMetadata_MaxConcurrentAssetsYAMLParsing(t *testing.T) {
+	t.Parallel()
+
+	var conf Config
+	err := yaml.Unmarshal([]byte(`
+environments:
+  default:
+    connections:
+      postgres:
+        - name: flaky_source
+          host: localhost
+          username: bruin
+          password: secret
+          database: analytics
+          max_concurrent_assets: 1
+`), &conf)
+	require.NoError(t, err)
+
+	conn := conf.Environments["default"].Connections.Postgres[0]
+	require.NotNil(t, conn.MaxConcurrentAssets)
+	assert.Equal(t, "flaky_source", conn.Name)
+	assert.Equal(t, 1, *conn.MaxConcurrentAssets)
+}
+
+func TestConnections_ConnectionConcurrencyLimits(t *testing.T) {
+	t.Parallel()
+
+	postgresLimit := 1
+	snowflakeLimit := 2
+	connections := &Connections{
+		Postgres: []PostgresConnection{
+			{
+				ConnectionMetadata: ConnectionMetadata{
+					Name:                "flaky_postgres",
+					MaxConcurrentAssets: &postgresLimit,
+				},
+			},
+			{
+				ConnectionMetadata: ConnectionMetadata{Name: "unlimited_postgres"},
+			},
+		},
+		Snowflake: []SnowflakeConnection{
+			{
+				ConnectionMetadata: ConnectionMetadata{
+					Name:                "busy_snowflake",
+					MaxConcurrentAssets: &snowflakeLimit,
+				},
+			},
+		},
+	}
+
+	limits, err := connections.ConnectionConcurrencyLimits()
+	require.NoError(t, err)
+	assert.Equal(t, map[string]int{
+		"flaky_postgres": 1,
+		"busy_snowflake": 2,
+	}, limits)
+}
+
+func TestConnections_ConnectionConcurrencyLimitsValidation(t *testing.T) {
+	t.Parallel()
+
+	var nilConnections *Connections
+	limits, err := nilConnections.ConnectionConcurrencyLimits()
+	require.NoError(t, err)
+	assert.Empty(t, limits)
+
+	zero := 0
+	_, err = (&Connections{
+		Postgres: []PostgresConnection{
+			{
+				ConnectionMetadata: ConnectionMetadata{
+					Name:                "postgres",
+					MaxConcurrentAssets: &zero,
+				},
+			},
+		},
+	}).ConnectionConcurrencyLimits()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "must be greater than 0")
+
+	validLimit := 1
+	_, err = (&Connections{
+		Postgres: []PostgresConnection{
+			{
+				ConnectionMetadata: ConnectionMetadata{
+					MaxConcurrentAssets: &validLimit,
+				},
+			},
+		},
+	}).ConnectionConcurrencyLimits()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "empty name")
+}
+
+func TestConfig_AddConnectionWithMaxConcurrentAssets(t *testing.T) {
+	t.Parallel()
+
+	conf := &Config{
+		Environments: map[string]Environment{
+			"default": {Connections: &Connections{}},
+		},
+	}
+
+	err := conf.AddConnection("default", "flaky-secret", "generic", map[string]interface{}{
+		"value":                 "secret-value",
+		"max_concurrent_assets": float64(2),
+	})
+	require.NoError(t, err)
+
+	conn := conf.Environments["default"].Connections.Generic[0]
+	require.NotNil(t, conn.MaxConcurrentAssets)
+	assert.Equal(t, 2, *conn.MaxConcurrentAssets)
+}
+
+func TestConfig_AddConnectionRejectsInvalidMaxConcurrentAssets(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		value interface{}
+	}{
+		{name: "zero", value: 0},
+		{name: "negative", value: -1},
+		{name: "fractional", value: 1.5},
+		{name: "string", value: "not-an-int"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			conf := &Config{
+				Environments: map[string]Environment{
+					"default": {Connections: &Connections{}},
+				},
+			}
+
+			err := conf.AddConnection("default", "bad-secret", "generic", map[string]interface{}{
+				"value":                 "secret-value",
+				"max_concurrent_assets": tt.value,
+			})
+			require.Error(t, err)
+			assert.Empty(t, conf.Environments["default"].Connections.Generic)
+		})
+	}
+}
+
+func TestGetConnectionFieldsForTypeIncludesMaxConcurrentAssets(t *testing.T) {
+	t.Parallel()
+
+	fields := GetConnectionFieldsForType("postgres")
+	names := make([]string, 0, len(fields))
+	for _, field := range fields {
+		names = append(names, field.Name)
+	}
+
+	assert.Contains(t, names, "max_concurrent_assets")
+	assert.NotContains(t, names, "name")
+}
+
+func TestConnectionsSchemaIncludesMaxConcurrentAssets(t *testing.T) {
+	t.Parallel()
+
+	schema, err := GetConnectionsSchema()
+	require.NoError(t, err)
+	assert.Contains(t, schema, "max_concurrent_assets")
+}
+
+func TestConnectionCustomMarshalersPreserveMaxConcurrentAssets(t *testing.T) {
+	t.Parallel()
+
+	limit := 2
+
+	t.Run("gcp json", func(t *testing.T) {
+		t.Parallel()
+		payload := mustMarshalConnectionJSON(t, GoogleCloudPlatformConnection{
+			ConnectionMetadata: ConnectionMetadata{Name: "gcp", MaxConcurrentAssets: &limit},
+			ProjectID:          "project",
+		})
+		assertJSONMaxConcurrentAssets(t, payload, limit)
+	})
+
+	t.Run("gcp yaml", func(t *testing.T) {
+		t.Parallel()
+		data, err := yaml.Marshal(GoogleCloudPlatformConnection{
+			ConnectionMetadata: ConnectionMetadata{Name: "gcp", MaxConcurrentAssets: &limit},
+			ProjectID:          "project",
+		})
+		require.NoError(t, err)
+		assert.Contains(t, string(data), "max_concurrent_assets: 2")
+	})
+
+	t.Run("athena yaml", func(t *testing.T) {
+		t.Parallel()
+		data, err := yaml.Marshal(AthenaConnection{
+			ConnectionMetadata: ConnectionMetadata{Name: "athena", MaxConcurrentAssets: &limit},
+			Database:           "analytics",
+		})
+		require.NoError(t, err)
+		assert.Contains(t, string(data), "max_concurrent_assets: 2")
+	})
+
+	t.Run("snowflake json", func(t *testing.T) {
+		t.Parallel()
+		payload := mustMarshalConnectionJSON(t, SnowflakeConnection{
+			ConnectionMetadata: ConnectionMetadata{Name: "snowflake", MaxConcurrentAssets: &limit},
+			Account:            "account",
+		})
+		assertJSONMaxConcurrentAssets(t, payload, limit)
+	})
+
+	t.Run("snowflake yaml", func(t *testing.T) {
+		t.Parallel()
+		data, err := yaml.Marshal(SnowflakeConnection{
+			ConnectionMetadata: ConnectionMetadata{Name: "snowflake", MaxConcurrentAssets: &limit},
+			Account:            "account",
+		})
+		require.NoError(t, err)
+		assert.Contains(t, string(data), "max_concurrent_assets: 2")
+	})
+
+	t.Run("generic json", func(t *testing.T) {
+		t.Parallel()
+		payload := mustMarshalConnectionJSON(t, GenericConnection{
+			ConnectionMetadata: ConnectionMetadata{Name: "generic", MaxConcurrentAssets: &limit},
+			Value:              "secret",
+		})
+		assertJSONMaxConcurrentAssets(t, payload, limit)
+	})
+}
+
+func assertJSONMaxConcurrentAssets(t *testing.T, payload map[string]interface{}, want int) {
+	t.Helper()
+
+	got, ok := payload["max_concurrent_assets"].(float64)
+	require.True(t, ok)
+	assert.InDelta(t, float64(want), got, 0)
+}
+
+func mustMarshalConnectionJSON(t *testing.T, conn interface{}) map[string]interface{} {
+	t.Helper()
+
+	data, err := json.Marshal(conn)
+	require.NoError(t, err)
+
+	var payload map[string]interface{}
+	require.NoError(t, json.Unmarshal(data, &payload))
+	return payload
 }

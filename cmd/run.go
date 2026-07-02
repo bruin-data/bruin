@@ -1303,6 +1303,16 @@ func Run(isDebug *bool) *cli.Command {
 				}
 			}
 
+			connectionLimits, err := cm.SelectedEnvironment.Connections.ConnectionConcurrencyLimits()
+			if err != nil {
+				errorPrinter.Printf("Invalid connection concurrency limit: %v\n", err)
+				return cli.Exit("", 1)
+			}
+			if err := s.SetConnectionLimitsFromDetails(connectionLimits, connectionManager); err != nil {
+				errorPrinter.Printf("Failed to configure connection concurrency limits: %v\n", err)
+				return cli.Exit("", 1)
+			}
+
 			if s.InstanceCountByStatus(scheduler.Pending) == 0 {
 				warningPrinter.Println("No tasks to run.")
 				return nil

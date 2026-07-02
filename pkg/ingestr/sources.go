@@ -395,6 +395,14 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "custom:<dimensions>:<metrics>", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
 	},
 
+	// Google Search Console
+	"gsc": {
+		{Name: "<granularity>:<dimensions>", PrimaryKey: "", IncKey: "date", IncStrategy: "merge"},
+		{Name: "searchAppearance", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "sites", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "sitemaps", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+	},
+
 	// Google Sheets
 	"google_sheets": {
 		{Name: "<spreadsheet_id>.<sheet_name>", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
@@ -667,6 +675,12 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 
 	// MySQL - Relational database (user-defined tables)
 	"mysql": {},
+
+	// Vitess - MySQL-compatible sharded database (user-defined tables)
+	"vitess": {},
+
+	// PlanetScale - Managed Vitess platform (user-defined tables)
+	"planetscale": {},
 
 	// Notion - Workspace
 	"notion": {

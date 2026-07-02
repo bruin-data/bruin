@@ -2033,6 +2033,8 @@ func CloudAgents() *cli.Command {
 			cloudAgentsStatus(),
 			cloudAgentsThreads(),
 			cloudAgentsMessages(),
+			cloudAgentsGetPrompt(),
+			cloudAgentsSetPrompt(),
 		},
 	}
 }
@@ -2251,6 +2253,97 @@ func cloudAgentsThreads() *cli.Command {
 				t.AppendRow(table.Row{th.ID, th.AgentID, th.CreatedAt, th.UpdatedAt})
 			}
 			t.Render()
+			return nil
+		},
+	}
+}
+
+func cloudAgentsGetPrompt() *cli.Command {
+	return &cli.Command{
+		Name:  "get-prompt",
+		Usage: "Get an agent's system prompt",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "agent-id",
+				Usage:    "agent ID",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			prompt, err := client.GetAgentPrompt(ctx, c.Int("agent-id"))
+			if err != nil {
+				printError(err, output, "Failed to get agent prompt")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(prompt, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			if prompt.SystemPrompt == nil {
+				fmt.Println("(none)")
+				return nil
+			}
+			fmt.Println(*prompt.SystemPrompt)
+			return nil
+		},
+	}
+}
+
+func cloudAgentsSetPrompt() *cli.Command {
+	return &cli.Command{
+		Name:  "set-prompt",
+		Usage: "Set an agent's system prompt",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "agent-id",
+				Usage:    "agent ID",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:     "prompt",
+				Usage:    "the new system prompt",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			prompt, err := client.SetAgentPrompt(ctx, c.Int("agent-id"), c.String("prompt"))
+			if err != nil {
+				printError(err, output, "Failed to set agent prompt")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(prompt, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			infoPrinter.Printf("Updated system prompt for agent %d (%s)\n", prompt.ID, prompt.Name)
 			return nil
 		},
 	}

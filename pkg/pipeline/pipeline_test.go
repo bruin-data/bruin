@@ -730,6 +730,19 @@ func TestPipeline_GetConnectionNameForAsset(t *testing.T) {
 		assert.Equal(t, "default-gcp-connection", found)
 	})
 
+	t.Run("ingestr destination_connection parameter overrides destination type default", func(t *testing.T) {
+		t.Parallel()
+		found, err := pipeline1.GetConnectionNameForAsset(&pipeline.Asset{
+			Type: "ingestr",
+			Parameters: pipeline.ParameterMap{
+				"destination":            "bigquery",
+				"destination_connection": "custom-destination",
+			},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "custom-destination", found)
+	})
+
 	t.Run("should return the right connection if the asset type is known", func(t *testing.T) {
 		t.Parallel()
 		found, err := pipeline1.GetConnectionNameForAsset(&pipeline.Asset{
@@ -2388,6 +2401,64 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 			},
 		},
 		{
+			name: "should apply default hooks when asset type is in applicable_type",
+			asset: &pipeline.Asset{
+				Name: "test-asset",
+				Type: pipeline.AssetTypeBigqueryQuery,
+				ExecutableFile: pipeline.ExecutableFile{
+					Path: "/tmp/test-asset.sql",
+				},
+			},
+			foundPipeline: &pipeline.Pipeline{
+				DefaultValues: &pipeline.DefaultValues{
+					Hooks: pipeline.Hooks{
+						ApplicableTypes: []string{"duckdb.sql", "bq.sql"},
+						Pre:             []pipeline.Hook{{Query: "select 1"}},
+						Post:            []pipeline.Hook{{Query: "select 2"}},
+					},
+				},
+			},
+			want: &pipeline.Asset{
+				Name:       "test-asset",
+				Type:       pipeline.AssetTypeBigqueryQuery,
+				Parameters: pipeline.ParameterMap{},
+				ExecutableFile: pipeline.ExecutableFile{
+					Path: "/tmp/test-asset.sql",
+				},
+				Hooks: pipeline.Hooks{
+					Pre:  []pipeline.Hook{{Query: "select 1"}},
+					Post: []pipeline.Hook{{Query: "select 2"}},
+				},
+			},
+		},
+		{
+			name: "should not apply default hooks when asset type is not in applicable_type",
+			asset: &pipeline.Asset{
+				Name: "test-asset",
+				Type: pipeline.AssetTypeBigqueryQuery,
+				ExecutableFile: pipeline.ExecutableFile{
+					Path: "/tmp/test-asset.sql",
+				},
+			},
+			foundPipeline: &pipeline.Pipeline{
+				DefaultValues: &pipeline.DefaultValues{
+					Hooks: pipeline.Hooks{
+						ApplicableTypes: []string{"duckdb.sql", "ms.sql"},
+						Pre:             []pipeline.Hook{{Query: "select 1"}},
+						Post:            []pipeline.Hook{{Query: "select 2"}},
+					},
+				},
+			},
+			want: &pipeline.Asset{
+				Name:       "test-asset",
+				Type:       pipeline.AssetTypeBigqueryQuery,
+				Parameters: pipeline.ParameterMap{},
+				ExecutableFile: pipeline.ExecutableFile{
+					Path: "/tmp/test-asset.sql",
+				},
+			},
+		},
+		{
 			name: "should not override existing hooks",
 			asset: &pipeline.Asset{
 				Name: "test-asset",
@@ -2495,6 +2566,9 @@ func TestDefaultValues_CoversAssetConfigFields(t *testing.T) {
 		"ExecutableFile": true,
 		"DefinitionFile": true,
 		"RetriesDelay":   true,
+		// Unit tests are inherently per-asset (they pin one asset's logic against
+		// specific inputs), so they are not inherited from pipeline-level defaults.
+		"UnitTests": true,
 	}
 
 	for i := range assetType.NumField() {

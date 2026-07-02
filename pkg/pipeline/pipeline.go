@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -64,6 +65,7 @@ const (
 	AssetTypeEMRServerlessPyspark      = AssetType("emr_serverless.pyspark")
 	AssetTypeEMRServerlessSpark        = AssetType("emr_serverless.spark")
 	AssetTypeGoodData                  = AssetType("gooddata")
+	AssetTypeGoogleSheets              = AssetType("gsheets")
 	AssetTypeGrafana                   = AssetType("grafana")
 	AssetTypeIngestr                   = AssetType("ingestr")
 	AssetTypeLooker                    = AssetType("looker")
@@ -117,6 +119,7 @@ const (
 	AssetTypeSnowflakeSeed             = AssetType("sf.seed")
 	AssetTypeSnowflakeSource           = AssetType("sf.source")
 	AssetTypeSnowflakeTableSensor      = AssetType("sf.sensor.table")
+	AssetTypeStarRocks                 = AssetType("starrocks")
 	AssetTypeSuperset                  = AssetType("superset")
 	AssetTypeSynapseQuery              = AssetType("synapse.sql")
 	AssetTypeSynapseQuerySensor        = AssetType("synapse.sensor.query")
@@ -198,6 +201,7 @@ var defaultMapping = map[string]string{
 	"sail":                  "sail-default",
 	"oracle":                "oracle-default",
 	"googleanalytics":       "googleanalytics-default",
+	"gsc":                   "gsc-default",
 	"applovin":              "applovin-default",
 	"salesforce":            "salesforce-default",
 	"solidgate":             "solidgate-default",
@@ -854,6 +858,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeSnowflakeTableSensor:      "snowflake",
 	AssetTypeSnowflakeSeed:             "snowflake",
 	AssetTypeSnowflakeSource:           "snowflake",
+	AssetTypeStarRocks:                 "starrocks",
 	AssetTypePostgresQuery:             "postgres",
 	AssetTypePostgresSeed:              "postgres",
 	AssetTypePostgresQuerySensor:       "postgres",
@@ -921,6 +926,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeS3KeySensor:               "aws",
 	AssetTypeDynamoDB:                  "dynamodb",
 	AssetTypeElasticsearch:             "elasticsearch",
+	AssetTypeGoogleSheets:              "google_sheets",
 	AssetTypeVerticaQuery:              "vertica",
 	AssetTypeVerticaSeed:               "vertica",
 	AssetTypeVerticaQuerySensor:        "vertica",
@@ -962,10 +968,12 @@ var IngestrTypeConnectionMapping = map[string]AssetType{
 	"synapse":       AssetTypeSynapseQuery,
 	"duckdb":        AssetTypeDuckDBQuery,
 	"clickhouse":    AssetTypeClickHouse,
+	"starrocks":     AssetTypeStarRocks,
 	"oracle":        AssetTypeOracleQuery,
 	"motherduck":    AssetTypeMotherduckQuery,
 	"dynamodb":      AssetTypeDynamoDB,
 	"elasticsearch": AssetTypeElasticsearch,
+	"gsheets":       AssetTypeGoogleSheets,
 	"vertica":       AssetTypeVerticaQuery,
 }
 
@@ -1000,6 +1008,66 @@ type CustomCheck struct {
 	Query         string          `json:"query" yaml:"query" mapstructure:"query"`
 	Retries       *int            `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
 	Notifications *Notifications  `json:"notifications,omitempty" yaml:"notifications,omitempty" mapstructure:"notifications"`
+}
+
+// UnitTest pins an asset's transformation logic by running it against mocked
+// input rows and asserting the produced output, independent of production data.
+// Unlike quality checks (which validate real data after a run), a unit test
+// substitutes the tables the query reads with fixtures. See
+// docs/proposals/sql-unit-tests.md.
+type UnitTest struct {
+	Name          string                 `json:"name" yaml:"name" mapstructure:"name"`
+	Description   string                 `json:"description,omitempty" yaml:"description,omitempty" mapstructure:"description"`
+	Inputs        []UnitTestInput        `json:"inputs,omitempty" yaml:"inputs,omitempty" mapstructure:"inputs"`
+	Fixtures      []string               `json:"fixtures,omitempty" yaml:"fixtures,omitempty" mapstructure:"fixtures"`
+	Variables     map[string]interface{} `json:"variables,omitempty" yaml:"variables,omitempty" mapstructure:"variables"`
+	ExecutionTime string                 `json:"execution_time,omitempty" yaml:"execution_time,omitempty" mapstructure:"execution_time"`
+	Expected      UnitTestExpected       `json:"expected" yaml:"expected,omitempty" mapstructure:"expected"`
+}
+
+// Fixture is a named, reusable set of mock rows for one asset, defined at the
+// pipeline level and pulled into a unit test by name (UnitTest.Fixtures). It
+// lets many tests share a baseline set of input rows (typically lookup or
+// dimension tables) instead of repeating them in every test. A test's own
+// inputs take precedence over a referenced fixture for the same asset.
+type Fixture struct {
+	Name  string                   `json:"name" yaml:"name" mapstructure:"name"`
+	Asset string                   `json:"asset" yaml:"asset" mapstructure:"asset"`
+	Rows  []map[string]interface{} `json:"rows,omitempty" yaml:"rows,omitempty" mapstructure:"rows"`
+}
+
+// UnitTestInput is a mocked table the asset's query reads from, identified by
+// the upstream asset name as it appears in the SQL. Rows are sparse: any column
+// not listed defaults to NULL.
+type UnitTestInput struct {
+	Asset string                   `json:"asset" yaml:"asset" mapstructure:"asset"`
+	Rows  []map[string]interface{} `json:"rows,omitempty" yaml:"rows,omitempty" mapstructure:"rows"`
+}
+
+// UnitTestExpected describes the output a unit test asserts. Count and Rows are
+// independent: a test may set either or both, and when both are set both must
+// hold. Count asserts the total number of produced rows. Rows compares the
+// produced rows against the listed ones. Match is "subset" (the default: every
+// expected row must appear, extra rows allowed) or "exact"; Order is "any" (the
+// default) or "strict".
+type UnitTestExpected struct {
+	Rows  []map[string]interface{} `json:"rows,omitempty" yaml:"rows,omitempty" mapstructure:"rows"`
+	Count *int64                   `json:"count,omitempty" yaml:"count,omitempty" mapstructure:"count"`
+	Match string                   `json:"match,omitempty" yaml:"match,omitempty" mapstructure:"match"`
+	Order string                   `json:"order,omitempty" yaml:"order,omitempty" mapstructure:"order"`
+	// CTEs asserts the output of named intermediate CTEs inside the asset's
+	// query, keyed by CTE name, so sub-logic can be pinned without asserting the
+	// whole result.
+	CTEs map[string]UnitTestCTEExpected `json:"ctes,omitempty" yaml:"ctes,omitempty" mapstructure:"ctes"`
+}
+
+// UnitTestCTEExpected asserts the rows produced by one named CTE in the asset's
+// query. Same row/count/match/order semantics as the top-level expectation.
+type UnitTestCTEExpected struct {
+	Rows  []map[string]interface{} `json:"rows,omitempty" yaml:"rows,omitempty" mapstructure:"rows"`
+	Count *int64                   `json:"count,omitempty" yaml:"count,omitempty" mapstructure:"count"`
+	Match string                   `json:"match,omitempty" yaml:"match,omitempty" mapstructure:"match"`
+	Order string                   `json:"order,omitempty" yaml:"order,omitempty" mapstructure:"order"`
 }
 
 type DependsColumn struct {
@@ -1112,6 +1180,7 @@ type Asset struct { //nolint:recvcheck
 	Extends           []string           `json:"extends" yaml:"extends,omitempty" mapstructure:"extends"`
 	Columns           []Column           `json:"columns" yaml:"columns,omitempty" mapstructure:"columns"`
 	CustomChecks      []CustomCheck      `json:"custom_checks" yaml:"custom_checks,omitempty" mapstructure:"custom_checks"`
+	UnitTests         []UnitTest         `json:"unit_tests,omitempty" yaml:"unit_tests,omitempty" mapstructure:"unit_tests"`
 	Hooks             Hooks              `json:"hooks,omitempty" yaml:"hooks,omitempty" mapstructure:"hooks"`
 	Metadata          EmptyStringMap     `json:"metadata" yaml:"metadata,omitempty" mapstructure:"metadata"`
 	Snowflake         SnowflakeConfig    `json:"snowflake" yaml:"snowflake,omitempty" mapstructure:"snowflake"`
@@ -1150,12 +1219,13 @@ type Hook struct {
 }
 
 type Hooks struct {
-	Pre  []Hook `json:"pre,omitempty" yaml:"pre,omitempty" mapstructure:"pre"`
-	Post []Hook `json:"post,omitempty" yaml:"post,omitempty" mapstructure:"post"`
+	ApplicableTypes []string `json:"applicable_type,omitempty" yaml:"applicable_type,omitempty" mapstructure:"applicable_type"`
+	Pre             []Hook   `json:"pre,omitempty" yaml:"pre,omitempty" mapstructure:"pre"`
+	Post            []Hook   `json:"post,omitempty" yaml:"post,omitempty" mapstructure:"post"`
 }
 
 func (h Hooks) IsZero() bool {
-	return len(h.Pre) == 0 && len(h.Post) == 0
+	return len(h.Pre) == 0 && len(h.Post) == 0 && len(h.ApplicableTypes) == 0
 }
 
 //nolint:recvcheck
@@ -2036,6 +2106,7 @@ type Pipeline struct {
 	tasksByName        map[string]*Asset      `yaml:"-"`
 	MacrosPath         string                 `json:"-" yaml:"-"`
 	Macros             []Macro                `json:"macros" yaml:"macros,omitempty" mapstructure:"macros"`
+	Fixtures           []Fixture              `json:"fixtures,omitempty" yaml:"fixtures,omitempty" mapstructure:"fixtures"`
 }
 
 func (p *Pipeline) UnmarshalYAML(unmarshal func(interface{}) error) error {
@@ -2178,45 +2249,37 @@ func (p *Pipeline) GetCompatibilityHash() string {
 func (p *Pipeline) GetAllConnectionNamesForAsset(asset *Asset) ([]string, error) {
 	assetType := asset.Type
 	if assetType == AssetTypePython { //nolint
-		secretKeys := make([]string, 0, len(asset.Secrets))
-		for _, secret := range asset.Secrets {
-			secretKeys = append(secretKeys, secret.SecretKey)
+		connectionNames := assetSecretConnectionNames(asset)
+		if asset.Connection != "" {
+			connectionNames = append(connectionNames, asset.Connection)
+		} else if asset.Materialization.Type != "" {
+			conn, err := p.GetConnectionNameForAsset(asset)
+			if err != nil {
+				return []string{}, err
+			}
+			connectionNames = append(connectionNames, conn)
 		}
-		return secretKeys, nil
+		return connectionNames, nil
+	} else if assetType == AssetTypeR {
+		connectionNames := assetSecretConnectionNames(asset)
+		if asset.Connection != "" {
+			connectionNames = append(connectionNames, asset.Connection)
+		}
+		return connectionNames, nil
 	} else if assetType == AssetTypeIngestr {
 		ingestrSource, ok := asset.Parameters.GetString("source_connection")
 		if !ok {
 			return []string{}, errors.Errorf("No source connection in asset")
 		}
 
-		ingestrDestination, ok := asset.Parameters.GetString("destination_connection")
-		if ok {
-			return []string{ingestrDestination, ingestrSource}, nil
+		ingestrDestination, err := p.GetConnectionNameForAsset(asset)
+		if err != nil {
+			return []string{}, err
 		}
 
-		// if destination connection not specified, we infer from destination type
-		ingestrDest, _ := asset.Parameters.GetString("destination")
-		assetType, ok = IngestrTypeConnectionMapping[ingestrDest]
-		if !ok {
-			return []string{}, errors.Errorf("connection type could not be inferred for destination '%s', please specify a `connection` key in the asset", ingestrDest)
-		}
-
-		mapping, ok := AssetTypeConnectionMapping[assetType]
-		if !ok {
-			return []string{}, errors.Errorf("No connection mapping found for asset type:'%s' (%s)", assetType, asset.Name)
-		}
-		conn, ok := p.DefaultConnections[mapping]
-		if ok {
-			ingestrDestination = conn
-			return []string{ingestrDestination, ingestrSource}, nil
-		}
-
-		ingestrDestination, ok = defaultMapping[mapping]
-		if ok {
-			return []string{ingestrDestination, ingestrSource}, nil
-		}
-
-		return []string{}, errors.Errorf("No default connection for type: '%s'", assetType)
+		return []string{ingestrDestination, ingestrSource}, nil
+	} else if assetMainTaskIsConnectionless(assetType) {
+		return nil, nil
 	} else {
 		conn, err := p.GetConnectionNameForAsset(asset)
 		if err != nil {
@@ -2225,6 +2288,60 @@ func (p *Pipeline) GetAllConnectionNamesForAsset(asset *Asset) ([]string, error)
 
 		return []string{conn}, nil
 	}
+}
+
+func assetMainTaskIsConnectionless(assetType AssetType) bool {
+	switch assetType {
+	case AssetTypeAthenaSource,
+		AssetTypeBigquerySource,
+		AssetTypeClickHouseSource,
+		AssetTypeDatabricksSource,
+		AssetTypeDuckDBSource,
+		AssetTypeMongoSource,
+		AssetTypeMsSQLSource,
+		AssetTypeOracleSource,
+		AssetTypePostgresSource,
+		AssetTypeRedshiftSource,
+		AssetTypeSnowflakeSource,
+		AssetTypeSynapseSource,
+		AssetTypeVerticaSource,
+		AssetTypeEmpty,
+		AssetTypeAgentClaudeCode,
+		AssetTypeDomo,
+		AssetTypeGoodData,
+		AssetTypeGrafana,
+		AssetTypeLooker,
+		AssetTypeLookerStudio,
+		AssetTypeMetabase,
+		AssetTypeModeBI,
+		AssetTypePowerBI,
+		AssetTypeQlikSense,
+		AssetTypeQlikView,
+		AssetTypeQuicksight,
+		AssetTypeRedash,
+		AssetTypeSisense,
+		AssetTypeSuperset,
+		AssetTypeTableauDashboard,
+		AssetTypeTableauWorksheet,
+		AssetType("appsflyer.export.bq"),
+		AssetType("dbt"),
+		AssetType("dbt.test"),
+		AssetType("gcs.sensor.object"),
+		AssetType("gcs.sensor.object_sensor_with_prefix"),
+		AssetType("python.beta"),
+		AssetType("python.legacy"):
+		return true
+	default:
+		return false
+	}
+}
+
+func assetSecretConnectionNames(asset *Asset) []string {
+	secretKeys := make([]string, 0, len(asset.Secrets))
+	for _, secret := range asset.Secrets {
+		secretKeys = append(secretKeys, secret.SecretKey)
+	}
+	return secretKeys
 }
 
 func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
@@ -2236,6 +2353,10 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 	var ok bool
 	switch assetType {
 	case AssetTypeIngestr:
+		if conn, ok := asset.Parameters.GetString("destination_connection"); ok && conn != "" {
+			return conn, nil
+		}
+
 		ingestrDest, _ := asset.Parameters.GetString("destination")
 		assetType, ok = IngestrTypeConnectionMapping[ingestrDest]
 		if !ok {
@@ -2975,7 +3096,7 @@ func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 	if (asset.IntervalModifiers.End == TimeModifier{}) {
 		asset.IntervalModifiers.End = defaults.IntervalModifiers.End
 	}
-	acceptsDefaultHooks := assetAcceptsDefaultHooks(asset)
+	acceptsDefaultHooks := assetAcceptsDefaultHooks(asset, defaults.Hooks)
 	if acceptsDefaultHooks && len(asset.Hooks.Pre) == 0 {
 		asset.Hooks.Pre = append([]Hook(nil), defaults.Hooks.Pre...)
 	}
@@ -3557,8 +3678,15 @@ func cloneWebhookNotification(value WebhookNotification) WebhookNotification {
 	return value
 }
 
-func assetAcceptsDefaultHooks(asset *Asset) bool {
-	return asset.IsSQLAsset()
+func assetAcceptsDefaultHooks(asset *Asset, defaults Hooks) bool {
+	if !asset.IsSQLAsset() {
+		return false
+	}
+	// When no applicable_type filter is set, every SQL asset inherits the defaults.
+	if len(defaults.ApplicableTypes) == 0 {
+		return true
+	}
+	return slices.Contains(defaults.ApplicableTypes, string(asset.Type))
 }
 
 func (b *Builder) InjectConnectionAsSecret(ctx context.Context, asset *Asset, foundPipeline *Pipeline) (*Asset, error) {
@@ -3656,7 +3784,11 @@ func (b *Builder) fillGlossaryStuff(ctx context.Context, asset *Asset, foundPipe
 }
 
 func (a *Asset) IsSQLAsset() bool {
-	switch a.Type {
+	return IsSQLAssetType(a.Type)
+}
+
+func IsSQLAssetType(t AssetType) bool {
+	switch t {
 	case AssetTypeBigqueryQuery,
 		AssetTypeSnowflakeQuery,
 		AssetTypePostgresQuery,

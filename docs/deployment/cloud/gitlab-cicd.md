@@ -86,6 +86,7 @@ validate:
   script:
     - cp $BRUIN_CONFIG .bruin.yml
     - bruin validate .
+    - bruin unit-test .
   only:
     - merge_requests
     - main
@@ -172,6 +173,7 @@ validate_mr:
   script:
     - cp $BRUIN_CONFIG .bruin.yml
     - bruin validate .
+    - bruin unit-test .
   only:
     - merge_requests
 ```
@@ -198,6 +200,7 @@ validate:
   stage: validate
   script:
     - bruin validate .
+    - bruin unit-test .
   only:
     - main
 
@@ -335,6 +338,7 @@ validate:
   stage: validate
   script:
     - bruin validate .
+    - bruin unit-test .
 
 ingestion:
   extends: .install_bruin
@@ -471,6 +475,7 @@ validate:
   script:
     - cp $BRUIN_CONFIG .bruin.yml
     - bruin validate .
+    - bruin unit-test .
 ```
 
 ### 4. Use Specific Docker Image Versions
@@ -552,6 +557,7 @@ validate:
   stage: validate
   script:
     - bruin validate .
+    - bruin unit-test .
   only:
     - merge_requests
     - main

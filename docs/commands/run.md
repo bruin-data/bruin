@@ -119,6 +119,56 @@ bruin run --selector "@fct_orders"
 
 `--selector` cannot be combined with `--tag`, `--downstream`, positional asset arguments, or single-asset runs. Use selector syntax directly for those cases.
 
+#### AND / OR logic with tags
+
+The selector grammar gives you both AND and OR when targeting assets by tag:
+
+- **Space = union (OR):** an asset matches if it satisfies *any* of the space-separated terms.
+- **Comma = intersection (AND):** an asset matches only if it satisfies *all* of the comma-separated terms.
+
+```bash
+# OR — assets tagged finance OR marketing
+bruin run --selector "tag:finance tag:marketing"
+
+# AND — assets tagged with BOTH daily AND critical
+bruin run --selector "tag:daily,tag:critical"
+
+# Mix — (daily AND critical) OR anything tagged adhoc
+bruin run --selector "tag:daily,tag:critical tag:adhoc"
+```
+
+Because comma is an intersection, an AND expression only matches when a single asset carries every listed tag. If no asset has all of them, the selector matches nothing.
+
+#### Combining tags with graph expansion
+
+Tag terms compose with the `+`, `n+`, and `@` graph operators, so you can pull in a tag's lineage as well:
+
+```bash
+# Everything tagged finance, plus all of their downstream assets
+bruin run --selector "tag:finance+"
+
+# Everything tagged finance, plus all of their upstream dependencies
+bruin run --selector "+tag:finance"
+
+# Upstream lineage of fct_orders, narrowed to only the finance-tagged assets in it
+bruin run --selector "+fct_orders,tag:finance"
+
+# Finance-tagged assets and their immediate (one level) downstream only
+bruin run --selector "tag:finance+1"
+```
+
+#### Tag wildcards
+
+Tag matching supports glob wildcards (`*`, `?`, `[...]`), which is handy for tag naming conventions:
+
+```bash
+# Any asset whose tag starts with "team_"
+bruin run --selector "tag:team_*"
+
+# Union of a wildcard tag and an exact tag
+bruin run --selector "tag:layer_* tag:critical"
+```
+
 ### Combining Tags and Execution Types
 
 Using `--tag` with `--only` restricts the execution steps to specific types for the assets filtered by the given tag. For example:

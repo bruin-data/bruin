@@ -235,22 +235,55 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		sourceURI = strings.ReplaceAll(sourceURI, "bigquery://", "gsheets://")
 	}
 
-	// Handle CDC mode - transform PostgreSQL URI to CDC format and auto-set merge strategy
+	// Handle CDC mode - transform the source URI into ingestr's CDC scheme and auto-set merge strategy.
+	// Supported today: PostgreSQL (postgres+cdc), the MySQL family (mysql+cdc / mariadb+cdc),
+	// Vitess (vitess+cdc, VStream) and PlanetScale (planetscale+cdc, psdbconnect).
 	if cdcVal, _ := asset.Parameters.GetString("cdc"); cdcVal == "true" {
 		parsedURI, err := url.Parse(sourceURI)
 		if err != nil {
 			return fmt.Errorf("failed to parse source URI for CDC: %w", err)
 		}
 
-		parsedURI.Scheme = strings.ReplaceAll(parsedURI.Scheme, "postgresql", "postgres+cdc")
+		switch {
+		case strings.Contains(parsedURI.Scheme, "postgresql"):
+			parsedURI.Scheme = strings.ReplaceAll(parsedURI.Scheme, "postgresql", "postgres+cdc")
+		case strings.HasPrefix(parsedURI.Scheme, "mysql"), strings.HasPrefix(parsedURI.Scheme, "mariadb"),
+			strings.HasPrefix(parsedURI.Scheme, "vitess"), strings.HasPrefix(parsedURI.Scheme, "planetscale"):
+			// mysql+cdc / mariadb+cdc / vitess+cdc / planetscale+cdc are all valid CDC schemes.
+			if !strings.HasSuffix(parsedURI.Scheme, "+cdc") {
+				parsedURI.Scheme += "+cdc"
+			}
+		}
 
 		q := parsedURI.Query()
+		// PostgreSQL logical-replication parameters.
 		if pub, _ := asset.Parameters.GetString("cdc_publication"); pub != "" {
 			q.Set("publication", pub)
 		}
 		if slot, _ := asset.Parameters.GetString("cdc_slot"); slot != "" {
 			q.Set("slot", slot)
 		}
+		// Vitess VStream / PlanetScale psdbconnect parameters.
+		if backend, _ := asset.Parameters.GetString("cdc_backend"); backend != "" {
+			q.Set("cdc_backend", backend)
+		}
+		if grpcPort, _ := asset.Parameters.GetString("cdc_grpc_port"); grpcPort != "" {
+			q.Set("grpc_port", grpcPort)
+		}
+		if grpcHost, _ := asset.Parameters.GetString("cdc_grpc_host"); grpcHost != "" {
+			q.Set("grpc_host", grpcHost)
+		}
+		if grpcTLS, _ := asset.Parameters.GetString("cdc_grpc_tls"); grpcTLS != "" {
+			q.Set("grpc_tls", grpcTLS)
+		}
+		// MySQL binlog replication identifier.
+		if serverID, _ := asset.Parameters.GetString("cdc_server_id"); serverID != "" {
+			q.Set("server_id", serverID)
+		}
+		if tls, _ := asset.Parameters.GetString("cdc_tls"); tls != "" {
+			q.Set("tls", tls)
+		}
+		// Shared parameters.
 		if mode, _ := asset.Parameters.GetString("cdc_mode"); mode != "" {
 			q.Set("mode", mode)
 		}

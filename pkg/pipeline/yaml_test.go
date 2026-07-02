@@ -559,6 +559,10 @@ func TestCheckRetries(t *testing.T) {
 	got, err := creator(filepath.Join("testdata", "yaml", "check-retries", "task.yml"))
 	require.NoError(t, err)
 
+	// asset-level retries is parsed from the definition.
+	require.NotNil(t, got.Retries)
+	require.Equal(t, 4, *got.Retries)
+
 	require.Len(t, got.Columns, 1)
 	checks := got.Columns[0].Checks
 	require.Len(t, checks, 2)
@@ -576,6 +580,173 @@ func TestCheckRetries(t *testing.T) {
 	require.NotNil(t, got.CustomChecks[0].Retries)
 	require.Equal(t, 3, *got.CustomChecks[0].Retries)
 	require.Nil(t, got.CustomChecks[1].Retries)
+}
+
+func TestUnitTestsParsing(t *testing.T) {
+	t.Parallel()
+
+	content := []byte(strings.TrimSpace(`
+name: analytics.daily_revenue
+type: duckdb.sql
+materialization:
+  type: table
+unit_tests:
+  - name: refunds_excluded_from_revenue
+    description: refunded orders must not count toward revenue
+    inputs:
+      - asset: analytics.orders
+        rows:
+          - {id: 1, status: paid, amount: 100}
+          - {id: 2, status: refunded, amount: 999}
+    expected:
+      rows:
+        - {revenue: 100}
+      match: subset
+  - name: row_count_is_one
+    fixtures: [base_orders]
+    inputs:
+      - asset: analytics.orders
+        rows:
+          - {id: 1}
+    expected:
+      count: 1
+`))
+
+	got, err := pipeline.ConvertYamlToTask(content)
+	require.NoError(t, err)
+	require.Len(t, got.UnitTests, 2)
+
+	first := got.UnitTests[0]
+	require.Equal(t, "refunds_excluded_from_revenue", first.Name)
+	require.Equal(t, "refunded orders must not count toward revenue", first.Description)
+
+	require.Len(t, first.Inputs, 1)
+	require.Equal(t, "analytics.orders", first.Inputs[0].Asset)
+	require.Len(t, first.Inputs[0].Rows, 2)
+	require.Equal(t, "paid", first.Inputs[0].Rows[0]["status"])
+	require.Equal(t, "refunded", first.Inputs[0].Rows[1]["status"])
+
+	require.Len(t, first.Expected.Rows, 1)
+	require.Equal(t, "subset", first.Expected.Match)
+
+	second := got.UnitTests[1]
+	require.Equal(t, "row_count_is_one", second.Name)
+	require.Equal(t, []string{"base_orders"}, second.Fixtures)
+	require.NotNil(t, second.Expected.Count)
+	require.Equal(t, int64(1), *second.Expected.Count)
+}
+
+func TestUnitTestsParsing_CTEsAndExecutionTime(t *testing.T) {
+	t.Parallel()
+
+	content := []byte(strings.TrimSpace(`
+name: analytics.report
+type: duckdb.sql
+unit_tests:
+  - name: with_cte_and_frozen_time
+    execution_time: "2023-01-01 12:05:03"
+    inputs:
+      - asset: analytics.orders
+        rows:
+          - {id: 1, status: paid}
+    expected:
+      ctes:
+        paid:
+          rows:
+            - {id: 1}
+          match: exact
+      rows:
+        - {id: 1}
+`))
+
+	got, err := pipeline.ConvertYamlToTask(content)
+	require.NoError(t, err)
+	require.Len(t, got.UnitTests, 1)
+
+	ut := got.UnitTests[0]
+	require.Equal(t, "2023-01-01 12:05:03", ut.ExecutionTime)
+	require.Contains(t, ut.Expected.CTEs, "paid")
+	require.Equal(t, "exact", ut.Expected.CTEs["paid"].Match)
+	require.Len(t, ut.Expected.CTEs["paid"].Rows, 1)
+	require.EqualValues(t, 1, ut.Expected.CTEs["paid"].Rows[0]["id"])
+}
+
+func TestPipelineFixturesParsing(t *testing.T) {
+	t.Parallel()
+
+	// A pipeline-level fixtures: block. Strict decoding mirrors what `bruin
+	// validate` runs over pipeline.yml, so this also proves the new key is not
+	// flagged as unknown.
+	content := []byte(strings.TrimSpace(`
+name: analytics
+fixtures:
+  - name: base_orders
+    asset: analytics.orders
+    rows:
+      - {id: 1, status: paid, amount: 100}
+      - {id: 2, status: refunded, amount: 999}
+`))
+
+	var pl pipeline.Pipeline
+	require.NoError(t, path.ConvertYamlToObjectStrict(content, &pl))
+	require.Len(t, pl.Fixtures, 1)
+	require.Equal(t, "base_orders", pl.Fixtures[0].Name)
+	require.Equal(t, "analytics.orders", pl.Fixtures[0].Asset)
+	require.Len(t, pl.Fixtures[0].Rows, 2)
+	require.Equal(t, "paid", pl.Fixtures[0].Rows[0]["status"])
+}
+
+func TestValidateAssetYAML_UnitTests(t *testing.T) {
+	t.Parallel()
+
+	fs := afero.NewMemMapFs()
+
+	valid := strings.TrimSpace(`
+/* @bruin
+name: analytics.daily_revenue
+type: duckdb.sql
+unit_tests:
+  - name: row_count_is_one
+    fixtures: [base_orders]
+    execution_time: "2023-01-01 12:05:03"
+    inputs:
+      - asset: analytics.orders
+        rows:
+          - {id: 1}
+    expected:
+      count: 1
+      ctes:
+        paid:
+          rows:
+            - {id: 1}
+@bruin */
+
+SELECT 1
+`)
+	require.NoError(t, afero.WriteFile(fs, "valid.sql", []byte(valid), 0o644))
+
+	// `bruin validate` strict-decodes the @bruin block; the new unit_tests key must be accepted.
+	require.NoError(t, pipeline.ValidateAssetYAML(fs, "valid.sql", pipeline.CommentTask))
+
+	invalid := strings.TrimSpace(`
+/* @bruin
+name: analytics.daily_revenue
+type: duckdb.sql
+unit_tests:
+  - name: row_count_is_one
+    not_a_real_field: oops
+    expected:
+      count: 1
+@bruin */
+
+SELECT 1
+`)
+	require.NoError(t, afero.WriteFile(fs, "invalid.sql", []byte(invalid), 0o644))
+
+	// Strict validation also covers the nested unit-test schema, so typos are caught.
+	err := pipeline.ValidateAssetYAML(fs, "invalid.sql", pipeline.CommentTask)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "not_a_real_field")
 }
 
 func TestConvertYamlToTask_Hooks(t *testing.T) {

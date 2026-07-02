@@ -91,6 +91,23 @@ environments:
           port: 3306
           database: "mysqldb"
 
+      vitess:
+        - name: conn8b
+          username: "vitessuser"
+          password: "vitesspass"
+          host: "vtgatehost"
+          port: 15306
+          database: "commerce"
+          grpc_port: 15991
+
+      planetscale:
+        - name: conn8c
+          username: "psuser"
+          password: "pspass"
+          host: "aws.connect.psdb.cloud"
+          port: 3306
+          database: "psdb"
+
       notion:
         - name: conn9
           api_key: "XXXXYYYYZZZZ"
@@ -397,6 +414,10 @@ environments:
         - name: "googleanalytics-1"
           service_account_file: "path/to/service_account.json"
           property_id: "12345"
+      gsc:
+        - name: "conn-gsc"
+          service_account_file: "path/to/service_account.json"
+          site_url: "sc-domain:example.com"
       applovin:
         - name: "applovin-1"
           api_key: "key-123"
