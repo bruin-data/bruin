@@ -4,13 +4,21 @@
 
 Bruin supports Socrata as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from any Socrata-powered open data portal into your data warehouse.
 
-In order to set up Socrata connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file. You need the `domain` and `app_token`. Optionally, you can provide `username` and `password` for accessing private datasets.
+In order to set up a Socrata connection, you need the Socrata portal domain and an app token from Socrata developer settings. You can optionally add API key credentials for authenticated or private datasets.
 
 Follow the steps below to correctly set up Socrata as a data source and run ingestion.
 
 ## Configuration
 
-### Step 1: Add a connection to .bruin.yml file
+### Step 1: Create a Socrata app token
+
+Create or sign in to a Socrata account. You can register for a free account at [evergreen.data.socrata.com/signup](https://evergreen.data.socrata.com/signup).
+
+After signing in, open your account menu, go to **Developer Settings**, and select **Create New App Token**. Copy the generated token and use it as `app_token` in `.bruin.yml`.
+
+If you need access to authenticated or private datasets, you can also generate API key credentials from developer settings. Use the API Key ID as `username` and the Key Secret as `password`.
+
+### Step 2: Add a connection to .bruin.yml file
 
 To connect to Socrata, you need to add a configuration item to the connections section of the `.bruin.yml` file. This configuration must comply with the following schema:
 
@@ -20,18 +28,18 @@ connections:
     - name: "my-socrata"
       domain: "data.seattle.gov"
       app_token: "your_app_token"
-      username: "your_username"  # optional, for private datasets
-      password: "your_password"  # optional, for private datasets
+      username: "your_api_key_id" # optional, for authenticated datasets
+      password: "your_api_key_secret" # optional, for authenticated datasets
 ```
 
-- `domain`: The Socrata domain (e.g., `data.seattle.gov`, `data.cityofnewyork.us`)
-- `app_token`: Socrata app token for API access (required)
-- `username`: Username for authentication (optional, required for private datasets)
-- `password`: Password for authentication (optional, required for private datasets)
+- `domain`: The Socrata portal domain, for example `data.seattle.gov` or `data.cityofnewyork.us`.
+- `app_token`: Socrata app token created from **Developer Settings** > **Create New App Token**.
+- `username`: Optional API Key ID from Socrata developer settings. Use this for authenticated or private datasets.
+- `password`: Optional API Key Secret from Socrata developer settings. Use this for authenticated or private datasets.
 
-### Step 2: Create an asset file for data ingestion
+### Step 3: Create an asset file for data ingestion
 
-To ingest data from Socrata, you need to create an [asset configuration](/assets/ingestr#asset-structure) file. This file defines the data flow from the source to the destination. Create a YAML file (e.g., socrata_ingestion.yml) inside the assets folder and add the following content:
+To ingest data from Socrata, you need to create an [asset configuration](/assets/ingestr#asset-structure) file. This file defines the data flow from the source to the destination. Create a YAML file, for example `socrata_ingestion.yml`, inside the assets folder and add the following content:
 
 ```yaml
 name: public.socrata_data
@@ -46,9 +54,9 @@ parameters:
 ```
 
 - `name`: The name of the asset.
-- `type`: Specifies the type of the asset. Set this to ingestr to use the ingestr data pipeline.
+- `type`: Specifies the type of the asset. Set this to `ingestr` to use the ingestr data pipeline.
 - `connection`: This is the destination connection, which defines where the data should be stored. For example: `postgres` indicates that the ingested data will be stored in a Postgres database.
-- `source_connection`: The name of the socrata connection defined in .bruin.yml.
+- `source_connection`: The name of the Socrata connection defined in `.bruin.yml`.
 - `source_table`: The Socrata dataset ID in 4x4 format (e.g., `2khk-5ukd`).
 
 ## Available Source Tables
@@ -56,10 +64,12 @@ parameters:
 Socrata source allows ingesting datasets by specifying their dataset ID as the source table:
 
 | Table | PK | Inc Key | Inc Strategy | Details |
-|-------|----|---------|--------------| ------- |
-| `<dataset_id>` | `:id` | user-defined | replace/merge | Loads all records from the specified Socrata dataset. Uses `replace` by default, or `merge` when `--incremental-key` is specified. |
+|-------|----|---------|--------------|---------|
+| `<dataset_id>` | `:id` | - | replace | Loads all records from the specified Socrata dataset. |
 
-### Step 3: [Run](/commands/run) asset to ingest data
+To find the dataset ID, open the Socrata dataset in a browser and copy the 4x4 identifier from the URL or API endpoint. For example, in `https://data.seattle.gov/City-Business/City-of-Seattle-Wage-Data/2khk-5ukd`, the domain is `data.seattle.gov` and the dataset ID is `2khk-5ukd`.
+
+### Step 4: [Run](/commands/run) asset to ingest data
 
 ```bash
 bruin run assets/socrata_ingestion.yml
