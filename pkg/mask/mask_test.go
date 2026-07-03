@@ -10,9 +10,9 @@ import (
 	"testing"
 )
 
-// sv collects sensitive values with no base dir, ignoring unreadable paths.
+// sv collects sensitive values, ignoring the unreadable-paths return.
 func sv(conn any) []string {
-	v, _ := SensitiveValues(conn, "")
+	v, _ := SensitiveValues(conn)
 	return v
 }
 
@@ -255,27 +255,27 @@ func TestSensitiveValues_File(t *testing.T) {
 	}
 }
 
-// TestSensitiveValues_RelativeFileResolvedAgainstBaseDir proves a relative
-// sensitive_file path is resolved against baseDir (the config dir), not the
-// process working directory, so masking reads the credential regardless of cwd.
-func TestSensitiveValues_RelativeFileResolvedAgainstBaseDir(t *testing.T) {
+// TestSensitiveValues_ReadsFileAsStored proves the path is read exactly as
+// stored on the connection (matching the code that embeds it), not rewritten.
+func TestSensitiveValues_ReadsFileAsStored(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	if err := os.WriteFile(dir+"/creds.json", []byte("RELATIVE_FILE_SECRET"), 0o600); err != nil {
+	fpath := dir + "/creds.json" // absolute
+	if err := os.WriteFile(fpath, []byte("AS_STORED_FILE_SECRET"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	type conn struct {
 		SAFile string `mapstructure:"service_account_file" sensitive_file:"true"`
 	}
-	values, unreadable := SensitiveValues(&conn{SAFile: "creds.json"}, dir)
+	values, unreadable := SensitiveValues(&conn{SAFile: fpath})
 	found := false
 	for _, v := range values {
-		if v == "RELATIVE_FILE_SECRET" {
+		if v == "AS_STORED_FILE_SECRET" {
 			found = true
 		}
 	}
 	if !found {
-		t.Errorf("relative sensitive_file not resolved against baseDir; values=%v unreadable=%v", values, unreadable)
+		t.Errorf("file contents not collected; values=%v unreadable=%v", values, unreadable)
 	}
 	if len(unreadable) != 0 {
 		t.Errorf("expected no unreadable paths, got %v", unreadable)
@@ -288,16 +288,16 @@ func TestSensitiveValues_RelativeFileResolvedAgainstBaseDir(t *testing.T) {
 func TestSensitiveValues_UnreadableReported(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
+	missing := filepath.Join(dir, "missing.json") // absolute, does not exist
 	type conn struct {
 		SAFile string `mapstructure:"service_account_file" sensitive_file:"true"`
 	}
-	values, unreadable := SensitiveValues(&conn{SAFile: "missing.json"}, dir)
+	values, unreadable := SensitiveValues(&conn{SAFile: missing})
 	if len(values) != 0 {
 		t.Errorf("expected no values for missing file, got %v", values)
 	}
-	want := filepath.Join(dir, "missing.json")
-	if len(unreadable) != 1 || unreadable[0] != want {
-		t.Errorf("expected unreadable [%s], got %v", want, unreadable)
+	if len(unreadable) != 1 || unreadable[0] != missing {
+		t.Errorf("expected unreadable [%s], got %v", missing, unreadable)
 	}
 }
 

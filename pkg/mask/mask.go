@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/url"
 	"os"
-	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
@@ -51,19 +50,19 @@ func forms(secret string) []string {
 
 // SensitiveValues returns the secret values in conn: inline `sensitive:"true"`
 // fields and the CONTENTS of `sensitive_file:"true"` paths, recursing into nested
-// structs, pointers, slices, and maps. Relative file paths are resolved against
-// baseDir (the config file's directory) so masking does not depend on the process
-// working directory. Paths that are set but cannot be read are returned in
-// unreadable, so the caller can surface a potential masking gap rather than
+// structs, pointers, slices, and maps. File paths are read exactly as stored on
+// the connection — the same value the code that embeds the credential reads — so
+// masking stays in sync whether the path was normalized (local config) or came
+// raw from a secrets backend. Paths that are set but cannot be read are returned
+// in unreadable, so the caller can surface a potential masking gap rather than
 // silently leaving the credential unmasked.
-func SensitiveValues(conn any, baseDir string) (values, unreadable []string) {
-	c := collector{baseDir: baseDir}
+func SensitiveValues(conn any) (values, unreadable []string) {
+	c := collector{}
 	c.walk(reflect.ValueOf(conn))
 	return c.values, c.unreadable
 }
 
 type collector struct {
-	baseDir    string
 	values     []string
 	unreadable []string
 }
@@ -114,14 +113,10 @@ func (c *collector) stringField(field reflect.StructField, s string) {
 	}
 }
 
-// readSecretFile reads a sensitive_file path, resolving relative paths against
-// baseDir so masking finds the same file bruin embeds regardless of the working
-// directory. A set-but-unreadable path is recorded so the caller can warn; empty
-// or implausibly large files are skipped (not maskable credentials).
+// readSecretFile reads a sensitive_file path exactly as stored, matching the code
+// that embeds the credential. A set-but-unreadable path is recorded so the caller
+// can warn; empty or implausibly large files are skipped (not maskable credentials).
 func (c *collector) readSecretFile(path string) {
-	if c.baseDir != "" && !filepath.IsAbs(path) {
-		path = filepath.Join(c.baseDir, path)
-	}
 	fi, err := os.Stat(path)
 	if err != nil {
 		c.unreadable = append(c.unreadable, path)

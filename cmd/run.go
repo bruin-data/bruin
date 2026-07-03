@@ -1225,7 +1225,7 @@ func Run(isDebug *bool) *cli.Command {
 			// no-log-file paths below install it as the output sink.
 			var masker *mask.Masker
 			if c.Bool("mask-credentials") {
-				secrets, unreadable := collectRunSecrets(foundPipeline, cm, connectionManager, filepath.Dir(configFilePath))
+				secrets, unreadable := collectRunSecrets(foundPipeline, cm, connectionManager)
 				for _, unreadablePath := range unreadable {
 					warningPrinter.Printf("credential masking: cannot read %s; its contents will not be masked in logs\n", unreadablePath)
 				}
@@ -2599,12 +2599,12 @@ func generateLogFileName(runID, pipelineName string, assets []*pipeline.Asset) s
 
 // collectRunSecrets unions the local config's sensitive values with each asset's
 // resolved connection (covering external secret backends); unresolved ones are
-// skipped. Relative sensitive_file paths resolve against baseDir (the config
-// directory). unreadable lists set-but-unreadable credential files so the caller
-// can warn that their contents will not be masked.
-func collectRunSecrets(p *pipeline.Pipeline, cfg *config.Config, connMgr config.ConnectionDetailsGetter, baseDir string) (secrets, unreadable []string) {
+// skipped. sensitive_file paths are read as stored, matching the code that embeds
+// them. unreadable lists set-but-unreadable credential files so the caller can
+// warn that their contents will not be masked.
+func collectRunSecrets(p *pipeline.Pipeline, cfg *config.Config, connMgr config.ConnectionDetailsGetter) (secrets, unreadable []string) {
 	if cfg != nil && cfg.SelectedEnvironment != nil {
-		v, u := mask.SensitiveValues(cfg.SelectedEnvironment.Connections, baseDir)
+		v, u := mask.SensitiveValues(cfg.SelectedEnvironment.Connections)
 		secrets = append(secrets, v...)
 		unreadable = append(unreadable, u...)
 	}
@@ -2622,7 +2622,7 @@ func collectRunSecrets(p *pipeline.Pipeline, cfg *config.Config, connMgr config.
 				continue
 			}
 			seen[name] = true
-			v, u := mask.SensitiveValues(connMgr.GetConnectionDetails(name), baseDir)
+			v, u := mask.SensitiveValues(connMgr.GetConnectionDetails(name))
 			secrets = append(secrets, v...)
 			unreadable = append(unreadable, u...)
 		}
