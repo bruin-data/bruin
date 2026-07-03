@@ -896,12 +896,8 @@ func Test_convertPKCS1ToPKCS8_Integration(t *testing.T) {
 	})
 }
 
-// TestManagerMapsStayPaired locks the invariant credential masking relies on:
-// every connection the embedder can use (availableConnections, read via
-// GetConnection to build the ingestr URI) must also be visible to the masker
-// (AllConnectionDetails, read via GetConnectionDetails to collect secrets). If an
-// Add*FromConfig ever populates one map but not the other, a connection's
-// credential could be embedded into a URI but never collected for masking.
+// TestManagerMapsStayPaired: every connection in availableConnections (embedder)
+// must also be in AllConnectionDetails (masker), or its credential could go unmasked.
 func TestManagerMapsStayPaired(t *testing.T) {
 	t.Parallel()
 	cfg := &config.Config{

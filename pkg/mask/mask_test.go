@@ -282,9 +282,8 @@ func TestSensitiveValues_ReadsFileAsStored(t *testing.T) {
 	}
 }
 
-// TestSensitiveValues_UnreadableReported proves a set-but-unreadable
-// sensitive_file path is reported (not silently dropped), so the caller can warn
-// that the credential will not be masked.
+// TestSensitiveValues_UnreadableReported: a set-but-unreadable sensitive_file path
+// is reported (not silently dropped) so the caller can warn.
 func TestSensitiveValues_UnreadableReported(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -345,9 +344,8 @@ func TestMaskEachFormType(t *testing.T) {
 	}
 }
 
-// TestMaskCoversEveryGeneratedForm is the exhaustive invariant: for several kinds
-// of secret, every form New()/forms() produces must actually be redacted by Mask.
-// If forms() ever emits a shape Mask can't match, this fails.
+// TestMaskCoversEveryGeneratedForm: every form forms() emits must be redacted by
+// Mask, across several secret kinds. Fails if forms() emits a shape Mask can't match.
 func TestMaskCoversEveryGeneratedForm(t *testing.T) {
 	t.Parallel()
 	secrets := []string{
@@ -371,9 +369,8 @@ func TestMaskCoversEveryGeneratedForm(t *testing.T) {
 	}
 }
 
-// TestSensitiveValuesInputMethods covers every way a credential is provided:
-// raw inline, base64 inline, inline JSON, a file path whose contents are the
-// secret, and a pass-through path that must NOT be collected.
+// TestSensitiveValuesInputMethods covers every input method: raw/base64/JSON inline,
+// a sensitive_file path, and a pass-through path that must NOT be collected.
 func TestSensitiveValuesInputMethods(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -460,10 +457,8 @@ func TestSensitiveValuesContainers(t *testing.T) {
 	}
 }
 
-// TestMaskConnectionEndToEnd ties collection + forms + masking together: build a
-// masker from a realistic connection that mixes every input method, then mask a
-// simulated ingestr command echo plus raw-value error lines. Secrets in every
-// shape must vanish; non-secret structure must remain.
+// TestMaskConnectionEndToEnd builds a masker from a connection mixing every input
+// method and masks a simulated ingestr command + error lines: secrets gone, structure kept.
 func TestMaskConnectionEndToEnd(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()

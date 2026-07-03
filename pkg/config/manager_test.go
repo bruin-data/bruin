@@ -1165,9 +1165,8 @@ environments:
 	cfg, err := LoadOrCreate(fs, configPath)
 	require.NoError(t, err)
 
-	// Both connections read the file and embed its contents into the ingestr URI,
-	// so their relative paths must be resolved against the config directory (so
-	// masking reads the same file, independent of the process working directory).
+	// Both read+embed the file, so their relative paths must resolve against the
+	// config directory (so masking reads the same file, independent of cwd).
 	require.Len(t, cfg.SelectedEnvironment.Connections.GoogleCloudPlatform, 1)
 	gcp := cfg.SelectedEnvironment.Connections.GoogleCloudPlatform[0].ServiceAccountFile
 	assert.Equal(t, filepath.Join(filepath.Dir(configPath), "creds/gcp.json"), gcp)

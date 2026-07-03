@@ -48,14 +48,8 @@ func forms(secret string) []string {
 	return out
 }
 
-// SensitiveValues returns the secret values in conn: inline `sensitive:"true"`
-// fields and the CONTENTS of `sensitive_file:"true"` paths, recursing into nested
-// structs, pointers, slices, and maps. File paths are read exactly as stored on
-// the connection — the same value the code that embeds the credential reads — so
-// masking stays in sync whether the path was normalized (local config) or came
-// raw from a secrets backend. Paths that are set but cannot be read are returned
-// in unreadable, so the caller can surface a potential masking gap rather than
-// silently leaving the credential unmasked.
+// SensitiveValues returns inline `sensitive:"true"` values and the CONTENTS of
+// `sensitive_file:"true"` paths in conn; unreadable lists set-but-unreadable paths.
 func SensitiveValues(conn any) (values, unreadable []string) {
 	c := collector{}
 	c.walk(reflect.ValueOf(conn))
@@ -113,9 +107,8 @@ func (c *collector) stringField(field reflect.StructField, s string) {
 	}
 }
 
-// readSecretFile reads a sensitive_file path exactly as stored, matching the code
-// that embeds the credential. A set-but-unreadable path is recorded so the caller
-// can warn; empty or implausibly large files are skipped (not maskable credentials).
+// readSecretFile reads a sensitive_file path as stored (matching the embedder),
+// recording unreadable paths; empty or over-cap files are skipped.
 func (c *collector) readSecretFile(path string) {
 	fi, err := os.Stat(path)
 	if err != nil {
@@ -184,10 +177,8 @@ func (r *Masker) Writer(w io.Writer) *LineWriter {
 	return &LineWriter{r: r, w: w}
 }
 
-// LineWriter masks output written through it. It never emits the trailing window
-// the width of the longest secret form, so a secret split across writes (including
-// a multi-line PEM/JSON) is held until fully buffered and masked as a whole rather
-// than leaked as an unmatched fragment.
+// LineWriter masks output, always holding back a trailing window the width of the
+// longest secret form so a secret split across writes is masked whole, not leaked.
 type LineWriter struct {
 	r   *Masker
 	w   io.Writer
@@ -199,11 +190,8 @@ func (lw *LineWriter) Write(p []byte) (int, error) {
 	lw.mu.Lock()
 	defer lw.mu.Unlock()
 	lw.buf = append(lw.buf, p...)
-	// Mask the whole buffer, then emit everything except a trailing window that
-	// could still be the start of a longer secret arriving in a later write. Any
-	// secret starting before that window is fully present here, so it is masked
-	// before it can be emitted. The retained bytes are already-masked, and Mask is
-	// idempotent, so re-masking them next write is safe.
+	// Mask the whole buffer and emit all but a trailing window that could still be
+	// the start of a later secret. Retained bytes are masked; Mask is idempotent.
 	masked := []byte(lw.r.Mask(string(lw.buf)))
 	keep := lw.r.maxLen - 1
 	if keep < 0 {

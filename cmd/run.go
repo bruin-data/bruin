@@ -1213,16 +1213,8 @@ func Run(isDebug *bool) *cli.Command {
 			// Use the interactive TUI only when explicitly requested via --interactive flag
 			useTUI := c.Bool("interactive") && interactiveTerminal
 
-			// Pass Python/child process output through verbatim (preserving carriage
-			// returns, no timestamp/task prefix) so progress bars like tqdm render in
-			// place. Only safe with a single sequential worker writing straight to a
-			// real terminal: with multiple workers the interleaved \r output would be
-			// unreadable, and with a log file the raw \r bytes pollute the log (the
-			// worker writes to the os.Stdout tee that logOutput installs below, and
-			// Clean() strips ANSI escapes but not carriage returns). So this is gated
-			// on !runConfig.NoLogFile to ensure os.Stdout is still the bare terminal.
-			// Build the credential masker up front so both the log-file and the
-			// no-log-file paths below install it as the output sink.
+			// Build the masker up front so both the log-file and no-log-file paths below
+			// install it as the output sink.
 			var masker *mask.Masker
 			if c.Bool("mask-credentials") {
 				secrets, unreadable := collectRunSecrets(foundPipeline, cm, connectionManager)
@@ -1233,8 +1225,8 @@ func Run(isDebug *bool) *cli.Command {
 			}
 			maskingActive := !masker.Empty()
 
-			// Also disabled when masking is active: the masking sink pipes os.Stdout,
-			// so it is no longer the bare terminal this passthrough needs.
+			// Pass ingestr output through verbatim (keeping \r) for live progress bars;
+			// needs a bare terminal: single worker, no TUI/log-file/masking.
 			interactivePythonLogs := interactiveTerminal &&
 				c.Int("workers") == 1 &&
 				!useTUI &&
@@ -2597,11 +2589,8 @@ func generateLogFileName(runID, pipelineName string, assets []*pipeline.Asset) s
 	return fmt.Sprintf("%s__%s__%d_assets_%s", runID, pipelineName, len(assets), shortHash)
 }
 
-// collectRunSecrets unions the local config's sensitive values with each asset's
-// resolved connection (covering external secret backends); unresolved ones are
-// skipped. sensitive_file paths are read as stored, matching the code that embeds
-// them. unreadable lists set-but-unreadable credential files so the caller can
-// warn that their contents will not be masked.
+// collectRunSecrets unions the config's sensitive values with each asset's resolved
+// connection (incl. secret backends); unreadable lists set-but-unreadable cred files.
 func collectRunSecrets(p *pipeline.Pipeline, cfg *config.Config, connMgr config.ConnectionDetailsGetter) (secrets, unreadable []string) {
 	if cfg != nil && cfg.SelectedEnvironment != nil {
 		v, u := mask.SensitiveValues(cfg.SelectedEnvironment.Connections)
@@ -2630,10 +2619,8 @@ func collectRunSecrets(p *pipeline.Pipeline, cfg *config.Config, connMgr config.
 	return secrets, unreadable
 }
 
-// logOutput redirects os.Stdout/os.Stderr through a masking sink. A non-empty
-// logPath also tees output to that file; an empty logPath masks terminal output
-// only. terminalWriter selects the terminal destination: nil = os.Stdout (legacy),
-// io.Discard = suppressed (TUI mode).
+// logOutput redirects os.Stdout/os.Stderr through a masking sink; a non-empty logPath
+// also tees to that file. terminalWriter: nil = os.Stdout, io.Discard = suppress (TUI).
 func logOutput(logPath string, terminalWriter io.Writer, masker *mask.Masker) (func(), error) {
 	if terminalWriter == nil {
 		terminalWriter = os.Stdout
