@@ -2589,13 +2589,12 @@ func generateLogFileName(runID, pipelineName string, assets []*pipeline.Asset) s
 	return fmt.Sprintf("%s__%s__%d_assets_%s", runID, pipelineName, len(assets), shortHash)
 }
 
-// collectRunSecrets unions the config's sensitive values with each asset's resolved
-// connection (incl. secret backends); unreadable lists set-but-unreadable cred files.
+// collectRunSecrets collects inline secrets from every configured connection, plus
+// full secrets (incl. credential-file contents) for each connection the run uses, so
+// unused connections' files are never read. unreadable lists set-but-unreadable files.
 func collectRunSecrets(p *pipeline.Pipeline, cfg *config.Config, connMgr config.ConnectionDetailsGetter) (secrets, unreadable []string) {
 	if cfg != nil && cfg.SelectedEnvironment != nil {
-		v, u := mask.SensitiveValues(cfg.SelectedEnvironment.Connections)
-		secrets = append(secrets, v...)
-		unreadable = append(unreadable, u...)
+		secrets = append(secrets, mask.InlineSensitiveValues(cfg.SelectedEnvironment.Connections)...)
 	}
 	if p == nil || connMgr == nil {
 		return secrets, unreadable

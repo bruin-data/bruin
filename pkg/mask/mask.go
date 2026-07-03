@@ -47,12 +47,22 @@ func forms(secret string) []string {
 // SensitiveValues returns inline `sensitive:"true"` values and the CONTENTS of
 // `sensitive_file:"true"` paths in conn; unreadable lists set-but-unreadable paths.
 func SensitiveValues(conn any) (values, unreadable []string) {
-	c := collector{}
+	c := collector{readFiles: true}
 	c.walk(reflect.ValueOf(conn))
 	return c.values, c.unreadable
 }
 
+// InlineSensitiveValues returns only inline `sensitive:"true"` values, without
+// reading any sensitive_file paths — used to mask every configured connection
+// cheaply while leaving credential files to the used-connection pass.
+func InlineSensitiveValues(conn any) []string {
+	c := collector{readFiles: false}
+	c.walk(reflect.ValueOf(conn))
+	return c.values
+}
+
 type collector struct {
+	readFiles  bool
 	values     []string
 	unreadable []string
 }
@@ -97,8 +107,8 @@ func (c *collector) sl(field reflect.StructField, s string) {
 		c.values = append(c.values, s)
 	}
 	// Path whose file CONTENTS are the secret (service_account_file,
-	// private_key_path).
-	if field.Tag.Get("sensitive_file") == "true" {
+	// private_key_path); only read when this pass reads files.
+	if c.readFiles && field.Tag.Get("sensitive_file") == "true" {
 		c.readSecretFile(s)
 	}
 }

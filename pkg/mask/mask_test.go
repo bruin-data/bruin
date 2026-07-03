@@ -240,6 +240,31 @@ func TestSensitiveValues_File(t *testing.T) {
 	}
 }
 
+// TestInlineSensitiveValues collects inline secrets but must NOT read files, so
+// unused connections' credential files are never loaded.
+func TestInlineSensitiveValues(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	fpath := dir + "/sa.json"
+	if err := os.WriteFile(fpath, []byte("FILE_SHOULD_NOT_BE_READ"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	type conn struct {
+		Password string `mapstructure:"password" sensitive:"true"`
+		SAFile   string `mapstructure:"service_account_file" sensitive_file:"true"`
+	}
+	got := map[string]bool{}
+	for _, v := range InlineSensitiveValues(&conn{Password: "INLINE_SECRET", SAFile: fpath}) {
+		got[v] = true
+	}
+	if !got["INLINE_SECRET"] {
+		t.Errorf("inline secret not collected; got %v", got)
+	}
+	if got["FILE_SHOULD_NOT_BE_READ"] {
+		t.Errorf("InlineSensitiveValues must not read files; got %v", got)
+	}
+}
+
 // TestSensitiveValues_ReadsFileAsStored proves the path is read exactly as
 // stored on the connection (matching the code that embeds it), not rewritten.
 func TestSensitiveValues_ReadsFileAsStored(t *testing.T) {
