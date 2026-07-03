@@ -495,7 +495,7 @@ func TestCreateAgent(t *testing.T) {
 		assert.Equal(t, "/agents", r.URL.Path)
 
 		var body map[string]any
-		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
 		assert.Equal(t, "new-agent", body["name"])
 		assert.Equal(t, "private", body["visibility"])
 		// empty optional fields are omitted so the server applies its defaults

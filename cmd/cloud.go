@@ -2069,13 +2069,19 @@ func cloudAgentsCreate() *cli.Command {
 			defer RecoverFromPanic()
 			output := c.String("output")
 
+			visibility := c.String("visibility")
+			if visibility != "" && visibility != "team" && visibility != "private" {
+				printError(fmt.Errorf("visibility must be 'team' or 'private', got %q", visibility), output, "Invalid --visibility")
+				return cli.Exit("", 1)
+			}
+
 			client, err := newCloudClient(c)
 			if err != nil {
 				printError(err, output, "Failed to create API client")
 				return cli.Exit("", 1)
 			}
 
-			agent, err := client.CreateAgent(ctx, c.String("name"), c.String("description"), c.String("prompt"), c.String("visibility"))
+			agent, err := client.CreateAgent(ctx, c.String("name"), c.String("description"), c.String("prompt"), visibility)
 			if err != nil {
 				printError(err, output, "Failed to create agent")
 				return cli.Exit("", 1)
