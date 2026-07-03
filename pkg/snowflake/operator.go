@@ -3,6 +3,8 @@ package snowflake
 import (
 	"context"
 	"io"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
@@ -17,6 +19,25 @@ import (
 	"github.com/pkg/errors"
 	"github.com/snowflakedb/gosnowflake"
 )
+
+// Snowflake identifiers are case-insensitive unless they are double-quoted.
+// This regex matches simple identifiers that do not require quoting.
+var safeSnowflakeIdentifier = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_$]*$`)
+
+func withWarehouse(q *query.Query, warehouse string) *query.Query {
+	warehouse = strings.TrimSpace(warehouse)
+	if warehouse == "" {
+		return q
+	}
+
+	if !safeSnowflakeIdentifier.MatchString(warehouse) {
+		warehouse = `"` + strings.ReplaceAll(warehouse, `"`, `""`) + `"`
+	}
+
+	cloned := *q
+	cloned.Query = "USE WAREHOUSE " + warehouse + ";\n" + q.Query
+	return &cloned
+}
 
 type materializer interface {
 	Render(task *pipeline.Asset, query string) (string, error)
@@ -155,8 +176,9 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	}
 
 	if o.devEnv == nil {
-		ansisql.LogQueryIfVerbose(ctx, writer, q.Query)
-		return conn.RunQueryWithoutResult(ctx, q)
+		runQuery := withWarehouse(q, t.Snowflake.Warehouse)
+		ansisql.LogQueryIfVerbose(ctx, writer, runQuery.Query)
+		return conn.RunQueryWithoutResult(ctx, runQuery)
 	}
 
 	q, err = o.devEnv.Modify(ctx, p, t, q)
@@ -164,9 +186,10 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	ansisql.LogQueryIfVerbose(ctx, writer, q.Query)
+	runQuery := withWarehouse(q, t.Snowflake.Warehouse)
+	ansisql.LogQueryIfVerbose(ctx, writer, runQuery.Query)
 
-	err = conn.RunQueryWithoutResult(ctx, q)
+	err = conn.RunQueryWithoutResult(ctx, runQuery)
 	if err != nil {
 		return err
 	}
