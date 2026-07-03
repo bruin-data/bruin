@@ -219,6 +219,38 @@ func TestWriterLongSecretSplitAcrossWrites(t *testing.T) {
 	}
 }
 
+// TestWriterSecretStartOnlyNotEmitted covers the exact reported case: a write
+// holding only the start of a secret must emit nothing until the rest arrives,
+// because the retained window is maxLen-1 (the longest form's length).
+func TestWriterSecretStartOnlyNotEmitted(t *testing.T) {
+	t.Parallel()
+	secret := "abcdefghijklmnopqrstuvwxyz0123456789ABCD" // 40 bytes
+	r := New([]string{secret})
+	var buf bytes.Buffer
+	w := r.Writer(&buf)
+
+	// First write: only the first 10 bytes of the secret.
+	if _, err := w.Write([]byte(secret[:10])); err != nil {
+		t.Fatal(err)
+	}
+	if buf.Len() != 0 {
+		t.Fatalf("start of secret emitted before completion: %q", buf.String())
+	}
+	// The rest arrives in a later write.
+	if _, err := w.Write([]byte(secret[10:])); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(buf.String(), secret[:10]) {
+		t.Fatalf("secret bytes leaked: %q", buf.String())
+	}
+	if !strings.Contains(buf.String(), Mask) {
+		t.Fatalf("mask not applied: %q", buf.String())
+	}
+}
+
 func TestSensitiveValues_File(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
