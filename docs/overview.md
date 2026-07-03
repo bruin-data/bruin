@@ -35,7 +35,7 @@ bruin init [template] [folder-name]
 
 - **Database platforms**: athena, clickhouse, duckdb, redshift
 - **Cloud platforms**: firebase, gsheet-bigquery, gsheet-duckdb, shopify-bigquery, shopify-duckdb
-- **Examples**: chess, duckdb-example, duckdb-lineage, frankfurter, gorgias, notion, python
+- **Examples**: chess, demo-snowflake-sales-analytics, demo-snowflake-salesforce, duckdb-example, duckdb-lineage, frankfurter, gorgias, notion, python
 - **Default**: default (basic template)
 
 ### Command: Connections

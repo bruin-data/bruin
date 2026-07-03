@@ -1,0 +1,24 @@
+name: sales_analytics
+schedule: daily
+start_date: "2024-01-01"
+
+default_connections:
+  snowflake: "snowflake-default"
+
+tags:
+  - energy_drink
+  - off_premise
+  - sales
+  - limited_edition
+  - demo
+
+domains:
+  - sales
+  - revenue_growth_management
+
+owner: bruin-fde
+
+meta:
+  client: energy_drink
+  demo_focus: limited_edition_product_decisions
+  destination: snowflake

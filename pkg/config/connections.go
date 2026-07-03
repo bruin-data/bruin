@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/invopop/jsonschema"
 	"golang.org/x/oauth2/google"
 	"gopkg.in/yaml.v3"
 )
@@ -161,15 +162,25 @@ func (c GoogleCloudPlatformConnection) MarshalJSON() ([]byte, error) {
 
 type AthenaConnection struct { //nolint:recvcheck
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	AccessKey          string `yaml:"access_key_id,omitempty" json:"access_key_id" mapstructure:"access_key_id" sensitive:"true"`
-	SecretKey          string `yaml:"secret_access_key,omitempty" json:"secret_access_key" mapstructure:"secret_access_key" sensitive:"true"`
-	SessionToken       string `yaml:"session_token,omitempty" json:"session_token" mapstructure:"session_token" sensitive:"true"`
+	AccessKey          string `yaml:"access_key_id,omitempty" json:"access_key_id,omitempty" mapstructure:"access_key_id" sensitive:"true"`
+	SecretKey          string `yaml:"secret_access_key,omitempty" json:"secret_access_key,omitempty" mapstructure:"secret_access_key" sensitive:"true"`
+	SessionToken       string `yaml:"session_token,omitempty" json:"session_token,omitempty" mapstructure:"session_token" sensitive:"true"`
 	QueryResultsPath   string `yaml:"query_results_path,omitempty" json:"query_results_path" mapstructure:"query_results_path"`
-	Region             string `yaml:"region,omitempty" json:"region" mapstructure:"region"`
+	Region             string `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
 	Database           string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
 	Profile            string `yaml:"profile,omitempty" json:"profile,omitempty" mapstructure:"profile"`
 
 	regionSetFromProfile bool
+}
+
+// JSONSchemaExtend requires either static access keys or a named profile, so an
+// Athena connection can never be defined without any AWS credentials while still
+// allowing profile-based auth (which supplies no access keys).
+func (AthenaConnection) JSONSchemaExtend(s *jsonschema.Schema) {
+	s.AnyOf = []*jsonschema.Schema{
+		{Required: []string{"access_key_id", "secret_access_key"}},
+		{Required: []string{"profile"}},
+	}
 }
 
 func (c AthenaConnection) GetName() string {
@@ -442,9 +453,10 @@ func (c VitessConnection) GetName() string {
 	return c.Name
 }
 
-// PlanetScaleConnection describes a connection to PlanetScale, the managed Vitess platform. ingestr
-// routes it through its own "planetscale" scheme (hosted psdbconnect API) and enables TLS
-// automatically, so no SSL configuration is required.
+// PlanetScaleConnection describes a connection to PlanetScale, the managed Vitess platform. It is
+// configured under the "planetscale_mysql" connection type (the "_mysql" suffix distinguishes it
+// from PlanetScale's Postgres offering). ingestr routes it through its "ps_mysql" scheme (hosted
+// psdbconnect API) and enables TLS automatically, so no SSL configuration is required.
 type PlanetScaleConnection struct {
 	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`

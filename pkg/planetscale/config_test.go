@@ -16,11 +16,11 @@ func TestConfig_GetIngestrURI(t *testing.T) {
 		Port:     3306,
 		Database: "my_database",
 	}
-	assert.Equal(t, "planetscale://user:pscale_pw_secret@aws.connect.psdb.cloud:3306/my_database", c.GetIngestrURI())
+	assert.Equal(t, "ps_mysql://user:pscale_pw_secret@aws.connect.psdb.cloud:3306/my_database", c.GetIngestrURI())
 
 	// Default port is applied when unset.
 	c.Port = 0
-	assert.Equal(t, "planetscale://user:pscale_pw_secret@aws.connect.psdb.cloud:3306/my_database", c.GetIngestrURI())
+	assert.Equal(t, "ps_mysql://user:pscale_pw_secret@aws.connect.psdb.cloud:3306/my_database", c.GetIngestrURI())
 }
 
 func TestConfig_ToDBConnectionURI(t *testing.T) {

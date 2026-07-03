@@ -61,6 +61,22 @@ The output will display a list of available templates.
 
 ---
 
+## Demo templates
+
+Bruin also includes larger demo templates for sample end-to-end pipelines with generated dummy data:
+
+- `demo-snowflake-sales-analytics`: Generates retail sales source tables with Python assets, loads them into Snowflake, and builds silver and gold tables for limited-edition SKU decisions.
+- `demo-snowflake-salesforce`: Seeds deterministic credit union CRM records into Salesforce, ingests Salesforce objects into Snowflake, and builds silver and gold CRM analytics tables.
+
+Both templates include placeholder connection values only. Replace the generated `.bruin.yml` values before running them.
+
+```bash
+bruin init demo-snowflake-sales-analytics my-sales-demo
+bruin init demo-snowflake-salesforce my-salesforce-demo
+```
+
+---
+
 ## Example template: Notion-to-BigQuery pipeline
 
 The **Notion-to-BigQuery Pipeline** template is an example of a Bruin pipeline designed to copy data from Notion to BigQuery. This template demonstrates how to structure a simple pipeline with Bruin and provides prebuilt configurations for both Notion and BigQuery assets.
