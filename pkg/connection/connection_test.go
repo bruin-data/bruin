@@ -895,3 +895,28 @@ func Test_convertPKCS1ToPKCS8_Integration(t *testing.T) {
 		assert.True(t, privateKey.Equal(rsaKey))
 	})
 }
+
+// TestManagerMapsStayPaired: every connection in availableConnections (embedder)
+// must also be in AllConnectionDetails (masker), or its credential could go unmasked.
+func TestManagerMapsStayPaired(t *testing.T) {
+	t.Parallel()
+	cfg := &config.Config{
+		SelectedEnvironment: &config.Environment{
+			Connections: &config.Connections{
+				Adjust:    []config.AdjustConnection{{ConnectionMetadata: config.ConnectionMetadata{Name: "adjust-1"}, APIKey: "k1"}},
+				Stripe:    []config.StripeConnection{{ConnectionMetadata: config.ConnectionMetadata{Name: "stripe-1"}, APIKey: "k2"}},
+				Chargebee: []config.ChargebeeConnection{{ConnectionMetadata: config.ConnectionMetadata{Name: "chargebee-1"}, Site: "s", APIKey: "k3"}},
+			},
+		},
+	}
+	mgr, errs := NewManagerFromConfig(cfg)
+	require.Empty(t, errs)
+	m, ok := mgr.(*Manager)
+	require.True(t, ok)
+	require.NotEmpty(t, m.availableConnections, "no connections built; test not exercising the invariant")
+	for name := range m.availableConnections {
+		if _, ok := m.AllConnectionDetails[name]; !ok {
+			t.Errorf("connection %q is usable by the embedder but missing from AllConnectionDetails; the masker cannot see it", name)
+		}
+	}
+}

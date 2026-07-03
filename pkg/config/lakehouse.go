@@ -28,13 +28,13 @@ const (
 
 type CatalogAuth struct {
 	// AWS credentials (for Glue)
-	AccessKey    string `yaml:"access_key,omitempty" json:"access_key,omitempty" mapstructure:"access_key"`
-	SecretKey    string `yaml:"secret_key,omitempty" json:"secret_key,omitempty" mapstructure:"secret_key"`
-	SessionToken string `yaml:"session_token,omitempty" json:"session_token,omitempty" mapstructure:"session_token"`
+	AccessKey    string `yaml:"access_key,omitempty" json:"access_key,omitempty" mapstructure:"access_key" sensitive:"true"`
+	SecretKey    string `yaml:"secret_key,omitempty" json:"secret_key,omitempty" mapstructure:"secret_key" sensitive:"true"`
+	SessionToken string `yaml:"session_token,omitempty" json:"session_token,omitempty" mapstructure:"session_token" sensitive:"true"`
 
 	// Postgres credentials (for DuckLake)
 	Username string `yaml:"username,omitempty" json:"username,omitempty" mapstructure:"username"`
-	Password string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password"`
+	Password string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password" sensitive:"true"`
 }
 
 func (auth CatalogAuth) IsAWS() bool {
@@ -102,9 +102,9 @@ var (
 
 type StorageAuth struct {
 	// S3/GCS HMAC-style credentials
-	AccessKey    string `yaml:"access_key,omitempty" json:"access_key,omitempty" mapstructure:"access_key"`
-	SecretKey    string `yaml:"secret_key,omitempty" json:"secret_key,omitempty" mapstructure:"secret_key"`
-	SessionToken string `yaml:"session_token,omitempty" json:"session_token,omitempty" mapstructure:"session_token"`
+	AccessKey    string `yaml:"access_key,omitempty" json:"access_key,omitempty" mapstructure:"access_key" sensitive:"true"`
+	SecretKey    string `yaml:"secret_key,omitempty" json:"secret_key,omitempty" mapstructure:"secret_key" sensitive:"true"`
+	SessionToken string `yaml:"session_token,omitempty" json:"session_token,omitempty" mapstructure:"session_token" sensitive:"true"`
 }
 
 func (a StorageAuth) IsS3() bool {

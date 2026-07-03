@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -1141,6 +1142,40 @@ func TestLoadOrCreate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestLoadResolvesReadEmbedCredentialPaths(t *testing.T) {
+	t.Parallel()
+	fs := afero.NewMemMapFs()
+	configPath := "/repo/.bruin.yml"
+	yml := `default_environment: default
+environments:
+  default:
+    connections:
+      google_cloud_platform:
+        - name: gcp-1
+          project_id: proj
+          service_account_file: creds/gcp.json
+      google_sheets:
+        - name: sheets-1
+          service_account_file: creds/sheets.json
+`
+	require.NoError(t, afero.WriteFile(fs, configPath, []byte(yml), 0o644))
+
+	cfg, err := LoadOrCreate(fs, configPath)
+	require.NoError(t, err)
+
+	// Both read+embed the file, so their relative paths must resolve against the
+	// config directory (so masking reads the same file, independent of cwd).
+	require.Len(t, cfg.SelectedEnvironment.Connections.GoogleCloudPlatform, 1)
+	gcp := cfg.SelectedEnvironment.Connections.GoogleCloudPlatform[0].ServiceAccountFile
+	assert.Equal(t, filepath.Join(filepath.Dir(configPath), "creds/gcp.json"), gcp)
+	assert.True(t, filepath.IsAbs(gcp), "gcp path should be absolute: %s", gcp)
+
+	require.Len(t, cfg.SelectedEnvironment.Connections.GoogleSheets, 1)
+	sheets := cfg.SelectedEnvironment.Connections.GoogleSheets[0].ServiceAccountFile
+	assert.Equal(t, filepath.Join(filepath.Dir(configPath), "creds/sheets.json"), sheets)
+	assert.True(t, filepath.IsAbs(sheets), "sheets path should be absolute: %s", sheets)
 }
 
 func TestLoadOrCreateWithoutPathAbsolutization(t *testing.T) {

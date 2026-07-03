@@ -52,6 +52,7 @@ table td:first-child {
 | `--debug-ingestr-src` | str | - | Use ingestr from the given path instead of the builtin version. |
 | `--config-file` | str | - | The path to the `.bruin.yml` file. |
 | `--secrets-backend` | str | - | The source of secrets if different from .bruin.yml. Possible values: `vault`, `doppler`, `aws`, `azure`. Can also be set via `BRUIN_SECRETS_BACKEND` environment variable. |
+| `--mask-credentials` | bool | `true` | Redact connection credential values from the run logs. On by default; set `--mask-credentials=false` to disable. |
 | `--no-validation` | bool | `false` | Skip validation for this run. |
 | `--no-timestamp` | bool | `false` | Skip logging timestamps for this run. |
 | `--no-color` | bool | `false` | Plain log output for this run. |
