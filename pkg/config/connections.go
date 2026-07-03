@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/invopop/jsonschema"
 	"golang.org/x/oauth2/google"
 	"gopkg.in/yaml.v3"
 )
@@ -161,15 +162,25 @@ func (c GoogleCloudPlatformConnection) MarshalJSON() ([]byte, error) {
 
 type AthenaConnection struct { //nolint:recvcheck
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	AccessKey          string `yaml:"access_key_id,omitempty" json:"access_key_id" mapstructure:"access_key_id"`
-	SecretKey          string `yaml:"secret_access_key,omitempty" json:"secret_access_key" mapstructure:"secret_access_key"`
-	SessionToken       string `yaml:"session_token,omitempty" json:"session_token" mapstructure:"session_token"`
+	AccessKey          string `yaml:"access_key_id,omitempty" json:"access_key_id,omitempty" mapstructure:"access_key_id"`
+	SecretKey          string `yaml:"secret_access_key,omitempty" json:"secret_access_key,omitempty" mapstructure:"secret_access_key"`
+	SessionToken       string `yaml:"session_token,omitempty" json:"session_token,omitempty" mapstructure:"session_token"`
 	QueryResultsPath   string `yaml:"query_results_path,omitempty" json:"query_results_path" mapstructure:"query_results_path"`
-	Region             string `yaml:"region,omitempty" json:"region" mapstructure:"region"`
+	Region             string `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
 	Database           string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
 	Profile            string `yaml:"profile,omitempty" json:"profile,omitempty" mapstructure:"profile"`
 
 	regionSetFromProfile bool
+}
+
+// JSONSchemaExtend requires either static access keys or a named profile, so an
+// Athena connection can never be defined without any AWS credentials while still
+// allowing profile-based auth (which supplies no access keys).
+func (AthenaConnection) JSONSchemaExtend(s *jsonschema.Schema) {
+	s.AnyOf = []*jsonschema.Schema{
+		{Required: []string{"access_key_id", "secret_access_key"}},
+		{Required: []string{"profile"}},
+	}
 }
 
 func (c AthenaConnection) GetName() string {

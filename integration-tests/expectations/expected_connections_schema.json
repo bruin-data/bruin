@@ -302,6 +302,19 @@
       ]
     },
     "AthenaConnection": {
+      "anyOf": [
+        {
+          "required": [
+            "access_key_id",
+            "secret_access_key"
+          ]
+        },
+        {
+          "required": [
+            "profile"
+          ]
+        }
+      ],
       "properties": {
         "name": {
           "type": "string"
@@ -335,11 +348,7 @@
       "type": "object",
       "required": [
         "name",
-        "access_key_id",
-        "secret_access_key",
-        "session_token",
-        "query_results_path",
-        "region"
+        "query_results_path"
       ]
     },
     "AttioConnection": {
