@@ -498,10 +498,7 @@ func expandEnvVarsInYAMLValues(node *yaml.Node, targetType reflect.Type) error {
 			return err
 		}
 	case yaml.ScalarNode:
-		expanded, ok, err := expandEnvVarReferences(node.Value)
-		if err != nil {
-			return err
-		}
+		expanded, ok := expandEnvVarReferences(node.Value)
 		if !ok {
 			return nil
 		}
@@ -607,9 +604,8 @@ func yamlTagName(field reflect.StructField) (string, bool) {
 	return name, inline
 }
 
-func expandEnvVarReferences(value string) (string, bool, error) {
+func expandEnvVarReferences(value string) (string, bool) {
 	matched := false
-	var missing []string
 	expanded := configEnvVarRegex.ReplaceAllStringFunc(value, func(match string) string {
 		matches := configEnvVarRegex.FindStringSubmatch(match)
 		if len(matches) != 2 {
@@ -618,7 +614,6 @@ func expandEnvVarReferences(value string) (string, bool, error) {
 
 		envValue, ok := os.LookupEnv(matches[1])
 		if !ok {
-			missing = append(missing, matches[1])
 			return match
 		}
 
@@ -626,11 +621,7 @@ func expandEnvVarReferences(value string) (string, bool, error) {
 		return envValue
 	})
 
-	if len(missing) > 0 {
-		return "", false, fmt.Errorf("environment variable %q is not set", missing[0])
-	}
-
-	return expanded, matched, nil
+	return expanded, matched
 }
 
 func LoadOrCreate(fs afero.Fs, path string) (*Config, error) {

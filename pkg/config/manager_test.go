@@ -2968,7 +2968,7 @@ environments:
 	assert.Equal(t, "dummy_secret", conn.Lakehouse.Storage.Auth.SecretKey)
 }
 
-func TestLoadFromFileOrEnv_ErrorsForMissingEnvironmentVariables(t *testing.T) {
+func TestLoadFromFileOrEnv_LeavesUnsetEnvironmentVariablesLiteral(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
@@ -2979,19 +2979,21 @@ environments:
   production:
     connections:
       postgres:
-        - name: missing-env
+        - name: literal-env
           host: localhost
           username: bruin
-          password: secret
+          password: "secret-${BRUIN_TEST_UNSET_CONFIG_PASSWORD}"
           database: analytics
-          port: ${POSTGRES_PORT}
+          port: 5432
 `), 0o644))
 
 	got, err := LoadFromFileOrEnv(fs, configPath)
 
-	require.Error(t, err)
-	assert.Nil(t, got)
-	assert.Contains(t, err.Error(), `environment variable "POSTGRES_PORT" is not set`)
+	require.NoError(t, err)
+	require.Len(t, got.SelectedEnvironment.Connections.Postgres, 1)
+	conn := got.SelectedEnvironment.Connections.Postgres[0]
+	assert.Equal(t, "secret-${BRUIN_TEST_UNSET_CONFIG_PASSWORD}", conn.Password)
+	assert.Equal(t, 5432, conn.Port)
 }
 
 func TestSnowflakeConnection_MarshalYAML_PrivateKey(t *testing.T) {
