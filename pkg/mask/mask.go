@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
@@ -48,27 +49,38 @@ func forms(secret string) []string {
 	return out
 }
 
-// SensitiveValues returns the non-empty values of every `sensitive:"true"`
-// string field in conn, recursing into nested structs, pointers, and slices.
-func SensitiveValues(conn any) []string {
-	var out []string
-	collect(reflect.ValueOf(conn), &out)
-	return out
+// SensitiveValues returns the secret values in conn: inline `sensitive:"true"`
+// fields and the CONTENTS of `sensitive_file:"true"` paths, recursing into nested
+// structs, pointers, slices, and maps. Relative file paths are resolved against
+// baseDir (the config file's directory) so masking does not depend on the process
+// working directory. Paths that are set but cannot be read are returned in
+// unreadable, so the caller can surface a potential masking gap rather than
+// silently leaving the credential unmasked.
+func SensitiveValues(conn any, baseDir string) (values, unreadable []string) {
+	c := collector{baseDir: baseDir}
+	c.walk(reflect.ValueOf(conn))
+	return c.values, c.unreadable
 }
 
-func collect(v reflect.Value, out *[]string) {
+type collector struct {
+	baseDir    string
+	values     []string
+	unreadable []string
+}
+
+func (c *collector) walk(v reflect.Value) {
 	switch v.Kind() { //nolint:exhaustive
 	case reflect.Pointer, reflect.Interface:
 		if !v.IsNil() {
-			collect(v.Elem(), out)
+			c.walk(v.Elem())
 		}
 	case reflect.Slice, reflect.Array:
 		for i := range v.Len() {
-			collect(v.Index(i), out)
+			c.walk(v.Index(i))
 		}
 	case reflect.Map:
 		for _, k := range v.MapKeys() {
-			collect(v.MapIndex(k), out)
+			c.walk(v.MapIndex(k))
 		}
 	case reflect.Struct:
 		t := v.Type()
@@ -79,26 +91,51 @@ func collect(v reflect.Value, out *[]string) {
 			}
 			fv := v.Field(i)
 			if fv.Kind() == reflect.String {
-				s := fv.String()
-				// Inline secret value.
-				if s != "" && field.Tag.Get("sensitive") == "true" {
-					*out = append(*out, s)
-				}
-				// Path whose file CONTENTS are the secret (service_account_file,
-				// private_key_path): read it, skipping implausibly large files.
-				if s != "" && field.Tag.Get("sensitive_file") == "true" {
-					if fi, err := os.Stat(s); err == nil && fi.Size() > 0 && fi.Size() <= maxSecretFileSize {
-						if b, err := os.ReadFile(s); err == nil && len(b) > 0 {
-							*out = append(*out, string(b))
-						}
-					}
-				}
-				// Strings never hold nested structs — nothing to recurse into.
-				continue
+				c.stringField(field, fv.String())
+				continue // strings never hold nested structs
 			}
-			collect(fv, out)
+			c.walk(fv)
 		}
 	}
+}
+
+func (c *collector) stringField(field reflect.StructField, s string) {
+	if s == "" {
+		return
+	}
+	// Inline secret value.
+	if field.Tag.Get("sensitive") == "true" {
+		c.values = append(c.values, s)
+	}
+	// Path whose file CONTENTS are the secret (service_account_file,
+	// private_key_path).
+	if field.Tag.Get("sensitive_file") == "true" {
+		c.readSecretFile(s)
+	}
+}
+
+// readSecretFile reads a sensitive_file path, resolving relative paths against
+// baseDir so masking finds the same file bruin embeds regardless of the working
+// directory. A set-but-unreadable path is recorded so the caller can warn; empty
+// or implausibly large files are skipped (not maskable credentials).
+func (c *collector) readSecretFile(path string) {
+	if c.baseDir != "" && !filepath.IsAbs(path) {
+		path = filepath.Join(c.baseDir, path)
+	}
+	fi, err := os.Stat(path)
+	if err != nil {
+		c.unreadable = append(c.unreadable, path)
+		return
+	}
+	if fi.Size() == 0 || fi.Size() > maxSecretFileSize {
+		return
+	}
+	b, err := os.ReadFile(path)
+	if err != nil || len(b) == 0 {
+		c.unreadable = append(c.unreadable, path)
+		return
+	}
+	c.values = append(c.values, string(b))
 }
 
 // Masker masks a fixed set of secret forms in arbitrary text.

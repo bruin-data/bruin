@@ -1225,7 +1225,11 @@ func Run(isDebug *bool) *cli.Command {
 			// no-log-file paths below install it as the output sink.
 			var masker *mask.Masker
 			if c.Bool("mask-credentials") {
-				masker = mask.New(collectRunSecrets(foundPipeline, cm, connectionManager))
+				secrets, unreadable := collectRunSecrets(foundPipeline, cm, connectionManager, filepath.Dir(configFilePath))
+				for _, unreadablePath := range unreadable {
+					warningPrinter.Printf("credential masking: cannot read %s; its contents will not be masked in logs\n", unreadablePath)
+				}
+				masker = mask.New(secrets)
 			}
 			maskingActive := !masker.Empty()
 
@@ -2594,14 +2598,18 @@ func generateLogFileName(runID, pipelineName string, assets []*pipeline.Asset) s
 }
 
 // collectRunSecrets unions the local config's sensitive values with each asset's
-// resolved connection (covering external secret backends); unresolved ones are skipped.
-func collectRunSecrets(p *pipeline.Pipeline, cfg *config.Config, connMgr config.ConnectionDetailsGetter) []string {
-	var secrets []string
+// resolved connection (covering external secret backends); unresolved ones are
+// skipped. Relative sensitive_file paths resolve against baseDir (the config
+// directory). unreadable lists set-but-unreadable credential files so the caller
+// can warn that their contents will not be masked.
+func collectRunSecrets(p *pipeline.Pipeline, cfg *config.Config, connMgr config.ConnectionDetailsGetter, baseDir string) (secrets, unreadable []string) {
 	if cfg != nil && cfg.SelectedEnvironment != nil {
-		secrets = append(secrets, mask.SensitiveValues(cfg.SelectedEnvironment.Connections)...)
+		v, u := mask.SensitiveValues(cfg.SelectedEnvironment.Connections, baseDir)
+		secrets = append(secrets, v...)
+		unreadable = append(unreadable, u...)
 	}
 	if p == nil || connMgr == nil {
-		return secrets
+		return secrets, unreadable
 	}
 	seen := map[string]bool{}
 	for _, asset := range p.Assets {
@@ -2614,10 +2622,12 @@ func collectRunSecrets(p *pipeline.Pipeline, cfg *config.Config, connMgr config.
 				continue
 			}
 			seen[name] = true
-			secrets = append(secrets, mask.SensitiveValues(connMgr.GetConnectionDetails(name))...)
+			v, u := mask.SensitiveValues(connMgr.GetConnectionDetails(name), baseDir)
+			secrets = append(secrets, v...)
+			unreadable = append(unreadable, u...)
 		}
 	}
-	return secrets
+	return secrets, unreadable
 }
 
 // logOutput redirects os.Stdout/os.Stderr through a masking sink. A non-empty

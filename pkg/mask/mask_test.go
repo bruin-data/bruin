@@ -5,9 +5,16 @@ import (
 	"encoding/base64"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
+
+// sv collects sensitive values with no base dir, ignoring unreadable paths.
+func sv(conn any) []string {
+	v, _ := SensitiveValues(conn, "")
+	return v
+}
 
 func TestSensitiveValues(t *testing.T) {
 	t.Parallel()
@@ -19,7 +26,7 @@ func TestSensitiveValues(t *testing.T) {
 		Empty    string `mapstructure:"empty" sensitive:"true"`
 		unexp    string //nolint:unused
 	}
-	got := SensitiveValues(&conn{Name: "c", Password: "p@ss", Host: "h", APIKey: "abc", Empty: "", unexp: "x"})
+	got := sv(&conn{Name: "c", Password: "p@ss", Host: "h", APIKey: "abc", Empty: "", unexp: "x"})
 	want := map[string]bool{"p@ss": true, "abc": true}
 	if len(got) != len(want) {
 		t.Fatalf("got %v, want keys %v", got, want)
@@ -222,7 +229,7 @@ func TestSensitiveValues_FileTooLarge(t *testing.T) {
 	type conn struct {
 		SAFile string `mapstructure:"service_account_file" sensitive_file:"true"`
 	}
-	if vals := SensitiveValues(&conn{SAFile: fpath}); len(vals) != 0 {
+	if vals := sv(&conn{SAFile: fpath}); len(vals) != 0 {
 		t.Errorf("oversized file should be skipped, got %d values", len(vals))
 	}
 }
@@ -240,11 +247,57 @@ func TestSensitiveValues_File(t *testing.T) {
 	}
 	c := &conn{Name: "c", SAFile: fpath}
 	got := map[string]bool{}
-	for _, v := range SensitiveValues(c) {
+	for _, v := range sv(c) {
 		got[v] = true
 	}
 	if !got["FILE_CONTENTS_SECRET_ABC"] {
 		t.Errorf("sensitive_file: file contents not collected; got %v", got)
+	}
+}
+
+// TestSensitiveValues_RelativeFileResolvedAgainstBaseDir proves a relative
+// sensitive_file path is resolved against baseDir (the config dir), not the
+// process working directory, so masking reads the credential regardless of cwd.
+func TestSensitiveValues_RelativeFileResolvedAgainstBaseDir(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if err := os.WriteFile(dir+"/creds.json", []byte("RELATIVE_FILE_SECRET"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	type conn struct {
+		SAFile string `mapstructure:"service_account_file" sensitive_file:"true"`
+	}
+	values, unreadable := SensitiveValues(&conn{SAFile: "creds.json"}, dir)
+	found := false
+	for _, v := range values {
+		if v == "RELATIVE_FILE_SECRET" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("relative sensitive_file not resolved against baseDir; values=%v unreadable=%v", values, unreadable)
+	}
+	if len(unreadable) != 0 {
+		t.Errorf("expected no unreadable paths, got %v", unreadable)
+	}
+}
+
+// TestSensitiveValues_UnreadableReported proves a set-but-unreadable
+// sensitive_file path is reported (not silently dropped), so the caller can warn
+// that the credential will not be masked.
+func TestSensitiveValues_UnreadableReported(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	type conn struct {
+		SAFile string `mapstructure:"service_account_file" sensitive_file:"true"`
+	}
+	values, unreadable := SensitiveValues(&conn{SAFile: "missing.json"}, dir)
+	if len(values) != 0 {
+		t.Errorf("expected no values for missing file, got %v", values)
+	}
+	want := filepath.Join(dir, "missing.json")
+	if len(unreadable) != 1 || unreadable[0] != want {
+		t.Errorf("expected unreadable [%s], got %v", want, unreadable)
 	}
 }
 
@@ -358,7 +411,7 @@ func TestSensitiveValuesInputMethods(t *testing.T) {
 		Ptr:       &nested{Password: "PTR_PASSWORD"},
 	}
 	got := map[string]bool{}
-	for _, v := range SensitiveValues(c) {
+	for _, v := range sv(c) {
 		got[v] = true
 	}
 
@@ -394,10 +447,10 @@ func TestSensitiveValuesContainers(t *testing.T) {
 		Password string `mapstructure:"password" sensitive:"true"`
 	}
 	got := map[string]bool{}
-	for _, v := range SensitiveValues([]*conn{{Password: "S1"}, {Password: "S2"}, nil}) {
+	for _, v := range sv([]*conn{{Password: "S1"}, {Password: "S2"}, nil}) {
 		got[v] = true
 	}
-	for _, v := range SensitiveValues(map[string]conn{"a": {Password: "S3"}}) {
+	for _, v := range sv(map[string]conn{"a": {Password: "S3"}}) {
 		got[v] = true
 	}
 	for _, want := range []string{"S1", "S2", "S3"} {
@@ -435,7 +488,7 @@ func TestMaskConnectionEndToEnd(t *testing.T) {
 		SAJSON:     saJSON,
 		PrivKeyPth: keyFile,
 	}
-	r := New(SensitiveValues(c))
+	r := New(sv(c))
 
 	log := "uv tool run ingestr ingest" +
 		" --source-uri postgres://user:" + userinfoForm(c.Password) + "@db.example.com:5432/app" +
