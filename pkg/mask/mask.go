@@ -16,10 +16,6 @@ import (
 // Mask is the placeholder written in place of a credential value.
 const Mask = "****"
 
-// maxSecretFileSize caps sensitive_file reads; real credential files (keys,
-// service-account JSON) are a few KB, so anything larger is skipped.
-const maxSecretFileSize = 1 << 20
-
 // forms returns the distinct string forms a secret can appear as in output.
 func forms(secret string) []string {
 	seen := map[string]struct{}{}
@@ -84,7 +80,7 @@ func (c *collector) walk(v reflect.Value) {
 			}
 			fv := v.Field(i)
 			if fv.Kind() == reflect.String {
-				c.stringField(field, fv.String())
+				c.sl(field, fv.String())
 				continue // strings never hold nested structs
 			}
 			c.walk(fv)
@@ -92,7 +88,7 @@ func (c *collector) walk(v reflect.Value) {
 	}
 }
 
-func (c *collector) stringField(field reflect.StructField, s string) {
+func (c *collector) sl(field reflect.StructField, s string) {
 	if s == "" {
 		return
 	}
@@ -107,23 +103,17 @@ func (c *collector) stringField(field reflect.StructField, s string) {
 	}
 }
 
-// readSecretFile reads a sensitive_file path as stored (matching the embedder),
-// recording unreadable paths; empty or over-cap files are skipped.
+// readSecretFile reads a sensitive_file path in full, as stored — matching the
+// embedder, so any-size credentials are masked. Unreadable paths are recorded.
 func (c *collector) readSecretFile(path string) {
-	fi, err := os.Stat(path)
+	b, err := os.ReadFile(path)
 	if err != nil {
 		c.unreadable = append(c.unreadable, path)
 		return
 	}
-	if fi.Size() == 0 || fi.Size() > maxSecretFileSize {
-		return
+	if len(b) > 0 {
+		c.values = append(c.values, string(b))
 	}
-	b, err := os.ReadFile(path)
-	if err != nil || len(b) == 0 {
-		c.unreadable = append(c.unreadable, path)
-		return
-	}
-	c.values = append(c.values, string(b))
 }
 
 // Masker masks a fixed set of secret forms in arbitrary text.

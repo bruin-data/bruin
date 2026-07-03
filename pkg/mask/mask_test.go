@@ -219,21 +219,6 @@ func TestWriterLongSecretSplitAcrossWrites(t *testing.T) {
 	}
 }
 
-func TestSensitiveValues_FileTooLarge(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	fpath := dir + "/big.json"
-	if err := os.WriteFile(fpath, bytes.Repeat([]byte("x"), maxSecretFileSize+1), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	type conn struct {
-		SAFile string `mapstructure:"service_account_file" sensitive_file:"true"`
-	}
-	if vals := sv(&conn{SAFile: fpath}); len(vals) != 0 {
-		t.Errorf("oversized file should be skipped, got %d values", len(vals))
-	}
-}
-
 func TestSensitiveValues_File(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
