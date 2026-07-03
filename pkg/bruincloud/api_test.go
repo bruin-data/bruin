@@ -488,6 +488,30 @@ func TestListAgents(t *testing.T) {
 	assert.Equal(t, "test-agent", agents[0].Name)
 }
 
+func TestCreateAgent(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/agents", r.URL.Path)
+
+		var body map[string]any
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, "new-agent", body["name"])
+		assert.Equal(t, "private", body["visibility"])
+		// empty optional fields are omitted so the server applies its defaults
+		_, hasDesc := body["description"]
+		assert.False(t, hasDesc)
+
+		w.WriteHeader(http.StatusCreated)
+		writeJSON(t, w, Agent{ID: 7, Name: "new-agent", Visibility: "private"})
+	})
+
+	agent, err := client.CreateAgent(t.Context(), "new-agent", "", "", "private")
+	require.NoError(t, err)
+	assert.Equal(t, 7, agent.ID)
+	assert.Equal(t, "private", agent.Visibility)
+}
+
 func TestListAgentThreads(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {

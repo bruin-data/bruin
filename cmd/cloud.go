@@ -2029,12 +2029,66 @@ func CloudAgents() *cli.Command {
 		Usage: "Manage Bruin Cloud agents",
 		Commands: []*cli.Command{
 			cloudAgentsList(),
+			cloudAgentsCreate(),
 			cloudAgentsSend(),
 			cloudAgentsStatus(),
 			cloudAgentsThreads(),
 			cloudAgentsMessages(),
 			cloudAgentsGetPrompt(),
 			cloudAgentsSetPrompt(),
+		},
+	}
+}
+
+func cloudAgentsCreate() *cli.Command {
+	return &cli.Command{
+		Name:  "create",
+		Usage: "Create a new agent",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.StringFlag{
+				Name:     "name",
+				Usage:    "the agent name",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:  "description",
+				Usage: "the agent description",
+			},
+			&cli.StringFlag{
+				Name:  "prompt",
+				Usage: "the agent's system prompt",
+			},
+			&cli.StringFlag{
+				Name:  "visibility",
+				Usage: "agent visibility: team or private (default: team)",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			agent, err := client.CreateAgent(ctx, c.String("name"), c.String("description"), c.String("prompt"), c.String("visibility"))
+			if err != nil {
+				printError(err, output, "Failed to create agent")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(agent, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			infoPrinter.Printf("Created agent %d (%s)\n", agent.ID, agent.Name)
+			return nil
 		},
 	}
 }

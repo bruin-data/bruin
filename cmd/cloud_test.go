@@ -219,7 +219,7 @@ func TestCloudAgentsCommand_Help(t *testing.T) {
 	cmd := CloudAgents()
 	require.NotNil(t, cmd)
 	assert.Equal(t, "agents", cmd.Name)
-	require.Len(t, cmd.Commands, 7)
+	require.Len(t, cmd.Commands, 8)
 }
 
 func TestExtractErrorLines_ErrorLevel(t *testing.T) {
