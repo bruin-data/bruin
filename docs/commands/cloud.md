@@ -599,6 +599,31 @@ Delete a connection by name:
 bruin cloud connections delete --name my_pg
 ```
 
+### `dashboards`
+
+Read the dashboards in your Bruin Cloud team — useful for inspecting or
+version-controlling a dashboard's definition.
+
+#### `list`
+
+List the team's dashboards (id, title, visibility, last updated):
+
+```bash
+bruin cloud dashboards list
+bruin cloud dashboards list --output json
+```
+
+#### `get`
+
+Get a single dashboard including its published definition (`state`):
+
+```bash
+bruin cloud dashboards get --dashboard-id 42
+
+# Full payload, incl. the definition, as JSON
+bruin cloud dashboards get --dashboard-id 42 --output json
+```
+
 ---
 
 ## Common Workflows

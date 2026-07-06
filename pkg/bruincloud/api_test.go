@@ -703,14 +703,14 @@ func TestTriggerRunWithTags(t *testing.T) {
 
 func TestListDashboards(t *testing.T) {
 	t.Parallel()
-	title := "Revenue"
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodGet, r.Method)
 		assert.Equal(t, "/dashboards", r.URL.Path)
 		w.WriteHeader(http.StatusOK)
+		// Match the API's snake_case shape exactly, so the tag mapping is covered.
 		writeJSON(t, w, map[string]any{
-			"dashboards": []Dashboard{
-				{ID: 3, Title: &title, Visibility: "team"},
+			"dashboards": []map[string]any{
+				{"id": 3, "title": "Revenue", "visibility": "team", "updated_at": "2026-07-06T10:00:00+00:00"},
 			},
 		})
 	})
@@ -719,6 +719,8 @@ func TestListDashboards(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, dashboards, 1)
 	assert.Equal(t, "Revenue", *dashboards[0].Title)
+	require.NotNil(t, dashboards[0].UpdatedAt)
+	assert.Equal(t, "2026-07-06T10:00:00+00:00", *dashboards[0].UpdatedAt)
 }
 
 func TestGetDashboard(t *testing.T) {
