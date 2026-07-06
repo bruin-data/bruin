@@ -512,6 +512,42 @@ func TestCreateAgent(t *testing.T) {
 	assert.Equal(t, "private", agent.Visibility)
 }
 
+func TestGetAgent(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/agents/7", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, Agent{ID: 7, Name: "an-agent", Visibility: "team"})
+	})
+
+	agent, err := client.GetAgent(t.Context(), 7)
+	require.NoError(t, err)
+	assert.Equal(t, "an-agent", agent.Name)
+}
+
+func TestUpdateAgent(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPatch, r.Method)
+		assert.Equal(t, "/agents/7", r.URL.Path)
+
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, "renamed", body["name"])
+		// empty fields are omitted so the server leaves them unchanged
+		_, hasVisibility := body["visibility"]
+		assert.False(t, hasVisibility)
+
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, Agent{ID: 7, Name: "renamed", Visibility: "team"})
+	})
+
+	agent, err := client.UpdateAgent(t.Context(), 7, "renamed", "", "")
+	require.NoError(t, err)
+	assert.Equal(t, "renamed", agent.Name)
+}
+
 func TestListAgentThreads(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {

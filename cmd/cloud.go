@@ -2030,12 +2030,114 @@ func CloudAgents() *cli.Command {
 		Commands: []*cli.Command{
 			cloudAgentsList(),
 			cloudAgentsCreate(),
+			cloudAgentsGet(),
+			cloudAgentsUpdate(),
 			cloudAgentsSend(),
 			cloudAgentsStatus(),
 			cloudAgentsThreads(),
 			cloudAgentsMessages(),
 			cloudAgentsGetPrompt(),
 			cloudAgentsSetPrompt(),
+		},
+	}
+}
+
+func cloudAgentsGet() *cli.Command {
+	return &cli.Command{
+		Name:  "get",
+		Usage: "Get a single agent's details",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "agent-id",
+				Usage:    "agent ID",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			agent, err := client.GetAgent(ctx, c.Int("agent-id"))
+			if err != nil {
+				printError(err, output, "Failed to get agent")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(agent, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			infoPrinter.Printf("Agent %d: %s (visibility: %s)\n", agent.ID, agent.Name, agent.Visibility)
+			return nil
+		},
+	}
+}
+
+func cloudAgentsUpdate() *cli.Command {
+	return &cli.Command{
+		Name:  "update",
+		Usage: "Update an agent's name, description or visibility",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "agent-id",
+				Usage:    "agent ID",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:  "name",
+				Usage: "the new agent name",
+			},
+			&cli.StringFlag{
+				Name:  "description",
+				Usage: "the new agent description",
+			},
+			&cli.StringFlag{
+				Name:  "visibility",
+				Usage: "agent visibility: team or private",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			visibility := c.String("visibility")
+			if visibility != "" && visibility != "team" && visibility != "private" {
+				printError(fmt.Errorf("visibility must be 'team' or 'private', got %q", visibility), output, "Invalid --visibility")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			agent, err := client.UpdateAgent(ctx, c.Int("agent-id"), c.String("name"), c.String("description"), visibility)
+			if err != nil {
+				printError(err, output, "Failed to update agent")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(agent, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			infoPrinter.Printf("Updated agent %d (%s)\n", agent.ID, agent.Name)
+			return nil
 		},
 	}
 }
