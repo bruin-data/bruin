@@ -67,6 +67,15 @@ func GetSupportedIngestrMaterializationStrategiesString() string {
 	return strings.Join(strategies, ", ")
 }
 
+func IsIngestrIncrementalKeyStrategy(strategy string) bool {
+	switch strategy {
+	case "append", "merge", "delete+insert":
+		return true
+	default:
+		return false
+	}
+}
+
 // GetSupportedPythonStrategiesString returns a comma-separated string of supported Python materialization strategies.
 func GetSupportedPythonStrategiesString() string {
 	strategies := make([]string, 0, len(SupportedPythonMaterializationStrategies))

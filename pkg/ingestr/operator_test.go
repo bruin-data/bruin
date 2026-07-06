@@ -224,6 +224,30 @@ func TestApplyMaterializationParameters(t *testing.T) {
 			wantErr: `ingestr asset defines both parameters.incremental_strategy="append" and materialization.strategy="merge"`,
 		},
 		{
+			name: "cdc requires merge materialization",
+			asset: &pipeline.Asset{
+				Parameters: pipeline.ParameterMap{
+					"cdc": "true",
+				},
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyAppend,
+				},
+			},
+			wantErr: `cdc ingestr assets require materialization.strategy "merge"`,
+		},
+		{
+			name: "incremental key requires incremental materialization strategy",
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategyCreateReplace,
+					IncrementalKey: "updated_at",
+				},
+			},
+			wantErr: "materialization.incremental_key is only supported for append, merge, and delete+insert strategies on ingestr assets",
+		},
+		{
 			name: "view materialization fails",
 			asset: &pipeline.Asset{
 				Materialization: pipeline.Materialization{

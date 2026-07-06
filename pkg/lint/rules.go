@@ -296,7 +296,7 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 		}
 	}
 
-	materializationIssues, materializationStrategy := validateIngestrMaterialization(asset)
+	materializationIssues, materializationStrategy := validateIngestrMaterialization(asset, effectiveStrategy)
 	issues = append(issues, materializationIssues...)
 	if materializationStrategy != "" {
 		effectiveStrategy = materializationStrategy
@@ -337,7 +337,7 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 	return issues, nil
 }
 
-func validateIngestrMaterialization(asset *pipeline.Asset) ([]*Issue, string) {
+func validateIngestrMaterialization(asset *pipeline.Asset, effectiveStrategy string) ([]*Issue, string) {
 	issues := make([]*Issue, 0)
 	mat := asset.Materialization
 	if mat.Type == pipeline.MaterializationTypeNone {
@@ -351,7 +351,7 @@ func validateIngestrMaterialization(asset *pipeline.Asset) ([]*Issue, string) {
 		}}, ""
 	}
 
-	effectiveStrategy := ""
+	materializationStrategy := ""
 	if mat.Strategy != pipeline.MaterializationStrategyNone {
 		strategy, ok := python.TranslateBruinMaterializationStrategyToIngestr(mat.Strategy)
 		if !ok {
@@ -360,16 +360,30 @@ func validateIngestrMaterialization(asset *pipeline.Asset) ([]*Issue, string) {
 				Description: fmt.Sprintf("Materialization strategy '%s' is not supported for ingestr assets. Supported strategies are: %s", mat.Strategy, python.GetSupportedIngestrMaterializationStrategiesString()),
 			})
 		} else {
+			materializationStrategy = strategy
 			effectiveStrategy = strategy
+			if cdcVal, _ := asset.Parameters.GetString("cdc"); cdcVal == "true" && strategy != "merge" {
+				issues = append(issues, &Issue{
+					Task:        asset,
+					Description: "CDC ingestr assets require materialization strategy 'merge'",
+				})
+			}
 			issues = append(issues, validateIngestrMaterializationConflict(asset, "incremental_strategy", strategy, "materialization.strategy")...)
 		}
+	}
+
+	if mat.IncrementalKey != "" && !python.IsIngestrIncrementalKeyStrategy(effectiveStrategy) {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: "Materialization incremental key is only supported for append, merge, and delete+insert strategies on ingestr assets",
+		})
 	}
 
 	issues = append(issues, validateIngestrMaterializationConflict(asset, "incremental_key", mat.IncrementalKey, "materialization.incremental_key")...)
 	issues = append(issues, validateIngestrMaterializationConflict(asset, "partition_by", mat.PartitionBy, "materialization.partition_by")...)
 	issues = append(issues, validateIngestrMaterializationConflict(asset, "cluster_by", strings.Join(mat.ClusterBy, ","), "materialization.cluster_by")...)
 
-	return issues, effectiveStrategy
+	return issues, materializationStrategy
 }
 
 func validateIngestrMaterializationConflict(asset *pipeline.Asset, key, value, source string) []*Issue {
