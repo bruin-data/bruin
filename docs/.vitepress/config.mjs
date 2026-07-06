@@ -129,6 +129,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "Configure Agents", link: "/cloud/ai-agents/configure"},
                             {text: "Chat with Agents", link: "/cloud/ai-agents/chat"},
                             {text: "Scheduled Agents", link: "/cloud/ai-agents/scheduled"},
+                            {text: "Agent Skills", link: "/cloud/ai-agents/skills"},
                             {
                                 text: "Examples",
                                 collapsed: true,
