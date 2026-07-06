@@ -1164,17 +1164,20 @@ environments:
 
 	cfg, err := LoadOrCreate(fs, configPath)
 	require.NoError(t, err)
+	absoluteConfigPath, err := filepath.Abs(configPath)
+	require.NoError(t, err)
+	configDir := filepath.Dir(absoluteConfigPath)
 
 	// Both read+embed the file, so their relative paths must resolve against the
 	// config directory (so masking reads the same file, independent of cwd).
 	require.Len(t, cfg.SelectedEnvironment.Connections.GoogleCloudPlatform, 1)
 	gcp := cfg.SelectedEnvironment.Connections.GoogleCloudPlatform[0].ServiceAccountFile
-	assert.Equal(t, filepath.Join(filepath.Dir(configPath), "creds/gcp.json"), gcp)
+	assert.Equal(t, filepath.Join(configDir, "creds/gcp.json"), gcp)
 	assert.True(t, filepath.IsAbs(gcp), "gcp path should be absolute: %s", gcp)
 
 	require.Len(t, cfg.SelectedEnvironment.Connections.GoogleSheets, 1)
 	sheets := cfg.SelectedEnvironment.Connections.GoogleSheets[0].ServiceAccountFile
-	assert.Equal(t, filepath.Join(filepath.Dir(configPath), "creds/sheets.json"), sheets)
+	assert.Equal(t, filepath.Join(configDir, "creds/sheets.json"), sheets)
 	assert.True(t, filepath.IsAbs(sheets), "sheets path should be absolute: %s", sheets)
 }
 
