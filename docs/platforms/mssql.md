@@ -125,6 +125,8 @@ Runs a materialized SQL Server asset or an SQL script. For detailed parameters, 
 
 Asset names may be `table`, `schema.table`, or `database.schema.table`. A three-part name lets you target a database other than the one in your connection config.
 
+For table assets using the default or `create+replace` materialization strategy, Bruin honors the asset's `columns` schema when every column defines a `type`: it creates the table with the declared column types and then inserts the query result. If any declared column has no type, Bruin keeps SQL Server's `SELECT INTO` behavior so column metadata used only for checks or documentation can still rely on SQL Server type inference.
+
 ::: warning Three-part `ddl` assets across databases
 With the `ddl` materialization strategy, Bruin auto-creates the asset's schema in the connection's *current* database. If a `database.schema.table` asset targets a different database, the schema must already exist there or the run fails with a "schema does not exist" error. Other strategies (e.g. `create+replace`) create the table directly and are unaffected.
 :::

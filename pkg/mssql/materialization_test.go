@@ -383,6 +383,56 @@ func TestMaterializer_Render(t *testing.T) {
 	}
 }
 
+func TestCreateReplaceWithTypedColumns(t *testing.T) {
+	t.Parallel()
+
+	asset := &pipeline.Asset{
+		Name: "dbo.customer_dim",
+		Materialization: pipeline.Materialization{
+			Type:     pipeline.MaterializationTypeTable,
+			Strategy: pipeline.MaterializationStrategyCreateReplace,
+		},
+		Columns: []pipeline.Column{
+			{Name: "id", Type: "int", PrimaryKey: true},
+			{Name: "customer_name", Type: "varchar", Length: intp(50)},
+			{Name: "is_active", Type: "bit", Default: "1"},
+		},
+	}
+
+	render, err := NewMaterializer(false).Render(asset, "SELECT id, customer_name, is_active FROM src.customers;")
+	require.NoError(t, err)
+
+	assert.NotContains(t, render, "SELECT tmp.* INTO")
+	assert.Contains(t, render, "DROP TABLE IF EXISTS [dbo].[customer_dim]")
+	assert.Contains(t, render, "CREATE TABLE [dbo].[customer_dim] (")
+	assert.Contains(t, render, "[customer_name] varchar(50)")
+	assert.Contains(t, render, "[is_active] bit DEFAULT 1")
+	assert.Contains(t, render, "PRIMARY KEY ([id])")
+	assert.Contains(t, render, "INSERT INTO [dbo].[customer_dim] ([id], [customer_name], [is_active]) SELECT id, customer_name, is_active FROM src.customers")
+}
+
+func TestCreateReplaceFallsBackToSelectIntoWithoutTypedColumns(t *testing.T) {
+	t.Parallel()
+
+	asset := &pipeline.Asset{
+		Name: "dbo.customer_dim",
+		Materialization: pipeline.Materialization{
+			Type:     pipeline.MaterializationTypeTable,
+			Strategy: pipeline.MaterializationStrategyCreateReplace,
+		},
+		Columns: []pipeline.Column{
+			{Name: "id", Type: "int"},
+			{Name: "customer_name"},
+		},
+	}
+
+	render, err := NewMaterializer(false).Render(asset, "SELECT id, customer_name FROM src.customers;")
+	require.NoError(t, err)
+
+	assert.Contains(t, render, "SELECT tmp.* INTO dbo.customer_dim")
+	assert.NotContains(t, render, "CREATE TABLE [dbo].[customer_dim]")
+}
+
 func intp(i int) *int { return &i }
 
 func TestColumnMetadataDDL(t *testing.T) {

@@ -2759,6 +2759,46 @@ func TestBuilder_SetupDefaultsFromPipelineAppliesAssetFieldDefaults(t *testing.T
 	assert.Equal(t, "#default", got.Notifications.Slack[1].Channel)
 }
 
+func TestBuilder_SetupDefaultsFromPipelineKeepsExplicitMSSQLAssetDefinitions(t *testing.T) {
+	t.Parallel()
+
+	asset := &pipeline.Asset{
+		Name: "dbo.customer_dim",
+		Type: pipeline.AssetTypeMsSQLQuery,
+		Materialization: pipeline.Materialization{
+			Type:     pipeline.MaterializationTypeTable,
+			Strategy: pipeline.MaterializationStrategyDDL,
+		},
+		Columns: []pipeline.Column{
+			{Name: "customer_name", Type: "varchar", Length: ptrInt(50)},
+		},
+	}
+	defaults := &pipeline.DefaultValues{
+		Materialization: pipeline.Materialization{
+			Type:     pipeline.MaterializationTypeTable,
+			Strategy: pipeline.MaterializationStrategyCreateReplace,
+		},
+		Columns: []pipeline.Column{
+			{Name: "customer_name", Type: "nvarchar", Length: ptrInt(4000)},
+			{Name: "loaded_at", Type: "datetime2"},
+		},
+	}
+
+	builder := &pipeline.Builder{}
+	got, err := builder.SetupDefaultsFromPipeline(t.Context(), asset, &pipeline.Pipeline{DefaultValues: defaults})
+	require.NoError(t, err)
+
+	assert.Equal(t, pipeline.MaterializationTypeTable, got.Materialization.Type)
+	assert.Equal(t, pipeline.MaterializationStrategyDDL, got.Materialization.Strategy)
+	require.Len(t, got.Columns, 2)
+	assert.Equal(t, "customer_name", got.Columns[0].Name)
+	assert.Equal(t, "varchar", got.Columns[0].Type)
+	require.NotNil(t, got.Columns[0].Length)
+	assert.Equal(t, 50, *got.Columns[0].Length)
+	assert.Equal(t, "loaded_at", got.Columns[1].Name)
+	assert.Equal(t, "datetime2", got.Columns[1].Type)
+}
+
 func TestBuilder_InjectConnectionAsSecret(t *testing.T) {
 	t.Parallel()
 
