@@ -2112,9 +2112,25 @@ func cloudAgentsUpdate() *cli.Command {
 			defer RecoverFromPanic()
 			output := c.String("output")
 
-			visibility := c.String("visibility")
-			if visibility != "" && visibility != "team" && visibility != "private" {
-				printError(fmt.Errorf("visibility must be 'team' or 'private', got %q", visibility), output, "Invalid --visibility")
+			// Build the patch from the flags the user actually set, so an explicit
+			// empty value (e.g. --description "") is sent rather than dropped.
+			fields := map[string]any{}
+			if c.IsSet("name") {
+				fields["name"] = c.String("name")
+			}
+			if c.IsSet("description") {
+				fields["description"] = c.String("description")
+			}
+			if c.IsSet("visibility") {
+				visibility := c.String("visibility")
+				if visibility != "team" && visibility != "private" {
+					printError(fmt.Errorf("visibility must be 'team' or 'private', got %q", visibility), output, "Invalid --visibility")
+					return cli.Exit("", 1)
+				}
+				fields["visibility"] = visibility
+			}
+			if len(fields) == 0 {
+				printError(fmt.Errorf("provide at least one of --name, --description or --visibility"), output, "Nothing to update")
 				return cli.Exit("", 1)
 			}
 
@@ -2124,7 +2140,7 @@ func cloudAgentsUpdate() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			agent, err := client.UpdateAgent(ctx, c.Int("agent-id"), c.String("name"), c.String("description"), visibility)
+			agent, err := client.UpdateAgent(ctx, c.Int("agent-id"), fields)
 			if err != nil {
 				printError(err, output, "Failed to update agent")
 				return cli.Exit("", 1)

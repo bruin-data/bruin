@@ -450,21 +450,12 @@ func (c *APIClient) GetAgent(ctx context.Context, agentID int) (*Agent, error) {
 	return &result, nil
 }
 
-// UpdateAgent updates an agent. Only non-empty fields are sent, so the server
-// changes just those; omitted fields are left unchanged.
-func (c *APIClient) UpdateAgent(ctx context.Context, agentID int, name, description, visibility string) (*Agent, error) {
-	body := map[string]any{}
-	if name != "" {
-		body["name"] = name
-	}
-	if description != "" {
-		body["description"] = description
-	}
-	if visibility != "" {
-		body["visibility"] = visibility
-	}
+// UpdateAgent patches an agent with the given fields. The caller decides which
+// fields to include (based on which flags were set), so an explicit empty value
+// is sent and can clear a field.
+func (c *APIClient) UpdateAgent(ctx context.Context, agentID int, fields map[string]any) (*Agent, error) {
 	var result Agent
-	err := c.doRequest(ctx, http.MethodPatch, fmt.Sprintf("/agents/%d", agentID), body, &result)
+	err := c.doRequest(ctx, http.MethodPatch, fmt.Sprintf("/agents/%d", agentID), fields, &result)
 	if err != nil {
 		return nil, err
 	}

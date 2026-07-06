@@ -543,7 +543,7 @@ func TestUpdateAgent(t *testing.T) {
 		writeJSON(t, w, Agent{ID: 7, Name: "renamed", Visibility: "team"})
 	})
 
-	agent, err := client.UpdateAgent(t.Context(), 7, "renamed", "", "")
+	agent, err := client.UpdateAgent(t.Context(), 7, map[string]any{"name": "renamed"})
 	require.NoError(t, err)
 	assert.Equal(t, "renamed", agent.Name)
 }
