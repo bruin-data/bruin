@@ -1,0 +1,14 @@
+{
+  "customContext": {
+    "rules": [
+      {
+        "scope": ["pkg/config/connections.go", "pkg/config/lakehouse.go", "pkg/config/*.go"],
+        "rule": "Credential masking — sensitive field tagging. Connection structs feed `bruin run` logs via ingestr URIs, so every field that carries a secret MUST be tagged so the masker (pkg/mask) can redact it. When a struct field is added or changed and its value is a credential (password, secret, token, api_key, access_key, private_key, service_account_json, passphrase, auth credential, client_secret, sasl_password, session_token, account_key, etc.), require exactly one of: (a) `sensitive:\"true\"` if the field holds the secret value inline, or (b) `sensitive_file:\"true\"` if the field is a filesystem path whose FILE CONTENTS are the secret AND bruin itself reads that file (os.ReadFile) and embeds the contents in the ingestr URI (e.g. service_account_file, private_key_path). If the field's name merely looks secret-bearing but is genuinely NOT a secret — an identifier, a username, or a path that is passed through to the ingestr subprocess unread (e.g. key_path, ssl_key_path, ssl_cert_path) — it must instead be added to `safeNonSecretKeys` in pkg/config/connections_sensitive_test.go. Flag any new or modified credential-looking connection field that has neither a sensitive tag nor an allowlist entry: it will leak into run logs, and the TestConnectionSensitiveTagsComplete guard test is expected to fail."
+      },
+      {
+        "scope": ["pkg/mask/**", "pkg/*/config.go", "pkg/config/connections.go", "pkg/config/lakehouse.go"],
+        "rule": "Credential masking — encoding forms registry. The masker in pkg/mask/mask.go redacts secrets by pre-computing, in the `forms(secret string)` function, EVERY textual shape a secret can take in a log line, then doing byte-substring replacement. It currently generates: raw, url.QueryEscape, url.PathEscape, userinfo (url.UserPassword), base64.StdEncoding, and base64-then-QueryEscape. Masking only works for shapes `forms()` knows about. If a change encodes, escapes, or otherwise transforms a credential into a NEW representation that is not already produced by `forms()` — for example base64.URLEncoding, hex, gzip+base64, a different escaping, JWT-style encoding, or embedding the secret in a new URI position — then `forms()` in pkg/mask/mask.go MUST be extended to emit that shape, otherwise the credential leaks unmasked. Flag any diff that introduces a new credential encoding/serialization (typically in a GetIngestrURI builder under pkg/*/config.go or in connection URI construction) without a corresponding addition to `forms()`."
+      }
+    ]
+  }
+}
