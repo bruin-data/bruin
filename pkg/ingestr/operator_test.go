@@ -1102,9 +1102,10 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 	finder := new(mockFinder)
 
 	tests := []struct {
-		name  string
-		asset *pipeline.Asset
-		want  []string
+		name    string
+		asset   *pipeline.Asset
+		want    []string
+		wantErr string
 	}{
 		{
 			name: "CDC mode transforms URI and auto-sets merge strategy",
@@ -1201,7 +1202,7 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 			},
 		},
 		{
-			name: "CDC mode with explicit incremental strategy",
+			name: "CDC mode rejects explicit non-merge incremental strategy",
 			asset: &pipeline.Asset{
 				Name:       "cdc-asset-explicit-strategy",
 				Connection: "bq",
@@ -1213,16 +1214,7 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 					"incremental_strategy": "append",
 				},
 			},
-			want: []string{
-				"ingest",
-				"--source-uri", "postgres+cdc://user:pass@localhost:5432/db",
-				"--source-table", "public.users",
-				"--dest-uri", "bigquery://uri-here",
-				"--dest-table", "cdc-asset-explicit-strategy",
-				"--yes",
-				"--progress", "log",
-				"--incremental-strategy", "append",
-			},
+			wantErr: `cdc ingestr assets require incremental_strategy "merge"`,
 		},
 	}
 
@@ -1231,7 +1223,9 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 			t.Parallel()
 
 			runner := new(mockRunner)
-			runner.On("RunIngestr", mock.Anything, tt.want, []string(nil), repo).Return(nil)
+			if tt.wantErr == "" {
+				runner.On("RunIngestr", mock.Anything, tt.want, []string(nil), repo).Return(nil)
+			}
 
 			startDate := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 			endDate := time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC)
@@ -1252,6 +1246,10 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 			ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, false)
 
 			err := o.Run(ctx, &ti)
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				return
+			}
 			require.NoError(t, err)
 		})
 	}
