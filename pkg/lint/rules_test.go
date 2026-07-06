@@ -1257,6 +1257,21 @@ func TestEnsureMaterializationValuesAreValid(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 		{
+			name: "ingestr materialization is ignored",
+			assets: []*pipeline.Asset{
+				{
+					Name: "task1",
+					Type: pipeline.AssetTypeIngestr,
+					Materialization: pipeline.Materialization{
+						Type:           pipeline.MaterializationTypeTable,
+						Strategy:       "whatever",
+						IncrementalKey: "dt",
+					},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
 			name: "view materialization has extra fields",
 			assets: []*pipeline.Asset{
 				{
@@ -2238,6 +2253,76 @@ func TestEnsurePipelineStartDateIsValid(t *testing.T) {
 			got, err := EnsurePipelineStartDateIsValid(ctx, tt.p)
 			tt.wantErr(t, err)
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestWarnIngestrAssetMaterializationIgnored(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		asset     *pipeline.Asset
+		wantIssue bool
+	}{
+		{
+			name: "ingestr asset with materialization warns",
+			asset: &pipeline.Asset{
+				Name: "raw.orders",
+				Type: pipeline.AssetTypeIngestr,
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+			},
+			wantIssue: true,
+		},
+		{
+			name: "ingestr asset with incremental key materialization warns",
+			asset: &pipeline.Asset{
+				Name: "raw.orders",
+				Type: pipeline.AssetTypeIngestr,
+				Materialization: pipeline.Materialization{
+					IncrementalKey: "updated_at",
+				},
+			},
+			wantIssue: true,
+		},
+		{
+			name: "ingestr asset without materialization does not warn",
+			asset: &pipeline.Asset{
+				Name: "raw.orders",
+				Type: pipeline.AssetTypeIngestr,
+			},
+		},
+		{
+			name: "sql asset with materialization does not warn",
+			asset: &pipeline.Asset{
+				Name: "raw.orders",
+				Type: pipeline.AssetTypeDuckDBQuery,
+				Materialization: pipeline.Materialization{
+					Type: pipeline.MaterializationTypeTable,
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			p := &pipeline.Pipeline{Assets: []*pipeline.Asset{tt.asset}}
+			got, err := WarnIngestrAssetMaterializationIgnored(t.Context(), p, tt.asset)
+			require.NoError(t, err)
+
+			if !tt.wantIssue {
+				assert.Empty(t, got)
+				return
+			}
+
+			require.Len(t, got, 1)
+			assert.Equal(t, tt.asset, got[0].Task)
+			assert.Equal(t, ingestrMaterializationIgnored, got[0].Description)
 		})
 	}
 }

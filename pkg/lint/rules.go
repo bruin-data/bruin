@@ -62,6 +62,7 @@ const (
 	materializationPartitionByNotSupportedForViews    = "Materialization partition by is not supported for views because views cannot be partitioned"
 	materializationIncrementalKeyNotSupportedForViews = "Materialization incremental key is not supported for views because views cannot be updated incrementally"
 	materializationClusterByNotSupportedForViews      = "Materialization cluster by is not supported for views because views cannot be clustered"
+	ingestrMaterializationIgnored                     = "The `materialization` block is ignored for ingestr assets. Use `parameters.incremental_strategy` and `parameters.incremental_key` instead."
 )
 
 var validIDRegexCompiled = regexp.MustCompile(validIDRegex)
@@ -326,6 +327,19 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 	}
 
 	return issues, nil
+}
+
+func WarnIngestrAssetMaterializationIgnored(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	if asset.Type != pipeline.AssetTypeIngestr || !hasMaterializationConfig(asset.Materialization) {
+		return []*Issue{}, nil
+	}
+
+	return []*Issue{
+		{
+			Task:        asset,
+			Description: ingestrMaterializationIgnored,
+		},
+	}, nil
 }
 
 func isFileExecutable(mode os.FileMode) bool {
@@ -1178,7 +1192,7 @@ func EnsureAssetNotificationsAreValid(ctx context.Context, p *pipeline.Pipeline,
 
 func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
-	if asset.Type == pipeline.AssetTypePython {
+	if asset.Type == pipeline.AssetTypePython || asset.Type == pipeline.AssetTypeIngestr {
 		return issues, nil
 	}
 
@@ -1343,6 +1357,15 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 	}
 
 	return issues, nil
+}
+
+func hasMaterializationConfig(mat pipeline.Materialization) bool {
+	return mat.Type != pipeline.MaterializationTypeNone ||
+		mat.Strategy != pipeline.MaterializationStrategyNone ||
+		mat.PartitionBy != "" ||
+		len(mat.ClusterBy) > 0 ||
+		mat.IncrementalKey != "" ||
+		mat.TimeGranularity != ""
 }
 
 func ensureDataVaultHubColumnsAreValid(asset *pipeline.Asset) []*Issue {

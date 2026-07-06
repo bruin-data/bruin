@@ -156,6 +156,13 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser sqlpa
 			ApplicableLevels: []Level{LevelAsset},
 		},
 		&SimpleRule{
+			Identifier:       "ingestr-materialization-ignored",
+			Fast:             true,
+			Severity:         ValidatorSeverityWarning,
+			AssetValidator:   WarnIngestrAssetMaterializationIgnored,
+			ApplicableLevels: []Level{LevelAsset},
+		},
+		&SimpleRule{
 			Identifier:       "valid-pipeline-start-date",
 			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
