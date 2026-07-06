@@ -249,14 +249,11 @@ func TestApplyMaterializationParameters(t *testing.T) {
 			wantErr: `cdc ingestr assets require incremental_strategy "merge"`,
 		},
 		{
-			name: "cdc requires merge parameter",
+			name: "cdc requires merge legacy parameter",
 			asset: &pipeline.Asset{
 				Parameters: pipeline.ParameterMap{
 					"cdc":                  "true",
 					"incremental_strategy": "append",
-				},
-				Materialization: pipeline.Materialization{
-					Type: pipeline.MaterializationTypeTable,
 				},
 			},
 			wantErr: `cdc ingestr assets require incremental_strategy "merge"`,

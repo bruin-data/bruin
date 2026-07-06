@@ -483,6 +483,13 @@ func applyClickHouseEngineParams(destURI string, params pipeline.ParameterMap) s
 }
 
 func applyMaterializationParameters(asset *pipeline.Asset) error {
+	if isCDCAsset(asset) {
+		strategy, _ := asset.Parameters.GetString("incremental_strategy")
+		if strategy = strings.TrimSpace(strategy); strategy != "" && strategy != "merge" {
+			return errors.New("cdc ingestr assets require incremental_strategy \"merge\"")
+		}
+	}
+
 	mat := asset.Materialization
 	if mat.Type == pipeline.MaterializationTypeNone {
 		return nil
