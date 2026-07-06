@@ -21,6 +21,7 @@ For how the underlying data is scoped and retained, see [Does the agent see my a
 - [Configure Agents](/cloud/ai-agents/configure): create an agent, pick a project, attach a connection set, add messaging integrations, set permissions.
 - [Chat with Agents](/cloud/ai-agents/chat): use the agent in the Bruin Cloud chat for analysis, reporting, and CLI tasks.
 - [Scheduled Agents](/cloud/ai-agents/scheduled): run an agent on a cadence (daily reports, threshold alerts, custom SQL runs).
+- [Agent Skills](/cloud/ai-agents/skills): teach an agent a reusable task by committing a `SKILL.md` to your repo.
 - [Integrations](/cloud/integrations/overview): connect an agent to Slack, Microsoft Teams, Discord, WhatsApp, or Telegram so your team can query data from where they already chat.
 - [Slack AI Analyst tutorial](/cloud/ai-agents/slack-ai-analyst): end-to-end walkthrough that builds a pipeline, enhances metadata, and deploys an analyst to Slack.
 
