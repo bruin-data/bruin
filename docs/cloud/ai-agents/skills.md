@@ -94,6 +94,11 @@ identically to the agent. Repo-committed skills are the right default when the
 skill is tied to a specific project; Cloud-managed skills are useful when you
 want the same skill across several projects without editing each repo.
 
+If a Cloud-managed skill and a repo skill share the same `name`, the
+Cloud-managed one wins — it is applied last and overrides the repo skill, so the
+agent loads a single skill under that name. Give a skill a distinct `name` if
+you want it to stand on its own rather than replace a repo skill.
+
 ## Tips
 
 - One skill, one job. A focused skill with a sharp `description` beats a
