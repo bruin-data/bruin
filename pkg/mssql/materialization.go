@@ -51,11 +51,50 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query string) (string, error)
 	if len(mat.ClusterBy) > 0 {
 		return "", errors.New("MsSQL assets do not support `cluster_by`")
 	}
+	if hasTypedColumns(task) {
+		return buildCreateReplaceQueryWithTypedColumns(task, query)
+	}
+
 	query = strings.TrimSuffix(query, ";")
 	queries := []string{
 		"BEGIN TRANSACTION",
 		"DROP TABLE IF EXISTS " + task.Name,
 		fmt.Sprintf("SELECT tmp.* INTO %s FROM (%s) AS tmp", task.Name, query),
+		"COMMIT",
+	}
+
+	return strings.Join(queries, ";\n") + ";", nil
+}
+
+func hasTypedColumns(asset *pipeline.Asset) bool {
+	if len(asset.Columns) == 0 {
+		return false
+	}
+	for _, col := range asset.Columns {
+		if strings.TrimSpace(col.Name) == "" || strings.TrimSpace(col.Type) == "" {
+			return false
+		}
+	}
+	return true
+}
+
+func buildCreateReplaceQueryWithTypedColumns(asset *pipeline.Asset, query string) (string, error) {
+	createTable, err := buildCreateTableStatement(asset)
+	if err != nil {
+		return "", err
+	}
+
+	quotedColumnNames := make([]string, 0, len(asset.Columns))
+	for _, col := range asset.Columns {
+		quotedColumnNames = append(quotedColumnNames, quoteIdentifier(col.Name))
+	}
+
+	query = strings.TrimSuffix(query, ";")
+	queries := []string{
+		"BEGIN TRANSACTION",
+		"DROP TABLE IF EXISTS " + quoteIdentifier(asset.Name),
+		createTable,
+		fmt.Sprintf("INSERT INTO %s (%s) %s", quoteIdentifier(asset.Name), strings.Join(quotedColumnNames, ", "), query),
 		"COMMIT",
 	}
 
@@ -185,38 +224,13 @@ func sqlStringLiteral(value string) string {
 	return "N'" + strings.ReplaceAll(value, "'", "''") + "'"
 }
 
-func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
-	if len(asset.Columns) == 0 {
-		return "", fmt.Errorf("materialization strategy %s requires the `columns` field to be set", asset.Materialization.Strategy)
-	}
-
-	// Derive the schema component, which is the second-to-last for both
-	// `schema.table` and `database.schema.table`. The schema is created in the
-	// session's current database, so a three-part name's schema is auto-created
-	// only when the database component is the connection's current database.
-	cb, ok := tablename.For("mssql")
-	if !ok {
-		return "", errors.New("mssql table-name capability not found")
-	}
-	tn, err := cb.Parse(asset.Name, tablename.Defaults{})
-	if err != nil {
-		return "", err
-	}
-	queries := make([]string, 0, 2)
-	if tn.Schema != "" {
-		queries = append(queries, fmt.Sprintf(
-			"IF SCHEMA_ID(%s) IS NULL\n    EXEC(N'CREATE SCHEMA %s')",
-			sqlStringLiteral(tn.Schema),
-			strings.ReplaceAll(quoteIdentifier(tn.Schema), "'", "''"),
-		))
-	}
-
+func buildColumnDefinitions(asset *pipeline.Asset) ([]string, error) {
 	columnDefs := make([]string, 0, len(asset.Columns)+1)
 	primaryKeys := make([]string, 0)
 	foreignKeys := make([]string, 0)
 	for _, col := range asset.Columns {
 		if col.Type == "" {
-			return "", fmt.Errorf("materialization strategy %s requires column %q to have a type", asset.Materialization.Strategy, col.Name)
+			return nil, fmt.Errorf("materialization strategy %s requires column %q to have a type", asset.Materialization.Strategy, col.Name)
 		}
 
 		def := fmt.Sprintf("    %s %s", quoteIdentifier(col.Name), col.SQLType())
@@ -246,11 +260,61 @@ func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 
 	columnDefs = append(columnDefs, foreignKeys...)
 
-	createTable := fmt.Sprintf(
-		"IF OBJECT_ID(%s, N'U') IS NULL\nBEGIN\nCREATE TABLE %s (\n%s\n)\nEND",
-		sqlStringLiteral(asset.Name),
+	return columnDefs, nil
+}
+
+func buildCreateTableStatement(asset *pipeline.Asset) (string, error) {
+	if len(asset.Columns) == 0 {
+		return "", fmt.Errorf("materialization strategy %s requires the `columns` field to be set", asset.Materialization.Strategy)
+	}
+
+	columnDefs, err := buildColumnDefinitions(asset)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf(
+		"CREATE TABLE %s (\n%s\n)",
 		quoteIdentifier(asset.Name),
 		strings.Join(columnDefs, ",\n"),
+	), nil
+}
+
+func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
+	if len(asset.Columns) == 0 {
+		return "", fmt.Errorf("materialization strategy %s requires the `columns` field to be set", asset.Materialization.Strategy)
+	}
+
+	// Derive the schema component, which is the second-to-last for both
+	// `schema.table` and `database.schema.table`. The schema is created in the
+	// session's current database, so a three-part name's schema is auto-created
+	// only when the database component is the connection's current database.
+	cb, ok := tablename.For("mssql")
+	if !ok {
+		return "", errors.New("mssql table-name capability not found")
+	}
+	tn, err := cb.Parse(asset.Name, tablename.Defaults{})
+	if err != nil {
+		return "", err
+	}
+	queries := make([]string, 0, 2)
+	if tn.Schema != "" {
+		queries = append(queries, fmt.Sprintf(
+			"IF SCHEMA_ID(%s) IS NULL\n    EXEC(N'CREATE SCHEMA %s')",
+			sqlStringLiteral(tn.Schema),
+			strings.ReplaceAll(quoteIdentifier(tn.Schema), "'", "''"),
+		))
+	}
+
+	createTableStatement, err := buildCreateTableStatement(asset)
+	if err != nil {
+		return "", err
+	}
+
+	createTable := fmt.Sprintf(
+		"IF OBJECT_ID(%s, N'U') IS NULL\nBEGIN\n%s\nEND",
+		sqlStringLiteral(asset.Name),
+		createTableStatement,
 	)
 	queries = append(queries, createTable)
 
