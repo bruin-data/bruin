@@ -372,7 +372,7 @@ func validateIngestrMaterialization(asset *pipeline.Asset, effectiveStrategy str
 		}
 	}
 
-	if mat.IncrementalKey != "" && !python.IsIngestrIncrementalKeyStrategy(effectiveStrategy) {
+	if hasIngestrMaterializationIncrementalKey(asset, mat) && !python.IsIngestrIncrementalKeyStrategy(effectiveStrategy) {
 		issues = append(issues, &Issue{
 			Task:        asset,
 			Description: "Materialization incremental key is only supported for append, merge, and delete+insert strategies on ingestr assets",
@@ -384,6 +384,14 @@ func validateIngestrMaterialization(asset *pipeline.Asset, effectiveStrategy str
 	issues = append(issues, validateIngestrMaterializationConflict(asset, "cluster_by", strings.Join(mat.ClusterBy, ","), "materialization.cluster_by")...)
 
 	return issues, materializationStrategy
+}
+
+func hasIngestrMaterializationIncrementalKey(asset *pipeline.Asset, mat pipeline.Materialization) bool {
+	if strings.TrimSpace(mat.IncrementalKey) != "" {
+		return true
+	}
+	key, _ := asset.Parameters.GetString("incremental_key")
+	return strings.TrimSpace(key) != ""
 }
 
 func validateIngestrMaterializationConflict(asset *pipeline.Asset, key, value, source string) []*Issue {

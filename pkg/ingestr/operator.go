@@ -516,7 +516,7 @@ func applyMaterializationParameters(asset *pipeline.Asset) error {
 		return errors.New("cdc ingestr assets require incremental_strategy \"merge\"")
 	}
 
-	if mat.IncrementalKey != "" && !python.IsIngestrIncrementalKeyStrategy(effectiveStrategy) {
+	if hasIngestrIncrementalKey(asset, mat) && !python.IsIngestrIncrementalKeyStrategy(effectiveStrategy) {
 		return errors.New("materialization.incremental_key is only supported for append, merge, and delete+insert strategies on ingestr assets")
 	}
 
@@ -536,6 +536,14 @@ func applyMaterializationParameters(asset *pipeline.Asset) error {
 func isCDCAsset(asset *pipeline.Asset) bool {
 	cdc, _ := asset.Parameters.GetString("cdc")
 	return cdc == "true"
+}
+
+func hasIngestrIncrementalKey(asset *pipeline.Asset, mat pipeline.Materialization) bool {
+	if strings.TrimSpace(mat.IncrementalKey) != "" {
+		return true
+	}
+	key, _ := asset.Parameters.GetString("incremental_key")
+	return strings.TrimSpace(key) != ""
 }
 
 func setMaterializationParameter(params pipeline.ParameterMap, key, value, source string) error {

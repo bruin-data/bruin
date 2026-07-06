@@ -178,18 +178,30 @@ func TestApplyMaterializationParameters(t *testing.T) {
 			name: "sets ingestr parameters",
 			asset: &pipeline.Asset{
 				Materialization: pipeline.Materialization{
-					Type:           pipeline.MaterializationTypeTable,
-					Strategy:       pipeline.MaterializationStrategyTruncateInsert,
-					IncrementalKey: "dt",
-					PartitionBy:    "dt",
-					ClusterBy:      []string{"tenant", "region"},
+					Type:        pipeline.MaterializationTypeTable,
+					Strategy:    pipeline.MaterializationStrategyTruncateInsert,
+					PartitionBy: "dt",
+					ClusterBy:   []string{"tenant", "region"},
 				},
 			},
 			wantParams: pipeline.ParameterMap{
 				"incremental_strategy": "truncate+insert",
-				"incremental_key":      "dt",
 				"partition_by":         "dt",
 				"cluster_by":           "tenant,region",
+			},
+		},
+		{
+			name: "sets incremental key for incremental strategy",
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategyAppend,
+					IncrementalKey: "updated_at",
+				},
+			},
+			wantParams: pipeline.ParameterMap{
+				"incremental_strategy": "append",
+				"incremental_key":      "updated_at",
 			},
 		},
 		{
@@ -256,6 +268,19 @@ func TestApplyMaterializationParameters(t *testing.T) {
 					Type:           pipeline.MaterializationTypeTable,
 					Strategy:       pipeline.MaterializationStrategyCreateReplace,
 					IncrementalKey: "updated_at",
+				},
+			},
+			wantErr: "materialization.incremental_key is only supported for append, merge, and delete+insert strategies on ingestr assets",
+		},
+		{
+			name: "legacy incremental key requires incremental materialization strategy",
+			asset: &pipeline.Asset{
+				Parameters: pipeline.ParameterMap{
+					"incremental_key": "updated_at",
+				},
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyCreateReplace,
 				},
 			},
 			wantErr: "materialization.incremental_key is only supported for append, merge, and delete+insert strategies on ingestr assets",

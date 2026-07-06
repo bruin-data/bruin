@@ -2145,6 +2145,24 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 			wantErr:        assert.NoError,
 		},
 		{
+			name: "ingestr asset with create replace materialization and legacy incremental key should fail",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "conn1",
+					"source_table":      "table1",
+					"destination":       "dest1",
+					"incremental_key":   "updated_at",
+				},
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyCreateReplace,
+				},
+			},
+			wantErrMessage: "Materialization incremental key is only supported for append, merge, and delete+insert strategies on ingestr assets",
+			wantErr:        assert.NoError,
+		},
+		{
 			name: "CDC ingestr asset with merge strategy but no primary key should pass",
 			asset: &pipeline.Asset{
 				Type: pipeline.AssetTypeIngestr,
