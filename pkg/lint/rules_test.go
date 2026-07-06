@@ -1998,6 +1998,171 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 			wantErr:        assert.NoError,
 		},
 		{
+			name: "ingestr asset with materialization merge but no primary key",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "conn1",
+					"source_table":      "table1",
+					"destination":       "dest1",
+				},
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+				Columns: []pipeline.Column{
+					{Name: "col1"},
+				},
+			},
+			wantErrMessage: "Materialization strategy 'merge' requires the 'primary_key' field to be set on at least one column",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "valid ingestr asset with materialization merge and primary key",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "conn1",
+					"source_table":      "table1",
+					"destination":       "dest1",
+				},
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategyMerge,
+					IncrementalKey: "updated_at",
+				},
+				Columns: []pipeline.Column{
+					{Name: "col1", PrimaryKey: true},
+					{Name: "updated_at"},
+				},
+			},
+			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "ingestr asset with unsupported materialization strategy",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "conn1",
+					"source_table":      "table1",
+					"destination":       "dest1",
+				},
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyDDL,
+				},
+			},
+			wantErrMessage: "Materialization strategy 'ddl' is not supported for ingestr assets. Supported strategies are: create+replace, append, merge, delete+insert, truncate+insert",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "ingestr asset with unsupported materialization type",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "conn1",
+					"source_table":      "table1",
+					"destination":       "dest1",
+				},
+				Materialization: pipeline.Materialization{
+					Type: pipeline.MaterializationTypeView,
+				},
+			},
+			wantErrMessage: "Ingestr assets only support materialization type 'table'",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "ingestr asset with conflicting materialization strategy",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection":    "conn1",
+					"source_table":         "table1",
+					"destination":          "dest1",
+					"incremental_strategy": "append",
+				},
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+				Columns: []pipeline.Column{
+					{Name: "col1", PrimaryKey: true},
+				},
+			},
+			wantErrMessage: `Ingestr asset defines both parameters.incremental_strategy="append" and materialization.strategy="merge"`,
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "CDC ingestr asset with append materialization should fail",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "conn1",
+					"source_table":      "table1",
+					"destination":       "dest1",
+					"cdc":               "true",
+				},
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyAppend,
+				},
+			},
+			wantErrMessage: "CDC ingestr assets require incremental strategy 'merge'",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "CDC ingestr asset with append parameter should fail",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection":    "conn1",
+					"source_table":         "table1",
+					"destination":          "dest1",
+					"cdc":                  "true",
+					"incremental_strategy": "append",
+				},
+			},
+			wantErrMessage: "CDC ingestr assets require incremental strategy 'merge'",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "ingestr asset with create replace materialization and incremental key should fail",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "conn1",
+					"source_table":      "table1",
+					"destination":       "dest1",
+				},
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategyCreateReplace,
+					IncrementalKey: "updated_at",
+				},
+			},
+			wantErrMessage: "Materialization incremental key is only supported for append, merge, and delete+insert strategies on ingestr assets",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "ingestr asset with create replace materialization and legacy incremental key should fail",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "conn1",
+					"source_table":      "table1",
+					"destination":       "dest1",
+					"incremental_key":   "updated_at",
+				},
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyCreateReplace,
+				},
+			},
+			wantErrMessage: "Materialization incremental key is only supported for append, merge, and delete+insert strategies on ingestr assets",
+			wantErr:        assert.NoError,
+		},
+		{
 			name: "CDC ingestr asset with merge strategy but no primary key should pass",
 			asset: &pipeline.Asset{
 				Type: pipeline.AssetTypeIngestr,

@@ -59,3 +59,31 @@ func TestTranslateBruinStrategyToIngestr(t *testing.T) {
 		})
 	}
 }
+
+func TestTranslateBruinMaterializationStrategyToIngestr(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		strategy    pipeline.MaterializationStrategy
+		wantIngestr string
+		wantExists  bool
+	}{
+		{name: "create+replace maps to replace", strategy: pipeline.MaterializationStrategyCreateReplace, wantIngestr: "replace", wantExists: true},
+		{name: "append maps to append", strategy: pipeline.MaterializationStrategyAppend, wantIngestr: "append", wantExists: true},
+		{name: "merge maps to merge", strategy: pipeline.MaterializationStrategyMerge, wantIngestr: "merge", wantExists: true},
+		{name: "delete+insert maps to delete+insert", strategy: pipeline.MaterializationStrategyDeleteInsert, wantIngestr: "delete+insert", wantExists: true},
+		{name: "truncate+insert maps to truncate+insert", strategy: pipeline.MaterializationStrategyTruncateInsert, wantIngestr: "truncate+insert", wantExists: true},
+		{name: "time_interval is unsupported", strategy: pipeline.MaterializationStrategyTimeInterval, wantIngestr: "", wantExists: false},
+		{name: "unsupported strategy returns false", strategy: pipeline.MaterializationStrategySCD2ByTime, wantIngestr: "", wantExists: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, exists := TranslateBruinMaterializationStrategyToIngestr(tt.strategy)
+			assert.Equal(t, tt.wantExists, exists)
+			assert.Equal(t, tt.wantIngestr, got)
+		})
+	}
+}
