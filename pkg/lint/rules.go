@@ -301,6 +301,12 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 	if materializationStrategy != "" {
 		effectiveStrategy = materializationStrategy
 	}
+	if cdcVal, _ := asset.Parameters.GetString("cdc"); cdcVal == "true" && effectiveStrategy != "" && effectiveStrategy != "merge" {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: "CDC ingestr assets require incremental strategy 'merge'",
+		})
+	}
 
 	updateOnMergeKeys := asset.ColumnNamesWithUpdateOnMerge()
 	if len(updateOnMergeKeys) > 0 {
@@ -362,12 +368,6 @@ func validateIngestrMaterialization(asset *pipeline.Asset, effectiveStrategy str
 		} else {
 			materializationStrategy = strategy
 			effectiveStrategy = strategy
-			if cdcVal, _ := asset.Parameters.GetString("cdc"); cdcVal == "true" && strategy != "merge" {
-				issues = append(issues, &Issue{
-					Task:        asset,
-					Description: "CDC ingestr assets require materialization strategy 'merge'",
-				})
-			}
 			issues = append(issues, validateIngestrMaterializationConflict(asset, "incremental_strategy", strategy, "materialization.strategy")...)
 		}
 	}

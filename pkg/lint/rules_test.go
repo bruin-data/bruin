@@ -2108,7 +2108,22 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 					Strategy: pipeline.MaterializationStrategyAppend,
 				},
 			},
-			wantErrMessage: "CDC ingestr assets require materialization strategy 'merge'",
+			wantErrMessage: "CDC ingestr assets require incremental strategy 'merge'",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "CDC ingestr asset with append parameter should fail",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection":    "conn1",
+					"source_table":         "table1",
+					"destination":          "dest1",
+					"cdc":                  "true",
+					"incremental_strategy": "append",
+				},
+			},
+			wantErrMessage: "CDC ingestr assets require incremental strategy 'merge'",
 			wantErr:        assert.NoError,
 		},
 		{
