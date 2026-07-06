@@ -419,6 +419,27 @@ func (c *APIClient) ListAgents(ctx context.Context) ([]Agent, error) {
 	return resp.Agents, err
 }
 
+// CreateAgent creates a new agent. Optional fields are omitted when empty so the
+// server applies its defaults (null description/prompt, "team" visibility).
+func (c *APIClient) CreateAgent(ctx context.Context, name, description, systemPrompt, visibility string) (*Agent, error) {
+	body := map[string]any{"name": name}
+	if description != "" {
+		body["description"] = description
+	}
+	if systemPrompt != "" {
+		body["system_prompt"] = systemPrompt
+	}
+	if visibility != "" {
+		body["visibility"] = visibility
+	}
+	var result Agent
+	err := c.doRequest(ctx, http.MethodPost, "/agents", body, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 func (c *APIClient) SendAgentMessage(ctx context.Context, agentID int, message string, threadID *int) (json.RawMessage, error) {
 	body := map[string]any{
 		"message": message,
