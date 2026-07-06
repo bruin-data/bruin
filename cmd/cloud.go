@@ -2711,6 +2711,7 @@ func CloudDashboards() *cli.Command {
 		Commands: []*cli.Command{
 			cloudDashboardsList(),
 			cloudDashboardsGet(),
+			cloudDashboardsCreate(),
 		},
 	}
 }
@@ -2816,6 +2817,88 @@ func cloudDashboardsGet() *cli.Command {
 					fmt.Println(string(dashboard.State))
 				}
 			}
+			return nil
+		},
+	}
+}
+
+func cloudDashboardsCreate() *cli.Command {
+	return &cli.Command{
+		Name:  "create",
+		Usage: "Create a dashboard from a definition (written to draft; publish stays in the UI)",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.StringFlag{
+				Name:     "title",
+				Usage:    "the dashboard title",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:  "visibility",
+				Usage: "team or private (default: team)",
+			},
+			&cli.StringFlag{
+				Name:  "state",
+				Usage: "the dashboard definition as a JSON string",
+			},
+			&cli.StringFlag{
+				Name:  "state-file",
+				Usage: "path to a file containing the dashboard definition as JSON",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			visibility := c.String("visibility")
+			if visibility != "" && visibility != "team" && visibility != "private" {
+				printError(fmt.Errorf("visibility must be 'team' or 'private', got %q", visibility), output, "Invalid --visibility")
+				return cli.Exit("", 1)
+			}
+
+			// The definition can come inline (--state) or from a file (--state-file).
+			raw := c.String("state")
+			if f := c.String("state-file"); f != "" {
+				data, err := os.ReadFile(f)
+				if err != nil {
+					printError(fmt.Errorf("failed to read --state-file: %w", err), output, "Invalid state file")
+					return cli.Exit("", 1)
+				}
+				raw = string(data)
+			}
+
+			var state map[string]any
+			if raw != "" {
+				if err := json.Unmarshal([]byte(raw), &state); err != nil {
+					printError(fmt.Errorf("invalid dashboard definition JSON: %w", err), output, "Invalid state")
+					return cli.Exit("", 1)
+				}
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			dashboard, err := client.CreateDashboard(ctx, c.String("title"), visibility, state)
+			if err != nil {
+				printError(err, output, "Failed to create dashboard")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(dashboard, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			title := ""
+			if dashboard.Title != nil {
+				title = *dashboard.Title
+			}
+			infoPrinter.Printf("Created dashboard %d (%s) as a draft — publish it from the Bruin Cloud UI.\n", dashboard.ID, title)
 			return nil
 		},
 	}

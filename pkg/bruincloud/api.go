@@ -559,3 +559,22 @@ func (c *APIClient) GetDashboard(ctx context.Context, dashboardID int) (*Dashboa
 	}
 	return &result, nil
 }
+
+// CreateDashboard creates a dashboard from a definition. The server writes the
+// definition to the draft only (never published). Empty optional fields are
+// omitted so the server applies its defaults.
+func (c *APIClient) CreateDashboard(ctx context.Context, title, visibility string, state map[string]any) (*Dashboard, error) {
+	body := map[string]any{"title": title}
+	if visibility != "" {
+		body["visibility"] = visibility
+	}
+	if state != nil {
+		body["state"] = state
+	}
+	var result Dashboard
+	err := c.doRequest(ctx, http.MethodPost, "/dashboards", body, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}

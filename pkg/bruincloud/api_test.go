@@ -742,3 +742,25 @@ func TestGetDashboard(t *testing.T) {
 	assert.Equal(t, 3, dashboard.ID)
 	assert.JSONEq(t, `{"widgets":[]}`, string(dashboard.State))
 }
+
+func TestCreateDashboard(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/dashboards", r.URL.Path)
+
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, "New Dash", body["title"])
+		assert.Equal(t, "private", body["visibility"])
+		assert.NotNil(t, body["state"])
+
+		w.WriteHeader(http.StatusCreated)
+		title := "New Dash"
+		writeJSON(t, w, Dashboard{ID: 9, Title: &title, Visibility: "private"})
+	})
+
+	dashboard, err := client.CreateDashboard(t.Context(), "New Dash", "private", map[string]any{"widgets": []any{}})
+	require.NoError(t, err)
+	assert.Equal(t, 9, dashboard.ID)
+}

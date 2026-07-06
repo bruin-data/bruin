@@ -624,6 +624,20 @@ bruin cloud dashboards get --dashboard-id 42
 bruin cloud dashboards get --dashboard-id 42 --output json
 ```
 
+#### `create`
+
+Create a dashboard from a definition. The definition is written to the dashboard's
+**draft** — it is never published automatically; publish it from the Bruin Cloud UI.
+
+```bash
+# Title only (empty draft)
+bruin cloud dashboards create --title "Q1 Revenue"
+
+# With a definition, inline or from a file
+bruin cloud dashboards create --title "Q1 Revenue" --visibility team --state '{"widgets":[]}'
+bruin cloud dashboards create --title "Q1 Revenue" --state-file ./dashboard.json
+```
+
 ---
 
 ## Common Workflows
