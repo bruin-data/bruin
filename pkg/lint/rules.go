@@ -284,13 +284,28 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 		}
 	}
 
+	effectiveStrategy := ""
 	if value, exists := asset.Parameters.GetString("incremental_strategy"); exists && value != "" {
 		if !python.IsIngestrStrategySupported(value) {
 			issues = append(issues, &Issue{
 				Task:        asset,
 				Description: fmt.Sprintf("Incremental strategy '%s' is not supported for ingestr assets. Supported strategies are: %s", value, python.GetSupportedIngestrStrategiesString()),
 			})
+		} else {
+			effectiveStrategy = value
 		}
+	}
+
+	materializationIssues, materializationStrategy := validateIngestrMaterialization(asset, effectiveStrategy)
+	issues = append(issues, materializationIssues...)
+	if materializationStrategy != "" {
+		effectiveStrategy = materializationStrategy
+	}
+	if cdcVal, _ := asset.Parameters.GetString("cdc"); cdcVal == "true" && effectiveStrategy != "" && effectiveStrategy != "merge" {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: "CDC ingestr assets require incremental strategy 'merge'",
+		})
 	}
 
 	updateOnMergeKeys := asset.ColumnNamesWithUpdateOnMerge()
@@ -312,7 +327,7 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 			Description: fmt.Sprintf("Invalid 'version' value %q: must be 'vMAJOR' or fully-qualified 'vMAJOR.MINOR.PATCH'", v),
 		})
 	}
-	if value, exists := asset.Parameters.GetString("incremental_strategy"); exists && value == "merge" {
+	if effectiveStrategy == "merge" {
 		// Skip PK validation for CDC mode - PKs are determined by the source
 		if cdcVal, _ := asset.Parameters.GetString("cdc"); cdcVal != "true" {
 			primaryKeys := asset.ColumnNamesWithPrimaryKey()
@@ -326,6 +341,95 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 	}
 
 	return issues, nil
+}
+
+func validateIngestrMaterialization(asset *pipeline.Asset, effectiveStrategy string) ([]*Issue, string) {
+	issues := make([]*Issue, 0)
+	mat := asset.Materialization
+	if mat.Type == pipeline.MaterializationTypeNone {
+		return issues, ""
+	}
+
+	if mat.Type != pipeline.MaterializationTypeTable {
+		return []*Issue{{
+			Task:        asset,
+			Description: "Ingestr assets only support materialization type 'table'",
+		}}, ""
+	}
+
+	materializationStrategy := ""
+	if mat.Strategy != pipeline.MaterializationStrategyNone {
+		strategy, ok := python.TranslateBruinMaterializationStrategyToIngestr(mat.Strategy)
+		if !ok {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: fmt.Sprintf("Materialization strategy '%s' is not supported for ingestr assets. Supported strategies are: %s", mat.Strategy, python.GetSupportedIngestrMaterializationStrategiesString()),
+			})
+		} else {
+			materializationStrategy = strategy
+			effectiveStrategy = strategy
+			issues = append(issues, validateIngestrMaterializationConflict(asset, "incremental_strategy", strategy, "materialization.strategy")...)
+		}
+	}
+
+	if hasIngestrMaterializationIncrementalKey(asset, mat) && !python.IsIngestrIncrementalKeyStrategy(effectiveStrategy) {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: "Materialization incremental key is only supported for append, merge, and delete+insert strategies on ingestr assets",
+		})
+	}
+
+	issues = append(issues, validateIngestrMaterializationConflict(asset, "incremental_key", mat.IncrementalKey, "materialization.incremental_key")...)
+	issues = append(issues, validateIngestrMaterializationConflict(asset, "partition_by", mat.PartitionBy, "materialization.partition_by")...)
+	issues = append(issues, validateIngestrMaterializationConflict(asset, "cluster_by", strings.Join(mat.ClusterBy, ","), "materialization.cluster_by")...)
+
+	return issues, materializationStrategy
+}
+
+func hasIngestrMaterializationIncrementalKey(asset *pipeline.Asset, mat pipeline.Materialization) bool {
+	if strings.TrimSpace(mat.IncrementalKey) != "" {
+		return true
+	}
+	key, _ := asset.Parameters.GetString("incremental_key")
+	return strings.TrimSpace(key) != ""
+}
+
+func validateIngestrMaterializationConflict(asset *pipeline.Asset, key, value, source string) []*Issue {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+
+	current, exists := asset.Parameters.GetString(key)
+	if !exists || strings.TrimSpace(current) == "" {
+		return nil
+	}
+
+	if normalizeIngestrMaterializationValue(key, current) == normalizeIngestrMaterializationValue(key, value) {
+		return nil
+	}
+
+	return []*Issue{{
+		Task:        asset,
+		Description: fmt.Sprintf("Ingestr asset defines both parameters.%s=%q and %s=%q", key, current, source, value),
+	}}
+}
+
+func normalizeIngestrMaterializationValue(key, value string) string {
+	value = strings.TrimSpace(value)
+	if key != "cluster_by" {
+		return value
+	}
+
+	parts := strings.Split(value, ",")
+	cleaned := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			cleaned = append(cleaned, part)
+		}
+	}
+	return strings.Join(cleaned, ",")
 }
 
 func isFileExecutable(mode os.FileMode) bool {
@@ -1178,7 +1282,7 @@ func EnsureAssetNotificationsAreValid(ctx context.Context, p *pipeline.Pipeline,
 
 func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
-	if asset.Type == pipeline.AssetTypePython {
+	if asset.Type == pipeline.AssetTypePython || asset.Type == pipeline.AssetTypeIngestr {
 		return issues, nil
 	}
 

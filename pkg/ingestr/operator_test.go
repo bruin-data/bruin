@@ -165,6 +165,161 @@ func TestApplyClickHouseEngineParams(t *testing.T) {
 	}
 }
 
+func TestApplyMaterializationParameters(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		asset      *pipeline.Asset
+		wantParams pipeline.ParameterMap
+		wantErr    string
+	}{
+		{
+			name: "sets ingestr parameters",
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					Strategy:    pipeline.MaterializationStrategyTruncateInsert,
+					PartitionBy: "dt",
+					ClusterBy:   []string{"tenant", "region"},
+				},
+			},
+			wantParams: pipeline.ParameterMap{
+				"incremental_strategy": "truncate+insert",
+				"partition_by":         "dt",
+				"cluster_by":           "tenant,region",
+			},
+		},
+		{
+			name: "sets incremental key for incremental strategy",
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategyAppend,
+					IncrementalKey: "updated_at",
+				},
+			},
+			wantParams: pipeline.ParameterMap{
+				"incremental_strategy": "append",
+				"incremental_key":      "updated_at",
+			},
+		},
+		{
+			name: "matching parameters are allowed",
+			asset: &pipeline.Asset{
+				Parameters: pipeline.ParameterMap{
+					"incremental_strategy": "replace",
+					"cluster_by":           "tenant, region",
+				},
+				Materialization: pipeline.Materialization{
+					Type:      pipeline.MaterializationTypeTable,
+					Strategy:  pipeline.MaterializationStrategyCreateReplace,
+					ClusterBy: []string{"tenant", "region"},
+				},
+			},
+			wantParams: pipeline.ParameterMap{
+				"incremental_strategy": "replace",
+				"cluster_by":           "tenant, region",
+			},
+		},
+		{
+			name: "conflicting parameters fail",
+			asset: &pipeline.Asset{
+				Parameters: pipeline.ParameterMap{
+					"incremental_strategy": "append",
+				},
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+			},
+			wantErr: `ingestr asset defines both parameters.incremental_strategy="append" and materialization.strategy="merge"`,
+		},
+		{
+			name: "cdc requires merge materialization",
+			asset: &pipeline.Asset{
+				Parameters: pipeline.ParameterMap{
+					"cdc": "true",
+				},
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyAppend,
+				},
+			},
+			wantErr: `cdc ingestr assets require incremental_strategy "merge"`,
+		},
+		{
+			name: "cdc requires merge legacy parameter",
+			asset: &pipeline.Asset{
+				Parameters: pipeline.ParameterMap{
+					"cdc":                  "true",
+					"incremental_strategy": "append",
+				},
+			},
+			wantErr: `cdc ingestr assets require incremental_strategy "merge"`,
+		},
+		{
+			name: "incremental key requires incremental materialization strategy",
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategyCreateReplace,
+					IncrementalKey: "updated_at",
+				},
+			},
+			wantErr: "materialization.incremental_key is only supported for append, merge, and delete+insert strategies on ingestr assets",
+		},
+		{
+			name: "legacy incremental key requires incremental materialization strategy",
+			asset: &pipeline.Asset{
+				Parameters: pipeline.ParameterMap{
+					"incremental_key": "updated_at",
+				},
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyCreateReplace,
+				},
+			},
+			wantErr: "materialization.incremental_key is only supported for append, merge, and delete+insert strategies on ingestr assets",
+		},
+		{
+			name: "view materialization fails",
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					Type: pipeline.MaterializationTypeView,
+				},
+			},
+			wantErr: `ingestr assets only support materialization type "table"`,
+		},
+		{
+			name: "unsupported strategy fails",
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyDDL,
+				},
+			},
+			wantErr: `materialization strategy "ddl" is not supported for ingestr assets`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := applyMaterializationParameters(tt.asset)
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.EqualError(t, err, tt.wantErr)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantParams, tt.asset.Parameters)
+		})
+	}
+}
+
 func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 	t.Parallel()
 
@@ -313,6 +468,43 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 				"--progress", "log",
 				"--incremental-key", "updated_at",
 				"--incremental-strategy", "merge",
+			},
+		},
+		{
+			name: "materialization maps to ingestr incremental flags",
+			asset: &pipeline.Asset{
+				Name:       "asset-name",
+				Connection: "bq",
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "updated_at"},
+				},
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategyMerge,
+					IncrementalKey: "updated_at",
+					PartitionBy:    "event_date",
+					ClusterBy:      []string{"account_id", "region"},
+				},
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "sf",
+					"source_table":      "source-table",
+					"destination":       "bigquery",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "snowflake://uri-here",
+				"--source-table", "source-table",
+				"--dest-uri", "bigquery://uri-here",
+				"--dest-table", "asset-name",
+				"--yes",
+				"--progress", "log",
+				"--incremental-key", "updated_at",
+				"--incremental-strategy", "merge",
+				"--partition-by", "event_date",
+				"--cluster-by", "account_id,region",
+				"--primary-key", "id",
 			},
 		},
 		{
@@ -910,9 +1102,10 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 	finder := new(mockFinder)
 
 	tests := []struct {
-		name  string
-		asset *pipeline.Asset
-		want  []string
+		name    string
+		asset   *pipeline.Asset
+		want    []string
+		wantErr string
 	}{
 		{
 			name: "CDC mode transforms URI and auto-sets merge strategy",
@@ -1009,7 +1202,7 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 			},
 		},
 		{
-			name: "CDC mode with explicit incremental strategy",
+			name: "CDC mode rejects explicit non-merge incremental strategy",
 			asset: &pipeline.Asset{
 				Name:       "cdc-asset-explicit-strategy",
 				Connection: "bq",
@@ -1021,16 +1214,7 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 					"incremental_strategy": "append",
 				},
 			},
-			want: []string{
-				"ingest",
-				"--source-uri", "postgres+cdc://user:pass@localhost:5432/db",
-				"--source-table", "public.users",
-				"--dest-uri", "bigquery://uri-here",
-				"--dest-table", "cdc-asset-explicit-strategy",
-				"--yes",
-				"--progress", "log",
-				"--incremental-strategy", "append",
-			},
+			wantErr: `cdc ingestr assets require incremental_strategy "merge"`,
 		},
 	}
 
@@ -1039,7 +1223,9 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 			t.Parallel()
 
 			runner := new(mockRunner)
-			runner.On("RunIngestr", mock.Anything, tt.want, []string(nil), repo).Return(nil)
+			if tt.wantErr == "" {
+				runner.On("RunIngestr", mock.Anything, tt.want, []string(nil), repo).Return(nil)
+			}
 
 			startDate := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 			endDate := time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC)
@@ -1060,6 +1246,10 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 			ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, false)
 
 			err := o.Run(ctx, &ti)
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				return
+			}
 			require.NoError(t, err)
 		})
 	}

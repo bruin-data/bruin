@@ -193,7 +193,7 @@ connections:
 |-------|------|----------|-------------|
 | `format` | string | Yes | Table format: `iceberg` or `ducklake` |
 | `catalog` | object | Yes | Catalog configuration (Glue for Iceberg, DuckDB/SQLite/Postgres for DuckLake) |
-| `storage` | object | No | Storage configuration (required for DuckLake) |
+| `storage` | object | Yes | Storage configuration (`type` and `auth` required for both formats; `path` is required for DuckLake and optional for Iceberg) |
 
 ---
 ### Supported Lakehouse Formats
@@ -213,9 +213,9 @@ MySQL catalogs are currently not supported for DuckLake in Bruin due to limitati
 
 #### Iceberg
 
-| Catalog | S3 |
-|-------------------|----|
-| Glue | <span class="lh-check" aria-label="supported"></span> |
+| Catalog | S3 | GCS |
+|-------------------|----|-----|
+| Glue | <span class="lh-check" aria-label="supported"></span> | <span class="lh-check" aria-label="supported"></span> |
 
 
 For background, see DuckDB's [lakehouse format overview](https://duckdb.org/docs/stable/lakehouse_formats).
