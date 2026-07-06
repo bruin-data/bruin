@@ -2857,10 +2857,17 @@ func cloudDashboardsCreate() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			// The definition can come inline (--state) or from a file (--state-file).
-			raw := c.String("state")
-			if f := c.String("state-file"); f != "" {
-				data, err := os.ReadFile(f)
+			// The definition can come inline (--state) or from a file (--state-file),
+			// but not both — otherwise a stale file could silently override the flag.
+			inline := c.String("state")
+			file := c.String("state-file")
+			if inline != "" && file != "" {
+				printError(errors.New("pass only one of --state or --state-file"), output, "Ambiguous state")
+				return cli.Exit("", 1)
+			}
+			raw := inline
+			if file != "" {
+				data, err := os.ReadFile(file)
 				if err != nil {
 					printError(fmt.Errorf("failed to read --state-file: %w", err), output, "Invalid state file")
 					return cli.Exit("", 1)
@@ -2872,6 +2879,11 @@ func cloudDashboardsCreate() *cli.Command {
 			if raw != "" {
 				if err := json.Unmarshal([]byte(raw), &state); err != nil {
 					printError(fmt.Errorf("invalid dashboard definition JSON: %w", err), output, "Invalid state")
+					return cli.Exit("", 1)
+				}
+				// A JSON object is required; null/scalars/arrays are not a definition.
+				if state == nil {
+					printError(errors.New("dashboard definition must be a JSON object"), output, "Invalid state")
 					return cli.Exit("", 1)
 				}
 			}
