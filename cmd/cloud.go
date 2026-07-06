@@ -2130,7 +2130,7 @@ func cloudAgentsUpdate() *cli.Command {
 				fields["visibility"] = visibility
 			}
 			if len(fields) == 0 {
-				printError(fmt.Errorf("provide at least one of --name, --description or --visibility"), output, "Nothing to update")
+				printError(errors.New("provide at least one of --name, --description or --visibility"), output, "Nothing to update")
 				return cli.Exit("", 1)
 			}
 
