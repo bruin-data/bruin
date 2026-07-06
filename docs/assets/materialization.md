@@ -4,6 +4,9 @@ Materialization is the idea of taking a simple `SELECT` query, and applying the 
 
 Bruin supports various materialization strategies catered to different use cases.
 
+> [!WARNING]
+> The materialization behavior described on this page applies to SQL assets only. It is not applied to `ingestr` assets; use `ingestr` parameters such as `incremental_strategy` and `incremental_key` instead. Python assets have their own [materialization workflow](./python.md#materialization).
+
 Here's a sample asset with materialization:
 
 ```bruin-sql
