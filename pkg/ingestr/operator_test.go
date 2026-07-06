@@ -165,6 +165,102 @@ func TestApplyClickHouseEngineParams(t *testing.T) {
 	}
 }
 
+func TestApplyMaterializationParameters(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		asset      *pipeline.Asset
+		wantParams pipeline.ParameterMap
+		wantErr    string
+	}{
+		{
+			name: "sets ingestr parameters",
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategyTruncateInsert,
+					IncrementalKey: "dt",
+					PartitionBy:    "dt",
+					ClusterBy:      []string{"tenant", "region"},
+				},
+			},
+			wantParams: pipeline.ParameterMap{
+				"incremental_strategy": "truncate+insert",
+				"incremental_key":      "dt",
+				"partition_by":         "dt",
+				"cluster_by":           "tenant,region",
+			},
+		},
+		{
+			name: "matching parameters are allowed",
+			asset: &pipeline.Asset{
+				Parameters: pipeline.ParameterMap{
+					"incremental_strategy": "replace",
+					"cluster_by":           "tenant, region",
+				},
+				Materialization: pipeline.Materialization{
+					Type:      pipeline.MaterializationTypeTable,
+					Strategy:  pipeline.MaterializationStrategyCreateReplace,
+					ClusterBy: []string{"tenant", "region"},
+				},
+			},
+			wantParams: pipeline.ParameterMap{
+				"incremental_strategy": "replace",
+				"cluster_by":           "tenant, region",
+			},
+		},
+		{
+			name: "conflicting parameters fail",
+			asset: &pipeline.Asset{
+				Parameters: pipeline.ParameterMap{
+					"incremental_strategy": "append",
+				},
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+			},
+			wantErr: `ingestr asset defines both parameters.incremental_strategy="append" and materialization.strategy="merge"`,
+		},
+		{
+			name: "view materialization fails",
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					Type: pipeline.MaterializationTypeView,
+				},
+			},
+			wantErr: `ingestr assets only support materialization type "table"`,
+		},
+		{
+			name: "unsupported strategy fails",
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyDDL,
+				},
+			},
+			wantErr: `materialization strategy "ddl" is not supported for ingestr assets`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := applyMaterializationParameters(tt.asset)
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.EqualError(t, err, tt.wantErr)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantParams, tt.asset.Parameters)
+		})
+	}
+}
+
 func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 	t.Parallel()
 
@@ -313,6 +409,43 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 				"--progress", "log",
 				"--incremental-key", "updated_at",
 				"--incremental-strategy", "merge",
+			},
+		},
+		{
+			name: "materialization maps to ingestr incremental flags",
+			asset: &pipeline.Asset{
+				Name:       "asset-name",
+				Connection: "bq",
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "updated_at"},
+				},
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategyMerge,
+					IncrementalKey: "updated_at",
+					PartitionBy:    "event_date",
+					ClusterBy:      []string{"account_id", "region"},
+				},
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "sf",
+					"source_table":      "source-table",
+					"destination":       "bigquery",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "snowflake://uri-here",
+				"--source-table", "source-table",
+				"--dest-uri", "bigquery://uri-here",
+				"--dest-table", "asset-name",
+				"--yes",
+				"--progress", "log",
+				"--incremental-key", "updated_at",
+				"--incremental-strategy", "merge",
+				"--partition-by", "event_date",
+				"--cluster-by", "account_id,region",
+				"--primary-key", "id",
 			},
 		},
 		{

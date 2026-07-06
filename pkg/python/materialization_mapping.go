@@ -13,6 +13,14 @@ var BruinToIngestrStrategyMap = map[pipeline.MaterializationStrategy]string{
 	pipeline.MaterializationStrategyDeleteInsert:  "delete+insert",
 }
 
+var bruinToIngestrMaterializationStrategyMap = map[pipeline.MaterializationStrategy]string{
+	pipeline.MaterializationStrategyCreateReplace:  "replace",
+	pipeline.MaterializationStrategyAppend:         "append",
+	pipeline.MaterializationStrategyMerge:          "merge",
+	pipeline.MaterializationStrategyDeleteInsert:   "delete+insert",
+	pipeline.MaterializationStrategyTruncateInsert: "truncate+insert",
+}
+
 // SupportedPythonMaterializationStrategies lists all materialization strategies supported by Python assets.
 var SupportedPythonMaterializationStrategies = []pipeline.MaterializationStrategy{
 	pipeline.MaterializationStrategyCreateReplace,
@@ -31,6 +39,32 @@ func IsPythonMaterializationStrategySupported(strategy pipeline.MaterializationS
 func TranslateBruinStrategyToIngestr(strategy pipeline.MaterializationStrategy) (string, bool) {
 	ingestrStrategy, exists := BruinToIngestrStrategyMap[strategy]
 	return ingestrStrategy, exists
+}
+
+// TranslateBruinMaterializationStrategyToIngestr converts Bruin materialization strategy names
+// to ingestr incremental strategy names.
+func TranslateBruinMaterializationStrategyToIngestr(strategy pipeline.MaterializationStrategy) (string, bool) {
+	ingestrStrategy, exists := bruinToIngestrMaterializationStrategyMap[strategy]
+	return ingestrStrategy, exists
+}
+
+func IsIngestrMaterializationStrategySupported(strategy pipeline.MaterializationStrategy) bool {
+	_, exists := bruinToIngestrMaterializationStrategyMap[strategy]
+	return exists
+}
+
+func GetSupportedIngestrMaterializationStrategiesString() string {
+	strategies := make([]string, 0, len(bruinToIngestrMaterializationStrategyMap))
+	for _, s := range []pipeline.MaterializationStrategy{
+		pipeline.MaterializationStrategyCreateReplace,
+		pipeline.MaterializationStrategyAppend,
+		pipeline.MaterializationStrategyMerge,
+		pipeline.MaterializationStrategyDeleteInsert,
+		pipeline.MaterializationStrategyTruncateInsert,
+	} {
+		strategies = append(strategies, string(s))
+	}
+	return strings.Join(strategies, ", ")
 }
 
 // GetSupportedPythonStrategiesString returns a comma-separated string of supported Python materialization strategies.

@@ -36,6 +36,13 @@ to your data warehouses:
 name: string
 type: ingestr
 connection: string # optional, by default uses the default connection for destination platform in pipeline.yml
+materialization: # optional, preferred for destination write strategy
+  type: table
+  strategy: create+replace | append | merge | delete+insert | truncate+insert
+  incremental_key: string
+  partition_by: string
+  cluster_by:
+    - string
 parameters:
   source: string # optional, used when inferring the source from connection is not enough, e.g. GCP connection + GSheets source
   source_connection: string
@@ -44,8 +51,8 @@ parameters:
   
   # optional
   version: v0 | v1 | v1.x.y
-  incremental_strategy: replace | append | merge | delete+insert
-  incremental_key: string
+  incremental_strategy: replace | append | merge | delete+insert # legacy alternative to materialization.strategy
+  incremental_key: string # legacy alternative to materialization.incremental_key
   schema_contract: evolve | freeze | discard_row | discard_value
   schema_naming: auto | direct | snake_case
   sql_backend: pyarrow | sqlalchemy
@@ -77,6 +84,7 @@ parameters:
 | `source_table` | Yes | `--source-table` | Table, sheet, or resource identifier to pull from the source. |
 | `file_type` | No | `--source-table` suffix | Appended to the `source_table` as `table#type` for connectors that need a file format hint (`csv`, `jsonl`, `parquet`). |
 | `version` | No | _n/a_  | Selects the version of ingestr to install and use.. Valid options are `v1` (latest), `v0` (legacy) or `v1.x.y` (full version specifer) | 
+| `materialization` | No | `--incremental-*`, `--partition-by`, `--cluster-by` | Preferred way to define destination write behavior. Supports `type: table` with `create+replace`, `append`, `merge`, `delete+insert`, and `truncate+insert`. |
 | `destination` | Yes | `--dest-uri` | Logical destination used to select the target connection; Bruin converts it into the URI supplied to Ingestr. |
 | `incremental_strategy` | No | `--incremental-strategy` | Passes the incremental loading strategy (`replace`, `append`, `merge`, `delete+insert`) to Ingestr. |
 | `incremental_key` | No | `--incremental-key` | Column that determines incremental progress. When the column is defined with type `date`, Bruin also forwards it through the `--columns` option so Ingestr treats it as a date field. |
@@ -164,7 +172,9 @@ parameters:
   source_connection: mysql_prod
   source_table: dbo.transactions
   destination: snowflake
-  incremental_strategy: append
+materialization:
+  type: table
+  strategy: append
   incremental_key: updated_at
 ```
 
@@ -193,9 +203,11 @@ parameters:
   source_connection: mongodb_prod
   source_table: prod.users
   destination: bigquery
-  incremental_strategy: merge
-  incremental_key: updated_at
   enforce_schema: true
+materialization:
+  type: table
+  strategy: merge
+  incremental_key: updated_at
 
 columns:
   - name: _id

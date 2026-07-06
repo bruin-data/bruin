@@ -202,6 +202,10 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		asset.IntervalModifiers.End = renderedEnd
 	}
 
+	if err := applyMaterializationParameters(asset); err != nil {
+		return err
+	}
+
 	// Source connection
 	sourceConnectionName, ok := asset.Parameters.GetString("source_connection")
 	if !ok {
@@ -476,6 +480,88 @@ func applyClickHouseEngineParams(destURI string, params pipeline.ParameterMap) s
 
 	parsedURI.RawQuery = q.Encode()
 	return parsedURI.String()
+}
+
+func applyMaterializationParameters(asset *pipeline.Asset) error {
+	mat := asset.Materialization
+	if mat.Type == pipeline.MaterializationTypeNone {
+		return nil
+	}
+
+	if mat.Type != pipeline.MaterializationTypeTable {
+		return fmt.Errorf("ingestr assets only support materialization type %q", pipeline.MaterializationTypeTable)
+	}
+
+	if asset.Parameters == nil {
+		asset.Parameters = pipeline.ParameterMap{}
+	}
+
+	if mat.Strategy != pipeline.MaterializationStrategyNone {
+		strategy, ok := python.TranslateBruinMaterializationStrategyToIngestr(mat.Strategy)
+		if !ok {
+			return fmt.Errorf("materialization strategy %q is not supported for ingestr assets", mat.Strategy)
+		}
+		if err := setMaterializationParameter(asset.Parameters, "incremental_strategy", strategy, "materialization.strategy"); err != nil {
+			return err
+		}
+	}
+
+	if err := setMaterializationParameter(asset.Parameters, "incremental_key", mat.IncrementalKey, "materialization.incremental_key"); err != nil {
+		return err
+	}
+	if err := setMaterializationParameter(asset.Parameters, "partition_by", mat.PartitionBy, "materialization.partition_by"); err != nil {
+		return err
+	}
+	if err := setMaterializationParameter(asset.Parameters, "cluster_by", materializationClusterBy(mat.ClusterBy), "materialization.cluster_by"); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func setMaterializationParameter(params pipeline.ParameterMap, key, value, source string) error {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+
+	if current, exists := params.GetString(key); exists && strings.TrimSpace(current) != "" {
+		if normalizeMaterializationParameter(key, current) != normalizeMaterializationParameter(key, value) {
+			return fmt.Errorf("ingestr asset defines both parameters.%s=%q and %s=%q", key, current, source, value)
+		}
+		return nil
+	}
+
+	params[key] = value
+	return nil
+}
+
+func materializationClusterBy(clusterBy []string) string {
+	cleaned := make([]string, 0, len(clusterBy))
+	for _, value := range clusterBy {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			cleaned = append(cleaned, value)
+		}
+	}
+	return strings.Join(cleaned, ",")
+}
+
+func normalizeMaterializationParameter(key, value string) string {
+	value = strings.TrimSpace(value)
+	if key != "cluster_by" {
+		return value
+	}
+
+	parts := strings.Split(value, ",")
+	cleaned := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			cleaned = append(cleaned, part)
+		}
+	}
+	return strings.Join(cleaned, ",")
 }
 
 func NewSeedOperator(conn config.ConnectionGetter, j jinja.RendererInterface) (*SeedOperator, error) {
