@@ -303,8 +303,8 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query, location string) ([]st
 	validFromExpr := "(SELECT now FROM time_now)"
 	validUntilUpdateExpr := "(SELECT now FROM time_now)"
 	if incrementalKey != "" {
-		validFromExpr = fmt.Sprintf("CAST(s.%s AS TIMESTAMP)", incrementalKey)
-		validUntilUpdateExpr = fmt.Sprintf("CAST(s.%s AS TIMESTAMP)", incrementalKey)
+		validFromExpr = fmt.Sprintf("CAST(s.%s AS TIMESTAMP WITH TIME ZONE)", incrementalKey)
+		validUntilUpdateExpr = fmt.Sprintf("CAST(s.%s AS TIMESTAMP WITH TIME ZONE)", incrementalKey)
 	}
 
 	sqlLines := []string{
@@ -349,7 +349,7 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query, location string) ([]st
 		"to_insert AS (",
 		fmt.Sprintf("\tSELECT %s,", strings.Join(toInsertSelectCols, ", ")),
 		fmt.Sprintf("\t%s AS _valid_from,", validFromExpr),
-		"\tTIMESTAMP '9999-12-31 23:59:59' AS _valid_until,",
+		"\tTIMESTAMP '9999-12-31 23:59:59 UTC' AS _valid_until,",
 		"\tTRUE AS _is_current",
 		"\tFROM source s",
 		fmt.Sprintf("\tLEFT JOIN current_data t ON (%s)", joinCondition),
@@ -389,14 +389,14 @@ func buildSCD2ByColumnFullRefresh(asset *pipeline.Asset, query, location string)
 
 	validFromExpr := "CURRENT_TIMESTAMP"
 	if asset.Materialization.IncrementalKey != "" {
-		validFromExpr = fmt.Sprintf("CAST(src.%s AS TIMESTAMP)", asset.Materialization.IncrementalKey)
+		validFromExpr = fmt.Sprintf("CAST(src.%s AS TIMESTAMP WITH TIME ZONE)", asset.Materialization.IncrementalKey)
 	}
 
 	createQuery := fmt.Sprintf(
 		"CREATE TABLE %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS\n"+
 			"SELECT %s,\n"+
 			"%s AS _valid_from,\n"+
-			"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n"+
+			"TIMESTAMP '9999-12-31 23:59:59 UTC' AS _valid_until,\n"+
 			"TRUE AS _is_current\n"+
 			"FROM (%s\n"+
 			") AS src",
@@ -465,7 +465,7 @@ func buildSCD2ByTimeQuery(asset *pipeline.Asset, query, location string) ([]stri
 	}
 	joinCondition := strings.Join(onConds, " AND ")
 
-	changeCondition := fmt.Sprintf("CAST(s.%s AS TIMESTAMP) > t._valid_from", incrementalKey)
+	changeCondition := fmt.Sprintf("CAST(s.%s AS TIMESTAMP WITH TIME ZONE) > t._valid_from", incrementalKey)
 
 	// Build user column list for SELECTs
 	userColList := strings.Join(userCols, ", ")
@@ -512,7 +512,7 @@ func buildSCD2ByTimeQuery(asset *pipeline.Asset, query, location string) ([]stri
 		fmt.Sprintf("\tSELECT %s,", strings.Join(toKeepSelectCols, ", ")),
 		"\tt._valid_from,",
 		"\t\tCASE",
-		fmt.Sprintf("\t\t\tWHEN _matched_by_source IS NOT NULL AND (%s) THEN CAST(s.%s AS TIMESTAMP)", changeCondition, incrementalKey),
+		fmt.Sprintf("\t\t\tWHEN _matched_by_source IS NOT NULL AND (%s) THEN CAST(s.%s AS TIMESTAMP WITH TIME ZONE)", changeCondition, incrementalKey),
 		"\t\t\tWHEN _matched_by_source IS NULL THEN (SELECT now FROM time_now)",
 		"\t\t\tELSE t._valid_until",
 		"\t\tEND AS _valid_until,",
@@ -527,8 +527,8 @@ func buildSCD2ByTimeQuery(asset *pipeline.Asset, query, location string) ([]stri
 		"--new/updated rows from source",
 		"to_insert AS (",
 		fmt.Sprintf("\tSELECT %s,", strings.Join(toInsertSelectCols, ", ")),
-		fmt.Sprintf("\tCAST(s.%s AS TIMESTAMP) AS _valid_from,", incrementalKey),
-		"\tTIMESTAMP '9999-12-31 23:59:59' AS _valid_until,",
+		fmt.Sprintf("\tCAST(s.%s AS TIMESTAMP WITH TIME ZONE) AS _valid_from,", incrementalKey),
+		"\tTIMESTAMP '9999-12-31 23:59:59 UTC' AS _valid_until,",
 		"\tTRUE AS _is_current",
 		"\tFROM source s",
 		fmt.Sprintf("\tLEFT JOIN current_data t ON (%s)", joinCondition),
@@ -575,8 +575,8 @@ func buildSCD2ByTimeFullRefresh(asset *pipeline.Asset, query, location string) (
 	createQuery := fmt.Sprintf(
 		"CREATE TABLE %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS\n"+
 			"SELECT %s,\n"+
-			"CAST(src.%s AS TIMESTAMP) AS _valid_from,\n"+
-			"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n"+
+			"CAST(src.%s AS TIMESTAMP WITH TIME ZONE) AS _valid_from,\n"+
+			"TIMESTAMP '9999-12-31 23:59:59 UTC' AS _valid_until,\n"+
 			"TRUE AS _is_current\n"+
 			"FROM (%s\n"+
 			") AS src",

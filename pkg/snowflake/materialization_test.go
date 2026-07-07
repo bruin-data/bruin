@@ -548,7 +548,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				"  );\n\n" +
 				"-- Step 3: Insert new records and new versions of changed records\n" +
 				"INSERT INTO my.asset (id, col1, col2, col3, col4, _valid_from, _valid_until, _is_current)\n" +
-				"SELECT source.id, source.col1, source.col2, source.col3, source.col4, $current_scd2_ts, TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS'), TRUE\n" +
+				"SELECT source.id, source.col1, source.col2, source.col3, source.col4, $current_scd2_ts, TO_TIMESTAMP_TZ('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS'), TRUE\n" +
 				"FROM (SELECT id, col1, col2, col3, col4 from source_table) AS source\n" +
 				"WHERE NOT EXISTS (\n" +
 				"  SELECT 1 FROM my.asset AS target \n" +
@@ -597,7 +597,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				"  );\n\n" +
 				"-- Step 3: Insert new records and new versions of changed records\n" +
 				"INSERT INTO my.asset (id, category, name, price, _valid_from, _valid_until, _is_current)\n" +
-				"SELECT source.id, source.category, source.name, source.price, $current_scd2_ts, TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS'), TRUE\n" +
+				"SELECT source.id, source.category, source.name, source.price, $current_scd2_ts, TO_TIMESTAMP_TZ('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS'), TRUE\n" +
 				"FROM (SELECT id, category, name, price from source_table) AS source\n" +
 				"WHERE NOT EXISTS (\n" +
 				"  SELECT 1 FROM my.asset AS target \n" +
@@ -627,9 +627,9 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 			query:       "SELECT id, name, price from source_table",
 			want: "CREATE OR REPLACE TABLE my.asset CLUSTER BY (_is_current, id) AS\n" +
 				"SELECT\n" +
-				"  CURRENT_TIMESTAMP() AS _valid_from,\n" +
+				"  CAST(CURRENT_TIMESTAMP() AS TIMESTAMP_TZ) AS _valid_from,\n" +
 				"  src.*,\n" +
-				"  TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS') AS _valid_until,\n" +
+				"  TO_TIMESTAMP_TZ('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS') AS _valid_until,\n" +
 				"  TRUE AS _is_current\n" +
 				"FROM (\n" +
 				"SELECT id, name, price from source_table\n" +
@@ -654,9 +654,9 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 			query:       "SELECT id, name, price from source_table",
 			want: "CREATE OR REPLACE TABLE my.asset CLUSTER BY (category, id) AS\n" +
 				"SELECT\n" +
-				"  CURRENT_TIMESTAMP() AS _valid_from,\n" +
+				"  CAST(CURRENT_TIMESTAMP() AS TIMESTAMP_TZ) AS _valid_from,\n" +
 				"  src.*,\n" +
-				"  TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS') AS _valid_until,\n" +
+				"  TO_TIMESTAMP_TZ('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS') AS _valid_until,\n" +
 				"  TRUE AS _is_current\n" +
 				"FROM (\n" +
 				"SELECT id, name, price from source_table\n" +
@@ -690,7 +690,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				"  );\n\n" +
 				"-- Step 2: Update existing records that have changes\n" +
 				"UPDATE my.asset AS target\n" +
-				"SET _valid_until = (SELECT CAST(source.updated_at AS TIMESTAMP) FROM (SELECT id, col1, col2, updated_at from source_table) AS source WHERE target.id = source.id LIMIT 1), _is_current = FALSE\n" +
+				"SET _valid_until = (SELECT CAST(source.updated_at AS TIMESTAMP_TZ) FROM (SELECT id, col1, col2, updated_at from source_table) AS source WHERE target.id = source.id LIMIT 1), _is_current = FALSE\n" +
 				"WHERE target._is_current = TRUE\n" +
 				"  AND EXISTS (\n" +
 				"    SELECT 1 FROM (SELECT id, col1, col2, updated_at from source_table) AS source\n" +
@@ -698,7 +698,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				"  );\n\n" +
 				"-- Step 3: Insert new records and new versions of changed records\n" +
 				"INSERT INTO my.asset (id, col1, col2, updated_at, _valid_from, _valid_until, _is_current)\n" +
-				"SELECT source.id, source.col1, source.col2, source.updated_at, CAST(source.updated_at AS TIMESTAMP), TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS'), TRUE\n" +
+				"SELECT source.id, source.col1, source.col2, source.updated_at, CAST(source.updated_at AS TIMESTAMP_TZ), TO_TIMESTAMP_TZ('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS'), TRUE\n" +
 				"FROM (SELECT id, col1, col2, updated_at from source_table) AS source\n" +
 				"WHERE NOT EXISTS (\n" +
 				"  SELECT 1 FROM my.asset AS target \n" +
@@ -706,7 +706,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				")\n" +
 				"OR EXISTS (\n" +
 				"  SELECT 1 FROM my.asset AS target\n" +
-				"  WHERE target.id = source.id AND target._is_current = FALSE AND target._valid_until = CAST(source.updated_at AS TIMESTAMP)\n" +
+				"  WHERE target.id = source.id AND target._is_current = FALSE AND target._valid_until = CAST(source.updated_at AS TIMESTAMP_TZ)\n" +
 				");\n\n" +
 				"COMMIT;",
 		},
@@ -730,9 +730,9 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 			query:       "SELECT id, name, price, updated_at from source_table",
 			want: "CREATE OR REPLACE TABLE my.asset CLUSTER BY (_is_current, id) AS\n" +
 				"SELECT\n" +
-				"  CAST(updated_at AS TIMESTAMP) AS _valid_from,\n" +
+				"  CAST(updated_at AS TIMESTAMP_TZ) AS _valid_from,\n" +
 				"  src.*,\n" +
-				"  TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS') AS _valid_until,\n" +
+				"  TO_TIMESTAMP_TZ('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS') AS _valid_until,\n" +
 				"  TRUE AS _is_current\n" +
 				"FROM (\n" +
 				"SELECT id, name, price, updated_at from source_table\n" +
@@ -916,18 +916,18 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 				"  SELECT s1.*, FALSE AS _is_current\n" +
 				"  FROM s1\n" +
 				"  JOIN   my.asset AS t1 USING (id)\n" +
-				"  WHERE  t1._valid_from < CAST(s1.ts AS TIMESTAMP) AND t1._is_current\n" +
+				"  WHERE  t1._valid_from < CAST(s1.ts AS TIMESTAMP_TZ) AND t1._is_current\n" +
 				") AS source\n" +
 				"ON  target.id = source.id AND target._is_current AND source._is_current\n\n" +
 				"WHEN MATCHED AND (\n" +
-				"  target._valid_from < CAST(source.ts AS TIMESTAMP)\n" +
+				"  target._valid_from < CAST(source.ts AS TIMESTAMP_TZ)\n" +
 				") THEN\n" +
 				"  UPDATE SET\n" +
-				"    target._valid_until = CAST(source.ts AS TIMESTAMP),\n" +
+				"    target._valid_until = CAST(source.ts AS TIMESTAMP_TZ),\n" +
 				"    target._is_current  = FALSE\n\n" +
 				"WHEN NOT MATCHED THEN\n" +
 				"  INSERT (id, event_name, ts, _valid_from, _valid_until, _is_current)\n" +
-				"  VALUES (source.id, source.event_name, source.ts, CAST(source.ts AS TIMESTAMP), TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS'), TRUE);\n\n" +
+				"  VALUES (source.id, source.event_name, source.ts, CAST(source.ts AS TIMESTAMP_TZ), TO_TIMESTAMP_TZ('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS'), TRUE);\n\n" +
 				"COMMIT;",
 		},
 		{
@@ -971,18 +971,18 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 				"  SELECT s1.*, FALSE AS _is_current\n" +
 				"  FROM s1\n" +
 				"  JOIN   my.asset AS t1 USING (id, event_type)\n" +
-				"  WHERE  t1._valid_from < CAST(s1.ts AS TIMESTAMP) AND t1._is_current\n" +
+				"  WHERE  t1._valid_from < CAST(s1.ts AS TIMESTAMP_TZ) AND t1._is_current\n" +
 				") AS source\n" +
 				"ON  target.id = source.id AND target.event_type = source.event_type AND target._is_current AND source._is_current\n\n" +
 				"WHEN MATCHED AND (\n" +
-				"  target._valid_from < CAST(source.ts AS TIMESTAMP)\n" +
+				"  target._valid_from < CAST(source.ts AS TIMESTAMP_TZ)\n" +
 				") THEN\n" +
 				"  UPDATE SET\n" +
-				"    target._valid_until = CAST(source.ts AS TIMESTAMP),\n" +
+				"    target._valid_until = CAST(source.ts AS TIMESTAMP_TZ),\n" +
 				"    target._is_current  = FALSE\n\n" +
 				"WHEN NOT MATCHED THEN\n" +
 				"  INSERT (id, event_type, col1, col2, ts, _valid_from, _valid_until, _is_current)\n" +
-				"  VALUES (source.id, source.event_type, source.col1, source.col2, source.ts, CAST(source.ts AS TIMESTAMP), TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS'), TRUE);\n\n" +
+				"  VALUES (source.id, source.event_type, source.col1, source.col2, source.ts, CAST(source.ts AS TIMESTAMP_TZ), TO_TIMESTAMP_TZ('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS'), TRUE);\n\n" +
 				"COMMIT;",
 		},
 		{
@@ -1004,9 +1004,9 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 			query:       "SELECT id, event_name, ts from source_table",
 			want: "CREATE OR REPLACE TABLE my.asset CLUSTER BY (_is_current, id) AS\n" +
 				"SELECT\n" +
-				"  CAST(ts AS TIMESTAMP) AS _valid_from,\n" +
+				"  CAST(ts AS TIMESTAMP_TZ) AS _valid_from,\n" +
 				"  src.*,\n" +
-				"  TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS') AS _valid_until,\n" +
+				"  TO_TIMESTAMP_TZ('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS') AS _valid_until,\n" +
 				"  TRUE AS _is_current\n" +
 				"FROM (\n" +
 				"SELECT id, event_name, ts from source_table\n" +
@@ -1032,9 +1032,9 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 			query:       "SELECT id, event_name, ts from source_table",
 			want: "CREATE OR REPLACE TABLE my.asset CLUSTER BY (event_type, id) AS\n" +
 				"SELECT\n" +
-				"  CAST(ts AS TIMESTAMP) AS _valid_from,\n" +
+				"  CAST(ts AS TIMESTAMP_TZ) AS _valid_from,\n" +
 				"  src.*,\n" +
-				"  TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS') AS _valid_until,\n" +
+				"  TO_TIMESTAMP_TZ('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS') AS _valid_until,\n" +
 				"  TRUE AS _is_current\n" +
 				"FROM (\n" +
 				"SELECT id, event_name, ts from source_table\n" +

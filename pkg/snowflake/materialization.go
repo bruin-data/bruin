@@ -270,8 +270,8 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 	tbl := asset.Name
 
 	if incrementalKey != "" {
-		validFromExpr := fmt.Sprintf("CAST(source.%s AS TIMESTAMP)", incrementalKey)
-		insertValues = append(insertValues, validFromExpr, "TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS')", "TRUE")
+		validFromExpr := fmt.Sprintf("CAST(source.%s AS TIMESTAMP_TZ)", incrementalKey)
+		insertValues = append(insertValues, validFromExpr, "TO_TIMESTAMP_TZ('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS')", "TRUE")
 
 		queryStr := fmt.Sprintf(
 			`
@@ -288,7 +288,7 @@ WHERE target._is_current = TRUE
 
 -- Step 2: Update existing records that have changes
 UPDATE %s AS target
-SET _valid_until = (SELECT CAST(source.%s AS TIMESTAMP) FROM (%s) AS source WHERE %s LIMIT 1), _is_current = FALSE
+SET _valid_until = (SELECT CAST(source.%s AS TIMESTAMP_TZ) FROM (%s) AS source WHERE %s LIMIT 1), _is_current = FALSE
 WHERE target._is_current = TRUE
   AND EXISTS (
     SELECT 1 FROM (%s) AS source
@@ -305,7 +305,7 @@ WHERE NOT EXISTS (
 )
 OR EXISTS (
   SELECT 1 FROM %s AS target
-  WHERE %s AND target._is_current = FALSE AND target._valid_until = CAST(source.%s AS TIMESTAMP)
+  WHERE %s AND target._is_current = FALSE AND target._valid_until = CAST(source.%s AS TIMESTAMP_TZ)
 );
 
 COMMIT;`,
@@ -333,7 +333,7 @@ COMMIT;`,
 		return strings.TrimSpace(queryStr), nil
 	}
 
-	insertValues = append(insertValues, "$current_scd2_ts", "TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS')", "TRUE")
+	insertValues = append(insertValues, "$current_scd2_ts", "TO_TIMESTAMP_TZ('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS')", "TRUE")
 
 	queryStr := fmt.Sprintf(
 		`
@@ -410,9 +410,9 @@ func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, 
 		clusterByClause = fmt.Sprintf("CLUSTER BY (_is_current, %s)", cluster)
 	}
 
-	validFromExpr := "CURRENT_TIMESTAMP()"
+	validFromExpr := "CAST(CURRENT_TIMESTAMP() AS TIMESTAMP_TZ)"
 	if asset.Materialization.IncrementalKey != "" {
-		validFromExpr = fmt.Sprintf("CAST(%s AS TIMESTAMP)", asset.Materialization.IncrementalKey)
+		validFromExpr = fmt.Sprintf("CAST(%s AS TIMESTAMP_TZ)", asset.Materialization.IncrementalKey)
 	}
 
 	stmt := fmt.Sprintf(
@@ -420,7 +420,7 @@ func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, 
 SELECT
   %s AS _valid_from,
   src.*,
-  TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS') AS _valid_until,
+  TO_TIMESTAMP_TZ('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS') AS _valid_until,
   TRUE AS _is_current
 FROM (
 %s
@@ -476,8 +476,8 @@ func buildSCD2ByTimeQuery(asset *pipeline.Asset, query string) (string, error) {
 	insertCols = append(insertCols, "_valid_from", "_valid_until", "_is_current")
 	insertValues = append(
 		insertValues,
-		"CAST(source."+asset.Materialization.IncrementalKey+" AS TIMESTAMP)",
-		"TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS')",
+		"CAST(source."+asset.Materialization.IncrementalKey+" AS TIMESTAMP_TZ)",
+		"TO_TIMESTAMP_TZ('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS')",
 		"TRUE",
 	)
 
@@ -516,15 +516,15 @@ USING (
   SELECT s1.*, FALSE AS _is_current
   FROM s1
   JOIN   %s AS t1 USING (%s)
-  WHERE  t1._valid_from < CAST(s1.%s AS TIMESTAMP) AND t1._is_current
+  WHERE  t1._valid_from < CAST(s1.%s AS TIMESTAMP_TZ) AND t1._is_current
 ) AS source
 ON  %s
 
 WHEN MATCHED AND (
-  target._valid_from < CAST(source.%s AS TIMESTAMP)
+  target._valid_from < CAST(source.%s AS TIMESTAMP_TZ)
 ) THEN
   UPDATE SET
-    target._valid_until = CAST(source.%s AS TIMESTAMP),
+    target._valid_until = CAST(source.%s AS TIMESTAMP_TZ),
     target._is_current  = FALSE
 
 WHEN NOT MATCHED THEN
@@ -573,9 +573,9 @@ func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query string) (string, er
 	stmt := fmt.Sprintf(
 		`CREATE OR REPLACE TABLE %s %s AS
 SELECT
-  CAST(%s AS TIMESTAMP) AS _valid_from,
+  CAST(%s AS TIMESTAMP_TZ) AS _valid_from,
   src.*,
-  TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS') AS _valid_until,
+  TO_TIMESTAMP_TZ('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS') AS _valid_until,
   TRUE AS _is_current
 FROM (
 %s

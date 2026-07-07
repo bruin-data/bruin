@@ -858,6 +858,24 @@ func dataVaultColumnIsExcluded(col *pipeline.Column, excludedColumns []*pipeline
 	return false
 }
 
+func pgTimestampWithTimeZone(expr, columnType string) string {
+	lcType := strings.ToLower(columnType)
+	if columnType == "" || strings.Contains(lcType, "time zone") || strings.Contains(lcType, "timestamptz") {
+		return fmt.Sprintf("CAST(%s AS TIMESTAMPTZ)", expr)
+	}
+	return fmt.Sprintf("CAST(%s AS TIMESTAMP) AT TIME ZONE 'UTC'", expr)
+}
+
+func pgIncrementalKeyType(asset *pipeline.Asset) string {
+	if asset.Materialization.IncrementalKey == "" {
+		return ""
+	}
+	if col := asset.GetColumnWithName(asset.Materialization.IncrementalKey); col != nil {
+		return col.Type
+	}
+	return ""
+}
+
 func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, error) {
 	primaryKeys := asset.ColumnNamesWithPrimaryKey()
 	if len(primaryKeys) == 0 {
@@ -866,15 +884,16 @@ func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, 
 
 	var validuntil string
 	if asset.Type == pipeline.AssetTypeRedshiftQuery {
-		validuntil = "TIMESTAMP '9999-12-31 00:00:00'"
+		validuntil = "TIMESTAMPTZ '9999-12-31 00:00:00'"
 	} else {
-		validuntil = "'9999-12-31 00:00:00'::TIMESTAMP"
+		validuntil = "'9999-12-31 00:00:00'::TIMESTAMPTZ"
 	}
 
-	validFromExpr := "CURRENT_TIMESTAMP"
+	validFromRaw := "CURRENT_TIMESTAMP"
 	if asset.Materialization.IncrementalKey != "" {
-		validFromExpr = QuoteIdentifier(asset.Materialization.IncrementalKey)
+		validFromRaw = QuoteIdentifier(asset.Materialization.IncrementalKey)
 	}
+	validFromExpr := pgTimestampWithTimeZone(validFromRaw, pgIncrementalKeyType(asset))
 
 	stmt := fmt.Sprintf(
 		`BEGIN TRANSACTION;
@@ -911,12 +930,13 @@ func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query string) (string, er
 
 	var validuntil string
 	if asset.Type == pipeline.AssetTypeRedshiftQuery {
-		validuntil = "TIMESTAMP '9999-12-31 00:00:00'"
+		validuntil = "TIMESTAMPTZ '9999-12-31 00:00:00'"
 	} else {
-		validuntil = "'9999-12-31 00:00:00'::TIMESTAMP"
+		validuntil = "'9999-12-31 00:00:00'::TIMESTAMPTZ"
 	}
 
 	quotedIncrementalKey := QuoteIdentifier(asset.Materialization.IncrementalKey)
+	validFromExpr := pgTimestampWithTimeZone(quotedIncrementalKey, pgIncrementalKeyType(asset))
 	stmt := fmt.Sprintf(
 		`BEGIN TRANSACTION;
 DROP TABLE IF EXISTS %s;
@@ -932,7 +952,7 @@ FROM (
 COMMIT;`,
 		QuoteIdentifier(asset.Name),
 		QuoteIdentifier(asset.Name),
-		quotedIncrementalKey,
+		validFromExpr,
 		validuntil,
 		strings.TrimSpace(query),
 	)
@@ -990,7 +1010,7 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 		validFromExpr = "source." + lowerIncrementalKey
 		validUntilUpdateExpr = "source." + lowerIncrementalKey
 	}
-	insertValues = append(insertValues, validFromExpr, "'9999-12-31 00:00:00'::TIMESTAMP", "TRUE")
+	insertValues = append(insertValues, validFromExpr, "'9999-12-31 00:00:00'::TIMESTAMPTZ", "TRUE")
 
 	pkListForUsing := make([]string, 0, len(primaryKeys))
 	for _, col := range asset.Columns {
@@ -1127,7 +1147,7 @@ func buildSCD2QueryByTime(asset *pipeline.Asset, query string) (string, error) {
 	insertValues = append(
 		insertValues,
 		"source."+quotedIncrementalKey,
-		"'9999-12-31 00:00:00'",
+		"'9999-12-31 00:00:00'::TIMESTAMPTZ",
 		"TRUE",
 	)
 
@@ -1226,7 +1246,7 @@ func buildRedshiftSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string
 		quotedIncrementalKey := QuoteIdentifier(incrementalKey)
 		validFromExpr = "source." + quotedIncrementalKey
 	}
-	insertValues = append(insertValues, validFromExpr, "TIMESTAMP '9999-12-31 00:00:00'", "TRUE")
+	insertValues = append(insertValues, validFromExpr, "TIMESTAMPTZ '9999-12-31 00:00:00'", "TRUE")
 
 	onConditions := make([]string, 0, len(primaryKeys))
 	for _, pk := range primaryKeys {
@@ -1374,7 +1394,7 @@ func buildRedshiftSCD2QueryByTime(asset *pipeline.Asset, query string) (string, 
 	insertValues = append(
 		insertValues,
 		"source."+quotedIncrementalKey,
-		"TIMESTAMP '9999-12-31 00:00:00'",
+		"TIMESTAMPTZ '9999-12-31 00:00:00'",
 		"TRUE",
 	)
 
