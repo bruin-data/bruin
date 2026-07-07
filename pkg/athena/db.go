@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
@@ -15,15 +17,17 @@ import (
 )
 
 type DB struct {
-	conn   *sqlx.DB
-	config *Config
-	mutex  sync.Mutex
+	conn       *sqlx.DB
+	config     *Config
+	mutex      sync.Mutex
+	typeMapper *diff.DatabaseTypeMapper
 }
 
 func NewDB(c *Config) *DB {
 	return &DB{
-		config: c,
-		mutex:  sync.Mutex{},
+		config:     c,
+		mutex:      sync.Mutex{},
+		typeMapper: diff.NewAthenaTypeMapper(),
 	}
 }
 
@@ -391,6 +395,510 @@ ORDER BY table_schema, table_name;
 	})
 
 	return summary, nil
+}
+
+func (db *DB) GetTableSummary(ctx context.Context, tableName string, schemaOnly bool) (*diff.TableSummaryResult, error) {
+	schemaName, tableNameOnly, qualifiedTableName, err := db.parseTableName(tableName)
+	if err != nil {
+		return nil, err
+	}
+
+	var rowCount int64
+	if !schemaOnly {
+		rowCount, err = db.fetchRowCount(ctx, qualifiedTableName, tableName)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	schemaResult, err := db.Select(ctx, &query.Query{Query: buildAthenaSchemaQuery(schemaName, tableNameOnly)})
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute schema query for table '%s': %w", tableName, err)
+	}
+
+	typeMapper := db.typeMapper
+	if typeMapper == nil {
+		typeMapper = diff.NewAthenaTypeMapper()
+	}
+
+	columns := make([]*diff.Column, 0, len(schemaResult))
+	for _, row := range schemaResult {
+		if len(row) < 3 {
+			continue
+		}
+
+		columnName, ok := row[0].(string)
+		if !ok {
+			continue
+		}
+
+		dataType, ok := row[1].(string)
+		if !ok {
+			continue
+		}
+
+		isNullableStr, ok := row[2].(string)
+		if !ok {
+			continue
+		}
+
+		normalizedType := typeMapper.MapType(dataType)
+		nullable := strings.EqualFold(isNullableStr, "YES")
+
+		var stats diff.ColumnStatistics
+		if schemaOnly {
+			stats = nil
+		} else {
+			switch normalizedType {
+			case diff.CommonTypeNumeric:
+				stats, err = db.fetchNumericalStats(ctx, qualifiedTableName, columnName)
+				if err != nil {
+					return nil, fmt.Errorf("failed to fetch numerical stats for column '%s': %w", columnName, err)
+				}
+			case diff.CommonTypeString:
+				stats, err = db.fetchStringStats(ctx, qualifiedTableName, columnName)
+				if err != nil {
+					return nil, fmt.Errorf("failed to fetch string stats for column '%s': %w", columnName, err)
+				}
+			case diff.CommonTypeBoolean:
+				stats, err = db.fetchBooleanStats(ctx, qualifiedTableName, columnName)
+				if err != nil {
+					return nil, fmt.Errorf("failed to fetch boolean stats for column '%s': %w", columnName, err)
+				}
+			case diff.CommonTypeDateTime:
+				stats, err = db.fetchDateTimeStats(ctx, qualifiedTableName, columnName)
+				if err != nil {
+					return nil, fmt.Errorf("failed to fetch datetime stats for column '%s': %w", columnName, err)
+				}
+			case diff.CommonTypeJSON:
+				stats, err = db.fetchJSONStats(ctx, qualifiedTableName, columnName)
+				if err != nil {
+					return nil, fmt.Errorf("failed to fetch JSON stats for column '%s': %w", columnName, err)
+				}
+			case diff.CommonTypeBinary, diff.CommonTypeUnknown:
+				stats = &diff.UnknownStatistics{}
+			}
+		}
+
+		columns = append(columns, &diff.Column{
+			Name:           columnName,
+			Type:           dataType,
+			NormalizedType: normalizedType,
+			Nullable:       nullable,
+			PrimaryKey:     false,
+			Unique:         false,
+			Stats:          stats,
+		})
+	}
+
+	return &diff.TableSummaryResult{
+		RowCount: rowCount,
+		Table: &diff.Table{
+			Name:    tableName,
+			Columns: columns,
+		},
+	}, nil
+}
+
+func (db *DB) parseTableName(tableName string) (string, string, string, error) {
+	tableComponents := strings.Split(tableName, ".")
+	for _, component := range tableComponents {
+		if component == "" {
+			return "", "", "", fmt.Errorf("table name must be in table or schema.table format, '%s' given", tableName)
+		}
+	}
+
+	var schemaName string
+	var tableNameOnly string
+
+	switch len(tableComponents) {
+	case 1:
+		if db.config == nil || db.config.Database == "" {
+			return "", "", "", fmt.Errorf("database must be configured when table name is not schema-qualified: %s", tableName)
+		}
+		schemaName = db.config.Database
+		tableNameOnly = tableComponents[0]
+	case 2:
+		schemaName = tableComponents[0]
+		tableNameOnly = tableComponents[1]
+	default:
+		return "", "", "", fmt.Errorf("table name must be in table or schema.table format, '%s' given", tableName)
+	}
+
+	return schemaName, tableNameOnly, quoteAthenaQualifiedTableName(schemaName, tableNameOnly), nil
+}
+
+func buildAthenaSchemaQuery(schemaName, tableName string) string {
+	return fmt.Sprintf(`
+SELECT
+    column_name,
+    data_type,
+    is_nullable
+FROM information_schema.columns
+WHERE table_schema = '%s' AND table_name = '%s'
+ORDER BY ordinal_position;
+`, escapeAthenaStringLiteral(schemaName), escapeAthenaStringLiteral(tableName))
+}
+
+func (db *DB) fetchRowCount(ctx context.Context, qualifiedTableName, originalTableName string) (int64, error) {
+	countQuery := fmt.Sprintf("SELECT COUNT(*) as row_count FROM %s", qualifiedTableName)
+	countResult, err := db.Select(ctx, &query.Query{Query: countQuery})
+	if err != nil {
+		return 0, fmt.Errorf("failed to execute count query for table '%s': %w", originalTableName, err)
+	}
+
+	if len(countResult) == 0 || len(countResult[0]) == 0 {
+		return 0, fmt.Errorf("count query returned no rows for table '%s'", originalTableName)
+	}
+
+	rowCount, err := athenaInt64Value(countResult[0][0])
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse row count for table '%s': %w", originalTableName, err)
+	}
+
+	return rowCount, nil
+}
+
+func (db *DB) fetchNumericalStats(ctx context.Context, qualifiedTableName, columnName string) (*diff.NumericalStatistics, error) {
+	quotedColumn := quoteAthenaIdentifier(columnName)
+	statsQuery := fmt.Sprintf(`
+SELECT
+    MIN(TRY_CAST(%s AS DOUBLE)) as min_val,
+    MAX(TRY_CAST(%s AS DOUBLE)) as max_val,
+    AVG(TRY_CAST(%s AS DOUBLE)) as avg_val,
+    SUM(TRY_CAST(%s AS DOUBLE)) as sum_val,
+    COUNT(%s) as count_val,
+    COUNT(*) - COUNT(%s) as null_count,
+    STDDEV(TRY_CAST(%s AS DOUBLE)) as stddev_val
+FROM %s
+`, quotedColumn, quotedColumn, quotedColumn, quotedColumn, quotedColumn, quotedColumn, quotedColumn, qualifiedTableName)
+
+	result, err := db.Select(ctx, &query.Query{Query: statsQuery})
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch numerical stats for column '%s': %w", columnName, err)
+	}
+	if len(result) == 0 || len(result[0]) < 7 {
+		return nil, fmt.Errorf("insufficient statistical data returned for column '%s'", columnName)
+	}
+
+	row := result[0]
+	stats := &diff.NumericalStatistics{}
+
+	if stats.Min, err = athenaOptionalFloat64Value(row[0]); err != nil {
+		return nil, fmt.Errorf("failed to parse min value for column '%s': %w", columnName, err)
+	}
+	if stats.Max, err = athenaOptionalFloat64Value(row[1]); err != nil {
+		return nil, fmt.Errorf("failed to parse max value for column '%s': %w", columnName, err)
+	}
+	if stats.Avg, err = athenaOptionalFloat64Value(row[2]); err != nil {
+		return nil, fmt.Errorf("failed to parse avg value for column '%s': %w", columnName, err)
+	}
+	if stats.Sum, err = athenaOptionalFloat64Value(row[3]); err != nil {
+		return nil, fmt.Errorf("failed to parse sum value for column '%s': %w", columnName, err)
+	}
+	if stats.Count, err = athenaInt64Value(row[4]); err != nil {
+		return nil, fmt.Errorf("failed to parse count value for column '%s': %w", columnName, err)
+	}
+	if stats.NullCount, err = athenaInt64Value(row[5]); err != nil {
+		return nil, fmt.Errorf("failed to parse null count for column '%s': %w", columnName, err)
+	}
+	if stats.StdDev, err = athenaOptionalFloat64Value(row[6]); err != nil {
+		return nil, fmt.Errorf("failed to parse stddev value for column '%s': %w", columnName, err)
+	}
+
+	return stats, nil
+}
+
+func (db *DB) fetchStringStats(ctx context.Context, qualifiedTableName, columnName string) (*diff.StringStatistics, error) {
+	quotedColumn := quoteAthenaIdentifier(columnName)
+	statsQuery := fmt.Sprintf(`
+SELECT
+    MIN(LENGTH(CAST(%s AS VARCHAR))) as min_len,
+    MAX(LENGTH(CAST(%s AS VARCHAR))) as max_len,
+    AVG(LENGTH(CAST(%s AS VARCHAR))) as avg_len,
+    COUNT(DISTINCT %s) as distinct_count,
+    COUNT(*) as total_count,
+    COUNT(*) - COUNT(%s) as null_count,
+    SUM(CASE WHEN CAST(%s AS VARCHAR) = '' THEN 1 ELSE 0 END) as empty_count
+FROM %s
+`, quotedColumn, quotedColumn, quotedColumn, quotedColumn, quotedColumn, quotedColumn, qualifiedTableName)
+
+	result, err := db.Select(ctx, &query.Query{Query: statsQuery})
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch string stats for column '%s': %w", columnName, err)
+	}
+	if len(result) == 0 || len(result[0]) < 7 {
+		return nil, fmt.Errorf("insufficient statistical data returned for column '%s'", columnName)
+	}
+
+	row := result[0]
+	stats := &diff.StringStatistics{}
+
+	if stats.MinLength, err = athenaIntValue(row[0]); err != nil {
+		return nil, fmt.Errorf("failed to parse min length for column '%s': %w", columnName, err)
+	}
+	if stats.MaxLength, err = athenaIntValue(row[1]); err != nil {
+		return nil, fmt.Errorf("failed to parse max length for column '%s': %w", columnName, err)
+	}
+	if stats.AvgLength, err = athenaFloat64Value(row[2]); err != nil {
+		return nil, fmt.Errorf("failed to parse avg length for column '%s': %w", columnName, err)
+	}
+	if stats.DistinctCount, err = athenaInt64Value(row[3]); err != nil {
+		return nil, fmt.Errorf("failed to parse distinct count for column '%s': %w", columnName, err)
+	}
+	if stats.Count, err = athenaInt64Value(row[4]); err != nil {
+		return nil, fmt.Errorf("failed to parse count value for column '%s': %w", columnName, err)
+	}
+	if stats.NullCount, err = athenaInt64Value(row[5]); err != nil {
+		return nil, fmt.Errorf("failed to parse null count for column '%s': %w", columnName, err)
+	}
+	if stats.EmptyCount, err = athenaInt64Value(row[6]); err != nil {
+		return nil, fmt.Errorf("failed to parse empty count for column '%s': %w", columnName, err)
+	}
+
+	return stats, nil
+}
+
+func (db *DB) fetchBooleanStats(ctx context.Context, qualifiedTableName, columnName string) (*diff.BooleanStatistics, error) {
+	quotedColumn := quoteAthenaIdentifier(columnName)
+	statsQuery := fmt.Sprintf(`
+SELECT
+    SUM(CASE WHEN %s = true THEN 1 ELSE 0 END) as true_count,
+    SUM(CASE WHEN %s = false THEN 1 ELSE 0 END) as false_count,
+    COUNT(*) as total_count,
+    COUNT(*) - COUNT(%s) as null_count
+FROM %s
+`, quotedColumn, quotedColumn, quotedColumn, qualifiedTableName)
+
+	result, err := db.Select(ctx, &query.Query{Query: statsQuery})
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch boolean stats for column '%s': %w", columnName, err)
+	}
+	if len(result) == 0 || len(result[0]) < 4 {
+		return nil, fmt.Errorf("insufficient statistical data returned for column '%s'", columnName)
+	}
+
+	row := result[0]
+	stats := &diff.BooleanStatistics{}
+
+	if stats.TrueCount, err = athenaInt64Value(row[0]); err != nil {
+		return nil, fmt.Errorf("failed to parse true count for column '%s': %w", columnName, err)
+	}
+	if stats.FalseCount, err = athenaInt64Value(row[1]); err != nil {
+		return nil, fmt.Errorf("failed to parse false count for column '%s': %w", columnName, err)
+	}
+	if stats.Count, err = athenaInt64Value(row[2]); err != nil {
+		return nil, fmt.Errorf("failed to parse count value for column '%s': %w", columnName, err)
+	}
+	if stats.NullCount, err = athenaInt64Value(row[3]); err != nil {
+		return nil, fmt.Errorf("failed to parse null count for column '%s': %w", columnName, err)
+	}
+
+	return stats, nil
+}
+
+func (db *DB) fetchDateTimeStats(ctx context.Context, qualifiedTableName, columnName string) (*diff.DateTimeStatistics, error) {
+	quotedColumn := quoteAthenaIdentifier(columnName)
+	statsQuery := fmt.Sprintf(`
+SELECT
+    CAST(MIN(%s) AS VARCHAR) as min_date,
+    CAST(MAX(%s) AS VARCHAR) as max_date,
+    COUNT(DISTINCT %s) as unique_count,
+    COUNT(*) as count_val,
+    COUNT(*) - COUNT(%s) as null_count
+FROM %s
+`, quotedColumn, quotedColumn, quotedColumn, quotedColumn, qualifiedTableName)
+
+	result, err := db.Select(ctx, &query.Query{Query: statsQuery})
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch datetime stats for column '%s': %w", columnName, err)
+	}
+	if len(result) == 0 || len(result[0]) < 5 {
+		return nil, fmt.Errorf("insufficient statistical data returned for column '%s'", columnName)
+	}
+
+	row := result[0]
+	stats := &diff.DateTimeStatistics{}
+
+	if row[0] != nil {
+		if parsedTime, parseErr := diff.ParseDateTime(row[0]); parseErr == nil {
+			stats.EarliestDate = parsedTime
+		}
+	}
+	if row[1] != nil {
+		if parsedTime, parseErr := diff.ParseDateTime(row[1]); parseErr == nil {
+			stats.LatestDate = parsedTime
+		}
+	}
+	if stats.UniqueCount, err = athenaInt64Value(row[2]); err != nil {
+		return nil, fmt.Errorf("failed to parse unique count for column '%s': %w", columnName, err)
+	}
+	if stats.Count, err = athenaInt64Value(row[3]); err != nil {
+		return nil, fmt.Errorf("failed to parse count value for column '%s': %w", columnName, err)
+	}
+	if stats.NullCount, err = athenaInt64Value(row[4]); err != nil {
+		return nil, fmt.Errorf("failed to parse null count for column '%s': %w", columnName, err)
+	}
+
+	return stats, nil
+}
+
+func (db *DB) fetchJSONStats(ctx context.Context, qualifiedTableName, columnName string) (*diff.JSONStatistics, error) {
+	quotedColumn := quoteAthenaIdentifier(columnName)
+	statsQuery := fmt.Sprintf(`
+SELECT
+    COUNT(*) as count_val,
+    COUNT(*) - COUNT(%s) as null_count
+FROM %s
+`, quotedColumn, qualifiedTableName)
+
+	result, err := db.Select(ctx, &query.Query{Query: statsQuery})
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch JSON stats for column '%s': %w", columnName, err)
+	}
+	if len(result) == 0 || len(result[0]) < 2 {
+		return nil, fmt.Errorf("insufficient statistical data returned for column '%s'", columnName)
+	}
+
+	row := result[0]
+	stats := &diff.JSONStatistics{}
+
+	if stats.Count, err = athenaInt64Value(row[0]); err != nil {
+		return nil, fmt.Errorf("failed to parse count value for column '%s': %w", columnName, err)
+	}
+	if stats.NullCount, err = athenaInt64Value(row[1]); err != nil {
+		return nil, fmt.Errorf("failed to parse null count for column '%s': %w", columnName, err)
+	}
+
+	return stats, nil
+}
+
+func athenaIntValue(value interface{}) (int, error) {
+	int64Value, err := athenaInt64Value(value)
+	if err != nil {
+		return 0, err
+	}
+
+	return int(int64Value), nil
+}
+
+func athenaInt64Value(value interface{}) (int64, error) {
+	switch val := value.(type) {
+	case nil:
+		return 0, nil
+	case int64:
+		return val, nil
+	case int:
+		return int64(val), nil
+	case int32:
+		return int64(val), nil
+	case int16:
+		return int64(val), nil
+	case int8:
+		return int64(val), nil
+	case uint64:
+		return int64(val), nil
+	case uint:
+		return int64(val), nil
+	case uint32:
+		return int64(val), nil
+	case uint16:
+		return int64(val), nil
+	case uint8:
+		return int64(val), nil
+	case float64:
+		return int64(val), nil
+	case float32:
+		return int64(val), nil
+	case []byte:
+		return athenaInt64Value(string(val))
+	case string:
+		trimmed := strings.TrimSpace(val)
+		if trimmed == "" {
+			return 0, nil
+		}
+		parsed, err := strconv.ParseInt(trimmed, 10, 64)
+		if err == nil {
+			return parsed, nil
+		}
+		parsedFloat, floatErr := strconv.ParseFloat(trimmed, 64)
+		if floatErr != nil {
+			return 0, err
+		}
+		return int64(parsedFloat), nil
+	default:
+		return 0, fmt.Errorf("unexpected numeric value type %T with value %v", val, val)
+	}
+}
+
+func athenaFloat64Value(value interface{}) (float64, error) {
+	switch val := value.(type) {
+	case nil:
+		return 0, nil
+	case float64:
+		return val, nil
+	case float32:
+		return float64(val), nil
+	case int64:
+		return float64(val), nil
+	case int:
+		return float64(val), nil
+	case int32:
+		return float64(val), nil
+	case int16:
+		return float64(val), nil
+	case int8:
+		return float64(val), nil
+	case uint64:
+		return float64(val), nil
+	case uint:
+		return float64(val), nil
+	case uint32:
+		return float64(val), nil
+	case uint16:
+		return float64(val), nil
+	case uint8:
+		return float64(val), nil
+	case []byte:
+		return athenaFloat64Value(string(val))
+	case string:
+		trimmed := strings.TrimSpace(val)
+		if trimmed == "" {
+			return 0, nil
+		}
+		parsed, err := strconv.ParseFloat(trimmed, 64)
+		if err != nil {
+			return 0, err
+		}
+		return parsed, nil
+	default:
+		return 0, fmt.Errorf("unexpected numeric value type %T with value %v", val, val)
+	}
+}
+
+func athenaOptionalFloat64Value(value interface{}) (*float64, error) {
+	if value == nil {
+		return nil, nil
+	}
+
+	parsed, err := athenaFloat64Value(value)
+	if err != nil {
+		return nil, err
+	}
+
+	return &parsed, nil
+}
+
+func quoteAthenaQualifiedTableName(schemaName, tableName string) string {
+	return quoteAthenaIdentifier(schemaName) + "." + quoteAthenaIdentifier(tableName)
+}
+
+func quoteAthenaIdentifier(identifier string) string {
+	return `"` + strings.ReplaceAll(identifier, `"`, `""`) + `"`
+}
+
+func escapeAthenaStringLiteral(value string) string {
+	return strings.ReplaceAll(value, "'", "''")
 }
 
 func (db *DB) BuildTableExistsQuery(tableName string) (string, error) {

@@ -247,6 +247,50 @@ func NewBigQueryTypeMapper() *DatabaseTypeMapper {
 	return mapper
 }
 
+// NewAthenaTypeMapper provides AWS Athena/Presto-specific type mapping.
+func NewAthenaTypeMapper() *DatabaseTypeMapper {
+	mapper := NewDatabaseTypeMapper()
+
+	// Numeric types in Athena.
+	mapper.AddNumericTypes(
+		"tinyint", "smallint", "integer", "int", "bigint",
+		"real", "double", "double precision",
+		"decimal", "numeric",
+	)
+
+	// String types in Athena.
+	mapper.AddStringTypes(
+		"char", "varchar", "string",
+		"uuid", "ipaddress",
+	)
+
+	// Boolean types in Athena.
+	mapper.AddBooleanTypes(
+		"boolean", "bool",
+	)
+
+	// DateTime types in Athena.
+	mapper.AddDateTimeTypes(
+		"date",
+		"time", "time with time zone",
+		"timestamp", "timestamp with time zone",
+		"interval year to month", "interval day to second",
+	)
+
+	// Binary types in Athena.
+	mapper.AddBinaryTypes(
+		"varbinary",
+	)
+
+	// JSON type in Athena. Complex ARRAY/MAP/ROW types remain unknown because
+	// their value-level comparison semantics vary by nested shape.
+	mapper.AddJSONTypes(
+		"json",
+	)
+
+	return mapper
+}
+
 // NewPostgresTypeMapper provides PostgreSQL-specific type mapping.
 func NewPostgresTypeMapper() *DatabaseTypeMapper {
 	mapper := NewDatabaseTypeMapper()

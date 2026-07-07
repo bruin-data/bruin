@@ -256,6 +256,60 @@ func TestBigQueryTypeMapper(t *testing.T) {
 	}
 }
 
+func TestAthenaTypeMapper(t *testing.T) {
+	t.Parallel()
+	mapper := NewAthenaTypeMapper()
+
+	tests := []struct {
+		inputType      string
+		expectedResult CommonDataType
+	}{
+		// Athena numeric types
+		{"tinyint", CommonTypeNumeric},
+		{"smallint", CommonTypeNumeric},
+		{"integer", CommonTypeNumeric},
+		{"bigint", CommonTypeNumeric},
+		{"real", CommonTypeNumeric},
+		{"double", CommonTypeNumeric},
+		{"decimal(10,2)", CommonTypeNumeric},
+
+		// Athena string types
+		{"varchar", CommonTypeString},
+		{"varchar(255)", CommonTypeString},
+		{"char", CommonTypeString},
+		{"string", CommonTypeString},
+		{"ipaddress", CommonTypeString},
+
+		// Athena boolean types
+		{"boolean", CommonTypeBoolean},
+
+		// Athena datetime types
+		{"date", CommonTypeDateTime},
+		{"timestamp", CommonTypeDateTime},
+		{"timestamp with time zone", CommonTypeDateTime},
+		{"time", CommonTypeDateTime},
+
+		// Athena binary and JSON types
+		{"varbinary", CommonTypeBinary},
+		{"json", CommonTypeJSON},
+
+		// Athena complex types are intentionally not normalized.
+		{"array(varchar)", CommonTypeUnknown},
+		{"map(varchar,bigint)", CommonTypeUnknown},
+		{"row(id bigint)", CommonTypeUnknown},
+	}
+
+	for _, tt := range tests {
+		t.Run("Athena_"+tt.inputType, func(t *testing.T) {
+			t.Parallel()
+			result := mapper.MapType(tt.inputType)
+			if result != tt.expectedResult {
+				t.Errorf("Athena mapper: MapType(%q) = %v, want %v", tt.inputType, result, tt.expectedResult)
+			}
+		})
+	}
+}
+
 func TestDatabaseTypeMapper_IsNumeric(t *testing.T) {
 	t.Parallel()
 	mapper := createTestMapper()
