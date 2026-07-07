@@ -252,5 +252,6 @@ type Dashboard struct {
 	Title      *string         `json:"title"`
 	Visibility string          `json:"visibility"`
 	UpdatedAt  *string         `json:"updated_at"`
+	URL        string          `json:"url"`
 	State      json.RawMessage `json:"state,omitempty"`
 }

@@ -3106,7 +3106,11 @@ func cloudDashboardsCreate() *cli.Command {
 			if dashboard.Title != nil {
 				title = *dashboard.Title
 			}
-			infoPrinter.Printf("Created dashboard %d (%s) as a draft — publish it from the Bruin Cloud UI.\n", dashboard.ID, title)
+			if dashboard.URL != "" {
+				infoPrinter.Printf("Created dashboard %d (%s) as a draft — open it to review and publish: %s\n", dashboard.ID, title, dashboard.URL)
+			} else {
+				infoPrinter.Printf("Created dashboard %d (%s) as a draft — publish it from the Bruin Cloud UI.\n", dashboard.ID, title)
+			}
 			return nil
 		},
 	}
