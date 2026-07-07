@@ -143,7 +143,7 @@ func TestCloudCommand_Help(t *testing.T) {
 	cmd := Cloud(&isDebug)
 	require.NotNil(t, cmd)
 	assert.Equal(t, "cloud", cmd.Name)
-	assert.Len(t, cmd.Commands, 8)
+	assert.Len(t, cmd.Commands, 9)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
@@ -157,6 +157,7 @@ func TestCloudCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "glossary")
 	assert.Contains(t, subNames, "agents")
 	assert.Contains(t, subNames, "connections")
+	assert.Contains(t, subNames, "dashboards")
 }
 
 func TestCloudProjectsCommand_Help(t *testing.T) {
@@ -220,6 +221,21 @@ func TestCloudAgentsCommand_Help(t *testing.T) {
 	require.NotNil(t, cmd)
 	assert.Equal(t, "agents", cmd.Name)
 	require.Len(t, cmd.Commands, 8)
+}
+
+func TestCloudDashboardsCommand_Help(t *testing.T) {
+	t.Parallel()
+	cmd := CloudDashboards()
+	require.NotNil(t, cmd)
+	assert.Equal(t, "dashboards", cmd.Name)
+	require.Len(t, cmd.Commands, 2)
+
+	subNames := make([]string, len(cmd.Commands))
+	for i, sub := range cmd.Commands {
+		subNames[i] = sub.Name
+	}
+	assert.Contains(t, subNames, "list")
+	assert.Contains(t, subNames, "get")
 }
 
 func TestExtractErrorLines_ErrorLevel(t *testing.T) {

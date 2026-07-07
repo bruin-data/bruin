@@ -700,3 +700,45 @@ func TestTriggerRunWithTags(t *testing.T) {
 		TriggerRunOptions{Note: "Q1 backfill", Tags: []string{"nightly", "manual"}})
 	require.NoError(t, err)
 }
+
+func TestListDashboards(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/dashboards", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+		// Match the API's snake_case shape exactly, so the tag mapping is covered.
+		writeJSON(t, w, map[string]any{
+			"dashboards": []map[string]any{
+				{"id": 3, "title": "Revenue", "visibility": "team", "updated_at": "2026-07-06T10:00:00+00:00"},
+			},
+		})
+	})
+
+	dashboards, err := client.ListDashboards(t.Context())
+	require.NoError(t, err)
+	require.Len(t, dashboards, 1)
+	assert.Equal(t, "Revenue", *dashboards[0].Title)
+	require.NotNil(t, dashboards[0].UpdatedAt)
+	assert.Equal(t, "2026-07-06T10:00:00+00:00", *dashboards[0].UpdatedAt)
+}
+
+func TestGetDashboard(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/dashboards/3", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, map[string]any{
+			"id":         3,
+			"title":      "Revenue",
+			"visibility": "team",
+			"state":      map[string]any{"widgets": []any{}},
+		})
+	})
+
+	dashboard, err := client.GetDashboard(t.Context(), 3)
+	require.NoError(t, err)
+	assert.Equal(t, 3, dashboard.ID)
+	assert.JSONEq(t, `{"widgets":[]}`, string(dashboard.State))
+}

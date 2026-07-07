@@ -540,3 +540,22 @@ func (c *APIClient) CreateConnection(ctx context.Context, name, connType string,
 func (c *APIClient) DeleteConnection(ctx context.Context, name string) error {
 	return c.doRequest(ctx, http.MethodDelete, "/connections/"+url.PathEscape(name), nil, nil)
 }
+
+// --- Dashboards ---
+
+func (c *APIClient) ListDashboards(ctx context.Context) ([]Dashboard, error) {
+	var resp struct {
+		Dashboards []Dashboard `json:"dashboards"`
+	}
+	err := c.doRequest(ctx, http.MethodGet, "/dashboards", nil, &resp)
+	return resp.Dashboards, err
+}
+
+func (c *APIClient) GetDashboard(ctx context.Context, dashboardID int) (*Dashboard, error) {
+	var result Dashboard
+	err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/dashboards/%d", dashboardID), nil, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}

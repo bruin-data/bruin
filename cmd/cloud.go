@@ -35,6 +35,7 @@ func Cloud(isDebug *bool) *cli.Command {
 			CloudGlossary(),
 			CloudAgents(),
 			CloudConnections(),
+			CloudDashboards(),
 		},
 	}
 }
@@ -2698,6 +2699,123 @@ func cloudConnectionsDelete() *cli.Command {
 			}
 
 			printSuccessForOutput(output, fmt.Sprintf("Successfully deleted connection '%s'", name))
+			return nil
+		},
+	}
+}
+
+func CloudDashboards() *cli.Command {
+	return &cli.Command{
+		Name:  "dashboards",
+		Usage: "Manage Bruin Cloud dashboards",
+		Commands: []*cli.Command{
+			cloudDashboardsList(),
+			cloudDashboardsGet(),
+		},
+	}
+}
+
+func cloudDashboardsList() *cli.Command {
+	return &cli.Command{
+		Name:  "list",
+		Usage: "List dashboards",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			dashboards, err := client.ListDashboards(ctx)
+			if err != nil {
+				printError(err, output, "Failed to list dashboards")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(dashboards, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"ID", "Title", "Visibility", "Updated At"})
+			for _, d := range dashboards {
+				title := ""
+				if d.Title != nil {
+					title = *d.Title
+				}
+				updated := ""
+				if d.UpdatedAt != nil {
+					updated = *d.UpdatedAt
+				}
+				t.AppendRow(table.Row{d.ID, title, d.Visibility, updated})
+			}
+			t.Render()
+			return nil
+		},
+	}
+}
+
+func cloudDashboardsGet() *cli.Command {
+	return &cli.Command{
+		Name:  "get",
+		Usage: "Get a dashboard including its published definition",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "dashboard-id",
+				Usage:    "dashboard ID",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			dashboard, err := client.GetDashboard(ctx, c.Int("dashboard-id"))
+			if err != nil {
+				printError(err, output, "Failed to get dashboard")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(dashboard, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			title := ""
+			if dashboard.Title != nil {
+				title = *dashboard.Title
+			}
+			infoPrinter.Printf("Dashboard %d: %s (visibility: %s)\n", dashboard.ID, title, dashboard.Visibility)
+
+			// Print the definition (state) as pretty JSON so it can be inspected or saved.
+			if len(dashboard.State) > 0 {
+				var obj any
+				if err := json.Unmarshal(dashboard.State, &obj); err == nil {
+					pretty, _ := json.MarshalIndent(obj, "", "  ")
+					fmt.Println(string(pretty))
+				} else {
+					fmt.Println(string(dashboard.State))
+				}
+			}
 			return nil
 		},
 	}
