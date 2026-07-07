@@ -2859,9 +2859,11 @@ func cloudDashboardsCreate() *cli.Command {
 
 			// The definition can come inline (--state) or from a file (--state-file),
 			// but not both — otherwise a stale file could silently override the flag.
+			// Check whether each flag was provided (not its value) so an explicit
+			// empty --state alongside --state-file is still rejected as ambiguous.
 			inline := c.String("state")
 			file := c.String("state-file")
-			if inline != "" && file != "" {
+			if c.IsSet("state") && c.IsSet("state-file") {
 				printError(errors.New("pass only one of --state or --state-file"), output, "Ambiguous state")
 				return cli.Exit("", 1)
 			}
