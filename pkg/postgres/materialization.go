@@ -860,7 +860,7 @@ func dataVaultColumnIsExcluded(col *pipeline.Column, excludedColumns []*pipeline
 
 func pgTimestampWithTimeZone(expr, columnType string) string {
 	lcType := strings.ToLower(columnType)
-	if columnType == "" || strings.Contains(lcType, "time zone") || strings.Contains(lcType, "timestamptz") {
+	if strings.Contains(lcType, "time zone") || strings.Contains(lcType, "timestamptz") {
 		return fmt.Sprintf("CAST(%s AS TIMESTAMPTZ)", expr)
 	}
 	return fmt.Sprintf("CAST(%s AS TIMESTAMP) AT TIME ZONE 'UTC'", expr)
@@ -889,11 +889,10 @@ func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, 
 		validuntil = "'9999-12-31 00:00:00'::TIMESTAMPTZ"
 	}
 
-	validFromRaw := "CURRENT_TIMESTAMP"
+	validFromExpr := "CAST(CURRENT_TIMESTAMP AS TIMESTAMPTZ)"
 	if asset.Materialization.IncrementalKey != "" {
-		validFromRaw = QuoteIdentifier(asset.Materialization.IncrementalKey)
+		validFromExpr = pgTimestampWithTimeZone(QuoteIdentifier(asset.Materialization.IncrementalKey), pgIncrementalKeyType(asset))
 	}
-	validFromExpr := pgTimestampWithTimeZone(validFromRaw, pgIncrementalKeyType(asset))
 
 	stmt := fmt.Sprintf(
 		`BEGIN TRANSACTION;
