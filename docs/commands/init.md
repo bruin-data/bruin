@@ -52,7 +52,7 @@ When you run `bruin init`, it:
 
 ## AI Templates
 
-AI templates are not pipeline templates. They install files into the Git repository root when Bruin can find one, otherwise into the current directory.
+`bruin init` also installs AI starter templates for agent instructions and troubleshooting skills.
 
 ```bash
 # Open the AI template selector
@@ -67,80 +67,7 @@ bruin init ai-skill-self-heal
 
 AI templates do not create a pipeline folder, initialize Git, or create `.bruin.yml` by default. They also do not accept a folder argument or `--in-place`.
 
-### Available AI Templates
-
-| Template | What it installs |
-| --- | --- |
-| `ai-agents-md` | A generic `AGENTS.md` starter with Bruin-oriented agent instructions. |
-| `ai-skill-self-heal` | Starter troubleshooting skills under `.agents/skills/`. |
-
-The self-healing starter is a pack of focused skills:
-
-* `pipeline-diagnose`
-* `schema-drift-check`
-* `duplicate-investigate`
-* `freshness-check`
-* `quality-check-investigate`
-* `maintenance-action`
-
-Each skill includes a placeholder `Actions` section for repository-specific behavior. Until customized, the skills only diagnose and report findings.
-
-### AI Skill Runtime Expectations
-
-The starter skills are primarily meant for AI agents configured inside Bruin Cloud. In that environment, agents should use Bruin Cloud MCP tools when available. If they use the CLI, the relevant Cloud commands include:
-
-```bash
-# Diagnose the latest failed or recent run
-bruin cloud runs diagnose --project-id <project-id> --pipeline <pipeline-name> --latest
-
-# Read run and asset logs
-bruin cloud runs get --project-id <project-id> --run-id <run-id>
-bruin cloud instances logs --project-id <project-id> --run-id <run-id> --asset <asset-name>
-bruin cloud instances failed-logs --project-id <project-id> --run-id <run-id>
-
-# Create or rerun Cloud runs
-bruin cloud runs trigger --project-id <project-id> --pipeline <pipeline-name>
-bruin cloud runs rerun --project-id <project-id> --run-id <run-id> --only-failed
-
-# Enable or disable Cloud pipelines
-bruin cloud pipelines enable --project-id <project-id> --pipeline <pipeline-name>
-bruin cloud pipelines disable --project-id <project-id> --pipeline <pipeline-name>
-```
-
-For local development, the skills should rely on local terminal commands such as `bruin validate`, `bruin render`, `bruin query`, and `bruin run`. Local troubleshooting should read terminal output and the local `logs/` folder, especially `logs/runs`, query logs, and export logs when they exist. Local runs should be created with `bruin run` rather than Bruin Cloud run commands.
-
-For any other agent runtime or orchestrator, customize the installed skills with the correct log source and action mechanism before using them to read logs, trigger runs, enable or disable pipelines, mark statuses, or change external systems.
-
-### AI Template Conflicts
-
-If an AI template target already exists, Bruin asks what to do:
-
-* `add`: append or update the marked Bruin AI section in `AGENTS.md`; for skill files, keep existing files.
-* `overwrite`: replace the existing target file.
-* `skip`: leave the existing target unchanged.
-
-In non-interactive shells, existing targets fail safely and Bruin prints the path that needs a choice.
-
-### Optional AI Connections
-
-Some AI starter skills can use Bruin Cloud or GitHub context. If `bruin init ai-skill-self-heal` does not find matching connections in `.bruin.yml`, Bruin asks whether to add placeholder connections:
-
-```yaml
-default_environment: default
-environments:
-  default:
-    connections:
-      bruin:
-        - name: bruin-cloud
-          api_token: "${BRUIN_CLOUD_API_TOKEN}"
-      github:
-        - name: github
-          access_token: "${GITHUB_TOKEN}"
-          owner: "<github-owner>"
-          repo: "<github-repo>"
-```
-
-Bruin infers `owner` and `repo` from the `origin` remote when possible. Existing connections are never duplicated.
+See [AI Templates](/commands/ai-templates) for the available templates, runtime expectations, optional connection setup, and an end-to-end DuckDB self-healing test workflow.
 
 ## Folder Structure
 

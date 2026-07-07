@@ -15,6 +15,7 @@ Use this skill when data is stale, a scheduled run is missing, or freshness chec
 - These starter skills are primarily meant for AI agents configured inside Bruin Cloud.
 - In Bruin Cloud, use Bruin Cloud MCP tools when available. If using the CLI, list recent runs with `bruin cloud runs list --project-id <project-id> --pipeline <pipeline-name>`, diagnose the latest run with `bruin cloud runs diagnose --project-id <project-id> --pipeline <pipeline-name> --latest`, and inspect failed logs with `bruin cloud instances failed-logs --project-id <project-id> --run-id <run-id>`.
 - In local development, inspect terminal output and the local `logs/` folder, especially `logs/runs`, query logs, and export logs when they exist. Create local runs with `bruin run <path>` and explicit dates when needed.
+- If investigation or fix verification requires running an asset or pipeline, prefer a dev or shadow environment. If none exists, ask whether to run in production or create temporary copies of the affected tables to reproduce and test the issue.
 - For other agent runtimes or orchestrators, customize this skill with the correct scheduler, log source, and run trigger mechanism before using it.
 
 ## Context to Gather
@@ -24,6 +25,14 @@ Use this skill when data is stale, a scheduled run is missing, or freshness chec
 - Compare expected partitions or timestamps with the latest available data.
 - Confirm timezone assumptions for schedules and freshness thresholds.
 - Use Bruin MCP docs tools or `bruin <command> --help` to confirm the current command syntax before running Cloud or local CLI commands.
+
+## Lineage Investigation
+
+- Find one specific stale partition, timestamp, date, tenant, or key first, then keep every upstream query filtered to that instance.
+- If the data has bronze, silver, gold, or other tiers, start at the stale asset and trace upstream through lineage one asset at a time.
+- Query the filtered instance in each upstream asset until you find the first asset or source where the expected data is missing, late, or filtered out.
+- Once the first stale asset is identified, read its SQL query or Python script and isolate the specific schedule dependency, incremental filter, date predicate, timezone conversion, source extraction, or function that likely caused the lag.
+- If the user has allowed fixes, change only that specific logic, then run the smallest asset-level validation in dev or shadow first. Recheck the same stale instance after the fix; only after that passes, run the full freshness check or affected pipeline check.
 
 ## Decision Tree
 
@@ -41,6 +50,12 @@ Define repository-specific actions here. Until customized, this skill must repor
 - Re-run the freshness check or equivalent query.
 - Confirm the latest source and destination timestamps.
 - Verify the expected schedule against the current date and timezone.
+
+## Testing This Skill
+
+- Use the local self-heal fixture from the Bruin `init` command docs.
+- Run the freshness scenario and verify the agent starts with the missing `transaction_date = DATE '2025-01-03'`, traces the date upstream, and identifies the stale filter in `silver_orders`.
+- If fixes are allowed, verify the agent changes only the isolated filter, checks the missing date first, then runs the full freshness check.
 
 ## Output
 

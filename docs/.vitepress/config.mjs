@@ -390,6 +390,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                     {text: "Validate", link: "/commands/validate"},
                     {text: "Unit Test", link: "/commands/unit-test"},
                     {text: "Init", link: "/commands/init"},
+                    {text: "AI Templates", link: "/commands/ai-templates"},
                     {text: "Clean", link: "/commands/clean"},
                     {text: "Connections", link: "/commands/connections"},
                     {text: "Data Diff", link: "/commands/data-diff"},
@@ -481,6 +482,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                 collapsed: false,
                 items: [
                     {text: "Overview", link: "/getting-started/templates"},
+                    {text: "AI Templates", link: "/commands/ai-templates"},
                     {
                         text: "Analytics Demos",
                         collapsed: false,
