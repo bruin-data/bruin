@@ -176,31 +176,6 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "warehouse override prepends USE WAREHOUSE",
-			setup: func(f *fields) {
-				f.e.On("ExtractQueriesFromString", "some content").
-					Return([]*query.Query{
-						{Query: "select * from users"},
-					}, nil)
-
-				f.m.On("Render", mock.Anything, "select * from users").
-					Return("select * from users", nil)
-				f.q.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "USE WAREHOUSE BIG_WH;\nselect * from users"}).
-					Return(nil)
-			},
-			args: args{
-				t: &pipeline.Asset{
-					Type: pipeline.AssetTypeSnowflakeQuery,
-					ExecutableFile: pipeline.ExecutableFile{
-						Path:    "test-file.sql",
-						Content: "some content",
-					},
-					Snowflake: pipeline.SnowflakeConfig{Warehouse: "BIG_WH"},
-				},
-			},
-			wantErr: false,
-		},
-		{
 			name: "query successfully executed with materialization",
 			setup: func(f *fields) {
 				f.e.On("ExtractQueriesFromString", "some content").
@@ -267,39 +242,79 @@ func TestBasicOperator_RunTask(t *testing.T) {
 	}
 }
 
-func TestWithWarehouse(t *testing.T) {
+func TestBasicOperator_RunTask_WarehouseOverride(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name      string
-		warehouse string
-		want      string // "" means the original query is returned unchanged
-	}{
-		{name: "empty warehouse returns original", warehouse: "", want: ""},
-		{name: "whitespace-only warehouse returns original", warehouse: "   ", want: ""},
-		{name: "simple identifier injected as-is", warehouse: "BIG_WH", want: "USE WAREHOUSE BIG_WH;\nselect 1"},
-		{name: "lowercase identifier preserved", warehouse: "compute_wh", want: "USE WAREHOUSE compute_wh;\nselect 1"},
-		{name: "surrounding whitespace trimmed", warehouse: "  BIG_WH  ", want: "USE WAREHOUSE BIG_WH;\nselect 1"},
-		{name: "name with space is quoted", warehouse: "my warehouse", want: "USE WAREHOUSE \"my warehouse\";\nselect 1"},
-		{name: "embedded double quote is escaped", warehouse: `odd"name`, want: "USE WAREHOUSE \"odd\"\"name\";\nselect 1"},
+	newAsset := func() *pipeline.Asset {
+		return &pipeline.Asset{
+			Type: pipeline.AssetTypeSnowflakeQuery,
+			ExecutableFile: pipeline.ExecutableFile{
+				Path:    "test-file.sql",
+				Content: "some content",
+			},
+			Parameters: pipeline.ParameterMap{"warehouse": "BIG_WH"},
+		}
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			base := &query.Query{Query: "select 1"}
-			got := withWarehouse(base, tt.warehouse)
-
-			if tt.want == "" {
-				assert.Same(t, base, got)
-				return
-			}
-
-			assert.NotSame(t, base, got)
-			assert.Equal(t, tt.want, got.Query)
-			assert.Equal(t, "select 1", base.Query, "original query must not be mutated")
-		})
+	setupExtractorAndMaterializer := func(e *mockExtractor, m *mockMaterializer) {
+		e.On("ExtractQueriesFromString", "some content").
+			Return([]*query.Query{{Query: "select * from users"}}, nil)
+		m.On("Render", mock.Anything, "select * from users").
+			Return("select * from users", nil)
+		m.On("IsFullRefresh").Return(false)
 	}
+
+	newExtractors := func() (*mockExtractor, *mockExtractor, *mockMaterializer) {
+		extractor := new(mockExtractor)
+		preExtractor := new(mockExtractor)
+		preExtractor.On("CloneForAsset", mock.Anything, mock.Anything, mock.Anything).Return(extractor, nil)
+		mat := new(mockMaterializer)
+		setupExtractorAndMaterializer(extractor, mat)
+		return preExtractor, extractor, mat
+	}
+
+	t.Run("runs on the overridden warehouse when reachable", func(t *testing.T) {
+		t.Parallel()
+
+		defaultClient := new(mockQuerierWithResult)
+		overrideClient := new(mockQuerierWithResult)
+		overrideClient.On("Ping", mock.Anything).Return(nil)
+		overrideClient.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "select * from users"}).Return(nil)
+
+		preExtractor, _, mat := newExtractors()
+
+		conn := new(mockConnectionFetcher)
+		conn.On("GetConnection", mock.Anything).Return(defaultClient)
+		conn.On("GetSfConnectionWithWarehouse", mock.Anything, "BIG_WH").Return(overrideClient, nil)
+
+		o := BasicOperator{connection: conn, extractor: preExtractor, materializer: mat}
+		require.NoError(t, o.RunTask(t.Context(), &pipeline.Pipeline{}, newAsset()))
+
+		overrideClient.AssertExpectations(t)
+		defaultClient.AssertNotCalled(t, "RunQueryWithoutResult", mock.Anything, mock.Anything)
+	})
+
+	t.Run("falls back to the default warehouse when the override is unreachable", func(t *testing.T) {
+		t.Parallel()
+
+		defaultClient := new(mockQuerierWithResult)
+		defaultClient.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "select * from users"}).Return(nil)
+		overrideClient := new(mockQuerierWithResult)
+		overrideClient.On("Ping", mock.Anything).Return(errors.New("account suspended"))
+
+		preExtractor, _, mat := newExtractors()
+
+		conn := new(mockConnectionFetcher)
+		conn.On("GetConnection", mock.Anything).Return(defaultClient)
+		conn.On("GetSfConnectionWithWarehouse", mock.Anything, "BIG_WH").Return(overrideClient, nil)
+
+		o := BasicOperator{connection: conn, extractor: preExtractor, materializer: mat}
+		require.NoError(t, o.RunTask(t.Context(), &pipeline.Pipeline{}, newAsset()))
+
+		overrideClient.AssertCalled(t, "Ping", mock.Anything)
+		overrideClient.AssertNotCalled(t, "RunQueryWithoutResult", mock.Anything, mock.Anything)
+		defaultClient.AssertExpectations(t)
+	})
 }
 
 func TestQuerySensorTimesOutWhenConfigured(t *testing.T) {

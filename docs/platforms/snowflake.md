@@ -375,7 +375,9 @@ order by start_time desc;
 
 ## Overriding the warehouse per asset
 
-By default, Bruin runs every query on the warehouse configured on the connection. You can override the warehouse for a specific asset with the `snowflake.warehouse` field. When set, Bruin issues a `USE WAREHOUSE <name>` in the same session before running the asset's query, so it applies only to that asset without changing the connection.
+By default, Bruin runs every query on the warehouse configured on the connection. You can override the warehouse for a specific asset with a `warehouse` parameter. When set, Bruin runs that asset on a dedicated Snowflake connection whose warehouse is the overridden one, without changing the connection default used by other assets.
+
+If the overridden warehouse can't be used (for example the role lacks `USAGE` on it, or the account can't resume it), Bruin logs a warning and falls back to the connection's default warehouse so the run isn't broken by the override.
 
 ```bruin-sql
 /* @bruin
@@ -384,7 +386,7 @@ type: sf.sql
 materialization:
     type: table
 
-snowflake:
+parameters:
     warehouse: BIG_WH
 @bruin */
 
@@ -393,19 +395,11 @@ from analytics.events
 where event_name = 'install'
 ```
 
-You can also set a default warehouse for the whole pipeline under `defaults` in `pipeline.yml`; individual assets can still override it:
-
-```yaml
-defaults:
-    snowflake:
-        warehouse: COMPUTE_WH
-```
-
 ### Overriding the warehouse at run time (urgent reruns)
 
-The `snowflake.warehouse` field supports Jinja templating, so you can drive it from a [pipeline variable](../assets/templating/templating.md) and override it at run time.
+The `warehouse` parameter supports Jinja templating, so you can drive it from a [pipeline variable](../assets/templating/templating.md) and override it at run time for one-off urgent reruns on a larger warehouse — without editing the asset.
 
-Reference a variable in the asset (with a sensible default):
+Reference a `warehouse` variable in the asset and declare its default in `pipeline.yml`:
 
 ```bruin-sql
 /* @bruin
@@ -414,23 +408,22 @@ type: sf.sql
 materialization:
     type: table
 
-snowflake:
+parameters:
     warehouse: "{{ var.warehouse }}"
 @bruin */
 
 select user_id, ts, platform, country from analytics.events
 ```
 
-Declare the variable's default in `pipeline.yml`:
-
 ```yaml
+# pipeline.yml
 variables:
     warehouse:
         type: string
         default: COMPUTE_WH
 ```
 
-Then override it for a single run with `--var`:
+Normal runs use the default (`COMPUTE_WH`). For an urgent rerun, override it for that single run with `--var`:
 
 ```bash
 bruin run --var '{"warehouse":"BIG_WH"}' ./my-pipeline

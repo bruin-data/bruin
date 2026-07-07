@@ -2,9 +2,8 @@ package snowflake
 
 import (
 	"context"
+	"fmt"
 	"io"
-	"regexp"
-	"strings"
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
@@ -20,23 +19,8 @@ import (
 	"github.com/snowflakedb/gosnowflake"
 )
 
-// Snowflake identifiers are case-insensitive unless they are double-quoted.
-// This regex matches simple identifiers that do not require quoting.
-var safeSnowflakeIdentifier = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_$]*$`)
-
-func withWarehouse(q *query.Query, warehouse string) *query.Query {
-	warehouse = strings.TrimSpace(warehouse)
-	if warehouse == "" {
-		return q
-	}
-
-	if !safeSnowflakeIdentifier.MatchString(warehouse) {
-		warehouse = `"` + strings.ReplaceAll(warehouse, `"`, `""`) + `"`
-	}
-
-	cloned := *q
-	cloned.Query = "USE WAREHOUSE " + warehouse + ";\n" + q.Query
-	return &cloned
+type warehouseConnectionGetter interface {
+	GetSfConnectionWithWarehouse(name, warehouse string) (SfClient, error)
 }
 
 type materializer interface {
@@ -142,6 +126,10 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return errors.Errorf("connection '%s' is not a snowflake connection", connName)
 	}
 
+	if warehouse, ok := t.Parameters.GetString("warehouse"); ok && warehouse != "" {
+		conn = o.connectionForWarehouse(ctx, ctx.Value(executor.KeyPrinter), conn, connName, warehouse)
+	}
+
 	if t.Materialization.Type != pipeline.MaterializationTypeNone {
 		err = conn.CreateSchemaIfNotExist(ctx, t)
 		if err != nil {
@@ -176,9 +164,8 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	}
 
 	if o.devEnv == nil {
-		runQuery := withWarehouse(q, t.Snowflake.Warehouse)
-		ansisql.LogQueryIfVerbose(ctx, writer, runQuery.Query)
-		return conn.RunQueryWithoutResult(ctx, runQuery)
+		ansisql.LogQueryIfVerbose(ctx, writer, q.Query)
+		return conn.RunQueryWithoutResult(ctx, q)
 	}
 
 	q, err = o.devEnv.Modify(ctx, p, t, q)
@@ -186,10 +173,9 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	runQuery := withWarehouse(q, t.Snowflake.Warehouse)
-	ansisql.LogQueryIfVerbose(ctx, writer, runQuery.Query)
+	ansisql.LogQueryIfVerbose(ctx, writer, q.Query)
 
-	err = conn.RunQueryWithoutResult(ctx, runQuery)
+	err = conn.RunQueryWithoutResult(ctx, q)
 	if err != nil {
 		return err
 	}
@@ -200,6 +186,38 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	}
 
 	return nil
+}
+
+// connectionForWarehouse returns a Snowflake client bound to the overridden
+// warehouse. If the connection getter can't provide one, or the overridden
+// client can't run a query (e.g. the warehouse is inaccessible or the account
+// can't resume it), it logs a warning and falls back to the default client.
+func (o BasicOperator) connectionForWarehouse(ctx context.Context, writer interface{}, fallback SfClient, connName, warehouse string) SfClient {
+	getter, ok := o.connection.(warehouseConnectionGetter)
+	if !ok {
+		return fallback
+	}
+
+	overridden, err := getter.GetSfConnectionWithWarehouse(connName, warehouse)
+	if err != nil {
+		logWarehouseFallback(writer, warehouse, err)
+		return fallback
+	}
+
+	if err := overridden.Ping(ctx); err != nil {
+		logWarehouseFallback(writer, warehouse, err)
+		return fallback
+	}
+
+	return overridden
+}
+
+func logWarehouseFallback(writer interface{}, warehouse string, err error) {
+	w, ok := writer.(io.Writer)
+	if !ok || w == nil {
+		return
+	}
+	_, _ = fmt.Fprintf(w, "warning: could not use warehouse override '%s', falling back to the connection's default warehouse: %v\n", warehouse, err)
 }
 
 func NewColumnCheckOperator(manager config.ConnectionGetter) *ansisql.ColumnCheckOperator {
