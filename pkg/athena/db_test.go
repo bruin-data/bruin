@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
@@ -262,6 +263,197 @@ func TestDB_SelectWithSchema(t *testing.T) {
 			require.NoError(t, mock.ExpectationsWereMet())
 		})
 	}
+}
+
+func TestDB_GetTableSummarySchemaOnly(t *testing.T) {
+	t.Parallel()
+
+	mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+	require.NoError(t, err)
+	defer mockDB.Close()
+
+	sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
+	mock.ExpectQuery(buildAthenaSchemaQuery("analytics", "orders")).
+		WillReturnRows(
+			sqlmock.NewRows([]string{"column_name", "data_type", "is_nullable"}).
+				AddRow("id", "bigint", "NO").
+				AddRow("status", "varchar", "YES").
+				AddRow("metadata", "json", "YES"),
+		)
+
+	db := DB{
+		conn:       sqlxDB,
+		config:     &Config{Database: "analytics"},
+		typeMapper: diff.NewAthenaTypeMapper(),
+	}
+
+	got, err := db.GetTableSummary(t.Context(), "orders", true)
+	require.NoError(t, err)
+
+	require.Equal(t, int64(0), got.RowCount)
+	require.Equal(t, "orders", got.Table.Name)
+	require.Len(t, got.Table.Columns, 3)
+
+	assert.Equal(t, "id", got.Table.Columns[0].Name)
+	assert.Equal(t, "bigint", got.Table.Columns[0].Type)
+	assert.Equal(t, diff.CommonTypeNumeric, got.Table.Columns[0].NormalizedType)
+	assert.False(t, got.Table.Columns[0].Nullable)
+	assert.Nil(t, got.Table.Columns[0].Stats)
+
+	assert.Equal(t, "status", got.Table.Columns[1].Name)
+	assert.Equal(t, diff.CommonTypeString, got.Table.Columns[1].NormalizedType)
+	assert.True(t, got.Table.Columns[1].Nullable)
+	assert.Nil(t, got.Table.Columns[1].Stats)
+
+	assert.Equal(t, "metadata", got.Table.Columns[2].Name)
+	assert.Equal(t, diff.CommonTypeJSON, got.Table.Columns[2].NormalizedType)
+	assert.Nil(t, got.Table.Columns[2].Stats)
+
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestDB_GetTableSummaryFull(t *testing.T) {
+	t.Parallel()
+
+	mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+	require.NoError(t, err)
+	defer mockDB.Close()
+
+	sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
+	mock.ExpectQuery(`SELECT COUNT(*) as row_count FROM "analytics"."orders"`).
+		WillReturnRows(sqlmock.NewRows([]string{"row_count"}).AddRow(4))
+	mock.ExpectQuery(buildAthenaSchemaQuery("analytics", "orders")).
+		WillReturnRows(
+			sqlmock.NewRows([]string{"column_name", "data_type", "is_nullable"}).
+				AddRow("amount", "decimal(10,2)", "YES").
+				AddRow("customer_name", "varchar", "YES").
+				AddRow("paid", "boolean", "YES").
+				AddRow("created_at", "timestamp", "NO").
+				AddRow("payload", "json", "YES").
+				AddRow("raw_bytes", "varbinary", "YES"),
+		)
+	mock.ExpectQuery(`
+SELECT
+    MIN(TRY_CAST("amount" AS DOUBLE)) as min_val,
+    MAX(TRY_CAST("amount" AS DOUBLE)) as max_val,
+    AVG(TRY_CAST("amount" AS DOUBLE)) as avg_val,
+    SUM(TRY_CAST("amount" AS DOUBLE)) as sum_val,
+    COUNT("amount") as count_val,
+    COUNT(*) - COUNT("amount") as null_count,
+    STDDEV(TRY_CAST("amount" AS DOUBLE)) as stddev_val
+FROM "analytics"."orders"
+`).WillReturnRows(sqlmock.NewRows([]string{"min_val", "max_val", "avg_val", "sum_val", "count_val", "null_count", "stddev_val"}).
+		AddRow(1.5, 9.5, 5.5, 22.0, 4, 1, 3.1))
+	mock.ExpectQuery(`
+SELECT
+    MIN(LENGTH(CAST("customer_name" AS VARCHAR))) as min_len,
+    MAX(LENGTH(CAST("customer_name" AS VARCHAR))) as max_len,
+    AVG(LENGTH(CAST("customer_name" AS VARCHAR))) as avg_len,
+    COUNT(DISTINCT "customer_name") as distinct_count,
+    COUNT(*) as total_count,
+    COUNT(*) - COUNT("customer_name") as null_count,
+    SUM(CASE WHEN CAST("customer_name" AS VARCHAR) = '' THEN 1 ELSE 0 END) as empty_count
+FROM "analytics"."orders"
+`).WillReturnRows(sqlmock.NewRows([]string{"min_len", "max_len", "avg_len", "distinct_count", "total_count", "null_count", "empty_count"}).
+		AddRow(3, 12, 7.5, 3, 4, 1, 1))
+	mock.ExpectQuery(`
+SELECT
+    SUM(CASE WHEN "paid" = true THEN 1 ELSE 0 END) as true_count,
+    SUM(CASE WHEN "paid" = false THEN 1 ELSE 0 END) as false_count,
+    COUNT(*) as total_count,
+    COUNT(*) - COUNT("paid") as null_count
+FROM "analytics"."orders"
+`).WillReturnRows(sqlmock.NewRows([]string{"true_count", "false_count", "total_count", "null_count"}).
+		AddRow(2, 1, 4, 1))
+	mock.ExpectQuery(`
+SELECT
+    CAST(MIN("created_at") AS VARCHAR) as min_date,
+    CAST(MAX("created_at") AS VARCHAR) as max_date,
+    COUNT(DISTINCT "created_at") as unique_count,
+    COUNT(*) as count_val,
+    COUNT(*) - COUNT("created_at") as null_count
+FROM "analytics"."orders"
+`).WillReturnRows(sqlmock.NewRows([]string{"min_date", "max_date", "unique_count", "count_val", "null_count"}).
+		AddRow("2024-01-01 00:00:00", "2024-01-03 12:00:00", 3, 4, 1))
+	mock.ExpectQuery(`
+SELECT
+    COUNT(*) as count_val,
+    COUNT(*) - COUNT("payload") as null_count
+FROM "analytics"."orders"
+`).WillReturnRows(sqlmock.NewRows([]string{"count_val", "null_count"}).AddRow(4, 1))
+
+	db := DB{
+		conn:       sqlxDB,
+		config:     &Config{Database: "unused"},
+		typeMapper: diff.NewAthenaTypeMapper(),
+	}
+
+	got, err := db.GetTableSummary(t.Context(), "analytics.orders", false)
+	require.NoError(t, err)
+
+	require.Equal(t, int64(4), got.RowCount)
+	require.Equal(t, "analytics.orders", got.Table.Name)
+	require.Len(t, got.Table.Columns, 6)
+
+	amountStats, ok := got.Table.Columns[0].Stats.(*diff.NumericalStatistics)
+	require.True(t, ok)
+	require.NotNil(t, amountStats.Min)
+	require.NotNil(t, amountStats.Max)
+	require.NotNil(t, amountStats.Avg)
+	require.NotNil(t, amountStats.Sum)
+	require.NotNil(t, amountStats.StdDev)
+	assert.InDelta(t, 1.5, *amountStats.Min, 0.0001)
+	assert.InDelta(t, 9.5, *amountStats.Max, 0.0001)
+	assert.InDelta(t, 5.5, *amountStats.Avg, 0.0001)
+	assert.InDelta(t, 22.0, *amountStats.Sum, 0.0001)
+	assert.Equal(t, int64(4), amountStats.Count)
+	assert.Equal(t, int64(1), amountStats.NullCount)
+	assert.InDelta(t, 3.1, *amountStats.StdDev, 0.0001)
+
+	stringStats, ok := got.Table.Columns[1].Stats.(*diff.StringStatistics)
+	require.True(t, ok)
+	assert.Equal(t, 3, stringStats.MinLength)
+	assert.Equal(t, 12, stringStats.MaxLength)
+	assert.InDelta(t, 7.5, stringStats.AvgLength, 0.0001)
+	assert.Equal(t, int64(3), stringStats.DistinctCount)
+	assert.Equal(t, int64(4), stringStats.Count)
+	assert.Equal(t, int64(1), stringStats.NullCount)
+	assert.Equal(t, int64(1), stringStats.EmptyCount)
+
+	booleanStats, ok := got.Table.Columns[2].Stats.(*diff.BooleanStatistics)
+	require.True(t, ok)
+	assert.Equal(t, int64(2), booleanStats.TrueCount)
+	assert.Equal(t, int64(1), booleanStats.FalseCount)
+	assert.Equal(t, int64(4), booleanStats.Count)
+	assert.Equal(t, int64(1), booleanStats.NullCount)
+
+	dateTimeStats, ok := got.Table.Columns[3].Stats.(*diff.DateTimeStatistics)
+	require.True(t, ok)
+	require.NotNil(t, dateTimeStats.EarliestDate)
+	require.NotNil(t, dateTimeStats.LatestDate)
+	assert.Equal(t, int64(3), dateTimeStats.UniqueCount)
+	assert.Equal(t, int64(4), dateTimeStats.Count)
+	assert.Equal(t, int64(1), dateTimeStats.NullCount)
+
+	jsonStats, ok := got.Table.Columns[4].Stats.(*diff.JSONStatistics)
+	require.True(t, ok)
+	assert.Equal(t, int64(4), jsonStats.Count)
+	assert.Equal(t, int64(1), jsonStats.NullCount)
+
+	_, ok = got.Table.Columns[5].Stats.(*diff.UnknownStatistics)
+	require.True(t, ok)
+
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestDB_GetTableSummaryInvalidTableName(t *testing.T) {
+	t.Parallel()
+
+	db := DB{config: &Config{Database: "analytics"}}
+
+	_, err := db.GetTableSummary(t.Context(), "a.b.c", true)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "table name must be in table or schema.table format")
 }
 
 func TestDB_BuildTableExistsQuery(t *testing.T) {
