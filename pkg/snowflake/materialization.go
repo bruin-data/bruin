@@ -330,7 +330,7 @@ COMMIT;`,
 			incrementalKey,
 		)
 
-		return strings.TrimSpace(queryStr), nil
+		return "ALTER SESSION SET TIMEZONE = 'UTC';\n" + strings.TrimSpace(queryStr), nil
 	}
 
 	insertValues = append(insertValues, "$current_scd2_ts", "TO_TIMESTAMP_TZ('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS')", "TRUE")
@@ -391,7 +391,7 @@ COMMIT;`,
 		strings.Join(buildPKConditions(primaryKeys, "target", "source"), " AND "),
 	)
 
-	return strings.TrimSpace(queryStr), nil
+	return "ALTER SESSION SET TIMEZONE = 'UTC';\n" + strings.TrimSpace(queryStr), nil
 }
 
 func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, error) {
@@ -431,7 +431,7 @@ FROM (
 		strings.TrimSpace(query),
 	)
 
-	return strings.TrimSpace(stmt), nil
+	return "ALTER SESSION SET TIMEZONE = 'UTC';\n" + strings.TrimSpace(stmt), nil
 }
 
 func buildSCD2ByTimeQuery(asset *pipeline.Asset, query string) (string, error) {
@@ -547,7 +547,7 @@ COMMIT;`,
 		strings.Join(insertValues, ", "),
 	)
 
-	return strings.TrimSpace(queryStr), nil
+	return "ALTER SESSION SET TIMEZONE = 'UTC';\n" + strings.TrimSpace(queryStr), nil
 }
 
 func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query string) (string, error) {
@@ -586,5 +586,5 @@ FROM (
 		strings.TrimSpace(query),
 	)
 
-	return strings.TrimSpace(stmt), nil
+	return "ALTER SESSION SET TIMEZONE = 'UTC';\n" + strings.TrimSpace(stmt), nil
 }

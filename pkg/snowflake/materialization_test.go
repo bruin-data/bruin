@@ -527,7 +527,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				},
 			},
 			query: "SELECT id, col1, col2, col3, col4 from source_table",
-			want: "BEGIN TRANSACTION;\n\n" +
+			want: "ALTER SESSION SET TIMEZONE = 'UTC';\nBEGIN TRANSACTION;\n\n" +
 				"-- Capture timestamp once for consistency across all operations\n" +
 				"SET current_scd2_ts = CURRENT_TIMESTAMP();\n\n" +
 				"-- Step 1: Update expired records that are no longer in source\n" +
@@ -576,7 +576,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				},
 			},
 			query: "SELECT id, category, name, price from source_table",
-			want: "BEGIN TRANSACTION;\n\n" +
+			want: "ALTER SESSION SET TIMEZONE = 'UTC';\nBEGIN TRANSACTION;\n\n" +
 				"-- Capture timestamp once for consistency across all operations\n" +
 				"SET current_scd2_ts = CURRENT_TIMESTAMP();\n\n" +
 				"-- Step 1: Update expired records that are no longer in source\n" +
@@ -625,7 +625,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 			},
 			fullRefresh: true,
 			query:       "SELECT id, name, price from source_table",
-			want: "CREATE OR REPLACE TABLE my.asset CLUSTER BY (_is_current, id) AS\n" +
+			want: "ALTER SESSION SET TIMEZONE = 'UTC';\nCREATE OR REPLACE TABLE my.asset CLUSTER BY (_is_current, id) AS\n" +
 				"SELECT\n" +
 				"  CAST(CURRENT_TIMESTAMP() AS TIMESTAMP_TZ) AS _valid_from,\n" +
 				"  src.*,\n" +
@@ -652,7 +652,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 			},
 			fullRefresh: true,
 			query:       "SELECT id, name, price from source_table",
-			want: "CREATE OR REPLACE TABLE my.asset CLUSTER BY (category, id) AS\n" +
+			want: "ALTER SESSION SET TIMEZONE = 'UTC';\nCREATE OR REPLACE TABLE my.asset CLUSTER BY (category, id) AS\n" +
 				"SELECT\n" +
 				"  CAST(CURRENT_TIMESTAMP() AS TIMESTAMP_TZ) AS _valid_from,\n" +
 				"  src.*,\n" +
@@ -679,7 +679,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				},
 			},
 			query: "SELECT id, col1, col2, updated_at from source_table",
-			want: "BEGIN TRANSACTION;\n\n" +
+			want: "ALTER SESSION SET TIMEZONE = 'UTC';\nBEGIN TRANSACTION;\n\n" +
 				"-- Step 1: Update expired records that are no longer in source\n" +
 				"UPDATE my.asset AS target\n" +
 				"SET _valid_until = CURRENT_TIMESTAMP(), _is_current = FALSE\n" +
@@ -728,7 +728,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 			},
 			fullRefresh: true,
 			query:       "SELECT id, name, price, updated_at from source_table",
-			want: "CREATE OR REPLACE TABLE my.asset CLUSTER BY (_is_current, id) AS\n" +
+			want: "ALTER SESSION SET TIMEZONE = 'UTC';\nCREATE OR REPLACE TABLE my.asset CLUSTER BY (_is_current, id) AS\n" +
 				"SELECT\n" +
 				"  CAST(updated_at AS TIMESTAMP_TZ) AS _valid_from,\n" +
 				"  src.*,\n" +
@@ -893,7 +893,7 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 				},
 			},
 			query: "SELECT id, event_name, ts from source_table",
-			want: "BEGIN TRANSACTION;\n\n" +
+			want: "ALTER SESSION SET TIMEZONE = 'UTC';\nBEGIN TRANSACTION;\n\n" +
 				"-- Capture timestamp once for consistency across all operations\n" +
 				"SET current_scd2_ts = CURRENT_TIMESTAMP();\n\n" +
 				"-- Step 1: Update expired records that are no longer in source\n" +
@@ -948,7 +948,7 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 				},
 			},
 			query: "SELECT id, event_type, col1, col2, ts from source_table",
-			want: "BEGIN TRANSACTION;\n\n" +
+			want: "ALTER SESSION SET TIMEZONE = 'UTC';\nBEGIN TRANSACTION;\n\n" +
 				"-- Capture timestamp once for consistency across all operations\n" +
 				"SET current_scd2_ts = CURRENT_TIMESTAMP();\n\n" +
 				"-- Step 1: Update expired records that are no longer in source\n" +
@@ -1002,7 +1002,7 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 			},
 			fullRefresh: true,
 			query:       "SELECT id, event_name, ts from source_table",
-			want: "CREATE OR REPLACE TABLE my.asset CLUSTER BY (_is_current, id) AS\n" +
+			want: "ALTER SESSION SET TIMEZONE = 'UTC';\nCREATE OR REPLACE TABLE my.asset CLUSTER BY (_is_current, id) AS\n" +
 				"SELECT\n" +
 				"  CAST(ts AS TIMESTAMP_TZ) AS _valid_from,\n" +
 				"  src.*,\n" +
@@ -1030,7 +1030,7 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 			},
 			fullRefresh: true,
 			query:       "SELECT id, event_name, ts from source_table",
-			want: "CREATE OR REPLACE TABLE my.asset CLUSTER BY (event_type, id) AS\n" +
+			want: "ALTER SESSION SET TIMEZONE = 'UTC';\nCREATE OR REPLACE TABLE my.asset CLUSTER BY (event_type, id) AS\n" +
 				"SELECT\n" +
 				"  CAST(ts AS TIMESTAMP_TZ) AS _valid_from,\n" +
 				"  src.*,\n" +
