@@ -793,10 +793,11 @@ func TestCreateDashboard(t *testing.T) {
 
 		w.WriteHeader(http.StatusCreated)
 		title := "New Dash"
-		writeJSON(t, w, Dashboard{ID: 9, Title: &title, Visibility: "private"})
+		writeJSON(t, w, Dashboard{ID: 9, Title: &title, Visibility: "private", URL: "https://cloud.getbruin.com/acme/dashboards/9?mode=edit"})
 	})
 
 	dashboard, err := client.CreateDashboard(t.Context(), "New Dash", "private", map[string]any{"widgets": []any{}})
 	require.NoError(t, err)
 	assert.Equal(t, 9, dashboard.ID)
+	assert.Equal(t, "https://cloud.getbruin.com/acme/dashboards/9?mode=edit", dashboard.URL)
 }
