@@ -2829,6 +2829,7 @@ func CloudDashboards() *cli.Command {
 		Commands: []*cli.Command{
 			cloudDashboardsList(),
 			cloudDashboardsGet(),
+			cloudDashboardsCreate(),
 		},
 	}
 }
@@ -2934,6 +2935,105 @@ func cloudDashboardsGet() *cli.Command {
 					fmt.Println(string(dashboard.State))
 				}
 			}
+			return nil
+		},
+	}
+}
+
+func cloudDashboardsCreate() *cli.Command {
+	return &cli.Command{
+		Name:  "create",
+		Usage: "Create a dashboard from a definition (written to draft; publish stays in the UI)",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.StringFlag{
+				Name:     "title",
+				Usage:    "the dashboard title",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:  "visibility",
+				Usage: "team or private (default: team)",
+			},
+			&cli.StringFlag{
+				Name:  "state",
+				Usage: "the dashboard definition as a JSON string",
+			},
+			&cli.StringFlag{
+				Name:  "state-file",
+				Usage: "path to a file containing the dashboard definition as JSON",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			visibility := c.String("visibility")
+			if visibility != "" && visibility != "team" && visibility != "private" {
+				printError(fmt.Errorf("visibility must be 'team' or 'private', got %q", visibility), output, "Invalid --visibility")
+				return cli.Exit("", 1)
+			}
+
+			// The definition can come inline (--state) or from a file (--state-file),
+			// but not both — otherwise a stale file could silently override the flag.
+			// Check whether each flag was provided (not its value) so an explicit
+			// empty --state alongside --state-file is still rejected as ambiguous.
+			inline := c.String("state")
+			file := c.String("state-file")
+			if c.IsSet("state") && c.IsSet("state-file") {
+				printError(errors.New("pass only one of --state or --state-file"), output, "Ambiguous state")
+				return cli.Exit("", 1)
+			}
+			raw := inline
+			if file != "" {
+				data, err := os.ReadFile(file)
+				if err != nil {
+					printError(fmt.Errorf("failed to read --state-file: %w", err), output, "Invalid state file")
+					return cli.Exit("", 1)
+				}
+				raw = string(data)
+			}
+
+			// Validate whenever a state flag was provided (even if empty), so an
+			// explicit --state '' or empty --state-file is rejected rather than
+			// silently creating an empty draft. Omitting both is title-only, which is fine.
+			var state map[string]any
+			if c.IsSet("state") || c.IsSet("state-file") {
+				if err := json.Unmarshal([]byte(raw), &state); err != nil {
+					printError(fmt.Errorf("invalid dashboard definition JSON: %w", err), output, "Invalid state")
+					return cli.Exit("", 1)
+				}
+				// A JSON object is required; null/scalars/arrays are not a definition.
+				if state == nil {
+					printError(errors.New("dashboard definition must be a JSON object"), output, "Invalid state")
+					return cli.Exit("", 1)
+				}
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			dashboard, err := client.CreateDashboard(ctx, c.String("title"), visibility, state)
+			if err != nil {
+				printError(err, output, "Failed to create dashboard")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(dashboard, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			title := ""
+			if dashboard.Title != nil {
+				title = *dashboard.Title
+			}
+			infoPrinter.Printf("Created dashboard %d (%s) as a draft — publish it from the Bruin Cloud UI.\n", dashboard.ID, title)
 			return nil
 		},
 	}
