@@ -2995,8 +2995,11 @@ func cloudDashboardsCreate() *cli.Command {
 				raw = string(data)
 			}
 
+			// Validate whenever a state flag was provided (even if empty), so an
+			// explicit --state '' or empty --state-file is rejected rather than
+			// silently creating an empty draft. Omitting both is title-only, which is fine.
 			var state map[string]any
-			if raw != "" {
+			if c.IsSet("state") || c.IsSet("state-file") {
 				if err := json.Unmarshal([]byte(raw), &state); err != nil {
 					printError(fmt.Errorf("invalid dashboard definition JSON: %w", err), output, "Invalid state")
 					return cli.Exit("", 1)
