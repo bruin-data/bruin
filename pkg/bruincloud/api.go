@@ -440,6 +440,28 @@ func (c *APIClient) CreateAgent(ctx context.Context, name, description, systemPr
 	return &result, nil
 }
 
+// GetAgent returns a single agent's details.
+func (c *APIClient) GetAgent(ctx context.Context, agentID int) (*Agent, error) {
+	var result Agent
+	err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/agents/%d", agentID), nil, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// UpdateAgent patches an agent with the given fields. The caller decides which
+// fields to include (based on which flags were set), so an explicit empty value
+// is sent and can clear a field.
+func (c *APIClient) UpdateAgent(ctx context.Context, agentID int, fields map[string]any) (*Agent, error) {
+	var result Agent
+	err := c.doRequest(ctx, http.MethodPatch, fmt.Sprintf("/agents/%d", agentID), fields, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 func (c *APIClient) SendAgentMessage(ctx context.Context, agentID int, message string, threadID *int) (json.RawMessage, error) {
 	body := map[string]any{
 		"message": message,
