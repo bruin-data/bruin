@@ -331,13 +331,16 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 	mockDuck.On("GetIngestrURI").Return("duckdb:////some/path", nil)
 	mockCh := new(mockConnection)
 	mockCh.On("GetIngestrURI").Return("clickhouse://user:pass@localhost:9000", nil)
+	mockOneLake := new(mockConnection)
+	mockOneLake.On("GetIngestrURI").Return("onelake://workspace/lakehouse", nil)
 
 	fetcher := simpleConnectionFetcher{
 		connections: map[string]*mockConnection{
-			"bq":   mockBq,
-			"sf":   mockSf,
-			"duck": mockDuck,
-			"ch":   mockCh,
+			"bq":      mockBq,
+			"sf":      mockSf,
+			"duck":    mockDuck,
+			"ch":      mockCh,
+			"onelake": mockOneLake,
 		},
 	}
 
@@ -384,6 +387,20 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 				},
 			},
 			want: []string{"ingest", "--source-uri", "snowflake://uri-here", "--source-table", "source-table", "--dest-uri", "bigquery://uri-here", "--dest-table", "asset-name", "--yes", "--progress", "log"},
+		},
+		{
+			name: "destination_table overrides asset name",
+			asset: &pipeline.Asset{
+				Name:       "fabric_events",
+				Connection: "onelake",
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "sf",
+					"source_table":      "source-table",
+					"destination":       "onelake",
+					"destination_table": "Tables/sales/events",
+				},
+			},
+			want: []string{"ingest", "--source-uri", "snowflake://uri-here", "--source-table", "source-table", "--dest-uri", "onelake://workspace/lakehouse", "--dest-table", "Tables/sales/events", "--yes", "--progress", "log"},
 		},
 		{
 			name: "trim whitespace",

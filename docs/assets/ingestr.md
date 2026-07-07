@@ -50,6 +50,7 @@ parameters:
   destination: bigquery | snowflake | redshift | synapse
   
   # optional
+  destination_table: string # defaults to the asset name
   version: v0 | v1 | v1.x.y
   incremental_strategy: replace | append | merge | delete+insert # legacy alternative to materialization.strategy
   incremental_key: string # legacy alternative to materialization.incremental_key
@@ -83,6 +84,7 @@ parameters:
 | `source` | No | _n/a_ | Overrides the inferred source type. For example, set `gsheets` when reusing a BigQuery connection for Google Sheets. |
 | `source_table` | Yes | `--source-table` | Table, sheet, or resource identifier to pull from the source. |
 | `file_type` | No | `--source-table` suffix | Appended to the `source_table` as `table#type` for connectors that need a file format hint (`csv`, `jsonl`, `parquet`). |
+| `destination_table` | No | `--dest-table` | Destination table, index, collection, or path passed to Ingestr. Defaults to the asset name. Use this when the target cannot be represented as a Bruin asset name, such as OneLake `Tables/<schema>/<table>` paths. |
 | `version` | No | _n/a_  | Selects the version of ingestr to install and use.. Valid options are `v1` (latest), `v0` (legacy) or `v1.x.y` (full version specifer) | 
 | `materialization` | No | `--incremental-*`, `--partition-by`, `--cluster-by` | Preferred way to define destination write behavior. Supports `type: table` with `create+replace`, `append`, `merge`, `delete+insert`, and `truncate+insert`. |
 | `destination` | Yes | `--dest-uri` | Logical destination used to select the target connection; Bruin converts it into the URI supplied to Ingestr. |

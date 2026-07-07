@@ -343,7 +343,7 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		destURI = applyClickHouseEngineParams(destURI, asset.Parameters)
 	}
 
-	destTable := asset.Name
+	destTable := resolveDestinationTableName(asset)
 
 	extraPackages = python.AddExtraPackages(destURI, sourceURI, extraPackages)
 
@@ -480,6 +480,16 @@ func applyClickHouseEngineParams(destURI string, params pipeline.ParameterMap) s
 
 	parsedURI.RawQuery = q.Encode()
 	return parsedURI.String()
+}
+
+func resolveDestinationTableName(asset *pipeline.Asset) string {
+	if destTable, exists := asset.Parameters.GetString("destination_table"); exists {
+		if destTable = strings.TrimSpace(destTable); destTable != "" {
+			return destTable
+		}
+	}
+
+	return asset.Name
 }
 
 func applyMaterializationParameters(asset *pipeline.Asset) error {
