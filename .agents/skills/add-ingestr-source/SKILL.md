@@ -20,7 +20,7 @@ Add or update these files for a new source named `<source>`:
 
 - `pkg/<source>/config.go`: the `Config` struct and `GetIngestrURI()`.
 - `pkg/<source>/db.go` (or `client.go`, matching the package you copy from): the `Client` and `NewClient`.
-- `pkg/config/connections.go`: add `<Source>Connection` with YAML/JSON/mapstructure tags and `GetName()`. Tag every credential/secret field — anything that must not be printed in logs (API keys, tokens, passwords, client secrets, access keys, etc.) — with `sensitive:"true"` so it is redacted.
+- `pkg/config/connections.go`: add `<Source>Connection` with YAML/JSON/mapstructure tags and `GetName()`. Tag every credential/secret field — anything that must not be printed in logs (API keys, tokens, passwords, client secrets, access keys, etc.) — with `sensitive:"true"` so it is redacted. For fields that hold a **path to a credential file** (e.g. a service-account JSON or private-key file), use `sensitive_file:"true"` instead — `sensitive:"true"` would mask only the path, while `sensitive_file:"true"` redacts the file's contents.
 - `pkg/config/manager.go`: add the connection slice to `Connections`, then update `AddConnection`, `DeleteConnection`, and `MergeFrom`.
 - `pkg/connection/connection.go`: import the package, add a `Manager` map, add `Add<Source>ConnectionFromConfig`, store it in `availableConnections` and `AllConnectionDetails`, and process it in `NewManagerFromConfigWithContext`.
 - `pkg/pipeline/pipeline.go`: add a `defaultMapping` entry `"<source>": "<source>-default"`.
