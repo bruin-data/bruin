@@ -809,6 +809,13 @@ func TestLoadFromFile(t *testing.T) {
 					APIKey:             "test-api-key",
 				},
 			},
+			Trello: []TrelloConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "trello-1"},
+					APIKey:             "test-api-key",
+					Token:              "test-token",
+				},
+			},
 			Jira: []JiraConnection{
 				{
 					ConnectionMetadata: ConnectionMetadata{Name: "jira-1"},
@@ -1442,6 +1449,17 @@ func TestConfig_AddConnection(t *testing.T) {
 			expectedErr: false,
 		},
 		{
+			name:     "Add Trello connection",
+			envName:  "default",
+			connType: "trello",
+			connName: "trello-conn",
+			creds: map[string]interface{}{
+				"api_key": "test-api-key",
+				"token":   "test-token",
+			},
+			expectedErr: false,
+		},
+		{
 			name:     "Add Fabric connection",
 			envName:  "default",
 			connType: "fabric",
@@ -1550,6 +1568,11 @@ func TestConfig_AddConnection(t *testing.T) {
 					assert.Len(t, env.Connections.Fireflies, 1)
 					assert.Equal(t, tt.connName, env.Connections.Fireflies[0].Name)
 					assert.Equal(t, tt.creds["api_key"], env.Connections.Fireflies[0].APIKey)
+				case "trello":
+					assert.Len(t, env.Connections.Trello, 1)
+					assert.Equal(t, tt.connName, env.Connections.Trello[0].Name)
+					assert.Equal(t, tt.creds["api_key"], env.Connections.Trello[0].APIKey)
+					assert.Equal(t, tt.creds["token"], env.Connections.Trello[0].Token)
 				case "fabric":
 					assert.Len(t, env.Connections.Fabric, 1)
 					assert.Equal(t, tt.connName, env.Connections.Fabric[0].Name)
@@ -2503,6 +2526,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Freshdesk:           []FreshdeskConnection{{ConnectionMetadata: ConnectionMetadata{Name: "freshdesk1"}}},
 				FundraiseUp:         []FundraiseUpConnection{{ConnectionMetadata: ConnectionMetadata{Name: "fundraiseup1"}}},
 				Fireflies:           []FirefliesConnection{{ConnectionMetadata: ConnectionMetadata{Name: "fireflies1"}}},
+				Trello:              []TrelloConnection{{ConnectionMetadata: ConnectionMetadata{Name: "trello1"}}},
 				Jira:                []JiraConnection{{ConnectionMetadata: ConnectionMetadata{Name: "jira1"}}},
 				Monday:              []MondayConnection{{ConnectionMetadata: ConnectionMetadata{Name: "monday1"}}},
 				PlusVibeAI:          []PlusVibeAIConnection{{ConnectionMetadata: ConnectionMetadata{Name: "plusvibeai1"}}},
@@ -2636,6 +2660,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Freshdesk:           []FreshdeskConnection{{ConnectionMetadata: ConnectionMetadata{Name: "freshdesk1"}}},
 				FundraiseUp:         []FundraiseUpConnection{{ConnectionMetadata: ConnectionMetadata{Name: "fundraiseup1"}}},
 				Fireflies:           []FirefliesConnection{{ConnectionMetadata: ConnectionMetadata{Name: "fireflies1"}}},
+				Trello:              []TrelloConnection{{ConnectionMetadata: ConnectionMetadata{Name: "trello1"}}},
 				Jira:                []JiraConnection{{ConnectionMetadata: ConnectionMetadata{Name: "jira1"}}},
 				Monday:              []MondayConnection{{ConnectionMetadata: ConnectionMetadata{Name: "monday1"}}},
 				PlusVibeAI:          []PlusVibeAIConnection{{ConnectionMetadata: ConnectionMetadata{Name: "plusvibeai1"}}},

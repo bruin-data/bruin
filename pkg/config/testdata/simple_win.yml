@@ -511,6 +511,10 @@ environments:
       fireflies:
         - name: "fireflies-1"
           api_key: "test-api-key"
+      trello:
+        - name: "trello-1"
+          api_key: "test-api-key"
+          token: "test-token"
       jira:
         - name: "jira-1"
           domain: "company.atlassian.net"

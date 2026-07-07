@@ -144,6 +144,7 @@ type Connections struct {
 	Freshdesk           []FreshdeskConnection           `yaml:"freshdesk,omitempty" json:"freshdesk,omitempty" mapstructure:"freshdesk"`
 	FundraiseUp         []FundraiseUpConnection         `yaml:"fundraiseup,omitempty" json:"fundraiseup,omitempty" mapstructure:"fundraiseup"`
 	Fireflies           []FirefliesConnection           `yaml:"fireflies,omitempty" json:"fireflies,omitempty" mapstructure:"fireflies"`
+	Trello              []TrelloConnection              `yaml:"trello,omitempty" json:"trello,omitempty" mapstructure:"trello"`
 	Jira                []JiraConnection                `yaml:"jira,omitempty" json:"jira,omitempty" mapstructure:"jira"`
 	Monday              []MondayConnection              `yaml:"monday,omitempty" json:"monday,omitempty" mapstructure:"monday"`
 	PlusVibeAI          []PlusVibeAIConnection          `yaml:"plusvibeai,omitempty" json:"plusvibeai,omitempty" mapstructure:"plusvibeai"`
@@ -1558,6 +1559,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Fireflies = append(env.Connections.Fireflies, conn)
+	case "trello":
+		var conn TrelloConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Trello = append(env.Connections.Trello, conn)
 	case "plusvibeai":
 		var conn PlusVibeAIConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1981,6 +1989,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.FundraiseUp = removeConnection(env.Connections.FundraiseUp, connectionName)
 	case "fireflies":
 		env.Connections.Fireflies = removeConnection(env.Connections.Fireflies, connectionName)
+	case "trello":
+		env.Connections.Trello = removeConnection(env.Connections.Trello, connectionName)
 	case "plusvibeai":
 		env.Connections.PlusVibeAI = removeConnection(env.Connections.PlusVibeAI, connectionName)
 	case "bruin":
@@ -2232,6 +2242,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Freshdesk, source.Freshdesk)
 	mergeConnectionList(&c.FundraiseUp, source.FundraiseUp)
 	mergeConnectionList(&c.Fireflies, source.Fireflies)
+	mergeConnectionList(&c.Trello, source.Trello)
 	mergeConnectionList(&c.Jira, source.Jira)
 	mergeConnectionList(&c.Monday, source.Monday)
 	mergeConnectionList(&c.PlusVibeAI, source.PlusVibeAI)

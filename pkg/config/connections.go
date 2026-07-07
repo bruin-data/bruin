@@ -1872,6 +1872,16 @@ func (c FirefliesConnection) GetName() string {
 	return c.Name
 }
 
+type TrelloConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
+	Token              string `yaml:"token,omitempty" json:"token" mapstructure:"token" sensitive:"true"`
+}
+
+func (c TrelloConnection) GetName() string {
+	return c.Name
+}
+
 type WistiaConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	AccessToken        string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token" sensitive:"true"`

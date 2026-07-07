@@ -343,6 +343,18 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "contacts", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
 	},
 
+	// Trello - Project management (boards, lists, cards)
+	"trello": {
+		{Name: "boards", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "organizations", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "lists", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "members", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "labels", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "checklists", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "cards", PrimaryKey: "id", IncKey: "dateLastActivity", IncStrategy: "merge"},
+		{Name: "actions", PrimaryKey: "id", IncKey: "date", IncStrategy: "merge"},
+	},
+
 	// Fluxx - Grants management platform
 	"fluxx": {
 		{Name: "claim", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},

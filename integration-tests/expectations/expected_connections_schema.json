@@ -1434,6 +1434,12 @@
           },
           "type": "array"
         },
+        "trello": {
+          "items": {
+            "$ref": "#/$defs/TrelloConnection"
+          },
+          "type": "array"
+        },
         "jira": {
           "items": {
             "$ref": "#/$defs/JiraConnection"
@@ -4774,6 +4780,29 @@
         "name",
         "access_token",
         "advertiser_ids"
+      ]
+    },
+    "TrelloConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "token": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key",
+        "token"
       ]
     },
     "TrinoConnection": {
