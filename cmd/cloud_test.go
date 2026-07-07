@@ -239,6 +239,46 @@ func TestCloudDashboardsCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "create")
 }
 
+func TestParseDashboardState(t *testing.T) {
+	t.Parallel()
+
+	t.Run("parses a JSON object", func(t *testing.T) {
+		t.Parallel()
+		got, err := parseDashboardState([]byte(`{"name":"d","rows":[]}`))
+		require.NoError(t, err)
+		assert.Equal(t, "d", got["name"])
+	})
+
+	t.Run("parses a YAML object", func(t *testing.T) {
+		t.Parallel()
+		got, err := parseDashboardState([]byte("name: d\nrows: []\n"))
+		require.NoError(t, err)
+		assert.Equal(t, "d", got["name"])
+	})
+
+	t.Run("preserves an unquoted date-like scalar as a string", func(t *testing.T) {
+		t.Parallel()
+		got, err := parseDashboardState([]byte("default: 2024-01-01\n"))
+		require.NoError(t, err)
+		assert.Equal(t, "2024-01-01", got["default"])
+	})
+
+	t.Run("returns nil for non-object documents", func(t *testing.T) {
+		t.Parallel()
+		for _, in := range []string{"", "null", `"scalar"`, "[1, 2]"} {
+			got, err := parseDashboardState([]byte(in))
+			require.NoError(t, err, "input %q", in)
+			assert.Nil(t, got, "input %q", in)
+		}
+	})
+
+	t.Run("errors on malformed YAML", func(t *testing.T) {
+		t.Parallel()
+		_, err := parseDashboardState([]byte("name: [unclosed"))
+		require.Error(t, err)
+	})
+}
+
 func TestExtractErrorLines_ErrorLevel(t *testing.T) {
 	t.Parallel()
 	logJSON := json.RawMessage(`{
