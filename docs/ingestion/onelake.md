@@ -45,7 +45,7 @@ OneLake requires Microsoft Entra ID authentication — shared account keys are n
 To ingest data to OneLake, you need to create an [asset configuration](/assets/ingestr.html#asset-structure) file. This file defines the data flow from the source to the destination. Create a YAML file (e.g., `stripe_onelake.yml`) inside the assets folder and add the following content:
 
 ```yaml
-name: Tables/events
+name: onelake.events
 type: ingestr
 connection: my-onelake
 
@@ -54,20 +54,23 @@ parameters:
   source_table: 'event'
 
   destination: onelake
+  destination_table: Tables/events
 ```
 
-- `name`: The name of the asset. This is also used as the destination table (`--dest-table`) in the lakehouse — see [Storage modes](#storage-modes) below.
+- `name`: The Bruin asset name used for orchestration, lineage, and checks.
 - `type`: Specifies the type of the asset. Set this to `ingestr` to use the ingestr data pipeline.
 - `connection`: This is the destination connection, which defines where the data should be stored. Here `my-onelake` points at the OneLake connection defined in `.bruin.yml`.
 - `source_connection`: The name of the source connection defined in `.bruin.yml`.
 - `source_table`: The table to ingest from the source.
 - `destination`: Set to `onelake`.
+- `destination_table`: The OneLake table or file path passed to ingestr as `--dest-table` - see [Storage modes](#storage-modes) below.
 
 ### Storage modes
 
-The asset name is passed to ingestr as the destination table, and its prefix determines how data is stored in the lakehouse:
+Bruin passes `parameters.destination_table` to ingestr as the destination table. If `destination_table` is not set, Bruin falls back to the asset `name`. The destination prefix determines how data is stored in the lakehouse:
 
 - `Tables/<name>` → a Delta Lake table that is queryable in Fabric.
+- `Tables/<schema>/<name>` → a Delta Lake table under a schema-enabled Fabric lakehouse schema.
 - `Files/<path>` → raw Parquet files.
 - A bare name (e.g. `events`) defaults to `Tables/`.
 

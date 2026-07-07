@@ -47,9 +47,10 @@ parameters:
   source: string # optional, used when inferring the source from connection is not enough, e.g. GCP connection + GSheets source
   source_connection: string
   source_table: string
-  destination: bigquery | snowflake | redshift | synapse
+  destination: bigquery | snowflake | redshift | synapse | onelake
   
   # optional
+  destination_table: string # overrides the --dest-table value; defaults to name
   version: v0 | v1 | v1.x.y
   incremental_strategy: replace | append | merge | delete+insert # legacy alternative to materialization.strategy
   incremental_key: string # legacy alternative to materialization.incremental_key
@@ -86,6 +87,7 @@ parameters:
 | `version` | No | _n/a_  | Selects the version of ingestr to install and use.. Valid options are `v1` (latest), `v0` (legacy) or `v1.x.y` (full version specifer) | 
 | `materialization` | No | `--incremental-*`, `--partition-by`, `--cluster-by` | Preferred way to define destination write behavior. Supports `type: table` with `create+replace`, `append`, `merge`, `delete+insert`, and `truncate+insert`. |
 | `destination` | Yes | `--dest-uri` | Logical destination used to select the target connection; Bruin converts it into the URI supplied to Ingestr. |
+| `destination_table` | No | `--dest-table` | Overrides the destination table/path passed to Ingestr. Defaults to the asset `name`; useful when the destination path cannot be represented as a Bruin asset name, such as OneLake `Tables/<schema>/<table>`. |
 | `incremental_strategy` | No | `--incremental-strategy` | Passes the incremental loading strategy (`replace`, `append`, `merge`, `delete+insert`) to Ingestr. |
 | `incremental_key` | No | `--incremental-key` | Column that determines incremental progress. When the column is defined with type `date`, Bruin also forwards it through the `--columns` option so Ingestr treats it as a date field. |
 | `partition_by` | No | `--partition-by` | Comma-separated list of destination columns to partition by. |

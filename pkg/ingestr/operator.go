@@ -343,7 +343,7 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		destURI = applyClickHouseEngineParams(destURI, asset.Parameters)
 	}
 
-	destTable := asset.Name
+	destTable := resolveDestinationTableName(asset)
 
 	extraPackages = python.AddExtraPackages(destURI, sourceURI, extraPackages)
 
@@ -596,6 +596,16 @@ func normalizeMaterializationParameter(key, value string) string {
 		}
 	}
 	return strings.Join(cleaned, ",")
+}
+
+func resolveDestinationTableName(asset *pipeline.Asset) string {
+	if value, exists := asset.Parameters.GetString("destination_table"); exists {
+		if value = strings.TrimSpace(value); value != "" {
+			return value
+		}
+	}
+
+	return asset.Name
 }
 
 func NewSeedOperator(conn config.ConnectionGetter, j jinja.RendererInterface) (*SeedOperator, error) {
