@@ -233,6 +233,7 @@ var defaultMapping = map[string]string{
 	"dune":                  "dune-default",
 	"espn":                  "espn-default",
 	"fireflies":             "fireflies-default",
+	"trello":                "trello-default",
 	"fluxx":                 "fluxx-default",
 	"footballdata":          "footballdata-default",
 	"frankfurter":           "frankfurter-default",
