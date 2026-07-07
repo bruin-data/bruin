@@ -18,6 +18,7 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
+	"gopkg.in/yaml.v3"
 )
 
 var ansiEscapeRegex = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
@@ -2940,6 +2941,75 @@ func cloudDashboardsGet() *cli.Command {
 	}
 }
 
+// parseDashboardState decodes a dashboard definition from JSON or YAML into a
+// map. It walks the YAML node tree rather than decoding straight into a map so
+// that timestamp-like scalars (e.g. an unquoted `2024-01-01`) are preserved as
+// their original string — yaml.v3 would otherwise resolve them to time.Time,
+// which JSON-encodes as an RFC3339 timestamp and changes the value. Returns a
+// nil map (no error) when the document is empty or not a mapping; the caller
+// rejects that as "must be an object".
+func parseDashboardState(raw []byte) (map[string]any, error) {
+	var doc yaml.Node
+	if err := yaml.Unmarshal(raw, &doc); err != nil {
+		return nil, err
+	}
+	if len(doc.Content) == 0 {
+		return nil, nil
+	}
+	v, err := yamlNodeToValue(doc.Content[0])
+	if err != nil {
+		return nil, err
+	}
+	m, ok := v.(map[string]any)
+	if !ok {
+		return nil, nil
+	}
+	return m, nil
+}
+
+func yamlNodeToValue(n *yaml.Node) (any, error) {
+	switch n.Kind {
+	case yaml.DocumentNode:
+		if len(n.Content) == 0 {
+			return nil, nil
+		}
+		return yamlNodeToValue(n.Content[0])
+	case yaml.AliasNode:
+		return yamlNodeToValue(n.Alias)
+	case yaml.MappingNode:
+		m := make(map[string]any, len(n.Content)/2)
+		for i := 0; i+1 < len(n.Content); i += 2 {
+			val, err := yamlNodeToValue(n.Content[i+1])
+			if err != nil {
+				return nil, err
+			}
+			m[n.Content[i].Value] = val
+		}
+		return m, nil
+	case yaml.SequenceNode:
+		s := make([]any, 0, len(n.Content))
+		for _, c := range n.Content {
+			val, err := yamlNodeToValue(c)
+			if err != nil {
+				return nil, err
+			}
+			s = append(s, val)
+		}
+		return s, nil
+	default: // ScalarNode
+		// Keep timestamp-like scalars as their raw string so the value shape is
+		// preserved through the JSON request to the API.
+		if n.Tag == "!!timestamp" {
+			return n.Value, nil
+		}
+		var v any
+		if err := n.Decode(&v); err != nil {
+			return nil, err
+		}
+		return v, nil
+	}
+}
+
 func cloudDashboardsCreate() *cli.Command {
 	return &cli.Command{
 		Name:  "create",
@@ -2958,11 +3028,11 @@ func cloudDashboardsCreate() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:  "state",
-				Usage: "the dashboard definition as a JSON string",
+				Usage: "the dashboard definition as a JSON or YAML string",
 			},
 			&cli.StringFlag{
 				Name:  "state-file",
-				Usage: "path to a file containing the dashboard definition as JSON",
+				Usage: "path to a file containing the dashboard definition as JSON or YAML",
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
@@ -2998,15 +3068,18 @@ func cloudDashboardsCreate() *cli.Command {
 			// Validate whenever a state flag was provided (even if empty), so an
 			// explicit --state '' or empty --state-file is rejected rather than
 			// silently creating an empty draft. Omitting both is title-only, which is fine.
+			// Accept JSON or YAML — dashboards are YAML-native and JSON is valid YAML.
 			var state map[string]any
 			if c.IsSet("state") || c.IsSet("state-file") {
-				if err := json.Unmarshal([]byte(raw), &state); err != nil {
-					printError(fmt.Errorf("invalid dashboard definition JSON: %w", err), output, "Invalid state")
+				parsed, err := parseDashboardState([]byte(raw))
+				if err != nil {
+					printError(fmt.Errorf("invalid dashboard definition (expected a JSON or YAML object): %w", err), output, "Invalid state")
 					return cli.Exit("", 1)
 				}
-				// A JSON object is required; null/scalars/arrays are not a definition.
+				state = parsed
+				// A mapping is required; null/scalars/arrays are not a definition.
 				if state == nil {
-					printError(errors.New("dashboard definition must be a JSON object"), output, "Invalid state")
+					printError(errors.New("dashboard definition must be a JSON or YAML object"), output, "Invalid state")
 					return cli.Exit("", 1)
 				}
 			}
