@@ -371,6 +371,16 @@ environments:
 						"SELECT name FROM `bruin_test`.`seed_contacts` ORDER BY name",
 						"Ada", "Grace",
 					),
+					queryContains(
+						"query seeded backslash value",
+						"SELECT note FROM `bruin_test`.`seed_contacts` WHERE name = 'Ada'",
+						`C:\tmp`,
+					),
+					queryContains(
+						"query seeded empty string value",
+						"SELECT CASE WHEN note = '' THEN 'empty-string' ELSE note END AS note_value FROM `bruin_test`.`seed_contacts` WHERE name = 'Grace'",
+						"empty-string",
+					),
 				},
 			},
 		},

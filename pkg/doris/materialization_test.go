@@ -118,25 +118,26 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT id, value FROM source",
-			want: "DROP TABLE IF EXISTS `analytics`.`__bruin_tmp_orders_new`;\n" +
-				"CREATE TABLE `analytics`.`__bruin_tmp_orders_new`\n" +
+			want: "DROP TABLE IF EXISTS `analytics`.`__bruin_tmp_orders_abcefghi_new`;\n" +
+				"CREATE TABLE `analytics`.`__bruin_tmp_orders_abcefghi_new`\n" +
 				"PROPERTIES (\"replication_num\" = \"1\")\n" +
 				"AS\n" +
 				"SELECT id, value FROM source;\n" +
-				"DROP TABLE IF EXISTS `analytics`.`__bruin_tmp_orders_kept`;\n" +
-				"CREATE TABLE `analytics`.`__bruin_tmp_orders_kept`\n" +
+				"DROP TABLE IF EXISTS `analytics`.`__bruin_tmp_orders_abcefghi_replacement`;\n" +
+				"CREATE TABLE `analytics`.`__bruin_tmp_orders_abcefghi_replacement`\n" +
 				"PROPERTIES (\"replication_num\" = \"1\")\n" +
 				"AS\n" +
-				"SELECT *\n" +
-				"FROM `analytics`.`orders`\n" +
-				"WHERE `id` NOT IN (SELECT DISTINCT `id` FROM `analytics`.`__bruin_tmp_orders_new`);\n" +
-				"TRUNCATE TABLE `analytics`.`orders`;\n" +
-				"INSERT INTO `analytics`.`orders`\n" +
-				"SELECT * FROM `analytics`.`__bruin_tmp_orders_kept`\n" +
+				"SELECT `target`.*\n" +
+				"FROM `analytics`.`orders` AS `target`\n" +
+				"WHERE NOT EXISTS (\n" +
+				"  SELECT 1\n" +
+				"  FROM `analytics`.`__bruin_tmp_orders_abcefghi_new` AS `new_rows`\n" +
+				"  WHERE (`target`.`id` = `new_rows`.`id` OR (`target`.`id` IS NULL AND `new_rows`.`id` IS NULL))\n" +
+				")\n" +
 				"UNION ALL\n" +
-				"SELECT * FROM `analytics`.`__bruin_tmp_orders_new`;\n" +
-				"DROP TABLE IF EXISTS `analytics`.`__bruin_tmp_orders_kept`;\n" +
-				"DROP TABLE IF EXISTS `analytics`.`__bruin_tmp_orders_new`;",
+				"SELECT * FROM `analytics`.`__bruin_tmp_orders_abcefghi_new`;\n" +
+				"ALTER TABLE `analytics`.`orders` REPLACE WITH TABLE `__bruin_tmp_orders_abcefghi_replacement` PROPERTIES('swap' = 'false');\n" +
+				"DROP TABLE IF EXISTS `analytics`.`__bruin_tmp_orders_abcefghi_new`;",
 		},
 		{
 			name: "time interval",

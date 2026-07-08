@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestConfig_GetIngestrURI(t *testing.T) {
@@ -53,5 +54,24 @@ func TestConfig_ToDBConnectionURI(t *testing.T) {
 		Database: "test",
 	}
 
-	assert.Equal(t, "root:password@tcp(localhost:9030)/test?multiStatements=true&parseTime=true", c.ToDBConnectionURI())
+	got, err := c.ToDBConnectionURI()
+	require.NoError(t, err)
+
+	assert.Equal(t, "root:password@tcp(localhost:9030)/test?multiStatements=true&parseTime=true", got)
+}
+
+func TestConfig_ToDBConnectionURIWithInvalidTLSPath(t *testing.T) {
+	t.Parallel()
+
+	c := Config{
+		Username:  "root",
+		Password:  "password",
+		Host:      "localhost",
+		Database:  "test",
+		SslCaPath: "/does/not/exist.pem",
+	}
+
+	_, err := c.ToDBConnectionURI()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ssl_ca_path")
 }

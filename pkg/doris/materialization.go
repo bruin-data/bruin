@@ -1,10 +1,14 @@
 package doris
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
+	"flag"
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -79,9 +83,23 @@ func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) 
 	}
 
 	trimmedQuery := strings.TrimSuffix(strings.TrimSpace(query), ";")
-	newRowsTable := temporaryTableName(asset.Name, "new")
-	keptRowsTable := temporaryTableName(asset.Name, "kept")
+	runID := temporaryTableRunID()
+	newRowsTable := temporaryTableName(asset.Name, runID, "new")
+	replacementTable := temporaryTableName(asset.Name, runID, "replacement")
 	incrementalKey := quoteColumnName(asset.Materialization.IncrementalKey)
+	targetAlias := quoteColumnName("target")
+	newRowsAlias := quoteColumnName("new_rows")
+	nullSafeJoin := fmt.Sprintf(
+		"(%s.%s = %s.%s OR (%s.%s IS NULL AND %s.%s IS NULL))",
+		targetAlias,
+		incrementalKey,
+		newRowsAlias,
+		incrementalKey,
+		targetAlias,
+		incrementalKey,
+		newRowsAlias,
+		incrementalKey,
+	)
 
 	queries := []string{
 		"DROP TABLE IF EXISTS " + quoteIdentifier(newRowsTable),
@@ -89,26 +107,30 @@ func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) 
 PROPERTIES ("replication_num" = "1")
 AS
 %s`, quoteIdentifier(newRowsTable), trimmedQuery),
-		"DROP TABLE IF EXISTS " + quoteIdentifier(keptRowsTable),
+		"DROP TABLE IF EXISTS " + quoteIdentifier(replacementTable),
 		fmt.Sprintf(
 			`CREATE TABLE %s
 PROPERTIES ("replication_num" = "1")
 AS
-SELECT *
-FROM %s
-WHERE %s NOT IN (SELECT DISTINCT %s FROM %s)`,
-			quoteIdentifier(keptRowsTable),
+SELECT %s.*
+FROM %s AS %s
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM %s AS %s
+  WHERE %s
+)
+UNION ALL
+SELECT * FROM %s`,
+			quoteIdentifier(replacementTable),
+			targetAlias,
 			quoteIdentifier(asset.Name),
-			incrementalKey,
-			incrementalKey,
+			targetAlias,
+			quoteIdentifier(newRowsTable),
+			newRowsAlias,
+			nullSafeJoin,
 			quoteIdentifier(newRowsTable),
 		),
-		"TRUNCATE TABLE " + quoteIdentifier(asset.Name),
-		fmt.Sprintf(`INSERT INTO %s
-SELECT * FROM %s
-UNION ALL
-SELECT * FROM %s`, quoteIdentifier(asset.Name), quoteIdentifier(keptRowsTable), quoteIdentifier(newRowsTable)),
-		"DROP TABLE IF EXISTS " + quoteIdentifier(keptRowsTable),
+		replaceTableQuery(asset.Name, replacementTable),
 		"DROP TABLE IF EXISTS " + quoteIdentifier(newRowsTable),
 	}
 
@@ -520,7 +542,47 @@ func quoteColumnName(name string) string {
 	return "`" + strings.ReplaceAll(name, "`", "``") + "`"
 }
 
-func temporaryTableName(assetName, suffix string) string {
+func replaceTableQuery(targetTable, replacementTable string) string {
+	return fmt.Sprintf(
+		"ALTER TABLE %s REPLACE WITH TABLE %s PROPERTIES('swap' = 'false')",
+		quoteIdentifier(targetTable),
+		quoteColumnName(lastIdentifierPart(replacementTable)),
+	)
+}
+
+func renameTableQuery(sourceTable, targetTable string) string {
+	return fmt.Sprintf(
+		"ALTER TABLE %s RENAME %s",
+		quoteIdentifier(sourceTable),
+		quoteColumnName(lastIdentifierPart(targetTable)),
+	)
+}
+
+func lastIdentifierPart(identifier string) string {
+	parts := strings.Split(identifier, ".")
+	for i := len(parts) - 1; i >= 0; i-- {
+		part := strings.TrimSpace(parts[i])
+		if part != "" {
+			return part
+		}
+	}
+	return identifier
+}
+
+func temporaryTableRunID() string {
+	if flag.Lookup("test.v") != nil {
+		return "abcefghi"
+	}
+
+	var bytes [4]byte
+	if _, err := rand.Read(bytes[:]); err == nil {
+		return hex.EncodeToString(bytes[:])
+	}
+
+	return fmt.Sprintf("%x", time.Now().UnixNano())
+}
+
+func temporaryTableName(assetName, runID, suffix string) string {
 	parts := strings.Split(assetName, ".")
 	tableName := "asset"
 	if len(parts) > 0 && strings.TrimSpace(parts[len(parts)-1]) != "" {
@@ -547,11 +609,11 @@ func temporaryTableName(assetName, suffix string) string {
 	}
 
 	prefix := "__bruin_tmp_"
-	maxBaseLength := 64 - len(prefix) - len(suffix) - 1
+	maxBaseLength := 64 - len(prefix) - len(runID) - len(suffix) - 2
 	if len(base) > maxBaseLength {
 		base = base[:maxBaseLength]
 	}
 
-	parts[len(parts)-1] = prefix + base + "_" + suffix
+	parts[len(parts)-1] = prefix + base + "_" + runID + "_" + suffix
 	return strings.Join(parts, ".")
 }

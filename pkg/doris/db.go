@@ -38,7 +38,7 @@ type Client struct {
 
 type DorisConfig interface {
 	GetIngestrURI() string
-	ToDBConnectionURI() string
+	ToDBConnectionURI() (string, error)
 }
 
 func NewClient(c DorisConfig) (*Client, error) {
@@ -60,7 +60,12 @@ func (c *Client) initializeDB(ctx context.Context) error {
 		return nil
 	}
 
-	conn, err := sqlx.ConnectContext(ctx, "mysql", c.config.ToDBConnectionURI())
+	dsn, err := c.config.ToDBConnectionURI()
+	if err != nil {
+		return err
+	}
+
+	conn, err := sqlx.ConnectContext(ctx, "mysql", dsn)
 	if err != nil {
 		return errors.Wrap(err, "failed to connect to Doris")
 	}

@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/config"
@@ -89,7 +90,10 @@ func (o SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error 
 		return err
 	}
 
-	if err := conn.RunQueryWithoutResult(ctx, &query.Query{Query: "DROP TABLE IF EXISTS " + quoteIdentifier(asset.Name)}); err != nil {
+	tempTable := temporaryTableName(asset.Name, temporaryTableRunID(), "seed")
+	ddlAsset.Name = tempTable
+
+	if err := conn.RunQueryWithoutResult(ctx, &query.Query{Query: "DROP TABLE IF EXISTS " + quoteIdentifier(tempTable)}); err != nil {
 		return err
 	}
 
@@ -102,11 +106,23 @@ func (o SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error 
 		return err
 	}
 
-	if len(rows) == 0 {
-		return nil
+	if len(rows) > 0 {
+		if err := insertRows(ctx, conn, tempTable, header, rows); err != nil {
+			return err
+		}
 	}
 
-	return insertRows(ctx, conn, asset.Name, header, rows)
+	exists, err := tableExists(ctx, conn, asset.Name)
+	if err != nil {
+		return err
+	}
+
+	swapQuery := renameTableQuery(tempTable, asset.Name)
+	if exists {
+		swapQuery = replaceTableQuery(asset.Name, tempTable)
+	}
+
+	return conn.RunQueryWithoutResult(ctx, &query.Query{Query: swapQuery})
 }
 
 func readCSV(path string) ([]string, [][]string, error) {
@@ -178,13 +194,34 @@ func insertRows(ctx context.Context, conn *Client, table string, columns []strin
 }
 
 func quoteValue(value string) string {
-	if value == "" {
-		return "NULL"
-	}
-
 	return quoteStringLiteral(value)
 }
 
 func quoteStringLiteral(value string) string {
-	return "'" + strings.ReplaceAll(value, "'", "''") + "'"
+	escaped := strings.ReplaceAll(value, `\`, `\\`)
+	escaped = strings.ReplaceAll(escaped, "'", "''")
+	return "'" + escaped + "'"
+}
+
+func tableExists(ctx context.Context, conn *Client, table string) (bool, error) {
+	existsQuery, err := conn.BuildTableExistsQuery(table)
+	if err != nil {
+		return false, err
+	}
+
+	rows, err := conn.Select(ctx, &query.Query{Query: existsQuery})
+	if err != nil {
+		return false, err
+	}
+
+	if len(rows) == 0 || len(rows[0]) == 0 {
+		return false, nil
+	}
+
+	count, err := strconv.ParseInt(fmt.Sprint(rows[0][0]), 10, 64)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse Doris table existence result: %w", err)
+	}
+
+	return count > 0, nil
 }

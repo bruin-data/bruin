@@ -13,6 +13,8 @@ columns:
         value:
           - LinkedIn
           - Twitter
+  - name: note
+    type: STRING
 
 parameters:
   path: ./seed.csv
