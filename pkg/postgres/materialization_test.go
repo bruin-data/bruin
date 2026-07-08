@@ -759,7 +759,7 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 				},
 			},
 			query: "SELECT id, event_name, ts from source_table",
-			want: "MERGE INTO \"my\".\"asset\" AS target\n" +
+			want: "BEGIN TRANSACTION;\nSET LOCAL TIME ZONE 'UTC';\nMERGE INTO \"my\".\"asset\" AS target\n" +
 				"USING (\n" +
 				"  WITH s1 AS (\n" +
 				"    SELECT id, event_name, ts from source_table\n" +
@@ -788,7 +788,7 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 				"\n" +
 				"WHEN NOT MATCHED BY TARGET THEN\n" +
 				"  INSERT (\"id\", \"event_name\", \"ts\", _valid_from, _valid_until, _is_current)\n" +
-				"  VALUES (source.\"id\", source.\"event_name\", source.\"ts\", source.\"ts\", '9999-12-31 00:00:00'::TIMESTAMPTZ, TRUE);",
+				"  VALUES (source.\"id\", source.\"event_name\", source.\"ts\", source.\"ts\", '9999-12-31 00:00:00'::TIMESTAMPTZ, TRUE);\nCOMMIT;",
 		},
 		//nolint:dupword
 		{
@@ -809,7 +809,7 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 				},
 			},
 			query: "SELECT id, event_type, col1, col2, ts from source_table",
-			want: "MERGE INTO \"my\".\"asset\" AS target\n" +
+			want: "BEGIN TRANSACTION;\nSET LOCAL TIME ZONE 'UTC';\nMERGE INTO \"my\".\"asset\" AS target\n" +
 				"USING (\n" +
 				"  WITH s1 AS (\n" +
 				"    SELECT id, event_type, col1, col2, ts from source_table\n" +
@@ -838,7 +838,7 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 				"\n" +
 				"WHEN NOT MATCHED BY TARGET THEN\n" +
 				"  INSERT (\"id\", \"event_type\", \"col1\", \"col2\", \"ts\", _valid_from, _valid_until, _is_current)\n" +
-				"  VALUES (source.\"id\", source.\"event_type\", source.\"col1\", source.\"col2\", source.\"ts\", source.\"ts\", '9999-12-31 00:00:00'::TIMESTAMPTZ, TRUE);",
+				"  VALUES (source.\"id\", source.\"event_type\", source.\"col1\", source.\"col2\", source.\"ts\", source.\"ts\", '9999-12-31 00:00:00'::TIMESTAMPTZ, TRUE);\nCOMMIT;",
 		},
 		{
 			name: "scd2_full_refresh_with_incremental_key",
@@ -979,7 +979,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				},
 			},
 			query: "SELECT id, col1, col2, col3, col4 from source_table",
-			want: "MERGE INTO \"my\".\"asset\" AS target\n" +
+			want: "BEGIN TRANSACTION;\nSET LOCAL TIME ZONE 'UTC';\nMERGE INTO \"my\".\"asset\" AS target\n" +
 				"USING (\n" +
 				"  WITH s1 AS (\n" +
 				"    SELECT id, col1, col2, col3, col4 from source_table\n" +
@@ -1008,7 +1008,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				"\n" +
 				"WHEN NOT MATCHED BY TARGET THEN\n" +
 				"  INSERT (id, col1, col2, col3, col4, _valid_from, _valid_until, _is_current)\n" +
-				"  VALUES (source.id, source.col1, source.col2, source.col3, source.col4, CURRENT_TIMESTAMP, '9999-12-31 00:00:00'::TIMESTAMPTZ, TRUE);",
+				"  VALUES (source.id, source.col1, source.col2, source.col3, source.col4, CURRENT_TIMESTAMP, '9999-12-31 00:00:00'::TIMESTAMPTZ, TRUE);\nCOMMIT;",
 		},
 		{
 			name: "scd2_multiple_primary_keys",
@@ -1026,7 +1026,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				},
 			},
 			query: "SELECT id, category, name, price from source_table",
-			want: "MERGE INTO \"my\".\"asset\" AS target\n" +
+			want: "BEGIN TRANSACTION;\nSET LOCAL TIME ZONE 'UTC';\nMERGE INTO \"my\".\"asset\" AS target\n" +
 				"USING (\n" +
 				"  WITH s1 AS (\n" +
 				"    SELECT id, category, name, price from source_table\n" +
@@ -1055,7 +1055,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				"\n" +
 				"WHEN NOT MATCHED BY TARGET THEN\n" +
 				"  INSERT (id, category, name, price, _valid_from, _valid_until, _is_current)\n" +
-				"  VALUES (source.id, source.category, source.name, source.price, CURRENT_TIMESTAMP, '9999-12-31 00:00:00'::TIMESTAMPTZ, TRUE);",
+				"  VALUES (source.id, source.category, source.name, source.price, CURRENT_TIMESTAMP, '9999-12-31 00:00:00'::TIMESTAMPTZ, TRUE);\nCOMMIT;",
 		},
 		{
 			name: "scd2_full_refresh_by_column",
@@ -1103,7 +1103,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				},
 			},
 			query: "SELECT id, col1, col2, updated_at from source_table",
-			want: "MERGE INTO \"my\".\"asset\" AS target\n" +
+			want: "BEGIN TRANSACTION;\nSET LOCAL TIME ZONE 'UTC';\nMERGE INTO \"my\".\"asset\" AS target\n" +
 				"USING (\n" +
 				"  WITH s1 AS (\n" +
 				"    SELECT id, col1, col2, updated_at from source_table\n" +
@@ -1132,7 +1132,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				"\n" +
 				"WHEN NOT MATCHED BY TARGET THEN\n" +
 				"  INSERT (id, col1, col2, updated_at, _valid_from, _valid_until, _is_current)\n" +
-				"  VALUES (source.id, source.col1, source.col2, source.updated_at, source.updated_at, '9999-12-31 00:00:00'::TIMESTAMPTZ, TRUE);", //nolint:dupword
+				"  VALUES (source.id, source.col1, source.col2, source.updated_at, source.updated_at, '9999-12-31 00:00:00'::TIMESTAMPTZ, TRUE);\nCOMMIT;", //nolint:dupword
 		},
 		{
 			name: "scd2_full_refresh_by_column_with_incremental_key",

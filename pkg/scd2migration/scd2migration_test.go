@@ -34,11 +34,11 @@ func TestPostgres(t *testing.T) {
 	require.NoError(t, Postgres(context.Background(), db, "public.products"))
 	assert.Equal(t, []string{
 		`ALTER TABLE "public"."products" ADD COLUMN "_valid_from__bruin_tz" TIMESTAMPTZ`,
-		`UPDATE "public"."products" SET "_valid_from__bruin_tz" = "_valid_from" AT TIME ZONE 'UTC'`,
+		`UPDATE "public"."products" SET "_valid_from__bruin_tz" = CAST("_valid_from" AS TIMESTAMPTZ)`,
 		`ALTER TABLE "public"."products" DROP COLUMN "_valid_from"`,
 		`ALTER TABLE "public"."products" RENAME COLUMN "_valid_from__bruin_tz" TO "_valid_from"`,
 		`ALTER TABLE "public"."products" ADD COLUMN "_valid_until__bruin_tz" TIMESTAMPTZ`,
-		`UPDATE "public"."products" SET "_valid_until__bruin_tz" = "_valid_until" AT TIME ZONE 'UTC'`,
+		`UPDATE "public"."products" SET "_valid_until__bruin_tz" = CAST("_valid_until" AS TIMESTAMPTZ)`,
 		`ALTER TABLE "public"."products" DROP COLUMN "_valid_until"`,
 		`ALTER TABLE "public"."products" RENAME COLUMN "_valid_until__bruin_tz" TO "_valid_until"`,
 	}, db.ran)
@@ -56,11 +56,11 @@ func TestPostgresDropsLeftoverTempColumn(t *testing.T) {
 	assert.Equal(t, []string{
 		`ALTER TABLE "products" DROP COLUMN "_valid_from__bruin_tz"`,
 		`ALTER TABLE "products" ADD COLUMN "_valid_from__bruin_tz" TIMESTAMPTZ`,
-		`UPDATE "products" SET "_valid_from__bruin_tz" = "_valid_from" AT TIME ZONE 'UTC'`,
+		`UPDATE "products" SET "_valid_from__bruin_tz" = CAST("_valid_from" AS TIMESTAMPTZ)`,
 		`ALTER TABLE "products" DROP COLUMN "_valid_from"`,
 		`ALTER TABLE "products" RENAME COLUMN "_valid_from__bruin_tz" TO "_valid_from"`,
 		`ALTER TABLE "products" ADD COLUMN "_valid_until__bruin_tz" TIMESTAMPTZ`,
-		`UPDATE "products" SET "_valid_until__bruin_tz" = "_valid_until" AT TIME ZONE 'UTC'`,
+		`UPDATE "products" SET "_valid_until__bruin_tz" = CAST("_valid_until" AS TIMESTAMPTZ)`,
 		`ALTER TABLE "products" DROP COLUMN "_valid_until"`,
 		`ALTER TABLE "products" RENAME COLUMN "_valid_until__bruin_tz" TO "_valid_until"`,
 	}, db.ran)

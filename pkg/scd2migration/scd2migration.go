@@ -52,7 +52,7 @@ func Postgres(ctx context.Context, db Querier, assetName string) error {
 		return err
 	}
 	stmts := buildSwap(pgQuote(assetName), "TIMESTAMPTZ", types, alreadyTZ, pgQuote,
-		func(col string) string { return col + " AT TIME ZONE 'UTC'" })
+		func(col string) string { return fmt.Sprintf("CAST(%s AS TIMESTAMPTZ)", col) })
 	return runEach(ctx, db, stmts)
 }
 

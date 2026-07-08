@@ -1041,6 +1041,8 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 
 	queryStr := fmt.Sprintf(
 		`
+BEGIN TRANSACTION;
+SET LOCAL TIME ZONE 'UTC';
 MERGE INTO %s AS target
 USING (
   WITH s1 AS (
@@ -1070,7 +1072,8 @@ WHEN NOT MATCHED BY SOURCE AND target._is_current = TRUE THEN
 
 WHEN NOT MATCHED BY TARGET THEN
   INSERT (%s)
-  VALUES (%s);`,
+  VALUES (%s);
+COMMIT;`,
 		QuoteIdentifier(asset.Name),
 		strings.TrimSpace(query),
 		QuoteIdentifier(asset.Name),
@@ -1159,6 +1162,8 @@ func buildSCD2QueryByTime(asset *pipeline.Asset, query string) (string, error) {
 
 	queryStr := fmt.Sprintf(
 		`
+BEGIN TRANSACTION;
+SET LOCAL TIME ZONE 'UTC';
 MERGE INTO %s AS target
 USING (
   WITH s1 AS (
@@ -1188,7 +1193,8 @@ WHEN NOT MATCHED BY SOURCE AND target._is_current = TRUE THEN
 
 WHEN NOT MATCHED BY TARGET THEN
   INSERT (%s)
-  VALUES (%s);`,
+  VALUES (%s);
+COMMIT;`,
 		QuoteIdentifier(tbl),
 		strings.TrimSpace(query),
 		QuoteIdentifier(tbl),
