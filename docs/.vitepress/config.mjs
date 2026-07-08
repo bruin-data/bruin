@@ -430,6 +430,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                 items: [
                     {
                         text: "Deployment",
+                        link: "/deployment/overview",
                         collapsed: false,
                         items: [
                             {text: "Ubuntu VM with Cron", link: "/deployment/vm-deployment"},

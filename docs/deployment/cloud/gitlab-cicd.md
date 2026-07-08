@@ -612,7 +612,7 @@ reporting:
 
 - Explore [Bruin Cloud](/cloud/overview) for managed orchestration
 - Learn about [quality checks](/quality/overview) to add validation
-- Review other [deployment options](/deployment/vm-deployment)
+- Review other [deployment options](/deployment/overview)
 
 ## Additional Resources
 
