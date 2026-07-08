@@ -52,12 +52,12 @@ func Postgres(ctx context.Context, db Querier, assetName string) error {
 		return err
 	}
 	stmts := buildSwap(pgQuote(assetName), "TIMESTAMPTZ", types, alreadyTZ, pgQuote,
-		func(col string) string { return fmt.Sprintf("CAST(%s AS TIMESTAMPTZ)", col) })
+		func(col string) string { return col + " AT TIME ZONE 'UTC'" })
 	return runEach(ctx, db, stmts)
 }
 
 // Snowflake converts TIMESTAMP_NTZ (and non-target TIMESTAMP_LTZ) columns to
-// TIMESTAMP_TZ, reading the stored values as UTC.
+// TIMESTAMP_TZ, reading the stored values as UTC
 func Snowflake(ctx context.Context, db Querier, assetName string) error {
 	parts := strings.Split(assetName, ".")
 	prefix, schema, table := "", "", strings.ToUpper(assetName)
@@ -67,8 +67,9 @@ func Snowflake(ctx context.Context, db Querier, assetName string) error {
 	case 3:
 		prefix, schema, table = parts[0]+".", strings.ToUpper(parts[1]), strings.ToUpper(parts[2])
 	}
+
 	types, err := fetchTypes(ctx, db, fmt.Sprintf(
-		"SELECT column_name, data_type FROM %sinformation_schema.columns WHERE table_schema = '%s' AND table_name = '%s'",
+		"SELECT column_name, data_type FROM %sinformation_schema.columns WHERE UPPER(table_schema) = '%s' AND UPPER(table_name) = '%s'",
 		prefix, schema, table,
 	))
 	if err != nil {
