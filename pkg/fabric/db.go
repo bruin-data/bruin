@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/microsoft/go-mssqldb"
@@ -13,8 +14,9 @@ import (
 )
 
 type DB struct {
-	conn   *sqlx.DB
-	config *Config
+	conn          *sqlx.DB
+	config        *Config
+	schemaCreator *SchemaCreator
 }
 
 // QuoteIdentifier quotes a Fabric identifier using square brackets.
@@ -35,7 +37,11 @@ func NewDB(c *Config) (*DB, error) {
 		return nil, errors.Wrap(err, "failed to open Fabric Warehouse connection")
 	}
 
-	return &DB{conn: conn, config: c}, nil
+	return &DB{conn: conn, config: c, schemaCreator: NewSchemaCreator()}, nil
+}
+
+func (db *DB) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
+	return db.schemaCreator.CreateSchemaIfNotExist(ctx, db, asset)
 }
 
 func (db *DB) Ping(ctx context.Context) error {
