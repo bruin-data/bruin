@@ -1421,6 +1421,7 @@ func TestConnectionTypeToDialect(t *testing.T) {
 
 	tests := map[string]string{
 		"clickhouse":            "clickhouse",
+		"doris":                 "doris",
 		"postgres":              "postgres",
 		"google_cloud_platform": "bigquery",
 		"snowflake":             "snowflake",
@@ -1436,6 +1437,12 @@ func TestConnectionTypeToDialect(t *testing.T) {
 			require.Equal(t, want, ConnectionTypeToDialect(connType))
 		})
 	}
+}
+
+func TestDorisDialectUsedTables(t *testing.T) {
+	got, err := sharedSQLParser.UsedTables("SELECT * FROM `bruin_test`.`orders` WHERE order_id > 0", "doris")
+	require.NoError(t, err)
+	require.Equal(t, []string{"bruin_test.orders"}, got)
 }
 
 func TestGetMissingDependenciesForAsset(t *testing.T) {

@@ -367,6 +367,12 @@ var assetTypePlatform = map[pipeline.AssetType]Platform{
 	pipeline.AssetTypeMySQLQuerySensor: PlatformMySQL,
 	pipeline.AssetTypeMySQLTableSensor: PlatformMySQL,
 
+	pipeline.AssetTypeDorisQuery:       PlatformDoris,
+	pipeline.AssetTypeDorisSeed:        PlatformDoris,
+	pipeline.AssetTypeDorisQuerySensor: PlatformDoris,
+	pipeline.AssetTypeDorisTableSensor: PlatformDoris,
+	pipeline.AssetTypeDorisSource:      PlatformDoris,
+
 	pipeline.AssetTypeDuckDBQuery:       PlatformDuckDB,
 	pipeline.AssetTypeDuckDBSeed:        PlatformDuckDB,
 	pipeline.AssetTypeDuckDBQuerySensor: PlatformDuckDB,

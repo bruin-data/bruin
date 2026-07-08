@@ -1,0 +1,19 @@
+name: bruin_test.seed_contacts
+type: doris.seed
+
+columns:
+  - name: name
+    type: STRING
+    checks:
+      - name: not_null
+  - name: channel
+    type: STRING
+    checks:
+      - name: accepted_values
+        value:
+          - LinkedIn
+          - Twitter
+
+parameters:
+  path: ./seed.csv
+  file_type: csv

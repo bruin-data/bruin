@@ -272,3 +272,20 @@ func TestSailIntegration(t *testing.T) {
 
 	runTestsInDirectory(t, sailDir, "Sail")
 }
+
+// TestDorisIntegration runs the self-contained Doris suite. It boots a local
+// Apache Doris all-in-one container via testcontainers and therefore does not
+// require .bruin.cloud.yml credentials.
+func TestDorisIntegration(t *testing.T) {
+	t.Parallel()
+
+	currentFolder, err := os.Getwd()
+	require.NoError(t, err, "Failed to get current working directory")
+
+	dorisDir := filepath.Join(currentFolder, "doris")
+	require.DirExists(t, dorisDir, "Doris test directory should exist")
+
+	t.Logf("Running self-contained Doris integration tests (testcontainers)")
+
+	runTestsInDirectory(t, dorisDir, "Doris")
+}

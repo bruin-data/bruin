@@ -100,6 +100,11 @@ var registry = map[string]Capability{
 		Labels:     [3]string{"", "database", "table"},
 		FormatDesc: "`table` or `schema.table`",
 	},
+	"doris": {
+		Platform: "doris", MinComponents: 1, MaxComponents: 2,
+		Labels:     [3]string{"", "database", "table"},
+		FormatDesc: "`table` or `schema.table`",
+	},
 	"clickhouse": {
 		Platform: "clickhouse", MinComponents: 1, MaxComponents: 2,
 		Labels:     [3]string{"", "database", "table"},

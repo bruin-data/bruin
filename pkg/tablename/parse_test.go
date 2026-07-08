@@ -79,6 +79,18 @@ func TestCapability_Parse(t *testing.T) {
 			want:     TableName{Schema: "public", Table: "users"},
 		},
 		{
+			name:     "doris two-part is database.table",
+			platform: "doris",
+			raw:      "analytics.orders",
+			want:     TableName{Schema: "analytics", Table: "orders"},
+		},
+		{
+			name:     "doris rejects three-part",
+			platform: "doris",
+			raw:      "catalog.analytics.orders",
+			wantErr:  true,
+		},
+		{
 			name:     "clickhouse rejects three-part",
 			platform: "clickhouse",
 			raw:      "cat.db.tbl",
