@@ -111,8 +111,8 @@ func buildSCD2ByTimeFullRefresh(asset *pipeline.Asset, query string) (string, er
 
 	createAsQuery := fmt.Sprintf(`SELECT
   src.*,
-  CAST(src.%s AS TIMESTAMP) AS bruin_valid_from,
-  TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS') AS bruin_valid_until,
+  FROM_TZ(CAST(src.%s AS TIMESTAMP(6)), 'UTC') AS bruin_valid_from,
+  FROM_TZ(CAST(TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS') AS TIMESTAMP(6)), 'UTC') AS bruin_valid_until,
   1 AS bruin_is_current
 FROM (
 %s
@@ -417,8 +417,8 @@ func buildSCD2ByTimeQuery(asset *pipeline.Asset, query string) (string, error) {
 	insertCols = append(insertCols, "bruin_valid_from", "bruin_valid_until", "bruin_is_current")
 	insertValues = append(
 		insertValues,
-		"CAST(source."+asset.Materialization.IncrementalKey+" AS TIMESTAMP)",
-		"TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS')",
+		"FROM_TZ(CAST(source."+asset.Materialization.IncrementalKey+" AS TIMESTAMP(6)), 'UTC')",
+		"FROM_TZ(CAST(TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS') AS TIMESTAMP(6)), 'UTC')",
 		"1",
 	)
 
@@ -428,7 +428,6 @@ func buildSCD2ByTimeQuery(asset *pipeline.Asset, query string) (string, error) {
 		))
 	}
 	joinConds = append(joinConds, "source.bruin_is_current_src = 1")
-	joinConds = append(joinConds, "target.bruin_is_current = 1")
 	onCondition := strings.Join(joinConds, " AND ")
 	tbl := asset.Name
 	pkJoinUpdateStr := strings.Join(buildPKConditions(primaryKeys, "target", "source"), " AND ")
@@ -440,7 +439,7 @@ func buildSCD2ByTimeQuery(asset *pipeline.Asset, query string) (string, error) {
 	queryStr := fmt.Sprintf(
 		`BEGIN
 UPDATE %s target
-SET bruin_valid_until = LOCALTIMESTAMP, bruin_is_current = 0
+SET bruin_valid_until = SYSTIMESTAMP AT TIME ZONE 'UTC', bruin_is_current = 0
 WHERE target.bruin_is_current = 1
   AND NOT EXISTS (
     SELECT 1 FROM (%s) source
@@ -448,7 +447,7 @@ WHERE target.bruin_is_current = 1
   )
   AND EXISTS (SELECT 1 FROM (%s) source_exists);
 
-MERGE INTO %s target
+MERGE INTO (SELECT * FROM %s WHERE bruin_is_current = 1) target
 USING (
   WITH s1 AS (
     %s
@@ -459,14 +458,14 @@ USING (
   SELECT s1.*, 0 AS bruin_is_current_src
   FROM s1
   JOIN %s t1 ON (%s)
-  WHERE t1.bruin_valid_from < CAST(s1.%s AS TIMESTAMP) AND t1.bruin_is_current = 1
+  WHERE t1.bruin_valid_from < FROM_TZ(CAST(s1.%s AS TIMESTAMP(6)), 'UTC') AND t1.bruin_is_current = 1
 ) source
 ON (%s)
 WHEN MATCHED THEN
   UPDATE SET
-    target.bruin_valid_until = CAST(source.%s AS TIMESTAMP),
+    target.bruin_valid_until = FROM_TZ(CAST(source.%s AS TIMESTAMP(6)), 'UTC'),
     target.bruin_is_current  = 0
-  WHERE target.bruin_valid_from < CAST(source.%s AS TIMESTAMP)
+  WHERE target.bruin_valid_from < FROM_TZ(CAST(source.%s AS TIMESTAMP(6)), 'UTC')
 WHEN NOT MATCHED THEN
   INSERT (%s)
   VALUES (%s);

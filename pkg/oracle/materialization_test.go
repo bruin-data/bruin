@@ -472,7 +472,7 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 			query: "SELECT id, event_name, ts from source_table",
 			want: `BEGIN
 UPDATE my.asset target
-SET bruin_valid_until = LOCALTIMESTAMP, bruin_is_current = 0
+SET bruin_valid_until = SYSTIMESTAMP AT TIME ZONE 'UTC', bruin_is_current = 0
 WHERE target.bruin_is_current = 1
   AND NOT EXISTS (
     SELECT 1 FROM (SELECT id, event_name, ts from source_table) source
@@ -480,7 +480,7 @@ WHERE target.bruin_is_current = 1
   )
   AND EXISTS (SELECT 1 FROM (SELECT id, event_name, ts from source_table) source_exists);
 
-MERGE INTO my.asset target
+MERGE INTO (SELECT * FROM my.asset WHERE bruin_is_current = 1) target
 USING (
   WITH s1 AS (
     SELECT id, event_name, ts from source_table
@@ -491,17 +491,17 @@ USING (
   SELECT s1.*, 0 AS bruin_is_current_src
   FROM s1
   JOIN my.asset t1 ON ((t1.id = s1.id OR (t1.id IS NULL AND s1.id IS NULL)))
-  WHERE t1.bruin_valid_from < CAST(s1.ts AS TIMESTAMP) AND t1.bruin_is_current = 1
+  WHERE t1.bruin_valid_from < FROM_TZ(CAST(s1.ts AS TIMESTAMP(6)), 'UTC') AND t1.bruin_is_current = 1
 ) source
-ON ((target.id = source.id OR (target.id IS NULL AND source.id IS NULL)) AND source.bruin_is_current_src = 1 AND target.bruin_is_current = 1)
+ON ((target.id = source.id OR (target.id IS NULL AND source.id IS NULL)) AND source.bruin_is_current_src = 1)
 WHEN MATCHED THEN
   UPDATE SET
-    target.bruin_valid_until = CAST(source.ts AS TIMESTAMP),
+    target.bruin_valid_until = FROM_TZ(CAST(source.ts AS TIMESTAMP(6)), 'UTC'),
     target.bruin_is_current  = 0
-  WHERE target.bruin_valid_from < CAST(source.ts AS TIMESTAMP)
+  WHERE target.bruin_valid_from < FROM_TZ(CAST(source.ts AS TIMESTAMP(6)), 'UTC')
 WHEN NOT MATCHED THEN
   INSERT (id, event_name, ts, bruin_valid_from, bruin_valid_until, bruin_is_current)
-  VALUES (source.id, source.event_name, source.ts, CAST(source.ts AS TIMESTAMP), TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS'), 1);
+  VALUES (source.id, source.event_name, source.ts, FROM_TZ(CAST(source.ts AS TIMESTAMP(6)), 'UTC'), FROM_TZ(CAST(TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS') AS TIMESTAMP(6)), 'UTC'), 1);
 END;`,
 		},
 		{
