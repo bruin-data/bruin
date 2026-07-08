@@ -3,6 +3,7 @@ package fabric
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/bruin-data/bruin/pkg/ansisql"
@@ -76,12 +77,32 @@ SELECT
     STDEV(CAST([id] AS FLOAT)) as stddev_val
 FROM [warehouse].[dbo].[orders]`
 
+const expectedStringStatsQuery = `
+SELECT
+    COUNT_BIG(*) as count,
+    COUNT_BIG(*) - COUNT_BIG([name]) as null_count,
+    COUNT_BIG(DISTINCT CONVERT(NVARCHAR(4000), [name])) as distinct_count,
+    COUNT_BIG(CASE WHEN CONVERT(NVARCHAR(4000), [name]) = N'' THEN 1 END) as empty_count,
+    MIN(LEN(CONVERT(NVARCHAR(4000), [name]))) as min_length,
+    MAX(LEN(CONVERT(NVARCHAR(4000), [name]))) as max_length,
+    AVG(CAST(LEN(CONVERT(NVARCHAR(4000), [name])) AS FLOAT)) as avg_length
+FROM [warehouse].[dbo].[orders]`
+
 const expectedBooleanStatsQuery = `
 SELECT
     COUNT_BIG(*) as count,
     COUNT_BIG(*) - COUNT_BIG([is_active]) as null_count,
     COUNT_BIG(CASE WHEN [is_active] = 1 THEN 1 END) as true_count,
     COUNT_BIG(CASE WHEN [is_active] = 0 THEN 1 END) as false_count
+FROM [warehouse].[dbo].[orders]`
+
+const expectedDateTimeStatsQuery = `
+SELECT
+    COUNT_BIG(*) as count,
+    COUNT_BIG(*) - COUNT_BIG([created_at]) as null_count,
+    COUNT_BIG(DISTINCT [created_at]) as unique_count,
+    CONVERT(VARCHAR(33), MIN([created_at]), 126) as earliest_date,
+    CONVERT(VARCHAR(33), MAX([created_at]), 126) as latest_date
 FROM [warehouse].[dbo].[orders]`
 
 func TestDB_GetColumns(t *testing.T) {
@@ -332,6 +353,37 @@ func TestDB_GetTableSummaryFullNumericalStats(t *testing.T) {
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestDB_FetchStringStats(t *testing.T) {
+	t.Parallel()
+
+	mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+	require.NoError(t, err)
+	defer mockDB.Close()
+
+	mock.ExpectQuery(expectedStringStatsQuery).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"count",
+			"null_count",
+			"distinct_count",
+			"empty_count",
+			"min_length",
+			"max_length",
+			"avg_length",
+		}).AddRow(int64(5), int64(1), int64(3), int64(1), int64(0), int64(12), float64(4.5)))
+
+	db := &DB{conn: sqlx.NewDb(mockDB, "sqlmock")}
+	got, err := db.fetchStringStats(t.Context(), "[warehouse].[dbo].[orders]", "[name]")
+	require.NoError(t, err)
+	assert.Equal(t, int64(5), got.Count)
+	assert.Equal(t, int64(1), got.NullCount)
+	assert.Equal(t, int64(3), got.DistinctCount)
+	assert.Equal(t, int64(1), got.EmptyCount)
+	assert.Equal(t, 0, got.MinLength)
+	assert.Equal(t, 12, got.MaxLength)
+	assert.InDelta(t, float64(4.5), got.AvgLength, 0)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestDB_FetchBooleanStats(t *testing.T) {
 	t.Parallel()
 
@@ -354,5 +406,34 @@ func TestDB_FetchBooleanStats(t *testing.T) {
 	assert.Equal(t, int64(1), got.NullCount)
 	assert.Equal(t, int64(3), got.TrueCount)
 	assert.Equal(t, int64(1), got.FalseCount)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestDB_FetchDateTimeStats(t *testing.T) {
+	t.Parallel()
+
+	mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+	require.NoError(t, err)
+	defer mockDB.Close()
+
+	mock.ExpectQuery(expectedDateTimeStatsQuery).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"count",
+			"null_count",
+			"unique_count",
+			"earliest_date",
+			"latest_date",
+		}).AddRow(int64(5), int64(1), int64(4), "2024-01-01T10:30:00.1234567", "2024-01-02T11:30:00.1234567"))
+
+	db := &DB{conn: sqlx.NewDb(mockDB, "sqlmock")}
+	got, err := db.fetchDateTimeStats(t.Context(), "[warehouse].[dbo].[orders]", "[created_at]")
+	require.NoError(t, err)
+	assert.Equal(t, int64(5), got.Count)
+	assert.Equal(t, int64(1), got.NullCount)
+	assert.Equal(t, int64(4), got.UniqueCount)
+	require.NotNil(t, got.EarliestDate)
+	require.NotNil(t, got.LatestDate)
+	assert.Equal(t, time.Date(2024, 1, 1, 10, 30, 0, 123456700, time.UTC), *got.EarliestDate)
+	assert.Equal(t, time.Date(2024, 1, 2, 11, 30, 0, 123456700, time.UTC), *got.LatestDate)
 	require.NoError(t, mock.ExpectationsWereMet())
 }

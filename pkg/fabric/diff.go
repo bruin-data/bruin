@@ -197,7 +197,7 @@ func (db *DB) fetchStringStats(ctx context.Context, tableName, columnName string
 SELECT
     COUNT_BIG(*) as count,
     COUNT_BIG(*) - COUNT_BIG(%s) as null_count,
-    COUNT(DISTINCT %s) as distinct_count,
+    COUNT_BIG(DISTINCT %s) as distinct_count,
     COUNT_BIG(CASE WHEN %s = N'' THEN 1 END) as empty_count,
     MIN(LEN(%s)) as min_length,
     MAX(LEN(%s)) as max_length,
@@ -295,7 +295,7 @@ func (db *DB) fetchDateTimeStats(ctx context.Context, tableName, columnName stri
 SELECT
     COUNT_BIG(*) as count,
     COUNT_BIG(*) - COUNT_BIG(%s) as null_count,
-    COUNT(DISTINCT %s) as unique_count,
+    COUNT_BIG(DISTINCT %s) as unique_count,
     CONVERT(VARCHAR(33), MIN(%s), 126) as earliest_date,
     CONVERT(VARCHAR(33), MAX(%s), 126) as latest_date
 FROM %s`,
