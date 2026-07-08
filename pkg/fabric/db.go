@@ -41,7 +41,33 @@ func NewDB(c *Config) (*DB, error) {
 }
 
 func (db *DB) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
+	schemaName, ok := schemaNameToCreate(asset.Name)
+	if ok && schemaName.catalog != "" && db.schemaCreator.currentDatabase == "" {
+		currentDatabase, err := db.GetCurrentDatabase(ctx)
+		if err != nil {
+			return err
+		}
+		db.schemaCreator.currentDatabase = currentDatabase
+	}
+
 	return db.schemaCreator.CreateSchemaIfNotExist(ctx, db, asset)
+}
+
+func (db *DB) GetCurrentDatabase(ctx context.Context) (string, error) {
+	rows, err := db.Select(ctx, &query.Query{Query: "SELECT DB_NAME()"})
+	if err != nil {
+		return "", errors.Wrap(err, "failed to get current Fabric warehouse")
+	}
+	if len(rows) == 0 || len(rows[0]) == 0 {
+		return "", errors.New("failed to get current Fabric warehouse: empty result")
+	}
+
+	currentDatabase, ok := fromFabricValue(rows[0][0])
+	if !ok || currentDatabase == "" {
+		return "", errors.New("failed to get current Fabric warehouse: empty value")
+	}
+
+	return currentDatabase, nil
 }
 
 func (db *DB) Ping(ctx context.Context) error {

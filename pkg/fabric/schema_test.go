@@ -106,16 +106,16 @@ func TestSchemaCreator_CreateSchemaIfNotExistRejectsDifferentCatalog(t *testing.
 	assert.Equal(t, "IF SCHEMA_ID(N'Sales') IS NULL\n    EXEC(N'CREATE SCHEMA [Sales]')", runner.queries[0])
 }
 
-func TestSchemaCreator_CreateSchemaIfNotExistAllowsUnconfiguredDatabase(t *testing.T) {
+func TestSchemaCreator_CreateSchemaIfNotExistRequiresDatabaseForQualifiedName(t *testing.T) {
 	t.Parallel()
 
 	runner := &recordingSchemaRunner{}
 	creator := NewSchemaCreator()
 
-	require.NoError(t, creator.CreateSchemaIfNotExist(t.Context(), runner, &pipeline.Asset{Name: "Warehouse.Sales.Orders"}))
+	err := creator.CreateSchemaIfNotExist(t.Context(), runner, &pipeline.Asset{Name: "Warehouse.Sales.Orders"})
 
-	require.Len(t, runner.queries, 1)
-	assert.Equal(t, "IF SCHEMA_ID(N'Sales') IS NULL\n    EXEC(N'CREATE SCHEMA [Sales]')", runner.queries[0])
+	require.ErrorContains(t, err, "cannot create Fabric schema Warehouse.Sales without a configured connection database")
+	assert.Empty(t, runner.queries)
 }
 
 func TestSchemaCreator_CreateSchemaIfNotExistReturnsQueryError(t *testing.T) {
