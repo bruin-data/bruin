@@ -1,3 +1,11 @@
+---
+name: schema-drift-check
+description: Use when a pipeline fails because source, destination, or declared asset columns may have changed.
+connections:
+  - bruin
+  - github
+---
+
 # Schema Drift Check
 
 ## When to Use

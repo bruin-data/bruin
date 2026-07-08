@@ -1,3 +1,11 @@
+---
+name: pipeline-diagnose
+description: Use when a Bruin pipeline, asset, or command fails and the cause is not yet clear.
+connections:
+  - bruin
+  - github
+---
+
 # Pipeline Diagnose
 
 ## When to Use

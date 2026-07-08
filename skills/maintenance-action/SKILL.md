@@ -1,3 +1,11 @@
+---
+name: maintenance-action
+description: Use after a diagnosis skill has identified a likely fix and the repository owner wants to define a controlled action.
+connections:
+  - bruin
+  - github
+---
+
 # Maintenance Action
 
 ## When to Use

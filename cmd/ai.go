@@ -11,6 +11,7 @@ func AI(isDebug *bool) *cli.Command {
 		Usage: "AI-powered commands for enhancing and analyzing assets",
 		Commands: []*cli.Command{
 			enhanceCommand(isDebug),
+			AISkills(),
 		},
 	}
 }

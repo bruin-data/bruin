@@ -31,7 +31,6 @@ bruin validate --help
 | Command | Description |
 |---------|-------------|
 | [`init`](/commands/init) | Create a new Bruin project from a template |
-| [`ai templates`](/commands/ai-templates) | Install AI agent instructions and troubleshooting skills with `bruin init ai` |
 | [`clean`](/commands/clean) | Remove temporary files and build artifacts |
 | [`format`](/commands/format) | Format asset files for consistency |
 
@@ -58,6 +57,7 @@ bruin validate --help
 | [`import`](/commands/import) | Import existing resources as Bruin assets |
 | [`patch`](/commands/patch) | Apply patches to asset definitions |
 | [`ai enhance`](/commands/ai-enhance) | Enhance asset metadata using AI |
+| [`ai skills`](/commands/ai-skills) | Install or update Bruin-provided AI agent skills |
 
 ### Maintenance
 

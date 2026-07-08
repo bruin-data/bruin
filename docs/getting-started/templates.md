@@ -35,22 +35,7 @@ bruin init --help
 
 These bundled templates are grouped by the job they help you start. Use the docs search for template names, sources, warehouses, or tags such as `DuckDB`, `Snowflake`, `Shopify`, `Python`, or `demo`.
 
-### AI templates
-
-<div class="template-grid">
-  <a class="template-card" href="../commands/ai-templates.html">
-    <span class="template-card__category">Agent setup</span>
-    <strong>ai-skill-self-heal</strong>
-    <span>Installs Bruin-oriented agent skills for diagnosing failed runs, schema drift, duplicates, freshness issues, quality checks, and approved maintenance actions.</span>
-    <span class="template-card__tags"><code>AI agents</code><code>skills</code><code>DuckDB test</code></span>
-  </a>
-  <a class="template-card" href="../commands/ai-templates.html">
-    <span class="template-card__category">Agent instructions</span>
-    <strong>ai-agents-md</strong>
-    <span>Installs a starter AGENTS.md file with repository guidance for AI agents working on Bruin pipelines.</span>
-    <span class="template-card__tags"><code>AGENTS.md</code><code>repo setup</code></span>
-  </a>
-</div>
+AI agent skills are installed separately with `bruin ai skills`; see [AI Skills](/commands/ai-skills).
 
 ### Analytics demos
 

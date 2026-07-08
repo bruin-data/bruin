@@ -1,3 +1,11 @@
+---
+name: quality-check-investigate
+description: Use when a Bruin quality check fails or starts warning unexpectedly.
+connections:
+  - bruin
+  - github
+---
+
 # Quality Check Investigate
 
 ## When to Use
