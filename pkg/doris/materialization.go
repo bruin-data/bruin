@@ -138,9 +138,15 @@ SELECT * FROM %s`,
 }
 
 func buildTruncateInsertQuery(asset *pipeline.Asset, query string) (string, error) {
+	runID := temporaryTableRunID()
+	replacementTable := temporaryTableName(asset.Name, runID, "replacement")
 	queries := []string{
-		"TRUNCATE TABLE " + quoteIdentifier(asset.Name),
-		fmt.Sprintf("INSERT INTO %s %s", quoteIdentifier(asset.Name), strings.TrimSuffix(strings.TrimSpace(query), ";")),
+		"DROP TABLE IF EXISTS " + quoteIdentifier(replacementTable),
+		fmt.Sprintf(`CREATE TABLE %s
+PROPERTIES (%s)
+AS
+%s`, quoteIdentifier(replacementTable), buildDorisProperties(asset), strings.TrimSuffix(strings.TrimSpace(query), ";")),
+		replaceTableQuery(asset.Name, replacementTable),
 	}
 
 	return strings.Join(queries, ";\n") + ";", nil

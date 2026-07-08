@@ -84,7 +84,7 @@ func TestMaterializer_Render(t *testing.T) {
 			want:  "INSERT INTO `analytics`.`orders` SELECT * FROM staging;",
 		},
 		{
-			name: "truncate insert emits truncate and insert",
+			name: "truncate insert stages replacement before swap",
 			asset: &pipeline.Asset{
 				Name: "analytics.orders",
 				Materialization: pipeline.Materialization{
@@ -93,7 +93,12 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT * FROM staging",
-			want:  "TRUNCATE TABLE `analytics`.`orders`;\nINSERT INTO `analytics`.`orders` SELECT * FROM staging;",
+			want: "DROP TABLE IF EXISTS `analytics`.`__bruin_tmp_orders_abcefghi_replacement`;\n" +
+				"CREATE TABLE `analytics`.`__bruin_tmp_orders_abcefghi_replacement`\n" +
+				"PROPERTIES (\"replication_num\" = \"1\")\n" +
+				"AS\n" +
+				"SELECT * FROM staging;\n" +
+				"ALTER TABLE `analytics`.`orders` REPLACE WITH TABLE `__bruin_tmp_orders_abcefghi_replacement` PROPERTIES('swap' = 'false');",
 		},
 		{
 			name: "incremental requires key",
