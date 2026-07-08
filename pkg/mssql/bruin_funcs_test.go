@@ -23,7 +23,7 @@ func TestMSSQLBuiltinOverrides(t *testing.T) {
 		assert.Contains(t, result, "convert(varchar(32),")
 		assert.Contains(t, result, "cast(user_id as varchar(max))")
 		assert.Contains(t, result, "cast(session_id as varchar(max))")
-		assert.NotContains(t, result, "cast(user_id as varchar)")
+		assert.NotRegexp(t, `cast\(user_id as varchar\s*\)`, result)
 	})
 
 	t.Run("deduplicate uses TOP WITH TIES", func(t *testing.T) {

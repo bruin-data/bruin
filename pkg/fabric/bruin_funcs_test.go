@@ -21,7 +21,7 @@ func TestFabricBuiltinOverrides(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, result, "cast(user_id as varchar(max))")
 		assert.Contains(t, result, "cast(session_id as varchar(max))")
-		assert.NotContains(t, result, "cast(user_id as varchar)")
+		assert.NotRegexp(t, `cast\(user_id as varchar\s*\)`, result)
 		assert.Contains(t, result, "hashbytes('md5',")
 	})
 }
