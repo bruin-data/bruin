@@ -21,5 +21,5 @@ Bruin orchestrates pipeline execution through several features that work togethe
 - **[Lineage](/commands/lineage)**: The dependency graph forms a lineage that lets you trace how data flows through your pipeline. You can visualize it via the [`lineage` command](/commands/lineage) or the [VS Code lineage panel](/vscode-extension/panels/lineage-panel). In Bruin Cloud, lineage extends [across pipelines](/cloud/cross-pipeline).
 - **[Scheduling](/pipelines/definition#schedule)**: Pipelines can be scheduled using cron expressions in `pipeline.yml`, defining when and how often they run.
 - **[Concurrency](/getting-started/concurrency)**: Control how many assets run simultaneously (`--workers`) and how many pipeline runs can overlap (`concurrency` setting in Bruin Cloud).
-- **[Deployment](/deployment/vm-deployment)**: Run pipelines locally, on VMs with cron, via CI/CD (GitHub Actions, GitLab), or on cloud infrastructure (AWS Lambda, ECS, Google Cloud Run).
+- **[Deployment](/deployment/overview)**: Run pipelines with Bruin Cloud, on VMs with cron, via CI/CD (GitHub Actions, GitLab), or on cloud infrastructure (AWS Lambda, ECS, Google Cloud Run).
 - **[Bruin Cloud](/cloud/overview)**: Managed orchestration with scheduling, monitoring, notifications, and cross-pipeline dependencies — no infrastructure to manage.

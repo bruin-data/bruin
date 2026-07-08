@@ -152,7 +152,7 @@ When deploying to Bruin Cloud or other environments, you have several options:
 2. **Secret Providers**: Use external secret managers like [HashiCorp Vault](/secrets/vault), [Doppler](/secrets/doppler), or [AWS Secrets Manager](/secrets/aws-secrets-manager)
 3. **CI/CD Integration**: Inject secrets during CI/CD pipeline execution
 
-See the [Deployment](/deployment/vm-deployment) documentation for platform-specific guidance.
+See the [Deployment](/deployment/overview) documentation for platform-specific guidance.
 
 ## Schema-Based Environments
 
