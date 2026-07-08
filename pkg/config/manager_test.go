@@ -1188,6 +1188,92 @@ environments:
 	assert.True(t, filepath.IsAbs(sheets), "sheets path should be absolute: %s", sheets)
 }
 
+func TestLoadDoesNotPrefixAnchoredCredentialPaths(t *testing.T) {
+	t.Parallel()
+	fs := afero.NewMemMapFs()
+	configPath := "/repo/.bruin.yml"
+	drivePath := `C:\Users\ColtonChilders\Documents\GCS Keys\plated-mesh.json`
+	rootedPath := `\Users\ColtonChilders\Documents\GCS Keys\plated-mesh.json`
+	yml := `default_environment: default
+environments:
+  default:
+    connections:
+      google_cloud_platform:
+        - name: gcp-drive
+          project_id: proj
+          service_account_file: 'C:\Users\ColtonChilders\Documents\GCS Keys\plated-mesh.json'
+      google_sheets:
+        - name: sheets-drive
+          service_account_file: 'C:\Users\ColtonChilders\Documents\GCS Keys\plated-mesh.json'
+        - name: sheets-rooted
+          service_account_file: '\Users\ColtonChilders\Documents\GCS Keys\plated-mesh.json'
+`
+	require.NoError(t, afero.WriteFile(fs, configPath, []byte(yml), 0o644))
+
+	cfg, err := LoadOrCreate(fs, configPath)
+	require.NoError(t, err)
+
+	require.Len(t, cfg.SelectedEnvironment.Connections.GoogleCloudPlatform, 1)
+	assert.Equal(t, drivePath, cfg.SelectedEnvironment.Connections.GoogleCloudPlatform[0].ServiceAccountFile)
+
+	require.Len(t, cfg.SelectedEnvironment.Connections.GoogleSheets, 2)
+	assert.Equal(t, drivePath, cfg.SelectedEnvironment.Connections.GoogleSheets[0].ServiceAccountFile)
+	assert.Equal(t, rootedPath, cfg.SelectedEnvironment.Connections.GoogleSheets[1].ServiceAccountFile)
+}
+
+func TestIsAnchoredLocalPath(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		path string
+		want bool
+	}{
+		{
+			name: "relative unix",
+			path: "creds/service-account.json",
+			want: false,
+		},
+		{
+			name: "relative windows",
+			path: `creds\service-account.json`,
+			want: false,
+		},
+		{
+			name: "windows drive absolute with backslashes",
+			path: `C:\Users\ColtonChilders\Documents\GCS Keys\plated-mesh.json`,
+			want: true,
+		},
+		{
+			name: "windows drive absolute with slashes",
+			path: "C:/Users/ColtonChilders/Documents/GCS Keys/plated-mesh.json",
+			want: true,
+		},
+		{
+			name: "windows drive relative",
+			path: `C:Users\ColtonChilders\Documents\GCS Keys\plated-mesh.json`,
+			want: false,
+		},
+		{
+			name: "windows rooted current drive",
+			path: `\Users\ColtonChilders\Documents\GCS Keys\plated-mesh.json`,
+			want: true,
+		},
+		{
+			name: "unix absolute",
+			path: "/Users/ColtonChilders/Documents/GCS Keys/plated-mesh.json",
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, isAnchoredLocalPath(tt.path))
+		})
+	}
+}
+
 func TestLoadOrCreateWithoutPathAbsolutization(t *testing.T) {
 	t.Parallel()
 
