@@ -11,7 +11,6 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/config"
-	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/charmbracelet/bubbles/list"
@@ -518,7 +517,7 @@ func (m *importDatabaseModel) loadDatabaseSummaryCmd() tea.Cmd {
 	cfg := m.cfg
 
 	return func() tea.Msg {
-		manager, errs := connection.NewManagerFromConfigWithContext(ctx, cfg)
+		manager, errs := connectionManagerFromConfig(ctx, cfg, makeLogger(false))
 		if len(errs) > 0 {
 			return dbSummaryLoadedMsg{err: fmt.Errorf("failed to create connection manager: %w", errs[0])}
 		}
@@ -674,6 +673,8 @@ func runImportDatabaseTUI(ctx context.Context, pipelinePath, environment, config
 			return fmt.Errorf("failed to select environment '%s': %w", environment, envErr)
 		}
 	}
+	ctx = context.WithValue(ctx, config.ConfigFilePathContextKey, configFile)
+	ctx = context.WithValue(ctx, config.EnvironmentNameContextKey, cfg.SelectedEnvironmentName)
 
 	if cfg.SelectedEnvironment == nil || cfg.SelectedEnvironment.Connections == nil {
 		return errors.New("no environment selected or no connections configured")

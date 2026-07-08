@@ -2644,11 +2644,11 @@ func cloudConnectionsList() *cli.Command {
 	}
 }
 
-// connectionFromConfig loads a named connection from the local .bruin.yml and
-// returns its type and credentials as a snake_case map (the cloud wire format).
+// connectionFromConfig loads a named connection from the selected connection
+// source and returns its type and credentials as a snake_case map (the cloud wire format).
 // The struct's JSON tags already match the wire format, so a marshal round-trip
 // avoids any per-type mapping.
-func connectionFromConfig(name, environment, configFile string) (string, map[string]any, error) {
+func connectionFromConfig(ctx context.Context, name, environment, configFile string) (string, map[string]any, error) {
 	configFilePath := configFile
 	if configFilePath == "" {
 		repoRoot, err := git.FindRepoFromPath(".")
@@ -2663,28 +2663,43 @@ func connectionFromConfig(name, environment, configFile string) (string, map[str
 		return "", nil, fmt.Errorf("failed to load %s: %w", configFilePath, err)
 	}
 
-	env := cm.SelectedEnvironment
 	if environment != "" {
-		e, ok := cm.Environments[environment]
-		if !ok {
-			return "", nil, fmt.Errorf("environment '%s' not found in config", environment)
+		if err := cm.SelectEnvironment(environment); err != nil {
+			return "", nil, err
 		}
-		env = &e
 	}
+
+	if secretsBackendFromContext(ctx) != "" {
+		ctx = context.WithValue(ctx, config.ConfigFilePathContextKey, configFilePath)
+		ctx = context.WithValue(ctx, config.EnvironmentNameContextKey, cm.SelectedEnvironmentName)
+		manager, errs := connectionManagerFromConfig(ctx, cm, makeLogger(false))
+		if len(errs) > 0 {
+			return "", nil, fmt.Errorf("failed to create connection manager: %w", errs[0])
+		}
+
+		connType := manager.GetConnectionType(name)
+		details := manager.GetConnectionDetails(name)
+		if connType == "" || details == nil {
+			return "", nil, config.NewConnectionNotFoundError(ctx, "", name)
+		}
+
+		credentials, err := connectionCredentialsMap(details)
+		if err != nil {
+			return "", nil, err
+		}
+		return connType, credentials, nil
+	}
+
+	env := cm.SelectedEnvironment
 	if env == nil || env.Connections == nil || !env.Connections.Exists(name) {
 		return "", nil, fmt.Errorf("connection '%s' not found in config", name)
 	}
 
 	connType := env.Connections.ConnectionsSummaryList()[name]
-	data, err := json.Marshal(env.Connections.GetConnection(name))
+	credentials, err := connectionCredentialsMap(env.Connections.GetConnection(name))
 	if err != nil {
-		return "", nil, fmt.Errorf("failed to serialize connection: %w", err)
+		return "", nil, err
 	}
-	var credentials map[string]any
-	if err := json.Unmarshal(data, &credentials); err != nil {
-		return "", nil, fmt.Errorf("failed to serialize connection: %w", err)
-	}
-	delete(credentials, "name")
 
 	// A relative service_account_file in .bruin.yml is relative to the config
 	// file, not the CWD the command runs from. Resolve it against the config dir.
@@ -2693,6 +2708,19 @@ func connectionFromConfig(name, environment, configFile string) (string, map[str
 	}
 
 	return connType, credentials, nil
+}
+
+func connectionCredentialsMap(connectionDetails any) (map[string]any, error) {
+	data, err := json.Marshal(connectionDetails)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize connection: %w", err)
+	}
+	var credentials map[string]any
+	if err := json.Unmarshal(data, &credentials); err != nil {
+		return nil, fmt.Errorf("failed to serialize connection: %w", err)
+	}
+	delete(credentials, "name")
+	return credentials, nil
 }
 
 func cloudConnectionsAdd() *cli.Command {
@@ -2747,9 +2775,9 @@ func cloudConnectionsAdd() *cli.Command {
 					return cli.Exit("", 1)
 				}
 			} else {
-				t, cr, err := connectionFromConfig(name, c.String("environment"), c.String("config-file"))
+				t, cr, err := connectionFromConfig(ctx, name, c.String("environment"), c.String("config-file"))
 				if err != nil {
-					printError(err, output, "Failed to read connection from .bruin.yml")
+					printError(err, output, "Failed to read connection")
 					return cli.Exit("", 1)
 				}
 				connType, credentials = t, cr

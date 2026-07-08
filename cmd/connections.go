@@ -9,7 +9,6 @@ import (
 	path2 "path"
 
 	"github.com/bruin-data/bruin/pkg/config"
-	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -470,7 +469,9 @@ func PingConnection() *cli.Command {
 				printErrorForOutput(output, errors2.Wrap(err, "failed to select the environment"))
 				return cli.Exit("", 1)
 			}
-			manager, errs := connection.NewManagerFromConfigWithContext(ctx, cm)
+			ctx = context.WithValue(ctx, config.ConfigFilePathContextKey, configFilePath)
+			ctx = context.WithValue(ctx, config.EnvironmentNameContextKey, cm.SelectedEnvironmentName)
+			manager, errs := connectionManagerFromConfig(ctx, cm, makeLogger(false))
 			if len(errs) > 0 {
 				// Handle each error in the errs slice
 				for _, err := range errs {
@@ -481,11 +482,7 @@ func PingConnection() *cli.Command {
 
 			conn := manager.GetConnection(name)
 			if conn == nil {
-				printErrorForOutput(output, &config.MissingConnectionError{
-					Name:            name,
-					ConfigFilePath:  configFilePath,
-					EnvironmentName: cm.SelectedEnvironmentName,
-				})
+				printErrorForOutput(output, config.NewConnectionNotFoundError(ctx, "", name))
 				return cli.Exit("", 1)
 			}
 

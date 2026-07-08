@@ -17,7 +17,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
-	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/path"
@@ -915,18 +914,16 @@ func getConnectionAndTypeFromConfigWithContext(ctx context.Context, env string, 
 		}
 	}
 
-	manager, errs := connection.NewManagerFromConfigWithContext(ctx, cm)
+	ctx = context.WithValue(ctx, config.ConfigFilePathContextKey, configFilePath)
+	ctx = context.WithValue(ctx, config.EnvironmentNameContextKey, cm.SelectedEnvironmentName)
+	manager, errs := connectionManagerFromConfig(ctx, cm, makeLogger(false))
 	if len(errs) > 0 {
 		return nil, "", errors.Wrap(errs[0], "failed to create connection manager")
 	}
 
 	conn := manager.GetConnection(connectionName)
 	if conn == nil {
-		return nil, "", &config.MissingConnectionError{
-			Name:            connectionName,
-			ConfigFilePath:  configFilePath,
-			EnvironmentName: cm.SelectedEnvironmentName,
-		}
+		return nil, "", config.NewConnectionNotFoundError(ctx, "", connectionName)
 	}
 
 	return conn, manager.GetConnectionType(connectionName), nil
@@ -954,8 +951,11 @@ func getConnectionFromPipelineInfoWithContext(ctx context.Context, pipelineInfo 
 		}
 	}
 
+	ctx = context.WithValue(ctx, config.ConfigFilePathContextKey, pipelineInfo.Config.Path())
+	ctx = context.WithValue(ctx, config.EnvironmentNameContextKey, pipelineInfo.Config.SelectedEnvironmentName)
+
 	// Get connection info
-	manager, errs := connection.NewManagerFromConfigWithContext(ctx, pipelineInfo.Config)
+	manager, errs := connectionManagerFromConfig(ctx, pipelineInfo.Config, makeLogger(false))
 	if len(errs) > 0 {
 		return "", nil, errors.Wrap(errs[0], "failed to create connection manager")
 	}
@@ -967,11 +967,7 @@ func getConnectionFromPipelineInfoWithContext(ctx context.Context, pipelineInfo 
 
 	conn := manager.GetConnection(connName)
 	if conn == nil {
-		return "", nil, &config.MissingConnectionError{
-			Name:            connName,
-			ConfigFilePath:  pipelineInfo.Config.Path(),
-			EnvironmentName: pipelineInfo.Config.SelectedEnvironmentName,
-		}
+		return "", nil, config.NewConnectionNotFoundError(ctx, "", connName)
 	}
 
 	return connName, conn, nil
@@ -985,18 +981,16 @@ func getConnectionByNameFromPipelineInfoWithContext(ctx context.Context, pipelin
 		}
 	}
 
-	manager, errs := connection.NewManagerFromConfigWithContext(ctx, pipelineInfo.Config)
+	ctx = context.WithValue(ctx, config.ConfigFilePathContextKey, pipelineInfo.Config.Path())
+	ctx = context.WithValue(ctx, config.EnvironmentNameContextKey, pipelineInfo.Config.SelectedEnvironmentName)
+	manager, errs := connectionManagerFromConfig(ctx, pipelineInfo.Config, makeLogger(false))
 	if len(errs) > 0 {
 		return "", nil, errors.Wrap(errs[0], "failed to create connection manager")
 	}
 
 	conn := manager.GetConnection(connName)
 	if conn == nil {
-		return "", nil, &config.MissingConnectionError{
-			Name:            connName,
-			ConfigFilePath:  pipelineInfo.Config.Path(),
-			EnvironmentName: pipelineInfo.Config.SelectedEnvironmentName,
-		}
+		return "", nil, config.NewConnectionNotFoundError(ctx, "", connName)
 	}
 
 	return connName, conn, nil

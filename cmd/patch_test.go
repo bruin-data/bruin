@@ -286,7 +286,7 @@ func TestFillColumnsFromDB(t *testing.T) {
 			fs := afero.NewMemMapFs()
 
 			// Execute the function with mock manager
-			status, err := fillColumnsFromDB(pp, fs, "test", "", mockManager)
+			status, err := fillColumnsFromDB(t.Context(), pp, fs, "test", "", mockManager)
 
 			// Verify results
 			if tt.expectError {
@@ -337,7 +337,7 @@ func TestFillColumnsFromDB_ConnectionOverride(t *testing.T) {
 		Config:   &config.Config{},
 	}
 
-	status, err := fillColumnsFromDB(pp, afero.NewMemMapFs(), "", "source_connection", mockManager)
+	status, err := fillColumnsFromDB(t.Context(), pp, afero.NewMemMapFs(), "", "source_connection", mockManager)
 	require.NoError(t, err)
 	assert.Equal(t, fillStatusUpdated, status)
 	assert.Equal(t, []pipeline.Column{
@@ -371,7 +371,7 @@ func TestFillColumnsFromDB_ConnectionOverrideMissing(t *testing.T) {
 		Config:   &config.Config{},
 	}
 
-	status, err := fillColumnsFromDB(pp, afero.NewMemMapFs(), "", "missing_connection", mockManager)
+	status, err := fillColumnsFromDB(t.Context(), pp, afero.NewMemMapFs(), "", "missing_connection", mockManager)
 	require.Error(t, err)
 	assert.Equal(t, fillStatusFailed, status)
 	assert.Contains(t, err.Error(), "missing_connection")

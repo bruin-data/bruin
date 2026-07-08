@@ -479,6 +479,9 @@ environments:
 
 	// Mock stdin to simulate user saying "n"
 	oldStdin := os.Stdin
+	defer func() {
+		os.Stdin = oldStdin
+	}()
 	r, w, _ := os.Pipe()
 	os.Stdin = r
 	_, _ = w.WriteString("n\n")
@@ -493,7 +496,4 @@ environments:
 	assert.True(t, cm.EnvironmentExists("dev"))
 	assert.True(t, cm.EnvironmentExists("prod"))
 	assert.Greater(t, len(cm.Environments), 1)
-
-	// Restore stdin
-	os.Stdin = oldStdin
 }
