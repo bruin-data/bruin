@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const expectedColumnsQuery = `
+const expectedCurrentDatabaseColumnsQuery = `
 SELECT
     COLUMN_NAME,
     DATA_TYPE,
@@ -20,6 +20,32 @@ SELECT
     NUMERIC_PRECISION,
     NUMERIC_SCALE
 FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = @p1 AND TABLE_NAME = @p2
+ORDER BY ORDINAL_POSITION;
+`
+
+const expectedWarehouseColumnsQuery = `
+SELECT
+    COLUMN_NAME,
+    DATA_TYPE,
+    IS_NULLABLE,
+    CHARACTER_MAXIMUM_LENGTH,
+    NUMERIC_PRECISION,
+    NUMERIC_SCALE
+FROM [warehouse].INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = @p1 AND TABLE_NAME = @p2
+ORDER BY ORDINAL_POSITION;
+`
+
+const expectedArchiveColumnsQuery = `
+SELECT
+    COLUMN_NAME,
+    DATA_TYPE,
+    IS_NULLABLE,
+    CHARACTER_MAXIMUM_LENGTH,
+    NUMERIC_PRECISION,
+    NUMERIC_SCALE
+FROM [archive].INFORMATION_SCHEMA.COLUMNS
 WHERE TABLE_SCHEMA = @p1 AND TABLE_NAME = @p2
 ORDER BY ORDINAL_POSITION;
 `
@@ -40,7 +66,7 @@ func TestDB_GetColumns(t *testing.T) {
 			databaseName: "warehouse",
 			tableName:    "sales.orders",
 			mockConnection: func(mock sqlmock.Sqlmock) {
-				mock.ExpectQuery(expectedColumnsQuery).
+				mock.ExpectQuery(expectedWarehouseColumnsQuery).
 					WithArgs("sales", "orders").
 					WillReturnRows(sqlmock.NewRows([]string{
 						"COLUMN_NAME",
@@ -67,7 +93,7 @@ func TestDB_GetColumns(t *testing.T) {
 			databaseName: "warehouse",
 			tableName:    "orders",
 			mockConnection: func(mock sqlmock.Sqlmock) {
-				mock.ExpectQuery(expectedColumnsQuery).
+				mock.ExpectQuery(expectedWarehouseColumnsQuery).
 					WithArgs("dbo", "orders").
 					WillReturnRows(sqlmock.NewRows([]string{
 						"COLUMN_NAME",
@@ -83,17 +109,31 @@ func TestDB_GetColumns(t *testing.T) {
 			},
 		},
 		{
-			name:         "rejects three-part table names",
+			name:         "three-part table name scopes lookup to table database",
 			databaseName: "warehouse",
-			tableName:    "other.sales.orders",
-			wantErr:      "table name must be in format",
+			tableName:    "archive.sales.orders",
+			mockConnection: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(expectedArchiveColumnsQuery).
+					WithArgs("sales", "orders").
+					WillReturnRows(sqlmock.NewRows([]string{
+						"COLUMN_NAME",
+						"DATA_TYPE",
+						"IS_NULLABLE",
+						"CHARACTER_MAXIMUM_LENGTH",
+						"NUMERIC_PRECISION",
+						"NUMERIC_SCALE",
+					}).AddRow("id", "bigint", "NO", nil, int64(19), int64(0)))
+			},
+			want: []*ansisql.DBColumn{
+				{Name: "id", Type: "bigint", Nullable: false, PrimaryKey: false, Unique: false},
+			},
 		},
 		{
 			name:         "query error",
 			databaseName: "warehouse",
 			tableName:    "sales.orders",
 			mockConnection: func(mock sqlmock.Sqlmock) {
-				mock.ExpectQuery(expectedColumnsQuery).
+				mock.ExpectQuery(expectedWarehouseColumnsQuery).
 					WithArgs("sales", "orders").
 					WillReturnError(errors.New("metadata failed"))
 			},
@@ -135,7 +175,7 @@ func TestDB_GetColumnsForTable(t *testing.T) {
 	require.NoError(t, err)
 	defer mockDB.Close()
 
-	mock.ExpectQuery(expectedColumnsQuery).
+	mock.ExpectQuery(expectedCurrentDatabaseColumnsQuery).
 		WithArgs("finance", "payments").
 		WillReturnRows(sqlmock.NewRows([]string{
 			"COLUMN_NAME",

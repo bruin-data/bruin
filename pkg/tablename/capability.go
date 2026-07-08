@@ -111,9 +111,9 @@ var registry = map[string]Capability{
 		FormatDesc: "`table` or `schema.table`",
 	},
 	"fabric": {
-		Platform: "fabric", MinComponents: 1, MaxComponents: 2,
-		Labels:     [3]string{"", "schema", "table"},
-		FormatDesc: "`table` or `schema.table`",
+		Platform: "fabric", MinComponents: 1, MaxComponents: 3,
+		Labels:     [3]string{"database", "schema", "table"},
+		FormatDesc: "`table`, `schema.table`, or `database.schema.table`",
 	},
 	"oracle": {
 		Platform: "oracle", MinComponents: 1, MaxComponents: 2,

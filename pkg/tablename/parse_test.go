@@ -85,6 +85,12 @@ func TestCapability_Parse(t *testing.T) {
 			wantErr:  true,
 		},
 		{
+			name:     "fabric three-part is database schema table",
+			platform: "fabric",
+			raw:      "warehouse.dbo.orders",
+			want:     TableName{Catalog: "warehouse", Schema: "dbo", Table: "orders"},
+		},
+		{
 			name:     "empty component is rejected",
 			platform: "snowflake",
 			raw:      "raw..events",

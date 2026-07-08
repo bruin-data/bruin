@@ -154,12 +154,12 @@ func (db *DB) GetColumns(ctx context.Context, databaseName, tableName string) ([
 	if !ok {
 		return nil, errors.New("fabric table-name capability not found")
 	}
-	tn, err := cb.Parse(tableName, tablename.Defaults{Schema: "dbo"})
+	tn, err := cb.Parse(tableName, tablename.Defaults{Catalog: databaseName, Schema: "dbo"})
 	if err != nil {
 		return nil, err
 	}
 
-	return db.getColumns(ctx, tn.Schema, tn.Table, databaseName+"."+tableName)
+	return db.getColumns(ctx, tn.Catalog, tn.Schema, tn.Table, tn.String("."))
 }
 
 func (db *DB) GetColumnsForTable(ctx context.Context, schemaName, tableName string) ([]*ansisql.DBColumn, error) {
@@ -170,11 +170,16 @@ func (db *DB) GetColumnsForTable(ctx context.Context, schemaName, tableName stri
 		return nil, errors.New("table name cannot be empty")
 	}
 
-	return db.getColumns(ctx, schemaName, tableName, schemaName+"."+tableName)
+	return db.getColumns(ctx, "", schemaName, tableName, schemaName+"."+tableName)
 }
 
-func (db *DB) getColumns(ctx context.Context, schemaName, tableName, displayName string) ([]*ansisql.DBColumn, error) {
-	const q = `
+func (db *DB) getColumns(ctx context.Context, databaseName, schemaName, tableName, displayName string) ([]*ansisql.DBColumn, error) {
+	infoSchema := "INFORMATION_SCHEMA"
+	if databaseName != "" {
+		infoSchema = QuoteIdentifier(databaseName) + ".INFORMATION_SCHEMA"
+	}
+
+	q := fmt.Sprintf(`
 SELECT
     COLUMN_NAME,
     DATA_TYPE,
@@ -182,10 +187,10 @@ SELECT
     CHARACTER_MAXIMUM_LENGTH,
     NUMERIC_PRECISION,
     NUMERIC_SCALE
-FROM INFORMATION_SCHEMA.COLUMNS
+FROM %s.COLUMNS
 WHERE TABLE_SCHEMA = @p1 AND TABLE_NAME = @p2
 ORDER BY ORDINAL_POSITION;
-`
+`, infoSchema)
 
 	rows, err := db.conn.QueryContext(ctx, q, schemaName, tableName)
 	if err != nil {
