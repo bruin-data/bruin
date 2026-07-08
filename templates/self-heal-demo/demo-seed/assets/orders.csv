@@ -1,0 +1,6 @@
+order_id,customer_id,order_date,product_id,amount,currency,order_status
+1001,501,2025-01-01,SKU-BOARD,25.00,USD,paid
+1002,502,2025-01-01,SKU-MUG,35.00,USD,paid
+1003,503,2025-01-02,SKU-HOODIE,40.00,USD,paid
+1004,503,2025-01-02,SKU-BAG,90.00,USD,paid
+1005,504,2025-01-03,SKU-CAP,50.00,USD,paid

@@ -1,0 +1,21 @@
+name: raw.fulfillment_events
+type: duckdb.seed
+description: Fulfillment event stream from the warehouse operations system.
+
+parameters:
+  path: ./fulfillment_events.csv
+
+columns:
+  - name: event_id
+    type: VARCHAR
+    checks:
+      - name: not_null
+      - name: unique
+  - name: order_id
+    type: INTEGER
+  - name: event_type
+    type: VARCHAR
+  - name: event_timestamp
+    type: TIMESTAMP
+  - name: facility
+    type: VARCHAR

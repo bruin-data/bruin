@@ -1,0 +1,23 @@
+name: raw.order_status_history
+type: duckdb.seed
+description: Status changes recorded by the order lifecycle system.
+
+parameters:
+  path: ./order_status_history.csv
+
+columns:
+  - name: status_event_id
+    type: VARCHAR
+    checks:
+      - name: not_null
+      - name: unique
+  - name: order_id
+    type: INTEGER
+    checks:
+      - name: not_null
+  - name: status
+    type: VARCHAR
+  - name: status_updated_at
+    type: TIMESTAMP
+  - name: is_current
+    type: BOOLEAN

@@ -20,8 +20,8 @@ Use this skill when data is stale, a scheduled run is missing, or freshness chec
 
 ## Operating Context
 
-- These starter skills are primarily meant for AI agents configured inside Bruin Cloud.
-- In Bruin Cloud, use Bruin Cloud MCP tools when available. If using the CLI, list recent runs with `bruin cloud runs list --project-id <project-id> --pipeline <pipeline-name>`, diagnose the latest run with `bruin cloud runs diagnose --project-id <project-id> --pipeline <pipeline-name> --latest`, and inspect failed logs with `bruin cloud instances failed-logs --project-id <project-id> --run-id <run-id>`.
+- These starter skills can be used by Bruin Cloud agents, local agents, and external assistants connected to Bruin Cloud.
+- In Bruin Cloud, use Cloud CLI access when the agent has it enabled. Use the `bruin cloud` CLI when the assistant has shell access and a configured API key or `.bruin.yml`; use Bruin Cloud MCP only when the assistant is configured for MCP tool calls or does not have direct CLI access. If using the CLI, list recent runs with `bruin cloud runs list --project-id <project-id> --pipeline <pipeline-name>`, diagnose the latest run with `bruin cloud runs diagnose --project-id <project-id> --pipeline <pipeline-name> --latest`, and inspect failed logs with `bruin cloud instances failed-logs --project-id <project-id> --run-id <run-id>`.
 - In local development, inspect terminal output and the local `logs/` folder, especially `logs/runs`, query logs, and export logs when they exist. Create local runs with `bruin run <path>` and explicit dates when needed.
 - If investigation or fix verification requires running an asset or pipeline, prefer a dev or shadow environment. If none exists, ask whether to run in production or create temporary copies of the affected tables to reproduce and test the issue.
 - For other agent runtimes or orchestrators, customize this skill with the correct scheduler, log source, and run trigger mechanism before using it.
@@ -58,12 +58,6 @@ Define repository-specific actions here. Until customized, this skill must repor
 - Re-run the freshness check or equivalent query.
 - Confirm the latest source and destination timestamps.
 - Verify the expected schedule against the current date and timezone.
-
-## Testing This Skill
-
-- Use the local self-heal fixture from the Bruin `init` command docs.
-- Run the freshness scenario and verify the agent starts with the missing `transaction_date = DATE '2025-01-03'`, traces the date upstream, and identifies the stale filter in `silver_orders`.
-- If fixes are allowed, verify the agent changes only the isolated filter, checks the missing date first, then runs the full freshness check.
 
 ## Output
 
