@@ -445,9 +445,7 @@ environments:
 	}
 }
 
-func TestEnvironmentDeleteCommand_Run_UserCancellation(t *testing.T) {
-	t.Parallel()
-
+func TestEnvironmentDeleteCommand_Run_UserCancellation(t *testing.T) { //nolint:paralleltest
 	// Create a temporary config file content
 	configContent := `
 default_environment: dev
