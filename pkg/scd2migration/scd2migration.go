@@ -57,7 +57,7 @@ func Postgres(ctx context.Context, db Querier, assetName string) error {
 }
 
 // Snowflake converts TIMESTAMP_NTZ (and non-target TIMESTAMP_LTZ) columns to
-// TIMESTAMP_TZ, reading the stored values as UTC
+// TIMESTAMP_TZ, reading the stored values as UTC.
 func Snowflake(ctx context.Context, db Querier, assetName string) error {
 	parts := strings.Split(assetName, ".")
 	prefix, schema, table := "", "", strings.ToUpper(assetName)

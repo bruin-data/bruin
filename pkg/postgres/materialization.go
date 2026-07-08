@@ -858,6 +858,13 @@ func dataVaultColumnIsExcluded(col *pipeline.Column, excludedColumns []*pipeline
 	return false
 }
 
+func scd2SessionTZ(asset *pipeline.Asset) string {
+	if asset.Type == pipeline.AssetTypeRedshiftQuery {
+		return ""
+	}
+	return "SET LOCAL TIME ZONE 'UTC';\n"
+}
+
 func pgTimestampWithTimeZone(expr, columnType string) string {
 	lcType := strings.ToLower(columnType)
 	if strings.Contains(lcType, "time zone") || strings.Contains(lcType, "timestamptz") {
@@ -896,7 +903,7 @@ func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, 
 
 	stmt := fmt.Sprintf(
 		`BEGIN TRANSACTION;
-DROP TABLE IF EXISTS %s;
+%sDROP TABLE IF EXISTS %s;
 CREATE TABLE %s AS
 SELECT
   %s AS _valid_from,
@@ -907,6 +914,7 @@ FROM (
 %s
 ) AS src;
 COMMIT;`,
+		scd2SessionTZ(asset),
 		QuoteIdentifier(asset.Name),
 		QuoteIdentifier(asset.Name),
 		validFromExpr,
@@ -938,7 +946,7 @@ func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query string) (string, er
 	validFromExpr := pgTimestampWithTimeZone(quotedIncrementalKey, pgIncrementalKeyType(asset))
 	stmt := fmt.Sprintf(
 		`BEGIN TRANSACTION;
-DROP TABLE IF EXISTS %s;
+%sDROP TABLE IF EXISTS %s;
 CREATE TABLE %s AS
 SELECT
   %s AS _valid_from,
@@ -949,6 +957,7 @@ FROM (
 %s
 ) AS src;
 COMMIT;`,
+		scd2SessionTZ(asset),
 		QuoteIdentifier(asset.Name),
 		QuoteIdentifier(asset.Name),
 		validFromExpr,

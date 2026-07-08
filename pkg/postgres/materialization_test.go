@@ -857,7 +857,7 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 			},
 			fullRefresh: true,
 			query:       "SELECT id, event_name, ts from source_table",
-			want: "BEGIN TRANSACTION;\n" +
+			want: "BEGIN TRANSACTION;\nSET LOCAL TIME ZONE 'UTC';\n" +
 				"DROP TABLE IF EXISTS \"my\".\"asset\";\n" +
 				"CREATE TABLE \"my\".\"asset\" AS\n" +
 				"SELECT\n" +
@@ -1073,7 +1073,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 			},
 			fullRefresh: true,
 			query:       "SELECT id, name, price from source_table",
-			want: "BEGIN TRANSACTION;\n" +
+			want: "BEGIN TRANSACTION;\nSET LOCAL TIME ZONE 'UTC';\n" +
 				"DROP TABLE IF EXISTS \"my\".\"asset\";\n" +
 				"CREATE TABLE \"my\".\"asset\" AS\n" +
 				"SELECT\n" +
@@ -1152,7 +1152,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 			},
 			fullRefresh: true,
 			query:       "SELECT id, name, price, updated_at from source_table",
-			want: "BEGIN TRANSACTION;\n" +
+			want: "BEGIN TRANSACTION;\nSET LOCAL TIME ZONE 'UTC';\n" +
 				"DROP TABLE IF EXISTS \"my\".\"asset\";\n" +
 				"CREATE TABLE \"my\".\"asset\" AS\n" +
 				"SELECT\n" +
