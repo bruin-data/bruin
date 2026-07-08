@@ -2642,6 +2642,9 @@ func TestBuilder_SetupDefaultsFromPipelineAppliesAssetFieldDefaults(t *testing.T
 		Notifications: &pipeline.Notifications{
 			Slack: []pipeline.SlackNotification{{Channel: "#asset"}},
 		},
+		Doris: pipeline.DorisConfig{
+			Properties: map[string]string{"compression": "lz4"},
+		},
 	}
 
 	defaults := &pipeline.DefaultValues{
@@ -2695,6 +2698,15 @@ func TestBuilder_SetupDefaultsFromPipelineAppliesAssetFieldDefaults(t *testing.T
 		Athena: pipeline.AthenaConfig{
 			Location: "s3://default/results",
 		},
+		Doris: pipeline.DorisConfig{
+			TableModel:    "duplicate_key",
+			DistributedBy: []string{"tenant_id"},
+			Buckets:       8,
+			Properties: map[string]string{
+				"compression":     "zstd",
+				"replication_num": "2",
+			},
+		},
 		Routing: &pipeline.RoutingConfig{
 			EgressGateway: "default-gateway",
 		},
@@ -2740,6 +2752,15 @@ func TestBuilder_SetupDefaultsFromPipelineAppliesAssetFieldDefaults(t *testing.T
 	assert.Equal(t, pipeline.EmptyStringMap{"catalog": "default"}, got.Metadata)
 	assert.Equal(t, "default-wh", got.Snowflake.Warehouse)
 	assert.Equal(t, "s3://default/results", got.Athena.Location)
+	assert.Equal(t, pipeline.DorisConfig{
+		TableModel:    "duplicate_key",
+		DistributedBy: []string{"tenant_id"},
+		Buckets:       8,
+		Properties: map[string]string{
+			"compression":     "lz4",
+			"replication_num": "2",
+		},
+	}, got.Doris)
 	assert.Equal(t, &pipeline.RoutingConfig{EgressGateway: "default-gateway"}, got.Routing)
 	assert.Equal(t, &rerunCooldown, got.RerunCooldown)
 	assert.Equal(t, &retries, got.Retries)

@@ -42,8 +42,10 @@ func TestEnsureAssetNameComponentCountIsValid(t *testing.T) {
 		{name: "postgres three-part rejected", assetName: "db.public.users", assetType: pipeline.AssetTypePostgresQuery, wantIssue: true},
 		{name: "clickhouse three-part rejected", assetName: "cat.db.t", assetType: pipeline.AssetTypeClickHouse, wantIssue: true},
 		{name: "mysql three-part rejected", assetName: "a.b.c", assetType: pipeline.AssetTypeMySQLQuery, wantIssue: true},
+		{name: "doris three-part rejected", assetName: "a.b.c", assetType: pipeline.AssetTypeDorisQuery, wantIssue: true},
 		// two-part still valid on two-level engines
 		{name: "postgres two-part valid", assetName: "public.users", assetType: pipeline.AssetTypePostgresQuery},
+		{name: "doris two-part valid", assetName: "analytics.orders", assetType: pipeline.AssetTypeDorisQuery},
 		// bigquery requires at least two components
 		{name: "bigquery one-part rejected", assetName: "tbl", assetType: pipeline.AssetTypeBigqueryQuery, wantIssue: true},
 		// empty components rejected
@@ -4953,6 +4955,30 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "task1",
 				Type: pipeline.AssetTypeMySQLTableSensor,
+				Parameters: pipeline.ParameterMap{
+					"table": "analytics.orders",
+				},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Doris - invalid format (too many components)",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeDorisTableSensor,
+				Parameters: pipeline.ParameterMap{
+					"table": "analytics.sales.daily",
+				},
+			},
+			want:    []string{"Doris table sensor `table` parameter must be in format `table` or `schema.table`, 'analytics.sales.daily' given"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Doris - valid database.table format",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeDorisTableSensor,
 				Parameters: pipeline.ParameterMap{
 					"table": "analytics.orders",
 				},

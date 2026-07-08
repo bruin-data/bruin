@@ -29,6 +29,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/databricks"
 	dataprocserverless "github.com/bruin-data/bruin/pkg/dataproc_serverless"
 	"github.com/bruin-data/bruin/pkg/date"
+	"github.com/bruin-data/bruin/pkg/doris"
 	"github.com/bruin-data/bruin/pkg/dremio"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/emr_serverless"
@@ -2524,6 +2525,34 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeMySQLTableSensor][scheduler.TaskInstanceTypeMain] = mysqlTableSensor
 		mainExecutors[pipeline.AssetTypeMySQLTableSensor][scheduler.TaskInstanceTypeColumnCheck] = mysqlCheckRunner
 		mainExecutors[pipeline.AssetTypeMySQLTableSensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+	}
+
+	if s.WillRunTaskOfType(pipeline.AssetTypeDorisQuery) ||
+		estimateCustomCheckType == pipeline.AssetTypeDorisQuery ||
+		s.WillRunTaskOfType(pipeline.AssetTypeDorisSeed) ||
+		s.WillRunTaskOfType(pipeline.AssetTypeDorisQuerySensor) ||
+		s.WillRunTaskOfType(pipeline.AssetTypeDorisTableSensor) {
+		dorisOperator := doris.NewBasicOperator(conn, wholeFileExtractor, fullRefresh, hoister, parser)
+		dorisCheckRunner := doris.NewColumnCheckOperator(conn)
+		dorisQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
+		dorisTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
+		dorisSeedOperator := doris.NewSeedOperator(conn, renderer)
+
+		mainExecutors[pipeline.AssetTypeDorisQuery][scheduler.TaskInstanceTypeMain] = dorisOperator
+		mainExecutors[pipeline.AssetTypeDorisQuery][scheduler.TaskInstanceTypeColumnCheck] = dorisCheckRunner
+		mainExecutors[pipeline.AssetTypeDorisQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeDorisSeed][scheduler.TaskInstanceTypeMain] = dorisSeedOperator
+		mainExecutors[pipeline.AssetTypeDorisSeed][scheduler.TaskInstanceTypeColumnCheck] = dorisCheckRunner
+		mainExecutors[pipeline.AssetTypeDorisSeed][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeDorisQuerySensor][scheduler.TaskInstanceTypeMain] = dorisQuerySensor
+		mainExecutors[pipeline.AssetTypeDorisQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = dorisCheckRunner
+		mainExecutors[pipeline.AssetTypeDorisQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeDorisTableSensor][scheduler.TaskInstanceTypeMain] = dorisTableSensor
+		mainExecutors[pipeline.AssetTypeDorisTableSensor][scheduler.TaskInstanceTypeColumnCheck] = dorisCheckRunner
+		mainExecutors[pipeline.AssetTypeDorisTableSensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 	}
 
 	if s.WillRunTaskOfType(pipeline.AssetTypeAgentClaudeCode) {

@@ -560,7 +560,12 @@ func buildFullyPopulatedPipelineForVisitorTest() *pipeline.Pipeline {
 			Post: []pipeline.Hook{{Query: "q"}},
 		},
 		Metadata: map[string]string{"k": "v"},
-		Routing:  &pipeline.RoutingConfig{EgressGateway: "gw"},
+		Doris: pipeline.DorisConfig{
+			TableModel:    "duplicate_key",
+			DistributedBy: []string{"id"},
+			Properties:    map[string]string{"replication_num": "1"},
+		},
+		Routing: &pipeline.RoutingConfig{EgressGateway: "gw"},
 	}
 	return &pipeline.Pipeline{
 		Name:               "p",
@@ -606,7 +611,12 @@ func buildFullyPopulatedPipelineForVisitorTest() *pipeline.Pipeline {
 			Metadata:  map[string]string{"k": "v"},
 			Snowflake: pipeline.SnowflakeConfig{Warehouse: "wh"},
 			Athena:    pipeline.AthenaConfig{Location: "loc"},
-			Routing:   &pipeline.RoutingConfig{EgressGateway: "gw"},
+			Doris: pipeline.DorisConfig{
+				TableModel:    "duplicate_key",
+				DistributedBy: []string{"id"},
+				Properties:    map[string]string{"replication_num": "1"},
+			},
+			Routing: &pipeline.RoutingConfig{EgressGateway: "gw"},
 			Notifications: &pipeline.Notifications{
 				Slack:   []pipeline.SlackNotification{{Channel: "c"}},
 				MSTeams: []pipeline.MSTeamsNotification{{Connection: "c"}},

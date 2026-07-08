@@ -43,6 +43,7 @@ import (
 	dataprocserverless "github.com/bruin-data/bruin/pkg/dataproc_serverless"
 	"github.com/bruin-data/bruin/pkg/db2"
 	"github.com/bruin-data/bruin/pkg/docebo"
+	"github.com/bruin-data/bruin/pkg/doris"
 	"github.com/bruin-data/bruin/pkg/dremio"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/dune"
@@ -166,6 +167,7 @@ type Manager struct {
 	Cursor               map[string]*cursor.Client
 	MongoAtlas           map[string]*mongoatlas.DB
 	Mysql                map[string]*mysql.Client
+	Doris                map[string]*doris.Client
 	Vitess               map[string]*mysql.Client
 	Planetscale          map[string]*mysql.Client
 	Notion               map[string]*notion.Client
@@ -1226,6 +1228,37 @@ func (m *Manager) AddMySQLConnectionFromConfig(connection *config.MySQLConnectio
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Mysql[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddDorisConnectionFromConfig(connection *config.DorisConnection) error {
+	m.mutex.Lock()
+	if m.Doris == nil {
+		m.Doris = make(map[string]*doris.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := doris.NewClient(&doris.Config{
+		Username:    connection.Username,
+		Password:    connection.Password,
+		Host:        connection.Host,
+		Port:        connection.Port,
+		Database:    connection.Database,
+		Driver:      connection.Driver,
+		SslCaPath:   connection.SslCaPath,
+		SslCertPath: connection.SslCertPath,
+		SslKeyPath:  connection.SslKeyPath,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Doris[connection.Name] = client
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 
@@ -3892,6 +3925,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Cursor, connectionManager.AddCursorConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.MongoAtlas, connectionManager.AddMongoAtlasConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.MySQL, connectionManager.AddMySQLConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Doris, connectionManager.AddDorisConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Vitess, connectionManager.AddVitessConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Planetscale, connectionManager.AddPlanetScaleConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Notion, connectionManager.AddNotionConnectionFromConfig, &wg, &errList, &mu)

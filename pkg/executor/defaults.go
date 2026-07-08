@@ -146,6 +146,36 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 		scheduler.TaskInstanceTypeCustomCheck:  NoOpOperator{},
 		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
 	},
+	pipeline.AssetTypeDorisQuery: {
+		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
+		scheduler.TaskInstanceTypeColumnCheck:  NoOpOperator{},
+		scheduler.TaskInstanceTypeCustomCheck:  NoOpOperator{},
+		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
+	},
+	pipeline.AssetTypeDorisSeed: {
+		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
+		scheduler.TaskInstanceTypeColumnCheck:  NoOpOperator{},
+		scheduler.TaskInstanceTypeCustomCheck:  NoOpOperator{},
+		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
+	},
+	pipeline.AssetTypeDorisQuerySensor: {
+		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
+		scheduler.TaskInstanceTypeColumnCheck:  NoOpOperator{},
+		scheduler.TaskInstanceTypeCustomCheck:  NoOpOperator{},
+		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
+	},
+	pipeline.AssetTypeDorisTableSensor: {
+		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
+		scheduler.TaskInstanceTypeColumnCheck:  NoOpOperator{},
+		scheduler.TaskInstanceTypeCustomCheck:  NoOpOperator{},
+		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
+	},
+	pipeline.AssetTypeDorisSource: {
+		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
+		scheduler.TaskInstanceTypeColumnCheck:  NoOpOperator{},
+		scheduler.TaskInstanceTypeCustomCheck:  NoOpOperator{},
+		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
+	},
 	pipeline.AssetTypeClickHouse: {
 		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
 		scheduler.TaskInstanceTypeColumnCheck:  NoOpOperator{},

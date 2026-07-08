@@ -113,6 +113,7 @@ For specific connection fields and configuration options, see the dedicated docu
 | `motherduck` | [MotherDuck](/platforms/motherduck) |
 | `clickhouse` | [ClickHouse](/platforms/clickhouse) |
 | `mysql` | [MySQL](/platforms/mysql) |
+| `doris` | [Apache Doris](/platforms/doris) |
 | `mssql` | [Microsoft SQL Server](/platforms/mssql) |
 | `synapse` | [Azure Synapse](/platforms/synapse) |
 | `oracle` | [Oracle](/platforms/oracle) |

@@ -245,6 +245,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "AWS Athena", link: "/platforms/athena"},
                             {text: "Clickhouse", link: "/platforms/clickhouse"},
                             {text: "Databricks", link: "/platforms/databricks"},
+                            {text: "Apache Doris", link: "/platforms/doris"},
                             {text: "DuckDB", link: "/platforms/duckdb"},
                             {text: "MotherDuck", link: "/platforms/motherduck"},
                             {text: "Oracle", link: "/platforms/oracle"},
