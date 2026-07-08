@@ -244,3 +244,14 @@ type Connection struct {
 	Name string `json:"name"`
 	Type string `json:"type"`
 }
+
+// Dashboard represents a Bruin Cloud dashboard. State is only populated by the
+// single-dashboard endpoint and carries the published definition as raw JSON.
+type Dashboard struct {
+	ID         int             `json:"id"`
+	Title      *string         `json:"title"`
+	Visibility string          `json:"visibility"`
+	UpdatedAt  *string         `json:"updated_at"`
+	URL        string          `json:"url"`
+	State      json.RawMessage `json:"state,omitempty"`
+}

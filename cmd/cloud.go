@@ -18,6 +18,7 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
+	"gopkg.in/yaml.v3"
 )
 
 var ansiEscapeRegex = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
@@ -35,6 +36,7 @@ func Cloud(isDebug *bool) *cli.Command {
 			CloudGlossary(),
 			CloudAgents(),
 			CloudConnections(),
+			CloudDashboards(),
 		},
 	}
 }
@@ -2030,12 +2032,130 @@ func CloudAgents() *cli.Command {
 		Commands: []*cli.Command{
 			cloudAgentsList(),
 			cloudAgentsCreate(),
+			cloudAgentsGet(),
+			cloudAgentsUpdate(),
 			cloudAgentsSend(),
 			cloudAgentsStatus(),
 			cloudAgentsThreads(),
 			cloudAgentsMessages(),
 			cloudAgentsGetPrompt(),
 			cloudAgentsSetPrompt(),
+		},
+	}
+}
+
+func cloudAgentsGet() *cli.Command {
+	return &cli.Command{
+		Name:  "get",
+		Usage: "Get a single agent's details",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "agent-id",
+				Usage:    "agent ID",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			agent, err := client.GetAgent(ctx, c.Int("agent-id"))
+			if err != nil {
+				printError(err, output, "Failed to get agent")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(agent, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			infoPrinter.Printf("Agent %d: %s (visibility: %s)\n", agent.ID, agent.Name, agent.Visibility)
+			return nil
+		},
+	}
+}
+
+func cloudAgentsUpdate() *cli.Command {
+	return &cli.Command{
+		Name:  "update",
+		Usage: "Update an agent's name, description or visibility",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "agent-id",
+				Usage:    "agent ID",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:  "name",
+				Usage: "the new agent name",
+			},
+			&cli.StringFlag{
+				Name:  "description",
+				Usage: "the new agent description",
+			},
+			&cli.StringFlag{
+				Name:  "visibility",
+				Usage: "agent visibility: team or private",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			// Build the patch from the flags the user actually set, so an explicit
+			// empty value (e.g. --description "") is sent rather than dropped.
+			fields := map[string]any{}
+			if c.IsSet("name") {
+				fields["name"] = c.String("name")
+			}
+			if c.IsSet("description") {
+				fields["description"] = c.String("description")
+			}
+			if c.IsSet("visibility") {
+				visibility := c.String("visibility")
+				if visibility != "team" && visibility != "private" {
+					printError(fmt.Errorf("visibility must be 'team' or 'private', got %q", visibility), output, "Invalid --visibility")
+					return cli.Exit("", 1)
+				}
+				fields["visibility"] = visibility
+			}
+			if len(fields) == 0 {
+				printError(errors.New("provide at least one of --name, --description or --visibility"), output, "Nothing to update")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			agent, err := client.UpdateAgent(ctx, c.Int("agent-id"), fields)
+			if err != nil {
+				printError(err, output, "Failed to update agent")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(agent, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			infoPrinter.Printf("Updated agent %d (%s)\n", agent.ID, agent.Name)
+			return nil
 		},
 	}
 }
@@ -2698,6 +2818,299 @@ func cloudConnectionsDelete() *cli.Command {
 			}
 
 			printSuccessForOutput(output, fmt.Sprintf("Successfully deleted connection '%s'", name))
+			return nil
+		},
+	}
+}
+
+func CloudDashboards() *cli.Command {
+	return &cli.Command{
+		Name:  "dashboards",
+		Usage: "Manage Bruin Cloud dashboards",
+		Commands: []*cli.Command{
+			cloudDashboardsList(),
+			cloudDashboardsGet(),
+			cloudDashboardsCreate(),
+		},
+	}
+}
+
+func cloudDashboardsList() *cli.Command {
+	return &cli.Command{
+		Name:  "list",
+		Usage: "List dashboards",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			dashboards, err := client.ListDashboards(ctx)
+			if err != nil {
+				printError(err, output, "Failed to list dashboards")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(dashboards, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"ID", "Title", "Visibility", "Updated At"})
+			for _, d := range dashboards {
+				title := ""
+				if d.Title != nil {
+					title = *d.Title
+				}
+				updated := ""
+				if d.UpdatedAt != nil {
+					updated = *d.UpdatedAt
+				}
+				t.AppendRow(table.Row{d.ID, title, d.Visibility, updated})
+			}
+			t.Render()
+			return nil
+		},
+	}
+}
+
+func cloudDashboardsGet() *cli.Command {
+	return &cli.Command{
+		Name:  "get",
+		Usage: "Get a dashboard including its published definition",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "dashboard-id",
+				Usage:    "dashboard ID",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			dashboard, err := client.GetDashboard(ctx, c.Int("dashboard-id"))
+			if err != nil {
+				printError(err, output, "Failed to get dashboard")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(dashboard, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			title := ""
+			if dashboard.Title != nil {
+				title = *dashboard.Title
+			}
+			infoPrinter.Printf("Dashboard %d: %s (visibility: %s)\n", dashboard.ID, title, dashboard.Visibility)
+
+			// Print the definition (state) as pretty JSON so it can be inspected or saved.
+			if len(dashboard.State) > 0 {
+				var obj any
+				if err := json.Unmarshal(dashboard.State, &obj); err == nil {
+					pretty, _ := json.MarshalIndent(obj, "", "  ")
+					fmt.Println(string(pretty))
+				} else {
+					fmt.Println(string(dashboard.State))
+				}
+			}
+			return nil
+		},
+	}
+}
+
+// parseDashboardState decodes a dashboard definition from JSON or YAML into a
+// map. It walks the YAML node tree rather than decoding straight into a map so
+// that timestamp-like scalars (e.g. an unquoted `2024-01-01`) are preserved as
+// their original string — yaml.v3 would otherwise resolve them to time.Time,
+// which JSON-encodes as an RFC3339 timestamp and changes the value. Returns a
+// nil map (no error) when the document is empty or not a mapping; the caller
+// rejects that as "must be an object".
+func parseDashboardState(raw []byte) (map[string]any, error) {
+	var doc yaml.Node
+	if err := yaml.Unmarshal(raw, &doc); err != nil {
+		return nil, err
+	}
+	if len(doc.Content) == 0 {
+		return nil, nil
+	}
+	v, err := yamlNodeToValue(doc.Content[0])
+	if err != nil {
+		return nil, err
+	}
+	m, ok := v.(map[string]any)
+	if !ok {
+		return nil, nil
+	}
+	return m, nil
+}
+
+func yamlNodeToValue(n *yaml.Node) (any, error) {
+	switch n.Kind {
+	case yaml.DocumentNode:
+		if len(n.Content) == 0 {
+			return nil, nil
+		}
+		return yamlNodeToValue(n.Content[0])
+	case yaml.AliasNode:
+		return yamlNodeToValue(n.Alias)
+	case yaml.MappingNode:
+		m := make(map[string]any, len(n.Content)/2)
+		for i := 0; i+1 < len(n.Content); i += 2 {
+			val, err := yamlNodeToValue(n.Content[i+1])
+			if err != nil {
+				return nil, err
+			}
+			m[n.Content[i].Value] = val
+		}
+		return m, nil
+	case yaml.SequenceNode:
+		s := make([]any, 0, len(n.Content))
+		for _, c := range n.Content {
+			val, err := yamlNodeToValue(c)
+			if err != nil {
+				return nil, err
+			}
+			s = append(s, val)
+		}
+		return s, nil
+	default: // ScalarNode
+		// Keep timestamp-like scalars as their raw string so the value shape is
+		// preserved through the JSON request to the API.
+		if n.Tag == "!!timestamp" {
+			return n.Value, nil
+		}
+		var v any
+		if err := n.Decode(&v); err != nil {
+			return nil, err
+		}
+		return v, nil
+	}
+}
+
+func cloudDashboardsCreate() *cli.Command {
+	return &cli.Command{
+		Name:  "create",
+		Usage: "Create a dashboard from a definition (written to draft; publish stays in the UI)",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.StringFlag{
+				Name:     "title",
+				Usage:    "the dashboard title",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:  "visibility",
+				Usage: "team or private (default: team)",
+			},
+			&cli.StringFlag{
+				Name:  "state",
+				Usage: "the dashboard definition as a JSON or YAML string",
+			},
+			&cli.StringFlag{
+				Name:  "state-file",
+				Usage: "path to a file containing the dashboard definition as JSON or YAML",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			visibility := c.String("visibility")
+			if visibility != "" && visibility != "team" && visibility != "private" {
+				printError(fmt.Errorf("visibility must be 'team' or 'private', got %q", visibility), output, "Invalid --visibility")
+				return cli.Exit("", 1)
+			}
+
+			// The definition can come inline (--state) or from a file (--state-file),
+			// but not both — otherwise a stale file could silently override the flag.
+			// Check whether each flag was provided (not its value) so an explicit
+			// empty --state alongside --state-file is still rejected as ambiguous.
+			inline := c.String("state")
+			file := c.String("state-file")
+			if c.IsSet("state") && c.IsSet("state-file") {
+				printError(errors.New("pass only one of --state or --state-file"), output, "Ambiguous state")
+				return cli.Exit("", 1)
+			}
+			raw := inline
+			if file != "" {
+				data, err := os.ReadFile(file)
+				if err != nil {
+					printError(fmt.Errorf("failed to read --state-file: %w", err), output, "Invalid state file")
+					return cli.Exit("", 1)
+				}
+				raw = string(data)
+			}
+
+			// Validate whenever a state flag was provided (even if empty), so an
+			// explicit --state '' or empty --state-file is rejected rather than
+			// silently creating an empty draft. Omitting both is title-only, which is fine.
+			// Accept JSON or YAML — dashboards are YAML-native and JSON is valid YAML.
+			var state map[string]any
+			if c.IsSet("state") || c.IsSet("state-file") {
+				parsed, err := parseDashboardState([]byte(raw))
+				if err != nil {
+					printError(fmt.Errorf("invalid dashboard definition (expected a JSON or YAML object): %w", err), output, "Invalid state")
+					return cli.Exit("", 1)
+				}
+				state = parsed
+				// A mapping is required; null/scalars/arrays are not a definition.
+				if state == nil {
+					printError(errors.New("dashboard definition must be a JSON or YAML object"), output, "Invalid state")
+					return cli.Exit("", 1)
+				}
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			dashboard, err := client.CreateDashboard(ctx, c.String("title"), visibility, state)
+			if err != nil {
+				printError(err, output, "Failed to create dashboard")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(dashboard, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			title := ""
+			if dashboard.Title != nil {
+				title = *dashboard.Title
+			}
+			if dashboard.URL != "" {
+				infoPrinter.Printf("Created dashboard %d (%s) as a draft — open it to review and publish: %s\n", dashboard.ID, title, dashboard.URL)
+			} else {
+				infoPrinter.Printf("Created dashboard %d (%s) as a draft — publish it from the Bruin Cloud UI.\n", dashboard.ID, title)
+			}
 			return nil
 		},
 	}

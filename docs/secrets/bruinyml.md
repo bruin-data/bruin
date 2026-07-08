@@ -135,6 +135,7 @@ For the specific fields and configuration options for each connection type, refe
 | `motherduck` | [MotherDuck](../platforms/motherduck.md) |
 | `clickhouse` | [ClickHouse](../platforms/clickhouse.md) |
 | `mysql` | [MySQL](../platforms/mysql.md) |
+| `doris` | [Apache Doris](../platforms/doris.md) |
 | `mssql` | [Microsoft SQL Server](../platforms/mssql.md) |
 | `synapse` | [Azure Synapse](../platforms/synapse.md) |
 | `oracle` | [Oracle](../platforms/oracle.md) |

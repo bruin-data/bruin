@@ -57,6 +57,7 @@ bruin validate --help
 | [`import`](/commands/import) | Import existing resources as Bruin assets |
 | [`patch`](/commands/patch) | Apply patches to asset definitions |
 | [`ai enhance`](/commands/ai-enhance) | Enhance asset metadata using AI |
+| [`ai skills`](/commands/ai-skills) | Install or update Bruin-provided AI agent skills |
 
 ### Maintenance
 

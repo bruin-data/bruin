@@ -1424,6 +1424,7 @@ func TestAssetTypeToDialect(t *testing.T) {
 		pipeline.AssetTypeBigqueryQuery:     "bigquery",
 		pipeline.AssetTypeClickHouse:        "clickhouse",
 		pipeline.AssetTypeDatabricksQuery:   "databricks",
+		pipeline.AssetTypeDorisQuery:        "doris",
 		pipeline.AssetTypeDremioQuery:       "trino",
 		pipeline.AssetTypeDuckDBQuery:       "duckdb",
 		pipeline.AssetTypeFabricQuery:       "fabric",
@@ -1464,6 +1465,7 @@ func TestConnectionTypeToDialect(t *testing.T) {
 		"dremio":                "trino",
 		"duckdb":                "duckdb",
 		"fabric":                "fabric",
+		"doris":                 "doris",
 		"google_cloud_platform": "bigquery",
 		"motherduck":            "duckdb",
 		"mssql":                 "tsql",
@@ -1486,6 +1488,12 @@ func TestConnectionTypeToDialect(t *testing.T) {
 			require.Equal(t, want, ConnectionTypeToDialect(connType))
 		})
 	}
+}
+
+func TestDorisDialectUsedTables(t *testing.T) {
+	got, err := sharedSQLParser.UsedTables("SELECT * FROM `bruin_test`.`orders` WHERE order_id > 0", "doris")
+	require.NoError(t, err)
+	require.Equal(t, []string{"bruin_test.orders"}, got)
 }
 
 func TestGetMissingDependenciesForAsset(t *testing.T) {

@@ -117,13 +117,14 @@ The inferred name is passed directly to your database, so the segments must matc
 | **Redshift** | `schema.table` | Not supported |
 | **Synapse** | `schema.table` | Not supported |
 | **MySQL** | `database.table` | Not supported |
+| **Doris** | `database.table` | Not supported |
 | **ClickHouse** | `database.table` | Not supported |
 
 For example, if you are using **BigQuery** and your folder structure is `assets/my_project/finance/revenue.sql`, the inferred name `my_project.finance.revenue` will be interpreted as project `my_project`, dataset `finance`, table `revenue`.
 
 If you are using **Snowflake** with the same structure, it would be interpreted as database `my_project`, schema `finance`, table `revenue`.
 
-For databases that only support two segments (like PostgreSQL or MySQL), use a single folder level under `assets/` (e.g. `assets/public/users.sql` → `public.users`). A three-segment name on these platforms is rejected during validation.
+For databases that only support two segments (like PostgreSQL, MySQL, or Doris), use a single folder level under `assets/` (e.g. `assets/public/users.sql` → `public.users`). A three-segment name on these platforms is rejected during validation.
 
 ### Auto-creation of the database/catalog
 

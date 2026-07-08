@@ -45,6 +45,7 @@ type Connections struct {
 	Cursor              []CursorConnection              `yaml:"cursor,omitempty" json:"cursor,omitempty" mapstructure:"cursor"`
 	MongoAtlas          []MongoAtlasConnection          `yaml:"mongo_atlas,omitempty" json:"mongo_atlas,omitempty" mapstructure:"mongo_atlas"`
 	MySQL               []MySQLConnection               `yaml:"mysql,omitempty" json:"mysql,omitempty" mapstructure:"mysql"`
+	Doris               []DorisConnection               `yaml:"doris,omitempty" json:"doris,omitempty" mapstructure:"doris"`
 	Vitess              []VitessConnection              `yaml:"vitess,omitempty" json:"vitess,omitempty" mapstructure:"vitess"`
 	Planetscale         []PlanetScaleConnection         `yaml:"planetscale_mysql,omitempty" json:"planetscale_mysql,omitempty" mapstructure:"planetscale_mysql"`
 	Notion              []NotionConnection              `yaml:"notion,omitempty" json:"notion,omitempty" mapstructure:"notion"`
@@ -144,6 +145,7 @@ type Connections struct {
 	Freshdesk           []FreshdeskConnection           `yaml:"freshdesk,omitempty" json:"freshdesk,omitempty" mapstructure:"freshdesk"`
 	FundraiseUp         []FundraiseUpConnection         `yaml:"fundraiseup,omitempty" json:"fundraiseup,omitempty" mapstructure:"fundraiseup"`
 	Fireflies           []FirefliesConnection           `yaml:"fireflies,omitempty" json:"fireflies,omitempty" mapstructure:"fireflies"`
+	Trello              []TrelloConnection              `yaml:"trello,omitempty" json:"trello,omitempty" mapstructure:"trello"`
 	Jira                []JiraConnection                `yaml:"jira,omitempty" json:"jira,omitempty" mapstructure:"jira"`
 	Monday              []MondayConnection              `yaml:"monday,omitempty" json:"monday,omitempty" mapstructure:"monday"`
 	PlusVibeAI          []PlusVibeAIConnection          `yaml:"plusvibeai,omitempty" json:"plusvibeai,omitempty" mapstructure:"plusvibeai"`
@@ -419,6 +421,21 @@ func LoadFromFileOrEnv(fs afero.Fs, path string) (*Config, error) {
 
 			if conn.SslKeyPath != "" && !filepath.IsAbs(conn.SslKeyPath) {
 				env.Connections.MySQL[i].SslKeyPath = filepath.Join(configLocation, conn.SslKeyPath)
+			}
+		}
+
+		// Make Doris SSL file paths absolute
+		for i, conn := range env.Connections.Doris {
+			if conn.SslCaPath != "" && !filepath.IsAbs(conn.SslCaPath) {
+				env.Connections.Doris[i].SslCaPath = filepath.Join(configLocation, conn.SslCaPath)
+			}
+
+			if conn.SslCertPath != "" && !filepath.IsAbs(conn.SslCertPath) {
+				env.Connections.Doris[i].SslCertPath = filepath.Join(configLocation, conn.SslCertPath)
+			}
+
+			if conn.SslKeyPath != "" && !filepath.IsAbs(conn.SslKeyPath) {
+				env.Connections.Doris[i].SslKeyPath = filepath.Join(configLocation, conn.SslKeyPath)
 			}
 		}
 
@@ -870,6 +887,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.MySQL = append(env.Connections.MySQL, conn)
+	case "doris":
+		var conn DorisConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Doris = append(env.Connections.Doris, conn)
 	case "vitess":
 		var conn VitessConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1558,6 +1582,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Fireflies = append(env.Connections.Fireflies, conn)
+	case "trello":
+		var conn TrelloConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Trello = append(env.Connections.Trello, conn)
 	case "plusvibeai":
 		var conn PlusVibeAIConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1779,6 +1810,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Monday = removeConnection(env.Connections.Monday, connectionName)
 	case "mysql":
 		env.Connections.MySQL = removeConnection(env.Connections.MySQL, connectionName)
+	case "doris":
+		env.Connections.Doris = removeConnection(env.Connections.Doris, connectionName)
 	case "vitess":
 		env.Connections.Vitess = removeConnection(env.Connections.Vitess, connectionName)
 	case "planetscale_mysql":
@@ -1981,6 +2014,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.FundraiseUp = removeConnection(env.Connections.FundraiseUp, connectionName)
 	case "fireflies":
 		env.Connections.Fireflies = removeConnection(env.Connections.Fireflies, connectionName)
+	case "trello":
+		env.Connections.Trello = removeConnection(env.Connections.Trello, connectionName)
 	case "plusvibeai":
 		env.Connections.PlusVibeAI = removeConnection(env.Connections.PlusVibeAI, connectionName)
 	case "bruin":
@@ -2133,6 +2168,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Cursor, source.Cursor)
 	mergeConnectionList(&c.MongoAtlas, source.MongoAtlas)
 	mergeConnectionList(&c.MySQL, source.MySQL)
+	mergeConnectionList(&c.Doris, source.Doris)
 	mergeConnectionList(&c.Vitess, source.Vitess)
 	mergeConnectionList(&c.Planetscale, source.Planetscale)
 	mergeConnectionList(&c.Notion, source.Notion)
@@ -2232,6 +2268,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Freshdesk, source.Freshdesk)
 	mergeConnectionList(&c.FundraiseUp, source.FundraiseUp)
 	mergeConnectionList(&c.Fireflies, source.Fireflies)
+	mergeConnectionList(&c.Trello, source.Trello)
 	mergeConnectionList(&c.Jira, source.Jira)
 	mergeConnectionList(&c.Monday, source.Monday)
 	mergeConnectionList(&c.PlusVibeAI, source.PlusVibeAI)

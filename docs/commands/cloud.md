@@ -599,6 +599,45 @@ Delete a connection by name:
 bruin cloud connections delete --name my_pg
 ```
 
+### `dashboards`
+
+Read the dashboards in your Bruin Cloud team — useful for inspecting or
+version-controlling a dashboard's definition.
+
+#### `list`
+
+List the team's dashboards (id, title, visibility, last updated):
+
+```bash
+bruin cloud dashboards list
+bruin cloud dashboards list --output json
+```
+
+#### `get`
+
+Get a single dashboard including its published definition (`state`):
+
+```bash
+bruin cloud dashboards get --dashboard-id 42
+
+# Full payload, incl. the definition, as JSON
+bruin cloud dashboards get --dashboard-id 42 --output json
+```
+
+#### `create`
+
+Create a dashboard from a definition. The definition is written to the dashboard's
+**draft** — it is never published automatically; publish it from the Bruin Cloud UI.
+
+```bash
+# Title only (empty draft)
+bruin cloud dashboards create --title "Q1 Revenue"
+
+# With a definition, inline or from a file
+bruin cloud dashboards create --title "Q1 Revenue" --visibility team --state '{"widgets":[]}'
+bruin cloud dashboards create --title "Q1 Revenue" --state-file ./dashboard.json
+```
+
 ---
 
 ## Common Workflows

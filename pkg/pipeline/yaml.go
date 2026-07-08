@@ -379,6 +379,13 @@ type athena struct {
 	QueryResultsPath string `yaml:"query_results_path"`
 }
 
+type doris struct {
+	TableModel    string            `yaml:"table_model"`
+	DistributedBy []string          `yaml:"distributed_by"`
+	Buckets       int               `yaml:"buckets"`
+	Properties    map[string]string `yaml:"properties"`
+}
+
 func notificationsOrNil(n Notifications) *Notifications {
 	if len(n.Slack) == 0 && len(n.MSTeams) == 0 && len(n.Discord) == 0 && len(n.Webhook) == 0 {
 		return nil
@@ -412,6 +419,7 @@ type taskDefinition struct {
 	Tags                  []string          `yaml:"tags"`
 	Snowflake             snowflake         `yaml:"snowflake"`
 	Athena                athena            `yaml:"athena"`
+	Doris                 doris             `yaml:"doris"`
 	Routing               *RoutingConfig    `yaml:"routing"`
 	IntervalModifiers     IntervalModifiers `yaml:"interval_modifiers"`
 	Domains               []string          `yaml:"domains"`
@@ -604,30 +612,36 @@ func taskDefinitionToAsset(definition taskDefinition) (*Asset, error) {
 	}
 
 	task := Asset{
-		ID:                hash(definition.Name),
-		URI:               definition.URI,
-		Name:              definition.Name,
-		Enabled:           definition.Enabled,
-		Description:       definition.Description,
-		Type:              AssetType(definition.Type),
-		Parameters:        definition.Parameters,
-		Connection:        definition.Connection,
-		Secrets:           make([]SecretMapping, len(definition.Secrets)),
-		Upstreams:         upstreams,
-		ExecutableFile:    ExecutableFile{},
-		Materialization:   mat,
-		Image:             definition.Image,
-		Instance:          definition.Instance,
-		Owner:             definition.Owner,
-		Tier:              definition.Tier,
-		StartDate:         definition.StartDate,
-		Tags:              definition.Tags,
-		Extends:           definition.Extends,
-		Columns:           columns,
-		CustomChecks:      make([]CustomCheck, len(definition.CustomChecks)),
-		Hooks:             definition.Hooks,
-		Snowflake:         SnowflakeConfig{Warehouse: definition.Snowflake.Warehouse},
-		Athena:            AthenaConfig{Location: definition.Athena.QueryResultsPath},
+		ID:              hash(definition.Name),
+		URI:             definition.URI,
+		Name:            definition.Name,
+		Enabled:         definition.Enabled,
+		Description:     definition.Description,
+		Type:            AssetType(definition.Type),
+		Parameters:      definition.Parameters,
+		Connection:      definition.Connection,
+		Secrets:         make([]SecretMapping, len(definition.Secrets)),
+		Upstreams:       upstreams,
+		ExecutableFile:  ExecutableFile{},
+		Materialization: mat,
+		Image:           definition.Image,
+		Instance:        definition.Instance,
+		Owner:           definition.Owner,
+		Tier:            definition.Tier,
+		StartDate:       definition.StartDate,
+		Tags:            definition.Tags,
+		Extends:         definition.Extends,
+		Columns:         columns,
+		CustomChecks:    make([]CustomCheck, len(definition.CustomChecks)),
+		Hooks:           definition.Hooks,
+		Snowflake:       SnowflakeConfig{Warehouse: definition.Snowflake.Warehouse},
+		Athena:          AthenaConfig{Location: definition.Athena.QueryResultsPath},
+		Doris: DorisConfig{
+			TableModel:    definition.Doris.TableModel,
+			DistributedBy: definition.Doris.DistributedBy,
+			Buckets:       definition.Doris.Buckets,
+			Properties:    definition.Doris.Properties,
+		},
 		Routing:           definition.Routing,
 		IntervalModifiers: definition.IntervalModifiers,
 		Domains:           definition.Domains,

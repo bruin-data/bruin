@@ -37,8 +37,6 @@ When you run `bruin init`, it:
 4. Optionally initializes a **Git repository** if none exists.
 5. Outputs next steps, such as validating or running your new pipeline.
 
----
-
 ## Folder Structure
 
 Every initialized pipeline follows this convention:

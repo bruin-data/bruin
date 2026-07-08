@@ -440,6 +440,28 @@ func (c *APIClient) CreateAgent(ctx context.Context, name, description, systemPr
 	return &result, nil
 }
 
+// GetAgent returns a single agent's details.
+func (c *APIClient) GetAgent(ctx context.Context, agentID int) (*Agent, error) {
+	var result Agent
+	err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/agents/%d", agentID), nil, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// UpdateAgent patches an agent with the given fields. The caller decides which
+// fields to include (based on which flags were set), so an explicit empty value
+// is sent and can clear a field.
+func (c *APIClient) UpdateAgent(ctx context.Context, agentID int, fields map[string]any) (*Agent, error) {
+	var result Agent
+	err := c.doRequest(ctx, http.MethodPatch, fmt.Sprintf("/agents/%d", agentID), fields, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 func (c *APIClient) SendAgentMessage(ctx context.Context, agentID int, message string, threadID *int) (json.RawMessage, error) {
 	body := map[string]any{
 		"message": message,
@@ -539,4 +561,42 @@ func (c *APIClient) CreateConnection(ctx context.Context, name, connType string,
 
 func (c *APIClient) DeleteConnection(ctx context.Context, name string) error {
 	return c.doRequest(ctx, http.MethodDelete, "/connections/"+url.PathEscape(name), nil, nil)
+}
+
+// --- Dashboards ---
+
+func (c *APIClient) ListDashboards(ctx context.Context) ([]Dashboard, error) {
+	var resp struct {
+		Dashboards []Dashboard `json:"dashboards"`
+	}
+	err := c.doRequest(ctx, http.MethodGet, "/dashboards", nil, &resp)
+	return resp.Dashboards, err
+}
+
+func (c *APIClient) GetDashboard(ctx context.Context, dashboardID int) (*Dashboard, error) {
+	var result Dashboard
+	err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/dashboards/%d", dashboardID), nil, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// CreateDashboard creates a dashboard from a definition. The server writes the
+// definition to the draft only (never published). Empty optional fields are
+// omitted so the server applies its defaults.
+func (c *APIClient) CreateDashboard(ctx context.Context, title, visibility string, state map[string]any) (*Dashboard, error) {
+	body := map[string]any{"title": title}
+	if visibility != "" {
+		body["visibility"] = visibility
+	}
+	if state != nil {
+		body["state"] = state
+	}
+	var result Dashboard
+	err := c.doRequest(ctx, http.MethodPost, "/dashboards", body, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
 }

@@ -18,6 +18,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/databricks"
 	"github.com/bruin-data/bruin/pkg/date"
+	"github.com/bruin-data/bruin/pkg/doris"
 	"github.com/bruin-data/bruin/pkg/dremio"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/fabric"
@@ -278,6 +279,8 @@ func Render() *cli.Command {
 				hoister: hoister,
 				materializers: map[pipeline.AssetType]queryMaterializer{
 					pipeline.AssetTypeMySQLQuery:              mysql.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeDorisQuery:              doris.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeDorisQuerySensor:        doris.NewMaterializer(fullRefresh),
 					pipeline.AssetTypeBigqueryQuery:           bigquery.NewMaterializer(fullRefresh),
 					pipeline.AssetTypeBigqueryQuerySensor:     bigquery.NewMaterializer(fullRefresh),
 					pipeline.AssetTypeSnowflakeQuery:          snowflake.NewMaterializer(fullRefresh),

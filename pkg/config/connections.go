@@ -430,6 +430,23 @@ func (c MySQLConnection) GetName() string {
 	return c.Name
 }
 
+type DorisConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	Username           string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password" sensitive:"true"`
+	Host               string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
+	Port               int    `yaml:"port,omitempty" json:"port" mapstructure:"port" jsonschema:"default=9030"`
+	Database           string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
+	Driver             string `yaml:"driver,omitempty" json:"driver,omitempty" mapstructure:"driver"`
+	SslCaPath          string `yaml:"ssl_ca_path,omitempty" json:"ssl_ca_path,omitempty" mapstructure:"ssl_ca_path"`
+	SslCertPath        string `yaml:"ssl_cert_path,omitempty" json:"ssl_cert_path,omitempty" mapstructure:"ssl_cert_path"`
+	SslKeyPath         string `yaml:"ssl_key_path,omitempty" json:"ssl_key_path,omitempty" mapstructure:"ssl_key_path"`
+}
+
+func (c DorisConnection) GetName() string {
+	return c.Name
+}
+
 // VitessConnection describes a connection to a Vitess cluster via vtgate. Vitess speaks the MySQL
 // wire protocol, but ingestr now routes it through its own "vitess" scheme, so it is a dedicated
 // connection type rather than a MySQL connection. The grpc_* fields point at vtgate's VStream gRPC
@@ -1869,6 +1886,16 @@ type FirefliesConnection struct {
 }
 
 func (c FirefliesConnection) GetName() string {
+	return c.Name
+}
+
+type TrelloConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
+	Token              string `yaml:"token,omitempty" json:"token" mapstructure:"token" sensitive:"true"`
+}
+
+func (c TrelloConnection) GetName() string {
 	return c.Name
 }
 

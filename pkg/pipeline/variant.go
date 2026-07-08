@@ -304,6 +304,7 @@ func assetFromDefaultValues(dv *DefaultValues) *Asset {
 		Metadata:          dv.Metadata,
 		Snowflake:         dv.Snowflake,
 		Athena:            dv.Athena,
+		Doris:             dv.Doris,
 		Routing:           dv.Routing,
 		IntervalModifiers: dv.IntervalModifiers,
 		RerunCooldown:     dv.RerunCooldown,
@@ -341,6 +342,7 @@ func copyAssetToDefaultValues(dv *DefaultValues, asset *Asset) {
 	dv.Metadata = asset.Metadata
 	dv.Snowflake = asset.Snowflake
 	dv.Athena = asset.Athena
+	dv.Doris = asset.Doris
 	dv.Routing = asset.Routing
 	dv.IntervalModifiers = asset.IntervalModifiers
 	dv.RerunCooldown = asset.RerunCooldown
@@ -434,6 +436,19 @@ func renderAssetStrings(render RenderFunc, a *Asset) error {
 	}
 	if a.Athena.Location, err = maybeRender(render, fmt.Sprintf("asset[%s].athena.location", originalName), a.Athena.Location); err != nil {
 		return err
+	}
+	if a.Doris.TableModel, err = maybeRender(render, fmt.Sprintf("asset[%s].doris.table_model", originalName), a.Doris.TableModel); err != nil {
+		return err
+	}
+	for i, column := range a.Doris.DistributedBy {
+		if a.Doris.DistributedBy[i], err = maybeRender(render, fmt.Sprintf("asset[%s].doris.distributed_by[%d]", originalName, i), column); err != nil {
+			return err
+		}
+	}
+	for key, value := range a.Doris.Properties {
+		if a.Doris.Properties[key], err = maybeRender(render, fmt.Sprintf("asset[%s].doris.properties[%s]", originalName, key), value); err != nil {
+			return err
+		}
 	}
 	if err := renderRoutingConfig(render, fmt.Sprintf("asset[%s].routing", originalName), a.Routing); err != nil {
 		return err

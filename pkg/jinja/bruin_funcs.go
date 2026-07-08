@@ -23,6 +23,7 @@ const (
 	PlatformPostgres   Platform = "postgres"
 	PlatformRedshift   Platform = "redshift"
 	PlatformMySQL      Platform = "mysql"
+	PlatformDoris      Platform = "doris"
 	PlatformDuckDB     Platform = "duckdb"
 	PlatformDatabricks Platform = "databricks"
 	PlatformMSSQL      Platform = "mssql"

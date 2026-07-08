@@ -13,6 +13,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/databricks"
 	"github.com/bruin-data/bruin/pkg/date"
+	"github.com/bruin-data/bruin/pkg/doris"
 	"github.com/bruin-data/bruin/pkg/dremio"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/fabric"
@@ -218,6 +219,8 @@ func RenderDDL() *cli.Command {
 				},
 				materializers: map[pipeline.AssetType]queryMaterializer{
 					pipeline.AssetTypeMySQLQuery:              mysql.NewMaterializer(false),
+					pipeline.AssetTypeDorisQuery:              doris.NewMaterializer(false),
+					pipeline.AssetTypeDorisQuerySensor:        doris.NewMaterializer(false),
 					pipeline.AssetTypeBigqueryQuery:           bigquery.NewMaterializer(false),
 					pipeline.AssetTypeBigqueryQuerySensor:     bigquery.NewMaterializer(false),
 					pipeline.AssetTypeSnowflakeQuery:          snowflake.NewMaterializer(false),

@@ -43,6 +43,7 @@ import (
 	dataprocserverless "github.com/bruin-data/bruin/pkg/dataproc_serverless"
 	"github.com/bruin-data/bruin/pkg/db2"
 	"github.com/bruin-data/bruin/pkg/docebo"
+	"github.com/bruin-data/bruin/pkg/doris"
 	"github.com/bruin-data/bruin/pkg/dremio"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/dune"
@@ -133,6 +134,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/surveymonkey"
 	"github.com/bruin-data/bruin/pkg/tableau"
 	"github.com/bruin-data/bruin/pkg/tiktokads"
+	"github.com/bruin-data/bruin/pkg/trello"
 	"github.com/bruin-data/bruin/pkg/trino"
 	"github.com/bruin-data/bruin/pkg/trustpilot"
 	"github.com/bruin-data/bruin/pkg/twilio"
@@ -165,6 +167,7 @@ type Manager struct {
 	Cursor               map[string]*cursor.Client
 	MongoAtlas           map[string]*mongoatlas.DB
 	Mysql                map[string]*mysql.Client
+	Doris                map[string]*doris.Client
 	Vitess               map[string]*mysql.Client
 	Planetscale          map[string]*mysql.Client
 	Notion               map[string]*notion.Client
@@ -240,6 +243,7 @@ type Manager struct {
 	Freshdesk            map[string]*freshdesk.Client
 	FundraiseUp          map[string]*fundraiseup.Client
 	Fireflies            map[string]*fireflies.Client
+	Trello               map[string]*trello.Client
 	Jira                 map[string]*jira.Client
 	Monday               map[string]*monday.Client
 	PlusVibeAI           map[string]*plusvibeai.Client
@@ -1224,6 +1228,37 @@ func (m *Manager) AddMySQLConnectionFromConfig(connection *config.MySQLConnectio
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Mysql[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddDorisConnectionFromConfig(connection *config.DorisConnection) error {
+	m.mutex.Lock()
+	if m.Doris == nil {
+		m.Doris = make(map[string]*doris.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := doris.NewClient(&doris.Config{
+		Username:    connection.Username,
+		Password:    connection.Password,
+		Host:        connection.Host,
+		Port:        connection.Port,
+		Database:    connection.Database,
+		Driver:      connection.Driver,
+		SslCaPath:   connection.SslCaPath,
+		SslCertPath: connection.SslCertPath,
+		SslKeyPath:  connection.SslKeyPath,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Doris[connection.Name] = client
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 
@@ -3188,6 +3223,28 @@ func (m *Manager) AddFirefliesConnectionFromConfig(connection *config.FirefliesC
 	return nil
 }
 
+func (m *Manager) AddTrelloConnectionFromConfig(connection *config.TrelloConnection) error {
+	m.mutex.Lock()
+	if m.Trello == nil {
+		m.Trello = make(map[string]*trello.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := trello.NewClient(trello.Config{
+		APIKey: connection.APIKey,
+		Token:  connection.Token,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Trello[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddJiraConnectionFromConfig(connection *config.JiraConnection) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -3868,6 +3925,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Cursor, connectionManager.AddCursorConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.MongoAtlas, connectionManager.AddMongoAtlasConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.MySQL, connectionManager.AddMySQLConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Doris, connectionManager.AddDorisConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Vitess, connectionManager.AddVitessConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Planetscale, connectionManager.AddPlanetScaleConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Notion, connectionManager.AddNotionConnectionFromConfig, &wg, &errList, &mu)
@@ -3947,6 +4005,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Freshdesk, connectionManager.AddFreshdeskConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.FundraiseUp, connectionManager.AddFundraiseUpConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Fireflies, connectionManager.AddFirefliesConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Trello, connectionManager.AddTrelloConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Jira, connectionManager.AddJiraConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Monday, connectionManager.AddMondayConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.PlusVibeAI, connectionManager.AddPlusVibeAIConnectionFromConfig, &wg, &errList, &mu)

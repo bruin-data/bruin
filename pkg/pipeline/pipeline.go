@@ -55,6 +55,11 @@ const (
 	AssetTypeDatabricksTableSensor     = AssetType("databricks.sensor.table")
 	AssetTypeDataprocServerlessPyspark = AssetType("dataproc_serverless.pyspark")
 	AssetTypeDomo                      = AssetType("domo")
+	AssetTypeDorisQuery                = AssetType("doris.sql")
+	AssetTypeDorisQuerySensor          = AssetType("doris.sensor.query")
+	AssetTypeDorisSeed                 = AssetType("doris.seed")
+	AssetTypeDorisSource               = AssetType("doris.source")
+	AssetTypeDorisTableSensor          = AssetType("doris.sensor.table")
 	AssetTypeDuckDBQuery               = AssetType("duckdb.sql")
 	AssetTypeDuckDBQuerySensor         = AssetType("duckdb.sensor.query")
 	AssetTypeDuckDBSeed                = AssetType("duckdb.seed")
@@ -178,6 +183,7 @@ var defaultMapping = map[string]string{
 	"recurly":               "recurly-default",
 	"appsflyer":             "appsflyer-default",
 	"kafka":                 "kafka-default",
+	"doris":                 "doris-default",
 	"duckdb":                "duckdb-default",
 	"clickhouse":            "clickhouse-default",
 	"hubspot":               "hubspot-default",
@@ -233,6 +239,7 @@ var defaultMapping = map[string]string{
 	"dune":                  "dune-default",
 	"espn":                  "espn-default",
 	"fireflies":             "fireflies-default",
+	"trello":                "trello-default",
 	"fluxx":                 "fluxx-default",
 	"footballdata":          "footballdata-default",
 	"frankfurter":           "frankfurter-default",
@@ -868,6 +875,11 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeMySQLSeed:                 "mysql",
 	AssetTypeMySQLQuerySensor:          "mysql",
 	AssetTypeMySQLTableSensor:          "mysql",
+	AssetTypeDorisQuery:                "doris",
+	AssetTypeDorisSeed:                 "doris",
+	AssetTypeDorisQuerySensor:          "doris",
+	AssetTypeDorisTableSensor:          "doris",
+	AssetTypeDorisSource:               "doris",
 	AssetTypeMongoSource:               "mongo",
 	AssetTypeRedshiftQuery:             "redshift",
 	AssetTypeRedshiftSeed:              "redshift",
@@ -968,6 +980,7 @@ var IngestrTypeConnectionMapping = map[string]AssetType{
 	"synapse":       AssetTypeSynapseQuery,
 	"duckdb":        AssetTypeDuckDBQuery,
 	"clickhouse":    AssetTypeClickHouse,
+	"doris":         AssetTypeDorisQuery,
 	"starrocks":     AssetTypeStarRocks,
 	"oracle":        AssetTypeOracleQuery,
 	"motherduck":    AssetTypeMotherduckQuery,
@@ -1129,6 +1142,26 @@ func (s AthenaConfig) MarshalJSON() ([]byte, error) {
 	return json.Marshal(Alias(s))
 }
 
+type DorisConfig struct {
+	TableModel    string            `json:"table_model,omitempty" yaml:"table_model,omitempty" mapstructure:"table_model"`
+	DistributedBy []string          `json:"distributed_by,omitempty" yaml:"distributed_by,omitempty" mapstructure:"distributed_by"`
+	Buckets       int               `json:"buckets,omitempty" yaml:"buckets,omitempty" mapstructure:"buckets"`
+	Properties    map[string]string `json:"properties,omitempty" yaml:"properties,omitempty" mapstructure:"properties"`
+}
+
+func (d DorisConfig) MarshalJSON() ([]byte, error) {
+	if d.IsZero() {
+		return []byte("null"), nil
+	}
+
+	type Alias DorisConfig
+	return json.Marshal(Alias(d))
+}
+
+func (d DorisConfig) IsZero() bool {
+	return d.TableModel == "" && len(d.DistributedBy) == 0 && d.Buckets == 0 && len(d.Properties) == 0
+}
+
 type RoutingConfig struct {
 	EgressGateway string `json:"egress_gateway,omitempty" yaml:"egress_gateway,omitempty" mapstructure:"egress_gateway"`
 }
@@ -1185,6 +1218,7 @@ type Asset struct { //nolint:recvcheck
 	Metadata          EmptyStringMap     `json:"metadata" yaml:"metadata,omitempty" mapstructure:"metadata"`
 	Snowflake         SnowflakeConfig    `json:"snowflake" yaml:"snowflake,omitempty" mapstructure:"snowflake"`
 	Athena            AthenaConfig       `json:"athena" yaml:"athena,omitempty" mapstructure:"athena"`
+	Doris             DorisConfig        `json:"doris,omitzero" yaml:"doris,omitempty" mapstructure:"doris"`
 	Routing           *RoutingConfig     `json:"routing,omitempty" yaml:"routing,omitempty" mapstructure:"routing"`
 	IntervalModifiers IntervalModifiers  `json:"interval_modifiers" yaml:"interval_modifiers,omitempty" mapstructure:"interval_modifiers"`
 	RerunCooldown     *int               `json:"rerun_cooldown,omitempty" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
@@ -2170,6 +2204,7 @@ type DefaultValues struct {
 	Metadata          EmptyStringMap         `json:"metadata,omitempty" yaml:"metadata,omitempty" mapstructure:"metadata"`
 	Snowflake         SnowflakeConfig        `json:"snowflake,omitempty" yaml:"snowflake,omitempty" mapstructure:"snowflake"`
 	Athena            AthenaConfig           `json:"athena,omitempty" yaml:"athena,omitempty" mapstructure:"athena"`
+	Doris             DorisConfig            `json:"doris,omitempty,omitzero" yaml:"doris,omitempty" mapstructure:"doris"`
 	Routing           *RoutingConfig         `json:"routing,omitempty" yaml:"routing,omitempty" mapstructure:"routing"`
 	IntervalModifiers IntervalModifiers      `json:"interval_modifiers" yaml:"interval_modifiers" mapstructure:"interval_modifiers"`
 	RerunCooldown     *int                   `json:"rerun_cooldown,omitempty" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
@@ -2212,6 +2247,7 @@ func (d *DefaultValues) UnmarshalYAML(value *yaml.Node) error {
 		Metadata:          asset.Metadata,
 		Snowflake:         asset.Snowflake,
 		Athena:            asset.Athena,
+		Doris:             asset.Doris,
 		Routing:           asset.Routing,
 		IntervalModifiers: asset.IntervalModifiers,
 		RerunCooldown:     asset.RerunCooldown,
@@ -2295,6 +2331,7 @@ func assetMainTaskIsConnectionless(assetType AssetType) bool {
 	case AssetTypeAthenaSource,
 		AssetTypeBigquerySource,
 		AssetTypeClickHouseSource,
+		AssetTypeDorisSource,
 		AssetTypeDatabricksSource,
 		AssetTypeDuckDBSource,
 		AssetTypeMongoSource,
@@ -2421,6 +2458,7 @@ func (p *Pipeline) GetMajorityAssetTypesFromSQLAssets(defaultIfNone AssetType) A
 		AssetTypeDremioQuery:       0,
 		AssetTypeSailQuery:         0,
 		AssetTypeOracleQuery:       0,
+		AssetTypeDorisQuery:        0,
 	}
 	maxTasks := 0
 	maxTaskType := defaultIfNone
@@ -3116,6 +3154,7 @@ func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 	if asset.Athena.Location == "" {
 		asset.Athena.Location = defaults.Athena.Location
 	}
+	mergeDorisDefaults(&asset.Doris, defaults.Doris)
 	if !defaults.Routing.IsZero() {
 		if asset.Routing == nil {
 			asset.Routing = defaults.Routing.Clone()
@@ -3153,6 +3192,28 @@ func mergeEmptyStringMapDefaults(target *EmptyStringMap, defaults EmptyStringMap
 	for key, value := range defaults {
 		if _, exists := (*target)[key]; !exists {
 			(*target)[key] = value
+		}
+	}
+}
+
+func mergeDorisDefaults(target *DorisConfig, defaults DorisConfig) {
+	if target.TableModel == "" {
+		target.TableModel = defaults.TableModel
+	}
+	if len(target.DistributedBy) == 0 && len(defaults.DistributedBy) > 0 {
+		target.DistributedBy = append([]string(nil), defaults.DistributedBy...)
+	}
+	if target.Buckets == 0 {
+		target.Buckets = defaults.Buckets
+	}
+	if len(defaults.Properties) > 0 {
+		if target.Properties == nil {
+			target.Properties = make(map[string]string, len(defaults.Properties))
+		}
+		for key, value := range defaults.Properties {
+			if _, exists := target.Properties[key]; !exists {
+				target.Properties[key] = value
+			}
 		}
 	}
 }
@@ -3811,6 +3872,7 @@ func IsSQLAssetType(t AssetType) bool {
 		AssetTypeDuckDBQuery,
 		AssetTypeMotherduckQuery,
 		AssetTypeClickHouse,
+		AssetTypeDorisQuery,
 		AssetTypeTrinoQuery,
 		AssetTypeDremioQuery,
 		AssetTypeSailQuery,
