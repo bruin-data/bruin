@@ -37,7 +37,7 @@ func NewDB(c *Config) (*DB, error) {
 		return nil, errors.Wrap(err, "failed to open Fabric Warehouse connection")
 	}
 
-	return &DB{conn: conn, config: c, schemaCreator: NewSchemaCreator()}, nil
+	return &DB{conn: conn, config: c, schemaCreator: NewSchemaCreator(c.Database)}, nil
 }
 
 func (db *DB) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {

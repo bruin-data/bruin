@@ -39,7 +39,7 @@ func TestSchemaCreator_CreateSchemaIfNotExist(t *testing.T) {
 		{
 			name:      "three-part name qualifies schema with catalog",
 			assetName: "Warehouse.Sales.Orders",
-			wantQuery: "IF NOT EXISTS (SELECT 1 FROM [Warehouse].sys.schemas WHERE name = N'Sales')\n    EXEC(N'USE [Warehouse]; CREATE SCHEMA [Sales]')",
+			wantQuery: "IF SCHEMA_ID(N'Sales') IS NULL\n    EXEC(N'CREATE SCHEMA [Sales]')",
 			wantRun:   true,
 		},
 		{
@@ -65,7 +65,7 @@ func TestSchemaCreator_CreateSchemaIfNotExist(t *testing.T) {
 			t.Parallel()
 
 			runner := &recordingSchemaRunner{}
-			creator := NewSchemaCreator()
+			creator := NewSchemaCreator("Warehouse")
 
 			err := creator.CreateSchemaIfNotExist(t.Context(), runner, &pipeline.Asset{Name: tt.assetName})
 			require.NoError(t, err)
@@ -84,7 +84,7 @@ func TestSchemaCreator_CreateSchemaIfNotExistCachesSchemas(t *testing.T) {
 	t.Parallel()
 
 	runner := &recordingSchemaRunner{}
-	creator := NewSchemaCreator()
+	creator := NewSchemaCreator("bruin_test")
 	asset := &pipeline.Asset{Name: "bruin_test.Products"}
 
 	require.NoError(t, creator.CreateSchemaIfNotExist(t.Context(), runner, asset))
@@ -93,25 +93,24 @@ func TestSchemaCreator_CreateSchemaIfNotExistCachesSchemas(t *testing.T) {
 	assert.Len(t, runner.queries, 1)
 }
 
-func TestSchemaCreator_CreateSchemaIfNotExistCachesQualifiedSchemasSeparately(t *testing.T) {
+func TestSchemaCreator_CreateSchemaIfNotExistRejectsDifferentCatalog(t *testing.T) {
 	t.Parallel()
 
 	runner := &recordingSchemaRunner{}
-	creator := NewSchemaCreator()
+	creator := NewSchemaCreator("DB1")
 
 	require.NoError(t, creator.CreateSchemaIfNotExist(t.Context(), runner, &pipeline.Asset{Name: "DB1.Sales.Orders"}))
-	require.NoError(t, creator.CreateSchemaIfNotExist(t.Context(), runner, &pipeline.Asset{Name: "DB2.Sales.Orders"}))
+	require.ErrorContains(t, creator.CreateSchemaIfNotExist(t.Context(), runner, &pipeline.Asset{Name: "DB2.Sales.Orders"}), "cannot create Fabric schema DB2.Sales while connected to warehouse DB1")
 
-	require.Len(t, runner.queries, 2)
-	assert.Equal(t, "IF NOT EXISTS (SELECT 1 FROM [DB1].sys.schemas WHERE name = N'Sales')\n    EXEC(N'USE [DB1]; CREATE SCHEMA [Sales]')", runner.queries[0])
-	assert.Equal(t, "IF NOT EXISTS (SELECT 1 FROM [DB2].sys.schemas WHERE name = N'Sales')\n    EXEC(N'USE [DB2]; CREATE SCHEMA [Sales]')", runner.queries[1])
+	require.Len(t, runner.queries, 1)
+	assert.Equal(t, "IF SCHEMA_ID(N'Sales') IS NULL\n    EXEC(N'CREATE SCHEMA [Sales]')", runner.queries[0])
 }
 
 func TestSchemaCreator_CreateSchemaIfNotExistReturnsQueryError(t *testing.T) {
 	t.Parallel()
 
 	runner := &recordingSchemaRunner{err: errors.New("boom")}
-	creator := NewSchemaCreator()
+	creator := NewSchemaCreator("bruin_test")
 
 	err := creator.CreateSchemaIfNotExist(t.Context(), runner, &pipeline.Asset{Name: "bruin_test.Products"})
 

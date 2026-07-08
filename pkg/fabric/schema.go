@@ -13,6 +13,7 @@ import (
 
 type SchemaCreator struct {
 	schemaNameCache *sync.Map
+	currentDatabase string
 }
 
 type schemaIdentifier struct {
@@ -24,14 +25,32 @@ type schemaQueryRunner interface {
 	RunQueryWithoutResult(ctx context.Context, q *query.Query) error
 }
 
-func NewSchemaCreator() *SchemaCreator {
-	return &SchemaCreator{schemaNameCache: &sync.Map{}}
+func NewSchemaCreator(currentDatabase ...string) *SchemaCreator {
+	creator := &SchemaCreator{schemaNameCache: &sync.Map{}}
+	if len(currentDatabase) > 0 {
+		creator.currentDatabase = currentDatabase[0]
+	}
+
+	return creator
 }
 
 func (sc *SchemaCreator) CreateSchemaIfNotExist(ctx context.Context, qr schemaQueryRunner, asset *pipeline.Asset) error {
 	schemaName, ok := schemaNameToCreate(asset.Name)
 	if !ok {
 		return nil
+	}
+
+	if schemaName.catalog != "" {
+		if sc.currentDatabase == "" {
+			return errors.Errorf("cannot create Fabric schema %s without a configured connection database", schemaName.cacheKey())
+		}
+		if !strings.EqualFold(schemaName.catalog, sc.currentDatabase) {
+			return errors.Errorf(
+				"cannot create Fabric schema %s while connected to warehouse %s",
+				schemaName.cacheKey(),
+				sc.currentDatabase,
+			)
+		}
 	}
 
 	cacheKey := schemaName.cacheKey()
@@ -75,16 +94,6 @@ func (s schemaIdentifier) cacheKey() string {
 }
 
 func buildCreateSchemaQuery(schemaName schemaIdentifier) string {
-	if schemaName.catalog != "" {
-		return fmt.Sprintf(
-			"IF NOT EXISTS (SELECT 1 FROM %s.sys.schemas WHERE name = %s)\n    EXEC(N'USE %s; CREATE SCHEMA %s')",
-			QuoteIdentifier(schemaName.catalog),
-			sqlStringLiteral(schemaName.schema),
-			strings.ReplaceAll(QuoteIdentifier(schemaName.catalog), "'", "''"),
-			strings.ReplaceAll(QuoteIdentifier(schemaName.schema), "'", "''"),
-		)
-	}
-
 	return fmt.Sprintf(
 		"IF SCHEMA_ID(%s) IS NULL\n    EXEC(N'CREATE SCHEMA %s')",
 		sqlStringLiteral(schemaName.schema),
