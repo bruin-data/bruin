@@ -189,8 +189,11 @@ func GetAllPossibleAssetPaths(pipelinePath string, assetsDirectoryNames []string
 	}
 
 	for _, file := range files {
+		// Normalize separators to forward slashes so the directory match works
+		// regardless of the OS path separator (e.g. backslashes on Windows).
+		normalized := filepath.ToSlash(file)
 		for _, dir := range assetsDirectoryNames {
-			if strings.Contains(file, "/"+dir+"/") {
+			if strings.Contains(normalized, "/"+dir+"/") {
 				taskFiles = append(taskFiles, file)
 				break
 			}

@@ -54,6 +54,32 @@ func TestGetPipelinePaths(t *testing.T) {
 	}
 }
 
+func TestGetAllPossibleAssetPaths(t *testing.T) {
+	t.Parallel()
+
+	mp := func(path string) string {
+		abs, err := filepath.Abs(testPipelinePath)
+		if err != nil {
+			t.Fatal()
+		}
+		return filepath.Join(abs, path)
+	}
+
+	got := GetAllPossibleAssetPaths(testPipelinePath, []string{"tasks", "assets"}, []string{".yml"})
+
+	// Only files that live under a "tasks"/"assets" directory should be returned,
+	// the top-level pipeline.yml files must be excluded.
+	want := []string{
+		mp("first-pipeline/tasks/helloworld/task.yml"),
+		mp("first-pipeline/tasks/test1/task.yml"),
+		mp("first-pipeline/tasks/test2/task.yml"),
+		mp("second-pipeline/tasks/test1/task.yml"),
+		mp("second-pipeline/tasks/test2/task.yml"),
+	}
+
+	require.Equal(t, want, got)
+}
+
 func TestGetPipelineRootFromTask(t *testing.T) {
 	t.Parallel()
 
