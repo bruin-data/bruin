@@ -31,6 +31,10 @@ func (m *mockQuerierWithResult) Ping(ctx context.Context) error {
 	return res.Error(0)
 }
 
+func (m *mockQuerierWithResult) MigrateSCD2Columns(ctx context.Context, asset *pipeline.Asset) error {
+	return nil
+}
+
 type mockConnectionFetcher struct {
 	mock.Mock
 }
@@ -69,6 +73,10 @@ func (m *mockMaterializer) Render(t *pipeline.Asset, query string) (string, erro
 
 func (m *mockMaterializer) LogIfFullRefreshAndDDL(writer interface{}, asset *pipeline.Asset) error {
 	return nil
+}
+
+func (m *mockMaterializer) IsFullRefresh() bool {
+	return false
 }
 
 func TestBasicOperator_RunTask(t *testing.T) {
