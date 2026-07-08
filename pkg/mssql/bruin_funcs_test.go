@@ -15,12 +15,15 @@ func TestMSSQLBuiltinOverrides(t *testing.T) {
 		"bruin": jinja.BuiltinFunctions(jinja.PlatformMSSQL),
 	})
 
-	t.Run("surrogate_key uses hashbytes", func(t *testing.T) {
+	t.Run("surrogate_key uses hashbytes and casts to unbounded varchar", func(t *testing.T) {
 		t.Parallel()
-		result, err := renderer.Render("{{ bruin.generate_surrogate_key(['user_id']) }}")
+		result, err := renderer.Render("{{ bruin.generate_surrogate_key(['user_id', 'session_id']) }}")
 		require.NoError(t, err)
 		assert.Contains(t, result, "hashbytes('md5',")
 		assert.Contains(t, result, "convert(varchar(32),")
+		assert.Contains(t, result, "cast(user_id as varchar(max))")
+		assert.Contains(t, result, "cast(session_id as varchar(max))")
+		assert.NotRegexp(t, `cast\(user_id as varchar\s*\)`, result)
 	})
 
 	t.Run("deduplicate uses TOP WITH TIES", func(t *testing.T) {
