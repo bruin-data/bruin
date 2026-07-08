@@ -41,10 +41,7 @@ func (sc *SchemaCreator) CreateSchemaIfNotExist(ctx context.Context, qr schemaQu
 	}
 
 	if schemaName.catalog != "" {
-		if sc.currentDatabase == "" {
-			return errors.Errorf("cannot create Fabric schema %s without a configured connection database", schemaName.cacheKey())
-		}
-		if !strings.EqualFold(schemaName.catalog, sc.currentDatabase) {
+		if sc.currentDatabase != "" && !strings.EqualFold(schemaName.catalog, sc.currentDatabase) {
 			return errors.Errorf(
 				"cannot create Fabric schema %s while connected to warehouse %s",
 				schemaName.cacheKey(),
