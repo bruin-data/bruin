@@ -19,6 +19,7 @@ type materializer interface {
 }
 
 type fabricClient interface {
+	CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error
 	RunQueryWithoutResult(ctx context.Context, query *query.Query) error
 }
 
@@ -90,6 +91,13 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	conn, ok := rawConn.(fabricClient)
 	if !ok {
 		return errors.Errorf("connection '%s' is not a fabric warehouse connection", connName)
+	}
+
+	if t.Materialization.Type != pipeline.MaterializationTypeNone {
+		err = conn.CreateSchemaIfNotExist(ctx, t)
+		if err != nil {
+			return err
+		}
 	}
 
 	writer := ctx.Value(executor.KeyPrinter)

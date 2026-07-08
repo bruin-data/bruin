@@ -67,19 +67,6 @@ func TestFabricWorkflows(t *testing.T) {
 						},
 					},
 					{
-						Name:    "ensure schema exists",
-						Command: binary,
-						Args: append(append([]string{"query"}, configFlags...), "--connection", "fabric-default", "--query",
-							"IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = 'bruin_test') EXEC('CREATE SCHEMA bruin_test');"),
-						Env: []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-						},
-					},
-					{
 						Name:    "create the initial products table",
 						Command: binary,
 						Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", tempAssetPath),
