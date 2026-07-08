@@ -15,6 +15,11 @@ type SchemaCreator struct {
 	schemaNameCache *sync.Map
 }
 
+type schemaIdentifier struct {
+	catalog string
+	schema  string
+}
+
 type schemaQueryRunner interface {
 	RunQueryWithoutResult(ctx context.Context, q *query.Query) error
 }
@@ -29,42 +34,61 @@ func (sc *SchemaCreator) CreateSchemaIfNotExist(ctx context.Context, qr schemaQu
 		return nil
 	}
 
-	if _, exists := sc.schemaNameCache.Load(schemaName); exists {
+	cacheKey := schemaName.cacheKey()
+	if _, exists := sc.schemaNameCache.Load(cacheKey); exists {
 		return nil
 	}
 
 	createQuery := query.Query{Query: buildCreateSchemaQuery(schemaName)}
 	if err := qr.RunQueryWithoutResult(ctx, &createQuery); err != nil {
-		return errors.Wrapf(err, "failed to create or ensure schema: %s", schemaName)
+		return errors.Wrapf(err, "failed to create or ensure schema: %s", cacheKey)
 	}
-	sc.schemaNameCache.Store(schemaName, true)
+	sc.schemaNameCache.Store(cacheKey, true)
 
 	return nil
 }
 
-func schemaNameToCreate(assetName string) (string, bool) {
+func schemaNameToCreate(assetName string) (schemaIdentifier, bool) {
 	parts := strings.Split(assetName, ".")
 	for _, part := range parts {
 		if strings.TrimSpace(part) == "" {
-			return "", false
+			return schemaIdentifier{}, false
 		}
 	}
 
 	switch len(parts) {
 	case 2:
-		return parts[0], true
+		return schemaIdentifier{schema: parts[0]}, true
 	case 3:
-		return parts[1], true
+		return schemaIdentifier{catalog: parts[0], schema: parts[1]}, true
 	default:
-		return "", false
+		return schemaIdentifier{}, false
 	}
 }
 
-func buildCreateSchemaQuery(schemaName string) string {
+func (s schemaIdentifier) cacheKey() string {
+	if s.catalog == "" {
+		return s.schema
+	}
+
+	return s.catalog + "." + s.schema
+}
+
+func buildCreateSchemaQuery(schemaName schemaIdentifier) string {
+	if schemaName.catalog != "" {
+		return fmt.Sprintf(
+			"IF NOT EXISTS (SELECT 1 FROM %s.sys.schemas WHERE name = %s)\n    EXEC(N'USE %s; CREATE SCHEMA %s')",
+			QuoteIdentifier(schemaName.catalog),
+			sqlStringLiteral(schemaName.schema),
+			strings.ReplaceAll(QuoteIdentifier(schemaName.catalog), "'", "''"),
+			strings.ReplaceAll(QuoteIdentifier(schemaName.schema), "'", "''"),
+		)
+	}
+
 	return fmt.Sprintf(
 		"IF SCHEMA_ID(%s) IS NULL\n    EXEC(N'CREATE SCHEMA %s')",
-		sqlStringLiteral(schemaName),
-		strings.ReplaceAll(QuoteIdentifier(schemaName), "'", "''"),
+		sqlStringLiteral(schemaName.schema),
+		strings.ReplaceAll(QuoteIdentifier(schemaName.schema), "'", "''"),
 	)
 }
 
