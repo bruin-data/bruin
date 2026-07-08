@@ -3334,6 +3334,36 @@ func TestConnectionsSchemaIncludesMaxConcurrentAssets(t *testing.T) {
 	assert.Contains(t, schema, "max_concurrent_assets")
 }
 
+func TestConnectionsSchemaRequiredFromYAMLTags(t *testing.T) {
+	t.Parallel()
+
+	schema, err := GetConnectionsSchema()
+	require.NoError(t, err)
+
+	var parsed struct {
+		Defs map[string]struct {
+			Required []string `json:"required"`
+		} `json:"$defs"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(schema), &parsed))
+
+	// Every credential field on OracleConnection has an omitempty yaml tag, so
+	// only "name" should be required (its json tags lack omitempty, which is
+	// what used to force all of them into "required").
+	assert.Equal(t, []string{"name"}, parsed.Defs["OracleConnection"].Required)
+
+	// ClickHouseConnection carries yaml tags without omitempty on its credential
+	// fields, so those stay required alongside "name".
+	assert.ElementsMatch(t,
+		[]string{"name", "username", "password", "host", "port", "database"},
+		parsed.Defs["ClickHouseConnection"].Required,
+	)
+
+	// Optional connection fields must never be marked required.
+	assert.NotContains(t, parsed.Defs["OracleConnection"].Required, "sid")
+	assert.NotContains(t, parsed.Defs["OracleConnection"].Required, "max_concurrent_assets")
+}
+
 func TestConnectionCustomMarshalersPreserveMaxConcurrentAssets(t *testing.T) {
 	t.Parallel()
 

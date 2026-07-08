@@ -190,12 +190,97 @@ func (c *Connections) ConnectionsSummaryList() map[string]string {
 
 func GetConnectionsSchema() (string, error) {
 	schema := jsonschema.Reflect(&Connections{})
+
+	// invopop derives each field's "required" flag from the json tag's omitempty
+	// option, but the connection structs only carry omitempty on their yaml tags
+	// (the json tags are inconsistent), so almost every field ends up marked
+	// required. Recompute "required" from the yaml tags instead: a field is
+	// optional when its yaml tag contains "omitempty", and "name" is always
+	// required. This matches GetConnectionTypeDefs / the add-connection TUI.
+	overrideRequiredFromYAMLTags(schema)
+
 	jsonStringSchema, err := json.Marshal(schema)
 	if err != nil {
 		return "", err
 	}
 
 	return string(jsonStringSchema), nil
+}
+
+// overrideRequiredFromYAMLTags rewrites the "required" list of every connection
+// definition in the reflected schema so it reflects the yaml tags rather than
+// the json tags. Only the connection structs (the slice element types on the
+// Connections struct) are touched; other definitions keep invopop's output.
+func overrideRequiredFromYAMLTags(schema *jsonschema.Schema) {
+	if schema.Definitions == nil {
+		return
+	}
+
+	ct := reflect.TypeFor[Connections]()
+	for i := range ct.NumField() {
+		ft := ct.Field(i).Type
+		if ft.Kind() != reflect.Slice {
+			continue
+		}
+		elem := ft.Elem()
+		if elem.Kind() == reflect.Pointer {
+			elem = elem.Elem()
+		}
+		if elem.Kind() != reflect.Struct {
+			continue
+		}
+		if def := schema.Definitions[elem.Name()]; def != nil {
+			def.Required = requiredYAMLFields(elem)
+		}
+	}
+}
+
+// requiredYAMLFields returns the json names of the fields on a connection struct
+// that are required: "name" is always required, and any other field whose yaml
+// tag does not contain "omitempty". Anonymous embedded structs (e.g.
+// ConnectionMetadata) are inlined, matching how invopop flattens them.
+func requiredYAMLFields(t reflect.Type) []string {
+	var required []string
+
+	var walk func(reflect.Type)
+	walk = func(t reflect.Type) {
+		if t.Kind() == reflect.Pointer {
+			t = t.Elem()
+		}
+		if t.Kind() != reflect.Struct {
+			return
+		}
+		for i := range t.NumField() {
+			sf := t.Field(i)
+			if !sf.IsExported() {
+				continue
+			}
+			if sf.Anonymous {
+				walk(sf.Type)
+				continue
+			}
+
+			jsonTag := sf.Tag.Get("json")
+			if jsonTag == "" {
+				continue
+			}
+			jsonName := jsonTag
+			if idx := strings.Index(jsonName, ","); idx >= 0 {
+				jsonName = jsonName[:idx]
+			}
+			if jsonName == "" || jsonName == "-" {
+				continue
+			}
+
+			optional := strings.Contains(sf.Tag.Get("yaml"), "omitempty")
+			if jsonName == "name" || !optional {
+				required = append(required, jsonName)
+			}
+		}
+	}
+	walk(t)
+
+	return required
 }
 
 func (c *Connections) Exists(name string) bool {
