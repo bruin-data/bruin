@@ -4,7 +4,7 @@
 
 The `bruin ai skills` command installs or updates Bruin-provided agent skills for a repository.
 
-Run it without arguments to open a skill selector, or pass a skill name directly. Use `all` to install every bundled skill.
+Run it without arguments to open a checkbox selector, or pass a skill name directly. Use `all` to install every bundled skill and the `AGENTS.md` agent guidance.
 
 Bruin detects `.agents` and `.claude` at the project root:
 
@@ -20,10 +20,15 @@ Existing bundled skills are updated when their installed files differ from the b
 ```bash
 bruin ai skills
 bruin ai skills bruin-semantic-layer
+bruin ai skills agents-md
 bruin ai skills all
 ```
 
 ## Bundled Skills
+
+### `AGENTS.md`
+
+Installs or updates the repository-level `AGENTS.md` guidance used by AI agents. If the file already exists, Bruin replaces the marked Bruin AI section when present or appends that section when absent.
 
 ### `bruin-semantic-layer`
 
@@ -60,3 +65,5 @@ Example output:
 Bruin skills initialized in /path/to/repo/.agents/skills
 - installed bruin-semantic-layer
 ```
+
+Running `bruin ai skills` without arguments opens a checkbox list where multiple skills and `AGENTS.md` can be selected in one run.

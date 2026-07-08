@@ -3,6 +3,7 @@ package cmd
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -239,6 +240,72 @@ func TestSkillsInitCommand_RunWithOptionsSelfHealAddsConnections(t *testing.T) {
 	assert.Equal(t, "${GITHUB_TOKEN}", env.Connections.GitHub[0].AccessToken)
 	assert.Equal(t, "<github-owner>", env.Connections.GitHub[0].Owner)
 	assert.Equal(t, "<github-repo>", env.Connections.GitHub[0].Repo)
+}
+
+func TestSkillsInitCommand_RunWithOptionsInstallsAgentsConfig(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	result, err := (SkillsInitCommand{}).RunWithOptions(t.Context(), root, SkillsInstallOptions{
+		InstallAgentsConfig: true,
+	})
+	require.NoError(t, err)
+
+	assert.Empty(t, result.Skills)
+	assert.Equal(t, filepath.Join(root, "AGENTS.md"), result.AgentsConfigPath)
+	assert.Equal(t, skillStatusInstalled, result.AgentsConfigStatus)
+
+	content := readRequiredFile(t, filepath.Join(root, "AGENTS.md"))
+	assert.Contains(t, content, aiAgentsSectionStart)
+	assert.Contains(t, content, "Bruin Pipeline Agent Guidance")
+	require.NoDirExists(t, filepath.Join(root, ".agents"))
+}
+
+func TestSkillsInitCommand_RunWithOptionsUpdatesAgentsConfigSection(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	agentsPath := filepath.Join(root, "AGENTS.md")
+	require.NoError(t, os.WriteFile(agentsPath, []byte(`# Existing
+
+keep this
+
+<!-- BEGIN BRUIN AI AGENTS -->
+old guidance
+<!-- END BRUIN AI AGENTS -->
+`), 0o644))
+
+	result, err := (SkillsInitCommand{}).RunWithOptions(t.Context(), root, SkillsInstallOptions{
+		InstallAgentsConfig: true,
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, agentsPath, result.AgentsConfigPath)
+	assert.Equal(t, skillStatusUpdated, result.AgentsConfigStatus)
+
+	content := readRequiredFile(t, agentsPath)
+	assert.Contains(t, content, "# Existing")
+	assert.Contains(t, content, "keep this")
+	assert.Contains(t, content, "Bruin Pipeline Agent Guidance")
+	assert.NotContains(t, content, "old guidance")
+	assert.Equal(t, 1, strings.Count(content, aiAgentsSectionStart))
+	assert.Equal(t, 1, strings.Count(content, aiAgentsSectionEnd))
+}
+
+func TestSkillsInitCommand_RunWithOptionsAllInstallsSkillsAndAgentsConfig(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	result, err := (SkillsInitCommand{}).RunWithOptions(t.Context(), root, SkillsInstallOptions{
+		InstallAll:          true,
+		InstallAgentsConfig: true,
+	})
+	require.NoError(t, err)
+
+	require.Len(t, result.Skills, 7)
+	assert.Equal(t, filepath.Join(root, "AGENTS.md"), result.AgentsConfigPath)
+	assert.Equal(t, skillStatusInstalled, result.AgentsConfigStatus)
+	assert.FileExists(t, filepath.Join(root, ".agents", "skills", "bruin-semantic-layer", "SKILL.md"))
 }
 
 func readRequiredFile(t *testing.T, path string) string {
