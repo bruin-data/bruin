@@ -59,12 +59,6 @@ Define repository-specific actions here. Until customized, this skill must repor
 - Confirm the latest source and destination timestamps.
 - Verify the expected schedule against the current date and timezone.
 
-## Testing This Skill
-
-- Use the local self-heal fixture from the Bruin `init` command docs.
-- Run the freshness scenario and verify the agent starts with the missing `transaction_date = DATE '2025-01-03'`, traces the date upstream, and identifies the stale filter in `silver_orders`.
-- If fixes are allowed, verify the agent changes only the isolated filter, checks the missing date first, then runs the full freshness check.
-
 ## Output
 
 Return:

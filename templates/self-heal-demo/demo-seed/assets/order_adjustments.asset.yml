@@ -1,0 +1,23 @@
+name: raw.order_adjustments
+type: duckdb.seed
+description: Refunds, promotions, and service credits applied after checkout.
+
+parameters:
+  path: ./order_adjustments.csv
+
+columns:
+  - name: adjustment_id
+    type: VARCHAR
+    checks:
+      - name: not_null
+      - name: unique
+  - name: order_id
+    type: INTEGER
+  - name: customer_id
+    type: INTEGER
+  - name: adjustment_type
+    type: VARCHAR
+  - name: adjustment_amount
+    type: DOUBLE
+  - name: created_at
+    type: TIMESTAMP

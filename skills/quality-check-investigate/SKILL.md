@@ -59,12 +59,6 @@ Define repository-specific actions here. Until customized, this skill must repor
 - Re-run `bruin validate <path>` if files were changed.
 - Confirm whether failing row counts and examples match the diagnosis.
 
-## Testing This Skill
-
-- Use the local self-heal fixture from the Bruin `init` command docs.
-- Run the quality-check scenario and verify the agent starts with `order_id = 1003`, traces the negative `amount` upstream, and identifies the specific calculation in `silver_orders`.
-- If fixes are allowed, verify the agent changes only the isolated expression, checks `order_id = 1003` first, then runs the full quality check.
-
 ## Output
 
 Return:

@@ -59,12 +59,6 @@ Define repository-specific actions here. Until customized, this skill must repor
 - Re-run the smallest schema inspection or render command used in diagnosis.
 - Confirm whether downstream references are accounted for.
 
-## Testing This Skill
-
-- Use the local self-heal fixture from the Bruin `init` command docs.
-- Run the schema-drift scenario and verify the agent identifies that `bronze_orders.amount` was renamed to `gross_amount` while `silver_orders` still references `amount`.
-- If fixes are allowed, verify the agent updates only the affected select list or mapping, then runs render/schema validation before broader checks.
-
 ## Output
 
 Return:

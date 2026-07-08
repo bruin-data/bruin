@@ -60,12 +60,6 @@ Define repository-specific actions here. Until customized, this skill must repor
 - Run `bruin validate <path>` when files were changed.
 - Capture the final command output or remaining error.
 
-## Testing This Skill
-
-- Use the local self-heal fixture from the Bruin `init` command docs.
-- Run the pipeline-diagnose scenario and verify the agent classifies the failure, reads the affected asset, and identifies the exact missing table reference or broken SQL step.
-- If fixes are allowed, verify the agent changes only the isolated failing reference, reruns the smallest failing command, then runs validation.
-
 ## Output
 
 Return a concise diagnosis with:

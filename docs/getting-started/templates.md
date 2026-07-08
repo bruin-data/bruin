@@ -61,7 +61,7 @@ AI agent skills are installed separately with `bruin ai skills`; see [AI Skills]
   <a class="template-card" href="./templates-docs/self-heal-demo-README.html">
     <span class="template-card__category">Agent test pipeline</span>
     <strong>self-heal-demo</strong>
-    <span>Local DuckDB pipeline with intentional duplicate, freshness, schema drift, and quality issues for testing self-healing agent skills.</span>
+    <span>Local DuckDB project with separate seed and demo pipelines for realistic duplicate, freshness, schema drift, and quality failures.</span>
     <span class="template-card__tags"><code>DuckDB</code><code>AI agents</code><code>data quality</code></span>
   </a>
 </div>

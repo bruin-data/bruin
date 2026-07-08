@@ -59,12 +59,6 @@ Define repository-specific actions here. Until customized, this skill must repor
 - Re-run the affected quality check if available.
 - Confirm whether the duplicate count changed after any reviewed fix.
 
-## Testing This Skill
-
-- Use the local self-heal fixture from the Bruin `init` command docs.
-- Run the duplicate scenario and verify the agent starts with `order_id = 1002`, traces the duplicate from `gold_order_report` to `silver_orders`, and identifies the extra `UNION ALL` as the likely cause.
-- If fixes are allowed, verify the agent removes or corrects only that logic, checks `order_id = 1002` first, then runs the full duplicate check.
-
 ## Output
 
 Return:

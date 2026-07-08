@@ -1,0 +1,21 @@
+name: raw.product_catalog
+type: duckdb.seed
+description: Product catalog export with current pricing fields.
+
+parameters:
+  path: ./product_catalog.csv
+
+columns:
+  - name: product_id
+    type: VARCHAR
+    checks:
+      - name: not_null
+      - name: unique
+  - name: product_name
+    type: VARCHAR
+  - name: listed_price
+    type: DOUBLE
+  - name: currency
+    type: VARCHAR
+  - name: effective_date
+    type: DATE

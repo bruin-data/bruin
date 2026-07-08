@@ -54,12 +54,6 @@ Define repository-specific actions here. Until customized, this skill must not m
 - For local actions, verify with the local command output, `bruin validate <path>`, and local `logs/` files when present.
 - Record any command that could not be run.
 
-## Testing This Skill
-
-- Use the local self-heal fixture from the Bruin `init` command docs after a diagnosis skill has found an isolated issue.
-- Give explicit permission to fix one scenario and verify the agent changes only the approved asset logic.
-- Verify the agent checks the known bad row, key, partition, or timestamp first, then runs the broader validation only after the specific example is resolved.
-
 ## Output
 
 Return:
