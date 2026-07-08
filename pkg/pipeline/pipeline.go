@@ -2405,6 +2405,7 @@ func (p *Pipeline) GetMajorityAssetTypesFromSQLAssets(defaultIfNone AssetType) A
 		AssetTypeBigqueryQuery:     0,
 		AssetTypeSnowflakeQuery:    0,
 		AssetTypePostgresQuery:     0,
+		AssetTypeMySQLQuery:        0,
 		AssetTypeMsSQLQuery:        0,
 		AssetTypeVerticaQuery:      0,
 		AssetTypeDatabricksQuery:   0,
@@ -2414,6 +2415,12 @@ func (p *Pipeline) GetMajorityAssetTypesFromSQLAssets(defaultIfNone AssetType) A
 		AssetTypeFabricQueryLegacy: 0,
 		AssetTypeAthenaQuery:       0,
 		AssetTypeDuckDBQuery:       0,
+		AssetTypeMotherduckQuery:   0,
+		AssetTypeClickHouse:        0,
+		AssetTypeTrinoQuery:        0,
+		AssetTypeDremioQuery:       0,
+		AssetTypeSailQuery:         0,
+		AssetTypeOracleQuery:       0,
 	}
 	maxTasks := 0
 	maxTaskType := defaultIfNone
@@ -3792,6 +3799,7 @@ func IsSQLAssetType(t AssetType) bool {
 	case AssetTypeBigqueryQuery,
 		AssetTypeSnowflakeQuery,
 		AssetTypePostgresQuery,
+		AssetTypeMySQLQuery,
 		AssetTypeRedshiftQuery,
 		AssetTypeMsSQLQuery,
 		AssetTypeVerticaQuery,
@@ -3801,6 +3809,7 @@ func IsSQLAssetType(t AssetType) bool {
 		AssetTypeFabricQueryLegacy,
 		AssetTypeAthenaQuery,
 		AssetTypeDuckDBQuery,
+		AssetTypeMotherduckQuery,
 		AssetTypeClickHouse,
 		AssetTypeTrinoQuery,
 		AssetTypeDremioQuery,

@@ -1416,15 +1416,65 @@ func TestSqlParser_RenameTablesClearsStaleCatalog(t *testing.T) { //nolint
 	}
 }
 
+func TestAssetTypeToDialect(t *testing.T) {
+	t.Parallel()
+
+	tests := map[pipeline.AssetType]string{
+		pipeline.AssetTypeAthenaQuery:       "athena",
+		pipeline.AssetTypeBigqueryQuery:     "bigquery",
+		pipeline.AssetTypeClickHouse:        "clickhouse",
+		pipeline.AssetTypeDatabricksQuery:   "databricks",
+		pipeline.AssetTypeDremioQuery:       "trino",
+		pipeline.AssetTypeDuckDBQuery:       "duckdb",
+		pipeline.AssetTypeFabricQuery:       "fabric",
+		pipeline.AssetTypeFabricQueryLegacy: "fabric",
+		pipeline.AssetTypeMotherduckQuery:   "duckdb",
+		pipeline.AssetTypeMsSQLQuery:        "tsql",
+		pipeline.AssetTypeMySQLQuery:        "mysql",
+		pipeline.AssetTypeOracleQuery:       "oracle",
+		pipeline.AssetTypePostgresQuery:     "postgres",
+		pipeline.AssetTypeRedshiftQuery:     "redshift",
+		pipeline.AssetTypeSailQuery:         "trino",
+		pipeline.AssetTypeSnowflakeQuery:    "snowflake",
+		pipeline.AssetTypeSynapseQuery:      "tsql",
+		pipeline.AssetTypeTrinoQuery:        "trino",
+		pipeline.AssetTypeVerticaQuery:      "postgres",
+	}
+
+	for assetType, want := range tests {
+		t.Run(string(assetType), func(t *testing.T) {
+			t.Parallel()
+			got, err := AssetTypeToDialect(assetType)
+			require.NoError(t, err)
+			require.Equal(t, want, got)
+		})
+	}
+
+	_, err := AssetTypeToDialect(pipeline.AssetTypePython)
+	require.Error(t, err)
+}
+
 func TestConnectionTypeToDialect(t *testing.T) {
 	t.Parallel()
 
 	tests := map[string]string{
+		"athena":                "athena",
 		"clickhouse":            "clickhouse",
-		"postgres":              "postgres",
+		"databricks":            "databricks",
+		"dremio":                "trino",
+		"duckdb":                "duckdb",
+		"fabric":                "fabric",
 		"google_cloud_platform": "bigquery",
-		"snowflake":             "snowflake",
+		"motherduck":            "duckdb",
 		"mssql":                 "tsql",
+		"mysql":                 "mysql",
+		"oracle":                "oracle",
+		"postgres":              "postgres",
+		"redshift":              "redshift",
+		"sail":                  "trino",
+		"snowflake":             "snowflake",
+		"synapse":               "tsql",
+		"trino":                 "trino",
 		"vertica":               "postgres",
 		"":                      "",
 		"unknown":               "",

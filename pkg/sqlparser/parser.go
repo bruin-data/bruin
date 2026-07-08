@@ -355,6 +355,7 @@ var assetTypeDialectMap = map[pipeline.AssetType]string{
 	pipeline.AssetTypeMsSQLQuery:        "tsql",
 	pipeline.AssetTypeSynapseQuery:      "tsql",
 	pipeline.AssetTypeDuckDBQuery:       "duckdb",
+	pipeline.AssetTypeMotherduckQuery:   "duckdb",
 	pipeline.AssetTypeOracleQuery:       "oracle",
 	pipeline.AssetTypeFabricQuery:       "fabric",
 	pipeline.AssetTypeFabricQueryLegacy: "fabric",

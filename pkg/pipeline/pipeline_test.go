@@ -44,6 +44,67 @@ func (m *mockGlossaryReader) GetEntities(pathToPipeline string) ([]*glossary.Ent
 	return m.entities, nil
 }
 
+func sqlQueryAssetTypes() []pipeline.AssetType {
+	return []pipeline.AssetType{
+		pipeline.AssetTypeAthenaQuery,
+		pipeline.AssetTypeBigqueryQuery,
+		pipeline.AssetTypeClickHouse,
+		pipeline.AssetTypeDatabricksQuery,
+		pipeline.AssetTypeDremioQuery,
+		pipeline.AssetTypeDuckDBQuery,
+		pipeline.AssetTypeFabricQuery,
+		pipeline.AssetTypeFabricQueryLegacy,
+		pipeline.AssetTypeMotherduckQuery,
+		pipeline.AssetTypeMsSQLQuery,
+		pipeline.AssetTypeMySQLQuery,
+		pipeline.AssetTypeOracleQuery,
+		pipeline.AssetTypePostgresQuery,
+		pipeline.AssetTypeRedshiftQuery,
+		pipeline.AssetTypeSailQuery,
+		pipeline.AssetTypeSnowflakeQuery,
+		pipeline.AssetTypeSynapseQuery,
+		pipeline.AssetTypeTrinoQuery,
+		pipeline.AssetTypeVerticaQuery,
+	}
+}
+
+func TestIsSQLAssetTypeCoversQueryAssets(t *testing.T) {
+	t.Parallel()
+
+	for _, assetType := range sqlQueryAssetTypes() {
+		t.Run(string(assetType), func(t *testing.T) {
+			t.Parallel()
+			require.True(t, pipeline.IsSQLAssetType(assetType))
+		})
+	}
+
+	for _, assetType := range []pipeline.AssetType{
+		pipeline.AssetTypePython,
+		pipeline.AssetTypeBigquerySeed,
+		pipeline.AssetTypeStarRocks,
+	} {
+		t.Run(string(assetType), func(t *testing.T) {
+			t.Parallel()
+			require.False(t, pipeline.IsSQLAssetType(assetType))
+		})
+	}
+}
+
+func TestGetMajorityAssetTypesFromSQLAssetsCoversQueryAssets(t *testing.T) {
+	t.Parallel()
+
+	for _, assetType := range sqlQueryAssetTypes() {
+		t.Run(string(assetType), func(t *testing.T) {
+			t.Parallel()
+			pl := &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{{Type: assetType}},
+			}
+
+			require.Equal(t, assetType, pl.GetMajorityAssetTypesFromSQLAssets(pipeline.AssetTypeBigqueryQuery))
+		})
+	}
+}
+
 func TestParameterMapGetString(t *testing.T) {
 	t.Parallel()
 
@@ -760,6 +821,19 @@ func TestPipeline_GetConnectionNameForAsset(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.Equal(t, "postgres-default", found)
+	})
+
+	t.Run("motherduck SQL assets resolve motherduck default connections", func(t *testing.T) {
+		t.Parallel()
+		motherduckPipeline := &pipeline.Pipeline{
+			Name:               "motherduck-pipeline",
+			DefaultConnections: map[string]string{"motherduck": "my-motherduck"},
+		}
+		found, err := motherduckPipeline.GetConnectionNameForAsset(&pipeline.Asset{
+			Type: pipeline.AssetTypeMotherduckQuery,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "my-motherduck", found)
 	})
 
 	t.Run("mongo.source resolves a mongo default connection", func(t *testing.T) {
