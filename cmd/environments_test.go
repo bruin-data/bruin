@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"os"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/config"
@@ -477,13 +476,6 @@ environments:
 	err := afero.WriteFile(fs, ".bruin.yml", []byte(configContent), 0o644)
 	require.NoError(t, err)
 
-	// Mock stdin to simulate user saying "n"
-	oldStdin := os.Stdin
-	r, w, _ := os.Pipe()
-	os.Stdin = r
-	_, _ = w.WriteString("n\n")
-	w.Close()
-
 	// Create a mock config using the in-memory filesystem
 	cm, err := config.LoadOrCreate(fs, ".bruin.yml")
 	require.NoError(t, err)
@@ -493,7 +485,4 @@ environments:
 	assert.True(t, cm.EnvironmentExists("dev"))
 	assert.True(t, cm.EnvironmentExists("prod"))
 	assert.Greater(t, len(cm.Environments), 1)
-
-	// Restore stdin
-	os.Stdin = oldStdin
 }

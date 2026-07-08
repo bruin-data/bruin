@@ -53,6 +53,33 @@ Bruin also includes starter troubleshooting skills:
 
 These skills help agents diagnose failed runs, schema drift, duplicates, freshness issues, quality checks, and approved maintenance actions. When installed, Bruin can optionally add placeholder Bruin Cloud and GitHub connections to `.bruin.yml` if matching connections do not already exist.
 
+### Runtime Expectations
+
+The starter skills can be used by Bruin Cloud agents, local agents, and external assistants connected to Bruin Cloud. The Bruin CLI exposes Bruin Cloud operations through `bruin cloud`, which is the clearest path when an assistant has shell access plus a configured API key or `.bruin.yml`. Bruin Cloud MCP is optional; use it when the assistant is configured for MCP tool calls, needs structured Cloud tools directly in chat, or should not shell out to the local CLI.
+
+In local development, the skills should rely on terminal commands such as `bruin validate`, `bruin render`, `bruin query`, and `bruin run`, plus the local `logs/` folder when it exists.
+
+### Test With `self-heal-demo`
+
+Use the regular `self-heal-demo` pipeline template to test the data-problem skills locally with DuckDB:
+
+```bash
+mkdir tmp-pipeline
+cd tmp-pipeline
+git init
+
+bruin ai skills all
+bruin init self-heal-demo
+
+bruin validate self-heal-demo
+bruin run --tag duplicate-investigate self-heal-demo || true
+bruin run --tag quality-check-investigate self-heal-demo || true
+bruin run --tag freshness-check self-heal-demo || true
+bruin run --tag schema-drift-check self-heal-demo || true
+```
+
+The template includes intentional duplicate, quality, freshness, and schema drift issues. See the generated `self-heal-demo/README.md` or the [template docs](/getting-started/templates-docs/self-heal-demo-README) for the scenario map and proof queries.
+
 ## Example
 
 ```bash

@@ -2,6 +2,8 @@
 
 This guide shows how to connect **Cursor**, **Claude Code** and **Codex** to the **Bruin Cloud MCP** so your AI assistant can securely call Bruin Cloud tools (for example: listing pipelines, inspecting runs, or triggering actions) directly from chat.
 
+Bruin Cloud MCP is optional. The Bruin CLI already supports Cloud operations through [`bruin cloud`](/commands/cloud), which is usually the right interface when an assistant has shell access and a configured API key or `.bruin.yml`. Use Bruin Cloud MCP when your assistant is set up for MCP tool calls, when you want structured Cloud tools available directly in chat, or when the assistant should not shell out to the local CLI.
+
 ## Setup
 
 The Bruin Cloud MCP is exposed at:
