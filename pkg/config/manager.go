@@ -354,7 +354,7 @@ func isAnchoredLocalPath(path string) bool {
 	if path == "" {
 		return false
 	}
-	if path[0] == '\\' || path[0] == '/' {
+	if path[0] == '\\' {
 		return true
 	}
 	if len(path) < 3 {
@@ -431,45 +431,45 @@ func LoadFromFileOrEnv(fs afero.Fs, path string) (*Config, error) {
 		}
 		// Make MySQL SSL file paths absolute
 		for i, conn := range env.Connections.MySQL {
-			if conn.SslCaPath != "" && !filepath.IsAbs(conn.SslCaPath) {
+			if conn.SslCaPath != "" && !isAnchoredLocalPath(conn.SslCaPath) {
 				env.Connections.MySQL[i].SslCaPath = filepath.Join(configLocation, conn.SslCaPath)
 			}
 
-			if conn.SslCertPath != "" && !filepath.IsAbs(conn.SslCertPath) {
+			if conn.SslCertPath != "" && !isAnchoredLocalPath(conn.SslCertPath) {
 				env.Connections.MySQL[i].SslCertPath = filepath.Join(configLocation, conn.SslCertPath)
 			}
 
-			if conn.SslKeyPath != "" && !filepath.IsAbs(conn.SslKeyPath) {
+			if conn.SslKeyPath != "" && !isAnchoredLocalPath(conn.SslKeyPath) {
 				env.Connections.MySQL[i].SslKeyPath = filepath.Join(configLocation, conn.SslKeyPath)
 			}
 		}
 
 		// Make Doris SSL file paths absolute
 		for i, conn := range env.Connections.Doris {
-			if conn.SslCaPath != "" && !filepath.IsAbs(conn.SslCaPath) {
+			if conn.SslCaPath != "" && !isAnchoredLocalPath(conn.SslCaPath) {
 				env.Connections.Doris[i].SslCaPath = filepath.Join(configLocation, conn.SslCaPath)
 			}
 
-			if conn.SslCertPath != "" && !filepath.IsAbs(conn.SslCertPath) {
+			if conn.SslCertPath != "" && !isAnchoredLocalPath(conn.SslCertPath) {
 				env.Connections.Doris[i].SslCertPath = filepath.Join(configLocation, conn.SslCertPath)
 			}
 
-			if conn.SslKeyPath != "" && !filepath.IsAbs(conn.SslKeyPath) {
+			if conn.SslKeyPath != "" && !isAnchoredLocalPath(conn.SslKeyPath) {
 				env.Connections.Doris[i].SslKeyPath = filepath.Join(configLocation, conn.SslKeyPath)
 			}
 		}
 
 		// Make Vitess SSL file paths absolute
 		for i, conn := range env.Connections.Vitess {
-			if conn.SslCaPath != "" && !filepath.IsAbs(conn.SslCaPath) {
+			if conn.SslCaPath != "" && !isAnchoredLocalPath(conn.SslCaPath) {
 				env.Connections.Vitess[i].SslCaPath = filepath.Join(configLocation, conn.SslCaPath)
 			}
 
-			if conn.SslCertPath != "" && !filepath.IsAbs(conn.SslCertPath) {
+			if conn.SslCertPath != "" && !isAnchoredLocalPath(conn.SslCertPath) {
 				env.Connections.Vitess[i].SslCertPath = filepath.Join(configLocation, conn.SslCertPath)
 			}
 
-			if conn.SslKeyPath != "" && !filepath.IsAbs(conn.SslKeyPath) {
+			if conn.SslKeyPath != "" && !isAnchoredLocalPath(conn.SslKeyPath) {
 				env.Connections.Vitess[i].SslKeyPath = filepath.Join(configLocation, conn.SslKeyPath)
 			}
 		}
@@ -480,7 +480,7 @@ func LoadFromFileOrEnv(fs afero.Fs, path string) (*Config, error) {
 				continue
 			}
 
-			if filepath.IsAbs(conn.PrivateKeyPath) {
+			if isAnchoredLocalPath(conn.PrivateKeyPath) {
 				continue
 			}
 

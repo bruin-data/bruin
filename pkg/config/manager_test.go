@@ -1194,10 +1194,31 @@ func TestLoadDoesNotPrefixAnchoredCredentialPaths(t *testing.T) {
 	configPath := "/repo/.bruin.yml"
 	drivePath := `C:\Users\ColtonChilders\Documents\GCS Keys\plated-mesh.json`
 	rootedPath := `\Users\ColtonChilders\Documents\GCS Keys\plated-mesh.json`
+	caPath := `C:\certs\ca.pem`
+	certPath := `C:\certs\client.pem`
+	keyPath := `C:\certs\client-key.pem`
 	yml := `default_environment: default
 environments:
   default:
     connections:
+      snowflake:
+        - name: sf-drive
+          private_key_path: 'C:\certs\client-key.pem'
+      mysql:
+        - name: mysql-drive
+          ssl_ca_path: 'C:\certs\ca.pem'
+          ssl_cert_path: 'C:\certs\client.pem'
+          ssl_key_path: 'C:\certs\client-key.pem'
+      doris:
+        - name: doris-drive
+          ssl_ca_path: 'C:\certs\ca.pem'
+          ssl_cert_path: 'C:\certs\client.pem'
+          ssl_key_path: 'C:\certs\client-key.pem'
+      vitess:
+        - name: vitess-drive
+          ssl_ca_path: 'C:\certs\ca.pem'
+          ssl_cert_path: 'C:\certs\client.pem'
+          ssl_key_path: 'C:\certs\client-key.pem'
       google_cloud_platform:
         - name: gcp-drive
           project_id: proj
@@ -1212,6 +1233,24 @@ environments:
 
 	cfg, err := LoadOrCreate(fs, configPath)
 	require.NoError(t, err)
+
+	require.Len(t, cfg.SelectedEnvironment.Connections.Snowflake, 1)
+	assert.Equal(t, keyPath, cfg.SelectedEnvironment.Connections.Snowflake[0].PrivateKeyPath)
+
+	require.Len(t, cfg.SelectedEnvironment.Connections.MySQL, 1)
+	assert.Equal(t, caPath, cfg.SelectedEnvironment.Connections.MySQL[0].SslCaPath)
+	assert.Equal(t, certPath, cfg.SelectedEnvironment.Connections.MySQL[0].SslCertPath)
+	assert.Equal(t, keyPath, cfg.SelectedEnvironment.Connections.MySQL[0].SslKeyPath)
+
+	require.Len(t, cfg.SelectedEnvironment.Connections.Doris, 1)
+	assert.Equal(t, caPath, cfg.SelectedEnvironment.Connections.Doris[0].SslCaPath)
+	assert.Equal(t, certPath, cfg.SelectedEnvironment.Connections.Doris[0].SslCertPath)
+	assert.Equal(t, keyPath, cfg.SelectedEnvironment.Connections.Doris[0].SslKeyPath)
+
+	require.Len(t, cfg.SelectedEnvironment.Connections.Vitess, 1)
+	assert.Equal(t, caPath, cfg.SelectedEnvironment.Connections.Vitess[0].SslCaPath)
+	assert.Equal(t, certPath, cfg.SelectedEnvironment.Connections.Vitess[0].SslCertPath)
+	assert.Equal(t, keyPath, cfg.SelectedEnvironment.Connections.Vitess[0].SslKeyPath)
 
 	require.Len(t, cfg.SelectedEnvironment.Connections.GoogleCloudPlatform, 1)
 	assert.Equal(t, drivePath, cfg.SelectedEnvironment.Connections.GoogleCloudPlatform[0].ServiceAccountFile)
