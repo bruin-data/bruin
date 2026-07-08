@@ -9,6 +9,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/scd2migration"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/pkg/errors"
@@ -17,6 +18,7 @@ import (
 type materializer interface {
 	Render(task *pipeline.Asset, query string) (string, error)
 	LogIfFullRefreshAndDDL(writer interface{}, asset *pipeline.Asset) error
+	IsFullRefresh() bool
 }
 
 type MySQLClient interface {
@@ -119,6 +121,12 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, asset 
 	if asset.Materialization.Type != pipeline.MaterializationTypeNone {
 		if err := conn.CreateSchemaIfNotExist(ctx, asset); err != nil {
 			return errors.Wrap(err, "failed to ensure schema exists")
+		}
+	}
+
+	if asset.Materialization.IsSCD2() && !o.materializer.IsFullRefresh() {
+		if err := scd2migration.MySQL(ctx, conn, asset.Name); err != nil {
+			return err
 		}
 	}
 

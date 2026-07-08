@@ -12,6 +12,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/scd2migration"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/pkg/errors"
@@ -131,6 +132,12 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	if o.materializer.IsFullRefresh() {
 		err = conn.RecreateTableOnMaterializationTypeMismatch(ctx, t)
 		if err != nil {
+			return err
+		}
+	}
+
+	if t.Materialization.IsSCD2() && !o.materializer.IsFullRefresh() {
+		if err = scd2migration.Snowflake(ctx, conn, t.Name); err != nil {
 			return err
 		}
 	}
