@@ -5,7 +5,11 @@ import (
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/fabric"
+	"github.com/bruin-data/bruin/pkg/mssql"
+	"github.com/bruin-data/bruin/pkg/oracle"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
@@ -32,6 +36,55 @@ type MockConnectionManager struct {
 func (m *MockConnectionManager) GetConnection(name string) any {
 	args := m.Called(name)
 	return args.Get(0)
+}
+
+func TestBuildSchemaProbeQuery(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		conn      interface{}
+		tableName string
+		want      string
+	}{
+		{
+			name:      "default limit",
+			conn:      &MockConnection{},
+			tableName: "public.orders",
+			want:      "SELECT * FROM public.orders WHERE 1=0 LIMIT 0",
+		},
+		{
+			name:      "mssql uses top",
+			conn:      &mssql.DB{},
+			tableName: "dbo.orders",
+			want:      "SELECT TOP 0 * FROM dbo.orders",
+		},
+		{
+			name:      "fabric uses top and quotes identifier",
+			conn:      &fabric.DB{},
+			tableName: "sales.orders",
+			want:      "SELECT TOP 0 * FROM [sales].[orders]",
+		},
+		{
+			name:      "oracle omits limit",
+			conn:      &oracle.Client{},
+			tableName: "SALES.ORDERS",
+			want:      "SELECT * FROM SALES.ORDERS WHERE 1=0",
+		},
+		{
+			name:      "postgres receives pre-quoted identifier",
+			conn:      &postgres.Client{},
+			tableName: `"public.orders"`,
+			want:      `SELECT * FROM "public.orders" WHERE 1=0 LIMIT 0`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, buildSchemaProbeQuery(tt.conn, tt.tableName))
+		})
+	}
 }
 
 func TestFillColumnsFromDB(t *testing.T) {

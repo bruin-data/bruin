@@ -9,6 +9,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
+	"github.com/bruin-data/bruin/pkg/fabric"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/mssql"
@@ -126,13 +127,7 @@ func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment, connectionOverride 
 		tableName = postgres.QuoteIdentifier(tableName)
 	}
 
-	queryStr := fmt.Sprintf("SELECT * FROM %s WHERE 1=0 LIMIT 0", tableName)
-	if _, ok := conn.(*mssql.DB); ok {
-		queryStr = "SELECT TOP 0 * FROM " + tableName
-	}
-	if _, ok := conn.(*oracle.Client); ok {
-		queryStr = "SELECT * FROM " + tableName + " WHERE 1=0"
-	}
+	queryStr := buildSchemaProbeQuery(conn, tableName)
 	q := &query.Query{Query: queryStr}
 	result, err := querier.SelectWithSchema(query.WithQueryType(context.Background(), query.QueryTypePatch), q)
 	if err != nil {
@@ -212,6 +207,19 @@ func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment, connectionOverride 
 		return fillStatusFailed, fmt.Errorf("failed to persist asset '%s': %w", pp.Asset.Name, err)
 	}
 	return fillStatusUpdated, nil
+}
+
+func buildSchemaProbeQuery(conn interface{}, tableName string) string {
+	switch conn.(type) {
+	case *mssql.DB:
+		return "SELECT TOP 0 * FROM " + tableName
+	case *fabric.DB:
+		return "SELECT TOP 0 * FROM " + fabric.QuoteIdentifier(tableName)
+	case *oracle.Client:
+		return "SELECT * FROM " + tableName + " WHERE 1=0"
+	default:
+		return fmt.Sprintf("SELECT * FROM %s WHERE 1=0 LIMIT 0", tableName)
+	}
 }
 
 func Patch() *cli.Command {
