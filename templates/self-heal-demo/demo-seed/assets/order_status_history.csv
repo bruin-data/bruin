@@ -1,0 +1,7 @@
+status_event_id,order_id,status,status_updated_at,is_current
+evt-1001-1,1001,paid,2025-01-01 09:15:00,true
+evt-1002-1,1002,authorized,2025-01-01 10:00:00,false
+evt-1002-2,1002,paid,2025-01-01 10:05:00,true
+evt-1003-1,1003,paid,2025-01-02 11:20:00,true
+evt-1004-1,1004,paid,2025-01-02 13:45:00,true
+evt-1005-1,1005,paid,2025-01-03 08:10:00,true

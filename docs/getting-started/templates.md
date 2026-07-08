@@ -58,6 +58,12 @@ AI agent skills are installed separately with `bruin ai skills`; see [AI Skills]
     <span>Seeds Salesforce CRM demo data, ingests it into Snowflake, and builds relationship, lending, and marketing analytics.</span>
     <span class="template-card__tags"><code>Salesforce</code><code>Snowflake</code><code>CRM</code></span>
   </a>
+  <a class="template-card" href="./templates-docs/self-heal-demo-README.html">
+    <span class="template-card__category">Agent test pipeline</span>
+    <strong>self-heal-demo</strong>
+    <span>Local DuckDB project with separate seed and demo pipelines for realistic duplicate, freshness, schema drift, and quality failures.</span>
+    <span class="template-card__tags"><code>DuckDB</code><code>AI agents</code><code>data quality</code></span>
+  </a>
 </div>
 
 ### Local and learning templates

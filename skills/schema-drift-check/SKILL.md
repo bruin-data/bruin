@@ -20,8 +20,8 @@ Use this skill when a pipeline fails because source, destination, or declared as
 
 ## Operating Context
 
-- These starter skills are primarily meant for AI agents configured inside Bruin Cloud.
-- In Bruin Cloud, use Bruin Cloud MCP tools when available. If using the CLI, inspect runs with `bruin cloud runs diagnose --project-id <project-id> --pipeline <pipeline-name> --latest`, fetch run details with `bruin cloud runs get --project-id <project-id> --run-id <run-id>`, and fetch failed asset logs with `bruin cloud instances failed-logs --project-id <project-id> --run-id <run-id>`.
+- These starter skills can be used by Bruin Cloud agents, local agents, and external assistants connected to Bruin Cloud.
+- In Bruin Cloud, use Cloud CLI access when the agent has it enabled. Use the `bruin cloud` CLI when the assistant has shell access and a configured API key or `.bruin.yml`; use Bruin Cloud MCP only when the assistant is configured for MCP tool calls or does not have direct CLI access. If using the CLI, inspect runs with `bruin cloud runs diagnose --project-id <project-id> --pipeline <pipeline-name> --latest`, fetch run details with `bruin cloud runs get --project-id <project-id> --run-id <run-id>`, and fetch failed asset logs with `bruin cloud instances failed-logs --project-id <project-id> --run-id <run-id>`.
 - In local development, inspect terminal output and the local `logs/` folder, especially `logs/runs`, query logs, and export logs when they exist. Use `bruin render <asset>`, `bruin validate <path>`, and `bruin query` with existing `.bruin.yml` connections for schema investigation.
 - If investigation or fix verification requires running an asset or pipeline, prefer a dev or shadow environment. If none exists, ask whether to run in production or create temporary copies of the affected tables to reproduce and test the issue.
 - For other agent runtimes or orchestrators, customize this skill with the correct log source, schema inspection mechanism, and action mechanism before using it.
@@ -58,12 +58,6 @@ Define repository-specific actions here. Until customized, this skill must repor
 - Re-run validation for the affected asset.
 - Re-run the smallest schema inspection or render command used in diagnosis.
 - Confirm whether downstream references are accounted for.
-
-## Testing This Skill
-
-- Use the local self-heal fixture from the Bruin `init` command docs.
-- Run the schema-drift scenario and verify the agent identifies that `bronze_orders.amount` was renamed to `gross_amount` while `silver_orders` still references `amount`.
-- If fixes are allowed, verify the agent updates only the affected select list or mapping, then runs render/schema validation before broader checks.
 
 ## Output
 

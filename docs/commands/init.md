@@ -24,6 +24,9 @@ bruin init default ecommerce-pipeline
 
 # Create a pipeline in the current directory (no parent folder)
 bruin init default --in-place
+
+# Create the self-healing DuckDB demo pipeline
+bruin init self-heal-demo
 ```
 
 ## How It Works
@@ -36,7 +39,6 @@ When you run `bruin init`, it:
 3. Merges any template-level `.bruin.yml` configuration into your existing (or newly created) root `.bruin.yml`.
 4. Optionally initializes a **Git repository** if none exists.
 5. Outputs next steps, such as validating or running your new pipeline.
-
 ## Folder Structure
 
 Every initialized pipeline follows this convention:

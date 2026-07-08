@@ -1,0 +1,3 @@
+adjustment_id,order_id,customer_id,adjustment_type,adjustment_amount,created_at
+adj-900,1004,503,refund,-75.00,2025-01-02 18:00:00
+adj-901,1005,504,promotion,-5.00,2025-01-03 09:00:00

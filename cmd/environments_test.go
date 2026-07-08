@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"os"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/config"
@@ -476,16 +475,6 @@ environments:
 	fs := afero.NewMemMapFs()
 	err := afero.WriteFile(fs, ".bruin.yml", []byte(configContent), 0o644)
 	require.NoError(t, err)
-
-	// Mock stdin to simulate user saying "n"
-	oldStdin := os.Stdin
-	defer func() {
-		os.Stdin = oldStdin
-	}()
-	r, w, _ := os.Pipe()
-	os.Stdin = r
-	_, _ = w.WriteString("n\n")
-	w.Close()
 
 	// Create a mock config using the in-memory filesystem
 	cm, err := config.LoadOrCreate(fs, ".bruin.yml")

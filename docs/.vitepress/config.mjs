@@ -392,7 +392,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                     {text: "Validate", link: "/commands/validate"},
                     {text: "Unit Test", link: "/commands/unit-test"},
                     {text: "Init", link: "/commands/init"},
-                    {text: "AI Templates", link: "/commands/ai-templates"},
+                    {text: "AI Skills", link: "/commands/ai-skills"},
                     {text: "Clean", link: "/commands/clean"},
                     {text: "Connections", link: "/commands/connections"},
                     {text: "Data Diff", link: "/commands/data-diff"},
@@ -485,7 +485,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                 collapsed: false,
                 items: [
                     {text: "Overview", link: "/getting-started/templates"},
-                    {text: "AI Templates", link: "/commands/ai-templates"},
                     {
                         text: "Analytics Demos",
                         collapsed: false,
@@ -493,6 +492,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "ecommerce", link: "/getting-started/templates-docs/ecommerce-README"},
                             {text: "demo-snowflake-sales-analytics", link: "/getting-started/templates-docs/demo-snowflake-sales-analytics-README"},
                             {text: "demo-snowflake-salesforce", link: "/getting-started/templates-docs/demo-snowflake-salesforce-README"},
+                            {text: "self-heal-demo", link: "/getting-started/templates-docs/self-heal-demo-README"},
                         ],
                     },
                     {

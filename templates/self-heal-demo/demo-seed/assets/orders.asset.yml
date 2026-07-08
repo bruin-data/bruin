@@ -1,0 +1,27 @@
+name: raw.orders
+type: duckdb.seed
+description: Raw order headers for the self-heal demo.
+
+parameters:
+  path: ./orders.csv
+
+columns:
+  - name: order_id
+    type: INTEGER
+    checks:
+      - name: not_null
+      - name: unique
+  - name: customer_id
+    type: INTEGER
+    checks:
+      - name: not_null
+  - name: order_date
+    type: DATE
+  - name: product_id
+    type: VARCHAR
+  - name: amount
+    type: DOUBLE
+  - name: currency
+    type: VARCHAR
+  - name: order_status
+    type: VARCHAR
