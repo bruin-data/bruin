@@ -211,7 +211,7 @@ func DataDiffCmd() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:        "target-dialect",
-				Usage:       "Target SQL dialect for ALTER TABLE statements (postgresql, snowflake, bigquery, duckdb, generic). Auto-detected if not specified.",
+				Usage:       "Target SQL dialect for ALTER TABLE statements (postgresql, snowflake, bigquery, duckdb, tsql, generic). Auto-detected if not specified.",
 				Destination: &targetDialect,
 			},
 			&cli.BoolFlag{

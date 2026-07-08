@@ -352,6 +352,47 @@ func NewSnowflakeTypeMapper() *DatabaseTypeMapper {
 	return mapper
 }
 
+// NewSQLServerTypeMapper provides SQL Server-compatible type mapping, including
+// Microsoft Fabric Warehouse types exposed through the TDS endpoint.
+func NewSQLServerTypeMapper() *DatabaseTypeMapper {
+	mapper := NewDatabaseTypeMapper()
+
+	mapper.AddNumericTypes(
+		"bigint", "int", "smallint", "tinyint",
+		"decimal", "numeric",
+		"float", "real",
+		"money", "smallmoney",
+	)
+
+	mapper.AddStringTypes(
+		"char", "varchar",
+		"nchar", "nvarchar",
+		"text", "ntext",
+		"uniqueidentifier",
+		"xml",
+	)
+
+	mapper.AddBooleanTypes(
+		"bit",
+	)
+
+	mapper.AddDateTimeTypes(
+		"date",
+		"time",
+		"datetime",
+		"datetime2",
+		"smalldatetime",
+		"datetimeoffset",
+	)
+
+	mapper.AddBinaryTypes(
+		"binary", "varbinary",
+		"image",
+	)
+
+	return mapper
+}
+
 // NewMongoTypeMapper provides MongoDB type mapping. The keys are the BSON type
 // aliases reported by the aggregation `$type` operator (e.g. "double", "string",
 // "objectId"), since MongoDB has no static catalog and types are inferred from
@@ -511,10 +552,13 @@ func ParseDateTime(value interface{}) (*time.Time, error) {
 			time.RFC3339,                    // 2006-01-02T15:04:05Z07:00
 			time.RFC3339Nano,                // 2006-01-02T15:04:05.999999999Z07:00
 			"2006-01-02T15:04:05",           // RFC3339 without timezone
+			"2006-01-02T15:04:05.999999999", // RFC3339Nano without timezone
 			"2006-01-02 15:04:05 -0700 MST", // BigQuery format with timezone
 			"2006-01-02 15:04:05",           // Standard datetime
+			"2006-01-02 15:04:05.999999999", // Standard datetime with fractional seconds
 			"2006-01-02 15:04:05.999999",    // With microseconds
 			"2006-01-02",                    // Date only
+			"15:04:05.999999999",            // Time only with fractional seconds
 			"15:04:05",                      // Time only
 		}
 
