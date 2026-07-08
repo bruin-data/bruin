@@ -1,3 +1,11 @@
+---
+name: duplicate-investigate
+description: Use when duplicate rows, unstable primary keys, repeated ingestion, or failed uniqueness checks appear in a Bruin asset.
+connections:
+  - bruin
+  - github
+---
+
 # Duplicate Investigate
 
 ## When to Use

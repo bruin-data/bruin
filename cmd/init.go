@@ -265,10 +265,6 @@ func Init() *cli.Command {
 				}
 			}
 
-			if isAITemplateArgument(templateName) {
-				return handleAIInit(ctx, c, selectedViaInteractive)
-			}
-
 			_, err = templates.Templates.ReadDir(templateName)
 			if err != nil || !slices.Contains(templateList, templateName) {
 				errorPrinter.Printf("Template '%s' not found\n", templateName)

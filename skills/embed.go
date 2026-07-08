@@ -2,5 +2,5 @@ package skills
 
 import "embed"
 
-//go:embed all:bruin-semantic-layer
+//go:embed */SKILL.md
 var Files embed.FS

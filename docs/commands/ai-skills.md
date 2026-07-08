@@ -1,10 +1,12 @@
-# Skills Command
+# AI Skills Command
 
 ## Overview
 
-The `bruin skills` command manages Bruin-provided agent skills for a repository.
+The `bruin ai skills` command installs or updates Bruin-provided agent skills for a repository.
 
-Use `bruin skills init` to install or update bundled skills under the repository's agent home. Bruin detects `.agents` and `.claude` at the project root:
+Run it without arguments to open a skill selector, or pass a skill name directly. Use `all` to install every bundled skill.
+
+Bruin detects `.agents` and `.claude` at the project root:
 
 - If `.agents` exists, skills are installed under `.agents/skills`.
 - If only `.claude` exists, skills are installed under `.claude/skills`.
@@ -16,7 +18,9 @@ Existing bundled skills are updated when their installed files differ from the b
 ## Usage
 
 ```bash
-bruin skills init
+bruin ai skills
+bruin ai skills bruin-semantic-layer
+bruin ai skills all
 ```
 
 ## Bundled Skills
@@ -31,10 +35,23 @@ The skill points agents to the local source of truth:
 - `docs/commands/query.md`
 - `pkg/semantic/`
 
+### Self-healing Skills
+
+Bruin also includes starter troubleshooting skills:
+
+- `pipeline-diagnose`
+- `schema-drift-check`
+- `duplicate-investigate`
+- `freshness-check`
+- `quality-check-investigate`
+- `maintenance-action`
+
+These skills help agents diagnose failed runs, schema drift, duplicates, freshness issues, quality checks, and approved maintenance actions. When installed, Bruin can optionally add placeholder Bruin Cloud and GitHub connections to `.bruin.yml` if matching connections do not already exist.
+
 ## Example
 
 ```bash
-bruin skills init
+bruin ai skills bruin-semantic-layer
 ```
 
 Example output:

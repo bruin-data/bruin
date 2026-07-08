@@ -10,6 +10,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/git"
 	bundledskills "github.com/bruin-data/bruin/skills"
+	"github.com/manifoldco/promptui"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli/v3"
 	"gopkg.in/yaml.v3"
@@ -26,8 +27,10 @@ const (
 )
 
 type bundledSkill struct {
-	Name  string
-	Files []bundledSkillFile
+	Name                string
+	Description         string
+	RequiredConnections []aiConnectionType
+	Files               []bundledSkillFile
 }
 
 type bundledSkillFile struct {
@@ -36,8 +39,9 @@ type bundledSkillFile struct {
 }
 
 type skillFrontmatter struct {
-	Name        string `yaml:"name"`
-	Description string `yaml:"description"`
+	Name                string             `yaml:"name"`
+	Description         string             `yaml:"description"`
+	RequiredConnections []aiConnectionType `yaml:"connections"`
 }
 
 type skillInstallPlan struct {
@@ -48,10 +52,17 @@ type skillInstallPlan struct {
 
 type SkillsInitCommand struct{}
 
+type SkillsInstallOptions struct {
+	SkillNames         []string
+	ConnectionResolver func(connection aiConnectionType) (bool, error)
+}
+
 type SkillsInitResult struct {
-	Root             string
-	PrimarySkillsDir string
-	Skills           []SkillInstallResult
+	Root               string
+	PrimarySkillsDir   string
+	Skills             []SkillInstallResult
+	ConnectionsAdded   []string
+	ConnectionsSkipped []string
 }
 
 type SkillInstallResult struct {
@@ -108,7 +119,9 @@ func loadBundledSkill(dir string) (bundledSkill, error) {
 		return bundledSkill{}, fmt.Errorf("bundled skill directory %q does not match frontmatter name %q", dir, metadata.Name)
 	}
 	skill := bundledSkill{
-		Name: metadata.Name,
+		Name:                metadata.Name,
+		Description:         metadata.Description,
+		RequiredConnections: metadata.RequiredConnections,
 	}
 	err = iofs.WalkDir(bundledskills.Files, dir, func(path string, d iofs.DirEntry, err error) error {
 		if err != nil {
@@ -137,24 +150,43 @@ func loadBundledSkill(dir string) (bundledSkill, error) {
 	return skill, nil
 }
 
-// Skills returns the parent command for Bruin agent skills.
-func Skills() *cli.Command {
+// AISkills creates the command that installs bundled Bruin AI skills.
+func AISkills() *cli.Command {
 	return &cli.Command{
-		Name:  "skills",
-		Usage: "manage Bruin agent skills",
-		Commands: []*cli.Command{
-			SkillsInit(),
-		},
-	}
-}
-
-// SkillsInit creates the command that installs bundled Bruin agent skills.
-func SkillsInit() *cli.Command {
-	return &cli.Command{
-		Name:  "init",
-		Usage: "install or update Bruin agent skills in .agents or .claude",
+		Name:      "skills",
+		Usage:     "install or update Bruin agent skills in .agents or .claude",
+		ArgsUsage: "[skill name|all]",
 		Action: func(ctx context.Context, c *cli.Command) error {
 			defer RecoverFromPanic()
+
+			if c.Args().Len() > 1 {
+				errorPrinter.Printf("Expected at most one skill name.\n")
+				return cli.Exit("", 1)
+			}
+
+			bundledSkills, err := loadBundledBruinSkills()
+			if err != nil {
+				errorPrinter.Printf("Failed to load Bruin skills: %v\n", err)
+				return cli.Exit("", 1)
+			}
+
+			selection := c.Args().Get(0)
+			if selection == "" {
+				selected, cancelled, err := runSkillSelector(bundledSkills)
+				if err != nil {
+					errorPrinter.Printf("Error running the skill selector: %v\n", err)
+					return cli.Exit("", 1)
+				}
+				if cancelled {
+					return nil
+				}
+				selection = selected
+			}
+
+			var skillNames []string
+			if selection != "all" {
+				skillNames = []string{selection}
+			}
 
 			root, err := resolveSkillsRoot()
 			if err != nil {
@@ -163,7 +195,7 @@ func SkillsInit() *cli.Command {
 			}
 
 			r := SkillsInitCommand{}
-			result, err := r.Run(root)
+			result, err := r.RunWithOptions(ctx, root, SkillsInstallOptions{SkillNames: skillNames})
 			if err != nil {
 				errorPrinter.Printf("Failed to initialize Bruin skills: %v\n", err)
 				return cli.Exit("", 1)
@@ -176,6 +208,10 @@ func SkillsInit() *cli.Command {
 }
 
 func (r SkillsInitCommand) Run(root string) (*SkillsInitResult, error) {
+	return r.RunWithOptions(context.Background(), root, SkillsInstallOptions{})
+}
+
+func (r SkillsInitCommand) RunWithOptions(ctx context.Context, root string, opts SkillsInstallOptions) (*SkillsInitResult, error) {
 	if root == "" {
 		return nil, errors.New("project root is required")
 	}
@@ -194,13 +230,18 @@ func (r SkillsInitCommand) Run(root string) (*SkillsInitResult, error) {
 		return nil, err
 	}
 
+	selectedSkills, err := selectBundledSkills(bundledSkills, opts.SkillNames)
+	if err != nil {
+		return nil, err
+	}
+
 	result := &SkillsInitResult{
 		Root:             root,
 		PrimarySkillsDir: plan.PrimarySkillsDir,
-		Skills:           make([]SkillInstallResult, 0, len(bundledSkills)),
+		Skills:           make([]SkillInstallResult, 0, len(selectedSkills)),
 	}
 
-	for _, skill := range bundledSkills {
+	for _, skill := range selectedSkills {
 		installResult, err := installBundledSkill(plan.PrimarySkillsDir, skill)
 		if err != nil {
 			return nil, err
@@ -217,7 +258,84 @@ func (r SkillsInitCommand) Run(root string) (*SkillsInitResult, error) {
 		result.Skills = append(result.Skills, installResult)
 	}
 
+	requiredConnections := requiredConnectionsForSkills(selectedSkills)
+	connectionResult, err := ensureAIConnections(ctx, root, requiredConnections, aiConnectionOptions{
+		connectionResolver: opts.ConnectionResolver,
+	})
+	if err != nil {
+		return nil, err
+	}
+	result.ConnectionsAdded = connectionResult.Added
+	result.ConnectionsSkipped = connectionResult.Skipped
+
 	return result, nil
+}
+
+func runSkillSelector(skills []bundledSkill) (string, bool, error) {
+	if !isStdinTerminal() {
+		return "", false, fmt.Errorf("skill name is required in non-interactive mode; available skills: %s", strings.Join(skillSelectionNames(skills), ", "))
+	}
+
+	items := append([]string{"all"}, skillSelectionNames(skills)...)
+	prompt := promptui.Select{
+		Label: "Select a Bruin AI skill to install",
+		Items: items,
+	}
+
+	_, selected, err := prompt.Run()
+	if err != nil {
+		if errors.Is(err, promptui.ErrAbort) {
+			return "", true, nil
+		}
+		return "", false, err
+	}
+
+	return selected, false, nil
+}
+
+func skillSelectionNames(skills []bundledSkill) []string {
+	names := make([]string, 0, len(skills))
+	for _, skill := range skills {
+		names = append(names, skill.Name)
+	}
+	return names
+}
+
+func selectBundledSkills(skills []bundledSkill, names []string) ([]bundledSkill, error) {
+	if len(names) == 0 {
+		return skills, nil
+	}
+
+	byName := make(map[string]bundledSkill, len(skills))
+	for _, skill := range skills {
+		byName[skill.Name] = skill
+	}
+
+	selected := make([]bundledSkill, 0, len(names))
+	for _, name := range names {
+		skill, ok := byName[name]
+		if !ok {
+			return nil, fmt.Errorf("bruin AI skill %q not found. Available skills: %s", name, strings.Join(skillSelectionNames(skills), ", "))
+		}
+		selected = append(selected, skill)
+	}
+
+	return selected, nil
+}
+
+func requiredConnectionsForSkills(skills []bundledSkill) []aiConnectionType {
+	seen := map[aiConnectionType]bool{}
+	required := make([]aiConnectionType, 0)
+	for _, skill := range skills {
+		for _, connection := range skill.RequiredConnections {
+			if seen[connection] {
+				continue
+			}
+			seen[connection] = true
+			required = append(required, connection)
+		}
+	}
+	return required
 }
 
 func resolveSkillsRoot() (string, error) {
@@ -612,5 +730,11 @@ func printSkillsInitResult(result *SkillsInitResult) {
 		for _, link := range skill.Links {
 			infoPrinter.Printf("  linked %s\n", link)
 		}
+	}
+	if len(result.ConnectionsAdded) > 0 {
+		infoPrinter.Printf("Added placeholder connections to .bruin.yml: %s\n", strings.Join(result.ConnectionsAdded, ", "))
+	}
+	if len(result.ConnectionsSkipped) > 0 {
+		infoPrinter.Printf("Skipped optional connection setup: %s\n", strings.Join(result.ConnectionsSkipped, ", "))
 	}
 }

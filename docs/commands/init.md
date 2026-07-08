@@ -7,8 +7,6 @@ It automatically sets up the folder structure, initializes configuration files, 
 
 You can use it to start a new data pipeline project quickly, or to add a new pipeline inside an existing repository.
 
-`bruin init` also includes an `ai` template category for adding generic AI agent starter files to an existing repository.
-
 ## Usage
 
 ```bash
@@ -26,15 +24,6 @@ bruin init default ecommerce-pipeline
 
 # Create a pipeline in the current directory (no parent folder)
 bruin init default --in-place
-
-# Choose an AI starter template
-bruin init ai
-
-# Install a generic AGENTS.md file
-bruin init ai-agents-md
-
-# Install starter troubleshooting skills
-bruin init ai-skill-self-heal
 ```
 
 ## How It Works
@@ -47,27 +36,6 @@ When you run `bruin init`, it:
 3. Merges any template-level `.bruin.yml` configuration into your existing (or newly created) root `.bruin.yml`.
 4. Optionally initializes a **Git repository** if none exists.
 5. Outputs next steps, such as validating or running your new pipeline.
-
----
-
-## AI Templates
-
-`bruin init` also installs AI starter templates for agent instructions and troubleshooting skills.
-
-```bash
-# Open the AI template selector
-bruin init ai
-
-# Install AGENTS.md directly
-bruin init ai-agents-md
-
-# Install the troubleshooting skill pack directly
-bruin init ai-skill-self-heal
-```
-
-AI templates do not create a pipeline folder, initialize Git, or create `.bruin.yml` by default. They also do not accept a folder argument or `--in-place`.
-
-See [AI Templates](/commands/ai-templates) for the available templates, runtime expectations, optional connection setup, and an end-to-end DuckDB self-healing test workflow.
 
 ## Folder Structure
 

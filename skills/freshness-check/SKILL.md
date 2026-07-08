@@ -1,3 +1,11 @@
+---
+name: freshness-check
+description: Use when data is stale, a scheduled run is missing, or freshness checks fail.
+connections:
+  - bruin
+  - github
+---
+
 # Freshness Check
 
 ## When to Use
