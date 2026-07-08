@@ -178,6 +178,8 @@ var DatabasePrefixToSqlfluffDialect = map[string]string{
 	"rs":         "redshift",
 	"athena":     "athena",
 	"ms":         "tsql",
+	"fabric":     "tsql",
+	"fw":         "tsql",
 	"databricks": "sparksql",
 	"synapse":    "tsql",
 	"duckdb":     "duckdb",

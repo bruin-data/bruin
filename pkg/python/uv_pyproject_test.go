@@ -5,9 +5,54 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestDetectDialectFromAssetType(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		assetType string
+		want      string
+	}{
+		{
+			name:      "fabric uses tsql for sqlfluff",
+			assetType: string(pipeline.AssetTypeFabricQuery),
+			want:      "tsql",
+		},
+		{
+			name:      "legacy fabric warehouse uses tsql for sqlfluff",
+			assetType: string(pipeline.AssetTypeFabricQueryLegacy),
+			want:      "tsql",
+		},
+		{
+			name:      "mssql uses tsql",
+			assetType: string(pipeline.AssetTypeMsSQLQuery),
+			want:      "tsql",
+		},
+		{
+			name:      "duckdb stays duckdb",
+			assetType: string(pipeline.AssetTypeDuckDBQuery),
+			want:      "duckdb",
+		},
+		{
+			name:      "unknown falls back to ansi",
+			assetType: "unknown.sql",
+			want:      "ansi",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, DetectDialectFromAssetType(tt.assetType))
+		})
+	}
+}
 
 func TestParsePyprojectToml(t *testing.T) {
 	t.Parallel()

@@ -6,6 +6,8 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/python"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -61,4 +63,38 @@ func TestCheckLint(t *testing.T) {
 			require.Equal(t, tc.expectChange, changed, "Unexpected change detection result")
 		})
 	}
+}
+
+func TestFindSQLFilesWithDialectsUsesTSQLForFabric(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+	assetsDir := filepath.Join(tempDir, "assets")
+	require.NoError(t, os.MkdirAll(assetsDir, 0o755))
+
+	fabricAssetPath := filepath.Join(assetsDir, "fabric_asset.sql")
+	require.NoError(t, os.WriteFile(fabricAssetPath, []byte(`/* @bruin
+name: test.fabric_asset
+type: fabric.sql
+@bruin */
+
+SELECT 1;
+`), 0o644))
+
+	legacyFabricAssetPath := filepath.Join(assetsDir, "legacy_fabric_asset.sql")
+	require.NoError(t, os.WriteFile(legacyFabricAssetPath, []byte(`/* @bruin
+name: test.legacy_fabric_asset
+type: fw.sql
+@bruin */
+
+SELECT 1;
+`), 0o644))
+
+	got, err := findSQLFilesWithDialects(tempDir)
+	require.NoError(t, err)
+
+	assert.ElementsMatch(t, []python.SQLFileInfo{
+		{FilePath: fabricAssetPath, Dialect: "tsql"},
+		{FilePath: legacyFabricAssetPath, Dialect: "tsql"},
+	}, got)
 }
