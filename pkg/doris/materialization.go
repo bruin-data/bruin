@@ -146,6 +146,7 @@ func buildTruncateInsertQuery(asset *pipeline.Asset, query string) (string, erro
 PROPERTIES (%s)
 AS
 %s`, quoteIdentifier(replacementTable), buildDorisProperties(asset), strings.TrimSuffix(strings.TrimSpace(query), ";")),
+		createTableLikeQuery(asset.Name, replacementTable),
 		replaceTableQuery(asset.Name, replacementTable),
 	}
 
@@ -553,6 +554,14 @@ func replaceTableQuery(targetTable, replacementTable string) string {
 		"ALTER TABLE %s REPLACE WITH TABLE %s PROPERTIES('swap' = 'false')",
 		quoteIdentifier(targetTable),
 		quoteColumnName(lastIdentifierPart(replacementTable)),
+	)
+}
+
+func createTableLikeQuery(targetTable, sourceTable string) string {
+	return fmt.Sprintf(
+		"CREATE TABLE IF NOT EXISTS %s LIKE %s",
+		quoteIdentifier(targetTable),
+		quoteIdentifier(sourceTable),
 	)
 }
 

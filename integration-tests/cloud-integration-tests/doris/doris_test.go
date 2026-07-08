@@ -289,6 +289,25 @@ environments:
 			},
 		},
 		{
+			name: "truncate-insert-missing-target-materialization",
+			workflow: e2e.Workflow{
+				Name: "truncate-insert-missing-target-materialization",
+				Steps: []e2e.Task{
+					runAssetWithArgs("truncate+insert: create missing target from staged replacement", "truncate-insert-updated-pipeline/assets/snapshots.sql"),
+					queryContains(
+						"truncate+insert missing target: query final row count",
+						"SELECT COUNT(*) AS row_count FROM `bruin_test`.`truncate_insert_snapshots`",
+						"2",
+					),
+					queryContains(
+						"truncate+insert missing target: verify replacement rows were inserted",
+						"SELECT snapshot_name FROM `bruin_test`.`truncate_insert_snapshots` ORDER BY snapshot_id",
+						"replacement-one", "replacement-two",
+					),
+				},
+			},
+		},
+		{
 			name: "truncate-insert-materialization",
 			workflow: e2e.Workflow{
 				Name: "truncate-insert-materialization",

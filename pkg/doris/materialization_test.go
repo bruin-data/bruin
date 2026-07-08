@@ -98,6 +98,7 @@ func TestMaterializer_Render(t *testing.T) {
 				"PROPERTIES (\"replication_num\" = \"1\")\n" +
 				"AS\n" +
 				"SELECT * FROM staging;\n" +
+				"CREATE TABLE IF NOT EXISTS `analytics`.`orders` LIKE `analytics`.`__bruin_tmp_orders_abcefghi_replacement`;\n" +
 				"ALTER TABLE `analytics`.`orders` REPLACE WITH TABLE `__bruin_tmp_orders_abcefghi_replacement` PROPERTIES('swap' = 'false');",
 		},
 		{
