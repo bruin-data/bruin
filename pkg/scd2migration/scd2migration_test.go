@@ -66,6 +66,21 @@ func TestPostgresDropsLeftoverTempColumn(t *testing.T) {
 	}, db.ran)
 }
 
+func TestPostgresRecoversInterruptedSwap(t *testing.T) {
+	t.Parallel()
+
+	// A prior run dropped _valid_from but crashed before renaming the temp back.
+	// The next run must finish the rename rather than leave the table broken.
+	db := &fakeQuerier{columns: [][]interface{}{
+		{"_valid_from__bruin_tz", "timestamp with time zone"},
+		{"_valid_until", "timestamp with time zone"},
+	}}
+	require.NoError(t, Postgres(context.Background(), db, "products"))
+	assert.Equal(t, []string{
+		`ALTER TABLE "products" RENAME COLUMN "_valid_from__bruin_tz" TO "_valid_from"`,
+	}, db.ran)
+}
+
 func TestPostgresAlreadyTimezoneAware(t *testing.T) {
 	t.Parallel()
 

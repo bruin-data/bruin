@@ -107,21 +107,34 @@ func MySQL(ctx context.Context, db Querier, assetName string) error {
 func buildSwap(table, targetType string, colTypes map[string]string, alreadyOK func(string) bool, quote func(string) string, convert func(col string) string) []string {
 	var stmts []string
 	for _, col := range columns {
-		colType, ok := colTypes[col]
-		if !ok || alreadyOK(colType) {
-			continue
-		}
 		qCol, qTmp := quote(col), quote(col+tmpSuffix)
-		if _, leftover := colTypes[col+tmpSuffix]; leftover {
-			stmts = append(stmts, fmt.Sprintf("ALTER TABLE %s DROP COLUMN %s", table, qTmp))
+		colType, oldExists := colTypes[col]
+		_, tempExists := colTypes[col+tmpSuffix]
+
+		switch {
+		case !oldExists && tempExists:
+			// A prior run dropped the original but did not rename the temp — finish it.
+			stmts = append(stmts, fmt.Sprintf("ALTER TABLE %s RENAME COLUMN %s TO %s", table, qTmp, qCol))
+		case !oldExists:
+			// Neither the column nor a temp exists — nothing to migrate.
+		case alreadyOK(colType):
+			// Already the target type — drop any orphan temp left by a prior run.
+			if tempExists {
+				stmts = append(stmts, fmt.Sprintf("ALTER TABLE %s DROP COLUMN %s", table, qTmp))
+			}
+		default:
+			// Convert: drop any leftover temp, then add / copy / drop / rename.
+			if tempExists {
+				stmts = append(stmts, fmt.Sprintf("ALTER TABLE %s DROP COLUMN %s", table, qTmp))
+			}
+			stmts = append(
+				stmts,
+				fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, qTmp, targetType), // new empty column
+				fmt.Sprintf("UPDATE %s SET %s = %s", table, qTmp, convert(qCol)),        // copy values with conversion
+				fmt.Sprintf("ALTER TABLE %s DROP COLUMN %s", table, qCol),               // drop old column
+				fmt.Sprintf("ALTER TABLE %s RENAME COLUMN %s TO %s", table, qTmp, qCol), // rename new column to old name
+			)
 		}
-		stmts = append(
-			stmts,
-			fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, qTmp, targetType), // new empty column
-			fmt.Sprintf("UPDATE %s SET %s = %s", table, qTmp, convert(qCol)),        // copy values with conversion
-			fmt.Sprintf("ALTER TABLE %s DROP COLUMN %s", table, qCol),               // drop old column
-			fmt.Sprintf("ALTER TABLE %s RENAME COLUMN %s TO %s", table, qTmp, qCol), // rename new column to old name
-		)
 	}
 	return stmts
 }
