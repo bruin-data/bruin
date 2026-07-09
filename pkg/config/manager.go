@@ -348,13 +348,14 @@ func (c *Config) SelectEnvironment(name string) error {
 }
 
 func isAnchoredLocalPath(path string) bool {
-	if filepath.IsAbs(path) {
-		return true
-	}
+	return hasAnchoredLocalPathPrefix(path) || filepath.IsAbs(path)
+}
+
+func hasAnchoredLocalPathPrefix(path string) bool {
 	if path == "" {
 		return false
 	}
-	if path[0] == '\\' {
+	if path[0] == '/' || path[0] == '\\' {
 		return true
 	}
 	if len(path) < 3 {

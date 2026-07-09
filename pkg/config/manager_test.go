@@ -1194,6 +1194,7 @@ func TestLoadDoesNotPrefixAnchoredCredentialPaths(t *testing.T) {
 	configPath := "/repo/.bruin.yml"
 	drivePath := `C:\Users\ColtonChilders\Documents\GCS Keys\plated-mesh.json`
 	rootedPath := `\Users\ColtonChilders\Documents\GCS Keys\plated-mesh.json`
+	slashRootedPath := "/Users/ColtonChilders/Documents/GCS Keys/plated-mesh.json"
 	caPath := `C:\certs\ca.pem`
 	certPath := `C:\certs\client.pem`
 	keyPath := `C:\certs\client-key.pem`
@@ -1228,6 +1229,8 @@ environments:
           service_account_file: 'C:\Users\ColtonChilders\Documents\GCS Keys\plated-mesh.json'
         - name: sheets-rooted
           service_account_file: '\Users\ColtonChilders\Documents\GCS Keys\plated-mesh.json'
+        - name: sheets-slash-rooted
+          service_account_file: '/Users/ColtonChilders/Documents/GCS Keys/plated-mesh.json'
 `
 	require.NoError(t, afero.WriteFile(fs, configPath, []byte(yml), 0o644))
 
@@ -1255,9 +1258,10 @@ environments:
 	require.Len(t, cfg.SelectedEnvironment.Connections.GoogleCloudPlatform, 1)
 	assert.Equal(t, drivePath, cfg.SelectedEnvironment.Connections.GoogleCloudPlatform[0].ServiceAccountFile)
 
-	require.Len(t, cfg.SelectedEnvironment.Connections.GoogleSheets, 2)
+	require.Len(t, cfg.SelectedEnvironment.Connections.GoogleSheets, 3)
 	assert.Equal(t, drivePath, cfg.SelectedEnvironment.Connections.GoogleSheets[0].ServiceAccountFile)
 	assert.Equal(t, rootedPath, cfg.SelectedEnvironment.Connections.GoogleSheets[1].ServiceAccountFile)
+	assert.Equal(t, slashRootedPath, cfg.SelectedEnvironment.Connections.GoogleSheets[2].ServiceAccountFile)
 }
 
 func TestIsAnchoredLocalPath(t *testing.T) {
@@ -1299,7 +1303,7 @@ func TestIsAnchoredLocalPath(t *testing.T) {
 			want: true,
 		},
 		{
-			name: "unix absolute",
+			name: "slash rooted",
 			path: "/Users/ColtonChilders/Documents/GCS Keys/plated-mesh.json",
 			want: true,
 		},
@@ -1309,6 +1313,54 @@ func TestIsAnchoredLocalPath(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			assert.Equal(t, tt.want, isAnchoredLocalPath(tt.path))
+		})
+	}
+}
+
+func TestHasAnchoredLocalPathPrefix(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		path string
+		want bool
+	}{
+		{
+			name: "slash rooted",
+			path: "/Users/x/key.json",
+			want: true,
+		},
+		{
+			name: "backslash rooted",
+			path: `\Users\x\key.json`,
+			want: true,
+		},
+		{
+			name: "windows drive absolute with backslashes",
+			path: `C:\Users\x\key.json`,
+			want: true,
+		},
+		{
+			name: "windows drive absolute with slashes",
+			path: "C:/Users/x/key.json",
+			want: true,
+		},
+		{
+			name: "drive relative",
+			path: `C:Users\x\key.json`,
+			want: false,
+		},
+		{
+			name: "relative",
+			path: "Users/x/key.json",
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, hasAnchoredLocalPathPrefix(tt.path))
 		})
 	}
 }
