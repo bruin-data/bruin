@@ -111,8 +111,8 @@ format: lint-python
 	go tool gofumpt -w cmd pkg semantic-engine &
 
 	@echo "$(OK_COLOR)>> [golangci-lint] running$(NO_COLOR)" & \
-	golangci-lint run --timeout 10m60s --build-tags="no_duckdb_arrow" ./...  & \
-	cd semantic-engine && golangci-lint run --timeout 10m60s & \
+	golangci-lint run --timeout 10m60s --new-from-merge-base=origin/main --build-tags="no_duckdb_arrow" ./...  & \
+	cd semantic-engine && golangci-lint run --timeout 10m60s --new-from-merge-base=origin/main & \
 	wait
 
 tools-update:
