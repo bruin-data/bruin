@@ -49,7 +49,7 @@ parameters:
 - `type`: Always `ingestr` for InfluxDB.
 - `source_connection`: The InfluxDB connection name defined in `.bruin.yml`.
 - `source_table`: Name of the InfluxDB table to ingest. The measurement name should be provided as the value for --source-table.
-- `destination`: The destination connection name.
+- `destination`: The destination platform/type, for example `postgres`.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 

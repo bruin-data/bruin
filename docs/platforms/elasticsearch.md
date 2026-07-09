@@ -84,7 +84,7 @@ Elasticsearch can be used as a destination for [Ingestr Assets](../assets/ingest
 ### Example: Load data from Snapchat Ads to Elasticsearch
 
 ```yaml
-name: snapchat.ads
+name: snapchat_ads
 type: ingestr
 description: Snapchat Ads individual ads data with merge strategy for incremental updates
 
@@ -102,7 +102,7 @@ parameters:
 This configuration will:
 
 1. Extract ads data from Snapchat Ads using the `my-snapchatads` connection
-2. Load the data into the `ads` index in your Elasticsearch cluster
+2. Load the data into the `snapchat_ads` index in your Elasticsearch cluster
 3. Use the default Elasticsearch connection (`elasticsearch-default`) from your pipeline configuration
 
 > [!NOTE]
@@ -110,7 +110,7 @@ This configuration will:
 
 ## Index Naming
 
-The `destination_table` parameter specifies the Elasticsearch index name where data will be loaded. Index names in Elasticsearch:
+For ingestr assets, Bruin passes the asset `name` as ingestr's `--dest-table`. For Elasticsearch destinations, that destination table is the target index name. Index names in Elasticsearch:
 
 - Must be lowercase
 - Cannot contain spaces or special characters like `\`, `/`, `*`, `?`, `"`, `<`, `>`, `|`, `,`, `#`

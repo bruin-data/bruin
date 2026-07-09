@@ -60,7 +60,7 @@ parameters:
 | `custom_reports_list` | id | – | replace | Retrieves metadata about existing custom reports in your Personio account, such as report name, report type, report date / timeframe. |
 | `employees_absences_balance` | [employee_id,id] | – | merge | Retrieves the absence balance for a specific employee |
 
-- `destination`: The name of the destination connection.
+- `destination`: The destination platform/type, for example `postgres`.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 

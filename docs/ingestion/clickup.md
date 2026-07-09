@@ -38,7 +38,7 @@ parameters:
 - `type`: Always `ingestr` for ClickUp.
 - `source_connection`: The ClickUp connection name defined in `.bruin.yml`.
 - `source_table`: Name of the ClickUp table to ingest.
-- `destination`: The destination connection name.
+- `destination`: The destination platform/type, for example `postgres`.
 
 ## Available Source Tables
 

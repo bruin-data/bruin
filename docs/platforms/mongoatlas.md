@@ -26,7 +26,7 @@ To set up a MongoDB Atlas connection, you need to add a configuration item to `c
 - `username`: MongoDB Atlas database username
 - `password`: MongoDB Atlas database password
 - `host`: MongoDB Atlas cluster hostname, without the `mongodb+srv://` protocol (e.g., `cluster0.example.mongodb.net`)
-- `database`: Optional. If set, Bruin appends it to the connection URI path. For ingestr assets, the target database is usually provided in `source_table` or `destination_table` as `database.collection`.
+- `database`: Optional. If set, Bruin appends it to the connection URI path. For ingestr assets, the target database is usually provided in `source_table` for source assets or in the asset `name` for destination assets, using `database.collection` format.
 
 > [!NOTE]
 > The connection uses the `mongodb+srv://` protocol, which is the standard for MongoDB Atlas connections. You don't need to specify the protocol or a port in the configuration.
@@ -57,17 +57,15 @@ MongoDB Atlas can be used as a destination for [Ingestr Assets](../assets/ingest
 ### Example: Load data from PostgreSQL to MongoDB Atlas
 
 ```yaml
-name: ingest.users
+name: mydb.users
 type: ingestr
-connection: postgres
+connection: connection_name
 
 parameters:
   source_connection: postgres
   source_table: 'public.users'
 
   destination: mongo_atlas
-  destination_connection: connection_name
-  destination_table: 'mydb.users'
 ```
 
 This configuration will:
@@ -75,7 +73,7 @@ This configuration will:
 1. Extract data from the `public.users` table in PostgreSQL
 2. Load the data into the `users` collection in the `mydb` MongoDB Atlas database
 
-`destination_connection` must match the `name` of a `mongo_atlas` connection in `.bruin.yml`. `destination_table` uses `database.collection` format.
+`connection` must match the `name` of a `mongo_atlas` connection in `.bruin.yml`. Bruin passes the asset `name` as ingestr's destination table, so use `database.collection` format in `name`.
 
 ## Using MongoDB Atlas as a Source
 

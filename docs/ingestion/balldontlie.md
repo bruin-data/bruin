@@ -43,7 +43,7 @@ parameters:
 - `type`: Always `ingestr` for BallDontLie FIFA.
 - `source_connection`: Name of the BallDontLie connection defined in `.bruin.yml`.
 - `source_table`: One of the tables listed below.
-- `destination`: Destination connection name.
+- `destination`: The destination platform/type, for example `postgres`.
 
 ## Available Source Tables
 

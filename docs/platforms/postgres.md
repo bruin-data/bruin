@@ -203,7 +203,7 @@ CDC is enabled by setting `cdc: "true"` on an `ingestr` asset with a PostgreSQL 
 | `cdc_slot` | No | Name of the PostgreSQL replication slot to use |
 | `cdc_dest_schema` | No | Schema to use when running multi-table CDC |
 | `source_table` | Yes | Source table in `schema.table` format, or `"*"` to replicate all tables in the publication |
-| `incremental_strategy` | No | Defaults to `"merge"` when CDC is enabled; can be overridden to `"append"` |
+| `incremental_strategy` | No | Defaults to `"merge"` when CDC is enabled. CDC assets must use `"merge"`; Bruin rejects other strategies. |
 
 > [!NOTE]
 > When CDC is enabled, primary key columns do not need to be specified in the asset definition — they are determined automatically from the source table.

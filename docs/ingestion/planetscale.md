@@ -89,7 +89,7 @@ CDC is enabled by setting `cdc: "true"` on an ingestr asset with a PlanetScale s
 |-----------|----------|-------------|
 | `cdc` | Yes | Set to `"true"` to enable CDC mode |
 | `cdc_dest_schema` | No | Destination schema to use for multi-table CDC runs |
-| `incremental_strategy` | No | Defaults to `"merge"` when CDC is enabled; can be overridden to `"append"` |
+| `incremental_strategy` | No | Defaults to `"merge"` when CDC is enabled. CDC assets must use `"merge"`; Bruin rejects other strategies. |
 
 Requirements:
 

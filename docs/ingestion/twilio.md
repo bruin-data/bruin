@@ -58,7 +58,20 @@ parameters:
 | `calls` | sid | date_updated | merge | Voice calls. Lifecycle changes (status/duration/end_time) bump `date_updated`. |
 | `recordings` | sid | date_updated | merge | Call recordings, including deleted ones (soft-deletes surface as `status=deleted`). |
 | `incoming_phone_numbers` | sid | - | replace | Phone numbers owned by the account. |
-| `usage_records` | - | - | replace | Usage totals per category over the account lifetime. Accepts an optional `:daily`, `:monthly`, or `:yearly` granularity suffix (e.g. `usage_records:daily`) that loads incrementally by period. |
+| `usage_records` | - | - | replace | Usage totals per category over the account lifetime. Accepts optional granularity suffixes listed below. |
+
+### Usage record granularity
+
+`usage_records` accepts an optional granularity suffix that switches to Twilio's `Daily`, `Monthly`, or `Yearly` sub-resources:
+
+| Source table | Grain | Inc Key | Inc Strategy |
+| ------------ | ----- | ------- | ------------ |
+| `usage_records` | lifetime total per category | - | replace |
+| `usage_records:daily` | one row per category per day | start_date | merge |
+| `usage_records:monthly` | one row per category per month | start_date | merge |
+| `usage_records:yearly` | one row per category per year | start_date | merge |
+
+The granular variants load incrementally by period: past periods are loaded once and the current period is refreshed on each run.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 

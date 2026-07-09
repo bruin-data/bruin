@@ -53,7 +53,7 @@ parameters:
 - `connection`: The name of the destination connection. For example, "neon" is a connection name.
 - `source_connection`: The name of the GCP Spanner connection defined in .bruin.yml.
 - `source_table`: The name of the data table in GCP Spanner that you want to ingest.
-- `destination`: The name or type of the destination connection, which is Postgres.
+- `destination`: The destination platform/type, for example `postgres`.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 

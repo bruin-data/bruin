@@ -40,7 +40,7 @@ parameters:
 
 - `source_connection`: The Trustpilot connection name defined in `.bruin.yml`.
 - `source_table`: Table to ingest. See the available tables below.
-- `destination`: Destination connection name.
+- `destination`: The destination platform/type, for example `postgres`.
 
 ## Available Source Tables
 

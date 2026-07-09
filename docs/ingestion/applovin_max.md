@@ -42,7 +42,7 @@ parameters:
 - `type`: Specifies the asset’s type. Set this to `ingestr` to use the ingestr data pipeline. For AppLovin Max, it will be always `ingestr`.
 - `source_connection`: The name of the AppLovin Max connection defined in `.bruin.yml`.
 - `source_table`: The name of the table in AppLovin Max to ingest. The format is `<table_name>:<application_ids>` where `application_ids` is a comma-separated list of application IDs.
-- `destination`: The name of the destination connection.
+- `destination`: The destination platform/type, for example `postgres`.
 
 ## Available Source Tables
 

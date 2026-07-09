@@ -42,7 +42,7 @@ parameters:
 - `type`: Specifies the asset’s type. Set this to `ingestr` to use the ingestr data pipeline. For Pipedrive, it will be always `ingestr`
 - `source_connection`: The name of the Pipedrive connection defined in `.bruin.yml`
 - `source_table`: The name of the table in Pipedrive to ingest.
-- `destination`: The name of the destination connection.
+- `destination`: The destination platform/type, for example `postgres`.
 
 ## Available Source Tables
 
