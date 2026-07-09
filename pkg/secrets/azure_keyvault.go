@@ -174,17 +174,27 @@ func newAzureKeyVaultClientWithCredential(logger logger.Logger, vaultURL string,
 
 // GetConnection retrieves a connection by name from Azure Key Vault.
 func (c *AzureKeyVaultClient) GetConnection(name string) any {
+	conn, err := c.ResolveConnection(name)
+	if err != nil {
+		c.logger.Errorf("%v", err)
+		return nil
+	}
+
+	return conn
+}
+
+// ResolveConnection implements config.ConnectionResolver.
+func (c *AzureKeyVaultClient) ResolveConnection(name string) (any, error) {
 	c.cacheMu.RLock()
 	if conn, ok := c.cacheConnections[name]; ok {
 		c.cacheMu.RUnlock()
-		return conn
+		return conn, nil
 	}
 	c.cacheMu.RUnlock()
 
 	manager, err := c.getAzureKeyVaultManager(name)
 	if err != nil {
-		c.logger.Errorf("%v", err)
-		return nil
+		return nil, err
 	}
 
 	conn := manager.GetConnection(name)
@@ -193,7 +203,7 @@ func (c *AzureKeyVaultClient) GetConnection(name string) any {
 	c.cacheConnections[name] = conn
 	c.cacheMu.Unlock()
 
-	return conn
+	return conn, nil
 }
 
 // GetConnectionDetails retrieves connection details by name from Azure Key Vault.

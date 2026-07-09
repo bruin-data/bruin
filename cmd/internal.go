@@ -54,6 +54,7 @@ func Internal() *cli.Command {
 			ListVariants(),
 			AssetMetadata(),
 			IngestrSources(),
+			IngestrURI(),
 			LockAssetDependencies(),
 		},
 	}
