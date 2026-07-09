@@ -34,11 +34,11 @@ func TestPostgres(t *testing.T) {
 	require.NoError(t, Postgres(context.Background(), db, "public.products"))
 	assert.Equal(t, []string{
 		`ALTER TABLE "public"."products" ADD COLUMN "_valid_from__bruin_tz" TIMESTAMPTZ`,
-		`UPDATE "public"."products" SET "_valid_from__bruin_tz" = "_valid_from" AT TIME ZONE 'UTC'`,
+		`UPDATE "public"."products" SET "_valid_from__bruin_tz" = CAST("_valid_from" AS TIMESTAMPTZ)`,
 		`ALTER TABLE "public"."products" DROP COLUMN "_valid_from"`,
 		`ALTER TABLE "public"."products" RENAME COLUMN "_valid_from__bruin_tz" TO "_valid_from"`,
 		`ALTER TABLE "public"."products" ADD COLUMN "_valid_until__bruin_tz" TIMESTAMPTZ`,
-		`UPDATE "public"."products" SET "_valid_until__bruin_tz" = "_valid_until" AT TIME ZONE 'UTC'`,
+		`UPDATE "public"."products" SET "_valid_until__bruin_tz" = CAST("_valid_until" AS TIMESTAMPTZ)`,
 		`ALTER TABLE "public"."products" DROP COLUMN "_valid_until"`,
 		`ALTER TABLE "public"."products" RENAME COLUMN "_valid_until__bruin_tz" TO "_valid_until"`,
 	}, db.ran)
@@ -56,11 +56,11 @@ func TestPostgresDropsLeftoverTempColumn(t *testing.T) {
 	assert.Equal(t, []string{
 		`ALTER TABLE "products" DROP COLUMN "_valid_from__bruin_tz"`,
 		`ALTER TABLE "products" ADD COLUMN "_valid_from__bruin_tz" TIMESTAMPTZ`,
-		`UPDATE "products" SET "_valid_from__bruin_tz" = "_valid_from" AT TIME ZONE 'UTC'`,
+		`UPDATE "products" SET "_valid_from__bruin_tz" = CAST("_valid_from" AS TIMESTAMPTZ)`,
 		`ALTER TABLE "products" DROP COLUMN "_valid_from"`,
 		`ALTER TABLE "products" RENAME COLUMN "_valid_from__bruin_tz" TO "_valid_from"`,
 		`ALTER TABLE "products" ADD COLUMN "_valid_until__bruin_tz" TIMESTAMPTZ`,
-		`UPDATE "products" SET "_valid_until__bruin_tz" = "_valid_until" AT TIME ZONE 'UTC'`,
+		`UPDATE "products" SET "_valid_until__bruin_tz" = CAST("_valid_until" AS TIMESTAMPTZ)`,
 		`ALTER TABLE "products" DROP COLUMN "_valid_until"`,
 		`ALTER TABLE "products" RENAME COLUMN "_valid_until__bruin_tz" TO "_valid_until"`,
 	}, db.ran)
@@ -94,17 +94,16 @@ func TestSnowflake(t *testing.T) {
 
 	db := &fakeQuerier{columns: naiveCols("timestamp_ntz", "timestamp_ntz")}
 	require.NoError(t, Snowflake(context.Background(), db, "DB.SCHEMA.PRODUCTS"))
-	// Snowflake runs a single batched statement that shares the UTC session.
-	require.Len(t, db.ran, 1)
-	assert.Equal(t, "ALTER SESSION SET TIMEZONE = 'UTC';\n"+
-		"ALTER TABLE DB.SCHEMA.PRODUCTS ADD COLUMN _valid_from__bruin_tz TIMESTAMP_TZ;\n"+
-		"UPDATE DB.SCHEMA.PRODUCTS SET _valid_from__bruin_tz = CAST(_valid_from AS TIMESTAMP_TZ);\n"+
-		"ALTER TABLE DB.SCHEMA.PRODUCTS DROP COLUMN _valid_from;\n"+
-		"ALTER TABLE DB.SCHEMA.PRODUCTS RENAME COLUMN _valid_from__bruin_tz TO _valid_from;\n"+
-		"ALTER TABLE DB.SCHEMA.PRODUCTS ADD COLUMN _valid_until__bruin_tz TIMESTAMP_TZ;\n"+
-		"UPDATE DB.SCHEMA.PRODUCTS SET _valid_until__bruin_tz = CAST(_valid_until AS TIMESTAMP_TZ);\n"+
-		"ALTER TABLE DB.SCHEMA.PRODUCTS DROP COLUMN _valid_until;\n"+
-		"ALTER TABLE DB.SCHEMA.PRODUCTS RENAME COLUMN _valid_until__bruin_tz TO _valid_until;", db.ran[0])
+	assert.Equal(t, []string{
+		"ALTER TABLE DB.SCHEMA.PRODUCTS ADD COLUMN _valid_from__bruin_tz TIMESTAMP_TZ",
+		"UPDATE DB.SCHEMA.PRODUCTS SET _valid_from__bruin_tz = CONVERT_TIMEZONE('UTC', CAST(_valid_from AS TIMESTAMP_TZ))",
+		"ALTER TABLE DB.SCHEMA.PRODUCTS DROP COLUMN _valid_from",
+		"ALTER TABLE DB.SCHEMA.PRODUCTS RENAME COLUMN _valid_from__bruin_tz TO _valid_from",
+		"ALTER TABLE DB.SCHEMA.PRODUCTS ADD COLUMN _valid_until__bruin_tz TIMESTAMP_TZ",
+		"UPDATE DB.SCHEMA.PRODUCTS SET _valid_until__bruin_tz = CONVERT_TIMEZONE('UTC', CAST(_valid_until AS TIMESTAMP_TZ))",
+		"ALTER TABLE DB.SCHEMA.PRODUCTS DROP COLUMN _valid_until",
+		"ALTER TABLE DB.SCHEMA.PRODUCTS RENAME COLUMN _valid_until__bruin_tz TO _valid_until",
+	}, db.ran)
 }
 
 func TestSnowflakeLTZIsMigratedButTZIsSkipped(t *testing.T) {
@@ -112,12 +111,12 @@ func TestSnowflakeLTZIsMigratedButTZIsSkipped(t *testing.T) {
 
 	db := &fakeQuerier{columns: naiveCols("timestamp_ltz", "timestamp_tz")}
 	require.NoError(t, Snowflake(context.Background(), db, "schema.products"))
-	require.Len(t, db.ran, 1)
-	assert.Equal(t, "ALTER SESSION SET TIMEZONE = 'UTC';\n"+
-		"ALTER TABLE schema.products ADD COLUMN _valid_from__bruin_tz TIMESTAMP_TZ;\n"+
-		"UPDATE schema.products SET _valid_from__bruin_tz = CAST(_valid_from AS TIMESTAMP_TZ);\n"+
-		"ALTER TABLE schema.products DROP COLUMN _valid_from;\n"+
-		"ALTER TABLE schema.products RENAME COLUMN _valid_from__bruin_tz TO _valid_from;", db.ran[0])
+	assert.Equal(t, []string{
+		"ALTER TABLE schema.products ADD COLUMN _valid_from__bruin_tz TIMESTAMP_TZ",
+		"UPDATE schema.products SET _valid_from__bruin_tz = CONVERT_TIMEZONE('UTC', CAST(_valid_from AS TIMESTAMP_TZ))",
+		"ALTER TABLE schema.products DROP COLUMN _valid_from",
+		"ALTER TABLE schema.products RENAME COLUMN _valid_from__bruin_tz TO _valid_from",
+	}, db.ran)
 }
 
 func TestMySQL(t *testing.T) {

@@ -52,7 +52,7 @@ func Postgres(ctx context.Context, db Querier, assetName string) error {
 		return err
 	}
 	stmts := buildSwap(pgQuote(assetName), "TIMESTAMPTZ", types, alreadyTZ, pgQuote,
-		func(col string) string { return col + " AT TIME ZONE 'UTC'" })
+		func(col string) string { return fmt.Sprintf("CAST(%s AS TIMESTAMPTZ)", col) })
 	return runEach(ctx, db, stmts)
 }
 
@@ -76,12 +76,10 @@ func Snowflake(ctx context.Context, db Querier, assetName string) error {
 		return err
 	}
 	stmts := buildSwap(assetName, "TIMESTAMP_TZ", types, alreadyTZ, ident,
-		func(col string) string { return fmt.Sprintf("CAST(%s AS TIMESTAMP_TZ)", col) })
-	if len(stmts) == 0 {
-		return nil
-	}
-	batch := "ALTER SESSION SET TIMEZONE = 'UTC';\n" + strings.Join(stmts, ";\n") + ";"
-	return db.RunQueryWithoutResult(ctx, &query.Query{Query: batch})
+		func(col string) string {
+			return fmt.Sprintf("CONVERT_TIMEZONE('UTC', CAST(%s AS TIMESTAMP_TZ))", col)
+		})
+	return runEach(ctx, db, stmts)
 }
 
 // MySQL converts the legacy VARCHAR _valid_until (from the old string sentinel)
