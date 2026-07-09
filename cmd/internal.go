@@ -14,7 +14,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/bigquery" //nolint:unused
 	"github.com/bruin-data/bruin/pkg/config"
-	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/ingestr"
@@ -1454,7 +1453,9 @@ func AssetMetadata() *cli.Command {
 				}
 			}
 
-			manager, errs := connection.NewManagerFromConfigWithContext(ctx, cm)
+			ctx = context.WithValue(ctx, config.ConfigFilePathContextKey, cm.Path())
+			ctx = context.WithValue(ctx, config.EnvironmentNameContextKey, cm.SelectedEnvironmentName)
+			manager, errs := connectionManagerFromConfig(ctx, cm, makeLogger(false))
 			if len(errs) > 0 {
 				printErrorJSON(errs[0])
 				return cli.Exit("", 1)

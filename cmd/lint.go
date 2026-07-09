@@ -11,7 +11,6 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
-	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/lint"
@@ -179,7 +178,9 @@ func Lint(isDebug *bool) *cli.Command {
 
 			logger.Debugf("switched to the environment '%s'", cm.SelectedEnvironmentName)
 
-			connectionManager, errs := connection.NewManagerFromConfigWithContext(ctx, cm)
+			ctx = context.WithValue(ctx, config.ConfigFilePathContextKey, configFilePath)
+			ctx = context.WithValue(ctx, config.EnvironmentNameContextKey, cm.SelectedEnvironmentName)
+			connectionManager, errs := connectionManagerFromConfig(ctx, cm, logger)
 			if len(errs) > 0 {
 				printErrors(errs, c.String("output"), "Failed to register connections")
 				return cli.Exit("", 1)

@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/config"
-	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/query"
@@ -277,8 +276,11 @@ func DataDiffCmd() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
+			ctx = context.WithValue(ctx, config.ConfigFilePathContextKey, configFilePath)
+			ctx = context.WithValue(ctx, config.EnvironmentNameContextKey, cm.SelectedEnvironmentName)
+
 			// Create connection manager
-			manager, errs := connection.NewManagerFromConfigWithContext(ctx, cm)
+			manager, errs := connectionManagerFromConfig(ctx, cm, makeLogger(false))
 			if len(errs) > 0 {
 				// Handle multiple errors, e.g. by joining them or returning the first one
 				return fmt.Errorf("failed to create connection manager: %w", errs[0])

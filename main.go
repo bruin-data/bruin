@@ -58,7 +58,9 @@ func main() {
 				Usage:       "show debug information",
 				Destination: &isDebug,
 			},
+			cmd.SecretsBackendFlag(),
 		},
+		Before: cmd.WithSecretsBackendContext,
 		Commands: []*cli.Command{
 			cmd.Lint(&isDebug),
 			cmd.Run(&isDebug),

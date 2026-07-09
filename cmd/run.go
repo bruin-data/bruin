@@ -25,7 +25,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/claudecode"
 	"github.com/bruin-data/bruin/pkg/clickhouse"
 	"github.com/bruin-data/bruin/pkg/config"
-	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/databricks"
 	dataprocserverless "github.com/bruin-data/bruin/pkg/dataproc_serverless"
 	"github.com/bruin-data/bruin/pkg/date"
@@ -55,7 +54,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/s3"
 	"github.com/bruin-data/bruin/pkg/sail"
 	"github.com/bruin-data/bruin/pkg/scheduler"
-	"github.com/bruin-data/bruin/pkg/secrets"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/synapse"
@@ -675,11 +673,6 @@ func Run(isDebug *bool) *cli.Command {
 				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
 			},
-			&cli.StringFlag{
-				Name:    "secrets-backend",
-				Sources: cli.EnvVars("BRUIN_SECRETS_BACKEND"),
-				Usage:   "the source of secrets if different from .bruin.yml. Possible values: 'vault', 'doppler', 'aws', 'azure'",
-			},
 			&cli.BoolFlag{
 				Name:  "no-validation",
 				Usage: "skip validation for this run.",
@@ -851,7 +844,6 @@ func Run(isDebug *bool) *cli.Command {
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigRunID, runID)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigFullRefresh, runConfig.FullRefresh)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigQueryAnnotations, runConfig.Annotations)
-			runCtx = context.WithValue(runCtx, config.SecretsBackendContextKey, c.String("secrets-backend"))
 
 			// Preview load uses WithOnlyPipeline so we can introspect the
 			// pipeline.yml metadata (notably .Variants) before requiring the user
@@ -1163,31 +1155,7 @@ func Run(isDebug *bool) *cli.Command {
 			var connectionManager config.ConnectionAndDetailsGetter
 			var errs []error
 
-			secretsBackend := c.String("secrets-backend")
-			switch secretsBackend {
-			case "vault":
-				connectionManager, err = secrets.NewVaultClientFromEnv(logger) //nolint:contextcheck
-				if err != nil {
-					errs = append(errs, errors.Wrap(err, "failed to initialize vault client"))
-				}
-			case "doppler":
-				connectionManager, err = secrets.NewDopplerClientFromEnv(logger)
-				if err != nil {
-					errs = append(errs, errors.Wrap(err, "failed to initialize doppler client"))
-				}
-			case "aws":
-				connectionManager, err = secrets.NewAWSSecretsManagerClientFromEnv(ctx, logger)
-				if err != nil {
-					errs = append(errs, errors.Wrap(err, "failed to initialize AWS Secrets Manager client"))
-				}
-			case "azure":
-				connectionManager, err = secrets.NewAzureKeyVaultClientFromEnv(logger)
-				if err != nil {
-					errs = append(errs, errors.Wrap(err, "failed to initialize Azure Key Vault client"))
-				}
-			default:
-				connectionManager, errs = connection.NewManagerFromConfigWithContext(ctx, cm)
-			}
+			connectionManager, errs = connectionManagerFromConfig(runCtx, cm, logger)
 
 			if len(errs) > 0 {
 				printErrors(errs, runConfig.Output, "Errors occurred while initializing connection manager")

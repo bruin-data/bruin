@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/config"
-	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/date"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
@@ -201,7 +200,8 @@ func resolveConnectionManager(ctx context.Context, pipelinePath, env string) (co
 	if err != nil {
 		return nil, fmt.Errorf("failed to find the git repository root: %w", err)
 	}
-	cm, err := config.LoadOrCreate(afero.NewOsFs(), filepath.Join(repoRoot.Path, ".bruin.yml"))
+	configFilePath := filepath.Join(repoRoot.Path, ".bruin.yml")
+	cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load the config: %w", err)
 	}
@@ -210,7 +210,9 @@ func resolveConnectionManager(ctx context.Context, pipelinePath, env string) (co
 			return nil, fmt.Errorf("failed to use the environment %q: %w", env, err)
 		}
 	}
-	manager, errs := connection.NewManagerFromConfigWithContext(ctx, cm)
+	ctx = context.WithValue(ctx, config.ConfigFilePathContextKey, configFilePath)
+	ctx = context.WithValue(ctx, config.EnvironmentNameContextKey, cm.SelectedEnvironmentName)
+	manager, errs := connectionManagerFromConfig(ctx, cm, makeLogger(false))
 	if len(errs) > 0 {
 		return nil, errs[0]
 	}

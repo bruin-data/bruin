@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/config"
-	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/enhance"
 	"github.com/bruin-data/bruin/pkg/git"
@@ -396,7 +395,7 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 		if pp.Asset.Name != "" {
 			logPrefix = pp.Asset.Name
 		}
-		status, fillErr := fillColumnsFromDB(pp, fs, c.String("environment"), "", nil) //nolint:contextcheck
+		status, fillErr := fillColumnsFromDB(ctx, pp, fs, c.String("environment"), "", nil)
 		if fillErr != nil && !quiet && output != "json" {
 			warningPrinter.Printf("[%s] Warning: fill columns failed: %v\n", logPrefix, fillErr)
 		} else if status == fillStatusUpdated && !quiet && output != "json" {
@@ -470,7 +469,11 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 		enhancer.SetOutput(&streamBuf)
 	}
 
-	if apiKey := getAnthropicAPIKey(fs, assetPath); apiKey != "" {
+	apiKey, err := getAnthropicAPIKey(ctx, fs, assetPath, c.String("environment"))
+	if err != nil {
+		return err
+	}
+	if apiKey != "" {
 		enhancer.SetAPIKey(apiKey)
 	}
 
@@ -573,30 +576,63 @@ func printEnhanceError(output string, err error) error {
 	return cli.Exit("", 1)
 }
 
-// getAnthropicAPIKey tries to get the Anthropic API key from the config file.
-func getAnthropicAPIKey(fs afero.Fs, inputPath string) string {
+// getAnthropicAPIKey tries to get the Anthropic API key from the configured connection source.
+func getAnthropicAPIKey(ctx context.Context, fs afero.Fs, inputPath, environment string) (string, error) {
 	repoRoot, err := git.FindRepoFromPath(inputPath)
 	if err != nil {
-		return ""
+		return "", errors.Wrap(err, "failed to find repository root")
 	}
 
-	cm, err := config.LoadOrCreate(fs, filepath.Join(repoRoot.Path, ".bruin.yml"))
+	configFilePath := filepath.Join(repoRoot.Path, ".bruin.yml")
+	cm, err := config.LoadOrCreate(fs, configFilePath)
 	if err != nil {
-		return ""
+		return "", errors.Wrap(err, "failed to load config")
+	}
+	if environment != "" {
+		if err := cm.SelectEnvironment(environment); err != nil {
+			return "", errors.Wrapf(err, "failed to use the environment %q", environment)
+		}
 	}
 
 	// Get the selected environment's connections
 	env := cm.SelectedEnvironment
 	if env == nil {
-		return ""
+		return "", nil
 	}
 
 	// Return the first Anthropic connection's API key
 	if len(env.Connections.Anthropic) > 0 {
-		return env.Connections.Anthropic[0].APIKey
+		connectionName := env.Connections.Anthropic[0].Name
+		localAPIKey := env.Connections.Anthropic[0].APIKey
+		if secretsBackendFromContext(ctx) == "" {
+			return localAPIKey, nil
+		}
+
+		ctx = context.WithValue(ctx, config.ConfigFilePathContextKey, configFilePath)
+		ctx = context.WithValue(ctx, config.EnvironmentNameContextKey, cm.SelectedEnvironmentName)
+		manager, errs := connectionManagerFromConfig(ctx, cm, makeLogger(false))
+		if len(errs) > 0 {
+			return "", errors.Wrap(errs[0], "failed to read Anthropic connection from secrets backend")
+		}
+
+		details := manager.GetConnectionDetails(connectionName)
+		switch conn := details.(type) {
+		case *config.AnthropicConnection:
+			if conn.APIKey == "" {
+				return "", fmt.Errorf("anthropic connection %q from secrets backend does not include an API key", connectionName)
+			}
+			return conn.APIKey, nil
+		case config.AnthropicConnection:
+			if conn.APIKey == "" {
+				return "", fmt.Errorf("anthropic connection %q from secrets backend does not include an API key", connectionName)
+			}
+			return conn.APIKey, nil
+		default:
+			return "", config.NewConnectionNotFoundError(ctx, "", connectionName)
+		}
 	}
 
-	return ""
+	return "", nil
 }
 
 // showDiff displays a colored diff between the original content and the current file content.
@@ -687,7 +723,7 @@ func preFetchTableSummary(ctx context.Context, fs afero.Fs, assetPath string, as
 	ctx = context.WithValue(ctx, config.ConfigFilePathContextKey, filepath.Join(repoRoot.Path, ".bruin.yml"))
 	ctx = context.WithValue(ctx, config.EnvironmentNameContextKey, cm.SelectedEnvironmentName)
 
-	manager, errs := connection.NewManagerFromConfigWithContext(ctx, cm)
+	manager, errs := connectionManagerFromConfig(ctx, cm, makeLogger(false))
 	if len(errs) > 0 {
 		return ""
 	}
