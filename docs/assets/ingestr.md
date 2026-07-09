@@ -227,3 +227,21 @@ columns:
 ```
 
 When `enforce_schema: true` is set, Bruin passes the column type hints to Ingestr via the `--columns` flag, ensuring the destination table schema matches your definition.
+
+#### Sized string types
+
+You can give a string column an optional length to create a bounded column instead of an unbounded one. Set the length inline in the `type` or with the `length` field (requires `enforce_schema: true`):
+
+```yaml
+parameters:
+  enforce_schema: "true"
+
+columns:
+  - name: name
+    type: varchar(100)
+  - name: email
+    type: string
+    length: 255
+```
+
+If you set both, the inline length wins. A string type without a length creates an unbounded column.
