@@ -256,6 +256,40 @@ func TestBigQueryTypeMapper(t *testing.T) {
 	}
 }
 
+func TestSQLServerTypeMapper(t *testing.T) {
+	t.Parallel()
+	mapper := NewSQLServerTypeMapper()
+
+	tests := []struct {
+		inputType      string
+		expectedResult CommonDataType
+	}{
+		{"int", CommonTypeNumeric},
+		{"bigint", CommonTypeNumeric},
+		{"decimal(18,2)", CommonTypeNumeric},
+		{"float", CommonTypeNumeric},
+		{"nvarchar", CommonTypeString},
+		{"varchar(255)", CommonTypeString},
+		{"uniqueidentifier", CommonTypeString},
+		{"bit", CommonTypeBoolean},
+		{"date", CommonTypeDateTime},
+		{"datetime2", CommonTypeDateTime},
+		{"datetimeoffset", CommonTypeDateTime},
+		{"varbinary(max)", CommonTypeBinary},
+		{"geography", CommonTypeUnknown},
+	}
+
+	for _, tt := range tests {
+		t.Run("SQLServer_"+tt.inputType, func(t *testing.T) {
+			t.Parallel()
+			result := mapper.MapType(tt.inputType)
+			if result != tt.expectedResult {
+				t.Errorf("SQL Server mapper: MapType(%q) = %v, want %v", tt.inputType, result, tt.expectedResult)
+			}
+		})
+	}
+}
+
 func TestDatabaseTypeMapper_IsNumeric(t *testing.T) {
 	t.Parallel()
 	mapper := createTestMapper()

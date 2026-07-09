@@ -44,7 +44,7 @@ table td:first-child {
 | `--config-file` | str | - | Optional path to the `.bruin.yml` configuration file. Other [secret backends](../secrets/overview.md) can be used.|
 | `--full` | bool | `false` | Include detailed row counts and column statistics analysis in addition to schema comparison |
 | `--fail-if-diff` | bool | `false` | Return a non-zero exit code if differences are found |
-| `--target-dialect` | str | auto-detect | Target SQL dialect for ALTER TABLE statements (postgresql, snowflake, bigquery, duckdb, generic). Auto-detected from connection types if not specified |
+| `--target-dialect` | str | auto-detect | Target SQL dialect for ALTER TABLE statements (postgresql, snowflake, bigquery, duckdb, tsql, generic). Auto-detected from connection types if not specified |
 | `--reverse` | bool | `false` | Reverse the direction of ALTER statements (transform Table1 to match Table2 instead of Table2 to match Table1) |
 | `--sample` | int | `0` | For MongoDB sources, sample at most N documents per collection instead of scanning the whole collection (statistics become approximate). `0` scans everything. Ignored by other connection types |
 
@@ -156,6 +156,7 @@ The generated statements can:
 - Snowflake (`snowflake`)
 - BigQuery (`bigquery`)
 - DuckDB (`duckdb`)
+- SQL Server / Microsoft Fabric (`tsql`)
 - Generic SQL (`generic`)
 
 ## Examples

@@ -13,6 +13,7 @@ const (
 	DialectSnowflake  DatabaseDialect = "snowflake"
 	DialectBigQuery   DatabaseDialect = "bigquery"
 	DialectDuckDB     DatabaseDialect = "duckdb"
+	DialectTSQL       DatabaseDialect = "tsql"
 	DialectGeneric    DatabaseDialect = "generic"
 )
 
@@ -25,7 +26,7 @@ type AlterStatementGenerator struct {
 // NewAlterStatementGenerator creates a new ALTER statement generator with the specified dialect.
 func NewAlterStatementGenerator(dialect DatabaseDialect, reverse bool) *AlterStatementGenerator {
 	return &AlterStatementGenerator{
-		dialect: dialect,
+		dialect: normalizeDialect(dialect),
 		reverse: reverse,
 	}
 }
@@ -109,6 +110,22 @@ func (g *AlterStatementGenerator) generateMissingColumnClause(missingCol Missing
 
 // generateAddColumnClause generates an ADD COLUMN clause.
 func (g *AlterStatementGenerator) generateAddColumnClause(columnName, dataType string, nullable, primaryKey, unique bool) string {
+	if g.dialect == DialectTSQL {
+		clause := fmt.Sprintf("ADD %s %s", g.quoteIdentifier(columnName), dataType)
+		if nullable {
+			clause += " NULL"
+		} else {
+			clause += " NOT NULL"
+		}
+		if unique {
+			clause += " UNIQUE"
+		}
+		if primaryKey {
+			clause += " /* PRIMARY KEY - may need to be added separately */"
+		}
+		return clause
+	}
+
 	clause := fmt.Sprintf("ADD COLUMN %s %s", g.quoteIdentifier(columnName), dataType)
 
 	// DuckDB doesn't support adding columns with constraints directly
@@ -185,6 +202,8 @@ func (g *AlterStatementGenerator) generateAlterTypeClause(columnName string, typ
 		return fmt.Sprintf("ALTER COLUMN %s TYPE %s", g.quoteIdentifier(columnName), newType)
 	case DialectSnowflake, DialectBigQuery:
 		return fmt.Sprintf("ALTER COLUMN %s SET DATA TYPE %s", g.quoteIdentifier(columnName), newType)
+	case DialectTSQL:
+		return fmt.Sprintf("ALTER COLUMN %s %s", g.quoteIdentifier(columnName), newType)
 	case DialectGeneric:
 		return fmt.Sprintf("ALTER COLUMN %s TYPE %s", g.quoteIdentifier(columnName), newType)
 	default:
@@ -217,6 +236,8 @@ func (g *AlterStatementGenerator) generateAlterNullabilityClause(columnName stri
 		// BigQuery doesn't support ALTER COLUMN for nullability changes on existing columns
 		// This requires recreating the table
 		return fmt.Sprintf("/* BigQuery does not support changing nullability - column %s would need table recreation */", g.quoteIdentifier(columnName))
+	case DialectTSQL:
+		return fmt.Sprintf("/* SQL Server/Fabric requires ALTER COLUMN with the full data type to change nullability for column %s */", g.quoteIdentifier(columnName))
 	case DialectGeneric:
 		fallthrough
 	default:
@@ -240,6 +261,8 @@ func (g *AlterStatementGenerator) canCombineAlterClauses() bool {
 	case DialectBigQuery:
 		// BigQuery supports multiple ADD COLUMN but not mixing with ALTER COLUMN
 		return false
+	case DialectTSQL:
+		return false
 	case DialectGeneric:
 		return true
 	default:
@@ -254,6 +277,9 @@ func (g *AlterStatementGenerator) quoteIdentifier(identifier string) string {
 		return identifier
 	}
 	if strings.HasPrefix(identifier, "`") && strings.HasSuffix(identifier, "`") {
+		return identifier
+	}
+	if strings.HasPrefix(identifier, "[") && strings.HasSuffix(identifier, "]") {
 		return identifier
 	}
 
@@ -272,6 +298,16 @@ func (g *AlterStatementGenerator) quoteIdentifier(identifier string) string {
 		return fmt.Sprintf("\"%s\"", identifier)
 	case DialectSnowflake, DialectDuckDB:
 		return fmt.Sprintf("\"%s\"", identifier)
+	case DialectTSQL:
+		if strings.Contains(identifier, ".") {
+			parts := strings.Split(identifier, ".")
+			quotedParts := make([]string, len(parts))
+			for i, part := range parts {
+				quotedParts[i] = fmt.Sprintf("[%s]", strings.ReplaceAll(part, "]", "]]"))
+			}
+			return strings.Join(quotedParts, ".")
+		}
+		return fmt.Sprintf("[%s]", strings.ReplaceAll(identifier, "]", "]]"))
 	case DialectGeneric:
 		return fmt.Sprintf("\"%s\"", identifier)
 	default:
@@ -307,7 +343,28 @@ func dialectFromConnectionType(connType string) DatabaseDialect {
 		return DialectBigQuery
 	case strings.Contains(connType, "duckdb"), strings.Contains(connType, "duck"):
 		return DialectDuckDB
+	case strings.Contains(connType, "fabric"), strings.Contains(connType, "mssql"), strings.Contains(connType, "sqlserver"):
+		return DialectTSQL
 	default:
 		return DialectGeneric
+	}
+}
+
+func normalizeDialect(dialect DatabaseDialect) DatabaseDialect {
+	switch strings.ToLower(string(dialect)) {
+	case "postgres", "postgresql":
+		return DialectPostgreSQL
+	case "snowflake":
+		return DialectSnowflake
+	case "bigquery", "bq":
+		return DialectBigQuery
+	case "duckdb", "duck":
+		return DialectDuckDB
+	case "tsql", "t-sql", "mssql", "sqlserver", "sql-server", "fabric":
+		return DialectTSQL
+	case "generic":
+		return DialectGeneric
+	default:
+		return dialect
 	}
 }

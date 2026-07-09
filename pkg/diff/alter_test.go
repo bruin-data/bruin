@@ -26,6 +26,41 @@ func TestNewAlterStatementGenerator(t *testing.T) {
 	})
 }
 
+func TestGenerateAlterStatements_TSQL(t *testing.T) {
+	t.Parallel()
+
+	gen := NewAlterStatementGenerator(DialectTSQL, false)
+	result := &SchemaComparisonResult{
+		HasSchemaDifferences: true,
+		Table1: &TableSummaryResult{
+			Table: &Table{Name: "dbo.users"},
+		},
+		Table2: &TableSummaryResult{
+			Table: &Table{Name: "dbo.users_copy"},
+		},
+		MissingColumns: []MissingColumn{
+			{
+				ColumnName:  "email",
+				Type:        "nvarchar(255)",
+				Nullable:    false,
+				MissingFrom: "dbo.users_copy",
+				TableName:   "dbo.users",
+			},
+		},
+	}
+
+	statements := gen.GenerateAlterStatements(result)
+	require.Len(t, statements, 1)
+	assert.Equal(t, "ALTER TABLE [dbo].[users_copy] ADD [email] nvarchar(255) NOT NULL;", statements[0])
+}
+
+func TestDetectDialectFromConnectionFabric(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, DialectTSQL, DetectDialectFromConnection("fabric_gold", "fabric_gold"))
+	assert.Equal(t, DialectTSQL, NewAlterStatementGenerator(DatabaseDialect("fabric"), false).dialect)
+}
+
 func TestGenerateAlterStatements_NoChanges(t *testing.T) {
 	t.Parallel()
 

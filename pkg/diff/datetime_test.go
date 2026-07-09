@@ -47,6 +47,12 @@ func TestParseDateTime(t *testing.T) {
 			wantErr:  false,
 		},
 		{
+			name:     "datetime2 without timezone",
+			input:    "2023-01-15T10:30:00.1234567",
+			wantTime: timePtr(time.Date(2023, 1, 15, 10, 30, 0, 123456700, time.UTC)),
+			wantErr:  false,
+		},
+		{
 			name:     "standard datetime string",
 			input:    "2023-01-15 10:30:00",
 			wantTime: timePtr(time.Date(2023, 1, 15, 10, 30, 0, 0, time.UTC)),
@@ -68,6 +74,12 @@ func TestParseDateTime(t *testing.T) {
 			name:     "time only string",
 			input:    "10:30:00",
 			wantTime: timePtr(time.Date(0, 1, 1, 10, 30, 0, 0, time.UTC)),
+			wantErr:  false,
+		},
+		{
+			name:     "time only with fractional seconds",
+			input:    "10:30:00.1234567",
+			wantTime: timePtr(time.Date(0, 1, 1, 10, 30, 0, 123456700, time.UTC)),
 			wantErr:  false,
 		},
 		{

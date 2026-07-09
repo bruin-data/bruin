@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/tablename"
@@ -19,6 +20,7 @@ type DB struct {
 	conn          *sqlx.DB
 	config        *Config
 	schemaCreator *SchemaCreator
+	typeMapper    *diff.DatabaseTypeMapper
 }
 
 // QuoteIdentifier quotes a Fabric identifier using square brackets.
@@ -39,7 +41,7 @@ func NewDB(c *Config) (*DB, error) {
 		return nil, errors.Wrap(err, "failed to open Fabric Warehouse connection")
 	}
 
-	return &DB{conn: conn, config: c, schemaCreator: NewSchemaCreator(c.Database)}, nil
+	return &DB{conn: conn, config: c, schemaCreator: NewSchemaCreator(c.Database), typeMapper: diff.NewSQLServerTypeMapper()}, nil
 }
 
 func (db *DB) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
