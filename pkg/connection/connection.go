@@ -288,6 +288,10 @@ type Manager struct {
 	Generic              map[string]*config.GenericConnection
 	mutex                sync.Mutex
 	availableConnections map[string]any
+	// snowflakeWarehouseOverrides caches per-warehouse Snowflake clients, keyed
+	// by "<connection name>\x00<warehouse>", so a warehouse override reuses one
+	// client instead of opening a new connection pool for every asset.
+	snowflakeWarehouseOverrides map[string]*snowflake.DB
 }
 
 func (m *Manager) GetConnection(name string) any {
@@ -456,18 +460,28 @@ func (m *Manager) AddSfConnectionFromConfig(connection *config.SnowflakeConnecti
 // connection config with a different warehouse. The returned client is not
 // pinged here; callers that need to fall back on failure should validate it.
 func (m *Manager) GetSfConnectionWithWarehouse(name, warehouse string) (snowflake.SfClient, error) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
 	base, ok := m.Snowflake[name]
 	if !ok || base == nil {
 		return nil, errors.Errorf("snowflake connection '%s' does not exist", name)
 	}
 
-	if strings.TrimSpace(warehouse) == "" {
-		return base, nil
-	}
-
 	detail, ok := m.AllConnectionDetails[name].(*config.SnowflakeConnection)
 	if !ok {
 		return nil, errors.Errorf("connection '%s' is not a snowflake connection", name)
+	}
+
+	// No override, or the override matches the connection's own warehouse.
+	warehouse = strings.TrimSpace(warehouse)
+	if warehouse == "" || strings.EqualFold(warehouse, detail.Warehouse) {
+		return base, nil
+	}
+
+	key := name + "\x00" + warehouse
+	if db, ok := m.snowflakeWarehouseOverrides[key]; ok {
+		return db, nil
 	}
 
 	override := *detail
@@ -477,6 +491,10 @@ func (m *Manager) GetSfConnectionWithWarehouse(name, warehouse string) (snowflak
 		return nil, errors.Wrapf(err, "failed to create snowflake connection '%s' with warehouse '%s'", name, warehouse)
 	}
 
+	if m.snowflakeWarehouseOverrides == nil {
+		m.snowflakeWarehouseOverrides = make(map[string]*snowflake.DB)
+	}
+	m.snowflakeWarehouseOverrides[key] = db
 	return db, nil
 }
 

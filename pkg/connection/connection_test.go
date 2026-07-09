@@ -659,12 +659,23 @@ func TestManager_GetSfConnectionWithWarehouse(t *testing.T) {
 		assert.Same(t, base, got)
 	})
 
-	t.Run("override returns a distinct connection", func(t *testing.T) {
+	t.Run("warehouse equal to the default returns the default connection", func(t *testing.T) {
+		t.Parallel()
+		got, err := m.GetSfConnectionWithWarehouse("sf", "default_wh") // case-insensitive match of DEFAULT_WH
+		require.NoError(t, err)
+		assert.Same(t, base, got)
+	})
+
+	t.Run("override returns a distinct, cached connection", func(t *testing.T) {
 		t.Parallel()
 		override, err := m.GetSfConnectionWithWarehouse("sf", "BIG_WH")
 		require.NoError(t, err)
 		require.NotNil(t, override)
 		assert.NotSame(t, base, override)
+
+		again, err := m.GetSfConnectionWithWarehouse("sf", "BIG_WH")
+		require.NoError(t, err)
+		assert.Same(t, override, again, "the overridden connection should be cached and reused")
 	})
 
 	t.Run("unknown connection returns an error", func(t *testing.T) {
