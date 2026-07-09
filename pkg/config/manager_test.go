@@ -1151,7 +1151,7 @@ func TestLoadOrCreate(t *testing.T) {
 	}
 }
 
-func TestLoadResolvesReadEmbedCredentialPaths(t *testing.T) {
+func TestLoadCredentialFilePaths(t *testing.T) {
 	t.Parallel()
 	fs := afero.NewMemMapFs()
 	configPath := "/repo/.bruin.yml"
@@ -1175,17 +1175,17 @@ environments:
 	require.NoError(t, err)
 	configDir := filepath.Dir(absoluteConfigPath)
 
-	// Both read+embed the file, so their relative paths must resolve against the
-	// config directory (so masking reads the same file, independent of cwd).
+	// GCP service_account_file keeps its long-standing config-relative resolution.
 	require.Len(t, cfg.SelectedEnvironment.Connections.GoogleCloudPlatform, 1)
 	gcp := cfg.SelectedEnvironment.Connections.GoogleCloudPlatform[0].ServiceAccountFile
 	assert.Equal(t, filepath.Join(configDir, "creds/gcp.json"), gcp)
-	assert.True(t, filepath.IsAbs(gcp), "gcp path should be absolute: %s", gcp)
 
+	// GoogleSheets service_account_file is left exactly as written — bruin reads it
+	// verbatim (as the masker does), so cross-platform absolute paths like
+	// /Users/... or C:\... are never rewritten/mangled by the loader.
 	require.Len(t, cfg.SelectedEnvironment.Connections.GoogleSheets, 1)
 	sheets := cfg.SelectedEnvironment.Connections.GoogleSheets[0].ServiceAccountFile
-	assert.Equal(t, filepath.Join(configDir, "creds/sheets.json"), sheets)
-	assert.True(t, filepath.IsAbs(sheets), "sheets path should be absolute: %s", sheets)
+	assert.Equal(t, "creds/sheets.json", sheets)
 }
 
 func TestLoadOrCreateWithoutPathAbsolutization(t *testing.T) {
