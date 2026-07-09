@@ -347,6 +347,27 @@ func (c *Config) SelectEnvironment(name string) error {
 	return nil
 }
 
+func isAnchoredLocalPath(path string) bool {
+	return hasAnchoredLocalPathPrefix(path) || filepath.IsAbs(path)
+}
+
+func hasAnchoredLocalPathPrefix(path string) bool {
+	if path == "" {
+		return false
+	}
+	if path[0] == '/' || path[0] == '\\' {
+		return true
+	}
+	if len(path) < 3 {
+		return false
+	}
+
+	drive := path[0]
+	return ((drive >= 'A' && drive <= 'Z') || (drive >= 'a' && drive <= 'z')) &&
+		path[1] == ':' &&
+		(path[2] == '\\' || path[2] == '/')
+}
+
 func LoadFromFileOrEnv(fs afero.Fs, path string) (*Config, error) {
 	var config Config
 	envConfig := os.Getenv("BRUIN_CONFIG_FILE_CONTENT")
@@ -396,7 +417,7 @@ func LoadFromFileOrEnv(fs afero.Fs, path string) (*Config, error) {
 				continue
 			}
 
-			if filepath.IsAbs(conn.ServiceAccountFile) {
+			if isAnchoredLocalPath(conn.ServiceAccountFile) {
 				continue
 			}
 			env.Connections.GoogleCloudPlatform[i].ServiceAccountFile = filepath.Join(configLocation, conn.ServiceAccountFile)
@@ -404,52 +425,52 @@ func LoadFromFileOrEnv(fs afero.Fs, path string) (*Config, error) {
 		// Make GoogleSheets service account file paths absolute (bruin reads and
 		// embeds these into the ingestr URI, so masking must find the same file).
 		for i, conn := range env.Connections.GoogleSheets {
-			if conn.ServiceAccountFile == "" || filepath.IsAbs(conn.ServiceAccountFile) {
+			if conn.ServiceAccountFile == "" || isAnchoredLocalPath(conn.ServiceAccountFile) {
 				continue
 			}
 			env.Connections.GoogleSheets[i].ServiceAccountFile = filepath.Join(configLocation, conn.ServiceAccountFile)
 		}
 		// Make MySQL SSL file paths absolute
 		for i, conn := range env.Connections.MySQL {
-			if conn.SslCaPath != "" && !filepath.IsAbs(conn.SslCaPath) {
+			if conn.SslCaPath != "" && !isAnchoredLocalPath(conn.SslCaPath) {
 				env.Connections.MySQL[i].SslCaPath = filepath.Join(configLocation, conn.SslCaPath)
 			}
 
-			if conn.SslCertPath != "" && !filepath.IsAbs(conn.SslCertPath) {
+			if conn.SslCertPath != "" && !isAnchoredLocalPath(conn.SslCertPath) {
 				env.Connections.MySQL[i].SslCertPath = filepath.Join(configLocation, conn.SslCertPath)
 			}
 
-			if conn.SslKeyPath != "" && !filepath.IsAbs(conn.SslKeyPath) {
+			if conn.SslKeyPath != "" && !isAnchoredLocalPath(conn.SslKeyPath) {
 				env.Connections.MySQL[i].SslKeyPath = filepath.Join(configLocation, conn.SslKeyPath)
 			}
 		}
 
 		// Make Doris SSL file paths absolute
 		for i, conn := range env.Connections.Doris {
-			if conn.SslCaPath != "" && !filepath.IsAbs(conn.SslCaPath) {
+			if conn.SslCaPath != "" && !isAnchoredLocalPath(conn.SslCaPath) {
 				env.Connections.Doris[i].SslCaPath = filepath.Join(configLocation, conn.SslCaPath)
 			}
 
-			if conn.SslCertPath != "" && !filepath.IsAbs(conn.SslCertPath) {
+			if conn.SslCertPath != "" && !isAnchoredLocalPath(conn.SslCertPath) {
 				env.Connections.Doris[i].SslCertPath = filepath.Join(configLocation, conn.SslCertPath)
 			}
 
-			if conn.SslKeyPath != "" && !filepath.IsAbs(conn.SslKeyPath) {
+			if conn.SslKeyPath != "" && !isAnchoredLocalPath(conn.SslKeyPath) {
 				env.Connections.Doris[i].SslKeyPath = filepath.Join(configLocation, conn.SslKeyPath)
 			}
 		}
 
 		// Make Vitess SSL file paths absolute
 		for i, conn := range env.Connections.Vitess {
-			if conn.SslCaPath != "" && !filepath.IsAbs(conn.SslCaPath) {
+			if conn.SslCaPath != "" && !isAnchoredLocalPath(conn.SslCaPath) {
 				env.Connections.Vitess[i].SslCaPath = filepath.Join(configLocation, conn.SslCaPath)
 			}
 
-			if conn.SslCertPath != "" && !filepath.IsAbs(conn.SslCertPath) {
+			if conn.SslCertPath != "" && !isAnchoredLocalPath(conn.SslCertPath) {
 				env.Connections.Vitess[i].SslCertPath = filepath.Join(configLocation, conn.SslCertPath)
 			}
 
-			if conn.SslKeyPath != "" && !filepath.IsAbs(conn.SslKeyPath) {
+			if conn.SslKeyPath != "" && !isAnchoredLocalPath(conn.SslKeyPath) {
 				env.Connections.Vitess[i].SslKeyPath = filepath.Join(configLocation, conn.SslKeyPath)
 			}
 		}
@@ -460,7 +481,7 @@ func LoadFromFileOrEnv(fs afero.Fs, path string) (*Config, error) {
 				continue
 			}
 
-			if filepath.IsAbs(conn.PrivateKeyPath) {
+			if isAnchoredLocalPath(conn.PrivateKeyPath) {
 				continue
 			}
 

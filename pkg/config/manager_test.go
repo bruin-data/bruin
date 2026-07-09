@@ -1188,6 +1188,183 @@ environments:
 	assert.True(t, filepath.IsAbs(sheets), "sheets path should be absolute: %s", sheets)
 }
 
+func TestLoadDoesNotPrefixAnchoredCredentialPaths(t *testing.T) {
+	t.Parallel()
+	fs := afero.NewMemMapFs()
+	configPath := "/repo/.bruin.yml"
+	drivePath := `C:\Users\ColtonChilders\Documents\GCS Keys\plated-mesh.json`
+	rootedPath := `\Users\ColtonChilders\Documents\GCS Keys\plated-mesh.json`
+	slashRootedPath := "/Users/ColtonChilders/Documents/GCS Keys/plated-mesh.json"
+	caPath := `C:\certs\ca.pem`
+	certPath := `C:\certs\client.pem`
+	keyPath := `C:\certs\client-key.pem`
+	yml := `default_environment: default
+environments:
+  default:
+    connections:
+      snowflake:
+        - name: sf-drive
+          private_key_path: 'C:\certs\client-key.pem'
+      mysql:
+        - name: mysql-drive
+          ssl_ca_path: 'C:\certs\ca.pem'
+          ssl_cert_path: 'C:\certs\client.pem'
+          ssl_key_path: 'C:\certs\client-key.pem'
+      doris:
+        - name: doris-drive
+          ssl_ca_path: 'C:\certs\ca.pem'
+          ssl_cert_path: 'C:\certs\client.pem'
+          ssl_key_path: 'C:\certs\client-key.pem'
+      vitess:
+        - name: vitess-drive
+          ssl_ca_path: 'C:\certs\ca.pem'
+          ssl_cert_path: 'C:\certs\client.pem'
+          ssl_key_path: 'C:\certs\client-key.pem'
+      google_cloud_platform:
+        - name: gcp-drive
+          project_id: proj
+          service_account_file: 'C:\Users\ColtonChilders\Documents\GCS Keys\plated-mesh.json'
+      google_sheets:
+        - name: sheets-drive
+          service_account_file: 'C:\Users\ColtonChilders\Documents\GCS Keys\plated-mesh.json'
+        - name: sheets-rooted
+          service_account_file: '\Users\ColtonChilders\Documents\GCS Keys\plated-mesh.json'
+        - name: sheets-slash-rooted
+          service_account_file: '/Users/ColtonChilders/Documents/GCS Keys/plated-mesh.json'
+`
+	require.NoError(t, afero.WriteFile(fs, configPath, []byte(yml), 0o644))
+
+	cfg, err := LoadOrCreate(fs, configPath)
+	require.NoError(t, err)
+
+	require.Len(t, cfg.SelectedEnvironment.Connections.Snowflake, 1)
+	assert.Equal(t, keyPath, cfg.SelectedEnvironment.Connections.Snowflake[0].PrivateKeyPath)
+
+	require.Len(t, cfg.SelectedEnvironment.Connections.MySQL, 1)
+	assert.Equal(t, caPath, cfg.SelectedEnvironment.Connections.MySQL[0].SslCaPath)
+	assert.Equal(t, certPath, cfg.SelectedEnvironment.Connections.MySQL[0].SslCertPath)
+	assert.Equal(t, keyPath, cfg.SelectedEnvironment.Connections.MySQL[0].SslKeyPath)
+
+	require.Len(t, cfg.SelectedEnvironment.Connections.Doris, 1)
+	assert.Equal(t, caPath, cfg.SelectedEnvironment.Connections.Doris[0].SslCaPath)
+	assert.Equal(t, certPath, cfg.SelectedEnvironment.Connections.Doris[0].SslCertPath)
+	assert.Equal(t, keyPath, cfg.SelectedEnvironment.Connections.Doris[0].SslKeyPath)
+
+	require.Len(t, cfg.SelectedEnvironment.Connections.Vitess, 1)
+	assert.Equal(t, caPath, cfg.SelectedEnvironment.Connections.Vitess[0].SslCaPath)
+	assert.Equal(t, certPath, cfg.SelectedEnvironment.Connections.Vitess[0].SslCertPath)
+	assert.Equal(t, keyPath, cfg.SelectedEnvironment.Connections.Vitess[0].SslKeyPath)
+
+	require.Len(t, cfg.SelectedEnvironment.Connections.GoogleCloudPlatform, 1)
+	assert.Equal(t, drivePath, cfg.SelectedEnvironment.Connections.GoogleCloudPlatform[0].ServiceAccountFile)
+
+	require.Len(t, cfg.SelectedEnvironment.Connections.GoogleSheets, 3)
+	assert.Equal(t, drivePath, cfg.SelectedEnvironment.Connections.GoogleSheets[0].ServiceAccountFile)
+	assert.Equal(t, rootedPath, cfg.SelectedEnvironment.Connections.GoogleSheets[1].ServiceAccountFile)
+	assert.Equal(t, slashRootedPath, cfg.SelectedEnvironment.Connections.GoogleSheets[2].ServiceAccountFile)
+}
+
+func TestIsAnchoredLocalPath(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		path string
+		want bool
+	}{
+		{
+			name: "relative unix",
+			path: "creds/service-account.json",
+			want: false,
+		},
+		{
+			name: "relative windows",
+			path: `creds\service-account.json`,
+			want: false,
+		},
+		{
+			name: "windows drive absolute with backslashes",
+			path: `C:\Users\ColtonChilders\Documents\GCS Keys\plated-mesh.json`,
+			want: true,
+		},
+		{
+			name: "windows drive absolute with slashes",
+			path: "C:/Users/ColtonChilders/Documents/GCS Keys/plated-mesh.json",
+			want: true,
+		},
+		{
+			name: "windows drive relative",
+			path: `C:Users\ColtonChilders\Documents\GCS Keys\plated-mesh.json`,
+			want: false,
+		},
+		{
+			name: "windows rooted current drive",
+			path: `\Users\ColtonChilders\Documents\GCS Keys\plated-mesh.json`,
+			want: true,
+		},
+		{
+			name: "slash rooted",
+			path: "/Users/ColtonChilders/Documents/GCS Keys/plated-mesh.json",
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, isAnchoredLocalPath(tt.path))
+		})
+	}
+}
+
+func TestHasAnchoredLocalPathPrefix(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		path string
+		want bool
+	}{
+		{
+			name: "slash rooted",
+			path: "/Users/x/key.json",
+			want: true,
+		},
+		{
+			name: "backslash rooted",
+			path: `\Users\x\key.json`,
+			want: true,
+		},
+		{
+			name: "windows drive absolute with backslashes",
+			path: `C:\Users\x\key.json`,
+			want: true,
+		},
+		{
+			name: "windows drive absolute with slashes",
+			path: "C:/Users/x/key.json",
+			want: true,
+		},
+		{
+			name: "drive relative",
+			path: `C:Users\x\key.json`,
+			want: false,
+		},
+		{
+			name: "relative",
+			path: "Users/x/key.json",
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, hasAnchoredLocalPathPrefix(tt.path))
+		})
+	}
+}
+
 func TestLoadOrCreateWithoutPathAbsolutization(t *testing.T) {
 	t.Parallel()
 
