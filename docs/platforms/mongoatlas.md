@@ -64,8 +64,6 @@ connection: connection_name
 parameters:
   source_connection: postgres
   source_table: 'public.users'
-
-  destination: mongo_atlas
 ```
 
 This configuration will:
@@ -73,7 +71,7 @@ This configuration will:
 1. Extract data from the `public.users` table in PostgreSQL
 2. Load the data into the `users` collection in the `mydb` MongoDB Atlas database
 
-`connection` must match the `name` of a `mongo_atlas` connection in `.bruin.yml`. Bruin passes the asset `name` as ingestr's destination table, so use `database.collection` format in `name`.
+`connection` must match the `name` of a `mongo_atlas` connection in `.bruin.yml`; no `destination` parameter is needed when the destination connection is explicit. Bruin passes the asset `name` as ingestr's destination table, so use `database.collection` format in `name`.
 
 ## Using MongoDB Atlas as a Source
 
