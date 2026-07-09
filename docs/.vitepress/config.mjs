@@ -276,6 +276,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                                 items: [
                                     {text: "Adjust", link: "/ingestion/adjust"},
                                     {text: "Airtable", link: "/ingestion/airtable"},
+                                    {text: "Amplitude", link: "/ingestion/amplitude"},
                                     {text: "Anthropic", link: "/ingestion/anthropic"},
                                     {text: "Allium", link: "/ingestion/allium"},
                                     {text: "API-Football", link: "/ingestion/api-football"},

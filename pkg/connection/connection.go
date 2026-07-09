@@ -14,6 +14,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/adls"
 	"github.com/bruin-data/bruin/pkg/airtable"
 	"github.com/bruin-data/bruin/pkg/allium"
+	"github.com/bruin-data/bruin/pkg/amplitude"
 	"github.com/bruin-data/bruin/pkg/anthropic"
 	"github.com/bruin-data/bruin/pkg/apifootball"
 	"github.com/bruin-data/bruin/pkg/appleads"
@@ -229,6 +230,7 @@ type Manager struct {
 	Pipedrive            map[string]*pipedrive.Client
 	Polymarket           map[string]*polymarket.Client
 	Mixpanel             map[string]*mixpanel.Client
+	Amplitude            map[string]*amplitude.Client
 	Clickup              map[string]*clickup.Client
 	Jobtread             map[string]*jobtread.Client
 	Posthog              map[string]*posthog.Client
@@ -2876,6 +2878,29 @@ func (m *Manager) AddMixpanelConnectionFromConfig(connection *config.MixpanelCon
 	return nil
 }
 
+func (m *Manager) AddAmplitudeConnectionFromConfig(connection *config.AmplitudeConnection) error {
+	m.mutex.Lock()
+	if m.Amplitude == nil {
+		m.Amplitude = make(map[string]*amplitude.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := amplitude.NewClient(amplitude.Config{
+		APIKey:    connection.APIKey,
+		SecretKey: connection.SecretKey,
+		Region:    connection.Region,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Amplitude[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddGoogleAnalyticsConnectionFromConfig(connection *config.GoogleAnalyticsConnection) error {
 	m.mutex.Lock()
 	if m.GoogleAnalytics == nil {
@@ -3988,6 +4013,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Jobtread, connectionManager.AddJobtreadConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Posthog, connectionManager.AddPosthogConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Mixpanel, connectionManager.AddMixpanelConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Amplitude, connectionManager.AddAmplitudeConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Pinterest, connectionManager.AddPinterestConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Trustpilot, connectionManager.AddTrustpilotConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.QuickBooks, connectionManager.AddQuickBooksConnectionFromConfig, &wg, &errList, &mu)

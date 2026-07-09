@@ -379,6 +379,11 @@ environments:
           password: "secret-123"
           project_id: "12345"
           server: "eu"
+      amplitude:
+        - name: "amplitude-1"
+          api_key: "api-key-123"
+          secret_key: "secret-key-123"
+          region: "us"
       wise:
         - name: "wise-1"
           api_key: "token-123"

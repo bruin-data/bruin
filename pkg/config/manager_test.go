@@ -621,6 +621,14 @@ func TestLoadFromFile(t *testing.T) {
 					Server:             "eu",
 				},
 			},
+			Amplitude: []AmplitudeConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "amplitude-1"},
+					APIKey:             "api-key-123",
+					SecretKey:          "secret-key-123",
+					Region:             "us",
+				},
+			},
 			Wise: []WiseConnection{
 				{
 					ConnectionMetadata: ConnectionMetadata{Name: "wise-1"},
@@ -2666,6 +2674,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Pipedrive:           []PipedriveConnection{{ConnectionMetadata: ConnectionMetadata{Name: "pipedrive1"}}},
 				Polymarket:          []PolymarketConnection{{ConnectionMetadata: ConnectionMetadata{Name: "polymarket1"}}},
 				Mixpanel:            []MixpanelConnection{{ConnectionMetadata: ConnectionMetadata{Name: "mixpanel1"}}},
+				Amplitude:           []AmplitudeConnection{{ConnectionMetadata: ConnectionMetadata{Name: "amplitude1"}}},
 				Clickup:             []ClickupConnection{{ConnectionMetadata: ConnectionMetadata{Name: "clickup1"}}},
 				Jobtread:            []JobtreadConnection{{ConnectionMetadata: ConnectionMetadata{Name: "jobtread1"}}},
 				Posthog:             []PosthogConnection{{ConnectionMetadata: ConnectionMetadata{Name: "posthog1"}}},
@@ -2800,6 +2809,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Pipedrive:           []PipedriveConnection{{ConnectionMetadata: ConnectionMetadata{Name: "pipedrive1"}}},
 				Polymarket:          []PolymarketConnection{{ConnectionMetadata: ConnectionMetadata{Name: "polymarket1"}}},
 				Mixpanel:            []MixpanelConnection{{ConnectionMetadata: ConnectionMetadata{Name: "mixpanel1"}}},
+				Amplitude:           []AmplitudeConnection{{ConnectionMetadata: ConnectionMetadata{Name: "amplitude1"}}},
 				Clickup:             []ClickupConnection{{ConnectionMetadata: ConnectionMetadata{Name: "clickup1"}}},
 				Jobtread:            []JobtreadConnection{{ConnectionMetadata: ConnectionMetadata{Name: "jobtread1"}}},
 				Posthog:             []PosthogConnection{{ConnectionMetadata: ConnectionMetadata{Name: "posthog1"}}},

@@ -261,6 +261,7 @@ var defaultMapping = map[string]string{
 	"kinesis":               "kinesis-default",
 	"linear":                "linear-default",
 	"linkedinads":           "linkedinads-default",
+	"amplitude":             "amplitude-default",
 	"mailchimp":             "mailchimp-default",
 	"manifold":              "manifold-default",
 	"mixpanel":              "mixpanel-default",

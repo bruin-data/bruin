@@ -132,6 +132,30 @@
         "api_key"
       ]
     },
+    "AmplitudeConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "secret_key": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name"
+      ]
+    },
     "AnthropicConnection": {
       "properties": {
         "name": {
@@ -1203,6 +1227,12 @@
         "mixpanel": {
           "items": {
             "$ref": "#/$defs/MixpanelConnection"
+          },
+          "type": "array"
+        },
+        "amplitude": {
+          "items": {
+            "$ref": "#/$defs/AmplitudeConnection"
           },
           "type": "array"
         },
