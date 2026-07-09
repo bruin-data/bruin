@@ -61,7 +61,7 @@ parameters:
 | `team_member_wages` | id | - | replace | Hourly wage settings per team member. |
 | `shifts` | id | - | replace | Worked shifts (Labor API). |
 | `bank_accounts` | id | - | replace | Linked bank accounts. |
-| `cash_drawers` | id | - | replace | Cash drawer shifts across all locations. |
+| `cash_drawers` | id, location_id | - | replace | Cash drawer shifts across all locations. |
 | `loyalty` | id | - | replace | Loyalty accounts (requires a paid Square Loyalty subscription). |
 
 ### Step 3: [Run](/commands/run) asset to ingest data

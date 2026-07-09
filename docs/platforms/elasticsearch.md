@@ -81,12 +81,12 @@ connections:
 
 Elasticsearch can be used as a destination for [Ingestr Assets](../assets/ingestr.md). This allows you to load data from various sources into your Elasticsearch cluster.
 
-### Example: Load data from Snapchat Ads to Elasticsearch
+### Example: Load Snapchat Ads transactions to Elasticsearch
 
 ```yaml
-name: snapchat_ads
+name: snapchat_transactions
 type: ingestr
-description: Snapchat Ads individual ads data with merge strategy for incremental updates
+description: Snapchat Ads transactions data
 
 tags:
   - snapchat
@@ -96,13 +96,13 @@ tags:
 parameters:
   destination: elasticsearch
   source_connection: my-snapchatads
-  source_table: ads
+  source_table: transactions
 ```
 
 This configuration will:
 
-1. Extract ads data from Snapchat Ads using the `my-snapchatads` connection
-2. Load the data into the `snapchat_ads` index in your Elasticsearch cluster
+1. Extract transactions data from Snapchat Ads using the `my-snapchatads` connection
+2. Load the data into the `snapchat_transactions` index in your Elasticsearch cluster
 3. Use the default Elasticsearch connection (`elasticsearch-default`) from your pipeline configuration
 
 > [!NOTE]

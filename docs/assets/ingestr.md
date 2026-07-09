@@ -55,15 +55,15 @@ parameters:
   source: string # optional, used when inferring the source from connection is not enough, e.g. GCP connection + GSheets source
   source_connection: string
   source_table: string
-  destination: string # logical destination type, e.g. bigquery, snowflake, duckdb, postgres
+  destination: string # logical destination type; required unless connection or destination_connection is set
   destination_connection: string # optional, used instead of destination default connection when connection is not set
   
   # optional
-  version: v0 | v1 | v1.x.y
+  version: v0 | v1 | vMAJOR.MINOR.PATCH
   incremental_strategy: replace | append | merge | delete+insert | truncate+insert # legacy alternative to materialization.strategy
   incremental_key: string # legacy alternative to materialization.incremental_key
   schema_contract: evolve | freeze | discard_row | discard_value
-  schema_naming: default | direct | snake_case
+  schema_naming: auto | default | direct | snake_case
   sql_backend: pyarrow | sqlalchemy
   page_size: integer
   loader_file_format: jsonl | csv | parquet
@@ -102,9 +102,9 @@ parameters:
 | `source` | No | _n/a_ | Overrides the inferred source type. For example, set `gsheets` when reusing a BigQuery connection for Google Sheets. |
 | `source_table` | Yes | `--source-table` | Table, sheet, or resource identifier to pull from the source. |
 | `file_type` | No | `--source-table` suffix | Appended to the `source_table` as `table#type` for connectors that need a file format hint (`csv`, `jsonl`, `parquet`). |
-| `version` | No | _n/a_ | Selects the version of ingestr to install and use. Valid options are `v1` (latest), `v0` (legacy), or `v1.x.y` (full version specifier). |
+| `version` | No | _n/a_ | Selects the version of ingestr to install and use. Valid options are bare family markers such as `v1` or `v0`, or a full version pin such as `v1.0.71`. |
 | `materialization` | No | `--incremental-*`, `--partition-by`, `--cluster-by` | Preferred way to define destination write behavior. Supports `type: table` with `create+replace`, `append`, `merge`, `delete+insert`, and `truncate+insert`. |
-| `destination` | Yes | _n/a_ | Logical destination type. When `connection` and `destination_connection` are omitted, Bruin uses this value to choose the pipeline default destination connection. |
+| `destination` | Unless `connection` or `destination_connection` is set | _n/a_ | Logical destination type used for default connection inference. When `connection` and `destination_connection` are omitted, Bruin uses this value to choose the pipeline default destination connection. |
 | `destination_connection` | No | _n/a_ | Named destination connection to use when `connection` is omitted. This overrides default connection inference from `destination`. |
 | `incremental_strategy` | No | `--incremental-strategy` | Passes the incremental loading strategy (`replace`, `append`, `merge`, `delete+insert`, or `truncate+insert`) to Ingestr. Prefer `materialization.strategy` for new assets. |
 | `incremental_key` | No | `--incremental-key` | Column that determines incremental progress. When the column is defined with type `date`, Bruin also forwards it through the `--columns` option so Ingestr treats it as a date field. |
@@ -162,7 +162,7 @@ Bruin forwards these write strategies to ingestr:
 | `materialization.strategy: truncate+insert` | `truncate+insert` |
 | `parameters.incremental_strategy` | Passed through as-is |
 
-Use `materialization.incremental_key` or `parameters.incremental_key` only with `append`, `merge`, and `delete+insert`. `merge` requires at least one `primary_key: true` column unless the asset is a CDC asset, where ingestr determines the keys from the source. `truncate+insert` is accepted by Bruin, but ingestr will fail the run if the selected destination cannot truncate tables. Ingestr's `scd2` strategy is not a supported Bruin ingestr asset materialization strategy.
+Use `materialization.incremental_key` or `parameters.incremental_key` only with `append`, `merge`, and `delete+insert`. `merge` requires primary keys, supplied either by ingestr source metadata/schema or by asset columns marked `primary_key: true`; CDC assets determine keys from the source. `truncate+insert` is accepted by Bruin, but ingestr will fail the run if the selected destination cannot truncate tables. Ingestr's `scd2` strategy is not a supported Bruin ingestr asset materialization strategy.
 
 Destination support depends on ingestr's destination implementation:
 
@@ -245,7 +245,7 @@ The examples below show how to use the `ingestr` asset type in your pipeline. Fe
 name: raw.transactions
 type: ingestr
 parameters:
-  source_connection: mssql_prod
+  source_connection: mysql_prod
   source_table: public.transactions
   destination: bigquery
 ```
@@ -258,7 +258,7 @@ This example shows how to use `updated_at` column to incrementally load the data
 name: raw.transactions
 type: ingestr
 parameters:
-  source_connection: mysql_prod
+  source_connection: mssql_prod
   source_table: dbo.transactions
   destination: snowflake
 materialization:
