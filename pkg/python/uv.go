@@ -17,6 +17,7 @@ import (
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/ingestruri"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/uv"
 	"github.com/pkg/errors"
@@ -196,10 +197,6 @@ type UvChecker struct {
 
 type uvInstaller interface {
 	EnsureUvInstalled(ctx context.Context) (string, error)
-}
-
-type pipelineConnection interface {
-	GetIngestrURI() (string, error)
 }
 
 type UvPythonRunner struct {
@@ -479,23 +476,9 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		return err
 	}
 
-	destConnection := u.conn.GetConnection(destConnectionName)
-	if destConnection == nil {
-		return config.NewConnectionNotFoundError(ctx, "destination", destConnectionName)
-	}
-
-	destConnectionInst, ok := destConnection.(pipelineConnection)
-	if !ok {
-		return errors.Errorf("destination connection '%s' is not supported by ingestr", destConnectionName)
-	}
-
-	destURI, err := destConnectionInst.GetIngestrURI()
+	destURI, err := ingestruri.ForConnection(ctx, u.conn, "destination", destConnectionName)
 	if err != nil {
-		return errors.Wrap(err, "could not get the destination uri")
-	}
-
-	if destURI == "" {
-		return errors.New("destination uri is empty, which means the destination connection is not configured correctly")
+		return err
 	}
 
 	cmdArgs = append(cmdArgs, "--dest-uri", destURI)
@@ -505,7 +488,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 	extraPackages = AddExtraPackages(destURI, "", extraPackages)
 
 	if strings.HasPrefix(destURI, "duckdb://") {
-		if dbURIGetter, ok := destConnectionInst.(interface{ GetDBConnectionURI() string }); ok {
+		if dbURIGetter, ok := u.conn.GetConnection(destConnectionName).(interface{ GetDBConnectionURI() string }); ok {
 			duck.LockDatabase(dbURIGetter.GetDBConnectionURI())
 			defer duck.UnlockDatabase(dbURIGetter.GetDBConnectionURI())
 		}

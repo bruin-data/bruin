@@ -13,6 +13,7 @@ import (
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/ingestruri"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/python"
@@ -167,10 +168,6 @@ type SeedOperator struct {
 	jinjaRenderer jinja.RendererInterface
 }
 
-type pipelineConnection interface {
-	GetIngestrURI() (string, error)
-}
-
 func NewBasicOperator(conn config.ConnectionGetter, j jinja.RendererInterface) (*BasicOperator, error) {
 	uvRunner := &python.UvPythonRunner{
 		UvInstaller: &python.UvChecker{},
@@ -212,26 +209,12 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		return errors.New("source connection not configured")
 	}
 
-	sourceConnection := o.conn.GetConnection(sourceConnectionName)
-	if sourceConnection == nil {
-		return config.NewConnectionNotFoundError(ctx, "source", sourceConnectionName)
-	}
-
-	sourceURI, err := sourceConnection.(pipelineConnection).GetIngestrURI()
+	sourceURI, err := ingestruri.ForConnection(ctx, o.conn, "source", sourceConnectionName)
 	if err != nil {
-		return fmt.Errorf("could not get the source uri: %w", err)
+		return err
 	}
 
-	if sourceURI == "" {
-		return errors.New("source uri is empty, which means the source connection is not configured correctly")
-	}
-
-	// Ensure the URI has the authority separator "//" after the scheme.
-	// Some source configs build URIs without a Host, causing Go's url.URL.String()
-	// to produce "scheme:?params" instead of "scheme://?params".
-	if parts := strings.SplitN(sourceURI, ":", 2); len(parts) == 2 && !strings.HasPrefix(parts[1], "//") {
-		sourceURI = parts[0] + "://" + parts[1]
-	}
+	sourceURI = ingestruri.Normalize(sourceURI)
 
 	// some connection types can be shared among sources, therefore inferring source URI from the connection type is not
 	// always feasible. In the case of GSheets, we have to reuse the same GCP credentials, but change the prefix with gsheets://
@@ -240,32 +223,14 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	}
 
 	// Handle CDC mode - transform the source URI into ingestr's CDC scheme and auto-set merge strategy.
-	// Supported today: PostgreSQL (postgres+cdc), the MySQL family (mysql+cdc / mariadb+cdc),
-	// Vitess (vitess+cdc, VStream) and PlanetScale (ps_mysql+cdc, psdbconnect).
 	if cdcVal, _ := asset.Parameters.GetString("cdc"); cdcVal == "true" {
-		// url.Parse rejects schemes containing an underscore (PlanetScale's ps_mysql), so split
-		// the scheme off manually, parse the remainder under a placeholder, and restore the real
-		// scheme. This mirrors how ingestr parses its own MySQL-family URIs.
-		scheme, rest, found := strings.Cut(sourceURI, "://")
-		if !found {
-			return fmt.Errorf("source URI %q has no scheme, cannot enable CDC", sourceURI)
-		}
-		parsedURI, err := url.Parse("placeholder://" + rest)
+		parsedURI, err := ingestruri.Parse(sourceURI)
 		if err != nil {
-			return fmt.Errorf("failed to parse source URI for CDC: %w", err)
+			return fmt.Errorf("cannot enable CDC: %w", err)
 		}
-		parsedURI.Scheme = scheme
 
-		switch {
-		case strings.Contains(parsedURI.Scheme, "postgresql"):
-			parsedURI.Scheme = strings.ReplaceAll(parsedURI.Scheme, "postgresql", "postgres+cdc")
-		case strings.HasPrefix(parsedURI.Scheme, "mysql"), strings.HasPrefix(parsedURI.Scheme, "mariadb"),
-			strings.HasPrefix(parsedURI.Scheme, "vitess"), strings.HasPrefix(parsedURI.Scheme, "ps_mysql"):
-			// mysql+cdc / mariadb+cdc / vitess+cdc / ps_mysql+cdc are all valid CDC schemes.
-			if !strings.HasSuffix(parsedURI.Scheme, "+cdc") {
-				parsedURI.Scheme += "+cdc"
-			}
-		}
+		// An unsupported scheme is left alone here, and ingestr rejects it downstream.
+		parsedURI.Scheme, _ = ingestruri.CDCScheme(parsedURI.Scheme)
 
 		q := parsedURI.Query()
 		// PostgreSQL logical-replication parameters.
@@ -325,18 +290,9 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		return err
 	}
 
-	destConnection := o.conn.GetConnection(destConnectionName)
-	if destConnection == nil {
-		return config.NewConnectionNotFoundError(ctx, "destination", destConnectionName)
-	}
-
-	destURI, err := destConnection.(pipelineConnection).GetIngestrURI()
+	destURI, err := ingestruri.ForConnection(ctx, o.conn, "destination", destConnectionName)
 	if err != nil {
-		return errors.Wrap(err, "could not get the destination uri")
-	}
-
-	if destURI == "" {
-		return errors.New("destination uri is empty, which means the connection is not configured correctly")
+		return err
 	}
 
 	if strings.HasPrefix(destURI, "clickhouse://") {
@@ -651,17 +607,9 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 		return err
 	}
 
-	destConnection := o.conn.GetConnection(destConnectionName)
-	if destConnection == nil {
-		return config.NewConnectionNotFoundError(ctx, "destination", destConnectionName)
-	}
-
-	destURI, err := destConnection.(pipelineConnection).GetIngestrURI()
+	destURI, err := ingestruri.ForConnection(ctx, o.conn, "destination", destConnectionName)
 	if err != nil {
-		return errors.Wrap(err, "could not get the destination uri")
-	}
-	if destURI == "" {
-		return errors.New("destination uri is empty, which means the destination connection is not configured correctly")
+		return err
 	}
 
 	destTable := o.resolveSeedDestinationTableName(destConnectionName, destURI, asset.Name)
