@@ -181,6 +181,16 @@ type ConnectionAndDetailsGetter interface {
 	ConnectionDetailsGetter
 }
 
+// ConnectionResolver is an optional counterpart to ConnectionGetter for
+// implementations that can explain why a lookup failed. GetConnection returns a
+// bare nil, which cannot distinguish "no such connection" from "the secrets
+// backend rejected our credentials".
+//
+// A nil connection with a nil error means the connection does not exist.
+type ConnectionResolver interface {
+	ResolveConnection(name string) (any, error)
+}
+
 func (c *Connections) ConnectionsSummaryList() map[string]string {
 	if c.typeNameMap == nil {
 		c.buildConnectionKeyMap()

@@ -99,17 +99,27 @@ func newAWSSecretsManagerClientFromConfig(logger logger.Logger, cfg aws.Config) 
 
 // GetConnection retrieves a connection by name from AWS Secrets Manager.
 func (c *AWSSecretsManagerClient) GetConnection(name string) any {
+	conn, err := c.ResolveConnection(name)
+	if err != nil {
+		c.logger.Errorf("%v", err)
+		return nil
+	}
+
+	return conn
+}
+
+// ResolveConnection implements config.ConnectionResolver.
+func (c *AWSSecretsManagerClient) ResolveConnection(name string) (any, error) {
 	c.cacheMu.RLock()
 	if conn, ok := c.cacheConnections[name]; ok {
 		c.cacheMu.RUnlock()
-		return conn
+		return conn, nil
 	}
 	c.cacheMu.RUnlock()
 
 	manager, err := c.getAWSSecretsManager(name)
 	if err != nil {
-		c.logger.Errorf("%v", err)
-		return nil
+		return nil, err
 	}
 
 	conn := manager.GetConnection(name)
@@ -118,7 +128,7 @@ func (c *AWSSecretsManagerClient) GetConnection(name string) any {
 	c.cacheConnections[name] = conn
 	c.cacheMu.Unlock()
 
-	return conn
+	return conn, nil
 }
 
 // GetConnectionDetails retrieves connection details by name from AWS Secrets Manager.

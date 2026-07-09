@@ -130,20 +130,30 @@ func NewDopplerClient(logger logger.Logger, token, project, config string) (*Dop
 
 // GetConnection retrieves a connection by name from Doppler.
 func (c *DopplerClient) GetConnection(name string) any {
-	if conn, ok := c.cacheConnections[name]; ok {
-		return conn
-	}
-
-	manager, err := c.getDopplerManager(name)
+	conn, err := c.ResolveConnection(name)
 	if err != nil {
 		c.logger.Errorf("%v", err)
 		return nil
 	}
 
+	return conn
+}
+
+// ResolveConnection implements config.ConnectionResolver.
+func (c *DopplerClient) ResolveConnection(name string) (any, error) {
+	if conn, ok := c.cacheConnections[name]; ok {
+		return conn, nil
+	}
+
+	manager, err := c.getDopplerManager(name)
+	if err != nil {
+		return nil, err
+	}
+
 	conn := manager.GetConnection(name)
 	c.cacheConnections[name] = conn
 
-	return conn
+	return conn, nil
 }
 
 // GetConnectionDetails retrieves connection details by name from Doppler.

@@ -133,20 +133,30 @@ func newVaultClientWithKubernetesAuth(host, role, mountPath, kubernetesAuthMount
 }
 
 func (c *Client) GetConnection(name string) any {
-	if conn, ok := c.cacheConnections[name]; ok {
-		return conn
-	}
-
-	manager, err := c.getVaultManager(name)
+	conn, err := c.ResolveConnection(name)
 	if err != nil {
 		c.logger.Errorf("%v", err)
 		return nil
 	}
 
+	return conn
+}
+
+// ResolveConnection implements config.ConnectionResolver.
+func (c *Client) ResolveConnection(name string) (any, error) {
+	if conn, ok := c.cacheConnections[name]; ok {
+		return conn, nil
+	}
+
+	manager, err := c.getVaultManager(name)
+	if err != nil {
+		return nil, err
+	}
+
 	conn := manager.GetConnection(name)
 	c.cacheConnections[name] = conn
 
-	return conn
+	return conn, nil
 }
 
 func (c *Client) GetConnectionDetails(name string) any {
