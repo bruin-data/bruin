@@ -12,6 +12,8 @@ TELEMETRY_KEY=""
 FILES := $(wildcard *.yml *.txt *.py)
 OS_ARCH:=$(shell go env GOOS)_$(shell go env GOARCH)
 GOLANGCI_LINT_VERSION=v2.11.1
+GOLANGCI_LINT_COMPLEX_LINTERS=gosec revive unparam wastedassign
+GOLANGCI_LINT_LOCAL_DISABLE_FLAGS=$(foreach linter,$(GOLANGCI_LINT_COMPLEX_LINTERS),--disable=$(linter))
 
 # Suppress CGO linker warnings on macOS (not needed on Linux/Windows)
 ifeq ($(shell go env GOOS),darwin)
@@ -21,7 +23,7 @@ endif
 
 JQ_REL_PATH = jq --arg prefix "$$(pwd)" 'walk(if type == "object" and has("path") and (.path | type == "string") then .path |= (if . == $$prefix then "integration-tests" elif startswith($$prefix + "/") then .[($$prefix | length + 1):] elif startswith($$prefix) then .[($$prefix | length):] elif startswith("integration-tests/") then .[16:] else . end) else . end)'
 
-.PHONY: all clean test build build-no-duckdb docs-app format pre-commit refresh-integration-expectations integration-test-cloud validate-links tools-update
+.PHONY: all clean test build build-no-duckdb docs-app format lint-full pre-commit refresh-integration-expectations integration-test-cloud validate-links tools-update
 all: clean deps test build
 
 deps: 
@@ -111,8 +113,14 @@ format: lint-python
 	go tool gofumpt -w cmd pkg semantic-engine &
 
 	@echo "$(OK_COLOR)>> [golangci-lint] running$(NO_COLOR)" & \
-	golangci-lint run --timeout 10m60s --new-from-merge-base=origin/main --build-tags="no_duckdb_arrow" ./...  & \
-	cd semantic-engine && golangci-lint run --timeout 10m60s --new-from-merge-base=origin/main & \
+	golangci-lint run --timeout 10m60s --new-from-merge-base=origin/main --build-tags="no_duckdb_arrow" $(GOLANGCI_LINT_LOCAL_DISABLE_FLAGS) ./...  & \
+	cd semantic-engine && golangci-lint run --timeout 10m60s --new-from-merge-base=origin/main $(GOLANGCI_LINT_LOCAL_DISABLE_FLAGS) & \
+	wait
+
+lint-full:
+	@echo "$(OK_COLOR)>> [golangci-lint] running full lint suite$(NO_COLOR)" & \
+	golangci-lint run --timeout 10m60s --build-tags="no_duckdb_arrow" ./... & \
+	cd semantic-engine && golangci-lint run --timeout 10m60s ./... & \
 	wait
 
 tools-update:
