@@ -118,10 +118,12 @@ format: lint-python
 	wait
 
 lint-full:
-	@echo "$(OK_COLOR)>> [golangci-lint] running full lint suite$(NO_COLOR)" & \
-	golangci-lint run --timeout 10m60s --build-tags="no_duckdb_arrow" ./... & \
-	cd semantic-engine && golangci-lint run --timeout 10m60s ./... & \
-	wait
+	@echo "$(OK_COLOR)>> [golangci-lint] running full lint suite$(NO_COLOR)"; \
+	golangci-lint run --timeout 10m60s --build-tags="no_duckdb_arrow" ./... & root_pid=$$!; \
+	(cd semantic-engine && golangci-lint run --timeout 10m60s ./...) & semantic_engine_pid=$$!; \
+	wait $$root_pid; root_status=$$?; \
+	wait $$semantic_engine_pid; semantic_engine_status=$$?; \
+	test $$root_status -eq 0 -a $$semantic_engine_status -eq 0
 
 tools-update:
 	go get github.com/daixiang0/gci@latest
