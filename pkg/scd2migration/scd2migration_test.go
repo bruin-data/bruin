@@ -119,6 +119,38 @@ func TestSnowflakeLTZIsMigratedButTZIsSkipped(t *testing.T) {
 	}, db.ran)
 }
 
+func TestOracle(t *testing.T) {
+	t.Parallel()
+
+	// Oracle reports column names in uppercase via all_tab_columns.
+	db := &fakeQuerier{columns: [][]interface{}{
+		{"BRUIN_VALID_FROM", "TIMESTAMP(6)"},
+		{"BRUIN_VALID_UNTIL", "TIMESTAMP(6)"},
+	}}
+	require.NoError(t, Oracle(context.Background(), db, "scd2.oracle_products"))
+	assert.Equal(t, []string{
+		"ALTER TABLE scd2.oracle_products ADD (bruin_valid_from__bruin_tz TIMESTAMP(6) WITH TIME ZONE)",
+		"UPDATE scd2.oracle_products SET bruin_valid_from__bruin_tz = FROM_TZ(CAST(bruin_valid_from AS TIMESTAMP(6)), SESSIONTIMEZONE) AT TIME ZONE 'UTC'",
+		"ALTER TABLE scd2.oracle_products DROP COLUMN bruin_valid_from",
+		"ALTER TABLE scd2.oracle_products RENAME COLUMN bruin_valid_from__bruin_tz TO bruin_valid_from",
+		"ALTER TABLE scd2.oracle_products ADD (bruin_valid_until__bruin_tz TIMESTAMP(6) WITH TIME ZONE)",
+		"UPDATE scd2.oracle_products SET bruin_valid_until__bruin_tz = FROM_TZ(CAST(bruin_valid_until AS TIMESTAMP(6)), SESSIONTIMEZONE) AT TIME ZONE 'UTC'",
+		"ALTER TABLE scd2.oracle_products DROP COLUMN bruin_valid_until",
+		"ALTER TABLE scd2.oracle_products RENAME COLUMN bruin_valid_until__bruin_tz TO bruin_valid_until",
+	}, db.ran)
+}
+
+func TestOracleAlreadyTimezoneAware(t *testing.T) {
+	t.Parallel()
+
+	db := &fakeQuerier{columns: [][]interface{}{
+		{"BRUIN_VALID_FROM", "TIMESTAMP(6) WITH TIME ZONE"},
+		{"BRUIN_VALID_UNTIL", "TIMESTAMP(6) WITH TIME ZONE"},
+	}}
+	require.NoError(t, Oracle(context.Background(), db, "oracle_products"))
+	assert.Empty(t, db.ran)
+}
+
 func TestMySQL(t *testing.T) {
 	t.Parallel()
 

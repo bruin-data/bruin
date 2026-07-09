@@ -31,10 +31,6 @@ func (m *mockQuerierWithResult) Ping(ctx context.Context) error {
 	return res.Error(0)
 }
 
-func (m *mockQuerierWithResult) MigrateSCD2Columns(ctx context.Context, asset *pipeline.Asset) error {
-	return nil
-}
-
 type mockConnectionFetcher struct {
 	mock.Mock
 }

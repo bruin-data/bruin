@@ -111,7 +111,7 @@ func buildSCD2ByTimeFullRefresh(asset *pipeline.Asset, query string) (string, er
 
 	createAsQuery := fmt.Sprintf(`SELECT
   src.*,
-  FROM_TZ(CAST(src.%s AS TIMESTAMP(6)), 'UTC') AS bruin_valid_from,
+  CAST(src.%s AS TIMESTAMP(6) WITH TIME ZONE) AT TIME ZONE 'UTC' AS bruin_valid_from,
   FROM_TZ(CAST(TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS') AS TIMESTAMP(6)), 'UTC') AS bruin_valid_until,
   1 AS bruin_is_current
 FROM (
@@ -417,7 +417,7 @@ func buildSCD2ByTimeQuery(asset *pipeline.Asset, query string) (string, error) {
 	insertCols = append(insertCols, "bruin_valid_from", "bruin_valid_until", "bruin_is_current")
 	insertValues = append(
 		insertValues,
-		"FROM_TZ(CAST(source."+asset.Materialization.IncrementalKey+" AS TIMESTAMP(6)), 'UTC')",
+		"CAST(source."+asset.Materialization.IncrementalKey+" AS TIMESTAMP(6) WITH TIME ZONE) AT TIME ZONE 'UTC'",
 		"FROM_TZ(CAST(TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS') AS TIMESTAMP(6)), 'UTC')",
 		"1",
 	)
@@ -458,14 +458,14 @@ USING (
   SELECT s1.*, 0 AS bruin_is_current_src
   FROM s1
   JOIN %s t1 ON (%s)
-  WHERE t1.bruin_valid_from < FROM_TZ(CAST(s1.%s AS TIMESTAMP(6)), 'UTC') AND t1.bruin_is_current = 1
+  WHERE t1.bruin_valid_from < CAST(s1.%s AS TIMESTAMP(6) WITH TIME ZONE) AT TIME ZONE 'UTC' AND t1.bruin_is_current = 1
 ) source
 ON (%s)
 WHEN MATCHED THEN
   UPDATE SET
-    target.bruin_valid_until = FROM_TZ(CAST(source.%s AS TIMESTAMP(6)), 'UTC'),
+    target.bruin_valid_until = CAST(source.%s AS TIMESTAMP(6) WITH TIME ZONE) AT TIME ZONE 'UTC',
     target.bruin_is_current  = 0
-  WHERE target.bruin_valid_from < FROM_TZ(CAST(source.%s AS TIMESTAMP(6)), 'UTC')
+  WHERE target.bruin_valid_from < CAST(source.%s AS TIMESTAMP(6) WITH TIME ZONE) AT TIME ZONE 'UTC'
 WHEN NOT MATCHED THEN
   INSERT (%s)
   VALUES (%s);

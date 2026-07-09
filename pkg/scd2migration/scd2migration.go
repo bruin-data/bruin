@@ -9,13 +9,12 @@
 //	          converts them on the incremental path, reading the stored values
 //	          as UTC. It is a no-op once the columns are correct, so it is safe
 //	          to run on every incremental.
-//	Affects:  Postgres, Snowflake and MySQL (this package) plus Oracle
-//	          (pkg/oracle). DuckDB and Athena are NOT affected — their
-//	          incremental rebuilds the table and converts legacy values
-//	          automatically.
+//	Affects:  Postgres, Snowflake, MySQL and Oracle (this package). DuckDB and
+//	          Athena are NOT affected — their incremental rebuilds the table and
+//	          converts legacy values automatically.
 //	Removal:  On or after the expiry date, once existing deployments have run at
 //	          least once on the timezone-aware release, delete this package and
-//	          the call sites in pkg/{postgres,snowflake,mysql}/operator.go.
+//	          the call sites in pkg/{postgres,snowflake,mysql,oracle}/operator.go.
 package scd2migration
 
 import (
@@ -34,8 +33,17 @@ type Querier interface {
 
 const tmpSuffix = "__bruin_tz"
 
-// columns are the SCD2 auto-managed timestamp columns to migrate.
-var columns = []string{"_valid_from", "_valid_until"}
+const (
+	addColumnANSI   = "ALTER TABLE %s ADD COLUMN %s %s"
+	addColumnOracle = "ALTER TABLE %s ADD (%s %s)"
+)
+
+// columns are the SCD2 auto-managed timestamp columns to migrate. Oracle
+// disallows leading underscores in identifiers, so it prefixes them with bruin_.
+var (
+	columns       = []string{"_valid_from", "_valid_until"}
+	oracleColumns = []string{"bruin_valid_from", "bruin_valid_until"}
+)
 
 // Postgres converts naive _valid_from/_valid_until columns to TIMESTAMPTZ,
 // reading the stored values as UTC.
@@ -51,7 +59,7 @@ func Postgres(ctx context.Context, db Querier, assetName string) error {
 	if err != nil {
 		return err
 	}
-	stmts := buildSwap(pgQuote(assetName), "TIMESTAMPTZ", types, alreadyTZ, pgQuote,
+	stmts := buildSwap(pgQuote(assetName), "TIMESTAMPTZ", addColumnANSI, columns, types, alreadyTZ, pgQuote,
 		func(col string) string { return fmt.Sprintf("CAST(%s AS TIMESTAMPTZ)", col) })
 	return runEach(ctx, db, stmts)
 }
@@ -75,7 +83,7 @@ func Snowflake(ctx context.Context, db Querier, assetName string) error {
 	if err != nil {
 		return err
 	}
-	stmts := buildSwap(assetName, "TIMESTAMP_TZ", types, alreadyTZ, ident,
+	stmts := buildSwap(assetName, "TIMESTAMP_TZ", addColumnANSI, columns, types, alreadyTZ, ident,
 		func(col string) string {
 			return fmt.Sprintf("CONVERT_TIMEZONE('UTC', CAST(%s AS TIMESTAMP_TZ))", col)
 		})
@@ -97,14 +105,40 @@ func MySQL(ctx context.Context, db Querier, assetName string) error {
 	if err != nil {
 		return err
 	}
-	stmts := buildSwap(assetName, "DATETIME", types, isDateTime, ident,
+	stmts := buildSwap(assetName, "DATETIME", addColumnANSI, columns, types, isDateTime, ident,
 		func(col string) string { return fmt.Sprintf("CAST(%s AS DATETIME)", col) })
 	return runEach(ctx, db, stmts)
 }
 
-func buildSwap(table, targetType string, colTypes map[string]string, alreadyOK func(string) bool, quote func(string) string, convert func(col string) string) []string {
+// Oracle converts naive bruin_valid_from/bruin_valid_until columns to
+// TIMESTAMP(6) WITH TIME ZONE, reading the naive values in the session timezone
+// and normalizing the result to a UTC (+00) offset.
+func Oracle(ctx context.Context, db Querier, assetName string) error {
+	owner, table := "", strings.ToUpper(assetName)
+	if p := strings.SplitN(assetName, ".", 2); len(p) == 2 {
+		owner, table = strings.ToUpper(p[0]), strings.ToUpper(p[1])
+	}
+	ownerFilter := ""
+	if owner != "" {
+		ownerFilter = fmt.Sprintf(" AND owner = '%s'", owner)
+	}
+	types, err := fetchTypes(ctx, db, fmt.Sprintf(
+		"SELECT column_name, data_type FROM all_tab_columns WHERE table_name = '%s'%s",
+		table, ownerFilter,
+	))
+	if err != nil {
+		return err
+	}
+	stmts := buildSwap(assetName, "TIMESTAMP(6) WITH TIME ZONE", addColumnOracle, oracleColumns, types, alreadyTZ, ident,
+		func(col string) string {
+			return fmt.Sprintf("FROM_TZ(CAST(%s AS TIMESTAMP(6)), SESSIONTIMEZONE) AT TIME ZONE 'UTC'", col)
+		})
+	return runEach(ctx, db, stmts)
+}
+
+func buildSwap(table, targetType, addFmt string, cols []string, colTypes map[string]string, alreadyOK func(string) bool, quote func(string) string, convert func(col string) string) []string {
 	var stmts []string
-	for _, col := range columns {
+	for _, col := range cols {
 		qCol, qTmp := quote(col), quote(col+tmpSuffix)
 		colType, oldExists := colTypes[col]
 		_, tempExists := colTypes[col+tmpSuffix]
@@ -127,7 +161,7 @@ func buildSwap(table, targetType string, colTypes map[string]string, alreadyOK f
 			}
 			stmts = append(
 				stmts,
-				fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, qTmp, targetType), // new empty column
+				fmt.Sprintf(addFmt, table, qTmp, targetType),                            // new empty column
 				fmt.Sprintf("UPDATE %s SET %s = %s", table, qTmp, convert(qCol)),        // copy values with conversion
 				fmt.Sprintf("ALTER TABLE %s DROP COLUMN %s", table, qCol),               // drop old column
 				fmt.Sprintf("ALTER TABLE %s RENAME COLUMN %s TO %s", table, qTmp, qCol), // rename new column to old name
