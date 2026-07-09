@@ -160,7 +160,7 @@ CDC is enabled by setting `cdc: "true"` on an ingestr asset with a MySQL source 
 | Parameter | Required | Description |
 |-----------|----------|-------------|
 | `cdc` | Yes | Set to `"true"` to enable CDC mode |
-| `cdc_mode` | No | `"stream"` for real-time streaming or `"batch"` for batch replication |
+| `cdc_mode` | No | Only `"batch"` (the default) is supported. MySQL binary-log CDC reads up to the current binlog position and exits; `"stream"` is rejected by ingestr |
 | `cdc_server_id` | No | Replication server identifier for MySQL binary-log CDC |
 | `cdc_dest_schema` | No | Destination schema to use for multi-table CDC runs |
 | `incremental_strategy` | No | Defaults to `"merge"` when CDC is enabled; can be overridden to `"append"` |
