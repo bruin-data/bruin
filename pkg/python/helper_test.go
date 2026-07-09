@@ -1,6 +1,7 @@
 package python
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -229,6 +230,8 @@ func TestConsolidatedParameters_ColumnMasks(t *testing.T) {
 	}
 }
 
+func intPtr(i int) *int { return &i }
+
 func TestColumnHints(t *testing.T) {
 	t.Parallel()
 
@@ -347,6 +350,75 @@ func TestColumnHints(t *testing.T) {
 			normalizeNames: false,
 			expected:       "span:interval,huge:decimal",
 		},
+		{
+			name: "inline sized string aliases become text(n)",
+			columns: []pipeline.Column{
+				{Name: "a", Type: "string(50)"},
+				{Name: "b", Type: "varchar(100)"},
+				{Name: "c", Type: "nvarchar(50)"},
+				{Name: "d", Type: "text(255)"},
+				{Name: "e", Type: "longtext(20)"},
+			},
+			normalizeNames: false,
+			expected:       "a:text(50),b:text(100),c:text(50),d:text(255),e:text(20)",
+		},
+		{
+			name: "length field sizes string types",
+			columns: []pipeline.Column{
+				{Name: "a", Type: "varchar", Length: intPtr(100)},
+				{Name: "b", Type: "nvarchar", Length: intPtr(50)},
+				{Name: "c", Type: "text", Length: intPtr(255)},
+			},
+			normalizeNames: false,
+			expected:       "a:text(100),b:text(50),c:text(255)",
+		},
+		{
+			name: "inline length takes precedence over length field",
+			columns: []pipeline.Column{
+				{Name: "a", Type: "varchar(100)", Length: intPtr(50)},
+			},
+			normalizeNames: false,
+			expected:       "a:text(100)",
+		},
+		{
+			name: "unbounded and non-positive lengths stay unbounded text",
+			columns: []pipeline.Column{
+				{Name: "a", Type: "varchar"},
+				{Name: "b", Type: "varchar(max)"},
+				{Name: "c", Type: "varchar", Length: intPtr(0)},
+			},
+			normalizeNames: false,
+			expected:       "a:text,b:text,c:text",
+		},
+		{
+			name: "non-string sized types are unaffected",
+			columns: []pipeline.Column{
+				{Name: "kept", Type: "int"},
+				{Name: "dropped_int", Type: "int(11)"},
+				{Name: "dropped_dec", Type: "decimal(10,2)"},
+			},
+			normalizeNames: false,
+			expected:       "kept:int",
+		},
+		{
+			name: "sized string with source_column emits dest:text(n):source",
+			columns: []pipeline.Column{
+				{Name: "email", SourceColumn: "eml", Type: "varchar(255)"},
+			},
+			normalizeNames: false,
+			expected:       "email:text(255):eml",
+		},
+		{
+			name: "nvarchar maps to text and honors length",
+			columns: []pipeline.Column{
+				{Name: "bare", Type: "nvarchar"},
+				{Name: "inline", Type: "nvarchar(100)"},
+				{Name: "field", Type: "nvarchar", Length: intPtr(50)},
+				{Name: "renamed", SourceColumn: "src", Type: "nvarchar(255)"},
+			},
+			normalizeNames: false,
+			expected:       "bare:text,inline:text(100),field:text(50),renamed:text(255):src",
+		},
 	}
 
 	for _, tt := range tests {
@@ -354,6 +426,32 @@ func TestColumnHints(t *testing.T) {
 			t.Parallel()
 			result := ColumnHints(tt.columns, tt.normalizeNames)
 			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestColumnHints_SizedTypes guards that every alias mapping to a sized ingestr type
+// accepts a length, both via an inline length and via the length field.
+func TestColumnHints_SizedTypes(t *testing.T) {
+	t.Parallel()
+
+	sized := make(map[string]string) // source alias -> expected hint
+	for typ, hint := range TypeHintMapping {
+		if ingestrSizedTypes[hint] {
+			sized[typ] = hint
+		}
+	}
+	require.NotEmpty(t, sized)
+
+	for typ, hint := range sized {
+		want := fmt.Sprintf("c:%s(50)", hint)
+		t.Run(typ, func(t *testing.T) {
+			t.Parallel()
+			inline := ColumnHints([]pipeline.Column{{Name: "c", Type: typ + "(50)"}}, false)
+			assert.Equal(t, want, inline, "inline length for %q", typ)
+
+			field := ColumnHints([]pipeline.Column{{Name: "c", Type: typ, Length: intPtr(50)}}, false)
+			assert.Equal(t, want, field, "length field for %q", typ)
 		})
 	}
 }
