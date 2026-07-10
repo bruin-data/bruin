@@ -421,8 +421,8 @@ func (db *DB) BuildTableExistsQuery(tableName string) (string, error) {
 	q := fmt.Sprintf(
 		"SELECT COUNT(*) FROM %s.TABLES WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'",
 		infoSchema,
-		tn.Schema,
-		tn.Table,
+		strings.ReplaceAll(tn.Schema, "'", "''"),
+		strings.ReplaceAll(tn.Table, "'", "''"),
 	)
 
 	return q, nil

@@ -117,7 +117,7 @@ jobs:
       - name: Run integration tests
         run: make integration-test
       - name: Run MSSQL developer environment integration test
-        run: cd integration-tests/mssql && go test -v -count=1 -timeout 15m .
+        run: make integration-test-mssql
   dockerBuild:
     runs-on: depot-ubuntu-latest
     name: Docker Build

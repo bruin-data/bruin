@@ -585,6 +585,13 @@ func TestClient_BuildTableExistsQuery(t *testing.T) {
 			wantQuery: "SELECT COUNT(*) FROM [otherdb].information_schema.tables WHERE table_schema = 'test_schema' AND table_name = 'test_table'",
 			wantErr:   false,
 		},
+		{
+			name:      "schema and table names escape single quotes",
+			c:         &DB{config: &Config{Database: "test_db"}},
+			tableName: "otherdb.dev_o'brien.order's",
+			wantQuery: "SELECT COUNT(*) FROM [otherdb].information_schema.tables WHERE table_schema = 'dev_o''brien' AND table_name = 'order''s'",
+			wantErr:   false,
+		},
 	}
 
 	for _, tt := range tests {

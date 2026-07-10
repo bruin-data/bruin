@@ -243,6 +243,11 @@ func TestDB_BuildTableExistsQuery(t *testing.T) {
 			want:      "SELECT COUNT(*) FROM [upstream].INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'dev_sales' AND TABLE_NAME = 'orders'",
 		},
 		{
+			name:      "schema and table with single quotes",
+			tableName: "upstream.dev_o'brien.order's",
+			want:      "SELECT COUNT(*) FROM [upstream].INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'dev_o''brien' AND TABLE_NAME = 'order''s'",
+		},
+		{
 			name:      "invalid table name",
 			tableName: "database.schema.table.extra",
 			wantError: "must be in format",
