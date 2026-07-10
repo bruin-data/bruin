@@ -288,6 +288,10 @@ type Manager struct {
 	Generic              map[string]*config.GenericConnection
 	mutex                sync.Mutex
 	availableConnections map[string]any
+	// snowflakeWarehouseOverrides caches per-warehouse Snowflake clients, keyed
+	// by "<connection name>\x00<warehouse>", so a warehouse override reuses one
+	// client instead of opening a new connection pool for every asset.
+	snowflakeWarehouseOverrides map[string]*snowflake.DB
 }
 
 func (m *Manager) GetConnection(name string) any {
@@ -397,13 +401,7 @@ func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatfo
 	return nil
 }
 
-func (m *Manager) AddSfConnectionFromConfig(connection *config.SnowflakeConnection) error {
-	m.mutex.Lock()
-	if m.Snowflake == nil {
-		m.Snowflake = make(map[string]*snowflake.DB)
-	}
-	m.mutex.Unlock()
-
+func newSnowflakeDBFromConnection(connection *config.SnowflakeConnection) (*snowflake.DB, error) {
 	privateKey := ""
 
 	// Prioritize the direct PrivateKey field over PrivateKeyPath
@@ -412,7 +410,7 @@ func (m *Manager) AddSfConnectionFromConfig(connection *config.SnowflakeConnecti
 	} else if connection.PrivateKeyPath != "" {
 		privateKeyBytes, err := os.ReadFile(connection.PrivateKeyPath)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		privateKey = string(privateKeyBytes)
 	}
@@ -422,7 +420,7 @@ func (m *Manager) AddSfConnectionFromConfig(connection *config.SnowflakeConnecti
 		privateKey = convertPKCS1ToPKCS8(privateKey)
 	}
 
-	db, err := snowflake.NewDB(&snowflake.Config{
+	return snowflake.NewDB(&snowflake.Config{
 		Account:    connection.Account,
 		Username:   connection.Username,
 		Password:   connection.Password,
@@ -433,6 +431,16 @@ func (m *Manager) AddSfConnectionFromConfig(connection *config.SnowflakeConnecti
 		Warehouse:  connection.Warehouse,
 		PrivateKey: privateKey,
 	})
+}
+
+func (m *Manager) AddSfConnectionFromConfig(connection *config.SnowflakeConnection) error {
+	m.mutex.Lock()
+	if m.Snowflake == nil {
+		m.Snowflake = make(map[string]*snowflake.DB)
+	}
+	m.mutex.Unlock()
+
+	db, err := newSnowflakeDBFromConnection(connection)
 	if err != nil {
 		return err
 	}
@@ -444,6 +452,50 @@ func (m *Manager) AddSfConnectionFromConfig(connection *config.SnowflakeConnecti
 	m.AllConnectionDetails[connection.Name] = connection
 
 	return nil
+}
+
+// GetSfConnectionWithWarehouse returns a Snowflake client for the named
+// connection whose warehouse is overridden. When warehouse is empty it returns
+// the default connection unchanged; otherwise it builds a client by cloning the
+// connection config with a different warehouse. The returned client is not
+// pinged here; callers that need to fall back on failure should validate it.
+func (m *Manager) GetSfConnectionWithWarehouse(name, warehouse string) (snowflake.SfClient, error) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	base, ok := m.Snowflake[name]
+	if !ok || base == nil {
+		return nil, errors.Errorf("snowflake connection '%s' does not exist", name)
+	}
+
+	detail, ok := m.AllConnectionDetails[name].(*config.SnowflakeConnection)
+	if !ok {
+		return nil, errors.Errorf("connection '%s' is not a snowflake connection", name)
+	}
+
+	// No override, or the override matches the connection's own warehouse.
+	warehouse = strings.TrimSpace(warehouse)
+	if warehouse == "" || strings.EqualFold(warehouse, detail.Warehouse) {
+		return base, nil
+	}
+
+	key := name + "\x00" + warehouse
+	if db, ok := m.snowflakeWarehouseOverrides[key]; ok {
+		return db, nil
+	}
+
+	override := *detail
+	override.Warehouse = warehouse
+	db, err := newSnowflakeDBFromConnection(&override)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to create snowflake connection '%s' with warehouse '%s'", name, warehouse)
+	}
+
+	if m.snowflakeWarehouseOverrides == nil {
+		m.snowflakeWarehouseOverrides = make(map[string]*snowflake.DB)
+	}
+	m.snowflakeWarehouseOverrides[key] = db
+	return db, nil
 }
 
 func (m *Manager) AddAthenaConnectionFromConfig(connection *config.AthenaConnection) error {

@@ -2,6 +2,7 @@ package snowflake
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"time"
 
@@ -17,6 +18,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/snowflakedb/gosnowflake"
 )
+
+type warehouseConnectionGetter interface {
+	GetSfConnectionWithWarehouse(name, warehouse string) (SfClient, error)
+}
 
 type materializer interface {
 	Render(task *pipeline.Asset, query string) (string, error)
@@ -121,6 +126,10 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return errors.Errorf("connection '%s' is not a snowflake connection", connName)
 	}
 
+	if warehouse, ok := t.Parameters.GetString("warehouse"); ok && warehouse != "" {
+		conn = o.connectionForWarehouse(ctx, ctx.Value(executor.KeyPrinter), conn, connName, warehouse)
+	}
+
 	if t.Materialization.Type != pipeline.MaterializationTypeNone {
 		err = conn.CreateSchemaIfNotExist(ctx, t)
 		if err != nil {
@@ -177,6 +186,38 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	}
 
 	return nil
+}
+
+// connectionForWarehouse returns a Snowflake client bound to the overridden
+// warehouse. If the connection getter can't provide one, or the overridden
+// client can't run a query (e.g. the warehouse is inaccessible or the account
+// can't resume it), it logs a warning and falls back to the default client.
+func (o BasicOperator) connectionForWarehouse(ctx context.Context, writer interface{}, fallback SfClient, connName, warehouse string) SfClient {
+	getter, ok := o.connection.(warehouseConnectionGetter)
+	if !ok {
+		return fallback
+	}
+
+	overridden, err := getter.GetSfConnectionWithWarehouse(connName, warehouse)
+	if err != nil {
+		logWarehouseFallback(writer, warehouse, err)
+		return fallback
+	}
+
+	if err := overridden.Ping(ctx); err != nil {
+		logWarehouseFallback(writer, warehouse, err)
+		return fallback
+	}
+
+	return overridden
+}
+
+func logWarehouseFallback(writer interface{}, warehouse string, err error) {
+	w, ok := writer.(io.Writer)
+	if !ok || w == nil {
+		return
+	}
+	_, _ = fmt.Fprintf(w, "warning: could not use warehouse override '%s', falling back to the connection's default warehouse: %v\n", warehouse, err)
 }
 
 func NewColumnCheckOperator(manager config.ConnectionGetter) *ansisql.ColumnCheckOperator {
