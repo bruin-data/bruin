@@ -43,7 +43,7 @@ parameters:
 - `type`: Always `ingestr` for JobTread.
 - `source_connection`: The JobTread connection name defined in `.bruin.yml`.
 - `source_table`: Name of the JobTread table to ingest.
-- `destination`: The destination connection name.
+- `destination`: The destination platform/type, for example `postgres`.
 
 ## Available Source Tables
 

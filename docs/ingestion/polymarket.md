@@ -56,7 +56,7 @@ parameters:
 - `type`: Always `ingestr` for Polymarket.
 - `source_connection`: The Polymarket connection name defined in `.bruin.yml`.
 - `source_table`: The Polymarket table to ingest.
-- `destination`: The destination connection name.
+- `destination`: The destination platform/type, for example `duckdb`.
 - `schema_naming`: `direct` is recommended for Polymarket tables because provider columns and keys can use camelCase.
 
 ### Step 3: Run the asset

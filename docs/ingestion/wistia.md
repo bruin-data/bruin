@@ -38,7 +38,7 @@ parameters:
 
 - `source_connection`: The name of the Wistia connection defined in `.bruin.yml`.
 - `source_table`: The Wistia table to ingest. See available tables below.
-- `destination`: The destination connection name.
+- `destination`: The destination platform/type, for example `postgres`.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 

@@ -53,7 +53,7 @@ parameters:
 - `connection`: The destination connection, which defines where the data should be stored.
 - `source_connection`: The name of the Reddit Ads connection defined in `.bruin.yml`.
 - `source_table`: The Reddit Ads table to ingest. See [Available Source Tables](#available-source-tables) for options.
-- `destination`: The destination connection name.
+- `destination`: The destination platform/type, for example `postgres`.
 
 ## Available Source Tables
 
@@ -61,14 +61,13 @@ Reddit Ads source allows ingesting the following tables:
 
 | Table | PK | Inc Key | Inc Strategy | Details |
 |-------|----|---------|--------------|---------|
-| `accounts` | id | - | replace | Retrieves all ad accounts accessible by the authenticated user. |
-| `campaigns` | id | - | replace | Retrieves campaigns for each ad account. |
-| `ad_groups` | id | - | replace | Retrieves ad groups for each ad account. |
-| `ads` | id | - | replace | Retrieves ads for each ad account. |
-| `posts` | id | - | replace | Retrieves ad posts (creatives) for each ad account. |
-| `custom_audiences` | id | - | replace | Retrieves custom audiences for targeting. |
-| `saved_audiences` | id | - | replace | Retrieves saved audience configurations. |
-| `pixels` | id | - | replace | Retrieves conversion tracking pixels. |
+| `accounts` | id | modified_at | merge | Retrieves the ad accounts accessible by the authenticated user, or the accounts scoped in the table name. |
+| `campaigns` | id | modified_at | merge | Retrieves campaigns for each ad account. |
+| `ad_groups` | id | modified_at | merge | Retrieves ad groups for each ad account. |
+| `ads` | id | modified_at | merge | Retrieves ads for each ad account. |
+| `custom_audiences` | id | modified_at | merge | Retrieves custom audiences for targeting. |
+| `saved_audiences` | id | updated_at | merge | Retrieves saved audience configurations. |
+| `pixels` | id | modified_at | merge | Retrieves conversion tracking pixels. |
 | `funding_instruments` | id | - | replace | Retrieves funding instruments (payment methods) for each ad account. |
 | `custom` | [level_id, breakdowns] | date | merge | Custom reports allow you to retrieve performance data based on specific levels, breakdowns, and metrics. |
 

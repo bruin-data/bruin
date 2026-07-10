@@ -45,7 +45,7 @@ parameters:
 - `connection`: This is the destination connection, which defines where the data should be stored. For example: `postgres` indicates that the ingested data will be stored in a Postgres database.
 - `source_connection`: The name of the SQLite connection defined in .bruin.yml.
 - `source_table`: The name of the data table in SQLite that you want to ingest.
-- `destination`: The name of the destination connection.
+- `destination`: The destination platform/type, for example `postgres`.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 

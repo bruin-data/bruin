@@ -98,7 +98,7 @@ Vitess CDC streams inserts, updates, and deletes through vtgate's VStream gRPC A
 | `cdc_grpc_host` | No | Overrides the connection's `grpc_host` for this asset |
 | `cdc_grpc_tls` | No | Overrides the connection's `grpc_tls` for this asset |
 | `cdc_dest_schema` | No | Destination schema to use for multi-table CDC runs |
-| `incremental_strategy` | No | Defaults to `"merge"` when CDC is enabled; can be overridden to `"append"` |
+| `incremental_strategy` | No | Defaults to `"merge"` when CDC is enabled. CDC assets must use `"merge"`; Bruin rejects other strategies. |
 
 Requirements:
 
