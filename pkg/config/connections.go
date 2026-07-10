@@ -1331,6 +1331,17 @@ func (c MixpanelConnection) GetName() string {
 	return c.Name
 }
 
+type AmplitudeConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key,omitempty" mapstructure:"api_key" sensitive:"true"`
+	SecretKey          string `yaml:"secret_key,omitempty" json:"secret_key,omitempty" mapstructure:"secret_key" sensitive:"true"`
+	Region             string `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
+}
+
+func (c AmplitudeConnection) GetName() string {
+	return c.Name
+}
+
 type ClickupConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	APIToken           string `yaml:"api_token,omitempty" json:"api_token" mapstructure:"api_token" sensitive:"true"`
