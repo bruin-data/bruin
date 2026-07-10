@@ -403,6 +403,31 @@ WHERE TABLE_SCHEMA NOT IN ('sys', 'INFORMATION_SCHEMA')
 	return summary, nil
 }
 
+func (db *DB) BuildTableExistsQuery(tableName string) (string, error) {
+	cb, ok := tablename.For("fabric")
+	if !ok {
+		return "", errors.New("fabric table-name capability not found")
+	}
+	tn, err := cb.Parse(tableName, tablename.Defaults{Schema: "dbo"})
+	if err != nil {
+		return "", err
+	}
+
+	infoSchema := "INFORMATION_SCHEMA"
+	if tn.Catalog != "" {
+		infoSchema = QuoteIdentifier(tn.Catalog) + ".INFORMATION_SCHEMA"
+	}
+
+	q := fmt.Sprintf(
+		"SELECT COUNT(*) FROM %s.TABLES WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'",
+		infoSchema,
+		tn.Schema,
+		tn.Table,
+	)
+
+	return q, nil
+}
+
 func (db *DB) GetIngestrURI() (string, error) {
 	return db.config.GetIngestrURI()
 }

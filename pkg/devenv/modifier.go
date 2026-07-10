@@ -8,6 +8,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 )
@@ -128,15 +129,18 @@ func (d *DevEnvQueryModifier) Modify(ctx context.Context, p *pipeline.Pipeline, 
 			schema := parts[1]
 			table := parts[2]
 
-			// only rewrite if the database matches the connection's database
-			if database != dbSummary.Name {
-				continue
-			}
-
 			devSchema := env.SchemaPrefix + schema
 			devTable := fmt.Sprintf("%s.%s.%s", database, devSchema, table)
 
-			if dbSummary.TableExists(devSchema, table) {
+			tableExists := dbSummary.TableExists(devSchema, table)
+			if !strings.EqualFold(database, dbSummary.Name) {
+				tableExists, err = tableExistsInDatabase(ctx, conn, devTable)
+				if err != nil {
+					return nil, err
+				}
+			}
+
+			if tableExists {
 				renameMapping[tableReference] = devTable
 			}
 		default:
@@ -150,6 +154,30 @@ func (d *DevEnvQueryModifier) Modify(ctx context.Context, p *pipeline.Pipeline, 
 	}
 
 	return q, nil
+}
+
+func tableExistsInDatabase(ctx context.Context, conn any, tableName string) (bool, error) {
+	tableChecker, ok := conn.(ansisql.TableExistsChecker)
+	if !ok {
+		return false, nil
+	}
+
+	tableExistsQuery, err := tableChecker.BuildTableExistsQuery(tableName)
+	if err != nil {
+		return false, fmt.Errorf("failed to build existence check for developer environment table '%s': %w", tableName, err)
+	}
+
+	result, err := tableChecker.Select(ctx, &query.Query{Query: tableExistsQuery})
+	if err != nil {
+		return false, fmt.Errorf("failed to check developer environment table '%s': %w", tableName, err)
+	}
+
+	count, err := helpers.CastResultToInteger(result, true)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse existence check for developer environment table '%s': %w", tableName, err)
+	}
+
+	return count > 0, nil
 }
 
 func (d *DevEnvQueryModifier) RegisterAssetForSchemaCache(ctx context.Context, p *pipeline.Pipeline, a *pipeline.Asset, q *query.Query) error {
