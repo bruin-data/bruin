@@ -2,6 +2,8 @@ package executor
 
 import (
 	"context"
+	"fmt"
+	"io"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -22,6 +24,15 @@ type Sequential struct {
 
 func (s Sequential) RunSingleTask(ctx context.Context, instance scheduler.TaskInstance) error {
 	task := instance.GetAsset()
+	fullRefresh, _ := ctx.Value(pipeline.RunConfigFullRefresh).(bool)
+	if fullRefresh && task.RefreshRestricted != nil && *task.RefreshRestricted {
+		ctx = context.WithValue(ctx, pipeline.RunConfigFullRefresh, false)
+		if instance.GetType() == scheduler.TaskInstanceTypeMain {
+			if printer, ok := ctx.Value(KeyPrinter).(io.Writer); ok {
+				_, _ = fmt.Fprintf(printer, "Warning: full refresh is restricted for asset %q; running incrementally.\n", task.Name)
+			}
+		}
+	}
 
 	// check if task type exists in map
 	executors, ok := s.TaskTypeMap[task.Type]

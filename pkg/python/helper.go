@@ -37,6 +37,7 @@ var ingestrBoolParameterFlags = []string{
 }
 
 func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs []string, columnOpts *ColumnHintOptions) ([]string, error) {
+	fullRefresh, _ := ctx.Value(pipeline.RunConfigFullRefresh).(bool)
 	cmdArgs = appendIngestrParameterFlags(asset.Parameters, cmdArgs)
 	cmdArgs = appendIngestrMaskFlags(asset.Parameters, asset.Columns, cmdArgs, columnOpts != nil && columnOpts.NormalizeColumnNames)
 
@@ -60,8 +61,6 @@ func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs 
 	if ctx.Value(pipeline.RunConfigStartDate) != nil {
 		startTimeInstance, okParse := ctx.Value(pipeline.RunConfigStartDate).(time.Time)
 		if okParse {
-			fullRefresh, _ := ctx.Value(pipeline.RunConfigFullRefresh).(bool)
-
 			// If full-refresh and asset has a start_date, use that instead
 			if fullRefresh && asset.StartDate != "" {
 				parsedStartDate, err := time.Parse("2006-01-02", asset.StartDate)
@@ -91,8 +90,7 @@ func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs 
 		}
 	}
 
-	fullRefresh := ctx.Value(pipeline.RunConfigFullRefresh)
-	if fullRefresh != nil && fullRefresh.(bool) {
+	if fullRefresh {
 		cmdArgs = append(cmdArgs, "--full-refresh")
 	}
 
