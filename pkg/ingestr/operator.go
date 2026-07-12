@@ -447,6 +447,10 @@ func applyMaterializationParameters(asset *pipeline.Asset) error {
 	}
 
 	mat := asset.Materialization
+	if hasIngestrIncrementalPredicate(asset, mat) {
+		return errors.New("incremental_predicate is not supported for ingestr assets")
+	}
+
 	if mat.Type == pipeline.MaterializationTypeNone {
 		return nil
 	}
@@ -482,7 +486,6 @@ func applyMaterializationParameters(asset *pipeline.Asset) error {
 	if hasIngestrIncrementalKey(asset, mat) && !python.IsIngestrIncrementalKeyStrategy(effectiveStrategy) {
 		return errors.New("materialization.incremental_key is only supported for append, merge, and delete+insert strategies on ingestr assets")
 	}
-
 	if err := setMaterializationParameter(asset.Parameters, "incremental_key", mat.IncrementalKey, "materialization.incremental_key"); err != nil {
 		return err
 	}
@@ -507,6 +510,14 @@ func hasIngestrIncrementalKey(asset *pipeline.Asset, mat pipeline.Materializatio
 	}
 	key, _ := asset.Parameters.GetString("incremental_key")
 	return strings.TrimSpace(key) != ""
+}
+
+func hasIngestrIncrementalPredicate(asset *pipeline.Asset, mat pipeline.Materialization) bool {
+	if strings.TrimSpace(mat.IncrementalPredicate) != "" {
+		return true
+	}
+	predicate, _ := asset.Parameters.GetString("incremental_predicate")
+	return strings.TrimSpace(predicate) != ""
 }
 
 func setMaterializationParameter(params pipeline.ParameterMap, key, value, source string) error {

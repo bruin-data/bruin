@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/tablename"
@@ -96,6 +97,7 @@ func buildMergeQuery(asset *pipeline.Asset, query string) ([]string, error) {
 	for _, key := range primaryKeys {
 		on = append(on, fmt.Sprintf("target.%s = source.%s", key, key))
 	}
+	on = ansisql.AddIncrementalPredicate(on, asset.Materialization.IncrementalPredicate)
 	onQuery := strings.Join(on, " AND ")
 
 	allColumnValues := strings.Join(columnNames, ", ")

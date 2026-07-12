@@ -425,6 +425,9 @@ func renderAssetStrings(render RenderFunc, a *Asset) error {
 	if a.Materialization.IncrementalKey, err = maybeRender(render, fmt.Sprintf("asset[%s].materialization.incremental_key", originalName), a.Materialization.IncrementalKey); err != nil {
 		return err
 	}
+	if a.Materialization.IncrementalPredicate, err = maybeRender(render, fmt.Sprintf("asset[%s].materialization.incremental_predicate", originalName), a.Materialization.IncrementalPredicate); err != nil {
+		return err
+	}
 	for i, c := range a.Materialization.ClusterBy {
 		if a.Materialization.ClusterBy[i], err = maybeRender(render, fmt.Sprintf("asset[%s].materialization.cluster_by[%d]", originalName, i), c); err != nil {
 			return err

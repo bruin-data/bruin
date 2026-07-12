@@ -99,6 +99,21 @@ func TestBuildDeleteInsertQuery(t *testing.T) {
 	})
 }
 
+func TestBuildMergeQueryRejectsIncrementalPredicate(t *testing.T) {
+	t.Parallel()
+	asset := &pipeline.Asset{
+		Name: "dbo.Table",
+		Materialization: pipeline.Materialization{
+			Type:                 pipeline.MaterializationTypeTable,
+			Strategy:             pipeline.MaterializationStrategyMerge,
+			IncrementalPredicate: "target.event_date >= '2026-07-01'",
+		},
+		Columns: []pipeline.Column{{Name: "id", PrimaryKey: true}},
+	}
+	_, err := buildMergeQuery(asset, "SELECT 1")
+	require.ErrorContains(t, err, "incremental_predicate is not supported for Fabric merge materialization")
+}
+
 func TestBuildDDLQuery(t *testing.T) {
 	t.Parallel()
 

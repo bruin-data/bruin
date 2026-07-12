@@ -213,6 +213,7 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 
 	tempTableName := "__bruin_merge_tmp_" + helpers.PrefixGenerator()
 	onClause := buildJoinConditions(primaryKeys, "target", "source")
+	onClause = strings.Join(ansisql.AddIncrementalPredicate([]string{onClause}, asset.Materialization.IncrementalPredicate), " AND ")
 
 	queries := []string{
 		"START TRANSACTION",

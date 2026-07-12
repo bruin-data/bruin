@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
@@ -132,6 +133,7 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 	for _, key := range primaryKeys {
 		on = append(on, fmt.Sprintf("target.%s = source.%s", QuoteIdentifier(key), QuoteIdentifier(key)))
 	}
+	on = ansisql.AddIncrementalPredicate(on, asset.Materialization.IncrementalPredicate)
 	onQuery := strings.Join(on, " AND ")
 
 	// Quote all column names for INSERT clause
@@ -171,6 +173,12 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 }
 
 func buildRedshiftMergeQuery(asset *pipeline.Asset, query string) (string, error) {
+	// Redshift MERGE only accepts equality predicates between source and target columns
+	// in its match condition, so arbitrary incremental predicates cannot be supported.
+	if strings.TrimSpace(asset.Materialization.IncrementalPredicate) != "" {
+		return "", errors.New("incremental_predicate is not supported for Redshift merge materialization")
+	}
+
 	if len(asset.Columns) == 0 {
 		return "", fmt.Errorf("materialization strategy %s requires the `columns` field to be set", asset.Materialization.Strategy)
 	}

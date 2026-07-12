@@ -69,11 +69,12 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 					},
 				},
 				Materialization: pipeline.Materialization{
-					Type:           pipeline.MaterializationTypeTable,
-					Strategy:       pipeline.MaterializationStrategyCreateReplace,
-					ClusterBy:      []string{"key1", "key2"},
-					PartitionBy:    "dt",
-					IncrementalKey: "dt",
+					Type:                 pipeline.MaterializationTypeTable,
+					Strategy:             pipeline.MaterializationStrategyCreateReplace,
+					ClusterBy:            []string{"key1", "key2"},
+					PartitionBy:          "dt",
+					IncrementalKey:       "dt",
+					IncrementalPredicate: "target.dt >= DATE '2026-07-01'",
 				},
 				Hooks: pipeline.Hooks{
 					Pre:  []pipeline.Hook{{Query: "select 1"}},

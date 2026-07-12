@@ -152,6 +152,27 @@ func Test_uvPythonRunner_RunWithMaterialization_DisablesTelemetryForIngestrUploa
 	cmd.AssertExpectations(t)
 }
 
+func Test_uvPythonRunner_RunWithMaterialization_RejectsIncrementalPredicate(t *testing.T) {
+	t.Parallel()
+
+	runner := &UvPythonRunner{}
+
+	err := runner.runWithMaterialization(t.Context(), &executionContext{
+		asset: &pipeline.Asset{
+			Name:       "public.asset_data",
+			Type:       pipeline.AssetTypePython,
+			Connection: "dest",
+			Materialization: pipeline.Materialization{
+				Type:                 "table",
+				Strategy:             pipeline.MaterializationStrategyMerge,
+				IncrementalPredicate: "target.event_date >= DATE '2026-07-01'",
+			},
+		},
+	}, "")
+
+	require.ErrorContains(t, err, "incremental_predicate is not supported for Python assets")
+}
+
 func extractArrowPathFromScript(t *testing.T, script string) string {
 	t.Helper()
 

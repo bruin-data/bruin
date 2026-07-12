@@ -346,6 +346,13 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 func validateIngestrMaterialization(asset *pipeline.Asset, effectiveStrategy string) ([]*Issue, string) {
 	issues := make([]*Issue, 0)
 	mat := asset.Materialization
+	if hasIngestrMaterializationIncrementalPredicate(asset, mat) {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: "Incremental predicate is not supported for ingestr assets",
+		})
+	}
+
 	if mat.Type == pipeline.MaterializationTypeNone {
 		return issues, ""
 	}
@@ -378,7 +385,6 @@ func validateIngestrMaterialization(asset *pipeline.Asset, effectiveStrategy str
 			Description: "Materialization incremental key is only supported for append, merge, and delete+insert strategies on ingestr assets",
 		})
 	}
-
 	issues = append(issues, validateIngestrMaterializationConflict(asset, "incremental_key", mat.IncrementalKey, "materialization.incremental_key")...)
 	issues = append(issues, validateIngestrMaterializationConflict(asset, "partition_by", mat.PartitionBy, "materialization.partition_by")...)
 	issues = append(issues, validateIngestrMaterializationConflict(asset, "cluster_by", strings.Join(mat.ClusterBy, ","), "materialization.cluster_by")...)
@@ -392,6 +398,14 @@ func hasIngestrMaterializationIncrementalKey(asset *pipeline.Asset, mat pipeline
 	}
 	key, _ := asset.Parameters.GetString("incremental_key")
 	return strings.TrimSpace(key) != ""
+}
+
+func hasIngestrMaterializationIncrementalPredicate(asset *pipeline.Asset, mat pipeline.Materialization) bool {
+	if strings.TrimSpace(mat.IncrementalPredicate) != "" {
+		return true
+	}
+	predicate, _ := asset.Parameters.GetString("incremental_predicate")
+	return strings.TrimSpace(predicate) != ""
 }
 
 func validateIngestrMaterializationConflict(asset *pipeline.Asset, key, value, source string) []*Issue {
@@ -618,6 +632,13 @@ func ValidatePythonAssetMaterialization(ctx context.Context, p *pipeline.Pipelin
 		issues = append(issues, &Issue{
 			Task:        asset,
 			Description: "A task with materialization must have a connection defined",
+		})
+	}
+
+	if asset.Materialization.IncrementalPredicate != "" {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: "Incremental predicate is not supported for Python assets",
 		})
 	}
 
@@ -1304,6 +1325,13 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 			})
 		}
 
+		if asset.Materialization.IncrementalPredicate != "" {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: "Materialization incremental predicate is not supported for views",
+			})
+		}
+
 		if asset.Materialization.ClusterBy != nil {
 			issues = append(issues, &Issue{
 				Task:        asset,
@@ -1319,6 +1347,13 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 		}
 
 	case pipeline.MaterializationTypeTable:
+		if asset.Materialization.IncrementalPredicate != "" && asset.Materialization.Strategy != pipeline.MaterializationStrategyMerge {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: "Incremental predicate is only supported with the 'merge' strategy.",
+			})
+		}
+
 		if asset.Materialization.Strategy == pipeline.MaterializationStrategyNone {
 			return issues, nil
 		}

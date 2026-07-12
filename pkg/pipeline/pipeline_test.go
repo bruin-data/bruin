@@ -989,7 +989,14 @@ func TestMaterialization_MarshalJSON(t *testing.T) {
 			materialization: pipeline.Materialization{
 				TimeGranularity: pipeline.MaterializationTimeGranularityDate,
 			},
-			want: `{"type":"","strategy":"","partition_by":"","cluster_by":null,"incremental_key":"","time_granularity":"date"}`,
+			want: `{"type":"","strategy":"","partition_by":"","cluster_by":null,"incremental_key":"","incremental_predicate":"","time_granularity":"date"}`,
+		},
+		{
+			name: "incremental predicate only materialization is preserved",
+			materialization: pipeline.Materialization{
+				IncrementalPredicate: "target.dt >= DATE '2026-07-01'",
+			},
+			want: `{"type":"","strategy":"","partition_by":"","cluster_by":null,"incremental_key":"","incremental_predicate":"target.dt >= DATE '2026-07-01'","time_granularity":""}`,
 		},
 	}
 
@@ -2731,11 +2738,12 @@ func TestBuilder_SetupDefaultsFromPipelineAppliesAssetFieldDefaults(t *testing.T
 		Domains:     []string{"default-domain", "asset-domain"},
 		Meta:        pipeline.EmptyStringMap{"shared": "default", "default": "yes"},
 		Materialization: pipeline.Materialization{
-			Type:           pipeline.MaterializationTypeTable,
-			Strategy:       pipeline.MaterializationStrategyCreateReplace,
-			PartitionBy:    "dt",
-			ClusterBy:      []string{"tenant"},
-			IncrementalKey: "updated_at",
+			Type:                 pipeline.MaterializationTypeTable,
+			Strategy:             pipeline.MaterializationStrategyCreateReplace,
+			PartitionBy:          "dt",
+			ClusterBy:            []string{"tenant"},
+			IncrementalKey:       "updated_at",
+			IncrementalPredicate: "target.dt >= DATE '2026-07-01'",
 		},
 		Upstreams: []pipeline.Upstream{
 			{Type: "asset", Value: "default-upstream"},
@@ -2814,6 +2822,8 @@ func TestBuilder_SetupDefaultsFromPipelineAppliesAssetFieldDefaults(t *testing.T
 	assert.Equal(t, pipeline.MaterializationStrategyAppend, got.Materialization.Strategy)
 	assert.Equal(t, "dt", got.Materialization.PartitionBy)
 	assert.Equal(t, []string{"tenant"}, got.Materialization.ClusterBy)
+	assert.Equal(t, "updated_at", got.Materialization.IncrementalKey)
+	assert.Equal(t, "target.dt >= DATE '2026-07-01'", got.Materialization.IncrementalPredicate)
 	assert.Equal(t, []pipeline.Upstream{
 		{Type: "asset", Value: "asset-upstream"},
 		{Type: "asset", Value: "default-upstream"},

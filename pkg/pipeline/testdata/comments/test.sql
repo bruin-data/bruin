@@ -14,6 +14,7 @@
 -- @bruin.materialization.cluster_by: event_name
 -- @bruin.materialization.strategy: delete+insert
 -- @bruin.materialization.incremental_key: dt
+-- @bruin.materialization.incremental_predicate: target.dt >= DATE '2026-07-01'
 -- @bruin.columns.some_column.primary_key: true
 -- @bruin.columns.some_column.type: numeric
 -- @bruin.columns.some_column.precision: 10

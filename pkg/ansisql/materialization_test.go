@@ -60,3 +60,17 @@ COMMIT;`,
 		})
 	}
 }
+
+func TestAddIncrementalPredicate(t *testing.T) {
+	t.Parallel()
+
+	base := []string{"target.id = source.id"}
+
+	assert.Equal(t, base, AddIncrementalPredicate(base, ""))
+	assert.Equal(t, base, AddIncrementalPredicate(base, "   "))
+	assert.Equal(
+		t,
+		[]string{"target.id = source.id", "(target.event_date >= DATE '2026-07-01')"},
+		AddIncrementalPredicate(base, "  target.event_date >= DATE '2026-07-01'  "),
+	)
+}

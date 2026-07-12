@@ -358,6 +358,9 @@ func commentRowsToTask(commentRows []string) (*Asset, error) {
 			case "incremental_key":
 				task.Materialization.IncrementalKey = value
 				continue
+			case "incremental_predicate":
+				task.Materialization.IncrementalPredicate = value
+				continue
 			case "cluster_by":
 				values := strings.Split(value, ",")
 				for _, v := range values {
