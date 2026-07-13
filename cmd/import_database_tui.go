@@ -39,6 +39,28 @@ var supportedImportConnectionTypes = map[string]bool{
 	"mongo_atlas":           true,
 }
 
+// supportedIngestrImportConnectionTypes is intentionally explicit so a future
+// database connection added to supportedImportConnectionTypes is not offered
+// in ingestr mode until its connection implements ingestruri.Connection.
+var supportedIngestrImportConnectionTypes = map[string]bool{
+	"google_cloud_platform": true,
+	"snowflake":             true,
+	"postgres":              true,
+	"mssql":                 true,
+	"mysql":                 true,
+	"databricks":            true,
+	"duckdb":                true,
+	"motherduck":            true,
+	"clickhouse":            true,
+	"oracle":                true,
+	"athena":                true,
+	"synapse":               true,
+	"redshift":              true,
+	"sqlite":                true,
+	"mongo":                 true,
+	"mongo_atlas":           true,
+}
+
 const (
 	dbtuiStepConnection = iota
 	dbtuiStepLoading
@@ -688,6 +710,9 @@ func runImportDatabaseTUI(ctx context.Context, pipelinePath, environment, config
 	var connItems []importConnectionItem
 	for name, connType := range connSummary {
 		if !supportedImportConnectionTypes[connType] {
+			continue
+		}
+		if ingestrImport && !supportedIngestrImportConnectionTypes[connType] {
 			continue
 		}
 		connItems = append(connItems, importConnectionItem{name: name, connType: connType})
