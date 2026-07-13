@@ -17,6 +17,7 @@ import (
 	"cloud.google.com/go/bigquery/datatransfer/apiv1/datatransferpb"
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/bigquery"
+	"github.com/bruin-data/bruin/pkg/ingestruri"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/mongo"
@@ -81,12 +82,13 @@ func ImportDatabase(isDebug *bool) *cli.Command {
 				Usage:   "skip filling column metadata from database schema",
 			},
 			&cli.BoolFlag{
-				Name:  "as-ingestr",
-				Usage: "generate runnable ingestr assets that replicate the source instead of source placeholders (MongoDB only)",
+				Name:    "ingestr",
+				Aliases: []string{"as-ingestr"},
+				Usage:   "generate runnable ingestr assets that replicate the source instead of source placeholders",
 			},
 			&cli.StringFlag{
 				Name:  "destination",
-				Usage: "destination platform for --as-ingestr assets (e.g. duckdb, postgres, bigquery)",
+				Usage: "destination platform for --ingestr assets (e.g. duckdb, postgres, bigquery)",
 			},
 			&cli.StringFlag{
 				Name:    "environment",
@@ -108,18 +110,18 @@ func ImportDatabase(isDebug *bool) *cli.Command {
 
 			connectionName := c.String("connection")
 			noColumns := c.Bool("no-columns")
-			asIngestr := c.Bool("as-ingestr")
+			ingestrImport := c.Bool("ingestr")
 			destination := c.String("destination")
 			environment := c.String("environment")
 			configFile := c.String("config-file")
 			var err error
 
-			if validationErr := validateIngestrImportFlags(asIngestr, destination); validationErr != nil {
+			if validationErr := validateIngestrImportFlags(ingestrImport, destination); validationErr != nil {
 				return cli.Exit(validationErr.Error(), 1)
 			}
 
 			if connectionName == "" {
-				err = runImportDatabaseTUI(ctx, pipelinePath, environment, configFile, !noColumns, asIngestr, destination)
+				err = runImportDatabaseTUI(ctx, pipelinePath, environment, configFile, !noColumns, ingestrImport, destination)
 			} else {
 				schema := c.String("schema")
 				schemas := c.StringSlice("schemas")
@@ -128,7 +130,7 @@ func ImportDatabase(isDebug *bool) *cli.Command {
 				}
 
 				log := makeLogger(*isDebug)
-				err = runImport(ctx, log, pipelinePath, connectionName, schema, schemas, !noColumns, environment, configFile, asIngestr, destination)
+				err = runImport(ctx, log, pipelinePath, connectionName, schema, schemas, !noColumns, environment, configFile, ingestrImport, destination)
 			}
 
 			if err != nil {
@@ -140,21 +142,21 @@ func ImportDatabase(isDebug *bool) *cli.Command {
 	}
 }
 
-// validateIngestrImportFlags validates the --as-ingestr / --destination flag
+// validateIngestrImportFlags validates the --ingestr / --destination flag
 // combination. The destination is required (and must be a known ingestr
 // destination platform) so the generated ingestr assets are runnable, and it
-// is rejected without --as-ingestr so a forgotten --as-ingestr does not
+// is rejected without --ingestr so a forgotten --ingestr does not
 // silently fall back to plain source placeholders.
-func validateIngestrImportFlags(asIngestr bool, destination string) error {
-	if !asIngestr {
+func validateIngestrImportFlags(ingestrImport bool, destination string) error {
+	if !ingestrImport {
 		if destination != "" {
-			return errors.New("--destination has no effect without --as-ingestr")
+			return errors.New("--destination has no effect without --ingestr")
 		}
 		return nil
 	}
 
 	if destination == "" {
-		return errors.New("--destination is required when using --as-ingestr")
+		return errors.New("--destination is required when using --ingestr")
 	}
 
 	if _, ok := pipeline.IngestrTypeConnectionMapping[destination]; !ok {
@@ -312,11 +314,11 @@ type importWarning struct {
 	message   string
 }
 
-func runImport(ctx context.Context, log logger.Logger, pipelinePath, connectionName, schema string, schemas []string, fillColumns bool, environment, configFile string, asIngestr bool, destination string) error {
+func runImport(ctx context.Context, log logger.Logger, pipelinePath, connectionName, schema string, schemas []string, fillColumns bool, environment, configFile string, ingestrImport bool, destination string) error {
 	fs := afero.NewOsFs()
 
-	log.Debugf("starting database import: connection=%s, schema=%q, schemas=%v, fillColumns=%v, environment=%q, asIngestr=%v, destination=%q",
-		connectionName, schema, schemas, fillColumns, environment, asIngestr, destination)
+	log.Debugf("starting database import: connection=%s, schema=%q, schemas=%v, fillColumns=%v, environment=%q, ingestr=%v, destination=%q",
+		connectionName, schema, schemas, fillColumns, environment, ingestrImport, destination)
 
 	conn, err := getConnectionFromConfigWithContext(ctx, environment, connectionName, fs, configFile)
 	if err != nil {
@@ -325,8 +327,8 @@ func runImport(ctx context.Context, log logger.Logger, pipelinePath, connectionN
 
 	log.Debugf("resolved connection type: %T", conn)
 
-	if asIngestr && !isMongoConnection(conn) {
-		return fmt.Errorf("--as-ingestr is currently only supported for MongoDB connections, but '%s' is not a MongoDB connection", connectionName)
+	if ingestrImport && !supportsIngestrSource(conn) {
+		return fmt.Errorf("connection '%s' cannot be used as an ingestr source", connectionName)
 	}
 
 	var summary *ansisql.DBDatabase
@@ -405,7 +407,7 @@ func runImport(ctx context.Context, log logger.Logger, pipelinePath, connectionN
 			fullName := fmt.Sprintf("%s.%s", schemaObj.Name, table.Name)
 			var createdAsset *pipeline.Asset
 			var warning string
-			if asIngestr {
+			if ingestrImport {
 				createdAsset = createIngestrAsset(assetsPath, schemaObj.Name, table.Name, connectionName, destination, table)
 			} else {
 				createdAsset, warning = createAsset(ctx, assetsPath, schemaObj.Name, table.Name, assetType, conn, fillColumns, table)
@@ -432,7 +434,7 @@ func runImport(ctx context.Context, log logger.Logger, pipelinePath, connectionN
 				}
 				existingAssets[assetName] = createdAsset
 				totalTables++
-			case asIngestr:
+			case ingestrImport:
 				// ingestr assets carry no columns, so there is nothing to merge
 				// into an existing asset; skip it without re-persisting to avoid
 				// a misleading "Merged" count on re-runs.
@@ -796,22 +798,16 @@ func createAsset(ctx context.Context, assetsPath, schemaName, tableName string, 
 	return asset, ""
 }
 
-// isMongoConnection reports whether the given connection is a MongoDB
-// connection (regular or Atlas), used to gate --as-ingestr support.
-func isMongoConnection(conn interface{}) bool {
-	switch conn.(type) {
-	case *mongo.DB, *mongoatlas.DB:
-		return true
-	default:
-		return false
-	}
+func supportsIngestrSource(conn any) bool {
+	_, ok := conn.(ingestruri.Connection)
+	return ok
 }
 
-// createIngestrAsset builds a runnable ingestr asset for a single MongoDB
-// collection. Running the generated asset replicates the collection into the
+// createIngestrAsset builds a runnable ingestr asset for a single database
+// table. Running the generated asset replicates the table into the
 // chosen destination. The asset name and file path follow the same lowercased
 // convention as createAsset, but source_table preserves the original database
-// and collection names because MongoDB identifiers are case-sensitive.
+// identifiers because some sources use case-sensitive names.
 func createIngestrAsset(assetsPath, schemaName, tableName, sourceConnection, destination string, table *ansisql.DBTable) *pipeline.Asset {
 	schemaFolder := filepath.Join(assetsPath, strings.ToLower(schemaName))
 	fileName := strings.ToLower(tableName) + ".asset.yml"
