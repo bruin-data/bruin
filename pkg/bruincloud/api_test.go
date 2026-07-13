@@ -801,3 +801,27 @@ func TestCreateDashboard(t *testing.T) {
 	assert.Equal(t, 9, dashboard.ID)
 	assert.Equal(t, "https://cloud.getbruin.com/acme/dashboards/9?mode=edit", dashboard.URL)
 }
+
+func TestUpdateDashboard(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPatch, r.Method)
+		assert.Equal(t, "/dashboards/9", r.URL.Path)
+
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, "Renamed", body["title"])
+		// omitted fields are left out so the server leaves them unchanged
+		_, hasVisibility := body["visibility"]
+		assert.False(t, hasVisibility)
+
+		w.WriteHeader(http.StatusOK)
+		title := "Renamed"
+		writeJSON(t, w, Dashboard{ID: 9, Title: &title, Visibility: "team", URL: "https://cloud.getbruin.com/acme/dashboards/9?mode=edit"})
+	})
+
+	dashboard, err := client.UpdateDashboard(t.Context(), 9, map[string]any{"title": "Renamed"})
+	require.NoError(t, err)
+	assert.Equal(t, 9, dashboard.ID)
+	assert.Equal(t, "Renamed", *dashboard.Title)
+}
