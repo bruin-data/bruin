@@ -228,7 +228,7 @@ func TestCloudDashboardsCommand_Help(t *testing.T) {
 	cmd := CloudDashboards()
 	require.NotNil(t, cmd)
 	assert.Equal(t, "dashboards", cmd.Name)
-	require.Len(t, cmd.Commands, 3)
+	require.Len(t, cmd.Commands, 4)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
@@ -237,6 +237,7 @@ func TestCloudDashboardsCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "list")
 	assert.Contains(t, subNames, "get")
 	assert.Contains(t, subNames, "create")
+	assert.Contains(t, subNames, "update")
 }
 
 func TestParseDashboardState(t *testing.T) {
