@@ -145,7 +145,6 @@ environments:
 Points to make:
 - `duckdb-default`: An ordinary local DuckDB file used as the *source* holding raw data before it's loaded into the lakehouse.
 - `ducklake-pg`: The lakehouse; the `lakehouse` block makes it DuckLake. `catalog` points at the Postgres container (`port: 5434` matches the Docker mapping). `storage` points at MinIO. Because it's S3-compatible you need `endpoint`, `url_style: path`, and `use_ssl: false` (the three fields for any non-AWS S3 backend over plain HTTP).
-- The Postgres credentials are `lakehouse` / `lakehouse` on purpose — not `ducklake`. Bruin masks connection secret values in run output, so if the password were `ducklake` (the same word as the schema), the logs would show the `ducklake` schema as `****`. Keeping the secret distinct from any identifier keeps the output readable.
 - Link to [catalog options](../../platforms/duckdb.md#catalog-options) and [storage options](../../platforms/duckdb.md#storage-options) for the full set.
 
 ## Step 4 — Configure the pipeline
