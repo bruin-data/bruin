@@ -13,12 +13,30 @@ import (
 	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
+	"github.com/fatih/color"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
 )
+
+func TestDisableColorIfRequested(t *testing.T) { //nolint:paralleltest // mutates global color.NoColor
+	previousNoColor := color.NoColor
+	t.Cleanup(func() {
+		color.NoColor = previousNoColor
+	})
+
+	color.NoColor = true
+	disableColorIfRequested(false)
+	assert.True(t, color.NoColor)
+
+	color.NoColor = false
+	printer := color.New(color.FgBlue)
+	disableColorIfRequested(true)
+	assert.True(t, color.NoColor)
+	assert.NotContains(t, printer.Sprint("asset output"), "\x1b[")
+}
 
 func TestClean(t *testing.T) {
 	t.Parallel()

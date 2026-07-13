@@ -14,6 +14,8 @@ This command is used to execute a Bruin pipeline or a specific asset within a pi
 bruin run [FLAGS] [optional path to the pipeline/asset]
 ```
 
+Bruin omits ANSI color codes when `--no-color` is passed, when the `NO_COLOR` environment variable is set, or when standard output is not a terminal.
+
 <img alt="Bruin - init" src="/chesspipeline.gif" style="margin: 10px;" />
 
 <style>

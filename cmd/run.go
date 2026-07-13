@@ -568,6 +568,12 @@ func setApplyIntervalModifiers(c *cli.Command) bool {
 	return applyIntervalModifiers
 }
 
+func disableColorIfRequested(noColor bool) {
+	if noColor {
+		color.NoColor = true
+	}
+}
+
 func Run(isDebug *bool) *cli.Command {
 	return &cli.Command{
 		Name:      "run",
@@ -735,6 +741,8 @@ func Run(isDebug *bool) *cli.Command {
 		DisableSliceFlagSeparator: true,
 		Action: func(ctx context.Context, c *cli.Command) error {
 			defer RecoverFromPanic()
+			noColor := c.Bool("no-color")
+			disableColorIfRequested(noColor)
 
 			logger := makeLogger(*isDebug)
 			if c.IsSet("use-pip") {
@@ -1169,7 +1177,6 @@ func Run(isDebug *bool) *cli.Command {
 				pipelineInfo.RunDownstreamTasks = true
 			}
 
-			noColor := c.Bool("no-color")
 			minimalLogs := c.Bool("minimal-logs")
 
 			// Detect the real terminal here, before logOutput swaps os.Stdout for
