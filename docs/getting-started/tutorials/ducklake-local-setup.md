@@ -33,20 +33,21 @@ A lakehouse stores data as open-format files (Parquet) on object storage, while 
 bruin init empty duckdb-ducklake
 ```
 
-Resulting structure (`.bruin.yml` is created at the repo root):
+Resulting structure — note that `.bruin.yml` (the connection/config file) is created at the **repo root**, one level above the pipeline folder:
 
 ```plaintext
-.bruin.yml
-duckdb-ducklake/
+.bruin.yml          # connections & config — repo root
+.gitignore
+duckdb-ducklake/    # the pipeline
 ├─ assets/
 └─ pipeline.yml
 ```
 
-Then `cd duckdb-ducklake`.
+Run every `bruin` command from this **repo root** (the directory that holds `.bruin.yml`).
 
 ## Step 2 — Start local infrastructure
 
-Create `duckdb-ducklake/docker-compose.yml`:
+Create `docker-compose.yml` at the repo root (next to `.bruin.yml`):
 
 ```yaml
 services:
@@ -230,10 +231,10 @@ Create `duckdb-ducklake/assets/orders_by_country.sql`:
 name: ducklake.orders_by_country
 type: duckdb.sql
 connection: ducklake-pg
-materialization:
-  type: table
 depends:
   - ducklake.orders
+materialization:
+  type: table
 @bruin */
 
 SELECT
@@ -256,15 +257,16 @@ duckdb-ducklake/
 │  ├─ raw_orders.asset.yml        # seed:      CSV -> duckdb-default
 │  ├─ orders.asset.yml            # ingestr:   duckdb-default -> lakehouse
 │  └─ orders_by_country.sql       # transform: lakehouse -> lakehouse
-├─ docker-compose.yml
 └─ pipeline.yml
+.bruin.yml                        # connections & config (repo root)
+docker-compose.yml                # local infra (repo root)
 ```
 
 ## Step 8 — Validate and run
 
 ```bash
-bruin validate .
-bruin run .
+bruin validate duckdb-ducklake
+bruin run duckdb-ducklake
 ```
 
 Note: assets run in dependency order (seed → ingest → transform).
