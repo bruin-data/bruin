@@ -9,7 +9,6 @@ import (
 	_ "github.com/bruin-data/bruin/internal/bootstrap"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	v "github.com/bruin-data/bruin/pkg/version"
-	"github.com/fatih/color"
 	"github.com/urfave/cli/v3"
 )
 
@@ -21,7 +20,6 @@ var (
 
 func main() {
 	isDebug := false
-	color.NoColor = false
 	var optOut bool
 	if os.Getenv("TELEMETRY_OPTOUT") != "" {
 		optOut = true
