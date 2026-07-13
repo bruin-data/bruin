@@ -223,6 +223,54 @@ func TestDB_GetColumns(t *testing.T) {
 	}
 }
 
+func TestDB_BuildTableExistsQuery(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		tableName string
+		want      string
+		wantError string
+	}{
+		{
+			name:      "schema and table",
+			tableName: "sales.orders",
+			want:      "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'sales' AND TABLE_NAME = 'orders'",
+		},
+		{
+			name:      "database schema and table",
+			tableName: "upstream.dev_sales.orders",
+			want:      "SELECT COUNT(*) FROM [upstream].INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'dev_sales' AND TABLE_NAME = 'orders'",
+		},
+		{
+			name:      "schema and table with single quotes",
+			tableName: "upstream.dev_o'brien.order's",
+			want:      "SELECT COUNT(*) FROM [upstream].INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'dev_o''brien' AND TABLE_NAME = 'order''s'",
+		},
+		{
+			name:      "invalid table name",
+			tableName: "database.schema.table.extra",
+			wantError: "must be in format",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			db := &DB{}
+			got, err := db.BuildTableExistsQuery(tt.tableName)
+			if tt.wantError != "" {
+				require.ErrorContains(t, err, tt.wantError)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestDB_GetColumnsForTable(t *testing.T) {
 	t.Parallel()
 

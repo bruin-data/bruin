@@ -116,6 +116,8 @@ jobs:
           done
       - name: Run integration tests
         run: make integration-test
+      - name: Run MSSQL developer environment integration test
+        run: make integration-test-mssql
   dockerBuild:
     runs-on: depot-ubuntu-latest
     name: Docker Build
