@@ -18,6 +18,12 @@ type IngestrTypeHintProvider interface {
 	IngestrTypeHints() map[string]string
 }
 
+// IngestrTypeWrapperProvider is an optional capability for destinations that use
+// transparent type wrappers (e.g. ClickHouse Nullable(T) / LowCardinality(T)).
+type IngestrTypeWrapperProvider interface {
+	IngestrTypeWrappers() map[string]bool
+}
+
 // TypeHintMapping maps portable / cross-platform column type aliases to ingestr
 // (dlt) types. Destination-specific aliases live on the connection via
 // IngestrTypeHintProvider. 'text' is the ingestr default when no hint is emitted.
@@ -215,13 +221,6 @@ var ingestrSizedTypes = map[string]bool{
 	"text": true,
 }
 
-// typeWrappers are parameterized types whose inner type should be resolved instead
-// of the wrapper itself (ClickHouse Nullable(T) / LowCardinality(T)).
-var typeWrappers = map[string]bool{
-	"nullable":       true,
-	"lowcardinality": true,
-}
-
 // TypeHintOverlayForConnection returns DB-specific type aliases when the
 // connection implements IngestrTypeHintProvider; otherwise nil.
 func TypeHintOverlayForConnection(conn any) map[string]string {
@@ -234,12 +233,22 @@ func TypeHintOverlayForConnection(conn any) map[string]string {
 	return nil
 }
 
+// TypeWrappersForConnection returns transparent type wrappers when the
+// connection implements IngestrTypeWrapperProvider; otherwise nil.
+func TypeWrappersForConnection(conn any) map[string]bool {
+	if conn == nil {
+		return nil
+	}
+	if p, ok := conn.(IngestrTypeWrapperProvider); ok {
+		return p.IngestrTypeWrappers()
+	}
+	return nil
+}
+
 // MergeTypeHints returns a copy of base with overlay entries applied. Overlay
 // keys are normalised the same way as column types. Overlay wins on conflict.
+// The returned map is always a clone so callers cannot mutate TypeHintMapping.
 func MergeTypeHints(base, overlay map[string]string) map[string]string {
-	if len(overlay) == 0 {
-		return base
-	}
 	merged := maps.Clone(base)
 	if merged == nil {
 		merged = make(map[string]string, len(overlay))
@@ -251,8 +260,9 @@ func MergeTypeHints(base, overlay map[string]string) map[string]string {
 }
 
 // resolveColumnTypeHint maps a declared column type to an ingestr hint, peeling
-// transparent wrappers and resolving parameterized bases (e.g. DateTime64(3)).
-func resolveColumnTypeHint(typ string, mapping map[string]string) (hint string, known bool, inlineLength string) {
+// destination-specific transparent wrappers and resolving parameterized bases
+// (e.g. DateTime64(3)).
+func resolveColumnTypeHint(typ string, mapping map[string]string, wrappers map[string]bool) (hint string, known bool, inlineLength string) {
 	typ = NormaliseColumnType(typ)
 	for {
 		if h, ok := mapping[typ]; ok {
@@ -263,7 +273,7 @@ func resolveColumnTypeHint(typ string, mapping map[string]string) (hint string, 
 			return "", false, ""
 		}
 		base = NormaliseColumnType(base)
-		if typeWrappers[base] {
+		if wrappers[base] {
 			typ = NormaliseColumnType(inner)
 			continue
 		}
@@ -280,11 +290,12 @@ func resolveColumnTypeHint(typ string, mapping map[string]string) (hint string, 
 // ColumnHints returns an ingestr compatible type hint string
 // that can be passed via the --column flag to the CLI.
 // overlay may be nil; when set, its aliases are merged over TypeHintMapping.
-func ColumnHints(cols []pipeline.Column, normaliseNames bool, overlay map[string]string) string {
+// wrappers may be nil; when set, those parameterized types peel to their inner type.
+func ColumnHints(cols []pipeline.Column, normaliseNames bool, overlay map[string]string, wrappers map[string]bool) string {
 	mapping := MergeTypeHints(TypeHintMapping, overlay)
 	hints := make([]string, 0)
 	for _, col := range cols {
-		hint, typeKnown, inlineLength := resolveColumnTypeHint(col.Type, mapping)
+		hint, typeKnown, inlineLength := resolveColumnTypeHint(col.Type, mapping, wrappers)
 
 		if !typeKnown && col.SourceColumn == "" {
 			continue
@@ -403,4 +414,7 @@ type ColumnHintOptions struct {
 	// TypeHintOverlay is an optional destination-specific alias map merged over
 	// TypeHintMapping (e.g. from IngestrTypeHintProvider on the dest connection).
 	TypeHintOverlay map[string]string
+	// TypeWrappers is an optional set of transparent parameterized type names
+	// (e.g. from IngestrTypeWrapperProvider) whose inner type should be resolved.
+	TypeWrappers map[string]bool
 }

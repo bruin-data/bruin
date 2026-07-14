@@ -110,8 +110,23 @@ func IngestrTypeHints() map[string]string {
 	}
 }
 
+// IngestrTypeWrappers are ClickHouse parameterized types whose inner type should
+// be resolved for ingestr --columns hints (e.g. Nullable(DateTime64(3))).
+func IngestrTypeWrappers() map[string]bool {
+	return map[string]bool{
+		"nullable":       true,
+		"lowcardinality": true,
+	}
+}
+
 // IngestrTypeHints implements the optional connection capability used by
 // pkg/python when building ingestr --columns hints for this destination.
 func (c *Client) IngestrTypeHints() map[string]string {
 	return IngestrTypeHints()
+}
+
+// IngestrTypeWrappers implements the optional connection capability used by
+// pkg/python when peeling destination-specific type wrappers.
+func (c *Client) IngestrTypeWrappers() map[string]bool {
+	return IngestrTypeWrappers()
 }

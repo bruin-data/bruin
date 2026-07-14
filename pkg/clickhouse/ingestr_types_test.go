@@ -12,19 +12,25 @@ import (
 func TestIngestrTypeHints_ClientImplementsProvider(t *testing.T) {
 	t.Parallel()
 
-	var provider python.IngestrTypeHintProvider = &Client{}
-	hints := provider.IngestrTypeHints()
+	var hintsProvider python.IngestrTypeHintProvider = &Client{}
+	hints := hintsProvider.IngestrTypeHints()
 	require.NotEmpty(t, hints)
 	assert.Equal(t, "timestamp", hints["datetime64"])
 	assert.Equal(t, "bigint", hints["uint64"])
 	assert.Equal(t, "tinyint", hints["int8"], "ClickHouse Int8 must override PostgreSQL int8→bigint")
 	assert.Equal(t, "bigint", hints["time"], "ClickHouse TIME is an Int64 alias")
+
+	var wrappersProvider python.IngestrTypeWrapperProvider = &Client{}
+	wrappers := wrappersProvider.IngestrTypeWrappers()
+	assert.True(t, wrappers["nullable"])
+	assert.True(t, wrappers["lowcardinality"])
 }
 
 func TestIngestrTypeHints_CoversClickHouseTypes(t *testing.T) {
 	t.Parallel()
 
 	hints := IngestrTypeHints()
+	wrappers := IngestrTypeWrappers()
 	cases := []struct {
 		declared string
 		want     string
@@ -103,7 +109,7 @@ func TestIngestrTypeHints_CoversClickHouseTypes(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.declared, func(t *testing.T) {
 			t.Parallel()
-			got := python.ColumnHints([]pipeline.Column{{Name: "c", Type: tc.declared}}, false, hints)
+			got := python.ColumnHints([]pipeline.Column{{Name: "c", Type: tc.declared}}, false, hints, wrappers)
 			assert.Equal(t, "c:"+tc.want, got)
 		})
 	}
@@ -120,17 +126,24 @@ func TestIngestrTypeHints_UsedAsColumnHintOverlay(t *testing.T) {
 		{Name: "flag", Type: "Nullable(Bool)"},
 	}
 
-	got := python.ColumnHints(cols, false, IngestrTypeHints())
+	got := python.ColumnHints(cols, false, IngestrTypeHints(), IngestrTypeWrappers())
 	assert.Equal(t, "id:bigint,created_at:timestamp,payload:json,name:text,flag:bool", got)
 }
 
 func TestTypeHintOverlayForConnection_FromClickHouseClient(t *testing.T) {
 	t.Parallel()
 
-	overlay := python.TypeHintOverlayForConnection(&Client{})
+	client := &Client{}
+	overlay := python.TypeHintOverlayForConnection(client)
 	require.NotNil(t, overlay)
 	assert.Equal(t, IngestrTypeHints(), overlay)
 
+	wrappers := python.TypeWrappersForConnection(client)
+	require.NotNil(t, wrappers)
+	assert.Equal(t, IngestrTypeWrappers(), wrappers)
+
 	assert.Nil(t, python.TypeHintOverlayForConnection(nil))
 	assert.Nil(t, python.TypeHintOverlayForConnection(struct{}{}))
+	assert.Nil(t, python.TypeWrappersForConnection(nil))
+	assert.Nil(t, python.TypeWrappersForConnection(struct{}{}))
 }

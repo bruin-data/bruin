@@ -240,6 +240,7 @@ func TestColumnHints(t *testing.T) {
 		columns        []pipeline.Column
 		normalizeNames bool
 		overlay        map[string]string
+		wrappers       map[string]bool
 		expected       string
 	}{
 		{
@@ -442,7 +443,20 @@ func TestColumnHints(t *testing.T) {
 				{Name: "c", Type: "Nullable(LowCardinality(timestamp))"},
 			},
 			normalizeNames: false,
-			expected:       "a:int,b:text(50),c:timestamp",
+			wrappers: map[string]bool{
+				"nullable":       true,
+				"lowcardinality": true,
+			},
+			expected: "a:int,b:text(50),c:timestamp",
+		},
+		{
+			name: "wrappers are not peeled without destination wrappers",
+			columns: []pipeline.Column{
+				{Name: "a", Type: "Nullable(integer)"},
+				{Name: "b", Type: "string"},
+			},
+			normalizeNames: false,
+			expected:       "b:text",
 		},
 		{
 			name: "destination overlay wins over defaults",
@@ -468,7 +482,7 @@ func TestColumnHints(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result := ColumnHints(tt.columns, tt.normalizeNames, tt.overlay)
+			result := ColumnHints(tt.columns, tt.normalizeNames, tt.overlay, tt.wrappers)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -491,10 +505,10 @@ func TestColumnHints_SizedTypes(t *testing.T) {
 		want := fmt.Sprintf("c:%s(50)", hint)
 		t.Run(typ, func(t *testing.T) {
 			t.Parallel()
-			inline := ColumnHints([]pipeline.Column{{Name: "c", Type: typ + "(50)"}}, false, nil)
+			inline := ColumnHints([]pipeline.Column{{Name: "c", Type: typ + "(50)"}}, false, nil, nil)
 			assert.Equal(t, want, inline, "inline length for %q", typ)
 
-			field := ColumnHints([]pipeline.Column{{Name: "c", Type: typ, Length: intPtr(50)}}, false, nil)
+			field := ColumnHints([]pipeline.Column{{Name: "c", Type: typ, Length: intPtr(50)}}, false, nil, nil)
 			assert.Equal(t, want, field, "length field for %q", typ)
 		})
 	}
@@ -722,11 +736,11 @@ func TestColumnHints_Normalization(t *testing.T) {
 	}
 
 	// Without normalization
-	result := ColumnHints(columns, false, nil)
+	result := ColumnHints(columns, false, nil, nil)
 	assert.Equal(t, "DateOfBirth:date", result)
 
 	// With normalization
-	result = ColumnHints(columns, true, nil)
+	result = ColumnHints(columns, true, nil, nil)
 	assert.Equal(t, "date_of_birth:date", result)
 }
 
