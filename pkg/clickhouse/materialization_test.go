@@ -51,9 +51,7 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 			query: "SELECT 1",
 			want: []string{
-				"CREATE TABLE my.__bruin_tmp_abcefghi PRIMARY KEY id AS SELECT 1",
-				"DROP TABLE IF EXISTS my.asset",
-				"RENAME TABLE my.__bruin_tmp_abcefghi TO my.asset",
+				"CREATE OR REPLACE TABLE my.asset PRIMARY KEY id AS SELECT 1",
 			},
 		},
 		{
@@ -74,9 +72,7 @@ func TestMaterializer_Render(t *testing.T) {
 			fullRefresh: true,
 			query:       "SELECT 1",
 			want: []string{
-				"CREATE TABLE my.__bruin_tmp_abcefghi PRIMARY KEY id AS SELECT 1",
-				"DROP TABLE IF EXISTS my.asset",
-				"RENAME TABLE my.__bruin_tmp_abcefghi TO my.asset",
+				"CREATE OR REPLACE TABLE my.asset PRIMARY KEY id AS SELECT 1",
 			},
 		},
 		{
@@ -207,7 +203,7 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 			query: "SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}'",
 			want: []string{
-				"DELETE FROM my.asset WHERE ts BETWEEN '{{start_timestamp}}' AND '{{end_timestamp}}'",
+				"DELETE FROM my.asset WHERE ts BETWEEN '{{ start_timestamp | date_format('%Y-%m-%dT%H:%M:%S.%f') }}' AND '{{ end_timestamp | date_format('%Y-%m-%dT%H:%M:%S.%f') }}'",
 				"INSERT INTO my.asset SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}'",
 			},
 		},

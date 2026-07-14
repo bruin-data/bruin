@@ -108,26 +108,13 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query string) ([]string, erro
 
 	query = strings.TrimSuffix(query, ";")
 
-	// Extract database name from task.Name to ensure temp table is created in the correct database
-	assetNameParts := strings.Split(task.Name, ".")
-	var tempTableName string
-	if len(assetNameParts) == 2 {
-		databaseName := assetNameParts[0]
-		tempTableName = databaseName + ".__bruin_tmp_" + helpers.PrefixGenerator()
-	} else {
-		// Fallback for tables without explicit database
-		tempTableName = "__bruin_tmp_" + helpers.PrefixGenerator()
-	}
-
 	return []string{
 		fmt.Sprintf(
-			"CREATE TABLE %s PRIMARY KEY %s AS %s",
-			tempTableName,
+			"CREATE OR REPLACE TABLE %s PRIMARY KEY %s AS %s",
+			task.Name,
 			task.ColumnNamesWithPrimaryKey()[0],
 			query,
 		),
-		"DROP TABLE IF EXISTS " + task.Name,
-		fmt.Sprintf("RENAME TABLE %s TO %s", tempTableName, task.Name),
 	}, nil
 }
 
@@ -144,8 +131,8 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) ([]string, erro
 		return nil, errors.New("time_granularity must be either 'date', or 'timestamp'")
 	}
 
-	startVar := "{{start_timestamp}}"
-	endVar := "{{end_timestamp}}"
+	startVar := "{{ start_timestamp | date_format('%Y-%m-%dT%H:%M:%S.%f') }}"
+	endVar := "{{ end_timestamp | date_format('%Y-%m-%dT%H:%M:%S.%f') }}"
 	if asset.Materialization.TimeGranularity == pipeline.MaterializationTimeGranularityDate {
 		startVar = "{{start_date}}"
 		endVar = "{{end_date}}"
