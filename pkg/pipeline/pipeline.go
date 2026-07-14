@@ -1228,6 +1228,7 @@ type Asset struct { //nolint:recvcheck
 	IntervalModifiers IntervalModifiers  `json:"interval_modifiers" yaml:"interval_modifiers,omitempty" mapstructure:"interval_modifiers"`
 	RerunCooldown     *int               `json:"rerun_cooldown,omitempty" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
 	Retries           *int               `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
+	Timeout           time.Duration      `json:"timeout,omitempty" yaml:"timeout,omitempty" mapstructure:"timeout"`
 	RetriesDelay      *int               `json:"retries_delay,omitempty" yaml:"-" mapstructure:"-"`
 	RefreshRestricted *bool              `json:"refresh_restricted,omitempty" yaml:"refresh_restricted,omitempty" mapstructure:"refresh_restricted"`
 	Notifications     *Notifications     `json:"notifications,omitempty" yaml:"notifications,omitempty" mapstructure:"notifications"`
@@ -2214,6 +2215,7 @@ type DefaultValues struct {
 	IntervalModifiers IntervalModifiers      `json:"interval_modifiers" yaml:"interval_modifiers" mapstructure:"interval_modifiers"`
 	RerunCooldown     *int                   `json:"rerun_cooldown,omitempty" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
 	Retries           *int                   `json:"retries,omitempty" yaml:"retries,omitempty" mapstructure:"retries"`
+	Timeout           time.Duration          `json:"timeout,omitempty" yaml:"timeout,omitempty" mapstructure:"timeout"`
 	RefreshRestricted *bool                  `json:"refresh_restricted,omitempty" yaml:"refresh_restricted,omitempty" mapstructure:"refresh_restricted"`
 	Notifications     *Notifications         `json:"notifications,omitempty" yaml:"notifications,omitempty" mapstructure:"notifications"`
 }
@@ -2257,6 +2259,7 @@ func (d *DefaultValues) UnmarshalYAML(value *yaml.Node) error {
 		IntervalModifiers: asset.IntervalModifiers,
 		RerunCooldown:     asset.RerunCooldown,
 		Retries:           asset.Retries,
+		Timeout:           asset.Timeout,
 		RefreshRestricted: asset.RefreshRestricted,
 		Notifications:     asset.Notifications,
 	}
@@ -3172,6 +3175,9 @@ func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 	}
 	if asset.Retries == nil && defaults.Retries != nil {
 		asset.Retries = cloneIntPtr(defaults.Retries)
+	}
+	if asset.Timeout == 0 {
+		asset.Timeout = defaults.Timeout
 	}
 	if asset.RefreshRestricted == nil && defaults.RefreshRestricted != nil {
 		asset.RefreshRestricted = cloneBoolPtr(defaults.RefreshRestricted)

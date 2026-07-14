@@ -280,6 +280,18 @@ The asset-level value is, in turn, the default for the asset's [quality checks](
 
 - **Type:** `Integer`
 
+## `timeout`
+
+Sets the timeout for an asset. The value uses Go duration syntax, so it can combine units such as `1h30m` and supports `ns`, `us`/`µs`, `ms`, `s`, `m`, and `h`.
+
+```yaml
+timeout: 1h30m
+```
+
+If omitted, the asset inherits `default.timeout` from `pipeline.yml` when one is configured.
+
+- **Type:** `String` (Go duration)
+
 ## `rerun_cooldown`
 
 Set a delay (in seconds) between retry attempts for failed assets. This helps prevent overwhelming downstream systems during failures and allows for temporary issues to resolve. If not specified, the asset inherits the pipeline's `rerun_cooldown` setting.

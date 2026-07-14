@@ -3,6 +3,7 @@ package pipeline_test
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -65,6 +66,7 @@ func Test_createTaskFromFile(t *testing.T) {
 				Description: "some description goes here",
 				Type:        "bq.sql",
 				Retries:     &retriesValue,
+				Timeout:     90 * time.Minute,
 				ExecutableFile: pipeline.ExecutableFile{
 					Name:    "test.sql",
 					Path:    path.AbsPathForTests(t, "testdata/comments/test.sql"),

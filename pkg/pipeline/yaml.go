@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/pkg/errors"
@@ -426,6 +427,7 @@ type taskDefinition struct {
 	Meta                  map[string]string `yaml:"meta"`
 	Metadata              map[string]string `yaml:"metadata"`
 	Retries               *int              `yaml:"retries"`
+	Timeout               time.Duration     `yaml:"timeout"`
 	RerunCooldown         *int              `yaml:"rerun_cooldown"`
 	RefreshRestricted     *bool             `yaml:"refresh_restricted,omitempty"`
 	FullRefreshRestricted *bool             `yaml:"full_refresh_restricted,omitempty"`
@@ -648,6 +650,7 @@ func taskDefinitionToAsset(definition taskDefinition) (*Asset, error) {
 		Meta:              definition.Meta,
 		Metadata:          definition.Metadata,
 		Retries:           definition.Retries,
+		Timeout:           definition.Timeout,
 		RerunCooldown:     definition.RerunCooldown,
 		RefreshRestricted: definition.refreshRestricted(),
 		Notifications:     notificationsOrNil(definition.Notifications),
