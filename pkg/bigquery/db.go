@@ -102,9 +102,9 @@ func NewDB(c *Config) (*Client, error) {
 	// For explicit credentials, create the client immediately
 	switch {
 	case c.CredentialsJSON != "":
-		options = append(options, option.WithCredentialsJSON([]byte(c.CredentialsJSON)))
+		options = append(options, option.WithAuthCredentialsJSON(option.ServiceAccount, []byte(c.CredentialsJSON)))
 	case c.CredentialsFilePath != "":
-		options = append(options, option.WithCredentialsFile(c.CredentialsFilePath))
+		options = append(options, option.WithAuthCredentialsFile(option.ServiceAccount, c.CredentialsFilePath))
 	case c.Credentials != nil:
 		options = append(options, option.WithCredentials(c.Credentials))
 	default:
@@ -167,9 +167,9 @@ func (d *Client) createClient(ctx context.Context) error {
 	if !d.config.UseApplicationDefaultCredentials {
 		switch {
 		case d.config.CredentialsJSON != "":
-			options = append(options, option.WithCredentialsJSON([]byte(d.config.CredentialsJSON)))
+			options = append(options, option.WithAuthCredentialsJSON(option.ServiceAccount, []byte(d.config.CredentialsJSON)))
 		case d.config.CredentialsFilePath != "":
-			options = append(options, option.WithCredentialsFile(d.config.CredentialsFilePath))
+			options = append(options, option.WithAuthCredentialsFile(option.ServiceAccount, d.config.CredentialsFilePath))
 		case d.config.Credentials != nil:
 			options = append(options, option.WithCredentials(d.config.Credentials))
 		default:
@@ -214,9 +214,9 @@ func (d *Client) NewDataTransferClient(ctx context.Context) (*datatransfer.Clien
 	if !d.config.UseApplicationDefaultCredentials {
 		switch {
 		case d.config.CredentialsJSON != "":
-			options = append(options, option.WithCredentialsJSON([]byte(d.config.CredentialsJSON)))
+			options = append(options, option.WithAuthCredentialsJSON(option.ServiceAccount, []byte(d.config.CredentialsJSON)))
 		case d.config.CredentialsFilePath != "":
-			options = append(options, option.WithCredentialsFile(d.config.CredentialsFilePath))
+			options = append(options, option.WithAuthCredentialsFile(option.ServiceAccount, d.config.CredentialsFilePath))
 		case d.config.Credentials != nil:
 			options = append(options, option.WithCredentials(d.config.Credentials))
 		default:
