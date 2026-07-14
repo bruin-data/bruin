@@ -269,6 +269,8 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 
 		sourceURI = parsedURI.String()
 
+		applyCDCStreamParameters(asset.Parameters)
+
 		// Auto-set merge strategy for CDC if not already set
 		if _, exists := asset.Parameters["incremental_strategy"]; !exists {
 			asset.Parameters["incremental_strategy"] = "merge"
@@ -324,6 +326,14 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		"--progress",
 		"log",
 	)
+
+	// ingestr serves the stream metrics over HTTP for the lifetime of the run,
+	// and rejects --metrics-addr unless --stream is set as well.
+	if isCDCAsset(asset) {
+		if metricsAddr, _ := asset.Parameters.GetString("cdc_stream_metrics_addr"); metricsAddr != "" {
+			baseArgs = append(baseArgs, "--metrics-addr", metricsAddr)
+		}
+	}
 
 	if executor.IsDebugMode(ctx) {
 		baseArgs = append(baseArgs, "--debug")
@@ -494,6 +504,22 @@ func applyMaterializationParameters(asset *pipeline.Asset) error {
 	}
 
 	return nil
+}
+
+// cdcStreamParameterAliases maps the cdc_stream_* parameters onto the generic
+// streaming parameters that carry the same ingestr flag. Emitting both would
+// pass the flag twice, so the cdc_stream_* value wins for a CDC asset.
+var cdcStreamParameterAliases = map[string]string{
+	"cdc_stream_flush_interval": "flush_interval",
+	"cdc_stream_flush_records":  "flush_records",
+}
+
+func applyCDCStreamParameters(params pipeline.ParameterMap) {
+	for alias, param := range cdcStreamParameterAliases {
+		if value, _ := params.GetString(alias); value != "" {
+			params[param] = value
+		}
+	}
 }
 
 func isCDCAsset(asset *pipeline.Asset) bool {

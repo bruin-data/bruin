@@ -202,6 +202,9 @@ CDC is enabled by setting `cdc: "true"` on an `ingestr` asset with a PostgreSQL 
 | `cdc_publication` | No | Name of the PostgreSQL publication to use |
 | `cdc_slot` | No | Name of the PostgreSQL replication slot to use |
 | `cdc_dest_schema` | No | Schema to use when running multi-table CDC |
+| `cdc_stream_metrics_addr` | No | Address to serve streaming metrics on, such as `127.0.0.1:6060`. Only valid when the asset also sets `stream: true` |
+| `cdc_stream_flush_interval` | No | How often buffered records are written to the destination, such as `30s`. Takes precedence over `flush_interval` |
+| `cdc_stream_flush_records` | No | Number of buffered records that triggers a write to the destination. Takes precedence over `flush_records` |
 | `source_table` | Yes | Source table in `schema.table` format, or `"*"` to replicate all tables in the publication |
 | `incremental_strategy` | No | Defaults to `"merge"` when CDC is enabled. CDC assets must use `"merge"`; Bruin rejects other strategies. |
 
@@ -250,6 +253,32 @@ parameters:
   destination: bigquery
   cdc: "true"
   cdc_mode: stream
+```
+
+#### Tuning and observing a stream
+The `cdc_stream_*` parameters configure a running stream. `cdc_stream_flush_interval` and `cdc_stream_flush_records` control how often buffered changes reach the destination, and `cdc_stream_metrics_addr` serves replication lag, rows synced, and the last synced timestamp over HTTP for as long as the stream runs. The metrics are [expvar](https://pkg.go.dev/expvar) variables served at `/debug/vars`, and Postgres reports its lag as `bytes_behind`: the WAL the source has produced but the replication slot has not confirmed as durable.
+
+Nothing is served unless `cdc_stream_metrics_addr` is set, and it requires `stream: true` — ingestr rejects the address otherwise.
+
+```yaml
+name: public.orders
+type: ingestr
+connection: bigquery
+
+parameters:
+  source_connection: my_pg
+  source_table: public.orders
+  destination: bigquery
+  cdc: "true"
+  cdc_mode: stream
+  stream: true
+  cdc_stream_flush_interval: 30s
+  cdc_stream_flush_records: 10000
+  cdc_stream_metrics_addr: 127.0.0.1:6060
+```
+
+```bash
+curl -s localhost:6060/debug/vars | jq '.ingestr_replication, .ingestr_stream_tables'
 ```
 
 #### Wildcard CDC — replicate all tables

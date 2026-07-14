@@ -91,6 +91,9 @@ parameters:
   cdc_grpc_host: string
   cdc_grpc_tls: string
   cdc_dest_schema: string
+  cdc_stream_metrics_addr: string
+  cdc_stream_flush_interval: string
+  cdc_stream_flush_records: integer
 ```
 
 ## Parameter reference
@@ -127,8 +130,8 @@ parameters:
 | `staging_dataset` | No | `--staging-dataset` | Dataset/schema to use for staging tables. |
 | `trim_whitespace` | No | `--trim-whitespace` | Trims leading and trailing whitespace from extracted string values when set to `true`. |
 | `stream` | No | `--stream` | Enables continuous ingestion for CDC and message-broker sources. |
-| `flush_interval` | No | `--flush-interval` | Flush interval for streaming mode, such as `30s`. |
-| `flush_records` | No | `--flush-records` | Number of buffered records that triggers a flush in streaming mode. |
+| `flush_interval` | No | `--flush-interval` | Flush interval for streaming mode, such as `30s`. CDC assets can set `cdc_stream_flush_interval` instead, which takes precedence. |
+| `flush_records` | No | `--flush-records` | Number of buffered records that triggers a flush in streaming mode. CDC assets can set `cdc_stream_flush_records` instead, which takes precedence. |
 | `enforce_schema` | No | `--columns` | When set to `true`, enforces the column types defined in the asset's `columns` section. Ingestr will create or update the destination table with the specified schema. |
 | `cdc` | No | source URI scheme | Enables Bruin's CDC URI handling for PostgreSQL, MySQL/MariaDB, Vitess, and PlanetScale sources when set to `"true"`. CDC assets must use `merge`; Bruin sets it automatically when omitted and rejects other strategies. |
 | `cdc_mode` | No | source URI query | CDC mode, either `stream` or `batch`. |
@@ -140,6 +143,9 @@ parameters:
 | `cdc_grpc_host` | No | source URI query | Vitess VStream gRPC host override. |
 | `cdc_grpc_tls` | No | source URI query | Vitess VStream TLS setting. |
 | `cdc_dest_schema` | No | source URI query | Destination schema used for multi-table CDC runs. |
+| `cdc_stream_metrics_addr` | No | `--metrics-addr` | Address on which a streaming CDC asset serves replication lag and rows-synced metrics at `/debug/vars`, such as `127.0.0.1:6060`. Requires `stream: true`. See [PostgreSQL CDC](../platforms/postgres.md#cdc-change-data-capture). |
+| `cdc_stream_flush_interval` | No | `--flush-interval` | Flush interval for a streaming CDC asset. Takes precedence over `flush_interval`. |
+| `cdc_stream_flush_records` | No | `--flush-records` | Buffered record count that triggers a flush for a streaming CDC asset. Takes precedence over `flush_records`. |
 
 ## Destination connections and strategies
 
