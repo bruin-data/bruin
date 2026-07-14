@@ -75,11 +75,11 @@ As a result of this command, Bruin will ingest data from the given MongoDB table
 
 > [!TIP]
 > Instead of writing one asset per collection by hand, you can scaffold them automatically with
-> [`bruin import database --as-ingestr`](/commands/import#mongodb). It scans the MongoDB connection
+> [`bruin import database --ingestr`](/commands/import#mongodb). It scans the MongoDB connection
 > and generates a runnable ingestr asset for every collection, so you can replicate the whole
 > database by running the generated pipeline:
 > ```bash
-> bruin import database --connection localMongo --as-ingestr --destination duckdb ./my-pipeline
+> bruin import database --connection localMongo --ingestr --destination duckdb ./my-pipeline
 > ```
 
 <img width="1017" alt="image" src="https://github.com/user-attachments/assets/2bad9131-baa1-4f20-8e3d-eed4329e7f90">

@@ -39,6 +39,28 @@ var supportedImportConnectionTypes = map[string]bool{
 	"mongo_atlas":           true,
 }
 
+// supportedIngestrImportConnectionTypes is intentionally explicit so a future
+// database connection added to supportedImportConnectionTypes is not offered
+// in ingestr mode until its connection implements ingestruri.Connection.
+var supportedIngestrImportConnectionTypes = map[string]bool{
+	"google_cloud_platform": true,
+	"snowflake":             true,
+	"postgres":              true,
+	"mssql":                 true,
+	"mysql":                 true,
+	"databricks":            true,
+	"duckdb":                true,
+	"motherduck":            true,
+	"clickhouse":            true,
+	"oracle":                true,
+	"athena":                true,
+	"synapse":               true,
+	"redshift":              true,
+	"sqlite":                true,
+	"mongo":                 true,
+	"mongo_atlas":           true,
+}
+
 const (
 	dbtuiStepConnection = iota
 	dbtuiStepLoading
@@ -174,13 +196,13 @@ func (d schemaCheckboxDelegate) Render(w io.Writer, m list.Model, index int, ite
 }
 
 type importDatabaseModel struct {
-	ctx          context.Context //nolint:containedctx // bubbletea pattern for async commands
-	pipelinePath string
-	environment  string
-	configFile   string
-	fillColumns  bool
-	asIngestr    bool
-	destination  string
+	ctx           context.Context //nolint:containedctx // bubbletea pattern for async commands
+	pipelinePath  string
+	environment   string
+	configFile    string
+	fillColumns   bool
+	ingestrImport bool
+	destination   string
 
 	step int
 
@@ -526,6 +548,9 @@ func (m *importDatabaseModel) loadDatabaseSummaryCmd() tea.Cmd {
 		if conn == nil {
 			return dbSummaryLoadedMsg{err: fmt.Errorf("connection '%s' not found", connName)}
 		}
+		if m.ingestrImport && !supportsIngestrSource(conn) {
+			return dbSummaryLoadedMsg{err: fmt.Errorf("connection '%s' cannot be used as an ingestr source", connName)}
+		}
 
 		summarizer, ok := conn.(interface {
 			GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error)
@@ -549,7 +574,7 @@ func (m *importDatabaseModel) executeImportCmd() tea.Cmd {
 	connName := m.selectedConnName
 	conn := m.conn
 	fillColumns := m.fillColumns
-	asIngestr := m.asIngestr
+	ingestrImport := m.ingestrImport
 	destination := m.destination
 	summary := m.dbSummary
 
@@ -594,7 +619,7 @@ func (m *importDatabaseModel) executeImportCmd() tea.Cmd {
 
 				var createdAsset *pipeline.Asset
 				var warning string
-				if asIngestr {
+				if ingestrImport {
 					createdAsset = createIngestrAsset(assetsPath, schema.Name, table.Name, connName, destination, table)
 				} else {
 					createdAsset, warning = createAsset(ctx, assetsPath, schema.Name, table.Name, assetType, conn, fillColumns, table)
@@ -618,7 +643,7 @@ func (m *importDatabaseModel) executeImportCmd() tea.Cmd {
 					}
 					existingAssets[assetName] = createdAsset
 					totalTables++
-				case asIngestr:
+				case ingestrImport:
 					// ingestr assets carry no columns, so there is nothing to
 					// merge into an existing asset; skip it without re-persisting
 					// to avoid a misleading "merged" count on re-runs.
@@ -651,7 +676,7 @@ func (m *importDatabaseModel) executeImportCmd() tea.Cmd {
 	}
 }
 
-func runImportDatabaseTUI(ctx context.Context, pipelinePath, environment, configFile string, fillColumns, asIngestr bool, destination string) error {
+func runImportDatabaseTUI(ctx context.Context, pipelinePath, environment, configFile string, fillColumns, ingestrImport bool, destination string) error {
 	fs := afero.NewOsFs()
 
 	repoRoot, err := git.FindRepoFromPath(".")
@@ -687,18 +712,13 @@ func runImportDatabaseTUI(ctx context.Context, pipelinePath, environment, config
 		if !supportedImportConnectionTypes[connType] {
 			continue
 		}
-		// --as-ingestr is only supported for MongoDB connections, so restrict
-		// the selectable connections to mongo / mongo_atlas in that mode.
-		if asIngestr && connType != "mongo" && connType != "mongo_atlas" {
+		if ingestrImport && !supportedIngestrImportConnectionTypes[connType] {
 			continue
 		}
 		connItems = append(connItems, importConnectionItem{name: name, connType: connType})
 	}
 
 	if len(connItems) == 0 {
-		if asIngestr {
-			return errors.New("--as-ingestr requires a MongoDB connection, but none were found")
-		}
 		return errors.New("no database connections found that support import")
 	}
 
@@ -719,17 +739,17 @@ func runImportDatabaseTUI(ctx context.Context, pipelinePath, environment, config
 	connList.Styles.Title = dbtuiHeaderStyle
 
 	model := &importDatabaseModel{
-		ctx:          ctx,
-		pipelinePath: pipelinePath,
-		environment:  environment,
-		configFile:   configFile,
-		fillColumns:  fillColumns,
-		asIngestr:    asIngestr,
-		destination:  destination,
-		step:         dbtuiStepConnection,
-		cfg:          cfg,
-		connList:     connList,
-		connItems:    connItems,
+		ctx:           ctx,
+		pipelinePath:  pipelinePath,
+		environment:   environment,
+		configFile:    configFile,
+		fillColumns:   fillColumns,
+		ingestrImport: ingestrImport,
+		destination:   destination,
+		step:          dbtuiStepConnection,
+		cfg:           cfg,
+		connList:      connList,
+		connItems:     connItems,
 	}
 
 	p := tea.NewProgram(model, tea.WithAltScreen())
