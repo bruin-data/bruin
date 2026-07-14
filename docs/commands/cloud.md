@@ -638,6 +638,26 @@ bruin cloud dashboards create --title "Q1 Revenue" --visibility team --state '{"
 bruin cloud dashboards create --title "Q1 Revenue" --state-file ./dashboard.json
 ```
 
+#### `update`
+
+Update an existing dashboard's title, visibility, or definition. Only the flags
+you pass are changed. Like `create`, a new definition is written to the
+dashboard's **draft** — never published automatically; publish it from the Bruin
+Cloud UI. Changing visibility requires manage-access (the dashboard creator or a
+team admin).
+
+```bash
+# Rename
+bruin cloud dashboards update --dashboard-id 42 --title "Q1 Revenue (final)"
+
+# Replace the definition, inline or from a file
+bruin cloud dashboards update --dashboard-id 42 --state '{"widgets":[]}'
+bruin cloud dashboards update --dashboard-id 42 --state-file ./dashboard.json
+
+# Change visibility
+bruin cloud dashboards update --dashboard-id 42 --visibility team
+```
+
 ---
 
 ## Common Workflows

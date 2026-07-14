@@ -84,6 +84,16 @@ func (m *mockConnectionFetcher) GetConnection(name string) any {
 	return get.(SfClient)
 }
 
+func (m *mockConnectionFetcher) GetSfConnectionWithWarehouse(name, warehouse string) (SfClient, error) {
+	args := m.Called(name, warehouse)
+	get := args.Get(0)
+	if get == nil {
+		return nil, args.Error(1)
+	}
+
+	return get.(SfClient), args.Error(1)
+}
+
 func TestAcceptedValuesCheck_Check(t *testing.T) {
 	t.Parallel()
 

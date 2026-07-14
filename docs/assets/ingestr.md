@@ -1,6 +1,6 @@
 # Ingestr Assets
 
-[Ingestr](https://github.com/bruin-data/ingestr) is a CLI tool that allows you to easily move data between platforms. Bruin supports `ingestr` natively as an asset type.
+[Ingestr](https://github.com/bruin-data/ingestr) is a CLI tool that allows you to move data between platforms. Bruin supports `ingestr` natively as an asset type.
 
 Using Ingestr, you can move data from:
 
@@ -21,14 +21,22 @@ Using Ingestr, you can move data from:
 
 to your data warehouses:
 
+* AWS Athena
 * Google BigQuery
+* ClickHouse
+* Databricks
+* DuckDB
+* Microsoft SQL Server
+* Oracle
+* Postgres
+* StarRocks
 * Snowflake
 * AWS Redshift
 * Azure Synapse
-* Postgres
+* other ingestr destinations when the asset points at an explicit Bruin connection
 
 > [!INFO]
-> You can read more about the capabilities of ingestr [in its documentation](https://getbruin.com/docs/ingestr/).
+> See the ingestr [platform catalog](https://getbruin.com/docs/ingestr/supported-sources/platforms.html), [ingest command reference](https://getbruin.com/docs/ingestr/commands/ingest.html), and [incremental loading guide](https://getbruin.com/docs/ingestr/getting-started/incremental-loading.html) for the upstream source, destination, and strategy behavior.
 
 ## Asset Structure
 
@@ -47,14 +55,15 @@ parameters:
   source: string # optional, used when inferring the source from connection is not enough, e.g. GCP connection + GSheets source
   source_connection: string
   source_table: string
-  destination: bigquery | snowflake | redshift | synapse
+  destination: string # logical destination type; required unless connection or destination_connection is set
+  destination_connection: string # optional, used instead of destination default connection when connection is not set
   
   # optional
-  version: v0 | v1 | v1.x.y
-  incremental_strategy: replace | append | merge | delete+insert # legacy alternative to materialization.strategy
+  version: v0 | v1 | vMAJOR.MINOR.PATCH
+  incremental_strategy: replace | append | merge | delete+insert | truncate+insert # legacy alternative to materialization.strategy
   incremental_key: string # legacy alternative to materialization.incremental_key
   schema_contract: evolve | freeze | discard_row | discard_value
-  schema_naming: auto | direct | snake_case
+  schema_naming: auto | default | direct | snake_case
   sql_backend: pyarrow | sqlalchemy
   page_size: integer
   loader_file_format: jsonl | csv | parquet
@@ -72,6 +81,16 @@ parameters:
   flush_interval: string
   flush_records: integer
   enforce_schema: true|false # Will ensure that the columns defined in the asset are present in the destination and with the desired types (see https://getbruin.com/docs/bruin/assets/columns.html)
+  cdc: "true"|"false"
+  cdc_mode: stream | batch
+  cdc_publication: string
+  cdc_slot: string
+  cdc_server_id: string
+  cdc_tls: string
+  cdc_grpc_port: string
+  cdc_grpc_host: string
+  cdc_grpc_tls: string
+  cdc_dest_schema: string
 ```
 
 ## Parameter reference
@@ -83,10 +102,11 @@ parameters:
 | `source` | No | _n/a_ | Overrides the inferred source type. For example, set `gsheets` when reusing a BigQuery connection for Google Sheets. |
 | `source_table` | Yes | `--source-table` | Table, sheet, or resource identifier to pull from the source. |
 | `file_type` | No | `--source-table` suffix | Appended to the `source_table` as `table#type` for connectors that need a file format hint (`csv`, `jsonl`, `parquet`). |
-| `version` | No | _n/a_  | Selects the version of ingestr to install and use.. Valid options are `v1` (latest), `v0` (legacy) or `v1.x.y` (full version specifer) | 
+| `version` | No | _n/a_ | Selects the version of ingestr to install and use. Valid options are bare family markers such as `v1` or `v0`, or a full version pin such as `v1.0.71`. |
 | `materialization` | No | `--incremental-*`, `--partition-by`, `--cluster-by` | Preferred way to define destination write behavior. Supports `type: table` with `create+replace`, `append`, `merge`, `delete+insert`, and `truncate+insert`. |
-| `destination` | Yes | `--dest-uri` | Logical destination used to select the target connection; Bruin converts it into the URI supplied to Ingestr. |
-| `incremental_strategy` | No | `--incremental-strategy` | Passes the incremental loading strategy (`replace`, `append`, `merge`, `delete+insert`) to Ingestr. |
+| `destination` | Unless `connection` or `destination_connection` is set | _n/a_ | Logical destination type used for default connection inference. When `connection` and `destination_connection` are omitted, Bruin uses this value to choose the pipeline default destination connection. |
+| `destination_connection` | No | _n/a_ | Named destination connection to use when `connection` is omitted. This overrides default connection inference from `destination`. |
+| `incremental_strategy` | No | `--incremental-strategy` | Passes the incremental loading strategy (`replace`, `append`, `merge`, `delete+insert`, or `truncate+insert`) to Ingestr. Prefer `materialization.strategy` for new assets. |
 | `incremental_key` | No | `--incremental-key` | Column that determines incremental progress. When the column is defined with type `date`, Bruin also forwards it through the `--columns` option so Ingestr treats it as a date field. |
 | `partition_by` | No | `--partition-by` | Comma-separated list of destination columns to partition by. |
 | `cluster_by` | No | `--cluster-by` | Comma-separated list of destination clustering keys. |
@@ -110,6 +130,75 @@ parameters:
 | `flush_interval` | No | `--flush-interval` | Flush interval for streaming mode, such as `30s`. CDC assets can set `cdc_stream_flush_interval` instead, which takes precedence. |
 | `flush_records` | No | `--flush-records` | Number of buffered records that triggers a flush in streaming mode. CDC assets can set `cdc_stream_flush_records` instead, which takes precedence. |
 | `enforce_schema` | No | `--columns` | When set to `true`, enforces the column types defined in the asset's `columns` section. Ingestr will create or update the destination table with the specified schema. |
+| `cdc` | No | source URI scheme | Enables Bruin's CDC URI handling for PostgreSQL, MySQL/MariaDB, Vitess, and PlanetScale sources when set to `"true"`. CDC assets must use `merge`; Bruin sets it automatically when omitted and rejects other strategies. |
+| `cdc_mode` | No | source URI query | CDC mode, either `stream` or `batch`. |
+| `cdc_publication` | No | source URI query | PostgreSQL publication name. |
+| `cdc_slot` | No | source URI query | PostgreSQL replication slot name. |
+| `cdc_server_id` | No | source URI query | MySQL-family binlog replication server ID. |
+| `cdc_tls` | No | source URI query | MySQL-family CDC TLS setting. |
+| `cdc_grpc_port` | No | source URI query | Vitess VStream gRPC port override. |
+| `cdc_grpc_host` | No | source URI query | Vitess VStream gRPC host override. |
+| `cdc_grpc_tls` | No | source URI query | Vitess VStream TLS setting. |
+| `cdc_dest_schema` | No | source URI query | Destination schema used for multi-table CDC runs. |
+
+## Destination connections and strategies
+
+Bruin resolves the destination connection in this order:
+
+1. `connection` on the asset, when set.
+2. `parameters.destination_connection`, when set.
+3. The pipeline default connection for `parameters.destination`.
+
+When Bruin infers a destination connection from `parameters.destination`, the built-in destination values are `athena`, `bigquery`, `clickhouse`, `databricks`, `doris`, `duckdb`, `dynamodb`, `elasticsearch`, `gsheets`, `motherduck`, `mssql`, `oracle`, `postgres`, `redshift`, `snowflake`, `starrocks`, `synapse`, and `vertica`. Other ingestr destinations can still be used when you set `connection` or `destination_connection` to a compatible Bruin connection.
+
+Bruin forwards these write strategies to ingestr:
+
+| Bruin configuration | Ingestr strategy |
+| --- | --- |
+| `materialization.strategy: create+replace` | `replace` |
+| `materialization.strategy: append` | `append` |
+| `materialization.strategy: merge` | `merge` |
+| `materialization.strategy: delete+insert` | `delete+insert` |
+| `materialization.strategy: truncate+insert` | `truncate+insert` |
+| `parameters.incremental_strategy` | Passed through as-is |
+
+Use `materialization.incremental_key` or `parameters.incremental_key` only with `append`, `merge`, and `delete+insert`. `merge` requires primary keys, supplied either by ingestr source metadata/schema or by asset columns marked `primary_key: true`; CDC assets determine keys from the source. `truncate+insert` is accepted by Bruin, but ingestr will fail the run if the selected destination cannot truncate tables. Ingestr's `scd2` strategy is not a supported Bruin ingestr asset materialization strategy.
+
+Destination support depends on ingestr's destination implementation:
+
+| Destination / scheme | Bruin can infer default connection from `destination` | Supported strategies in Bruin ingestr assets |
+| --- | --- | --- |
+| Athena / `athena` | Yes | `replace`, `append` |
+| BigQuery / `bigquery` | Yes | `replace`, `append`, `merge`, `delete+insert`, `truncate+insert` |
+| Blob storage / `s3`, `gcs`, `adls`, `abfs`, etc. | No, set `connection` | `replace`, `append` |
+| Cassandra / `cassandra` | No, set `connection` | `replace`, `append`, `merge`, `truncate+insert` |
+| ClickHouse / `clickhouse` | Yes | `replace`, `append`, `merge`, `delete+insert`, `truncate+insert` |
+| CrateDB / `cratedb` | No, set `connection` | `replace`, `append`, `merge`, `truncate+insert` |
+| CSV, JSONL, Parquet / `csv`, `jsonl`, `parquet` | No, set `connection` | `replace`, `append` |
+| Databricks / `databricks` | Yes | `replace`, `append`, `merge`, `delete+insert`, `truncate+insert` |
+| DuckDB, MotherDuck / `duckdb`, `motherduck`, `md` | Yes for `duckdb` and `motherduck` | `replace`, `append`, `merge`, `delete+insert`, `truncate+insert` |
+| DynamoDB / `dynamodb` | Yes | `replace`, `append`, `merge` |
+| Elasticsearch / `elasticsearch` | Yes | `replace`, `append` |
+| Fabric / `fabric` | No, set `connection` | `replace`, `append`, `merge`, `delete+insert`, `truncate+insert` |
+| Google Sheets / `gsheets` | Yes | `replace`, `append` |
+| Iceberg / `iceberg`, `iceberg+rest`, etc. | No, set `connection` | `replace`, `append`, `merge`, `delete+insert`, `truncate+insert` |
+| MaxCompute / `maxcompute`, `odps` | No, set `connection` | `replace`, `append`, `truncate+insert` without primary keys |
+| MongoDB / `mongodb`, `mongodb+srv` | No, set `connection` | `replace`, `append`, `merge` |
+| MS SQL Server / `mssql` | Yes | `replace`, `append`, `merge`, `delete+insert`, `truncate+insert` |
+| MySQL, Vitess, PlanetScale / `mysql`, `vitess`, `ps_mysql` | No, set `connection` | `replace`, `append`, `merge`, `delete+insert`, `truncate+insert` |
+| OneLake / `onelake` | No, set `connection` | `replace`, `append`, `merge`, `delete+insert` |
+| Oracle / `oracle` | Yes | `replace`, `append`, `merge`, `delete+insert`, `truncate+insert` |
+| PostgreSQL / `postgres` | Yes | `replace`, `append`, `merge`, `delete+insert`, `truncate+insert` |
+| Redshift / `redshift` | Yes | `replace`, `append`, `merge`, `delete+insert`, `truncate+insert` |
+| Snowflake / `snowflake` | Yes | `replace`, `append`, `merge`, `delete+insert`, `truncate+insert` |
+| SQLite / `sqlite` | No, set `connection` | `replace`, `append`, `merge`, `delete+insert`, `truncate+insert` |
+| StarRocks / `starrocks` | Yes | `replace`, `append`, `merge` |
+| Synapse / `synapse` | Yes | `replace`, `append`, `merge`, `delete+insert`, `truncate+insert` |
+| Trino / `trino` | No, set `connection` | `replace`, `append`, `merge` |
+
+For `truncate+insert`, ingestr truncates the target table before loading new rows. If primary keys are configured, ingestr also needs destination merge support to deduplicate rows from staging. The Bruin CLI can infer default connections for `doris` and `vertica`, but the current ingestr source does not register `doris://` or `vertica://` destinations; use native Bruin assets for those platforms unless your ingestr version adds destination support.
+
+Each source-specific ingestion page in this documentation lists that source's supported tables with primary keys, incremental keys, and default incremental strategies. The upstream ingestr docs remain the source of truth for destination-specific strategy limits.
 
 ### Column metadata
 
@@ -169,7 +258,7 @@ This example shows how to use `updated_at` column to incrementally load the data
 name: raw.transactions
 type: ingestr
 parameters:
-  source_connection: mysql_prod
+  source_connection: mssql_prod
   source_table: dbo.transactions
   destination: snowflake
 materialization:
@@ -227,3 +316,21 @@ columns:
 ```
 
 When `enforce_schema: true` is set, Bruin passes the column type hints to Ingestr via the `--columns` flag, ensuring the destination table schema matches your definition.
+
+#### Sized string types
+
+You can give a string column an optional length to create a bounded column instead of an unbounded one. Set the length inline in the `type` or with the `length` field (requires `enforce_schema: true`):
+
+```yaml
+parameters:
+  enforce_schema: "true"
+
+columns:
+  - name: name
+    type: varchar(100)
+  - name: email
+    type: string
+    length: 255
+```
+
+If you set both, the inline length wins. A string type without a length creates an unbounded column.

@@ -53,8 +53,8 @@ table td:first-child {
 | `--connection`, `-c` | string | - | **Required.** Name of the connection to use as defined in `.bruin.yml` (or other [secrets backend](../secrets/overview.md)) |
 | `--schema`, `-s` | string | - | Filter by specific schema name |
 | `--no-columns`, `-n` | bool | `false` | Skip filling column metadata from database schema |
-| `--as-ingestr` | bool | `false` | Generate runnable [ingestr](../assets/ingestr.md) assets that replicate the source instead of source placeholders. Currently MongoDB only; requires `--destination` |
-| `--destination` | string | - | Destination platform for `--as-ingestr` assets (e.g. `duckdb`, `postgres`, `bigquery`, `snowflake`) |
+| `--ingestr` | bool | `false` | Generate runnable [ingestr](../assets/ingestr.md) assets that replicate the source instead of source placeholders. `--as-ingestr` is retained as an alias; requires `--destination` |
+| `--destination` | string | - | Destination platform for `--ingestr` assets (e.g. `duckdb`, `postgres`, `bigquery`, `snowflake`) |
 | `--environment`, `--env` | string | - | Target environment name as defined in `.bruin.yml` |
 | `--config-file` | string | - | Path to the `.bruin.yml` file. Can also be set via `BRUIN_CONFIG_FILE` environment variable |
 
@@ -72,18 +72,43 @@ table td:first-child {
 - **MS SQL Server** → `mssql`
 - **MongoDB** → `mongo`, `mongo_atlas`
 
+### Importing as ingestr assets
+
+Use `--ingestr` with `--destination` to generate executable ingestr assets for the discovered tables instead of metadata-only source assets. This works with every database connection supported by `import database` that can be used as an ingestr source.
+
+For example, the following command scans `postgres-source` and creates assets that copy its tables directly into the pipeline's default DuckDB connection:
+
+```bash
+bruin import database --connection postgres-source --ingestr --destination duckdb ./my-pipeline
+```
+
+For a source table named `public.Users`, it writes `assets/public/users.asset.yml`:
+
+```yaml
+name: public.users
+type: ingestr
+parameters:
+  source_connection: postgres-source
+  source_table: public.Users
+  destination: duckdb
+```
+
+The destination connection is resolved from the pipeline's default connection for the selected destination platform. Running the pipeline then transfers each source table directly to the identically named destination table. The source schema and table spelling is preserved in `source_table`, while the Bruin asset name and destination table name use the import command's existing lowercase convention.
+
+`--destination` is required and must be a supported ingestr destination. Passing it without `--ingestr` is rejected. Re-running an ingestr import skips assets that already exist instead of overwriting them. The older `--as-ingestr` spelling remains available as an alias for compatibility.
+
 #### MongoDB
 
 MongoDB is schemaless and has no `database → schema → table` hierarchy, so it maps as **database → schema** and **collection → table**. The import scans every database on the server (excluding the internal `admin`, `local`, and `config` databases) and creates one `mongo.source` asset per collection under `assets/<database>/`. Use `--schema <database>` to import a single database.
 
-Because collections have no fixed schema, imported MongoDB assets are created **without columns** — they are name + metadata stubs (the `--no-columns` flag has no additional effect). You can add column definitions yourself afterwards, for example when turning a collection into an `ingestr` asset, where columns drive schema enforcement, masking, and primary keys.
+Because collections have no fixed schema, regular imported MongoDB assets are created **without columns** — they are name + metadata stubs (the `--no-columns` flag has no additional effect). You can add column definitions yourself afterwards, where columns drive schema enforcement, masking, and primary keys.
 
-##### Replicating MongoDB with `--as-ingestr`
+##### Replicating MongoDB with `--ingestr`
 
-A `mongo.source` asset is a metadata placeholder and is **not runnable** on its own (MongoDB is not SQL). To generate assets that actually replicate the data, add `--as-ingestr` together with a `--destination` platform. Instead of `mongo.source` placeholders, each collection becomes a runnable [ingestr](../assets/ingestr.md) asset:
+A `mongo.source` asset is a metadata placeholder and is **not runnable** on its own (MongoDB is not SQL). Use the general [ingestr import mode](#importing-as-ingestr-assets) to make each collection a runnable asset instead:
 
 ```bash
-bruin import database --connection localMongo --as-ingestr --destination duckdb ./my-pipeline
+bruin import database --connection localMongo --ingestr --destination duckdb ./my-pipeline
 ```
 
 For a database `myDB` with a `Users` collection this writes `assets/mydb/users.asset.yml`:
@@ -97,12 +122,7 @@ parameters:
   destination: duckdb
 ```
 
-Running the pipeline (`bruin run ./my-pipeline`) then replicates every collection into the destination via ingestr. The destination *connection* is resolved from the pipeline's default connection for that platform. Notes:
-
-- `--destination` is **required** with `--as-ingestr` and must be a supported ingestr destination (e.g. `duckdb`, `postgres`, `bigquery`, `snowflake`, `redshift`, `clickhouse`). Passing `--destination` without `--as-ingestr` is rejected so a forgotten `--as-ingestr` does not silently produce `mongo.source` placeholders.
-- Re-running the import skips collections whose assets already exist (it never overwrites them); the summary reports how many were skipped.
-- `--as-ingestr` is currently **MongoDB only**; using it with a non-MongoDB connection is rejected. In the interactive TUI (when `--connection` is omitted) only MongoDB connections are offered.
-- The asset name and file path are lowercased, but `source_table` preserves the original database/collection casing because MongoDB identifiers are case-sensitive.
+The asset name and file path are lowercased, but `source_table` preserves the original database/collection casing because MongoDB identifiers are case-sensitive.
 
 ### How It Works
 
@@ -155,15 +175,15 @@ Import using a specific environment configuration:
 bruin import database --connection snowflake-prod --environment production ./my-pipeline
 ```
 
-#### Replicate MongoDB as ingestr assets
+#### Replicate a database as ingestr assets
 
-Generate runnable ingestr assets for every collection so the database can be replicated into a destination (MongoDB only):
+Generate runnable ingestr assets for every discovered table so the database can be replicated into a destination:
 
 ```bash
-bruin import database --connection localMongo --as-ingestr --destination duckdb ./my-pipeline
+bruin import database --connection postgres-source --ingestr --destination duckdb ./my-pipeline
 ```
 
-See [MongoDB](#mongodb) above for the generated asset structure.
+See [Importing as ingestr assets](#importing-as-ingestr-assets) above for the generated asset structure.
 
 ### Generated Asset Structure
 

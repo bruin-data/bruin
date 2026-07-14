@@ -49,7 +49,7 @@ parameters:
 
 - `source_connection`: name of the Zoom connection defined in `.bruin.yml`.
 - `source_table`: Zoom table to ingest.
-- `destination`: name of the destination connection.
+- `destination`: The destination platform/type, for example `duckdb`.
 
 ## Available Source Tables
 

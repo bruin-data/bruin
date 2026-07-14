@@ -663,6 +663,17 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "boost_history", PrimaryKey: "id", IncKey: "createdTime", IncStrategy: "merge"},
 	},
 
+	// Amplitude - Analytics
+	"amplitude": {
+		{Name: "events", PrimaryKey: "uuid", IncKey: "event_time", IncStrategy: "merge"},
+		{Name: "cohorts", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "annotations", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "event_types", PrimaryKey: "event_type", IncKey: "", IncStrategy: "replace"},
+		{Name: "event_categories", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "event_properties", PrimaryKey: "event_property", IncKey: "", IncStrategy: "replace"},
+		{Name: "user_properties", PrimaryKey: "user_property", IncKey: "", IncStrategy: "replace"},
+	},
+
 	// Mixpanel - Analytics
 	"mixpanel": {
 		{Name: "events", PrimaryKey: "distinct_id", IncKey: "time", IncStrategy: "merge"},

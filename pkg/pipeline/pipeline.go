@@ -261,6 +261,7 @@ var defaultMapping = map[string]string{
 	"kinesis":               "kinesis-default",
 	"linear":                "linear-default",
 	"linkedinads":           "linkedinads-default",
+	"amplitude":             "amplitude-default",
 	"mailchimp":             "mailchimp-default",
 	"manifold":              "manifold-default",
 	"mixpanel":              "mixpanel-default",
@@ -610,6 +611,10 @@ type Materialization struct {
 	ClusterBy       []string                       `json:"cluster_by" yaml:"cluster_by,omitempty" mapstructure:"cluster_by"`
 	IncrementalKey  string                         `json:"incremental_key" yaml:"incremental_key,omitempty" mapstructure:"incremental_key"`
 	TimeGranularity MaterializationTimeGranularity `json:"time_granularity" yaml:"time_granularity,omitempty" mapstructure:"time_granularity"`
+}
+
+func (m Materialization) IsSCD2() bool {
+	return m.Strategy == MaterializationStrategySCD2ByColumn || m.Strategy == MaterializationStrategySCD2ByTime
 }
 
 func (m Materialization) MarshalJSON() ([]byte, error) {

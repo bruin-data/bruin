@@ -46,6 +46,20 @@ func (m *mockConnectionInstance) GetDatabaseSummary(ctx context.Context) (*ansis
 	return args.Get(0).(*ansisql.DBDatabase), args.Error(1)
 }
 
+type mockTableCheckingConnectionInstance struct {
+	mockConnectionInstance
+}
+
+func (m *mockTableCheckingConnectionInstance) BuildTableExistsQuery(tableName string) (string, error) {
+	args := m.Called(tableName)
+	return args.String(0), args.Error(1)
+}
+
+func (m *mockTableCheckingConnectionInstance) Select(ctx context.Context, q *query.Query) ([][]interface{}, error) {
+	args := m.Called(ctx, q)
+	return args.Get(0).([][]interface{}), args.Error(1)
+}
+
 type mockConnectionWithoutDatabaseSummary struct{}
 
 func TestDevEnvQueryModifier_Modify(t *testing.T) {
@@ -342,6 +356,74 @@ func TestDevEnvQueryModifier_Modify_ThreePartNames(t *testing.T) {
 						"myschema.mytable": "dev_myschema.mytable",
 					},
 				).Return("select * from mydb.myschema.mytable", nil)
+			},
+		},
+		{
+			name:        "3-part cross-database name rewrites when dev table exists",
+			selectedEnv: &config.Environment{SchemaPrefix: "dev_"},
+			inputQuery:  "select * from upstreamdb.myschema.mytable",
+			outputQuery: "select * from upstreamdb.dev_myschema.mytable",
+			setupFields: func(f *fields) {
+				c := new(mockTableCheckingConnectionInstance)
+				c.On("GetDatabaseSummary", mock.Anything).Return(&ansisql.DBDatabase{
+					Name:    "currentdb",
+					Schemas: []*ansisql.DBSchema{},
+				}, nil)
+				c.On("BuildTableExistsQuery", "upstreamdb.dev_myschema.mytable").
+					Return("table exists query", nil)
+				c.On("Select", mock.Anything, &query.Query{Query: "table exists query"}).
+					Return([][]interface{}{{int64(1)}}, nil)
+				f.Conn.On("GetConnection", "mssql-default").Return(c)
+
+				f.Parser.On("UsedTables", "select * from upstreamdb.myschema.mytable", "tsql").
+					Return([]string{"upstreamdb.myschema.mytable"}, nil)
+
+				f.Parser.On(
+					"RenameTables",
+					"select * from upstreamdb.myschema.mytable",
+					"tsql",
+					map[string]string{
+						"myschema.mytable":            "dev_myschema.mytable",
+						"upstreamdb.myschema.mytable": "upstreamdb.dev_myschema.mytable",
+					},
+				).Return("select * from upstreamdb.dev_myschema.mytable", nil)
+			},
+		},
+		{
+			name:        "3-part cross-database name is not rewritten when dev table does not exist upstream",
+			selectedEnv: &config.Environment{SchemaPrefix: "dev_"},
+			inputQuery:  "select * from upstreamdb.myschema.mytable",
+			outputQuery: "select * from upstreamdb.myschema.mytable",
+			setupFields: func(f *fields) {
+				c := new(mockTableCheckingConnectionInstance)
+				c.On("GetDatabaseSummary", mock.Anything).Return(&ansisql.DBDatabase{
+					Name: "currentdb",
+					Schemas: []*ansisql.DBSchema{
+						{
+							Name: "dev_myschema",
+							Tables: []*ansisql.DBTable{
+								{Name: "mytable"},
+							},
+						},
+					},
+				}, nil)
+				c.On("BuildTableExistsQuery", "upstreamdb.dev_myschema.mytable").
+					Return("table exists query", nil)
+				c.On("Select", mock.Anything, &query.Query{Query: "table exists query"}).
+					Return([][]interface{}{{int64(0)}}, nil)
+				f.Conn.On("GetConnection", "mssql-default").Return(c)
+
+				f.Parser.On("UsedTables", "select * from upstreamdb.myschema.mytable", "tsql").
+					Return([]string{"upstreamdb.myschema.mytable"}, nil)
+
+				f.Parser.On(
+					"RenameTables",
+					"select * from upstreamdb.myschema.mytable",
+					"tsql",
+					map[string]string{
+						"myschema.mytable": "dev_myschema.mytable",
+					},
+				).Return("select * from upstreamdb.myschema.mytable", nil)
 			},
 		},
 		{

@@ -3,6 +3,7 @@ package python
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -216,6 +217,12 @@ var TypeHintMapping = map[string]string{
 
 var multipleSpacePattern = regexp.MustCompile(`\s+`)
 
+// ingestrSizedTypes are the ingestr types that accept a single length parameter, e.g.
+// text(50). Add an entry if a source type starts mapping to another sized type.
+var ingestrSizedTypes = map[string]bool{
+	"text": true,
+}
+
 // ColumnHints returns an ingestr compatible type hint string
 // that can be passed via the --column flag to the CLI.
 func ColumnHints(cols []pipeline.Column, normaliseNames bool) string {
@@ -224,8 +231,28 @@ func ColumnHints(cols []pipeline.Column, normaliseNames bool) string {
 		typ := NormaliseColumnType(col.Type)
 		hint, typeKnown := TypeHintMapping[typ]
 
+		// Resolve the base type of a sized type like "varchar(100)" and re-apply the
+		// length, but only when that type accepts one.
+		inlineLength := ""
+		if !typeKnown {
+			if base, inner, ok := splitParenType(typ); ok {
+				if mapped, found := TypeHintMapping[base]; found && ingestrSizedTypes[mapped] {
+					hint, typeKnown = mapped, true
+					inlineLength = inner
+				}
+			}
+		}
+
 		if !typeKnown && col.SourceColumn == "" {
 			continue
+		}
+
+		// Append a length to sized types; an inline length takes precedence over the
+		// length field, and a non-numeric size is treated as unbounded.
+		if typeKnown && ingestrSizedTypes[hint] {
+			if length := sizedStringLength(inlineLength, col.Length); length != "" {
+				hint = fmt.Sprintf("%s(%s)", hint, length)
+			}
 		}
 
 		name := col.Name
@@ -243,6 +270,33 @@ func ColumnHints(cols []pipeline.Column, normaliseNames bool) string {
 		}
 	}
 	return strings.Join(hints, ",")
+}
+
+// splitParenType splits a type such as "varchar(100)" into base ("varchar") and inner
+// ("100"), returning ok=false when there is no trailing parenthesised section.
+func splitParenType(typ string) (base, inner string, ok bool) {
+	open := strings.IndexByte(typ, '(')
+	if open <= 0 || !strings.HasSuffix(typ, ")") {
+		return "", "", false
+	}
+	base = strings.TrimSpace(typ[:open])
+	inner = strings.TrimSpace(typ[open+1 : len(typ)-1])
+	return base, inner, true
+}
+
+// sizedStringLength resolves the length for a sized string type, preferring an inline
+// length over the length field; only positive integers yield a bounded column.
+func sizedStringLength(inlineLength string, lengthField *int) string {
+	if inlineLength != "" {
+		if n, err := strconv.Atoi(inlineLength); err == nil && n > 0 {
+			return strconv.Itoa(n)
+		}
+		return ""
+	}
+	if lengthField != nil && *lengthField > 0 {
+		return strconv.Itoa(*lengthField)
+	}
+	return ""
 }
 
 func NormaliseColumnType(typ string) string {

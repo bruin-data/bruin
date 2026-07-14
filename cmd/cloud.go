@@ -2859,6 +2859,7 @@ func CloudDashboards() *cli.Command {
 			cloudDashboardsList(),
 			cloudDashboardsGet(),
 			cloudDashboardsCreate(),
+			cloudDashboardsUpdate(),
 		},
 	}
 }
@@ -3138,6 +3139,121 @@ func cloudDashboardsCreate() *cli.Command {
 				infoPrinter.Printf("Created dashboard %d (%s) as a draft — open it to review and publish: %s\n", dashboard.ID, title, dashboard.URL)
 			} else {
 				infoPrinter.Printf("Created dashboard %d (%s) as a draft — publish it from the Bruin Cloud UI.\n", dashboard.ID, title)
+			}
+			return nil
+		},
+	}
+}
+
+func cloudDashboardsUpdate() *cli.Command {
+	return &cli.Command{
+		Name:  "update",
+		Usage: "Update a dashboard's title, visibility or definition (definition written to draft; publish stays in the UI)",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "dashboard-id",
+				Usage:    "dashboard ID",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:  "title",
+				Usage: "the new dashboard title",
+			},
+			&cli.StringFlag{
+				Name:  "visibility",
+				Usage: "team or private",
+			},
+			&cli.StringFlag{
+				Name:  "state",
+				Usage: "the dashboard definition as a JSON or YAML string",
+			},
+			&cli.StringFlag{
+				Name:  "state-file",
+				Usage: "path to a file containing the dashboard definition as JSON or YAML",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			// Build the patch from the flags actually set, so an explicit empty value
+			// is sent rather than dropped.
+			fields := map[string]any{}
+			if c.IsSet("title") {
+				fields["title"] = c.String("title")
+			}
+			if c.IsSet("visibility") {
+				visibility := c.String("visibility")
+				if visibility != "team" && visibility != "private" {
+					printError(fmt.Errorf("visibility must be 'team' or 'private', got %q", visibility), output, "Invalid --visibility")
+					return cli.Exit("", 1)
+				}
+				fields["visibility"] = visibility
+			}
+
+			// The definition can come inline (--state) or from a file (--state-file),
+			// but not both — otherwise a stale file could silently override the flag.
+			if c.IsSet("state") && c.IsSet("state-file") {
+				printError(errors.New("pass only one of --state or --state-file"), output, "Ambiguous state")
+				return cli.Exit("", 1)
+			}
+			if c.IsSet("state") || c.IsSet("state-file") {
+				raw := c.String("state")
+				if file := c.String("state-file"); file != "" {
+					data, err := os.ReadFile(file)
+					if err != nil {
+						printError(fmt.Errorf("failed to read --state-file: %w", err), output, "Invalid state file")
+						return cli.Exit("", 1)
+					}
+					raw = string(data)
+				}
+				// Accept JSON or YAML — dashboards are YAML-native and JSON is valid YAML.
+				state, err := parseDashboardState([]byte(raw))
+				if err != nil {
+					printError(fmt.Errorf("invalid dashboard definition (expected a JSON or YAML object): %w", err), output, "Invalid state")
+					return cli.Exit("", 1)
+				}
+				// A mapping is required; null/scalars/arrays are not a definition.
+				if state == nil {
+					printError(errors.New("dashboard definition must be a JSON or YAML object"), output, "Invalid state")
+					return cli.Exit("", 1)
+				}
+				fields["state"] = state
+			}
+
+			if len(fields) == 0 {
+				printError(errors.New("provide at least one of --title, --visibility, --state or --state-file"), output, "Nothing to update")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			dashboard, err := client.UpdateDashboard(ctx, c.Int("dashboard-id"), fields)
+			if err != nil {
+				printError(err, output, "Failed to update dashboard")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(dashboard, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			title := ""
+			if dashboard.Title != nil {
+				title = *dashboard.Title
+			}
+			if dashboard.URL != "" {
+				infoPrinter.Printf("Updated dashboard %d (%s) — open it to review and publish: %s\n", dashboard.ID, title, dashboard.URL)
+			} else {
+				infoPrinter.Printf("Updated dashboard %d (%s).\n", dashboard.ID, title)
 			}
 			return nil
 		},

@@ -600,3 +600,16 @@ func (c *APIClient) CreateDashboard(ctx context.Context, title, visibility strin
 	}
 	return &result, nil
 }
+
+// UpdateDashboard applies a partial update to a dashboard. Only the fields
+// present are changed; the definition (state) is written to the draft only
+// (never published), same as create. Changing visibility requires manage-access
+// on the server side.
+func (c *APIClient) UpdateDashboard(ctx context.Context, dashboardID int, fields map[string]any) (*Dashboard, error) {
+	var result Dashboard
+	err := c.doRequest(ctx, http.MethodPatch, fmt.Sprintf("/dashboards/%d", dashboardID), fields, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}

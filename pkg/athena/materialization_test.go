@@ -555,7 +555,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 					"to_insert AS (\n" +
 					"\tSELECT s.id AS id, s.col1 AS col1, s.col2 AS col2,\n" +
 					"\t(SELECT now FROM time_now) AS _valid_from,\n" +
-					"\tTIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+					"\twith_timezone(TIMESTAMP '9999-12-31 23:59:59', 'UTC') AS _valid_until,\n" +
 					"\tTRUE AS _is_current\n" +
 					"\tFROM source s\n" +
 					"\tLEFT JOIN current_data t ON (t.id = s.id)\n" +
@@ -625,7 +625,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 					"to_insert AS (\n" +
 					"\tSELECT s.id AS id, s.category AS category, s.name AS name,\n" +
 					"\t(SELECT now FROM time_now) AS _valid_from,\n" +
-					"\tTIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+					"\twith_timezone(TIMESTAMP '9999-12-31 23:59:59', 'UTC') AS _valid_until,\n" +
 					"\tTRUE AS _is_current\n" +
 					"\tFROM source s\n" +
 					"\tLEFT JOIN current_data t ON (t.id = s.id AND t.category = s.category)\n" +
@@ -680,7 +680,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 					"\tSELECT t.id, t.col1, t.updated_at,\n" +
 					"\tt._valid_from,\n" +
 					"\t\tCASE\n" +
-					"\t\t\tWHEN _matched_by_source IS NOT NULL AND (t.col1 != s.col1 OR t.updated_at != s.updated_at) THEN CAST(s.updated_at AS TIMESTAMP)\n" +
+					"\t\t\tWHEN _matched_by_source IS NOT NULL AND (t.col1 != s.col1 OR t.updated_at != s.updated_at) THEN with_timezone(CAST(s.updated_at AS TIMESTAMP), 'UTC')\n" +
 					"\t\t\tWHEN _matched_by_source IS NULL THEN (SELECT now FROM time_now)\n" +
 					"\t\t\tELSE t._valid_until\n" +
 					"\t\tEND AS _valid_until,\n" +
@@ -695,8 +695,8 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 					"--new/updated rows from source\n" +
 					"to_insert AS (\n" +
 					"\tSELECT s.id AS id, s.col1 AS col1, s.updated_at AS updated_at,\n" +
-					"\tCAST(s.updated_at AS TIMESTAMP) AS _valid_from,\n" +
-					"\tTIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+					"\twith_timezone(CAST(s.updated_at AS TIMESTAMP), 'UTC') AS _valid_from,\n" +
+					"\twith_timezone(TIMESTAMP '9999-12-31 23:59:59', 'UTC') AS _valid_until,\n" +
 					"\tTRUE AS _is_current\n" +
 					"\tFROM source s\n" +
 					"\tLEFT JOIN current_data t ON (t.id = s.id)\n" +
@@ -774,7 +774,7 @@ func TestBuildSCD2ByColumnFullRefreshQuery(t *testing.T) {
 				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi', partitioning = ARRAY['_valid_from']) AS\n" +
 					"SELECT src.id, src.name, src.price,\n" +
 					"CURRENT_TIMESTAMP AS _valid_from,\n" +
-					"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+					"with_timezone(TIMESTAMP '9999-12-31 23:59:59', 'UTC') AS _valid_until,\n" +
 					"TRUE AS _is_current\n" +
 					"FROM (SELECT id, name, price from source_table\n" +
 					") AS src",
@@ -803,7 +803,7 @@ func TestBuildSCD2ByColumnFullRefreshQuery(t *testing.T) {
 				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi', partitioning = ARRAY['_valid_from']) AS\n" +
 					"SELECT src.id, src.category, src.name, src.price,\n" +
 					"CURRENT_TIMESTAMP AS _valid_from,\n" +
-					"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+					"with_timezone(TIMESTAMP '9999-12-31 23:59:59', 'UTC') AS _valid_until,\n" +
 					"TRUE AS _is_current\n" +
 					"FROM (SELECT id, category, name, price from source_table\n" +
 					") AS src",
@@ -832,7 +832,7 @@ func TestBuildSCD2ByColumnFullRefreshQuery(t *testing.T) {
 				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi', partitioning = ARRAY['category, id']) AS\n" +
 					"SELECT src.id, src.name, src.price,\n" +
 					"CURRENT_TIMESTAMP AS _valid_from,\n" +
-					"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+					"with_timezone(TIMESTAMP '9999-12-31 23:59:59', 'UTC') AS _valid_until,\n" +
 					"TRUE AS _is_current\n" +
 					"FROM (SELECT id, name, price from source_table\n" +
 					") AS src",
@@ -860,8 +860,8 @@ func TestBuildSCD2ByColumnFullRefreshQuery(t *testing.T) {
 			want: []string{
 				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi', partitioning = ARRAY['_valid_from']) AS\n" +
 					"SELECT src.id, src.name, src.updated_at,\n" +
-					"CAST(src.updated_at AS TIMESTAMP) AS _valid_from,\n" +
-					"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+					"with_timezone(CAST(src.updated_at AS TIMESTAMP), 'UTC') AS _valid_from,\n" +
+					"with_timezone(TIMESTAMP '9999-12-31 23:59:59', 'UTC') AS _valid_until,\n" +
 					"TRUE AS _is_current\n" +
 					"FROM (SELECT id, name, updated_at from source_table\n" +
 					") AS src",
@@ -1045,12 +1045,12 @@ func TestBuildSCD2ByTimeQuery(t *testing.T) {
 					"\tSELECT t.id, t.event_name, t.ts,\n" +
 					"\tt._valid_from,\n" +
 					"\t\tCASE\n" +
-					"\t\t\tWHEN _matched_by_source IS NOT NULL AND (CAST(s.ts AS TIMESTAMP) > t._valid_from) THEN CAST(s.ts AS TIMESTAMP)\n" +
+					"\t\t\tWHEN _matched_by_source IS NOT NULL AND (with_timezone(CAST(s.ts AS TIMESTAMP), 'UTC') > t._valid_from) THEN with_timezone(CAST(s.ts AS TIMESTAMP), 'UTC')\n" +
 					"\t\t\tWHEN _matched_by_source IS NULL THEN (SELECT now FROM time_now)\n" +
 					"\t\t\tELSE t._valid_until\n" +
 					"\t\tEND AS _valid_until,\n" +
 					"\t\tCASE\n" +
-					"\t\t\tWHEN _matched_by_source IS NOT NULL AND (CAST(s.ts AS TIMESTAMP) > t._valid_from) THEN FALSE\n" +
+					"\t\t\tWHEN _matched_by_source IS NOT NULL AND (with_timezone(CAST(s.ts AS TIMESTAMP), 'UTC') > t._valid_from) THEN FALSE\n" +
 					"\t\t\tWHEN _matched_by_source IS NULL THEN FALSE\n" +
 					"\t\t\tELSE t._is_current\n" +
 					"\t\tEND AS _is_current\n" +
@@ -1060,12 +1060,12 @@ func TestBuildSCD2ByTimeQuery(t *testing.T) {
 					"--new/updated rows from source\n" +
 					"to_insert AS (\n" +
 					"\tSELECT s.id AS id, s.event_name AS event_name, s.ts AS ts,\n" +
-					"\tCAST(s.ts AS TIMESTAMP) AS _valid_from,\n" +
-					"\tTIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+					"\twith_timezone(CAST(s.ts AS TIMESTAMP), 'UTC') AS _valid_from,\n" +
+					"\twith_timezone(TIMESTAMP '9999-12-31 23:59:59', 'UTC') AS _valid_until,\n" +
 					"\tTRUE AS _is_current\n" +
 					"\tFROM source s\n" +
 					"\tLEFT JOIN current_data t ON (t.id = s.id)\n" +
-					"\tWHERE (_matched_by_target IS NULL) OR (CAST(s.ts AS TIMESTAMP) > t._valid_from)\n" +
+					"\tWHERE (_matched_by_target IS NULL) OR (with_timezone(CAST(s.ts AS TIMESTAMP), 'UTC') > t._valid_from)\n" +
 					")\n" +
 					"SELECT id, event_name, ts, _valid_from, _valid_until, _is_current FROM to_keep\n" +
 					"UNION ALL\n" +
@@ -1116,12 +1116,12 @@ func TestBuildSCD2ByTimeQuery(t *testing.T) {
 					"\tSELECT t.id, t.event_name, t.ts,\n" +
 					"\tt._valid_from,\n" +
 					"\t\tCASE\n" +
-					"\t\t\tWHEN _matched_by_source IS NOT NULL AND (CAST(s.ts AS TIMESTAMP) > t._valid_from) THEN CAST(s.ts AS TIMESTAMP)\n" +
+					"\t\t\tWHEN _matched_by_source IS NOT NULL AND (with_timezone(CAST(s.ts AS TIMESTAMP), 'UTC') > t._valid_from) THEN with_timezone(CAST(s.ts AS TIMESTAMP), 'UTC')\n" +
 					"\t\t\tWHEN _matched_by_source IS NULL THEN (SELECT now FROM time_now)\n" +
 					"\t\t\tELSE t._valid_until\n" +
 					"\t\tEND AS _valid_until,\n" +
 					"\t\tCASE\n" +
-					"\t\t\tWHEN _matched_by_source IS NOT NULL AND (CAST(s.ts AS TIMESTAMP) > t._valid_from) THEN FALSE\n" +
+					"\t\t\tWHEN _matched_by_source IS NOT NULL AND (with_timezone(CAST(s.ts AS TIMESTAMP), 'UTC') > t._valid_from) THEN FALSE\n" +
 					"\t\t\tWHEN _matched_by_source IS NULL THEN FALSE\n" +
 					"\t\t\tELSE t._is_current\n" +
 					"\t\tEND AS _is_current\n" +
@@ -1131,12 +1131,12 @@ func TestBuildSCD2ByTimeQuery(t *testing.T) {
 					"--new/updated rows from source\n" +
 					"to_insert AS (\n" +
 					"\tSELECT s.id AS id, s.event_name AS event_name, s.ts AS ts,\n" +
-					"\tCAST(s.ts AS TIMESTAMP) AS _valid_from,\n" +
-					"\tTIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+					"\twith_timezone(CAST(s.ts AS TIMESTAMP), 'UTC') AS _valid_from,\n" +
+					"\twith_timezone(TIMESTAMP '9999-12-31 23:59:59', 'UTC') AS _valid_until,\n" +
 					"\tTRUE AS _is_current\n" +
 					"\tFROM source s\n" +
 					"\tLEFT JOIN current_data t ON (t.id = s.id AND t.event_name = s.event_name)\n" +
-					"\tWHERE (_matched_by_target IS NULL) OR (CAST(s.ts AS TIMESTAMP) > t._valid_from)\n" +
+					"\tWHERE (_matched_by_target IS NULL) OR (with_timezone(CAST(s.ts AS TIMESTAMP), 'UTC') > t._valid_from)\n" +
 					")\n" +
 					"SELECT id, event_name, ts, _valid_from, _valid_until, _is_current FROM to_keep\n" +
 					"UNION ALL\n" +
@@ -1229,8 +1229,8 @@ func TestBuildSCD2ByTimeFullRefreshQuery(t *testing.T) {
 			want: []string{
 				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi', partitioning = ARRAY['_valid_from']) AS\n" +
 					"SELECT src.id, src.event_name, src.ts,\n" +
-					"CAST(src.ts AS TIMESTAMP) AS _valid_from,\n" +
-					"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+					"with_timezone(CAST(src.ts AS TIMESTAMP), 'UTC') AS _valid_from,\n" +
+					"with_timezone(TIMESTAMP '9999-12-31 23:59:59', 'UTC') AS _valid_until,\n" +
 					"TRUE AS _is_current\n" +
 					"FROM (SELECT id, event_name, ts from source_table\n" +
 					") AS src",
@@ -1259,8 +1259,8 @@ func TestBuildSCD2ByTimeFullRefreshQuery(t *testing.T) {
 			want: []string{
 				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi', partitioning = ARRAY['_valid_from']) AS\n" +
 					"SELECT src.id, src.category, src.event_name, src.ts,\n" +
-					"CAST(src.ts AS TIMESTAMP) AS _valid_from,\n" +
-					"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+					"with_timezone(CAST(src.ts AS TIMESTAMP), 'UTC') AS _valid_from,\n" +
+					"with_timezone(TIMESTAMP '9999-12-31 23:59:59', 'UTC') AS _valid_until,\n" +
 					"TRUE AS _is_current\n" +
 					"FROM (SELECT id, category, event_name, ts from source_table\n" +
 					") AS src",
@@ -1289,8 +1289,8 @@ func TestBuildSCD2ByTimeFullRefreshQuery(t *testing.T) {
 			want: []string{
 				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi', partitioning = ARRAY['category, id']) AS\n" +
 					"SELECT src.id, src.event_name, src.ts,\n" +
-					"CAST(src.ts AS TIMESTAMP) AS _valid_from,\n" +
-					"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+					"with_timezone(CAST(src.ts AS TIMESTAMP), 'UTC') AS _valid_from,\n" +
+					"with_timezone(TIMESTAMP '9999-12-31 23:59:59', 'UTC') AS _valid_until,\n" +
 					"TRUE AS _is_current\n" +
 					"FROM (SELECT id, event_name, ts from source_table\n" +
 					") AS src",

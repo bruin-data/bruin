@@ -157,7 +157,7 @@ parameters:
 - `type`: Specifies the asset's type. Set this to `ingestr` to use the ingestr data pipeline. For Salesforce, it will be always `ingestr`.
 - `source_connection`: The name of the Salesforce connection defined in `.bruin.yml` or Bruin Cloud.
 - `source_table`: The name of the table in Salesforce to ingest.
-- `destination`: The name of the destination connection.
+- `destination`: The destination platform/type, for example `postgres`.
 
 Before running a full pipeline, test with one Salesforce ingestion asset.
 

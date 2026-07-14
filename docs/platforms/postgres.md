@@ -206,7 +206,7 @@ CDC is enabled by setting `cdc: "true"` on an `ingestr` asset with a PostgreSQL 
 | `cdc_stream_flush_interval` | No | How often buffered records are written to the destination, such as `30s`. Takes precedence over `flush_interval` |
 | `cdc_stream_flush_records` | No | Number of buffered records that triggers a write to the destination. Takes precedence over `flush_records` |
 | `source_table` | Yes | Source table in `schema.table` format, or `"*"` to replicate all tables in the publication |
-| `incremental_strategy` | No | Defaults to `"merge"` when CDC is enabled; can be overridden to `"append"` |
+| `incremental_strategy` | No | Defaults to `"merge"` when CDC is enabled. CDC assets must use `"merge"`; Bruin rejects other strategies. |
 
 > [!NOTE]
 > When CDC is enabled, primary key columns do not need to be specified in the asset definition — they are determined automatically from the source table.

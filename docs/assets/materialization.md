@@ -455,7 +455,13 @@ When changes are detected in non-primary key columns:
 - `_valid_until`: TIMESTAMP when the record version became inactive (set to `TIMESTAMP('9999-12-31')` for current records, or uses `incremental_key` value when a record is expired due to changes)
 - `_is_current`: BOOLEAN indicating if this is the current version of the record
 
-For DuckDB and MotherDuck, `_valid_from` and `_valid_until` are created as `TIMESTAMP WITH TIME ZONE`.
+`_valid_from` and `_valid_until` are created as timezone-aware timestamps so that both columns represent an unambiguous absolute instant (values are stored in UTC). The exact type depends on the platform: `TIMESTAMP WITH TIME ZONE` / `TIMESTAMPTZ` on DuckDB, MotherDuck, Postgres, Redshift, Athena and Oracle; `TIMESTAMP_TZ` on Snowflake; and BigQuery's / Databricks' `TIMESTAMP` (which is already an absolute-instant type). When the `incremental_key` is a timezone-naive column, its values are interpreted as **UTC** (not the database session timezone), so `_valid_from`/`_valid_until` are deterministic regardless of where the pipeline runs.
+
+MySQL is the one exception: both columns are `DATETIME` (timezone-naive, stored in UTC), because MySQL's timezone-aware `TIMESTAMP` type cannot represent the far-future `9999-12-31` sentinel used for current records.
+
+::: tip Migrating existing tables
+SCD2 tables created before the timezone-aware columns were introduced are upgraded automatically on the next **incremental** run: the existing `_valid_from`/`_valid_until` values are converted to **UTC**, with no `--full-refresh` and no loss of history. This is a temporary migration (added July 2026) that will be removed once existing tables have been upgraded.
+:::
 
 **Optional: Using `incremental_key` for timestamps:**
 
@@ -612,7 +618,13 @@ The strategy tracks changes based on the time values in the `incremental_key` co
 - `_valid_until`: TIMESTAMP when the record version became inactive (set to `TIMESTAMP('9999-12-31')` for current records)
 - `_is_current`: BOOLEAN indicating if this is the current version of the record
 
-For DuckDB and MotherDuck, `_valid_from` and `_valid_until` are created as `TIMESTAMP WITH TIME ZONE`.
+`_valid_from` and `_valid_until` are created as timezone-aware timestamps so that both columns represent an unambiguous absolute instant (values are stored in UTC). The exact type depends on the platform: `TIMESTAMP WITH TIME ZONE` / `TIMESTAMPTZ` on DuckDB, MotherDuck, Postgres, Redshift, Athena and Oracle; `TIMESTAMP_TZ` on Snowflake; and BigQuery's / Databricks' `TIMESTAMP` (which is already an absolute-instant type). When the `incremental_key` is a timezone-naive column, its values are interpreted as **UTC** (not the database session timezone), so `_valid_from`/`_valid_until` are deterministic regardless of where the pipeline runs.
+
+MySQL is the one exception: both columns are `DATETIME` (timezone-naive, stored in UTC), because MySQL's timezone-aware `TIMESTAMP` type cannot represent the far-future `9999-12-31` sentinel used for current records.
+
+::: tip Migrating existing tables
+SCD2 tables created before the timezone-aware columns were introduced are upgraded automatically on the next **incremental** run — the existing `_valid_from`/`_valid_until` values are converted to **UTC**, with no `--full-refresh` and no loss of history. This is a temporary migration (added July 2026) that will be removed once existing tables have been upgraded.
+:::
 
 Here's an example of an asset with `scd2_by_time` materialization:
 

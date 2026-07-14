@@ -40,7 +40,7 @@ parameters:
 
 - `source_connection`: name of the Pinterest connection defined in `.bruin.yml`.
 - `source_table`: Pinterest table to ingest.
-- `destination`: name of the destination connection.
+- `destination`: The destination platform/type, for example `postgres`.
 
 ## Available Source Tables
 

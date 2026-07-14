@@ -51,7 +51,7 @@ parameters:
 
 ### Example assets
 
-These examples use DuckDB as the destination. Replace `connection` and `destination` with the destination connection you want to load into.
+These examples use DuckDB as the destination. Replace `connection` with the destination connection name and `destination` with the destination platform/type you want to load into.
 
 Single Excel sheet:
 

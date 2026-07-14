@@ -242,6 +242,81 @@ func TestBasicOperator_RunTask(t *testing.T) {
 	}
 }
 
+func TestBasicOperator_RunTask_WarehouseOverride(t *testing.T) {
+	t.Parallel()
+
+	newAsset := func() *pipeline.Asset {
+		return &pipeline.Asset{
+			Type: pipeline.AssetTypeSnowflakeQuery,
+			ExecutableFile: pipeline.ExecutableFile{
+				Path:    "test-file.sql",
+				Content: "some content",
+			},
+			Parameters: pipeline.ParameterMap{"warehouse": "BIG_WH"},
+		}
+	}
+
+	setupExtractorAndMaterializer := func(e *mockExtractor, m *mockMaterializer) {
+		e.On("ExtractQueriesFromString", "some content").
+			Return([]*query.Query{{Query: "select * from users"}}, nil)
+		m.On("Render", mock.Anything, "select * from users").
+			Return("select * from users", nil)
+		m.On("IsFullRefresh").Return(false)
+	}
+
+	newExtractors := func() (*mockExtractor, *mockExtractor, *mockMaterializer) {
+		extractor := new(mockExtractor)
+		preExtractor := new(mockExtractor)
+		preExtractor.On("CloneForAsset", mock.Anything, mock.Anything, mock.Anything).Return(extractor, nil)
+		mat := new(mockMaterializer)
+		setupExtractorAndMaterializer(extractor, mat)
+		return preExtractor, extractor, mat
+	}
+
+	t.Run("runs on the overridden warehouse when reachable", func(t *testing.T) {
+		t.Parallel()
+
+		defaultClient := new(mockQuerierWithResult)
+		overrideClient := new(mockQuerierWithResult)
+		overrideClient.On("Ping", mock.Anything).Return(nil)
+		overrideClient.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "select * from users"}).Return(nil)
+
+		preExtractor, _, mat := newExtractors()
+
+		conn := new(mockConnectionFetcher)
+		conn.On("GetConnection", mock.Anything).Return(defaultClient)
+		conn.On("GetSfConnectionWithWarehouse", mock.Anything, "BIG_WH").Return(overrideClient, nil)
+
+		o := BasicOperator{connection: conn, extractor: preExtractor, materializer: mat}
+		require.NoError(t, o.RunTask(t.Context(), &pipeline.Pipeline{}, newAsset()))
+
+		overrideClient.AssertExpectations(t)
+		defaultClient.AssertNotCalled(t, "RunQueryWithoutResult", mock.Anything, mock.Anything)
+	})
+
+	t.Run("falls back to the default warehouse when the override is unreachable", func(t *testing.T) {
+		t.Parallel()
+
+		defaultClient := new(mockQuerierWithResult)
+		defaultClient.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "select * from users"}).Return(nil)
+		overrideClient := new(mockQuerierWithResult)
+		overrideClient.On("Ping", mock.Anything).Return(errors.New("account suspended"))
+
+		preExtractor, _, mat := newExtractors()
+
+		conn := new(mockConnectionFetcher)
+		conn.On("GetConnection", mock.Anything).Return(defaultClient)
+		conn.On("GetSfConnectionWithWarehouse", mock.Anything, "BIG_WH").Return(overrideClient, nil)
+
+		o := BasicOperator{connection: conn, extractor: preExtractor, materializer: mat}
+		require.NoError(t, o.RunTask(t.Context(), &pipeline.Pipeline{}, newAsset()))
+
+		overrideClient.AssertCalled(t, "Ping", mock.Anything)
+		overrideClient.AssertNotCalled(t, "RunQueryWithoutResult", mock.Anything, mock.Anything)
+		defaultClient.AssertExpectations(t)
+	})
+}
+
 func TestQuerySensorTimesOutWhenConfigured(t *testing.T) {
 	t.Parallel()
 

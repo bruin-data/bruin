@@ -968,9 +968,9 @@ func TestCreateIngestrAsset(t *testing.T) {
 
 	testAssetsPath := filepath.Join("test", "assets")
 
-	// Mixed-case database/collection names verify that the asset name and file
+	// Mixed-case schema/table names verify that the asset name and file
 	// path are lowercased while source_table preserves the original case
-	// (MongoDB identifiers are case-sensitive).
+	// for databases with case-sensitive identifiers.
 	table := &ansisql.DBTable{
 		Name: "Users",
 		Type: ansisql.DBTableTypeTable,
@@ -1003,37 +1003,37 @@ func TestValidateIngestrImportFlags(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name        string
-		asIngestr   bool
-		destination string
-		wantErr     string
+		name          string
+		ingestrImport bool
+		destination   string
+		wantErr       string
 	}{
 		{
-			name:        "not as-ingestr with no destination is fine",
-			asIngestr:   false,
-			destination: "",
+			name:          "regular import with no destination is fine",
+			ingestrImport: false,
+			destination:   "",
 		},
 		{
-			name:        "destination without as-ingestr is rejected",
-			asIngestr:   false,
-			destination: "duckdb",
-			wantErr:     "--destination has no effect without --as-ingestr",
+			name:          "destination without ingestr is rejected",
+			ingestrImport: false,
+			destination:   "duckdb",
+			wantErr:       "--destination has no effect without --ingestr",
 		},
 		{
-			name:      "as-ingestr requires destination",
-			asIngestr: true,
-			wantErr:   "--destination is required",
+			name:          "ingestr requires destination",
+			ingestrImport: true,
+			wantErr:       "--destination is required",
 		},
 		{
-			name:        "as-ingestr rejects unknown destination",
-			asIngestr:   true,
-			destination: "bogus",
-			wantErr:     "invalid --destination",
+			name:          "ingestr rejects unknown destination",
+			ingestrImport: true,
+			destination:   "bogus",
+			wantErr:       "invalid --destination",
 		},
 		{
-			name:        "as-ingestr accepts valid destination",
-			asIngestr:   true,
-			destination: "duckdb",
+			name:          "ingestr accepts valid destination",
+			ingestrImport: true,
+			destination:   "duckdb",
 		},
 	}
 
@@ -1041,7 +1041,7 @@ func TestValidateIngestrImportFlags(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := validateIngestrImportFlags(tt.asIngestr, tt.destination)
+			err := validateIngestrImportFlags(tt.ingestrImport, tt.destination)
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
@@ -1052,24 +1052,25 @@ func TestValidateIngestrImportFlags(t *testing.T) {
 	}
 }
 
-func TestIsMongoConnection(t *testing.T) {
+func TestImportDatabaseIngestrFlag(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name string
-		conn interface{}
-		want bool
-	}{
-		{name: "mongo connection", conn: &mongo.DB{}, want: true},
-		{name: "mongo atlas connection", conn: &mongoatlas.DB{}, want: true},
-		{name: "mssql connection", conn: &mssql.DB{}, want: false},
-		{name: "nil connection", conn: nil, want: false},
+	command := ImportDatabase(new(bool))
+	for _, flag := range command.Flags {
+		if flag.Names()[0] == "ingestr" {
+			assert.Equal(t, []string{"ingestr", "as-ingestr"}, flag.Names())
+			return
+		}
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			assert.Equal(t, tt.want, isMongoConnection(tt.conn))
-		})
-	}
+	t.Fatal("ingestr flag not found")
+}
+
+func TestSupportsIngestrSource(t *testing.T) {
+	t.Parallel()
+
+	assert.True(t, supportsIngestrSource(&mssql.DB{}))
+	assert.True(t, supportsIngestrSource(&mongo.DB{}))
+	assert.False(t, supportsIngestrSource(&mockConnection{}))
+	assert.False(t, supportsIngestrSource(nil))
 }

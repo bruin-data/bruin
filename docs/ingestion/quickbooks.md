@@ -48,7 +48,7 @@ parameters:
 
 - `source_connection`: name of the QuickBooks connection defined in `.bruin.yml`.
 - `source_table`: QuickBooks table to ingest.
-- `destination`: name of the destination connection.
+- `destination`: The destination platform/type, for example `postgres`.
 
 ## Available Source Tables
 

@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"bytes"
 	"context"
 	"testing"
 
@@ -49,6 +50,39 @@ func TestLocal_RunSingleTask(t *testing.T) {
 		err := l.RunSingleTask(t.Context(), instance)
 
 		require.NoError(t, err)
+		mockOperator.AssertExpectations(t)
+	})
+
+	t.Run("full refresh restriction is applied before dispatch", func(t *testing.T) {
+		t.Parallel()
+
+		restricted := true
+		restrictedAsset := &pipeline.Asset{
+			Name:              "restricted-task",
+			Type:              "test",
+			RefreshRestricted: &restricted,
+		}
+		restrictedInstance := &scheduler.AssetInstance{Asset: restrictedAsset}
+		mockOperator := new(mockOperator)
+		mockOperator.On("Run", mock.MatchedBy(func(ctx context.Context) bool {
+			fullRefresh, ok := ctx.Value(pipeline.RunConfigFullRefresh).(bool)
+			return ok && !fullRefresh
+		}), restrictedInstance).Return(nil)
+		l := Sequential{
+			TaskTypeMap: map[pipeline.AssetType]Config{
+				"test": {
+					scheduler.TaskInstanceTypeMain: mockOperator,
+				},
+			},
+		}
+		var output bytes.Buffer
+		ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, true)
+		ctx = context.WithValue(ctx, KeyPrinter, &output)
+
+		err := l.RunSingleTask(ctx, restrictedInstance)
+
+		require.NoError(t, err)
+		require.Equal(t, "Warning: full refresh is restricted for asset \"restricted-task\"; running incrementally.\n", output.String())
 		mockOperator.AssertExpectations(t)
 	})
 

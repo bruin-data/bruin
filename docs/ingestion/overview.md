@@ -11,6 +11,8 @@ Bruin has built-in data ingestion capabilities thanks to [ingestr](https://githu
 
 Using Bruin, you can load data from any source into your data platforms as a regular asset.
 
+For the complete Bruin asset schema, destination resolution behavior, and write-strategy configuration, see [Ingestr assets](/assets/ingestr). For the upstream connector catalog, see the ingestr [platform catalog](https://getbruin.com/docs/ingestr/supported-sources/platforms.html).
+
 ## Definition Schema
 
 Ingestr assets are defined in a simple YAML file:
@@ -31,6 +33,8 @@ The interesting part is in the `parameters` list:
 - `destination`: the destination you'd like to load the data on
 
 Effectively, this asset will run `ingestr` in the background and load the data to your data warehouse.
+
+Source-specific pages in this section list the available source tables and their primary keys, incremental keys, and default incremental strategies. You can override the destination write strategy on an asset with `materialization.strategy` (`create+replace`, `append`, `merge`, `delete+insert`, or `truncate+insert`) when the selected ingestr destination supports it.
 
 ## Examples
 

@@ -21,7 +21,7 @@ endif
 
 JQ_REL_PATH = jq --arg prefix "$$(pwd)" 'walk(if type == "object" and has("path") and (.path | type == "string") then .path |= (if . == $$prefix then "integration-tests" elif startswith($$prefix + "/") then .[($$prefix | length + 1):] elif startswith($$prefix) then .[($$prefix | length):] elif startswith("integration-tests/") then .[16:] else . end) else . end)'
 
-.PHONY: all clean test build build-no-duckdb docs-app format pre-commit refresh-integration-expectations integration-test-cloud validate-links tools-update
+.PHONY: all clean test build build-no-duckdb docs-app format pre-commit refresh-integration-expectations integration-test-cloud integration-test-mssql validate-links tools-update
 all: clean deps test build
 
 deps: 
@@ -79,6 +79,10 @@ integration-test-cloud: build
 	@echo "$(OK_COLOR)==> Running cloud integration tests...$(NO_COLOR)"
 	@cd integration-tests && git init
 	@cd integration-tests/cloud-integration-tests && env SILENT=1 go test -count=1 -v .
+
+integration-test-mssql: build
+	@echo "$(OK_COLOR)==> Running MSSQL integration tests...$(NO_COLOR)"
+	@cd integration-tests/mssql && env SILENT=1 go test -count=1 -v -timeout 15m .
 
 clean:
 	@rm -rf ./bin
