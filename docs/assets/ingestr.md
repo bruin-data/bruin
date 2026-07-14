@@ -107,8 +107,8 @@ parameters:
 | `staging_dataset` | No | `--staging-dataset` | Dataset/schema to use for staging tables. |
 | `trim_whitespace` | No | `--trim-whitespace` | Trims leading and trailing whitespace from extracted string values when set to `true`. |
 | `stream` | No | `--stream` | Enables continuous ingestion for CDC and message-broker sources. |
-| `flush_interval` | No | `--flush-interval` | Flush interval for streaming mode, such as `30s`. |
-| `flush_records` | No | `--flush-records` | Number of buffered records that triggers a flush in streaming mode. |
+| `flush_interval` | No | `--flush-interval` | Flush interval for streaming mode, such as `30s`. CDC assets can set `cdc_stream_flush_interval` instead, which takes precedence. |
+| `flush_records` | No | `--flush-records` | Number of buffered records that triggers a flush in streaming mode. CDC assets can set `cdc_stream_flush_records` instead, which takes precedence. |
 | `enforce_schema` | No | `--columns` | When set to `true`, enforces the column types defined in the asset's `columns` section. Ingestr will create or update the destination table with the specified schema. |
 
 ### Column metadata
