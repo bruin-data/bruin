@@ -65,6 +65,132 @@ parameters:
 
 Runs a materialized clickhouse asset or an SQL script. For detailed parameters, you can check [Definition Schema](../assets/definition-schema.md) page.
 
+### Materialization and incremental strategies
+
+`clickhouse.sql` supports table and view materializations. For a table with no explicit strategy, Bruin uses `create+replace`.
+
+| Strategy | Support | How Bruin executes it |
+| --- | --- | --- |
+| `create+replace` | Supported | Creates a temporary table from the asset query, drops the target table, then renames the temporary table to the target name. Requires `columns` and exactly one column marked `primary_key: true`. |
+| `append` | Supported | Runs `INSERT INTO <target> <asset query>`. Bruin does not add filtering or deduplicate rows; make the asset query select only the new rows. |
+| `delete+insert` | Supported | Refreshes the values returned for an `incremental_key`: it writes the query result to a temporary table, deletes target rows whose incremental-key value occurs in that table, inserts the temporary-table rows, then drops the temporary table. Requires `incremental_key`, `columns`, and exactly one `primary_key: true` column. |
+| `time_interval` | Supported | On a normal run, deletes target rows in the requested date or timestamp interval, then inserts the asset query result. Requires `incremental_key`, `time_granularity` (`date` or `timestamp`), and an existing target table. The asset query must filter itself to the same interval. A `--full-refresh` runs `create+replace` instead, which requires `columns` and exactly one `primary_key: true` column. |
+| `truncate+insert` | Supported | Truncates the existing table, then inserts the asset query result. This is a full-table refresh that preserves the table definition; it is not an incremental strategy. |
+| `ddl` | Supported | Creates the table if it does not already exist from the defined columns, primary key, and optional `partition_by`. Do not include a query in a DDL asset. |
+| `merge`, `scd2_by_column`, `scd2_by_time` | Not supported | Use `delete+insert`, `time_interval`, or an explicit ClickHouse SQL implementation instead. |
+
+Create the target table with `create+replace` or `ddl` before its first `append`, `delete+insert`, `time_interval`, or `truncate+insert` run. `create+replace`, including a `--full-refresh` of a `time_interval` asset, requires `columns` and exactly one `primary_key: true` column. The primary key defines the temporary table; Bruin does not use it to deduplicate or merge rows.
+
+View materializations support only the default strategy, which creates or replaces the view. Table-only strategies, including all incremental strategies, are not supported for views.
+
+> [!NOTE]
+> ClickHouse statements are executed one at a time and are not wrapped in a transaction. In particular, a failed `delete+insert`, `time_interval`, or `truncate+insert` run can leave the target table between steps. Use idempotent, date- or partition-bounded queries and rerun the asset to recover.
+
+#### `delete+insert` example
+
+Use `delete+insert` when the query returns complete replacements for one or more incremental-key values. For example, this refreshes every `dt` returned by the query:
+
+```bruin-sql
+/* @bruin
+name: analytics.daily_orders
+type: clickhouse.sql
+materialization:
+  type: table
+  strategy: delete+insert
+  incremental_key: dt
+columns:
+  - name: order_id
+    type: UInt64
+    primary_key: true
+  - name: dt
+    type: Date
+@bruin */
+
+SELECT
+  order_id,
+  toDate(created_at) AS dt
+FROM raw.orders
+WHERE toDate(created_at) BETWEEN '{{ start_date }}' AND '{{ end_date }}'
+```
+
+The temporary table is created in the same database as the target. Bruin deletes existing `analytics.daily_orders` rows for the distinct `dt` values in that temporary table, then inserts the replacement rows.
+
+#### `time_interval` example
+
+Use `time_interval` for a known run window. Bruin uses the run's `start_date` and `end_date` values for a `date` key, or `start_timestamp` and `end_timestamp` for a `timestamp` key. The bounds are inclusive.
+
+```bruin-sql
+/* @bruin
+name: analytics.daily_orders
+type: clickhouse.sql
+materialization:
+  type: table
+  strategy: time_interval
+  incremental_key: dt
+  time_granularity: date
+@bruin */
+
+SELECT
+  order_id,
+  toDate(created_at) AS dt
+FROM raw.orders
+WHERE toDate(created_at) BETWEEN '{{ start_date }}' AND '{{ end_date }}'
+```
+
+Bruin deletes `analytics.daily_orders` rows whose `dt` falls within that interval, then inserts the query result. It does not automatically add the `WHERE` clause shown above.
+
+#### Full refresh behavior
+
+Running `bruin run --full-refresh` changes every ClickHouse table materialization except `ddl` to `create+replace`. This includes `time_interval`: it does **not** use interval-based deletion during a full refresh. The rebuild creates a temporary table, drops the target, then renames the temporary table. It requires `columns` and exactly one `primary_key: true` column. A `ddl` asset remains `CREATE TABLE IF NOT EXISTS` during a full refresh.
+
+### Column data types
+
+Bruin does not translate or validate ClickHouse column types against its own allowlist. For `ddl` materializations, it passes `columns[].type` through to ClickHouse. `precision`/`scale` or `length` are added to an unparameterized type when you provide them separately. ClickHouse is therefore the authority for whether a type is available on your server version and configuration; see its [data type reference](https://clickhouse.com/docs/sql-reference/data-types) for the complete, current list.
+
+For `create+replace`, `delete+insert`, and a `--full-refresh`, ClickHouse derives the temporary table's column types from the asset query's `SELECT` result. For `append`, `truncate+insert`, and normal `time_interval` runs, ClickHouse uses the existing target table's schema.
+
+Common ClickHouse column types include:
+
+| Family | Types and examples |
+| --- | --- |
+| Integers | `Int8`, `Int16`, `Int32`, `Int64`, `Int128`, `Int256`; `UInt8`, `UInt16`, `UInt32`, `UInt64`, `UInt128`, `UInt256` |
+| Floating point and exact numeric | `Float32`, `Float64`, `BFloat16`, `Decimal(P, S)` |
+| Text and categorical | `String`, `FixedString(N)`, `Enum8(...)`, `Enum16(...)`, `LowCardinality(String)` |
+| Date and time | `Date`, `Date32`, `DateTime`, `DateTime('UTC')`, `DateTime64(P, 'UTC')` |
+| Scalar identifiers | `Bool`, `UUID`, `IPv4`, `IPv6` |
+| Nullable and composite | `Nullable(T)`, `Array(T)`, `Tuple(...)`, `Map(K, V)`, `Nested(...)` |
+| Version- or setting-dependent types | `JSON`, `Dynamic`, `Variant(...)`, `Time`, `Time64`, `QBit`, geo types, `AggregateFunction(...)`, `SimpleAggregateFunction(...)` |
+
+For a DDL asset, use ClickHouse-native type syntax directly:
+
+```bruin-sql
+/* @bruin
+name: analytics.events
+type: clickhouse.sql
+materialization:
+  type: table
+  strategy: ddl
+columns:
+  - name: event_id
+    type: UInt64
+    primary_key: true
+  - name: occurred_at
+    type: DateTime64(3, 'UTC')
+  - name: amount
+    type: Decimal
+    precision: 12
+    scale: 2
+  - name: tags
+    type: Array(String)
+  - name: attributes
+    type: Map(String, String)
+  - name: payload
+    type: Nullable(String)
+@bruin */
+```
+
+This renders `amount` as `Decimal(12, 2)` and preserves the parameterized type declarations exactly as written.
+
 ### Examples
 
 Create a view to determine the top 10 earning drivers in a taxi company:
