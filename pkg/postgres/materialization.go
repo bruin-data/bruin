@@ -858,6 +858,31 @@ func dataVaultColumnIsExcluded(col *pipeline.Column, excludedColumns []*pipeline
 	return false
 }
 
+func scd2SessionTZ(asset *pipeline.Asset) string {
+	if asset.Type == pipeline.AssetTypeRedshiftQuery {
+		return ""
+	}
+	return "SET LOCAL TIME ZONE 'UTC';\n"
+}
+
+func pgTimestampWithTimeZone(expr, columnType string) string {
+	lcType := strings.ToLower(columnType)
+	if strings.Contains(lcType, "time zone") || strings.Contains(lcType, "timestamptz") {
+		return fmt.Sprintf("CAST(%s AS TIMESTAMPTZ)", expr)
+	}
+	return fmt.Sprintf("CAST(%s AS TIMESTAMP) AT TIME ZONE 'UTC'", expr)
+}
+
+func pgIncrementalKeyType(asset *pipeline.Asset) string {
+	if asset.Materialization.IncrementalKey == "" {
+		return ""
+	}
+	if col := asset.GetColumnWithName(asset.Materialization.IncrementalKey); col != nil {
+		return col.Type
+	}
+	return ""
+}
+
 func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, error) {
 	primaryKeys := asset.ColumnNamesWithPrimaryKey()
 	if len(primaryKeys) == 0 {
@@ -866,19 +891,19 @@ func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, 
 
 	var validuntil string
 	if asset.Type == pipeline.AssetTypeRedshiftQuery {
-		validuntil = "TIMESTAMP '9999-12-31 00:00:00'"
+		validuntil = "TIMESTAMPTZ '9999-12-31 00:00:00'"
 	} else {
-		validuntil = "'9999-12-31 00:00:00'::TIMESTAMP"
+		validuntil = "'9999-12-31 00:00:00'::TIMESTAMPTZ"
 	}
 
-	validFromExpr := "CURRENT_TIMESTAMP"
+	validFromExpr := "CAST(CURRENT_TIMESTAMP AS TIMESTAMPTZ)"
 	if asset.Materialization.IncrementalKey != "" {
-		validFromExpr = QuoteIdentifier(asset.Materialization.IncrementalKey)
+		validFromExpr = pgTimestampWithTimeZone(QuoteIdentifier(asset.Materialization.IncrementalKey), pgIncrementalKeyType(asset))
 	}
 
 	stmt := fmt.Sprintf(
 		`BEGIN TRANSACTION;
-DROP TABLE IF EXISTS %s;
+%sDROP TABLE IF EXISTS %s;
 CREATE TABLE %s AS
 SELECT
   %s AS _valid_from,
@@ -889,6 +914,7 @@ FROM (
 %s
 ) AS src;
 COMMIT;`,
+		scd2SessionTZ(asset),
 		QuoteIdentifier(asset.Name),
 		QuoteIdentifier(asset.Name),
 		validFromExpr,
@@ -911,15 +937,16 @@ func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query string) (string, er
 
 	var validuntil string
 	if asset.Type == pipeline.AssetTypeRedshiftQuery {
-		validuntil = "TIMESTAMP '9999-12-31 00:00:00'"
+		validuntil = "TIMESTAMPTZ '9999-12-31 00:00:00'"
 	} else {
-		validuntil = "'9999-12-31 00:00:00'::TIMESTAMP"
+		validuntil = "'9999-12-31 00:00:00'::TIMESTAMPTZ"
 	}
 
 	quotedIncrementalKey := QuoteIdentifier(asset.Materialization.IncrementalKey)
+	validFromExpr := pgTimestampWithTimeZone(quotedIncrementalKey, pgIncrementalKeyType(asset))
 	stmt := fmt.Sprintf(
 		`BEGIN TRANSACTION;
-DROP TABLE IF EXISTS %s;
+%sDROP TABLE IF EXISTS %s;
 CREATE TABLE %s AS
 SELECT
   %s AS _valid_from,
@@ -930,9 +957,10 @@ FROM (
 %s
 ) AS src;
 COMMIT;`,
+		scd2SessionTZ(asset),
 		QuoteIdentifier(asset.Name),
 		QuoteIdentifier(asset.Name),
-		quotedIncrementalKey,
+		validFromExpr,
 		validuntil,
 		strings.TrimSpace(query),
 	)
@@ -990,7 +1018,7 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 		validFromExpr = "source." + lowerIncrementalKey
 		validUntilUpdateExpr = "source." + lowerIncrementalKey
 	}
-	insertValues = append(insertValues, validFromExpr, "'9999-12-31 00:00:00'::TIMESTAMP", "TRUE")
+	insertValues = append(insertValues, validFromExpr, "'9999-12-31 00:00:00'::TIMESTAMPTZ", "TRUE")
 
 	pkListForUsing := make([]string, 0, len(primaryKeys))
 	for _, col := range asset.Columns {
@@ -1022,6 +1050,8 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 
 	queryStr := fmt.Sprintf(
 		`
+BEGIN TRANSACTION;
+SET LOCAL TIME ZONE 'UTC';
 MERGE INTO %s AS target
 USING (
   WITH s1 AS (
@@ -1051,7 +1081,8 @@ WHEN NOT MATCHED BY SOURCE AND target._is_current = TRUE THEN
 
 WHEN NOT MATCHED BY TARGET THEN
   INSERT (%s)
-  VALUES (%s);`,
+  VALUES (%s);
+COMMIT;`,
 		QuoteIdentifier(asset.Name),
 		strings.TrimSpace(query),
 		QuoteIdentifier(asset.Name),
@@ -1127,7 +1158,7 @@ func buildSCD2QueryByTime(asset *pipeline.Asset, query string) (string, error) {
 	insertValues = append(
 		insertValues,
 		"source."+quotedIncrementalKey,
-		"'9999-12-31 00:00:00'",
+		"'9999-12-31 00:00:00'::TIMESTAMPTZ",
 		"TRUE",
 	)
 
@@ -1140,6 +1171,8 @@ func buildSCD2QueryByTime(asset *pipeline.Asset, query string) (string, error) {
 
 	queryStr := fmt.Sprintf(
 		`
+BEGIN TRANSACTION;
+SET LOCAL TIME ZONE 'UTC';
 MERGE INTO %s AS target
 USING (
   WITH s1 AS (
@@ -1169,7 +1202,8 @@ WHEN NOT MATCHED BY SOURCE AND target._is_current = TRUE THEN
 
 WHEN NOT MATCHED BY TARGET THEN
   INSERT (%s)
-  VALUES (%s);`,
+  VALUES (%s);
+COMMIT;`,
 		QuoteIdentifier(tbl),
 		strings.TrimSpace(query),
 		QuoteIdentifier(tbl),
@@ -1226,7 +1260,7 @@ func buildRedshiftSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string
 		quotedIncrementalKey := QuoteIdentifier(incrementalKey)
 		validFromExpr = "source." + quotedIncrementalKey
 	}
-	insertValues = append(insertValues, validFromExpr, "TIMESTAMP '9999-12-31 00:00:00'", "TRUE")
+	insertValues = append(insertValues, validFromExpr, "TIMESTAMPTZ '9999-12-31 00:00:00'", "TRUE")
 
 	onConditions := make([]string, 0, len(primaryKeys))
 	for _, pk := range primaryKeys {
@@ -1374,7 +1408,7 @@ func buildRedshiftSCD2QueryByTime(asset *pipeline.Asset, query string) (string, 
 	insertValues = append(
 		insertValues,
 		"source."+quotedIncrementalKey,
-		"TIMESTAMP '9999-12-31 00:00:00'",
+		"TIMESTAMPTZ '9999-12-31 00:00:00'",
 		"TRUE",
 	)
 

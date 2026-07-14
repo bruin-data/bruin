@@ -11,6 +11,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/scd2migration"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 )
@@ -18,6 +19,7 @@ import (
 type materializer interface {
 	Render(task *pipeline.Asset, query string) (string, error)
 	LogIfFullRefreshAndDDL(writer interface{}, asset *pipeline.Asset) error
+	IsFullRefresh() bool
 }
 
 // OracleClient is the interface for executing queries against Oracle.
@@ -26,6 +28,7 @@ type materializer interface {
 // ensure asset names match the exact case used during creation.
 type OracleClient interface {
 	RunQueryWithoutResult(ctx context.Context, query *query.Query) error
+	Select(ctx context.Context, query *query.Query) ([][]interface{}, error)
 }
 
 type devEnv interface {
@@ -92,6 +95,15 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, asset 
 	}
 
 	// We don't have CreateSchemaIfNotExist required in the interface implemented natively yet on Oracle.
+
+	// On the incremental SCD2 path the target table already exists and keeps its
+	// original column types. Migrate legacy naive bruin_valid_from/bruin_valid_until
+	// columns to timezone-aware types before writing tz-aware values into them.
+	if asset.Materialization.IsSCD2() && !o.materializer.IsFullRefresh() {
+		if err := scd2migration.Oracle(ctx, conn, asset.Name); err != nil {
+			return err
+		}
+	}
 
 	var lastQuery *query.Query
 	for _, q := range queries {

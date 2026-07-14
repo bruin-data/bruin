@@ -759,7 +759,7 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 				},
 			},
 			query: "SELECT id, event_name, ts from source_table",
-			want: "MERGE INTO \"my\".\"asset\" AS target\n" +
+			want: "BEGIN TRANSACTION;\nSET LOCAL TIME ZONE 'UTC';\nMERGE INTO \"my\".\"asset\" AS target\n" +
 				"USING (\n" +
 				"  WITH s1 AS (\n" +
 				"    SELECT id, event_name, ts from source_table\n" +
@@ -788,7 +788,7 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 				"\n" +
 				"WHEN NOT MATCHED BY TARGET THEN\n" +
 				"  INSERT (\"id\", \"event_name\", \"ts\", _valid_from, _valid_until, _is_current)\n" +
-				"  VALUES (source.\"id\", source.\"event_name\", source.\"ts\", source.\"ts\", '9999-12-31 00:00:00', TRUE);",
+				"  VALUES (source.\"id\", source.\"event_name\", source.\"ts\", source.\"ts\", '9999-12-31 00:00:00'::TIMESTAMPTZ, TRUE);\nCOMMIT;",
 		},
 		//nolint:dupword
 		{
@@ -809,7 +809,7 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 				},
 			},
 			query: "SELECT id, event_type, col1, col2, ts from source_table",
-			want: "MERGE INTO \"my\".\"asset\" AS target\n" +
+			want: "BEGIN TRANSACTION;\nSET LOCAL TIME ZONE 'UTC';\nMERGE INTO \"my\".\"asset\" AS target\n" +
 				"USING (\n" +
 				"  WITH s1 AS (\n" +
 				"    SELECT id, event_type, col1, col2, ts from source_table\n" +
@@ -838,7 +838,7 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 				"\n" +
 				"WHEN NOT MATCHED BY TARGET THEN\n" +
 				"  INSERT (\"id\", \"event_type\", \"col1\", \"col2\", \"ts\", _valid_from, _valid_until, _is_current)\n" +
-				"  VALUES (source.\"id\", source.\"event_type\", source.\"col1\", source.\"col2\", source.\"ts\", source.\"ts\", '9999-12-31 00:00:00', TRUE);",
+				"  VALUES (source.\"id\", source.\"event_type\", source.\"col1\", source.\"col2\", source.\"ts\", source.\"ts\", '9999-12-31 00:00:00'::TIMESTAMPTZ, TRUE);\nCOMMIT;",
 		},
 		{
 			name: "scd2_full_refresh_with_incremental_key",
@@ -857,13 +857,13 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 			},
 			fullRefresh: true,
 			query:       "SELECT id, event_name, ts from source_table",
-			want: "BEGIN TRANSACTION;\n" +
+			want: "BEGIN TRANSACTION;\nSET LOCAL TIME ZONE 'UTC';\n" +
 				"DROP TABLE IF EXISTS \"my\".\"asset\";\n" +
 				"CREATE TABLE \"my\".\"asset\" AS\n" +
 				"SELECT\n" +
-				"  \"ts\" AS _valid_from,\n" +
+				"  CAST(\"ts\" AS TIMESTAMP) AT TIME ZONE 'UTC' AS _valid_from,\n" +
 				"  src.*,\n" +
-				"  '9999-12-31 00:00:00'::TIMESTAMP AS _valid_until,\n" +
+				"  '9999-12-31 00:00:00'::TIMESTAMPTZ AS _valid_until,\n" +
 				"  TRUE AS _is_current\n" +
 				"FROM (\n" +
 				"SELECT id, event_name, ts from source_table\n" +
@@ -979,7 +979,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				},
 			},
 			query: "SELECT id, col1, col2, col3, col4 from source_table",
-			want: "MERGE INTO \"my\".\"asset\" AS target\n" +
+			want: "BEGIN TRANSACTION;\nSET LOCAL TIME ZONE 'UTC';\nMERGE INTO \"my\".\"asset\" AS target\n" +
 				"USING (\n" +
 				"  WITH s1 AS (\n" +
 				"    SELECT id, col1, col2, col3, col4 from source_table\n" +
@@ -1008,7 +1008,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				"\n" +
 				"WHEN NOT MATCHED BY TARGET THEN\n" +
 				"  INSERT (id, col1, col2, col3, col4, _valid_from, _valid_until, _is_current)\n" +
-				"  VALUES (source.id, source.col1, source.col2, source.col3, source.col4, CURRENT_TIMESTAMP, '9999-12-31 00:00:00'::TIMESTAMP, TRUE);",
+				"  VALUES (source.id, source.col1, source.col2, source.col3, source.col4, CURRENT_TIMESTAMP, '9999-12-31 00:00:00'::TIMESTAMPTZ, TRUE);\nCOMMIT;",
 		},
 		{
 			name: "scd2_multiple_primary_keys",
@@ -1026,7 +1026,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				},
 			},
 			query: "SELECT id, category, name, price from source_table",
-			want: "MERGE INTO \"my\".\"asset\" AS target\n" +
+			want: "BEGIN TRANSACTION;\nSET LOCAL TIME ZONE 'UTC';\nMERGE INTO \"my\".\"asset\" AS target\n" +
 				"USING (\n" +
 				"  WITH s1 AS (\n" +
 				"    SELECT id, category, name, price from source_table\n" +
@@ -1055,7 +1055,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				"\n" +
 				"WHEN NOT MATCHED BY TARGET THEN\n" +
 				"  INSERT (id, category, name, price, _valid_from, _valid_until, _is_current)\n" +
-				"  VALUES (source.id, source.category, source.name, source.price, CURRENT_TIMESTAMP, '9999-12-31 00:00:00'::TIMESTAMP, TRUE);",
+				"  VALUES (source.id, source.category, source.name, source.price, CURRENT_TIMESTAMP, '9999-12-31 00:00:00'::TIMESTAMPTZ, TRUE);\nCOMMIT;",
 		},
 		{
 			name: "scd2_full_refresh_by_column",
@@ -1073,13 +1073,13 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 			},
 			fullRefresh: true,
 			query:       "SELECT id, name, price from source_table",
-			want: "BEGIN TRANSACTION;\n" +
+			want: "BEGIN TRANSACTION;\nSET LOCAL TIME ZONE 'UTC';\n" +
 				"DROP TABLE IF EXISTS \"my\".\"asset\";\n" +
 				"CREATE TABLE \"my\".\"asset\" AS\n" +
 				"SELECT\n" +
-				"  CURRENT_TIMESTAMP AS _valid_from,\n" +
+				"  CAST(CURRENT_TIMESTAMP AS TIMESTAMPTZ) AS _valid_from,\n" +
 				"  src.*,\n" +
-				"  '9999-12-31 00:00:00'::TIMESTAMP AS _valid_until,\n" +
+				"  '9999-12-31 00:00:00'::TIMESTAMPTZ AS _valid_until,\n" +
 				"  TRUE AS _is_current\n" +
 				"FROM (\n" +
 				"SELECT id, name, price from source_table\n" +
@@ -1103,7 +1103,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				},
 			},
 			query: "SELECT id, col1, col2, updated_at from source_table",
-			want: "MERGE INTO \"my\".\"asset\" AS target\n" +
+			want: "BEGIN TRANSACTION;\nSET LOCAL TIME ZONE 'UTC';\nMERGE INTO \"my\".\"asset\" AS target\n" +
 				"USING (\n" +
 				"  WITH s1 AS (\n" +
 				"    SELECT id, col1, col2, updated_at from source_table\n" +
@@ -1132,7 +1132,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				"\n" +
 				"WHEN NOT MATCHED BY TARGET THEN\n" +
 				"  INSERT (id, col1, col2, updated_at, _valid_from, _valid_until, _is_current)\n" +
-				"  VALUES (source.id, source.col1, source.col2, source.updated_at, source.updated_at, '9999-12-31 00:00:00'::TIMESTAMP, TRUE);", //nolint:dupword
+				"  VALUES (source.id, source.col1, source.col2, source.updated_at, source.updated_at, '9999-12-31 00:00:00'::TIMESTAMPTZ, TRUE);\nCOMMIT;", //nolint:dupword
 		},
 		{
 			name: "scd2_full_refresh_by_column_with_incremental_key",
@@ -1152,13 +1152,13 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 			},
 			fullRefresh: true,
 			query:       "SELECT id, name, price, updated_at from source_table",
-			want: "BEGIN TRANSACTION;\n" +
+			want: "BEGIN TRANSACTION;\nSET LOCAL TIME ZONE 'UTC';\n" +
 				"DROP TABLE IF EXISTS \"my\".\"asset\";\n" +
 				"CREATE TABLE \"my\".\"asset\" AS\n" +
 				"SELECT\n" +
-				"  \"updated_at\" AS _valid_from,\n" +
+				"  CAST(\"updated_at\" AS TIMESTAMP) AT TIME ZONE 'UTC' AS _valid_from,\n" +
 				"  src.*,\n" +
-				"  '9999-12-31 00:00:00'::TIMESTAMP AS _valid_until,\n" +
+				"  '9999-12-31 00:00:00'::TIMESTAMPTZ AS _valid_until,\n" +
 				"  TRUE AS _is_current\n" +
 				"FROM (\n" +
 				"SELECT id, name, price, updated_at from source_table\n" +
@@ -1348,7 +1348,7 @@ func TestBuildRedshiftSCD2QueryByTime(t *testing.T) {
 				"  \\);\n\n" +
 				"-- Insert new records and new versions of changed records\n" +
 				"INSERT INTO \"my\"\\.\"asset\" \\(\"id\", \"event_name\", \"ts\", _valid_from, _valid_until, _is_current\\)\n" +
-				"SELECT source\\.\"id\", source\\.\"event_name\", source\\.\"ts\", source\\.\"ts\", TIMESTAMP '9999-12-31 00:00:00', TRUE\n" + //nolint:dupword
+				"SELECT source\\.\"id\", source\\.\"event_name\", source\\.\"ts\", source\\.\"ts\", TIMESTAMPTZ '9999-12-31 00:00:00', TRUE\n" + //nolint:dupword
 				"FROM __bruin_scd2_time_tmp_.+ AS source\n" +
 				"WHERE NOT EXISTS \\(\n" +
 				"  SELECT 1 FROM \"my\"\\.\"asset\" AS target \n" +
@@ -1402,7 +1402,7 @@ func TestBuildRedshiftSCD2QueryByTime(t *testing.T) {
 				"  \\);\n\n" +
 				"-- Insert new records and new versions of changed records\n" +
 				"INSERT INTO \"my\"\\.\"asset\" \\(\"id\", \"event_type\", \"col1\", \"col2\", \"ts\", _valid_from, _valid_until, _is_current\\)\n" +
-				"SELECT source\\.\"id\", source\\.\"event_type\", source\\.\"col1\", source\\.\"col2\", source\\.\"ts\", source\\.\"ts\", TIMESTAMP '9999-12-31 00:00:00', TRUE\n" + //nolint:dupword
+				"SELECT source\\.\"id\", source\\.\"event_type\", source\\.\"col1\", source\\.\"col2\", source\\.\"ts\", source\\.\"ts\", TIMESTAMPTZ '9999-12-31 00:00:00', TRUE\n" + //nolint:dupword
 				"FROM __bruin_scd2_time_tmp_.+ AS source\n" +
 				"WHERE NOT EXISTS \\(\n" +
 				"  SELECT 1 FROM \"my\"\\.\"asset\" AS target \n" +
@@ -1438,9 +1438,9 @@ func TestBuildRedshiftSCD2QueryByTime(t *testing.T) {
 				"DROP TABLE IF EXISTS \"my\".\"asset\";\n" +
 				"CREATE TABLE \"my\".\"asset\" AS\n" +
 				"SELECT\n" +
-				"  \"ts\" AS _valid_from,\n" +
+				"  CAST(\"ts\" AS TIMESTAMP) AT TIME ZONE 'UTC' AS _valid_from,\n" +
 				"  src.*,\n" +
-				"  TIMESTAMP '9999-12-31 00:00:00' AS _valid_until,\n" +
+				"  TIMESTAMPTZ '9999-12-31 00:00:00' AS _valid_until,\n" +
 				"  TRUE AS _is_current\n" +
 				"FROM (\n" +
 				"SELECT id, event_name, ts from source_table\n" +
@@ -1591,7 +1591,7 @@ func TestBuildRedshiftSCD2ByColumnQuery(t *testing.T) {
 				"  \\);\n\n" +
 				"-- Insert new records and new versions of changed records\n" +
 				"INSERT INTO \"my\"\\.\"asset\" \\(\"id\", \"col1\", \"col2\", \"col3\", \"col4\", _valid_from, _valid_until, _is_current\\)\n" +
-				"SELECT source\\.\"id\", source\\.\"col1\", source\\.\"col2\", source\\.\"col3\", source\\.\"col4\", \\(SELECT session_timestamp FROM _ts\\), TIMESTAMP '9999-12-31 00:00:00', TRUE\n" +
+				"SELECT source\\.\"id\", source\\.\"col1\", source\\.\"col2\", source\\.\"col3\", source\\.\"col4\", \\(SELECT session_timestamp FROM _ts\\), TIMESTAMPTZ '9999-12-31 00:00:00', TRUE\n" +
 				"FROM __bruin_scd2_tmp_.+ AS source\n" +
 				"WHERE NOT EXISTS \\(\n" +
 				"  SELECT 1 FROM \"my\"\\.\"asset\" AS target \n" +
@@ -1642,7 +1642,7 @@ func TestBuildRedshiftSCD2ByColumnQuery(t *testing.T) {
 				"  \\);\n\n" +
 				"-- Insert new records and new versions of changed records\n" +
 				"INSERT INTO \"my\"\\.\"asset\" \\(\"id\", \"category\", \"name\", \"price\", _valid_from, _valid_until, _is_current\\)\n" +
-				"SELECT source\\.\"id\", source\\.\"category\", source\\.\"name\", source\\.\"price\", \\(SELECT session_timestamp FROM _ts\\), TIMESTAMP '9999-12-31 00:00:00', TRUE\n" +
+				"SELECT source\\.\"id\", source\\.\"category\", source\\.\"name\", source\\.\"price\", \\(SELECT session_timestamp FROM _ts\\), TIMESTAMPTZ '9999-12-31 00:00:00', TRUE\n" +
 				"FROM __bruin_scd2_tmp_.+ AS source\n" +
 				"WHERE NOT EXISTS \\(\n" +
 				"  SELECT 1 FROM \"my\"\\.\"asset\" AS target \n" +
@@ -1672,9 +1672,9 @@ func TestBuildRedshiftSCD2ByColumnQuery(t *testing.T) {
 				"DROP TABLE IF EXISTS \"my\".\"asset\";\n" +
 				"CREATE TABLE \"my\".\"asset\" AS\n" +
 				"SELECT\n" +
-				"  CURRENT_TIMESTAMP AS _valid_from,\n" +
+				"  CAST(CURRENT_TIMESTAMP AS TIMESTAMPTZ) AS _valid_from,\n" +
 				"  src.*,\n" +
-				"  TIMESTAMP '9999-12-31 00:00:00' AS _valid_until,\n" +
+				"  TIMESTAMPTZ '9999-12-31 00:00:00' AS _valid_until,\n" +
 				"  TRUE AS _is_current\n" +
 				"FROM (\n" +
 				"SELECT id, name, price from source_table\n" +
@@ -1725,7 +1725,7 @@ func TestBuildRedshiftSCD2ByColumnQuery(t *testing.T) {
 				"-- Insert new records and new versions of changed records\n" +
 				"INSERT INTO \"my\"\\.\"asset\" \\(\"id\", \"col1\", \"col2\", \"updated_at\", _valid_from, _valid_until, _is_current\\)\n" +
 				//nolint:dupword
-				"SELECT source\\.\"id\", source\\.\"col1\", source\\.\"col2\", source\\.\"updated_at\", source\\.\"updated_at\", TIMESTAMP '9999-12-31 00:00:00', TRUE\n" +
+				"SELECT source\\.\"id\", source\\.\"col1\", source\\.\"col2\", source\\.\"updated_at\", source\\.\"updated_at\", TIMESTAMPTZ '9999-12-31 00:00:00', TRUE\n" +
 				"FROM __bruin_scd2_tmp_.+ AS source\n" +
 				"WHERE NOT EXISTS \\(\n" +
 				"  SELECT 1 FROM \"my\"\\.\"asset\" AS target \n" +
@@ -1757,9 +1757,9 @@ func TestBuildRedshiftSCD2ByColumnQuery(t *testing.T) {
 				"DROP TABLE IF EXISTS \"my\".\"asset\";\n" +
 				"CREATE TABLE \"my\".\"asset\" AS\n" +
 				"SELECT\n" +
-				"  \"updated_at\" AS _valid_from,\n" +
+				"  CAST(\"updated_at\" AS TIMESTAMP) AT TIME ZONE 'UTC' AS _valid_from,\n" +
 				"  src.*,\n" +
-				"  TIMESTAMP '9999-12-31 00:00:00' AS _valid_until,\n" +
+				"  TIMESTAMPTZ '9999-12-31 00:00:00' AS _valid_until,\n" +
 				"  TRUE AS _is_current\n" +
 				"FROM (\n" +
 				"SELECT id, name, price, updated_at from source_table\n" +

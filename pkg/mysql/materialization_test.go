@@ -314,7 +314,7 @@ COMMIT;$`,
 				"UPDATE analytics.history AS target JOIN %[1]s AS source ON target.id = source.id SET target._valid_until = CAST(source.event_time AS DATETIME), target._is_current = FALSE WHERE target._is_current = TRUE AND target._valid_from < CAST(source.event_time AS DATETIME);\n" +
 				"UPDATE analytics.history AS target LEFT JOIN %[1]s AS source ON target.id = source.id SET target._valid_until = CURRENT_TIMESTAMP, target._is_current = FALSE WHERE target._is_current = TRUE AND source.id IS NULL;\n" +
 				"INSERT INTO analytics.history (id, event_time, country, _valid_from, _valid_until, _is_current)\n" +
-				"SELECT source.id, source.event_time, source.country, CAST(source.event_time AS DATETIME), '9999-12-31 23:59:59', TRUE\n" +
+				"SELECT source.id, source.event_time, source.country, CAST(source.event_time AS DATETIME), CAST('9999-12-31 23:59:59' AS DATETIME), TRUE\n" +
 				"FROM %[1]s AS source\n" +
 				"LEFT JOIN analytics.history AS current ON current.id = source.id AND current._is_current = TRUE\n" +
 				"WHERE current.id IS NULL OR current._valid_from < CAST(source.event_time AS DATETIME);\n" +
@@ -345,7 +345,7 @@ COMMIT;$`,
 				"  src.event_time,\n" +
 				"  src.country,\n" +
 				"  CAST(src.event_time AS DATETIME) AS _valid_from,\n" +
-				"  '9999-12-31 23:59:59' AS _valid_until,\n" +
+				"  CAST('9999-12-31 23:59:59' AS DATETIME) AS _valid_until,\n" +
 				"  TRUE AS _is_current\n" +
 				"FROM (\n" +
 				"SELECT id, event_time, country FROM source\n" +
@@ -405,7 +405,7 @@ COMMIT;$`,
 				"UPDATE analytics.history AS target LEFT JOIN %[1]s AS source ON target.id = source.id SET target._valid_until = @current_scd2_ts, target._is_current = FALSE WHERE target._is_current = TRUE AND source.id IS NULL;\n" +
 				"UPDATE analytics.history AS target JOIN %[1]s AS source ON target.id = source.id SET target._valid_until = @current_scd2_ts, target._is_current = FALSE WHERE target._is_current = TRUE AND (NOT (target.name <=> source.name) OR NOT (target.country <=> source.country));\n" +
 				"INSERT INTO analytics.history (id, name, country, _valid_from, _valid_until, _is_current)\n" +
-				"SELECT source.id, source.name, source.country, @current_scd2_ts, '9999-12-31 23:59:59', TRUE\n" +
+				"SELECT source.id, source.name, source.country, @current_scd2_ts, CAST('9999-12-31 23:59:59' AS DATETIME), TRUE\n" +
 				"FROM %[1]s AS source\n" +
 				"LEFT JOIN analytics.history AS current ON current.id = source.id AND current._is_current = TRUE\n" +
 				"WHERE current.id IS NULL OR (NOT (current.name <=> source.name) OR NOT (current.country <=> source.country));\n" +
@@ -435,7 +435,7 @@ COMMIT;$`,
 				"  src.name,\n" +
 				"  src.country,\n" +
 				"  CURRENT_TIMESTAMP AS _valid_from,\n" +
-				"  '9999-12-31 23:59:59' AS _valid_until,\n" +
+				"  CAST('9999-12-31 23:59:59' AS DATETIME) AS _valid_until,\n" +
 				"  TRUE AS _is_current\n" +
 				"FROM (\n" +
 				"SELECT id, name, country FROM source\n" +
@@ -464,7 +464,7 @@ COMMIT;$`,
 				"UPDATE analytics.history AS target LEFT JOIN %[1]s AS source ON target.id = source.id SET target._valid_until = @current_scd2_ts, target._is_current = FALSE WHERE target._is_current = TRUE AND source.id IS NULL;\n" +
 				"UPDATE analytics.history AS target JOIN %[1]s AS source ON target.id = source.id SET target._valid_until = CAST(source.updated_at AS DATETIME), target._is_current = FALSE WHERE target._is_current = TRUE AND (NOT (target.name <=> source.name) OR NOT (target.updated_at <=> source.updated_at));\n" +
 				"INSERT INTO analytics.history (id, name, updated_at, _valid_from, _valid_until, _is_current)\n" +
-				"SELECT source.id, source.name, source.updated_at, CAST(source.updated_at AS DATETIME), '9999-12-31 23:59:59', TRUE\n" +
+				"SELECT source.id, source.name, source.updated_at, CAST(source.updated_at AS DATETIME), CAST('9999-12-31 23:59:59' AS DATETIME), TRUE\n" +
 				"FROM %[1]s AS source\n" +
 				"LEFT JOIN analytics.history AS current ON current.id = source.id AND current._is_current = TRUE\n" +
 				"WHERE current.id IS NULL OR (NOT (current.name <=> source.name) OR NOT (current.updated_at <=> source.updated_at));\n" +
@@ -495,7 +495,7 @@ COMMIT;$`,
 				"  src.name,\n" +
 				"  src.updated_at,\n" +
 				"  CAST(src.updated_at AS DATETIME) AS _valid_from,\n" +
-				"  '9999-12-31 23:59:59' AS _valid_until,\n" +
+				"  CAST('9999-12-31 23:59:59' AS DATETIME) AS _valid_until,\n" +
 				"  TRUE AS _is_current\n" +
 				"FROM (\n" +
 				"SELECT id, name, updated_at FROM source\n" +

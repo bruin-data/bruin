@@ -346,7 +346,7 @@ func buildSCD2ByTimeQuery(asset *pipeline.Asset, query string) (string, error) {
 			asset.Name, tempTableName, joinCondition, timeExpr, timeExpr),
 		fmt.Sprintf("UPDATE %s AS target LEFT JOIN %s AS source ON %s SET target._valid_until = CURRENT_TIMESTAMP, target._is_current = FALSE WHERE target._is_current = TRUE AND source.%s IS NULL",
 			asset.Name, tempTableName, joinCondition, firstPK),
-		fmt.Sprintf("INSERT INTO %s (%s)\nSELECT %s, %s, '9999-12-31 23:59:59', TRUE\nFROM %s AS source\nLEFT JOIN %s AS current ON %s AND current._is_current = TRUE\nWHERE current.%s IS NULL OR current._valid_from < %s",
+		fmt.Sprintf("INSERT INTO %s (%s)\nSELECT %s, %s, CAST('9999-12-31 23:59:59' AS DATETIME), TRUE\nFROM %s AS source\nLEFT JOIN %s AS current ON %s AND current._is_current = TRUE\nWHERE current.%s IS NULL OR current._valid_from < %s",
 			asset.Name,
 			insertList,
 			selectClause,
@@ -405,7 +405,7 @@ CREATE TABLE %s AS
 SELECT
   %s,
   CAST(src.%s AS DATETIME) AS _valid_from,
-  '9999-12-31 23:59:59' AS _valid_until,
+  CAST('9999-12-31 23:59:59' AS DATETIME) AS _valid_until,
   TRUE AS _is_current
 FROM (
 %s
@@ -501,7 +501,7 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 			asset.Name, tempTableName, joinCondition, firstPK),
 		fmt.Sprintf("UPDATE %s AS target JOIN %s AS source ON %s SET target._valid_until = %s, target._is_current = FALSE WHERE target._is_current = TRUE AND (%s)",
 			asset.Name, tempTableName, joinCondition, validUntilUpdateExpr, changeCondition),
-		fmt.Sprintf("INSERT INTO %s (%s)\nSELECT %s, %s, '9999-12-31 23:59:59', TRUE\nFROM %s AS source\nLEFT JOIN %s AS current ON %s AND current._is_current = TRUE\nWHERE current.%s IS NULL OR (%s)",
+		fmt.Sprintf("INSERT INTO %s (%s)\nSELECT %s, %s, CAST('9999-12-31 23:59:59' AS DATETIME), TRUE\nFROM %s AS source\nLEFT JOIN %s AS current ON %s AND current._is_current = TRUE\nWHERE current.%s IS NULL OR (%s)",
 			asset.Name,
 			insertList,
 			selectClause,
@@ -550,7 +550,7 @@ CREATE TABLE %s AS
 SELECT
   %s,
   %s AS _valid_from,
-  '9999-12-31 23:59:59' AS _valid_until,
+  CAST('9999-12-31 23:59:59' AS DATETIME) AS _valid_until,
   TRUE AS _is_current
 FROM (
 %s
