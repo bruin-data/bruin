@@ -613,6 +613,10 @@ type Materialization struct {
 	TimeGranularity MaterializationTimeGranularity `json:"time_granularity" yaml:"time_granularity,omitempty" mapstructure:"time_granularity"`
 }
 
+func (m Materialization) IsSCD2() bool {
+	return m.Strategy == MaterializationStrategySCD2ByColumn || m.Strategy == MaterializationStrategySCD2ByTime
+}
+
 func (m Materialization) MarshalJSON() ([]byte, error) {
 	if m.Type == "" && m.Strategy == "" && m.PartitionBy == "" && len(m.ClusterBy) == 0 && m.IncrementalKey == "" && m.TimeGranularity == "" {
 		return []byte("null"), nil
