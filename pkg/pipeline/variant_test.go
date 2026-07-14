@@ -437,6 +437,7 @@ func TestVariantVisitorCoversStringFields(t *testing.T) {
 		"Pipeline.Notifications.MSTeams[].Connection": true,
 		"Pipeline.Notifications.Discord[].Connection": true,
 		"Pipeline.Notifications.Webhook[].Connection": true,
+		"Pipeline.Notifications.Email[].Recipients[]": true,
 
 		// Asset internals + file metadata — never user-templated.
 		"Pipeline.Assets[].ID":                     true,
@@ -498,10 +499,12 @@ func TestVariantVisitorCoversStringFields(t *testing.T) {
 		"Pipeline.Assets[].Notifications.MSTeams[].Connection":      true,
 		"Pipeline.Assets[].Notifications.Discord[].Connection":      true,
 		"Pipeline.Assets[].Notifications.Webhook[].Connection":      true,
+		"Pipeline.Assets[].Notifications.Email[].Recipients[]":      true,
 		"Pipeline.DefaultValues.Notifications.Slack[].Channel":      true,
 		"Pipeline.DefaultValues.Notifications.MSTeams[].Connection": true,
 		"Pipeline.DefaultValues.Notifications.Discord[].Connection": true,
 		"Pipeline.DefaultValues.Notifications.Webhook[].Connection": true,
+		"Pipeline.DefaultValues.Notifications.Email[].Recipients[]": true,
 	}
 
 	pl := buildFullyPopulatedPipelineForVisitorTest()
@@ -622,6 +625,7 @@ func buildFullyPopulatedPipelineForVisitorTest() *pipeline.Pipeline {
 				MSTeams: []pipeline.MSTeamsNotification{{Connection: "c"}},
 				Discord: []pipeline.DiscordNotification{{Connection: "c"}},
 				Webhook: []pipeline.WebhookNotification{{Connection: "c"}},
+				Email:   []pipeline.EmailNotification{{Recipients: []string{"alerts@example.com"}}},
 			},
 		},
 		Variables: pipeline.Variables{

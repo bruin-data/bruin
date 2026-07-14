@@ -326,6 +326,7 @@ type Notifications struct {
 	MSTeams []MSTeamsNotification `yaml:"ms_teams" json:"ms_teams" mapstructure:"ms_teams"`
 	Discord []DiscordNotification `yaml:"discord" json:"discord" mapstructure:"discord"`
 	Webhook []WebhookNotification `yaml:"webhook" json:"webhook" mapstructure:"webhook"`
+	Email   []EmailNotification   `yaml:"email" json:"email" mapstructure:"email"`
 }
 
 type DefaultTrueBool struct { //nolint:recvcheck
@@ -517,11 +518,17 @@ type WebhookNotification struct {
 	NotificationCommon `yaml:",inline" json:",inline" mapstructure:",inline"`
 }
 
+type EmailNotification struct {
+	Recipients         []string `yaml:"recipients" json:"recipients" mapstructure:"recipients"`
+	NotificationCommon `yaml:",inline" json:",inline" mapstructure:",inline"`
+}
+
 func (n Notifications) MarshalJSON() ([]byte, error) {
 	slack := make([]SlackNotification, 0, len(n.Slack))
 	MSTeams := make([]MSTeamsNotification, 0, len(n.MSTeams))
 	discord := make([]DiscordNotification, 0, len(n.Discord))
 	webhook := make([]WebhookNotification, 0, len(n.Webhook))
+	email := make([]EmailNotification, 0, len(n.Email))
 	for _, s := range n.Slack {
 		if !reflect.ValueOf(s).IsZero() {
 			slack = append(slack, s)
@@ -542,17 +549,24 @@ func (n Notifications) MarshalJSON() ([]byte, error) {
 			webhook = append(webhook, s)
 		}
 	}
+	for _, s := range n.Email {
+		if !reflect.ValueOf(s).IsZero() {
+			email = append(email, s)
+		}
+	}
 
 	return json.Marshal(struct {
 		Slack   []SlackNotification   `json:"slack"`
 		MSTeams []MSTeamsNotification `json:"ms_teams"`
 		Discord []DiscordNotification `json:"discord"`
 		Webhook []WebhookNotification `json:"webhook"`
+		Email   []EmailNotification   `json:"email"`
 	}{
 		Slack:   slack,
 		MSTeams: MSTeams,
 		Discord: discord,
 		Webhook: webhook,
+		Email:   email,
 	})
 }
 
@@ -3567,6 +3581,7 @@ func mergeNotificationDefaults(target *Notifications, defaults *Notifications) *
 	merged.MSTeams = appendMissingMSTeamsNotifications(merged.MSTeams, defaults.MSTeams)
 	merged.Discord = appendMissingDiscordNotifications(merged.Discord, defaults.Discord)
 	merged.Webhook = appendMissingWebhookNotifications(merged.Webhook, defaults.Webhook)
+	merged.Email = appendMissingEmailNotifications(merged.Email, defaults.Email)
 	return merged
 }
 
@@ -3628,6 +3643,26 @@ func appendMissingWebhookNotifications(target []WebhookNotification, defaults []
 		}
 	}
 	return merged
+}
+
+func appendMissingEmailNotifications(target []EmailNotification, defaults []EmailNotification) []EmailNotification {
+	merged := append([]EmailNotification(nil), target...)
+	existing := make(map[string]bool, len(merged))
+	for _, notification := range merged {
+		existing[emailRecipientsKey(notification.Recipients)] = true
+	}
+	for _, notification := range defaults {
+		key := emailRecipientsKey(notification.Recipients)
+		if !existing[key] {
+			merged = append(merged, cloneEmailNotification(notification))
+			existing[key] = true
+		}
+	}
+	return merged
+}
+
+func emailRecipientsKey(recipients []string) string {
+	return strings.Join(recipients, "\x00")
 }
 
 func cloneEmptyStringMap(value EmptyStringMap) EmptyStringMap {
@@ -3711,6 +3746,7 @@ func cloneNotifications(value *Notifications) *Notifications {
 		MSTeams: make([]MSTeamsNotification, 0, len(value.MSTeams)),
 		Discord: make([]DiscordNotification, 0, len(value.Discord)),
 		Webhook: make([]WebhookNotification, 0, len(value.Webhook)),
+		Email:   make([]EmailNotification, 0, len(value.Email)),
 	}
 	for _, notification := range value.Slack {
 		clone.Slack = append(clone.Slack, cloneSlackNotification(notification))
@@ -3723,6 +3759,9 @@ func cloneNotifications(value *Notifications) *Notifications {
 	}
 	for _, notification := range value.Webhook {
 		clone.Webhook = append(clone.Webhook, cloneWebhookNotification(notification))
+	}
+	for _, notification := range value.Email {
+		clone.Email = append(clone.Email, cloneEmailNotification(notification))
 	}
 	return clone
 }
@@ -3746,6 +3785,13 @@ func cloneDiscordNotification(value DiscordNotification) DiscordNotification {
 }
 
 func cloneWebhookNotification(value WebhookNotification) WebhookNotification {
+	value.Success = cloneDefaultTrueBool(value.Success)
+	value.Failure = cloneDefaultTrueBool(value.Failure)
+	return value
+}
+
+func cloneEmailNotification(value EmailNotification) EmailNotification {
+	value.Recipients = append([]string(nil), value.Recipients...)
 	value.Success = cloneDefaultTrueBool(value.Success)
 	value.Failure = cloneDefaultTrueBool(value.Failure)
 	return value

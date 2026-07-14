@@ -28,7 +28,8 @@
     "slack": [],
     "discord": [],
     "ms_teams" : [],
-    "webhook": []
+    "webhook": [],
+  "email": []
   },
   "catchup": "",
   "commit": "",

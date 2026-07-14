@@ -387,7 +387,7 @@ type doris struct {
 }
 
 func notificationsOrNil(n Notifications) *Notifications {
-	if len(n.Slack) == 0 && len(n.MSTeams) == 0 && len(n.Discord) == 0 && len(n.Webhook) == 0 {
+	if len(n.Slack) == 0 && len(n.MSTeams) == 0 && len(n.Discord) == 0 && len(n.Webhook) == 0 && len(n.Email) == 0 {
 		return nil
 	}
 	return &n

@@ -1228,6 +1228,41 @@ func TestEnsurePipelineNotificationsAreValid(t *testing.T) {
 			},
 			want: []*Issue{{Description: discordConnectionNotUnique}},
 		},
+		{
+			name: "valid email recipients",
+			p: &pipeline.Pipeline{
+				Notifications: pipeline.Notifications{
+					Email: []pipeline.EmailNotification{{Recipients: []string{"alerts@example.com", "oncall@example.com"}}},
+				},
+			},
+			want: noIssues,
+		},
+		{
+			name: "email recipients are required",
+			p: &pipeline.Pipeline{
+				Notifications: pipeline.Notifications{Email: []pipeline.EmailNotification{{}}},
+			},
+			want: []*Issue{{Description: emailRecipientsEmpty}},
+		},
+		{
+			name: "email recipient cannot be empty",
+			p: &pipeline.Pipeline{
+				Notifications: pipeline.Notifications{Email: []pipeline.EmailNotification{{Recipients: []string{""}}}},
+			},
+			want: []*Issue{{Description: emailRecipientEmpty}},
+		},
+		{
+			name: "duplicate email recipient groups",
+			p: &pipeline.Pipeline{
+				Notifications: pipeline.Notifications{
+					Email: []pipeline.EmailNotification{
+						{Recipients: []string{"alerts@example.com"}},
+						{Recipients: []string{"alerts@example.com"}},
+					},
+				},
+			},
+			want: []*Issue{{Description: emailRecipientsNotUnique}},
+		},
 	}
 
 	for _, tt := range tests {

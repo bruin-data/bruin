@@ -52,6 +52,9 @@ const (
 	msTeamsConnectionNotUnique = "The `connection` attribute under the MS Teams notifications must be unique"
 	discordConnectionEmpty     = "Discord notifications `connection` attribute must not be empty"
 	discordConnectionNotUnique = "The `connection` attribute under the Discord notifications must be unique"
+	emailRecipientsEmpty       = "Email notifications must have at least one recipient"
+	emailRecipientEmpty        = "Email notification recipients must not be empty"
+	emailRecipientsNotUnique   = "The `recipients` attribute under the email notifications must be unique"
 
 	pipelineConcurrencyMustBePositive    = "Pipeline concurrency must be 1 or greater"
 	pipelineMaxActiveStepsMustBePositive = "Pipeline max_active_steps must be a positive number"
@@ -1218,6 +1221,30 @@ func validateNotifications(n *pipeline.Notifications, issueContext []string) []*
 		mapSlice(n.Discord, func(d pipeline.DiscordNotification) string { return d.Connection }),
 		discordConnectionEmpty, discordConnectionNotUnique, issueContext,
 	)...)
+
+	emailRecipientGroups := make([]string, 0, len(n.Email))
+	for _, email := range n.Email {
+		if len(email.Recipients) == 0 {
+			issues = append(issues, &Issue{Description: emailRecipientsEmpty, Context: issueContext})
+			continue
+		}
+
+		recipients := make([]string, 0, len(email.Recipients))
+		for _, recipient := range email.Recipients {
+			recipient = strings.TrimSpace(recipient)
+			if recipient == "" {
+				issues = append(issues, &Issue{Description: emailRecipientEmpty, Context: issueContext})
+				continue
+			}
+			recipients = append(recipients, recipient)
+		}
+
+		key := strings.Join(recipients, "\x00")
+		if slices.Contains(emailRecipientGroups, key) {
+			issues = append(issues, &Issue{Description: emailRecipientsNotUnique, Context: issueContext})
+		}
+		emailRecipientGroups = append(emailRecipientGroups, key)
+	}
 
 	return issues
 }
