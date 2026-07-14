@@ -342,6 +342,7 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	cmdArgs, err := python.ConsolidatedParameters(ctx, asset, baseArgs, &python.ColumnHintOptions{
 		NormalizeColumnNames:   false,
 		EnforceSchemaByDefault: false,
+		TypeHintOverlay:        python.TypeHintOverlayForConnection(o.conn.GetConnection(destConnectionName)),
 	})
 	if err != nil {
 		return err
@@ -664,6 +665,7 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 	cmdArgs, err := python.ConsolidatedParameters(ctx, asset, baseArgs, &python.ColumnHintOptions{
 		NormalizeColumnNames:   true,
 		EnforceSchemaByDefault: true,
+		TypeHintOverlay:        python.TypeHintOverlayForConnection(o.conn.GetConnection(destConnectionName)),
 	})
 	if err != nil {
 		return err

@@ -102,7 +102,7 @@ func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs 
 		}
 
 		if shouldEnforce {
-			columns := ColumnHints(asset.Columns, columnOpts.NormalizeColumnNames)
+			columns := ColumnHints(asset.Columns, columnOpts.NormalizeColumnNames, columnOpts.TypeHintOverlay)
 			if columns != "" {
 				cmdArgs = append(cmdArgs, "--columns", columns)
 			}
