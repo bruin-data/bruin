@@ -62,10 +62,10 @@ type Client struct {
 // Returns an empty slice when using Application Default Credentials.
 func (c *Client) getClientOptions() []option.ClientOption {
 	if c.ServiceAccountJSON != "" {
-		return []option.ClientOption{option.WithCredentialsJSON([]byte(c.ServiceAccountJSON))}
+		return []option.ClientOption{option.WithAuthCredentialsJSON(option.ServiceAccount, []byte(c.ServiceAccountJSON))}
 	}
 	if c.ServiceAccountFile != "" {
-		return []option.ClientOption{option.WithCredentialsFile(c.ServiceAccountFile)}
+		return []option.ClientOption{option.WithAuthCredentialsFile(option.ServiceAccount, c.ServiceAccountFile)}
 	}
 	// Use Application Default Credentials - no explicit option needed
 	return []option.ClientOption{}
