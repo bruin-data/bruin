@@ -55,6 +55,7 @@ func ConvertPythonDateFormatToGolang(pythonFormat string) string {
 		"%H": "15",
 		"%M": "04",
 		"%S": "05",
+		"%f": "000000",
 		"%z": "MST",
 		"%Z": "MST",
 		"%a": "Mon",
