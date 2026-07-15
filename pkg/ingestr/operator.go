@@ -270,9 +270,10 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		if tls, _ := asset.Parameters.GetString("cdc_tls"); tls != "" {
 			q.Set("tls", tls)
 		}
-		// SQL Server log-based CDC parameters. Change Tracking (+ct) ignores query
+		// SQL Server log-based CDC parameters, confined to the mssql source so they
+		// cannot leak into other CDC URIs. Change Tracking (+ct) ignores query
 		// parameters, so these are only forwarded for the mssql+cdc source.
-		if !changeTracking {
+		if isMSSQLScheme(baseScheme) && !changeTracking {
 			if captureInstance, _ := asset.Parameters.GetString("cdc_capture_instance"); captureInstance != "" {
 				q.Set("capture_instance", captureInstance)
 			}
@@ -280,12 +281,14 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 				q.Set("poll_interval", pollInterval)
 			}
 		}
-		// MongoDB change-stream parameters.
-		if maxAwaitTime, _ := asset.Parameters.GetString("cdc_max_await_time"); maxAwaitTime != "" {
-			q.Set("max_await_time", maxAwaitTime)
-		}
-		if sampleSize, _ := asset.Parameters.GetString("cdc_schema_sample_size"); sampleSize != "" {
-			q.Set("schema_sample_size", sampleSize)
+		// MongoDB change-stream parameters, confined to the mongodb source.
+		if isMongoDBScheme(baseScheme) {
+			if maxAwaitTime, _ := asset.Parameters.GetString("cdc_max_await_time"); maxAwaitTime != "" {
+				q.Set("max_await_time", maxAwaitTime)
+			}
+			if sampleSize, _ := asset.Parameters.GetString("cdc_schema_sample_size"); sampleSize != "" {
+				q.Set("schema_sample_size", sampleSize)
+			}
 		}
 		// Shared parameters.
 		if mode, _ := asset.Parameters.GetString("cdc_mode"); mode != "" {
@@ -560,6 +563,12 @@ func isCDCAsset(asset *pipeline.Asset) bool {
 // the only source that offers the Change Tracking (+ct) capture mode.
 func isMSSQLScheme(scheme string) bool {
 	return strings.HasPrefix(scheme, "mssql") || strings.HasPrefix(scheme, "sqlserver")
+}
+
+// isMongoDBScheme reports whether scheme belongs to the MongoDB family (mongodb,
+// mongodb+srv), which understands the change-stream CDC parameters.
+func isMongoDBScheme(scheme string) bool {
+	return strings.HasPrefix(scheme, "mongodb")
 }
 
 func hasIngestrIncrementalKey(asset *pipeline.Asset, mat pipeline.Materialization) bool {
