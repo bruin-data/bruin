@@ -387,11 +387,9 @@ type doris struct {
 }
 
 type starrocks struct {
-	TableModel    string            `yaml:"table_model"`
-	DistributedBy []string          `yaml:"distributed_by"`
-	PartitionBy   []string          `yaml:"partition_by"`
-	Buckets       int               `yaml:"buckets"`
-	Properties    map[string]string `yaml:"properties"`
+	TableModel string            `yaml:"table_model"`
+	Buckets    int               `yaml:"buckets"`
+	Properties map[string]string `yaml:"properties"`
 }
 
 func notificationsOrNil(n Notifications) *Notifications {
@@ -652,11 +650,9 @@ func taskDefinitionToAsset(definition taskDefinition) (*Asset, error) {
 			Properties:    definition.Doris.Properties,
 		},
 		StarRocks: StarRocksConfig{
-			TableModel:    definition.StarRocks.TableModel,
-			DistributedBy: definition.StarRocks.DistributedBy,
-			PartitionBy:   definition.StarRocks.PartitionBy,
-			Buckets:       definition.StarRocks.Buckets,
-			Properties:    definition.StarRocks.Properties,
+			TableModel: definition.StarRocks.TableModel,
+			Buckets:    definition.StarRocks.Buckets,
+			Properties: definition.StarRocks.Properties,
 		},
 		Routing:           definition.Routing,
 		IntervalModifiers: definition.IntervalModifiers,

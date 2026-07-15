@@ -171,13 +171,13 @@ func TestMaterializer_Render(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "analytics.events",
 				Materialization: pipeline.Materialization{
-					Type:     pipeline.MaterializationTypeTable,
-					Strategy: pipeline.MaterializationStrategyDDL,
+					Type:        pipeline.MaterializationTypeTable,
+					Strategy:    pipeline.MaterializationStrategyDDL,
+					ClusterBy:   []string{"id"},
+					PartitionBy: "event_date",
 				},
 				StarRocks: pipeline.StarRocksConfig{
-					DistributedBy: []string{"id"},
-					PartitionBy:   []string{"event_date"},
-					Buckets:       4,
+					Buckets: 4,
 				},
 				Columns: []pipeline.Column{
 					{Name: "id", Type: "INT"},
@@ -189,7 +189,7 @@ func TestMaterializer_Render(t *testing.T) {
 				"`event_date` DATE\n" +
 				")\n" +
 				"DUPLICATE KEY(`id`)\n" +
-				"PARTITION BY (`event_date`)\n" +
+				"PARTITION BY (event_date)\n" +
 				"DISTRIBUTED BY HASH(`id`) BUCKETS 4\n" +
 				"PROPERTIES (\"replication_num\" = \"1\");",
 		},
@@ -271,13 +271,13 @@ func TestMaterializer_Render(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "analytics.accounts",
 				Materialization: pipeline.Materialization{
-					Type:     pipeline.MaterializationTypeTable,
-					Strategy: pipeline.MaterializationStrategyMerge,
+					Type:      pipeline.MaterializationTypeTable,
+					Strategy:  pipeline.MaterializationStrategyMerge,
+					ClusterBy: []string{"account_id"},
 				},
 				StarRocks: pipeline.StarRocksConfig{
-					DistributedBy: []string{"account_id"},
-					Buckets:       2,
-					Properties:    map[string]string{"compression": "zstd"},
+					Buckets:    2,
+					Properties: map[string]string{"compression": "zstd"},
 				},
 				Columns: []pipeline.Column{
 					{Name: "status", Type: "VARCHAR(20)", UpdateOnMerge: true},

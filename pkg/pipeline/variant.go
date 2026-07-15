@@ -455,16 +455,6 @@ func renderAssetStrings(render RenderFunc, a *Asset) error {
 	if a.StarRocks.TableModel, err = maybeRender(render, fmt.Sprintf("asset[%s].starrocks.table_model", originalName), a.StarRocks.TableModel); err != nil {
 		return err
 	}
-	for i, column := range a.StarRocks.DistributedBy {
-		if a.StarRocks.DistributedBy[i], err = maybeRender(render, fmt.Sprintf("asset[%s].starrocks.distributed_by[%d]", originalName, i), column); err != nil {
-			return err
-		}
-	}
-	for i, column := range a.StarRocks.PartitionBy {
-		if a.StarRocks.PartitionBy[i], err = maybeRender(render, fmt.Sprintf("asset[%s].starrocks.partition_by[%d]", originalName, i), column); err != nil {
-			return err
-		}
-	}
 	for key, value := range a.StarRocks.Properties {
 		if a.StarRocks.Properties[key], err = maybeRender(render, fmt.Sprintf("asset[%s].starrocks.properties[%s]", originalName, key), value); err != nil {
 			return err

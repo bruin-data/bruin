@@ -1191,12 +1191,14 @@ func (d DorisConfig) IsZero() bool {
 	return d.TableModel == "" && len(d.DistributedBy) == 0 && d.Buckets == 0 && len(d.Properties) == 0
 }
 
+// StarRocksConfig carries StarRocks-specific table layout that has no
+// materialization-level equivalent. Distribution and partitioning are taken from
+// the materialization's `cluster_by` and `partition_by` fields respectively, so
+// they are intentionally absent here.
 type StarRocksConfig struct {
-	TableModel    string            `json:"table_model,omitempty" yaml:"table_model,omitempty" mapstructure:"table_model"`
-	DistributedBy []string          `json:"distributed_by,omitempty" yaml:"distributed_by,omitempty" mapstructure:"distributed_by"`
-	PartitionBy   []string          `json:"partition_by,omitempty" yaml:"partition_by,omitempty" mapstructure:"partition_by"`
-	Buckets       int               `json:"buckets,omitempty" yaml:"buckets,omitempty" mapstructure:"buckets"`
-	Properties    map[string]string `json:"properties,omitempty" yaml:"properties,omitempty" mapstructure:"properties"`
+	TableModel string            `json:"table_model,omitempty" yaml:"table_model,omitempty" mapstructure:"table_model"`
+	Buckets    int               `json:"buckets,omitempty" yaml:"buckets,omitempty" mapstructure:"buckets"`
+	Properties map[string]string `json:"properties,omitempty" yaml:"properties,omitempty" mapstructure:"properties"`
 }
 
 func (s StarRocksConfig) MarshalJSON() ([]byte, error) {
@@ -1209,7 +1211,7 @@ func (s StarRocksConfig) MarshalJSON() ([]byte, error) {
 }
 
 func (s StarRocksConfig) IsZero() bool {
-	return s.TableModel == "" && len(s.DistributedBy) == 0 && len(s.PartitionBy) == 0 && s.Buckets == 0 && len(s.Properties) == 0
+	return s.TableModel == "" && s.Buckets == 0 && len(s.Properties) == 0
 }
 
 type RoutingConfig struct {
@@ -3277,12 +3279,6 @@ func mergeDorisDefaults(target *DorisConfig, defaults DorisConfig) {
 func mergeStarRocksDefaults(target *StarRocksConfig, defaults StarRocksConfig) {
 	if target.TableModel == "" {
 		target.TableModel = defaults.TableModel
-	}
-	if len(target.DistributedBy) == 0 && len(defaults.DistributedBy) > 0 {
-		target.DistributedBy = append([]string(nil), defaults.DistributedBy...)
-	}
-	if len(target.PartitionBy) == 0 && len(defaults.PartitionBy) > 0 {
-		target.PartitionBy = append([]string(nil), defaults.PartitionBy...)
 	}
 	if target.Buckets == 0 {
 		target.Buckets = defaults.Buckets

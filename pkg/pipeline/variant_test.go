@@ -569,10 +569,8 @@ func buildFullyPopulatedPipelineForVisitorTest() *pipeline.Pipeline {
 			Properties:    map[string]string{"replication_num": "1"},
 		},
 		StarRocks: pipeline.StarRocksConfig{
-			TableModel:    "primary_key",
-			DistributedBy: []string{"id"},
-			PartitionBy:   []string{"dt"},
-			Properties:    map[string]string{"replication_num": "1"},
+			TableModel: "primary_key",
+			Properties: map[string]string{"replication_num": "1"},
 		},
 		Routing: &pipeline.RoutingConfig{EgressGateway: "gw"},
 	}
@@ -626,10 +624,8 @@ func buildFullyPopulatedPipelineForVisitorTest() *pipeline.Pipeline {
 				Properties:    map[string]string{"replication_num": "1"},
 			},
 			StarRocks: pipeline.StarRocksConfig{
-				TableModel:    "primary_key",
-				DistributedBy: []string{"id"},
-				PartitionBy:   []string{"dt"},
-				Properties:    map[string]string{"replication_num": "1"},
+				TableModel: "primary_key",
+				Properties: map[string]string{"replication_num": "1"},
 			},
 			Routing: &pipeline.RoutingConfig{EgressGateway: "gw"},
 			Notifications: &pipeline.Notifications{
