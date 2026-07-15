@@ -156,10 +156,10 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser sqlpa
 			ApplicableLevels: []Level{LevelAsset},
 		},
 		&SimpleRule{
-			Identifier:       "ingestr-cdc-stream-parameter",
+			Identifier:       "ingestr-cdc-mode-deprecated",
 			Fast:             true,
 			Severity:         ValidatorSeverityWarning,
-			AssetValidator:   WarnIngestrCDCStreamParameter,
+			AssetValidator:   WarnIngestrCDCModeDeprecated,
 			ApplicableLevels: []Level{LevelAsset},
 		},
 		&SimpleRule{

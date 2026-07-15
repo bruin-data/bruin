@@ -2398,7 +2398,7 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 	}
 }
 
-func TestWarnIngestrCDCStreamParameter(t *testing.T) {
+func TestWarnIngestrCDCModeDeprecated(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -2410,7 +2410,7 @@ func TestWarnIngestrCDCStreamParameter(t *testing.T) {
 			name: "non-ingestr asset is ignored",
 			asset: &pipeline.Asset{
 				Type:       pipeline.AssetTypePython,
-				Parameters: pipeline.ParameterMap{"cdc": "true", "stream": "true"},
+				Parameters: pipeline.ParameterMap{"cdc": "true", "cdc_mode": "stream"},
 			},
 		},
 		{
@@ -2421,17 +2421,24 @@ func TestWarnIngestrCDCStreamParameter(t *testing.T) {
 			},
 		},
 		{
-			name: "cdc asset with cdc_mode only is fine",
+			name: "cdc asset using stream is fine",
 			asset: &pipeline.Asset{
 				Type:       pipeline.AssetTypeIngestr,
-				Parameters: pipeline.ParameterMap{"cdc": "true", "cdc_mode": "stream"},
+				Parameters: pipeline.ParameterMap{"cdc": "true", "stream": "true"},
 			},
 		},
 		{
-			name: "cdc asset with redundant stream parameter warns",
+			name: "cdc asset without cdc_mode (batch) is fine",
 			asset: &pipeline.Asset{
 				Type:       pipeline.AssetTypeIngestr,
-				Parameters: pipeline.ParameterMap{"cdc": "true", "cdc_mode": "stream", "stream": "true"},
+				Parameters: pipeline.ParameterMap{"cdc": "true"},
+			},
+		},
+		{
+			name: "cdc asset using deprecated cdc_mode warns",
+			asset: &pipeline.Asset{
+				Type:       pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{"cdc": "true", "cdc_mode": "stream"},
 			},
 			wantWarn: true,
 		},
@@ -2442,11 +2449,11 @@ func TestWarnIngestrCDCStreamParameter(t *testing.T) {
 			t.Parallel()
 
 			p := &pipeline.Pipeline{Assets: []*pipeline.Asset{tt.asset}}
-			got, err := WarnIngestrCDCStreamParameter(t.Context(), p, tt.asset)
+			got, err := WarnIngestrCDCModeDeprecated(t.Context(), p, tt.asset)
 			require.NoError(t, err)
 			if tt.wantWarn {
 				assert.Len(t, got, 1)
-				assert.Contains(t, got[0].Description, "cdc_mode: stream")
+				assert.Contains(t, got[0].Description, "deprecated")
 			} else {
 				assert.Empty(t, got)
 			}

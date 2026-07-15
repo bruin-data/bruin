@@ -346,12 +346,10 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 	return issues, nil
 }
 
-// WarnIngestrCDCStreamParameter nudges CDC assets towards a single streaming
-// switch. On a CDC asset, streaming is controlled by cdc_mode: stream, which
-// enables ingestr's --stream flag on its own; setting the generic stream
-// parameter as well is redundant (and stream: true alongside cdc_mode: batch is
-// contradictory).
-func WarnIngestrCDCStreamParameter(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+// WarnIngestrCDCModeDeprecated flags the deprecated cdc_mode parameter. Streaming
+// is now controlled by the single stream parameter across all source types:
+// set stream: true to stream a CDC asset, or omit it for a bounded (batch) run.
+func WarnIngestrCDCModeDeprecated(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 	if asset.Type != pipeline.AssetTypeIngestr || asset.Parameters == nil {
 		return issues, nil
@@ -361,13 +359,13 @@ func WarnIngestrCDCStreamParameter(ctx context.Context, p *pipeline.Pipeline, as
 		return issues, nil
 	}
 
-	if _, exists := asset.Parameters.GetString("stream"); !exists {
+	if _, exists := asset.Parameters.GetString("cdc_mode"); !exists {
 		return issues, nil
 	}
 
 	issues = append(issues, &Issue{
 		Task:        asset,
-		Description: "The 'stream' parameter is redundant on a CDC asset; use 'cdc_mode: stream' to stream (or 'cdc_mode: batch' for a bounded run)",
+		Description: "'cdc_mode' is deprecated; set 'stream: true' to stream a CDC asset, or omit it for a bounded (batch) run",
 	})
 
 	return issues, nil

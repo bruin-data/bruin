@@ -1203,6 +1203,31 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 			},
 		},
 		{
+			name: "CDC with stream true streams without cdc_mode",
+			asset: &pipeline.Asset{
+				Name:       "cdc-asset-stream-param",
+				Connection: "bq",
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "pg",
+					"source_table":      "public.users",
+					"destination":       "bigquery",
+					"cdc":               "true",
+					"stream":            "true",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "postgres+cdc://user:pass@localhost:5432/db",
+				"--source-table", "public.users",
+				"--dest-uri", "bigquery://uri-here",
+				"--dest-table", "cdc-asset-stream-param",
+				"--yes",
+				"--progress", "log",
+				"--incremental-strategy", "merge",
+				"--stream",
+			},
+		},
+		{
 			name: "CDC stream metrics address is passed through",
 			asset: &pipeline.Asset{
 				Name:       "cdc-asset-stream-metrics",

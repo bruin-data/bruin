@@ -82,7 +82,7 @@ parameters:
   flush_records: integer
   enforce_schema: true|false # Will ensure that the columns defined in the asset are present in the destination and with the desired types (see https://getbruin.com/docs/bruin/assets/columns.html)
   cdc: "true"|"false"
-  cdc_mode: stream | batch
+  cdc_mode: stream | batch # deprecated, use stream instead
   cdc_publication: string
   cdc_slot: string
   cdc_server_id: string
@@ -130,12 +130,12 @@ parameters:
 | `staging_bucket` | No | `--staging-bucket` | Overrides the staging bucket that Ingestr uses for intermediate files. |
 | `staging_dataset` | No | `--staging-dataset` | Dataset/schema to use for staging tables. |
 | `trim_whitespace` | No | `--trim-whitespace` | Trims leading and trailing whitespace from extracted string values when set to `true`. |
-| `stream` | No | `--stream` | Enables continuous ingestion for message-broker sources (such as Kafka). For CDC assets use `cdc_mode: stream` instead, which enables streaming on its own. |
+| `stream` | No | `--stream` | Enables continuous ingestion. Works for CDC sources (`cdc: true`) and message-broker sources (such as Kafka). A streaming asset never exits on its own and must be launched with `bruin run --stream` (see [Streaming assets](#streaming-assets)). |
 | `flush_interval` | No | `--flush-interval` | Flush interval for streaming mode, such as `30s`. CDC assets can set `cdc_stream_flush_interval` instead, which takes precedence. |
 | `flush_records` | No | `--flush-records` | Number of buffered records that triggers a flush in streaming mode. CDC assets can set `cdc_stream_flush_records` instead, which takes precedence. |
 | `enforce_schema` | No | `--columns` | When set to `true`, enforces the column types defined in the asset's `columns` section. Ingestr will create or update the destination table with the specified schema. |
 | `cdc` | No | source URI scheme | Enables Bruin's CDC URI handling for PostgreSQL, MySQL/MariaDB, Vitess, and PlanetScale sources when set to `"true"`. CDC assets must use `merge`; Bruin sets it automatically when omitted and rejects other strategies. |
-| `cdc_mode` | No | `--stream` flag | CDC mode, either `stream` or `batch`. `batch` (the default) catches up to the current source position and exits, so it fits a scheduled batch run. `stream` runs continuously and must be launched with `bruin run --stream` (see [Streaming assets](#streaming-assets)). |
+| `cdc_mode` | No | `--stream` flag | **Deprecated** — use `stream` instead. `cdc_mode: stream` is equivalent to `stream: true`; `cdc_mode: batch` is the default (omit it). |
 | `cdc_publication` | No | source URI query | PostgreSQL publication name. |
 | `cdc_slot` | No | source URI query | PostgreSQL replication slot name. |
 | `cdc_server_id` | No | source URI query | MySQL-family binlog replication server ID. |
@@ -145,7 +145,7 @@ parameters:
 | `cdc_grpc_tls` | No | source URI query | Vitess VStream TLS setting. |
 | `cdc_dest_schema` | No | source URI query | Destination schema used for multi-table CDC runs. |
 | `cdc_state_id` | No | source URI query | Stable identity for this CDC connector's resume state. Set it when multiple otherwise-identical CDC assets write to the same destination so they keep independent offsets. |
-| `cdc_stream_metrics_addr` | No | `--metrics-addr` | Address on which a streaming CDC asset serves replication lag and rows-synced metrics at `/debug/vars`, such as `127.0.0.1:6060`. Requires `cdc_mode: stream`. See [PostgreSQL CDC](../platforms/postgres.md#cdc-change-data-capture). |
+| `cdc_stream_metrics_addr` | No | `--metrics-addr` | Address on which a streaming CDC asset serves replication lag and rows-synced metrics at `/debug/vars`, such as `127.0.0.1:6060`. Requires `stream: true`. See [PostgreSQL CDC](../platforms/postgres.md#cdc-change-data-capture). |
 | `cdc_stream_flush_interval` | No | `--flush-interval` | Flush interval for a streaming CDC asset. Takes precedence over `flush_interval`. |
 | `cdc_stream_flush_records` | No | `--flush-records` | Buffered record count that triggers a flush for a streaming CDC asset. Takes precedence over `flush_records`. |
 
@@ -242,13 +242,13 @@ Pipeline run options propagate to ingestr automatically:
 
 * When a run defines an interval start or end date, Bruin appends `--interval-start` and `--interval-end` with the resolved timestamps (including interval modifiers, when enabled).
 * Running with `--full-refresh` adds the `--full-refresh` flag to Ingestr.
-* For a streaming asset (`cdc_mode: stream`), Bruin omits `--interval-end` so the live tail is not truncated, and does not pass `--full-refresh`.
+* For a streaming asset (`stream: true`), Bruin omits `--interval-end` so the live tail is not truncated, and does not pass `--full-refresh`.
 
 ## Streaming assets
 
 Some ingestr sources can ingest **continuously** and never finish on their own:
 
-* CDC sources (PostgreSQL, MySQL/MariaDB, Vitess, PlanetScale) with `cdc_mode: stream`.
+* CDC sources (PostgreSQL, Vitess, PlanetScale) with `cdc: true` and `stream: true`.
 * Message-broker sources (Kafka, Kinesis) with `stream: true`.
 
 A continuous asset does not fit a normal batch `bruin run` (which expects every asset to complete), so Bruin keeps streaming assets out of ordinary runs and gives them a dedicated run mode.

@@ -160,7 +160,7 @@ CDC is enabled by setting `cdc: "true"` on an ingestr asset with a MySQL source 
 | Parameter | Required | Description |
 |-----------|----------|-------------|
 | `cdc` | Yes | Set to `"true"` to enable CDC mode |
-| `cdc_mode` | No | Only `"batch"` (the default) is supported. MySQL binary-log CDC reads up to the current binlog position and exits; `"stream"` is rejected by ingestr |
+| `cdc_mode` | No | **Deprecated** — use `stream` instead. MySQL binary-log CDC only supports batch (read up to the current binlog position and exit), so leave `stream` unset; `stream: true` is rejected by ingestr |
 | `cdc_server_id` | No | Replication server identifier for MySQL binary-log CDC |
 | `cdc_dest_schema` | No | Destination schema to use for multi-table CDC runs |
 | `incremental_strategy` | No | Defaults to `"merge"` when CDC is enabled. CDC assets must use `"merge"`; Bruin rejects other strategies. |
