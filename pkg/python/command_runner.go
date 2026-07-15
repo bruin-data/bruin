@@ -46,7 +46,7 @@ func (l *CommandRunner) Run(ctx context.Context, repo *git.Repo, command *Comman
 	// short-lived and reaped by cmd.Wait). A managed command is a long-running
 	// stream that must stop when the run context is cancelled, so it is tied to
 	// ctx and given process-group teardown.
-	cmdCtx := context.Background()
+	cmdCtx := context.Background() //nolint:contextcheck // one-shot commands are intentionally detached; managed commands use ctx below
 	if command.Managed {
 		cmdCtx = ctx
 	}
