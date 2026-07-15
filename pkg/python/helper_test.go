@@ -1,8 +1,10 @@
 package python
 
 import (
+	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/stretchr/testify/assert"
@@ -108,15 +110,67 @@ func TestConsolidatedParameters_IngestrFlagPassthrough(t *testing.T) {
 		"--pipelines-dir", ".ingestr",
 		"--staging-bucket", "gs://bucket/path",
 		"--staging-dataset", "scratch",
-		"--flush-interval", "10s",
-		"--flush-records", "10000",
 		"--sql-backend", "sqlalchemy",
 		"--loader-file-format", "parquet",
 		"--no-inference",
 		"--trim-whitespace",
 		"--stream",
+		"--flush-interval", "10s",
+		"--flush-records", "10000",
 		"--mask", "email:hash",
 	}, result)
+}
+
+func TestConsolidatedParameters_StreamGating(t *testing.T) {
+	t.Parallel()
+
+	t.Run("flush flags are dropped without stream", func(t *testing.T) {
+		t.Parallel()
+		asset := &pipeline.Asset{
+			Parameters: pipeline.ParameterMap{
+				"flush_interval": "10s",
+				"flush_records":  "10000",
+			},
+		}
+		result, err := ConsolidatedParameters(t.Context(), asset, []string{"--existing"}, nil)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"--existing"}, result)
+	})
+
+	t.Run("flush flags are emitted with stream", func(t *testing.T) {
+		t.Parallel()
+		asset := &pipeline.Asset{
+			Parameters: pipeline.ParameterMap{
+				"stream":         "true",
+				"flush_interval": "10s",
+				"flush_records":  "10000",
+			},
+		}
+		result, err := ConsolidatedParameters(t.Context(), asset, []string{"--existing"}, nil)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"--existing", "--stream", "--flush-interval", "10s", "--flush-records", "10000"}, result)
+	})
+
+	t.Run("interval-end is suppressed for a streaming asset", func(t *testing.T) {
+		t.Parallel()
+		asset := &pipeline.Asset{Parameters: pipeline.ParameterMap{"stream": "true"}}
+		ctx := context.WithValue(t.Context(), pipeline.RunConfigStartDate, time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC))
+		ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC))
+		result, err := ConsolidatedParameters(ctx, asset, []string{"--existing"}, nil)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"--existing", "--stream", "--interval-start", "2025-01-01T00:00:00Z"}, result)
+		assert.NotContains(t, result, "--interval-end")
+	})
+
+	t.Run("interval-end is kept for a non-streaming asset", func(t *testing.T) {
+		t.Parallel()
+		asset := &pipeline.Asset{Parameters: pipeline.ParameterMap{}}
+		ctx := context.WithValue(t.Context(), pipeline.RunConfigStartDate, time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC))
+		ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC))
+		result, err := ConsolidatedParameters(ctx, asset, []string{"--existing"}, nil)
+		require.NoError(t, err)
+		assert.Contains(t, result, "--interval-end")
+	})
 }
 
 func TestConsolidatedParameters_TrimWhitespace(t *testing.T) {

@@ -24,16 +24,30 @@ var ingestrValueParameterFlags = []string{
 	"pipelines_dir",
 	"staging_bucket",
 	"staging_dataset",
-	"flush_interval",
-	"flush_records",
 	"sql_backend",
 	"loader_file_format",
+}
+
+// ingestrStreamValueParameterFlags carry ingestr flags that are only valid
+// together with --stream; ingestr errors if they are passed without it.
+var ingestrStreamValueParameterFlags = []string{
+	"flush_interval",
+	"flush_records",
 }
 
 var ingestrBoolParameterFlags = []string{
 	"no_inference",
 	"trim_whitespace",
 	"stream",
+}
+
+// isStreamingParams reports whether the asset runs in continuous streaming mode.
+// The ingestr operator sets stream=true for cdc_mode: stream before this runs, so
+// the generic stream parameter is a reliable signal here (and avoids an import
+// cycle back into the ingestr package).
+func isStreamingParams(params pipeline.ParameterMap) bool {
+	value, _ := params.GetString("stream")
+	return value == "true"
 }
 
 func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs []string, columnOpts *ColumnHintOptions) ([]string, error) {
@@ -78,7 +92,10 @@ func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs 
 		}
 	}
 
-	if ctx.Value(pipeline.RunConfigEndDate) != nil {
+	// In streaming mode --interval-end would truncate the live tail, so only bound
+	// the initial snapshot with --interval-start and leave the stream open-ended.
+	streaming := isStreamingParams(asset.Parameters)
+	if !streaming && ctx.Value(pipeline.RunConfigEndDate) != nil {
 		endTimeInstance, okParse := ctx.Value(pipeline.RunConfigEndDate).(time.Time)
 		if okParse {
 			applyModifiers, ok := ctx.Value(pipeline.RunConfigApplyIntervalModifiers).(bool)
@@ -90,7 +107,9 @@ func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs 
 		}
 	}
 
-	if fullRefresh {
+	// A full refresh on a stream would reset ingestr's own CDC state; the run
+	// command rejects the combination up front, but guard here as well.
+	if fullRefresh && !streaming {
 		cmdArgs = append(cmdArgs, "--full-refresh")
 	}
 
@@ -162,6 +181,15 @@ func appendIngestrParameterFlags(params pipeline.ParameterMap, cmdArgs []string)
 	for _, param := range ingestrBoolParameterFlags {
 		if value, exists := params.GetString(param); exists && value == "true" {
 			cmdArgs = append(cmdArgs, "--"+strings.ReplaceAll(param, "_", "-"))
+		}
+	}
+
+	// Flush flags are only valid alongside --stream; ingestr rejects them otherwise.
+	if isStreamingParams(params) {
+		for _, param := range ingestrStreamValueParameterFlags {
+			if value, exists := params.GetString(param); exists && value != "" {
+				cmdArgs = append(cmdArgs, "--"+strings.ReplaceAll(param, "_", "-"), value)
+			}
 		}
 	}
 

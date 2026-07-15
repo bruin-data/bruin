@@ -55,6 +55,20 @@ func ingestrEnvVars() map[string]string {
 	}
 }
 
+type streamingContextKey struct{}
+
+// WithStreaming marks a context as belonging to a long-running streaming ingestr
+// run. RunIngestr uses it to launch the child as a managed process that is tied
+// to the context and torn down gracefully on cancellation.
+func WithStreaming(ctx context.Context) context.Context {
+	return context.WithValue(ctx, streamingContextKey{}, true)
+}
+
+func isStreamingContext(ctx context.Context) bool {
+	streaming, _ := ctx.Value(streamingContextKey{}).(bool)
+	return streaming
+}
+
 // parsePythonVersion parses a "X.Y" version string into (major, minor).
 func parsePythonVersion(v string) (int, int, bool) {
 	parts := strings.Split(v, ".")
@@ -247,6 +261,7 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []s
 		Name:    u.binaryFullPath,
 		Args:    u.ingestrRunCmd(ctx, extraPackages, args),
 		EnvVars: ingestrEnvVars(),
+		Managed: isStreamingContext(ctx),
 	}
 
 	return u.Cmd.Run(ctx, repo, noDependencyCommand)

@@ -91,6 +91,7 @@ parameters:
   cdc_grpc_host: string
   cdc_grpc_tls: string
   cdc_dest_schema: string
+  cdc_state_id: string
   cdc_stream_metrics_addr: string
   cdc_stream_flush_interval: string
   cdc_stream_flush_records: integer
@@ -134,7 +135,7 @@ parameters:
 | `flush_records` | No | `--flush-records` | Number of buffered records that triggers a flush in streaming mode. CDC assets can set `cdc_stream_flush_records` instead, which takes precedence. |
 | `enforce_schema` | No | `--columns` | When set to `true`, enforces the column types defined in the asset's `columns` section. Ingestr will create or update the destination table with the specified schema. |
 | `cdc` | No | source URI scheme | Enables Bruin's CDC URI handling for PostgreSQL, MySQL/MariaDB, Vitess, and PlanetScale sources when set to `"true"`. CDC assets must use `merge`; Bruin sets it automatically when omitted and rejects other strategies. |
-| `cdc_mode` | No | source URI query | CDC mode, either `stream` or `batch`. |
+| `cdc_mode` | No | `--stream` flag | CDC mode, either `stream` or `batch`. `batch` (the default) catches up to the current source position and exits, so it fits a scheduled batch run. `stream` runs continuously and must be launched with `bruin run --stream` (see [Streaming CDC assets](#streaming-cdc-assets)). |
 | `cdc_publication` | No | source URI query | PostgreSQL publication name. |
 | `cdc_slot` | No | source URI query | PostgreSQL replication slot name. |
 | `cdc_server_id` | No | source URI query | MySQL-family binlog replication server ID. |
@@ -143,6 +144,7 @@ parameters:
 | `cdc_grpc_host` | No | source URI query | Vitess VStream gRPC host override. |
 | `cdc_grpc_tls` | No | source URI query | Vitess VStream TLS setting. |
 | `cdc_dest_schema` | No | source URI query | Destination schema used for multi-table CDC runs. |
+| `cdc_state_id` | No | source URI query | Stable identity for this CDC connector's resume state. Set it when multiple otherwise-identical CDC assets write to the same destination so they keep independent offsets. |
 | `cdc_stream_metrics_addr` | No | `--metrics-addr` | Address on which a streaming CDC asset serves replication lag and rows-synced metrics at `/debug/vars`, such as `127.0.0.1:6060`. Requires `stream: true`. See [PostgreSQL CDC](../platforms/postgres.md#cdc-change-data-capture). |
 | `cdc_stream_flush_interval` | No | `--flush-interval` | Flush interval for a streaming CDC asset. Takes precedence over `flush_interval`. |
 | `cdc_stream_flush_records` | No | `--flush-records` | Buffered record count that triggers a flush for a streaming CDC asset. Takes precedence over `flush_records`. |
@@ -240,6 +242,23 @@ Pipeline run options propagate to ingestr automatically:
 
 * When a run defines an interval start or end date, Bruin appends `--interval-start` and `--interval-end` with the resolved timestamps (including interval modifiers, when enabled).
 * Running with `--full-refresh` adds the `--full-refresh` flag to Ingestr.
+* For a streaming asset (`cdc_mode: stream`), Bruin omits `--interval-end` so the live tail is not truncated, and does not pass `--full-refresh`.
+
+## Streaming CDC assets
+
+A CDC asset with `cdc_mode: stream` replicates changes **continuously** and never finishes on its own, so it does not fit a normal batch `bruin run` (which expects every asset to complete). Bruin therefore keeps streaming assets out of ordinary runs and gives them a dedicated run mode.
+
+Launch a single streaming asset with `--stream`:
+
+```bash
+bruin run --stream assets/my_cdc_asset.asset.yml
+```
+
+* The run targets exactly one streaming asset and keeps it running in the foreground until you stop it with `Ctrl+C` (`SIGINT`/`SIGTERM`). Ingestr flushes buffered records and advances its offset before exiting, so the next run resumes cleanly.
+* A normal `bruin run <pipeline>` skips streaming assets and prints a notice; downstream assets read whatever the stream has landed so far.
+* `--stream` runs only the main task — column/custom checks and metadata push do not run for a stream. It cannot be combined with `--downstream`, `--continue`, `--modified`, `--selector`, `--interactive`, `--sensor-mode`, or `--full-refresh`.
+* Resume state (replication offset) is managed by ingestr in the destination's staging namespace, keyed by `cdc_state_id`. Bruin does not store offsets.
+* For merge to apply updates and deletes correctly, the source table needs a usable primary key / replica identity. For PostgreSQL, an unconsumed replication slot retains WAL on the source, so monitor replication lag via `cdc_stream_metrics_addr` (`/debug/vars`). See [PostgreSQL CDC](../platforms/postgres.md#cdc-change-data-capture).
 
 ## Examples
 
