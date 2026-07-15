@@ -25,6 +25,11 @@ type CommandInstance struct {
 	Name    string
 	Args    []string
 	EnvVars map[string]string
+	// Managed ties the child process to the caller's context and enables graceful
+	// process-group teardown (SIGTERM -> grace -> SIGKILL). It is used for
+	// long-running streaming ingestr runs, which must be stoppable on
+	// cancellation; one-shot commands keep the detached behaviour below.
+	Managed bool
 }
 
 type CommandRunner struct{}
@@ -37,8 +42,19 @@ func (l *CommandRunner) Run(ctx context.Context, repo *git.Repo, command *Comman
 		strings.Join(command.Args, " "),
 	)
 
-	cmd := exec.CommandContext(context.Background(), command.Name, command.Args...) //nolint:gosec,contextcheck
+	// One-shot commands are deliberately detached from the run context (they are
+	// short-lived and reaped by cmd.Wait). A managed command is a long-running
+	// stream that must stop when the run context is cancelled, so it is tied to
+	// ctx and given process-group teardown.
+	cmdCtx := context.Background() //nolint:contextcheck // one-shot commands are intentionally detached; managed commands use ctx below
+	if command.Managed {
+		cmdCtx = ctx
+	}
+	cmd := exec.CommandContext(cmdCtx, command.Name, command.Args...) //nolint:gosec
 	cmd.Dir = repo.Path
+	if command.Managed {
+		configureManagedCmd(cmd)
+	}
 
 	// Build environment: start with parent environment to inherit PATH, CC, CFLAGS, etc.
 	envMap := make(map[string]string)

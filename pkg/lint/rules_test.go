@@ -2398,6 +2398,69 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 	}
 }
 
+func TestWarnIngestrCDCModeDeprecated(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		asset    *pipeline.Asset
+		wantWarn bool
+	}{
+		{
+			name: "non-ingestr asset is ignored",
+			asset: &pipeline.Asset{
+				Type:       pipeline.AssetTypePython,
+				Parameters: pipeline.ParameterMap{"cdc": "true", "cdc_mode": "stream"},
+			},
+		},
+		{
+			name: "non-cdc streaming asset is fine",
+			asset: &pipeline.Asset{
+				Type:       pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{"stream": "true"},
+			},
+		},
+		{
+			name: "cdc asset using stream is fine",
+			asset: &pipeline.Asset{
+				Type:       pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{"cdc": "true", "stream": "true"},
+			},
+		},
+		{
+			name: "cdc asset without cdc_mode (batch) is fine",
+			asset: &pipeline.Asset{
+				Type:       pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{"cdc": "true"},
+			},
+		},
+		{
+			name: "cdc asset using deprecated cdc_mode warns",
+			asset: &pipeline.Asset{
+				Type:       pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{"cdc": "true", "cdc_mode": "stream"},
+			},
+			wantWarn: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			p := &pipeline.Pipeline{Assets: []*pipeline.Asset{tt.asset}}
+			got, err := WarnIngestrCDCModeDeprecated(t.Context(), p, tt.asset)
+			require.NoError(t, err)
+			if tt.wantWarn {
+				assert.Len(t, got, 1)
+				assert.Contains(t, got[0].Description, "deprecated")
+			} else {
+				assert.Empty(t, got)
+			}
+		})
+	}
+}
+
 func TestEnsurePipelineStartDateIsValid(t *testing.T) {
 	t.Parallel()
 

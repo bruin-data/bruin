@@ -352,6 +352,28 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 	return issues, nil
 }
 
+// WarnIngestrCDCModeDeprecated flags the deprecated cdc_mode parameter. Streaming
+// is now controlled by the single stream parameter across all source types:
+// set stream: true to stream a CDC asset, or omit it for a bounded (batch) run.
+func WarnIngestrCDCModeDeprecated(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	if asset.Type != pipeline.AssetTypeIngestr || asset.Parameters == nil {
+		return nil, nil
+	}
+
+	if cdc, _ := asset.Parameters.GetString("cdc"); cdc != "true" {
+		return nil, nil
+	}
+
+	if _, exists := asset.Parameters.GetString("cdc_mode"); !exists {
+		return nil, nil
+	}
+
+	return []*Issue{{
+		Task:        asset,
+		Description: "'cdc_mode' is deprecated; set 'stream: true' to stream a CDC asset, or omit it for a bounded (batch) run",
+	}}, nil
+}
+
 func validateIngestrMaterialization(asset *pipeline.Asset, effectiveStrategy string) ([]*Issue, string) {
 	issues := make([]*Issue, 0)
 	mat := asset.Materialization

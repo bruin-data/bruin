@@ -30,6 +30,9 @@ var versionPattern = regexp.MustCompile(`^v(0|[1-9]\d*)(\.\d+\.\d+)?$`)
 const (
 	versionFamilyV0 = "v0"
 	versionFamilyV1 = "v1"
+	// paramStream is the ingestr asset parameter that enables continuous streaming.
+	// The deprecated cdc_mode: stream alias uses the same literal as its value.
+	paramStream = "stream"
 )
 
 // resolvedEngine is the outcome of parsing parameters.version on an ingestr asset.
@@ -290,18 +293,27 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 				q.Set("schema_sample_size", sampleSize)
 			}
 		}
-		// Shared parameters.
-		if mode, _ := asset.Parameters.GetString("cdc_mode"); mode != "" {
-			q.Set("mode", mode)
-		}
+		// The cdc_mode selector is no longer sent as a URI query parameter: ingestr
+		// deprecated ?mode= and rejects mode=stream unless --stream is also passed.
+		// Continuous ingestion is driven purely by the --stream flag, which we
+		// enable below for the deprecated cdc_mode: stream alias.
 		if destSchema, _ := asset.Parameters.GetString("cdc_dest_schema"); destSchema != "" {
 			q.Set("dest_schema", destSchema)
+		}
+		if stateID, _ := asset.Parameters.GetString("cdc_state_id"); stateID != "" {
+			q.Set("state_id", stateID)
 		}
 		parsedURI.RawQuery = q.Encode()
 
 		sourceURI = parsedURI.String()
 
 		applyCDCStreamParameters(asset.Parameters)
+
+		// cdc_mode: stream maps to ingestr's --stream flag (continuous ingestion).
+		// Reuse the generic stream parameter so the shared flag builder emits it.
+		if mode, _ := asset.Parameters.GetString("cdc_mode"); mode == paramStream {
+			asset.Parameters[paramStream] = "true"
+		}
 
 		// Auto-set merge strategy for CDC if not already set
 		if _, exists := asset.Parameters["incremental_strategy"]; !exists {
@@ -360,8 +372,9 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	)
 
 	// ingestr serves the stream metrics over HTTP for the lifetime of the run,
-	// and rejects --metrics-addr unless --stream is set as well.
-	if isCDCAsset(asset) {
+	// and rejects --metrics-addr unless --stream is set as well, so only emit it
+	// for a streaming asset.
+	if IsStreamingAsset(asset) {
 		if metricsAddr, _ := asset.Parameters.GetString("cdc_stream_metrics_addr"); metricsAddr != "" {
 			baseArgs = append(baseArgs, "--metrics-addr", metricsAddr)
 		}
@@ -410,6 +423,13 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	cmdArgs, err = appendQueryAnnotations(ctx, cmdArgs, engine, ti)
 	if err != nil {
 		return err
+	}
+
+	// A streaming asset runs continuously; mark the context so the runner launches
+	// ingestr as a managed process that is tied to this context and torn down
+	// gracefully (SIGTERM to the process group) when the run is cancelled.
+	if IsStreamingAsset(asset) {
+		ctx = python.WithStreaming(ctx)
 	}
 
 	return o.runner.RunIngestr(ctx, cmdArgs, extraPackages, repo)
@@ -560,6 +580,27 @@ func applyCDCStreamParameters(params pipeline.ParameterMap) {
 func isCDCAsset(asset *pipeline.Asset) bool {
 	cdc, _ := asset.Parameters.GetString("cdc")
 	return cdc == "true"
+}
+
+// IsStreamingAsset reports whether an ingestr asset runs as a continuous,
+// never-terminating stream rather than a one-shot batch load. This is true for a
+// CDC asset in stream mode (cdc: true + stream: true) and for a message-broker
+// source that opts into continuous ingestion with the stream parameter.
+//
+// It is the single classifier the run command and the filter chain use to route
+// streaming assets away from the batch DAG.
+func IsStreamingAsset(asset *pipeline.Asset) bool {
+	if asset == nil || asset.Type != pipeline.AssetTypeIngestr {
+		return false
+	}
+	if stream, _ := asset.Parameters.GetString(paramStream); stream == "true" {
+		return true
+	}
+	if isCDCAsset(asset) {
+		mode, _ := asset.Parameters.GetString("cdc_mode")
+		return mode == paramStream
+	}
+	return false
 }
 
 // isMSSQLScheme reports whether scheme belongs to the SQL Server family, which is

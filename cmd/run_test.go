@@ -1471,6 +1471,59 @@ func TestApplyAllFilters_SkipsDisabledAssetsAndAllowsDownstream(t *testing.T) {
 	assert.NotContains(t, queued, "Task1:id:not_null")
 }
 
+func TestSkipStreamingAssets(t *testing.T) {
+	t.Parallel()
+
+	newPipeline := func() *pipeline.Pipeline {
+		return &pipeline.Pipeline{
+			Name: "TestPipeline",
+			Assets: []*pipeline.Asset{
+				{
+					Name:       "batch_asset",
+					Type:       pipeline.AssetTypeIngestr,
+					Parameters: pipeline.ParameterMap{"cdc": "true", "cdc_mode": "batch"},
+				},
+				{
+					Name:       "stream_asset",
+					Type:       pipeline.AssetTypeIngestr,
+					Parameters: pipeline.ParameterMap{"cdc": "true", "cdc_mode": "stream"},
+				},
+			},
+		}
+	}
+
+	humanIDs := func(instances []scheduler.TaskInstance) []string {
+		ids := make([]string, 0, len(instances))
+		for _, inst := range instances {
+			ids = append(ids, inst.GetHumanID())
+		}
+		return ids
+	}
+
+	t.Run("skips streaming assets in a normal run", func(t *testing.T) {
+		t.Parallel()
+		p := newPipeline()
+		s := scheduler.NewScheduler(zap.NewNop().Sugar(), p, "test")
+		require.NoError(t, ApplyAllFilters(t.Context(), &Filter{}, s, p))
+
+		pending := humanIDs(s.GetTaskInstancesByStatus(scheduler.Pending))
+		skipped := humanIDs(s.GetTaskInstancesByStatus(scheduler.Skipped))
+		assert.Contains(t, pending, "batch_asset")
+		assert.NotContains(t, pending, "stream_asset")
+		assert.Contains(t, skipped, "stream_asset")
+	})
+
+	t.Run("keeps the streaming asset in stream mode", func(t *testing.T) {
+		t.Parallel()
+		p := newPipeline()
+		s := scheduler.NewScheduler(zap.NewNop().Sugar(), p, "test")
+		require.NoError(t, SkipStreamingAssets(t.Context(), &Filter{StreamMode: true}, s, p))
+
+		skipped := humanIDs(s.GetTaskInstancesByStatus(scheduler.Skipped))
+		assert.NotContains(t, skipped, "stream_asset")
+	})
+}
+
 func TestValidation(t *testing.T) {
 	t.Parallel()
 	logger := zaptest.NewLogger(t).Sugar()

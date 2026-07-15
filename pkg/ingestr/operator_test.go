@@ -1192,19 +1192,46 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 			},
 			want: []string{
 				"ingest",
-				"--source-uri", "postgres+cdc://user:pass@localhost:5432/db?mode=stream",
+				"--source-uri", "postgres+cdc://user:pass@localhost:5432/db",
 				"--source-table", "public.users",
 				"--dest-uri", "bigquery://uri-here",
 				"--dest-table", "cdc-asset-stream-mode",
 				"--yes",
 				"--progress", "log",
 				"--incremental-strategy", "merge",
+				"--stream",
+			},
+		},
+		{
+			name: "CDC with stream true streams without cdc_mode",
+			asset: &pipeline.Asset{
+				Name:       "cdc-asset-stream-param",
+				Connection: "bq",
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "pg",
+					"source_table":      "public.users",
+					"destination":       "bigquery",
+					"cdc":               "true",
+					"stream":            "true",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "postgres+cdc://user:pass@localhost:5432/db",
+				"--source-table", "public.users",
+				"--dest-uri", "bigquery://uri-here",
+				"--dest-table", "cdc-asset-stream-param",
+				"--yes",
+				"--progress", "log",
+				"--incremental-strategy", "merge",
+				"--stream",
 			},
 		},
 		{
 			name: "CDC stream metrics address is passed through",
 			asset: &pipeline.Asset{
 				Name:       "cdc-asset-stream-metrics",
+				Type:       pipeline.AssetTypeIngestr,
 				Connection: "bq",
 				Parameters: pipeline.ParameterMap{
 					"source_connection":       "pg",
@@ -1218,7 +1245,7 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 			},
 			want: []string{
 				"ingest",
-				"--source-uri", "postgres+cdc://user:pass@localhost:5432/db?mode=stream",
+				"--source-uri", "postgres+cdc://user:pass@localhost:5432/db",
 				"--source-table", "public.users",
 				"--dest-uri", "bigquery://uri-here",
 				"--dest-table", "cdc-asset-stream-metrics",
@@ -1248,16 +1275,16 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 			},
 			want: []string{
 				"ingest",
-				"--source-uri", "postgres+cdc://user:pass@localhost:5432/db?mode=stream",
+				"--source-uri", "postgres+cdc://user:pass@localhost:5432/db",
 				"--source-table", "public.users",
 				"--dest-uri", "bigquery://uri-here",
 				"--dest-table", "cdc-asset-stream-flush",
 				"--yes",
 				"--progress", "log",
 				"--incremental-strategy", "merge",
+				"--stream",
 				"--flush-interval", "30s",
 				"--flush-records", "10000",
-				"--stream",
 			},
 		},
 		{
@@ -1333,6 +1360,59 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
+		})
+	}
+}
+
+func TestIsStreamingAsset(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		asset *pipeline.Asset
+		want  bool
+	}{
+		{
+			name:  "nil asset",
+			asset: nil,
+			want:  false,
+		},
+		{
+			name:  "non-ingestr asset",
+			asset: &pipeline.Asset{Type: pipeline.AssetTypePython, Parameters: pipeline.ParameterMap{"stream": "true"}},
+			want:  false,
+		},
+		{
+			name:  "cdc batch mode is not streaming",
+			asset: &pipeline.Asset{Type: pipeline.AssetTypeIngestr, Parameters: pipeline.ParameterMap{"cdc": "true", "cdc_mode": "batch"}},
+			want:  false,
+		},
+		{
+			name:  "cdc without mode is not streaming",
+			asset: &pipeline.Asset{Type: pipeline.AssetTypeIngestr, Parameters: pipeline.ParameterMap{"cdc": "true"}},
+			want:  false,
+		},
+		{
+			name:  "cdc stream mode is streaming",
+			asset: &pipeline.Asset{Type: pipeline.AssetTypeIngestr, Parameters: pipeline.ParameterMap{"cdc": "true", "cdc_mode": "stream"}},
+			want:  true,
+		},
+		{
+			name:  "generic stream flag is streaming",
+			asset: &pipeline.Asset{Type: pipeline.AssetTypeIngestr, Parameters: pipeline.ParameterMap{"stream": "true"}},
+			want:  true,
+		},
+		{
+			name:  "cdc_mode stream without cdc is not streaming",
+			asset: &pipeline.Asset{Type: pipeline.AssetTypeIngestr, Parameters: pipeline.ParameterMap{"cdc_mode": "stream"}},
+			want:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, IsStreamingAsset(tt.asset))
 		})
 	}
 }

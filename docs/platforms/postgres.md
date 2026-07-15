@@ -198,11 +198,12 @@ CDC is enabled by setting `cdc: "true"` on an `ingestr` asset with a PostgreSQL 
 | Parameter | Required | Description |
 |-----------|----------|-------------|
 | `cdc` | Yes | Set to `"true"` to enable CDC mode |
-| `cdc_mode` | No | `"stream"` for real-time streaming or `"batch"` for batch replication |
+| `stream` | No | Set to `true` for continuous (real-time) streaming. Omit for batch replication (read up to the current WAL position and exit) |
+| `cdc_mode` | No | **Deprecated** — use `stream` instead. `cdc_mode: stream` is equivalent to `stream: true` |
 | `cdc_publication` | No | Name of the PostgreSQL publication to use |
 | `cdc_slot` | No | Name of the PostgreSQL replication slot to use |
 | `cdc_dest_schema` | No | Schema to use when running multi-table CDC |
-| `cdc_stream_metrics_addr` | No | Address to serve streaming metrics on, such as `127.0.0.1:6060`. Only valid when the asset also sets `stream: true` |
+| `cdc_stream_metrics_addr` | No | Address to serve streaming metrics on, such as `127.0.0.1:6060`. Only valid for a streaming asset (`stream: true`) |
 | `cdc_stream_flush_interval` | No | How often buffered records are written to the destination, such as `30s`. Takes precedence over `flush_interval` |
 | `cdc_stream_flush_records` | No | Number of buffered records that triggers a write to the destination. Takes precedence over `flush_records` |
 | `source_table` | Yes | Source table in `schema.table` format, or `"*"` to replicate all tables in the publication |
@@ -252,13 +253,21 @@ parameters:
   source_table: public.orders
   destination: bigquery
   cdc: "true"
-  cdc_mode: stream
+  stream: true
 ```
+
+A streaming CDC asset (`stream: true`) runs continuously, so it is excluded from a normal `bruin run` and is launched on its own:
+
+```bash
+bruin run --stream assets/public.orders.asset.yml
+```
+
+The stream runs in the foreground until you stop it with `Ctrl+C`, then flushes and exits cleanly. See [Streaming assets](../assets/ingestr.md#streaming-assets) for the full behaviour and restrictions.
 
 #### Tuning and observing a stream
 The `cdc_stream_*` parameters configure a running stream. `cdc_stream_flush_interval` and `cdc_stream_flush_records` control how often buffered changes reach the destination, and `cdc_stream_metrics_addr` serves replication lag, rows synced, and the last synced timestamp over HTTP for as long as the stream runs. The metrics are [expvar](https://pkg.go.dev/expvar) variables served at `/debug/vars`, and Postgres reports its lag as `bytes_behind`: the WAL the source has produced but the replication slot has not confirmed as durable.
 
-Nothing is served unless `cdc_stream_metrics_addr` is set, and it requires `stream: true` — ingestr rejects the address otherwise.
+Nothing is served unless `cdc_stream_metrics_addr` is set, and it requires a streaming asset (`stream: true`) — ingestr rejects the address otherwise.
 
 ```yaml
 name: public.orders
@@ -270,7 +279,6 @@ parameters:
   source_table: public.orders
   destination: bigquery
   cdc: "true"
-  cdc_mode: stream
   stream: true
   cdc_stream_flush_interval: 30s
   cdc_stream_flush_records: 10000
