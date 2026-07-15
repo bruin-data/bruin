@@ -30,6 +30,9 @@ var versionPattern = regexp.MustCompile(`^v(0|[1-9]\d*)(\.\d+\.\d+)?$`)
 const (
 	versionFamilyV0 = "v0"
 	versionFamilyV1 = "v1"
+	// paramStream is the ingestr asset parameter that enables continuous streaming.
+	// The deprecated cdc_mode: stream alias uses the same literal as its value.
+	paramStream = "stream"
 )
 
 // resolvedEngine is the outcome of parsing parameters.version on an ingestr asset.
@@ -276,8 +279,8 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 
 		// cdc_mode: stream maps to ingestr's --stream flag (continuous ingestion).
 		// Reuse the generic stream parameter so the shared flag builder emits it.
-		if mode, _ := asset.Parameters.GetString("cdc_mode"); mode == "stream" {
-			asset.Parameters["stream"] = "true"
+		if mode, _ := asset.Parameters.GetString("cdc_mode"); mode == paramStream {
+			asset.Parameters[paramStream] = "true"
 		}
 
 		// Auto-set merge strategy for CDC if not already set
@@ -555,12 +558,12 @@ func IsStreamingAsset(asset *pipeline.Asset) bool {
 	if asset == nil || asset.Type != pipeline.AssetTypeIngestr {
 		return false
 	}
-	if stream, _ := asset.Parameters.GetString("stream"); stream == "true" {
+	if stream, _ := asset.Parameters.GetString(paramStream); stream == "true" {
 		return true
 	}
 	if isCDCAsset(asset) {
 		mode, _ := asset.Parameters.GetString("cdc_mode")
-		return mode == "stream"
+		return mode == paramStream
 	}
 	return false
 }
