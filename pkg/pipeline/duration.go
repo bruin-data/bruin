@@ -9,7 +9,7 @@ import (
 )
 
 // DurationSeconds stores a duration while serializing to JSON as whole seconds.
-type DurationSeconds time.Duration
+type DurationSeconds time.Duration //nolint:recvcheck
 
 func (d DurationSeconds) Duration() time.Duration {
 	return time.Duration(d)

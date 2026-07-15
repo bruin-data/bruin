@@ -53,12 +53,12 @@ const (
 	discordConnectionEmpty     = "Discord notifications `connection` attribute must not be empty"
 	discordConnectionNotUnique = "The `connection` attribute under the Discord notifications must be unique"
 
-	pipelineConcurrencyMustBePositive    = "Pipeline concurrency must be 1 or greater"
-	pipelineMaxActiveStepsMustBePositive = "Pipeline max_active_steps must be a positive number"
-	assetTierMustBeBetweenOneAndFive     = "Asset tier must be between 1 and 5"
-	assetTimeoutMustBeAtLeastOneSecond   = "Asset timeout must be at least 1s"
+	pipelineConcurrencyMustBePositive            = "Pipeline concurrency must be 1 or greater"
+	pipelineMaxActiveStepsMustBePositive         = "Pipeline max_active_steps must be a positive number"
+	assetTierMustBeBetweenOneAndFive             = "Asset tier must be between 1 and 5"
+	assetTimeoutMustBeAtLeastOneSecond           = "Asset timeout must be at least 1s"
 	pipelineDefaultTimeoutMustBeAtLeastOneSecond = "Pipeline default timeout must be at least 1s"
-	secretMappingKeyMustExist            = "Secrets must have a `key` attribute"
+	secretMappingKeyMustExist                    = "Secrets must have a `key` attribute"
 
 	materializationStrategyIsNotSupportedForViews     = "Materialization strategy is not supported for views"
 	materializationPartitionByNotSupportedForViews    = "Materialization partition by is not supported for views because views cannot be partitioned"

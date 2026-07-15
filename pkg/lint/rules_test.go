@@ -4043,9 +4043,9 @@ func TestEnsurePipelineDefaultTimeoutIsValid(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name    string
-		p       *pipeline.Pipeline
-		want    []*Issue
+		name string
+		p    *pipeline.Pipeline
+		want []*Issue
 	}{
 		{
 			name: "missing defaults is valid",
