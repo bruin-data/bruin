@@ -2398,6 +2398,62 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 	}
 }
 
+func TestWarnIngestrCDCStreamParameter(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		asset    *pipeline.Asset
+		wantWarn bool
+	}{
+		{
+			name: "non-ingestr asset is ignored",
+			asset: &pipeline.Asset{
+				Type:       pipeline.AssetTypePython,
+				Parameters: pipeline.ParameterMap{"cdc": "true", "stream": "true"},
+			},
+		},
+		{
+			name: "non-cdc streaming asset is fine",
+			asset: &pipeline.Asset{
+				Type:       pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{"stream": "true"},
+			},
+		},
+		{
+			name: "cdc asset with cdc_mode only is fine",
+			asset: &pipeline.Asset{
+				Type:       pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{"cdc": "true", "cdc_mode": "stream"},
+			},
+		},
+		{
+			name: "cdc asset with redundant stream parameter warns",
+			asset: &pipeline.Asset{
+				Type:       pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{"cdc": "true", "cdc_mode": "stream", "stream": "true"},
+			},
+			wantWarn: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			p := &pipeline.Pipeline{Assets: []*pipeline.Asset{tt.asset}}
+			got, err := WarnIngestrCDCStreamParameter(t.Context(), p, tt.asset)
+			require.NoError(t, err)
+			if tt.wantWarn {
+				assert.Len(t, got, 1)
+				assert.Contains(t, got[0].Description, "cdc_mode: stream")
+			} else {
+				assert.Empty(t, got)
+			}
+		})
+	}
+}
+
 func TestEnsurePipelineStartDateIsValid(t *testing.T) {
 	t.Parallel()
 

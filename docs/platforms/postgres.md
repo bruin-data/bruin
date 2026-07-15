@@ -279,7 +279,6 @@ parameters:
   destination: bigquery
   cdc: "true"
   cdc_mode: stream
-  stream: true
   cdc_stream_flush_interval: 30s
   cdc_stream_flush_records: 10000
   cdc_stream_metrics_addr: 127.0.0.1:6060

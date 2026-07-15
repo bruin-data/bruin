@@ -346,6 +346,33 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 	return issues, nil
 }
 
+// WarnIngestrCDCStreamParameter nudges CDC assets towards a single streaming
+// switch. On a CDC asset, streaming is controlled by cdc_mode: stream, which
+// enables ingestr's --stream flag on its own; setting the generic stream
+// parameter as well is redundant (and stream: true alongside cdc_mode: batch is
+// contradictory).
+func WarnIngestrCDCStreamParameter(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+	if asset.Type != pipeline.AssetTypeIngestr || asset.Parameters == nil {
+		return issues, nil
+	}
+
+	if cdc, _ := asset.Parameters.GetString("cdc"); cdc != "true" {
+		return issues, nil
+	}
+
+	if _, exists := asset.Parameters.GetString("stream"); !exists {
+		return issues, nil
+	}
+
+	issues = append(issues, &Issue{
+		Task:        asset,
+		Description: "The 'stream' parameter is redundant on a CDC asset; use 'cdc_mode: stream' to stream (or 'cdc_mode: batch' for a bounded run)",
+	})
+
+	return issues, nil
+}
+
 func validateIngestrMaterialization(asset *pipeline.Asset, effectiveStrategy string) ([]*Issue, string) {
 	issues := make([]*Issue, 0)
 	mat := asset.Materialization
