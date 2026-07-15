@@ -37,7 +37,7 @@ func Cloud(isDebug *bool) *cli.Command {
 			CloudAgents(),
 			CloudConnections(),
 			CloudDashboards(),
-			CloudScheduledRuns(),
+			CloudScheduledAgents(),
 		},
 	}
 }
@@ -2972,7 +2972,7 @@ func cloudDashboardsGet() *cli.Command {
 }
 
 // parseJSONOrYAMLObject decodes a JSON or YAML object (a dashboard definition, a
-// scheduled-run plan, ...) into a map. It walks the YAML node tree rather than
+// scheduled-agent plan, ...) into a map. It walks the YAML node tree rather than
 // decoding straight into a map so
 // that timestamp-like scalars (e.g. an unquoted `2024-01-01`) are preserved as
 // their original string — yaml.v3 would otherwise resolve them to time.Time,
@@ -3262,23 +3262,23 @@ func cloudDashboardsUpdate() *cli.Command {
 	}
 }
 
-func CloudScheduledRuns() *cli.Command {
+func CloudScheduledAgents() *cli.Command {
 	return &cli.Command{
-		Name:  "scheduled-runs",
-		Usage: "Manage Bruin Cloud scheduled runs",
+		Name:  "scheduled-agents",
+		Usage: "Manage Bruin Cloud scheduled agents",
 		Commands: []*cli.Command{
-			cloudScheduledRunsList(),
-			cloudScheduledRunsGet(),
-			cloudScheduledRunsCreate(),
-			cloudScheduledRunsUpdate(),
+			cloudScheduledAgentsList(),
+			cloudScheduledAgentsGet(),
+			cloudScheduledAgentsCreate(),
+			cloudScheduledAgentsUpdate(),
 		},
 	}
 }
 
-func cloudScheduledRunsList() *cli.Command {
+func cloudScheduledAgentsList() *cli.Command {
 	return &cli.Command{
 		Name:  "list",
-		Usage: "List scheduled runs",
+		Usage: "List scheduled agents",
 		Flags: []cli.Flag{
 			apiKeyFlag(),
 			outputFlag(),
@@ -3293,9 +3293,9 @@ func cloudScheduledRunsList() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			runs, err := client.ListScheduledRuns(ctx)
+			runs, err := client.ListScheduledAgents(ctx)
 			if err != nil {
-				printError(err, output, "Failed to list scheduled runs")
+				printError(err, output, "Failed to list scheduled agents")
 				return cli.Exit("", 1)
 			}
 
@@ -3317,16 +3317,16 @@ func cloudScheduledRunsList() *cli.Command {
 	}
 }
 
-func cloudScheduledRunsGet() *cli.Command {
+func cloudScheduledAgentsGet() *cli.Command {
 	return &cli.Command{
 		Name:  "get",
-		Usage: "Get a scheduled run including its plan",
+		Usage: "Get a scheduled agent including its plan",
 		Flags: []cli.Flag{
 			apiKeyFlag(),
 			outputFlag(),
 			&cli.IntFlag{
-				Name:     "scheduled-run-id",
-				Usage:    "scheduled run ID",
+				Name:     "scheduled-agent-id",
+				Usage:    "scheduled agent ID",
 				Required: true,
 			},
 		},
@@ -3340,9 +3340,9 @@ func cloudScheduledRunsGet() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			run, err := client.GetScheduledRun(ctx, c.Int("scheduled-run-id"))
+			run, err := client.GetScheduledAgent(ctx, c.Int("scheduled-agent-id"))
 			if err != nil {
-				printError(err, output, "Failed to get scheduled run")
+				printError(err, output, "Failed to get scheduled agent")
 				return cli.Exit("", 1)
 			}
 
@@ -3352,17 +3352,17 @@ func cloudScheduledRunsGet() *cli.Command {
 				return nil
 			}
 
-			printScheduledRun(run)
+			printScheduledAgent(run)
 			return nil
 		},
 	}
 }
 
-func cloudScheduledRunsCreate() *cli.Command {
+func cloudScheduledAgentsCreate() *cli.Command {
 	return &cli.Command{
 		Name:  "create",
-		Usage: "Create a scheduled run from a plan (stored as an inactive draft; activation stays in the UI)",
-		Flags: append(scheduledRunPlanFlags(),
+		Usage: "Create a scheduled agent from a plan (stored as an inactive draft; activation stays in the UI)",
+		Flags: append(scheduledAgentPlanFlags(),
 			&cli.IntFlag{
 				Name:     "agent-id",
 				Usage:    "the agent that runs the scheduled task",
@@ -3373,7 +3373,7 @@ func cloudScheduledRunsCreate() *cli.Command {
 			defer RecoverFromPanic()
 			output := c.String("output")
 
-			fields, err := buildScheduledRunFields(c)
+			fields, err := buildScheduledAgentFields(c)
 			if err != nil {
 				printError(err, output, "Invalid plan")
 				return cli.Exit("", 1)
@@ -3386,9 +3386,9 @@ func cloudScheduledRunsCreate() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			run, err := client.CreateScheduledRun(ctx, fields)
+			run, err := client.CreateScheduledAgent(ctx, fields)
 			if err != nil {
-				printError(err, output, "Failed to create scheduled run")
+				printError(err, output, "Failed to create scheduled agent")
 				return cli.Exit("", 1)
 			}
 
@@ -3398,20 +3398,20 @@ func cloudScheduledRunsCreate() *cli.Command {
 				return nil
 			}
 
-			infoPrinter.Printf("Created scheduled run %d (%s) as a draft — review and activate it from the Bruin Cloud UI.\n", run.ID, derefString(run.Title))
+			infoPrinter.Printf("Created scheduled agent %d (%s) as a draft — review and activate it from the Bruin Cloud UI.\n", run.ID, derefString(run.Title))
 			return nil
 		},
 	}
 }
 
-func cloudScheduledRunsUpdate() *cli.Command {
+func cloudScheduledAgentsUpdate() *cli.Command {
 	return &cli.Command{
 		Name:  "update",
-		Usage: "Update a scheduled run's title or plan (activation stays in the UI)",
-		Flags: append(scheduledRunPlanFlags(),
+		Usage: "Update a scheduled agent's title or plan (activation stays in the UI)",
+		Flags: append(scheduledAgentPlanFlags(),
 			&cli.IntFlag{
-				Name:     "scheduled-run-id",
-				Usage:    "scheduled run ID",
+				Name:     "scheduled-agent-id",
+				Usage:    "scheduled agent ID",
 				Required: true,
 			},
 		),
@@ -3419,7 +3419,7 @@ func cloudScheduledRunsUpdate() *cli.Command {
 			defer RecoverFromPanic()
 			output := c.String("output")
 
-			fields, err := buildScheduledRunFields(c)
+			fields, err := buildScheduledAgentFields(c)
 			if err != nil {
 				printError(err, output, "Invalid plan")
 				return cli.Exit("", 1)
@@ -3435,9 +3435,9 @@ func cloudScheduledRunsUpdate() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			run, err := client.UpdateScheduledRun(ctx, c.Int("scheduled-run-id"), fields)
+			run, err := client.UpdateScheduledAgent(ctx, c.Int("scheduled-agent-id"), fields)
 			if err != nil {
-				printError(err, output, "Failed to update scheduled run")
+				printError(err, output, "Failed to update scheduled agent")
 				return cli.Exit("", 1)
 			}
 
@@ -3447,14 +3447,14 @@ func cloudScheduledRunsUpdate() *cli.Command {
 				return nil
 			}
 
-			infoPrinter.Printf("Updated scheduled run %d (%s).\n", run.ID, derefString(run.Title))
+			infoPrinter.Printf("Updated scheduled agent %d (%s).\n", run.ID, derefString(run.Title))
 			return nil
 		},
 	}
 }
 
-// scheduledRunPlanFlags are the plan flags shared by create and update.
-func scheduledRunPlanFlags() []cli.Flag {
+// scheduledAgentPlanFlags are the plan flags shared by create and update.
+func scheduledAgentPlanFlags() []cli.Flag {
 	return []cli.Flag{
 		apiKeyFlag(),
 		outputFlag(),
@@ -3469,10 +3469,10 @@ func scheduledRunPlanFlags() []cli.Flag {
 	}
 }
 
-// buildScheduledRunFields assembles the request body from an optional full plan
+// buildScheduledAgentFields assembles the request body from an optional full plan
 // (--state / --state-file) overlaid with the convenience flags. Shared by create
 // and update so the two build the body identically.
-func buildScheduledRunFields(c *cli.Command) (map[string]any, error) {
+func buildScheduledAgentFields(c *cli.Command) (map[string]any, error) {
 	fields := map[string]any{}
 
 	// The plan can come inline (--state) or from a file (--state-file), not both.
@@ -3528,8 +3528,8 @@ func buildScheduledRunFields(c *cli.Command) (map[string]any, error) {
 	return fields, nil
 }
 
-func printScheduledRun(run *bruincloud.ScheduledRun) {
-	infoPrinter.Printf("Scheduled run %d: %s\n", run.ID, derefString(run.Title))
+func printScheduledAgent(run *bruincloud.ScheduledAgent) {
+	infoPrinter.Printf("Scheduled agent %d: %s\n", run.ID, derefString(run.Title))
 	fmt.Printf("  Active:    %v\n", run.IsActive)
 	fmt.Printf("  Cron:      %s\n", derefString(run.ScheduleCron))
 	fmt.Printf("  Timezone:  %s\n", derefString(run.ScheduleTimezone))

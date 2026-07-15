@@ -614,40 +614,40 @@ func (c *APIClient) UpdateDashboard(ctx context.Context, dashboardID int, fields
 	return &result, nil
 }
 
-func (c *APIClient) ListScheduledRuns(ctx context.Context) ([]ScheduledRun, error) {
+func (c *APIClient) ListScheduledAgents(ctx context.Context) ([]ScheduledAgent, error) {
 	var resp struct {
-		ScheduledRuns []ScheduledRun `json:"scheduled_runs"`
+		ScheduledAgents []ScheduledAgent `json:"scheduled_agents"`
 	}
-	err := c.doRequest(ctx, http.MethodGet, "/scheduled-runs", nil, &resp)
-	return resp.ScheduledRuns, err
+	err := c.doRequest(ctx, http.MethodGet, "/scheduled-agents", nil, &resp)
+	return resp.ScheduledAgents, err
 }
 
-func (c *APIClient) GetScheduledRun(ctx context.Context, scheduledRunID int) (*ScheduledRun, error) {
-	var result ScheduledRun
-	err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/scheduled-runs/%d", scheduledRunID), nil, &result)
+func (c *APIClient) GetScheduledAgent(ctx context.Context, scheduledAgentID int) (*ScheduledAgent, error) {
+	var result ScheduledAgent
+	err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/scheduled-agents/%d", scheduledAgentID), nil, &result)
 	if err != nil {
 		return nil, err
 	}
 	return &result, nil
 }
 
-// CreateScheduledRun creates a scheduled run from a plan. The server stores it as
+// CreateScheduledAgent creates a scheduled agent from a plan. The server stores it as
 // an inactive draft (a human activates it from the UI); fields is the request
 // body and must include agent_id.
-func (c *APIClient) CreateScheduledRun(ctx context.Context, fields map[string]any) (*ScheduledRun, error) {
-	var result ScheduledRun
-	err := c.doRequest(ctx, http.MethodPost, "/scheduled-runs", fields, &result)
+func (c *APIClient) CreateScheduledAgent(ctx context.Context, fields map[string]any) (*ScheduledAgent, error) {
+	var result ScheduledAgent
+	err := c.doRequest(ctx, http.MethodPost, "/scheduled-agents", fields, &result)
 	if err != nil {
 		return nil, err
 	}
 	return &result, nil
 }
 
-// UpdateScheduledRun applies a partial update to a scheduled run's plan. Only the
+// UpdateScheduledAgent applies a partial update to a scheduled agent's plan. Only the
 // fields present are changed; activation is not updatable via the API.
-func (c *APIClient) UpdateScheduledRun(ctx context.Context, scheduledRunID int, fields map[string]any) (*ScheduledRun, error) {
-	var result ScheduledRun
-	err := c.doRequest(ctx, http.MethodPatch, fmt.Sprintf("/scheduled-runs/%d", scheduledRunID), fields, &result)
+func (c *APIClient) UpdateScheduledAgent(ctx context.Context, scheduledAgentID int, fields map[string]any) (*ScheduledAgent, error) {
+	var result ScheduledAgent
+	err := c.doRequest(ctx, http.MethodPatch, fmt.Sprintf("/scheduled-agents/%d", scheduledAgentID), fields, &result)
 	if err != nil {
 		return nil, err
 	}

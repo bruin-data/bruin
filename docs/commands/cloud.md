@@ -660,30 +660,30 @@ bruin cloud dashboards update --dashboard-id 42 --visibility team
 
 ---
 
-### `scheduled-runs`
+### `scheduled-agents`
 
-Manage scheduled runs — cron-based recurring agent tasks.
+Manage scheduled agents — cron-based recurring agent tasks.
 
 #### `list` / `get`
 
 ```bash
-bruin cloud scheduled-runs list
-bruin cloud scheduled-runs get --scheduled-run-id 42
-bruin cloud scheduled-runs get --scheduled-run-id 42 --output json
+bruin cloud scheduled-agents list
+bruin cloud scheduled-agents get --scheduled-agent-id 42
+bruin cloud scheduled-agents get --scheduled-agent-id 42 --output json
 ```
 
 #### `create`
 
-Create a scheduled run from a plan. It is stored as an inactive **draft** — a
+Create a scheduled agent from a plan. It is stored as an inactive **draft** — a
 human reviews and activates it from the Bruin Cloud UI; the CLI never activates a
 run. Pass the plan with convenience flags, or the full plan via `--state-file`
 (JSON or YAML with `schedule`, `instructions`, `verified_sqls`, `memory`, ...).
 
 ```bash
-bruin cloud scheduled-runs create --agent-id 7 --title "Daily revenue" \
+bruin cloud scheduled-agents create --agent-id 7 --title "Daily revenue" \
   --cron "0 9 * * *" --timezone UTC --instructions "Summarise yesterday's revenue."
 
-bruin cloud scheduled-runs create --agent-id 7 --state-file ./plan.yaml
+bruin cloud scheduled-agents create --agent-id 7 --state-file ./plan.yaml
 ```
 
 #### `update`
@@ -692,8 +692,8 @@ Update a run's title or plan. Only the flags you pass change. Activation stays i
 the UI.
 
 ```bash
-bruin cloud scheduled-runs update --scheduled-run-id 42 --cron "0 8 * * 1"
-bruin cloud scheduled-runs update --scheduled-run-id 42 --state-file ./plan.yaml
+bruin cloud scheduled-agents update --scheduled-agent-id 42 --cron "0 8 * * 1"
+bruin cloud scheduled-agents update --scheduled-agent-id 42 --state-file ./plan.yaml
 ```
 
 ---

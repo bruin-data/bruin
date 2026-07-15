@@ -256,10 +256,10 @@ type Dashboard struct {
 	State      json.RawMessage `json:"state,omitempty"`
 }
 
-// ScheduledRun represents a Bruin Cloud scheduled run — a cron-based recurring
+// ScheduledAgent represents a Bruin Cloud scheduled agent — a cron-based recurring
 // agent task. The nested plan fields (verified SQLs, memory, ...) are kept as raw
 // JSON so `--output json` round-trips the full server response faithfully.
-type ScheduledRun struct {
+type ScheduledAgent struct {
 	ID                int             `json:"id"`
 	Title             *string         `json:"title"`
 	IsActive          bool            `json:"is_active"`

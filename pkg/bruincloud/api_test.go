@@ -826,63 +826,63 @@ func TestUpdateDashboard(t *testing.T) {
 	assert.Equal(t, "Renamed", *dashboard.Title)
 }
 
-func TestListScheduledRuns(t *testing.T) {
+func TestListScheduledAgents(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodGet, r.Method)
-		assert.Equal(t, "/scheduled-runs", r.URL.Path)
+		assert.Equal(t, "/scheduled-agents", r.URL.Path)
 
 		w.WriteHeader(http.StatusOK)
 		title := "Nightly"
 		cron := "0 0 * * *"
 		writeJSON(t, w, map[string]any{
-			"scheduled_runs": []ScheduledRun{{ID: 3, Title: &title, IsActive: true, ScheduleCron: &cron}},
+			"scheduled_agents": []ScheduledAgent{{ID: 3, Title: &title, IsActive: true, ScheduleCron: &cron}},
 		})
 	})
 
-	runs, err := client.ListScheduledRuns(t.Context())
+	runs, err := client.ListScheduledAgents(t.Context())
 	require.NoError(t, err)
 	require.Len(t, runs, 1)
 	assert.Equal(t, 3, runs[0].ID)
 	assert.True(t, runs[0].IsActive)
 }
 
-func TestGetScheduledRun(t *testing.T) {
+func TestGetScheduledAgent(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodGet, r.Method)
-		assert.Equal(t, "/scheduled-runs/5", r.URL.Path)
+		assert.Equal(t, "/scheduled-agents/5", r.URL.Path)
 
 		w.WriteHeader(http.StatusOK)
 		title := "Nightly"
 		cron := "0 0 * * *"
-		writeJSON(t, w, ScheduledRun{ID: 5, Title: &title, IsActive: true, ScheduleCron: &cron})
+		writeJSON(t, w, ScheduledAgent{ID: 5, Title: &title, IsActive: true, ScheduleCron: &cron})
 	})
 
-	run, err := client.GetScheduledRun(t.Context(), 5)
+	run, err := client.GetScheduledAgent(t.Context(), 5)
 	require.NoError(t, err)
 	assert.Equal(t, 5, run.ID)
 	assert.Equal(t, "Nightly", *run.Title)
 	assert.Equal(t, "0 0 * * *", *run.ScheduleCron)
 }
 
-func TestGetScheduledRun_NotFound(t *testing.T) {
+func TestGetScheduledAgent_NotFound(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
-		writeJSON(t, w, map[string]any{"message": "Scheduled run not found", "error": "not_found"})
+		writeJSON(t, w, map[string]any{"message": "Scheduled agent not found", "error": "not_found"})
 	})
 
 	// A 404 surfaces as an error, not a zero-value run.
-	_, err := client.GetScheduledRun(t.Context(), 999)
+	_, err := client.GetScheduledAgent(t.Context(), 999)
 	require.Error(t, err)
 }
 
-func TestCreateScheduledRun(t *testing.T) {
+func TestCreateScheduledAgent(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodPost, r.Method)
-		assert.Equal(t, "/scheduled-runs", r.URL.Path)
+		assert.Equal(t, "/scheduled-agents", r.URL.Path)
 
 		var body map[string]any
 		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
@@ -891,21 +891,21 @@ func TestCreateScheduledRun(t *testing.T) {
 
 		w.WriteHeader(http.StatusCreated)
 		title := "Daily"
-		writeJSON(t, w, ScheduledRun{ID: 11, Title: &title, IsActive: false})
+		writeJSON(t, w, ScheduledAgent{ID: 11, Title: &title, IsActive: false})
 	})
 
-	run, err := client.CreateScheduledRun(t.Context(), map[string]any{"agent_id": 7, "title": "Daily"})
+	run, err := client.CreateScheduledAgent(t.Context(), map[string]any{"agent_id": 7, "title": "Daily"})
 	require.NoError(t, err)
 	assert.Equal(t, 11, run.ID)
 	// Created as a draft — never active from the API.
 	assert.False(t, run.IsActive)
 }
 
-func TestUpdateScheduledRun(t *testing.T) {
+func TestUpdateScheduledAgent(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodPatch, r.Method)
-		assert.Equal(t, "/scheduled-runs/11", r.URL.Path)
+		assert.Equal(t, "/scheduled-agents/11", r.URL.Path)
 
 		var body map[string]any
 		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
@@ -913,10 +913,10 @@ func TestUpdateScheduledRun(t *testing.T) {
 
 		w.WriteHeader(http.StatusOK)
 		title := "Renamed"
-		writeJSON(t, w, ScheduledRun{ID: 11, Title: &title})
+		writeJSON(t, w, ScheduledAgent{ID: 11, Title: &title})
 	})
 
-	run, err := client.UpdateScheduledRun(t.Context(), 11, map[string]any{"title": "Renamed"})
+	run, err := client.UpdateScheduledAgent(t.Context(), 11, map[string]any{"title": "Renamed"})
 	require.NoError(t, err)
 	assert.Equal(t, "Renamed", *run.Title)
 }

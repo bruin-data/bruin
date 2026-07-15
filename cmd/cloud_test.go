@@ -158,7 +158,7 @@ func TestCloudCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "agents")
 	assert.Contains(t, subNames, "connections")
 	assert.Contains(t, subNames, "dashboards")
-	assert.Contains(t, subNames, "scheduled-runs")
+	assert.Contains(t, subNames, "scheduled-agents")
 }
 
 func TestCloudProjectsCommand_Help(t *testing.T) {
@@ -241,11 +241,11 @@ func TestCloudDashboardsCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "update")
 }
 
-func TestCloudScheduledRunsCommand_Help(t *testing.T) {
+func TestCloudScheduledAgentsCommand_Help(t *testing.T) {
 	t.Parallel()
-	cmd := CloudScheduledRuns()
+	cmd := CloudScheduledAgents()
 	require.NotNil(t, cmd)
-	assert.Equal(t, "scheduled-runs", cmd.Name)
+	assert.Equal(t, "scheduled-agents", cmd.Name)
 	require.Len(t, cmd.Commands, 4)
 
 	subNames := make([]string, len(cmd.Commands))
