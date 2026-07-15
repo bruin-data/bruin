@@ -230,7 +230,19 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		}
 
 		// An unsupported scheme is left alone here, and ingestr rejects it downstream.
-		parsedURI.Scheme, _ = ingestruri.CDCScheme(parsedURI.Scheme)
+		baseScheme := parsedURI.Scheme
+		parsedURI.Scheme, _ = ingestruri.CDCScheme(baseScheme)
+
+		// SQL Server exposes two capture mechanisms. Log-based CDC (mssql+cdc) is the
+		// default; Change Tracking (mssql+ct) is selected per-asset because it can't be
+		// derived from the scheme alone. The +ct source takes no query parameters and is
+		// driven purely by --primary-key / --incremental-strategy merge, so its
+		// source-specific parameters below are skipped.
+		sqlCapture, _ := asset.Parameters.GetString("cdc_sql_capture")
+		changeTracking := isMSSQLScheme(baseScheme) && sqlCapture == "change_tracking"
+		if changeTracking {
+			parsedURI.Scheme = strings.TrimSuffix(parsedURI.Scheme, "+cdc") + "+ct"
+		}
 
 		q := parsedURI.Query()
 		// PostgreSQL logical-replication parameters.
@@ -257,6 +269,26 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		}
 		if tls, _ := asset.Parameters.GetString("cdc_tls"); tls != "" {
 			q.Set("tls", tls)
+		}
+		// SQL Server log-based CDC parameters, confined to the mssql source so they
+		// cannot leak into other CDC URIs. Change Tracking (+ct) ignores query
+		// parameters, so these are only forwarded for the mssql+cdc source.
+		if isMSSQLScheme(baseScheme) && !changeTracking {
+			if captureInstance, _ := asset.Parameters.GetString("cdc_capture_instance"); captureInstance != "" {
+				q.Set("capture_instance", captureInstance)
+			}
+			if pollInterval, _ := asset.Parameters.GetString("cdc_poll_interval"); pollInterval != "" {
+				q.Set("poll_interval", pollInterval)
+			}
+		}
+		// MongoDB change-stream parameters, confined to the mongodb source.
+		if isMongoDBScheme(baseScheme) {
+			if maxAwaitTime, _ := asset.Parameters.GetString("cdc_max_await_time"); maxAwaitTime != "" {
+				q.Set("max_await_time", maxAwaitTime)
+			}
+			if sampleSize, _ := asset.Parameters.GetString("cdc_schema_sample_size"); sampleSize != "" {
+				q.Set("schema_sample_size", sampleSize)
+			}
 		}
 		// Shared parameters.
 		if mode, _ := asset.Parameters.GetString("cdc_mode"); mode != "" {
@@ -528,6 +560,18 @@ func applyCDCStreamParameters(params pipeline.ParameterMap) {
 func isCDCAsset(asset *pipeline.Asset) bool {
 	cdc, _ := asset.Parameters.GetString("cdc")
 	return cdc == "true"
+}
+
+// isMSSQLScheme reports whether scheme belongs to the SQL Server family, which is
+// the only source that offers the Change Tracking (+ct) capture mode.
+func isMSSQLScheme(scheme string) bool {
+	return strings.HasPrefix(scheme, "mssql") || strings.HasPrefix(scheme, "sqlserver")
+}
+
+// isMongoDBScheme reports whether scheme belongs to the MongoDB family (mongodb,
+// mongodb+srv), which understands the change-stream CDC parameters.
+func isMongoDBScheme(scheme string) bool {
+	return strings.HasPrefix(scheme, "mongodb")
 }
 
 func hasIngestrIncrementalKey(asset *pipeline.Asset, mat pipeline.Materialization) bool {

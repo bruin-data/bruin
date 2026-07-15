@@ -107,8 +107,14 @@ func Parse(uri string) (*url.URL, error) {
 // This is not a plain "+cdc" suffix: PostgreSQL's ingestr URI uses the
 // "postgresql" scheme but its CDC scheme is "postgres+cdc".
 //
-// Supported today: PostgreSQL, the MySQL family (mysql, mariadb), Vitess, and
-// PlanetScale (ps_mysql).
+// Supported today: PostgreSQL, the MySQL family (mysql, mariadb), Vitess,
+// PlanetScale (ps_mysql), MongoDB (mongodb, mongodb+srv), and SQL Server (mssql).
+//
+// MongoDB and SQL Server both follow the plain "+cdc" suffix rule, which yields
+// exactly what ingestr expects: "mongodb+cdc", "mongodb+srv+cdc", "mssql+cdc".
+// SQL Server Change Tracking ("mssql+ct") is not selected here because it depends
+// on an asset parameter rather than the scheme alone; the ingestr operator swaps
+// the suffix for that mode.
 func CDCScheme(scheme string) (string, bool) {
 	switch {
 	case strings.HasSuffix(scheme, "+cdc"):
@@ -116,7 +122,9 @@ func CDCScheme(scheme string) (string, bool) {
 	case strings.Contains(scheme, "postgresql"):
 		return strings.ReplaceAll(scheme, "postgresql", "postgres+cdc"), true
 	case strings.HasPrefix(scheme, "mysql"), strings.HasPrefix(scheme, "mariadb"),
-		strings.HasPrefix(scheme, "vitess"), strings.HasPrefix(scheme, "ps_mysql"):
+		strings.HasPrefix(scheme, "vitess"), strings.HasPrefix(scheme, "ps_mysql"),
+		strings.HasPrefix(scheme, "mongodb"),
+		strings.HasPrefix(scheme, "mssql"), strings.HasPrefix(scheme, "sqlserver"):
 		return scheme + "+cdc", true
 	}
 
