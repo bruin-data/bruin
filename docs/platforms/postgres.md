@@ -261,7 +261,7 @@ A `cdc_mode: stream` asset runs continuously, so it is excluded from a normal `b
 bruin run --stream assets/public.orders.asset.yml
 ```
 
-The stream runs in the foreground until you stop it with `Ctrl+C`, then flushes and exits cleanly. See [Streaming CDC assets](../assets/ingestr.md#streaming-cdc-assets) for the full behaviour and restrictions.
+The stream runs in the foreground until you stop it with `Ctrl+C`, then flushes and exits cleanly. See [Streaming assets](../assets/ingestr.md#streaming-assets) for the full behaviour and restrictions.
 
 #### Tuning and observing a stream
 The `cdc_stream_*` parameters configure a running stream. `cdc_stream_flush_interval` and `cdc_stream_flush_records` control how often buffered changes reach the destination, and `cdc_stream_metrics_addr` serves replication lag, rows synced, and the last synced timestamp over HTTP for as long as the stream runs. The metrics are [expvar](https://pkg.go.dev/expvar) variables served at `/debug/vars`, and Postgres reports its lag as `bytes_behind`: the WAL the source has produced but the replication slot has not confirmed as durable.
