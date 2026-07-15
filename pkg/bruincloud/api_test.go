@@ -847,6 +847,37 @@ func TestListScheduledRuns(t *testing.T) {
 	assert.True(t, runs[0].IsActive)
 }
 
+func TestGetScheduledRun(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/scheduled-runs/5", r.URL.Path)
+
+		w.WriteHeader(http.StatusOK)
+		title := "Nightly"
+		cron := "0 0 * * *"
+		writeJSON(t, w, ScheduledRun{ID: 5, Title: &title, IsActive: true, ScheduleCron: &cron})
+	})
+
+	run, err := client.GetScheduledRun(t.Context(), 5)
+	require.NoError(t, err)
+	assert.Equal(t, 5, run.ID)
+	assert.Equal(t, "Nightly", *run.Title)
+	assert.Equal(t, "0 0 * * *", *run.ScheduleCron)
+}
+
+func TestGetScheduledRun_NotFound(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		writeJSON(t, w, map[string]any{"message": "Scheduled run not found", "error": "not_found"})
+	})
+
+	// A 404 surfaces as an error, not a zero-value run.
+	_, err := client.GetScheduledRun(t.Context(), 999)
+	require.Error(t, err)
+}
+
 func TestCreateScheduledRun(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
