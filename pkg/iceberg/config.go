@@ -36,8 +36,9 @@ type Config struct {
 	TablePath       string
 	// TableProperties are emitted as table.<key>=<value> (Iceberg table properties).
 	TableProperties map[string]string
-	// Properties is a passthrough for any other ingestr Iceberg URI parameter
-	// (e.g. REST auth, sql catalog uri). Applied last, so it wins on conflict.
+	// Properties is a passthrough for non-secret ingestr Iceberg URI parameters.
+	// Applied last, so it wins on conflict. Its values are NOT masked in logs,
+	// so credentials belong in the dedicated fields, never here.
 	Properties map[string]string
 }
 

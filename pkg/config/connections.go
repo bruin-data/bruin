@@ -1298,8 +1298,11 @@ type IcebergConnection struct {
 	// TableProperties are Iceberg table properties, emitted as table.<key>=<value>
 	// (e.g. {"write.format.default": "parquet"}).
 	TableProperties map[string]string `yaml:"table_properties,omitempty" json:"table_properties,omitempty" mapstructure:"table_properties"`
-	// Properties is a passthrough for any other ingestr Iceberg URI parameter
-	// (e.g. REST catalog auth, the sql catalog "uri", s3.*/glue.* overrides).
+	// Properties is a passthrough for non-secret ingestr Iceberg URI parameters
+	// (e.g. oauth2-server-uri, s3.* / glue.* non-credential overrides). Its values
+	// are NOT redacted from logs, so credentials must go in the dedicated fields
+	// (catalog.auth, catalog.credential, catalog.token, catalog.uri, storage.auth),
+	// never here.
 	Properties map[string]string `yaml:"properties,omitempty" json:"properties,omitempty" mapstructure:"properties"`
 }
 
