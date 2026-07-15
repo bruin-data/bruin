@@ -126,6 +126,7 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 	for _, pk := range primaryKeys {
 		onConditions = append(onConditions, fmt.Sprintf("target.%s = source.%s", pk, pk))
 	}
+	onConditions = ansisql.AddIncrementalPredicate(onConditions, asset.Materialization.IncrementalPredicate)
 	onCondition := strings.Join(onConditions, " AND ")
 
 	allColumnNames := strings.Join(columnNames, ", ")

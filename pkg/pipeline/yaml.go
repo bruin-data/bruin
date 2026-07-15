@@ -210,12 +210,13 @@ func (a *clusterBy) UnmarshalYAML(value *yaml.Node) error {
 }
 
 type materialization struct {
-	Type            string    `yaml:"type"`
-	Strategy        string    `yaml:"strategy"`
-	PartitionBy     string    `yaml:"partition_by"`
-	ClusterBy       clusterBy `yaml:"cluster_by"`
-	IncrementalKey  string    `yaml:"incremental_key"`
-	TimeGranularity string    `yaml:"time_granularity,omitempty"`
+	Type                 string    `yaml:"type"`
+	Strategy             string    `yaml:"strategy"`
+	PartitionBy          string    `yaml:"partition_by"`
+	ClusterBy            clusterBy `yaml:"cluster_by"`
+	IncrementalKey       string    `yaml:"incremental_key"`
+	IncrementalPredicate string    `yaml:"incremental_predicate"`
+	TimeGranularity      string    `yaml:"time_granularity,omitempty"`
 }
 
 type columnCheckValue struct {
@@ -512,12 +513,13 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 
 func taskDefinitionToAsset(definition taskDefinition) (*Asset, error) {
 	mat := Materialization{
-		Type:            MaterializationType(strings.ToLower(definition.Materialization.Type)),
-		Strategy:        MaterializationStrategy(strings.ToLower(definition.Materialization.Strategy)),
-		ClusterBy:       definition.Materialization.ClusterBy,
-		PartitionBy:     definition.Materialization.PartitionBy,
-		IncrementalKey:  definition.Materialization.IncrementalKey,
-		TimeGranularity: MaterializationTimeGranularity(strings.ToLower(definition.Materialization.TimeGranularity)),
+		Type:                 MaterializationType(strings.ToLower(definition.Materialization.Type)),
+		Strategy:             MaterializationStrategy(strings.ToLower(definition.Materialization.Strategy)),
+		ClusterBy:            definition.Materialization.ClusterBy,
+		PartitionBy:          definition.Materialization.PartitionBy,
+		IncrementalKey:       definition.Materialization.IncrementalKey,
+		IncrementalPredicate: definition.Materialization.IncrementalPredicate,
+		TimeGranularity:      MaterializationTimeGranularity(strings.ToLower(definition.Materialization.TimeGranularity)),
 	}
 
 	columns := make([]Column, len(definition.Columns))

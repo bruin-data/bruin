@@ -20,6 +20,19 @@ func GetColumnsWithMergeLogic(asset *pipeline.Asset) []pipeline.Column {
 	return columns
 }
 
+// AddIncrementalPredicate appends the user-provided SQL predicate to a merge
+// match condition. The predicate is intentionally treated as plain SQL so it
+// can use database-specific syntax and the target/source aliases exposed by
+// materializers.
+func AddIncrementalPredicate(conditions []string, predicate string) []string {
+	predicate = strings.TrimSpace(predicate)
+	if predicate == "" {
+		return conditions
+	}
+
+	return append(conditions, "("+predicate+")")
+}
+
 // BuildTruncateInsertQuery creates a truncate+insert query that works for standard ANSI SQL databases.
 // This can be used by platforms that support standard TRUNCATE TABLE syntax with transactions.
 func BuildTruncateInsertQuery(task *pipeline.Asset, query string) (string, error) {

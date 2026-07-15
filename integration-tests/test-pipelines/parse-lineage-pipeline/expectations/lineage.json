@@ -30,6 +30,7 @@
         "partition_by": "",
         "cluster_by": null,
         "incremental_key": "",
+        "incremental_predicate": "",
         "time_granularity": ""
       },
       "upstreams": [
@@ -148,6 +149,7 @@
         "partition_by": "",
         "cluster_by": null,
         "incremental_key": "",
+        "incremental_predicate": "",
         "time_granularity": ""
       },
       "upstreams": [
@@ -345,6 +347,7 @@
         "partition_by": "",
         "cluster_by": null,
         "incremental_key": "",
+        "incremental_predicate": "",
         "time_granularity": ""
       },
       "upstreams": [
@@ -531,6 +534,7 @@
         "partition_by": "",
         "cluster_by": null,
         "incremental_key": "",
+        "incremental_predicate": "",
         "time_granularity": ""
       },
       "upstreams": [],

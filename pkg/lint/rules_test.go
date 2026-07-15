@@ -1299,11 +1299,12 @@ func TestEnsureMaterializationValuesAreValid(t *testing.T) {
 				{
 					Name: "task1",
 					Materialization: pipeline.Materialization{
-						Type:           pipeline.MaterializationTypeView,
-						Strategy:       "whatever",
-						IncrementalKey: "whatever",
-						ClusterBy:      []string{"whatever"},
-						PartitionBy:    "whatever",
+						Type:                 pipeline.MaterializationTypeView,
+						Strategy:             "whatever",
+						IncrementalKey:       "whatever",
+						IncrementalPredicate: "whatever",
+						ClusterBy:            []string{"whatever"},
+						PartitionBy:          "whatever",
 					},
 				},
 			},
@@ -1311,6 +1312,7 @@ func TestEnsureMaterializationValuesAreValid(t *testing.T) {
 			want: []string{
 				materializationStrategyIsNotSupportedForViews,
 				materializationIncrementalKeyNotSupportedForViews,
+				"Materialization incremental predicate is not supported for views",
 				materializationClusterByNotSupportedForViews,
 				materializationPartitionByNotSupportedForViews,
 			},
@@ -1356,6 +1358,23 @@ func TestEnsureMaterializationValuesAreValid(t *testing.T) {
 			wantErr: assert.NoError,
 			want: []string{
 				"Incremental key is only supported with 'delete+insert', 'time_interval', 'scd2_by_time' and 'scd2_by_column' strategies.",
+			},
+		},
+		{
+			name: "table materialization has incremental predicate but wrong strategy",
+			assets: []*pipeline.Asset{
+				{
+					Name: "task1",
+					Materialization: pipeline.Materialization{
+						Type:                 pipeline.MaterializationTypeTable,
+						Strategy:             pipeline.MaterializationStrategyAppend,
+						IncrementalPredicate: "target.dt >= DATE '2026-07-01'",
+					},
+				},
+			},
+			wantErr: assert.NoError,
+			want: []string{
+				"Incremental predicate is only supported with the 'merge' strategy.",
 			},
 		},
 		{
@@ -2091,6 +2110,41 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 				},
 			},
 			wantErrMessage: "Materialization strategy 'ddl' is not supported for ingestr assets. Supported strategies are: create+replace, append, merge, delete+insert, truncate+insert",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "ingestr asset with incremental predicate",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "conn1",
+					"source_table":      "table1",
+					"destination":       "dest1",
+				},
+				Materialization: pipeline.Materialization{
+					Type:                 pipeline.MaterializationTypeTable,
+					Strategy:             pipeline.MaterializationStrategyMerge,
+					IncrementalPredicate: "target.updated_at >= DATE '2026-07-01'",
+				},
+				Columns: []pipeline.Column{
+					{Name: "col1", PrimaryKey: true},
+				},
+			},
+			wantErrMessage: "Incremental predicate is not supported for ingestr assets",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "ingestr asset with incremental predicate parameter and no materialization",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection":     "conn1",
+					"source_table":          "table1",
+					"destination":           "dest1",
+					"incremental_predicate": "target.updated_at >= DATE '2026-07-01'",
+				},
+			},
+			wantErrMessage: "Incremental predicate is not supported for ingestr assets",
 			wantErr:        assert.NoError,
 		},
 		{
@@ -3379,6 +3433,39 @@ func TestEnsureValidPythonAssetMaterialization(t *testing.T) {
 				},
 			},
 			want:    []*Issue{},
+			wantErr: false,
+		},
+		{
+			name: "python asset with incremental predicate",
+			p: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "asset1",
+						Type: pipeline.AssetTypePython,
+						Materialization: pipeline.Materialization{
+							Type:                 pipeline.MaterializationTypeTable,
+							Strategy:             pipeline.MaterializationStrategyMerge,
+							IncrementalPredicate: "target.updated_at >= DATE '2026-07-01'",
+						},
+						Connection: "conn1",
+					},
+				},
+			},
+			want: []*Issue{
+				{
+					Task: &pipeline.Asset{
+						Name: "asset1",
+						Type: pipeline.AssetTypePython,
+						Materialization: pipeline.Materialization{
+							Type:                 pipeline.MaterializationTypeTable,
+							Strategy:             pipeline.MaterializationStrategyMerge,
+							IncrementalPredicate: "target.updated_at >= DATE '2026-07-01'",
+						},
+						Connection: "conn1",
+					},
+					Description: "Incremental predicate is not supported for Python assets",
+				},
+			},
 			wantErr: false,
 		},
 		{

@@ -305,7 +305,8 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 	}
 	query = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(query), ";"))
 
-	onQuery := strings.Join(buildPKConditions(primaryKeys, "target", "source"), " AND ")
+	on := ansisql.AddIncrementalPredicate(buildPKConditions(primaryKeys, "target", "source"), asset.Materialization.IncrementalPredicate)
+	onQuery := strings.Join(on, " AND ")
 
 	insertCols := strings.Join(columnNames, ", ")
 

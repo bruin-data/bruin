@@ -83,6 +83,23 @@ This is the column of the table that will be used for incremental updates of the
 - **Type:** `String`
 - **Default:** `""`
 
+### `materialization > incremental_predicate`
+
+Additional plain SQL added to the match condition of a `merge` materialization. This is useful for limiting the destination partitions scanned by warehouses such as BigQuery. The generated merge exposes the new data and the destination table as the `source` and `target` aliases.
+
+```yaml
+materialization:
+  type: table
+  strategy: merge
+  incremental_predicate: target.event_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)
+```
+
+- **Type:** `String`
+- **Default:** `""`
+- **Supported platforms:** BigQuery, Athena, Databricks, Doris, DuckDB, MSSQL, MySQL, Oracle, PostgreSQL, Snowflake, Synapse, and Vertica. It is not supported for Redshift (whose `MERGE` only accepts equality predicates in its match condition), Ingestr assets, or Python assets.
+
+The predicate is database-specific SQL and is inserted without validation. It must cover every existing destination row that could match the source data. If a matching primary key exists outside the predicate, the merge treats the source row as new and may insert a duplicate.
+
 ## Strategies
 
 Bruin supports various materialization strategies that take your code and convert it to another structure behind the scenes to materialize the execution results of your assets.

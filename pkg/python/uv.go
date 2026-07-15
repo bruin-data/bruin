@@ -365,6 +365,10 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		return errors.New("only table materialization is supported for Python assets")
 	}
 
+	if mat.IncrementalPredicate != "" {
+		return errors.New("incremental_predicate is not supported for Python assets")
+	}
+
 	arrowFilePath := filepath.Join(os.TempDir(), fmt.Sprintf("asset_data_%d.arrow", time.Now().UnixNano()))
 	defer func(name string) {
 		_ = os.Remove(name)

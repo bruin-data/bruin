@@ -87,11 +87,12 @@ func Test_createTaskFromFile(t *testing.T) {
 				},
 
 				Materialization: pipeline.Materialization{
-					Type:           pipeline.MaterializationTypeTable,
-					Strategy:       pipeline.MaterializationStrategyDeleteInsert,
-					PartitionBy:    "dt",
-					IncrementalKey: "dt",
-					ClusterBy:      []string{"event_name"},
+					Type:                 pipeline.MaterializationTypeTable,
+					Strategy:             pipeline.MaterializationStrategyDeleteInsert,
+					PartitionBy:          "dt",
+					IncrementalKey:       "dt",
+					IncrementalPredicate: "target.dt >= DATE '2026-07-01'",
+					ClusterBy:            []string{"event_name"},
 				},
 				Columns: []pipeline.Column{
 					{Name: "some_column", PrimaryKey: true, Type: "numeric", Precision: ptrInt(10), Scale: ptrInt(2), Checks: make([]pipeline.ColumnCheck, 0)},

@@ -205,6 +205,39 @@ func TestApplyMaterializationParameters(t *testing.T) {
 			},
 		},
 		{
+			name: "incremental predicate from materialization is rejected",
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					Type:                 pipeline.MaterializationTypeTable,
+					Strategy:             pipeline.MaterializationStrategyMerge,
+					IncrementalPredicate: "target.event_date >= DATE '2026-07-01'",
+				},
+			},
+			wantErr: "incremental_predicate is not supported for ingestr assets",
+		},
+		{
+			name: "incremental predicate from parameters is rejected",
+			asset: &pipeline.Asset{
+				Parameters: pipeline.ParameterMap{
+					"incremental_predicate": "target.event_date >= DATE '2026-06-01'",
+				},
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+			},
+			wantErr: "incremental_predicate is not supported for ingestr assets",
+		},
+		{
+			name: "incremental predicate is rejected even without materialization",
+			asset: &pipeline.Asset{
+				Parameters: pipeline.ParameterMap{
+					"incremental_predicate": "target.event_date >= DATE '2026-06-01'",
+				},
+			},
+			wantErr: "incremental_predicate is not supported for ingestr assets",
+		},
+		{
 			name: "matching parameters are allowed",
 			asset: &pipeline.Asset{
 				Parameters: pipeline.ParameterMap{

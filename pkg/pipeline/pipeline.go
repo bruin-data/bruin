@@ -624,12 +624,13 @@ var AllAvailableMaterializationStrategies = []MaterializationStrategy{
 }
 
 type Materialization struct {
-	Type            MaterializationType            `json:"type" yaml:"type,omitempty" mapstructure:"type"`
-	Strategy        MaterializationStrategy        `json:"strategy" yaml:"strategy,omitempty" mapstructure:"strategy"`
-	PartitionBy     string                         `json:"partition_by" yaml:"partition_by,omitempty" mapstructure:"partition_by"`
-	ClusterBy       []string                       `json:"cluster_by" yaml:"cluster_by,omitempty" mapstructure:"cluster_by"`
-	IncrementalKey  string                         `json:"incremental_key" yaml:"incremental_key,omitempty" mapstructure:"incremental_key"`
-	TimeGranularity MaterializationTimeGranularity `json:"time_granularity" yaml:"time_granularity,omitempty" mapstructure:"time_granularity"`
+	Type                 MaterializationType            `json:"type" yaml:"type,omitempty" mapstructure:"type"`
+	Strategy             MaterializationStrategy        `json:"strategy" yaml:"strategy,omitempty" mapstructure:"strategy"`
+	PartitionBy          string                         `json:"partition_by" yaml:"partition_by,omitempty" mapstructure:"partition_by"`
+	ClusterBy            []string                       `json:"cluster_by" yaml:"cluster_by,omitempty" mapstructure:"cluster_by"`
+	IncrementalKey       string                         `json:"incremental_key" yaml:"incremental_key,omitempty" mapstructure:"incremental_key"`
+	IncrementalPredicate string                         `json:"incremental_predicate" yaml:"incremental_predicate,omitempty" mapstructure:"incremental_predicate"`
+	TimeGranularity      MaterializationTimeGranularity `json:"time_granularity" yaml:"time_granularity,omitempty" mapstructure:"time_granularity"`
 }
 
 func (m Materialization) IsSCD2() bool {
@@ -637,7 +638,7 @@ func (m Materialization) IsSCD2() bool {
 }
 
 func (m Materialization) MarshalJSON() ([]byte, error) {
-	if m.Type == "" && m.Strategy == "" && m.PartitionBy == "" && len(m.ClusterBy) == 0 && m.IncrementalKey == "" && m.TimeGranularity == "" {
+	if m.Type == "" && m.Strategy == "" && m.PartitionBy == "" && len(m.ClusterBy) == 0 && m.IncrementalKey == "" && m.IncrementalPredicate == "" && m.TimeGranularity == "" {
 		return []byte("null"), nil
 	}
 
@@ -3328,6 +3329,9 @@ func mergeMaterializationDefaults(target *Materialization, defaults Materializat
 	}
 	if target.IncrementalKey == "" {
 		target.IncrementalKey = defaults.IncrementalKey
+	}
+	if target.IncrementalPredicate == "" {
+		target.IncrementalPredicate = defaults.IncrementalPredicate
 	}
 	if target.TimeGranularity == "" {
 		target.TimeGranularity = defaults.TimeGranularity
