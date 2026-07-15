@@ -82,7 +82,8 @@ func TestMaterializer_Render(t *testing.T) {
 				"AS\n" +
 				"SELECT * FROM staging;\n" +
 				"CREATE TABLE IF NOT EXISTS `analytics`.`orders` LIKE `analytics`.`__bruin_tmp_orders_abcefghi_replacement`;\n" +
-				"ALTER TABLE `analytics`.`orders` SWAP WITH `__bruin_tmp_orders_abcefghi_replacement`;",
+				"ALTER TABLE `analytics`.`orders` SWAP WITH `__bruin_tmp_orders_abcefghi_replacement`;\n" +
+				"DROP TABLE IF EXISTS `analytics`.`__bruin_tmp_orders_abcefghi_replacement`;",
 		},
 		{
 			name: "incremental requires key",
@@ -126,6 +127,7 @@ func TestMaterializer_Render(t *testing.T) {
 				"UNION ALL\n" +
 				"SELECT * FROM `analytics`.`__bruin_tmp_orders_abcefghi_new`;\n" +
 				"ALTER TABLE `analytics`.`orders` SWAP WITH `__bruin_tmp_orders_abcefghi_replacement`;\n" +
+				"DROP TABLE IF EXISTS `analytics`.`__bruin_tmp_orders_abcefghi_replacement`;\n" +
 				"DROP TABLE IF EXISTS `analytics`.`__bruin_tmp_orders_abcefghi_new`;",
 		},
 		{

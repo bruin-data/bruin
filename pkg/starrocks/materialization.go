@@ -580,12 +580,15 @@ func quoteColumnName(name string) string {
 
 // replaceTableQuery atomically swaps the target with a staged replacement.
 // StarRocks exposes this via `ALTER TABLE ... SWAP WITH ...` (unlike Doris,
-// which uses `REPLACE WITH TABLE ... PROPERTIES('swap'='false')`).
+// which uses `REPLACE WITH TABLE ... PROPERTIES('swap'='false')`). SWAP WITH is a
+// bidirectional exchange, so after the swap the replacement table holds the old
+// target data — drop it to avoid leaking a table on every run.
 func replaceTableQuery(targetTable, replacementTable string) string {
 	return fmt.Sprintf(
-		"ALTER TABLE %s SWAP WITH %s",
+		"ALTER TABLE %s SWAP WITH %s;\nDROP TABLE IF EXISTS %s",
 		quoteIdentifier(targetTable),
 		quoteColumnName(lastIdentifierPart(replacementTable)),
+		quoteIdentifier(replacementTable),
 	)
 }
 
