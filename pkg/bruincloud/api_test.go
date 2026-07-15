@@ -825,3 +825,98 @@ func TestUpdateDashboard(t *testing.T) {
 	assert.Equal(t, 9, dashboard.ID)
 	assert.Equal(t, "Renamed", *dashboard.Title)
 }
+
+func TestListScheduledAgents(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/scheduled-agents", r.URL.Path)
+
+		w.WriteHeader(http.StatusOK)
+		title := "Nightly"
+		cron := "0 0 * * *"
+		writeJSON(t, w, map[string]any{
+			"scheduled_agents": []ScheduledAgent{{ID: 3, Title: &title, IsActive: true, ScheduleCron: &cron}},
+		})
+	})
+
+	runs, err := client.ListScheduledAgents(t.Context())
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+	assert.Equal(t, 3, runs[0].ID)
+	assert.True(t, runs[0].IsActive)
+}
+
+func TestGetScheduledAgent(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/scheduled-agents/5", r.URL.Path)
+
+		w.WriteHeader(http.StatusOK)
+		title := "Nightly"
+		cron := "0 0 * * *"
+		writeJSON(t, w, ScheduledAgent{ID: 5, Title: &title, IsActive: true, ScheduleCron: &cron})
+	})
+
+	run, err := client.GetScheduledAgent(t.Context(), 5)
+	require.NoError(t, err)
+	assert.Equal(t, 5, run.ID)
+	assert.Equal(t, "Nightly", *run.Title)
+	assert.Equal(t, "0 0 * * *", *run.ScheduleCron)
+}
+
+func TestGetScheduledAgent_NotFound(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		writeJSON(t, w, map[string]any{"message": "Scheduled agent not found", "error": "not_found"})
+	})
+
+	// A 404 surfaces as an error, not a zero-value run.
+	_, err := client.GetScheduledAgent(t.Context(), 999)
+	require.Error(t, err)
+}
+
+func TestCreateScheduledAgent(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/scheduled-agents", r.URL.Path)
+
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.EqualValues(t, 7, body["agent_id"])
+		assert.Equal(t, "Daily", body["title"])
+
+		w.WriteHeader(http.StatusCreated)
+		title := "Daily"
+		writeJSON(t, w, ScheduledAgent{ID: 11, Title: &title, IsActive: false})
+	})
+
+	run, err := client.CreateScheduledAgent(t.Context(), map[string]any{"agent_id": 7, "title": "Daily"})
+	require.NoError(t, err)
+	assert.Equal(t, 11, run.ID)
+	// Created as a draft — never active from the API.
+	assert.False(t, run.IsActive)
+}
+
+func TestUpdateScheduledAgent(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPatch, r.Method)
+		assert.Equal(t, "/scheduled-agents/11", r.URL.Path)
+
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, "Renamed", body["title"])
+
+		w.WriteHeader(http.StatusOK)
+		title := "Renamed"
+		writeJSON(t, w, ScheduledAgent{ID: 11, Title: &title})
+	})
+
+	run, err := client.UpdateScheduledAgent(t.Context(), 11, map[string]any{"title": "Renamed"})
+	require.NoError(t, err)
+	assert.Equal(t, "Renamed", *run.Title)
+}

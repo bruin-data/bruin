@@ -255,3 +255,22 @@ type Dashboard struct {
 	URL        string          `json:"url"`
 	State      json.RawMessage `json:"state,omitempty"`
 }
+
+// ScheduledAgent represents a Bruin Cloud scheduled agent — a cron-based recurring
+// agent task. The nested plan fields (verified SQLs, memory, ...) are kept as raw
+// JSON so `--output json` round-trips the full server response faithfully.
+type ScheduledAgent struct {
+	ID                int             `json:"id"`
+	Title             *string         `json:"title"`
+	IsActive          bool            `json:"is_active"`
+	ScheduleCron      *string         `json:"schedule_cron"`
+	ScheduleTimezone  *string         `json:"schedule_timezone"`
+	NextRunAt         *string         `json:"next_run_at"`
+	LastRunAt         *string         `json:"last_run_at"`
+	Instructions      *string         `json:"instructions"`
+	OutputFormatting  *string         `json:"output_formatting"`
+	VerifiedSqls      json.RawMessage `json:"verified_sqls,omitempty"`
+	Memory            json.RawMessage `json:"memory,omitempty"`
+	MonitorsDashboard json.RawMessage `json:"monitors_dashboard,omitempty"`
+	RecentExecutions  json.RawMessage `json:"recent_executions,omitempty"`
+}
