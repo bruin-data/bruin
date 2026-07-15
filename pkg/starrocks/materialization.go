@@ -269,8 +269,8 @@ func buildDDLQuery(asset *pipeline.Asset, _ string) (string, error) {
 func requiresTypedCreateTable(asset *pipeline.Asset) bool {
 	return asset.Materialization.Strategy == pipeline.MaterializationStrategyMerge ||
 		strings.TrimSpace(asset.StarRocks.TableModel) != "" ||
-		len(asset.StarRocks.DistributedBy) > 0 ||
-		len(asset.StarRocks.PartitionBy) > 0 ||
+		len(asset.Materialization.ClusterBy) > 0 ||
+		strings.TrimSpace(asset.Materialization.PartitionBy) != "" ||
 		asset.StarRocks.Buckets != 0
 }
 
@@ -312,10 +312,6 @@ func buildCreateTableStatement(asset *pipeline.Asset, ifNotExists bool) (string,
 	if err != nil {
 		return "", err
 	}
-	partitionBy, err := starRocksPartitionByColumns(asset)
-	if err != nil {
-		return "", err
-	}
 
 	columnDefs := make([]string, 0, len(orderedColumns))
 	keyColumnSet := columnSet(keyColumns)
@@ -328,9 +324,12 @@ func buildCreateTableStatement(asset *pipeline.Asset, ifNotExists bool) (string,
 		createPrefix += "IF NOT EXISTS "
 	}
 
+	// StarRocks partitioning comes from the materialization's `partition_by`,
+	// which is a free-form expression (a column or an expression such as
+	// date_trunc('day', ts)) mirroring how the other platforms treat it.
 	partitionClause := ""
-	if len(partitionBy) > 0 {
-		partitionClause = fmt.Sprintf("PARTITION BY (%s)\n", strings.Join(quoteColumnNames(partitionBy), ", "))
+	if partitionBy := strings.TrimSpace(asset.Materialization.PartitionBy); partitionBy != "" {
+		partitionClause = fmt.Sprintf("PARTITION BY (%s)\n", partitionBy)
 	}
 
 	return fmt.Sprintf(
@@ -459,32 +458,23 @@ func starRocksKeyColumns(asset *pipeline.Asset, model string) ([]string, error) 
 	return []string{asset.Columns[0].Name}, nil
 }
 
+// starRocksDistributedByColumns resolves the hash distribution columns for
+// `DISTRIBUTED BY HASH(...)`. StarRocks' data distribution is expressed through
+// the materialization's `cluster_by` field, which is the same notion of "the
+// columns that decide how rows are laid out" used across the other platforms.
+// It falls back to the table's key columns when `cluster_by` is unset.
 func starRocksDistributedByColumns(asset *pipeline.Asset, keyColumns []string) ([]string, error) {
-	if len(asset.StarRocks.DistributedBy) == 0 {
+	if len(asset.Materialization.ClusterBy) == 0 {
 		return keyColumns, nil
 	}
 
-	for _, column := range asset.StarRocks.DistributedBy {
+	for _, column := range asset.Materialization.ClusterBy {
 		if strings.TrimSpace(column) == "" {
-			return nil, errors.New("starrocks distributed_by columns cannot be empty")
+			return nil, errors.New("starrocks cluster_by columns cannot be empty")
 		}
 	}
 
-	return asset.StarRocks.DistributedBy, nil
-}
-
-func starRocksPartitionByColumns(asset *pipeline.Asset) ([]string, error) {
-	if len(asset.StarRocks.PartitionBy) == 0 {
-		return nil, nil
-	}
-
-	for _, column := range asset.StarRocks.PartitionBy {
-		if strings.TrimSpace(column) == "" {
-			return nil, errors.New("starrocks partition_by columns cannot be empty")
-		}
-	}
-
-	return asset.StarRocks.PartitionBy, nil
+	return asset.Materialization.ClusterBy, nil
 }
 
 func starRocksBuckets(asset *pipeline.Asset) (int, error) {

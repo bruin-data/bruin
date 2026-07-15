@@ -55,14 +55,26 @@ View materialization is also supported. For local and single-node StarRocks clus
 
 #### Table layout
 
-Optional StarRocks table layout settings can be declared under `starrocks`:
+Distribution and partitioning are taken from the standard materialization fields,
+so they work the same way as on the other platforms:
+
+- `materialization.cluster_by` → `DISTRIBUTED BY HASH(...)` (defaults to the key columns)
+- `materialization.partition_by` → `PARTITION BY (...)` (a column or expression such as `date_trunc('day', event_date)`)
+
+`partition_by` is emitted verbatim so that expressions work, so it is **not** automatically backtick-quoted. If you partition on a single column whose name is a StarRocks reserved word (e.g. `date`, `value`, `key`), quote it yourself: `partition_by: "`date`"`.
+
+StarRocks-specific layout that has no materialization equivalent is declared under `starrocks`:
 
 ```yaml
+materialization:
+  type: table
+  strategy: create+replace
+  cluster_by: [account_id]          # DISTRIBUTED BY HASH(account_id)
+  partition_by: event_date          # PARTITION BY (event_date)
+
 starrocks:
-  table_model: primary_key         # duplicate_key | unique_key | primary_key
-  distributed_by: [account_id]      # defaults to the key columns
-  partition_by: [event_date]        # optional expression partitioning
-  buckets: 8                        # defaults to 1
+  table_model: primary_key          # duplicate_key | unique_key | primary_key
+  buckets: 8                         # defaults to 1
   properties:
     replication_num: "1"
 ```
