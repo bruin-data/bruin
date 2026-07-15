@@ -1,6 +1,7 @@
 package starrocks
 
 import (
+	"fmt"
 	"net"
 	"net/url"
 	"strconv"
@@ -64,4 +65,35 @@ func (c Config) GetIngestrURI() string {
 	u.RawQuery = query.Encode()
 
 	return u.String()
+}
+
+// ToDBConnectionURI builds a go-sql-driver/mysql DSN for StarRocks, which speaks
+// the MySQL wire protocol on its FE query port (9030 by default). The SSL field
+// carries a driver-native tls mode ("true"/"skip-verify"/"preferred"), so it is
+// forwarded straight to the driver's built-in tls parameter without registering a
+// custom TLS config.
+func (c Config) ToDBConnectionURI() (string, error) {
+	port := c.Port
+	if port == 0 {
+		port = defaultPort
+	}
+
+	query := url.Values{}
+	query.Set("multiStatements", "true")
+	query.Set("parseTime", "true")
+	if c.SSL != "" {
+		query.Set("tls", c.SSL)
+	}
+
+	dsn := fmt.Sprintf(
+		"%s:%s@tcp(%s:%d)/%s?%s",
+		c.Username,
+		c.Password,
+		c.Host,
+		port,
+		c.Database,
+		query.Encode(),
+	)
+
+	return dsn, nil
 }

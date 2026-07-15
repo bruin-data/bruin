@@ -1,0 +1,6 @@
+name: bruin_test.source_table
+type: starrocks.source
+
+columns:
+  - name: id
+    type: INT

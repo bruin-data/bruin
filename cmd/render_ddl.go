@@ -28,6 +28,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/sail"
 	"github.com/bruin-data/bruin/pkg/snowflake"
+	"github.com/bruin-data/bruin/pkg/starrocks"
 	"github.com/bruin-data/bruin/pkg/synapse"
 	"github.com/bruin-data/bruin/pkg/trino"
 	"github.com/bruin-data/bruin/pkg/vertica"
@@ -221,6 +222,8 @@ func RenderDDL() *cli.Command {
 					pipeline.AssetTypeMySQLQuery:              mysql.NewMaterializer(false),
 					pipeline.AssetTypeDorisQuery:              doris.NewMaterializer(false),
 					pipeline.AssetTypeDorisQuerySensor:        doris.NewMaterializer(false),
+					pipeline.AssetTypeStarRocksQuery:          starrocks.NewMaterializer(false),
+					pipeline.AssetTypeStarRocksQuerySensor:    starrocks.NewMaterializer(false),
 					pipeline.AssetTypeBigqueryQuery:           bigquery.NewMaterializer(false),
 					pipeline.AssetTypeBigqueryQuerySensor:     bigquery.NewMaterializer(false),
 					pipeline.AssetTypeSnowflakeQuery:          snowflake.NewMaterializer(false),
