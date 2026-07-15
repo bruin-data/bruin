@@ -2,6 +2,7 @@ package python
 
 import (
 	"fmt"
+	"maps"
 	"regexp"
 	"strconv"
 	"strings"
@@ -10,8 +11,22 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
-// TypeHintMapping maps different destination types to dlt types.
-// 'text' mappings are omitted, since they are the default.
+// IngestrTypeHintProvider is an optional capability on destination connections.
+// Packages like clickhouse implement this so DB-native type aliases can overlay
+// the shared defaults without pkg/python needing to know about each platform.
+type IngestrTypeHintProvider interface {
+	IngestrTypeHints() map[string]string
+}
+
+// IngestrTypeWrapperProvider is an optional capability for destinations that use
+// transparent type wrappers (e.g. ClickHouse Nullable(T) / LowCardinality(T)).
+type IngestrTypeWrapperProvider interface {
+	IngestrTypeWrappers() map[string]bool
+}
+
+// TypeHintMapping maps portable / cross-platform column type aliases to ingestr
+// (dlt) types. Destination-specific aliases live on the connection via
+// IngestrTypeHintProvider. 'text' is the ingestr default when no hint is emitted.
 var TypeHintMapping = map[string]string{
 	// Integer types — mapped to the narrowest ingestr type that preserves the
 	// declared width, so a column the source detected as Int16/Int32 is not
@@ -19,11 +34,9 @@ var TypeHintMapping = map[string]string{
 	// 8-bit (-> Int16 in ingestr; ingestr has no Int8 type)
 	"tinyint": "tinyint",
 	"byte":    "tinyint", // Spark/Databricks ByteType (-128..127)
-	"uint8":   "tinyint", // ClickHouse (0..255)
 	// 16-bit
 	"smallint":    "smallint",
 	"int2":        "smallint", // PostgreSQL alias
-	"int16":       "smallint", // ClickHouse
 	"smallserial": "smallint", // PostgreSQL auto-increment
 	"serial2":     "smallint", // PostgreSQL alias
 	"short":       "smallint", // Generic
@@ -31,22 +44,13 @@ var TypeHintMapping = map[string]string{
 	"int":       "int",
 	"integer":   "int",
 	"int4":      "int", // PostgreSQL alias
-	"int32":     "int", // ClickHouse
 	"mediumint": "int", // MySQL (24-bit, fits Int32)
 	"serial":    "int", // PostgreSQL auto-increment
 	"serial4":   "int", // PostgreSQL alias
-	"uint16":    "int", // ClickHouse (0..65535, exceeds Int16)
 	"year":      "int", // MySQL
 	// 64-bit (and wider types clamped to Int64, the widest ingestr offers)
 	"bigint":    "bigint",
 	"int8":      "bigint", // PostgreSQL alias
-	"int64":     "bigint", // ClickHouse
-	"int128":    "bigint", // ClickHouse (no wider ingestr type)
-	"int256":    "bigint", // ClickHouse (no wider ingestr type)
-	"uint32":    "bigint", // ClickHouse (0..4.3B, exceeds Int32)
-	"uint64":    "bigint", // ClickHouse (best-effort; may exceed Int64)
-	"uint128":   "bigint", // ClickHouse
-	"uint256":   "bigint", // ClickHouse
 	"bigserial": "bigint", // PostgreSQL auto-increment
 	"serial8":   "bigint", // PostgreSQL alias
 	"long":      "bigint", // Generic
@@ -57,8 +61,7 @@ var TypeHintMapping = map[string]string{
 	"float4":           "double",
 	"float8":           "double",
 	"float16":          "double", // Some systems
-	"float32":          "double", // ClickHouse
-	"float64":          "double", // ClickHouse/BigQuery
+	"float64":          "double", // BigQuery / generic
 	"double":           "double",
 	"double precision": "double",
 	"real":             "double",
@@ -115,7 +118,6 @@ var TypeHintMapping = map[string]string{
 	"datetime2":                   "timestamp_ntz", // SQL Server (no time zone)
 	"datetimeoffset":              "timestamp",     // SQL Server (has offset)
 	"smalldatetime":               "timestamp_ntz", // SQL Server (no time zone)
-	"datetime64":                  "timestamp",     // ClickHouse
 	"interval":                    "interval",      // PostgreSQL (time interval)
 
 	// String/Text types
@@ -139,8 +141,6 @@ var TypeHintMapping = map[string]string{
 	"longvarchar":       "text", // JDBC
 	"nvarchar2":         "text", // Oracle
 	"varchar2":          "text", // Oracle
-	"fixedstring":       "text", // ClickHouse
-	"lowcardinality":    "text", // ClickHouse
 
 	// UUID/GUID types
 	"uuid":             "text",
@@ -158,8 +158,6 @@ var TypeHintMapping = map[string]string{
 	"record":  "json", // BigQuery
 	"super":   "json", // Redshift
 	"hstore":  "json", // PostgreSQL key-value
-	"tuple":   "json", // ClickHouse
-	"nested":  "json", // ClickHouse
 
 	// XML type
 	"xml": "text",
@@ -223,25 +221,81 @@ var ingestrSizedTypes = map[string]bool{
 	"text": true,
 }
 
+// TypeHintOverlayForConnection returns DB-specific type aliases when the
+// connection implements IngestrTypeHintProvider; otherwise nil.
+func TypeHintOverlayForConnection(conn any) map[string]string {
+	if conn == nil {
+		return nil
+	}
+	if p, ok := conn.(IngestrTypeHintProvider); ok {
+		return p.IngestrTypeHints()
+	}
+	return nil
+}
+
+// TypeWrappersForConnection returns transparent type wrappers when the
+// connection implements IngestrTypeWrapperProvider; otherwise nil.
+func TypeWrappersForConnection(conn any) map[string]bool {
+	if conn == nil {
+		return nil
+	}
+	if p, ok := conn.(IngestrTypeWrapperProvider); ok {
+		return p.IngestrTypeWrappers()
+	}
+	return nil
+}
+
+// MergeTypeHints returns a copy of base with overlay entries applied. Overlay
+// keys are normalised the same way as column types. Overlay wins on conflict.
+// The returned map is always a clone so callers cannot mutate TypeHintMapping.
+func MergeTypeHints(base, overlay map[string]string) map[string]string {
+	merged := maps.Clone(base)
+	if merged == nil {
+		merged = make(map[string]string, len(overlay))
+	}
+	for k, v := range overlay {
+		merged[NormaliseColumnType(k)] = v
+	}
+	return merged
+}
+
+// resolveColumnTypeHint maps a declared column type to an ingestr hint, peeling
+// destination-specific transparent wrappers and resolving parameterized bases
+// (e.g. DateTime64(3)).
+func resolveColumnTypeHint(typ string, mapping map[string]string, wrappers map[string]bool) (hint string, known bool, inlineLength string) {
+	typ = NormaliseColumnType(typ)
+	for {
+		if h, ok := mapping[typ]; ok {
+			return h, true, ""
+		}
+		base, inner, ok := splitParenType(typ)
+		if !ok {
+			return "", false, ""
+		}
+		base = NormaliseColumnType(base)
+		if wrappers[base] {
+			typ = NormaliseColumnType(inner)
+			continue
+		}
+		if h, ok := mapping[base]; ok {
+			if ingestrSizedTypes[h] {
+				return h, true, inner
+			}
+			return h, true, ""
+		}
+		return "", false, ""
+	}
+}
+
 // ColumnHints returns an ingestr compatible type hint string
 // that can be passed via the --column flag to the CLI.
-func ColumnHints(cols []pipeline.Column, normaliseNames bool) string {
+// overlay may be nil; when set, its aliases are merged over TypeHintMapping.
+// wrappers may be nil; when set, those parameterized types peel to their inner type.
+func ColumnHints(cols []pipeline.Column, normaliseNames bool, overlay map[string]string, wrappers map[string]bool) string {
+	mapping := MergeTypeHints(TypeHintMapping, overlay)
 	hints := make([]string, 0)
 	for _, col := range cols {
-		typ := NormaliseColumnType(col.Type)
-		hint, typeKnown := TypeHintMapping[typ]
-
-		// Resolve the base type of a sized type like "varchar(100)" and re-apply the
-		// length, but only when that type accepts one.
-		inlineLength := ""
-		if !typeKnown {
-			if base, inner, ok := splitParenType(typ); ok {
-				if mapped, found := TypeHintMapping[base]; found && ingestrSizedTypes[mapped] {
-					hint, typeKnown = mapped, true
-					inlineLength = inner
-				}
-			}
-		}
+		hint, typeKnown, inlineLength := resolveColumnTypeHint(col.Type, mapping, wrappers)
 
 		if !typeKnown && col.SourceColumn == "" {
 			continue
@@ -357,4 +411,10 @@ type ColumnHintOptions struct {
 	// If true, schema will be enforced by default (used for seed assets).
 	// If false, schema will only be enforced when enforce_schema="true" is explicitly set.
 	EnforceSchemaByDefault bool
+	// TypeHintOverlay is an optional destination-specific alias map merged over
+	// TypeHintMapping (e.g. from IngestrTypeHintProvider on the dest connection).
+	TypeHintOverlay map[string]string
+	// TypeWrappers is an optional set of transparent parameterized type names
+	// (e.g. from IngestrTypeWrapperProvider) whose inner type should be resolved.
+	TypeWrappers map[string]bool
 }

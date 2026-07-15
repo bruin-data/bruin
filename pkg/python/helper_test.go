@@ -239,6 +239,8 @@ func TestColumnHints(t *testing.T) {
 		name           string
 		columns        []pipeline.Column
 		normalizeNames bool
+		overlay        map[string]string
+		wrappers       map[string]bool
 		expected       string
 	}{
 		{
@@ -322,12 +324,11 @@ func TestColumnHints(t *testing.T) {
 				{Name: "pg_small", Type: "int2"},
 				{Name: "pg_int", Type: "int4"},
 				{Name: "pg_big", Type: "int8"},
-				{Name: "ch_unsigned", Type: "uint16"},
 				{Name: "spark_byte", Type: "byte"},
 				{Name: "mysql_year", Type: "year"},
 			},
 			normalizeNames: false,
-			expected:       "pg_small:smallint,pg_int:int,pg_big:bigint,ch_unsigned:int,spark_byte:tinyint,mysql_year:int",
+			expected:       "pg_small:smallint,pg_int:int,pg_big:bigint,spark_byte:tinyint,mysql_year:int",
 		},
 		{
 			name: "no-tz timestamps map to timestamp_ntz while tz-aware stay timestamp",
@@ -391,14 +392,14 @@ func TestColumnHints(t *testing.T) {
 			expected:       "a:text,b:text,c:text",
 		},
 		{
-			name: "non-string sized types are unaffected",
+			name: "non-string parameterized types use base mapping without length",
 			columns: []pipeline.Column{
 				{Name: "kept", Type: "int"},
-				{Name: "dropped_int", Type: "int(11)"},
-				{Name: "dropped_dec", Type: "decimal(10,2)"},
+				{Name: "sized_int", Type: "int(11)"},
+				{Name: "sized_dec", Type: "decimal(10,2)"},
 			},
 			normalizeNames: false,
-			expected:       "kept:int",
+			expected:       "kept:int,sized_int:int,sized_dec:decimal",
 		},
 		{
 			name: "sized string with source_column emits dest:text(n):source",
@@ -419,12 +420,69 @@ func TestColumnHints(t *testing.T) {
 			normalizeNames: false,
 			expected:       "bare:text,inline:text(100),field:text(50),renamed:text(255):src",
 		},
+		{
+			name: "destination overlay aliases are applied",
+			columns: []pipeline.Column{
+				{Name: "id", Type: "uint64"},
+				{Name: "ts", Type: "DateTime64"},
+				{Name: "ts_prec", Type: "DateTime64(3)"},
+				{Name: "name", Type: "string"},
+			},
+			normalizeNames: false,
+			overlay: map[string]string{
+				"uint64":     "bigint",
+				"datetime64": "timestamp",
+			},
+			expected: "id:bigint,ts:timestamp,ts_prec:timestamp,name:text",
+		},
+		{
+			name: "nullable and lowcardinality wrappers peel to inner type",
+			columns: []pipeline.Column{
+				{Name: "a", Type: "Nullable(integer)"},
+				{Name: "b", Type: "LowCardinality(varchar(50))"},
+				{Name: "c", Type: "Nullable(LowCardinality(timestamp))"},
+			},
+			normalizeNames: false,
+			wrappers: map[string]bool{
+				"nullable":       true,
+				"lowcardinality": true,
+			},
+			expected: "a:int,b:text(50),c:timestamp",
+		},
+		{
+			name: "wrappers are not peeled without destination wrappers",
+			columns: []pipeline.Column{
+				{Name: "a", Type: "Nullable(integer)"},
+				{Name: "b", Type: "string"},
+			},
+			normalizeNames: false,
+			expected:       "b:text",
+		},
+		{
+			name: "destination overlay wins over defaults",
+			columns: []pipeline.Column{
+				{Name: "x", Type: "integer"},
+			},
+			normalizeNames: false,
+			overlay:        map[string]string{"integer": "bigint"},
+			expected:       "x:bigint",
+		},
+		{
+			name: "clickhouse-only types are skipped without overlay",
+			columns: []pipeline.Column{
+				{Name: "id", Type: "uint64"},
+				{Name: "ts", Type: "datetime64"},
+				{Name: "name", Type: "string"},
+			},
+			normalizeNames: false,
+			expected:       "name:text",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result := ColumnHints(tt.columns, tt.normalizeNames)
+			result := ColumnHints(tt.columns, tt.normalizeNames, tt.overlay, tt.wrappers)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -447,10 +505,10 @@ func TestColumnHints_SizedTypes(t *testing.T) {
 		want := fmt.Sprintf("c:%s(50)", hint)
 		t.Run(typ, func(t *testing.T) {
 			t.Parallel()
-			inline := ColumnHints([]pipeline.Column{{Name: "c", Type: typ + "(50)"}}, false)
+			inline := ColumnHints([]pipeline.Column{{Name: "c", Type: typ + "(50)"}}, false, nil, nil)
 			assert.Equal(t, want, inline, "inline length for %q", typ)
 
-			field := ColumnHints([]pipeline.Column{{Name: "c", Type: typ, Length: intPtr(50)}}, false)
+			field := ColumnHints([]pipeline.Column{{Name: "c", Type: typ, Length: intPtr(50)}}, false, nil, nil)
 			assert.Equal(t, want, field, "length field for %q", typ)
 		})
 	}
@@ -573,6 +631,25 @@ func TestConsolidatedParameters_EnforceSchema(t *testing.T) {
 			wantColumn: false,
 		},
 		{
+			name: "type hint overlay is applied when enforcing schema",
+			asset: &pipeline.Asset{
+				Parameters: pipeline.ParameterMap{},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "uint64"},
+					{Name: "ts", Type: "datetime64"},
+				},
+			},
+			columnOpts: &ColumnHintOptions{
+				NormalizeColumnNames:   false,
+				EnforceSchemaByDefault: true,
+				TypeHintOverlay: map[string]string{
+					"uint64":     "bigint",
+					"datetime64": "timestamp",
+				},
+			},
+			wantColumn: true,
+		},
+		{
 			name: "seed asset without enforce_schema uses default (true)",
 			asset: &pipeline.Asset{
 				Parameters: pipeline.ParameterMap{
@@ -659,11 +736,11 @@ func TestColumnHints_Normalization(t *testing.T) {
 	}
 
 	// Without normalization
-	result := ColumnHints(columns, false)
+	result := ColumnHints(columns, false, nil, nil)
 	assert.Equal(t, "DateOfBirth:date", result)
 
 	// With normalization
-	result = ColumnHints(columns, true)
+	result = ColumnHints(columns, true, nil, nil)
 	assert.Equal(t, "date_of_birth:date", result)
 }
 
