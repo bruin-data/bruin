@@ -149,7 +149,7 @@ WHEN NOT MATCHED THEN
 
 `incremental_predicate` does not filter the asset query. Filter the asset query separately when source processing should use the same or a narrower window.
 
-This pattern can significantly reduce cost and execution work when the destination is large and partitioned. In one BigQuery benchmark, merging a 5,000-row source into a 1.8-million-row destination processed 1.92 GB without the predicate and 10.5 MB with the seven-day destination predicate shown above. That was a 99.45% reduction in bytes processed (about 183 times less data scanned), with 98.91% fewer billed bytes and 93.88% less slot usage. Actual savings depend on the destination size, partitioning, and the selected window.
+This pattern can significantly reduce cost and execution work when the destination is large and partitioned. In one BigQuery benchmark, merging a 5,000-row source into a 1.8-million-row destination processed 1.92 GB without the predicate and 10.5 MB with the seven-day destination predicate shown above. That was a 99.45% reduction in bytes processed (a factor-of-183 reduction), with 98.91% fewer billed bytes and 93.88% less slot usage. Actual savings depend on the destination size, partitioning, and the selected window.
 
 - **Type:** `String`
 - **Default:** `""`
