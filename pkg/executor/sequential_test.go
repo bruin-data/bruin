@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"testing"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -14,6 +15,12 @@ import (
 
 type mockOperator struct {
 	mock.Mock
+}
+
+type operatorFunc func(context.Context, scheduler.TaskInstance) error
+
+func (f operatorFunc) Run(ctx context.Context, ti scheduler.TaskInstance) error {
+	return f(ctx, ti)
 }
 
 func (d *mockOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
@@ -124,5 +131,66 @@ func TestLocal_RunSingleTask(t *testing.T) {
 
 		require.Error(t, err)
 		mockOperator.AssertExpectations(t)
+	})
+}
+
+func TestSequential_RunSingleTaskTimeout(t *testing.T) {
+	t.Parallel()
+
+	t.Run("configured timeout fails the asset with a clear error", func(t *testing.T) {
+		t.Parallel()
+
+		asset := &pipeline.Asset{
+			Name:    "dataset.slow_asset",
+			Type:    "test",
+			Timeout: pipeline.DurationSeconds(25 * time.Millisecond),
+		}
+		instance := &scheduler.AssetInstance{Asset: asset}
+		operator := operatorFunc(func(ctx context.Context, _ scheduler.TaskInstance) error {
+			<-ctx.Done()
+			return nil
+		})
+		executor := Sequential{
+			TaskTypeMap: map[pipeline.AssetType]Config{
+				"test": {scheduler.TaskInstanceTypeMain: operator},
+			},
+		}
+
+		err := executor.RunSingleTask(t.Context(), instance)
+
+		var timeoutErr *AssetTimeoutError
+		require.ErrorAs(t, err, &timeoutErr)
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+		require.Equal(t, "dataset.slow_asset", timeoutErr.AssetName)
+		require.Equal(t, 25*time.Millisecond, timeoutErr.Timeout)
+		require.Equal(t, `asset "dataset.slow_asset" timed out after 25ms`, err.Error())
+	})
+
+	t.Run("an earlier run deadline is not reported as an asset timeout", func(t *testing.T) {
+		t.Parallel()
+
+		asset := &pipeline.Asset{
+			Name:    "dataset.slow_asset",
+			Type:    "test",
+			Timeout: pipeline.DurationSeconds(time.Hour),
+		}
+		instance := &scheduler.AssetInstance{Asset: asset}
+		operator := operatorFunc(func(ctx context.Context, _ scheduler.TaskInstance) error {
+			<-ctx.Done()
+			return ctx.Err()
+		})
+		executor := Sequential{
+			TaskTypeMap: map[pipeline.AssetType]Config{
+				"test": {scheduler.TaskInstanceTypeMain: operator},
+			},
+		}
+		ctx, cancel := context.WithTimeout(t.Context(), 25*time.Millisecond)
+		defer cancel()
+
+		err := executor.RunSingleTask(ctx, instance)
+
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+		var timeoutErr *AssetTimeoutError
+		require.NotErrorAs(t, err, &timeoutErr)
 	})
 }

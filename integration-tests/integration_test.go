@@ -72,8 +72,9 @@ func TestIndividualTasks(t *testing.T) {
 	binary := bruinBinary(currentFolder)
 
 	tests := []struct {
-		name string
-		task e2e.Task
+		name        string
+		task        e2e.Task
+		maxDuration time.Duration
 	}{
 		{
 			name: "builtin-policies",
@@ -1586,6 +1587,69 @@ func TestIndividualTasks(t *testing.T) {
 			},
 		},
 		{
+			name: "run-asset-timeout-explicit",
+			task: e2e.Task{
+				Name:    "run-asset-timeout-explicit",
+				Command: binary,
+				Args:    []string{"run", "--no-log-file", filepath.Join(currentFolder, "test-pipelines/asset-timeout/assets/explicit.py")},
+				Env:     []string{"PYTHONDONTWRITEBYTECODE=1"},
+				Expected: e2e.Output{
+					ExitCode: 1,
+					Contains: []string{
+						"Failed: asset_timeout.explicit",
+						`asset "asset_timeout.explicit" timed out after 2s`,
+					},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+			maxDuration: 8 * time.Second,
+		},
+		{
+			name: "run-asset-timeout-from-pipeline-default",
+			task: e2e.Task{
+				Name:    "run-asset-timeout-from-pipeline-default",
+				Command: binary,
+				Args:    []string{"run", "--no-log-file", filepath.Join(currentFolder, "test-pipelines/asset-timeout/assets/from_default.py")},
+				Env:     []string{"PYTHONDONTWRITEBYTECODE=1"},
+				Expected: e2e.Output{
+					ExitCode: 1,
+					Contains: []string{
+						"Failed: asset_timeout.from_default",
+						`asset "asset_timeout.from_default" timed out after 1s`,
+					},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+			maxDuration: 8 * time.Second,
+		},
+		{
+			name: "run-asset-without-timeout",
+			task: e2e.Task{
+				Name:    "run-asset-without-timeout",
+				Command: binary,
+				Args:    []string{"run", "--no-log-file", filepath.Join(currentFolder, "test-pipelines/asset-no-timeout/assets/no_timeout.py")},
+				Env:     []string{"PYTHONDONTWRITEBYTECODE=1"},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{
+						"Finished: asset_timeout.no_timeout",
+						"bruin run completed",
+					},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+			maxDuration: 8 * time.Second,
+		},
+		{
 			name: "test-truncate-insert-validate",
 			task: e2e.Task{
 				Name:       "test-truncate-insert-validate",
@@ -1879,8 +1943,12 @@ func TestIndividualTasks(t *testing.T) {
 			if os.Getenv("ENABLE_PARALLEL") == "1" {
 				t.Parallel()
 			}
+			startedAt := time.Now()
 			err := tt.task.Run()
 			require.NoError(t, err, "Task %s failed: %v", tt.task.Name, err)
+			if tt.maxDuration > 0 {
+				require.Less(t, time.Since(startedAt), tt.maxDuration, "Task %s exceeded its maximum duration", tt.task.Name)
+			}
 		})
 	}
 }

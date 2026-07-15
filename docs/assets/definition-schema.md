@@ -282,13 +282,14 @@ The asset-level value is, in turn, the default for the asset's [quality checks](
 
 ## `timeout`
 
-Sets the timeout for an asset. The value uses Go duration syntax, so it can combine units such as `1h30m` and supports `ns`, `us`/`µs`, `ms`, `s`, `m`, and `h`.
+Sets the timeout for an asset. During `bruin run`, an execution step that exceeds this duration is cancelled and the asset fails with a timeout error. The value uses Go duration syntax, so it can combine units such as `1h30m` and supports `ns`, `us`/`µs`, `ms`, `s`, `m`, and `h`.
 
 ```yaml
 timeout: 1h30m
 ```
 
 If omitted, the asset inherits `default.timeout` from `pipeline.yml` when one is configured.
+The timeout must be at least one second. It is separate from the run-wide [`bruin run --timeout`](/commands/run) setting; whichever deadline is reached first cancels the execution.
 
 - **Type:** `String` (Go duration)
 

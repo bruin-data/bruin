@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/stretchr/testify/assert"
@@ -293,6 +294,7 @@ func TestPipeline_MaterializeVariant(t *testing.T) {
 		pl := build()
 		pl.DefaultValues = &pipeline.DefaultValues{
 			Parameters: pipeline.ParameterMap{"region": "{{ var.region }}"},
+			Timeout:    pipeline.DurationSeconds(90 * time.Minute),
 			Hooks: pipeline.Hooks{
 				Pre:  []pipeline.Hook{{Query: "select '{{ start_date }}'"}},
 				Post: []pipeline.Hook{{Query: "select '{{ end_date }}'"}},
@@ -318,6 +320,7 @@ func TestPipeline_MaterializeVariant(t *testing.T) {
 		assert.Equal(t, "select '{{ end_datetime }}'", pl.Assets[0].Hooks.Post[0].Query)
 		assert.Equal(t, "select '{{ start_date }}'", pl.DefaultValues.Hooks.Pre[0].Query)
 		assert.Equal(t, "select '{{ end_date }}'", pl.DefaultValues.Hooks.Post[0].Query)
+		assert.Equal(t, 90*time.Minute, pl.DefaultValues.Timeout.Duration())
 	})
 
 	t.Run("renders default secrets", func(t *testing.T) {

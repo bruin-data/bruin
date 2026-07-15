@@ -37,7 +37,8 @@ func (l *CommandRunner) Run(ctx context.Context, repo *git.Repo, command *Comman
 		strings.Join(command.Args, " "),
 	)
 
-	cmd := exec.CommandContext(context.Background(), command.Name, command.Args...) //nolint:gosec,contextcheck
+	cmd := exec.CommandContext(ctx, command.Name, command.Args...) //nolint:gosec
+	configureCommandCancellation(cmd)
 	cmd.Dir = repo.Path
 
 	// Build environment: start with parent environment to inherit PATH, CC, CFLAGS, etc.
