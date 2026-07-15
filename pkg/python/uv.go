@@ -451,6 +451,12 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		asset.Parameters["incremental_key"] = mat.IncrementalKey
 	}
 
+	destConnectionName, err := execCtx.pipeline.GetConnectionNameForAsset(asset)
+	if err != nil {
+		return err
+	}
+
+	destConn := u.conn.GetConnection(destConnectionName)
 	// build ingestr flags
 	cmdArgs, err := ConsolidatedParameters(ctx, asset, []string{
 		"ingest",
@@ -466,12 +472,9 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 	}, &ColumnHintOptions{
 		NormalizeColumnNames:   false,
 		EnforceSchemaByDefault: false,
+		TypeHintOverlay:        TypeHintOverlayForConnection(destConn),
+		TypeWrappers:           TypeWrappersForConnection(destConn),
 	})
-	if err != nil {
-		return err
-	}
-
-	destConnectionName, err := execCtx.pipeline.GetConnectionNameForAsset(asset)
 	if err != nil {
 		return err
 	}
