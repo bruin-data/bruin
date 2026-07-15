@@ -348,6 +348,22 @@ environments:
           bucket_name: "my-bucket"
           path_to_file: "/folder1/file.csv"
           layout: "my_layout"
+      iceberg:
+        - name: "iceberg-1"
+          catalog_name: "analytics"
+          catalog:
+            type: "glue"
+            catalog_id: "123456789012"
+            region: "us-east-1"
+            auth:
+              access_key: "AKIAEXAMPLE"
+              secret_key: "secret-123"
+          storage:
+            type: "s3"
+            path: "s3://my-lake/warehouse"
+            auth:
+              access_key: "AKIAEXAMPLE"
+              secret_key: "secret-123"
       applovinmax:
         - name: "applovinmax-1"
           api_key: "api-key-123"

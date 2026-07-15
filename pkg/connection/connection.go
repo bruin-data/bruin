@@ -74,6 +74,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/hostaway"
 	httpsource "github.com/bruin-data/bruin/pkg/http"
 	"github.com/bruin-data/bruin/pkg/hubspot"
+	"github.com/bruin-data/bruin/pkg/iceberg"
 	"github.com/bruin-data/bruin/pkg/indeed"
 	"github.com/bruin-data/bruin/pkg/influxdb"
 	"github.com/bruin-data/bruin/pkg/intercom"
@@ -224,6 +225,7 @@ type Manager struct {
 	RevenueCat           map[string]*revenuecat.Client
 	ClickHouse           map[string]*clickhouse.Client
 	GCS                  map[string]*gcs.Client
+	Iceberg              map[string]*iceberg.Client
 	ApplovinMax          map[string]*applovinmax.Client
 	Personio             map[string]*personio.Client
 	Kinesis              map[string]*kinesis.Client
@@ -2597,6 +2599,36 @@ func (m *Manager) AddGCSConnectionFromConfig(connection *config.GCSConnection) e
 	return nil
 }
 
+func (m *Manager) AddIcebergConnectionFromConfig(connection *config.IcebergConnection) error {
+	m.mutex.Lock()
+	if m.Iceberg == nil {
+		m.Iceberg = make(map[string]*iceberg.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := iceberg.NewClient(iceberg.Config{
+		CatalogName:     connection.CatalogName,
+		Catalog:         connection.Catalog,
+		Storage:         connection.Storage,
+		CreateNamespace: connection.CreateNamespace,
+		TableLocation:   connection.TableLocation,
+		TablePath:       connection.TablePath,
+		TableProperties: connection.TableProperties,
+		Properties:      connection.Properties,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Iceberg[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
 func (m *Manager) AddPersonioConnectionFromConfig(connection *config.PersonioConnection) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -4056,6 +4088,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.RevenueCat, connectionManager.AddRevenueCatConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Linear, connectionManager.AddLinearConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.GCS, connectionManager.AddGCSConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Iceberg, connectionManager.AddIcebergConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Personio, connectionManager.AddPersonioConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.ApplovinMax, connectionManager.AddApplovinMaxConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Kinesis, connectionManager.AddKinesisConnectionFromConfig, &wg, &errList, &mu)

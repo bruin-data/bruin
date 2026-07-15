@@ -1188,6 +1188,12 @@
           },
           "type": "array"
         },
+        "iceberg": {
+          "items": {
+            "$ref": "#/$defs/IcebergConnection"
+          },
+          "type": "array"
+        },
         "sharepoint": {
           "items": {
             "$ref": "#/$defs/SharePointConnection"
@@ -2814,6 +2820,140 @@
       "required": [
         "name",
         "token"
+      ]
+    },
+    "IcebergAuth": {
+      "properties": {
+        "access_key": {
+          "type": "string"
+        },
+        "secret_key": {
+          "type": "string"
+        },
+        "session_token": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "IcebergCatalog": {
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "catalog_id": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "database": {
+          "type": "string"
+        },
+        "auth": {
+          "$ref": "#/$defs/IcebergAuth"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "type"
+      ]
+    },
+    "IcebergConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "catalog_name": {
+          "type": "string"
+        },
+        "catalog": {
+          "$ref": "#/$defs/IcebergCatalog"
+        },
+        "storage": {
+          "$ref": "#/$defs/IcebergStorage"
+        },
+        "create_namespace": {
+          "type": "boolean"
+        },
+        "table_location": {
+          "type": "string"
+        },
+        "table_path": {
+          "type": "string"
+        },
+        "table_properties": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "properties": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "catalog",
+        "storage"
+      ]
+    },
+    "IcebergStorage": {
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "bucket": {
+          "type": "string"
+        },
+        "prefix": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        },
+        "endpoint": {
+          "type": "string"
+        },
+        "use_ssl": {
+          "type": "boolean"
+        },
+        "auth": {
+          "$ref": "#/$defs/IcebergAuth"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "type"
       ]
     },
     "IndeedConnection": {

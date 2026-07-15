@@ -320,6 +320,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                                     {text: "G2", link: "/ingestion/g2"},
                                     {text: "Hostaway", link: "/ingestion/hostaway"},
                                     {text: "Hubspot", link: "/ingestion/hubspot"},
+                                    {text: "Apache Iceberg", link: "/ingestion/iceberg"},
                                     {text: "Indeed", link: "/ingestion/indeed"},
                                     {text: "Intercom", link: "/ingestion/intercom"},
                                     {text: "InfluxDB", link: "/ingestion/influxdb"},

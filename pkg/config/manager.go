@@ -99,6 +99,7 @@ type Connections struct {
 	RevenueCat          []RevenueCatConnection          `yaml:"revenuecat,omitempty" json:"revenuecat,omitempty" mapstructure:"revenuecat"`
 	Linear              []LinearConnection              `yaml:"linear,omitempty" json:"linear,omitempty" mapstructure:"linear"`
 	GCS                 []GCSConnection                 `yaml:"gcs,omitempty" json:"gcs,omitempty" mapstructure:"gcs"`
+	Iceberg             []IcebergConnection             `yaml:"iceberg,omitempty" json:"iceberg,omitempty" mapstructure:"iceberg"`
 	SharePoint          []SharePointConnection          `yaml:"sharepoint,omitempty" json:"sharepoint,omitempty" mapstructure:"sharepoint"`
 	ApplovinMax         []ApplovinMaxConnection         `yaml:"applovinmax,omitempty" json:"applovinmax,omitempty" mapstructure:"applovinmax"`
 	Personio            []PersonioConnection            `yaml:"personio,omitempty" json:"personio,omitempty" mapstructure:"personio"`
@@ -1269,6 +1270,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.GCS = append(env.Connections.GCS, conn)
+	case "iceberg":
+		var conn IcebergConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Iceberg = append(env.Connections.Iceberg, conn)
 	case "sharepoint":
 		var conn SharePointConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1955,6 +1963,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Linear = removeConnection(env.Connections.Linear, connectionName)
 	case "gcs":
 		env.Connections.GCS = removeConnection(env.Connections.GCS, connectionName)
+	case "iceberg":
+		env.Connections.Iceberg = removeConnection(env.Connections.Iceberg, connectionName)
 	case "sharepoint":
 		env.Connections.SharePoint = removeConnection(env.Connections.SharePoint, connectionName)
 	case "clickhouse":
@@ -2263,6 +2273,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.RevenueCat, source.RevenueCat)
 	mergeConnectionList(&c.Linear, source.Linear)
 	mergeConnectionList(&c.GCS, source.GCS)
+	mergeConnectionList(&c.Iceberg, source.Iceberg)
 	mergeConnectionList(&c.SharePoint, source.SharePoint)
 	mergeConnectionList(&c.ApplovinMax, source.ApplovinMax)
 	mergeConnectionList(&c.Personio, source.Personio)
