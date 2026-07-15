@@ -54,7 +54,7 @@ parameters:
 | products | id | | replace | Products in your catalog, including pricing and fulfillment settings. |
 | coupons | id | | replace | Coupons and their discount configuration. |
 | subscription_report | subscription_id, transaction_date | sync_date | merge | Subscription metrics (MRR, ARR, subscribers, churn) grouped by the fields you choose. |
-| revenue_report | Order_ID, Transaction_Date | syncDate | merge | Revenue metrics grouped by the fields you choose. |
+| revenue_report | order_id, transaction_date | syncdate | merge | Revenue metrics grouped by the fields you choose. |
 
 `orders` and `subscriptions` support incremental date-range loads via `--interval-start` / `--interval-end`. Reports load incrementally on their sync-date column; customize a report's columns and grouping with the colon form `<report>:<columns>:<group_by>`.
 
