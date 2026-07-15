@@ -282,7 +282,8 @@
     "slack": [],
     "ms_teams": [],
     "discord": [],
-    "webhook": []
+    "webhook": [],
+    "email": []
   },
   "catchup": "",
   "metadata_push": {
