@@ -44,6 +44,14 @@ type IcebergCatalog struct {
 	Port      int                `yaml:"port,omitempty" json:"port,omitempty" mapstructure:"port"`
 	Database  string             `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
 	Auth      IcebergAuth        `yaml:"auth,omitempty" json:"auth,omitempty" mapstructure:"auth"`
+
+	// Catalog credentials. These are dedicated fields (rather than free-form
+	// Properties entries) so the credential masker redacts them from run logs.
+	// Credential/Token are REST-catalog auth; URI is the SQL-catalog connection
+	// string (may embed a password).
+	Credential string `yaml:"credential,omitempty" json:"credential,omitempty" mapstructure:"credential" sensitive:"true"`
+	Token      string `yaml:"token,omitempty" json:"token,omitempty" mapstructure:"token" sensitive:"true"`
+	URI        string `yaml:"uri,omitempty" json:"uri,omitempty" mapstructure:"uri" sensitive:"true"`
 }
 
 // IcebergStorage describes the S3-compatible object store holding the data files.

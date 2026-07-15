@@ -111,6 +111,12 @@ func icebergCatalogURI(cat config.IcebergCatalog) (string, url.Values, error) {
 		if cat.Host == "" {
 			return "", nil, fmt.Errorf("iceberg: rest catalog requires %q", "host")
 		}
+		if cat.Credential != "" {
+			q.Set("credential", cat.Credential)
+		}
+		if cat.Token != "" {
+			q.Set("token", cat.Token)
+		}
 		return "iceberg+rest://" + hostPort(cat.Host, cat.Port), q, nil
 	case config.IcebergCatalogHive:
 		if cat.Host == "" {
@@ -123,7 +129,11 @@ func icebergCatalogURI(cat config.IcebergCatalog) (string, url.Values, error) {
 		}
 		return "iceberg+hadoop://" + ensureLeadingSlash(cat.Path), q, nil
 	case config.IcebergCatalogSQL:
-		// Advanced pass-through SQL catalog; connection string comes via properties.uri.
+		// Advanced SQL catalog; the connection string comes from the sensitive
+		// uri field (or, for other params, the properties passthrough).
+		if cat.URI != "" {
+			q.Set("uri", cat.URI)
+		}
 		return "iceberg+sql://", q, nil
 	case "":
 		return "", nil, fmt.Errorf("iceberg: catalog.type must be provided (supported: %s)", supportedCatalogList())

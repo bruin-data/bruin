@@ -137,15 +137,16 @@ func TestConfig_GetIngestrURI_RESTCatalog(t *testing.T) {
 			Type: config.IcebergCatalogREST,
 			Host: "catalog.internal",
 			Port: 8181,
+			// REST-catalog auth via dedicated (masked) fields.
+			Credential: "client-id:secret",
 		},
 		Storage: config.IcebergStorage{
 			Type:   config.IcebergStorageS3,
 			Path:   "s3://warehouse/prod",
 			Region: testAWSRegion,
 		},
-		// REST-catalog auth / advanced options via the passthrough.
+		// Non-secret advanced options via the passthrough.
 		Properties: map[string]string{
-			"credential":        "client-id:secret",
 			"oauth2-server-uri": "https://auth.internal/token",
 		},
 	}
@@ -185,9 +186,8 @@ func TestConfig_GetIngestrURI_SQLCatalogViaProperties(t *testing.T) {
 	t.Parallel()
 
 	c := Config{
-		Catalog:    config.IcebergCatalog{Type: config.IcebergCatalogSQL},
-		Storage:    config.IcebergStorage{Type: config.IcebergStorageS3, Path: "s3://b/p"},
-		Properties: map[string]string{"uri": "postgresql://u:p@h:5432/db"},
+		Catalog: config.IcebergCatalog{Type: config.IcebergCatalogSQL, URI: "postgresql://u:p@h:5432/db"},
+		Storage: config.IcebergStorage{Type: config.IcebergStorageS3, Path: "s3://b/p"},
 	}
 	got, err := c.GetIngestrURI()
 	require.NoError(t, err)

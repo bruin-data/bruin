@@ -61,8 +61,8 @@ Each catalog type takes different fields. Use the matching `catalog:` block belo
             type: rest                        # required
             host: "catalog.internal"          # required
             port: 8181                        # optional
-          properties:                         # optional — REST auth, if the catalog requires it
-            credential: "${ICEBERG_REST_CREDENTIAL}"
+            credential: "${ICEBERG_REST_CREDENTIAL}"   # optional — REST auth, if the catalog requires it
+            token: "${ICEBERG_REST_TOKEN}"             # optional — bearer token, alternative to credential
 ```
 
 **Hive**
@@ -103,7 +103,6 @@ Each catalog type takes different fields. Use the matching `catalog:` block belo
 ```yaml
           catalog:
             type: sql                         # required
-          properties:
             uri: "postgresql://user:pass@host:5432/db"   # required — catalog connection string
 ```
 
@@ -135,7 +134,10 @@ The location is **optional**: when all of `path`/`bucket`/`prefix` are omitted, 
 - `table_location`: explicit table location; supports `{namespace}`, `{table}`, and `{identifier}` placeholders.
 - `table_path`: path under the warehouse, e.g. `{namespace}/{table}`.
 - `table_properties`: Iceberg table properties, e.g. `write.format.default: parquet`.
-- `properties`: any additional catalog options, such as REST-catalog authentication.
+- `properties`: any additional, non-secret catalog options passed through to the Iceberg URI verbatim.
+
+> [!WARNING]
+> `properties` values are **not** redacted from run logs. Put credentials in the dedicated fields (`auth`, `credential`, `token`, `uri`), never in `properties`.
 
 ## Step 2: Create an asset file
 

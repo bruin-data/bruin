@@ -5,7 +5,41 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/bruin-data/bruin/pkg/mask"
+	"github.com/stretchr/testify/assert"
 )
+
+// TestIcebergConnectionSecretsAreMasked guards that catalog credentials carried
+// on dedicated fields are collected by the masker. The free-form Properties map
+// is deliberately NOT a place for secrets: map values bypass the masker.
+func TestIcebergConnectionSecretsAreMasked(t *testing.T) {
+	t.Parallel()
+	conn := &IcebergConnection{
+		Catalog: IcebergCatalog{
+			Type:       IcebergCatalogREST,
+			Host:       "catalog.internal",
+			Credential: "rest-client:rest-secret",
+			Token:      "bearer-token",
+			URI:        "postgresql://u:catalog-pass@h:5432/db",
+			Auth:       IcebergAuth{AccessKey: "AKID", SecretKey: "catalog-secret-key"},
+		},
+		Storage: IcebergStorage{
+			Type: IcebergStorageS3,
+			Path: "s3://lake/wh",
+			Auth: IcebergAuth{SecretKey: "storage-secret-key"},
+		},
+	}
+
+	values := mask.InlineSensitiveValues(conn)
+	for _, want := range []string{
+		"rest-client:rest-secret", "bearer-token",
+		"postgresql://u:catalog-pass@h:5432/db",
+		"catalog-secret-key", "storage-secret-key",
+	} {
+		assert.Contains(t, values, want)
+	}
+}
 
 // secretNamePattern flags credential-looking field names. A match MUST carry
 // `sensitive:"true"` or be listed in safeNonSecretKeys, else the test fails.

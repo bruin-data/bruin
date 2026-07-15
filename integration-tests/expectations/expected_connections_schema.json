@@ -2868,6 +2868,15 @@
         },
         "auth": {
           "$ref": "#/$defs/IcebergAuth"
+        },
+        "credential": {
+          "type": "string"
+        },
+        "token": {
+          "type": "string"
+        },
+        "uri": {
+          "type": "string"
         }
       },
       "additionalProperties": false,
