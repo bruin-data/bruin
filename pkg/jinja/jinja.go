@@ -373,6 +373,12 @@ var assetTypePlatform = map[pipeline.AssetType]Platform{
 	pipeline.AssetTypeDorisTableSensor: PlatformDoris,
 	pipeline.AssetTypeDorisSource:      PlatformDoris,
 
+	pipeline.AssetTypeStarRocksQuery:       PlatformStarRocks,
+	pipeline.AssetTypeStarRocksSeed:        PlatformStarRocks,
+	pipeline.AssetTypeStarRocksQuerySensor: PlatformStarRocks,
+	pipeline.AssetTypeStarRocksTableSensor: PlatformStarRocks,
+	pipeline.AssetTypeStarRocksSource:      PlatformStarRocks,
+
 	pipeline.AssetTypeDuckDBQuery:       PlatformDuckDB,
 	pipeline.AssetTypeDuckDBSeed:        PlatformDuckDB,
 	pipeline.AssetTypeDuckDBQuerySensor: PlatformDuckDB,

@@ -1687,6 +1687,7 @@ var TableSensorAllowedAssetTypes = map[pipeline.AssetType]bool{
 	pipeline.AssetTypeSynapseTableSensor:    true,
 	pipeline.AssetTypeMySQLTableSensor:      true,
 	pipeline.AssetTypeDorisTableSensor:      true,
+	pipeline.AssetTypeStarRocksTableSensor:  true,
 }
 
 var platformNames = map[pipeline.AssetType]string{
@@ -1701,6 +1702,7 @@ var platformNames = map[pipeline.AssetType]string{
 	pipeline.AssetTypeSynapseTableSensor:    "Synapse",
 	pipeline.AssetTypeMySQLTableSensor:      "MySQL",
 	pipeline.AssetTypeDorisTableSensor:      "Doris",
+	pipeline.AssetTypeStarRocksTableSensor:  "StarRocks",
 }
 
 func ValidateTableSensorTableParameter(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
