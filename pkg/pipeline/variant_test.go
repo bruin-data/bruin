@@ -568,6 +568,12 @@ func buildFullyPopulatedPipelineForVisitorTest() *pipeline.Pipeline {
 			DistributedBy: []string{"id"},
 			Properties:    map[string]string{"replication_num": "1"},
 		},
+		StarRocks: pipeline.StarRocksConfig{
+			TableModel:    "primary_key",
+			DistributedBy: []string{"id"},
+			PartitionBy:   []string{"dt"},
+			Properties:    map[string]string{"replication_num": "1"},
+		},
 		Routing: &pipeline.RoutingConfig{EgressGateway: "gw"},
 	}
 	return &pipeline.Pipeline{
@@ -617,6 +623,12 @@ func buildFullyPopulatedPipelineForVisitorTest() *pipeline.Pipeline {
 			Doris: pipeline.DorisConfig{
 				TableModel:    "duplicate_key",
 				DistributedBy: []string{"id"},
+				Properties:    map[string]string{"replication_num": "1"},
+			},
+			StarRocks: pipeline.StarRocksConfig{
+				TableModel:    "primary_key",
+				DistributedBy: []string{"id"},
+				PartitionBy:   []string{"dt"},
 				Properties:    map[string]string{"replication_num": "1"},
 			},
 			Routing: &pipeline.RoutingConfig{EgressGateway: "gw"},

@@ -2,6 +2,45 @@ package starrocks
 
 import "testing"
 
+func TestConfig_ToDBConnectionURI(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		config Config
+		want   string
+	}{
+		{
+			name:   "minimal with default port",
+			config: Config{Username: "root", Password: "password", Host: "localhost", Database: "test"},
+			want:   "root:password@tcp(localhost:9030)/test?multiStatements=true&parseTime=true",
+		},
+		{
+			name:   "custom port",
+			config: Config{Username: "root", Password: "secret", Host: "fe", Port: 9031, Database: "analytics"},
+			want:   "root:secret@tcp(fe:9031)/analytics?multiStatements=true&parseTime=true",
+		},
+		{
+			name:   "ssl mode forwarded to tls param",
+			config: Config{Username: "root", Password: "password", Host: "fe", Database: "db", SSL: "skip-verify"},
+			want:   "root:password@tcp(fe:9030)/db?multiStatements=true&parseTime=true&tls=skip-verify",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := tt.config.ToDBConnectionURI()
+			if err != nil {
+				t.Fatalf("ToDBConnectionURI() error = %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("ToDBConnectionURI() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestConfig_GetIngestrURI(t *testing.T) {
 	t.Parallel()
 

@@ -83,6 +83,7 @@ parameters:
   enforce_schema: true|false # Will ensure that the columns defined in the asset are present in the destination and with the desired types (see https://getbruin.com/docs/bruin/assets/columns.html)
   cdc: "true"|"false"
   cdc_mode: stream | batch # deprecated, use stream instead
+  cdc_sql_capture: cdc | change_tracking
   cdc_publication: string
   cdc_slot: string
   cdc_server_id: string
@@ -90,6 +91,10 @@ parameters:
   cdc_grpc_port: string
   cdc_grpc_host: string
   cdc_grpc_tls: string
+  cdc_capture_instance: string
+  cdc_poll_interval: string
+  cdc_max_await_time: string
+  cdc_schema_sample_size: integer
   cdc_dest_schema: string
   cdc_state_id: string
   cdc_stream_metrics_addr: string
@@ -134,8 +139,9 @@ parameters:
 | `flush_interval` | No | `--flush-interval` | Flush interval for streaming mode, such as `30s`. CDC assets can set `cdc_stream_flush_interval` instead, which takes precedence. |
 | `flush_records` | No | `--flush-records` | Number of buffered records that triggers a flush in streaming mode. CDC assets can set `cdc_stream_flush_records` instead, which takes precedence. |
 | `enforce_schema` | No | `--columns` | When set to `true`, enforces the column types defined in the asset's `columns` section. Ingestr will create or update the destination table with the specified schema. |
-| `cdc` | No | source URI scheme | Enables Bruin's CDC URI handling for PostgreSQL, MySQL/MariaDB, Vitess, and PlanetScale sources when set to `"true"`. CDC assets must use `merge`; Bruin sets it automatically when omitted and rejects other strategies. |
+| `cdc` | No | source URI scheme | Enables Bruin's CDC URI handling for PostgreSQL, MySQL/MariaDB, Vitess, PlanetScale, MongoDB, and SQL Server (log-based CDC and Change Tracking) sources when set to `"true"`. CDC assets must use `merge`; Bruin sets it automatically when omitted and rejects other strategies. |
 | `cdc_mode` | No | `--stream` flag | **Deprecated** — use `stream` instead. `cdc_mode: stream` is equivalent to `stream: true`; `cdc_mode: batch` is the default (omit it). |
+| `cdc_sql_capture` | No | source URI scheme | SQL Server capture mechanism, either `cdc` (log-based, `mssql+cdc`; default) or `change_tracking` (`mssql+ct`). |
 | `cdc_publication` | No | source URI query | PostgreSQL publication name. |
 | `cdc_slot` | No | source URI query | PostgreSQL replication slot name. |
 | `cdc_server_id` | No | source URI query | MySQL-family binlog replication server ID. |
@@ -143,6 +149,10 @@ parameters:
 | `cdc_grpc_port` | No | source URI query | Vitess VStream gRPC port override. |
 | `cdc_grpc_host` | No | source URI query | Vitess VStream gRPC host override. |
 | `cdc_grpc_tls` | No | source URI query | Vitess VStream TLS setting. |
+| `cdc_capture_instance` | No | source URI query | SQL Server log-based CDC capture instance name. |
+| `cdc_poll_interval` | No | source URI query | SQL Server log-based CDC poll interval, such as `10s`. |
+| `cdc_max_await_time` | No | source URI query | MongoDB change-stream maximum await time, such as `5s`. |
+| `cdc_schema_sample_size` | No | source URI query | MongoDB number of documents sampled to infer the schema. |
 | `cdc_dest_schema` | No | source URI query | Destination schema used for multi-table CDC runs. |
 | `cdc_state_id` | No | source URI query | Stable identity for this CDC connector's resume state. Set it when multiple otherwise-identical CDC assets write to the same destination so they keep independent offsets. |
 | `cdc_stream_metrics_addr` | No | `--metrics-addr` | Address on which a streaming CDC asset serves replication lag and rows-synced metrics at `/debug/vars`, such as `127.0.0.1:6060`. Requires `stream: true`. See [PostgreSQL CDC](../platforms/postgres.md#cdc-change-data-capture). |

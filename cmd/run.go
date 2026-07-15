@@ -56,6 +56,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
+	"github.com/bruin-data/bruin/pkg/starrocks"
 	"github.com/bruin-data/bruin/pkg/synapse"
 	"github.com/bruin-data/bruin/pkg/tableau"
 	"github.com/bruin-data/bruin/pkg/telemetry"
@@ -2573,6 +2574,34 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeDorisTableSensor][scheduler.TaskInstanceTypeMain] = dorisTableSensor
 		mainExecutors[pipeline.AssetTypeDorisTableSensor][scheduler.TaskInstanceTypeColumnCheck] = dorisCheckRunner
 		mainExecutors[pipeline.AssetTypeDorisTableSensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+	}
+
+	if s.WillRunTaskOfType(pipeline.AssetTypeStarRocksQuery) ||
+		estimateCustomCheckType == pipeline.AssetTypeStarRocksQuery ||
+		s.WillRunTaskOfType(pipeline.AssetTypeStarRocksSeed) ||
+		s.WillRunTaskOfType(pipeline.AssetTypeStarRocksQuerySensor) ||
+		s.WillRunTaskOfType(pipeline.AssetTypeStarRocksTableSensor) {
+		starRocksOperator := starrocks.NewBasicOperator(conn, wholeFileExtractor, fullRefresh, hoister, parser)
+		starRocksCheckRunner := starrocks.NewColumnCheckOperator(conn)
+		starRocksQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
+		starRocksTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
+		starRocksSeedOperator := starrocks.NewSeedOperator(conn, renderer)
+
+		mainExecutors[pipeline.AssetTypeStarRocksQuery][scheduler.TaskInstanceTypeMain] = starRocksOperator
+		mainExecutors[pipeline.AssetTypeStarRocksQuery][scheduler.TaskInstanceTypeColumnCheck] = starRocksCheckRunner
+		mainExecutors[pipeline.AssetTypeStarRocksQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeStarRocksSeed][scheduler.TaskInstanceTypeMain] = starRocksSeedOperator
+		mainExecutors[pipeline.AssetTypeStarRocksSeed][scheduler.TaskInstanceTypeColumnCheck] = starRocksCheckRunner
+		mainExecutors[pipeline.AssetTypeStarRocksSeed][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeStarRocksQuerySensor][scheduler.TaskInstanceTypeMain] = starRocksQuerySensor
+		mainExecutors[pipeline.AssetTypeStarRocksQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = starRocksCheckRunner
+		mainExecutors[pipeline.AssetTypeStarRocksQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeStarRocksTableSensor][scheduler.TaskInstanceTypeMain] = starRocksTableSensor
+		mainExecutors[pipeline.AssetTypeStarRocksTableSensor][scheduler.TaskInstanceTypeColumnCheck] = starRocksCheckRunner
+		mainExecutors[pipeline.AssetTypeStarRocksTableSensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 	}
 
 	if s.WillRunTaskOfType(pipeline.AssetTypeAgentClaudeCode) {

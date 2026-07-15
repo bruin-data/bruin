@@ -1550,6 +1550,171 @@ func TestBasicOperator_MySQLCDCMode(t *testing.T) {
 	}
 }
 
+func TestBasicOperator_MongoMSSQLCDCMode(t *testing.T) {
+	t.Parallel()
+
+	// Bruin's mongo/mongo_atlas connections emit mongodb:// and mongodb+srv:// URIs, and the
+	// mssql connection emits mssql://. All three follow the plain "+cdc" suffix rule, while
+	// SQL Server Change Tracking is selected per-asset and rewrites the suffix to "+ct".
+	mockMongo := new(mockConnection)
+	mockMongo.On("GetIngestrURI").Return("mongodb://user:pass@localhost:27017/db", nil)
+	mockAtlas := new(mockConnection)
+	mockAtlas.On("GetIngestrURI").Return("mongodb+srv://user:pass@cluster.mongodb.net/db", nil)
+	mockMS := new(mockConnection)
+	mockMS.On("GetIngestrURI").Return("mssql://user:pass@localhost:1433/db", nil)
+	mockBq := new(mockConnection)
+	mockBq.On("GetIngestrURI").Return("bigquery://uri-here", nil)
+
+	fetcher := simpleConnectionFetcher{
+		connections: map[string]*mockConnection{
+			"mongo": mockMongo,
+			"atlas": mockAtlas,
+			"ms":    mockMS,
+			"bq":    mockBq,
+		},
+	}
+
+	finder := new(mockFinder)
+
+	tests := []struct {
+		name  string
+		asset *pipeline.Asset
+		want  []string
+	}{
+		{
+			name: "MongoDB CDC transforms URI and auto-sets merge strategy",
+			asset: &pipeline.Asset{
+				Name:       "cdc-mongo-asset",
+				Connection: "bq",
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "mongo",
+					"source_table":      "users.details",
+					"destination":       "bigquery",
+					"cdc":               "true",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "mongodb+cdc://user:pass@localhost:27017/db",
+				"--source-table", "users.details",
+				"--dest-uri", "bigquery://uri-here",
+				"--dest-table", "cdc-mongo-asset",
+				"--yes",
+				"--progress", "log",
+				"--incremental-strategy", "merge",
+			},
+		},
+		{
+			name: "MongoDB Atlas CDC adds change-stream parameters",
+			asset: &pipeline.Asset{
+				Name:       "cdc-atlas-asset",
+				Connection: "bq",
+				Parameters: pipeline.ParameterMap{
+					"source_connection":      "atlas",
+					"source_table":           "users.details",
+					"destination":            "bigquery",
+					"cdc":                    "true",
+					"cdc_max_await_time":     "5s",
+					"cdc_schema_sample_size": "100",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "mongodb+srv+cdc://user:pass@cluster.mongodb.net/db?max_await_time=5s&schema_sample_size=100",
+				"--source-table", "users.details",
+				"--dest-uri", "bigquery://uri-here",
+				"--dest-table", "cdc-atlas-asset",
+				"--yes",
+				"--progress", "log",
+				"--incremental-strategy", "merge",
+			},
+		},
+		{
+			name: "SQL Server log-based CDC adds capture instance and poll interval",
+			asset: &pipeline.Asset{
+				Name:       "cdc-mssql-asset",
+				Connection: "bq",
+				Parameters: pipeline.ParameterMap{
+					"source_connection":    "ms",
+					"source_table":         "dbo.users",
+					"destination":          "bigquery",
+					"cdc":                  "true",
+					"cdc_capture_instance": "dbo_users",
+					"cdc_poll_interval":    "10s",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "mssql+cdc://user:pass@localhost:1433/db?capture_instance=dbo_users&poll_interval=10s",
+				"--source-table", "dbo.users",
+				"--dest-uri", "bigquery://uri-here",
+				"--dest-table", "cdc-mssql-asset",
+				"--yes",
+				"--progress", "log",
+				"--incremental-strategy", "merge",
+			},
+		},
+		{
+			// Change Tracking uses the +ct scheme and ignores query parameters, so
+			// capture_instance/poll_interval must not leak into the emitted URI.
+			name: "SQL Server Change Tracking uses +ct scheme without query params",
+			asset: &pipeline.Asset{
+				Name:       "ct-mssql-asset",
+				Connection: "bq",
+				Parameters: pipeline.ParameterMap{
+					"source_connection":    "ms",
+					"source_table":         "dbo.users",
+					"destination":          "bigquery",
+					"cdc":                  "true",
+					"cdc_sql_capture":      "change_tracking",
+					"cdc_capture_instance": "dbo_users",
+					"cdc_poll_interval":    "10s",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "mssql+ct://user:pass@localhost:1433/db",
+				"--source-table", "dbo.users",
+				"--dest-uri", "bigquery://uri-here",
+				"--dest-table", "ct-mssql-asset",
+				"--yes",
+				"--progress", "log",
+				"--incremental-strategy", "merge",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			runner := new(mockRunner)
+			runner.On("RunIngestr", mock.Anything, tt.want, []string(nil), repo).Return(nil)
+
+			startDate := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+			endDate := time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC)
+			executionDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+
+			o := &BasicOperator{
+				conn:          &fetcher,
+				finder:        finder,
+				runner:        runner,
+				jinjaRenderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, &executionDate, "ingestr-test", "ingestr-test", nil),
+			}
+
+			ti := scheduler.AssetInstance{
+				Pipeline: &pipeline.Pipeline{},
+				Asset:    tt.asset,
+			}
+
+			ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, false)
+
+			err := o.Run(ctx, &ti)
+			require.NoError(t, err)
+		})
+	}
+}
+
 func TestBasicOperator_VitessPlanetScaleCDCMode(t *testing.T) {
 	t.Parallel()
 

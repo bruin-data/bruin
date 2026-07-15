@@ -125,6 +125,11 @@ const (
 	AssetTypeSnowflakeSource           = AssetType("sf.source")
 	AssetTypeSnowflakeTableSensor      = AssetType("sf.sensor.table")
 	AssetTypeStarRocks                 = AssetType("starrocks")
+	AssetTypeStarRocksQuery            = AssetType("starrocks.sql")
+	AssetTypeStarRocksQuerySensor      = AssetType("starrocks.sensor.query")
+	AssetTypeStarRocksSeed             = AssetType("starrocks.seed")
+	AssetTypeStarRocksSource           = AssetType("starrocks.source")
+	AssetTypeStarRocksTableSensor      = AssetType("starrocks.sensor.table")
 	AssetTypeSuperset                  = AssetType("superset")
 	AssetTypeSynapseQuery              = AssetType("synapse.sql")
 	AssetTypeSynapseQuerySensor        = AssetType("synapse.sensor.query")
@@ -885,6 +890,11 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeSnowflakeSeed:             "snowflake",
 	AssetTypeSnowflakeSource:           "snowflake",
 	AssetTypeStarRocks:                 "starrocks",
+	AssetTypeStarRocksQuery:            "starrocks",
+	AssetTypeStarRocksSeed:             "starrocks",
+	AssetTypeStarRocksQuerySensor:      "starrocks",
+	AssetTypeStarRocksTableSensor:      "starrocks",
+	AssetTypeStarRocksSource:           "starrocks",
 	AssetTypePostgresQuery:             "postgres",
 	AssetTypePostgresSeed:              "postgres",
 	AssetTypePostgresQuerySensor:       "postgres",
@@ -1000,7 +1010,7 @@ var IngestrTypeConnectionMapping = map[string]AssetType{
 	"duckdb":        AssetTypeDuckDBQuery,
 	"clickhouse":    AssetTypeClickHouse,
 	"doris":         AssetTypeDorisQuery,
-	"starrocks":     AssetTypeStarRocks,
+	"starrocks":     AssetTypeStarRocksQuery,
 	"oracle":        AssetTypeOracleQuery,
 	"motherduck":    AssetTypeMotherduckQuery,
 	"dynamodb":      AssetTypeDynamoDB,
@@ -1181,6 +1191,27 @@ func (d DorisConfig) IsZero() bool {
 	return d.TableModel == "" && len(d.DistributedBy) == 0 && d.Buckets == 0 && len(d.Properties) == 0
 }
 
+type StarRocksConfig struct {
+	TableModel    string            `json:"table_model,omitempty" yaml:"table_model,omitempty" mapstructure:"table_model"`
+	DistributedBy []string          `json:"distributed_by,omitempty" yaml:"distributed_by,omitempty" mapstructure:"distributed_by"`
+	PartitionBy   []string          `json:"partition_by,omitempty" yaml:"partition_by,omitempty" mapstructure:"partition_by"`
+	Buckets       int               `json:"buckets,omitempty" yaml:"buckets,omitempty" mapstructure:"buckets"`
+	Properties    map[string]string `json:"properties,omitempty" yaml:"properties,omitempty" mapstructure:"properties"`
+}
+
+func (s StarRocksConfig) MarshalJSON() ([]byte, error) {
+	if s.IsZero() {
+		return []byte("null"), nil
+	}
+
+	type Alias StarRocksConfig
+	return json.Marshal(Alias(s))
+}
+
+func (s StarRocksConfig) IsZero() bool {
+	return s.TableModel == "" && len(s.DistributedBy) == 0 && len(s.PartitionBy) == 0 && s.Buckets == 0 && len(s.Properties) == 0
+}
+
 type RoutingConfig struct {
 	EgressGateway string `json:"egress_gateway,omitempty" yaml:"egress_gateway,omitempty" mapstructure:"egress_gateway"`
 }
@@ -1238,6 +1269,7 @@ type Asset struct { //nolint:recvcheck
 	Snowflake         SnowflakeConfig    `json:"snowflake" yaml:"snowflake,omitempty" mapstructure:"snowflake"`
 	Athena            AthenaConfig       `json:"athena" yaml:"athena,omitempty" mapstructure:"athena"`
 	Doris             DorisConfig        `json:"doris,omitzero" yaml:"doris,omitempty" mapstructure:"doris"`
+	StarRocks         StarRocksConfig    `json:"starrocks,omitzero" yaml:"starrocks,omitempty" mapstructure:"starrocks"`
 	Routing           *RoutingConfig     `json:"routing,omitempty" yaml:"routing,omitempty" mapstructure:"routing"`
 	IntervalModifiers IntervalModifiers  `json:"interval_modifiers" yaml:"interval_modifiers,omitempty" mapstructure:"interval_modifiers"`
 	RerunCooldown     *int               `json:"rerun_cooldown,omitempty" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
@@ -2224,6 +2256,7 @@ type DefaultValues struct {
 	Snowflake         SnowflakeConfig        `json:"snowflake,omitempty" yaml:"snowflake,omitempty" mapstructure:"snowflake"`
 	Athena            AthenaConfig           `json:"athena,omitempty" yaml:"athena,omitempty" mapstructure:"athena"`
 	Doris             DorisConfig            `json:"doris,omitempty,omitzero" yaml:"doris,omitempty" mapstructure:"doris"`
+	StarRocks         StarRocksConfig        `json:"starrocks,omitempty,omitzero" yaml:"starrocks,omitempty" mapstructure:"starrocks"`
 	Routing           *RoutingConfig         `json:"routing,omitempty" yaml:"routing,omitempty" mapstructure:"routing"`
 	IntervalModifiers IntervalModifiers      `json:"interval_modifiers" yaml:"interval_modifiers" mapstructure:"interval_modifiers"`
 	RerunCooldown     *int                   `json:"rerun_cooldown,omitempty" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
@@ -2267,6 +2300,7 @@ func (d *DefaultValues) UnmarshalYAML(value *yaml.Node) error {
 		Snowflake:         asset.Snowflake,
 		Athena:            asset.Athena,
 		Doris:             asset.Doris,
+		StarRocks:         asset.StarRocks,
 		Routing:           asset.Routing,
 		IntervalModifiers: asset.IntervalModifiers,
 		RerunCooldown:     asset.RerunCooldown,
@@ -2359,6 +2393,7 @@ func assetMainTaskIsConnectionless(assetType AssetType) bool {
 		AssetTypePostgresSource,
 		AssetTypeRedshiftSource,
 		AssetTypeSnowflakeSource,
+		AssetTypeStarRocksSource,
 		AssetTypeSynapseSource,
 		AssetTypeVerticaSource,
 		AssetTypeEmpty,
@@ -2478,6 +2513,7 @@ func (p *Pipeline) GetMajorityAssetTypesFromSQLAssets(defaultIfNone AssetType) A
 		AssetTypeSailQuery:         0,
 		AssetTypeOracleQuery:       0,
 		AssetTypeDorisQuery:        0,
+		AssetTypeStarRocksQuery:    0,
 	}
 	maxTasks := 0
 	maxTaskType := defaultIfNone
@@ -3174,6 +3210,7 @@ func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 		asset.Athena.Location = defaults.Athena.Location
 	}
 	mergeDorisDefaults(&asset.Doris, defaults.Doris)
+	mergeStarRocksDefaults(&asset.StarRocks, defaults.StarRocks)
 	if !defaults.Routing.IsZero() {
 		if asset.Routing == nil {
 			asset.Routing = defaults.Routing.Clone()
@@ -3221,6 +3258,31 @@ func mergeDorisDefaults(target *DorisConfig, defaults DorisConfig) {
 	}
 	if len(target.DistributedBy) == 0 && len(defaults.DistributedBy) > 0 {
 		target.DistributedBy = append([]string(nil), defaults.DistributedBy...)
+	}
+	if target.Buckets == 0 {
+		target.Buckets = defaults.Buckets
+	}
+	if len(defaults.Properties) > 0 {
+		if target.Properties == nil {
+			target.Properties = make(map[string]string, len(defaults.Properties))
+		}
+		for key, value := range defaults.Properties {
+			if _, exists := target.Properties[key]; !exists {
+				target.Properties[key] = value
+			}
+		}
+	}
+}
+
+func mergeStarRocksDefaults(target *StarRocksConfig, defaults StarRocksConfig) {
+	if target.TableModel == "" {
+		target.TableModel = defaults.TableModel
+	}
+	if len(target.DistributedBy) == 0 && len(defaults.DistributedBy) > 0 {
+		target.DistributedBy = append([]string(nil), defaults.DistributedBy...)
+	}
+	if len(target.PartitionBy) == 0 && len(defaults.PartitionBy) > 0 {
+		target.PartitionBy = append([]string(nil), defaults.PartitionBy...)
 	}
 	if target.Buckets == 0 {
 		target.Buckets = defaults.Buckets
@@ -3924,6 +3986,7 @@ func IsSQLAssetType(t AssetType) bool {
 		AssetTypeMotherduckQuery,
 		AssetTypeClickHouse,
 		AssetTypeDorisQuery,
+		AssetTypeStarRocksQuery,
 		AssetTypeTrinoQuery,
 		AssetTypeDremioQuery,
 		AssetTypeSailQuery,

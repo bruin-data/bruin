@@ -324,6 +324,12 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 			Description: "Invalid 'cdc_mode' value: must be 'stream' or 'batch'",
 		})
 	}
+	if capture, exists := asset.Parameters.GetString("cdc_sql_capture"); exists && capture != "cdc" && capture != "change_tracking" {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: "Invalid 'cdc_sql_capture' value: must be 'cdc' or 'change_tracking'",
+		})
+	}
 	if v, exists := asset.Parameters.GetString("version"); exists && v != "" && !ingestrVersionPattern.MatchString(v) {
 		issues = append(issues, &Issue{
 			Task:        asset,
@@ -1709,6 +1715,7 @@ var TableSensorAllowedAssetTypes = map[pipeline.AssetType]bool{
 	pipeline.AssetTypeSynapseTableSensor:    true,
 	pipeline.AssetTypeMySQLTableSensor:      true,
 	pipeline.AssetTypeDorisTableSensor:      true,
+	pipeline.AssetTypeStarRocksTableSensor:  true,
 }
 
 var platformNames = map[pipeline.AssetType]string{
@@ -1723,6 +1730,7 @@ var platformNames = map[pipeline.AssetType]string{
 	pipeline.AssetTypeSynapseTableSensor:    "Synapse",
 	pipeline.AssetTypeMySQLTableSensor:      "MySQL",
 	pipeline.AssetTypeDorisTableSensor:      "Doris",
+	pipeline.AssetTypeStarRocksTableSensor:  "StarRocks",
 }
 
 func ValidateTableSensorTableParameter(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
