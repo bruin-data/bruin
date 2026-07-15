@@ -613,3 +613,43 @@ func (c *APIClient) UpdateDashboard(ctx context.Context, dashboardID int, fields
 	}
 	return &result, nil
 }
+
+func (c *APIClient) ListScheduledRuns(ctx context.Context) ([]ScheduledRun, error) {
+	var resp struct {
+		ScheduledRuns []ScheduledRun `json:"scheduled_runs"`
+	}
+	err := c.doRequest(ctx, http.MethodGet, "/scheduled-runs", nil, &resp)
+	return resp.ScheduledRuns, err
+}
+
+func (c *APIClient) GetScheduledRun(ctx context.Context, scheduledRunID int) (*ScheduledRun, error) {
+	var result ScheduledRun
+	err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/scheduled-runs/%d", scheduledRunID), nil, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// CreateScheduledRun creates a scheduled run from a plan. The server stores it as
+// an inactive draft (a human activates it from the UI); fields is the request
+// body and must include agent_id.
+func (c *APIClient) CreateScheduledRun(ctx context.Context, fields map[string]any) (*ScheduledRun, error) {
+	var result ScheduledRun
+	err := c.doRequest(ctx, http.MethodPost, "/scheduled-runs", fields, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// UpdateScheduledRun applies a partial update to a scheduled run's plan. Only the
+// fields present are changed; activation is not updatable via the API.
+func (c *APIClient) UpdateScheduledRun(ctx context.Context, scheduledRunID int, fields map[string]any) (*ScheduledRun, error) {
+	var result ScheduledRun
+	err := c.doRequest(ctx, http.MethodPatch, fmt.Sprintf("/scheduled-runs/%d", scheduledRunID), fields, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}

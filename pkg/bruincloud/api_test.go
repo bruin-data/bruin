@@ -825,3 +825,67 @@ func TestUpdateDashboard(t *testing.T) {
 	assert.Equal(t, 9, dashboard.ID)
 	assert.Equal(t, "Renamed", *dashboard.Title)
 }
+
+func TestListScheduledRuns(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/scheduled-runs", r.URL.Path)
+
+		w.WriteHeader(http.StatusOK)
+		title := "Nightly"
+		cron := "0 0 * * *"
+		writeJSON(t, w, map[string]any{
+			"scheduled_runs": []ScheduledRun{{ID: 3, Title: &title, IsActive: true, ScheduleCron: &cron}},
+		})
+	})
+
+	runs, err := client.ListScheduledRuns(t.Context())
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+	assert.Equal(t, 3, runs[0].ID)
+	assert.True(t, runs[0].IsActive)
+}
+
+func TestCreateScheduledRun(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/scheduled-runs", r.URL.Path)
+
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.EqualValues(t, 7, body["agent_id"])
+		assert.Equal(t, "Daily", body["title"])
+
+		w.WriteHeader(http.StatusCreated)
+		title := "Daily"
+		writeJSON(t, w, ScheduledRun{ID: 11, Title: &title, IsActive: false})
+	})
+
+	run, err := client.CreateScheduledRun(t.Context(), map[string]any{"agent_id": 7, "title": "Daily"})
+	require.NoError(t, err)
+	assert.Equal(t, 11, run.ID)
+	// Created as a draft — never active from the API.
+	assert.False(t, run.IsActive)
+}
+
+func TestUpdateScheduledRun(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPatch, r.Method)
+		assert.Equal(t, "/scheduled-runs/11", r.URL.Path)
+
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, "Renamed", body["title"])
+
+		w.WriteHeader(http.StatusOK)
+		title := "Renamed"
+		writeJSON(t, w, ScheduledRun{ID: 11, Title: &title})
+	})
+
+	run, err := client.UpdateScheduledRun(t.Context(), 11, map[string]any{"title": "Renamed"})
+	require.NoError(t, err)
+	assert.Equal(t, "Renamed", *run.Title)
+}
