@@ -674,6 +674,17 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "user_properties", PrimaryKey: "user_property", IncKey: "", IncStrategy: "replace"},
 	},
 
+	// FastSpring - Payments & Subscriptions
+	"fastspring": {
+		{Name: "orders", PrimaryKey: "id", IncKey: "changed", IncStrategy: "merge"},
+		{Name: "subscriptions", PrimaryKey: "id", IncKey: "changed", IncStrategy: "merge"},
+		{Name: "accounts", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "products", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "coupons", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "subscription_report", PrimaryKey: "subscription_id, transaction_date", IncKey: "sync_date", IncStrategy: "merge"},
+		{Name: "revenue_report", PrimaryKey: "Order_ID, Transaction_Date", IncKey: "syncDate", IncStrategy: "merge"},
+	},
+
 	// Mixpanel - Analytics
 	"mixpanel": {
 		{Name: "events", PrimaryKey: "distinct_id", IncKey: "time", IncStrategy: "merge"},

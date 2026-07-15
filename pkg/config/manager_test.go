@@ -629,6 +629,13 @@ func TestLoadFromFile(t *testing.T) {
 					Region:             "us",
 				},
 			},
+			Fastspring: []FastspringConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "fastspring-1"},
+					Username:           "user-123",
+					Password:           "pass-123",
+				},
+			},
 			Wise: []WiseConnection{
 				{
 					ConnectionMetadata: ConnectionMetadata{Name: "wise-1"},
@@ -2675,6 +2682,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Polymarket:          []PolymarketConnection{{ConnectionMetadata: ConnectionMetadata{Name: "polymarket1"}}},
 				Mixpanel:            []MixpanelConnection{{ConnectionMetadata: ConnectionMetadata{Name: "mixpanel1"}}},
 				Amplitude:           []AmplitudeConnection{{ConnectionMetadata: ConnectionMetadata{Name: "amplitude1"}}},
+				Fastspring:          []FastspringConnection{{ConnectionMetadata: ConnectionMetadata{Name: "fastspring1"}}},
 				Clickup:             []ClickupConnection{{ConnectionMetadata: ConnectionMetadata{Name: "clickup1"}}},
 				Jobtread:            []JobtreadConnection{{ConnectionMetadata: ConnectionMetadata{Name: "jobtread1"}}},
 				Posthog:             []PosthogConnection{{ConnectionMetadata: ConnectionMetadata{Name: "posthog1"}}},
@@ -2810,6 +2818,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Polymarket:          []PolymarketConnection{{ConnectionMetadata: ConnectionMetadata{Name: "polymarket1"}}},
 				Mixpanel:            []MixpanelConnection{{ConnectionMetadata: ConnectionMetadata{Name: "mixpanel1"}}},
 				Amplitude:           []AmplitudeConnection{{ConnectionMetadata: ConnectionMetadata{Name: "amplitude1"}}},
+				Fastspring:          []FastspringConnection{{ConnectionMetadata: ConnectionMetadata{Name: "fastspring1"}}},
 				Clickup:             []ClickupConnection{{ConnectionMetadata: ConnectionMetadata{Name: "clickup1"}}},
 				Jobtread:            []JobtreadConnection{{ConnectionMetadata: ConnectionMetadata{Name: "jobtread1"}}},
 				Posthog:             []PosthogConnection{{ConnectionMetadata: ConnectionMetadata{Name: "posthog1"}}},

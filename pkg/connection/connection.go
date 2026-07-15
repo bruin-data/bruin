@@ -54,6 +54,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/espn"
 	fabric "github.com/bruin-data/bruin/pkg/fabric"
 	"github.com/bruin-data/bruin/pkg/facebookads"
+	"github.com/bruin-data/bruin/pkg/fastspring"
 	"github.com/bruin-data/bruin/pkg/fireflies"
 	"github.com/bruin-data/bruin/pkg/fluxx"
 	"github.com/bruin-data/bruin/pkg/footballdata"
@@ -231,6 +232,7 @@ type Manager struct {
 	Polymarket           map[string]*polymarket.Client
 	Mixpanel             map[string]*mixpanel.Client
 	Amplitude            map[string]*amplitude.Client
+	Fastspring           map[string]*fastspring.Client
 	Clickup              map[string]*clickup.Client
 	Jobtread             map[string]*jobtread.Client
 	Posthog              map[string]*posthog.Client
@@ -2953,6 +2955,28 @@ func (m *Manager) AddAmplitudeConnectionFromConfig(connection *config.AmplitudeC
 	return nil
 }
 
+func (m *Manager) AddFastspringConnectionFromConfig(connection *config.FastspringConnection) error {
+	m.mutex.Lock()
+	if m.Fastspring == nil {
+		m.Fastspring = make(map[string]*fastspring.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := fastspring.NewClient(fastspring.Config{
+		Username: connection.Username,
+		Password: connection.Password,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Fastspring[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddGoogleAnalyticsConnectionFromConfig(connection *config.GoogleAnalyticsConnection) error {
 	m.mutex.Lock()
 	if m.GoogleAnalytics == nil {
@@ -4066,6 +4090,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Posthog, connectionManager.AddPosthogConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Mixpanel, connectionManager.AddMixpanelConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Amplitude, connectionManager.AddAmplitudeConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Fastspring, connectionManager.AddFastspringConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Pinterest, connectionManager.AddPinterestConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Trustpilot, connectionManager.AddTrustpilotConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.QuickBooks, connectionManager.AddQuickBooksConnectionFromConfig, &wg, &errList, &mu)
