@@ -166,10 +166,16 @@ func TestCDCScheme(t *testing.T) {
 		{scheme: "mariadb", want: "mariadb+cdc", wantOK: true},
 		{scheme: "vitess", want: "vitess+cdc", wantOK: true},
 		{scheme: "ps_mysql", want: "ps_mysql+cdc", wantOK: true},
+		{scheme: "mongodb", want: "mongodb+cdc", wantOK: true},
+		{scheme: "mongodb+srv", want: "mongodb+srv+cdc", wantOK: true},
+		{scheme: "mssql", want: "mssql+cdc", wantOK: true},
+		{scheme: "sqlserver", want: "sqlserver+cdc", wantOK: true},
 
 		// already a cdc scheme
 		{scheme: "postgres+cdc", want: "postgres+cdc", wantOK: true},
 		{scheme: "mysql+cdc", want: "mysql+cdc", wantOK: true},
+		{scheme: "mongodb+cdc", want: "mongodb+cdc", wantOK: true},
+		{scheme: "mssql+cdc", want: "mssql+cdc", wantOK: true},
 
 		// no cdc counterpart
 		{scheme: "bigquery", want: "bigquery", wantOK: false},
@@ -191,7 +197,7 @@ func TestCDCScheme(t *testing.T) {
 func TestCDCScheme_Idempotent(t *testing.T) {
 	t.Parallel()
 
-	for _, scheme := range []string{"postgresql", "mysql", "mariadb", "vitess", "ps_mysql"} {
+	for _, scheme := range []string{"postgresql", "mysql", "mariadb", "vitess", "ps_mysql", "mongodb", "mongodb+srv", "mssql"} {
 		once, ok := CDCScheme(scheme)
 		require.True(t, ok)
 
@@ -230,6 +236,21 @@ func TestCDC(t *testing.T) {
 			name: "vitess keeps its grpc_port",
 			uri:  "vitess://u:p@vtgate.internal:15306/commerce?grpc_port=15991",
 			want: "vitess+cdc://u:p@vtgate.internal:15306/commerce?grpc_port=15991",
+		},
+		{
+			name: "mongodb",
+			uri:  "mongodb://u:p@h:27017/db",
+			want: "mongodb+cdc://u:p@h:27017/db",
+		},
+		{
+			name: "mongodb+srv",
+			uri:  "mongodb+srv://u:p@cluster.mongodb.net/db",
+			want: "mongodb+srv+cdc://u:p@cluster.mongodb.net/db",
+		},
+		{
+			name: "mssql keeps its odbc query",
+			uri:  "mssql://u:p@h:1433/db?driver=ODBC+Driver+18+for+SQL+Server",
+			want: "mssql+cdc://u:p@h:1433/db?driver=ODBC+Driver+18+for+SQL+Server",
 		},
 		{
 			name:    "unsupported scheme is an error rather than a silent passthrough",

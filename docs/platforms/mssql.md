@@ -318,3 +318,76 @@ columns:
     type: "BIT"
     description: "Whether the customer account is currently active"
 ```
+
+## Change Data Capture (CDC)
+
+Bruin supports SQL Server CDC through the `ingestr` asset type, capturing row-level changes (inserts, updates, deletes) and replicating them to a destination. SQL Server offers two capture mechanisms, selected with the `cdc_sql_capture` parameter:
+
+- **Log-based CDC** (`cdc_sql_capture: cdc`, the default) reads the SQL Server CDC change tables.
+- **Change Tracking** (`cdc_sql_capture: change_tracking`) uses the lighter-weight Change Tracking feature.
+
+### Prerequisites
+
+For log-based CDC, enable CDC on the source database:
+
+```sql
+EXEC sys.sp_cdc_enable_db;
+-- then enable CDC on each table you want to replicate
+EXEC sys.sp_cdc_enable_table @source_schema = N'dbo', @source_name = N'users', @role_name = NULL;
+```
+
+For Change Tracking, enable it on the database and each table:
+
+```sql
+ALTER DATABASE MyDatabase SET CHANGE_TRACKING = ON (CHANGE_RETENTION = 2 DAYS, AUTO_CLEANUP = ON);
+ALTER TABLE dbo.users ENABLE CHANGE_TRACKING;
+```
+
+Change Tracking requires each source table to have a primary key, and does not support streaming.
+
+### Parameters
+
+CDC is enabled by setting `cdc: "true"` on an `ingestr` asset with a SQL Server source connection.
+
+| Parameter | Required | Applies to | Description |
+|-----------|----------|------------|-------------|
+| `cdc` | Yes | both | Set to `"true"` to enable CDC mode |
+| `cdc_sql_capture` | No | both | `"cdc"` (log-based, default) or `"change_tracking"` |
+| `cdc_mode` | No | log-based CDC | `"stream"` for continuous streaming or `"batch"` for batch replication |
+| `cdc_capture_instance` | No | log-based CDC | Capture instance name to read from |
+| `cdc_poll_interval` | No | log-based CDC | Poll interval for change tables, such as `10s` |
+| `cdc_dest_schema` | No | log-based CDC | Destination schema to use for multi-table CDC runs |
+| `source_table` | Yes | both | Source table in `schema.table` format |
+| `incremental_strategy` | No | both | Defaults to `"merge"` when CDC is enabled. CDC assets must use `"merge"`; Bruin rejects other strategies. |
+
+> [!NOTE]
+> When CDC is enabled, primary key columns do not need to be declared in the asset — log-based CDC and Change Tracking both determine keys from the source table.
+
+### Examples
+
+#### Log-based CDC
+```yaml
+name: dbo.users
+type: ingestr
+connection: bigquery
+
+parameters:
+  source_connection: mssql_prod
+  source_table: dbo.users
+  destination: bigquery
+  cdc: "true"
+```
+
+#### Change Tracking
+```yaml
+name: dbo.users
+type: ingestr
+connection: bigquery
+
+parameters:
+  source_connection: mssql_prod
+  source_table: dbo.users
+  destination: bigquery
+  cdc: "true"
+  cdc_sql_capture: change_tracking
+```
