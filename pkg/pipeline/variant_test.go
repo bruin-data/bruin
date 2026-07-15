@@ -440,6 +440,7 @@ func TestVariantVisitorCoversStringFields(t *testing.T) {
 		"Pipeline.Notifications.MSTeams[].Connection": true,
 		"Pipeline.Notifications.Discord[].Connection": true,
 		"Pipeline.Notifications.Webhook[].Connection": true,
+		"Pipeline.Notifications.Email[].Recipients[]": true,
 
 		// Asset internals + file metadata — never user-templated.
 		"Pipeline.Assets[].ID":                     true,
@@ -501,10 +502,12 @@ func TestVariantVisitorCoversStringFields(t *testing.T) {
 		"Pipeline.Assets[].Notifications.MSTeams[].Connection":      true,
 		"Pipeline.Assets[].Notifications.Discord[].Connection":      true,
 		"Pipeline.Assets[].Notifications.Webhook[].Connection":      true,
+		"Pipeline.Assets[].Notifications.Email[].Recipients[]":      true,
 		"Pipeline.DefaultValues.Notifications.Slack[].Channel":      true,
 		"Pipeline.DefaultValues.Notifications.MSTeams[].Connection": true,
 		"Pipeline.DefaultValues.Notifications.Discord[].Connection": true,
 		"Pipeline.DefaultValues.Notifications.Webhook[].Connection": true,
+		"Pipeline.DefaultValues.Notifications.Email[].Recipients[]": true,
 	}
 
 	pl := buildFullyPopulatedPipelineForVisitorTest()
@@ -568,6 +571,10 @@ func buildFullyPopulatedPipelineForVisitorTest() *pipeline.Pipeline {
 			DistributedBy: []string{"id"},
 			Properties:    map[string]string{"replication_num": "1"},
 		},
+		StarRocks: pipeline.StarRocksConfig{
+			TableModel: "primary_key",
+			Properties: map[string]string{"replication_num": "1"},
+		},
 		Routing: &pipeline.RoutingConfig{EgressGateway: "gw"},
 	}
 	return &pipeline.Pipeline{
@@ -619,12 +626,17 @@ func buildFullyPopulatedPipelineForVisitorTest() *pipeline.Pipeline {
 				DistributedBy: []string{"id"},
 				Properties:    map[string]string{"replication_num": "1"},
 			},
+			StarRocks: pipeline.StarRocksConfig{
+				TableModel: "primary_key",
+				Properties: map[string]string{"replication_num": "1"},
+			},
 			Routing: &pipeline.RoutingConfig{EgressGateway: "gw"},
 			Notifications: &pipeline.Notifications{
 				Slack:   []pipeline.SlackNotification{{Channel: "c"}},
 				MSTeams: []pipeline.MSTeamsNotification{{Connection: "c"}},
 				Discord: []pipeline.DiscordNotification{{Connection: "c"}},
 				Webhook: []pipeline.WebhookNotification{{Connection: "c"}},
+				Email:   []pipeline.EmailNotification{{Recipients: []string{"alerts@example.com"}}},
 			},
 		},
 		Variables: pipeline.Variables{

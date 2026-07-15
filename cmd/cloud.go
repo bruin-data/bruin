@@ -37,6 +37,7 @@ func Cloud(isDebug *bool) *cli.Command {
 			CloudAgents(),
 			CloudConnections(),
 			CloudDashboards(),
+			CloudScheduledAgents(),
 		},
 	}
 }
@@ -2970,14 +2971,15 @@ func cloudDashboardsGet() *cli.Command {
 	}
 }
 
-// parseDashboardState decodes a dashboard definition from JSON or YAML into a
-// map. It walks the YAML node tree rather than decoding straight into a map so
+// parseJSONOrYAMLObject decodes a JSON or YAML object (a dashboard definition, a
+// scheduled-agent plan, ...) into a map. It walks the YAML node tree rather than
+// decoding straight into a map so
 // that timestamp-like scalars (e.g. an unquoted `2024-01-01`) are preserved as
 // their original string — yaml.v3 would otherwise resolve them to time.Time,
 // which JSON-encodes as an RFC3339 timestamp and changes the value. Returns a
 // nil map (no error) when the document is empty or not a mapping; the caller
 // rejects that as "must be an object".
-func parseDashboardState(raw []byte) (map[string]any, error) {
+func parseJSONOrYAMLObject(raw []byte) (map[string]any, error) {
 	var doc yaml.Node
 	if err := yaml.Unmarshal(raw, &doc); err != nil {
 		return nil, err
@@ -3100,7 +3102,7 @@ func cloudDashboardsCreate() *cli.Command {
 			// Accept JSON or YAML — dashboards are YAML-native and JSON is valid YAML.
 			var state map[string]any
 			if c.IsSet("state") || c.IsSet("state-file") {
-				parsed, err := parseDashboardState([]byte(raw))
+				parsed, err := parseJSONOrYAMLObject([]byte(raw))
 				if err != nil {
 					printError(fmt.Errorf("invalid dashboard definition (expected a JSON or YAML object): %w", err), output, "Invalid state")
 					return cli.Exit("", 1)
@@ -3210,7 +3212,7 @@ func cloudDashboardsUpdate() *cli.Command {
 					raw = string(data)
 				}
 				// Accept JSON or YAML — dashboards are YAML-native and JSON is valid YAML.
-				state, err := parseDashboardState([]byte(raw))
+				state, err := parseJSONOrYAMLObject([]byte(raw))
 				if err != nil {
 					printError(fmt.Errorf("invalid dashboard definition (expected a JSON or YAML object): %w", err), output, "Invalid state")
 					return cli.Exit("", 1)
@@ -3258,4 +3260,291 @@ func cloudDashboardsUpdate() *cli.Command {
 			return nil
 		},
 	}
+}
+
+func CloudScheduledAgents() *cli.Command {
+	return &cli.Command{
+		Name:  "scheduled-agents",
+		Usage: "Manage Bruin Cloud scheduled agents",
+		Commands: []*cli.Command{
+			cloudScheduledAgentsList(),
+			cloudScheduledAgentsGet(),
+			cloudScheduledAgentsCreate(),
+			cloudScheduledAgentsUpdate(),
+		},
+	}
+}
+
+func cloudScheduledAgentsList() *cli.Command {
+	return &cli.Command{
+		Name:  "list",
+		Usage: "List scheduled agents",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			runs, err := client.ListScheduledAgents(ctx)
+			if err != nil {
+				printError(err, output, "Failed to list scheduled agents")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(runs, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"ID", "Title", "Active", "Cron", "Next Run"})
+			for _, r := range runs {
+				t.AppendRow(table.Row{r.ID, derefString(r.Title), r.IsActive, derefString(r.ScheduleCron), derefString(r.NextRunAt)})
+			}
+			t.Render()
+			return nil
+		},
+	}
+}
+
+func cloudScheduledAgentsGet() *cli.Command {
+	return &cli.Command{
+		Name:  "get",
+		Usage: "Get a scheduled agent including its plan",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "scheduled-agent-id",
+				Usage:    "scheduled agent ID",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			run, err := client.GetScheduledAgent(ctx, c.Int("scheduled-agent-id"))
+			if err != nil {
+				printError(err, output, "Failed to get scheduled agent")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(run, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			printScheduledAgent(run)
+			return nil
+		},
+	}
+}
+
+func cloudScheduledAgentsCreate() *cli.Command {
+	return &cli.Command{
+		Name:  "create",
+		Usage: "Create a scheduled agent from a plan (stored as an inactive draft; activation stays in the UI)",
+		Flags: append(
+			scheduledAgentPlanFlags(),
+			&cli.IntFlag{
+				Name:     "agent-id",
+				Usage:    "the agent that runs the scheduled task",
+				Required: true,
+			},
+		),
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			fields, err := buildScheduledAgentFields(c)
+			if err != nil {
+				printError(err, output, "Invalid plan")
+				return cli.Exit("", 1)
+			}
+			fields["agent_id"] = c.Int("agent-id")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			run, err := client.CreateScheduledAgent(ctx, fields)
+			if err != nil {
+				printError(err, output, "Failed to create scheduled agent")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(run, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			infoPrinter.Printf("Created scheduled agent %d (%s) as a draft — review and activate it from the Bruin Cloud UI.\n", run.ID, derefString(run.Title))
+			return nil
+		},
+	}
+}
+
+func cloudScheduledAgentsUpdate() *cli.Command {
+	return &cli.Command{
+		Name:  "update",
+		Usage: "Update a scheduled agent's title or plan (activation stays in the UI)",
+		Flags: append(
+			scheduledAgentPlanFlags(),
+			&cli.IntFlag{
+				Name:     "scheduled-agent-id",
+				Usage:    "scheduled agent ID",
+				Required: true,
+			},
+		),
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			fields, err := buildScheduledAgentFields(c)
+			if err != nil {
+				printError(err, output, "Invalid plan")
+				return cli.Exit("", 1)
+			}
+			if len(fields) == 0 {
+				printError(errors.New("provide at least one field to update (e.g. --title, --cron, --instructions or --state-file)"), output, "Nothing to update")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			run, err := client.UpdateScheduledAgent(ctx, c.Int("scheduled-agent-id"), fields)
+			if err != nil {
+				printError(err, output, "Failed to update scheduled agent")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(run, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			infoPrinter.Printf("Updated scheduled agent %d (%s).\n", run.ID, derefString(run.Title))
+			return nil
+		},
+	}
+}
+
+// scheduledAgentPlanFlags are the plan flags shared by create and update.
+func scheduledAgentPlanFlags() []cli.Flag {
+	return []cli.Flag{
+		apiKeyFlag(),
+		outputFlag(),
+		&cli.StringFlag{Name: "title", Usage: "the run title"},
+		&cli.StringFlag{Name: "cron", Usage: "cron schedule, e.g. '0 9 * * *'"},
+		&cli.StringFlag{Name: "timezone", Usage: "schedule timezone, e.g. 'UTC'"},
+		&cli.StringFlag{Name: "instructions", Usage: "what the run should do"},
+		&cli.StringFlag{Name: "output-formatting", Usage: "how the result should be formatted"},
+		&cli.StringFlag{Name: "connection", Usage: "the data connection to query"},
+		&cli.StringFlag{Name: "state", Usage: "the full plan as a JSON or YAML object string"},
+		&cli.StringFlag{Name: "state-file", Usage: "path to a file with the full plan as JSON or YAML"},
+	}
+}
+
+// buildScheduledAgentFields assembles the request body from an optional full plan
+// (--state / --state-file) overlaid with the convenience flags. Shared by create
+// and update so the two build the body identically.
+func buildScheduledAgentFields(c *cli.Command) (map[string]any, error) {
+	fields := map[string]any{}
+
+	// The plan can come inline (--state) or from a file (--state-file), not both.
+	if c.IsSet("state") && c.IsSet("state-file") {
+		return nil, errors.New("pass only one of --state or --state-file")
+	}
+	if c.IsSet("state") || c.IsSet("state-file") {
+		raw := c.String("state")
+		if file := c.String("state-file"); file != "" {
+			data, err := os.ReadFile(file)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read --state-file: %w", err)
+			}
+			raw = string(data)
+		}
+		parsed, err := parseJSONOrYAMLObject([]byte(raw))
+		if err != nil {
+			return nil, fmt.Errorf("invalid plan (expected a JSON or YAML object): %w", err)
+		}
+		if parsed == nil {
+			return nil, errors.New("plan must be a JSON or YAML object")
+		}
+		fields = parsed
+	}
+
+	if c.IsSet("title") {
+		fields["title"] = c.String("title")
+	}
+	if c.IsSet("instructions") {
+		fields["instructions"] = c.String("instructions")
+	}
+	if c.IsSet("output-formatting") {
+		fields["output_formatting"] = c.String("output-formatting")
+	}
+	if c.IsSet("connection") {
+		fields["connection"] = c.String("connection")
+	}
+	// --cron / --timezone are shorthand for the nested schedule object.
+	if c.IsSet("cron") || c.IsSet("timezone") {
+		schedule, _ := fields["schedule"].(map[string]any)
+		if schedule == nil {
+			schedule = map[string]any{}
+		}
+		if c.IsSet("cron") {
+			schedule["cron"] = c.String("cron")
+		}
+		if c.IsSet("timezone") {
+			schedule["timezone"] = c.String("timezone")
+		}
+		fields["schedule"] = schedule
+	}
+
+	return fields, nil
+}
+
+func printScheduledAgent(run *bruincloud.ScheduledAgent) {
+	infoPrinter.Printf("Scheduled agent %d: %s\n", run.ID, derefString(run.Title))
+	fmt.Printf("  Active:    %v\n", run.IsActive)
+	fmt.Printf("  Cron:      %s\n", derefString(run.ScheduleCron))
+	fmt.Printf("  Timezone:  %s\n", derefString(run.ScheduleTimezone))
+	fmt.Printf("  Next run:  %s\n", derefString(run.NextRunAt))
+	fmt.Printf("  Last run:  %s\n", derefString(run.LastRunAt))
+	if run.Instructions != nil && *run.Instructions != "" {
+		fmt.Printf("  Instructions:\n%s\n", *run.Instructions)
+	}
+}
+
+func derefString(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }

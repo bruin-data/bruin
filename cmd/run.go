@@ -56,6 +56,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
+	"github.com/bruin-data/bruin/pkg/starrocks"
 	"github.com/bruin-data/bruin/pkg/synapse"
 	"github.com/bruin-data/bruin/pkg/tableau"
 	"github.com/bruin-data/bruin/pkg/telemetry"
@@ -710,6 +711,10 @@ func Run(isDebug *bool) *cli.Command {
 				Aliases: []string{"i"},
 				Usage:   "use an interactive TUI that shows live progress of asset execution",
 			},
+			&cli.BoolFlag{
+				Name:  "stream",
+				Usage: "run a single streaming CDC ingestr asset continuously until interrupted (Ctrl+C); the target must be one streaming asset",
+			},
 			&cli.StringSliceFlag{
 				Name:    "var",
 				Usage:   "override pipeline variables with custom values",
@@ -917,6 +922,36 @@ func Run(isDebug *bool) *cli.Command {
 				}
 			}
 
+			// Streaming mode runs a single never-terminating CDC/broker asset in the
+			// foreground until interrupted. Validate the invocation up front: it must
+			// target exactly one streaming asset and cannot combine with flags that
+			// assume a finite, multi-asset batch run.
+			streamMode := c.Bool("stream")
+			if streamMode {
+				if !preview.RunningForAnAsset || c.Args().Len() != 1 || task == nil {
+					printError(errors.New("--stream requires a single streaming asset, e.g. bruin run --stream path/to/asset.yml"), c.String("output"), "Invalid --stream usage")
+					return cli.Exit("", 1)
+				}
+				if !ingestr.IsStreamingAsset(task) {
+					printError(fmt.Errorf("asset %q is not a streaming asset; --stream requires an ingestr CDC asset with cdc_mode: stream (or a message-broker source with stream: true)", task.Name), c.String("output"), "Invalid --stream usage")
+					return cli.Exit("", 1)
+				}
+				for _, incompatible := range []string{"downstream", "continue", "modified", "selector", "interactive", "full-refresh"} {
+					if c.Bool(incompatible) || (incompatible == "selector" && c.String("selector") != "") {
+						printError(fmt.Errorf("--stream cannot be combined with --%s", incompatible), c.String("output"), "Invalid --stream usage")
+						return cli.Exit("", 1)
+					}
+				}
+				if runConfig.SensorMode != "" {
+					printError(errors.New("--stream cannot be combined with --sensor-mode"), c.String("output"), "Invalid --stream usage")
+					return cli.Exit("", 1)
+				}
+				// A stream never "succeeds", so its column/custom checks and metadata
+				// push would never run (or would run against a moving table). Restrict
+				// the run to the main task only.
+				runConfig.Only = []string{"main"}
+			}
+
 			statePath := filepath.Join(repoRoot.Path, "logs/runs", preview.Pipeline.Name)
 			err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, "logs/runs")
 			if err != nil {
@@ -937,6 +972,7 @@ func Run(isDebug *bool) *cli.Command {
 				SelectedAssets:    selectedAssets,
 				Selector:          runConfig.Selector,
 				ExcludeTags:       runConfig.ExcludeTags,
+				StreamMode:        streamMode,
 				singleCheckID: scheduler.CheckUniqueID{
 					ID:    singleCheckID,
 					Asset: task,
@@ -1281,6 +1317,10 @@ func Run(isDebug *bool) *cli.Command {
 					errorPrinter.Printf("Failed to skip disabled assets: %v\n", err)
 					return cli.Exit("", 1)
 				}
+				if err := SkipStreamingAssets(context.Background(), filter, s, foundPipeline); err != nil { //nolint:contextcheck
+					errorPrinter.Printf("Failed to skip streaming assets: %v\n", err)
+					return cli.Exit("", 1)
+				}
 			}
 
 			if !c.Bool("continue") {
@@ -1371,10 +1411,16 @@ func Run(isDebug *bool) *cli.Command {
 				InteractivePythonLogs: interactivePythonLogs,
 			}
 
-			// Create a context with timeout
-			timeoutDuration := time.Duration(c.Int("timeout")) * time.Second
-			timeoutCtx, timeoutCancel := context.WithTimeout(runCtx, timeoutDuration)
-			defer timeoutCancel()
+			// Create a context with timeout. A streaming asset is meant to run
+			// indefinitely, so skip the default timeout unless the user set one
+			// explicitly; SIGINT/SIGTERM remains the way to stop it.
+			timeoutCtx := runCtx
+			if !streamMode || c.IsSet("timeout") {
+				timeoutDuration := time.Duration(c.Int("timeout")) * time.Second
+				var timeoutCancel context.CancelFunc
+				timeoutCtx, timeoutCancel = context.WithTimeout(runCtx, timeoutDuration)
+				defer timeoutCancel()
+			}
 
 			// Combine timeout context with signal handling
 			exeCtx, cancel := signal.NotifyContext(timeoutCtx, syscall.SIGINT, syscall.SIGTERM)
@@ -2530,6 +2576,34 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeDorisTableSensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 	}
 
+	if s.WillRunTaskOfType(pipeline.AssetTypeStarRocksQuery) ||
+		estimateCustomCheckType == pipeline.AssetTypeStarRocksQuery ||
+		s.WillRunTaskOfType(pipeline.AssetTypeStarRocksSeed) ||
+		s.WillRunTaskOfType(pipeline.AssetTypeStarRocksQuerySensor) ||
+		s.WillRunTaskOfType(pipeline.AssetTypeStarRocksTableSensor) {
+		starRocksOperator := starrocks.NewBasicOperator(conn, wholeFileExtractor, fullRefresh, hoister, parser)
+		starRocksCheckRunner := starrocks.NewColumnCheckOperator(conn)
+		starRocksQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
+		starRocksTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
+		starRocksSeedOperator := starrocks.NewSeedOperator(conn, renderer)
+
+		mainExecutors[pipeline.AssetTypeStarRocksQuery][scheduler.TaskInstanceTypeMain] = starRocksOperator
+		mainExecutors[pipeline.AssetTypeStarRocksQuery][scheduler.TaskInstanceTypeColumnCheck] = starRocksCheckRunner
+		mainExecutors[pipeline.AssetTypeStarRocksQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeStarRocksSeed][scheduler.TaskInstanceTypeMain] = starRocksSeedOperator
+		mainExecutors[pipeline.AssetTypeStarRocksSeed][scheduler.TaskInstanceTypeColumnCheck] = starRocksCheckRunner
+		mainExecutors[pipeline.AssetTypeStarRocksSeed][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeStarRocksQuerySensor][scheduler.TaskInstanceTypeMain] = starRocksQuerySensor
+		mainExecutors[pipeline.AssetTypeStarRocksQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = starRocksCheckRunner
+		mainExecutors[pipeline.AssetTypeStarRocksQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeStarRocksTableSensor][scheduler.TaskInstanceTypeMain] = starRocksTableSensor
+		mainExecutors[pipeline.AssetTypeStarRocksTableSensor][scheduler.TaskInstanceTypeColumnCheck] = starRocksCheckRunner
+		mainExecutors[pipeline.AssetTypeStarRocksTableSensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+	}
+
 	if s.WillRunTaskOfType(pipeline.AssetTypeAgentClaudeCode) {
 		claudeCodeOperator := claudecode.NewClaudeCodeOperator(renderer)
 		mainExecutors[pipeline.AssetTypeAgentClaudeCode][scheduler.TaskInstanceTypeMain] = claudeCodeOperator
@@ -2728,6 +2802,7 @@ type Filter struct {
 	Selector           string
 	ExcludeTag         string
 	ExcludeTags        []string
+	StreamMode         bool // Whether this is a streaming run (from `--stream`)
 	selectedBySelector bool
 	singleCheckID      scheduler.CheckUniqueID // ID of the single check to run, if any
 }
@@ -2980,6 +3055,32 @@ func SkipDisabledAssets(ctx context.Context, f *Filter, s *scheduler.Scheduler, 
 	return nil
 }
 
+// SkipStreamingAssets keeps continuously-running streaming assets out of a normal
+// batch run: they never terminate, so a batch run that included one would hang.
+// They are launched instead with `bruin run --stream <asset>`. In streaming mode
+// this is a no-op, since the single streaming asset is the intended target.
+func SkipStreamingAssets(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
+	if f.StreamMode {
+		return nil
+	}
+
+	skipped := 0
+	for _, asset := range p.Assets {
+		if !ingestr.IsStreamingAsset(asset) {
+			continue
+		}
+		if s.MarkAsset(asset, scheduler.Skipped, false) {
+			skipped++
+		}
+	}
+
+	if skipped > 0 {
+		warningPrinter.Printf("Excluded %d streaming asset(s) from this run; launch one with `bruin run --stream <asset>`.\n", skipped)
+	}
+
+	return nil
+}
+
 type FilterMutator func(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error
 
 func ApplyAllFilters(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
@@ -2994,6 +3095,7 @@ func ApplyAllFilters(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *
 		FilterTaskTypes,
 		SkipAllTasksIfSingleCheck,
 		SkipDisabledAssets,
+		SkipStreamingAssets,
 	}
 
 	for _, filterFunc := range funcs {

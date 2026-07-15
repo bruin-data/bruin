@@ -12,3 +12,6 @@ notifications:
     - connection: some_conn
   discord:
     - connection: some_discord_conn
+  email:
+    - recipients:
+        - alerts@example.com

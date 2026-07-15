@@ -386,8 +386,14 @@ type doris struct {
 	Properties    map[string]string `yaml:"properties"`
 }
 
+type starrocks struct {
+	TableModel string            `yaml:"table_model"`
+	Buckets    int               `yaml:"buckets"`
+	Properties map[string]string `yaml:"properties"`
+}
+
 func notificationsOrNil(n Notifications) *Notifications {
-	if len(n.Slack) == 0 && len(n.MSTeams) == 0 && len(n.Discord) == 0 && len(n.Webhook) == 0 {
+	if len(n.Slack) == 0 && len(n.MSTeams) == 0 && len(n.Discord) == 0 && len(n.Webhook) == 0 && len(n.Email) == 0 {
 		return nil
 	}
 	return &n
@@ -420,6 +426,7 @@ type taskDefinition struct {
 	Snowflake             snowflake         `yaml:"snowflake"`
 	Athena                athena            `yaml:"athena"`
 	Doris                 doris             `yaml:"doris"`
+	StarRocks             starrocks         `yaml:"starrocks"`
 	Routing               *RoutingConfig    `yaml:"routing"`
 	IntervalModifiers     IntervalModifiers `yaml:"interval_modifiers"`
 	Domains               []string          `yaml:"domains"`
@@ -642,6 +649,11 @@ func taskDefinitionToAsset(definition taskDefinition) (*Asset, error) {
 			DistributedBy: definition.Doris.DistributedBy,
 			Buckets:       definition.Doris.Buckets,
 			Properties:    definition.Doris.Properties,
+		},
+		StarRocks: StarRocksConfig{
+			TableModel: definition.StarRocks.TableModel,
+			Buckets:    definition.StarRocks.Buckets,
+			Properties: definition.StarRocks.Properties,
 		},
 		Routing:           definition.Routing,
 		IntervalModifiers: definition.IntervalModifiers,

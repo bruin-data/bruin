@@ -52,4 +52,30 @@ parameters:
 bruin run assets/kafka_ingestion.yml
 ```
 
-As a result of this command, Bruin will ingest data from the given Kafka table into your Postgres database.
+As a result of this command, Bruin will ingest data from the given Kafka table into your Postgres database. By default the asset consumes the currently available messages and exits, which fits a scheduled run.
+
+## Continuous (streaming) ingestion
+
+Set `stream: true` to consume the topic **continuously** instead of exiting once the current backlog is drained:
+
+```yaml
+name: public.kafka
+type: ingestr
+connection: postgres
+
+parameters:
+  source_connection: my_kafka
+  source_table: 'kafka.my_topic'
+  destination: postgres
+  stream: true
+  flush_interval: 30s      # optional: how often buffered records are written
+  flush_records: 10000     # optional: buffered-record count that triggers a write
+```
+
+A streaming asset never finishes on its own, so it is excluded from a normal `bruin run` (which expects every asset to complete) and is launched on its own:
+
+```bash
+bruin run --stream assets/kafka_ingestion.yml
+```
+
+The stream runs in the foreground until you stop it with `Ctrl+C`, then flushes buffered records and exits cleanly. A normal `bruin run <pipeline>` skips streaming assets and prints a notice. See [Streaming assets](/assets/ingestr#streaming-assets) for the full behaviour and restrictions, which apply to message-broker streams as well.

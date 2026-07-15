@@ -936,6 +936,8 @@ func convertSourceTypeToQueryType(sourceType pipeline.AssetType) pipeline.AssetT
 		return pipeline.AssetTypePostgresQuery
 	case pipeline.AssetTypeDorisSource:
 		return pipeline.AssetTypeDorisQuery
+	case pipeline.AssetTypeStarRocksSource:
+		return pipeline.AssetTypeStarRocksQuery
 	case pipeline.AssetTypeRedshiftSource:
 		return pipeline.AssetTypeRedshiftQuery
 	case pipeline.AssetTypeMsSQLSource:
@@ -984,6 +986,9 @@ func determineAssetTypeFromConnection(connectionName string, conn interface{}) p
 		if strings.Contains(connType, "doris") {
 			return pipeline.AssetTypeDorisSource
 		}
+		if strings.Contains(connType, "starrocks") {
+			return pipeline.AssetTypeStarRocksSource
+		}
 		if strings.Contains(connType, "athena") {
 			return pipeline.AssetTypeAthenaSource
 		}
@@ -1024,6 +1029,9 @@ func determineAssetTypeFromConnection(connectionName string, conn interface{}) p
 	}
 	if strings.Contains(connectionLower, "doris") {
 		return pipeline.AssetTypeDorisSource
+	}
+	if strings.Contains(connectionLower, "starrocks") {
+		return pipeline.AssetTypeStarRocksSource
 	}
 	if strings.Contains(connectionLower, "redshift") || strings.Contains(connectionLower, "rs") {
 		return pipeline.AssetTypeRedshiftSource

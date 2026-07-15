@@ -125,6 +125,11 @@ const (
 	AssetTypeSnowflakeSource           = AssetType("sf.source")
 	AssetTypeSnowflakeTableSensor      = AssetType("sf.sensor.table")
 	AssetTypeStarRocks                 = AssetType("starrocks")
+	AssetTypeStarRocksQuery            = AssetType("starrocks.sql")
+	AssetTypeStarRocksQuerySensor      = AssetType("starrocks.sensor.query")
+	AssetTypeStarRocksSeed             = AssetType("starrocks.seed")
+	AssetTypeStarRocksSource           = AssetType("starrocks.source")
+	AssetTypeStarRocksTableSensor      = AssetType("starrocks.sensor.table")
 	AssetTypeSuperset                  = AssetType("superset")
 	AssetTypeSynapseQuery              = AssetType("synapse.sql")
 	AssetTypeSynapseQuerySensor        = AssetType("synapse.sensor.query")
@@ -326,6 +331,7 @@ type Notifications struct {
 	MSTeams []MSTeamsNotification `yaml:"ms_teams" json:"ms_teams" mapstructure:"ms_teams"`
 	Discord []DiscordNotification `yaml:"discord" json:"discord" mapstructure:"discord"`
 	Webhook []WebhookNotification `yaml:"webhook" json:"webhook" mapstructure:"webhook"`
+	Email   []EmailNotification   `yaml:"email" json:"email" mapstructure:"email"`
 }
 
 type DefaultTrueBool struct { //nolint:recvcheck
@@ -517,11 +523,17 @@ type WebhookNotification struct {
 	NotificationCommon `yaml:",inline" json:",inline" mapstructure:",inline"`
 }
 
+type EmailNotification struct {
+	Recipients         []string `yaml:"recipients" json:"recipients" mapstructure:"recipients"`
+	NotificationCommon `yaml:",inline" json:",inline" mapstructure:",inline"`
+}
+
 func (n Notifications) MarshalJSON() ([]byte, error) {
 	slack := make([]SlackNotification, 0, len(n.Slack))
 	MSTeams := make([]MSTeamsNotification, 0, len(n.MSTeams))
 	discord := make([]DiscordNotification, 0, len(n.Discord))
 	webhook := make([]WebhookNotification, 0, len(n.Webhook))
+	email := make([]EmailNotification, 0, len(n.Email))
 	for _, s := range n.Slack {
 		if !reflect.ValueOf(s).IsZero() {
 			slack = append(slack, s)
@@ -542,17 +554,24 @@ func (n Notifications) MarshalJSON() ([]byte, error) {
 			webhook = append(webhook, s)
 		}
 	}
+	for _, s := range n.Email {
+		if !reflect.ValueOf(s).IsZero() {
+			email = append(email, s)
+		}
+	}
 
 	return json.Marshal(struct {
 		Slack   []SlackNotification   `json:"slack"`
 		MSTeams []MSTeamsNotification `json:"ms_teams"`
 		Discord []DiscordNotification `json:"discord"`
 		Webhook []WebhookNotification `json:"webhook"`
+		Email   []EmailNotification   `json:"email"`
 	}{
 		Slack:   slack,
 		MSTeams: MSTeams,
 		Discord: discord,
 		Webhook: webhook,
+		Email:   email,
 	})
 }
 
@@ -871,6 +890,11 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeSnowflakeSeed:             "snowflake",
 	AssetTypeSnowflakeSource:           "snowflake",
 	AssetTypeStarRocks:                 "starrocks",
+	AssetTypeStarRocksQuery:            "starrocks",
+	AssetTypeStarRocksSeed:             "starrocks",
+	AssetTypeStarRocksQuerySensor:      "starrocks",
+	AssetTypeStarRocksTableSensor:      "starrocks",
+	AssetTypeStarRocksSource:           "starrocks",
 	AssetTypePostgresQuery:             "postgres",
 	AssetTypePostgresSeed:              "postgres",
 	AssetTypePostgresQuerySensor:       "postgres",
@@ -986,7 +1010,7 @@ var IngestrTypeConnectionMapping = map[string]AssetType{
 	"duckdb":        AssetTypeDuckDBQuery,
 	"clickhouse":    AssetTypeClickHouse,
 	"doris":         AssetTypeDorisQuery,
-	"starrocks":     AssetTypeStarRocks,
+	"starrocks":     AssetTypeStarRocksQuery,
 	"oracle":        AssetTypeOracleQuery,
 	"motherduck":    AssetTypeMotherduckQuery,
 	"dynamodb":      AssetTypeDynamoDB,
@@ -1167,6 +1191,29 @@ func (d DorisConfig) IsZero() bool {
 	return d.TableModel == "" && len(d.DistributedBy) == 0 && d.Buckets == 0 && len(d.Properties) == 0
 }
 
+// StarRocksConfig carries StarRocks-specific table layout that has no
+// materialization-level equivalent. Distribution and partitioning are taken from
+// the materialization's `cluster_by` and `partition_by` fields respectively, so
+// they are intentionally absent here.
+type StarRocksConfig struct {
+	TableModel string            `json:"table_model,omitempty" yaml:"table_model,omitempty" mapstructure:"table_model"`
+	Buckets    int               `json:"buckets,omitempty" yaml:"buckets,omitempty" mapstructure:"buckets"`
+	Properties map[string]string `json:"properties,omitempty" yaml:"properties,omitempty" mapstructure:"properties"`
+}
+
+func (s StarRocksConfig) MarshalJSON() ([]byte, error) {
+	if s.IsZero() {
+		return []byte("null"), nil
+	}
+
+	type Alias StarRocksConfig
+	return json.Marshal(Alias(s))
+}
+
+func (s StarRocksConfig) IsZero() bool {
+	return s.TableModel == "" && s.Buckets == 0 && len(s.Properties) == 0
+}
+
 type RoutingConfig struct {
 	EgressGateway string `json:"egress_gateway,omitempty" yaml:"egress_gateway,omitempty" mapstructure:"egress_gateway"`
 }
@@ -1224,6 +1271,7 @@ type Asset struct { //nolint:recvcheck
 	Snowflake         SnowflakeConfig    `json:"snowflake" yaml:"snowflake,omitempty" mapstructure:"snowflake"`
 	Athena            AthenaConfig       `json:"athena" yaml:"athena,omitempty" mapstructure:"athena"`
 	Doris             DorisConfig        `json:"doris,omitzero" yaml:"doris,omitempty" mapstructure:"doris"`
+	StarRocks         StarRocksConfig    `json:"starrocks,omitzero" yaml:"starrocks,omitempty" mapstructure:"starrocks"`
 	Routing           *RoutingConfig     `json:"routing,omitempty" yaml:"routing,omitempty" mapstructure:"routing"`
 	IntervalModifiers IntervalModifiers  `json:"interval_modifiers" yaml:"interval_modifiers,omitempty" mapstructure:"interval_modifiers"`
 	RerunCooldown     *int               `json:"rerun_cooldown,omitempty" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
@@ -2211,6 +2259,7 @@ type DefaultValues struct {
 	Snowflake         SnowflakeConfig        `json:"snowflake,omitempty" yaml:"snowflake,omitempty" mapstructure:"snowflake"`
 	Athena            AthenaConfig           `json:"athena,omitempty" yaml:"athena,omitempty" mapstructure:"athena"`
 	Doris             DorisConfig            `json:"doris,omitempty,omitzero" yaml:"doris,omitempty" mapstructure:"doris"`
+	StarRocks         StarRocksConfig        `json:"starrocks,omitempty,omitzero" yaml:"starrocks,omitempty" mapstructure:"starrocks"`
 	Routing           *RoutingConfig         `json:"routing,omitempty" yaml:"routing,omitempty" mapstructure:"routing"`
 	IntervalModifiers IntervalModifiers      `json:"interval_modifiers" yaml:"interval_modifiers" mapstructure:"interval_modifiers"`
 	RerunCooldown     *int                   `json:"rerun_cooldown,omitempty" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
@@ -2255,6 +2304,7 @@ func (d *DefaultValues) UnmarshalYAML(value *yaml.Node) error {
 		Snowflake:         asset.Snowflake,
 		Athena:            asset.Athena,
 		Doris:             asset.Doris,
+		StarRocks:         asset.StarRocks,
 		Routing:           asset.Routing,
 		IntervalModifiers: asset.IntervalModifiers,
 		RerunCooldown:     asset.RerunCooldown,
@@ -2348,6 +2398,7 @@ func assetMainTaskIsConnectionless(assetType AssetType) bool {
 		AssetTypePostgresSource,
 		AssetTypeRedshiftSource,
 		AssetTypeSnowflakeSource,
+		AssetTypeStarRocksSource,
 		AssetTypeSynapseSource,
 		AssetTypeVerticaSource,
 		AssetTypeEmpty,
@@ -2467,6 +2518,7 @@ func (p *Pipeline) GetMajorityAssetTypesFromSQLAssets(defaultIfNone AssetType) A
 		AssetTypeSailQuery:         0,
 		AssetTypeOracleQuery:       0,
 		AssetTypeDorisQuery:        0,
+		AssetTypeStarRocksQuery:    0,
 	}
 	maxTasks := 0
 	maxTaskType := defaultIfNone
@@ -3163,6 +3215,7 @@ func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 		asset.Athena.Location = defaults.Athena.Location
 	}
 	mergeDorisDefaults(&asset.Doris, defaults.Doris)
+	mergeStarRocksDefaults(&asset.StarRocks, defaults.StarRocks)
 	if !defaults.Routing.IsZero() {
 		if asset.Routing == nil {
 			asset.Routing = defaults.Routing.Clone()
@@ -3213,6 +3266,25 @@ func mergeDorisDefaults(target *DorisConfig, defaults DorisConfig) {
 	}
 	if len(target.DistributedBy) == 0 && len(defaults.DistributedBy) > 0 {
 		target.DistributedBy = append([]string(nil), defaults.DistributedBy...)
+	}
+	if target.Buckets == 0 {
+		target.Buckets = defaults.Buckets
+	}
+	if len(defaults.Properties) > 0 {
+		if target.Properties == nil {
+			target.Properties = make(map[string]string, len(defaults.Properties))
+		}
+		for key, value := range defaults.Properties {
+			if _, exists := target.Properties[key]; !exists {
+				target.Properties[key] = value
+			}
+		}
+	}
+}
+
+func mergeStarRocksDefaults(target *StarRocksConfig, defaults StarRocksConfig) {
+	if target.TableModel == "" {
+		target.TableModel = defaults.TableModel
 	}
 	if target.Buckets == 0 {
 		target.Buckets = defaults.Buckets
@@ -3573,6 +3645,7 @@ func mergeNotificationDefaults(target *Notifications, defaults *Notifications) *
 	merged.MSTeams = appendMissingMSTeamsNotifications(merged.MSTeams, defaults.MSTeams)
 	merged.Discord = appendMissingDiscordNotifications(merged.Discord, defaults.Discord)
 	merged.Webhook = appendMissingWebhookNotifications(merged.Webhook, defaults.Webhook)
+	merged.Email = appendMissingEmailNotifications(merged.Email, defaults.Email)
 	return merged
 }
 
@@ -3634,6 +3707,26 @@ func appendMissingWebhookNotifications(target []WebhookNotification, defaults []
 		}
 	}
 	return merged
+}
+
+func appendMissingEmailNotifications(target []EmailNotification, defaults []EmailNotification) []EmailNotification {
+	merged := append([]EmailNotification(nil), target...)
+	existing := make(map[string]bool, len(merged))
+	for _, notification := range merged {
+		existing[emailRecipientsKey(notification.Recipients)] = true
+	}
+	for _, notification := range defaults {
+		key := emailRecipientsKey(notification.Recipients)
+		if !existing[key] {
+			merged = append(merged, cloneEmailNotification(notification))
+			existing[key] = true
+		}
+	}
+	return merged
+}
+
+func emailRecipientsKey(recipients []string) string {
+	return strings.Join(recipients, "\x00")
 }
 
 func cloneEmptyStringMap(value EmptyStringMap) EmptyStringMap {
@@ -3717,6 +3810,7 @@ func cloneNotifications(value *Notifications) *Notifications {
 		MSTeams: make([]MSTeamsNotification, 0, len(value.MSTeams)),
 		Discord: make([]DiscordNotification, 0, len(value.Discord)),
 		Webhook: make([]WebhookNotification, 0, len(value.Webhook)),
+		Email:   make([]EmailNotification, 0, len(value.Email)),
 	}
 	for _, notification := range value.Slack {
 		clone.Slack = append(clone.Slack, cloneSlackNotification(notification))
@@ -3729,6 +3823,9 @@ func cloneNotifications(value *Notifications) *Notifications {
 	}
 	for _, notification := range value.Webhook {
 		clone.Webhook = append(clone.Webhook, cloneWebhookNotification(notification))
+	}
+	for _, notification := range value.Email {
+		clone.Email = append(clone.Email, cloneEmailNotification(notification))
 	}
 	return clone
 }
@@ -3752,6 +3849,13 @@ func cloneDiscordNotification(value DiscordNotification) DiscordNotification {
 }
 
 func cloneWebhookNotification(value WebhookNotification) WebhookNotification {
+	value.Success = cloneDefaultTrueBool(value.Success)
+	value.Failure = cloneDefaultTrueBool(value.Failure)
+	return value
+}
+
+func cloneEmailNotification(value EmailNotification) EmailNotification {
+	value.Recipients = append([]string(nil), value.Recipients...)
 	value.Success = cloneDefaultTrueBool(value.Success)
 	value.Failure = cloneDefaultTrueBool(value.Failure)
 	return value
@@ -3884,6 +3988,7 @@ func IsSQLAssetType(t AssetType) bool {
 		AssetTypeMotherduckQuery,
 		AssetTypeClickHouse,
 		AssetTypeDorisQuery,
+		AssetTypeStarRocksQuery,
 		AssetTypeTrinoQuery,
 		AssetTypeDremioQuery,
 		AssetTypeSailQuery,

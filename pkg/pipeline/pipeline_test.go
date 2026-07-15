@@ -63,6 +63,7 @@ func sqlQueryAssetTypes() []pipeline.AssetType {
 		pipeline.AssetTypeRedshiftQuery,
 		pipeline.AssetTypeSailQuery,
 		pipeline.AssetTypeSnowflakeQuery,
+		pipeline.AssetTypeStarRocksQuery,
 		pipeline.AssetTypeSynapseQuery,
 		pipeline.AssetTypeTrinoQuery,
 		pipeline.AssetTypeVerticaQuery,
@@ -2877,6 +2878,32 @@ func TestBuilder_SetupDefaultsFromPipelineAppliesAssetFieldDefaults(t *testing.T
 	assert.Len(t, got.Notifications.Slack, 2)
 	assert.Equal(t, "#asset", got.Notifications.Slack[0].Channel)
 	assert.Equal(t, "#default", got.Notifications.Slack[1].Channel)
+}
+
+func TestBuilder_SetupDefaultsFromPipelineMergesEmailNotifications(t *testing.T) {
+	t.Parallel()
+
+	asset := &pipeline.Asset{
+		Notifications: &pipeline.Notifications{
+			Email: []pipeline.EmailNotification{{Recipients: []string{"asset@example.com"}}},
+		},
+	}
+	defaults := &pipeline.DefaultValues{
+		Notifications: &pipeline.Notifications{
+			Email: []pipeline.EmailNotification{
+				{Recipients: []string{"default@example.com"}},
+				{Recipients: []string{"asset@example.com"}},
+			},
+		},
+	}
+
+	got, err := (&pipeline.Builder{}).SetupDefaultsFromPipeline(t.Context(), asset, &pipeline.Pipeline{DefaultValues: defaults})
+	require.NoError(t, err)
+	require.NotNil(t, got.Notifications)
+	assert.Equal(t, []pipeline.EmailNotification{
+		{Recipients: []string{"asset@example.com"}},
+		{Recipients: []string{"default@example.com"}},
+	}, got.Notifications.Email)
 }
 
 func TestBuilder_SetupDefaultsFromPipelineKeepsExplicitMSSQLAssetDefinitions(t *testing.T) {

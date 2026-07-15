@@ -52,6 +52,9 @@ const (
 	msTeamsConnectionNotUnique = "The `connection` attribute under the MS Teams notifications must be unique"
 	discordConnectionEmpty     = "Discord notifications `connection` attribute must not be empty"
 	discordConnectionNotUnique = "The `connection` attribute under the Discord notifications must be unique"
+	emailRecipientsEmpty       = "Email notifications must have at least one recipient"
+	emailRecipientEmpty        = "Email notification recipients must not be empty"
+	emailRecipientsNotUnique   = "The `recipients` attribute under the email notifications must be unique"
 
 	pipelineConcurrencyMustBePositive            = "Pipeline concurrency must be 1 or greater"
 	pipelineMaxActiveStepsMustBePositive         = "Pipeline max_active_steps must be a positive number"
@@ -323,6 +326,12 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 			Description: "Invalid 'cdc_mode' value: must be 'stream' or 'batch'",
 		})
 	}
+	if capture, exists := asset.Parameters.GetString("cdc_sql_capture"); exists && capture != "cdc" && capture != "change_tracking" {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: "Invalid 'cdc_sql_capture' value: must be 'cdc' or 'change_tracking'",
+		})
+	}
 	if v, exists := asset.Parameters.GetString("version"); exists && v != "" && !ingestrVersionPattern.MatchString(v) {
 		issues = append(issues, &Issue{
 			Task:        asset,
@@ -343,6 +352,28 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 	}
 
 	return issues, nil
+}
+
+// WarnIngestrCDCModeDeprecated flags the deprecated cdc_mode parameter. Streaming
+// is now controlled by the single stream parameter across all source types:
+// set stream: true to stream a CDC asset, or omit it for a bounded (batch) run.
+func WarnIngestrCDCModeDeprecated(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	if asset.Type != pipeline.AssetTypeIngestr || asset.Parameters == nil {
+		return nil, nil
+	}
+
+	if cdc, _ := asset.Parameters.GetString("cdc"); cdc != "true" {
+		return nil, nil
+	}
+
+	if _, exists := asset.Parameters.GetString("cdc_mode"); !exists {
+		return nil, nil
+	}
+
+	return []*Issue{{
+		Task:        asset,
+		Description: "'cdc_mode' is deprecated; set 'stream: true' to stream a CDC asset, or omit it for a bounded (batch) run",
+	}}, nil
 }
 
 func validateIngestrMaterialization(asset *pipeline.Asset, effectiveStrategy string) ([]*Issue, string) {
@@ -1221,6 +1252,30 @@ func validateNotifications(n *pipeline.Notifications, issueContext []string) []*
 		discordConnectionEmpty, discordConnectionNotUnique, issueContext,
 	)...)
 
+	emailRecipientGroups := make([]string, 0, len(n.Email))
+	for _, email := range n.Email {
+		if len(email.Recipients) == 0 {
+			issues = append(issues, &Issue{Description: emailRecipientsEmpty, Context: issueContext})
+			continue
+		}
+
+		recipients := make([]string, 0, len(email.Recipients))
+		for _, recipient := range email.Recipients {
+			recipient = strings.TrimSpace(recipient)
+			if recipient == "" {
+				issues = append(issues, &Issue{Description: emailRecipientEmpty, Context: issueContext})
+				continue
+			}
+			recipients = append(recipients, recipient)
+		}
+
+		key := strings.Join(recipients, "\x00")
+		if slices.Contains(emailRecipientGroups, key) {
+			issues = append(issues, &Issue{Description: emailRecipientsNotUnique, Context: issueContext})
+		}
+		emailRecipientGroups = append(emailRecipientGroups, key)
+	}
+
 	return issues
 }
 
@@ -1662,6 +1717,7 @@ var TableSensorAllowedAssetTypes = map[pipeline.AssetType]bool{
 	pipeline.AssetTypeSynapseTableSensor:    true,
 	pipeline.AssetTypeMySQLTableSensor:      true,
 	pipeline.AssetTypeDorisTableSensor:      true,
+	pipeline.AssetTypeStarRocksTableSensor:  true,
 }
 
 var platformNames = map[pipeline.AssetType]string{
@@ -1676,6 +1732,7 @@ var platformNames = map[pipeline.AssetType]string{
 	pipeline.AssetTypeSynapseTableSensor:    "Synapse",
 	pipeline.AssetTypeMySQLTableSensor:      "MySQL",
 	pipeline.AssetTypeDorisTableSensor:      "Doris",
+	pipeline.AssetTypeStarRocksTableSensor:  "StarRocks",
 }
 
 func ValidateTableSensorTableParameter(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {

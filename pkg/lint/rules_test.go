@@ -1229,6 +1229,41 @@ func TestEnsurePipelineNotificationsAreValid(t *testing.T) {
 			},
 			want: []*Issue{{Description: discordConnectionNotUnique}},
 		},
+		{
+			name: "valid email recipients",
+			p: &pipeline.Pipeline{
+				Notifications: pipeline.Notifications{
+					Email: []pipeline.EmailNotification{{Recipients: []string{"alerts@example.com", "oncall@example.com"}}},
+				},
+			},
+			want: noIssues,
+		},
+		{
+			name: "email recipients are required",
+			p: &pipeline.Pipeline{
+				Notifications: pipeline.Notifications{Email: []pipeline.EmailNotification{{}}},
+			},
+			want: []*Issue{{Description: emailRecipientsEmpty}},
+		},
+		{
+			name: "email recipient cannot be empty",
+			p: &pipeline.Pipeline{
+				Notifications: pipeline.Notifications{Email: []pipeline.EmailNotification{{Recipients: []string{""}}}},
+			},
+			want: []*Issue{{Description: emailRecipientEmpty}},
+		},
+		{
+			name: "duplicate email recipient groups",
+			p: &pipeline.Pipeline{
+				Notifications: pipeline.Notifications{
+					Email: []pipeline.EmailNotification{
+						{Recipients: []string{"alerts@example.com"}},
+						{Recipients: []string{"alerts@example.com"}},
+					},
+				},
+			},
+			want: []*Issue{{Description: emailRecipientsNotUnique}},
+		},
 	}
 
 	for _, tt := range tests {
@@ -2359,6 +2394,69 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 				assert.Equal(t, tt.wantErrMessage, got[0].Description)
 			} else {
 				assert.Equal(t, []*Issue{}, got)
+			}
+		})
+	}
+}
+
+func TestWarnIngestrCDCModeDeprecated(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		asset    *pipeline.Asset
+		wantWarn bool
+	}{
+		{
+			name: "non-ingestr asset is ignored",
+			asset: &pipeline.Asset{
+				Type:       pipeline.AssetTypePython,
+				Parameters: pipeline.ParameterMap{"cdc": "true", "cdc_mode": "stream"},
+			},
+		},
+		{
+			name: "non-cdc streaming asset is fine",
+			asset: &pipeline.Asset{
+				Type:       pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{"stream": "true"},
+			},
+		},
+		{
+			name: "cdc asset using stream is fine",
+			asset: &pipeline.Asset{
+				Type:       pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{"cdc": "true", "stream": "true"},
+			},
+		},
+		{
+			name: "cdc asset without cdc_mode (batch) is fine",
+			asset: &pipeline.Asset{
+				Type:       pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{"cdc": "true"},
+			},
+		},
+		{
+			name: "cdc asset using deprecated cdc_mode warns",
+			asset: &pipeline.Asset{
+				Type:       pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{"cdc": "true", "cdc_mode": "stream"},
+			},
+			wantWarn: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			p := &pipeline.Pipeline{Assets: []*pipeline.Asset{tt.asset}}
+			got, err := WarnIngestrCDCModeDeprecated(t.Context(), p, tt.asset)
+			require.NoError(t, err)
+			if tt.wantWarn {
+				assert.Len(t, got, 1)
+				assert.Contains(t, got[0].Description, "deprecated")
+			} else {
+				assert.Empty(t, got)
 			}
 		})
 	}

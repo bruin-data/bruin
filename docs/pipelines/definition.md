@@ -279,6 +279,10 @@ notifications:
     - connection: "webhook-default"
       success: true
       failure: true
+  email:
+    - recipients: ["data-alerts@example.com", "oncall@example.com"]
+      success: false
+      failure: true
 ```
 
 - **Type:** `Object`
