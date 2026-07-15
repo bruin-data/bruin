@@ -194,6 +194,29 @@ func TestMaterializer_Render(t *testing.T) {
 				"PROPERTIES (\"replication_num\" = \"1\");",
 		},
 		{
+			name: "ddl emits expression partition by clause",
+			asset: &pipeline.Asset{
+				Name: "analytics.events",
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					Strategy:    pipeline.MaterializationStrategyDDL,
+					PartitionBy: "date_trunc('day', event_ts)",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT"},
+					{Name: "event_ts", Type: "DATETIME"},
+				},
+			},
+			want: "CREATE TABLE IF NOT EXISTS `analytics`.`events` (\n" +
+				"`id` INT,\n" +
+				"`event_ts` DATETIME\n" +
+				")\n" +
+				"DUPLICATE KEY(`id`)\n" +
+				"PARTITION BY (date_trunc('day', event_ts))\n" +
+				"DISTRIBUTED BY HASH(`id`) BUCKETS 1\n" +
+				"PROPERTIES (\"replication_num\" = \"1\");",
+		},
+		{
 			name: "merge creates primary key table and upserts",
 			asset: &pipeline.Asset{
 				Name: "analytics.accounts",

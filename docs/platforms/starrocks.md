@@ -61,6 +61,8 @@ so they work the same way as on the other platforms:
 - `materialization.cluster_by` → `DISTRIBUTED BY HASH(...)` (defaults to the key columns)
 - `materialization.partition_by` → `PARTITION BY (...)` (a column or expression such as `date_trunc('day', event_date)`)
 
+`partition_by` is emitted verbatim so that expressions work, so it is **not** automatically backtick-quoted. If you partition on a single column whose name is a StarRocks reserved word (e.g. `date`, `value`, `key`), quote it yourself: `partition_by: "`date`"`.
+
 StarRocks-specific layout that has no materialization equivalent is declared under `starrocks`:
 
 ```yaml
