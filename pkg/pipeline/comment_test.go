@@ -66,7 +66,7 @@ func Test_createTaskFromFile(t *testing.T) {
 				Description: "some description goes here",
 				Type:        "bq.sql",
 				Retries:     &retriesValue,
-				Timeout:     90 * time.Minute,
+				Timeout:     pipeline.DurationSeconds(90 * time.Minute),
 				ExecutableFile: pipeline.ExecutableFile{
 					Name:    "test.sql",
 					Path:    path.AbsPathForTests(t, "testdata/comments/test.sql"),

@@ -261,6 +261,14 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser sqlpa
 			ApplicableLevels: []Level{LevelAsset},
 		},
 		&SimpleRule{
+			Identifier:       "valid-timeout",
+			Fast:             true,
+			Severity:         ValidatorSeverityCritical,
+			Validator:        EnsurePipelineDefaultTimeoutIsValid,
+			AssetValidator:   EnsureAssetTimeoutIsValidForASingleAsset,
+			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
+		},
+		&SimpleRule{
 			Identifier:       "plain-yaml-files",
 			Fast:             false,
 			Severity:         ValidatorSeverityWarning,

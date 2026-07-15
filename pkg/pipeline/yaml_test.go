@@ -419,7 +419,7 @@ type: python
 timeout: 1h30m
 `)))
 	require.NoError(t, err)
-	require.Equal(t, 90*time.Minute, task.Timeout)
+	require.Equal(t, 90*time.Minute, task.Timeout.Duration())
 
 	content, err := task.FormatContent()
 	require.NoError(t, err)

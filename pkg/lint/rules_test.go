@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/jinja"
@@ -3977,6 +3978,114 @@ func TestEnsureAssetTierIsValidForASingleAsset(t *testing.T) {
 				t.Errorf("EnsureAssetTierIsValidForASingleAsset() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestEnsureAssetTimeoutIsValidForASingleAsset(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		timeout pipeline.DurationSeconds
+		want    []*Issue
+	}{
+		{
+			name:    "unset timeout is valid",
+			timeout: 0,
+			want:    noIssues,
+		},
+		{
+			name:    "one second is valid",
+			timeout: pipeline.DurationSeconds(time.Second),
+			want:    noIssues,
+		},
+		{
+			name:    "ninety minutes is valid",
+			timeout: pipeline.DurationSeconds(90 * time.Minute),
+			want:    noIssues,
+		},
+		{
+			name:    "sub-second timeout is invalid",
+			timeout: pipeline.DurationSeconds(500 * time.Millisecond),
+			want: []*Issue{
+				{
+					Task:        &pipeline.Asset{Timeout: pipeline.DurationSeconds(500 * time.Millisecond)},
+					Description: assetTimeoutMustBeAtLeastOneSecond,
+				},
+			},
+		},
+		{
+			name:    "negative timeout is invalid",
+			timeout: pipeline.DurationSeconds(-5 * time.Second),
+			want: []*Issue{
+				{
+					Task:        &pipeline.Asset{Timeout: pipeline.DurationSeconds(-5 * time.Second)},
+					Description: assetTimeoutMustBeAtLeastOneSecond,
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			asset := &pipeline.Asset{Timeout: tt.timeout}
+			got, err := EnsureAssetTimeoutIsValidForASingleAsset(t.Context(), &pipeline.Pipeline{}, asset)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestEnsurePipelineDefaultTimeoutIsValid(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		p       *pipeline.Pipeline
+		want    []*Issue
+	}{
+		{
+			name: "missing defaults is valid",
+			p:    &pipeline.Pipeline{},
+			want: noIssues,
+		},
+		{
+			name: "unset default timeout is valid",
+			p: &pipeline.Pipeline{
+				DefaultValues: &pipeline.DefaultValues{},
+			},
+			want: noIssues,
+		},
+		{
+			name: "one second default is valid",
+			p: &pipeline.Pipeline{
+				DefaultValues: &pipeline.DefaultValues{
+					Timeout: pipeline.DurationSeconds(time.Second),
+				},
+			},
+			want: noIssues,
+		},
+		{
+			name: "sub-second default timeout is invalid",
+			p: &pipeline.Pipeline{
+				DefaultValues: &pipeline.DefaultValues{
+					Timeout: pipeline.DurationSeconds(250 * time.Millisecond),
+				},
+			},
+			want: []*Issue{
+				{Description: pipelineDefaultTimeoutMustBeAtLeastOneSecond},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := EnsurePipelineDefaultTimeoutIsValid(t.Context(), tt.p)
+			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
 		})
 	}

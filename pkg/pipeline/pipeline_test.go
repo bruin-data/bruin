@@ -2367,24 +2367,24 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 			name:  "should set timeout from pipeline defaults",
 			asset: &pipeline.Asset{Name: "test-asset"},
 			foundPipeline: &pipeline.Pipeline{
-				DefaultValues: &pipeline.DefaultValues{Timeout: 2 * time.Hour},
+				DefaultValues: &pipeline.DefaultValues{Timeout: pipeline.DurationSeconds(2 * time.Hour)},
 			},
 			want: &pipeline.Asset{
 				Name:       "test-asset",
 				Parameters: pipeline.ParameterMap{},
-				Timeout:    2 * time.Hour,
+				Timeout:    pipeline.DurationSeconds(2 * time.Hour),
 			},
 		},
 		{
 			name:  "should not override existing timeout",
-			asset: &pipeline.Asset{Name: "test-asset", Timeout: 30 * time.Minute},
+			asset: &pipeline.Asset{Name: "test-asset", Timeout: pipeline.DurationSeconds(30 * time.Minute)},
 			foundPipeline: &pipeline.Pipeline{
-				DefaultValues: &pipeline.DefaultValues{Timeout: 2 * time.Hour},
+				DefaultValues: &pipeline.DefaultValues{Timeout: pipeline.DurationSeconds(2 * time.Hour)},
 			},
 			want: &pipeline.Asset{
 				Name:       "test-asset",
 				Parameters: pipeline.ParameterMap{},
-				Timeout:    30 * time.Minute,
+				Timeout:    pipeline.DurationSeconds(30 * time.Minute),
 			},
 		},
 		{
@@ -3360,7 +3360,7 @@ default:
 `), &p)
 	require.NoError(t, err)
 	require.NotNil(t, p.DefaultValues)
-	assert.Equal(t, 2*time.Hour+45*time.Minute, p.DefaultValues.Timeout)
+	assert.Equal(t, 2*time.Hour+45*time.Minute, p.DefaultValues.Timeout.Duration())
 }
 
 func TestAsset_FormatContent_DeduplicatesTags(t *testing.T) {

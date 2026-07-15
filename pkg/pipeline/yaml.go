@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/pkg/errors"
@@ -427,7 +426,7 @@ type taskDefinition struct {
 	Meta                  map[string]string `yaml:"meta"`
 	Metadata              map[string]string `yaml:"metadata"`
 	Retries               *int              `yaml:"retries"`
-	Timeout               time.Duration     `yaml:"timeout"`
+	Timeout               DurationSeconds   `yaml:"timeout"`
 	RerunCooldown         *int              `yaml:"rerun_cooldown"`
 	RefreshRestricted     *bool             `yaml:"refresh_restricted,omitempty"`
 	FullRefreshRestricted *bool             `yaml:"full_refresh_restricted,omitempty"`

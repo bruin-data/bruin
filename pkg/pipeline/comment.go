@@ -292,7 +292,7 @@ func commentRowsToTask(commentRows []string) (*Asset, error) {
 			if err != nil {
 				return nil, errors.Wrapf(err, "failed to parse timeout value '%s'", value)
 			}
-			task.Timeout = timeout
+			task.Timeout = DurationSeconds(timeout)
 
 			continue
 		case "refresh_restricted", "full_refresh_restricted":

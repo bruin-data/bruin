@@ -56,6 +56,8 @@ const (
 	pipelineConcurrencyMustBePositive    = "Pipeline concurrency must be 1 or greater"
 	pipelineMaxActiveStepsMustBePositive = "Pipeline max_active_steps must be a positive number"
 	assetTierMustBeBetweenOneAndFive     = "Asset tier must be between 1 and 5"
+	assetTimeoutMustBeAtLeastOneSecond   = "Asset timeout must be at least 1s"
+	pipelineDefaultTimeoutMustBeAtLeastOneSecond = "Pipeline default timeout must be at least 1s"
 	secretMappingKeyMustExist            = "Secrets must have a `key` attribute"
 
 	materializationStrategyIsNotSupportedForViews     = "Materialization strategy is not supported for views"
@@ -2143,6 +2145,33 @@ func EnsureAssetTierIsValidForASingleAsset(ctx context.Context, p *pipeline.Pipe
 		issues = append(issues, &Issue{
 			Task:        asset,
 			Description: assetTierMustBeBetweenOneAndFive,
+		})
+	}
+
+	return issues, nil
+}
+
+func EnsureAssetTimeoutIsValidForASingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+	if asset.Timeout != 0 && asset.Timeout.Duration() < time.Second {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: assetTimeoutMustBeAtLeastOneSecond,
+		})
+	}
+
+	return issues, nil
+}
+
+func EnsurePipelineDefaultTimeoutIsValid(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+	if p.DefaultValues == nil || p.DefaultValues.Timeout == 0 {
+		return issues, nil
+	}
+
+	if p.DefaultValues.Timeout.Duration() < time.Second {
+		issues = append(issues, &Issue{
+			Description: pipelineDefaultTimeoutMustBeAtLeastOneSecond,
 		})
 	}
 
