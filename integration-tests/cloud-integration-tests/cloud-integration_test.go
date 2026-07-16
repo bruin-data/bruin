@@ -306,3 +306,20 @@ func TestStarRocksIntegration(t *testing.T) {
 
 	runTestsInDirectory(t, starRocksDir, "StarRocks")
 }
+
+// TestClickHouseIntegration runs the self-contained ClickHouse suite. It boots
+// a local ClickHouse container via testcontainers and does not require
+// .bruin.cloud.yml credentials.
+func TestClickHouseIntegration(t *testing.T) {
+	t.Parallel()
+
+	currentFolder, err := os.Getwd()
+	require.NoError(t, err, "Failed to get current working directory")
+
+	clickHouseDir := filepath.Join(currentFolder, "clickhouse")
+	require.DirExists(t, clickHouseDir, "ClickHouse test directory should exist")
+
+	t.Logf("Running self-contained ClickHouse integration tests (testcontainers)")
+
+	runTestsInDirectory(t, clickHouseDir, "ClickHouse")
+}
