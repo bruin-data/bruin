@@ -87,8 +87,7 @@ func isEmbeddedYamlComment(file afero.File, prefixes []string) bool {
 	return false
 }
 
-// isIndentationYAMLError reports whether a go-yaml error message corresponds to
-// one of the scanner errors that are typically the result of bad indentation.
+// isIndentationYAMLError reports whether a go-yaml error is typically caused by indentation.
 func isIndentationYAMLError(msg string) bool {
 	for _, s := range []string{
 		"could not find expected ':'",
@@ -111,8 +110,6 @@ func commentedYamlToTask(file afero.File, filePath string) (*Asset, error) {
 
 	task, err := ConvertYamlToTask([]byte(rows))
 	if err != nil {
-		// Append a terse hint for the scanner errors that are typically caused by
-		// indentation; other YAML errors pass through unchanged.
 		yamlErr := new(path.YamlParseError)
 		if errors.As(err, &yamlErr) && isIndentationYAMLError(err.Error()) {
 			return nil, &ParseError{err.Error() + " (check indentation)"}
@@ -164,12 +161,7 @@ OUTER:
 		for _, prefix := range prefixes {
 			if trimmed == prefix {
 				if !seenPrefix {
-					// First occurrence - this is the opening marker. Emit a blank
-					// line in its place instead of dropping it, so the extracted
-					// YAML keeps the same line numbers as the original file. This
-					// way a go-yaml parse error ("yaml: line N: ...") points at the
-					// real line in the asset file rather than an offset within the
-					// stripped comment block.
+					// Blank the opening marker to keep YAML line numbers aligned with the file.
 					seenPrefix = true
 					rowsBuilder.WriteByte('\n')
 					continue OUTER
@@ -189,8 +181,7 @@ OUTER:
 		rowsBuilder.WriteByte('\n')
 	}
 
-	// Only trailing newlines are trimmed; leading blank lines are preserved so
-	// that the returned YAML stays aligned with the original file's line numbers.
+	// Trim only trailing newlines; leading blanks keep line numbers aligned with the file.
 	return strings.TrimRight(rowsBuilder.String(), "\n"), rowCount
 }
 
