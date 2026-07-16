@@ -89,12 +89,22 @@ func isEmbeddedYamlComment(file afero.File, prefixes []string) bool {
 
 func commentedYamlToTask(file afero.File, filePath string) (*Asset, error) {
 	rows, commentRowEnd := readUntilComments(file, possiblePrefixesForCommentBlocks, possibleSuffixesForCommentBlocks)
-	if rows == "" {
+	if strings.TrimSpace(rows) == "" {
 		return nil, &ParseError{"no embedded YAML found in the comments"}
 	}
 
 	task, err := ConvertYamlToTask([]byte(rows))
 	if err != nil {
+		yamlErr := new(path.YamlParseError)
+		if errors.As(err, &yamlErr) {
+			msg := "invalid YAML in the embedded @bruin configuration block: " + err.Error()
+			// Scanner/syntax errors (unlike type-mismatch "unmarshal errors") are
+			// almost always caused by indentation, so add a targeted hint for them.
+			if !strings.Contains(err.Error(), "unmarshal errors") {
+				msg += ". This is often caused by incorrect indentation — for example a multi-line 'query:' whose lines are not all indented past the key"
+			}
+			return nil, &ParseError{msg}
+		}
 		return nil, &ParseError{err.Error()}
 	}
 
@@ -133,7 +143,7 @@ func readUntilComments(file afero.File, prefixes, suffixes []string) (string, in
 
 OUTER:
 	for scanner.Scan() {
-		rowCount += 1
+		rowCount++
 
 		rowText := scanner.Text()
 		trimmed := strings.TrimSpace(rowText)
@@ -142,8 +152,14 @@ OUTER:
 		for _, prefix := range prefixes {
 			if trimmed == prefix {
 				if !seenPrefix {
-					// First occurrence - this is the opening marker
+					// First occurrence - this is the opening marker. Emit a blank
+					// line in its place instead of dropping it, so the extracted
+					// YAML keeps the same line numbers as the original file. This
+					// way a go-yaml parse error ("yaml: line N: ...") points at the
+					// real line in the asset file rather than an offset within the
+					// stripped comment block.
 					seenPrefix = true
+					rowsBuilder.WriteByte('\n')
 					continue OUTER
 				}
 			}
@@ -161,7 +177,9 @@ OUTER:
 		rowsBuilder.WriteByte('\n')
 	}
 
-	return strings.TrimSpace(rowsBuilder.String()), rowCount
+	// Only trailing newlines are trimmed; leading blank lines are preserved so
+	// that the returned YAML stays aligned with the original file's line numbers.
+	return strings.TrimRight(rowsBuilder.String(), "\n"), rowCount
 }
 
 func singleLineCommentsToTask(scanner *bufio.Scanner, commentMarker, filePath string) (*Asset, error) {
@@ -490,7 +508,7 @@ func ValidateAssetYAML(fs afero.Fs, filePath string, defType TaskDefinitionType)
 		}
 
 		rows, _ := readUntilComments(file, possiblePrefixesForCommentBlocks, possibleSuffixesForCommentBlocks)
-		if rows == "" {
+		if strings.TrimSpace(rows) == "" {
 			return nil
 		}
 		data = []byte(rows)

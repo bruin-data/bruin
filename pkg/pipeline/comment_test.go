@@ -400,6 +400,24 @@ func Test_createTaskFromFile(t *testing.T) {
 	}
 }
 
+func TestCreateTaskFromFileComments_invalidEmbeddedYAML(t *testing.T) {
+	t.Parallel()
+
+	_, err := pipeline.CreateTaskFromFileComments(afero.NewOsFs())("testdata/comments/failembeddedyamlindent.sql")
+	require.Error(t, err)
+
+	msg := err.Error()
+	// The message should explain that the embedded @bruin config is the culprit
+	// and hint at the most common cause (indentation), rather than surfacing the
+	// raw go-yaml error on its own.
+	assert.Contains(t, msg, "invalid YAML in the embedded @bruin configuration block")
+	assert.Contains(t, msg, "indentation")
+	// The reported line number must match the offending line in the source file
+	// (line 6, the under-indented query continuation), not an offset within the
+	// stripped comment block.
+	assert.Contains(t, msg, "yaml: line 6:")
+}
+
 func BenchmarkCreateTaskFromFileComments(b *testing.B) {
 	b.ReportAllocs()
 
