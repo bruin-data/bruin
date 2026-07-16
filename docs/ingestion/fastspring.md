@@ -53,10 +53,10 @@ parameters:
 | accounts | id | | replace | Customer accounts, including contact details and address. |
 | products | id | | replace | Products in your catalog, including pricing and fulfillment settings. |
 | coupons | id | | replace | Coupons and their discount configuration. |
-| subscription_report | subscription_id, transaction_date | sync_date | merge | Subscription metrics (MRR, ARR, subscribers, churn) grouped by the fields you choose. |
-| revenue_report | order_id, transaction_date | syncdate | merge | Revenue metrics grouped by the fields you choose. |
+| subscription_report | subscription_id, transaction_date (default) | sync_date | merge | Subscription metrics (MRR, ARR, subscribers, churn) grouped by the fields you choose. |
+| revenue_report | order_id, transaction_date (default) | syncdate | merge | Revenue metrics grouped by the fields you choose. |
 
-`orders` and `subscriptions` support incremental date-range loads via `--interval-start` / `--interval-end`. Reports load incrementally on their sync-date column; customize a report's columns and grouping with the colon form `<report>:<columns>:<group_by>`.
+`orders` and `subscriptions` support incremental date-range loads: the run's date interval — set with `--start-date` / `--end-date` (see [run](/commands/run)) — filters records to that window. The `subscription_report` and `revenue_report` tables have configurable columns and grouping — see [Reports](#reports) below.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 
@@ -65,3 +65,38 @@ bruin run assets/fastspring_ingestion.yml
 ```
 
 Running this command ingests data from FastSpring into your Postgres database.
+
+## Reports
+
+FastSpring's Data API can generate aggregated subscription and revenue reports:
+
+| Table | Details |
+| ----- | ------- |
+| `subscription_report` | Subscription metrics (MRR, ARR, subscribers, churn, …) grouped by the fields you choose. |
+| `revenue_report` | Revenue metrics grouped by the fields you choose. |
+
+Each report has sensible default columns and grouping. To customize, set `source_table` to the colon form `<report>:<columns>:<group_by>`, where `columns` and `group_by` are comma-separated lists. Omit a part to keep its default:
+
+- `subscription_report`: default columns and grouping.
+- `subscription_report:mrr,arr,subscription_id,transaction_date`: custom columns, default grouping.
+- `revenue_report:income_in_usd,product_name:product_name,transaction_month`: custom columns and grouping.
+
+For example:
+
+```yaml
+name: public.revenue_report
+type: ingestr
+
+parameters:
+  source_connection: fastspring
+  source_table: 'revenue_report:income_in_usd,product_name:product_name,transaction_month'
+  destination: postgres
+```
+
+See the [subscription report](https://developer.fastspring.com/reference/generate-subscription-report) and [revenue report](https://developer.fastspring.com/reference/generate-revenue-report) references for the full list of columns.
+
+The `group_by` fields become the table's primary key, so they must uniquely identify a row.
+
+### Incremental behavior
+
+Reports load incrementally (merge) using the **sync date** as the incremental key: `sync_date` for `subscription_report` and `syncdate` for `revenue_report`. Each run sends its start date as the report's sync-date filter, so only rows synced on or after that date are pulled, and results are upserted on the `group_by` primary key without duplicates. The sync-date column is **always requested**, even when you pass a custom `columns` list, so incremental sync keeps working regardless of the columns you choose.
