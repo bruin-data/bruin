@@ -1342,6 +1342,16 @@ func (c AmplitudeConnection) GetName() string {
 	return c.Name
 }
 
+type FastspringConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	Username           string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password" sensitive:"true"`
+}
+
+func (c FastspringConnection) GetName() string {
+	return c.Name
+}
+
 type ClickupConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	APIToken           string `yaml:"api_token,omitempty" json:"api_token" mapstructure:"api_token" sensitive:"true"`

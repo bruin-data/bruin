@@ -1236,6 +1236,12 @@
           },
           "type": "array"
         },
+        "fastspring": {
+          "items": {
+            "$ref": "#/$defs/FastspringConnection"
+          },
+          "type": "array"
+        },
         "clickup": {
           "items": {
             "$ref": "#/$defs/ClickupConnection"
@@ -2215,6 +2221,29 @@
         "name",
         "access_token",
         "account_id"
+      ]
+    },
+    "FastspringConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "username",
+        "password"
       ]
     },
     "FirefliesConnection": {

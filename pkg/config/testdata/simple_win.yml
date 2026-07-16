@@ -386,6 +386,10 @@ environments:
           api_key: "api-key-123"
           secret_key: "secret-key-123"
           region: "us"
+      fastspring:
+        - name: "fastspring-1"
+          username: "user-123"
+          password: "pass-123"
       wise:
         - name: "wise-1"
           api_key: "token-123"

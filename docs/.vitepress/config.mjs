@@ -303,6 +303,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                                     {text: "Elasticsearch", link: "/ingestion/elasticsearch"},
                                     {text: "ESPN", link: "/ingestion/espn"},
                                     {text: "Facebook", link: "/ingestion/facebook-ads"},
+                                    {text: "FastSpring", link: "/ingestion/fastspring"},
                                     {text: "Fireflies", link: "/ingestion/fireflies"},
                                     {text: "Fluxx", link: "/ingestion/fluxx"},
                                     {text: "football-data.org", link: "/ingestion/footballdata"},
