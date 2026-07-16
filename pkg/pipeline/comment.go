@@ -87,6 +87,22 @@ func isEmbeddedYamlComment(file afero.File, prefixes []string) bool {
 	return false
 }
 
+// isIndentationYAMLError reports whether a go-yaml error message corresponds to
+// one of the scanner errors that are typically the result of bad indentation.
+func isIndentationYAMLError(msg string) bool {
+	for _, s := range []string{
+		"could not find expected ':'",
+		"did not find expected key",
+		"mapping values are not allowed in this context",
+		"found character that cannot start any token",
+	} {
+		if strings.Contains(msg, s) {
+			return true
+		}
+	}
+	return false
+}
+
 func commentedYamlToTask(file afero.File, filePath string) (*Asset, error) {
 	rows, commentRowEnd := readUntilComments(file, possiblePrefixesForCommentBlocks, possibleSuffixesForCommentBlocks)
 	if strings.TrimSpace(rows) == "" {
@@ -98,9 +114,10 @@ func commentedYamlToTask(file afero.File, filePath string) (*Asset, error) {
 		yamlErr := new(path.YamlParseError)
 		if errors.As(err, &yamlErr) {
 			msg := "invalid YAML in the embedded @bruin configuration block: " + err.Error()
-			// Scanner/syntax errors (unlike type-mismatch "unmarshal errors") are
-			// almost always caused by indentation, so add a targeted hint for them.
-			if !strings.Contains(err.Error(), "unmarshal errors") {
+			// Only the scanner errors that are typically caused by indentation get
+			// the indentation hint; other YAML errors (type mismatches, duplicate
+			// keys, stray document separators, ...) get the wrapper without it.
+			if isIndentationYAMLError(err.Error()) {
 				msg += ". This is often caused by incorrect indentation — for example a multi-line 'query:' whose lines are not all indented past the key"
 			}
 			return nil, &ParseError{msg}

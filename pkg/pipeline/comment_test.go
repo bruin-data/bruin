@@ -418,6 +418,19 @@ func TestCreateTaskFromFileComments_invalidEmbeddedYAML(t *testing.T) {
 	assert.Contains(t, msg, "yaml: line 6:")
 }
 
+func TestCreateTaskFromFileComments_nonIndentationYAMLErrorSkipsHint(t *testing.T) {
+	t.Parallel()
+
+	_, err := pipeline.CreateTaskFromFileComments(afero.NewOsFs())("testdata/comments/failembeddedyamldupkey.sql")
+	require.Error(t, err)
+
+	msg := err.Error()
+	// A duplicate key isn't an indentation problem, so it still gets the general
+	// wrapper but must NOT get the (misleading) indentation hint.
+	assert.Contains(t, msg, "invalid YAML in the embedded @bruin configuration block")
+	assert.NotContains(t, msg, "indentation")
+}
+
 func BenchmarkCreateTaskFromFileComments(b *testing.B) {
 	b.ReportAllocs()
 
