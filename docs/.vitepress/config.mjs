@@ -114,6 +114,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                     {text: "Getting Started", link: "/cloud/getting-started"},
                     {text: "Projects", link: "/cloud/projects"},
                     {text: "Connections", link: "/cloud/connections"},
+                    {text: "Databricks OAuth", link: "/cloud/databricks-oauth"},
                     {text: "Pipelines", link: "/cloud/pipelines"},
                     {text: "Runs", link: "/cloud/runs"},
                     {text: "Backfills", link: "/cloud/backfills"},
