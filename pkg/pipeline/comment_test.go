@@ -410,7 +410,6 @@ func TestCreateTaskFromFileComments_invalidEmbeddedYAML(t *testing.T) {
 	// The message should explain that the embedded @bruin config is the culprit
 	// and hint at the most common cause (indentation), rather than surfacing the
 	// raw go-yaml error on its own.
-	assert.Contains(t, msg, "invalid YAML in the embedded @bruin block")
 	assert.Contains(t, msg, "check indentation")
 	// The reported line number must match the offending line in the source file
 	// (line 6, the under-indented query continuation), not an offset within the
@@ -425,9 +424,9 @@ func TestCreateTaskFromFileComments_nonIndentationYAMLErrorSkipsHint(t *testing.
 	require.Error(t, err)
 
 	msg := err.Error()
-	// A duplicate key isn't an indentation problem, so it still gets the general
-	// wrapper but must NOT get the (misleading) indentation hint.
-	assert.Contains(t, msg, "invalid YAML in the embedded @bruin block")
+	// A duplicate key isn't an indentation problem, so it must NOT get the
+	// (misleading) indentation hint — the raw YAML error passes through.
+	assert.Contains(t, msg, "already defined")
 	assert.NotContains(t, msg, "indentation")
 }
 

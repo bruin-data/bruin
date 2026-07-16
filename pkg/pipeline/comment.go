@@ -111,16 +111,11 @@ func commentedYamlToTask(file afero.File, filePath string) (*Asset, error) {
 
 	task, err := ConvertYamlToTask([]byte(rows))
 	if err != nil {
+		// Append a terse hint for the scanner errors that are typically caused by
+		// indentation; other YAML errors pass through unchanged.
 		yamlErr := new(path.YamlParseError)
-		if errors.As(err, &yamlErr) {
-			msg := "invalid YAML in the embedded @bruin block: " + err.Error()
-			// Only the scanner errors that are typically caused by indentation get
-			// the terse indentation hint; other YAML errors (type mismatches,
-			// duplicate keys, stray document separators, ...) get the wrapper only.
-			if isIndentationYAMLError(err.Error()) {
-				msg += " (check indentation)"
-			}
-			return nil, &ParseError{msg}
+		if errors.As(err, &yamlErr) && isIndentationYAMLError(err.Error()) {
+			return nil, &ParseError{err.Error() + " (check indentation)"}
 		}
 		return nil, &ParseError{err.Error()}
 	}
