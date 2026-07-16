@@ -85,20 +85,77 @@ This is the column of the table that will be used for incremental updates of the
 
 ### `materialization > incremental_predicate`
 
-Additional plain SQL added to the match condition of a `merge` materialization. This is useful for limiting the destination partitions scanned by warehouses such as BigQuery. The generated merge exposes the new data and the destination table as the `source` and `target` aliases.
+An additional boolean SQL expression added to the match condition of a `merge` materialization. It limits the destination rows considered for a match and can reduce the number of destination partitions scanned by warehouses such as BigQuery.
 
-```yaml
+The generated merge exposes two aliases:
+
+| Alias | Refers to |
+| --- | --- |
+| `source` | The rows returned by the asset query for the current run. |
+| `target` | The existing rows in the destination table named by the asset. |
+
+The predicate may reference either alias. Provide only the expression, without a leading `WHERE` or `AND` and without a trailing semicolon.
+
+The following BigQuery asset reads seven days from its source and restricts matching to the same seven days in the partitioned destination table:
+
+```bruin-sql
+/* @bruin
+
+name: analytics.events
+type: bq.sql
+
 materialization:
   type: table
   strategy: merge
-  incremental_predicate: target.event_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)
+  partition_by: event_date
+  incremental_predicate: target.event_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY) # [!code focus]
+
+columns:
+  - name: event_id
+    type: integer
+    primary_key: true
+  - name: event_date
+    type: date
+  - name: payload
+    type: string
+    update_on_merge: true
+
+@bruin */
+
+SELECT event_id, event_date, payload
+FROM raw.events
+WHERE event_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY) -- [!code focus]
 ```
+
+Bruin adds the predicate to the primary-key comparison in the generated merge. The relevant part is equivalent to:
+
+```sql
+MERGE analytics.events AS target -- [!code focus]
+USING (
+  SELECT event_id, event_date, payload
+  FROM raw.events
+  WHERE event_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)
+) AS source -- [!code focus]
+ON (
+  (source.event_id = target.event_id OR (source.event_id IS NULL AND target.event_id IS NULL))
+  AND (target.event_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)) -- [!code focus]
+)
+WHEN MATCHED THEN
+  UPDATE SET target.payload = source.payload
+WHEN NOT MATCHED THEN
+  INSERT (event_id, event_date, payload)
+  VALUES (source.event_id, source.event_date, source.payload);
+```
+
+`incremental_predicate` does not filter the asset query. Filter the asset query separately when source processing should use the same or a narrower window.
+
+This pattern can significantly reduce cost and execution work when the destination is large and partitioned. In one BigQuery benchmark, merging a 5,000-row source into a 1.8-million-row destination processed 1.92 GB without the predicate and 10.5 MB with the seven-day destination predicate shown above. That was a 99.45% reduction in bytes processed (a factor-of-183 reduction), with 98.91% fewer billed bytes and 93.88% less slot usage. Actual savings depend on the destination size, partitioning, and the selected window.
 
 - **Type:** `String`
 - **Default:** `""`
 - **Supported platforms:** BigQuery, Athena, Databricks, Doris, DuckDB, MSSQL, MySQL, Oracle, PostgreSQL, Snowflake, Synapse, and Vertica. It is not supported for Redshift (whose `MERGE` only accepts equality predicates in its match condition), Ingestr assets, or Python assets.
 
-The predicate is database-specific SQL and is inserted without validation. It must cover every existing destination row that could match the source data. If a matching primary key exists outside the predicate, the merge treats the source row as new and may insert a duplicate.
+The predicate is database-specific SQL and is inserted without validation. It must include every destination row that could match the source data. If a primary key already exists outside the predicate, that row cannot match and the merge may insert a duplicate. Account for late-arriving data and the full period in which existing rows can change when choosing the destination window.
 
 ## Strategies
 
