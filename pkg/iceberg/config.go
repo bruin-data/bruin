@@ -130,11 +130,11 @@ func icebergCatalogURI(cat config.IcebergCatalog) (string, url.Values, error) {
 		}
 		return "iceberg+hadoop://" + ensureLeadingSlash(cat.Path), q, nil
 	case config.IcebergCatalogSQL:
-		// Advanced SQL catalog; the connection string comes from the sensitive
-		// uri field (or, for other params, the properties passthrough).
-		if cat.URI != "" {
-			q.Set("uri", cat.URI)
+		// Advanced SQL catalog; the connection string comes from the sensitive uri field.
+		if cat.URI == "" {
+			return "", nil, fmt.Errorf("iceberg: sql catalog requires %q (catalog connection string)", "uri")
 		}
+		q.Set("uri", cat.URI)
 		return "iceberg+sql://", q, nil
 	case "":
 		return "", nil, fmt.Errorf("iceberg: catalog.type must be provided (supported: %s)", supportedCatalogList())

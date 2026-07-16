@@ -10,7 +10,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const testAWSRegion = "us-east-1"
+const (
+	testAWSRegion = "us-east-1"
+	testS3Path    = "s3://b/p"
+)
 
 func parseQuery(t *testing.T, raw string) (string, url.Values) {
 	t.Helper()
@@ -167,7 +170,7 @@ func TestConfig_GetIngestrURI_HadoopAndHive(t *testing.T) {
 
 	hadoop := Config{
 		Catalog: config.IcebergCatalog{Type: config.IcebergCatalogHadoop, Path: "/tmp/warehouse"},
-		Storage: config.IcebergStorage{Type: config.IcebergStorageS3, Path: "s3://b/p"},
+		Storage: config.IcebergStorage{Type: config.IcebergStorageS3, Path: testS3Path},
 	}
 	got, err := hadoop.GetIngestrURI()
 	require.NoError(t, err)
@@ -175,7 +178,7 @@ func TestConfig_GetIngestrURI_HadoopAndHive(t *testing.T) {
 
 	hive := Config{
 		Catalog: config.IcebergCatalog{Type: config.IcebergCatalogHive, Host: "metastore", Port: 9083},
-		Storage: config.IcebergStorage{Type: config.IcebergStorageS3, Path: "s3://b/p"},
+		Storage: config.IcebergStorage{Type: config.IcebergStorageS3, Path: testS3Path},
 	}
 	got, err = hive.GetIngestrURI()
 	require.NoError(t, err)
@@ -187,7 +190,7 @@ func TestConfig_GetIngestrURI_SQLCatalogViaProperties(t *testing.T) {
 
 	c := Config{
 		Catalog: config.IcebergCatalog{Type: config.IcebergCatalogSQL, URI: "postgresql://u:p@h:5432/db"},
-		Storage: config.IcebergStorage{Type: config.IcebergStorageS3, Path: "s3://b/p"},
+		Storage: config.IcebergStorage{Type: config.IcebergStorageS3, Path: testS3Path},
 	}
 	got, err := c.GetIngestrURI()
 	require.NoError(t, err)
@@ -270,6 +273,14 @@ func TestConfig_GetIngestrURI_Errors(t *testing.T) {
 			wantErr: "sqlite catalog requires",
 		},
 		{
+			name: "sql requires uri",
+			config: Config{
+				Catalog: config.IcebergCatalog{Type: config.IcebergCatalogSQL},
+				Storage: config.IcebergStorage{Type: config.IcebergStorageS3, Path: testS3Path},
+			},
+			wantErr: "sql catalog requires",
+		},
+		{
 			name: "missing storage type",
 			config: Config{
 				Catalog: config.IcebergCatalog{Type: config.IcebergCatalogGlue},
@@ -288,7 +299,7 @@ func TestConfig_GetIngestrURI_Errors(t *testing.T) {
 			name: "path and bucket are mutually exclusive",
 			config: Config{
 				Catalog: config.IcebergCatalog{Type: config.IcebergCatalogGlue},
-				Storage: config.IcebergStorage{Type: config.IcebergStorageS3, Path: "s3://b/p", Bucket: "b"},
+				Storage: config.IcebergStorage{Type: config.IcebergStorageS3, Path: testS3Path, Bucket: "b"},
 			},
 			wantErr: `set either "path"`,
 		},
