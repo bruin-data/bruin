@@ -266,6 +266,53 @@ func TestClient_SelectWithSchema(t *testing.T) {
 			},
 		},
 		{
+			name:  "test ClickHouse-specific result statement uses query",
+			query: "KILL QUERY WHERE query_id = 'test-query' TEST",
+			expected: &query.QueryResult{
+				Columns:     []string{"kill_status"},
+				Rows:        [][]interface{}{{"finished"}},
+				ColumnTypes: []string{"String"},
+			},
+			setupMock: func(conn *MockConn) {
+				rows := MockRows{
+					index: new(int),
+					rows:  [][]any{{"finished"}},
+					types: []MockColumnType{{ColumnName: "kill_status", TypeName: "String"}},
+				}
+
+				conn.On("Query", mock.Anything, "KILL QUERY WHERE query_id = 'test-query' TEST").Return(rows, nil)
+			},
+		},
+		{
+			name:  "test insert uses exec and returns execution summary",
+			query: "INSERT INTO bug_test_seed (event_date, row_id, amount) VALUES (toDate('2026-07-16'), 'row_7', 77)",
+			expected: &query.QueryResult{
+				Columns:     []string{},
+				Rows:        [][]interface{}{},
+				ColumnTypes: []string{},
+				Execution:   query.NewExecutionSummaryFromStatement("clickhouse", "INSERT", nil),
+			},
+			setupMock: func(conn *MockConn) {
+				conn.On(
+					"Exec",
+					mock.Anything,
+					"INSERT INTO bug_test_seed (event_date, row_id, amount) VALUES (toDate('2026-07-16'), 'row_7', 77)",
+				).Return(nil)
+			},
+		},
+		{
+			name:    "test insert execution error",
+			query:   "INSERT INTO bug_test_seed (row_id) VALUES ('row_7')",
+			wantErr: "failed to execute query: execution error",
+			setupMock: func(conn *MockConn) {
+				conn.On(
+					"Exec",
+					mock.Anything,
+					"INSERT INTO bug_test_seed (row_id) VALUES ('row_7')",
+				).Return(errors.New("execution error"))
+			},
+		},
+		{
 			name:    "test select errors with schema",
 			query:   "SELECT * FROM table",
 			wantErr: "failed to execute query: Some error", // Updated error message
@@ -314,6 +361,31 @@ func TestClient_SelectWithSchema(t *testing.T) {
 			if tt.expected != nil {
 				assert.Equal(t, tt.expected.Columns, result.Columns, "Column names do not match")
 			}
+		})
+	}
+}
+
+func TestShouldUseExec(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		sql  string
+		want bool
+	}{
+		{name: "insert", sql: "INSERT INTO events VALUES (1)", want: true},
+		{name: "insert into returning table", sql: "INSERT INTO returning VALUES (1)", want: true},
+		{name: "insert into returning column", sql: "INSERT INTO events (returning) VALUES (1)", want: true},
+		{name: "create", sql: "CREATE TABLE events (id UInt64) ENGINE = Memory", want: true},
+		{name: "select", sql: "SELECT * FROM events", want: false},
+		{name: "watch", sql: "WATCH events", want: false},
+		{name: "kill query test", sql: "KILL QUERY WHERE query_id = 'test-query' TEST", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, shouldUseExec(tt.sql))
 		})
 	}
 }

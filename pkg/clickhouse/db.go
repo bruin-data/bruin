@@ -79,8 +79,16 @@ func (c *Client) GetIngestrURI() (string, error) {
 }
 
 // Select runs a query and returns the results.
-func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{}, error) {
-	rows, err := c.connection.Query(ctx, query.String())
+func (c *Client) Select(ctx context.Context, q *query.Query) ([][]interface{}, error) {
+	sql := q.String()
+	if shouldUseExec(sql) {
+		if err := c.connection.Exec(ctx, sql); err != nil {
+			return nil, err
+		}
+		return [][]interface{}{}, nil
+	}
+
+	rows, err := c.connection.Query(ctx, sql)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +110,21 @@ func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 }
 
 func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {
-	rows, err := c.connection.Query(ctx, queryObj.String())
+	sql := queryObj.String()
+	if shouldUseExec(sql) {
+		if err := c.connection.Exec(ctx, sql); err != nil {
+			return nil, errors.Wrap(err, "failed to execute query")
+		}
+
+		return &query.QueryResult{
+			Columns:     []string{},
+			Rows:        [][]interface{}{},
+			ColumnTypes: []string{},
+			Execution:   query.NewExecutionSummaryFromStatement("clickhouse", query.SQLStatementType(sql), nil),
+		}, nil
+	}
+
+	rows, err := c.connection.Query(ctx, sql)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to execute query")
 	}
@@ -136,6 +158,19 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 		ColumnTypes: columnTypes,
 		Rows:        collectedRows,
 	}, nil
+}
+
+// shouldUseExec deliberately recognizes only statement families known not to
+// return rows. ClickHouse also has result-producing statements such as WATCH
+// and KILL QUERY, so treating every unknown statement as non-result would
+// silently discard valid results.
+func shouldUseExec(sql string) bool {
+	switch query.FirstSQLKeyword(sql) {
+	case "ALTER", "ATTACH", "CREATE", "DELETE", "DETACH", "DROP", "GRANT", "INSERT", "OPTIMIZE", "RENAME", "REVOKE", "SET", "SYSTEM", "TRUNCATE", "UPDATE", "USE":
+		return true
+	default:
+		return false
+	}
 }
 
 // Test runs a simple query (SELECT 1) to validate the connection.
