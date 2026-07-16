@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/bruincloud"
@@ -3381,6 +3382,10 @@ func cloudScheduledAgentsCreate() *cli.Command {
 			}
 			fields["agent_id"] = c.Int("agent-id")
 
+			if id, ok := messagePairIDFromEnv(); ok {
+				fields["message_pair_id"] = id
+			}
+
 			client, err := newCloudClient(c)
 			if err != nil {
 				printError(err, output, "Failed to create API client")
@@ -3469,6 +3474,19 @@ func scheduledAgentPlanFlags() []cli.Flag {
 		&cli.StringFlag{Name: "state", Usage: "the full plan as a JSON or YAML object string"},
 		&cli.StringFlag{Name: "state-file", Usage: "path to a file with the full plan as JSON or YAML"},
 	}
+}
+
+// messagePairIDFromEnv reads BRUIN_MESSAGE_PAIR_ID; false when unset or non-numeric.
+func messagePairIDFromEnv() (int, bool) {
+	v := strings.TrimSpace(os.Getenv("BRUIN_MESSAGE_PAIR_ID"))
+	if v == "" {
+		return 0, false
+	}
+	id, err := strconv.Atoi(v)
+	if err != nil {
+		return 0, false
+	}
+	return id, true
 }
 
 // buildScheduledAgentFields assembles the request body from an optional full plan
