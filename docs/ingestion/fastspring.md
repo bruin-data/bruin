@@ -53,10 +53,10 @@ parameters:
 | accounts | id | | replace | Customer accounts, including contact details and address. |
 | products | id | | replace | Products in your catalog, including pricing and fulfillment settings. |
 | coupons | id | | replace | Coupons and their discount configuration. |
-| subscription_report | subscription_id, transaction_date | sync_date | merge | Subscription metrics (MRR, ARR, subscribers, churn) grouped by the fields you choose. |
-| revenue_report | order_id, transaction_date | syncdate | merge | Revenue metrics grouped by the fields you choose. |
+| subscription_report | subscription_id, transaction_date (default) | sync_date | merge | Subscription metrics (MRR, ARR, subscribers, churn) grouped by the fields you choose. |
+| revenue_report | order_id, transaction_date (default) | syncdate | merge | Revenue metrics grouped by the fields you choose. |
 
-`orders` and `subscriptions` support incremental date-range loads (the run's date interval filters records to that window). The `subscription_report` and `revenue_report` tables have configurable columns and grouping — see [Reports](#reports) below.
+`orders` and `subscriptions` support incremental date-range loads: the run's date interval — set with `--start-date` / `--end-date` (see [run](/commands/run)) — filters records to that window. The `subscription_report` and `revenue_report` tables have configurable columns and grouping — see [Reports](#reports) below.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 
