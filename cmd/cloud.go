@@ -3476,14 +3476,14 @@ func scheduledAgentPlanFlags() []cli.Flag {
 	}
 }
 
-// messagePairIDFromEnv reads BRUIN_MESSAGE_PAIR_ID; false when unset or non-numeric.
+// messagePairIDFromEnv reads BRUIN_MESSAGE_PAIR_ID; false when unset, non-numeric or non-positive.
 func messagePairIDFromEnv() (int, bool) {
 	v := strings.TrimSpace(os.Getenv("BRUIN_MESSAGE_PAIR_ID"))
 	if v == "" {
 		return 0, false
 	}
 	id, err := strconv.Atoi(v)
-	if err != nil {
+	if err != nil || id <= 0 {
 		return 0, false
 	}
 	return id, true

@@ -277,6 +277,14 @@ func TestMessagePairIDFromEnv(t *testing.T) {
 		_, ok := messagePairIDFromEnv()
 		assert.False(t, ok)
 	})
+
+	t.Run("skips zero and negative values", func(t *testing.T) {
+		for _, v := range []string{"0", "-5"} {
+			t.Setenv("BRUIN_MESSAGE_PAIR_ID", v)
+			_, ok := messagePairIDFromEnv()
+			assert.Falsef(t, ok, "value %q should be skipped", v)
+		}
+	})
 }
 
 func TestParseDashboardState(t *testing.T) {
