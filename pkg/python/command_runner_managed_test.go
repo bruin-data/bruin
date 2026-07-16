@@ -13,9 +13,9 @@ import (
 )
 
 // TestCommandRunner_ManagedCommandStopsOnCancel verifies that a managed command
-// is tied to the run context and reaped when it is cancelled, rather than running
-// to completion detached. A non-managed command uses context.Background() and
-// would not stop, so this exercises the streaming teardown path specifically.
+// is tied to the run context and reaped when it is cancelled. Managed commands
+// use graceful streaming teardown rather than the immediate cancellation used
+// by one-shot commands.
 func TestCommandRunner_ManagedCommandStopsOnCancel(t *testing.T) {
 	t.Parallel()
 

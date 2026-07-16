@@ -2,6 +2,7 @@
 -- @bruin.description: some description goes here
 -- @bruin.type: bq.sql
 -- @bruin.retries: 5
+-- @bruin.timeout: 1h30m
 -- @bruin.depends: task1, task2
 -- @bruin.depends: task3,task4
 -- @bruin.depends: task5, task3

@@ -3362,7 +3362,8 @@ func cloudScheduledAgentsCreate() *cli.Command {
 	return &cli.Command{
 		Name:  "create",
 		Usage: "Create a scheduled agent from a plan (stored as an inactive draft; activation stays in the UI)",
-		Flags: append(scheduledAgentPlanFlags(),
+		Flags: append(
+			scheduledAgentPlanFlags(),
 			&cli.IntFlag{
 				Name:     "agent-id",
 				Usage:    "the agent that runs the scheduled task",
@@ -3408,7 +3409,8 @@ func cloudScheduledAgentsUpdate() *cli.Command {
 	return &cli.Command{
 		Name:  "update",
 		Usage: "Update a scheduled agent's title or plan (activation stays in the UI)",
-		Flags: append(scheduledAgentPlanFlags(),
+		Flags: append(
+			scheduledAgentPlanFlags(),
 			&cli.IntFlag{
 				Name:     "scheduled-agent-id",
 				Usage:    "scheduled agent ID",

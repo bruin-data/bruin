@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -20,6 +21,20 @@ type (
 
 type Sequential struct {
 	TaskTypeMap map[pipeline.AssetType]Config
+}
+
+// AssetTimeoutError reports that an asset exceeded its configured timeout.
+type AssetTimeoutError struct {
+	AssetName string
+	Timeout   time.Duration
+}
+
+func (e *AssetTimeoutError) Error() string {
+	return fmt.Sprintf("asset %q timed out after %s", e.AssetName, e.Timeout)
+}
+
+func (e *AssetTimeoutError) Unwrap() error {
+	return context.DeadlineExceeded
 }
 
 func (s Sequential) RunSingleTask(ctx context.Context, instance scheduler.TaskInstance) error {
@@ -45,5 +60,21 @@ func (s Sequential) RunSingleTask(ctx context.Context, instance scheduler.TaskIn
 		return errors.New("there is no executor configured for the asset class: " + instance.GetType().String())
 	}
 
-	return executor.Run(ctx, instance)
+	if task.Timeout == 0 {
+		return executor.Run(ctx, instance)
+	}
+
+	timeoutErr := &AssetTimeoutError{
+		AssetName: task.Name,
+		Timeout:   task.Timeout.Duration(),
+	}
+	timeoutCtx, cancel := context.WithTimeoutCause(ctx, timeoutErr.Timeout, timeoutErr)
+	defer cancel()
+
+	err := executor.Run(timeoutCtx, instance)
+	if errors.Is(context.Cause(timeoutCtx), timeoutErr) {
+		return timeoutErr
+	}
+
+	return err
 }

@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -408,6 +409,34 @@ routing:
 `)))
 	require.NoError(t, err)
 	require.Equal(t, &pipeline.RoutingConfig{EgressGateway: "wg-shared-ams3"}, task.Routing)
+}
+
+func TestConvertYamlToTask_Timeout(t *testing.T) {
+	t.Parallel()
+
+	task, err := pipeline.ConvertYamlToTask([]byte(strings.TrimSpace(`
+name: dataset.asset
+type: python
+timeout: 1h30m
+`)))
+	require.NoError(t, err)
+	require.Equal(t, 90*time.Minute, task.Timeout.Duration())
+
+	content, err := task.FormatContent()
+	require.NoError(t, err)
+	require.Contains(t, string(content), "timeout: 1h30m")
+}
+
+func TestConvertYamlToTask_InvalidTimeout(t *testing.T) {
+	t.Parallel()
+
+	_, err := pipeline.ConvertYamlToTask([]byte(strings.TrimSpace(`
+name: dataset.asset
+type: python
+timeout: ninety minutes
+`)))
+	require.Error(t, err)
+	require.ErrorContains(t, err, "cannot unmarshal")
 }
 
 func TestConvertYamlToTask_Enabled(t *testing.T) {

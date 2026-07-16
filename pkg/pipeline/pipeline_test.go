@@ -2372,6 +2372,30 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 			},
 		},
 		{
+			name:  "should set timeout from pipeline defaults",
+			asset: &pipeline.Asset{Name: "test-asset"},
+			foundPipeline: &pipeline.Pipeline{
+				DefaultValues: &pipeline.DefaultValues{Timeout: pipeline.DurationSeconds(2 * time.Hour)},
+			},
+			want: &pipeline.Asset{
+				Name:       "test-asset",
+				Parameters: pipeline.ParameterMap{},
+				Timeout:    pipeline.DurationSeconds(2 * time.Hour),
+			},
+		},
+		{
+			name:  "should not override existing timeout",
+			asset: &pipeline.Asset{Name: "test-asset", Timeout: pipeline.DurationSeconds(30 * time.Minute)},
+			foundPipeline: &pipeline.Pipeline{
+				DefaultValues: &pipeline.DefaultValues{Timeout: pipeline.DurationSeconds(2 * time.Hour)},
+			},
+			want: &pipeline.Asset{
+				Name:       "test-asset",
+				Parameters: pipeline.ParameterMap{},
+				Timeout:    pipeline.DurationSeconds(30 * time.Minute),
+			},
+		},
+		{
 			name: "should apply default hooks when missing",
 			asset: &pipeline.Asset{
 				Name: "test-asset",
@@ -3360,6 +3384,20 @@ default:
 	require.NoError(t, err)
 	require.NotNil(t, p.DefaultValues)
 	assert.Equal(t, &pipeline.RoutingConfig{EgressGateway: "wg-shared-ams3"}, p.DefaultValues.Routing)
+}
+
+func TestPipeline_UnmarshalDefaultTimeout(t *testing.T) {
+	t.Parallel()
+
+	var p pipeline.Pipeline
+	err := yaml.Unmarshal([]byte(`
+name: timeout-pipeline
+default:
+  timeout: 2h45m
+`), &p)
+	require.NoError(t, err)
+	require.NotNil(t, p.DefaultValues)
+	assert.Equal(t, 2*time.Hour+45*time.Minute, p.DefaultValues.Timeout.Duration())
 }
 
 func TestAsset_FormatContent_DeduplicatesTags(t *testing.T) {

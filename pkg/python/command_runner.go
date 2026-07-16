@@ -42,18 +42,12 @@ func (l *CommandRunner) Run(ctx context.Context, repo *git.Repo, command *Comman
 		strings.Join(command.Args, " "),
 	)
 
-	// One-shot commands are deliberately detached from the run context (they are
-	// short-lived and reaped by cmd.Wait). A managed command is a long-running
-	// stream that must stop when the run context is cancelled, so it is tied to
-	// ctx and given process-group teardown.
-	cmdCtx := context.Background() //nolint:contextcheck // one-shot commands are intentionally detached; managed commands use ctx below
-	if command.Managed {
-		cmdCtx = ctx
-	}
-	cmd := exec.CommandContext(cmdCtx, command.Name, command.Args...) //nolint:gosec
+	cmd := exec.CommandContext(ctx, command.Name, command.Args...) //nolint:gosec
 	cmd.Dir = repo.Path
 	if command.Managed {
 		configureManagedCmd(cmd)
+	} else {
+		configureCommandCancellation(cmd)
 	}
 
 	// Build environment: start with parent environment to inherit PATH, CC, CFLAGS, etc.

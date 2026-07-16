@@ -2,9 +2,11 @@ package executor
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"testing"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -83,6 +85,35 @@ func TestConcurrent_Start(t *testing.T) {
 	assert.Len(t, results, len(p.Assets))
 
 	mockOperator.AssertExpectations(t)
+}
+
+func TestConcurrent_StartTimesOutAsset(t *testing.T) {
+	t.Parallel()
+
+	asset := &pipeline.Asset{
+		Name:    "dataset.slow_asset",
+		Type:    "test",
+		Timeout: pipeline.DurationSeconds(25 * time.Millisecond),
+	}
+	p := &pipeline.Pipeline{Assets: []*pipeline.Asset{asset}}
+	logger := zap.NewNop().Sugar()
+	s := scheduler.NewScheduler(logger, p, "test")
+	operator := operatorFunc(func(ctx context.Context, _ scheduler.TaskInstance) error {
+		<-ctx.Done()
+		return nil
+	})
+	ex, err := NewConcurrent(logger, map[pipeline.AssetType]Config{
+		"test": {scheduler.TaskInstanceTypeMain: operator},
+	}, 1, FormattingOptions{MinimalLogs: true})
+	require.NoError(t, err)
+	ex.Start(t.Context(), s.WorkQueue, s.Results)
+
+	results := s.Run(t.Context())
+
+	require.Len(t, results, 1)
+	var timeoutErr *AssetTimeoutError
+	require.ErrorAs(t, results[0].Error, &timeoutErr)
+	require.Equal(t, scheduler.Failed, results[0].Instance.GetStatus())
 }
 
 func TestWorkerWriter_Write(t *testing.T) {
