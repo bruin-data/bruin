@@ -29,7 +29,7 @@ These set the default state of the checkboxes in an asset's run options:
 ### Query preview
 
 - **Preview Selected Query** (`bruin.query.previewSelectedQuery.enabled`): show the "Preview selected query" CodeLens when you select text in a SQL file. On by default.
-- **Query Timeout** (`bruin.query.timeout`): timeout in seconds for query execution. Defaults to `1000`.
+- **Query Timeout** (`bruin.query.timeout`): how long a query preview may run, in **seconds**, before it's cancelled. Defaults to `1000` — deliberately generous so large queries aren't cut off; lower it if you'd rather fail fast.
 
 ### Validation
 
