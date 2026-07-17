@@ -291,3 +291,65 @@ func TestNewTableSensorgNoQueries(t *testing.T) {
 
 	assert.ErrorContains(t, err, "no queries extracted from table exists query")
 }
+
+func TestQuerySensorAddsAnnotations(t *testing.T) {
+	t.Parallel()
+
+	mockConn := &MockConnectionGetter{}
+	mockDB := &MockSensorDB{}
+	mockExtractor := &MockQueryExtractor{}
+	p := &pipeline.Pipeline{Name: "sensor_pipeline"}
+	asset := &pipeline.Asset{
+		Name: "query_sensor_asset",
+		Type: pipeline.AssetTypeDatabricksQuerySensor,
+		Parameters: pipeline.ParameterMap{
+			"query": "SELECT 1",
+		},
+	}
+	expectedQuery := &query.Query{
+		Query:       "-- @bruin.config: {\"asset\":\"query_sensor_asset\",\"pipeline\":\"sensor_pipeline\",\"sensor_type\":\"query\",\"type\":\"sensor\"}\nSELECT 1",
+		Annotations: map[string]string{"asset": "query_sensor_asset", "pipeline": "sensor_pipeline", "sensor_type": "query", "type": "sensor"},
+	}
+
+	mockExtractor.On("CloneForAsset", mock.Anything, p, asset).Return(mockExtractor, nil)
+	mockExtractor.On("ExtractQueriesFromString", "SELECT 1").Return([]*query.Query{{Query: "SELECT 1"}}, nil)
+	mockConn.On("GetConnection", "databricks-default").Return(mockDB)
+	mockDB.On("Select", mock.Anything, expectedQuery).Return([][]interface{}{{int64(1)}}, nil).Once()
+
+	ctx := context.WithValue(t.Context(), pipeline.RunConfigQueryAnnotations, DefaultQueryAnnotations)
+	err := NewQuerySensor(mockConn, mockExtractor, "once").RunTask(ctx, p, asset)
+
+	require.NoError(t, err)
+	mockDB.AssertExpectations(t)
+}
+
+func TestTableSensorAddsAnnotations(t *testing.T) {
+	t.Parallel()
+
+	mockConn := &MockConnectionGetter{}
+	mockDB := &MockTableExistsChecker{}
+	mockExtractor := &MockQueryExtractor{}
+	p := &pipeline.Pipeline{Name: "sensor_pipeline"}
+	asset := &pipeline.Asset{
+		Name: "table_sensor_asset",
+		Type: pipeline.AssetTypeDatabricksTableSensor,
+		Parameters: pipeline.ParameterMap{
+			"table": "catalog.schema.table",
+		},
+	}
+	expectedQuery := &query.Query{
+		Query:       "-- @bruin.config: {\"asset\":\"table_sensor_asset\",\"pipeline\":\"sensor_pipeline\",\"sensor_type\":\"table\",\"type\":\"sensor\"}\nSELECT 1",
+		Annotations: map[string]string{"asset": "table_sensor_asset", "pipeline": "sensor_pipeline", "sensor_type": "table", "type": "sensor"},
+	}
+
+	mockConn.On("GetConnection", "databricks-default").Return(mockDB)
+	mockDB.On("BuildTableExistsQuery", "catalog.schema.table").Return("SELECT 1", nil)
+	mockExtractor.On("ExtractQueriesFromString", "SELECT 1").Return([]*query.Query{{Query: "SELECT 1"}}, nil)
+	mockDB.On("Select", mock.Anything, expectedQuery).Return([][]interface{}{{int64(1)}}, nil).Once()
+
+	ctx := context.WithValue(t.Context(), pipeline.RunConfigQueryAnnotations, DefaultQueryAnnotations)
+	err := NewTableSensor(mockConn, "once", mockExtractor).RunTask(ctx, p, asset)
+
+	require.NoError(t, err)
+	mockDB.AssertExpectations(t)
+}

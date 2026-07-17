@@ -12,6 +12,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/tablename"
 	_ "github.com/databricks/databricks-sql-go"
+	"github.com/databricks/databricks-sql-go/driverctx"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -61,12 +62,20 @@ func (db *DB) RunQueryWithoutResult(ctx context.Context, query *query.Query) err
 	return err
 }
 
+func withNativeQueryTags(ctx context.Context, queryObj *query.Query) context.Context {
+	if len(queryObj.Annotations) == 0 {
+		return ctx
+	}
+	return driverctx.NewContextWithQueryTags(ctx, queryObj.Annotations)
+}
+
 func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, error) {
 	if err := db.ensureConnection(); err != nil {
 		return nil, err
 	}
 
 	queryString := query.String()
+	ctx = withNativeQueryTags(ctx, query)
 	rows, err := db.conn.QueryContext(ctx, queryString)
 	if err == nil {
 		err = rows.Err()
@@ -116,6 +125,7 @@ func (db *DB) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*que
 	}
 
 	queryString := queryObj.String()
+	ctx = withNativeQueryTags(ctx, queryObj)
 	rows, err := db.conn.QueryContext(ctx, queryString)
 	if err != nil {
 		errorMessage := err.Error()
@@ -182,8 +192,28 @@ func (db *DB) Ping(ctx context.Context) error {
 	return nil
 }
 
-func (db *DB) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
-	return db.schemaCreator.CreateSchemaIfNotExist(ctx, db, asset)
+type annotatedSchemaQueryRunner struct {
+	db           *DB
+	assetName    string
+	pipelineName string
+}
+
+func (r *annotatedSchemaQueryRunner) RunQueryWithoutResult(ctx context.Context, q *query.Query) error {
+	annotatedQuery, err := ansisql.AddAnnotationComment(ctx, q, r.assetName, "schema", r.pipelineName)
+	if err != nil {
+		return errors.Wrap(err, "failed to add schema annotation comment")
+	}
+
+	return r.db.RunQueryWithoutResult(ctx, annotatedQuery)
+}
+
+func (db *DB) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset, pipelineName string) error {
+	runner := &annotatedSchemaQueryRunner{
+		db:           db,
+		assetName:    asset.Name,
+		pipelineName: pipelineName,
+	}
+	return db.schemaCreator.CreateSchemaIfNotExist(ctx, runner, asset)
 }
 
 func (db *DB) GetIngestrURI() (string, error) {

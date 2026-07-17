@@ -79,12 +79,54 @@ func TestAddAnnotationComment(t *testing.T) {
 					assert.Contains(t, resultQuery.Query, `"pipeline":"test-pipeline"`)
 					assert.Contains(t, resultQuery.Query, `"project":"test"`)
 					assert.Contains(t, resultQuery.Query, "SELECT * FROM table")
+					assert.Equal(t, map[string]string{
+						"asset":    "test-asset",
+						"pipeline": "test-pipeline",
+						"project":  "test",
+						"type":     "main",
+					}, resultQuery.Annotations)
 				} else {
 					assert.Equal(t, tt.expected, resultQuery.Query)
 				}
 			}
 		})
 	}
+}
+
+func TestAddAnnotationJSONComment(t *testing.T) {
+	t.Parallel()
+
+	original := &query.Query{
+		Query:               "SELECT * FROM orders WHERE id = ?",
+		Args:                []any{42},
+		VariableDefinitions: []string{"SET value = 1"},
+	}
+	annotationJSON := `{"asset":"orders","attempt":9007199254740993,"enabled":true,"labels":["daily","critical"],"metadata":{"owner":"data"}}`
+
+	annotated, err := AddAnnotationJSONComment(original, annotationJSON)
+
+	require.NoError(t, err)
+	assert.Equal(t, "-- @bruin.config: "+annotationJSON+"\n"+original.Query, annotated.Query)
+	assert.Equal(t, original.Args, annotated.Args)
+	assert.Equal(t, original.VariableDefinitions, annotated.VariableDefinitions)
+	assert.Equal(t, map[string]string{
+		"asset":    "orders",
+		"attempt":  "9007199254740993",
+		"enabled":  "true",
+		"labels":   `["daily","critical"]`,
+		"metadata": `{"owner":"data"}`,
+	}, annotated.Annotations)
+	assert.Equal(t, "SELECT * FROM orders WHERE id = ?", original.Query)
+	assert.Nil(t, original.Annotations)
+}
+
+func TestAddAnnotationJSONComment_InvalidJSON(t *testing.T) {
+	t.Parallel()
+
+	annotated, err := AddAnnotationJSONComment(&query.Query{Query: "SELECT 1"}, `{"asset"`)
+
+	require.Error(t, err)
+	assert.Nil(t, annotated)
 }
 
 func TestBuildAnnotationJSON(t *testing.T) {

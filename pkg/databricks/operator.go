@@ -24,7 +24,7 @@ type Client interface {
 	Select(ctx context.Context, query *query.Query) ([][]interface{}, error)
 	SelectWithSchema(ctx context.Context, query *query.Query) (*query.QueryResult, error)
 	Ping(ctx context.Context) error
-	CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error
+	CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset, pipelineName string) error
 }
 
 type devEnv interface {
@@ -57,6 +57,7 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 }
 
 func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) error {
+	ctx = query.WithQueryType(ctx, query.QueryTypeMain)
 	extractor, err := o.extractor.CloneForAsset(ctx, p, t)
 	if err != nil {
 		return errors.Wrapf(err, "failed to clone extractor for asset %s", t.Name)
@@ -107,7 +108,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	}
 
 	if t.Materialization.Type != pipeline.MaterializationTypeNone {
-		err = conn.CreateSchemaIfNotExist(ctx, t)
+		err = conn.CreateSchemaIfNotExist(ctx, t, p.Name)
 		if err != nil {
 			return err
 		}
@@ -123,9 +124,14 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 			}
 		}
 
-		ansisql.LogQueryIfVerbose(ctx, writer, q.Query)
+		annotatedQuery, err := ansisql.AddAnnotationComment(ctx, q, t.Name, "main", p.Name)
+		if err != nil {
+			return err
+		}
 
-		err = conn.RunQueryWithoutResult(ctx, q)
+		ansisql.LogQueryIfVerbose(ctx, writer, annotatedQuery.Query)
+
+		err = conn.RunQueryWithoutResult(ctx, annotatedQuery)
 		if err != nil {
 			return err
 		}
