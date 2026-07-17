@@ -16,6 +16,7 @@ connections:
       host: "some-clickhouse-host.somedomain.com"
       port: 9440
       database: "dev" # Default database for direct ClickHouse assets and unqualified seeds.
+      http_port: 8443 # Optional; used only for ingestr and defaults to 8443.
       secure: 1 # Set to 1 for ClickHouse Cloud or another TLS connection.
 ```
 
@@ -224,7 +225,7 @@ Create a view to determine the top 10 earning drivers in a taxi company:
 name: highest_earning_drivers
 type: clickhouse.sql
 materialization:
-    type: view
+  type: view
 @bruin */
 
 SELECT 
@@ -243,7 +244,7 @@ View Top 5 Customers by Spending:
 name: top_five_customers
 type: clickhouse.sql
 materialization:
-    type: view
+  type: view
 @bruin */
 
 SELECT 
