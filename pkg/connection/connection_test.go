@@ -465,6 +465,7 @@ func Test_AddSharePointConnectionFromConfig(t *testing.T) {
 		Site:               "sites/Example",
 		Library:            "Documents",
 		MaxFiles:           &maxFiles,
+		DownloadTimeout:    "30m",
 	}
 
 	err := m.AddSharePointConnectionFromConfig(configuration)
@@ -478,6 +479,7 @@ func Test_AddSharePointConnectionFromConfig(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, uri, "sharepoint://?")
 	assert.Contains(t, uri, "max_files=0")
+	assert.Contains(t, uri, "download_timeout=30m")
 	assert.Equal(t, configuration, m.GetConnectionDetails("test"))
 }
 

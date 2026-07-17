@@ -1292,6 +1292,7 @@ type SharePointConnection struct {
 	Library            string `yaml:"library,omitempty" json:"library,omitempty" mapstructure:"library"`
 	MaxFileSize        *int64 `yaml:"max_file_size,omitempty" json:"max_file_size,omitempty" mapstructure:"max_file_size"`
 	MaxFiles           *int64 `yaml:"max_files,omitempty" json:"max_files,omitempty" mapstructure:"max_files"`
+	DownloadTimeout    string `yaml:"download_timeout,omitempty" json:"download_timeout,omitempty" mapstructure:"download_timeout"`
 }
 
 func (c SharePointConnection) GetName() string {
