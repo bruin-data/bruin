@@ -19,6 +19,28 @@ This tab provides a comprehensive view of your asset, allowing you to manage key
 
 ![Bruin Side Panel](../../../public/vscode-extension/panels/side-panel/asset-details-tab-new.gif)
 
+### Running the asset
+
+From the General tab you can run or validate the asset without switching to the terminal:
+
+- **Run / Validate**: Run or validate the current asset (or the whole pipeline for a `pipeline.yml`).
+- **Run with downstream**: Also run the assets that depend on this one (`--downstream`).
+- **Options**: An options menu with:
+  - **Full Refresh**: Rebuild the asset from scratch (`--full-refresh`).
+  - **Interval Modifiers**, **Exclusive End Date**, **Push Metadata**, **Apply Sensor Mode**: Toggles for the matching run flags. Their defaults are configurable — see [Configuration](/vscode-extension/configuration).
+  - **Tag filters**: Include or exclude assets by tag when running a pipeline.
+  - **Continue**: Resume a pipeline run from where it last failed (`--continue`).
+- **Variant**: Pick a pipeline variant when the pipeline defines them.
+
+### Backfill
+
+Backfill re-runs an asset over a range of past dates, split into chunks:
+
+- **Granularity**: Split the date range by hour, day, week, or month.
+- **Stop on failure**: Stop the backfill if one of the chunks fails.
+- Sensors are skipped automatically during a backfill so it never blocks waiting on one.
+- Backfill runs are grouped in the [Run History](/vscode-extension/panels/run-history) panel as expandable rows.
+
 ## 2. Columns
 
 - Lists the columns associated with the asset.
