@@ -144,7 +144,7 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) ([]string, erro
 			asset.Materialization.IncrementalKey,
 			startVar,
 			endVar),
-		fmt.Sprintf(`INSERT INTO %s %s`,
+		fmt.Sprintf(`INSERT INTO %s SETTINGS insert_deduplicate = 0 %s`,
 			asset.Name, query),
 	}
 
