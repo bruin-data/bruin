@@ -307,8 +307,8 @@ Bruin merges the custom JSON with fields that identify the execution step. The s
 | Main asset statement | `asset`, `pipeline`, `type: main` |
 | Automatic Databricks schema/catalog setup | `asset`, `pipeline`, `type: schema` |
 | Query or table sensor probe | `asset`, `pipeline`, `type: sensor`, `sensor_type: query\|table` |
-| Column quality check | `asset`, `pipeline`, `type: column_check`, `column_name`, `column_check_type` |
-| Custom quality check | `asset`, `pipeline`, `type: custom_check`, `custom_check_name` |
+| Column quality check | `asset`, `asset_name`, `pipeline`, `type: column_check`, `column_name`, `column_check_type` |
+| Custom quality check | `asset`, `asset_name`, `pipeline`, `type: custom_check`, `custom_check_name` |
 
 Annotations are applied to every rendered statement in a multi-statement asset, including materialization and hook statements. User-provided fields override standard fields with the same name.
 
