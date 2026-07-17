@@ -32,8 +32,8 @@ const (
         <tcp_port>9181</tcp_port>
         <server_id>1</server_id>
         <heart_beat_interval_ms>0</heart_beat_interval_ms>
-        <election_timeout_lower_bound_ms>0</election_timeout_lower_bound_ms>
-        <election_timeout_upper_bound_ms>0</election_timeout_upper_bound_ms>
+        <election_timeout_lower_bound_ms>100</election_timeout_lower_bound_ms>
+        <election_timeout_upper_bound_ms>200</election_timeout_upper_bound_ms>
         <raft_configuration>
             <server>
                 <id>1</id>
