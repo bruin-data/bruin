@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -20,11 +21,34 @@ import (
 )
 
 const (
-	clickHouseImage    = "clickhouse/clickhouse-server:26.2"
-	clickHouseUser     = "default"
-	clickHousePassword = "password"
-	clickHouseDatabase = "default"
-	connectionName     = "clickhouse-default"
+	clickHouseImage              = "clickhouse/clickhouse-server:26.2"
+	clickHouseDeduplicationImage = "clickhouse/clickhouse-server:25.8"
+	clickHouseUser               = "default"
+	clickHousePassword           = "password"
+	clickHouseDatabase           = "default"
+	connectionName               = "clickhouse-default"
+	clickHouseKeeperConfig       = `<clickhouse>
+    <keeper_server>
+        <tcp_port>9181</tcp_port>
+        <server_id>1</server_id>
+        <heart_beat_interval_ms>0</heart_beat_interval_ms>
+        <election_timeout_lower_bound_ms>0</election_timeout_lower_bound_ms>
+        <election_timeout_upper_bound_ms>0</election_timeout_upper_bound_ms>
+        <raft_configuration>
+            <server>
+                <id>1</id>
+                <hostname>localhost</hostname>
+                <port>9234</port>
+            </server>
+        </raft_configuration>
+    </keeper_server>
+    <zookeeper>
+        <node>
+            <host>127.0.0.1</host>
+            <port>9181</port>
+        </node>
+    </zookeeper>
+</clickhouse>`
 )
 
 // TestQueryInsertDoesNotReportEOF protects the regression from
@@ -91,18 +115,97 @@ func TestQueryInsertDoesNotReportEOF(t *testing.T) {
 	require.Equal(t, "row_1", rows[0][0])
 }
 
+// TestTimeIntervalRerunKeepsRows protects the regression from
+// https://github.com/bruin-data/bruin/issues/2396. ClickHouse's insert
+// deduplication must not treat a time-interval refresh as a retry of the
+// previous refresh after Bruin has deleted that interval.
+func TestTimeIntervalRerunKeepsRows(t *testing.T) {
+	// This ReplicatedMergeTree version reproduces SharedMergeTree's behavior:
+	// the lightweight delete does not prevent the replacement block from being
+	// deduplicated on an identical interval rerun.
+	host, port := startClickHouseWithKeeper(t, clickHouseDeduplicationImage)
+	configPath := writeClickHouseConfig(t, host, port)
+	binary := bruinBinary(t)
+
+	runBruinQuery(t, binary, configPath,
+		"CREATE TABLE bug_test_seed (event_date Date, row_id String, amount Int32) ENGINE = MergeTree ORDER BY row_id",
+	)
+	runBruinQuery(t, binary, configPath,
+		"CREATE TABLE bug_test_incremental (event_date Date, row_id String, amount Int32) ENGINE = ReplicatedMergeTree('/clickhouse/tables/bug_test_incremental', 'replica1') ORDER BY row_id",
+	)
+	runBruinQuery(t, binary, configPath,
+		"INSERT INTO bug_test_seed (event_date, row_id, amount) VALUES (toDate('2026-07-16'), 'row_7', 77)",
+	)
+
+	assetPath := writeTimeIntervalPipeline(t)
+	for range 2 {
+		runBruin(t, binary, configPath,
+			"run",
+			"--env", "default",
+			"--start-date", "2026-07-16",
+			"--end-date", "2026-07-16",
+			assetPath,
+		)
+	}
+
+	client, err := clickhouse.NewClient(&clickhouse.Config{
+		Username: clickHouseUser,
+		Password: clickHousePassword,
+		Host:     host,
+		Port:     port,
+		Database: clickHouseDatabase,
+	})
+	require.NoError(t, err)
+
+	rows, err := client.Select(t.Context(), &query.Query{
+		Query: "SELECT row_id, amount FROM bug_test_incremental WHERE event_date = toDate('2026-07-16')",
+	})
+	require.NoError(t, err)
+	require.Equal(t, [][]interface{}{{"row_7", int32(77)}}, rows)
+
+	require.NoError(t, client.RunQueryWithoutResult(t.Context(), &query.Query{Query: "SYSTEM FLUSH LOGS"}))
+	rows, err = client.Select(t.Context(), &query.Query{
+		Query: `SELECT count()
+FROM system.query_log
+WHERE type = 'QueryFinish'
+  AND position(query, 'INSERT INTO bug_test_incremental SETTINGS insert_deduplicate = 0') > 0`,
+	})
+	require.NoError(t, err)
+	require.Equal(t, [][]interface{}{{uint64(2)}}, rows)
+}
+
 func startClickHouse(t *testing.T) (string, int) {
 	t.Helper()
-	testcontainers.SkipIfProviderIsNotHealthy(t)
 
 	image := os.Getenv("CLICKHOUSE_TEST_IMAGE")
 	if image == "" {
 		image = clickHouseImage
 	}
+	return startClickHouseContainer(t, image, false)
+}
+
+func startClickHouseWithKeeper(t *testing.T, image string) (string, int) {
+	t.Helper()
+	return startClickHouseContainer(t, image, true)
+}
+
+func startClickHouseContainer(t *testing.T, image string, withKeeper bool) (string, int) {
+	t.Helper()
+	testcontainers.SkipIfProviderIsNotHealthy(t)
+
+	var files []testcontainers.ContainerFile
+	if withKeeper {
+		files = append(files, testcontainers.ContainerFile{
+			Reader:            strings.NewReader(clickHouseKeeperConfig),
+			ContainerFilePath: "/etc/clickhouse-server/config.d/keeper.xml",
+			FileMode:          0o644,
+		})
+	}
 
 	container, err := testcontainers.GenericContainer(t.Context(), testcontainers.GenericContainerRequest{
 		ContainerRequest: testcontainers.ContainerRequest{
 			Image: image,
+			Files: files,
 			Env: map[string]string{
 				"CLICKHOUSE_DB":                        clickHouseDatabase,
 				"CLICKHOUSE_USER":                      clickHouseUser,
@@ -130,6 +233,19 @@ func startClickHouse(t *testing.T) (string, int) {
 	require.NoError(t, err)
 	port, err := strconv.Atoi(mappedPort.Port())
 	require.NoError(t, err)
+
+	client, err := clickhouse.NewClient(&clickhouse.Config{
+		Username: clickHouseUser,
+		Password: clickHousePassword,
+		Host:     host,
+		Port:     port,
+		Database: clickHouseDatabase,
+	})
+	require.NoError(t, err)
+	require.Eventually(t, func() bool {
+		_, err := client.Select(t.Context(), &query.Query{Query: "SELECT 1"})
+		return err == nil
+	}, 30*time.Second, 500*time.Millisecond, "ClickHouse did not become query-ready")
 
 	return host, port
 }
@@ -175,6 +291,56 @@ func bruinBinary(t *testing.T) string {
 	binary := filepath.Join(repositoryRoot, "bin", executable)
 	require.FileExists(t, binary)
 	return binary
+}
+
+func writeTimeIntervalPipeline(t *testing.T) string {
+	t.Helper()
+
+	pipelineDir, err := os.MkdirTemp(".", "time-interval-pipeline-")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.RemoveAll(pipelineDir))
+	})
+	pipelineDir, err = filepath.Abs(pipelineDir)
+	require.NoError(t, err)
+	assetsDir := filepath.Join(pipelineDir, "assets")
+	require.NoError(t, os.MkdirAll(assetsDir, 0o755))
+
+	pipelineYAML := `name: clickhouse-time-interval-test
+default_connections:
+  clickhouse: clickhouse-default
+`
+	require.NoError(t, os.WriteFile(filepath.Join(pipelineDir, "pipeline.yml"), []byte(pipelineYAML), 0o600))
+
+	assetSQL := `/* @bruin
+name: bug_test_incremental
+type: clickhouse.sql
+materialization:
+  type: table
+  strategy: time_interval
+  incremental_key: event_date
+  time_granularity: date
+@bruin */
+
+SELECT event_date, row_id, amount
+FROM bug_test_seed
+WHERE event_date BETWEEN toDate('{{start_date}}') AND toDate('{{end_date}}')
+`
+	assetPath := filepath.Join(assetsDir, "bug_test_incremental.sql")
+	require.NoError(t, os.WriteFile(assetPath, []byte(assetSQL), 0o600))
+	return assetPath
+}
+
+func runBruin(t *testing.T, binary, configPath string, args ...string) string {
+	t.Helper()
+
+	commandArgs := []string{args[0], "--config-file", configPath}
+	commandArgs = append(commandArgs, args[1:]...)
+	cmd := exec.CommandContext(t.Context(), binary, commandArgs...)
+	cmd.Env = append(os.Environ(), "DISABLE_TELEMETRY=true", "INGESTR_DISABLE_TELEMETRY=true")
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err, "bruin %s failed:\n%s", commandArgs[0], output)
+	return string(output)
 }
 
 func runBruinQuery(t *testing.T, binary, configPath, sql string) string {
