@@ -258,6 +258,35 @@ func TestCloudScheduledAgentsCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "update")
 }
 
+func TestMessagePairIDFromEnv(t *testing.T) {
+	t.Run("reads a numeric value", func(t *testing.T) {
+		t.Setenv("BRUIN_MESSAGE_PAIR_ID", " 42 ")
+		id, ok := messagePairIDFromEnv()
+		require.True(t, ok)
+		assert.Equal(t, 42, id)
+	})
+
+	t.Run("skips when unset", func(t *testing.T) {
+		t.Setenv("BRUIN_MESSAGE_PAIR_ID", "")
+		_, ok := messagePairIDFromEnv()
+		assert.False(t, ok)
+	})
+
+	t.Run("skips a non-numeric value", func(t *testing.T) {
+		t.Setenv("BRUIN_MESSAGE_PAIR_ID", "abc")
+		_, ok := messagePairIDFromEnv()
+		assert.False(t, ok)
+	})
+
+	t.Run("skips zero and negative values", func(t *testing.T) {
+		for _, v := range []string{"0", "-5"} {
+			t.Setenv("BRUIN_MESSAGE_PAIR_ID", v)
+			_, ok := messagePairIDFromEnv()
+			assert.Falsef(t, ok, "value %q should be skipped", v)
+		}
+	})
+}
+
 func TestParseDashboardState(t *testing.T) {
 	t.Parallel()
 
