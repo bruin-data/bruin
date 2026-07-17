@@ -123,6 +123,48 @@ GROUP BY driver_id
 ORDER BY average_rating DESC;
 ```
 
+#### Merge materialization
+
+ClickHouse has no `MERGE INTO` statement, so Bruin implements the `merge` strategy with a delete+insert pattern keyed on the asset's primary key column(s):
+
+- the query result is staged in a temporary table
+- rows in the target whose primary key matches a staged row are deleted
+- the staged rows are inserted into the target
+- the temporary table is dropped
+
+This upserts rows by primary key: existing rows are replaced and new rows are added, while untouched rows remain. The optional `incremental_predicate` is appended to the delete condition to scope which target rows are considered for replacement.
+
+Merge assets must declare `columns` and at least one `primary_key` column. Composite primary keys are supported. On a full refresh, Bruin falls back to `create+replace` (creating the table from the query result) so the target exists for subsequent incremental merges.
+
+Here's a sample asset with `merge` materialization:
+
+```bruin-sql
+/* @bruin
+name: dashboard.drivers_summary
+type: clickhouse.sql
+
+materialization:
+    type: table
+    strategy: merge
+
+columns:
+  - name: driver_id
+    type: integer
+    primary_key: true
+  - name: total_earnings
+    type: float
+  - name: average_rating
+    type: float
+@bruin */
+
+SELECT
+    driver_id,
+    SUM(fare_amount) AS total_earnings,
+    AVG(rating) AS average_rating
+FROM trips
+GROUP BY driver_id;
+```
+
 ### `clickhouse.sensor.table`
 
 Sensors are a special type of assets that are used to wait on certain external signals.
