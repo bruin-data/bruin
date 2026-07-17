@@ -49,17 +49,17 @@ func TestBuildBatchConfig_Autotuning(t *testing.T) {
 
 	// no autotuning params: nothing set
 	req := newJob(&JobRunParams{}).buildBatchConfig(ws)
-	assert.Empty(t, req.Batch.RuntimeConfig.Cohort)
-	assert.Nil(t, req.Batch.RuntimeConfig.AutotuningConfig)
+	assert.Empty(t, req.GetBatch().GetRuntimeConfig().GetCohort())
+	assert.Nil(t, req.GetBatch().GetRuntimeConfig().GetAutotuningConfig())
 
 	// autotuning without explicit cohort: cohort derived from pipeline + asset
 	req = newJob(&JobRunParams{
 		AutotuningScenarios: []dataprocpb.AutotuningConfig_Scenario{dataprocpb.AutotuningConfig_AUTO},
 	}).buildBatchConfig(ws)
-	assert.Equal(t, "my-pipeline-my-asset-staging", req.Batch.RuntimeConfig.Cohort)
+	assert.Equal(t, "my-pipeline-my-asset-staging", req.GetBatch().GetRuntimeConfig().GetCohort())
 	assert.Equal(t,
 		[]dataprocpb.AutotuningConfig_Scenario{dataprocpb.AutotuningConfig_AUTO},
-		req.Batch.RuntimeConfig.AutotuningConfig.Scenarios,
+		req.GetBatch().GetRuntimeConfig().GetAutotuningConfig().GetScenarios(),
 	)
 
 	// explicit cohort wins
@@ -67,12 +67,12 @@ func TestBuildBatchConfig_Autotuning(t *testing.T) {
 		Cohort:              "custom-cohort",
 		AutotuningScenarios: []dataprocpb.AutotuningConfig_Scenario{dataprocpb.AutotuningConfig_SCALING},
 	}).buildBatchConfig(ws)
-	assert.Equal(t, "custom-cohort", req.Batch.RuntimeConfig.Cohort)
+	assert.Equal(t, "custom-cohort", req.GetBatch().GetRuntimeConfig().GetCohort())
 
 	// cohort without autotuning is allowed
 	req = newJob(&JobRunParams{Cohort: "just-cohort"}).buildBatchConfig(ws)
-	assert.Equal(t, "just-cohort", req.Batch.RuntimeConfig.Cohort)
-	assert.Nil(t, req.Batch.RuntimeConfig.AutotuningConfig)
+	assert.Equal(t, "just-cohort", req.GetBatch().GetRuntimeConfig().GetCohort())
+	assert.Nil(t, req.GetBatch().GetRuntimeConfig().GetAutotuningConfig())
 }
 
 func TestDefaultCohort(t *testing.T) {
