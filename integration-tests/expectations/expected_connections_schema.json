@@ -4359,6 +4359,9 @@
         },
         "max_files": {
           "type": "integer"
+        },
+        "download_timeout": {
+          "type": "string"
         }
       },
       "additionalProperties": false,

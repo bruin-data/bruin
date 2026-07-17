@@ -931,6 +931,7 @@ func TestLoadFromFile(t *testing.T) {
 					Library:            "Documents",
 					MaxFileSize:        &sharePointMaxFileSize,
 					MaxFiles:           &sharePointMaxFiles,
+					DownloadTimeout:    "30m",
 				},
 			},
 			APIFootball: []APIFootballConnection{
@@ -1671,12 +1672,13 @@ func TestConfig_AddConnection(t *testing.T) {
 			connType: "sharepoint",
 			connName: "sharepoint-conn",
 			creds: map[string]interface{}{
-				"tenant_id":     "tenant-id",
-				"client_id":     "client-id",
-				"client_secret": "client-secret",
-				"hostname":      "example.sharepoint.com",
-				"site":          "sites/Example",
-				"library":       "Documents",
+				"tenant_id":        "tenant-id",
+				"client_id":        "client-id",
+				"client_secret":    "client-secret",
+				"hostname":         "example.sharepoint.com",
+				"site":             "sites/Example",
+				"library":          "Documents",
+				"download_timeout": "30m",
 			},
 			expectedErr: false,
 		},
@@ -1782,6 +1784,7 @@ func TestConfig_AddConnection(t *testing.T) {
 					assert.Equal(t, tt.creds["hostname"], env.Connections.SharePoint[0].Hostname)
 					assert.Equal(t, tt.creds["site"], env.Connections.SharePoint[0].Site)
 					assert.Equal(t, tt.creds["library"], env.Connections.SharePoint[0].Library)
+					assert.Equal(t, tt.creds["download_timeout"], env.Connections.SharePoint[0].DownloadTimeout)
 				}
 			}
 		})

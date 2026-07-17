@@ -6,17 +6,19 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Config struct {
-	TenantID     string
-	ClientID     string
-	ClientSecret string
-	Hostname     string
-	Site         string
-	Library      string
-	MaxFileSize  *int64
-	MaxFiles     *int64
+	TenantID        string
+	ClientID        string
+	ClientSecret    string
+	Hostname        string
+	Site            string
+	Library         string
+	MaxFileSize     *int64
+	MaxFiles        *int64
+	DownloadTimeout string
 }
 
 func (c Config) GetIngestrURI() (string, error) {
@@ -59,6 +61,14 @@ func (c Config) GetIngestrURI() (string, error) {
 			return "", errors.New("sharepoint: max_files cannot be negative")
 		}
 		params.Set("max_files", strconv.FormatInt(*c.MaxFiles, 10))
+	}
+
+	if downloadTimeout := strings.TrimSpace(c.DownloadTimeout); downloadTimeout != "" {
+		duration, err := time.ParseDuration(downloadTimeout)
+		if err != nil || duration < 0 {
+			return "", fmt.Errorf("sharepoint: invalid download_timeout %q: must be a non-negative Go duration such as 30m or 600s", downloadTimeout)
+		}
+		params.Set("download_timeout", downloadTimeout)
 	}
 
 	return "sharepoint://?" + params.Encode(), nil

@@ -13,14 +13,15 @@ func TestConfig_GetIngestrURI(t *testing.T) {
 	maxFileSize := int64(1048576)
 	maxFiles := int64(0)
 	cfg := Config{
-		TenantID:     "tenant-id",
-		ClientID:     "client-id",
-		ClientSecret: "secret with spaces",
-		Hostname:     "example.sharepoint.com",
-		Site:         "sites/Example",
-		Library:      "Shared Documents",
-		MaxFileSize:  &maxFileSize,
-		MaxFiles:     &maxFiles,
+		TenantID:        "tenant-id",
+		ClientID:        "client-id",
+		ClientSecret:    "secret with spaces",
+		Hostname:        "example.sharepoint.com",
+		Site:            "sites/Example",
+		Library:         "Shared Documents",
+		MaxFileSize:     &maxFileSize,
+		MaxFiles:        &maxFiles,
+		DownloadTimeout: "30m",
 	}
 
 	uri, err := cfg.GetIngestrURI()
@@ -40,6 +41,7 @@ func TestConfig_GetIngestrURI(t *testing.T) {
 	require.Equal(t, "Shared Documents", query.Get("library"))
 	require.Equal(t, "1048576", query.Get("max_file_size"))
 	require.Equal(t, "0", query.Get("max_files"))
+	require.Equal(t, "30m", query.Get("download_timeout"))
 }
 
 func TestConfig_GetIngestrURI_RequiresCredentials(t *testing.T) {
@@ -64,6 +66,29 @@ func TestConfig_GetIngestrURI_RejectsNegativeLimits(t *testing.T) {
 
 	_, err := cfg.GetIngestrURI()
 	require.ErrorContains(t, err, "max_files cannot be negative")
+}
+
+func TestConfig_GetIngestrURI_RejectsInvalidDownloadTimeout(t *testing.T) {
+	t.Parallel()
+
+	tests := []string{"invalid", "-5m"}
+	for _, downloadTimeout := range tests {
+		t.Run(downloadTimeout, func(t *testing.T) {
+			t.Parallel()
+
+			cfg := Config{
+				TenantID:        "tenant-id",
+				ClientID:        "client-id",
+				ClientSecret:    "secret",
+				Hostname:        "example.sharepoint.com",
+				Site:            "sites/Example",
+				DownloadTimeout: downloadTimeout,
+			}
+
+			_, err := cfg.GetIngestrURI()
+			require.ErrorContains(t, err, "invalid download_timeout")
+		})
+	}
 }
 
 func TestClient_GetIngestrURI(t *testing.T) {

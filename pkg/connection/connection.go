@@ -901,14 +901,15 @@ func (m *Manager) AddSharePointConnectionFromConfig(connection *config.SharePoin
 	m.mutex.Unlock()
 
 	client, err := sharepoint.NewClient(sharepoint.Config{
-		TenantID:     connection.TenantID,
-		ClientID:     connection.ClientID,
-		ClientSecret: connection.ClientSecret,
-		Hostname:     connection.Hostname,
-		Site:         connection.Site,
-		Library:      connection.Library,
-		MaxFileSize:  connection.MaxFileSize,
-		MaxFiles:     connection.MaxFiles,
+		TenantID:        connection.TenantID,
+		ClientID:        connection.ClientID,
+		ClientSecret:    connection.ClientSecret,
+		Hostname:        connection.Hostname,
+		Site:            connection.Site,
+		Library:         connection.Library,
+		MaxFileSize:     connection.MaxFileSize,
+		MaxFiles:        connection.MaxFiles,
+		DownloadTimeout: connection.DownloadTimeout,
 	})
 	if err != nil {
 		return err
