@@ -44,8 +44,12 @@ Run Bruin CLI commands directly from the extension:
 
 ## 5. Explore the Bruin Panels
 
-The Bruin extension provides two main panels :
+The Bruin extension provides several panels:
 
-- **Side Panel**: Displays the current asset’s details with tabs for viewing asset information, columns, and settings.
+- **Side Panel**: Displays the current asset’s details with tabs for asset information, columns, details, custom checks, and settings.
 - **Lineage Panel**: Found at the bottom of VS Code, near the terminal, this panel shows the asset lineage, giving you a visual overview of how the asset connects to other assets.
-- **Query Preview Panel**: Found near the `Lineage` panel, this panel allows you to preview query results directly within VS Code. When running a query, results will be displayed in this panel, enabling quick debugging and verification without switching to an external database tool.
+- **Query Preview Panel**: Found near the `Lineage` panel, it lets you preview query results directly within VS Code — handy for quick debugging without switching to an external database tool.
+- **Table Diff Panel**: Compare two tables side by side to spot differences.
+- **Run History Panel**: Review the history of your Bruin runs.
+
+See the [Panels Overview](/vscode-extension/panel-overview) for details.
