@@ -41,6 +41,14 @@ Backfill re-runs an asset over a range of past dates, split into chunks:
 - Sensors are skipped automatically during a backfill so it never blocks waiting on one.
 - Backfill runs are grouped in the [Run History](/vscode-extension/panels/run-history) panel as expandable rows.
 
+### Variable overrides
+
+If your pipeline defines [variables](/variables/overview), you can override their values for a run without editing the pipeline file:
+
+- Open the **Variables** section in the General tab to see the pipeline's variables and their default values.
+- Enter a new value for any variable you want to override, and leave the rest as they are.
+- Turn on the **Variable overrides** checkbox in the run options to apply your overrides to the next run.
+
 ## 2. Columns
 
 - Lists the columns associated with the asset.
