@@ -137,7 +137,7 @@ func buildMergeQuery(task *pipeline.Asset, query string) ([]string, error) {
 	}
 
 	queries := []string{
-		fmt.Sprintf("CREATE TABLE %s PRIMARY KEY (%s) AS %s", tempTableName, keys, query),
+		fmt.Sprintf("CREATE TABLE %s ENGINE = MergeTree() PRIMARY KEY (%s) AS %s", tempTableName, keys, query),
 		fmt.Sprintf("DELETE FROM %s WHERE %s", task.Name, deleteCondition),
 		fmt.Sprintf("INSERT INTO %s SETTINGS insert_deduplicate = 0 SELECT * FROM %s", task.Name, tempTableName),
 		"DROP TABLE IF EXISTS " + tempTableName,
