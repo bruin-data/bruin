@@ -264,7 +264,11 @@ func Query() *cli.Command {
 						// Snowflake strips leading SQL comments, so use QUERY_TAG instead.
 						timeoutCtx = gosnowflake.WithQueryTag(timeoutCtx, tag)
 					} else {
-						q.Query = "-- @bruin.config: " + tag + "\n" + q.Query
+						annotatedQuery, err := ansisql.AddAnnotationJSONComment(&q, tag)
+						if err != nil {
+							return handleError(c.String("output"), err)
+						}
+						q = *annotatedQuery
 					}
 				}
 

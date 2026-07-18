@@ -15,6 +15,7 @@ type Query struct {
 	VariableDefinitions []string
 	Query               string
 	Args                []any
+	Annotations         map[string]string `json:"-"`
 }
 
 type QueryResult struct {
