@@ -39,6 +39,7 @@ func (o *QuerySensor) Run(ctx context.Context, ti scheduler.TaskInstance) error 
 }
 
 func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) error {
+	ctx = query.WithQueryType(ctx, query.QueryTypeSensor)
 	if o.sensorMode == "skip" {
 		return nil
 	}
@@ -54,6 +55,13 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 	qry, err := extractor.ExtractQueriesFromString(qq)
 	if err != nil {
 		return errors.Wrap(err, "failed to render query sensor query")
+	}
+	if len(qry) == 0 {
+		return errors.New("no queries extracted from query sensor query")
+	}
+	annotatedQuery, err := AddSensorAnnotationComment(ctx, qry[0], t.Name, "query", p.Name)
+	if err != nil {
+		return errors.Wrap(err, "failed to add query sensor annotation comment")
 	}
 	connName, err := p.GetConnectionNameForAsset(t)
 	if err != nil {
@@ -83,7 +91,7 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 			if querier, ok := conn.(interface {
 				Select(ctx context.Context, q *query.Query) ([][]interface{}, error)
 			}); ok {
-				res, err := querier.Select(ctx, qry[0])
+				res, err := querier.Select(ctx, annotatedQuery)
 				if err != nil {
 					if printerExists {
 						fmt.Fprintln(printer, "Error: Sensor query failed:", err)
@@ -143,6 +151,7 @@ func (ts *TableSensor) Run(ctx context.Context, ti scheduler.TaskInstance) error
 }
 
 func (ts *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) error {
+	ctx = query.WithQueryType(ctx, query.QueryTypeSensor)
 	if ts.sensorMode == "skip" {
 		return nil
 	}
@@ -182,6 +191,10 @@ func (ts *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	}
 
 	extractedQuery := extractedQueries[0]
+	annotatedQuery, err := AddSensorAnnotationComment(ctx, extractedQuery, t.Name, "table", p.Name)
+	if err != nil {
+		return errors.Wrap(err, "failed to add table sensor annotation comment")
+	}
 
 	printer, printerExists := ctx.Value(executor.KeyPrinter).(io.Writer)
 	if printerExists {
@@ -199,7 +212,7 @@ func (ts *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 			return errors.Errorf("Sensor timed out after %s", sensorTimeout)
 
 		default:
-			res, err := tableChecker.Select(ctx, extractedQuery)
+			res, err := tableChecker.Select(ctx, annotatedQuery)
 			if err != nil {
 				if printerExists {
 					fmt.Fprintln(printer, "Error: Sensor query failed:", err)

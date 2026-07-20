@@ -63,7 +63,7 @@ table td:first-child {
 | `--timeout` | int | `604800` | Timeout for the entire pipeline run in seconds. |
 | `--var` | []str | - | Override pipeline [variables](/variables/overview) with custom values. |
 | `--variant` | str | - | Materialize the named [variant](/pipelines/variants) of a variant-bearing pipeline. Required when the pipeline declares variants. |
-| `--query-annotations` | str | - | Add annotations to SQL queries as comments. Use `default` to add asset name, pipeline name, and execution step, or provide custom JSON for additional fields. |
+| `--query-annotations` | str | - | Attach annotations to SQL queries for tracking. Use `default` to add asset name, pipeline name, and execution step, or provide custom JSON for additional fields. |
 | `--backfill-id` | str | - | Tag this run as part of a backfill group; written to the run log as `backfill_id` so related runs can be grouped. |
 | `--backfill-total` | int | `0` | Total number of chunks in this backfill; written to the run log as `backfill_total` so progress can be reported. Informational only — it does not affect scheduling or execution. |
 
@@ -299,6 +299,20 @@ Run with custom JSON annotations:
 ```bash
 bruin run path/to/your/asset.sql --query-annotations '{"environment":"prod","team":"data","version":"1.2"}'
 ```
+
+Bruin merges the custom JSON with fields that identify the execution step. The standard fields depend on the query being executed:
+
+| Execution step | Standard annotation fields |
+|----------------|----------------------------|
+| Main asset statement | `asset`, `pipeline`, `type: main` |
+| Automatic Databricks schema/catalog setup | `asset`, `pipeline`, `type: schema` |
+| Query or table sensor probe | `asset`, `pipeline`, `type: sensor`, `sensor_type: query\|table` |
+| Column quality check | `asset`, `asset_name`, `pipeline`, `type: column_check`, `column_name`, `column_check_type` |
+| Custom quality check | `asset`, `asset_name`, `pipeline`, `type: custom_check`, `custom_check_name` |
+
+Annotations are applied to every rendered statement in a multi-statement asset, including materialization and hook statements. User-provided fields override standard fields with the same name.
+
+Databricks sends the same fields as native statement-level query tags in addition to the SQL annotation comment, so they are available in Databricks query history and `system.query.history.query_tags`.
 
 ## Metadata Push
 

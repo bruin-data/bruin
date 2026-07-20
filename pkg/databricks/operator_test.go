@@ -2,13 +2,16 @@ package databricks
 
 import (
 	"context"
+	"strings"
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 type mockExtractor struct {
@@ -226,4 +229,197 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBasicOperator_QueryAnnotations_Default(t *testing.T) {
+	t.Parallel()
+
+	client := new(mockQuerierWithResult)
+	extractor := new(mockExtractor)
+	mat := new(mockMaterializer)
+
+	extractor.On("ExtractQueriesFromString", "SELECT * FROM users").
+		Return([]*query.Query{{Query: "SELECT * FROM users"}}, nil)
+	mat.On("Render", mock.Anything, "SELECT * FROM users").
+		Return([]string{"SELECT * FROM users"}, nil)
+
+	var executedQuery *query.Query
+	client.On("RunQueryWithoutResult", mock.Anything, mock.AnythingOfType("*query.Query")).
+		Run(func(args mock.Arguments) {
+			executedQuery = args.Get(1).(*query.Query)
+		}).
+		Return(nil)
+
+	conn := new(mockConnectionFetcher)
+	conn.On("GetConnection", "databricks-default").Return(client)
+
+	o := BasicOperator{
+		connection:   conn,
+		extractor:    extractor,
+		materializer: mat,
+	}
+	asset := &pipeline.Asset{
+		Name: "test_asset",
+		Type: pipeline.AssetTypeDatabricksQuery,
+		ExecutableFile: pipeline.ExecutableFile{
+			Path:    "test-file.sql",
+			Content: "SELECT * FROM users",
+		},
+	}
+	ctx := context.WithValue(t.Context(), pipeline.RunConfigQueryAnnotations, ansisql.DefaultQueryAnnotations)
+
+	err := o.RunTask(ctx, &pipeline.Pipeline{Name: "test_pipeline"}, asset)
+
+	require.NoError(t, err)
+	require.NotNil(t, executedQuery)
+	expectedComment := `-- @bruin.config: {"asset":"test_asset","pipeline":"test_pipeline","type":"main"}`
+	assert.True(t, strings.HasPrefix(executedQuery.Query, expectedComment))
+	assert.Contains(t, executedQuery.Query, "SELECT * FROM users")
+	assert.Equal(t, map[string]string{"asset": "test_asset", "pipeline": "test_pipeline", "type": "main"}, executedQuery.Annotations)
+}
+
+func TestBasicOperator_QueryAnnotations_CustomJSON(t *testing.T) {
+	t.Parallel()
+
+	client := new(mockQuerierWithResult)
+	extractor := new(mockExtractor)
+	mat := new(mockMaterializer)
+
+	extractor.On("ExtractQueriesFromString", "SELECT * FROM orders").
+		Return([]*query.Query{{Query: "SELECT * FROM orders"}}, nil)
+	mat.On("Render", mock.Anything, "SELECT * FROM orders").
+		Return([]string{"SELECT * FROM orders"}, nil)
+
+	var executedQuery *query.Query
+	client.On("RunQueryWithoutResult", mock.Anything, mock.AnythingOfType("*query.Query")).
+		Run(func(args mock.Arguments) {
+			executedQuery = args.Get(1).(*query.Query)
+		}).
+		Return(nil)
+
+	conn := new(mockConnectionFetcher)
+	conn.On("GetConnection", "databricks-default").Return(client)
+
+	o := BasicOperator{
+		connection:   conn,
+		extractor:    extractor,
+		materializer: mat,
+	}
+	asset := &pipeline.Asset{
+		Name: "orders_asset",
+		Type: pipeline.AssetTypeDatabricksQuery,
+		ExecutableFile: pipeline.ExecutableFile{
+			Path:    "orders.sql",
+			Content: "SELECT * FROM orders",
+		},
+	}
+	customAnnotations := `{"environment":"test","owner":"data_team","version":"1.0"}`
+	ctx := context.WithValue(t.Context(), pipeline.RunConfigQueryAnnotations, customAnnotations)
+
+	err := o.RunTask(ctx, &pipeline.Pipeline{Name: "orders_pipeline"}, asset)
+
+	require.NoError(t, err)
+	require.NotNil(t, executedQuery)
+	assert.True(t, strings.HasPrefix(executedQuery.Query, "-- @bruin.config:"))
+	assert.Contains(t, executedQuery.Query, `"asset":"orders_asset"`)
+	assert.Contains(t, executedQuery.Query, `"pipeline":"orders_pipeline"`)
+	assert.Contains(t, executedQuery.Query, `"type":"main"`)
+	assert.Contains(t, executedQuery.Query, `"environment":"test"`)
+	assert.Contains(t, executedQuery.Query, `"owner":"data_team"`)
+	assert.Contains(t, executedQuery.Query, `"version":"1.0"`)
+	assert.Contains(t, executedQuery.Query, "SELECT * FROM orders")
+	assert.Equal(t, map[string]string{
+		"asset":       "orders_asset",
+		"environment": "test",
+		"owner":       "data_team",
+		"pipeline":    "orders_pipeline",
+		"type":        "main",
+		"version":     "1.0",
+	}, executedQuery.Annotations)
+}
+
+func TestBasicOperator_QueryAnnotations_EachRenderedQuery(t *testing.T) {
+	t.Parallel()
+
+	client := new(mockQuerierWithResult)
+	extractor := new(mockExtractor)
+	mat := new(mockMaterializer)
+
+	extractor.On("ExtractQueriesFromString", "SELECT * FROM users").
+		Return([]*query.Query{{Query: "SELECT * FROM users"}}, nil)
+	mat.On("Render", mock.Anything, "SELECT * FROM users").
+		Return([]string{"SET spark.sql.shuffle.partitions = 8", "SELECT * FROM users"}, nil)
+
+	executedQueries := make([]*query.Query, 0, 2)
+	client.On("RunQueryWithoutResult", mock.Anything, mock.AnythingOfType("*query.Query")).
+		Run(func(args mock.Arguments) {
+			executedQueries = append(executedQueries, args.Get(1).(*query.Query))
+		}).
+		Return(nil).
+		Twice()
+
+	conn := new(mockConnectionFetcher)
+	conn.On("GetConnection", "databricks-default").Return(client)
+	o := BasicOperator{
+		connection:   conn,
+		extractor:    extractor,
+		materializer: mat,
+	}
+	asset := &pipeline.Asset{
+		Name: "test_asset",
+		Type: pipeline.AssetTypeDatabricksQuery,
+		ExecutableFile: pipeline.ExecutableFile{
+			Content: "SELECT * FROM users",
+		},
+	}
+	ctx := context.WithValue(t.Context(), pipeline.RunConfigQueryAnnotations, ansisql.DefaultQueryAnnotations)
+
+	err := o.RunTask(ctx, &pipeline.Pipeline{Name: "test_pipeline"}, asset)
+
+	require.NoError(t, err)
+	require.Len(t, executedQueries, 2)
+	for _, executedQuery := range executedQueries {
+		assert.True(t, strings.HasPrefix(executedQuery.Query, `-- @bruin.config: {"asset":"test_asset","pipeline":"test_pipeline","type":"main"}`))
+		assert.Equal(t, map[string]string{"asset": "test_asset", "pipeline": "test_pipeline", "type": "main"}, executedQuery.Annotations)
+	}
+	assert.Contains(t, executedQueries[0].Query, "SET spark.sql.shuffle.partitions = 8")
+	assert.Contains(t, executedQueries[1].Query, "SELECT * FROM users")
+}
+
+func TestBasicOperator_SetsMainQueryType(t *testing.T) {
+	t.Parallel()
+
+	client := new(mockQuerierWithResult)
+	extractor := new(mockExtractor)
+	mat := new(mockMaterializer)
+
+	extractor.On("ExtractQueriesFromString", "SELECT 1").
+		Return([]*query.Query{{Query: "SELECT 1"}}, nil)
+	mat.On("Render", mock.Anything, "SELECT 1").
+		Return([]string{"SELECT 1"}, nil)
+	client.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "SELECT 1"}).
+		Run(func(args mock.Arguments) {
+			ctx := args.Get(0).(context.Context)
+			assert.Equal(t, query.QueryTypeMain, query.QueryTypeFromContext(ctx))
+		}).
+		Return(nil)
+
+	conn := new(mockConnectionFetcher)
+	conn.On("GetConnection", "databricks-default").Return(client)
+	o := BasicOperator{
+		connection:   conn,
+		extractor:    extractor,
+		materializer: mat,
+	}
+	asset := &pipeline.Asset{
+		Type: pipeline.AssetTypeDatabricksQuery,
+		ExecutableFile: pipeline.ExecutableFile{
+			Content: "SELECT 1",
+		},
+	}
+
+	err := o.RunTask(t.Context(), &pipeline.Pipeline{}, asset)
+
+	require.NoError(t, err)
+	client.AssertExpectations(t)
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 type mockQuerierWithResult struct {
@@ -46,8 +47,8 @@ func (m *mockQuerierWithResult) Ping(ctx context.Context) error {
 	return args.Error(0)
 }
 
-func (m *mockQuerierWithResult) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
-	args := m.Called(ctx, asset)
+func (m *mockQuerierWithResult) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset, pipelineName string) error {
+	args := m.Called(ctx, asset, pipelineName)
 	return args.Error(0)
 }
 
@@ -302,4 +303,92 @@ func TestPatternCheck_Check(t *testing.T) {
 			},
 		},
 	)
+}
+
+func TestColumnCheckAddsAnnotations(t *testing.T) {
+	t.Parallel()
+
+	client := new(mockQuerierWithResult)
+	conn := new(mockConnectionFetcher)
+	conn.On("GetConnection", "test").Return(client)
+	expectedQuery := &query.Query{
+		Query: `-- @bruin.config: {"asset":"catalog.schema.asset","asset_name":"catalog.schema.asset","column_check_type":"not_null","column_name":"id","pipeline":"test_pipeline","type":"column_check"}
+SELECT count(*) FROM catalog.schema.asset WHERE id IS NULL`,
+		Annotations: map[string]string{
+			"asset":             "catalog.schema.asset",
+			"asset_name":        "catalog.schema.asset",
+			"column_check_type": "not_null",
+			"column_name":       "id",
+			"pipeline":          "test_pipeline",
+			"type":              "column_check",
+		},
+	}
+	client.On("Select", mock.Anything, expectedQuery).Return([][]interface{}{{int64(0)}}, nil).Once()
+
+	instance := &scheduler.ColumnCheckInstance{
+		AssetInstance: &scheduler.AssetInstance{
+			Asset: &pipeline.Asset{
+				Name: "catalog.schema.asset",
+				Type: pipeline.AssetTypeDatabricksQuery,
+			},
+			Pipeline: &pipeline.Pipeline{
+				Name:               "test_pipeline",
+				DefaultConnections: map[string]string{"databricks": "test"},
+			},
+		},
+		Column: &pipeline.Column{Name: "id"},
+		Check:  &pipeline.ColumnCheck{Name: "not_null"},
+	}
+	ctx := context.WithValue(t.Context(), pipeline.RunConfigQueryAnnotations, ansisql.DefaultQueryAnnotations)
+
+	err := ansisql.NewNotNullCheck(conn).Check(ctx, instance)
+
+	require.NoError(t, err)
+	assert.Equal(t, expectedQuery.Query, instance.ExecutedQuery)
+	client.AssertExpectations(t)
+}
+
+func TestCustomCheckAddsAnnotations(t *testing.T) {
+	t.Parallel()
+
+	client := new(mockQuerierWithResult)
+	conn := new(mockConnectionFetcher)
+	conn.On("GetConnection", "test").Return(client)
+	expectedQuery := &query.Query{
+		Query: `-- @bruin.config: {"asset":"catalog.schema.asset","asset_name":"catalog.schema.asset","custom_check_name":"row_count","pipeline":"test_pipeline","type":"custom_check"}
+SELECT 1`,
+		Annotations: map[string]string{
+			"asset":             "catalog.schema.asset",
+			"asset_name":        "catalog.schema.asset",
+			"custom_check_name": "row_count",
+			"pipeline":          "test_pipeline",
+			"type":              "custom_check",
+		},
+	}
+	client.On("Select", mock.Anything, expectedQuery).Return([][]interface{}{{int64(1)}}, nil).Once()
+
+	instance := &scheduler.CustomCheckInstance{
+		AssetInstance: &scheduler.AssetInstance{
+			Asset: &pipeline.Asset{
+				Name: "catalog.schema.asset",
+				Type: pipeline.AssetTypeDatabricksQuery,
+			},
+			Pipeline: &pipeline.Pipeline{
+				Name:               "test_pipeline",
+				DefaultConnections: map[string]string{"databricks": "test"},
+			},
+		},
+		Check: &pipeline.CustomCheck{
+			Name:  "row_count",
+			Value: 1,
+			Query: "SELECT 1",
+		},
+	}
+	ctx := context.WithValue(t.Context(), pipeline.RunConfigQueryAnnotations, ansisql.DefaultQueryAnnotations)
+
+	err := ansisql.NewCustomCheck(conn, nil).Check(ctx, instance)
+
+	require.NoError(t, err)
+	assert.Equal(t, expectedQuery.Query, instance.ExecutedQuery)
+	client.AssertExpectations(t)
 }
