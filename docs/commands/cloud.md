@@ -53,13 +53,13 @@ bruin cloud projects list
 ```
 
 **Example output:**
-```
-+--------------------+------+--------+
-| ID                 | REPO | STATUS |
-+--------------------+------+--------+
-| buraktestpipeline  | ...  | active |
-| analytics-prod     | ...  | active |
-+--------------------+------+--------+
+
+```text
++--------------+----------------+-----------------------------+----------+
+| ID           | NAME           | REPO URL                    | BRANCH   |
++--------------+----------------+-----------------------------+----------+
+| <project-id> | <project-name> | https://github.com/org/repo | <branch> |
++--------------+----------------+-----------------------------+----------+
 ```
 
 ---
@@ -70,9 +70,10 @@ Manage pipelines within a project.
 
 #### `list`
 
-List all pipelines in a project:
+List every pipeline you can access, or restrict the result to one project:
 
 ```bash
+bruin cloud pipelines list
 bruin cloud pipelines list --project-id <project-id>
 ```
 
@@ -86,22 +87,22 @@ bruin cloud pipelines get --project-id <project-id> --name <pipeline-name>
 
 #### `errors`
 
-Show validation errors for pipelines in a project:
+Show validation errors for your accessible pipelines:
 
 ```bash
-bruin cloud pipelines errors --project-id <project-id>
+bruin cloud pipelines errors
 ```
 
 #### `enable` / `disable`
 
-Enable or disable pipelines. You can target specific pipelines or all of them at once:
+Enable or disable a specific pipeline:
 
 ```bash
 # Enable a specific pipeline
 bruin cloud pipelines enable --project-id <project-id> --pipeline <pipeline-name>
 
-# Disable all pipelines in a project
-bruin cloud pipelines disable --project-id <project-id>
+# Disable a specific pipeline
+bruin cloud pipelines disable --project-id <project-id> --pipeline <pipeline-name>
 ```
 
 #### `delete`
@@ -114,7 +115,7 @@ bruin cloud pipelines delete --project-id <project-id> --pipeline <pipeline-name
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--project-id`, `-p` | str | - | Project ID (required) |
+| `--project-id`, `-p` | str | - | Project ID (optional filter for `list`; required by `get`, `enable`, `disable`, and `delete`) |
 | `--name` | str | - | Pipeline name (for `get`) |
 | `--pipeline` | str | - | Pipeline name (for `enable`, `disable`, `delete`) |
 
@@ -142,7 +143,7 @@ bruin cloud runs list --project-id <project-id> --pipeline <pipeline-name> --sta
 |------|------|---------|-------------|
 | `--project-id`, `-p` | str | - | Project ID (required) |
 | `--pipeline` | str | - | Pipeline name (required) |
-| `--status` | str | - | Filter by status: `running`, `succeeded`, `failed` |
+| `--status` | str | - | Filter by an exact status, e.g. `running`, `success`, or `failed` |
 | `--limit` | int | `20` | Maximum number of results |
 | `--offset` | int | `0` | Number of results to skip |
 
@@ -151,18 +152,24 @@ bruin cloud runs list --project-id <project-id> --pipeline <pipeline-name> --sta
 Get detailed information about a specific run:
 
 ```bash
-bruin cloud runs get --project-id <project-id> --run-id <run-id>
+bruin cloud runs get --project-id <project-id> --pipeline <pipeline-name> --run-id <run-id>
 ```
+
+Use `--latest` instead of `--run-id` to retrieve the most recent run for the pipeline.
 
 #### `trigger`
 
-Manually trigger a new pipeline run:
+Trigger a new pipeline run. A start and end date are required:
 
 ```bash
-bruin cloud runs trigger --project-id <project-id> --pipeline <pipeline-name>
+bruin cloud runs trigger \\
+  --project-id <project-id> \\
+  --pipeline <pipeline-name> \\
+  --start-date 2024-01-01 \\
+  --end-date 2024-01-31
 ```
 
-You can also specify a date range:
+For example:
 
 ```bash
 bruin cloud runs trigger \
@@ -174,9 +181,9 @@ bruin cloud runs trigger \
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--start-date` | str | - | Start date for the run (YYYY-MM-DD) |
-| `--end-date` | str | - | End date for the run (YYYY-MM-DD) |
-| `--asset`, `--assets` | []str | - | Select assets to run by their full name, e.g. `schema.table` (repeatable or comma-separated). |
+| `--start-date` | str | - | Start of the run interval (required) |
+| `--end-date` | str | - | End of the run interval (required) |
+| `--asset`, `--assets` | []str | - | Select assets by name (repeatable or comma-separated). |
 | `--downstream` | bool | `false` | Also run everything downstream of the selected `--asset`(s). Requires `--asset`. |
 | `--tag`, `-t` | []str | - | Tag the run (repeatable). A run-level label shown in the Cloud activity log — **not** an asset filter. |
 | `--full-refresh`, `-r` | bool | `false` | Full-refresh the assets in the run: the `--asset` selection if given, otherwise every asset. |
@@ -185,12 +192,11 @@ bruin cloud runs trigger \
 | `--split` | str | - | Trigger a backfill, splitting the date range into one run per interval by unit: `minute`, `hour`, `day`, `week`, `month`, `year`. |
 | `--chunk-size` | int | `1` | Number of split units per batch (used with `--split`). |
 
-**Run only selected assets.** Select assets with `--asset` using their **full name**
-(`schema.table`, repeatable or comma-separated). Without a selection, the whole pipeline
-runs.
+**Run only selected assets.** Select assets with `--asset` (repeatable or
+comma-separated). Without a selection, the whole pipeline runs.
 
 ```bash
-# Run a single asset (full schema.table name)
+# Run a single asset
 bruin cloud runs trigger \
   --project-id <project-id> --pipeline <pipeline-name> \
   --start-date 2024-01-01 --end-date 2024-01-31 \
@@ -300,10 +306,8 @@ bruin cloud runs trigger \
 
 > [!NOTE]
 > `--split` creates a backfill.
-> Without `--split`, the command triggers a single normal run.
-
-> [!NOTE]
-> For a backfill, `--end-date` is **exclusive**: the range is split as
+> Without `--split`, the command triggers a single normal run. For a backfill,
+> `--end-date` is **exclusive**: the range is split as
 > `[start-date, end-date)`, so the last interval ends just before `--end-date`. To
 > include a final period, pass the date one period past it — e.g. `--end-date 2024-01-04`
 > to cover `2024-01-03` with `--split day`.
@@ -313,22 +317,26 @@ bruin cloud runs trigger \
 Re-run a previous pipeline run. Useful when a transient issue caused a failure:
 
 ```bash
-bruin cloud runs rerun --project-id <project-id> --run-id <run-id>
+bruin cloud runs rerun --project-id <project-id> --pipeline <pipeline-name> --run-id <run-id>
 ```
 
 To rerun only the assets that failed:
 
 ```bash
-bruin cloud runs rerun --project-id <project-id> --run-id <run-id> --only-failed
+bruin cloud runs rerun --project-id <project-id> --pipeline <pipeline-name> --run-id <run-id> --only-failed
 ```
+
+Use `--latest` instead of `--run-id` to rerun the most recent pipeline run.
 
 #### `mark-status`
 
-Manually mark a run as succeeded or failed:
+Manually mark a run as `success` or `failed`:
 
 ```bash
-bruin cloud runs mark-status --project-id <project-id> --run-id <run-id> --status succeeded
+bruin cloud runs mark-status --project-id <project-id> --pipeline <pipeline-name> --run-id <run-id> --status success
 ```
+
+As with `get` and `rerun`, you can use `--latest` instead of `--run-id`.
 
 #### `diagnose`
 
@@ -339,16 +347,19 @@ bruin cloud runs mark-status --project-id <project-id> --run-id <run-id> --statu
 bruin cloud runs diagnose --project-id <project-id> --pipeline <pipeline-name> --latest
 
 # Diagnose a specific run by ID
-bruin cloud runs diagnose --project-id <project-id> --run-id <run-id>
+bruin cloud runs diagnose --project-id <project-id> --pipeline <pipeline-name> --run-id <run-id>
 ```
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--latest` | bool | `false` | Automatically pick the most recent run |
 | `--run-id` | str | - | Specific run ID to diagnose |
+| `--project-id`, `-p` | str | - | Project ID (required) |
+| `--pipeline` | str | - | Pipeline name (required) |
 
 **Example output:**
-```
+
+```text
 === Run Diagnosis ===
   Run ID:    manual__2026-03-06T20:01:11.741565+00:00
   Project:   buraktestpipeline
@@ -379,14 +390,13 @@ bruin cloud runs diagnose --project-id <project-id> --run-id <run-id>
 
 ### `assets`
 
-Browse assets across your project.
+Browse the assets in a pipeline.
 
 #### `list`
 
-List all assets in a project, optionally filtered to a specific pipeline:
+List all assets in a pipeline:
 
 ```bash
-bruin cloud assets list --project-id <project-id>
 bruin cloud assets list --project-id <project-id> --pipeline <pipeline-name>
 ```
 
@@ -403,13 +413,15 @@ bruin cloud assets get --project-id <project-id> --pipeline <pipeline-name> --as
 ### `instances`
 
 Instances represent individual asset executions within a run. These commands are useful when you need to drill down into exactly what happened during a specific run.
+Each requires `--project-id` and `--pipeline`, then either `--run-id` or
+`--latest` to select the run.
 
 #### `list`
 
 List asset instances for a run:
 
 ```bash
-bruin cloud instances list --project-id <project-id> --run-id <run-id>
+bruin cloud instances list --project-id <project-id> --pipeline <pipeline-name> --run-id <run-id>
 ```
 
 #### `get`
@@ -417,7 +429,7 @@ bruin cloud instances list --project-id <project-id> --run-id <run-id>
 Get details for a specific asset instance:
 
 ```bash
-bruin cloud instances get --project-id <project-id> --run-id <run-id> --asset <asset-name>
+bruin cloud instances get --project-id <project-id> --pipeline <pipeline-name> --run-id <run-id> --asset <asset-name>
 ```
 
 #### `logs`
@@ -425,7 +437,7 @@ bruin cloud instances get --project-id <project-id> --run-id <run-id> --asset <a
 View execution logs for an asset instance:
 
 ```bash
-bruin cloud instances logs --project-id <project-id> --run-id <run-id> --asset <asset-name>
+bruin cloud instances logs --project-id <project-id> --pipeline <pipeline-name> --run-id <run-id> --asset <asset-name>
 ```
 
 You can also filter logs by execution step:
@@ -433,6 +445,7 @@ You can also filter logs by execution step:
 ```bash
 bruin cloud instances logs \
   --project-id <project-id> \
+  --pipeline <pipeline-name> \
   --run-id <run-id> \
   --asset <asset-name> \
   --step-name "main"
@@ -441,30 +454,30 @@ bruin cloud instances logs \
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--asset` | str | - | Asset name |
-| `--step-id` | str | - | Filter by step ID |
-| `--step-name` | str | - | Filter by step name |
-| `--try-number` | int | - | Filter by try number |
+| `--step-id` | str | - | Step ID. Required unless `--asset` is supplied. |
+| `--step-name` | str | - | Step or check name to filter when using `--asset` |
+| `--try-number` | int | `1` | Attempt number. With `--asset`, the command uses the step's attempt unless you set this flag. |
 
 #### `failed-logs`
 
 A shortcut to get logs for all failed assets in a run — no need to figure out which assets failed first:
 
 ```bash
-bruin cloud instances failed-logs --project-id <project-id> --run-id <run-id>
+bruin cloud instances failed-logs --project-id <project-id> --pipeline <pipeline-name> --run-id <run-id>
 ```
 
 ---
 
 ### `glossary`
 
-Access the data glossary for your project.
+Access the data glossary.
 
 #### `list`
 
-List all glossary entities:
+List all glossary entities in your team:
 
 ```bash
-bruin cloud glossary list --project-id <project-id>
+bruin cloud glossary list
 ```
 
 #### `get`
@@ -489,6 +502,29 @@ List available agents:
 
 ```bash
 bruin cloud agents list
+```
+
+#### `create`
+
+Create an agent. Visibility is `team` by default; use `private` to create a
+private agent.
+
+```bash
+bruin cloud agents create \
+  --name "Pipeline assistant" \
+  --description "Helps investigate pipeline failures" \
+  --prompt "Investigate failures and suggest next steps." \
+  --visibility team
+```
+
+#### `get` / `update`
+
+Inspect one agent or update its name, description, or visibility. `update`
+requires at least one field to change.
+
+```bash
+bruin cloud agents get --agent-id <agent-id>
+bruin cloud agents update --agent-id <agent-id> --description "Updated description"
 ```
 
 #### `send`
@@ -537,6 +573,18 @@ List all messages in a thread:
 bruin cloud agents messages \
   --agent-id <agent-id> \
   --thread-id <thread-id>
+```
+
+Both `threads` and `messages` accept `--limit` (default `20`) and `--offset`
+for pagination.
+
+#### `get-prompt` / `set-prompt`
+
+Read or replace an agent's system prompt:
+
+```bash
+bruin cloud agents get-prompt --agent-id <agent-id>
+bruin cloud agents set-prompt --agent-id <agent-id> --prompt "Use concise, evidence-backed answers."
 ```
 
 ### `connections`
@@ -717,7 +765,7 @@ When a transient issue caused a partial failure, you don't need to rerun everyth
 bruin cloud runs list --project-id my-project --pipeline my-pipeline --status failed
 
 # Then rerun only the failures
-bruin cloud runs rerun --project-id my-project --run-id <run-id> --only-failed
+bruin cloud runs rerun --project-id my-project --pipeline my-pipeline --run-id <run-id> --only-failed
 ```
 
 ### Trigger a backfill
