@@ -1364,6 +1364,22 @@ func (c FastspringConnection) GetName() string {
 	return c.Name
 }
 
+type PayrailsConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	ClientID           string `yaml:"client_id,omitempty" json:"client_id" mapstructure:"client_id"`
+	ClientSecret       string `yaml:"client_secret,omitempty" json:"client_secret" mapstructure:"client_secret" sensitive:"true"`
+	CertPath           string `yaml:"cert_path,omitempty" json:"cert_path,omitempty" mapstructure:"cert_path"`
+	KeyPath            string `yaml:"key_path,omitempty" json:"key_path,omitempty" mapstructure:"key_path"`
+	Cert               string `yaml:"cert,omitempty" json:"cert,omitempty" mapstructure:"cert" sensitive:"true"`
+	Key                string `yaml:"key,omitempty" json:"key,omitempty" mapstructure:"key" sensitive:"true"`
+	Environment        string `yaml:"environment,omitempty" json:"environment,omitempty" mapstructure:"environment"`
+	BaseURL            string `yaml:"base_url,omitempty" json:"base_url,omitempty" mapstructure:"base_url"`
+}
+
+func (c PayrailsConnection) GetName() string {
+	return c.Name
+}
+
 type ClickupConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	APIToken           string `yaml:"api_token,omitempty" json:"api_token" mapstructure:"api_token" sensitive:"true"`

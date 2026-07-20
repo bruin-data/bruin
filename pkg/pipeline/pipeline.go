@@ -269,6 +269,7 @@ var defaultMapping = map[string]string{
 	"linkedinads":           "linkedinads-default",
 	"amplitude":             "amplitude-default",
 	"fastspring":            "fastspring-default",
+	"payrails":              "payrails-default",
 	"mailchimp":             "mailchimp-default",
 	"manifold":              "manifold-default",
 	"mixpanel":              "mixpanel-default",

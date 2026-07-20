@@ -100,6 +100,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/onelake"
 	"github.com/bruin-data/bruin/pkg/oracle"
 	"github.com/bruin-data/bruin/pkg/paddle"
+	"github.com/bruin-data/bruin/pkg/payrails"
 	"github.com/bruin-data/bruin/pkg/personio"
 	"github.com/bruin-data/bruin/pkg/phantombuster"
 	"github.com/bruin-data/bruin/pkg/pinterest"
@@ -235,6 +236,7 @@ type Manager struct {
 	Mixpanel             map[string]*mixpanel.Client
 	Amplitude            map[string]*amplitude.Client
 	Fastspring           map[string]*fastspring.Client
+	Payrails             map[string]*payrails.Client
 	Clickup              map[string]*clickup.Client
 	Jobtread             map[string]*jobtread.Client
 	Posthog              map[string]*posthog.Client
@@ -3005,6 +3007,34 @@ func (m *Manager) AddFastspringConnectionFromConfig(connection *config.Fastsprin
 	return nil
 }
 
+func (m *Manager) AddPayrailsConnectionFromConfig(connection *config.PayrailsConnection) error {
+	m.mutex.Lock()
+	if m.Payrails == nil {
+		m.Payrails = make(map[string]*payrails.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := payrails.NewClient(payrails.Config{
+		ClientID:     connection.ClientID,
+		ClientSecret: connection.ClientSecret,
+		CertPath:     connection.CertPath,
+		KeyPath:      connection.KeyPath,
+		Cert:         connection.Cert,
+		Key:          connection.Key,
+		Environment:  connection.Environment,
+		BaseURL:      connection.BaseURL,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Payrails[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddGoogleAnalyticsConnectionFromConfig(connection *config.GoogleAnalyticsConnection) error {
 	m.mutex.Lock()
 	if m.GoogleAnalytics == nil {
@@ -4120,6 +4150,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Mixpanel, connectionManager.AddMixpanelConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Amplitude, connectionManager.AddAmplitudeConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Fastspring, connectionManager.AddFastspringConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Payrails, connectionManager.AddPayrailsConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Pinterest, connectionManager.AddPinterestConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Trustpilot, connectionManager.AddTrustpilotConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.QuickBooks, connectionManager.AddQuickBooksConnectionFromConfig, &wg, &errList, &mu)

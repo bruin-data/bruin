@@ -645,6 +645,15 @@ func TestLoadFromFile(t *testing.T) {
 					Password:           "pass-123",
 				},
 			},
+			Payrails: []PayrailsConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "payrails-1"},
+					ClientID:           "client-123",
+					ClientSecret:       "secret-123",
+					CertPath:           "/tmp/client.pem",
+					KeyPath:            "/tmp/client.key",
+				},
+			},
 			Wise: []WiseConnection{
 				{
 					ConnectionMetadata: ConnectionMetadata{Name: "wise-1"},
@@ -2736,6 +2745,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Mixpanel:            []MixpanelConnection{{ConnectionMetadata: ConnectionMetadata{Name: "mixpanel1"}}},
 				Amplitude:           []AmplitudeConnection{{ConnectionMetadata: ConnectionMetadata{Name: "amplitude1"}}},
 				Fastspring:          []FastspringConnection{{ConnectionMetadata: ConnectionMetadata{Name: "fastspring1"}}},
+				Payrails:            []PayrailsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "payrails1"}}},
 				Clickup:             []ClickupConnection{{ConnectionMetadata: ConnectionMetadata{Name: "clickup1"}}},
 				Jobtread:            []JobtreadConnection{{ConnectionMetadata: ConnectionMetadata{Name: "jobtread1"}}},
 				Posthog:             []PosthogConnection{{ConnectionMetadata: ConnectionMetadata{Name: "posthog1"}}},
@@ -2873,6 +2883,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Mixpanel:            []MixpanelConnection{{ConnectionMetadata: ConnectionMetadata{Name: "mixpanel1"}}},
 				Amplitude:           []AmplitudeConnection{{ConnectionMetadata: ConnectionMetadata{Name: "amplitude1"}}},
 				Fastspring:          []FastspringConnection{{ConnectionMetadata: ConnectionMetadata{Name: "fastspring1"}}},
+				Payrails:            []PayrailsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "payrails1"}}},
 				Clickup:             []ClickupConnection{{ConnectionMetadata: ConnectionMetadata{Name: "clickup1"}}},
 				Jobtread:            []JobtreadConnection{{ConnectionMetadata: ConnectionMetadata{Name: "jobtread1"}}},
 				Posthog:             []PosthogConnection{{ConnectionMetadata: ConnectionMetadata{Name: "posthog1"}}},
