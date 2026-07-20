@@ -222,6 +222,17 @@ parameters:
   # timeout for the job (optional)
   # Uses Go duration format: 1h, 30m, 1h30m, etc.
   timeout: 1h
+
+  # Dataproc autotuning scenarios (optional)
+  # Comma-separated: auto, scaling, broadcast_hash_join, memory, none.
+  # Equivalent to gcloud's --autotuning-scenarios flag.
+  autotuning_scenarios: auto
+
+  # Cohort identifier grouping recurring runs of the same workload for
+  # autotuning (optional). Equivalent to gcloud's --cohort flag.
+  # Defaults to "<pipeline-name>-<asset-name>" when autotuning_scenarios
+  # is set, so each asset gets a stable per-asset cohort automatically.
+  cohort: daily-etl-job
 ```
 
 ### Parameters
@@ -233,6 +244,8 @@ parameters:
 | `args` | No | - | Space-separated arguments passed to the PySpark script |
 | `config` | No | - | Spark configuration in `--conf key=value` format |
 | `timeout` | No | - | Job timeout using Go duration format (e.g., `1h`, `30m`) |
+| `autotuning_scenarios` | No | - | [Dataproc autotuning](https://cloud.google.com/dataproc-serverless/docs/concepts/autotuning) scenarios, comma-separated (`auto`, `scaling`, `broadcast_hash_join`, `memory`, `none`). Equivalent to gcloud's `--autotuning-scenarios` |
+| `cohort` | No | derived | Cohort identifier grouping recurring runs for autotuning (equivalent to gcloud's `--cohort`). When `autotuning_scenarios` is set and no cohort is given, defaults to a sanitized `<pipeline-name>-<asset-name>` |
 
 ### Connection Fields
 

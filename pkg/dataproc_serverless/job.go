@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -41,20 +42,22 @@ func (e batchError) Error() string {
 }
 
 type JobRunParams struct {
-	Project          string
-	Region           string
-	RuntimeVersion   string
-	ContainerImage   string
-	Config           string
-	Args             []string
-	Timeout          time.Duration
-	Workspace        string
-	ExecutionRole    string
-	SubnetworkURI    string
-	NetworkTags      []string
-	KmsKey           string
-	StagingBucket    string
-	MetastoreService string
+	Project             string
+	Region              string
+	RuntimeVersion      string
+	ContainerImage      string
+	Config              string
+	Args                []string
+	Timeout             time.Duration
+	Workspace           string
+	ExecutionRole       string
+	SubnetworkURI       string
+	NetworkTags         []string
+	KmsKey              string
+	StagingBucket       string
+	MetastoreService    string
+	Cohort              string
+	AutotuningScenarios []dataprocpb.AutotuningConfig_Scenario
 }
 
 func parseParams(cfg *Client, params pipeline.ParameterMap) *JobRunParams {
@@ -88,6 +91,12 @@ func parseParams(cfg *Client, params pipeline.ParameterMap) *JobRunParams {
 			jobParams.Timeout = t
 		}
 	}
+	if cohort, _ := params.GetString("cohort"); cohort != "" {
+		jobParams.Cohort = strings.TrimSpace(cohort)
+	}
+	if scenarios, _ := params.GetString("autotuning_scenarios"); scenarios != "" {
+		jobParams.AutotuningScenarios = parseAutotuningScenarios(scenarios)
+	}
 	if args, _ := params.GetString("args"); args != "" {
 		arglist := strings.Split(strings.TrimSpace(args), " ")
 		for _, arg := range arglist {
@@ -98,6 +107,38 @@ func parseParams(cfg *Client, params pipeline.ParameterMap) *JobRunParams {
 		}
 	}
 	return &jobParams
+}
+
+// parseAutotuningScenarios parses a comma-separated list of autotuning
+// scenario names (e.g. "auto" or "scaling,broadcast_hash_join,memory").
+// Both gcloud-style hyphens and proto-style underscores are accepted.
+// Unknown values are skipped.
+func parseAutotuningScenarios(raw string) []dataprocpb.AutotuningConfig_Scenario {
+	var scenarios []dataprocpb.AutotuningConfig_Scenario
+	for _, name := range strings.Split(raw, ",") {
+		name = strings.ToUpper(strings.ReplaceAll(strings.TrimSpace(name), "-", "_"))
+		if name == "" {
+			continue
+		}
+		if val, ok := dataprocpb.AutotuningConfig_Scenario_value[name]; ok && val != int32(dataprocpb.AutotuningConfig_SCENARIO_UNSPECIFIED) {
+			scenarios = append(scenarios, dataprocpb.AutotuningConfig_Scenario(val))
+		}
+	}
+	return scenarios
+}
+
+var cohortInvalidChars = regexp.MustCompile(`[^a-z0-9-]+`)
+
+// defaultCohort derives a stable per-asset cohort identifier so that
+// successive runs of the same asset are grouped for autotuning.
+func defaultCohort(pipelineName, assetName string) string {
+	cohort := strings.ToLower(pipelineName + "-" + assetName)
+	cohort = cohortInvalidChars.ReplaceAllString(cohort, "-")
+	cohort = strings.Trim(cohort, "-")
+	if len(cohort) > 63 {
+		cohort = strings.Trim(cohort[:63], "-")
+	}
+	return cohort
 }
 
 type Job struct {
@@ -258,6 +299,19 @@ func (job Job) buildBatchConfig(ws *workspace) *dataprocpb.CreateBatchRequest {
 			Properties:     sparkProperties,
 		},
 		EnvironmentConfig: batchEnvironmentConfig(job.params),
+	}
+
+	cohort := job.params.Cohort
+	if cohort == "" && len(job.params.AutotuningScenarios) > 0 {
+		// Autotuning requires a cohort to group recurring runs of the same
+		// workload; derive a stable one from the pipeline and asset names.
+		cohort = defaultCohort(job.pipeline.Name, job.asset.Name)
+	}
+	batch.RuntimeConfig.Cohort = cohort
+	if len(job.params.AutotuningScenarios) > 0 {
+		batch.RuntimeConfig.AutotuningConfig = &dataprocpb.AutotuningConfig{
+			Scenarios: job.params.AutotuningScenarios,
+		}
 	}
 
 	return &dataprocpb.CreateBatchRequest{
