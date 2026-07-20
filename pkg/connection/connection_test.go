@@ -8,6 +8,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/adapty"
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/emr_serverless"
@@ -480,6 +481,38 @@ func Test_AddSharePointConnectionFromConfig(t *testing.T) {
 	assert.Contains(t, uri, "sharepoint://?")
 	assert.Contains(t, uri, "max_files=0")
 	assert.Contains(t, uri, "download_timeout=30m")
+	assert.Equal(t, configuration, m.GetConnectionDetails("test"))
+}
+
+func Test_AddAdaptyConnectionFromConfig(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
+
+	lookbackDays := 0
+	configuration := &config.AdaptyConnection{
+		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
+		APIKey:             "secret_live_123",
+		LookbackDays:       &lookbackDays,
+		Timezone:           "Europe/Istanbul",
+	}
+
+	err := m.AddAdaptyConnectionFromConfig(configuration)
+	require.NoError(t, err)
+
+	res, ok := m.GetConnection("test").(*adapty.Client)
+	require.True(t, ok)
+	require.NotNil(t, res)
+
+	uri, err := res.GetIngestrURI()
+	require.NoError(t, err)
+	assert.Contains(t, uri, "adapty://?")
+	assert.Contains(t, uri, "api_key=secret_live_123")
+	assert.Contains(t, uri, "lookback_days=0")
+	assert.Contains(t, uri, "timezone=Europe%2FIstanbul")
 	assert.Equal(t, configuration, m.GetConnectionDetails("test"))
 }
 

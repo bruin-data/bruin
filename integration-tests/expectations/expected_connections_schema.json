@@ -71,6 +71,31 @@
         "api_key"
       ]
     },
+    "AdaptyConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "lookback_days": {
+          "type": "integer"
+        },
+        "timezone": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
+      ]
+    },
     "AdjustConnection": {
       "properties": {
         "name": {
@@ -939,6 +964,12 @@
         "adjust": {
           "items": {
             "$ref": "#/$defs/AdjustConnection"
+          },
+          "type": "array"
+        },
+        "adapty": {
+          "items": {
+            "$ref": "#/$defs/AdaptyConnection"
           },
           "type": "array"
         },

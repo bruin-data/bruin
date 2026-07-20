@@ -800,6 +800,17 @@ func (c AdjustConnection) GetName() string {
 	return c.Name
 }
 
+type AdaptyConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	APIKey             string `yaml:"api_key" json:"api_key" mapstructure:"api_key" sensitive:"true"`
+	LookbackDays       *int   `yaml:"lookback_days,omitempty" json:"lookback_days,omitempty" mapstructure:"lookback_days"`
+	Timezone           string `yaml:"timezone,omitempty" json:"timezone,omitempty" mapstructure:"timezone"`
+}
+
+func (c AdaptyConnection) GetName() string {
+	return c.Name
+}
+
 type AnthropicConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`

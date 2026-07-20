@@ -32,6 +32,7 @@ func TestLoadFromFile(t *testing.T) {
 	clickhouseSecureValue := 0
 	sharePointMaxFileSize := int64(104857600)
 	sharePointMaxFiles := int64(10000)
+	adaptyLookbackDays := 60
 
 	devEnv := Environment{
 		Connections: &Connections{
@@ -219,6 +220,14 @@ func TestLoadFromFile(t *testing.T) {
 				{
 					ConnectionMetadata: ConnectionMetadata{Name: "conn16"},
 					APIKey:             "adjustokey",
+				},
+			},
+			Adapty: []AdaptyConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "adapty-1"},
+					APIKey:             "adaptykey",
+					LookbackDays:       &adaptyLookbackDays,
+					Timezone:           "Europe/Istanbul",
 				},
 			},
 			SurveyMonkey: []SurveyMonkeyConnection{
@@ -1683,6 +1692,18 @@ func TestConfig_AddConnection(t *testing.T) {
 			expectedErr: false,
 		},
 		{
+			name:     "Add Adapty connection",
+			envName:  "default",
+			connType: "adapty",
+			connName: "adapty-conn",
+			creds: map[string]interface{}{
+				"api_key":       "secret_live_123",
+				"lookback_days": 15,
+				"timezone":      "UTC",
+			},
+			expectedErr: false,
+		},
+		{
 			name:        "Add Invalid connection",
 			envName:     "default",
 			connType:    "invalid",
@@ -1785,6 +1806,13 @@ func TestConfig_AddConnection(t *testing.T) {
 					assert.Equal(t, tt.creds["site"], env.Connections.SharePoint[0].Site)
 					assert.Equal(t, tt.creds["library"], env.Connections.SharePoint[0].Library)
 					assert.Equal(t, tt.creds["download_timeout"], env.Connections.SharePoint[0].DownloadTimeout)
+				case "adapty":
+					assert.Len(t, env.Connections.Adapty, 1)
+					assert.Equal(t, tt.connName, env.Connections.Adapty[0].Name)
+					assert.Equal(t, tt.creds["api_key"], env.Connections.Adapty[0].APIKey)
+					require.NotNil(t, env.Connections.Adapty[0].LookbackDays)
+					assert.Equal(t, tt.creds["lookback_days"], *env.Connections.Adapty[0].LookbackDays)
+					assert.Equal(t, tt.creds["timezone"], env.Connections.Adapty[0].Timezone)
 				}
 			}
 		})
@@ -1878,6 +1906,25 @@ func TestDeleteConnection(t *testing.T) {
 			expectedErr: false,
 		},
 		{
+			name:     "Delete existing Adapty connection",
+			envName:  "default",
+			connName: "adapty-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{
+						"default": {
+							Connections: &Connections{
+								Adapty: []AdaptyConnection{
+									{ConnectionMetadata: ConnectionMetadata{Name: "adapty-conn"}, APIKey: "secret_live_123"},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedErr: false,
+		},
+		{
 			name:     "Delete non-existent connection",
 			envName:  "staging",
 			connName: "non-existent-conn",
@@ -1927,6 +1974,8 @@ func TestDeleteConnection(t *testing.T) {
 					assert.Empty(t, env.Connections.Fabric)
 				case "sharepoint-conn":
 					assert.Empty(t, env.Connections.SharePoint)
+				case "adapty-conn":
+					assert.Empty(t, env.Connections.Adapty)
 				}
 
 				assert.False(t, env.Connections.Exists(tt.connName))
@@ -2635,6 +2684,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				G2:                  []G2Connection{{ConnectionMetadata: ConnectionMetadata{Name: "g21"}}},
 				Klaviyo:             []KlaviyoConnection{{ConnectionMetadata: ConnectionMetadata{Name: "klaviyo1"}}},
 				Adjust:              []AdjustConnection{{ConnectionMetadata: ConnectionMetadata{Name: "adjust1"}}},
+				Adapty:              []AdaptyConnection{{ConnectionMetadata: ConnectionMetadata{Name: "adapty1"}}},
 				SurveyMonkey:        []SurveyMonkeyConnection{{ConnectionMetadata: ConnectionMetadata{Name: "surveymonkey1"}}},
 				Anthropic:           []AnthropicConnection{{ConnectionMetadata: ConnectionMetadata{Name: "anthropic1"}}},
 				Generic:             []GenericConnection{{ConnectionMetadata: ConnectionMetadata{Name: "generic1"}}},
@@ -2771,6 +2821,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				G2:                  []G2Connection{{ConnectionMetadata: ConnectionMetadata{Name: "g21"}}},
 				Klaviyo:             []KlaviyoConnection{{ConnectionMetadata: ConnectionMetadata{Name: "klaviyo1"}}},
 				Adjust:              []AdjustConnection{{ConnectionMetadata: ConnectionMetadata{Name: "adjust1"}}},
+				Adapty:              []AdaptyConnection{{ConnectionMetadata: ConnectionMetadata{Name: "adapty1"}}},
 				SurveyMonkey:        []SurveyMonkeyConnection{{ConnectionMetadata: ConnectionMetadata{Name: "surveymonkey1"}}},
 				Anthropic:           []AnthropicConnection{{ConnectionMetadata: ConnectionMetadata{Name: "anthropic1"}}},
 				Generic:             []GenericConnection{{ConnectionMetadata: ConnectionMetadata{Name: "generic1"}}},
