@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/bruin-data/bruin/pkg/adapty"
 	"github.com/bruin-data/bruin/pkg/adjust"
 	"github.com/bruin-data/bruin/pkg/adls"
 	"github.com/bruin-data/bruin/pkg/airtable"
@@ -183,6 +184,7 @@ type Manager struct {
 	G2                   map[string]*g2.Client
 	Klaviyo              map[string]*klaviyo.Client
 	Adjust               map[string]*adjust.Client
+	Adapty               map[string]*adapty.Client
 	Anthropic            map[string]*anthropic.Client
 	Intercom             map[string]*intercom.Client
 	Athena               map[string]*athena.DB
@@ -1527,6 +1529,31 @@ func (m *Manager) AddAdjustConnectionFromConfig(connection *config.AdjustConnect
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Adjust[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddAdaptyConnectionFromConfig(connection *config.AdaptyConnection) error {
+	m.mutex.Lock()
+	if m.Adapty == nil {
+		m.Adapty = make(map[string]*adapty.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := adapty.NewClient(adapty.Config{
+		APIKey:       connection.APIKey,
+		LookbackDays: connection.LookbackDays,
+		Timezone:     connection.Timezone,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Adapty[connection.Name] = client
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 
@@ -4072,6 +4099,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.G2, connectionManager.AddG2ConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Klaviyo, connectionManager.AddKlaviyoConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Adjust, connectionManager.AddAdjustConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Adapty, connectionManager.AddAdaptyConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.SurveyMonkey, connectionManager.AddSurveyMonkeyConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Anthropic, connectionManager.AddAnthropicConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Intercom, connectionManager.AddIntercomConnectionFromConfig, &wg, &errList, &mu)

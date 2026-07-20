@@ -36,6 +36,18 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 	// Azure Data Lake Storage Gen2 (user-defined paths)
 	"adls": {},
 
+	// Adapty - Subscription monetization platform
+	"adapty": {
+		{Name: "analytics?chart_id=<chart_id>", IncKey: "date", IncStrategy: "delete+insert"},
+		{Name: "cohorts", IncKey: "date", IncStrategy: "delete+insert"},
+		{Name: "conversion?from_period=<period>&to_period=<period>", IncKey: "date", IncStrategy: "delete+insert"},
+		{Name: "funnel", IncKey: "date", IncStrategy: "delete+insert"},
+		{Name: "ltv", IncKey: "date", IncStrategy: "delete+insert"},
+		{Name: "retention", IncKey: "date", IncStrategy: "delete+insert"},
+		{Name: "placements?placement_type=<placement_type>", IncStrategy: "replace"},
+		{Name: "paywalls", PrimaryKey: "paywall_id", IncKey: "updated_at", IncStrategy: "merge"},
+	},
+
 	// Adjust - Mobile marketing analytics platform
 	"adjust": {
 		{Name: "campaigns", PrimaryKey: "id", IncKey: "created", IncStrategy: "merge"},

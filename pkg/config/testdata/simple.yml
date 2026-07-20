@@ -156,6 +156,11 @@ environments:
       adjust:
         - name: conn16
           api_key: "adjustokey"
+      adapty:
+        - name: "adapty-1"
+          api_key: "adaptykey"
+          lookback_days: 60
+          timezone: "Europe/Istanbul"
       surveymonkey:
         - name: "surveymonkey-default"
           access_token: "test-token-123"

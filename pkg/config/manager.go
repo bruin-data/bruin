@@ -58,6 +58,7 @@ type Connections struct {
 	G2                  []G2Connection                  `yaml:"g2,omitempty" json:"g2,omitempty" mapstructure:"g2"`
 	Klaviyo             []KlaviyoConnection             `yaml:"klaviyo,omitempty" json:"klaviyo,omitempty" mapstructure:"klaviyo"`
 	Adjust              []AdjustConnection              `yaml:"adjust,omitempty" json:"adjust,omitempty" mapstructure:"adjust"`
+	Adapty              []AdaptyConnection              `yaml:"adapty,omitempty" json:"adapty,omitempty" mapstructure:"adapty"`
 	Anthropic           []AnthropicConnection           `yaml:"anthropic,omitempty" json:"anthropic,omitempty" mapstructure:"anthropic"`
 	Generic             []GenericConnection             `yaml:"generic,omitempty" json:"generic,omitempty" mapstructure:"generic"`
 	FacebookAds         []FacebookAdsConnection         `yaml:"facebookads,omitempty" json:"facebookads,omitempty" mapstructure:"facebookads"`
@@ -1005,6 +1006,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Adjust = append(env.Connections.Adjust, conn)
+	case "adapty":
+		var conn AdaptyConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Adapty = append(env.Connections.Adapty, conn)
 	case "anthropic":
 		var conn AnthropicConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1897,6 +1905,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Klaviyo = removeConnection(env.Connections.Klaviyo, connectionName)
 	case "adjust":
 		env.Connections.Adjust = removeConnection(env.Connections.Adjust, connectionName)
+	case "adapty":
+		env.Connections.Adapty = removeConnection(env.Connections.Adapty, connectionName)
 	case "anthropic":
 		env.Connections.Anthropic = removeConnection(env.Connections.Anthropic, connectionName)
 	case "intercom":
@@ -2242,6 +2252,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.G2, source.G2)
 	mergeConnectionList(&c.Klaviyo, source.Klaviyo)
 	mergeConnectionList(&c.Adjust, source.Adjust)
+	mergeConnectionList(&c.Adapty, source.Adapty)
 	mergeConnectionList(&c.Anthropic, source.Anthropic)
 	mergeConnectionList(&c.Generic, source.Generic)
 	mergeConnectionList(&c.FacebookAds, source.FacebookAds)

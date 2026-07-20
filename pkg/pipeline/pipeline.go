@@ -183,6 +183,7 @@ var defaultMapping = map[string]string{
 	"facebookads":           "facebookads-default",
 	"klaviyo":               "klaviyo-default",
 	"adjust":                "adjust-default",
+	"adapty":                "adapty-default",
 	"stripe":                "stripe-default",
 	"paddle":                "paddle-default",
 	"chargebee":             "chargebee-default",
