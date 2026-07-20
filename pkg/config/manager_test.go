@@ -15,6 +15,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const testAWSRegion = "us-east-1"
+
 func TestLoadFromFile(t *testing.T) {
 	t.Parallel()
 
@@ -559,6 +561,23 @@ func TestLoadFromFile(t *testing.T) {
 					Layout:             "my_layout",
 				},
 			},
+			Iceberg: []IcebergConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "iceberg-1"},
+					CatalogName:        "analytics",
+					Catalog: IcebergCatalog{
+						Type:      IcebergCatalogGlue,
+						CatalogID: "123456789012",
+						Region:    testAWSRegion,
+						Auth:      IcebergAuth{AccessKey: "AKIAEXAMPLE", SecretKey: "secret-123"},
+					},
+					Storage: IcebergStorage{
+						Type: IcebergStorageS3,
+						Path: "s3://my-lake/warehouse",
+						Auth: IcebergAuth{AccessKey: "AKIAEXAMPLE", SecretKey: "secret-123"},
+					},
+				},
+			},
 			ApplovinMax: []ApplovinMaxConnection{
 				{
 					ConnectionMetadata: ConnectionMetadata{Name: "applovinmax-1"},
@@ -577,7 +596,7 @@ func TestLoadFromFile(t *testing.T) {
 					ConnectionMetadata: ConnectionMetadata{Name: "kinesis-1"},
 					AccessKeyID:        "aws-access-key-id-123",
 					SecretAccessKey:    "aws-secret-access-key-123",
-					Region:             "us-east-1",
+					Region:             testAWSRegion,
 				},
 			},
 			Pipedrive: []PipedriveConnection{
@@ -1692,6 +1711,29 @@ func TestConfig_AddConnection(t *testing.T) {
 			expectedErr: false,
 		},
 		{
+			name:     "Add Iceberg connection",
+			envName:  "default",
+			connType: "iceberg",
+			connName: "iceberg-conn",
+			creds: map[string]interface{}{
+				"catalog_name": "analytics",
+				"catalog": map[string]interface{}{
+					"type":       "glue",
+					"catalog_id": "123456789012",
+					"region":     testAWSRegion,
+					"auth": map[string]interface{}{
+						"access_key": "AKIAEXAMPLE",
+						"secret_key": "secret-123",
+					},
+				},
+				"storage": map[string]interface{}{
+					"type": "s3",
+					"path": "s3://my-lake/warehouse",
+				},
+			},
+			expectedErr: false,
+		},
+		{
 			name:     "Add Adapty connection",
 			envName:  "default",
 			connType: "adapty",
@@ -1806,6 +1848,14 @@ func TestConfig_AddConnection(t *testing.T) {
 					assert.Equal(t, tt.creds["site"], env.Connections.SharePoint[0].Site)
 					assert.Equal(t, tt.creds["library"], env.Connections.SharePoint[0].Library)
 					assert.Equal(t, tt.creds["download_timeout"], env.Connections.SharePoint[0].DownloadTimeout)
+				case "iceberg":
+					assert.Len(t, env.Connections.Iceberg, 1)
+					assert.Equal(t, tt.connName, env.Connections.Iceberg[0].Name)
+					assert.Equal(t, "analytics", env.Connections.Iceberg[0].CatalogName)
+					assert.Equal(t, IcebergCatalogGlue, env.Connections.Iceberg[0].Catalog.Type)
+					assert.Equal(t, "123456789012", env.Connections.Iceberg[0].Catalog.CatalogID)
+					assert.Equal(t, IcebergStorageS3, env.Connections.Iceberg[0].Storage.Type)
+					assert.Equal(t, "s3://my-lake/warehouse", env.Connections.Iceberg[0].Storage.Path)
 				case "adapty":
 					assert.Len(t, env.Connections.Adapty, 1)
 					assert.Equal(t, tt.connName, env.Connections.Adapty[0].Name)
@@ -1878,6 +1928,25 @@ func TestDeleteConnection(t *testing.T) {
 							Connections: &Connections{
 								Fabric: []FabricConnection{
 									{ConnectionMetadata: ConnectionMetadata{Name: "fabric-conn"}, Host: "fabric.example", Database: "warehouse", ClientID: "client-id"},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Delete existing Iceberg connection",
+			envName:  "default",
+			connName: "iceberg-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{
+						"default": {
+							Connections: &Connections{
+								Iceberg: []IcebergConnection{
+									{ConnectionMetadata: ConnectionMetadata{Name: "iceberg-conn"}, Catalog: IcebergCatalog{Type: IcebergCatalogGlue, Region: testAWSRegion}, Storage: IcebergStorage{Type: IcebergStorageS3, Path: "s3://my-lake/warehouse"}},
 								},
 							},
 						},

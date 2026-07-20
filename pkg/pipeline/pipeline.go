@@ -70,6 +70,7 @@ const (
 	AssetTypeEMRServerlessPyspark      = AssetType("emr_serverless.pyspark")
 	AssetTypeEMRServerlessSpark        = AssetType("emr_serverless.spark")
 	AssetTypeGoodData                  = AssetType("gooddata")
+	AssetTypeIceberg                   = AssetType("ingestr.iceberg") // ingestr-only mapping key (not an executable asset type)
 	AssetTypeGoogleSheets              = AssetType("gsheets")
 	AssetTypeGrafana                   = AssetType("grafana")
 	AssetTypeIngestr                   = AssetType("ingestr")
@@ -205,6 +206,7 @@ var defaultMapping = map[string]string{
 	"tiktokads":             "tiktokads-default",
 	"appstore":              "appstore-default",
 	"gcs":                   "gcs-default",
+	"iceberg":               "iceberg-default",
 	"emr_serverless":        "emr_serverless-default",
 	"dataproc_serverless":   "dataproc_serverless-default",
 	"trino":                 "trino-default",
@@ -947,6 +949,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeAthenaTableSensor:         "athena",
 	AssetTypeAthenaSource:              "athena",
 	AssetTypeDuckDBQuery:               "duckdb",
+	AssetTypeIceberg:                   "iceberg",
 	AssetTypeDuckDBSeed:                "duckdb",
 	AssetTypeDuckDBQuerySensor:         "duckdb",
 	AssetTypeDuckDBSource:              "duckdb",
@@ -1020,6 +1023,7 @@ var IngestrTypeConnectionMapping = map[string]AssetType{
 	"elasticsearch": AssetTypeElasticsearch,
 	"gsheets":       AssetTypeGoogleSheets,
 	"vertica":       AssetTypeVerticaQuery,
+	"iceberg":       AssetTypeIceberg,
 }
 
 type SecretMapping struct {

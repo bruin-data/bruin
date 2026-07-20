@@ -1293,6 +1293,34 @@ func (c GCSConnection) GetName() string {
 	return c.Name
 }
 
+// IcebergConnection is a first-class ingestr destination for Apache Iceberg,
+// described by a catalog and a storage block (plus optional table settings).
+type IcebergConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	// CatalogName is the logical catalog identifier (defaults to "ingestr").
+	CatalogName string         `yaml:"catalog_name,omitempty" json:"catalog_name,omitempty" mapstructure:"catalog_name"`
+	Catalog     IcebergCatalog `yaml:"catalog" json:"catalog" mapstructure:"catalog"`
+	Storage     IcebergStorage `yaml:"storage" json:"storage" mapstructure:"storage"`
+
+	// Table/namespace behaviour (ingestr destination write options).
+	CreateNamespace *bool  `yaml:"create_namespace,omitempty" json:"create_namespace,omitempty" mapstructure:"create_namespace"`
+	TableLocation   string `yaml:"table_location,omitempty" json:"table_location,omitempty" mapstructure:"table_location"`
+	TablePath       string `yaml:"table_path,omitempty" json:"table_path,omitempty" mapstructure:"table_path"`
+	// TableProperties are Iceberg table properties, emitted as table.<key>=<value>
+	// (e.g. {"write.format.default": "parquet"}).
+	TableProperties map[string]string `yaml:"table_properties,omitempty" json:"table_properties,omitempty" mapstructure:"table_properties"`
+	// Properties is a passthrough for non-secret ingestr Iceberg URI parameters
+	// (e.g. oauth2-server-uri, s3.* / glue.* non-credential overrides). Its values
+	// are NOT redacted from logs, so credentials must go in the dedicated fields
+	// (catalog.auth, catalog.credential, catalog.token, catalog.uri, storage.auth),
+	// never here.
+	Properties map[string]string `yaml:"properties,omitempty" json:"properties,omitempty" mapstructure:"properties"`
+}
+
+func (c IcebergConnection) GetName() string {
+	return c.Name
+}
+
 type SharePointConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	TenantID           string `yaml:"tenant_id" json:"tenant_id" mapstructure:"tenant_id"`
