@@ -57,7 +57,8 @@ func TestBuildBatchConfig_Autotuning(t *testing.T) {
 		AutotuningScenarios: []dataprocpb.AutotuningConfig_Scenario{dataprocpb.AutotuningConfig_AUTO},
 	}).buildBatchConfig(ws)
 	assert.Equal(t, "my-pipeline-my-asset-staging", req.GetBatch().GetRuntimeConfig().GetCohort())
-	assert.Equal(t,
+	assert.Equal(
+		t,
 		[]dataprocpb.AutotuningConfig_Scenario{dataprocpb.AutotuningConfig_AUTO},
 		req.GetBatch().GetRuntimeConfig().GetAutotuningConfig().GetScenarios(),
 	)

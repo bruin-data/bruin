@@ -189,15 +189,15 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) ([]string, erro
 		return nil, errors.New("time_granularity must be either 'date', or 'timestamp'")
 	}
 
-	startVar := "{{ start_timestamp | date_format('%Y-%m-%dT%H:%M:%S.%f') }}"
-	endVar := "{{ end_timestamp | date_format('%Y-%m-%dT%H:%M:%S.%f') }}"
+	startVar := "toDateTime64('{{ start_timestamp | date_format('%Y-%m-%d %H:%M:%S.%f') }}', 6)"
+	endVar := "toDateTime64('{{ end_timestamp | date_format('%Y-%m-%d %H:%M:%S.%f') }}', 6)"
 	if asset.Materialization.TimeGranularity == pipeline.MaterializationTimeGranularityDate {
-		startVar = "{{start_date}}"
-		endVar = "{{end_date}}"
+		startVar = "'{{start_date}}'"
+		endVar = "'{{end_date}}'"
 	}
 
 	queries := []string{
-		fmt.Sprintf(`DELETE FROM %s WHERE %s BETWEEN '%s' AND '%s'`,
+		fmt.Sprintf(`DELETE FROM %s WHERE %s BETWEEN %s AND %s`,
 			asset.Name,
 			asset.Materialization.IncrementalKey,
 			startVar,

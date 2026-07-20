@@ -275,7 +275,7 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 			query: "SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}'",
 			want: []string{
-				"DELETE FROM my.asset WHERE ts BETWEEN '{{ start_timestamp | date_format('%Y-%m-%dT%H:%M:%S.%f') }}' AND '{{ end_timestamp | date_format('%Y-%m-%dT%H:%M:%S.%f') }}'",
+				"DELETE FROM my.asset WHERE ts BETWEEN toDateTime64('{{ start_timestamp | date_format('%Y-%m-%d %H:%M:%S.%f') }}', 6) AND toDateTime64('{{ end_timestamp | date_format('%Y-%m-%d %H:%M:%S.%f') }}', 6)",
 				"INSERT INTO my.asset SETTINGS insert_deduplicate = 0 SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}'",
 			},
 		},
