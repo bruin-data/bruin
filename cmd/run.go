@@ -2401,13 +2401,15 @@ func SetupExecutors(
 	}
 
 	//nolint:dupl
-	if s.WillRunTaskOfType(pipeline.AssetTypeAthenaQuery) || estimateCustomCheckType == pipeline.AssetTypeAthenaQuery || s.WillRunTaskOfType(pipeline.AssetTypeAthenaSeed) {
+	if s.WillRunTaskOfType(pipeline.AssetTypeAthenaQuery) || estimateCustomCheckType == pipeline.AssetTypeAthenaQuery || s.WillRunTaskOfType(pipeline.AssetTypeAthenaSeed) ||
+		s.WillRunTaskOfType(pipeline.AssetTypeAthenaTableSensor) || s.WillRunTaskOfType(pipeline.AssetTypeAthenaSQLSensor) {
 		athenaOperator := athena.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializerListWithLocation{
 			Mat:     athena.NewMaterializer(fullRefresh),
 			Hoister: hoister,
 		}, parser)
 		athenaCheckRunner := athena.NewColumnCheckOperator(conn)
 		athenaTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
+		athenaQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
 
 		mainExecutors[pipeline.AssetTypeAthenaQuery][scheduler.TaskInstanceTypeMain] = athenaOperator
 		mainExecutors[pipeline.AssetTypeAthenaQuery][scheduler.TaskInstanceTypeColumnCheck] = athenaCheckRunner
@@ -2420,6 +2422,10 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeAthenaTableSensor][scheduler.TaskInstanceTypeMain] = athenaTableSensor
 		mainExecutors[pipeline.AssetTypeAthenaTableSensor][scheduler.TaskInstanceTypeColumnCheck] = athenaCheckRunner
 		mainExecutors[pipeline.AssetTypeAthenaTableSensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeAthenaSQLSensor][scheduler.TaskInstanceTypeMain] = athenaQuerySensor
+		mainExecutors[pipeline.AssetTypeAthenaSQLSensor][scheduler.TaskInstanceTypeColumnCheck] = athenaCheckRunner
+		mainExecutors[pipeline.AssetTypeAthenaSQLSensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
 		if estimateCustomCheckType == pipeline.AssetTypeAthenaQuery {
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = athenaCheckRunner
