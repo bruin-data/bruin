@@ -9,6 +9,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/tablename"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	drv "github.com/uber/athenadriver/go"
@@ -394,19 +395,25 @@ ORDER BY table_schema, table_name;
 }
 
 func (db *DB) BuildTableExistsQuery(tableName string) (string, error) {
-	tableComponents := strings.Split(tableName, ".")
-
-	if len(tableComponents) != 1 {
-		return "", fmt.Errorf("table name must be in table format, '%s' given", tableName)
+	cb, ok := tablename.For("athena")
+	if !ok {
+		return "", errors.New("athena table-name capability not found")
+	}
+	tn, err := cb.Parse(tableName, tablename.Defaults{Schema: db.config.Database})
+	if err != nil {
+		return "", err
 	}
 
-	tableName = tableComponents[0]
-	schemaName := db.config.Database // db.config.Database returns TABLE_SCHEMA
+	infoSchema := "information_schema"
+	if tn.Catalog != "" {
+		infoSchema = tn.Catalog + ".information_schema"
+	}
 
 	query := fmt.Sprintf(
-		"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '%s' AND table_name = '%s'",
-		schemaName,
-		tableName,
+		"SELECT COUNT(*) FROM %s.tables WHERE table_schema = '%s' AND table_name = '%s'",
+		infoSchema,
+		tn.Schema,
+		tn.Table,
 	)
 
 	return strings.TrimSpace(query), nil

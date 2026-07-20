@@ -47,10 +47,15 @@ func TestEnsureAssetNameComponentCountIsValid(t *testing.T) {
 		// two-part still valid on two-level engines
 		{name: "postgres two-part valid", assetName: "public.users", assetType: pipeline.AssetTypePostgresQuery},
 		{name: "doris two-part valid", assetName: "analytics.orders", assetType: pipeline.AssetTypeDorisQuery},
+		// athena asset names accept one to three components
+		{name: "athena two-part valid", assetName: "events.adjust", assetType: pipeline.AssetTypeAthenaQuery},
+		{name: "athena three-part valid", assetName: "catalog.events.adjust", assetType: pipeline.AssetTypeAthenaSource},
+		{name: "athena four-part rejected", assetName: "a.catalog.events.adjust", assetType: pipeline.AssetTypeAthenaQuery, wantIssue: true},
 		// bigquery requires at least two components
 		{name: "bigquery one-part rejected", assetName: "tbl", assetType: pipeline.AssetTypeBigqueryQuery, wantIssue: true},
 		// empty components rejected
 		{name: "empty component rejected", assetName: "raw..events", assetType: pipeline.AssetTypeSnowflakeQuery, wantIssue: true},
+		{name: "athena empty component rejected", assetName: "events..adjust", assetType: pipeline.AssetTypeAthenaQuery, wantIssue: true},
 		// non-database asset types are out of scope (no capability) -> no-op even with many dots
 		{name: "python dotted name no-op", assetName: "a.b.c.d", assetType: pipeline.AssetTypePython},
 		{name: "ingestr dotted name no-op", assetName: "a.b.c.d", assetType: pipeline.AssetTypeIngestr},
@@ -5010,7 +5015,7 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 		{
-			name: "Athena - invalid format (too many components)",
+			name: "Athena - valid database.table format",
 			asset: &pipeline.Asset{
 				Name: "task1",
 				Type: pipeline.AssetTypeAthenaTableSensor,
@@ -5018,7 +5023,31 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 					"table": "database.table",
 				},
 			},
-			want:    []string{"Athena table sensor `table` parameter must be in format `table`, 'database.table' given"},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Athena - valid catalog.database.table format",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeAthenaTableSensor,
+				Parameters: pipeline.ParameterMap{
+					"table": "catalog.database.table",
+				},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Athena - invalid format (too many components)",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeAthenaTableSensor,
+				Parameters: pipeline.ParameterMap{
+					"table": "account.catalog.database.table",
+				},
+			},
+			want:    []string{"Athena table sensor `table` parameter must be in format `table`, `database.table`, or `catalog.database.table`, 'account.catalog.database.table' given"},
 			wantErr: assert.NoError,
 		},
 		{
