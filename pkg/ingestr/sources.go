@@ -686,6 +686,13 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "user_properties", PrimaryKey: "user_property", IncKey: "", IncStrategy: "replace"},
 	},
 
+	// Payrails - Payments
+	"payrails": {
+		{Name: "payments", PrimaryKey: "id", IncKey: "createdAt", IncStrategy: "merge"},
+		{Name: "instruments", PrimaryKey: "id", IncKey: "createdAt", IncStrategy: "merge"},
+		{Name: "executions", PrimaryKey: "id", IncKey: "updatedAt", IncStrategy: "merge"},
+	},
+
 	// FastSpring - Payments & Subscriptions
 	"fastspring": {
 		{Name: "orders", PrimaryKey: "id", IncKey: "changed", IncStrategy: "merge"},

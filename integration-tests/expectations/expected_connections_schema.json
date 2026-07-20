@@ -1279,6 +1279,12 @@
           },
           "type": "array"
         },
+        "payrails": {
+          "items": {
+            "$ref": "#/$defs/PayrailsConnection"
+          },
+          "type": "array"
+        },
         "clickup": {
           "items": {
             "$ref": "#/$defs/ClickupConnection"
@@ -3745,6 +3751,47 @@
       "required": [
         "name",
         "api_key"
+      ]
+    },
+    "PayrailsConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "client_id": {
+          "type": "string"
+        },
+        "client_secret": {
+          "type": "string"
+        },
+        "cert_path": {
+          "type": "string"
+        },
+        "key_path": {
+          "type": "string"
+        },
+        "cert": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "environment": {
+          "type": "string"
+        },
+        "base_url": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "client_id",
+        "client_secret"
       ]
     },
     "PersonioConnection": {
