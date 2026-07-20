@@ -81,7 +81,9 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) ([]string, error)
 			query,
 		),
 		fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", task.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
-		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", task.Name, tempTableName),
+		// An identical rerun must replace rows deleted above instead of being
+		// discarded by ClickHouse's block-level insert deduplication.
+		fmt.Sprintf("INSERT INTO %s SETTINGS insert_deduplicate = 0 SELECT * FROM %s", task.Name, tempTableName),
 		"DROP TABLE IF EXISTS " + tempTableName,
 	}
 

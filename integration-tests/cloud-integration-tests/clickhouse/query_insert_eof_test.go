@@ -49,6 +49,13 @@ const (
         </node>
     </zookeeper>
 </clickhouse>`
+	clickHouseUserConfig = `<clickhouse>
+    <profiles>
+        <default>
+            <allow_nondeterministic_mutations>1</allow_nondeterministic_mutations>
+        </default>
+    </profiles>
+</clickhouse>`
 )
 
 // TestQueryInsertDoesNotReportEOF protects the regression from
@@ -195,11 +202,18 @@ func startClickHouseContainer(t *testing.T, image string, withKeeper bool) (stri
 
 	var files []testcontainers.ContainerFile
 	if withKeeper {
-		files = append(files, testcontainers.ContainerFile{
-			Reader:            strings.NewReader(clickHouseKeeperConfig),
-			ContainerFilePath: "/etc/clickhouse-server/config.d/keeper.xml",
-			FileMode:          0o644,
-		})
+		files = append(files,
+			testcontainers.ContainerFile{
+				Reader:            strings.NewReader(clickHouseKeeperConfig),
+				ContainerFilePath: "/etc/clickhouse-server/config.d/keeper.xml",
+				FileMode:          0o644,
+			},
+			testcontainers.ContainerFile{
+				Reader:            strings.NewReader(clickHouseUserConfig),
+				ContainerFilePath: "/etc/clickhouse-server/users.d/bruin.xml",
+				FileMode:          0o644,
+			},
+		)
 	}
 
 	container, err := testcontainers.GenericContainer(t.Context(), testcontainers.GenericContainerRequest{

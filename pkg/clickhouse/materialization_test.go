@@ -151,7 +151,7 @@ func TestMaterializer_Render(t *testing.T) {
 			want: []string{
 				"CREATE TABLE my.__bruin_tmp_abcefghi PRIMARY KEY id AS SELECT 1",
 				"DELETE FROM my.asset WHERE dt in (SELECT DISTINCT dt FROM my.__bruin_tmp_abcefghi)",
-				"INSERT INTO my.asset SELECT * FROM my.__bruin_tmp_abcefghi",
+				"INSERT INTO my.asset SETTINGS insert_deduplicate = 0 SELECT * FROM my.__bruin_tmp_abcefghi",
 				"DROP TABLE IF EXISTS my.__bruin_tmp_abcefghi",
 			},
 		},
