@@ -400,6 +400,30 @@ func Test_createTaskFromFile(t *testing.T) {
 	}
 }
 
+func TestCreateTaskFromFileComments_invalidEmbeddedYAML(t *testing.T) {
+	t.Parallel()
+
+	_, err := pipeline.CreateTaskFromFileComments(afero.NewOsFs())("testdata/comments/failembeddedyamlindent.sql")
+	require.Error(t, err)
+
+	msg := err.Error()
+	assert.Contains(t, msg, "check indentation")
+	// line 6 is the offending line in the file, not an offset within the comment block.
+	assert.Contains(t, msg, "yaml: line 6:")
+}
+
+func TestCreateTaskFromFileComments_nonIndentationYAMLErrorSkipsHint(t *testing.T) {
+	t.Parallel()
+
+	_, err := pipeline.CreateTaskFromFileComments(afero.NewOsFs())("testdata/comments/failembeddedyamldupkey.sql")
+	require.Error(t, err)
+
+	msg := err.Error()
+	// A duplicate key isn't indentation-related, so no hint is appended.
+	assert.Contains(t, msg, "already defined")
+	assert.NotContains(t, msg, "indentation")
+}
+
 func BenchmarkCreateTaskFromFileComments(b *testing.B) {
 	b.ReportAllocs()
 

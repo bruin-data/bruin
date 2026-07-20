@@ -87,14 +87,33 @@ func isEmbeddedYamlComment(file afero.File, prefixes []string) bool {
 	return false
 }
 
+// isIndentationYAMLError reports whether a go-yaml error is typically caused by indentation.
+func isIndentationYAMLError(msg string) bool {
+	for _, s := range []string{
+		"could not find expected ':'",
+		"did not find expected key",
+		"mapping values are not allowed in this context",
+		"found character that cannot start any token",
+	} {
+		if strings.Contains(msg, s) {
+			return true
+		}
+	}
+	return false
+}
+
 func commentedYamlToTask(file afero.File, filePath string) (*Asset, error) {
 	rows, commentRowEnd := readUntilComments(file, possiblePrefixesForCommentBlocks, possibleSuffixesForCommentBlocks)
-	if rows == "" {
+	if strings.TrimSpace(rows) == "" {
 		return nil, &ParseError{"no embedded YAML found in the comments"}
 	}
 
 	task, err := ConvertYamlToTask([]byte(rows))
 	if err != nil {
+		yamlErr := new(path.YamlParseError)
+		if errors.As(err, &yamlErr) && isIndentationYAMLError(err.Error()) {
+			return nil, &ParseError{err.Error() + " (check indentation)"}
+		}
 		return nil, &ParseError{err.Error()}
 	}
 
@@ -133,7 +152,7 @@ func readUntilComments(file afero.File, prefixes, suffixes []string) (string, in
 
 OUTER:
 	for scanner.Scan() {
-		rowCount += 1
+		rowCount++
 
 		rowText := scanner.Text()
 		trimmed := strings.TrimSpace(rowText)
@@ -142,8 +161,9 @@ OUTER:
 		for _, prefix := range prefixes {
 			if trimmed == prefix {
 				if !seenPrefix {
-					// First occurrence - this is the opening marker
+					// Blank the opening marker to keep YAML line numbers aligned with the file.
 					seenPrefix = true
+					rowsBuilder.WriteByte('\n')
 					continue OUTER
 				}
 			}
@@ -161,7 +181,8 @@ OUTER:
 		rowsBuilder.WriteByte('\n')
 	}
 
-	return strings.TrimSpace(rowsBuilder.String()), rowCount
+	// Trim only trailing newlines; leading blanks keep line numbers aligned with the file.
+	return strings.TrimRight(rowsBuilder.String(), "\n"), rowCount
 }
 
 func singleLineCommentsToTask(scanner *bufio.Scanner, commentMarker, filePath string) (*Asset, error) {
@@ -490,7 +511,7 @@ func ValidateAssetYAML(fs afero.Fs, filePath string, defType TaskDefinitionType)
 		}
 
 		rows, _ := readUntilComments(file, possiblePrefixesForCommentBlocks, possibleSuffixesForCommentBlocks)
-		if rows == "" {
+		if strings.TrimSpace(rows) == "" {
 			return nil
 		}
 		data = []byte(rows)
