@@ -479,14 +479,16 @@ bruin cloud glossary get --project-id <project-id> --entity <entity-name>
 
 ### `agents`
 
-Interact with Bruin Cloud AI agents from the terminal.
+Interact with Bruin Cloud AI agents from the terminal. Agents are scoped to your
+account (team) via the API key, not to a specific project, so these commands do
+not take a `--project-id`.
 
 #### `list`
 
 List available agents:
 
 ```bash
-bruin cloud agents list --project-id <project-id>
+bruin cloud agents list
 ```
 
 #### `send`
@@ -495,7 +497,6 @@ Send a message to an agent:
 
 ```bash
 bruin cloud agents send \
-  --project-id <project-id> \
   --agent-id <agent-id> \
   --message "What pipelines failed today?"
 ```
@@ -504,7 +505,6 @@ To continue an existing conversation, pass a thread ID:
 
 ```bash
 bruin cloud agents send \
-  --project-id <project-id> \
   --agent-id <agent-id> \
   --thread-id <thread-id> \
   --message "Tell me more about that failure"
@@ -516,7 +516,6 @@ Check the status of a message (useful for async agent responses):
 
 ```bash
 bruin cloud agents status \
-  --project-id <project-id> \
   --agent-id <agent-id> \
   --thread-id <thread-id> \
   --message-id <message-id>
@@ -527,7 +526,7 @@ bruin cloud agents status \
 List all threads for an agent:
 
 ```bash
-bruin cloud agents threads --project-id <project-id> --agent-id <agent-id>
+bruin cloud agents threads --agent-id <agent-id>
 ```
 
 #### `messages`
@@ -536,7 +535,6 @@ List all messages in a thread:
 
 ```bash
 bruin cloud agents messages \
-  --project-id <project-id> \
   --agent-id <agent-id> \
   --thread-id <thread-id>
 ```
