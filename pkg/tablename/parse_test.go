@@ -67,6 +67,31 @@ func TestCapability_Parse(t *testing.T) {
 			want:     TableName{Catalog: "main", Schema: "silver", Table: "orders"},
 		},
 		{
+			name:     "athena one-part fills database default",
+			platform: "athena",
+			raw:      "events",
+			defaults: Defaults{Schema: "analytics"},
+			want:     TableName{Schema: "analytics", Table: "events"},
+		},
+		{
+			name:     "athena two-part is database.table",
+			platform: "athena",
+			raw:      "analytics.events",
+			want:     TableName{Schema: "analytics", Table: "events"},
+		},
+		{
+			name:     "athena three-part is catalog.database.table",
+			platform: "athena",
+			raw:      "awsdatacatalog.analytics.events",
+			want:     TableName{Catalog: "awsdatacatalog", Schema: "analytics", Table: "events"},
+		},
+		{
+			name:     "athena rejects four-part name",
+			platform: "athena",
+			raw:      "account.awsdatacatalog.analytics.events",
+			wantErr:  true,
+		},
+		{
 			name:     "postgres rejects three-part",
 			platform: "postgres",
 			raw:      "db.public.users",

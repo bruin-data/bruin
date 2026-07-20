@@ -148,10 +148,9 @@ var registry = map[string]Capability{
 		FormatDesc: "`table` or `schema.table`",
 	},
 	"athena": {
-		// Athena currently accepts a bare table only (database from config).
-		Platform: "athena", MinComponents: 1, MaxComponents: 1,
-		Labels:     [3]string{"", "", "table"},
-		FormatDesc: "`table`",
+		Platform: "athena", MinComponents: 1, MaxComponents: 3,
+		Labels:     [3]string{"catalog", "database", "table"},
+		FormatDesc: "`table`, `database.table`, or `catalog.database.table`",
 	},
 
 	// --- special: arbitrary-depth paths ---

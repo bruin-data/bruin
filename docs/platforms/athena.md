@@ -156,7 +156,7 @@ parameters:
 
 **Parameters**:
 
-- `table`: `table_id` format. `catalogue_id` and `database_id` are then taken from the configuration in `bruin.yml`.
+- `table`: `table`, `database.table`, or `catalog.database.table`. Missing database information is taken from the connection in `.bruin.yml`.
 - `poke_interval`: The interval between retries in seconds (default 30 seconds).
 - `timeout`: How long to wait before the sensor fails. Uses single-unit duration syntax (`s`, `m`, `h`, `d`, `ms`, `ns`), e.g. `1h` or `90m`. Defaults to `24h`. See [Sensor Timeout](/assets/sensor#timeout).
 

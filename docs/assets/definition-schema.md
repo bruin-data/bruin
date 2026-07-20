@@ -111,6 +111,7 @@ The inferred name is passed directly to your database, so the segments must matc
 | **Snowflake** | `schema.table` | `database.schema.table` |
 | **Databricks** | `schema.table` | `catalog.schema.table` |
 | **MSSQL** | `schema.table` | `database.schema.table` |
+| **Athena** | `database.table` | `catalog.database.table` |
 | **Trino** | `schema.table` | `catalog.schema.table` |
 | **DuckDB / MotherDuck** | `schema.table` | `catalog.schema.table` |
 | **PostgreSQL** | `schema.table` | Not supported |
@@ -135,11 +136,12 @@ For a three-segment name, Bruin ensures the parent container exists before creat
 | **Snowflake** | Yes — `CREATE DATABASE IF NOT EXISTS` (needs the `CREATE DATABASE` privilege) |
 | **Databricks** | Yes — `CREATE CATALOG IF NOT EXISTS` (needs the `CREATE CATALOG` privilege) |
 | **BigQuery** | No — projects are managed outside SQL; the project must already exist |
+| **Athena** | No — catalogs and databases must already exist |
 | **Trino** | No — catalogs are connector configuration; must already exist |
 | **DuckDB / MotherDuck** | No — the catalog is an attached database; must already be attached |
 | **MSSQL** | No — the database must already exist |
 
-The schema (middle segment) is auto-created on all three-level platforms. Where the database/catalog is not auto-created and does not exist, the run fails with a clear "does not exist" error rather than creating it implicitly.
+The schema (middle segment) is auto-created where the platform supports it. Athena catalogs and databases must already exist. Where the database/catalog is not auto-created and does not exist, the run fails with a clear "does not exist" error rather than creating it implicitly.
 
 ::: warning Three-segment `ddl` assets that target another database (MSSQL)
 A three-segment name can point at a database/catalog other than the one in your connection config, and Bruin writes the table there directly. On **MSSQL** with the `ddl` materialization strategy, schema auto-creation runs in the connection's *current* database, so a `database.schema.table` asset whose database differs from the connection's default requires the target schema to already exist in that database — otherwise the run fails with a "schema does not exist" error. Strategies that create the table directly (e.g. `create+replace`) are unaffected.
