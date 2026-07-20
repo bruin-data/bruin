@@ -301,7 +301,16 @@
                 "failure": true
             }
         ],
-        "webhook": []
+        "webhook": [],
+    "email": [
+        {
+            "recipients": [
+                "alerts@example.com"
+            ],
+            "success": true,
+            "failure": true
+        }
+    ]
     },
     "catchup": "",
     "metadata_push": {

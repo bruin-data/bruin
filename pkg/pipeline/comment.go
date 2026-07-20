@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/pkg/errors"
@@ -286,6 +287,14 @@ func commentRowsToTask(commentRows []string) (*Asset, error) {
 			task.Retries = &retries
 
 			continue
+		case "timeout":
+			timeout, err := time.ParseDuration(value)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to parse timeout value '%s'", value)
+			}
+			task.Timeout = DurationSeconds(timeout)
+
+			continue
 		case "refresh_restricted", "full_refresh_restricted":
 			refreshRestricted, err := strconv.ParseBool(value)
 			if err != nil {
@@ -357,6 +366,9 @@ func commentRowsToTask(commentRows []string) (*Asset, error) {
 				continue
 			case "incremental_key":
 				task.Materialization.IncrementalKey = value
+				continue
+			case "incremental_predicate":
+				task.Materialization.IncrementalPredicate = value
 				continue
 			case "cluster_by":
 				values := strings.Split(value, ",")

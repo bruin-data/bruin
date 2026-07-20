@@ -210,12 +210,13 @@ func (a *clusterBy) UnmarshalYAML(value *yaml.Node) error {
 }
 
 type materialization struct {
-	Type            string    `yaml:"type"`
-	Strategy        string    `yaml:"strategy"`
-	PartitionBy     string    `yaml:"partition_by"`
-	ClusterBy       clusterBy `yaml:"cluster_by"`
-	IncrementalKey  string    `yaml:"incremental_key"`
-	TimeGranularity string    `yaml:"time_granularity,omitempty"`
+	Type                 string    `yaml:"type"`
+	Strategy             string    `yaml:"strategy"`
+	PartitionBy          string    `yaml:"partition_by"`
+	ClusterBy            clusterBy `yaml:"cluster_by"`
+	IncrementalKey       string    `yaml:"incremental_key"`
+	IncrementalPredicate string    `yaml:"incremental_predicate"`
+	TimeGranularity      string    `yaml:"time_granularity,omitempty"`
 }
 
 type columnCheckValue struct {
@@ -386,8 +387,14 @@ type doris struct {
 	Properties    map[string]string `yaml:"properties"`
 }
 
+type starrocks struct {
+	TableModel string            `yaml:"table_model"`
+	Buckets    int               `yaml:"buckets"`
+	Properties map[string]string `yaml:"properties"`
+}
+
 func notificationsOrNil(n Notifications) *Notifications {
-	if len(n.Slack) == 0 && len(n.MSTeams) == 0 && len(n.Discord) == 0 && len(n.Webhook) == 0 {
+	if len(n.Slack) == 0 && len(n.MSTeams) == 0 && len(n.Discord) == 0 && len(n.Webhook) == 0 && len(n.Email) == 0 {
 		return nil
 	}
 	return &n
@@ -420,12 +427,14 @@ type taskDefinition struct {
 	Snowflake             snowflake         `yaml:"snowflake"`
 	Athena                athena            `yaml:"athena"`
 	Doris                 doris             `yaml:"doris"`
+	StarRocks             starrocks         `yaml:"starrocks"`
 	Routing               *RoutingConfig    `yaml:"routing"`
 	IntervalModifiers     IntervalModifiers `yaml:"interval_modifiers"`
 	Domains               []string          `yaml:"domains"`
 	Meta                  map[string]string `yaml:"meta"`
 	Metadata              map[string]string `yaml:"metadata"`
 	Retries               *int              `yaml:"retries"`
+	Timeout               DurationSeconds   `yaml:"timeout"`
 	RerunCooldown         *int              `yaml:"rerun_cooldown"`
 	RefreshRestricted     *bool             `yaml:"refresh_restricted,omitempty"`
 	FullRefreshRestricted *bool             `yaml:"full_refresh_restricted,omitempty"`
@@ -505,12 +514,13 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 
 func taskDefinitionToAsset(definition taskDefinition) (*Asset, error) {
 	mat := Materialization{
-		Type:            MaterializationType(strings.ToLower(definition.Materialization.Type)),
-		Strategy:        MaterializationStrategy(strings.ToLower(definition.Materialization.Strategy)),
-		ClusterBy:       definition.Materialization.ClusterBy,
-		PartitionBy:     definition.Materialization.PartitionBy,
-		IncrementalKey:  definition.Materialization.IncrementalKey,
-		TimeGranularity: MaterializationTimeGranularity(strings.ToLower(definition.Materialization.TimeGranularity)),
+		Type:                 MaterializationType(strings.ToLower(definition.Materialization.Type)),
+		Strategy:             MaterializationStrategy(strings.ToLower(definition.Materialization.Strategy)),
+		ClusterBy:            definition.Materialization.ClusterBy,
+		PartitionBy:          definition.Materialization.PartitionBy,
+		IncrementalKey:       definition.Materialization.IncrementalKey,
+		IncrementalPredicate: definition.Materialization.IncrementalPredicate,
+		TimeGranularity:      MaterializationTimeGranularity(strings.ToLower(definition.Materialization.TimeGranularity)),
 	}
 
 	columns := make([]Column, len(definition.Columns))
@@ -642,12 +652,18 @@ func taskDefinitionToAsset(definition taskDefinition) (*Asset, error) {
 			Buckets:       definition.Doris.Buckets,
 			Properties:    definition.Doris.Properties,
 		},
+		StarRocks: StarRocksConfig{
+			TableModel: definition.StarRocks.TableModel,
+			Buckets:    definition.StarRocks.Buckets,
+			Properties: definition.StarRocks.Properties,
+		},
 		Routing:           definition.Routing,
 		IntervalModifiers: definition.IntervalModifiers,
 		Domains:           definition.Domains,
 		Meta:              definition.Meta,
 		Metadata:          definition.Metadata,
 		Retries:           definition.Retries,
+		Timeout:           definition.Timeout,
 		RerunCooldown:     definition.RerunCooldown,
 		RefreshRestricted: definition.refreshRestricted(),
 		Notifications:     notificationsOrNil(definition.Notifications),

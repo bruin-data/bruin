@@ -63,6 +63,7 @@ func sqlQueryAssetTypes() []pipeline.AssetType {
 		pipeline.AssetTypeRedshiftQuery,
 		pipeline.AssetTypeSailQuery,
 		pipeline.AssetTypeSnowflakeQuery,
+		pipeline.AssetTypeStarRocksQuery,
 		pipeline.AssetTypeSynapseQuery,
 		pipeline.AssetTypeTrinoQuery,
 		pipeline.AssetTypeVerticaQuery,
@@ -989,7 +990,14 @@ func TestMaterialization_MarshalJSON(t *testing.T) {
 			materialization: pipeline.Materialization{
 				TimeGranularity: pipeline.MaterializationTimeGranularityDate,
 			},
-			want: `{"type":"","strategy":"","partition_by":"","cluster_by":null,"incremental_key":"","time_granularity":"date"}`,
+			want: `{"type":"","strategy":"","partition_by":"","cluster_by":null,"incremental_key":"","incremental_predicate":"","time_granularity":"date"}`,
+		},
+		{
+			name: "incremental predicate only materialization is preserved",
+			materialization: pipeline.Materialization{
+				IncrementalPredicate: "target.dt >= DATE '2026-07-01'",
+			},
+			want: `{"type":"","strategy":"","partition_by":"","cluster_by":null,"incremental_key":"","incremental_predicate":"target.dt >= DATE '2026-07-01'","time_granularity":""}`,
 		},
 	}
 
@@ -2364,6 +2372,30 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 			},
 		},
 		{
+			name:  "should set timeout from pipeline defaults",
+			asset: &pipeline.Asset{Name: "test-asset"},
+			foundPipeline: &pipeline.Pipeline{
+				DefaultValues: &pipeline.DefaultValues{Timeout: pipeline.DurationSeconds(2 * time.Hour)},
+			},
+			want: &pipeline.Asset{
+				Name:       "test-asset",
+				Parameters: pipeline.ParameterMap{},
+				Timeout:    pipeline.DurationSeconds(2 * time.Hour),
+			},
+		},
+		{
+			name:  "should not override existing timeout",
+			asset: &pipeline.Asset{Name: "test-asset", Timeout: pipeline.DurationSeconds(30 * time.Minute)},
+			foundPipeline: &pipeline.Pipeline{
+				DefaultValues: &pipeline.DefaultValues{Timeout: pipeline.DurationSeconds(2 * time.Hour)},
+			},
+			want: &pipeline.Asset{
+				Name:       "test-asset",
+				Parameters: pipeline.ParameterMap{},
+				Timeout:    pipeline.DurationSeconds(30 * time.Minute),
+			},
+		},
+		{
 			name: "should apply default hooks when missing",
 			asset: &pipeline.Asset{
 				Name: "test-asset",
@@ -2731,11 +2763,12 @@ func TestBuilder_SetupDefaultsFromPipelineAppliesAssetFieldDefaults(t *testing.T
 		Domains:     []string{"default-domain", "asset-domain"},
 		Meta:        pipeline.EmptyStringMap{"shared": "default", "default": "yes"},
 		Materialization: pipeline.Materialization{
-			Type:           pipeline.MaterializationTypeTable,
-			Strategy:       pipeline.MaterializationStrategyCreateReplace,
-			PartitionBy:    "dt",
-			ClusterBy:      []string{"tenant"},
-			IncrementalKey: "updated_at",
+			Type:                 pipeline.MaterializationTypeTable,
+			Strategy:             pipeline.MaterializationStrategyCreateReplace,
+			PartitionBy:          "dt",
+			ClusterBy:            []string{"tenant"},
+			IncrementalKey:       "updated_at",
+			IncrementalPredicate: "target.dt >= DATE '2026-07-01'",
 		},
 		Upstreams: []pipeline.Upstream{
 			{Type: "asset", Value: "default-upstream"},
@@ -2814,6 +2847,8 @@ func TestBuilder_SetupDefaultsFromPipelineAppliesAssetFieldDefaults(t *testing.T
 	assert.Equal(t, pipeline.MaterializationStrategyAppend, got.Materialization.Strategy)
 	assert.Equal(t, "dt", got.Materialization.PartitionBy)
 	assert.Equal(t, []string{"tenant"}, got.Materialization.ClusterBy)
+	assert.Equal(t, "updated_at", got.Materialization.IncrementalKey)
+	assert.Equal(t, "target.dt >= DATE '2026-07-01'", got.Materialization.IncrementalPredicate)
 	assert.Equal(t, []pipeline.Upstream{
 		{Type: "asset", Value: "asset-upstream"},
 		{Type: "asset", Value: "default-upstream"},
@@ -2853,6 +2888,32 @@ func TestBuilder_SetupDefaultsFromPipelineAppliesAssetFieldDefaults(t *testing.T
 	assert.Len(t, got.Notifications.Slack, 2)
 	assert.Equal(t, "#asset", got.Notifications.Slack[0].Channel)
 	assert.Equal(t, "#default", got.Notifications.Slack[1].Channel)
+}
+
+func TestBuilder_SetupDefaultsFromPipelineMergesEmailNotifications(t *testing.T) {
+	t.Parallel()
+
+	asset := &pipeline.Asset{
+		Notifications: &pipeline.Notifications{
+			Email: []pipeline.EmailNotification{{Recipients: []string{"asset@example.com"}}},
+		},
+	}
+	defaults := &pipeline.DefaultValues{
+		Notifications: &pipeline.Notifications{
+			Email: []pipeline.EmailNotification{
+				{Recipients: []string{"default@example.com"}},
+				{Recipients: []string{"asset@example.com"}},
+			},
+		},
+	}
+
+	got, err := (&pipeline.Builder{}).SetupDefaultsFromPipeline(t.Context(), asset, &pipeline.Pipeline{DefaultValues: defaults})
+	require.NoError(t, err)
+	require.NotNil(t, got.Notifications)
+	assert.Equal(t, []pipeline.EmailNotification{
+		{Recipients: []string{"asset@example.com"}},
+		{Recipients: []string{"default@example.com"}},
+	}, got.Notifications.Email)
 }
 
 func TestBuilder_SetupDefaultsFromPipelineKeepsExplicitMSSQLAssetDefinitions(t *testing.T) {
@@ -3323,6 +3384,20 @@ default:
 	require.NoError(t, err)
 	require.NotNil(t, p.DefaultValues)
 	assert.Equal(t, &pipeline.RoutingConfig{EgressGateway: "wg-shared-ams3"}, p.DefaultValues.Routing)
+}
+
+func TestPipeline_UnmarshalDefaultTimeout(t *testing.T) {
+	t.Parallel()
+
+	var p pipeline.Pipeline
+	err := yaml.Unmarshal([]byte(`
+name: timeout-pipeline
+default:
+  timeout: 2h45m
+`), &p)
+	require.NoError(t, err)
+	require.NotNil(t, p.DefaultValues)
+	assert.Equal(t, 2*time.Hour+45*time.Minute, p.DefaultValues.Timeout.Duration())
 }
 
 func TestAsset_FormatContent_DeduplicatesTags(t *testing.T) {

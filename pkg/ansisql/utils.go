@@ -58,13 +58,38 @@ func prependAnnotationComment(ctx context.Context, q *query.Query, fields map[st
 	if err != nil {
 		return nil, err
 	}
-	if jsonStr == "" {
+	return AddAnnotationJSONComment(q, jsonStr)
+}
+
+// AddAnnotationJSONComment adds the annotation payload to the SQL and carries
+// the same fields as structured metadata for backends with native query tags.
+func AddAnnotationJSONComment(q *query.Query, annotationJSON string) (*query.Query, error) {
+	if annotationJSON == "" {
 		return q, nil
 	}
 
-	return &query.Query{
-		Query: fmt.Sprintf("-- @bruin.config: %s\n", jsonStr) + q.Query,
-	}, nil
+	annotations := make(map[string]json.RawMessage)
+	if err := json.Unmarshal([]byte(annotationJSON), &annotations); err != nil {
+		return nil, errors.Wrapf(err, "invalid JSON in annotations: %s", annotationJSON)
+	}
+
+	annotationTags := make(map[string]string, len(annotations))
+	for key, value := range annotations {
+		if len(value) > 0 && value[0] == '"' {
+			var stringValue string
+			if err := json.Unmarshal(value, &stringValue); err != nil {
+				return nil, errors.Wrapf(err, "failed to decode annotation %q", key)
+			}
+			annotationTags[key] = stringValue
+			continue
+		}
+		annotationTags[key] = string(value)
+	}
+
+	annotatedQuery := *q
+	annotatedQuery.Query = fmt.Sprintf("-- @bruin.config: %s\n", annotationJSON) + q.Query
+	annotatedQuery.Annotations = annotationTags
+	return &annotatedQuery, nil
 }
 
 func AddAnnotationComment(ctx context.Context, q *query.Query, assetName, taskType, pipelineName string) (*query.Query, error) {
@@ -93,6 +118,15 @@ func AddCustomCheckAnnotationComment(ctx context.Context, q *query.Query, assetN
 		"type":              "custom_check",
 		"custom_check_name": checkName,
 		"pipeline":          pipelineName,
+	})
+}
+
+func AddSensorAnnotationComment(ctx context.Context, q *query.Query, assetName, sensorType, pipelineName string) (*query.Query, error) {
+	return prependAnnotationComment(ctx, q, map[string]interface{}{
+		"asset":       assetName,
+		"type":        "sensor",
+		"sensor_type": sensorType,
+		"pipeline":    pipelineName,
 	})
 }
 

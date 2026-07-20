@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/stretchr/testify/assert"
@@ -293,6 +294,7 @@ func TestPipeline_MaterializeVariant(t *testing.T) {
 		pl := build()
 		pl.DefaultValues = &pipeline.DefaultValues{
 			Parameters: pipeline.ParameterMap{"region": "{{ var.region }}"},
+			Timeout:    pipeline.DurationSeconds(90 * time.Minute),
 			Hooks: pipeline.Hooks{
 				Pre:  []pipeline.Hook{{Query: "select '{{ start_date }}'"}},
 				Post: []pipeline.Hook{{Query: "select '{{ end_date }}'"}},
@@ -318,6 +320,7 @@ func TestPipeline_MaterializeVariant(t *testing.T) {
 		assert.Equal(t, "select '{{ end_datetime }}'", pl.Assets[0].Hooks.Post[0].Query)
 		assert.Equal(t, "select '{{ start_date }}'", pl.DefaultValues.Hooks.Pre[0].Query)
 		assert.Equal(t, "select '{{ end_date }}'", pl.DefaultValues.Hooks.Post[0].Query)
+		assert.Equal(t, 90*time.Minute, pl.DefaultValues.Timeout.Duration())
 	})
 
 	t.Run("renders default secrets", func(t *testing.T) {
@@ -437,6 +440,7 @@ func TestVariantVisitorCoversStringFields(t *testing.T) {
 		"Pipeline.Notifications.MSTeams[].Connection": true,
 		"Pipeline.Notifications.Discord[].Connection": true,
 		"Pipeline.Notifications.Webhook[].Connection": true,
+		"Pipeline.Notifications.Email[].Recipients[]": true,
 
 		// Asset internals + file metadata — never user-templated.
 		"Pipeline.Assets[].ID":                     true,
@@ -498,10 +502,12 @@ func TestVariantVisitorCoversStringFields(t *testing.T) {
 		"Pipeline.Assets[].Notifications.MSTeams[].Connection":      true,
 		"Pipeline.Assets[].Notifications.Discord[].Connection":      true,
 		"Pipeline.Assets[].Notifications.Webhook[].Connection":      true,
+		"Pipeline.Assets[].Notifications.Email[].Recipients[]":      true,
 		"Pipeline.DefaultValues.Notifications.Slack[].Channel":      true,
 		"Pipeline.DefaultValues.Notifications.MSTeams[].Connection": true,
 		"Pipeline.DefaultValues.Notifications.Discord[].Connection": true,
 		"Pipeline.DefaultValues.Notifications.Webhook[].Connection": true,
+		"Pipeline.DefaultValues.Notifications.Email[].Recipients[]": true,
 	}
 
 	pl := buildFullyPopulatedPipelineForVisitorTest()
@@ -565,6 +571,10 @@ func buildFullyPopulatedPipelineForVisitorTest() *pipeline.Pipeline {
 			DistributedBy: []string{"id"},
 			Properties:    map[string]string{"replication_num": "1"},
 		},
+		StarRocks: pipeline.StarRocksConfig{
+			TableModel: "primary_key",
+			Properties: map[string]string{"replication_num": "1"},
+		},
 		Routing: &pipeline.RoutingConfig{EgressGateway: "gw"},
 	}
 	return &pipeline.Pipeline{
@@ -616,12 +626,17 @@ func buildFullyPopulatedPipelineForVisitorTest() *pipeline.Pipeline {
 				DistributedBy: []string{"id"},
 				Properties:    map[string]string{"replication_num": "1"},
 			},
+			StarRocks: pipeline.StarRocksConfig{
+				TableModel: "primary_key",
+				Properties: map[string]string{"replication_num": "1"},
+			},
 			Routing: &pipeline.RoutingConfig{EgressGateway: "gw"},
 			Notifications: &pipeline.Notifications{
 				Slack:   []pipeline.SlackNotification{{Channel: "c"}},
 				MSTeams: []pipeline.MSTeamsNotification{{Connection: "c"}},
 				Discord: []pipeline.DiscordNotification{{Connection: "c"}},
 				Webhook: []pipeline.WebhookNotification{{Connection: "c"}},
+				Email:   []pipeline.EmailNotification{{Recipients: []string{"alerts@example.com"}}},
 			},
 		},
 		Variables: pipeline.Variables{

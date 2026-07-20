@@ -200,6 +200,7 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 	for _, key := range primaryKeys {
 		on = append(on, fmt.Sprintf("target.%s = source.%s", quoteColumnName(key), quoteColumnName(key)))
 	}
+	on = ansisql.AddIncrementalPredicate(on, asset.Materialization.IncrementalPredicate)
 
 	mergeLines := []string{
 		fmt.Sprintf("MERGE INTO %s target", quoteIdentifier(asset.Name)),

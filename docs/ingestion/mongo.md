@@ -84,6 +84,46 @@ As a result of this command, Bruin will ingest data from the given MongoDB table
 
 <img width="1017" alt="image" src="https://github.com/user-attachments/assets/2bad9131-baa1-4f20-8e3d-eed4329e7f90">
 
+## Change Data Capture (CDC)
+
+Bruin supports MongoDB CDC through the `ingestr` asset type. CDC uses MongoDB [change streams](https://www.mongodb.com/docs/manual/changeStreams/) to capture inserts, updates, and deletes and replicate them to the destination. It works with both the `mongo` and `mongo_atlas` connection types.
+
+### Prerequisites
+
+- The source MongoDB deployment must be a **replica set** (or sharded cluster). Change streams are not available on standalone servers.
+- The source collection must expose `_id` as its primary key — MongoDB CDC requires it because delete events only carry the document key.
+
+### Parameters
+
+CDC is enabled by setting `cdc: "true"` on an `ingestr` asset with a MongoDB source connection.
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `cdc` | Yes | Set to `"true"` to enable CDC mode |
+| `cdc_mode` | No | `"stream"` for continuous streaming or `"batch"` for batch replication |
+| `cdc_max_await_time` | No | Maximum time the change stream waits for new events, such as `5s` |
+| `cdc_schema_sample_size` | No | Number of documents sampled to infer the schema |
+| `cdc_dest_schema` | No | Destination schema to use for the replicated collection |
+| `source_table` | Yes | Source namespace in `database.collection` format (aggregation pipelines are not supported in CDC mode) |
+| `incremental_strategy` | No | Defaults to `"merge"` when CDC is enabled. CDC assets must use `"merge"`; Bruin rejects other strategies. |
+
+> [!NOTE]
+> When CDC is enabled, primary key columns do not need to be specified in the asset definition — MongoDB CDC always keys on `_id`.
+
+### Example
+
+```yaml
+name: public.users
+type: ingestr
+connection: postgres
+
+parameters:
+  source_connection: localMongo
+  source_table: 'users.details'
+  destination: postgres
+  cdc: "true"
+```
+
 ## Querying
 
 Beyond ingestion, you can run ad-hoc queries against a MongoDB connection with the [`query` command](/commands/query) and verify it with [`bruin connections test`](/commands/connections). Because MongoDB is not SQL, the query is a JSON object describing a find or aggregation against one collection:

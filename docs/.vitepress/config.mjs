@@ -129,6 +129,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "Configure Agents", link: "/cloud/ai-agents/configure"},
                             {text: "Chat with Agents", link: "/cloud/ai-agents/chat"},
                             {text: "Scheduled Agents", link: "/cloud/ai-agents/scheduled"},
+                            {text: "Databricks OAuth", link: "/cloud/ai-agents/databricks-oauth"},
                             {
                                 text: "Examples",
                                 collapsed: true,
@@ -256,6 +257,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "Postgres", link: "/platforms/postgres"},
                             {text: "Redshift", link: "/platforms/redshift"},
                             {text: "Snowflake", link: "/platforms/snowflake"},
+                            {text: "StarRocks", link: "/platforms/starrocks"},
                             {text: "Synapse", link: "/platforms/synapse"},
                             {text: "S3", link: "/platforms/s3"},
                             {text: "Trino", link: "/platforms/trino"},
@@ -302,6 +304,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                                     {text: "Elasticsearch", link: "/ingestion/elasticsearch"},
                                     {text: "ESPN", link: "/ingestion/espn"},
                                     {text: "Facebook", link: "/ingestion/facebook-ads"},
+                                    {text: "FastSpring", link: "/ingestion/fastspring"},
                                     {text: "Fireflies", link: "/ingestion/fireflies"},
                                     {text: "Fluxx", link: "/ingestion/fluxx"},
                                     {text: "football-data.org", link: "/ingestion/footballdata"},

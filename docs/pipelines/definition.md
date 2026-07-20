@@ -279,6 +279,10 @@ notifications:
     - connection: "webhook-default"
       success: true
       failure: true
+  email:
+    - recipients: ["data-alerts@example.com", "oncall@example.com"]
+      success: false
+      failure: true
 ```
 
 - **Type:** `Object`
@@ -418,6 +422,7 @@ Example:
 ```yaml
 
 default:
+  timeout: 1h30m
   secrets:
     - key: MY_API_KEY
       inject_as: API_KEY
@@ -459,6 +464,7 @@ Fields:
 | interval_modifiers | Object                     | —       | See [Interval Modifiers](/assets/interval-modifiers) |
 | hooks              | Object                     | —       | See [Hooks](/assets/definition-schema#hooks) |
 | retries            | Integer                    | —       | Default asset retries            |
+| timeout            | String (Go duration)       | —       | Default asset timeout (for example, `1h30m`) |
 | rerun_cooldown     | Integer                    | —       | Default retry delay/cooldown     |
 | refresh_restricted | Boolean                    | —       | Default full-refresh restriction |
 | notifications      | Object                     | —       | Default asset notifications      |

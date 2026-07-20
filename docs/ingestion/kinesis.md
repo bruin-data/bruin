@@ -56,6 +56,32 @@ parameters:
 bruin run ingestr.kinesis.asset.yml
 ```
 
-As a result of this command, Bruin will ingest data from the given Kinesis table into your Postgres database.
+As a result of this command, Bruin will ingest data from the given Kinesis table into your Postgres database. By default the asset reads the currently available records and exits, which fits a scheduled run.
 
 <img alt="kinesis" src="./media/kinesis-ingestion.png">
+
+## Continuous (streaming) ingestion
+
+Set `stream: true` to read the stream **continuously** instead of exiting once the current records are consumed:
+
+```yaml
+name: public.kinesis
+type: ingestr
+connection: postgres
+
+parameters:
+  source_connection: kinesis
+  source_table: 'test_stream'
+  destination: postgres
+  stream: true
+  flush_interval: 30s      # optional: how often buffered records are written
+  flush_records: 10000     # optional: buffered-record count that triggers a write
+```
+
+A streaming asset never finishes on its own, so it is excluded from a normal `bruin run` and is launched on its own:
+
+```bash
+bruin run --stream assets/kinesis_ingestion.yml
+```
+
+The stream runs in the foreground until you stop it with `Ctrl+C`, then flushes buffered records and exits cleanly. A normal `bruin run <pipeline>` skips streaming assets and prints a notice. See [Streaming assets](/assets/ingestr#streaming-assets) for the full behaviour and restrictions, which apply to message-broker streams as well.

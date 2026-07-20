@@ -289,3 +289,37 @@ func TestDorisIntegration(t *testing.T) {
 
 	runTestsInDirectory(t, dorisDir, "Doris")
 }
+
+// TestStarRocksIntegration runs the self-contained StarRocks suite. It boots a
+// local StarRocks all-in-one container via testcontainers and therefore does not
+// require .bruin.cloud.yml credentials.
+func TestStarRocksIntegration(t *testing.T) {
+	t.Parallel()
+
+	currentFolder, err := os.Getwd()
+	require.NoError(t, err, "Failed to get current working directory")
+
+	starRocksDir := filepath.Join(currentFolder, "starrocks")
+	require.DirExists(t, starRocksDir, "StarRocks test directory should exist")
+
+	t.Logf("Running self-contained StarRocks integration tests (testcontainers)")
+
+	runTestsInDirectory(t, starRocksDir, "StarRocks")
+}
+
+// TestClickHouseIntegration runs the self-contained ClickHouse suite. It boots
+// a local ClickHouse container via testcontainers and does not require
+// .bruin.cloud.yml credentials.
+func TestClickHouseIntegration(t *testing.T) {
+	t.Parallel()
+
+	currentFolder, err := os.Getwd()
+	require.NoError(t, err, "Failed to get current working directory")
+
+	clickHouseDir := filepath.Join(currentFolder, "clickhouse")
+	require.DirExists(t, clickHouseDir, "ClickHouse test directory should exist")
+
+	t.Logf("Running self-contained ClickHouse integration tests (testcontainers)")
+
+	runTestsInDirectory(t, clickHouseDir, "ClickHouse")
+}

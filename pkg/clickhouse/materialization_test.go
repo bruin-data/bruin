@@ -51,9 +51,7 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 			query: "SELECT 1",
 			want: []string{
-				"CREATE TABLE my.__bruin_tmp_abcefghi PRIMARY KEY id AS SELECT 1",
-				"DROP TABLE IF EXISTS my.asset",
-				"RENAME TABLE my.__bruin_tmp_abcefghi TO my.asset",
+				"CREATE OR REPLACE TABLE my.asset PRIMARY KEY (id) AS SELECT 1",
 			},
 		},
 		{
@@ -74,9 +72,27 @@ func TestMaterializer_Render(t *testing.T) {
 			fullRefresh: true,
 			query:       "SELECT 1",
 			want: []string{
-				"CREATE TABLE my.__bruin_tmp_abcefghi PRIMARY KEY id AS SELECT 1",
-				"DROP TABLE IF EXISTS my.asset",
-				"RENAME TABLE my.__bruin_tmp_abcefghi TO my.asset",
+				"CREATE OR REPLACE TABLE my.asset PRIMARY KEY (id) AS SELECT 1",
+			},
+		},
+		{
+			name: "materialize to a table, full refresh with composite primary key falls back to create+replace",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "int", PrimaryKey: true},
+					{Name: "dt", Type: "date", PrimaryKey: true},
+					{Name: "name", Type: "string"},
+				},
+			},
+			fullRefresh: true,
+			query:       "SELECT 1 as id, '2026-01-01' as dt, 'a' as name",
+			want: []string{
+				"CREATE OR REPLACE TABLE my.asset PRIMARY KEY (id, dt) AS SELECT 1 as id, '2026-01-01' as dt, 'a' as name",
 			},
 		},
 		{
@@ -153,7 +169,7 @@ func TestMaterializer_Render(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "merge without primary keys",
+			name: "merge without primary key errors",
 			task: &pipeline.Asset{
 				Name: "my.asset",
 				Materialization: pipeline.Materialization{
@@ -162,23 +178,75 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 				Columns: []pipeline.Column{
 					{Name: "id", Type: "int"},
+					{Name: "name", Type: "string"},
 				},
 			},
-			query:   "SELECT 1 as id",
+			query:   "SELECT 1 as id, 'a' as name",
 			wantErr: true,
 		},
 		{
-			name: "merge without columns",
+			name: "merge with primary key builds delete+insert on primary key",
 			task: &pipeline.Asset{
 				Name: "my.asset",
 				Materialization: pipeline.Materialization{
 					Type:     pipeline.MaterializationTypeTable,
 					Strategy: pipeline.MaterializationStrategyMerge,
 				},
-				Columns: []pipeline.Column{},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "int", PrimaryKey: true},
+					{Name: "name", Type: "string"},
+				},
 			},
-			query:   "SELECT 1 as id",
-			wantErr: true,
+			query: "SELECT 1 as id, 'a' as name",
+			want: []string{
+				"CREATE TABLE my.__bruin_tmp_abcefghi ENGINE = MergeTree() PRIMARY KEY (id) AS SELECT 1 as id, 'a' as name",
+				"DELETE FROM my.asset WHERE id IN (SELECT id FROM my.__bruin_tmp_abcefghi)",
+				"INSERT INTO my.asset SETTINGS insert_deduplicate = 0 SELECT * FROM my.__bruin_tmp_abcefghi",
+				"DROP TABLE IF EXISTS my.__bruin_tmp_abcefghi",
+			},
+		},
+		{
+			name: "merge with composite primary key builds delete on all keys",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "int", PrimaryKey: true},
+					{Name: "dt", Type: "date", PrimaryKey: true},
+					{Name: "name", Type: "string"},
+				},
+			},
+			query: "SELECT 1 as id, '2026-01-01' as dt, 'a' as name",
+			want: []string{
+				"CREATE TABLE my.__bruin_tmp_abcefghi ENGINE = MergeTree() PRIMARY KEY (id, dt) AS SELECT 1 as id, '2026-01-01' as dt, 'a' as name",
+				"DELETE FROM my.asset WHERE (id, dt) IN (SELECT id, dt FROM my.__bruin_tmp_abcefghi)",
+				"INSERT INTO my.asset SETTINGS insert_deduplicate = 0 SELECT * FROM my.__bruin_tmp_abcefghi",
+				"DROP TABLE IF EXISTS my.__bruin_tmp_abcefghi",
+			},
+		},
+		{
+			name: "merge with incremental_predicate appends to delete condition",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:                 pipeline.MaterializationTypeTable,
+					Strategy:             pipeline.MaterializationStrategyMerge,
+					IncrementalPredicate: "dt >= '2026-01-01'",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "int", PrimaryKey: true},
+				},
+			},
+			query: "SELECT 1 as id",
+			want: []string{
+				"CREATE TABLE my.__bruin_tmp_abcefghi ENGINE = MergeTree() PRIMARY KEY (id) AS SELECT 1 as id",
+				"DELETE FROM my.asset WHERE id IN (SELECT id FROM my.__bruin_tmp_abcefghi) AND (dt >= '2026-01-01')",
+				"INSERT INTO my.asset SETTINGS insert_deduplicate = 0 SELECT * FROM my.__bruin_tmp_abcefghi",
+				"DROP TABLE IF EXISTS my.__bruin_tmp_abcefghi",
+			},
 		},
 		{
 			name: "time_interval_no_incremental_key",
@@ -207,8 +275,8 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 			query: "SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}'",
 			want: []string{
-				"DELETE FROM my.asset WHERE ts BETWEEN '{{start_timestamp}}' AND '{{end_timestamp}}'",
-				"INSERT INTO my.asset SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}'",
+				"DELETE FROM my.asset WHERE ts BETWEEN '{{ start_timestamp | date_format('%Y-%m-%dT%H:%M:%S.%f') }}' AND '{{ end_timestamp | date_format('%Y-%m-%dT%H:%M:%S.%f') }}'",
+				"INSERT INTO my.asset SETTINGS insert_deduplicate = 0 SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}'",
 			},
 		},
 		{
@@ -225,7 +293,7 @@ func TestMaterializer_Render(t *testing.T) {
 			query: "SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}'",
 			want: []string{
 				"DELETE FROM my.asset WHERE dt BETWEEN '{{start_date}}' AND '{{end_date}}'",
-				"INSERT INTO my.asset SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}'",
+				"INSERT INTO my.asset SETTINGS insert_deduplicate = 0 SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}'",
 			},
 		},
 		{

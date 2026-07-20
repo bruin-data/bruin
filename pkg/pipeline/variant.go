@@ -305,10 +305,12 @@ func assetFromDefaultValues(dv *DefaultValues) *Asset {
 		Snowflake:         dv.Snowflake,
 		Athena:            dv.Athena,
 		Doris:             dv.Doris,
+		StarRocks:         dv.StarRocks,
 		Routing:           dv.Routing,
 		IntervalModifiers: dv.IntervalModifiers,
 		RerunCooldown:     dv.RerunCooldown,
 		Retries:           dv.Retries,
+		Timeout:           dv.Timeout,
 		RefreshRestricted: dv.RefreshRestricted,
 		Notifications:     dv.Notifications,
 	}
@@ -343,10 +345,12 @@ func copyAssetToDefaultValues(dv *DefaultValues, asset *Asset) {
 	dv.Snowflake = asset.Snowflake
 	dv.Athena = asset.Athena
 	dv.Doris = asset.Doris
+	dv.StarRocks = asset.StarRocks
 	dv.Routing = asset.Routing
 	dv.IntervalModifiers = asset.IntervalModifiers
 	dv.RerunCooldown = asset.RerunCooldown
 	dv.Retries = asset.Retries
+	dv.Timeout = asset.Timeout
 	dv.RefreshRestricted = asset.RefreshRestricted
 	dv.Notifications = asset.Notifications
 }
@@ -425,6 +429,9 @@ func renderAssetStrings(render RenderFunc, a *Asset) error {
 	if a.Materialization.IncrementalKey, err = maybeRender(render, fmt.Sprintf("asset[%s].materialization.incremental_key", originalName), a.Materialization.IncrementalKey); err != nil {
 		return err
 	}
+	if a.Materialization.IncrementalPredicate, err = maybeRender(render, fmt.Sprintf("asset[%s].materialization.incremental_predicate", originalName), a.Materialization.IncrementalPredicate); err != nil {
+		return err
+	}
 	for i, c := range a.Materialization.ClusterBy {
 		if a.Materialization.ClusterBy[i], err = maybeRender(render, fmt.Sprintf("asset[%s].materialization.cluster_by[%d]", originalName, i), c); err != nil {
 			return err
@@ -447,6 +454,14 @@ func renderAssetStrings(render RenderFunc, a *Asset) error {
 	}
 	for key, value := range a.Doris.Properties {
 		if a.Doris.Properties[key], err = maybeRender(render, fmt.Sprintf("asset[%s].doris.properties[%s]", originalName, key), value); err != nil {
+			return err
+		}
+	}
+	if a.StarRocks.TableModel, err = maybeRender(render, fmt.Sprintf("asset[%s].starrocks.table_model", originalName), a.StarRocks.TableModel); err != nil {
+		return err
+	}
+	for key, value := range a.StarRocks.Properties {
+		if a.StarRocks.Properties[key], err = maybeRender(render, fmt.Sprintf("asset[%s].starrocks.properties[%s]", originalName, key), value); err != nil {
 			return err
 		}
 	}

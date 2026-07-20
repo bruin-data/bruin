@@ -156,6 +156,13 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser sqlpa
 			ApplicableLevels: []Level{LevelAsset},
 		},
 		&SimpleRule{
+			Identifier:       "ingestr-cdc-mode-deprecated",
+			Fast:             true,
+			Severity:         ValidatorSeverityWarning,
+			AssetValidator:   WarnIngestrCDCModeDeprecated,
+			ApplicableLevels: []Level{LevelAsset},
+		},
+		&SimpleRule{
 			Identifier:       "valid-pipeline-start-date",
 			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
@@ -259,6 +266,14 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser sqlpa
 			Severity:         ValidatorSeverityCritical,
 			AssetValidator:   EnsureAssetTierIsValidForASingleAsset,
 			ApplicableLevels: []Level{LevelAsset},
+		},
+		&SimpleRule{
+			Identifier:       "valid-timeout",
+			Fast:             true,
+			Severity:         ValidatorSeverityCritical,
+			Validator:        EnsurePipelineDefaultTimeoutIsValid,
+			AssetValidator:   EnsureAssetTimeoutIsValidForASingleAsset,
+			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
 		},
 		&SimpleRule{
 			Identifier:       "plain-yaml-files",

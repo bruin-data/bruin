@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/jinja"
@@ -1228,6 +1229,41 @@ func TestEnsurePipelineNotificationsAreValid(t *testing.T) {
 			},
 			want: []*Issue{{Description: discordConnectionNotUnique}},
 		},
+		{
+			name: "valid email recipients",
+			p: &pipeline.Pipeline{
+				Notifications: pipeline.Notifications{
+					Email: []pipeline.EmailNotification{{Recipients: []string{"alerts@example.com", "oncall@example.com"}}},
+				},
+			},
+			want: noIssues,
+		},
+		{
+			name: "email recipients are required",
+			p: &pipeline.Pipeline{
+				Notifications: pipeline.Notifications{Email: []pipeline.EmailNotification{{}}},
+			},
+			want: []*Issue{{Description: emailRecipientsEmpty}},
+		},
+		{
+			name: "email recipient cannot be empty",
+			p: &pipeline.Pipeline{
+				Notifications: pipeline.Notifications{Email: []pipeline.EmailNotification{{Recipients: []string{""}}}},
+			},
+			want: []*Issue{{Description: emailRecipientEmpty}},
+		},
+		{
+			name: "duplicate email recipient groups",
+			p: &pipeline.Pipeline{
+				Notifications: pipeline.Notifications{
+					Email: []pipeline.EmailNotification{
+						{Recipients: []string{"alerts@example.com"}},
+						{Recipients: []string{"alerts@example.com"}},
+					},
+				},
+			},
+			want: []*Issue{{Description: emailRecipientsNotUnique}},
+		},
 	}
 
 	for _, tt := range tests {
@@ -1264,11 +1300,12 @@ func TestEnsureMaterializationValuesAreValid(t *testing.T) {
 				{
 					Name: "task1",
 					Materialization: pipeline.Materialization{
-						Type:           pipeline.MaterializationTypeView,
-						Strategy:       "whatever",
-						IncrementalKey: "whatever",
-						ClusterBy:      []string{"whatever"},
-						PartitionBy:    "whatever",
+						Type:                 pipeline.MaterializationTypeView,
+						Strategy:             "whatever",
+						IncrementalKey:       "whatever",
+						IncrementalPredicate: "whatever",
+						ClusterBy:            []string{"whatever"},
+						PartitionBy:          "whatever",
 					},
 				},
 			},
@@ -1276,6 +1313,7 @@ func TestEnsureMaterializationValuesAreValid(t *testing.T) {
 			want: []string{
 				materializationStrategyIsNotSupportedForViews,
 				materializationIncrementalKeyNotSupportedForViews,
+				"Materialization incremental predicate is not supported for views",
 				materializationClusterByNotSupportedForViews,
 				materializationPartitionByNotSupportedForViews,
 			},
@@ -1321,6 +1359,23 @@ func TestEnsureMaterializationValuesAreValid(t *testing.T) {
 			wantErr: assert.NoError,
 			want: []string{
 				"Incremental key is only supported with 'delete+insert', 'time_interval', 'scd2_by_time' and 'scd2_by_column' strategies.",
+			},
+		},
+		{
+			name: "table materialization has incremental predicate but wrong strategy",
+			assets: []*pipeline.Asset{
+				{
+					Name: "task1",
+					Materialization: pipeline.Materialization{
+						Type:                 pipeline.MaterializationTypeTable,
+						Strategy:             pipeline.MaterializationStrategyAppend,
+						IncrementalPredicate: "target.dt >= DATE '2026-07-01'",
+					},
+				},
+			},
+			wantErr: assert.NoError,
+			want: []string{
+				"Incremental predicate is only supported with the 'merge' strategy.",
 			},
 		},
 		{
@@ -2059,6 +2114,41 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 			wantErr:        assert.NoError,
 		},
 		{
+			name: "ingestr asset with incremental predicate",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "conn1",
+					"source_table":      "table1",
+					"destination":       "dest1",
+				},
+				Materialization: pipeline.Materialization{
+					Type:                 pipeline.MaterializationTypeTable,
+					Strategy:             pipeline.MaterializationStrategyMerge,
+					IncrementalPredicate: "target.updated_at >= DATE '2026-07-01'",
+				},
+				Columns: []pipeline.Column{
+					{Name: "col1", PrimaryKey: true},
+				},
+			},
+			wantErrMessage: "Incremental predicate is not supported for ingestr assets",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "ingestr asset with incremental predicate parameter and no materialization",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection":     "conn1",
+					"source_table":          "table1",
+					"destination":           "dest1",
+					"incremental_predicate": "target.updated_at >= DATE '2026-07-01'",
+				},
+			},
+			wantErrMessage: "Incremental predicate is not supported for ingestr assets",
+			wantErr:        assert.NoError,
+		},
+		{
 			name: "ingestr asset with unsupported materialization type",
 			asset: &pipeline.Asset{
 				Type: pipeline.AssetTypeIngestr,
@@ -2358,6 +2448,69 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 				assert.Equal(t, tt.wantErrMessage, got[0].Description)
 			} else {
 				assert.Equal(t, []*Issue{}, got)
+			}
+		})
+	}
+}
+
+func TestWarnIngestrCDCModeDeprecated(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		asset    *pipeline.Asset
+		wantWarn bool
+	}{
+		{
+			name: "non-ingestr asset is ignored",
+			asset: &pipeline.Asset{
+				Type:       pipeline.AssetTypePython,
+				Parameters: pipeline.ParameterMap{"cdc": "true", "cdc_mode": "stream"},
+			},
+		},
+		{
+			name: "non-cdc streaming asset is fine",
+			asset: &pipeline.Asset{
+				Type:       pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{"stream": "true"},
+			},
+		},
+		{
+			name: "cdc asset using stream is fine",
+			asset: &pipeline.Asset{
+				Type:       pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{"cdc": "true", "stream": "true"},
+			},
+		},
+		{
+			name: "cdc asset without cdc_mode (batch) is fine",
+			asset: &pipeline.Asset{
+				Type:       pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{"cdc": "true"},
+			},
+		},
+		{
+			name: "cdc asset using deprecated cdc_mode warns",
+			asset: &pipeline.Asset{
+				Type:       pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{"cdc": "true", "cdc_mode": "stream"},
+			},
+			wantWarn: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			p := &pipeline.Pipeline{Assets: []*pipeline.Asset{tt.asset}}
+			got, err := WarnIngestrCDCModeDeprecated(t.Context(), p, tt.asset)
+			require.NoError(t, err)
+			if tt.wantWarn {
+				assert.Len(t, got, 1)
+				assert.Contains(t, got[0].Description, "deprecated")
+			} else {
+				assert.Empty(t, got)
 			}
 		})
 	}
@@ -3284,6 +3437,39 @@ func TestEnsureValidPythonAssetMaterialization(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "python asset with incremental predicate",
+			p: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "asset1",
+						Type: pipeline.AssetTypePython,
+						Materialization: pipeline.Materialization{
+							Type:                 pipeline.MaterializationTypeTable,
+							Strategy:             pipeline.MaterializationStrategyMerge,
+							IncrementalPredicate: "target.updated_at >= DATE '2026-07-01'",
+						},
+						Connection: "conn1",
+					},
+				},
+			},
+			want: []*Issue{
+				{
+					Task: &pipeline.Asset{
+						Name: "asset1",
+						Type: pipeline.AssetTypePython,
+						Materialization: pipeline.Materialization{
+							Type:                 pipeline.MaterializationTypeTable,
+							Strategy:             pipeline.MaterializationStrategyMerge,
+							IncrementalPredicate: "target.updated_at >= DATE '2026-07-01'",
+						},
+						Connection: "conn1",
+					},
+					Description: "Incremental predicate is not supported for Python assets",
+				},
+			},
+			wantErr: false,
+		},
+		{
 			name: "invalid python asset with unsupported strategy",
 			p: &pipeline.Pipeline{
 				Assets: []*pipeline.Asset{
@@ -3977,6 +4163,114 @@ func TestEnsureAssetTierIsValidForASingleAsset(t *testing.T) {
 				t.Errorf("EnsureAssetTierIsValidForASingleAsset() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestEnsureAssetTimeoutIsValidForASingleAsset(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		timeout pipeline.DurationSeconds
+		want    []*Issue
+	}{
+		{
+			name:    "unset timeout is valid",
+			timeout: 0,
+			want:    noIssues,
+		},
+		{
+			name:    "one second is valid",
+			timeout: pipeline.DurationSeconds(time.Second),
+			want:    noIssues,
+		},
+		{
+			name:    "ninety minutes is valid",
+			timeout: pipeline.DurationSeconds(90 * time.Minute),
+			want:    noIssues,
+		},
+		{
+			name:    "sub-second timeout is invalid",
+			timeout: pipeline.DurationSeconds(500 * time.Millisecond),
+			want: []*Issue{
+				{
+					Task:        &pipeline.Asset{Timeout: pipeline.DurationSeconds(500 * time.Millisecond)},
+					Description: assetTimeoutMustBeAtLeastOneSecond,
+				},
+			},
+		},
+		{
+			name:    "negative timeout is invalid",
+			timeout: pipeline.DurationSeconds(-5 * time.Second),
+			want: []*Issue{
+				{
+					Task:        &pipeline.Asset{Timeout: pipeline.DurationSeconds(-5 * time.Second)},
+					Description: assetTimeoutMustBeAtLeastOneSecond,
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			asset := &pipeline.Asset{Timeout: tt.timeout}
+			got, err := EnsureAssetTimeoutIsValidForASingleAsset(t.Context(), &pipeline.Pipeline{}, asset)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestEnsurePipelineDefaultTimeoutIsValid(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		p    *pipeline.Pipeline
+		want []*Issue
+	}{
+		{
+			name: "missing defaults is valid",
+			p:    &pipeline.Pipeline{},
+			want: noIssues,
+		},
+		{
+			name: "unset default timeout is valid",
+			p: &pipeline.Pipeline{
+				DefaultValues: &pipeline.DefaultValues{},
+			},
+			want: noIssues,
+		},
+		{
+			name: "one second default is valid",
+			p: &pipeline.Pipeline{
+				DefaultValues: &pipeline.DefaultValues{
+					Timeout: pipeline.DurationSeconds(time.Second),
+				},
+			},
+			want: noIssues,
+		},
+		{
+			name: "sub-second default timeout is invalid",
+			p: &pipeline.Pipeline{
+				DefaultValues: &pipeline.DefaultValues{
+					Timeout: pipeline.DurationSeconds(250 * time.Millisecond),
+				},
+			},
+			want: []*Issue{
+				{Description: pipelineDefaultTimeoutMustBeAtLeastOneSecond},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := EnsurePipelineDefaultTimeoutIsValid(t.Context(), tt.p)
+			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
 		})
 	}

@@ -317,3 +317,13 @@ columns:
     type: "STRING"
     description: "Transaction status (completed, pending, refunded)"
 ```
+
+## Query annotations
+
+When query annotations are enabled, Bruin adds the annotation JSON as a `@bruin.config` SQL comment and sends the same fields as native Databricks statement-level query tags. Native tags are available in Databricks query history and `system.query.history.query_tags`.
+
+This applies to asset statements, schema and catalog setup, quality checks, sensors, and ad-hoc queries. Use `--query-annotations default` for Bruin's standard fields, or provide a JSON object with additional fields:
+
+```shell
+bruin run path/to/pipeline --query-annotations '{"environment":"prod","team":"data"}'
+```

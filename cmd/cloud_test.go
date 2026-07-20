@@ -143,7 +143,7 @@ func TestCloudCommand_Help(t *testing.T) {
 	cmd := Cloud(&isDebug)
 	require.NotNil(t, cmd)
 	assert.Equal(t, "cloud", cmd.Name)
-	assert.Len(t, cmd.Commands, 9)
+	assert.Len(t, cmd.Commands, 10)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
@@ -158,6 +158,7 @@ func TestCloudCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "agents")
 	assert.Contains(t, subNames, "connections")
 	assert.Contains(t, subNames, "dashboards")
+	assert.Contains(t, subNames, "scheduled-agents")
 }
 
 func TestCloudProjectsCommand_Help(t *testing.T) {
@@ -240,26 +241,72 @@ func TestCloudDashboardsCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "update")
 }
 
+func TestCloudScheduledAgentsCommand_Help(t *testing.T) {
+	t.Parallel()
+	cmd := CloudScheduledAgents()
+	require.NotNil(t, cmd)
+	assert.Equal(t, "scheduled-agents", cmd.Name)
+	require.Len(t, cmd.Commands, 4)
+
+	subNames := make([]string, len(cmd.Commands))
+	for i, sub := range cmd.Commands {
+		subNames[i] = sub.Name
+	}
+	assert.Contains(t, subNames, "list")
+	assert.Contains(t, subNames, "get")
+	assert.Contains(t, subNames, "create")
+	assert.Contains(t, subNames, "update")
+}
+
+func TestMessagePairIDFromEnv(t *testing.T) {
+	t.Run("reads a numeric value", func(t *testing.T) {
+		t.Setenv("BRUIN_MESSAGE_PAIR_ID", " 42 ")
+		id, ok := messagePairIDFromEnv()
+		require.True(t, ok)
+		assert.Equal(t, 42, id)
+	})
+
+	t.Run("skips when unset", func(t *testing.T) {
+		t.Setenv("BRUIN_MESSAGE_PAIR_ID", "")
+		_, ok := messagePairIDFromEnv()
+		assert.False(t, ok)
+	})
+
+	t.Run("skips a non-numeric value", func(t *testing.T) {
+		t.Setenv("BRUIN_MESSAGE_PAIR_ID", "abc")
+		_, ok := messagePairIDFromEnv()
+		assert.False(t, ok)
+	})
+
+	t.Run("skips zero and negative values", func(t *testing.T) {
+		for _, v := range []string{"0", "-5"} {
+			t.Setenv("BRUIN_MESSAGE_PAIR_ID", v)
+			_, ok := messagePairIDFromEnv()
+			assert.Falsef(t, ok, "value %q should be skipped", v)
+		}
+	})
+}
+
 func TestParseDashboardState(t *testing.T) {
 	t.Parallel()
 
 	t.Run("parses a JSON object", func(t *testing.T) {
 		t.Parallel()
-		got, err := parseDashboardState([]byte(`{"name":"d","rows":[]}`))
+		got, err := parseJSONOrYAMLObject([]byte(`{"name":"d","rows":[]}`))
 		require.NoError(t, err)
 		assert.Equal(t, "d", got["name"])
 	})
 
 	t.Run("parses a YAML object", func(t *testing.T) {
 		t.Parallel()
-		got, err := parseDashboardState([]byte("name: d\nrows: []\n"))
+		got, err := parseJSONOrYAMLObject([]byte("name: d\nrows: []\n"))
 		require.NoError(t, err)
 		assert.Equal(t, "d", got["name"])
 	})
 
 	t.Run("preserves an unquoted date-like scalar as a string", func(t *testing.T) {
 		t.Parallel()
-		got, err := parseDashboardState([]byte("default: 2024-01-01\n"))
+		got, err := parseJSONOrYAMLObject([]byte("default: 2024-01-01\n"))
 		require.NoError(t, err)
 		assert.Equal(t, "2024-01-01", got["default"])
 	})
@@ -267,7 +314,7 @@ func TestParseDashboardState(t *testing.T) {
 	t.Run("returns nil for non-object documents", func(t *testing.T) {
 		t.Parallel()
 		for _, in := range []string{"", "null", `"scalar"`, "[1, 2]"} {
-			got, err := parseDashboardState([]byte(in))
+			got, err := parseJSONOrYAMLObject([]byte(in))
 			require.NoError(t, err, "input %q", in)
 			assert.Nil(t, got, "input %q", in)
 		}
@@ -275,7 +322,7 @@ func TestParseDashboardState(t *testing.T) {
 
 	t.Run("errors on malformed YAML", func(t *testing.T) {
 		t.Parallel()
-		_, err := parseDashboardState([]byte("name: [unclosed"))
+		_, err := parseJSONOrYAMLObject([]byte("name: [unclosed"))
 		require.Error(t, err)
 	})
 }

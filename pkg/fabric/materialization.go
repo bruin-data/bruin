@@ -101,6 +101,11 @@ func buildDeleteInsertQuery(asset *pipeline.Asset, query string) (string, error)
 
 // buildMergeQuery falls back to delete+insert because Fabric MERGE is limited.
 func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
+	// The delete+insert fallback has no merge match condition to attach the predicate to.
+	if strings.TrimSpace(asset.Materialization.IncrementalPredicate) != "" {
+		return "", errors.New("incremental_predicate is not supported for Fabric merge materialization")
+	}
+
 	return buildDeleteInsertQuery(asset, query)
 }
 

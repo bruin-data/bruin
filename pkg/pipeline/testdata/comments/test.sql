@@ -2,6 +2,7 @@
 -- @bruin.description: some description goes here
 -- @bruin.type: bq.sql
 -- @bruin.retries: 5
+-- @bruin.timeout: 1h30m
 -- @bruin.depends: task1, task2
 -- @bruin.depends: task3,task4
 -- @bruin.depends: task5, task3
@@ -14,6 +15,7 @@
 -- @bruin.materialization.cluster_by: event_name
 -- @bruin.materialization.strategy: delete+insert
 -- @bruin.materialization.incremental_key: dt
+-- @bruin.materialization.incremental_predicate: target.dt >= DATE '2026-07-01'
 -- @bruin.columns.some_column.primary_key: true
 -- @bruin.columns.some_column.type: numeric
 -- @bruin.columns.some_column.precision: 10

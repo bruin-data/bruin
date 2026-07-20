@@ -30,6 +30,9 @@ var versionPattern = regexp.MustCompile(`^v(0|[1-9]\d*)(\.\d+\.\d+)?$`)
 const (
 	versionFamilyV0 = "v0"
 	versionFamilyV1 = "v1"
+	// paramStream is the ingestr asset parameter that enables continuous streaming.
+	// The deprecated cdc_mode: stream alias uses the same literal as its value.
+	paramStream = "stream"
 )
 
 // resolvedEngine is the outcome of parsing parameters.version on an ingestr asset.
@@ -230,7 +233,19 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		}
 
 		// An unsupported scheme is left alone here, and ingestr rejects it downstream.
-		parsedURI.Scheme, _ = ingestruri.CDCScheme(parsedURI.Scheme)
+		baseScheme := parsedURI.Scheme
+		parsedURI.Scheme, _ = ingestruri.CDCScheme(baseScheme)
+
+		// SQL Server exposes two capture mechanisms. Log-based CDC (mssql+cdc) is the
+		// default; Change Tracking (mssql+ct) is selected per-asset because it can't be
+		// derived from the scheme alone. The +ct source takes no query parameters and is
+		// driven purely by --primary-key / --incremental-strategy merge, so its
+		// source-specific parameters below are skipped.
+		sqlCapture, _ := asset.Parameters.GetString("cdc_sql_capture")
+		changeTracking := isMSSQLScheme(baseScheme) && sqlCapture == "change_tracking"
+		if changeTracking {
+			parsedURI.Scheme = strings.TrimSuffix(parsedURI.Scheme, "+cdc") + "+ct"
+		}
 
 		q := parsedURI.Query()
 		// PostgreSQL logical-replication parameters.
@@ -258,18 +273,47 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		if tls, _ := asset.Parameters.GetString("cdc_tls"); tls != "" {
 			q.Set("tls", tls)
 		}
-		// Shared parameters.
-		if mode, _ := asset.Parameters.GetString("cdc_mode"); mode != "" {
-			q.Set("mode", mode)
+		// SQL Server log-based CDC parameters, confined to the mssql source so they
+		// cannot leak into other CDC URIs. Change Tracking (+ct) ignores query
+		// parameters, so these are only forwarded for the mssql+cdc source.
+		if isMSSQLScheme(baseScheme) && !changeTracking {
+			if captureInstance, _ := asset.Parameters.GetString("cdc_capture_instance"); captureInstance != "" {
+				q.Set("capture_instance", captureInstance)
+			}
+			if pollInterval, _ := asset.Parameters.GetString("cdc_poll_interval"); pollInterval != "" {
+				q.Set("poll_interval", pollInterval)
+			}
 		}
+		// MongoDB change-stream parameters, confined to the mongodb source.
+		if isMongoDBScheme(baseScheme) {
+			if maxAwaitTime, _ := asset.Parameters.GetString("cdc_max_await_time"); maxAwaitTime != "" {
+				q.Set("max_await_time", maxAwaitTime)
+			}
+			if sampleSize, _ := asset.Parameters.GetString("cdc_schema_sample_size"); sampleSize != "" {
+				q.Set("schema_sample_size", sampleSize)
+			}
+		}
+		// The cdc_mode selector is no longer sent as a URI query parameter: ingestr
+		// deprecated ?mode= and rejects mode=stream unless --stream is also passed.
+		// Continuous ingestion is driven purely by the --stream flag, which we
+		// enable below for the deprecated cdc_mode: stream alias.
 		if destSchema, _ := asset.Parameters.GetString("cdc_dest_schema"); destSchema != "" {
 			q.Set("dest_schema", destSchema)
+		}
+		if stateID, _ := asset.Parameters.GetString("cdc_state_id"); stateID != "" {
+			q.Set("state_id", stateID)
 		}
 		parsedURI.RawQuery = q.Encode()
 
 		sourceURI = parsedURI.String()
 
 		applyCDCStreamParameters(asset.Parameters)
+
+		// cdc_mode: stream maps to ingestr's --stream flag (continuous ingestion).
+		// Reuse the generic stream parameter so the shared flag builder emits it.
+		if mode, _ := asset.Parameters.GetString("cdc_mode"); mode == paramStream {
+			asset.Parameters[paramStream] = "true"
+		}
 
 		// Auto-set merge strategy for CDC if not already set
 		if _, exists := asset.Parameters["incremental_strategy"]; !exists {
@@ -328,8 +372,9 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	)
 
 	// ingestr serves the stream metrics over HTTP for the lifetime of the run,
-	// and rejects --metrics-addr unless --stream is set as well.
-	if isCDCAsset(asset) {
+	// and rejects --metrics-addr unless --stream is set as well, so only emit it
+	// for a streaming asset.
+	if IsStreamingAsset(asset) {
 		if metricsAddr, _ := asset.Parameters.GetString("cdc_stream_metrics_addr"); metricsAddr != "" {
 			baseArgs = append(baseArgs, "--metrics-addr", metricsAddr)
 		}
@@ -339,9 +384,12 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		baseArgs = append(baseArgs, "--debug")
 	}
 
+	destConn := o.conn.GetConnection(destConnectionName)
 	cmdArgs, err := python.ConsolidatedParameters(ctx, asset, baseArgs, &python.ColumnHintOptions{
 		NormalizeColumnNames:   false,
 		EnforceSchemaByDefault: false,
+		TypeHintOverlay:        python.TypeHintOverlayForConnection(destConn),
+		TypeWrappers:           python.TypeWrappersForConnection(destConn),
 	})
 	if err != nil {
 		return err
@@ -375,6 +423,13 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	cmdArgs, err = appendQueryAnnotations(ctx, cmdArgs, engine, ti)
 	if err != nil {
 		return err
+	}
+
+	// A streaming asset runs continuously; mark the context so the runner launches
+	// ingestr as a managed process that is tied to this context and torn down
+	// gracefully (SIGTERM to the process group) when the run is cancelled.
+	if IsStreamingAsset(asset) {
+		ctx = python.WithStreaming(ctx)
 	}
 
 	return o.runner.RunIngestr(ctx, cmdArgs, extraPackages, repo)
@@ -457,6 +512,10 @@ func applyMaterializationParameters(asset *pipeline.Asset) error {
 	}
 
 	mat := asset.Materialization
+	if hasIngestrIncrementalPredicate(asset, mat) {
+		return errors.New("incremental_predicate is not supported for ingestr assets")
+	}
+
 	if mat.Type == pipeline.MaterializationTypeNone {
 		return nil
 	}
@@ -492,7 +551,6 @@ func applyMaterializationParameters(asset *pipeline.Asset) error {
 	if hasIngestrIncrementalKey(asset, mat) && !python.IsIngestrIncrementalKeyStrategy(effectiveStrategy) {
 		return errors.New("materialization.incremental_key is only supported for append, merge, and delete+insert strategies on ingestr assets")
 	}
-
 	if err := setMaterializationParameter(asset.Parameters, "incremental_key", mat.IncrementalKey, "materialization.incremental_key"); err != nil {
 		return err
 	}
@@ -527,12 +585,53 @@ func isCDCAsset(asset *pipeline.Asset) bool {
 	return cdc == "true"
 }
 
+// IsStreamingAsset reports whether an ingestr asset runs as a continuous,
+// never-terminating stream rather than a one-shot batch load. This is true for a
+// CDC asset in stream mode (cdc: true + stream: true) and for a message-broker
+// source that opts into continuous ingestion with the stream parameter.
+//
+// It is the single classifier the run command and the filter chain use to route
+// streaming assets away from the batch DAG.
+func IsStreamingAsset(asset *pipeline.Asset) bool {
+	if asset == nil || asset.Type != pipeline.AssetTypeIngestr {
+		return false
+	}
+	if stream, _ := asset.Parameters.GetString(paramStream); stream == "true" {
+		return true
+	}
+	if isCDCAsset(asset) {
+		mode, _ := asset.Parameters.GetString("cdc_mode")
+		return mode == paramStream
+	}
+	return false
+}
+
+// isMSSQLScheme reports whether scheme belongs to the SQL Server family, which is
+// the only source that offers the Change Tracking (+ct) capture mode.
+func isMSSQLScheme(scheme string) bool {
+	return strings.HasPrefix(scheme, "mssql") || strings.HasPrefix(scheme, "sqlserver")
+}
+
+// isMongoDBScheme reports whether scheme belongs to the MongoDB family (mongodb,
+// mongodb+srv), which understands the change-stream CDC parameters.
+func isMongoDBScheme(scheme string) bool {
+	return strings.HasPrefix(scheme, "mongodb")
+}
+
 func hasIngestrIncrementalKey(asset *pipeline.Asset, mat pipeline.Materialization) bool {
 	if strings.TrimSpace(mat.IncrementalKey) != "" {
 		return true
 	}
 	key, _ := asset.Parameters.GetString("incremental_key")
 	return strings.TrimSpace(key) != ""
+}
+
+func hasIngestrIncrementalPredicate(asset *pipeline.Asset, mat pipeline.Materialization) bool {
+	if strings.TrimSpace(mat.IncrementalPredicate) != "" {
+		return true
+	}
+	predicate, _ := asset.Parameters.GetString("incremental_predicate")
+	return strings.TrimSpace(predicate) != ""
 }
 
 func setMaterializationParameter(params pipeline.ParameterMap, key, value, source string) error {
@@ -661,9 +760,12 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 		baseArgs = append(baseArgs, "--debug")
 	}
 
+	destConn := o.conn.GetConnection(destConnectionName)
 	cmdArgs, err := python.ConsolidatedParameters(ctx, asset, baseArgs, &python.ColumnHintOptions{
 		NormalizeColumnNames:   true,
 		EnforceSchemaByDefault: true,
+		TypeHintOverlay:        python.TypeHintOverlayForConnection(destConn),
+		TypeWrappers:           python.TypeWrappersForConnection(destConn),
 	})
 	if err != nil {
 		return err

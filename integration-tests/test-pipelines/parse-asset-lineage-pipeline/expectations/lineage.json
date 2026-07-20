@@ -23,6 +23,7 @@
         "partition_by": "",
         "cluster_by": null,
         "incremental_key": "",
+        "incremental_predicate": "",
         "time_granularity": ""
       },
       "interval_modifiers": null,
@@ -123,6 +124,7 @@
         "partition_by": "",
         "cluster_by": null,
         "incremental_key": "",
+        "incremental_predicate": "",
         "time_granularity": ""
       },
       "interval_modifiers": null,
@@ -288,6 +290,7 @@
         "partition_by": "",
         "cluster_by": null,
         "incremental_key": "",
+        "incremental_predicate": "",
         "time_granularity": ""
       },
       "interval_modifiers": null,
@@ -442,6 +445,7 @@
         "partition_by": "",
         "cluster_by": null,
         "incremental_key": "",
+        "incremental_predicate": "",
         "time_granularity": ""
       },
       "interval_modifiers": null,

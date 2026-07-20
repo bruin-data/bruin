@@ -72,6 +72,7 @@ func mergeMaterializer(asset *pipeline.Asset, query string) (string, error) {
 	for _, key := range primaryKeys {
 		on = append(on, fmt.Sprintf("(source.%s = target.%s OR (source.%s IS NULL and target.%s IS NULL))", key, key, key, key))
 	}
+	on = ansisql.AddIncrementalPredicate(on, asset.Materialization.IncrementalPredicate)
 	onQuery := strings.Join(on, " AND ")
 
 	allColumnValues := strings.Join(columnNames, ", ")

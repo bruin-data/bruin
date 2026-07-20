@@ -323,6 +323,29 @@ INSERT INTO my.asset SELECT 1 as id, 'test' as name`,
 				"WHEN NOT MATCHED THEN INSERT\\(dt, event_type, value, value2\\) VALUES\\(dt, event_type, value, value2\\);",
 		},
 		{
+			name: "merge with incremental predicate",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "event_date"},
+					{Name: "value", UpdateOnMerge: true},
+				},
+				Materialization: pipeline.Materialization{
+					Type:                 pipeline.MaterializationTypeTable,
+					Strategy:             pipeline.MaterializationStrategyMerge,
+					IncrementalPredicate: "target.event_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)",
+				},
+			},
+			query: "SELECT id, event_date, value FROM source_table",
+			want: "MERGE my.asset target\n" +
+				"USING (SELECT id, event_date, value FROM source_table) source\n" +
+				"ON ((source.id = target.id OR (source.id IS NULL and target.id IS NULL)) AND (target.event_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)))\n" +
+				"WHEN MATCHED THEN UPDATE SET target.value = source.value\n" +
+				"WHEN NOT MATCHED THEN INSERT(id, event_date, value) VALUES(id, event_date, value);",
+			exactMatch: true,
+		},
+		{
 			name: "merge with merge_sql custom expressions",
 			task: &pipeline.Asset{
 				Name: "my.asset",

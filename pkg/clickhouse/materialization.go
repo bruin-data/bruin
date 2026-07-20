@@ -27,7 +27,7 @@ var matMap = AssetMaterializationMap{
 		pipeline.MaterializationStrategyCreateReplace:  buildCreateReplaceQuery,
 		pipeline.MaterializationStrategyDeleteInsert:   buildIncrementalQuery,
 		pipeline.MaterializationStrategyTruncateInsert: buildTruncateInsertQuery,
-		pipeline.MaterializationStrategyMerge:          errorMaterializer,
+		pipeline.MaterializationStrategyMerge:          buildMergeQuery,
 		pipeline.MaterializationStrategyTimeInterval:   buildTimeIntervalQuery,
 		pipeline.MaterializationStrategyDDL:            buildDDLQuery,
 	},
@@ -88,6 +88,64 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) ([]string, error)
 	return queries, nil
 }
 
+// buildMergeQuery implements the `merge` materialization strategy for ClickHouse.
+//
+// ClickHouse has no `MERGE INTO` statement, so the upsert is performed with a
+// delete+insert pattern keyed on the asset's primary key column(s): the query
+// result is staged in a temporary table, rows in the target whose primary key
+// appears in the staged rows are deleted, and the staged rows are then
+// inserted. This preserves the semantics of `merge` (existing rows are
+// replaced, new rows are added, untouched rows remain) while staying within
+// ClickHouse's SQL surface: a lightweight DELETE cannot reference other tables
+// in its WHERE clause, so the match is expressed as an IN subquery against the
+// temp table. The INSERT disables insert deduplication because ClickHouse's
+// block-level dedup would otherwise silently drop the insert on a rerun after
+// the matching rows were deleted (see issue #2396). The optional
+// `incremental_predicate` is appended to the delete condition to scope which
+// target rows are considered for replacement; it must reference the target
+// table's columns unqualified, since ClickHouse DELETE has no table aliases.
+func buildMergeQuery(task *pipeline.Asset, query string) ([]string, error) {
+	if len(task.Columns) == 0 {
+		return nil, fmt.Errorf("materialization strategy %s requires the `columns` field to be set", task.Materialization.Strategy)
+	}
+
+	primaryKeys := task.ColumnNamesWithPrimaryKey()
+	if len(primaryKeys) == 0 {
+		return nil, fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column", task.Materialization.Strategy)
+	}
+
+	// Extract database name from task.Name to ensure temp table is created in the correct database
+	assetNameParts := strings.Split(task.Name, ".")
+	var tempTableName string
+	if len(assetNameParts) == 2 {
+		databaseName := assetNameParts[0]
+		tempTableName = databaseName + ".__bruin_tmp_" + helpers.PrefixGenerator()
+	} else {
+		// Fallback for tables without explicit database
+		tempTableName = "__bruin_tmp_" + helpers.PrefixGenerator()
+	}
+
+	keys := strings.Join(primaryKeys, ", ")
+	deleteCondition := keys
+	if len(primaryKeys) > 1 {
+		deleteCondition = "(" + deleteCondition + ")"
+	}
+	deleteCondition += fmt.Sprintf(" IN (SELECT %s FROM %s)", keys, tempTableName)
+
+	if pred := strings.TrimSpace(task.Materialization.IncrementalPredicate); pred != "" {
+		deleteCondition += " AND (" + pred + ")"
+	}
+
+	queries := []string{
+		fmt.Sprintf("CREATE TABLE %s ENGINE = MergeTree() PRIMARY KEY (%s) AS %s", tempTableName, keys, query),
+		fmt.Sprintf("DELETE FROM %s WHERE %s", task.Name, deleteCondition),
+		fmt.Sprintf("INSERT INTO %s SETTINGS insert_deduplicate = 0 SELECT * FROM %s", task.Name, tempTableName),
+		"DROP TABLE IF EXISTS " + tempTableName,
+	}
+
+	return queries, nil
+}
+
 func buildTruncateInsertQuery(task *pipeline.Asset, query string) ([]string, error) {
 	// ClickHouse doesn't support transactions, so we return individual statements
 	queries := []string{
@@ -102,32 +160,19 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query string) ([]string, erro
 		return nil, fmt.Errorf("materialization strategy %s requires the `columns` field to be set", task.Materialization.Strategy)
 	}
 	primaryKeys := task.ColumnNamesWithPrimaryKey()
-	if len(primaryKeys) != 1 {
-		return nil, fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at EXACTLY one column", task.Materialization.Strategy)
+	if len(primaryKeys) == 0 {
+		return nil, fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column", task.Materialization.Strategy)
 	}
 
 	query = strings.TrimSuffix(query, ";")
 
-	// Extract database name from task.Name to ensure temp table is created in the correct database
-	assetNameParts := strings.Split(task.Name, ".")
-	var tempTableName string
-	if len(assetNameParts) == 2 {
-		databaseName := assetNameParts[0]
-		tempTableName = databaseName + ".__bruin_tmp_" + helpers.PrefixGenerator()
-	} else {
-		// Fallback for tables without explicit database
-		tempTableName = "__bruin_tmp_" + helpers.PrefixGenerator()
-	}
-
 	return []string{
 		fmt.Sprintf(
-			"CREATE TABLE %s PRIMARY KEY %s AS %s",
-			tempTableName,
-			task.ColumnNamesWithPrimaryKey()[0],
+			"CREATE OR REPLACE TABLE %s PRIMARY KEY (%s) AS %s",
+			task.Name,
+			strings.Join(primaryKeys, ", "),
 			query,
 		),
-		"DROP TABLE IF EXISTS " + task.Name,
-		fmt.Sprintf("RENAME TABLE %s TO %s", tempTableName, task.Name),
 	}, nil
 }
 
@@ -144,8 +189,8 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) ([]string, erro
 		return nil, errors.New("time_granularity must be either 'date', or 'timestamp'")
 	}
 
-	startVar := "{{start_timestamp}}"
-	endVar := "{{end_timestamp}}"
+	startVar := "{{ start_timestamp | date_format('%Y-%m-%dT%H:%M:%S.%f') }}"
+	endVar := "{{ end_timestamp | date_format('%Y-%m-%dT%H:%M:%S.%f') }}"
 	if asset.Materialization.TimeGranularity == pipeline.MaterializationTimeGranularityDate {
 		startVar = "{{start_date}}"
 		endVar = "{{end_date}}"
@@ -157,7 +202,7 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) ([]string, erro
 			asset.Materialization.IncrementalKey,
 			startVar,
 			endVar),
-		fmt.Sprintf(`INSERT INTO %s %s`,
+		fmt.Sprintf(`INSERT INTO %s SETTINGS insert_deduplicate = 0 %s`,
 			asset.Name, query),
 	}
 

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -20,6 +21,55 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
 )
+
+type registrationTestOperator struct{}
+
+func (*registrationTestOperator) Run(context.Context, scheduler.TaskInstance) error {
+	return nil
+}
+
+func TestRegisterDatabricksExecutors(t *testing.T) {
+	t.Parallel()
+
+	configs := map[pipeline.AssetType]executor.Config{}
+	for _, assetType := range []pipeline.AssetType{
+		pipeline.AssetTypeDatabricksQuery,
+		pipeline.AssetTypeDatabricksSeed,
+		pipeline.AssetTypeDatabricksSource,
+		pipeline.AssetTypeDatabricksQuerySensor,
+		pipeline.AssetTypeDatabricksTableSensor,
+		pipeline.AssetTypePython,
+	} {
+		configs[assetType] = executor.Config{}
+	}
+
+	set := databricksExecutorSet{
+		main:        &registrationTestOperator{},
+		check:       &registrationTestOperator{},
+		customCheck: &registrationTestOperator{},
+		seed:        &registrationTestOperator{},
+		querySensor: &registrationTestOperator{},
+		tableSensor: &registrationTestOperator{},
+	}
+	registerDatabricksExecutors(configs, set, true)
+
+	assert.Same(t, set.main, configs[pipeline.AssetTypeDatabricksQuery][scheduler.TaskInstanceTypeMain])
+	assert.Same(t, set.seed, configs[pipeline.AssetTypeDatabricksSeed][scheduler.TaskInstanceTypeMain])
+	assert.Same(t, set.querySensor, configs[pipeline.AssetTypeDatabricksQuerySensor][scheduler.TaskInstanceTypeMain])
+	assert.Same(t, set.tableSensor, configs[pipeline.AssetTypeDatabricksTableSensor][scheduler.TaskInstanceTypeMain])
+
+	for _, assetType := range []pipeline.AssetType{
+		pipeline.AssetTypeDatabricksQuery,
+		pipeline.AssetTypeDatabricksSeed,
+		pipeline.AssetTypeDatabricksSource,
+		pipeline.AssetTypeDatabricksQuerySensor,
+		pipeline.AssetTypeDatabricksTableSensor,
+		pipeline.AssetTypePython,
+	} {
+		assert.Same(t, set.check, configs[assetType][scheduler.TaskInstanceTypeColumnCheck])
+		assert.Same(t, set.customCheck, configs[assetType][scheduler.TaskInstanceTypeCustomCheck])
+	}
+}
 
 func TestDisableColorIfRequested(t *testing.T) { //nolint:paralleltest // mutates global color.NoColor
 	previousNoColor := color.NoColor
@@ -1469,6 +1519,59 @@ func TestApplyAllFilters_SkipsDisabledAssetsAndAllowsDownstream(t *testing.T) {
 	assert.Contains(t, queued, "Task2")
 	assert.NotContains(t, queued, "Task1")
 	assert.NotContains(t, queued, "Task1:id:not_null")
+}
+
+func TestSkipStreamingAssets(t *testing.T) {
+	t.Parallel()
+
+	newPipeline := func() *pipeline.Pipeline {
+		return &pipeline.Pipeline{
+			Name: "TestPipeline",
+			Assets: []*pipeline.Asset{
+				{
+					Name:       "batch_asset",
+					Type:       pipeline.AssetTypeIngestr,
+					Parameters: pipeline.ParameterMap{"cdc": "true", "cdc_mode": "batch"},
+				},
+				{
+					Name:       "stream_asset",
+					Type:       pipeline.AssetTypeIngestr,
+					Parameters: pipeline.ParameterMap{"cdc": "true", "cdc_mode": "stream"},
+				},
+			},
+		}
+	}
+
+	humanIDs := func(instances []scheduler.TaskInstance) []string {
+		ids := make([]string, 0, len(instances))
+		for _, inst := range instances {
+			ids = append(ids, inst.GetHumanID())
+		}
+		return ids
+	}
+
+	t.Run("skips streaming assets in a normal run", func(t *testing.T) {
+		t.Parallel()
+		p := newPipeline()
+		s := scheduler.NewScheduler(zap.NewNop().Sugar(), p, "test")
+		require.NoError(t, ApplyAllFilters(t.Context(), &Filter{}, s, p))
+
+		pending := humanIDs(s.GetTaskInstancesByStatus(scheduler.Pending))
+		skipped := humanIDs(s.GetTaskInstancesByStatus(scheduler.Skipped))
+		assert.Contains(t, pending, "batch_asset")
+		assert.NotContains(t, pending, "stream_asset")
+		assert.Contains(t, skipped, "stream_asset")
+	})
+
+	t.Run("keeps the streaming asset in stream mode", func(t *testing.T) {
+		t.Parallel()
+		p := newPipeline()
+		s := scheduler.NewScheduler(zap.NewNop().Sugar(), p, "test")
+		require.NoError(t, SkipStreamingAssets(t.Context(), &Filter{StreamMode: true}, s, p))
+
+		skipped := humanIDs(s.GetTaskInstancesByStatus(scheduler.Skipped))
+		assert.NotContains(t, skipped, "stream_asset")
+	})
 }
 
 func TestValidation(t *testing.T) {

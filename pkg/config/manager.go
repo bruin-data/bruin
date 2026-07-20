@@ -108,6 +108,7 @@ type Connections struct {
 	Polymarket          []PolymarketConnection          `yaml:"polymarket,omitempty" json:"polymarket,omitempty" mapstructure:"polymarket"`
 	Mixpanel            []MixpanelConnection            `yaml:"mixpanel,omitempty" json:"mixpanel,omitempty" mapstructure:"mixpanel"`
 	Amplitude           []AmplitudeConnection           `yaml:"amplitude,omitempty" json:"amplitude,omitempty" mapstructure:"amplitude"`
+	Fastspring          []FastspringConnection          `yaml:"fastspring,omitempty" json:"fastspring,omitempty" mapstructure:"fastspring"`
 	Clickup             []ClickupConnection             `yaml:"clickup,omitempty" json:"clickup,omitempty" mapstructure:"clickup"`
 	Jobtread            []JobtreadConnection            `yaml:"jobtread,omitempty" json:"jobtread,omitempty" mapstructure:"jobtread"`
 	Posthog             []PosthogConnection             `yaml:"posthog,omitempty" json:"posthog,omitempty" mapstructure:"posthog"`
@@ -1375,6 +1376,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Amplitude = append(env.Connections.Amplitude, conn)
+	case "fastspring":
+		var conn FastspringConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Fastspring = append(env.Connections.Fastspring, conn)
 	case "wise":
 		var conn WiseConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1993,6 +2001,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Mixpanel = removeConnection(env.Connections.Mixpanel, connectionName)
 	case "amplitude":
 		env.Connections.Amplitude = removeConnection(env.Connections.Amplitude, connectionName)
+	case "fastspring":
+		env.Connections.Fastspring = removeConnection(env.Connections.Fastspring, connectionName)
 	case "pinterest":
 		env.Connections.Pinterest = removeConnection(env.Connections.Pinterest, connectionName)
 	case "trino":
@@ -2282,6 +2292,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Polymarket, source.Polymarket)
 	mergeConnectionList(&c.Mixpanel, source.Mixpanel)
 	mergeConnectionList(&c.Amplitude, source.Amplitude)
+	mergeConnectionList(&c.Fastspring, source.Fastspring)
 	mergeConnectionList(&c.Clickup, source.Clickup)
 	mergeConnectionList(&c.Jobtread, source.Jobtread)
 	mergeConnectionList(&c.Posthog, source.Posthog)

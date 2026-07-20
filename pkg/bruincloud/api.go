@@ -613,3 +613,43 @@ func (c *APIClient) UpdateDashboard(ctx context.Context, dashboardID int, fields
 	}
 	return &result, nil
 }
+
+func (c *APIClient) ListScheduledAgents(ctx context.Context) ([]ScheduledAgent, error) {
+	var resp struct {
+		ScheduledAgents []ScheduledAgent `json:"scheduled_agents"`
+	}
+	err := c.doRequest(ctx, http.MethodGet, "/scheduled-agents", nil, &resp)
+	return resp.ScheduledAgents, err
+}
+
+func (c *APIClient) GetScheduledAgent(ctx context.Context, scheduledAgentID int) (*ScheduledAgent, error) {
+	var result ScheduledAgent
+	err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/scheduled-agents/%d", scheduledAgentID), nil, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// CreateScheduledAgent creates a scheduled agent from a plan. The server stores it as
+// an inactive draft (a human activates it from the UI); fields is the request
+// body and must include agent_id.
+func (c *APIClient) CreateScheduledAgent(ctx context.Context, fields map[string]any) (*ScheduledAgent, error) {
+	var result ScheduledAgent
+	err := c.doRequest(ctx, http.MethodPost, "/scheduled-agents", fields, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// UpdateScheduledAgent applies a partial update to a scheduled agent's plan. Only the
+// fields present are changed; activation is not updatable via the API.
+func (c *APIClient) UpdateScheduledAgent(ctx context.Context, scheduledAgentID int, fields map[string]any) (*ScheduledAgent, error) {
+	var result ScheduledAgent
+	err := c.doRequest(ctx, http.MethodPatch, fmt.Sprintf("/scheduled-agents/%d", scheduledAgentID), fields, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}

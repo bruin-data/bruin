@@ -34,6 +34,7 @@ const (
 	PlatformOracle     Platform = "oracle"
 	PlatformFabric     Platform = "fabric"
 	PlatformVertica    Platform = "vertica"
+	PlatformStarRocks  Platform = "starrocks"
 )
 
 // ---------------------------------------------------------------------------

@@ -1320,6 +1320,7 @@ type SharePointConnection struct {
 	Library            string `yaml:"library,omitempty" json:"library,omitempty" mapstructure:"library"`
 	MaxFileSize        *int64 `yaml:"max_file_size,omitempty" json:"max_file_size,omitempty" mapstructure:"max_file_size"`
 	MaxFiles           *int64 `yaml:"max_files,omitempty" json:"max_files,omitempty" mapstructure:"max_files"`
+	DownloadTimeout    string `yaml:"download_timeout,omitempty" json:"download_timeout,omitempty" mapstructure:"download_timeout"`
 }
 
 func (c SharePointConnection) GetName() string {
@@ -1367,6 +1368,16 @@ type AmplitudeConnection struct {
 }
 
 func (c AmplitudeConnection) GetName() string {
+	return c.Name
+}
+
+type FastspringConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	Username           string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password" sensitive:"true"`
+}
+
+func (c FastspringConnection) GetName() string {
 	return c.Name
 }
 

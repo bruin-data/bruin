@@ -1,11 +1,15 @@
 package databricks
 
 import (
+	"context"
 	"errors"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/databricks/databricks-sql-go/driverctx"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -38,6 +42,28 @@ func TestNewDB_LazyConnection(t *testing.T) {
 
 	// Step 3: Now conn should be set
 	require.NotNil(t, db.conn, "connection should be initialized after ensureConnection")
+}
+
+func TestWithNativeQueryTags(t *testing.T) {
+	t.Parallel()
+
+	tags := map[string]string{
+		"asset":    "catalog.schema.asset",
+		"pipeline": "test_pipeline",
+		"type":     "main",
+	}
+
+	ctx := withNativeQueryTags(t.Context(), &query.Query{Annotations: tags})
+
+	assert.Equal(t, tags, driverctx.QueryTagsFromContext(ctx))
+}
+
+func TestWithNativeQueryTags_NoAnnotations(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+
+	assert.Same(t, ctx, withNativeQueryTags(ctx, &query.Query{}))
 }
 
 func TestDB_Select(t *testing.T) {
@@ -256,6 +282,32 @@ func TestDB_Ping(t *testing.T) {
 			require.NoError(t, mock.ExpectationsWereMet())
 		})
 	}
+}
+
+func TestDB_CreateSchemaIfNotExistAddsAnnotations(t *testing.T) {
+	t.Parallel()
+
+	mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+	require.NoError(t, err)
+	defer mockDB.Close()
+
+	asset := &pipeline.Asset{Name: "catalog.schema.asset"}
+	annotation := `-- @bruin.config: {"asset":"catalog.schema.asset","pipeline":"test_pipeline","type":"schema"}` + "\n"
+	mock.ExpectQuery(annotation + "CREATE CATALOG IF NOT EXISTS CATALOG").
+		WillReturnRows(sqlmock.NewRows([]string{"result"}))
+	mock.ExpectQuery(annotation + "CREATE SCHEMA IF NOT EXISTS CATALOG.SCHEMA").
+		WillReturnRows(sqlmock.NewRows([]string{"result"}))
+
+	db := DB{
+		conn:          sqlx.NewDb(mockDB, "sqlmock"),
+		schemaCreator: ansisql.NewSchemaCreatorWithContainer("CATALOG"),
+	}
+	ctx := context.WithValue(t.Context(), pipeline.RunConfigQueryAnnotations, ansisql.DefaultQueryAnnotations)
+
+	err = db.CreateSchemaIfNotExist(ctx, asset, "test_pipeline")
+
+	require.NoError(t, err)
+	require.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestDB_BuildTableExistsQuery(t *testing.T) {

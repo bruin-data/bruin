@@ -648,6 +648,13 @@ func TestLoadFromFile(t *testing.T) {
 					Region:             "us",
 				},
 			},
+			Fastspring: []FastspringConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "fastspring-1"},
+					Username:           "user-123",
+					Password:           "pass-123",
+				},
+			},
 			Wise: []WiseConnection{
 				{
 					ConnectionMetadata: ConnectionMetadata{Name: "wise-1"},
@@ -943,6 +950,7 @@ func TestLoadFromFile(t *testing.T) {
 					Library:            "Documents",
 					MaxFileSize:        &sharePointMaxFileSize,
 					MaxFiles:           &sharePointMaxFiles,
+					DownloadTimeout:    "30m",
 				},
 			},
 			APIFootball: []APIFootballConnection{
@@ -1683,12 +1691,13 @@ func TestConfig_AddConnection(t *testing.T) {
 			connType: "sharepoint",
 			connName: "sharepoint-conn",
 			creds: map[string]interface{}{
-				"tenant_id":     "tenant-id",
-				"client_id":     "client-id",
-				"client_secret": "client-secret",
-				"hostname":      "example.sharepoint.com",
-				"site":          "sites/Example",
-				"library":       "Documents",
+				"tenant_id":        "tenant-id",
+				"client_id":        "client-id",
+				"client_secret":    "client-secret",
+				"hostname":         "example.sharepoint.com",
+				"site":             "sites/Example",
+				"library":          "Documents",
+				"download_timeout": "30m",
 			},
 			expectedErr: false,
 		},
@@ -1817,6 +1826,7 @@ func TestConfig_AddConnection(t *testing.T) {
 					assert.Equal(t, tt.creds["hostname"], env.Connections.SharePoint[0].Hostname)
 					assert.Equal(t, tt.creds["site"], env.Connections.SharePoint[0].Site)
 					assert.Equal(t, tt.creds["library"], env.Connections.SharePoint[0].Library)
+					assert.Equal(t, tt.creds["download_timeout"], env.Connections.SharePoint[0].DownloadTimeout)
 				case "iceberg":
 					assert.Len(t, env.Connections.Iceberg, 1)
 					assert.Equal(t, tt.connName, env.Connections.Iceberg[0].Name)
@@ -2744,6 +2754,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Polymarket:          []PolymarketConnection{{ConnectionMetadata: ConnectionMetadata{Name: "polymarket1"}}},
 				Mixpanel:            []MixpanelConnection{{ConnectionMetadata: ConnectionMetadata{Name: "mixpanel1"}}},
 				Amplitude:           []AmplitudeConnection{{ConnectionMetadata: ConnectionMetadata{Name: "amplitude1"}}},
+				Fastspring:          []FastspringConnection{{ConnectionMetadata: ConnectionMetadata{Name: "fastspring1"}}},
 				Clickup:             []ClickupConnection{{ConnectionMetadata: ConnectionMetadata{Name: "clickup1"}}},
 				Jobtread:            []JobtreadConnection{{ConnectionMetadata: ConnectionMetadata{Name: "jobtread1"}}},
 				Posthog:             []PosthogConnection{{ConnectionMetadata: ConnectionMetadata{Name: "posthog1"}}},
@@ -2879,6 +2890,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Polymarket:          []PolymarketConnection{{ConnectionMetadata: ConnectionMetadata{Name: "polymarket1"}}},
 				Mixpanel:            []MixpanelConnection{{ConnectionMetadata: ConnectionMetadata{Name: "mixpanel1"}}},
 				Amplitude:           []AmplitudeConnection{{ConnectionMetadata: ConnectionMetadata{Name: "amplitude1"}}},
+				Fastspring:          []FastspringConnection{{ConnectionMetadata: ConnectionMetadata{Name: "fastspring1"}}},
 				Clickup:             []ClickupConnection{{ConnectionMetadata: ConnectionMetadata{Name: "clickup1"}}},
 				Jobtread:            []JobtreadConnection{{ConnectionMetadata: ConnectionMetadata{Name: "jobtread1"}}},
 				Posthog:             []PosthogConnection{{ConnectionMetadata: ConnectionMetadata{Name: "posthog1"}}},

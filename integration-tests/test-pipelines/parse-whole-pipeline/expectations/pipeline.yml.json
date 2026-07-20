@@ -164,6 +164,7 @@
         "partition_by": "",
         "cluster_by": null,
         "incremental_key": "",
+        "incremental_predicate": "",
         "time_granularity": ""
       },
       "upstreams": [
@@ -243,7 +244,8 @@
     "slack": [],
     "ms_teams": [],
     "discord": [],
-    "webhook": []
+    "webhook": [],
+    "email": []
   },
   "catchup": "",
   "metadata_push": {

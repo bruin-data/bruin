@@ -52,11 +52,16 @@ const (
 	msTeamsConnectionNotUnique = "The `connection` attribute under the MS Teams notifications must be unique"
 	discordConnectionEmpty     = "Discord notifications `connection` attribute must not be empty"
 	discordConnectionNotUnique = "The `connection` attribute under the Discord notifications must be unique"
+	emailRecipientsEmpty       = "Email notifications must have at least one recipient"
+	emailRecipientEmpty        = "Email notification recipients must not be empty"
+	emailRecipientsNotUnique   = "The `recipients` attribute under the email notifications must be unique"
 
-	pipelineConcurrencyMustBePositive    = "Pipeline concurrency must be 1 or greater"
-	pipelineMaxActiveStepsMustBePositive = "Pipeline max_active_steps must be a positive number"
-	assetTierMustBeBetweenOneAndFive     = "Asset tier must be between 1 and 5"
-	secretMappingKeyMustExist            = "Secrets must have a `key` attribute"
+	pipelineConcurrencyMustBePositive            = "Pipeline concurrency must be 1 or greater"
+	pipelineMaxActiveStepsMustBePositive         = "Pipeline max_active_steps must be a positive number"
+	assetTierMustBeBetweenOneAndFive             = "Asset tier must be between 1 and 5"
+	assetTimeoutMustBeAtLeastOneSecond           = "Asset timeout must be at least 1s"
+	pipelineDefaultTimeoutMustBeAtLeastOneSecond = "Pipeline default timeout must be at least 1s"
+	secretMappingKeyMustExist                    = "Secrets must have a `key` attribute"
 
 	materializationStrategyIsNotSupportedForViews     = "Materialization strategy is not supported for views"
 	materializationPartitionByNotSupportedForViews    = "Materialization partition by is not supported for views because views cannot be partitioned"
@@ -321,6 +326,12 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 			Description: "Invalid 'cdc_mode' value: must be 'stream' or 'batch'",
 		})
 	}
+	if capture, exists := asset.Parameters.GetString("cdc_sql_capture"); exists && capture != "cdc" && capture != "change_tracking" {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: "Invalid 'cdc_sql_capture' value: must be 'cdc' or 'change_tracking'",
+		})
+	}
 	if v, exists := asset.Parameters.GetString("version"); exists && v != "" && !ingestrVersionPattern.MatchString(v) {
 		issues = append(issues, &Issue{
 			Task:        asset,
@@ -343,9 +354,38 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 	return issues, nil
 }
 
+// WarnIngestrCDCModeDeprecated flags the deprecated cdc_mode parameter. Streaming
+// is now controlled by the single stream parameter across all source types:
+// set stream: true to stream a CDC asset, or omit it for a bounded (batch) run.
+func WarnIngestrCDCModeDeprecated(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	if asset.Type != pipeline.AssetTypeIngestr || asset.Parameters == nil {
+		return nil, nil
+	}
+
+	if cdc, _ := asset.Parameters.GetString("cdc"); cdc != "true" {
+		return nil, nil
+	}
+
+	if _, exists := asset.Parameters.GetString("cdc_mode"); !exists {
+		return nil, nil
+	}
+
+	return []*Issue{{
+		Task:        asset,
+		Description: "'cdc_mode' is deprecated; set 'stream: true' to stream a CDC asset, or omit it for a bounded (batch) run",
+	}}, nil
+}
+
 func validateIngestrMaterialization(asset *pipeline.Asset, effectiveStrategy string) ([]*Issue, string) {
 	issues := make([]*Issue, 0)
 	mat := asset.Materialization
+	if hasIngestrMaterializationIncrementalPredicate(asset, mat) {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: "Incremental predicate is not supported for ingestr assets",
+		})
+	}
+
 	if mat.Type == pipeline.MaterializationTypeNone {
 		return issues, ""
 	}
@@ -378,7 +418,6 @@ func validateIngestrMaterialization(asset *pipeline.Asset, effectiveStrategy str
 			Description: "Materialization incremental key is only supported for append, merge, and delete+insert strategies on ingestr assets",
 		})
 	}
-
 	issues = append(issues, validateIngestrMaterializationConflict(asset, "incremental_key", mat.IncrementalKey, "materialization.incremental_key")...)
 	issues = append(issues, validateIngestrMaterializationConflict(asset, "partition_by", mat.PartitionBy, "materialization.partition_by")...)
 	issues = append(issues, validateIngestrMaterializationConflict(asset, "cluster_by", strings.Join(mat.ClusterBy, ","), "materialization.cluster_by")...)
@@ -392,6 +431,14 @@ func hasIngestrMaterializationIncrementalKey(asset *pipeline.Asset, mat pipeline
 	}
 	key, _ := asset.Parameters.GetString("incremental_key")
 	return strings.TrimSpace(key) != ""
+}
+
+func hasIngestrMaterializationIncrementalPredicate(asset *pipeline.Asset, mat pipeline.Materialization) bool {
+	if strings.TrimSpace(mat.IncrementalPredicate) != "" {
+		return true
+	}
+	predicate, _ := asset.Parameters.GetString("incremental_predicate")
+	return strings.TrimSpace(predicate) != ""
 }
 
 func validateIngestrMaterializationConflict(asset *pipeline.Asset, key, value, source string) []*Issue {
@@ -618,6 +665,13 @@ func ValidatePythonAssetMaterialization(ctx context.Context, p *pipeline.Pipelin
 		issues = append(issues, &Issue{
 			Task:        asset,
 			Description: "A task with materialization must have a connection defined",
+		})
+	}
+
+	if asset.Materialization.IncrementalPredicate != "" {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: "Incremental predicate is not supported for Python assets",
 		})
 	}
 
@@ -1219,6 +1273,30 @@ func validateNotifications(n *pipeline.Notifications, issueContext []string) []*
 		discordConnectionEmpty, discordConnectionNotUnique, issueContext,
 	)...)
 
+	emailRecipientGroups := make([]string, 0, len(n.Email))
+	for _, email := range n.Email {
+		if len(email.Recipients) == 0 {
+			issues = append(issues, &Issue{Description: emailRecipientsEmpty, Context: issueContext})
+			continue
+		}
+
+		recipients := make([]string, 0, len(email.Recipients))
+		for _, recipient := range email.Recipients {
+			recipient = strings.TrimSpace(recipient)
+			if recipient == "" {
+				issues = append(issues, &Issue{Description: emailRecipientEmpty, Context: issueContext})
+				continue
+			}
+			recipients = append(recipients, recipient)
+		}
+
+		key := strings.Join(recipients, "\x00")
+		if slices.Contains(emailRecipientGroups, key) {
+			issues = append(issues, &Issue{Description: emailRecipientsNotUnique, Context: issueContext})
+		}
+		emailRecipientGroups = append(emailRecipientGroups, key)
+	}
+
 	return issues
 }
 
@@ -1304,6 +1382,13 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 			})
 		}
 
+		if asset.Materialization.IncrementalPredicate != "" {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: "Materialization incremental predicate is not supported for views",
+			})
+		}
+
 		if asset.Materialization.ClusterBy != nil {
 			issues = append(issues, &Issue{
 				Task:        asset,
@@ -1319,6 +1404,13 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 		}
 
 	case pipeline.MaterializationTypeTable:
+		if asset.Materialization.IncrementalPredicate != "" && asset.Materialization.Strategy != pipeline.MaterializationStrategyMerge {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: "Incremental predicate is only supported with the 'merge' strategy.",
+			})
+		}
+
 		if asset.Materialization.Strategy == pipeline.MaterializationStrategyNone {
 			return issues, nil
 		}
@@ -1660,6 +1752,7 @@ var TableSensorAllowedAssetTypes = map[pipeline.AssetType]bool{
 	pipeline.AssetTypeSynapseTableSensor:    true,
 	pipeline.AssetTypeMySQLTableSensor:      true,
 	pipeline.AssetTypeDorisTableSensor:      true,
+	pipeline.AssetTypeStarRocksTableSensor:  true,
 }
 
 var platformNames = map[pipeline.AssetType]string{
@@ -1674,6 +1767,7 @@ var platformNames = map[pipeline.AssetType]string{
 	pipeline.AssetTypeSynapseTableSensor:    "Synapse",
 	pipeline.AssetTypeMySQLTableSensor:      "MySQL",
 	pipeline.AssetTypeDorisTableSensor:      "Doris",
+	pipeline.AssetTypeStarRocksTableSensor:  "StarRocks",
 }
 
 func ValidateTableSensorTableParameter(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
@@ -2143,6 +2237,33 @@ func EnsureAssetTierIsValidForASingleAsset(ctx context.Context, p *pipeline.Pipe
 		issues = append(issues, &Issue{
 			Task:        asset,
 			Description: assetTierMustBeBetweenOneAndFive,
+		})
+	}
+
+	return issues, nil
+}
+
+func EnsureAssetTimeoutIsValidForASingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+	if asset.Timeout != 0 && asset.Timeout.Duration() < time.Second {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: assetTimeoutMustBeAtLeastOneSecond,
+		})
+	}
+
+	return issues, nil
+}
+
+func EnsurePipelineDefaultTimeoutIsValid(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+	if p.DefaultValues == nil || p.DefaultValues.Timeout == 0 {
+		return issues, nil
+	}
+
+	if p.DefaultValues.Timeout.Duration() < time.Second {
+		issues = append(issues, &Issue{
+			Description: pipelineDefaultTimeoutMustBeAtLeastOneSecond,
 		})
 	}
 

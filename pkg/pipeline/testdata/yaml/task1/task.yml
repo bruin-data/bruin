@@ -13,6 +13,7 @@ materialization:
   strategy: "create+replace"
   partition_by: dt
   incremental_key: dt
+  incremental_predicate: target.dt >= DATE '2026-07-01'
   cluster_by:
     - key1
     - key2
@@ -44,4 +45,3 @@ columns:
           - 3
   - name: col2
     description: "column two"
-

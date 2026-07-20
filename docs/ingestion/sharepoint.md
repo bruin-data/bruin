@@ -20,6 +20,7 @@ connections:
       library: Documents # optional
       max_file_size: 104857600 # optional, bytes
       max_files: 10000 # optional, use 0 for unlimited
+      download_timeout: 30m # optional, Go duration
 ```
 
 - `tenant_id`: Azure AD tenant ID for the app registration.
@@ -30,6 +31,7 @@ connections:
 - `library`: optional document library name. If omitted, ingestr uses the site's default Documents library.
 - `max_file_size`: optional maximum bytes for a single downloaded file. Use `0` for unlimited.
 - `max_files`: optional maximum number of files a glob may match. Defaults to `10000`; use `0` for unlimited.
+- `download_timeout`: optional per-request HTTP timeout as a Go duration, such as `30m` or `600s`. It defaults to `10m`; raise it for large files on slow connections.
 
 Authentication uses the OAuth2 client-credentials flow. The app registration needs application permission to read the site's files, such as `Sites.Read.All` or `Files.Read.All`, granted with admin consent.
 
