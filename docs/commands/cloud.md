@@ -354,7 +354,7 @@ bruin cloud runs diagnose --project-id <project-id> --pipeline <pipeline-name> -
 |------|------|---------|-------------|
 | `--latest` | bool | `false` | Automatically pick the most recent run |
 | `--run-id` | str | - | Specific run ID to diagnose |
-| `--project-id`, `-p` | str | - | Project ID (required) |
+| `--project-id`, `-p` | str | - | Project ID. Optional when the API key has access to exactly one project. |
 | `--pipeline` | str | - | Pipeline name (required) |
 
 **Example output:**
