@@ -18,6 +18,8 @@ var ingestrValueParameterFlags = []string{
 	"page_size",
 	"loader_file_size",
 	"extract_parallelism",
+	"extract_partition_by",
+	"extract_partition_interval",
 	"sql_reflection_level",
 	"sql_limit",
 	"sql_exclude_columns",
