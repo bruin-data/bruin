@@ -5121,6 +5121,18 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			want:    []string{},
 			wantErr: assert.NoError,
 		},
+		{
+			name: "PostgreSQL - valid table name with space",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypePostgresTableSensor,
+				Parameters: pipeline.ParameterMap{
+					"table": "public.Order Details",
+				},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
 
 		// Redshift tests
 		{
