@@ -273,6 +273,43 @@ func (d *Client) IsValid(ctx context.Context, query *query.Query) (bool, error) 
 	return true, nil
 }
 
+// waitForJobCompletion polls job.Status until the job is terminal and returns its
+// error, if any. Unlike job.Read (jobs.getQueryResults), job.Status reports a
+// failed job's state immediately instead of retrying it as a transient error, so a
+// rate-limited job surfaces at once rather than hanging (BRU-5103).
+func waitForJobCompletion(ctx context.Context, job *bigquery.Job) error {
+	const (
+		initialPollInterval = time.Second
+		maxPollInterval     = 10 * time.Second
+	)
+	wait := initialPollInterval
+	for {
+		// Use an already-terminal status (from submit or a prior poll) to skip an RPC.
+		status := job.LastStatus()
+		if status == nil || !status.Done() {
+			fresh, err := job.Status(ctx)
+			if err != nil {
+				return err
+			}
+			status = fresh
+		}
+		if status.Done() {
+			return status.Err()
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(wait):
+		}
+		if wait < maxPollInterval {
+			wait *= 2
+			if wait > maxPollInterval {
+				wait = maxPollInterval
+			}
+		}
+	}
+}
+
 func (d *Client) RunQueryWithoutResult(ctx context.Context, q *query.Query) error {
 	if err := d.ensureClientInitialized(ctx); err != nil {
 		return err
@@ -286,8 +323,7 @@ func (d *Client) RunQueryWithoutResult(ctx context.Context, q *query.Query) erro
 		return formatError(err)
 	}
 	query.LogOrSinkQueryID(ctx, "BigQuery", job.ID())
-	_, err = job.Read(ctx)
-	if err != nil {
+	if err := waitForJobCompletion(ctx, job); err != nil {
 		return formatError(err)
 	}
 
@@ -307,6 +343,10 @@ func (d *Client) Select(ctx context.Context, q *query.Query) ([][]interface{}, e
 		return nil, formatError(err)
 	}
 	query.LogOrSinkQueryID(ctx, "BigQuery", job.ID())
+	// Surface a failed job immediately; job.Read below then returns without retrying (BRU-5103).
+	if err := waitForJobCompletion(ctx, job); err != nil {
+		return nil, formatError(err)
+	}
 	rows, err := job.Read(ctx)
 	if err != nil {
 		return nil, formatError(err)
@@ -347,6 +387,10 @@ func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 		return nil, fmt.Errorf("failed to run query: %w", formatError(err))
 	}
 	query.LogOrSinkQueryID(ctx, "BigQuery", job.ID())
+	// Surface a failed job immediately; job.Read below then returns without retrying (BRU-5103).
+	if err := waitForJobCompletion(ctx, job); err != nil {
+		return nil, fmt.Errorf("failed to wait for query completion: %w", formatError(err))
+	}
 	rows, err := job.Read(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read query results: %w", formatError(err))
@@ -718,16 +762,30 @@ func (d *Client) UpdateTableMetadataIfNotExist(ctx context.Context, asset *pipel
 
 func formatError(err error) error {
 	var googleError *googleapi.Error
-	if !errors.As(err, &googleError) {
-		return err
+	if errors.As(err, &googleError) {
+		if googleError.Code == 404 || googleError.Code == 400 {
+			return fmt.Errorf("%s", googleError.Message)
+		}
+		return googleError
 	}
 
-	if googleError.Code == 404 || googleError.Code == 400 {
-		return fmt.Errorf("%s", googleError.Message)
+	// Terminal job failures surface as *bigquery.Error (via job.Status), whose default
+	// string is a verbose struct dump. Present its message cleanly while preserving the
+	// structured error so callers can still errors.As it for Reason/Location.
+	var bqError *bigquery.Error
+	if errors.As(err, &bqError) && bqError.Message != "" {
+		return &jobError{err: bqError}
 	}
 
-	return googleError
+	return err
 }
+
+// jobError presents a *bigquery.Error's message (its default string is a verbose
+// struct dump) while preserving the underlying error for errors.As.
+type jobError struct{ err *bigquery.Error }
+
+func (e *jobError) Error() string { return e.err.Message }
+func (e *jobError) Unwrap() error { return e.err }
 
 // Test runs a simple query (SELECT 1) to validate the connection.
 func (d *Client) Ping(ctx context.Context) error {
