@@ -3404,7 +3404,11 @@ func cloudScheduledAgentsCreate() *cli.Command {
 				return nil
 			}
 
-			infoPrinter.Printf("Created scheduled agent %d (%s) as a draft — review and activate it from the Bruin Cloud UI.\n", run.ID, derefString(run.Title))
+			if run.IsActive {
+				infoPrinter.Printf("Created scheduled agent %d (%s) — it's active and the next run is scheduled. Manage it in the Bruin Cloud UI.\n", run.ID, derefString(run.Title))
+			} else {
+				infoPrinter.Printf("Created scheduled agent %d (%s) as a draft — add a schedule and activate it from the Bruin Cloud UI.\n", run.ID, derefString(run.Title))
+			}
 			return nil
 		},
 	}
