@@ -181,6 +181,51 @@ WHERE type = 'QueryFinish'
 	require.Equal(t, [][]interface{}{{uint64(2)}}, rows)
 }
 
+// TestTimeIntervalTimestampFirstRunAndRerun protects the regression from
+// https://github.com/bruin-data/bruin/issues/2419. ClickHouse DateTime columns
+// do not accept ISO-8601 string literals containing a T in the DELETE bounds.
+func TestTimeIntervalTimestampFirstRunAndRerun(t *testing.T) {
+	host, port := startClickHouse(t)
+	configPath := writeClickHouseConfig(t, host, port)
+	binary := bruinBinary(t)
+
+	runBruinQuery(t, binary, configPath,
+		"CREATE TABLE timestamp_seed (event_date Date, row_id String, amount Int32) ENGINE = MergeTree ORDER BY row_id",
+	)
+	runBruinQuery(t, binary, configPath,
+		"CREATE TABLE timestamp_incremental (event_timestamp DateTime, row_id String, amount Int32) ENGINE = MergeTree ORDER BY row_id",
+	)
+	runBruinQuery(t, binary, configPath,
+		"INSERT INTO timestamp_seed (event_date, row_id, amount) VALUES (toDate('2026-07-23'), 'row_7', 77)",
+	)
+
+	assetPath := writeTimeIntervalTimestampPipeline(t)
+	runInterval := func() {
+		runBruin(t, binary, configPath,
+			"run",
+			"--env", "default",
+			"--start-date", "2026-07-23T00:00:00.000Z",
+			"--end-date", "2026-07-23T23:59:59.999999999Z",
+			"--apply-interval-modifiers",
+			assetPath,
+		)
+	}
+
+	client := newClient(t, host, port)
+	assertRows := func() {
+		rows, err := client.Select(t.Context(), &query.Query{
+			Query: "SELECT toString(event_timestamp), row_id, amount FROM timestamp_incremental ORDER BY row_id",
+		})
+		require.NoError(t, err)
+		require.Equal(t, [][]interface{}{{"2026-07-23 00:00:00", "row_7", int32(77)}}, rows)
+	}
+
+	runInterval()
+	assertRows()
+	runInterval()
+	assertRows()
+}
+
 func startClickHouse(t *testing.T) (string, int) {
 	t.Helper()
 
@@ -341,6 +386,55 @@ FROM bug_test_seed
 WHERE event_date BETWEEN toDate('{{start_date}}') AND toDate('{{end_date}}')
 `
 	assetPath := filepath.Join(assetsDir, "bug_test_incremental.sql")
+	require.NoError(t, os.WriteFile(assetPath, []byte(assetSQL), 0o600))
+	return assetPath
+}
+
+func writeTimeIntervalTimestampPipeline(t *testing.T) string {
+	t.Helper()
+
+	pipelineDir, err := os.MkdirTemp(".", "time-interval-timestamp-pipeline-")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.RemoveAll(pipelineDir))
+	})
+	pipelineDir, err = filepath.Abs(pipelineDir)
+	require.NoError(t, err)
+	assetsDir := filepath.Join(pipelineDir, "assets")
+	require.NoError(t, os.MkdirAll(assetsDir, 0o755))
+
+	pipelineYAML := `name: clickhouse-time-interval-timestamp-test
+default_connections:
+  clickhouse: clickhouse-default
+`
+	require.NoError(t, os.WriteFile(filepath.Join(pipelineDir, "pipeline.yml"), []byte(pipelineYAML), 0o600))
+
+	assetSQL := `/* @bruin
+name: timestamp_incremental
+type: clickhouse.sql
+materialization:
+  type: table
+  strategy: time_interval
+  incremental_key: event_timestamp
+  time_granularity: timestamp
+columns:
+  - name: event_timestamp
+    type: timestamp
+  - name: row_id
+    type: varchar
+    primary_key: true
+  - name: amount
+    type: integer
+@bruin */
+
+SELECT
+  toDateTime(event_date) AS event_timestamp,
+  row_id,
+  amount
+FROM timestamp_seed
+WHERE event_date BETWEEN toDate('{{ start_date }}') AND toDate('{{ end_date }}')
+`
+	assetPath := filepath.Join(assetsDir, "timestamp_incremental.sql")
 	require.NoError(t, os.WriteFile(assetPath, []byte(assetSQL), 0o600))
 	return assetPath
 }
