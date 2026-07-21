@@ -1,0 +1,72 @@
+name: raw.claude_code_usage
+type: ingestr
+
+description: Daily Claude Code usage data from the Anthropic Admin API. This asset runs independently of the Cursor ingestion assets.
+
+columns:
+  - name: date
+    type: string
+    description: UTC date covered by the usage record.
+    primary_key: true
+    checks:
+      - name: not_null
+  - name: actor_type
+    type: string
+    description: Whether the actor is a user or an API key.
+    primary_key: true
+    checks:
+      - name: not_null
+  - name: actor_id
+    type: string
+    description: User email address or API key name.
+    primary_key: true
+    checks:
+      - name: not_null
+  - name: organization_id
+    type: string
+    description: Anthropic organization identifier.
+  - name: customer_type
+    type: string
+    description: Anthropic customer type, such as api or subscription.
+  - name: terminal_type
+    type: string
+    description: Terminal or environment where Claude Code was used.
+    primary_key: true
+  - name: num_sessions
+    type: integer
+    description: Number of distinct Claude Code sessions.
+  - name: lines_added
+    type: integer
+    description: Lines of code added with Claude Code.
+  - name: lines_removed
+    type: integer
+    description: Lines of code removed with Claude Code.
+  - name: commits_by_claude_code
+    type: integer
+    description: Git commits created through Claude Code.
+  - name: pull_requests_by_claude_code
+    type: integer
+    description: Pull requests created through Claude Code.
+  - name: total_input_tokens
+    type: integer
+    description: Input tokens used across all models.
+  - name: total_output_tokens
+    type: integer
+    description: Output tokens used across all models.
+  - name: total_cache_read_tokens
+    type: integer
+    description: Prompt cache read tokens used across all models.
+  - name: total_cache_creation_tokens
+    type: integer
+    description: Prompt cache creation tokens used across all models.
+  - name: total_estimated_cost_cents
+    type: numeric
+    description: Estimated cost in minor USD units (cents).
+  - name: models_used
+    type: string
+    description: Comma-separated Claude model names used by the actor.
+
+parameters:
+  source_connection: anthropic-default
+  source_table: claude_code_usage
+  destination: duckdb

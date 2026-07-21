@@ -1,0 +1,221 @@
+name: AI Coding Usage
+description: Cross-platform Anthropic Claude Code and Cursor adoption, consumption, cost, and productivity.
+connection: duckdb-dashboard
+
+filters:
+  - name: platform
+    type: select
+    default: All
+    options:
+      values: [All, anthropic, cursor]
+  - name: date_range
+    type: date-range
+    default: last_30_days
+
+queries:
+  daily_token_usage:
+    sql: |
+      SELECT
+        usage_date,
+        COALESCE(SUM(total_tokens) FILTER (WHERE platform = 'anthropic'), 0) AS anthropic_tokens,
+        COALESCE(SUM(total_tokens) FILTER (WHERE platform = 'cursor'), 0) AS cursor_tokens
+      FROM marts.ai_coding_usage_by_user_day
+      WHERE usage_date >= CAST('{{ filters.date_range.start }}' AS DATE)
+        AND usage_date <= CAST('{{ filters.date_range.end }}' AS DATE)
+      {% if filters.platform != 'All' %}
+        AND platform = '{{ filters.platform }}'
+      {% endif %}
+      GROUP BY usage_date
+      ORDER BY usage_date
+
+  platform_usage:
+    sql: |
+      SELECT
+        platform,
+        COUNT(DISTINCT user_type || ':' || user_id) FILTER (WHERE is_active) AS active_users,
+        SUM(requests) AS requests,
+        SUM(total_tokens) AS total_tokens,
+        ROUND(SUM(estimated_cost_usd), 2) AS estimated_cost_usd
+      FROM marts.ai_coding_usage_by_user_day
+      WHERE usage_date >= CAST('{{ filters.date_range.start }}' AS DATE)
+        AND usage_date <= CAST('{{ filters.date_range.end }}' AS DATE)
+      {% if filters.platform != 'All' %}
+        AND platform = '{{ filters.platform }}'
+      {% endif %}
+      GROUP BY platform
+      ORDER BY total_tokens DESC
+
+  daily_active_users:
+    sql: |
+      SELECT
+        usage_date,
+        COUNT(DISTINCT user_type || ':' || user_id) FILTER (WHERE is_active) AS active_users
+      FROM marts.ai_coding_usage_by_user_day
+      WHERE usage_date >= CAST('{{ filters.date_range.start }}' AS DATE)
+        AND usage_date <= CAST('{{ filters.date_range.end }}' AS DATE)
+      {% if filters.platform != 'All' %}
+        AND platform = '{{ filters.platform }}'
+      {% endif %}
+      GROUP BY usage_date
+      ORDER BY usage_date
+
+  user_summary:
+    sql: |
+      SELECT
+        user_id,
+        user_type,
+        STRING_AGG(DISTINCT platform, ',' ORDER BY platform) AS platforms,
+        COUNT(DISTINCT usage_date) FILTER (WHERE is_active) AS active_days,
+        SUM(sessions) AS sessions,
+        SUM(requests) AS requests,
+        SUM(total_tokens) AS total_tokens,
+        ROUND(SUM(estimated_cost_usd), 2) AS estimated_cost_usd,
+        SUM(ai_lines_added) AS ai_lines_added,
+        SUM(ai_lines_removed) AS ai_lines_removed
+      FROM marts.ai_coding_usage_by_user_day
+      WHERE usage_date >= CAST('{{ filters.date_range.start }}' AS DATE)
+        AND usage_date <= CAST('{{ filters.date_range.end }}' AS DATE)
+      {% if filters.platform != 'All' %}
+        AND platform = '{{ filters.platform }}'
+      {% endif %}
+      GROUP BY user_id, user_type
+      ORDER BY total_tokens DESC
+      LIMIT 50
+
+rows:
+  - widgets:
+      - name: Daily Tokens
+        type: chart
+        chart: bar
+        query: daily_token_usage
+        x: usage_date
+        y: [anthropic_tokens, cursor_tokens]
+        stacked: true
+        col: 12
+
+  - widgets:
+      - name: Active Users
+        type: metric
+        column: value
+        format: number
+        col: 3
+        sql: |
+          SELECT COUNT(DISTINCT user_type || ':' || user_id) AS value
+          FROM marts.ai_coding_usage_by_user_day
+          WHERE is_active
+            AND usage_date >= CAST('{{ filters.date_range.start }}' AS DATE)
+            AND usage_date <= CAST('{{ filters.date_range.end }}' AS DATE)
+          {% if filters.platform != 'All' %}
+            AND platform = '{{ filters.platform }}'
+          {% endif %}
+
+      - name: Total Tokens
+        type: metric
+        column: value
+        format: number
+        col: 3
+        sql: |
+          SELECT COALESCE(SUM(total_tokens), 0) AS value
+          FROM marts.ai_coding_usage_by_user_day
+          WHERE usage_date >= CAST('{{ filters.date_range.start }}' AS DATE)
+            AND usage_date <= CAST('{{ filters.date_range.end }}' AS DATE)
+          {% if filters.platform != 'All' %}
+            AND platform = '{{ filters.platform }}'
+          {% endif %}
+
+      - name: Estimated Cost
+        type: metric
+        column: value
+        prefix: "$"
+        format: number
+        col: 3
+        sql: |
+          SELECT ROUND(COALESCE(SUM(estimated_cost_usd), 0), 2) AS value
+          FROM marts.ai_coding_usage_by_user_day
+          WHERE usage_date >= CAST('{{ filters.date_range.start }}' AS DATE)
+            AND usage_date <= CAST('{{ filters.date_range.end }}' AS DATE)
+          {% if filters.platform != 'All' %}
+            AND platform = '{{ filters.platform }}'
+          {% endif %}
+
+      - name: Requests
+        type: metric
+        column: value
+        format: number
+        col: 3
+        sql: |
+          SELECT COALESCE(SUM(requests), 0) AS value
+          FROM marts.ai_coding_usage_by_user_day
+          WHERE usage_date >= CAST('{{ filters.date_range.start }}' AS DATE)
+            AND usage_date <= CAST('{{ filters.date_range.end }}' AS DATE)
+          {% if filters.platform != 'All' %}
+            AND platform = '{{ filters.platform }}'
+          {% endif %}
+
+  - widgets:
+      - name: Daily Token Consumption
+        type: chart
+        chart: area
+        query: daily_token_usage
+        x: usage_date
+        y: [anthropic_tokens, cursor_tokens]
+        col: 8
+
+      - name: Cost by Platform
+        type: chart
+        chart: bar
+        query: platform_usage
+        x: platform
+        y: [estimated_cost_usd]
+        col: 4
+
+  - widgets:
+      - name: Daily Active Users
+        type: chart
+        chart: line
+        query: daily_active_users
+        x: usage_date
+        y: [active_users]
+        col: 6
+
+      - name: Requests by Platform
+        type: chart
+        chart: bar
+        query: platform_usage
+        x: platform
+        y: [requests]
+        col: 6
+
+  - widgets:
+      - name: User Consumption
+        type: table
+        query: user_summary
+        col: 12
+        columns:
+          - name: user_id
+            label: User
+          - name: user_type
+            label: Type
+          - name: platforms
+            label: Platforms
+          - name: active_days
+            label: Active Days
+            format: number
+          - name: sessions
+            label: Sessions
+            format: number
+          - name: requests
+            label: Requests
+            format: number
+          - name: total_tokens
+            label: Tokens
+            format: number
+          - name: estimated_cost_usd
+            label: Estimated Cost
+            format: currency
+          - name: ai_lines_added
+            label: AI Lines Added
+            format: number
+          - name: ai_lines_removed
+            label: AI Lines Removed
+            format: number

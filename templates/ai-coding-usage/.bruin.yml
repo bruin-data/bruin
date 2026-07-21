@@ -1,0 +1,17 @@
+default_environment: default
+
+environments:
+  default:
+    connections:
+      anthropic:
+        - name: anthropic-default
+          api_key: ${ANTHROPIC_ADMIN_API_KEY}
+      cursor:
+        - name: cursor-default
+          api_key: ${CURSOR_ADMIN_API_KEY}
+      duckdb:
+        - name: duckdb-default
+          path: claude_code_usage.duckdb
+        - name: duckdb-dashboard
+          path: claude_code_usage.duckdb
+          read_only: true

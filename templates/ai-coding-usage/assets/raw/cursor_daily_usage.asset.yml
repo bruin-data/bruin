@@ -1,0 +1,90 @@
+name: raw.cursor_daily_usage
+type: ingestr
+
+description: Daily per-user activity and productivity metrics from the Cursor Admin API. This asset runs independently of the Anthropic ingestion asset.
+
+columns:
+  - name: date
+    type: bigint
+    description: UTC usage date as Unix epoch milliseconds.
+    primary_key: true
+    checks:
+      - name: not_null
+  - name: email
+    type: string
+    description: Cursor team member email address.
+    primary_key: true
+    checks:
+      - name: not_null
+  - name: isActive
+    type: boolean
+    description: Whether the user was active on this date.
+  - name: totalLinesAdded
+    type: bigint
+    description: Total lines added by the user.
+  - name: totalLinesDeleted
+    type: bigint
+    description: Total lines deleted by the user.
+  - name: acceptedLinesAdded
+    type: bigint
+    description: Lines added from accepted AI suggestions.
+  - name: acceptedLinesDeleted
+    type: bigint
+    description: Lines deleted from accepted AI suggestions.
+  - name: totalApplies
+    type: bigint
+    description: AI code apply operations.
+  - name: totalAccepts
+    type: bigint
+    description: Accepted AI suggestions.
+  - name: totalRejects
+    type: bigint
+    description: Rejected AI suggestions.
+  - name: totalTabsShown
+    type: bigint
+    description: Tab completions shown.
+  - name: totalTabsAccepted
+    type: bigint
+    description: Tab completions accepted.
+  - name: composerRequests
+    type: bigint
+    description: Composer or edit requests.
+  - name: chatRequests
+    type: bigint
+    description: Ask or chat requests.
+  - name: agentRequests
+    type: bigint
+    description: Agent requests.
+  - name: cmdkUsages
+    type: bigint
+    description: Command palette usages.
+  - name: subscriptionIncludedReqs
+    type: bigint
+    description: Requests included in the subscription.
+  - name: apiKeyReqs
+    type: bigint
+    description: Requests made with API keys.
+  - name: usageBasedReqs
+    type: bigint
+    description: Usage-based billing requests.
+  - name: bugbotUsages
+    type: bigint
+    description: Bugbot usages.
+  - name: mostUsedModel
+    type: string
+    description: Most frequently used model.
+  - name: applyMostUsedExtension
+    type: string
+    description: Most-used file extension for AI applies.
+  - name: tabMostUsedExtension
+    type: string
+    description: Most-used file extension for tab completions.
+  - name: clientVersion
+    type: string
+    description: Cursor client version.
+
+parameters:
+  source_connection: cursor-default
+  source_table: daily_usage_data
+  destination: duckdb
+  enforce_schema: "true"
