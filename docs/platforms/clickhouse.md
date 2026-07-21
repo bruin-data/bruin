@@ -285,11 +285,16 @@ ORDER BY average_rating DESC;
 ClickHouse has no `MERGE INTO` statement, so Bruin implements the `merge` strategy with a delete+insert pattern keyed on the asset's primary key column(s):
 
 - the query result is staged in a temporary table
+- an empty insert validates the staged result against the target table before any target rows are deleted
 - rows in the target whose primary key matches a staged row are deleted
 - the staged rows are inserted into the target
 - the temporary table is dropped
 
 This upserts rows by primary key: existing rows are replaced and new rows are added, while untouched rows remain. The optional `incremental_predicate` is appended to the delete condition to scope which target rows are considered for replacement.
+
+The compatibility check catches errors such as a different number of staged and target columns before the delete. If a later statement fails, Bruin makes a best-effort attempt to drop the per-run staging table. The merge still consists of independent ClickHouse statements rather than a transaction, so an operational failure during the real insert can leave the matching target rows deleted; fix the failure and rerun the asset to restore them.
+
+Unlike merge implementations that expose `source` and `target` aliases, ClickHouse's `DELETE` statement has no target alias. A ClickHouse `incremental_predicate` must therefore reference target columns without qualification, for example `event_date >= toDate('2026-07-01')` rather than `target.event_date >= toDate('2026-07-01')`.
 
 Merge assets must declare `columns` and at least one `primary_key` column. Composite primary keys are supported. On a full refresh, Bruin falls back to `create+replace` (creating the table from the query result) so the target exists for subsequent incremental merges.
 

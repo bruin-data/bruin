@@ -40,6 +40,31 @@ func (m *Materializer) Render(asset *pipeline.Asset, query string) ([]string, er
 	return []string{}, fmt.Errorf("unsupported materialization type - strategy combination: (`%s` - `%s`)", mat.Type, mat.Strategy)
 }
 
+// RenderWithCleanup returns the normal materialization statements together
+// with idempotent cleanup statements that the operator should execute if a
+// statement fails before the normal cleanup point is reached.
+func (m *Materializer) RenderWithCleanup(asset *pipeline.Asset, query string) ([]string, []string, error) {
+	queries, err := m.Render(asset, query)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	strategy := asset.Materialization.Strategy
+	if m.fullRefresh && asset.Materialization.Type == pipeline.MaterializationTypeTable && strategy != pipeline.MaterializationStrategyDDL {
+		strategy = pipeline.MaterializationStrategyCreateReplace
+	}
+
+	if strategy != pipeline.MaterializationStrategyMerge && strategy != pipeline.MaterializationStrategyDeleteInsert {
+		return queries, nil, nil
+	}
+
+	if len(queries) == 0 {
+		return queries, nil, nil
+	}
+
+	return queries, []string{queries[len(queries)-1]}, nil
+}
+
 func NewMaterializer(fullRefresh bool) *Materializer {
 	return &Materializer{
 		MaterializationMap: matMap,

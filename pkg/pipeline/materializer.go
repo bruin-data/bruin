@@ -151,6 +151,27 @@ func (m HookWrapperMaterializerList) Render(asset *Asset, query string) ([]strin
 	return wrapHookQueriesList(materialized, asset.Hooks, m.Hoister, asset.Type), nil
 }
 
+// RenderWithCleanup renders the materialization and returns any idempotent
+// cleanup queries that should be retried if execution stops early. List-based
+// materializers that do not provide cleanup metadata retain the normal Render
+// behavior and return no cleanup queries.
+func (m HookWrapperMaterializerList) RenderWithCleanup(asset *Asset, query string) ([]string, []string, error) {
+	cleanupMaterializer, ok := m.Mat.(interface {
+		RenderWithCleanup(asset *Asset, query string) ([]string, []string, error)
+	})
+	if !ok {
+		materialized, err := m.Render(asset, query)
+		return materialized, nil, err
+	}
+
+	materialized, cleanup, err := cleanupMaterializer.RenderWithCleanup(asset, query)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return wrapHookQueriesList(materialized, asset.Hooks, m.Hoister, asset.Type), cleanup, nil
+}
+
 func (m HookWrapperMaterializerList) LogIfFullRefreshAndDDL(writer interface{}, asset *Asset) error {
 	if m.Mat == nil {
 		return errors.New("hook wrapper materializer requires a base materializer")

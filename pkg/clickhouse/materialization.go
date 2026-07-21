@@ -136,8 +136,11 @@ func buildMergeQuery(task *pipeline.Asset, query string) ([]string, error) {
 		deleteCondition += " AND (" + pred + ")"
 	}
 
+	// Validate that ClickHouse can plan an insert from the staged schema before
+	// deleting target rows. LIMIT 0 performs no write and avoids deduplication.
 	queries := []string{
 		fmt.Sprintf("CREATE TABLE %s ENGINE = MergeTree() PRIMARY KEY (%s) AS %s", tempTableName, keys, query),
+		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s LIMIT 0", task.Name, tempTableName),
 		fmt.Sprintf("DELETE FROM %s WHERE %s", task.Name, deleteCondition),
 		fmt.Sprintf("INSERT INTO %s SETTINGS insert_deduplicate = 0 SELECT * FROM %s", task.Name, tempTableName),
 		"DROP TABLE IF EXISTS " + tempTableName,
