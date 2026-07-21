@@ -20,6 +20,9 @@ Use a Salesforce user that has:
 - API access
 - Access to the Salesforce objects you want to ingest
 - Permission to log in through API/SOAP if using username/password/security-token auth
+- **Read** field-level security (FLS) on every field you want to ingest
+
+Salesforce only exposes fields the connecting user is allowed to read. Any field the user lacks Read FLS on is silently omitted from ingestion and arrives empty (NULL) in the destination, even if it holds data in Salesforce. Grant Read access via the user's profile or a permission set.
 
 Common Salesforce objects include:
 
@@ -247,3 +250,15 @@ Fix one of the following:
 
 - Rename the Bruin Cloud connection to match the asset.
 - Or update the asset to reference the Bruin Cloud connection name.
+
+### Some fields ingest as empty (NULL)
+
+Individual fields come through empty even though they have data in Salesforce, and the run reports no error.
+
+This is field-level security (FLS). Salesforce builds the query from the fields the connecting user can read and omits the rest, so ingestr never fetches them.
+
+Fix:
+
+- Grant the Salesforce user **Read** access to those fields, via its profile or an assigned permission set.
+- Confirm what the user can see by describing the object as that user (e.g. `GET /services/data/v59.0/sobjects/<object>/describe`) — only the listed fields are ingested.
+- Re-run the asset.
