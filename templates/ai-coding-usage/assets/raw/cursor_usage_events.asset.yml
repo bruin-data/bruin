@@ -1,0 +1,44 @@
+name: raw.cursor_usage_events
+type: ingestr
+
+description: Per-request Cursor usage events with model, token, and cost information.
+
+columns:
+  - name: timestamp
+    type: string
+    description: Event timestamp as epoch milliseconds or an ISO timestamp.
+    primary_key: true
+    checks:
+      - name: not_null
+  - name: userEmail
+    type: string
+    description: Email address of the user who made the request.
+    checks:
+      - name: not_null
+  - name: model
+    type: string
+    description: Model used for the request.
+  - name: kind
+    type: string
+    description: Cursor usage or billing category.
+  - name: maxMode
+    type: boolean
+    description: Whether Cursor Max Mode was enabled.
+  - name: requestsCosts
+    type: numeric
+    description: Cursor request cost units.
+  - name: isTokenBasedCall
+    type: boolean
+    description: Whether token-level usage and cost are available.
+  - name: tokenUsage
+    type: json
+    description: Input, output, cache, and cost details for token-based calls.
+  - name: isFreeBugbot
+    type: boolean
+    description: Whether the event was a free Bugbot request.
+
+parameters:
+  source_connection: cursor-default
+  source_table: filtered_usage_events
+  destination: duckdb
+  enforce_schema: "true"

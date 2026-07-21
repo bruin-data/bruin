@@ -1,0 +1,12 @@
+name: ai-coding-usage
+schedule: daily
+start_date: "2025-01-01"
+catchup: false
+
+default_connections:
+  anthropic: anthropic-default
+  cursor: cursor-default
+  duckdb: duckdb-default
+
+default:
+  type: duckdb.sql
