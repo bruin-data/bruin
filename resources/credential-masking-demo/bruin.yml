@@ -1,0 +1,8 @@
+default_environment: default
+
+environments:
+  default:
+    connections:
+      generic:
+        - name: demo-api
+          value: "sk_demo_social_7K9m+Q2pX="
