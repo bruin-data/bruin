@@ -22,7 +22,8 @@ Use a Salesforce user that has:
 - Permission to log in through API/SOAP if using username/password/security-token auth
 - **Read** field-level security (FLS) on every field you want to ingest
 
-Salesforce only exposes fields the connecting user is allowed to read. Any field the user lacks Read FLS on is silently omitted from ingestion and arrives empty (NULL) in the destination, even if it holds data in Salesforce. Grant Read access via the user's profile or a permission set.
+> [!WARNING]
+> ingestr only ingests the fields the connecting user is permitted to read. If a field you expect is missing, make sure the user has Read access to it (via its profile or a permission set) — otherwise Salesforce won't return it and it stays empty in the destination.
 
 Common Salesforce objects include:
 
@@ -255,10 +256,10 @@ Fix one of the following:
 
 Individual fields come through empty even though they have data in Salesforce, and the run reports no error.
 
-This is field-level security (FLS). Salesforce builds the query from the fields the connecting user can read and omits the rest, so ingestr never fetches them.
+ingestr only fetches the fields the connecting user is permitted to read (its query is built from what Salesforce returns for that user). A common reason a field is skipped is that the user lacks Read access to it, for example due to field-level security (FLS).
 
-Fix:
+To ingest a field that's coming through empty:
 
-- Grant the Salesforce user **Read** access to those fields, via its profile or an assigned permission set.
-- Confirm what the user can see by describing the object as that user (e.g. `GET /services/data/v59.0/sobjects/<object>/describe`) — only the listed fields are ingested.
+- Make sure the Salesforce user has **Read** access to it, via its profile or an assigned permission set.
+- You can check which fields the user can see by describing the object as that user (e.g. `GET /services/data/v59.0/sobjects/<object>/describe`) — only the listed fields are ingested.
 - Re-run the asset.
