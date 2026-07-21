@@ -13,6 +13,7 @@ columns:
   - name: userEmail
     type: string
     description: Email address of the user who made the request.
+    primary_key: true
     checks:
       - name: not_null
   - name: model
