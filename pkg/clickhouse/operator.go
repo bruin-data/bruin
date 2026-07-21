@@ -2,6 +2,7 @@ package clickhouse
 
 import (
 	"context"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/config"
@@ -17,6 +18,10 @@ import (
 type materializer interface {
 	Render(task *pipeline.Asset, query string) ([]string, error)
 	LogIfFullRefreshAndDDL(writer interface{}, asset *pipeline.Asset) error
+}
+
+type materializerWithCleanup interface {
+	RenderWithCleanup(task *pipeline.Asset, query string) ([]string, []string, error)
 }
 
 type ClickHouseClient interface {
@@ -66,7 +71,12 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	}
 
 	q := queries[0]
-	materializedQueries, err := o.materializer.Render(t, q.String())
+	var materializedQueries, cleanupQueries []string
+	if cleanupMaterializer, ok := o.materializer.(materializerWithCleanup); ok {
+		materializedQueries, cleanupQueries, err = cleanupMaterializer.RenderWithCleanup(t, q.String())
+	} else {
+		materializedQueries, err = o.materializer.Render(t, q.String())
+	}
 	if err != nil {
 		return err
 	}
@@ -99,7 +109,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		if o.devEnv != nil {
 			q, err = o.devEnv.Modify(ctx, p, t, q)
 			if err != nil {
-				return err
+				return o.cleanupAfterFailure(ctx, p, t, conn, writer, cleanupQueries, err)
 			}
 		}
 
@@ -107,7 +117,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 
 		err = conn.RunQueryWithoutResult(ctx, q)
 		if err != nil {
-			return err
+			return o.cleanupAfterFailure(ctx, p, t, conn, writer, cleanupQueries, err)
 		}
 		lastQuery = q
 	}
@@ -126,6 +136,41 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	}
 
 	return nil
+}
+
+func (o BasicOperator) cleanupAfterFailure(
+	ctx context.Context,
+	p *pipeline.Pipeline,
+	t *pipeline.Asset,
+	conn ClickHouseClient,
+	writer interface{},
+	cleanupQueries []string,
+	originalErr error,
+) error {
+	if len(cleanupQueries) == 0 {
+		return originalErr
+	}
+
+	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+	defer cancel()
+
+	for _, queryString := range cleanupQueries {
+		cleanupQuery := &query.Query{Query: queryString}
+		if o.devEnv != nil {
+			var err error
+			cleanupQuery, err = o.devEnv.Modify(cleanupCtx, p, t, cleanupQuery)
+			if err != nil {
+				return errors.Wrapf(originalErr, "failed to prepare cleanup query after ClickHouse query failure: %v", err)
+			}
+		}
+
+		ansisql.LogQueryIfVerbose(cleanupCtx, writer, cleanupQuery.Query)
+		if err := conn.RunQueryWithoutResult(cleanupCtx, cleanupQuery); err != nil {
+			return errors.Wrapf(originalErr, "failed to clean up after ClickHouse query failure: %v", err)
+		}
+	}
+
+	return originalErr
 }
 
 func NewBasicOperator(conn config.ConnectionGetter, extractor query.QueryExtractor, materializer materializer, parser *sqlparser.SQLParser) *BasicOperator {

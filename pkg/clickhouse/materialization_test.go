@@ -200,6 +200,7 @@ func TestMaterializer_Render(t *testing.T) {
 			query: "SELECT 1 as id, 'a' as name",
 			want: []string{
 				"CREATE TABLE my.__bruin_tmp_abcefghi ENGINE = MergeTree() PRIMARY KEY (id) AS SELECT 1 as id, 'a' as name",
+				"INSERT INTO my.asset SELECT * FROM my.__bruin_tmp_abcefghi LIMIT 0",
 				"DELETE FROM my.asset WHERE id IN (SELECT id FROM my.__bruin_tmp_abcefghi)",
 				"INSERT INTO my.asset SETTINGS insert_deduplicate = 0 SELECT * FROM my.__bruin_tmp_abcefghi",
 				"DROP TABLE IF EXISTS my.__bruin_tmp_abcefghi",
@@ -222,6 +223,7 @@ func TestMaterializer_Render(t *testing.T) {
 			query: "SELECT 1 as id, '2026-01-01' as dt, 'a' as name",
 			want: []string{
 				"CREATE TABLE my.__bruin_tmp_abcefghi ENGINE = MergeTree() PRIMARY KEY (id, dt) AS SELECT 1 as id, '2026-01-01' as dt, 'a' as name",
+				"INSERT INTO my.asset SELECT * FROM my.__bruin_tmp_abcefghi LIMIT 0",
 				"DELETE FROM my.asset WHERE (id, dt) IN (SELECT id, dt FROM my.__bruin_tmp_abcefghi)",
 				"INSERT INTO my.asset SETTINGS insert_deduplicate = 0 SELECT * FROM my.__bruin_tmp_abcefghi",
 				"DROP TABLE IF EXISTS my.__bruin_tmp_abcefghi",
@@ -243,6 +245,7 @@ func TestMaterializer_Render(t *testing.T) {
 			query: "SELECT 1 as id",
 			want: []string{
 				"CREATE TABLE my.__bruin_tmp_abcefghi ENGINE = MergeTree() PRIMARY KEY (id) AS SELECT 1 as id",
+				"INSERT INTO my.asset SELECT * FROM my.__bruin_tmp_abcefghi LIMIT 0",
 				"DELETE FROM my.asset WHERE id IN (SELECT id FROM my.__bruin_tmp_abcefghi) AND (dt >= '2026-01-01')",
 				"INSERT INTO my.asset SETTINGS insert_deduplicate = 0 SELECT * FROM my.__bruin_tmp_abcefghi",
 				"DROP TABLE IF EXISTS my.__bruin_tmp_abcefghi",
