@@ -230,10 +230,10 @@ func (db *DB) GetTables(ctx context.Context, databaseName string) ([]string, err
 	q := fmt.Sprintf(`
 SELECT table_name
 FROM information_schema.tables
-WHERE table_schema = '%s'
+WHERE table_schema = %s
     AND table_type IN ('BASE TABLE', 'VIEW')
 ORDER BY table_name;
-`, databaseName)
+`, quoteAthenaStringLiteral(databaseName))
 
 	result, err := db.Select(ctx, &query.Query{Query: q})
 	if err != nil {
@@ -266,9 +266,9 @@ SELECT
     data_type,
     is_nullable
 FROM information_schema.columns
-WHERE table_schema = '%s' AND table_name = '%s'
+WHERE table_schema = %s AND table_name = %s
 ORDER BY ordinal_position;
-`, databaseName, tableName)
+`, quoteAthenaStringLiteral(databaseName), quoteAthenaStringLiteral(tableName))
 
 	result, err := db.Select(ctx, &query.Query{Query: q})
 	if err != nil {
@@ -406,15 +406,23 @@ func (db *DB) BuildTableExistsQuery(tableName string) (string, error) {
 
 	infoSchema := "information_schema"
 	if tn.Catalog != "" {
-		infoSchema = tn.Catalog + ".information_schema"
+		infoSchema = quoteAthenaIdentifier(tn.Catalog) + ".information_schema"
 	}
 
 	query := fmt.Sprintf(
-		"SELECT COUNT(*) FROM %s.tables WHERE table_schema = '%s' AND table_name = '%s'",
+		"SELECT COUNT(*) FROM %s.tables WHERE table_schema = %s AND table_name = %s",
 		infoSchema,
-		tn.Schema,
-		tn.Table,
+		quoteAthenaStringLiteral(tn.Schema),
+		quoteAthenaStringLiteral(tn.Table),
 	)
 
 	return strings.TrimSpace(query), nil
+}
+
+func quoteAthenaStringLiteral(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "''") + "'"
+}
+
+func quoteAthenaIdentifier(value string) string {
+	return `"` + strings.ReplaceAll(value, `"`, `""`) + `"`
 }

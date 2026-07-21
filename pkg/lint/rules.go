@@ -1798,9 +1798,8 @@ func ValidateTableSensorTableParameter(ctx context.Context, p *pipeline.Pipeline
 }
 
 // validateTableNameFormat validates a table sensor's `table` parameter against
-// the platform's table-name capability (the single source of truth shared with
-// asset-name validation, see EnsureAssetNameComponentCountIsValid). It returns an
-// empty string when the name is valid.
+// the platform's table-name capability. Athena additionally uses the character
+// policy applied to asset names. It returns an empty string when the name is valid.
 func validateTableNameFormat(assetType pipeline.AssetType, tableName string) string {
 	platformName := platformNames[assetType]
 
@@ -1821,6 +1820,10 @@ func validateTableNameFormat(assetType pipeline.AssetType, tableName string) str
 
 	if err := capability.CheckName(tableName); err != nil {
 		return fmt.Sprintf("%s table sensor `table` parameter must be in format %s, '%s' given", platformName, capability.FormatDesc, tableName)
+	}
+
+	if assetType == pipeline.AssetTypeAthenaTableSensor && !validIDRegexCompiled.MatchString(tableName) {
+		return fmt.Sprintf("%s table sensor `table` parameter must be made of alphanumeric characters, dashes, dots and underscores, %q given", platformName, tableName)
 	}
 
 	return ""

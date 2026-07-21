@@ -157,6 +157,57 @@ func TestDB_Ping(t *testing.T) {
 	}
 }
 
+func TestDB_GetTablesEscapesDatabaseName(t *testing.T) {
+	t.Parallel()
+
+	mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+	require.NoError(t, err)
+	defer mockDB.Close()
+
+	mock.ExpectQuery(`
+SELECT table_name
+FROM information_schema.tables
+WHERE table_schema = 'dev_o''brien'
+    AND table_type IN ('BASE TABLE', 'VIEW')
+ORDER BY table_name;
+`).WillReturnRows(sqlmock.NewRows([]string{"table_name"}).AddRow("orders"))
+
+	db := DB{conn: sqlx.NewDb(mockDB, "sqlmock")}
+	tables, err := db.GetTables(t.Context(), "dev_o'brien")
+
+	require.NoError(t, err)
+	require.Equal(t, []string{"orders"}, tables)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestDB_GetColumnsEscapesDatabaseAndTableNames(t *testing.T) {
+	t.Parallel()
+
+	mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+	require.NoError(t, err)
+	defer mockDB.Close()
+
+	mock.ExpectQuery(`
+SELECT
+    column_name,
+    data_type,
+    is_nullable
+FROM information_schema.columns
+WHERE table_schema = 'dev_o''brien' AND table_name = 'order''s'
+ORDER BY ordinal_position;
+`).WillReturnRows(sqlmock.NewRows([]string{"column_name", "data_type", "is_nullable"}).AddRow("id", "bigint", "NO"))
+
+	db := DB{conn: sqlx.NewDb(mockDB, "sqlmock")}
+	columns, err := db.GetColumns(t.Context(), "dev_o'brien", "order's")
+
+	require.NoError(t, err)
+	require.Len(t, columns, 1)
+	require.Equal(t, "id", columns[0].Name)
+	require.Equal(t, "bigint", columns[0].Type)
+	require.False(t, columns[0].Nullable)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestDB_SelectWithSchema(t *testing.T) {
 	t.Parallel()
 
@@ -313,7 +364,28 @@ func TestDB_BuildTableExistsQuery(t *testing.T) {
 			name:      "valid catalog.database.table format",
 			db:        &DB{config: &Config{Database: "test_db"}},
 			tableName: "catalog.database.table",
-			wantQuery: "SELECT COUNT(*) FROM catalog.information_schema.tables WHERE table_schema = 'database' AND table_name = 'table'",
+			wantQuery: "SELECT COUNT(*) FROM \"catalog\".information_schema.tables WHERE table_schema = 'database' AND table_name = 'table'",
+			wantErr:   false,
+		},
+		{
+			name:      "escapes schema and table string literals",
+			db:        &DB{config: &Config{Database: "test_db"}},
+			tableName: "dev_o'brien.order's",
+			wantQuery: "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'dev_o''brien' AND table_name = 'order''s'",
+			wantErr:   false,
+		},
+		{
+			name:      "escapes default database string literal",
+			db:        &DB{config: &Config{Database: "dev_o'brien"}},
+			tableName: "orders",
+			wantQuery: "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'dev_o''brien' AND table_name = 'orders'",
+			wantErr:   false,
+		},
+		{
+			name:      "quotes and escapes catalog identifier",
+			db:        &DB{config: &Config{Database: "test_db"}},
+			tableName: `cat"alog.database.table`,
+			wantQuery: `SELECT COUNT(*) FROM "cat""alog".information_schema.tables WHERE table_schema = 'database' AND table_name = 'table'`,
 			wantErr:   false,
 		},
 		{

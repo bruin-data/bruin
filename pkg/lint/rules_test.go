@@ -5062,6 +5062,18 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			want:    []string{},
 			wantErr: assert.NoError,
 		},
+		{
+			name: "Athena - table parameter with quote",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeAthenaTableSensor,
+				Parameters: pipeline.ParameterMap{
+					"table": "database.events'--",
+				},
+			},
+			want:    []string{"Athena table sensor `table` parameter must be made of alphanumeric characters, dashes, dots and underscores, \"database.events'--\" given"},
+			wantErr: assert.NoError,
+		},
 
 		// PostgreSQL tests
 		{
@@ -5104,6 +5116,18 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 				Type: pipeline.AssetTypePostgresTableSensor,
 				Parameters: pipeline.ParameterMap{
 					"table": "schema.table",
+				},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "PostgreSQL - valid table name with space",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypePostgresTableSensor,
+				Parameters: pipeline.ParameterMap{
+					"table": "public.Order Details",
 				},
 			},
 			want:    []string{},
@@ -5379,6 +5403,18 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 				},
 			},
 			want:    []string{"BigQuery table sensor `table` parameter contains empty components, '.dataset.table' given"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Valid table name characters",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeBigqueryTableSensor,
+				Parameters: pipeline.ParameterMap{
+					"table": "my-project.data_set.table-name",
+				},
+			},
+			want:    []string{},
 			wantErr: assert.NoError,
 		},
 	}
