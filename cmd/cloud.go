@@ -3362,7 +3362,7 @@ func cloudScheduledAgentsGet() *cli.Command {
 func cloudScheduledAgentsCreate() *cli.Command {
 	return &cli.Command{
 		Name:  "create",
-		Usage: "Create a scheduled agent from a plan (stored as an inactive draft; activation stays in the UI)",
+		Usage: "Create a scheduled agent from a plan (active when it includes a schedule; a plan with no cron stays a draft)",
 		Flags: append(
 			scheduledAgentPlanFlags(),
 			&cli.IntFlag{
@@ -3404,10 +3404,13 @@ func cloudScheduledAgentsCreate() *cli.Command {
 				return nil
 			}
 
-			if run.IsActive {
+			switch {
+			case run.IsActive:
 				infoPrinter.Printf("Created scheduled agent %d (%s) — it's active and the next run is scheduled. Manage it in the Bruin Cloud UI.\n", run.ID, derefString(run.Title))
-			} else {
-				infoPrinter.Printf("Created scheduled agent %d (%s) as a draft — add a schedule and activate it from the Bruin Cloud UI.\n", run.ID, derefString(run.Title))
+			case run.ScheduleCron != nil && *run.ScheduleCron != "":
+				infoPrinter.Printf("Created scheduled agent %d (%s) as a draft — activate it from the Bruin Cloud UI.\n", run.ID, derefString(run.Title))
+			default:
+				infoPrinter.Printf("Created scheduled agent %d (%s) as a draft — add a schedule, then activate it from the Bruin Cloud UI.\n", run.ID, derefString(run.Title))
 			}
 			return nil
 		},
