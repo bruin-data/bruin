@@ -3362,7 +3362,7 @@ func cloudScheduledAgentsGet() *cli.Command {
 func cloudScheduledAgentsCreate() *cli.Command {
 	return &cli.Command{
 		Name:  "create",
-		Usage: "Create a scheduled agent from a plan (stored as an inactive draft; activation stays in the UI)",
+		Usage: "Create a scheduled agent from a plan (active when it includes a schedule; a plan with no cron stays a draft)",
 		Flags: append(
 			scheduledAgentPlanFlags(),
 			&cli.IntFlag{
@@ -3404,7 +3404,14 @@ func cloudScheduledAgentsCreate() *cli.Command {
 				return nil
 			}
 
-			infoPrinter.Printf("Created scheduled agent %d (%s) as a draft — review and activate it from the Bruin Cloud UI.\n", run.ID, derefString(run.Title))
+			switch {
+			case run.IsActive:
+				infoPrinter.Printf("Created scheduled agent %d (%s) — it's active and the next run is scheduled. Manage it in the Bruin Cloud UI.\n", run.ID, derefString(run.Title))
+			case run.ScheduleCron != nil && *run.ScheduleCron != "":
+				infoPrinter.Printf("Created scheduled agent %d (%s) as a draft — activate it from the Bruin Cloud UI.\n", run.ID, derefString(run.Title))
+			default:
+				infoPrinter.Printf("Created scheduled agent %d (%s) as a draft — add a schedule, then activate it from the Bruin Cloud UI.\n", run.ID, derefString(run.Title))
+			}
 			return nil
 		},
 	}
@@ -3413,13 +3420,17 @@ func cloudScheduledAgentsCreate() *cli.Command {
 func cloudScheduledAgentsUpdate() *cli.Command {
 	return &cli.Command{
 		Name:  "update",
-		Usage: "Update a scheduled agent's title or plan (activation stays in the UI)",
+		Usage: "Update a scheduled agent's title, plan, or active state (--active true|false)",
 		Flags: append(
 			scheduledAgentPlanFlags(),
 			&cli.IntFlag{
 				Name:     "scheduled-agent-id",
 				Usage:    "scheduled agent ID",
 				Required: true,
+			},
+			&cli.BoolFlag{
+				Name:  "active",
+				Usage: "activate (true) or pause (false) the scheduled agent; activating needs a schedule",
 			},
 		),
 		Action: func(ctx context.Context, c *cli.Command) error {
@@ -3431,8 +3442,11 @@ func cloudScheduledAgentsUpdate() *cli.Command {
 				printError(err, output, "Invalid plan")
 				return cli.Exit("", 1)
 			}
+			if c.IsSet("active") {
+				fields["is_active"] = c.Bool("active")
+			}
 			if len(fields) == 0 {
-				printError(errors.New("provide at least one field to update (e.g. --title, --cron, --instructions or --state-file)"), output, "Nothing to update")
+				printError(errors.New("provide at least one field to update (e.g. --title, --cron, --instructions, --active or --state-file)"), output, "Nothing to update")
 				return cli.Exit("", 1)
 			}
 
