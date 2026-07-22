@@ -91,8 +91,15 @@ func validateDuckLakeForDuckDB(lh config.LakehouseConfig) error {
 		if !lh.Storage.Auth.IsGCS() {
 			return errors.New("DuckDB ducklake with gcs storage requires access_key and secret_key")
 		}
+	case config.StorageTypeAzure:
+		if lh.Storage.Path == "" {
+			return errors.New("DuckDB ducklake with azure storage requires path")
+		}
+		if !lh.Storage.Auth.IsAzure() {
+			return errors.New("DuckDB ducklake with azure storage requires connection_string or account_name")
+		}
 	default:
-		return fmt.Errorf("DuckDB ducklake does not support storage type: '%s' (supported: s3, gcs)", lh.Storage.Type)
+		return fmt.Errorf("DuckDB ducklake does not support storage type: '%s' (supported: s3, gcs, azure)", lh.Storage.Type)
 	}
 
 	return nil
@@ -121,6 +128,15 @@ func (l *LakehouseAttacher) GenerateAttachStatements(lh *config.LakehouseConfig,
 	for _, ext := range extensions {
 		statements = append(statements, "INSTALL "+ext)
 		statements = append(statements, "LOAD "+ext)
+	}
+
+	// The azure extension's default transport ignores the system CA bundle and
+	// fails TLS to *.blob.core.windows.net on Linux/containers; the curl
+	// transport uses libcurl + the standard CA paths. GLOBAL because the
+	// session scope is insufficient for DuckLake maintenance calls
+	// (duckdb/ducklake#776).
+	if lh.Storage.Type == config.StorageTypeAzure {
+		statements = append(statements, "SET GLOBAL azure_transport_option_type = 'curl'")
 	}
 
 	secretStatements := l.generateSecretStatements(*lh, alias)
@@ -152,6 +168,10 @@ func (l *LakehouseAttacher) getRequiredExtensions(lh config.LakehouseConfig) []s
 	}
 	if lh.Storage.Type == config.StorageTypeGCS {
 		extensions = append(extensions, "httpfs")
+	}
+	// The azure extension registers the az:// filesystem itself — no httpfs/aws.
+	if lh.Storage.Type == config.StorageTypeAzure {
+		extensions = append(extensions, "azure")
 	}
 
 	switch lh.Catalog.Type {
@@ -189,6 +209,8 @@ func (l *LakehouseAttacher) generateSecretStatements(lh config.LakehouseConfig, 
 		storageSecret = l.generateS3Secret(defaultSecretName(alias, "storage"), lh.Storage)
 	case config.StorageTypeGCS:
 		storageSecret = l.generateGCSSecret(defaultSecretName(alias, "storage"), lh.Storage)
+	case config.StorageTypeAzure:
+		storageSecret = l.generateAzureSecret(defaultSecretName(alias, "storage"), lh.Storage)
 	}
 	if storageSecret != "" {
 		statements = append(statements, storageSecret)
@@ -253,6 +275,33 @@ func (l *LakehouseAttacher) generateGCSSecret(name string, storage config.Storag
 	parts = append(parts, ",   SECRET "+quoteSQLStringLiteral(auth.SecretKey))
 
 	scope := "gs://"
+	if storage.Path != "" {
+		scope = storage.Path
+	}
+	parts = append(parts, ",   SCOPE "+quoteSQLStringLiteral(scope))
+
+	parts = append(parts, ")")
+	return strings.Join(parts, "\n")
+}
+
+func (l *LakehouseAttacher) generateAzureSecret(name string, storage config.StorageConfig) string {
+	auth := storage.Auth
+	if !auth.IsAzure() {
+		return ""
+	}
+
+	parts := make([]string, 0, 6)
+	parts = append(parts, "CREATE OR REPLACE SECRET "+name+" (")
+	parts = append(parts, "    TYPE azure")
+	if auth.ConnectionString != "" {
+		parts = append(parts, ",   CONNECTION_STRING "+quoteSQLStringLiteral(auth.ConnectionString))
+	} else {
+		// No account key: authenticate via managed identity / az login / env.
+		parts = append(parts, ",   PROVIDER credential_chain")
+		parts = append(parts, ",   ACCOUNT_NAME "+quoteSQLStringLiteral(auth.AccountName))
+	}
+
+	scope := "az://"
 	if storage.Path != "" {
 		scope = storage.Path
 	}

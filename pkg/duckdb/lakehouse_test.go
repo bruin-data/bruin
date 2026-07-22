@@ -73,6 +73,18 @@ func validDuckLakeSQLiteConfig() *config.LakehouseConfig {
 	return cfg
 }
 
+func validDuckLakeAzureConfig() *config.LakehouseConfig {
+	cfg := validDuckLakePostgresConfig()
+	cfg.Storage = config.StorageConfig{
+		Type: config.StorageTypeAzure,
+		Path: "az://warehouse",
+		Auth: config.StorageAuth{
+			ConnectionString: "DefaultEndpointsProtocol=https;AccountName=acct;AccountKey=key;EndpointSuffix=core.windows.net",
+		},
+	}
+	return cfg
+}
+
 func TestValidateLakehouseConfig(t *testing.T) {
 	t.Parallel()
 
@@ -288,6 +300,40 @@ func TestValidateLakehouseConfig(t *testing.T) {
 			wantErr: true,
 			errMsg:  "with gcs storage requires path",
 		},
+		{
+			name:    "ducklake with postgres and azure storage passes",
+			build:   validDuckLakeAzureConfig,
+			wantErr: false,
+		},
+		{
+			name: "ducklake with azure storage (account_name / credential chain) passes",
+			build: func() *config.LakehouseConfig {
+				cfg := validDuckLakeAzureConfig()
+				cfg.Storage.Auth = config.StorageAuth{AccountName: "acct"}
+				return cfg
+			},
+			wantErr: false,
+		},
+		{
+			name: "ducklake with azure storage missing auth fails",
+			build: func() *config.LakehouseConfig {
+				cfg := validDuckLakeAzureConfig()
+				cfg.Storage.Auth = config.StorageAuth{}
+				return cfg
+			},
+			wantErr: true,
+			errMsg:  "with azure storage requires connection_string or account_name",
+		},
+		{
+			name: "ducklake with azure storage missing path fails",
+			build: func() *config.LakehouseConfig {
+				cfg := validDuckLakeAzureConfig()
+				cfg.Storage.Path = ""
+				return cfg
+			},
+			wantErr: true,
+			errMsg:  "with azure storage requires path",
+		},
 	}
 
 	for _, tt := range tests {
@@ -390,6 +436,19 @@ func TestLakehouseAttacher_GetRequiredExtensions(t *testing.T) {
 				},
 			},
 			wantExts: []string{"ducklake", "sqlite", "httpfs"},
+		},
+		{
+			name: "ducklake with postgres and azure",
+			lh: &config.LakehouseConfig{
+				Format: config.LakehouseFormatDuckLake,
+				Catalog: config.CatalogConfig{
+					Type: config.CatalogTypePostgres,
+				},
+				Storage: config.StorageConfig{
+					Type: config.StorageTypeAzure,
+				},
+			},
+			wantExts: []string{"ducklake", "postgres", "azure"},
 		},
 	}
 
@@ -618,6 +677,65 @@ func TestLakehouseAttacher_GenerateGCSSecret(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			result := attacher.generateGCSSecret("test_secret", *tt.storage)
+			assert.Equal(t, tt.want, result)
+		})
+	}
+}
+
+func TestLakehouseAttacher_GenerateAzureSecret(t *testing.T) {
+	t.Parallel()
+	attacher := NewLakehouseAttacher()
+
+	tests := []struct {
+		name    string
+		storage *config.StorageConfig
+		want    string
+	}{
+		{
+			name: "azure with connection string",
+			storage: &config.StorageConfig{
+				Type: config.StorageTypeAzure,
+				Path: "az://ducklake/warehouse",
+				Auth: config.StorageAuth{
+					ConnectionString: "DefaultEndpointsProtocol=https;AccountName=acct;AccountKey=key;EndpointSuffix=core.windows.net",
+				},
+			},
+			want: `CREATE OR REPLACE SECRET test_secret (
+    TYPE azure
+,   CONNECTION_STRING 'DefaultEndpointsProtocol=https;AccountName=acct;AccountKey=key;EndpointSuffix=core.windows.net'
+,   SCOPE 'az://ducklake/warehouse'
+)`,
+		},
+		{
+			name: "azure with account name (credential chain)",
+			storage: &config.StorageConfig{
+				Type: config.StorageTypeAzure,
+				Path: "az://ducklake/warehouse",
+				Auth: config.StorageAuth{
+					AccountName: "acct",
+				},
+			},
+			want: `CREATE OR REPLACE SECRET test_secret (
+    TYPE azure
+,   PROVIDER credential_chain
+,   ACCOUNT_NAME 'acct'
+,   SCOPE 'az://ducklake/warehouse'
+)`,
+		},
+		{
+			name: "azure without credentials returns empty",
+			storage: &config.StorageConfig{
+				Type: config.StorageTypeAzure,
+				Auth: config.StorageAuth{},
+			},
+			want: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := attacher.generateAzureSecret("test_secret", *tt.storage)
 			assert.Equal(t, tt.want, result)
 		})
 	}
@@ -1049,6 +1167,45 @@ func TestLakehouseAttacher_GenerateAttachStatements(t *testing.T) {
 				"USE ducklake_catalog",
 			},
 			wantMinLen: 10,
+		},
+		{
+			name: "ducklake with postgres and azure storage",
+			lh: &config.LakehouseConfig{
+				Format: config.LakehouseFormatDuckLake,
+				Catalog: config.CatalogConfig{
+					Type:     config.CatalogTypePostgres,
+					Host:     "localhost",
+					Database: "ducklake_catalog",
+					Auth: config.CatalogAuth{
+						Username: "ducklake_user",
+						Password: "ducklake_password",
+					},
+				},
+				Storage: config.StorageConfig{
+					Type: config.StorageTypeAzure,
+					Path: "az://ducklake/warehouse",
+					Auth: config.StorageAuth{
+						ConnectionString: "DefaultEndpointsProtocol=https;AccountName=acct;AccountKey=key;EndpointSuffix=core.windows.net",
+					},
+				},
+			},
+			alias: "ducklake_catalog",
+			wantContains: []string{
+				"INSTALL ducklake",
+				"LOAD ducklake",
+				"INSTALL azure",
+				"LOAD azure",
+				"SET GLOBAL azure_transport_option_type = 'curl'",
+				"CREATE OR REPLACE SECRET",
+				"TYPE azure",
+				"CONNECTION_STRING",
+				"ATTACH 'ducklake:postgres:' AS ducklake_catalog",
+				"DATA_PATH 'az://ducklake/warehouse'",
+				"OVERRIDE_DATA_PATH true",
+				"CREATE SCHEMA IF NOT EXISTS ducklake_catalog.main",
+				"USE ducklake_catalog",
+			},
+			wantMinLen: 9,
 		},
 	}
 

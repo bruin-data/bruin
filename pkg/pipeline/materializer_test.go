@@ -108,6 +108,19 @@ func (m listMaterializer) Render(_ *Asset, _ string) ([]string, error) {
 	return m.out, nil
 }
 
+type listMaterializerWithCleanup struct {
+	out     []string
+	cleanup []string
+}
+
+func (m listMaterializerWithCleanup) Render(_ *Asset, _ string) ([]string, error) {
+	return m.out, nil
+}
+
+func (m listMaterializerWithCleanup) RenderWithCleanup(_ *Asset, _ string) ([]string, []string, error) {
+	return m.out, m.cleanup, nil
+}
+
 type listWithLocationMaterializer struct {
 	out         []string
 	gotLocation string
@@ -154,6 +167,29 @@ func TestHookWrapperMaterializerList_Render(t *testing.T) {
 	got, err := wrapper.Render(asset, "ignored")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"select 1;", "select 3", "select 2;"}, got)
+}
+
+func TestHookWrapperMaterializerList_RenderWithCleanup(t *testing.T) {
+	t.Parallel()
+
+	asset := &Asset{
+		Hooks: Hooks{
+			Pre:  []Hook{{Query: "select 1"}},
+			Post: []Hook{{Query: "select 2"}},
+		},
+	}
+
+	wrapper := HookWrapperMaterializerList{
+		Mat: listMaterializerWithCleanup{
+			out:     []string{"select 3", "drop table temp"},
+			cleanup: []string{"drop table temp"},
+		},
+	}
+
+	got, cleanup, err := wrapper.RenderWithCleanup(asset, "ignored")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"select 1;", "select 3", "drop table temp", "select 2;"}, got)
+	assert.Equal(t, []string{"drop table temp"}, cleanup)
 }
 
 func TestHookWrapperMaterializerListWithLocation_Render(t *testing.T) {

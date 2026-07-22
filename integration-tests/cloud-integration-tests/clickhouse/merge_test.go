@@ -3,6 +3,7 @@ package clickhouse_test
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -202,6 +203,134 @@ FROM merge_fr_seed
 		{"row_2", int32(200)},
 		{"row_4", int32(400)},
 	}, rows)
+}
+
+// TestMergeInsertFailurePreservesTargetAndCleansUpStaging protects the
+// failure path of merge materialization. A staged query whose shape does not
+// match the target must fail before matching target rows are deleted, and the
+// staging table must be removed even though the run failed.
+func TestMergeInsertFailurePreservesTargetAndCleansUpStaging(t *testing.T) {
+	host, port := startClickHouse(t)
+	configPath := writeClickHouseConfig(t, host, port)
+	binary := bruinBinary(t)
+
+	runBruinQuery(t, binary, configPath,
+		"CREATE TABLE merge_failure_target (row_id String, amount Int32) ENGINE = MergeTree ORDER BY row_id",
+	)
+	runBruinQuery(t, binary, configPath,
+		"CREATE TABLE merge_failure_seed (row_id String, amount Int32, unexpected String) ENGINE = MergeTree ORDER BY row_id",
+	)
+	runBruinQuery(t, binary, configPath,
+		"INSERT INTO merge_failure_target VALUES ('row_1', 10), ('row_2', 20)",
+	)
+	runBruinQuery(t, binary, configPath,
+		"INSERT INTO merge_failure_seed VALUES ('row_1', 100, 'extra')",
+	)
+
+	assetPath := writeMergePipeline(t, "clickhouse-merge-failure-test", `/* @bruin
+name: merge_failure_target
+type: clickhouse.sql
+materialization:
+  type: table
+  strategy: merge
+columns:
+  - name: row_id
+    type: String
+    primary_key: true
+  - name: amount
+    type: Int32
+@bruin */
+
+SELECT row_id, amount, unexpected
+FROM merge_failure_seed
+`)
+
+	output := runBruinExpectFailure(t, binary, configPath, "run", assetPath)
+	require.Contains(t, output, "Number of columns doesn't match")
+
+	client := newClient(t, host, port)
+	rows, err := client.Select(t.Context(), &query.Query{
+		Query: "SELECT row_id, amount FROM merge_failure_target ORDER BY row_id",
+	})
+	require.NoError(t, err)
+	require.Equal(t, [][]interface{}{
+		{"row_1", int32(10)},
+		{"row_2", int32(20)},
+	}, rows)
+
+	requireNoMergeStagingTables(t, client)
+}
+
+// TestMergeDeleteFailureCleansUpStaging verifies that a failure after staging
+// creation still removes the per-run staging table. ClickHouse DELETE does not
+// expose the target alias used by other merge implementations, so a qualified
+// incremental predicate deliberately exercises this path.
+func TestMergeDeleteFailureCleansUpStaging(t *testing.T) {
+	host, port := startClickHouse(t)
+	configPath := writeClickHouseConfig(t, host, port)
+	binary := bruinBinary(t)
+
+	runBruinQuery(t, binary, configPath,
+		"CREATE TABLE merge_predicate_target (row_id String, event_date Date, amount Int32) ENGINE = MergeTree ORDER BY row_id",
+	)
+	runBruinQuery(t, binary, configPath,
+		"CREATE TABLE merge_predicate_seed (row_id String, event_date Date, amount Int32) ENGINE = MergeTree ORDER BY row_id",
+	)
+	runBruinQuery(t, binary, configPath,
+		"INSERT INTO merge_predicate_target VALUES ('row_1', toDate('2026-07-20'), 10)",
+	)
+	runBruinQuery(t, binary, configPath,
+		"INSERT INTO merge_predicate_seed VALUES ('row_1', toDate('2026-07-20'), 100)",
+	)
+
+	assetPath := writeMergePipeline(t, "clickhouse-merge-predicate-failure-test", `/* @bruin
+name: merge_predicate_target
+type: clickhouse.sql
+materialization:
+  type: table
+  strategy: merge
+  incremental_predicate: target.event_date >= toDate('2026-07-01')
+columns:
+  - name: row_id
+    type: String
+    primary_key: true
+  - name: event_date
+    type: Date
+  - name: amount
+    type: Int32
+@bruin */
+
+SELECT row_id, event_date, amount
+FROM merge_predicate_seed
+`)
+
+	output := runBruinExpectFailure(t, binary, configPath, "run", assetPath)
+	require.Contains(t, output, "target.event_date")
+
+	client := newClient(t, host, port)
+	requireNoMergeStagingTables(t, client)
+}
+
+func requireNoMergeStagingTables(t *testing.T, client *clickhouse.Client) {
+	t.Helper()
+
+	rows, err := client.Select(t.Context(), &query.Query{
+		Query: "SELECT count() FROM system.tables WHERE database = currentDatabase() AND name LIKE '__bruin_tmp_%'",
+	})
+	require.NoError(t, err)
+	require.Equal(t, [][]interface{}{{uint64(0)}}, rows)
+}
+
+func runBruinExpectFailure(t *testing.T, binary, configPath string, args ...string) string {
+	t.Helper()
+
+	commandArgs := []string{args[0], "--config-file", configPath}
+	commandArgs = append(commandArgs, args[1:]...)
+	cmd := exec.CommandContext(t.Context(), binary, commandArgs...)
+	cmd.Env = append(os.Environ(), "DISABLE_TELEMETRY=true", "INGESTR_DISABLE_TELEMETRY=true")
+	output, err := cmd.CombinedOutput()
+	require.Error(t, err, "bruin %s unexpectedly succeeded:\n%s", commandArgs[0], output)
+	return string(output)
 }
 
 func newClient(t *testing.T, host string, port int) *clickhouse.Client {

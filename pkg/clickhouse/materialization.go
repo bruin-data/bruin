@@ -81,7 +81,9 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) ([]string, error)
 			query,
 		),
 		fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", task.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
-		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", task.Name, tempTableName),
+		// An identical rerun must replace rows deleted above instead of being
+		// discarded by ClickHouse's block-level insert deduplication.
+		fmt.Sprintf("INSERT INTO %s SETTINGS insert_deduplicate = 0 SELECT * FROM %s", task.Name, tempTableName),
 		"DROP TABLE IF EXISTS " + tempTableName,
 	}
 
@@ -136,8 +138,11 @@ func buildMergeQuery(task *pipeline.Asset, query string) ([]string, error) {
 		deleteCondition += " AND (" + pred + ")"
 	}
 
+	// Validate that ClickHouse can plan an insert from the staged schema before
+	// deleting target rows. LIMIT 0 performs no write and avoids deduplication.
 	queries := []string{
 		fmt.Sprintf("CREATE TABLE %s ENGINE = MergeTree() PRIMARY KEY (%s) AS %s", tempTableName, keys, query),
+		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s LIMIT 0", task.Name, tempTableName),
 		fmt.Sprintf("DELETE FROM %s WHERE %s", task.Name, deleteCondition),
 		fmt.Sprintf("INSERT INTO %s SETTINGS insert_deduplicate = 0 SELECT * FROM %s", task.Name, tempTableName),
 		"DROP TABLE IF EXISTS " + tempTableName,
@@ -189,15 +194,15 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) ([]string, erro
 		return nil, errors.New("time_granularity must be either 'date', or 'timestamp'")
 	}
 
-	startVar := "{{ start_timestamp | date_format('%Y-%m-%dT%H:%M:%S.%f') }}"
-	endVar := "{{ end_timestamp | date_format('%Y-%m-%dT%H:%M:%S.%f') }}"
+	startVar := "toDateTime64('{{ start_timestamp | date_format('%Y-%m-%d %H:%M:%S.%f') }}', 6)"
+	endVar := "toDateTime64('{{ end_timestamp | date_format('%Y-%m-%d %H:%M:%S.%f') }}', 6)"
 	if asset.Materialization.TimeGranularity == pipeline.MaterializationTimeGranularityDate {
-		startVar = "{{start_date}}"
-		endVar = "{{end_date}}"
+		startVar = "'{{start_date}}'"
+		endVar = "'{{end_date}}'"
 	}
 
 	queries := []string{
-		fmt.Sprintf(`DELETE FROM %s WHERE %s BETWEEN '%s' AND '%s'`,
+		fmt.Sprintf(`DELETE FROM %s WHERE %s BETWEEN %s AND %s`,
 			asset.Name,
 			asset.Materialization.IncrementalKey,
 			startVar,

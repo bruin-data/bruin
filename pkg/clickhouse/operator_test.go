@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 type mockExtractor struct {
@@ -39,6 +40,24 @@ func (m *mockMaterializer) Render(t *pipeline.Asset, query string) ([]string, er
 }
 
 func (m *mockMaterializer) LogIfFullRefreshAndDDL(writer interface{}, asset *pipeline.Asset) error {
+	return nil
+}
+
+type mockMaterializerWithCleanup struct {
+	mock.Mock
+}
+
+func (m *mockMaterializerWithCleanup) Render(t *pipeline.Asset, query string) ([]string, error) {
+	res := m.Called(t, query)
+	return res.Get(0).([]string), res.Error(1)
+}
+
+func (m *mockMaterializerWithCleanup) RenderWithCleanup(t *pipeline.Asset, query string) ([]string, []string, error) {
+	res := m.Called(t, query)
+	return res.Get(0).([]string), res.Get(1).([]string), res.Error(2)
+}
+
+func (m *mockMaterializerWithCleanup) LogIfFullRefreshAndDDL(writer interface{}, asset *pipeline.Asset) error {
 	return nil
 }
 
@@ -226,4 +245,51 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBasicOperator_RunTaskCleansUpAfterQueryFailure(t *testing.T) {
+	t.Parallel()
+
+	asset := &pipeline.Asset{
+		Type: pipeline.AssetTypeClickHouse,
+		ExecutableFile: pipeline.ExecutableFile{
+			Path:    "test-file.sql",
+			Content: "some query",
+		},
+	}
+	client := new(mockQuerierWithResult)
+	extractor := new(mockExtractor)
+	mat := new(mockMaterializerWithCleanup)
+	conn := new(mockConnectionFetcher)
+
+	extractor.On("ExtractQueriesFromString", "some query").
+		Return([]*query.Query{{Query: "select * from users"}}, nil)
+	mat.On("RenderWithCleanup", asset, "select * from users").
+		Return(
+			[]string{"CREATE TABLE temp", "INSERT INTO target SELECT * FROM temp"},
+			[]string{"DROP TABLE IF EXISTS temp"},
+			nil,
+		)
+	conn.On("GetConnection", mock.Anything).Return(client)
+	createCall := client.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "CREATE TABLE temp"}).
+		Return(nil).
+		Once()
+	insertCall := client.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "INSERT INTO target SELECT * FROM temp"}).
+		Return(errors.New("insert failed")).
+		Once().
+		NotBefore(createCall)
+	client.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "DROP TABLE IF EXISTS temp"}).
+		Return(nil).
+		Once().
+		NotBefore(insertCall)
+
+	o := BasicOperator{
+		connection:   conn,
+		extractor:    extractor,
+		materializer: mat,
+	}
+
+	err := o.RunTask(t.Context(), &pipeline.Pipeline{}, asset)
+	require.EqualError(t, err, "insert failed")
+	client.AssertExpectations(t)
 }

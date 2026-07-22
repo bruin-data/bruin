@@ -20,6 +20,10 @@ Use a Salesforce user that has:
 - API access
 - Access to the Salesforce objects you want to ingest
 - Permission to log in through API/SOAP if using username/password/security-token auth
+- **Read** field-level security (FLS) on every field you want to ingest
+
+> [!WARNING]
+> ingestr only ingests the fields the connecting user is permitted to read. If you want a field to be ingested, make sure the user has Read access to it, through its profile or a permission set. If the user does not have permission to a field, Salesforce does not return it and ingestr does not fetch it.
 
 Common Salesforce objects include:
 
@@ -247,3 +251,15 @@ Fix one of the following:
 
 - Rename the Bruin Cloud connection to match the asset.
 - Or update the asset to reference the Bruin Cloud connection name.
+
+### Some fields are not ingested
+
+A field is not ingested even though it has data in Salesforce, and the run reports no error.
+
+ingestr only fetches the fields the connecting user is permitted to read (its query is built from what Salesforce returns for that user). A common reason a field is skipped is that the user lacks Read access to it, for example due to field-level security (FLS).
+
+To ingest a field that is missing:
+
+- Make sure the Salesforce user has **Read** access to it, through its profile or an assigned permission set.
+- You can check which fields the user can see by describing the object as that user (for example `GET /services/data/v59.0/sobjects/<object>/describe`). Only the fields listed in the response are ingested.
+- Run the asset again.

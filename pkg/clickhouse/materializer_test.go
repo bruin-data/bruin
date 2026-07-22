@@ -73,3 +73,40 @@ func TestLogIfFullRefreshAndDDL(t *testing.T) {
 		})
 	}
 }
+
+func TestMaterializer_RenderWithCleanup(t *testing.T) {
+	t.Parallel()
+
+	asset := &pipeline.Asset{
+		Name: "my.asset",
+		Materialization: pipeline.Materialization{
+			Type:     pipeline.MaterializationTypeTable,
+			Strategy: pipeline.MaterializationStrategyMerge,
+		},
+		Columns: []pipeline.Column{{Name: "id", PrimaryKey: true}},
+	}
+
+	queries, cleanup, err := NewMaterializer(false).RenderWithCleanup(asset, "SELECT 1 AS id")
+	require.NoError(t, err)
+	require.NotEmpty(t, queries)
+	require.Equal(t, []string{"DROP TABLE IF EXISTS my.__bruin_tmp_abcefghi"}, cleanup)
+	require.Equal(t, cleanup[0], queries[len(queries)-1])
+}
+
+func TestMaterializer_RenderWithCleanupFullRefreshDoesNotReturnMergeCleanup(t *testing.T) {
+	t.Parallel()
+
+	asset := &pipeline.Asset{
+		Name: "my.asset",
+		Materialization: pipeline.Materialization{
+			Type:     pipeline.MaterializationTypeTable,
+			Strategy: pipeline.MaterializationStrategyMerge,
+		},
+		Columns: []pipeline.Column{{Name: "id", PrimaryKey: true}},
+	}
+
+	queries, cleanup, err := NewMaterializer(true).RenderWithCleanup(asset, "SELECT 1 AS id")
+	require.NoError(t, err)
+	require.Len(t, queries, 1)
+	require.Empty(t, cleanup)
+}

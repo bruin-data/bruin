@@ -69,6 +69,8 @@ parameters:
   loader_file_format: jsonl | csv | parquet
   loader_file_size: integer
   extract_parallelism: integer
+  extract_partition_by: string
+  extract_partition_interval: string | integer
   sql_limit: integer
   sql_exclude_columns: string
   no_inference: true|false
@@ -126,6 +128,8 @@ parameters:
 | `schema_naming` | No | `--schema-naming` | Controls how Ingestr normalizes schema names. Accepted values match the [Ingestr CLI.](https://getbruin.com/docs/ingestr/commands/ingest.html#optional-flags) |
 | `page_size` | No | `--page-size` | Sets the fetch page size for SQL sources. |
 | `extract_parallelism` | No | `--extract-parallelism` | Limits the number of concurrent extraction workers. |
+| `extract_partition_by` | No | `--extract-partition-by` | Source date/time or integer column used to split bounded extraction into parallel windows. |
+| `extract_partition_interval` | No | `--extract-partition-interval` | Width of each extract partition window as a duration (such as `1h` or `7d`), integer step, or `auto`. Ingestr defaults to `auto` when `extract_partition_by` is set. |
 | `sql_reflection_level` | No | `--sql-reflection-level` | Tunes the amount of schema reflection performed against the source. |
 | `sql_limit` | No | `--sql-limit` | Applies a `LIMIT` clause when extracting from the source. |
 | `sql_exclude_columns` | No | `--sql-exclude-columns` | List of columns to skip during extraction. |

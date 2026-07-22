@@ -1,0 +1,4 @@
+interface:
+  display_name: "Record VHS Demo"
+  short_description: "Record polished Bruin terminal demos"
+  default_prompt: "Use $record-vhs-demo to record and visually verify a polished Bruin terminal demo."

@@ -1060,7 +1060,7 @@ func (c ApplovinMaxConnection) GetName() string {
 
 type GenericConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	Value              string `yaml:"value,omitempty" json:"value" mapstructure:"value"`
+	Value              string `yaml:"value,omitempty" json:"value" mapstructure:"value" sensitive:"true"`
 }
 
 func (c GenericConnection) MarshalJSON() ([]byte, error) {

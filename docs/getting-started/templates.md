@@ -121,6 +121,12 @@ AI agent skills are installed separately with `bruin ai skills`; see [AI Skills]
 ### Source-to-warehouse ingestion
 
 <div class="template-grid">
+  <a class="template-card" href="./templates-docs/ai-coding-usage-README.html">
+    <span class="template-card__category">AI usage analytics</span>
+    <strong>ai-coding-usage</strong>
+    <span>Ingests Anthropic Claude Code and Cursor usage into DuckDB, then builds normalized summaries and a DAC dashboard.</span>
+    <span class="template-card__tags"><code>Anthropic</code><code>Cursor</code><code>DuckDB</code></span>
+  </a>
   <a class="template-card" href="./templates-docs/shopify-bigquery-README.html">
     <span class="template-card__category">Commerce source</span>
     <strong>shopify-bigquery</strong>
@@ -197,7 +203,7 @@ bruin init nyc-taxi my-taxi-pipeline
 | Goal | Start with |
 | --- | --- |
 | Learn Bruin locally without cloud credentials | `duckdb`, `python`, `frankfurter`, or `chess` |
-| Build a source-to-warehouse ingestion pipeline | `shopify-bigquery`, `gsheet-bigquery`, `notion`, or `gorgias` |
+| Build a source-to-warehouse ingestion pipeline | `ai-coding-usage`, `shopify-bigquery`, `gsheet-bigquery`, `notion`, or `gorgias` |
 | Explore a complete demo with generated data | `demo-snowflake-sales-analytics` or `demo-snowflake-salesforce` |
 | Scaffold ecommerce reporting | `ecommerce` |
 | Work with a specific database | `athena`, `clickhouse`, `bronze-silver-postgres`, `bigquery`, `databricks`, or `redshift` |
