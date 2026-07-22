@@ -342,6 +342,38 @@ storage:
     secret_key: "${GCS_HMAC_SECRET_KEY}"
 ```
 
+#### Azure
+
+Bruin supports Azure Blob Storage for DuckLake. Authenticate either with an account-key
+`connection_string`, or with `account_name` alone to use DuckDB's credential chain
+(managed identity, `az login`, or environment credentials).
+
+```yaml
+storage:
+  type: azure
+  path: "az://my-container/path" # required for DuckLake
+  auth:
+    connection_string: "${AZURE_STORAGE_CONNECTION_STRING}"
+```
+
+```yaml
+# Managed identity / az login / environment credentials
+storage:
+  type: azure
+  path: "az://my-container/path"
+  auth:
+    account_name: "${AZURE_STORAGE_ACCOUNT}"
+```
+
+Bruin loads the `azure` extension and sets `azure_transport_option_type = 'curl'`
+(globally) so TLS to `*.blob.core.windows.net` uses the system CA bundle — required on
+Linux/containers, which must have `ca-certificates` installed.
+
+> [!NOTE]
+> DuckLake maintenance calls that delete/scan blobs (e.g.
+> `ducklake_delete_orphaned_files`) can still hit Azure-side issues on some setups; core
+> read/write works. See [duckdb/ducklake#776](https://github.com/duckdb/ducklake/issues/776).
+
 ---
 ### Usage
 

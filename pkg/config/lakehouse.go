@@ -82,8 +82,9 @@ func (c CatalogConfig) IsZero() bool {
 type StorageType string
 
 const (
-	StorageTypeS3  StorageType = "s3"
-	StorageTypeGCS StorageType = "gcs"
+	StorageTypeS3    StorageType = "s3"
+	StorageTypeGCS   StorageType = "gcs"
+	StorageTypeAzure StorageType = "azure"
 	// Future: StorageTypeLocal.
 )
 
@@ -97,6 +98,7 @@ var (
 	supportedStorageTypes = []StorageType{
 		StorageTypeS3,
 		StorageTypeGCS,
+		StorageTypeAzure,
 	}
 )
 
@@ -105,6 +107,12 @@ type StorageAuth struct {
 	AccessKey    string `yaml:"access_key,omitempty" json:"access_key,omitempty" mapstructure:"access_key" sensitive:"true"`
 	SecretKey    string `yaml:"secret_key,omitempty" json:"secret_key,omitempty" mapstructure:"secret_key" sensitive:"true"`
 	SessionToken string `yaml:"session_token,omitempty" json:"session_token,omitempty" mapstructure:"session_token" sensitive:"true"`
+
+	// Azure credentials. ConnectionString authenticates with an account key;
+	// when empty, AccountName selects DuckDB's credential_chain provider
+	// (managed identity / az login / env).
+	ConnectionString string `yaml:"connection_string,omitempty" json:"connection_string,omitempty" mapstructure:"connection_string" sensitive:"true"`
+	AccountName      string `yaml:"account_name,omitempty" json:"account_name,omitempty" mapstructure:"account_name"`
 }
 
 func (a StorageAuth) IsS3() bool {
@@ -113,6 +121,10 @@ func (a StorageAuth) IsS3() bool {
 
 func (a StorageAuth) IsGCS() bool {
 	return a.AccessKey != "" && a.SecretKey != ""
+}
+
+func (a StorageAuth) IsAzure() bool {
+	return a.ConnectionString != "" || a.AccountName != ""
 }
 
 func (a StorageAuth) IsZero() bool {
@@ -179,7 +191,7 @@ func (lh *LakehouseConfig) Validate() error {
 
 	// Validate storage type if specified
 	if lh.Storage.Type == "" || !slices.Contains(supportedStorageTypes, lh.Storage.Type) {
-		return errors.New("empty or unsupported storage type: (supported: s3, gcs)")
+		return errors.New("empty or unsupported storage type: (supported: s3, gcs, azure)")
 	}
 
 	// DuckDB's CREATE SECRET only accepts "path" or "vhost" for URL_STYLE;
