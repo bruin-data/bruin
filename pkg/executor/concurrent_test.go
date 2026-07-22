@@ -116,6 +116,47 @@ func TestConcurrent_StartTimesOutAsset(t *testing.T) {
 	require.Equal(t, scheduler.Failed, results[0].Instance.GetStatus())
 }
 
+func TestTaskLogIndent(t *testing.T) {
+	t.Parallel()
+
+	assetInstance := &scheduler.AssetInstance{}
+
+	tests := []struct {
+		name     string
+		task     scheduler.TaskInstance
+		expected string
+	}{
+		{
+			name:     "asset",
+			task:     assetInstance,
+			expected: "",
+		},
+		{
+			name:     "column quality check",
+			task:     &scheduler.ColumnCheckInstance{AssetInstance: assetInstance},
+			expected: qualityCheckLogIndent,
+		},
+		{
+			name:     "custom quality check",
+			task:     &scheduler.CustomCheckInstance{AssetInstance: assetInstance},
+			expected: qualityCheckLogIndent,
+		},
+		{
+			name:     "metadata push",
+			task:     &scheduler.MetadataPushInstance{AssetInstance: assetInstance},
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.expected, taskLogIndent(tt.task))
+		})
+	}
+}
+
 func TestWorkerWriter_Write(t *testing.T) {
 	t.Parallel()
 

@@ -40,6 +40,7 @@ const (
 	timeFormat = "15:04:05"
 
 	stillRunningLogInterval = 120 * time.Second
+	qualityCheckLogIndent   = "    "
 )
 
 // IsDebugMode reports whether the context carries a KeyIsDebug *bool set to true.
@@ -115,6 +116,15 @@ type worker struct {
 	formatOpts FormattingOptions
 }
 
+func taskLogIndent(task scheduler.TaskInstance) string {
+	switch task.GetType() {
+	case scheduler.TaskInstanceTypeColumnCheck, scheduler.TaskInstanceTypeCustomCheck:
+		return qualityCheckLogIndent
+	default:
+		return ""
+	}
+}
+
 func (w worker) run(ctx context.Context, taskChannel <-chan scheduler.TaskInstance, results chan<- *scheduler.TaskExecutionResult) {
 	for task := range taskChannel {
 		if w.formatOpts.OnTaskStart != nil {
@@ -135,10 +145,11 @@ func (w worker) run(ctx context.Context, taskChannel <-chan scheduler.TaskInstan
 				runningPrinter = color.New(color.Faint)
 			}
 			if !w.formatOpts.MinimalLogs {
+				indent := taskLogIndent(task)
 				if w.formatOpts.DoNotLogTimestamp {
-					fmt.Printf("%s\n", runningPrinter.Sprintf("Running:  %s", task.GetHumanID()))
+					fmt.Printf("%s\n", runningPrinter.Sprintf("%sRunning:  %s", indent, task.GetHumanID()))
 				} else {
-					fmt.Printf("%s %s\n", timestampStr, runningPrinter.Sprintf("Running:  %s", task.GetHumanID()))
+					fmt.Printf("%s %s\n", timestampStr, runningPrinter.Sprintf("%sRunning:  %s", indent, task.GetHumanID()))
 				}
 			}
 			w.printLock.Unlock()
@@ -165,11 +176,12 @@ func (w worker) run(ctx context.Context, taskChannel <-chan scheduler.TaskInstan
 						if !w.formatOpts.NoColor {
 							stillRunningPrinter = color.New(color.Faint)
 						}
+						indent := taskLogIndent(task)
 						if w.formatOpts.DoNotLogTimestamp {
-							fmt.Printf("%s\n", stillRunningPrinter.Sprintf("Still running: %s (%s)", task.GetHumanID(), elapsed))
+							fmt.Printf("%s\n", stillRunningPrinter.Sprintf("%sStill running: %s (%s)", indent, task.GetHumanID(), elapsed))
 						} else {
 							ts := whitePrinter("[%s]", time.Now().Format(timeFormat))
-							fmt.Printf("%s %s\n", ts, stillRunningPrinter.Sprintf("Still running: %s (%s)", task.GetHumanID(), elapsed))
+							fmt.Printf("%s %s\n", ts, stillRunningPrinter.Sprintf("%sStill running: %s (%s)", indent, task.GetHumanID(), elapsed))
 						}
 						w.printLock.Unlock()
 					case <-stopTicker:
@@ -231,11 +243,12 @@ func (w worker) run(ctx context.Context, taskChannel <-chan scheduler.TaskInstan
 			}
 
 			if !w.formatOpts.MinimalLogs {
+				indent := taskLogIndent(task)
 				if w.formatOpts.DoNotLogTimestamp {
-					fmt.Printf("%s\n", printerInstance.Sprintf("%s: %s %s", res, task.GetHumanID(), faint(durationString)))
+					fmt.Printf("%s\n", printerInstance.Sprintf("%s%s: %s %s", indent, res, task.GetHumanID(), faint(durationString)))
 				} else {
 					timestampStr := whitePrinter("[%s]", time.Now().Format(timeFormat))
-					fmt.Printf("%s %s\n", timestampStr, printerInstance.Sprintf("%s: %s %s", res, task.GetHumanID(), faint(durationString)))
+					fmt.Printf("%s %s\n", timestampStr, printerInstance.Sprintf("%s%s: %s %s", indent, res, task.GetHumanID(), faint(durationString)))
 				}
 			}
 			w.printLock.Unlock()
