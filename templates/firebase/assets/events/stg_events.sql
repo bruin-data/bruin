@@ -80,4 +80,3 @@ SELECT
     event_value_in_usd,
 from `analytics_123456789.events_*` -- TODO: Change 123456789 to your analytics ID
 where replace(_TABLE_SUFFIX, 'intraday_', '') between '20200101' and '21000101'
-  and replace(_TABLE_SUFFIX, 'intraday_', '') between '{{ start_date_nodash }}' and '{{ end_date | add_days(1) | date_format("%Y%m%d") }}'
