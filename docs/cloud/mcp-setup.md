@@ -116,7 +116,7 @@ Once the Bruin Cloud MCP server is connected, you can ask in natural language, f
 
 ### Available tools
 
-Read-only tools only query data; write tools change state (trigger runs, mark statuses, manage connections) and are annotated as destructive so your assistant asks before calling them.
+Read-only tools only query data; write tools change state (trigger runs, mark statuses, manage connections) and are annotated as destructive so compatible assistants can apply additional safeguards before calling them.
 
 | Tool | Access | Purpose |
 | --- | --- | --- |
