@@ -68,6 +68,7 @@ type GoogleCloudPlatformConnection struct { //nolint:recvcheck
 	ConnectionMetadata               `yaml:",inline" mapstructure:",squash"`
 	ServiceAccountJSON               string   `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" mapstructure:"service_account_json" sensitive:"true"`
 	ServiceAccountFile               string   `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" mapstructure:"service_account_file" sensitive_file:"true"`
+	AccessToken                      string   `yaml:"access_token,omitempty" json:"access_token,omitempty" mapstructure:"access_token" sensitive:"true"`
 	ProjectID                        string   `yaml:"project_id,omitempty" json:"project_id" mapstructure:"project_id"`
 	Location                         string   `yaml:"location,omitempty" json:"location,omitempty" mapstructure:"location"`
 	UseApplicationDefaultCredentials bool     `yaml:"use_application_default_credentials,omitempty" json:"use_application_default_credentials,omitempty" mapstructure:"use_application_default_credentials"`
@@ -115,6 +116,9 @@ func (c GoogleCloudPlatformConnection) MarshalYAML() (interface{}, error) {
 	} else if c.ServiceAccountJSON != "" {
 		m["service_account_json"] = c.ServiceAccountJSON
 	}
+	if c.AccessToken != "" {
+		m["access_token"] = c.AccessToken
+	}
 	return m, nil
 }
 
@@ -142,6 +146,9 @@ func (c GoogleCloudPlatformConnection) MarshalJSON() ([]byte, error) {
 		"project_id":                          c.ProjectID,
 		"location":                            c.Location,
 		"use_application_default_credentials": strconv.FormatBool(c.UseApplicationDefaultCredentials),
+	}
+	if c.AccessToken != "" {
+		payload["access_token"] = c.AccessToken
 	}
 	addConnectionMetadataToMap(c.ConnectionMetadata, payload)
 	if c.MaxBillableBytes != nil {

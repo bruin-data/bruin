@@ -19,6 +19,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/pkg/errors"
 	"github.com/sourcegraph/conc/pool"
+	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iterator"
@@ -105,6 +106,8 @@ func NewDB(c *Config) (*Client, error) {
 		options = append(options, option.WithAuthCredentialsJSON(option.ServiceAccount, []byte(c.CredentialsJSON)))
 	case c.CredentialsFilePath != "":
 		options = append(options, option.WithAuthCredentialsFile(option.ServiceAccount, c.CredentialsFilePath))
+	case c.AccessToken != "":
+		options = append(options, option.WithTokenSource(oauth2.StaticTokenSource(&oauth2.Token{AccessToken: c.AccessToken})))
 	case c.Credentials != nil:
 		options = append(options, option.WithCredentials(c.Credentials))
 	default:
@@ -170,6 +173,8 @@ func (d *Client) createClient(ctx context.Context) error {
 			options = append(options, option.WithAuthCredentialsJSON(option.ServiceAccount, []byte(d.config.CredentialsJSON)))
 		case d.config.CredentialsFilePath != "":
 			options = append(options, option.WithAuthCredentialsFile(option.ServiceAccount, d.config.CredentialsFilePath))
+		case d.config.AccessToken != "":
+			options = append(options, option.WithTokenSource(oauth2.StaticTokenSource(&oauth2.Token{AccessToken: d.config.AccessToken})))
 		case d.config.Credentials != nil:
 			options = append(options, option.WithCredentials(d.config.Credentials))
 		default:
@@ -217,6 +222,8 @@ func (d *Client) NewDataTransferClient(ctx context.Context) (*datatransfer.Clien
 			options = append(options, option.WithAuthCredentialsJSON(option.ServiceAccount, []byte(d.config.CredentialsJSON)))
 		case d.config.CredentialsFilePath != "":
 			options = append(options, option.WithAuthCredentialsFile(option.ServiceAccount, d.config.CredentialsFilePath))
+		case d.config.AccessToken != "":
+			options = append(options, option.WithTokenSource(oauth2.StaticTokenSource(&oauth2.Token{AccessToken: d.config.AccessToken})))
 		case d.config.Credentials != nil:
 			options = append(options, option.WithCredentials(d.config.Credentials))
 		default:
