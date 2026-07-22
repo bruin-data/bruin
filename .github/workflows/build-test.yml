@@ -160,7 +160,9 @@ jobs:
     # GitHub-native build for PRs opened from forks, which cannot use Depot.
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
-    name: Docker Build (fork)
+    # Same check name as the Depot job so a required "Docker Build" status check
+    # is satisfied whichever path runs (the other is skipped, which passes).
+    name: Docker Build
     permissions:
       contents: read
     steps:
