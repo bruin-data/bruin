@@ -72,6 +72,14 @@ func BuildIngestrLakehouseURI(lh *config.LakehouseConfig) string {
 	if st.Auth.SessionToken != "" {
 		q.Set("storage_session_token", st.Auth.SessionToken)
 	}
+	// Azure credentials: connection_string authenticates with an account key;
+	// account_name selects DuckDB's credential_chain provider on the ingestr side.
+	if st.Auth.ConnectionString != "" {
+		q.Set("storage_connection_string", st.Auth.ConnectionString)
+	}
+	if st.Auth.AccountName != "" {
+		q.Set("storage_account_name", st.Auth.AccountName)
+	}
 
 	return "ducklake://?" + q.Encode()
 }
