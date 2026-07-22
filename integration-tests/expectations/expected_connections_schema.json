@@ -4703,6 +4703,12 @@
         },
         "session_token": {
           "type": "string"
+        },
+        "connection_string": {
+          "type": "string"
+        },
+        "account_name": {
+          "type": "string"
         }
       },
       "additionalProperties": false,
