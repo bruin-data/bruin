@@ -119,6 +119,9 @@ jobs:
       - name: Run MSSQL developer environment integration test
         run: make integration-test-mssql
   dockerBuild:
+    # Depot build for pushes and internally-created PRs. Fork PRs cannot
+    # authenticate with Depot, so they are handled by dockerBuildFork instead.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: depot-ubuntu-latest
     name: Docker Build
     permissions:
@@ -153,6 +156,35 @@ jobs:
           build-args: |
             VERSION=${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
             BRANCH_NAME=${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+  dockerBuildFork:
+    # GitHub-native build for PRs opened from forks, which cannot use Depot.
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    # Same check name as the Depot job so a required "Docker Build" status check
+    # is satisfied whichever path runs (the other is skipped, which passes).
+    name: Docker Build
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: false
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ github.head_ref }}
+            BRANCH_NAME=${{ github.head_ref }}
   lint:
     runs-on: depot-ubuntu-latest-8
     steps:
