@@ -89,6 +89,57 @@ func TestBuildIngestrLakehouseURI_DuckDBCatalogS3Storage_MinIO(t *testing.T) {
 	assert.Equal(t, "SECRET", q.Get("storage_secret_key"))
 }
 
+func TestBuildIngestrLakehouseURI_AzureStorage_ConnectionString(t *testing.T) {
+	t.Parallel()
+
+	lh := &config.LakehouseConfig{
+		Format: config.LakehouseFormatDuckLake,
+		Catalog: config.CatalogConfig{
+			Type: config.CatalogTypeSQLite,
+			Path: "/tmp/catalog.sqlite",
+		},
+		Storage: config.StorageConfig{
+			Type: config.StorageTypeAzure,
+			Path: "az://ducklake/warehouse",
+			Auth: config.StorageAuth{
+				ConnectionString: "DefaultEndpointsProtocol=https;AccountName=acct;AccountKey=key;EndpointSuffix=core.windows.net",
+			},
+		},
+	}
+
+	scheme, q := parseQuery(t, BuildIngestrLakehouseURI(lh))
+
+	assert.Equal(t, "ducklake", scheme)
+	assert.Equal(t, "sqlite", q.Get("catalog_type"))
+	assert.Equal(t, "azure", q.Get("storage_type"))
+	assert.Equal(t, "az://ducklake/warehouse", q.Get("storage_path"))
+	assert.Equal(t, "DefaultEndpointsProtocol=https;AccountName=acct;AccountKey=key;EndpointSuffix=core.windows.net", q.Get("storage_connection_string"))
+	assert.Empty(t, q.Get("storage_account_name"))
+}
+
+func TestBuildIngestrLakehouseURI_AzureStorage_AccountName(t *testing.T) {
+	t.Parallel()
+
+	lh := &config.LakehouseConfig{
+		Format: config.LakehouseFormatDuckLake,
+		Catalog: config.CatalogConfig{
+			Type: config.CatalogTypeSQLite,
+			Path: "/tmp/catalog.sqlite",
+		},
+		Storage: config.StorageConfig{
+			Type: config.StorageTypeAzure,
+			Path: "az://ducklake/warehouse",
+			Auth: config.StorageAuth{AccountName: "acct"},
+		},
+	}
+
+	_, q := parseQuery(t, BuildIngestrLakehouseURI(lh))
+
+	assert.Equal(t, "azure", q.Get("storage_type"))
+	assert.Equal(t, "acct", q.Get("storage_account_name"))
+	assert.Empty(t, q.Get("storage_connection_string"))
+}
+
 func TestBuildIngestrLakehouseURI_PostgresCatalog(t *testing.T) {
 	t.Parallel()
 
