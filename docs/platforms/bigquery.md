@@ -30,6 +30,9 @@ Google BigQuery requires a Google Cloud Platform connection, which can be added 
               ...
             }
 
+          # Option 4: Use a pre-minted OAuth access token (short-lived)
+          access_token: "ya29...."
+
           # Optional query safety limits. When set, Bruin dry-runs each BigQuery
           # query before execution and stops if the estimate exceeds either limit.
           max_billable_bytes: 1000000000000
@@ -82,6 +85,16 @@ service_account_json: |
     ...
   }
 ```
+
+#### 4. OAuth Access Token
+
+Use a pre-minted OAuth access token (e.g. from `gcloud auth print-access-token` or an OAuth flow). Access tokens are short-lived (~1 hour), so this option suits managed environments that inject a fresh token per run:
+
+```yaml
+access_token: "ya29...."
+```
+
+**Note:** Access-token connections cannot be used for ingestr assets — use a service account for those.
 
 ## BigQuery Assets
 

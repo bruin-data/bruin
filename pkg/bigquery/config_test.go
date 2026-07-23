@@ -15,11 +15,19 @@ func TestConfig_GetConnectionURI(t *testing.T) {
 		ProjectID           string
 		CredentialsFilePath string
 		CredentialsJSON     string
+		AccessToken         string
 		Credentials         *google.Credentials
 		Location            string
 		wantErr             bool
 		Expected            string
 	}{
+		{
+			Name:        "access token cannot be used for ingestr",
+			ProjectID:   "project-id",
+			AccessToken: "ya29.some-token",
+			Location:    "location",
+			wantErr:     true,
+		},
 		{
 			Name:                "no creds",
 			ProjectID:           "project-id",
@@ -67,6 +75,7 @@ func TestConfig_GetConnectionURI(t *testing.T) {
 				ProjectID:           tt.ProjectID,
 				CredentialsFilePath: tt.CredentialsFilePath,
 				CredentialsJSON:     tt.CredentialsJSON,
+				AccessToken:         tt.AccessToken,
 				Credentials:         tt.Credentials,
 				Location:            tt.Location,
 			}
@@ -89,10 +98,17 @@ func TestConfig_IsValid(t *testing.T) {
 		ProjectID                        string
 		CredentialsFilePath              string
 		CredentialsJSON                  string
+		AccessToken                      string
 		Credentials                      *google.Credentials
 		UseApplicationDefaultCredentials bool
 		Expected                         bool
 	}{
+		{
+			Name:        "valid with project ID and access token",
+			ProjectID:   "project-id",
+			AccessToken: "ya29.some-token",
+			Expected:    true,
+		},
 		{
 			Name:                             "valid with project ID and service account file",
 			ProjectID:                        "project-id",
@@ -156,6 +172,7 @@ func TestConfig_IsValid(t *testing.T) {
 				ProjectID:                        tt.ProjectID,
 				CredentialsFilePath:              tt.CredentialsFilePath,
 				CredentialsJSON:                  tt.CredentialsJSON,
+				AccessToken:                      tt.AccessToken,
 				Credentials:                      tt.Credentials,
 				UseApplicationDefaultCredentials: tt.UseApplicationDefaultCredentials,
 			}

@@ -2681,6 +2681,9 @@
         "service_account_file": {
           "type": "string"
         },
+        "access_token": {
+          "type": "string"
+        },
         "project_id": {
           "type": "string"
         },

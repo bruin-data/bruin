@@ -363,10 +363,10 @@ func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatfo
 	m.mutex.Unlock()
 
 	// Check if we have valid credentials configuration
-	hasExplicitCredentials := len(connection.ServiceAccountFile) > 0 || len(connection.ServiceAccountJSON) > 0 || connection.GetCredentials() != nil
+	hasExplicitCredentials := len(connection.ServiceAccountFile) > 0 || len(connection.ServiceAccountJSON) > 0 || len(connection.AccessToken) > 0 || connection.GetCredentials() != nil
 
 	if !hasExplicitCredentials && !connection.UseApplicationDefaultCredentials {
-		return errors.New("credentials are required: provide either service_account_file, service_account_json, or enable use_application_default_credentials")
+		return errors.New("credentials are required: provide either service_account_file, service_account_json, access_token, or enable use_application_default_credentials")
 	}
 
 	// Validate ServiceAccountFile if provided.
@@ -389,6 +389,7 @@ func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatfo
 		ProjectID:                        connection.ProjectID,
 		CredentialsFilePath:              connection.ServiceAccountFile,
 		CredentialsJSON:                  connection.ServiceAccountJSON,
+		AccessToken:                      connection.AccessToken,
 		Credentials:                      connection.GetCredentials(),
 		Location:                         connection.Location,
 		UseApplicationDefaultCredentials: connection.UseApplicationDefaultCredentials,
