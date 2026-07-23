@@ -298,6 +298,7 @@ var defaultMapping = map[string]string{
 	"surveymonkey":          "surveymonkey-default",
 	"trustpilot":            "trustpilot-default",
 	"twilio":                "twilio-default",
+	"typeform":              "typeform-default",
 	"wise":                  "wise-default",
 	"wistia":                "wistia-default",
 	"zoom":                  "zoom-default",

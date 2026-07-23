@@ -143,6 +143,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/trino"
 	"github.com/bruin-data/bruin/pkg/trustpilot"
 	"github.com/bruin-data/bruin/pkg/twilio"
+	"github.com/bruin-data/bruin/pkg/typeform"
 	"github.com/bruin-data/bruin/pkg/vertica"
 	"github.com/bruin-data/bruin/pkg/vitess"
 	"github.com/bruin-data/bruin/pkg/wise"
@@ -197,6 +198,7 @@ type Manager struct {
 	Recurly              map[string]*recurly.Client
 	GitLab               map[string]*gitlab.Client
 	SurveyMonkey         map[string]*surveymonkey.Client
+	Typeform             map[string]*typeform.Client
 	Appsflyer            map[string]*appsflyer.Client
 	Kafka                map[string]*kafka.Client
 	RabbitMQ             map[string]*rabbitmq.Client
@@ -1581,6 +1583,30 @@ func (m *Manager) AddSurveyMonkeyConnectionFromConfig(connection *config.SurveyM
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.SurveyMonkey[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddTypeformConnectionFromConfig(connection *config.TypeformConnection) error {
+	m.mutex.Lock()
+	if m.Typeform == nil {
+		m.Typeform = make(map[string]*typeform.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := typeform.NewClient(typeform.Config{
+		Token:  connection.Token,
+		Region: connection.Region,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Typeform[connection.Name] = client
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 
@@ -4132,6 +4158,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Adjust, connectionManager.AddAdjustConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Adapty, connectionManager.AddAdaptyConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.SurveyMonkey, connectionManager.AddSurveyMonkeyConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Typeform, connectionManager.AddTypeformConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Anthropic, connectionManager.AddAnthropicConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Intercom, connectionManager.AddIntercomConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.FacebookAds, connectionManager.AddFacebookAdsConnectionFromConfig, &wg, &errList, &mu)

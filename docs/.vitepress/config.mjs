@@ -379,6 +379,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                                     {text: "TikTok Ads", link: "/ingestion/tiktokads"},
                                     {text: "Trello", link: "/ingestion/trello"},
                                     {text: "Twilio", link: "/ingestion/twilio"},
+                                    {text: "Typeform", link: "/ingestion/typeform"},
                                     {text: "Vitess", link: "/ingestion/vitess"},
                                     {text: "Wise", link: "/ingestion/wise"},
                                     {text: "Zendesk", link: "/ingestion/zendesk"},

@@ -1088,6 +1088,14 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "contacts", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
 	},
 
+	// Typeform - Online form and survey platform
+	"typeform": {
+		{Name: "forms", PrimaryKey: "id", IncKey: "last_updated_at", IncStrategy: "merge"},
+		{Name: "responses", PrimaryKey: "response_id", IncKey: "submitted_at", IncStrategy: "merge"},
+		{Name: "workspaces", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "themes", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+	},
+
 	// TikTok Ads
 	"tiktokads": {
 		{Name: "custom:<dimensions>:<metrics>", PrimaryKey: "", IncKey: "", IncStrategy: "merge"},

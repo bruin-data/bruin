@@ -167,6 +167,7 @@ type Connections struct {
 	BallDontLie         []BallDontLieConnection         `yaml:"balldontlie,omitempty" json:"balldontlie,omitempty" mapstructure:"balldontlie"`
 	Vertica             []VerticaConnection             `yaml:"vertica,omitempty" json:"vertica,omitempty" mapstructure:"vertica"`
 	SurveyMonkey        []SurveyMonkeyConnection        `yaml:"surveymonkey,omitempty" json:"surveymonkey,omitempty" mapstructure:"surveymonkey"`
+	Typeform            []TypeformConnection            `yaml:"typeform,omitempty" json:"typeform,omitempty" mapstructure:"typeform"`
 	Dune                []DuneConnection                `yaml:"dune,omitempty" json:"dune,omitempty" mapstructure:"dune"`
 	byKey               map[string]any
 	typeNameMap         map[string]string
@@ -1758,6 +1759,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.SurveyMonkey = append(env.Connections.SurveyMonkey, conn)
+	case "typeform":
+		var conn TypeformConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Typeform = append(env.Connections.Typeform, conn)
 	case "dune":
 		var conn DuneConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -2125,6 +2133,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Vertica = removeConnection(env.Connections.Vertica, connectionName)
 	case "surveymonkey":
 		env.Connections.SurveyMonkey = removeConnection(env.Connections.SurveyMonkey, connectionName)
+	case "typeform":
+		env.Connections.Typeform = removeConnection(env.Connections.Typeform, connectionName)
 	case "dune":
 		env.Connections.Dune = removeConnection(env.Connections.Dune, connectionName)
 	default:
@@ -2371,6 +2381,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.BallDontLie, source.BallDontLie)
 	mergeConnectionList(&c.Vertica, source.Vertica)
 	mergeConnectionList(&c.SurveyMonkey, source.SurveyMonkey)
+	mergeConnectionList(&c.Typeform, source.Typeform)
 	mergeConnectionList(&c.Dune, source.Dune)
 	c.buildConnectionKeyMap()
 	return nil

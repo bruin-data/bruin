@@ -2177,3 +2177,13 @@ type SurveyMonkeyConnection struct {
 func (c SurveyMonkeyConnection) GetName() string {
 	return c.Name
 }
+
+type TypeformConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	Token              string `yaml:"token,omitempty" json:"token" mapstructure:"token" sensitive:"true"`
+	Region             string `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
+}
+
+func (c TypeformConnection) GetName() string {
+	return c.Name
+}
