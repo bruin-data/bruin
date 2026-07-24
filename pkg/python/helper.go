@@ -8,6 +8,8 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
+const ingestrIntervalTimestampFormat = "2006-01-02T15:04:05.999999Z07:00"
+
 var ingestrValueParameterFlags = []string{
 	"incremental_key",
 	"incremental_strategy",
@@ -90,7 +92,7 @@ func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs 
 			if ok && applyModifiers {
 				startTime = pipeline.ModifyDate(startTimeInstance, asset.IntervalModifiers.Start)
 			}
-			cmdArgs = append(cmdArgs, "--interval-start", startTime.Format(time.RFC3339))
+			cmdArgs = append(cmdArgs, "--interval-start", startTime.Format(ingestrIntervalTimestampFormat))
 		}
 	}
 
@@ -105,7 +107,7 @@ func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs 
 			if ok && applyModifiers {
 				endTime = pipeline.ModifyDate(endTimeInstance, asset.IntervalModifiers.End)
 			}
-			cmdArgs = append(cmdArgs, "--interval-end", endTime.Format(time.RFC3339))
+			cmdArgs = append(cmdArgs, "--interval-end", endTime.Format(ingestrIntervalTimestampFormat))
 		}
 	}
 
