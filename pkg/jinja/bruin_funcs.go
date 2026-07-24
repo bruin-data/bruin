@@ -26,6 +26,7 @@ const (
 	PlatformDoris      Platform = "doris"
 	PlatformDuckDB     Platform = "duckdb"
 	PlatformDatabricks Platform = "databricks"
+	PlatformSpark      Platform = "spark"
 	PlatformMSSQL      Platform = "mssql"
 	PlatformClickhouse Platform = "clickhouse"
 	PlatformAthena     Platform = "athena"

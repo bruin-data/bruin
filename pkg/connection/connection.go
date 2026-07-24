@@ -132,6 +132,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/socrata"
 	"github.com/bruin-data/bruin/pkg/solidgate"
 	"github.com/bruin-data/bruin/pkg/spanner"
+	"github.com/bruin-data/bruin/pkg/spark"
 	"github.com/bruin-data/bruin/pkg/sqlite"
 	"github.com/bruin-data/bruin/pkg/square"
 	"github.com/bruin-data/bruin/pkg/starrocks"
@@ -287,6 +288,7 @@ type Manager struct {
 	StarRocks            map[string]*starrocks.Client
 	Dremio               map[string]*dremio.Client
 	Sail                 map[string]*sail.Client
+	Spark                map[string]*spark.Client
 	Dune                 map[string]*dune.Client
 	Vertica              map[string]*vertica.DB
 	CustomerIo           map[string]*customerio.Client
@@ -4030,6 +4032,33 @@ func (m *Manager) AddSailConnectionFromConfig(connection *config.SailConnection)
 	return nil
 }
 
+func (m *Manager) AddSparkConnectionFromConfig(ctx context.Context, connection *config.SparkConnection) error {
+	m.mutex.Lock()
+	if m.Spark == nil {
+		m.Spark = make(map[string]*spark.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := spark.NewClient(ctx, spark.Config{
+		URI:               connection.URI,
+		Catalog:           connection.Catalog,
+		IngestLocation:    connection.IngestLocation,
+		IngestStagingArea: connection.IngestStagingArea,
+		Options:           connection.Options,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Spark[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
 func (m *Manager) AddVerticaConnectionFromConfig(connection *config.VerticaConnection) error {
 	m.mutex.Lock()
 	if m.Vertica == nil {
@@ -4257,6 +4286,9 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.StarRocks, connectionManager.AddStarRocksConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Dremio, connectionManager.AddDremioConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Sail, connectionManager.AddSailConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Spark, func(conn *config.SparkConnection) error {
+		return connectionManager.AddSparkConnectionFromConfig(ctx, conn)
+	}, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Vertica, connectionManager.AddVerticaConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.CustomerIo, connectionManager.AddCustomerIoConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Sendgrid, connectionManager.AddSendgridConnectionFromConfig, &wg, &errList, &mu)

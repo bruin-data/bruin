@@ -62,6 +62,7 @@ func sqlQueryAssetTypes() []pipeline.AssetType {
 		pipeline.AssetTypePostgresQuery,
 		pipeline.AssetTypeRedshiftQuery,
 		pipeline.AssetTypeSailQuery,
+		pipeline.AssetTypeSparkQuery,
 		pipeline.AssetTypeSnowflakeQuery,
 		pipeline.AssetTypeStarRocksQuery,
 		pipeline.AssetTypeSynapseQuery,

@@ -336,9 +336,12 @@ Merge strategy requires columns to be defined and marked with `primary_key` and 
 
 Supported platforms for `merge_sql`:
 
-- BigQuery, Snowflake, Postgres, mssql, MySQL: supported
+- BigQuery, Snowflake, Postgres, mssql, MySQL, Spark: supported
 - Athena (Iceberg tables): supported
-- Databricks,ClickHouse, Trino, DuckDB, Dremio, Sail: not supported
+- Databricks, ClickHouse, Trino, DuckDB, Dremio, Sail: not supported
+
+Spark `merge` requires a catalog and table format that implement row-level
+`MERGE INTO`, such as Iceberg with the Spark SQL extensions enabled.
 
 > [!INFO]
 > An important difference between `merge` and `delete+insert` is that `merge` will update the existing rows, while `delete+insert` will delete the existing rows and insert the new rows. This means if your source has deleted rows, `merge` will not delete them from the destination, whereas `delete+insert` will if their `incremental_key` matches.
@@ -557,8 +560,8 @@ This is useful when you want the SCD2 timeline to reflect the actual business ti
 
 **NOTE:**
 
-- Unless otherwise specified by `partition_by`, the SCD2 table will be partitioned by `_valid_from` for platforms which support partitioning (BigQuery, Athena, Snowflake).
-- Unless otherwise specified by `cluster_by`, the SCD2 table will be clustered using `_is_current` AND `primary key(s)` for platforms which support clustering (BigQuery, Snowflake).  
+- Unless otherwise specified by `partition_by`, the SCD2 table will be partitioned by `_valid_from` for platforms which support partitioning (BigQuery, Athena, Snowflake, Spark).
+- Unless otherwise specified by `cluster_by`, the SCD2 table will be clustered using `_is_current` AND `primary key(s)` for platforms which support clustering (BigQuery, Snowflake, Spark).
 
 Here's an example of an asset with `scd2_by_column` materialization:
 
@@ -794,4 +797,4 @@ Notice how:
 | **Configuration** | Only requires primary_key columns; `incremental_key` is optional | Requires both primary_key columns and incremental_key |
 
 > [!WARNING]
-> SCD2 materializations are currently only supported for BigQuery, Snowflake, Postgres, Amazon Redshift, MySQL, DuckDB, and Databricks.
+> SCD2 materializations are currently only supported for BigQuery, Snowflake, Postgres, Amazon Redshift, MySQL, DuckDB, Databricks, and Spark.

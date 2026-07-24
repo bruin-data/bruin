@@ -63,6 +63,11 @@ var registry = map[string]Capability{
 		Labels:     [3]string{"catalog", "schema", "table"},
 		FormatDesc: "`schema.table` or `catalog.schema.table`",
 	},
+	"spark": {
+		Platform: "spark", MinComponents: 1, MaxComponents: 3,
+		Labels:     [3]string{"catalog", "schema", "table"},
+		FormatDesc: "`table`, `schema.table`, or `catalog.schema.table`",
+	},
 	"trino": {
 		Platform: "trino", MinComponents: 1, MaxComponents: 3,
 		Labels:     [3]string{"catalog", "schema", "table"},

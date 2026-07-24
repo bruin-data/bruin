@@ -80,7 +80,7 @@ func (q Query) String() string {
 }
 
 var (
-	queryCommentRegex        = regexp.MustCompile(`(?m)(?s)\/\*.*?\*\/|(^|\s)--.*?\n`)
+	queryCommentRegex        = regexp.MustCompile(`(?s:/\*.*?\*/)|(?m:(^|\s)--[^\r\n]*(?:\r?\n|$))`)
 	oraclePLSQLDDLStartRegex = regexp.MustCompile(`(?is)^CREATE\s+(?:OR\s+REPLACE\s+)?(?:(?:NON)?EDITIONABLE\s+)?(?:PROCEDURE|FUNCTION|PACKAGE(?:\s+BODY)?|TRIGGER|TYPE\s+BODY)\b`)
 	oraclePLSQLDDLBodyRegex  = regexp.MustCompile(`(?is)^CREATE\s+(?:OR\s+REPLACE\s+)?(?:(?:NON)?EDITIONABLE\s+)?(?:PACKAGE(?:\s+BODY)?|TYPE\s+BODY)\b`)
 	oraclePLSQLDDLNameRegex  = regexp.MustCompile(`(?is)^CREATE\s+(?:OR\s+REPLACE\s+)?(?:(?:NON)?EDITIONABLE\s+)?(?:PACKAGE(?:\s+BODY)?|TYPE\s+BODY)\s+([A-Z0-9_$#".]+)\b`)
@@ -93,8 +93,9 @@ var (
 // instances. For usecases that require EXPLAIN statements, such as validating Snowflake queries, it is not possible
 // to use a single query with multiple statements, so we need to split them into multiple queries.
 type FileQuerySplitterExtractor struct {
-	Fs       afero.Fs
-	Renderer jinja.RendererInterface
+	Fs                        afero.Fs
+	Renderer                  jinja.RendererInterface
+	PreserveSessionStatements bool
 }
 
 func (f FileQuerySplitterExtractor) ExtractQueriesFromString(content string) ([]*Query, error) {
@@ -104,10 +105,10 @@ func (f FileQuerySplitterExtractor) ExtractQueriesFromString(content string) ([]
 		return nil, errors.Wrap(err, "could not render file while extracting the queries with the split query extractor")
 	}
 
-	return splitQueries(cleanedUpQueries), nil
+	return splitQueries(cleanedUpQueries, f.PreserveSessionStatements), nil
 }
 
-func splitQueries(fileContent string) []*Query {
+func splitQueries(fileContent string, preserveSessionStatements bool) []*Query {
 	queries := make([]*Query, 0)
 	var sqlVariablesSeenSoFar []string
 
@@ -131,11 +132,18 @@ func splitQueries(fileContent string) []*Query {
 		cleanQuery := strings.TrimSpace(strings.Join(cleanQueryRows, "\n"))
 		lowerCaseVersion := strings.ToLower(cleanQuery)
 		if strings.HasPrefix(lowerCaseVersion, "set") || strings.HasPrefix(lowerCaseVersion, "declare") {
+			if preserveSessionStatements {
+				queries = append(queries, &Query{Query: cleanQuery})
+				continue
+			}
 			sqlVariablesSeenSoFar = append(sqlVariablesSeenSoFar, cleanQuery)
 			continue
 		}
 
 		if strings.HasPrefix(lowerCaseVersion, "use") {
+			if preserveSessionStatements {
+				queries = append(queries, &Query{Query: cleanQuery})
+			}
 			continue
 		}
 
@@ -148,6 +156,13 @@ func splitQueries(fileContent string) []*Query {
 	return queries
 }
 
+// SplitQueriesPreservingSessionStatements splits an already-rendered SQL
+// script while retaining statements that configure the current SQL session.
+func SplitQueriesPreservingSessionStatements(content string) []*Query {
+	cleanedUpQueries := queryCommentRegex.ReplaceAllLiteralString(content, "\n")
+	return splitQueries(cleanedUpQueries, true)
+}
+
 func (f FileQuerySplitterExtractor) CloneForAsset(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) (QueryExtractor, error) {
 	renderer, err := f.Renderer.CloneForAsset(ctx, p, t)
 	if err != nil {
@@ -155,8 +170,9 @@ func (f FileQuerySplitterExtractor) CloneForAsset(ctx context.Context, p *pipeli
 	}
 
 	return &FileQuerySplitterExtractor{
-		Renderer: renderer,
-		Fs:       f.Fs,
+		Renderer:                  renderer,
+		Fs:                        f.Fs,
+		PreserveSessionStatements: f.PreserveSessionStatements,
 	}, nil
 }
 

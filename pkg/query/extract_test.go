@@ -201,6 +201,66 @@ set min_level_req = 22;
 	}
 }
 
+func TestFileExtractor_PreservesSessionStatements(t *testing.T) {
+	t.Parallel()
+
+	renderer := new(mockNoOpRenderer)
+	renderer.On("Render", mock.Anything).Return("default", nil)
+	extractor := FileQuerySplitterExtractor{
+		Renderer:                  renderer,
+		PreserveSessionStatements: true,
+	}
+
+	got, err := extractor.ExtractQueriesFromString(`
+USE analytics;
+SET spark.sql.shuffle.partitions = 8;
+DECLARE threshold INT DEFAULT 10;
+SELECT threshold;
+`)
+	require.NoError(t, err)
+	require.Equal(t, []*Query{
+		{Query: "USE analytics"},
+		{Query: "SET spark.sql.shuffle.partitions = 8"},
+		{Query: "DECLARE threshold INT DEFAULT 10"},
+		{Query: "SELECT threshold"},
+	}, got)
+	renderer.AssertExpectations(t)
+}
+
+func TestSplitQueriesPreservingSessionStatementsRemovesComments(t *testing.T) {
+	t.Parallel()
+
+	got := SplitQueriesPreservingSessionStatements(`
+-- select the namespace
+USE analytics;
+/* configure this session */
+SET spark.sql.shuffle.partitions = 8;
+SELECT 1;
+`)
+
+	require.Equal(t, []*Query{
+		{Query: "USE analytics"},
+		{Query: "SET spark.sql.shuffle.partitions = 8"},
+		{Query: "SELECT 1"},
+	}, got)
+}
+
+func TestFileExtractorRemovesTrailingCommentWithoutNewline(t *testing.T) {
+	t.Parallel()
+
+	renderer := new(mockNoOpRenderer)
+	renderer.On("Render", mock.Anything).Return("default", nil)
+	extractor := FileQuerySplitterExtractor{
+		Renderer:                  renderer,
+		PreserveSessionStatements: true,
+	}
+
+	got, err := extractor.ExtractQueriesFromString("SELECT 1;\n-- trailing comment")
+	require.NoError(t, err)
+	require.Equal(t, []*Query{{Query: "SELECT 1"}}, got)
+	renderer.AssertExpectations(t)
+}
+
 func TestOracleScriptExtractor_ExtractQueriesFromString(t *testing.T) {
 	t.Parallel()
 

@@ -1862,6 +1862,21 @@ func (c SailConnection) GetName() string {
 	return c.Name
 }
 
+// SparkConnection configures Bruin's dynamically installed ADBC Spark driver.
+// URI may contain authentication data, so it is treated as sensitive.
+type SparkConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	URI                string            `yaml:"uri" json:"uri" mapstructure:"uri" sensitive:"true"`
+	Catalog            string            `yaml:"catalog,omitempty" json:"catalog,omitempty" mapstructure:"catalog"`
+	IngestLocation     string            `yaml:"ingest_location,omitempty" json:"ingest_location,omitempty" mapstructure:"ingest_location"`
+	IngestStagingArea  string            `yaml:"ingest_staging_area,omitempty" json:"ingest_staging_area,omitempty" mapstructure:"ingest_staging_area"`
+	Options            map[string]string `yaml:"options,omitempty" json:"options,omitempty" mapstructure:"options" sensitive:"true"`
+}
+
+func (c SparkConnection) GetName() string {
+	return c.Name
+}
+
 func (c TableauConnection) GetName() string {
 	return c.Name
 }

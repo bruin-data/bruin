@@ -55,6 +55,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/sail"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/bruin-data/bruin/pkg/snowflake"
+	"github.com/bruin-data/bruin/pkg/spark"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/starrocks"
 	"github.com/bruin-data/bruin/pkg/synapse"
@@ -2153,6 +2154,44 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeSailQuerySensor][scheduler.TaskInstanceTypeMain] = sailQuerySensor
 		mainExecutors[pipeline.AssetTypeSailQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = sailCheckRunner
 		mainExecutors[pipeline.AssetTypeSailQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+	}
+	if s.WillRunTaskOfType(pipeline.AssetTypeSparkQuery) || estimateCustomCheckType == pipeline.AssetTypeSparkQuery ||
+		s.WillRunTaskOfType(pipeline.AssetTypeSparkSeed) || s.WillRunTaskOfType(pipeline.AssetTypeSparkSource) ||
+		s.WillRunTaskOfType(pipeline.AssetTypeSparkQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeSparkTableSensor) {
+		sparkFileExtractor := &query.FileQuerySplitterExtractor{
+			Fs:                        fs,
+			Renderer:                  renderer,
+			PreserveSessionStatements: true,
+		}
+		sparkOperator := spark.NewBasicOperator(conn, sparkFileExtractor, fullRefresh, hoister, parser)
+		sparkCheckRunner := spark.NewColumnCheckOperator(conn)
+		sparkQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
+		sparkTableSensor := spark.NewTableSensor(conn, sensorMode)
+		sparkSeedOperator := spark.NewSeedOperator(conn, renderer)
+
+		mainExecutors[pipeline.AssetTypeSparkQuery][scheduler.TaskInstanceTypeMain] = sparkOperator
+		mainExecutors[pipeline.AssetTypeSparkQuery][scheduler.TaskInstanceTypeColumnCheck] = sparkCheckRunner
+		mainExecutors[pipeline.AssetTypeSparkQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeSparkSeed][scheduler.TaskInstanceTypeMain] = sparkSeedOperator
+		mainExecutors[pipeline.AssetTypeSparkSeed][scheduler.TaskInstanceTypeColumnCheck] = sparkCheckRunner
+		mainExecutors[pipeline.AssetTypeSparkSeed][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeSparkSource][scheduler.TaskInstanceTypeColumnCheck] = sparkCheckRunner
+		mainExecutors[pipeline.AssetTypeSparkSource][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeSparkQuerySensor][scheduler.TaskInstanceTypeMain] = sparkQuerySensor
+		mainExecutors[pipeline.AssetTypeSparkQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = sparkCheckRunner
+		mainExecutors[pipeline.AssetTypeSparkQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeSparkTableSensor][scheduler.TaskInstanceTypeMain] = sparkTableSensor
+		mainExecutors[pipeline.AssetTypeSparkTableSensor][scheduler.TaskInstanceTypeColumnCheck] = sparkCheckRunner
+		mainExecutors[pipeline.AssetTypeSparkTableSensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		if estimateCustomCheckType == pipeline.AssetTypeSparkQuery {
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = sparkCheckRunner
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+		}
 	}
 	if s.WillRunTaskOfType(pipeline.AssetTypeOracleQuery) || s.WillRunTaskOfType(pipeline.AssetTypeOracleSource) || estimateCustomCheckType == pipeline.AssetTypeOracleQuery {
 		oracleFileExtractor := &query.OracleScriptExtractor{
