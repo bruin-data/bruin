@@ -144,9 +144,20 @@ After making changes, you MUST validate your work before finishing:
    - This runs lint and quality check validation on the asset.
    - If it fails, fix the issues and re-run until it passes.
 
+IMPORTANT: After you finish, quality checks will be automatically executed against the real data using "bruin run --only checks". If any quality check fails against the actual data, your changes will be reverted. Therefore:
+
+- Be VERY conservative when adding quality checks
+- Only add checks when you have HIGH confidence they will pass
+- Use the pre-fetched table statistics to verify your assumptions before adding checks
+- For example, if adding a "unique" check, verify the column has unique values in the stats
+- If adding a "not_null" check, verify the null_count is 0 in the stats
+- If adding "accepted_values", verify the sample values match your expected values
+
 Common validation pitfalls to avoid:
 - Only use quality checks that pass the "bruin validate" check
-- Keep YAML indentation consistent (2 spaces).
+- Keep YAML indentation consistent (2 spaces)
+- Do not add unique checks on columns that may have duplicates
+- Do not add not_null checks on columns with nulls
 
 ## Guardrails
 - Do not hallucinate business meaning.
