@@ -28,6 +28,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/sail"
 	"github.com/bruin-data/bruin/pkg/snowflake"
+	"github.com/bruin-data/bruin/pkg/spark"
 	"github.com/bruin-data/bruin/pkg/starrocks"
 	"github.com/bruin-data/bruin/pkg/synapse"
 	"github.com/bruin-data/bruin/pkg/trino"
@@ -238,6 +239,8 @@ func RenderDDL() *cli.Command {
 					pipeline.AssetTypeDremioQuerySensor:       dremio.NewMaterializer(false),
 					pipeline.AssetTypeSailQuery:               sail.NewMaterializer(false),
 					pipeline.AssetTypeSailQuerySensor:         sail.NewMaterializer(false),
+					pipeline.AssetTypeSparkQuery:              spark.NewRenderer(false),
+					pipeline.AssetTypeSparkQuerySensor:        spark.NewRenderer(false),
 					pipeline.AssetTypeOracleQuery:             oracle.NewMaterializer(false),
 					pipeline.AssetTypeMsSQLQuery:              mssql.NewMaterializer(false),
 					pipeline.AssetTypeMsSQLQuerySensor:        mssql.NewMaterializer(false),

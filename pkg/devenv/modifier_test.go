@@ -12,6 +12,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 type mockConnectionFetcher struct {
@@ -58,6 +59,27 @@ func (m *mockTableCheckingConnectionInstance) BuildTableExistsQuery(tableName st
 func (m *mockTableCheckingConnectionInstance) Select(ctx context.Context, q *query.Query) ([][]interface{}, error) {
 	args := m.Called(ctx, q)
 	return args.Get(0).([][]interface{}), args.Error(1)
+}
+
+type mockMetadataTableCheckingConnection struct {
+	mock.Mock
+}
+
+func (m *mockMetadataTableCheckingConnection) TableExists(ctx context.Context, tableName string) (bool, error) {
+	args := m.Called(ctx, tableName)
+	return args.Bool(0), args.Error(1)
+}
+
+type mockBulkTableCheckingConnection struct {
+	mockConnectionInstance
+}
+
+func (m *mockBulkTableCheckingConnection) TablesExist(
+	ctx context.Context,
+	tableNames []string,
+) (map[string]bool, error) {
+	args := m.Called(ctx, tableNames)
+	return args.Get(0).(map[string]bool), args.Error(1)
 }
 
 type mockConnectionWithoutDatabaseSummary struct{}
@@ -569,4 +591,210 @@ func TestDevEnvQueryModifier_Modify_ThreePartNames(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDevEnvQueryModifier_Modify_ThreePartAssetWithCatalogQualifiedSummary(t *testing.T) {
+	t.Parallel()
+
+	p := &pipeline.Pipeline{
+		DefaultConnections: map[string]string{"spark": "spark-default"},
+	}
+	asset := &pipeline.Asset{
+		Name: "local.dev_target.output",
+		Type: pipeline.AssetTypeSparkQuery,
+	}
+	connection := new(mockConnectionInstance)
+	connection.On("GetDatabaseSummary", mock.Anything).Return(&ansisql.DBDatabase{
+		Name: "local",
+		Schemas: []*ansisql.DBSchema{{
+			Name:   "local.dev_source",
+			Tables: []*ansisql.DBTable{{Name: "events"}},
+		}},
+	}, nil)
+	connectionFetcher := new(mockConnectionFetcher)
+	connectionFetcher.On("GetConnection", "spark-default").Return(connection)
+	sqlParser := new(mockSQLParser)
+	inputQuery := "SELECT * FROM source.events UNION ALL SELECT * FROM local.source.events"
+	sqlParser.On("UsedTables", inputQuery, "spark").
+		Return([]string{"source.events", "local.source.events"}, nil)
+	expectedMapping := map[string]string{
+		"local.target.output": "local.dev_target.output",
+		"source.events":       "dev_source.events",
+		"local.source.events": "local.dev_source.events",
+	}
+	outputQuery := "SELECT * FROM dev_source.events UNION ALL SELECT * FROM local.dev_source.events"
+	sqlParser.On("RenameTables", inputQuery, "spark", expectedMapping).Return(outputQuery, nil)
+
+	modifier := &DevEnvQueryModifier{
+		Dialect: "spark",
+		Conn:    connectionFetcher,
+		Parser:  sqlParser,
+	}
+	ctx := context.WithValue(
+		t.Context(),
+		config.EnvironmentContextKey,
+		&config.Environment{SchemaPrefix: "dev_"},
+	)
+
+	got, err := modifier.Modify(ctx, p, asset, &query.Query{Query: inputQuery})
+	require.NoError(t, err)
+	require.Equal(t, &query.Query{Query: outputQuery}, got)
+	connection.AssertExpectations(t)
+	connectionFetcher.AssertExpectations(t)
+	sqlParser.AssertExpectations(t)
+}
+
+func TestDevEnvQueryModifier_RegisterThreePartAssetInCatalogQualifiedSummary(t *testing.T) {
+	t.Parallel()
+
+	summary := &ansisql.DBDatabase{
+		Name: "local",
+		Schemas: []*ansisql.DBSchema{{
+			Name: "local.default",
+		}},
+	}
+	modifier := &DevEnvQueryModifier{
+		connSchemaCache: map[string]*ansisql.DBDatabase{"spark-default": summary},
+	}
+	p := &pipeline.Pipeline{
+		DefaultConnections: map[string]string{"spark": "spark-default"},
+	}
+	asset := &pipeline.Asset{
+		Name: "local.dev_target.output",
+		Type: pipeline.AssetTypeSparkQuery,
+	}
+
+	require.NoError(t, modifier.RegisterAssetForSchemaCache(t.Context(), p, asset, &query.Query{}))
+	require.Len(t, summary.Schemas, 2)
+	require.Equal(t, "local.dev_target", summary.Schemas[1].Name)
+	require.Equal(t, []*ansisql.DBTable{{Name: "output"}}, summary.Schemas[1].Tables)
+}
+
+func TestDevEnvQueryModifier_RegisterCrossCatalogAssetSeparately(t *testing.T) {
+	t.Parallel()
+
+	summary := &ansisql.DBDatabase{
+		Name: "local",
+		Schemas: []*ansisql.DBSchema{{
+			Name:   "dev_target",
+			Tables: []*ansisql.DBTable{{Name: "existing"}},
+		}},
+	}
+	modifier := &DevEnvQueryModifier{
+		connSchemaCache: map[string]*ansisql.DBDatabase{"spark-default": summary},
+	}
+	p := &pipeline.Pipeline{
+		DefaultConnections: map[string]string{"spark": "spark-default"},
+	}
+	asset := &pipeline.Asset{
+		Name: "other.dev_target.output",
+		Type: pipeline.AssetTypeSparkQuery,
+	}
+
+	require.NoError(t, modifier.RegisterAssetForSchemaCache(t.Context(), p, asset, &query.Query{}))
+	require.Len(t, summary.Schemas, 2)
+	require.Equal(t, "other.dev_target", summary.Schemas[1].Name)
+	require.Equal(t, []*ansisql.DBTable{{Name: "output"}}, summary.Schemas[1].Tables)
+	require.Equal(t, []*ansisql.DBTable{{Name: "existing"}}, summary.Schemas[0].Tables)
+}
+
+func TestDevEnvQueryModifier_SparkSummaryLookupIsCaseInsensitive(t *testing.T) {
+	t.Parallel()
+
+	summary := &ansisql.DBDatabase{
+		Name: "local",
+		Schemas: []*ansisql.DBSchema{{
+			Name:   "local.dev_source",
+			Tables: []*ansisql.DBTable{{Name: "events"}},
+		}},
+	}
+	sparkModifier := &DevEnvQueryModifier{Dialect: "spark"}
+	postgresModifier := &DevEnvQueryModifier{Dialect: "postgres"}
+
+	require.True(t, sparkModifier.databaseSummaryTableExists(summary, "LOCAL", "DEV_SOURCE", "EVENTS"))
+	require.False(t, postgresModifier.databaseSummaryTableExists(summary, "LOCAL", "DEV_SOURCE", "EVENTS"))
+}
+
+func TestDevEnvQueryModifier_SparkSummaryLookupKeepsCatalogsSeparate(t *testing.T) {
+	t.Parallel()
+
+	summary := &ansisql.DBDatabase{
+		Name: "local",
+		Schemas: []*ansisql.DBSchema{{
+			Name:   "dev_source",
+			Tables: []*ansisql.DBTable{{Name: "events"}},
+		}},
+	}
+	modifier := &DevEnvQueryModifier{Dialect: "spark"}
+
+	require.True(t, modifier.databaseSummaryTableExists(summary, "LOCAL", "DEV_SOURCE", "EVENTS"))
+	require.False(t, modifier.databaseSummaryTableExists(summary, "other", "dev_source", "events"))
+}
+
+func TestTableExistsInDatabasePrefersMetadataChecker(t *testing.T) {
+	t.Parallel()
+
+	connection := new(mockMetadataTableCheckingConnection)
+	connection.On("TableExists", mock.Anything, "spark_catalog.dev_source.events").Return(true, nil)
+
+	exists, err := tableExistsInDatabase(t.Context(), connection, "spark_catalog.dev_source.events")
+	require.NoError(t, err)
+	require.True(t, exists)
+	connection.AssertExpectations(t)
+}
+
+func TestDevEnvQueryModifierBatchesCrossCatalogTableChecks(t *testing.T) {
+	t.Parallel()
+
+	p := &pipeline.Pipeline{
+		DefaultConnections: map[string]string{"spark": "spark-default"},
+	}
+	asset := &pipeline.Asset{
+		Name: "dev_target.output",
+		Type: pipeline.AssetTypeSparkQuery,
+	}
+	connection := new(mockBulkTableCheckingConnection)
+	connection.On("GetDatabaseSummary", mock.Anything).Return(&ansisql.DBDatabase{
+		Name:    "local",
+		Schemas: []*ansisql.DBSchema{},
+	}, nil)
+	crossCatalogTables := []string{
+		"other.dev_source.events",
+		"other.dev_source.users",
+	}
+	connection.On("TablesExist", mock.Anything, crossCatalogTables).Return(map[string]bool{
+		"other.dev_source.events": true,
+		"other.dev_source.users":  false,
+	}, nil).Once()
+	connectionFetcher := new(mockConnectionFetcher)
+	connectionFetcher.On("GetConnection", "spark-default").Return(connection)
+	sqlParser := new(mockSQLParser)
+	inputQuery := "SELECT * FROM other.source.events UNION ALL SELECT * FROM other.source.users"
+	sqlParser.On("UsedTables", inputQuery, "spark").Return(
+		[]string{"other.source.events", "other.source.users"},
+		nil,
+	)
+	expectedMapping := map[string]string{
+		"target.output":       "dev_target.output",
+		"other.source.events": "other.dev_source.events",
+	}
+	outputQuery := "SELECT * FROM other.dev_source.events UNION ALL SELECT * FROM other.source.users"
+	sqlParser.On("RenameTables", inputQuery, "spark", expectedMapping).Return(outputQuery, nil)
+	modifier := &DevEnvQueryModifier{
+		Dialect: "spark",
+		Conn:    connectionFetcher,
+		Parser:  sqlParser,
+	}
+	ctx := context.WithValue(
+		t.Context(),
+		config.EnvironmentContextKey,
+		&config.Environment{SchemaPrefix: "dev_"},
+	)
+
+	got, err := modifier.Modify(ctx, p, asset, &query.Query{Query: inputQuery})
+	require.NoError(t, err)
+	require.Equal(t, &query.Query{Query: outputQuery}, got)
+	connection.AssertExpectations(t)
+	connectionFetcher.AssertExpectations(t)
+	sqlParser.AssertExpectations(t)
 }

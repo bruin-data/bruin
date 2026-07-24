@@ -1,5 +1,6 @@
-// Package spark provides shared utilities for Spark-based execution environments
-// such as EMR Serverless and Dataproc Serverless.
+// Package spark provides Bruin's ADBC Spark SQL platform and shared utilities
+// for Spark-based execution environments such as EMR Serverless and Dataproc
+// Serverless.
 package spark
 
 import (

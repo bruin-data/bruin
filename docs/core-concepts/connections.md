@@ -120,6 +120,7 @@ For specific connection fields and configuration options, see the dedicated docu
 | `trino` | [Trino](/platforms/trino) |
 | `dremio` | [Dremio](/platforms/dremio) |
 | `sail` | [Sail](/platforms/sail) |
+| `spark` | [Apache Spark](/platforms/spark) |
 | `s3` | [S3](/platforms/s3) |
 
 ## Ingestion Source Connections

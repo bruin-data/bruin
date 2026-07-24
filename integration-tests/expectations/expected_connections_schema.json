@@ -1495,6 +1495,12 @@
           },
           "type": "array"
         },
+        "spark": {
+          "items": {
+            "$ref": "#/$defs/SparkConnection"
+          },
+          "type": "array"
+        },
         "fluxx": {
           "items": {
             "$ref": "#/$defs/FluxxConnection"
@@ -4861,6 +4867,40 @@
         "project_id",
         "instance_id",
         "database"
+      ]
+    },
+    "SparkConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "uri": {
+          "type": "string"
+        },
+        "catalog": {
+          "type": "string"
+        },
+        "ingest_location": {
+          "type": "string"
+        },
+        "ingest_staging_area": {
+          "type": "string"
+        },
+        "options": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "uri"
       ]
     },
     "SquareConnection": {

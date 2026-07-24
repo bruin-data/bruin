@@ -1,0 +1,15 @@
+name: local.bruin_test.external_source
+type: spark.source
+
+columns:
+  - name: id
+    type: INT
+    checks:
+      - name: not_null
+      - name: unique
+      - name: positive
+  - name: source_name
+    type: STRING
+    checks:
+      - name: accepted_values
+        value: ["managed-elsewhere"]

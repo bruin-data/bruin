@@ -946,6 +946,8 @@ func convertSourceTypeToQueryType(sourceType pipeline.AssetType) pipeline.AssetT
 		return pipeline.AssetTypeSynapseQuery
 	case pipeline.AssetTypeDatabricksSource:
 		return pipeline.AssetTypeDatabricksQuery
+	case pipeline.AssetTypeSparkSource:
+		return pipeline.AssetTypeSparkQuery
 	case pipeline.AssetTypeAthenaSource:
 		return pipeline.AssetTypeAthenaQuery
 	case pipeline.AssetTypeDuckDBSource:
@@ -995,6 +997,9 @@ func determineAssetTypeFromConnection(connectionName string, conn interface{}) p
 		if strings.Contains(connType, "databricks") {
 			return pipeline.AssetTypeDatabricksSource
 		}
+		if strings.Contains(connType, "spark") {
+			return pipeline.AssetTypeSparkSource
+		}
 		if strings.Contains(connType, "duckdb") {
 			return pipeline.AssetTypeDuckDBSource
 		}
@@ -1041,6 +1046,9 @@ func determineAssetTypeFromConnection(connectionName string, conn interface{}) p
 	}
 	if strings.Contains(connectionLower, "databricks") {
 		return pipeline.AssetTypeDatabricksSource
+	}
+	if strings.Contains(connectionLower, "spark") {
+		return pipeline.AssetTypeSparkSource
 	}
 	if strings.Contains(connectionLower, "duckdb") {
 		return pipeline.AssetTypeDuckDBSource

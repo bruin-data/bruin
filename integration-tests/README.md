@@ -31,7 +31,7 @@ The following make commands are available for running integration tests:
 
 #### Run Full Integration Tests
 ```bash
-# Run all integration tests (including ingestr tests)
+# Run all integration tests (including ingestr and local Spark tests)
 make integration-test
 
 # Run all integration tests in parallel
@@ -48,6 +48,10 @@ ENABLE_PARALLEL=1 make integration-test-light
 ```
 
 **Note**: `ENABLE_PARALLEL=1` enables parallel test execution. By default, tests run sequentially.
+
+The full suite also starts Spark Connect and MinIO with Docker. It uses the
+active Docker context and skips the Spark portion when no healthy Docker
+provider is available. Use `make integration-test-spark` to run only Spark.
 
 ## Test Pipeline Structure
 

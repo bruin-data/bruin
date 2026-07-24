@@ -20,8 +20,9 @@ export LDFLAGS=-Wl,-w
 endif
 
 JQ_REL_PATH = jq --arg prefix "$$(pwd)" 'walk(if type == "object" and has("path") and (.path | type == "string") then .path |= (if . == $$prefix then "integration-tests" elif startswith($$prefix + "/") then .[($$prefix | length + 1):] elif startswith($$prefix) then .[($$prefix | length):] elif startswith("integration-tests/") then .[16:] else . end) else . end)'
+SPARK_INTEGRATION_TEST = cd integration-tests/cloud-integration-tests/spark && env SILENT=1 go test -count=1 -v -timeout 30m .
 
-.PHONY: all clean test build build-no-duckdb docs-app format pre-commit refresh-integration-expectations integration-test-cloud integration-test-mssql validate-links tools-update
+.PHONY: all clean test build build-no-duckdb docs-app format pre-commit refresh-integration-expectations integration-test integration-test-light integration-test-cloud integration-test-spark integration-test-mssql validate-links tools-update
 all: clean deps test build
 
 deps: 
@@ -55,6 +56,8 @@ integration-test: build
 	@echo "$(OK_COLOR)==> Running integration tests...$(NO_COLOR)"
 	@cd integration-tests && git init
 	@cd integration-tests && env SILENT=1 go test -tags="no_duckdb_arrow" -v -count=1 .
+	@echo "$(OK_COLOR)==> Running Spark integration tests...$(NO_COLOR)"
+	@$(SPARK_INTEGRATION_TEST)
 
 integration-test-light: build
 	@rm -rf integration-tests/duckdb-files  # Clean up the directory if it exists
@@ -78,7 +81,11 @@ integration-test-cloud: build
 	@rm integration-tests/cloud-integration-tests/bruin
 	@echo "$(OK_COLOR)==> Running cloud integration tests...$(NO_COLOR)"
 	@cd integration-tests && git init
-	@cd integration-tests/cloud-integration-tests && env SILENT=1 go test -count=1 -v .
+	@cd integration-tests/cloud-integration-tests && env SILENT=1 go test -count=1 -v -timeout 30m .
+
+integration-test-spark: build
+	@echo "$(OK_COLOR)==> Running Spark integration tests...$(NO_COLOR)"
+	@$(SPARK_INTEGRATION_TEST)
 
 integration-test-mssql: build
 	@echo "$(OK_COLOR)==> Running MSSQL integration tests...$(NO_COLOR)"
@@ -129,10 +136,10 @@ lint-python:
 	@[ -d .venv ] || uv venv --quiet
 	@uv pip install --quiet sqlglot==30.7.0
 	@echo "$(OK_COLOR)==> Running Python formatting with ruff...$(NO_COLOR)"
-	@uvx ruff format ./pythonsrc
+	@uvx ruff@0.15.7 format ./pythonsrc
 
 	@echo "$(OK_COLOR)==> Running Python linting with ruff...$(NO_COLOR)"
-	@uvx ruff check --fix ./pythonsrc
+	@uvx ruff@0.15.7 check --fix ./pythonsrc
 
 refresh-integration-expectations: build
 	@echo "$(OK_COLOR)==> Refreshing integration expectations...$(NO_COLOR)"

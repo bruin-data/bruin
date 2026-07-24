@@ -1,0 +1,23 @@
+name: local.bruin_test.seed_contacts
+type: spark.seed
+
+columns:
+  - name: name
+    type: STRING
+    checks:
+      - name: not_null
+  - name: age
+    type: INT
+    checks:
+      - name: positive
+  - name: joined_on
+    type: DATE
+  - name: channel
+    type: STRING
+    checks:
+      - name: accepted_values
+        value: ["LinkedIn", "Twitter"]
+
+parameters:
+  path: ./seed.csv
+  file_type: csv

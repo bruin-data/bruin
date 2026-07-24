@@ -65,7 +65,7 @@ func getAvailablePlatforms(configPath string) (map[string]bool, error) {
 }
 
 func runTestsInDirectory(t *testing.T, dir string, platformName string) {
-	cmd := exec.CommandContext(context.Background(), "go", "test", "-v", "./...")
+	cmd := exec.CommandContext(context.Background(), "go", "test", "-v", "-timeout", "30m", "./...")
 	cmd.Dir = dir
 	cmd.Env = os.Environ()
 
@@ -271,6 +271,20 @@ func TestSailIntegration(t *testing.T) {
 	t.Logf("Running self-contained Sail integration tests (testcontainers)")
 
 	runTestsInDirectory(t, sailDir, "Sail")
+}
+
+// TestSparkIntegration runs the self-contained Spark suite. It boots Spark
+// Connect and MinIO via testcontainers and therefore needs no cloud credentials.
+func TestSparkIntegration(t *testing.T) { //nolint:paralleltest // avoid running the resource-heavy Spark cluster alongside other cloud suites
+	currentFolder, err := os.Getwd()
+	require.NoError(t, err, "Failed to get current working directory")
+
+	sparkDir := filepath.Join(currentFolder, "spark")
+	require.DirExists(t, sparkDir, "Spark test directory should exist")
+
+	t.Logf("Running self-contained Spark integration tests (testcontainers)")
+
+	runTestsInDirectory(t, sparkDir, "Spark")
 }
 
 // TestDorisIntegration runs the self-contained Doris suite. It boots a local
