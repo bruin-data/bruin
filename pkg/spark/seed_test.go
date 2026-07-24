@@ -1,6 +1,9 @@
 package spark
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/apache/arrow-go/v18/arrow"
@@ -39,4 +42,20 @@ func TestSparkArrowTypeWidensTinyInt(t *testing.T) {
 
 	require.Equal(t, arrow.PrimitiveTypes.Int16, sparkArrowType("TINYINT"))
 	require.Equal(t, arrow.PrimitiveTypes.Int16, sparkArrowType("BYTE"))
+}
+
+func TestReadSeedAcceptsMixedCaseHTTPScheme(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		if _, err := writer.Write([]byte("id,name\n1,Ada\n")); err != nil {
+			t.Errorf("failed to write seed response: %v", err)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	seedURL := strings.Replace(server.URL, "http://", "HTTP://", 1)
+	data, err := readSeed(t.Context(), &pipeline.Asset{}, seedURL)
+	require.NoError(t, err)
+	require.Equal(t, "id,name\n1,Ada\n", string(data))
 }

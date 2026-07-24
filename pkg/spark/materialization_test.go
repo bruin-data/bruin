@@ -171,6 +171,47 @@ func TestMaterializerDDLRequiresColumns(t *testing.T) {
 	require.ErrorContains(t, err, "requires the `columns` field")
 }
 
+func TestMaterializerQuotesIncrementalKeys(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		strategy pipeline.MaterializationStrategy
+		expected string
+	}{
+		{
+			name:     "delete insert",
+			strategy: pipeline.MaterializationStrategyDeleteInsert,
+			expected: "WHERE `order` IN (\n    SELECT DISTINCT `order`",
+		},
+		{
+			name:     "time interval",
+			strategy: pipeline.MaterializationStrategyTimeInterval,
+			expected: "WHERE `order` BETWEEN TIMESTAMP",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			asset := &pipeline.Asset{
+				Name: "catalog.analytics.events",
+				Materialization: pipeline.Materialization{
+					Type:            pipeline.MaterializationTypeTable,
+					Strategy:        test.strategy,
+					IncrementalKey:  "order",
+					TimeGranularity: pipeline.MaterializationTimeGranularityTimestamp,
+				},
+			}
+
+			actual, err := NewMaterializer(false).Render(asset, "SELECT * FROM updates")
+			require.NoError(t, err)
+			require.Contains(t, actual, test.expected)
+		})
+	}
+}
+
 func TestMaterializerSCD2ByColumnFullRefresh(t *testing.T) {
 	t.Parallel()
 

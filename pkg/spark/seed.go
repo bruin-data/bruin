@@ -212,7 +212,8 @@ func configureIngestNamespace(ctx context.Context, connection adbc.Connection, a
 }
 
 func readSeed(ctx context.Context, asset *pipeline.Asset, seedPath string) ([]byte, error) {
-	if strings.HasPrefix(seedPath, "http://") || strings.HasPrefix(seedPath, "https://") {
+	lowerSeedPath := strings.ToLower(seedPath)
+	if strings.HasPrefix(lowerSeedPath, "http://") || strings.HasPrefix(lowerSeedPath, "https://") {
 		request, err := http.NewRequestWithContext(ctx, http.MethodGet, seedPath, nil)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create Spark seed request")

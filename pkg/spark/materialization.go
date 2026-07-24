@@ -20,11 +20,29 @@ func NewMaterializer(fullRefresh bool) *pipeline.Materializer {
 	tableMaterializers := materializer.MaterializationMap[pipeline.MaterializationTypeTable]
 	tableMaterializers[pipeline.MaterializationStrategyNone] = buildCreateReplaceQuery
 	tableMaterializers[pipeline.MaterializationStrategyCreateReplace] = buildCreateReplaceQuery
+	tableMaterializers[pipeline.MaterializationStrategyDeleteInsert] = quoteIncrementalKey(
+		tableMaterializers[pipeline.MaterializationStrategyDeleteInsert],
+	)
+	tableMaterializers[pipeline.MaterializationStrategyTimeInterval] = quoteIncrementalKey(
+		tableMaterializers[pipeline.MaterializationStrategyTimeInterval],
+	)
 	tableMaterializers[pipeline.MaterializationStrategyMerge] = buildMergeQuery
 	tableMaterializers[pipeline.MaterializationStrategyDDL] = buildDDLQuery
 	tableMaterializers[pipeline.MaterializationStrategySCD2ByColumn] = buildSCD2ByColumnQuery
 	tableMaterializers[pipeline.MaterializationStrategySCD2ByTime] = buildSCD2ByTimeQuery
 	return materializer
+}
+
+func quoteIncrementalKey(materializer pipeline.MaterializerFunc) pipeline.MaterializerFunc {
+	return func(asset *pipeline.Asset, query string) (string, error) {
+		if asset.Materialization.IncrementalKey == "" {
+			return materializer(asset, query)
+		}
+		assetCopy := *asset
+		assetCopy.Materialization = asset.Materialization
+		assetCopy.Materialization.IncrementalKey = quoteIdentifier(asset.Materialization.IncrementalKey)
+		return materializer(&assetCopy, query)
+	}
 }
 
 func buildCreateReplaceQuery(asset *pipeline.Asset, query string) (string, error) {
