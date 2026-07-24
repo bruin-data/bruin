@@ -884,15 +884,32 @@ func cloudRunsTrigger() *cli.Command {
 			}
 
 			startDate, endDate := c.String("start-date"), c.String("end-date")
-			if err := client.TriggerRun(ctx, project, pipeline, startDate, endDate, opts); err != nil {
+			result, err := client.TriggerRun(ctx, project, pipeline, startDate, endDate, opts)
+			if err != nil {
 				printError(err, output, "Failed to trigger run")
 				return cli.Exit("", 1)
 			}
 
+			if output == "json" {
+				response := struct {
+					Status string `json:"status"`
+					*bruincloud.TriggerRunResponse
+				}{
+					Status:             "success",
+					TriggerRunResponse: result,
+				}
+				data, _ := json.MarshalIndent(response, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
 			if split == "" {
-				printSuccessForOutput(output, fmt.Sprintf("Successfully triggered run for pipeline '%s' in project '%s'", pipeline, project))
+				successPrinter.Printf("Successfully triggered run '%s' for pipeline '%s' in project '%s'\n", result.RunID, pipeline, project)
 			} else {
-				printSuccessForOutput(output, fmt.Sprintf("Successfully triggered backfill (split by %s, chunk size %d) for pipeline '%s' in project '%s'", split, chunkSize, pipeline, project))
+				successPrinter.Printf("Successfully triggered backfill '%s' (split by %s, chunk size %d) for pipeline '%s' in project '%s'\n", result.MultipleActionID, split, chunkSize, pipeline, project)
+				if result.URL != "" {
+					fmt.Printf("  View backfill: %s\n", result.URL)
+				}
 			}
 			return nil
 		},

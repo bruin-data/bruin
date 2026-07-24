@@ -4,6 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/bruincloud"
@@ -190,6 +194,58 @@ func TestCloudRunsCommand_Help(t *testing.T) {
 		subNames[i] = sub.Name
 	}
 	assert.Contains(t, subNames, "diagnose")
+}
+
+func TestCloudRunsTriggerCommand_OutputsCreatedRunID(t *testing.T) { //nolint:paralleltest // redirects os.Stdout
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/trigger-pipeline-run", r.URL.Path)
+		assert.Equal(t, http.MethodPost, r.Method)
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{
+			"message": "Run triggered successfully",
+			"project": "proj",
+			"pipeline": "pipe",
+			"run_id": "run-123"
+		}`))
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
+
+	originalStdout := os.Stdout
+	reader, writer, err := os.Pipe()
+	require.NoError(t, err)
+	os.Stdout = writer
+	t.Cleanup(func() {
+		os.Stdout = originalStdout
+		_ = reader.Close()
+		_ = writer.Close()
+	})
+
+	cmd := cloudRunsTrigger()
+	err = cmd.Run(t.Context(), []string{
+		"trigger",
+		"--api-key", "test-key",
+		"--output", "json",
+		"--project-id", "proj",
+		"--pipeline", "pipe",
+		"--start-date", "2026-01-01",
+		"--end-date", "2026-01-02",
+	})
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+	os.Stdout = originalStdout
+
+	output, err := io.ReadAll(reader)
+	require.NoError(t, err)
+	var result struct {
+		Status string `json:"status"`
+		bruincloud.TriggerRunResponse
+	}
+	require.NoError(t, json.Unmarshal(output, &result))
+	assert.Equal(t, "success", result.Status)
+	assert.Equal(t, "run-123", result.RunID)
+	assert.Equal(t, "proj", result.Project)
+	assert.Equal(t, "pipe", result.Pipeline)
 }
 
 func TestCloudAssetsCommand_Help(t *testing.T) {

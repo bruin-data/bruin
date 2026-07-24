@@ -52,6 +52,19 @@ type PipelineRun struct {
 	Note                      *string         `json:"note"`
 }
 
+// TriggerRunResponse identifies the run or backfill created by a trigger request.
+// Normal triggers return RunID, while split triggers return MultipleActionID and URL.
+type TriggerRunResponse struct {
+	Message          string `json:"message"`
+	Project          string `json:"project"`
+	Pipeline         string `json:"pipeline"`
+	RunID            string `json:"run_id,omitempty"`
+	MultipleActionID string `json:"multiple_action_id,omitempty"`
+	Split            string `json:"split,omitempty"`
+	ChunkSize        int    `json:"chunk_size,omitempty"`
+	URL              string `json:"url,omitempty"`
+}
+
 // Asset represents a pipeline asset.
 type Asset struct {
 	Project                 string          `json:"project"`

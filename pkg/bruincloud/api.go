@@ -242,8 +242,8 @@ func encodeRunNote(note string, tags []string) string {
 	return string(b)
 }
 
-// TriggerRun triggers a pipeline run for the given date range.
-func (c *APIClient) TriggerRun(ctx context.Context, project, pipeline, startDate, endDate string, opts TriggerRunOptions) error {
+// TriggerRun triggers a pipeline run for the given date range and returns its identifier.
+func (c *APIClient) TriggerRun(ctx context.Context, project, pipeline, startDate, endDate string, opts TriggerRunOptions) (*TriggerRunResponse, error) {
 	body := map[string]any{
 		"project":    project,
 		"pipeline":   pipeline,
@@ -273,7 +273,11 @@ func (c *APIClient) TriggerRun(ctx context.Context, project, pipeline, startDate
 	if note := encodeRunNote(opts.Note, opts.Tags); note != "" {
 		body["note"] = note
 	}
-	return c.doRequest(ctx, http.MethodPost, "/trigger-pipeline-run", body, nil)
+	var response TriggerRunResponse
+	if err := c.doRequest(ctx, http.MethodPost, "/trigger-pipeline-run", body, &response); err != nil {
+		return nil, err
+	}
+	return &response, nil
 }
 
 func (c *APIClient) RerunRun(ctx context.Context, project, pipeline, runID string, onlyFailed bool) error {
