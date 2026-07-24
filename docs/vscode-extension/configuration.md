@@ -1,45 +1,44 @@
 ## Configuration
 
-You can configure the Bruin VS Code extension to suit your preferences, adjusting settings for folding behavior and the default path separator.
+You can configure the Bruin extension from VS Code's settings. Open Settings (`Cmd/Ctrl + ,`), search for "Bruin", and adjust any of the options below.
 
-### Folding Behavior
+### General
 
-Choose whether Bruin sections are folded or expanded by default when opening an asset. Adjust this in the extension settings under `Bruin > Default Folding State`. The options are:
+- **Folding State** (`bruin.FoldingState`): Whether Bruin sections are folded or expanded by default when you open an asset. Options: `folded`, `expanded`.
+- **Path Separator** (`bruin.pathSeparator`): The separator used when building asset paths. Defaults to your operating system's (`/` on Unix, `\` on Windows).
+- **SQLFluff Formatting** (`bruin.format.sqlfluff`): Format SQL files with SQLFluff. Off by default.
+- **CLI Auto-Update** (`bruin.cli.autoUpdate`): Automatically update the Bruin CLI when a new version is available. On by default.
+- **Telemetry** (`bruin.telemetry.enabled`): Send anonymous usage data to help improve the extension. On by default.
 
-- **Folded**: All Bruin sections will be collapsed by default.
-- **Expanded**: All Bruin sections will be open by default.
+### Run option defaults
 
-This feature helps you focus on relevant sections, keeping the rest of the code minimized.
+These set the default state of the checkboxes in an asset's run options:
 
-### Path Separator
+- **Interval Modifiers** (`bruin.checkbox.defaultIntervalModifiers`): default for the `--apply-interval-modifiers` flag. Off by default.
+- **Exclusive End Date** (`bruin.checkbox.defaultExclusiveEndDate`): default for using an exclusive end date. On by default.
+- **Push Metadata** (`bruin.checkbox.defaultPushMetadata`): default for pushing metadata. Off by default.
+- **Apply Sensor Mode** (`bruin.checkbox.defaultApplySensorMode`): default for applying the sensor mode. Off by default.
 
-Set your preferred path separator in the extension settings under `Bruin > Path Separator`. While the extension detects your operating system's default (`\` for Windows and `/` for Unix-based systems), you can override this if you have specific path formatting needs.
+### Sensor mode
 
-### Additional Settings
+- **Sensor Mode** (`bruin.run.sensorMode`): the mode used when "Apply Sensor Mode" is enabled. Options:
+  - `once` – run the sensor query once and continue based on the result.
+  - `skip` – skip sensors entirely (useful for local development). This is the default.
+  - `wait` – loop until the expected result is met (production-like behavior).
 
-#### Checkbox Settings
+### Query preview
 
-The extension provides checkbox settings to control default enabled/disabled states for various features:
+- **Preview Selected Query** (`bruin.query.previewSelectedQuery.enabled`): show the "Preview selected query" CodeLens when you select text in a SQL file. On by default.
+- **Query Timeout** (`bruin.query.timeout`): how long a query preview may run, in **seconds**, before it's cancelled. Defaults to `1000` — deliberately generous so large queries aren't cut off; lower it if you'd rather fail fast.
 
-- **Apply Interval Modifiers**: Controls the default state of the `--apply-interval-modifiers` flag
-- **Full Refresh Confirmation**: Enable/disable confirmation prompts before running with `full-refresh`
-- **Auto-save Materialization**: Control whether materialization changes are auto-saved
+### Validation
 
-#### Exclude Tags
+- **Default Exclude Tag** (`bruin.validate.defaultExcludeTag`): a tag to exclude from validation by default.
 
-- **Default Exclude Tag**: Set a default tag input to exclude assets with specific tags from being validated
-- This helps filter out assets during validation processes based on their tags
+### Accessing settings
 
-### Accessing Configuration Settings
-
-To access and modify the Bruin extension settings:
-
-1. Open VS Code.
-2. Click the **Settings** gear icon in the lower-left corner.
-3. In the search bar, type "Bruin" to filter the Bruin extension settings.
-4. Adjust the settings for:
-   - **Default Folding State** and **Path Separator**
-   - **Checkbox Settings** for feature defaults
-   - **Exclude Tags** for validation filtering
+1. Open VS Code Settings (`Cmd/Ctrl + ,`).
+2. Search for "Bruin".
+3. Adjust any of the settings above.
 
 ![Extension Config](../public/vscode-extension/extension-config.png)

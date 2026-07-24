@@ -548,6 +548,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                         items: [
                             {text: "Getting Started", link: "/vscode-extension/getting-started"},
                             {text: "Configuration", link: "/vscode-extension/configuration"},
+                            {text: "Commands & Shortcuts", link: "/vscode-extension/commands"},
                             {text: "Panels Overview", link: "/vscode-extension/panel-overview",
                                 items: [
                                     {text: "Side Panel",
@@ -558,6 +559,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                                         ]},
                                     {text: "Lineage", link: "/vscode-extension/panels/lineage-panel"},
                                     {text: "Query Preview", link: "/vscode-extension/panels/query-preview"},
+                                    {text: "Table Diff", link: "/vscode-extension/panels/table-diff"},
+                                    {text: "Run History", link: "/vscode-extension/panels/run-history"},
+                                    {text: "Activity Bar", link: "/vscode-extension/panels/activity-bar"},
                                 ],
                             },
                         ],
