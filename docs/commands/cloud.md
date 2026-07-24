@@ -172,6 +172,10 @@ bruin cloud runs trigger \
   --end-date 2024-01-31
 ```
 
+On success, the command prints the created run ID so you can match the invocation
+to its logs and status. With `--output json`, the response includes the ID in
+`run_id`.
+
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--start-date` | str | - | Start date for the run (YYYY-MM-DD) |
@@ -301,6 +305,8 @@ bruin cloud runs trigger \
 > [!NOTE]
 > `--split` creates a backfill.
 > Without `--split`, the command triggers a single normal run.
+> A split trigger prints the backfill ID and its Bruin Cloud tracking URL instead
+> of a run ID because the individual runs are created asynchronously.
 
 > [!NOTE]
 > For a backfill, `--end-date` is **exclusive**: the range is split as

@@ -310,12 +310,20 @@ func TestTriggerRun(t *testing.T) {
 		assert.NotContains(t, body, "split")
 		assert.NotContains(t, body, "assets")
 
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`200`))
+		w.WriteHeader(http.StatusCreated)
+		writeJSON(t, w, TriggerRunResponse{
+			Message:  "Run triggered successfully",
+			Project:  "proj",
+			Pipeline: "pipe",
+			RunID:    "run-123",
+		})
 	})
 
-	err := client.TriggerRun(t.Context(), "proj", "pipe", "2026-01-01", "2026-01-02", TriggerRunOptions{})
+	result, err := client.TriggerRun(t.Context(), "proj", "pipe", "2026-01-01", "2026-01-02", TriggerRunOptions{})
 	require.NoError(t, err)
+	assert.Equal(t, "run-123", result.RunID)
+	assert.Equal(t, "proj", result.Project)
+	assert.Equal(t, "pipe", result.Pipeline)
 }
 
 func TestTriggerRunWithSplit(t *testing.T) {
@@ -332,12 +340,24 @@ func TestTriggerRunWithSplit(t *testing.T) {
 		assert.Equal(t, "month", body["split"])
 		assert.EqualValues(t, 2, body["chunk_size"])
 
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`200`))
+		w.WriteHeader(http.StatusCreated)
+		writeJSON(t, w, TriggerRunResponse{
+			Message:          "Backfill triggered successfully",
+			Project:          "proj",
+			Pipeline:         "pipe",
+			MultipleActionID: "backfill-123",
+			Split:            "month",
+			ChunkSize:        2,
+			URL:              "https://cloud.getbruin.com/acme/projects/proj/pipelines/pipe/backfills/backfill-123",
+		})
 	})
 
-	err := client.TriggerRun(t.Context(), "proj", "pipe", "2026-01-01", "2026-04-01", TriggerRunOptions{Split: "month", ChunkSize: 2})
+	result, err := client.TriggerRun(t.Context(), "proj", "pipe", "2026-01-01", "2026-04-01", TriggerRunOptions{Split: "month", ChunkSize: 2})
 	require.NoError(t, err)
+	assert.Equal(t, "backfill-123", result.MultipleActionID)
+	assert.Equal(t, "month", result.Split)
+	assert.Equal(t, 2, result.ChunkSize)
+	assert.Contains(t, result.URL, "/backfills/backfill-123")
 }
 
 func TestTriggerRunSplitDefaultsChunkSize(t *testing.T) {
@@ -349,10 +369,10 @@ func TestTriggerRunSplitDefaultsChunkSize(t *testing.T) {
 		assert.EqualValues(t, 1, body["chunk_size"])
 
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`200`))
+		_, _ = w.Write([]byte(`{}`))
 	})
 
-	err := client.TriggerRun(t.Context(), "proj", "pipe", "2026-01-01", "2026-04-01", TriggerRunOptions{Split: "month"})
+	_, err := client.TriggerRun(t.Context(), "proj", "pipe", "2026-01-01", "2026-04-01", TriggerRunOptions{Split: "month"})
 	require.NoError(t, err)
 }
 
@@ -369,7 +389,7 @@ func TestTriggerRunWithOptions(t *testing.T) {
 		assert.Equal(t, "bar", vars["foo"])
 
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`200`))
+		_, _ = w.Write([]byte(`{}`))
 	})
 
 	opts := TriggerRunOptions{
@@ -377,7 +397,7 @@ func TestTriggerRunWithOptions(t *testing.T) {
 		FullRefresh: true,
 		Variables:   map[string]any{"foo": "bar"},
 	}
-	err := client.TriggerRun(t.Context(), "proj", "pipe", "2026-01-01", "2026-01-31", opts)
+	_, err := client.TriggerRun(t.Context(), "proj", "pipe", "2026-01-01", "2026-01-31", opts)
 	require.NoError(t, err)
 }
 
@@ -392,14 +412,14 @@ func TestTriggerRunWithDownstream(t *testing.T) {
 		assert.Equal(t, true, body["downstream"])
 
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`200`))
+		_, _ = w.Write([]byte(`{}`))
 	})
 
 	opts := TriggerRunOptions{
 		Assets:     []string{"raw_events"},
 		Downstream: true,
 	}
-	err := client.TriggerRun(t.Context(), "proj", "pipe", "2026-01-01", "2026-01-31", opts)
+	_, err := client.TriggerRun(t.Context(), "proj", "pipe", "2026-01-01", "2026-01-31", opts)
 	require.NoError(t, err)
 }
 
@@ -729,10 +749,10 @@ func TestTriggerRunWithTags(t *testing.T) {
 		// Note + tags are carried together inside the note field as JSON (the Cloud RunNote format).
 		assert.JSONEq(t, `{"note":"Q1 backfill","tags":["nightly","manual"]}`, body["note"].(string))
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`200`))
+		_, _ = w.Write([]byte(`{}`))
 	})
 
-	err := client.TriggerRun(t.Context(), "p", "pipe", "2026-01-01", "2026-01-02",
+	_, err := client.TriggerRun(t.Context(), "p", "pipe", "2026-01-01", "2026-01-02",
 		TriggerRunOptions{Note: "Q1 backfill", Tags: []string{"nightly", "manual"}})
 	require.NoError(t, err)
 }
