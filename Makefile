@@ -54,7 +54,7 @@ integration-test: build
 	@mkdir -p integration-tests/logs/runs
 	@echo "$(OK_COLOR)==> Running integration tests...$(NO_COLOR)"
 	@cd integration-tests && git init
-	@cd integration-tests && env SILENT=1 go test -tags="no_duckdb_arrow" -v -count=1 .
+	@cd integration-tests && env SILENT=1 SF_DISABLE_MINICORE=true go test -tags="no_duckdb_arrow" -v -count=1 .
 
 integration-test-light: build
 	@rm -rf integration-tests/duckdb-files  # Clean up the directory if it exists
@@ -69,7 +69,7 @@ integration-test-light: build
 	@mkdir -p integration-tests/logs/runs
 	@echo "$(OK_COLOR)==> Running integration tests (skipping ingestr tasks)...$(NO_COLOR)"
 	@cd integration-tests && git init
-	@cd integration-tests && env SILENT=1 go test -tags="no_duckdb_arrow" -v -count=1 -run "^(TestIndividualTasks|TestWorkflowTasks)" .
+	@cd integration-tests && env SILENT=1 SF_DISABLE_MINICORE=true go test -tags="no_duckdb_arrow" -v -count=1 -run "^(TestIndividualTasks|TestWorkflowTasks)" .
 
 integration-test-cloud: build
 	@touch integration-tests/cloud-integration-tests/.git
@@ -78,11 +78,11 @@ integration-test-cloud: build
 	@rm integration-tests/cloud-integration-tests/bruin
 	@echo "$(OK_COLOR)==> Running cloud integration tests...$(NO_COLOR)"
 	@cd integration-tests && git init
-	@cd integration-tests/cloud-integration-tests && env SILENT=1 go test -count=1 -v .
+	@cd integration-tests/cloud-integration-tests && env SILENT=1 SF_DISABLE_MINICORE=true go test -count=1 -v .
 
 integration-test-mssql: build
 	@echo "$(OK_COLOR)==> Running MSSQL integration tests...$(NO_COLOR)"
-	@cd integration-tests/mssql && env SILENT=1 go test -count=1 -v -timeout 15m .
+	@cd integration-tests/mssql && env SILENT=1 SF_DISABLE_MINICORE=true go test -count=1 -v -timeout 15m .
 
 clean:
 	@rm -rf ./bin
@@ -92,9 +92,9 @@ test: test-unit
 test-unit:
 	@echo "$(OK_COLOR)==> Running the unit tests$(NO_COLOR)"
 	@$(MAKE) rustsqlparser-lib
-	@go test -tags="no_duckdb_arrow" -race -p 50 -vet=off -timeout 10m ./cmd/... ./pkg/...
+	@env SF_DISABLE_MINICORE=true go test -tags="no_duckdb_arrow" -race -p 50 -vet=off -timeout 10m ./cmd/... ./pkg/...
 	@echo "$(OK_COLOR)==> Running the semantic-engine module tests$(NO_COLOR)"
-	@cd semantic-engine && go test -race -timeout 10m ./...
+	@cd semantic-engine && env SF_DISABLE_MINICORE=true go test -race -timeout 10m ./...
 
 RUST_LIB = pkg/sqlparser/rustffi/target/release/libbruin_rustsqlparser.a
 
