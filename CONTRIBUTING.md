@@ -41,4 +41,5 @@ You can simply run it:
 
 ### Testing
 
-You can run the tests by running `make test`.
+Run `make test` for the fast local unit-test loop. Use `make test-full` to
+include race detection; CI runs the full target.
