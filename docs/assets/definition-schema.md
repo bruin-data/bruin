@@ -334,6 +334,28 @@ If omitted, the asset inherits `default.routing` from `pipeline.yml` when it is 
 
 This option determines how the asset will be materialized. Refer to the docs on [materialization](./materialization) for more details.
 
+## `bigquery`
+
+BigQuery-specific table options and partition-scoped merge behavior. Table options are applied when a `bq.sql` table materialization creates or replaces its table.
+
+```yaml
+materialization:
+  type: table
+  partition_by: event_date
+bigquery:
+  require_partition_filter: true
+  partition_expiration_days: 30
+  partition_key_immutable: true
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `require_partition_filter` | Boolean | `false` | Requires queries to filter the partitioning column. |
+| `partition_expiration_days` | Number | unset | Number of days before each partition expires. Must be positive. Set `0` to disable an inherited pipeline default. |
+| `partition_key_immutable` | Boolean | `false` | Declares that the partition value cannot change for a given merge primary key. |
+
+Enabling a required partition filter or a positive partition expiration requires a partitioned table. Partition expiration is not supported for integer-range partitions, and required partition filters have additional restrictions for incremental materializations. See [BigQuery table options](../platforms/bigquery.md#bigquery-table-options) for details.
+
 ## `hooks`
 
 Hooks let you run SQL snippets before and/or after the main asset query. This is useful for setup or cleanup (loading extensions, attaching databases, or writing run logs, etc.).

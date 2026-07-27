@@ -103,6 +103,51 @@ func TestMaterializer_Render(t *testing.T) {
 			want:  "CREATE OR REPLACE TABLE my.asset PARTITION BY dt CLUSTER BY event_type, event_name AS\nSELECT 1",
 		},
 		{
+			name: "materialize to a table with BigQuery partition options",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					Strategy:    pipeline.MaterializationStrategyCreateReplace,
+					PartitionBy: "dt",
+				},
+				BigQuery: pipeline.BigQueryConfig{
+					RequirePartitionFilter:  boolp(true),
+					PartitionExpirationDays: floatp(7.5),
+				},
+			},
+			query: "SELECT 1",
+			want:  "CREATE OR REPLACE TABLE my.asset PARTITION BY dt  OPTIONS \\(require_partition_filter = TRUE, partition_expiration_days = 7.5\\) AS\nSELECT 1",
+		},
+		{
+			name: "require partition filter requires a partitioned table",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type: pipeline.MaterializationTypeTable,
+				},
+				BigQuery: pipeline.BigQueryConfig{
+					RequirePartitionFilter: boolp(true),
+				},
+			},
+			query:   "SELECT 1",
+			wantErr: true,
+		},
+		{
+			name: "zero partition expiration disables an inherited value for an unpartitioned table",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type: pipeline.MaterializationTypeTable,
+				},
+				BigQuery: pipeline.BigQueryConfig{
+					PartitionExpirationDays: floatp(0),
+				},
+			},
+			query: "SELECT 1",
+			want:  "CREATE OR REPLACE TABLE my.asset   AS\nSELECT 1",
+		},
+		{
 			name: "materialize to a table with append",
 			task: &pipeline.Asset{
 				Name: "my.asset",
@@ -219,6 +264,10 @@ COMMIT TRANSACTION;`,
 					Type:           pipeline.MaterializationTypeTable,
 					Strategy:       pipeline.MaterializationStrategyDeleteInsert,
 					IncrementalKey: "somekey",
+					PartitionBy:    "somekey",
+				},
+				BigQuery: pipeline.BigQueryConfig{
+					RequirePartitionFilter: boolp(true),
 				},
 				Columns: []pipeline.Column{
 					{Name: "somekey", Type: "date"},
@@ -232,6 +281,27 @@ COMMIT TRANSACTION;`,
 				"DELETE FROM my\\.asset WHERE somekey in unnest\\(distinct_keys.+\\);\n" +
 				"INSERT INTO my\\.asset SELECT \\* FROM __bruin_tmp.+;\n" +
 				"COMMIT TRANSACTION;$",
+		},
+		{
+			name: "delete+insert required partition filter must use the incremental key",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategyDeleteInsert,
+					IncrementalKey: "updated_at",
+					PartitionBy:    "event_date",
+				},
+				BigQuery: pipeline.BigQueryConfig{
+					RequirePartitionFilter: boolp(true),
+				},
+				Columns: []pipeline.Column{
+					{Name: "event_date", Type: "DATE"},
+					{Name: "updated_at", Type: "TIMESTAMP"},
+				},
+			},
+			query:   "SELECT event_date, updated_at FROM source_table",
+			wantErr: true,
 		},
 		{
 			name: "delete+insert comment out",
@@ -337,6 +407,7 @@ COMMIT TRANSACTION;`,
 				Materialization: pipeline.Materialization{
 					Type:                 pipeline.MaterializationTypeTable,
 					Strategy:             pipeline.MaterializationStrategyMerge,
+					PartitionBy:          "event_date",
 					IncrementalPredicate: "target.event_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)",
 				},
 			},
@@ -347,6 +418,125 @@ COMMIT TRANSACTION;`,
 				"WHEN MATCHED THEN UPDATE SET target.value = source.value\n" +
 				"WHEN NOT MATCHED THEN INSERT(id, event_date, value) VALUES(id, event_date, value);",
 			exactMatch: true,
+		},
+		{
+			name: "merge with a required partition filter uses a partition-scoped transaction",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "event_date", Type: "DATE"},
+					{Name: "value", UpdateOnMerge: true},
+				},
+				Materialization: pipeline.Materialization{
+					Type:                 pipeline.MaterializationTypeTable,
+					Strategy:             pipeline.MaterializationStrategyMerge,
+					PartitionBy:          "event_date",
+					IncrementalPredicate: "target.event_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)",
+				},
+				BigQuery: pipeline.BigQueryConfig{
+					RequirePartitionFilter: boolp(true),
+					PartitionKeyImmutable:  boolp(true),
+				},
+			},
+			query: "SELECT id, event_date, value FROM source_table;",
+			want: "DECLARE bruin_merge_partitions_abcefghi ARRAY<DATE>;\n" +
+				"BEGIN TRANSACTION;\n" +
+				"CREATE TEMP TABLE __bruin_merge_source_abcefghi AS SELECT id, event_date, value FROM source_table;\n" +
+				"SET bruin_merge_partitions_abcefghi = ARRAY(SELECT DISTINCT source.event_date FROM __bruin_merge_source_abcefghi source WHERE source.event_date IS NOT NULL);\n" +
+				"ASSERT NOT EXISTS (SELECT 1 FROM __bruin_merge_source_abcefghi source WHERE source.event_date IS NULL) AS 'partition-scoped merge requires non-null partition values';\n" +
+				"MERGE my.asset target\n" +
+				"USING __bruin_merge_source_abcefghi source\n" +
+				"ON (target.event_date IN UNNEST(bruin_merge_partitions_abcefghi) AND (source.id = target.id OR (source.id IS NULL and target.id IS NULL)) AND (target.event_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)))\n" +
+				"WHEN MATCHED THEN UPDATE SET target.value = source.value;\n" +
+				"INSERT INTO my.asset(id, event_date, value)\n" +
+				"SELECT source.id, source.event_date, source.value\n" +
+				"FROM __bruin_merge_source_abcefghi source\n" +
+				"WHERE NOT EXISTS (\n" +
+				"  SELECT 1\n" +
+				"  FROM my.asset target\n" +
+				"  WHERE target.event_date IN UNNEST(bruin_merge_partitions_abcefghi) AND (source.id = target.id OR (source.id IS NULL and target.id IS NULL)) AND (target.event_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY))\n" +
+				");\n" +
+				"COMMIT TRANSACTION;",
+			exactMatch: true,
+		},
+		{
+			name: "merge with a required partition filter skips the update when no columns merge",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "event_date", Type: "DATE", PrimaryKey: true},
+					{Name: "value"},
+				},
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					Strategy:    pipeline.MaterializationStrategyMerge,
+					PartitionBy: "event_date",
+				},
+				BigQuery: pipeline.BigQueryConfig{
+					RequirePartitionFilter: boolp(true),
+				},
+			},
+			query: "SELECT id, event_date, value FROM source_table",
+			want: "DECLARE bruin_merge_partitions_abcefghi ARRAY<DATE>;\n" +
+				"BEGIN TRANSACTION;\n" +
+				"CREATE TEMP TABLE __bruin_merge_source_abcefghi AS SELECT id, event_date, value FROM source_table;\n" +
+				"SET bruin_merge_partitions_abcefghi = ARRAY(SELECT DISTINCT source.event_date FROM __bruin_merge_source_abcefghi source WHERE source.event_date IS NOT NULL);\n" +
+				"ASSERT NOT EXISTS (SELECT 1 FROM __bruin_merge_source_abcefghi source WHERE source.event_date IS NULL) AS 'partition-scoped merge requires non-null partition values';\n" +
+				"INSERT INTO my.asset(id, event_date, value)\n" +
+				"SELECT source.id, source.event_date, source.value\n" +
+				"FROM __bruin_merge_source_abcefghi source\n" +
+				"WHERE NOT EXISTS (\n" +
+				"  SELECT 1\n" +
+				"  FROM my.asset target\n" +
+				"  WHERE target.event_date IN UNNEST(bruin_merge_partitions_abcefghi) AND (source.id = target.id OR (source.id IS NULL and target.id IS NULL)) AND (source.event_date = target.event_date OR (source.event_date IS NULL and target.event_date IS NULL))\n" +
+				");\n" +
+				"COMMIT TRANSACTION;",
+			exactMatch: true,
+		},
+		{
+			name: "merge with a required partition filter rejects a partition key that may move",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "event_date", Type: "DATE"},
+				},
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					Strategy:    pipeline.MaterializationStrategyMerge,
+					PartitionBy: "event_date",
+				},
+				BigQuery: pipeline.BigQueryConfig{
+					RequirePartitionFilter: boolp(true),
+				},
+			},
+			query:   "SELECT id, event_date FROM source_table",
+			wantErr: true,
+		},
+		{
+			name: "merge with a required partition filter supports partition expressions",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "created_at", Type: "TIMESTAMP", PrimaryKey: true},
+					{Name: "value", UpdateOnMerge: true},
+				},
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					Strategy:    pipeline.MaterializationStrategyMerge,
+					PartitionBy: "DATE(created_at)",
+				},
+				BigQuery: pipeline.BigQueryConfig{
+					RequirePartitionFilter: boolp(true),
+				},
+			},
+			query: "SELECT id, created_at, value FROM source_table",
+			want: "(?s)DECLARE bruin_merge_partitions_abcefghi ARRAY<DATE>;.*" +
+				"SET bruin_merge_partitions_abcefghi = ARRAY\\(SELECT DISTINCT DATE\\(source.created_at\\).*" +
+				"ON \\(DATE\\(target.created_at\\) IN UNNEST\\(bruin_merge_partitions_abcefghi\\).*",
 		},
 		{
 			name: "merge with merge_sql custom expressions",
@@ -441,6 +631,10 @@ COMMIT TRANSACTION;`,
 					Strategy:        pipeline.MaterializationStrategyTimeInterval,
 					TimeGranularity: pipeline.MaterializationTimeGranularityTimestamp,
 					IncrementalKey:  "ts",
+					PartitionBy:     "TIMESTAMP_TRUNC(ts, DAY)",
+				},
+				BigQuery: pipeline.BigQueryConfig{
+					RequirePartitionFilter: boolp(true),
 				},
 			},
 			query: "SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}'",
@@ -448,6 +642,24 @@ COMMIT TRANSACTION;`,
 				"DELETE FROM my\\.asset WHERE ts BETWEEN '{{start_timestamp}}' AND '{{end_timestamp}}';\n" +
 				"INSERT INTO my\\.asset SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}';\n" +
 				"COMMIT TRANSACTION;$",
+		},
+		{
+			name: "time_interval required partition filter must use the incremental key",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:            pipeline.MaterializationTypeTable,
+					Strategy:        pipeline.MaterializationStrategyTimeInterval,
+					TimeGranularity: pipeline.MaterializationTimeGranularityTimestamp,
+					IncrementalKey:  "updated_at",
+					PartitionBy:     "event_date",
+				},
+				BigQuery: pipeline.BigQueryConfig{
+					RequirePartitionFilter: boolp(true),
+				},
+			},
+			query:   "SELECT event_date, updated_at FROM source_table",
+			wantErr: true,
 		},
 		{
 			name: "time_interval_date",
@@ -487,6 +699,31 @@ COMMIT TRANSACTION;`,
 			}
 		})
 	}
+}
+
+func TestMergeRequiredPartitionFilterRejectsUnsupportedPartitionExpression(t *testing.T) {
+	t.Parallel()
+
+	_, err := mergeMaterializer(
+		&pipeline.Asset{
+			Name: "dataset.events",
+			Materialization: pipeline.Materialization{
+				Type:        pipeline.MaterializationTypeTable,
+				Strategy:    pipeline.MaterializationStrategyMerge,
+				PartitionBy: "RANGE_BUCKET(id, GENERATE_ARRAY(0, 100, 10))",
+			},
+			BigQuery: pipeline.BigQueryConfig{
+				RequirePartitionFilter: boolp(true),
+			},
+			Columns: []pipeline.Column{
+				{Name: "id", Type: "INT64", PrimaryKey: true},
+			},
+		},
+		"SELECT id FROM source",
+	)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "partition-scoped BigQuery merge does not support")
 }
 
 func TestBuildDDLQuery(t *testing.T) {
@@ -559,6 +796,109 @@ func TestBuildDDLQuery(t *testing.T) {
 			want: "CREATE TABLE IF NOT EXISTS my_partitioned_clustered_table (\n  id INT64,\n  timestamp TIMESTAMP OPTIONS(description=\"Event timestamp\"),\n  category STRING OPTIONS(description=\"Category of the item\")\n)\nPARTITION BY timestamp\nCLUSTER BY category",
 		},
 		{
+			name: "table with BigQuery partition options",
+			asset: &pipeline.Asset{
+				Name: "my_partitioned_table",
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64"},
+					{Name: "dt", Type: "DATE"},
+				},
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					PartitionBy: "dt",
+				},
+				BigQuery: pipeline.BigQueryConfig{
+					RequirePartitionFilter:  boolp(true),
+					PartitionExpirationDays: floatp(30),
+				},
+			},
+			want: "CREATE TABLE IF NOT EXISTS my_partitioned_table (\n  id INT64,\n  dt DATE\n)\nPARTITION BY dt\nOPTIONS (require_partition_filter = TRUE, partition_expiration_days = 30)",
+		},
+		{
+			name: "partition expiration requires a partitioned table",
+			asset: &pipeline.Asset{
+				Name: "my_table",
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64"},
+				},
+				Materialization: pipeline.Materialization{
+					Type: pipeline.MaterializationTypeTable,
+				},
+				BigQuery: pipeline.BigQueryConfig{
+					PartitionExpirationDays: floatp(30),
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "negative partition expiration is rejected",
+			asset: &pipeline.Asset{
+				Name: "my_partitioned_table",
+				Columns: []pipeline.Column{
+					{Name: "dt", Type: "DATE"},
+				},
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					PartitionBy: "dt",
+				},
+				BigQuery: pipeline.BigQueryConfig{
+					PartitionExpirationDays: floatp(-30),
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "partition expiration is unsupported for integer-range partitions",
+			asset: &pipeline.Asset{
+				Name: "my_integer_partitioned_table",
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64"},
+				},
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					PartitionBy: "RANGE_BUCKET(id, GENERATE_ARRAY(0, 100, 10))",
+				},
+				BigQuery: pipeline.BigQueryConfig{
+					PartitionExpirationDays: floatp(30),
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "zero partition expiration omits the time-partitioned table option",
+			asset: &pipeline.Asset{
+				Name: "my_partitioned_table",
+				Columns: []pipeline.Column{
+					{Name: "dt", Type: "DATE"},
+				},
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					PartitionBy: "dt",
+				},
+				BigQuery: pipeline.BigQueryConfig{
+					PartitionExpirationDays: floatp(0),
+				},
+			},
+			want: "CREATE TABLE IF NOT EXISTS my_partitioned_table (\n  dt DATE\n)\nPARTITION BY dt",
+		},
+		{
+			name: "zero partition expiration disables an inherited value for integer-range partitions",
+			asset: &pipeline.Asset{
+				Name: "my_integer_partitioned_table",
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64"},
+				},
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					PartitionBy: "RANGE_BUCKET(id, GENERATE_ARRAY(0, 100, 10))",
+				},
+				BigQuery: pipeline.BigQueryConfig{
+					PartitionExpirationDays: floatp(0),
+				},
+			},
+			want: "CREATE TABLE IF NOT EXISTS my_integer_partitioned_table (\n  id INT64\n)\nPARTITION BY RANGE_BUCKET(id, GENERATE_ARRAY(0, 100, 10))",
+		},
+		{
 			name: "table with primary key",
 			asset: &pipeline.Asset{
 				Name: "my_table_with_pk",
@@ -614,6 +954,31 @@ func TestBuildDDLQuery(t *testing.T) {
 				require.NoError(t, err)
 				assert.Equal(t, tt.want, got)
 			}
+		})
+	}
+}
+
+func TestPartitionExpressionReferencesColumn(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		expression string
+		column     string
+		want       bool
+	}{
+		{name: "direct column", expression: "event_date", column: "event_date", want: true},
+		{name: "wrapped timestamp column", expression: "TIMESTAMP_TRUNC(updated_at, DAY)", column: "updated_at", want: true},
+		{name: "nested expression", expression: "DATE(DATETIME_TRUNC(updated_at, DAY))", column: "updated_at", want: true},
+		{name: "backticked flexible column", expression: "DATE(`event-date`)", column: "event-date", want: true},
+		{name: "different column", expression: "DATE(updated_at)", column: "event_date", want: false},
+		{name: "function name is not a column", expression: "DATE(updated_at)", column: "date", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, partitionExpressionReferencesColumn(tt.expression, tt.column))
 		})
 	}
 }
@@ -860,6 +1225,59 @@ func TestBuildSCD2Query(t *testing.T) {
 				"FROM (\n" +
 				"SELECT id, event_name, ts, created_at from source_table\n" +
 				") AS src;",
+		},
+		{
+			name: "scd2 full refresh with BigQuery partition options",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByTime,
+					IncrementalKey: "ts",
+				},
+				BigQuery: pipeline.BigQueryConfig{
+					PartitionExpirationDays: floatp(14),
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "ts", Type: "DATE"},
+				},
+			},
+			fullRefresh: true,
+			query:       "SELECT id, ts from source_table",
+			want: "CREATE OR REPLACE TABLE `my.asset`\n" +
+				"PARTITION BY DATE(_valid_from)\n" +
+				"CLUSTER BY _is_current, id\n" +
+				"OPTIONS (partition_expiration_days = 14) AS\n" +
+				"SELECT\n" +
+				"  CAST (ts AS TIMESTAMP) AS _valid_from,\n" +
+				"  src.*,\n" +
+				"  TIMESTAMP('9999-12-31') AS _valid_until,\n" +
+				"  TRUE AS _is_current\n" +
+				"FROM (\n" +
+				"SELECT id, ts from source_table\n" +
+				") AS src;",
+		},
+		{
+			name: "scd2 rejects required partition filters",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByTime,
+					IncrementalKey: "ts",
+				},
+				BigQuery: pipeline.BigQueryConfig{
+					RequirePartitionFilter: boolp(true),
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "ts", Type: "DATE"},
+				},
+			},
+			fullRefresh: true,
+			query:       "SELECT id, ts from source_table",
+			wantErr:     true,
 		},
 		{
 			name: "scd2_by_column_full_refresh_with_custom_partitioning",
@@ -1124,3 +1542,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 }
 
 func intp(i int) *int { return &i }
+
+func boolp(value bool) *bool { return &value }
+
+func floatp(value float64) *float64 { return &value }

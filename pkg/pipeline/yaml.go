@@ -380,6 +380,12 @@ type athena struct {
 	QueryResultsPath string `yaml:"query_results_path"`
 }
 
+type bigquery struct {
+	RequirePartitionFilter  *bool    `yaml:"require_partition_filter"`
+	PartitionExpirationDays *float64 `yaml:"partition_expiration_days"`
+	PartitionKeyImmutable   *bool    `yaml:"partition_key_immutable"`
+}
+
 type doris struct {
 	TableModel    string            `yaml:"table_model"`
 	DistributedBy []string          `yaml:"distributed_by"`
@@ -426,6 +432,7 @@ type taskDefinition struct {
 	Tags                  []string          `yaml:"tags"`
 	Snowflake             snowflake         `yaml:"snowflake"`
 	Athena                athena            `yaml:"athena"`
+	BigQuery              bigquery          `yaml:"bigquery"`
 	Doris                 doris             `yaml:"doris"`
 	StarRocks             starrocks         `yaml:"starrocks"`
 	Routing               *RoutingConfig    `yaml:"routing"`
@@ -646,6 +653,11 @@ func taskDefinitionToAsset(definition taskDefinition) (*Asset, error) {
 		Hooks:           definition.Hooks,
 		Snowflake:       SnowflakeConfig{Warehouse: definition.Snowflake.Warehouse},
 		Athena:          AthenaConfig{Location: definition.Athena.QueryResultsPath},
+		BigQuery: BigQueryConfig{
+			RequirePartitionFilter:  definition.BigQuery.RequirePartitionFilter,
+			PartitionExpirationDays: definition.BigQuery.PartitionExpirationDays,
+			PartitionKeyImmutable:   definition.BigQuery.PartitionKeyImmutable,
+		},
 		Doris: DorisConfig{
 			TableModel:    definition.Doris.TableModel,
 			DistributedBy: definition.Doris.DistributedBy,

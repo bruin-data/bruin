@@ -57,7 +57,7 @@ func updateAssetDependencies(ctx context.Context, asset *pipeline.Asset, p *pipe
 		asset.AddUpstream(foundMissingUpstream)
 	}
 
-	err = asset.Persist(afero.NewOsFs()) // Use afero.NewOsFs() for real file system operations
+	err = asset.Persist(afero.NewOsFs(), p) // Use afero.NewOsFs() for real file system operations
 	if err != nil {
 		return fmt.Errorf("failed to persist asset '%s': %w", asset.Name, err)
 	}

@@ -1,14 +1,14 @@
 import pytest
-from sqlglot import parse_one, exp
+from sqlglot import exp, parse_one
 from sqlglot.optimizer import optimize
 
 from . import main as parser_main
 from .main import (
-    get_column_lineage,
-    extract_non_selected_columns,
     Column,
-    get_tables,
     add_limit,
+    extract_non_selected_columns,
+    get_column_lineage,
+    get_tables,
     is_single_select_query,
 )
 
@@ -1876,7 +1876,6 @@ ORDER BY 1, 2, 3
     },
 ]
 
-#
 
 
 @pytest.mark.parametrize(
@@ -2406,6 +2405,7 @@ def test_is_single_select_query():
 def test_merge_parts():
     """Test merge_parts function with various table formats including SQL Server hints."""
     from sqlglot import parse_one
+
     from .main import merge_parts
 
     # Test simple table name
@@ -2466,6 +2466,7 @@ def test_merge_parts():
 def test_get_table_name():
     """Test get_table_name function with various table formats and dialects."""
     from sqlglot import parse_one
+
     from .main import get_table_name
 
     # Test simple table name

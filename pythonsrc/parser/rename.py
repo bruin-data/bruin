@@ -1,4 +1,4 @@
-from sqlglot import parse, exp
+from sqlglot import exp, parse
 
 
 def replace_table_references(

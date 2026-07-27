@@ -1193,6 +1193,25 @@ func (s AthenaConfig) MarshalJSON() ([]byte, error) {
 	return json.Marshal(Alias(s))
 }
 
+type BigQueryConfig struct {
+	RequirePartitionFilter  *bool    `json:"require_partition_filter,omitempty" yaml:"require_partition_filter,omitempty" mapstructure:"require_partition_filter"`
+	PartitionExpirationDays *float64 `json:"partition_expiration_days,omitempty" yaml:"partition_expiration_days,omitempty" mapstructure:"partition_expiration_days"`
+	PartitionKeyImmutable   *bool    `json:"partition_key_immutable,omitempty" yaml:"partition_key_immutable,omitempty" mapstructure:"partition_key_immutable"`
+}
+
+func (b BigQueryConfig) MarshalJSON() ([]byte, error) {
+	if b.IsZero() {
+		return []byte("null"), nil
+	}
+
+	type Alias BigQueryConfig
+	return json.Marshal(Alias(b))
+}
+
+func (b BigQueryConfig) IsZero() bool {
+	return b.RequirePartitionFilter == nil && b.PartitionExpirationDays == nil && b.PartitionKeyImmutable == nil
+}
+
 type DorisConfig struct {
 	TableModel    string            `json:"table_model,omitempty" yaml:"table_model,omitempty" mapstructure:"table_model"`
 	DistributedBy []string          `json:"distributed_by,omitempty" yaml:"distributed_by,omitempty" mapstructure:"distributed_by"`
@@ -1292,6 +1311,7 @@ type Asset struct { //nolint:recvcheck
 	Metadata          EmptyStringMap     `json:"metadata" yaml:"metadata,omitempty" mapstructure:"metadata"`
 	Snowflake         SnowflakeConfig    `json:"snowflake" yaml:"snowflake,omitempty" mapstructure:"snowflake"`
 	Athena            AthenaConfig       `json:"athena" yaml:"athena,omitempty" mapstructure:"athena"`
+	BigQuery          BigQueryConfig     `json:"bigquery" yaml:"bigquery,omitempty" mapstructure:"bigquery"`
 	Doris             DorisConfig        `json:"doris,omitzero" yaml:"doris,omitempty" mapstructure:"doris"`
 	StarRocks         StarRocksConfig    `json:"starrocks,omitzero" yaml:"starrocks,omitempty" mapstructure:"starrocks"`
 	Routing           *RoutingConfig     `json:"routing,omitempty" yaml:"routing,omitempty" mapstructure:"routing"`
@@ -1797,23 +1817,38 @@ func (a *Asset) GetNameIfItWasSetFromItsPath(foundPipeline *Pipeline) (string, e
 func (a Asset) Persist(fs afero.Fs, pipeline ...*Pipeline) error {
 	// Save original values
 	originalParams := a.Parameters
+	originalBigQuery := a.BigQuery
 
-	// Remove parameters that match pipeline defaults
-	// pipeline is optional - if provided and has defaults, filter them out
-	if len(pipeline) > 0 && pipeline[0] != nil && pipeline[0].DefaultValues != nil && len(pipeline[0].DefaultValues.Parameters) > 0 {
-		filteredParams := ParameterMap{}
-		for key, value := range a.Parameters {
-			// Only keep parameters that are NOT in defaults or have different values
-			if defaultValue, existsInDefaults := pipeline[0].DefaultValues.Parameters[key]; !existsInDefaults || !reflect.DeepEqual(defaultValue, value) {
-				filteredParams[key] = value
+	// Remove values that match pipeline defaults.
+	// Pipeline is optional; callers that provide it avoid persisting inherited values on the asset.
+	if len(pipeline) > 0 && pipeline[0] != nil && pipeline[0].DefaultValues != nil {
+		defaults := pipeline[0].DefaultValues
+
+		if len(defaults.Parameters) > 0 {
+			filteredParams := ParameterMap{}
+			for key, value := range a.Parameters {
+				// Only keep parameters that are NOT in defaults or have different values
+				if defaultValue, existsInDefaults := defaults.Parameters[key]; !existsInDefaults || !reflect.DeepEqual(defaultValue, value) {
+					filteredParams[key] = value
+				}
+			}
+
+			// If no parameters remain, set to nil instead of empty map
+			if len(filteredParams) == 0 {
+				a.Parameters = nil
+			} else {
+				a.Parameters = filteredParams
 			}
 		}
 
-		// If no parameters remain, set to nil instead of empty map
-		if len(filteredParams) == 0 {
-			a.Parameters = nil
-		} else {
-			a.Parameters = filteredParams
+		if reflect.DeepEqual(a.BigQuery.RequirePartitionFilter, defaults.BigQuery.RequirePartitionFilter) {
+			a.BigQuery.RequirePartitionFilter = nil
+		}
+		if reflect.DeepEqual(a.BigQuery.PartitionExpirationDays, defaults.BigQuery.PartitionExpirationDays) {
+			a.BigQuery.PartitionExpirationDays = nil
+		}
+		if reflect.DeepEqual(a.BigQuery.PartitionKeyImmutable, defaults.BigQuery.PartitionKeyImmutable) {
+			a.BigQuery.PartitionKeyImmutable = nil
 		}
 	}
 
@@ -1822,6 +1857,7 @@ func (a Asset) Persist(fs afero.Fs, pipeline ...*Pipeline) error {
 
 	// Restore original values (even if formatting failed)
 	a.Parameters = originalParams
+	a.BigQuery = originalBigQuery
 
 	if err != nil {
 		return errors.Wrap(err, "failed to generate content for persistence")
@@ -2280,6 +2316,7 @@ type DefaultValues struct {
 	Metadata          EmptyStringMap         `json:"metadata,omitempty" yaml:"metadata,omitempty" mapstructure:"metadata"`
 	Snowflake         SnowflakeConfig        `json:"snowflake,omitempty" yaml:"snowflake,omitempty" mapstructure:"snowflake"`
 	Athena            AthenaConfig           `json:"athena,omitempty" yaml:"athena,omitempty" mapstructure:"athena"`
+	BigQuery          BigQueryConfig         `json:"bigquery,omitempty" yaml:"bigquery,omitempty" mapstructure:"bigquery"`
 	Doris             DorisConfig            `json:"doris,omitempty,omitzero" yaml:"doris,omitempty" mapstructure:"doris"`
 	StarRocks         StarRocksConfig        `json:"starrocks,omitempty,omitzero" yaml:"starrocks,omitempty" mapstructure:"starrocks"`
 	Routing           *RoutingConfig         `json:"routing,omitempty" yaml:"routing,omitempty" mapstructure:"routing"`
@@ -2325,6 +2362,7 @@ func (d *DefaultValues) UnmarshalYAML(value *yaml.Node) error {
 		Metadata:          asset.Metadata,
 		Snowflake:         asset.Snowflake,
 		Athena:            asset.Athena,
+		BigQuery:          asset.BigQuery,
 		Doris:             asset.Doris,
 		StarRocks:         asset.StarRocks,
 		Routing:           asset.Routing,
@@ -3239,6 +3277,7 @@ func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 	if asset.Athena.Location == "" {
 		asset.Athena.Location = defaults.Athena.Location
 	}
+	mergeBigQueryDefaults(&asset.BigQuery, defaults.BigQuery)
 	mergeDorisDefaults(&asset.Doris, defaults.Doris)
 	mergeStarRocksDefaults(&asset.StarRocks, defaults.StarRocks)
 	if !defaults.Routing.IsZero() {
@@ -3282,6 +3321,21 @@ func mergeEmptyStringMapDefaults(target *EmptyStringMap, defaults EmptyStringMap
 		if _, exists := (*target)[key]; !exists {
 			(*target)[key] = value
 		}
+	}
+}
+
+func mergeBigQueryDefaults(target *BigQueryConfig, defaults BigQueryConfig) {
+	if target.RequirePartitionFilter == nil && defaults.RequirePartitionFilter != nil {
+		value := *defaults.RequirePartitionFilter
+		target.RequirePartitionFilter = &value
+	}
+	if target.PartitionExpirationDays == nil && defaults.PartitionExpirationDays != nil {
+		value := *defaults.PartitionExpirationDays
+		target.PartitionExpirationDays = &value
+	}
+	if target.PartitionKeyImmutable == nil && defaults.PartitionKeyImmutable != nil {
+		value := *defaults.PartitionKeyImmutable
+		target.PartitionKeyImmutable = &value
 	}
 }
 

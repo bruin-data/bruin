@@ -74,6 +74,7 @@
             "metadata": {},
             "snowflake": null,
             "athena": null,
+            "bigquery": null,
             "interval_modifiers": null,
             "retries": null
         },
@@ -116,6 +117,7 @@
             "metadata": {},
             "snowflake": null,
             "athena": null,
+            "bigquery": null,
             "interval_modifiers": null,
             "retries": null
         },
@@ -200,6 +202,7 @@
             "metadata": {},
             "snowflake": null,
             "athena": null,
+            "bigquery": null,
             "interval_modifiers": null,
             "retries": null
         },
@@ -283,6 +286,7 @@
             "metadata": {},
             "snowflake": null,
             "athena": null,
+            "bigquery": null,
             "interval_modifiers": null,
             "retries": null
         }

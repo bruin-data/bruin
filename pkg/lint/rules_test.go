@@ -1633,6 +1633,208 @@ func TestEnsureMaterializationValuesAreValid(t *testing.T) {
 	}
 }
 
+func TestEnsureBigQueryTableOptionsAreValid(t *testing.T) {
+	t.Parallel()
+
+	trueValue := true
+	falseValue := false
+	thirtyDays := 30.0
+	negativeDays := -1.0
+	tests := []struct {
+		name                   string
+		assetType              pipeline.AssetType
+		materializationType    pipeline.MaterializationType
+		strategy               pipeline.MaterializationStrategy
+		partitionBy            string
+		incrementalKey         string
+		columns                []pipeline.Column
+		requirePartitionFilter *bool
+		expirationDays         *float64
+		partitionKeyImmutable  *bool
+		defaultRequireFilter   *bool
+		wantIssueContains      string
+	}{
+		{
+			name:                   "allows a partition-scoped merge when the partition column is a primary key",
+			assetType:              pipeline.AssetTypeBigqueryQuery,
+			materializationType:    pipeline.MaterializationTypeTable,
+			strategy:               pipeline.MaterializationStrategyMerge,
+			partitionBy:            "DATE(ts)",
+			columns:                []pipeline.Column{{Name: "ts", Type: "TIMESTAMP", PrimaryKey: true}},
+			requirePartitionFilter: &trueValue,
+		},
+		{
+			name:                 "allows a safe partition-scoped merge with an inherited required filter",
+			assetType:            pipeline.AssetTypeBigqueryQuery,
+			materializationType:  pipeline.MaterializationTypeTable,
+			strategy:             pipeline.MaterializationStrategyMerge,
+			partitionBy:          "DATE(ts)",
+			columns:              []pipeline.Column{{Name: "ts", Type: "TIMESTAMP", PrimaryKey: true}},
+			defaultRequireFilter: &trueValue,
+		},
+		{
+			name:                   "rejects a partition-scoped merge when the partition key may move",
+			assetType:              pipeline.AssetTypeBigqueryQuery,
+			materializationType:    pipeline.MaterializationTypeTable,
+			strategy:               pipeline.MaterializationStrategyMerge,
+			partitionBy:            "event_date",
+			columns:                []pipeline.Column{{Name: "id", Type: "INT64", PrimaryKey: true}, {Name: "event_date", Type: "DATE"}},
+			requirePartitionFilter: &trueValue,
+			wantIssueContains:      "partition column \"event_date\" to be a primary key or bigquery.partition_key_immutable to be true",
+		},
+		{
+			name:                   "allows a partition-scoped merge with an immutable partition key",
+			assetType:              pipeline.AssetTypeBigqueryQuery,
+			materializationType:    pipeline.MaterializationTypeTable,
+			strategy:               pipeline.MaterializationStrategyMerge,
+			partitionBy:            "event_date",
+			columns:                []pipeline.Column{{Name: "id", Type: "INT64", PrimaryKey: true}, {Name: "event_date", Type: "DATE"}},
+			requirePartitionFilter: &trueValue,
+			partitionKeyImmutable:  &trueValue,
+		},
+		{
+			name:                   "rejects a required partition filter without a partition",
+			assetType:              pipeline.AssetTypeBigqueryQuery,
+			materializationType:    pipeline.MaterializationTypeTable,
+			strategy:               pipeline.MaterializationStrategyCreateReplace,
+			requirePartitionFilter: &trueValue,
+			wantIssueContains:      "requires materialization.partition_by to be set",
+		},
+		{
+			name:                   "rejects a required partition filter with SCD2",
+			assetType:              pipeline.AssetTypeBigqueryQuery,
+			materializationType:    pipeline.MaterializationTypeTable,
+			strategy:               pipeline.MaterializationStrategySCD2ByTime,
+			incrementalKey:         "ts",
+			requirePartitionFilter: &trueValue,
+			wantIssueContains:      "not supported with materialization strategy scd2_by_time",
+		},
+		{
+			name:                   "rejects delete+insert when the partition does not use the incremental key",
+			assetType:              pipeline.AssetTypeBigqueryQuery,
+			materializationType:    pipeline.MaterializationTypeTable,
+			strategy:               pipeline.MaterializationStrategyDeleteInsert,
+			partitionBy:            "DATE(created_at)",
+			incrementalKey:         "ts",
+			columns:                []pipeline.Column{{Name: "ts", Type: "TIMESTAMP"}},
+			requirePartitionFilter: &trueValue,
+			wantIssueContains:      "requires materialization.partition_by to use materialization.incremental_key",
+		},
+		{
+			name:                   "rejects delete+insert when the incremental key column type is missing",
+			assetType:              pipeline.AssetTypeBigqueryQuery,
+			materializationType:    pipeline.MaterializationTypeTable,
+			strategy:               pipeline.MaterializationStrategyDeleteInsert,
+			partitionBy:            "DATE(ts)",
+			incrementalKey:         "ts",
+			requirePartitionFilter: &trueValue,
+			wantIssueContains:      "requires the incremental key column type to be set",
+		},
+		{
+			name:                "rejects a negative partition expiration",
+			assetType:           pipeline.AssetTypeBigqueryQuery,
+			materializationType: pipeline.MaterializationTypeTable,
+			strategy:            pipeline.MaterializationStrategyCreateReplace,
+			partitionBy:         "DATE(ts)",
+			expirationDays:      &negativeDays,
+			wantIssueContains:   "must be a positive number",
+		},
+		{
+			name:                "rejects a partition expiration without a partition",
+			assetType:           pipeline.AssetTypeBigqueryQuery,
+			materializationType: pipeline.MaterializationTypeTable,
+			strategy:            pipeline.MaterializationStrategyCreateReplace,
+			expirationDays:      &thirtyDays,
+			wantIssueContains:   "requires materialization.partition_by to be set",
+		},
+		{
+			name:                   "an explicit false value overrides a true default",
+			assetType:              pipeline.AssetTypeBigqueryQuery,
+			materializationType:    pipeline.MaterializationTypeTable,
+			strategy:               pipeline.MaterializationStrategyMerge,
+			requirePartitionFilter: &falseValue,
+			defaultRequireFilter:   &trueValue,
+		},
+		{
+			name:                 "allows merge when the default disables the option",
+			assetType:            pipeline.AssetTypeBigqueryQuery,
+			materializationType:  pipeline.MaterializationTypeTable,
+			strategy:             pipeline.MaterializationStrategyMerge,
+			defaultRequireFilter: &falseValue,
+		},
+		{
+			name:                   "allows delete+insert partitioned on the incremental key",
+			assetType:              pipeline.AssetTypeBigqueryQuery,
+			materializationType:    pipeline.MaterializationTypeTable,
+			strategy:               pipeline.MaterializationStrategyDeleteInsert,
+			partitionBy:            "DATE(ts)",
+			incrementalKey:         "ts",
+			columns:                []pipeline.Column{{Name: "ts", Type: "TIMESTAMP"}},
+			requirePartitionFilter: &trueValue,
+			expirationDays:         &thirtyDays,
+		},
+		{
+			name:                 "ignores views that inherit the option from defaults",
+			assetType:            pipeline.AssetTypeBigqueryQuery,
+			materializationType:  pipeline.MaterializationTypeView,
+			defaultRequireFilter: &trueValue,
+		},
+		{
+			name:                   "ignores non-BigQuery assets",
+			assetType:              pipeline.AssetTypeSnowflakeQuery,
+			materializationType:    pipeline.MaterializationTypeTable,
+			strategy:               pipeline.MaterializationStrategyMerge,
+			requirePartitionFilter: &trueValue,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			asset := &pipeline.Asset{
+				Name:    "dataset.events",
+				Type:    tt.assetType,
+				Columns: tt.columns,
+				Materialization: pipeline.Materialization{
+					Type:           tt.materializationType,
+					Strategy:       tt.strategy,
+					PartitionBy:    tt.partitionBy,
+					IncrementalKey: tt.incrementalKey,
+				},
+				BigQuery: pipeline.BigQueryConfig{
+					RequirePartitionFilter:  tt.requirePartitionFilter,
+					PartitionExpirationDays: tt.expirationDays,
+					PartitionKeyImmutable:   tt.partitionKeyImmutable,
+				},
+			}
+			p := &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{asset},
+			}
+			if tt.defaultRequireFilter != nil {
+				p.DefaultValues = &pipeline.DefaultValues{
+					BigQuery: pipeline.BigQueryConfig{
+						RequirePartitionFilter: tt.defaultRequireFilter,
+					},
+				}
+				_, err := (&pipeline.Builder{}).SetupDefaultsFromPipeline(t.Context(), asset, p)
+				require.NoError(t, err)
+			}
+
+			got, err := EnsureBigQueryTableOptionsAreValid(t.Context(), p, asset)
+			require.NoError(t, err)
+			if tt.wantIssueContains == "" {
+				assert.Empty(t, got)
+				return
+			}
+
+			require.Len(t, got, 1)
+			assert.Same(t, asset, got[0].Task)
+			assert.Contains(t, got[0].Description, tt.wantIssueContains)
+		})
+	}
+}
+
 func TestEnsureSnowflakeSensorHasQueryParameter(t *testing.T) {
 	t.Parallel()
 
