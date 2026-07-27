@@ -17,7 +17,7 @@ jobs:
     strategy:
       matrix:
         platform: [ depot-ubuntu-latest-4, depot-macos-15, depot-windows-latest-4 ]
-        suite: ["test", "integration-test"]
+        suite: ["test-full", "integration-test"]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Install R in background (Ubuntu)
