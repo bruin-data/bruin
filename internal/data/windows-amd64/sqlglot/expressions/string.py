@@ -303,15 +303,11 @@ class FromBase64(Expression, Func):
 
 
 class Hex(Expression, Func):
-    pass
+    arg_types = {"this": True, "case": False}
 
 
 class HexDecodeString(Expression, Func):
     pass
-
-
-class HexEncode(Expression, Func):
-    arg_types = {"this": True, "case": False}
 
 
 class LowerHex(Hex):
@@ -379,6 +375,7 @@ class ToNumber(Expression, Func):
         "scale": False,
         "safe": False,
         "safe_name": False,
+        "default": False,
     }
 
 
@@ -478,6 +475,17 @@ class RegexpReplace(Expression, Func):
 
 class RegexpSplit(Expression, Func):
     arg_types = {"this": True, "expression": True, "limit": False}
+
+
+class RegexpSubstr(Expression, Func):
+    arg_types = {
+        "this": True,
+        "expression": True,
+        "position": False,
+        "occurrence": False,
+        "parameters": False,
+        "group": False,
+    }
 
 
 # Hashing / cryptographic

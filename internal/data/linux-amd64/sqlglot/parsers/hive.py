@@ -8,7 +8,7 @@ from sqlglot.helper import seq_get
 from sqlglot.tokens import TokenType
 
 if t.TYPE_CHECKING:
-    from sqlglot._typing import F
+    from sqlglot.dialects.dialect import Dialect
 
 
 def build_with_ignore_nulls(
@@ -23,8 +23,8 @@ def build_with_ignore_nulls(
     return _parse
 
 
-def _build_to_date(args: list) -> exp.TsOrDsToDate:
-    expr = build_formatted_time(exp.TsOrDsToDate, "hive")(args)
+def _build_to_date(args: list, dialect: Dialect) -> exp.TsOrDsToDate:
+    expr = build_formatted_time(exp.TsOrDsToDate)(args, dialect)
     expr.set("safe", True)
     return expr
 
@@ -62,8 +62,8 @@ class HiveParser(parser.Parser):
 
     FUNCTION_PARSERS = {
         **parser.Parser.FUNCTION_PARSERS,
-        "PERCENTILE": lambda self: self._parse_quantile_function(exp.Quantile),
-        "PERCENTILE_APPROX": lambda self: self._parse_quantile_function(exp.ApproxQuantile),
+        "PERCENTILE": lambda self: self._parse_distinct_arg_function(exp.Quantile),
+        "PERCENTILE_APPROX": lambda self: self._parse_distinct_arg_function(exp.ApproxQuantile),
     }
 
     FUNCTIONS = {
@@ -74,11 +74,12 @@ class HiveParser(parser.Parser):
         "DATE_ADD": lambda args: exp.TsOrDsAdd(
             this=seq_get(args, 0), expression=seq_get(args, 1), unit=exp.Literal.string("DAY")
         ),
-        "DATE_FORMAT": lambda args: build_formatted_time(exp.TimeToStr, "hive")(
+        "DATE_FORMAT": lambda args, dialect: build_formatted_time(exp.TimeToStr)(
             [
                 exp.TimeStrToTime(this=seq_get(args, 0)),
                 seq_get(args, 1),
-            ]
+            ],
+            dialect,
         ),
         "DATE_SUB": _build_date_add,
         "DATEDIFF": lambda args: exp.DateDiff(
@@ -88,7 +89,7 @@ class HiveParser(parser.Parser):
         "DAY": lambda args: exp.Day(this=exp.TsOrDsToDate(this=seq_get(args, 0))),
         "FIRST": build_with_ignore_nulls(exp.First),
         "FIRST_VALUE": build_with_ignore_nulls(exp.FirstValue),
-        "FROM_UNIXTIME": build_formatted_time(exp.UnixToStr, "hive", True),
+        "FROM_UNIXTIME": build_formatted_time(exp.UnixToStr, default=True),
         "GET_JSON_OBJECT": lambda args, dialect: exp.JSONExtractScalar(
             this=seq_get(args, 0), expression=dialect.to_json_path(seq_get(args, 1))
         ),
@@ -111,8 +112,8 @@ class HiveParser(parser.Parser):
         "TO_JSON": exp.JSONFormat.from_arg_list,
         "TRUNC": exp.TimestampTrunc.from_arg_list,
         "UNBASE64": exp.FromBase64.from_arg_list,
-        "UNIX_TIMESTAMP": lambda args: build_formatted_time(exp.StrToUnix, "hive", True)(
-            args or [exp.CurrentTimestamp()]
+        "UNIX_TIMESTAMP": lambda args, dialect: build_formatted_time(exp.StrToUnix, default=True)(
+            args or [exp.CurrentTimestamp()], dialect
         ),
         "YEAR": lambda args: exp.Year(this=exp.TsOrDsToDate.from_arg_list(args)),
     }
@@ -176,23 +177,12 @@ class HiveParser(parser.Parser):
             )
         )
 
-    def _parse_quantile_function(self, func: type[F]) -> F:
-        if self._match(TokenType.DISTINCT):
-            first_arg: exp.Expr | None = self.expression(
-                exp.Distinct(expressions=[self._parse_lambda()])
-            )
-        else:
-            self._match(TokenType.ALL)
-            first_arg = self._parse_lambda()
-
-        args = [first_arg]
-        if self._match(TokenType.COMMA):
-            args.extend(self._parse_function_args())
-
-        return func.from_arg_list(args)
-
     def _parse_types(
-        self, check_func: bool = False, schema: bool = False, allow_identifiers: bool = True
+        self,
+        check_func: bool = False,
+        schema: bool = False,
+        allow_identifiers: bool = True,
+        with_collation: bool = False,
     ) -> exp.Expr | None:
         """
         Spark (and most likely Hive) treats casts to CHAR(length) and VARCHAR(length) as casts to
@@ -213,18 +203,21 @@ class HiveParser(parser.Parser):
         Reference: https://spark.apache.org/docs/latest/sql-ref-datatypes.html
         """
         this = super()._parse_types(
-            check_func=check_func, schema=schema, allow_identifiers=allow_identifiers
+            check_func=check_func,
+            schema=schema,
+            allow_identifiers=allow_identifiers,
+            with_collation=with_collation,
         )
 
         if this and not schema:
-            return this.transform(
-                lambda node: (
-                    node.replace(exp.DType.TEXT.into_expr())
-                    if isinstance(node, exp.DataType) and node.is_type("char", "varchar")
-                    else node
-                ),
-                copy=False,
-            )
+
+            def _to_text(node: exp.Expr) -> exp.Expr:
+                if isinstance(node, exp.DataType) and node.is_type("char", "varchar"):
+                    node.set("this", exp.DType.TEXT)
+                    node.set("expressions", None)
+                return node
+
+            return this.transform(_to_text, copy=False)
 
         return this
 

@@ -111,6 +111,9 @@ class MySQLParser(parser.Parser):
         "CURDATE": exp.CurrentDate.from_arg_list,
         "CURTIME": exp.CurrentTime.from_arg_list,
         "DATE": lambda args: exp.TsOrDsToDate(this=seq_get(args, 0)),
+        "DATEDIFF": lambda args: exp.DateDiff(
+            this=seq_get(args, 0), expression=seq_get(args, 1), date_part_boundary=True
+        ),
         "DATE_ADD": build_date_delta_with_interval(exp.DateAdd),
         "DATE_FORMAT": lambda args: exp.TimeToStr(
             this=exp.TsOrDsToTimestamp(this=seq_get(args, 0)),
@@ -122,7 +125,7 @@ class MySQLParser(parser.Parser):
         "DAYOFWEEK": lambda args: exp.DayOfWeek(this=exp.TsOrDsToDate(this=seq_get(args, 0))),
         "DAYOFYEAR": lambda args: exp.DayOfYear(this=exp.TsOrDsToDate(this=seq_get(args, 0))),
         "FORMAT": exp.NumberToStr.from_arg_list,
-        "FROM_UNIXTIME": build_formatted_time(exp.UnixToTime, "mysql"),
+        "FROM_UNIXTIME": build_formatted_time(exp.UnixToTime),
         "ISNULL": isnull_to_is_null,
         "LENGTH": lambda args: exp.Length(this=seq_get(args, 0), binary=True),
         "MAKETIME": exp.TimeFromParts.from_arg_list,
@@ -252,6 +255,7 @@ class MySQLParser(parser.Parser):
 
     ALTER_PARSERS = {
         **parser.Parser.ALTER_PARSERS,
+        "CHANGE": lambda self: self._parse_alter_table_modify(rename=True),
         "MODIFY": lambda self: self._parse_alter_table_modify(),
         "AUTO_INCREMENT": lambda self: self._parse_property_assignment(exp.AutoIncrementProperty),
     }
@@ -315,18 +319,27 @@ class MySQLParser(parser.Parser):
             return self.expression(exp.DropPrimaryKey())
         return super()._parse_alter_drop_action()
 
-    def _parse_alter_table_modify(self) -> exp.Expr | None:
+    def _parse_alter_table_modify(self, rename: bool = False) -> exp.Expr | None:
+        # MODIFY [COLUMN]            col_name      column_definition [FIRST | AFTER col_name]
+        # CHANGE [COLUMN] old_col_name new_col_name column_definition [FIRST | AFTER col_name]
         self._match(TokenType.COLUMN)
 
         column = self._parse_field(any_token=True)
         if column is None:
             return None
 
+        rename_from = None
+        if rename:
+            rename_from = column
+            column = self._parse_field(any_token=True)
+            if column is None:
+                return None
+
         column_def = self._parse_column_def(column)
         if not isinstance(column_def, exp.ColumnDef):
             return None
 
-        return self.expression(exp.ModifyColumn(this=column_def))
+        return self.expression(exp.ModifyColumn(this=column_def, rename_from=rename_from))
 
     def _parse_generated_as_identity(
         self,

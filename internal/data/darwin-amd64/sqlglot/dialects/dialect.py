@@ -86,6 +86,7 @@ class Dialects(str, Enum):
     BIGQUERY = "bigquery"
     CLICKHOUSE = "clickhouse"
     DATABRICKS = "databricks"
+    DAX = "dax"
     DORIS = "doris"
     DREMIO = "dremio"
     DRILL = "drill"
@@ -132,6 +133,23 @@ class NormalizationStrategy(str, AutoName):
 
     CASE_INSENSITIVE_UPPERCASE = auto()
     """Always case-insensitive (uppercase), regardless of quotes."""
+
+
+# "Strict" dialects (e.g. modern Hive, Spark 3+) map their zero-padded MM/dd to these in TIME_MAPPING so they
+# roundtrip, since a lax %m/%d renders non-padded there for parse expressions (see HiveGenerator.format_time).
+STRICT_TIME_FORMATS = {"%mstrict": "%m", "%dstrict": "%d"}
+
+
+def _with_strict_time_inverse(inverse_mapping: dict[str, str]) -> dict[str, str]:
+    for strict_format, lax_format in STRICT_TIME_FORMATS.items():
+        if strict_format in inverse_mapping:
+            # In strict dialects, a foreign lax %m formats the same padded way as %mstrict (MM)
+            inverse_mapping.setdefault(lax_format, inverse_mapping[strict_format])
+        else:
+            # Elsewhere, the strict format degrades to its lax counterpart so it never leaks
+            inverse_mapping.setdefault(strict_format, inverse_mapping.get(lax_format, lax_format))
+
+    return inverse_mapping
 
 
 class _Dialect(type):
@@ -237,11 +255,14 @@ class _Dialect(type):
         )
         # Merge class-defined INVERSE_TIME_MAPPING with auto-generated mappings
         # This allows dialects to define custom inverse mappings for roundtrip correctness
-        klass.INVERSE_TIME_MAPPING = {v: k for k, v in klass.TIME_MAPPING.items()} | (
-            klass.__dict__.get("INVERSE_TIME_MAPPING") or {}
+        klass.INVERSE_TIME_MAPPING = _with_strict_time_inverse(
+            {v: k for k, v in klass.TIME_MAPPING.items()}
+            | (klass.__dict__.get("INVERSE_TIME_MAPPING") or {})
         )
         klass.INVERSE_TIME_TRIE = new_trie(klass.INVERSE_TIME_MAPPING)
-        klass.INVERSE_FORMAT_MAPPING = {v: k for k, v in klass.FORMAT_MAPPING.items()}
+        klass.INVERSE_FORMAT_MAPPING = _with_strict_time_inverse(
+            {v: k for k, v in klass.FORMAT_MAPPING.items()}
+        )
         klass.INVERSE_FORMAT_TRIE = new_trie(klass.INVERSE_FORMAT_MAPPING)
 
         klass.INVERSE_CREATABLE_KIND_MAPPING = {
@@ -305,7 +326,12 @@ class _Dialect(type):
                 **klass.UNESCAPED_SEQUENCES,
             }
 
-        klass.ESCAPED_SEQUENCES = {v: k for k, v in klass.UNESCAPED_SEQUENCES.items()}
+        klass.ESCAPED_SEQUENCES = {
+            # The filter is necessary because of `\\a -> a` in Snowflake; we can't replace `a` with `\a`.
+            v: k
+            for k, v in klass.UNESCAPED_SEQUENCES.items()
+            if not v.isprintable() or v == "\\"
+        }
 
         klass.SUPPORTS_COLUMN_JOIN_MARKS = "(+)" in klass.tokenizer_class.KEYWORDS
 
@@ -523,6 +549,11 @@ class Dialect(metaclass=_Dialect):
     SUPPORTS_ORDER_BY_ALL = False
     """
     Whether ORDER BY ALL is supported (expands to all the selected columns) as in DuckDB, Spark3/Databricks
+    """
+
+    SUPPORTS_LIMIT_ALL = False
+    """
+    Whether LIMIT ALL is supported (equivalent to no limit) as in Postgres.
     """
 
     PROJECTION_ALIASES_SHADOW_SOURCE_NAMES = False
@@ -1219,7 +1250,9 @@ def inline_array_unless_query(self: Generator, expression: exp.Expr) -> str:
 def no_ilike_sql(self: Generator, expression: exp.ILike) -> str:
     return self.like_sql(
         exp.Like(
-            this=exp.Lower(this=expression.this), expression=exp.Lower(this=expression.expression)
+            this=exp.Lower(this=expression.this),
+            expression=exp.Lower(this=expression.expression),
+            negate=expression.args.get("negate"),
         )
     )
 
@@ -1538,27 +1571,31 @@ def months_between_sql(self: Generator, expression: exp.MonthsBetween) -> str:
 
 
 def build_formatted_time(
-    exp_class: Type[E], dialect: str, default: bool | str | None = None
-) -> t.Callable[[BuilderArgs], E]:
+    exp_class: Type[E], dialect_override: str | None = None, default: bool | str | None = None
+) -> t.Callable[[BuilderArgs, Dialect], E]:
     """Helper used for time expressions.
 
     Args:
         exp_class: the expression class to instantiate.
-        dialect: target sql dialect.
+        dialect_override: optional sql dialect to override the parser's one.
         default: the default format, True being time.
 
     Returns:
         A callable that can be used to return the appropriately formatted time expression.
     """
 
-    def _builder(args: BuilderArgs) -> E:
-        return exp_class(
-            this=seq_get(args, 0),
-            format=Dialect[dialect].format_time(
-                seq_get(args, 1)
-                or (Dialect[dialect].TIME_FORMAT if default is True else default or None)
-            ),
+    def _builder(args: BuilderArgs, dialect: Dialect) -> E:
+        target_dialect = (
+            t.cast(Dialect, Dialect[dialect_override])
+            if isinstance(dialect_override, str)
+            else dialect
         )
+
+        fmt = seq_get(args, 1)
+        if not fmt:
+            fmt = target_dialect.TIME_FORMAT if default is True else default or None
+
+        return exp_class(this=seq_get(args, 0), format=target_dialect.format_time(fmt))
 
     return _builder
 
@@ -1779,10 +1816,6 @@ def trim_sql(self: Generator, expression: exp.Trim, default_trim_type: str = "")
     from_part = "FROM " if trim_type or remove_chars else ""
     collation = f" COLLATE {collation}" if collation else ""
     return f"TRIM({trim_type}{remove_chars}{from_part}{target}{collation})"
-
-
-def str_to_time_sql(self: Generator, expression: exp.Expr) -> str:
-    return self.func("STRPTIME", expression.this, self.format_time(expression))
 
 
 def concat_to_dpipe_sql(self: Generator, expression: exp.Concat) -> str:
@@ -2008,6 +2041,45 @@ def unit_to_var(expression: exp.Expr, default: str = "DAY") -> exp.Expr | None:
     return exp.Var(this=value) if value else None
 
 
+# Days of week to ISO 8601 day-of-week numbers
+# ISO 8601 standard: Monday=1, Tuesday=2, Wednesday=3, Thursday=4, Friday=5, Saturday=6, Sunday=7
+WEEK_START_DAY_TO_DOW = {
+    "MONDAY": 1,
+    "TUESDAY": 2,
+    "WEDNESDAY": 3,
+    "THURSDAY": 4,
+    "FRIDAY": 5,
+    "SATURDAY": 6,
+    "SUNDAY": 7,
+}
+
+
+def week_unit_to_dow(unit: exp.Expr | None) -> int | None:
+    """
+    Compute the week start day for a week-ish diff unit, e.g BigQuery's WEEK(<day>)
+    or ISOWEEK unit parts.
+
+    Args:
+        unit: The unit expression (Var for WEEK/ISOWEEK or WeekStart)
+
+    Returns:
+        The ISO 8601 day number (Monday=1, Sunday=7 etc) or None if not a week unit or if day is dynamic (not a constant).
+
+        Examples:
+            "WEEK(SUNDAY)" -> 7
+            "WEEK(MONDAY)" -> 1
+            "ISOWEEK" -> 1
+    """
+    if isinstance(unit, exp.Var) and unit.name.upper() in ("WEEK", "ISOWEEK"):
+        return 1
+
+    # Handle WeekStart expressions with explicit day
+    if isinstance(unit, exp.WeekStart):
+        return WEEK_START_DAY_TO_DOW.get(unit.name.upper())
+
+    return None
+
+
 @t.overload
 def map_date_part(part: exp.Expr, dialect: DialectType = Dialect) -> exp.Expr:
     pass
@@ -2123,10 +2195,9 @@ def json_extract_segments(
         if not isinstance(path, exp.JSONPath):
             return rename_func(name)(self, expression)
 
-        escape = path.args.get("escape")
-
         segments = []
         for segment in path.expressions:
+            escape = segment.args.get("quoted")
             path = self.sql(segment)
             if path:
                 if isinstance(segment, exp.JSONPathPart) and (
@@ -2463,8 +2534,7 @@ def build_timetostr_or_tochar(
             annotate_types(this, dialect=dialect)
 
         if this.is_type(*exp.DataType.TEMPORAL_TYPES):
-            dialect_name = dialect.__class__.__name__.lower()
-            return build_formatted_time(exp.TimeToStr, dialect_name, default=True)(args)
+            return build_formatted_time(exp.TimeToStr, default=True)(args, t.cast(Dialect, dialect))
 
     return exp.ToChar.from_arg_list(args)
 

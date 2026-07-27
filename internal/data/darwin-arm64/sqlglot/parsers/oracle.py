@@ -4,19 +4,20 @@ import typing as t
 
 from sqlglot import exp, parser
 from sqlglot.dialects.dialect import build_formatted_time, build_timetostr_or_tochar, build_trunc
-from sqlglot.helper import seq_get
+from sqlglot.helper import ensure_list, seq_get
 from sqlglot.parser import OPTIONS_TYPE, build_coalesce
 from sqlglot.tokens import TokenType
 
 if t.TYPE_CHECKING:
     from sqlglot._typing import E
+    from sqlglot.dialects.dialect import Dialect
 
 
-def _build_to_timestamp(args: list) -> exp.StrToTime | exp.Anonymous:
+def _build_to_timestamp(args: list, dialect: Dialect) -> exp.StrToTime | exp.Anonymous:
     if len(args) == 1:
         return exp.Anonymous(this="TO_TIMESTAMP", expressions=args)
 
-    return build_formatted_time(exp.StrToTime, "oracle")(args)
+    return build_formatted_time(exp.StrToTime)(args, dialect)
 
 
 class OracleParser(parser.Parser):
@@ -31,7 +32,7 @@ class OracleParser(parser.Parser):
         "SQUARE": lambda args: exp.Pow(this=seq_get(args, 0), expression=exp.Literal.number(2)),
         "TO_CHAR": build_timetostr_or_tochar,
         "TO_TIMESTAMP": _build_to_timestamp,
-        "TO_DATE": build_formatted_time(exp.StrToDate, "oracle"),
+        "TO_DATE": build_formatted_time(exp.StrToDate),
         "TRUNC": lambda args, dialect: build_trunc(
             args, dialect, date_trunc_unabbreviate=False, default_date_trunc_unit="DD"
         ),
@@ -57,6 +58,7 @@ class OracleParser(parser.Parser):
         "JSON_ARRAYAGG": lambda self: self._parse_oracle_json_arrayagg(),
         "JSON_EXISTS": lambda self: self._parse_json_exists(),
         "LISTAGG": lambda self: self._parse_string_agg(),
+        "TO_NUMBER": lambda self: self._parse_to_number(),
     }
 
     PROPERTY_PARSERS = {
@@ -75,14 +77,17 @@ class OracleParser(parser.Parser):
     QUERY_MODIFIER_PARSERS = {
         **parser.Parser.QUERY_MODIFIER_PARSERS,
         TokenType.ORDER_SIBLINGS_BY: lambda self: ("order", self._parse_order()),
-        TokenType.WITH: lambda self: ("options", [self._parse_query_restrictions()]),
+        TokenType.WITH: lambda self: (
+            "options",
+            ensure_list(self._parse_query_restrictions()),
+        ),
     }
 
     TYPE_LITERAL_PARSERS = {
         exp.DType.DATE: lambda self, this, _: self.expression(exp.DateStrToDate(this=this)),
         # https://docs.oracle.com/en/database/oracle/oracle-database/19/refrn/NLS_TIMESTAMP_FORMAT.html
         exp.DType.TIMESTAMP: lambda self, this, _: _build_to_timestamp(
-            [this, '"%Y-%m-%d %H:%M:%S.%f"']
+            [this, '"%Y-%m-%d %H:%M:%S.%f"'], self.dialect
         ),
     }
 
@@ -96,6 +101,26 @@ class OracleParser(parser.Parser):
             ("CHECK", "OPTION"),
         ),
     }
+
+    def _parse_to_number(self) -> exp.ToNumber:
+        # https://docs.oracle.com/en/database/oracle/oracle-database/19/sqlrf/TO_NUMBER.html
+        this = self._parse_bitwise()
+
+        default = None
+        if self._match(TokenType.DEFAULT):
+            default = self._parse_bitwise()
+            self._match_text_seq("ON", "CONVERSION", "ERROR")
+
+        fmt = None
+        nlsparam = None
+        if self._match(TokenType.COMMA):
+            fmt = self._parse_bitwise()
+            if self._match(TokenType.COMMA):
+                nlsparam = self._parse_bitwise()
+
+        return self.expression(
+            exp.ToNumber(this=this, format=fmt, nlsparam=nlsparam, default=default)
+        )
 
     def _parse_dbms_random(self) -> exp.Expr | None:
         if self._match_text_seq(".", "VALUE"):

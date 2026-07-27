@@ -10,12 +10,14 @@ import re
 import sys
 import textwrap
 import typing as t
+from builtins import type as Type
 from collections import deque
+from collections.abc import Collection, Iterator, Mapping, MutableMapping, Sequence
 from copy import deepcopy
 from decimal import Decimal
 from functools import reduce
-from collections.abc import Iterator, Sequence, Collection, Mapping, MutableMapping
-from sqlglot._typing import E, T
+
+from sqlglot._typing import E, GeneratorNoDialectArgs, ParserNoDialectArgs, T
 from sqlglot.errors import ParseError
 from sqlglot.helper import (
     camel_to_snake_case,
@@ -24,17 +26,15 @@ from sqlglot.helper import (
     to_bool,
     trait,
 )
-
 from sqlglot.tokenizer_core import Token
-from builtins import type as Type
-from sqlglot._typing import GeneratorNoDialectArgs, ParserNoDialectArgs
 
 if t.TYPE_CHECKING:
-    from typing_extensions import Self, Unpack, Concatenate
+    from typing_extensions import Concatenate, Self, Unpack
+
+    from sqlglot._typing import P
     from sqlglot.dialects.dialect import DialectType
     from sqlglot.expressions.datatypes import DATA_TYPE, DataType, DType, Interval
     from sqlglot.expressions.query import Select
-    from sqlglot._typing import P
 
     R = t.TypeVar("R")
 
@@ -88,6 +88,7 @@ class Expr:
     _hash_raw_args: t.ClassVar[bool] = False
     is_subquery: t.ClassVar[bool] = False
     is_cast: t.ClassVar[bool] = False
+    is_data_type: t.ClassVar[bool] = False
 
     args: dict[str, t.Any]
     parent: Expr | None
@@ -237,6 +238,9 @@ class Expr:
 
     @property
     def meta(self) -> dict[str, t.Any]:
+        raise NotImplementedError
+
+    def meta_get(self, key: str, default: t.Any = None) -> t.Any:
         raise NotImplementedError
 
     def __deepcopy__(self, memo: t.Any) -> Expr:
@@ -837,26 +841,35 @@ class Expression(Expr):
     def __hash__(self) -> int:
         if self._hash is None:
             nodes: list[Expr] = []
-            queue: deque[Expr] = deque()
-            queue.append(self)
+            stack: list[Expr] = [self]
 
-            while queue:
-                node = queue.popleft()
+            # Collect nodes, finding child expressions inline instead of via the
+            # iter_expressions generator (whose per-node generator object dominates the
+            # hash's cost). reversed(nodes) is a valid post-order regardless of DFS/BFS.
+            while stack:
+                node = stack.pop()
                 nodes.append(node)
 
-                for child in node.iter_expressions():
-                    if child._hash is None:
-                        queue.append(child)
+                for v in node.args.values():
+                    if isinstance(v, Expr):
+                        if v._hash is None:
+                            stack.append(v)
+                    elif type(v) is list:
+                        for x in v:
+                            if isinstance(x, Expr) and x._hash is None:
+                                stack.append(x)
 
             for node in reversed(nodes):
                 hash_ = hash(node.key)
 
                 if node._hash_raw_args:
-                    for k, v in sorted(node.args.items()):
+                    for k in sorted(node.args):
+                        v = node.args[k]
                         if v:
                             hash_ = hash((hash_, k, v))
                 else:
-                    for k, v in sorted(node.args.items()):
+                    for k in sorted(node.args):
+                        v = node.args[k]
                         vt = type(v)
 
                         if vt is list:
@@ -953,6 +966,8 @@ class Expression(Expr):
 
     @property
     def type(self) -> DataType | None:
+        if self.is_data_type:
+            return self  # type: ignore[return-value]
         if self.is_cast:
             return self._type or self.to  # type: ignore[attr-defined]
         return self._type
@@ -977,6 +992,11 @@ class Expression(Expr):
         if self._meta is None:
             self._meta = {}
         return self._meta
+
+    def meta_get(self, key: str, default: t.Any = None) -> t.Any:
+        """Reads a meta value without allocating the meta dict (unlike the `meta` property)."""
+        meta = self._meta
+        return meta.get(key, default) if meta is not None else default
 
     def __deepcopy__(self, memo: t.Any) -> Expr:
         root = self.__class__()
@@ -1039,6 +1059,11 @@ class Expression(Expr):
         return comments
 
     def append(self, arg_key: str, value: t.Any) -> None:
+        node: Expr | None = self
+        while node and node._hash is not None:
+            node._hash = None
+            node = node.parent
+
         if type(self.args.get(arg_key)) is not list:
             self.args[arg_key] = []
         self._set_parent(arg_key, value)
@@ -1764,7 +1789,12 @@ class JoinHint(Expression):
 
 
 class Identifier(Expression):
-    arg_types = {"this": True, "quoted": False, "global_": False, "temporary": False}
+    arg_types = {
+        "this": True,
+        "quoted": False,
+        "global_": False,
+        "temporary": False,
+    }
     is_primitive = True
     _hash_raw_args = True
 
@@ -1777,12 +1807,19 @@ class Identifier(Expression):
         return self.name
 
 
+# https://docs.snowflake.com/en/sql-reference/identifier-literal
+# "expressions" holds the arguments when the resolved identifier is invoked as a
+# function, e.g. `IDENTIFIER('my_func')(1, 2)`
+class DynamicIdentifier(Expression, Func):
+    arg_types = {"this": True, "expressions": False}
+
+
 class Opclass(Expression):
     arg_types = {"this": True, "expression": True}
 
 
 class Star(Expression):
-    arg_types = {"except_": False, "replace": False, "rename": False}
+    arg_types = {"except_": False, "replace": False, "rename": False, "ilike": False}
 
     @property
     def name(self) -> str:
@@ -2118,6 +2155,10 @@ class Distance(Expression, Binary):
     pass
 
 
+class DistanceNd(Expression, Binary):
+    pass
+
+
 class Escape(Expression, Binary):
     pass
 
@@ -2135,7 +2176,7 @@ class GTE(Expression, Binary, Predicate):
 
 
 class ILike(Expression, Binary, Predicate):
-    pass
+    arg_types = {"this": True, "expression": True, "negate": False}
 
 
 class IntDiv(Expression, Binary):
@@ -2147,7 +2188,7 @@ class Is(Expression, Binary, Predicate):
 
 
 class Like(Expression, Binary, Predicate):
-    pass
+    arg_types = {"this": True, "expression": True, "negate": False}
 
 
 class Match(Expression, Binary, Predicate):
@@ -2269,8 +2310,7 @@ class Or(Expression, Connector, Func):
 
 
 class Xor(Expression, Connector, Func):
-    arg_types = {"this": False, "expression": False, "expressions": False, "round_input": False}
-    is_var_len_args = True
+    arg_types = {"this": True, "expression": True, "round_input": False}
 
 
 class Pow(Expression, Binary, Func):
@@ -2387,7 +2427,8 @@ def convert(value: t.Any, copy: bool = False) -> Expr:
 
         return _Array(expressions=[convert(v, copy=copy) for v in value])
     if isinstance(value, dict):
-        from sqlglot.expressions.array import Array as _Array, Map as _Map
+        from sqlglot.expressions.array import Array as _Array
+        from sqlglot.expressions.array import Map as _Map
 
         return _Map(
             keys=_Array(expressions=[convert(k, copy=copy) for k in value]),
@@ -2428,6 +2469,7 @@ QUERY_MODIFIERS = {
     "settings": False,
     "format": False,
     "options": False,
+    "for_": False,
 }
 
 
@@ -2534,7 +2576,7 @@ def _to_s(node: t.Any, verbose: bool = False, level: int = 0, repr_str: bool = F
     if isinstance(node, Expr):
         args = {k: v for k, v in node.args.items() if (v is not None and v != []) or verbose}
 
-        if (node.type or verbose) and type(node).__name__ != "DataType":
+        if (node.type or verbose) and not node.is_data_type:
             args["_type"] = node.type
         if node.comments or verbose:
             args["_comments"] = node.comments

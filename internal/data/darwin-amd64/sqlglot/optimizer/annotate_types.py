@@ -13,6 +13,7 @@ from sqlglot.helper import (
     is_iso_datetime,
     seq_get,
 )
+from sqlglot.errors import OptimizeError
 from sqlglot.optimizer.scope import Scope, traverse_scope
 from sqlglot.schema import MappingSchema, Schema, ensure_schema
 
@@ -224,14 +225,30 @@ class TypeAnnotator:
         # When set to False, this enables partial annotation by skipping already-annotated nodes
         self._overwrite_types = overwrite_types
 
-        # Maps Scope to its corresponding selected sources
-        self._scope_selects: dict[Scope, dict[str, dict[str, t.Any]]] = {}
+        # Maps (Scope, source_name) to its column projections and types
+        self._scope_source_selects: dict[
+            tuple[Scope, str], dict[str, exp.DataType | exp.DType]
+        ] = {}
 
     def clear(self) -> None:
         self._visited.clear()
         self._null_expressions.clear()
         self._setop_column_types.clear()
-        self._scope_selects.clear()
+        self._scope_source_selects.clear()
+
+    def uncache(self, expression: exp.Expr, deep: bool = True) -> None:
+        """
+        Evicts `expression` (or its subtree, if `deep`) from the annotation caches. This must
+        be called when an already-annotated tree is about to be mutated, both so that a
+        subsequent annotation pass doesn't skip it and so that the ids of any discarded nodes
+        can't be conflated with new nodes allocated at the same addresses.
+        """
+        nodes: t.Iterable[exp.Expr] = expression.walk() if deep else (expression,)
+        for node in nodes:
+            node_id = id(node)
+            self._visited.discard(node_id)
+            self._null_expressions.pop(node_id, None)
+            self._setop_column_types.pop(node_id, None)
 
     # TODO (mypyc): should be expression: E -> E but mypyc resolves the TypeVar
     # to the isinstance-narrowed type, causing runtime type check failures.
@@ -277,14 +294,19 @@ class TypeAnnotator:
 
         return expression
 
-    def _get_scope_selects(self, scope: Scope) -> dict[str, dict[str, t.Any]]:
-        if scope not in self._scope_selects:
-            selects = {}
-            for name, source in scope.sources.items():
-                if not isinstance(source, Scope):
-                    continue
+    def _get_scope_source_selects(
+        self, scope: Scope, source_name: str
+    ) -> dict[str, exp.DataType | exp.DType]:
+        key = (scope, source_name)
+        selects = self._scope_source_selects.get(key)
 
+        if selects is None:
+            selects = {}
+            source = scope.sources.get(source_name)
+
+            if isinstance(source, Scope):
                 expression = source.expression
+
                 if isinstance(expression, exp.UDTF):
                     values = []
 
@@ -297,7 +319,7 @@ class TypeAnnotator:
                         values = expression.expressions[0].expressions
 
                     if not values:
-                        continue
+                        return {}
 
                     alias_column_names = expression.alias_column_names
 
@@ -315,29 +337,57 @@ class TypeAnnotator:
                     )
 
                     if struct_type:
-                        selects[name] = {
+                        selects = {
                             col_def.name: t.cast(t.Union[exp.DataType, exp.DType], col_def.kind)
                             for col_def in struct_type.expressions
                             if isinstance(col_def, exp.ColumnDef) and col_def.kind
                         }
                     else:
-                        selects[name] = {
+                        selects = {
                             alias: column.type for alias, column in zip(alias_column_names, values)
                         }
+
                 elif isinstance(expression, exp.SetOperation) and len(
-                    expression.left.selects
-                ) == len(expression.right.selects):
-                    selects[name] = self._get_setop_column_types(expression)
+                    expression.this.selects
+                ) == len(expression.expression.selects):
+                    selects = self._get_setop_column_types(expression)
+
                 elif isinstance(expression, exp.Selectable):
-                    selects[name] = {s.alias_or_name: s.type for s in expression.selects if s.type}
+                    selects = {s.alias_or_name: s.type for s in expression.selects if s.type}
 
-            for pivot in scope.pivots:
-                if pivot.unpivot and (col_types := self._get_unpivot_column_types(pivot, selects)):
-                    selects[pivot.alias] = col_types
+            else:
+                pivots = (
+                    source.args.get("pivots", []) if isinstance(source, exp.Table) else scope.pivots
+                )
+                for pivot in pivots:
+                    if pivot.alias_or_name == source_name:
+                        parent = pivot.parent
+                        parent_source = scope.sources.get(parent.alias_or_name) if parent else None
 
-            self._scope_selects[scope] = selects
+                        if parent and isinstance(parent_source, Scope):
+                            src_types = self._get_scope_source_selects(scope, parent.alias_or_name)
+                        elif isinstance(parent, exp.Table) and isinstance(
+                            self.schema, MappingSchema
+                        ):
+                            src_types = (
+                                self.schema.find(
+                                    parent, raise_on_missing=False, ensure_data_types=True
+                                )
+                                or {}
+                            )
+                        else:
+                            src_types = {}
 
-        return self._scope_selects[scope]
+                        selects = (
+                            self._get_unpivot_column_types(pivot, src_types)
+                            if pivot.unpivot
+                            else self._get_pivot_column_types(pivot, src_types)
+                        )
+                        break
+
+            self._scope_source_selects[key] = selects
+
+        return selects
 
     def annotate_scope(self, scope: Scope) -> None:
         if isinstance(self.schema, MappingSchema):
@@ -364,7 +414,7 @@ class TypeAnnotator:
                     isinstance(source, Scope)
                     and isinstance(source.expression, exp.Query)
                     and (
-                        source.expression.meta.get("query_type") or exp.DType.UNKNOWN.into_expr()
+                        source.expression.meta_get("query_type") or exp.DType.UNKNOWN.into_expr()
                     ).is_type(exp.DType.STRUCT)
                 ):
                     self._set_type(table_column, source.expression.meta["query_type"])
@@ -424,18 +474,25 @@ class TypeAnnotator:
                         source_scope = source_scope.parent
 
                 if isinstance(source, exp.Table):
-                    table_col_type = self.schema.get_column_type(source, expr)
-                    if table_col_type.is_type(exp.DType.UNKNOWN) and source.args.get("pivots"):
+                    table_col_type: exp.DataType | exp.DType | None = self.schema.get_column_type(
+                        source, expr
+                    )
+                    if (
+                        isinstance(table_col_type, exp.DataType)
+                        and table_col_type.is_type(exp.DType.UNKNOWN)
+                        and source.args.get("pivots")
+                    ):
                         table_col_type = (
-                            self._get_scope_selects(source_scope or scope)
-                            .get(expr.table, {})
-                            .get(expr.name)
-                            or table_col_type
+                            self._get_scope_source_selects(source_scope or scope, expr.table).get(
+                                expr.name
+                            )
+                            or exp.DType.UNKNOWN
                         )
+
                     self._set_type(expr, table_col_type)
                 elif source and source_scope:
-                    col_type = (
-                        self._get_scope_selects(source_scope).get(expr.table, {}).get(expr.name)
+                    col_type = self._get_scope_source_selects(source_scope, expr.table).get(
+                        expr.name
                     )
                     if col_type:
                         self._set_type(expr, col_type)
@@ -447,16 +504,14 @@ class TypeAnnotator:
                     not source
                     and scope.pivots
                     and (
-                        pivot_type := self._get_scope_selects(scope)
-                        .get(expr.table, {})
-                        .get(expr.name)
+                        col_type := self._get_scope_source_selects(scope, expr.table).get(expr.name)
                     )
                 ):
-                    self._set_type(expr, pivot_type)
+                    self._set_type(expr, col_type)
                 else:
                     self._set_type(expr, exp.DType.UNKNOWN)
 
-                if expr.is_type(exp.DType.JSON) and (dot_parts := expr.meta.get("dot_parts")):
+                if expr.is_type(exp.DType.JSON) and (dot_parts := expr.meta_get("dot_parts")):
                     # JSON dot access is case sensitive across all dialects, so we need to undo the normalization.
                     i = iter(dot_parts)
                     parent = expr.parent
@@ -575,9 +630,9 @@ class TypeAnnotator:
         # Validate that left and right have same number of projections
         if not (
             isinstance(setop, exp.SetOperation)
-            and setop.left.selects
-            and setop.right.selects
-            and len(setop.left.selects) == len(setop.right.selects)
+            and setop.this.selects
+            and setop.expression.selects
+            and len(setop.this.selects) == len(setop.expression.selects)
         ):
             return col_types
 
@@ -589,20 +644,20 @@ class TypeAnnotator:
                 continue
 
             if set_op.args.get("by_name"):
-                r_type_by_select = {s.alias_or_name: s.type for s in set_op.right.selects}
+                r_type_by_select = {s.alias_or_name: s.type for s in set_op.expression.selects}
                 setop_cols = {
                     s.alias_or_name: self._maybe_coerce(
                         t.cast(exp.DataType, s.type),
                         r_type_by_select.get(s.alias_or_name) or exp.DType.UNKNOWN,
                     )
-                    for s in set_op.left.selects
+                    for s in set_op.this.selects
                 }
             else:
                 setop_cols = {
                     ls.alias_or_name: self._maybe_coerce(
                         t.cast(exp.DataType, ls.type), t.cast(exp.DataType, rs.type)
                     )
-                    for ls, rs in zip(set_op.left.selects, set_op.right.selects)
+                    for ls, rs in zip(set_op.this.selects, set_op.expression.selects)
                 }
 
             # Coerce intermediate results with the previously registered types, if they exist
@@ -615,10 +670,9 @@ class TypeAnnotator:
         return col_types
 
     def _get_unpivot_column_types(
-        self, pivot: exp.Pivot, selects: dict[str, dict[str, t.Any]]
-    ) -> dict[str, t.Any]:
-        src_types = selects.get(parent.alias_or_name, {}) if (parent := pivot.parent) else {}
-        new_types: dict[str, t.Any] = {}
+        self, pivot: exp.Pivot, src_types: dict[str, exp.DataType | exp.DType]
+    ) -> dict[str, exp.DataType | exp.DType]:
+        new_types: dict[str, exp.DataType | exp.DType] = {}
 
         for field in pivot.fields:
             field_col = field.this
@@ -635,17 +689,49 @@ class TypeAnnotator:
             val_expr = seq_get(pivot.expressions, 0)
             val_cols = val_expr.expressions if isinstance(val_expr, exp.Tuple) else [val_expr]
             for val_col, in_col in zip(val_cols, in_cols):
-                new_types[val_col.output_name] = (
-                    src_types.get(in_col.output_name)
-                    if in_col.is_type(exp.DType.UNKNOWN)
-                    else in_col.type
-                )
+                new_types[val_col.output_name] = in_col.type
 
         return {
             name: type_
             for name in pivot.output_columns(src_types)
             if (type_ := new_types.get(name) or src_types.get(name))
         }
+
+    def _get_pivot_column_types(
+        self, pivot: exp.Pivot, src_types: dict[str, exp.DataType | exp.DType]
+    ) -> dict[str, exp.DataType | exp.DType]:
+        first_field = seq_get(pivot.fields, 0)
+        if not isinstance(first_field, exp.In):
+            raise OptimizeError(f"Expected In expression for pivot field, got {type(first_field)}")
+
+        pivot_constants = first_field.expressions
+
+        # The first agg_cols_offset entries are source columns that pass through the PIVOT unchanged;
+        # the rest are the aggregated columns, one per combination of IN value and aggregate function.
+        output_to_src = pivot.output_columns(src_types)
+
+        agg_types = [
+            agg.this.type if isinstance(agg, exp.Alias) else agg.type for agg in pivot.expressions
+        ]
+        agg_cols_offset = len(output_to_src) - len(pivot_constants) * len(agg_types)
+        if agg_cols_offset < 0:
+            raise OptimizeError(f"Negative pivot column offset: {agg_cols_offset}")
+
+        output_names = list(output_to_src)
+        new_types: dict[str, exp.DataType | exp.DType] = {}
+
+        for name in output_names[:agg_cols_offset]:
+            if type_ := src_types.get(output_to_src[name]):
+                new_types[name] = type_
+
+        for name, agg_type in zip(
+            output_names[agg_cols_offset:],
+            (a for _ in pivot_constants for a in agg_types),
+        ):
+            if agg_type:
+                new_types[name] = agg_type
+
+        return new_types
 
     def _annotate_binary(self, expression: B) -> B:
         left, right = expression.left, expression.right
@@ -668,7 +754,7 @@ class TypeAnnotator:
             self._annotate_by_args(expression, left, right)
 
         if isinstance(expression, exp.Is) or (
-            left.meta.get("nonnull") is True and right.meta.get("nonnull") is True
+            left.meta_get("nonnull") is True and right.meta_get("nonnull") is True
         ):
             expression.meta["nonnull"] = True
 
@@ -680,7 +766,7 @@ class TypeAnnotator:
         else:
             self._set_type(expression, expression.this.type)
 
-        if expression.this.meta.get("nonnull") is True:
+        if expression.this.meta_get("nonnull") is True:
             expression.meta["nonnull"] = True
 
         return expression
@@ -956,6 +1042,16 @@ class TypeAnnotator:
         else:
             self._set_type(expression, exp.DType.INT)
         return expression
+
+    def _annotate_within_group(self, expression: exp.WithinGroup) -> exp.WithinGroup:
+        if isinstance(expression.this, exp.PercentileDisc):
+            order = expression.args.get("expression")
+            order_expressions = order and order.expressions
+            sort_type = order_expressions[0].this.type if order_expressions else exp.DType.UNKNOWN
+            self._set_type(expression, sort_type)
+            return expression
+
+        return self._annotate_by_args(expression, "this")
 
     def _annotate_by_array_element(self, expression: exp.Expr) -> exp.Expr:
         array_arg = expression.this
