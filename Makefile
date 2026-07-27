@@ -33,6 +33,7 @@ LINT_BUILD_TAGS ?= no_duckdb_arrow
 LINT_FAST_LINTERS ?= errcheck,govet,ineffassign
 TEST_CONCURRENCY ?= 4
 GO_FORMAT_PATHS := cmd pkg semantic-engine integration-tests/integration_test.go main.go
+LINT_MODULES := . $(patsubst %/go.mod,%,$(filter-out go.mod,$(shell git ls-files '*go.mod')))
 
 # Suppress CGO linker warnings on macOS (not needed on Linux/Windows)
 ifeq ($(shell go env GOOS),darwin)
@@ -143,8 +144,12 @@ format: lint-python
 # because govet is already enabled by golangci-lint.
 lint:
 	@echo "$(OK_COLOR)==> Running fast linters on packages changed since $(LINT_MERGE_BASE)$(NO_COLOR)"
-	@LINT_MODULE_DIR="." LINT_BUILD_TAGS="$(LINT_BUILD_TAGS)" LINT_MERGE_BASE="$(LINT_MERGE_BASE)" LINT_CONCURRENCY="$(LINT_CONCURRENCY)" LINT_TIMEOUT="$(LINT_TIMEOUT)" LINT_PARALLEL_FLAGS="$(LINT_PARALLEL_FLAGS)" LINT_ENABLE_ONLY="$(LINT_FAST_LINTERS)" ./hack/lint-changed.sh
-	@LINT_MODULE_DIR="semantic-engine" LINT_BUILD_TAGS="" LINT_MERGE_BASE="$(LINT_MERGE_BASE)" LINT_CONCURRENCY="$(LINT_CONCURRENCY)" LINT_TIMEOUT="$(LINT_TIMEOUT)" LINT_PARALLEL_FLAGS="$(LINT_PARALLEL_FLAGS)" LINT_ENABLE_ONLY="$(LINT_FAST_LINTERS)" ./hack/lint-changed.sh
+	@set -e; \
+	for module in $(LINT_MODULES); do \
+		build_tags=""; \
+		if [ "$$module" = "." ]; then build_tags="$(LINT_BUILD_TAGS)"; fi; \
+		LINT_MODULE_DIR="$$module" LINT_BUILD_TAGS="$$build_tags" LINT_MERGE_BASE="$(LINT_MERGE_BASE)" LINT_CONCURRENCY="$(LINT_CONCURRENCY)" LINT_TIMEOUT="$(LINT_TIMEOUT)" LINT_PARALLEL_FLAGS="$(LINT_PARALLEL_FLAGS)" LINT_ENABLE_ONLY="$(LINT_FAST_LINTERS)" ./hack/lint-changed.sh; \
+	done
 
 lint-fast: lint
 

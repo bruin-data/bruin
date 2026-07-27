@@ -102,7 +102,8 @@ make build-no-duckdb # Build without DuckDB (CGO_ENABLED=0)
 make deps           # Install dependencies and tools
 make clean          # Remove build artifacts
 make format         # Format Go/Python and run fast changed-package lint
-make lint-full      # Run all Go linters across both Go modules
+make lint           # Run fast lint on changed packages in every Go module
+make lint-full      # Run all Go linters across the primary Go modules
 make tools-update   # Update development tools
 ```
 
