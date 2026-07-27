@@ -143,12 +143,13 @@ func TestCloudCommand_Help(t *testing.T) {
 	cmd := Cloud(&isDebug)
 	require.NotNil(t, cmd)
 	assert.Equal(t, "cloud", cmd.Name)
-	assert.Len(t, cmd.Commands, 10)
+	assert.Len(t, cmd.Commands, 11)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
 		subNames[i] = sub.Name
 	}
+	assert.Contains(t, subNames, "cost")
 	assert.Contains(t, subNames, "projects")
 	assert.Contains(t, subNames, "pipelines")
 	assert.Contains(t, subNames, "runs")
@@ -539,7 +540,7 @@ func TestParseCostFilters(t *testing.T) {
 		t.Parallel()
 		filters, err := parseCostFilters(nil)
 		require.NoError(t, err)
-		assert.Nil(t, filters)
+		assert.Empty(t, filters)
 	})
 
 	t.Run("malformed", func(t *testing.T) {
@@ -554,5 +555,5 @@ func TestFormatCostCell(t *testing.T) {
 	assert.Equal(t, "", formatCostCell(nil))
 	assert.Equal(t, "daily-etl", formatCostCell("daily-etl"))
 	assert.Equal(t, "74123", formatCostCell(float64(74123)))
-	assert.Equal(t, `{"pipeline_id":"p"}`, formatCostCell(map[string]any{"pipeline_id": "p"}))
+	assert.JSONEq(t, `{"pipeline_id":"p"}`, formatCostCell(map[string]any{"pipeline_id": "p"}))
 }

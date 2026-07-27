@@ -3775,7 +3775,8 @@ func parseCostFilters(raw []string) ([]bruincloud.CostFilter, error) {
 			if !ok {
 				return nil, fmt.Errorf("filter value %q is only valid for op 'in'", entry)
 			}
-			last.Value = append(vals, entry)
+			vals = append(vals, entry)
+			last.Value = vals
 			continue
 		}
 		parts := strings.SplitN(entry, ":", 3)
