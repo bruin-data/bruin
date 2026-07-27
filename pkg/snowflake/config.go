@@ -22,12 +22,15 @@ type Config struct {
 	Schema     string
 	Warehouse  string
 	PrivateKey string
+	Token      string
 }
 
 func (c Config) DSN() (string, error) {
 	authType := gosnowflake.AuthTypeSnowflake
 	if c.PrivateKey != "" {
 		authType = gosnowflake.AuthTypeJwt
+	} else if c.Token != "" {
+		authType = gosnowflake.AuthTypeOAuth
 	}
 
 	var privateKey *rsa.PrivateKey
@@ -50,6 +53,7 @@ func (c Config) DSN() (string, error) {
 		Schema:        c.Schema,
 		Warehouse:     c.Warehouse,
 		PrivateKey:    privateKey,
+		Token:         c.Token,
 	}
 
 	return gosnowflake.DSN(&snowflakeConfig)
@@ -87,7 +91,13 @@ func (c Config) GetIngestrURI() (string, error) {
 }
 
 func (c Config) IsValid() bool {
-	return c.Account != "" && c.Username != "" && c.Password != "" && c.Region != ""
+	if c.Account == "" {
+		return false
+	}
+	if c.Token != "" || c.PrivateKey != "" {
+		return true
+	}
+	return c.Username != "" && c.Password != "" && c.Region != ""
 }
 
 func parsePrivateKey(content string, passphrase string) (*rsa.PrivateKey, error) {

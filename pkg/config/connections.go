@@ -528,15 +528,18 @@ func (c RedshiftConnection) GetName() string {
 type SnowflakeConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	Account            string `yaml:"account,omitempty" json:"account" mapstructure:"account"`
-	Username           string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
-	Password           string `yaml:"password,omitempty" json:"password,omitempty" jsonschema:"oneof_required=password" mapstructure:"password" sensitive:"true"`
-	Region             string `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
-	Role               string `yaml:"role,omitempty" json:"role,omitempty" mapstructure:"role"`
-	Database           string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
-	Schema             string `yaml:"schema,omitempty" json:"schema,omitempty" mapstructure:"schema"`
-	Warehouse          string `yaml:"warehouse,omitempty" json:"warehouse,omitempty" mapstructure:"warehouse"`
-	PrivateKeyPath     string `yaml:"private_key_path,omitempty" json:"private_key_path,omitempty" jsonschema:"oneof_required=private_key_path" mapstructure:"private_key_path" sensitive_file:"true"`
-	PrivateKey         string `yaml:"private_key,omitempty" json:"private_key,omitempty" jsonschema:"oneof_required=private_key" mapstructure:"private_key" sensitive:"true"`
+	// omitempty: required for password/private_key auth, but token (OAuth) auth carries
+	// its own identity and needs no username — see IsValid()/DSN() in pkg/snowflake.
+	Username       string `yaml:"username,omitempty" json:"username,omitempty" mapstructure:"username"`
+	Password       string `yaml:"password,omitempty" json:"password,omitempty" jsonschema:"oneof_required=password" mapstructure:"password" sensitive:"true"`
+	Region         string `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
+	Role           string `yaml:"role,omitempty" json:"role,omitempty" mapstructure:"role"`
+	Database       string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
+	Schema         string `yaml:"schema,omitempty" json:"schema,omitempty" mapstructure:"schema"`
+	Warehouse      string `yaml:"warehouse,omitempty" json:"warehouse,omitempty" mapstructure:"warehouse"`
+	PrivateKeyPath string `yaml:"private_key_path,omitempty" json:"private_key_path,omitempty" jsonschema:"oneof_required=private_key_path" mapstructure:"private_key_path" sensitive_file:"true"`
+	PrivateKey     string `yaml:"private_key,omitempty" json:"private_key,omitempty" jsonschema:"oneof_required=private_key" mapstructure:"private_key" sensitive:"true"`
+	Token          string `yaml:"token,omitempty" json:"token,omitempty" jsonschema:"oneof_required=token" mapstructure:"token" sensitive:"true"`
 }
 
 func (c SnowflakeConnection) MarshalJSON() ([]byte, error) {

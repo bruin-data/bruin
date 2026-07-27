@@ -4730,6 +4730,12 @@
             "private_key"
           ],
           "title": "private_key"
+        },
+        {
+          "required": [
+            "token"
+          ],
+          "title": "token"
         }
       ],
       "properties": {
@@ -4768,14 +4774,16 @@
         },
         "private_key": {
           "type": "string"
+        },
+        "token": {
+          "type": "string"
         }
       },
       "additionalProperties": false,
       "type": "object",
       "required": [
         "name",
-        "account",
-        "username"
+        "account"
       ]
     },
     "SocrataConnection": {
