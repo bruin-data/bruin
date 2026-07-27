@@ -39,6 +39,7 @@ func Cloud(isDebug *bool) *cli.Command {
 			CloudConnections(),
 			CloudDashboards(),
 			CloudScheduledAgents(),
+			CloudCost(),
 		},
 	}
 }
@@ -3579,4 +3580,220 @@ func derefString(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+func CloudCost() *cli.Command {
+	return &cli.Command{
+		Name:  "cost",
+		Usage: "Explore Bruin Cloud warehouse costs",
+		Commands: []*cli.Command{
+			cloudCostSchema(),
+			cloudCostExplorer(),
+		},
+	}
+}
+
+func cloudCostSchema() *cli.Command {
+	return &cli.Command{
+		Name:  "schema",
+		Usage: "List the dimensions, filters, and time buckets the cost explorer supports",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.StringFlag{
+				Name:  "platform",
+				Usage: "warehouse platform: bigquery (default) or databricks",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			schema, err := client.GetCostExplorerSchema(ctx, c.String("platform"))
+			if err != nil {
+				printError(err, output, "Failed to get cost explorer schema")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(schema, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			fmt.Printf("Platform: %s\n", schema.Platform)
+			fmt.Printf("Available platforms: %s\n", strings.Join(schema.AvailablePlatforms, ", "))
+			fmt.Printf("Time buckets: %s\n\n", strings.Join(schema.TimeDimensions, ", "))
+
+			dt := table.NewWriter()
+			dt.SetOutputMirror(os.Stdout)
+			dt.SetTitle("Dimensions")
+			dt.AppendHeader(table.Row{"Key", "Label"})
+			for _, d := range schema.Dimensions {
+				dt.AppendRow(table.Row{d.Key, d.Label})
+			}
+			dt.Render()
+
+			ft := table.NewWriter()
+			ft.SetOutputMirror(os.Stdout)
+			ft.SetTitle("Filters")
+			ft.AppendHeader(table.Row{"Field", "Op", "Multiple"})
+			for _, f := range schema.Filters {
+				ft.AppendRow(table.Row{f.Field, f.Op, f.Multiple})
+			}
+			ft.Render()
+			return nil
+		},
+	}
+}
+
+func cloudCostExplorer() *cli.Command {
+	return &cli.Command{
+		Name:  "explorer",
+		Usage: "Show warehouse cost breakdowns over a date range",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			limitFlag(),
+			offsetFlag(),
+			&cli.StringFlag{
+				Name:     "start-date",
+				Usage:    "start of the range, inclusive (e.g. 2026-07-01)",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:     "end-date",
+				Usage:    "end of the range, inclusive (e.g. 2026-07-31)",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:  "platform",
+				Usage: "warehouse platform: bigquery (default) or databricks",
+			},
+			&cli.StringFlag{
+				Name:  "dimension",
+				Usage: "group costs by this dimension (see 'bruin cloud cost schema')",
+			},
+			&cli.StringFlag{
+				Name:  "time-dimension",
+				Usage: "bucket costs over time: day, week, or month",
+			},
+			&cli.StringSliceFlag{
+				Name:  "filter",
+				Usage: "filter as field:op:value; repeat for multiple. For op 'in', comma-separate values (e.g. pipeline_id:in:a,b)",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			filters, err := parseCostFilters(c.StringSlice("filter"))
+			if err != nil {
+				printError(err, output, "Invalid --filter")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			resp, err := client.GetCostExplorer(ctx, bruincloud.CostExplorerRequest{
+				StartDate:     c.String("start-date"),
+				EndDate:       c.String("end-date"),
+				Platform:      c.String("platform"),
+				Dimension:     c.String("dimension"),
+				TimeDimension: c.String("time-dimension"),
+				Filters:       filters,
+				Limit:         c.Int("limit"),
+				Offset:        c.Int("offset"),
+			})
+			if err != nil {
+				printError(err, output, "Failed to get cost explorer data")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(resp, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			header := table.Row{}
+			if resp.TimeDimension != nil {
+				header = append(header, "Period")
+			}
+			if resp.Dimension != nil {
+				header = append(header, *resp.Dimension)
+			}
+			header = append(header, "Queries", "Cost (USD)", "TB Billed")
+			t.AppendHeader(header)
+			for _, row := range resp.Rows {
+				r := table.Row{}
+				if resp.TimeDimension != nil {
+					r = append(r, formatCostCell(row["time_period"]))
+				}
+				if resp.Dimension != nil {
+					r = append(r, formatCostCell(row[*resp.Dimension]))
+				}
+				r = append(r, formatCostCell(row["query_count"]), formatCostCell(row["total_cost_usd"]), formatCostCell(row["total_terabytes_billed"]))
+				t.AppendRow(r)
+			}
+			t.Render()
+
+			if resp.NextOffset != nil {
+				fmt.Printf("\nShowing rows %d-%d of %d. Next page: --offset=%d\n", resp.Offset, resp.Offset+resp.ReturnedRows-1, resp.TotalRows, *resp.NextOffset)
+			}
+			return nil
+		},
+	}
+}
+
+func parseCostFilters(raw []string) ([]bruincloud.CostFilter, error) {
+	if len(raw) == 0 {
+		return nil, nil
+	}
+	filters := make([]bruincloud.CostFilter, 0, len(raw))
+	for _, entry := range raw {
+		parts := strings.SplitN(entry, ":", 3)
+		if len(parts) != 3 || parts[0] == "" || parts[1] == "" {
+			return nil, fmt.Errorf("filter %q must be field:op:value", entry)
+		}
+		f := bruincloud.CostFilter{Field: parts[0], Op: parts[1]}
+		if parts[1] == "in" {
+			f.Value = strings.Split(parts[2], ",")
+		} else {
+			f.Value = parts[2]
+		}
+		filters = append(filters, f)
+	}
+	return filters, nil
+}
+
+func formatCostCell(v any) string {
+	switch val := v.(type) {
+	case nil:
+		return ""
+	case string:
+		return val
+	case float64:
+		return strconv.FormatFloat(val, 'f', -1, 64)
+	case bool:
+		return strconv.FormatBool(val)
+	default:
+		data, err := json.Marshal(val)
+		if err != nil {
+			return fmt.Sprintf("%v", val)
+		}
+		return string(data)
+	}
 }

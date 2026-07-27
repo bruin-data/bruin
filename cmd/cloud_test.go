@@ -512,3 +512,37 @@ func TestParseRunVariables(t *testing.T) {
 		assert.Contains(t, err.Error(), "invalid variable override")
 	})
 }
+
+func TestParseCostFilters(t *testing.T) {
+	t.Parallel()
+
+	t.Run("eq and in", func(t *testing.T) {
+		t.Parallel()
+		filters, err := parseCostFilters([]string{"user_email:eq:a@b.com", "pipeline_id:in:x,y"})
+		require.NoError(t, err)
+		require.Len(t, filters, 2)
+		assert.Equal(t, bruincloud.CostFilter{Field: "user_email", Op: "eq", Value: "a@b.com"}, filters[0])
+		assert.Equal(t, bruincloud.CostFilter{Field: "pipeline_id", Op: "in", Value: []string{"x", "y"}}, filters[1])
+	})
+
+	t.Run("empty", func(t *testing.T) {
+		t.Parallel()
+		filters, err := parseCostFilters(nil)
+		require.NoError(t, err)
+		assert.Nil(t, filters)
+	})
+
+	t.Run("malformed", func(t *testing.T) {
+		t.Parallel()
+		_, err := parseCostFilters([]string{"pipeline_id=x"})
+		require.Error(t, err)
+	})
+}
+
+func TestFormatCostCell(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, "", formatCostCell(nil))
+	assert.Equal(t, "daily-etl", formatCostCell("daily-etl"))
+	assert.Equal(t, "74123", formatCostCell(float64(74123)))
+	assert.Equal(t, `{"pipeline_id":"p"}`, formatCostCell(map[string]any{"pipeline_id": "p"}))
+}

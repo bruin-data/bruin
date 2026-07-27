@@ -696,6 +696,40 @@ bruin cloud scheduled-agents update --scheduled-agent-id 42 --state-file ./plan.
 
 ---
 
+### `cost`
+
+Explore warehouse costs, mirroring the Cost Explorer in the Bruin Cloud UI.
+
+#### `schema`
+
+List the dimensions, filter fields, and time buckets the cost explorer supports for a platform:
+
+```bash
+bruin cloud cost schema
+bruin cloud cost schema --platform databricks --output json
+```
+
+#### `explorer`
+
+Show cost breakdowns over a date range. Group by a dimension, bucket over time, and filter:
+
+```bash
+# Total cost for July
+bruin cloud cost explorer --start-date 2026-07-01 --end-date 2026-07-31
+
+# Most expensive pipelines
+bruin cloud cost explorer --start-date 2026-07-01 --end-date 2026-07-31 --dimension pipeline_id
+
+# Daily trend for two pipelines, as JSON
+bruin cloud cost explorer --start-date 2026-07-01 --end-date 2026-07-31 \
+  --dimension asset_name --time-dimension day \
+  --filter pipeline_id:in:daily-etl,ml-features --output json
+```
+
+Filters are `field:op:value`; repeat `--filter` for multiple. For op `in`, comma-separate the values. Large result sets paginate with `--limit` and `--offset` (the response reports the next offset).
+
+---
+
 ## Common Workflows
 
 ### "My pipeline failed, what happened?"

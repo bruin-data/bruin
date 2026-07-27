@@ -653,3 +653,25 @@ func (c *APIClient) UpdateScheduledAgent(ctx context.Context, scheduledAgentID i
 	}
 	return &result, nil
 }
+
+// GetCostExplorerSchema lists the dimensions, filter fields, and time buckets the cost explorer supports.
+func (c *APIClient) GetCostExplorerSchema(ctx context.Context, platform string) (*CostExplorerSchema, error) {
+	params := url.Values{}
+	if platform != "" {
+		params.Set("platform", platform)
+	}
+	path := "/cost-explorer/schema"
+	if enc := params.Encode(); enc != "" {
+		path += "?" + enc
+	}
+	var schema CostExplorerSchema
+	err := c.doRequest(ctx, http.MethodGet, path, nil, &schema)
+	return &schema, err
+}
+
+// GetCostExplorer returns a page of warehouse cost breakdown rows.
+func (c *APIClient) GetCostExplorer(ctx context.Context, req CostExplorerRequest) (*CostExplorerResponse, error) {
+	var resp CostExplorerResponse
+	err := c.doRequest(ctx, http.MethodPost, "/cost-explorer", req, &resp)
+	return &resp, err
+}
