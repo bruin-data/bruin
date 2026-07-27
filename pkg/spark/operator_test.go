@@ -10,6 +10,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 )
 
@@ -104,6 +105,115 @@ func (passthroughSparkMaterializer) Render(_ *pipeline.Asset, statement string) 
 
 func (passthroughSparkMaterializer) LogIfFullRefreshAndDDL(interface{}, *pipeline.Asset) error {
 	return nil
+}
+
+// recordingDevEnv rewrites `analytics.` to `dev_analytics.` and records every
+// statement it was asked to modify. Statements listed in unparseable fail, the
+// way a real parser fails on Spark syntax it does not model.
+type recordingDevEnv struct {
+	modified    []string
+	unparseable []string
+}
+
+func (d *recordingDevEnv) Modify(
+	_ context.Context,
+	_ *pipeline.Pipeline,
+	_ *pipeline.Asset,
+	q *query.Query,
+) (*query.Query, error) {
+	d.modified = append(d.modified, q.Query)
+	for _, unparseable := range d.unparseable {
+		if q.Query == unparseable {
+			return nil, errors.New("cannot parse statement")
+		}
+	}
+	return &query.Query{Query: strings.ReplaceAll(q.Query, "analytics.", "dev_analytics.")}, nil
+}
+
+func (d *recordingDevEnv) RegisterAssetForSchemaCache(
+	context.Context,
+	*pipeline.Pipeline,
+	*pipeline.Asset,
+	*query.Query,
+) error {
+	return nil
+}
+
+func TestBasicOperatorAppliesDevEnvToSessionStatementsWithSubqueries(t *testing.T) {
+	t.Parallel()
+
+	const setVar = "SET VAR cutoff = (SELECT MAX(event_ts) FROM analytics.events)"
+
+	tests := []struct {
+		name         string
+		statements   []string
+		unparseable  []string
+		wantModified []string
+		wantRun      []string
+	}{
+		{
+			name:         "SET assigned from a subquery is rewritten",
+			statements:   []string{setVar, "SELECT * FROM analytics.events"},
+			wantModified: []string{setVar, "SELECT * FROM analytics.events"},
+			wantRun: []string{
+				"SET VAR cutoff = (SELECT MAX(event_ts) FROM dev_analytics.events)",
+				"SELECT * FROM dev_analytics.events",
+			},
+		},
+		{
+			name:         "USE and plain SET are left alone",
+			statements:   []string{"USE analytics", "SET spark.sql.shuffle.partitions = 8", "SELECT 1"},
+			wantModified: []string{"SELECT 1"},
+			wantRun:      []string{"USE analytics", "SET spark.sql.shuffle.partitions = 8", "SELECT 1"},
+		},
+		{
+			name:         "an unparseable session statement runs as-is",
+			statements:   []string{setVar, "SELECT 1"},
+			unparseable:  []string{setVar},
+			wantModified: []string{setVar, "SELECT 1"},
+			wantRun:      []string{setVar, "SELECT 1"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			queries := make([]*query.Query, 0, len(test.statements))
+			for _, statement := range test.statements {
+				queries = append(queries, &query.Query{Query: statement})
+			}
+			connection := &recordingConnection{}
+			modifier := &recordingDevEnv{unparseable: test.unparseable}
+			operator := BasicOperator{
+				connection: sparkConnectionGetter{connection: &Client{connection: connection}},
+				extractor: &queuedSparkExtractor{
+					responses: [][]*query.Query{queries, queries},
+				},
+				materializer: passthroughSparkMaterializer{},
+				devEnv:       modifier,
+			}
+			asset := &pipeline.Asset{
+				Name: "catalog.analytics.events",
+				Type: pipeline.AssetTypeSparkQuery,
+			}
+
+			require.NoError(t, operator.RunTask(t.Context(), &pipeline.Pipeline{Name: "p"}, asset))
+			require.Equal(t, test.wantModified, modifier.modified)
+			require.Equal(t, test.wantRun, connection.queries)
+		})
+	}
+}
+
+func TestSparkStatementCanReferenceTables(t *testing.T) {
+	t.Parallel()
+
+	require.True(t, sparkStatementCanReferenceTables("SET VAR x = (SELECT MAX(ts) FROM events)"))
+	require.True(t, sparkStatementCanReferenceTables("DECLARE VARIABLE x INT DEFAULT (select 1 from events)"))
+	require.False(t, sparkStatementCanReferenceTables("SET spark.sql.shuffle.partitions = 8"))
+	require.False(t, sparkStatementCanReferenceTables("USE local.analytics"))
+	require.False(t, sparkStatementCanReferenceTables("RESET spark.sql.ansi.enabled"))
+	require.False(t, sparkStatementCanReferenceTables("SET spark.job.description = selected"))
 }
 
 func TestBasicOperatorQueryAnnotations(t *testing.T) {
@@ -315,12 +425,13 @@ func TestBasicOperatorMaterializationRequiresQualifiedTargetWithUseHook(t *testi
 	)
 }
 
-func TestBasicOperatorMaterializationDetectsUseAnywhereInHooks(t *testing.T) {
+func TestBasicOperatorMaterializationDetectsUseAnywhereInPreHooks(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name  string
 		hooks pipeline.Hooks
+		error string
 	}{
 		{
 			name: "pre-hook after another statement",
@@ -329,12 +440,24 @@ func TestBasicOperatorMaterializationDetectsUseAnywhereInHooks(t *testing.T) {
 					Query: "SET spark.sql.shuffle.partitions = 8; USE local.analytics",
 				}},
 			},
+			error: "materialized Spark assets that use USE must have a fully qualified catalog.schema.table name",
 		},
 		{
-			name: "commented post-hook after another statement",
+			name: "commented pre-hook after another statement",
+			hooks: pipeline.Hooks{
+				Pre: []pipeline.Hook{{
+					Query: "-- configure the session\nSET spark.sql.shuffle.partitions = 8; /* select the namespace */ USE local.analytics",
+				}},
+			},
+			error: "materialized Spark assets that use USE must have a fully qualified catalog.schema.table name",
+		},
+		{
+			// Post-hooks run after the materialized statement, so a USE in one
+			// cannot change how the target table name resolved.
+			name: "post-hook USE is allowed",
 			hooks: pipeline.Hooks{
 				Post: []pipeline.Hook{{
-					Query: "-- configure the session\nSET spark.sql.shuffle.partitions = 8; /* select the namespace */ USE local.analytics",
+					Query: "USE maintenance_catalog; OPTIMIZE some_table",
 				}},
 			},
 		},
@@ -354,11 +477,11 @@ func TestBasicOperatorMaterializationDetectsUseAnywhereInHooks(t *testing.T) {
 			}
 
 			_, err := operator.renderQueries(asset, []*query.Query{{Query: "SELECT * FROM source"}})
-			require.EqualError(
-				t,
-				err,
-				"materialized Spark assets that use USE must have a fully qualified catalog.schema.table name",
-			)
+			if test.error == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.EqualError(t, err, test.error)
 		})
 	}
 }

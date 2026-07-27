@@ -67,40 +67,20 @@ func (o SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error 
 	if err != nil {
 		return err
 	}
-	header, err := csv.NewReader(bytes.NewReader(data)).Read()
+	reader, err := newSeedRecordReader(asset.Columns, data)
 	if err != nil {
-		return errors.Wrap(err, "failed to read Spark seed header")
+		return err
 	}
-	if len(header) == 0 {
-		return errors.New("Spark seed file has no header row")
-	}
-
-	fields := sparkSeedFields(asset.Columns, header)
-	reader := arrowcsv.NewReader(
-		bytes.NewReader(data),
-		arrow.NewSchema(fields, nil),
-		arrowcsv.WithHeader(true),
-		arrowcsv.WithChunk(4096),
-		arrowcsv.WithNullReader(false),
-	)
 	defer reader.Release()
 
 	if err := client.CreateSchemaIfNotExist(ctx, asset, p.Name); err != nil {
 		return err
 	}
-	options, err := client.config.ToOptions()
+	database, connection, err := client.adbcConnection(ctx)
 	if err != nil {
 		return err
 	}
-	database, err := newADBCDatabase(options)
-	if err != nil {
-		return errors.Wrap(err, "failed to create Spark ADBC database")
-	}
 	defer database.Close()
-	connection, err := database.Open(ctx)
-	if err != nil {
-		return errors.Wrap(err, "failed to open Spark ADBC connection")
-	}
 	defer connection.Close()
 
 	targetTable, err := configureIngestNamespace(ctx, connection, asset.Name)
@@ -125,6 +105,33 @@ func validateSparkSeedFileType(fileType string) error {
 		return fmt.Errorf("spark.seed only supports CSV files, got %q", fileType)
 	}
 	return nil
+}
+
+// newSeedRecordReader builds an Arrow reader over the seed rows, using the
+// schema derived from the CSV header and the asset's declared columns.
+//
+// The header row is consumed here and stripped from the data handed to Arrow so
+// that the reader can run with WithHeader(false). With WithHeader(true) Arrow
+// re-reads the header itself and overwrites every schema field name with the raw
+// cell, which would discard the trimming done by sparkSeedFields and create
+// columns such as " name" for a header written as "id, name".
+func newSeedRecordReader(columns []pipeline.Column, data []byte) (*arrowcsv.Reader, error) {
+	headerReader := csv.NewReader(bytes.NewReader(data))
+	header, err := headerReader.Read()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to read Spark seed header")
+	}
+	if len(header) == 0 {
+		return nil, errors.New("Spark seed file has no header row")
+	}
+
+	return arrowcsv.NewReader(
+		bytes.NewReader(data[headerReader.InputOffset():]),
+		arrow.NewSchema(sparkSeedFields(columns, header), nil),
+		arrowcsv.WithHeader(false),
+		arrowcsv.WithChunk(4096),
+		arrowcsv.WithNullReader(false),
+	), nil
 }
 
 func sparkSeedFields(columns []pipeline.Column, header []string) []arrow.Field {

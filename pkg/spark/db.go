@@ -3,6 +3,7 @@ package spark
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"encoding/json"
 	"sort"
 	"strings"
@@ -22,24 +23,76 @@ type connection interface {
 }
 
 type Client struct {
+	// connection is only set by tests that inject a mock; production clients
+	// build their pool lazily through conn().
 	connection  connection
 	config      Config
 	schemaCache sync.Map
+
+	poolOnce sync.Once
+	pool     *sql.DB
+	poolErr  error
 }
 
-func NewClient(ctx context.Context, c Config) (*Client, error) {
-	dsn, err := c.ToDSN()
-	if err != nil {
+func NewClient(_ context.Context, c Config) (*Client, error) {
+	// The connection is not opened here: the ADBC driver has to be downloaded
+	// and installed before it can be used, and every Bruin command builds all
+	// configured connections up front. Doing that work eagerly would make a
+	// single Spark entry in .bruin.yml fail commands that touch no Spark asset.
+	if _, err := c.ToDSN(); err != nil {
 		return nil, err
 	}
+	return &Client{config: c}, nil
+}
+
+// conn lazily installs the ADBC driver and opens the connection pool.
+func (c *Client) conn(ctx context.Context) (connection, error) { //nolint:ireturn
+	if c.connection != nil {
+		return c.connection, nil
+	}
+	c.poolOnce.Do(func() {
+		dsn, err := c.config.ToDSN()
+		if err != nil {
+			c.poolErr = err
+			return
+		}
+		if err := EnsureADBCDriverInstalled(ctx); err != nil {
+			c.poolErr = err
+			return
+		}
+		pool, err := sql.Open(ADBCDriverName(), dsn)
+		if err != nil {
+			c.poolErr = errors.Wrap(err, "failed to open Spark connection")
+			return
+		}
+		c.pool = pool
+	})
+	if c.poolErr != nil {
+		return nil, c.poolErr
+	}
+	return c.pool, nil
+}
+
+// adbcConnection opens a raw ADBC connection for the APIs that are not exposed
+// through database/sql, such as bulk ingest and the object catalog.
+func (c *Client) adbcConnection(ctx context.Context) (adbc.Database, adbc.Connection, error) { //nolint:ireturn
 	if err := EnsureADBCDriverInstalled(ctx); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	conn, err := sql.Open(ADBCDriverName(), dsn)
+	options, err := c.config.ToOptions()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to open Spark connection")
+		return nil, nil, err
 	}
-	return &Client{connection: conn, config: c}, nil
+	database, err := newADBCDatabase(options)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed to create Spark ADBC database")
+	}
+	conn, err := database.Open(ctx)
+	if err != nil {
+		database.Close()
+		return nil, nil, errors.Wrap(err, "failed to open Spark ADBC connection")
+	}
+	return database, conn, nil
 }
 
 func trimQuery(queryObj *query.Query) string {
@@ -51,17 +104,44 @@ func (c *Client) RunQueryWithoutResult(ctx context.Context, queryObj *query.Quer
 }
 
 func (c *Client) RunQueriesWithoutResult(ctx context.Context, queries []*query.Query) error {
+	conn, err := c.conn(ctx)
+	if err != nil {
+		return err
+	}
+
 	executor := interface {
 		ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
-	}(c.connection)
+	}(conn)
 
-	if database, ok := c.connection.(*sql.DB); ok {
+	// Session statements such as USE and SET only apply to the statements that
+	// follow them on the same connection, so all the queries of a task are
+	// pinned to a single session.
+	if database, ok := conn.(*sql.DB); ok {
 		session, err := database.Conn(ctx)
 		if err != nil {
 			return errors.Wrap(err, "failed to acquire Spark session")
 		}
-		defer session.Close()
+		// That same state would otherwise be handed to the next caller through
+		// the idle pool, so a session that ran one is discarded rather than
+		// reused: the ADBC driver implements no session reset.
+		discard := false
+		defer func() {
+			if discard {
+				_ = session.Raw(func(any) error { return driver.ErrBadConn })
+			}
+			_ = session.Close()
+		}()
 		executor = session
+
+		for _, queryObj := range queries {
+			if isSparkSessionStatement(queryObj.Query) {
+				discard = true
+			}
+			if _, err := executor.ExecContext(ctx, trimQuery(queryObj)); err != nil {
+				return errors.Wrap(err, "failed to execute Spark query")
+			}
+		}
+		return nil
 	}
 
 	for _, queryObj := range queries {
@@ -73,7 +153,11 @@ func (c *Client) RunQueriesWithoutResult(ctx context.Context, queries []*query.Q
 }
 
 func (c *Client) Select(ctx context.Context, queryObj *query.Query) ([][]interface{}, error) {
-	rows, err := c.connection.QueryContext(ctx, trimQuery(queryObj))
+	conn, err := c.conn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := conn.QueryContext(ctx, trimQuery(queryObj))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to execute Spark query")
 	}
@@ -103,7 +187,11 @@ func (c *Client) Select(ctx context.Context, queryObj *query.Query) ([][]interfa
 }
 
 func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {
-	rows, err := c.connection.QueryContext(ctx, trimQuery(queryObj))
+	conn, err := c.conn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := conn.QueryContext(ctx, trimQuery(queryObj))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to execute Spark query")
 	}
@@ -162,19 +250,11 @@ func (c *Client) TablesExist(ctx context.Context, tableNames []string) (map[stri
 		return results, nil
 	}
 
-	options, err := c.config.ToOptions()
+	database, connection, err := c.adbcConnection(ctx)
 	if err != nil {
 		return nil, err
 	}
-	database, err := newADBCDatabase(options)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create Spark ADBC database")
-	}
 	defer database.Close()
-	connection, err := database.Open(ctx)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to open Spark ADBC connection")
-	}
 	defer connection.Close()
 
 	defaultCatalog, defaultSchema, err := sparkNamespaceDefaults(ctx, connection, c.config.Catalog)
@@ -255,19 +335,11 @@ type objectCatalog struct {
 }
 
 func (c *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
-	options, err := c.config.ToOptions()
+	database, connection, err := c.adbcConnection(ctx)
 	if err != nil {
 		return nil, err
 	}
-	database, err := newADBCDatabase(options)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create Spark ADBC database")
-	}
 	defer database.Close()
-	connection, err := database.Open(ctx)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to open Spark ADBC connection")
-	}
 	defer connection.Close()
 
 	databaseName := c.config.Catalog

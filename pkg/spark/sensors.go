@@ -52,19 +52,11 @@ func (s *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, asset *
 		return errors.Errorf("connection '%s' is not a Spark connection", connectionName)
 	}
 
-	options, err := connection.config.ToOptions()
+	database, metadataConnection, err := connection.adbcConnection(ctx)
 	if err != nil {
 		return err
 	}
-	database, err := newADBCDatabase(options)
-	if err != nil {
-		return errors.Wrap(err, "failed to create Spark ADBC database")
-	}
 	defer database.Close()
-	metadataConnection, err := database.Open(ctx)
-	if err != nil {
-		return errors.Wrap(err, "failed to open Spark ADBC connection")
-	}
 	defer metadataConnection.Close()
 
 	defaultCatalog, currentSchema, err := sparkNamespaceDefaults(

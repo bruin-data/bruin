@@ -54,14 +54,28 @@ func (c Config) validate() error {
 		return errors.New("Spark connection URI must include a host and port")
 	}
 
+	seenKeys := make(map[string]string, len(c.Options))
 	for key, value := range c.Options {
-		if strings.TrimSpace(key) == "" {
+		normalizedKey := strings.TrimSpace(key)
+		if normalizedKey == "" {
 			return errors.New("Spark connection option names cannot be empty")
 		}
+		// ToOptions writes the trimmed name, so two keys that differ only by
+		// whitespace would otherwise collide and let map iteration order decide
+		// which value reaches the driver.
+		if previous, duplicate := seenKeys[normalizedKey]; duplicate {
+			return fmt.Errorf(
+				"spark connection options %q and %q refer to the same option %q",
+				previous, key, normalizedKey,
+			)
+		}
+		seenKeys[normalizedKey] = key
 		if strings.ContainsRune(key, ';') || strings.ContainsRune(value, ';') {
 			return fmt.Errorf("spark connection option %q cannot contain ';' (the DSN option delimiter)", key)
 		}
-		switch key {
+		// Compared on the trimmed name so that a stray " uri" cannot slip past
+		// the managed-option checks and reach the driver.
+		switch normalizedKey {
 		case "driver", "uri":
 			return fmt.Errorf("spark connection option %q is managed by Bruin and cannot be overridden", key)
 		case optionCatalog:
@@ -89,7 +103,7 @@ func (c Config) ToOptions() (map[string]string, error) {
 		options[optionCatalog] = c.Catalog
 	}
 	for key, value := range c.Options {
-		options[key] = value
+		options[strings.TrimSpace(key)] = value
 	}
 
 	return options, nil

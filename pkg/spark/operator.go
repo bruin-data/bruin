@@ -2,6 +2,8 @@ package spark
 
 import (
 	"context"
+	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
@@ -106,10 +108,20 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, asset 
 	for _, queryObj := range materializedQueries {
 		queryToRun := queryObj
 		sessionStatement := isSparkSessionStatement(queryObj.Query)
-		if o.devEnv != nil && !sessionStatement {
-			queryToRun, err = o.devEnv.Modify(ctx, p, asset, queryObj)
-			if err != nil {
-				return err
+		if o.devEnv != nil && (!sessionStatement || sparkStatementCanReferenceTables(queryObj.Query)) {
+			modified, modifyErr := o.devEnv.Modify(ctx, p, asset, queryObj)
+			switch {
+			case modifyErr == nil:
+				queryToRun = modified
+			case !sessionStatement:
+				return modifyErr
+			default:
+				// A session statement is not always parseable SQL, so a parser
+				// failure leaves it untouched instead of failing the run.
+				ansisql.LogQueryIfVerbose(ctx, writer, fmt.Sprintf(
+					"could not apply the developer environment to a Spark session statement, running it as-is: %s",
+					modifyErr,
+				))
 			}
 		}
 		annotatedQuery, err := ansisql.AddAnnotationComment(ctx, queryToRun, asset.Name, "main", p.Name)
@@ -197,12 +209,13 @@ func sparkAssetUsesStatement(
 			return true
 		}
 	}
-	for _, hooks := range [][]pipeline.Hook{asset.Hooks.Pre, asset.Hooks.Post} {
-		for _, hook := range hooks {
-			for _, hookStatement := range query.SplitQueriesPreservingSessionStatements(hook.Query) {
-				if matches(hookStatement.Query) {
-					return true
-				}
+	// Only pre-hooks are scanned: WrapHooks emits post-hooks strictly after the
+	// materialized statement, so a USE in one cannot change how the target table
+	// name resolved.
+	for _, hook := range asset.Hooks.Pre {
+		for _, hookStatement := range query.SplitQueriesPreservingSessionStatements(hook.Query) {
+			if matches(hookStatement.Query) {
+				return true
 			}
 		}
 	}
@@ -236,6 +249,22 @@ func isSparkSessionStatement(statement string) bool {
 	switch sparkLeadingKeyword(statement) {
 	case "DECLARE", "RESET", "SET", "USE":
 		return true
+	default:
+		return false
+	}
+}
+
+var sparkSelectKeywordRegex = regexp.MustCompile(`(?i)\bSELECT\b`)
+
+// sparkStatementCanReferenceTables reports whether a session statement can carry
+// a table reference that a developer environment has to rewrite. USE and RESET
+// never can, but SET and DECLARE do through their scalar-subquery forms —
+// `SET VAR cutoff = (SELECT MAX(ts) FROM events)` and
+// `DECLARE VARIABLE x INT DEFAULT (SELECT ... FROM events)`.
+func sparkStatementCanReferenceTables(statement string) bool {
+	switch sparkLeadingKeyword(statement) {
+	case "DECLARE", "SET":
+		return sparkSelectKeywordRegex.MatchString(statement)
 	default:
 		return false
 	}

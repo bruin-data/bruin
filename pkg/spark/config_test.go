@@ -41,6 +41,14 @@ func TestConfigToOptions(t *testing.T) {
 	}, config.IngestOptions())
 }
 
+// optionsCollidingAfterTrimming builds the map outside a literal so that the
+// deliberately whitespace-padded key is not read as a typo.
+func optionsCollidingAfterTrimming() map[string]string {
+	options := map[string]string{"spark.connect.timeout": "30"}
+	options[" spark.connect.timeout"] = "60"
+	return options
+}
+
 func TestConfigValidation(t *testing.T) {
 	t.Parallel()
 
@@ -62,6 +70,19 @@ func TestConfigValidation(t *testing.T) {
 			name:   "managed URI option",
 			config: Config{URI: "spark://localhost:10000", Options: map[string]string{"uri": "spark://elsewhere:10000"}},
 			error:  "managed by Bruin",
+		},
+		{
+			name:   "managed URI option with surrounding whitespace",
+			config: Config{URI: "spark://localhost:10000", Options: map[string]string{" uri ": "spark://elsewhere:10000"}},
+			error:  "managed by Bruin",
+		},
+		{
+			name: "options colliding after trimming",
+			config: Config{
+				URI:     "spark://localhost:10000",
+				Options: optionsCollidingAfterTrimming(),
+			},
+			error: "refer to the same option",
 		},
 		{
 			name:   "duplicate catalog option",

@@ -2141,8 +2141,9 @@ func SetupExecutors(
 	}
 	if s.WillRunTaskOfType(pipeline.AssetTypeSailQuery) || estimateCustomCheckType == pipeline.AssetTypeSailQuery || s.WillRunTaskOfType(pipeline.AssetTypeSailQuerySensor) {
 		sailFileExtractor := &query.FileQuerySplitterExtractor{
-			Fs:       fs,
-			Renderer: renderer,
+			Fs:               fs,
+			Renderer:         renderer,
+			BackslashEscapes: true,
 		}
 		sailOperator := sail.NewBasicOperator(conn, sailFileExtractor, fullRefresh, hoister, parser)
 		sailCheckRunner := sail.NewColumnCheckOperator(conn)
@@ -2162,6 +2163,7 @@ func SetupExecutors(
 			Fs:                        fs,
 			Renderer:                  renderer,
 			PreserveSessionStatements: true,
+			BackslashEscapes:          true,
 		}
 		sparkOperator := spark.NewBasicOperator(conn, sparkFileExtractor, fullRefresh, hoister, parser)
 		sparkCheckRunner := spark.NewColumnCheckOperator(conn)

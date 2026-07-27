@@ -54,6 +54,51 @@ func TestCreateSchemaIfNotExistAnnotations(t *testing.T) {
 	)
 }
 
+func TestRunQueriesWithoutResultDiscardsSessionStatefulConnections(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name      string
+		queries   []string
+		wantIdle  int
+		wantClose bool
+	}{
+		{
+			name:      "session statement leaks state, so the connection is dropped",
+			queries:   []string{"USE local.analytics", "SELECT 1"},
+			wantIdle:  0,
+			wantClose: true,
+		},
+		{
+			name:     "plain statements keep the connection poolable",
+			queries:  []string{"SELECT 1"},
+			wantIdle: 1,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			db, mock, err := sqlmock.New()
+			require.NoError(t, err)
+			defer db.Close() //nolint:errcheck
+
+			queries := make([]*query.Query, 0, len(tt.queries))
+			for _, statement := range tt.queries {
+				mock.ExpectExec(regexp.QuoteMeta(statement)).WillReturnResult(sqlmock.NewResult(0, 0))
+				queries = append(queries, &query.Query{Query: statement})
+			}
+			if tt.wantClose {
+				mock.ExpectClose()
+			}
+
+			client := &Client{connection: db}
+			require.NoError(t, client.RunQueriesWithoutResult(t.Context(), queries))
+			require.Equal(t, tt.wantIdle, db.Stats().Idle)
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
 func TestAppendObjectCatalogs(t *testing.T) {
 	t.Parallel()
 

@@ -198,8 +198,12 @@ environments:
 			Env: taskEnv,
 			Expected: e2e.Output{
 				ExitCode: 1,
+				// Exit code 1 alone would also be produced by a driver install
+				// failure or a Spark Connect hiccup, so the assertion is tied to
+				// the `positive` check on `price` actually firing.
+				Contains: []string{"price", "positive", "non-positive values"},
 			},
-			Asserts: []func(*e2e.Task) error{e2e.AssertByExitCode},
+			Asserts: []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByContains},
 		}
 		runTask(t, &task)
 	})
@@ -235,10 +239,21 @@ environments:
 			"replace matching incremental keys",
 			"delete-insert-updated-pipeline/assets/orders.sql",
 		)))
+		// Asserted with exact counts rather than substrings so that a DELETE
+		// that silently no-ops, leaving the stale 'will-update' row behind,
+		// still fails the test.
 		task := queryContains(
 			"verify delete-insert rows",
-			"SELECT order_status FROM local.bruin_test.delete_insert_orders ORDER BY order_id",
-			"kept", "updated", "new",
+			`SELECT CASE WHEN
+				(SELECT COUNT(*) FROM local.bruin_test.delete_insert_orders) = 3
+				AND (SELECT COUNT(*) FROM local.bruin_test.delete_insert_orders
+					WHERE order_id = 1 AND order_status = 'kept') = 1
+				AND (SELECT COUNT(*) FROM local.bruin_test.delete_insert_orders
+					WHERE order_id = 2 AND order_status = 'updated') = 1
+				AND (SELECT COUNT(*) FROM local.bruin_test.delete_insert_orders
+					WHERE order_id = 3 AND order_status = 'new') = 1
+				THEN 'delete-insert-ok' ELSE 'delete-insert-failed' END AS status`,
+			"delete-insert-ok",
 		)
 		runTask(t, &task)
 	})
@@ -252,10 +267,19 @@ environments:
 			"replace the truncate-insert target",
 			"truncate-insert-updated-pipeline/assets/snapshots.sql",
 		)))
+		// A TRUNCATE that silently no-ops would leave the 'old-*' rows in place
+		// while still satisfying a substring assertion, so the row count is
+		// checked explicitly.
 		task := queryContains(
 			"verify truncate-insert rows",
-			"SELECT snapshot_name FROM local.bruin_test.truncate_insert_snapshots ORDER BY snapshot_id",
-			"replacement-one", "replacement-two",
+			`SELECT CASE WHEN
+				(SELECT COUNT(*) FROM local.bruin_test.truncate_insert_snapshots) = 2
+				AND (SELECT COUNT(*) FROM local.bruin_test.truncate_insert_snapshots
+					WHERE snapshot_id = 10 AND snapshot_name = 'replacement-one') = 1
+				AND (SELECT COUNT(*) FROM local.bruin_test.truncate_insert_snapshots
+					WHERE snapshot_id = 11 AND snapshot_name = 'replacement-two') = 1
+				THEN 'truncate-insert-ok' ELSE 'truncate-insert-failed' END AS status`,
+			"truncate-insert-ok",
 		)
 		runTask(t, &task)
 	})
@@ -271,10 +295,23 @@ environments:
 			"time-interval-updated-pipeline/assets/events.sql",
 			"--start-date", "2024-01-15", "--end-date", "2024-01-18",
 		)))
+		// Exact counts, so that a bounded delete that no-ops (leaving
+		// 'old-middle' behind) or an unfiltered insert (bringing
+		// 'outside-filtered' in) fails rather than passing on substrings.
 		task := queryContains(
 			"verify time interval rows",
-			"SELECT event_name FROM local.bruin_test.time_interval_events ORDER BY dt, event_id",
-			"old-before", "updated-middle", "new-middle", "old-after",
+			`SELECT CASE WHEN
+				(SELECT COUNT(*) FROM local.bruin_test.time_interval_events) = 4
+				AND (SELECT COUNT(*) FROM local.bruin_test.time_interval_events
+					WHERE event_id = 1 AND event_name = 'old-before') = 1
+				AND (SELECT COUNT(*) FROM local.bruin_test.time_interval_events
+					WHERE event_id = 2 AND event_name = 'updated-middle') = 1
+				AND (SELECT COUNT(*) FROM local.bruin_test.time_interval_events
+					WHERE event_id = 4 AND event_name = 'new-middle') = 1
+				AND (SELECT COUNT(*) FROM local.bruin_test.time_interval_events
+					WHERE event_id = 3 AND event_name = 'old-after') = 1
+				THEN 'time-interval-ok' ELSE 'time-interval-failed' END AS status`,
+			"time-interval-ok",
 		)
 		runTask(t, &task)
 	})

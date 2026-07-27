@@ -56,8 +56,6 @@ integration-test: build
 	@echo "$(OK_COLOR)==> Running integration tests...$(NO_COLOR)"
 	@cd integration-tests && git init
 	@cd integration-tests && env SILENT=1 go test -tags="no_duckdb_arrow" -v -count=1 .
-	@echo "$(OK_COLOR)==> Running Spark integration tests...$(NO_COLOR)"
-	@$(SPARK_INTEGRATION_TEST)
 
 integration-test-light: build
 	@rm -rf integration-tests/duckdb-files  # Clean up the directory if it exists

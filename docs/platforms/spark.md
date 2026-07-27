@@ -33,9 +33,9 @@ Connection fields:
 | `catalog` | no | Initial Spark catalog (`adbc.connection.catalog`). |
 | `ingest_staging_area` | for seeds | S3 or S3-compatible URI where ADBC temporarily stages Parquet data during bulk ingestion. |
 | `ingest_location` | no | Optional `LOCATION` for tables created by ADBC bulk ingestion. EMR deployments generally require an S3 path. |
-| `options` | no | Additional ADBC Spark driver options as key/value pairs. `driver` and `uri` are managed by Bruin. |
+| `options` | no | Additional ADBC Spark driver options as key/value pairs. `driver`, `uri`, `spark.ingest.location`, and `spark.ingest.staging_area_uri` are managed by Bruin — use the `uri`, `ingest_location`, and `ingest_staging_area` fields instead. `adbc.connection.catalog` is only accepted here when the `catalog` field is left empty; prefer `catalog`. |
 
-The URI and additional options are treated as sensitive because they may contain credentials.
+The URI is treated as sensitive because it may contain credentials, as are `options` entries whose key names a credential (for example `password`, `secret`, `token`, or `access_key`). Other option values are ordinary driver settings and are left in log output as-is.
 
 ## Spark assets
 

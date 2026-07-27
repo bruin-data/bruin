@@ -37,6 +37,30 @@ func TestSparkSeedFieldsMatchesDeclaredColumnsCaseInsensitively(t *testing.T) {
 	}, fields)
 }
 
+func TestNewSeedRecordReaderTrimsHeaderNames(t *testing.T) {
+	t.Parallel()
+
+	reader, err := newSeedRecordReader(
+		[]pipeline.Column{{Name: "age", Type: "INT"}, {Name: "name", Type: "STRING"}},
+		[]byte(" age , name \n42,Ada\n36,Grace\n"),
+	)
+	require.NoError(t, err)
+	defer reader.Release()
+
+	names := make([]string, 0, reader.Schema().NumFields())
+	for _, field := range reader.Schema().Fields() {
+		names = append(names, field.Name)
+	}
+	require.Equal(t, []string{"age", "name"}, names)
+
+	rows := 0
+	for reader.Next() {
+		rows += int(reader.RecordBatch().NumRows())
+	}
+	require.NoError(t, reader.Err())
+	require.Equal(t, 2, rows)
+}
+
 func TestSparkArrowTypeWidensTinyInt(t *testing.T) {
 	t.Parallel()
 

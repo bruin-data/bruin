@@ -499,6 +499,45 @@ func TestSensitiveValuesContainers(t *testing.T) {
 	}
 }
 
+func TestSensitiveValuesSensitiveMap(t *testing.T) {
+	t.Parallel()
+	type conn struct {
+		Options map[string]string `mapstructure:"options" sensitive:"true"`
+		Plain   map[string]string `mapstructure:"plain"`
+	}
+	got := map[string]bool{}
+	for _, v := range sv(conn{
+		Options: map[string]string{
+			"spark.auth.oauth_token":                 "SECRET-TOKEN-1",
+			"fs.azure.account.key.acme.dfs.core.net": "SECRET-ACCOUNT-KEY",
+			"spark.ingest.s3.secret-access-key":      "SECRET-ACCESS-KEY",
+			"spark.ingest.s3.use_path_style":         "true",
+			"spark.livy.session_kind":                "sql",
+			"spark.opt.emr-serverless.token_enabled": "true",
+			"empty_token":                            "",
+		},
+		Plain: map[string]string{"region": "eu-west-1"},
+	}) {
+		got[v] = true
+	}
+	for _, want := range []string{"SECRET-TOKEN-1", "SECRET-ACCOUNT-KEY", "SECRET-ACCESS-KEY"} {
+		if !got[want] {
+			t.Errorf("credential %q from a sensitive map was not collected; got %v", want, got)
+		}
+	}
+	// A non-credential option, or a short value under a credential-shaped key,
+	// must not become a global find-and-replace pattern.
+	if got["true"] || got["sql"] {
+		t.Errorf("non-credential map value must not be collected; got %v", got)
+	}
+	if got["eu-west-1"] {
+		t.Errorf("value from an untagged map must not be collected; got %v", got)
+	}
+	if got[""] {
+		t.Errorf("empty map value must not be collected; got %v", got)
+	}
+}
+
 // TestMaskConnectionEndToEnd builds a masker from a connection mixing every input
 // method and masks a simulated ingestr command + error lines: secrets gone, structure kept.
 func TestMaskConnectionEndToEnd(t *testing.T) {

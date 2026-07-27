@@ -8,6 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const scd2IncrementalKey = "updated_at"
+
 func TestMaterializerMerge(t *testing.T) {
 	t.Parallel()
 
@@ -216,7 +218,7 @@ func TestMaterializerSCD2ByColumnFullRefresh(t *testing.T) {
 	t.Parallel()
 
 	asset := scd2Asset(pipeline.MaterializationStrategySCD2ByColumn)
-	asset.Materialization.IncrementalKey = "updated_at"
+	asset.Materialization.IncrementalKey = scd2IncrementalKey
 
 	actual, err := NewMaterializer(true).Render(asset, "SELECT * FROM customer_updates;")
 	require.NoError(t, err)
@@ -227,7 +229,23 @@ func TestMaterializerSCD2ByColumnFullRefresh(t *testing.T) {
 	assert.Contains(
 		t,
 		actual,
-		"ALTER TABLE `catalog`.`analytics`.`customers` WRITE ORDERED BY _is_current, customer_id;",
+		"ALTER TABLE `catalog`.`analytics`.`customers` WRITE ORDERED BY _is_current, `customer_id`;",
+	)
+}
+
+func TestMaterializerSCD2QuotesDerivedSortKeys(t *testing.T) {
+	t.Parallel()
+
+	asset := scd2Asset(pipeline.MaterializationStrategySCD2ByColumn)
+	asset.Materialization.IncrementalKey = scd2IncrementalKey
+	asset.Columns[0].Name = "order"
+
+	actual, err := NewMaterializer(true).Render(asset, "SELECT * FROM customer_updates;")
+	require.NoError(t, err)
+	assert.Contains(
+		t,
+		actual,
+		"ALTER TABLE `catalog`.`analytics`.`customers` WRITE ORDERED BY _is_current, `order`;",
 	)
 }
 
@@ -235,7 +253,7 @@ func TestMaterializerSCD2ByTimeFullRefreshWithCustomLayout(t *testing.T) {
 	t.Parallel()
 
 	asset := scd2Asset(pipeline.MaterializationStrategySCD2ByTime)
-	asset.Materialization.IncrementalKey = "updated_at"
+	asset.Materialization.IncrementalKey = scd2IncrementalKey
 	asset.Materialization.PartitionBy = "months(updated_at)"
 	asset.Materialization.ClusterBy = []string{"customer_name", "_is_current"}
 
@@ -254,7 +272,7 @@ func TestMaterializerSCD2ByColumnIncremental(t *testing.T) {
 	t.Parallel()
 
 	asset := scd2Asset(pipeline.MaterializationStrategySCD2ByColumn)
-	asset.Materialization.IncrementalKey = "updated_at"
+	asset.Materialization.IncrementalKey = scd2IncrementalKey
 
 	actual, err := NewMaterializer(false).Render(asset, "SELECT * FROM customer_updates;")
 	require.NoError(t, err)
@@ -275,7 +293,7 @@ func TestMaterializerSCD2ByTimeIncremental(t *testing.T) {
 	t.Parallel()
 
 	asset := scd2Asset(pipeline.MaterializationStrategySCD2ByTime)
-	asset.Materialization.IncrementalKey = "updated_at"
+	asset.Materialization.IncrementalKey = scd2IncrementalKey
 
 	actual, err := NewMaterializer(false).Render(asset, "SELECT * FROM customer_updates;")
 	require.NoError(t, err)
@@ -358,7 +376,7 @@ func scd2Asset(strategy pipeline.MaterializationStrategy) *pipeline.Asset {
 		Columns: []pipeline.Column{
 			{Name: "customer_id", Type: "BIGINT", PrimaryKey: true},
 			{Name: "customer_name", Type: "STRING"},
-			{Name: "updated_at", Type: "TIMESTAMP"},
+			{Name: scd2IncrementalKey, Type: "TIMESTAMP"},
 		},
 		Materialization: pipeline.Materialization{
 			Type:     pipeline.MaterializationTypeTable,

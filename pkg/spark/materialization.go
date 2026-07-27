@@ -237,7 +237,14 @@ func scd2Layout(asset *pipeline.Asset, primaryKeys []string) (string, []string) 
 
 	clusterBy := asset.Materialization.ClusterBy
 	if len(clusterBy) == 0 {
-		clusterBy = append([]string{"_is_current"}, primaryKeys...)
+		// User-supplied cluster_by is passed through verbatim because it may hold
+		// expressions, but the derived default is made of bare column names and
+		// has to be quoted like every other asset-derived identifier.
+		clusterBy = make([]string, 0, len(primaryKeys)+1)
+		clusterBy = append(clusterBy, "_is_current")
+		for _, primaryKey := range primaryKeys {
+			clusterBy = append(clusterBy, quoteIdentifier(primaryKey))
+		}
 	}
 	return partitionBy, clusterBy
 }

@@ -644,6 +644,60 @@ func TestDevEnvQueryModifier_Modify_ThreePartAssetWithCatalogQualifiedSummary(t 
 	sqlParser.AssertExpectations(t)
 }
 
+// Accepting three-part asset names is not Spark-specific: it also turns the
+// modifier on for platforms that name assets project.dataset.table, so the
+// rewrite is pinned down for a non-Spark dialect too.
+func TestDevEnvQueryModifier_Modify_ThreePartAssetOnNonSparkDialect(t *testing.T) {
+	t.Parallel()
+
+	p := &pipeline.Pipeline{
+		DefaultConnections: map[string]string{"google_cloud_platform": "bigquery-default"},
+	}
+	asset := &pipeline.Asset{
+		Name: "myproject.dev_analytics.orders",
+		Type: pipeline.AssetTypeBigqueryQuery,
+	}
+	connection := new(mockConnectionInstance)
+	connection.On("GetDatabaseSummary", mock.Anything).Return(&ansisql.DBDatabase{
+		Name: "myproject",
+		Schemas: []*ansisql.DBSchema{{
+			Name:   "dev_analytics",
+			Tables: []*ansisql.DBTable{{Name: "events"}},
+		}},
+	}, nil)
+	connectionFetcher := new(mockConnectionFetcher)
+	connectionFetcher.On("GetConnection", "bigquery-default").Return(connection)
+	sqlParser := new(mockSQLParser)
+	inputQuery := "SELECT * FROM analytics.events UNION ALL SELECT * FROM myproject.analytics.events"
+	sqlParser.On("UsedTables", inputQuery, "bigquery").
+		Return([]string{"analytics.events", "myproject.analytics.events"}, nil)
+	expectedMapping := map[string]string{
+		"myproject.analytics.orders": "myproject.dev_analytics.orders",
+		"analytics.events":           "dev_analytics.events",
+		"myproject.analytics.events": "myproject.dev_analytics.events",
+	}
+	outputQuery := "SELECT * FROM dev_analytics.events UNION ALL SELECT * FROM myproject.dev_analytics.events"
+	sqlParser.On("RenameTables", inputQuery, "bigquery", expectedMapping).Return(outputQuery, nil)
+
+	modifier := &DevEnvQueryModifier{
+		Dialect: "bigquery",
+		Conn:    connectionFetcher,
+		Parser:  sqlParser,
+	}
+	ctx := context.WithValue(
+		t.Context(),
+		config.EnvironmentContextKey,
+		&config.Environment{SchemaPrefix: "dev_"},
+	)
+
+	got, err := modifier.Modify(ctx, p, asset, &query.Query{Query: inputQuery})
+	require.NoError(t, err)
+	require.Equal(t, &query.Query{Query: outputQuery}, got)
+	connection.AssertExpectations(t)
+	connectionFetcher.AssertExpectations(t)
+	sqlParser.AssertExpectations(t)
+}
+
 func TestDevEnvQueryModifier_RegisterThreePartAssetInCatalogQualifiedSummary(t *testing.T) {
 	t.Parallel()
 
