@@ -11,7 +11,28 @@ CURRENT_DIR=$(pwd)
 TELEMETRY_KEY=""
 FILES := $(wildcard *.yml *.txt *.py)
 OS_ARCH:=$(shell go env GOOS)_$(shell go env GOARCH)
-GOLANGCI_LINT_VERSION=v2.11.1
+LINT_MERGE_BASE ?= origin/main
+GCI_VERSION ?= v0.14.0
+GOFUMPT_VERSION ?= v0.10.0
+RUFF_VERSION ?= 0.15.4
+# Pinned, not @latest. v2.12.x made its cache checkout-independent, but cached
+# diagnostics still contain absolute paths from the checkout that produced
+# them. That makes shared-cache results unsafe across worktrees. Re-test before
+# bumping beyond the latest pre-change patch release.
+GOLANGCI_LINT_VERSION ?= v2.11.4
+# Build golangci-lint with the toolchain targeted by this module.
+GOLANGCI_LINT_INSTALL := GOTOOLCHAIN=go$(shell awk '/^go /{print $$2; exit}' go.mod) \
+	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+# golangci-lint uses a single global lock in the system temporary directory.
+# Its cache supports concurrent processes, so allow separate worktrees to lint
+# at the same time without one runner failing on lock contention.
+LINT_PARALLEL_FLAGS ?= --allow-parallel-runners
+LINT_CONCURRENCY ?= 4
+LINT_TIMEOUT ?= 10m
+LINT_BUILD_TAGS ?= no_duckdb_arrow
+LINT_FAST_LINTERS ?= errcheck,govet,ineffassign
+TEST_CONCURRENCY ?= 4
+GO_FORMAT_PATHS := cmd pkg semantic-engine integration-tests/integration_test.go main.go
 
 # Suppress CGO linker warnings on macOS (not needed on Linux/Windows)
 ifeq ($(shell go env GOOS),darwin)
@@ -21,7 +42,7 @@ endif
 
 JQ_REL_PATH = jq --arg prefix "$$(pwd)" 'walk(if type == "object" and has("path") and (.path | type == "string") then .path |= (if . == $$prefix then "integration-tests" elif startswith($$prefix + "/") then .[($$prefix | length + 1):] elif startswith($$prefix) then .[($$prefix | length):] elif startswith("integration-tests/") then .[16:] else . end) else . end)'
 
-.PHONY: all clean test build build-no-duckdb docs-app format pre-commit refresh-integration-expectations integration-test-cloud integration-test-mssql validate-links tools-update
+.PHONY: all clean test test-full test-unit build build-no-duckdb docs-app format format-ci lint lint-fast lint-full lint-ci pre-commit refresh-integration-expectations integration-test-cloud integration-test-mssql validate-links setup tools-update
 all: clean deps test build
 
 deps: 
@@ -90,11 +111,18 @@ clean:
 test: test-unit
 
 test-unit:
-	@echo "$(OK_COLOR)==> Running the unit tests$(NO_COLOR)"
+	@echo "$(OK_COLOR)==> Running the unit tests (fast)$(NO_COLOR)"
 	@$(MAKE) rustsqlparser-lib
-	@env SF_DISABLE_MINICORE=true go test -tags="no_duckdb_arrow" -race -p 50 -vet=off -timeout 10m ./cmd/... ./pkg/...
+	@env SF_DISABLE_MINICORE=true go test -tags="no_duckdb_arrow" -p "$(TEST_CONCURRENCY)" -vet=off -timeout 10m ./cmd/... ./pkg/...
 	@echo "$(OK_COLOR)==> Running the semantic-engine module tests$(NO_COLOR)"
-	@cd semantic-engine && env SF_DISABLE_MINICORE=true go test -race -timeout 10m ./...
+	@cd semantic-engine && env SF_DISABLE_MINICORE=true go test -p "$(TEST_CONCURRENCY)" -timeout 10m ./...
+
+test-full:
+	@echo "$(OK_COLOR)==> Running the unit tests (full)$(NO_COLOR)"
+	@$(MAKE) rustsqlparser-lib
+	@env SF_DISABLE_MINICORE=true go test -tags="no_duckdb_arrow" -race -p "$(TEST_CONCURRENCY)" -vet=off -timeout 10m ./cmd/... ./pkg/...
+	@echo "$(OK_COLOR)==> Running the semantic-engine module tests with race detection$(NO_COLOR)"
+	@cd semantic-engine && env SF_DISABLE_MINICORE=true go test -race -p "$(TEST_CONCURRENCY)" -timeout 10m ./...
 
 RUST_LIB = pkg/sqlparser/rustffi/target/release/libbruin_rustsqlparser.a
 
@@ -105,34 +133,62 @@ $(RUST_LIB): pkg/sqlparser/rustffi/Cargo.toml $(wildcard pkg/sqlparser/rustffi/s
 	@cargo build --release --manifest-path pkg/sqlparser/rustffi/Cargo.toml
 
 format: lint-python
-	@echo "$(OK_COLOR)>> [go vet] running$(NO_COLOR)" & \
-	go vet -tags="no_duckdb_arrow" ./... & 
+	@echo "$(OK_COLOR)>> [gci] formatting$(NO_COLOR)"
+	@go tool gci write $(GO_FORMAT_PATHS)
+	@echo "$(OK_COLOR)>> [gofumpt] formatting$(NO_COLOR)"
+	@go tool gofumpt -w $(GO_FORMAT_PATHS)
+	@$(MAKE) lint
 
-	@echo "$(OK_COLOR)>> [gci] running$(NO_COLOR)" & \
-	go tool gci write cmd pkg semantic-engine integration-tests/integration_test.go main.go &
+# Fast edit-loop check on changed Go packages. `go vet` is deliberately absent
+# because govet is already enabled by golangci-lint.
+lint:
+	@echo "$(OK_COLOR)==> Running fast linters on packages changed since $(LINT_MERGE_BASE)$(NO_COLOR)"
+	@LINT_MODULE_DIR="." LINT_BUILD_TAGS="$(LINT_BUILD_TAGS)" LINT_MERGE_BASE="$(LINT_MERGE_BASE)" LINT_CONCURRENCY="$(LINT_CONCURRENCY)" LINT_TIMEOUT="$(LINT_TIMEOUT)" LINT_PARALLEL_FLAGS="$(LINT_PARALLEL_FLAGS)" LINT_ENABLE_ONLY="$(LINT_FAST_LINTERS)" ./hack/lint-changed.sh
+	@LINT_MODULE_DIR="semantic-engine" LINT_BUILD_TAGS="" LINT_MERGE_BASE="$(LINT_MERGE_BASE)" LINT_CONCURRENCY="$(LINT_CONCURRENCY)" LINT_TIMEOUT="$(LINT_TIMEOUT)" LINT_PARALLEL_FLAGS="$(LINT_PARALLEL_FLAGS)" LINT_ENABLE_ONLY="$(LINT_FAST_LINTERS)" ./hack/lint-changed.sh
 
-	@echo "$(OK_COLOR)>> [gofumpt] running$(NO_COLOR)" & \
-	go tool gofumpt -w cmd pkg semantic-engine &
+lint-fast: lint
 
-	@echo "$(OK_COLOR)>> [golangci-lint] running$(NO_COLOR)" & \
-	golangci-lint run --timeout 10m60s --new-from-merge-base=origin/main --build-tags="no_duckdb_arrow" ./...  & \
-	cd semantic-engine && golangci-lint run --timeout 10m60s --new-from-merge-base=origin/main & \
-	wait
+# Full check for CI and pre-merge validation.
+lint-full:
+	@echo "$(OK_COLOR)==> Running all linters across the repository$(NO_COLOR)"
+	@golangci-lint run --timeout "$(LINT_TIMEOUT)" --concurrency "$(LINT_CONCURRENCY)" $(LINT_PARALLEL_FLAGS) --build-tags="$(LINT_BUILD_TAGS)" ./...
+	@cd semantic-engine && golangci-lint run --timeout "$(LINT_TIMEOUT)" --concurrency "$(LINT_CONCURRENCY)" $(LINT_PARALLEL_FLAGS) ./...
+
+# Check Go formatting without modifying files.
+format-ci:
+	@echo "$(OK_COLOR)==> Checking Go formatting$(NO_COLOR)"
+	@GCI_DIFF=$$(go tool gci list $(GO_FORMAT_PATHS) 2>&1); \
+	GOFUMPT_DIFF=$$(go tool gofumpt -d $(GO_FORMAT_PATHS) 2>&1); \
+	if [ -n "$$GCI_DIFF$$GOFUMPT_DIFF" ]; then \
+		echo "$(ERROR_COLOR)Files need formatting:$(NO_COLOR)"; \
+		[ -z "$$GCI_DIFF" ] || echo "$$GCI_DIFF"; \
+		[ -z "$$GOFUMPT_DIFF" ] || echo "$$GOFUMPT_DIFF"; \
+		exit 1; \
+	fi
+	@echo "$(OK_COLOR)All Go files are properly formatted$(NO_COLOR)"
+
+lint-ci: format-ci lint-full
+	@echo "$(OK_COLOR)All checks passed$(NO_COLOR)"
+
+setup:
+	@printf "$(OK_COLOR)==> Installing development tools$(NO_COLOR)\n"
+	@current_version="$$(golangci-lint version 2>/dev/null | awk '{ for (i = 1; i <= NF; i++) if ($$i == "version") { print "v"$$(i+1); exit } }')"; \
+	if [ "$$current_version" != "$(GOLANGCI_LINT_VERSION)" ]; then $(GOLANGCI_LINT_INSTALL); fi
 
 tools-update:
-	go get github.com/daixiang0/gci@latest
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $$(go env GOPATH)/bin $(GOLANGCI_LINT_VERSION)
-	go get mvdan.cc/gofumpt@latest
+	go get github.com/daixiang0/gci@$(GCI_VERSION)
+	go get mvdan.cc/gofumpt@$(GOFUMPT_VERSION)
+	$(GOLANGCI_LINT_INSTALL)
 	@go mod tidy
 
 lint-python:
 	@[ -d .venv ] || uv venv --quiet
 	@uv pip install --quiet sqlglot==30.7.0
 	@echo "$(OK_COLOR)==> Running Python formatting with ruff...$(NO_COLOR)"
-	@uvx ruff format ./pythonsrc
+	@uvx ruff@$(RUFF_VERSION) format ./pythonsrc
 
 	@echo "$(OK_COLOR)==> Running Python linting with ruff...$(NO_COLOR)"
-	@uvx ruff check --fix ./pythonsrc
+	@uvx ruff@$(RUFF_VERSION) check --fix ./pythonsrc
 
 refresh-integration-expectations: build
 	@echo "$(OK_COLOR)==> Refreshing integration expectations...$(NO_COLOR)"
