@@ -169,11 +169,15 @@ func TestConsolidatedParameters_StreamGating(t *testing.T) {
 	t.Run("interval-end is kept for a non-streaming asset", func(t *testing.T) {
 		t.Parallel()
 		asset := &pipeline.Asset{Parameters: pipeline.ParameterMap{}}
-		ctx := context.WithValue(t.Context(), pipeline.RunConfigStartDate, time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC))
-		ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC))
+		ctx := context.WithValue(t.Context(), pipeline.RunConfigStartDate, time.Date(2026, 7, 24, 15, 0, 0, 123456000, time.UTC))
+		ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2026, 7, 24, 15, 59, 59, 999000000, time.UTC))
 		result, err := ConsolidatedParameters(ctx, asset, []string{"--existing"}, nil)
 		require.NoError(t, err)
-		assert.Contains(t, result, "--interval-end")
+		assert.Equal(t, []string{
+			"--existing",
+			"--interval-start", "2026-07-24T15:00:00.123456Z",
+			"--interval-end", "2026-07-24T15:59:59.999Z",
+		}, result)
 	})
 }
 

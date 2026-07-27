@@ -274,3 +274,59 @@ type ScheduledAgent struct {
 	MonitorsDashboard json.RawMessage `json:"monitors_dashboard,omitempty"`
 	RecentExecutions  json.RawMessage `json:"recent_executions,omitempty"`
 }
+
+// CostDimension is a group-by dimension the cost explorer supports.
+type CostDimension struct {
+	Key   string `json:"key"`
+	Label string `json:"label"`
+}
+
+// CostFilterField is a filter field the cost explorer supports.
+type CostFilterField struct {
+	Field    string `json:"field"`
+	Op       string `json:"op"`
+	Multiple bool   `json:"multiple"`
+}
+
+// CostExplorerSchema lists the dimensions, filter fields, and time buckets the cost explorer supports.
+type CostExplorerSchema struct {
+	Platform           string            `json:"platform"`
+	AvailablePlatforms []string          `json:"available_platforms"`
+	Dimensions         []CostDimension   `json:"dimensions"`
+	Filters            []CostFilterField `json:"filters"`
+	TimeDimensions     []string          `json:"time_dimensions"`
+}
+
+// CostFilter is a single {field, op, value} cost explorer filter.
+type CostFilter struct {
+	Field string `json:"field"`
+	Op    string `json:"op"`
+	Value any    `json:"value"`
+}
+
+// CostExplorerRequest is the body sent to the cost explorer endpoint.
+type CostExplorerRequest struct {
+	StartDate     string       `json:"start_date"`
+	EndDate       string       `json:"end_date"`
+	Platform      string       `json:"platform,omitempty"`
+	Dimension     string       `json:"dimension,omitempty"`
+	TimeDimension string       `json:"time_dimension,omitempty"`
+	Filters       []CostFilter `json:"filters,omitempty"`
+	Limit         int          `json:"limit,omitempty"`
+	Offset        int          `json:"offset,omitempty"`
+}
+
+// CostExplorerResponse is a page of cost breakdown rows.
+type CostExplorerResponse struct {
+	Platform      string           `json:"platform"`
+	StartDate     string           `json:"start_date"`
+	EndDate       string           `json:"end_date"`
+	Dimension     *string          `json:"dimension"`
+	TimeDimension *string          `json:"time_dimension"`
+	TotalRows     int              `json:"total_rows"`
+	ReturnedRows  int              `json:"returned_rows"`
+	Offset        int              `json:"offset"`
+	Truncated     bool             `json:"truncated"`
+	NextOffset    *int             `json:"next_offset,omitempty"`
+	Rows          []map[string]any `json:"rows"`
+}

@@ -920,3 +920,59 @@ func TestUpdateScheduledAgent(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "Renamed", *run.Title)
 }
+
+func TestGetCostExplorerSchema(t *testing.T) {
+	t.Parallel()
+	var gotPath string
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.RequestURI()
+		writeJSON(t, w, CostExplorerSchema{
+			Platform:           "bigquery",
+			AvailablePlatforms: []string{"bigquery"},
+			Dimensions:         []CostDimension{{Key: "pipeline_id", Label: "Pipeline"}},
+			Filters:            []CostFilterField{{Field: "pipeline_id", Op: "in", Multiple: true}},
+			TimeDimensions:     []string{"day", "week", "month"},
+		})
+	})
+
+	schema, err := client.GetCostExplorerSchema(t.Context(), "databricks")
+	require.NoError(t, err)
+	assert.Equal(t, "/cost-explorer/schema?platform=databricks", gotPath)
+	assert.Equal(t, "bigquery", schema.Platform)
+	assert.Equal(t, []string{"day", "week", "month"}, schema.TimeDimensions)
+	require.Len(t, schema.Dimensions, 1)
+	assert.Equal(t, "pipeline_id", schema.Dimensions[0].Key)
+}
+
+func TestGetCostExplorer(t *testing.T) {
+	t.Parallel()
+	var gotBody map[string]any
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		gotBody = readJSON(t, r)
+		next := 2
+		writeJSON(t, w, CostExplorerResponse{
+			Platform:     "bigquery",
+			TotalRows:    3,
+			ReturnedRows: 2,
+			Offset:       0,
+			Truncated:    true,
+			NextOffset:   &next,
+			Rows:         []map[string]any{{"pipeline_id": "daily-etl", "total_cost_usd": 42.5}},
+		})
+	})
+
+	resp, err := client.GetCostExplorer(t.Context(), CostExplorerRequest{
+		StartDate: "2026-07-01",
+		EndDate:   "2026-07-31",
+		Dimension: "pipeline_id",
+		Filters:   []CostFilter{{Field: "pipeline_id", Op: "in", Value: []string{"daily-etl"}}},
+		Limit:     2,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "2026-07-01", gotBody["start_date"])
+	assert.Equal(t, "pipeline_id", gotBody["dimension"])
+	assert.Equal(t, 3, resp.TotalRows)
+	require.NotNil(t, resp.NextOffset)
+	assert.Equal(t, 2, *resp.NextOffset)
+}

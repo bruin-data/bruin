@@ -143,12 +143,13 @@ func TestCloudCommand_Help(t *testing.T) {
 	cmd := Cloud(&isDebug)
 	require.NotNil(t, cmd)
 	assert.Equal(t, "cloud", cmd.Name)
-	assert.Len(t, cmd.Commands, 10)
+	assert.Len(t, cmd.Commands, 11)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
 		subNames[i] = sub.Name
 	}
+	assert.Contains(t, subNames, "cost")
 	assert.Contains(t, subNames, "projects")
 	assert.Contains(t, subNames, "pipelines")
 	assert.Contains(t, subNames, "runs")
@@ -511,4 +512,45 @@ func TestParseRunVariables(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid variable override")
 	})
+}
+
+func TestParseCostFilters(t *testing.T) {
+	t.Parallel()
+
+	t.Run("eq and repeated in merge by field", func(t *testing.T) {
+		t.Parallel()
+		// urfave splits on commas, so `in` values arrive as repeated --filter flags.
+		filters, err := parseCostFilters([]string{"user_email:eq:a@b.com", "pipeline_id:in:x", "pipeline_id:in:y"})
+		require.NoError(t, err)
+		require.Len(t, filters, 2)
+		assert.Equal(t, bruincloud.CostFilter{Field: "user_email", Op: "eq", Value: "a@b.com"}, filters[0])
+		assert.Equal(t, bruincloud.CostFilter{Field: "pipeline_id", Op: "in", Value: []string{"x", "y"}}, filters[1])
+	})
+
+	t.Run("bare token is rejected", func(t *testing.T) {
+		t.Parallel()
+		_, err := parseCostFilters([]string{"pipeline_id:in:a", "b"})
+		require.Error(t, err)
+	})
+
+	t.Run("empty", func(t *testing.T) {
+		t.Parallel()
+		filters, err := parseCostFilters(nil)
+		require.NoError(t, err)
+		assert.Empty(t, filters)
+	})
+
+	t.Run("malformed", func(t *testing.T) {
+		t.Parallel()
+		_, err := parseCostFilters([]string{"pipeline_id=x"})
+		require.Error(t, err)
+	})
+}
+
+func TestFormatCostCell(t *testing.T) {
+	t.Parallel()
+	assert.Empty(t, formatCostCell(nil))
+	assert.Equal(t, "daily-etl", formatCostCell("daily-etl"))
+	assert.Equal(t, "74123", formatCostCell(float64(74123)))
+	assert.JSONEq(t, `{"pipeline_id":"p"}`, formatCostCell(map[string]any{"pipeline_id": "p"}))
 }
