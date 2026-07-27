@@ -352,15 +352,38 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
         }
 
     scope = build_scope(optimized)
+    lineage_by_column: dict[str, Node] = {}
+    try:
+        lineage_by_column = lineage.lineage(
+            None,
+            optimized,
+            schema,
+            dialect=dialect,
+            scope=scope,
+            copy=False,
+            trim_selects=False,
+        )
+    except Exception as e:
+        # A malformed or unsupported projection should not prevent lineage from
+        # being calculated for the other output columns. Fall back to the
+        # per-column path below, which preserves the existing error isolation.
+        logging.warning(
+            f"Batch lineage error, falling back to per-column lineage: {str(e)}"
+        )
+
     for col in cols:
         try:
-            ll = lineage.lineage(
-                col["name"],
-                optimized,
-                schema,
-                dialect=dialect,
-                scope=scope,
-            )
+            ll = lineage_by_column.get(col["name"])
+            if ll is None:
+                ll = lineage.lineage(
+                    col["name"],
+                    optimized,
+                    schema,
+                    dialect=dialect,
+                    scope=scope,
+                    copy=False,
+                    trim_selects=False,
+                )
             cl = []
             leaves: list[Node] = []
 
