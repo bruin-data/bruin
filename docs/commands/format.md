@@ -51,6 +51,7 @@ When the `--sqlfluff` flag is used, Bruin automatically:
 | `athena.` | athena | Amazon Athena |
 | `ms.` | tsql | Microsoft SQL Server |
 | `databricks.` | sparksql | Databricks |
+| `spark.` | sparksql | Apache Spark |
 | `synapse.` | tsql | Azure Synapse |
 | `duckdb.` | duckdb | DuckDB |
 | `clickhouse.` | clickhouse | ClickHouse |

@@ -42,8 +42,9 @@ export LDFLAGS=-Wl,-w
 endif
 
 JQ_REL_PATH = jq --arg prefix "$$(pwd)" 'walk(if type == "object" and has("path") and (.path | type == "string") then .path |= (if . == $$prefix then "integration-tests" elif startswith($$prefix + "/") then .[($$prefix | length + 1):] elif startswith($$prefix) then .[($$prefix | length):] elif startswith("integration-tests/") then .[16:] else . end) else . end)'
+SPARK_INTEGRATION_TEST = cd integration-tests/cloud-integration-tests/spark && env SILENT=1 SF_DISABLE_MINICORE=true go test -count=1 -v -timeout 30m .
 
-.PHONY: all clean test test-full test-unit build build-no-duckdb docs-app format format-ci lint lint-fast lint-full lint-ci pre-commit refresh-integration-expectations integration-test-cloud integration-test-mssql validate-links setup tools-update
+.PHONY: all clean test test-full test-unit build build-no-duckdb docs-app format format-ci lint lint-fast lint-full lint-ci pre-commit refresh-integration-expectations integration-test integration-test-light integration-test-cloud integration-test-spark integration-test-mssql validate-links setup tools-update
 all: clean deps test build
 
 deps: 
@@ -100,7 +101,11 @@ integration-test-cloud: build
 	@rm integration-tests/cloud-integration-tests/bruin
 	@echo "$(OK_COLOR)==> Running cloud integration tests...$(NO_COLOR)"
 	@cd integration-tests && git init
-	@cd integration-tests/cloud-integration-tests && env SILENT=1 SF_DISABLE_MINICORE=true go test -count=1 -v .
+	@cd integration-tests/cloud-integration-tests && env SILENT=1 SF_DISABLE_MINICORE=true go test -count=1 -v -timeout 30m .
+
+integration-test-spark: build
+	@echo "$(OK_COLOR)==> Running Spark integration tests...$(NO_COLOR)"
+	@$(SPARK_INTEGRATION_TEST)
 
 integration-test-mssql: build
 	@echo "$(OK_COLOR)==> Running MSSQL integration tests...$(NO_COLOR)"

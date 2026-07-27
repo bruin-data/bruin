@@ -49,6 +49,15 @@ ENABLE_PARALLEL=1 make integration-test-light
 
 **Note**: `ENABLE_PARALLEL=1` enables parallel test execution. By default, tests run sequentially.
 
+#### Run the Spark Suite
+
+`make integration-test-spark` starts Spark Connect and MinIO with Docker via
+testcontainers, so it needs no cloud credentials. It uses the active Docker
+context and skips itself when no healthy Docker provider is available. It is
+kept out of `make integration-test` because building the Spark image and
+pulling the Iceberg and hadoop-aws jars is slow; `make integration-test-cloud`
+also runs it, alongside the other self-contained suites.
+
 ## Test Pipeline Structure
 
 Each test pipeline in `test-pipelines/` should follow a standard structure:

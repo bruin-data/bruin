@@ -734,6 +734,7 @@ func TestPlatformForAssetType(t *testing.T) {
 		{pipeline.AssetTypeDuckDBQuery, PlatformDuckDB},
 		{pipeline.AssetTypeMotherduckQuery, PlatformDuckDB},
 		{pipeline.AssetTypeDatabricksQuery, PlatformDatabricks},
+		{pipeline.AssetTypeSparkQuery, PlatformSpark},
 		{pipeline.AssetTypeAthenaQuery, PlatformAthena},
 		{pipeline.AssetTypeTrinoQuery, PlatformTrino},
 		{pipeline.AssetTypeSynapseQuery, PlatformSynapse},

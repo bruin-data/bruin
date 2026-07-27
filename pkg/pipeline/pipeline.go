@@ -148,6 +148,11 @@ const (
 	AssetTypeDremioQuerySensor         = AssetType("dremio.sensor.query")
 	AssetTypeSailQuery                 = AssetType("sail.sql")
 	AssetTypeSailQuerySensor           = AssetType("sail.sensor.query")
+	AssetTypeSparkQuery                = AssetType("spark.sql")
+	AssetTypeSparkQuerySensor          = AssetType("spark.sensor.query")
+	AssetTypeSparkSeed                 = AssetType("spark.seed")
+	AssetTypeSparkSource               = AssetType("spark.source")
+	AssetTypeSparkTableSensor          = AssetType("spark.sensor.table")
 	AssetTypeVerticaQuery              = AssetType("vertica.sql")
 	AssetTypeVerticaQuerySensor        = AssetType("vertica.sensor.query")
 	AssetTypeVerticaSeed               = AssetType("vertica.seed")
@@ -213,6 +218,7 @@ var defaultMapping = map[string]string{
 	"starrocks":             "starrocks-default",
 	"dremio":                "dremio-default",
 	"sail":                  "sail-default",
+	"spark":                 "spark-default",
 	"oracle":                "oracle-default",
 	"googleanalytics":       "googleanalytics-default",
 	"gsc":                   "gsc-default",
@@ -970,6 +976,11 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeDremioQuerySensor:         "dremio",
 	AssetTypeSailQuery:                 "sail",
 	AssetTypeSailQuerySensor:           "sail",
+	AssetTypeSparkQuery:                "spark",
+	AssetTypeSparkSeed:                 "spark",
+	AssetTypeSparkQuerySensor:          "spark",
+	AssetTypeSparkSource:               "spark",
+	AssetTypeSparkTableSensor:          "spark",
 	AssetTypeOracleQuery:               "oracle",
 	AssetTypeOracleSource:              "oracle",
 	AssetTypeS3KeySensor:               "aws",
@@ -2400,6 +2411,7 @@ func assetMainTaskIsConnectionless(assetType AssetType) bool {
 		AssetTypeClickHouseSource,
 		AssetTypeDorisSource,
 		AssetTypeDatabricksSource,
+		AssetTypeSparkSource,
 		AssetTypeDuckDBSource,
 		AssetTypeMongoSource,
 		AssetTypeMsSQLSource,
@@ -2525,6 +2537,7 @@ func (p *Pipeline) GetMajorityAssetTypesFromSQLAssets(defaultIfNone AssetType) A
 		AssetTypeTrinoQuery:        0,
 		AssetTypeDremioQuery:       0,
 		AssetTypeSailQuery:         0,
+		AssetTypeSparkQuery:        0,
 		AssetTypeOracleQuery:       0,
 		AssetTypeDorisQuery:        0,
 		AssetTypeStarRocksQuery:    0,
@@ -4004,6 +4017,7 @@ func IsSQLAssetType(t AssetType) bool {
 		AssetTypeTrinoQuery,
 		AssetTypeDremioQuery,
 		AssetTypeSailQuery,
+		AssetTypeSparkQuery,
 		AssetTypeOracleQuery:
 		return true
 	default:

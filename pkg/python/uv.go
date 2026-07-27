@@ -196,6 +196,7 @@ var DatabasePrefixToSqlfluffDialect = map[string]string{
 	"fabric":     "tsql",
 	"fw":         "tsql",
 	"databricks": "sparksql",
+	"spark":      "sparksql",
 	"synapse":    "tsql",
 	"duckdb":     "duckdb",
 	"clickhouse": "clickhouse",

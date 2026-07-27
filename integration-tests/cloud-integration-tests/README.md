@@ -1,5 +1,9 @@
 # Cloud Integration Tests
 
+Self-contained suites for Spark, Sail, Doris, StarRocks, and ClickHouse start
+their own local containers and do not require entries in `.bruin.cloud.yml`.
+See each platform directory for its exact requirements and direct test command.
+
 This directory contains integration tests for cloud data platforms supported by Bruin. These tests verify that Bruin works correctly with real cloud databases and data warehouses.
 
 ## Overview

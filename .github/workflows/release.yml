@@ -53,16 +53,20 @@ jobs:
       - name: Wait for R (Ubuntu)
         if: matrix.suite == 'integration-test' && startsWith(matrix.platform, 'depot-ubuntu')
         run: |
-          timeout=120
-          while ! command -v Rscript &>/dev/null; do
-            timeout=$((timeout - 1))
-            if [ $timeout -le 0 ]; then
-              echo "::error::R installation timed out after 120s. Install log:"
+          # Budgeted on wall clock rather than loop iterations, and generously:
+          # the background apt-get fetches 30 MB, and a slow archive mirror had
+          # been overrunning the old 120-iteration budget. The loop still exits
+          # the moment Rscript appears, so a healthy run pays nothing for this.
+          deadline=$((SECONDS + 600))
+          until command -v Rscript >/dev/null 2>&1; do
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "::error::R did not become available within 600s. Install log:"
               cat /tmp/r_install.log 2>/dev/null || true
               exit 1
             fi
-            sleep 1
+            sleep 2
           done
+          echo "R available after ${SECONDS}s"
       - name: Install R (macOS)
         if: matrix.suite == 'integration-test' && startsWith(matrix.platform, 'depot-macos')
         run: |

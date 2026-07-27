@@ -93,9 +93,71 @@ func (c *collector) walk(v reflect.Value) {
 				c.sl(field, fv.String())
 				continue // strings never hold nested structs
 			}
+			if fv.Kind() == reflect.Map && field.Tag.Get("sensitive") == "true" {
+				c.sensitiveMap(field, fv)
+				continue
+			}
 			c.walk(fv)
 		}
 	}
+}
+
+// credentialKeyMarkers name the option keys whose values are treated as secrets
+// inside a map tagged sensitive:"true". They are matched against the key with
+// every separator removed, so they carry none themselves: driver option
+// namespaces mix dots, hyphens and underscores (`fs.azure.account.key.…`,
+// `spark.ingest.s3.access-key`), and a separator-sensitive marker would miss
+// most real spellings.
+var credentialKeyMarkers = []string{
+	"password", "passwd", "pwd", "passphrase", "secret", "token", "credential",
+	"apikey", "accountkey", "accesskey", "privatekey", "sessionkey", "signature",
+}
+
+// minCredentialLength is the shortest map value that is treated as a secret.
+// Masking is a plain find-and-replace over the whole run output, so a short
+// value such as "true" or "none" — plausible even under a credential-shaped key
+// like `…token_enabled` — would redact an ordinary word from every log line.
+const minCredentialLength = 8
+
+// sensitiveMap collects the credential values of a map field tagged
+// sensitive:"true".
+//
+// Only values whose key names a credential are collected. Such maps hold
+// arbitrary driver options, most of which are ordinary settings, and collecting
+// a value like "true" from `spark.ingest.s3.use_path_style` would redact every
+// occurrence of that substring in every log line.
+func (c *collector) sensitiveMap(field reflect.StructField, m reflect.Value) {
+	for _, key := range m.MapKeys() {
+		value := m.MapIndex(key)
+		if value.Kind() != reflect.String {
+			c.walk(value) // a nested struct may carry its own sensitive fields
+			continue
+		}
+		if key.Kind() != reflect.String || len(value.String()) < minCredentialLength {
+			continue
+		}
+		name := stripKeySeparators(key.String())
+		for _, marker := range credentialKeyMarkers {
+			if strings.Contains(name, marker) {
+				c.sl(field, value.String())
+				break
+			}
+		}
+	}
+}
+
+// stripKeySeparators lowercases an option key and drops everything that is not
+// a letter or a digit, so `FS.Azure.Account.Key` and `access-key` normalize to
+// the separator-free forms the markers are written in.
+func stripKeySeparators(key string) string {
+	var b strings.Builder
+	b.Grow(len(key))
+	for _, r := range strings.ToLower(key) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }
 
 func (c *collector) sl(field reflect.StructField, s string) {
