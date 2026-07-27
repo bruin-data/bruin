@@ -157,8 +157,8 @@ lint-full:
 # Check Go formatting without modifying files.
 format-ci:
 	@echo "$(OK_COLOR)==> Checking Go formatting$(NO_COLOR)"
-	@GCI_DIFF=$$(go tool gci list $(GO_FORMAT_PATHS) 2>&1); \
-	GOFUMPT_DIFF=$$(go tool gofumpt -d $(GO_FORMAT_PATHS) 2>&1); \
+	@GCI_DIFF=$$(go tool gci list $(GO_FORMAT_PATHS)) || exit $$?; \
+	GOFUMPT_DIFF=$$(go tool gofumpt -d $(GO_FORMAT_PATHS)) || exit $$?; \
 	if [ -n "$$GCI_DIFF$$GOFUMPT_DIFF" ]; then \
 		echo "$(ERROR_COLOR)Files need formatting:$(NO_COLOR)"; \
 		[ -z "$$GCI_DIFF" ] || echo "$$GCI_DIFF"; \
