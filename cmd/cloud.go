@@ -3764,6 +3764,20 @@ func parseCostFilters(raw []string) ([]bruincloud.CostFilter, error) {
 	}
 	filters := make([]bruincloud.CostFilter, 0, len(raw))
 	for _, entry := range raw {
+		// StringSliceFlag splits on commas, so an `in` filter's values arrive as separate
+		// entries; a fragment without ":" is a continuation of the preceding `in` filter.
+		if !strings.Contains(entry, ":") {
+			if len(filters) == 0 {
+				return nil, fmt.Errorf("filter %q must be field:op:value", entry)
+			}
+			last := &filters[len(filters)-1]
+			vals, ok := last.Value.([]string)
+			if !ok {
+				return nil, fmt.Errorf("filter value %q is only valid for op 'in'", entry)
+			}
+			last.Value = append(vals, entry)
+			continue
+		}
 		parts := strings.SplitN(entry, ":", 3)
 		if len(parts) != 3 || parts[0] == "" || parts[1] == "" {
 			return nil, fmt.Errorf("filter %q must be field:op:value", entry)

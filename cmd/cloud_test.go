@@ -525,6 +525,16 @@ func TestParseCostFilters(t *testing.T) {
 		assert.Equal(t, bruincloud.CostFilter{Field: "pipeline_id", Op: "in", Value: []string{"x", "y"}}, filters[1])
 	})
 
+	t.Run("in values split across entries by the slice flag", func(t *testing.T) {
+		t.Parallel()
+		// urfave's StringSliceFlag splits "pipeline_id:in:daily-etl,ml" on the comma.
+		filters, err := parseCostFilters([]string{"pipeline_id:in:daily-etl", "ml", "user_email:eq:a@b.com"})
+		require.NoError(t, err)
+		require.Len(t, filters, 2)
+		assert.Equal(t, bruincloud.CostFilter{Field: "pipeline_id", Op: "in", Value: []string{"daily-etl", "ml"}}, filters[0])
+		assert.Equal(t, bruincloud.CostFilter{Field: "user_email", Op: "eq", Value: "a@b.com"}, filters[1])
+	})
+
 	t.Run("empty", func(t *testing.T) {
 		t.Parallel()
 		filters, err := parseCostFilters(nil)
