@@ -517,23 +517,20 @@ func TestParseRunVariables(t *testing.T) {
 func TestParseCostFilters(t *testing.T) {
 	t.Parallel()
 
-	t.Run("eq and in", func(t *testing.T) {
+	t.Run("eq and repeated in merge by field", func(t *testing.T) {
 		t.Parallel()
-		filters, err := parseCostFilters([]string{"user_email:eq:a@b.com", "pipeline_id:in:x,y"})
+		// urfave splits on commas, so `in` values arrive as repeated --filter flags.
+		filters, err := parseCostFilters([]string{"user_email:eq:a@b.com", "pipeline_id:in:x", "pipeline_id:in:y"})
 		require.NoError(t, err)
 		require.Len(t, filters, 2)
 		assert.Equal(t, bruincloud.CostFilter{Field: "user_email", Op: "eq", Value: "a@b.com"}, filters[0])
 		assert.Equal(t, bruincloud.CostFilter{Field: "pipeline_id", Op: "in", Value: []string{"x", "y"}}, filters[1])
 	})
 
-	t.Run("in values split across entries by the slice flag", func(t *testing.T) {
+	t.Run("bare token is rejected", func(t *testing.T) {
 		t.Parallel()
-		// urfave's StringSliceFlag splits "pipeline_id:in:daily-etl,ml" on the comma.
-		filters, err := parseCostFilters([]string{"pipeline_id:in:daily-etl", "ml", "user_email:eq:a@b.com"})
-		require.NoError(t, err)
-		require.Len(t, filters, 2)
-		assert.Equal(t, bruincloud.CostFilter{Field: "pipeline_id", Op: "in", Value: []string{"daily-etl", "ml"}}, filters[0])
-		assert.Equal(t, bruincloud.CostFilter{Field: "user_email", Op: "eq", Value: "a@b.com"}, filters[1])
+		_, err := parseCostFilters([]string{"pipeline_id:in:a", "b"})
+		require.Error(t, err)
 	})
 
 	t.Run("empty", func(t *testing.T) {
@@ -552,7 +549,7 @@ func TestParseCostFilters(t *testing.T) {
 
 func TestFormatCostCell(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, "", formatCostCell(nil))
+	assert.Empty(t, formatCostCell(nil))
 	assert.Equal(t, "daily-etl", formatCostCell("daily-etl"))
 	assert.Equal(t, "74123", formatCostCell(float64(74123)))
 	assert.JSONEq(t, `{"pipeline_id":"p"}`, formatCostCell(map[string]any{"pipeline_id": "p"}))

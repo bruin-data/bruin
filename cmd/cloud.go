@@ -3686,7 +3686,7 @@ func cloudCostExplorer() *cli.Command {
 			},
 			&cli.StringSliceFlag{
 				Name:  "filter",
-				Usage: "filter as field:op:value; repeat for multiple. For op 'in', comma-separate values (e.g. pipeline_id:in:a,b)",
+				Usage: "filter as field:op:value; repeat --filter per value for op 'in' (e.g. --filter pipeline_id:in:a --filter pipeline_id:in:b)",
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
@@ -3762,34 +3762,29 @@ func parseCostFilters(raw []string) ([]bruincloud.CostFilter, error) {
 	if len(raw) == 0 {
 		return nil, nil
 	}
+	// urfave's StringSliceFlag splits values on commas, so multiple `in` values are passed as
+	// repeated --filter flags (e.g. --filter pipeline_id:in:a --filter pipeline_id:in:b) and
+	// merged here by field. Every token must be a complete field:op:value.
 	filters := make([]bruincloud.CostFilter, 0, len(raw))
+	inIndex := make(map[string]int)
 	for _, entry := range raw {
-		// StringSliceFlag splits on commas, so an `in` filter's values arrive as separate
-		// entries; a fragment without ":" is a continuation of the preceding `in` filter.
-		if !strings.Contains(entry, ":") {
-			if len(filters) == 0 {
-				return nil, fmt.Errorf("filter %q must be field:op:value", entry)
-			}
-			last := &filters[len(filters)-1]
-			vals, ok := last.Value.([]string)
-			if !ok {
-				return nil, fmt.Errorf("filter value %q is only valid for op 'in'", entry)
-			}
-			vals = append(vals, entry)
-			last.Value = vals
-			continue
-		}
 		parts := strings.SplitN(entry, ":", 3)
 		if len(parts) != 3 || parts[0] == "" || parts[1] == "" {
 			return nil, fmt.Errorf("filter %q must be field:op:value", entry)
 		}
-		f := bruincloud.CostFilter{Field: parts[0], Op: parts[1]}
-		if parts[1] == "in" {
-			f.Value = strings.Split(parts[2], ",")
-		} else {
-			f.Value = parts[2]
+		field, op, value := parts[0], parts[1], parts[2]
+		if op == "in" {
+			if idx, ok := inIndex[field]; ok {
+				vals := filters[idx].Value.([]string)
+				vals = append(vals, value)
+				filters[idx].Value = vals
+				continue
+			}
+			inIndex[field] = len(filters)
+			filters = append(filters, bruincloud.CostFilter{Field: field, Op: op, Value: []string{value}})
+			continue
 		}
-		filters = append(filters, f)
+		filters = append(filters, bruincloud.CostFilter{Field: field, Op: op, Value: value})
 	}
 	return filters, nil
 }

@@ -723,10 +723,10 @@ bruin cloud cost explorer --start-date 2026-07-01 --end-date 2026-07-31 --dimens
 # Daily trend for two pipelines, as JSON
 bruin cloud cost explorer --start-date 2026-07-01 --end-date 2026-07-31 \
   --dimension asset_name --time-dimension day \
-  --filter pipeline_id:in:daily-etl,ml-features --output json
+  --filter pipeline_id:in:daily-etl --filter pipeline_id:in:ml-features --output json
 ```
 
-Filters are `field:op:value`; repeat `--filter` for multiple. For op `in`, comma-separate the values. Large result sets paginate with `--limit` and `--offset` (the response reports the next offset).
+Filters are `field:op:value`; repeat `--filter` for multiple. For op `in`, repeat `--filter` once per value (values for the same field are combined). Large result sets paginate with `--limit` and `--offset` (the response reports the next offset).
 
 ---
 
