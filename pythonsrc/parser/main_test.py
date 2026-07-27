@@ -1967,6 +1967,50 @@ def test_get_column_lineage_falls_back_with_per_column_error_isolation(monkeypat
     ]
 
 
+def test_get_column_lineage_uses_per_column_fallback_for_duplicate_aliases(monkeypatch):
+    sqlglot_lineage = parser_main.lineage.lineage
+    lineage_calls = []
+
+    def tracking_lineage(column, *args, **kwargs):
+        lineage_calls.append((column, kwargs.get("copy"), kwargs.get("trim_selects")))
+        return sqlglot_lineage(column, *args, **kwargs)
+
+    monkeypatch.setattr(parser_main.lineage, "lineage", tracking_lineage)
+
+    result = get_column_lineage(
+        """
+        SELECT
+            src.first_value AS duplicate,
+            src.second_value AS duplicate
+        FROM synthetic.events AS src
+        """,
+        {
+            "synthetic.events": {
+                "first_value": "INT64",
+                "second_value": "INT64",
+            }
+        },
+        "bigquery",
+    )
+
+    assert lineage_calls == [
+        ("duplicate", False, False),
+        ("duplicate", False, False),
+    ]
+    assert result["columns"] == [
+        {
+            "name": "duplicate",
+            "type": "BIGINT",
+            "upstream": [{"column": "first_value", "table": "synthetic.events"}],
+        },
+        {
+            "name": "duplicate",
+            "type": "BIGINT",
+            "upstream": [{"column": "first_value", "table": "synthetic.events"}],
+        },
+    ]
+
+
 @pytest.mark.parametrize(
     "query,schema,expected,dialect",
     [
