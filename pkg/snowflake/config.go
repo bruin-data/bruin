@@ -97,6 +97,9 @@ func (c Config) IsValid() bool {
 	if c.Token != "" {
 		return true
 	}
+	if c.PrivateKey != "" {
+		return c.Username != ""
+	}
 	return c.Username != "" && c.Password != "" && c.Region != ""
 }
 
