@@ -586,6 +586,11 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         class: "mermaid my-class", // set additional css classes for parent container
     },
     vite: {
+        optimizeDeps: {
+            esbuildOptions: {
+                target: "esnext",
+            },
+        },
         build: {
             target: ["chrome107", "edge107", "firefox104", "safari16"],
         },

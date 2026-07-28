@@ -4,9 +4,53 @@
 
 Bruin supports Shopify as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Shopify into your data warehouse.
 
-In order to set up Shopify connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file. You need the `url` of your Shopify store and the `api_key`. For details on how to obtain these credentials, please refer [here](https://dlthub.com/docs/dlt-ecosystem/verified-sources/shopify#setup-guide).
+To set up a Shopify connection, you need your store URL and Shopify Admin API access token. For the underlying connector reference, see the [ingestr Shopify documentation](https://getbruin.com/docs/ingestr/supported-sources/shopify.html).
 
 Follow the steps below to correctly set up Shopify as a data source and run ingestion:
+
+## Setting up a Shopify Integration
+
+To use the Shopify API, create a custom app in the Shopify Dev Dashboard and install it in your store.
+
+### Step 1: Create or Select an App
+
+1. Go to the [Shopify Dev Dashboard](https://dev.shopify.com/dashboard)
+2. Select an existing app or create a new one
+
+### Step 2: Configure API Scopes
+
+In the app configuration, make sure the app has read scopes for the data you want to ingest:
+
+- `read_products`
+- `read_customers`
+- `read_orders`
+- `read_inventory`
+- `read_locations`
+
+These are examples, not an exhaustive list. Add every Admin API access scope required by the source tables you select, including the relevant permissions for discounts, events, transactions, balance, and price rules.
+
+After changing scopes:
+
+1. Create a new app version
+2. Release the new app version
+
+### Step 3: Install the App in Your Store
+
+1. Open the Shopify store admin: `https://admin.shopify.com/store/your-store-name`
+2. Go to **Settings** → **Apps and sales channels**
+3. Find and open your app
+4. Install or reinstall the app so the new scopes become active
+
+### Step 4: Get the Admin API Access Token
+
+1. After installation, go back to **Apps and sales channels**
+2. Click on your app
+3. Click **API credentials**
+4. Copy the **Admin API access token**
+
+> **Important**: The access token is displayed only once. Copy and store it securely.
+
+Use your store name, for example `my-store.myshopify.com`, as `url`, and use the Admin API access token as `api_key` in `.bruin.yml`. The `api_key` parameter is named for compatibility; its value is not the app's API key.
 
 ## Configuration
 
@@ -15,18 +59,17 @@ Follow the steps below to correctly set up Shopify as a data source and run inge
 To ingest data from Shopify, you need to create an [asset configuration](/assets/ingestr#asset-structure) file. This file defines the data flow from the source to the destination. Create a YAML file (e.g., shopify_ingestion.yml) inside the assets folder and add the following content:
 
 ```yaml
-   connections:
+connections:
     shopify:
-        - name: my-shopify
-          url: test.myshopify.com
-          api_key: abckey
-          client_id: your_client_id
-          client_secret: your_client_secret
+      - name: my-shopify
+        url: my-store.myshopify.com
+        api_key: your_admin_api_access_token
 ```
 
-- `api_key`: the API key used for authentication with Shopify
-- `client_id`: the OAuth client ID for your Shopify app (optional)
-- `client_secret`: the OAuth client secret for your Shopify app (optional)
+- `url`: the Shopify store domain, such as `my-store.myshopify.com`.
+- `api_key`: the **Admin API access token** from your Shopify app. The parameter is named `api_key` for compatibility, but its value is not the app's API key.
+
+For this token-based connection, the store domain and its Admin API access token are the only required values. You do not need to provide the app's `client_id` or `client_secret`.
 
 ### Step 2: Create an asset file for data ingestion
 
