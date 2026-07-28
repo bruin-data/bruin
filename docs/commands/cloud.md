@@ -627,9 +627,16 @@ bruin cloud dashboards get --dashboard-id 42 --output json
 Create a dashboard from a definition. The definition is written to the dashboard's
 **draft** — it is never published automatically; publish it from the Bruin Cloud UI.
 
+Pass `--agent-id` to bind the dashboard to an agent so its canvas chat and refresh
+work. If omitted, the server falls back to the agent encoded in a Cloud-CLI token;
+a generic team token has none, so the dashboard opens without a chat panel.
+
 ```bash
 # Title only (empty draft)
 bruin cloud dashboards create --title "Q1 Revenue"
+
+# Bind an agent so the dashboard's chat works
+bruin cloud dashboards create --title "Q1 Revenue" --agent-id 7
 
 # With a definition, inline or from a file
 bruin cloud dashboards create --title "Q1 Revenue" --visibility team --state '{"widgets":[]}'

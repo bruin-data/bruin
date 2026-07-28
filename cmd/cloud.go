@@ -3059,6 +3059,10 @@ func cloudDashboardsCreate() *cli.Command {
 				Name:  "visibility",
 				Usage: "team or private (default: team)",
 			},
+			&cli.IntFlag{
+				Name:  "agent-id",
+				Usage: "the agent to bind for canvas chat and refresh (defaults to the token's agent)",
+			},
 			&cli.StringFlag{
 				Name:  "state",
 				Usage: "the dashboard definition as a JSON or YAML string",
@@ -3075,6 +3079,14 @@ func cloudDashboardsCreate() *cli.Command {
 			visibility := c.String("visibility")
 			if visibility != "" && visibility != "team" && visibility != "private" {
 				printError(fmt.Errorf("visibility must be 'team' or 'private', got %q", visibility), output, "Invalid --visibility")
+				return cli.Exit("", 1)
+			}
+
+			// Reject an explicit non-positive --agent-id rather than silently
+			// dropping it (which would fall back to the token agent, or none, and
+			// create a dashboard with no chat against the caller's intent).
+			if c.IsSet("agent-id") && c.Int("agent-id") <= 0 {
+				printError(fmt.Errorf("--agent-id must be a positive integer, got %d", c.Int("agent-id")), output, "Invalid --agent-id")
 				return cli.Exit("", 1)
 			}
 
@@ -3123,7 +3135,7 @@ func cloudDashboardsCreate() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			dashboard, err := client.CreateDashboard(ctx, c.String("title"), visibility, state)
+			dashboard, err := client.CreateDashboard(ctx, c.String("title"), visibility, c.Int("agent-id"), state)
 			if err != nil {
 				printError(err, output, "Failed to create dashboard")
 				return cli.Exit("", 1)
@@ -3143,6 +3155,12 @@ func cloudDashboardsCreate() *cli.Command {
 				infoPrinter.Printf("Created dashboard %d (%s) as a draft — open it to review and publish: %s\n", dashboard.ID, title, dashboard.URL)
 			} else {
 				infoPrinter.Printf("Created dashboard %d (%s) as a draft — publish it from the Bruin Cloud UI.\n", dashboard.ID, title)
+			}
+			// No agent resolved (neither an explicit --agent-id nor the token's
+			// agent), so the dashboard opens without a chat panel. Warn and point
+			// at the fix instead of leaving it a silent surprise.
+			if dashboard.AgentID == nil || *dashboard.AgentID <= 0 {
+				errorPrinter.Println("Warning: no agent bound — this dashboard opens without a chat panel. Pass --agent-id <id> (see 'bruin cloud agents list').")
 			}
 			return nil
 		},

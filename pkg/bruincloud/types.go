@@ -253,6 +253,7 @@ type Dashboard struct {
 	Visibility string          `json:"visibility"`
 	UpdatedAt  *string         `json:"updated_at"`
 	URL        string          `json:"url"`
+	AgentID    *int            `json:"agent_id"`
 	State      json.RawMessage `json:"state,omitempty"`
 }
 

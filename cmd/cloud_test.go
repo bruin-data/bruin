@@ -242,6 +242,26 @@ func TestCloudDashboardsCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "update")
 }
 
+func TestCloudDashboardsCreate_RejectsNonPositiveAgentID(t *testing.T) {
+	t.Parallel()
+	// An explicit non-positive --agent-id must fail fast (before any request)
+	// rather than being silently dropped into the token-agent fallback. The
+	// command signals failure via a non-zero exit code, so capture it through
+	// the exit handler instead of Run's return value.
+	for _, v := range []string{"0", "-3"} {
+		cmd := cloudDashboardsCreate()
+		exitCode := 0
+		cmd.ExitErrHandler = func(_ context.Context, _ *cli.Command, err error) {
+			var ec cli.ExitCoder
+			if errors.As(err, &ec) {
+				exitCode = ec.ExitCode()
+			}
+		}
+		_ = cmd.Run(t.Context(), []string{"create", "--title", "T", "--api-key", "k", "--agent-id", v})
+		assert.Equalf(t, 1, exitCode, "agent-id %q should be rejected", v)
+	}
+}
+
 func TestCloudScheduledAgentsCommand_Help(t *testing.T) {
 	t.Parallel()
 	cmd := CloudScheduledAgents()
