@@ -1,0 +1,92 @@
+name: shopify.t1_inventory_items
+type: ingestr
+description: "Raw Shopify inventory item records, incrementally merged from the live shop."
+
+materialization:
+  type: table
+  strategy: merge
+  incremental_key: updated_at
+
+parameters:
+  source_connection: shopify-default
+  source_table: inventory_items
+  destination: clickhouse
+  schema_contract: evolve
+  schema_naming: snake_case
+
+tags:
+  - t1
+  - source
+  - shopify
+  - inventory
+domains:
+  - commerce
+  - merchandising
+  - fulfillment
+meta:
+  grain: one row per Shopify inventory item
+  source_system: shopify
+  source_table: inventory_items
+  data_classification: internal
+  contains_pii: "false"
+  ingestion_strategy: merge on updated_at
+
+columns:
+  - name: id
+    type: String
+    description: "Shopify Admin GraphQL global identifier for the inventory item."
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: created_at
+    type: Nullable(DateTime64(6, 'UTC'))
+    description: "Timestamp when the inventory item was created in Shopify."
+  - name: cost
+    type: Nullable(Float64)
+    description: "Unit cost recorded for the inventory item in shop currency."
+  - name: country_code_of_origin
+    type: Nullable(String)
+    description: "ISO country code where the inventory item originated."
+  - name: province_code_of_origin
+    type: Nullable(String)
+    description: "Province or state code where the inventory item originated."
+  - name: harmonized_system_code
+    type: Nullable(String)
+    description: "Harmonized System tariff code used for customs classification."
+  - name: duplicate_sku_count
+    type: Nullable(Int64)
+    description: "Number of other inventory items that use the same SKU."
+  - name: inventory_history_url
+    type: Nullable(String)
+    description: "Shopify Admin URL for the inventory item's history."
+  - name: legacy_resource_id
+    type: Nullable(String)
+    description: "Legacy numeric Shopify resource identifier represented as text."
+  - name: measurement
+    type: Nullable(String)
+    description: "Serialized inventory measurement, including weight and its unit."
+  - name: requires_shipping
+    type: Nullable(Bool)
+    description: "Whether the inventory item represents a physical item requiring shipping."
+  - name: sku
+    type: Nullable(String)
+    description: "Merchant-defined stock-keeping unit."
+  - name: tracked
+    type: Nullable(Bool)
+    description: "Whether Shopify tracks inventory quantities for the item."
+  - name: tracked_editable
+    type: Nullable(String)
+    description: "Serialized state explaining whether inventory tracking can be edited."
+  - name: updated_at
+    type: Nullable(DateTime64(6, 'UTC'))
+    description: "Timestamp when Shopify last updated the inventory item; used as the incremental cursor."
+  - name: inventory_levels
+    type: Nullable(String)
+    description: "Serialized per-location inventory quantities and location identifiers."
+  - name: variant
+    type: Nullable(String)
+    description: "Serialized Shopify product variant associated with the inventory item."
+  - name: _ingestr_loaded_at
+    type: Nullable(DateTime64(6, 'UTC'))
+    description: "Timestamp when ingestr loaded the record into ClickHouse."

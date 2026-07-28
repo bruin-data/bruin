@@ -1,0 +1,72 @@
+name: shopify.t1_events
+type: ingestr
+description: "Raw Shopify audit events describing changes and actions across shop resources."
+
+materialization:
+  type: table
+  strategy: merge
+  incremental_key: created_at
+
+parameters:
+  source_connection: shopify-default
+  source_table: events
+  destination: clickhouse
+  schema_contract: evolve
+  schema_naming: snake_case
+
+tags:
+  - t1
+  - source
+  - shopify
+  - events
+  - audit
+domains:
+  - commerce
+  - operations
+  - governance
+meta:
+  grain: one row per Shopify audit event
+  source_system: shopify
+  source_table: events
+  data_classification: restricted
+  contains_pii: "true"
+  ingestion_strategy: merge on created_at
+
+columns:
+  - name: id
+    type: Int64
+    description: "Shopify numeric identifier for the audit event."
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: subject_id
+    type: Nullable(Int64)
+    description: "Numeric identifier of the Shopify resource affected by the event."
+  - name: created_at
+    type: Nullable(DateTime64(6, 'UTC'))
+    description: "Timestamp when Shopify created the event; used as the incremental cursor."
+  - name: subject_type
+    type: Nullable(String)
+    description: "Shopify resource type affected by the event, such as Order or PriceRule."
+  - name: verb
+    type: Nullable(String)
+    description: "Action recorded by Shopify, such as create or confirmed."
+  - name: arguments
+    type: Nullable(String)
+    description: "Serialized arguments associated with the event."
+  - name: message
+    type: Nullable(String)
+    description: "Human-readable Shopify event message; may contain internal user information."
+  - name: author
+    type: Nullable(String)
+    description: "Author attributed to the event; may identify a staff user or application."
+  - name: description
+    type: Nullable(String)
+    description: "Additional human-readable description of the event."
+  - name: path
+    type: Nullable(String)
+    description: "Shopify Admin path associated with the affected resource."
+  - name: _ingestr_loaded_at
+    type: Nullable(DateTime64(6, 'UTC'))
+    description: "Timestamp when ingestr loaded the record into ClickHouse."
