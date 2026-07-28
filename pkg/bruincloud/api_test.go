@@ -794,13 +794,17 @@ func TestCreateDashboard(t *testing.T) {
 
 		w.WriteHeader(http.StatusCreated)
 		title := "New Dash"
-		writeJSON(t, w, Dashboard{ID: 9, Title: &title, Visibility: "private", URL: "https://cloud.getbruin.com/acme/dashboards/9?mode=edit"})
+		boundAgent := 7
+		writeJSON(t, w, Dashboard{ID: 9, Title: &title, Visibility: "private", URL: "https://cloud.getbruin.com/acme/dashboards/9?mode=edit", AgentID: &boundAgent})
 	})
 
 	dashboard, err := client.CreateDashboard(t.Context(), "New Dash", "private", 7, map[string]any{"widgets": []any{}})
 	require.NoError(t, err)
 	assert.Equal(t, 9, dashboard.ID)
 	assert.Equal(t, "https://cloud.getbruin.com/acme/dashboards/9?mode=edit", dashboard.URL)
+	// The bound agent comes back on the response so the CLI can warn when none resolved.
+	require.NotNil(t, dashboard.AgentID)
+	assert.Equal(t, 7, *dashboard.AgentID)
 }
 
 func TestCreateDashboardOmitsAgentIDWhenZero(t *testing.T) {

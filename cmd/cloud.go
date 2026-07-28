@@ -3156,6 +3156,12 @@ func cloudDashboardsCreate() *cli.Command {
 			} else {
 				infoPrinter.Printf("Created dashboard %d (%s) as a draft — publish it from the Bruin Cloud UI.\n", dashboard.ID, title)
 			}
+			// No agent resolved (neither an explicit --agent-id nor the token's
+			// agent), so the dashboard opens without a chat panel. Warn and point
+			// at the fix instead of leaving it a silent surprise.
+			if dashboard.AgentID == nil || *dashboard.AgentID <= 0 {
+				errorPrinter.Println("Warning: no agent bound — this dashboard opens without a chat panel. Pass --agent-id <id> (see 'bruin cloud agents list').")
+			}
 			return nil
 		},
 	}
