@@ -3059,6 +3059,10 @@ func cloudDashboardsCreate() *cli.Command {
 				Name:  "visibility",
 				Usage: "team or private (default: team)",
 			},
+			&cli.IntFlag{
+				Name:  "agent-id",
+				Usage: "the agent to bind for canvas chat and refresh (defaults to the token's agent)",
+			},
 			&cli.StringFlag{
 				Name:  "state",
 				Usage: "the dashboard definition as a JSON or YAML string",
@@ -3123,7 +3127,7 @@ func cloudDashboardsCreate() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			dashboard, err := client.CreateDashboard(ctx, c.String("title"), visibility, state)
+			dashboard, err := client.CreateDashboard(ctx, c.String("title"), visibility, c.Int("agent-id"), state)
 			if err != nil {
 				printError(err, output, "Failed to create dashboard")
 				return cli.Exit("", 1)

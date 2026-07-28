@@ -789,6 +789,7 @@ func TestCreateDashboard(t *testing.T) {
 		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
 		assert.Equal(t, "New Dash", body["title"])
 		assert.Equal(t, "private", body["visibility"])
+		assert.EqualValues(t, 7, body["agent_id"])
 		assert.NotNil(t, body["state"])
 
 		w.WriteHeader(http.StatusCreated)
@@ -796,7 +797,7 @@ func TestCreateDashboard(t *testing.T) {
 		writeJSON(t, w, Dashboard{ID: 9, Title: &title, Visibility: "private", URL: "https://cloud.getbruin.com/acme/dashboards/9?mode=edit"})
 	})
 
-	dashboard, err := client.CreateDashboard(t.Context(), "New Dash", "private", map[string]any{"widgets": []any{}})
+	dashboard, err := client.CreateDashboard(t.Context(), "New Dash", "private", 7, map[string]any{"widgets": []any{}})
 	require.NoError(t, err)
 	assert.Equal(t, 9, dashboard.ID)
 	assert.Equal(t, "https://cloud.getbruin.com/acme/dashboards/9?mode=edit", dashboard.URL)

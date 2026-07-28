@@ -585,10 +585,15 @@ func (c *APIClient) GetDashboard(ctx context.Context, dashboardID int) (*Dashboa
 // CreateDashboard creates a dashboard from a definition. The server writes the
 // definition to the draft only (never published). Empty optional fields are
 // omitted so the server applies its defaults.
-func (c *APIClient) CreateDashboard(ctx context.Context, title, visibility string, state map[string]any) (*Dashboard, error) {
+func (c *APIClient) CreateDashboard(ctx context.Context, title, visibility string, agentID int, state map[string]any) (*Dashboard, error) {
 	body := map[string]any{"title": title}
 	if visibility != "" {
 		body["visibility"] = visibility
+	}
+	// Bind the dashboard to an agent so canvas chat and refresh work; omit to let
+	// the server fall back to the agent encoded in a Cloud-CLI token.
+	if agentID > 0 {
+		body["agent_id"] = agentID
 	}
 	if state != nil {
 		body["state"] = state
