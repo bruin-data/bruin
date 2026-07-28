@@ -1316,7 +1316,7 @@ type IcebergConnection struct {
 	// CatalogName is the logical catalog identifier (defaults to "ingestr").
 	CatalogName string         `yaml:"catalog_name,omitempty" json:"catalog_name,omitempty" mapstructure:"catalog_name"`
 	Catalog     IcebergCatalog `yaml:"catalog" json:"catalog" mapstructure:"catalog"`
-	Storage     IcebergStorage `yaml:"storage" json:"storage" mapstructure:"storage"`
+	Storage     IcebergStorage `yaml:"storage,omitempty" json:"storage,omitempty" mapstructure:"storage"`
 
 	// Table/namespace behaviour (ingestr destination write options).
 	CreateNamespace *bool  `yaml:"create_namespace,omitempty" json:"create_namespace,omitempty" mapstructure:"create_namespace"`

@@ -11,8 +11,10 @@ import (
 )
 
 const (
-	testAWSRegion = "us-east-1"
-	testS3Path    = "s3://b/p"
+	testAWSRegion  = "us-east-1"
+	testS3Path     = "s3://b/p"
+	testSQLitePath = "/c.db"
+	testS3LakeWh   = "s3://lake/wh"
 )
 
 func parseQuery(t *testing.T, raw string) (string, url.Values) {
@@ -44,7 +46,7 @@ func TestConfig_GetIngestrURI_GlueS3(t *testing.T) {
 
 	scheme, q := parseQuery(t, got)
 	assert.Equal(t, "iceberg+glue", scheme)
-	assert.Equal(t, "s3", q.Get("storage"))
+	assert.Empty(t, q.Get("storage"), "storage flag is no longer emitted; the warehouse scheme carries the backend")
 	assert.Equal(t, "s3://company-lake/warehouse", q.Get("warehouse"))
 	assert.Equal(t, testAWSRegion, q.Get("region"))
 	assert.Equal(t, "AKID", q.Get("access_key_id"))
@@ -78,7 +80,7 @@ func TestConfig_GetIngestrURI_SQLiteS3MinIO(t *testing.T) {
 
 	scheme, q := parseQuery(t, got)
 	assert.Equal(t, "iceberg+sqlite", scheme)
-	assert.Equal(t, "s3", q.Get("storage"))
+	assert.Empty(t, q.Get("storage"), "storage flag is no longer emitted; the warehouse scheme carries the backend")
 	assert.Equal(t, "localhost:9000", q.Get("endpoint"))
 	assert.Equal(t, "false", q.Get("use_ssl"))
 	assert.Equal(t, "minioadmin", q.Get("access_key_id"))
@@ -98,7 +100,7 @@ func TestConfig_GetIngestrURI_BucketPrefixStorage(t *testing.T) {
 	}
 
 	_, q := parseQuery(t, mustURI(t, c))
-	assert.Equal(t, "s3", q.Get("storage"))
+	assert.Empty(t, q.Get("storage"), "storage flag is no longer emitted; the warehouse scheme carries the backend")
 	assert.Equal(t, "company-lake", q.Get("bucket"))
 	assert.Equal(t, "warehouse", q.Get("prefix"))
 	assert.Empty(t, q.Get("warehouse"), "warehouse must not be set when bucket is used")
@@ -128,7 +130,7 @@ func TestConfig_GetIngestrURI_PostgresS3(t *testing.T) {
 	assert.True(t, strings.HasPrefix(got, "iceberg+postgres://iceberg_user:secret@metadata-db.internal:5432/iceberg_catalog?"), "got: %s", got)
 
 	_, q := parseQuery(t, got)
-	assert.Equal(t, "s3", q.Get("storage"))
+	assert.Empty(t, q.Get("storage"), "storage flag is no longer emitted; the warehouse scheme carries the backend")
 	assert.Equal(t, "eu-west-1", q.Get("region"))
 }
 
@@ -160,7 +162,7 @@ func TestConfig_GetIngestrURI_RESTCatalog(t *testing.T) {
 
 	scheme, q := parseQuery(t, got)
 	assert.Equal(t, "iceberg+rest", scheme)
-	assert.Equal(t, "s3", q.Get("storage"))
+	assert.Empty(t, q.Get("storage"), "storage flag is no longer emitted; the warehouse scheme carries the backend")
 	assert.Equal(t, "client-id:secret", q.Get("credential"))
 	assert.Equal(t, "https://auth.internal/token", q.Get("oauth2-server-uri"))
 }
@@ -185,6 +187,141 @@ func TestConfig_GetIngestrURI_HadoopAndHive(t *testing.T) {
 	assert.True(t, strings.HasPrefix(got, "iceberg+hive://metastore:9083?"), "got: %s", got)
 }
 
+func TestConfig_GetIngestrURI_RESTUseSSL(t *testing.T) {
+	t.Parallel()
+
+	useSSL := true
+	c := Config{
+		Catalog: config.IcebergCatalog{
+			Type:       config.IcebergCatalogREST,
+			Host:       "catalog.example.com",
+			Port:       443,
+			RestUseSSL: &useSSL,
+		},
+		Storage: config.IcebergStorage{Type: config.IcebergStorageS3, Path: testS3Path},
+	}
+
+	_, q := parseQuery(t, mustURI(t, c))
+	assert.Equal(t, "true", q.Get("rest_use_ssl"))
+}
+
+func TestConfig_GetIngestrURI_SQLCatalogDriverDialect(t *testing.T) {
+	t.Parallel()
+
+	c := Config{
+		Catalog: config.IcebergCatalog{
+			Type:    config.IcebergCatalogSQL,
+			URI:     "postgresql://u:p@h:5432/db",
+			Driver:  "pgx",
+			Dialect: "postgres",
+		},
+		Storage: config.IcebergStorage{Type: config.IcebergStorageS3, Path: testS3Path},
+	}
+	_, q := parseQuery(t, mustURI(t, c))
+	assert.Equal(t, "postgresql://u:p@h:5432/db", q.Get("uri"))
+	assert.Equal(t, "pgx", q.Get("sql.driver"))
+	assert.Equal(t, "postgres", q.Get("sql.dialect"))
+}
+
+func TestConfig_GetIngestrURI_GCSStorage(t *testing.T) {
+	t.Parallel()
+
+	// Native GCS via a gs:// warehouse + service-account key file.
+	path := Config{
+		Catalog: config.IcebergCatalog{Type: config.IcebergCatalogSQLite, Path: testSQLitePath},
+		Storage: config.IcebergStorage{
+			Type:    config.IcebergStorageGCS,
+			Path:    "gs://company-lake/warehouse",
+			KeyFile: "/creds/gcs-sa.json",
+		},
+	}
+	_, q := parseQuery(t, mustURI(t, path))
+	assert.Equal(t, "gcs", q.Get("storage"))
+	assert.Equal(t, "gs://company-lake/warehouse", q.Get("warehouse"))
+	assert.Equal(t, "/creds/gcs-sa.json", q.Get("gcs.keypath"))
+
+	// Bucket (+ prefix): storage=gcs tells ingestr to build the gs:// warehouse.
+	bucket := Config{
+		Catalog: config.IcebergCatalog{Type: config.IcebergCatalogSQLite, Path: testSQLitePath},
+		Storage: config.IcebergStorage{
+			Type:   config.IcebergStorageGCS,
+			Bucket: "company-lake",
+			Prefix: "warehouse",
+		},
+	}
+	_, q = parseQuery(t, mustURI(t, bucket))
+	assert.Equal(t, "gcs", q.Get("storage"))
+	assert.Equal(t, "company-lake", q.Get("bucket"))
+	assert.Equal(t, "warehouse", q.Get("prefix"))
+}
+
+func TestConfig_GetIngestrURI_LocalStorage(t *testing.T) {
+	t.Parallel()
+
+	c := Config{
+		Catalog: config.IcebergCatalog{Type: config.IcebergCatalogSQLite, Path: testSQLitePath},
+		Storage: config.IcebergStorage{Type: config.IcebergStorageLocal, Path: "file:///tmp/warehouse"},
+	}
+	_, q := parseQuery(t, mustURI(t, c))
+	assert.Equal(t, "file:///tmp/warehouse", q.Get("warehouse"))
+	assert.Empty(t, q.Get("storage"), "local storage sets no storage flag")
+}
+
+func TestConfig_GetIngestrURI_HadoopObjectStorage(t *testing.T) {
+	t.Parallel()
+
+	// No catalog path: the Hadoop warehouse comes from the storage block (s3://).
+	c := Config{
+		Catalog:    config.IcebergCatalog{Type: config.IcebergCatalogHadoop},
+		Storage:    config.IcebergStorage{Type: config.IcebergStorageS3, Path: testS3LakeWh},
+		Properties: map[string]string{"allow-unsafe-commits": "true"},
+	}
+	got := mustURI(t, c)
+	assert.True(t, strings.HasPrefix(got, "iceberg+hadoop://?"), "got: %s", got)
+	_, q := parseQuery(t, got)
+	assert.Equal(t, testS3LakeWh, q.Get("warehouse"))
+	assert.Equal(t, "true", q.Get("allow-unsafe-commits"))
+}
+
+func TestConfig_GetIngestrURI_SQLCatalogNoStorage(t *testing.T) {
+	t.Parallel()
+
+	// The advanced sql catalog may own its warehouse, so storage is optional.
+	c := Config{
+		Catalog: config.IcebergCatalog{
+			Type:    config.IcebergCatalogSQL,
+			URI:     "postgresql://u:p@h:5432/db",
+			Driver:  "pgx",
+			Dialect: "postgres",
+		},
+	}
+	got := mustURI(t, c)
+	assert.True(t, strings.HasPrefix(got, "iceberg+sql://?"), "got: %s", got)
+}
+
+func TestConfig_GetIngestrURI_HadoopLocalNoStorage(t *testing.T) {
+	t.Parallel()
+
+	// A local Hadoop warehouse (catalog path) needs no storage block.
+	c := Config{Catalog: config.IcebergCatalog{Type: config.IcebergCatalogHadoop, Path: "/tmp/wh"}}
+	got := mustURI(t, c)
+	assert.True(t, strings.HasPrefix(got, "iceberg+hadoop:///tmp/wh"), "got: %s", got)
+}
+
+func TestConfig_GetIngestrURI_NoStorage(t *testing.T) {
+	t.Parallel()
+
+	// Glue/REST/SQL catalogs may supply their own warehouse; storage is optional.
+	c := Config{
+		Catalog: config.IcebergCatalog{Type: config.IcebergCatalogGlue, Region: testAWSRegion},
+	}
+	got := mustURI(t, c)
+	assert.True(t, strings.HasPrefix(got, "iceberg+glue://?"), "got: %s", got)
+	_, q := parseQuery(t, got)
+	assert.Empty(t, q.Get("storage"))
+	assert.Equal(t, testAWSRegion, q.Get("region"))
+}
+
 func TestConfig_GetIngestrURI_SQLCatalogViaProperties(t *testing.T) {
 	t.Parallel()
 
@@ -205,7 +342,7 @@ func TestConfig_GetIngestrURI_TableAndNamespaceParams(t *testing.T) {
 	createNS := false
 	c := Config{
 		Catalog:         config.IcebergCatalog{Type: config.IcebergCatalogGlue, Region: testAWSRegion},
-		Storage:         config.IcebergStorage{Type: config.IcebergStorageS3, Path: "s3://lake/wh"},
+		Storage:         config.IcebergStorage{Type: config.IcebergStorageS3, Path: testS3LakeWh},
 		CreateNamespace: &createNS,
 		TableLocation:   "s3://lake/wh/{namespace}/{table}",
 		TablePath:       "{namespace}/{table}",
@@ -229,7 +366,7 @@ func TestConfig_GetIngestrURI_PropertiesOverride(t *testing.T) {
 	// A passthrough property wins over a structured value on conflict.
 	c := Config{
 		Catalog:    config.IcebergCatalog{Type: config.IcebergCatalogGlue, Region: testAWSRegion},
-		Storage:    config.IcebergStorage{Type: config.IcebergStorageS3, Path: "s3://lake/wh"},
+		Storage:    config.IcebergStorage{Type: config.IcebergStorageS3, Path: testS3LakeWh},
 		Properties: map[string]string{"region": "eu-west-1"},
 	}
 	_, q := parseQuery(t, mustURI(t, c))
@@ -241,6 +378,56 @@ func mustURI(t *testing.T, c Config) string {
 	uri, err := c.GetIngestrURI()
 	require.NoError(t, err)
 	return uri
+}
+
+func TestConfig_GetIngestrURI_InferStorageFromScheme(t *testing.T) {
+	t.Parallel()
+
+	// gs:// warehouse, no storage.type → inferred GCS.
+	gcs := Config{
+		Catalog: config.IcebergCatalog{Type: config.IcebergCatalogSQLite, Path: testSQLitePath},
+		Storage: config.IcebergStorage{Path: "gs://lake/wh", KeyFile: "/sa.json"},
+	}
+	_, q := parseQuery(t, mustURI(t, gcs))
+	assert.Equal(t, "gs://lake/wh", q.Get("warehouse"))
+	assert.Equal(t, "/sa.json", q.Get("gcs.keypath"))
+	assert.Empty(t, q.Get("storage"))
+
+	// s3:// warehouse, no type → inferred S3 (credentials emitted).
+	s3 := Config{
+		Catalog: config.IcebergCatalog{Type: config.IcebergCatalogSQLite, Path: testSQLitePath},
+		Storage: config.IcebergStorage{Path: testS3LakeWh, Region: testAWSRegion, Auth: config.IcebergAuth{AccessKey: "AKID", SecretKey: "SECRET"}},
+	}
+	_, q = parseQuery(t, mustURI(t, s3))
+	assert.Equal(t, testS3LakeWh, q.Get("warehouse"))
+	assert.Equal(t, "AKID", q.Get("access_key_id"))
+
+	// file:// warehouse, no type → inferred local.
+	local := Config{
+		Catalog: config.IcebergCatalog{Type: config.IcebergCatalogSQLite, Path: testSQLitePath},
+		Storage: config.IcebergStorage{Path: "file:///tmp/wh"},
+	}
+	_, q = parseQuery(t, mustURI(t, local))
+	assert.Equal(t, "file:///tmp/wh", q.Get("warehouse"))
+
+	// bucket with no type → defaults to s3 (bucket/prefix passthrough).
+	bucket := Config{
+		Catalog: config.IcebergCatalog{Type: config.IcebergCatalogSQLite, Path: testSQLitePath},
+		Storage: config.IcebergStorage{Bucket: "lake", Prefix: "wh"},
+	}
+	_, q = parseQuery(t, mustURI(t, bucket))
+	assert.Equal(t, "lake", q.Get("bucket"))
+	assert.Equal(t, "wh", q.Get("prefix"))
+
+	// bucket with type=gcs → storage=gcs + bucket/prefix (ingestr builds gs://).
+	gcsBucket := Config{
+		Catalog: config.IcebergCatalog{Type: config.IcebergCatalogSQLite, Path: testSQLitePath},
+		Storage: config.IcebergStorage{Type: config.IcebergStorageGCS, Bucket: "lake", Prefix: "wh"},
+	}
+	_, q = parseQuery(t, mustURI(t, gcsBucket))
+	assert.Equal(t, "gcs", q.Get("storage"))
+	assert.Equal(t, "lake", q.Get("bucket"))
+	assert.Equal(t, "wh", q.Get("prefix"))
 }
 
 func TestConfig_GetIngestrURI_Errors(t *testing.T) {
@@ -281,19 +468,12 @@ func TestConfig_GetIngestrURI_Errors(t *testing.T) {
 			wantErr: "sql catalog requires",
 		},
 		{
-			name: "missing storage type",
+			name: "unsupported storage type",
 			config: Config{
 				Catalog: config.IcebergCatalog{Type: config.IcebergCatalogGlue},
+				Storage: config.IcebergStorage{Type: config.IcebergStorageType("azure"), Path: "az://b/p"},
 			},
-			wantErr: "storage.type must be provided",
-		},
-		{
-			name: "gcs not yet supported",
-			config: Config{
-				Catalog: config.IcebergCatalog{Type: config.IcebergCatalogGlue},
-				Storage: config.IcebergStorage{Type: config.IcebergStorageType("gcs"), Path: "gs://b/p"},
-			},
-			wantErr: `unsupported storage type "gcs"`,
+			wantErr: `unsupported storage type "azure"`,
 		},
 		{
 			name: "path and bucket are mutually exclusive",
@@ -328,7 +508,7 @@ func TestClient_GetIngestrURI(t *testing.T) {
 
 	client, err := NewClient(Config{
 		Catalog: config.IcebergCatalog{Type: config.IcebergCatalogGlue, Region: testAWSRegion},
-		Storage: config.IcebergStorage{Type: config.IcebergStorageS3, Path: "s3://lake/wh"},
+		Storage: config.IcebergStorage{Type: config.IcebergStorageS3, Path: testS3LakeWh},
 	})
 	require.NoError(t, err)
 

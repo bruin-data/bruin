@@ -18,7 +18,9 @@ const (
 type IcebergStorageType string
 
 const (
-	IcebergStorageS3 IcebergStorageType = "s3"
+	IcebergStorageS3    IcebergStorageType = "s3"
+	IcebergStorageGCS   IcebergStorageType = "gcs"
+	IcebergStorageLocal IcebergStorageType = "local"
 )
 
 // IcebergAuth holds credentials for the catalog and/or storage backend.
@@ -45,6 +47,15 @@ type IcebergCatalog struct {
 	Database  string             `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
 	Auth      IcebergAuth        `yaml:"auth,omitempty" json:"auth,omitempty" mapstructure:"auth"`
 
+	// RestUseSSL selects HTTPS for the REST catalog (ingestr defaults to HTTP);
+	// set true for managed catalogs like Polaris, Unity, or Tabular.
+	RestUseSSL *bool `yaml:"rest_use_ssl,omitempty" json:"rest_use_ssl,omitempty" mapstructure:"rest_use_ssl"`
+
+	// Driver and Dialect configure the generic sql catalog (both required, e.g.
+	// driver=pgx, dialect=postgres); the sqlite/postgres types set them for you.
+	Driver  string `yaml:"driver,omitempty" json:"driver,omitempty" mapstructure:"driver"`
+	Dialect string `yaml:"dialect,omitempty" json:"dialect,omitempty" mapstructure:"dialect"`
+
 	// Catalog credentials. These are dedicated fields (rather than free-form
 	// Properties entries) so the credential masker redacts them from run logs.
 	// Credential/Token are REST-catalog auth; URI is the SQL-catalog connection
@@ -54,21 +65,26 @@ type IcebergCatalog struct {
 	URI        string `yaml:"uri,omitempty" json:"uri,omitempty" mapstructure:"uri" sensitive:"true"`
 }
 
-// IcebergStorage describes the S3-compatible object store holding the data files.
-//
-// The warehouse location can be given two ways (mutually exclusive): either as a
-// full s3:// URI in Path, or as a separate Bucket (+ optional Prefix). Leave all
-// three empty to let the catalog supply its own warehouse location.
+// IcebergStorage describes where data files live. Type is "s3" (or S3-compatible),
+// "gcs", or "local"; leave the block empty to inherit the catalog's warehouse.
 type IcebergStorage struct {
-	Type IcebergStorageType `yaml:"type" json:"type" mapstructure:"type"`
-	// Path is the full s3://<bucket>/<prefix> warehouse location.
+	// Type is optional: when empty it's inferred from the warehouse scheme
+	// (s3://→s3, gs://→gcs, file://→local); set it to disambiguate the bucket form.
+	Type IcebergStorageType `yaml:"type,omitempty" json:"type,omitempty" mapstructure:"type"`
+	// Path is the full warehouse location: s3://<bucket>/<prefix>,
+	// gs://<bucket>/<prefix>, or (for local storage) a filesystem path/file:// URI.
 	Path string `yaml:"path,omitempty" json:"path,omitempty" mapstructure:"path"`
 	// Bucket/Prefix are an alternative to Path: the bucket name and an optional
-	// key prefix, from which the s3://<bucket>/<prefix> warehouse is built.
+	// key prefix, from which the s3://… or gs://… warehouse is built.
 	Bucket   string      `yaml:"bucket,omitempty" json:"bucket,omitempty" mapstructure:"bucket"`
 	Prefix   string      `yaml:"prefix,omitempty" json:"prefix,omitempty" mapstructure:"prefix"`
 	Region   string      `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
 	Endpoint string      `yaml:"endpoint,omitempty" json:"endpoint,omitempty" mapstructure:"endpoint"`
 	UseSSL   *bool       `yaml:"use_ssl,omitempty" json:"use_ssl,omitempty" mapstructure:"use_ssl"`
 	Auth     IcebergAuth `yaml:"auth,omitempty" json:"auth,omitempty" mapstructure:"auth"`
+
+	// GCS service-account credentials (type "gcs"): KeyFile is a key-file path,
+	// KeyJSON the inline JSON. Empty uses Application Default Credentials.
+	KeyFile string `yaml:"key_file,omitempty" json:"key_file,omitempty" mapstructure:"key_file"`
+	KeyJSON string `yaml:"key_json,omitempty" json:"key_json,omitempty" mapstructure:"key_json" sensitive:"true"`
 }

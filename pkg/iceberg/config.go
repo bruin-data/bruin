@@ -112,6 +112,11 @@ func icebergCatalogURI(cat config.IcebergCatalog) (string, url.Values, error) {
 		if cat.Host == "" {
 			return "", nil, fmt.Errorf("iceberg: rest catalog requires %q", "host")
 		}
+		// ingestr builds the REST endpoint as http:// unless rest_use_ssl is set;
+		// managed catalogs (Polaris, Tabular, R2, Unity, ...) are served over TLS.
+		if cat.RestUseSSL != nil {
+			q.Set("rest_use_ssl", strconv.FormatBool(*cat.RestUseSSL))
+		}
 		if cat.Credential != "" {
 			q.Set("credential", cat.Credential)
 		}
@@ -125,16 +130,26 @@ func icebergCatalogURI(cat config.IcebergCatalog) (string, url.Values, error) {
 		}
 		return "iceberg+hive://" + hostPort(cat.Host, cat.Port), q, nil
 	case config.IcebergCatalogHadoop:
-		if cat.Path == "" {
-			return "", nil, fmt.Errorf("iceberg: hadoop catalog requires %q (warehouse directory)", "path")
+		// Local warehouse goes in the URL path; for object storage (s3://, gs://)
+		// leave Path empty so the warehouse comes from the storage block.
+		if cat.Path != "" {
+			return "iceberg+hadoop://" + ensureLeadingSlash(cat.Path), q, nil
 		}
-		return "iceberg+hadoop://" + ensureLeadingSlash(cat.Path), q, nil
+		return "iceberg+hadoop://", q, nil
 	case config.IcebergCatalogSQL:
 		// Advanced SQL catalog; the connection string comes from the sensitive uri field.
 		if cat.URI == "" {
 			return "", nil, fmt.Errorf("iceberg: sql catalog requires %q (catalog connection string)", "uri")
 		}
 		q.Set("uri", cat.URI)
+		// ingestr's generic sql catalog needs both driver and dialect; settable here
+		// or via properties. The sqlite/postgres catalog types set them automatically.
+		if cat.Driver != "" {
+			q.Set("sql.driver", cat.Driver)
+		}
+		if cat.Dialect != "" {
+			q.Set("sql.dialect", cat.Dialect)
+		}
 		return "iceberg+sql://", q, nil
 	case "":
 		return "", nil, fmt.Errorf("iceberg: catalog.type must be provided (supported: %s)", supportedCatalogList())
@@ -144,41 +159,50 @@ func icebergCatalogURI(cat config.IcebergCatalog) (string, url.Values, error) {
 }
 
 // icebergStorageParams maps a storage backend to its ingestr Iceberg params.
-// ingestr is S3-only today; add a case (e.g. GCS) when it gains support.
 func icebergStorageParams(st config.IcebergStorage) (url.Values, error) {
 	q := url.Values{}
+
 	switch st.Type {
-	case config.IcebergStorageS3:
-		q.Set("storage", "s3")
-		// The warehouse can be given as a full s3:// URI (path) or as a separate
-		// bucket (+ optional prefix); ingestr builds the same warehouse from either.
-		switch {
-		case st.Path != "" && st.Bucket != "":
-			return nil, fmt.Errorf("iceberg: storage: set either %q (a full s3:// warehouse) or %q, not both", "path", "bucket")
-		case st.Prefix != "" && st.Bucket == "":
-			return nil, fmt.Errorf("iceberg: storage: %q requires %q", "prefix", "bucket")
-		case st.Path != "":
-			q.Set("warehouse", st.Path)
-		case st.Bucket != "":
-			q.Set("bucket", st.Bucket)
-			if st.Prefix != "" {
-				q.Set("prefix", st.Prefix)
-			}
-		}
-		if st.Endpoint != "" {
-			q.Set("endpoint", st.Endpoint)
-		}
-		if st.UseSSL != nil {
-			q.Set("use_ssl", strconv.FormatBool(*st.UseSSL))
-		}
-		setAWSCredentials(q, st.Region, st.Auth.AccessKey, st.Auth.SecretKey, st.Auth.SessionToken)
-		return q, nil
-	case "":
-		return nil, fmt.Errorf("iceberg: storage.type must be provided (supported: %s)", config.StorageTypeS3)
+	case "", config.IcebergStorageS3, config.IcebergStorageGCS, config.IcebergStorageLocal:
 	default:
-		// e.g. StorageTypeGCS: not supported by ingestr's Iceberg destination yet.
-		return nil, fmt.Errorf("iceberg: unsupported storage type %q (supported: %s)", st.Type, config.StorageTypeS3)
+		return nil, fmt.Errorf("iceberg: unsupported storage type %q (supported: %s, %s, %s)", st.Type, config.IcebergStorageS3, config.IcebergStorageGCS, config.IcebergStorageLocal)
 	}
+	if st.Path != "" && st.Bucket != "" {
+		return nil, fmt.Errorf("iceberg: storage: set either %q (a full warehouse URI) or %q, not both", "path", "bucket")
+	}
+	if st.Prefix != "" && st.Bucket == "" {
+		return nil, fmt.Errorf("iceberg: storage: %q requires %q", "prefix", "bucket")
+	}
+
+	// storage tells ingestr which scheme to build for the bucket form. s3 is its
+	// default, so only gcs needs declaring; a full path or local warehouse carries
+	// its own scheme. Everything else is passed through and ingestr does the rest.
+	if st.Type == config.IcebergStorageGCS {
+		q.Set("storage", "gcs")
+	}
+	switch {
+	case st.Path != "":
+		q.Set("warehouse", st.Path)
+	case st.Bucket != "":
+		q.Set("bucket", st.Bucket)
+		if st.Prefix != "" {
+			q.Set("prefix", st.Prefix)
+		}
+	}
+	if st.Endpoint != "" {
+		q.Set("endpoint", st.Endpoint)
+	}
+	if st.UseSSL != nil {
+		q.Set("use_ssl", strconv.FormatBool(*st.UseSSL))
+	}
+	setAWSCredentials(q, st.Region, st.Auth.AccessKey, st.Auth.SecretKey, st.Auth.SessionToken)
+	if st.KeyFile != "" {
+		q.Set("gcs.keypath", st.KeyFile)
+	}
+	if st.KeyJSON != "" {
+		q.Set("gcs.jsonkey", st.KeyJSON)
+	}
+	return q, nil
 }
 
 // setAWSCredentials sets the shared S3/Glue region and credential parameters that

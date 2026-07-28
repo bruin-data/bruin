@@ -61,9 +61,14 @@ Each catalog type takes different fields. Use the matching `catalog:` block belo
             type: rest                        # required
             host: "catalog.internal"          # required
             port: 8181                        # optional
+            rest_use_ssl: true                # optional — use HTTPS (default is HTTP); set true for hosted catalogs (Polaris, Unity, Lakekeeper, Tabular)
             credential: "${ICEBERG_REST_CREDENTIAL}"   # optional — REST auth, if the catalog requires it
             token: "${ICEBERG_REST_TOKEN}"             # optional — bearer token, alternative to credential
 ```
+
+> [!TIP]
+> A REST catalog is a **running server** you start and configure yourself — it holds its own warehouse location, storage backend, and credentials, and usually writes the table metadata to storage. Your connection's `storage` block still supplies the credentials Bruin uses to write the **data files**.
+> OAuth2 options such as `oauth2-server-uri` and `scope` go in the top-level [`properties`](#table-options) block.
 
 **Hive**
 ```yaml
@@ -72,6 +77,9 @@ Each catalog type takes different fields. Use the matching `catalog:` block belo
             host: "metastore.internal"        # required
             port: 9083                        # optional
 ```
+
+> [!WARNING]
+> The Hive metastore reaches storage **independently** — your connection's `storage` credentials configure only the Bruin client and never reach the metastore. On the metastore side, use an `s3a://` warehouse, put the right connector jar on its classpath (`hadoop-aws` for S3, `gcs-connector` for GCS), and set the matching `fs.s3a.*` / `fs.gs.*` properties in its `core-site.xml`. Without this it fails with `No FileSystem for scheme "s3"`. A `file://` warehouse needs none of this.
 
 **Postgres**
 ```yaml
@@ -84,6 +92,23 @@ Each catalog type takes different fields. Use the matching `catalog:` block belo
               username: "iceberg_user"
               password: "${PG_PASSWORD}"
 ```
+
+For the `postgres` catalog, ingestr forwards standard PostgreSQL connection parameters to the catalog database connection, so you can secure or tune it via the top-level [`properties`](#table-options) block — a managed database (Neon, RDS, Cloud SQL) usually needs TLS:
+
+```yaml
+          catalog:
+            type: postgres
+            host: "metadata-db.internal"
+            database: "iceberg_catalog"
+            auth:
+              username: "iceberg_user"
+              password: "${PG_PASSWORD}"
+          properties:
+            sslmode: "require"                # e.g. require, verify-full
+            sslrootcert: "/path/to/ca.pem"    # optional
+```
+
+Recognized connection parameters: `sslmode`, `sslcert`, `sslkey`, `sslrootcert`, `sslpassword`, `sslcrl`, `sslcrldir`, `sslsni`, `sslcompression`, `requiressl`, `connect_timeout`, `application_name`, `fallback_application_name`, `target_session_attrs`, `tcp_user_timeout`, `options`, `service`, `servicefile`, `passfile`, `krbsrvname`, and `replication`. Any other property is treated as an Iceberg/storage option, not a database connection setting. This forwarding applies only to `type: postgres`; for the generic `sql` catalog, embed these inside the `uri` connection string instead (e.g. `postgresql://…?sslmode=require`).
 
 **SQLite**
 ```yaml
@@ -99,34 +124,98 @@ Each catalog type takes different fields. Use the matching `catalog:` block belo
             path: "/warehouse"                # required — warehouse directory
 ```
 
+> [!WARNING]
+> The Hadoop catalog only commits atomically on a real local or HDFS filesystem. For an object-storage warehouse (`s3://…`) you must add `allow-unsafe-commits: "true"` to `properties`, otherwise the connection fails.
+
 **SQL** (advanced)
 ```yaml
           catalog:
             type: sql                         # required
             uri: "postgresql://user:pass@host:5432/db"   # required — catalog connection string
+            driver: "pgx"                     # required — database/sql driver (e.g. pgx, sqlite)
+            dialect: "postgres"               # required — SQL dialect (e.g. postgres, sqlite)
 ```
+
+> The generic `sql` catalog is only needed for backends other than SQLite/Postgres — for those, use the dedicated `sqlite`/`postgres` catalog types, which set `driver`/`dialect` for you.
 
 ### Storage options
 
+`type` (`s3`, `gcs`, or `local`) is **optional** — the backend is normally inferred from the warehouse **scheme** (`s3://` → s3, `gs://` → gcs, `file://` → local). You only need `type` to disambiguate the `bucket`/`prefix` form (which carries no scheme), where it selects `s3://` (the default) vs `gs://`. The **warehouse location** — the root under which table data files are written — can be given two ways (mutually exclusive): a full URI in `path` (`s3://…`, `gs://…`, or a filesystem path), or a `bucket` (+ optional `prefix`). Leave both empty to inherit the catalog's own warehouse (Glue, REST, and SQL catalogs supply one); the `region`/`endpoint`/`use_ssl`/`auth` credentials are still used to write the data files either way.
+
+**AWS S3**
+
 ```yaml
           storage:
-            type: s3                                    # required
-            path: "s3://my-company-lake/warehouse"      # optional — the Iceberg warehouse location
-            region: "us-east-1"                         # optional
-            endpoint: "localhost:9000"                  # optional — for S3-compatible stores (MinIO, R2, ...)
-            use_ssl: false                              # optional — false for plain-HTTP local storage
+            type: s3
+            path: "s3://my-company-lake/warehouse"      # full warehouse URI
+            region: "us-east-1"
             auth:
-              access_key: "${AWS_ACCESS_KEY_ID}"        # required
-              secret_key: "${AWS_SECRET_ACCESS_KEY}"    # required
-              session_token: "${AWS_SESSION_TOKEN}"     # optional
+              access_key: "${AWS_ACCESS_KEY_ID}"
+              secret_key: "${AWS_SECRET_ACCESS_KEY}"
+              session_token: "${AWS_SESSION_TOKEN}"     # optional — temporary/STS credentials
 ```
 
-The **warehouse location** — the `s3://<bucket>/<prefix>` root under which table data files are written — can be given two ways (they are mutually exclusive):
+**AWS S3 with `bucket` + `prefix`** (alternative to `path`)
 
-- as a full URI in `path`, e.g. `path: "s3://my-company-lake/warehouse"`; or
-- as a separate `bucket` (and optional `prefix`), e.g. `bucket: "my-company-lake"` with `prefix: "warehouse"`.
+```yaml
+          storage:
+            type: s3
+            bucket: "my-company-lake"                   # builds s3://my-company-lake/warehouse
+            prefix: "warehouse"                         # optional
+            region: "us-east-1"
+            auth:
+              access_key: "${AWS_ACCESS_KEY_ID}"
+              secret_key: "${AWS_SECRET_ACCESS_KEY}"
+```
 
-The location is **optional**: when all of `path`/`bucket`/`prefix` are omitted, the warehouse is taken from the catalog itself (Glue, REST, and SQL catalogs supply their own warehouse location). The `region`, `endpoint`, `use_ssl`, and `auth` credentials are still used to read and write the S3 data files regardless of where the warehouse location comes from.
+**S3-compatible (MinIO, Cloudflare R2, …)** — set `endpoint`, and `use_ssl: false` for a plain-HTTP local store:
+
+```yaml
+          storage:
+            type: s3
+            path: "s3://warehouse"
+            endpoint: "localhost:9000"                  # the S3-compatible endpoint
+            use_ssl: false
+            region: "us-east-1"
+            auth:
+              access_key: "${MINIO_ACCESS_KEY}"
+              secret_key: "${MINIO_SECRET_KEY}"
+```
+
+> [!TIP]
+> For non-AWS S3-compatible stores (MinIO, Cloudflare R2, GCS interop), S3 compatibility mode is enabled automatically when `endpoint` is set. To disable it, add `s3.compat-mode: "false"` to the top-level [`properties`](#table-options) block.
+
+**Google Cloud Storage (native)** — `type: gcs` with a `gs://` warehouse and a service-account key (`bucket` + `prefix` works too):
+
+```yaml
+          storage:
+            type: gcs
+            path: "gs://my-company-lake/warehouse"      # or: bucket + prefix
+            key_file: "/path/to/service-account.json"   # SA key file (or key_json for inline JSON)
+```
+
+Leave `key_file`/`key_json` empty to use Application Default Credentials.
+
+**GCS via the S3 interop endpoint (HMAC keys)** — use `type: s3` with the Google endpoint and HMAC credentials:
+
+```yaml
+          storage:
+            type: s3
+            path: "s3://my-gcs-bucket/warehouse"
+            endpoint: "storage.googleapis.com"
+            region: "auto"
+            auth:
+              access_key: "${GCS_HMAC_KEY}"
+              secret_key: "${GCS_HMAC_SECRET}"
+```
+
+**Local filesystem** — `type: local` with a filesystem path (a fully local SQLite/Hadoop setup):
+
+```yaml
+          storage:
+            type: local
+            path: "/tmp/iceberg-warehouse"              # becomes file:///tmp/iceberg-warehouse
+```
 
 ### Table options
 
@@ -134,7 +223,7 @@ The location is **optional**: when all of `path`/`bucket`/`prefix` are omitted, 
 - `table_location`: explicit table location; supports `{namespace}`, `{table}`, and `{identifier}` placeholders.
 - `table_path`: path under the warehouse, e.g. `{namespace}/{table}`.
 - `table_properties`: Iceberg table properties, e.g. `write.format.default: parquet`.
-- `properties`: any additional, non-secret catalog options passed through to the Iceberg URI verbatim.
+- `properties`: any additional, non-secret catalog options passed through to the Iceberg URI verbatim (e.g. `allow-unsafe-commits`, `s3.compat-mode`, `oauth2-server-uri` — see the notes on the relevant catalog/storage above).
 
 > [!WARNING]
 > `properties` values are **not** redacted from run logs. Put credentials in the dedicated fields (`auth`, `credential`, `token`, `uri`), never in `properties`.
