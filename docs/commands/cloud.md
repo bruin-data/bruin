@@ -652,7 +652,7 @@ The definition is a YAML or JSON object with these top-level keys:
 | `name` | yes | dashboard name |
 | `connection` | for SQL widgets | a connection **the bound agent has** (see `bruin cloud connections list`). The canvas runs every widget's SQL against this connection; a name the agent doesn't have makes the queries fail |
 | `description` | no | free text |
-| `filters` | no | list of filter controls (see below) |
+| `filters` | no | interactive controls that feed widget SQL via `{{ filters.X }}` placeholders (see **Filters** below) |
 | `rows` | yes | the layout — a list of rows, each holding widgets |
 
 A **row** is `{ tab?: string, widgets: [...] }`. Widgets sit on a 12-column grid; each widget's `col` values within a row must sum to ≤ 12.
@@ -696,6 +696,30 @@ rows:
       - { id: t_orders, type: table, name: Recent orders, col: 12,
           sql: "SELECT id, customer, amount FROM orders ORDER BY id DESC LIMIT 20" }
 ```
+
+**Filters** are interactive controls a viewer changes; each feeds widget SQL through a `{{ filters.<name> }}` placeholder. A filter is:
+
+| Field | Description |
+|-------|-------------|
+| `name` | referenced in SQL as `{{ filters.<name> }}` |
+| `type` | `date`, `text`, `number`, or `select` |
+| `default` | initial value. `date` accepts `TODAY`, `TODAY-N`, `TODAY+N`, or `YYYY-MM-DD`; a `select` with `multiple: true` takes a list (`[]` = no filtering) |
+| `multiple` | `select` only — allow selecting several values |
+| `options` | `select` only — `{ values: [...] }` (static) or `{ query: "SELECT ..." }` (one column of values) |
+
+```yaml
+filters:
+  - name: start_date
+    type: date
+    default: "TODAY-30"
+  - name: region
+    type: select
+    multiple: true
+    default: []
+    options: { query: "SELECT DISTINCT region FROM orders ORDER BY 1" }
+```
+
+Reference them in a widget's `sql`, e.g. `WHERE created_at >= '{{ filters.start_date }}'`. Filters only act on `sql` widgets, so a dashboard built purely from inline data can't use them.
 
 #### `update`
 
