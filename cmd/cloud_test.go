@@ -252,7 +252,8 @@ func TestCloudDashboardsCreate_RejectsNonPositiveAgentID(t *testing.T) {
 		cmd := cloudDashboardsCreate()
 		exitCode := 0
 		cmd.ExitErrHandler = func(_ context.Context, _ *cli.Command, err error) {
-			if ec, ok := err.(cli.ExitCoder); ok {
+			var ec cli.ExitCoder
+			if errors.As(err, &ec) {
 				exitCode = ec.ExitCode()
 			}
 		}
