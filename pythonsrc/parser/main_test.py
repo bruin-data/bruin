@@ -1877,7 +1877,6 @@ ORDER BY 1, 2, 3
 ]
 
 
-
 @pytest.mark.parametrize(
     "query,schema,expected,expected_non_selected,dialect",
     [
