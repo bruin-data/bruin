@@ -130,6 +130,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "Chat with Agents", link: "/cloud/ai-agents/chat"},
                             {text: "Scheduled Agents", link: "/cloud/ai-agents/scheduled"},
                             {text: "Databricks OAuth", link: "/cloud/ai-agents/databricks-oauth"},
+                            {text: "Snowflake OAuth", link: "/cloud/ai-agents/snowflake-oauth"},
                             {
                                 text: "Examples",
                                 collapsed: true,
