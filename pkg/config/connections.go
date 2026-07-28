@@ -528,7 +528,7 @@ func (c RedshiftConnection) GetName() string {
 type SnowflakeConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	Account            string `yaml:"account,omitempty" json:"account" mapstructure:"account"`
-	Username           string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Username           string `yaml:"username,omitempty" json:"username,omitempty" mapstructure:"username"`
 	Password           string `yaml:"password,omitempty" json:"password,omitempty" jsonschema:"oneof_required=password" mapstructure:"password" sensitive:"true"`
 	Region             string `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
 	Role               string `yaml:"role,omitempty" json:"role,omitempty" mapstructure:"role"`
