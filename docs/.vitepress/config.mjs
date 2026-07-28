@@ -264,6 +264,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "Trino", link: "/platforms/trino"},
                             {text: "Dremio", link: "/platforms/dremio"},
                             {text: "Sail", link: "/platforms/sail"},
+                            {text: "Apache Spark", link: "/platforms/spark"},
                             {text: "AWS EMR Serverless", link: "/platforms/emr_serverless"},
                             {text: "GCP Dataproc Serverless", link: "/platforms/dataproc_serverless"},
                         ],
