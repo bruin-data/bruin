@@ -702,10 +702,10 @@ rows:
 | Field | Description |
 |-------|-------------|
 | `name` | referenced in SQL as `{{ filters.<name> }}` |
-| `type` | `date`, `text`, `number`, or `select` |
-| `default` | initial value. `date` accepts `TODAY`, `TODAY-N`, `TODAY+N`, or `YYYY-MM-DD`; a `select` with `multiple: true` takes a list (`[]` = no filtering) |
+| `type` | `date`, `date-range`, `number`, `select`, or `text` |
+| `default` | initial value. `date`: `TODAY`, `TODAY+/-N`, or `YYYY-MM-DD`; `date-range`: a preset string like `last_30_days` (resolves to a start/end pair); `select` with `multiple: true`: a list (`[]` = no filtering) |
 | `multiple` | `select` only — allow selecting several values |
-| `options` | `select` only — `{ values: [...] }` (static) or `{ query: "SELECT ..." }` (one column of values) |
+| `options` | for `select`/`date-range` — `values: [...]` (static) or `query: "SELECT ..."` (one column), with an optional `connection` for that query, and `presets: [...]` to choose which date-range presets to show |
 
 ```yaml
 filters:
