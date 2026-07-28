@@ -4783,7 +4783,8 @@
       "type": "object",
       "required": [
         "name",
-        "account"
+        "account",
+        "username"
       ]
     },
     "SocrataConnection": {

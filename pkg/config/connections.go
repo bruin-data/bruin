@@ -528,7 +528,7 @@ func (c RedshiftConnection) GetName() string {
 type SnowflakeConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	Account            string `yaml:"account,omitempty" json:"account" mapstructure:"account"`
-	Username           string `yaml:"username,omitempty" json:"username,omitempty" mapstructure:"username"`
+	Username           string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
 	Password           string `yaml:"password,omitempty" json:"password,omitempty" jsonschema:"oneof_required=password" mapstructure:"password" sensitive:"true"`
 	Region             string `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
 	Role               string `yaml:"role,omitempty" json:"role,omitempty" mapstructure:"role"`
@@ -564,6 +564,7 @@ func (c SnowflakeConnection) MarshalJSON() ([]byte, error) {
 		"schema":      c.Schema,
 		"warehouse":   c.Warehouse,
 		"private_key": c.PrivateKey,
+		"token":       c.Token,
 	}
 	addConnectionMetadataToMap(c.ConnectionMetadata, payload)
 
@@ -662,6 +663,13 @@ func (c SnowflakeConnection) MarshalYAML() (interface{}, error) {
 			node.Content,
 			&yaml.Node{Kind: yaml.ScalarNode, Value: "private_key"},
 			privateKeyNode,
+		)
+	}
+	if c.Token != "" {
+		node.Content = append(
+			node.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "token"},
+			&yaml.Node{Kind: yaml.ScalarNode, Value: c.Token},
 		)
 	}
 

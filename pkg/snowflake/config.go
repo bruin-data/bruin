@@ -91,13 +91,13 @@ func (c Config) GetIngestrURI() (string, error) {
 }
 
 func (c Config) IsValid() bool {
-	if c.Account == "" {
+	if c.Account == "" || c.Username == "" {
 		return false
 	}
 	if c.Token != "" || c.PrivateKey != "" {
 		return true
 	}
-	return c.Username != "" && c.Password != "" && c.Region != ""
+	return c.Password != "" && c.Region != ""
 }
 
 func parsePrivateKey(content string, passphrase string) (*rsa.PrivateKey, error) {
