@@ -3082,6 +3082,14 @@ func cloudDashboardsCreate() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
+			// Reject an explicit non-positive --agent-id rather than silently
+			// dropping it (which would fall back to the token agent, or none, and
+			// create a dashboard with no chat against the caller's intent).
+			if c.IsSet("agent-id") && c.Int("agent-id") <= 0 {
+				printError(fmt.Errorf("--agent-id must be a positive integer, got %d", c.Int("agent-id")), output, "Invalid --agent-id")
+				return cli.Exit("", 1)
+			}
+
 			// The definition can come inline (--state) or from a file (--state-file),
 			// but not both — otherwise a stale file could silently override the flag.
 			// Check whether each flag was provided (not its value) so an explicit
