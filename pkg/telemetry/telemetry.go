@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	url          = "https://getbruinbumlky.dataplane.rudderstack.com"
+	url          = "https://events-rs.getbruin.com"
 	startTimeKey = "telemetry_start"
 )
 
