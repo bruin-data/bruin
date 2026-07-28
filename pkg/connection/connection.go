@@ -445,6 +445,7 @@ func newSnowflakeDBFromConnection(connection *config.SnowflakeConnection) (*snow
 		Schema:     connection.Schema,
 		Warehouse:  connection.Warehouse,
 		PrivateKey: privateKey,
+		Token:      connection.Token,
 	})
 }
 

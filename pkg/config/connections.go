@@ -528,7 +528,7 @@ func (c RedshiftConnection) GetName() string {
 type SnowflakeConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	Account            string `yaml:"account,omitempty" json:"account" mapstructure:"account"`
-	Username           string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Username           string `yaml:"username,omitempty" json:"username,omitempty" mapstructure:"username"`
 	Password           string `yaml:"password,omitempty" json:"password,omitempty" jsonschema:"oneof_required=password" mapstructure:"password" sensitive:"true"`
 	Region             string `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
 	Role               string `yaml:"role,omitempty" json:"role,omitempty" mapstructure:"role"`
@@ -537,6 +537,7 @@ type SnowflakeConnection struct {
 	Warehouse          string `yaml:"warehouse,omitempty" json:"warehouse,omitempty" mapstructure:"warehouse"`
 	PrivateKeyPath     string `yaml:"private_key_path,omitempty" json:"private_key_path,omitempty" jsonschema:"oneof_required=private_key_path" mapstructure:"private_key_path" sensitive_file:"true"`
 	PrivateKey         string `yaml:"private_key,omitempty" json:"private_key,omitempty" jsonschema:"oneof_required=private_key" mapstructure:"private_key" sensitive:"true"`
+	Token              string `yaml:"token,omitempty" json:"token,omitempty" jsonschema:"oneof_required=token" mapstructure:"token" sensitive:"true"`
 }
 
 func (c SnowflakeConnection) MarshalJSON() ([]byte, error) {
@@ -563,6 +564,7 @@ func (c SnowflakeConnection) MarshalJSON() ([]byte, error) {
 		"schema":      c.Schema,
 		"warehouse":   c.Warehouse,
 		"private_key": c.PrivateKey,
+		"token":       c.Token,
 	}
 	addConnectionMetadataToMap(c.ConnectionMetadata, payload)
 
@@ -661,6 +663,13 @@ func (c SnowflakeConnection) MarshalYAML() (interface{}, error) {
 			node.Content,
 			&yaml.Node{Kind: yaml.ScalarNode, Value: "private_key"},
 			privateKeyNode,
+		)
+	}
+	if c.Token != "" {
+		node.Content = append(
+			node.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "token"},
+			&yaml.Node{Kind: yaml.ScalarNode, Value: c.Token},
 		)
 	}
 
