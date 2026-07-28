@@ -803,6 +803,25 @@ func TestCreateDashboard(t *testing.T) {
 	assert.Equal(t, "https://cloud.getbruin.com/acme/dashboards/9?mode=edit", dashboard.URL)
 }
 
+func TestCreateDashboardOmitsAgentIDWhenZero(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		// No agent id given, so the field is omitted and the server applies its
+		// token-agent fallback rather than clearing the binding.
+		_, hasAgentID := body["agent_id"]
+		assert.False(t, hasAgentID)
+
+		w.WriteHeader(http.StatusCreated)
+		title := "New Dash"
+		writeJSON(t, w, Dashboard{ID: 9, Title: &title, Visibility: "team"})
+	})
+
+	_, err := client.CreateDashboard(t.Context(), "New Dash", "", 0, nil)
+	require.NoError(t, err)
+}
+
 func TestUpdateDashboard(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
