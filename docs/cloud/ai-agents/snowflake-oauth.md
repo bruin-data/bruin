@@ -77,13 +77,9 @@ When you open a [chat](/cloud/ai-agents/chat) with an agent that uses a per-user
 ## Notes and limitations
 
 - **Role**: the minted token uses your Snowflake default role. Bruin doesn't currently support picking a different role per connection — Snowflake ties a role to the OAuth token at the moment you authorize, so switching roles means reconnecting, not a per-query setting.
-- **`ACCOUNTADMIN` can't authorize**: by default, Snowflake auto-adds `ACCOUNTADMIN`, `ORGADMIN`, and `SECURITYADMIN` to the security integration's `BLOCKED_ROLES_LIST` (controlled by the account parameter `OAUTH_ADD_PRIVILEGED_ROLES_TO_BLOCKED_LIST`, `TRUE` by default). If your default role is one of them, authorization fails. Either switch your default role:
+- **`ACCOUNTADMIN` can't authorize**: `ACCOUNTADMIN`, `SECURITYADMIN`, `GLOBALORGADMIN`, and `ORGADMIN` are always in the security integration's `BLOCKED_ROLES_LIST` and can't be removed from it. If your default role is one of them, authorization fails — switch your default role first:
   ```sql
   ALTER USER <username> SET DEFAULT_ROLE = <non_admin_role>;
-  ```
-  or, before creating the security integration, let privileged roles through:
-  ```sql
-  ALTER ACCOUNT SET OAUTH_ADD_PRIVILEGED_ROLES_TO_BLOCKED_LIST = FALSE;
   ```
 - **Reconnecting after recreating the integration**: if you drop and recreate a security integration with the same name, previously authorized users may skip the consent screen on their next connect (Snowflake remembers a "delegated authorization" per user/role/integration). To force a fresh consent, revoke it first:
   ```sql
