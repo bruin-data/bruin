@@ -3844,7 +3844,7 @@ func TestValidateHookQueryDryRun(t *testing.T) {
 
 	sqlAssetWithHooks := &pipeline.Asset{
 		Name: "asset_with_hooks",
-		Type: pipeline.AssetTypeBigqueryQuery,
+		Type: pipeline.AssetTypeSnowflakeQuery,
 		Hooks: pipeline.Hooks{
 			Pre: []pipeline.Hook{
 				{Query: "SELECT 1"},
@@ -3866,9 +3866,16 @@ func TestValidateHookQueryDryRun(t *testing.T) {
 			Pre: []pipeline.Hook{{Query: "SELECT 1"}},
 		},
 	}
+	bigQueryAssetWithHooks := &pipeline.Asset{
+		Name: "bigquery_asset_with_hooks",
+		Type: pipeline.AssetTypeBigqueryQuery,
+		Hooks: pipeline.Hooks{
+			Pre: []pipeline.Hook{{Query: "DECLARE window_start DATE"}},
+		},
+	}
 
 	p := &pipeline.Pipeline{
-		Assets: []*pipeline.Asset{sqlAssetWithHooks, sqlAssetWithoutHooks, pythonAssetWithHooks},
+		Assets: []*pipeline.Asset{sqlAssetWithHooks, sqlAssetWithoutHooks, pythonAssetWithHooks, bigQueryAssetWithHooks},
 	}
 
 	t.Run("valid hook queries", func(t *testing.T) {
@@ -3920,6 +3927,16 @@ func TestValidateHookQueryDryRun(t *testing.T) {
 		cm := &fakeConnectionManager{validator: &fakeQueryValidator{isValid: false}}
 		validator := ValidateHookQueryDryRun(cm)
 		issues, err := validator(t.Context(), p, pythonAssetWithHooks)
+		require.NoError(t, err)
+		assert.Empty(t, issues)
+	})
+
+	t.Run("BigQuery hooks are validated with the complete asset script", func(t *testing.T) {
+		t.Parallel()
+
+		cm := &fakeConnectionManager{validator: &fakeQueryValidator{isValid: false}}
+		validator := ValidateHookQueryDryRun(cm)
+		issues, err := validator(t.Context(), p, bigQueryAssetWithHooks)
 		require.NoError(t, err)
 		assert.Empty(t, issues)
 	})
