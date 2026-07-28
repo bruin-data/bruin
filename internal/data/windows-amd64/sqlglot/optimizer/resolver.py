@@ -30,6 +30,7 @@ class Resolver:
         self._all_columns: set[str] | None = None
         self._infer_schema: bool = infer_schema
         self._get_source_columns_cache: dict[tuple[str, bool], Sequence[str]] = {}
+        self._column_type_from_scope_cache: dict[tuple[int, str], exp.DataType | None] = {}
 
     def get_table(self, column: str | exp.Column) -> exp.Identifier | None:
         """
@@ -115,8 +116,8 @@ class Resolver:
             kind = set_op.kind
 
             # Visit the children UNIONs (if any) in a post-order traversal
-            left = self.get_source_columns_from_set_op(set_op.left)
-            right = self.get_source_columns_from_set_op(set_op.right)
+            left = self.get_source_columns_from_set_op(set_op.this)
+            right = self.get_source_columns_from_set_op(set_op.expression)
 
             # We use dict.fromkeys to deduplicate keys and maintain insertion order
             if side == "LEFT":
@@ -157,9 +158,8 @@ class Resolver:
             ):
                 columns = source_expr.named_selects
 
-                # in bigquery, unnest structs are automatically scoped as tables, so you can
-                # directly select a struct field in a query.
-                # this handles the case where the unnest is statically defined.
+                # in bigquery, unnest structs are automatically scoped as tables, so you can directly select
+                # a struct field in a query. This handles the case where the unnest is statically defined.
                 if self.dialect.UNNEST_COLUMN_ONLY and isinstance(source_expr, exp.Unnest):
                     if not source_expr.type or source_expr.type.is_type(exp.DType.UNKNOWN):
                         unnest_expr = seq_get(source_expr.expressions, 0)
@@ -178,9 +178,16 @@ class Resolver:
                 ):
                     explode_col = source_expr.this.this
 
-                    if isinstance(explode_col, exp.Column) and source.parent:
+                    # If the column is unqualified at this point, it couldn't be resolved when
+                    # this scope's children were qualified; disambiguating it here would require
+                    # enumerating this very source's columns, i.e recurse without bound
+                    if isinstance(explode_col, exp.Column) and explode_col.table and source.parent:
                         col_type = self._get_unnest_column_type(explode_col, source.parent)
                         columns.extend(self._struct_field_names(col_type))
+                elif isinstance(source_expr, exp.Lateral) and isinstance(
+                    source_expr.this, exp.Query
+                ):
+                    columns = source_expr.this.named_selects
             elif isinstance(source, Scope) and isinstance(source.expression, exp.SetOperation):
                 columns = self.get_source_columns_from_set_op(source.expression)
             else:
@@ -398,16 +405,28 @@ class Resolver:
         Returns:
             The DataType of the column, or None if not found.
         """
+        # A single source can be reachable through many paths of a scope DAG (e.g. a CTE
+        # referenced by several other CTEs). The schema and scope are immutable during
+        # qualification, so the type of `column` under `source` depends only on
+        # `(source, column name)`; memoize it to walk each source once.
+        cache_key = (id(source), column.name)
+        if cache_key in self._column_type_from_scope_cache:
+            return self._column_type_from_scope_cache[cache_key]
+
+        # None is a valid result if DataType could not be determined!
+        result: exp.DataType | None = None
         if isinstance(source, exp.Table):
             # base table - get the column type from schema
-            col_type: exp.DataType | None = self.schema.get_column_type(source, column)
+            col_type = self.schema.get_column_type(source, column)
             if col_type and not col_type.is_type(exp.DType.UNKNOWN):
-                return col_type
+                result = col_type
         elif isinstance(source, Scope):
             # iterate over all sources in the scope
-            for source_name, nested_source in source.sources.items():
-                col_type = self._get_column_type_from_scope(nested_source, column)
-                if col_type and not col_type.is_type(exp.DType.UNKNOWN):
-                    return col_type
+            for nested_source in source.sources.values():
+                nested_type = self._get_column_type_from_scope(nested_source, column)
+                if nested_type and not nested_type.is_type(exp.DType.UNKNOWN):
+                    result = nested_type
+                    break
 
-        return None
+        self._column_type_from_scope_cache[cache_key] = result
+        return result

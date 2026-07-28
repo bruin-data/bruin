@@ -131,7 +131,7 @@ def _is_limit_1(scope: Scope) -> bool:
     return limit is not None and limit.expression.this == "1"
 
 
-def join_condition(join):
+def join_condition(join: exp.Join) -> tuple[list[exp.Expr], list[exp.Expr], exp.Expr]:
     """
     Extract the join condition from a join expression.
 
@@ -142,11 +142,11 @@ def join_condition(join):
             Tuple of (source key, join key, remaining predicate)
     """
     name = join.alias_or_name
-    on = (join.args.get("on") or exp.true()).copy()
-    source_key = []
-    join_key = []
+    on: exp.Expr = (join.args.get("on") or exp.true()).copy()
+    source_key: list[exp.Expr] = []
+    join_key: list[exp.Expr] = []
 
-    def extract_condition(condition):
+    def extract_condition(condition: exp.Expr) -> None:
         left, right = condition.unnest_operands()
         left_tables = exp.column_table_names(left)
         right_tables = exp.column_table_names(right)
@@ -174,14 +174,14 @@ def join_condition(join):
             if isinstance(condition, exp.EQ):
                 extract_condition(condition)
     elif normalized(on, dnf=True):
-        conditions = None
+        conditions: list[exp.EQ] = []
 
         for condition in on.flatten():
             parts = [part for part in condition.flatten() if isinstance(part, exp.EQ)]
-            if conditions is None:
+            if not conditions:
                 conditions = parts
             else:
-                temp = []
+                temp: list[exp.EQ] = []
                 for p in parts:
                     cs = [c for c in conditions if p == c]
 

@@ -14,6 +14,7 @@ from sqlglot.tokens import TokenType
 
 if t.TYPE_CHECKING:
     from sqlglot._typing import E
+    from sqlglot.dialects.dialect import Dialect
 
 
 def _build_contains_substring(args: list) -> exp.Contains:
@@ -27,19 +28,24 @@ def _build_date(args: list) -> exp.Date | exp.DateFromParts:
     return expr_type.from_arg_list(args)
 
 
-def build_date_diff(args: list) -> exp.Expr:
-    expr = exp.DateDiff(
-        this=seq_get(args, 0),
-        expression=seq_get(args, 1),
-        unit=seq_get(args, 2),
-        date_part_boundary=True,
-    )
+def build_date_diff(
+    expr_type: type[exp.DateDiff | exp.DatetimeDiff],
+) -> t.Callable[[list], exp.Expr]:
+    def _builder(args: list) -> exp.Expr:
+        expr = expr_type(
+            this=seq_get(args, 0),
+            expression=seq_get(args, 1),
+            unit=seq_get(args, 2),
+            date_part_boundary=True,
+        )
 
-    unit = expr.args.get("unit")
-    if isinstance(unit, exp.Var) and unit.name.upper() == "WEEK":
-        expr.set("unit", exp.WeekStart(this=exp.var("SUNDAY")))
+        unit = expr.args.get("unit")
+        if isinstance(unit, exp.Var) and unit.name.upper() == "WEEK":
+            expr.set("unit", exp.WeekStart(this=exp.var("SUNDAY")))
 
-    return expr
+        return expr
+
+    return _builder
 
 
 def _build_datetime(args: list) -> exp.Func:
@@ -53,7 +59,7 @@ def _build_datetime(args: list) -> exp.Func:
 def _build_extract_json_with_default_path(
     expr_type: type[E],
 ) -> t.Callable:
-    def _builder(args: list, dialect: t.Any) -> E:
+    def _builder(args: list, dialect: Dialect) -> E:
         if len(args) == 1:
             args.append(exp.Literal.string("$"))
         return parser.build_extract_json_with_path(expr_type)(args, dialect)
@@ -61,10 +67,10 @@ def _build_extract_json_with_default_path(
     return _builder
 
 
-def _build_format_time(expr_type: type[exp.Expr]) -> t.Callable[[list], exp.TimeToStr]:
-    def _builder(args: list) -> exp.TimeToStr:
-        formatted_time = build_formatted_time(exp.TimeToStr, "bigquery")(
-            [expr_type(this=seq_get(args, 1)), seq_get(args, 0)]
+def _build_format_time(expr_type: type[exp.Expr]) -> t.Callable[[list, Dialect], exp.TimeToStr]:
+    def _builder(args: list, dialect: Dialect) -> exp.TimeToStr:
+        formatted_time = build_formatted_time(exp.TimeToStr)(
+            [expr_type(this=seq_get(args, 1)), seq_get(args, 0)], dialect
         )
         formatted_time.set("zone", seq_get(args, 2))
         return formatted_time
@@ -91,14 +97,27 @@ def _build_levenshtein(args: list) -> exp.Levenshtein:
     )
 
 
-def _build_parse_timestamp(args: list) -> exp.StrToTime:
-    this = build_formatted_time(exp.StrToTime, "bigquery")([seq_get(args, 1), seq_get(args, 0)])
+def _build_parse_date(args: list, dialect: Dialect) -> exp.StrToDate:
+    this = build_formatted_time(exp.StrToDate)([seq_get(args, 1), seq_get(args, 0)], dialect)
+    this.set("default_year", exp.Literal.number(1970))
+    return this
+
+
+def _build_parse_timestamp(args: list, dialect: Dialect) -> exp.StrToTime:
+    this = build_formatted_time(exp.StrToTime)([seq_get(args, 1), seq_get(args, 0)], dialect)
     this.set("zone", seq_get(args, 2))
+    this.set("default_year", exp.Literal.number(1970))
+    return this
+
+
+def _build_parse_datetime(args: list, dialect: Dialect) -> exp.ParseDatetime:
+    this = build_formatted_time(exp.ParseDatetime)([seq_get(args, 1), seq_get(args, 0)], dialect)
+    this.set("default_year", exp.Literal.number(1970))
     return this
 
 
 def _build_regexp_extract(expr_type: type[E], default_group: exp.Expr | None = None) -> t.Callable:
-    def _builder(args: list, dialect: t.Any) -> E:
+    def _builder(args: list, dialect: Dialect) -> E:
         try:
             group = re.compile(args[1].name).groups == 1
         except re.error:
@@ -139,6 +158,26 @@ def _build_to_hex(args: list) -> exp.Hex | exp.MD5:
     return exp.MD5(this=arg.this) if isinstance(arg, exp.MD5Digest) else exp.LowerHex(this=arg)
 
 
+_DOMAIN_DOT = "\0"  # placeholder; cannot occur in a SQL identifier
+
+
+def _split_qualified_name(name: str, min_num_words: int) -> list[str | None]:
+    # A dotted reference (e.g. `project.dataset.table`) is split into a fixed number of parts,
+    # the first of which is the project. Domain-scoped (legacy) project IDs have the form
+    # `domain.com:project-id`, where the dots belong to the domain, not the path - and a project
+    # ID itself can't contain dots, so every such dot precedes the colon. Mask those, then let
+    # `split_num_words` split and pad as usual, to avoid corrupting the project ID.
+    # See: https://docs.cloud.google.com/artifact-registry/docs/docker/names#domain
+    colon = name.find(":")
+    if colon != -1 and "." in name[:colon]:
+        name = name[:colon].replace(".", _DOMAIN_DOT) + name[colon:]
+        return [
+            p and p.replace(_DOMAIN_DOT, ".") for p in split_num_words(name, ".", min_num_words)
+        ]
+
+    return split_num_words(name, ".", min_num_words)
+
+
 MAKE_INTERVAL_KWARGS = ["year", "month", "day", "hour", "minute", "second"]
 
 
@@ -147,6 +186,7 @@ class BigQueryParser(parser.Parser):
     LOG_DEFAULTS_TO_LN: t.ClassVar = True
     SUPPORTS_IMPLICIT_UNNEST: t.ClassVar = True
     JOINS_HAVE_EQUAL_PRECEDENCE: t.ClassVar = True
+    ADJACENT_STRINGS_CANNOT_BE_CONNECTED: t.ClassVar = True
 
     # BigQuery does not allow ASC/DESC to be used as an identifier, allows GRANT as an identifier
     ID_VAR_TOKENS: t.ClassVar = {
@@ -187,7 +227,7 @@ class BigQueryParser(parser.Parser):
         "CONTAINS_SUBSTR": _build_contains_substring,
         "DATE": _build_date,
         "DATE_ADD": build_date_delta_with_interval(exp.DateAdd),
-        "DATE_DIFF": build_date_diff,
+        "DATE_DIFF": build_date_diff(exp.DateDiff),
         "DATE_SUB": build_date_delta_with_interval(exp.DateSub),
         "DATE_TRUNC": lambda args: exp.DateTrunc(
             unit=seq_get(args, 1),
@@ -196,6 +236,7 @@ class BigQueryParser(parser.Parser):
         ),
         "DATETIME": _build_datetime,
         "DATETIME_ADD": build_date_delta_with_interval(exp.DatetimeAdd),
+        "DATETIME_DIFF": build_date_diff(exp.DatetimeDiff),
         "DATETIME_SUB": build_date_delta_with_interval(exp.DatetimeSub),
         "DIV": binary_from_function(exp.IntDiv),
         "EDIT_DISTANCE": _build_levenshtein,
@@ -220,16 +261,12 @@ class BigQueryParser(parser.Parser):
         ),
         "OCTET_LENGTH": exp.ByteLength.from_arg_list,
         "TO_HEX": _build_to_hex,
-        "PARSE_DATE": lambda args: build_formatted_time(exp.StrToDate, "bigquery")(
-            [seq_get(args, 1), seq_get(args, 0)]
-        ),
-        "PARSE_TIME": lambda args: build_formatted_time(exp.ParseTime, "bigquery")(
-            [seq_get(args, 1), seq_get(args, 0)]
+        "PARSE_DATE": _build_parse_date,
+        "PARSE_TIME": lambda args, dialect: build_formatted_time(exp.ParseTime)(
+            [seq_get(args, 1), seq_get(args, 0)], dialect
         ),
         "PARSE_TIMESTAMP": _build_parse_timestamp,
-        "PARSE_DATETIME": lambda args: build_formatted_time(exp.ParseDatetime, "bigquery")(
-            [seq_get(args, 1), seq_get(args, 0)]
-        ),
+        "PARSE_DATETIME": _build_parse_datetime,
         "REGEXP_CONTAINS": exp.RegexpLike.from_arg_list,
         "REGEXP_EXTRACT": _build_regexp_extract(exp.RegexpExtract),
         "REGEXP_SUBSTR": _build_regexp_extract(exp.RegexpExtract),
@@ -239,7 +276,9 @@ class BigQueryParser(parser.Parser):
         "SHA256": lambda args: exp.SHA2Digest(
             this=seq_get(args, 0), length=exp.Literal.number(256)
         ),
-        "SHA512": lambda args: exp.SHA2(this=seq_get(args, 0), length=exp.Literal.number(512)),
+        "SHA512": lambda args: exp.SHA2Digest(
+            this=seq_get(args, 0), length=exp.Literal.number(512)
+        ),
         "SIMILARITY": exp.AISimilarity.from_arg_list,
         "SPLIT": lambda args: exp.Split(
             # https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#split
@@ -418,7 +457,7 @@ class BigQueryParser(parser.Parser):
             alias = table.this
             catalog, db, this_id, *rest = (
                 exp.to_identifier(p, quoted=True)
-                for p in split_num_words(".".join(p.name for p in table.parts), ".", 3)
+                for p in _split_qualified_name(".".join(p.name for p in table.parts), 3)
             )
 
             for part in (catalog, db, this_id):
@@ -459,10 +498,10 @@ class BigQueryParser(parser.Parser):
 
             info_schema_view = f"{table_parts[-2].name}.{table_parts[-1].name}"
             new_this = exp.Identifier(this=info_schema_view, quoted=True).update_positions(
-                line=table_parts[-2].meta.get("line"),
-                col=table_parts[-1].meta.get("col"),
-                start=table_parts[-2].meta.get("start"),
-                end=table_parts[-1].meta.get("end"),
+                line=table_parts[-2].meta_get("line"),
+                col=table_parts[-1].meta_get("col"),
+                start=table_parts[-2].meta_get("start"),
+                end=table_parts[-1].meta_get("end"),
             )
             table.set("this", new_this)
             table.set("db", seq_get(table_parts, -3))
@@ -475,18 +514,26 @@ class BigQueryParser(parser.Parser):
         if isinstance(column, exp.Column):
             parts = column.parts
             if any("." in p.name for p in parts):
-                catalog, db, table, this, *rest = (
+                catalog, db, table, this_id, *rest = (
                     exp.to_identifier(p, quoted=True)
-                    for p in split_num_words(".".join(p.name for p in parts), ".", 4)
+                    for p in _split_qualified_name(".".join(p.name for p in parts), 4)
                 )
 
+                this: exp.Expr | None = this_id
                 if rest and this:
-                    this = exp.Dot.build([this, *rest])  # type: ignore
+                    this = exp.Dot.build([this, *rest])  # type: ignore[list-item]
 
                 column = exp.Column(this=this, table=table, db=db, catalog=catalog)
                 column.meta["quoted_column"] = True
 
         return column
+
+    def _parse_cluster_property(self) -> exp.ClusterProperty:
+        return self.expression(
+            exp.ClusterProperty(
+                expressions=self._parse_csv(self._parse_column),
+            )
+        )
 
     @t.overload
     def _parse_json_object(self, agg: t.Literal[False]) -> exp.JSONObject: ...

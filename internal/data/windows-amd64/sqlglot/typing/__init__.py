@@ -22,7 +22,9 @@ EXPRESSION_METADATA: ExprMetadataType = {
     },
     **{
         expr_type: {"annotator": lambda self, e: self._annotate_unary(e)}
-        for expr_type in subclasses(exp.__name__, (exp.Unary, exp.Alias))
+        for expr_type in subclasses(
+            exp.__name__, (exp.Unary, exp.Alias, exp.IgnoreNulls, exp.RespectNulls)
+        )
     },
     **{
         expr_type: {"returns": exp.DType.BIGINT}
@@ -30,7 +32,11 @@ EXPRESSION_METADATA: ExprMetadataType = {
             exp.ApproxDistinct,
             exp.ArraySize,
             exp.CountIf,
+            exp.DenseRank,
             exp.Int64,
+            exp.Ntile,
+            exp.Rank,
+            exp.RowNumber,
             exp.UnixSeconds,
             exp.UnixMicros,
             exp.UnixMillis,
@@ -92,6 +98,8 @@ EXPRESSION_METADATA: ExprMetadataType = {
             exp.Asin,
             exp.Asinh,
             exp.Acos,
+            exp.CovarPop,
+            exp.CovarSamp,
             exp.Acosh,
             exp.ApproxQuantile,
             exp.Atan,
@@ -108,6 +116,7 @@ EXPRESSION_METADATA: ExprMetadataType = {
             exp.Log,
             exp.Pi,
             exp.Pow,
+            exp.PercentileCont,
             exp.Quantile,
             exp.Radians,
             exp.Round,
@@ -122,6 +131,8 @@ EXPRESSION_METADATA: ExprMetadataType = {
             exp.Tan,
             exp.Tanh,
             exp.ToDouble,
+            exp.CumeDist,
+            exp.PercentRank,
             exp.Variance,
             exp.VariancePop,
             exp.Skewness,
@@ -224,10 +235,14 @@ EXPRESSION_METADATA: ExprMetadataType = {
             exp.Lower,
             exp.MD5,
             exp.Monthname,
+            exp.RawString,
+            exp.Repeat,
             exp.SHA,
             exp.SHA2,
-            exp.Substring,
+            exp.SessionUser,
+            exp.Space,
             exp.String,
+            exp.Substring,
             exp.TimeToStr,
             exp.TimeToTimeStr,
             exp.Trim,
@@ -235,12 +250,10 @@ EXPRESSION_METADATA: ExprMetadataType = {
             exp.ToBase64,
             exp.Translate,
             exp.TsOrDsToDateStr,
+            exp.Typeof,
             exp.UnixToStr,
             exp.UnixToTimeStr,
             exp.Upper,
-            exp.RawString,
-            exp.SessionUser,
-            exp.Space,
         }
     },
     **{
@@ -256,6 +269,7 @@ EXPRESSION_METADATA: ExprMetadataType = {
             exp.HavingMax,
             exp.LastValue,
             exp.Limit,
+            exp.NthValue,
             exp.Order,
             exp.SortArray,
             exp.Window,
@@ -320,7 +334,7 @@ EXPRESSION_METADATA: ExprMetadataType = {
             e, exp.DType.BIGINT if e.args.get("big_int") else exp.DType.INT
         )
     },
-    exp.DataType: {"annotator": lambda self, e: self._set_type(e, e.copy())},
+    exp.DataType: {"annotator": lambda _, e: e},
     exp.Div: {"annotator": lambda self, e: self._annotate_div(e)},
     exp.Distinct: {"annotator": lambda self, e: self._annotate_by_args(e, "expressions")},
     exp.Dot: {"annotator": lambda self, e: self._annotate_dot(e)},
@@ -342,6 +356,8 @@ EXPRESSION_METADATA: ExprMetadataType = {
         "annotator": lambda self, e: self._set_type(e, exp.DataType.from_str("ARRAY<TIMESTAMP>"))
     },
     exp.If: {"annotator": lambda self, e: self._annotate_by_args(e, "true", "false")},
+    exp.Lag: {"annotator": lambda self, e: self._annotate_by_args(e, "this", "default")},
+    exp.Lead: {"annotator": lambda self, e: self._annotate_by_args(e, "this", "default")},
     exp.Literal: {"annotator": lambda self, e: self._annotate_literal(e)},
     exp.Null: {"returns": exp.DType.NULL},
     exp.Nullif: {"annotator": lambda self, e: self._annotate_by_args(e, "this", "expression")},
@@ -358,5 +374,6 @@ EXPRESSION_METADATA: ExprMetadataType = {
     },
     exp.ToMap: {"annotator": lambda self, e: self._annotate_to_map(e)},
     exp.Unnest: {"annotator": lambda self, e: self._annotate_unnest(e)},
+    exp.WithinGroup: {"annotator": lambda self, e: self._annotate_within_group(e)},
     exp.Subquery: {"annotator": lambda self, e: self._annotate_subquery(e)},
 }

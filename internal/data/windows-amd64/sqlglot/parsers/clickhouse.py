@@ -22,9 +22,9 @@ if t.TYPE_CHECKING:
 
 def _build_datetime_format(
     expr_type: Type[E],
-) -> t.Callable[[list], E]:
-    def _builder(args: list) -> E:
-        expr = build_formatted_time(expr_type, "clickhouse")(args)
+) -> t.Callable:
+    def _builder(args: list, dialect: t.Any) -> E:
+        expr = build_formatted_time(expr_type)(args, dialect)
 
         timezone = seq_get(args, 2)
         if timezone:
@@ -251,6 +251,14 @@ class ClickHouseParser(parser.Parser):
             for k, v in parser.Parser.FUNCTIONS.items()
             if k not in ("TRANSFORM", "APPROX_TOP_SUM")
         },
+        **{
+            regexp_extract: lambda args: exp.RegexpExtract(
+                this=seq_get(args, 0),
+                expression=seq_get(args, 1),
+                group=seq_get(args, 2),
+            )
+            for regexp_extract in ("REGEXPEXTRACT", "REGEXP_EXTRACT", "REGEXP_SUBSTR")
+        },
         **{f"TOSTARTOF{unit}": _build_timestamp_trunc(unit=unit) for unit in TIMESTAMP_TRUNC_UNITS},
         "ANY": exp.AnyValue.from_arg_list,
         "ARRAYCOMPACT": exp.ArrayCompact.from_arg_list,
@@ -262,6 +270,10 @@ class ClickHouseParser(parser.Parser):
         "ARRAYMIN": exp.ArrayMin.from_arg_list,
         "ARRAYREVERSE": exp.ArrayReverse.from_arg_list,
         "ARRAYSLICE": exp.ArraySlice.from_arg_list,
+        "ARRAYFILTER": lambda args: exp.ArrayFilter(
+            this=seq_get(args, 1), expression=seq_get(args, 0)
+        ),
+        "ARRAYMAP": lambda args: exp.Transform(this=seq_get(args, 1), expression=seq_get(args, 0)),
         "CURRENTDATABASE": exp.CurrentDatabase.from_arg_list,
         "CURRENTSCHEMAS": exp.CurrentSchemas.from_arg_list,
         "COUNTIF": _build_count_if,
@@ -275,6 +287,7 @@ class ClickHouseParser(parser.Parser):
         "DATE_FORMAT": _build_datetime_format(exp.TimeToStr),
         "DATE_SUB": build_date_delta(exp.DateSub, default_unit=None),
         "DATESUB": build_date_delta(exp.DateSub, default_unit=None),
+        "DATETRUNC": exp.DateTrunc.from_arg_list,
         "FORMATDATETIME": _build_datetime_format(exp.TimeToStr),
         "HAS": exp.ArrayContains.from_arg_list,
         "ILIKE": build_like(exp.ILike),
@@ -296,7 +309,6 @@ class ClickHouseParser(parser.Parser):
         "TIMESTAMPADD": build_date_delta(exp.TimestampAdd, default_unit=None),
         "TOMONDAY": _build_timestamp_trunc("WEEK"),
         "UNIQ": exp.ApproxDistinct.from_arg_list,
-        "XOR": lambda args: exp.Xor(expressions=args),
         "MD5": exp.MD5Digest.from_arg_list,
         "SHA256": lambda args: exp.SHA2(this=seq_get(args, 0), length=exp.Literal.number(256)),
         "SHA512": lambda args: exp.SHA2(this=seq_get(args, 0), length=exp.Literal.number(512)),
@@ -317,6 +329,7 @@ class ClickHouseParser(parser.Parser):
     FUNC_TOKENS = {
         *parser.Parser.FUNC_TOKENS,
         TokenType.AND,
+        TokenType.FILE,
         TokenType.OR,
         TokenType.SET,
     }
@@ -370,6 +383,7 @@ class ClickHouseParser(parser.Parser):
         "TUPLE": lambda self: exp.Struct.from_arg_list(self._parse_function_args(alias=True)),
         "AND": lambda self: exp.and_(*self._parse_function_args(alias=False)),
         "OR": lambda self: exp.or_(*self._parse_function_args(alias=False)),
+        "XOR": lambda self: exp.xor(*self._parse_function_args(alias=False)),
     }
 
     PROPERTY_PARSERS = {
@@ -420,6 +434,7 @@ class ClickHouseParser(parser.Parser):
 
     ALIAS_TOKENS = parser.Parser.ALIAS_TOKENS - {
         TokenType.FORMAT,
+        TokenType.SETTINGS,
     }
 
     LOG_DEFAULTS_TO_LN = True
@@ -487,10 +502,17 @@ class ClickHouseParser(parser.Parser):
         return self._parse_lambda()
 
     def _parse_types(
-        self, check_func: bool = False, schema: bool = False, allow_identifiers: bool = True
+        self,
+        check_func: bool = False,
+        schema: bool = False,
+        allow_identifiers: bool = True,
+        with_collation: bool = False,
     ) -> exp.Expr | None:
         dtype = super()._parse_types(
-            check_func=check_func, schema=schema, allow_identifiers=allow_identifiers
+            check_func=check_func,
+            schema=schema,
+            allow_identifiers=allow_identifiers,
+            with_collation=with_collation,
         )
         if isinstance(dtype, exp.DataType) and dtype.args.get("nullable") is not True:
             # Mark every type as non-nullable which is ClickHouse's default, unless it's
@@ -656,9 +678,14 @@ class ClickHouseParser(parser.Parser):
         return is_global, side or kind, kind_pre or kind
 
     def _parse_join(
-        self, skip_join_token: bool = False, parse_bracket: bool = False
+        self,
+        skip_join_token: bool = False,
+        parse_bracket: bool = False,
+        alias_tokens: t.Collection[TokenType] | None = None,
     ) -> exp.Join | None:
-        join = super()._parse_join(skip_join_token=skip_join_token, parse_bracket=True)
+        join = super()._parse_join(
+            skip_join_token=skip_join_token, parse_bracket=True, alias_tokens=alias_tokens
+        )
         if join:
             method = join.args.get("method")
             join.set("method", None)
@@ -839,7 +866,7 @@ class ClickHouseParser(parser.Parser):
         return exp.DefinerProperty(this=self._parse_string())
 
     def _parse_projection_def(self) -> exp.ProjectionDef | None:
-        if not self._match_text_seq("PROJECTION"):
+        if not self._match(TokenType.PROJECTION):
             return None
 
         return self.expression(

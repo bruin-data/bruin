@@ -39,16 +39,25 @@ def _transform_create(expression: exp.Expr) -> exp.Expr:
                 "constraints", exp.ColumnConstraint(kind=exp.PrimaryKeyColumnConstraint())
             )
             schema.expressions.remove(primary_key)
-        else:
-            for column in defs.values():
-                auto_increment = None
-                for constraint in column.constraints:
-                    if isinstance(constraint.kind, exp.PrimaryKeyColumnConstraint):
-                        break
-                    if isinstance(constraint.kind, exp.AutoIncrementColumnConstraint):
-                        auto_increment = constraint
-                if auto_increment:
-                    column.constraints.remove(auto_increment)
+
+        for column in defs.values():
+            primary_key_index = -1
+            auto_increment = None
+            auto_increment_index = -1
+
+            for i, constraint in enumerate(column.constraints):
+                if isinstance(constraint.kind, exp.PrimaryKeyColumnConstraint):
+                    primary_key_index = i
+                elif isinstance(constraint.kind, exp.AutoIncrementColumnConstraint):
+                    auto_increment = constraint
+                    auto_increment_index = i
+
+            if auto_increment is not None and (
+                primary_key_index == -1 or auto_increment_index < primary_key_index
+            ):
+                column.constraints.remove(auto_increment)
+                if primary_key_index != -1:
+                    column.constraints.insert(primary_key_index, auto_increment)
 
     return expression
 
@@ -69,6 +78,18 @@ def _generated_to_auto_increment(expression: exp.Expr) -> exp.Expr:
         expression.append(
             "constraints", exp.ColumnConstraint(kind=exp.AutoIncrementColumnConstraint())
         )
+
+    return expression
+
+
+def _offset_to_limit(expression: exp.Expr) -> exp.Expr:
+    if not isinstance(expression, exp.Select):
+        return expression
+
+    offset = expression.args.get("offset")
+
+    if offset and not expression.args.get("limit"):
+        expression.limit(-1, copy=False)
 
     return expression
 
@@ -152,6 +173,7 @@ class SQLiteGenerator(generator.Generator):
         exp.Rand: rename_func("RANDOM"),
         exp.Select: transforms.preprocess(
             [
+                _offset_to_limit,
                 transforms.eliminate_distinct_on,
                 transforms.eliminate_qualify,
                 transforms.eliminate_semi_and_anti_joins,
@@ -182,6 +204,13 @@ class SQLiteGenerator(generator.Generator):
 
     LIMIT_FETCH = "LIMIT"
 
+    def insert_sql(self, expression: exp.Insert) -> str:
+        if expression.args.get("ignore"):
+            expression.set("ignore", False)
+            expression.set("alternative", "IGNORE")
+
+        return super().insert_sql(expression)
+
     def bitwiseandagg_sql(self, expression: exp.BitwiseAndAgg) -> str:
         self.unsupported("BITWISE_AND aggregation is not supported in SQLite")
         return self.function_fallback_sql(expression)
@@ -201,8 +230,13 @@ class SQLiteGenerator(generator.Generator):
 
     def dateadd_sql(self, expression: exp.DateAdd) -> str:
         modifier = expression.expression
-        modifier = modifier.name if modifier.is_string else self.sql(modifier)
         unit = expression.args.get("unit")
+        # An INTERVAL amount carries its own unit, e.g. DATE_ADD(d, INTERVAL 1 DAY);
+        # unwrap it so the unit is not left inside the quoted modifier string.
+        if isinstance(modifier, exp.Interval):
+            unit = unit or modifier.unit
+            modifier = modifier.this
+        modifier = modifier.name if modifier.is_string else self.sql(modifier)
         modifier = f"'{modifier} {unit.name}'" if unit else f"'{modifier}'"
         return self.func("DATE", expression.this, modifier)
 

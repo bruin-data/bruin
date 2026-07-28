@@ -1,37 +1,23 @@
 from __future__ import annotations
 
-import threading
 import typing as t
 
+from sqlglot import tokenizer_core
 from sqlglot.trie import new_trie
 
 from sqlglot.tokenizer_core import Token, TokenizerCore, TokenType
 
-T = t.TypeVar("T")
 
-
-class ThreadLocalCache(threading.local):
-    """Per-thread cache. Each thread sees its own dict; safe for caching stateful objects."""
-
-    def __init__(self) -> None:
-        self.cache: dict[type, t.Any] = {}
-
-    def get_or_build(self, key: type, build: t.Callable[[], T]) -> T:
-        if not (obj := self.cache.get(key)):
-            self.cache[key] = obj = build()
-        return obj
-
-
-try:
-    import sqlglotc  # noqa: F401
-except ImportError:
-    pass
+# The sqlglotc distribution ships no importable `sqlglotc` module; it overlays
+# compiled .so files onto sqlglot's modules, so detect it via the compiled core.
+SQLGLOTC_INSTALLED = not getattr(tokenizer_core, "__file__", "py").endswith(".py")
 
 try:
     import sqlglotrs  # type: ignore # noqa: F401
-    import warnings
 
-    if "sqlglotc" not in globals():
+    if not SQLGLOTC_INSTALLED:
+        import warnings
+
         warnings.warn(
             "sqlglot[rs] is deprecated and no longer compatible with sqlglot. "
             "Please use sqlglotc instead for faster parsing: pip install sqlglot[c]",
@@ -87,7 +73,7 @@ class _TokenizerBase:
     _ESCAPE_FOLLOW_CHARS: t.ClassVar[set[str]]
     _IDENTIFIER_ESCAPES: t.ClassVar[set[str]]
     _COMMENTS: t.ClassVar[dict[str, str | None]]
-    _KEYWORD_TRIE: t.ClassVar[dict[str, object]]
+    _KEYWORD_TRIE: t.ClassVar[dict[str | int, object]]
 
     @classmethod
     def __init_subclass__(cls, **kwargs: t.Any) -> None:
@@ -208,7 +194,7 @@ class Tokenizer(_TokenizerBase):
     _QUOTES: t.ClassVar[dict[str, str]] = {}
     _STRING_ESCAPES: t.ClassVar[set[str]] = set()
     _BYTE_STRING_ESCAPES: t.ClassVar[set[str]] = set()
-    _KEYWORD_TRIE: t.ClassVar[dict[str, object]] = {}
+    _KEYWORD_TRIE: t.ClassVar[dict[str | int, object]] = {}
     _ESCAPE_FOLLOW_CHARS: t.ClassVar[set[str]] = set()
 
     KEYWORDS: t.ClassVar[dict[str, TokenType]] = {
@@ -236,6 +222,7 @@ class Tokenizer(_TokenizerBase):
         "#>": TokenType.HASH_ARROW,
         "#>>": TokenType.DHASH_ARROW,
         "<->": TokenType.LR_ARROW,
+        "<<->>": TokenType.LLRR_ARROW,
         "&&": TokenType.DAMP,
         "??": TokenType.DQMARK,
         "~~~": TokenType.GLOB,
@@ -547,8 +534,6 @@ class Tokenizer(_TokenizerBase):
 
     COMMENTS = ["--", ("/*", "*/")]
 
-    _core_cache: t.ClassVar[ThreadLocalCache] = ThreadLocalCache()
-
     __slots__ = (
         "dialect",
         "_core",
@@ -558,7 +543,7 @@ class Tokenizer(_TokenizerBase):
         from sqlglot.dialects.dialect import Dialect
 
         self.dialect = Dialect.get_or_raise(dialect)
-        self._core = self._core_cache.get_or_build(type(self), self._init_core)
+        self._core = self._init_core()
 
     def _init_core(self) -> TokenizerCore:
         return TokenizerCore(
