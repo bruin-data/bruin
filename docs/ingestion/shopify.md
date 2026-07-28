@@ -27,6 +27,8 @@ In the app configuration, make sure the app has read scopes for the data you wan
 - `read_inventory`
 - `read_locations`
 
+These are examples, not an exhaustive list. Add every Admin API access scope required by the source tables you select, including the relevant permissions for discounts, events, transactions, balance, and price rules.
+
 After changing scopes:
 
 1. Create a new app version
