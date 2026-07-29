@@ -643,6 +643,99 @@ bruin cloud dashboards create --title "Q1 Revenue" --visibility team --state '{"
 bruin cloud dashboards create --title "Q1 Revenue" --state-file ./dashboard.json
 ```
 
+#### Dashboard definition (the `--state` / `--state-file` value)
+
+The definition is a YAML or JSON object with these top-level keys:
+
+| Key | Required | Description |
+|-----|----------|-------------|
+| `name` | yes | dashboard name |
+| `connection` | for SQL widgets | a connection **the bound agent has** (see `bruin cloud connections list`). The canvas runs every widget's SQL against this connection; a name the agent doesn't have makes the queries fail |
+| `description` | no | free text |
+| `filters` | no | interactive controls that feed widget SQL via filter placeholders (see **Filters** below) |
+| `rows` | yes | the layout — a list of rows, each holding widgets |
+
+A **row** is `{ tab?: string, widgets: [...] }`. Widgets sit on a 12-column grid; each widget's `col` values within a row must sum to ≤ 12.
+
+**Tabs** are expressed **per row** with a `tab:` field — there is **no top-level `tabs:` key**. Rows sharing a `tab` name render together under that tab; rows with no `tab` render above the tab bar (put shared KPIs there). Omit `tab` everywhere for a flat dashboard.
+
+A **widget** is:
+
+| Field | Applies to | Description |
+|-------|-----------|-------------|
+| `id` | all | unique, stable string |
+| `type` | all | `metric`, `chart`, or `table` |
+| `name` | all | widget title |
+| `col` | all | column span 1–12 |
+| `sql` | all | the query (BigQuery/Snowflake/… dialect of the connection) |
+| `chart` | chart | `bar`, `line`, `area`, `scatter`, `histogram`, `heatmap`, `pie`, `donut` |
+| `x`, `y` | chart | axis encodings — `{ field, type, format? }`; `y.field` is a **list** |
+| `value` | metric | `{ field, type, format? }` for the single metric value |
+
+Encoding `type` is `date`, `number`, or `category`. `format` is a d3 format string (e.g. `"$,.0f"`, `".1%"`, `"%b %Y"`).
+
+Example (`dashboard.yaml`):
+
+```yaml
+name: Revenue Overview
+connection: my_warehouse   # must be one of the bound agent's connections
+rows:
+  # No tab → always visible, above the tab bar
+  - widgets:
+      - { id: m_rev, type: metric, name: Total Revenue, col: 4,
+          sql: "SELECT SUM(amount) AS revenue FROM orders",
+          value: { field: revenue, type: number, format: "$,.0f" } }
+  - tab: Trends
+    widgets:
+      - { id: c_rev, type: chart, chart: line, name: Revenue over time, col: 12,
+          sql: "SELECT month, SUM(amount) AS revenue FROM orders GROUP BY 1 ORDER BY 1",
+          x: { field: month, type: date, format: "%b %Y" },
+          y: { field: [revenue], type: number, format: "$,.0f" } }
+  - tab: Detail
+    widgets:
+      - { id: t_orders, type: table, name: Recent orders, col: 12,
+          sql: "SELECT id, customer, amount FROM orders ORDER BY id DESC LIMIT 20" }
+```
+
+**Filters** are interactive controls a viewer changes; each feeds widget SQL through a placeholder named after the filter. A filter is:
+
+| Field | Description |
+|-------|-------------|
+| `name` | the placeholder name used in a widget's SQL |
+| `type` | `date`, `date-range`, `number`, `select`, or `text` |
+| `default` | initial value. `date`: `TODAY`, `TODAY+/-N`, or `YYYY-MM-DD`; `date-range`: a preset string like `last_30_days` (resolves to a start/end pair); `select` with `multiple: true`: a list (`[]` = no filtering) |
+| `multiple` | `select` only — allow selecting several values |
+| `options` | for `select`/`date-range` — `values: [...]` (static) or `query: "SELECT ..."` (one column), with an optional `connection` for that query, and `presets: [...]` to choose which date-range presets to show |
+
+```yaml
+filters:
+  - name: start_date
+    type: date
+    default: "TODAY-30"
+  - name: region
+    type: select
+    multiple: true
+    default: []
+    options: { query: "SELECT DISTINCT region FROM orders ORDER BY 1" }
+```
+
+A widget's SQL references a filter with a double-brace placeholder named after the
+filter. Single-value filters (`date`, `text`, `number`, `select`) resolve to one
+value; a `date-range` filter resolves to a `.start` / `.end` pair; a multi-select
+(`select` with `multiple: true`) resolves to a list, so guard it and expand it:
+
+```sql
+SELECT * FROM orders
+WHERE created_at >= '{{ filters.start_date }}'                 -- date / text / number / single select
+  AND order_date BETWEEN '{{ filters.period.start }}'          -- date-range endpoints
+                     AND '{{ filters.period.end }}'
+  {% if filters.region %}                                      -- multi-select: empty list = no filter
+  AND region IN ({% for r in filters.region %}'{{ r }}'{% if not loop.last %}, {% endif %}{% endfor %})
+  {% endif %}
+```
+
+Filters only act on `sql` widgets, so a dashboard built purely from inline data can't use them.
+
 #### `update`
 
 Update an existing dashboard's title, visibility, or definition. Only the flags
