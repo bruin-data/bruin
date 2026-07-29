@@ -223,7 +223,13 @@ func TestCloudAgentsCommand_Help(t *testing.T) {
 	cmd := CloudAgents()
 	require.NotNil(t, cmd)
 	assert.Equal(t, "agents", cmd.Name)
-	require.Len(t, cmd.Commands, 10)
+	require.Len(t, cmd.Commands, 11)
+
+	subNames := make([]string, len(cmd.Commands))
+	for i, sub := range cmd.Commands {
+		subNames[i] = sub.Name
+	}
+	assert.Contains(t, subNames, "connections")
 }
 
 func TestCloudDashboardsCommand_Help(t *testing.T) {
@@ -259,6 +265,24 @@ func TestCloudDashboardsCreate_RejectsNonPositiveAgentID(t *testing.T) {
 			}
 		}
 		_ = cmd.Run(t.Context(), []string{"create", "--title", "T", "--api-key", "k", "--agent-id", v})
+		assert.Equalf(t, 1, exitCode, "agent-id %q should be rejected", v)
+	}
+}
+
+func TestCloudAgentsConnections_RejectsNonPositiveAgentID(t *testing.T) {
+	t.Parallel()
+	// An explicit non-positive --agent-id must fail locally, not become a bad
+	// API request with a generic remote error.
+	for _, v := range []string{"0", "-3"} {
+		cmd := cloudAgentsConnections()
+		exitCode := 0
+		cmd.ExitErrHandler = func(_ context.Context, _ *cli.Command, err error) {
+			var ec cli.ExitCoder
+			if errors.As(err, &ec) {
+				exitCode = ec.ExitCode()
+			}
+		}
+		_ = cmd.Run(t.Context(), []string{"connections", "--api-key", "k", "--agent-id", v})
 		assert.Equalf(t, 1, exitCode, "agent-id %q should be rejected", v)
 	}
 }

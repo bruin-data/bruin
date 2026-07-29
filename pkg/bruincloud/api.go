@@ -478,6 +478,17 @@ func (c *APIClient) ListAgents(ctx context.Context) ([]Agent, error) {
 	return resp.Agents, err
 }
 
+// ListAgentConnections returns the connection names and types available to the
+// agent (from its dev-env secret) — names/types only, never credentials. Use it
+// to pick a connection the agent can actually query.
+func (c *APIClient) ListAgentConnections(ctx context.Context, agentID int) ([]AgentConnection, error) {
+	var resp struct {
+		Connections []AgentConnection `json:"connections"`
+	}
+	err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/agents/%d/connections", agentID), nil, &resp)
+	return resp.Connections, err
+}
+
 // CreateAgent creates a new agent. Optional fields are omitted when empty so the
 // server applies its defaults (null description/prompt, "team" visibility).
 func (c *APIClient) CreateAgent(ctx context.Context, name, description, systemPrompt, visibility string) (*Agent, error) {

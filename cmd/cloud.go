@@ -2165,6 +2165,71 @@ func CloudAgents() *cli.Command {
 			cloudAgentsMessages(),
 			cloudAgentsGetPrompt(),
 			cloudAgentsSetPrompt(),
+			cloudAgentsConnections(),
+		},
+	}
+}
+
+func cloudAgentsConnections() *cli.Command {
+	return &cli.Command{
+		Name:  "connections",
+		Usage: "List the connections available to an agent (names and types)",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "agent-id",
+				Usage:    "agent ID",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			// Fail fast on an invalid id rather than sending a bad request and
+			// surfacing a generic remote error.
+			if c.Int("agent-id") <= 0 {
+				printError(fmt.Errorf("--agent-id must be a positive integer, got %d", c.Int("agent-id")), output, "Invalid --agent-id")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			connections, err := client.ListAgentConnections(ctx, c.Int("agent-id"))
+			if err != nil {
+				printError(err, output, "Failed to list agent connections")
+				return cli.Exit("", 1)
+			}
+			// Normalize a nil slice so JSON output is an empty list, not null —
+			// scripting consumers then handle one shape.
+			if connections == nil {
+				connections = []bruincloud.AgentConnection{}
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(connections, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			if len(connections) == 0 {
+				infoPrinter.Println("No connections available to this agent.")
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"Name", "Type"})
+			for _, conn := range connections {
+				t.AppendRow(table.Row{conn.Name, conn.Type})
+			}
+			t.Render()
+			return nil
 		},
 	}
 }
