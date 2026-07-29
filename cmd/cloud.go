@@ -2065,6 +2065,13 @@ func cloudAgentsConnections() *cli.Command {
 			defer RecoverFromPanic()
 			output := c.String("output")
 
+			// Fail fast on an invalid id rather than sending a bad request and
+			// surfacing a generic remote error.
+			if c.Int("agent-id") <= 0 {
+				printError(fmt.Errorf("--agent-id must be a positive integer, got %d", c.Int("agent-id")), output, "Invalid --agent-id")
+				return cli.Exit("", 1)
+			}
+
 			client, err := newCloudClient(c)
 			if err != nil {
 				printError(err, output, "Failed to create API client")
@@ -2075,6 +2082,11 @@ func cloudAgentsConnections() *cli.Command {
 			if err != nil {
 				printError(err, output, "Failed to list agent connections")
 				return cli.Exit("", 1)
+			}
+			// Normalize a nil slice so JSON output is an empty list, not null —
+			// scripting consumers then handle one shape.
+			if connections == nil {
+				connections = []bruincloud.AgentConnection{}
 			}
 
 			if output == "json" {
