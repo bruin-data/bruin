@@ -130,11 +130,13 @@ You can run the following commands to get started:
     bruin validate bruin-pipeline
 ```
 
-### Initializing the Shopify-Bigquery template
+### Initializing a Shopify template
 
 ``` bash
-bruin init shopify-bigquery
+bruin init shopify-clickhouse
 ```
+
+The `shopify-clickhouse` template creates raw Shopify ingestion assets, conformed commerce models, and ClickHouse reporting marts. Configure the generated pipeline with your Shopify and ClickHouse connections before running it.
 
 #### Output
 

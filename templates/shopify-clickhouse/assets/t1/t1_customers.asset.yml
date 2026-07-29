@@ -1,0 +1,125 @@
+name: shopify.t1_customers
+type: ingestr
+description: "Raw Shopify customer records, incrementally merged from the live shop."
+
+materialization:
+  type: table
+  strategy: merge
+  incremental_key: updated_at
+
+parameters:
+  source_connection: shopify-default
+  source_table: customers
+  destination: clickhouse
+  schema_contract: evolve
+  schema_naming: snake_case
+
+tags:
+  - t1
+  - source
+  - shopify
+  - customers
+  - pii
+domains:
+  - commerce
+  - customer
+meta:
+  grain: one row per Shopify customer
+  source_system: shopify
+  source_table: customers
+  data_classification: restricted
+  contains_pii: "true"
+  ingestion_strategy: merge on updated_at
+
+columns:
+  - name: id
+    type: Int64
+    description: "Shopify numeric identifier for the customer."
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: admin_graphql_api_id
+    type: Nullable(String)
+    description: "Shopify Admin GraphQL global identifier for the customer."
+  - name: email
+    type: Nullable(String)
+    description: "Customer email address supplied to Shopify; contains personal data."
+  - name: first_name
+    type: Nullable(String)
+    description: "Customer given name supplied to Shopify; contains personal data."
+  - name: last_name
+    type: Nullable(String)
+    description: "Customer family name supplied to Shopify; contains personal data."
+  - name: phone
+    type: Nullable(String)
+    description: "Customer phone number supplied to Shopify; contains personal data."
+  - name: created_at
+    type: Nullable(DateTime64(6, 'UTC'))
+    description: "Timestamp when the customer record was created in Shopify."
+  - name: updated_at
+    type: Nullable(DateTime64(6, 'UTC'))
+    description: "Timestamp when Shopify last updated the customer record; used as the incremental cursor."
+  - name: state
+    type: Nullable(String)
+    description: "Current Shopify customer-account state."
+  - name: note
+    type: Nullable(String)
+    description: "Merchant-entered note attached to the customer; may contain personal data."
+  - name: tags
+    type: Nullable(String)
+    description: "Serialized tags assigned to the customer in Shopify."
+  - name: tax_exempt
+    type: Nullable(Bool)
+    description: "Whether Shopify marks the customer as exempt from tax."
+  - name: tax_exemptions
+    type: Nullable(String)
+    description: "Serialized list of tax exemptions assigned to the customer."
+  - name: verified_email
+    type: Nullable(Bool)
+    description: "Whether Shopify considers the customer email address verified."
+  - name: multipass_identifier
+    type: Nullable(String)
+    description: "Shopify Multipass identifier for the customer when configured."
+  - name: accepts_marketing
+    type: Nullable(Bool)
+    description: "Legacy Shopify flag indicating whether the customer accepts marketing."
+  - name: accepts_marketing_updated_at
+    type: Nullable(DateTime64(6, 'UTC'))
+    description: "Timestamp when the legacy marketing-acceptance state last changed."
+  - name: marketing_opt_in_level
+    type: Nullable(String)
+    description: "Marketing opt-in level recorded by Shopify."
+  - name: locale
+    type: Nullable(String)
+    description: "Customer locale recorded by Shopify."
+  - name: orders_count
+    type: Nullable(Int64)
+    description: "Number of orders Shopify associates with the customer."
+  - name: total_spent
+    type: Nullable(String)
+    description: "Lifetime amount spent as returned by Shopify in shop currency."
+  - name: currency
+    type: Nullable(String)
+    description: "ISO currency code associated with the customer's spending totals."
+  - name: default_address
+    type: Nullable(String)
+    description: "Serialized default postal address; contains personal data."
+  - name: addresses
+    type: Nullable(String)
+    description: "Serialized customer postal-address collection; contains personal data."
+  - name: email_marketing_consent
+    type: Nullable(String)
+    description: "Serialized Shopify email-marketing consent state."
+  - name: sms_marketing_consent
+    type: Nullable(String)
+    description: "Serialized Shopify SMS-marketing consent state."
+  - name: last_order_id
+    type: Nullable(Int64)
+    description: "Numeric identifier of the customer's most recent Shopify order."
+  - name: last_order_name
+    type: Nullable(String)
+    description: "Merchant-facing name of the customer's most recent Shopify order."
+  - name: _ingestr_loaded_at
+    type: Nullable(DateTime64(6, 'UTC'))
+    description: "Timestamp when ingestr loaded the record into ClickHouse."
