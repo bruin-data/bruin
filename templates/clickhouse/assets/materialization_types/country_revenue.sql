@@ -77,13 +77,15 @@ custom_checks:
       SELECT count() > 0
       FROM country_revenue
   - name: country target coverage
-    description: Every country in the mart must be represented in the governed target seed.
+    description: Every country in the customer summary must be represented in the governed target seed.
     value: 0
     blocking: false
     query: |
       SELECT count()
-      FROM country_revenue
-      WHERE monthly_revenue_target IS NULL
+      FROM customer_order_summary AS summary
+      LEFT JOIN country_targets AS targets
+        ON summary.country = targets.country
+      WHERE targets.country IS NULL
 unit_tests:
   - name: calculates_country_target_attainment
     inputs:
