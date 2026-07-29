@@ -652,7 +652,7 @@ The definition is a YAML or JSON object with these top-level keys:
 | `name` | yes | dashboard name |
 | `connection` | for SQL widgets | a connection **the bound agent has** (see `bruin cloud connections list`). The canvas runs every widget's SQL against this connection; a name the agent doesn't have makes the queries fail |
 | `description` | no | free text |
-| `filters` | no | interactive controls that feed widget SQL via `{{ filters.X }}` placeholders (see **Filters** below) |
+| `filters` | no | interactive controls that feed widget SQL via filter placeholders (see **Filters** below) |
 | `rows` | yes | the layout — a list of rows, each holding widgets |
 
 A **row** is `{ tab?: string, widgets: [...] }`. Widgets sit on a 12-column grid; each widget's `col` values within a row must sum to ≤ 12.
@@ -697,11 +697,11 @@ rows:
           sql: "SELECT id, customer, amount FROM orders ORDER BY id DESC LIMIT 20" }
 ```
 
-**Filters** are interactive controls a viewer changes; each feeds widget SQL through a `{{ filters.<name> }}` placeholder. A filter is:
+**Filters** are interactive controls a viewer changes; each feeds widget SQL through a placeholder named after the filter. A filter is:
 
 | Field | Description |
 |-------|-------------|
-| `name` | referenced in SQL as `{{ filters.<name> }}` |
+| `name` | the placeholder name used in a widget's SQL |
 | `type` | `date`, `date-range`, `number`, `select`, or `text` |
 | `default` | initial value. `date`: `TODAY`, `TODAY+/-N`, or `YYYY-MM-DD`; `date-range`: a preset string like `last_30_days` (resolves to a start/end pair); `select` with `multiple: true`: a list (`[]` = no filtering) |
 | `multiple` | `select` only — allow selecting several values |
@@ -719,7 +719,22 @@ filters:
     options: { query: "SELECT DISTINCT region FROM orders ORDER BY 1" }
 ```
 
-Reference them in a widget's `sql`, e.g. `WHERE created_at >= '{{ filters.start_date }}'`. Filters only act on `sql` widgets, so a dashboard built purely from inline data can't use them.
+A widget's SQL references a filter with a double-brace placeholder named after the
+filter. Single-value filters (`date`, `text`, `number`, `select`) resolve to one
+value; a `date-range` filter resolves to a `.start` / `.end` pair; a multi-select
+(`select` with `multiple: true`) resolves to a list, so guard it and expand it:
+
+```sql
+SELECT * FROM orders
+WHERE created_at >= '{{ filters.start_date }}'                 -- date / text / number / single select
+  AND order_date BETWEEN '{{ filters.period.start }}'          -- date-range endpoints
+                     AND '{{ filters.period.end }}'
+  {% if filters.region %}                                      -- multi-select: empty list = no filter
+  AND region IN ({% for r in filters.region %}'{{ r }}'{% if not loop.last %}, {% endif %}{% endfor %})
+  {% endif %}
+```
+
+Filters only act on `sql` widgets, so a dashboard built purely from inline data can't use them.
 
 #### `update`
 
