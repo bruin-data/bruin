@@ -401,7 +401,7 @@ bruin cloud backfills list --project-id <project-id> --pipeline <pipeline-name>
 
 Each row shows the backfill ID (the `multiple_action_id`), its overall interval,
 and how many runs it fanned out into. Use `--limit` to control how many backfills
-are returned (default 10).
+are returned (default 20).
 
 #### `runs`
 
