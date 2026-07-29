@@ -60,7 +60,7 @@ SQL raw assets + seed + Python asset
 | Ingestr | ingestion/raw_postgres_orders.asset.yml | Incremental PostgreSQL-to-ClickHouse replication using merge and an explicit high-water mark. |
 | DDL and physical layout | data_definitions/order_events_contract.sql | Explicit ClickHouse DDL with a partition key and composite ClickHouse sorting key. |
 | Governance | Most assets | Owners, tags, domains, metadata, column descriptions, and classification labels. |
-| Quality and testing | materialization_types/country_revenue.sql, materialization_types/customer_order_summary.sql | Built-in and custom quality checks, plus a mocked SQL unit test. |
+| Quality and testing | materialization_types/country_revenue.sql, materialization_types/customer_order_summary.sql | Built-in and custom quality checks, including a non-blocking check for customer-summary countries missing from the target seed, plus a mocked SQL unit test. |
 | Lineage | All dependent assets | Execution ordering and upstream/downstream inspection through Bruin lineage. |
 
 ## Operating ClickHouse writes
