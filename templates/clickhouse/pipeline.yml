@@ -1,6 +1,8 @@
-name: bruin-clickhouse
+name: bruin-clickhouse-101
 schedule: daily
 start_date: "2024-01-01"
 catchup: false
+
 default_connections:
     clickhouse: "clickhouse-default"
+    postgres: "postgres-default"
