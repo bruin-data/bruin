@@ -32,6 +32,7 @@ func Cloud(isDebug *bool) *cli.Command {
 			CloudProjects(),
 			CloudPipelines(),
 			CloudRuns(),
+			CloudBackfills(),
 			CloudAssets(),
 			CloudInstances(),
 			CloudGlossary(),
@@ -39,6 +40,7 @@ func Cloud(isDebug *bool) *cli.Command {
 			CloudConnections(),
 			CloudDashboards(),
 			CloudScheduledAgents(),
+			CloudCost(),
 		},
 	}
 }
@@ -891,14 +893,7 @@ func cloudRunsTrigger() *cli.Command {
 			}
 
 			if output == "json" {
-				response := struct {
-					Status string `json:"status"`
-					*bruincloud.TriggerRunResponse
-				}{
-					Status:             "success",
-					TriggerRunResponse: result,
-				}
-				data, _ := json.MarshalIndent(response, "", "  ")
+				data, _ := json.MarshalIndent(result, "", "  ")
 				fmt.Println(string(data))
 				return nil
 			}
@@ -908,7 +903,7 @@ func cloudRunsTrigger() *cli.Command {
 			} else {
 				successPrinter.Printf("Successfully triggered backfill '%s' (split by %s, chunk size %d) for pipeline '%s' in project '%s'\n", result.MultipleActionID, split, chunkSize, pipeline, project)
 				if result.URL != "" {
-					fmt.Printf("  View backfill: %s\n", result.URL)
+					fmt.Printf("Track this backfill at: %s\n", result.URL)
 				}
 			}
 			return nil
@@ -1264,6 +1259,117 @@ func cloudRunsDiagnose() *cli.Command {
 				}
 			}
 
+			return nil
+		},
+	}
+}
+
+// --- Backfills ---
+
+func CloudBackfills() *cli.Command {
+	return &cli.Command{
+		Name:  "backfills",
+		Usage: "Inspect backfills (grouped runs created by 'runs trigger --split')",
+		Commands: []*cli.Command{
+			cloudBackfillsList(),
+			cloudBackfillsRuns(),
+		},
+	}
+}
+
+func cloudBackfillsList() *cli.Command {
+	return &cli.Command{
+		Name:  "list",
+		Usage: "List recent backfills",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			projectFlag(),
+			pipelineFlag(),
+			limitFlag(),
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			backfills, err := client.ListBackfills(ctx, c.String("project-id"), c.String("pipeline"), c.Int("limit"))
+			if err != nil {
+				printError(err, output, "Failed to list backfills")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(backfills, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"Backfill ID", "Project", "Pipeline", "Interval Start", "Interval End", "Runs", "Created"})
+			for _, b := range backfills {
+				t.AppendRow(table.Row{b.ID, b.Project, b.Pipeline, b.IntervalStart, b.IntervalEnd, len(b.Runs), b.CreatedAt})
+			}
+			t.Render()
+			return nil
+		},
+	}
+}
+
+func cloudBackfillsRuns() *cli.Command {
+	return &cli.Command{
+		Name:  "runs",
+		Usage: "List the individual runs of a backfill",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.StringFlag{
+				Name:     "id",
+				Usage:    "backfill ID (the 'Backfill ID' from 'backfills list')",
+				Required: true,
+			},
+			limitFlag(),
+			offsetFlag(),
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			runs, err := client.GetBackfillRuns(ctx, c.String("id"), c.Int("limit"), c.Int("offset"))
+			if err != nil {
+				printError(err, output, "Failed to get backfill runs")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(runs, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"Run ID", "Interval Start", "Interval End", "Created", "Note"})
+			for _, r := range runs {
+				note := ""
+				if r.Note != nil {
+					note = *r.Note
+				}
+				t.AppendRow(table.Row{r.RunID, r.IntervalStart, r.IntervalEnd, r.CreatedAt, note})
+			}
+			t.Render()
 			return nil
 		},
 	}
@@ -2059,6 +2165,71 @@ func CloudAgents() *cli.Command {
 			cloudAgentsMessages(),
 			cloudAgentsGetPrompt(),
 			cloudAgentsSetPrompt(),
+			cloudAgentsConnections(),
+		},
+	}
+}
+
+func cloudAgentsConnections() *cli.Command {
+	return &cli.Command{
+		Name:  "connections",
+		Usage: "List the connections available to an agent (names and types)",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "agent-id",
+				Usage:    "agent ID",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			// Fail fast on an invalid id rather than sending a bad request and
+			// surfacing a generic remote error.
+			if c.Int("agent-id") <= 0 {
+				printError(fmt.Errorf("--agent-id must be a positive integer, got %d", c.Int("agent-id")), output, "Invalid --agent-id")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			connections, err := client.ListAgentConnections(ctx, c.Int("agent-id"))
+			if err != nil {
+				printError(err, output, "Failed to list agent connections")
+				return cli.Exit("", 1)
+			}
+			// Normalize a nil slice so JSON output is an empty list, not null —
+			// scripting consumers then handle one shape.
+			if connections == nil {
+				connections = []bruincloud.AgentConnection{}
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(connections, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			if len(connections) == 0 {
+				infoPrinter.Println("No connections available to this agent.")
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"Name", "Type"})
+			for _, conn := range connections {
+				t.AppendRow(table.Row{conn.Name, conn.Type})
+			}
+			t.Render()
+			return nil
 		},
 	}
 }
@@ -3075,6 +3246,10 @@ func cloudDashboardsCreate() *cli.Command {
 				Name:  "visibility",
 				Usage: "team or private (default: team)",
 			},
+			&cli.IntFlag{
+				Name:  "agent-id",
+				Usage: "the agent to bind for canvas chat and refresh (defaults to the token's agent)",
+			},
 			&cli.StringFlag{
 				Name:  "state",
 				Usage: "the dashboard definition as a JSON or YAML string",
@@ -3091,6 +3266,14 @@ func cloudDashboardsCreate() *cli.Command {
 			visibility := c.String("visibility")
 			if visibility != "" && visibility != "team" && visibility != "private" {
 				printError(fmt.Errorf("visibility must be 'team' or 'private', got %q", visibility), output, "Invalid --visibility")
+				return cli.Exit("", 1)
+			}
+
+			// Reject an explicit non-positive --agent-id rather than silently
+			// dropping it (which would fall back to the token agent, or none, and
+			// create a dashboard with no chat against the caller's intent).
+			if c.IsSet("agent-id") && c.Int("agent-id") <= 0 {
+				printError(fmt.Errorf("--agent-id must be a positive integer, got %d", c.Int("agent-id")), output, "Invalid --agent-id")
 				return cli.Exit("", 1)
 			}
 
@@ -3139,7 +3322,7 @@ func cloudDashboardsCreate() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			dashboard, err := client.CreateDashboard(ctx, c.String("title"), visibility, state)
+			dashboard, err := client.CreateDashboard(ctx, c.String("title"), visibility, c.Int("agent-id"), state)
 			if err != nil {
 				printError(err, output, "Failed to create dashboard")
 				return cli.Exit("", 1)
@@ -3159,6 +3342,12 @@ func cloudDashboardsCreate() *cli.Command {
 				infoPrinter.Printf("Created dashboard %d (%s) as a draft — open it to review and publish: %s\n", dashboard.ID, title, dashboard.URL)
 			} else {
 				infoPrinter.Printf("Created dashboard %d (%s) as a draft — publish it from the Bruin Cloud UI.\n", dashboard.ID, title)
+			}
+			// No agent resolved (neither an explicit --agent-id nor the token's
+			// agent), so the dashboard opens without a chat panel. Warn and point
+			// at the fix instead of leaving it a silent surprise.
+			if dashboard.AgentID == nil || *dashboard.AgentID <= 0 {
+				errorPrinter.Println("Warning: no agent bound — this dashboard opens without a chat panel. Pass --agent-id <id> (see 'bruin cloud agents list').")
 			}
 			return nil
 		},
@@ -3596,4 +3785,230 @@ func derefString(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+func CloudCost() *cli.Command {
+	return &cli.Command{
+		Name:  "cost",
+		Usage: "Explore Bruin Cloud warehouse costs",
+		Commands: []*cli.Command{
+			cloudCostSchema(),
+			cloudCostExplorer(),
+		},
+	}
+}
+
+func cloudCostSchema() *cli.Command {
+	return &cli.Command{
+		Name:  "schema",
+		Usage: "List the dimensions, filters, and time buckets the cost explorer supports",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.StringFlag{
+				Name:  "platform",
+				Usage: "warehouse platform: bigquery (default) or databricks",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			schema, err := client.GetCostExplorerSchema(ctx, c.String("platform"))
+			if err != nil {
+				printError(err, output, "Failed to get cost explorer schema")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(schema, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			fmt.Printf("Platform: %s\n", schema.Platform)
+			fmt.Printf("Available platforms: %s\n", strings.Join(schema.AvailablePlatforms, ", "))
+			fmt.Printf("Time buckets: %s\n\n", strings.Join(schema.TimeDimensions, ", "))
+
+			dt := table.NewWriter()
+			dt.SetOutputMirror(os.Stdout)
+			dt.SetTitle("Dimensions")
+			dt.AppendHeader(table.Row{"Key", "Label"})
+			for _, d := range schema.Dimensions {
+				dt.AppendRow(table.Row{d.Key, d.Label})
+			}
+			dt.Render()
+
+			ft := table.NewWriter()
+			ft.SetOutputMirror(os.Stdout)
+			ft.SetTitle("Filters")
+			ft.AppendHeader(table.Row{"Field", "Op", "Multiple"})
+			for _, f := range schema.Filters {
+				ft.AppendRow(table.Row{f.Field, f.Op, f.Multiple})
+			}
+			ft.Render()
+			return nil
+		},
+	}
+}
+
+func cloudCostExplorer() *cli.Command {
+	return &cli.Command{
+		Name:  "explorer",
+		Usage: "Show warehouse cost breakdowns over a date range",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			limitFlag(),
+			offsetFlag(),
+			&cli.StringFlag{
+				Name:     "start-date",
+				Usage:    "start of the range, inclusive (e.g. 2026-07-01)",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:     "end-date",
+				Usage:    "end of the range, inclusive (e.g. 2026-07-31)",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:  "platform",
+				Usage: "warehouse platform: bigquery (default) or databricks",
+			},
+			&cli.StringFlag{
+				Name:  "dimension",
+				Usage: "group costs by this dimension (see 'bruin cloud cost schema')",
+			},
+			&cli.StringFlag{
+				Name:  "time-dimension",
+				Usage: "bucket costs over time: day, week, or month",
+			},
+			&cli.StringSliceFlag{
+				Name:  "filter",
+				Usage: "filter as field:op:value; repeat --filter per value for op 'in' (e.g. --filter pipeline_id:in:a --filter pipeline_id:in:b)",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			filters, err := parseCostFilters(c.StringSlice("filter"))
+			if err != nil {
+				printError(err, output, "Invalid --filter")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			resp, err := client.GetCostExplorer(ctx, bruincloud.CostExplorerRequest{
+				StartDate:     c.String("start-date"),
+				EndDate:       c.String("end-date"),
+				Platform:      c.String("platform"),
+				Dimension:     c.String("dimension"),
+				TimeDimension: c.String("time-dimension"),
+				Filters:       filters,
+				Limit:         c.Int("limit"),
+				Offset:        c.Int("offset"),
+			})
+			if err != nil {
+				printError(err, output, "Failed to get cost explorer data")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(resp, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			header := table.Row{}
+			if resp.TimeDimension != nil {
+				header = append(header, "Period")
+			}
+			if resp.Dimension != nil {
+				header = append(header, *resp.Dimension)
+			}
+			header = append(header, "Queries", "Cost (USD)", "TB Billed")
+			t.AppendHeader(header)
+			for _, row := range resp.Rows {
+				r := table.Row{}
+				if resp.TimeDimension != nil {
+					r = append(r, formatCostCell(row["time_period"]))
+				}
+				if resp.Dimension != nil {
+					r = append(r, formatCostCell(row[*resp.Dimension]))
+				}
+				r = append(r, formatCostCell(row["query_count"]), formatCostCell(row["total_cost_usd"]), formatCostCell(row["total_terabytes_billed"]))
+				t.AppendRow(r)
+			}
+			t.Render()
+
+			if resp.NextOffset != nil {
+				fmt.Printf("\nShowing rows %d-%d of %d. Next page: --offset=%d\n", resp.Offset, resp.Offset+resp.ReturnedRows-1, resp.TotalRows, *resp.NextOffset)
+			}
+			return nil
+		},
+	}
+}
+
+func parseCostFilters(raw []string) ([]bruincloud.CostFilter, error) {
+	if len(raw) == 0 {
+		return nil, nil
+	}
+	// urfave's StringSliceFlag splits values on commas, so multiple `in` values are passed as
+	// repeated --filter flags (e.g. --filter pipeline_id:in:a --filter pipeline_id:in:b) and
+	// merged here by field. Every token must be a complete field:op:value.
+	filters := make([]bruincloud.CostFilter, 0, len(raw))
+	inIndex := make(map[string]int)
+	for _, entry := range raw {
+		parts := strings.SplitN(entry, ":", 3)
+		if len(parts) != 3 || parts[0] == "" || parts[1] == "" {
+			return nil, fmt.Errorf("filter %q must be field:op:value", entry)
+		}
+		field, op, value := parts[0], parts[1], parts[2]
+		if op == "in" {
+			if idx, ok := inIndex[field]; ok {
+				vals := filters[idx].Value.([]string)
+				vals = append(vals, value)
+				filters[idx].Value = vals
+				continue
+			}
+			inIndex[field] = len(filters)
+			filters = append(filters, bruincloud.CostFilter{Field: field, Op: op, Value: []string{value}})
+			continue
+		}
+		filters = append(filters, bruincloud.CostFilter{Field: field, Op: op, Value: value})
+	}
+	return filters, nil
+}
+
+func formatCostCell(v any) string {
+	switch val := v.(type) {
+	case nil:
+		return ""
+	case string:
+		return val
+	case float64:
+		return strconv.FormatFloat(val, 'f', -1, 64)
+	case bool:
+		return strconv.FormatBool(val)
+	default:
+		data, err := json.Marshal(val)
+		if err != nil {
+			return fmt.Sprintf("%v", val)
+		}
+		return string(data)
+	}
 }

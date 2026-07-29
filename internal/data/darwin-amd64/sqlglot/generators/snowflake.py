@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import typing as t
+from collections import defaultdict
 
 from sqlglot import exp, generator, transforms
 from sqlglot.dialects.dialect import (
@@ -34,7 +35,6 @@ from sqlglot.parsers.snowflake import (
     build_object_construct,
 )
 from sqlglot.tokens import TokenType
-from collections import defaultdict
 
 if t.TYPE_CHECKING:
     from sqlglot._typing import E
@@ -380,7 +380,6 @@ class SnowflakeGenerator(generator.Generator):
     JOIN_HINTS = False
     TABLE_HINTS = False
     QUERY_HINTS = False
-    AGGREGATE_FILTER_SUPPORTED = False
     SUPPORTS_TABLE_COPY = False
     COLLATE_IS_FUNC = True
     LIMIT_ONLY_LITERALS = True
@@ -559,6 +558,7 @@ class SnowflakeGenerator(generator.Generator):
         exp.MD5Digest: rename_func("MD5_BINARY"),
         exp.MD5NumberLower64: rename_func("MD5_NUMBER_LOWER64"),
         exp.MD5NumberUpper64: rename_func("MD5_NUMBER_UPPER64"),
+        exp.Hex: rename_func("HEX_ENCODE"),
         exp.LowerHex: rename_func("TO_CHAR"),
         exp.Skewness: rename_func("SKEW"),
         exp.StarMap: rename_func("OBJECT_CONSTRUCT"),
@@ -614,6 +614,13 @@ class SnowflakeGenerator(generator.Generator):
             "SHA2_BINARY", e.this, e.args.get("length") or exp.Literal.number(256)
         ),
     }
+
+    def dynamicidentifier_sql(self, expression: exp.DynamicIdentifier) -> str:
+        this = self.func("IDENTIFIER", expression.this)
+        if "expressions" in expression.args:
+            # `IDENTIFIER(...)` invoked as a function, e.g. `IDENTIFIER('my_func')(1, 2)`
+            return self.func(this, *expression.expressions, normalize=False)
+        return this
 
     def sortarray_sql(self, expression: exp.SortArray) -> str:
         asc = expression.args.get("asc")
@@ -836,6 +843,13 @@ class SnowflakeGenerator(generator.Generator):
 
         return f"{value}{explode}{alias}"
 
+    def undrop_sql(self, expression: exp.Undrop) -> str:
+        this = self.sql(expression, "this")
+        kind = expression.kind
+        rename = self.sql(expression, "rename")
+        rename = f" RENAME TO {rename}" if rename else ""
+        return f"UNDROP {kind} {this}{rename}"
+
     def show_sql(self, expression: exp.Show) -> str:
         terse = "TERSE " if expression.args.get("terse") else ""
         iceberg = "ICEBERG " if expression.args.get("iceberg") else ""
@@ -901,9 +915,6 @@ class SnowflakeGenerator(generator.Generator):
             order_clause = ""
 
         return f"AUTOINCREMENT{start}{increment}{order_clause}"
-
-    def cluster_sql(self, expression: exp.Cluster) -> str:
-        return f"CLUSTER BY ({self.expressions(expression, flat=True)})"
 
     def struct_sql(self, expression: exp.Struct) -> str:
         if len(expression.expressions) == 1:
@@ -1163,3 +1174,60 @@ class SnowflakeGenerator(generator.Generator):
             # omit the default window from window ranking functions
             expression.set("spec", None)
         return super().window_sql(expression)
+
+    def filter_sql(self, expression: exp.Filter) -> str:
+        # Snowflake doesn't support FILTER (WHERE cond), so we rewrite it into an
+        # equivalent conditional aggregation, i.e. wrap the input values in an IFF
+        agg = expression.this
+        agg_arg = agg.this
+        cond = expression.expression.this
+
+        if isinstance(agg, exp.WithinGroup):
+            # Ordered-set aggregates take their input from the ORDER BY key, so the
+            # condition has to wrap that instead of the aggregate's own argument
+            if isinstance(agg_arg, (exp.Mode, *exp.PERCENTILES)):
+                for ordered in agg.expression.expressions:
+                    key = ordered.this
+                    key.replace(exp.If(this=cond.copy(), true=key.copy()))
+
+                return self.sql(agg)
+
+            # Besides the percentile functions, these are the only functions Snowflake
+            # accepts WITHIN GROUP for, so anything else can't be rewritten correctly
+            if isinstance(agg_arg, (exp.ArrayAgg, exp.GroupConcat)):
+                agg_arg = agg_arg.this
+            else:
+                self.unsupported("Unable to rewrite FILTER into the aggregate's arguments")
+                return self.sql(agg)
+
+        # `COUNT(*/t.*) FILTER (WHERE cond)` counts qualifying rows, but a star can't be an IFF
+        # argument: `IFF(cond, *, NULL)` expands to multiple columns once the table has 2+ of
+        # them, which Snowflake rejects. Use its native COUNT_IF instead.
+        if isinstance(agg, exp.Count) and agg_arg.is_star:
+            return self.func("COUNT_IF", cond)
+
+        # `DISTINCT` and `ORDER BY` are part of the aggregate's own argument list, so the
+        # condition has to wrap the values underneath them rather than the whole clause --
+        # `IFF(cond, DISTINCT x, NULL)` is not a call any dialect accepts.
+        if isinstance(agg_arg, exp.Order):
+            agg_arg = agg_arg.this
+
+        if isinstance(agg_arg, exp.Distinct):
+            targets = agg_arg.expressions
+        else:
+            targets = [agg_arg]
+
+        for target in targets:
+            target.replace(exp.If(this=cond.copy(), true=target.copy()))
+
+        return self.sql(agg)
+
+    def withingroup_sql(self, expression: exp.WithinGroup) -> str:
+        # Snowflake's MODE doesn't support the ordered-set syntax, i.e. it only
+        # accepts the value to aggregate as an argument: MODE(<expr>)
+        if isinstance(expression.this, exp.Mode) and not expression.this.this:
+            order = expression.expression
+            if isinstance(order, exp.Order) and len(order.expressions) == 1:
+                return self.sql(exp.Mode(this=order.expressions[0].this))
+
+        return super().withingroup_sql(expression)

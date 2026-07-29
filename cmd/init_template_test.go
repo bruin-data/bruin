@@ -60,6 +60,41 @@ func TestInitSelfHealDemoCopiesPipelineTemplate(t *testing.T) {
 	require.Contains(t, string(configContent), "path: self-heal-demo.duckdb")
 }
 
+func TestInitShopifyClickHouseCopiesPipelineTemplate(t *testing.T) {
+	targetRoot := t.TempDir()
+	t.Chdir(targetRoot)
+
+	gitInit := exec.CommandContext(t.Context(), "git", "init")
+	gitInit.Dir = targetRoot
+	out, err := gitInit.CombinedOutput()
+	require.NoError(t, err, string(out))
+
+	err = Init().Run(t.Context(), []string{"init", "shopify-clickhouse"})
+	require.NoError(t, err)
+
+	pipelineRoot := filepath.Join(targetRoot, "shopify-clickhouse")
+	require.FileExists(t, filepath.Join(pipelineRoot, "README.md"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "pipeline.yml"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "assets", "t1", "t1_orders.asset.yml"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "assets", "t2", "t2_orders.sql"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "assets", "t3", "t3_daily_kpis.sql"))
+
+	pipeline, err := os.ReadFile(filepath.Join(pipelineRoot, "pipeline.yml"))
+	require.NoError(t, err)
+	require.Contains(t, string(pipeline), "name: shopify-clickhouse")
+	require.Contains(t, string(pipeline), "shopify: \"shopify-default\"")
+
+	ordersAsset, err := os.ReadFile(filepath.Join(pipelineRoot, "assets", "t1", "t1_orders.asset.yml"))
+	require.NoError(t, err)
+	require.Contains(t, string(ordersAsset), "name: shopify.t1_orders")
+	require.Contains(t, string(ordersAsset), "source_connection: shopify-default")
+
+	orderLinesAsset, err := os.ReadFile(filepath.Join(pipelineRoot, "assets", "t2", "t2_order_line_items.sql"))
+	require.NoError(t, err)
+	require.Contains(t, string(orderLinesAsset), "strategy: delete+insert")
+	require.Contains(t, string(orderLinesAsset), "incremental_key: order_id")
+}
+
 func TestSelfHealDemoTemplateContainsDataProblemScenarios(t *testing.T) {
 	t.Parallel()
 

@@ -80,9 +80,9 @@ def catch(*exceptions):
     """Decorator that ignores a simplification function if any of `exceptions` are raised"""
 
     def decorator(func):
-        def wrapped(expression, *args, **kwargs):
+        def wrapped(self, expression, *args, **kwargs):
             try:
-                return func(expression, *args, **kwargs)
+                return func(self, expression, *args, **kwargs)
             except exceptions:
                 return expression
 
@@ -241,7 +241,7 @@ def _datetrunc_range(date: date, unit: str, dialect: Dialect) -> DateRange | Non
     Returns:
         tuple of [min, max) or None if a value can never be equal to `date` for `unit`
     """
-    floor = date_floor(date, unit, dialect)
+    floor = datetime_floor(date, unit, dialect)
 
     if date != floor:
         # This will always be False, except for NULL values.
@@ -446,35 +446,58 @@ def interval(unit: str, n: int = 1) -> relativedelta:
         return relativedelta(minutes=1 * n)
     if unit == "second":
         return relativedelta(seconds=1 * n)
+    if unit == "millisecond":
+        return relativedelta(microseconds=1000 * n)
+    if unit == "microsecond":
+        return relativedelta(microseconds=1 * n)
 
     raise UnsupportedUnit(f"Unsupported unit: {unit}")
 
 
-def date_floor(d: date, unit: str, dialect: Dialect) -> date:
+def datetime_floor(d: date, unit: str, dialect: Dialect) -> date:
+    # Truncate sub-day units — only valid for datetime inputs
+    if isinstance(d, datetime):
+        if unit == "hour":
+            return d.replace(minute=0, second=0, microsecond=0)
+        elif unit == "minute":
+            return d.replace(second=0, microsecond=0)
+        elif unit == "second":
+            return d.replace(microsecond=0)
+        elif unit == "millisecond":
+            return d.replace(microsecond=(d.microsecond // 1000) * 1000)
+        elif unit == "microsecond":
+            return d
+
+    # Truncate date-level units, shared for both date and datetime
     if unit == "year":
-        return d.replace(month=1, day=1)
-    if unit == "quarter":
+        result: date = d.replace(month=1, day=1)
+    elif unit == "quarter":
         if d.month <= 3:
-            return d.replace(month=1, day=1)
+            result = d.replace(month=1, day=1)
         elif d.month <= 6:
-            return d.replace(month=4, day=1)
+            result = d.replace(month=4, day=1)
         elif d.month <= 9:
-            return d.replace(month=7, day=1)
+            result = d.replace(month=7, day=1)
         else:
-            return d.replace(month=10, day=1)
-    if unit == "month":
-        return d.replace(month=d.month, day=1)
-    if unit == "week":
+            result = d.replace(month=10, day=1)
+    elif unit == "month":
+        result = d.replace(month=d.month, day=1)
+    elif unit == "week":
         # Assuming week starts on Monday (0) and ends on Sunday (6)
-        return d - timedelta(days=d.weekday() - dialect.WEEK_OFFSET)
-    if unit == "day":
-        return d
+        result = d - timedelta(days=d.weekday() - dialect.WEEK_OFFSET)
+    elif unit == "day":
+        result = d
+    else:
+        raise UnsupportedUnit(f"Unsupported unit: {unit}")
 
-    raise UnsupportedUnit(f"Unsupported unit: {unit}")
+    # For datetime inputs, zero out the time component after date-level truncation
+    if isinstance(result, datetime):
+        return result.replace(hour=0, minute=0, second=0, microsecond=0)
+    return result
 
 
 def date_ceil(d: date, unit: str, dialect: Dialect) -> date:
-    floor = date_floor(d, unit, dialect)
+    floor = datetime_floor(d, unit, dialect)
 
     if floor == d:
         return d
@@ -526,6 +549,10 @@ class Simplifier:
         exp.Is,
     )
 
+    # Operand types that allow a connector pair to combine in _flat_simplify: constants
+    # (matched by the is_false/is_null/is_zero/always_true checks) and comparisons.
+    CONNECTOR_COMBINABLE: t.ClassVar = (exp.Boolean, exp.Literal, exp.Null, *COMPARISONS)
+
     INVERSE_COMPARISONS: t.ClassVar[dict[type[exp.Expr], type[exp.Expr]]] = {
         exp.LT: exp.GT,
         exp.GT: exp.LT,
@@ -557,11 +584,12 @@ class Simplifier:
         exp.LT: lambda l, dt, u, d, t: (
             l
             < date_literal(
-                dt if dt == date_floor(dt, u, d) else date_floor(dt, u, d) + interval(u), t
+                dt if dt == datetime_floor(dt, u, d) else datetime_floor(dt, u, d) + interval(u),
+                t,
             )
         ),
-        exp.GT: lambda l, dt, u, d, t: l >= date_literal(date_floor(dt, u, d) + interval(u), t),
-        exp.LTE: lambda l, dt, u, d, t: l < date_literal(date_floor(dt, u, d) + interval(u), t),
+        exp.GT: lambda l, dt, u, d, t: l >= date_literal(datetime_floor(dt, u, d) + interval(u), t),
+        exp.LTE: lambda l, dt, u, d, t: l < date_literal(datetime_floor(dt, u, d) + interval(u), t),
         exp.GTE: lambda l, dt, u, d, t: l >= date_literal(date_ceil(dt, u, d), t),
         exp.EQ: _datetrunc_eq,
         exp.NEQ: _datetrunc_neq,
@@ -592,9 +620,9 @@ class Simplifier:
         joins: list[exp.Join] = []
 
         for node in expression.walk(
-            prune=lambda n: bool(isinstance(n, exp.Condition) or n.meta.get(FINAL))
+            prune=lambda n: bool(isinstance(n, exp.Condition) or n.meta_get(FINAL))
         ):
-            if node.meta.get(FINAL):
+            if node.meta_get(FINAL):
                 continue
 
             # group by expressions cannot be simplified, for example
@@ -682,11 +710,8 @@ class Simplifier:
             if node is not original:
                 original.replace(node)
 
-            for n in node.iter_expressions(reverse=True):
-                if n.meta.get(FINAL):
-                    raise
             pre_transformation_stack.extend(
-                n for n in node.iter_expressions(reverse=True) if not n.meta.get(FINAL)
+                n for n in node.iter_expressions(reverse=True) if not n.meta_get(FINAL)
             )
             post_transformation_stack.append((node, parent))
 
@@ -695,9 +720,16 @@ class Simplifier:
             root = original is expression
 
             # Resets parent, arg_key, index pointers– this is needed because some of the
-            # previous transformations mutate the AST, leading to an inconsistent state
+            # previous transformations mutate the AST, leading to an inconsistent state.
+            # We only fix pointers instead of calling `set` because the values are unchanged:
+            # actual mutations go through `set`/`replace`, which already invalidate cached
+            # hashes, so clearing them again here would force `while_changing` to rehash
+            # entire subtrees after every (mostly no-op) pass.
             for k, v in tuple(original.args.items()):
-                original.set(k, v)
+                if v is None:
+                    original.args.pop(k)
+                else:
+                    original._set_parent(k, v)
 
             # Post-order transformations
             node = self.simplify_not(original)
@@ -933,7 +965,7 @@ class Simplifier:
             ops = set(expression.flatten())
             for op in ops:
                 if isinstance(op, exp.Not) and op.this in ops:
-                    if expression.meta.get("nonnull") is True:
+                    if expression.meta_get("nonnull") is True:
                         return exp.false() if isinstance(expression, exp.And) else exp.true()
 
         return expression
@@ -1061,6 +1093,12 @@ class Simplifier:
             l     r
             x + 1 = 3
             a   b
+
+        Subtraction is not commutative, so when the variable is the subtrahend the operands
+        can't simply be swapped; the comparison is inverted instead:
+
+            5 - x = 2 becomes x = 3
+            5 - x < 2 becomes x > 3
         """
         if isinstance(expression, self.COMPARISONS):
             l, r = expression.left, expression.right
@@ -1088,6 +1126,10 @@ class Simplifier:
             if not a_predicate(a) and b_predicate(b):
                 pass
             elif not a_predicate(b) and b_predicate(a):
+                if isinstance(l, exp.Sub):
+                    return self.INVERSE_COMPARISONS.get(expression.__class__, expression.__class__)(
+                        this=b, expression=exp.Sub(this=a, expression=r)
+                    )
                 a, b = b, a
             else:
                 return expression
@@ -1285,15 +1327,15 @@ class Simplifier:
             sep_expr, *expressions = expression.expressions
             sep = sep_expr.name
             concat_type = exp.ConcatWs
-            args = {}
         else:
             expressions = expression.expressions
             sep = ""
             concat_type = exp.Concat
-            args = {
-                "safe": expression.args.get("safe"),
-                "coalesce": expression.args.get("coalesce"),
-            }
+
+        args = {
+            "safe": expression.args.get("safe"),
+            "coalesce": expression.args.get("coalesce"),
+        }
 
         new_args = []
         for is_string_group, group in itertools.groupby(
@@ -1375,7 +1417,8 @@ class Simplifier:
             date = extract_date(this)
             if date and expression.unit:
                 return date_literal(
-                    date_floor(date, expression.unit.name.lower(), self.dialect), trunc_type
+                    datetime_floor(date, expression.unit.name.lower(), self.dialect),
+                    trunc_type,
                 )
         elif comparison not in self.DATETRUNC_COMPARISONS:
             return expression
@@ -1467,6 +1510,16 @@ class Simplifier:
             queue = deque(expression.flatten(unnest=False))
             size = len(queue)
 
+            # The pairwise scan below is O(n^2). For connectors, a pair only combines if one side
+            # is a constant or both are comparisons (see _simplify_connectors / _simplify_comparison);
+            # if no operand is combinable the scan is a guaranteed no-op, so return early. This
+            # avoids the quadratic blowup on large connectors of inert operands (e.g. a 1000-way OR
+            # of ANDs). Non-connector callers (simplify_equality) are unaffected by the type guard.
+            if isinstance(expression, exp.Connector) and not any(
+                isinstance(op, self.CONNECTOR_COMBINABLE) for op in queue
+            ):
+                return expression
+
             while queue:
                 a = queue.popleft()
 
@@ -1508,6 +1561,7 @@ class Gen:
     def gen(self, expression: exp.Expr, comments: bool = False) -> str:
         self.stack = [expression]
         self.sqls.clear()
+        dispatch = GEN_DISPATCH
 
         while self.stack:
             node = self.stack.pop()
@@ -1516,10 +1570,10 @@ class Gen:
                 if comments and node.comments:
                     self.stack.append(f" /*{','.join(node.comments)}*/")
 
-                exp_handler_name = f"{node.key}_sql"
+                handler = dispatch.get(node.key)
 
-                if hasattr(self, exp_handler_name):
-                    getattr(self, exp_handler_name)(node)
+                if handler is not None:
+                    handler(self, node)
                 elif isinstance(node, exp.Func):
                     self._function(node)
                 else:
@@ -1628,7 +1682,7 @@ class Gen:
         self.stack.append(f'"{e.this}"' if e.quoted else e.this)
 
     def ilike_sql(self, e: exp.ILike) -> None:
-        self._binary(e, " ILIKE ")
+        self._binary(e, " NOT ILIKE " if e.args.get("negate") else " ILIKE ")
 
     def in_sql(self, e: exp.In) -> None:
         self.stack.append(")")
@@ -1648,7 +1702,7 @@ class Gen:
         self._binary(e, " IS ")
 
     def like_sql(self, e: exp.Like) -> None:
-        self._binary(e, " Like ")
+        self._binary(e, " NOT Like " if e.args.get("negate") else " Like ")
 
     def literal_sql(self, e: exp.Literal) -> None:
         self.stack.append(f"'{e.this}'" if e.is_string else e.this)
@@ -1748,3 +1802,16 @@ class Gen:
             self.stack.append(kvs)
             return True
         return False
+
+
+def _build_gen_dispatch() -> dict[str, t.Callable[..., None]]:
+    # Precompute {expr key -> unbound handler}, mirroring the generator's _build_dispatch, so gen()
+    # avoids the per-node f-string + hasattr/getattr lookup (which mypyc can't devirtualize).
+    dispatch: dict[str, t.Callable[..., None]] = {}
+    for name in dir(Gen):
+        if name.endswith("_sql") and not name.startswith("_"):
+            dispatch[name[:-4]] = getattr(Gen, name)
+    return dispatch
+
+
+GEN_DISPATCH = _build_gen_dispatch()

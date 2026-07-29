@@ -1,0 +1,42 @@
+name: public.orders
+type: pg.source
+description: 'Demonstrates a PostgreSQL source asset: it documents an external table''s connection, schema, primary key, and quality expectations without copying or materializing any data. Downstream sensor and Ingestr assets reference this contract for lineage.'
+connection: postgres-default
+tags:
+  - layer:source
+  - domain:commerce
+  - source:postgres
+  - requires-postgres-default
+domains:
+  - commerce
+meta:
+  data_classification: confidential
+  freshness_sla: hourly
+  source_connection: postgres-default
+  source_system: postgres
+  system_owner: commerce-platform@example.com
+owner: commerce-platform@example.com
+
+columns:
+  - name: id
+    type: bigint
+    description: Source system order identifier.
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: customer_id
+    type: bigint
+    description: Customer associated with the source order.
+  - name: created_at
+    type: timestamp
+    description: Timestamp at which the order was created.
+  - name: status
+    type: varchar
+    description: Operational order status.
+  - name: total_amount
+    type: numeric
+    description: Order total in USD.
+  - name: updated_at
+    type: timestamp
+    description: Timestamp used as the incremental high-water mark.

@@ -44,7 +44,7 @@ const (
 	// IngestrVersionV0 is the legacy ingestr release pinned for parameters.version=v0.
 	IngestrVersionV0 = "0.14.155"
 	// IngestrVersionV1 is the current ingestr release used by default and for parameters.version=v1.
-	IngestrVersionV1 = "1.1.9"
+	IngestrVersionV1 = "1.1.12"
 	sqlfluffVersion  = "3.4.1"
 )
 
@@ -196,6 +196,7 @@ var DatabasePrefixToSqlfluffDialect = map[string]string{
 	"fabric":     "tsql",
 	"fw":         "tsql",
 	"databricks": "sparksql",
+	"spark":      "sparksql",
 	"synapse":    "tsql",
 	"duckdb":     "duckdb",
 	"clickhouse": "clickhouse",

@@ -242,8 +242,22 @@ func encodeRunNote(note string, tags []string) string {
 	return string(b)
 }
 
-// TriggerRun triggers a pipeline run for the given date range and returns its identifier.
-func (c *APIClient) TriggerRun(ctx context.Context, project, pipeline, startDate, endDate string, opts TriggerRunOptions) (*TriggerRunResponse, error) {
+// TriggerRunResult holds the response from the trigger endpoint. A normal run
+// returns RunID; a backfill (triggered with a split) returns MultipleActionID
+// and a URL to track the backfill in the dashboard.
+type TriggerRunResult struct {
+	Message          string `json:"message"`
+	Project          string `json:"project"`
+	Pipeline         string `json:"pipeline"`
+	RunID            string `json:"run_id"`
+	MultipleActionID string `json:"multiple_action_id"`
+	Split            string `json:"split"`
+	ChunkSize        int    `json:"chunk_size"`
+	URL              string `json:"url"`
+}
+
+// TriggerRun triggers a pipeline run for the given date range.
+func (c *APIClient) TriggerRun(ctx context.Context, project, pipeline, startDate, endDate string, opts TriggerRunOptions) (*TriggerRunResult, error) {
 	body := map[string]any{
 		"project":    project,
 		"pipeline":   pipeline,
@@ -273,11 +287,11 @@ func (c *APIClient) TriggerRun(ctx context.Context, project, pipeline, startDate
 	if note := encodeRunNote(opts.Note, opts.Tags); note != "" {
 		body["note"] = note
 	}
-	var response TriggerRunResponse
-	if err := c.doRequest(ctx, http.MethodPost, "/trigger-pipeline-run", body, &response); err != nil {
+	var result TriggerRunResult
+	if err := c.doRequest(ctx, http.MethodPost, "/trigger-pipeline-run", body, &result); err != nil {
 		return nil, err
 	}
-	return &response, nil
+	return &result, nil
 }
 
 func (c *APIClient) RerunRun(ctx context.Context, project, pipeline, runID string, onlyFailed bool) error {
@@ -317,6 +331,47 @@ func (c *APIClient) GetLatestRun(ctx context.Context, project, pipeline string) 
 		return nil, fmt.Errorf("no runs found for pipeline '%s' in project '%s'", pipeline, project)
 	}
 	return &runs[0], nil
+}
+
+// --- Backfills ---
+
+// ListBackfills returns the most recent backfills, optionally filtered by project and pipeline.
+func (c *APIClient) ListBackfills(ctx context.Context, project, pipeline string, limit int) ([]Backfill, error) {
+	params := url.Values{}
+	if project != "" {
+		params.Set("project", project)
+	}
+	if pipeline != "" {
+		params.Set("pipeline", pipeline)
+	}
+	if limit > 0 {
+		params.Set("limit", strconv.Itoa(limit))
+	}
+	path := "/backfills"
+	if enc := params.Encode(); enc != "" {
+		path += "?" + enc
+	}
+	var backfills []Backfill
+	err := c.doRequest(ctx, http.MethodGet, path, nil, &backfills)
+	return backfills, err
+}
+
+// GetBackfillRuns returns the individual runs that make up a single backfill.
+func (c *APIClient) GetBackfillRuns(ctx context.Context, multipleActionID string, limit, offset int) ([]BackfillRun, error) {
+	params := url.Values{}
+	if limit > 0 {
+		params.Set("limit", strconv.Itoa(limit))
+	}
+	if offset > 0 {
+		params.Set("offset", strconv.Itoa(offset))
+	}
+	path := "/backfills/" + url.PathEscape(multipleActionID) + "/runs"
+	if enc := params.Encode(); enc != "" {
+		path += "?" + enc
+	}
+	var runs []BackfillRun
+	err := c.doRequest(ctx, http.MethodGet, path, nil, &runs)
+	return runs, err
 }
 
 // --- Assets ---
@@ -421,6 +476,17 @@ func (c *APIClient) ListAgents(ctx context.Context) ([]Agent, error) {
 	}
 	err := c.doRequest(ctx, http.MethodGet, "/agents", nil, &resp)
 	return resp.Agents, err
+}
+
+// ListAgentConnections returns the connection names and types available to the
+// agent (from its dev-env secret) — names/types only, never credentials. Use it
+// to pick a connection the agent can actually query.
+func (c *APIClient) ListAgentConnections(ctx context.Context, agentID int) ([]AgentConnection, error) {
+	var resp struct {
+		Connections []AgentConnection `json:"connections"`
+	}
+	err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/agents/%d/connections", agentID), nil, &resp)
+	return resp.Connections, err
 }
 
 // CreateAgent creates a new agent. Optional fields are omitted when empty so the
@@ -589,10 +655,15 @@ func (c *APIClient) GetDashboard(ctx context.Context, dashboardID int) (*Dashboa
 // CreateDashboard creates a dashboard from a definition. The server writes the
 // definition to the draft only (never published). Empty optional fields are
 // omitted so the server applies its defaults.
-func (c *APIClient) CreateDashboard(ctx context.Context, title, visibility string, state map[string]any) (*Dashboard, error) {
+func (c *APIClient) CreateDashboard(ctx context.Context, title, visibility string, agentID int, state map[string]any) (*Dashboard, error) {
 	body := map[string]any{"title": title}
 	if visibility != "" {
 		body["visibility"] = visibility
+	}
+	// Bind the dashboard to an agent so canvas chat and refresh work; omit to let
+	// the server fall back to the agent encoded in a Cloud-CLI token.
+	if agentID > 0 {
+		body["agent_id"] = agentID
 	}
 	if state != nil {
 		body["state"] = state
@@ -656,4 +727,26 @@ func (c *APIClient) UpdateScheduledAgent(ctx context.Context, scheduledAgentID i
 		return nil, err
 	}
 	return &result, nil
+}
+
+// GetCostExplorerSchema lists the dimensions, filter fields, and time buckets the cost explorer supports.
+func (c *APIClient) GetCostExplorerSchema(ctx context.Context, platform string) (*CostExplorerSchema, error) {
+	params := url.Values{}
+	if platform != "" {
+		params.Set("platform", platform)
+	}
+	path := "/cost-explorer/schema"
+	if enc := params.Encode(); enc != "" {
+		path += "?" + enc
+	}
+	var schema CostExplorerSchema
+	err := c.doRequest(ctx, http.MethodGet, path, nil, &schema)
+	return &schema, err
+}
+
+// GetCostExplorer returns a page of warehouse cost breakdown rows.
+func (c *APIClient) GetCostExplorer(ctx context.Context, req CostExplorerRequest) (*CostExplorerResponse, error) {
+	var resp CostExplorerResponse
+	err := c.doRequest(ctx, http.MethodPost, "/cost-explorer", req, &resp)
+	return &resp, err
 }

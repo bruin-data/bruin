@@ -1,12 +1,15 @@
 package cmd
 
 import (
+	"bytes"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/spark"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -339,6 +342,46 @@ func TestRenderCommand_Run(t *testing.T) {
 			f.writer.AssertExpectations(t)
 		})
 	}
+}
+
+func TestRenderCommandUsesSparkRendererHookOrdering(t *testing.T) {
+	t.Parallel()
+
+	extractor := new(mockExtractor)
+	extractor.On("ExtractQueriesFromString", "script").Return([]*query.Query{{
+		Query: "USE local.analytics; SELECT 1;",
+	}}, nil)
+	writer := new(bytes.Buffer)
+	asset := &pipeline.Asset{
+		Name: "local.analytics.events",
+		Type: pipeline.AssetTypeSparkQuery,
+		ExecutableFile: pipeline.ExecutableFile{
+			Content: "script",
+		},
+		Materialization: pipeline.Materialization{
+			Type: pipeline.MaterializationTypeTable,
+		},
+		Hooks: pipeline.Hooks{
+			Pre: []pipeline.Hook{{Query: "SET spark.sql.adaptive.enabled = true"}},
+		},
+	}
+	render := &RenderCommand{
+		extractor: extractor,
+		materializers: map[pipeline.AssetType]queryMaterializer{
+			pipeline.AssetTypeSparkQuery: spark.NewRenderer(false),
+		},
+		writer: writer,
+		output: "json",
+	}
+
+	require.NoError(t, render.Run(&pipeline.Pipeline{}, asset, ModifierInfo{}))
+	var payload map[string]string
+	require.NoError(t, json.Unmarshal(writer.Bytes(), &payload))
+	rendered := payload["query"]
+	require.Equal(t, 1, strings.Count(rendered, "SET spark.sql.adaptive.enabled = true"))
+	require.Less(t, strings.Index(rendered, "USE local.analytics"), strings.Index(rendered, "SET spark.sql.adaptive.enabled = true"))
+	require.Less(t, strings.Index(rendered, "SET spark.sql.adaptive.enabled = true"), strings.Index(rendered, "CREATE TABLE"))
+	extractor.AssertExpectations(t)
 }
 
 func TestRenderCommand_Run_QuerySensors(t *testing.T) { //nolint:paralleltest

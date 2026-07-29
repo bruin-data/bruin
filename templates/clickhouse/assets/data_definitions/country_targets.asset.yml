@@ -1,0 +1,40 @@
+name: country_targets
+type: clickhouse.seed
+description: 'Demonstrates a version-controlled ClickHouse seed: Bruin reads the colocated CSV, enforces the declared column types, and loads it with a replace strategy. The owner, metadata, key, and checks show how even static reference inputs can be governed as assets.'
+tags:
+  - layer:reference
+  - domain:commerce
+  - source:seed
+domains:
+  - commerce
+meta:
+  business_owner: revenue-operations@example.com
+  change_management: pull-request
+  data_classification: internal
+owner: revenue-operations@example.com
+
+parameters:
+  enforce_schema: true
+  path: country_targets.csv
+
+columns:
+  - name: country
+    type: String
+    description: Country matched to the customer dimension.
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: monthly_revenue_target
+    type: Float64
+    description: Monthly paid-revenue target in USD.
+    checks:
+      - name: positive
+  - name: is_priority_market
+    type: UInt8
+    description: Whether Revenue Operations considers this a priority market.
+    checks:
+      - name: accepted_values
+        value:
+          - 0
+          - 1

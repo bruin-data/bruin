@@ -146,6 +146,7 @@ type Connections struct {
 	StarRocks           []StarRocksConnection           `yaml:"starrocks,omitempty" json:"starrocks,omitempty" mapstructure:"starrocks"`
 	Dremio              []DremioConnection              `yaml:"dremio,omitempty" json:"dremio,omitempty" mapstructure:"dremio"`
 	Sail                []SailConnection                `yaml:"sail,omitempty" json:"sail,omitempty" mapstructure:"sail"`
+	Spark               []SparkConnection               `yaml:"spark,omitempty" json:"spark,omitempty" mapstructure:"spark"`
 	Fluxx               []FluxxConnection               `yaml:"fluxx,omitempty" json:"fluxx,omitempty" mapstructure:"fluxx"`
 	Freshdesk           []FreshdeskConnection           `yaml:"freshdesk,omitempty" json:"freshdesk,omitempty" mapstructure:"freshdesk"`
 	FundraiseUp         []FundraiseUpConnection         `yaml:"fundraiseup,omitempty" json:"fundraiseup,omitempty" mapstructure:"fundraiseup"`
@@ -1449,6 +1450,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Sail = append(env.Connections.Sail, conn)
+	case "spark":
+		var conn SparkConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Spark = append(env.Connections.Spark, conn)
 	case "trustpilot":
 		var conn TrustpilotConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -2041,6 +2049,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Dremio = removeConnection(env.Connections.Dremio, connectionName)
 	case "sail":
 		env.Connections.Sail = removeConnection(env.Connections.Sail, connectionName)
+	case "spark":
+		env.Connections.Spark = removeConnection(env.Connections.Spark, connectionName)
 	case "trustpilot":
 		env.Connections.Trustpilot = removeConnection(env.Connections.Trustpilot, connectionName)
 	case "quickbooks":
@@ -2360,6 +2370,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.StarRocks, source.StarRocks)
 	mergeConnectionList(&c.Dremio, source.Dremio)
 	mergeConnectionList(&c.Sail, source.Sail)
+	mergeConnectionList(&c.Spark, source.Spark)
 	mergeConnectionList(&c.Fluxx, source.Fluxx)
 	mergeConnectionList(&c.Freshdesk, source.Freshdesk)
 	mergeConnectionList(&c.FundraiseUp, source.FundraiseUp)

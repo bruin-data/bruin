@@ -16,6 +16,7 @@ import (
 	_ "github.com/bruin-data/bruin/pkg/postgres"
 	_ "github.com/bruin-data/bruin/pkg/redshift"
 	_ "github.com/bruin-data/bruin/pkg/snowflake"
+	_ "github.com/bruin-data/bruin/pkg/spark"
 	_ "github.com/bruin-data/bruin/pkg/synapse"
 	_ "github.com/bruin-data/bruin/pkg/trino"
 	_ "github.com/bruin-data/bruin/pkg/vertica"
@@ -74,6 +75,12 @@ func TestPlatformSpecificBuiltinSQL(t *testing.T) {
 		{
 			name:     "databricks",
 			platform: jinja.PlatformDatabricks,
+			query:    `{{ bruin.get_url_parameter('page_url', 'utm_source') }}||{{ bruin.date_spine('day', "'2020-01-01'", "'2020-01-02'") }}`,
+			contains: []string{"regexp_extract", "utm_source", ", 1)", "explode(", "sequence("},
+		},
+		{
+			name:     "spark",
+			platform: jinja.PlatformSpark,
 			query:    `{{ bruin.get_url_parameter('page_url', 'utm_source') }}||{{ bruin.date_spine('day', "'2020-01-01'", "'2020-01-02'") }}`,
 			contains: []string{"regexp_extract", "utm_source", ", 1)", "explode(", "sequence("},
 		},

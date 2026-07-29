@@ -33,6 +33,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/sail"
 	"github.com/bruin-data/bruin/pkg/snowflake"
+	"github.com/bruin-data/bruin/pkg/spark"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/starrocks"
 	"github.com/bruin-data/bruin/pkg/synapse"
@@ -298,6 +299,8 @@ func Render() *cli.Command {
 					pipeline.AssetTypeDremioQuerySensor:       dremio.NewMaterializer(fullRefresh),
 					pipeline.AssetTypeSailQuery:               sail.NewMaterializer(fullRefresh),
 					pipeline.AssetTypeSailQuerySensor:         sail.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeSparkQuery:              spark.NewRenderer(fullRefresh),
+					pipeline.AssetTypeSparkQuerySensor:        spark.NewRenderer(fullRefresh),
 					pipeline.AssetTypeOracleQuery:             oracle.NewMaterializer(fullRefresh),
 					pipeline.AssetTypeMsSQLQuery:              mssql.NewMaterializer(fullRefresh),
 					pipeline.AssetTypeMsSQLQuerySensor:        mssql.NewMaterializer(fullRefresh),
@@ -377,6 +380,10 @@ type queryMaterializer interface {
 	Render(asset *pipeline.Asset, query string) (string, error)
 }
 
+type hookWrappingQueryMaterializer interface {
+	WrapsHooks() bool
+}
+
 type taskCreator interface {
 	CreateAssetFromFile(path string, foundPipeline *pipeline.Pipeline) (*pipeline.Asset, error)
 }
@@ -441,7 +448,13 @@ func (r *RenderCommand) Run(pl *pipeline.Pipeline, task *pipeline.Asset, modifie
 				}
 				qq.Query = rextractedQueries[0].Query
 			}
-			qq.Query = pipeline.WrapHooks(qq.Query, task.Hooks, r.hoister, task.Type)
+			hooksWrapped := false
+			if wrapper, ok := materializer.(hookWrappingQueryMaterializer); ok {
+				hooksWrapped = wrapper.WrapsHooks()
+			}
+			if !hooksWrapped {
+				qq.Query = pipeline.WrapHooks(qq.Query, task.Hooks, r.hoister, task.Type)
+			}
 		}
 	}
 

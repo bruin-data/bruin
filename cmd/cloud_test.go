@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/bruincloud"
+	"github.com/fatih/color"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
@@ -147,15 +148,17 @@ func TestCloudCommand_Help(t *testing.T) {
 	cmd := Cloud(&isDebug)
 	require.NotNil(t, cmd)
 	assert.Equal(t, "cloud", cmd.Name)
-	assert.Len(t, cmd.Commands, 10)
+	assert.Len(t, cmd.Commands, 12)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
 		subNames[i] = sub.Name
 	}
+	assert.Contains(t, subNames, "cost")
 	assert.Contains(t, subNames, "projects")
 	assert.Contains(t, subNames, "pipelines")
 	assert.Contains(t, subNames, "runs")
+	assert.Contains(t, subNames, "backfills")
 	assert.Contains(t, subNames, "assets")
 	assert.Contains(t, subNames, "instances")
 	assert.Contains(t, subNames, "glossary")
@@ -196,7 +199,7 @@ func TestCloudRunsCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "diagnose")
 }
 
-func TestCloudRunsTriggerCommand_OutputsCreatedRunID(t *testing.T) { //nolint:paralleltest // redirects os.Stdout
+func TestCloudRunsTriggerCommand_OutputsCreatedRunID(t *testing.T) { //nolint:paralleltest // redirects global output
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/trigger-pipeline-run", r.URL.Path)
 		assert.Equal(t, http.MethodPost, r.Method)
@@ -212,11 +215,14 @@ func TestCloudRunsTriggerCommand_OutputsCreatedRunID(t *testing.T) { //nolint:pa
 	t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
 
 	originalStdout := os.Stdout
+	originalColorOutput := color.Output
 	reader, writer, err := os.Pipe()
 	require.NoError(t, err)
 	os.Stdout = writer
+	color.Output = writer
 	t.Cleanup(func() {
 		os.Stdout = originalStdout
+		color.Output = originalColorOutput
 		_ = reader.Close()
 		_ = writer.Close()
 	})
@@ -225,27 +231,19 @@ func TestCloudRunsTriggerCommand_OutputsCreatedRunID(t *testing.T) { //nolint:pa
 	err = cmd.Run(t.Context(), []string{
 		"trigger",
 		"--api-key", "test-key",
-		"--output", "json",
 		"--project-id", "proj",
 		"--pipeline", "pipe",
 		"--start-date", "2026-01-01",
 		"--end-date", "2026-01-02",
 	})
 	require.NoError(t, err)
-	require.NoError(t, writer.Close())
 	os.Stdout = originalStdout
+	color.Output = originalColorOutput
+	require.NoError(t, writer.Close())
 
 	output, err := io.ReadAll(reader)
 	require.NoError(t, err)
-	var result struct {
-		Status string `json:"status"`
-		bruincloud.TriggerRunResponse
-	}
-	require.NoError(t, json.Unmarshal(output, &result))
-	assert.Equal(t, "success", result.Status)
-	assert.Equal(t, "run-123", result.RunID)
-	assert.Equal(t, "proj", result.Project)
-	assert.Equal(t, "pipe", result.Pipeline)
+	assert.Contains(t, string(output), "Successfully triggered run 'run-123' for pipeline 'pipe' in project 'proj'")
 }
 
 func TestCloudAssetsCommand_Help(t *testing.T) {
@@ -277,7 +275,13 @@ func TestCloudAgentsCommand_Help(t *testing.T) {
 	cmd := CloudAgents()
 	require.NotNil(t, cmd)
 	assert.Equal(t, "agents", cmd.Name)
-	require.Len(t, cmd.Commands, 10)
+	require.Len(t, cmd.Commands, 11)
+
+	subNames := make([]string, len(cmd.Commands))
+	for i, sub := range cmd.Commands {
+		subNames[i] = sub.Name
+	}
+	assert.Contains(t, subNames, "connections")
 }
 
 func TestCloudDashboardsCommand_Help(t *testing.T) {
@@ -295,6 +299,44 @@ func TestCloudDashboardsCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "get")
 	assert.Contains(t, subNames, "create")
 	assert.Contains(t, subNames, "update")
+}
+
+func TestCloudDashboardsCreate_RejectsNonPositiveAgentID(t *testing.T) {
+	t.Parallel()
+	// An explicit non-positive --agent-id must fail fast (before any request)
+	// rather than being silently dropped into the token-agent fallback. The
+	// command signals failure via a non-zero exit code, so capture it through
+	// the exit handler instead of Run's return value.
+	for _, v := range []string{"0", "-3"} {
+		cmd := cloudDashboardsCreate()
+		exitCode := 0
+		cmd.ExitErrHandler = func(_ context.Context, _ *cli.Command, err error) {
+			var ec cli.ExitCoder
+			if errors.As(err, &ec) {
+				exitCode = ec.ExitCode()
+			}
+		}
+		_ = cmd.Run(t.Context(), []string{"create", "--title", "T", "--api-key", "k", "--agent-id", v})
+		assert.Equalf(t, 1, exitCode, "agent-id %q should be rejected", v)
+	}
+}
+
+func TestCloudAgentsConnections_RejectsNonPositiveAgentID(t *testing.T) {
+	t.Parallel()
+	// An explicit non-positive --agent-id must fail locally, not become a bad
+	// API request with a generic remote error.
+	for _, v := range []string{"0", "-3"} {
+		cmd := cloudAgentsConnections()
+		exitCode := 0
+		cmd.ExitErrHandler = func(_ context.Context, _ *cli.Command, err error) {
+			var ec cli.ExitCoder
+			if errors.As(err, &ec) {
+				exitCode = ec.ExitCode()
+			}
+		}
+		_ = cmd.Run(t.Context(), []string{"connections", "--api-key", "k", "--agent-id", v})
+		assert.Equalf(t, 1, exitCode, "agent-id %q should be rejected", v)
+	}
 }
 
 func TestCloudScheduledAgentsCommand_Help(t *testing.T) {
@@ -567,4 +609,45 @@ func TestParseRunVariables(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid variable override")
 	})
+}
+
+func TestParseCostFilters(t *testing.T) {
+	t.Parallel()
+
+	t.Run("eq and repeated in merge by field", func(t *testing.T) {
+		t.Parallel()
+		// urfave splits on commas, so `in` values arrive as repeated --filter flags.
+		filters, err := parseCostFilters([]string{"user_email:eq:a@b.com", "pipeline_id:in:x", "pipeline_id:in:y"})
+		require.NoError(t, err)
+		require.Len(t, filters, 2)
+		assert.Equal(t, bruincloud.CostFilter{Field: "user_email", Op: "eq", Value: "a@b.com"}, filters[0])
+		assert.Equal(t, bruincloud.CostFilter{Field: "pipeline_id", Op: "in", Value: []string{"x", "y"}}, filters[1])
+	})
+
+	t.Run("bare token is rejected", func(t *testing.T) {
+		t.Parallel()
+		_, err := parseCostFilters([]string{"pipeline_id:in:a", "b"})
+		require.Error(t, err)
+	})
+
+	t.Run("empty", func(t *testing.T) {
+		t.Parallel()
+		filters, err := parseCostFilters(nil)
+		require.NoError(t, err)
+		assert.Empty(t, filters)
+	})
+
+	t.Run("malformed", func(t *testing.T) {
+		t.Parallel()
+		_, err := parseCostFilters([]string{"pipeline_id=x"})
+		require.Error(t, err)
+	})
+}
+
+func TestFormatCostCell(t *testing.T) {
+	t.Parallel()
+	assert.Empty(t, formatCostCell(nil))
+	assert.Equal(t, "daily-etl", formatCostCell("daily-etl"))
+	assert.Equal(t, "74123", formatCostCell(float64(74123)))
+	assert.JSONEq(t, `{"pipeline_id":"p"}`, formatCostCell(map[string]any{"pipeline_id": "p"}))
 }

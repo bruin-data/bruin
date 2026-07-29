@@ -763,12 +763,6 @@ func ValidateAssetSeedValidation(ctx context.Context, p *pipeline.Pipeline, asse
 			return issues, nil
 		}
 
-		lowerPath := strings.ToLower(seedPath)
-		if strings.HasPrefix(lowerPath, "http://") || strings.HasPrefix(lowerPath, "https://") {
-			// URL seeds are validated at runtime by ingestr, skip local file checks
-			return issues, nil
-		}
-
 		seedFileTypeRaw, _ := asset.Parameters.GetString("file_type")
 		fileType := strings.ToLower(strings.TrimSpace(seedFileTypeRaw))
 		if fileType != "" && !supportedSeedFileTypes[fileType] {
@@ -776,6 +770,19 @@ func ValidateAssetSeedValidation(ctx context.Context, p *pipeline.Pipeline, asse
 				Task:        asset,
 				Description: fmt.Sprintf("Unsupported seed file_type %q (supported: csv, parquet, pq, json, jsonl, ndjson, avro)", seedFileTypeRaw),
 			})
+			return issues, nil
+		}
+		if asset.Type == pipeline.AssetTypeSparkSeed && !isCSVSeed(seedPath, seedFileTypeRaw) {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: "Spark seed assets only support CSV files",
+			})
+			return issues, nil
+		}
+
+		lowerPath := strings.ToLower(seedPath)
+		if strings.HasPrefix(lowerPath, "http://") || strings.HasPrefix(lowerPath, "https://") {
+			// URL seeds are validated at runtime by ingestr, skip local file checks
 			return issues, nil
 		}
 
@@ -852,7 +859,9 @@ func isCSVSeed(seedPath, fileType string) bool {
 	if ft := strings.ToLower(strings.TrimSpace(fileType)); ft != "" {
 		return ft == "csv"
 	}
-	ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(seedPath)), ".")
+	pathWithoutQuery := strings.SplitN(seedPath, "?", 2)[0]
+	pathWithoutFragment := strings.SplitN(pathWithoutQuery, "#", 2)[0]
+	ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(pathWithoutFragment)), ".")
 	switch ext {
 	case "parquet", "pq", "jsonl", "ndjson", "json", "avro":
 		return false
@@ -1753,6 +1762,7 @@ var TableSensorAllowedAssetTypes = map[pipeline.AssetType]bool{
 	pipeline.AssetTypeMySQLTableSensor:      true,
 	pipeline.AssetTypeDorisTableSensor:      true,
 	pipeline.AssetTypeStarRocksTableSensor:  true,
+	pipeline.AssetTypeSparkTableSensor:      true,
 }
 
 var platformNames = map[pipeline.AssetType]string{
@@ -1768,6 +1778,7 @@ var platformNames = map[pipeline.AssetType]string{
 	pipeline.AssetTypeMySQLTableSensor:      "MySQL",
 	pipeline.AssetTypeDorisTableSensor:      "Doris",
 	pipeline.AssetTypeStarRocksTableSensor:  "StarRocks",
+	pipeline.AssetTypeSparkTableSensor:      "Spark",
 }
 
 func ValidateTableSensorTableParameter(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {

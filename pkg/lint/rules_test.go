@@ -4830,6 +4830,48 @@ func TestValidateAssetSeedValidation_NonCSVFormats(t *testing.T) {
 	}
 }
 
+func TestValidateAssetSeedValidation_SparkCSVOnly(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		seedPath   string
+		fileType   string
+		wantIssues int
+	}{
+		{name: "CSV URL is supported", seedPath: "https://example.com/data.csv"},
+		{name: "CSV file_type is case insensitive", seedPath: "https://example.com/data.dat", fileType: "CSV"},
+		{name: "explicit Parquet file_type is rejected", seedPath: "https://example.com/data.dat", fileType: "parquet", wantIssues: 1},
+		{name: "Parquet extension is rejected", seedPath: "https://example.com/data.parquet", wantIssues: 1},
+		{name: "non-CSV URL extension before query is rejected", seedPath: "https://example.com/data.json?download=1", wantIssues: 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			parameters := pipeline.ParameterMap{"path": tt.seedPath}
+			if tt.fileType != "" {
+				parameters["file_type"] = tt.fileType
+			}
+			asset := &pipeline.Asset{
+				Name:       "test_seed",
+				Type:       pipeline.AssetTypeSparkSeed,
+				Parameters: parameters,
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Path: "/test/assets/test.asset.yml",
+				},
+			}
+
+			issues, err := ValidateAssetSeedValidation(t.Context(), &pipeline.Pipeline{}, asset)
+			require.NoError(t, err)
+			require.Len(t, issues, tt.wantIssues)
+			if tt.wantIssues > 0 {
+				assert.Equal(t, "Spark seed assets only support CSV files", issues[0].Description)
+			}
+		})
+	}
+}
+
 func TestValidateTableSensorTableParameter(t *testing.T) {
 	t.Parallel()
 
@@ -4996,6 +5038,41 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "task1",
 				Type: pipeline.AssetTypeDatabricksTableSensor,
+				Parameters: pipeline.ParameterMap{
+					"table": "catalog.schema.table",
+				},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+
+		// Spark tests
+		{
+			name: "Spark - no table parameter",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeSparkTableSensor,
+			},
+			want:    []string{"Spark table sensor requires a `table` parameter"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Spark - valid table format",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeSparkTableSensor,
+				Parameters: pipeline.ParameterMap{
+					"table": "table",
+				},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Spark - valid catalog.schema.table format",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeSparkTableSensor,
 				Parameters: pipeline.ParameterMap{
 					"table": "catalog.schema.table",
 				},

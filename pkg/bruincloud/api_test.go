@@ -311,7 +311,7 @@ func TestTriggerRun(t *testing.T) {
 		assert.NotContains(t, body, "assets")
 
 		w.WriteHeader(http.StatusCreated)
-		writeJSON(t, w, TriggerRunResponse{
+		writeJSON(t, w, TriggerRunResult{
 			Message:  "Run triggered successfully",
 			Project:  "proj",
 			Pipeline: "pipe",
@@ -341,7 +341,7 @@ func TestTriggerRunWithSplit(t *testing.T) {
 		assert.EqualValues(t, 2, body["chunk_size"])
 
 		w.WriteHeader(http.StatusCreated)
-		writeJSON(t, w, TriggerRunResponse{
+		writeJSON(t, w, TriggerRunResult{
 			Message:          "Backfill triggered successfully",
 			Project:          "proj",
 			Pipeline:         "pipe",
@@ -368,8 +368,8 @@ func TestTriggerRunSplitDefaultsChunkSize(t *testing.T) {
 		// Split set with the zero-value ChunkSize must still send a valid chunk size.
 		assert.EqualValues(t, 1, body["chunk_size"])
 
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{}`))
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"multiple_action_id":"m1"}`))
 	})
 
 	_, err := client.TriggerRun(t.Context(), "proj", "pipe", "2026-01-01", "2026-04-01", TriggerRunOptions{Split: "month"})
@@ -388,8 +388,8 @@ func TestTriggerRunWithOptions(t *testing.T) {
 		vars := body["variables"].(map[string]any)
 		assert.Equal(t, "bar", vars["foo"])
 
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{}`))
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"run_id":"run-1"}`))
 	})
 
 	opts := TriggerRunOptions{
@@ -411,8 +411,8 @@ func TestTriggerRunWithDownstream(t *testing.T) {
 		assert.Equal(t, []any{"raw_events"}, body["assets"])
 		assert.Equal(t, true, body["downstream"])
 
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{}`))
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"run_id":"run-1"}`))
 	})
 
 	opts := TriggerRunOptions{
@@ -506,6 +506,27 @@ func TestListAgents(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, agents, 1)
 	assert.Equal(t, "test-agent", agents[0].Name)
+}
+
+func TestListAgentConnections(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/agents/7/connections", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, map[string]any{
+			"connections": []AgentConnection{
+				{Name: "warehouse_prod", Type: "snowflake"},
+				{Name: "djamila-dev", Type: "google_cloud_platform"},
+			},
+		})
+	})
+
+	connections, err := client.ListAgentConnections(t.Context(), 7)
+	require.NoError(t, err)
+	require.Len(t, connections, 2)
+	assert.Equal(t, "warehouse_prod", connections[0].Name)
+	assert.Equal(t, "google_cloud_platform", connections[1].Type)
 }
 
 func TestCreateAgent(t *testing.T) {
@@ -748,13 +769,65 @@ func TestTriggerRunWithTags(t *testing.T) {
 		body := readJSON(t, r)
 		// Note + tags are carried together inside the note field as JSON (the Cloud RunNote format).
 		assert.JSONEq(t, `{"note":"Q1 backfill","tags":["nightly","manual"]}`, body["note"].(string))
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{}`))
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"message":"Run triggered successfully","run_id":"run-123"}`))
 	})
 
-	_, err := client.TriggerRun(t.Context(), "p", "pipe", "2026-01-01", "2026-01-02",
+	result, err := client.TriggerRun(t.Context(), "p", "pipe", "2026-01-01", "2026-01-02",
 		TriggerRunOptions{Note: "Q1 backfill", Tags: []string{"nightly", "manual"}})
 	require.NoError(t, err)
+	assert.Equal(t, "run-123", result.RunID)
+}
+
+func TestTriggerRunBackfillReturnsURL(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		body := readJSON(t, r)
+		assert.Equal(t, "day", body["split"])
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"message":"Backfill triggered successfully","multiple_action_id":"abc","split":"day","chunk_size":1,"url":"https://cloud.getbruin.com/acme/projects/p/pipelines/pipe/backfills/abc"}`))
+	})
+
+	result, err := client.TriggerRun(t.Context(), "p", "pipe", "2026-01-01", "2026-01-03",
+		TriggerRunOptions{Split: "day", ChunkSize: 1})
+	require.NoError(t, err)
+	assert.Equal(t, "https://cloud.getbruin.com/acme/projects/p/pipelines/pipe/backfills/abc", result.URL)
+	assert.Equal(t, "abc", result.MultipleActionID)
+}
+
+func TestListBackfills(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/backfills", r.URL.Path)
+		assert.Equal(t, "proj", r.URL.Query().Get("project"))
+		assert.Equal(t, "pipe", r.URL.Query().Get("pipeline"))
+		assert.Equal(t, "5", r.URL.Query().Get("limit"))
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`[{"id":"m1","project":"proj","pipeline":"pipe","interval_start":"2026-01-01T00:00:00.000Z","interval_end":"2026-01-03T00:00:00.000Z","created_at":"2026-01-01T00:00:00.000Z","runs":[{"runId":"m1__a"},{"runId":"m1__b"}]}]`))
+	})
+
+	backfills, err := client.ListBackfills(t.Context(), "proj", "pipe", 5)
+	require.NoError(t, err)
+	require.Len(t, backfills, 1)
+	assert.Equal(t, "m1", backfills[0].ID)
+	assert.Len(t, backfills[0].Runs, 2)
+}
+
+func TestGetBackfillRuns(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/backfills/m1/runs", r.URL.Path)
+		assert.Equal(t, "30", r.URL.Query().Get("limit"))
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`[{"project":"proj","pipeline":"pipe","runId":"m1__a","interval_start":"2026-01-01T00:00:00.000Z","interval_end":"2026-01-02T00:00:00.000Z","created_at":"2026-01-01T00:00:00.000Z","note":null}]`))
+	})
+
+	runs, err := client.GetBackfillRuns(t.Context(), "m1", 30, 0)
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+	assert.Equal(t, "m1__a", runs[0].RunID)
 }
 
 func TestListDashboards(t *testing.T) {
@@ -809,17 +882,41 @@ func TestCreateDashboard(t *testing.T) {
 		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
 		assert.Equal(t, "New Dash", body["title"])
 		assert.Equal(t, "private", body["visibility"])
+		assert.EqualValues(t, 7, body["agent_id"])
 		assert.NotNil(t, body["state"])
 
 		w.WriteHeader(http.StatusCreated)
 		title := "New Dash"
-		writeJSON(t, w, Dashboard{ID: 9, Title: &title, Visibility: "private", URL: "https://cloud.getbruin.com/acme/dashboards/9?mode=edit"})
+		boundAgent := 7
+		writeJSON(t, w, Dashboard{ID: 9, Title: &title, Visibility: "private", URL: "https://cloud.getbruin.com/acme/dashboards/9?mode=edit", AgentID: &boundAgent})
 	})
 
-	dashboard, err := client.CreateDashboard(t.Context(), "New Dash", "private", map[string]any{"widgets": []any{}})
+	dashboard, err := client.CreateDashboard(t.Context(), "New Dash", "private", 7, map[string]any{"widgets": []any{}})
 	require.NoError(t, err)
 	assert.Equal(t, 9, dashboard.ID)
 	assert.Equal(t, "https://cloud.getbruin.com/acme/dashboards/9?mode=edit", dashboard.URL)
+	// The bound agent comes back on the response so the CLI can warn when none resolved.
+	require.NotNil(t, dashboard.AgentID)
+	assert.Equal(t, 7, *dashboard.AgentID)
+}
+
+func TestCreateDashboardOmitsAgentIDWhenZero(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		// No agent id given, so the field is omitted and the server applies its
+		// token-agent fallback rather than clearing the binding.
+		_, hasAgentID := body["agent_id"]
+		assert.False(t, hasAgentID)
+
+		w.WriteHeader(http.StatusCreated)
+		title := "New Dash"
+		writeJSON(t, w, Dashboard{ID: 9, Title: &title, Visibility: "team"})
+	})
+
+	_, err := client.CreateDashboard(t.Context(), "New Dash", "", 0, nil)
+	require.NoError(t, err)
 }
 
 func TestUpdateDashboard(t *testing.T) {
@@ -939,4 +1036,60 @@ func TestUpdateScheduledAgent(t *testing.T) {
 	run, err := client.UpdateScheduledAgent(t.Context(), 11, map[string]any{"title": "Renamed"})
 	require.NoError(t, err)
 	assert.Equal(t, "Renamed", *run.Title)
+}
+
+func TestGetCostExplorerSchema(t *testing.T) {
+	t.Parallel()
+	var gotPath string
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.RequestURI()
+		writeJSON(t, w, CostExplorerSchema{
+			Platform:           "bigquery",
+			AvailablePlatforms: []string{"bigquery"},
+			Dimensions:         []CostDimension{{Key: "pipeline_id", Label: "Pipeline"}},
+			Filters:            []CostFilterField{{Field: "pipeline_id", Op: "in", Multiple: true}},
+			TimeDimensions:     []string{"day", "week", "month"},
+		})
+	})
+
+	schema, err := client.GetCostExplorerSchema(t.Context(), "databricks")
+	require.NoError(t, err)
+	assert.Equal(t, "/cost-explorer/schema?platform=databricks", gotPath)
+	assert.Equal(t, "bigquery", schema.Platform)
+	assert.Equal(t, []string{"day", "week", "month"}, schema.TimeDimensions)
+	require.Len(t, schema.Dimensions, 1)
+	assert.Equal(t, "pipeline_id", schema.Dimensions[0].Key)
+}
+
+func TestGetCostExplorer(t *testing.T) {
+	t.Parallel()
+	var gotBody map[string]any
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		gotBody = readJSON(t, r)
+		next := 2
+		writeJSON(t, w, CostExplorerResponse{
+			Platform:     "bigquery",
+			TotalRows:    3,
+			ReturnedRows: 2,
+			Offset:       0,
+			Truncated:    true,
+			NextOffset:   &next,
+			Rows:         []map[string]any{{"pipeline_id": "daily-etl", "total_cost_usd": 42.5}},
+		})
+	})
+
+	resp, err := client.GetCostExplorer(t.Context(), CostExplorerRequest{
+		StartDate: "2026-07-01",
+		EndDate:   "2026-07-31",
+		Dimension: "pipeline_id",
+		Filters:   []CostFilter{{Field: "pipeline_id", Op: "in", Value: []string{"daily-etl"}}},
+		Limit:     2,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "2026-07-01", gotBody["start_date"])
+	assert.Equal(t, "pipeline_id", gotBody["dimension"])
+	assert.Equal(t, 3, resp.TotalRows)
+	require.NotNil(t, resp.NextOffset)
+	assert.Equal(t, 2, *resp.NextOffset)
 }

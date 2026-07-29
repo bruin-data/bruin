@@ -11,4 +11,14 @@ EXPRESSION_METADATA = {
             exp.CountIf,
         }
     },
+    exp.MD5Digest: {
+        "annotator": lambda self, e: self._set_type(
+            e, exp.DataType.build("FixedString(16)", dialect="clickhouse")
+        )
+    },
+    exp.Corr: {
+        "annotator": lambda self, e: self._set_type(
+            e, exp.DataType.build("Float64", dialect="clickhouse")
+        )
+    },
 }

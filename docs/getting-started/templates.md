@@ -105,10 +105,10 @@ AI agent skills are installed separately with `bruin ai skills`; see [AI Skills]
     <span class="template-card__tags"><code>Athena</code><code>AWS</code><code>SQL</code></span>
   </a>
   <a class="template-card" href="./templates-docs/clickhouse-README.html">
-    <span class="template-card__category">Warehouse SQL</span>
+    <span class="template-card__category">Feature showcase</span>
     <strong>clickhouse</strong>
-    <span>ClickHouse SQL pipeline with a sample table and schema checks.</span>
-    <span class="template-card__tags"><code>ClickHouse</code><code>SQL</code><code>checks</code></span>
+    <span>ClickHouse showcase with materialization strategies, seed data, Python, quality checks, lineage, and optional PostgreSQL ingestion.</span>
+    <span class="template-card__tags"><code>ClickHouse</code><code>PostgreSQL</code><code>ingestr</code></span>
   </a>
   <a class="template-card" href="./templates-docs/bronze-silver-postgres-README.html">
     <span class="template-card__category">Layered ELT</span>
@@ -138,6 +138,12 @@ AI agent skills are installed separately with `bruin ai skills`; see [AI Skills]
     <strong>shopify-duckdb</strong>
     <span>Copies Shopify data into DuckDB for local ecommerce exploration.</span>
     <span class="template-card__tags"><code>Shopify</code><code>DuckDB</code><code>ingestr</code></span>
+  </a>
+  <a class="template-card" href="./templates-docs/shopify-clickhouse-README.html">
+    <span class="template-card__category">Commerce analytics</span>
+    <strong>shopify-clickhouse</strong>
+    <span>Ingests Shopify data into ClickHouse and builds configurable models for orders, customers, products, and daily reporting.</span>
+    <span class="template-card__tags"><code>Shopify</code><code>ClickHouse</code><code>ingestr</code></span>
   </a>
   <a class="template-card" href="./templates-docs/gsheet-bigquery-README.html">
     <span class="template-card__category">Spreadsheet source</span>
@@ -203,7 +209,7 @@ bruin init nyc-taxi my-taxi-pipeline
 | Goal | Start with |
 | --- | --- |
 | Learn Bruin locally without cloud credentials | `duckdb`, `python`, `frankfurter`, or `chess` |
-| Build a source-to-warehouse ingestion pipeline | `ai-coding-usage`, `shopify-bigquery`, `gsheet-bigquery`, `notion`, or `gorgias` |
+| Build a source-to-warehouse ingestion pipeline | `ai-coding-usage`, `shopify-bigquery`, `shopify-clickhouse`, `gsheet-bigquery`, `notion`, or `gorgias` |
 | Explore a complete demo with generated data | `demo-snowflake-sales-analytics` or `demo-snowflake-salesforce` |
 | Scaffold ecommerce reporting | `ecommerce` |
 | Work with a specific database | `athena`, `clickhouse`, `bronze-silver-postgres`, `bigquery`, `databricks`, or `redshift` |

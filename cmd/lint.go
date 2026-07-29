@@ -500,8 +500,9 @@ func queryValidatorRules(logger logger.Logger, cfg *config.Config, connectionMan
 			TaskType:    pipeline.AssetTypeSnowflakeQuery,
 			Connections: connectionManager,
 			Extractor: &query.FileQuerySplitterExtractor{
-				Fs:       fs,
-				Renderer: renderer,
+				Fs:               fs,
+				Renderer:         renderer,
+				BackslashEscapes: true,
 			},
 			WorkerCount: 32,
 			Logger:      logger,
@@ -516,8 +517,9 @@ func queryValidatorRules(logger logger.Logger, cfg *config.Config, connectionMan
 			TaskType:    pipeline.AssetTypeRedshiftQuery,
 			Connections: connectionManager,
 			Extractor: &query.FileQuerySplitterExtractor{
-				Fs:       fs,
-				Renderer: renderer,
+				Fs:               fs,
+				Renderer:         renderer,
+				BackslashEscapes: true,
 			},
 			WorkerCount: 32,
 			Logger:      logger,

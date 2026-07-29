@@ -137,6 +137,34 @@ def _pushdown_cte_column_names(expression: exp.Expr) -> exp.Expr:
     return expression
 
 
+def _unnest_explode_generate_series(expression: exp.Expr) -> exp.Expr:
+    """
+    Rewrites exploding GENERATE_SERIES projections into table references, e.g.
+
+        SELECT GENERATE_SERIES(1, 2) AS x           -> SELECT x FROM GENERATE_SERIES(1, 2) AS x
+        SELECT y, GENERATE_SERIES(1, 2) AS x FROM t -> SELECT y, x FROM t CROSS JOIN GENERATE_SERIES(1, 2) AS x
+
+    since BigQuery can't explode in the projection and must unnest it in the FROM clause instead.
+    The resulting table reference is unnested downstream by `transforms.unnest_generate_series`.
+    """
+    if isinstance(expression, exp.Select):
+        for projection in expression.selects:
+            if isinstance(series := projection.unalias(), exp.ExplodingGenerateSeries):
+                column_name = projection.output_name or "_gen_series_value"
+
+                projection.replace(exp.column(column_name))
+                table = exp.Table(
+                    this=series, alias=exp.TableAlias(this=exp.to_identifier(column_name))
+                )
+
+                if expression.args.get("from_"):
+                    expression.join(table, copy=False, join_type="CROSS")
+                else:
+                    expression.set("from_", exp.From(this=table))
+
+    return expression
+
+
 def _array_contains_sql(self: BigQueryGenerator, expression: exp.ArrayContains) -> str:
     return self.sql(
         exp.Exists(
@@ -201,7 +229,7 @@ def _levenshtein_sql(self: BigQueryGenerator, expression: exp.Levenshtein) -> st
 
 
 def _json_extract_sql(self: BigQueryGenerator, expression: JSON_EXTRACT_TYPE) -> str:
-    name = (expression._meta and expression.meta.get("name")) or expression.sql_name()
+    name = expression.meta_get("name") or expression.sql_name()
     upper = name.upper()
 
     dquote_escaping = upper in DQUOTES_ESCAPING_JSON_FUNCTIONS
@@ -232,6 +260,7 @@ class BigQueryGenerator(generator.Generator):
     COLLATE_IS_FUNC = True
     LIMIT_ONLY_LITERALS = True
     SUPPORTS_TABLE_ALIAS_COLUMNS = False
+    SUPPORTS_NAMED_CTE_COLUMNS = False
     UNPIVOT_ALIASES_ARE_IDENTIFIERS = False
     JSON_KEY_VALUE_PAIR_SEP = ","
     NULL_ORDERING_SUPPORTED: bool | None = False
@@ -357,6 +386,7 @@ class BigQueryGenerator(generator.Generator):
         exp.ParseDatetime: lambda self, e: self.func("PARSE_DATETIME", self.format_time(e), e.this),
         exp.Select: transforms.preprocess(
             [
+                _unnest_explode_generate_series,
                 transforms.explode_projection_to_unnest(),
                 transforms.unqualify_unnest,
                 transforms.eliminate_distinct_on,
@@ -378,6 +408,7 @@ class BigQueryGenerator(generator.Generator):
         exp.StrToDate: _str_to_datetime_sql,
         exp.StrToTime: _str_to_datetime_sql,
         exp.SessionUser: lambda *_: "SESSION_USER()",
+        exp.Table: transforms.preprocess([transforms.unnest_generate_series]),
         exp.TimeAdd: date_add_interval_sql("TIME", "ADD"),
         exp.TimeFromParts: rename_func("TIME"),
         exp.TimestampFromParts: rename_func("DATETIME"),
@@ -564,7 +595,7 @@ class BigQueryGenerator(generator.Generator):
         )
 
     def column_parts(self, expression: exp.Column) -> str:
-        if expression.meta.get("quoted_column"):
+        if expression.meta_get("quoted_column"):
             # If a column reference is of the form `dataset.table`.name, we need
             # to preserve the quoted table path, otherwise the reference breaks
             table_parts = ".".join(p.name for p in expression.parts[:-1])
@@ -582,7 +613,7 @@ class BigQueryGenerator(generator.Generator):
         #
         # - WITH x AS (SELECT [1, 2] AS y) SELECT * FROM x, `x.y`   -> cross join
         # - WITH x AS (SELECT [1, 2] AS y) SELECT * FROM x, `x`.`y` -> implicit unnest
-        if expression.meta.get("quoted_table"):
+        if expression.meta_get("quoted_table"):
             table_parts = ".".join(p.name for p in expression.parts)
             return self.sql(exp.Identifier(this=table_parts, quoted=True))
 
@@ -687,3 +718,9 @@ class BigQueryGenerator(generator.Generator):
                 return f"{self.sql(expression, 'to')}{self.sql(this)}"
 
         return super().cast_sql(expression, safe_prefix=safe_prefix)
+
+    def clusterproperty_sql(self, expression: exp.ClusterProperty) -> str:
+        if expression.this:
+            self.unsupported(f"Unsupported CLUSTER BY {self.sql(expression, 'this')}")
+            return ""
+        return self.op_expressions("CLUSTER BY", expression)

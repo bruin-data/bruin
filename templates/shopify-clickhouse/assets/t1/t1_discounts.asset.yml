@@ -1,0 +1,53 @@
+name: shopify.t1_discounts
+type: ingestr
+description: "Raw Shopify discount definitions, incrementally merged from the live shop."
+
+materialization:
+  type: table
+  strategy: merge
+  incremental_key: updated_at
+
+parameters:
+  source_connection: shopify-default
+  source_table: discounts
+  destination: clickhouse
+  schema_contract: evolve
+  schema_naming: snake_case
+
+tags:
+  - t1
+  - source
+  - shopify
+  - discounts
+domains:
+  - commerce
+  - marketing
+  - finance
+meta:
+  grain: one row per Shopify discount definition
+  source_system: shopify
+  source_table: discounts
+  data_classification: internal
+  contains_pii: "false"
+  ingestion_strategy: merge on updated_at
+
+columns:
+  - name: id
+    type: String
+    description: "Shopify Admin GraphQL global identifier for the discount node."
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: discount
+    type: Nullable(String)
+    description: "Serialized discount definition, including type, status, eligibility, value, dates, and redeem codes."
+  - name: metafields_first250
+    type: Nullable(String)
+    description: "Serialized first page of up to 250 metafields attached to the discount."
+  - name: updated_at
+    type: Nullable(DateTime64(6, 'UTC'))
+    description: "Timestamp when Shopify last updated the discount; used as the incremental cursor."
+  - name: _ingestr_loaded_at
+    type: Nullable(DateTime64(6, 'UTC'))
+    description: "Timestamp when ingestr loaded the record into ClickHouse."

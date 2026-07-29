@@ -5,8 +5,8 @@ from __future__ import annotations
 import typing as t
 from enum import auto
 
+from sqlglot.expressions.core import ColumnConstraintKind, Expression, Literal, convert
 from sqlglot.helper import AutoName
-from sqlglot.expressions.core import Expression, ColumnConstraintKind, Literal, convert
 
 
 class Property(Expression):
@@ -63,6 +63,10 @@ class BlockCompressionProperty(Property):
     }
 
 
+class CalledOnNullInputProperty(Property):
+    arg_types = {}
+
+
 class CatalogProperty(Property):
     arg_types = {}
 
@@ -73,6 +77,10 @@ class CharacterSetProperty(Property):
 
 class ChecksumProperty(Property):
     arg_types = {"on": False, "default": False}
+
+
+class ClusterProperty(Property):
+    arg_types = {"this": False, "expressions": False}
 
 
 class CollateProperty(Property):

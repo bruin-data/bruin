@@ -15,6 +15,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/spark"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -291,6 +292,12 @@ func TestDetermineAssetTypeFromConnection(t *testing.T) {
 			want:           pipeline.AssetTypePostgresSource,
 		},
 		{
+			name:           "spark connection type overrides name",
+			connectionName: "prod",
+			conn:           &spark.Client{},
+			want:           pipeline.AssetTypeSparkSource,
+		},
+		{
 			name:           "connection type not detected (embedded mock)",
 			connectionName: "test-conn",
 			conn:           &struct{ mockConnection }{},
@@ -363,6 +370,12 @@ func TestDetermineAssetTypeFromConnection(t *testing.T) {
 			connectionName: "databricks-lakehouse",
 			conn:           &mockConnection{},
 			want:           pipeline.AssetTypeDatabricksSource,
+		},
+		{
+			name:           "spark by name",
+			connectionName: "spark-lakehouse",
+			conn:           &mockConnection{},
+			want:           pipeline.AssetTypeSparkSource,
 		},
 		{
 			name:           "duckdb by name",

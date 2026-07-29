@@ -130,6 +130,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "Chat with Agents", link: "/cloud/ai-agents/chat"},
                             {text: "Scheduled Agents", link: "/cloud/ai-agents/scheduled"},
                             {text: "Databricks OAuth", link: "/cloud/ai-agents/databricks-oauth"},
+                            {text: "Snowflake OAuth", link: "/cloud/ai-agents/snowflake-oauth"},
                             {
                                 text: "Examples",
                                 collapsed: true,
@@ -263,6 +264,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "Trino", link: "/platforms/trino"},
                             {text: "Dremio", link: "/platforms/dremio"},
                             {text: "Sail", link: "/platforms/sail"},
+                            {text: "Apache Spark", link: "/platforms/spark"},
                             {text: "AWS EMR Serverless", link: "/platforms/emr_serverless"},
                             {text: "GCP Dataproc Serverless", link: "/platforms/dataproc_serverless"},
                         ],
@@ -585,6 +587,11 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         class: "mermaid my-class", // set additional css classes for parent container
     },
     vite: {
+        optimizeDeps: {
+            esbuildOptions: {
+                target: "esnext",
+            },
+        },
         build: {
             target: ["chrome107", "edge107", "firefox104", "safari16"],
         },
