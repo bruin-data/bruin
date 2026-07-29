@@ -52,6 +52,29 @@ type PipelineRun struct {
 	Note                      *string         `json:"note"`
 }
 
+// Backfill represents a group of runs created by a single split trigger,
+// identified by its multiple_action_id.
+type Backfill struct {
+	ID            string        `json:"id"`
+	Project       string        `json:"project"`
+	Pipeline      string        `json:"pipeline"`
+	IntervalStart string        `json:"interval_start"`
+	IntervalEnd   string        `json:"interval_end"`
+	CreatedAt     string        `json:"created_at"`
+	Runs          []BackfillRun `json:"runs"`
+}
+
+// BackfillRun represents a single run within a backfill.
+type BackfillRun struct {
+	Project       string  `json:"project"`
+	Pipeline      string  `json:"pipeline"`
+	RunID         string  `json:"runId"`
+	IntervalStart string  `json:"interval_start"`
+	IntervalEnd   string  `json:"interval_end"`
+	CreatedAt     string  `json:"created_at"`
+	Note          *string `json:"note"`
+}
+
 // Asset represents a pipeline asset.
 type Asset struct {
 	Project                 string          `json:"project"`

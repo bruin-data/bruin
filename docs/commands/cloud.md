@@ -308,6 +308,16 @@ bruin cloud runs trigger \
 > include a final period, pass the date one period past it — e.g. `--end-date 2024-01-04`
 > to cover `2024-01-03` with `--split day`.
 
+When a `--split` trigger succeeds, the command prints a link to track the backfill
+in the dashboard:
+
+```text
+Successfully triggered backfill (split by day, chunk size 1) for pipeline 'my-pipeline' in project 'my-project'
+Track this backfill at: https://cloud.getbruin.com/<company>/projects/my-project/pipelines/my-pipeline/backfills/<backfill-id>
+```
+
+Use `bruin cloud backfills` (below) to inspect the backfill and its runs from the CLI.
+
 #### `rerun`
 
 Re-run a previous pipeline run. Useful when a transient issue caused a failure:
@@ -374,6 +384,35 @@ bruin cloud runs diagnose --project-id <project-id> --run-id <run-id>
 
 > [!TIP]
 > The `diagnose` command is especially handy when used with `--latest` — you don't even need to know the run ID. Just point it at a pipeline and it tells you what went wrong.
+
+---
+
+### `backfills`
+
+Inspect backfills — the grouped runs created by `runs trigger --split`.
+
+#### `list`
+
+List recent backfills, optionally filtered by project and pipeline:
+
+```bash
+bruin cloud backfills list --project-id <project-id> --pipeline <pipeline-name>
+```
+
+Each row shows the backfill ID (the `multiple_action_id`), its overall interval,
+and how many runs it fanned out into. Use `--limit` to control how many backfills
+are returned (default 10).
+
+#### `runs`
+
+List the individual runs that make up a single backfill, using the backfill ID
+from `backfills list`:
+
+```bash
+bruin cloud backfills runs --id <backfill-id>
+```
+
+Use `--limit` / `--offset` to page through the runs.
 
 ---
 

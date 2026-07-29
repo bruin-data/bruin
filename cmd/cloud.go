@@ -32,6 +32,7 @@ func Cloud(isDebug *bool) *cli.Command {
 			CloudProjects(),
 			CloudPipelines(),
 			CloudRuns(),
+			CloudBackfills(),
 			CloudAssets(),
 			CloudInstances(),
 			CloudGlossary(),
@@ -885,15 +886,25 @@ func cloudRunsTrigger() *cli.Command {
 			}
 
 			startDate, endDate := c.String("start-date"), c.String("end-date")
-			if err := client.TriggerRun(ctx, project, pipeline, startDate, endDate, opts); err != nil {
+			result, err := client.TriggerRun(ctx, project, pipeline, startDate, endDate, opts)
+			if err != nil {
 				printError(err, output, "Failed to trigger run")
 				return cli.Exit("", 1)
 			}
 
+			if output == "json" {
+				data, _ := json.MarshalIndent(result, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
 			if split == "" {
-				printSuccessForOutput(output, fmt.Sprintf("Successfully triggered run for pipeline '%s' in project '%s'", pipeline, project))
+				successPrinter.Printf("Successfully triggered run for pipeline '%s' in project '%s'\n", pipeline, project)
 			} else {
-				printSuccessForOutput(output, fmt.Sprintf("Successfully triggered backfill (split by %s, chunk size %d) for pipeline '%s' in project '%s'", split, chunkSize, pipeline, project))
+				successPrinter.Printf("Successfully triggered backfill (split by %s, chunk size %d) for pipeline '%s' in project '%s'\n", split, chunkSize, pipeline, project)
+				if result.URL != "" {
+					fmt.Printf("Track this backfill at: %s\n", result.URL)
+				}
 			}
 			return nil
 		},
@@ -1248,6 +1259,117 @@ func cloudRunsDiagnose() *cli.Command {
 				}
 			}
 
+			return nil
+		},
+	}
+}
+
+// --- Backfills ---
+
+func CloudBackfills() *cli.Command {
+	return &cli.Command{
+		Name:  "backfills",
+		Usage: "Inspect backfills (grouped runs created by 'runs trigger --split')",
+		Commands: []*cli.Command{
+			cloudBackfillsList(),
+			cloudBackfillsRuns(),
+		},
+	}
+}
+
+func cloudBackfillsList() *cli.Command {
+	return &cli.Command{
+		Name:  "list",
+		Usage: "List recent backfills",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			projectFlag(),
+			pipelineFlag(),
+			limitFlag(),
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			backfills, err := client.ListBackfills(ctx, c.String("project-id"), c.String("pipeline"), c.Int("limit"))
+			if err != nil {
+				printError(err, output, "Failed to list backfills")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(backfills, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"Backfill ID", "Project", "Pipeline", "Interval Start", "Interval End", "Runs", "Created"})
+			for _, b := range backfills {
+				t.AppendRow(table.Row{b.ID, b.Project, b.Pipeline, b.IntervalStart, b.IntervalEnd, len(b.Runs), b.CreatedAt})
+			}
+			t.Render()
+			return nil
+		},
+	}
+}
+
+func cloudBackfillsRuns() *cli.Command {
+	return &cli.Command{
+		Name:  "runs",
+		Usage: "List the individual runs of a backfill",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.StringFlag{
+				Name:     "id",
+				Usage:    "backfill ID (the 'Backfill ID' from 'backfills list')",
+				Required: true,
+			},
+			limitFlag(),
+			offsetFlag(),
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			runs, err := client.GetBackfillRuns(ctx, c.String("id"), c.Int("limit"), c.Int("offset"))
+			if err != nil {
+				printError(err, output, "Failed to get backfill runs")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(runs, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"Run ID", "Interval Start", "Interval End", "Created", "Note"})
+			for _, r := range runs {
+				note := ""
+				if r.Note != nil {
+					note = *r.Note
+				}
+				t.AppendRow(table.Row{r.RunID, r.IntervalStart, r.IntervalEnd, r.CreatedAt, note})
+			}
+			t.Render()
 			return nil
 		},
 	}
