@@ -491,6 +491,17 @@ List available agents:
 bruin cloud agents list
 ```
 
+#### `connections`
+
+List the connections available to an agent — names and types only (never
+credential values). Use it to pick a connection the agent can actually query,
+e.g. for a dashboard's `connection`:
+
+```bash
+bruin cloud agents connections --agent-id 7
+bruin cloud agents connections --agent-id 7 --output json
+```
+
 #### `send`
 
 Send a message to an agent:

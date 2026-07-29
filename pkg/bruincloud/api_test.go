@@ -488,6 +488,27 @@ func TestListAgents(t *testing.T) {
 	assert.Equal(t, "test-agent", agents[0].Name)
 }
 
+func TestListAgentConnections(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/agents/7/connections", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, map[string]any{
+			"connections": []AgentConnection{
+				{Name: "warehouse_prod", Type: "snowflake"},
+				{Name: "djamila-dev", Type: "google_cloud_platform"},
+			},
+		})
+	})
+
+	connections, err := client.ListAgentConnections(t.Context(), 7)
+	require.NoError(t, err)
+	require.Len(t, connections, 2)
+	assert.Equal(t, "warehouse_prod", connections[0].Name)
+	assert.Equal(t, "google_cloud_platform", connections[1].Type)
+}
+
 func TestCreateAgent(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {

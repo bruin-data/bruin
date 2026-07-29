@@ -105,6 +105,13 @@ type Agent struct {
 	Visibility  string  `json:"visibility"`
 }
 
+// AgentConnection is one connection available to an agent — name and type only
+// (no credential values).
+type AgentConnection struct {
+	Name string `json:"name"`
+	Type string `json:"type"`
+}
+
 // AgentThread represents a thread for an agent.
 type AgentThread struct {
 	ID        int    `json:"id"`

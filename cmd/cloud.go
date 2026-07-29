@@ -2043,6 +2043,59 @@ func CloudAgents() *cli.Command {
 			cloudAgentsMessages(),
 			cloudAgentsGetPrompt(),
 			cloudAgentsSetPrompt(),
+			cloudAgentsConnections(),
+		},
+	}
+}
+
+func cloudAgentsConnections() *cli.Command {
+	return &cli.Command{
+		Name:  "connections",
+		Usage: "List the connections available to an agent (names and types)",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "agent-id",
+				Usage:    "agent ID",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			connections, err := client.ListAgentConnections(ctx, c.Int("agent-id"))
+			if err != nil {
+				printError(err, output, "Failed to list agent connections")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(connections, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			if len(connections) == 0 {
+				infoPrinter.Println("No connections available to this agent.")
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"Name", "Type"})
+			for _, conn := range connections {
+				t.AppendRow(table.Row{conn.Name, conn.Type})
+			}
+			t.Render()
+			return nil
 		},
 	}
 }
