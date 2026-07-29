@@ -88,6 +88,11 @@ func TestInitShopifyClickHouseCopiesPipelineTemplate(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, string(ordersAsset), "name: shopify.t1_orders")
 	require.Contains(t, string(ordersAsset), "source_connection: shopify-default")
+
+	orderLinesAsset, err := os.ReadFile(filepath.Join(pipelineRoot, "assets", "t2", "t2_order_line_items.sql"))
+	require.NoError(t, err)
+	require.Contains(t, string(orderLinesAsset), "strategy: delete+insert")
+	require.Contains(t, string(orderLinesAsset), "incremental_key: order_id")
 }
 
 func TestSelfHealDemoTemplateContainsDataProblemScenarios(t *testing.T) {
