@@ -242,8 +242,22 @@ func encodeRunNote(note string, tags []string) string {
 	return string(b)
 }
 
+// TriggerRunResult holds the response from the trigger endpoint. A normal run
+// returns RunID; a backfill (triggered with a split) returns MultipleActionID
+// and a URL to track the backfill in the dashboard.
+type TriggerRunResult struct {
+	Message          string `json:"message"`
+	Project          string `json:"project"`
+	Pipeline         string `json:"pipeline"`
+	RunID            string `json:"run_id"`
+	MultipleActionID string `json:"multiple_action_id"`
+	Split            string `json:"split"`
+	ChunkSize        int    `json:"chunk_size"`
+	URL              string `json:"url"`
+}
+
 // TriggerRun triggers a pipeline run for the given date range.
-func (c *APIClient) TriggerRun(ctx context.Context, project, pipeline, startDate, endDate string, opts TriggerRunOptions) error {
+func (c *APIClient) TriggerRun(ctx context.Context, project, pipeline, startDate, endDate string, opts TriggerRunOptions) (*TriggerRunResult, error) {
 	body := map[string]any{
 		"project":    project,
 		"pipeline":   pipeline,
@@ -273,7 +287,11 @@ func (c *APIClient) TriggerRun(ctx context.Context, project, pipeline, startDate
 	if note := encodeRunNote(opts.Note, opts.Tags); note != "" {
 		body["note"] = note
 	}
-	return c.doRequest(ctx, http.MethodPost, "/trigger-pipeline-run", body, nil)
+	var result TriggerRunResult
+	if err := c.doRequest(ctx, http.MethodPost, "/trigger-pipeline-run", body, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
 }
 
 func (c *APIClient) RerunRun(ctx context.Context, project, pipeline, runID string, onlyFailed bool) error {
@@ -313,6 +331,47 @@ func (c *APIClient) GetLatestRun(ctx context.Context, project, pipeline string) 
 		return nil, fmt.Errorf("no runs found for pipeline '%s' in project '%s'", pipeline, project)
 	}
 	return &runs[0], nil
+}
+
+// --- Backfills ---
+
+// ListBackfills returns the most recent backfills, optionally filtered by project and pipeline.
+func (c *APIClient) ListBackfills(ctx context.Context, project, pipeline string, limit int) ([]Backfill, error) {
+	params := url.Values{}
+	if project != "" {
+		params.Set("project", project)
+	}
+	if pipeline != "" {
+		params.Set("pipeline", pipeline)
+	}
+	if limit > 0 {
+		params.Set("limit", strconv.Itoa(limit))
+	}
+	path := "/backfills"
+	if enc := params.Encode(); enc != "" {
+		path += "?" + enc
+	}
+	var backfills []Backfill
+	err := c.doRequest(ctx, http.MethodGet, path, nil, &backfills)
+	return backfills, err
+}
+
+// GetBackfillRuns returns the individual runs that make up a single backfill.
+func (c *APIClient) GetBackfillRuns(ctx context.Context, multipleActionID string, limit, offset int) ([]BackfillRun, error) {
+	params := url.Values{}
+	if limit > 0 {
+		params.Set("limit", strconv.Itoa(limit))
+	}
+	if offset > 0 {
+		params.Set("offset", strconv.Itoa(offset))
+	}
+	path := "/backfills/" + url.PathEscape(multipleActionID) + "/runs"
+	if enc := params.Encode(); enc != "" {
+		path += "?" + enc
+	}
+	var runs []BackfillRun
+	err := c.doRequest(ctx, http.MethodGet, path, nil, &runs)
+	return runs, err
 }
 
 // --- Assets ---
