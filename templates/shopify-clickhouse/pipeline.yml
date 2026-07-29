@@ -1,0 +1,29 @@
+name: shopify-clickhouse
+schedule: "@daily"
+start_date: "2020-01-01"
+catchup: false
+
+default_connections:
+    clickhouse: "clickhouse-default"
+    shopify: "shopify-default"
+
+tags:
+    - clickhouse
+    - ecommerce
+    - shopify
+    - ingestr
+
+domains:
+    - commerce
+    - finance
+    - customer
+    - merchandising
+    - fulfillment
+
+meta:
+    description: "Shopify analytics warehouse ingested with ingestr and modeled in ClickHouse."
+    data_classification: mixed
+    source_mode: live-shopify
+    source_connection: shopify-default
+    reporting_timezone: UTC
+    currency_policy: no conversion; monetary aggregates remain at shop-currency grain
