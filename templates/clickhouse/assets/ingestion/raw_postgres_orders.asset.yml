@@ -1,0 +1,71 @@
+name: raw_postgres_orders
+type: ingestr
+description: Demonstrates Ingestr-based PostgreSQL-to-ClickHouse replication. It maps source columns, creates a ReplacingMergeTree destination, and uses merge plus updated_at as a high-water mark so incremental runs merge newly changed source rows after the readiness sensor passes.
+connection: clickhouse-default
+tags:
+  - layer:raw
+  - domain:commerce
+  - source:postgres
+  - strategy:merge
+  - requires-postgres-default
+domains:
+  - commerce
+meta:
+  data_classification: confidential
+  destination_system: clickhouse
+  incremental_key: updated_at
+  source_connection: postgres-default
+  source_system: postgres
+
+materialization:
+  type: table
+  strategy: merge
+  incremental_key: updated_at
+
+depends:
+  - postgres_orders_sensor
+owner: data-foundations@example.com
+
+parameters:
+  destination: clickhouse
+  enforce_schema: true
+  engine: replacing_merge_tree
+  engine.index_granularity: 8192
+  source_connection: postgres-default
+  source_table: public.orders
+
+columns:
+  - name: order_id
+    source_column: id
+    type: UInt64
+    description: Destination order identifier mapped from public.orders.id.
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: customer_id
+    type: UInt64
+    description: Customer associated with the source order.
+    checks:
+      - name: not_null
+  - name: order_date
+    source_column: created_at
+    type: Date
+    description: Source creation date preserved in the ClickHouse destination.
+    checks:
+      - name: not_null
+  - name: order_status
+    source_column: status
+    type: LowCardinality(String)
+    description: Order status mapped from the operational source.
+  - name: amount
+    source_column: total_amount
+    type: Float64
+    description: Order amount in USD mapped from total_amount.
+    checks:
+      - name: non_negative
+  - name: updated_at
+    type: DateTime
+    description: Source high-water mark used by merge ingestion.
+    checks:
+      - name: not_null
