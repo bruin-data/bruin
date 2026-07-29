@@ -899,9 +899,9 @@ func cloudRunsTrigger() *cli.Command {
 			}
 
 			if split == "" {
-				successPrinter.Printf("Successfully triggered run for pipeline '%s' in project '%s'\n", pipeline, project)
+				successPrinter.Printf("Successfully triggered run '%s' for pipeline '%s' in project '%s'\n", result.RunID, pipeline, project)
 			} else {
-				successPrinter.Printf("Successfully triggered backfill (split by %s, chunk size %d) for pipeline '%s' in project '%s'\n", split, chunkSize, pipeline, project)
+				successPrinter.Printf("Successfully triggered backfill '%s' (split by %s, chunk size %d) for pipeline '%s' in project '%s'\n", result.MultipleActionID, split, chunkSize, pipeline, project)
 				if result.URL != "" {
 					fmt.Printf("Track this backfill at: %s\n", result.URL)
 				}

@@ -4,9 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/bruincloud"
+	"github.com/fatih/color"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
@@ -192,6 +197,53 @@ func TestCloudRunsCommand_Help(t *testing.T) {
 		subNames[i] = sub.Name
 	}
 	assert.Contains(t, subNames, "diagnose")
+}
+
+func TestCloudRunsTriggerCommand_OutputsCreatedRunID(t *testing.T) { //nolint:paralleltest // redirects global output
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/trigger-pipeline-run", r.URL.Path)
+		assert.Equal(t, http.MethodPost, r.Method)
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{
+			"message": "Run triggered successfully",
+			"project": "proj",
+			"pipeline": "pipe",
+			"run_id": "run-123"
+		}`))
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
+
+	originalStdout := os.Stdout
+	originalColorOutput := color.Output
+	reader, writer, err := os.Pipe()
+	require.NoError(t, err)
+	os.Stdout = writer
+	color.Output = writer
+	t.Cleanup(func() {
+		os.Stdout = originalStdout
+		color.Output = originalColorOutput
+		_ = reader.Close()
+		_ = writer.Close()
+	})
+
+	cmd := cloudRunsTrigger()
+	err = cmd.Run(t.Context(), []string{
+		"trigger",
+		"--api-key", "test-key",
+		"--project-id", "proj",
+		"--pipeline", "pipe",
+		"--start-date", "2026-01-01",
+		"--end-date", "2026-01-02",
+	})
+	require.NoError(t, err)
+	os.Stdout = originalStdout
+	color.Output = originalColorOutput
+	require.NoError(t, writer.Close())
+
+	output, err := io.ReadAll(reader)
+	require.NoError(t, err)
+	assert.Contains(t, string(output), "Successfully triggered run 'run-123' for pipeline 'pipe' in project 'proj'")
 }
 
 func TestCloudAssetsCommand_Help(t *testing.T) {

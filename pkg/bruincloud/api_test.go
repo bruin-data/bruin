@@ -311,11 +311,19 @@ func TestTriggerRun(t *testing.T) {
 		assert.NotContains(t, body, "assets")
 
 		w.WriteHeader(http.StatusCreated)
-		_, _ = w.Write([]byte(`{"run_id":"run-1"}`))
+		writeJSON(t, w, TriggerRunResult{
+			Message:  "Run triggered successfully",
+			Project:  "proj",
+			Pipeline: "pipe",
+			RunID:    "run-123",
+		})
 	})
 
-	_, err := client.TriggerRun(t.Context(), "proj", "pipe", "2026-01-01", "2026-01-02", TriggerRunOptions{})
+	result, err := client.TriggerRun(t.Context(), "proj", "pipe", "2026-01-01", "2026-01-02", TriggerRunOptions{})
 	require.NoError(t, err)
+	assert.Equal(t, "run-123", result.RunID)
+	assert.Equal(t, "proj", result.Project)
+	assert.Equal(t, "pipe", result.Pipeline)
 }
 
 func TestTriggerRunWithSplit(t *testing.T) {
@@ -333,11 +341,23 @@ func TestTriggerRunWithSplit(t *testing.T) {
 		assert.EqualValues(t, 2, body["chunk_size"])
 
 		w.WriteHeader(http.StatusCreated)
-		_, _ = w.Write([]byte(`{"multiple_action_id":"m1"}`))
+		writeJSON(t, w, TriggerRunResult{
+			Message:          "Backfill triggered successfully",
+			Project:          "proj",
+			Pipeline:         "pipe",
+			MultipleActionID: "backfill-123",
+			Split:            "month",
+			ChunkSize:        2,
+			URL:              "https://cloud.getbruin.com/acme/projects/proj/pipelines/pipe/backfills/backfill-123",
+		})
 	})
 
-	_, err := client.TriggerRun(t.Context(), "proj", "pipe", "2026-01-01", "2026-04-01", TriggerRunOptions{Split: "month", ChunkSize: 2})
+	result, err := client.TriggerRun(t.Context(), "proj", "pipe", "2026-01-01", "2026-04-01", TriggerRunOptions{Split: "month", ChunkSize: 2})
 	require.NoError(t, err)
+	assert.Equal(t, "backfill-123", result.MultipleActionID)
+	assert.Equal(t, "month", result.Split)
+	assert.Equal(t, 2, result.ChunkSize)
+	assert.Contains(t, result.URL, "/backfills/backfill-123")
 }
 
 func TestTriggerRunSplitDefaultsChunkSize(t *testing.T) {
