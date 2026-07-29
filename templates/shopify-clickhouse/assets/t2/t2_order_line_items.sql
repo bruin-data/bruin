@@ -5,7 +5,8 @@ description: "Conformed Shopify order lines parsed from the nested order payload
 
 materialization:
   type: table
-  strategy: merge
+  strategy: delete+insert
+  incremental_key: order_id
 
 depends:
   - shopify.t1_orders
@@ -25,7 +26,7 @@ meta:
   source_system: shopify
   currency_scope: monetary values remain in each order's shop currency
   refund_policy: recognized line revenue allocates the order's current subtotal proportionally across original net line values
-  refresh_strategy: primary-key merge for lines belonging to orders updated in the run interval
+  refresh_strategy: replace complete line sets for orders updated in the run interval
   data_classification: internal
 
 custom_checks:

@@ -115,7 +115,7 @@ The T1 assets preserve Shopify structures that are useful as a starting point, i
 
 In particular, the payment reconciliation mart summarizes Shopify order financial statuses; it is not a payout or gateway-settlement ledger. Add Shopify Payments or another payment-source integration if you need settlement-level reporting.
 
-The template uses `merge` materializations for incrementally updated entities and daily marts. The customer-cohort and product-performance marts use `create+replace`, because they summarize the full available history.
+The template uses `merge` materializations for incrementally updated entities and daily marts. Order lines use `delete+insert` keyed by order so removed lines do not remain after an order edit. The customer-cohort and product-performance marts use `create+replace`, because they summarize the full available history.
 
 ## Explore the marts
 
