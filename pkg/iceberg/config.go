@@ -5,6 +5,7 @@ package iceberg
 import (
 	"fmt"
 	"net/url"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -57,7 +58,14 @@ func (c Config) GetIngestrURI() (string, error) {
 
 	// Storage settings take precedence; catalog settings fill any gaps (ingestr
 	// aliases region/credentials into both the s3.* and glue.* namespaces).
+	// The shared credential keys are filled as a group: storage that brings its
+	// own key pair must not inherit the catalog's session token, which belongs
+	// to a different account and would be rejected.
+	storageHasOwnCredentials := hasAnySharedCredential(q)
 	for key, values := range catalogParams {
+		if storageHasOwnCredentials && isSharedCredentialParam(key) {
+			continue
+		}
 		if _, exists := q[key]; !exists {
 			q[key] = values
 		}
@@ -93,7 +101,11 @@ func icebergCatalogURI(cat config.IcebergCatalog) (string, url.Values, error) {
 	q := url.Values{}
 	switch cat.Type {
 	case config.IcebergCatalogGlue:
+		// The shared keys keep serving storage that has no credentials of its own;
+		// glue.* pins the catalog's account so S3-compatible storage (GCS interop,
+		// MinIO, R2) with different credentials cannot overwrite it.
 		setAWSCredentials(q, cat.Region, cat.Auth.AccessKey, cat.Auth.SecretKey, cat.Auth.SessionToken)
+		setGlueCredentials(q, cat.Region, cat.Auth.AccessKey, cat.Auth.SecretKey, cat.Auth.SessionToken)
 		if cat.CatalogID != "" {
 			q.Set("glue.id", cat.CatalogID)
 		}
@@ -219,6 +231,41 @@ func setAWSCredentials(q url.Values, region, accessKey, secretKey, sessionToken 
 	}
 	if sessionToken != "" {
 		q.Set("session_token", sessionToken)
+	}
+}
+
+// sharedCredentialParams are the credential keys ingestr aliases into both the
+// s3.* and glue.* namespaces; they always come from a single account.
+var sharedCredentialParams = []string{"access_key_id", "secret_access_key", "session_token"}
+
+func isSharedCredentialParam(key string) bool {
+	return slices.Contains(sharedCredentialParams, key)
+}
+
+func hasAnySharedCredential(q url.Values) bool {
+	for _, key := range sharedCredentialParams {
+		if q.Get(key) != "" {
+			return true
+		}
+	}
+
+	return false
+}
+
+// setGlueCredentials sets the glue.*-namespaced region and credential parameters
+// so the catalog keeps its own AWS account regardless of what storage sets.
+func setGlueCredentials(q url.Values, region, accessKey, secretKey, sessionToken string) {
+	if region != "" {
+		q.Set("glue.region", region)
+	}
+	if accessKey != "" {
+		q.Set("glue.access-key-id", accessKey)
+	}
+	if secretKey != "" {
+		q.Set("glue.secret-access-key", secretKey)
+	}
+	if sessionToken != "" {
+		q.Set("glue.session-token", sessionToken)
 	}
 }
 
