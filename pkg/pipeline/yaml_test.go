@@ -411,6 +411,22 @@ routing:
 	require.Equal(t, &pipeline.RoutingConfig{EgressGateway: "wg-shared-ams3"}, task.Routing)
 }
 
+func TestConvertYamlToTask_MaterializationStrategyAlias(t *testing.T) {
+	t.Parallel()
+
+	// ingestr users often reference ingestr's "replace" incremental strategy,
+	// which Bruin exposes as "create+replace". The parser should accept it.
+	task, err := pipeline.ConvertYamlToTask([]byte(strings.TrimSpace(`
+name: dataset.asset
+type: ingestr
+materialization:
+  type: table
+  strategy: replace
+`)))
+	require.NoError(t, err)
+	require.Equal(t, pipeline.MaterializationStrategyCreateReplace, task.Materialization.Strategy)
+}
+
 func TestConvertYamlToTask_Timeout(t *testing.T) {
 	t.Parallel()
 

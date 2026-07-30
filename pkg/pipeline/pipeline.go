@@ -635,6 +635,25 @@ var AllAvailableMaterializationStrategies = []MaterializationStrategy{
 	MaterializationStrategyDataVaultSatellite,
 }
 
+// materializationStrategyAliases maps alternative strategy names to their
+// canonical Bruin equivalent. ingestr users often reference ingestr's
+// incremental-strategy names, and ingestr calls a full-table replace "replace"
+// whereas Bruin exposes the same behavior as "create+replace". Accepting the
+// alias keeps those pipelines working instead of failing validation.
+var materializationStrategyAliases = map[MaterializationStrategy]MaterializationStrategy{
+	"replace": MaterializationStrategyCreateReplace,
+}
+
+// NormalizeMaterializationStrategy lowercases the given strategy and resolves
+// any known alias to its canonical Bruin strategy.
+func NormalizeMaterializationStrategy(strategy string) MaterializationStrategy {
+	normalized := MaterializationStrategy(strings.ToLower(strings.TrimSpace(strategy)))
+	if canonical, ok := materializationStrategyAliases[normalized]; ok {
+		return canonical
+	}
+	return normalized
+}
+
 type Materialization struct {
 	Type                 MaterializationType            `json:"type" yaml:"type,omitempty" mapstructure:"type"`
 	Strategy             MaterializationStrategy        `json:"strategy" yaml:"strategy,omitempty" mapstructure:"strategy"`

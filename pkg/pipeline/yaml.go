@@ -515,7 +515,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 func taskDefinitionToAsset(definition taskDefinition) (*Asset, error) {
 	mat := Materialization{
 		Type:                 MaterializationType(strings.ToLower(definition.Materialization.Type)),
-		Strategy:             MaterializationStrategy(strings.ToLower(definition.Materialization.Strategy)),
+		Strategy:             NormalizeMaterializationStrategy(definition.Materialization.Strategy),
 		ClusterBy:            definition.Materialization.ClusterBy,
 		PartitionBy:          definition.Materialization.PartitionBy,
 		IncrementalKey:       definition.Materialization.IncrementalKey,

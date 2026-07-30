@@ -380,7 +380,7 @@ func commentRowsToTask(commentRows []string) (*Asset, error) {
 				task.Materialization.Type = MaterializationType(strings.ToLower(value))
 				continue
 			case "strategy":
-				task.Materialization.Strategy = MaterializationStrategy(strings.ToLower(value))
+				task.Materialization.Strategy = NormalizeMaterializationStrategy(value)
 				continue
 			case "partition_by":
 				task.Materialization.PartitionBy = value

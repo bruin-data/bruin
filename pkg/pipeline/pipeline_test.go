@@ -1013,6 +1013,50 @@ func TestMaterialization_MarshalJSON(t *testing.T) {
 	}
 }
 
+func TestNormalizeMaterializationStrategy(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		input string
+		want  pipeline.MaterializationStrategy
+	}{
+		{
+			name:  "replace is aliased to create+replace",
+			input: "replace",
+			want:  pipeline.MaterializationStrategyCreateReplace,
+		},
+		{
+			name:  "replace alias is case-insensitive and trimmed",
+			input: "  REPLACE ",
+			want:  pipeline.MaterializationStrategyCreateReplace,
+		},
+		{
+			name:  "create+replace is kept as-is",
+			input: "create+replace",
+			want:  pipeline.MaterializationStrategyCreateReplace,
+		},
+		{
+			name:  "other strategies pass through lowercased",
+			input: "Delete+Insert",
+			want:  pipeline.MaterializationStrategyDeleteInsert,
+		},
+		{
+			name:  "empty stays empty",
+			input: "",
+			want:  pipeline.MaterializationStrategyNone,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, pipeline.NormalizeMaterializationStrategy(tt.input))
+		})
+	}
+}
+
 func TestColumnCheckValue_MarshalJSON(t *testing.T) {
 	t.Parallel()
 

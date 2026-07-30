@@ -184,6 +184,8 @@ Bruin forwards these write strategies to ingestr:
 | `materialization.strategy: truncate+insert` | `truncate+insert` |
 | `parameters.incremental_strategy` | Passed through as-is |
 
+For convenience, `materialization.strategy: replace` is accepted as an alias for `create+replace`, so assets that reference ingestr's own `replace` strategy name keep working. Both map to ingestr's `replace`; `create+replace` remains the canonical Bruin name.
+
 Use `materialization.incremental_key` or `parameters.incremental_key` only with `append`, `merge`, and `delete+insert`. `merge` requires primary keys, supplied either by ingestr source metadata/schema or by asset columns marked `primary_key: true`; CDC assets determine keys from the source. `truncate+insert` is accepted by Bruin, but ingestr will fail the run if the selected destination cannot truncate tables. Ingestr's `scd2` strategy is not a supported Bruin ingestr asset materialization strategy.
 
 Destination support depends on ingestr's destination implementation:
