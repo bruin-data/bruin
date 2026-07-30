@@ -351,6 +351,37 @@ func TestCloudAgentsConnections_RejectsNonPositiveAgentID(t *testing.T) {
 	}
 }
 
+func TestCloudAgentsConnectionsAdd_RejectsNonPositiveAgentID(t *testing.T) {
+	t.Parallel()
+	for _, v := range []string{"0", "-3"} {
+		cmd := cloudAgentsConnectionsAdd()
+		exitCode := 0
+		cmd.ExitErrHandler = func(_ context.Context, _ *cli.Command, err error) {
+			var ec cli.ExitCoder
+			if errors.As(err, &ec) {
+				exitCode = ec.ExitCode()
+			}
+		}
+		_ = runCLI(t.Context(), cmd, []string{"add", "--api-key", "k", "--agent-id", v})
+		assert.Equalf(t, 1, exitCode, "agent-id %q should be rejected", v)
+	}
+}
+
+func TestCloudAgentsConnectionsAdd_RequiresName(t *testing.T) {
+	t.Parallel()
+	// A positive agent-id but no --name must fail locally before any API call.
+	cmd := cloudAgentsConnectionsAdd()
+	exitCode := 0
+	cmd.ExitErrHandler = func(_ context.Context, _ *cli.Command, err error) {
+		var ec cli.ExitCoder
+		if errors.As(err, &ec) {
+			exitCode = ec.ExitCode()
+		}
+	}
+	_ = runCLI(t.Context(), cmd, []string{"add", "--api-key", "k", "--agent-id", "7"})
+	assert.Equal(t, 1, exitCode)
+}
+
 func TestCloudScheduledAgentsCommand_Help(t *testing.T) {
 	t.Parallel()
 	cmd := CloudScheduledAgents()

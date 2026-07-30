@@ -547,6 +547,25 @@ bruin cloud agents connections --agent-id 7
 bruin cloud agents connections --agent-id 7 --output json
 ```
 
+##### `connections add`
+
+Add a connection to an agent's connection set so it can query it. By default the
+connection is read from your local `.bruin.yml` by name; alternatively pass the
+credentials inline with `--credentials` (JSON) and `--type`. Credential values
+are sent to Bruin Cloud but never printed.
+
+```bash
+# From local .bruin.yml (reads type + credentials for the named connection)
+bruin cloud agents connections add --agent-id 7 --name my_postgres
+
+# Inline
+bruin cloud agents connections add \
+  --agent-id 7 \
+  --name my_postgres \
+  --type postgres \
+  --credentials '{"username":"u","password":"p","host":"db.example.com","database":"main"}'
+```
+
 #### `send`
 
 Send a message to an agent:

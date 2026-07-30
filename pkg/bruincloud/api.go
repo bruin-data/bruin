@@ -489,6 +489,19 @@ func (c *APIClient) ListAgentConnections(ctx context.Context, agentID int) ([]Ag
 	return resp.Connections, err
 }
 
+// AddAgentConnection adds a connection (type + name + config) to the agent's
+// connection set and returns the resulting connections — names/types only,
+// never credentials. The config carries the credential values and is sent to
+// the server, not logged.
+func (c *APIClient) AddAgentConnection(ctx context.Context, agentID int, connType, name string, config map[string]any) ([]AgentConnection, error) {
+	body := map[string]any{"type": connType, "name": name, "config": config}
+	var resp struct {
+		Connections []AgentConnection `json:"connections"`
+	}
+	err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/agents/%d/connections", agentID), body, &resp)
+	return resp.Connections, err
+}
+
 // CreateAgent creates a new agent. Optional fields are omitted when empty so the
 // server applies its defaults (null description/prompt, "team" visibility).
 func (c *APIClient) CreateAgent(ctx context.Context, name, description, systemPrompt, visibility string) (*Agent, error) {
