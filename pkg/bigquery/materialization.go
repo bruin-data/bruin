@@ -47,12 +47,16 @@ func viewMaterializer(asset *pipeline.Asset, query string) (string, error) {
 }
 
 func buildTruncateInsertQuery(task *pipeline.Asset, query string) (string, error) {
-	// BigQuery doesn't support transactions, so we execute as separate statements
+	// BigQuery treats TRUNCATE TABLE as a DML statement, so the truncate and insert can
+	// run inside a single transaction. This makes the full refresh atomic: readers never
+	// observe the intermediate empty table, and a failed insert rolls back the truncate.
 	queries := []string{
+		"BEGIN TRANSACTION",
 		"TRUNCATE TABLE " + task.Name,
 		fmt.Sprintf("INSERT INTO %s %s", task.Name, strings.TrimSuffix(query, ";")),
+		"COMMIT TRANSACTION",
 	}
-	return strings.Join(queries, ";\n"), nil
+	return strings.Join(queries, ";\n") + ";", nil
 }
 
 func mergeMaterializer(asset *pipeline.Asset, query string) (string, error) {
