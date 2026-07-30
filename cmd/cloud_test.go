@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sync"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/bruincloud"
@@ -301,6 +302,17 @@ func TestCloudDashboardsCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "update")
 }
 
+// cliRunMu serializes cli.Command.Run: urfave/cli's ensureHelp resets the
+// package-level cli.HelpFlag on every run, so concurrent runs race on it.
+var cliRunMu sync.Mutex
+
+func runCLI(ctx context.Context, cmd *cli.Command, args []string) error {
+	cliRunMu.Lock()
+	defer cliRunMu.Unlock()
+
+	return cmd.Run(ctx, args)
+}
+
 func TestCloudDashboardsCreate_RejectsNonPositiveAgentID(t *testing.T) {
 	t.Parallel()
 	// An explicit non-positive --agent-id must fail fast (before any request)
@@ -316,7 +328,7 @@ func TestCloudDashboardsCreate_RejectsNonPositiveAgentID(t *testing.T) {
 				exitCode = ec.ExitCode()
 			}
 		}
-		_ = cmd.Run(t.Context(), []string{"create", "--title", "T", "--api-key", "k", "--agent-id", v})
+		_ = runCLI(t.Context(), cmd, []string{"create", "--title", "T", "--api-key", "k", "--agent-id", v})
 		assert.Equalf(t, 1, exitCode, "agent-id %q should be rejected", v)
 	}
 }
@@ -334,7 +346,7 @@ func TestCloudAgentsConnections_RejectsNonPositiveAgentID(t *testing.T) {
 				exitCode = ec.ExitCode()
 			}
 		}
-		_ = cmd.Run(t.Context(), []string{"connections", "--api-key", "k", "--agent-id", v})
+		_ = runCLI(t.Context(), cmd, []string{"connections", "--api-key", "k", "--agent-id", v})
 		assert.Equalf(t, 1, exitCode, "agent-id %q should be rejected", v)
 	}
 }
