@@ -196,11 +196,13 @@ func Lint(isDebug *bool) *cli.Command {
 				defer p.Close()
 			}
 
+			// Hook declare-hoisting is optional (Rust FFI, darwin/linux+CGO only).
+			// Log failures at debug level; printing them would corrupt JSON output.
 			var hookHoister pipeline.DeclareHoister
 			if p, err := sqlparser.NewRustSQLParser(false); err != nil {
-				printError(err, c.String("output"), "Could not initialize hook SQL parser")
+				logger.Debugf("could not initialize hook SQL parser, skipping declare hoisting: %v", err)
 			} else if err := p.Start(); err != nil {
-				printError(err, c.String("output"), "Could not start hook SQL parser")
+				logger.Debugf("could not start hook SQL parser, skipping declare hoisting: %v", err)
 			} else {
 				hookHoister = p
 				defer p.Close()
