@@ -3821,16 +3821,8 @@ func cloudAuditLogsList() *cli.Command {
 				Name:  "end-date",
 				Usage: "only entries at or before this time (ISO 8601)",
 			},
-			&cli.IntFlag{
-				Name:  "page",
-				Usage: "page number",
-				Value: 1,
-			},
-			&cli.IntFlag{
-				Name:  "limit",
-				Usage: "entries per page (max 100)",
-				Value: 25,
-			},
+			limitFlag(),
+			offsetFlag(),
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			defer RecoverFromPanic()
@@ -3847,8 +3839,8 @@ func cloudAuditLogsList() *cli.Command {
 				UserIDs:   c.StringSlice("user-id"),
 				StartDate: c.String("start-date"),
 				EndDate:   c.String("end-date"),
-				Page:      c.Int("page"),
-				PerPage:   c.Int("limit"),
+				Limit:     c.Int("limit"),
+				Offset:    c.Int("offset"),
 			})
 			if err != nil {
 				printError(err, output, "Failed to list audit logs")

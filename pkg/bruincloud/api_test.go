@@ -1102,8 +1102,8 @@ func TestListAuditLogs(t *testing.T) {
 		assert.Equal(t, []string{"login", "new_conn"}, q["types[]"])
 		assert.Equal(t, []string{"7"}, q["userIds[]"])
 		assert.Equal(t, "2026-07-01", q.Get("startDate"))
-		assert.Equal(t, "2", q.Get("page"))
-		assert.Equal(t, "50", q.Get("perPage"))
+		assert.Equal(t, "50", q.Get("limit"))
+		assert.Equal(t, "10", q.Get("offset"))
 		w.WriteHeader(http.StatusOK)
 		writeJSON(t, w, map[string]any{
 			"auditLogs": []AuditLog{
@@ -1117,8 +1117,8 @@ func TestListAuditLogs(t *testing.T) {
 		Types:     []string{"login", "new_conn"},
 		UserIDs:   []string{"7"},
 		StartDate: "2026-07-01",
-		Page:      2,
-		PerPage:   50,
+		Limit:     50,
+		Offset:    10,
 	})
 	require.NoError(t, err)
 	require.Len(t, logs, 1)

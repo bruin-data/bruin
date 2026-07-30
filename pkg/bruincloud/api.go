@@ -747,11 +747,11 @@ func (c *APIClient) ListAuditLogs(ctx context.Context, opts AuditLogListOptions)
 	if opts.EndDate != "" {
 		params.Set("endDate", opts.EndDate)
 	}
-	if opts.Page > 0 {
-		params.Set("page", strconv.Itoa(opts.Page))
+	if opts.Limit > 0 {
+		params.Set("limit", strconv.Itoa(opts.Limit))
 	}
-	if opts.PerPage > 0 {
-		params.Set("perPage", strconv.Itoa(opts.PerPage))
+	if opts.Offset > 0 {
+		params.Set("offset", strconv.Itoa(opts.Offset))
 	}
 
 	path := "/audit-logs"

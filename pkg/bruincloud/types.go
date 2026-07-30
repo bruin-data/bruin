@@ -325,8 +325,8 @@ type AuditLogListOptions struct {
 	UserIDs   []string
 	StartDate string
 	EndDate   string
-	Page      int
-	PerPage   int
+	Limit     int
+	Offset    int
 }
 
 // CostDimension is a group-by dimension the cost explorer supports.
