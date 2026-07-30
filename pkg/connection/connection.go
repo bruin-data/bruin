@@ -2060,6 +2060,9 @@ func (m *Manager) AddKafkaConnectionFromConfig(connection *config.KafkaConnectio
 		return err
 	}
 
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
 	m.Kafka[connection.Name] = client
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
