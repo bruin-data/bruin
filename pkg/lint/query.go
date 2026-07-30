@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
@@ -35,6 +36,8 @@ type QueryValidatorRule struct {
 	Connections  connectionManager
 	Extractor    queryExtractor
 	Materializer materializer
+	HookRenderer jinja.RendererInterface
+	HookHoister  pipeline.DeclareHoister
 	WorkerCount  int
 	Logger       logger.Logger
 }
@@ -54,6 +57,24 @@ func (q *QueryValidatorRule) GetApplicableLevels() []Level {
 
 func (q *QueryValidatorRule) GetSeverity() ValidatorSeverity {
 	return ValidatorSeverityCritical
+}
+
+func (q *QueryValidatorRule) wrapRenderedHooks(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset, sql string) (string, error) {
+	if q.HookRenderer == nil || asset.Hooks.IsZero() {
+		return sql, nil
+	}
+
+	assetRenderer, err := q.HookRenderer.CloneForAsset(ctx, p, asset)
+	if err != nil {
+		return "", fmt.Errorf("failed to create hook renderer: %w", err)
+	}
+
+	renderedHooks, err := pipeline.ResolveHookTemplatesToNew(asset.Hooks, assetRenderer)
+	if err != nil {
+		return "", err
+	}
+
+	return pipeline.WrapHooks(sql, renderedHooks, q.HookHoister, asset.Type), nil
 }
 
 func (q *QueryValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
@@ -116,6 +137,16 @@ func (q *QueryValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipe
 		}
 		foundQuery.Query = materialized
 	}
+
+	queryWithHooks, err := q.wrapRenderedHooks(ctx, p, asset, foundQuery.Query)
+	if err != nil {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("Failed to render hooks: %s", err),
+		})
+		return issues, nil
+	}
+	foundQuery.Query = queryWithHooks
 
 	assetConnectionName, err := p.GetConnectionNameForAsset(asset)
 	if err != nil {
@@ -230,6 +261,18 @@ func (q *QueryValidatorRule) validateTask(ctx context.Context, p *pipeline.Pipel
 				}
 				foundQuery.Query = materialized
 			}
+
+			queryWithHooks, err := q.wrapRenderedHooks(ctx, p, task, foundQuery.Query)
+			if err != nil {
+				mu.Lock()
+				issues = append(issues, &Issue{
+					Task:        task,
+					Description: fmt.Sprintf("Failed to render hooks: %s", err),
+				})
+				mu.Unlock()
+				return
+			}
+			foundQuery.Query = queryWithHooks
 
 			assetConnectionName, err := p.GetConnectionNameForAsset(task)
 			if err != nil {

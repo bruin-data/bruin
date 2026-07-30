@@ -1993,6 +1993,13 @@ func ValidateHookQueryDryRun(connections connectionManager) AssetValidator {
 			return issues, nil
 		}
 
+		// The BigQuery query validator dry-runs the complete materialized script,
+		// including hooks. Validating hooks independently would break shared
+		// script scope, such as a pre-hook DECLARE referenced by the asset query.
+		if asset.Type == pipeline.AssetTypeBigqueryQuery {
+			return issues, nil
+		}
+
 		connName, err := p.GetConnectionNameForAsset(asset)
 		if err != nil { //nolint
 			return issues, nil

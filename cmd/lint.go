@@ -196,6 +196,16 @@ func Lint(isDebug *bool) *cli.Command {
 				defer p.Close()
 			}
 
+			var hookHoister pipeline.DeclareHoister
+			if p, err := sqlparser.NewRustSQLParser(false); err != nil {
+				printError(err, c.String("output"), "Could not initialize hook SQL parser")
+			} else if err := p.Start(); err != nil {
+				printError(err, c.String("output"), "Could not start hook SQL parser")
+			} else {
+				hookHoister = p
+				defer p.Close()
+			}
+
 			rules, err := lint.GetRules(fs, &git.RepoFinder{}, c.Bool("exclude-warnings"), parser, true)
 			if err != nil {
 				printError(err, c.String("output"), "An error occurred while building the validation rules")
@@ -203,7 +213,7 @@ func Lint(isDebug *bool) *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			rules = append(rules, queryValidatorRules(logger, cm, connectionManager, fullRefresh)...)
+			rules = append(rules, queryValidatorRules(logger, cm, connectionManager, fullRefresh, hookHoister)...)
 			rules = append(rules, lint.GetCustomCheckQueryDryRunRule(connectionManager, renderer))
 			rules = append(rules, lint.GetHookQueryDryRunRule(connectionManager))
 			rules = append(rules, SeedAssetsValidator)
@@ -472,7 +482,7 @@ func flattenErrors(err error) []string {
 	return foundErrors
 }
 
-func queryValidatorRules(logger logger.Logger, cfg *config.Config, connectionManager config.ConnectionGetter, fullRefresh bool) []lint.Rule {
+func queryValidatorRules(logger logger.Logger, cfg *config.Config, connectionManager config.ConnectionGetter, fullRefresh bool, hookHoister pipeline.DeclareHoister) []lint.Rule {
 	rules := []lint.Rule{}
 	renderer := jinja.NewRendererWithYesterday("your-pipeline-name", "your-run-id")
 	if len(cfg.SelectedEnvironment.Connections.GoogleCloudPlatform) > 0 {
@@ -488,8 +498,10 @@ func queryValidatorRules(logger logger.Logger, cfg *config.Config, connectionMan
 				materializer: bigquery.NewMaterializer(fullRefresh),
 				renderer:     renderer,
 			},
-			WorkerCount: 32,
-			Logger:      logger,
+			HookRenderer: renderer,
+			HookHoister:  hookHoister,
+			WorkerCount:  32,
+			Logger:       logger,
 		})
 	} else {
 		logger.Debug("no GCP connections found, skipping BigQuery validation")

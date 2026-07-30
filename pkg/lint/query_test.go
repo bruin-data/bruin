@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/stretchr/testify/assert"
@@ -58,6 +59,80 @@ type mockMaterializer struct {
 func (m *mockMaterializer) Render(task *pipeline.Asset, query string) (string, error) {
 	res := m.Called(task, query)
 	return res.Get(0).(string), res.Error(1)
+}
+
+func TestQueryValidatorRule_ValidateAssetWithHookScope(t *testing.T) {
+	t.Parallel()
+
+	startDate := time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC)
+	endDate := time.Date(2024, time.January, 31, 0, 0, 0, 0, time.UTC)
+	executionDate := endDate
+	ctx := context.WithValue(t.Context(), pipeline.RunConfigStartDate, startDate)
+	ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, endDate)
+	ctx = context.WithValue(ctx, pipeline.RunConfigExecutionDate, executionDate)
+	ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run-id")
+
+	asset := &pipeline.Asset{
+		Name: "dashboard.repro1",
+		Type: pipeline.AssetTypeBigqueryQuery,
+		ExecutableFile: pipeline.ExecutableFile{
+			Content: "asset query",
+		},
+		Hooks: pipeline.Hooks{
+			Pre: []pipeline.Hook{{
+				Query: "DECLARE window_start DATE DEFAULT date_sub(date '{{ end_date }}', INTERVAL 30 DAY)",
+			}},
+		},
+	}
+	p := &pipeline.Pipeline{
+		Name:   "test-pipeline",
+		Assets: []*pipeline.Asset{asset},
+		DefaultConnections: map[string]string{
+			"google_cloud_platform": "gcp-conn",
+		},
+	}
+
+	extractor := new(mockExtractor)
+	extractor.On("CloneForAsset", mock.Anything, p, asset).Return(extractor, nil)
+	extractor.On("ExtractQueriesFromString", "asset query").Return(
+		[]*query.Query{{Query: "select window_start, date '2024-01-31' as window_end"}},
+		nil,
+	)
+
+	materializer := new(mockMaterializer)
+	materializer.On(
+		"Render",
+		asset,
+		"select window_start, date '2024-01-31' as window_end",
+	).Return(
+		"CREATE OR REPLACE TABLE dashboard.repro1 AS\nselect window_start, date '2024-01-31' as window_end",
+		nil,
+	)
+
+	expectedQuery := &query.Query{Query: "DECLARE window_start DATE DEFAULT date_sub(date '2024-01-31', INTERVAL 30 DAY);\n" +
+		"CREATE OR REPLACE TABLE dashboard.repro1 AS\nselect window_start, date '2024-01-31' as window_end;"}
+	validator := new(mockValidator)
+	validator.On("IsValid", mock.Anything, expectedQuery).Return(true, nil)
+
+	connections := new(mockConnectionManager)
+	connections.On("GetConnection", "gcp-conn").Return(validator)
+
+	rule := &QueryValidatorRule{
+		TaskType:     pipeline.AssetTypeBigqueryQuery,
+		Connections:  connections,
+		Extractor:    extractor,
+		Materializer: materializer,
+		HookRenderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, &executionDate, "test-pipeline", "test-run-id", nil),
+		Logger:       zap.NewNop().Sugar(),
+	}
+
+	issues, err := rule.ValidateAsset(ctx, p, asset)
+	require.NoError(t, err)
+	assert.Empty(t, issues)
+	validator.AssertExpectations(t)
+	extractor.AssertExpectations(t)
+	materializer.AssertExpectations(t)
+	connections.AssertExpectations(t)
 }
 
 func TestQueryValidatorRule_Validate(t *testing.T) {
