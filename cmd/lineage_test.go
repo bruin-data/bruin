@@ -39,8 +39,7 @@ func (m *mockPrinter) Print(a ...interface{}) (int, error) {
 }
 
 func TestLineageCommand_Run(t *testing.T) {
-	// Not parallel: cli.Command.Run mutates the package-level cli.HelpFlag, so two
-	// concurrent Run calls race inside the library.
+	t.Parallel()
 
 	type args struct {
 		assetPath string
