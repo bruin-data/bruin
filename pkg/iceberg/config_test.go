@@ -55,6 +55,87 @@ func TestConfig_GetIngestrURI_GlueS3(t *testing.T) {
 	assert.Equal(t, "analytics", q.Get("catalog_name"))
 }
 
+func TestConfig_GetIngestrURI_GlueOnS3CompatibleStorage(t *testing.T) {
+	t.Parallel()
+
+	// Glue on S3-compatible storage: the two use different accounts, so the
+	// catalog's AWS settings must survive the storage block.
+	useSSL := true
+	c := Config{
+		Catalog: config.IcebergCatalog{
+			Type:   config.IcebergCatalogGlue,
+			Region: "eu-north-1",
+			Auth:   config.IcebergAuth{AccessKey: "ASIAKID", SecretKey: "AWSSECRET", SessionToken: "AWSTOKEN"},
+		},
+		Storage: config.IcebergStorage{
+			Type:     config.IcebergStorageS3,
+			Path:     testS3LakeWh,
+			Endpoint: "storage.googleapis.com",
+			UseSSL:   &useSSL,
+			Region:   "auto",
+			Auth:     config.IcebergAuth{AccessKey: "GOOGKID", SecretKey: "GOOGSECRET"},
+		},
+	}
+
+	_, q := parseQuery(t, mustURI(t, c))
+	assert.Equal(t, "eu-north-1", q.Get("glue.region"))
+	assert.Equal(t, "ASIAKID", q.Get("glue.access-key-id"))
+	assert.Equal(t, "AWSSECRET", q.Get("glue.secret-access-key"))
+	assert.Equal(t, "AWSTOKEN", q.Get("glue.session-token"))
+
+	// Storage still owns the shared keys ingestr aliases into s3.*.
+	assert.Equal(t, "auto", q.Get("region"))
+	assert.Equal(t, "GOOGKID", q.Get("access_key_id"))
+	assert.Equal(t, "GOOGSECRET", q.Get("secret_access_key"))
+}
+
+func TestConfig_GetIngestrURI_StorageKeepsOwnCredentials(t *testing.T) {
+	t.Parallel()
+
+	// Storage with its own key pair and no session token must not inherit the
+	// catalog's; MinIO and other S3-compatible stores reject an AWS STS token.
+	c := Config{
+		Catalog: config.IcebergCatalog{
+			Type:   config.IcebergCatalogGlue,
+			Region: "eu-north-1",
+			Auth:   config.IcebergAuth{AccessKey: "ASIAKID", SecretKey: "AWSSECRET", SessionToken: "AWSTOKEN"},
+		},
+		Storage: config.IcebergStorage{
+			Type:     config.IcebergStorageS3,
+			Path:     "s3://warehouse/wh",
+			Endpoint: "localhost:9000",
+			Auth:     config.IcebergAuth{AccessKey: "minioadmin", SecretKey: "minioadmin"},
+		},
+	}
+
+	_, q := parseQuery(t, mustURI(t, c))
+	assert.Equal(t, "minioadmin", q.Get("access_key_id"))
+	assert.Equal(t, "minioadmin", q.Get("secret_access_key"))
+	assert.Empty(t, q.Get("session_token"), "catalog session token must not leak into S3-compatible storage")
+	assert.Equal(t, "AWSTOKEN", q.Get("glue.session-token"))
+}
+
+func TestConfig_GetIngestrURI_CredentialsSharedWhenStorageHasNone(t *testing.T) {
+	t.Parallel()
+
+	// Storage without credentials still inherits the catalog's, the common
+	// Glue + real-S3 setup where both sides are the same AWS account.
+	c := Config{
+		Catalog: config.IcebergCatalog{
+			Type:   config.IcebergCatalogGlue,
+			Region: testAWSRegion,
+			Auth:   config.IcebergAuth{AccessKey: "AKID", SecretKey: "SECRET", SessionToken: "TOKEN"},
+		},
+		Storage: config.IcebergStorage{Type: config.IcebergStorageS3, Path: testS3LakeWh},
+	}
+
+	_, q := parseQuery(t, mustURI(t, c))
+	assert.Equal(t, "AKID", q.Get("access_key_id"))
+	assert.Equal(t, "SECRET", q.Get("secret_access_key"))
+	assert.Equal(t, "TOKEN", q.Get("session_token"))
+	assert.Equal(t, testAWSRegion, q.Get("region"))
+}
+
 func TestConfig_GetIngestrURI_SQLiteS3MinIO(t *testing.T) {
 	t.Parallel()
 
