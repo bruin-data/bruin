@@ -539,8 +539,7 @@ func TestAddAgentConnection(t *testing.T) {
 		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
 		assert.Equal(t, "warehouse", body["name"])
 		assert.Equal(t, "postgres", body["type"])
-		cfg, ok := body["config"].(map[string]any)
-		require.True(t, ok)
+		cfg, _ := body["config"].(map[string]any)
 		assert.Equal(t, "secret", cfg["password"])
 
 		w.WriteHeader(http.StatusCreated)
