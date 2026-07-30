@@ -40,6 +40,7 @@ func Cloud(isDebug *bool) *cli.Command {
 			CloudConnections(),
 			CloudDashboards(),
 			CloudScheduledAgents(),
+			CloudAuditLogs(),
 			CloudCost(),
 		},
 	}
@@ -3785,6 +3786,91 @@ func derefString(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+func CloudAuditLogs() *cli.Command {
+	return &cli.Command{
+		Name:  "audit-logs",
+		Usage: "Read the Bruin Cloud team audit log",
+		Commands: []*cli.Command{
+			cloudAuditLogsList(),
+		},
+	}
+}
+
+func cloudAuditLogsList() *cli.Command {
+	return &cli.Command{
+		Name:  "list",
+		Usage: "List audit log entries (requires a personal API token)",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.StringSliceFlag{
+				Name:  "type",
+				Usage: "filter by event type (repeatable), e.g. --type login --type new_conn",
+			},
+			&cli.StringSliceFlag{
+				Name:  "user-id",
+				Usage: "filter by acting user ID (repeatable)",
+			},
+			&cli.StringFlag{
+				Name:  "start-date",
+				Usage: "only entries at or after this time (ISO 8601)",
+			},
+			&cli.StringFlag{
+				Name:  "end-date",
+				Usage: "only entries at or before this time (ISO 8601)",
+			},
+			&cli.IntFlag{
+				Name:  "page",
+				Usage: "page number",
+				Value: 1,
+			},
+			&cli.IntFlag{
+				Name:  "limit",
+				Usage: "entries per page (max 100)",
+				Value: 25,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			logs, err := client.ListAuditLogs(ctx, bruincloud.AuditLogListOptions{
+				Types:     c.StringSlice("type"),
+				UserIDs:   c.StringSlice("user-id"),
+				StartDate: c.String("start-date"),
+				EndDate:   c.String("end-date"),
+				Page:      c.Int("page"),
+				PerPage:   c.Int("limit"),
+			})
+			if err != nil {
+				printError(err, output, "Failed to list audit logs")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(logs, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"Time", "Type", "User", "Source", "IP"})
+			for _, l := range logs {
+				t.AppendRow(table.Row{l.CreatedAt, l.Type, l.UserIdentifier, derefString(l.Source), derefString(l.IPAddress)})
+			}
+			t.Render()
+			return nil
+		},
+	}
 }
 
 func CloudCost() *cli.Command {
