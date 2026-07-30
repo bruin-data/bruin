@@ -196,11 +196,14 @@ func Lint(isDebug *bool) *cli.Command {
 				defer p.Close()
 			}
 
+			// Hook declare-hoisting is optional (Rust FFI, darwin/linux+CGO only).
+			// Warn on stderr when unavailable so DECLARE-related validation errors
+			// are explainable, without corrupting structured stdout output.
 			var hookHoister pipeline.DeclareHoister
 			if p, err := sqlparser.NewRustSQLParser(false); err != nil {
-				printError(err, c.String("output"), "Could not initialize hook SQL parser")
+				fmt.Fprintf(os.Stderr, "warning: hook SQL parser unavailable, DECLARE hoisting disabled: %v\n", err)
 			} else if err := p.Start(); err != nil {
-				printError(err, c.String("output"), "Could not start hook SQL parser")
+				fmt.Fprintf(os.Stderr, "warning: hook SQL parser unavailable, DECLARE hoisting disabled: %v\n", err)
 			} else {
 				hookHoister = p
 				defer p.Close()
