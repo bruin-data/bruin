@@ -187,6 +187,38 @@ func TestConfig_GetIngestrURI_HadoopAndHive(t *testing.T) {
 	assert.True(t, strings.HasPrefix(got, "iceberg+hive://metastore:9083?"), "got: %s", got)
 }
 
+func TestConfig_GetIngestrURI_HadoopWarehouseURIInCatalogPath(t *testing.T) {
+	t.Parallel()
+
+	// A warehouse URI in catalog.path is not a filesystem path: in the URL path it
+	// would come back as "/s3://bucket/wh" and the catalog would treat it as local.
+	c := Config{
+		Catalog: config.IcebergCatalog{Type: config.IcebergCatalogHadoop, Path: "s3://bucket/wh"},
+		Storage: config.IcebergStorage{Type: config.IcebergStorageS3},
+	}
+
+	got, err := c.GetIngestrURI()
+	require.NoError(t, err)
+	assert.True(t, strings.HasPrefix(got, "iceberg+hadoop://?"), "warehouse URI must not land in the URL path, got: %s", got)
+
+	_, q := parseQuery(t, got)
+	assert.Equal(t, "s3://bucket/wh", q.Get("warehouse"))
+}
+
+func TestConfig_GetIngestrURI_HadoopStorageWarehouseWins(t *testing.T) {
+	t.Parallel()
+
+	// storage.path is the documented place for the warehouse, so it takes
+	// precedence over a URI left in catalog.path.
+	c := Config{
+		Catalog: config.IcebergCatalog{Type: config.IcebergCatalogHadoop, Path: "s3://from-catalog/wh"},
+		Storage: config.IcebergStorage{Type: config.IcebergStorageS3, Path: "s3://from-storage/wh"},
+	}
+
+	_, q := parseQuery(t, mustURI(t, c))
+	assert.Equal(t, "s3://from-storage/wh", q.Get("warehouse"))
+}
+
 func TestConfig_GetIngestrURI_RESTUseSSL(t *testing.T) {
 	t.Parallel()
 

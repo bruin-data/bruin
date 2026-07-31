@@ -130,9 +130,17 @@ func icebergCatalogURI(cat config.IcebergCatalog) (string, url.Values, error) {
 		}
 		return "iceberg+hive://" + hostPort(cat.Host, cat.Port), q, nil
 	case config.IcebergCatalogHadoop:
-		// Local warehouse goes in the URL path; for object storage (s3://, gs://)
-		// leave Path empty so the warehouse comes from the storage block.
+		// A local warehouse goes in the URL path. A warehouse URI cannot: it would
+		// produce iceberg+hadoop:///s3://bucket/wh, which reads back as the local
+		// path "/s3:" and fails with "mkdir /s3:". Forward it as the warehouse
+		// instead, where the storage block's own warehouse still takes precedence.
 		if cat.Path != "" {
+			if strings.Contains(cat.Path, "://") {
+				q.Set("warehouse", cat.Path)
+
+				return "iceberg+hadoop://", q, nil
+			}
+
 			return "iceberg+hadoop://" + ensureLeadingSlash(cat.Path), q, nil
 		}
 		return "iceberg+hadoop://", q, nil
