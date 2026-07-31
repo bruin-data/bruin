@@ -115,7 +115,7 @@ func TestMaterializer_Render(t *testing.T) {
 			want:  "INSERT INTO my.asset SELECT 1",
 		},
 		{
-			name: "truncate+insert builds proper queries without transactions",
+			name: "truncate+insert wraps truncate and insert in a transaction",
 			task: &pipeline.Asset{
 				Name: "my.asset",
 				Materialization: pipeline.Materialization{
@@ -124,8 +124,11 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT 1 as id, 'test' as name",
-			want: `TRUNCATE TABLE my.asset;
-INSERT INTO my.asset SELECT 1 as id, 'test' as name`,
+			want: `BEGIN TRANSACTION;
+TRUNCATE TABLE my.asset;
+INSERT INTO my.asset SELECT 1 as id, 'test' as name;
+COMMIT TRANSACTION;`,
+			exactMatch: true,
 		},
 		{
 			name: "incremental strategies require the incremental_key to be set",

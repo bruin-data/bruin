@@ -301,6 +301,9 @@ select
 from users
 ```
 
+> [!NOTE]
+> On platforms where `TRUNCATE` participates in transactions (such as BigQuery), Bruin wraps the truncate and insert in a single transaction. A failed insert rolls back the truncate, and readers never observe the table in its intermediate empty state. On engines where `TRUNCATE` implicitly commits, the truncate and insert run as separate statements, so a failure between them can leave the table empty.
+
 ### `append`
 
 `append` strategy is useful when you want to add new rows to the table without overwriting the existing rows. This is useful when you have a table that is constantly being updated and you want to keep the history of the data.
