@@ -97,6 +97,11 @@ Once the Bruin Cloud MCP server is connected, you can ask in natural language, f
 - "List all connections."
 - "Create a new generic connection called my-secret with value X."
 - "Delete the connection named my-secret."
+- "What was my BigQuery warehouse spend last month?"
+- "Which pipelines cost the most this month? Break it down by pipeline."
+- "Break down warehouse cost by user for pipeline X."
+- "Show the daily cost trend for pipeline X over the last 2 weeks."
+- "What are the most expensive assets in pipeline X?"
 
 
 ## Troubleshooting
@@ -111,5 +116,6 @@ Once the Bruin Cloud MCP server is connected, you can ask in natural language, f
 
 - [Pipelines](/cloud/pipelines) for the operations the MCP can drive (runs, backfills, status).
 - [Connections](/cloud/connections) for the connections the MCP can list and create.
+- [Insights](/cloud/insights#cost-explorer) for the Cost Explorer data the MCP can query (warehouse spend by pipeline, asset, or user).
 - [Bruin MCP (local)](/getting-started/bruin-mcp) for the local-CLI MCP, separate from the cloud-hosted one.
 - [`bruin cloud`](/commands/cloud) — the CLI command that talks to Bruin Cloud using the same kind of API token.
