@@ -742,6 +742,43 @@ func (c *APIClient) UpdateScheduledAgent(ctx context.Context, scheduledAgentID i
 	return &result, nil
 }
 
+// --- Audit logs ---
+
+// ListAuditLogs returns a page of the team's audit trail, most recent first.
+// The endpoint is read-only and accepts only a personal (user-scoped) token.
+func (c *APIClient) ListAuditLogs(ctx context.Context, opts AuditLogListOptions) ([]AuditLog, error) {
+	params := url.Values{}
+	for _, t := range opts.Types {
+		params.Add("types[]", t)
+	}
+	for _, id := range opts.UserIDs {
+		params.Add("userIds[]", id)
+	}
+	if opts.StartDate != "" {
+		params.Set("startDate", opts.StartDate)
+	}
+	if opts.EndDate != "" {
+		params.Set("endDate", opts.EndDate)
+	}
+	if opts.Limit > 0 {
+		params.Set("limit", strconv.Itoa(opts.Limit))
+	}
+	if opts.Offset > 0 {
+		params.Set("offset", strconv.Itoa(opts.Offset))
+	}
+
+	path := "/audit-logs"
+	if encoded := params.Encode(); encoded != "" {
+		path += "?" + encoded
+	}
+
+	var resp struct {
+		AuditLogs []AuditLog `json:"auditLogs"`
+	}
+	err := c.doRequest(ctx, http.MethodGet, path, nil, &resp)
+	return resp.AuditLogs, err
+}
+
 // GetCostExplorerSchema lists the dimensions, filter fields, and time buckets the cost explorer supports.
 func (c *APIClient) GetCostExplorerSchema(ctx context.Context, platform string) (*CostExplorerSchema, error) {
 	params := url.Values{}

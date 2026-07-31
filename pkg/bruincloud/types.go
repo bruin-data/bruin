@@ -306,6 +306,29 @@ type ScheduledAgent struct {
 	RecentExecutions  json.RawMessage `json:"recent_executions,omitempty"`
 }
 
+// AuditLog is one entry in a team's audit trail as returned by GET /audit-logs.
+// Metadata is event-specific and left raw.
+type AuditLog struct {
+	Type           string          `json:"type"`
+	UserIdentifier string          `json:"user_identifier"`
+	IPAddress      *string         `json:"ip_address"`
+	CreatedAt      string          `json:"created_at"`
+	URL            *string         `json:"url"`
+	Source         *string         `json:"source"`
+	Metadata       json.RawMessage `json:"metadata"`
+}
+
+// AuditLogListOptions are the optional filters for ListAuditLogs. Zero values
+// are omitted from the request.
+type AuditLogListOptions struct {
+	Types     []string
+	UserIDs   []string
+	StartDate string
+	EndDate   string
+	Limit     int
+	Offset    int
+}
+
 // CostDimension is a group-by dimension the cost explorer supports.
 type CostDimension struct {
 	Key   string `json:"key"`

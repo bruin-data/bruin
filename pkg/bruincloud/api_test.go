@@ -1119,3 +1119,35 @@ func TestGetCostExplorer(t *testing.T) {
 	require.NotNil(t, resp.NextOffset)
 	assert.Equal(t, 2, *resp.NextOffset)
 }
+
+func TestListAuditLogs(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/audit-logs", r.URL.Path)
+		q := r.URL.Query()
+		assert.Equal(t, []string{"login", "new_conn"}, q["types[]"])
+		assert.Equal(t, []string{"7"}, q["userIds[]"])
+		assert.Equal(t, "2026-07-01", q.Get("startDate"))
+		assert.Equal(t, "50", q.Get("limit"))
+		assert.Equal(t, "10", q.Get("offset"))
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, map[string]any{
+			"auditLogs": []AuditLog{
+				{Type: "login", UserIdentifier: "alice@example.com"},
+			},
+			"total": 1,
+		})
+	})
+
+	logs, err := client.ListAuditLogs(t.Context(), AuditLogListOptions{
+		Types:     []string{"login", "new_conn"},
+		UserIDs:   []string{"7"},
+		StartDate: "2026-07-01",
+		Limit:     50,
+		Offset:    10,
+	})
+	require.NoError(t, err)
+	require.Len(t, logs, 1)
+	assert.Equal(t, "login", logs[0].Type)
+	assert.Equal(t, "alice@example.com", logs[0].UserIdentifier)
+}
