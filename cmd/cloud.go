@@ -2173,14 +2173,20 @@ func CloudAgents() *cli.Command {
 func cloudAgentsConnections() *cli.Command {
 	return &cli.Command{
 		Name:  "connections",
-		Usage: "List the connections available to an agent (names and types)",
+		Usage: "List the connections available to an agent, or add one with the 'add' subcommand",
+		// Backward compatible: the bare command still lists (its Action below); the
+		// 'add' subcommand writes a connection. --agent-id is therefore not Required
+		// on the parent (that would also demand it when invoking 'add'); the Action
+		// validates it instead.
+		Commands: []*cli.Command{
+			cloudAgentsConnectionsAdd(),
+		},
 		Flags: []cli.Flag{
 			apiKeyFlag(),
 			outputFlag(),
 			&cli.IntFlag{
-				Name:     "agent-id",
-				Usage:    "agent ID",
-				Required: true,
+				Name:  "agent-id",
+				Usage: "agent ID",
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
@@ -2229,6 +2235,108 @@ func cloudAgentsConnections() *cli.Command {
 				t.AppendRow(table.Row{conn.Name, conn.Type})
 			}
 			t.Render()
+			return nil
+		},
+	}
+}
+
+func cloudAgentsConnectionsAdd() *cli.Command {
+	return &cli.Command{
+		Name:  "add",
+		Usage: "Add a connection to an agent (from local .bruin.yml by default)",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:  "agent-id",
+				Usage: "agent ID",
+			},
+			&cli.StringFlag{
+				Name:  "name",
+				Usage: "the name of the connection",
+			},
+			&cli.StringFlag{
+				Name:  "environment",
+				Usage: "the .bruin.yml environment to read the connection from (default: selected environment)",
+			},
+			&cli.StringFlag{
+				Name:  "config-file",
+				Usage: "path to the .bruin.yml file",
+			},
+			&cli.StringFlag{
+				Name:  "type",
+				Usage: "connection type; required only with --credentials (otherwise read from .bruin.yml)",
+			},
+			&cli.StringFlag{
+				Name:  "credentials",
+				Usage: "JSON credentials; if omitted, the connection is read from .bruin.yml",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			// Fail fast on an invalid id rather than sending a bad request and
+			// surfacing a generic remote error.
+			if c.Int("agent-id") <= 0 {
+				printError(fmt.Errorf("--agent-id must be a positive integer, got %d", c.Int("agent-id")), output, "Invalid --agent-id")
+				return cli.Exit("", 1)
+			}
+
+			name := c.String("name")
+			if name == "" {
+				printError(errors.New("--name is required"), output, "Missing required flags")
+				return cli.Exit("", 1)
+			}
+
+			// Two ways to supply the connection: explicit --credentials JSON (with
+			// --type), or read it from the local .bruin.yml by name (the default).
+			connType := c.String("type")
+			creds := c.String("credentials")
+			var credentials map[string]any
+
+			if creds != "" {
+				if connType == "" {
+					printError(errors.New("--type is required when --credentials is provided"), output, "Missing required flags")
+					return cli.Exit("", 1)
+				}
+				if err := json.Unmarshal([]byte(creds), &credentials); err != nil {
+					printError(err, output, "Invalid --credentials JSON")
+					return cli.Exit("", 1)
+				}
+			} else {
+				t, cr, err := connectionFromConfig(ctx, name, c.String("environment"), c.String("config-file"))
+				if err != nil {
+					printError(err, output, "Failed to read connection")
+					return cli.Exit("", 1)
+				}
+				connType, credentials = t, cr
+			}
+
+			// The cloud runner can't read local files, so resolve a local
+			// service_account_file path into the service_account_json content here.
+			if path, ok := credentials["service_account_file"].(string); ok && path != "" {
+				data, err := os.ReadFile(path)
+				if err != nil {
+					printError(err, output, "Failed to read service_account_file")
+					return cli.Exit("", 1)
+				}
+				credentials["service_account_json"] = string(data)
+				delete(credentials, "service_account_file")
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			if _, err := client.AddAgentConnection(ctx, c.Int("agent-id"), connType, name, credentials); err != nil {
+				printError(err, output, "Failed to add agent connection")
+				return cli.Exit("", 1)
+			}
+
+			printSuccessForOutput(output, fmt.Sprintf("Added connection '%s' of type '%s' to agent %d", name, connType, c.Int("agent-id")))
 			return nil
 		},
 	}

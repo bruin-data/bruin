@@ -529,6 +529,32 @@ func TestListAgentConnections(t *testing.T) {
 	assert.Equal(t, "google_cloud_platform", connections[1].Type)
 }
 
+func TestAddAgentConnection(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/agents/7/connections", r.URL.Path)
+
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, "warehouse", body["name"])
+		assert.Equal(t, "postgres", body["type"])
+		cfg, _ := body["config"].(map[string]any)
+		assert.Equal(t, "secret", cfg["password"])
+
+		w.WriteHeader(http.StatusCreated)
+		writeJSON(t, w, map[string]any{
+			"connections": []AgentConnection{{Name: "warehouse", Type: "postgres"}},
+		})
+	})
+
+	connections, err := client.AddAgentConnection(t.Context(), 7, "postgres", "warehouse", map[string]any{"password": "secret"})
+	require.NoError(t, err)
+	require.Len(t, connections, 1)
+	assert.Equal(t, "warehouse", connections[0].Name)
+	assert.Equal(t, "postgres", connections[0].Type)
+}
+
 func TestCreateAgent(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
