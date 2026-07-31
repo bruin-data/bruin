@@ -353,6 +353,8 @@ func (db *DB) GetDatabases(ctx context.Context) ([]string, error) {
 func (db *DB) GetTablesWithSchemas(ctx context.Context, databaseName string) (map[string][]string, error) {
 	if databaseName == "" {
 		databaseName = db.config.Database
+	} else if databaseName != db.config.Database {
+		return nil, fmt.Errorf("database %q does not match configured database %q", databaseName, db.config.Database)
 	}
 	if databaseName == "" {
 		return nil, errors.New("database name not configured")

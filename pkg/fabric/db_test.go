@@ -532,3 +532,11 @@ func TestDB_GetTablesWithSchemas(t *testing.T) {
 	}, got)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
+
+func TestDB_GetTablesWithSchemas_MismatchedDatabase(t *testing.T) {
+	t.Parallel()
+
+	db := &DB{config: &Config{Database: "warehouse"}}
+	_, err := db.GetTablesWithSchemas(t.Context(), "other")
+	require.Error(t, err)
+}
