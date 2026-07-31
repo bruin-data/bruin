@@ -48,9 +48,11 @@ func TestConfig_GetIngestrURI_GlueS3(t *testing.T) {
 	assert.Equal(t, "iceberg+glue", scheme)
 	assert.Empty(t, q.Get("storage"), "storage flag is no longer emitted; the warehouse scheme carries the backend")
 	assert.Equal(t, "s3://company-lake/warehouse", q.Get("warehouse"))
-	assert.Equal(t, testAWSRegion, q.Get("region"))
-	assert.Equal(t, "AKID", q.Get("access_key_id"))
-	assert.Equal(t, "SECRET", q.Get("secret_access_key"))
+	assert.Equal(t, testAWSRegion, q.Get("glue.region"))
+	assert.Equal(t, "AKID", q.Get("glue.access-key-id"))
+	assert.Equal(t, "SECRET", q.Get("glue.secret-access-key"))
+	// real S3 and only the catalog configured, so the storage inherits it
+	assert.Equal(t, "AKID", q.Get("s3.access-key-id"))
 	assert.Equal(t, "123456789012", q.Get("glue.id"))
 	assert.Equal(t, "analytics", q.Get("catalog_name"))
 }
@@ -83,10 +85,11 @@ func TestConfig_GetIngestrURI_GlueOnS3CompatibleStorage(t *testing.T) {
 	assert.Equal(t, "AWSSECRET", q.Get("glue.secret-access-key"))
 	assert.Equal(t, "AWSTOKEN", q.Get("glue.session-token"))
 
-	// Storage still owns the shared keys ingestr aliases into s3.*.
-	assert.Equal(t, "auto", q.Get("region"))
-	assert.Equal(t, "GOOGKID", q.Get("access_key_id"))
-	assert.Equal(t, "GOOGSECRET", q.Get("secret_access_key"))
+	// The storage has an endpoint, so its credentials are pinned to s3.*.
+	assert.Equal(t, "auto", q.Get("s3.region"))
+	assert.Equal(t, "GOOGKID", q.Get("s3.access-key-id"))
+	assert.Equal(t, "GOOGSECRET", q.Get("s3.secret-access-key"))
+	assert.Empty(t, q.Get("access_key_id"), "GCS interop keys must never reach the shared params")
 }
 
 func TestConfig_GetIngestrURI_StorageKeepsOwnCredentials(t *testing.T) {
@@ -109,9 +112,10 @@ func TestConfig_GetIngestrURI_StorageKeepsOwnCredentials(t *testing.T) {
 	}
 
 	_, q := parseQuery(t, mustURI(t, c))
-	assert.Equal(t, "minioadmin", q.Get("access_key_id"))
-	assert.Equal(t, "minioadmin", q.Get("secret_access_key"))
-	assert.Empty(t, q.Get("session_token"), "catalog session token must not leak into S3-compatible storage")
+	assert.Equal(t, "minioadmin", q.Get("s3.access-key-id"))
+	assert.Equal(t, "minioadmin", q.Get("s3.secret-access-key"))
+	assert.Empty(t, q.Get("s3.session-token"), "catalog session token must not leak into S3-compatible storage")
+	assert.Empty(t, q.Get("session_token"), "nor through the shared params, which ingestr aliases into s3.*")
 	assert.Equal(t, "AWSTOKEN", q.Get("glue.session-token"))
 }
 
@@ -130,10 +134,10 @@ func TestConfig_GetIngestrURI_CredentialsSharedWhenStorageHasNone(t *testing.T) 
 	}
 
 	_, q := parseQuery(t, mustURI(t, c))
-	assert.Equal(t, "AKID", q.Get("access_key_id"))
-	assert.Equal(t, "SECRET", q.Get("secret_access_key"))
-	assert.Equal(t, "TOKEN", q.Get("session_token"))
-	assert.Equal(t, testAWSRegion, q.Get("region"))
+	assert.Equal(t, "AKID", q.Get("s3.access-key-id"))
+	assert.Equal(t, "SECRET", q.Get("s3.secret-access-key"))
+	assert.Equal(t, "TOKEN", q.Get("s3.session-token"))
+	assert.Equal(t, testAWSRegion, q.Get("s3.region"))
 }
 
 func TestConfig_GetIngestrURI_SQLiteS3MinIO(t *testing.T) {
@@ -164,7 +168,7 @@ func TestConfig_GetIngestrURI_SQLiteS3MinIO(t *testing.T) {
 	assert.Empty(t, q.Get("storage"), "storage flag is no longer emitted; the warehouse scheme carries the backend")
 	assert.Equal(t, "localhost:9000", q.Get("endpoint"))
 	assert.Equal(t, "false", q.Get("use_ssl"))
-	assert.Equal(t, "minioadmin", q.Get("access_key_id"))
+	assert.Equal(t, "minioadmin", q.Get("s3.access-key-id"))
 }
 
 func TestConfig_GetIngestrURI_BucketPrefixStorage(t *testing.T) {
@@ -212,7 +216,7 @@ func TestConfig_GetIngestrURI_PostgresS3(t *testing.T) {
 
 	_, q := parseQuery(t, got)
 	assert.Empty(t, q.Get("storage"), "storage flag is no longer emitted; the warehouse scheme carries the backend")
-	assert.Equal(t, "eu-west-1", q.Get("region"))
+	assert.Equal(t, "eu-west-1", q.Get("s3.region"))
 }
 
 func TestConfig_GetIngestrURI_RESTCatalog(t *testing.T) {
@@ -298,6 +302,83 @@ func TestConfig_GetIngestrURI_HadoopStorageWarehouseWins(t *testing.T) {
 
 	_, q := parseQuery(t, mustURI(t, c))
 	assert.Equal(t, "s3://from-storage/wh", q.Get("warehouse"))
+}
+
+func TestConfig_GetIngestrURI_S3CompatibleStorageKeepsCredentialsToItself(t *testing.T) {
+	t.Parallel()
+
+	// The catalog has no credentials of its own: it authenticates with whatever
+	// the AWS default chain provides (env, SSO, instance role). MinIO's key pair
+	// must not reach glue.* through ingestr's aliasing, or Glue is called with it.
+	useSSL := false
+	c := Config{
+		Catalog: config.IcebergCatalog{Type: config.IcebergCatalogGlue, Region: "eu-north-1"},
+		Storage: config.IcebergStorage{
+			Type:     config.IcebergStorageS3,
+			Path:     "s3://warehouse/wh",
+			Endpoint: "localhost:9000",
+			UseSSL:   &useSSL,
+			Region:   testAWSRegion,
+			Auth:     config.IcebergAuth{AccessKey: "minioadmin", SecretKey: "minioadmin"},
+		},
+	}
+
+	_, q := parseQuery(t, mustURI(t, c))
+	assert.Equal(t, "minioadmin", q.Get("s3.access-key-id"))
+	assert.Equal(t, "minioadmin", q.Get("s3.secret-access-key"))
+	assert.Equal(t, testAWSRegion, q.Get("s3.region"))
+	assert.Empty(t, q.Get("access_key_id"), "storage keys must not sit in the shared params, which ingestr aliases into glue.*")
+	assert.Empty(t, q.Get("secret_access_key"))
+	assert.Equal(t, "eu-north-1", q.Get("glue.region"))
+	assert.Empty(t, q.Get("glue.access-key-id"), "the catalog brought no credentials, so it must fall through to the default chain")
+}
+
+func TestConfig_GetIngestrURI_AWSEndpointStillSharesCredentials(t *testing.T) {
+	t.Parallel()
+
+	// Regional, VPC and FIPS endpoints are still AWS, so the credentials stay in
+	// the shared keys and a Glue catalog without its own auth keeps inheriting them.
+	for _, endpoint := range []string{
+		"s3.eu-north-1.amazonaws.com",
+		"https://s3.eu-north-1.amazonaws.com",
+		"bucket.vpce-0123-abcd.s3.eu-north-1.vpce.amazonaws.com",
+		"s3-fips.us-east-1.amazonaws.com:443",
+	} {
+		c := Config{
+			Catalog: config.IcebergCatalog{Type: config.IcebergCatalogGlue, Region: testAWSRegion},
+			Storage: config.IcebergStorage{
+				Type:     config.IcebergStorageS3,
+				Path:     testS3LakeWh,
+				Endpoint: endpoint,
+				Auth:     config.IcebergAuth{AccessKey: "AKID", SecretKey: "SECRET"},
+			},
+		}
+
+		_, q := parseQuery(t, mustURI(t, c))
+		assert.Equalf(t, "AKID", q.Get("glue.access-key-id"), "endpoint %q is AWS, so Glue must still inherit the credentials", endpoint)
+		assert.Equalf(t, "AKID", q.Get("s3.access-key-id"), "the storage keeps its own credentials for endpoint %q", endpoint)
+	}
+}
+
+func TestConfig_GetIngestrURI_RealS3StillSharesCredentials(t *testing.T) {
+	t.Parallel()
+
+	// No endpoint means real AWS S3, where catalog and storage are normally the
+	// same account, so credentials given on one side serve both.
+	c := Config{
+		Catalog: config.IcebergCatalog{Type: config.IcebergCatalogGlue, Region: testAWSRegion},
+		Storage: config.IcebergStorage{
+			Type: config.IcebergStorageS3,
+			Path: testS3LakeWh,
+			Auth: config.IcebergAuth{AccessKey: "AKID", SecretKey: "SECRET"},
+		},
+	}
+
+	_, q := parseQuery(t, mustURI(t, c))
+	assert.Equal(t, "AKID", q.Get("s3.access-key-id"))
+	assert.Equal(t, "SECRET", q.Get("s3.secret-access-key"))
+	assert.Equal(t, "AKID", q.Get("glue.access-key-id"), "only the storage is configured, so Glue inherits it")
+	assert.Equal(t, testAWSRegion, q.Get("glue.region"))
 }
 
 func TestConfig_GetIngestrURI_RESTUseSSL(t *testing.T) {
@@ -432,7 +513,7 @@ func TestConfig_GetIngestrURI_NoStorage(t *testing.T) {
 	assert.True(t, strings.HasPrefix(got, "iceberg+glue://?"), "got: %s", got)
 	_, q := parseQuery(t, got)
 	assert.Empty(t, q.Get("storage"))
-	assert.Equal(t, testAWSRegion, q.Get("region"))
+	assert.Equal(t, testAWSRegion, q.Get("glue.region"))
 }
 
 func TestConfig_GetIngestrURI_SQLCatalogViaProperties(t *testing.T) {
@@ -513,7 +594,7 @@ func TestConfig_GetIngestrURI_InferStorageFromScheme(t *testing.T) {
 	}
 	_, q = parseQuery(t, mustURI(t, s3))
 	assert.Equal(t, testS3LakeWh, q.Get("warehouse"))
-	assert.Equal(t, "AKID", q.Get("access_key_id"))
+	assert.Equal(t, "AKID", q.Get("s3.access-key-id"))
 
 	// file:// warehouse, no type → inferred local.
 	local := Config{
