@@ -83,10 +83,11 @@ func TestConfig_GetIngestrURI_GlueOnS3CompatibleStorage(t *testing.T) {
 	assert.Equal(t, "AWSSECRET", q.Get("glue.secret-access-key"))
 	assert.Equal(t, "AWSTOKEN", q.Get("glue.session-token"))
 
-	// Storage still owns the shared keys ingestr aliases into s3.*.
-	assert.Equal(t, "auto", q.Get("region"))
-	assert.Equal(t, "GOOGKID", q.Get("access_key_id"))
-	assert.Equal(t, "GOOGSECRET", q.Get("secret_access_key"))
+	// The storage has an endpoint, so its credentials are pinned to s3.*.
+	assert.Equal(t, "auto", q.Get("s3.region"))
+	assert.Equal(t, "GOOGKID", q.Get("s3.access-key-id"))
+	assert.Equal(t, "GOOGSECRET", q.Get("s3.secret-access-key"))
+	assert.Empty(t, q.Get("access_key_id"), "GCS interop keys must never reach the shared params")
 }
 
 func TestConfig_GetIngestrURI_StorageKeepsOwnCredentials(t *testing.T) {
@@ -109,9 +110,10 @@ func TestConfig_GetIngestrURI_StorageKeepsOwnCredentials(t *testing.T) {
 	}
 
 	_, q := parseQuery(t, mustURI(t, c))
-	assert.Equal(t, "minioadmin", q.Get("access_key_id"))
-	assert.Equal(t, "minioadmin", q.Get("secret_access_key"))
-	assert.Empty(t, q.Get("session_token"), "catalog session token must not leak into S3-compatible storage")
+	assert.Equal(t, "minioadmin", q.Get("s3.access-key-id"))
+	assert.Equal(t, "minioadmin", q.Get("s3.secret-access-key"))
+	assert.Empty(t, q.Get("s3.session-token"), "catalog session token must not leak into S3-compatible storage")
+	assert.Empty(t, q.Get("session_token"), "nor through the shared params, which ingestr aliases into s3.*")
 	assert.Equal(t, "AWSTOKEN", q.Get("glue.session-token"))
 }
 
@@ -164,7 +166,7 @@ func TestConfig_GetIngestrURI_SQLiteS3MinIO(t *testing.T) {
 	assert.Empty(t, q.Get("storage"), "storage flag is no longer emitted; the warehouse scheme carries the backend")
 	assert.Equal(t, "localhost:9000", q.Get("endpoint"))
 	assert.Equal(t, "false", q.Get("use_ssl"))
-	assert.Equal(t, "minioadmin", q.Get("access_key_id"))
+	assert.Equal(t, "minioadmin", q.Get("s3.access-key-id"))
 }
 
 func TestConfig_GetIngestrURI_BucketPrefixStorage(t *testing.T) {
@@ -298,6 +300,55 @@ func TestConfig_GetIngestrURI_HadoopStorageWarehouseWins(t *testing.T) {
 
 	_, q := parseQuery(t, mustURI(t, c))
 	assert.Equal(t, "s3://from-storage/wh", q.Get("warehouse"))
+}
+
+func TestConfig_GetIngestrURI_S3CompatibleStorageKeepsCredentialsToItself(t *testing.T) {
+	t.Parallel()
+
+	// The catalog has no credentials of its own: it authenticates with whatever
+	// the AWS default chain provides (env, SSO, instance role). MinIO's key pair
+	// must not reach glue.* through ingestr's aliasing, or Glue is called with it.
+	useSSL := false
+	c := Config{
+		Catalog: config.IcebergCatalog{Type: config.IcebergCatalogGlue, Region: "eu-north-1"},
+		Storage: config.IcebergStorage{
+			Type:     config.IcebergStorageS3,
+			Path:     "s3://warehouse/wh",
+			Endpoint: "localhost:9000",
+			UseSSL:   &useSSL,
+			Region:   testAWSRegion,
+			Auth:     config.IcebergAuth{AccessKey: "minioadmin", SecretKey: "minioadmin"},
+		},
+	}
+
+	_, q := parseQuery(t, mustURI(t, c))
+	assert.Equal(t, "minioadmin", q.Get("s3.access-key-id"))
+	assert.Equal(t, "minioadmin", q.Get("s3.secret-access-key"))
+	assert.Equal(t, testAWSRegion, q.Get("s3.region"))
+	assert.Empty(t, q.Get("access_key_id"), "storage keys must not sit in the shared params, which ingestr aliases into glue.*")
+	assert.Empty(t, q.Get("secret_access_key"))
+	assert.Equal(t, "eu-north-1", q.Get("glue.region"))
+	assert.Empty(t, q.Get("glue.access-key-id"), "the catalog brought no credentials, so it must fall through to the default chain")
+}
+
+func TestConfig_GetIngestrURI_RealS3StillSharesCredentials(t *testing.T) {
+	t.Parallel()
+
+	// No endpoint means real AWS S3, where catalog and storage are normally the
+	// same account, so the shared keys stay put and Glue keeps inheriting them.
+	c := Config{
+		Catalog: config.IcebergCatalog{Type: config.IcebergCatalogGlue, Region: testAWSRegion},
+		Storage: config.IcebergStorage{
+			Type: config.IcebergStorageS3,
+			Path: testS3LakeWh,
+			Auth: config.IcebergAuth{AccessKey: "AKID", SecretKey: "SECRET"},
+		},
+	}
+
+	_, q := parseQuery(t, mustURI(t, c))
+	assert.Equal(t, "AKID", q.Get("access_key_id"))
+	assert.Equal(t, "SECRET", q.Get("secret_access_key"))
+	assert.Empty(t, q.Get("s3.access-key-id"), "real S3 keeps using the shared keys")
 }
 
 func TestConfig_GetIngestrURI_RESTUseSSL(t *testing.T) {

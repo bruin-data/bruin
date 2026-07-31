@@ -215,7 +215,17 @@ func icebergStorageParams(st config.IcebergStorage) (url.Values, error) {
 	if st.UseSSL != nil {
 		q.Set("use_ssl", strconv.FormatBool(*st.UseSSL))
 	}
-	setAWSCredentials(q, st.Region, st.Auth.AccessKey, st.Auth.SecretKey, st.Auth.SessionToken)
+	// A custom endpoint means the storage is S3-compatible but not AWS (MinIO, R2,
+	// GCS interop), so its credentials are pinned to s3.*: left in the shared keys,
+	// ingestr would alias them into glue.* whenever the catalog has none of its own
+	// -- a Glue catalog relying on the ambient AWS credentials would then try to
+	// authenticate with, say, minioadmin. Real S3 keeps using the shared keys so a
+	// Glue catalog in the same account still inherits them.
+	if st.Endpoint != "" {
+		setS3Credentials(q, st.Region, st.Auth.AccessKey, st.Auth.SecretKey, st.Auth.SessionToken)
+	} else {
+		setAWSCredentials(q, st.Region, st.Auth.AccessKey, st.Auth.SecretKey, st.Auth.SessionToken)
+	}
 	if st.KeyFile != "" {
 		q.Set("gcs.keypath", st.KeyFile)
 	}
@@ -250,14 +260,35 @@ func isSharedCredentialParam(key string) bool {
 	return slices.Contains(sharedCredentialParams, key)
 }
 
+// storageCredentialParams are the s3.*-namespaced equivalents, set when the
+// storage is S3-compatible but not AWS.
+var storageCredentialParams = []string{"s3.access-key-id", "s3.secret-access-key", "s3.session-token"}
+
 func hasAnySharedCredential(q url.Values) bool {
-	for _, key := range sharedCredentialParams {
+	for _, key := range append(append([]string{}, sharedCredentialParams...), storageCredentialParams...) {
 		if q.Get(key) != "" {
 			return true
 		}
 	}
 
 	return false
+}
+
+// setS3Credentials sets the s3.*-namespaced region and credential parameters, so
+// they configure the storage client and nothing else.
+func setS3Credentials(q url.Values, region, accessKey, secretKey, sessionToken string) {
+	if region != "" {
+		q.Set("s3.region", region)
+	}
+	if accessKey != "" {
+		q.Set("s3.access-key-id", accessKey)
+	}
+	if secretKey != "" {
+		q.Set("s3.secret-access-key", secretKey)
+	}
+	if sessionToken != "" {
+		q.Set("s3.session-token", sessionToken)
+	}
 }
 
 // setGlueCredentials sets the glue.*-namespaced region and credential parameters
