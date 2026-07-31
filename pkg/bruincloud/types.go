@@ -68,7 +68,7 @@ type Backfill struct {
 type BackfillRun struct {
 	Project       string  `json:"project"`
 	Pipeline      string  `json:"pipeline"`
-	RunID         string  `json:"runId"`
+	RunID         string  `json:"run_id"`
 	IntervalStart string  `json:"interval_start"`
 	IntervalEnd   string  `json:"interval_end"`
 	CreatedAt     string  `json:"created_at"`
@@ -197,14 +197,14 @@ type AssetInstanceResponse struct {
 type AssetInstanceInfo struct {
 	Asset                  string             `json:"asset"`
 	Type                   string             `json:"type"`
-	StartDate              string             `json:"startDate"`
-	EndDate                string             `json:"endDate"`
-	WallTimeDuration       float64            `json:"wallTimeDuration"`
-	TotalExecutionDuration float64            `json:"totalExecutionDuration"`
+	StartDate              string             `json:"start_date"`
+	EndDate                string             `json:"end_date"`
+	WallTimeDuration       float64            `json:"wall_time_duration"`
+	TotalExecutionDuration float64            `json:"total_execution_duration"`
 	Status                 string             `json:"status"`
-	IsFinished             bool               `json:"isFinished"`
+	IsFinished             bool               `json:"is_finished"`
 	Steps                  AssetInstanceSteps `json:"steps"`
-	StepIDs                []string           `json:"stepIds"`
+	StepIDs                []string           `json:"step_ids"`
 }
 
 // AssetInstanceSteps represents the steps of an asset instance.
