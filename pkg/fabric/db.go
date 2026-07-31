@@ -338,6 +338,57 @@ func fromFabricValue(value any) (string, bool) {
 	}
 }
 
+// GetDatabases returns the databases available to the connection. A Fabric
+// connection is scoped to a single warehouse (there is no cross-warehouse USE),
+// so the only database we can enumerate is the configured one.
+func (db *DB) GetDatabases(ctx context.Context) ([]string, error) {
+	if db.config.Database == "" {
+		return nil, errors.New("database name not configured")
+	}
+	return []string{db.config.Database}, nil
+}
+
+// GetTablesWithSchemas returns the tables of the warehouse grouped by schema,
+// which lets the extension render a schema level in the connections tree.
+func (db *DB) GetTablesWithSchemas(ctx context.Context, databaseName string) (map[string][]string, error) {
+	if databaseName == "" {
+		databaseName = db.config.Database
+	}
+	if databaseName == "" {
+		return nil, errors.New("database name not configured")
+	}
+
+	const schemaQuery = `
+SELECT TABLE_SCHEMA, TABLE_NAME
+FROM information_schema.tables
+WHERE TABLE_SCHEMA NOT IN ('sys', 'INFORMATION_SCHEMA')
+ORDER BY TABLE_SCHEMA, TABLE_NAME
+`
+
+	rows, err := db.Select(ctx, &query.Query{Query: schemaQuery})
+	if err != nil {
+		return nil, fmt.Errorf("failed to query information_schema.tables: %w", err)
+	}
+
+	schemas := make(map[string][]string)
+	for _, row := range rows {
+		if len(row) < 2 {
+			continue
+		}
+		schemaName, ok := fromFabricValue(row[0])
+		if !ok {
+			continue
+		}
+		tableName, ok := fromFabricValue(row[1])
+		if !ok {
+			continue
+		}
+		schemas[schemaName] = append(schemas[schemaName], tableName)
+	}
+
+	return schemas, nil
+}
+
 func (db *DB) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
 	currentDB := db.config.Database
 	if currentDB == "" {

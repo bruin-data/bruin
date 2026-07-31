@@ -485,3 +485,50 @@ func TestDB_FetchDateTimeStats(t *testing.T) {
 	assert.Equal(t, time.Date(2024, 1, 2, 11, 30, 0, 123456700, time.UTC), *got.LatestDate)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
+
+const expectedTablesWithSchemasQuery = `
+SELECT TABLE_SCHEMA, TABLE_NAME
+FROM information_schema.tables
+WHERE TABLE_SCHEMA NOT IN ('sys', 'INFORMATION_SCHEMA')
+ORDER BY TABLE_SCHEMA, TABLE_NAME
+`
+
+func TestDB_GetDatabases(t *testing.T) {
+	t.Parallel()
+
+	db := &DB{config: &Config{Database: "warehouse"}}
+	got, err := db.GetDatabases(t.Context())
+	require.NoError(t, err)
+	assert.Equal(t, []string{"warehouse"}, got)
+
+	dbNoName := &DB{config: &Config{}}
+	_, err = dbNoName.GetDatabases(t.Context())
+	require.Error(t, err)
+}
+
+func TestDB_GetTablesWithSchemas(t *testing.T) {
+	t.Parallel()
+
+	mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+	require.NoError(t, err)
+	defer mockDB.Close()
+
+	mock.ExpectQuery(expectedTablesWithSchemasQuery).
+		WillReturnRows(sqlmock.NewRows([]string{"TABLE_SCHEMA", "TABLE_NAME"}).
+			AddRow("dbo", "customers").
+			AddRow("dbo", "orders").
+			AddRow("sales", "regions"))
+
+	db := &DB{
+		conn:   sqlx.NewDb(mockDB, "sqlmock"),
+		config: &Config{Database: "warehouse"},
+	}
+
+	got, err := db.GetTablesWithSchemas(t.Context(), "warehouse")
+	require.NoError(t, err)
+	assert.Equal(t, map[string][]string{
+		"dbo":   {"customers", "orders"},
+		"sales": {"regions"},
+	}, got)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
