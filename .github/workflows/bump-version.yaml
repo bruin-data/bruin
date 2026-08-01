@@ -8,7 +8,7 @@ jobs:
     name: Bump Version
     runs-on: depot-ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@a37ce9120846195fa4ece8f58b268e6043cb2f26 # v3
         with:
           fetch-depth: '0'
       - name: Set branch name
@@ -16,7 +16,7 @@ jobs:
         run: echo "::set-output name=branch_name::$(echo ${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}})"
       - name: Bump version and push tag
         id: bump_version
-        uses: anothrNick/github-tag-action@1.36.0
+        uses: anothrNick/github-tag-action@ce4b5ffa38e072fa7a901e417253c438fcc2ccce # 1.36.0
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
           WITH_V: true
