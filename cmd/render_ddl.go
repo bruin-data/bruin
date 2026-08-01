@@ -240,6 +240,7 @@ func RenderDDL() *cli.Command {
 					pipeline.AssetTypeSailQuery:               sail.NewMaterializer(false),
 					pipeline.AssetTypeSailQuerySensor:         sail.NewMaterializer(false),
 					pipeline.AssetTypeSparkQuery:              spark.NewRenderer(false),
+					pipeline.AssetTypeFabricSparkQuery:        spark.NewRenderer(false),
 					pipeline.AssetTypeSparkQuerySensor:        spark.NewRenderer(false),
 					pipeline.AssetTypeOracleQuery:             oracle.NewMaterializer(false),
 					pipeline.AssetTypeMsSQLQuery:              mssql.NewMaterializer(false),

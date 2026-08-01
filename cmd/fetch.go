@@ -969,9 +969,9 @@ func getConnectionFromPipelineInfoWithContext(ctx context.Context, pipelineInfo 
 		return "", nil, errors.Wrap(err, "failed to get connection")
 	}
 
-	conn := manager.GetConnection(connName)
-	if conn == nil {
-		return "", nil, config.NewConnectionNotFoundError(ctx, "", connName)
+	conn, err := resolveConnectionForAsset(ctx, manager, pipelineInfo.Asset.Type, connName)
+	if err != nil {
+		return "", nil, err
 	}
 
 	return connName, conn, nil

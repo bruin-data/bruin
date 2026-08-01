@@ -300,6 +300,7 @@ func Render() *cli.Command {
 					pipeline.AssetTypeSailQuery:               sail.NewMaterializer(fullRefresh),
 					pipeline.AssetTypeSailQuerySensor:         sail.NewMaterializer(fullRefresh),
 					pipeline.AssetTypeSparkQuery:              spark.NewRenderer(fullRefresh),
+					pipeline.AssetTypeFabricSparkQuery:        spark.NewRenderer(fullRefresh),
 					pipeline.AssetTypeSparkQuerySensor:        spark.NewRenderer(fullRefresh),
 					pipeline.AssetTypeOracleQuery:             oracle.NewMaterializer(fullRefresh),
 					pipeline.AssetTypeMsSQLQuery:              mssql.NewMaterializer(fullRefresh),

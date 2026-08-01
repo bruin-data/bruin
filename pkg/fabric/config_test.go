@@ -59,6 +59,24 @@ func TestConfig_ToDBConnectionURI(t *testing.T) {
 		assert.Contains(t, uri, "fedauth=ActiveDirectoryServicePrincipal")
 		assert.Equal(t, azuread.DriverName, c.DriverName())
 	})
+
+	// fabricSparkConfig mirrors this precedence so that one Fabric connection
+	// authenticates as the same identity on the Warehouse and Spark engines.
+	t.Run("azure default credential wins over service principal", func(t *testing.T) {
+		t.Parallel()
+		c := Config{
+			Host:                      "fabric.example",
+			Database:                  "warehouse",
+			UseAzureDefaultCredential: true,
+			ClientID:                  "client-id",
+			ClientSecret:              "secret",
+			TenantID:                  "tenant-id",
+		}
+
+		uri := c.ToDBConnectionURI()
+		assert.Contains(t, uri, "fedauth=ActiveDirectoryDefault")
+		assert.NotContains(t, uri, "fedauth=ActiveDirectoryServicePrincipal")
+	})
 }
 
 func TestConfig_GetIngestrURI(t *testing.T) {
@@ -100,6 +118,24 @@ func TestConfig_GetIngestrURI(t *testing.T) {
 			Host:                      "fabric.example",
 			Database:                  "warehouse",
 			UseAzureDefaultCredential: true,
+		}
+
+		uri, err := c.GetIngestrURI()
+		require.NoError(t, err)
+		assert.Equal(t, "fabric://fabric.example:1433/warehouse?fedauth=ActiveDirectoryDefault", uri)
+	})
+
+	// Matches ToDBConnectionURI and fabricSparkConfig, so a connection that sets
+	// both authenticates as one identity on every execution path.
+	t.Run("azure default credential wins over service principal", func(t *testing.T) {
+		t.Parallel()
+		c := Config{
+			Host:                      "fabric.example",
+			Database:                  "warehouse",
+			UseAzureDefaultCredential: true,
+			ClientID:                  "client-id",
+			ClientSecret:              "secret",
+			TenantID:                  "tenant-id",
 		}
 
 		uri, err := c.GetIngestrURI()

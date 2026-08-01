@@ -84,9 +84,11 @@ func (c *Config) ToDBConnectionURI() string {
 }
 
 // GetIngestrURI builds the URI ingestr expects for a Microsoft Fabric Warehouse
-// source/destination. Fabric only supports Microsoft Entra ID authentication, so a
-// service-principal URI is produced when client credentials are set, falling back to
-// ActiveDirectoryDefault when use_azure_default_credential is enabled. SQL
+// source/destination. Fabric only supports Microsoft Entra ID authentication, so
+// use_azure_default_credential produces an ActiveDirectoryDefault URI and the client
+// credentials produce a service-principal one. Default credential takes precedence when
+// both are set, matching ToDBConnectionURI and fabricSparkConfig, so that one Fabric
+// connection authenticates as the same identity on every execution path. SQL
 // username/password auth is rejected because Fabric Warehouse has no such login.
 //
 //	fabric://<client_id>:<client_secret>@<host>:<port>/<database>?tenant_id=<tenant_id>
@@ -102,7 +104,10 @@ func (c *Config) GetIngestrURI() (string, error) {
 	}
 
 	query := url.Values{}
-	if c.ClientID != "" {
+	switch {
+	case c.UseAzureDefaultCredential:
+		query.Set("fedauth", "ActiveDirectoryDefault")
+	case c.ClientID != "":
 		if c.ClientSecret != "" {
 			u.User = url.UserPassword(c.ClientID, c.ClientSecret)
 		} else {
@@ -111,8 +116,6 @@ func (c *Config) GetIngestrURI() (string, error) {
 		if c.TenantID != "" {
 			query.Set("tenant_id", c.TenantID)
 		}
-	} else {
-		query.Set("fedauth", "ActiveDirectoryDefault")
 	}
 
 	u.RawQuery = query.Encode()

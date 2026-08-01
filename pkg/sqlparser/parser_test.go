@@ -1428,6 +1428,7 @@ func TestAssetTypeToDialect(t *testing.T) {
 		pipeline.AssetTypeDremioQuery:       "trino",
 		pipeline.AssetTypeDuckDBQuery:       "duckdb",
 		pipeline.AssetTypeFabricQuery:       "fabric",
+		pipeline.AssetTypeFabricSparkQuery:  "spark",
 		pipeline.AssetTypeFabricQueryLegacy: "fabric",
 		pipeline.AssetTypeMotherduckQuery:   "duckdb",
 		pipeline.AssetTypeMsSQLQuery:        "tsql",

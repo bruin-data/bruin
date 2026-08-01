@@ -31,6 +31,12 @@ type devEnv interface {
 	RegisterAssetForSchemaCache(ctx context.Context, p *pipeline.Pipeline, a *pipeline.Asset, q *query.Query) error
 }
 
+// ClientResolver allows execution backends such as Microsoft Fabric to derive
+// a Spark client from another Bruin connection type.
+type ClientResolver interface {
+	ResolveSparkClient(ctx context.Context, name string) (*Client, error)
+}
+
 type BasicOperator struct {
 	connection   config.ConnectionGetter
 	extractor    query.QueryExtractor
@@ -77,13 +83,9 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, asset 
 	if err != nil {
 		return err
 	}
-	rawConnection := o.connection.GetConnection(connectionName)
-	if rawConnection == nil {
-		return config.NewConnectionNotFoundError(ctx, "", connectionName)
-	}
-	connection, ok := rawConnection.(*Client)
-	if !ok {
-		return errors.Errorf("connection '%s' is not a Spark connection", connectionName)
+	connection, err := resolveClient(ctx, o.connection, connectionName)
+	if err != nil {
+		return err
 	}
 	materialized, err := o.renderQueries(asset, queries)
 	if err != nil {
@@ -145,6 +147,21 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, asset 
 		return errors.Wrap(err, "cannot register asset for schema cache")
 	}
 	return nil
+}
+
+func resolveClient(ctx context.Context, connections config.ConnectionGetter, name string) (*Client, error) {
+	if resolver, ok := connections.(ClientResolver); ok {
+		return resolver.ResolveSparkClient(ctx, name)
+	}
+	rawConnection := connections.GetConnection(name)
+	if rawConnection == nil {
+		return nil, config.NewConnectionNotFoundError(ctx, "", name)
+	}
+	connection, ok := rawConnection.(*Client)
+	if !ok {
+		return nil, errors.Errorf("connection '%s' is not a Spark connection", name)
+	}
+	return connection, nil
 }
 
 func (o BasicOperator) renderQueries(asset *pipeline.Asset, queries []*query.Query) (string, error) {

@@ -37,6 +37,20 @@ func (g sparkConnectionGetter) GetConnection(string) any {
 	return g.connection
 }
 
+type resolvingSparkConnectionGetter struct {
+	client       *Client
+	resolvedName string
+}
+
+func (g *resolvingSparkConnectionGetter) GetConnection(string) any {
+	return nil
+}
+
+func (g *resolvingSparkConnectionGetter) ResolveSparkClient(_ context.Context, name string) (*Client, error) {
+	g.resolvedName = name
+	return g.client, nil
+}
+
 type sparkOperatorExtractor struct {
 	extractCount int
 }
@@ -257,6 +271,31 @@ func TestBasicOperatorQueryAnnotations(t *testing.T) {
 	}
 	require.Contains(t, connection.queries[0], "SET spark.sql.shuffle.partitions = 8")
 	require.Contains(t, connection.queries[1], "SELECT 1")
+}
+
+func TestBasicOperatorUsesSparkClientResolver(t *testing.T) {
+	t.Parallel()
+
+	connection := &recordingConnection{}
+	resolver := &resolvingSparkConnectionGetter{client: &Client{connection: connection}}
+	operator := BasicOperator{
+		connection:   resolver,
+		extractor:    &sparkOperatorExtractor{},
+		materializer: sparkOperatorMaterializer{},
+		devEnv:       nil,
+	}
+	asset := &pipeline.Asset{
+		Name:       "analytics.asset",
+		Type:       pipeline.AssetTypeFabricSparkQuery,
+		Connection: "shared-fabric",
+		ExecutableFile: pipeline.ExecutableFile{
+			Content: "SELECT 1",
+		},
+	}
+
+	require.NoError(t, operator.RunTask(t.Context(), &pipeline.Pipeline{Name: "pipeline"}, asset))
+	require.Equal(t, "shared-fabric", resolver.resolvedName)
+	require.NotEmpty(t, connection.queries)
 }
 
 func TestBasicOperatorQueryAnnotationsDisabled(t *testing.T) {

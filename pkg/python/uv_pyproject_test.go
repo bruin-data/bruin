@@ -29,6 +29,11 @@ func TestDetectDialectFromAssetType(t *testing.T) {
 			want:      "tsql",
 		},
 		{
+			name:      "fabric Spark assets use Spark SQL",
+			assetType: string(pipeline.AssetTypeFabricSparkQuery),
+			want:      "sparksql",
+		},
+		{
 			name:      "mssql uses tsql",
 			assetType: string(pipeline.AssetTypeMsSQLQuery),
 			want:      "tsql",

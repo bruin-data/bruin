@@ -392,6 +392,7 @@ var assetTypePlatform = map[pipeline.AssetType]Platform{
 	pipeline.AssetTypeDatabricksTableSensor: PlatformDatabricks,
 
 	pipeline.AssetTypeSparkQuery:       PlatformSpark,
+	pipeline.AssetTypeFabricSparkQuery: PlatformSpark,
 	pipeline.AssetTypeSparkSeed:        PlatformSpark,
 	pipeline.AssetTypeSparkQuerySensor: PlatformSpark,
 	pipeline.AssetTypeSparkSource:      PlatformSpark,
