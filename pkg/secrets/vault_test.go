@@ -97,7 +97,7 @@ func TestValidateVaultAddress(t *testing.T) {
 	}
 }
 
-func TestVaultClientConfigFromEnv(t *testing.T) {
+func TestVaultClientConfigFromEnv(t *testing.T) { //nolint:paralleltest // mutates process environment via t.Setenv
 	environmentVariables := []string{
 		"BRUIN_VAULT_TIMEOUT",
 		"BRUIN_VAULT_RETRY_WAIT_MIN",
@@ -108,13 +108,13 @@ func TestVaultClientConfigFromEnv(t *testing.T) {
 		t.Setenv(name, "")
 	}
 
-	t.Run("uses defaults", func(t *testing.T) {
+	t.Run("uses defaults", func(t *testing.T) { //nolint:paralleltest
 		clientConfig, err := vaultClientConfigFromEnv()
 		require.NoError(t, err)
 		require.Equal(t, defaultVaultClientConfig(), clientConfig)
 	})
 
-	t.Run("reads overrides", func(t *testing.T) {
+	t.Run("reads overrides", func(t *testing.T) { //nolint:paralleltest
 		t.Setenv("BRUIN_VAULT_TIMEOUT", "12s")
 		t.Setenv("BRUIN_VAULT_RETRY_WAIT_MIN", "50ms")
 		t.Setenv("BRUIN_VAULT_RETRY_WAIT_MAX", "3s")
@@ -139,14 +139,14 @@ func TestVaultClientConfigFromEnv(t *testing.T) {
 		{name: "BRUIN_VAULT_RETRY_WAIT_MAX", value: "-1s"},
 		{name: "BRUIN_VAULT_MAX_RETRIES", value: "-1"},
 	} {
-		t.Run("rejects invalid "+tt.name, func(t *testing.T) {
+		t.Run("rejects invalid "+tt.name, func(t *testing.T) { //nolint:paralleltest
 			t.Setenv(tt.name, tt.value)
 			_, err := vaultClientConfigFromEnv()
 			require.ErrorContains(t, err, tt.name)
 		})
 	}
 
-	t.Run("rejects a maximum wait below the minimum", func(t *testing.T) {
+	t.Run("rejects a maximum wait below the minimum", func(t *testing.T) { //nolint:paralleltest
 		t.Setenv("BRUIN_VAULT_RETRY_WAIT_MIN", "2s")
 		t.Setenv("BRUIN_VAULT_RETRY_WAIT_MAX", "1s")
 		_, err := vaultClientConfigFromEnv()

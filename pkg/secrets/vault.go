@@ -2,9 +2,10 @@ package secrets
 
 import (
 	"context"
+	crand "crypto/rand"
 	"encoding/json"
 	"fmt"
-	"math/rand/v2"
+	"math/big"
 	"net/http"
 	"net/url"
 	"os"
@@ -193,7 +194,7 @@ type Client struct {
 	mountPath               string
 	path                    string
 	logger                  logger.Logger
-	ctx                     context.Context
+	contextProvider         func() context.Context
 	requestTimeout          time.Duration
 	cacheMu                 sync.RWMutex
 	managerRequests         singleflight.Group
@@ -229,7 +230,11 @@ func vaultRetryBackoff(minimum, maximum time.Duration, attempt int, response *ht
 	// Equal jitter prevents clients from retrying in lockstep while retaining a
 	// useful minimum delay. The request context still caps the total wait.
 	half := delay / 2
-	return half + time.Duration(rand.Int64N(int64(delay-half)+1))
+	jitter, err := crand.Int(crand.Reader, big.NewInt(int64(delay-half)+1))
+	if err != nil {
+		return delay
+	}
+	return half + time.Duration(jitter.Int64())
 }
 
 func responseHasRetryAfter(response *http.Response) bool {
@@ -302,7 +307,7 @@ func newClient(ctx context.Context, client kvV2Reader, mountPath string, logger 
 		mountPath:               mountPath,
 		path:                    path,
 		logger:                  logger,
-		ctx:                     ctx,
+		contextProvider:         func() context.Context { return ctx },
 		requestTimeout:          requestTimeout,
 		cacheManagers:           make(map[string]config.ConnectionAndDetailsGetter),
 		cacheConnections:        make(map[string]any),
@@ -429,9 +434,11 @@ func (c *Client) fetchVaultManager(name string) (config.ConnectionAndDetailsGett
 	if requestTimeout <= 0 {
 		requestTimeout = defaultVaultRequestTimeout
 	}
-	baseContext := c.ctx
-	if baseContext == nil {
-		baseContext = context.Background()
+	baseContext := context.Background()
+	if c.contextProvider != nil {
+		if providedContext := c.contextProvider(); providedContext != nil {
+			baseContext = providedContext
+		}
 	}
 	ctx, cancelFunc := context.WithTimeout(baseContext, requestTimeout)
 	defer cancelFunc()
