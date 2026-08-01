@@ -4,19 +4,53 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand/v2"
 	"net/http"
+	"net/url"
 	"os"
+	"strconv"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/logger"
+	"github.com/hashicorp/go-retryablehttp"
 	"github.com/hashicorp/vault-client-go"
 	"github.com/hashicorp/vault-client-go/schema"
 	"github.com/pkg/errors"
+	"golang.org/x/sync/singleflight"
 )
 
+const (
+	defaultVaultRequestTimeout = 30 * time.Second
+	defaultVaultRetryWaitMin   = 200 * time.Millisecond
+	defaultVaultRetryWaitMax   = 2 * time.Second
+	defaultVaultRetryMax       = 3
+)
+
+type vaultClientConfig struct {
+	requestTimeout time.Duration
+	retryWaitMin   time.Duration
+	retryWaitMax   time.Duration
+	retryMax       int
+}
+
+func defaultVaultClientConfig() vaultClientConfig {
+	return vaultClientConfig{
+		requestTimeout: defaultVaultRequestTimeout,
+		retryWaitMin:   defaultVaultRetryWaitMin,
+		retryWaitMax:   defaultVaultRetryWaitMax,
+		retryMax:       defaultVaultRetryMax,
+	}
+}
+
 func NewVaultClientFromEnv(logger logger.Logger) (*Client, error) {
+	return NewVaultClientFromEnvContext(context.Background(), logger)
+}
+
+func NewVaultClientFromEnvContext(ctx context.Context, logger logger.Logger) (*Client, error) {
 	host := os.Getenv("BRUIN_VAULT_HOST")
 	if host == "" {
 		return nil, errors.New("BRUIN_VAULT_HOST env variable not set")
@@ -39,12 +73,27 @@ func NewVaultClientFromEnv(logger logger.Logger) (*Client, error) {
 		kubernetesAuthMountPath = "kubernetes"
 	}
 
-	return NewVaultClient(logger, host, token, role, path, mountPath, kubernetesAuthMountPath)
+	clientConfig, err := vaultClientConfigFromEnv()
+	if err != nil {
+		return nil, err
+	}
+
+	return newVaultClient(ctx, logger, host, token, role, path, mountPath, kubernetesAuthMountPath, clientConfig)
 }
 
 func NewVaultClient(logger logger.Logger, host, token, role, path string, mountPath string, kubernetesAuthMountPath string) (*Client, error) {
+	return newVaultClient(context.Background(), logger, host, token, role, path, mountPath, kubernetesAuthMountPath, defaultVaultClientConfig())
+}
+
+func newVaultClient(ctx context.Context, logger logger.Logger, host, token, role, path string, mountPath string, kubernetesAuthMountPath string, clientConfig vaultClientConfig) (*Client, error) {
+	if ctx == nil {
+		return nil, errors.New("nil context provided")
+	}
 	if host == "" {
 		return nil, errors.New("empty vault host provided")
+	}
+	if err := validateVaultAddress(host); err != nil {
+		return nil, err
 	}
 	if path == "" {
 		return nil, errors.New("empty vault path provided")
@@ -53,13 +102,86 @@ func NewVaultClient(logger logger.Logger, host, token, role, path string, mountP
 		return nil, errors.New("empty vault mountpath provided")
 	}
 	if token != "" {
-		return newVaultClientWithToken(host, token, mountPath, logger, path)
+		return newVaultClientWithToken(ctx, host, token, mountPath, logger, path, clientConfig)
 	}
 	if role != "" {
-		return newVaultClientWithKubernetesAuth(host, role, mountPath, kubernetesAuthMountPath, logger, path)
+		return newVaultClientWithKubernetesAuth(ctx, host, role, mountPath, kubernetesAuthMountPath, logger, path, clientConfig)
 	}
 
 	return nil, errors.New("no vault credentials provided")
+}
+
+func vaultClientConfigFromEnv() (vaultClientConfig, error) {
+	clientConfig := defaultVaultClientConfig()
+
+	var err error
+	clientConfig.requestTimeout, err = durationFromEnv("BRUIN_VAULT_TIMEOUT", clientConfig.requestTimeout)
+	if err != nil {
+		return vaultClientConfig{}, err
+	}
+	clientConfig.retryWaitMin, err = durationFromEnv("BRUIN_VAULT_RETRY_WAIT_MIN", clientConfig.retryWaitMin)
+	if err != nil {
+		return vaultClientConfig{}, err
+	}
+	clientConfig.retryWaitMax, err = durationFromEnv("BRUIN_VAULT_RETRY_WAIT_MAX", clientConfig.retryWaitMax)
+	if err != nil {
+		return vaultClientConfig{}, err
+	}
+
+	if value := os.Getenv("BRUIN_VAULT_MAX_RETRIES"); value != "" {
+		clientConfig.retryMax, err = strconv.Atoi(value)
+		if err != nil || clientConfig.retryMax < 0 {
+			return vaultClientConfig{}, errors.New("BRUIN_VAULT_MAX_RETRIES must be a non-negative integer")
+		}
+	}
+
+	if clientConfig.retryWaitMax < clientConfig.retryWaitMin {
+		return vaultClientConfig{}, errors.New("BRUIN_VAULT_RETRY_WAIT_MAX must be greater than or equal to BRUIN_VAULT_RETRY_WAIT_MIN")
+	}
+
+	return clientConfig, nil
+}
+
+func durationFromEnv(name string, defaultValue time.Duration) (time.Duration, error) {
+	value := os.Getenv(name)
+	if value == "" {
+		return defaultValue, nil
+	}
+
+	duration, err := time.ParseDuration(value)
+	if err != nil || duration <= 0 {
+		return 0, errors.Errorf("%s must be a positive duration", name)
+	}
+
+	return duration, nil
+}
+
+func validateVaultAddress(address string) error {
+	parsed, err := url.Parse(address)
+	if err != nil {
+		return errors.Wrap(err, "invalid Vault host")
+	}
+	if parsed.User != nil {
+		return errors.New("invalid Vault host: URL credentials are not allowed")
+	}
+	if parsed.RawQuery != "" || parsed.Fragment != "" {
+		return errors.New("invalid Vault host: query parameters and fragments are not allowed")
+	}
+
+	switch parsed.Scheme {
+	case "http", "https":
+		if parsed.Host == "" {
+			return errors.New("invalid Vault host: HTTP(S) URL must include a host")
+		}
+	case "unix":
+		if strings.TrimPrefix(address, "unix://") == "" {
+			return errors.New("invalid Vault host: unix URL must include a socket path")
+		}
+	default:
+		return errors.New("invalid Vault host: URL scheme must be http, https, or unix")
+	}
+
+	return nil
 }
 
 type kvV2Reader interface {
@@ -71,15 +193,55 @@ type Client struct {
 	mountPath               string
 	path                    string
 	logger                  logger.Logger
+	ctx                     context.Context
+	requestTimeout          time.Duration
+	cacheMu                 sync.RWMutex
+	managerRequests         singleflight.Group
+	cacheManagers           map[string]config.ConnectionAndDetailsGetter
 	cacheConnections        map[string]any
 	cacheConnectionsDetails map[string]any
 }
 
-func newVaultClientWithToken(host, token, mountPath string, logger logger.Logger, path string) (*Client, error) {
+func newVaultAPIClient(host string, clientConfig vaultClientConfig) (*vault.Client, error) {
 	client, err := vault.New(
 		vault.WithAddress(host),
-		vault.WithRequestTimeout(30*time.Second),
+		vault.WithRequestTimeout(clientConfig.requestTimeout),
+		vault.WithRetryConfiguration(vault.RetryConfiguration{
+			RetryWaitMin: clientConfig.retryWaitMin,
+			RetryWaitMax: clientConfig.retryWaitMax,
+			RetryMax:     clientConfig.retryMax,
+			Backoff:      vaultRetryBackoff,
+		}),
 	)
+	if err != nil {
+		return nil, err
+	}
+
+	return client, nil
+}
+
+func vaultRetryBackoff(minimum, maximum time.Duration, attempt int, response *http.Response) time.Duration {
+	delay := retryablehttp.DefaultBackoff(minimum, maximum, attempt, response)
+	if delay <= 1 || responseHasRetryAfter(response) {
+		return delay
+	}
+
+	// Equal jitter prevents clients from retrying in lockstep while retaining a
+	// useful minimum delay. The request context still caps the total wait.
+	half := delay / 2
+	return half + time.Duration(rand.Int64N(int64(delay-half)+1))
+}
+
+func responseHasRetryAfter(response *http.Response) bool {
+	if response == nil || (response.StatusCode != http.StatusTooManyRequests && response.StatusCode != http.StatusServiceUnavailable) {
+		return false
+	}
+
+	return response.Header.Get("Retry-After") != ""
+}
+
+func newVaultClientWithToken(ctx context.Context, host, token, mountPath string, logger logger.Logger, path string, clientConfig vaultClientConfig) (*Client, error) {
+	client, err := newVaultAPIClient(host, clientConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -88,21 +250,11 @@ func newVaultClientWithToken(host, token, mountPath string, logger logger.Logger
 		return nil, errors.Wrap(err, "failed to set token on Vault client")
 	}
 
-	return &Client{
-		client:                  &client.Secrets,
-		mountPath:               mountPath,
-		path:                    path,
-		logger:                  logger,
-		cacheConnections:        make(map[string]any),
-		cacheConnectionsDetails: make(map[string]any),
-	}, nil
+	return newClient(ctx, &client.Secrets, mountPath, logger, path, clientConfig.requestTimeout), nil
 }
 
-func newVaultClientWithKubernetesAuth(host, role, mountPath, kubernetesAuthMountPath string, logger logger.Logger, path string) (*Client, error) {
-	client, err := vault.New(
-		vault.WithAddress(host),
-		vault.WithRequestTimeout(30*time.Second),
-	)
+func newVaultClientWithKubernetesAuth(ctx context.Context, host, role, mountPath, kubernetesAuthMountPath string, logger logger.Logger, path string, clientConfig vaultClientConfig) (*Client, error) {
+	client, err := newVaultAPIClient(host, clientConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -112,24 +264,50 @@ func newVaultClientWithKubernetesAuth(host, role, mountPath, kubernetesAuthMount
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read service account token")
 	}
-
-	resp, err := client.Auth.KubernetesLogin(context.Background(), schema.KubernetesLoginRequest{Jwt: string(token), Role: role}, vault.WithMountPath(kubernetesAuthMountPath))
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to login to the secrets backend")
+	serviceAccountToken := strings.TrimSpace(string(token))
+	if serviceAccountToken == "" {
+		return nil, errors.New("service account token is empty")
 	}
 
-	if err := client.SetToken(resp.Auth.ClientToken); err != nil {
+	authContext, cancel := context.WithTimeout(ctx, clientConfig.requestTimeout)
+	defer cancel()
+
+	clientToken, err := loginToVaultWithKubernetes(authContext, client, serviceAccountToken, role, kubernetesAuthMountPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := client.SetToken(clientToken); err != nil {
 		return nil, errors.Wrap(err, "failed to set token on secrets client")
 	}
 
+	return newClient(ctx, &client.Secrets, mountPath, logger, path, clientConfig.requestTimeout), nil
+}
+
+func loginToVaultWithKubernetes(ctx context.Context, client *vault.Client, serviceAccountToken, role, kubernetesAuthMountPath string) (string, error) {
+	resp, err := client.Auth.KubernetesLogin(ctx, schema.KubernetesLoginRequest{Jwt: serviceAccountToken, Role: role}, vault.WithMountPath(kubernetesAuthMountPath))
+	if err != nil {
+		return "", sanitizedVaultError(err, "failed to login to the secrets backend")
+	}
+	if resp == nil || resp.Auth == nil || strings.TrimSpace(resp.Auth.ClientToken) == "" {
+		return "", errors.New("failed to login to the secrets backend: Vault returned no client token")
+	}
+
+	return resp.Auth.ClientToken, nil
+}
+
+func newClient(ctx context.Context, client kvV2Reader, mountPath string, logger logger.Logger, path string, requestTimeout time.Duration) *Client {
 	return &Client{
-		client:                  &client.Secrets,
+		client:                  client,
 		mountPath:               mountPath,
 		path:                    path,
 		logger:                  logger,
+		ctx:                     ctx,
+		requestTimeout:          requestTimeout,
+		cacheManagers:           make(map[string]config.ConnectionAndDetailsGetter),
 		cacheConnections:        make(map[string]any),
 		cacheConnectionsDetails: make(map[string]any),
-	}, nil
+	}
 }
 
 func (c *Client) GetConnection(name string) any {
@@ -144,9 +322,12 @@ func (c *Client) GetConnection(name string) any {
 
 // ResolveConnection implements config.ConnectionResolver.
 func (c *Client) ResolveConnection(name string) (any, error) {
+	c.cacheMu.RLock()
 	if conn, ok := c.cacheConnections[name]; ok {
+		c.cacheMu.RUnlock()
 		return conn, nil
 	}
+	c.cacheMu.RUnlock()
 
 	manager, err := c.getVaultManager(name)
 	if err != nil {
@@ -154,15 +335,23 @@ func (c *Client) ResolveConnection(name string) (any, error) {
 	}
 
 	conn := manager.GetConnection(name)
+	c.cacheMu.Lock()
+	if c.cacheConnections == nil {
+		c.cacheConnections = make(map[string]any)
+	}
 	c.cacheConnections[name] = conn
+	c.cacheMu.Unlock()
 
 	return conn, nil
 }
 
 func (c *Client) GetConnectionDetails(name string) any {
+	c.cacheMu.RLock()
 	if deets, ok := c.cacheConnectionsDetails[name]; ok {
+		c.cacheMu.RUnlock()
 		return deets
 	}
+	c.cacheMu.RUnlock()
 
 	manager, err := c.getVaultManager(name)
 	if err != nil {
@@ -171,7 +360,12 @@ func (c *Client) GetConnectionDetails(name string) any {
 	}
 
 	deets := manager.GetConnectionDetails(name)
+	c.cacheMu.Lock()
+	if c.cacheConnectionsDetails == nil {
+		c.cacheConnectionsDetails = make(map[string]any)
+	}
 	c.cacheConnectionsDetails[name] = deets
+	c.cacheMu.Unlock()
 
 	return deets
 }
@@ -185,7 +379,61 @@ func (c *Client) GetConnectionType(name string) string {
 }
 
 func (c *Client) getVaultManager(name string) (config.ConnectionAndDetailsGetter, error) {
-	ctx, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
+	if strings.TrimSpace(name) == "" {
+		return nil, errors.New("cannot read a Vault secret with an empty name")
+	}
+
+	c.cacheMu.RLock()
+	manager, ok := c.cacheManagers[name]
+	c.cacheMu.RUnlock()
+	if ok {
+		return manager, nil
+	}
+
+	result, err, _ := c.managerRequests.Do(name, func() (any, error) {
+		c.cacheMu.RLock()
+		manager, ok := c.cacheManagers[name]
+		c.cacheMu.RUnlock()
+		if ok {
+			return manager, nil
+		}
+
+		manager, err := c.fetchVaultManager(name)
+		if err != nil {
+			return nil, err
+		}
+
+		c.cacheMu.Lock()
+		if c.cacheManagers == nil {
+			c.cacheManagers = make(map[string]config.ConnectionAndDetailsGetter)
+		}
+		c.cacheManagers[name] = manager
+		c.cacheMu.Unlock()
+
+		return manager, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	manager, ok = result.(config.ConnectionAndDetailsGetter)
+	if !ok {
+		return nil, errors.New("failed to process Vault secret manager")
+	}
+
+	return manager, nil
+}
+
+func (c *Client) fetchVaultManager(name string) (config.ConnectionAndDetailsGetter, error) {
+	requestTimeout := c.requestTimeout
+	if requestTimeout <= 0 {
+		requestTimeout = defaultVaultRequestTimeout
+	}
+	baseContext := c.ctx
+	if baseContext == nil {
+		baseContext = context.Background()
+	}
+	ctx, cancelFunc := context.WithTimeout(baseContext, requestTimeout)
 	defer cancelFunc()
 
 	secretPath := fmt.Sprintf("%s/%s", c.path, name)
@@ -195,18 +443,17 @@ func (c *Client) getVaultManager(name string) (config.ConnectionAndDetailsGetter
 		if errors.As(err, &respErr) && respErr.StatusCode == http.StatusNotFound {
 			return nil, errors.Errorf("secret '%s' not found in Vault", name)
 		}
-		return nil, errors.Wrapf(err, "failed to read secret '%s' from Vault", name)
+		return nil, sanitizedVaultError(err, fmt.Sprintf("failed to read secret '%s' from Vault", name))
+	}
+	if res == nil {
+		return nil, errors.Errorf("failed to read secret '%s' from Vault: Vault returned an empty response", name)
 	}
 
 	detailsRaw, okDetails := res.Data.Data["details"]
 	secretType, okType := res.Data.Data["type"].(string)
-	if !okDetails && !okType {
-		return nil, errors.Errorf("secret '%s' is missing required 'details' or 'type' fields", name)
-	}
-
 	details, ok := detailsRaw.(map[string]any)
-	if !ok {
-		return nil, errors.Errorf("secret '%s' has invalid 'details' field: expected a map", name)
+	if !okDetails || !ok || !okType || strings.TrimSpace(secretType) == "" {
+		return nil, errors.Errorf("secret '%s' must contain both 'type' (non-empty string) and 'details' (object)", name)
 	}
 
 	details["name"] = name
@@ -249,4 +496,17 @@ func (c *Client) getVaultManager(name string) (config.ConnectionAndDetailsGetter
 	}
 
 	return manager, nil
+}
+
+func sanitizedVaultError(err error, message string) error {
+	var responseError *vault.ResponseError
+	if errors.As(err, &responseError) {
+		statusText := http.StatusText(responseError.StatusCode)
+		if statusText == "" {
+			return errors.Errorf("%s: Vault returned HTTP status %d", message, responseError.StatusCode)
+		}
+		return errors.Errorf("%s: Vault returned HTTP status %d (%s)", message, responseError.StatusCode, statusText)
+	}
+
+	return errors.Wrap(err, message)
 }
