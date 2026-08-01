@@ -86,9 +86,8 @@ func TestFabricSparkConfigWithServicePrincipal(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// The Warehouse path (ToDBConnectionURI) lets use_azure_default_credential win
-// over the service principal fields, so Spark has to agree — otherwise one
-// connection authenticates as two different identities.
+// Match the Warehouse path's existing precedence when both modes are present.
+// Ingestr separately preserves its historical service-principal precedence.
 func TestFabricSparkConfigPrefersDefaultCredentialOverServicePrincipal(t *testing.T) {
 	t.Parallel()
 

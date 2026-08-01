@@ -33,7 +33,7 @@ https://app.fabric.microsoft.com/groups/<workspace_id>/lakehouses/<lakehouse_id>
 
 If `use_azure_default_credential: true` is set, the connector uses Azure's DefaultAzureCredential chain. You can authenticate locally with Azure CLI (`az login`).
 
-If a connection sets `use_azure_default_credential: true` *and* the service principal fields, the default credential wins on every execution path — Warehouse, Spark, and ingestr — so one connection always authenticates as a single identity.
+Configure only one Microsoft Entra authentication method per connection. For backward compatibility, Warehouse and Spark use the default credential when both methods are configured, while ingestr continues to use the service principal.
 
 ### Service principal (client secret)
 
@@ -122,7 +122,7 @@ FROM raw.events
 GROUP BY event_date
 ```
 
-Fabric Spark SQL authenticates with Microsoft Entra ID using the parent connection's credentials, following the same [precedence](#azure-ad-defaultazurecredential) as the rest of the platform. When using a service principal, all three of `client_id`, `client_secret`, and `tenant_id` must be set. The authenticated identity must have permission to execute jobs on the Lakehouse.
+Fabric Spark SQL authenticates with Microsoft Entra ID using the parent connection's credentials. When using a service principal, all three of `client_id`, `client_secret`, and `tenant_id` must be set. The authenticated identity must have permission to execute jobs on the Lakehouse.
 
 ## Using Fabric with Ingestr
 
