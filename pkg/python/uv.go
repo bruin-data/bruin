@@ -803,6 +803,9 @@ type SQLFileInfo struct {
 // DetectDialectFromAssetType extracts the dialect from an asset's type field
 // by splitting on the first dot and mapping the prefix.
 func DetectDialectFromAssetType(assetType string) string {
+	if assetType == string(pipeline.AssetTypeFabricSparkQuery) {
+		return "sparksql"
+	}
 	parts := strings.Split(assetType, ".")
 	if len(parts) == 0 {
 		return "ansi" // fallback to ANSI SQL

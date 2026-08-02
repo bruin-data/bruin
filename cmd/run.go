@@ -2195,6 +2195,27 @@ func SetupExecutors(
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 		}
 	}
+	if s.WillRunTaskOfType(pipeline.AssetTypeFabricSparkQuery) || estimateCustomCheckType == pipeline.AssetTypeFabricSparkQuery {
+		fabricSparkConnections := fabric.NewSparkConnectionGetter(conn)
+		fabricSparkFileExtractor := &query.FileQuerySplitterExtractor{
+			Fs:                        fs,
+			Renderer:                  renderer,
+			PreserveSessionStatements: true,
+			BackslashEscapes:          true,
+		}
+		fabricSparkOperator := spark.NewBasicOperator(fabricSparkConnections, fabricSparkFileExtractor, fullRefresh, hoister, parser)
+		fabricSparkCheckRunner := spark.NewColumnCheckOperator(fabricSparkConnections)
+		fabricSparkCustomCheckRunner := ansisql.NewCustomCheckOperator(fabricSparkConnections, renderer)
+
+		mainExecutors[pipeline.AssetTypeFabricSparkQuery][scheduler.TaskInstanceTypeMain] = fabricSparkOperator
+		mainExecutors[pipeline.AssetTypeFabricSparkQuery][scheduler.TaskInstanceTypeColumnCheck] = fabricSparkCheckRunner
+		mainExecutors[pipeline.AssetTypeFabricSparkQuery][scheduler.TaskInstanceTypeCustomCheck] = fabricSparkCustomCheckRunner
+
+		if estimateCustomCheckType == pipeline.AssetTypeFabricSparkQuery {
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = fabricSparkCheckRunner
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = fabricSparkCustomCheckRunner
+		}
+	}
 	if s.WillRunTaskOfType(pipeline.AssetTypeOracleQuery) || s.WillRunTaskOfType(pipeline.AssetTypeOracleSource) || estimateCustomCheckType == pipeline.AssetTypeOracleQuery {
 		oracleFileExtractor := &query.OracleScriptExtractor{
 			Fs:       fs,

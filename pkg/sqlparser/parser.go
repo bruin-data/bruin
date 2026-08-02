@@ -353,6 +353,7 @@ var assetTypeDialectMap = map[pipeline.AssetType]string{
 	pipeline.AssetTypeDremioQuery:       "trino",
 	pipeline.AssetTypeSailQuery:         "trino",
 	pipeline.AssetTypeSparkQuery:        "spark",
+	pipeline.AssetTypeFabricSparkQuery:  "spark",
 	pipeline.AssetTypeClickHouse:        "clickhouse",
 	pipeline.AssetTypeDatabricksQuery:   "databricks",
 	pipeline.AssetTypeMsSQLQuery:        "tsql",
