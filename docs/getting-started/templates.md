@@ -118,6 +118,43 @@ AI agent skills are installed separately with `bruin ai skills`; see [AI Skills]
   </a>
 </div>
 
+### Apache Iceberg
+
+An Iceberg connection is a **catalog** (where table metadata lives) plus **storage** (where the data files go). These five differ only in those two blocks; the assets are identical, so they double as a reference for wiring up a catalog and storage pair.
+
+<div class="template-grid">
+  <a class="template-card" href="./templates-docs/iceberg-sqlite-local-README.html">
+    <span class="template-card__category">Credential-free</span>
+    <strong>iceberg-sqlite-local</strong>
+    <span>Iceberg tables on your own disk with a SQLite catalog. No accounts, no services &mdash; run it as soon as it is generated.</span>
+    <span class="template-card__tags"><code>Iceberg</code><code>SQLite</code><code>local</code></span>
+  </a>
+  <a class="template-card" href="./templates-docs/iceberg-rest-minio-README.html">
+    <span class="template-card__category">Local stack</span>
+    <strong>iceberg-rest-minio</strong>
+    <span>A REST catalog server in front of MinIO, both from the bundled docker-compose file.</span>
+    <span class="template-card__tags"><code>Iceberg</code><code>REST</code><code>MinIO</code></span>
+  </a>
+  <a class="template-card" href="./templates-docs/iceberg-glue-s3-README.html">
+    <span class="template-card__category">AWS</span>
+    <strong>iceberg-glue-s3</strong>
+    <span>AWS Glue as the catalog with data in S3 &mdash; a managed catalog, so there is no metastore to run.</span>
+    <span class="template-card__tags"><code>Iceberg</code><code>Glue</code><code>S3</code></span>
+  </a>
+  <a class="template-card" href="./templates-docs/iceberg-postgres-gcs-README.html">
+    <span class="template-card__category">GCP</span>
+    <strong>iceberg-postgres-gcs</strong>
+    <span>A Postgres catalog you own, with data in Google Cloud Storage via a service-account key.</span>
+    <span class="template-card__tags"><code>Iceberg</code><code>Postgres</code><code>GCS</code></span>
+  </a>
+  <a class="template-card" href="./templates-docs/iceberg-hadoop-gcsinterop-README.html">
+    <span class="template-card__category">No catalog service</span>
+    <strong>iceberg-hadoop-gcsinterop</strong>
+    <span>Metadata kept in the warehouse itself, on GCS through its S3 interoperability API.</span>
+    <span class="template-card__tags"><code>Iceberg</code><code>hadoop</code><code>GCS interop</code></span>
+  </a>
+</div>
+
 ### Source-to-warehouse ingestion
 
 <div class="template-grid">
@@ -208,7 +245,8 @@ bruin init nyc-taxi my-taxi-pipeline
 
 | Goal | Start with |
 | --- | --- |
-| Learn Bruin locally without cloud credentials | `duckdb`, `python`, `frankfurter`, or `chess` |
+| Learn Bruin locally without cloud credentials | `duckdb`, `python`, `frankfurter`, `chess`, or `iceberg-sqlite-local` |
+| Load into an Iceberg lakehouse | `iceberg-sqlite-local` to try it, then `iceberg-glue-s3`, `iceberg-postgres-gcs`, `iceberg-rest-minio`, or `iceberg-hadoop-gcsinterop` |
 | Build a source-to-warehouse ingestion pipeline | `ai-coding-usage`, `shopify-bigquery`, `shopify-clickhouse`, `gsheet-bigquery`, `notion`, or `gorgias` |
 | Explore a complete demo with generated data | `demo-snowflake-sales-analytics` or `demo-snowflake-salesforce` |
 | Scaffold ecommerce reporting | `ecommerce` |

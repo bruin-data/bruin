@@ -525,6 +525,17 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                         ],
                     },
                     {
+                        text: "Apache Iceberg",
+                        collapsed: false,
+                        items: [
+                            {text: "iceberg-sqlite-local", link: "/getting-started/templates-docs/iceberg-sqlite-local-README"},
+                            {text: "iceberg-rest-minio", link: "/getting-started/templates-docs/iceberg-rest-minio-README"},
+                            {text: "iceberg-glue-s3", link: "/getting-started/templates-docs/iceberg-glue-s3-README"},
+                            {text: "iceberg-postgres-gcs", link: "/getting-started/templates-docs/iceberg-postgres-gcs-README"},
+                            {text: "iceberg-hadoop-gcsinterop", link: "/getting-started/templates-docs/iceberg-hadoop-gcsinterop-README"},
+                        ],
+                    },
+                    {
                         text: "Source Ingestion",
                         collapsed: false,
                         items: [

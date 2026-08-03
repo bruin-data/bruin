@@ -1,0 +1,22 @@
+default_environment: default
+environments:
+  default:
+    connections:
+      frankfurter:
+        - name: "frankfurter-default"
+      iceberg:
+        - name: "iceberg-default"
+          catalog:
+            type: postgres
+            host: "${PG_HOST}"
+            port: 5432
+            database: "${PG_DATABASE}"
+            auth:
+              username: "${PG_USERNAME}"
+              password: "${PG_PASSWORD}"
+          storage:
+            type: gcs
+            path: "gs://${GCS_BUCKET}/warehouse"
+            key_file: "sa.json"           # relative to this file
+          properties:
+            sslmode: "require"            # managed Postgres refuses plaintext

@@ -1,0 +1,13 @@
+name: raw.exchange_rates
+type: ingestr
+connection: iceberg-default
+
+# A sqlite catalog is a single-writer file: without an order, both assets create
+# the catalog at once and one of them loses with SQLITE_BUSY.
+depends:
+  - raw.currencies
+
+parameters:
+  source_connection: frankfurter-default
+  source_table: exchange_rates
+  destination: iceberg
