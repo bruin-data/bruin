@@ -14,7 +14,7 @@ docker compose up -d          # MinIO + the bucket + the REST catalog
 bruin run iceberg-rest-minio
 ```
 
-Browse what landed at [localhost:9001](http://localhost:9001) (`minioadmin` /
+Browse what landed in the MinIO console at `localhost:9001` (`minioadmin` /
 `minioadmin`), under `warehouse/raw/`:
 
 ```
