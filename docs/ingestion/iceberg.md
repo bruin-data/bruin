@@ -11,9 +11,9 @@ Bruin supports Iceberg as a **destination** for [Ingestr assets](/assets/ingestr
 
 | Catalog (`catalog.type`) | Storage (`storage.type`) |
 |---|---|
-| `glue`, `sqlite`, `postgres`, `rest`, `hive`, `hadoop`, `sql` | `s3` (S3-compatible) |
+| `glue`, `sqlite`, `postgres`, `rest`, `hive`, `hadoop`, `sql` | `s3`, `gcs`, `local` |
 
-Iceberg tables are written to **S3-compatible** storage (AWS S3, MinIO, Cloudflare R2, etc.).
+Table data is written to AWS S3 or any S3-compatible store (MinIO, Cloudflare R2, GCS interop), to Google Cloud Storage natively, or to the local filesystem.
 
 ## Step 1: Add a connection to .bruin.yml
 
@@ -183,7 +183,7 @@ Recognized connection parameters: `sslmode`, `sslcert`, `sslkey`, `sslrootcert`,
 ```
 
 > [!TIP]
-> For non-AWS S3-compatible stores (MinIO, Cloudflare R2, GCS interop), S3 compatibility mode is enabled automatically when `endpoint` is set. To disable it, add `s3.compat-mode: "false"` to the top-level [`properties`](#table-options) block.
+> Reaching **GCS over its S3 interoperability API** needs S3 compatibility mode, which is not set for you — add `s3.compat-mode: "true"` to the top-level [`properties`](#table-options) block. Without it Google rejects the headers the AWS SDK signs by default and the write fails with `SignatureDoesNotMatch`. MinIO and R2 accept those headers, so they need nothing extra.
 
 **Google Cloud Storage (native)** — `type: gcs` with a `gs://` warehouse and a service-account key (`bucket` + `prefix` works too):
 
@@ -203,10 +203,13 @@ Leave `key_file`/`key_json` empty to use Application Default Credentials.
             type: s3
             path: "s3://my-gcs-bucket/warehouse"
             endpoint: "storage.googleapis.com"
-            region: "auto"
+            region: "auto"                              # required, but unused with an endpoint set
             auth:
               access_key: "${GCS_HMAC_KEY}"
               secret_key: "${GCS_HMAC_SECRET}"
+          properties:
+            s3.compat-mode: "true"                      # required — see the tip above
+            s3.force-virtual-addressing: "false"
 ```
 
 **Local filesystem** — `type: local` with a filesystem path (a fully local SQLite/Hadoop setup):
