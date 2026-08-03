@@ -12,7 +12,8 @@ An IAM user or role that can reach both halves:
 - **Glue** — `glue:GetDatabase`, `glue:CreateDatabase`, `glue:GetTable`, `glue:CreateTable`, `glue:UpdateTable`
 - **The bucket** — `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject`, `s3:ListBucket`
 
-Then set these before running:
+Then supply the values, either by exporting them or by replacing the `${...}`
+placeholders in `.bruin.yml` directly:
 
 ```bash
 export AWS_REGION=eu-north-1

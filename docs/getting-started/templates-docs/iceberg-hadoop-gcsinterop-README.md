@@ -13,6 +13,9 @@ the alternative to a service-account key.
 An **HMAC key** for the bucket: Cloud Storage → Settings → Interoperability →
 *Create a key*. It looks like an AWS key pair and is used as one.
 
+Then supply the values, either by exporting them or by replacing the `${...}`
+placeholders in `.bruin.yml` directly:
+
 ```bash
 export GCS_BUCKET=my-company-lake
 export GCS_HMAC_KEY=GOOG1E…

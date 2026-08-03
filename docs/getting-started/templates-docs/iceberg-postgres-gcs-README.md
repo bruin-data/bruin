@@ -13,6 +13,9 @@ RDS, or one you run.
 2. **A GCS service account** with `roles/storage.objectAdmin` on the bucket.
    Download its JSON key and save it next to `.bruin.yml` as `sa.json`.
 
+Then supply the values, either by exporting them or by replacing the `${...}`
+placeholders in `.bruin.yml` directly:
+
 ```bash
 export PG_HOST=my-catalog.example.com
 export PG_DATABASE=iceberg_catalog
