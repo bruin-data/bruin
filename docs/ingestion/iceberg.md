@@ -96,7 +96,7 @@ Each catalog type takes different fields. Use the matching `catalog:` block belo
 
 A managed database (Neon, RDS, Cloud SQL) refuses plaintext connections, so `ssl_mode` is usually required there. It takes libpq's values — `disable`, `allow`, `prefer`, `require`, `verify-ca`, `verify-full` — and is sent to the catalog database as `sslmode`.
 
-The remaining PostgreSQL connection parameters have no dedicated field; set them through the top-level [`properties`](#table-options) block, which ingestr forwards to the catalog database connection:
+`ssl_mode` is the only PostgreSQL connection parameter with a dedicated field. To set any of the others — certificate paths, timeouts, and so on — use the top-level [`properties`](#table-options) block, which ingestr forwards to the catalog database connection:
 
 ```yaml
           catalog:
