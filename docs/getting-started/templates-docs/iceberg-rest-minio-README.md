@@ -55,5 +55,6 @@ than S3, so Bruin turns on S3 compatibility mode for you. And the REST catalog
 reaches storage **itself** to write metadata, which is why the same MinIO
 credentials appear in `docker-compose.yml` — the ones above configure only Bruin.
 
-Unlike the SQLite catalog in `iceberg-sqlite-local`, a catalog server handles
-concurrent writers, so these two assets load in parallel.
+`raw.exchange_rates` depends on `raw.currencies` so the two do not race to create
+the `raw` namespace on the first run — the catalog registers it once and the
+loser fails. Ordinary concurrent writes to existing tables are fine.
