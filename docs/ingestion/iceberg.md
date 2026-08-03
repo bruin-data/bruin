@@ -88,27 +88,31 @@ Each catalog type takes different fields. Use the matching `catalog:` block belo
             host: "metadata-db.internal"      # required
             port: 5432                        # optional
             database: "iceberg_catalog"       # optional
+            ssl_mode: "require"               # optional — TLS mode
             auth:                             # optional
               username: "iceberg_user"
               password: "${PG_PASSWORD}"
 ```
 
-For the `postgres` catalog, ingestr forwards standard PostgreSQL connection parameters to the catalog database connection, so you can secure or tune it via the top-level [`properties`](#table-options) block — a managed database (Neon, RDS, Cloud SQL) usually needs TLS:
+A managed database (Neon, RDS, Cloud SQL) refuses plaintext connections, so `ssl_mode` is usually required there. It takes libpq's values — `disable`, `allow`, `prefer`, `require`, `verify-ca`, `verify-full` — and is sent to the catalog database as `sslmode`.
+
+The remaining PostgreSQL connection parameters have no dedicated field; set them through the top-level [`properties`](#table-options) block, which ingestr forwards to the catalog database connection:
 
 ```yaml
           catalog:
             type: postgres
             host: "metadata-db.internal"
             database: "iceberg_catalog"
+            ssl_mode: "verify-full"
             auth:
               username: "iceberg_user"
               password: "${PG_PASSWORD}"
           properties:
-            sslmode: "require"                # e.g. require, verify-full
-            sslrootcert: "/path/to/ca.pem"    # optional
+            sslrootcert: "/path/to/ca.pem"
+            connect_timeout: "10"
 ```
 
-Recognized connection parameters: `sslmode`, `sslcert`, `sslkey`, `sslrootcert`, `sslpassword`, `sslcrl`, `sslcrldir`, `sslsni`, `sslcompression`, `requiressl`, `connect_timeout`, `application_name`, `fallback_application_name`, `target_session_attrs`, `tcp_user_timeout`, `options`, `service`, `servicefile`, `passfile`, `krbsrvname`, and `replication`. Any other property is treated as an Iceberg/storage option, not a database connection setting. This forwarding applies only to `type: postgres`; for the generic `sql` catalog, embed these inside the `uri` connection string instead (e.g. `postgresql://…?sslmode=require`).
+Recognized connection parameters: `sslmode`, `sslcert`, `sslkey`, `sslrootcert`, `sslpassword`, `sslcrl`, `sslcrldir`, `sslsni`, `sslcompression`, `requiressl`, `connect_timeout`, `application_name`, `fallback_application_name`, `target_session_attrs`, `tcp_user_timeout`, `options`, `service`, `servicefile`, `passfile`, `krbsrvname`, and `replication`. Any other property is treated as an Iceberg/storage option, not a database connection setting. This forwarding applies only to `type: postgres`; for the generic `sql` catalog, embed these inside the `uri` connection string instead (e.g. `postgresql://…?sslmode=require`). A `sslmode` set in `properties` takes precedence over the `ssl_mode` field.
 
 **SQLite**
 ```yaml
