@@ -170,6 +170,35 @@ func TestCloudCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "audit-logs")
 }
 
+func TestCloudLeafCommandsHaveTeamFlag(t *testing.T) {
+	t.Parallel()
+	isDebug := false
+
+	checked := 0
+	var walk func(*cli.Command)
+	walk = func(c *cli.Command) {
+		for _, sub := range c.Commands {
+			if len(sub.Commands) > 0 {
+				walk(sub)
+				continue
+			}
+			has := false
+			for _, f := range sub.Flags {
+				for _, n := range f.Names() {
+					if n == "team" {
+						has = true
+					}
+				}
+			}
+			assert.Truef(t, has, "cloud command %q should have --team", sub.Name)
+			checked++
+		}
+	}
+	walk(Cloud(&isDebug))
+
+	assert.Positive(t, checked)
+}
+
 func TestCloudProjectsCommand_Help(t *testing.T) {
 	t.Parallel()
 	cmd := CloudProjects()

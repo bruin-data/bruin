@@ -26,7 +26,14 @@ const (
 type APIClient struct {
 	baseURL    string
 	apiKey     string
+	team       string
 	httpClient *http.Client
+}
+
+// SetTeam makes requests act on the given team (company prefix) via the
+// X-Bruin-Team header, instead of the token owner's current team.
+func (c *APIClient) SetTeam(team string) {
+	c.team = team
 }
 
 // NewAPIClient creates a new API client with the given API key.
@@ -84,6 +91,9 @@ func (c *APIClient) doRequest(ctx context.Context, method, path string, body any
 
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
 	req.Header.Set("Accept", "application/json")
+	if c.team != "" {
+		req.Header.Set("X-Bruin-Team", c.team)
+	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}

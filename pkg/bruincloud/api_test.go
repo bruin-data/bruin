@@ -52,6 +52,39 @@ func TestDoRequest_AuthHeader(t *testing.T) {
 	assert.Equal(t, "Bearer test-api-key", gotAuth)
 }
 
+func TestDoRequest_TeamHeader(t *testing.T) {
+	t.Parallel()
+
+	t.Run("sends X-Bruin-Team when set", func(t *testing.T) {
+		t.Parallel()
+		var got string
+		client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			got = r.Header.Get("X-Bruin-Team")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("[]"))
+		})
+		client.SetTeam("acme")
+
+		_, err := client.ListProjects(t.Context())
+		require.NoError(t, err)
+		assert.Equal(t, "acme", got)
+	})
+
+	t.Run("omits the header when unset", func(t *testing.T) {
+		t.Parallel()
+		var present bool
+		client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			_, present = r.Header["X-Bruin-Team"]
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("[]"))
+		})
+
+		_, err := client.ListProjects(t.Context())
+		require.NoError(t, err)
+		assert.False(t, present)
+	})
+}
+
 func TestDoRequest_ErrorParsing(t *testing.T) {
 	t.Parallel()
 
