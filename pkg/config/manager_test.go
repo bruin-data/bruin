@@ -3745,3 +3745,50 @@ func mustMarshalConnectionJSON(t *testing.T, conn interface{}) map[string]interf
 	require.NoError(t, json.Unmarshal(data, &payload))
 	return payload
 }
+
+func TestLoadFromFile_MakesIcebergLocalPathsAbsolute(t *testing.T) {
+	t.Parallel()
+
+	fs := afero.NewMemMapFs()
+	configPath := filepath.Join("repo", ".bruin.yml")
+	require.NoError(t, fs.MkdirAll(filepath.Dir(configPath), 0o755))
+	require.NoError(t, afero.WriteFile(fs, configPath, []byte(`default_environment: default
+environments:
+  default:
+    connections:
+      iceberg:
+        - name: local
+          catalog:
+            type: sqlite
+            path: catalog.db
+          storage:
+            type: local
+            path: warehouse
+        - name: remote
+          catalog:
+            type: hadoop
+            path: "s3://bucket/warehouse"
+          storage:
+            type: gcs
+            path: "gs://bucket/warehouse"
+            key_file: creds/sa.json
+`), 0o644))
+
+	cfg, err := LoadFromFileOrEnv(fs, configPath)
+	require.NoError(t, err)
+
+	configLocation, err := filepath.Abs("repo")
+	require.NoError(t, err)
+
+	// A sqlite catalog and a local warehouse are files on this machine, and the
+	// ingestr subprocess does not run from the config's directory.
+	local := cfg.Environments["default"].Connections.Iceberg[0]
+	require.Equal(t, filepath.Join(configLocation, "catalog.db"), local.Catalog.Path)
+	require.Equal(t, filepath.Join(configLocation, "warehouse"), local.Storage.Path)
+
+	// Anything carrying a scheme is a location, not a path here.
+	remote := cfg.Environments["default"].Connections.Iceberg[1]
+	require.Equal(t, "s3://bucket/warehouse", remote.Catalog.Path)
+	require.Equal(t, "gs://bucket/warehouse", remote.Storage.Path)
+	require.Equal(t, filepath.Join(configLocation, "creds/sa.json"), remote.Storage.KeyFile)
+}

@@ -364,6 +364,14 @@ func (c *Config) SelectEnvironment(name string) error {
 	return nil
 }
 
+// hasURIScheme reports whether a path carries a scheme like s3://, gs:// or
+// file://, in which case it is a location rather than a path on this machine.
+func hasURIScheme(path string) bool {
+	i := strings.Index(path, "://")
+
+	return i > 0
+}
+
 func isAnchoredLocalPath(path string) bool {
 	return hasAnchoredLocalPathPrefix(path) || filepath.IsAbs(path)
 }
@@ -489,6 +497,21 @@ func LoadFromFileOrEnv(fs afero.Fs, path string) (*Config, error) {
 
 			if conn.SslKeyPath != "" && !isAnchoredLocalPath(conn.SslKeyPath) {
 				env.Connections.Vitess[i].SslKeyPath = filepath.Join(configLocation, conn.SslKeyPath)
+			}
+		}
+
+		// Make Iceberg local file paths absolute: a sqlite catalog is a file, a
+		// hadoop catalog without a scheme is a directory, and both are read by the
+		// ingestr subprocess, which does not run from the config's directory.
+		for i, conn := range env.Connections.Iceberg {
+			if conn.Catalog.Path != "" && !isAnchoredLocalPath(conn.Catalog.Path) && !hasURIScheme(conn.Catalog.Path) {
+				env.Connections.Iceberg[i].Catalog.Path = filepath.Join(configLocation, conn.Catalog.Path)
+			}
+			if conn.Storage.Path != "" && !isAnchoredLocalPath(conn.Storage.Path) && !hasURIScheme(conn.Storage.Path) {
+				env.Connections.Iceberg[i].Storage.Path = filepath.Join(configLocation, conn.Storage.Path)
+			}
+			if conn.Storage.KeyFile != "" && !isAnchoredLocalPath(conn.Storage.KeyFile) {
+				env.Connections.Iceberg[i].Storage.KeyFile = filepath.Join(configLocation, conn.Storage.KeyFile)
 			}
 		}
 
