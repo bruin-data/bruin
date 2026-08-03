@@ -183,7 +183,7 @@ Recognized connection parameters: `sslmode`, `sslcert`, `sslkey`, `sslrootcert`,
 ```
 
 > [!TIP]
-> Reaching **GCS over its S3 interoperability API** needs S3 compatibility mode, which is not set for you — add `s3.compat-mode: "true"` to the top-level [`properties`](#table-options) block. Without it Google rejects the headers the AWS SDK signs by default and the write fails with `SignatureDoesNotMatch`. MinIO and R2 accept those headers, so they need nothing extra.
+> For non-AWS S3-compatible stores (MinIO, Cloudflare R2, GCS interop), S3 compatibility mode is enabled automatically when `endpoint` is set — without it GCS interop rejects the headers the AWS SDK signs and fails with `SignatureDoesNotMatch`. To disable it, add `s3.compat-mode: "false"` to the top-level [`properties`](#table-options) block.
 
 **Google Cloud Storage (native)** — `type: gcs` with a `gs://` warehouse and a service-account key (`bucket` + `prefix` works too):
 
@@ -203,13 +203,10 @@ Leave `key_file`/`key_json` empty to use Application Default Credentials.
             type: s3
             path: "s3://my-gcs-bucket/warehouse"
             endpoint: "storage.googleapis.com"
-            region: "auto"                              # required, but unused with an endpoint set
+            region: "auto"                              # required, but unused once endpoint is set
             auth:
               access_key: "${GCS_HMAC_KEY}"
               secret_key: "${GCS_HMAC_SECRET}"
-          properties:
-            s3.compat-mode: "true"                      # required — see the tip above
-            s3.force-virtual-addressing: "false"
 ```
 
 **Local filesystem** — `type: local` with a filesystem path (a fully local SQLite/Hadoop setup):
