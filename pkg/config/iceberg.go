@@ -51,6 +51,13 @@ type IcebergCatalog struct {
 	// set true for managed catalogs like Polaris, Unity, or Tabular.
 	RestUseSSL *bool `yaml:"rest_use_ssl,omitempty" json:"rest_use_ssl,omitempty" mapstructure:"rest_use_ssl"`
 
+	// SSLMode is the postgres catalog's TLS mode (disable, require, verify-full,
+	// ...), spelled ssl_mode like every other connection and sent to the catalog as
+	// libpq's sslmode. Managed Postgres -- Neon, RDS, Cloud SQL -- generally refuses
+	// plaintext, so it is needed more often than not; the sql catalog carries TLS in
+	// its own uri instead.
+	SSLMode string `yaml:"ssl_mode,omitempty" json:"ssl_mode,omitempty" mapstructure:"ssl_mode"`
+
 	// Driver and Dialect configure the generic sql catalog (both required, e.g.
 	// driver=pgx, dialect=postgres); the sqlite/postgres types set them for you.
 	Driver  string `yaml:"driver,omitempty" json:"driver,omitempty" mapstructure:"driver"`

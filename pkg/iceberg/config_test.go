@@ -381,6 +381,40 @@ func TestConfig_GetIngestrURI_RealS3StillSharesCredentials(t *testing.T) {
 	assert.Equal(t, testAWSRegion, q.Get("glue.region"))
 }
 
+func TestConfig_GetIngestrURI_PostgresCatalogSSLMode(t *testing.T) {
+	t.Parallel()
+
+	// Managed Postgres refuses plaintext, and ingestr copies the libpq DSN
+	// parameters it recognises into the catalog connection string.
+	c := Config{
+		Catalog: config.IcebergCatalog{
+			Type:     config.IcebergCatalogPostgres,
+			Host:     "ep-abc.eu-central-1.aws.neon.tech",
+			Port:     5432,
+			Database: "neondb",
+			SSLMode:  "require",
+			Auth:     config.IcebergAuth{Username: "u", Password: "p"},
+		},
+		Storage: config.IcebergStorage{Type: config.IcebergStorageS3, Path: testS3LakeWh},
+	}
+
+	_, q := parseQuery(t, mustURI(t, c))
+	assert.Equal(t, "require", q.Get("sslmode"), "the field is ssl_mode but libpq calls it sslmode")
+}
+
+func TestConfig_GetIngestrURI_SSLModeOnlyForPostgres(t *testing.T) {
+	t.Parallel()
+
+	// Other catalogs carry TLS elsewhere: rest via rest_use_ssl, sql inside its uri.
+	c := Config{
+		Catalog: config.IcebergCatalog{Type: config.IcebergCatalogHive, Host: "metastore", Port: 9083, SSLMode: "require"},
+		Storage: config.IcebergStorage{Type: config.IcebergStorageS3, Path: testS3LakeWh},
+	}
+
+	_, q := parseQuery(t, mustURI(t, c))
+	assert.Empty(t, q.Get("sslmode"))
+}
+
 func TestConfig_GetIngestrURI_RESTUseSSL(t *testing.T) {
 	t.Parallel()
 

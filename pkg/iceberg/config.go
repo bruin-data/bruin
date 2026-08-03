@@ -129,6 +129,12 @@ func icebergCatalogURI(cat config.IcebergCatalog) (string, url.Values, error) {
 		if cat.Host == "" {
 			return "", nil, fmt.Errorf("iceberg: postgres catalog requires %q", "host")
 		}
+		// ingestr copies the libpq DSN parameters it recognises into the catalog
+		// connection string, sslmode among them.
+		if cat.SSLMode != "" {
+			q.Set("sslmode", cat.SSLMode)
+		}
+
 		return "iceberg+postgres://" + postgresAuthority(cat), q, nil
 	case config.IcebergCatalogREST:
 		if cat.Host == "" {

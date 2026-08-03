@@ -579,7 +579,7 @@ func expandEnvVarsInYAMLValues(node *yaml.Node, targetType reflect.Type) error {
 }
 
 func dereferenceType(targetType reflect.Type) reflect.Type {
-	for targetType != nil && targetType.Kind() == reflect.Ptr {
+	for targetType != nil && targetType.Kind() == reflect.Pointer {
 		targetType = targetType.Elem()
 	}
 

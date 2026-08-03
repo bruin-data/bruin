@@ -162,7 +162,7 @@ func extractFields(t reflect.Type) []ConnectionFieldDef {
 
 func kindToTypeString(t reflect.Type) string {
 	k := t.Kind()
-	if k == reflect.Ptr {
+	if k == reflect.Pointer {
 		k = t.Elem().Kind()
 	}
 
