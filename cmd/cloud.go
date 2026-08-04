@@ -29,6 +29,7 @@ func Cloud(isDebug *bool) *cli.Command {
 		Name:  "cloud",
 		Usage: "Interact with Bruin Cloud API",
 		Commands: []*cli.Command{
+			CloudTeams(),
 			CloudProjects(),
 			CloudPipelines(),
 			CloudRuns(),
@@ -241,6 +242,58 @@ func printFormattedLogs(result json.RawMessage) {
 }
 
 // --- Projects ---
+
+func CloudTeams() *cli.Command {
+	return &cli.Command{
+		Name:  "teams",
+		Usage: "Manage Bruin Cloud teams",
+		Commands: []*cli.Command{
+			cloudTeamsList(),
+		},
+	}
+}
+
+func cloudTeamsList() *cli.Command {
+	return &cli.Command{
+		Name:  "list",
+		Usage: "List the teams your token can act on",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			teams, err := client.ListTeams(ctx)
+			if err != nil {
+				printError(err, output, "Failed to list teams")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(teams, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"ID", "Name", "Company Prefix"})
+			for _, tm := range teams {
+				t.AppendRow(table.Row{tm.ID, tm.Name, tm.CompanyPrefix})
+			}
+			t.Render()
+			return nil
+		},
+	}
+}
 
 func CloudProjects() *cli.Command {
 	return &cli.Command{

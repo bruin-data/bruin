@@ -45,6 +45,26 @@ These flags are available on all `cloud` subcommands:
 
 ## Subcommands
 
+### `teams`
+
+List the teams your token can act on. Run this to discover the company prefix to pass to `--team` (or `BRUIN_CLOUD_TEAM`) — needed when your personal API key belongs to more than one team.
+
+```bash
+bruin cloud teams list
+```
+
+**Example output:**
+```
++----+--------+----------------+
+| ID | NAME   | COMPANY PREFIX |
++----+--------+----------------+
+| 1  | Acme   | acme           |
+| 2  | Globex | globex         |
++----+--------+----------------+
+```
+
+---
+
 ### `projects`
 
 List all projects you have access to. This is usually the first command you'll run — the project ID you see here is what you'll pass to other commands.
