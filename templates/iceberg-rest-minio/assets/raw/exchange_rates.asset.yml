@@ -2,11 +2,6 @@ name: raw.exchange_rates
 type: ingestr
 connection: iceberg-default
 
-# Both assets create the raw namespace on the first run; the catalog registers it
-# once and the loser fails, so give them an order.
-depends:
-  - raw.currencies
-
 parameters:
   source_connection: frankfurter-default
   source_table: exchange_rates

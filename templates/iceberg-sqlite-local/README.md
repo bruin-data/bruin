@@ -48,11 +48,6 @@ a SQLite file and a local directory. Everything else — Glue, REST, Postgres,
 Hive, and S3 or GCS storage — swaps in by changing those two blocks only. The
 assets never change.
 
-`raw.exchange_rates` depends on `raw.currencies` so the two do not start
-together: a SQLite catalog is a single-writer file, and both creating it at once
-fails with `SQLITE_BUSY`. Every catalog needs the ordering for the first run
-anyway, since the namespace is created once and the second asset loses.
-
 Not for production — the point is to see Iceberg work before committing to
 infrastructure. See the [Iceberg docs](https://getbruin.com/docs/bruin/ingestion/iceberg.html)
 for the real backends.
