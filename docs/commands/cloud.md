@@ -40,6 +40,7 @@ These flags are available on all `cloud` subcommands:
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--api-key` | str | - | Bruin Cloud API key. Also reads from `BRUIN_CLOUD_API_KEY` env var or `.bruin.yml`. |
+| `--team` | str | - | Act on this team (company prefix) instead of your current team. Also reads from `BRUIN_CLOUD_TEAM`. Only applies to personal API keys, and only for teams you belong to. |
 | `--output`, `-o` | str | `plain` | Output format: `plain` or `json`. Use `json` for scripting. |
 
 ## Subcommands

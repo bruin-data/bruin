@@ -4,8 +4,8 @@ package iceberg
 
 import (
 	"fmt"
+	"net"
 	"net/url"
-	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -56,18 +56,32 @@ func (c Config) GetIngestrURI() (string, error) {
 		return "", err
 	}
 
-	// Storage settings take precedence; catalog settings fill any gaps (ingestr
-	// aliases region/credentials into both the s3.* and glue.* namespaces).
-	// The shared credential keys are filled as a group: storage that brings its
-	// own key pair must not inherit the catalog's session token, which belongs
-	// to a different account and would be rejected.
-	storageHasOwnCredentials := hasAnySharedCredential(q)
+	// Storage settings take precedence; catalog settings fill any gaps.
 	for key, values := range catalogParams {
-		if storageHasOwnCredentials && isSharedCredentialParam(key) {
-			continue
-		}
 		if _, exists := q[key]; !exists {
 			q[key] = values
+		}
+	}
+
+	// Each block's credentials go under its own namespace (glue.* and s3.*) rather
+	// than the shared keys ingestr aliases into both: with one flat namespace it
+	// cannot tell a storage key pair from a catalog one, and would hand MinIO's to
+	// AWS Glue. Sharing is then explicit, and only between two AWS endpoints --
+	// when just one side is configured, the operator gave a single AWS account and
+	// means it for both.
+	if c.Catalog.Type == config.IcebergCatalogGlue && isAWSStorage(c.Storage) {
+		if !hasAWSCredentials(c.Storage.Auth) {
+			region := c.Storage.Region
+			if region == "" {
+				region = c.Catalog.Region
+			}
+			setS3Credentials(q, region, c.Catalog.Auth.AccessKey, c.Catalog.Auth.SecretKey, c.Catalog.Auth.SessionToken)
+		} else if !hasAWSCredentials(c.Catalog.Auth) {
+			region := c.Catalog.Region
+			if region == "" {
+				region = c.Storage.Region
+			}
+			setGlueCredentials(q, region, c.Storage.Auth.AccessKey, c.Storage.Auth.SecretKey, c.Storage.Auth.SessionToken)
 		}
 	}
 
@@ -101,10 +115,6 @@ func icebergCatalogURI(cat config.IcebergCatalog) (string, url.Values, error) {
 	q := url.Values{}
 	switch cat.Type {
 	case config.IcebergCatalogGlue:
-		// The shared keys keep serving storage that has no credentials of its own;
-		// glue.* pins the catalog's account so S3-compatible storage (GCS interop,
-		// MinIO, R2) with different credentials cannot overwrite it.
-		setAWSCredentials(q, cat.Region, cat.Auth.AccessKey, cat.Auth.SecretKey, cat.Auth.SessionToken)
 		setGlueCredentials(q, cat.Region, cat.Auth.AccessKey, cat.Auth.SecretKey, cat.Auth.SessionToken)
 		if cat.CatalogID != "" {
 			q.Set("glue.id", cat.CatalogID)
@@ -215,7 +225,7 @@ func icebergStorageParams(st config.IcebergStorage) (url.Values, error) {
 	if st.UseSSL != nil {
 		q.Set("use_ssl", strconv.FormatBool(*st.UseSSL))
 	}
-	setAWSCredentials(q, st.Region, st.Auth.AccessKey, st.Auth.SecretKey, st.Auth.SessionToken)
+	setS3Credentials(q, st.Region, st.Auth.AccessKey, st.Auth.SecretKey, st.Auth.SessionToken)
 	if st.KeyFile != "" {
 		q.Set("gcs.keypath", st.KeyFile)
 	}
@@ -225,39 +235,52 @@ func icebergStorageParams(st config.IcebergStorage) (url.Values, error) {
 	return q, nil
 }
 
-// setAWSCredentials sets the shared S3/Glue region and credential parameters that
-// ingestr aliases into both the s3.* and glue.* namespaces.
-func setAWSCredentials(q url.Values, region, accessKey, secretKey, sessionToken string) {
+// isAWSStorage reports whether the storage is AWS S3 itself rather than an
+// S3-compatible service. Regional, VPC, FIPS and dualstack endpoints all live
+// under amazonaws.com; MinIO, R2 and GCS interop do not.
+func isAWSStorage(st config.IcebergStorage) bool {
+	if st.Type == config.IcebergStorageGCS || st.Type == config.IcebergStorageLocal {
+		return false
+	}
+	if st.Endpoint == "" {
+		return true
+	}
+
+	host := st.Endpoint
+	if idx := strings.Index(host, "://"); idx >= 0 {
+		host = host[idx+3:]
+	}
+	host, _, _ = strings.Cut(host, "/")
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	host = strings.ToLower(strings.TrimSuffix(host, "."))
+
+	return host == "amazonaws.com" ||
+		strings.HasSuffix(host, ".amazonaws.com") ||
+		strings.HasSuffix(host, ".amazonaws.com.cn")
+}
+
+// hasAWSCredentials reports whether an auth block carries an AWS key pair.
+func hasAWSCredentials(auth config.IcebergAuth) bool {
+	return auth.AccessKey != "" || auth.SecretKey != "" || auth.SessionToken != ""
+}
+
+// setS3Credentials sets the s3.*-namespaced region and credential parameters, so
+// they configure the storage client and nothing else.
+func setS3Credentials(q url.Values, region, accessKey, secretKey, sessionToken string) {
 	if region != "" {
-		q.Set("region", region)
+		q.Set("s3.region", region)
 	}
 	if accessKey != "" {
-		q.Set("access_key_id", accessKey)
+		q.Set("s3.access-key-id", accessKey)
 	}
 	if secretKey != "" {
-		q.Set("secret_access_key", secretKey)
+		q.Set("s3.secret-access-key", secretKey)
 	}
 	if sessionToken != "" {
-		q.Set("session_token", sessionToken)
+		q.Set("s3.session-token", sessionToken)
 	}
-}
-
-// sharedCredentialParams are the credential keys ingestr aliases into both the
-// s3.* and glue.* namespaces; they always come from a single account.
-var sharedCredentialParams = []string{"access_key_id", "secret_access_key", "session_token"}
-
-func isSharedCredentialParam(key string) bool {
-	return slices.Contains(sharedCredentialParams, key)
-}
-
-func hasAnySharedCredential(q url.Values) bool {
-	for _, key := range sharedCredentialParams {
-		if q.Get(key) != "" {
-			return true
-		}
-	}
-
-	return false
 }
 
 // setGlueCredentials sets the glue.*-namespaced region and credential parameters

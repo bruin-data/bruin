@@ -95,6 +95,48 @@ func TestInitShopifyClickHouseCopiesPipelineTemplate(t *testing.T) {
 	require.Contains(t, string(orderLinesAsset), "incremental_key: order_id")
 }
 
+func TestInitMigrationFivetranCopiesMigrationWorkspace(t *testing.T) {
+	targetRoot := t.TempDir()
+	t.Chdir(targetRoot)
+
+	gitInit := exec.CommandContext(t.Context(), "git", "init")
+	gitInit.Dir = targetRoot
+	out, err := gitInit.CombinedOutput()
+	require.NoError(t, err, string(out))
+
+	err = os.WriteFile(filepath.Join(targetRoot, ".bruin.yml"), []byte("connections:\n  duckdb: []\n  duckdb: []\n"), 0o600)
+	require.NoError(t, err)
+
+	err = Init().Run(t.Context(), []string{"init", "migration-fivetran", "my-fivetran-migration"})
+	require.NoError(t, err)
+
+	migrationRoot := filepath.Join(targetRoot, "my-fivetran-migration")
+	require.FileExists(t, filepath.Join(migrationRoot, ".gitignore"))
+	require.FileExists(t, filepath.Join(migrationRoot, "fivetran-bruin-prompt.md"))
+	require.FileExists(t, filepath.Join(migrationRoot, "plan.md"))
+	require.FileExists(t, filepath.Join(migrationRoot, "bruin", "pipeline.yml"))
+	require.FileExists(t, filepath.Join(migrationRoot, "bruin", "assets", "placeholder"))
+	require.FileExists(t, filepath.Join(migrationRoot, ".agents", "skills", "bruin-fivetran-migrator", "SKILL.md"))
+	require.FileExists(t, filepath.Join(migrationRoot, ".agents", "skills", "bruin-fivetran-migrator", "import_fivetran.py"))
+
+	pipeline, err := os.ReadFile(filepath.Join(migrationRoot, "bruin", "pipeline.yml"))
+	require.NoError(t, err)
+	require.Contains(t, string(pipeline), "name: bruin")
+
+	prompt, err := os.ReadFile(filepath.Join(migrationRoot, "fivetran-bruin-prompt.md"))
+	require.NoError(t, err)
+	require.Contains(t, string(prompt), "review-gated workflow")
+
+	skill, err := os.ReadFile(filepath.Join(migrationRoot, ".agents", "skills", "bruin-fivetran-migrator", "SKILL.md"))
+	require.NoError(t, err)
+	require.Contains(t, string(skill), "Capture exactly one connection selected by the user.")
+
+	gitCheckIgnore := exec.CommandContext(t.Context(), "git", "check-ignore", ".bruin.yml", ".artifacts/fivetran/capture")
+	gitCheckIgnore.Dir = migrationRoot
+	out, err = gitCheckIgnore.CombinedOutput()
+	require.NoError(t, err, string(out))
+}
+
 func TestSelfHealDemoTemplateContainsDataProblemScenarios(t *testing.T) {
 	t.Parallel()
 

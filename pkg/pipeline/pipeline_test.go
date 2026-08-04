@@ -54,6 +54,7 @@ func sqlQueryAssetTypes() []pipeline.AssetType {
 		pipeline.AssetTypeDremioQuery,
 		pipeline.AssetTypeDuckDBQuery,
 		pipeline.AssetTypeFabricQuery,
+		pipeline.AssetTypeFabricSparkQuery,
 		pipeline.AssetTypeFabricQueryLegacy,
 		pipeline.AssetTypeMotherduckQuery,
 		pipeline.AssetTypeMsSQLQuery,
@@ -824,6 +825,19 @@ func TestPipeline_GetConnectionNameForAsset(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.Equal(t, "postgres-default", found)
+	})
+
+	t.Run("Fabric Spark assets reuse the Fabric default connection", func(t *testing.T) {
+		t.Parallel()
+		fabricPipeline := &pipeline.Pipeline{
+			Name:               "fabric-pipeline",
+			DefaultConnections: map[string]string{"fabric": "shared-fabric"},
+		}
+		found, err := fabricPipeline.GetConnectionNameForAsset(&pipeline.Asset{
+			Type: pipeline.AssetTypeFabricSparkQuery,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "shared-fabric", found)
 	})
 
 	t.Run("motherduck SQL assets resolve motherduck default connections", func(t *testing.T) {

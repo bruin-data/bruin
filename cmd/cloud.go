@@ -25,7 +25,7 @@ import (
 var ansiEscapeRegex = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
 
 func Cloud(isDebug *bool) *cli.Command {
-	return &cli.Command{
+	cmd := &cli.Command{
 		Name:  "cloud",
 		Usage: "Interact with Bruin Cloud API",
 		Commands: []*cli.Command{
@@ -43,6 +43,32 @@ func Cloud(isDebug *bool) *cli.Command {
 			CloudAuditLogs(),
 			CloudCost(),
 		},
+	}
+	addTeamFlag(cmd)
+	return cmd
+}
+
+// addTeamFlag adds --team to every runnable cloud command, so any of them can
+// target a team other than the token owner's current one. A command is runnable
+// when it has an action of its own (leaves always, but also parents like
+// "agents connections" that both list and hold subcommands); recurse into any
+// parent so its children get the flag too.
+func addTeamFlag(cmd *cli.Command) {
+	for _, sub := range cmd.Commands {
+		if sub.Action != nil || len(sub.Commands) == 0 {
+			sub.Flags = append(sub.Flags, teamFlag())
+		}
+		if len(sub.Commands) > 0 {
+			addTeamFlag(sub)
+		}
+	}
+}
+
+func teamFlag() *cli.StringFlag {
+	return &cli.StringFlag{
+		Name:    "team",
+		Usage:   "act on this team (company prefix) instead of your current team",
+		Sources: cli.EnvVars("BRUIN_CLOUD_TEAM"),
 	}
 }
 
@@ -143,7 +169,11 @@ func newCloudClient(c *cli.Command) (*bruincloud.APIClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return bruincloud.NewAPIClient(key), nil
+	client := bruincloud.NewAPIClient(key)
+	if team := c.String("team"); team != "" {
+		client.SetTeam(team)
+	}
+	return client, nil
 }
 
 func resolveRunID(ctx context.Context, c *cli.Command, client *bruincloud.APIClient, project, pipeline string) (string, error) {

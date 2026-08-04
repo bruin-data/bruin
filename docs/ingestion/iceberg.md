@@ -11,9 +11,9 @@ Bruin supports Iceberg as a **destination** for [Ingestr assets](/assets/ingestr
 
 | Catalog (`catalog.type`) | Storage (`storage.type`) |
 |---|---|
-| `glue`, `sqlite`, `postgres`, `rest`, `hive`, `hadoop`, `sql` | `s3` (S3-compatible) |
+| `glue`, `sqlite`, `postgres`, `rest`, `hive`, `hadoop`, `sql` | `s3`, `gcs`, `local` |
 
-Iceberg tables are written to **S3-compatible** storage (AWS S3, MinIO, Cloudflare R2, etc.).
+Table data is written to AWS S3 or any S3-compatible store (MinIO, Cloudflare R2, GCS interop), to Google Cloud Storage natively, or to the local filesystem.
 
 ## Step 1: Add a connection to .bruin.yml
 
@@ -183,7 +183,7 @@ Recognized connection parameters: `sslmode`, `sslcert`, `sslkey`, `sslrootcert`,
 ```
 
 > [!TIP]
-> For non-AWS S3-compatible stores (MinIO, Cloudflare R2, GCS interop), S3 compatibility mode is enabled automatically when `endpoint` is set. To disable it, add `s3.compat-mode: "false"` to the top-level [`properties`](#table-options) block.
+> An `endpoint` that isn't AWS (MinIO, Cloudflare R2, GCS interop) defaults `s3.compat-mode` on — GCS interop fails with `SignatureDoesNotMatch` without it — and `region` to `auto`, which those stores ignore but the AWS SDK insists on. Override either in [`properties`](#table-options). AWS endpoints, including VPC and FIPS, get neither.
 
 **Google Cloud Storage (native)** — `type: gcs` with a `gs://` warehouse and a service-account key (`bucket` + `prefix` works too):
 
@@ -203,7 +203,7 @@ Leave `key_file`/`key_json` empty to use Application Default Credentials.
             type: s3
             path: "s3://my-gcs-bucket/warehouse"
             endpoint: "storage.googleapis.com"
-            region: "auto"
+            region: "auto"                              # optional — the default for a non-AWS endpoint
             auth:
               access_key: "${GCS_HMAC_KEY}"
               secret_key: "${GCS_HMAC_SECRET}"

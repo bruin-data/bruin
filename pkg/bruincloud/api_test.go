@@ -52,6 +52,39 @@ func TestDoRequest_AuthHeader(t *testing.T) {
 	assert.Equal(t, "Bearer test-api-key", gotAuth)
 }
 
+func TestDoRequest_TeamHeader(t *testing.T) {
+	t.Parallel()
+
+	t.Run("sends X-Bruin-Team when set", func(t *testing.T) {
+		t.Parallel()
+		var got string
+		client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			got = r.Header.Get("X-Bruin-Team")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("[]"))
+		})
+		client.SetTeam("acme")
+
+		_, err := client.ListProjects(t.Context())
+		require.NoError(t, err)
+		assert.Equal(t, "acme", got)
+	})
+
+	t.Run("omits the header when unset", func(t *testing.T) {
+		t.Parallel()
+		var present bool
+		client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			_, present = r.Header["X-Bruin-Team"]
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("[]"))
+		})
+
+		_, err := client.ListProjects(t.Context())
+		require.NoError(t, err)
+		assert.False(t, present)
+	})
+}
+
 func TestDoRequest_ErrorParsing(t *testing.T) {
 	t.Parallel()
 
@@ -830,7 +863,7 @@ func TestListBackfills(t *testing.T) {
 		assert.Equal(t, "pipe", r.URL.Query().Get("pipeline"))
 		assert.Equal(t, "5", r.URL.Query().Get("limit"))
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`[{"id":"m1","project":"proj","pipeline":"pipe","interval_start":"2026-01-01T00:00:00.000Z","interval_end":"2026-01-03T00:00:00.000Z","created_at":"2026-01-01T00:00:00.000Z","runs":[{"runId":"m1__a"},{"runId":"m1__b"}]}]`))
+		_, _ = w.Write([]byte(`[{"id":"m1","project":"proj","pipeline":"pipe","interval_start":"2026-01-01T00:00:00.000Z","interval_end":"2026-01-03T00:00:00.000Z","created_at":"2026-01-01T00:00:00.000Z","runs":[{"run_id":"m1__a"},{"run_id":"m1__b"}]}]`))
 	})
 
 	backfills, err := client.ListBackfills(t.Context(), "proj", "pipe", 5)
@@ -847,7 +880,7 @@ func TestGetBackfillRuns(t *testing.T) {
 		assert.Equal(t, "/backfills/m1/runs", r.URL.Path)
 		assert.Equal(t, "30", r.URL.Query().Get("limit"))
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`[{"project":"proj","pipeline":"pipe","runId":"m1__a","interval_start":"2026-01-01T00:00:00.000Z","interval_end":"2026-01-02T00:00:00.000Z","created_at":"2026-01-01T00:00:00.000Z","note":null}]`))
+		_, _ = w.Write([]byte(`[{"project":"proj","pipeline":"pipe","run_id":"m1__a","interval_start":"2026-01-01T00:00:00.000Z","interval_end":"2026-01-02T00:00:00.000Z","created_at":"2026-01-01T00:00:00.000Z","note":null}]`))
 	})
 
 	runs, err := client.GetBackfillRuns(t.Context(), "m1", 30, 0)

@@ -177,6 +177,15 @@ AI agent skills are installed separately with `bruin ai skills`; see [AI Skills]
   </a>
 </div>
 
+## Migration templates
+
+Migration templates provide a review-gated starting point for moving existing
+data integrations to Bruin.
+
+| Template | Use when you want to start with |
+| --- | --- |
+| `migration-fivetran` | A review-gated Fivetran migration workspace with a blank `bruin/` pipeline, migration prompt, plan, and agent skill. |
+
 ## Other bundled templates
 
 Bruin also ships smaller starter templates and specialized examples that may not have full walkthrough pages yet.
@@ -210,6 +219,7 @@ bruin init nyc-taxi my-taxi-pipeline
 | --- | --- |
 | Learn Bruin locally without cloud credentials | `duckdb`, `python`, `frankfurter`, or `chess` |
 | Build a source-to-warehouse ingestion pipeline | `ai-coding-usage`, `shopify-bigquery`, `shopify-clickhouse`, `gsheet-bigquery`, `notion`, or `gorgias` |
+| Migrate one Fivetran connection to a review-gated Bruin project | `migration-fivetran` |
 | Explore a complete demo with generated data | `demo-snowflake-sales-analytics` or `demo-snowflake-salesforce` |
 | Scaffold ecommerce reporting | `ecommerce` |
 | Work with a specific database | `athena`, `clickhouse`, `bronze-silver-postgres`, `bigquery`, `databricks`, or `redshift` |

@@ -86,6 +86,7 @@ const (
 	AssetTypeMsSQLSource               = AssetType("ms.source")
 	AssetTypeMsSQLTableSensor          = AssetType("ms.sensor.table")
 	AssetTypeFabricQuery               = AssetType("fabric.sql")
+	AssetTypeFabricSparkQuery          = AssetType("fabric.spark_sql")
 	AssetTypeFabricQuerySensor         = AssetType("fabric.sensor.query")
 	AssetTypeFabricSeed                = AssetType("fabric.seed")
 	AssetTypeFabricTableSensor         = AssetType("fabric.sensor.table")
@@ -934,6 +935,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeMsSQLTableSensor:          "mssql",
 	AssetTypeMsSQLSource:               "mssql",
 	AssetTypeFabricQuery:               "fabric",
+	AssetTypeFabricSparkQuery:          "fabric",
 	AssetTypeFabricSeed:                "fabric",
 	AssetTypeFabricQuerySensor:         "fabric",
 	AssetTypeFabricTableSensor:         "fabric",
@@ -2529,6 +2531,7 @@ func (p *Pipeline) GetMajorityAssetTypesFromSQLAssets(defaultIfNone AssetType) A
 		AssetTypeRedshiftQuery:     0,
 		AssetTypeSynapseQuery:      0,
 		AssetTypeFabricQuery:       0,
+		AssetTypeFabricSparkQuery:  0,
 		AssetTypeFabricQueryLegacy: 0,
 		AssetTypeAthenaQuery:       0,
 		AssetTypeDuckDBQuery:       0,
@@ -4007,6 +4010,7 @@ func IsSQLAssetType(t AssetType) bool {
 		AssetTypeDatabricksQuery,
 		AssetTypeSynapseQuery,
 		AssetTypeFabricQuery,
+		AssetTypeFabricSparkQuery,
 		AssetTypeFabricQueryLegacy,
 		AssetTypeAthenaQuery,
 		AssetTypeDuckDBQuery,

@@ -2244,6 +2244,9 @@
         },
         "tenant_id": {
           "type": "string"
+        },
+        "lakehouse": {
+          "$ref": "#/$defs/FabricLakehouseConfig"
         }
       },
       "additionalProperties": false,
@@ -2253,6 +2256,22 @@
         "host",
         "port",
         "database"
+      ]
+    },
+    "FabricLakehouseConfig": {
+      "properties": {
+        "workspace_id": {
+          "type": "string"
+        },
+        "lakehouse_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "workspace_id",
+        "lakehouse_id"
       ]
     },
     "FacebookAdsConnection": {

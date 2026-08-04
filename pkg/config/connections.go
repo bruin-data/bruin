@@ -268,16 +268,24 @@ func (c SynapseConnection) GetName() string {
 
 type FabricConnection struct {
 	ConnectionMetadata        `yaml:",inline" mapstructure:",squash"`
-	Host                      string `yaml:"host,omitempty"     json:"host" mapstructure:"host"`
-	Port                      int    `yaml:"port,omitempty"     json:"port" mapstructure:"port" jsonschema:"default=1433"`
-	Database                  string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
-	Username                  string `yaml:"username,omitempty" json:"username,omitempty" mapstructure:"username"`
-	Password                  string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password" sensitive:"true"`
-	Options                   string `yaml:"options,omitempty"  json:"options,omitempty" mapstructure:"options"`
-	UseAzureDefaultCredential bool   `yaml:"use_azure_default_credential,omitempty" json:"use_azure_default_credential,omitempty" mapstructure:"use_azure_default_credential"`
-	ClientID                  string `yaml:"client_id,omitempty" json:"client_id,omitempty" mapstructure:"client_id"`
-	ClientSecret              string `yaml:"client_secret,omitempty" json:"client_secret,omitempty" mapstructure:"client_secret" sensitive:"true"`
-	TenantID                  string `yaml:"tenant_id,omitempty" json:"tenant_id,omitempty" mapstructure:"tenant_id"`
+	Host                      string                 `yaml:"host,omitempty"     json:"host" mapstructure:"host"`
+	Port                      int                    `yaml:"port,omitempty"     json:"port" mapstructure:"port" jsonschema:"default=1433"`
+	Database                  string                 `yaml:"database,omitempty" json:"database" mapstructure:"database"`
+	Username                  string                 `yaml:"username,omitempty" json:"username,omitempty" mapstructure:"username"`
+	Password                  string                 `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password" sensitive:"true"`
+	Options                   string                 `yaml:"options,omitempty"  json:"options,omitempty" mapstructure:"options"`
+	UseAzureDefaultCredential bool                   `yaml:"use_azure_default_credential,omitempty" json:"use_azure_default_credential,omitempty" mapstructure:"use_azure_default_credential"`
+	ClientID                  string                 `yaml:"client_id,omitempty" json:"client_id,omitempty" mapstructure:"client_id"`
+	ClientSecret              string                 `yaml:"client_secret,omitempty" json:"client_secret,omitempty" mapstructure:"client_secret" sensitive:"true"`
+	TenantID                  string                 `yaml:"tenant_id,omitempty" json:"tenant_id,omitempty" mapstructure:"tenant_id"`
+	Lakehouse                 *FabricLakehouseConfig `yaml:"lakehouse,omitempty" json:"lakehouse,omitempty" mapstructure:"lakehouse"`
+}
+
+// FabricLakehouseConfig identifies the Lakehouse used by Fabric Spark assets.
+// Authentication is inherited from the parent Fabric connection.
+type FabricLakehouseConfig struct {
+	WorkspaceID string `yaml:"workspace_id,omitempty" json:"workspace_id" mapstructure:"workspace_id"`
+	LakehouseID string `yaml:"lakehouse_id,omitempty" json:"lakehouse_id" mapstructure:"lakehouse_id"`
 }
 
 func (c FabricConnection) GetName() string {
