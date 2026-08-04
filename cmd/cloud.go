@@ -49,14 +49,18 @@ func Cloud(isDebug *bool) *cli.Command {
 }
 
 // addTeamFlag adds --team to every runnable cloud command, so any of them can
-// target a team other than the token owner's current one.
+// target a team other than the token owner's current one. A command is runnable
+// when it has an action of its own (leaves always, but also parents like
+// "agents connections" that both list and hold subcommands); recurse into any
+// parent so its children get the flag too.
 func addTeamFlag(cmd *cli.Command) {
 	for _, sub := range cmd.Commands {
+		if sub.Action != nil || len(sub.Commands) == 0 {
+			sub.Flags = append(sub.Flags, teamFlag())
+		}
 		if len(sub.Commands) > 0 {
 			addTeamFlag(sub)
-			continue
 		}
-		sub.Flags = append(sub.Flags, teamFlag())
 	}
 }
 

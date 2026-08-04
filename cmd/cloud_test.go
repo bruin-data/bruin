@@ -178,20 +178,23 @@ func TestCloudLeafCommandsHaveTeamFlag(t *testing.T) {
 	var walk func(*cli.Command)
 	walk = func(c *cli.Command) {
 		for _, sub := range c.Commands {
-			if len(sub.Commands) > 0 {
-				walk(sub)
-				continue
-			}
-			has := false
-			for _, f := range sub.Flags {
-				for _, n := range f.Names() {
-					if n == "team" {
-						has = true
+			// Every runnable command (a leaf, or a parent like "agents
+			// connections" that has its own action) must carry --team.
+			if sub.Action != nil || len(sub.Commands) == 0 {
+				has := false
+				for _, f := range sub.Flags {
+					for _, n := range f.Names() {
+						if n == "team" {
+							has = true
+						}
 					}
 				}
+				assert.Truef(t, has, "cloud command %q should have --team", sub.Name)
+				checked++
 			}
-			assert.Truef(t, has, "cloud command %q should have --team", sub.Name)
-			checked++
+			if len(sub.Commands) > 0 {
+				walk(sub)
+			}
 		}
 	}
 	walk(Cloud(&isDebug))
