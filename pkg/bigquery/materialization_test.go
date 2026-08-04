@@ -176,6 +176,36 @@ COMMIT TRANSACTION;`,
 			exactMatch: true,
 		},
 		{
+			name: "append rejects require partition filter without a partitioned table",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyAppend,
+				},
+				BigQuery: pipeline.BigQueryConfig{
+					RequirePartitionFilter: boolp(true),
+				},
+			},
+			query:   "SELECT 1",
+			wantErr: true,
+		},
+		{
+			name: "truncate+insert rejects require partition filter without a partitioned table",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyTruncateInsert,
+				},
+				BigQuery: pipeline.BigQueryConfig{
+					RequirePartitionFilter: boolp(true),
+				},
+			},
+			query:   "SELECT 1",
+			wantErr: true,
+		},
+		{
 			name: "incremental strategies require the incremental_key to be set",
 			task: &pipeline.Asset{
 				Name: "my.asset",
@@ -455,6 +485,145 @@ COMMIT TRANSACTION;`,
 			exactMatch: true,
 		},
 		{
+			name: "merge with a required partition filter on a truncated timestamp partition",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "created_at", Type: "TIMESTAMP"},
+					{Name: "value", UpdateOnMerge: true},
+				},
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					Strategy:    pipeline.MaterializationStrategyMerge,
+					PartitionBy: "TIMESTAMP_TRUNC(created_at, HOUR)",
+				},
+				BigQuery: pipeline.BigQueryConfig{
+					RequirePartitionFilter: boolp(true),
+					PartitionKeyImmutable:  boolp(true),
+				},
+			},
+			query: "SELECT id, created_at, value FROM source_table",
+			want: "DECLARE bruin_merge_partitions_abcefghi ARRAY<TIMESTAMP>;\n" +
+				"BEGIN TRANSACTION;\n" +
+				"CREATE TEMP TABLE __bruin_merge_source_abcefghi AS SELECT id, created_at, value FROM source_table;\n" +
+				"SET bruin_merge_partitions_abcefghi = ARRAY(SELECT DISTINCT TIMESTAMP_TRUNC(source.created_at, HOUR) FROM __bruin_merge_source_abcefghi source WHERE TIMESTAMP_TRUNC(source.created_at, HOUR) IS NOT NULL);\n" +
+				"ASSERT NOT EXISTS (SELECT 1 FROM __bruin_merge_source_abcefghi source WHERE TIMESTAMP_TRUNC(source.created_at, HOUR) IS NULL) AS 'partition-scoped merge requires non-null partition values';\n" +
+				"CREATE TEMP TABLE __bruin_merge_new_abcefghi AS\n" +
+				"SELECT source.* FROM __bruin_merge_source_abcefghi source\n" +
+				"WHERE NOT EXISTS (\n" +
+				"  SELECT 1\n" +
+				"  FROM my.asset target\n" +
+				"  WHERE TIMESTAMP_TRUNC(target.created_at, HOUR) IN UNNEST(bruin_merge_partitions_abcefghi) AND (source.id = target.id OR (source.id IS NULL and target.id IS NULL))\n" +
+				");\n" +
+				"MERGE my.asset target\n" +
+				"USING __bruin_merge_source_abcefghi source\n" +
+				"ON (TIMESTAMP_TRUNC(target.created_at, HOUR) IN UNNEST(bruin_merge_partitions_abcefghi) AND (source.id = target.id OR (source.id IS NULL and target.id IS NULL)))\n" +
+				"WHEN MATCHED THEN UPDATE SET target.value = source.value;\n" +
+				"INSERT INTO my.asset(id, created_at, value)\n" +
+				"SELECT source.id, source.created_at, source.value\n" +
+				"FROM __bruin_merge_new_abcefghi source;\n" +
+				"COMMIT TRANSACTION;",
+			exactMatch: true,
+		},
+		{
+			name: "merge with a required partition filter on a monthly date partition",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "event_date", Type: "DATE", PrimaryKey: true},
+				},
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					Strategy:    pipeline.MaterializationStrategyMerge,
+					PartitionBy: "DATE_TRUNC(event_date, MONTH)",
+				},
+				BigQuery: pipeline.BigQueryConfig{
+					RequirePartitionFilter: boolp(true),
+				},
+			},
+			query: "SELECT id, event_date FROM source_table",
+			want: "DECLARE bruin_merge_partitions_abcefghi ARRAY<DATE>;\n" +
+				"BEGIN TRANSACTION;\n" +
+				"CREATE TEMP TABLE __bruin_merge_source_abcefghi AS SELECT id, event_date FROM source_table;\n" +
+				"SET bruin_merge_partitions_abcefghi = ARRAY(SELECT DISTINCT DATE_TRUNC(source.event_date, MONTH) FROM __bruin_merge_source_abcefghi source WHERE DATE_TRUNC(source.event_date, MONTH) IS NOT NULL);\n" +
+				"ASSERT NOT EXISTS (SELECT 1 FROM __bruin_merge_source_abcefghi source WHERE DATE_TRUNC(source.event_date, MONTH) IS NULL) AS 'partition-scoped merge requires non-null partition values';\n" +
+				"INSERT INTO my.asset(id, event_date)\n" +
+				"SELECT source.id, source.event_date\n" +
+				"FROM __bruin_merge_source_abcefghi source\n" +
+				"WHERE NOT EXISTS (\n" +
+				"  SELECT 1\n" +
+				"  FROM my.asset target\n" +
+				"  WHERE DATE_TRUNC(target.event_date, MONTH) IN UNNEST(bruin_merge_partitions_abcefghi) AND (source.id = target.id OR (source.id IS NULL and target.id IS NULL)) AND (source.event_date = target.event_date OR (source.event_date IS NULL and target.event_date IS NULL))\n" +
+				");\n" +
+				"COMMIT TRANSACTION;",
+			exactMatch: true,
+		},
+		{
+			name: "merge with a required partition filter rejects a non-temporal partition column",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "bucket", Type: "INT64", PrimaryKey: true},
+				},
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					Strategy:    pipeline.MaterializationStrategyMerge,
+					PartitionBy: "bucket",
+				},
+				BigQuery: pipeline.BigQueryConfig{
+					RequirePartitionFilter: boolp(true),
+				},
+			},
+			query:   "SELECT id, bucket FROM source_table",
+			wantErr: true,
+		},
+		{
+			name: "merge with a required partition filter rejects updating the partition column on merge",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "event_date", Type: "DATE", UpdateOnMerge: true},
+					{Name: "value", UpdateOnMerge: true},
+				},
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					Strategy:    pipeline.MaterializationStrategyMerge,
+					PartitionBy: "event_date",
+				},
+				BigQuery: pipeline.BigQueryConfig{
+					RequirePartitionFilter: boolp(true),
+					PartitionKeyImmutable:  boolp(true),
+				},
+			},
+			query:   "SELECT id, event_date, value FROM source_table",
+			wantErr: true,
+		},
+		{
+			name: "merge with a required partition filter rejects merge_sql on the partition column",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "event_date", Type: "DATE", MergeSQL: "GREATEST(target.event_date, source.event_date)"},
+				},
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					Strategy:    pipeline.MaterializationStrategyMerge,
+					PartitionBy: "event_date",
+				},
+				BigQuery: pipeline.BigQueryConfig{
+					RequirePartitionFilter: boolp(true),
+					PartitionKeyImmutable:  boolp(true),
+				},
+			},
+			query:   "SELECT id, event_date FROM source_table",
+			wantErr: true,
+		},
+		{
 			name: "merge with a required partition filter rejects a partition key that may move",
 			task: &pipeline.Asset{
 				Name: "my.asset",
@@ -676,18 +845,20 @@ FROM staging.events
 WHERE event_date >= DATE '2026-07-01';
 SET bruin_merge_partitions_abcefghi = ARRAY(SELECT DISTINCT source.event_date FROM __bruin_merge_source_abcefghi source WHERE source.event_date IS NOT NULL);
 ASSERT NOT EXISTS (SELECT 1 FROM __bruin_merge_source_abcefghi source WHERE source.event_date IS NULL) AS 'partition-scoped merge requires non-null partition values';
+CREATE TEMP TABLE __bruin_merge_new_abcefghi AS
+SELECT source.* FROM __bruin_merge_source_abcefghi source
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM analytics.events target
+  WHERE target.event_date IN UNNEST(bruin_merge_partitions_abcefghi) AND (source.id = target.id OR (source.id IS NULL and target.id IS NULL)) AND (target.event_date >= DATE '2026-07-01')
+);
 MERGE analytics.events target
 USING __bruin_merge_source_abcefghi source
 ON (target.event_date IN UNNEST(bruin_merge_partitions_abcefghi) AND (source.id = target.id OR (source.id IS NULL and target.id IS NULL)) AND (target.event_date >= DATE '2026-07-01'))
 WHEN MATCHED THEN UPDATE SET target.payload = source.payload;
 INSERT INTO analytics.events(id, event_date, payload)
 SELECT source.id, source.event_date, source.payload
-FROM __bruin_merge_source_abcefghi source
-WHERE NOT EXISTS (
-  SELECT 1
-  FROM analytics.events target
-  WHERE target.event_date IN UNNEST(bruin_merge_partitions_abcefghi) AND (source.id = target.id OR (source.id IS NULL and target.id IS NULL)) AND (target.event_date >= DATE '2026-07-01')
-);
+FROM __bruin_merge_new_abcefghi source;
 COMMIT TRANSACTION;`
 
 	generatedFullSQL, err := NewMaterializer(false).Render(asset, assetQuery)
@@ -733,18 +904,20 @@ FROM staging.raw_events
 WHERE DATE(created_at) = DATE '2026-07-27';
 SET bruin_merge_partitions_abcefghi = ARRAY(SELECT DISTINCT DATE(source.created_at) FROM __bruin_merge_source_abcefghi source WHERE DATE(source.created_at) IS NOT NULL);
 ASSERT NOT EXISTS (SELECT 1 FROM __bruin_merge_source_abcefghi source WHERE DATE(source.created_at) IS NULL) AS 'partition-scoped merge requires non-null partition values';
+CREATE TEMP TABLE __bruin_merge_new_abcefghi AS
+SELECT source.* FROM __bruin_merge_source_abcefghi source
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM analytics.events_by_day target
+  WHERE DATE(target.created_at) IN UNNEST(bruin_merge_partitions_abcefghi) AND (source.id = target.id OR (source.id IS NULL and target.id IS NULL)) AND (source.created_at = target.created_at OR (source.created_at IS NULL and target.created_at IS NULL))
+);
 MERGE analytics.events_by_day target
 USING __bruin_merge_source_abcefghi source
 ON (DATE(target.created_at) IN UNNEST(bruin_merge_partitions_abcefghi) AND (source.id = target.id OR (source.id IS NULL and target.id IS NULL)) AND (source.created_at = target.created_at OR (source.created_at IS NULL and target.created_at IS NULL)))
 WHEN MATCHED THEN UPDATE SET target.payload = source.payload;
 INSERT INTO analytics.events_by_day(id, created_at, payload)
 SELECT source.id, source.created_at, source.payload
-FROM __bruin_merge_source_abcefghi source
-WHERE NOT EXISTS (
-  SELECT 1
-  FROM analytics.events_by_day target
-  WHERE DATE(target.created_at) IN UNNEST(bruin_merge_partitions_abcefghi) AND (source.id = target.id OR (source.id IS NULL and target.id IS NULL)) AND (source.created_at = target.created_at OR (source.created_at IS NULL and target.created_at IS NULL))
-);
+FROM __bruin_merge_new_abcefghi source;
 COMMIT TRANSACTION;`
 
 	generatedFullSQL, err := NewMaterializer(false).Render(asset, assetQuery)

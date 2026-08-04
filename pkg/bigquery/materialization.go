@@ -62,6 +62,10 @@ func viewMaterializer(asset *pipeline.Asset, query string) (string, error) {
 }
 
 func buildTruncateInsertQuery(task *pipeline.Asset, query string) (string, error) {
+	if err := validateRequirePartitionFilter(task, task.Materialization.PartitionBy != ""); err != nil {
+		return "", err
+	}
+
 	// BigQuery treats TRUNCATE TABLE as a DML statement, so the truncate and insert can
 	// run inside a single transaction. This makes the full refresh atomic: readers never
 	// observe the intermediate empty table, and a failed insert rolls back the truncate.
@@ -210,6 +214,17 @@ func validatePartitionedMerge(asset *pipeline.Asset) error {
 		return nil
 	}
 
+	// When the partition is the bare column, rewriting the column rewrites the partition, so
+	// partition_key_immutable cannot hold: the merge does not match the row in its old partition
+	// and the insert then duplicates it into the new one. Truncated partitions are left alone
+	// because there a value can change without crossing a partition boundary.
+	if partition.function == "" && (partitionColumn.UpdateOnMerge || partitionColumn.MergeSQL != "") {
+		return errors.Errorf(
+			"partition column %q cannot use update_on_merge or merge_sql in a partition-scoped BigQuery merge because rewriting it moves the row to another partition and duplicates it; drop update_on_merge/merge_sql from the column, or disable bigquery.require_partition_filter so a normal merge can search the whole target",
+			partition.columnName,
+		)
+	}
+
 	if asset.BigQuery.PartitionKeyImmutable != nil && *asset.BigQuery.PartitionKeyImmutable {
 		return nil
 	}
@@ -259,13 +274,34 @@ func buildPartitionedMergeQuery(
 		),
 	}
 
+	insertTable := sourceTable
+	notMatchedFilter := []string{
+		"WHERE NOT EXISTS (",
+		"  SELECT 1",
+		fmt.Sprintf("  FROM %s target", asset.Name),
+		"  WHERE " + filteredMatchQuery,
+		")",
+	}
+
 	if whenMatchedThenQuery != "" {
+		// The merge below mutates the target, so the rows that still need inserting have to be
+		// captured beforehand. Re-evaluating the match after the update would re-select any row
+		// whose incremental predicate stopped holding because the merge changed a column it
+		// references, and insert a duplicate of it.
+		insertTable = "__bruin_merge_new_" + suffix
+		statements = append(statements, strings.Join(append([]string{
+			fmt.Sprintf("CREATE TEMP TABLE %s AS", insertTable),
+			fmt.Sprintf("SELECT source.* FROM %s source", sourceTable),
+		}, notMatchedFilter...), "\n"))
+
 		statements = append(statements, strings.Join([]string{
 			fmt.Sprintf("MERGE %s target", asset.Name),
 			fmt.Sprintf("USING %s source", sourceTable),
 			fmt.Sprintf("ON (%s)", filteredMatchQuery),
 			whenMatchedThenQuery,
 		}, "\n"))
+
+		notMatchedFilter = nil
 	}
 
 	sourceColumnNames := make([]string, len(columnNames))
@@ -273,22 +309,24 @@ func buildPartitionedMergeQuery(
 		sourceColumnNames[i] = "source." + column
 	}
 
-	statements = append(statements, strings.Join([]string{
+	insertLines := make([]string, 0, 3+len(notMatchedFilter))
+	insertLines = append(
+		insertLines,
 		fmt.Sprintf("INSERT INTO %s(%s)", asset.Name, strings.Join(columnNames, ", ")),
-		"SELECT " + strings.Join(sourceColumnNames, ", "),
-		fmt.Sprintf("FROM %s source", sourceTable),
-		"WHERE NOT EXISTS (",
-		"  SELECT 1",
-		fmt.Sprintf("  FROM %s target", asset.Name),
-		"  WHERE " + filteredMatchQuery,
-		")",
-	}, "\n"))
+		"SELECT "+strings.Join(sourceColumnNames, ", "),
+		fmt.Sprintf("FROM %s source", insertTable),
+	)
+	statements = append(statements, strings.Join(append(insertLines, notMatchedFilter...), "\n"))
 	statements = append(statements, "COMMIT TRANSACTION")
 
 	return strings.Join(statements, ";\n") + ";", nil
 }
 
 func buildAppendQuery(asset *pipeline.Asset, query string) (string, error) {
+	if err := validateRequirePartitionFilter(asset, asset.Materialization.PartitionBy != ""); err != nil {
+		return "", err
+	}
+
 	return fmt.Sprintf("INSERT INTO %s %s", asset.Name, query), nil
 }
 

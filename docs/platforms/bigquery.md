@@ -158,10 +158,15 @@ Bruin's built-in column checks (`not_null`, `unique`, `positive`, `accepted_valu
 
 Bruin supports `merge` with `bigquery.require_partition_filter: true` by using a partition-scoped transaction. It materializes the asset query once in a temporary table, collects the exact non-null partition values produced by that query, and then:
 
-1. runs an update-only `MERGE` against those target partitions; and
-2. inserts source rows whose primary keys do not exist in those target partitions.
+1. captures the source rows whose primary keys do not exist in those target partitions;
+2. runs an update-only `MERGE` against those target partitions; and
+3. inserts the rows captured in step 1.
 
-Both target reads contain a real partition predicate, so BigQuery keeps enforcing the required-filter option and prunes unrelated partitions instead of relying on a tautological filter that can still scan the whole table. The statements run in one transaction and the source query runs only once.
+Step 1 runs before the `MERGE` on purpose. Reading the target again afterwards would re-select any row whose `materialization.incremental_predicate` stopped holding because the `MERGE` updated a column it references, and insert a duplicate of it.
+
+When no column carries `update_on_merge` or `merge_sql` there is nothing to update, so steps 1 and 2 are skipped and a single insert reads the target directly.
+
+Every target read contains a real partition predicate, so BigQuery keeps enforcing the required-filter option and prunes unrelated partitions instead of relying on a tautological filter that can still scan the whole table. The statements run in one transaction and the source query runs only once.
 
 For correctness, the column referenced by `materialization.partition_by` must either be part of the merge primary key or be immutable for a given primary key. If it is not a primary-key column, declare that invariant explicitly:
 
@@ -192,6 +197,8 @@ from staging.events
 ```
 
 Setting `partition_key_immutable: true` incorrectly can leave an old row behind if the same primary key later arrives with a different partition value. If partition values can move, include the partition column in the primary key, use a strategy that replaces complete partitions, or leave `require_partition_filter` disabled so a normal merge can search the whole target.
+
+Bruin rejects the case it can prove: when `partition_by` is the bare column, a non-primary-key partition column that carries `update_on_merge` or `merge_sql` is rewritten by the merge itself, so `partition_key_immutable` cannot hold for it. With `DATE(column)` or a `*_TRUNC(column, unit)` partition the declaration is still trusted, since a value can change without crossing a partition boundary.
 
 Partition-scoped merge currently supports `DATE`, `DATETIME`, and `TIMESTAMP` partition columns, `DATE(column)`, and the corresponding `*_TRUNC(column, unit)` expressions. The partition column must have a declared type when it is used directly. Source rows with a null partition value are rejected before the target is modified.
 
