@@ -50,9 +50,9 @@ are resolved only once. Fields nested inside a connection can be traversed with 
 ```
 
 The usual Bruin Jinja helpers remain available in the same namespace. For example,
-`{{ bruin.slugify("Account Name") }}` renders as `account_name`. Most other helpers generate SQL
-expressions and are primarily useful in asset templates; see [Jinja templating and built-in
-functions](/assets/templating/macros).
+<code v-pre>{{ bruin.slugify("Account Name") }}</code> renders as `account_name`. Most other helpers
+generate SQL expressions and are primarily useful in asset templates; see [Jinja templating and
+built-in functions](/assets/templating/macros).
 
 Use `--environment` (or `--env`) to select a non-default environment and `--config-file` to use a
 specific `.bruin.yml` file. Bruin's global `--secrets-backend` flag is also supported:
@@ -68,9 +68,9 @@ does not need to enumerate every secret in the backend.
 
 ## Curl variables
 
-Curl uses `{{name}}`-style expressions for values supplied with `--variable`, which overlaps with
-Jinja syntax. Bruin recognizes curl's variable syntax and leaves those expressions for curl while
-still rendering connection references in the same argument:
+Curl uses <code v-pre>{{name}}</code>-style expressions for values supplied with `--variable`, which
+overlaps with Jinja syntax. Bruin recognizes curl's variable syntax and leaves those expressions for
+curl while still rendering connection references in the same argument:
 
 ```bash
 bruin curl -- \
@@ -79,7 +79,7 @@ bruin curl -- \
 ```
 
 Curl variable names are alphanumeric with underscores and do not contain dots, optionally followed
-by colon-separated functions such as `{{path:trim:url}}`. Bruin connection expressions are
+by colon-separated functions such as <code v-pre>{{path:trim:url}}</code>. Bruin connection expressions are
 namespaced under `bruin.connection(...)`, which makes the two forms unambiguous.
 
 All curl arguments, including option names, option values, URLs, and curl variable declarations,

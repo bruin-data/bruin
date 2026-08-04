@@ -228,7 +228,7 @@ func TestCurlCommandReportsRenderFailuresOnStderr(t *testing.T) { //nolint:paral
 }
 
 func TestExecuteCurlPassesArgumentsUnchanged(t *testing.T) { //nolint:paralleltest // changes PATH
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == osWindows {
 		t.Skip("uses a POSIX test executable")
 	}
 
@@ -262,16 +262,16 @@ done
 func TestCurlExitCode(t *testing.T) {
 	t.Parallel()
 
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == osWindows {
 		t.Skip("relies on POSIX signals")
 	}
 
-	failed := exec.Command("sh", "-c", "exit 7").Run()
+	failed := exec.CommandContext(t.Context(), "sh", "-c", "exit 7").Run()
 	var failedExit *exec.ExitError
 	require.ErrorAs(t, failed, &failedExit)
 	assert.Equal(t, 7, curlExitCode(failedExit))
 
-	signalled := exec.Command("sh", "-c", "kill -TERM $$")
+	signalled := exec.CommandContext(t.Context(), "sh", "-c", "kill -TERM $$")
 	require.NoError(t, signalled.Start())
 	var signalledExit *exec.ExitError
 	require.ErrorAs(t, signalled.Wait(), &signalledExit)
