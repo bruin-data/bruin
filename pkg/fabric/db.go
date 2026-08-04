@@ -369,7 +369,7 @@ ORDER BY TABLE_SCHEMA, TABLE_NAME
 
 	rows, err := db.Select(ctx, &query.Query{Query: schemaQuery})
 	if err != nil {
-		return nil, fmt.Errorf("failed to query information_schema.tables: %w", err)
+		return nil, fmt.Errorf("failed to query INFORMATION_SCHEMA.TABLES: %w", err)
 	}
 
 	schemas := make(map[string][]string)
@@ -405,7 +405,7 @@ WHERE TABLE_SCHEMA NOT IN ('sys', 'INFORMATION_SCHEMA')
 
 	tables, err := db.Select(ctx, &query.Query{Query: schemaQuery})
 	if err != nil {
-		return nil, fmt.Errorf("failed to query information_schema.tables: %w", err)
+		return nil, fmt.Errorf("failed to query INFORMATION_SCHEMA.TABLES: %w", err)
 	}
 
 	summary := &ansisql.DBDatabase{

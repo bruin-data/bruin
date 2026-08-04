@@ -540,3 +540,40 @@ func TestDB_GetTablesWithSchemas_MismatchedDatabase(t *testing.T) {
 	_, err := db.GetTablesWithSchemas(t.Context(), "other")
 	require.Error(t, err)
 }
+
+const expectedDatabaseSummaryQuery = `
+SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE
+FROM INFORMATION_SCHEMA.TABLES
+WHERE TABLE_SCHEMA NOT IN ('sys', 'INFORMATION_SCHEMA')
+`
+
+func TestDB_GetDatabaseSummary(t *testing.T) {
+	t.Parallel()
+
+	mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+	require.NoError(t, err)
+	defer mockDB.Close()
+
+	// Asserts the case-sensitive uppercase INFORMATION_SCHEMA.TABLES query.
+	mock.ExpectQuery(expectedDatabaseSummaryQuery).
+		WillReturnRows(sqlmock.NewRows([]string{"TABLE_SCHEMA", "TABLE_NAME", "TABLE_TYPE"}).
+			AddRow("dbo", "customers", "BASE TABLE").
+			AddRow("dbo", "v_orders", "VIEW"))
+
+	db := &DB{
+		conn:   sqlx.NewDb(mockDB, "sqlmock"),
+		config: &Config{Database: "warehouse"},
+	}
+
+	got, err := db.GetDatabaseSummary(t.Context())
+	require.NoError(t, err)
+	assert.Equal(t, "warehouse", got.Name)
+	require.Len(t, got.Schemas, 1)
+	assert.Equal(t, "dbo", got.Schemas[0].Name)
+	require.Len(t, got.Schemas[0].Tables, 2)
+	assert.Equal(t, "customers", got.Schemas[0].Tables[0].Name)
+	assert.Equal(t, ansisql.DBTableTypeTable, got.Schemas[0].Tables[0].Type)
+	assert.Equal(t, "v_orders", got.Schemas[0].Tables[1].Name)
+	assert.Equal(t, ansisql.DBTableTypeView, got.Schemas[0].Tables[1].Type)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
