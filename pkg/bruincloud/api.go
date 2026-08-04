@@ -129,6 +129,18 @@ func (c *APIClient) doRequest(ctx context.Context, method, path string, body any
 	return nil
 }
 
+// --- Teams ---
+
+// ListTeams returns the teams the token can act on. Unlike the other endpoints
+// it needs no --team: it's how you discover the company_prefixes to pass there.
+func (c *APIClient) ListTeams(ctx context.Context) ([]Team, error) {
+	var resp struct {
+		Teams []Team `json:"teams"`
+	}
+	err := c.doRequest(ctx, http.MethodGet, "/teams", nil, &resp)
+	return resp.Teams, err
+}
+
 // --- Projects ---
 
 func (c *APIClient) ListProjects(ctx context.Context) ([]Project, error) {

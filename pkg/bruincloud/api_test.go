@@ -889,6 +889,28 @@ func TestGetBackfillRuns(t *testing.T) {
 	assert.Equal(t, "m1__a", runs[0].RunID)
 }
 
+func TestListTeams(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/teams", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, map[string]any{
+			"teams": []map[string]any{
+				{"id": 1, "name": "Acme", "company_prefix": "acme"},
+				{"id": 2, "name": "Globex", "company_prefix": "globex"},
+			},
+		})
+	})
+
+	teams, err := client.ListTeams(t.Context())
+	require.NoError(t, err)
+	require.Len(t, teams, 2)
+	assert.Equal(t, "Acme", teams[0].Name)
+	assert.Equal(t, "acme", teams[0].CompanyPrefix)
+	assert.Equal(t, 2, teams[1].ID)
+}
+
 func TestListDashboards(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {

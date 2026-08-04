@@ -5,6 +5,14 @@ import (
 	"strings"
 )
 
+// Team is a team the caller's token can act on. CompanyPrefix is what you pass
+// to --team (the X-Bruin-Team header) to target this team on other commands.
+type Team struct {
+	ID            int    `json:"id"`
+	Name          string `json:"name"`
+	CompanyPrefix string `json:"company_prefix"`
+}
+
 // Project represents a Bruin Cloud project.
 type Project struct {
 	ID       string          `json:"id"`
