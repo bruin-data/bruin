@@ -12,7 +12,6 @@ environments:
             type: s3
             path: "s3://${GCS_BUCKET}/warehouse"
             endpoint: "storage.googleapis.com"
-            region: "auto"
             auth:
               access_key: "${GCS_HMAC_KEY}"
               secret_key: "${GCS_HMAC_SECRET}"

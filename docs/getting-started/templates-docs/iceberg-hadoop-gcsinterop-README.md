@@ -25,7 +25,6 @@ the marked values are missing:
             type: s3
             path: "s3://${GCS_BUCKET}/warehouse"        # <- your GCS bucket
             endpoint: "storage.googleapis.com"
-            region: "auto"
             auth:
               access_key: "${GCS_HMAC_KEY}"             # <-
               secret_key: "${GCS_HMAC_SECRET}"          # <-
@@ -59,5 +58,5 @@ bucket is Google's, because the S3 interop endpoint really is an S3 API — only
 `endpoint` points at Google. For native GCS instead, use `type: gcs`, a `gs://`
 warehouse and a service-account key, as in `iceberg-postgres-gcs`.
 
-`region: auto` is a placeholder: Google ignores it, but the AWS SDK will not sign
-a request without one.
+No `region` here: Google ignores it, and ingestr supplies the placeholder the
+AWS SDK insists on. AWS S3 still needs a real one.
