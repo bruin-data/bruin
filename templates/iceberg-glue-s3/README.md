@@ -12,8 +12,29 @@ An IAM user or role that can reach both halves:
 - **Glue** — `glue:GetDatabase`, `glue:CreateDatabase`, `glue:GetTable`, `glue:CreateTable`, `glue:UpdateTable`
 - **The bucket** — `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject`, `s3:ListBucket`
 
-Then supply the values, either by exporting them or by replacing the `${...}`
-placeholders in `.bruin.yml` directly:
+Then fill in the blanks in `.bruin.yml` — the connection is already there, only
+the marked values are missing:
+
+```yaml
+      iceberg:
+        - name: "iceberg-default"
+          catalog:
+            type: glue
+            region: "${AWS_REGION}"                     # <- e.g. eu-north-1
+            auth:
+              access_key: "${AWS_ACCESS_KEY_ID}"        # <-
+              secret_key: "${AWS_SECRET_ACCESS_KEY}"    # <-
+          storage:
+            type: s3
+            path: "s3://${S3_BUCKET}/warehouse"         # <- your bucket
+            region: "${AWS_REGION}"
+            auth:
+              access_key: "${AWS_ACCESS_KEY_ID}"
+              secret_key: "${AWS_SECRET_ACCESS_KEY}"
+```
+
+Replace each `${...}` with the value, or export them as environment variables
+and leave the file alone — Bruin expands both:
 
 ```bash
 export AWS_REGION=eu-north-1

@@ -13,8 +13,28 @@ the alternative to a service-account key.
 An **HMAC key** for the bucket: Cloud Storage → Settings → Interoperability →
 *Create a key*. It looks like an AWS key pair and is used as one.
 
-Then supply the values, either by exporting them or by replacing the `${...}`
-placeholders in `.bruin.yml` directly:
+Then fill in the blanks in `.bruin.yml` — the connection is already there, only
+the marked values are missing:
+
+```yaml
+      iceberg:
+        - name: "iceberg-default"
+          catalog:
+            type: hadoop
+          storage:
+            type: s3
+            path: "s3://${GCS_BUCKET}/warehouse"        # <- your GCS bucket
+            endpoint: "storage.googleapis.com"
+            region: "auto"
+            auth:
+              access_key: "${GCS_HMAC_KEY}"             # <-
+              secret_key: "${GCS_HMAC_SECRET}"          # <-
+          properties:
+            allow-unsafe-commits: "true"
+```
+
+Replace each `${...}` with the value, or export them as environment variables
+and leave the file alone — Bruin expands both:
 
 ```bash
 export GCS_BUCKET=my-company-lake

@@ -13,16 +13,30 @@ RDS, or one you run.
 2. **A GCS service account** with `roles/storage.objectAdmin` on the bucket.
    Download its JSON key and save it next to `.bruin.yml` as `sa.json`.
 
-Then supply the values, either by exporting them or by replacing the `${...}`
-placeholders in `.bruin.yml` directly:
+Then fill in the blanks in `.bruin.yml` — the connection is already there, only
+the marked values are missing:
 
-```bash
-export PG_HOST=my-catalog.example.com
-export PG_DATABASE=iceberg_catalog
-export PG_USERNAME=iceberg_user
-export PG_PASSWORD=…
-export GCS_BUCKET=my-company-lake
+```yaml
+      iceberg:
+        - name: "iceberg-default"
+          catalog:
+            type: postgres
+            host: "${PG_HOST}"              # <- your Postgres host
+            port: 5432
+            database: "${PG_DATABASE}"      # <-
+            auth:
+              username: "${PG_USERNAME}"    # <-
+              password: "${PG_PASSWORD}"    # <-
+          storage:
+            type: gcs
+            path: "gs://${GCS_BUCKET}/warehouse"   # <- your bucket
+            key_file: "sa.json"
+          properties:
+            sslmode: "require"
 ```
+
+Replace each `${...}` with the value, or export them as environment variables
+and leave the file alone — Bruin expands both.
 
 ```bash
 bruin run iceberg-postgres-gcs
