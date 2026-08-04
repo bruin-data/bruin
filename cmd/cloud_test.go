@@ -385,6 +385,36 @@ func TestCloudAgentsConnections_RejectsNonPositiveAgentID(t *testing.T) {
 	}
 }
 
+func TestCloudAgentsMcp_RejectsNonPositiveAgentID(t *testing.T) {
+	t.Parallel()
+	// Each mcp subcommand must reject a non-positive --agent-id locally rather
+	// than sending a bad request. Required flags are supplied so parsing reaches
+	// the Action guard.
+	cases := []struct {
+		name string
+		cmd  func() *cli.Command
+		args []string
+	}{
+		{"list", cloudAgentsMcpList, []string{"list", "--api-key", "k"}},
+		{"set", cloudAgentsMcpSet, []string{"set", "--api-key", "k", "--kind", "linear", "--connection", "c"}},
+		{"remove", cloudAgentsMcpRemove, []string{"remove", "--api-key", "k", "--kind", "linear"}},
+	}
+	for _, tc := range cases {
+		for _, v := range []string{"0", "-3"} {
+			cmd := tc.cmd()
+			exitCode := 0
+			cmd.ExitErrHandler = func(_ context.Context, _ *cli.Command, err error) {
+				var ec cli.ExitCoder
+				if errors.As(err, &ec) {
+					exitCode = ec.ExitCode()
+				}
+			}
+			_ = runCLI(t.Context(), cmd, append(tc.args, "--agent-id", v))
+			assert.Equalf(t, 1, exitCode, "%s: agent-id %q should be rejected", tc.name, v)
+		}
+	}
+}
+
 func TestCloudAgentsConnectionsAdd_RejectsNonPositiveAgentID(t *testing.T) {
 	t.Parallel()
 	for _, v := range []string{"0", "-3"} {

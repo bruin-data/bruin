@@ -567,6 +567,30 @@ bruin cloud agents connections add \
   --credentials '{"username":"u","password":"p","host":"db.example.com","database":"main"}'
 ```
 
+#### `mcp`
+
+Manage an agent's external MCP servers (Linear, GitHub, Notion, …). Each MCP kind
+is backed by a `bruin.yml` connection from the agent's dev-env set.
+
+`list` shows the agent's current picks plus the connections eligible for each kind:
+
+```bash
+bruin cloud agents mcp list --agent-id 7
+bruin cloud agents mcp list --agent-id 7 --output json
+```
+
+`set` attaches or updates one kind (leaving the others intact):
+
+```bash
+bruin cloud agents mcp set --agent-id 7 --kind linear --connection my-linear
+```
+
+`remove` detaches a kind:
+
+```bash
+bruin cloud agents mcp remove --agent-id 7 --kind linear
+```
+
 #### `send`
 
 Send a message to an agent:

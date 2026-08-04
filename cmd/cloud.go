@@ -2519,6 +2519,13 @@ func cloudAgentsMcpList() *cli.Command {
 			defer RecoverFromPanic()
 			output := c.String("output")
 
+			// Fail fast on an invalid id rather than sending a bad request and
+			// surfacing a generic remote error.
+			if c.Int("agent-id") <= 0 {
+				printError(fmt.Errorf("--agent-id must be a positive integer, got %d", c.Int("agent-id")), output, "Invalid --agent-id")
+				return cli.Exit("", 1)
+			}
+
 			client, err := newCloudClient(c)
 			if err != nil {
 				printError(err, output, "Failed to create API client")
@@ -2594,6 +2601,13 @@ func cloudAgentsMcpSet() *cli.Command {
 			agentID := c.Int("agent-id")
 			kind := c.String("kind")
 
+			// Fail fast on an invalid id rather than sending a bad request and
+			// surfacing a generic remote error.
+			if agentID <= 0 {
+				printError(fmt.Errorf("--agent-id must be a positive integer, got %d", agentID), output, "Invalid --agent-id")
+				return cli.Exit("", 1)
+			}
+
 			client, err := newCloudClient(c)
 			if err != nil {
 				printError(err, output, "Failed to create API client")
@@ -2651,6 +2665,13 @@ func cloudAgentsMcpRemove() *cli.Command {
 			output := c.String("output")
 			agentID := c.Int("agent-id")
 			kind := c.String("kind")
+
+			// Fail fast on an invalid id rather than sending a bad request and
+			// surfacing a generic remote error.
+			if agentID <= 0 {
+				printError(fmt.Errorf("--agent-id must be a positive integer, got %d", agentID), output, "Invalid --agent-id")
+				return cli.Exit("", 1)
+			}
 
 			client, err := newCloudClient(c)
 			if err != nil {

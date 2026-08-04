@@ -680,8 +680,8 @@ func TestSetAgentMcpServers(t *testing.T) {
 		var body map[string]any
 		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
 		integrations, ok := body["mcp_integrations"].([]any)
-		require.True(t, ok)
-		require.Len(t, integrations, 1)
+		assert.True(t, ok)
+		assert.Len(t, integrations, 1)
 
 		w.WriteHeader(http.StatusOK)
 		writeJSON(t, w, Agent{ID: 7, Name: "a", Visibility: "team"})
