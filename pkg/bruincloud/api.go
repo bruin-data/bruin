@@ -555,6 +555,23 @@ func (c *APIClient) UpdateAgent(ctx context.Context, agentID int, fields map[str
 	return &result, nil
 }
 
+// ListAgentMcpServers returns the agent's current external MCP server picks
+// along with the supported kinds and the connections eligible for each.
+func (c *APIClient) ListAgentMcpServers(ctx context.Context, agentID int) (*AgentMcpServersResponse, error) {
+	var result AgentMcpServersResponse
+	err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/agents/%d/mcp-servers", agentID), nil, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// SetAgentMcpServers replaces the agent's external MCP picks with the given set.
+// This is a full replace: any kind not in servers is detached.
+func (c *APIClient) SetAgentMcpServers(ctx context.Context, agentID int, servers []AgentMcpServer) (*Agent, error) {
+	return c.UpdateAgent(ctx, agentID, map[string]any{"mcp_integrations": servers})
+}
+
 func (c *APIClient) SendAgentMessage(ctx context.Context, agentID int, message string, threadID *int) (json.RawMessage, error) {
 	body := map[string]any{
 		"message": message,

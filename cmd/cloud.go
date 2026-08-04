@@ -2197,6 +2197,7 @@ func CloudAgents() *cli.Command {
 			cloudAgentsGetPrompt(),
 			cloudAgentsSetPrompt(),
 			cloudAgentsConnections(),
+			cloudAgentsMcp(),
 		},
 	}
 }
@@ -2487,6 +2488,229 @@ func cloudAgentsUpdate() *cli.Command {
 			return nil
 		},
 	}
+}
+
+func cloudAgentsMcp() *cli.Command {
+	return &cli.Command{
+		Name:  "mcp",
+		Usage: "Manage an agent's external MCP servers (Linear, GitHub, …)",
+		Commands: []*cli.Command{
+			cloudAgentsMcpList(),
+			cloudAgentsMcpSet(),
+			cloudAgentsMcpRemove(),
+		},
+	}
+}
+
+func cloudAgentsMcpList() *cli.Command {
+	return &cli.Command{
+		Name:  "list",
+		Usage: "List an agent's MCP servers and the connections available for each kind",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "agent-id",
+				Usage:    "agent ID",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			resp, err := client.ListAgentMcpServers(ctx, c.Int("agent-id"))
+			if err != nil {
+				printError(err, output, "Failed to list agent MCP servers")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(resp, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"Kind", "Connection", "Display Name"})
+			for _, s := range resp.MCPIntegrations {
+				display := ""
+				if s.DisplayName != nil {
+					display = *s.DisplayName
+				}
+				t.AppendRow(table.Row{s.Kind, s.ConnectionName, display})
+			}
+			t.Render()
+
+			// Show what can be configured: every supported kind and the
+			// connections eligible from the agent's dev-env set.
+			kinds := make([]string, 0, len(resp.MCPKinds))
+			for k := range resp.MCPKinds {
+				kinds = append(kinds, k)
+			}
+			sort.Strings(kinds)
+			infoPrinter.Println("\nAvailable kinds (eligible connections):")
+			for _, k := range kinds {
+				infoPrinter.Printf("  %s (%s): %s\n", k, resp.MCPKinds[k], strings.Join(resp.ConnectionsByMcpKind[k], ", "))
+			}
+			return nil
+		},
+	}
+}
+
+func cloudAgentsMcpSet() *cli.Command {
+	return &cli.Command{
+		Name:  "set",
+		Usage: "Attach or update an MCP server on an agent",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "agent-id",
+				Usage:    "agent ID",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:     "kind",
+				Usage:    "MCP kind (e.g. linear, github, notion)",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:     "connection",
+				Usage:    "bruin.yml connection name backing this MCP server",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+			agentID := c.Int("agent-id")
+			kind := c.String("kind")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			// Read-modify-write: the API replaces the whole set, so merge the new
+			// pick into the current one to keep the other kinds intact.
+			current, err := client.ListAgentMcpServers(ctx, agentID)
+			if err != nil {
+				printError(err, output, "Failed to load current MCP servers")
+				return cli.Exit("", 1)
+			}
+
+			servers := upsertMcpServer(current.MCPIntegrations, kind, c.String("connection"))
+
+			agent, err := client.SetAgentMcpServers(ctx, agentID, servers)
+			if err != nil {
+				printError(err, output, "Failed to set MCP server")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(agent, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			infoPrinter.Printf("Set MCP server %q on agent %d\n", kind, agentID)
+			return nil
+		},
+	}
+}
+
+func cloudAgentsMcpRemove() *cli.Command {
+	return &cli.Command{
+		Name:  "remove",
+		Usage: "Detach an MCP server from an agent",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "agent-id",
+				Usage:    "agent ID",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:     "kind",
+				Usage:    "MCP kind to remove (e.g. linear, github)",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+			agentID := c.Int("agent-id")
+			kind := c.String("kind")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			current, err := client.ListAgentMcpServers(ctx, agentID)
+			if err != nil {
+				printError(err, output, "Failed to load current MCP servers")
+				return cli.Exit("", 1)
+			}
+
+			servers, removed := removeMcpServer(current.MCPIntegrations, kind)
+			if !removed {
+				printError(fmt.Errorf("agent %d has no MCP server of kind %q", agentID, kind), output, "Nothing to remove")
+				return cli.Exit("", 1)
+			}
+
+			if _, err := client.SetAgentMcpServers(ctx, agentID, servers); err != nil {
+				printError(err, output, "Failed to remove MCP server")
+				return cli.Exit("", 1)
+			}
+
+			infoPrinter.Printf("Removed MCP server %q from agent %d\n", kind, agentID)
+			return nil
+		},
+	}
+}
+
+// upsertMcpServer returns servers with kind set to connection — updating the
+// existing entry in place or appending a new one.
+func upsertMcpServer(servers []bruincloud.AgentMcpServer, kind, connection string) []bruincloud.AgentMcpServer {
+	out := make([]bruincloud.AgentMcpServer, 0, len(servers)+1)
+	found := false
+	for _, s := range servers {
+		if s.Kind == kind {
+			s.ConnectionName = connection
+			found = true
+		}
+		out = append(out, bruincloud.AgentMcpServer{Kind: s.Kind, ConnectionName: s.ConnectionName})
+	}
+	if !found {
+		out = append(out, bruincloud.AgentMcpServer{Kind: kind, ConnectionName: connection})
+	}
+	return out
+}
+
+// removeMcpServer returns servers without kind, and whether it was present.
+func removeMcpServer(servers []bruincloud.AgentMcpServer, kind string) ([]bruincloud.AgentMcpServer, bool) {
+	out := make([]bruincloud.AgentMcpServer, 0, len(servers))
+	removed := false
+	for _, s := range servers {
+		if s.Kind == kind {
+			removed = true
+			continue
+		}
+		out = append(out, bruincloud.AgentMcpServer{Kind: s.Kind, ConnectionName: s.ConnectionName})
+	}
+	return out, removed
 }
 
 func cloudAgentsCreate() *cli.Command {
