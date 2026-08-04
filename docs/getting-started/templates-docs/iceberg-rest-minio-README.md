@@ -24,7 +24,7 @@ raw/currencies/metadata/00001-….metadata.json
 
 Tear it down with `docker compose down -v`.
 
-## What this shows
+## Notes
 
 An Iceberg connection is a **catalog** (where table metadata lives) and
 **storage** (where the data files go). Here the catalog is a server you talk to

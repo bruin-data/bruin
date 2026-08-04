@@ -41,6 +41,8 @@ export GCS_HMAC_KEY=GOOG1E…
 export GCS_HMAC_SECRET=…
 ```
 
+## Run it
+
 ```bash
 bruin run iceberg-hadoop-gcsinterop
 ```

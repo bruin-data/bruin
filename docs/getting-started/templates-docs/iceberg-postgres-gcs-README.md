@@ -38,6 +38,8 @@ the marked values are missing:
 Replace each `${...}` with the value, or export them as environment variables
 and leave the file alone — Bruin expands both.
 
+## Run it
+
 ```bash
 bruin run iceberg-postgres-gcs
 ```

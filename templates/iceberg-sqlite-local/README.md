@@ -40,7 +40,7 @@ SET unsafe_enable_version_guessing = true;
 SELECT * FROM iceberg_scan('warehouse/raw.db/currencies');
 ```
 
-## What this shows
+## Notes
 
 An Iceberg connection is a **catalog** (where table metadata lives) and
 **storage** (where the data files go). This template picks the simplest of each:

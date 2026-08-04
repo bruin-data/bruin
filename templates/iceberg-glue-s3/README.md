@@ -47,6 +47,8 @@ Use a long-lived access key, not SSO or STS credentials — those expire within
 hours and a scheduled pipeline would start failing overnight. If you must use
 them, add `session_token` to both `auth` blocks.
 
+## Run it
+
 ```bash
 bruin run iceberg-glue-s3
 ```
