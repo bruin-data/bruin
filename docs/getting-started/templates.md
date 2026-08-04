@@ -216,12 +216,16 @@ An Iceberg connection is a **catalog** (where table metadata lives) plus **stora
 
 ## Migration templates
 
-Migration templates provide a review-gated starting point for moving existing
-data integrations to Bruin.
+Migration templates provide a review-gated starting point for moving existing data integrations to Bruin.
 
-| Template | Use when you want to start with |
-| --- | --- |
-| `migration-fivetran` | A review-gated Fivetran migration workspace with a blank `bruin/` pipeline, migration prompt, plan, and agent skill. |
+<div class="template-grid">
+  <a class="template-card" href="./templates-docs/migration-fivetran.html">
+    <span class="template-card__category">Review-gated migration</span>
+    <strong>migration-fivetran</strong>
+    <span>Migrate one Fivetran connection at a time with a staged agent prompt, migration plan, and read-only configuration importer.</span>
+    <span class="template-card__tags"><code>Fivetran</code><code>ingestr</code><code>AI agents</code></span>
+  </a>
+</div>
 
 ## Other bundled templates
 
