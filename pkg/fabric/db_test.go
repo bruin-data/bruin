@@ -541,6 +541,16 @@ func TestDB_GetTablesWithSchemas_MismatchedDatabase(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestDB_Limit(t *testing.T) {
+	t.Parallel()
+
+	db := &DB{}
+	// The query is preserved verbatim inside the derived table (no rewrite),
+	// so case-sensitive column aliases survive.
+	got := db.Limit("SELECT src.Account FROM (SELECT x AS Account FROM t) src;", 100)
+	assert.Equal(t, "SELECT TOP 100 * FROM (\nSELECT src.Account FROM (SELECT x AS Account FROM t) src\n) as t", got)
+}
+
 const expectedDatabaseSummaryQuery = `
 SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE
 FROM INFORMATION_SCHEMA.TABLES

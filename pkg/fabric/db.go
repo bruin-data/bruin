@@ -83,6 +83,15 @@ func (db *DB) RunQueryWithoutResult(ctx context.Context, q *query.Query) error {
 	return err
 }
 
+// Limit wraps the query so it returns at most `limit` rows. It preserves the
+// original query verbatim inside a derived table rather than rewriting it,
+// which matters on Fabric's case-sensitive collation where a parser round-trip
+// would otherwise lowercase column aliases and break the outer references.
+func (db *DB) Limit(query string, limit int64) string {
+	query = strings.TrimRight(query, "; \n\t")
+	return fmt.Sprintf("SELECT TOP %d * FROM (\n%s\n) as t", limit, query)
+}
+
 func (db *DB) Select(ctx context.Context, q *query.Query) ([][]interface{}, error) {
 	queryString := q.String()
 	rows, err := db.conn.QueryContext(ctx, queryString)
