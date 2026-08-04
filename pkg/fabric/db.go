@@ -83,6 +83,15 @@ func (db *DB) RunQueryWithoutResult(ctx context.Context, q *query.Query) error {
 	return err
 }
 
+// Limit wraps the query so it returns at most `limit` rows. It preserves the
+// original query verbatim inside a derived table rather than rewriting it,
+// which matters on Fabric's case-sensitive collation where a parser round-trip
+// would otherwise lowercase column aliases and break the outer references.
+func (db *DB) Limit(query string, limit int64) string {
+	query = strings.TrimRight(query, "; \n\t")
+	return fmt.Sprintf("SELECT TOP %d * FROM (\n%s\n) as t", limit, query)
+}
+
 func (db *DB) Select(ctx context.Context, q *query.Query) ([][]interface{}, error) {
 	queryString := q.String()
 	rows, err := db.conn.QueryContext(ctx, queryString)
@@ -362,14 +371,14 @@ func (db *DB) GetTablesWithSchemas(ctx context.Context, databaseName string) (ma
 
 	const schemaQuery = `
 SELECT TABLE_SCHEMA, TABLE_NAME
-FROM information_schema.tables
+FROM INFORMATION_SCHEMA.TABLES
 WHERE TABLE_SCHEMA NOT IN ('sys', 'INFORMATION_SCHEMA')
 ORDER BY TABLE_SCHEMA, TABLE_NAME
 `
 
 	rows, err := db.Select(ctx, &query.Query{Query: schemaQuery})
 	if err != nil {
-		return nil, fmt.Errorf("failed to query information_schema.tables: %w", err)
+		return nil, fmt.Errorf("failed to query INFORMATION_SCHEMA.TABLES: %w", err)
 	}
 
 	schemas := make(map[string][]string)
@@ -399,13 +408,13 @@ func (db *DB) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, erro
 
 	const schemaQuery = `
 SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE
-FROM information_schema.tables
+FROM INFORMATION_SCHEMA.TABLES
 WHERE TABLE_SCHEMA NOT IN ('sys', 'INFORMATION_SCHEMA')
 `
 
 	tables, err := db.Select(ctx, &query.Query{Query: schemaQuery})
 	if err != nil {
-		return nil, fmt.Errorf("failed to query information_schema.tables: %w", err)
+		return nil, fmt.Errorf("failed to query INFORMATION_SCHEMA.TABLES: %w", err)
 	}
 
 	summary := &ansisql.DBDatabase{

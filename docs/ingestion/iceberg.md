@@ -183,7 +183,7 @@ Recognized connection parameters: `sslmode`, `sslcert`, `sslkey`, `sslrootcert`,
 ```
 
 > [!TIP]
-> For non-AWS S3-compatible stores (MinIO, Cloudflare R2, GCS interop), S3 compatibility mode is enabled automatically when `endpoint` is set — without it GCS interop rejects the headers the AWS SDK signs and fails with `SignatureDoesNotMatch`. To disable it, add `s3.compat-mode: "false"` to the top-level [`properties`](#table-options) block.
+> An `endpoint` that isn't AWS (MinIO, Cloudflare R2, GCS interop) defaults `s3.compat-mode` on — GCS interop fails with `SignatureDoesNotMatch` without it — and `region` to `auto`, which those stores ignore but the AWS SDK insists on. Override either in [`properties`](#table-options). AWS endpoints, including VPC and FIPS, get neither.
 
 **Google Cloud Storage (native)** — `type: gcs` with a `gs://` warehouse and a service-account key (`bucket` + `prefix` works too):
 
@@ -203,7 +203,7 @@ Leave `key_file`/`key_json` empty to use Application Default Credentials.
             type: s3
             path: "s3://my-gcs-bucket/warehouse"
             endpoint: "storage.googleapis.com"
-            region: "auto"                              # required, but unused once endpoint is set
+            region: "auto"                              # optional — the default for a non-AWS endpoint
             auth:
               access_key: "${GCS_HMAC_KEY}"
               secret_key: "${GCS_HMAC_SECRET}"
