@@ -648,6 +648,52 @@ func TestUpdateAgent(t *testing.T) {
 	assert.Equal(t, "renamed", agent.Name)
 }
 
+func TestListAgentMcpServers(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/agents/7/mcp-servers", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, map[string]any{
+			"mcp_integrations": []AgentMcpServer{
+				{Kind: "linear", ConnectionName: "my-linear"},
+			},
+			"mcp_kinds":               map[string]string{"linear": "Linear", "github": "GitHub"},
+			"connections_by_mcp_kind": map[string][]string{"linear": {"my-linear"}, "github": {}},
+		})
+	})
+
+	resp, err := client.ListAgentMcpServers(t.Context(), 7)
+	require.NoError(t, err)
+	require.Len(t, resp.MCPIntegrations, 1)
+	assert.Equal(t, "linear", resp.MCPIntegrations[0].Kind)
+	assert.Equal(t, "Linear", resp.MCPKinds["linear"])
+	assert.Equal(t, []string{"my-linear"}, resp.ConnectionsByMcpKind["linear"])
+}
+
+func TestSetAgentMcpServers(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPatch, r.Method)
+		assert.Equal(t, "/agents/7", r.URL.Path)
+
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		integrations, ok := body["mcp_integrations"].([]any)
+		assert.True(t, ok)
+		assert.Len(t, integrations, 1)
+
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, Agent{ID: 7, Name: "a", Visibility: "team"})
+	})
+
+	agent, err := client.SetAgentMcpServers(t.Context(), 7, []AgentMcpServer{
+		{Kind: "linear", ConnectionName: "my-linear"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 7, agent.ID)
+}
+
 func TestListAgentThreads(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {

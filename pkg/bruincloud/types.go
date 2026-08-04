@@ -130,10 +130,28 @@ type GlossaryEntity struct {
 
 // Agent represents a Bruin Cloud agent.
 type Agent struct {
-	ID          int     `json:"id"`
-	Name        string  `json:"name"`
-	Description *string `json:"description"`
-	Visibility  string  `json:"visibility"`
+	ID              int              `json:"id"`
+	Name            string           `json:"name"`
+	Description     *string          `json:"description"`
+	Visibility      string           `json:"visibility"`
+	MCPIntegrations []AgentMcpServer `json:"mcp_integrations,omitempty"`
+}
+
+// AgentMcpServer is one external MCP server attached to an agent — a supported
+// kind (linear, github, …) backed by a bruin.yml connection in the agent's
+// dev-env set.
+type AgentMcpServer struct {
+	Kind           string  `json:"kind"`
+	ConnectionName string  `json:"connection_name"`
+	DisplayName    *string `json:"display_name"`
+}
+
+// AgentMcpServersResponse is the payload of the agent MCP-servers endpoint: the
+// current picks plus the options for configuring them.
+type AgentMcpServersResponse struct {
+	MCPIntegrations      []AgentMcpServer    `json:"mcp_integrations"`
+	MCPKinds             map[string]string   `json:"mcp_kinds"`
+	ConnectionsByMcpKind map[string][]string `json:"connections_by_mcp_kind"`
 }
 
 // AgentConnection is one connection available to an agent — name and type only

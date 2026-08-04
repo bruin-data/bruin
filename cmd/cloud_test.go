@@ -310,13 +310,14 @@ func TestCloudAgentsCommand_Help(t *testing.T) {
 	cmd := CloudAgents()
 	require.NotNil(t, cmd)
 	assert.Equal(t, "agents", cmd.Name)
-	require.Len(t, cmd.Commands, 11)
+	require.Len(t, cmd.Commands, 12)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
 		subNames[i] = sub.Name
 	}
 	assert.Contains(t, subNames, "connections")
+	assert.Contains(t, subNames, "mcp")
 }
 
 func TestCloudDashboardsCommand_Help(t *testing.T) {
@@ -382,6 +383,36 @@ func TestCloudAgentsConnections_RejectsNonPositiveAgentID(t *testing.T) {
 		}
 		_ = runCLI(t.Context(), cmd, []string{"connections", "--api-key", "k", "--agent-id", v})
 		assert.Equalf(t, 1, exitCode, "agent-id %q should be rejected", v)
+	}
+}
+
+func TestCloudAgentsMcp_RejectsNonPositiveAgentID(t *testing.T) {
+	t.Parallel()
+	// Each mcp subcommand must reject a non-positive --agent-id locally rather
+	// than sending a bad request. Required flags are supplied so parsing reaches
+	// the Action guard.
+	cases := []struct {
+		name string
+		cmd  func() *cli.Command
+		args []string
+	}{
+		{"list", cloudAgentsMcpList, []string{"list", "--api-key", "k"}},
+		{"set", cloudAgentsMcpSet, []string{"set", "--api-key", "k", "--kind", "linear", "--connection", "c"}},
+		{"remove", cloudAgentsMcpRemove, []string{"remove", "--api-key", "k", "--kind", "linear"}},
+	}
+	for _, tc := range cases {
+		for _, v := range []string{"0", "-3"} {
+			cmd := tc.cmd()
+			exitCode := 0
+			cmd.ExitErrHandler = func(_ context.Context, _ *cli.Command, err error) {
+				var ec cli.ExitCoder
+				if errors.As(err, &ec) {
+					exitCode = ec.ExitCode()
+				}
+			}
+			_ = runCLI(t.Context(), cmd, append(tc.args, "--agent-id", v))
+			assert.Equalf(t, 1, exitCode, "%s: agent-id %q should be rejected", tc.name, v)
+		}
 	}
 }
 
@@ -727,4 +758,50 @@ func TestFormatCostCell(t *testing.T) {
 	assert.Equal(t, "daily-etl", formatCostCell("daily-etl"))
 	assert.Equal(t, "74123", formatCostCell(float64(74123)))
 	assert.JSONEq(t, `{"pipeline_id":"p"}`, formatCostCell(map[string]any{"pipeline_id": "p"}))
+}
+
+func TestUpsertMcpServer(t *testing.T) {
+	t.Parallel()
+
+	t.Run("appends a new kind", func(t *testing.T) {
+		t.Parallel()
+		out := upsertMcpServer([]bruincloud.AgentMcpServer{{Kind: "linear", ConnectionName: "a"}}, "github", "b")
+		require.Len(t, out, 2)
+		assert.Equal(t, "linear", out[0].Kind)
+		assert.Equal(t, "github", out[1].Kind)
+		assert.Equal(t, "b", out[1].ConnectionName)
+	})
+
+	t.Run("updates an existing kind in place", func(t *testing.T) {
+		t.Parallel()
+		out := upsertMcpServer([]bruincloud.AgentMcpServer{
+			{Kind: "linear", ConnectionName: "old"},
+			{Kind: "github", ConnectionName: "gh"},
+		}, "linear", "new")
+		require.Len(t, out, 2)
+		assert.Equal(t, "new", out[0].ConnectionName)
+		assert.Equal(t, "gh", out[1].ConnectionName)
+	})
+}
+
+func TestRemoveMcpServer(t *testing.T) {
+	t.Parallel()
+
+	t.Run("drops the kind and reports it", func(t *testing.T) {
+		t.Parallel()
+		out, removed := removeMcpServer([]bruincloud.AgentMcpServer{
+			{Kind: "linear", ConnectionName: "a"},
+			{Kind: "github", ConnectionName: "b"},
+		}, "linear")
+		assert.True(t, removed)
+		require.Len(t, out, 1)
+		assert.Equal(t, "github", out[0].Kind)
+	})
+
+	t.Run("reports when the kind is absent", func(t *testing.T) {
+		t.Parallel()
+		out, removed := removeMcpServer([]bruincloud.AgentMcpServer{{Kind: "linear", ConnectionName: "a"}}, "github")
+		assert.False(t, removed)
+		require.Len(t, out, 1)
+	})
 }
