@@ -50,8 +50,9 @@ the assets changes.
               secret_key: "minioadmin"
 ```
 
-Two things about that `endpoint`. It is what makes this S3-*compatible* rather
-than S3, so Bruin turns on S3 compatibility mode for you. And the REST catalog
-reaches storage **itself** to write metadata, which is why the same MinIO
-credentials appear in `docker-compose.yml` — the ones above configure only Bruin.
+Two things about that `endpoint`. It marks the store as S3-*compatible* rather
+than S3, which ingestr turns into `s3.compat-mode` — MinIO does not need it, but
+GCS over its S3 endpoint does. And the REST catalog reaches storage **itself** to
+write metadata, which is why the same MinIO credentials appear in
+`docker-compose.yml`; the ones above configure only Bruin.
 
