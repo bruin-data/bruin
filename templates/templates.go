@@ -6,4 +6,6 @@ import (
 
 //go:embed *
 //go:embed */.bruin.yml
+//go:embed migration-fivetran/.gitignore
+//go:embed migration-fivetran/.agents/skills/bruin-fivetran-migrator/*
 var Templates embed.FS
