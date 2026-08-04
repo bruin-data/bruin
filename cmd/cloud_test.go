@@ -149,12 +149,13 @@ func TestCloudCommand_Help(t *testing.T) {
 	cmd := Cloud(&isDebug)
 	require.NotNil(t, cmd)
 	assert.Equal(t, "cloud", cmd.Name)
-	assert.Len(t, cmd.Commands, 13)
+	assert.Len(t, cmd.Commands, 14)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
 		subNames[i] = sub.Name
 	}
+	assert.Contains(t, subNames, "teams")
 	assert.Contains(t, subNames, "cost")
 	assert.Contains(t, subNames, "projects")
 	assert.Contains(t, subNames, "pipelines")
