@@ -548,6 +548,13 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "firebase", link: "/getting-started/templates-docs/firebase-README"},
                         ],
                     },
+                    {
+                        text: "Migration Templates",
+                        collapsed: false,
+                        items: [
+                            {text: "migration-fivetran", link: "/getting-started/templates-docs/migration-fivetran"},
+                        ],
+                    },
                 ],
             },
             {
