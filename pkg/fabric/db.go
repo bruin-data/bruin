@@ -362,7 +362,7 @@ func (db *DB) GetTablesWithSchemas(ctx context.Context, databaseName string) (ma
 
 	const schemaQuery = `
 SELECT TABLE_SCHEMA, TABLE_NAME
-FROM information_schema.tables
+FROM INFORMATION_SCHEMA.TABLES
 WHERE TABLE_SCHEMA NOT IN ('sys', 'INFORMATION_SCHEMA')
 ORDER BY TABLE_SCHEMA, TABLE_NAME
 `
@@ -399,7 +399,7 @@ func (db *DB) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, erro
 
 	const schemaQuery = `
 SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE
-FROM information_schema.tables
+FROM INFORMATION_SCHEMA.TABLES
 WHERE TABLE_SCHEMA NOT IN ('sys', 'INFORMATION_SCHEMA')
 `
 

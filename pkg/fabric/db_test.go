@@ -488,7 +488,7 @@ func TestDB_FetchDateTimeStats(t *testing.T) {
 
 const expectedTablesWithSchemasQuery = `
 SELECT TABLE_SCHEMA, TABLE_NAME
-FROM information_schema.tables
+FROM INFORMATION_SCHEMA.TABLES
 WHERE TABLE_SCHEMA NOT IN ('sys', 'INFORMATION_SCHEMA')
 ORDER BY TABLE_SCHEMA, TABLE_NAME
 `
