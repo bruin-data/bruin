@@ -1,0 +1,19 @@
+default_environment: default
+environments:
+  default:
+    connections:
+      frankfurter:
+        - name: "frankfurter-default"
+      iceberg:
+        - name: "iceberg-default"
+          catalog:
+            type: hadoop
+          storage:
+            type: s3
+            path: "s3://${GCS_BUCKET}/warehouse"
+            endpoint: "storage.googleapis.com"
+            auth:
+              access_key: "${GCS_HMAC_KEY}"
+              secret_key: "${GCS_HMAC_SECRET}"
+          properties:
+            allow-unsafe-commits: "true"  # hadoop does not commit atomically to object storage

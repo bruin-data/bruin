@@ -1,0 +1,8 @@
+name: raw.exchange_rates
+type: ingestr
+connection: iceberg-default
+
+parameters:
+  source_connection: frankfurter-default
+  source_table: exchange_rates
+  destination: iceberg
