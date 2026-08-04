@@ -1005,6 +1005,16 @@ type Limiter interface {
 }
 
 func addLimitToQuery(query string, limit int64, conn interface{}, parser *sqlparser.SQLParser, dialect string) string {
+	// Fabric Warehouses use a case-sensitive collation, and the SQL parser's
+	// add-limit round-trip lowercases derived-table column aliases (e.g. a
+	// subquery's `Account` is re-emitted as `account`), which then fails to
+	// resolve in the case-sensitive outer query. Wrap the query verbatim so the
+	// original identifiers are preserved.
+	if dialect == "fabric" {
+		if l, ok := conn.(Limiter); ok {
+			return l.Limit(query, limit)
+		}
+	}
 	// Check if the query is a single SELECT statement before applying limit
 	if parser != nil {
 		isSingleSelect, err := parser.IsSingleSelectQuery(query, dialect)
