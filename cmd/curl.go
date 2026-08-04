@@ -1,11 +1,9 @@
 package cmd
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os/exec"
@@ -16,6 +14,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/telemetry"
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli/v3"
 )
@@ -239,15 +238,17 @@ func newCurlVariablePlaceholder(protected string) (string, error) {
 }
 
 func connectionFields(details any) (map[string]any, error) {
-	serialized, err := json.Marshal(details)
+	fields := make(map[string]any)
+	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		Result:  &fields,
+		TagName: "mapstructure",
+		Squash:  true,
+		Deep:    true,
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	fields := make(map[string]any)
-	decoder := json.NewDecoder(bytes.NewReader(serialized))
-	decoder.UseNumber()
-	if err := decoder.Decode(&fields); err != nil {
+	if err := decoder.Decode(details); err != nil {
 		return nil, err
 	}
 

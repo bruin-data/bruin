@@ -45,6 +45,7 @@ func TestRenderCurlArgs(t *testing.T) {
 		"--header",
 		`Authorization: Bearer {{ bruin.connection("auth-api").credentials.token }}`,
 		`--user={{ bruin.connection("warehouse").username }}:{{ bruin.connection("warehouse").password }}`,
+		`schema={{ bruin.connection("warehouse").schema }},pool={{ bruin.connection("warehouse").pool_max_conns }},ssl={{ bruin.connection("warehouse").ssl_mode }}`,
 		`X-Slug: {{ bruin.slugify("Hello World") }}`,
 	}, lookup)
 
@@ -55,6 +56,7 @@ func TestRenderCurlArgs(t *testing.T) {
 		"--header",
 		"Authorization: Bearer nested-secret",
 		"--user=api-user:secret-token",
+		"schema=,pool=0,ssl=",
 		"X-Slug: hello_world",
 	}, actual)
 	assert.Equal(t, map[string]int{"auth-api": 1, "warehouse": 1}, lookupCounts)
