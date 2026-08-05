@@ -70,7 +70,10 @@ jobs:
       - name: Run full test suite
         shell: bash
         run: |
-          [[ "${{ runner.os }}" != 'Windows' ]] || export CC="/c/mingw64/bin/gcc.exe"
+          # Race-enabled Windows binaries need the matching MinGW runtime DLLs.
+          # Installer tests inject a missing shell, so the native fallback is
+          # still covered without depending on this PATH.
+          [[ "${{ runner.os }}" != 'Windows' ]] || export PATH="/c/mingw64/bin:$PATH"
           make test-full
   end2end:
     strategy:
