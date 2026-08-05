@@ -1624,8 +1624,49 @@ func TestEnsureMaterializationValuesAreValid(t *testing.T) {
 			},
 			wantErr: assert.NoError,
 			want: []string{
-				"Materialization strategy 'datavault_hub' requires a hash key column, identified by 'datavault_role: hash_key', 'primary_key: true', or a single column name ending in '_hk'",
+				"Materialization strategy 'datavault_hub' requires exactly one hash key column, identified by 'datavault_role: hash_key', a single column with 'primary_key: true', or a single column name ending in '_hk'",
 			},
+		},
+		{
+			name: "table materialization has datavault_satellite with several primary keys and no explicit role",
+			assets: []*pipeline.Asset{
+				{
+					Name: "task1",
+					Materialization: pipeline.Materialization{
+						Type:     pipeline.MaterializationTypeTable,
+						Strategy: pipeline.MaterializationStrategyDataVaultSatellite,
+					},
+					Columns: []pipeline.Column{
+						{Name: "load_dts", Type: "timestamp", PrimaryKey: true},
+						{Name: "customer_hk", Type: "text", PrimaryKey: true},
+						{Name: "hashdiff", Type: "text"},
+						{Name: "record_source", Type: "text"},
+					},
+				},
+			},
+			wantErr: assert.NoError,
+			want: []string{
+				"Materialization strategy 'datavault_satellite' requires exactly one parent hash key column, identified by 'datavault_role: parent_hash_key', a single column with 'primary_key: true', or a single column name ending in '_hk'",
+			},
+		},
+		{
+			name: "table materialization has datavault_satellite with several primary keys and an explicit role",
+			assets: []*pipeline.Asset{
+				{
+					Name: "task1",
+					Materialization: pipeline.Materialization{
+						Type:     pipeline.MaterializationTypeTable,
+						Strategy: pipeline.MaterializationStrategyDataVaultSatellite,
+					},
+					Columns: []pipeline.Column{
+						{Name: "load_dts", Type: "timestamp", PrimaryKey: true},
+						{Name: "customer_hk", Type: "text", PrimaryKey: true, Meta: map[string]string{"datavault_role": "parent_hash_key"}},
+						{Name: "hashdiff", Type: "text"},
+						{Name: "record_source", Type: "text"},
+					},
+				},
+			},
+			wantErr: assert.NoError,
 		},
 	}
 	ctx := t.Context()

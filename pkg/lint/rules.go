@@ -1559,7 +1559,7 @@ func ensureDataVaultHubColumnsAreValid(asset *pipeline.Asset) []*Issue {
 	if dataVaultHashKeyName(asset, []string{"hash_key", "hub_hash_key"}) == "" {
 		issues = append(issues, &Issue{
 			Task:        asset,
-			Description: "Materialization strategy 'datavault_hub' requires a hash key column, identified by 'datavault_role: hash_key', 'primary_key: true', or a single column name ending in '_hk'",
+			Description: "Materialization strategy 'datavault_hub' requires exactly one hash key column, identified by 'datavault_role: hash_key', a single column with 'primary_key: true', or a single column name ending in '_hk'",
 		})
 	}
 	if !hasDataVaultColumn(asset, []string{"business_key"}, func(col pipeline.Column) bool {
@@ -1584,7 +1584,7 @@ func ensureDataVaultLinkColumnsAreValid(asset *pipeline.Asset) []*Issue {
 	if linkHashKeyName == "" {
 		issues = append(issues, &Issue{
 			Task:        asset,
-			Description: "Materialization strategy 'datavault_link' requires a link hash key column, identified by 'datavault_role: link_hash_key', 'primary_key: true', or a single column name ending in '_hk'",
+			Description: "Materialization strategy 'datavault_link' requires exactly one link hash key column, identified by 'datavault_role: link_hash_key', a single column with 'primary_key: true', or a single column name ending in '_hk'",
 		})
 	}
 
@@ -1617,7 +1617,7 @@ func ensureDataVaultSatelliteColumnsAreValid(asset *pipeline.Asset) []*Issue {
 	if dataVaultHashKeyName(asset, []string{"parent_hash_key", "hub_hash_key", "hash_key"}) == "" {
 		issues = append(issues, &Issue{
 			Task:        asset,
-			Description: "Materialization strategy 'datavault_satellite' requires a parent hash key column, identified by 'datavault_role: parent_hash_key', 'primary_key: true', or a single column name ending in '_hk'",
+			Description: "Materialization strategy 'datavault_satellite' requires exactly one parent hash key column, identified by 'datavault_role: parent_hash_key', a single column with 'primary_key: true', or a single column name ending in '_hk'",
 		})
 	}
 	if !hasDataVaultColumn(asset, []string{"hashdiff", "hash_diff"}, func(col pipeline.Column) bool {
@@ -1685,7 +1685,7 @@ func appendCommonDataVaultColumnIssues(asset *pipeline.Asset, strategy string, i
 }
 
 // dataVaultHashKeyName mirrors the hash key resolution used by the materializers: an explicit role
-// wins, then the first column marked with primary_key, and the '_hk' suffix only counts when exactly
+// wins, then a single column marked with primary_key, and the '_hk' suffix only counts when exactly
 // one column carries it. Keeping the two in sync stops `bruin validate` from accepting assets that
 // then fail at run time with an unresolvable hash key.
 func dataVaultHashKeyName(asset *pipeline.Asset, roles []string) string {
@@ -1694,10 +1694,15 @@ func dataVaultHashKeyName(asset *pipeline.Asset, roles []string) string {
 			return col.Name
 		}
 	}
-	for _, col := range asset.Columns {
-		if col.PrimaryKey {
-			return col.Name
-		}
+
+	// The materializers refuse to guess which of several primary key columns is the hash key, so
+	// validate has to reject that too rather than accepting whichever one is declared first.
+	primaryKeys := asset.ColumnNamesWithPrimaryKey()
+	if len(primaryKeys) > 1 {
+		return ""
+	}
+	if len(primaryKeys) == 1 {
+		return primaryKeys[0]
 	}
 
 	name := ""

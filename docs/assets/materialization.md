@@ -516,7 +516,7 @@ in the materialization definition with the following keys:
 
 ### Data Vault strategies
 
-Bruin provides three strategies for loading a Raw Data Vault: `datavault_hub`, `datavault_link`, and `datavault_satellite`. They are supported for PostgreSQL and DuckDB SQL assets with `type: table` materialization. Redshift reuses the PostgreSQL SQL generator but produces statements Redshift cannot execute. On any other platform an incremental run fails with an unsupported strategy error, while a `--full-refresh` run silently falls back to `create+replace` and drops the Data Vault loading rules, which `bruin validate` does not flag.
+Bruin provides three strategies for loading a Raw Data Vault: `datavault_hub`, `datavault_link`, and `datavault_satellite`. They are supported for PostgreSQL and DuckDB SQL assets with `type: table` materialization. On any other platform, including Redshift, both incremental and `--full-refresh` runs fail with an unsupported strategy error, which `bruin validate` does not flag.
 
 The asset query must calculate the hash keys and hashdiff and return every column declared in `columns`. Bruin uses those values to apply the loading rules; it does not calculate hashes. Every declared column must have both a `name` and a database-compatible `type`.
 
