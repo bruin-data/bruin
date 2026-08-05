@@ -244,7 +244,7 @@ The start date for the asset, used when running with full refresh (`--full-refre
 
 ## `interval_modifiers`
 
-Controls how the processing window is adjusted by shifting the start and end times. Requires the `--apply-interval-modifiers` flag when running the pipeline.
+Controls how the processing window is adjusted by shifting the start and end times. On the CLI this requires the `--apply-interval-modifiers` flag; Bruin Cloud applies the modifiers automatically. See [enabling interval modifiers](./interval-modifiers#enabling-interval-modifiers).
 
 ```yaml
 interval_modifiers:

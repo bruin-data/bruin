@@ -24,7 +24,7 @@ bruin render [path to asset definition] [flags]
 | `--full-refresh`      | `-r`  | Truncate the table before running the query. Also sets the `full_refresh` jinja variable to `True`. |
 | `--start-date`        |       | Specify the start date in `YYYY-MM-DD`, `YYYY-MM-DD HH:MM:SS`, or `YYYY-MM-DD HH:MM:SS.ffffff` format.|
 | `--end-date`          |       | Specify the end date in `YYYY-MM-DD`, `YYYY-MM-DD HH:MM:SS`, or `YYYY-MM-DD HH:MM:SS.ffffff` format. |
-| `--apply-interval-modifiers` |       | Apply interval modifiers if flag is given. |
+| `--apply-interval-modifiers` |       | Apply [interval modifiers](/assets/interval-modifiers). Off unless the flag is given — useful for previewing the window a Bruin Cloud run would use, since Cloud always applies them. |
 | `--var`               |       | Override pipeline variables with custom values. |
 | `--output [format]`   | `-o`  | Specify the output format (e.g., `json`). Defaults to console output.  |
 | `--config-file`       |       | The path to the `.bruin.yml` file. |

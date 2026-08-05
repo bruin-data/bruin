@@ -461,7 +461,7 @@ Fields:
 | snowflake          | Object                     | —       | Snowflake-specific defaults      |
 | athena             | Object                     | —       | Athena-specific defaults         |
 | routing            | Object                     | —       | Runtime routing defaults for assets |
-| interval_modifiers | Object                     | —       | See [Interval Modifiers](/assets/interval-modifiers) |
+| interval_modifiers | Object                     | —       | See [Interval Modifiers](/assets/interval-modifiers). Applied automatically in Bruin Cloud; needs `--apply-interval-modifiers` on the CLI |
 | hooks              | Object                     | —       | See [Hooks](/assets/definition-schema#hooks) |
 | retries            | Integer                    | —       | Default asset retries            |
 | timeout            | String (Go duration)       | —       | Default asset timeout (for example, `1h30m`) |
