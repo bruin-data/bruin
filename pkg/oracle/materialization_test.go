@@ -330,6 +330,7 @@ END;`,
 				},
 			},
 			query: "SELECT 1 as ts",
+			//nolint:dupword // The expected output contains nested PL/SQL BEGIN blocks.
 			want: `BEGIN
 	BEGIN
 		EXECUTE IMMEDIATE 'CREATE TABLE my.asset AS SELECT * FROM (SELECT 1 as ts) __bruin_bootstrap WHERE 1 = 0';
@@ -356,6 +357,7 @@ END;`,
 				},
 			},
 			query: "SELECT 1 as dt",
+			//nolint:dupword // The expected output contains nested PL/SQL BEGIN blocks.
 			want: `BEGIN
 	BEGIN
 		EXECUTE IMMEDIATE 'CREATE TABLE my.asset AS SELECT * FROM (SELECT 1 as dt) __bruin_bootstrap WHERE 1 = 0';
