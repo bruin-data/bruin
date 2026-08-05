@@ -81,9 +81,10 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) ([]string, error)
 			query,
 		),
 		fmt.Sprintf(
-			"CREATE TABLE IF NOT EXISTS %s PRIMARY KEY %s AS SELECT * FROM %s LIMIT 0",
+			"CREATE TABLE IF NOT EXISTS %s PRIMARY KEY %s%s AS SELECT * FROM %s LIMIT 0",
 			task.Name,
 			task.ColumnNamesWithPrimaryKey()[0],
+			buildPartitionByClause(task),
 			tempTableName,
 		),
 		fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", task.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
@@ -148,7 +149,7 @@ func buildMergeQuery(task *pipeline.Asset, query string) ([]string, error) {
 	// deleting target rows. LIMIT 0 performs no write and avoids deduplication.
 	queries := []string{
 		fmt.Sprintf("CREATE TABLE %s ENGINE = MergeTree() PRIMARY KEY (%s) AS %s", tempTableName, keys, query),
-		fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s ENGINE = MergeTree() PRIMARY KEY (%s) AS SELECT * FROM %s LIMIT 0", task.Name, keys, tempTableName),
+		fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s ENGINE = MergeTree() PRIMARY KEY (%s)%s AS SELECT * FROM %s LIMIT 0", task.Name, keys, buildPartitionByClause(task), tempTableName),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s LIMIT 0", task.Name, tempTableName),
 		fmt.Sprintf("DELETE FROM %s WHERE %s", task.Name, deleteCondition),
 		fmt.Sprintf("INSERT INTO %s SETTINGS insert_deduplicate = 0 SELECT * FROM %s", task.Name, tempTableName),
@@ -210,8 +211,9 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) ([]string, erro
 
 	queries := []string{
 		fmt.Sprintf(
-			"CREATE TABLE IF NOT EXISTS %s ENGINE = MergeTree() ORDER BY tuple() AS SELECT * FROM (%s) AS __bruin_bootstrap WHERE 1 = 0",
+			"CREATE TABLE IF NOT EXISTS %s ENGINE = MergeTree() ORDER BY tuple()%s AS SELECT * FROM (%s) AS __bruin_bootstrap WHERE 1 = 0",
 			asset.Name,
+			buildPartitionByClause(asset),
 			strings.TrimSuffix(query, ";"),
 		),
 		fmt.Sprintf(`DELETE FROM %s WHERE %s BETWEEN %s AND %s`,
@@ -224,6 +226,15 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) ([]string, erro
 	}
 
 	return queries, nil
+}
+
+func buildPartitionByClause(asset *pipeline.Asset) string {
+	partitionBy := strings.TrimSpace(asset.Materialization.PartitionBy)
+	if partitionBy == "" {
+		return ""
+	}
+
+	return fmt.Sprintf(" PARTITION BY (%s)", partitionBy)
 }
 
 func buildDDLQuery(asset *pipeline.Asset, query string) ([]string, error) {

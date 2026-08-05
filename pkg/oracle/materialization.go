@@ -350,7 +350,9 @@ func buildIncrementalPLSQLBlock(asset *pipeline.Asset, query string, dmlStatemen
 		query,
 	)
 
-	lines := []string{
+	lines := make([]string, 0, 10+len(dmlStatements))
+	lines = append(
+		lines,
 		"BEGIN",
 		"   BEGIN",
 		fmt.Sprintf("      EXECUTE IMMEDIATE '%s';", escapeOracleString(createTable)),
@@ -360,7 +362,7 @@ func buildIncrementalPLSQLBlock(asset *pipeline.Asset, query string, dmlStatemen
 		"            RAISE;",
 		"         END IF;",
 		"   END;",
-	}
+	)
 	for _, statement := range dmlStatements {
 		statement = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(statement), ";"))
 		lines = append(lines, fmt.Sprintf("   EXECUTE IMMEDIATE '%s';", escapeOracleString(statement)))
