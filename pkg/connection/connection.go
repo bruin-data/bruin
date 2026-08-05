@@ -3155,11 +3155,13 @@ func (m *Manager) AddSalesforceConnectionFromConfig(connection *config.Salesforc
 	m.mutex.Unlock()
 
 	client, err := salesforce.NewClient(salesforce.Config{
-		Username:    connection.Username,
-		Password:    connection.Password,
-		Token:       connection.Token,
-		AccessToken: connection.AccessToken,
-		Domain:      connection.Domain,
+		Username:     connection.Username,
+		Password:     connection.Password,
+		Token:        connection.Token,
+		AccessToken:  connection.AccessToken,
+		ClientID:     connection.ClientID,
+		ClientSecret: connection.ClientSecret,
+		Domain:       connection.Domain,
 	})
 	if err != nil {
 		return err

@@ -4567,6 +4567,12 @@
         "access_token": {
           "type": "string"
         },
+        "client_id": {
+          "type": "string"
+        },
+        "client_secret": {
+          "type": "string"
+        },
         "domain": {
           "type": "string"
         }
