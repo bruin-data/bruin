@@ -58,9 +58,10 @@ func NewLocalOperator(config config.ConnectionAndDetailsGetter, envVariables map
 		repoFinder: &git.RepoFinder{},
 		module:     &ModulePathFinder{},
 		runner: &UvPythonRunner{
-			Cmd:         cmdRunner,
-			UvInstaller: &UvChecker{},
-			conn:        config,
+			Cmd:              cmdRunner,
+			UvInstaller:      &UvChecker{},
+			IngestrInstaller: &IngestrChecker{},
+			conn:             config,
 		},
 		envVariables: envVariables,
 		config:       config,

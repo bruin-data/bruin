@@ -13,10 +13,11 @@ import (
 const managedStopGrace = 30 * time.Second
 
 // configureManagedCmd prepares a long-running streaming command for graceful
-// teardown. ingestr is launched via `uv tool run`, so the process we start (uv)
-// forks the real ingestr/python child; signalling only uv's PID would orphan
-// that child (and, for CDC, leave a replication slot open). Putting the child in
-// its own process group lets us signal the whole tree at once.
+// teardown. A legacy or local ingestr can be launched via `uv tool run`, so the
+// process we start may fork the real ingestr/python child; signalling only the
+// parent PID would orphan that child (and, for CDC, leave a replication slot
+// open). Putting the child in its own process group lets us signal the whole
+// tree at once.
 //
 // On context cancellation exec.Cmd calls Cancel, which sends SIGTERM to the
 // group. ingestr treats SIGTERM as its normal stop: it flushes buffered records,
@@ -28,7 +29,7 @@ func configureManagedCmd(cmd *exec.Cmd) {
 		if cmd.Process == nil {
 			return nil
 		}
-		// Negative PID targets the whole process group (uv + ingestr/python).
+		// Negative PID targets the whole process group, including any uv/python wrapper.
 		if err := syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM); err != nil {
 			// Fall back to signalling just the process we started.
 			return cmd.Process.Signal(syscall.SIGTERM)

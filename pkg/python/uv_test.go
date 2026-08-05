@@ -23,6 +23,15 @@ func (m *mockUvInstaller) EnsureUvInstalled(ctx context.Context) (string, error)
 	return called.String(0), called.Error(1)
 }
 
+type mockIngestrInstaller struct {
+	mock.Mock
+}
+
+func (m *mockIngestrInstaller) EnsureIngestrInstalled(ctx context.Context, version string) (string, error) {
+	called := m.Called(ctx, version)
+	return called.String(0), called.Error(1)
+}
+
 type mockCmd struct {
 	mock.Mock
 }
@@ -55,44 +64,85 @@ func Test_ingestrEnvVars_DisablesTelemetry(t *testing.T) {
 	}, ingestrEnvVars())
 }
 
-func Test_uvPythonRunner_RunIngestr_DisablesTelemetry(t *testing.T) {
+func Test_uvPythonRunner_RunIngestr_UsesReleasedBinaryAndDisablesTelemetry(t *testing.T) {
 	t.Parallel()
 
 	repo := &git.Repo{}
+	ctx := WithStreaming(t.Context())
 	cmd := new(mockCmd)
 	cmd.On("Run", mock.Anything, repo, &CommandInstance{
-		Name: "~/.bruin/uv",
-		Args: []string{
-			"tool",
-			"run",
-			"--no-config",
-			"--prerelease",
-			"allow",
-			"--python",
-			"3.11",
-			"--from",
-			"ingestr@" + IngestrVersionV1,
-			"ingestr",
-			"ingest",
-		},
+		Name: "~/.bruin/ingestr/" + IngestrVersionV1 + "/ingestr",
+		Args: []string{"ingest"},
 		EnvVars: map[string]string{
 			"INGESTR_DISABLE_TELEMETRY": "true",
 			"PYTHONUNBUFFERED":          "1",
 		},
+		Managed: true,
 	}).Return(nil)
 
-	inst := new(mockUvInstaller)
-	inst.On("EnsureUvInstalled", mock.Anything).Return("~/.bruin/uv", nil)
+	ingestrInst := new(mockIngestrInstaller)
+	ingestrInst.On("EnsureIngestrInstalled", mock.Anything, IngestrVersionV1).
+		Return("~/.bruin/ingestr/"+IngestrVersionV1+"/ingestr", nil)
 
 	runner := &UvPythonRunner{
-		Cmd:         cmd,
-		UvInstaller: inst,
+		Cmd:              cmd,
+		IngestrInstaller: ingestrInst,
+	}
+
+	err := runner.RunIngestr(ctx, []string{"ingest"}, []string{"pyodbc==5.1.0"}, repo)
+
+	require.NoError(t, err)
+	cmd.AssertExpectations(t)
+	ingestrInst.AssertExpectations(t)
+}
+
+func Test_uvPythonRunner_RunIngestr_PropagatesReleaseInstallationFailure(t *testing.T) {
+	t.Parallel()
+
+	repo := &git.Repo{}
+	cmd := new(mockCmd)
+	ingestrInst := new(mockIngestrInstaller)
+	ingestrInst.On("EnsureIngestrInstalled", mock.Anything, IngestrVersionV1).
+		Return("", assert.AnError)
+	runner := &UvPythonRunner{
+		Cmd:              cmd,
+		IngestrInstaller: ingestrInst,
 	}
 
 	err := runner.RunIngestr(t.Context(), []string{"ingest"}, nil, repo)
 
+	require.ErrorIs(t, err, assert.AnError)
+	cmd.AssertNotCalled(t, "Run", mock.Anything, mock.Anything, mock.Anything)
+	ingestrInst.AssertExpectations(t)
+}
+
+func Test_uvPythonRunner_RunIngestr_UsesUvForLegacyRelease(t *testing.T) {
+	t.Parallel()
+
+	repo := &git.Repo{}
+	ctx := context.WithValue(t.Context(), CtxIngestrVersion, IngestrVersionV0)
+	cmd := new(mockCmd)
+	cmd.On("Run", mock.Anything, repo, mock.MatchedBy(func(command *CommandInstance) bool {
+		return command.Name == "~/.bruin/uv" &&
+			containsArg(command.Args, "ingestr@"+IngestrVersionV0) &&
+			containsArg(command.Args, "pyodbc==5.1.0")
+	})).Return(nil)
+
+	uvInst := new(mockUvInstaller)
+	uvInst.On("EnsureUvInstalled", mock.Anything).Return("~/.bruin/uv", nil)
+	ingestrInst := new(mockIngestrInstaller)
+
+	runner := &UvPythonRunner{
+		Cmd:              cmd,
+		UvInstaller:      uvInst,
+		IngestrInstaller: ingestrInst,
+	}
+	err := runner.RunIngestr(ctx, []string{"ingest"}, []string{"pyodbc==5.1.0"}, repo)
+
 	require.NoError(t, err)
 	cmd.AssertExpectations(t)
+	uvInst.AssertExpectations(t)
+	ingestrInst.AssertNotCalled(t, "EnsureIngestrInstalled", mock.Anything, mock.Anything)
 }
 
 func Test_uvPythonRunner_RunWithMaterialization_DisablesTelemetryForIngestrUpload(t *testing.T) {
@@ -115,9 +165,9 @@ func Test_uvPythonRunner_RunWithMaterialization_DisablesTelemetryForIngestrUploa
 	}).Return(nil)
 
 	cmd.On("Run", mock.Anything, repo, mock.MatchedBy(func(c *CommandInstance) bool {
-		return c.Name == "~/.bruin/uv" &&
+		return c.Name == "~/.bruin/ingestr/"+IngestrVersionV1+"/ingestr" &&
 			len(c.Args) > 0 &&
-			c.Args[0] == "tool" &&
+			c.Args[0] == "ingest" &&
 			c.EnvVars["INGESTR_DISABLE_TELEMETRY"] == "true" &&
 			c.EnvVars["PYTHONUNBUFFERED"] == "1" &&
 			containsArg(c.Args, "mmap://")
@@ -125,10 +175,14 @@ func Test_uvPythonRunner_RunWithMaterialization_DisablesTelemetryForIngestrUploa
 
 	inst := new(mockUvInstaller)
 	inst.On("EnsureUvInstalled", mock.Anything).Return("~/.bruin/uv", nil)
+	ingestrInst := new(mockIngestrInstaller)
+	ingestrInst.On("EnsureIngestrInstalled", mock.Anything, IngestrVersionV1).
+		Return("~/.bruin/ingestr/"+IngestrVersionV1+"/ingestr", nil)
 
 	runner := &UvPythonRunner{
-		Cmd:         cmd,
-		UvInstaller: inst,
+		Cmd:              cmd,
+		UvInstaller:      inst,
+		IngestrInstaller: ingestrInst,
 		conn: fakeConnectionGetter{
 			"dest": fakeIngestrConnection{uri: "postgres://user:pass@localhost:5432/db"},
 		},
@@ -150,6 +204,7 @@ func Test_uvPythonRunner_RunWithMaterialization_DisablesTelemetryForIngestrUploa
 
 	require.NoError(t, err)
 	cmd.AssertExpectations(t)
+	ingestrInst.AssertExpectations(t)
 }
 
 func Test_uvPythonRunner_RunWithMaterialization_RejectsIncrementalPredicate(t *testing.T) {
@@ -373,13 +428,13 @@ func Test_ingestrPackage_HonorsCtxIngestrVersion(t *testing.T) {
 	assert.True(t, isLocal)
 }
 
-func Test_ingestrRunCmd_UsesResolvedPackage(t *testing.T) {
+func Test_uvIngestrRunCmd_UsesResolvedPackage(t *testing.T) {
 	t.Parallel()
 
 	u := &UvPythonRunner{}
 	ctx := context.WithValue(t.Context(), CtxIngestrVersion, "0.14.155")
 
-	args := u.ingestrRunCmd(ctx, []string{"pyodbc", "duckdb"}, []string{"ingest", "--source-uri", "csv:///tmp/seed.csv"})
+	args := u.uvIngestrRunCmd(ctx, []string{"pyodbc", "duckdb"}, []string{"ingest", "--source-uri", "csv:///tmp/seed.csv"})
 
 	assert.Equal(t, []string{
 		"tool",
@@ -402,13 +457,13 @@ func Test_ingestrRunCmd_UsesResolvedPackage(t *testing.T) {
 	}, args)
 }
 
-func Test_ingestrRunCmd_LocalPathForcesReinstall(t *testing.T) {
+func Test_uvIngestrRunCmd_LocalPathForcesReinstall(t *testing.T) {
 	t.Parallel()
 
 	u := &UvPythonRunner{}
 	ctx := context.WithValue(t.Context(), LocalIngestr, "/local/ingestr")
 
-	args := u.ingestrRunCmd(ctx, nil, []string{"ingest"})
+	args := u.uvIngestrRunCmd(ctx, nil, []string{"ingest"})
 
 	assert.Equal(t, []string{
 		"tool",

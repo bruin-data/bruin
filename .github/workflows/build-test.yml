@@ -37,7 +37,7 @@ jobs:
   test:
     strategy:
       matrix:
-        platform: [depot-ubuntu-latest-4]
+        platform: [depot-ubuntu-latest-4, depot-windows-latest-4]
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -62,12 +62,16 @@ jobs:
             rust-${{ runner.os }}-
       - name: Touch cached Rust lib
         if: steps.rust-cache.outputs.cache-hit == 'true'
+        shell: bash
         run: touch pkg/sqlparser/rustffi/target/release/libbruin_rustsqlparser.a
       - name: Setup Rust
         if: steps.rust-cache.outputs.cache-hit != 'true'
         uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
       - name: Run full test suite
-        run: make test-full
+        shell: bash
+        run: |
+          [[ "${{ runner.os }}" != 'Windows' ]] || export PATH="/c/mingw64/bin:$PATH"
+          make test-full
   end2end:
     strategy:
       matrix:
