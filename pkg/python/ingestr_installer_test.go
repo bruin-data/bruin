@@ -13,6 +13,8 @@ import (
 )
 
 func TestIngestrCheckerInstallsAndCachesExactRelease(t *testing.T) {
+	t.Parallel()
+
 	homeDir := t.TempDir()
 	installCalls := 0
 	checker := &IngestrChecker{
@@ -45,6 +47,8 @@ func TestIngestrCheckerInstallsAndCachesExactRelease(t *testing.T) {
 }
 
 func TestIngestrCheckerCleansUpFailedInstallation(t *testing.T) {
+	t.Parallel()
+
 	homeDir := t.TempDir()
 	installErr := assert.AnError
 	checker := &IngestrChecker{
@@ -61,6 +65,8 @@ func TestIngestrCheckerCleansUpFailedInstallation(t *testing.T) {
 }
 
 func TestIngestrCheckerRejectsInstallerWithoutBinary(t *testing.T) {
+	t.Parallel()
+
 	homeDir := t.TempDir()
 	checker := &IngestrChecker{
 		install: func(context.Context, io.Writer, string, string) error {
@@ -75,6 +81,8 @@ func TestIngestrCheckerRejectsInstallerWithoutBinary(t *testing.T) {
 }
 
 func TestIngestrCheckerRejectsInvalidVersion(t *testing.T) {
+	t.Parallel()
+
 	checker := &IngestrChecker{}
 
 	_, err := checker.EnsureIngestrInstalled(t.Context(), "../../unexpected")
