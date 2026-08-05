@@ -7,8 +7,8 @@ Bruin supports Salesforce as a source for [ingestr assets](/assets/ingestr), and
 Bruin's Salesforce ingestr connection supports three credential forms:
 
 - **Username, password, and security token**: recommended for scheduled runs when Salesforce SOAP API login is enabled.
-- **OAuth 2.0 client credentials**: recommended when you have a Salesforce Connected App configured for the client credentials flow. ingestr exchanges `client_id` and `client_secret` for an access token at runtime.
-- **Static access token**: useful for short-lived interactive runs when SOAP API login is unavailable. Bruin does not refresh expired static Salesforce access tokens.
+- **OAuth 2.0 client credentials**: use a Connected App that allows the client credentials flow. ingestr exchanges `client_id` and `client_secret` for an access token.
+- **Static access token**: useful when SOAP API login is unavailable or username/password auth is blocked. Bruin does not refresh expired static Salesforce access tokens.
 
 Follow the steps below to set up Salesforce correctly as a data source and run ingestion.
 
@@ -79,7 +79,7 @@ connections:
 - `token` is your Salesforce security token. Do not append the security token to the password.
 - `domain` is your Salesforce domain. You can pass either the host, such as `your-domain.my.salesforce.com`, or the full URL, such as `https://your-domain.my.salesforce.com`. For sandboxes, use the sandbox My Domain URL.
 
-For OAuth 2.0 client credentials, use a Connected App that allows the client credentials flow:
+For OAuth 2.0 client credentials:
 
 ```yaml
 connections:
@@ -92,10 +92,9 @@ connections:
 
 - `client_id` is the Connected App consumer key.
 - `client_secret` is the Connected App consumer secret.
-- `domain` is your Salesforce My Domain or instance domain. You can pass either the host or the full URL. For sandboxes, use the sandbox My Domain URL.
-- ingestr requests a fresh access token from Salesforce for each run using these credentials.
+- `domain` is your Salesforce domain. You can pass either the host or the full URL.
 
-If you already have a short-lived OAuth access token, you can pass it directly:
+If SOAP API login is not enabled or username/password auth is blocked, use a static access token:
 
 ```yaml
 connections:
@@ -109,11 +108,7 @@ connections:
 - Bruin does not refresh this token when it expires.
 - `domain` is the Salesforce instance domain for the same org as the token. You can pass either the host or the full URL.
 
-Auth precedence when multiple credential fields are set:
-
-1. `access_token`
-2. `client_id` and `client_secret`
-3. `username`, `password`, and `token`
+When multiple credential forms are set, `access_token` takes precedence, then `client_id`/`client_secret`, then `username`/`password`/`token`.
 
 Do not commit `.bruin.yml` if it contains Salesforce credentials.
 
@@ -149,7 +144,7 @@ Security Token: leave blank
 Domain: https://your-domain.my.salesforce.com
 ```
 
-For OAuth 2.0 client credentials, configure the connection in `.bruin.yml` with `client_id`, `client_secret`, and `domain` until matching Bruin Cloud fields are available for your workspace.
+For OAuth 2.0 client credentials, use `client_id`, `client_secret`, and `domain` in `.bruin.yml`.
 
 The Bruin Cloud connection name must exactly match the asset's `source_connection` value. For example, if an asset uses:
 
