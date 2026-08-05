@@ -3937,7 +3937,7 @@ func cloudScheduledAgentsRunStates() *cli.Command {
 
 // scheduledAgentIDFlag is the required parent-scope flag shared by the run-state
 // commands (a run-state file only exists in the context of a scheduled agent).
-func scheduledAgentIDFlag() cli.Flag {
+func scheduledAgentIDFlag() *cli.IntFlag {
 	return &cli.IntFlag{
 		Name:     "scheduled-agent-id",
 		Usage:    "scheduled agent the run-state file belongs to",
@@ -3945,7 +3945,7 @@ func scheduledAgentIDFlag() cli.Flag {
 	}
 }
 
-func runStateNameFlag() cli.Flag {
+func runStateNameFlag() *cli.StringFlag {
 	return &cli.StringFlag{
 		Name:     "name",
 		Usage:    "run-state file name",

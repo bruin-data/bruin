@@ -325,6 +325,9 @@ type RunState struct {
 	UpdatedAt *string `json:"updated_at"`
 }
 
+// ScheduledAgent represents a Bruin Cloud scheduled agent — a cron-based
+// recurring agent task. The nested plan fields (verified SQLs, memory, ...) are
+// kept as raw JSON so `--output json` round-trips the full server response.
 type ScheduledAgent struct {
 	ID                int             `json:"id"`
 	Title             *string         `json:"title"`
