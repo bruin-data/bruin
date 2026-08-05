@@ -69,7 +69,7 @@ Define the column that will be used for the partitioning of the resulting table.
 - **Type:** `String`
 - **Default:** none
 
-On BigQuery, `partition_by` accepts a full partitioning expression, and the granularity comes from that expression. A bare column (`event_ts`) or `DATE(event_ts)` produces **day**-level partitioning; use a truncation function to choose another granularity — `TIMESTAMP_TRUNC(event_ts, HOUR)`, `DATETIME_TRUNC(event_ts, MONTH)`, or `DATE_TRUNC(event_dt, YEAR)` (`HOUR`, `DAY`, `MONTH`, and `YEAR` are supported). Note that a bare `TIMESTAMP`/`DATETIME` column is not a valid partition expression on BigQuery — wrap it in `DATE(...)` or a `*_TRUNC(...)` call.
+On BigQuery, `partition_by` takes a partitioning expression that sets the granularity. A bare `DATE` column or `DATE(ts)` gives **day**-level partitioning; for other granularities wrap a `TIMESTAMP`/`DATETIME` column in `TIMESTAMP_TRUNC`/`DATETIME_TRUNC` with `HOUR`/`DAY`/`MONTH`/`YEAR` (e.g. `TIMESTAMP_TRUNC(event_ts, HOUR)`). A bare `TIMESTAMP`/`DATETIME` column is not valid.
 
 ### `materialization > cluster_by`
 
