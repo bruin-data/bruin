@@ -914,6 +914,28 @@ bruin cloud scheduled-agents update --scheduled-agent-id 42 --cron "0 8 * * 1"
 bruin cloud scheduled-agents update --scheduled-agent-id 42 --state-file ./plan.yaml
 ```
 
+#### `run-states`
+
+Manage a scheduled agent's **run-state** files — the markdown "memory" the agent
+persists across runs (keyed by name, upserted on write). Reads and writes both
+require only the `scheduled-agent:list` ability, so any Cloud-CLI-enabled agent
+can manage its own run state.
+
+```bash
+# List the files on a scheduled agent
+bruin cloud scheduled-agents run-states list --scheduled-agent-id 42
+
+# Print one file's content (redirect to save it)
+bruin cloud scheduled-agents run-states get --scheduled-agent-id 42 --name memory.md > memory.md
+
+# Create or replace a file (upsert), inline or from a file
+bruin cloud scheduled-agents run-states set --scheduled-agent-id 42 --name memory.md --content "notes..."
+bruin cloud scheduled-agents run-states set --scheduled-agent-id 42 --name memory.md --content-file ./memory.md
+
+# Delete a file
+bruin cloud scheduled-agents run-states delete --scheduled-agent-id 42 --name memory.md
+```
+
 ---
 
 ### `cost`

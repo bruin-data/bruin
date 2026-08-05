@@ -452,7 +452,7 @@ func TestCloudScheduledAgentsCommand_Help(t *testing.T) {
 	cmd := CloudScheduledAgents()
 	require.NotNil(t, cmd)
 	assert.Equal(t, "scheduled-agents", cmd.Name)
-	require.Len(t, cmd.Commands, 4)
+	require.Len(t, cmd.Commands, 5)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
@@ -462,6 +462,24 @@ func TestCloudScheduledAgentsCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "get")
 	assert.Contains(t, subNames, "create")
 	assert.Contains(t, subNames, "update")
+	assert.Contains(t, subNames, "run-states")
+}
+
+func TestCloudScheduledAgentsRunStatesCommand_Help(t *testing.T) {
+	t.Parallel()
+	cmd := cloudScheduledAgentsRunStates()
+	require.NotNil(t, cmd)
+	assert.Equal(t, "run-states", cmd.Name)
+	require.Len(t, cmd.Commands, 4)
+
+	subNames := make([]string, len(cmd.Commands))
+	for i, sub := range cmd.Commands {
+		subNames[i] = sub.Name
+	}
+	assert.Contains(t, subNames, "list")
+	assert.Contains(t, subNames, "get")
+	assert.Contains(t, subNames, "set")
+	assert.Contains(t, subNames, "delete")
 }
 
 func TestMessagePairIDFromEnv(t *testing.T) {
