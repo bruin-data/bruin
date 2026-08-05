@@ -1,6 +1,7 @@
 package clickhouse
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -456,6 +457,22 @@ func TestMaterializer_Render(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
+			}
+			strategy := tt.task.Materialization.Strategy
+			bootstrapStrategy := strategy == pipeline.MaterializationStrategyDeleteInsert ||
+				strategy == pipeline.MaterializationStrategyMerge ||
+				strategy == pipeline.MaterializationStrategyTimeInterval
+			if !tt.wantErr && !tt.fullRefresh && bootstrapStrategy {
+				withoutBootstrap := make([]string, 0, len(render)-1)
+				for _, statement := range render {
+					if strings.HasPrefix(statement, "CREATE TABLE IF NOT EXISTS ") {
+						assert.Contains(t, statement, tt.task.Name)
+						continue
+					}
+					withoutBootstrap = append(withoutBootstrap, statement)
+				}
+				require.Len(t, withoutBootstrap, len(render)-1)
+				render = withoutBootstrap
 			}
 
 			assert.Equal(t, tt.want, render)

@@ -796,6 +796,15 @@ COMMIT TRANSACTION;`,
 			} else {
 				require.NoError(t, err)
 			}
+			strategy := tt.task.Materialization.Strategy
+			bootstrapStrategy := strategy == pipeline.MaterializationStrategyDeleteInsert ||
+				strategy == pipeline.MaterializationStrategyMerge ||
+				strategy == pipeline.MaterializationStrategyTimeInterval
+			if !tt.wantErr && !tt.fullRefresh && bootstrapStrategy {
+				bootstrap := buildCreateTableIfNotExistsQuery(tt.task, tt.query) + ";\n"
+				assert.Contains(t, render, bootstrap)
+				render = strings.Replace(render, bootstrap, "", 1)
+			}
 
 			if tt.exactMatch {
 				assert.Equal(t, tt.want, render)
@@ -836,6 +845,15 @@ WHERE event_date >= DATE '2026-07-01';`
 	}
 
 	expectedFullSQL := `DECLARE bruin_merge_partitions_abcefghi ARRAY<DATE>;
+CREATE TABLE IF NOT EXISTS analytics.events PARTITION BY event_date AS
+SELECT * FROM (
+SELECT
+  id,
+  event_date,
+  payload
+FROM staging.events
+WHERE event_date >= DATE '2026-07-01'
+) AS __bruin_bootstrap WHERE 1 = 0;
 BEGIN TRANSACTION;
 CREATE TEMP TABLE __bruin_merge_source_abcefghi AS SELECT
   id,
@@ -895,6 +913,15 @@ WHERE DATE(created_at) = DATE '2026-07-27';`
 	}
 
 	expectedFullSQL := `DECLARE bruin_merge_partitions_abcefghi ARRAY<DATE>;
+CREATE TABLE IF NOT EXISTS analytics.events_by_day PARTITION BY DATE(created_at) AS
+SELECT * FROM (
+SELECT
+  id,
+  created_at,
+  payload
+FROM staging.raw_events
+WHERE DATE(created_at) = DATE '2026-07-27'
+) AS __bruin_bootstrap WHERE 1 = 0;
 BEGIN TRANSACTION;
 CREATE TEMP TABLE __bruin_merge_source_abcefghi AS SELECT
   id,

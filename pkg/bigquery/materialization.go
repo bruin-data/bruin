@@ -131,7 +131,7 @@ func mergeMaterializer(asset *pipeline.Asset, query string) (string, error) {
 		fmt.Sprintf("WHEN NOT MATCHED THEN INSERT(%s) VALUES(%s)", allColumnValues, allColumnValues),
 	}
 
-	return strings.Join(mergeLines, "\n") + ";", nil
+	return buildCreateTableIfNotExistsQuery(asset, query) + ";\n" + strings.Join(mergeLines, "\n") + ";", nil
 }
 
 type mergePartitionExpression struct {
@@ -258,6 +258,7 @@ func buildPartitionedMergeQuery(
 
 	statements := []string{
 		fmt.Sprintf("DECLARE %s ARRAY<%s>", partitionVariable, partition.dataType),
+		buildCreateTableIfNotExistsQuery(asset, query),
 		"BEGIN TRANSACTION",
 		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", sourceTable, strings.TrimSuffix(query, ";")),
 		fmt.Sprintf(
@@ -350,6 +351,7 @@ func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) 
 	declaredVarName := "distinct_keys_" + randPrefix
 	queries := []string{
 		fmt.Sprintf("DECLARE %s array<%s>", declaredVarName, foundCol.Type),
+		buildCreateTableIfNotExistsQuery(asset, query),
 		"BEGIN TRANSACTION",
 		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, strings.TrimSuffix(query, ";")),
 		fmt.Sprintf("SET %s = (SELECT array_agg(distinct %s) FROM %s)", declaredVarName, mat.IncrementalKey, tempTableName),
@@ -366,6 +368,7 @@ func buildIncrementalQueryWithoutTempVariable(asset *pipeline.Asset, query strin
 	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
 
 	queries := []string{
+		buildCreateTableIfNotExistsQuery(asset, query),
 		"BEGIN TRANSACTION",
 		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, strings.TrimSuffix(query, ";")),
 		fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", asset.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
@@ -546,6 +549,18 @@ func buildCreateReplaceQuery(asset *pipeline.Asset, query string) (string, error
 	}
 }
 
+func buildCreateTableIfNotExistsQuery(asset *pipeline.Asset, query string) string {
+	options := make([]string, 0, 2)
+	if asset.Materialization.PartitionBy != "" {
+		options = append(options, "PARTITION BY "+asset.Materialization.PartitionBy)
+	}
+	if len(asset.Materialization.ClusterBy) > 0 {
+		options = append(options, "CLUSTER BY "+strings.Join(asset.Materialization.ClusterBy, ", "))
+	}
+
+	return ansisql.BuildCreateTableIfNotExistsAsQuery(asset.Name, strings.Join(options, " "), query)
+}
+
 func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error) {
 	if asset.Materialization.IncrementalKey == "" {
 		return "", errors.New("incremental_key is required for time_interval strategy")
@@ -570,6 +585,7 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 	}
 
 	queries := []string{
+		buildCreateTableIfNotExistsQuery(asset, query),
 		"BEGIN TRANSACTION",
 		fmt.Sprintf(`DELETE FROM %s WHERE %s BETWEEN '%s' AND '%s'`,
 			asset.Name,

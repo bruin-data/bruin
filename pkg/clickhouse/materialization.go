@@ -80,6 +80,12 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) ([]string, error)
 			task.ColumnNamesWithPrimaryKey()[0],
 			query,
 		),
+		fmt.Sprintf(
+			"CREATE TABLE IF NOT EXISTS %s PRIMARY KEY %s AS SELECT * FROM %s LIMIT 0",
+			task.Name,
+			task.ColumnNamesWithPrimaryKey()[0],
+			tempTableName,
+		),
 		fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", task.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
 		// An identical rerun must replace rows deleted above instead of being
 		// discarded by ClickHouse's block-level insert deduplication.
@@ -142,6 +148,7 @@ func buildMergeQuery(task *pipeline.Asset, query string) ([]string, error) {
 	// deleting target rows. LIMIT 0 performs no write and avoids deduplication.
 	queries := []string{
 		fmt.Sprintf("CREATE TABLE %s ENGINE = MergeTree() PRIMARY KEY (%s) AS %s", tempTableName, keys, query),
+		fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s ENGINE = MergeTree() PRIMARY KEY (%s) AS SELECT * FROM %s LIMIT 0", task.Name, keys, tempTableName),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s LIMIT 0", task.Name, tempTableName),
 		fmt.Sprintf("DELETE FROM %s WHERE %s", task.Name, deleteCondition),
 		fmt.Sprintf("INSERT INTO %s SETTINGS insert_deduplicate = 0 SELECT * FROM %s", task.Name, tempTableName),
@@ -202,6 +209,11 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) ([]string, erro
 	}
 
 	queries := []string{
+		fmt.Sprintf(
+			"CREATE TABLE IF NOT EXISTS %s ENGINE = MergeTree() ORDER BY tuple() AS SELECT * FROM (%s) AS __bruin_bootstrap WHERE 1 = 0",
+			asset.Name,
+			strings.TrimSuffix(query, ";"),
+		),
 		fmt.Sprintf(`DELETE FROM %s WHERE %s BETWEEN %s AND %s`,
 			asset.Name,
 			asset.Materialization.IncrementalKey,

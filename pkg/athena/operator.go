@@ -21,6 +21,18 @@ type materializer interface {
 	LogIfFullRefreshAndDDL(writer interface{}, asset *pipeline.Asset) error
 }
 
+type initialTableMaterializer interface {
+	RenderInitialTable(asset *pipeline.Asset, query, location string) ([]string, error)
+}
+
+type initialTableInsertionIndexer interface {
+	InitialTableInsertionIndex(asset *pipeline.Asset) int
+}
+
+type tableExistsQueryBuilder interface {
+	BuildTableExistsQuery(tableName string) (string, error)
+}
+
 type Client interface {
 	RunQueryWithoutResult(ctx context.Context, query *query.Query) error
 	Select(ctx context.Context, query *query.Query) ([][]interface{}, error)
@@ -108,6 +120,43 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		}
 	}
 
+	if shouldInitializeIncrementalTable(t) && !isFullRefreshMaterializer(o.materializer) {
+		initializer, canInitialize := o.materializer.(initialTableMaterializer)
+		tableChecker, canCheck := conn.(tableExistsQueryBuilder)
+		if canInitialize && canCheck {
+			existsQuery, err := tableChecker.BuildTableExistsQuery(t.Name)
+			if err != nil {
+				return errors.Wrap(err, "cannot build incremental target existence query")
+			}
+			result, err := conn.Select(ctx, &query.Query{Query: existsQuery})
+			if err != nil {
+				return errors.Wrap(err, "cannot check whether incremental target exists")
+			}
+			count, err := helpers.CastResultToInteger(result, true)
+			if err != nil {
+				return errors.Wrap(err, "cannot parse incremental target existence result")
+			}
+			if count == 0 {
+				initialQueries, err := initializer.RenderInitialTable(t, q.String(), conn.GetResultsLocation())
+				if err != nil {
+					return err
+				}
+				insertionIndex := 0
+				if indexer, ok := o.materializer.(initialTableInsertionIndexer); ok {
+					insertionIndex = indexer.InitialTableInsertionIndex(t)
+				}
+				if insertionIndex < 0 || insertionIndex > len(materializedQueries) {
+					insertionIndex = 0
+				}
+				withInitialTable := make([]string, 0, len(initialQueries)+len(materializedQueries))
+				withInitialTable = append(withInitialTable, materializedQueries[:insertionIndex]...)
+				withInitialTable = append(withInitialTable, initialQueries...)
+				withInitialTable = append(withInitialTable, materializedQueries[insertionIndex:]...)
+				materializedQueries = withInitialTable
+			}
+		}
+	}
+
 	var lastQuery *query.Query
 	for _, queryString := range materializedQueries {
 		queryObj := &query.Query{Query: queryString}
@@ -141,6 +190,26 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	}
 
 	return nil
+}
+
+func shouldInitializeIncrementalTable(asset *pipeline.Asset) bool {
+	if asset.Materialization.Type != pipeline.MaterializationTypeTable {
+		return false
+	}
+
+	switch asset.Materialization.Strategy {
+	case pipeline.MaterializationStrategyDeleteInsert,
+		pipeline.MaterializationStrategyMerge,
+		pipeline.MaterializationStrategyTimeInterval:
+		return true
+	default:
+		return false
+	}
+}
+
+func isFullRefreshMaterializer(materializer materializer) bool {
+	fullRefresh, ok := materializer.(interface{ IsFullRefresh() bool })
+	return ok && fullRefresh.IsFullRefresh()
 }
 
 func NewColumnCheckOperator(manager config.ConnectionGetter) *ansisql.ColumnCheckOperator {

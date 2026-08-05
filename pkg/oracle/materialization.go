@@ -185,12 +185,16 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 		endVar = "{{end_date}}"
 	}
 
-	return fmt.Sprintf(`BEGIN
-   DELETE FROM %s WHERE %s BETWEEN '%s' AND '%s';
-   INSERT INTO %s
-%s
-;
-END;`, asset.Name, asset.Materialization.IncrementalKey, startVar, endVar, asset.Name, query), nil
+	deleteQuery := fmt.Sprintf(
+		"DELETE FROM %s WHERE %s BETWEEN '%s' AND '%s'",
+		asset.Name,
+		asset.Materialization.IncrementalKey,
+		startVar,
+		endVar,
+	)
+	insertQuery := fmt.Sprintf("INSERT INTO %s\n%s", asset.Name, query)
+
+	return buildIncrementalPLSQLBlock(asset, query, deleteQuery, insertQuery), nil
 }
 
 func buildDDLQuery(asset *pipeline.Asset, _ string) (string, error) {
@@ -269,18 +273,18 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) (string, error) {
 
 	query = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(query), ";"))
 
-	// Wrap DELETE + INSERT in a single PL/SQL block so both DML statements
-	// execute atomically through the Go driver in one ExecContext call.
 	// Uses EXISTS instead of IN (SELECT DISTINCT ...) to let Oracle's optimizer
 	// choose the best semi-join strategy without forcing a full DISTINCT sort.
-	return fmt.Sprintf(`BEGIN
-   DELETE FROM %s t WHERE EXISTS (
-      SELECT 1 FROM (%s) s WHERE s.%s = t.%s
-   );
-   INSERT INTO %s
-%s
-;
-END;`, task.Name, query, mat.IncrementalKey, mat.IncrementalKey, task.Name, query), nil
+	deleteQuery := fmt.Sprintf(
+		"DELETE FROM %s t WHERE EXISTS (\n   SELECT 1 FROM (%s) s WHERE s.%s = t.%s\n)",
+		task.Name,
+		query,
+		mat.IncrementalKey,
+		mat.IncrementalKey,
+	)
+	insertQuery := fmt.Sprintf("INSERT INTO %s\n%s", task.Name, query)
+
+	return buildIncrementalPLSQLBlock(task, query, deleteQuery, insertQuery), nil
 }
 
 func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
@@ -332,7 +336,38 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 	}
 	mergeLines = append(mergeLines, fmt.Sprintf("WHEN NOT MATCHED THEN INSERT (%s) VALUES (%s)", insertCols, getSourcePrefix(columnNames)))
 
-	return strings.Join(mergeLines, "\n") + ";", nil
+	return buildIncrementalPLSQLBlock(asset, query, strings.Join(mergeLines, "\n")), nil
+}
+
+// buildIncrementalPLSQLBlock defers parsing the incremental DML until after the
+// target has been created. Static SQL inside the block would be resolved before
+// the bootstrap DDL runs and would still fail with ORA-00942 on a first run.
+func buildIncrementalPLSQLBlock(asset *pipeline.Asset, query string, dmlStatements ...string) string {
+	query = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(query), ";"))
+	createTable := fmt.Sprintf(
+		"CREATE TABLE %s AS SELECT * FROM (%s) __bruin_bootstrap WHERE 1 = 0",
+		asset.Name,
+		query,
+	)
+
+	lines := []string{
+		"BEGIN",
+		"   BEGIN",
+		fmt.Sprintf("      EXECUTE IMMEDIATE '%s';", escapeOracleString(createTable)),
+		"   EXCEPTION",
+		"      WHEN OTHERS THEN",
+		"         IF SQLCODE != -955 THEN",
+		"            RAISE;",
+		"         END IF;",
+		"   END;",
+	}
+	for _, statement := range dmlStatements {
+		statement = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(statement), ";"))
+		lines = append(lines, fmt.Sprintf("   EXECUTE IMMEDIATE '%s';", escapeOracleString(statement)))
+	}
+	lines = append(lines, "END;")
+
+	return strings.Join(lines, "\n")
 }
 
 func getSourcePrefix(columns []string) string {

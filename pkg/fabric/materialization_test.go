@@ -71,6 +71,7 @@ func TestBuildDeleteInsertQuery(t *testing.T) {
 		expected := "DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp];\n" +
 			"CREATE TABLE [dbo].[Table__bruin_tmp] AS\n" +
 			"SELECT 1;\n" +
+			"IF OBJECT_ID('dbo.Table', 'U') IS NULL BEGIN CREATE TABLE [dbo].[Table] AS SELECT * FROM [dbo].[Table__bruin_tmp] WHERE 1 = 0 END;\n" +
 			"DELETE FROM [dbo].[Table] WHERE EXISTS (\n" +
 			"  SELECT 1 FROM [dbo].[Table__bruin_tmp] WHERE [dbo].[Table].[id] = [dbo].[Table__bruin_tmp].[id]\n" +
 			");\n" +
@@ -90,6 +91,7 @@ func TestBuildDeleteInsertQuery(t *testing.T) {
 		expected := "DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp];\n" +
 			"CREATE TABLE [dbo].[Table__bruin_tmp] AS\n" +
 			"WITH cte AS (SELECT id, val FROM src) SELECT * FROM cte;\n" +
+			"IF OBJECT_ID('dbo.Table', 'U') IS NULL BEGIN CREATE TABLE [dbo].[Table] AS SELECT * FROM [dbo].[Table__bruin_tmp] WHERE 1 = 0 END;\n" +
 			"DELETE FROM [dbo].[Table] WHERE EXISTS (\n" +
 			"  SELECT 1 FROM [dbo].[Table__bruin_tmp] WHERE [dbo].[Table].[id] = [dbo].[Table__bruin_tmp].[id]\n" +
 			");\n" +

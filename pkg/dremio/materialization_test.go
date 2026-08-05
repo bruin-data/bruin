@@ -119,3 +119,30 @@ SELECT * FROM source;`,
 		})
 	}
 }
+
+func TestMaterializer_IncrementalStrategiesBootstrapMissingTable(t *testing.T) {
+	t.Parallel()
+
+	for _, strategy := range []pipeline.MaterializationStrategy{
+		pipeline.MaterializationStrategyDeleteInsert,
+		pipeline.MaterializationStrategyTimeInterval,
+	} {
+		t.Run(string(strategy), func(t *testing.T) {
+			t.Parallel()
+			asset := &pipeline.Asset{
+				Name: "analytics.events",
+				Materialization: pipeline.Materialization{
+					Type:            pipeline.MaterializationTypeTable,
+					Strategy:        strategy,
+					IncrementalKey:  "event_date",
+					TimeGranularity: pipeline.MaterializationTimeGranularityDate,
+				},
+			}
+
+			got, err := NewMaterializer(false).Render(asset, "SELECT event_date FROM raw_events")
+			require.NoError(t, err)
+			assert.Contains(t, got, "CREATE TABLE IF NOT EXISTS \"analytics\".\"events\" AS")
+			assert.Contains(t, got, "AS __bruin_bootstrap WHERE 1 = 0")
+		})
+	}
+}

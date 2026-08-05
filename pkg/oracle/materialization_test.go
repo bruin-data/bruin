@@ -126,12 +126,19 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 			query: "SELECT 1 as dt",
 			want: `BEGIN
-   DELETE FROM my.asset t WHERE EXISTS (
-      SELECT 1 FROM (SELECT 1 as dt) s WHERE s.dt = t.dt
-   );
-   INSERT INTO my.asset
-SELECT 1 as dt
-;
+	BEGIN
+		EXECUTE IMMEDIATE 'CREATE TABLE my.asset AS SELECT * FROM (SELECT 1 as dt) __bruin_bootstrap WHERE 1 = 0';
+	EXCEPTION
+		WHEN OTHERS THEN
+			IF SQLCODE != -955 THEN
+				RAISE;
+			END IF;
+	END;
+	EXECUTE IMMEDIATE 'DELETE FROM my.asset t WHERE EXISTS (
+   SELECT 1 FROM (SELECT 1 as dt) s WHERE s.dt = t.dt
+)';
+	EXECUTE IMMEDIATE 'INSERT INTO my.asset
+SELECT 1 as dt';
 END;`,
 		},
 		{
@@ -176,7 +183,22 @@ END;`,
 				},
 			},
 			query: "SELECT 1 as id, 'abc' as name",
-			want:  "MERGE INTO my.asset target\nUSING (\nSELECT 1 as id, 'abc' as name\n) source ON ((target.id = source.id OR (target.id IS NULL AND source.id IS NULL)))\nWHEN MATCHED THEN UPDATE SET target.name = source.name\nWHEN NOT MATCHED THEN INSERT (id, name) VALUES (source.id, source.name);",
+			want: `BEGIN
+	BEGIN
+		EXECUTE IMMEDIATE 'CREATE TABLE my.asset AS SELECT * FROM (SELECT 1 as id, ''abc'' as name) __bruin_bootstrap WHERE 1 = 0';
+	EXCEPTION
+		WHEN OTHERS THEN
+			IF SQLCODE != -955 THEN
+				RAISE;
+			END IF;
+	END;
+	EXECUTE IMMEDIATE 'MERGE INTO my.asset target
+USING (
+SELECT 1 as id, ''abc'' as name
+) source ON ((target.id = source.id OR (target.id IS NULL AND source.id IS NULL)))
+WHEN MATCHED THEN UPDATE SET target.name = source.name
+WHEN NOT MATCHED THEN INSERT (id, name) VALUES (source.id, source.name)';
+END;`,
 		},
 		{
 			name: "merge with custom MergeSQL expression",
@@ -192,7 +214,22 @@ END;`,
 				},
 			},
 			query: "SELECT 1 as id, 'abc' as name",
-			want:  "MERGE INTO my.asset target\nUSING (\nSELECT 1 as id, 'abc' as name\n) source ON ((target.id = source.id OR (target.id IS NULL AND source.id IS NULL)))\nWHEN MATCHED THEN UPDATE SET target.name = COALESCE(source.name, target.name)\nWHEN NOT MATCHED THEN INSERT (id, name) VALUES (source.id, source.name);",
+			want: `BEGIN
+	BEGIN
+		EXECUTE IMMEDIATE 'CREATE TABLE my.asset AS SELECT * FROM (SELECT 1 as id, ''abc'' as name) __bruin_bootstrap WHERE 1 = 0';
+	EXCEPTION
+		WHEN OTHERS THEN
+			IF SQLCODE != -955 THEN
+				RAISE;
+			END IF;
+	END;
+	EXECUTE IMMEDIATE 'MERGE INTO my.asset target
+USING (
+SELECT 1 as id, ''abc'' as name
+) source ON ((target.id = source.id OR (target.id IS NULL AND source.id IS NULL)))
+WHEN MATCHED THEN UPDATE SET target.name = COALESCE(source.name, target.name)
+WHEN NOT MATCHED THEN INSERT (id, name) VALUES (source.id, source.name)';
+END;`,
 		},
 		{
 			name: "merge insert-only, no UpdateOnMerge columns",
@@ -208,7 +245,21 @@ END;`,
 				},
 			},
 			query: "SELECT 1 as id, 'abc' as name",
-			want:  "MERGE INTO my.asset target\nUSING (\nSELECT 1 as id, 'abc' as name\n) source ON ((target.id = source.id OR (target.id IS NULL AND source.id IS NULL)))\nWHEN NOT MATCHED THEN INSERT (id, name) VALUES (source.id, source.name);",
+			want: `BEGIN
+	BEGIN
+		EXECUTE IMMEDIATE 'CREATE TABLE my.asset AS SELECT * FROM (SELECT 1 as id, ''abc'' as name) __bruin_bootstrap WHERE 1 = 0';
+	EXCEPTION
+		WHEN OTHERS THEN
+			IF SQLCODE != -955 THEN
+				RAISE;
+			END IF;
+	END;
+	EXECUTE IMMEDIATE 'MERGE INTO my.asset target
+USING (
+SELECT 1 as id, ''abc'' as name
+) source ON ((target.id = source.id OR (target.id IS NULL AND source.id IS NULL)))
+WHEN NOT MATCHED THEN INSERT (id, name) VALUES (source.id, source.name)';
+END;`,
 		},
 		{
 			name: "semicolon trimming and schema-qualified table name",
@@ -276,10 +327,17 @@ END;`,
 			},
 			query: "SELECT 1 as ts",
 			want: `BEGIN
-   DELETE FROM my.asset WHERE ts BETWEEN '{{start_timestamp}}' AND '{{end_timestamp}}';
-   INSERT INTO my.asset
-SELECT 1 as ts
-;
+	BEGIN
+		EXECUTE IMMEDIATE 'CREATE TABLE my.asset AS SELECT * FROM (SELECT 1 as ts) __bruin_bootstrap WHERE 1 = 0';
+	EXCEPTION
+		WHEN OTHERS THEN
+			IF SQLCODE != -955 THEN
+				RAISE;
+			END IF;
+	END;
+	EXECUTE IMMEDIATE 'DELETE FROM my.asset WHERE ts BETWEEN ''{{start_timestamp}}'' AND ''{{end_timestamp}}''';
+	EXECUTE IMMEDIATE 'INSERT INTO my.asset
+SELECT 1 as ts';
 END;`,
 		},
 		{
@@ -295,10 +353,17 @@ END;`,
 			},
 			query: "SELECT 1 as dt",
 			want: `BEGIN
-   DELETE FROM my.asset WHERE dt BETWEEN '{{start_date}}' AND '{{end_date}}';
-   INSERT INTO my.asset
-SELECT 1 as dt
-;
+	BEGIN
+		EXECUTE IMMEDIATE 'CREATE TABLE my.asset AS SELECT * FROM (SELECT 1 as dt) __bruin_bootstrap WHERE 1 = 0';
+	EXCEPTION
+		WHEN OTHERS THEN
+			IF SQLCODE != -955 THEN
+				RAISE;
+			END IF;
+	END;
+	EXECUTE IMMEDIATE 'DELETE FROM my.asset WHERE dt BETWEEN ''{{start_date}}'' AND ''{{end_date}}''';
+	EXECUTE IMMEDIATE 'INSERT INTO my.asset
+SELECT 1 as dt';
 END;`,
 		},
 		{
@@ -400,7 +465,8 @@ END;`,
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				if !assert.Equal(t, tt.want, render) {
+				want := strings.ReplaceAll(tt.want, "\t", "   ")
+				if !assert.Equal(t, want, render) {
 					t.Logf("\nWant:\n%s\nGot:\n%s", tt.want, render)
 				}
 			}

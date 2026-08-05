@@ -82,6 +82,7 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) ([]string, error)
 
 	queries := []string{
 		fmt.Sprintf("SELECT alias.* INTO %s FROM (%s) AS alias;", tempTableName, query),
+		buildCreateTableIfNotExistsQuery(task, "SELECT * FROM "+tempTableName),
 		fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s);", task.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s;", task.Name, tempTableName),
 		fmt.Sprintf("DROP TABLE %s;", tempTableName),
@@ -151,7 +152,10 @@ func buildMergeQuery(asset *pipeline.Asset, query string) ([]string, error) {
 		fmt.Sprintf("WHEN NOT MATCHED THEN INSERT(%s) VALUES(%s)", allColumnValues, allColumnValues),
 	}
 
-	return []string{strings.Join(mergeLines, "\n") + ";"}, nil
+	return []string{
+		buildCreateTableIfNotExistsQuery(asset, query),
+		strings.Join(mergeLines, "\n") + ";",
+	}, nil
 }
 
 func buildTimeIntervalQuery(asset *pipeline.Asset, query string) ([]string, error) {
@@ -174,6 +178,7 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) ([]string, erro
 	}
 
 	queries := []string{
+		buildCreateTableIfNotExistsQuery(asset, query),
 		fmt.Sprintf(`DELETE FROM %s WHERE %s BETWEEN '%s' AND '%s'`,
 			asset.Name,
 			asset.Materialization.IncrementalKey,
@@ -184,6 +189,16 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) ([]string, erro
 	}
 
 	return queries, nil
+}
+
+func buildCreateTableIfNotExistsQuery(asset *pipeline.Asset, selectQuery string) string {
+	selectQuery = strings.TrimSuffix(strings.TrimSpace(selectQuery), ";")
+	return fmt.Sprintf(
+		"IF OBJECT_ID(%s, N'U') IS NULL\nBEGIN\nSELECT __bruin_bootstrap.* INTO %s FROM (\n%s\n) AS __bruin_bootstrap WHERE 1 = 0;\nEND;",
+		sqlStringLiteral(asset.Name),
+		quoteIdentifier(asset.Name),
+		selectQuery,
+	)
 }
 
 func quoteIdentifier(identifier string) string {
