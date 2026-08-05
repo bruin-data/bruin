@@ -171,11 +171,15 @@ On a new BigQuery destination, load every table before running query validation:
 bruin run --full-refresh --no-validation my-stripe-pipeline
 ```
 
-After that initial load, run `bruin validate my-stripe-pipeline` and schedule
+Run this pipeline-wide full refresh only for the first load, or when you
+intentionally reset the reporting history. It recreates the daily snapshot
+tables, so re-running it removes the observations used by the MRR movement and
+retention reports.
+
+After the initial load, run `bruin validate my-stripe-pipeline` and schedule
 the pipeline daily. The raw tables hold the Stripe objects returned by
-incremental discovery; schedule periodic full refreshes or targeted reloads
-when your reporting needs to account for changes to older mutable Stripe
-records.
+incremental discovery. When you need to reload older mutable Stripe records,
+use a targeted reload and keep the snapshot tables intact.
 
 ## Customize it
 
