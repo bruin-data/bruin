@@ -1,15 +1,19 @@
 package python
 
 import (
+	"archive/zip"
 	"context"
 	"fmt"
 	"io"
+	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/user"
@@ -21,6 +25,8 @@ import (
 const (
 	ingestrInstallerURL          = "https://getbruin.com/install/ingestr"
 	ingestrInstallerShellCommand = `curl -LsSf "$1" | sh -s -- -b "$2" "$3"`
+	ingestrReleaseDownloadURL    = "https://github.com/bruin-data/ingestr/releases/download"
+	maxIngestrBinarySize         = 512 * 1024 * 1024
 )
 
 // ingestrInstallMu prevents concurrent installations within the same Bruin
@@ -29,6 +35,14 @@ const (
 var ingestrInstallMu sync.Mutex
 
 type ingestrInstallFunc func(ctx context.Context, output io.Writer, installDir, version string) error
+
+type ingestrInstallerRuntime struct {
+	goos               string
+	goarch             string
+	findShell          func(string) (string, error)
+	httpClient         *http.Client
+	releaseDownloadURL string
+}
 
 // IngestrChecker installs and locates standalone ingestr releases.
 type IngestrChecker struct {
@@ -124,18 +138,135 @@ func ingestrBinaryName(goos string) string {
 }
 
 func runIngestrInstaller(ctx context.Context, output io.Writer, installDir, version string) error {
-	shell, err := exec.LookPath("sh")
+	installer := ingestrInstallerRuntime{
+		goos:               runtime.GOOS,
+		goarch:             runtime.GOARCH,
+		findShell:          exec.LookPath,
+		httpClient:         &http.Client{Timeout: 5 * time.Minute},
+		releaseDownloadURL: ingestrReleaseDownloadURL,
+	}
+	return installer.install(ctx, output, installDir, version)
+}
+
+func (r ingestrInstallerRuntime) install(ctx context.Context, output io.Writer, installDir, version string) error {
+	shell, err := r.findShell("sh")
 	if err != nil {
+		if r.goos == "windows" {
+			return r.installWindowsRelease(ctx, output, installDir, version)
+		}
 		return errors.Wrap(err, "the ingestr installer requires sh")
 	}
 
-	cmd := exec.CommandContext(ctx, shell, ingestrInstallerCommandArgs(installDir, version, runtime.GOOS)...) //nolint:gosec
+	cmd := exec.CommandContext(ctx, shell, ingestrInstallerCommandArgs(installDir, version, r.goos)...) //nolint:gosec
 	cmd.Env = environmentWithOverride(os.Environ(), "SHELL", "bruin-installer")
 	cmd.Stdout = output
 	cmd.Stderr = output
 
 	if err := cmd.Run(); err != nil {
 		return errors.Wrapf(err, "failed to install ingestr v%s", version)
+	}
+	return nil
+}
+
+func (r ingestrInstallerRuntime) installWindowsRelease(
+	ctx context.Context,
+	output io.Writer,
+	installDir string,
+	version string,
+) error {
+	archiveName, err := windowsIngestrArchiveName(r.goarch)
+	if err != nil {
+		return err
+	}
+
+	downloadURL := strings.TrimRight(r.releaseDownloadURL, "/") + "/" + url.PathEscape("v"+version) + "/" + archiveName
+	_, _ = fmt.Fprintf(output, "Downloading ingestr v%s for Windows...\n", version)
+
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
+	if err != nil {
+		return errors.Wrap(err, "failed to create ingestr download request")
+	}
+	response, err := r.httpClient.Do(request)
+	if err != nil {
+		return errors.Wrapf(err, "failed to download ingestr v%s", version)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		return fmt.Errorf("failed to download ingestr v%s: server returned %s", version, response.Status)
+	}
+
+	archiveFile, err := os.CreateTemp(installDir, ".ingestr-*.zip")
+	if err != nil {
+		return errors.Wrap(err, "failed to create temporary ingestr archive")
+	}
+	archivePath := archiveFile.Name()
+	defer os.Remove(archivePath)
+
+	_, copyErr := io.Copy(archiveFile, response.Body)
+	closeErr := archiveFile.Close()
+	if copyErr != nil {
+		return errors.Wrap(copyErr, "failed to save ingestr release archive")
+	}
+	if closeErr != nil {
+		return errors.Wrap(closeErr, "failed to close ingestr release archive")
+	}
+
+	return extractWindowsIngestrArchive(archivePath, installDir)
+}
+
+func windowsIngestrArchiveName(goarch string) (string, error) {
+	if goarch != "amd64" {
+		return "", fmt.Errorf("ingestr standalone releases do not support windows/%s", goarch)
+	}
+	return "ingestr_Windows_x86_64.zip", nil
+}
+
+func extractWindowsIngestrArchive(archivePath, installDir string) error {
+	archive, err := zip.OpenReader(archivePath)
+	if err != nil {
+		return errors.Wrap(err, "failed to open ingestr release archive")
+	}
+	defer archive.Close()
+
+	const binaryName = "ingestr.exe"
+	for _, file := range archive.File {
+		if file.FileInfo().IsDir() || filepath.Base(filepath.ToSlash(file.Name)) != binaryName {
+			continue
+		}
+
+		return extractFileFromZip(file, filepath.Join(installDir, binaryName))
+	}
+
+	return fmt.Errorf("ingestr release archive did not contain %s", binaryName)
+}
+
+func extractFileFromZip(source *zip.File, destination string) error {
+	reader, err := source.Open()
+	if err != nil {
+		return errors.Wrap(err, "failed to open ingestr binary in release archive")
+	}
+
+	file, err := os.OpenFile(destination, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o755)
+	if err != nil {
+		_ = reader.Close()
+		return errors.Wrap(err, "failed to create ingestr binary")
+	}
+
+	written, copyErr := io.CopyN(file, reader, maxIngestrBinarySize+1)
+	readerCloseErr := reader.Close()
+	fileCloseErr := file.Close()
+	if copyErr != nil && !errors.Is(copyErr, io.EOF) {
+		return errors.Wrap(copyErr, "failed to extract ingestr binary")
+	}
+	if written > maxIngestrBinarySize {
+		return fmt.Errorf("ingestr binary exceeds the %d-byte extraction limit", maxIngestrBinarySize)
+	}
+	if readerCloseErr != nil {
+		return errors.Wrap(readerCloseErr, "failed to close ingestr binary in release archive")
+	}
+	if fileCloseErr != nil {
+		return errors.Wrap(fileCloseErr, "failed to close ingestr binary")
 	}
 	return nil
 }

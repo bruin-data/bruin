@@ -70,7 +70,7 @@ jobs:
       - name: Run full test suite
         shell: bash
         run: |
-          [[ "${{ runner.os }}" != 'Windows' ]] || export PATH="/c/mingw64/bin:$PATH"
+          [[ "${{ runner.os }}" != 'Windows' ]] || export CC="/c/mingw64/bin/gcc.exe"
           make test-full
   end2end:
     strategy:

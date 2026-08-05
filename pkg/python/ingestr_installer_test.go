@@ -1,8 +1,12 @@
 package python
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -138,12 +142,95 @@ func TestIngestrBinaryName(t *testing.T) {
 	assert.Equal(t, "ingestr.exe", ingestrBinaryName("windows"))
 }
 
-func TestRunIngestrInstallerRequiresShell(t *testing.T) {
-	t.Setenv("PATH", t.TempDir())
+func TestIngestrInstallerRequiresShellOnUnix(t *testing.T) {
+	t.Parallel()
 
-	err := runIngestrInstaller(t.Context(), io.Discard, t.TempDir(), "1.2.3")
+	installer := ingestrInstallerRuntime{
+		goos: "linux",
+		findShell: func(string) (string, error) {
+			return "", os.ErrNotExist
+		},
+	}
+
+	err := installer.install(t.Context(), io.Discard, t.TempDir(), "1.2.3")
 
 	require.ErrorContains(t, err, "requires sh")
+}
+
+func TestIngestrInstallerFallsBackToNativeWindowsDownload(t *testing.T) {
+	t.Parallel()
+
+	archive := windowsIngestrTestArchive(t, "ingestr.exe", "windows binary")
+	requestedPath := make(chan string, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		requestedPath <- request.URL.Path
+		writer.Header().Set("Content-Type", "application/zip")
+		_, _ = writer.Write(archive)
+	}))
+	t.Cleanup(server.Close)
+	installDir := t.TempDir()
+	installer := ingestrInstallerRuntime{
+		goos:   "windows",
+		goarch: "amd64",
+		findShell: func(string) (string, error) {
+			return "", os.ErrNotExist
+		},
+		httpClient:         server.Client(),
+		releaseDownloadURL: server.URL,
+	}
+
+	err := installer.install(t.Context(), io.Discard, installDir, "1.2.3")
+
+	require.NoError(t, err)
+	assert.Equal(t, "/v1.2.3/ingestr_Windows_x86_64.zip", <-requestedPath)
+	contents, err := os.ReadFile(filepath.Join(installDir, "ingestr.exe"))
+	require.NoError(t, err)
+	assert.Equal(t, "windows binary", string(contents))
+}
+
+func TestNativeWindowsIngestrInstallerRejectsFailedDownload(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		http.Error(writer, "not found", http.StatusNotFound)
+	}))
+	t.Cleanup(server.Close)
+	installer := ingestrInstallerRuntime{
+		goarch:             "amd64",
+		httpClient:         server.Client(),
+		releaseDownloadURL: server.URL,
+	}
+
+	err := installer.installWindowsRelease(t.Context(), io.Discard, t.TempDir(), "1.2.3")
+
+	require.ErrorContains(t, err, "server returned 404 Not Found")
+}
+
+func TestNativeWindowsIngestrInstallerRequiresBinaryInArchive(t *testing.T) {
+	t.Parallel()
+
+	archive := windowsIngestrTestArchive(t, "README.md", "missing binary")
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		_, _ = writer.Write(archive)
+	}))
+	t.Cleanup(server.Close)
+	installer := ingestrInstallerRuntime{
+		goarch:             "amd64",
+		httpClient:         server.Client(),
+		releaseDownloadURL: server.URL,
+	}
+
+	err := installer.installWindowsRelease(t.Context(), io.Discard, t.TempDir(), "1.2.3")
+
+	require.ErrorContains(t, err, "archive did not contain ingestr.exe")
+}
+
+func TestWindowsIngestrArchiveNameRejectsUnsupportedArchitecture(t *testing.T) {
+	t.Parallel()
+
+	_, err := windowsIngestrArchiveName("arm64")
+
+	require.ErrorContains(t, err, "do not support windows/arm64")
 }
 
 func TestEnvironmentWithOverride(t *testing.T) {
@@ -160,4 +247,17 @@ func installationTempDirs(t *testing.T, homeDir string) []string {
 	matches, err := filepath.Glob(filepath.Join(homeDir, "ingestr", ".install-*"))
 	require.NoError(t, err)
 	return matches
+}
+
+func windowsIngestrTestArchive(t *testing.T, name, contents string) []byte {
+	t.Helper()
+
+	var buffer bytes.Buffer
+	archive := zip.NewWriter(&buffer)
+	file, err := archive.Create(name)
+	require.NoError(t, err)
+	_, err = file.Write([]byte(contents))
+	require.NoError(t, err)
+	require.NoError(t, archive.Close())
+	return buffer.Bytes()
 }
