@@ -59,6 +59,9 @@ The strategy used for the materialization, can be one of the following:
 - `merge`: merge the existing records with the new records, requires a primary key to be set.
 - `time_interval`: incrementally load time-based data within specific time windows.
 - `ddl`: create a new table using a DDL (Data Definition Language) statement.
+- `datavault_hub`: incrementally load unique business entities into a Data Vault hub.
+- `datavault_link`: incrementally load unique relationships into a Data Vault link.
+- `datavault_satellite`: incrementally load descriptive history into a Data Vault satellite.
 - `scd2_by_column`: implement SCD2 logic that tracks changes based on column value differences.
 - `scd2_by_time`: implement SCD2 logic that tracks changes based on time-based incremental key.
 
@@ -511,6 +514,186 @@ in the materialization definition with the following keys:
 - `partition_by`
 - `cluster_by`
 
+### Data Vault strategies
+
+Bruin provides three strategies for loading a Raw Data Vault: `datavault_hub`, `datavault_link`, and `datavault_satellite`. They are supported for PostgreSQL and DuckDB SQL assets with `type: table` materialization. Redshift reuses the PostgreSQL SQL generator but produces statements Redshift cannot execute. On any other platform an incremental run fails with an unsupported strategy error, while a `--full-refresh` run silently falls back to `create+replace` and drops the Data Vault loading rules, which `bruin validate` does not flag.
+
+The asset query must calculate the hash keys and hashdiff and return every column declared in `columns`. Bruin uses those values to apply the loading rules; it does not calculate hashes. Every declared column must have both a `name` and a database-compatible `type`.
+
+#### Data Vault column roles
+
+Set a column's role with `meta.datavault_role`. Explicit roles are recommended, especially when an asset contains multiple hash key columns.
+
+| Column purpose | Accepted `datavault_role` values | Naming or configuration fallback |
+| --- | --- | --- |
+| Hub hash key | `hash_key`, `hub_hash_key` | First column with `primary_key: true`, or the only column ending in `_hk` |
+| Hub business key | `business_key` | Columns ending in `_bk`, in addition to the explicitly roled columns |
+| Link hash key | `link_hash_key`, `hash_key` | First column with `primary_key: true`, or the only column ending in `_hk` |
+| Related hash keys in a link | `hub_hash_key`, `parent_hash_key`, `foreign_hash_key` | Other columns ending in `_hk` |
+| Satellite parent hash key | `parent_hash_key`, `hub_hash_key`, `hash_key` | First column with `primary_key: true`, or the only column ending in `_hk` |
+| Satellite hashdiff | `hashdiff`, `hash_diff` | A column named `hashdiff` or `hash_diff` |
+| Load datetime | `load_datetime`, `load_dts` | A column named `load_dts`, `load_datetime`, or `loaded_at` |
+| Record source | `record_source` | A column named `record_source` |
+
+Role values and naming fallbacks are case-insensitive. For a link with several `_hk` columns, identify the link hash key explicitly with `datavault_role: link_hash_key` or `primary_key: true`; Bruin treats the remaining `_hk` columns as related hash keys.
+
+In a hub, every column ending in `_bk` is added to the business keys, and in a link every column ending in `_hk` other than the link hash key is added to the related hash keys. Both happen in addition to the explicitly roled columns rather than instead of them, so a descriptive column carrying one of those suffixes becomes a required column. Rename such columns if you do not want them to take part in the key.
+
+All three strategies:
+
+- Create the schema, when the asset name has the form `schema.table`, and create the target table if it does not exist.
+- Define every role-bearing column as `NOT NULL`, meaning hash keys, business keys, the satellite hashdiff, the load datetime, and the record source, and skip source rows that contain `NULL` in any of them. A column you declare with `nullable: false` also becomes `NOT NULL` in the table definition, but it takes no part in the skip filter, so a `NULL` there fails the run instead of dropping the row.
+- Run the table creation and incremental load in one transaction.
+- Drop and recreate the target table when the asset runs with `--full-refresh`, then apply the same Data Vault loading rules to the refreshed data. An asset with `full_refresh_restricted: true` keeps its incremental behavior and is not dropped.
+
+On incremental runs, `CREATE TABLE IF NOT EXISTS` does not alter an existing target. If you change the declared columns or their types, migrate the table separately or run a full refresh.
+
+#### `datavault_hub`
+
+The `datavault_hub` strategy loads one row per hub hash key. Within the current asset query, Bruin keeps the row with the earliest load datetime for each hash key. It inserts that row only when the hash key does not already exist in the target, making repeated loads idempotent.
+
+A hub requires:
+
+- One hub hash key
+- One or more business keys
+- One load datetime
+- One record source
+
+```bruin-sql
+/* @bruin
+name: rdv.hub_customer
+type: duckdb.sql
+
+materialization:
+  type: table
+  strategy: datavault_hub
+
+columns:
+  - name: customer_hk
+    type: VARCHAR
+    meta:
+      datavault_role: hash_key
+  - name: customer_id
+    type: VARCHAR
+    meta:
+      datavault_role: business_key
+  - name: load_dts
+    type: TIMESTAMP
+    meta:
+      datavault_role: load_datetime
+  - name: record_source
+    type: VARCHAR
+    meta:
+      datavault_role: record_source
+@bruin */
+
+SELECT customer_hk, customer_id, load_dts, record_source
+FROM stg.customer_hashed
+```
+
+Bruin creates `customer_hk` as the target table's primary key.
+
+#### `datavault_link`
+
+The `datavault_link` strategy loads one row per link hash key. As with hubs, Bruin keeps the earliest row per link hash key from the current query and inserts it only when that key does not already exist in the target.
+
+A link requires:
+
+- One link hash key
+- One or more related hub, parent, or foreign hash keys
+- One load datetime
+- One record source
+
+```bruin-sql
+/* @bruin
+name: rdv.link_customer_order
+type: duckdb.sql
+
+materialization:
+  type: table
+  strategy: datavault_link
+
+columns:
+  - name: customer_order_hk
+    type: VARCHAR
+    meta:
+      datavault_role: link_hash_key
+  - name: customer_hk
+    type: VARCHAR
+    meta:
+      datavault_role: hub_hash_key
+  - name: order_hk
+    type: VARCHAR
+    meta:
+      datavault_role: hub_hash_key
+  - name: load_dts
+    type: TIMESTAMP
+    meta:
+      datavault_role: load_datetime
+  - name: record_source
+    type: VARCHAR
+    meta:
+      datavault_role: record_source
+@bruin */
+
+SELECT customer_order_hk, customer_hk, order_hk, load_dts, record_source
+FROM stg.customer_orders_hashed
+```
+
+Bruin creates `customer_order_hk` as the target table's primary key.
+
+#### `datavault_satellite`
+
+The `datavault_satellite` strategy preserves descriptive history for a parent hash key. Bruin orders incoming rows for each parent by load datetime, compares their hashdiff values with the latest target row and with the preceding row in the current batch, and inserts only new changes. Consecutive rows with an unchanged hashdiff are not inserted.
+
+Bruin loads at most one row per target primary key, which is the parent hash key and load datetime by default. Rows that collide on that key within a batch are collapsed into one, and rows whose key already exists in the target are skipped rather than updated. Give each version of a parent a distinct load datetime so that no version is dropped.
+
+A satellite requires:
+
+- One parent hash key
+- One hashdiff
+- One load datetime
+- One record source
+- Any number of descriptive columns
+
+```bruin-sql
+/* @bruin
+name: rdv.sat_customer_details
+type: duckdb.sql
+
+materialization:
+  type: table
+  strategy: datavault_satellite
+
+columns:
+  - name: customer_hk
+    type: VARCHAR
+    meta:
+      datavault_role: parent_hash_key
+  - name: hashdiff
+    type: VARCHAR
+    meta:
+      datavault_role: hashdiff
+  - name: load_dts
+    type: TIMESTAMP
+    meta:
+      datavault_role: load_datetime
+  - name: record_source
+    type: VARCHAR
+    meta:
+      datavault_role: record_source
+  - name: customer_name
+    type: VARCHAR
+  - name: email
+    type: VARCHAR
+@bruin */
+
+SELECT customer_hk, hashdiff, load_dts, record_source, customer_name, email
+FROM stg.customer_hashed
+```
+
+By default, Bruin creates a composite primary key from the parent hash key and load datetime. You can define a different primary key by marking its columns with `primary_key: true`; marking only the parent hash key keeps the default parent-hash-key and load-datetime primary key. When you define a custom primary key, set `datavault_role: parent_hash_key` on the parent hash key column as well, because Bruin otherwise falls back to the first `primary_key: true` column and can pick the wrong one.
+
 ### `scd2_by_column`
 
 The `scd2_by_column` strategy implements [Slowly Changing Dimension Type 2](https://en.wikipedia.org/wiki/Slowly_changing_dimension) logic, which maintains a full history of data changes over time. This strategy is useful when you want to track changes to records and preserve the historical state of your data.
@@ -555,6 +738,7 @@ materialization:
 ```
 
 When `incremental_key` is specified:
+
 - `_valid_from` for new/updated records will be set to the value of the `incremental_key` column
 - `_valid_until` for records being expired (due to changes) will be set to the value of the `incremental_key` column from the new record
 - Records expiring because they're no longer in the source data will still use `CURRENT_TIMESTAMP()` for `_valid_until`
