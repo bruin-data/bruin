@@ -40,6 +40,7 @@ type ingestrInstallerRuntime struct {
 	goos               string
 	goarch             string
 	findShell          func(string) (string, error)
+	runShell           func(context.Context, io.Writer, string, []string) error
 	httpClient         *http.Client
 	releaseDownloadURL string
 }
@@ -142,6 +143,7 @@ func runIngestrInstaller(ctx context.Context, output io.Writer, installDir, vers
 		goos:               runtime.GOOS,
 		goarch:             runtime.GOARCH,
 		findShell:          exec.LookPath,
+		runShell:           runIngestrShellInstaller,
 		httpClient:         &http.Client{Timeout: 5 * time.Minute},
 		releaseDownloadURL: ingestrReleaseDownloadURL,
 	}
@@ -157,15 +159,29 @@ func (r ingestrInstallerRuntime) install(ctx context.Context, output io.Writer, 
 		return errors.Wrap(err, "the ingestr installer requires sh")
 	}
 
-	cmd := exec.CommandContext(ctx, shell, ingestrInstallerCommandArgs(installDir, version, r.goos)...) //nolint:gosec
-	cmd.Env = environmentWithOverride(os.Environ(), "SHELL", "bruin-installer")
-	cmd.Stdout = output
-	cmd.Stderr = output
-
-	if err := cmd.Run(); err != nil {
+	if err := r.runShell(ctx, output, shell, ingestrInstallerCommandArgs(installDir, version, r.goos)); err != nil {
+		if r.goos == "windows" && ctx.Err() == nil {
+			if fallbackErr := r.installWindowsRelease(ctx, output, installDir, version); fallbackErr != nil {
+				return fmt.Errorf(
+					"failed to install ingestr v%s with the shell installer: %w; native Windows fallback failed: %w",
+					version,
+					err,
+					fallbackErr,
+				)
+			}
+			return nil
+		}
 		return errors.Wrapf(err, "failed to install ingestr v%s", version)
 	}
 	return nil
+}
+
+func runIngestrShellInstaller(ctx context.Context, output io.Writer, shell string, args []string) error {
+	cmd := exec.CommandContext(ctx, shell, args...) //nolint:gosec
+	cmd.Env = environmentWithOverride(os.Environ(), "SHELL", "bruin-installer")
+	cmd.Stdout = output
+	cmd.Stderr = output
+	return cmd.Run()
 }
 
 func (r ingestrInstallerRuntime) installWindowsRelease(

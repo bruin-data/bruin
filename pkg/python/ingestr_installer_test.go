@@ -188,6 +188,56 @@ func TestIngestrInstallerFallsBackToNativeWindowsDownload(t *testing.T) {
 	assert.Equal(t, "windows binary", string(contents))
 }
 
+func TestIngestrInstallerFallsBackAfterWindowsShellFailure(t *testing.T) {
+	t.Parallel()
+
+	archive := windowsIngestrTestArchive(t, "ingestr.exe", "fallback binary")
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		_, _ = writer.Write(archive)
+	}))
+	t.Cleanup(server.Close)
+	installDir := t.TempDir()
+	installer := ingestrInstallerRuntime{
+		goos:   "windows",
+		goarch: "amd64",
+		findShell: func(string) (string, error) {
+			return "sh", nil
+		},
+		runShell: func(context.Context, io.Writer, string, []string) error {
+			return assert.AnError
+		},
+		httpClient:         server.Client(),
+		releaseDownloadURL: server.URL,
+	}
+
+	err := installer.install(t.Context(), io.Discard, installDir, "1.2.3")
+
+	require.NoError(t, err)
+	contents, err := os.ReadFile(filepath.Join(installDir, "ingestr.exe"))
+	require.NoError(t, err)
+	assert.Equal(t, "fallback binary", string(contents))
+}
+
+func TestIngestrInstallerDoesNotFallbackAfterContextCancellation(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	installer := ingestrInstallerRuntime{
+		goos: "windows",
+		findShell: func(string) (string, error) {
+			return "sh", nil
+		},
+		runShell: func(ctx context.Context, _ io.Writer, _ string, _ []string) error {
+			return ctx.Err()
+		},
+	}
+
+	err := installer.install(ctx, io.Discard, t.TempDir(), "1.2.3")
+
+	require.ErrorIs(t, err, context.Canceled)
+}
+
 func TestNativeWindowsIngestrInstallerRejectsFailedDownload(t *testing.T) {
 	t.Parallel()
 
