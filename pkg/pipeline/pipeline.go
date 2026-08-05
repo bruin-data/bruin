@@ -621,6 +621,18 @@ const (
 	MaterializationStrategyDataVaultSatellite MaterializationStrategy        = "datavault_satellite"
 )
 
+// IsDataVault reports whether the strategy is one of the Data Vault loading strategies.
+// These carry their own full-refresh handling, so they must never be silently swapped
+// for another strategy on a platform that does not implement them.
+func (s MaterializationStrategy) IsDataVault() bool {
+	switch s {
+	case MaterializationStrategyDataVaultHub, MaterializationStrategyDataVaultLink, MaterializationStrategyDataVaultSatellite:
+		return true
+	default:
+		return false
+	}
+}
+
 var AllAvailableMaterializationStrategies = []MaterializationStrategy{
 	MaterializationStrategyCreateReplace,
 	MaterializationStrategyDeleteInsert,

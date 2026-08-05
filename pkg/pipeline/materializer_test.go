@@ -92,6 +92,53 @@ func TestMaterializer_Render(t *testing.T) {
 	}
 }
 
+func TestMaterializer_RenderFullRefreshWithDataVaultStrategy(t *testing.T) {
+	t.Parallel()
+
+	render := func(matMap AssetMaterializationMap) (string, error) {
+		materializer := Materializer{MaterializationMap: matMap, FullRefresh: true}
+		return materializer.Render(&Asset{
+			Materialization: Materialization{
+				Type:     MaterializationTypeTable,
+				Strategy: MaterializationStrategyDataVaultHub,
+			},
+		}, "SELECT * FROM table")
+	}
+
+	t.Run("platforms implementing the strategy still route through create+replace", func(t *testing.T) {
+		t.Parallel()
+
+		result, err := render(AssetMaterializationMap{
+			MaterializationTypeTable: {
+				MaterializationStrategyDataVaultHub: func(_ *Asset, query string) (string, error) {
+					return "HUB;" + query, nil
+				},
+				MaterializationStrategyCreateReplace: func(_ *Asset, query string) (string, error) {
+					return "CREATE OR REPLACE;" + query, nil
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "CREATE OR REPLACE;SELECT * FROM table", result)
+	})
+
+	t.Run("platforms without the strategy fail instead of silently dropping the loading rules", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := render(AssetMaterializationMap{
+			MaterializationTypeTable: {
+				MaterializationStrategyCreateReplace: func(_ *Asset, query string) (string, error) {
+					return "CREATE OR REPLACE;" + query, nil
+				},
+			},
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unsupported materialization type - strategy combination")
+	})
+}
+
 type stringMaterializer struct {
 	out string
 }

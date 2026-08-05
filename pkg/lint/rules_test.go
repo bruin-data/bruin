@@ -1604,6 +1604,29 @@ func TestEnsureMaterializationValuesAreValid(t *testing.T) {
 				"Materialization strategy 'datavault_hub' requires the 'columns' field to be set with actual columns",
 			},
 		},
+		{
+			name: "table materialization has datavault_hub with an ambiguous hash key",
+			assets: []*pipeline.Asset{
+				{
+					Name: "task1",
+					Materialization: pipeline.Materialization{
+						Type:     pipeline.MaterializationTypeTable,
+						Strategy: pipeline.MaterializationStrategyDataVaultHub,
+					},
+					Columns: []pipeline.Column{
+						{Name: "customer_hk", Type: "text"},
+						{Name: "order_hk", Type: "text"},
+						{Name: "customer_bk", Type: "text"},
+						{Name: "load_dts", Type: "timestamp"},
+						{Name: "record_source", Type: "text"},
+					},
+				},
+			},
+			wantErr: assert.NoError,
+			want: []string{
+				"Materialization strategy 'datavault_hub' requires a hash key column, identified by 'datavault_role: hash_key', 'primary_key: true', or a single column name ending in '_hk'",
+			},
+		},
 	}
 	ctx := t.Context()
 	for _, tt := range tests {
