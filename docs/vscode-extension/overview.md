@@ -22,6 +22,10 @@ The VS Code extension includes a built-in lineage panel that allows you to get a
 
 ![Lineage Overview](../public/vscode-extension/panels/lineage-panel/lineage-overview.png)
 
+## Query preview
+
+Run a query straight from the editor and see the results as a table in the Query Preview panel — no need to switch to an external database tool. You can run the whole query or just a selected part of it.
+
 ## Rendered Jinja queries
 
 Bruin supports [Jinja](../assets/templating/templating) out of the box, and while Jinja is powerful, it is often tricky to understand the resulting query. The VS Code extension includes a built-in query renderer, which shows you the rendered version of the query, not just for Jinja but also [materialized](../assets/materialization.md) versions of any query.
@@ -31,6 +35,14 @@ Bruin supports [Jinja](../assets/templating/templating) out of the box, and whil
 ## Local data catalog
 
 The VS Code extension visualizes Bruin definitions, including asset & column documentation. This means that you can simply view an asset file, and on the right side you can see all the relevant details about an asset, its columns, quality checks, and lineage.
+
+## Table diff
+
+Compare two tables side by side in the Table Diff panel to see how their schemas and data differ — useful for checking a model against its source or spotting unexpected changes.
+
+## Run history
+
+Review the history of your Bruin runs from the Run History panel, so you can see what ran, when, and how it turned out without leaving the editor.
 
 ## Bruin CLI integration
 
