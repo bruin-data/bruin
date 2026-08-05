@@ -159,22 +159,23 @@ bruin init stripe-bigquery my-stripe-pipeline
 ```
 
 Set `start_date` in `pipeline.yml` to the earliest Stripe history you need,
-then validate the generated project:
+then run the fast validation checks:
 
 ```bash
-bruin validate my-stripe-pipeline
+bruin validate --fast my-stripe-pipeline
 ```
 
-For the first load, run a full refresh:
+On a new BigQuery destination, load every table before running query validation:
 
 ```bash
-bruin run --full-refresh my-stripe-pipeline
+bruin run --full-refresh --no-validation my-stripe-pipeline
 ```
 
-After the initial load, run the pipeline on its daily schedule. The raw tables
-hold the Stripe objects returned by incremental discovery; schedule periodic
-full refreshes or targeted reloads when your reporting needs to account for
-changes to older mutable Stripe records.
+After that initial load, run `bruin validate my-stripe-pipeline` and schedule
+the pipeline daily. The raw tables hold the Stripe objects returned by
+incremental discovery; schedule periodic full refreshes or targeted reloads
+when your reporting needs to account for changes to older mutable Stripe
+records.
 
 ## Customize it
 
