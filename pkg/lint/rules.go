@@ -1577,12 +1577,10 @@ func ensureDataVaultHubColumnsAreValid(asset *pipeline.Asset) []*Issue {
 		return issues
 	}
 
-	if !hasDataVaultColumn(asset, []string{"hash_key", "hub_hash_key"}, func(col pipeline.Column) bool {
-		return col.PrimaryKey || strings.HasSuffix(strings.ToLower(col.Name), "_hk")
-	}) {
+	if dataVaultHashKeyName(asset, []string{"hash_key", "hub_hash_key"}) == "" {
 		issues = append(issues, &Issue{
 			Task:        asset,
-			Description: "Materialization strategy 'datavault_hub' requires a hash key column",
+			Description: "Materialization strategy 'datavault_hub' requires exactly one hash key column, identified by 'datavault_role: hash_key', a single column with 'primary_key: true', or a single column name ending in '_hk'",
 		})
 	}
 	if !hasDataVaultColumn(asset, []string{"business_key"}, func(col pipeline.Column) bool {
@@ -1603,17 +1601,11 @@ func ensureDataVaultLinkColumnsAreValid(asset *pipeline.Asset) []*Issue {
 		return issues
 	}
 
-	linkHashKeyName := ""
-	for _, col := range asset.Columns {
-		if dataVaultColumnMatches(col, []string{"link_hash_key", "hash_key"}) || col.PrimaryKey || strings.HasSuffix(strings.ToLower(col.Name), "_hk") {
-			linkHashKeyName = col.Name
-			break
-		}
-	}
+	linkHashKeyName := dataVaultHashKeyName(asset, []string{"link_hash_key", "hash_key"})
 	if linkHashKeyName == "" {
 		issues = append(issues, &Issue{
 			Task:        asset,
-			Description: "Materialization strategy 'datavault_link' requires a link hash key column",
+			Description: "Materialization strategy 'datavault_link' requires exactly one link hash key column, identified by 'datavault_role: link_hash_key', a single column with 'primary_key: true', or a single column name ending in '_hk'",
 		})
 	}
 
@@ -1643,12 +1635,10 @@ func ensureDataVaultSatelliteColumnsAreValid(asset *pipeline.Asset) []*Issue {
 		return issues
 	}
 
-	if !hasDataVaultColumn(asset, []string{"parent_hash_key", "hub_hash_key", "hash_key"}, func(col pipeline.Column) bool {
-		return col.PrimaryKey || strings.HasSuffix(strings.ToLower(col.Name), "_hk")
-	}) {
+	if dataVaultHashKeyName(asset, []string{"parent_hash_key", "hub_hash_key", "hash_key"}) == "" {
 		issues = append(issues, &Issue{
 			Task:        asset,
-			Description: "Materialization strategy 'datavault_satellite' requires a parent hash key column",
+			Description: "Materialization strategy 'datavault_satellite' requires exactly one parent hash key column, identified by 'datavault_role: parent_hash_key', a single column with 'primary_key: true', or a single column name ending in '_hk'",
 		})
 	}
 	if !hasDataVaultColumn(asset, []string{"hashdiff", "hash_diff"}, func(col pipeline.Column) bool {
@@ -1713,6 +1703,40 @@ func appendCommonDataVaultColumnIssues(asset *pipeline.Asset, strategy string, i
 			Description: fmt.Sprintf("Materialization strategy '%s' requires a record source column", strategy),
 		})
 	}
+}
+
+// dataVaultHashKeyName mirrors the hash key resolution used by the materializers: an explicit role
+// wins, then a single column marked with primary_key, and the '_hk' suffix only counts when exactly
+// one column carries it. Keeping the two in sync stops `bruin validate` from accepting assets that
+// then fail at run time with an unresolvable hash key.
+func dataVaultHashKeyName(asset *pipeline.Asset, roles []string) string {
+	for _, col := range asset.Columns {
+		if dataVaultColumnMatches(col, roles) {
+			return col.Name
+		}
+	}
+
+	// The materializers refuse to guess which of several primary key columns is the hash key, so
+	// validate has to reject that too rather than accepting whichever one is declared first.
+	primaryKeys := asset.ColumnNamesWithPrimaryKey()
+	if len(primaryKeys) > 1 {
+		return ""
+	}
+	if len(primaryKeys) == 1 {
+		return primaryKeys[0]
+	}
+
+	name := ""
+	for _, col := range asset.Columns {
+		if !strings.HasSuffix(strings.ToLower(col.Name), "_hk") {
+			continue
+		}
+		if name != "" {
+			return ""
+		}
+		name = col.Name
+	}
+	return name
 }
 
 func hasDataVaultColumn(asset *pipeline.Asset, roles []string, fallback func(pipeline.Column) bool) bool {

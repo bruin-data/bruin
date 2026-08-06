@@ -543,6 +543,52 @@ func TestDataVaultMaterializations(t *testing.T) {
 		assert.Contains(t, got, "CREATE TABLE IF NOT EXISTS rdv.hub_customer")
 		assert.NotContains(t, got, "CREATE TABLE rdv.hub_customer AS")
 	})
+
+	t.Run("refuses to guess the hash key when several columns are primary keys", func(t *testing.T) {
+		t.Parallel()
+
+		asset := &pipeline.Asset{
+			Name: "rdv.sat_customer_details",
+			Materialization: pipeline.Materialization{
+				Type:     pipeline.MaterializationTypeTable,
+				Strategy: pipeline.MaterializationStrategyDataVaultSatellite,
+			},
+			Columns: []pipeline.Column{
+				{Name: "load_dts", Type: "TIMESTAMP", PrimaryKey: true},
+				{Name: "customer_hk", Type: "VARCHAR", PrimaryKey: true},
+				{Name: "hashdiff", Type: "VARCHAR"},
+				{Name: "record_source", Type: "VARCHAR"},
+			},
+		}
+
+		_, err := NewMaterializer(false).Render(asset, "select customer_hk, hashdiff, load_dts, record_source from stg.crm_customer_hashed")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "mark it with datavault_role: parent_hash_key")
+	})
+
+	t.Run("an explicit role resolves the hash key even with several primary keys", func(t *testing.T) {
+		t.Parallel()
+
+		asset := &pipeline.Asset{
+			Name: "rdv.sat_customer_details",
+			Materialization: pipeline.Materialization{
+				Type:     pipeline.MaterializationTypeTable,
+				Strategy: pipeline.MaterializationStrategyDataVaultSatellite,
+			},
+			Columns: []pipeline.Column{
+				{Name: "load_dts", Type: "TIMESTAMP", PrimaryKey: true},
+				{Name: "customer_hk", Type: "VARCHAR", PrimaryKey: true, Meta: map[string]string{"datavault_role": "parent_hash_key"}},
+				{Name: "hashdiff", Type: "VARCHAR"},
+				{Name: "record_source", Type: "VARCHAR"},
+			},
+		}
+
+		got, err := NewMaterializer(false).Render(asset, "select customer_hk, hashdiff, load_dts, record_source from stg.crm_customer_hashed")
+		require.NoError(t, err)
+
+		assert.Contains(t, got, "customer_hk VARCHAR NOT NULL")
+		assert.Contains(t, got, "PRIMARY KEY (load_dts, customer_hk)")
+	})
 }
 
 func TestDuckDBTimestampWithTimeZone(t *testing.T) {
