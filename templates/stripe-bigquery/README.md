@@ -197,11 +197,11 @@ retention, movement components, invoice billings, and the latest customer MRR
 distribution. It deliberately filters to one currency at a time because the
 reporting tables retain money in native minor units and do not apply FX rates.
 
-After configuring `gcp-default`, install DAC and its dashboard-authoring
-skill from the project root:
+After configuring `gcp-default`, install a verified DAC release by following
+the [DAC installation guide](https://getbruin.com/docs/dac/getting-started/installation.html).
+Then install its dashboard-authoring skill from the project root:
 
 ```bash
-curl -fsSL https://getbruin.com/install/dac | sh
 dac skills install --dir . create-dashboard
 ```
 
