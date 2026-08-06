@@ -39,7 +39,7 @@ bruin curl -- \
   https://api.linear.app/graphql
 ```
 
-Bruin flags (`--environment`, `--config-file`) go before `--`; everything after `--` belongs to curl. Field names match `.bruin.yml` (snake_case), and nested fields are traversed with dots: <code v-pre>{{ bruin.connection("service-api").credentials.client_id }}</code>. Run `bruin connections list` to see the available connections and their field names. See [curl](/commands/curl) for details.
+Bruin flags (`--environment`, `--config-file`) go before `--`; everything after `--` belongs to curl. Field names match `.bruin.yml` (snake_case), and nested fields are traversed with dots: <code v-pre>{{ bruin.connection("service-api").credentials.client_id }}</code>. Run `bruin connections list` to see the available connections and, in the `FILLED FIELDS` column, which field names are set on each one. See [curl](/commands/curl) for details.
 
 ### Command: Init (Create Project)
 
