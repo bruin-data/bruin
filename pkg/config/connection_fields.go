@@ -87,6 +87,53 @@ func GetConnectionFieldsForType(typeName string) []ConnectionFieldDef {
 	return nil
 }
 
+// FilledFieldsForConnection returns the mapstructure names of the connection's
+// non-empty fields, sorted. It never returns values, so a caller can tell an
+// api_key connection from an api_token one, and a filled one from an empty one,
+// without a credential leaving the config.
+func (c *Connections) FilledFieldsForConnection(name string) []string {
+	v := reflect.Indirect(reflect.ValueOf(c.GetConnection(name)))
+	if v.Kind() != reflect.Struct {
+		return nil
+	}
+
+	filled := filledFields(v)
+	sort.Strings(filled)
+	return filled
+}
+
+// filledFields applies the same field selection as extractFields, but over a
+// value, so it reports which of those fields actually carry something.
+func filledFields(v reflect.Value) []string {
+	t := v.Type()
+	filled := make([]string, 0, t.NumField())
+
+	for i := range t.NumField() {
+		sf := t.Field(i)
+		if !sf.IsExported() {
+			continue
+		}
+
+		if sf.Anonymous {
+			if embedded := reflect.Indirect(v.Field(i)); embedded.Kind() == reflect.Struct {
+				filled = append(filled, filledFields(embedded)...)
+				continue
+			}
+		}
+
+		msTag, _, _ := strings.Cut(sf.Tag.Get("mapstructure"), ",")
+		if msTag == "" || msTag == "name" || kindToTypeString(sf.Type) == "" {
+			continue
+		}
+
+		if !v.Field(i).IsZero() {
+			filled = append(filled, msTag)
+		}
+	}
+
+	return filled
+}
+
 // extractFields reads the exported fields of a connection struct, skipping the
 // "name" field and non-primitive types (slices, maps, nested structs, complex
 // pointer types).
