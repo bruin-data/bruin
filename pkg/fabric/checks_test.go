@@ -7,8 +7,8 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 type mockFabricSelector struct {
@@ -50,7 +50,7 @@ func TestRelationshipsCheckQuotesIdentifiers(t *testing.T) {
 		Check: &pipeline.ColumnCheck{Name: "relationships"},
 	}
 
-	assert.NoError(t, (&RelationshipsCheck{conn: connections}).Check(t.Context(), instance))
+	require.NoError(t, (&RelationshipsCheck{conn: connections}).Check(t.Context(), instance))
 	selector.AssertExpectations(t)
 	connections.AssertExpectations(t)
 }
