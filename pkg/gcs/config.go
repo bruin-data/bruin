@@ -8,17 +8,18 @@ import (
 )
 
 type Config struct {
-	ServiceAccountFile string
-	ServiceAccountJSON string
-	BucketName         string
-	PathToFile         string
-	Layout             string
+	ServiceAccountFile               string
+	ServiceAccountJSON               string
+	UseApplicationDefaultCredentials bool
+	BucketName                       string
+	PathToFile                       string
+	Layout                           string
 }
 
 func (c Config) GetIngestrURI() (string, error) {
 	missingCredentials := c.ServiceAccountFile == "" && c.ServiceAccountJSON == ""
-	if missingCredentials {
-		return "", errors.New("GCS: either service_account_file or service_account_json must be provided")
+	if missingCredentials && !c.UseApplicationDefaultCredentials {
+		return "", errors.New("GCS: provide service_account_file, service_account_json, or enable use_application_default_credentials")
 	}
 
 	params := url.Values{}

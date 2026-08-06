@@ -1305,12 +1305,13 @@ func (c LinearConnection) GetName() string {
 }
 
 type GCSConnection struct {
-	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" jsonschema:"oneof_required=service_account_file" mapstructure:"service_account_file"`
-	ServiceAccountJSON string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" jsonschema:"oneof_required=service_account_json" mapstructure:"service_account_json" sensitive:"true"`
-	BucketName         string `yaml:"bucket_name,omitempty" json:"bucket_name,omitempty" mapstructure:"bucket_name"`
-	PathToFile         string `yaml:"path_to_file,omitempty" json:"path_to_file,omitempty" mapstructure:"path_to_file"`
-	Layout             string `yaml:"layout,omitempty" json:"layout,omitempty" mapstructure:"layout"`
+	ConnectionMetadata               `yaml:",inline" mapstructure:",squash"`
+	ServiceAccountFile               string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" jsonschema:"oneof_required=service_account_file" mapstructure:"service_account_file"`
+	ServiceAccountJSON               string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" jsonschema:"oneof_required=service_account_json" mapstructure:"service_account_json" sensitive:"true"`
+	UseApplicationDefaultCredentials bool   `yaml:"use_application_default_credentials,omitempty" json:"use_application_default_credentials,omitempty" jsonschema:"oneof_required=use_application_default_credentials" mapstructure:"use_application_default_credentials"`
+	BucketName                       string `yaml:"bucket_name,omitempty" json:"bucket_name,omitempty" mapstructure:"bucket_name"`
+	PathToFile                       string `yaml:"path_to_file,omitempty" json:"path_to_file,omitempty" mapstructure:"path_to_file"`
+	Layout                           string `yaml:"layout,omitempty" json:"layout,omitempty" mapstructure:"layout"`
 }
 
 func (c GCSConnection) GetName() string {
