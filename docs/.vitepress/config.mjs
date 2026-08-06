@@ -405,6 +405,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                     {text: "AI Skills", link: "/commands/ai-skills"},
                     {text: "Clean", link: "/commands/clean"},
                     {text: "Connections", link: "/commands/connections"},
+                    {text: "Curl", link: "/commands/curl"},
                     {text: "Data Diff", link: "/commands/data-diff"},
                     {text: "Environments", link: "/commands/environments"},
                     {text: "Format", link: "/commands/format"},
