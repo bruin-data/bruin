@@ -3,6 +3,7 @@ package bigquery
 import (
 	"context"
 	"fmt"
+	"io"
 	"regexp"
 	"runtime"
 	"sort"
@@ -15,6 +16,7 @@ import (
 	datatransfer "cloud.google.com/go/bigquery/datatransfer/apiv1"
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/diff"
+	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/pkg/errors"
@@ -284,19 +286,22 @@ func (d *Client) IsValid(ctx context.Context, query *query.Query) (bool, error) 
 // cancel for a BigQuery job whose run has been aborted.
 const bigQueryJobCancelTimeout = 10 * time.Second
 
-// cancelJobOnContextCancellation cancels the server-side BigQuery job when ctx
-// has been cancelled (e.g. the user aborted the run with Ctrl+C). Without this,
-// cancelling the Go context only stops us from waiting on the job while it keeps
-// running on BigQuery, holding table locks and blocking subsequent runs of the
-// same asset. A fresh context is used because ctx is already done; cancelling a
-// job that has already finished is a harmless no-op.
+// cancelJobOnContextCancellation stops the server-side BigQuery job when ctx has
+// been cancelled — otherwise the job keeps running (holding table locks) after we
+// stop waiting on it. A fresh context is required because ctx is already done.
 func cancelJobOnContextCancellation(ctx context.Context, job *bigquery.Job) {
 	if job == nil || ctx.Err() == nil {
 		return
 	}
+	// ctx is already cancelled; a fresh context is needed for the cancel RPC to reach BigQuery.
 	cancelCtx, cancel := context.WithTimeout(context.Background(), bigQueryJobCancelTimeout)
 	defer cancel()
-	_ = job.Cancel(cancelCtx)
+	if err := job.Cancel(cancelCtx); err != nil { //nolint:contextcheck // fresh context is intentional (see above)
+		// Surface the failure so the user knows the job may still be running.
+		if w, ok := ctx.Value(executor.KeyPrinter).(io.Writer); ok && w != nil {
+			_, _ = fmt.Fprintf(w, "failed to cancel BigQuery job %s: %v\n", job.ID(), err)
+		}
+	}
 }
 
 func (d *Client) RunQueryWithoutResult(ctx context.Context, q *query.Query) error {

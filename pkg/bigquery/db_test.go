@@ -279,14 +279,17 @@ func TestDB_RunQueryWithoutResultCancelsJobOnContextCancellation(t *testing.T) {
 	var cancelRequested atomic.Bool
 
 	writeJSON := func(w http.ResponseWriter, v any) {
-		resp, _ := json.Marshal(v)
+		resp, err := json.Marshal(v)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		_, _ = w.Write(resp)
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		// Server-side job cancellation: POST /projects/{project}/jobs/{jobID}/cancel
-		case r.Method == http.MethodPost && strings.Contains(r.URL.Path, fmt.Sprintf("/jobs/%s/cancel", jobID)):
+		case r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/jobs/"+jobID+"/cancel"):
 			cancelRequested.Store(true)
 			writeJSON(w, &bigquery2.JobCancelResponse{
 				Job: &bigquery2.Job{
@@ -296,8 +299,8 @@ func TestDB_RunQueryWithoutResultCancelsJobOnContextCancellation(t *testing.T) {
 			})
 			return
 
-		// Job submit (q.Run): return a still-running query job so job.Read has to poll.
-		case r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, fmt.Sprintf("/projects/%s/jobs", projectID)):
+		// Submit returns a RUNNING job so job.Read has to poll.
+		case r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/projects/"+projectID+"/jobs"):
 			writeJSON(w, &bigquery2.Job{
 				Configuration: &bigquery2.JobConfiguration{
 					Query: &bigquery2.JobConfigurationQuery{
@@ -313,10 +316,8 @@ func TestDB_RunQueryWithoutResultCancelsJobOnContextCancellation(t *testing.T) {
 			})
 			return
 
-		// Query results poll (job.Read): abort the run mid-flight and report the
-		// job as still incomplete, mimicking a user pressing Ctrl+C while the
-		// query keeps running on BigQuery.
-		case r.Method == http.MethodGet && strings.Contains(r.URL.Path, fmt.Sprintf("/queries/%s", jobID)):
+		// First poll cancels the run and reports the job as still incomplete.
+		case r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/queries/"+jobID):
 			cancel()
 			writeJSON(w, &bigquery2.GetQueryResultsResponse{
 				JobReference: &bigquery2.JobReference{JobId: jobID, ProjectId: projectID, Location: "US"},
