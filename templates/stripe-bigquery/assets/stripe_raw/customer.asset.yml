@@ -1,0 +1,7 @@
+name: stripe_raw.customer
+type: ingestr
+
+description: Raw-layer ingestion of Stripe customer data into BigQuery.
+
+parameters:
+  source_table: customer

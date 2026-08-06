@@ -1,0 +1,15 @@
+name: stripe_raw.subscription
+type: ingestr
+
+description: >
+  Raw-layer ingestion of Stripe subscription data into BigQuery. Explicitly
+  types ended_at because Stripe can omit that nullable field when no
+  subscription has ended.
+
+parameters:
+  source_table: subscription
+  enforce_schema: true
+
+columns:
+  - name: ended_at
+    type: integer

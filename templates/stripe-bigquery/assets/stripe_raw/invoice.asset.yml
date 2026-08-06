@@ -1,0 +1,7 @@
+name: stripe_raw.invoice
+type: ingestr
+
+description: Raw-layer ingestion of Stripe invoice data into BigQuery.
+
+parameters:
+  source_table: invoice
