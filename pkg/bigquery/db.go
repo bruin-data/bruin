@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"regexp"
 	"runtime"
 	"sort"
@@ -297,10 +298,13 @@ func cancelJobOnContextCancellation(ctx context.Context, job *bigquery.Job) {
 	cancelCtx, cancel := context.WithTimeout(context.Background(), bigQueryJobCancelTimeout)
 	defer cancel()
 	if err := job.Cancel(cancelCtx); err != nil { //nolint:contextcheck // fresh context is intentional (see above)
-		// Surface the failure so the user knows the job may still be running.
-		if w, ok := ctx.Value(executor.KeyPrinter).(io.Writer); ok && w != nil {
-			_, _ = fmt.Fprintf(w, "failed to cancel BigQuery job %s: %v\n", job.ID(), err)
+		// Surface the failure so the user knows the job may still be running,
+		// falling back to stderr when there is no console writer in the context.
+		w, ok := ctx.Value(executor.KeyPrinter).(io.Writer)
+		if !ok || w == nil {
+			w = os.Stderr
 		}
+		_, _ = fmt.Fprintf(w, "failed to cancel BigQuery job %s: %v\n", job.ID(), err)
 	}
 }
 
