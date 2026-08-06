@@ -1,19 +1,19 @@
 import json
-import sys
 import logging
 import os
+import sys
+from pathlib import Path
+
 from parser.main import (
+    add_ctes,
+    add_limit,
+    extract_select,
+    freeze_time,
     get_column_lineage,
     get_tables,
-    add_limit,
     is_single_select_query,
-    add_ctes,
-    extract_select,
     select_cte,
-    freeze_time,
 )
-
-from pathlib import Path
 
 home = str(Path.home())
 log_dir = f"{home}/.bruin/pylogs"
@@ -42,7 +42,6 @@ def main():
             result = {}
             if cmd["command"] == "init":
                 logging.info("got init command")
-                pass
             elif cmd["command"] == "lineage":
                 logging.info("got lineage command")
                 c = cmd["contents"]

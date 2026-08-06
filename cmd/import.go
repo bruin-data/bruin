@@ -428,7 +428,7 @@ func runImport(ctx context.Context, log logger.Logger, pipelinePath, connectionN
 					return errors2.Wrapf(err, "failed to create schema directory %s", schemaFolder)
 				}
 
-				err = createdAsset.Persist(fs)
+				err = createdAsset.Persist(fs, pipelineFound)
 				if err != nil {
 					return err
 				}
@@ -450,7 +450,7 @@ func runImport(ctx context.Context, log logger.Logger, pipelinePath, connectionN
 						existingAsset.Columns = append(existingAsset.Columns, c)
 					}
 				}
-				err = existingAsset.Persist(fs)
+				err = existingAsset.Persist(fs, pipelineFound)
 				mergedTableCount++
 				if err != nil {
 					return err

@@ -460,6 +460,7 @@ Fields:
 | materialization    | Object                     | —       | Default materialization config   |
 | snowflake          | Object                     | —       | Snowflake-specific defaults      |
 | athena             | Object                     | —       | Athena-specific defaults         |
+| bigquery           | Object                     | —       | [BigQuery-specific table option defaults](../platforms/bigquery.md#bigquery-table-options) |
 | routing            | Object                     | —       | Runtime routing defaults for assets |
 | interval_modifiers | Object                     | —       | See [Interval Modifiers](/assets/interval-modifiers) |
 | hooks              | Object                     | —       | See [Hooks](/assets/definition-schema#hooks) |

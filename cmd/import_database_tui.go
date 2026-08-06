@@ -638,7 +638,7 @@ func (m *importDatabaseModel) executeImportCmd() tea.Cmd {
 					if mkErr := fs.MkdirAll(schemaFolder, 0o755); mkErr != nil {
 						return importCompleteMsg{err: fmt.Errorf("failed to create directory %s: %w", schemaFolder, mkErr)}
 					}
-					if pErr := createdAsset.Persist(fs); pErr != nil {
+					if pErr := createdAsset.Persist(fs, pipelineFound); pErr != nil {
 						return importCompleteMsg{err: pErr}
 					}
 					existingAssets[assetName] = createdAsset
@@ -659,7 +659,7 @@ func (m *importDatabaseModel) executeImportCmd() tea.Cmd {
 							existingAsset.Columns = append(existingAsset.Columns, c)
 						}
 					}
-					if pErr := existingAsset.Persist(fs); pErr != nil {
+					if pErr := existingAsset.Persist(fs, pipelineFound); pErr != nil {
 						return importCompleteMsg{err: pErr}
 					}
 					mergedTableCount++

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/helpers"
@@ -1548,6 +1549,26 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 	}
 
 	return issues, nil
+}
+
+// EnsureBigQueryTableOptionsAreValid reports `bigquery` block configurations that would fail while
+// materializing the asset. It delegates to the materializer's own validation so that `bruin validate`
+// and `bruin run` never disagree about which configurations are supported.
+func EnsureBigQueryTableOptionsAreValid(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	if asset.Type != pipeline.AssetTypeBigqueryQuery {
+		return []*Issue{}, nil
+	}
+
+	if err := bigquery.ValidateTableOptions(asset); err != nil {
+		return []*Issue{ //nolint:nilerr
+			{
+				Task:        asset,
+				Description: err.Error(),
+			},
+		}, nil
+	}
+
+	return []*Issue{}, nil
 }
 
 func ensureDataVaultHubColumnsAreValid(asset *pipeline.Asset) []*Issue {
