@@ -46,6 +46,12 @@ AI agent skills are installed separately with `bruin ai skills`; see [AI Skills]
     <span>Interactive ecommerce pipeline with selected raw sources, staging models, and revenue, customer, product, marketing, and KPI reports.</span>
     <span class="template-card__tags"><code>Shopify</code><code>Stripe</code><code>Klaviyo</code><code>GA4</code></span>
   </a>
+  <a class="template-card" href="./templates-docs/ga4-search-console-bigquery-README.html">
+    <span class="template-card__category">Organic search analytics</span>
+    <strong>ga4-search-console-bigquery</strong>
+    <span>Turns GA4 and Search Console exports already in BigQuery into staging models plus seven reports neither product can produce, including the landing-page join between search visibility and revenue.</span>
+    <span class="template-card__tags"><code>GA4</code><code>Search Console</code><code>BigQuery</code><code>SEO</code></span>
+  </a>
   <a class="template-card" href="./templates-docs/demo-snowflake-sales-analytics-README.html">
     <span class="template-card__category">Demo pipeline</span>
     <strong>demo-snowflake-sales-analytics</strong>
@@ -270,6 +276,7 @@ bruin init nyc-taxi my-taxi-pipeline
 | Migrate one Fivetran connection to a review-gated Bruin project | `migration-fivetran` |
 | Explore a complete demo with generated data | `demo-snowflake-sales-analytics` or `demo-snowflake-salesforce` |
 | Scaffold ecommerce reporting | `ecommerce` |
+| Report on organic search using GA4 and Search Console data already in BigQuery | `ga4-search-console-bigquery` |
 | Work with a specific database | `athena`, `clickhouse`, `bronze-silver-postgres`, `bigquery`, `databricks`, or `redshift` |
 
 Most templates include placeholder connection values only. Replace the generated `.bruin.yml` values before running the pipeline.

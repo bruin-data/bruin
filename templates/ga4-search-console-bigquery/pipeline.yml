@@ -1,0 +1,78 @@
+name: ga4-search-console-bigquery
+schedule: daily
+start_date: "2026-01-01"
+catchup: false
+
+default:
+  type: bq.sql
+
+default_connections:
+  google_cloud_platform: gcp-default
+
+variables:
+  # Dataset holding the GA4 BigQuery export, i.e. the one containing the
+  # events_YYYYMMDD tables. Qualify it with a project when the export lives
+  # outside the project configured on the gcp-default connection.
+  ga4_dataset:
+    type: string
+    default: analytics_000000000
+
+  # Dataset holding the Search Console bulk data export. Google always names
+  # the tables searchdata_site_impression, searchdata_url_impression, and
+  # ExportLog inside it.
+  search_console_dataset:
+    type: string
+    default: searchconsole
+
+  # Case-insensitive RE2 pattern that marks a search query as branded. Include
+  # your brand name plus its common misspellings and transliterations.
+  brand_query_pattern:
+    type: string
+    default: "(example|exampl|examp1e)"
+
+  # GA4 event names counted as key events (conversions) in the reports.
+  key_event_names:
+    type: array
+    items:
+      type: string
+    default: ["purchase", "generate_lead", "sign_up"]
+
+  # Extra days re-read before the run window. Search Console publishes with a
+  # two-to-three day delay and revises history, and GA4 finalizes a daily table
+  # after its intraday table is dropped. The staging models replace whole days,
+  # so a wider window heals late and revised data.
+  source_lookback_days:
+    type: integer
+    minimum: 0
+    maximum: 30
+    default: 4
+
+  # Trailing days of staged history each report aggregates. This bounds the
+  # bytes every report scans; raise it to report over more history.
+  reporting_window_days:
+    type: integer
+    minimum: 28
+    maximum: 730
+    default: 180
+
+  # Length of the current and prior comparison windows in the trend and
+  # new-versus-lost reports.
+  trend_window_days:
+    type: integer
+    minimum: 7
+    maximum: 90
+    default: 28
+
+  # Minimum window impressions a query needs before it appears in a
+  # query-grain report.
+  min_query_impressions:
+    type: integer
+    minimum: 1
+    default: 100
+
+  # Minimum window impressions a page needs before it appears in a page-grain
+  # report.
+  min_page_impressions:
+    type: integer
+    minimum: 1
+    default: 100

@@ -178,6 +178,126 @@ func TestStripeBigQueryStarterTemplateHasFocusedAssetSet(t *testing.T) {
 	require.Contains(t, string(readme), "Stripe Billing Analytics to BigQuery")
 }
 
+func TestInitGA4SearchConsoleBigQueryCopiesStarterTemplate(t *testing.T) {
+	targetRoot := t.TempDir()
+	t.Chdir(targetRoot)
+
+	gitInit := exec.CommandContext(t.Context(), "git", "init")
+	gitInit.Dir = targetRoot
+	out, err := gitInit.CombinedOutput()
+	require.NoError(t, err, string(out))
+
+	err = Init().Run(t.Context(), []string{"init", "ga4-search-console-bigquery"})
+	require.NoError(t, err)
+
+	pipelineRoot := filepath.Join(targetRoot, "ga4-search-console-bigquery")
+	require.FileExists(t, filepath.Join(pipelineRoot, "pipeline.yml"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "README.md"))
+	require.FileExists(t, filepath.Join(pipelineRoot, ".gitignore"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "macros", "url.sql"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "macros", "search.sql"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "assets", "web_stage", "ga4_sessions.sql"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "assets", "web_reports", "organic_landing_page_performance.sql"))
+
+	pipeline, err := os.ReadFile(filepath.Join(pipelineRoot, "pipeline.yml"))
+	require.NoError(t, err)
+	require.Contains(t, string(pipeline), "name: ga4-search-console-bigquery")
+	require.Contains(t, string(pipeline), "google_cloud_platform: gcp-default")
+
+	configContent, err := os.ReadFile(filepath.Join(targetRoot, ".bruin.yml"))
+	require.NoError(t, err)
+	require.Contains(t, string(configContent), "name: gcp-default")
+}
+
+func TestGA4SearchConsoleBigQueryTemplateHasFocusedAssetSet(t *testing.T) {
+	t.Parallel()
+
+	expectedAssets := []string{
+		"web_stage/gsc_site_query_daily.sql",
+		"web_stage/gsc_url_query_daily.sql",
+		"web_stage/gsc_position_click_curve.sql",
+		"web_stage/gsc_export_log.sql",
+		"web_stage/ga4_sessions.sql",
+		"web_stage/ga4_page_daily.sql",
+		"web_reports/search_brand_split_weekly.sql",
+		"web_reports/search_query_opportunities.sql",
+		"web_reports/search_query_cannibalization.sql",
+		"web_reports/search_page_trend.sql",
+		"web_reports/search_new_and_lost_queries.sql",
+		"web_reports/organic_landing_page_performance.sql",
+		"web_reports/organic_query_value.sql",
+	}
+
+	var actualAssets []string
+	err := iofs.WalkDir(templates.Templates, "ga4-search-console-bigquery/assets", func(path string, entry iofs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+
+		actualAssets = append(actualAssets, strings.TrimPrefix(path, "ga4-search-console-bigquery/assets/"))
+		return nil
+	})
+	require.NoError(t, err)
+	require.Len(t, actualAssets, 13)
+	require.ElementsMatch(t, expectedAssets, actualAssets)
+
+	pipeline, err := templates.Templates.ReadFile("ga4-search-console-bigquery/pipeline.yml")
+	require.NoError(t, err)
+	require.Contains(t, string(pipeline), "name: ga4-search-console-bigquery")
+	// The template reads exports that already exist in BigQuery, so the dataset
+	// names and the brand pattern must stay overridable without editing SQL.
+	require.Contains(t, string(pipeline), "ga4_dataset:")
+	require.Contains(t, string(pipeline), "search_console_dataset:")
+	require.Contains(t, string(pipeline), "brand_query_pattern:")
+
+	readme, err := templates.Templates.ReadFile("ga4-search-console-bigquery/README.md")
+	require.NoError(t, err)
+	require.Contains(t, string(readme), "Google Analytics and Search Console Reporting on BigQuery")
+}
+
+func TestGA4SearchConsoleBigQueryTemplateReadsExistingExports(t *testing.T) {
+	t.Parallel()
+
+	readTemplate := func(path string) string {
+		t.Helper()
+		content, err := templates.Templates.ReadFile(path)
+		require.NoError(t, err)
+		return string(content)
+	}
+
+	// Both GA4 models must skip the intraday tables that the events_* wildcard
+	// also matches, otherwise a partial day would be loaded as if it were final.
+	for _, asset := range []string{"ga4_sessions", "ga4_page_daily"} {
+		content := readTemplate("ga4-search-console-bigquery/assets/web_stage/" + asset + ".sql")
+		require.Contains(t, content, "`{{ var.ga4_dataset }}.events_*`", asset)
+		require.Contains(t, content, `REGEXP_CONTAINS(_TABLE_SUFFIX, r'^[0-9]{8}$')`, asset)
+	}
+
+	siteImpression := readTemplate("ga4-search-console-bigquery/assets/web_stage/gsc_site_query_daily.sql")
+	require.Contains(t, siteImpression, "`{{ var.search_console_dataset }}.searchdata_site_impression`")
+	// Position lives in sum_top_position on the property-level table and in
+	// sum_position on the URL-level one; swapping them silently breaks position.
+	require.Contains(t, siteImpression, "SUM(sum_top_position)")
+
+	urlImpression := readTemplate("ga4-search-console-bigquery/assets/web_stage/gsc_url_query_daily.sql")
+	require.Contains(t, urlImpression, "`{{ var.search_console_dataset }}.searchdata_url_impression`")
+	require.Contains(t, urlImpression, "SUM(sum_position)")
+
+	// The GA4 and Search Console sides only join when both derive page_path from
+	// the shared macro rather than normalizing inline.
+	require.Contains(t, urlImpression, "{{ page_path('url') }}")
+	sessions := readTemplate("ga4-search-console-bigquery/assets/web_stage/ga4_sessions.sql")
+	require.Contains(t, sessions, "{{ page_path('landing_page_location') }}")
+
+	// Search Console only reports Google, so the join must use the narrower flag.
+	landingPages := readTemplate("ga4-search-console-bigquery/assets/web_reports/organic_landing_page_performance.sql")
+	require.Contains(t, landingPages, "is_google_organic_session")
+	require.NotContains(t, landingPages, "sessions.is_organic_search_session")
+}
+
 func TestInitMigrationFivetranCopiesMigrationWorkspace(t *testing.T) {
 	targetRoot := t.TempDir()
 	t.Chdir(targetRoot)
