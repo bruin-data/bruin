@@ -241,14 +241,14 @@ func QuoteIdentifierWithBrackets(identifier string) string {
 
 func quoteIdentifier(identifier, openingQuote, closingQuote string, always bool) string {
 	identifier = strings.TrimSpace(identifier)
-	if isQuotedIdentifier(identifier) {
-		return identifier
-	}
-
-	parts := strings.Split(identifier, ".")
+	parts := splitIdentifierPath(identifier)
 	for index, part := range parts {
 		part = strings.TrimSpace(part)
-		if isQuotedIdentifier(part) || (!always && !identifierNeedsQuoting(part)) {
+		if unquoted, quoted := unquoteIdentifier(part); quoted {
+			parts[index] = openingQuote + strings.ReplaceAll(unquoted, closingQuote, closingQuote+closingQuote) + closingQuote
+			continue
+		}
+		if !always && !identifierNeedsQuoting(part) {
 			parts[index] = part
 			continue
 		}
@@ -257,13 +257,54 @@ func quoteIdentifier(identifier, openingQuote, closingQuote string, always bool)
 	return strings.Join(parts, ".")
 }
 
-func isQuotedIdentifier(identifier string) bool {
-	if len(identifier) < 2 {
-		return false
+func splitIdentifierPath(identifier string) []string {
+	parts := make([]string, 0, strings.Count(identifier, ".")+1)
+	start := 0
+	var closingQuote byte
+
+	for index := 0; index < len(identifier); index++ {
+		char := identifier[index]
+		if closingQuote != 0 {
+			if char != closingQuote {
+				continue
+			}
+			if index+1 < len(identifier) && identifier[index+1] == closingQuote {
+				index++
+				continue
+			}
+			closingQuote = 0
+			continue
+		}
+
+		switch char {
+		case '"', '`':
+			closingQuote = char
+		case '[':
+			closingQuote = ']'
+		case '.':
+			parts = append(parts, identifier[start:index])
+			start = index + 1
+		}
 	}
-	return (identifier[0] == '"' && identifier[len(identifier)-1] == '"') ||
-		(identifier[0] == '`' && identifier[len(identifier)-1] == '`') ||
-		(identifier[0] == '[' && identifier[len(identifier)-1] == ']')
+
+	return append(parts, identifier[start:])
+}
+
+func unquoteIdentifier(identifier string) (string, bool) {
+	if len(identifier) < 2 {
+		return identifier, false
+	}
+
+	switch {
+	case identifier[0] == '"' && identifier[len(identifier)-1] == '"':
+		return strings.ReplaceAll(identifier[1:len(identifier)-1], `""`, `"`), true
+	case identifier[0] == '`' && identifier[len(identifier)-1] == '`':
+		return strings.ReplaceAll(identifier[1:len(identifier)-1], "``", "`"), true
+	case identifier[0] == '[' && identifier[len(identifier)-1] == ']':
+		return strings.ReplaceAll(identifier[1:len(identifier)-1], "]]", "]"), true
+	default:
+		return identifier, false
+	}
 }
 
 func identifierNeedsQuoting(identifier string) bool {

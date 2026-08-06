@@ -147,6 +147,10 @@ func TestRelationshipIdentifierQuoters(t *testing.T) {
 		{name: "backticks every component", quote: QuoteIdentifierWithBackticks, input: "analytics.order-items", expect: "`analytics`.`order-items`"},
 		{name: "brackets every component and escape closing bracket", quote: QuoteIdentifierWithBrackets, input: "analytics.order]items", expect: "[analytics].[order]]items]"},
 		{name: "preserves an already quoted path", quote: QuoteIdentifierWithBackticks, input: "`my-project.analytics.order-items`", expect: "`my-project.analytics.order-items`"},
+		{name: "converts backticks to double quotes", quote: QuoteIdentifierWithDoubleQuotes, input: "`analytics`.`order-items`", expect: `"analytics"."order-items"`},
+		{name: "converts double quotes to backticks", quote: QuoteIdentifierWithBackticks, input: `"sales data"."order-items"`, expect: "`sales data`.`order-items`"},
+		{name: "converts and escapes brackets", quote: QuoteIdentifierWithBrackets, input: `"analytics"."order]items"`, expect: "[analytics].[order]]items]"},
+		{name: "preserves dots inside a quoted component", quote: QuoteIdentifierWithDoubleQuotes, input: "`my-project.analytics`.orders", expect: `"my-project.analytics"."orders"`},
 	}
 
 	for _, tt := range tests {
