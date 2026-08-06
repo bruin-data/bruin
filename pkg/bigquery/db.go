@@ -280,6 +280,25 @@ func (d *Client) IsValid(ctx context.Context, query *query.Query) (bool, error) 
 	return true, nil
 }
 
+// bigQueryJobCancelTimeout bounds how long we wait when issuing a server-side
+// cancel for a BigQuery job whose run has been aborted.
+const bigQueryJobCancelTimeout = 10 * time.Second
+
+// cancelJobOnContextCancellation cancels the server-side BigQuery job when ctx
+// has been cancelled (e.g. the user aborted the run with Ctrl+C). Without this,
+// cancelling the Go context only stops us from waiting on the job while it keeps
+// running on BigQuery, holding table locks and blocking subsequent runs of the
+// same asset. A fresh context is used because ctx is already done; cancelling a
+// job that has already finished is a harmless no-op.
+func cancelJobOnContextCancellation(ctx context.Context, job *bigquery.Job) {
+	if job == nil || ctx.Err() == nil {
+		return
+	}
+	cancelCtx, cancel := context.WithTimeout(context.Background(), bigQueryJobCancelTimeout)
+	defer cancel()
+	_ = job.Cancel(cancelCtx)
+}
+
 func (d *Client) RunQueryWithoutResult(ctx context.Context, q *query.Query) error {
 	if err := d.ensureClientInitialized(ctx); err != nil {
 		return err
@@ -292,6 +311,7 @@ func (d *Client) RunQueryWithoutResult(ctx context.Context, q *query.Query) erro
 	if err != nil {
 		return formatError(err)
 	}
+	defer cancelJobOnContextCancellation(ctx, job)
 	query.LogOrSinkQueryID(ctx, "BigQuery", job.ID())
 	_, err = job.Read(ctx)
 	if err != nil {
@@ -313,6 +333,7 @@ func (d *Client) Select(ctx context.Context, q *query.Query) ([][]interface{}, e
 	if err != nil {
 		return nil, formatError(err)
 	}
+	defer cancelJobOnContextCancellation(ctx, job)
 	query.LogOrSinkQueryID(ctx, "BigQuery", job.ID())
 	rows, err := job.Read(ctx)
 	if err != nil {
@@ -353,6 +374,7 @@ func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 	if err != nil {
 		return nil, fmt.Errorf("failed to run query: %w", formatError(err))
 	}
+	defer cancelJobOnContextCancellation(ctx, job)
 	query.LogOrSinkQueryID(ctx, "BigQuery", job.ID())
 	rows, err := job.Read(ctx)
 	if err != nil {
