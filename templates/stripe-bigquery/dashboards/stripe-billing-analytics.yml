@@ -1,0 +1,252 @@
+name: Stripe Billing Analytics
+description: Native-currency recurring-revenue, customer, movement, and invoice-billing KPIs from the stripe_reports layer.
+connection: gcp-default
+
+filters:
+  - name: date_range
+    type: date-range
+    default: all_time
+  - name: currency
+    type: text
+    default: usd
+
+queries:
+  latest_subscription_kpis:
+    sql: |
+      SELECT
+        metric_month,
+        currency,
+        ending_mrr_minor,
+        ending_run_rate_arr_minor,
+        ending_active_customer_count
+      FROM `stripe_reports.monthly_subscription_kpis`
+      WHERE metric_month >= CAST('{{ filters.date_range.start }}' AS DATE)
+        AND metric_month <= CAST('{{ filters.date_range.end }}' AS DATE)
+        AND LOWER(currency) = LOWER('{{ filters.currency }}')
+      QUALIFY ROW_NUMBER() OVER (ORDER BY metric_month DESC) = 1
+
+  latest_invoice_billings:
+    sql: |
+      SELECT
+        invoice_billing_month,
+        currency,
+        SUM(issued_invoice_count) AS issued_invoice_count,
+        SUM(subscription_invoice_count) AS subscription_invoice_count,
+        SUM(invoiced_billings_minor) AS invoiced_billings_minor,
+        SUM(invoiced_subscription_billings_minor)
+          AS invoiced_subscription_billings_minor
+      FROM `stripe_reports.monthly_invoice_billings`
+      WHERE invoice_billing_month >= CAST('{{ filters.date_range.start }}' AS DATE)
+        AND invoice_billing_month <= CAST('{{ filters.date_range.end }}' AS DATE)
+        AND LOWER(currency) = LOWER('{{ filters.currency }}')
+      GROUP BY invoice_billing_month, currency
+      QUALIFY ROW_NUMBER() OVER (ORDER BY invoice_billing_month DESC) = 1
+
+  monthly_mrr:
+    sql: |
+      SELECT
+        metric_month,
+        SUM(ending_mrr_minor) AS ending_mrr_minor
+      FROM `stripe_reports.monthly_mrr_by_customer`
+      WHERE metric_month >= CAST('{{ filters.date_range.start }}' AS DATE)
+        AND metric_month <= CAST('{{ filters.date_range.end }}' AS DATE)
+        AND LOWER(currency) = LOWER('{{ filters.currency }}')
+      GROUP BY metric_month
+      ORDER BY metric_month
+
+  monthly_mrr_movements:
+    sql: |
+      WITH monthly_movements AS (
+        SELECT
+          metric_month,
+          SUM(new_mrr_minor) AS new_mrr_minor,
+          SUM(reactivation_mrr_minor) AS reactivation_mrr_minor,
+          SUM(expansion_mrr_minor) AS expansion_mrr_minor,
+          -SUM(contraction_mrr_minor) AS contraction_mrr_loss_minor,
+          -SUM(churned_mrr_minor) AS churned_mrr_loss_minor
+        FROM `stripe_reports.monthly_mrr_movements`
+        WHERE metric_month >= CAST('{{ filters.date_range.start }}' AS DATE)
+          AND metric_month <= CAST('{{ filters.date_range.end }}' AS DATE)
+          AND LOWER(currency) = LOWER('{{ filters.currency }}')
+        GROUP BY metric_month
+      )
+      SELECT
+        metric_month,
+        movement_category,
+        movement_mrr_minor
+      FROM monthly_movements,
+      UNNEST([
+        STRUCT('New' AS movement_category, new_mrr_minor AS movement_mrr_minor),
+        STRUCT('Reactivation', reactivation_mrr_minor),
+        STRUCT('Expansion', expansion_mrr_minor),
+        STRUCT('Contraction', contraction_mrr_loss_minor),
+        STRUCT('Churn', churned_mrr_loss_minor)
+      ])
+      ORDER BY metric_month, movement_category
+
+  monthly_invoice_billings:
+    sql: |
+      SELECT
+        invoice_billing_month,
+        invoice_billing_date_basis,
+        SUM(invoiced_billings_minor) AS invoiced_billings_minor
+      FROM `stripe_reports.monthly_invoice_billings`
+      WHERE invoice_billing_month >= CAST('{{ filters.date_range.start }}' AS DATE)
+        AND invoice_billing_month <= CAST('{{ filters.date_range.end }}' AS DATE)
+        AND LOWER(currency) = LOWER('{{ filters.currency }}')
+      GROUP BY invoice_billing_month, invoice_billing_date_basis
+      ORDER BY invoice_billing_month, invoice_billing_date_basis
+
+  latest_customer_mrr:
+    sql: |
+      WITH filtered_customer_mrr AS (
+        SELECT
+          metric_month,
+          stripe_customer_id,
+          crm_account_id,
+          COALESCE(NULLIF(crm_account_id, ''), stripe_customer_id)
+            AS customer_label,
+          customer_segment,
+          customer_region,
+          sales_owner,
+          active_subscription_count,
+          ending_mrr_minor,
+          run_rate_arr_minor
+        FROM `stripe_reports.monthly_mrr_by_customer`
+        WHERE metric_month >= CAST('{{ filters.date_range.start }}' AS DATE)
+          AND metric_month <= CAST('{{ filters.date_range.end }}' AS DATE)
+          AND LOWER(currency) = LOWER('{{ filters.currency }}')
+      )
+      SELECT *
+      FROM filtered_customer_mrr
+      QUALIFY metric_month = MAX(metric_month) OVER ()
+      ORDER BY ending_mrr_minor DESC, stripe_customer_id
+      LIMIT 20
+
+rows:
+  - widgets:
+      - name: Dashboard overview
+        type: text
+        content: |
+          # Stripe billing analytics
+
+          Recurring revenue and billings are shown for one native currency at a time. Enter the three-letter Stripe currency code to avoid aggregating monetary amounts across currencies.
+
+          **Metric policy:** MRR is gross list-price run rate from eligible active and past-due subscriptions. It is not recognized revenue, bookings, cash, or a financial statement. Monetary amounts remain in native minor units.
+        col: 12
+
+  - widgets:
+      - name: Latest Ending MRR (minor units)
+        type: metric
+        query: latest_subscription_kpis
+        value:
+          field: ending_mrr_minor
+          type: number
+          format: ",.0f"
+        col: 3
+
+      - name: Latest Run-Rate ARR (minor units)
+        type: metric
+        query: latest_subscription_kpis
+        value:
+          field: ending_run_rate_arr_minor
+          type: number
+          format: ",.0f"
+        col: 3
+
+      - name: Active Customers
+        type: metric
+        query: latest_subscription_kpis
+        value:
+          field: ending_active_customer_count
+          type: number
+          format: ",.0f"
+        col: 3
+
+      - name: Latest Invoice Billings (minor units)
+        type: metric
+        query: latest_invoice_billings
+        value:
+          field: invoiced_billings_minor
+          type: number
+          format: ",.0f"
+        col: 3
+
+  - widgets:
+      - name: Snapshot history status
+        type: text
+        content: |
+          **Snapshot history:** The first observed month is a baseline. MRR movement and retention become available after the next contiguous monthly snapshot, so an empty movement chart is expected until then.
+        col: 12
+
+  - widgets:
+      - name: Monthly Ending MRR (minor units)
+        type: chart
+        chart: line
+        query: monthly_mrr
+        x: { field: metric_month }
+        y: { field: [ending_mrr_minor] }
+        col: 6
+
+      - name: Monthly MRR Movement Components (minor units; requires prior snapshot)
+        type: chart
+        chart: bar
+        query: monthly_mrr_movements
+        x: { field: metric_month }
+        y: { field: [movement_mrr_minor] }
+        color: { field: movement_category }
+        stacked: true
+        col: 6
+
+  - widgets:
+      - name: Monthly Invoice Billings by Date Basis (minor units)
+        type: chart
+        chart: bar
+        query: monthly_invoice_billings
+        x: { field: invoice_billing_month }
+        y: { field: [invoiced_billings_minor] }
+        color: { field: invoice_billing_date_basis }
+        stacked: true
+        col: 6
+
+      - name: Latest Customer MRR (minor units)
+        type: chart
+        chart: bar
+        query: latest_customer_mrr
+        x: { field: customer_label }
+        y: { field: [ending_mrr_minor] }
+        col: 6
+
+  - widgets:
+      - name: Latest Customer MRR Detail
+        type: table
+        query: latest_customer_mrr
+        col: 12
+        columns:
+          - name: stripe_customer_id
+            label: Stripe customer
+          - name: crm_account_id
+            label: CRM account
+          - name: customer_segment
+            label: Segment
+          - name: customer_region
+            label: Region
+          - name: sales_owner
+            label: Sales owner
+          - name: active_subscription_count
+            label: Active subscriptions
+          - name: ending_mrr_minor
+            label: Ending MRR (minor units)
+          - name: run_rate_arr_minor
+            label: Run-rate ARR (minor units)
+
+  - widgets:
+      - name: Sources and limitations
+        type: text
+        content: |
+          **Sources:** `stripe_reports.monthly_mrr_by_customer`, `monthly_mrr_movements`, `monthly_subscription_kpis`, and `monthly_invoice_billings`.
+
+          **Method:** The MRR movement chart treats contraction and churn as negative values; its components reconcile to ending MRR only for contiguous monthly snapshots. Invoice billings use finalization date when available and flag creation-date fallback separately.
+
+          **Limitations:** The first snapshot month is a baseline, so retention and movement metrics may be unavailable until the next contiguous monthly observation. No FX conversion is applied.
+        col: 12

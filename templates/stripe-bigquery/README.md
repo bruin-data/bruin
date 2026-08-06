@@ -16,6 +16,8 @@ small enough to adapt to your own reporting needs.
 stripe-bigquery/
 ├── pipeline.yml
 ├── README.md
+├── dashboards/
+│   └── stripe-billing-analytics.yml
 └── assets/
     ├── stripe_raw/
     │   ├── customer.asset.yml
@@ -187,3 +189,38 @@ Use the stage models as a stable interface for your own reports. Review the
 selected assets, source fields, quality checks, and metric policy before using
 the results for financial reporting. Extend the pipeline with your business
 definitions, identity mapping, and FX policy where required.
+
+## View the billing dashboard
+
+The included DAC dashboard visualizes native-currency MRR, ARR, customer count,
+retention, movement components, invoice billings, and the latest customer MRR
+distribution. It deliberately filters to one currency at a time because the
+reporting tables retain money in native minor units and do not apply FX rates.
+
+After configuring `gcp-default`, install DAC and its dashboard-authoring
+skill from the project root:
+
+```bash
+curl -fsSL https://getbruin.com/install/dac | sh
+dac skills install --dir . create-dashboard
+```
+
+Restart your coding agent after installing the skill so it can use the local
+`create-dashboard` instructions. Then validate the dashboard, execute its
+queries, and serve the DAC app:
+
+```bash
+dac --config .bruin.yml validate --dir dashboards
+dac --config .bruin.yml check --dir dashboards
+dac --config .bruin.yml serve --dir dashboards --port 8321
+```
+
+### Dashboard preview
+
+![Stripe billing analytics dashboard preview](images/stripe-billing-analytics-demo.png)
+
+This screenshot uses synthetic data solely to demonstrate the dashboard's
+layout and charts.
+
+The first snapshot month is a baseline, so MRR movement and retention metrics
+may be unavailable until a following contiguous monthly snapshot is present.
