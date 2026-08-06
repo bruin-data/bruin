@@ -426,7 +426,7 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 		if !quiet && output != "json" {
 			infoPrinter.Printf("[%s]   Inferred asset name from path: %s\n", logPrefix, inferredName)
 		}
-		if persistErr := pp.Asset.Persist(fs); persistErr != nil {
+		if persistErr := pp.Asset.Persist(fs, pp.Pipeline); persistErr != nil {
 			return errors.Wrap(persistErr, "failed to persist asset with inferred name")
 		}
 	}

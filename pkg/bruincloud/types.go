@@ -316,6 +316,18 @@ type Dashboard struct {
 // ScheduledAgent represents a Bruin Cloud scheduled agent — a cron-based recurring
 // agent task. The nested plan fields (verified SQLs, memory, ...) are kept as raw
 // JSON so `--output json` round-trips the full server response faithfully.
+// RunState is a single markdown "memory" file persisted across runs of a
+// scheduled agent, keyed by name. Content may be empty.
+type RunState struct {
+	Name      string  `json:"name"`
+	Content   string  `json:"content"`
+	CreatedAt *string `json:"created_at"`
+	UpdatedAt *string `json:"updated_at"`
+}
+
+// ScheduledAgent represents a Bruin Cloud scheduled agent — a cron-based
+// recurring agent task. The nested plan fields (verified SQLs, memory, ...) are
+// kept as raw JSON so `--output json` round-trips the full server response.
 type ScheduledAgent struct {
 	ID                int             `json:"id"`
 	Title             *string         `json:"title"`

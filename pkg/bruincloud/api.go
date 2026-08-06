@@ -781,6 +781,44 @@ func (c *APIClient) UpdateScheduledAgent(ctx context.Context, scheduledAgentID i
 	return &result, nil
 }
 
+// --- Scheduled agent run state ---
+
+// ListRunStates returns the run-state ("memory") files persisted on a scheduled
+// agent. Each is a markdown file the agent carries across runs, keyed by name.
+func (c *APIClient) ListRunStates(ctx context.Context, scheduledAgentID int) ([]RunState, error) {
+	var resp struct {
+		RunStates []RunState `json:"run_states"`
+	}
+	err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/scheduled-agents/%d/run-states", scheduledAgentID), nil, &resp)
+	return resp.RunStates, err
+}
+
+// GetRunState returns a single run-state file by name.
+func (c *APIClient) GetRunState(ctx context.Context, scheduledAgentID int, name string) (*RunState, error) {
+	var result RunState
+	err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/scheduled-agents/%d/run-states/%s", scheduledAgentID, url.PathEscape(name)), nil, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// SetRunState creates or replaces a run-state file (the server upserts on name).
+func (c *APIClient) SetRunState(ctx context.Context, scheduledAgentID int, name, content string) (*RunState, error) {
+	var result RunState
+	body := map[string]any{"content": content}
+	err := c.doRequest(ctx, http.MethodPut, fmt.Sprintf("/scheduled-agents/%d/run-states/%s", scheduledAgentID, url.PathEscape(name)), body, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// DeleteRunState removes a run-state file by name.
+func (c *APIClient) DeleteRunState(ctx context.Context, scheduledAgentID int, name string) error {
+	return c.doRequest(ctx, http.MethodDelete, fmt.Sprintf("/scheduled-agents/%d/run-states/%s", scheduledAgentID, url.PathEscape(name)), nil, nil)
+}
+
 // --- Audit logs ---
 
 // ListAuditLogs returns a page of the team's audit trail, most recent first.

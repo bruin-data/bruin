@@ -267,6 +267,93 @@ func TestDB_RunQueryWithoutResult(t *testing.T) {
 	}
 }
 
+func TestDB_RunQueryWithoutResultCancelsJobOnContextCancellation(t *testing.T) {
+	t.Parallel()
+
+	projectID := testProjectID
+	jobID := testJobID
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var cancelRequested atomic.Bool
+
+	writeJSON := func(w http.ResponseWriter, v any) {
+		resp, err := json.Marshal(v)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		_, _ = w.Write(resp)
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/jobs/"+jobID+"/cancel"):
+			cancelRequested.Store(true)
+			writeJSON(w, &bigquery2.JobCancelResponse{
+				Job: &bigquery2.Job{
+					JobReference: &bigquery2.JobReference{JobId: jobID, ProjectId: projectID, Location: "US"},
+					Status:       &bigquery2.JobStatus{State: "DONE"},
+				},
+			})
+			return
+
+		// Submit returns a RUNNING job so job.Read has to poll.
+		case r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/projects/"+projectID+"/jobs"):
+			writeJSON(w, &bigquery2.Job{
+				Configuration: &bigquery2.JobConfiguration{
+					Query: &bigquery2.JobConfigurationQuery{
+						Query: "select * from users",
+						DestinationTable: &bigquery2.TableReference{
+							ProjectId: projectID,
+							DatasetId: "test-dataset",
+						},
+					},
+				},
+				JobReference: &bigquery2.JobReference{JobId: jobID, ProjectId: projectID, Location: "US"},
+				Status:       &bigquery2.JobStatus{State: "RUNNING"},
+			})
+			return
+
+		// First poll cancels the run and reports the job as still incomplete.
+		case r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/queries/"+jobID):
+			cancel()
+			writeJSON(w, &bigquery2.GetQueryResultsResponse{
+				JobReference: &bigquery2.JobReference{JobId: jobID, ProjectId: projectID, Location: "US"},
+				JobComplete:  false,
+			})
+			return
+		}
+
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte("unexpected request: " + r.Method + " " + r.URL.Path))
+	}))
+	defer server.Close()
+
+	client, err := bigquery.NewClient(
+		context.Background(),
+		projectID,
+		option.WithEndpoint(server.URL),
+		option.WithCredentials(&google.Credentials{
+			ProjectID: projectID,
+			TokenSource: oauth2.StaticTokenSource(&oauth2.Token{
+				AccessToken: "some-token",
+			}),
+		}),
+	)
+	require.NoError(t, err)
+	client.Location = "US"
+
+	d := Client{client: client}
+
+	err = d.RunQueryWithoutResult(ctx, &query.Query{Query: "select * from users"})
+	require.Error(t, err, "an aborted run should surface the cancellation error")
+
+	require.Eventually(t, cancelRequested.Load, 2*time.Second, 10*time.Millisecond,
+		"aborting the run should trigger a server-side BigQuery job cancel")
+}
+
 func TestClientValidateQueryLimits(t *testing.T) {
 	t.Parallel()
 

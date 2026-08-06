@@ -3,6 +3,8 @@ package bigquery
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
 	"regexp"
 	"runtime"
 	"sort"
@@ -15,6 +17,7 @@ import (
 	datatransfer "cloud.google.com/go/bigquery/datatransfer/apiv1"
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/diff"
+	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/pkg/errors"
@@ -280,6 +283,31 @@ func (d *Client) IsValid(ctx context.Context, query *query.Query) (bool, error) 
 	return true, nil
 }
 
+// bigQueryJobCancelTimeout bounds how long we wait when issuing a server-side
+// cancel for a BigQuery job whose run has been aborted.
+const bigQueryJobCancelTimeout = 10 * time.Second
+
+// cancelJobOnContextCancellation stops the server-side BigQuery job when ctx has
+// been cancelled — otherwise the job keeps running (holding table locks) after we
+// stop waiting on it. A fresh context is required because ctx is already done.
+func cancelJobOnContextCancellation(ctx context.Context, job *bigquery.Job) {
+	if job == nil || ctx.Err() == nil {
+		return
+	}
+	// ctx is already cancelled; a fresh context is needed for the cancel RPC to reach BigQuery.
+	cancelCtx, cancel := context.WithTimeout(context.Background(), bigQueryJobCancelTimeout)
+	defer cancel()
+	if err := job.Cancel(cancelCtx); err != nil { //nolint:contextcheck // fresh context is intentional (see above)
+		// Surface the failure so the user knows the job may still be running,
+		// falling back to stderr when there is no console writer in the context.
+		w, ok := ctx.Value(executor.KeyPrinter).(io.Writer)
+		if !ok || w == nil {
+			w = os.Stderr
+		}
+		_, _ = fmt.Fprintf(w, "failed to cancel BigQuery job %s: %v\n", job.ID(), err)
+	}
+}
+
 func (d *Client) RunQueryWithoutResult(ctx context.Context, q *query.Query) error {
 	if err := d.ensureClientInitialized(ctx); err != nil {
 		return err
@@ -292,6 +320,7 @@ func (d *Client) RunQueryWithoutResult(ctx context.Context, q *query.Query) erro
 	if err != nil {
 		return formatError(err)
 	}
+	defer cancelJobOnContextCancellation(ctx, job)
 	query.LogOrSinkQueryID(ctx, "BigQuery", job.ID())
 	_, err = job.Read(ctx)
 	if err != nil {
@@ -313,6 +342,7 @@ func (d *Client) Select(ctx context.Context, q *query.Query) ([][]interface{}, e
 	if err != nil {
 		return nil, formatError(err)
 	}
+	defer cancelJobOnContextCancellation(ctx, job)
 	query.LogOrSinkQueryID(ctx, "BigQuery", job.ID())
 	rows, err := job.Read(ctx)
 	if err != nil {
@@ -353,6 +383,7 @@ func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 	if err != nil {
 		return nil, fmt.Errorf("failed to run query: %w", formatError(err))
 	}
+	defer cancelJobOnContextCancellation(ctx, job)
 	query.LogOrSinkQueryID(ctx, "BigQuery", job.ID())
 	rows, err := job.Read(ctx)
 	if err != nil {

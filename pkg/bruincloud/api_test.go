@@ -1252,3 +1252,77 @@ func TestListAuditLogs(t *testing.T) {
 	assert.Equal(t, "login", logs[0].Type)
 	assert.Equal(t, "alice@example.com", logs[0].UserIdentifier)
 }
+
+func TestListRunStates(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/scheduled-agents/7/run-states", r.URL.Path)
+		assert.Equal(t, http.MethodGet, r.Method)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"run_states":[{"name":"a.md","content":"x"},{"name":"b.md","content":"y"}]}`))
+	})
+
+	states, err := client.ListRunStates(t.Context(), 7)
+	require.NoError(t, err)
+	require.Len(t, states, 2)
+	assert.Equal(t, "a.md", states[0].Name)
+	assert.Equal(t, "x", states[0].Content)
+}
+
+func TestGetRunState(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/scheduled-agents/7/run-states/notes.md", r.URL.Path)
+		assert.Equal(t, http.MethodGet, r.Method)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"name":"notes.md","content":"hello"}`))
+	})
+
+	state, err := client.GetRunState(t.Context(), 7, "notes.md")
+	require.NoError(t, err)
+	assert.Equal(t, "notes.md", state.Name)
+	assert.Equal(t, "hello", state.Content)
+}
+
+func TestSetRunState(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/scheduled-agents/7/run-states/notes.md", r.URL.Path)
+		assert.Equal(t, http.MethodPut, r.Method)
+		body := readJSON(t, r)
+		assert.Equal(t, "new content", body["content"])
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"name":"notes.md","content":"new content"}`))
+	})
+
+	state, err := client.SetRunState(t.Context(), 7, "notes.md", "new content")
+	require.NoError(t, err)
+	assert.Equal(t, "new content", state.Content)
+}
+
+// A name with characters that need percent-encoding must be escaped in the path
+// so it can't break out of the run-states segment.
+func TestSetRunStateEscapesName(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/scheduled-agents/7/run-states/my%20notes.md", r.URL.EscapedPath())
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"name":"my notes.md","content":"x"}`))
+	})
+
+	_, err := client.SetRunState(t.Context(), 7, "my notes.md", "x")
+	require.NoError(t, err)
+}
+
+func TestDeleteRunState(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/scheduled-agents/7/run-states/gone.md", r.URL.Path)
+		assert.Equal(t, http.MethodDelete, r.Method)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"success":true}`))
+	})
+
+	err := client.DeleteRunState(t.Context(), 7, "gone.md")
+	require.NoError(t, err)
+}

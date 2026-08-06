@@ -32,7 +32,13 @@ func (m *Materializer) Render(asset *Asset, query string) (string, error) {
 		// This strategy should never be overridden, even with full refresh
 		// Also respect full refresh restriction - if true, don't drop/recreate the table
 		if mat.Strategy != MaterializationStrategyDDL && (asset.RefreshRestricted == nil || !*asset.RefreshRestricted) {
-			strategy = MaterializationStrategyCreateReplace
+			// Data Vault strategies are only overridden on platforms that implement them, since
+			// those route CreateReplace back into their own builders. Overriding it elsewhere would
+			// silently produce a plain table dump with none of the Data Vault loading rules applied.
+			_, dataVaultSupported := m.MaterializationMap[mat.Type][mat.Strategy]
+			if !mat.Strategy.IsDataVault() || dataVaultSupported {
+				strategy = MaterializationStrategyCreateReplace
+			}
 		}
 	}
 

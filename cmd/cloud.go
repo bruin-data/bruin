@@ -3915,8 +3915,225 @@ func CloudScheduledAgents() *cli.Command {
 			cloudScheduledAgentsGet(),
 			cloudScheduledAgentsCreate(),
 			cloudScheduledAgentsUpdate(),
+			cloudScheduledAgentsRunStates(),
 		},
 	}
+}
+
+// cloudScheduledAgentsRunStates groups the CRUD commands for a scheduled agent's
+// run-state ("memory") files — the markdown the agent persists across runs.
+func cloudScheduledAgentsRunStates() *cli.Command {
+	return &cli.Command{
+		Name:  "run-states",
+		Usage: "Manage a scheduled agent's run-state (\"memory\") files",
+		Commands: []*cli.Command{
+			cloudRunStatesList(),
+			cloudRunStatesGet(),
+			cloudRunStatesSet(),
+			cloudRunStatesDelete(),
+		},
+	}
+}
+
+// scheduledAgentIDFlag is the required parent-scope flag shared by the run-state
+// commands (a run-state file only exists in the context of a scheduled agent).
+func scheduledAgentIDFlag() *cli.IntFlag {
+	return &cli.IntFlag{
+		Name:     "scheduled-agent-id",
+		Usage:    "scheduled agent the run-state file belongs to",
+		Required: true,
+	}
+}
+
+func runStateNameFlag() *cli.StringFlag {
+	return &cli.StringFlag{
+		Name:     "name",
+		Usage:    "run-state file name",
+		Required: true,
+	}
+}
+
+func cloudRunStatesList() *cli.Command {
+	return &cli.Command{
+		Name:  "list",
+		Usage: "List a scheduled agent's run-state files",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			scheduledAgentIDFlag(),
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			states, err := client.ListRunStates(ctx, c.Int("scheduled-agent-id"))
+			if err != nil {
+				printError(err, output, "Failed to list run states")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(states, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"Name", "Size (bytes)", "Updated"})
+			for _, s := range states {
+				t.AppendRow(table.Row{s.Name, len(s.Content), derefString(s.UpdatedAt)})
+			}
+			t.Render()
+			return nil
+		},
+	}
+}
+
+func cloudRunStatesGet() *cli.Command {
+	return &cli.Command{
+		Name:  "get",
+		Usage: "Get a run-state file (prints its content; use --output json for the full record)",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			scheduledAgentIDFlag(),
+			runStateNameFlag(),
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			state, err := client.GetRunState(ctx, c.Int("scheduled-agent-id"), c.String("name"))
+			if err != nil {
+				printError(err, output, "Failed to get run state")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(state, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			// Print the raw content so it can be redirected to a file.
+			fmt.Print(state.Content)
+			return nil
+		},
+	}
+}
+
+func cloudRunStatesSet() *cli.Command {
+	return &cli.Command{
+		Name:  "set",
+		Usage: "Create or replace a run-state file from --content or --content-file",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			scheduledAgentIDFlag(),
+			runStateNameFlag(),
+			&cli.StringFlag{Name: "content", Usage: "the file content"},
+			&cli.StringFlag{Name: "content-file", Usage: "path to a file whose contents become the run-state content"},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			content, err := resolveRunStateContent(c)
+			if err != nil {
+				printError(err, output, "Invalid content")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			state, err := client.SetRunState(ctx, c.Int("scheduled-agent-id"), c.String("name"), content)
+			if err != nil {
+				printError(err, output, "Failed to set run state")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(state, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			successPrinter.Printf("Saved run-state file '%s' on scheduled agent %d.\n", state.Name, c.Int("scheduled-agent-id"))
+			return nil
+		},
+	}
+}
+
+func cloudRunStatesDelete() *cli.Command {
+	return &cli.Command{
+		Name:  "delete",
+		Usage: "Delete a run-state file",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			scheduledAgentIDFlag(),
+			runStateNameFlag(),
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			if err := client.DeleteRunState(ctx, c.Int("scheduled-agent-id"), c.String("name")); err != nil {
+				printError(err, output, "Failed to delete run state")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				fmt.Println(`{"success": true}`)
+				return nil
+			}
+
+			successPrinter.Printf("Deleted run-state file '%s' from scheduled agent %d.\n", c.String("name"), c.Int("scheduled-agent-id"))
+			return nil
+		},
+	}
+}
+
+// resolveRunStateContent reads the run-state content from exactly one of
+// --content or --content-file.
+func resolveRunStateContent(c *cli.Command) (string, error) {
+	if c.IsSet("content") && c.IsSet("content-file") {
+		return "", errors.New("pass only one of --content or --content-file")
+	}
+	if c.IsSet("content-file") {
+		data, err := os.ReadFile(c.String("content-file"))
+		if err != nil {
+			return "", fmt.Errorf("failed to read --content-file: %w", err)
+		}
+		return string(data), nil
+	}
+	if c.IsSet("content") {
+		return c.String("content"), nil
+	}
+	return "", errors.New("provide the content with --content or --content-file")
 }
 
 func cloudScheduledAgentsList() *cli.Command {

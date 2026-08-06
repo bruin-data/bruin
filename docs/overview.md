@@ -27,6 +27,20 @@ bruin query --connection my_connection --query "SELECT * FROM table" --descripti
 
 Always use the `--description` flag to describe why you are running the query, e.g. `--description "checking row counts after ingestion"`.
 
+### Command: Curl
+
+bruin curl -- [curl flags and URL]
+
+A pass-through wrapper around the installed `curl` that renders Bruin connections into the arguments via Jinja. **Use this instead of plain `curl` whenever a connection is not a data warehouse** — API-style connections like Linear, GitHub, Notion, Shopify, or any `generic` connection holding a token. It avoids copy-pasting secrets into the shell.
+
+```bash
+bruin curl -- \
+  --header 'Authorization: Bearer {{ bruin.connection("linear").api_key }}' \
+  https://api.linear.app/graphql
+```
+
+Bruin flags (`--environment`, `--config-file`) go before `--`; everything after `--` belongs to curl. Field names match `.bruin.yml` (snake_case), and nested fields are traversed with dots: <code v-pre>{{ bruin.connection("service-api").credentials.client_id }}</code>. Run `bruin connections list` to see the available connections and, in the `FILLED FIELDS` column, which field names are set on each one. See [curl](/commands/curl) for details.
+
 ### Command: Init (Create Project)
 
 bruin init [template] [folder-name]
@@ -191,6 +205,7 @@ columns:
 
 - If connection is not defined for an asset, check the `default_connections` in `pipeline.yml`
 - Use `bruin connections test --name [name]` to test if a connection is working
+- **For non-warehouse connections (APIs like Linear, GitHub, Notion, or `generic` token connections), hit them with `bruin curl` rather than plain `curl`** so credentials come from the connection instead of being pasted into the command
 
 ### **Common Workflows**
 
