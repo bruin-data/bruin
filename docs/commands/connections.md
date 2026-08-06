@@ -12,23 +12,23 @@ To list all the connections in the `.bruin.yml` file, run the following command:
 bruin connections list
 ```
 
-The output will look like this:
+The output will look like this. `FILLED FIELDS` lists the names of the fields that are set on each connection, never their values:
 
 ```plaintext
 Environment: default
-+---------+-----------+
-| TYPE    | NAME      |
-+---------+-----------+
-| generic | MY_SECRET |
-| gorgias | my_conn   |
-+---------+-----------+
++---------+-----------+------------------------+
+| TYPE    | NAME      | FILLED FIELDS          |
++---------+-----------+------------------------+
+| generic | MY_SECRET | value                  |
+| gorgias | my_conn   | api_key, domain, email |
++---------+-----------+------------------------+
 
 Environment: someother
-+---------+-----------+
-| TYPE    | NAME      |
-+---------+-----------+
-| generic | MY_SECRET |
-+---------+-----------+
++---------+-----------+---------------+
+| TYPE    | NAME      | FILLED FIELDS |
++---------+-----------+---------------+
+| generic | MY_SECRET | value         |
++---------+-----------+---------------+
 ```
 
 ### Flags
