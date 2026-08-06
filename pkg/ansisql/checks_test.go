@@ -121,14 +121,40 @@ func TestRelationshipsCheck_Check(t *testing.T) {
 		func(q *mockQuerierWithResult) CheckRunner {
 			conn := new(mockConnectionFetcher)
 			conn.On("GetConnection", "test").Return(q, nil)
-			return &RelationshipsCheck{conn: conn}
+			return NewRelationshipsCheck(conn, QuoteIdentifierWithDoubleQuotes)
 		},
-		"SELECT COUNT(*) FROM dataset.test_asset bruin_relationship_child WHERE bruin_relationship_child.test_column IS NOT NULL AND bruin_relationship_child.test_column NOT IN (SELECT bruin_relationship_parent.id FROM dataset.parent_asset bruin_relationship_parent WHERE bruin_relationship_parent.id IS NOT NULL)",
+		`SELECT COUNT(*) FROM "dataset"."test_asset" bruin_relationship_child WHERE bruin_relationship_child."test_column" IS NOT NULL AND bruin_relationship_child."test_column" NOT IN (SELECT bruin_relationship_parent."id" FROM "dataset"."parent_asset" bruin_relationship_parent WHERE bruin_relationship_parent."id" IS NOT NULL)`,
 		"column 'test_column' has 5 rows with values missing from 'dataset.parent_asset.id'",
 		&pipeline.ColumnCheck{
 			Name: "relationships",
 		},
 	)
+}
+
+func TestRelationshipIdentifierQuoters(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		quote  func(string) string
+		input  string
+		expect string
+	}{
+		{name: "double quotes every component", quote: QuoteIdentifierWithDoubleQuotes, input: "analytics.OrderItems", expect: `"analytics"."OrderItems"`},
+		{name: "conditional double quotes preserve ordinary case folding", quote: QuoteIdentifierWithDoubleQuotesWhenNeeded, input: "analytics.OrderItems", expect: "analytics.OrderItems"},
+		{name: "conditional double quotes reserved identifiers", quote: QuoteIdentifierWithDoubleQuotesWhenNeeded, input: "analytics.order", expect: `analytics."order"`},
+		{name: "conditional double quotes punctuated identifiers", quote: QuoteIdentifierWithDoubleQuotesWhenNeeded, input: "sales data.order-items", expect: `"sales data"."order-items"`},
+		{name: "backticks every component", quote: QuoteIdentifierWithBackticks, input: "analytics.order-items", expect: "`analytics`.`order-items`"},
+		{name: "brackets every component and escape closing bracket", quote: QuoteIdentifierWithBrackets, input: "analytics.order]items", expect: "[analytics].[order]]items]"},
+		{name: "preserves an already quoted path", quote: QuoteIdentifierWithBackticks, input: "`my-project.analytics.order-items`", expect: "`my-project.analytics.order-items`"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expect, tt.quote(tt.input))
+		})
+	}
 }
 
 func TestRelationshipsCheckRequiresForeignKey(t *testing.T) {

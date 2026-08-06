@@ -164,11 +164,12 @@ func (c *UniqueCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstan
 // from both sides to make NOT IN null-safe. The query deliberately counts child
 // rows, matching dbt's relationships test semantics.
 type RelationshipsCheck struct {
-	conn config.ConnectionGetter
+	conn            config.ConnectionGetter
+	quoteIdentifier func(string) string
 }
 
-func NewRelationshipsCheck(conn config.ConnectionGetter) *RelationshipsCheck {
-	return &RelationshipsCheck{conn: conn}
+func NewRelationshipsCheck(conn config.ConnectionGetter, quoteIdentifier func(string) string) *RelationshipsCheck {
+	return &RelationshipsCheck{conn: conn, quoteIdentifier: quoteIdentifier}
 }
 
 func (c *RelationshipsCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
@@ -179,12 +180,12 @@ func (c *RelationshipsCheck) Check(ctx context.Context, ti *scheduler.ColumnChec
 
 	qq := fmt.Sprintf(
 		"SELECT COUNT(*) FROM %s bruin_relationship_child WHERE bruin_relationship_child.%s IS NOT NULL AND bruin_relationship_child.%s NOT IN (SELECT bruin_relationship_parent.%s FROM %s bruin_relationship_parent WHERE bruin_relationship_parent.%s IS NOT NULL)",
-		ti.GetAsset().Name,
-		ti.Column.Name,
-		ti.Column.Name,
-		foreignKey.Column,
-		foreignKey.Table,
-		foreignKey.Column,
+		c.quoteIdentifier(ti.GetAsset().Name),
+		c.quoteIdentifier(ti.Column.Name),
+		c.quoteIdentifier(ti.Column.Name),
+		c.quoteIdentifier(foreignKey.Column),
+		c.quoteIdentifier(foreignKey.Table),
+		c.quoteIdentifier(foreignKey.Column),
 	)
 
 	return (&CountableQueryCheck{
@@ -201,6 +202,82 @@ func (c *RelationshipsCheck) Check(ctx context.Context, ti *scheduler.ColumnChec
 			)
 		},
 	}).Check(ctx, ti)
+}
+
+var reservedSQLIdentifiers = map[string]bool{
+	"ALL": true, "ALTER": true, "AND": true, "ANY": true, "AS": true, "ASC": true,
+	"BETWEEN": true, "BY": true, "CASE": true, "CAST": true, "CHECK": true, "COLUMN": true,
+	"CREATE": true, "CROSS": true, "CURRENT": true, "DATABASE": true, "DEFAULT": true,
+	"DELETE": true, "DESC": true, "DISTINCT": true, "DROP": true, "ELSE": true, "END": true,
+	"EXISTS": true, "FALSE": true, "FETCH": true, "FOR": true, "FOREIGN": true, "FROM": true,
+	"FULL": true, "GROUP": true, "HAVING": true, "IN": true, "INNER": true, "INSERT": true,
+	"INTERSECT": true, "INTO": true, "IS": true, "JOIN": true, "KEY": true, "LEFT": true,
+	"LIKE": true, "LIMIT": true, "MERGE": true, "NATURAL": true, "NOT": true, "NULL": true,
+	"OFFSET": true, "ON": true, "OR": true, "ORDER": true, "OUTER": true, "PRIMARY": true,
+	"REFERENCES": true, "RIGHT": true, "ROW": true, "SELECT": true, "SET": true, "TABLE": true,
+	"THEN": true, "TRUE": true, "UNION": true, "UNIQUE": true, "UPDATE": true, "USING": true,
+	"VALUES": true, "VIEW": true, "WHEN": true, "WHERE": true, "WITH": true,
+}
+
+// QuoteIdentifierWithDoubleQuotes quotes every dotted identifier component using ANSI double quotes.
+func QuoteIdentifierWithDoubleQuotes(identifier string) string {
+	return quoteIdentifier(identifier, `"`, `"`, true)
+}
+
+// QuoteIdentifierWithDoubleQuotesWhenNeeded preserves ordinary identifiers and quotes reserved or non-standard components.
+func QuoteIdentifierWithDoubleQuotesWhenNeeded(identifier string) string {
+	return quoteIdentifier(identifier, `"`, `"`, false)
+}
+
+// QuoteIdentifierWithBackticks quotes every dotted identifier component using backticks.
+func QuoteIdentifierWithBackticks(identifier string) string {
+	return quoteIdentifier(identifier, "`", "`", true)
+}
+
+// QuoteIdentifierWithBrackets quotes every dotted identifier component using SQL Server brackets.
+func QuoteIdentifierWithBrackets(identifier string) string {
+	return quoteIdentifier(identifier, "[", "]", true)
+}
+
+func quoteIdentifier(identifier, openingQuote, closingQuote string, always bool) string {
+	identifier = strings.TrimSpace(identifier)
+	if isQuotedIdentifier(identifier) {
+		return identifier
+	}
+
+	parts := strings.Split(identifier, ".")
+	for index, part := range parts {
+		part = strings.TrimSpace(part)
+		if isQuotedIdentifier(part) || (!always && !identifierNeedsQuoting(part)) {
+			parts[index] = part
+			continue
+		}
+		parts[index] = openingQuote + strings.ReplaceAll(part, closingQuote, closingQuote+closingQuote) + closingQuote
+	}
+	return strings.Join(parts, ".")
+}
+
+func isQuotedIdentifier(identifier string) bool {
+	if len(identifier) < 2 {
+		return false
+	}
+	return (identifier[0] == '"' && identifier[len(identifier)-1] == '"') ||
+		(identifier[0] == '`' && identifier[len(identifier)-1] == '`') ||
+		(identifier[0] == '[' && identifier[len(identifier)-1] == ']')
+}
+
+func identifierNeedsQuoting(identifier string) bool {
+	if identifier == "" || reservedSQLIdentifiers[strings.ToUpper(identifier)] {
+		return true
+	}
+	for index := range len(identifier) {
+		char := identifier[index]
+		if (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || char == '_' || (index > 0 && char >= '0' && char <= '9') {
+			continue
+		}
+		return true
+	}
+	return false
 }
 
 type PositiveCheck struct {
