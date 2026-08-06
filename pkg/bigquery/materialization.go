@@ -2,12 +2,27 @@ package bigquery
 
 import (
 	"fmt"
+	"math"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/pkg/errors"
+)
+
+var (
+	integerRangePartitionRegex       = regexp.MustCompile(`(?i)\brange_bucket\s*\(`)
+	simpleMergePartitionRegex        = regexp.MustCompile(`(?i)^\s*` + "`?" + `([a-z_][a-z0-9_]*)` + "`?" + `\s*$`)
+	dateMergePartitionRegex          = regexp.MustCompile(`(?i)^\s*date\s*\(\s*` + "`?" + `([a-z_][a-z0-9_]*)` + "`?" + `\s*\)\s*$`)
+	truncatedMergePartitionRegex     = regexp.MustCompile(`(?i)^\s*(date_trunc|datetime_trunc|timestamp_trunc)\s*\(\s*` + "`?" + `([a-z_][a-z0-9_]*)` + "`?" + `\s*,\s*(day|hour|month|year)\s*\)\s*$`)
+	supportedMergePartitionDataTypes = map[string]bool{
+		"DATE":      true,
+		"DATETIME":  true,
+		"TIMESTAMP": true,
+	}
 )
 
 var matMap = pipeline.AssetMaterializationMap{
@@ -47,6 +62,10 @@ func viewMaterializer(asset *pipeline.Asset, query string) (string, error) {
 }
 
 func buildTruncateInsertQuery(task *pipeline.Asset, query string) (string, error) {
+	if err := validateRequirePartitionFilter(task, task.Materialization.PartitionBy != ""); err != nil {
+		return "", err
+	}
+
 	// BigQuery treats TRUNCATE TABLE as a DML statement, so the truncate and insert can
 	// run inside a single transaction. This makes the full refresh atomic: readers never
 	// observe the intermediate empty table, and a failed insert rolls back the truncate.
@@ -60,6 +79,10 @@ func buildTruncateInsertQuery(task *pipeline.Asset, query string) (string, error
 }
 
 func mergeMaterializer(asset *pipeline.Asset, query string) (string, error) {
+	if err := validateRequirePartitionFilter(asset, asset.Materialization.PartitionBy != ""); err != nil {
+		return "", err
+	}
+
 	if len(asset.Columns) == 0 {
 		return "", fmt.Errorf("materialization strategy %s requires the `columns` field to be set", asset.Materialization.Strategy)
 	}
@@ -79,8 +102,6 @@ func mergeMaterializer(asset *pipeline.Asset, query string) (string, error) {
 	on = ansisql.AddIncrementalPredicate(on, asset.Materialization.IncrementalPredicate)
 	onQuery := strings.Join(on, " AND ")
 
-	allColumnValues := strings.Join(columnNames, ", ")
-
 	whenMatchedThenQuery := ""
 
 	if len(mergeColumns) > 0 {
@@ -97,6 +118,11 @@ func mergeMaterializer(asset *pipeline.Asset, query string) (string, error) {
 		whenMatchedThenQuery = "WHEN MATCHED THEN UPDATE SET " + matchedUpdateQuery
 	}
 
+	if requirePartitionFilterEnabled(asset) {
+		return buildPartitionedMergeQuery(asset, query, columnNames, on, whenMatchedThenQuery)
+	}
+
+	allColumnValues := strings.Join(columnNames, ", ")
 	mergeLines := []string{
 		fmt.Sprintf("MERGE %s target", asset.Name),
 		fmt.Sprintf("USING (%s) source", strings.TrimSuffix(query, ";")),
@@ -108,7 +134,199 @@ func mergeMaterializer(asset *pipeline.Asset, query string) (string, error) {
 	return strings.Join(mergeLines, "\n") + ";", nil
 }
 
+type mergePartitionExpression struct {
+	columnName string
+	dataType   string
+	function   string
+	unit       string
+}
+
+func (p mergePartitionExpression) render(alias string) string {
+	column := alias + "." + p.columnName
+	switch p.function {
+	case "":
+		return column
+	case "DATE":
+		return "DATE(" + column + ")"
+	default:
+		return fmt.Sprintf("%s(%s, %s)", p.function, column, p.unit)
+	}
+}
+
+func parseMergePartitionExpression(asset *pipeline.Asset) (mergePartitionExpression, error) {
+	expression := asset.Materialization.PartitionBy
+	if matches := simpleMergePartitionRegex.FindStringSubmatch(expression); matches != nil {
+		column := asset.GetColumnWithName(matches[1])
+		if column == nil {
+			return mergePartitionExpression{}, errors.Errorf("materialization.partition_by references column %q, but that column is not defined", matches[1])
+		}
+
+		dataType := strings.ToUpper(strings.TrimSpace(column.Type))
+		if !supportedMergePartitionDataTypes[dataType] {
+			return mergePartitionExpression{}, errors.Errorf(
+				"partition-scoped BigQuery merge requires partition column %q to have type DATE, DATETIME, or TIMESTAMP, got %q",
+				column.Name,
+				column.Type,
+			)
+		}
+
+		return mergePartitionExpression{columnName: column.Name, dataType: dataType}, nil
+	}
+
+	if matches := dateMergePartitionRegex.FindStringSubmatch(expression); matches != nil {
+		column := asset.GetColumnWithName(matches[1])
+		if column == nil {
+			return mergePartitionExpression{}, errors.Errorf("materialization.partition_by references column %q, but that column is not defined", matches[1])
+		}
+		return mergePartitionExpression{columnName: column.Name, dataType: "DATE", function: "DATE"}, nil
+	}
+
+	if matches := truncatedMergePartitionRegex.FindStringSubmatch(expression); matches != nil {
+		column := asset.GetColumnWithName(matches[2])
+		if column == nil {
+			return mergePartitionExpression{}, errors.Errorf("materialization.partition_by references column %q, but that column is not defined", matches[2])
+		}
+
+		function := strings.ToUpper(matches[1])
+		dataType := strings.TrimSuffix(function, "_TRUNC")
+		return mergePartitionExpression{
+			columnName: column.Name,
+			dataType:   dataType,
+			function:   function,
+			unit:       strings.ToUpper(matches[3]),
+		}, nil
+	}
+
+	return mergePartitionExpression{}, errors.Errorf(
+		"partition-scoped BigQuery merge does not support materialization.partition_by expression %q; use a DATE, DATETIME, or TIMESTAMP column, DATE(column), or a supported *_TRUNC(column, unit) expression",
+		expression,
+	)
+}
+
+func validatePartitionedMerge(asset *pipeline.Asset) error {
+	partition, err := parseMergePartitionExpression(asset)
+	if err != nil {
+		return err
+	}
+
+	partitionColumn := asset.GetColumnWithName(partition.columnName)
+	if partitionColumn.PrimaryKey {
+		return nil
+	}
+
+	// When the partition is the bare column, rewriting the column rewrites the partition, so
+	// partition_key_immutable cannot hold: the merge does not match the row in its old partition
+	// and the insert then duplicates it into the new one. Truncated partitions are left alone
+	// because there a value can change without crossing a partition boundary.
+	if partition.function == "" && (partitionColumn.UpdateOnMerge || partitionColumn.MergeSQL != "") {
+		return errors.Errorf(
+			"partition column %q cannot use update_on_merge or merge_sql in a partition-scoped BigQuery merge because rewriting it moves the row to another partition and duplicates it; drop update_on_merge/merge_sql from the column, or disable bigquery.require_partition_filter so a normal merge can search the whole target",
+			partition.columnName,
+		)
+	}
+
+	if asset.BigQuery.PartitionKeyImmutable != nil && *asset.BigQuery.PartitionKeyImmutable {
+		return nil
+	}
+
+	return errors.Errorf(
+		"partition-scoped BigQuery merge requires partition column %q to be a primary key or bigquery.partition_key_immutable to be true; otherwise an existing row could be left behind when its partition value changes",
+		partition.columnName,
+	)
+}
+
+func buildPartitionedMergeQuery(
+	asset *pipeline.Asset,
+	query string,
+	columnNames []string,
+	matchConditions []string,
+	whenMatchedThenQuery string,
+) (string, error) {
+	partition, err := parseMergePartitionExpression(asset)
+	if err != nil {
+		return "", err
+	}
+
+	suffix := helpers.PrefixGenerator()
+	sourceTable := "__bruin_merge_source_" + suffix
+	partitionVariable := "bruin_merge_partitions_" + suffix
+	sourcePartitionExpression := partition.render("source")
+	targetPartitionExpression := partition.render("target")
+	targetPartitionFilter := fmt.Sprintf("%s IN UNNEST(%s)", targetPartitionExpression, partitionVariable)
+	filteredMatchConditions := append([]string{targetPartitionFilter}, matchConditions...)
+	filteredMatchQuery := strings.Join(filteredMatchConditions, " AND ")
+
+	statements := []string{
+		fmt.Sprintf("DECLARE %s ARRAY<%s>", partitionVariable, partition.dataType),
+		"BEGIN TRANSACTION",
+		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", sourceTable, strings.TrimSuffix(query, ";")),
+		fmt.Sprintf(
+			"SET %s = ARRAY(SELECT DISTINCT %s FROM %s source WHERE %s IS NOT NULL)",
+			partitionVariable,
+			sourcePartitionExpression,
+			sourceTable,
+			sourcePartitionExpression,
+		),
+		fmt.Sprintf(
+			"ASSERT NOT EXISTS (SELECT 1 FROM %s source WHERE %s IS NULL) AS 'partition-scoped merge requires non-null partition values'",
+			sourceTable,
+			sourcePartitionExpression,
+		),
+	}
+
+	insertTable := sourceTable
+	notMatchedFilter := []string{
+		"WHERE NOT EXISTS (",
+		"  SELECT 1",
+		fmt.Sprintf("  FROM %s target", asset.Name),
+		"  WHERE " + filteredMatchQuery,
+		")",
+	}
+
+	if whenMatchedThenQuery != "" {
+		// The merge below mutates the target, so the rows that still need inserting have to be
+		// captured beforehand. Re-evaluating the match after the update would re-select any row
+		// whose incremental predicate stopped holding because the merge changed a column it
+		// references, and insert a duplicate of it.
+		insertTable = "__bruin_merge_new_" + suffix
+		statements = append(statements, strings.Join(append([]string{
+			fmt.Sprintf("CREATE TEMP TABLE %s AS", insertTable),
+			fmt.Sprintf("SELECT source.* FROM %s source", sourceTable),
+		}, notMatchedFilter...), "\n"))
+
+		statements = append(statements, strings.Join([]string{
+			fmt.Sprintf("MERGE %s target", asset.Name),
+			fmt.Sprintf("USING %s source", sourceTable),
+			fmt.Sprintf("ON (%s)", filteredMatchQuery),
+			whenMatchedThenQuery,
+		}, "\n"))
+
+		notMatchedFilter = nil
+	}
+
+	sourceColumnNames := make([]string, len(columnNames))
+	for i, column := range columnNames {
+		sourceColumnNames[i] = "source." + column
+	}
+
+	insertLines := make([]string, 0, 3+len(notMatchedFilter))
+	insertLines = append(
+		insertLines,
+		fmt.Sprintf("INSERT INTO %s(%s)", asset.Name, strings.Join(columnNames, ", ")),
+		"SELECT "+strings.Join(sourceColumnNames, ", "),
+		fmt.Sprintf("FROM %s source", insertTable),
+	)
+	statements = append(statements, strings.Join(append(insertLines, notMatchedFilter...), "\n"))
+	statements = append(statements, "COMMIT TRANSACTION")
+
+	return strings.Join(statements, ";\n") + ";", nil
+}
+
 func buildAppendQuery(asset *pipeline.Asset, query string) (string, error) {
+	if err := validateRequirePartitionFilter(asset, asset.Materialization.PartitionBy != ""); err != nil {
+		return "", err
+	}
+
 	return fmt.Sprintf("INSERT INTO %s %s", asset.Name, query), nil
 }
 
@@ -116,6 +334,9 @@ func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) 
 	mat := asset.Materialization
 	if mat.IncrementalKey == "" {
 		return "", fmt.Errorf("materialization strategy %s requires the `incremental_key` field to be set", mat.Strategy)
+	}
+	if err := validateRequirePartitionFilter(asset, mat.PartitionBy != ""); err != nil {
+		return "", err
 	}
 
 	foundCol := asset.GetColumnWithName(mat.IncrementalKey)
@@ -155,6 +376,145 @@ func buildIncrementalQueryWithoutTempVariable(asset *pipeline.Asset, query strin
 	return strings.Join(queries, ";\n") + ";", nil
 }
 
+// ValidateTableOptions reports configuration errors in an asset's `bigquery` block without
+// rendering a query. Linting uses it so that `bruin validate` rejects exactly the configurations
+// that would later fail while materializing the asset.
+func ValidateTableOptions(asset *pipeline.Asset) error {
+	// The block is only applied while creating a table. Other materialization types ignore it,
+	// which assets inheriting `default.bigquery` from pipeline.yml rely on.
+	if asset.BigQuery.IsZero() || asset.Materialization.Type != pipeline.MaterializationTypeTable {
+		return nil
+	}
+
+	_, err := buildTableOptions(asset, assetIsPartitioned(asset))
+	return err
+}
+
+// assetIsPartitioned reports whether materializing the asset produces a partitioned table.
+// SCD2 strategies fall back to partitioning on `DATE(_valid_from)` when partition_by is omitted.
+func assetIsPartitioned(asset *pipeline.Asset) bool {
+	switch asset.Materialization.Strategy {
+	case pipeline.MaterializationStrategySCD2ByTime, pipeline.MaterializationStrategySCD2ByColumn:
+		return true
+	default:
+		return asset.Materialization.PartitionBy != ""
+	}
+}
+
+func validateRequirePartitionFilter(asset *pipeline.Asset, partitioned bool) error {
+	if !requirePartitionFilterEnabled(asset) {
+		return nil
+	}
+	if !partitioned {
+		return errors.New("bigquery.require_partition_filter requires materialization.partition_by to be set")
+	}
+
+	switch asset.Materialization.Strategy {
+	case pipeline.MaterializationStrategySCD2ByTime, pipeline.MaterializationStrategySCD2ByColumn:
+		return errors.Errorf(
+			"bigquery.require_partition_filter is not supported with materialization strategy %s because its incremental query scans all target partitions",
+			asset.Materialization.Strategy,
+		)
+	case pipeline.MaterializationStrategyMerge:
+		return validatePartitionedMerge(asset)
+	case pipeline.MaterializationStrategyDeleteInsert:
+		if !partitionExpressionReferencesColumn(asset.Materialization.PartitionBy, asset.Materialization.IncrementalKey) {
+			return errors.New("bigquery.require_partition_filter with materialization strategy delete+insert requires materialization.partition_by to use materialization.incremental_key")
+		}
+		column := asset.GetColumnWithName(asset.Materialization.IncrementalKey)
+		if column == nil || column.Type == "" || column.Type == "UNKNOWN" {
+			return errors.New("bigquery.require_partition_filter with materialization strategy delete+insert requires the incremental key column type to be set")
+		}
+	case pipeline.MaterializationStrategyTimeInterval:
+		if !partitionExpressionReferencesColumn(asset.Materialization.PartitionBy, asset.Materialization.IncrementalKey) {
+			return errors.New("bigquery.require_partition_filter with materialization strategy time_interval requires materialization.partition_by to use materialization.incremental_key")
+		}
+	default:
+		return nil
+	}
+
+	return nil
+}
+
+func requirePartitionFilterEnabled(asset *pipeline.Asset) bool {
+	return asset.BigQuery.RequirePartitionFilter != nil && *asset.BigQuery.RequirePartitionFilter
+}
+
+func partitionExpressionReferencesColumn(expression, column string) bool {
+	if column == "" {
+		return false
+	}
+
+	candidate := strings.TrimSpace(expression)
+	for {
+		openParen := strings.IndexByte(candidate, '(')
+		if openParen == -1 {
+			break
+		}
+
+		argument := candidate[openParen+1:]
+		depth := 0
+		end := len(argument)
+		for index, char := range argument {
+			switch char {
+			case '(':
+				depth++
+			case ')':
+				if depth == 0 {
+					end = index
+					goto argumentFound
+				}
+				depth--
+			case ',':
+				if depth == 0 {
+					end = index
+					goto argumentFound
+				}
+			}
+		}
+
+	argumentFound:
+		candidate = strings.TrimSpace(argument[:end])
+	}
+
+	candidate = strings.Trim(strings.TrimSpace(candidate), "`")
+	column = strings.Trim(strings.TrimSpace(column), "`")
+	return strings.EqualFold(candidate, column)
+}
+
+func buildTableOptions(asset *pipeline.Asset, partitioned bool) (string, error) {
+	options := make([]string, 0, 2)
+
+	if err := validateRequirePartitionFilter(asset, partitioned); err != nil {
+		return "", err
+	}
+	if asset.BigQuery.RequirePartitionFilter != nil && *asset.BigQuery.RequirePartitionFilter {
+		options = append(options, "require_partition_filter = TRUE")
+	}
+
+	if asset.BigQuery.PartitionExpirationDays != nil {
+		// zero means "do not expire partitions", which is also how an inherited pipeline default is disabled.
+		if expirationDays := *asset.BigQuery.PartitionExpirationDays; expirationDays != 0 {
+			if expirationDays < 0 || math.IsNaN(expirationDays) || math.IsInf(expirationDays, 0) {
+				return "", errors.Errorf("bigquery.partition_expiration_days must be a positive number, got %s", strconv.FormatFloat(expirationDays, 'f', -1, 64))
+			}
+			if !partitioned {
+				return "", errors.New("bigquery.partition_expiration_days requires materialization.partition_by to be set")
+			}
+			if integerRangePartitionRegex.MatchString(asset.Materialization.PartitionBy) {
+				return "", errors.New("bigquery.partition_expiration_days is not supported for integer-range partitioned tables")
+			}
+			options = append(options, "partition_expiration_days = "+strconv.FormatFloat(expirationDays, 'f', -1, 64))
+		}
+	}
+
+	if len(options) == 0 {
+		return "", nil
+	}
+
+	return "OPTIONS (" + strings.Join(options, ", ") + ")", nil
+}
+
 func buildCreateReplaceQuery(asset *pipeline.Asset, query string) (string, error) {
 	mat := asset.Materialization
 	switch asset.Materialization.Strategy {
@@ -173,7 +533,16 @@ func buildCreateReplaceQuery(asset *pipeline.Asset, query string) (string, error
 		if len(mat.ClusterBy) > 0 {
 			clusterByClause = "CLUSTER BY " + strings.Join(mat.ClusterBy, ", ")
 		}
-		return fmt.Sprintf("CREATE OR REPLACE TABLE %s %s %s AS\n%s", asset.Name, partitionClause, clusterByClause, query), nil
+
+		optionsClause, err := buildTableOptions(asset, mat.PartitionBy != "")
+		if err != nil {
+			return "", err
+		}
+		if optionsClause == "" {
+			return fmt.Sprintf("CREATE OR REPLACE TABLE %s %s %s AS\n%s", asset.Name, partitionClause, clusterByClause, query), nil
+		}
+
+		return fmt.Sprintf("CREATE OR REPLACE TABLE %s %s %s %s AS\n%s", asset.Name, partitionClause, clusterByClause, optionsClause, query), nil
 	}
 }
 
@@ -189,6 +558,10 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 	if asset.Materialization.TimeGranularity != pipeline.MaterializationTimeGranularityTimestamp && asset.Materialization.TimeGranularity != pipeline.MaterializationTimeGranularityDate {
 		return "", errors.New("time_granularity must be either 'date', or 'timestamp'")
 	}
+	if err := validateRequirePartitionFilter(asset, asset.Materialization.PartitionBy != ""); err != nil {
+		return "", err
+	}
+
 	startVar := "{{start_timestamp}}"
 	endVar := "{{end_timestamp}}"
 	if asset.Materialization.TimeGranularity == pipeline.MaterializationTimeGranularityDate {
@@ -262,11 +635,23 @@ func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 		q += "\nCLUSTER BY " + strings.Join(asset.Materialization.ClusterBy, ", ")
 	}
 
+	optionsClause, err := buildTableOptions(asset, asset.Materialization.PartitionBy != "")
+	if err != nil {
+		return "", err
+	}
+	if optionsClause != "" {
+		q += "\n" + optionsClause
+	}
+
 	return q, nil
 }
 
 func buildSCD2QueryByTime(asset *pipeline.Asset, query string) (string, error) {
 	query = strings.TrimRight(query, ";")
+
+	if err := validateRequirePartitionFilter(asset, assetIsPartitioned(asset)); err != nil {
+		return "", err
+	}
 
 	if asset.Materialization.IncrementalKey == "" {
 		return "", errors.New("incremental_key is required for SCD2_by_time strategy")
@@ -368,6 +753,10 @@ WHEN NOT MATCHED BY TARGET THEN
 
 func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error) {
 	query = strings.TrimRight(query, ";")
+	if err := validateRequirePartitionFilter(asset, assetIsPartitioned(asset)); err != nil {
+		return "", err
+	}
+
 	var (
 		primaryKeys      = make([]string, 0, 4)
 		compareConds     = make([]string, 0, 12)
@@ -497,10 +886,18 @@ func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query string) (string, er
 		clusterClause = "CLUSTER BY _is_current, " + cluster
 	}
 
+	optionsClause, err := buildTableOptions(asset, assetIsPartitioned(asset))
+	if err != nil {
+		return "", err
+	}
+	if optionsClause != "" {
+		optionsClause = "\n" + optionsClause
+	}
+
 	stmt := fmt.Sprintf(
 		`CREATE OR REPLACE TABLE %s
 %s
-%s AS
+%s%s AS
 SELECT
   CAST (%s AS TIMESTAMP) AS _valid_from,
   src.*,
@@ -512,6 +909,7 @@ FROM (
 		tbl,
 		partitionClause,
 		clusterClause,
+		optionsClause,
 		asset.Materialization.IncrementalKey,
 		strings.TrimSpace(query),
 	)
@@ -543,6 +941,14 @@ func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, 
 		clusterClause = "CLUSTER BY _is_current, " + cluster
 	}
 
+	optionsClause, err := buildTableOptions(asset, assetIsPartitioned(asset))
+	if err != nil {
+		return "", err
+	}
+	if optionsClause != "" {
+		optionsClause = "\n" + optionsClause
+	}
+
 	validFromExpr := "CURRENT_TIMESTAMP()"
 	if asset.Materialization.IncrementalKey != "" {
 		validFromExpr = fmt.Sprintf("CAST (%s AS TIMESTAMP)", asset.Materialization.IncrementalKey)
@@ -551,7 +957,7 @@ func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, 
 	stmt := fmt.Sprintf(
 		`CREATE OR REPLACE TABLE %s
 %s
-%s AS
+%s%s AS
 SELECT
   %s AS _valid_from,
   src.*,
@@ -563,6 +969,7 @@ FROM (
 		tbl,
 		partitionClause,
 		clusterClause,
+		optionsClause,
 		validFromExpr,
 		strings.TrimSpace(query),
 	)

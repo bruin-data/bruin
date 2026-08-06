@@ -1,9 +1,10 @@
 import logging
 from dataclasses import dataclass
-from sqlglot import parse_one, parse, exp, lineage
+
+from sqlglot import exp, lineage, parse, parse_one
 from sqlglot.lineage import Node
 from sqlglot.optimizer import optimize
-from sqlglot.optimizer.scope import find_all_in_scope, build_scope
+from sqlglot.optimizer.scope import build_scope, find_all_in_scope
 
 
 def normalize_sqlglot_dialect(dialect: str | None) -> str | None:
@@ -289,7 +290,7 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
         return {
             "columns": [],
             "non_selected_columns": [],
-            "errors": [f"Parse error: {str(e)}"],
+            "errors": [f"Parse error: {e!s}"],
         }
 
     result = []
@@ -331,10 +332,10 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
                 return {
                     "columns": [],
                     "non_selected_columns": [],
-                    "errors": [f"Schema Error: {str(e)}"],
+                    "errors": [f"Schema Error: {e!s}"],
                 }
     except Exception as e:
-        logging.error(f"Schema error: {str(e)}")
+        logging.error(f"Schema error: {e!s}")
         return {
             "columns": [],
             "non_selected_columns": [],
@@ -344,7 +345,7 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
     try:
         cols = extract_columns(optimized)
     except Exception as e:
-        logging.error(f"Error extracting columns: {str(e)}")
+        logging.error(f"Error extracting columns: {e!s}")
         return {
             "columns": [],
             "non_selected_columns": [],
@@ -419,7 +420,7 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
                 {"name": col["name"], "upstream": cl, "type": col.get("type", "")}
             )
         except Exception as e:
-            logging.error(f"Lineage error for column {col['name']}: {str(e)}")
+            logging.error(f"Lineage error for column {col['name']}: {e!s}")
             continue
 
     result.sort(key=lambda x: x["name"])
@@ -441,7 +442,7 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
                 continue
         non_selected_columns = list(non_selected_columns_dict.values())
     except Exception as e:
-        logging.error(f"Error extracting non-selected columns: {str(e)}")
+        logging.error(f"Error extracting non-selected columns: {e!s}")
 
     # Sort upstreams even if there are errors
     try:
@@ -450,7 +451,7 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
         for col in non_selected_columns:
             col["upstream"] = sorted(col["upstream"], key=lambda x: x["column"].lower())
     except Exception as e:
-        logging.error(f"Error: {str(e)}")
+        logging.error(f"Error: {e!s}")
 
     return {
         "columns": result,
