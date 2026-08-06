@@ -90,7 +90,7 @@ func (s *storageObjectStore) Close() error {
 
 type objectStoreFactory func(ctx context.Context, connectionDetails any) (objectStore, error)
 
-func newObjectStore(ctx context.Context, connectionDetails any) (objectStore, error) {
+func newStorageObjectStore(ctx context.Context, connectionDetails any) (*storageObjectStore, error) {
 	clientOptions, err := storageClientOptions(connectionDetails)
 	if err != nil {
 		return nil, err
@@ -152,7 +152,9 @@ func NewObjectSensor(conn config.ConnectionAndDetailsGetter, sensorMode string) 
 	return &ObjectSensor{
 		connection: conn,
 		sensorMode: sensorMode,
-		newStore:   newObjectStore,
+		newStore: func(ctx context.Context, connectionDetails any) (objectStore, error) {
+			return newStorageObjectStore(ctx, connectionDetails)
+		},
 	}
 }
 
@@ -209,11 +211,12 @@ func (s *ObjectSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, asset 
 
 	for {
 		var found bool
-		if isPrefixSensor {
+		switch {
+		case isPrefixSensor:
 			found, err = store.ObjectWithPrefixExists(ctx, bucket, target)
-		} else if objectpattern.ContainsWildcard(target) {
+		case objectpattern.ContainsWildcard(target):
 			found, err = store.ObjectMatchingPatternExists(ctx, bucket, target)
-		} else {
+		default:
 			found, err = store.ObjectExists(ctx, bucket, target)
 		}
 		if err != nil {
