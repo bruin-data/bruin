@@ -729,6 +729,8 @@ func TestLoadFromFile(t *testing.T) {
 					Password:           "password-123",
 					Token:              "token-123",
 					AccessToken:        "access-token-123",
+					ClientID:           "client-id-123",
+					ClientSecret:       "client-secret-123",
 					Domain:             "mydomain.my.salesforce.com",
 				},
 			},

@@ -1594,6 +1594,8 @@ type SalesforceConnection struct {
 	Password           string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password" sensitive:"true"`
 	Token              string `yaml:"token,omitempty" json:"token,omitempty" mapstructure:"token" sensitive:"true"`
 	AccessToken        string `yaml:"access_token,omitempty" json:"access_token,omitempty" mapstructure:"access_token" sensitive:"true"`
+	ClientID           string `yaml:"client_id,omitempty" json:"client_id,omitempty" mapstructure:"client_id"`
+	ClientSecret       string `yaml:"client_secret,omitempty" json:"client_secret,omitempty" mapstructure:"client_secret" sensitive:"true"`
 	Domain             string `yaml:"domain" json:"domain" mapstructure:"domain"`
 }
 
