@@ -205,6 +205,13 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser sqlpa
 			ApplicableLevels: []Level{LevelAsset},
 		},
 		&SimpleRule{
+			Identifier:       "blocking-relationships-check-references-downstream",
+			Fast:             true,
+			Severity:         ValidatorSeverityWarning,
+			AssetValidator:   WarnBlockingRelationshipsCheckReferencesDownstream,
+			ApplicableLevels: []Level{LevelAsset},
+		},
+		&SimpleRule{
 			Identifier:       "duplicate-tags",
 			Fast:             true,
 			Severity:         ValidatorSeverityCritical,

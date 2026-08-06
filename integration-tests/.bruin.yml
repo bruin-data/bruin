@@ -314,6 +314,18 @@ environments:
         - name: "duckdb-ddl"
           path: "duckdb-files/duckdb-ddl.db"
 
+  env-duckdb-relationships-valid:
+    connections:
+      duckdb:
+        - name: "duckdb-ddl"
+          path: "duckdb-files/duckdb-relationships-valid.db"
+
+  env-duckdb-relationships-orphan:
+    connections:
+      duckdb:
+        - name: "duckdb-ddl"
+          path: "duckdb-files/duckdb-relationships-orphan.db"
+
   env-validate-with-exclude-tag:
     connections:
       duckdb:

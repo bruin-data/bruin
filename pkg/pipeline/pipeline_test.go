@@ -3535,6 +3535,16 @@ func TestAsset_PrefixSchema(t *testing.T) {
 			assert.Equal(t, tt.want, a.Name)
 		})
 	}
+
+	a := &pipeline.Asset{
+		Name: "analytics.orders",
+		Columns: []pipeline.Column{
+			{Name: "customer_id", ForeignKey: &pipeline.ColumnReference{Table: "analytics.customers", Column: "id"}},
+		},
+	}
+	a.PrefixSchema("dev_")
+	assert.Equal(t, "dev_analytics.orders", a.Name)
+	assert.Equal(t, "dev_analytics.customers", a.Columns[0].ForeignKey.Table)
 }
 
 func TestAsset_PrefixUpstreams(t *testing.T) {

@@ -48,6 +48,7 @@ func NewColumnCheckOperator(conn config.ConnectionGetter) *ColumnCheckOperator {
 		checks: map[string]builder[CheckRunner]{
 			"not_null":        func(c *connectionRemapper) CheckRunner { return ansisql.NewNotNullCheck(c) },
 			"unique":          func(c *connectionRemapper) CheckRunner { return ansisql.NewUniqueCheck(c) },
+			"relationships":   func(c *connectionRemapper) CheckRunner { return ansisql.NewRelationshipsCheck(c) },
 			"positive":        func(c *connectionRemapper) CheckRunner { return ansisql.NewPositiveCheck(c) },
 			"non_negative":    func(c *connectionRemapper) CheckRunner { return ansisql.NewNonNegativeCheck(c) },
 			"negative":        func(c *connectionRemapper) CheckRunner { return ansisql.NewNegativeCheck(c) },

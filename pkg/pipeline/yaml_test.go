@@ -507,6 +507,8 @@ columns:
     foreign_key:
       table: customers
       column: id
+    checks:
+      - name: relationships
   - name: amount
     type: numeric
     precision: 10
@@ -523,6 +525,8 @@ columns:
 	require.Nil(t, task.Columns[0].ForeignKey)
 
 	require.Equal(t, &pipeline.ColumnReference{Table: "customers", Column: "id"}, task.Columns[1].ForeignKey)
+	require.Len(t, task.Columns[1].Checks, 1)
+	require.Equal(t, "relationships", task.Columns[1].Checks[0].Name)
 
 	require.Equal(t, 10, *task.Columns[2].Precision)
 	require.Equal(t, 2, *task.Columns[2].Scale)

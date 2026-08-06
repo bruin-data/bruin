@@ -1570,6 +1570,47 @@ func TestIndividualTasks(t *testing.T) {
 			},
 		},
 		{
+			name: "test-relationships-check-duckdb",
+			task: e2e.Task{
+				Name:    "test-relationships-check-duckdb",
+				Command: binary,
+				Args:    []string{"run", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--env", "env-duckdb-relationships-valid", "--variant", "valid", filepath.Join(currentFolder, "test-pipelines/duckdb-relationships-check")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{
+						"Successfully validated 2 assets",
+						"Finished: relationship_test.orders:customer_id:relationships",
+						"bruin run completed",
+					},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "test-relationships-check-duckdb-orphan",
+			task: e2e.Task{
+				Name:    "test-relationships-check-duckdb-orphan",
+				Command: binary,
+				Args:    []string{"run", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--env", "env-duckdb-relationships-orphan", "--variant", "orphan", filepath.Join(currentFolder, "test-pipelines/duckdb-relationships-check")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 1,
+					Contains: []string{
+						"Failed: relationship_test.orders:customer_id:relationships",
+						"column 'customer_id' has 1 rows with values missing from 'relationship_test.customers.id'",
+					},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
 			name: "duckdb-sensor-timeout",
 			task: e2e.Task{
 				Name:    "duckdb-sensor-timeout",

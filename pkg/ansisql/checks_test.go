@@ -113,6 +113,55 @@ func TestUniqueCheck_Check(t *testing.T) {
 	)
 }
 
+func TestRelationshipsCheck_Check(t *testing.T) {
+	t.Parallel()
+
+	runTestsFoCountZeroCheck(
+		t,
+		func(q *mockQuerierWithResult) CheckRunner {
+			conn := new(mockConnectionFetcher)
+			conn.On("GetConnection", "test").Return(q, nil)
+			return &RelationshipsCheck{conn: conn}
+		},
+		"SELECT COUNT(*) FROM dataset.test_asset bruin_relationship_child WHERE bruin_relationship_child.test_column IS NOT NULL AND bruin_relationship_child.test_column NOT IN (SELECT bruin_relationship_parent.id FROM dataset.parent_asset bruin_relationship_parent WHERE bruin_relationship_parent.id IS NOT NULL)",
+		"column 'test_column' has 5 rows with values missing from 'dataset.parent_asset.id'",
+		&pipeline.ColumnCheck{
+			Name: "relationships",
+		},
+	)
+}
+
+func TestRelationshipsCheckRequiresForeignKey(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		foreignKey *pipeline.ColumnReference
+	}{
+		{name: "missing foreign key"},
+		{name: "missing table", foreignKey: &pipeline.ColumnReference{Column: "id"}},
+		{name: "missing column", foreignKey: &pipeline.ColumnReference{Table: "dataset.parent_asset"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			check := &RelationshipsCheck{}
+			instance := &scheduler.ColumnCheckInstance{
+				AssetInstance: &scheduler.AssetInstance{
+					Asset:    &pipeline.Asset{Name: "dataset.test_asset"},
+					Pipeline: &pipeline.Pipeline{Name: "test"},
+				},
+				Column: &pipeline.Column{Name: "test_column", ForeignKey: tt.foreignKey},
+				Check:  &pipeline.ColumnCheck{Name: "relationships"},
+			}
+
+			assert.EqualError(t, check.Check(t.Context(), instance), "relationships check on column 'test_column' requires foreign_key.table and foreign_key.column")
+		})
+	}
+}
+
 func runTestsFoCountZeroCheck(t *testing.T, instanceBuilder func(q *mockQuerierWithResult) CheckRunner, expectedQueryString string, expectedErrorMessage string, checkInstance *pipeline.ColumnCheck) {
 	expectedQuery := &query.Query{Query: expectedQueryString}
 	setupFunc := func(val [][]interface{}, err error) func(n *mockQuerierWithResult) {
@@ -194,6 +243,12 @@ func runTestsFoCountZeroCheck(t *testing.T, instanceBuilder func(q *mockQuerierW
 				},
 				Column: &pipeline.Column{
 					Name: "test_column",
+					ForeignKey: func() *pipeline.ColumnReference {
+						if checkInstance.Name == "relationships" {
+							return &pipeline.ColumnReference{Table: "dataset.parent_asset", Column: "id"}
+						}
+						return nil
+					}(),
 					Checks: []pipeline.ColumnCheck{
 						{
 							Name: "not_null",

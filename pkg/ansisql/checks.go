@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/helpers"
@@ -152,6 +153,52 @@ func (c *UniqueCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstan
 		checkName:     "unique",
 		customError: func(count int64) error {
 			return errors.Errorf("column '%s' has %d non-unique values", ti.Column.Name, count)
+		},
+	}).Check(ctx, ti)
+}
+
+// RelationshipsCheck verifies that every non-null value in a child column
+// exists in the column referenced by its foreign_key metadata. A non-correlated
+// NOT IN subquery works across all supported SQL dialects, including ClickHouse
+// versions from before correlated subqueries were supported. Nulls are removed
+// from both sides to make NOT IN null-safe. The query deliberately counts child
+// rows, matching dbt's relationships test semantics.
+type RelationshipsCheck struct {
+	conn config.ConnectionGetter
+}
+
+func NewRelationshipsCheck(conn config.ConnectionGetter) *RelationshipsCheck {
+	return &RelationshipsCheck{conn: conn}
+}
+
+func (c *RelationshipsCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
+	foreignKey := ti.Column.ForeignKey
+	if foreignKey == nil || strings.TrimSpace(foreignKey.Table) == "" || strings.TrimSpace(foreignKey.Column) == "" {
+		return errors.Errorf("relationships check on column '%s' requires foreign_key.table and foreign_key.column", ti.Column.Name)
+	}
+
+	qq := fmt.Sprintf(
+		"SELECT COUNT(*) FROM %s bruin_relationship_child WHERE bruin_relationship_child.%s IS NOT NULL AND bruin_relationship_child.%s NOT IN (SELECT bruin_relationship_parent.%s FROM %s bruin_relationship_parent WHERE bruin_relationship_parent.%s IS NOT NULL)",
+		ti.GetAsset().Name,
+		ti.Column.Name,
+		ti.Column.Name,
+		foreignKey.Column,
+		foreignKey.Table,
+		foreignKey.Column,
+	)
+
+	return (&CountableQueryCheck{
+		conn:          c.conn,
+		queryInstance: &query.Query{Query: qq},
+		checkName:     "relationships",
+		customError: func(count int64) error {
+			return errors.Errorf(
+				"column '%s' has %d rows with values missing from '%s.%s'",
+				ti.Column.Name,
+				count,
+				foreignKey.Table,
+				foreignKey.Column,
+			)
 		},
 	}).Check(ctx, ti)
 }
