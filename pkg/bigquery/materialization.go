@@ -131,7 +131,12 @@ func mergeMaterializer(asset *pipeline.Asset, query string) (string, error) {
 		fmt.Sprintf("WHEN NOT MATCHED THEN INSERT(%s) VALUES(%s)", allColumnValues, allColumnValues),
 	}
 
-	return buildCreateTableIfNotExistsQuery(asset, query) + ";\n" + strings.Join(mergeLines, "\n") + ";", nil
+	bootstrapQuery, err := buildCreateTableIfNotExistsQuery(asset, query)
+	if err != nil {
+		return "", err
+	}
+
+	return bootstrapQuery + ";\n" + strings.Join(mergeLines, "\n") + ";", nil
 }
 
 type mergePartitionExpression struct {
@@ -255,10 +260,14 @@ func buildPartitionedMergeQuery(
 	targetPartitionFilter := fmt.Sprintf("%s IN UNNEST(%s)", targetPartitionExpression, partitionVariable)
 	filteredMatchConditions := append([]string{targetPartitionFilter}, matchConditions...)
 	filteredMatchQuery := strings.Join(filteredMatchConditions, " AND ")
+	bootstrapQuery, err := buildCreateTableIfNotExistsQuery(asset, query)
+	if err != nil {
+		return "", err
+	}
 
 	statements := []string{
 		fmt.Sprintf("DECLARE %s ARRAY<%s>", partitionVariable, partition.dataType),
-		buildCreateTableIfNotExistsQuery(asset, query),
+		bootstrapQuery,
 		"BEGIN TRANSACTION",
 		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", sourceTable, strings.TrimSuffix(query, ";")),
 		fmt.Sprintf(
@@ -347,11 +356,15 @@ func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) 
 
 	randPrefix := helpers.PrefixGenerator()
 	tempTableName := "__bruin_tmp_" + randPrefix
+	bootstrapQuery, err := buildCreateTableIfNotExistsQuery(asset, query)
+	if err != nil {
+		return "", err
+	}
 
 	declaredVarName := "distinct_keys_" + randPrefix
 	queries := []string{
 		fmt.Sprintf("DECLARE %s array<%s>", declaredVarName, foundCol.Type),
-		buildCreateTableIfNotExistsQuery(asset, query),
+		bootstrapQuery,
 		"BEGIN TRANSACTION",
 		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, strings.TrimSuffix(query, ";")),
 		fmt.Sprintf("SET %s = (SELECT array_agg(distinct %s) FROM %s)", declaredVarName, mat.IncrementalKey, tempTableName),
@@ -366,9 +379,13 @@ func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) 
 func buildIncrementalQueryWithoutTempVariable(asset *pipeline.Asset, query string) (string, error) {
 	mat := asset.Materialization
 	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
+	bootstrapQuery, err := buildCreateTableIfNotExistsQuery(asset, query)
+	if err != nil {
+		return "", err
+	}
 
 	queries := []string{
-		buildCreateTableIfNotExistsQuery(asset, query),
+		bootstrapQuery,
 		"BEGIN TRANSACTION",
 		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, strings.TrimSuffix(query, ";")),
 		fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", asset.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
@@ -549,16 +566,23 @@ func buildCreateReplaceQuery(asset *pipeline.Asset, query string) (string, error
 	}
 }
 
-func buildCreateTableIfNotExistsQuery(asset *pipeline.Asset, query string) string {
-	options := make([]string, 0, 2)
+func buildCreateTableIfNotExistsQuery(asset *pipeline.Asset, query string) (string, error) {
+	options := make([]string, 0, 3)
 	if asset.Materialization.PartitionBy != "" {
 		options = append(options, "PARTITION BY "+asset.Materialization.PartitionBy)
 	}
 	if len(asset.Materialization.ClusterBy) > 0 {
 		options = append(options, "CLUSTER BY "+strings.Join(asset.Materialization.ClusterBy, ", "))
 	}
+	tableOptions, err := buildTableOptions(asset, asset.Materialization.PartitionBy != "")
+	if err != nil {
+		return "", err
+	}
+	if tableOptions != "" {
+		options = append(options, tableOptions)
+	}
 
-	return ansisql.BuildCreateTableIfNotExistsAsQuery(asset.Name, strings.Join(options, " "), query)
+	return ansisql.BuildCreateTableIfNotExistsAsQuery(asset.Name, strings.Join(options, " "), query), nil
 }
 
 func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error) {
@@ -583,9 +607,13 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 		startVar = "{{start_date}}"
 		endVar = "{{end_date}}"
 	}
+	bootstrapQuery, err := buildCreateTableIfNotExistsQuery(asset, query)
+	if err != nil {
+		return "", err
+	}
 
 	queries := []string{
-		buildCreateTableIfNotExistsQuery(asset, query),
+		bootstrapQuery,
 		"BEGIN TRANSACTION",
 		fmt.Sprintf(`DELETE FROM %s WHERE %s BETWEEN '%s' AND '%s'`,
 			asset.Name,
