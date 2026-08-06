@@ -85,6 +85,8 @@ The **New run** button (top right) triggers a manual run. Options:
 - Add **notes** and **tags**. They show up in the activity log.
 - Run a single interval, or create multiple jobs across intervals.
 
+Any [interval modifiers](/assets/interval-modifiers) defined on your assets are applied automatically, for both scheduled and manual runs. There is no flag or toggle for it in Cloud — the CLI equivalent is `bruin run --apply-interval-modifiers`.
+
 #### Backfills
 
 - **Auto-split by schedule:** one job per scheduled interval. A 23-day range on a daily schedule produces 23 jobs.
