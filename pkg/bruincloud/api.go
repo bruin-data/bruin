@@ -26,7 +26,14 @@ const (
 type APIClient struct {
 	baseURL    string
 	apiKey     string
+	team       string
 	httpClient *http.Client
+}
+
+// SetTeam makes requests act on the given team (company prefix) via the
+// X-Bruin-Team header, instead of the token owner's current team.
+func (c *APIClient) SetTeam(team string) {
+	c.team = team
 }
 
 // NewAPIClient creates a new API client with the given API key.
@@ -84,6 +91,9 @@ func (c *APIClient) doRequest(ctx context.Context, method, path string, body any
 
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
 	req.Header.Set("Accept", "application/json")
+	if c.team != "" {
+		req.Header.Set("X-Bruin-Team", c.team)
+	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -117,6 +127,18 @@ func (c *APIClient) doRequest(ctx context.Context, method, path string, body any
 	}
 
 	return nil
+}
+
+// --- Teams ---
+
+// ListTeams returns the teams the token can act on. Unlike the other endpoints
+// it needs no --team: it's how you discover the company_prefixes to pass there.
+func (c *APIClient) ListTeams(ctx context.Context) ([]Team, error) {
+	var resp struct {
+		Teams []Team `json:"teams"`
+	}
+	err := c.doRequest(ctx, http.MethodGet, "/teams", nil, &resp)
+	return resp.Teams, err
 }
 
 // --- Projects ---
@@ -242,8 +264,22 @@ func encodeRunNote(note string, tags []string) string {
 	return string(b)
 }
 
+// TriggerRunResult holds the response from the trigger endpoint. A normal run
+// returns RunID; a backfill (triggered with a split) returns MultipleActionID
+// and a URL to track the backfill in the dashboard.
+type TriggerRunResult struct {
+	Message          string `json:"message"`
+	Project          string `json:"project"`
+	Pipeline         string `json:"pipeline"`
+	RunID            string `json:"run_id"`
+	MultipleActionID string `json:"multiple_action_id"`
+	Split            string `json:"split"`
+	ChunkSize        int    `json:"chunk_size"`
+	URL              string `json:"url"`
+}
+
 // TriggerRun triggers a pipeline run for the given date range.
-func (c *APIClient) TriggerRun(ctx context.Context, project, pipeline, startDate, endDate string, opts TriggerRunOptions) error {
+func (c *APIClient) TriggerRun(ctx context.Context, project, pipeline, startDate, endDate string, opts TriggerRunOptions) (*TriggerRunResult, error) {
 	body := map[string]any{
 		"project":    project,
 		"pipeline":   pipeline,
@@ -273,7 +309,11 @@ func (c *APIClient) TriggerRun(ctx context.Context, project, pipeline, startDate
 	if note := encodeRunNote(opts.Note, opts.Tags); note != "" {
 		body["note"] = note
 	}
-	return c.doRequest(ctx, http.MethodPost, "/trigger-pipeline-run", body, nil)
+	var result TriggerRunResult
+	if err := c.doRequest(ctx, http.MethodPost, "/trigger-pipeline-run", body, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
 }
 
 func (c *APIClient) RerunRun(ctx context.Context, project, pipeline, runID string, onlyFailed bool) error {
@@ -313,6 +353,47 @@ func (c *APIClient) GetLatestRun(ctx context.Context, project, pipeline string) 
 		return nil, fmt.Errorf("no runs found for pipeline '%s' in project '%s'", pipeline, project)
 	}
 	return &runs[0], nil
+}
+
+// --- Backfills ---
+
+// ListBackfills returns the most recent backfills, optionally filtered by project and pipeline.
+func (c *APIClient) ListBackfills(ctx context.Context, project, pipeline string, limit int) ([]Backfill, error) {
+	params := url.Values{}
+	if project != "" {
+		params.Set("project", project)
+	}
+	if pipeline != "" {
+		params.Set("pipeline", pipeline)
+	}
+	if limit > 0 {
+		params.Set("limit", strconv.Itoa(limit))
+	}
+	path := "/backfills"
+	if enc := params.Encode(); enc != "" {
+		path += "?" + enc
+	}
+	var backfills []Backfill
+	err := c.doRequest(ctx, http.MethodGet, path, nil, &backfills)
+	return backfills, err
+}
+
+// GetBackfillRuns returns the individual runs that make up a single backfill.
+func (c *APIClient) GetBackfillRuns(ctx context.Context, multipleActionID string, limit, offset int) ([]BackfillRun, error) {
+	params := url.Values{}
+	if limit > 0 {
+		params.Set("limit", strconv.Itoa(limit))
+	}
+	if offset > 0 {
+		params.Set("offset", strconv.Itoa(offset))
+	}
+	path := "/backfills/" + url.PathEscape(multipleActionID) + "/runs"
+	if enc := params.Encode(); enc != "" {
+		path += "?" + enc
+	}
+	var runs []BackfillRun
+	err := c.doRequest(ctx, http.MethodGet, path, nil, &runs)
+	return runs, err
 }
 
 // --- Assets ---
@@ -419,6 +500,30 @@ func (c *APIClient) ListAgents(ctx context.Context) ([]Agent, error) {
 	return resp.Agents, err
 }
 
+// ListAgentConnections returns the connection names and types available to the
+// agent (from its dev-env secret) — names/types only, never credentials. Use it
+// to pick a connection the agent can actually query.
+func (c *APIClient) ListAgentConnections(ctx context.Context, agentID int) ([]AgentConnection, error) {
+	var resp struct {
+		Connections []AgentConnection `json:"connections"`
+	}
+	err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/agents/%d/connections", agentID), nil, &resp)
+	return resp.Connections, err
+}
+
+// AddAgentConnection adds a connection (type + name + config) to the agent's
+// connection set and returns the resulting connections — names/types only,
+// never credentials. The config carries the credential values and is sent to
+// the server, not logged.
+func (c *APIClient) AddAgentConnection(ctx context.Context, agentID int, connType, name string, config map[string]any) ([]AgentConnection, error) {
+	body := map[string]any{"type": connType, "name": name, "config": config}
+	var resp struct {
+		Connections []AgentConnection `json:"connections"`
+	}
+	err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/agents/%d/connections", agentID), body, &resp)
+	return resp.Connections, err
+}
+
 // CreateAgent creates a new agent. Optional fields are omitted when empty so the
 // server applies its defaults (null description/prompt, "team" visibility).
 func (c *APIClient) CreateAgent(ctx context.Context, name, description, systemPrompt, visibility string) (*Agent, error) {
@@ -460,6 +565,23 @@ func (c *APIClient) UpdateAgent(ctx context.Context, agentID int, fields map[str
 		return nil, err
 	}
 	return &result, nil
+}
+
+// ListAgentMcpServers returns the agent's current external MCP server picks
+// along with the supported kinds and the connections eligible for each.
+func (c *APIClient) ListAgentMcpServers(ctx context.Context, agentID int) (*AgentMcpServersResponse, error) {
+	var result AgentMcpServersResponse
+	err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/agents/%d/mcp-servers", agentID), nil, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// SetAgentMcpServers replaces the agent's external MCP picks with the given set.
+// This is a full replace: any kind not in servers is detached.
+func (c *APIClient) SetAgentMcpServers(ctx context.Context, agentID int, servers []AgentMcpServer) (*Agent, error) {
+	return c.UpdateAgent(ctx, agentID, map[string]any{"mcp_integrations": servers})
 }
 
 func (c *APIClient) SendAgentMessage(ctx context.Context, agentID int, message string, threadID *int) (json.RawMessage, error) {
@@ -585,10 +707,15 @@ func (c *APIClient) GetDashboard(ctx context.Context, dashboardID int) (*Dashboa
 // CreateDashboard creates a dashboard from a definition. The server writes the
 // definition to the draft only (never published). Empty optional fields are
 // omitted so the server applies its defaults.
-func (c *APIClient) CreateDashboard(ctx context.Context, title, visibility string, state map[string]any) (*Dashboard, error) {
+func (c *APIClient) CreateDashboard(ctx context.Context, title, visibility string, agentID int, state map[string]any) (*Dashboard, error) {
 	body := map[string]any{"title": title}
 	if visibility != "" {
 		body["visibility"] = visibility
+	}
+	// Bind the dashboard to an agent so canvas chat and refresh work; omit to let
+	// the server fall back to the agent encoded in a Cloud-CLI token.
+	if agentID > 0 {
+		body["agent_id"] = agentID
 	}
 	if state != nil {
 		body["state"] = state
@@ -652,4 +779,101 @@ func (c *APIClient) UpdateScheduledAgent(ctx context.Context, scheduledAgentID i
 		return nil, err
 	}
 	return &result, nil
+}
+
+// --- Scheduled agent run state ---
+
+// ListRunStates returns the run-state ("memory") files persisted on a scheduled
+// agent. Each is a markdown file the agent carries across runs, keyed by name.
+func (c *APIClient) ListRunStates(ctx context.Context, scheduledAgentID int) ([]RunState, error) {
+	var resp struct {
+		RunStates []RunState `json:"run_states"`
+	}
+	err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/scheduled-agents/%d/run-states", scheduledAgentID), nil, &resp)
+	return resp.RunStates, err
+}
+
+// GetRunState returns a single run-state file by name.
+func (c *APIClient) GetRunState(ctx context.Context, scheduledAgentID int, name string) (*RunState, error) {
+	var result RunState
+	err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/scheduled-agents/%d/run-states/%s", scheduledAgentID, url.PathEscape(name)), nil, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// SetRunState creates or replaces a run-state file (the server upserts on name).
+func (c *APIClient) SetRunState(ctx context.Context, scheduledAgentID int, name, content string) (*RunState, error) {
+	var result RunState
+	body := map[string]any{"content": content}
+	err := c.doRequest(ctx, http.MethodPut, fmt.Sprintf("/scheduled-agents/%d/run-states/%s", scheduledAgentID, url.PathEscape(name)), body, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// DeleteRunState removes a run-state file by name.
+func (c *APIClient) DeleteRunState(ctx context.Context, scheduledAgentID int, name string) error {
+	return c.doRequest(ctx, http.MethodDelete, fmt.Sprintf("/scheduled-agents/%d/run-states/%s", scheduledAgentID, url.PathEscape(name)), nil, nil)
+}
+
+// --- Audit logs ---
+
+// ListAuditLogs returns a page of the team's audit trail, most recent first.
+// The endpoint is read-only and accepts only a personal (user-scoped) token.
+func (c *APIClient) ListAuditLogs(ctx context.Context, opts AuditLogListOptions) ([]AuditLog, error) {
+	params := url.Values{}
+	for _, t := range opts.Types {
+		params.Add("types[]", t)
+	}
+	for _, id := range opts.UserIDs {
+		params.Add("userIds[]", id)
+	}
+	if opts.StartDate != "" {
+		params.Set("startDate", opts.StartDate)
+	}
+	if opts.EndDate != "" {
+		params.Set("endDate", opts.EndDate)
+	}
+	if opts.Limit > 0 {
+		params.Set("limit", strconv.Itoa(opts.Limit))
+	}
+	if opts.Offset > 0 {
+		params.Set("offset", strconv.Itoa(opts.Offset))
+	}
+
+	path := "/audit-logs"
+	if encoded := params.Encode(); encoded != "" {
+		path += "?" + encoded
+	}
+
+	var resp struct {
+		AuditLogs []AuditLog `json:"auditLogs"`
+	}
+	err := c.doRequest(ctx, http.MethodGet, path, nil, &resp)
+	return resp.AuditLogs, err
+}
+
+// GetCostExplorerSchema lists the dimensions, filter fields, and time buckets the cost explorer supports.
+func (c *APIClient) GetCostExplorerSchema(ctx context.Context, platform string) (*CostExplorerSchema, error) {
+	params := url.Values{}
+	if platform != "" {
+		params.Set("platform", platform)
+	}
+	path := "/cost-explorer/schema"
+	if enc := params.Encode(); enc != "" {
+		path += "?" + enc
+	}
+	var schema CostExplorerSchema
+	err := c.doRequest(ctx, http.MethodGet, path, nil, &schema)
+	return &schema, err
+}
+
+// GetCostExplorer returns a page of warehouse cost breakdown rows.
+func (c *APIClient) GetCostExplorer(ctx context.Context, req CostExplorerRequest) (*CostExplorerResponse, error) {
+	var resp CostExplorerResponse
+	err := c.doRequest(ctx, http.MethodPost, "/cost-explorer", req, &resp)
+	return &resp, err
 }

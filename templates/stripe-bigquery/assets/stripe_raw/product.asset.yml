@@ -1,0 +1,7 @@
+name: stripe_raw.product
+type: ingestr
+
+description: Raw-layer ingestion of Stripe product data into BigQuery.
+
+parameters:
+  source_table: product

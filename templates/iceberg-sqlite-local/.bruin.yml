@@ -1,0 +1,14 @@
+default_environment: default
+environments:
+  default:
+    connections:
+      frankfurter:
+        - name: "frankfurter-default"
+      iceberg:
+        - name: "iceberg-default"
+          catalog:
+            type: sqlite
+            path: "catalog.db"          # relative to this file
+          storage:
+            type: local
+            path: "warehouse"           # relative to this file

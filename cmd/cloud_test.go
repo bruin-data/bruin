@@ -4,9 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"sync"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/bruincloud"
+	"github.com/fatih/color"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
@@ -143,15 +149,18 @@ func TestCloudCommand_Help(t *testing.T) {
 	cmd := Cloud(&isDebug)
 	require.NotNil(t, cmd)
 	assert.Equal(t, "cloud", cmd.Name)
-	assert.Len(t, cmd.Commands, 10)
+	assert.Len(t, cmd.Commands, 14)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
 		subNames[i] = sub.Name
 	}
+	assert.Contains(t, subNames, "teams")
+	assert.Contains(t, subNames, "cost")
 	assert.Contains(t, subNames, "projects")
 	assert.Contains(t, subNames, "pipelines")
 	assert.Contains(t, subNames, "runs")
+	assert.Contains(t, subNames, "backfills")
 	assert.Contains(t, subNames, "assets")
 	assert.Contains(t, subNames, "instances")
 	assert.Contains(t, subNames, "glossary")
@@ -159,6 +168,39 @@ func TestCloudCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "connections")
 	assert.Contains(t, subNames, "dashboards")
 	assert.Contains(t, subNames, "scheduled-agents")
+	assert.Contains(t, subNames, "audit-logs")
+}
+
+func TestCloudLeafCommandsHaveTeamFlag(t *testing.T) {
+	t.Parallel()
+	isDebug := false
+
+	checked := 0
+	var walk func(*cli.Command)
+	walk = func(c *cli.Command) {
+		for _, sub := range c.Commands {
+			// Every runnable command (a leaf, or a parent like "agents
+			// connections" that has its own action) must carry --team.
+			if sub.Action != nil || len(sub.Commands) == 0 {
+				has := false
+				for _, f := range sub.Flags {
+					for _, n := range f.Names() {
+						if n == "team" {
+							has = true
+						}
+					}
+				}
+				assert.Truef(t, has, "cloud command %q should have --team", sub.Name)
+				checked++
+			}
+			if len(sub.Commands) > 0 {
+				walk(sub)
+			}
+		}
+	}
+	walk(Cloud(&isDebug))
+
+	assert.Positive(t, checked)
 }
 
 func TestCloudProjectsCommand_Help(t *testing.T) {
@@ -192,6 +234,53 @@ func TestCloudRunsCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "diagnose")
 }
 
+func TestCloudRunsTriggerCommand_OutputsCreatedRunID(t *testing.T) { //nolint:paralleltest // redirects global output
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/trigger-pipeline-run", r.URL.Path)
+		assert.Equal(t, http.MethodPost, r.Method)
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{
+			"message": "Run triggered successfully",
+			"project": "proj",
+			"pipeline": "pipe",
+			"run_id": "run-123"
+		}`))
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
+
+	originalStdout := os.Stdout
+	originalColorOutput := color.Output
+	reader, writer, err := os.Pipe()
+	require.NoError(t, err)
+	os.Stdout = writer
+	color.Output = writer
+	t.Cleanup(func() {
+		os.Stdout = originalStdout
+		color.Output = originalColorOutput
+		_ = reader.Close()
+		_ = writer.Close()
+	})
+
+	cmd := cloudRunsTrigger()
+	err = cmd.Run(t.Context(), []string{
+		"trigger",
+		"--api-key", "test-key",
+		"--project-id", "proj",
+		"--pipeline", "pipe",
+		"--start-date", "2026-01-01",
+		"--end-date", "2026-01-02",
+	})
+	require.NoError(t, err)
+	os.Stdout = originalStdout
+	color.Output = originalColorOutput
+	require.NoError(t, writer.Close())
+
+	output, err := io.ReadAll(reader)
+	require.NoError(t, err)
+	assert.Contains(t, string(output), "Successfully triggered run 'run-123' for pipeline 'pipe' in project 'proj'")
+}
+
 func TestCloudAssetsCommand_Help(t *testing.T) {
 	t.Parallel()
 	cmd := CloudAssets()
@@ -221,7 +310,14 @@ func TestCloudAgentsCommand_Help(t *testing.T) {
 	cmd := CloudAgents()
 	require.NotNil(t, cmd)
 	assert.Equal(t, "agents", cmd.Name)
-	require.Len(t, cmd.Commands, 10)
+	require.Len(t, cmd.Commands, 12)
+
+	subNames := make([]string, len(cmd.Commands))
+	for i, sub := range cmd.Commands {
+		subNames[i] = sub.Name
+	}
+	assert.Contains(t, subNames, "connections")
+	assert.Contains(t, subNames, "mcp")
 }
 
 func TestCloudDashboardsCommand_Help(t *testing.T) {
@@ -241,12 +337,122 @@ func TestCloudDashboardsCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "update")
 }
 
+// cliRunMu serializes cli.Command.Run: urfave/cli's ensureHelp resets the
+// package-level cli.HelpFlag on every run, so concurrent runs race on it.
+var cliRunMu sync.Mutex
+
+func runCLI(ctx context.Context, cmd *cli.Command, args []string) error {
+	cliRunMu.Lock()
+	defer cliRunMu.Unlock()
+
+	return cmd.Run(ctx, args)
+}
+
+func TestCloudDashboardsCreate_RejectsNonPositiveAgentID(t *testing.T) {
+	t.Parallel()
+	// An explicit non-positive --agent-id must fail fast (before any request)
+	// rather than being silently dropped into the token-agent fallback. The
+	// command signals failure via a non-zero exit code, so capture it through
+	// the exit handler instead of Run's return value.
+	for _, v := range []string{"0", "-3"} {
+		cmd := cloudDashboardsCreate()
+		exitCode := 0
+		cmd.ExitErrHandler = func(_ context.Context, _ *cli.Command, err error) {
+			var ec cli.ExitCoder
+			if errors.As(err, &ec) {
+				exitCode = ec.ExitCode()
+			}
+		}
+		_ = runCLI(t.Context(), cmd, []string{"create", "--title", "T", "--api-key", "k", "--agent-id", v})
+		assert.Equalf(t, 1, exitCode, "agent-id %q should be rejected", v)
+	}
+}
+
+func TestCloudAgentsConnections_RejectsNonPositiveAgentID(t *testing.T) {
+	t.Parallel()
+	// An explicit non-positive --agent-id must fail locally, not become a bad
+	// API request with a generic remote error.
+	for _, v := range []string{"0", "-3"} {
+		cmd := cloudAgentsConnections()
+		exitCode := 0
+		cmd.ExitErrHandler = func(_ context.Context, _ *cli.Command, err error) {
+			var ec cli.ExitCoder
+			if errors.As(err, &ec) {
+				exitCode = ec.ExitCode()
+			}
+		}
+		_ = runCLI(t.Context(), cmd, []string{"connections", "--api-key", "k", "--agent-id", v})
+		assert.Equalf(t, 1, exitCode, "agent-id %q should be rejected", v)
+	}
+}
+
+func TestCloudAgentsMcp_RejectsNonPositiveAgentID(t *testing.T) {
+	t.Parallel()
+	// Each mcp subcommand must reject a non-positive --agent-id locally rather
+	// than sending a bad request. Required flags are supplied so parsing reaches
+	// the Action guard.
+	cases := []struct {
+		name string
+		cmd  func() *cli.Command
+		args []string
+	}{
+		{"list", cloudAgentsMcpList, []string{"list", "--api-key", "k"}},
+		{"set", cloudAgentsMcpSet, []string{"set", "--api-key", "k", "--kind", "linear", "--connection", "c"}},
+		{"remove", cloudAgentsMcpRemove, []string{"remove", "--api-key", "k", "--kind", "linear"}},
+	}
+	for _, tc := range cases {
+		for _, v := range []string{"0", "-3"} {
+			cmd := tc.cmd()
+			exitCode := 0
+			cmd.ExitErrHandler = func(_ context.Context, _ *cli.Command, err error) {
+				var ec cli.ExitCoder
+				if errors.As(err, &ec) {
+					exitCode = ec.ExitCode()
+				}
+			}
+			_ = runCLI(t.Context(), cmd, append(tc.args, "--agent-id", v))
+			assert.Equalf(t, 1, exitCode, "%s: agent-id %q should be rejected", tc.name, v)
+		}
+	}
+}
+
+func TestCloudAgentsConnectionsAdd_RejectsNonPositiveAgentID(t *testing.T) {
+	t.Parallel()
+	for _, v := range []string{"0", "-3"} {
+		cmd := cloudAgentsConnectionsAdd()
+		exitCode := 0
+		cmd.ExitErrHandler = func(_ context.Context, _ *cli.Command, err error) {
+			var ec cli.ExitCoder
+			if errors.As(err, &ec) {
+				exitCode = ec.ExitCode()
+			}
+		}
+		_ = runCLI(t.Context(), cmd, []string{"add", "--api-key", "k", "--agent-id", v})
+		assert.Equalf(t, 1, exitCode, "agent-id %q should be rejected", v)
+	}
+}
+
+func TestCloudAgentsConnectionsAdd_RequiresName(t *testing.T) {
+	t.Parallel()
+	// A positive agent-id but no --name must fail locally before any API call.
+	cmd := cloudAgentsConnectionsAdd()
+	exitCode := 0
+	cmd.ExitErrHandler = func(_ context.Context, _ *cli.Command, err error) {
+		var ec cli.ExitCoder
+		if errors.As(err, &ec) {
+			exitCode = ec.ExitCode()
+		}
+	}
+	_ = runCLI(t.Context(), cmd, []string{"add", "--api-key", "k", "--agent-id", "7"})
+	assert.Equal(t, 1, exitCode)
+}
+
 func TestCloudScheduledAgentsCommand_Help(t *testing.T) {
 	t.Parallel()
 	cmd := CloudScheduledAgents()
 	require.NotNil(t, cmd)
 	assert.Equal(t, "scheduled-agents", cmd.Name)
-	require.Len(t, cmd.Commands, 4)
+	require.Len(t, cmd.Commands, 5)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
@@ -256,6 +462,24 @@ func TestCloudScheduledAgentsCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "get")
 	assert.Contains(t, subNames, "create")
 	assert.Contains(t, subNames, "update")
+	assert.Contains(t, subNames, "run-states")
+}
+
+func TestCloudScheduledAgentsRunStatesCommand_Help(t *testing.T) {
+	t.Parallel()
+	cmd := cloudScheduledAgentsRunStates()
+	require.NotNil(t, cmd)
+	assert.Equal(t, "run-states", cmd.Name)
+	require.Len(t, cmd.Commands, 4)
+
+	subNames := make([]string, len(cmd.Commands))
+	for i, sub := range cmd.Commands {
+		subNames[i] = sub.Name
+	}
+	assert.Contains(t, subNames, "list")
+	assert.Contains(t, subNames, "get")
+	assert.Contains(t, subNames, "set")
+	assert.Contains(t, subNames, "delete")
 }
 
 func TestMessagePairIDFromEnv(t *testing.T) {
@@ -510,5 +734,92 @@ func TestParseRunVariables(t *testing.T) {
 		_, err := parseRunVariables([]string{"env=prod"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid variable override")
+	})
+}
+
+func TestParseCostFilters(t *testing.T) {
+	t.Parallel()
+
+	t.Run("eq and repeated in merge by field", func(t *testing.T) {
+		t.Parallel()
+		// urfave splits on commas, so `in` values arrive as repeated --filter flags.
+		filters, err := parseCostFilters([]string{"user_email:eq:a@b.com", "pipeline_id:in:x", "pipeline_id:in:y"})
+		require.NoError(t, err)
+		require.Len(t, filters, 2)
+		assert.Equal(t, bruincloud.CostFilter{Field: "user_email", Op: "eq", Value: "a@b.com"}, filters[0])
+		assert.Equal(t, bruincloud.CostFilter{Field: "pipeline_id", Op: "in", Value: []string{"x", "y"}}, filters[1])
+	})
+
+	t.Run("bare token is rejected", func(t *testing.T) {
+		t.Parallel()
+		_, err := parseCostFilters([]string{"pipeline_id:in:a", "b"})
+		require.Error(t, err)
+	})
+
+	t.Run("empty", func(t *testing.T) {
+		t.Parallel()
+		filters, err := parseCostFilters(nil)
+		require.NoError(t, err)
+		assert.Empty(t, filters)
+	})
+
+	t.Run("malformed", func(t *testing.T) {
+		t.Parallel()
+		_, err := parseCostFilters([]string{"pipeline_id=x"})
+		require.Error(t, err)
+	})
+}
+
+func TestFormatCostCell(t *testing.T) {
+	t.Parallel()
+	assert.Empty(t, formatCostCell(nil))
+	assert.Equal(t, "daily-etl", formatCostCell("daily-etl"))
+	assert.Equal(t, "74123", formatCostCell(float64(74123)))
+	assert.JSONEq(t, `{"pipeline_id":"p"}`, formatCostCell(map[string]any{"pipeline_id": "p"}))
+}
+
+func TestUpsertMcpServer(t *testing.T) {
+	t.Parallel()
+
+	t.Run("appends a new kind", func(t *testing.T) {
+		t.Parallel()
+		out := upsertMcpServer([]bruincloud.AgentMcpServer{{Kind: "linear", ConnectionName: "a"}}, "github", "b")
+		require.Len(t, out, 2)
+		assert.Equal(t, "linear", out[0].Kind)
+		assert.Equal(t, "github", out[1].Kind)
+		assert.Equal(t, "b", out[1].ConnectionName)
+	})
+
+	t.Run("updates an existing kind in place", func(t *testing.T) {
+		t.Parallel()
+		out := upsertMcpServer([]bruincloud.AgentMcpServer{
+			{Kind: "linear", ConnectionName: "old"},
+			{Kind: "github", ConnectionName: "gh"},
+		}, "linear", "new")
+		require.Len(t, out, 2)
+		assert.Equal(t, "new", out[0].ConnectionName)
+		assert.Equal(t, "gh", out[1].ConnectionName)
+	})
+}
+
+func TestRemoveMcpServer(t *testing.T) {
+	t.Parallel()
+
+	t.Run("drops the kind and reports it", func(t *testing.T) {
+		t.Parallel()
+		out, removed := removeMcpServer([]bruincloud.AgentMcpServer{
+			{Kind: "linear", ConnectionName: "a"},
+			{Kind: "github", ConnectionName: "b"},
+		}, "linear")
+		assert.True(t, removed)
+		require.Len(t, out, 1)
+		assert.Equal(t, "github", out[0].Kind)
+	})
+
+	t.Run("reports when the kind is absent", func(t *testing.T) {
+		t.Parallel()
+		out, removed := removeMcpServer([]bruincloud.AgentMcpServer{{Kind: "linear", ConnectionName: "a"}}, "github")
+		assert.False(t, removed)
+		require.Len(t, out, 1)
 	})
 }

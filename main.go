@@ -62,6 +62,7 @@ func main() {
 		Commands: []*cli.Command{
 			cmd.Lint(&isDebug),
 			cmd.Run(&isDebug),
+			cmd.Curl(),
 			cmd.Render(),
 			cmd.RenderDDL(),
 			cmd.UnitTest(),
@@ -87,7 +88,6 @@ func main() {
 	}
 
 	err := app.Run(context.Background(), os.Args)
-
 	if err != nil {
 		cli.HandleExitCoder(err)
 		// Close the telemetry client manually as the defer is not called on os.Exit(1)

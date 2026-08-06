@@ -25,13 +25,15 @@ import (
 var ansiEscapeRegex = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
 
 func Cloud(isDebug *bool) *cli.Command {
-	return &cli.Command{
+	cmd := &cli.Command{
 		Name:  "cloud",
 		Usage: "Interact with Bruin Cloud API",
 		Commands: []*cli.Command{
+			CloudTeams(),
 			CloudProjects(),
 			CloudPipelines(),
 			CloudRuns(),
+			CloudBackfills(),
 			CloudAssets(),
 			CloudInstances(),
 			CloudGlossary(),
@@ -39,7 +41,35 @@ func Cloud(isDebug *bool) *cli.Command {
 			CloudConnections(),
 			CloudDashboards(),
 			CloudScheduledAgents(),
+			CloudAuditLogs(),
+			CloudCost(),
 		},
+	}
+	addTeamFlag(cmd)
+	return cmd
+}
+
+// addTeamFlag adds --team to every runnable cloud command, so any of them can
+// target a team other than the token owner's current one. A command is runnable
+// when it has an action of its own (leaves always, but also parents like
+// "agents connections" that both list and hold subcommands); recurse into any
+// parent so its children get the flag too.
+func addTeamFlag(cmd *cli.Command) {
+	for _, sub := range cmd.Commands {
+		if sub.Action != nil || len(sub.Commands) == 0 {
+			sub.Flags = append(sub.Flags, teamFlag())
+		}
+		if len(sub.Commands) > 0 {
+			addTeamFlag(sub)
+		}
+	}
+}
+
+func teamFlag() *cli.StringFlag {
+	return &cli.StringFlag{
+		Name:    "team",
+		Usage:   "act on this team (company prefix) instead of your current team",
+		Sources: cli.EnvVars("BRUIN_CLOUD_TEAM"),
 	}
 }
 
@@ -140,7 +170,11 @@ func newCloudClient(c *cli.Command) (*bruincloud.APIClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return bruincloud.NewAPIClient(key), nil
+	client := bruincloud.NewAPIClient(key)
+	if team := c.String("team"); team != "" {
+		client.SetTeam(team)
+	}
+	return client, nil
 }
 
 func resolveRunID(ctx context.Context, c *cli.Command, client *bruincloud.APIClient, project, pipeline string) (string, error) {
@@ -208,6 +242,58 @@ func printFormattedLogs(result json.RawMessage) {
 }
 
 // --- Projects ---
+
+func CloudTeams() *cli.Command {
+	return &cli.Command{
+		Name:  "teams",
+		Usage: "Manage Bruin Cloud teams",
+		Commands: []*cli.Command{
+			cloudTeamsList(),
+		},
+	}
+}
+
+func cloudTeamsList() *cli.Command {
+	return &cli.Command{
+		Name:  "list",
+		Usage: "List the teams your token can act on",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			teams, err := client.ListTeams(ctx)
+			if err != nil {
+				printError(err, output, "Failed to list teams")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(teams, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"ID", "Name", "Company Prefix"})
+			for _, tm := range teams {
+				t.AppendRow(table.Row{tm.ID, tm.Name, tm.CompanyPrefix})
+			}
+			t.Render()
+			return nil
+		},
+	}
+}
 
 func CloudProjects() *cli.Command {
 	return &cli.Command{
@@ -884,15 +970,25 @@ func cloudRunsTrigger() *cli.Command {
 			}
 
 			startDate, endDate := c.String("start-date"), c.String("end-date")
-			if err := client.TriggerRun(ctx, project, pipeline, startDate, endDate, opts); err != nil {
+			result, err := client.TriggerRun(ctx, project, pipeline, startDate, endDate, opts)
+			if err != nil {
 				printError(err, output, "Failed to trigger run")
 				return cli.Exit("", 1)
 			}
 
+			if output == "json" {
+				data, _ := json.MarshalIndent(result, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
 			if split == "" {
-				printSuccessForOutput(output, fmt.Sprintf("Successfully triggered run for pipeline '%s' in project '%s'", pipeline, project))
+				successPrinter.Printf("Successfully triggered run '%s' for pipeline '%s' in project '%s'\n", result.RunID, pipeline, project)
 			} else {
-				printSuccessForOutput(output, fmt.Sprintf("Successfully triggered backfill (split by %s, chunk size %d) for pipeline '%s' in project '%s'", split, chunkSize, pipeline, project))
+				successPrinter.Printf("Successfully triggered backfill '%s' (split by %s, chunk size %d) for pipeline '%s' in project '%s'\n", result.MultipleActionID, split, chunkSize, pipeline, project)
+				if result.URL != "" {
+					fmt.Printf("Track this backfill at: %s\n", result.URL)
+				}
 			}
 			return nil
 		},
@@ -1247,6 +1343,117 @@ func cloudRunsDiagnose() *cli.Command {
 				}
 			}
 
+			return nil
+		},
+	}
+}
+
+// --- Backfills ---
+
+func CloudBackfills() *cli.Command {
+	return &cli.Command{
+		Name:  "backfills",
+		Usage: "Inspect backfills (grouped runs created by 'runs trigger --split')",
+		Commands: []*cli.Command{
+			cloudBackfillsList(),
+			cloudBackfillsRuns(),
+		},
+	}
+}
+
+func cloudBackfillsList() *cli.Command {
+	return &cli.Command{
+		Name:  "list",
+		Usage: "List recent backfills",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			projectFlag(),
+			pipelineFlag(),
+			limitFlag(),
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			backfills, err := client.ListBackfills(ctx, c.String("project-id"), c.String("pipeline"), c.Int("limit"))
+			if err != nil {
+				printError(err, output, "Failed to list backfills")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(backfills, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"Backfill ID", "Project", "Pipeline", "Interval Start", "Interval End", "Runs", "Created"})
+			for _, b := range backfills {
+				t.AppendRow(table.Row{b.ID, b.Project, b.Pipeline, b.IntervalStart, b.IntervalEnd, len(b.Runs), b.CreatedAt})
+			}
+			t.Render()
+			return nil
+		},
+	}
+}
+
+func cloudBackfillsRuns() *cli.Command {
+	return &cli.Command{
+		Name:  "runs",
+		Usage: "List the individual runs of a backfill",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.StringFlag{
+				Name:     "id",
+				Usage:    "backfill ID (the 'Backfill ID' from 'backfills list')",
+				Required: true,
+			},
+			limitFlag(),
+			offsetFlag(),
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			runs, err := client.GetBackfillRuns(ctx, c.String("id"), c.Int("limit"), c.Int("offset"))
+			if err != nil {
+				printError(err, output, "Failed to get backfill runs")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(runs, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"Run ID", "Interval Start", "Interval End", "Created", "Note"})
+			for _, r := range runs {
+				note := ""
+				if r.Note != nil {
+					note = *r.Note
+				}
+				t.AppendRow(table.Row{r.RunID, r.IntervalStart, r.IntervalEnd, r.CreatedAt, note})
+			}
+			t.Render()
 			return nil
 		},
 	}
@@ -2042,6 +2249,180 @@ func CloudAgents() *cli.Command {
 			cloudAgentsMessages(),
 			cloudAgentsGetPrompt(),
 			cloudAgentsSetPrompt(),
+			cloudAgentsConnections(),
+			cloudAgentsMcp(),
+		},
+	}
+}
+
+func cloudAgentsConnections() *cli.Command {
+	return &cli.Command{
+		Name:  "connections",
+		Usage: "List the connections available to an agent, or add one with the 'add' subcommand",
+		// Backward compatible: the bare command still lists (its Action below); the
+		// 'add' subcommand writes a connection. --agent-id is therefore not Required
+		// on the parent (that would also demand it when invoking 'add'); the Action
+		// validates it instead.
+		Commands: []*cli.Command{
+			cloudAgentsConnectionsAdd(),
+		},
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:  "agent-id",
+				Usage: "agent ID",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			// Fail fast on an invalid id rather than sending a bad request and
+			// surfacing a generic remote error.
+			if c.Int("agent-id") <= 0 {
+				printError(fmt.Errorf("--agent-id must be a positive integer, got %d", c.Int("agent-id")), output, "Invalid --agent-id")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			connections, err := client.ListAgentConnections(ctx, c.Int("agent-id"))
+			if err != nil {
+				printError(err, output, "Failed to list agent connections")
+				return cli.Exit("", 1)
+			}
+			// Normalize a nil slice so JSON output is an empty list, not null —
+			// scripting consumers then handle one shape.
+			if connections == nil {
+				connections = []bruincloud.AgentConnection{}
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(connections, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			if len(connections) == 0 {
+				infoPrinter.Println("No connections available to this agent.")
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"Name", "Type"})
+			for _, conn := range connections {
+				t.AppendRow(table.Row{conn.Name, conn.Type})
+			}
+			t.Render()
+			return nil
+		},
+	}
+}
+
+func cloudAgentsConnectionsAdd() *cli.Command {
+	return &cli.Command{
+		Name:  "add",
+		Usage: "Add a connection to an agent (from local .bruin.yml by default)",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:  "agent-id",
+				Usage: "agent ID",
+			},
+			&cli.StringFlag{
+				Name:  "name",
+				Usage: "the name of the connection",
+			},
+			&cli.StringFlag{
+				Name:  "environment",
+				Usage: "the .bruin.yml environment to read the connection from (default: selected environment)",
+			},
+			&cli.StringFlag{
+				Name:  "config-file",
+				Usage: "path to the .bruin.yml file",
+			},
+			&cli.StringFlag{
+				Name:  "type",
+				Usage: "connection type; required only with --credentials (otherwise read from .bruin.yml)",
+			},
+			&cli.StringFlag{
+				Name:  "credentials",
+				Usage: "JSON credentials; if omitted, the connection is read from .bruin.yml",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			// Fail fast on an invalid id rather than sending a bad request and
+			// surfacing a generic remote error.
+			if c.Int("agent-id") <= 0 {
+				printError(fmt.Errorf("--agent-id must be a positive integer, got %d", c.Int("agent-id")), output, "Invalid --agent-id")
+				return cli.Exit("", 1)
+			}
+
+			name := c.String("name")
+			if name == "" {
+				printError(errors.New("--name is required"), output, "Missing required flags")
+				return cli.Exit("", 1)
+			}
+
+			// Two ways to supply the connection: explicit --credentials JSON (with
+			// --type), or read it from the local .bruin.yml by name (the default).
+			connType := c.String("type")
+			creds := c.String("credentials")
+			var credentials map[string]any
+
+			if creds != "" {
+				if connType == "" {
+					printError(errors.New("--type is required when --credentials is provided"), output, "Missing required flags")
+					return cli.Exit("", 1)
+				}
+				if err := json.Unmarshal([]byte(creds), &credentials); err != nil {
+					printError(err, output, "Invalid --credentials JSON")
+					return cli.Exit("", 1)
+				}
+			} else {
+				t, cr, err := connectionFromConfig(ctx, name, c.String("environment"), c.String("config-file"))
+				if err != nil {
+					printError(err, output, "Failed to read connection")
+					return cli.Exit("", 1)
+				}
+				connType, credentials = t, cr
+			}
+
+			// The cloud runner can't read local files, so resolve a local
+			// service_account_file path into the service_account_json content here.
+			if path, ok := credentials["service_account_file"].(string); ok && path != "" {
+				data, err := os.ReadFile(path)
+				if err != nil {
+					printError(err, output, "Failed to read service_account_file")
+					return cli.Exit("", 1)
+				}
+				credentials["service_account_json"] = string(data)
+				delete(credentials, "service_account_file")
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			if _, err := client.AddAgentConnection(ctx, c.Int("agent-id"), connType, name, credentials); err != nil {
+				printError(err, output, "Failed to add agent connection")
+				return cli.Exit("", 1)
+			}
+
+			printSuccessForOutput(output, fmt.Sprintf("Added connection '%s' of type '%s' to agent %d", name, connType, c.Int("agent-id")))
+			return nil
 		},
 	}
 }
@@ -2160,6 +2541,250 @@ func cloudAgentsUpdate() *cli.Command {
 			return nil
 		},
 	}
+}
+
+func cloudAgentsMcp() *cli.Command {
+	return &cli.Command{
+		Name:  "mcp",
+		Usage: "Manage an agent's external MCP servers (Linear, GitHub, …)",
+		Commands: []*cli.Command{
+			cloudAgentsMcpList(),
+			cloudAgentsMcpSet(),
+			cloudAgentsMcpRemove(),
+		},
+	}
+}
+
+func cloudAgentsMcpList() *cli.Command {
+	return &cli.Command{
+		Name:  "list",
+		Usage: "List an agent's MCP servers and the connections available for each kind",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "agent-id",
+				Usage:    "agent ID",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			// Fail fast on an invalid id rather than sending a bad request and
+			// surfacing a generic remote error.
+			if c.Int("agent-id") <= 0 {
+				printError(fmt.Errorf("--agent-id must be a positive integer, got %d", c.Int("agent-id")), output, "Invalid --agent-id")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			resp, err := client.ListAgentMcpServers(ctx, c.Int("agent-id"))
+			if err != nil {
+				printError(err, output, "Failed to list agent MCP servers")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(resp, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"Kind", "Connection", "Display Name"})
+			for _, s := range resp.MCPIntegrations {
+				display := ""
+				if s.DisplayName != nil {
+					display = *s.DisplayName
+				}
+				t.AppendRow(table.Row{s.Kind, s.ConnectionName, display})
+			}
+			t.Render()
+
+			// Show what can be configured: every supported kind and the
+			// connections eligible from the agent's dev-env set.
+			kinds := make([]string, 0, len(resp.MCPKinds))
+			for k := range resp.MCPKinds {
+				kinds = append(kinds, k)
+			}
+			sort.Strings(kinds)
+			infoPrinter.Println("\nAvailable kinds (eligible connections):")
+			for _, k := range kinds {
+				infoPrinter.Printf("  %s (%s): %s\n", k, resp.MCPKinds[k], strings.Join(resp.ConnectionsByMcpKind[k], ", "))
+			}
+			return nil
+		},
+	}
+}
+
+func cloudAgentsMcpSet() *cli.Command {
+	return &cli.Command{
+		Name:  "set",
+		Usage: "Attach or update an MCP server on an agent",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "agent-id",
+				Usage:    "agent ID",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:     "kind",
+				Usage:    "MCP kind (e.g. linear, github, notion)",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:     "connection",
+				Usage:    "bruin.yml connection name backing this MCP server",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+			agentID := c.Int("agent-id")
+			kind := c.String("kind")
+
+			// Fail fast on an invalid id rather than sending a bad request and
+			// surfacing a generic remote error.
+			if agentID <= 0 {
+				printError(fmt.Errorf("--agent-id must be a positive integer, got %d", agentID), output, "Invalid --agent-id")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			// Read-modify-write: the API replaces the whole set, so merge the new
+			// pick into the current one to keep the other kinds intact.
+			current, err := client.ListAgentMcpServers(ctx, agentID)
+			if err != nil {
+				printError(err, output, "Failed to load current MCP servers")
+				return cli.Exit("", 1)
+			}
+
+			servers := upsertMcpServer(current.MCPIntegrations, kind, c.String("connection"))
+
+			agent, err := client.SetAgentMcpServers(ctx, agentID, servers)
+			if err != nil {
+				printError(err, output, "Failed to set MCP server")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(agent, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			infoPrinter.Printf("Set MCP server %q on agent %d\n", kind, agentID)
+			return nil
+		},
+	}
+}
+
+func cloudAgentsMcpRemove() *cli.Command {
+	return &cli.Command{
+		Name:  "remove",
+		Usage: "Detach an MCP server from an agent",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "agent-id",
+				Usage:    "agent ID",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:     "kind",
+				Usage:    "MCP kind to remove (e.g. linear, github)",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+			agentID := c.Int("agent-id")
+			kind := c.String("kind")
+
+			// Fail fast on an invalid id rather than sending a bad request and
+			// surfacing a generic remote error.
+			if agentID <= 0 {
+				printError(fmt.Errorf("--agent-id must be a positive integer, got %d", agentID), output, "Invalid --agent-id")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			current, err := client.ListAgentMcpServers(ctx, agentID)
+			if err != nil {
+				printError(err, output, "Failed to load current MCP servers")
+				return cli.Exit("", 1)
+			}
+
+			servers, removed := removeMcpServer(current.MCPIntegrations, kind)
+			if !removed {
+				printError(fmt.Errorf("agent %d has no MCP server of kind %q", agentID, kind), output, "Nothing to remove")
+				return cli.Exit("", 1)
+			}
+
+			if _, err := client.SetAgentMcpServers(ctx, agentID, servers); err != nil {
+				printError(err, output, "Failed to remove MCP server")
+				return cli.Exit("", 1)
+			}
+
+			infoPrinter.Printf("Removed MCP server %q from agent %d\n", kind, agentID)
+			return nil
+		},
+	}
+}
+
+// upsertMcpServer returns servers with kind set to connection — updating the
+// existing entry in place or appending a new one.
+func upsertMcpServer(servers []bruincloud.AgentMcpServer, kind, connection string) []bruincloud.AgentMcpServer {
+	out := make([]bruincloud.AgentMcpServer, 0, len(servers)+1)
+	found := false
+	for _, s := range servers {
+		if s.Kind == kind {
+			s.ConnectionName = connection
+			found = true
+		}
+		out = append(out, bruincloud.AgentMcpServer{Kind: s.Kind, ConnectionName: s.ConnectionName})
+	}
+	if !found {
+		out = append(out, bruincloud.AgentMcpServer{Kind: kind, ConnectionName: connection})
+	}
+	return out
+}
+
+// removeMcpServer returns servers without kind, and whether it was present.
+func removeMcpServer(servers []bruincloud.AgentMcpServer, kind string) ([]bruincloud.AgentMcpServer, bool) {
+	out := make([]bruincloud.AgentMcpServer, 0, len(servers))
+	removed := false
+	for _, s := range servers {
+		if s.Kind == kind {
+			removed = true
+			continue
+		}
+		out = append(out, bruincloud.AgentMcpServer{Kind: s.Kind, ConnectionName: s.ConnectionName})
+	}
+	return out, removed
 }
 
 func cloudAgentsCreate() *cli.Command {
@@ -3058,6 +3683,10 @@ func cloudDashboardsCreate() *cli.Command {
 				Name:  "visibility",
 				Usage: "team or private (default: team)",
 			},
+			&cli.IntFlag{
+				Name:  "agent-id",
+				Usage: "the agent to bind for canvas chat and refresh (defaults to the token's agent)",
+			},
 			&cli.StringFlag{
 				Name:  "state",
 				Usage: "the dashboard definition as a JSON or YAML string",
@@ -3074,6 +3703,14 @@ func cloudDashboardsCreate() *cli.Command {
 			visibility := c.String("visibility")
 			if visibility != "" && visibility != "team" && visibility != "private" {
 				printError(fmt.Errorf("visibility must be 'team' or 'private', got %q", visibility), output, "Invalid --visibility")
+				return cli.Exit("", 1)
+			}
+
+			// Reject an explicit non-positive --agent-id rather than silently
+			// dropping it (which would fall back to the token agent, or none, and
+			// create a dashboard with no chat against the caller's intent).
+			if c.IsSet("agent-id") && c.Int("agent-id") <= 0 {
+				printError(fmt.Errorf("--agent-id must be a positive integer, got %d", c.Int("agent-id")), output, "Invalid --agent-id")
 				return cli.Exit("", 1)
 			}
 
@@ -3122,7 +3759,7 @@ func cloudDashboardsCreate() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			dashboard, err := client.CreateDashboard(ctx, c.String("title"), visibility, state)
+			dashboard, err := client.CreateDashboard(ctx, c.String("title"), visibility, c.Int("agent-id"), state)
 			if err != nil {
 				printError(err, output, "Failed to create dashboard")
 				return cli.Exit("", 1)
@@ -3142,6 +3779,12 @@ func cloudDashboardsCreate() *cli.Command {
 				infoPrinter.Printf("Created dashboard %d (%s) as a draft — open it to review and publish: %s\n", dashboard.ID, title, dashboard.URL)
 			} else {
 				infoPrinter.Printf("Created dashboard %d (%s) as a draft — publish it from the Bruin Cloud UI.\n", dashboard.ID, title)
+			}
+			// No agent resolved (neither an explicit --agent-id nor the token's
+			// agent), so the dashboard opens without a chat panel. Warn and point
+			// at the fix instead of leaving it a silent surprise.
+			if dashboard.AgentID == nil || *dashboard.AgentID <= 0 {
+				errorPrinter.Println("Warning: no agent bound — this dashboard opens without a chat panel. Pass --agent-id <id> (see 'bruin cloud agents list').")
 			}
 			return nil
 		},
@@ -3272,8 +3915,225 @@ func CloudScheduledAgents() *cli.Command {
 			cloudScheduledAgentsGet(),
 			cloudScheduledAgentsCreate(),
 			cloudScheduledAgentsUpdate(),
+			cloudScheduledAgentsRunStates(),
 		},
 	}
+}
+
+// cloudScheduledAgentsRunStates groups the CRUD commands for a scheduled agent's
+// run-state ("memory") files — the markdown the agent persists across runs.
+func cloudScheduledAgentsRunStates() *cli.Command {
+	return &cli.Command{
+		Name:  "run-states",
+		Usage: "Manage a scheduled agent's run-state (\"memory\") files",
+		Commands: []*cli.Command{
+			cloudRunStatesList(),
+			cloudRunStatesGet(),
+			cloudRunStatesSet(),
+			cloudRunStatesDelete(),
+		},
+	}
+}
+
+// scheduledAgentIDFlag is the required parent-scope flag shared by the run-state
+// commands (a run-state file only exists in the context of a scheduled agent).
+func scheduledAgentIDFlag() *cli.IntFlag {
+	return &cli.IntFlag{
+		Name:     "scheduled-agent-id",
+		Usage:    "scheduled agent the run-state file belongs to",
+		Required: true,
+	}
+}
+
+func runStateNameFlag() *cli.StringFlag {
+	return &cli.StringFlag{
+		Name:     "name",
+		Usage:    "run-state file name",
+		Required: true,
+	}
+}
+
+func cloudRunStatesList() *cli.Command {
+	return &cli.Command{
+		Name:  "list",
+		Usage: "List a scheduled agent's run-state files",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			scheduledAgentIDFlag(),
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			states, err := client.ListRunStates(ctx, c.Int("scheduled-agent-id"))
+			if err != nil {
+				printError(err, output, "Failed to list run states")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(states, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"Name", "Size (bytes)", "Updated"})
+			for _, s := range states {
+				t.AppendRow(table.Row{s.Name, len(s.Content), derefString(s.UpdatedAt)})
+			}
+			t.Render()
+			return nil
+		},
+	}
+}
+
+func cloudRunStatesGet() *cli.Command {
+	return &cli.Command{
+		Name:  "get",
+		Usage: "Get a run-state file (prints its content; use --output json for the full record)",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			scheduledAgentIDFlag(),
+			runStateNameFlag(),
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			state, err := client.GetRunState(ctx, c.Int("scheduled-agent-id"), c.String("name"))
+			if err != nil {
+				printError(err, output, "Failed to get run state")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(state, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			// Print the raw content so it can be redirected to a file.
+			fmt.Print(state.Content)
+			return nil
+		},
+	}
+}
+
+func cloudRunStatesSet() *cli.Command {
+	return &cli.Command{
+		Name:  "set",
+		Usage: "Create or replace a run-state file from --content or --content-file",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			scheduledAgentIDFlag(),
+			runStateNameFlag(),
+			&cli.StringFlag{Name: "content", Usage: "the file content"},
+			&cli.StringFlag{Name: "content-file", Usage: "path to a file whose contents become the run-state content"},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			content, err := resolveRunStateContent(c)
+			if err != nil {
+				printError(err, output, "Invalid content")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			state, err := client.SetRunState(ctx, c.Int("scheduled-agent-id"), c.String("name"), content)
+			if err != nil {
+				printError(err, output, "Failed to set run state")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(state, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			successPrinter.Printf("Saved run-state file '%s' on scheduled agent %d.\n", state.Name, c.Int("scheduled-agent-id"))
+			return nil
+		},
+	}
+}
+
+func cloudRunStatesDelete() *cli.Command {
+	return &cli.Command{
+		Name:  "delete",
+		Usage: "Delete a run-state file",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			scheduledAgentIDFlag(),
+			runStateNameFlag(),
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			if err := client.DeleteRunState(ctx, c.Int("scheduled-agent-id"), c.String("name")); err != nil {
+				printError(err, output, "Failed to delete run state")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				fmt.Println(`{"success": true}`)
+				return nil
+			}
+
+			successPrinter.Printf("Deleted run-state file '%s' from scheduled agent %d.\n", c.String("name"), c.Int("scheduled-agent-id"))
+			return nil
+		},
+	}
+}
+
+// resolveRunStateContent reads the run-state content from exactly one of
+// --content or --content-file.
+func resolveRunStateContent(c *cli.Command) (string, error) {
+	if c.IsSet("content") && c.IsSet("content-file") {
+		return "", errors.New("pass only one of --content or --content-file")
+	}
+	if c.IsSet("content-file") {
+		data, err := os.ReadFile(c.String("content-file"))
+		if err != nil {
+			return "", fmt.Errorf("failed to read --content-file: %w", err)
+		}
+		return string(data), nil
+	}
+	if c.IsSet("content") {
+		return c.String("content"), nil
+	}
+	return "", errors.New("provide the content with --content or --content-file")
 }
 
 func cloudScheduledAgentsList() *cli.Command {
@@ -3579,4 +4439,307 @@ func derefString(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+func CloudAuditLogs() *cli.Command {
+	return &cli.Command{
+		Name:  "audit-logs",
+		Usage: "Read the Bruin Cloud team audit log",
+		Commands: []*cli.Command{
+			cloudAuditLogsList(),
+		},
+	}
+}
+
+func cloudAuditLogsList() *cli.Command {
+	return &cli.Command{
+		Name:  "list",
+		Usage: "List audit log entries (requires a personal API token)",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.StringSliceFlag{
+				Name:  "type",
+				Usage: "filter by event type (repeatable), e.g. --type login --type new_conn",
+			},
+			&cli.StringSliceFlag{
+				Name:  "user-id",
+				Usage: "filter by acting user ID (repeatable)",
+			},
+			&cli.StringFlag{
+				Name:  "start-date",
+				Usage: "only entries at or after this time (ISO 8601)",
+			},
+			&cli.StringFlag{
+				Name:  "end-date",
+				Usage: "only entries at or before this time (ISO 8601)",
+			},
+			limitFlag(),
+			offsetFlag(),
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			logs, err := client.ListAuditLogs(ctx, bruincloud.AuditLogListOptions{
+				Types:     c.StringSlice("type"),
+				UserIDs:   c.StringSlice("user-id"),
+				StartDate: c.String("start-date"),
+				EndDate:   c.String("end-date"),
+				Limit:     c.Int("limit"),
+				Offset:    c.Int("offset"),
+			})
+			if err != nil {
+				printError(err, output, "Failed to list audit logs")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(logs, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"Time", "Type", "User", "Source", "IP"})
+			for _, l := range logs {
+				t.AppendRow(table.Row{l.CreatedAt, l.Type, l.UserIdentifier, derefString(l.Source), derefString(l.IPAddress)})
+			}
+			t.Render()
+			return nil
+		},
+	}
+}
+
+func CloudCost() *cli.Command {
+	return &cli.Command{
+		Name:  "cost",
+		Usage: "Explore Bruin Cloud warehouse costs",
+		Commands: []*cli.Command{
+			cloudCostSchema(),
+			cloudCostExplorer(),
+		},
+	}
+}
+
+func cloudCostSchema() *cli.Command {
+	return &cli.Command{
+		Name:  "schema",
+		Usage: "List the dimensions, filters, and time buckets the cost explorer supports",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.StringFlag{
+				Name:  "platform",
+				Usage: "warehouse platform: bigquery (default) or databricks",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			schema, err := client.GetCostExplorerSchema(ctx, c.String("platform"))
+			if err != nil {
+				printError(err, output, "Failed to get cost explorer schema")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(schema, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			fmt.Printf("Platform: %s\n", schema.Platform)
+			fmt.Printf("Available platforms: %s\n", strings.Join(schema.AvailablePlatforms, ", "))
+			fmt.Printf("Time buckets: %s\n\n", strings.Join(schema.TimeDimensions, ", "))
+
+			dt := table.NewWriter()
+			dt.SetOutputMirror(os.Stdout)
+			dt.SetTitle("Dimensions")
+			dt.AppendHeader(table.Row{"Key", "Label"})
+			for _, d := range schema.Dimensions {
+				dt.AppendRow(table.Row{d.Key, d.Label})
+			}
+			dt.Render()
+
+			ft := table.NewWriter()
+			ft.SetOutputMirror(os.Stdout)
+			ft.SetTitle("Filters")
+			ft.AppendHeader(table.Row{"Field", "Op", "Multiple"})
+			for _, f := range schema.Filters {
+				ft.AppendRow(table.Row{f.Field, f.Op, f.Multiple})
+			}
+			ft.Render()
+			return nil
+		},
+	}
+}
+
+func cloudCostExplorer() *cli.Command {
+	return &cli.Command{
+		Name:  "explorer",
+		Usage: "Show warehouse cost breakdowns over a date range",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			limitFlag(),
+			offsetFlag(),
+			&cli.StringFlag{
+				Name:     "start-date",
+				Usage:    "start of the range, inclusive (e.g. 2026-07-01)",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:     "end-date",
+				Usage:    "end of the range, inclusive (e.g. 2026-07-31)",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:  "platform",
+				Usage: "warehouse platform: bigquery (default) or databricks",
+			},
+			&cli.StringFlag{
+				Name:  "dimension",
+				Usage: "group costs by this dimension (see 'bruin cloud cost schema')",
+			},
+			&cli.StringFlag{
+				Name:  "time-dimension",
+				Usage: "bucket costs over time: day, week, or month",
+			},
+			&cli.StringSliceFlag{
+				Name:  "filter",
+				Usage: "filter as field:op:value; repeat --filter per value for op 'in' (e.g. --filter pipeline_id:in:a --filter pipeline_id:in:b)",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			filters, err := parseCostFilters(c.StringSlice("filter"))
+			if err != nil {
+				printError(err, output, "Invalid --filter")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			resp, err := client.GetCostExplorer(ctx, bruincloud.CostExplorerRequest{
+				StartDate:     c.String("start-date"),
+				EndDate:       c.String("end-date"),
+				Platform:      c.String("platform"),
+				Dimension:     c.String("dimension"),
+				TimeDimension: c.String("time-dimension"),
+				Filters:       filters,
+				Limit:         c.Int("limit"),
+				Offset:        c.Int("offset"),
+			})
+			if err != nil {
+				printError(err, output, "Failed to get cost explorer data")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(resp, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			header := table.Row{}
+			if resp.TimeDimension != nil {
+				header = append(header, "Period")
+			}
+			if resp.Dimension != nil {
+				header = append(header, *resp.Dimension)
+			}
+			header = append(header, "Queries", "Cost (USD)", "TB Billed")
+			t.AppendHeader(header)
+			for _, row := range resp.Rows {
+				r := table.Row{}
+				if resp.TimeDimension != nil {
+					r = append(r, formatCostCell(row["time_period"]))
+				}
+				if resp.Dimension != nil {
+					r = append(r, formatCostCell(row[*resp.Dimension]))
+				}
+				r = append(r, formatCostCell(row["query_count"]), formatCostCell(row["total_cost_usd"]), formatCostCell(row["total_terabytes_billed"]))
+				t.AppendRow(r)
+			}
+			t.Render()
+
+			if resp.NextOffset != nil {
+				fmt.Printf("\nShowing rows %d-%d of %d. Next page: --offset=%d\n", resp.Offset, resp.Offset+resp.ReturnedRows-1, resp.TotalRows, *resp.NextOffset)
+			}
+			return nil
+		},
+	}
+}
+
+func parseCostFilters(raw []string) ([]bruincloud.CostFilter, error) {
+	if len(raw) == 0 {
+		return nil, nil
+	}
+	// urfave's StringSliceFlag splits values on commas, so multiple `in` values are passed as
+	// repeated --filter flags (e.g. --filter pipeline_id:in:a --filter pipeline_id:in:b) and
+	// merged here by field. Every token must be a complete field:op:value.
+	filters := make([]bruincloud.CostFilter, 0, len(raw))
+	inIndex := make(map[string]int)
+	for _, entry := range raw {
+		parts := strings.SplitN(entry, ":", 3)
+		if len(parts) != 3 || parts[0] == "" || parts[1] == "" {
+			return nil, fmt.Errorf("filter %q must be field:op:value", entry)
+		}
+		field, op, value := parts[0], parts[1], parts[2]
+		if op == "in" {
+			if idx, ok := inIndex[field]; ok {
+				vals := filters[idx].Value.([]string)
+				vals = append(vals, value)
+				filters[idx].Value = vals
+				continue
+			}
+			inIndex[field] = len(filters)
+			filters = append(filters, bruincloud.CostFilter{Field: field, Op: op, Value: []string{value}})
+			continue
+		}
+		filters = append(filters, bruincloud.CostFilter{Field: field, Op: op, Value: value})
+	}
+	return filters, nil
+}
+
+func formatCostCell(v any) string {
+	switch val := v.(type) {
+	case nil:
+		return ""
+	case string:
+		return val
+	case float64:
+		return strconv.FormatFloat(val, 'f', -1, 64)
+	case bool:
+		return strconv.FormatBool(val)
+	default:
+		data, err := json.Marshal(val)
+		if err != nil {
+			return fmt.Sprintf("%v", val)
+		}
+		return string(data)
+	}
 }

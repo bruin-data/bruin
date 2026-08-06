@@ -485,3 +485,105 @@ func TestDB_FetchDateTimeStats(t *testing.T) {
 	assert.Equal(t, time.Date(2024, 1, 2, 11, 30, 0, 123456700, time.UTC), *got.LatestDate)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
+
+const expectedTablesWithSchemasQuery = `
+SELECT TABLE_SCHEMA, TABLE_NAME
+FROM INFORMATION_SCHEMA.TABLES
+WHERE TABLE_SCHEMA NOT IN ('sys', 'INFORMATION_SCHEMA')
+ORDER BY TABLE_SCHEMA, TABLE_NAME
+`
+
+func TestDB_GetDatabases(t *testing.T) {
+	t.Parallel()
+
+	db := &DB{config: &Config{Database: "warehouse"}}
+	got, err := db.GetDatabases(t.Context())
+	require.NoError(t, err)
+	assert.Equal(t, []string{"warehouse"}, got)
+
+	dbNoName := &DB{config: &Config{}}
+	_, err = dbNoName.GetDatabases(t.Context())
+	require.Error(t, err)
+}
+
+func TestDB_GetTablesWithSchemas(t *testing.T) {
+	t.Parallel()
+
+	mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+	require.NoError(t, err)
+	defer mockDB.Close()
+
+	mock.ExpectQuery(expectedTablesWithSchemasQuery).
+		WillReturnRows(sqlmock.NewRows([]string{"TABLE_SCHEMA", "TABLE_NAME"}).
+			AddRow("dbo", "customers").
+			AddRow("dbo", "orders").
+			AddRow("sales", "regions"))
+
+	db := &DB{
+		conn:   sqlx.NewDb(mockDB, "sqlmock"),
+		config: &Config{Database: "warehouse"},
+	}
+
+	got, err := db.GetTablesWithSchemas(t.Context(), "warehouse")
+	require.NoError(t, err)
+	assert.Equal(t, map[string][]string{
+		"dbo":   {"customers", "orders"},
+		"sales": {"regions"},
+	}, got)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestDB_GetTablesWithSchemas_MismatchedDatabase(t *testing.T) {
+	t.Parallel()
+
+	db := &DB{config: &Config{Database: "warehouse"}}
+	_, err := db.GetTablesWithSchemas(t.Context(), "other")
+	require.Error(t, err)
+}
+
+func TestDB_Limit(t *testing.T) {
+	t.Parallel()
+
+	db := &DB{}
+	// The query is preserved verbatim inside the derived table (no rewrite),
+	// so case-sensitive column aliases survive.
+	got := db.Limit("SELECT src.Account FROM (SELECT x AS Account FROM t) src;", 100)
+	assert.Equal(t, "SELECT TOP 100 * FROM (\nSELECT src.Account FROM (SELECT x AS Account FROM t) src\n) as t", got)
+}
+
+const expectedDatabaseSummaryQuery = `
+SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE
+FROM INFORMATION_SCHEMA.TABLES
+WHERE TABLE_SCHEMA NOT IN ('sys', 'INFORMATION_SCHEMA')
+`
+
+func TestDB_GetDatabaseSummary(t *testing.T) {
+	t.Parallel()
+
+	mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+	require.NoError(t, err)
+	defer mockDB.Close()
+
+	// Asserts the case-sensitive uppercase INFORMATION_SCHEMA.TABLES query.
+	mock.ExpectQuery(expectedDatabaseSummaryQuery).
+		WillReturnRows(sqlmock.NewRows([]string{"TABLE_SCHEMA", "TABLE_NAME", "TABLE_TYPE"}).
+			AddRow("dbo", "customers", "BASE TABLE").
+			AddRow("dbo", "v_orders", "VIEW"))
+
+	db := &DB{
+		conn:   sqlx.NewDb(mockDB, "sqlmock"),
+		config: &Config{Database: "warehouse"},
+	}
+
+	got, err := db.GetDatabaseSummary(t.Context())
+	require.NoError(t, err)
+	assert.Equal(t, "warehouse", got.Name)
+	require.Len(t, got.Schemas, 1)
+	assert.Equal(t, "dbo", got.Schemas[0].Name)
+	require.Len(t, got.Schemas[0].Tables, 2)
+	assert.Equal(t, "customers", got.Schemas[0].Tables[0].Name)
+	assert.Equal(t, ansisql.DBTableTypeTable, got.Schemas[0].Tables[0].Type)
+	assert.Equal(t, "v_orders", got.Schemas[0].Tables[1].Name)
+	assert.Equal(t, ansisql.DBTableTypeView, got.Schemas[0].Tables[1].Type)
+	require.NoError(t, mock.ExpectationsWereMet())
+}

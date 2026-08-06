@@ -101,13 +101,16 @@ make build-no-duckdb # Build without DuckDB (CGO_ENABLED=0)
 ```bash
 make deps           # Install dependencies and tools
 make clean          # Remove build artifacts
-make format         # Format Go and Python code
+make format         # Format Go/Python and run fast changed-package lint
+make lint           # Run fast lint on changed packages in every Go module
+make lint-full      # Run all Go linters across the primary Go modules
 make tools-update   # Update development tools
 ```
 
 #### Testing Targets
 ```bash
-make test                      # Run unit tests
+make test                      # Run fast unit tests
+make test-full                 # Run unit tests with race detection
 make test-unit                 # Run unit tests specifically
 make integration-test          # Full integration tests with ingestr
 make integration-test-light    # Light integration tests without ingestr
@@ -180,7 +183,7 @@ Each CLI command is implemented in its own file:
 #### Unit Tests
 - **Location**: Throughout `pkg/` packages with `*_test.go` files
 - **Execution**: `make test-unit`
-- **Coverage**: Race detection enabled, 10-minute timeout
+- **Coverage**: Fast local tests by default; `make test-full` adds race detection
 - **Scope**: Excludes cloud integration tests
 
 Use narrow test loops while developing, then run the required full checks before finishing:
@@ -220,8 +223,8 @@ Use `make integration-test-light` for changes that affect parsing, command workf
 Tools automatically installed and run via `make format`:
 - **`gci`**: Import organization
 - **`gofumpt`**: Stricter Go formatting
-- **`golangci-lint`**: Comprehensive linting (10m timeout)
-- **`go vet`**: Static analysis
+- **`golangci-lint`**: Fast changed-package linting; `make lint-full` runs the comprehensive suite
+- **`govet`**: Enabled through `golangci-lint`
 
 #### Python Code
 Tools run via `make lint-python`:

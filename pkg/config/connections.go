@@ -268,16 +268,24 @@ func (c SynapseConnection) GetName() string {
 
 type FabricConnection struct {
 	ConnectionMetadata        `yaml:",inline" mapstructure:",squash"`
-	Host                      string `yaml:"host,omitempty"     json:"host" mapstructure:"host"`
-	Port                      int    `yaml:"port,omitempty"     json:"port" mapstructure:"port" jsonschema:"default=1433"`
-	Database                  string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
-	Username                  string `yaml:"username,omitempty" json:"username,omitempty" mapstructure:"username"`
-	Password                  string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password" sensitive:"true"`
-	Options                   string `yaml:"options,omitempty"  json:"options,omitempty" mapstructure:"options"`
-	UseAzureDefaultCredential bool   `yaml:"use_azure_default_credential,omitempty" json:"use_azure_default_credential,omitempty" mapstructure:"use_azure_default_credential"`
-	ClientID                  string `yaml:"client_id,omitempty" json:"client_id,omitempty" mapstructure:"client_id"`
-	ClientSecret              string `yaml:"client_secret,omitempty" json:"client_secret,omitempty" mapstructure:"client_secret" sensitive:"true"`
-	TenantID                  string `yaml:"tenant_id,omitempty" json:"tenant_id,omitempty" mapstructure:"tenant_id"`
+	Host                      string                 `yaml:"host,omitempty"     json:"host" mapstructure:"host"`
+	Port                      int                    `yaml:"port,omitempty"     json:"port" mapstructure:"port" jsonschema:"default=1433"`
+	Database                  string                 `yaml:"database,omitempty" json:"database" mapstructure:"database"`
+	Username                  string                 `yaml:"username,omitempty" json:"username,omitempty" mapstructure:"username"`
+	Password                  string                 `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password" sensitive:"true"`
+	Options                   string                 `yaml:"options,omitempty"  json:"options,omitempty" mapstructure:"options"`
+	UseAzureDefaultCredential bool                   `yaml:"use_azure_default_credential,omitempty" json:"use_azure_default_credential,omitempty" mapstructure:"use_azure_default_credential"`
+	ClientID                  string                 `yaml:"client_id,omitempty" json:"client_id,omitempty" mapstructure:"client_id"`
+	ClientSecret              string                 `yaml:"client_secret,omitempty" json:"client_secret,omitempty" mapstructure:"client_secret" sensitive:"true"`
+	TenantID                  string                 `yaml:"tenant_id,omitempty" json:"tenant_id,omitempty" mapstructure:"tenant_id"`
+	Lakehouse                 *FabricLakehouseConfig `yaml:"lakehouse,omitempty" json:"lakehouse,omitempty" mapstructure:"lakehouse"`
+}
+
+// FabricLakehouseConfig identifies the Lakehouse used by Fabric Spark assets.
+// Authentication is inherited from the parent Fabric connection.
+type FabricLakehouseConfig struct {
+	WorkspaceID string `yaml:"workspace_id,omitempty" json:"workspace_id" mapstructure:"workspace_id"`
+	LakehouseID string `yaml:"lakehouse_id,omitempty" json:"lakehouse_id" mapstructure:"lakehouse_id"`
 }
 
 func (c FabricConnection) GetName() string {
@@ -528,7 +536,7 @@ func (c RedshiftConnection) GetName() string {
 type SnowflakeConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	Account            string `yaml:"account,omitempty" json:"account" mapstructure:"account"`
-	Username           string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Username           string `yaml:"username,omitempty" json:"username,omitempty" mapstructure:"username"`
 	Password           string `yaml:"password,omitempty" json:"password,omitempty" jsonschema:"oneof_required=password" mapstructure:"password" sensitive:"true"`
 	Region             string `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
 	Role               string `yaml:"role,omitempty" json:"role,omitempty" mapstructure:"role"`
@@ -537,6 +545,7 @@ type SnowflakeConnection struct {
 	Warehouse          string `yaml:"warehouse,omitempty" json:"warehouse,omitempty" mapstructure:"warehouse"`
 	PrivateKeyPath     string `yaml:"private_key_path,omitempty" json:"private_key_path,omitempty" jsonschema:"oneof_required=private_key_path" mapstructure:"private_key_path" sensitive_file:"true"`
 	PrivateKey         string `yaml:"private_key,omitempty" json:"private_key,omitempty" jsonschema:"oneof_required=private_key" mapstructure:"private_key" sensitive:"true"`
+	Token              string `yaml:"token,omitempty" json:"token,omitempty" jsonschema:"oneof_required=token" mapstructure:"token" sensitive:"true"`
 }
 
 func (c SnowflakeConnection) MarshalJSON() ([]byte, error) {
@@ -563,6 +572,7 @@ func (c SnowflakeConnection) MarshalJSON() ([]byte, error) {
 		"schema":      c.Schema,
 		"warehouse":   c.Warehouse,
 		"private_key": c.PrivateKey,
+		"token":       c.Token,
 	}
 	addConnectionMetadataToMap(c.ConnectionMetadata, payload)
 
@@ -661,6 +671,13 @@ func (c SnowflakeConnection) MarshalYAML() (interface{}, error) {
 			node.Content,
 			&yaml.Node{Kind: yaml.ScalarNode, Value: "private_key"},
 			privateKeyNode,
+		)
+	}
+	if c.Token != "" {
+		node.Content = append(
+			node.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "token"},
+			&yaml.Node{Kind: yaml.ScalarNode, Value: c.Token},
 		)
 	}
 
@@ -1307,7 +1324,7 @@ type IcebergConnection struct {
 	// CatalogName is the logical catalog identifier (defaults to "ingestr").
 	CatalogName string         `yaml:"catalog_name,omitempty" json:"catalog_name,omitempty" mapstructure:"catalog_name"`
 	Catalog     IcebergCatalog `yaml:"catalog" json:"catalog" mapstructure:"catalog"`
-	Storage     IcebergStorage `yaml:"storage" json:"storage" mapstructure:"storage"`
+	Storage     IcebergStorage `yaml:"storage,omitempty" json:"storage,omitempty" mapstructure:"storage"`
 
 	// Table/namespace behaviour (ingestr destination write options).
 	CreateNamespace *bool  `yaml:"create_namespace,omitempty" json:"create_namespace,omitempty" mapstructure:"create_namespace"`
@@ -1859,6 +1876,21 @@ type SailConnection struct {
 }
 
 func (c SailConnection) GetName() string {
+	return c.Name
+}
+
+// SparkConnection configures Bruin's dynamically installed ADBC Spark driver.
+// URI may contain authentication data, so it is treated as sensitive.
+type SparkConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	URI                string            `yaml:"uri" json:"uri" mapstructure:"uri" sensitive:"true"`
+	Catalog            string            `yaml:"catalog,omitempty" json:"catalog,omitempty" mapstructure:"catalog"`
+	IngestLocation     string            `yaml:"ingest_location,omitempty" json:"ingest_location,omitempty" mapstructure:"ingest_location"`
+	IngestStagingArea  string            `yaml:"ingest_staging_area,omitempty" json:"ingest_staging_area,omitempty" mapstructure:"ingest_staging_area"`
+	Options            map[string]string `yaml:"options,omitempty" json:"options,omitempty" mapstructure:"options" sensitive:"true"`
+}
+
+func (c SparkConnection) GetName() string {
 	return c.Name
 }
 

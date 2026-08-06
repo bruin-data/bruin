@@ -4,6 +4,7 @@ package iceberg
 
 import (
 	"fmt"
+	"net"
 	"net/url"
 	"sort"
 	"strconv"
@@ -55,11 +56,32 @@ func (c Config) GetIngestrURI() (string, error) {
 		return "", err
 	}
 
-	// Storage settings take precedence; catalog settings fill any gaps (ingestr
-	// aliases region/credentials into both the s3.* and glue.* namespaces).
+	// Storage settings take precedence; catalog settings fill any gaps.
 	for key, values := range catalogParams {
 		if _, exists := q[key]; !exists {
 			q[key] = values
+		}
+	}
+
+	// Each block's credentials go under its own namespace (glue.* and s3.*) rather
+	// than the shared keys ingestr aliases into both: with one flat namespace it
+	// cannot tell a storage key pair from a catalog one, and would hand MinIO's to
+	// AWS Glue. Sharing is then explicit, and only between two AWS endpoints --
+	// when just one side is configured, the operator gave a single AWS account and
+	// means it for both.
+	if c.Catalog.Type == config.IcebergCatalogGlue && isAWSStorage(c.Storage) {
+		if !hasAWSCredentials(c.Storage.Auth) {
+			region := c.Storage.Region
+			if region == "" {
+				region = c.Catalog.Region
+			}
+			setS3Credentials(q, region, c.Catalog.Auth.AccessKey, c.Catalog.Auth.SecretKey, c.Catalog.Auth.SessionToken)
+		} else if !hasAWSCredentials(c.Catalog.Auth) {
+			region := c.Catalog.Region
+			if region == "" {
+				region = c.Storage.Region
+			}
+			setGlueCredentials(q, region, c.Storage.Auth.AccessKey, c.Storage.Auth.SecretKey, c.Storage.Auth.SessionToken)
 		}
 	}
 
@@ -93,7 +115,7 @@ func icebergCatalogURI(cat config.IcebergCatalog) (string, url.Values, error) {
 	q := url.Values{}
 	switch cat.Type {
 	case config.IcebergCatalogGlue:
-		setAWSCredentials(q, cat.Region, cat.Auth.AccessKey, cat.Auth.SecretKey, cat.Auth.SessionToken)
+		setGlueCredentials(q, cat.Region, cat.Auth.AccessKey, cat.Auth.SecretKey, cat.Auth.SessionToken)
 		if cat.CatalogID != "" {
 			q.Set("glue.id", cat.CatalogID)
 		}
@@ -112,6 +134,11 @@ func icebergCatalogURI(cat config.IcebergCatalog) (string, url.Values, error) {
 		if cat.Host == "" {
 			return "", nil, fmt.Errorf("iceberg: rest catalog requires %q", "host")
 		}
+		// ingestr builds the REST endpoint as http:// unless rest_use_ssl is set;
+		// managed catalogs (Polaris, Tabular, R2, Unity, ...) are served over TLS.
+		if cat.RestUseSSL != nil {
+			q.Set("rest_use_ssl", strconv.FormatBool(*cat.RestUseSSL))
+		}
 		if cat.Credential != "" {
 			q.Set("credential", cat.Credential)
 		}
@@ -125,16 +152,34 @@ func icebergCatalogURI(cat config.IcebergCatalog) (string, url.Values, error) {
 		}
 		return "iceberg+hive://" + hostPort(cat.Host, cat.Port), q, nil
 	case config.IcebergCatalogHadoop:
-		if cat.Path == "" {
-			return "", nil, fmt.Errorf("iceberg: hadoop catalog requires %q (warehouse directory)", "path")
+		// A local warehouse goes in the URL path. A warehouse URI cannot: it would
+		// produce iceberg+hadoop:///s3://bucket/wh, which reads back as the local
+		// path "/s3:" and fails with "mkdir /s3:". Forward it as the warehouse
+		// instead, where the storage block's own warehouse still takes precedence.
+		if cat.Path != "" {
+			if strings.Contains(cat.Path, "://") {
+				q.Set("warehouse", cat.Path)
+
+				return "iceberg+hadoop://", q, nil
+			}
+
+			return "iceberg+hadoop://" + ensureLeadingSlash(cat.Path), q, nil
 		}
-		return "iceberg+hadoop://" + ensureLeadingSlash(cat.Path), q, nil
+		return "iceberg+hadoop://", q, nil
 	case config.IcebergCatalogSQL:
 		// Advanced SQL catalog; the connection string comes from the sensitive uri field.
 		if cat.URI == "" {
 			return "", nil, fmt.Errorf("iceberg: sql catalog requires %q (catalog connection string)", "uri")
 		}
 		q.Set("uri", cat.URI)
+		// ingestr's generic sql catalog needs both driver and dialect; settable here
+		// or via properties. The sqlite/postgres catalog types set them automatically.
+		if cat.Driver != "" {
+			q.Set("sql.driver", cat.Driver)
+		}
+		if cat.Dialect != "" {
+			q.Set("sql.dialect", cat.Dialect)
+		}
 		return "iceberg+sql://", q, nil
 	case "":
 		return "", nil, fmt.Errorf("iceberg: catalog.type must be provided (supported: %s)", supportedCatalogList())
@@ -144,57 +189,114 @@ func icebergCatalogURI(cat config.IcebergCatalog) (string, url.Values, error) {
 }
 
 // icebergStorageParams maps a storage backend to its ingestr Iceberg params.
-// ingestr is S3-only today; add a case (e.g. GCS) when it gains support.
 func icebergStorageParams(st config.IcebergStorage) (url.Values, error) {
 	q := url.Values{}
+
 	switch st.Type {
-	case config.IcebergStorageS3:
-		q.Set("storage", "s3")
-		// The warehouse can be given as a full s3:// URI (path) or as a separate
-		// bucket (+ optional prefix); ingestr builds the same warehouse from either.
-		switch {
-		case st.Path != "" && st.Bucket != "":
-			return nil, fmt.Errorf("iceberg: storage: set either %q (a full s3:// warehouse) or %q, not both", "path", "bucket")
-		case st.Prefix != "" && st.Bucket == "":
-			return nil, fmt.Errorf("iceberg: storage: %q requires %q", "prefix", "bucket")
-		case st.Path != "":
-			q.Set("warehouse", st.Path)
-		case st.Bucket != "":
-			q.Set("bucket", st.Bucket)
-			if st.Prefix != "" {
-				q.Set("prefix", st.Prefix)
-			}
-		}
-		if st.Endpoint != "" {
-			q.Set("endpoint", st.Endpoint)
-		}
-		if st.UseSSL != nil {
-			q.Set("use_ssl", strconv.FormatBool(*st.UseSSL))
-		}
-		setAWSCredentials(q, st.Region, st.Auth.AccessKey, st.Auth.SecretKey, st.Auth.SessionToken)
-		return q, nil
-	case "":
-		return nil, fmt.Errorf("iceberg: storage.type must be provided (supported: %s)", config.StorageTypeS3)
+	case "", config.IcebergStorageS3, config.IcebergStorageGCS, config.IcebergStorageLocal:
 	default:
-		// e.g. StorageTypeGCS: not supported by ingestr's Iceberg destination yet.
-		return nil, fmt.Errorf("iceberg: unsupported storage type %q (supported: %s)", st.Type, config.StorageTypeS3)
+		return nil, fmt.Errorf("iceberg: unsupported storage type %q (supported: %s, %s, %s)", st.Type, config.IcebergStorageS3, config.IcebergStorageGCS, config.IcebergStorageLocal)
+	}
+	if st.Path != "" && st.Bucket != "" {
+		return nil, fmt.Errorf("iceberg: storage: set either %q (a full warehouse URI) or %q, not both", "path", "bucket")
+	}
+	if st.Prefix != "" && st.Bucket == "" {
+		return nil, fmt.Errorf("iceberg: storage: %q requires %q", "prefix", "bucket")
+	}
+
+	// storage tells ingestr which scheme to build for the bucket form. s3 is its
+	// default, so only gcs needs declaring; a full path or local warehouse carries
+	// its own scheme. Everything else is passed through and ingestr does the rest.
+	if st.Type == config.IcebergStorageGCS {
+		q.Set("storage", "gcs")
+	}
+	switch {
+	case st.Path != "":
+		q.Set("warehouse", st.Path)
+	case st.Bucket != "":
+		q.Set("bucket", st.Bucket)
+		if st.Prefix != "" {
+			q.Set("prefix", st.Prefix)
+		}
+	}
+	if st.Endpoint != "" {
+		q.Set("endpoint", st.Endpoint)
+	}
+	if st.UseSSL != nil {
+		q.Set("use_ssl", strconv.FormatBool(*st.UseSSL))
+	}
+	setS3Credentials(q, st.Region, st.Auth.AccessKey, st.Auth.SecretKey, st.Auth.SessionToken)
+	if st.KeyFile != "" {
+		q.Set("gcs.keypath", st.KeyFile)
+	}
+	if st.KeyJSON != "" {
+		q.Set("gcs.jsonkey", st.KeyJSON)
+	}
+	return q, nil
+}
+
+// isAWSStorage reports whether the storage is AWS S3 itself rather than an
+// S3-compatible service. Regional, VPC, FIPS and dualstack endpoints all live
+// under amazonaws.com; MinIO, R2 and GCS interop do not.
+func isAWSStorage(st config.IcebergStorage) bool {
+	if st.Type == config.IcebergStorageGCS || st.Type == config.IcebergStorageLocal {
+		return false
+	}
+	if st.Endpoint == "" {
+		return true
+	}
+
+	host := st.Endpoint
+	if idx := strings.Index(host, "://"); idx >= 0 {
+		host = host[idx+3:]
+	}
+	host, _, _ = strings.Cut(host, "/")
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	host = strings.ToLower(strings.TrimSuffix(host, "."))
+
+	return host == "amazonaws.com" ||
+		strings.HasSuffix(host, ".amazonaws.com") ||
+		strings.HasSuffix(host, ".amazonaws.com.cn")
+}
+
+// hasAWSCredentials reports whether an auth block carries an AWS key pair.
+func hasAWSCredentials(auth config.IcebergAuth) bool {
+	return auth.AccessKey != "" || auth.SecretKey != "" || auth.SessionToken != ""
+}
+
+// setS3Credentials sets the s3.*-namespaced region and credential parameters, so
+// they configure the storage client and nothing else.
+func setS3Credentials(q url.Values, region, accessKey, secretKey, sessionToken string) {
+	if region != "" {
+		q.Set("s3.region", region)
+	}
+	if accessKey != "" {
+		q.Set("s3.access-key-id", accessKey)
+	}
+	if secretKey != "" {
+		q.Set("s3.secret-access-key", secretKey)
+	}
+	if sessionToken != "" {
+		q.Set("s3.session-token", sessionToken)
 	}
 }
 
-// setAWSCredentials sets the shared S3/Glue region and credential parameters that
-// ingestr aliases into both the s3.* and glue.* namespaces.
-func setAWSCredentials(q url.Values, region, accessKey, secretKey, sessionToken string) {
+// setGlueCredentials sets the glue.*-namespaced region and credential parameters
+// so the catalog keeps its own AWS account regardless of what storage sets.
+func setGlueCredentials(q url.Values, region, accessKey, secretKey, sessionToken string) {
 	if region != "" {
-		q.Set("region", region)
+		q.Set("glue.region", region)
 	}
 	if accessKey != "" {
-		q.Set("access_key_id", accessKey)
+		q.Set("glue.access-key-id", accessKey)
 	}
 	if secretKey != "" {
-		q.Set("secret_access_key", secretKey)
+		q.Set("glue.secret-access-key", secretKey)
 	}
 	if sessionToken != "" {
-		q.Set("session_token", sessionToken)
+		q.Set("glue.session-token", sessionToken)
 	}
 }
 

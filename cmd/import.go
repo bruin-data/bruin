@@ -428,7 +428,7 @@ func runImport(ctx context.Context, log logger.Logger, pipelinePath, connectionN
 					return errors2.Wrapf(err, "failed to create schema directory %s", schemaFolder)
 				}
 
-				err = createdAsset.Persist(fs)
+				err = createdAsset.Persist(fs, pipelineFound)
 				if err != nil {
 					return err
 				}
@@ -450,7 +450,7 @@ func runImport(ctx context.Context, log logger.Logger, pipelinePath, connectionN
 						existingAsset.Columns = append(existingAsset.Columns, c)
 					}
 				}
-				err = existingAsset.Persist(fs)
+				err = existingAsset.Persist(fs, pipelineFound)
 				mergedTableCount++
 				if err != nil {
 					return err
@@ -946,6 +946,8 @@ func convertSourceTypeToQueryType(sourceType pipeline.AssetType) pipeline.AssetT
 		return pipeline.AssetTypeSynapseQuery
 	case pipeline.AssetTypeDatabricksSource:
 		return pipeline.AssetTypeDatabricksQuery
+	case pipeline.AssetTypeSparkSource:
+		return pipeline.AssetTypeSparkQuery
 	case pipeline.AssetTypeAthenaSource:
 		return pipeline.AssetTypeAthenaQuery
 	case pipeline.AssetTypeDuckDBSource:
@@ -995,6 +997,9 @@ func determineAssetTypeFromConnection(connectionName string, conn interface{}) p
 		if strings.Contains(connType, "databricks") {
 			return pipeline.AssetTypeDatabricksSource
 		}
+		if strings.Contains(connType, "spark") {
+			return pipeline.AssetTypeSparkSource
+		}
 		if strings.Contains(connType, "duckdb") {
 			return pipeline.AssetTypeDuckDBSource
 		}
@@ -1041,6 +1046,9 @@ func determineAssetTypeFromConnection(connectionName string, conn interface{}) p
 	}
 	if strings.Contains(connectionLower, "databricks") {
 		return pipeline.AssetTypeDatabricksSource
+	}
+	if strings.Contains(connectionLower, "spark") {
+		return pipeline.AssetTypeSparkSource
 	}
 	if strings.Contains(connectionLower, "duckdb") {
 		return pipeline.AssetTypeDuckDBSource

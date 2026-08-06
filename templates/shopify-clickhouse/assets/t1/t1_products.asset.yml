@@ -1,0 +1,115 @@
+name: shopify.t1_products
+type: ingestr
+description: "Raw Shopify product records, incrementally merged from the live shop."
+
+materialization:
+  type: table
+  strategy: merge
+  incremental_key: updated_at
+
+parameters:
+  source_connection: shopify-default
+  source_table: products
+  destination: clickhouse
+  schema_contract: evolve
+  schema_naming: snake_case
+
+tags:
+  - t1
+  - source
+  - shopify
+  - products
+domains:
+  - commerce
+  - merchandising
+meta:
+  grain: one row per Shopify product
+  source_system: shopify
+  source_table: products
+  data_classification: internal
+  contains_pii: "false"
+  ingestion_strategy: merge on updated_at
+
+columns:
+  - name: id
+    type: String
+    description: "Shopify Admin GraphQL global identifier for the product."
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: available_publications_count
+    type: Nullable(String)
+    description: "Serialized count metadata for publications on which the product is available."
+  - name: category
+    type: Nullable(String)
+    description: "Serialized Shopify product-category assignment."
+  - name: compare_at_price_range
+    type: Nullable(String)
+    description: "Serialized range of variant compare-at prices."
+  - name: created_at
+    type: Nullable(DateTime64(6, 'UTC'))
+    description: "Timestamp when the product was created in Shopify."
+  - name: default_cursor
+    type: Nullable(String)
+    description: "Shopify pagination cursor associated with the product."
+  - name: description
+    type: Nullable(String)
+    description: "Plain-text product description."
+  - name: description_html
+    type: Nullable(String)
+    description: "HTML-formatted product description."
+  - name: handle
+    type: Nullable(String)
+    description: "URL-safe Shopify product handle."
+  - name: metafields
+    type: Nullable(String)
+    description: "Serialized product metafields returned by Shopify."
+  - name: options
+    type: Nullable(String)
+    description: "Serialized product options such as size or color."
+  - name: price_range_v2
+    type: Nullable(String)
+    description: "Serialized range of current variant prices."
+  - name: product_type
+    type: Nullable(String)
+    description: "Merchant-defined product type."
+  - name: published_at
+    type: Nullable(DateTime64(6, 'UTC'))
+    description: "Timestamp when the product was first published."
+  - name: requires_selling_plan
+    type: Nullable(Bool)
+    description: "Whether the product can be purchased only through a selling plan."
+  - name: status
+    type: Nullable(String)
+    description: "Current Shopify product status, such as active, draft, or archived."
+  - name: tags
+    type: Nullable(String)
+    description: "Serialized tags assigned to the product."
+  - name: template_suffix
+    type: Nullable(String)
+    description: "Theme-template suffix assigned to the product."
+  - name: title
+    type: Nullable(String)
+    description: "Merchant-facing product title."
+  - name: total_inventory
+    type: Nullable(Int64)
+    description: "Total sellable inventory reported across the product's variants."
+  - name: tracks_inventory
+    type: Nullable(Bool)
+    description: "Whether at least one product variant tracks inventory."
+  - name: updated_at
+    type: Nullable(DateTime64(6, 'UTC'))
+    description: "Timestamp when Shopify last updated the product; used as the incremental cursor."
+  - name: variants_count
+    type: Nullable(String)
+    description: "Serialized count metadata for product variants."
+  - name: variants_first250
+    type: Nullable(String)
+    description: "Serialized first page of up to 250 Shopify product variants."
+  - name: vendor
+    type: Nullable(String)
+    description: "Vendor assigned to the product."
+  - name: _ingestr_loaded_at
+    type: Nullable(DateTime64(6, 'UTC'))
+    description: "Timestamp when ingestr loaded the record into ClickHouse."

@@ -21,7 +21,7 @@ Set your preferred path separator in the extension settings under `Bruin > Path 
 
 The extension provides checkbox settings to control default enabled/disabled states for various features:
 
-- **Apply Interval Modifiers**: Controls the default state of the `--apply-interval-modifiers` flag
+- **Apply Interval Modifiers**: Controls the default state of the `--apply-interval-modifiers` flag. Like the CLI, it is off unless you turn it on; Bruin Cloud applies [interval modifiers](/assets/interval-modifiers) automatically
 - **Full Refresh Confirmation**: Enable/disable confirmation prompts before running with `full-refresh`
 - **Auto-save Materialization**: Control whether materialization changes are auto-saved
 

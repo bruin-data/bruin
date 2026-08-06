@@ -201,6 +201,282 @@ set min_level_req = 22;
 	}
 }
 
+func TestFileExtractor_PreservesSessionStatements(t *testing.T) {
+	t.Parallel()
+
+	renderer := new(mockNoOpRenderer)
+	renderer.On("Render", mock.Anything).Return("default", nil)
+	extractor := FileQuerySplitterExtractor{
+		Renderer:                  renderer,
+		PreserveSessionStatements: true,
+	}
+
+	got, err := extractor.ExtractQueriesFromString(`
+USE analytics;
+SET spark.sql.shuffle.partitions = 8;
+DECLARE threshold INT DEFAULT 10;
+SELECT threshold;
+`)
+	require.NoError(t, err)
+	require.Equal(t, []*Query{
+		{Query: "USE analytics"},
+		{Query: "SET spark.sql.shuffle.partitions = 8"},
+		{Query: "DECLARE threshold INT DEFAULT 10"},
+		{Query: "SELECT threshold"},
+	}, got)
+	renderer.AssertExpectations(t)
+}
+
+func TestSplitQueriesPreservingSessionStatementsRemovesComments(t *testing.T) {
+	t.Parallel()
+
+	got := SplitQueriesPreservingSessionStatements(`
+-- select the namespace
+USE analytics;
+/* configure this session */
+SET spark.sql.shuffle.partitions = 8;
+SELECT 1;
+`)
+
+	require.Equal(t, []*Query{
+		{Query: "USE analytics"},
+		{Query: "SET spark.sql.shuffle.partitions = 8"},
+		{Query: "SELECT 1"},
+	}, got)
+}
+
+func TestFileExtractorRemovesTrailingCommentWithoutNewline(t *testing.T) {
+	t.Parallel()
+
+	renderer := new(mockNoOpRenderer)
+	renderer.On("Render", mock.Anything).Return("default", nil)
+	extractor := FileQuerySplitterExtractor{
+		Renderer:                  renderer,
+		PreserveSessionStatements: true,
+	}
+
+	got, err := extractor.ExtractQueriesFromString("SELECT 1;\n-- trailing comment")
+	require.NoError(t, err)
+	require.Equal(t, []*Query{{Query: "SELECT 1"}}, got)
+	renderer.AssertExpectations(t)
+}
+
+func TestStripSQLComments(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		in   string
+		want string
+		// noBackslashEscapes runs the case as a dialect where a backslash inside a
+		// string literal is data rather than an escape.
+		noBackslashEscapes bool
+	}{
+		{
+			name: "line comment with its newline",
+			in:   "SELECT 1 -- pick one\nFROM t",
+			want: "SELECT 1\nFROM t",
+		},
+		{
+			name: "trailing line comment without a newline",
+			in:   "SELECT 1\n-- trailing",
+			want: "SELECT 1\n\n",
+		},
+		{
+			name: "block comment",
+			in:   "SELECT /* pick\none */ 1",
+			want: "SELECT\n 1",
+		},
+		{
+			name: "double dash inside a string literal is data",
+			in:   "INSERT INTO audit VALUES ('run -- 1')",
+			want: "INSERT INTO audit VALUES ('run -- 1')",
+		},
+		{
+			name: "block comment opener inside a string literal is data",
+			in:   "SELECT 'a /* b' AS c",
+			want: "SELECT 'a /* b' AS c",
+		},
+		{
+			name: "doubled quote inside a string literal",
+			in:   "SELECT 'it''s -- fine' -- comment",
+			want: "SELECT 'it''s -- fine'\n",
+		},
+		{
+			name: "double dash inside a quoted identifier is data",
+			in:   `SELECT "a -- b" FROM t`,
+			want: `SELECT "a -- b" FROM t`,
+		},
+		{
+			name: "double dash inside a backtick identifier is data",
+			in:   "SELECT `a -- b` FROM t",
+			want: "SELECT `a -- b` FROM t",
+		},
+		{
+			name: "double dash inside an Oracle q-quote is data",
+			in:   "SELECT q'[run -- 1]' FROM t",
+			want: "SELECT q'[run -- 1]' FROM t",
+		},
+		{
+			name: "double dash not preceded by whitespace is not a comment",
+			in:   "SELECT 5--1 AS x",
+			want: "SELECT 5--1 AS x",
+		},
+		{
+			name: "unterminated block comment keeps its payload",
+			in:   "SELECT 1;\n/* unterminated\nSELECT 2",
+			want: "SELECT 1;\n/* unterminated\nSELECT 2",
+		},
+		{
+			name: "unterminated string literal keeps its payload",
+			in:   "SELECT 'unterminated -- x",
+			want: "SELECT 'unterminated\n",
+		},
+		{
+			name: "backslash-escaped quote still gets later comments stripped",
+			in:   "SELECT regexp_replace(name, '\\'', '') AS n -- strip; keep\nFROM t",
+			want: "SELECT regexp_replace(name, '\\'', '') AS n\nFROM t",
+		},
+		{
+			// A backslash escape inside the literal must not leave a phantom run
+			// open, or the comment survives and splitQueries cuts at its `;`.
+			name: "comment after a backslash-escaped literal is stripped",
+			in:   "SELECT 'it\\'s' -- note; here\nUNION ALL SELECT 'ok'",
+			want: "SELECT 'it\\'s'\nUNION ALL SELECT 'ok'",
+		},
+		{
+			name: "block comment after a backslash-escaped literal is stripped",
+			in:   "SELECT E'a\\'b' /* blk; split */ , 'c' FROM t",
+			want: "SELECT E'a\\'b'\n , 'c' FROM t",
+		},
+		{
+			name: "doubled backslash does not escape the closing quote",
+			in:   "SELECT 'a\\\\' -- c\nFROM t",
+			want: "SELECT 'a\\\\'\nFROM t",
+		},
+		{
+			name: "backslash inside a backtick identifier is data",
+			in:   "SELECT `a\\` -- c\nFROM t",
+			want: "SELECT `a\\`\nFROM t",
+		},
+		{
+			// Trino, Dremio, Oracle and standards-conforming Postgres take the
+			// backslash literally, so `ESCAPE '\'` closes its literal and the
+			// comment after it still gets stripped.
+			name:               "trailing backslash closes the literal without backslash escapes",
+			in:                 "SELECT x LIKE '%a' ESCAPE '\\' -- c; d\nAND y = 'z'",
+			want:               "SELECT x LIKE '%a' ESCAPE '\\'\nAND y = 'z'",
+			noBackslashEscapes: true,
+		},
+		{
+			name:               "windows path literal without backslash escapes",
+			in:                 "SELECT 'C:\\temp\\' AS p -- note; here\nFROM t",
+			want:               "SELECT 'C:\\temp\\' AS p\nFROM t",
+			noBackslashEscapes: true,
+		},
+		{
+			// Postgres needs both behaviours in one statement: the backslash is
+			// data in the plain literal but an escape in the E'' one.
+			name:               "postgres escape-string literal still escapes",
+			in:                 "SELECT E'it\\'s' AS a, 'C:\\' AS b -- note; here\nFROM t",
+			want:               "SELECT E'it\\'s' AS a, 'C:\\' AS b\nFROM t",
+			noBackslashEscapes: true,
+		},
+		{
+			name:               "lowercase postgres escape-string literal",
+			in:                 "SELECT e'a\\'b' /* blk; split */ , 'c' FROM t",
+			want:               "SELECT e'a\\'b'\n , 'c' FROM t",
+			noBackslashEscapes: true,
+		},
+		{
+			name:               "identifier ending in e before a literal is not an escape string",
+			in:                 "SELECT queue'a\\' AS x -- c\nFROM t",
+			want:               "SELECT queue'a\\' AS x\nFROM t",
+			noBackslashEscapes: true,
+		},
+		{
+			name: "unterminated block comment does not disable later stripping",
+			in:   "SELECT 1 /* a -- b\nFROM t -- drop me\nWHERE x",
+			want: "SELECT 1 /* a\nFROM t\nWHERE x",
+		},
+		{
+			name: "identifier ending in q before a literal is not a q-quote",
+			in:   "SELECT max_q'abc' AS x -- c\nFROM t",
+			want: "SELECT max_q'abc' AS x\nFROM t",
+		},
+		{
+			name: "form feed counts as whitespace before a line comment",
+			in:   "SELECT 1\f-- c\nFROM t",
+			want: "SELECT 1\f\nFROM t",
+		},
+		{
+			// Stripping runs before rendering, so an apostrophe in a Jinja
+			// comment would otherwise be scanned as the start of a literal and
+			// swallow the real comment below it.
+			// Left for the renderer to delete, so that its `{#-`/`-#}` whitespace
+			// controls still apply and a comment inside a token does not gain a
+			// newline through the middle of it.
+			name: "jinja comment containing an apostrophe",
+			in:   "{# don't touch #}\nSELECT a -- keep; only\nFROM t WHERE s = 'y'",
+			want: "{# don't touch #}\nSELECT a\nFROM t WHERE s = 'y'",
+		},
+		{
+			name: "jinja comment inside a token is not broken up",
+			in:   "SELECT co{# inline #}l FROM t -- c",
+			want: "SELECT co{# inline #}l FROM t\n",
+		},
+		{
+			name: "jinja expressions and blocks are left alone",
+			in:   "SELECT {{ start_date }} -- c\n{% if x %}AND y{% endif %}",
+			want: "SELECT {{ start_date }}\n{% if x %}AND y{% endif %}",
+		},
+		{
+			name: "unterminated jinja comment keeps its payload",
+			in:   "SELECT 1 {# unterminated\nFROM t -- drop me\nWHERE x",
+			want: "SELECT 1 {# unterminated\nFROM t\nWHERE x",
+		},
+		{
+			name: "postgres json path operators are not jinja comments",
+			in:   "SELECT data #> '{a,b}' -- c\nFROM t",
+			want: "SELECT data #> '{a,b}'\nFROM t",
+		},
+		{
+			name: "repeated unterminated block comments still strip later comments",
+			in:   "/* /* /* SELECT 1 -- drop me\nFROM t",
+			want: "/* /* /* SELECT 1\nFROM t",
+		},
+		{
+			name: "CRLF line comment",
+			in:   "SELECT 1 -- pick one\r\nFROM t",
+			want: "SELECT 1\nFROM t",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			require.Equal(t, test.want, stripSQLComments(test.in, !test.noBackslashEscapes))
+		})
+	}
+}
+
+// A post-hook is TrimSpace'd and joined without a trailing newline before every
+// operator re-parses it, so a `--` inside a string literal on the last line must
+// survive intact.
+func TestFileExtractorKeepsDoubleDashInsideStringLiteral(t *testing.T) {
+	t.Parallel()
+
+	renderer := new(mockNoOpRenderer)
+	renderer.On("Render", mock.Anything).Return("default", nil)
+	extractor := FileQuerySplitterExtractor{Renderer: renderer}
+
+	statement := "INSERT INTO audit VALUES ('run -- 1')"
+	got, err := extractor.ExtractQueriesFromString(statement)
+	require.NoError(t, err)
+	require.Equal(t, []*Query{{Query: statement}}, got)
+	renderer.AssertExpectations(t)
+}
+
 func TestOracleScriptExtractor_ExtractQueriesFromString(t *testing.T) {
 	t.Parallel()
 

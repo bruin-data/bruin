@@ -1,0 +1,21 @@
+default_environment: default
+environments:
+  default:
+    connections:
+      frankfurter:
+        - name: "frankfurter-default"
+      iceberg:
+        - name: "iceberg-default"
+          catalog:
+            type: glue
+            region: "${AWS_REGION}"
+            auth:
+              access_key: "${AWS_ACCESS_KEY_ID}"
+              secret_key: "${AWS_SECRET_ACCESS_KEY}"
+          storage:
+            type: s3
+            path: "s3://${S3_BUCKET}/warehouse"
+            region: "${AWS_REGION}"
+            auth:
+              access_key: "${AWS_ACCESS_KEY_ID}"
+              secret_key: "${AWS_SECRET_ACCESS_KEY}"

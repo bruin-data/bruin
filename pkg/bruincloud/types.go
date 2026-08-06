@@ -5,6 +5,14 @@ import (
 	"strings"
 )
 
+// Team is a team the caller's token can act on. CompanyPrefix is what you pass
+// to --team (the X-Bruin-Team header) to target this team on other commands.
+type Team struct {
+	ID            int    `json:"id"`
+	Name          string `json:"name"`
+	CompanyPrefix string `json:"company_prefix"`
+}
+
 // Project represents a Bruin Cloud project.
 type Project struct {
 	ID       string          `json:"id"`
@@ -50,6 +58,29 @@ type PipelineRun struct {
 	Status                    string          `json:"status"`
 	UnknownInstanceCount      int             `json:"unknown_instance_count"`
 	Note                      *string         `json:"note"`
+}
+
+// Backfill represents a group of runs created by a single split trigger,
+// identified by its multiple_action_id.
+type Backfill struct {
+	ID            string        `json:"id"`
+	Project       string        `json:"project"`
+	Pipeline      string        `json:"pipeline"`
+	IntervalStart string        `json:"interval_start"`
+	IntervalEnd   string        `json:"interval_end"`
+	CreatedAt     string        `json:"created_at"`
+	Runs          []BackfillRun `json:"runs"`
+}
+
+// BackfillRun represents a single run within a backfill.
+type BackfillRun struct {
+	Project       string  `json:"project"`
+	Pipeline      string  `json:"pipeline"`
+	RunID         string  `json:"run_id"`
+	IntervalStart string  `json:"interval_start"`
+	IntervalEnd   string  `json:"interval_end"`
+	CreatedAt     string  `json:"created_at"`
+	Note          *string `json:"note"`
 }
 
 // Asset represents a pipeline asset.
@@ -99,10 +130,35 @@ type GlossaryEntity struct {
 
 // Agent represents a Bruin Cloud agent.
 type Agent struct {
-	ID          int     `json:"id"`
-	Name        string  `json:"name"`
-	Description *string `json:"description"`
-	Visibility  string  `json:"visibility"`
+	ID              int              `json:"id"`
+	Name            string           `json:"name"`
+	Description     *string          `json:"description"`
+	Visibility      string           `json:"visibility"`
+	MCPIntegrations []AgentMcpServer `json:"mcp_integrations,omitempty"`
+}
+
+// AgentMcpServer is one external MCP server attached to an agent — a supported
+// kind (linear, github, …) backed by a bruin.yml connection in the agent's
+// dev-env set.
+type AgentMcpServer struct {
+	Kind           string  `json:"kind"`
+	ConnectionName string  `json:"connection_name"`
+	DisplayName    *string `json:"display_name"`
+}
+
+// AgentMcpServersResponse is the payload of the agent MCP-servers endpoint: the
+// current picks plus the options for configuring them.
+type AgentMcpServersResponse struct {
+	MCPIntegrations      []AgentMcpServer    `json:"mcp_integrations"`
+	MCPKinds             map[string]string   `json:"mcp_kinds"`
+	ConnectionsByMcpKind map[string][]string `json:"connections_by_mcp_kind"`
+}
+
+// AgentConnection is one connection available to an agent — name and type only
+// (no credential values).
+type AgentConnection struct {
+	Name string `json:"name"`
+	Type string `json:"type"`
 }
 
 // AgentThread represents a thread for an agent.
@@ -167,14 +223,14 @@ type AssetInstanceResponse struct {
 type AssetInstanceInfo struct {
 	Asset                  string             `json:"asset"`
 	Type                   string             `json:"type"`
-	StartDate              string             `json:"startDate"`
-	EndDate                string             `json:"endDate"`
-	WallTimeDuration       float64            `json:"wallTimeDuration"`
-	TotalExecutionDuration float64            `json:"totalExecutionDuration"`
+	StartDate              string             `json:"start_date"`
+	EndDate                string             `json:"end_date"`
+	WallTimeDuration       float64            `json:"wall_time_duration"`
+	TotalExecutionDuration float64            `json:"total_execution_duration"`
 	Status                 string             `json:"status"`
-	IsFinished             bool               `json:"isFinished"`
+	IsFinished             bool               `json:"is_finished"`
 	Steps                  AssetInstanceSteps `json:"steps"`
-	StepIDs                []string           `json:"stepIds"`
+	StepIDs                []string           `json:"step_ids"`
 }
 
 // AssetInstanceSteps represents the steps of an asset instance.
@@ -253,12 +309,25 @@ type Dashboard struct {
 	Visibility string          `json:"visibility"`
 	UpdatedAt  *string         `json:"updated_at"`
 	URL        string          `json:"url"`
+	AgentID    *int            `json:"agent_id"`
 	State      json.RawMessage `json:"state,omitempty"`
 }
 
 // ScheduledAgent represents a Bruin Cloud scheduled agent — a cron-based recurring
 // agent task. The nested plan fields (verified SQLs, memory, ...) are kept as raw
 // JSON so `--output json` round-trips the full server response faithfully.
+// RunState is a single markdown "memory" file persisted across runs of a
+// scheduled agent, keyed by name. Content may be empty.
+type RunState struct {
+	Name      string  `json:"name"`
+	Content   string  `json:"content"`
+	CreatedAt *string `json:"created_at"`
+	UpdatedAt *string `json:"updated_at"`
+}
+
+// ScheduledAgent represents a Bruin Cloud scheduled agent — a cron-based
+// recurring agent task. The nested plan fields (verified SQLs, memory, ...) are
+// kept as raw JSON so `--output json` round-trips the full server response.
 type ScheduledAgent struct {
 	ID                int             `json:"id"`
 	Title             *string         `json:"title"`
@@ -273,4 +342,83 @@ type ScheduledAgent struct {
 	Memory            json.RawMessage `json:"memory,omitempty"`
 	MonitorsDashboard json.RawMessage `json:"monitors_dashboard,omitempty"`
 	RecentExecutions  json.RawMessage `json:"recent_executions,omitempty"`
+}
+
+// AuditLog is one entry in a team's audit trail as returned by GET /audit-logs.
+// Metadata is event-specific and left raw.
+type AuditLog struct {
+	Type           string          `json:"type"`
+	UserIdentifier string          `json:"user_identifier"`
+	IPAddress      *string         `json:"ip_address"`
+	CreatedAt      string          `json:"created_at"`
+	URL            *string         `json:"url"`
+	Source         *string         `json:"source"`
+	Metadata       json.RawMessage `json:"metadata"`
+}
+
+// AuditLogListOptions are the optional filters for ListAuditLogs. Zero values
+// are omitted from the request.
+type AuditLogListOptions struct {
+	Types     []string
+	UserIDs   []string
+	StartDate string
+	EndDate   string
+	Limit     int
+	Offset    int
+}
+
+// CostDimension is a group-by dimension the cost explorer supports.
+type CostDimension struct {
+	Key   string `json:"key"`
+	Label string `json:"label"`
+}
+
+// CostFilterField is a filter field the cost explorer supports.
+type CostFilterField struct {
+	Field    string `json:"field"`
+	Op       string `json:"op"`
+	Multiple bool   `json:"multiple"`
+}
+
+// CostExplorerSchema lists the dimensions, filter fields, and time buckets the cost explorer supports.
+type CostExplorerSchema struct {
+	Platform           string            `json:"platform"`
+	AvailablePlatforms []string          `json:"available_platforms"`
+	Dimensions         []CostDimension   `json:"dimensions"`
+	Filters            []CostFilterField `json:"filters"`
+	TimeDimensions     []string          `json:"time_dimensions"`
+}
+
+// CostFilter is a single {field, op, value} cost explorer filter.
+type CostFilter struct {
+	Field string `json:"field"`
+	Op    string `json:"op"`
+	Value any    `json:"value"`
+}
+
+// CostExplorerRequest is the body sent to the cost explorer endpoint.
+type CostExplorerRequest struct {
+	StartDate     string       `json:"start_date"`
+	EndDate       string       `json:"end_date"`
+	Platform      string       `json:"platform,omitempty"`
+	Dimension     string       `json:"dimension,omitempty"`
+	TimeDimension string       `json:"time_dimension,omitempty"`
+	Filters       []CostFilter `json:"filters,omitempty"`
+	Limit         int          `json:"limit,omitempty"`
+	Offset        int          `json:"offset,omitempty"`
+}
+
+// CostExplorerResponse is a page of cost breakdown rows.
+type CostExplorerResponse struct {
+	Platform      string           `json:"platform"`
+	StartDate     string           `json:"start_date"`
+	EndDate       string           `json:"end_date"`
+	Dimension     *string          `json:"dimension"`
+	TimeDimension *string          `json:"time_dimension"`
+	TotalRows     int              `json:"total_rows"`
+	ReturnedRows  int              `json:"returned_rows"`
+	Offset        int              `json:"offset"`
+	Truncated     bool             `json:"truncated"`
+	NextOffset    *int             `json:"next_offset,omitempty"`
+	Rows          []map[string]any `json:"rows"`
 }

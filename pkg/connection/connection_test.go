@@ -5,7 +5,9 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"fmt"
 	"os"
+	"sync"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/adapty"
@@ -741,6 +743,44 @@ func TestManager_AddGenericConnectionFromConfig(t *testing.T) {
 	res, ok := m.GetConnection("test").(*config.GenericConnection)
 	assert.True(t, ok)
 	assert.NotNil(t, res)
+}
+
+func TestManager_AddKafkaConnectionFromConfigIsConcurrencySafe(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
+
+	// Connections are loaded in parallel, so every writer of the shared maps has
+	// to hold the mutex; a single unsynchronized writer takes the whole process
+	// down with "fatal error: concurrent map writes".
+	var wg sync.WaitGroup
+	for i := range 50 {
+		wg.Add(2)
+
+		go func() {
+			defer wg.Done()
+			assert.NoError(t, m.AddKafkaConnectionFromConfig(&config.KafkaConnection{
+				ConnectionMetadata: config.ConnectionMetadata{Name: fmt.Sprintf("kafka-%d", i)},
+				BootstrapServers:   "localhost:9092",
+				GroupID:            "g1",
+			}))
+		}()
+
+		go func() {
+			defer wg.Done()
+			assert.NoError(t, m.AddGenericConnectionFromConfig(&config.GenericConnection{
+				ConnectionMetadata: config.ConnectionMetadata{Name: fmt.Sprintf("generic-%d", i)},
+				Value:              "somevalue",
+			}))
+		}()
+	}
+	wg.Wait()
+
+	assert.Len(t, m.availableConnections, 100)
+	assert.Len(t, m.AllConnectionDetails, 100)
 }
 
 func TestManager_AddInfluxDBConnectionFromConfigStoresConnectionDetails(t *testing.T) {

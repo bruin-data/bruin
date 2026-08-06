@@ -146,6 +146,7 @@ type Connections struct {
 	StarRocks           []StarRocksConnection           `yaml:"starrocks,omitempty" json:"starrocks,omitempty" mapstructure:"starrocks"`
 	Dremio              []DremioConnection              `yaml:"dremio,omitempty" json:"dremio,omitempty" mapstructure:"dremio"`
 	Sail                []SailConnection                `yaml:"sail,omitempty" json:"sail,omitempty" mapstructure:"sail"`
+	Spark               []SparkConnection               `yaml:"spark,omitempty" json:"spark,omitempty" mapstructure:"spark"`
 	Fluxx               []FluxxConnection               `yaml:"fluxx,omitempty" json:"fluxx,omitempty" mapstructure:"fluxx"`
 	Freshdesk           []FreshdeskConnection           `yaml:"freshdesk,omitempty" json:"freshdesk,omitempty" mapstructure:"freshdesk"`
 	FundraiseUp         []FundraiseUpConnection         `yaml:"fundraiseup,omitempty" json:"fundraiseup,omitempty" mapstructure:"fundraiseup"`
@@ -363,6 +364,14 @@ func (c *Config) SelectEnvironment(name string) error {
 	return nil
 }
 
+// hasURIScheme reports whether a path carries a scheme like s3://, gs:// or
+// file://, in which case it is a location rather than a path on this machine.
+func hasURIScheme(path string) bool {
+	i := strings.Index(path, "://")
+
+	return i > 0
+}
+
 func isAnchoredLocalPath(path string) bool {
 	return hasAnchoredLocalPathPrefix(path) || filepath.IsAbs(path)
 }
@@ -488,6 +497,21 @@ func LoadFromFileOrEnv(fs afero.Fs, path string) (*Config, error) {
 
 			if conn.SslKeyPath != "" && !isAnchoredLocalPath(conn.SslKeyPath) {
 				env.Connections.Vitess[i].SslKeyPath = filepath.Join(configLocation, conn.SslKeyPath)
+			}
+		}
+
+		// Make Iceberg local file paths absolute: a sqlite catalog is a file, a
+		// hadoop catalog without a scheme is a directory, and both are read by the
+		// ingestr subprocess, which does not run from the config's directory.
+		for i, conn := range env.Connections.Iceberg {
+			if conn.Catalog.Path != "" && !isAnchoredLocalPath(conn.Catalog.Path) && !hasURIScheme(conn.Catalog.Path) {
+				env.Connections.Iceberg[i].Catalog.Path = filepath.Join(configLocation, conn.Catalog.Path)
+			}
+			if conn.Storage.Path != "" && !isAnchoredLocalPath(conn.Storage.Path) && !hasURIScheme(conn.Storage.Path) {
+				env.Connections.Iceberg[i].Storage.Path = filepath.Join(configLocation, conn.Storage.Path)
+			}
+			if conn.Storage.KeyFile != "" && !isAnchoredLocalPath(conn.Storage.KeyFile) {
+				env.Connections.Iceberg[i].Storage.KeyFile = filepath.Join(configLocation, conn.Storage.KeyFile)
 			}
 		}
 
@@ -1449,6 +1473,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Sail = append(env.Connections.Sail, conn)
+	case "spark":
+		var conn SparkConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Spark = append(env.Connections.Spark, conn)
 	case "trustpilot":
 		var conn TrustpilotConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -2041,6 +2072,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Dremio = removeConnection(env.Connections.Dremio, connectionName)
 	case "sail":
 		env.Connections.Sail = removeConnection(env.Connections.Sail, connectionName)
+	case "spark":
+		env.Connections.Spark = removeConnection(env.Connections.Spark, connectionName)
 	case "trustpilot":
 		env.Connections.Trustpilot = removeConnection(env.Connections.Trustpilot, connectionName)
 	case "quickbooks":
@@ -2360,6 +2393,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.StarRocks, source.StarRocks)
 	mergeConnectionList(&c.Dremio, source.Dremio)
 	mergeConnectionList(&c.Sail, source.Sail)
+	mergeConnectionList(&c.Spark, source.Spark)
 	mergeConnectionList(&c.Fluxx, source.Fluxx)
 	mergeConnectionList(&c.Freshdesk, source.Freshdesk)
 	mergeConnectionList(&c.FundraiseUp, source.FundraiseUp)

@@ -81,6 +81,7 @@ For retries, cancels, and per-asset reruns inside a single backfill run, open th
 - **Up to 250 child runs** per backfill.
 - Child runs honour the pipeline's normal asset dependencies — assets within each run still wait on their upstreams.
 - Cross-pipeline sensors apply: if an asset in the backfill depends on an external upstream via [URI](/cloud/cross-pipeline), it waits for that upstream interval to complete.
+- [Interval modifiers](/assets/interval-modifiers) are applied to every child interval, the same as scheduled runs. There is no toggle — unlike the CLI, which needs `--apply-interval-modifiers`. Overlapping windows are worth keeping in mind when child runs write to the same partitions.
 - Marking the backfill as success or failed is recorded in the [audit log](/cloud/audit-logs).
 
 ## Related

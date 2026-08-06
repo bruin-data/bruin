@@ -304,6 +304,7 @@ func assetFromDefaultValues(dv *DefaultValues) *Asset {
 		Metadata:          dv.Metadata,
 		Snowflake:         dv.Snowflake,
 		Athena:            dv.Athena,
+		BigQuery:          dv.BigQuery,
 		Doris:             dv.Doris,
 		StarRocks:         dv.StarRocks,
 		Routing:           dv.Routing,
@@ -344,6 +345,7 @@ func copyAssetToDefaultValues(dv *DefaultValues, asset *Asset) {
 	dv.Metadata = asset.Metadata
 	dv.Snowflake = asset.Snowflake
 	dv.Athena = asset.Athena
+	dv.BigQuery = asset.BigQuery
 	dv.Doris = asset.Doris
 	dv.StarRocks = asset.StarRocks
 	dv.Routing = asset.Routing

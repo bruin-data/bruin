@@ -37,21 +37,21 @@ jobs:
   test:
     strategy:
       matrix:
-        platform: [depot-ubuntu-latest-4]
+        platform: [depot-ubuntu-latest-4, depot-windows-latest-4]
     runs-on: ${{ matrix.platform }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 1
           fetch-tags: true
       - name: Setup Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: 'go.mod'
           cache-dependency-path: "go.sum"
       - name: Cache Rust artifacts
         id: rust-cache
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             ~/.cargo/registry
@@ -62,11 +62,19 @@ jobs:
             rust-${{ runner.os }}-
       - name: Touch cached Rust lib
         if: steps.rust-cache.outputs.cache-hit == 'true'
+        shell: bash
         run: touch pkg/sqlparser/rustffi/target/release/libbruin_rustsqlparser.a
       - name: Setup Rust
         if: steps.rust-cache.outputs.cache-hit != 'true'
-        uses: dtolnay/rust-toolchain@stable
-      - run: make test
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
+      - name: Run full test suite
+        shell: bash
+        run: |
+          # Race-enabled Windows binaries need the matching MinGW runtime DLLs.
+          # Installer tests inject a missing shell, so the native fallback is
+          # still covered without depending on this PATH.
+          [[ "${{ runner.os }}" != 'Windows' ]] || export PATH="/c/mingw64/bin:$PATH"
+          make test-full
   end2end:
     strategy:
       matrix:
@@ -76,18 +84,18 @@ jobs:
       - name: Install R (background)
         run: |
           nohup bash -c 'sudo apt-get install -y --no-install-recommends r-base-core 2>/dev/null || (sudo apt-get update && sudo apt-get install -y --no-install-recommends r-base-core)' > /tmp/r_install.log 2>&1 &
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 1
           fetch-tags: true
       - name: Setup Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: 'go.mod'
           cache-dependency-path: "go.sum"
       - name: Cache Rust artifacts
         id: rust-cache
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             ~/.cargo/registry
@@ -101,19 +109,23 @@ jobs:
         run: touch pkg/sqlparser/rustffi/target/release/libbruin_rustsqlparser.a
       - name: Setup Rust
         if: steps.rust-cache.outputs.cache-hit != 'true'
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
       - name: Wait for R
         run: |
-          timeout=120
-          while ! command -v Rscript &>/dev/null; do
-            timeout=$((timeout - 1))
-            if [ $timeout -le 0 ]; then
-              echo "::error::R installation timed out after 120s. Install log:"
+          # Budgeted on wall clock rather than loop iterations, and generously:
+          # the background apt-get fetches 30 MB, and a slow archive mirror had
+          # been overrunning the old 120-iteration budget. The loop still exits
+          # the moment Rscript appears, so a healthy run pays nothing for this.
+          deadline=$((SECONDS + 600))
+          until command -v Rscript >/dev/null 2>&1; do
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "::error::R did not become available within 600s. Install log:"
               cat /tmp/r_install.log 2>/dev/null || true
               exit 1
             fi
-            sleep 1
+            sleep 2
           done
+          echo "R available after ${SECONDS}s"
       - name: Run integration tests
         run: make integration-test
       - name: Run MSSQL developer environment integration test
@@ -131,22 +143,22 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Log in to the Container registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: bruin-data
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
       - name: Set up Depot
-        uses: depot/setup-action@v1
+        uses: depot/setup-action@15c09a5f77a0840ad4bce955686522a257853461 # v1
       - name: Build Docker image
-        uses: depot/build-push-action@v1
+        uses: depot/build-push-action@98e78adca7817480b8185f474a400b451d74e287 # v1
         with:
           context: .
           platforms: linux/amd64
@@ -166,16 +178,16 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
       - name: Build Docker image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
           platforms: linux/amd64
@@ -188,23 +200,21 @@ jobs:
   lint:
     runs-on: depot-ubuntu-latest-8
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: 'go.mod'
           cache-dependency-path: "go.sum"
       - name: Cache golangci-lint analysis
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.cache/golangci-lint
           key: golangci-lint-${{ runner.os }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
           restore-keys: |
             golangci-lint-${{ runner.os }}-${{ hashFiles('go.sum') }}-
-      - name: Install golangci-lint
-        run: |
-          VERSION=$(grep '^GOLANGCI_LINT_VERSION=' Makefile | cut -d= -f2)
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin ${VERSION}
-      - name: Run golangci-lint
-        run: golangci-lint run --timeout 10m60s --build-tags="no_duckdb_arrow" ./...
-      - name: Run golangci-lint (semantic-engine module)
-        run: cd semantic-engine && golangci-lint run --timeout 10m60s ./...
+      - name: Install linting tools
+        run: make setup
+      - name: Check formatting
+        run: make format-ci
+      - name: Run full lint suite
+        run: make lint-full

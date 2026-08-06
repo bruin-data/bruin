@@ -1,13 +1,14 @@
 import pytest
-from sqlglot import parse_one, exp
+from sqlglot import exp, parse_one
 from sqlglot.optimizer import optimize
 
+from . import main as parser_main
 from .main import (
-    get_column_lineage,
-    extract_non_selected_columns,
     Column,
-    get_tables,
     add_limit,
+    extract_non_selected_columns,
+    get_column_lineage,
+    get_tables,
     is_single_select_query,
 )
 
@@ -1875,8 +1876,6 @@ ORDER BY 1, 2, 3
     },
 ]
 
-#
-
 
 @pytest.mark.parametrize(
     "query,schema,expected,expected_non_selected,dialect",
@@ -1896,6 +1895,118 @@ def test_get_column_lineage(query, schema, expected, expected_non_selected, dial
     result = get_column_lineage(query, schema, dialect)
     assert result["columns"] == expected
     assert result["non_selected_columns"] == expected_non_selected
+
+
+def test_get_column_lineage_batches_wide_unions(monkeypatch):
+    width = 8
+    branches = 4
+    source_columns = [f"source_{index:02d}" for index in range(width)]
+    selects = []
+    schema = {}
+
+    for branch in range(branches):
+        table = f"synthetic.source_{branch}"
+        projections = ", ".join(
+            f"COALESCE(src.{column}, 0) + {branch} AS output_{index:02d}"
+            for index, column in enumerate(source_columns)
+        )
+        selects.append(f"SELECT {projections} FROM `{table}` AS src")
+        schema[table] = {column: "INT64" for column in source_columns}
+
+    lineage_calls = []
+    sqlglot_lineage = parser_main.lineage.lineage
+
+    def tracking_lineage(column, *args, **kwargs):
+        lineage_calls.append((column, kwargs.get("copy"), kwargs.get("trim_selects")))
+        return sqlglot_lineage(column, *args, **kwargs)
+
+    monkeypatch.setattr(parser_main.lineage, "lineage", tracking_lineage)
+
+    result = get_column_lineage("\nUNION ALL\n".join(selects), schema, "bigquery")
+
+    assert lineage_calls == [(None, False, False)]
+    assert result["errors"] == []
+    assert {column["name"]: column["upstream"] for column in result["columns"]} == {
+        f"output_{index:02d}": [
+            {"column": source_column, "table": f"synthetic.source_{branch}"}
+            for branch in range(branches)
+        ]
+        for index, source_column in enumerate(source_columns)
+    }
+
+
+def test_get_column_lineage_falls_back_with_per_column_error_isolation(monkeypatch):
+    sqlglot_lineage = parser_main.lineage.lineage
+    lineage_calls = []
+
+    def failing_batch_lineage(column, *args, **kwargs):
+        lineage_calls.append(column)
+        if column is None:
+            raise ValueError("unsupported projection in batch")
+        if column == "bad":
+            raise ValueError("unsupported projection")
+        return sqlglot_lineage(column, *args, **kwargs)
+
+    monkeypatch.setattr(parser_main.lineage, "lineage", failing_batch_lineage)
+
+    result = get_column_lineage(
+        "SELECT src.good AS good, src.bad AS bad FROM synthetic.events AS src",
+        {"synthetic.events": {"good": "INT64", "bad": "INT64"}},
+        "bigquery",
+    )
+
+    assert lineage_calls == [None, "good", "bad"]
+    assert result["columns"] == [
+        {
+            "name": "good",
+            "type": "BIGINT",
+            "upstream": [{"column": "good", "table": "synthetic.events"}],
+        }
+    ]
+
+
+def test_get_column_lineage_uses_per_column_fallback_for_duplicate_aliases(monkeypatch):
+    sqlglot_lineage = parser_main.lineage.lineage
+    lineage_calls = []
+
+    def tracking_lineage(column, *args, **kwargs):
+        lineage_calls.append((column, kwargs.get("copy"), kwargs.get("trim_selects")))
+        return sqlglot_lineage(column, *args, **kwargs)
+
+    monkeypatch.setattr(parser_main.lineage, "lineage", tracking_lineage)
+
+    result = get_column_lineage(
+        """
+        SELECT
+            src.first_value AS duplicate,
+            src.second_value AS duplicate
+        FROM synthetic.events AS src
+        """,
+        {
+            "synthetic.events": {
+                "first_value": "INT64",
+                "second_value": "INT64",
+            }
+        },
+        "bigquery",
+    )
+
+    assert lineage_calls == [
+        ("duplicate", False, False),
+        ("duplicate", False, False),
+    ]
+    assert result["columns"] == [
+        {
+            "name": "duplicate",
+            "type": "BIGINT",
+            "upstream": [{"column": "first_value", "table": "synthetic.events"}],
+        },
+        {
+            "name": "duplicate",
+            "type": "BIGINT",
+            "upstream": [{"column": "first_value", "table": "synthetic.events"}],
+        },
+    ]
 
 
 @pytest.mark.parametrize(
@@ -2293,6 +2404,7 @@ def test_is_single_select_query():
 def test_merge_parts():
     """Test merge_parts function with various table formats including SQL Server hints."""
     from sqlglot import parse_one
+
     from .main import merge_parts
 
     # Test simple table name
@@ -2353,6 +2465,7 @@ def test_merge_parts():
 def test_get_table_name():
     """Test get_table_name function with various table formats and dialects."""
     from sqlglot import parse_one
+
     from .main import get_table_name
 
     # Test simple table name

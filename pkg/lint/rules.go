@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/helpers"
@@ -763,12 +764,6 @@ func ValidateAssetSeedValidation(ctx context.Context, p *pipeline.Pipeline, asse
 			return issues, nil
 		}
 
-		lowerPath := strings.ToLower(seedPath)
-		if strings.HasPrefix(lowerPath, "http://") || strings.HasPrefix(lowerPath, "https://") {
-			// URL seeds are validated at runtime by ingestr, skip local file checks
-			return issues, nil
-		}
-
 		seedFileTypeRaw, _ := asset.Parameters.GetString("file_type")
 		fileType := strings.ToLower(strings.TrimSpace(seedFileTypeRaw))
 		if fileType != "" && !supportedSeedFileTypes[fileType] {
@@ -776,6 +771,19 @@ func ValidateAssetSeedValidation(ctx context.Context, p *pipeline.Pipeline, asse
 				Task:        asset,
 				Description: fmt.Sprintf("Unsupported seed file_type %q (supported: csv, parquet, pq, json, jsonl, ndjson, avro)", seedFileTypeRaw),
 			})
+			return issues, nil
+		}
+		if asset.Type == pipeline.AssetTypeSparkSeed && !isCSVSeed(seedPath, seedFileTypeRaw) {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: "Spark seed assets only support CSV files",
+			})
+			return issues, nil
+		}
+
+		lowerPath := strings.ToLower(seedPath)
+		if strings.HasPrefix(lowerPath, "http://") || strings.HasPrefix(lowerPath, "https://") {
+			// URL seeds are validated at runtime by ingestr, skip local file checks
 			return issues, nil
 		}
 
@@ -852,7 +860,9 @@ func isCSVSeed(seedPath, fileType string) bool {
 	if ft := strings.ToLower(strings.TrimSpace(fileType)); ft != "" {
 		return ft == "csv"
 	}
-	ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(seedPath)), ".")
+	pathWithoutQuery := strings.SplitN(seedPath, "?", 2)[0]
+	pathWithoutFragment := strings.SplitN(pathWithoutQuery, "#", 2)[0]
+	ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(pathWithoutFragment)), ".")
 	switch ext {
 	case "parquet", "pq", "jsonl", "ndjson", "json", "avro":
 		return false
@@ -1541,18 +1551,36 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 	return issues, nil
 }
 
+// EnsureBigQueryTableOptionsAreValid reports `bigquery` block configurations that would fail while
+// materializing the asset. It delegates to the materializer's own validation so that `bruin validate`
+// and `bruin run` never disagree about which configurations are supported.
+func EnsureBigQueryTableOptionsAreValid(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	if asset.Type != pipeline.AssetTypeBigqueryQuery {
+		return []*Issue{}, nil
+	}
+
+	if err := bigquery.ValidateTableOptions(asset); err != nil {
+		return []*Issue{ //nolint:nilerr
+			{
+				Task:        asset,
+				Description: err.Error(),
+			},
+		}, nil
+	}
+
+	return []*Issue{}, nil
+}
+
 func ensureDataVaultHubColumnsAreValid(asset *pipeline.Asset) []*Issue {
 	issues := ensureDataVaultColumnsHaveNamesAndTypes(asset, "datavault_hub")
 	if len(asset.Columns) == 0 {
 		return issues
 	}
 
-	if !hasDataVaultColumn(asset, []string{"hash_key", "hub_hash_key"}, func(col pipeline.Column) bool {
-		return col.PrimaryKey || strings.HasSuffix(strings.ToLower(col.Name), "_hk")
-	}) {
+	if dataVaultHashKeyName(asset, []string{"hash_key", "hub_hash_key"}) == "" {
 		issues = append(issues, &Issue{
 			Task:        asset,
-			Description: "Materialization strategy 'datavault_hub' requires a hash key column",
+			Description: "Materialization strategy 'datavault_hub' requires exactly one hash key column, identified by 'datavault_role: hash_key', a single column with 'primary_key: true', or a single column name ending in '_hk'",
 		})
 	}
 	if !hasDataVaultColumn(asset, []string{"business_key"}, func(col pipeline.Column) bool {
@@ -1573,17 +1601,11 @@ func ensureDataVaultLinkColumnsAreValid(asset *pipeline.Asset) []*Issue {
 		return issues
 	}
 
-	linkHashKeyName := ""
-	for _, col := range asset.Columns {
-		if dataVaultColumnMatches(col, []string{"link_hash_key", "hash_key"}) || col.PrimaryKey || strings.HasSuffix(strings.ToLower(col.Name), "_hk") {
-			linkHashKeyName = col.Name
-			break
-		}
-	}
+	linkHashKeyName := dataVaultHashKeyName(asset, []string{"link_hash_key", "hash_key"})
 	if linkHashKeyName == "" {
 		issues = append(issues, &Issue{
 			Task:        asset,
-			Description: "Materialization strategy 'datavault_link' requires a link hash key column",
+			Description: "Materialization strategy 'datavault_link' requires exactly one link hash key column, identified by 'datavault_role: link_hash_key', a single column with 'primary_key: true', or a single column name ending in '_hk'",
 		})
 	}
 
@@ -1613,12 +1635,10 @@ func ensureDataVaultSatelliteColumnsAreValid(asset *pipeline.Asset) []*Issue {
 		return issues
 	}
 
-	if !hasDataVaultColumn(asset, []string{"parent_hash_key", "hub_hash_key", "hash_key"}, func(col pipeline.Column) bool {
-		return col.PrimaryKey || strings.HasSuffix(strings.ToLower(col.Name), "_hk")
-	}) {
+	if dataVaultHashKeyName(asset, []string{"parent_hash_key", "hub_hash_key", "hash_key"}) == "" {
 		issues = append(issues, &Issue{
 			Task:        asset,
-			Description: "Materialization strategy 'datavault_satellite' requires a parent hash key column",
+			Description: "Materialization strategy 'datavault_satellite' requires exactly one parent hash key column, identified by 'datavault_role: parent_hash_key', a single column with 'primary_key: true', or a single column name ending in '_hk'",
 		})
 	}
 	if !hasDataVaultColumn(asset, []string{"hashdiff", "hash_diff"}, func(col pipeline.Column) bool {
@@ -1683,6 +1703,40 @@ func appendCommonDataVaultColumnIssues(asset *pipeline.Asset, strategy string, i
 			Description: fmt.Sprintf("Materialization strategy '%s' requires a record source column", strategy),
 		})
 	}
+}
+
+// dataVaultHashKeyName mirrors the hash key resolution used by the materializers: an explicit role
+// wins, then a single column marked with primary_key, and the '_hk' suffix only counts when exactly
+// one column carries it. Keeping the two in sync stops `bruin validate` from accepting assets that
+// then fail at run time with an unresolvable hash key.
+func dataVaultHashKeyName(asset *pipeline.Asset, roles []string) string {
+	for _, col := range asset.Columns {
+		if dataVaultColumnMatches(col, roles) {
+			return col.Name
+		}
+	}
+
+	// The materializers refuse to guess which of several primary key columns is the hash key, so
+	// validate has to reject that too rather than accepting whichever one is declared first.
+	primaryKeys := asset.ColumnNamesWithPrimaryKey()
+	if len(primaryKeys) > 1 {
+		return ""
+	}
+	if len(primaryKeys) == 1 {
+		return primaryKeys[0]
+	}
+
+	name := ""
+	for _, col := range asset.Columns {
+		if !strings.HasSuffix(strings.ToLower(col.Name), "_hk") {
+			continue
+		}
+		if name != "" {
+			return ""
+		}
+		name = col.Name
+	}
+	return name
 }
 
 func hasDataVaultColumn(asset *pipeline.Asset, roles []string, fallback func(pipeline.Column) bool) bool {
@@ -1753,6 +1807,7 @@ var TableSensorAllowedAssetTypes = map[pipeline.AssetType]bool{
 	pipeline.AssetTypeMySQLTableSensor:      true,
 	pipeline.AssetTypeDorisTableSensor:      true,
 	pipeline.AssetTypeStarRocksTableSensor:  true,
+	pipeline.AssetTypeSparkTableSensor:      true,
 }
 
 var platformNames = map[pipeline.AssetType]string{
@@ -1768,6 +1823,7 @@ var platformNames = map[pipeline.AssetType]string{
 	pipeline.AssetTypeMySQLTableSensor:      "MySQL",
 	pipeline.AssetTypeDorisTableSensor:      "Doris",
 	pipeline.AssetTypeStarRocksTableSensor:  "StarRocks",
+	pipeline.AssetTypeSparkTableSensor:      "Spark",
 }
 
 func ValidateTableSensorTableParameter(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
@@ -1979,6 +2035,13 @@ func ValidateHookQueryDryRun(connections connectionManager) AssetValidator {
 		var issues []*Issue
 
 		if !asset.IsSQLAsset() || asset.Hooks.IsZero() {
+			return issues, nil
+		}
+
+		// The BigQuery query validator dry-runs the complete materialized script,
+		// including hooks. Validating hooks independently would break shared
+		// script scope, such as a pre-hook DECLARE referenced by the asset query.
+		if asset.Type == pipeline.AssetTypeBigqueryQuery {
 			return issues, nil
 		}
 

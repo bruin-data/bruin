@@ -43,8 +43,8 @@ type resolvedEngine struct {
 
 // resolveIngestrEngine reads parameters.version, validates it, and returns the
 // resolved engine. An empty version defaults to v1 (the current pinned release).
-// Bare family markers (v0, v1, ...) resolve to the corresponding pinned PyPI
-// version; fully-qualified vMAJOR.MINOR.PATCH overrides to an exact PyPI version.
+// Bare family markers (v0, v1, ...) resolve to the corresponding pinned
+// version; fully-qualified vMAJOR.MINOR.PATCH overrides to an exact release.
 func resolveIngestrEngine(asset *pipeline.Asset) (resolvedEngine, error) {
 	versionRaw, _ := asset.Parameters.GetString("version")
 	versionParam := strings.TrimSpace(versionRaw)
@@ -140,8 +140,8 @@ func ensureFabricEngineSupport(engine resolvedEngine, uris ...string) error {
 	return nil
 }
 
-// applyIngestrEngine stashes the resolved PyPI version on the context so the
-// uv runner installs the requested release.
+// applyIngestrEngine stashes the resolved version on the context so the runner
+// installs the requested release.
 func applyIngestrEngine(ctx context.Context, engine resolvedEngine) context.Context {
 	if engine.ingestrVersion == "" {
 		return ctx
@@ -173,8 +173,9 @@ type SeedOperator struct {
 
 func NewBasicOperator(conn config.ConnectionGetter, j jinja.RendererInterface) (*BasicOperator, error) {
 	uvRunner := &python.UvPythonRunner{
-		UvInstaller: &python.UvChecker{},
-		Cmd:         &python.CommandRunner{},
+		UvInstaller:      &python.UvChecker{},
+		IngestrInstaller: &python.IngestrChecker{},
+		Cmd:              &python.CommandRunner{},
 	}
 
 	return &BasicOperator{conn: conn, runner: uvRunner, finder: &git.RepoFinder{}, jinjaRenderer: j}, nil
@@ -681,8 +682,9 @@ func normalizeMaterializationParameter(key, value string) string {
 
 func NewSeedOperator(conn config.ConnectionGetter, j jinja.RendererInterface) (*SeedOperator, error) {
 	uvRunner := &python.UvPythonRunner{
-		UvInstaller: &python.UvChecker{},
-		Cmd:         &python.CommandRunner{},
+		UvInstaller:      &python.UvChecker{},
+		IngestrInstaller: &python.IngestrChecker{},
+		Cmd:              &python.CommandRunner{},
 	}
 
 	return &SeedOperator{

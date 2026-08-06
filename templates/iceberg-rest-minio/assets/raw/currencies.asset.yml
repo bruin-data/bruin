@@ -1,0 +1,8 @@
+name: raw.currencies
+type: ingestr
+connection: iceberg-default
+
+parameters:
+  source_connection: frankfurter-default
+  source_table: currencies
+  destination: iceberg

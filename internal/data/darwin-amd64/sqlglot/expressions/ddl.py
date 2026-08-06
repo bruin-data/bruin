@@ -226,6 +226,14 @@ class UserDefinedFunction(Expression):
     arg_types = {"this": True, "expressions": False, "wrapped": False}
 
 
+class MacroOverloads(Expression):
+    arg_types = {"expressions": True}
+
+
+class MacroOverload(Expression):
+    arg_types = {"this": True, "expressions": False, "is_table": False}
+
+
 class CharacterSet(Expression):
     arg_types = {"this": True, "default": False}
 
@@ -246,7 +254,7 @@ class AlterColumn(Expression):
 
 
 class ModifyColumn(Expression):
-    pass
+    arg_types = {"this": True, "rename_from": False}
 
 
 class AlterIndex(Expression):
@@ -362,6 +370,14 @@ class DropPrimaryKey(Expression):
     arg_types = {}
 
 
+class Undrop(Expression):
+    arg_types = {"this": True, "kind": True, "rename": False}
+
+    @property
+    def kind(self) -> str:
+        return self.args["kind"].upper()
+
+
 class Command(Expression):
     arg_types = {"this": True, "expression": False}
 
@@ -416,7 +432,7 @@ class NextValueFor(Expression, Func):
 
 
 class Execute(Expression):
-    arg_types = {"this": True, "expressions": False}
+    arg_types = {"this": True, "expressions": False, "return_status": False}
 
     @property
     def name(self) -> str:

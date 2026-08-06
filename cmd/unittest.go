@@ -96,6 +96,10 @@ func UnitTest() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
+			// Built once so that assets sharing a connection also share the
+			// clients derived from it.
+			connectionResolver := newAssetConnectionResolver(manager)
+
 			passed, failed := 0, 0
 			for _, target := range targets {
 				// Macros are per-pipeline, so load them for each pipeline tested.
@@ -106,7 +110,7 @@ func UnitTest() *cli.Command {
 				}
 				schemas := assetColumnSchemas(target.pipeline)
 				for _, asset := range target.assets {
-					p, f := runAssetUnitTests(ctx, parser, manager, target.pipeline, asset, startDate, endDate, macroContent, schemas)
+					p, f := runAssetUnitTests(ctx, parser, connectionResolver, target.pipeline, asset, startDate, endDate, macroContent, schemas)
 					passed += p
 					failed += f
 				}
@@ -223,7 +227,7 @@ func resolveConnectionManager(ctx context.Context, pipelinePath, env string) (co
 // Each test is compiled to a single read-only CTE-injected query (no DDL, no
 // artifacts on the target), run via the connection, and compared. Returns
 // pass/fail counts.
-func runAssetUnitTests(ctx context.Context, parser unittest.Rewriter, manager config.ConnectionAndDetailsGetter, pl *pipeline.Pipeline, asset *pipeline.Asset, startDate, endDate time.Time, macroContent string, schemas map[string][]pipeline.Column) (passed, failed int) {
+func runAssetUnitTests(ctx context.Context, parser unittest.Rewriter, connections *assetConnectionResolver, pl *pipeline.Pipeline, asset *pipeline.Asset, startDate, endDate time.Time, macroContent string, schemas map[string][]pipeline.Column) (passed, failed int) {
 	if len(asset.UnitTests) == 0 {
 		return 0, 0
 	}
@@ -239,7 +243,12 @@ func runAssetUnitTests(ctx context.Context, parser unittest.Rewriter, manager co
 		errorPrinter.Printf("ERROR  %s — failed to resolve the connection: %v\n", asset.Name, err)
 		return 0, len(asset.UnitTests)
 	}
-	querier, ok := manager.GetConnection(connName).(schemaQuerier)
+	connection, err := connections.Resolve(ctx, asset.Type, connName)
+	if err != nil {
+		errorPrinter.Printf("ERROR  %s — failed to resolve connection %q: %v\n", asset.Name, connName, err)
+		return 0, len(asset.UnitTests)
+	}
+	querier, ok := connection.(schemaQuerier)
 	if !ok {
 		errorPrinter.Printf("ERROR  %s — connection %q is missing or cannot run queries\n", asset.Name, connName)
 		return 0, len(asset.UnitTests)

@@ -1,0 +1,316 @@
+name: shopify.t1_orders
+type: ingestr
+description: "Raw Shopify order records, including serialized line, customer, address, and refund structures."
+
+materialization:
+  type: table
+  strategy: merge
+  incremental_key: updated_at
+
+parameters:
+  source_connection: shopify-default
+  source_table: orders
+  destination: clickhouse
+  schema_contract: evolve
+  schema_naming: snake_case
+  enforce_schema: true
+
+tags:
+  - t1
+  - source
+  - shopify
+  - orders
+  - pii
+domains:
+  - commerce
+  - finance
+  - fulfillment
+meta:
+  grain: one row per Shopify order
+  source_system: shopify
+  source_table: orders
+  data_classification: restricted
+  contains_pii: "true"
+  ingestion_strategy: merge on updated_at
+
+columns:
+  - name: id
+    type: Int64
+    description: "Shopify numeric identifier for the order."
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: admin_graphql_api_id
+    type: Nullable(String)
+    description: "Shopify Admin GraphQL global identifier for the order."
+  - name: app_id
+    type: Nullable(Int64)
+    description: "Identifier of the app that created the order."
+  - name: billing_address
+    type: Nullable(String)
+    description: "Serialized billing address for the order; contains personal data."
+  - name: browser_ip
+    type: Nullable(String)
+    description: "Browser IP address captured for the order; contains personal data."
+  - name: buyer_accepts_marketing
+    type: Nullable(Bool)
+    description: "Whether the buyer accepted marketing when the order was placed."
+  - name: cancel_reason
+    type: Nullable(String)
+    description: "Shopify cancellation-reason code when the order was cancelled."
+  - name: cancelled_at
+    type: Nullable(DateTime64(6, 'UTC'))
+    description: "Timestamp when the order was cancelled."
+  - name: cart_token
+    type: Nullable(String)
+    description: "Token of the cart associated with the order."
+  - name: checkout_token
+    type: Nullable(String)
+    description: "Token of the checkout associated with the order."
+  - name: client_details
+    type: Nullable(String)
+    description: "Serialized browser and client details captured during checkout; may contain personal data."
+  - name: closed_at
+    type: Nullable(DateTime64(6, 'UTC'))
+    description: "Timestamp when the order was closed."
+  - name: company
+    type: Nullable(String)
+    description: "Serialized Shopify B2B company information associated with the order."
+  - name: confirmation_number
+    type: Nullable(String)
+    description: "Customer-facing confirmation number assigned to the order."
+  - name: confirmed
+    type: Nullable(Bool)
+    description: "Whether Shopify has confirmed the order."
+  - name: contact_email
+    type: Nullable(String)
+    description: "Email address used to contact the buyer; contains personal data."
+  - name: created_at
+    type: Nullable(DateTime64(6, 'UTC'))
+    description: "Timestamp when the order was created in Shopify."
+  - name: currency
+    type: Nullable(String)
+    description: "ISO code of the shop currency used for order amounts."
+  - name: current_subtotal_price
+    type: Nullable(String)
+    description: "Current line-item subtotal after discounts, returns, refunds, edits, and cancellations."
+  - name: current_subtotal_price_set
+    type: Nullable(String)
+    description: "Serialized current subtotal in shop and presentment currencies."
+  - name: current_total_additional_fees_set
+    type: Nullable(String)
+    description: "Serialized current additional fees in shop and presentment currencies."
+  - name: current_total_discounts
+    type: Nullable(String)
+    description: "Current order- and line-level discount total after returns and refunds."
+  - name: current_total_discounts_set
+    type: Nullable(String)
+    description: "Serialized current discount total in shop and presentment currencies."
+  - name: current_total_duties_set
+    type: Nullable(String)
+    description: "Serialized current duties total in shop and presentment currencies."
+  - name: current_total_price
+    type: Nullable(String)
+    description: "Current order total after returns, refunds, edits, and cancellations."
+  - name: current_total_price_set
+    type: Nullable(String)
+    description: "Serialized current order total in shop and presentment currencies."
+  - name: current_total_tax
+    type: Nullable(String)
+    description: "Current tax total after returns, refunds, edits, and cancellations."
+  - name: current_total_tax_set
+    type: Nullable(String)
+    description: "Serialized current tax total in shop and presentment currencies."
+  - name: customer
+    type: Nullable(String)
+    description: "Serialized Shopify customer associated with the order; contains personal data."
+  - name: customer_locale
+    type: Nullable(String)
+    description: "Buyer locale captured when the order was placed."
+  - name: discount_applications
+    type: Nullable(String)
+    description: "Serialized discount applications that explain how discounts were allocated."
+  - name: discount_codes
+    type: Nullable(String)
+    description: "Serialized discount codes applied to the order."
+  - name: email
+    type: Nullable(String)
+    description: "Buyer email address recorded on the order; contains personal data."
+  - name: estimated_taxes
+    type: Nullable(Bool)
+    description: "Whether taxes on the order are estimated."
+  - name: financial_status
+    type: Nullable(String)
+    description: "Shopify financial status of the order."
+  - name: fulfillment_status
+    type: Nullable(String)
+    description: "Shopify fulfillment status of the order."
+  - name: fulfillments
+    type: Nullable(String)
+    description: "Serialized fulfillment records associated with the order."
+  - name: gateway
+    type: Nullable(String)
+    description: "Legacy name of the primary payment gateway used for the order."
+  - name: landing_site
+    type: Nullable(String)
+    description: "Landing-site URL recorded for the buyer session."
+  - name: line_items
+    type: Nullable(String)
+    description: "Serialized order line items, including product, variant, quantity, price, tax, and discount details."
+  - name: location_id
+    type: Nullable(Int64)
+    description: "Shopify location identifier associated with the order."
+  - name: merchant_of_record_app_id
+    type: Nullable(Int64)
+    description: "Identifier of the app acting as merchant of record, when applicable."
+  - name: name
+    type: Nullable(String)
+    description: "Merchant-facing order name, typically including the configured prefix and order number."
+  - name: note
+    type: Nullable(String)
+    description: "Merchant or buyer note attached to the order; may contain personal data."
+  - name: note_attributes
+    type: Nullable(String)
+    description: "Serialized custom note attributes attached to the order."
+  - name: number
+    type: Nullable(Int64)
+    description: "Shopify order number without merchant-configured prefix or suffix."
+  - name: order_number
+    type: Nullable(Int64)
+    description: "Merchant-facing numeric order sequence."
+  - name: order_status_url
+    type: Nullable(String)
+    description: "Authenticated customer order-status URL; treat as sensitive."
+  - name: original_total_additional_fees_set
+    type: Nullable(String)
+    description: "Serialized original additional-fee total before later order changes."
+  - name: original_total_duties_set
+    type: Nullable(String)
+    description: "Serialized original duties total before later order changes."
+  - name: payment_gateway_names
+    type: Nullable(String)
+    description: "Serialized names of payment gateways used for the order."
+  - name: payment_terms
+    type: Nullable(String)
+    description: "Serialized payment terms associated with the order."
+  - name: phone
+    type: Nullable(String)
+    description: "Buyer phone number recorded on the order; contains personal data."
+  - name: po_number
+    type: Nullable(String)
+    description: "Purchase-order number associated with the order."
+  - name: presentment_currency
+    type: Nullable(String)
+    description: "ISO currency code presented to the buyer."
+  - name: processed_at
+    type: Nullable(DateTime64(6, 'UTC'))
+    description: "Timestamp when Shopify processed the order."
+  - name: referring_site
+    type: Nullable(String)
+    description: "Referring URL recorded for the buyer session."
+  - name: refunds
+    type: Nullable(String)
+    description: "Serialized refunds issued against the order."
+  - name: shipping_address
+    type: Nullable(String)
+    description: "Serialized shipping address for the order; contains personal data."
+  - name: shipping_lines
+    type: Nullable(String)
+    description: "Serialized shipping methods and charges applied to the order."
+  - name: source_identifier
+    type: Nullable(String)
+    description: "Identifier assigned to the order by its originating source."
+  - name: source_name
+    type: Nullable(String)
+    description: "Channel or application through which the order was created."
+  - name: source_url
+    type: Nullable(String)
+    description: "URL of the external source associated with the order."
+  - name: subtotal_price
+    type: Nullable(String)
+    description: "Original line-item subtotal after discounts and before shipping."
+  - name: subtotal_price_set
+    type: Nullable(String)
+    description: "Serialized original subtotal in shop and presentment currencies."
+  - name: tags
+    type: Nullable(String)
+    description: "Serialized tags assigned to the order."
+  - name: tax_exempt
+    type: Nullable(Bool)
+    description: "Whether the order is exempt from tax."
+  - name: tax_lines
+    type: Nullable(String)
+    description: "Serialized tax lines applied to the order."
+  - name: taxes_included
+    type: Nullable(Bool)
+    description: "Whether displayed prices include taxes."
+  - name: test
+    type: Nullable(Bool)
+    description: "Whether Shopify marks the order as a test order."
+  - name: token
+    type: Nullable(String)
+    description: "Shopify token identifying the order; treat as sensitive."
+  - name: total_discounts
+    type: Nullable(String)
+    description: "Original total discounts applied to the order."
+  - name: total_discounts_set
+    type: Nullable(String)
+    description: "Serialized original discount total in shop and presentment currencies."
+  - name: total_line_items_price
+    type: Nullable(String)
+    description: "Original total line-item price before order-level discounts."
+  - name: total_line_items_price_set
+    type: Nullable(String)
+    description: "Serialized original line-item total in shop and presentment currencies."
+  - name: total_outstanding
+    type: Nullable(String)
+    description: "Order total still owed by the buyer."
+  - name: total_price
+    type: Nullable(String)
+    description: "Original order total including taxes, shipping, and discounts."
+  - name: total_price_set
+    type: Nullable(String)
+    description: "Serialized original order total in shop and presentment currencies."
+  - name: total_shipping_price_set
+    type: Nullable(String)
+    description: "Serialized total shipping price in shop and presentment currencies."
+  - name: total_tax
+    type: Nullable(String)
+    description: "Original total tax charged on the order."
+  - name: total_tax_set
+    type: Nullable(String)
+    description: "Serialized original tax total in shop and presentment currencies."
+  - name: total_tip_received
+    type: Nullable(String)
+    description: "Total tips received for the order."
+  - name: total_weight
+    type: Nullable(String)
+    description: "Total line-item weight in the shop's configured weight unit."
+  - name: updated_at
+    type: Nullable(DateTime64(6, 'UTC'))
+    description: "Timestamp when Shopify last updated the order; used as the incremental cursor."
+  - name: user_id
+    type: Nullable(Int64)
+    description: "Identifier of the Shopify staff user associated with the order."
+  - name: duties_included
+    type: Nullable(Bool)
+    description: "Whether displayed prices include duties."
+  - name: merchant_business_entity_id
+    type: Nullable(String)
+    description: "Identifier of the merchant business entity responsible for the order."
+  - name: total_cash_rounding_payment_adjustment_set
+    type: Nullable(String)
+    description: "Serialized cash-rounding adjustment applied to order payments."
+  - name: total_cash_rounding_refund_adjustment_set
+    type: Nullable(String)
+    description: "Serialized cash-rounding adjustment applied to order refunds."
+  - name: checkout_id
+    type: Nullable(Int64)
+    description: "Numeric identifier of the checkout that produced the order."
+  - name: reference
+    type: Nullable(String)
+    description: "External reference attached to the order."
+  - name: _ingestr_loaded_at
+    type: Nullable(DateTime64(6, 'UTC'))
+    description: "Timestamp when ingestr loaded the record into ClickHouse."

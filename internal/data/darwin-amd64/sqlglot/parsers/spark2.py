@@ -20,6 +20,7 @@ def build_as_cast(to_type: str) -> t.Callable[[list], exp.Expr]:
 class Spark2Parser(HiveParser):
     TRIM_PATTERN_FIRST = True
     CHANGE_COLUMN_ALTER_SYNTAX = True
+    PIVOT_COLUMN_NAMING = "agg_name_if_multiple"
 
     FUNCTIONS = {
         **HiveParser.FUNCTIONS,
@@ -59,10 +60,10 @@ class Spark2Parser(HiveParser):
         "STRING": build_as_cast("string"),
         "SLICE": exp.ArraySlice.from_arg_list,
         "TIMESTAMP": build_as_cast("timestamp"),
-        "TO_TIMESTAMP": lambda args: (
+        "TO_TIMESTAMP": lambda args, dialect: (
             build_as_cast("timestamp")(args)
             if len(args) == 1
-            else build_formatted_time(exp.StrToTime, "spark")(args)
+            else build_formatted_time(exp.StrToTime)(args, dialect)
         ),
         "TO_UNIX_TIMESTAMP": exp.StrToUnix.from_arg_list,
         "TO_UTC_TIMESTAMP": lambda args, dialect: exp.FromTimeZone(
@@ -79,7 +80,7 @@ class Spark2Parser(HiveParser):
 
     FUNCTION_PARSERS = {
         **HiveParser.FUNCTION_PARSERS,
-        "APPROX_PERCENTILE": lambda self: self._parse_quantile_function(exp.ApproxQuantile),
+        "APPROX_PERCENTILE": lambda self: self._parse_distinct_arg_function(exp.ApproxQuantile),
         "BROADCAST": lambda self: self._parse_join_hint("BROADCAST"),
         "BROADCASTJOIN": lambda self: self._parse_join_hint("BROADCASTJOIN"),
         "MAPJOIN": lambda self: self._parse_join_hint("MAPJOIN"),

@@ -1604,6 +1604,70 @@ func TestEnsureMaterializationValuesAreValid(t *testing.T) {
 				"Materialization strategy 'datavault_hub' requires the 'columns' field to be set with actual columns",
 			},
 		},
+		{
+			name: "table materialization has datavault_hub with an ambiguous hash key",
+			assets: []*pipeline.Asset{
+				{
+					Name: "task1",
+					Materialization: pipeline.Materialization{
+						Type:     pipeline.MaterializationTypeTable,
+						Strategy: pipeline.MaterializationStrategyDataVaultHub,
+					},
+					Columns: []pipeline.Column{
+						{Name: "customer_hk", Type: "text"},
+						{Name: "order_hk", Type: "text"},
+						{Name: "customer_bk", Type: "text"},
+						{Name: "load_dts", Type: "timestamp"},
+						{Name: "record_source", Type: "text"},
+					},
+				},
+			},
+			wantErr: assert.NoError,
+			want: []string{
+				"Materialization strategy 'datavault_hub' requires exactly one hash key column, identified by 'datavault_role: hash_key', a single column with 'primary_key: true', or a single column name ending in '_hk'",
+			},
+		},
+		{
+			name: "table materialization has datavault_satellite with several primary keys and no explicit role",
+			assets: []*pipeline.Asset{
+				{
+					Name: "task1",
+					Materialization: pipeline.Materialization{
+						Type:     pipeline.MaterializationTypeTable,
+						Strategy: pipeline.MaterializationStrategyDataVaultSatellite,
+					},
+					Columns: []pipeline.Column{
+						{Name: "load_dts", Type: "timestamp", PrimaryKey: true},
+						{Name: "customer_hk", Type: "text", PrimaryKey: true},
+						{Name: "hashdiff", Type: "text"},
+						{Name: "record_source", Type: "text"},
+					},
+				},
+			},
+			wantErr: assert.NoError,
+			want: []string{
+				"Materialization strategy 'datavault_satellite' requires exactly one parent hash key column, identified by 'datavault_role: parent_hash_key', a single column with 'primary_key: true', or a single column name ending in '_hk'",
+			},
+		},
+		{
+			name: "table materialization has datavault_satellite with several primary keys and an explicit role",
+			assets: []*pipeline.Asset{
+				{
+					Name: "task1",
+					Materialization: pipeline.Materialization{
+						Type:     pipeline.MaterializationTypeTable,
+						Strategy: pipeline.MaterializationStrategyDataVaultSatellite,
+					},
+					Columns: []pipeline.Column{
+						{Name: "load_dts", Type: "timestamp", PrimaryKey: true},
+						{Name: "customer_hk", Type: "text", PrimaryKey: true, Meta: map[string]string{"datavault_role": "parent_hash_key"}},
+						{Name: "hashdiff", Type: "text"},
+						{Name: "record_source", Type: "text"},
+					},
+				},
+			},
+			wantErr: assert.NoError,
+		},
 	}
 	ctx := t.Context()
 	for _, tt := range tests {
@@ -1629,6 +1693,208 @@ func TestEnsureMaterializationValuesAreValid(t *testing.T) {
 			} else {
 				assert.Equal(t, []*Issue{}, got)
 			}
+		})
+	}
+}
+
+func TestEnsureBigQueryTableOptionsAreValid(t *testing.T) {
+	t.Parallel()
+
+	trueValue := true
+	falseValue := false
+	thirtyDays := 30.0
+	negativeDays := -1.0
+	tests := []struct {
+		name                   string
+		assetType              pipeline.AssetType
+		materializationType    pipeline.MaterializationType
+		strategy               pipeline.MaterializationStrategy
+		partitionBy            string
+		incrementalKey         string
+		columns                []pipeline.Column
+		requirePartitionFilter *bool
+		expirationDays         *float64
+		partitionKeyImmutable  *bool
+		defaultRequireFilter   *bool
+		wantIssueContains      string
+	}{
+		{
+			name:                   "allows a partition-scoped merge when the partition column is a primary key",
+			assetType:              pipeline.AssetTypeBigqueryQuery,
+			materializationType:    pipeline.MaterializationTypeTable,
+			strategy:               pipeline.MaterializationStrategyMerge,
+			partitionBy:            "DATE(ts)",
+			columns:                []pipeline.Column{{Name: "ts", Type: "TIMESTAMP", PrimaryKey: true}},
+			requirePartitionFilter: &trueValue,
+		},
+		{
+			name:                 "allows a safe partition-scoped merge with an inherited required filter",
+			assetType:            pipeline.AssetTypeBigqueryQuery,
+			materializationType:  pipeline.MaterializationTypeTable,
+			strategy:             pipeline.MaterializationStrategyMerge,
+			partitionBy:          "DATE(ts)",
+			columns:              []pipeline.Column{{Name: "ts", Type: "TIMESTAMP", PrimaryKey: true}},
+			defaultRequireFilter: &trueValue,
+		},
+		{
+			name:                   "rejects a partition-scoped merge when the partition key may move",
+			assetType:              pipeline.AssetTypeBigqueryQuery,
+			materializationType:    pipeline.MaterializationTypeTable,
+			strategy:               pipeline.MaterializationStrategyMerge,
+			partitionBy:            "event_date",
+			columns:                []pipeline.Column{{Name: "id", Type: "INT64", PrimaryKey: true}, {Name: "event_date", Type: "DATE"}},
+			requirePartitionFilter: &trueValue,
+			wantIssueContains:      "partition column \"event_date\" to be a primary key or bigquery.partition_key_immutable to be true",
+		},
+		{
+			name:                   "allows a partition-scoped merge with an immutable partition key",
+			assetType:              pipeline.AssetTypeBigqueryQuery,
+			materializationType:    pipeline.MaterializationTypeTable,
+			strategy:               pipeline.MaterializationStrategyMerge,
+			partitionBy:            "event_date",
+			columns:                []pipeline.Column{{Name: "id", Type: "INT64", PrimaryKey: true}, {Name: "event_date", Type: "DATE"}},
+			requirePartitionFilter: &trueValue,
+			partitionKeyImmutable:  &trueValue,
+		},
+		{
+			name:                   "rejects a required partition filter without a partition",
+			assetType:              pipeline.AssetTypeBigqueryQuery,
+			materializationType:    pipeline.MaterializationTypeTable,
+			strategy:               pipeline.MaterializationStrategyCreateReplace,
+			requirePartitionFilter: &trueValue,
+			wantIssueContains:      "requires materialization.partition_by to be set",
+		},
+		{
+			name:                   "rejects a required partition filter with SCD2",
+			assetType:              pipeline.AssetTypeBigqueryQuery,
+			materializationType:    pipeline.MaterializationTypeTable,
+			strategy:               pipeline.MaterializationStrategySCD2ByTime,
+			incrementalKey:         "ts",
+			requirePartitionFilter: &trueValue,
+			wantIssueContains:      "not supported with materialization strategy scd2_by_time",
+		},
+		{
+			name:                   "rejects delete+insert when the partition does not use the incremental key",
+			assetType:              pipeline.AssetTypeBigqueryQuery,
+			materializationType:    pipeline.MaterializationTypeTable,
+			strategy:               pipeline.MaterializationStrategyDeleteInsert,
+			partitionBy:            "DATE(created_at)",
+			incrementalKey:         "ts",
+			columns:                []pipeline.Column{{Name: "ts", Type: "TIMESTAMP"}},
+			requirePartitionFilter: &trueValue,
+			wantIssueContains:      "requires materialization.partition_by to use materialization.incremental_key",
+		},
+		{
+			name:                   "rejects delete+insert when the incremental key column type is missing",
+			assetType:              pipeline.AssetTypeBigqueryQuery,
+			materializationType:    pipeline.MaterializationTypeTable,
+			strategy:               pipeline.MaterializationStrategyDeleteInsert,
+			partitionBy:            "DATE(ts)",
+			incrementalKey:         "ts",
+			requirePartitionFilter: &trueValue,
+			wantIssueContains:      "requires the incremental key column type to be set",
+		},
+		{
+			name:                "rejects a negative partition expiration",
+			assetType:           pipeline.AssetTypeBigqueryQuery,
+			materializationType: pipeline.MaterializationTypeTable,
+			strategy:            pipeline.MaterializationStrategyCreateReplace,
+			partitionBy:         "DATE(ts)",
+			expirationDays:      &negativeDays,
+			wantIssueContains:   "must be a positive number",
+		},
+		{
+			name:                "rejects a partition expiration without a partition",
+			assetType:           pipeline.AssetTypeBigqueryQuery,
+			materializationType: pipeline.MaterializationTypeTable,
+			strategy:            pipeline.MaterializationStrategyCreateReplace,
+			expirationDays:      &thirtyDays,
+			wantIssueContains:   "requires materialization.partition_by to be set",
+		},
+		{
+			name:                   "an explicit false value overrides a true default",
+			assetType:              pipeline.AssetTypeBigqueryQuery,
+			materializationType:    pipeline.MaterializationTypeTable,
+			strategy:               pipeline.MaterializationStrategyMerge,
+			requirePartitionFilter: &falseValue,
+			defaultRequireFilter:   &trueValue,
+		},
+		{
+			name:                 "allows merge when the default disables the option",
+			assetType:            pipeline.AssetTypeBigqueryQuery,
+			materializationType:  pipeline.MaterializationTypeTable,
+			strategy:             pipeline.MaterializationStrategyMerge,
+			defaultRequireFilter: &falseValue,
+		},
+		{
+			name:                   "allows delete+insert partitioned on the incremental key",
+			assetType:              pipeline.AssetTypeBigqueryQuery,
+			materializationType:    pipeline.MaterializationTypeTable,
+			strategy:               pipeline.MaterializationStrategyDeleteInsert,
+			partitionBy:            "DATE(ts)",
+			incrementalKey:         "ts",
+			columns:                []pipeline.Column{{Name: "ts", Type: "TIMESTAMP"}},
+			requirePartitionFilter: &trueValue,
+			expirationDays:         &thirtyDays,
+		},
+		{
+			name:                 "ignores views that inherit the option from defaults",
+			assetType:            pipeline.AssetTypeBigqueryQuery,
+			materializationType:  pipeline.MaterializationTypeView,
+			defaultRequireFilter: &trueValue,
+		},
+		{
+			name:                   "ignores non-BigQuery assets",
+			assetType:              pipeline.AssetTypeSnowflakeQuery,
+			materializationType:    pipeline.MaterializationTypeTable,
+			strategy:               pipeline.MaterializationStrategyMerge,
+			requirePartitionFilter: &trueValue,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			asset := &pipeline.Asset{
+				Name:    "dataset.events",
+				Type:    tt.assetType,
+				Columns: tt.columns,
+				Materialization: pipeline.Materialization{
+					Type:           tt.materializationType,
+					Strategy:       tt.strategy,
+					PartitionBy:    tt.partitionBy,
+					IncrementalKey: tt.incrementalKey,
+				},
+				BigQuery: pipeline.BigQueryConfig{
+					RequirePartitionFilter:  tt.requirePartitionFilter,
+					PartitionExpirationDays: tt.expirationDays,
+					PartitionKeyImmutable:   tt.partitionKeyImmutable,
+				},
+			}
+			p := &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{asset},
+			}
+			if tt.defaultRequireFilter != nil {
+				p.DefaultValues = &pipeline.DefaultValues{
+					BigQuery: pipeline.BigQueryConfig{
+						RequirePartitionFilter: tt.defaultRequireFilter,
+					},
+				}
+				_, err := (&pipeline.Builder{}).SetupDefaultsFromPipeline(t.Context(), asset, p)
+				require.NoError(t, err)
+			}
+
+			got, err := EnsureBigQueryTableOptionsAreValid(t.Context(), p, asset)
+			require.NoError(t, err)
+			if tt.wantIssueContains == "" {
+				assert.Empty(t, got)
+				return
+			}
+
+			require.Len(t, got, 1)
+			assert.Same(t, asset, got[0].Task)
+			assert.Contains(t, got[0].Description, tt.wantIssueContains)
 		})
 	}
 }
@@ -3844,7 +4110,7 @@ func TestValidateHookQueryDryRun(t *testing.T) {
 
 	sqlAssetWithHooks := &pipeline.Asset{
 		Name: "asset_with_hooks",
-		Type: pipeline.AssetTypeBigqueryQuery,
+		Type: pipeline.AssetTypeSnowflakeQuery,
 		Hooks: pipeline.Hooks{
 			Pre: []pipeline.Hook{
 				{Query: "SELECT 1"},
@@ -3866,9 +4132,16 @@ func TestValidateHookQueryDryRun(t *testing.T) {
 			Pre: []pipeline.Hook{{Query: "SELECT 1"}},
 		},
 	}
+	bigQueryAssetWithHooks := &pipeline.Asset{
+		Name: "bigquery_asset_with_hooks",
+		Type: pipeline.AssetTypeBigqueryQuery,
+		Hooks: pipeline.Hooks{
+			Pre: []pipeline.Hook{{Query: "DECLARE window_start DATE"}},
+		},
+	}
 
 	p := &pipeline.Pipeline{
-		Assets: []*pipeline.Asset{sqlAssetWithHooks, sqlAssetWithoutHooks, pythonAssetWithHooks},
+		Assets: []*pipeline.Asset{sqlAssetWithHooks, sqlAssetWithoutHooks, pythonAssetWithHooks, bigQueryAssetWithHooks},
 	}
 
 	t.Run("valid hook queries", func(t *testing.T) {
@@ -3920,6 +4193,16 @@ func TestValidateHookQueryDryRun(t *testing.T) {
 		cm := &fakeConnectionManager{validator: &fakeQueryValidator{isValid: false}}
 		validator := ValidateHookQueryDryRun(cm)
 		issues, err := validator(t.Context(), p, pythonAssetWithHooks)
+		require.NoError(t, err)
+		assert.Empty(t, issues)
+	})
+
+	t.Run("BigQuery hooks are validated with the complete asset script", func(t *testing.T) {
+		t.Parallel()
+
+		cm := &fakeConnectionManager{validator: &fakeQueryValidator{isValid: false}}
+		validator := ValidateHookQueryDryRun(cm)
+		issues, err := validator(t.Context(), p, bigQueryAssetWithHooks)
 		require.NoError(t, err)
 		assert.Empty(t, issues)
 	})
@@ -4830,6 +5113,48 @@ func TestValidateAssetSeedValidation_NonCSVFormats(t *testing.T) {
 	}
 }
 
+func TestValidateAssetSeedValidation_SparkCSVOnly(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		seedPath   string
+		fileType   string
+		wantIssues int
+	}{
+		{name: "CSV URL is supported", seedPath: "https://example.com/data.csv"},
+		{name: "CSV file_type is case insensitive", seedPath: "https://example.com/data.dat", fileType: "CSV"},
+		{name: "explicit Parquet file_type is rejected", seedPath: "https://example.com/data.dat", fileType: "parquet", wantIssues: 1},
+		{name: "Parquet extension is rejected", seedPath: "https://example.com/data.parquet", wantIssues: 1},
+		{name: "non-CSV URL extension before query is rejected", seedPath: "https://example.com/data.json?download=1", wantIssues: 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			parameters := pipeline.ParameterMap{"path": tt.seedPath}
+			if tt.fileType != "" {
+				parameters["file_type"] = tt.fileType
+			}
+			asset := &pipeline.Asset{
+				Name:       "test_seed",
+				Type:       pipeline.AssetTypeSparkSeed,
+				Parameters: parameters,
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Path: "/test/assets/test.asset.yml",
+				},
+			}
+
+			issues, err := ValidateAssetSeedValidation(t.Context(), &pipeline.Pipeline{}, asset)
+			require.NoError(t, err)
+			require.Len(t, issues, tt.wantIssues)
+			if tt.wantIssues > 0 {
+				assert.Equal(t, "Spark seed assets only support CSV files", issues[0].Description)
+			}
+		})
+	}
+}
+
 func TestValidateTableSensorTableParameter(t *testing.T) {
 	t.Parallel()
 
@@ -4996,6 +5321,41 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "task1",
 				Type: pipeline.AssetTypeDatabricksTableSensor,
+				Parameters: pipeline.ParameterMap{
+					"table": "catalog.schema.table",
+				},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+
+		// Spark tests
+		{
+			name: "Spark - no table parameter",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeSparkTableSensor,
+			},
+			want:    []string{"Spark table sensor requires a `table` parameter"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Spark - valid table format",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeSparkTableSensor,
+				Parameters: pipeline.ParameterMap{
+					"table": "table",
+				},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Spark - valid catalog.schema.table format",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeSparkTableSensor,
 				Parameters: pipeline.ParameterMap{
 					"table": "catalog.schema.table",
 				},

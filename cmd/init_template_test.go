@@ -2,9 +2,11 @@
 package cmd
 
 import (
+	iofs "io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/bruin-data/bruin/templates"
@@ -58,6 +60,164 @@ func TestInitSelfHealDemoCopiesPipelineTemplate(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, string(configContent), "name: self-heal-demo")
 	require.Contains(t, string(configContent), "path: self-heal-demo.duckdb")
+}
+
+func TestInitShopifyClickHouseCopiesPipelineTemplate(t *testing.T) {
+	targetRoot := t.TempDir()
+	t.Chdir(targetRoot)
+
+	gitInit := exec.CommandContext(t.Context(), "git", "init")
+	gitInit.Dir = targetRoot
+	out, err := gitInit.CombinedOutput()
+	require.NoError(t, err, string(out))
+
+	err = Init().Run(t.Context(), []string{"init", "shopify-clickhouse"})
+	require.NoError(t, err)
+
+	pipelineRoot := filepath.Join(targetRoot, "shopify-clickhouse")
+	require.FileExists(t, filepath.Join(pipelineRoot, "README.md"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "pipeline.yml"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "assets", "t1", "t1_orders.asset.yml"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "assets", "t2", "t2_orders.sql"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "assets", "t3", "t3_daily_kpis.sql"))
+
+	pipeline, err := os.ReadFile(filepath.Join(pipelineRoot, "pipeline.yml"))
+	require.NoError(t, err)
+	require.Contains(t, string(pipeline), "name: shopify-clickhouse")
+	require.Contains(t, string(pipeline), "shopify: \"shopify-default\"")
+
+	ordersAsset, err := os.ReadFile(filepath.Join(pipelineRoot, "assets", "t1", "t1_orders.asset.yml"))
+	require.NoError(t, err)
+	require.Contains(t, string(ordersAsset), "name: shopify.t1_orders")
+	require.Contains(t, string(ordersAsset), "source_connection: shopify-default")
+
+	orderLinesAsset, err := os.ReadFile(filepath.Join(pipelineRoot, "assets", "t2", "t2_order_line_items.sql"))
+	require.NoError(t, err)
+	require.Contains(t, string(orderLinesAsset), "strategy: delete+insert")
+	require.Contains(t, string(orderLinesAsset), "incremental_key: order_id")
+}
+
+func TestInitStripeBigQueryCopiesStarterTemplate(t *testing.T) {
+	targetRoot := t.TempDir()
+	t.Chdir(targetRoot)
+
+	gitInit := exec.CommandContext(t.Context(), "git", "init")
+	gitInit.Dir = targetRoot
+	out, err := gitInit.CombinedOutput()
+	require.NoError(t, err, string(out))
+
+	err = Init().Run(t.Context(), []string{"init", "stripe-bigquery"})
+	require.NoError(t, err)
+
+	pipelineRoot := filepath.Join(targetRoot, "stripe-bigquery")
+	require.FileExists(t, filepath.Join(pipelineRoot, "pipeline.yml"))
+	require.FileExists(t, filepath.Join(pipelineRoot, ".gitignore"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "assets", "stripe_raw", "customer.asset.yml"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "assets", "stripe_reports", "monthly_subscription_kpis.sql"))
+	require.NoFileExists(t, filepath.Join(pipelineRoot, "assets", "stripe_raw", "refund.asset.yml"))
+
+	pipeline, err := os.ReadFile(filepath.Join(pipelineRoot, "pipeline.yml"))
+	require.NoError(t, err)
+	require.Contains(t, string(pipeline), "name: stripe-bigquery")
+
+	configContent, err := os.ReadFile(filepath.Join(targetRoot, ".bruin.yml"))
+	require.NoError(t, err)
+	require.Contains(t, string(configContent), "name: gcp-default")
+	require.Contains(t, string(configContent), "name: stripe-default")
+}
+
+func TestStripeBigQueryStarterTemplateHasFocusedAssetSet(t *testing.T) {
+	t.Parallel()
+
+	expectedAssets := []string{
+		"stripe_raw/customer.asset.yml",
+		"stripe_raw/product.asset.yml",
+		"stripe_raw/price.asset.yml",
+		"stripe_raw/subscription.asset.yml",
+		"stripe_raw/subscription_item.asset.yml",
+		"stripe_raw/invoice.asset.yml",
+		"stripe_stage/customers.sql",
+		"stripe_stage/products.sql",
+		"stripe_stage/prices.sql",
+		"stripe_stage/subscriptions.sql",
+		"stripe_stage/subscription_items.sql",
+		"stripe_stage/invoices.sql",
+		"stripe_stage/invoice_line_items.sql",
+		"stripe_stage/subscription_item_daily_snapshot.sql",
+		"stripe_stage/customer_currency_daily_mrr_snapshot.sql",
+		"stripe_reports/monthly_mrr_by_customer.sql",
+		"stripe_reports/monthly_mrr_movements.sql",
+		"stripe_reports/monthly_subscription_kpis.sql",
+		"stripe_reports/monthly_invoice_billings.sql",
+	}
+
+	var actualAssets []string
+	err := iofs.WalkDir(templates.Templates, "stripe-bigquery/assets", func(path string, entry iofs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+
+		actualAssets = append(actualAssets, strings.TrimPrefix(path, "stripe-bigquery/assets/"))
+		return nil
+	})
+	require.NoError(t, err)
+	require.Len(t, actualAssets, 19)
+	require.ElementsMatch(t, expectedAssets, actualAssets)
+
+	pipeline, err := templates.Templates.ReadFile("stripe-bigquery/pipeline.yml")
+	require.NoError(t, err)
+	require.Contains(t, string(pipeline), "name: stripe-bigquery")
+	require.Contains(t, string(pipeline), "source_connection: stripe-default")
+	require.Contains(t, string(pipeline), "destination: bigquery")
+
+	readme, err := templates.Templates.ReadFile("stripe-bigquery/README.md")
+	require.NoError(t, err)
+	require.Contains(t, string(readme), "Stripe Billing Analytics to BigQuery")
+}
+
+func TestInitMigrationFivetranCopiesMigrationWorkspace(t *testing.T) {
+	targetRoot := t.TempDir()
+	t.Chdir(targetRoot)
+
+	gitInit := exec.CommandContext(t.Context(), "git", "init")
+	gitInit.Dir = targetRoot
+	out, err := gitInit.CombinedOutput()
+	require.NoError(t, err, string(out))
+
+	err = os.WriteFile(filepath.Join(targetRoot, ".bruin.yml"), []byte("connections:\n  duckdb: []\n  duckdb: []\n"), 0o600)
+	require.NoError(t, err)
+
+	err = Init().Run(t.Context(), []string{"init", "migration-fivetran", "my-fivetran-migration"})
+	require.NoError(t, err)
+
+	migrationRoot := filepath.Join(targetRoot, "my-fivetran-migration")
+	require.FileExists(t, filepath.Join(migrationRoot, ".gitignore"))
+	require.FileExists(t, filepath.Join(migrationRoot, "fivetran-bruin-prompt.md"))
+	require.FileExists(t, filepath.Join(migrationRoot, "plan.md"))
+	require.FileExists(t, filepath.Join(migrationRoot, "bruin", "pipeline.yml"))
+	require.FileExists(t, filepath.Join(migrationRoot, "bruin", "assets", "placeholder"))
+	require.FileExists(t, filepath.Join(migrationRoot, ".agents", "skills", "bruin-fivetran-migrator", "SKILL.md"))
+	require.FileExists(t, filepath.Join(migrationRoot, ".agents", "skills", "bruin-fivetran-migrator", "import_fivetran.py"))
+
+	pipeline, err := os.ReadFile(filepath.Join(migrationRoot, "bruin", "pipeline.yml"))
+	require.NoError(t, err)
+	require.Contains(t, string(pipeline), "name: bruin")
+
+	prompt, err := os.ReadFile(filepath.Join(migrationRoot, "fivetran-bruin-prompt.md"))
+	require.NoError(t, err)
+	require.Contains(t, string(prompt), "review-gated workflow")
+
+	skill, err := os.ReadFile(filepath.Join(migrationRoot, ".agents", "skills", "bruin-fivetran-migrator", "SKILL.md"))
+	require.NoError(t, err)
+	require.Contains(t, string(skill), "Capture exactly one connection selected by the user.")
+
+	gitCheckIgnore := exec.CommandContext(t.Context(), "git", "check-ignore", ".bruin.yml", ".artifacts/fivetran/capture")
+	gitCheckIgnore.Dir = migrationRoot
+	out, err = gitCheckIgnore.CombinedOutput()
+	require.NoError(t, err, string(out))
 }
 
 func TestSelfHealDemoTemplateContainsDataProblemScenarios(t *testing.T) {

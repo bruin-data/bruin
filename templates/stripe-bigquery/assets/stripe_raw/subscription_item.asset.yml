@@ -1,0 +1,7 @@
+name: stripe_raw.subscription_item
+type: ingestr
+
+description: Raw-layer ingestion of Stripe subscription item data into BigQuery.
+
+parameters:
+  source_table: subscription_item

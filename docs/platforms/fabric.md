@@ -1,10 +1,10 @@
-# Microsoft Fabric Warehouse
+# Microsoft Fabric
 
-Bruin supports Microsoft Fabric Warehouse through the SQL endpoint (TDS protocol) using the `go-mssqldb` driver. Fabric is case-sensitive for identifiers, so use quoted identifiers or consistent casing in asset names.
+Bruin supports Microsoft Fabric Warehouse through the SQL endpoint (TDS protocol) and Fabric Lakehouses through the Fabric Livy API and Spark SQL. Both execution engines can share one Fabric connection and its Microsoft Entra credentials.
 
 ## Connection configuration
 
-Add a Fabric Warehouse connection under `fabric`:
+Add a Fabric connection under `fabric`. The optional `lakehouse` block enables Spark SQL assets without requiring a second `spark` connection:
 
 ```yaml
 # .bruin.yml
@@ -17,12 +17,23 @@ environments:
           port: 1433
           database: your_warehouse
           use_azure_default_credential: true
+          lakehouse:
+            workspace_id: "<workspace GUID>"
+            lakehouse_id: "<lakehouse GUID>"
           # options: "encrypt=true&TrustServerCertificate=false" # optional
+```
+
+`host`, `port`, and `database` configure the Warehouse SQL endpoint. They are required on every Fabric connection, even one used only for `fabric.spark_sql` assets, so point them at your workspace's SQL analytics endpoint. `lakehouse.workspace_id` and `lakehouse.lakehouse_id` identify the Lakehouse used by `fabric.spark_sql`; authentication is inherited from the parent Fabric connection. The IDs are visible in the Fabric Lakehouse URL:
+
+```text
+https://app.fabric.microsoft.com/groups/<workspace_id>/lakehouses/<lakehouse_id>
 ```
 
 ### Azure AD (DefaultAzureCredential)
 
 If `use_azure_default_credential: true` is set, the connector uses Azure's DefaultAzureCredential chain. You can authenticate locally with Azure CLI (`az login`).
+
+Configure only one Microsoft Entra authentication method per connection. For backward compatibility, Warehouse and Spark use the default credential when both methods are configured, while ingestr continues to use the service principal.
 
 ### Service principal (client secret)
 
@@ -56,11 +67,12 @@ environments:
 ```
 
 > [!NOTE]
-> SQL authentication is only available for native Fabric assets (`fabric.sql`, `fabric.seed`, sensors). Using Fabric as an [ingestr](#using-fabric-with-ingestr) source or destination requires Microsoft Entra ID authentication — username/password connections are rejected.
+> SQL authentication is only available for Warehouse assets (`fabric.sql`, `fabric.seed`, sensors). Using `fabric.spark_sql` or Fabric as an [ingestr](#using-fabric-with-ingestr) source or destination requires Microsoft Entra ID authentication — username/password connections are rejected.
 
 ## Asset types
 
 - `fabric.sql`
+- `fabric.spark_sql`
 - `fabric.seed`
 - `fabric.sensor.query`
 - `fabric.sensor.table`
@@ -91,6 +103,26 @@ SELECT
 FROM source_table
 WHERE modified_date > '{{ start_date }}'
 ```
+
+## Spark SQL on a Lakehouse
+
+Use `fabric.spark_sql` to execute Spark SQL through the [Fabric Livy API](https://learn.microsoft.com/fabric/data-engineering/api-livy-overview). It uses the same Spark SQL execution, checks, Jinja functions, and materialization machinery as `spark.sql`, while resolving the named connection from the `fabric` section.
+
+```sql
+/* @bruin
+name: analytics.daily_events
+type: fabric.spark_sql
+connection: fabric-default
+materialization:
+  type: table
+@bruin */
+
+SELECT event_date, COUNT(*) AS event_count
+FROM raw.events
+GROUP BY event_date
+```
+
+Fabric Spark SQL authenticates with Microsoft Entra ID using the parent connection's credentials. When using a service principal, all three of `client_id`, `client_secret`, and `tenant_id` must be set. The authenticated identity must have permission to execute jobs on the Lakehouse.
 
 ## Using Fabric with Ingestr
 

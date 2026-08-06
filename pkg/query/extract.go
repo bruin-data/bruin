@@ -80,7 +80,6 @@ func (q Query) String() string {
 }
 
 var (
-	queryCommentRegex        = regexp.MustCompile(`(?m)(?s)\/\*.*?\*\/|(^|\s)--.*?\n`)
 	oraclePLSQLDDLStartRegex = regexp.MustCompile(`(?is)^CREATE\s+(?:OR\s+REPLACE\s+)?(?:(?:NON)?EDITIONABLE\s+)?(?:PROCEDURE|FUNCTION|PACKAGE(?:\s+BODY)?|TRIGGER|TYPE\s+BODY)\b`)
 	oraclePLSQLDDLBodyRegex  = regexp.MustCompile(`(?is)^CREATE\s+(?:OR\s+REPLACE\s+)?(?:(?:NON)?EDITIONABLE\s+)?(?:PACKAGE(?:\s+BODY)?|TYPE\s+BODY)\b`)
 	oraclePLSQLDDLNameRegex  = regexp.MustCompile(`(?is)^CREATE\s+(?:OR\s+REPLACE\s+)?(?:(?:NON)?EDITIONABLE\s+)?(?:PACKAGE(?:\s+BODY)?|TYPE\s+BODY)\s+([A-Z0-9_$#".]+)\b`)
@@ -89,25 +88,275 @@ var (
 	oraclePLSQLBlockEndRegex = regexp.MustCompile(`(?s)\bEND(?:\s+([A-Z0-9_$#".]+))?\s*$`)
 )
 
+// stripSQLComments replaces every SQL comment in content with a newline.
+//
+// It scans rather than pattern-matches so that string literals, quoted
+// identifiers and Oracle q-quotes are skipped whole: `--` and `/*` inside
+// 'run -- 1' are data, not comments, and a regular expression cannot tell the
+// difference. As with a line comment in SQL, `--` only opens one at the start of
+// the text or after whitespace, so `x--1` is left intact.
+//
+// Jinja comments are skipped whole for the same reason, because this runs before
+// rendering and their contents would otherwise be scanned as SQL.
+//
+// backslashEscapes selects how a backslash inside a string literal is read:
+// Spark, Sail, Snowflake and Redshift let it escape the following quote, while
+// Trino, Dremio, Oracle and Postgres with standard_conforming_strings treat it as
+// data. A Postgres `E'…'` literal always escapes, whatever the flag says. Getting
+// this wrong leaves the run mispaired, so a comment that follows can be read as
+// string data and survive — and a `;` inside a surviving comment then splits one
+// statement into two.
+//
+// An unterminated delimiter is emitted as a single ordinary character and
+// scanning continues, so quoting the scanner does not model costs a re-sync at
+// the next delimiter rather than leaving every remaining comment unstripped.
+// `#`-to-end-of-line comments are the remaining known gap; no platform wired to
+// this extractor uses them, and they cannot be recognised because `#` is a valid
+// operator or identifier character elsewhere.
+func stripSQLComments(content string, backslashEscapes bool) string {
+	out := make([]byte, 0, len(content))
+	afterSpace := true
+	// Once a delimiter has no terminator in the remainder it has none from any
+	// later index either, so a failed search is remembered instead of being
+	// repeated for every later occurrence. Without this, input such as a long run
+	// of `'\` is quadratic.
+	noBlockEnd, noJinjaEnd := false, false
+	// Quote failures are tracked per escaping mode, since the two modes search for
+	// different terminators and a failure in one says nothing about the other.
+	var noQuoteEnd [2][256]bool
+	var noQQuoteEnd [256]bool
+
+	// code emits the byte at index as ordinary SQL and advances one position.
+	code := func(index int) int {
+		out = append(out, content[index])
+		afterSpace = false
+		return index + 1
+	}
+	// comment replaces the run just scanned with a newline, dropping the
+	// horizontal whitespace before it the way the regexp this replaced did.
+	comment := func(end int) int {
+		out = append(trimTrailingBlanks(out), '\n')
+		afterSpace = true
+		return end
+	}
+
+	for i := 0; i < len(content); {
+		var next byte
+		if i+1 < len(content) {
+			next = content[i+1]
+		}
+
+		switch ch := content[i]; {
+		case ch == '\'' || ch == '"' || ch == '`':
+			// A Postgres E'…' literal escapes with backslashes even in a dialect
+			// where an ordinary literal does not.
+			escapes := backslashEscapes || isEscapeStringStart(content, i)
+			slot := 0
+			if escapes {
+				slot = 1
+			}
+			if noQuoteEnd[slot][ch] {
+				i = code(i)
+				continue
+			}
+			end, terminated := endOfQuotedRun(content, i, escapes)
+			if !terminated {
+				noQuoteEnd[slot][ch] = true
+				i = code(i)
+				continue
+			}
+			out = append(out, content[i:end]...)
+			afterSpace = false
+			i = end
+		case isOracleQQuoteStart(content, i):
+			closer := oracleQQuoteEndDelimiterAt(content, i)
+			if noQQuoteEnd[closer] {
+				i = code(i)
+				continue
+			}
+			end, terminated := endOfQQuotedRun(content, i)
+			if !terminated {
+				noQQuoteEnd[closer] = true
+				i = code(i)
+				continue
+			}
+			out = append(out, content[i:end]...)
+			afterSpace = false
+			i = end
+		case ch == '-' && next == '-' && afterSpace:
+			i = comment(endOfLineComment(content, i))
+		case ch == '/' && next == '*':
+			if noBlockEnd {
+				i = code(i)
+				continue
+			}
+			end, terminated := endOfDelimitedRun(content, i, "*/")
+			if !terminated {
+				noBlockEnd = true
+				i = code(i)
+				continue
+			}
+			i = comment(end)
+		case ch == '{' && next == '#':
+			if noJinjaEnd {
+				i = code(i)
+				continue
+			}
+			end, terminated := endOfDelimitedRun(content, i, "#}")
+			if !terminated {
+				noJinjaEnd = true
+				i = code(i)
+				continue
+			}
+			// Skipped whole rather than replaced: the renderer deletes it, and it
+			// honours the `{#-`/`-#}` whitespace controls that a substituted
+			// newline would break for a comment inside a token.
+			out = append(out, content[i:end]...)
+			afterSpace = false
+			i = end
+		default:
+			out = append(out, ch)
+			afterSpace = ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' || ch == '\f'
+			i++
+		}
+	}
+
+	return string(out)
+}
+
+// isOracleQQuoteStart reports whether a q-quoted literal opens at index. The `q`
+// has to start a token, so that an identifier ending in q followed by an
+// ordinary literal — `max_q'abc'` — is not mistaken for one.
+func isOracleQQuoteStart(content string, index int) bool {
+	return oracleQQuoteEndDelimiterAt(content, index) != 0 && startsToken(content, index)
+}
+
+// isEscapeStringStart reports whether the quote at index opens a Postgres
+// escape-string literal, `E'…'`, in which a backslash always escapes the next
+// character regardless of standard_conforming_strings.
+func isEscapeStringStart(content string, index int) bool {
+	if content[index] != '\'' || index == 0 {
+		return false
+	}
+	if previous := content[index-1]; previous != 'E' && previous != 'e' {
+		return false
+	}
+	return startsToken(content, index-1)
+}
+
+// startsToken reports whether index begins a new SQL token, i.e. it is not
+// preceded by an identifier character.
+func startsToken(content string, index int) bool {
+	if index == 0 {
+		return true
+	}
+	return !isIdentifierByte(content[index-1])
+}
+
+func isIdentifierByte(b byte) bool {
+	switch {
+	case b >= 'a' && b <= 'z', b >= 'A' && b <= 'Z', b >= '0' && b <= '9':
+		return true
+	case b == '_', b == '$', b == '#':
+		return true
+	default:
+		return false
+	}
+}
+
+// endOfQuotedRun returns the index just past the quoted run that starts at
+// index. A doubled quote character is always an escaped one; a backslashed one is
+// too when the dialect says so and the run is a string literal, since
+// backtick-quoted identifiers only ever use doubling.
+func endOfQuotedRun(content string, index int, backslashEscapes bool) (int, bool) {
+	quote := content[index]
+	escapeWithBackslash := backslashEscapes && quote != '`'
+	for i := index + 1; i < len(content); i++ {
+		switch content[i] {
+		case '\\':
+			if escapeWithBackslash {
+				i++
+			}
+		case quote:
+			if i+1 < len(content) && content[i+1] == quote {
+				i++
+				continue
+			}
+			return i + 1, true
+		}
+	}
+	return len(content), false
+}
+
+// endOfQQuotedRun returns the index just past the Oracle q-quote that starts at
+// index, e.g. q'[it's fine]'.
+func endOfQQuotedRun(content string, index int) (int, bool) {
+	closer := oracleQQuoteEndDelimiterAt(content, index)
+	for i := index + 3; i < len(content)-1; i++ {
+		if content[i] == closer && content[i+1] == '\'' {
+			return i + 2, true
+		}
+	}
+	return len(content), false
+}
+
+// endOfLineComment returns the index just past the line comment that starts at
+// index, including its terminating newline.
+func endOfLineComment(content string, index int) int {
+	for i := index; i < len(content); i++ {
+		if content[i] == '\n' {
+			return i + 1
+		}
+		if content[i] == '\r' {
+			if i+1 < len(content) && content[i+1] == '\n' {
+				return i + 2
+			}
+			return i + 1
+		}
+	}
+	return len(content)
+}
+
+// endOfDelimitedRun returns the index just past the two-character-delimited run
+// that starts at index, such as a block comment closed by `*/`.
+func endOfDelimitedRun(content string, index int, closer string) (int, bool) {
+	if end := strings.Index(content[index+2:], closer); end >= 0 {
+		return index + 2 + end + len(closer), true
+	}
+	return len(content), false
+}
+
+func trimTrailingBlanks(out []byte) []byte {
+	for len(out) > 0 && (out[len(out)-1] == ' ' || out[len(out)-1] == '\t') {
+		out = out[:len(out)-1]
+	}
+	return out
+}
+
 // FileQuerySplitterExtractor is a regular file extractor, but it splits the queries in the given file into multiple
 // instances. For usecases that require EXPLAIN statements, such as validating Snowflake queries, it is not possible
 // to use a single query with multiple statements, so we need to split them into multiple queries.
 type FileQuerySplitterExtractor struct {
-	Fs       afero.Fs
-	Renderer jinja.RendererInterface
+	Fs                        afero.Fs
+	Renderer                  jinja.RendererInterface
+	PreserveSessionStatements bool
+	// BackslashEscapes marks a dialect in which a backslash escapes the next
+	// character inside a string literal, so that comment stripping pairs quotes
+	// the way the engine will. See stripSQLComments.
+	BackslashEscapes bool
 }
 
 func (f FileQuerySplitterExtractor) ExtractQueriesFromString(content string) ([]*Query, error) {
-	cleanedUpQueries := queryCommentRegex.ReplaceAllLiteralString(content, "\n")
+	cleanedUpQueries := stripSQLComments(content, f.BackslashEscapes)
 	cleanedUpQueries, err := f.Renderer.Render(cleanedUpQueries)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not render file while extracting the queries with the split query extractor")
 	}
 
-	return splitQueries(cleanedUpQueries), nil
+	return splitQueries(cleanedUpQueries, f.PreserveSessionStatements), nil
 }
 
-func splitQueries(fileContent string) []*Query {
+func splitQueries(fileContent string, preserveSessionStatements bool) []*Query {
 	queries := make([]*Query, 0)
 	var sqlVariablesSeenSoFar []string
 
@@ -131,11 +380,18 @@ func splitQueries(fileContent string) []*Query {
 		cleanQuery := strings.TrimSpace(strings.Join(cleanQueryRows, "\n"))
 		lowerCaseVersion := strings.ToLower(cleanQuery)
 		if strings.HasPrefix(lowerCaseVersion, "set") || strings.HasPrefix(lowerCaseVersion, "declare") {
+			if preserveSessionStatements {
+				queries = append(queries, &Query{Query: cleanQuery})
+				continue
+			}
 			sqlVariablesSeenSoFar = append(sqlVariablesSeenSoFar, cleanQuery)
 			continue
 		}
 
 		if strings.HasPrefix(lowerCaseVersion, "use") {
+			if preserveSessionStatements {
+				queries = append(queries, &Query{Query: cleanQuery})
+			}
 			continue
 		}
 
@@ -148,6 +404,14 @@ func splitQueries(fileContent string) []*Query {
 	return queries
 }
 
+// SplitQueriesPreservingSessionStatements splits an already-rendered SQL
+// script while retaining statements that configure the current SQL session. It is
+// only used by Spark, which escapes with backslashes.
+func SplitQueriesPreservingSessionStatements(content string) []*Query {
+	cleanedUpQueries := stripSQLComments(content, true)
+	return splitQueries(cleanedUpQueries, true)
+}
+
 func (f FileQuerySplitterExtractor) CloneForAsset(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) (QueryExtractor, error) {
 	renderer, err := f.Renderer.CloneForAsset(ctx, p, t)
 	if err != nil {
@@ -155,8 +419,10 @@ func (f FileQuerySplitterExtractor) CloneForAsset(ctx context.Context, p *pipeli
 	}
 
 	return &FileQuerySplitterExtractor{
-		Renderer: renderer,
-		Fs:       f.Fs,
+		Renderer:                  renderer,
+		Fs:                        f.Fs,
+		PreserveSessionStatements: f.PreserveSessionStatements,
+		BackslashEscapes:          f.BackslashEscapes,
 	}, nil
 }
 
@@ -214,7 +480,7 @@ func splitOracleQueries(fileContent string) []*Query {
 	queries := make([]*Query, 0, len(statements))
 	for _, statement := range statements {
 		statement = strings.TrimSpace(removeStandaloneOracleSlash(statement))
-		if statement == "" || strings.TrimSpace(queryCommentRegex.ReplaceAllLiteralString(statement, "\n")) == "" {
+		if statement == "" || strings.TrimSpace(stripSQLComments(statement, false /* Oracle treats a backslash as data */)) == "" {
 			continue
 		}
 		queries = append(queries, &Query{Query: statement})
@@ -378,7 +644,7 @@ func oraclePLSQLBlockComplete(statement string) bool {
 }
 
 func oraclePLSQLComparableText(statement string) string {
-	withoutComments := queryCommentRegex.ReplaceAllLiteralString(statement+"\n", "\n")
+	withoutComments := stripSQLComments(statement, false /* Oracle treats a backslash as data */)
 	withoutQuotedText := oracleMaskOracleQuotedText(withoutComments)
 	return strings.ToUpper(strings.TrimSpace(withoutQuotedText))
 }

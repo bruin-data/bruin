@@ -54,6 +54,7 @@ func sqlQueryAssetTypes() []pipeline.AssetType {
 		pipeline.AssetTypeDremioQuery,
 		pipeline.AssetTypeDuckDBQuery,
 		pipeline.AssetTypeFabricQuery,
+		pipeline.AssetTypeFabricSparkQuery,
 		pipeline.AssetTypeFabricQueryLegacy,
 		pipeline.AssetTypeMotherduckQuery,
 		pipeline.AssetTypeMsSQLQuery,
@@ -62,6 +63,7 @@ func sqlQueryAssetTypes() []pipeline.AssetType {
 		pipeline.AssetTypePostgresQuery,
 		pipeline.AssetTypeRedshiftQuery,
 		pipeline.AssetTypeSailQuery,
+		pipeline.AssetTypeSparkQuery,
 		pipeline.AssetTypeSnowflakeQuery,
 		pipeline.AssetTypeStarRocksQuery,
 		pipeline.AssetTypeSynapseQuery,
@@ -825,6 +827,19 @@ func TestPipeline_GetConnectionNameForAsset(t *testing.T) {
 		assert.Equal(t, "postgres-default", found)
 	})
 
+	t.Run("Fabric Spark assets reuse the Fabric default connection", func(t *testing.T) {
+		t.Parallel()
+		fabricPipeline := &pipeline.Pipeline{
+			Name:               "fabric-pipeline",
+			DefaultConnections: map[string]string{"fabric": "shared-fabric"},
+		}
+		found, err := fabricPipeline.GetConnectionNameForAsset(&pipeline.Asset{
+			Type: pipeline.AssetTypeFabricSparkQuery,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "shared-fabric", found)
+	})
+
 	t.Run("motherduck SQL assets resolve motherduck default connections", func(t *testing.T) {
 		t.Parallel()
 		motherduckPipeline := &pipeline.Pipeline{
@@ -1006,6 +1021,44 @@ func TestMaterialization_MarshalJSON(t *testing.T) {
 			t.Parallel()
 
 			got, err := tt.materialization.MarshalJSON()
+			require.NoError(t, err)
+			assert.JSONEq(t, tt.want, string(got))
+		})
+	}
+}
+
+func TestBigQueryConfig_MarshalJSON(t *testing.T) {
+	t.Parallel()
+
+	requirePartitionFilter := true
+	partitionExpirationDays := 7.5
+	partitionKeyImmutable := true
+
+	tests := []struct {
+		name   string
+		config pipeline.BigQueryConfig
+		want   string
+	}{
+		{
+			name: "empty config marshals to null",
+			want: "null",
+		},
+		{
+			name: "configured options are preserved",
+			config: pipeline.BigQueryConfig{
+				RequirePartitionFilter:  &requirePartitionFilter,
+				PartitionExpirationDays: &partitionExpirationDays,
+				PartitionKeyImmutable:   &partitionKeyImmutable,
+			},
+			want: `{"require_partition_filter":true,"partition_expiration_days":7.5,"partition_key_immutable":true}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := tt.config.MarshalJSON()
 			require.NoError(t, err)
 			assert.JSONEq(t, tt.want, string(got))
 		})
@@ -1263,6 +1316,134 @@ func TestAsset_Persist_TagsRemoval(t *testing.T) {
 			} else {
 				assert.True(t, containsTags, "%s\nContent:\n%s", tt.description, contentStr)
 			}
+		})
+	}
+}
+
+func TestAsset_Persist_BigQueryDefaults(t *testing.T) {
+	t.Parallel()
+
+	trueValue := true
+	falseValue := false
+	defaultExpiration := 30.0
+	overrideExpiration := 7.5
+	disabledExpiration := 0.0
+
+	tests := []struct {
+		name              string
+		assetBigQuery     pipeline.BigQueryConfig
+		wantBigQuery      bool
+		wantRequire       string
+		wantExpiration    string
+		wantImmutable     string
+		unwantedRequire   string
+		unwantedExpire    string
+		unwantedImmutable string
+	}{
+		{
+			name:         "fully inherited config is omitted",
+			wantBigQuery: false,
+		},
+		{
+			name: "explicit false override is retained",
+			assetBigQuery: pipeline.BigQueryConfig{
+				RequirePartitionFilter: &falseValue,
+			},
+			wantBigQuery:      true,
+			wantRequire:       "require_partition_filter: false",
+			unwantedExpire:    "partition_expiration_days:",
+			unwantedImmutable: "partition_key_immutable:",
+		},
+		{
+			name: "expiration override is retained without inherited filter",
+			assetBigQuery: pipeline.BigQueryConfig{
+				PartitionExpirationDays: &overrideExpiration,
+			},
+			wantBigQuery:      true,
+			wantExpiration:    "partition_expiration_days: 7.5",
+			unwantedRequire:   "require_partition_filter:",
+			unwantedImmutable: "partition_key_immutable:",
+		},
+		{
+			name: "zero expiration disables the inherited value",
+			assetBigQuery: pipeline.BigQueryConfig{
+				PartitionExpirationDays: &disabledExpiration,
+			},
+			wantBigQuery:      true,
+			wantExpiration:    "partition_expiration_days: 0",
+			unwantedRequire:   "require_partition_filter:",
+			unwantedImmutable: "partition_key_immutable:",
+		},
+		{
+			name: "mutable partition override is retained",
+			assetBigQuery: pipeline.BigQueryConfig{
+				PartitionKeyImmutable: &falseValue,
+			},
+			wantBigQuery:    true,
+			wantImmutable:   "partition_key_immutable: false",
+			unwantedRequire: "require_partition_filter:",
+			unwantedExpire:  "partition_expiration_days:",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			foundPipeline := &pipeline.Pipeline{
+				DefaultValues: &pipeline.DefaultValues{
+					BigQuery: pipeline.BigQueryConfig{
+						RequirePartitionFilter:  &trueValue,
+						PartitionExpirationDays: &defaultExpiration,
+						PartitionKeyImmutable:   &trueValue,
+					},
+				},
+			}
+			asset := &pipeline.Asset{
+				Name:     "analytics.events",
+				Type:     pipeline.AssetTypeBigqueryQuery,
+				BigQuery: tt.assetBigQuery,
+				ExecutableFile: pipeline.ExecutableFile{
+					Path:    "events.sql",
+					Content: "SELECT 1",
+				},
+			}
+
+			asset, err := (&pipeline.Builder{}).SetupDefaultsFromPipeline(t.Context(), asset, foundPipeline)
+			require.NoError(t, err)
+
+			fs := afero.NewMemMapFs()
+			require.NoError(t, asset.Persist(fs, foundPipeline))
+
+			content, err := afero.ReadFile(fs, asset.ExecutableFile.Path)
+			require.NoError(t, err)
+			persisted := string(content)
+
+			assert.Equal(t, tt.wantBigQuery, strings.Contains(persisted, "\nbigquery:"))
+			if tt.wantRequire != "" {
+				assert.Contains(t, persisted, tt.wantRequire)
+			}
+			if tt.wantExpiration != "" {
+				assert.Contains(t, persisted, tt.wantExpiration)
+			}
+			if tt.wantImmutable != "" {
+				assert.Contains(t, persisted, tt.wantImmutable)
+			}
+			if tt.unwantedRequire != "" {
+				assert.NotContains(t, persisted, tt.unwantedRequire)
+			}
+			if tt.unwantedExpire != "" {
+				assert.NotContains(t, persisted, tt.unwantedExpire)
+			}
+			if tt.unwantedImmutable != "" {
+				assert.NotContains(t, persisted, tt.unwantedImmutable)
+			}
+
+			reloaded, err := pipeline.CreateTaskFromFileComments(fs)(asset.ExecutableFile.Path)
+			require.NoError(t, err)
+			reloaded, err = (&pipeline.Builder{}).SetupDefaultsFromPipeline(t.Context(), reloaded, foundPipeline)
+			require.NoError(t, err)
+			assert.Equal(t, asset.BigQuery, reloaded.BigQuery)
 		})
 	}
 }
@@ -2714,6 +2895,9 @@ func TestBuilder_SetupDefaultsFromPipelineAppliesAssetFieldDefaults(t *testing.T
 	t.Parallel()
 
 	falseValue := false
+	requirePartitionFilter := true
+	partitionExpirationDays := 30.0
+	partitionKeyImmutable := true
 	retries := 3
 	rerunCooldown := 45
 	customCount := int64(1)
@@ -2806,6 +2990,11 @@ func TestBuilder_SetupDefaultsFromPipelineAppliesAssetFieldDefaults(t *testing.T
 		Athena: pipeline.AthenaConfig{
 			Location: "s3://default/results",
 		},
+		BigQuery: pipeline.BigQueryConfig{
+			RequirePartitionFilter:  &requirePartitionFilter,
+			PartitionExpirationDays: &partitionExpirationDays,
+			PartitionKeyImmutable:   &partitionKeyImmutable,
+		},
 		Doris: pipeline.DorisConfig{
 			TableModel:    "duplicate_key",
 			DistributedBy: []string{"tenant_id"},
@@ -2862,6 +3051,12 @@ func TestBuilder_SetupDefaultsFromPipelineAppliesAssetFieldDefaults(t *testing.T
 	assert.Equal(t, pipeline.EmptyStringMap{"catalog": "default"}, got.Metadata)
 	assert.Equal(t, "default-wh", got.Snowflake.Warehouse)
 	assert.Equal(t, "s3://default/results", got.Athena.Location)
+	require.NotNil(t, got.BigQuery.RequirePartitionFilter)
+	assert.True(t, *got.BigQuery.RequirePartitionFilter)
+	require.NotNil(t, got.BigQuery.PartitionExpirationDays)
+	assert.InDelta(t, 30.0, *got.BigQuery.PartitionExpirationDays, 0)
+	require.NotNil(t, got.BigQuery.PartitionKeyImmutable)
+	assert.True(t, *got.BigQuery.PartitionKeyImmutable)
 	assert.Equal(t, pipeline.DorisConfig{
 		TableModel:    "duplicate_key",
 		DistributedBy: []string{"tenant_id"},
@@ -2888,6 +3083,28 @@ func TestBuilder_SetupDefaultsFromPipelineAppliesAssetFieldDefaults(t *testing.T
 	assert.Len(t, got.Notifications.Slack, 2)
 	assert.Equal(t, "#asset", got.Notifications.Slack[0].Channel)
 	assert.Equal(t, "#default", got.Notifications.Slack[1].Channel)
+}
+
+func TestBuilder_SetupDefaultsFromPipelineKeepsExplicitBigQueryFalse(t *testing.T) {
+	t.Parallel()
+
+	defaultValue := true
+	assetValue := false
+	asset := &pipeline.Asset{
+		BigQuery: pipeline.BigQueryConfig{
+			RequirePartitionFilter: &assetValue,
+		},
+	}
+	defaults := &pipeline.DefaultValues{
+		BigQuery: pipeline.BigQueryConfig{
+			RequirePartitionFilter: &defaultValue,
+		},
+	}
+
+	got, err := (&pipeline.Builder{}).SetupDefaultsFromPipeline(t.Context(), asset, &pipeline.Pipeline{DefaultValues: defaults})
+	require.NoError(t, err)
+	require.NotNil(t, got.BigQuery.RequirePartitionFilter)
+	assert.False(t, *got.BigQuery.RequirePartitionFilter)
 }
 
 func TestBuilder_SetupDefaultsFromPipelineMergesEmailNotifications(t *testing.T) {
@@ -3384,6 +3601,28 @@ default:
 	require.NoError(t, err)
 	require.NotNil(t, p.DefaultValues)
 	assert.Equal(t, &pipeline.RoutingConfig{EgressGateway: "wg-shared-ams3"}, p.DefaultValues.Routing)
+}
+
+func TestPipeline_UnmarshalDefaultBigQuery(t *testing.T) {
+	t.Parallel()
+
+	var p pipeline.Pipeline
+	err := yaml.Unmarshal([]byte(`
+name: bigquery-pipeline
+default:
+  bigquery:
+    require_partition_filter: true
+    partition_expiration_days: 30
+    partition_key_immutable: true
+`), &p)
+	require.NoError(t, err)
+	require.NotNil(t, p.DefaultValues)
+	require.NotNil(t, p.DefaultValues.BigQuery.RequirePartitionFilter)
+	assert.True(t, *p.DefaultValues.BigQuery.RequirePartitionFilter)
+	require.NotNil(t, p.DefaultValues.BigQuery.PartitionExpirationDays)
+	assert.InDelta(t, 30.0, *p.DefaultValues.BigQuery.PartitionExpirationDays, 0)
+	require.NotNil(t, p.DefaultValues.BigQuery.PartitionKeyImmutable)
+	assert.True(t, *p.DefaultValues.BigQuery.PartitionKeyImmutable)
 }
 
 func TestPipeline_UnmarshalDefaultTimeout(t *testing.T) {

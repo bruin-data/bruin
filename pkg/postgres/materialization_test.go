@@ -602,7 +602,9 @@ COMMIT;`, got)
 		require.NoError(t, err)
 
 		assert.Contains(t, got, `primary key ("customer_hk", "load_dts")`)
-		assert.Contains(t, got, `LAG(valid."hashdiff") OVER (PARTITION BY valid."customer_hk" ORDER BY valid."load_dts", valid."hashdiff") AS __bruin_previous_hashdiff`)
+		assert.Contains(t, got, `SELECT DISTINCT ON (valid."customer_hk", valid."load_dts")`)
+		assert.Contains(t, got, `ORDER BY valid."customer_hk", valid."load_dts", valid."hashdiff"`)
+		assert.Contains(t, got, `LAG(dedup."hashdiff") OVER (PARTITION BY dedup."customer_hk" ORDER BY dedup."load_dts", dedup."hashdiff") AS __bruin_previous_hashdiff`)
 		assert.Contains(t, got, `SELECT DISTINCT ON (target."customer_hk")`)
 		assert.Contains(t, got, `latest."hashdiff" IS DISTINCT FROM source."hashdiff"`)
 		assert.Contains(t, got, `source.__bruin_previous_hashdiff IS DISTINCT FROM source."hashdiff"`)
@@ -633,6 +635,51 @@ COMMIT;`, got)
 		assert.Contains(t, got, `CREATE TABLE IF NOT EXISTS "rdv"."hub_customer"`)
 		assert.Contains(t, got, `ON CONFLICT ("customer_hk") DO NOTHING`)
 		assert.NotContains(t, got, `CREATE TABLE "rdv"."hub_customer" AS`)
+	})
+
+	t.Run("rejects Redshift assets, whose SQL dialect cannot run the generated statements", func(t *testing.T) {
+		t.Parallel()
+
+		asset := &pipeline.Asset{
+			Name: "rdv.hub_customer",
+			Type: pipeline.AssetTypeRedshiftQuery,
+			Materialization: pipeline.Materialization{
+				Type:     pipeline.MaterializationTypeTable,
+				Strategy: pipeline.MaterializationStrategyDataVaultHub,
+			},
+			Columns: []pipeline.Column{
+				{Name: "customer_hk", Type: "text", PrimaryKey: true},
+				{Name: "customer_bk", Type: "text"},
+				{Name: "load_dts", Type: "timestamptz"},
+				{Name: "record_source", Type: "text"},
+			},
+		}
+
+		_, err := NewMaterializer(false).Render(asset, "select customer_hk, customer_bk, load_dts, record_source from stg.crm_customer_hashed")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "is not supported for asset type rs.sql")
+	})
+
+	t.Run("refuses to guess the hash key when several columns are primary keys", func(t *testing.T) {
+		t.Parallel()
+
+		asset := &pipeline.Asset{
+			Name: "rdv.sat_customer_details",
+			Materialization: pipeline.Materialization{
+				Type:     pipeline.MaterializationTypeTable,
+				Strategy: pipeline.MaterializationStrategyDataVaultSatellite,
+			},
+			Columns: []pipeline.Column{
+				{Name: "load_dts", Type: "timestamptz", PrimaryKey: true},
+				{Name: "customer_hk", Type: "text", PrimaryKey: true},
+				{Name: "hashdiff", Type: "text"},
+				{Name: "record_source", Type: "text"},
+			},
+		}
+
+		_, err := NewMaterializer(false).Render(asset, "select customer_hk, hashdiff, load_dts, record_source from stg.crm_customer_hashed")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "mark it with datavault_role: parent_hash_key")
 	})
 
 	t.Run("requires typed columns", func(t *testing.T) {

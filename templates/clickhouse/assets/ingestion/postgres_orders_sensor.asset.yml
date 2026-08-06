@@ -1,0 +1,31 @@
+name: postgres_orders_sensor
+type: pg.sensor.query
+description: Demonstrates a PostgreSQL query sensor that gates downstream work. On each run it evaluates the templated start and end timestamps against postgres-default and allows the ingestion branch to proceed only when the requested interval is ready.
+connection: postgres-default
+tags:
+  - layer:sensor
+  - domain:commerce
+  - source:postgres
+  - requires-postgres-default
+domains:
+  - commerce
+meta:
+  data_classification: internal
+  sensor_mode: wait-recommended
+  source_connection: postgres-default
+  upstream_system: postgres
+
+depends:
+  - public.orders
+owner: commerce-platform@example.com
+
+parameters:
+  poke_interval: 60
+  query: |
+    SELECT EXISTS (
+      SELECT 1
+      FROM public.orders
+      WHERE updated_at >= '{{ start_timestamp }}'::timestamptz
+        AND updated_at <= '{{ end_timestamp }}'::timestamptz
+    )
+  timeout: 15m

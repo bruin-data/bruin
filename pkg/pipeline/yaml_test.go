@@ -411,6 +411,35 @@ routing:
 	require.Equal(t, &pipeline.RoutingConfig{EgressGateway: "wg-shared-ams3"}, task.Routing)
 }
 
+func TestConvertYamlToTask_BigQuery(t *testing.T) {
+	t.Parallel()
+
+	definition := strings.TrimSpace(`
+name: analytics.events
+type: bq.sql
+materialization:
+  type: table
+  partition_by: event_date
+bigquery:
+  require_partition_filter: true
+  partition_expiration_days: 7.5
+  partition_key_immutable: true
+`)
+	task, err := pipeline.ConvertYamlToTask([]byte(definition))
+	require.NoError(t, err)
+	require.NotNil(t, task.BigQuery.RequirePartitionFilter)
+	require.True(t, *task.BigQuery.RequirePartitionFilter)
+	require.NotNil(t, task.BigQuery.PartitionExpirationDays)
+	require.InDelta(t, 7.5, *task.BigQuery.PartitionExpirationDays, 0)
+	require.NotNil(t, task.BigQuery.PartitionKeyImmutable)
+	require.True(t, *task.BigQuery.PartitionKeyImmutable)
+
+	fs := afero.NewMemMapFs()
+	content := "/* @bruin\n" + definition + "\n@bruin */\n\nSELECT 1"
+	require.NoError(t, afero.WriteFile(fs, "bigquery.sql", []byte(content), 0o644))
+	require.NoError(t, pipeline.ValidateAssetYAML(fs, "bigquery.sql", pipeline.CommentTask))
+}
+
 func TestConvertYamlToTask_Timeout(t *testing.T) {
 	t.Parallel()
 

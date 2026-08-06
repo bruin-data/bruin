@@ -969,9 +969,9 @@ func getConnectionFromPipelineInfoWithContext(ctx context.Context, pipelineInfo 
 		return "", nil, errors.Wrap(err, "failed to get connection")
 	}
 
-	conn := manager.GetConnection(connName)
-	if conn == nil {
-		return "", nil, config.NewConnectionNotFoundError(ctx, "", connName)
+	conn, err := resolveConnectionForAsset(ctx, manager, pipelineInfo.Asset.Type, connName)
+	if err != nil {
+		return "", nil, err
 	}
 
 	return connName, conn, nil
@@ -1013,6 +1013,18 @@ func addLimitToQuery(query string, limit int64, conn interface{}, parser *sqlpar
 			return query
 		}
 		// If there's an error checking or it is a single SELECT, proceed with adding limit
+	}
+
+	// Fabric Warehouses use a case-sensitive collation, and the SQL parser's
+	// add-limit round-trip lowercases derived-table column aliases (e.g. a
+	// subquery's `Account` is re-emitted as `account`), which then fails to
+	// resolve in the case-sensitive outer query. Wrap the query verbatim so the
+	// original identifiers are preserved. This runs after the single-select
+	// guard so multi-statement / non-SELECT input is left untouched.
+	if dialect == "fabric" {
+		if l, ok := conn.(Limiter); ok {
+			return l.Limit(query, limit)
+		}
 	}
 
 	var err error

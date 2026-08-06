@@ -86,6 +86,7 @@ const (
 	AssetTypeMsSQLSource               = AssetType("ms.source")
 	AssetTypeMsSQLTableSensor          = AssetType("ms.sensor.table")
 	AssetTypeFabricQuery               = AssetType("fabric.sql")
+	AssetTypeFabricSparkQuery          = AssetType("fabric.spark_sql")
 	AssetTypeFabricQuerySensor         = AssetType("fabric.sensor.query")
 	AssetTypeFabricSeed                = AssetType("fabric.seed")
 	AssetTypeFabricTableSensor         = AssetType("fabric.sensor.table")
@@ -148,6 +149,11 @@ const (
 	AssetTypeDremioQuerySensor         = AssetType("dremio.sensor.query")
 	AssetTypeSailQuery                 = AssetType("sail.sql")
 	AssetTypeSailQuerySensor           = AssetType("sail.sensor.query")
+	AssetTypeSparkQuery                = AssetType("spark.sql")
+	AssetTypeSparkQuerySensor          = AssetType("spark.sensor.query")
+	AssetTypeSparkSeed                 = AssetType("spark.seed")
+	AssetTypeSparkSource               = AssetType("spark.source")
+	AssetTypeSparkTableSensor          = AssetType("spark.sensor.table")
 	AssetTypeVerticaQuery              = AssetType("vertica.sql")
 	AssetTypeVerticaQuerySensor        = AssetType("vertica.sensor.query")
 	AssetTypeVerticaSeed               = AssetType("vertica.seed")
@@ -213,6 +219,7 @@ var defaultMapping = map[string]string{
 	"starrocks":             "starrocks-default",
 	"dremio":                "dremio-default",
 	"sail":                  "sail-default",
+	"spark":                 "spark-default",
 	"oracle":                "oracle-default",
 	"googleanalytics":       "googleanalytics-default",
 	"gsc":                   "gsc-default",
@@ -614,6 +621,18 @@ const (
 	MaterializationStrategyDataVaultSatellite MaterializationStrategy        = "datavault_satellite"
 )
 
+// IsDataVault reports whether the strategy is one of the Data Vault loading strategies.
+// These carry their own full-refresh handling, so they must never be silently swapped
+// for another strategy on a platform that does not implement them.
+func (s MaterializationStrategy) IsDataVault() bool {
+	switch s {
+	case MaterializationStrategyDataVaultHub, MaterializationStrategyDataVaultLink, MaterializationStrategyDataVaultSatellite:
+		return true
+	default:
+		return false
+	}
+}
+
 var AllAvailableMaterializationStrategies = []MaterializationStrategy{
 	MaterializationStrategyCreateReplace,
 	MaterializationStrategyDeleteInsert,
@@ -928,6 +947,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeMsSQLTableSensor:          "mssql",
 	AssetTypeMsSQLSource:               "mssql",
 	AssetTypeFabricQuery:               "fabric",
+	AssetTypeFabricSparkQuery:          "fabric",
 	AssetTypeFabricSeed:                "fabric",
 	AssetTypeFabricQuerySensor:         "fabric",
 	AssetTypeFabricTableSensor:         "fabric",
@@ -970,6 +990,11 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeDremioQuerySensor:         "dremio",
 	AssetTypeSailQuery:                 "sail",
 	AssetTypeSailQuerySensor:           "sail",
+	AssetTypeSparkQuery:                "spark",
+	AssetTypeSparkSeed:                 "spark",
+	AssetTypeSparkQuerySensor:          "spark",
+	AssetTypeSparkSource:               "spark",
+	AssetTypeSparkTableSensor:          "spark",
 	AssetTypeOracleQuery:               "oracle",
 	AssetTypeOracleSource:              "oracle",
 	AssetTypeS3KeySensor:               "aws",
@@ -1180,6 +1205,25 @@ func (s AthenaConfig) MarshalJSON() ([]byte, error) {
 	return json.Marshal(Alias(s))
 }
 
+type BigQueryConfig struct {
+	RequirePartitionFilter  *bool    `json:"require_partition_filter,omitempty" yaml:"require_partition_filter,omitempty" mapstructure:"require_partition_filter"`
+	PartitionExpirationDays *float64 `json:"partition_expiration_days,omitempty" yaml:"partition_expiration_days,omitempty" mapstructure:"partition_expiration_days"`
+	PartitionKeyImmutable   *bool    `json:"partition_key_immutable,omitempty" yaml:"partition_key_immutable,omitempty" mapstructure:"partition_key_immutable"`
+}
+
+func (b BigQueryConfig) MarshalJSON() ([]byte, error) {
+	if b.IsZero() {
+		return []byte("null"), nil
+	}
+
+	type Alias BigQueryConfig
+	return json.Marshal(Alias(b))
+}
+
+func (b BigQueryConfig) IsZero() bool {
+	return b.RequirePartitionFilter == nil && b.PartitionExpirationDays == nil && b.PartitionKeyImmutable == nil
+}
+
 type DorisConfig struct {
 	TableModel    string            `json:"table_model,omitempty" yaml:"table_model,omitempty" mapstructure:"table_model"`
 	DistributedBy []string          `json:"distributed_by,omitempty" yaml:"distributed_by,omitempty" mapstructure:"distributed_by"`
@@ -1279,6 +1323,7 @@ type Asset struct { //nolint:recvcheck
 	Metadata          EmptyStringMap     `json:"metadata" yaml:"metadata,omitempty" mapstructure:"metadata"`
 	Snowflake         SnowflakeConfig    `json:"snowflake" yaml:"snowflake,omitempty" mapstructure:"snowflake"`
 	Athena            AthenaConfig       `json:"athena" yaml:"athena,omitempty" mapstructure:"athena"`
+	BigQuery          BigQueryConfig     `json:"bigquery" yaml:"bigquery,omitempty" mapstructure:"bigquery"`
 	Doris             DorisConfig        `json:"doris,omitzero" yaml:"doris,omitempty" mapstructure:"doris"`
 	StarRocks         StarRocksConfig    `json:"starrocks,omitzero" yaml:"starrocks,omitempty" mapstructure:"starrocks"`
 	Routing           *RoutingConfig     `json:"routing,omitempty" yaml:"routing,omitempty" mapstructure:"routing"`
@@ -1784,23 +1829,38 @@ func (a *Asset) GetNameIfItWasSetFromItsPath(foundPipeline *Pipeline) (string, e
 func (a Asset) Persist(fs afero.Fs, pipeline ...*Pipeline) error {
 	// Save original values
 	originalParams := a.Parameters
+	originalBigQuery := a.BigQuery
 
-	// Remove parameters that match pipeline defaults
-	// pipeline is optional - if provided and has defaults, filter them out
-	if len(pipeline) > 0 && pipeline[0] != nil && pipeline[0].DefaultValues != nil && len(pipeline[0].DefaultValues.Parameters) > 0 {
-		filteredParams := ParameterMap{}
-		for key, value := range a.Parameters {
-			// Only keep parameters that are NOT in defaults or have different values
-			if defaultValue, existsInDefaults := pipeline[0].DefaultValues.Parameters[key]; !existsInDefaults || !reflect.DeepEqual(defaultValue, value) {
-				filteredParams[key] = value
+	// Remove values that match pipeline defaults.
+	// Pipeline is optional; callers that provide it avoid persisting inherited values on the asset.
+	if len(pipeline) > 0 && pipeline[0] != nil && pipeline[0].DefaultValues != nil {
+		defaults := pipeline[0].DefaultValues
+
+		if len(defaults.Parameters) > 0 {
+			filteredParams := ParameterMap{}
+			for key, value := range a.Parameters {
+				// Only keep parameters that are NOT in defaults or have different values
+				if defaultValue, existsInDefaults := defaults.Parameters[key]; !existsInDefaults || !reflect.DeepEqual(defaultValue, value) {
+					filteredParams[key] = value
+				}
+			}
+
+			// If no parameters remain, set to nil instead of empty map
+			if len(filteredParams) == 0 {
+				a.Parameters = nil
+			} else {
+				a.Parameters = filteredParams
 			}
 		}
 
-		// If no parameters remain, set to nil instead of empty map
-		if len(filteredParams) == 0 {
-			a.Parameters = nil
-		} else {
-			a.Parameters = filteredParams
+		if reflect.DeepEqual(a.BigQuery.RequirePartitionFilter, defaults.BigQuery.RequirePartitionFilter) {
+			a.BigQuery.RequirePartitionFilter = nil
+		}
+		if reflect.DeepEqual(a.BigQuery.PartitionExpirationDays, defaults.BigQuery.PartitionExpirationDays) {
+			a.BigQuery.PartitionExpirationDays = nil
+		}
+		if reflect.DeepEqual(a.BigQuery.PartitionKeyImmutable, defaults.BigQuery.PartitionKeyImmutable) {
+			a.BigQuery.PartitionKeyImmutable = nil
 		}
 	}
 
@@ -1809,6 +1869,7 @@ func (a Asset) Persist(fs afero.Fs, pipeline ...*Pipeline) error {
 
 	// Restore original values (even if formatting failed)
 	a.Parameters = originalParams
+	a.BigQuery = originalBigQuery
 
 	if err != nil {
 		return errors.Wrap(err, "failed to generate content for persistence")
@@ -2267,6 +2328,7 @@ type DefaultValues struct {
 	Metadata          EmptyStringMap         `json:"metadata,omitempty" yaml:"metadata,omitempty" mapstructure:"metadata"`
 	Snowflake         SnowflakeConfig        `json:"snowflake,omitempty" yaml:"snowflake,omitempty" mapstructure:"snowflake"`
 	Athena            AthenaConfig           `json:"athena,omitempty" yaml:"athena,omitempty" mapstructure:"athena"`
+	BigQuery          BigQueryConfig         `json:"bigquery,omitempty" yaml:"bigquery,omitempty" mapstructure:"bigquery"`
 	Doris             DorisConfig            `json:"doris,omitempty,omitzero" yaml:"doris,omitempty" mapstructure:"doris"`
 	StarRocks         StarRocksConfig        `json:"starrocks,omitempty,omitzero" yaml:"starrocks,omitempty" mapstructure:"starrocks"`
 	Routing           *RoutingConfig         `json:"routing,omitempty" yaml:"routing,omitempty" mapstructure:"routing"`
@@ -2312,6 +2374,7 @@ func (d *DefaultValues) UnmarshalYAML(value *yaml.Node) error {
 		Metadata:          asset.Metadata,
 		Snowflake:         asset.Snowflake,
 		Athena:            asset.Athena,
+		BigQuery:          asset.BigQuery,
 		Doris:             asset.Doris,
 		StarRocks:         asset.StarRocks,
 		Routing:           asset.Routing,
@@ -2400,6 +2463,7 @@ func assetMainTaskIsConnectionless(assetType AssetType) bool {
 		AssetTypeClickHouseSource,
 		AssetTypeDorisSource,
 		AssetTypeDatabricksSource,
+		AssetTypeSparkSource,
 		AssetTypeDuckDBSource,
 		AssetTypeMongoSource,
 		AssetTypeMsSQLSource,
@@ -2517,6 +2581,7 @@ func (p *Pipeline) GetMajorityAssetTypesFromSQLAssets(defaultIfNone AssetType) A
 		AssetTypeRedshiftQuery:     0,
 		AssetTypeSynapseQuery:      0,
 		AssetTypeFabricQuery:       0,
+		AssetTypeFabricSparkQuery:  0,
 		AssetTypeFabricQueryLegacy: 0,
 		AssetTypeAthenaQuery:       0,
 		AssetTypeDuckDBQuery:       0,
@@ -2525,6 +2590,7 @@ func (p *Pipeline) GetMajorityAssetTypesFromSQLAssets(defaultIfNone AssetType) A
 		AssetTypeTrinoQuery:        0,
 		AssetTypeDremioQuery:       0,
 		AssetTypeSailQuery:         0,
+		AssetTypeSparkQuery:        0,
 		AssetTypeOracleQuery:       0,
 		AssetTypeDorisQuery:        0,
 		AssetTypeStarRocksQuery:    0,
@@ -3223,6 +3289,7 @@ func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 	if asset.Athena.Location == "" {
 		asset.Athena.Location = defaults.Athena.Location
 	}
+	mergeBigQueryDefaults(&asset.BigQuery, defaults.BigQuery)
 	mergeDorisDefaults(&asset.Doris, defaults.Doris)
 	mergeStarRocksDefaults(&asset.StarRocks, defaults.StarRocks)
 	if !defaults.Routing.IsZero() {
@@ -3266,6 +3333,21 @@ func mergeEmptyStringMapDefaults(target *EmptyStringMap, defaults EmptyStringMap
 		if _, exists := (*target)[key]; !exists {
 			(*target)[key] = value
 		}
+	}
+}
+
+func mergeBigQueryDefaults(target *BigQueryConfig, defaults BigQueryConfig) {
+	if target.RequirePartitionFilter == nil && defaults.RequirePartitionFilter != nil {
+		value := *defaults.RequirePartitionFilter
+		target.RequirePartitionFilter = &value
+	}
+	if target.PartitionExpirationDays == nil && defaults.PartitionExpirationDays != nil {
+		value := *defaults.PartitionExpirationDays
+		target.PartitionExpirationDays = &value
+	}
+	if target.PartitionKeyImmutable == nil && defaults.PartitionKeyImmutable != nil {
+		value := *defaults.PartitionKeyImmutable
+		target.PartitionKeyImmutable = &value
 	}
 }
 
@@ -3994,6 +4076,7 @@ func IsSQLAssetType(t AssetType) bool {
 		AssetTypeDatabricksQuery,
 		AssetTypeSynapseQuery,
 		AssetTypeFabricQuery,
+		AssetTypeFabricSparkQuery,
 		AssetTypeFabricQueryLegacy,
 		AssetTypeAthenaQuery,
 		AssetTypeDuckDBQuery,
@@ -4004,6 +4087,7 @@ func IsSQLAssetType(t AssetType) bool {
 		AssetTypeTrinoQuery,
 		AssetTypeDremioQuery,
 		AssetTypeSailQuery,
+		AssetTypeSparkQuery,
 		AssetTypeOracleQuery:
 		return true
 	default:

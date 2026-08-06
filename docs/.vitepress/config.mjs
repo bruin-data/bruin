@@ -130,6 +130,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "Chat with Agents", link: "/cloud/ai-agents/chat"},
                             {text: "Scheduled Agents", link: "/cloud/ai-agents/scheduled"},
                             {text: "Databricks OAuth", link: "/cloud/ai-agents/databricks-oauth"},
+                            {text: "Snowflake OAuth", link: "/cloud/ai-agents/snowflake-oauth"},
                             {
                                 text: "Examples",
                                 collapsed: true,
@@ -263,6 +264,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "Trino", link: "/platforms/trino"},
                             {text: "Dremio", link: "/platforms/dremio"},
                             {text: "Sail", link: "/platforms/sail"},
+                            {text: "Apache Spark", link: "/platforms/spark"},
                             {text: "AWS EMR Serverless", link: "/platforms/emr_serverless"},
                             {text: "GCP Dataproc Serverless", link: "/platforms/dataproc_serverless"},
                         ],
@@ -403,6 +405,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                     {text: "AI Skills", link: "/commands/ai-skills"},
                     {text: "Clean", link: "/commands/clean"},
                     {text: "Connections", link: "/commands/connections"},
+                    {text: "Curl", link: "/commands/curl"},
                     {text: "Data Diff", link: "/commands/data-diff"},
                     {text: "Environments", link: "/commands/environments"},
                     {text: "Format", link: "/commands/format"},
@@ -523,16 +526,35 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                         ],
                     },
                     {
+                        text: "Apache Iceberg",
+                        collapsed: false,
+                        items: [
+                            {text: "iceberg-sqlite-local", link: "/getting-started/templates-docs/iceberg-sqlite-local-README"},
+                            {text: "iceberg-rest-minio", link: "/getting-started/templates-docs/iceberg-rest-minio-README"},
+                            {text: "iceberg-glue-s3", link: "/getting-started/templates-docs/iceberg-glue-s3-README"},
+                            {text: "iceberg-postgres-gcs", link: "/getting-started/templates-docs/iceberg-postgres-gcs-README"},
+                            {text: "iceberg-hadoop-gcsinterop", link: "/getting-started/templates-docs/iceberg-hadoop-gcsinterop-README"},
+                        ],
+                    },
+                    {
                         text: "Source Ingestion",
                         collapsed: false,
                         items: [
                             {text: "shopify-bigquery", link: "/getting-started/templates-docs/shopify-bigquery-README"},
                             {text: "shopify-duckdb", link: "/getting-started/templates-docs/shopify-duckdb-README"},
+                            {text: "stripe-bigquery", link: "/getting-started/templates-docs/stripe-bigquery-README"},
                             {text: "gsheet-bigquery", link: "/getting-started/templates-docs/gsheet-bigquery-README"},
                             {text: "gsheet-duckdb", link: "/getting-started/templates-docs/gsheet-duckdb-README"},
                             {text: "notion", link: "/getting-started/templates-docs/notion-README"},
                             {text: "gorgias", link: "/getting-started/templates-docs/gorgias-README"},
                             {text: "firebase", link: "/getting-started/templates-docs/firebase-README"},
+                        ],
+                    },
+                    {
+                        text: "Migration Templates",
+                        collapsed: false,
+                        items: [
+                            {text: "migration-fivetran", link: "/getting-started/templates-docs/migration-fivetran"},
                         ],
                     },
                 ],
@@ -585,6 +607,11 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         class: "mermaid my-class", // set additional css classes for parent container
     },
     vite: {
+        optimizeDeps: {
+            esbuildOptions: {
+                target: "esnext",
+            },
+        },
         build: {
             target: ["chrome107", "edge107", "firefox104", "safari16"],
         },

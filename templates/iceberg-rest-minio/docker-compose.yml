@@ -1,0 +1,44 @@
+# Local Iceberg stack: a REST catalog server in front of MinIO.
+#   docker compose up -d      then      bruin run iceberg-rest-minio
+services:
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:                          # localhost only: the credentials above are the defaults
+      - "127.0.0.1:9000:9000"       # S3 API
+      - "127.0.0.1:9001:9001"       # web console
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      retries: 12
+
+  # The bucket has to exist before the catalog writes to it.
+  createbucket:
+    image: minio/mc
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 minioadmin minioadmin &&
+      mc mb --ignore-existing local/warehouse
+      "
+
+  iceberg-rest:
+    image: apache/iceberg-rest-fixture
+    depends_on:
+      createbucket:
+        condition: service_completed_successfully
+    environment:
+      CATALOG_WAREHOUSE: s3://warehouse/
+      CATALOG_IO__IMPL: org.apache.iceberg.aws.s3.S3FileIO
+      CATALOG_S3_ENDPOINT: http://minio:9000
+      CATALOG_S3_PATH__STYLE__ACCESS: "true"
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      AWS_REGION: us-east-1
+    ports:
+      - "127.0.0.1:8181:8181"

@@ -392,16 +392,16 @@ func Init() *cli.Command {
 				return nil
 			}
 
-			centralConfig, err := config.LoadOrCreateWithoutPathAbsolutization(afero.NewOsFs(), bruinYmlPath)
-			if err != nil {
-				errorPrinter.Printf("Could not write .bruin.yml file: %v\n", err)
-				return err
-			}
-
 			// Read template's .bruin.yml if it exists
 			templateBruinPath := templateName + "/.bruin.yml"
 			templateBruinContent, err := templates.Templates.ReadFile(templateBruinPath)
 			if err == nil { // Only process if file exists
+				centralConfig, err := config.LoadOrCreateWithoutPathAbsolutization(afero.NewOsFs(), bruinYmlPath)
+				if err != nil {
+					errorPrinter.Printf("Could not write .bruin.yml file: %v\n", err)
+					return err
+				}
+
 				if err := mergeTemplateConfig(centralConfig, templateBruinContent); err != nil {
 					errorPrinter.Printf("%v\n", err)
 					return err

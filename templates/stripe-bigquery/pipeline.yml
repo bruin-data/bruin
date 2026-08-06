@@ -1,0 +1,15 @@
+name: stripe-bigquery
+schedule: daily
+start_date: "2023-01-01"
+catchup: false
+
+default:
+  type: ingestr
+  parameters:
+    source_connection: stripe-default
+    destination: bigquery
+    loader_file_format: jsonl
+
+default_connections:
+  google_cloud_platform: gcp-default
+  stripe: stripe-default

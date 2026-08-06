@@ -54,7 +54,7 @@ func connectionManagerFromConfig(ctx context.Context, cm *config.Config, log log
 	case "":
 		return connection.NewManagerFromConfigWithContext(ctx, cm)
 	case "vault":
-		manager, err := secrets.NewVaultClientFromEnv(log) //nolint:contextcheck
+		manager, err := secrets.NewVaultClientFromEnvContext(ctx, log)
 		if err != nil {
 			return nil, []error{fmt.Errorf("failed to initialize vault client: %w", err)}
 		}

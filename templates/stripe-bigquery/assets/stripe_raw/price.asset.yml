@@ -1,0 +1,7 @@
+name: stripe_raw.price
+type: ingestr
+
+description: Raw-layer ingestion of Stripe price data into BigQuery.
+
+parameters:
+  source_table: price

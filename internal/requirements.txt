@@ -1,1 +1,1 @@
-sqlglot[c]==30.7.0
+sqlglot[c]==30.13.0

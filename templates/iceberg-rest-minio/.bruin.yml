@@ -1,0 +1,21 @@
+default_environment: default
+environments:
+  default:
+    connections:
+      frankfurter:
+        - name: "frankfurter-default"
+      iceberg:
+        - name: "iceberg-default"
+          catalog:
+            type: rest
+            host: "localhost"
+            port: 8181
+          storage:
+            type: s3
+            path: "s3://warehouse"
+            endpoint: "localhost:9000"
+            use_ssl: false
+            region: "us-east-1"
+            auth:
+              access_key: "minioadmin"
+              secret_key: "minioadmin"

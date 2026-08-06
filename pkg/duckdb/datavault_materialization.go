@@ -240,11 +240,9 @@ func resolveDataVaultHubColumns(asset *pipeline.Asset) (*pipeline.Column, []*pip
 		return nil, nil, nil, nil, errors.New("materialization strategy datavault_hub requires the `columns` field to be set")
 	}
 
-	hashKey := findDataVaultColumn(asset, []string{"hash_key", "hub_hash_key"}, func(col *pipeline.Column) bool {
-		return col.PrimaryKey
-	})
-	if hashKey == nil {
-		hashKey = findSingleDataVaultColumnBySuffix(asset, "_hk", nil)
+	hashKey, err := findDataVaultHashKeyColumn(asset, []string{"hash_key", "hub_hash_key"}, "hash_key")
+	if err != nil {
+		return nil, nil, nil, nil, err
 	}
 
 	businessKeys := findDataVaultColumns(asset, []string{"business_key"}, func(col *pipeline.Column) bool {
@@ -272,11 +270,9 @@ func resolveDataVaultLinkColumns(asset *pipeline.Asset) (*pipeline.Column, []*pi
 		return nil, nil, nil, nil, errors.New("materialization strategy datavault_link requires the `columns` field to be set")
 	}
 
-	linkHashKey := findDataVaultColumn(asset, []string{"link_hash_key", "hash_key"}, func(col *pipeline.Column) bool {
-		return col.PrimaryKey
-	})
-	if linkHashKey == nil {
-		linkHashKey = findSingleDataVaultColumnBySuffix(asset, "_hk", nil)
+	linkHashKey, err := findDataVaultHashKeyColumn(asset, []string{"link_hash_key", "hash_key"}, "link_hash_key")
+	if err != nil {
+		return nil, nil, nil, nil, err
 	}
 
 	excludedColumns := []*pipeline.Column{linkHashKey}
@@ -305,11 +301,9 @@ func resolveDataVaultSatelliteColumns(asset *pipeline.Asset) (*pipeline.Column, 
 		return nil, nil, nil, nil, errors.New("materialization strategy datavault_satellite requires the `columns` field to be set")
 	}
 
-	parentHashKey := findDataVaultColumn(asset, []string{"parent_hash_key", "hub_hash_key", "hash_key"}, func(col *pipeline.Column) bool {
-		return col.PrimaryKey
-	})
-	if parentHashKey == nil {
-		parentHashKey = findSingleDataVaultColumnBySuffix(asset, "_hk", nil)
+	parentHashKey, err := findDataVaultHashKeyColumn(asset, []string{"parent_hash_key", "hub_hash_key", "hash_key"}, "parent_hash_key")
+	if err != nil {
+		return nil, nil, nil, nil, err
 	}
 
 	hashDiff := findDataVaultColumn(asset, []string{"hashdiff", "hash_diff"}, func(col *pipeline.Column) bool {
@@ -477,6 +471,30 @@ func findDataVaultRecordSourceColumn(asset *pipeline.Asset) *pipeline.Column {
 	return findDataVaultColumn(asset, []string{"record_source"}, func(col *pipeline.Column) bool {
 		return strings.EqualFold(col.Name, "record_source")
 	})
+}
+
+// findDataVaultHashKeyColumn resolves a hash key by explicit role first, then by primary_key, then by a
+// unique `_hk` suffix. When several columns are marked with primary_key there is no way to tell which one
+// is the hash key, so the caller is asked for an explicit role rather than silently taking the first one
+// in declaration order. Returns a nil column when nothing matches, leaving the specific error to the caller.
+func findDataVaultHashKeyColumn(asset *pipeline.Asset, roles []string, preferredRole string) (*pipeline.Column, error) {
+	if col := findDataVaultColumn(asset, roles, nil); col != nil {
+		return col, nil
+	}
+
+	if primaryKeys := asset.ColumnNamesWithPrimaryKey(); len(primaryKeys) > 1 {
+		return nil, fmt.Errorf(
+			"materialization strategy %s cannot determine which of the primary key columns (%s) is the hash key, mark it with datavault_role: %s",
+			asset.Materialization.Strategy, strings.Join(primaryKeys, ", "), preferredRole,
+		)
+	}
+	if col := findDataVaultColumn(asset, nil, func(col *pipeline.Column) bool {
+		return col.PrimaryKey
+	}); col != nil {
+		return col, nil
+	}
+
+	return findSingleDataVaultColumnBySuffix(asset, "_hk", nil), nil
 }
 
 func findDataVaultColumn(asset *pipeline.Asset, roles []string, fallback func(*pipeline.Column) bool) *pipeline.Column {

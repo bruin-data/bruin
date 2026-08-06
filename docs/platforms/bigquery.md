@@ -117,6 +117,93 @@ from analytics.events
 where event_name = "install"
 ```
 
+#### BigQuery table options
+
+The top-level `bigquery` block configures BigQuery-specific table options and partition-scoped merge behavior. Table options are applied when Bruin creates a table with a `create+replace` or `ddl` materialization. Partition expiration is also supported during an SCD2 full refresh.
+
+```bruin-sql
+/* @bruin
+name: events.install
+type: bq.sql
+materialization:
+  type: table
+  partition_by: DATE(ts)
+bigquery:
+  require_partition_filter: true
+  partition_expiration_days: 30
+@bruin */
+
+select user_id, ts, platform, country
+from analytics.events
+where event_name = "install"
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `require_partition_filter` | Boolean | `false` | Requires queries to filter the table's partitioning column. |
+| `partition_expiration_days` | Number | unset | Expires each partition after this many days. Must be positive; fractional days are supported. Set `0` to disable an inherited pipeline default. |
+| `partition_key_immutable` | Boolean | `false` | Declares that a row's partition value cannot change for the same merge primary key. Used only by partition-scoped `merge` materializations. |
+
+Enabling `require_partition_filter` or setting a positive `partition_expiration_days` requires `materialization.partition_by`. SCD2 materializations satisfy this requirement for partition expiration with their default `DATE(_valid_from)` partition when `partition_by` is omitted. Partition expiration is not supported for integer-range partitions.
+
+`require_partition_filter` is not supported with SCD2 because its incremental queries must scan all target partitions. It has additional restrictions for incremental strategies: see [Merge and required partition filters](#merge-and-required-partition-filters) below. For `delete+insert` and `time_interval`, `partition_by` must use the configured `incremental_key`; `delete+insert` also requires the incremental key's column type. Bruin rejects these incompatible combinations before BigQuery can create a table that later runs cannot update.
+
+`require_partition_filter` and `partition_expiration_days` are emitted as BigQuery [`CREATE TABLE` options](https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#table_option_list), so Bruin only applies them while creating the table. A normal `append`, `merge`, `delete+insert`, `time_interval`, or `truncate+insert` run leaves an existing table's options untouched until a full refresh recreates it. The `ddl` strategy renders `CREATE TABLE IF NOT EXISTS` and is never recreated by a full refresh, so for those assets the options only take effect when the table is first created; change them on an existing table with [`ALTER TABLE SET OPTIONS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#alter_table_set_options_statement). Assets that are not materialized as a table ignore the block, so a `default.bigquery` in `pipeline.yml` can be applied pipeline-wide without breaking view assets. `partition_key_immutable` is a merge-safety declaration and is not written as a BigQuery table option.
+
+::: warning Quality checks on tables that require a partition filter
+Bruin's built-in column checks (`not_null`, `unique`, `positive`, `accepted_values`, and so on) query the asset without a partition filter, and BigQuery rejects those queries on a table created with `require_partition_filter = TRUE`. If you enable this option, drop the built-in column checks on that asset and express the equivalent assertions as [custom checks](/quality/custom) whose queries filter the partitioning column.
+:::
+
+#### Merge and required partition filters
+
+Bruin supports `merge` with `bigquery.require_partition_filter: true` by using a partition-scoped transaction. It materializes the asset query once in a temporary table, collects the exact non-null partition values produced by that query, and then:
+
+1. captures the source rows whose primary keys do not exist in those target partitions;
+2. runs an update-only `MERGE` against those target partitions; and
+3. inserts the rows captured in step 1.
+
+Step 1 runs before the `MERGE` on purpose. Reading the target again afterwards would re-select any row whose `materialization.incremental_predicate` stopped holding because the `MERGE` updated a column it references, and insert a duplicate of it.
+
+When no column carries `update_on_merge` or `merge_sql` there is nothing to update, so steps 1 and 2 are skipped and a single insert reads the target directly.
+
+Every target read contains a real partition predicate, so BigQuery keeps enforcing the required-filter option and prunes unrelated partitions instead of relying on a tautological filter that can still scan the whole table. The statements run in one transaction and the source query runs only once.
+
+For correctness, the column referenced by `materialization.partition_by` must either be part of the merge primary key or be immutable for a given primary key. If it is not a primary-key column, declare that invariant explicitly:
+
+```bruin-sql
+/* @bruin
+name: events.by_id
+type: bq.sql
+materialization:
+  type: table
+  strategy: merge
+  partition_by: event_date
+bigquery:
+  require_partition_filter: true
+  partition_key_immutable: true
+columns:
+  - name: id
+    type: INT64
+    primary_key: true
+  - name: event_date
+    type: DATE
+  - name: payload
+    type: STRING
+    update_on_merge: true
+@bruin */
+
+select id, event_date, payload
+from staging.events
+```
+
+Setting `partition_key_immutable: true` incorrectly can leave an old row behind if the same primary key later arrives with a different partition value. If partition values can move, include the partition column in the primary key, use a strategy that replaces complete partitions, or leave `require_partition_filter` disabled so a normal merge can search the whole target.
+
+Bruin rejects the case it can prove: when `partition_by` is the bare column, a non-primary-key partition column that carries `update_on_merge` or `merge_sql` is rewritten by the merge itself, so `partition_key_immutable` cannot hold for it. With `DATE(column)` or a `*_TRUNC(column, unit)` partition the declaration is still trusted, since a value can change without crossing a partition boundary.
+
+Partition-scoped merge currently supports `DATE`, `DATETIME`, and `TIMESTAMP` partition columns, `DATE(column)`, and the corresponding `*_TRUNC(column, unit)` expressions. The partition column must have a declared type when it is used directly. Source rows with a null partition value are rejected before the target is modified.
+
+For details on how BigQuery uses predicates to prune partitions in DML, see [Using DML with partitioned tables](https://cloud.google.com/bigquery/docs/using-dml-with-partitioned-tables#pruning_partitions_when_using_a_merge_statement).
+
 #### Example: Run a BigQuery script
 
 ```bruin-sql

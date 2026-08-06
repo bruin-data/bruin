@@ -44,7 +44,7 @@ const (
 	// IngestrVersionV0 is the legacy ingestr release pinned for parameters.version=v0.
 	IngestrVersionV0 = "0.14.155"
 	// IngestrVersionV1 is the current ingestr release used by default and for parameters.version=v1.
-	IngestrVersionV1 = "1.1.9"
+	IngestrVersionV1 = "1.1.22"
 	sqlfluffVersion  = "3.4.1"
 )
 
@@ -196,6 +196,7 @@ var DatabasePrefixToSqlfluffDialect = map[string]string{
 	"fabric":     "tsql",
 	"fw":         "tsql",
 	"databricks": "sparksql",
+	"spark":      "sparksql",
 	"synapse":    "tsql",
 	"duckdb":     "duckdb",
 	"clickhouse": "clickhouse",
@@ -213,11 +214,16 @@ type uvInstaller interface {
 	EnsureUvInstalled(ctx context.Context) (string, error)
 }
 
+type ingestrInstaller interface {
+	EnsureIngestrInstalled(ctx context.Context, version string) (string, error)
+}
+
 type UvPythonRunner struct {
-	Cmd            cmd
-	UvInstaller    uvInstaller
-	conn           config.ConnectionGetter
-	binaryFullPath string
+	Cmd              cmd
+	UvInstaller      uvInstaller
+	IngestrInstaller ingestrInstaller
+	conn             config.ConnectionGetter
+	binaryFullPath   string
 }
 
 func (u *UvPythonRunner) Run(ctx context.Context, execCtx *executionContext) error {
@@ -251,20 +257,13 @@ func (u *UvPythonRunner) Run(ctx context.Context, execCtx *executionContext) err
 }
 
 func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []string, repo *git.Repo) error {
-	binaryFullPath, err := u.UvInstaller.EnsureUvInstalled(ctx)
+	command, err := u.ingestrCommand(ctx, extraPackages, args)
 	if err != nil {
 		return err
 	}
-	u.binaryFullPath = binaryFullPath
+	command.Managed = isStreamingContext(ctx)
 
-	noDependencyCommand := &CommandInstance{
-		Name:    u.binaryFullPath,
-		Args:    u.ingestrRunCmd(ctx, extraPackages, args),
-		EnvVars: ingestrEnvVars(),
-		Managed: isStreamingContext(ctx),
-	}
-
-	return u.Cmd.Run(ctx, repo, noDependencyCommand)
+	return u.Cmd.Run(ctx, repo, command)
 }
 
 func (u *UvPythonRunner) runWithNoMaterialization(ctx context.Context, execCtx *executionContext, pythonVersion string) error {
@@ -525,17 +524,19 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		ingestrCtx = context.WithValue(ctx, executor.KeyPrinter, io.Writer(logBuffer))
 	}
 
-	runArgs := u.ingestrRunCmd(ctx, extraPackages, cmdArgs)
-
-	if executor.IsDebugMode(ctx) {
-		_, _ = output.Write([]byte("Running CommandInstance: uv " + strings.Join(runArgs, " ") + "\n"))
+	ingestrCommand, err := u.ingestrCommand(ingestrCtx, extraPackages, cmdArgs)
+	if err != nil {
+		if logBuffer != nil {
+			logBuffer.flushTo(output)
+		}
+		return errors.Wrap(err, "failed to prepare ingestr")
 	}
 
-	err = u.Cmd.Run(ingestrCtx, execCtx.repo, &CommandInstance{
-		Name:    u.binaryFullPath,
-		Args:    runArgs,
-		EnvVars: ingestrEnvVars(),
-	})
+	if executor.IsDebugMode(ctx) {
+		_, _ = output.Write([]byte("Running CommandInstance: " + ingestrCommand.Name + " " + strings.Join(ingestrCommand.Args, " ") + "\n"))
+	}
+
+	err = u.Cmd.Run(ingestrCtx, execCtx.repo, ingestrCommand)
 	if err != nil {
 		if logBuffer != nil {
 			logBuffer.flushTo(output)
@@ -557,18 +558,57 @@ func (u *UvPythonRunner) ingestrPackage(ctx context.Context) (string, bool) {
 			return ingestrPath, true
 		}
 	}
-	if v := ctx.Value(CtxIngestrVersion); v != nil {
-		if version, ok := v.(string); ok && version != "" {
-			return "ingestr@" + version, false
-		}
-	}
-	return "ingestr@" + IngestrVersionV1, false
+	return "ingestr@" + ingestrVersion(ctx), false
 }
 
-// ingestrRunCmd builds the `uv tool run` invocation for ingestr. Each call resolves
-// a per-version environment via `--from ingestr@<ver>` (or a local path), so v0 and
-// v1 assets in the same pipeline never share — and never clobber — an installation.
-func (u *UvPythonRunner) ingestrRunCmd(ctx context.Context, extraPackages, args []string) []string {
+func ingestrVersion(ctx context.Context) string {
+	if v := ctx.Value(CtxIngestrVersion); v != nil {
+		if version, ok := v.(string); ok && version != "" {
+			return version
+		}
+	}
+	return IngestrVersionV1
+}
+
+func isLegacyIngestrVersion(version string) bool {
+	return strings.HasPrefix(version, "0.")
+}
+
+// ingestrCommand resolves released v1+ versions to standalone binaries installed
+// by the official curl installer. Legacy v0 and local source checkouts continue to
+// use uv because they are Python packages and have no compatible binary release.
+func (u *UvPythonRunner) ingestrCommand(ctx context.Context, extraPackages, args []string) (*CommandInstance, error) {
+	_, isLocal := u.ingestrPackage(ctx)
+	version := ingestrVersion(ctx)
+	if isLocal || isLegacyIngestrVersion(version) {
+		binaryFullPath, err := u.UvInstaller.EnsureUvInstalled(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return &CommandInstance{
+			Name:    binaryFullPath,
+			Args:    u.uvIngestrRunCmd(ctx, extraPackages, args),
+			EnvVars: ingestrEnvVars(),
+		}, nil
+	}
+
+	installer := u.IngestrInstaller
+	if installer == nil {
+		installer = &IngestrChecker{}
+	}
+	binaryFullPath, err := installer.EnsureIngestrInstalled(ctx, version)
+	if err != nil {
+		return nil, err
+	}
+	return &CommandInstance{
+		Name:    binaryFullPath,
+		Args:    args,
+		EnvVars: ingestrEnvVars(),
+	}, nil
+}
+
+// uvIngestrRunCmd builds the legacy/local `uv tool run` invocation for ingestr.
+func (u *UvPythonRunner) uvIngestrRunCmd(ctx context.Context, extraPackages, args []string) []string {
 	ingestrPackageName, isLocal := u.ingestrPackage(ctx)
 	cmdline := make([]string, 0, 12+(2*len(extraPackages))+len(args))
 	cmdline = append(cmdline, "tool", "run", "--no-config", "--prerelease", "allow", "--python", pythonVersionForIngestr)
@@ -802,6 +842,9 @@ type SQLFileInfo struct {
 // DetectDialectFromAssetType extracts the dialect from an asset's type field
 // by splitting on the first dot and mapping the prefix.
 func DetectDialectFromAssetType(assetType string) string {
+	if assetType == string(pipeline.AssetTypeFabricSparkQuery) {
+		return "sparksql"
+	}
 	parts := strings.Split(assetType, ".")
 	if len(parts) == 0 {
 		return "ansi" // fallback to ANSI SQL

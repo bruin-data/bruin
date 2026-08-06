@@ -11,17 +11,16 @@ class DatabricksParser(SparkParser):
     LOG_DEFAULTS_TO_LN = True
     STRICT_CAST = True
     COLON_IS_VARIANT_EXTRACT = True
+    COLON_CHAIN_IS_SINGLE_EXTRACT = False
 
     FUNCTIONS = {
         **SparkParser.FUNCTIONS,
         "IFF": exp.If.from_arg_list,
         "GETDATE": exp.CurrentTimestamp.from_arg_list,
-        "DATEADD": build_date_delta(exp.DateAdd),
-        "DATE_ADD": build_date_delta(exp.DateAdd),
         "DATEDIFF": build_date_delta(exp.DateDiff),
         "DATE_DIFF": build_date_delta(exp.DateDiff),
         "NOW": exp.CurrentTimestamp.from_arg_list,
-        "TO_DATE": build_formatted_time(exp.TsOrDsToDate, "databricks"),
+        "TO_DATE": build_formatted_time(exp.TsOrDsToDate),
         "UNIFORM": lambda args: exp.Uniform(
             this=seq_get(args, 0), expression=seq_get(args, 1), seed=seq_get(args, 2)
         ),
@@ -30,6 +29,15 @@ class DatabricksParser(SparkParser):
     NO_PAREN_FUNCTION_PARSERS = {
         **SparkParser.NO_PAREN_FUNCTION_PARSERS,
         "CURDATE": lambda self: self._parse_curdate(),
+    }
+
+    FUNCTION_PARSERS = {
+        **SparkParser.FUNCTION_PARSERS,
+        "REGR_AVGX": lambda self: self._parse_distinct_arg_function(exp.RegrAvgx, distinct_index=1),
+        "REGR_AVGY": lambda self: self._parse_distinct_arg_function(exp.RegrAvgy),
+        "REGR_SXX": lambda self: self._parse_distinct_arg_function(exp.RegrSxx, distinct_index=1),
+        "REGR_SXY": lambda self: self._parse_distinct_arg_function(exp.RegrSxy),
+        "REGR_SYY": lambda self: self._parse_distinct_arg_function(exp.RegrSyy, distinct_index=1),
     }
 
     FACTOR = {
@@ -55,3 +63,14 @@ class DatabricksParser(SparkParser):
         if self._match(TokenType.L_PAREN):
             self._match_r_paren()
         return self.expression(exp.CurrentDate())
+
+    def _parse_primary_key_part(self) -> exp.Expr | None:
+        this = super()._parse_primary_key_part()
+        if this and self._match_text_seq("TIMESERIES"):
+            return self.expression(exp.TimeseriesKey(this=this))
+        return this
+
+    def _parse_cluster_property(self):
+        if self._match_texts(("AUTO", "NONE")):
+            return self.expression(exp.ClusterProperty(this=self._prev.text.upper()))
+        return super()._parse_cluster_property()

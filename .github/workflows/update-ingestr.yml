@@ -12,7 +12,7 @@ jobs:
   update:
     runs-on: depot-ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
 
@@ -71,7 +71,7 @@ jobs:
       - name: Create Pull Request
         id: create-pr
         if: steps.check.outputs.new == 'true'
-        uses: peter-evans/create-pull-request@v7.0.8
+        uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7.0.8
         with:
           branch: update-ingestr-${{ steps.check.outputs.version }}
           commit-message: "chore: bump ingestr to v${{ steps.check.outputs.version }}"

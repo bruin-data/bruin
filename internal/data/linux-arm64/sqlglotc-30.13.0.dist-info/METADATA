@@ -1,0 +1,15 @@
+Metadata-Version: 2.4
+Name: sqlglotc
+Version: 30.13.0
+Summary: mypyc-compiled extensions for sqlglot
+Author-email: Toby Mao <toby.mao@gmail.com>
+License-Expression: MIT
+Project-URL: Homepage, https://sqlglot.com/
+Project-URL: Repository, https://github.com/tobymao/sqlglot
+Requires-Python: >=3.10
+Requires-Dist: sqlglot==30.13.0
+Provides-Extra: dev
+Requires-Dist: setuptools>=61.0; extra == "dev"
+Requires-Dist: setuptools_scm; extra == "dev"
+Requires-Dist: sqlglot-mypy>=2.1.0.post9; extra == "dev"
+Dynamic: requires-dist

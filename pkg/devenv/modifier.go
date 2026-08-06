@@ -40,7 +40,7 @@ func (d *DevEnvQueryModifier) Modify(ctx context.Context, p *pipeline.Pipeline, 
 
 	assetName := a.Name
 	assetNameParts := strings.Split(assetName, ".")
-	if len(assetNameParts) != 2 {
+	if len(assetNameParts) != 2 && len(assetNameParts) != 3 {
 		return q, nil
 	}
 
@@ -99,14 +99,48 @@ func (d *DevEnvQueryModifier) Modify(ctx context.Context, p *pipeline.Pipeline, 
 		return nil, dbSummaryErr
 	}
 
+	crossCatalogTables := make([]string, 0)
+	seenCrossCatalogTables := make(map[string]bool)
+	for _, tableReference := range usedTables {
+		parts := strings.Split(tableReference, ".")
+		if len(parts) != 3 || strings.EqualFold(parts[0], dbSummary.Name) {
+			continue
+		}
+		devSchema := env.SchemaPrefix + parts[1]
+		if d.databaseSummaryTableExists(dbSummary, parts[0], devSchema, parts[2]) {
+			continue
+		}
+		devTable := fmt.Sprintf("%s.%s.%s", parts[0], devSchema, parts[2])
+		if !seenCrossCatalogTables[devTable] {
+			crossCatalogTables = append(crossCatalogTables, devTable)
+			seenCrossCatalogTables[devTable] = true
+		}
+	}
+
+	var crossCatalogTableExists map[string]bool
+	batchChecker, batchSupported := conn.(interface {
+		TablesExist(ctx context.Context, tableNames []string) (map[string]bool, error)
+	})
+	if batchSupported && len(crossCatalogTables) > 0 {
+		crossCatalogTableExists, err = batchChecker.TablesExist(ctx, crossCatalogTables)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	renameMapping := map[string]string{}
 
 	// we modify the asset names globally outside of this function.
 	// this means if for some case the asset query queries itself, it would be cool if we handle that as well.
 	// this conditional tries to do that.
-	if strings.HasPrefix(assetNameParts[0], env.SchemaPrefix) {
-		originalAssetName := strings.TrimPrefix(assetName, env.SchemaPrefix)
-		renameMapping[originalAssetName] = assetName
+	assetSchemaIndex := len(assetNameParts) - 2
+	if strings.HasPrefix(assetNameParts[assetSchemaIndex], env.SchemaPrefix) {
+		originalAssetNameParts := append([]string(nil), assetNameParts...)
+		originalAssetNameParts[assetSchemaIndex] = strings.TrimPrefix(
+			originalAssetNameParts[assetSchemaIndex],
+			env.SchemaPrefix,
+		)
+		renameMapping[strings.Join(originalAssetNameParts, ".")] = assetName
 	}
 
 	for _, tableReference := range usedTables {
@@ -120,7 +154,7 @@ func (d *DevEnvQueryModifier) Modify(ctx context.Context, p *pipeline.Pipeline, 
 			devSchema := env.SchemaPrefix + schema
 			devTable := fmt.Sprintf("%s.%s", devSchema, table)
 
-			if dbSummary.TableExists(devSchema, table) {
+			if d.databaseSummaryTableExists(dbSummary, dbSummary.Name, devSchema, table) {
 				renameMapping[tableReference] = devTable
 			}
 		case 3:
@@ -132,11 +166,17 @@ func (d *DevEnvQueryModifier) Modify(ctx context.Context, p *pipeline.Pipeline, 
 			devSchema := env.SchemaPrefix + schema
 			devTable := fmt.Sprintf("%s.%s.%s", database, devSchema, table)
 
-			tableExists := dbSummary.TableExists(devSchema, table)
+			tableExists := d.databaseSummaryTableExists(dbSummary, database, devSchema, table)
 			if !strings.EqualFold(database, dbSummary.Name) {
-				tableExists, err = tableExistsInDatabase(ctx, conn, devTable)
-				if err != nil {
-					return nil, err
+				if batchSupported {
+					if batchResult, checked := crossCatalogTableExists[devTable]; checked {
+						tableExists = batchResult
+					}
+				} else {
+					tableExists, err = tableExistsInDatabase(ctx, conn, devTable)
+					if err != nil {
+						return nil, err
+					}
 				}
 			}
 
@@ -156,7 +196,57 @@ func (d *DevEnvQueryModifier) Modify(ctx context.Context, p *pipeline.Pipeline, 
 	return q, nil
 }
 
+func (d *DevEnvQueryModifier) databaseSummaryTableExists(
+	database *ansisql.DBDatabase,
+	catalog,
+	schema,
+	table string,
+) bool {
+	useUnqualifiedSchema := catalog == "" || strings.EqualFold(catalog, database.Name)
+	if useUnqualifiedSchema && database.TableExists(schema, table) {
+		return true
+	}
+	if catalog != "" && database.TableExists(catalog+"."+schema, table) {
+		return true
+	}
+	if !strings.EqualFold(d.Dialect, "spark") {
+		return false
+	}
+
+	schemaNames := make([]string, 0, 2)
+	if useUnqualifiedSchema {
+		schemaNames = append(schemaNames, schema)
+	}
+	if catalog != "" {
+		schemaNames = append(schemaNames, catalog+"."+schema)
+	}
+	for _, existingSchema := range database.Schemas {
+		schemaMatches := false
+		for _, schemaName := range schemaNames {
+			if strings.EqualFold(existingSchema.Name, schemaName) {
+				schemaMatches = true
+				break
+			}
+		}
+		if !schemaMatches {
+			continue
+		}
+		for _, existingTable := range existingSchema.Tables {
+			if strings.EqualFold(existingTable.Name, table) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func tableExistsInDatabase(ctx context.Context, conn any, tableName string) (bool, error) {
+	if metadataChecker, ok := conn.(interface {
+		TableExists(ctx context.Context, tableName string) (bool, error)
+	}); ok {
+		return metadataChecker.TableExists(ctx, tableName)
+	}
+
 	tableChecker, ok := conn.(ansisql.TableExistsChecker)
 	if !ok {
 		return false, nil
@@ -199,12 +289,20 @@ func (d *DevEnvQueryModifier) RegisterAssetForSchemaCache(ctx context.Context, p
 	}
 
 	assetNameParts := strings.Split(a.Name, ".")
-	if len(assetNameParts) != 2 {
+	if len(assetNameParts) != 2 && len(assetNameParts) != 3 {
 		return nil
 	}
 
-	assetSchema := assetNameParts[0]
-	assetTable := assetNameParts[1]
+	assetCatalog := summary.Name
+	if len(assetNameParts) == 3 {
+		assetCatalog = assetNameParts[0]
+	}
+	assetSchemaName := assetNameParts[len(assetNameParts)-2]
+	assetSchema := assetCatalog + "." + assetSchemaName
+	if len(assetNameParts) == 2 || strings.EqualFold(assetCatalog, summary.Name) {
+		assetSchema = databaseSummarySchemaName(summary, assetCatalog, assetSchemaName)
+	}
+	assetTable := assetNameParts[len(assetNameParts)-1]
 
 	schemaIndex := -1
 	for i, schema := range summary.Schemas {
@@ -233,4 +331,23 @@ func (d *DevEnvQueryModifier) RegisterAssetForSchemaCache(ctx context.Context, p
 	})
 
 	return nil
+}
+
+func databaseSummarySchemaName(database *ansisql.DBDatabase, catalog, schema string) string {
+	qualifiedSchema := catalog + "." + schema
+	for _, existingSchema := range database.Schemas {
+		if strings.EqualFold(existingSchema.Name, schema) ||
+			(catalog != "" && strings.EqualFold(existingSchema.Name, qualifiedSchema)) {
+			return existingSchema.Name
+		}
+	}
+	if catalog != "" {
+		catalogPrefix := strings.ToLower(catalog) + "."
+		for _, existingSchema := range database.Schemas {
+			if strings.HasPrefix(strings.ToLower(existingSchema.Name), catalogPrefix) {
+				return qualifiedSchema
+			}
+		}
+	}
+	return schema
 }
