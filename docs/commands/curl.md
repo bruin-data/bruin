@@ -49,6 +49,10 @@ are resolved only once. Fields nested inside a connection can be traversed with 
 {{ bruin.connection("service-api").credentials.client_id }}
 ```
 
+If you do not know which field a connection exposes — `api_key` or `api_token`, for instance — run
+`bruin connections list`. The `FILLED FIELDS` column lists the field names that are set on each
+connection, without printing their values.
+
 The usual Bruin Jinja helpers remain available in the same namespace. For example,
 <code v-pre>{{ bruin.slugify("Account Name") }}</code> renders as `account_name`. Most other helpers
 generate SQL expressions and are primarily useful in asset templates; see [Jinja templating and

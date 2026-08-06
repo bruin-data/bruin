@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	path2 "path"
+	"strings"
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/git"
@@ -339,56 +340,32 @@ func (r *ConnectionsCommand) ListConnections(pathToProject, output, environment,
 		return nil
 	}
 
-	// Check if a specific environment is requested
+	envs := cm.Environments
 	if environment != "" {
 		env, exists := cm.Environments[environment]
 		if !exists {
 			errorPrinter.Printf("Environment '%s' not found.\n", environment)
 			return cli.Exit("", 1)
 		}
-
-		fmt.Println()
-		infoPrinter.Printf("Environment: %s\n", environment)
-
-		t := table.NewWriter()
-		t.SetOutputMirror(os.Stdout)
-		t.AppendHeader(table.Row{"Type", "Name"})
-
-		rows := env.Connections.ConnectionsSummaryList()
-
-		for row, connType := range rows {
-			t.AppendRow(table.Row{connType, row})
-		}
-		t.Render()
-		fmt.Println()
-
-		return nil
+		envs = map[string]config.Environment{environment: env}
 	}
-	// If no specific environment is requested, iterate through all environments
-	for envName, env := range cm.Environments {
+
+	for envName, env := range envs {
 		fmt.Println()
 		infoPrinter.Printf("Environment: %s\n", envName)
 
 		t := table.NewWriter()
 		t.SetOutputMirror(os.Stdout)
-		t.AppendHeader(table.Row{"Type", "Name"})
+		t.AppendHeader(table.Row{"Type", "Name", "Filled Fields"})
 
-		rows := env.Connections.ConnectionsSummaryList()
-
-		if len(rows) == 0 {
-			t.Render()
-			fmt.Println()
-			continue
-		}
-
-		for row, connType := range rows {
-			t.AppendRow(table.Row{connType, row})
+		for name, connType := range env.Connections.ConnectionsSummaryList() {
+			t.AppendRow(table.Row{connType, name, strings.Join(env.Connections.FilledFieldsForConnection(name), ", ")})
 		}
 		t.Render()
 		fmt.Println()
 	}
 
-	return err
+	return nil
 }
 
 func printErrorForOutput(output string, err error) {
