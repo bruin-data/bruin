@@ -29,3 +29,11 @@ COALESCE(
 {% macro url_hostname(url_column) -%}
 LOWER(REGEXP_EXTRACT({{ url_column }}, r'^https?://([^/:]+)'))
 {%- endmacro %}
+
+{# A path alone does not identify a page. A property that spans hosts — a blog or
+   docs subdomain, a country subdomain — commonly serves the same path on several
+   of them, and treating those as one page sums unrelated impressions and revenue
+   together. Use this wherever a page has to be counted or ranked as a unit. #}
+{% macro page_identity(hostname_column, path_column) -%}
+CONCAT(COALESCE({{ hostname_column }}, ''), {{ path_column }})
+{%- endmacro %}

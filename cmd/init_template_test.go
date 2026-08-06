@@ -298,6 +298,55 @@ func TestGA4SearchConsoleBigQueryTemplateReadsExistingExports(t *testing.T) {
 	require.NotContains(t, landingPages, "sessions.is_organic_search_session")
 }
 
+func TestGA4SearchConsoleBigQueryTemplateKeepsHostsSeparate(t *testing.T) {
+	t.Parallel()
+
+	readTemplate := func(path string) string {
+		t.Helper()
+		content, err := templates.Templates.ReadFile(path)
+		require.NoError(t, err)
+		return string(content)
+	}
+
+	// A property that spans hosts serves the same path on more than one of them.
+	// Every page-grain report must keep the host in its grain, otherwise unrelated
+	// pages are summed and whichever host earns the revenue has its value diluted.
+	for _, asset := range []string{
+		"organic_landing_page_performance",
+		"organic_query_value",
+		"search_page_trend",
+		"search_query_opportunities",
+		"search_query_cannibalization",
+		"search_new_and_lost_queries",
+	} {
+		content := readTemplate("ga4-search-console-bigquery/assets/web_reports/" + asset + ".sql")
+		require.Contains(t, content, "page_hostname", asset)
+	}
+
+	// Both sides of the GA4-to-Search-Console join must match on host as well as
+	// path, or the join silently reintroduces the merge.
+	landingPages := readTemplate("ga4-search-console-bigquery/assets/web_reports/organic_landing_page_performance.sql")
+	require.Contains(t, landingPages, "ON landing.page_hostname = search.page_hostname")
+	require.Contains(t, landingPages, "ON content.page_hostname = combined.page_hostname")
+
+	queryValue := readTemplate("ga4-search-console-bigquery/assets/web_reports/organic_query_value.sql")
+	require.Contains(t, queryValue, "USING (site_url, page_hostname, page_path)")
+	require.Contains(t, queryValue, "ON outcomes.page_hostname = query_page.page_hostname")
+}
+
+func TestGA4SearchConsoleBigQueryTemplateEscapesBrandPattern(t *testing.T) {
+	t.Parallel()
+
+	macros, err := templates.Templates.ReadFile("ga4-search-console-bigquery/macros/search.sql")
+	require.NoError(t, err)
+
+	// The brand pattern is interpolated into a string literal, and brands such as
+	// Levi's and O'Reilly carry an apostrophe. Without the triple quotes and the
+	// ['] rewrite, a bare apostrophe closes the literal and every asset that
+	// classifies a query fails to parse.
+	require.Contains(t, string(macros), `r'''{{ brand_pattern | replace("'", "[']") }}'''`)
+}
+
 func TestInitMigrationFivetranCopiesMigrationWorkspace(t *testing.T) {
 	targetRoot := t.TempDir()
 	t.Chdir(targetRoot)

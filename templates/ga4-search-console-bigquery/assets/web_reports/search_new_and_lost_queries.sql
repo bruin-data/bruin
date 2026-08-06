@@ -57,6 +57,9 @@ columns:
   - name: query_word_count
     type: INT64
     description: Word count of the query.
+  - name: top_page_hostname
+    type: STRING
+    description: Hostname of the page that earned the most impressions for this query.
   - name: top_page_path
     type: STRING
     description: >
@@ -155,6 +158,7 @@ windowed AS (
     daily.query,
     daily.query_brand_type,
     daily.query_word_count,
+    daily.page_hostname,
     daily.page_path,
     daily.data_date > bounds.current_start AS is_current_window,
     daily.impressions,
@@ -173,10 +177,11 @@ query_page AS (
     site_url,
     search_type,
     query,
+    page_hostname,
     page_path,
     SUM(impressions) AS impressions
   FROM windowed
-  GROUP BY 1, 2, 3, 4
+  GROUP BY 1, 2, 3, 4, 5
 ),
 
 top_page AS (
@@ -184,16 +189,18 @@ top_page AS (
     site_url,
     search_type,
     query,
+    page_hostname AS top_page_hostname,
     page_path AS top_page_path
   FROM (
     SELECT
       site_url,
       search_type,
       query,
+      page_hostname,
       page_path,
       ROW_NUMBER() OVER (
         PARTITION BY site_url, search_type, query
-        ORDER BY impressions DESC, page_path
+        ORDER BY impressions DESC, page_hostname, page_path
       ) AS page_rank
     FROM query_page
   )
@@ -227,6 +234,7 @@ SELECT
   IF(compared.prior_impressions = 0, 'new', 'lost') AS query_change_type,
   compared.query_brand_type,
   compared.query_word_count,
+  pages.top_page_hostname,
   pages.top_page_path,
   {{ var.trend_window_days }} AS window_days,
   DATE_ADD(bounds.current_start, INTERVAL 1 DAY) AS current_window_start_date,

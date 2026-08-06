@@ -94,7 +94,10 @@ bruin run --var reporting_window_days=365 ga4-search-console-bigquery
 
 The brand pattern is the one setting worth getting right before you read anything,
 because it splits the traffic that measures SEO work from the traffic that measures
-brand awareness.
+brand awareness. It is an RE2 pattern matched case-insensitively, and apostrophes
+are safe to use — `(levi's|levis)` and `(o'reilly|oreilly)` both work, because the
+`query_brand_type` macro rewrites each apostrophe into the `[']` character class
+before it reaches SQL.
 
 ## What it creates
 
@@ -114,12 +117,23 @@ impressions and clicks are real, so dropping them would quietly understate daily
 totals. They carry a NULL query and a `query_brand_type` of `anonymized`, and the
 query-grain reports exclude them explicitly.
 
-`page_path` is the join key across both systems, produced by the shared
-`page_path` macro in `macros/url.sql`. Search Console reports a canonical absolute
+`page_hostname` plus `page_path` is the join key across both systems, produced by
+the shared macros in `macros/url.sql`. Search Console reports a canonical absolute
 URL and GA4 reports whatever the tag collected, so both sides are lowercased and
-stripped of scheme, host, query string, fragment, and trailing slashes. If your
-site needs different rules — locale prefixes, pagination parameters that matter —
+stripped of scheme, query string, fragment, and trailing slashes. If your site
+needs different rules — locale prefixes, pagination parameters that matter —
 change the macro once and every model follows.
+
+The hostname stays in the grain of every page-level report on purpose. A property
+that spans hosts routinely serves the same path on more than one of them, and a
+docs or blog subdomain is a different page from the marketing site even when both
+answer `/guide`. Joining on the path alone would sum their impressions and revenue
+together and dilute the value of whichever host actually earns it. The cost is
+that a property whose two systems disagree about the canonical host — GA4
+recording a visit before a `www` redirect, say — reports that page twice, once as
+`search_only` and once as `ga4_only`, instead of hiding the disagreement inside a
+merged row. If you would rather see one row per path, aggregate over
+`page_hostname` in your own model on top of these reports.
 
 ### `web_reports` — the seven reports
 

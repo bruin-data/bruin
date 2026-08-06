@@ -68,14 +68,18 @@ columns:
           - underperforming_ctr
           - impressions_no_clicks
           - monitor
+  - name: top_page_hostname
+    type: STRING
+    description: Hostname of the page that earns the most clicks for this query.
   - name: top_page_path
     type: STRING
     description: Page that earns the most clicks for this query.
   - name: ranking_page_count
     type: INT64
     description: >
-      Pages that earned impressions for this query. More than one means the
-      property is competing with itself; see web_reports.search_query_cannibalization.
+      Pages that earned impressions for this query, counted per host so the same
+      path on two hosts counts as two pages. More than one means the property is
+      competing with itself; see web_reports.search_query_cannibalization.
     checks:
       - name: positive
   - name: impressions
@@ -165,6 +169,7 @@ query_page AS (
     daily.query,
     daily.query_brand_type,
     daily.query_word_count,
+    daily.page_hostname,
     daily.page_path,
     SUM(daily.impressions) AS impressions,
     SUM(daily.clicks) AS clicks,
@@ -175,7 +180,7 @@ query_page AS (
     AND daily.data_date <= bounds.window_end
     AND NOT daily.is_anonymized_query
     AND daily.query IS NOT NULL
-  GROUP BY 1, 2, 3, 4, 5, 6
+  GROUP BY 1, 2, 3, 4, 5, 6, 7
 ),
 
 query_totals AS (
@@ -185,7 +190,7 @@ query_totals AS (
     query,
     MAX(query_brand_type) AS query_brand_type,
     MAX(query_word_count) AS query_word_count,
-    COUNT(DISTINCT page_path) AS ranking_page_count,
+    COUNT(DISTINCT {{ page_identity('page_hostname', 'page_path') }}) AS ranking_page_count,
     SUM(impressions) AS impressions,
     SUM(clicks) AS clicks,
     SUM(sum_position) AS sum_position
@@ -198,16 +203,18 @@ top_page AS (
     site_url,
     search_type,
     query,
+    page_hostname AS top_page_hostname,
     page_path AS top_page_path
   FROM (
     SELECT
       site_url,
       search_type,
       query,
+      page_hostname,
       page_path,
       ROW_NUMBER() OVER (
         PARTITION BY site_url, search_type, query
-        ORDER BY clicks DESC, impressions DESC, page_path
+        ORDER BY clicks DESC, impressions DESC, page_hostname, page_path
       ) AS page_rank
     FROM query_page
   )
@@ -221,6 +228,7 @@ scored AS (
     totals.query,
     totals.query_brand_type,
     totals.query_word_count,
+    pages.top_page_hostname,
     pages.top_page_path,
     totals.ranking_page_count,
     totals.impressions,
@@ -266,6 +274,7 @@ SELECT
       AND benchmarked.ctr < benchmarked.expected_ctr * 0.6 THEN 'underperforming_ctr'
     ELSE 'monitor'
   END AS opportunity_type,
+  benchmarked.top_page_hostname,
   benchmarked.top_page_path,
   benchmarked.ranking_page_count,
   benchmarked.impressions,

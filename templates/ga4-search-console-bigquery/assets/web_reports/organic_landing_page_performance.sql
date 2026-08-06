@@ -10,13 +10,23 @@ description: >
   tell a page that ranks well but sells nothing from a page that converts well but
   nobody can find.
 
-  Rows are joined on the normalized page path from both sides and the join is a
-  full outer join on purpose, so pages present in only one system are kept rather
-  than silently dropped. coverage_status explains each mismatch: 'search_only'
-  usually means missing or blocked tracking, a redirect, or bot filtering, while
-  'ga4_only' means the page draws visits from somewhere other than Google search.
-  The GA4 side is restricted to Google organic sessions because Search Console
-  never reports Bing or any other engine.
+  Rows are joined on hostname and normalized page path from both sides, and the
+  join is a full outer join on purpose, so pages present in only one system are
+  kept rather than silently dropped. coverage_status explains each mismatch:
+  'search_only' usually means missing or blocked tracking, a redirect, or bot
+  filtering, while 'ga4_only' means the page draws visits from somewhere other
+  than Google search. The GA4 side is restricted to Google organic sessions
+  because Search Console never reports Bing or any other engine.
+
+  The hostname is part of the grain because a property that spans hosts commonly
+  serves the same path on more than one of them, and a docs or blog subdomain is
+  a different page from the marketing site even when both answer /guide. Joining
+  on the path alone would sum their impressions and revenue together and quietly
+  dilute the value of whichever host actually earns it. The cost is that a
+  property whose two systems disagree about the canonical host — GA4 recording
+  a visit before a www redirect, say — reports that page twice, once as
+  'search_only' and once as 'ga4_only', rather than hiding the disagreement in a
+  merged row.
 
   Money is read from GA4's USD conversion so it stays additive across properties.
   Session and click counts come from different measurement systems and will never
@@ -43,9 +53,15 @@ columns:
     description: >
       Search Console property. Filled from the search side, and from the property
       observed in the window for pages GA4 saw but Search Console did not.
+  - name: page_hostname
+    type: STRING
+    description: >
+      Hostname serving the page. Part of the grain so hosts sharing a path are
+      never summed together.
+    primary_key: true
   - name: page_path
     type: STRING
-    description: Normalized page path, the join key between the two systems.
+    description: Normalized page path. With the hostname, the join key between the two systems.
     primary_key: true
     checks:
       - name: not_null
@@ -152,13 +168,17 @@ columns:
 
 custom_checks:
   - name: landing page grain is unique
-    description: One row per page.
+    description: >
+      One row per host and page. The host belongs in the grain because a property
+      spanning hosts can serve the same path on several of them.
     query: |
       SELECT COUNT(*)
       FROM (
-        SELECT page_path
+        SELECT
+          page_hostname,
+          page_path
         FROM {{ this }}
-        GROUP BY 1
+        GROUP BY 1, 2
         HAVING COUNT(*) > 1
       )
     value: 0
@@ -191,6 +211,7 @@ WITH bounds AS (
 search AS (
   SELECT
     daily.site_url,
+    daily.page_hostname,
     daily.page_path,
     SUM(daily.impressions) AS search_impressions,
     SUM(daily.clicks) AS search_clicks,
@@ -200,7 +221,7 @@ search AS (
   WHERE daily.data_date > bounds.window_start
     AND daily.data_date <= bounds.window_end
     AND daily.search_type = 'WEB'
-  GROUP BY 1, 2
+  GROUP BY 1, 2, 3
 ),
 
 -- Search Console exports one property per dataset, so this resolves the property
@@ -213,6 +234,7 @@ observed_site AS (
 
 landing AS (
   SELECT
+    sessions.landing_page_hostname AS page_hostname,
     sessions.landing_page_path AS page_path,
     COUNT(*) AS organic_sessions,
     COUNTIF(sessions.is_engaged_session) AS engaged_sessions,
@@ -226,11 +248,12 @@ landing AS (
     AND sessions.session_date <= bounds.window_end
     AND sessions.is_google_organic_session
     AND sessions.landing_page_path IS NOT NULL
-  GROUP BY 1
+  GROUP BY 1, 2
 ),
 
 content AS (
   SELECT
+    pages.page_hostname,
     pages.page_path,
     SUM(pages.page_views) AS organic_page_views,
     SUM(pages.entrances) AS organic_entrances
@@ -239,11 +262,12 @@ content AS (
   WHERE pages.page_date > bounds.window_start
     AND pages.page_date <= bounds.window_end
     AND pages.is_google_organic
-  GROUP BY 1
+  GROUP BY 1, 2
 ),
 
 combined AS (
   SELECT
+    COALESCE(search.page_hostname, landing.page_hostname) AS page_hostname,
     COALESCE(search.page_path, landing.page_path) AS page_path,
     search.site_url,
     COALESCE(search.search_impressions, 0) AS search_impressions,
@@ -257,11 +281,13 @@ combined AS (
     COALESCE(landing.purchase_revenue_usd, 0) AS purchase_revenue_usd
   FROM search
   FULL OUTER JOIN landing
-    ON landing.page_path = search.page_path
+    ON landing.page_hostname = search.page_hostname
+    AND landing.page_path = search.page_path
 )
 
 SELECT
   COALESCE(combined.site_url, observed_site.site_url) AS site_url,
+  combined.page_hostname,
   combined.page_path,
   CASE
     WHEN combined.search_impressions = 0 THEN 'ga4_only'
@@ -303,6 +329,7 @@ FROM combined
 CROSS JOIN bounds
 CROSS JOIN observed_site
 LEFT JOIN content
-  ON content.page_path = combined.page_path
+  ON content.page_hostname = combined.page_hostname
+  AND content.page_path = combined.page_path
 WHERE combined.search_impressions >= {{ var.min_page_impressions }}
   OR combined.organic_sessions > 0;

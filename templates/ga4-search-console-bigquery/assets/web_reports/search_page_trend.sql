@@ -33,6 +33,12 @@ columns:
     primary_key: true
     checks:
       - name: not_null
+  - name: page_hostname
+    type: STRING
+    description: >
+      Hostname serving the page. Part of the grain so hosts sharing a path are
+      trended separately rather than summed.
+    primary_key: true
   - name: page_path
     type: STRING
     description: Normalized page path.
@@ -116,15 +122,16 @@ columns:
 
 custom_checks:
   - name: page trend grain is unique
-    description: One row per property and page.
+    description: One row per property, host, and page.
     query: |
       SELECT COUNT(*)
       FROM (
         SELECT
           site_url,
+          page_hostname,
           page_path
         FROM {{ this }}
-        GROUP BY 1, 2
+        GROUP BY 1, 2, 3
         HAVING COUNT(*) > 1
       )
     value: 0
@@ -152,6 +159,7 @@ WITH bounds AS (
 windowed AS (
   SELECT
     daily.site_url,
+    daily.page_hostname,
     daily.page_path,
     daily.data_date > bounds.current_start AS is_current_window,
     daily.impressions,
@@ -167,6 +175,7 @@ windowed AS (
 compared AS (
   SELECT
     site_url,
+    page_hostname,
     page_path,
     SUM(IF(is_current_window, impressions, 0)) AS current_impressions,
     SUM(IF(is_current_window, clicks, 0)) AS current_clicks,
@@ -176,12 +185,13 @@ compared AS (
     SUM(IF(is_current_window, 0, sum_position)) AS prior_sum_position,
     COUNT(DISTINCT IF(is_current_window, query, NULL)) AS distinct_query_count
   FROM windowed
-  GROUP BY 1, 2
+  GROUP BY 1, 2, 3
   HAVING SUM(impressions) >= {{ var.min_page_impressions }}
 )
 
 SELECT
   compared.site_url,
+  compared.page_hostname,
   compared.page_path,
   CASE
     WHEN compared.prior_impressions = 0 AND compared.current_impressions > 0 THEN 'new'

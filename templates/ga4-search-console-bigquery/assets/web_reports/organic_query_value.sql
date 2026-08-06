@@ -66,9 +66,14 @@ columns:
     description: Last date included.
   - name: ranking_page_count
     type: INT64
-    description: Pages that earned clicks for this query.
+    description: >
+      Pages that earned clicks for this query, counted per host so the same path on
+      two hosts counts as two pages.
     checks:
       - name: positive
+  - name: top_page_hostname
+    type: STRING
+    description: Hostname of the page that earned the most clicks for this query.
   - name: top_page_path
     type: STRING
     description: Page that earned the most clicks for this query.
@@ -158,6 +163,7 @@ WITH bounds AS (
 query_page AS (
   SELECT
     daily.site_url,
+    daily.page_hostname,
     daily.page_path,
     daily.query,
     daily.query_brand_type,
@@ -171,7 +177,7 @@ query_page AS (
     AND daily.search_type = 'WEB'
     AND NOT daily.is_anonymized_query
     AND daily.query IS NOT NULL
-  GROUP BY 1, 2, 3, 4
+  GROUP BY 1, 2, 3, 4, 5
   HAVING SUM(daily.clicks) > 0
 ),
 
@@ -180,14 +186,16 @@ query_page AS (
 page_click_totals AS (
   SELECT
     site_url,
+    page_hostname,
     page_path,
     SUM(search_clicks) AS attributable_clicks
   FROM query_page
-  GROUP BY 1, 2
+  GROUP BY 1, 2, 3
 ),
 
 page_outcomes AS (
   SELECT
+    sessions.landing_page_hostname AS page_hostname,
     sessions.landing_page_path AS page_path,
     COUNT(*) AS organic_sessions,
     COUNTIF(sessions.is_engaged_session) AS engaged_sessions,
@@ -199,7 +207,7 @@ page_outcomes AS (
     AND sessions.session_date <= bounds.window_end
     AND sessions.is_google_organic_session
     AND sessions.landing_page_path IS NOT NULL
-  GROUP BY 1
+  GROUP BY 1, 2
 ),
 
 allocated AS (
@@ -207,6 +215,7 @@ allocated AS (
     query_page.site_url,
     query_page.query,
     query_page.query_brand_type,
+    query_page.page_hostname,
     query_page.page_path,
     query_page.search_impressions,
     query_page.search_clicks,
@@ -218,9 +227,10 @@ allocated AS (
     COALESCE(outcomes.purchase_revenue_usd, 0) AS page_purchase_revenue_usd
   FROM query_page
   JOIN page_click_totals AS totals
-    USING (site_url, page_path)
+    USING (site_url, page_hostname, page_path)
   LEFT JOIN page_outcomes AS outcomes
-    ON outcomes.page_path = query_page.page_path
+    ON outcomes.page_hostname = query_page.page_hostname
+    AND outcomes.page_path = query_page.page_path
 ),
 
 rolled_up AS (
@@ -228,7 +238,7 @@ rolled_up AS (
     site_url,
     query,
     MAX(query_brand_type) AS query_brand_type,
-    COUNT(DISTINCT page_path) AS ranking_page_count,
+    COUNT(DISTINCT {{ page_identity('page_hostname', 'page_path') }}) AS ranking_page_count,
     SUM(search_impressions) AS search_impressions,
     SUM(search_clicks) AS search_clicks,
     SUM(sum_position) AS sum_position,
@@ -245,15 +255,17 @@ top_page AS (
   SELECT
     site_url,
     query,
+    page_hostname AS top_page_hostname,
     page_path AS top_page_path
   FROM (
     SELECT
       site_url,
       query,
+      page_hostname,
       page_path,
       ROW_NUMBER() OVER (
         PARTITION BY site_url, query
-        ORDER BY search_clicks DESC, search_impressions DESC, page_path
+        ORDER BY search_clicks DESC, search_impressions DESC, page_hostname, page_path
       ) AS page_rank
     FROM allocated
   )
@@ -267,6 +279,7 @@ SELECT
   DATE_ADD(bounds.window_start, INTERVAL 1 DAY) AS window_start_date,
   bounds.window_end AS window_end_date,
   rolled_up.ranking_page_count,
+  pages.top_page_hostname,
   pages.top_page_path,
   rolled_up.search_impressions,
   rolled_up.search_clicks,

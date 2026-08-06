@@ -48,7 +48,9 @@ columns:
     description: Whether the query is branded or non_branded.
   - name: ranking_page_count
     type: INT64
-    description: Pages that earned impressions for this query.
+    description: >
+      Pages that earned impressions for this query, counted per host so the same
+      path served by two hosts counts as two competing pages.
     checks:
       - name: not_null
   - name: query_impressions
@@ -61,6 +63,9 @@ columns:
     description: Clicks across every competing page.
     checks:
       - name: non_negative
+  - name: primary_page_hostname
+    type: STRING
+    description: Hostname of the page with the most clicks for this query.
   - name: primary_page_path
     type: STRING
     description: Page with the most clicks for this query.
@@ -80,6 +85,9 @@ columns:
     description: >
       Share of the query's clicks the primary page earned. The lower this is, the
       more evenly demand is being split.
+  - name: competing_page_hostname
+    type: STRING
+    description: Hostname of the second-ranked page for this query.
   - name: competing_page_path
     type: STRING
     description: Second-ranked page for this query.
@@ -147,6 +155,7 @@ query_page AS (
     daily.search_type,
     daily.query,
     daily.query_brand_type,
+    daily.page_hostname,
     daily.page_path,
     SUM(daily.impressions) AS impressions,
     SUM(daily.clicks) AS clicks,
@@ -157,7 +166,7 @@ query_page AS (
     AND daily.data_date <= bounds.window_end
     AND NOT daily.is_anonymized_query
     AND daily.query IS NOT NULL
-  GROUP BY 1, 2, 3, 4, 5
+  GROUP BY 1, 2, 3, 4, 5, 6
 ),
 
 ranked AS (
@@ -166,13 +175,14 @@ ranked AS (
     search_type,
     query,
     query_brand_type,
+    page_hostname,
     page_path,
     impressions,
     clicks,
     {{ average_position('sum_position', 'impressions') }} AS avg_position,
     ROW_NUMBER() OVER (
       PARTITION BY site_url, search_type, query
-      ORDER BY clicks DESC, impressions DESC, page_path
+      ORDER BY clicks DESC, impressions DESC, page_hostname, page_path
     ) AS page_rank,
     COUNT(*) OVER (PARTITION BY site_url, search_type, query) AS ranking_page_count,
     SUM(impressions) OVER (PARTITION BY site_url, search_type, query) AS query_impressions,
@@ -189,10 +199,12 @@ paired AS (
     MAX(ranking_page_count) AS ranking_page_count,
     MAX(query_impressions) AS query_impressions,
     MAX(query_clicks) AS query_clicks,
+    MAX(IF(page_rank = 1, page_hostname, NULL)) AS primary_page_hostname,
     MAX(IF(page_rank = 1, page_path, NULL)) AS primary_page_path,
     MAX(IF(page_rank = 1, impressions, NULL)) AS primary_page_impressions,
     MAX(IF(page_rank = 1, clicks, NULL)) AS primary_page_clicks,
     MAX(IF(page_rank = 1, avg_position, NULL)) AS primary_page_avg_position,
+    MAX(IF(page_rank = 2, page_hostname, NULL)) AS competing_page_hostname,
     MAX(IF(page_rank = 2, page_path, NULL)) AS competing_page_path,
     MAX(IF(page_rank = 2, impressions, NULL)) AS competing_page_impressions,
     MAX(IF(page_rank = 2, clicks, NULL)) AS competing_page_clicks,
@@ -211,12 +223,14 @@ SELECT
   paired.ranking_page_count,
   paired.query_impressions,
   paired.query_clicks,
+  paired.primary_page_hostname,
   paired.primary_page_path,
   paired.primary_page_impressions,
   paired.primary_page_clicks,
   paired.primary_page_avg_position,
   SAFE_DIVIDE(paired.primary_page_clicks, NULLIF(paired.query_clicks, 0))
     AS primary_page_click_share,
+  paired.competing_page_hostname,
   paired.competing_page_path,
   paired.competing_page_impressions,
   paired.competing_page_clicks,

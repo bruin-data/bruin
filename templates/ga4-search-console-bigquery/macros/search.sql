@@ -9,11 +9,18 @@ SAFE_DIVIDE({{ position_sum }}, NULLIF({{ impressions }}, 0)) + 1
 
 {# Google withholds rare queries to protect user privacy. Those rows still carry
    real impressions and clicks, so they are labelled instead of dropped: daily
-   totals stay correct and query-grain reports can exclude them explicitly. #}
+   totals stay correct and query-grain reports can exclude them explicitly.
+
+   The brand pattern is interpolated into a string literal, and plenty of brands
+   carry an apostrophe: Levi's, O'Reilly, Dunkin'. A bare apostrophe would close
+   the literal and break every asset that classifies a query, so two things
+   protect it. The literal is triple-quoted, and each apostrophe in the pattern
+   becomes the RE2 character class ['], which still matches one apostrophe but
+   cannot end the literal or form a closing triple quote. #}
 {% macro query_brand_type(query_column, is_anonymized_column, brand_pattern) -%}
 CASE
   WHEN {{ is_anonymized_column }} OR {{ query_column }} IS NULL THEN 'anonymized'
-  WHEN REGEXP_CONTAINS(LOWER({{ query_column }}), r'{{ brand_pattern }}') THEN 'branded'
+  WHEN REGEXP_CONTAINS(LOWER({{ query_column }}), r'''{{ brand_pattern | replace("'", "[']") }}''') THEN 'branded'
   ELSE 'non_branded'
 END
 {%- endmacro %}
