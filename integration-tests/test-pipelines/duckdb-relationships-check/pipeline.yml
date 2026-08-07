@@ -1,0 +1,15 @@
+name: duckdb_relationships_check
+
+default_connections:
+  duckdb: duckdb-ddl
+
+variables:
+  include_orphan:
+    type: boolean
+    default: false
+
+variants:
+  valid:
+    include_orphan: false
+  orphan:
+    include_orphan: true

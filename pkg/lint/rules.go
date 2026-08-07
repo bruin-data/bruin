@@ -1021,12 +1021,96 @@ func ValidateDuplicateColumnNames(ctx context.Context, p *pipeline.Pipeline, ass
 func ValidateColumnMetadata(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0, len(asset.Columns))
 
-	for _, column := range asset.Columns {
-		issues = append(issues, validateColumnForeignKey(p, asset, &column)...)
-		issues = append(issues, validateColumnTypeDetail(asset, &column)...)
+	for columnIndex := range asset.Columns {
+		column := &asset.Columns[columnIndex]
+		if column.HasCheck("relationships") && column.ForeignKey == nil {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: fmt.Sprintf("Column '%s' has a relationships check without foreign_key metadata", column.Name),
+			})
+		}
+		issues = append(issues, validateColumnForeignKey(p, asset, column)...)
+		issues = append(issues, validateColumnTypeDetail(asset, column)...)
 	}
 
 	return issues, nil
+}
+
+// WarnBlockingRelationshipsCheckReferencesDownstream warns when a blocking
+// relationships check references an asset that transitively depends on the
+// checked asset. The scheduler cannot wait for that referenced asset without
+// deadlocking, so it runs the check before the referenced asset is refreshed.
+func WarnBlockingRelationshipsCheckReferencesDownstream(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+
+	for columnIndex := range asset.Columns {
+		column := &asset.Columns[columnIndex]
+		if column.ForeignKey == nil || column.ForeignKey.Table == "" || column.ForeignKey.Table == asset.Name {
+			continue
+		}
+
+		for checkIndex := range column.Checks {
+			check := &column.Checks[checkIndex]
+			if check.Name != "relationships" || !check.Blocking.Bool() {
+				continue
+			}
+			if !assetTransitivelyDependsOn(p, column.ForeignKey.Table, asset.Name, make(map[string]bool)) {
+				continue
+			}
+
+			issues = append(issues, &Issue{
+				Task: asset,
+				Description: fmt.Sprintf(
+					"Column '%s' has a blocking relationships check referencing downstream asset '%s'; the check runs before that asset is refreshed. Set blocking to false or restructure the dependencies",
+					column.Name,
+					column.ForeignKey.Table,
+				),
+			})
+			break
+		}
+	}
+
+	return issues, nil
+}
+
+func assetTransitivelyDependsOn(p *pipeline.Pipeline, currentName, dependencyName string, visited map[string]bool) bool {
+	if currentName == dependencyName {
+		return true
+	}
+	if visited[currentName] {
+		return false
+	}
+	visited[currentName] = true
+
+	current := p.GetAssetByName(currentName)
+	if current == nil {
+		return false
+	}
+	for _, upstream := range current.Upstreams {
+		if upstream.Type != "asset" || upstream.Mode == pipeline.UpstreamModeSymbolic {
+			continue
+		}
+		if assetTransitivelyDependsOn(p, upstream.Value, dependencyName, visited) {
+			return true
+		}
+	}
+	for columnIndex := range current.Columns {
+		column := &current.Columns[columnIndex]
+		if column.ForeignKey == nil || column.ForeignKey.Table == "" {
+			continue
+		}
+		for checkIndex := range column.Checks {
+			check := &column.Checks[checkIndex]
+			if check.Name != "relationships" || !check.Blocking.Bool() {
+				continue
+			}
+			if assetTransitivelyDependsOn(p, column.ForeignKey.Table, dependencyName, visited) {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 func validateColumnForeignKey(p *pipeline.Pipeline, asset *pipeline.Asset, column *pipeline.Column) []*Issue {

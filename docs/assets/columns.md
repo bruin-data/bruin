@@ -72,6 +72,8 @@ columns:
     foreign_key:
       table: customers   # the name of another asset
       column: id         # the referenced column in that asset
+    checks:
+      - name: relationships # optionally validate the relationship after the asset runs
 ```
 
 | key      | type   | req? | description                                  |
@@ -84,6 +86,10 @@ a foreign key must name both a `table` and a `column`, the referenced asset must
 the pipeline, and the referenced column must exist on it. Numeric type detail is also
 checked — `precision`/`length` must be positive, `scale` must not be negative, and `scale`
 must not exceed `precision`.
+
+Adding the [`relationships`](../quality/available_checks.md#relationships) quality check
+turns the metadata into a runtime referential-integrity validation. Metadata alone does
+not cause Bruin to query the referenced table.
 
 ### Type detail
 

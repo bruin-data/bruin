@@ -17,6 +17,7 @@ func NewColumnCheckOperator(manager config.ConnectionGetter) *ansisql.ColumnChec
 	return ansisql.NewColumnCheckOperator(map[string]ansisql.CheckRunner{
 		"not_null":        &NotNullCheck{conn: manager},
 		"unique":          &UniqueCheck{conn: manager},
+		"relationships":   &RelationshipsCheck{conn: manager},
 		"positive":        &PositiveCheck{conn: manager},
 		"non_negative":    &NonNegativeCheck{conn: manager},
 		"negative":        &NegativeCheck{conn: manager},
@@ -25,6 +26,37 @@ func NewColumnCheckOperator(manager config.ConnectionGetter) *ansisql.ColumnChec
 		"accepted_values": &AcceptedValuesCheck{conn: manager},
 		"pattern":         &PatternCheck{conn: manager},
 	})
+}
+
+type RelationshipsCheck struct {
+	conn config.ConnectionGetter
+}
+
+func (c *RelationshipsCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
+	foreignKey := ti.Column.ForeignKey
+	if foreignKey == nil || strings.TrimSpace(foreignKey.Table) == "" || strings.TrimSpace(foreignKey.Column) == "" {
+		return errors.Errorf("relationships check on column '%s' requires foreign_key.table and foreign_key.column", ti.Column.Name)
+	}
+
+	qq := fmt.Sprintf(
+		"SELECT COUNT_BIG(*) FROM %s bruin_relationship_child WHERE bruin_relationship_child.%s IS NOT NULL AND bruin_relationship_child.%s NOT IN (SELECT bruin_relationship_parent.%s FROM %s bruin_relationship_parent WHERE bruin_relationship_parent.%s IS NOT NULL)",
+		QuoteIdentifier(ti.GetAsset().Name),
+		QuoteIdentifier(ti.Column.Name),
+		QuoteIdentifier(ti.Column.Name),
+		QuoteIdentifier(foreignKey.Column),
+		QuoteIdentifier(foreignKey.Table),
+		QuoteIdentifier(foreignKey.Column),
+	)
+
+	return ansisql.NewCountableQueryCheck(c.conn, 0, &query.Query{Query: qq}, "relationships", func(count int64) error {
+		return errors.Errorf(
+			"column '%s' has %d rows with values missing from '%s.%s'",
+			ti.Column.Name,
+			count,
+			foreignKey.Table,
+			foreignKey.Column,
+		)
+	}).Check(ctx, ti)
 }
 
 type AcceptedValuesCheck struct {
