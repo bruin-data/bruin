@@ -117,7 +117,14 @@ IF(
    Both branches compare _TABLE_SUFFIX directly against a literal range so
    BigQuery can still prune the wildcard. The prefix is constant within a branch,
    so the lexicographic range also excludes the other table family on its own —
-   'intraday_20260801' sorts above any eight-digit suffix. #}
+   'intraday_20260801' sorts above any eight-digit suffix.
+
+   One asymmetry to know about. In 'daily' mode a still-filling day is impossible
+   to read because its table does not exist yet. In 'intraday' mode it is not: the
+   current day's table is present and partial, so a run whose end_date is today
+   loads a fraction of it. Whole days are replaced on every run and the lookback
+   window re-reads them, so the partial day heals on the next run; only a report
+   built during the same day sees it. #}
 {% macro ga4_events_table_filter(mode, start_date, end_date, lookback_days) -%}
 {% if mode == 'intraday' -%}
 REGEXP_CONTAINS(_TABLE_SUFFIX, r'^intraday_[0-9]{8}$')

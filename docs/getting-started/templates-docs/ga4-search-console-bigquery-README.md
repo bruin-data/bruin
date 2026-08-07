@@ -324,6 +324,14 @@ A property with the daily export enabled reports `daily > 0`; leave
 reports `daily = 0` and must set `ga4_table_mode: intraday`, because its entire
 history lives in `events_intraday_YYYYMMDD` and those tables are never replaced.
 
+On the property tested, those intraday tables were complete days — events spanning
+00:00 to 23:5x with believable weekday and weekend volumes — so reading them is not
+a downgrade for historical dates. The exception is today: at midday it held 1,413
+events against 3,256 for the previous full day. `daily` mode cannot read a partial
+day because the table does not exist yet, but `intraday` mode can, so a run ending
+today loads part of it. Whole days are replaced on each run, so it corrects itself
+on the next one.
+
 ### Whether session attribution is populated
 
 ```sql

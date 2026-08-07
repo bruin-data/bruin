@@ -111,6 +111,10 @@ variables:
   #   SELECT COUNTIF(REGEXP_CONTAINS(table_id, r'^events_[0-9]{8}$')) AS daily,
   #          COUNTIF(REGEXP_CONTAINS(table_id, r'^events_intraday_')) AS intraday
   #   FROM `your_project.your_ga4_dataset.__TABLES__`
+  #
+  # In 'intraday' mode the current day's table exists and is still filling, so a
+  # run ending today reads a partial day. The default run window ends yesterday,
+  # and whole days are replaced on each run, so it heals by itself.
   ga4_table_mode:
     type: string
     enum: ["daily", "intraday"]
