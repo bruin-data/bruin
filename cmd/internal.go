@@ -396,10 +396,7 @@ type ParseCommand struct {
 }
 
 // buildAssetDatabaseMap best-effort maps each asset name to its connection's
-// configured database (from .bruin.yml). Column-lineage resolution uses it to
-// match a table reference that is qualified with its database (e.g.
-// prod.schema.table) back to the two-part asset. Returns an empty map when no
-// config is available, in which case resolution falls back to exact matching.
+// database from .bruin.yml. Empty when no config is available.
 func buildAssetDatabaseMap(inputPath string, foundPipeline *pipeline.Pipeline) map[string]string {
 	result := map[string]string{}
 	fs := afero.NewOsFs()
@@ -427,9 +424,8 @@ func buildAssetDatabaseMap(inputPath string, foundPipeline *pipeline.Pipeline) m
 	return result
 }
 
-// connectionDatabase reads the "Database" field from a connection config of any
-// type. Most SQL connections (Fabric, MSSQL, Snowflake, Postgres, ...) expose
-// it; those that don't yield "".
+// connectionDatabase returns a connection's leading namespace: Database, or
+// Catalog (Databricks/Trino/Spark/StarRocks), or ProjectID (BigQuery). "" if none.
 func connectionDatabase(conn any) string {
 	if conn == nil {
 		return ""
@@ -444,8 +440,10 @@ func connectionDatabase(conn any) string {
 	if v.Kind() != reflect.Struct {
 		return ""
 	}
-	if f := v.FieldByName("Database"); f.IsValid() && f.Kind() == reflect.String {
-		return f.String()
+	for _, field := range []string{"Database", "Catalog", "ProjectID"} {
+		if f := v.FieldByName(field); f.IsValid() && f.Kind() == reflect.String && f.String() != "" {
+			return f.String()
+		}
 	}
 	return ""
 }

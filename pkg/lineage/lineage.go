@@ -40,23 +40,16 @@ func NewLineageExtractor(parser sqlParser) *LineageExtractor {
 	}
 }
 
-// WithAssetDatabases attaches an asset-name -> database map (from .bruin.yml) so
-// column-lineage resolution can match a table reference that is qualified with
-// its database (e.g. prod.schema.table) back to the two-part asset schema.table.
-// Optional; when unset, resolution falls back to exact name matching.
+// WithAssetDatabases attaches an asset-name -> database map used to resolve
+// database-qualified table references. Optional.
 func (p *LineageExtractor) WithAssetDatabases(assetDatabases map[string]string) *LineageExtractor {
 	p.assetDatabases = assetDatabases
 	return p
 }
 
-// resolveUpstreamAsset finds the asset a column-lineage table reference points
-// to. It first tries an exact, case-insensitive match on the asset name. If that
-// fails and the reference is qualified with a leading database (e.g.
-// prod.schema.table against the asset schema.table), it qualifies each candidate
-// asset with its own connection's database and matches on the fully-qualified
-// name. Matching is case-insensitive and returns the canonical asset; a
-// genuinely external table (whose database does not match any asset's) resolves
-// to nil so no false edge is drawn.
+// resolveUpstreamAsset matches a table reference to an asset, falling back to a
+// database-qualified match (<database>.<name>) when the reference carries a
+// leading database the asset name omits. Unmatched references stay external.
 func (p *LineageExtractor) resolveUpstreamAsset(foundPipeline *pipeline.Pipeline, table string) *pipeline.Asset {
 	if asset := foundPipeline.GetAssetByNameCaseInsensitive(table); asset != nil {
 		return asset
