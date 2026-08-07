@@ -1,0 +1,51 @@
+name: web_analytics_raw.gsc_searchdata_site_impression
+type: bq.source
+description: >
+  Search Console bulk export at property and query grain, read as
+  `<search_console_dataset>.searchdata_site_impression`. Created and owned by
+  Google, never written by this pipeline. Impressions are counted once per
+  property per query, which is the grain the Search Console interface reports on,
+  so totals derived from it reconcile with the UI.
+
+tags:
+  - web_analytics_raw
+  - search_console
+
+columns:
+  - name: data_date
+    type: DATE
+    description: Reporting date, in Pacific Time.
+  - name: site_url
+    type: STRING
+    description: "Property, a URL prefix or an sc-domain: value."
+  - name: query
+    type: STRING
+    description: Search query, withheld on rare queries.
+  - name: is_anonymized_query
+    type: BOOL
+    description: Whether Google withheld the query for privacy.
+  - name: country
+    type: STRING
+    description: Three-letter country code of the searcher.
+  - name: search_type
+    type: STRING
+    description: Surface, such as WEB, IMAGE, VIDEO, NEWS, or DISCOVER.
+  - name: device
+    type: STRING
+    description: DESKTOP, MOBILE, or TABLET.
+  - name: impressions
+    type: INT64
+    description: Property-level impressions.
+  - name: clicks
+    type: INT64
+    description: Clicks through to the property.
+  - name: sum_top_position
+    type: NUMERIC
+    description: >
+      Summed zero-based topmost position. This table uses sum_top_position where
+      the URL-level table uses sum_position; the two are not interchangeable.
+
+# Names in this folder are stable logical identifiers rather than the real table
+# paths, because Bruin validates asset names before Jinja renders and a name may
+# not contain a variable or a wildcard. The real table each one stands for is in
+# its description above. These assets are no-op: bq.source never executes.
