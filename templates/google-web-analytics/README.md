@@ -1,6 +1,6 @@
 # Google Analytics and Search Console Reporting on BigQuery
 
-`ga4-search-console-bigquery` builds an organic search reporting layer on top of
+`google-web-analytics` builds an organic search reporting layer on top of
 GA4 and Search Console data you already have in BigQuery. It does not ingest
 anything: both products export to BigQuery natively, so this template starts where
 those exports land, conforms them in `web_stage`, and publishes nine reports in
@@ -37,7 +37,7 @@ export datasets and write access to the datasets this pipeline creates.
 ## Project structure
 
 ```text
-ga4-search-console-bigquery/
+google-web-analytics/
 ├── pipeline.yml
 ├── README.md
 ├── macros/
@@ -104,7 +104,7 @@ variables:
 Override any of them per run without editing the file:
 
 ```bash
-bruin run --var reporting_window_days=365 ga4-search-console-bigquery
+bruin run --var reporting_window_days=365 google-web-analytics
 ```
 
 The brand pattern is the one setting worth getting right before you read anything,
@@ -399,7 +399,7 @@ the bytes scanned to rise with it. The trend reports need at least
 ## Run it
 
 ```bash
-bruin init ga4-search-console-bigquery my-search-pipeline
+bruin init google-web-analytics my-search-pipeline
 ```
 
 Set the dataset names, brand pattern, and `start_date`, then validate:

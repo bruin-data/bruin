@@ -178,7 +178,7 @@ func TestStripeBigQueryStarterTemplateHasFocusedAssetSet(t *testing.T) {
 	require.Contains(t, string(readme), "Stripe Billing Analytics to BigQuery")
 }
 
-func TestInitGA4SearchConsoleBigQueryCopiesStarterTemplate(t *testing.T) {
+func TestInitGoogleWebAnalyticsCopiesStarterTemplate(t *testing.T) {
 	targetRoot := t.TempDir()
 	t.Chdir(targetRoot)
 
@@ -187,10 +187,10 @@ func TestInitGA4SearchConsoleBigQueryCopiesStarterTemplate(t *testing.T) {
 	out, err := gitInit.CombinedOutput()
 	require.NoError(t, err, string(out))
 
-	err = Init().Run(t.Context(), []string{"init", "ga4-search-console-bigquery"})
+	err = Init().Run(t.Context(), []string{"init", "google-web-analytics"})
 	require.NoError(t, err)
 
-	pipelineRoot := filepath.Join(targetRoot, "ga4-search-console-bigquery")
+	pipelineRoot := filepath.Join(targetRoot, "google-web-analytics")
 	require.FileExists(t, filepath.Join(pipelineRoot, "pipeline.yml"))
 	require.FileExists(t, filepath.Join(pipelineRoot, "README.md"))
 	require.FileExists(t, filepath.Join(pipelineRoot, ".gitignore"))
@@ -201,7 +201,7 @@ func TestInitGA4SearchConsoleBigQueryCopiesStarterTemplate(t *testing.T) {
 
 	pipeline, err := os.ReadFile(filepath.Join(pipelineRoot, "pipeline.yml"))
 	require.NoError(t, err)
-	require.Contains(t, string(pipeline), "name: ga4-search-console-bigquery")
+	require.Contains(t, string(pipeline), "name: google-web-analytics")
 	require.Contains(t, string(pipeline), "google_cloud_platform: gcp-default")
 
 	configContent, err := os.ReadFile(filepath.Join(targetRoot, ".bruin.yml"))
@@ -209,7 +209,7 @@ func TestInitGA4SearchConsoleBigQueryCopiesStarterTemplate(t *testing.T) {
 	require.Contains(t, string(configContent), "name: gcp-default")
 }
 
-func TestGA4SearchConsoleBigQueryTemplateHasFocusedAssetSet(t *testing.T) {
+func TestGoogleWebAnalyticsTemplateHasFocusedAssetSet(t *testing.T) {
 	t.Parallel()
 
 	expectedAssets := []string{
@@ -231,7 +231,7 @@ func TestGA4SearchConsoleBigQueryTemplateHasFocusedAssetSet(t *testing.T) {
 	}
 
 	var actualAssets []string
-	err := iofs.WalkDir(templates.Templates, "ga4-search-console-bigquery/assets", func(path string, entry iofs.DirEntry, err error) error {
+	err := iofs.WalkDir(templates.Templates, "google-web-analytics/assets", func(path string, entry iofs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -239,28 +239,28 @@ func TestGA4SearchConsoleBigQueryTemplateHasFocusedAssetSet(t *testing.T) {
 			return nil
 		}
 
-		actualAssets = append(actualAssets, strings.TrimPrefix(path, "ga4-search-console-bigquery/assets/"))
+		actualAssets = append(actualAssets, strings.TrimPrefix(path, "google-web-analytics/assets/"))
 		return nil
 	})
 	require.NoError(t, err)
 	require.Len(t, actualAssets, 15)
 	require.ElementsMatch(t, expectedAssets, actualAssets)
 
-	pipeline, err := templates.Templates.ReadFile("ga4-search-console-bigquery/pipeline.yml")
+	pipeline, err := templates.Templates.ReadFile("google-web-analytics/pipeline.yml")
 	require.NoError(t, err)
-	require.Contains(t, string(pipeline), "name: ga4-search-console-bigquery")
+	require.Contains(t, string(pipeline), "name: google-web-analytics")
 	// The template reads exports that already exist in BigQuery, so the dataset
 	// names and the brand pattern must stay overridable without editing SQL.
 	require.Contains(t, string(pipeline), "ga4_dataset:")
 	require.Contains(t, string(pipeline), "search_console_dataset:")
 	require.Contains(t, string(pipeline), "brand_query_pattern:")
 
-	readme, err := templates.Templates.ReadFile("ga4-search-console-bigquery/README.md")
+	readme, err := templates.Templates.ReadFile("google-web-analytics/README.md")
 	require.NoError(t, err)
 	require.Contains(t, string(readme), "Google Analytics and Search Console Reporting on BigQuery")
 }
 
-func TestGA4SearchConsoleBigQueryTemplateReadsExistingExports(t *testing.T) {
+func TestGoogleWebAnalyticsTemplateReadsExistingExports(t *testing.T) {
 	t.Parallel()
 
 	readTemplate := func(path string) string {
@@ -276,30 +276,30 @@ func TestGA4SearchConsoleBigQueryTemplateReadsExistingExports(t *testing.T) {
 	// verified against a real streaming-only export, which held 0 rows in daily
 	// tables and 9089 in intraday ones for the same window.
 	for _, asset := range []string{"ga4_sessions", "ga4_page_daily"} {
-		content := readTemplate("ga4-search-console-bigquery/assets/web_stage/" + asset + ".sql")
+		content := readTemplate("google-web-analytics/assets/web_stage/" + asset + ".sql")
 		require.Contains(t, content, "`{{ var.ga4_dataset }}.events_*`", asset)
 		require.Contains(t, content, "ga4_events_table_filter(", asset)
 	}
 
-	macros := readTemplate("ga4-search-console-bigquery/macros/search.sql")
+	macros := readTemplate("google-web-analytics/macros/search.sql")
 	require.Contains(t, macros, `REGEXP_CONTAINS(_TABLE_SUFFIX, r'^[0-9]{8}$')`)
 	require.Contains(t, macros, `REGEXP_CONTAINS(_TABLE_SUFFIX, r'^intraday_[0-9]{8}$')`)
 
 	// Streaming-only exports leave every session-scoped traffic-source field NULL,
 	// which made every session look non-organic and emptied every organic report.
 	// The fallback chain and the basis column are what keep those reports usable.
-	sessions := readTemplate("ga4-search-console-bigquery/assets/web_stage/ga4_sessions.sql")
+	sessions := readTemplate("google-web-analytics/assets/web_stage/ga4_sessions.sql")
 	require.Contains(t, sessions, "collected_traffic_source.manual_medium")
 	require.Contains(t, sessions, "traffic_source.medium")
 	require.Contains(t, sessions, "traffic_source_basis")
 
-	siteImpression := readTemplate("ga4-search-console-bigquery/assets/web_stage/gsc_site_query_daily.sql")
+	siteImpression := readTemplate("google-web-analytics/assets/web_stage/gsc_site_query_daily.sql")
 	require.Contains(t, siteImpression, "`{{ var.search_console_dataset }}.searchdata_site_impression`")
 	// Position lives in sum_top_position on the property-level table and in
 	// sum_position on the URL-level one; swapping them silently breaks position.
 	require.Contains(t, siteImpression, "SUM(sum_top_position)")
 
-	urlImpression := readTemplate("ga4-search-console-bigquery/assets/web_stage/gsc_url_query_daily.sql")
+	urlImpression := readTemplate("google-web-analytics/assets/web_stage/gsc_url_query_daily.sql")
 	require.Contains(t, urlImpression, "`{{ var.search_console_dataset }}.searchdata_url_impression`")
 	require.Contains(t, urlImpression, "SUM(sum_position)")
 
@@ -309,12 +309,12 @@ func TestGA4SearchConsoleBigQueryTemplateReadsExistingExports(t *testing.T) {
 	require.Contains(t, sessions, "{{ page_path('landing_page_location') }}")
 
 	// Search Console only reports Google, so the join must use the narrower flag.
-	landingPages := readTemplate("ga4-search-console-bigquery/assets/web_reports/organic_landing_page_performance.sql")
+	landingPages := readTemplate("google-web-analytics/assets/web_reports/organic_landing_page_performance.sql")
 	require.Contains(t, landingPages, "is_google_organic_session")
 	require.NotContains(t, landingPages, "sessions.is_organic_search_session")
 }
 
-func TestGA4SearchConsoleBigQueryTemplateKeepsHostsSeparate(t *testing.T) {
+func TestGoogleWebAnalyticsTemplateKeepsHostsSeparate(t *testing.T) {
 	t.Parallel()
 
 	readTemplate := func(path string) string {
@@ -337,25 +337,25 @@ func TestGA4SearchConsoleBigQueryTemplateKeepsHostsSeparate(t *testing.T) {
 		"search_new_and_lost_queries",
 		"search_competitor_visibility",
 	} {
-		content := readTemplate("ga4-search-console-bigquery/assets/web_reports/" + asset + ".sql")
+		content := readTemplate("google-web-analytics/assets/web_reports/" + asset + ".sql")
 		require.Contains(t, content, "page_hostname", asset)
 	}
 
 	// Both sides of the GA4-to-Search-Console join must match on host as well as
 	// path, or the join silently reintroduces the merge.
-	landingPages := readTemplate("ga4-search-console-bigquery/assets/web_reports/organic_landing_page_performance.sql")
+	landingPages := readTemplate("google-web-analytics/assets/web_reports/organic_landing_page_performance.sql")
 	require.Contains(t, landingPages, "ON landing.page_hostname = search.page_hostname")
 	require.Contains(t, landingPages, "ON content.page_hostname = combined.page_hostname")
 
-	queryValue := readTemplate("ga4-search-console-bigquery/assets/web_reports/organic_query_value.sql")
+	queryValue := readTemplate("google-web-analytics/assets/web_reports/organic_query_value.sql")
 	require.Contains(t, queryValue, "USING (site_url, page_hostname, page_path)")
 	require.Contains(t, queryValue, "ON outcomes.page_hostname = query_page.page_hostname")
 }
 
-func TestGA4SearchConsoleBigQueryTemplateEscapesBrandPattern(t *testing.T) {
+func TestGoogleWebAnalyticsTemplateEscapesBrandPattern(t *testing.T) {
 	t.Parallel()
 
-	macros, err := templates.Templates.ReadFile("ga4-search-console-bigquery/macros/search.sql")
+	macros, err := templates.Templates.ReadFile("google-web-analytics/macros/search.sql")
 	require.NoError(t, err)
 
 	// Configured patterns are interpolated into string literals, and plenty carry
@@ -368,13 +368,13 @@ func TestGA4SearchConsoleBigQueryTemplateEscapesBrandPattern(t *testing.T) {
 	require.Contains(t, string(macros), "{{ re_literal(commercial_pattern) }}")
 	require.Contains(t, string(macros), "{{ re_literal(pattern | lower) }}")
 
-	urlMacros, err := templates.Templates.ReadFile("ga4-search-console-bigquery/macros/url.sql")
+	urlMacros, err := templates.Templates.ReadFile("google-web-analytics/macros/url.sql")
 	require.NoError(t, err)
 	require.Contains(t, string(urlMacros), "{{ re_literal(support_pattern) }}")
 	require.Contains(t, string(urlMacros), "{{ re_literal(content_pattern) }}")
 }
 
-func TestGA4SearchConsoleBigQueryTemplateSupportsB2BSaaS(t *testing.T) {
+func TestGoogleWebAnalyticsTemplateSupportsB2BSaaS(t *testing.T) {
 	t.Parallel()
 
 	readTemplate := func(path string) string {
@@ -384,7 +384,7 @@ func TestGA4SearchConsoleBigQueryTemplateSupportsB2BSaaS(t *testing.T) {
 		return string(content)
 	}
 
-	pipeline := readTemplate("ga4-search-console-bigquery/pipeline.yml")
+	pipeline := readTemplate("google-web-analytics/pipeline.yml")
 	// B2B SaaS revenue is recognized in a CRM weeks after the visit, so the GA4
 	// export carries no purchase amount. Without priced key events every value
 	// metric in the reports reads zero.
@@ -398,7 +398,7 @@ func TestGA4SearchConsoleBigQueryTemplateSupportsB2BSaaS(t *testing.T) {
 	// count it, so the default map must leave it out.
 	require.NotContains(t, pipeline, "      purchase:")
 
-	sessions := readTemplate("ga4-search-console-bigquery/assets/web_stage/ga4_sessions.sql")
+	sessions := readTemplate("google-web-analytics/assets/web_stage/ga4_sessions.sql")
 	require.Contains(t, sessions, "demo_event_count")
 	require.Contains(t, sessions, "signup_event_count")
 	require.Contains(t, sessions, "key_event_value_usd")
@@ -412,7 +412,7 @@ func TestGA4SearchConsoleBigQueryTemplateSupportsB2BSaaS(t *testing.T) {
 		"web_stage/gsc_url_query_daily",
 		"web_stage/ga4_page_daily",
 	} {
-		require.Contains(t, readTemplate("ga4-search-console-bigquery/assets/"+asset+".sql"), "page_role")
+		require.Contains(t, readTemplate("google-web-analytics/assets/"+asset+".sql"), "page_role")
 	}
 	require.Contains(t, sessions, "landing_page_role")
 
@@ -422,16 +422,16 @@ func TestGA4SearchConsoleBigQueryTemplateSupportsB2BSaaS(t *testing.T) {
 		"web_stage/gsc_url_query_daily",
 		"web_stage/gsc_site_query_daily",
 	} {
-		content := readTemplate("ga4-search-console-bigquery/assets/" + asset + ".sql")
+		content := readTemplate("google-web-analytics/assets/" + asset + ".sql")
 		require.Contains(t, content, "query_intent_type", asset)
 		require.Contains(t, content, "competitor_name", asset)
 	}
 
-	landingPages := readTemplate("ga4-search-console-bigquery/assets/web_reports/organic_landing_page_performance.sql")
+	landingPages := readTemplate("google-web-analytics/assets/web_reports/organic_landing_page_performance.sql")
 	require.Contains(t, landingPages, "outcome_value_per_search_click_usd")
 	require.Contains(t, landingPages, "demo_events_per_hundred_clicks")
 
-	queryValue := readTemplate("ga4-search-console-bigquery/assets/web_reports/organic_query_value.sql")
+	queryValue := readTemplate("google-web-analytics/assets/web_reports/organic_query_value.sql")
 	require.Contains(t, queryValue, "modelled_outcome_value_per_click_usd")
 	require.Contains(t, queryValue, "modelled_demo_events")
 }

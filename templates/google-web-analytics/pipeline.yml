@@ -1,4 +1,4 @@
-name: ga4-search-console-bigquery
+name: google-web-analytics
 schedule: daily
 start_date: "2026-01-01"
 catchup: false

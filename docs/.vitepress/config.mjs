@@ -501,7 +501,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                         collapsed: false,
                         items: [
                             {text: "ecommerce", link: "/getting-started/templates-docs/ecommerce-README"},
-                            {text: "ga4-search-console-bigquery", link: "/getting-started/templates-docs/ga4-search-console-bigquery-README"},
+                            {text: "google-web-analytics", link: "/getting-started/templates-docs/google-web-analytics-README"},
                             {text: "demo-snowflake-sales-analytics", link: "/getting-started/templates-docs/demo-snowflake-sales-analytics-README"},
                             {text: "demo-snowflake-salesforce", link: "/getting-started/templates-docs/demo-snowflake-salesforce-README"},
                             {text: "self-heal-demo", link: "/getting-started/templates-docs/self-heal-demo-README"},
