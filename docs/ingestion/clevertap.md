@@ -56,7 +56,7 @@ The `events` and `profiles` tables accept an `event_name` parameter that narrows
   source_table: 'events?event_name=Charged,App Launched'
 ```
 
-Leave the parameter out and `events` loads every event, while `profiles` covers everyone who has raised at least one of them. CleverTap reaches profiles through their activity, so a user whose only recorded activity is a notification event is not included.
+Leave the parameter out and `events` loads every event, while `profiles` covers everyone who has raised at least one of them.
 
 ## Available Source Tables
 
@@ -77,29 +77,10 @@ The `events` table is loaded incrementally with a delete+insert strategy keyed o
 > [!NOTE]
 > `campaigns` and `campaign_reports` only ever contain campaigns created through the CleverTap API. Campaigns built in the dashboard are not included, because CleverTap offers no way to list them.
 
-> [!NOTE]
-> A campaign only has a report once it has completed and delivered. Campaigns that are still scheduled, running, paused, or stopped before delivering are skipped, so `campaign_reports` usually holds fewer rows than `campaigns`.
-
-> [!NOTE]
-> Notification events such as push impressions and clicks cannot be exported from CleverTap and are skipped automatically.
-
-> [!NOTE]
-> The `profile` column on `events` shows the user's details as they stand today, not as they were when the event happened. CleverTap keeps no history of past values, so point-in-time user attributes are not available from this source.
-
-### Joining events to profiles
-
-`events` carries two keys: `identity` identifies the person, and `object_id` identifies one device.
-
-```sql
-SELECT e.ts, e.event_name, p.name, p.profile_data
-FROM events e
-JOIN profiles p ON e.identity = p.identity
-```
+A few things to know: a campaign only gets a report once it has delivered, so `campaign_reports` usually holds fewer rows than `campaigns`; notification events such as push impressions cannot be exported and are skipped; and the `profile` column on `events` holds the user's details as they stand today, not as they were when the event happened.
 
 > [!WARNING]
-> Join on `identity`, not `object_id`. Someone using your app on both a phone and a laptop has a different `object_id` for each, so joining on it silently drops the events they raised on their other devices. Every device is still listed in `profiles.platform_info`.
-
-`identity` is only set for users who have logged in, so events from anonymous visitors have no profile to join to.
+> Join `events` to `profiles` on `identity`, not `object_id`. `object_id` identifies one device, so joining on it silently drops the events a user raised on their other devices. `identity` is only set for users who have logged in.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 
