@@ -1,5 +1,5 @@
 /* @bruin
-name: web_reports.organic_intent_pipeline
+name: web_analytics_reports.ga4_gsc_intent_pipeline
 type: bq.sql
 description: >
   What each kind of search demand actually contributes, crossed with the kind of
@@ -17,23 +17,23 @@ description: >
   whether the commercial and competitor rows are growing, and whether the value per
   click gap between them and informational content is as wide as it usually is.
 
-  Outcomes are modelled the same way as web_reports.organic_query_value: each
+  Outcomes are modelled the same way as web_analytics_reports.ga4_gsc_query_value: each
   page's GA4 results are split across the queries that sent it clicks, in
   proportion to those clicks. Within a page the weights sum to one, so page totals
   are preserved and only the split across intents is estimated. Withheld queries
   carry no intent and are excluded, so the totals here fall short of the site
-  totals in web_reports.organic_landing_page_performance by whatever share of
+  totals in web_analytics_reports.ga4_gsc_landing_page_performance by whatever share of
   clicks Google chose not to disclose.
 
 materialization:
   type: table
 
 depends:
-  - web_stage.gsc_url_query_daily
-  - web_stage.ga4_sessions
+  - web_analytics_staging.gsc_url_query_daily
+  - web_analytics_staging.ga4_sessions
 
 tags:
-  - web_reports
+  - web_analytics_reports
   - search_console
   - ga4
   - seo
@@ -192,7 +192,7 @@ query_page AS (
     SUM(daily.impressions) AS search_impressions,
     SUM(daily.clicks) AS search_clicks,
     SUM(daily.sum_position) AS sum_position
-  FROM web_stage.gsc_url_query_daily AS daily
+  FROM web_analytics_staging.gsc_url_query_daily AS daily
   CROSS JOIN bounds
   WHERE daily.data_date > bounds.window_start
     AND daily.data_date <= bounds.window_end
@@ -225,7 +225,7 @@ page_outcomes AS (
     SUM(sessions.demo_event_count) AS demo_events,
     SUM(sessions.signup_event_count) AS signup_events,
     SUM(sessions.session_outcome_value_usd) AS outcome_value_usd
-  FROM web_stage.ga4_sessions AS sessions
+  FROM web_analytics_staging.ga4_sessions AS sessions
   CROSS JOIN bounds
   WHERE sessions.session_date > bounds.window_start
     AND sessions.session_date <= bounds.window_end

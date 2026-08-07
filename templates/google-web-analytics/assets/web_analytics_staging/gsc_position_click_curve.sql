@@ -1,5 +1,5 @@
 /* @bruin
-name: web_stage.gsc_position_click_curve
+name: web_analytics_staging.gsc_position_click_curve
 type: bq.sql
 description: >
   Click-through rate the property actually earns at each search position, built
@@ -17,10 +17,10 @@ materialization:
   type: table
 
 depends:
-  - web_stage.gsc_url_query_daily
+  - web_analytics_staging.gsc_url_query_daily
 
 tags:
-  - web_stage
+  - web_analytics_staging
   - search_console
   - seo
 
@@ -111,7 +111,7 @@ positioned AS (
     daily.clicks,
     bounds.window_start,
     bounds.window_end
-  FROM web_stage.gsc_url_query_daily AS daily
+  FROM web_analytics_staging.gsc_url_query_daily AS daily
   CROSS JOIN bounds
   WHERE daily.data_date > bounds.window_start
     AND daily.data_date <= bounds.window_end

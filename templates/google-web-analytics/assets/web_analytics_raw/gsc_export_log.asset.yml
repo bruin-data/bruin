@@ -1,4 +1,4 @@
-name: sources.gsc_export_log_raw
+name: web_analytics_raw.gsc_export_log
 type: bq.source
 description: >
   Publication log of the Search Console bulk export, read as
@@ -7,7 +7,7 @@ description: >
   is the only way to tell a restatement from a real change in the site.
 
 tags:
-  - source
+  - web_analytics_raw
   - search_console
 
 columns:

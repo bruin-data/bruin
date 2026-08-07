@@ -1,15 +1,15 @@
 /* @bruin
-name: web_stage.ga4_page_daily
+name: web_analytics_staging.ga4_page_daily
 type: bq.sql
 description: >
   Daily page-level GA4 behaviour by channel, source, and device. Where
-  web_stage.ga4_sessions describes the page a visit started on, this model
+  web_analytics_staging.ga4_sessions describes the page a visit started on, this model
   describes every page a visit touched, which is what Search Console impressions
   are actually reported against: a URL earns impressions whether or not anyone
   ever lands on it first.
 
   Page paths are normalized with the same rules as the Search Console models, so
-  page_path joins directly against web_stage.gsc_url_query_daily.
+  page_path joins directly against web_analytics_staging.gsc_url_query_daily.
 
 materialization:
   type: table
@@ -21,10 +21,10 @@ materialization:
     - session_default_channel_group
 
 depends:
-  - sources.ga4_events_intraday
+  - web_analytics_raw.ga4_events_intraday
 
 tags:
-  - web_stage
+  - web_analytics_staging
   - ga4
   - content
 
@@ -39,7 +39,7 @@ columns:
     type: STRING
     description: >
       Normalized path of the viewed page. Shared join key with
-      web_stage.gsc_url_query_daily.
+      web_analytics_staging.gsc_url_query_daily.
     primary_key: true
     checks:
       - name: not_null
@@ -75,7 +75,7 @@ columns:
     type: BOOL
     description: >
       Whether the views came from Google organic search, matching the flag on
-      web_stage.ga4_sessions used for Search Console joins.
+      web_analytics_staging.ga4_sessions used for Search Console joins.
     checks:
       - name: not_null
   - name: page_views
@@ -159,7 +159,7 @@ WITH page_view_events AS (
       WHERE key = 'engagement_time_msec'
     ) AS engagement_time_msec,
     device.category AS device_category,
-    -- Same fallback chain as web_stage.ga4_sessions, so the organic flag on both
+    -- Same fallback chain as web_analytics_staging.ga4_sessions, so the organic flag on both
     -- models agrees. A streaming-only export supplies none of the session-scoped
     -- fields, which would otherwise make every page look non-organic.
     COALESCE(

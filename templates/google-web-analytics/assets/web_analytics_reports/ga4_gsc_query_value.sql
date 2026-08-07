@@ -1,5 +1,5 @@
 /* @bruin
-name: web_reports.organic_query_value
+name: web_analytics_reports.ga4_gsc_query_value
 type: bq.sql
 description: >
   Estimated engagement, key events, and revenue behind each search query. Google
@@ -29,17 +29,17 @@ description: >
   so their share of a page's outcome is spread across that page's disclosed queries
   and inflates them a little. A page whose clicks were all withheld contributes
   nothing, which is why site totals here fall short of the site totals in
-  web_reports.organic_landing_page_performance.
+  web_analytics_reports.ga4_gsc_landing_page_performance.
 
 materialization:
   type: table
 
 depends:
-  - web_stage.gsc_url_query_daily
-  - web_stage.ga4_sessions
+  - web_analytics_staging.gsc_url_query_daily
+  - web_analytics_staging.ga4_sessions
 
 tags:
-  - web_reports
+  - web_analytics_reports
   - search_console
   - ga4
   - seo
@@ -194,7 +194,7 @@ query_page AS (
     SUM(daily.impressions) AS search_impressions,
     SUM(daily.clicks) AS search_clicks,
     SUM(daily.sum_position) AS sum_position
-  FROM web_stage.gsc_url_query_daily AS daily
+  FROM web_analytics_staging.gsc_url_query_daily AS daily
   CROSS JOIN bounds
   WHERE daily.data_date > bounds.window_start
     AND daily.data_date <= bounds.window_end
@@ -228,7 +228,7 @@ page_outcomes AS (
     SUM(sessions.signup_event_count) AS signup_events,
     SUM(sessions.session_outcome_value_usd) AS outcome_value_usd,
     SUM(sessions.purchase_revenue_in_usd) AS purchase_revenue_usd
-  FROM web_stage.ga4_sessions AS sessions
+  FROM web_analytics_staging.ga4_sessions AS sessions
   CROSS JOIN bounds
   WHERE sessions.session_date > bounds.window_start
     AND sessions.session_date <= bounds.window_end

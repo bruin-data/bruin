@@ -1,5 +1,5 @@
 /* @bruin
-name: web_reports.organic_landing_page_performance
+name: web_analytics_reports.ga4_gsc_landing_page_performance
 type: bq.sql
 description: >
   Search Console visibility joined to what GA4 recorded after the click, per page.
@@ -47,12 +47,12 @@ materialization:
   type: table
 
 depends:
-  - web_stage.gsc_url_query_daily
-  - web_stage.ga4_sessions
-  - web_stage.ga4_page_daily
+  - web_analytics_staging.gsc_url_query_daily
+  - web_analytics_staging.ga4_sessions
+  - web_analytics_staging.ga4_page_daily
 
 tags:
-  - web_reports
+  - web_analytics_reports
   - search_console
   - ga4
   - seo
@@ -268,7 +268,7 @@ search AS (
     SUM(daily.impressions) AS search_impressions,
     SUM(daily.clicks) AS search_clicks,
     SUM(daily.sum_position) AS sum_position
-  FROM web_stage.gsc_url_query_daily AS daily
+  FROM web_analytics_staging.gsc_url_query_daily AS daily
   CROSS JOIN bounds
   WHERE daily.data_date > bounds.window_start
     AND daily.data_date <= bounds.window_end
@@ -298,7 +298,7 @@ landing AS (
     SUM(sessions.signup_event_count) AS signup_events,
     SUM(sessions.session_outcome_value_usd) AS outcome_value_usd,
     SUM(sessions.purchase_revenue_in_usd) AS purchase_revenue_usd
-  FROM web_stage.ga4_sessions AS sessions
+  FROM web_analytics_staging.ga4_sessions AS sessions
   CROSS JOIN bounds
   WHERE sessions.session_date > bounds.window_start
     AND sessions.session_date <= bounds.window_end
@@ -313,7 +313,7 @@ content AS (
     pages.page_path,
     SUM(pages.page_views) AS organic_page_views,
     SUM(pages.entrances) AS organic_entrances
-  FROM web_stage.ga4_page_daily AS pages
+  FROM web_analytics_staging.ga4_page_daily AS pages
   CROSS JOIN bounds
   WHERE pages.page_date > bounds.window_start
     AND pages.page_date <= bounds.window_end

@@ -1,5 +1,5 @@
 /* @bruin
-name: web_reports.search_new_and_lost_queries
+name: web_analytics_reports.gsc_new_and_lost_queries
 type: bq.sql
 description: >
   Queries the property started ranking for, and queries it stopped ranking for,
@@ -17,10 +17,10 @@ materialization:
   type: table
 
 depends:
-  - web_stage.gsc_url_query_daily
+  - web_analytics_staging.gsc_url_query_daily
 
 tags:
-  - web_reports
+  - web_analytics_reports
   - search_console
   - seo
 
@@ -163,7 +163,7 @@ windowed AS (
     daily.impressions,
     daily.clicks,
     daily.sum_position
-  FROM web_stage.gsc_url_query_daily AS daily
+  FROM web_analytics_staging.gsc_url_query_daily AS daily
   CROSS JOIN bounds
   WHERE daily.data_date > bounds.prior_start
     AND daily.data_date <= bounds.current_end

@@ -3,8 +3,8 @@
 `google-web-analytics` builds an organic search reporting layer on top of
 GA4 and Search Console data you already have in BigQuery. It does not ingest
 anything: both products export to BigQuery natively, so this template starts where
-those exports land, conforms them in `web_stage`, and publishes nine reports in
-`web_reports`.
+those exports land, conforms them in `web_analytics_staging`, and publishes nine reports in
+`web_analytics_reports`.
 
 Every report answers a question GA4 and Search Console cannot answer themselves —
 not because the data is missing, but because it is split across two products that
@@ -45,29 +45,34 @@ google-web-analytics/
 │   ├── search.sql
 │   └── url.sql
 └── assets/
-    ├── sources/
+    ├── web_analytics_raw/
     │   ├── ga4_events_intraday.asset.yml
     │   ├── gsc_searchdata_url_impression.asset.yml
     │   ├── gsc_searchdata_site_impression.asset.yml
-    │   └── gsc_exportlog.asset.yml
-    ├── web_stage/
-    │   ├── gsc_site_query_daily.sql
-    │   ├── gsc_url_query_daily.sql
-    │   ├── gsc_position_click_curve.sql
-    │   ├── gsc_export_log.sql
+    │   └── gsc_export_log.asset.yml
+    ├── web_analytics_staging/
     │   ├── ga4_sessions.sql
-    │   └── ga4_page_daily.sql
-    └── web_reports/
-        ├── search_brand_split_weekly.sql
-        ├── search_query_opportunities.sql
-        ├── search_query_cannibalization.sql
-        ├── search_page_trend.sql
-        ├── search_new_and_lost_queries.sql
-        ├── search_competitor_visibility.sql
-        ├── organic_landing_page_performance.sql
-        ├── organic_query_value.sql
-        └── organic_intent_pipeline.sql
+    │   ├── ga4_page_daily.sql
+    │   ├── gsc_url_query_daily.sql
+    │   ├── gsc_site_query_daily.sql
+    │   ├── gsc_position_click_curve.sql
+    │   └── gsc_export_log.sql
+    └── web_analytics_reports/
+        ├── gsc_brand_split_weekly.sql
+        ├── gsc_query_opportunities.sql
+        ├── gsc_query_cannibalization.sql
+        ├── gsc_page_trend.sql
+        ├── gsc_new_and_lost_queries.sql
+        ├── gsc_competitor_visibility.sql
+        ├── ga4_gsc_landing_page_performance.sql
+        ├── ga4_gsc_query_value.sql
+        └── ga4_gsc_intent_pipeline.sql
 ```
+
+Every asset follows one rule: the folder under `assets/` is exactly the dataset
+name, and the file name is exactly the table name. Each table is prefixed with the
+platform it comes from — `ga4_`, `gsc_`, or `ga4_gsc_` where the two are joined —
+so another platform can be added later without renaming anything.
 
 ## Configure it
 
@@ -115,10 +120,10 @@ bruin run --var reporting_window_days=365 google-web-analytics
 `brand_query_pattern`, `competitor_names`, `commercial_query_pattern`,
 `support_path_pattern`, and `content_path_pattern` are all evaluated **inside the
 staging models**, so their results are materialized. Changing any of them means
-rebuilding `web_stage`, not just the reports:
+rebuilding `web_analytics_staging`, not just the reports:
 
 ```bash
-bruin run --full-refresh my-pipeline/assets/web_stage
+bruin run --full-refresh my-pipeline/assets/web_analytics_staging
 ```
 
 Overriding one with `--var` on a report alone changes nothing, because the report
@@ -133,19 +138,19 @@ before it reaches SQL.
 
 ## What it creates
 
-### `sources` — the Google exports
+### `web_analytics_raw` — the Google exports
 
 Four `bq.source` assets stand in for the tables Google owns. They never execute;
 they exist so the exports appear as the upstream of the staging models rather than
 the graph starting mid-pipeline, and so the columns the pipeline relies on are
 documented in one place.
 
-Their names are stable logical identifiers — `sources.ga4_events_intraday` and so
+Their names are stable logical identifiers — `web_analytics_raw.ga4_events_intraday` and so
 on — because Bruin validates asset names before Jinja renders, so a name cannot
 contain the dataset variable or the `*` wildcard. The real table each one stands
 for is named in its description.
 
-### `web_stage` — conformed models
+### `web_analytics_staging` — conformed models
 
 | Asset | Grain | Notes |
 | --- | --- | --- |
@@ -179,23 +184,23 @@ recording a visit before a `www` redirect, say — reports that page twice, once
 merged row. If you would rather see one row per path, aggregate over
 `page_hostname` in your own model on top of these reports.
 
-### `web_reports` — the seven reports
+### `web_analytics_reports` — the seven reports
 
 | Report | The question | Why neither product answers it |
 | --- | --- | --- |
-| `search_brand_split_weekly` | How much demand is branded versus non-branded? | Search Console has no concept of a brand, so its headline click trend mixes discovery with people who already knew you. |
-| `search_query_opportunities` | Which queries are leaving clicks on the table, and how many? | Search Console shows CTR and position side by side but never says whether a CTR is good *for that position*. |
-| `search_query_cannibalization` | Which queries do several of my own pages compete for? | The interface can filter by query or group by page, never pivot one against the other. |
-| `search_page_trend` | Which pages are quietly decaying? | Period comparison works one view at a time and within a thousand exported rows, so the long tail never surfaces. |
-| `search_new_and_lost_queries` | What did I start and stop ranking for? | Comparing periods shows how shared queries moved, not which ones appeared or vanished. |
-| `organic_landing_page_performance` | What happened after the click? | Search Console stops at the click; GA4 never receives the query or the impression. |
-| `organic_query_value` | Which queries make money? | Google deliberately never passes the query to analytics. |
-| `search_competitor_visibility` | Where do I stand on each rival's comparison queries? | Search Console scatters them through a row-capped export with no idea they belong together. |
-| `organic_intent_pipeline` | Does content marketing actually produce pipeline? | Needs query intent, page role, and post-click outcomes at once. None of the three exists in either product. |
+| `gsc_brand_split_weekly` | How much demand is branded versus non-branded? | Search Console has no concept of a brand, so its headline click trend mixes discovery with people who already knew you. |
+| `gsc_query_opportunities` | Which queries are leaving clicks on the table, and how many? | Search Console shows CTR and position side by side but never says whether a CTR is good *for that position*. |
+| `gsc_query_cannibalization` | Which queries do several of my own pages compete for? | The interface can filter by query or group by page, never pivot one against the other. |
+| `gsc_page_trend` | Which pages are quietly decaying? | Period comparison works one view at a time and within a thousand exported rows, so the long tail never surfaces. |
+| `gsc_new_and_lost_queries` | What did I start and stop ranking for? | Comparing periods shows how shared queries moved, not which ones appeared or vanished. |
+| `ga4_gsc_landing_page_performance` | What happened after the click? | Search Console stops at the click; GA4 never receives the query or the impression. |
+| `ga4_gsc_query_value` | Which queries make money? | Google deliberately never passes the query to analytics. |
+| `gsc_competitor_visibility` | Where do I stand on each rival's comparison queries? | Search Console scatters them through a row-capped export with no idea they belong together. |
+| `ga4_gsc_intent_pipeline` | Does content marketing actually produce pipeline? | Needs query intent, page role, and post-click outcomes at once. None of the three exists in either product. |
 
 ## Reading the reports
 
-### Start with `organic_landing_page_performance`
+### Start with `ga4_gsc_landing_page_performance`
 
 This is the join the other reports lean on. Each page carries its Search Console
 visibility next to what GA4 recorded afterwards, so `revenue_per_search_click_usd`
@@ -217,11 +222,11 @@ never match exactly. `session_per_click_ratio` sits near one on healthy pages;
 treat a low value as a tracking lead, not as a bug in the report.
 
 The GA4 side is restricted to Google organic sessions, because Search Console has
-no visibility into Bing or any other engine. `web_stage.ga4_sessions` exposes both
+no visibility into Bing or any other engine. `web_analytics_staging.ga4_sessions` exposes both
 `is_organic_search_session` and the narrower `is_google_organic_session` so you can
 choose deliberately.
 
-### `organic_query_value` is modelled, not measured
+### `ga4_gsc_query_value` is modelled, not measured
 
 Each page's GA4 outcomes are split across the queries that sent clicks to it, in
 proportion to those clicks. Within a page the weights sum to one, so page totals
@@ -236,11 +241,11 @@ with it; do not report the revenue figure as measured.
 Clicks Google withheld are left out of the denominator rather than held back, so
 their share of a page's outcome is spread across that page's disclosed queries. A
 page whose clicks were all withheld contributes nothing, which is why site totals
-here fall short of those in `organic_landing_page_performance`.
+here fall short of those in `ga4_gsc_landing_page_performance`.
 
 ### Opportunity sizing
 
-`search_query_opportunities` gives two numbers, and they answer different
+`gsc_query_opportunities` gives two numbers, and they answer different
 questions:
 
 - `clicks_at_expected_ctr` — what fixing the title and description alone would
@@ -278,8 +283,8 @@ key_event_values:
 ```
 
 Every value column then works: `outcome_value_per_search_click_usd` on
-`organic_landing_page_performance` and `modelled_outcome_value_per_click_usd` on
-`organic_query_value` are the two columns to rank a content roadmap by. `purchase`
+`ga4_gsc_landing_page_performance` and `modelled_outcome_value_per_click_usd` on
+`ga4_gsc_query_value` are the two columns to rank a content roadmap by. `purchase`
 is deliberately absent from the weights because real ecommerce revenue is added
 from the GA4 ecommerce fields instead; giving it a weight would double count it.
 
@@ -300,7 +305,7 @@ organic clicks and none of the pipeline.
 
 ### Clicks and pipeline are not the same demand
 
-`organic_intent_pipeline` crosses query intent with page role, which settles the
+`ga4_gsc_intent_pipeline` crosses query intent with page role, which settles the
 recurring argument about whether content marketing works. A representative result:
 
 | intent | page role | clicks | click share | value share | value / click |
@@ -317,7 +322,7 @@ not automatically an argument against content marketing — informational conten
 how a site earns the authority to rank commercially later — but it is the number
 that should decide what gets built next.
 
-`search_competitor_visibility` breaks the highest-intent slice out per rival.
+`gsc_competitor_visibility` breaks the highest-intent slice out per rival.
 Populate `competitor_names` with real competitors, then look at `position_band`:
 ranking eleventh for "rival alternatives" means the demand exists and you are
 nowhere a searcher will look, which is usually the cheapest pipeline available to
@@ -374,7 +379,7 @@ WHERE _TABLE_SUFFIX >= '20260101'
 ```
 
 Streaming-only exports return `session_scoped = 0`: Google does not populate
-session-scoped traffic source in intraday tables. `web_stage.ga4_sessions`
+session-scoped traffic source in intraday tables. `web_analytics_staging.ga4_sessions`
 therefore falls back through `collected_traffic_source` and then the user-scoped
 `traffic_source`, and records which one it used in `traffic_source_basis`.
 
@@ -385,7 +390,7 @@ On the property tested, all 6,433 sessions resolved through `user_first_touch` o
 `traffic_source_basis` distribution before quoting any channel number:
 
 ```sql
-SELECT traffic_source_basis, COUNT(*) FROM web_stage.ga4_sessions GROUP BY 1
+SELECT traffic_source_basis, COUNT(*) FROM web_analytics_staging.ga4_sessions GROUP BY 1
 ```
 
 ### Your event names are probably not the defaults
@@ -405,7 +410,7 @@ Search Console publishes with a two-to-three day delay and revises history in
 place. GA4 finalizes a daily table only after dropping its intraday table. So the
 staging models widen their read window by `source_lookback_days` and replace whole
 days with `delete+insert`, which makes late and restated data self-healing on the
-next run. `web_stage.gsc_export_log` is where you confirm what Google actually
+next run. `web_analytics_staging.gsc_export_log` is where you confirm what Google actually
 published: a bumped `epoch_version` means Google restated a date rather than the
 site changing.
 
@@ -456,7 +461,7 @@ bruin run --start-date 2026-06-01 --end-date 2026-06-30 my-search-pipeline
 
 ## Customize it
 
-The `web_stage` models are the interface; build your own reports on those rather
+The `web_analytics_staging` models are the interface; build your own reports on those rather
 than against the raw exports. Common first changes:
 
 - Set `key_event_names` and `key_event_values` to the key events your property

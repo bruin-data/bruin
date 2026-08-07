@@ -1,5 +1,5 @@
 /* @bruin
-name: web_stage.gsc_export_log
+name: web_analytics_staging.gsc_export_log
 type: bq.sql
 description: >
   Publication log of the Search Console bulk export, read from the ExportLog
@@ -13,10 +13,10 @@ materialization:
   type: table
 
 depends:
-  - sources.gsc_export_log_raw
+  - web_analytics_raw.gsc_export_log
 
 tags:
-  - web_stage
+  - web_analytics_staging
   - search_console
   - freshness
 

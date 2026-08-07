@@ -1,5 +1,5 @@
 /* @bruin
-name: web_stage.gsc_url_query_daily
+name: web_analytics_staging.gsc_url_query_daily
 type: bq.sql
 description: >
   URL-level Search Console impressions by day, query, country, device, and search
@@ -9,7 +9,7 @@ description: >
   here so the model keeps working as Google adds new ones.
 
   URL-level impressions are counted per URL, so summing them across pages yields
-  a larger total than the property-level model. Use web_stage.gsc_site_query_daily
+  a larger total than the property-level model. Use web_analytics_staging.gsc_site_query_daily
   for property totals and this model for page and query analysis.
 
 materialization:
@@ -23,10 +23,10 @@ materialization:
     - query_brand_type
 
 depends:
-  - sources.gsc_searchdata_url_impression
+  - web_analytics_raw.gsc_searchdata_url_impression
 
 tags:
-  - web_stage
+  - web_analytics_staging
   - search_console
   - seo
 

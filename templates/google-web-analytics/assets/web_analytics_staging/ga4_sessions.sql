@@ -1,5 +1,5 @@
 /* @bruin
-name: web_stage.ga4_sessions
+name: web_analytics_staging.ga4_sessions
 type: bq.sql
 description: >
   One row per GA4 session, rebuilt from the event export. The GA4 interface
@@ -25,10 +25,10 @@ materialization:
     - landing_page_path
 
 depends:
-  - sources.ga4_events_intraday
+  - web_analytics_raw.ga4_events_intraday
 
 tags:
-  - web_stage
+  - web_analytics_staging
   - ga4
   - sessions
 
@@ -70,7 +70,7 @@ columns:
     type: STRING
     description: >
       Normalized path of the landing page. Shared join key with
-      web_stage.gsc_url_query_daily.
+      web_analytics_staging.gsc_url_query_daily.
   - name: landing_page_hostname
     type: STRING
     description: Hostname of the landing page.

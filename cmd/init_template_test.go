@@ -196,8 +196,10 @@ func TestInitGoogleWebAnalyticsCopiesStarterTemplate(t *testing.T) {
 	require.FileExists(t, filepath.Join(pipelineRoot, ".gitignore"))
 	require.FileExists(t, filepath.Join(pipelineRoot, "macros", "url.sql"))
 	require.FileExists(t, filepath.Join(pipelineRoot, "macros", "search.sql"))
-	require.FileExists(t, filepath.Join(pipelineRoot, "assets", "web_stage", "ga4_sessions.sql"))
-	require.FileExists(t, filepath.Join(pipelineRoot, "assets", "web_reports", "organic_landing_page_performance.sql"))
+	// Folder under assets/ is exactly the dataset, file name exactly the table.
+	require.FileExists(t, filepath.Join(pipelineRoot, "assets", "web_analytics_raw", "ga4_events_intraday.asset.yml"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "assets", "web_analytics_staging", "ga4_sessions.sql"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "assets", "web_analytics_reports", "ga4_gsc_landing_page_performance.sql"))
 
 	pipeline, err := os.ReadFile(filepath.Join(pipelineRoot, "pipeline.yml"))
 	require.NoError(t, err)
@@ -213,25 +215,25 @@ func TestGoogleWebAnalyticsTemplateHasFocusedAssetSet(t *testing.T) {
 	t.Parallel()
 
 	expectedAssets := []string{
-		"sources/ga4_events_intraday.asset.yml",
-		"sources/gsc_searchdata_url_impression.asset.yml",
-		"sources/gsc_searchdata_site_impression.asset.yml",
-		"sources/gsc_exportlog.asset.yml",
-		"web_stage/gsc_site_query_daily.sql",
-		"web_stage/gsc_url_query_daily.sql",
-		"web_stage/gsc_position_click_curve.sql",
-		"web_stage/gsc_export_log.sql",
-		"web_stage/ga4_sessions.sql",
-		"web_stage/ga4_page_daily.sql",
-		"web_reports/search_brand_split_weekly.sql",
-		"web_reports/search_query_opportunities.sql",
-		"web_reports/search_query_cannibalization.sql",
-		"web_reports/search_page_trend.sql",
-		"web_reports/search_new_and_lost_queries.sql",
-		"web_reports/search_competitor_visibility.sql",
-		"web_reports/organic_landing_page_performance.sql",
-		"web_reports/organic_query_value.sql",
-		"web_reports/organic_intent_pipeline.sql",
+		"web_analytics_raw/ga4_events_intraday.asset.yml",
+		"web_analytics_raw/gsc_searchdata_url_impression.asset.yml",
+		"web_analytics_raw/gsc_searchdata_site_impression.asset.yml",
+		"web_analytics_raw/gsc_export_log.asset.yml",
+		"web_analytics_staging/gsc_site_query_daily.sql",
+		"web_analytics_staging/gsc_url_query_daily.sql",
+		"web_analytics_staging/gsc_position_click_curve.sql",
+		"web_analytics_staging/gsc_export_log.sql",
+		"web_analytics_staging/ga4_sessions.sql",
+		"web_analytics_staging/ga4_page_daily.sql",
+		"web_analytics_reports/gsc_brand_split_weekly.sql",
+		"web_analytics_reports/gsc_query_opportunities.sql",
+		"web_analytics_reports/gsc_query_cannibalization.sql",
+		"web_analytics_reports/gsc_page_trend.sql",
+		"web_analytics_reports/gsc_new_and_lost_queries.sql",
+		"web_analytics_reports/gsc_competitor_visibility.sql",
+		"web_analytics_reports/ga4_gsc_landing_page_performance.sql",
+		"web_analytics_reports/ga4_gsc_query_value.sql",
+		"web_analytics_reports/ga4_gsc_intent_pipeline.sql",
 	}
 
 	var actualAssets []string
@@ -279,7 +281,7 @@ func TestGoogleWebAnalyticsTemplateReadsExistingExports(t *testing.T) {
 	// date and makes it impossible to pick up a daily table by accident. Verified
 	// against a real property whose 981 export tables are all intraday.
 	for _, asset := range []string{"ga4_sessions", "ga4_page_daily"} {
-		content := readTemplate("google-web-analytics/assets/web_stage/" + asset + ".sql")
+		content := readTemplate("google-web-analytics/assets/web_analytics_staging/" + asset + ".sql")
 		require.Contains(t, content, "`{{ var.ga4_dataset }}.events_intraday_*`", asset)
 		require.Contains(t, content, "ga4_intraday_window(", asset)
 		// Out of scope: daily tables and the user-data export.
@@ -291,18 +293,18 @@ func TestGoogleWebAnalyticsTemplateReadsExistingExports(t *testing.T) {
 	// Streaming-only exports leave every session-scoped traffic-source field NULL,
 	// which made every session look non-organic and emptied every organic report.
 	// The fallback chain and the basis column are what keep those reports usable.
-	sessions := readTemplate("google-web-analytics/assets/web_stage/ga4_sessions.sql")
+	sessions := readTemplate("google-web-analytics/assets/web_analytics_staging/ga4_sessions.sql")
 	require.Contains(t, sessions, "collected_traffic_source.manual_medium")
 	require.Contains(t, sessions, "traffic_source.medium")
 	require.Contains(t, sessions, "traffic_source_basis")
 
-	siteImpression := readTemplate("google-web-analytics/assets/web_stage/gsc_site_query_daily.sql")
+	siteImpression := readTemplate("google-web-analytics/assets/web_analytics_staging/gsc_site_query_daily.sql")
 	require.Contains(t, siteImpression, "`{{ var.search_console_dataset }}.searchdata_site_impression`")
 	// Position lives in sum_top_position on the property-level table and in
 	// sum_position on the URL-level one; swapping them silently breaks position.
 	require.Contains(t, siteImpression, "SUM(sum_top_position)")
 
-	urlImpression := readTemplate("google-web-analytics/assets/web_stage/gsc_url_query_daily.sql")
+	urlImpression := readTemplate("google-web-analytics/assets/web_analytics_staging/gsc_url_query_daily.sql")
 	require.Contains(t, urlImpression, "`{{ var.search_console_dataset }}.searchdata_url_impression`")
 	require.Contains(t, urlImpression, "SUM(sum_position)")
 
@@ -312,7 +314,7 @@ func TestGoogleWebAnalyticsTemplateReadsExistingExports(t *testing.T) {
 	require.Contains(t, sessions, "{{ page_path('landing_page_location') }}")
 
 	// Search Console only reports Google, so the join must use the narrower flag.
-	landingPages := readTemplate("google-web-analytics/assets/web_reports/organic_landing_page_performance.sql")
+	landingPages := readTemplate("google-web-analytics/assets/web_analytics_reports/ga4_gsc_landing_page_performance.sql")
 	require.Contains(t, landingPages, "is_google_organic_session")
 	require.NotContains(t, landingPages, "sessions.is_organic_search_session")
 }
@@ -331,26 +333,26 @@ func TestGoogleWebAnalyticsTemplateKeepsHostsSeparate(t *testing.T) {
 	// Every page-grain report must keep the host in its grain, otherwise unrelated
 	// pages are summed and whichever host earns the revenue has its value diluted.
 	for _, asset := range []string{
-		"organic_landing_page_performance",
-		"organic_query_value",
-		"organic_intent_pipeline",
-		"search_page_trend",
-		"search_query_opportunities",
-		"search_query_cannibalization",
-		"search_new_and_lost_queries",
-		"search_competitor_visibility",
+		"ga4_gsc_landing_page_performance",
+		"ga4_gsc_query_value",
+		"ga4_gsc_intent_pipeline",
+		"gsc_page_trend",
+		"gsc_query_opportunities",
+		"gsc_query_cannibalization",
+		"gsc_new_and_lost_queries",
+		"gsc_competitor_visibility",
 	} {
-		content := readTemplate("google-web-analytics/assets/web_reports/" + asset + ".sql")
+		content := readTemplate("google-web-analytics/assets/web_analytics_reports/" + asset + ".sql")
 		require.Contains(t, content, "page_hostname", asset)
 	}
 
 	// Both sides of the GA4-to-Search-Console join must match on host as well as
 	// path, or the join silently reintroduces the merge.
-	landingPages := readTemplate("google-web-analytics/assets/web_reports/organic_landing_page_performance.sql")
+	landingPages := readTemplate("google-web-analytics/assets/web_analytics_reports/ga4_gsc_landing_page_performance.sql")
 	require.Contains(t, landingPages, "ON landing.page_hostname = search.page_hostname")
 	require.Contains(t, landingPages, "ON content.page_hostname = combined.page_hostname")
 
-	queryValue := readTemplate("google-web-analytics/assets/web_reports/organic_query_value.sql")
+	queryValue := readTemplate("google-web-analytics/assets/web_analytics_reports/ga4_gsc_query_value.sql")
 	require.Contains(t, queryValue, "USING (site_url, page_hostname, page_path)")
 	require.Contains(t, queryValue, "ON outcomes.page_hostname = query_page.page_hostname")
 }
@@ -401,7 +403,7 @@ func TestGoogleWebAnalyticsTemplateSupportsB2BSaaS(t *testing.T) {
 	// count it, so the default map must leave it out.
 	require.NotContains(t, pipeline, "      purchase:")
 
-	sessions := readTemplate("google-web-analytics/assets/web_stage/ga4_sessions.sql")
+	sessions := readTemplate("google-web-analytics/assets/web_analytics_staging/ga4_sessions.sql")
 	require.Contains(t, sessions, "demo_event_count")
 	require.Contains(t, sessions, "signup_event_count")
 	require.Contains(t, sessions, "key_event_value_usd")
@@ -412,8 +414,8 @@ func TestGoogleWebAnalyticsTemplateSupportsB2BSaaS(t *testing.T) {
 	// Documentation regularly out-ranks the marketing site and its clicks are
 	// existing customers, so every page-level model must carry the role.
 	for _, asset := range []string{
-		"web_stage/gsc_url_query_daily",
-		"web_stage/ga4_page_daily",
+		"web_analytics_staging/gsc_url_query_daily",
+		"web_analytics_staging/ga4_page_daily",
 	} {
 		require.Contains(t, readTemplate("google-web-analytics/assets/"+asset+".sql"), "page_role")
 	}
@@ -422,19 +424,19 @@ func TestGoogleWebAnalyticsTemplateSupportsB2BSaaS(t *testing.T) {
 	// Commercial intent has to reach both Search Console models for the intent
 	// reports to slice anything.
 	for _, asset := range []string{
-		"web_stage/gsc_url_query_daily",
-		"web_stage/gsc_site_query_daily",
+		"web_analytics_staging/gsc_url_query_daily",
+		"web_analytics_staging/gsc_site_query_daily",
 	} {
 		content := readTemplate("google-web-analytics/assets/" + asset + ".sql")
 		require.Contains(t, content, "query_intent_type", asset)
 		require.Contains(t, content, "competitor_name", asset)
 	}
 
-	landingPages := readTemplate("google-web-analytics/assets/web_reports/organic_landing_page_performance.sql")
+	landingPages := readTemplate("google-web-analytics/assets/web_analytics_reports/ga4_gsc_landing_page_performance.sql")
 	require.Contains(t, landingPages, "outcome_value_per_search_click_usd")
 	require.Contains(t, landingPages, "demo_events_per_hundred_clicks")
 
-	queryValue := readTemplate("google-web-analytics/assets/web_reports/organic_query_value.sql")
+	queryValue := readTemplate("google-web-analytics/assets/web_analytics_reports/ga4_gsc_query_value.sql")
 	require.Contains(t, queryValue, "modelled_outcome_value_per_click_usd")
 	require.Contains(t, queryValue, "modelled_demo_events")
 }
@@ -454,13 +456,13 @@ func TestGoogleWebAnalyticsTemplateDeclaresSourcesForLineage(t *testing.T) {
 	// Asset names are validated before Jinja renders, so these cannot carry the
 	// dataset variable or the wildcard -- hence stable logical names.
 	sources := map[string]string{
-		"ga4_events_intraday":            "sources.ga4_events_intraday",
-		"gsc_searchdata_url_impression":  "sources.gsc_searchdata_url_impression",
-		"gsc_searchdata_site_impression": "sources.gsc_searchdata_site_impression",
-		"gsc_exportlog":                  "sources.gsc_export_log_raw",
+		"ga4_events_intraday":            "web_analytics_raw.ga4_events_intraday",
+		"gsc_searchdata_url_impression":  "web_analytics_raw.gsc_searchdata_url_impression",
+		"gsc_searchdata_site_impression": "web_analytics_raw.gsc_searchdata_site_impression",
+		"gsc_export_log":                 "web_analytics_raw.gsc_export_log",
 	}
 	for file, name := range sources {
-		content := readTemplate("google-web-analytics/assets/sources/" + file + ".asset.yml")
+		content := readTemplate("google-web-analytics/assets/web_analytics_raw/" + file + ".asset.yml")
 		require.Contains(t, content, "name: "+name, file)
 		require.Contains(t, content, "type: bq.source", file)
 		require.NotContains(t, content, "{{ var.", file)
@@ -470,15 +472,66 @@ func TestGoogleWebAnalyticsTemplateDeclaresSourcesForLineage(t *testing.T) {
 	// Every staging model that reads an export must point at its source asset,
 	// otherwise the lineage graph starts mid-pipeline.
 	for asset, dep := range map[string]string{
-		"ga4_sessions":         "sources.ga4_events_intraday",
-		"ga4_page_daily":       "sources.ga4_events_intraday",
-		"gsc_url_query_daily":  "sources.gsc_searchdata_url_impression",
-		"gsc_site_query_daily": "sources.gsc_searchdata_site_impression",
-		"gsc_export_log":       "sources.gsc_export_log_raw",
+		"ga4_sessions":         "web_analytics_raw.ga4_events_intraday",
+		"ga4_page_daily":       "web_analytics_raw.ga4_events_intraday",
+		"gsc_url_query_daily":  "web_analytics_raw.gsc_searchdata_url_impression",
+		"gsc_site_query_daily": "web_analytics_raw.gsc_searchdata_site_impression",
+		"gsc_export_log":       "web_analytics_raw.gsc_export_log",
 	} {
-		content := readTemplate("google-web-analytics/assets/web_stage/" + asset + ".sql")
+		content := readTemplate("google-web-analytics/assets/web_analytics_staging/" + asset + ".sql")
 		require.Contains(t, content, "  - "+dep, asset)
 	}
+}
+
+func TestGoogleWebAnalyticsTemplateNamesMatchTheirLocation(t *testing.T) {
+	t.Parallel()
+
+	// One naming rule holds across the template: the folder under assets/ is
+	// exactly the dataset and the file name is exactly the table. That is what
+	// makes an asset findable from a table name in a warehouse, so it is worth
+	// pinning rather than trusting to review.
+	err := iofs.WalkDir(templates.Templates, "google-web-analytics/assets", func(path string, entry iofs.DirEntry, err error) error {
+		if err != nil || entry.IsDir() {
+			return err
+		}
+		rel := strings.TrimPrefix(path, "google-web-analytics/assets/")
+		parts := strings.SplitN(rel, "/", 2)
+		require.Len(t, parts, 2, rel)
+		dataset := parts[0]
+		table := strings.TrimSuffix(strings.TrimSuffix(parts[1], ".sql"), ".asset.yml")
+
+		content, err := templates.Templates.ReadFile(path)
+		require.NoError(t, err)
+		require.Contains(t, string(content), "name: "+dataset+"."+table, rel)
+
+		// Every table is prefixed with the platform it comes from, so another
+		// platform can be added later without renaming anything.
+		require.True(t,
+			strings.HasPrefix(table, "ga4_") || strings.HasPrefix(table, "gsc_"),
+			"%s is missing a platform prefix", rel)
+		return nil
+	})
+	require.NoError(t, err)
+
+	for _, dataset := range []string{"web_analytics_raw", "web_analytics_staging", "web_analytics_reports"} {
+		entries, err := iofs.ReadDir(templates.Templates, "google-web-analytics/assets/"+dataset)
+		require.NoError(t, err, dataset)
+		require.NotEmpty(t, entries, dataset)
+	}
+}
+
+func TestGoogleWebAnalyticsTemplateUsesGoogleSQLTypes(t *testing.T) {
+	t.Parallel()
+
+	content, err := templates.Templates.ReadFile("google-web-analytics/assets/web_analytics_raw/ga4_events_intraday.asset.yml")
+	require.NoError(t, err)
+
+	// RECORD is the legacy and REST representation of a nested field. GoogleSQL,
+	// and INFORMATION_SCHEMA.COLUMNS with it, reports STRUCT and ARRAY<STRUCT>.
+	// Verified against a real GA4 export.
+	require.NotContains(t, string(content), "type: RECORD")
+	require.Contains(t, string(content), "type: STRUCT")
+	require.Contains(t, string(content), "type: ARRAY<STRUCT>")
 }
 
 func TestInitMigrationFivetranCopiesMigrationWorkspace(t *testing.T) {

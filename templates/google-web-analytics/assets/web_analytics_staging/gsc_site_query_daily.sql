@@ -1,5 +1,5 @@
 /* @bruin
-name: web_stage.gsc_site_query_daily
+name: web_analytics_staging.gsc_site_query_daily
 type: bq.sql
 description: >
   Property-level Search Console impressions by day, query, country, device, and
@@ -19,10 +19,10 @@ materialization:
     - device
 
 depends:
-  - sources.gsc_searchdata_site_impression
+  - web_analytics_raw.gsc_searchdata_site_impression
 
 tags:
-  - web_stage
+  - web_analytics_staging
   - search_console
   - seo
 

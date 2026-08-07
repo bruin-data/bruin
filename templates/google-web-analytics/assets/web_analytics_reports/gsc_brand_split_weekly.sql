@@ -1,5 +1,5 @@
 /* @bruin
-name: web_reports.search_brand_split_weekly
+name: web_analytics_reports.gsc_brand_split_weekly
 type: bq.sql
 description: >
   Weekly search performance split into branded, non-branded, and anonymized
@@ -16,10 +16,10 @@ materialization:
   type: table
 
 depends:
-  - web_stage.gsc_site_query_daily
+  - web_analytics_staging.gsc_site_query_daily
 
 tags:
-  - web_reports
+  - web_analytics_reports
   - search_console
   - seo
 
@@ -133,7 +133,7 @@ weekly AS (
     SUM(daily.clicks) AS clicks,
     SUM(daily.sum_top_position) AS sum_top_position,
     COUNT(DISTINCT daily.query) AS distinct_query_count
-  FROM web_stage.gsc_site_query_daily AS daily
+  FROM web_analytics_staging.gsc_site_query_daily AS daily
   CROSS JOIN bounds
   WHERE daily.data_date > bounds.window_start
     AND daily.data_date <= bounds.window_end

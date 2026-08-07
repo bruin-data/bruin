@@ -1,5 +1,5 @@
 /* @bruin
-name: web_reports.search_page_trend
+name: web_analytics_reports.gsc_page_trend
 type: bq.sql
 description: >
   Every page's search performance over the trailing window against the window
@@ -18,10 +18,10 @@ materialization:
   type: table
 
 depends:
-  - web_stage.gsc_url_query_daily
+  - web_analytics_staging.gsc_url_query_daily
 
 tags:
-  - web_reports
+  - web_analytics_reports
   - search_console
   - seo
 
@@ -165,7 +165,7 @@ windowed AS (
     daily.clicks,
     daily.sum_position,
     IF(daily.is_anonymized_query, NULL, daily.query) AS query
-  FROM web_stage.gsc_url_query_daily AS daily
+  FROM web_analytics_staging.gsc_url_query_daily AS daily
   CROSS JOIN bounds
   WHERE daily.data_date > bounds.prior_start
     AND daily.data_date <= bounds.current_end

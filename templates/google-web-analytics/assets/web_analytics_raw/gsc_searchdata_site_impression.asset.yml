@@ -1,4 +1,4 @@
-name: sources.gsc_searchdata_site_impression
+name: web_analytics_raw.gsc_searchdata_site_impression
 type: bq.source
 description: >
   Search Console bulk export at property and query grain, read as
@@ -8,7 +8,7 @@ description: >
   so totals derived from it reconcile with the UI.
 
 tags:
-  - source
+  - web_analytics_raw
   - search_console
 
 columns:
