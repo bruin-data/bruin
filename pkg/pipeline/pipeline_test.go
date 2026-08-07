@@ -878,6 +878,32 @@ func TestPipeline_GetConnectionNameForAsset(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "my-atlas", found)
 	})
+
+	t.Run("GCS sensors resolve a GCS default connection", func(t *testing.T) {
+		t.Parallel()
+		gcsPipeline := &pipeline.Pipeline{
+			Name:               "gcs-pipeline",
+			DefaultConnections: map[string]string{"gcs": "my-gcs"},
+		}
+		found, err := gcsPipeline.GetConnectionNameForAsset(&pipeline.Asset{
+			Type: pipeline.AssetTypeGCSObjectSensor,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "my-gcs", found)
+	})
+
+	t.Run("GCS sensors fall back to a Google Cloud Platform connection", func(t *testing.T) {
+		t.Parallel()
+		gcpPipeline := &pipeline.Pipeline{
+			Name:               "gcs-pipeline",
+			DefaultConnections: map[string]string{"google_cloud_platform": "my-gcp"},
+		}
+		found, err := gcpPipeline.GetConnectionNameForAsset(&pipeline.Asset{
+			Type: pipeline.AssetTypeGCSObjectSensor,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "my-gcp", found)
+	})
 }
 
 func intPointer(i int) *int {

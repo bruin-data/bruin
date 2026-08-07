@@ -143,6 +143,7 @@ For the specific fields and configuration options for each connection type, refe
 | `elasticsearch` | [Elasticsearch](../platforms/elasticsearch.md) |
 | `mongo_atlas` | [MongoDB Atlas](../platforms/mongoatlas.md) |
 | `s3` | [S3](../platforms/s3.md) |
+| `gcs` | [Google Cloud Storage](../platforms/gcs.md) |
 | `emr_serverless` | [AWS EMR Serverless](../platforms/emr_serverless.md) |
 | `dataproc_serverless` | [GCP Dataproc Serverless](../platforms/dataproc_serverless.md) |
 

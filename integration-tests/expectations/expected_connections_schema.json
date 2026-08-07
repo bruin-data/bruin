@@ -2542,6 +2542,12 @@
             "service_account_json"
           ],
           "title": "service_account_json"
+        },
+        {
+          "required": [
+            "use_application_default_credentials"
+          ],
+          "title": "use_application_default_credentials"
         }
       ],
       "properties": {
@@ -2556,6 +2562,9 @@
         },
         "service_account_json": {
           "type": "string"
+        },
+        "use_application_default_credentials": {
+          "type": "boolean"
         },
         "bucket_name": {
           "type": "string"
