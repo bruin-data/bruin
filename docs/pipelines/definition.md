@@ -171,7 +171,7 @@ schedule: "0 0 * * *"
 
 ### Start date
 
-The earliest date the pipeline has data for. Bruin Cloud uses it as the anchor for scheduled backfills and [catchup](#catchup) runs, filling in any missed intervals between `start_date` and now.
+The earliest date the pipeline has data for. Bruin Cloud uses it as the anchor for scheduled backfills and [catchup](#catchup) runs, with missed intervals filled according to the pipeline's catchup mode.
 
 Example:
 
