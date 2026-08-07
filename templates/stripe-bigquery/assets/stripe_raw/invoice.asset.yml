@@ -1,7 +1,281 @@
 name: stripe_raw.invoice
 type: ingestr
 
-description: Raw-layer ingestion of Stripe invoice data into BigQuery.
+description: >
+  Raw-layer Stripe invoices loaded into BigQuery with ingestr's incremental
+  Stripe mode. Each run fetches the invoices created inside its own time
+  window and merges them into the destination table on `id`. Invoices are
+  mutable: finalization, payment, and void transitions on an invoice created
+  in an earlier window are not picked up until a backfill covers it.
+
+materialization:
+  type: table
+  strategy: merge
+  incremental_key: created
 
 parameters:
-  source_table: invoice
+  source_table: invoice:sync:incremental
+  enforce_schema: true
+
+tags:
+  - stripe_raw
+  - stripe
+  - billing
+
+columns:
+  - name: id
+    type: varchar
+    description: Stripe invoice identifier, for example `in_1MtHbELkdIwHu7ixl4OzzPMv`.
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: object
+    type: varchar
+    description: Stripe object type, always `invoice`.
+  - name: created
+    type: bigint
+    description: Unix timestamp in seconds of when the invoice was created.
+    checks:
+      - name: not_null
+  - name: number
+    type: varchar
+    description: Customer-facing invoice number.
+  - name: customer
+    type: varchar
+    description: Identifier of the customer the invoice is billed to.
+  - name: subscription
+    type: varchar
+    description: Identifier of the subscription the invoice was generated for.
+  - name: subscription_details
+    type: json
+    description: Subscription metadata captured when the invoice was created.
+  - name: status
+    type: varchar
+    description: >
+      Invoice status, one of `draft`, `open`, `paid`, `uncollectible`, or
+      `void`. The reports exclude `draft` and `void` invoices.
+  - name: status_transitions
+    type: json
+    description: >
+      Timestamps of the invoice status transitions. The stage layer reads
+      `finalized_at` from it and falls back to `created` when it is missing.
+  - name: billing_reason
+    type: varchar
+    description: >
+      Why the invoice was created, for example `subscription_cycle` or
+      `manual`. The stage layer uses it to flag subscription invoices.
+  - name: collection_method
+    type: varchar
+    description: >
+      How the invoice is collected, either `charge_automatically` or
+      `send_invoice`.
+  - name: currency
+    type: varchar
+    description: Three-letter ISO currency code the invoice is billed in.
+  - name: amount_due
+    type: bigint
+    description: Amount due in minor currency units.
+  - name: amount_paid
+    type: bigint
+    description: Amount paid in minor currency units.
+  - name: amount_remaining
+    type: bigint
+    description: Amount still owed in minor currency units.
+  - name: amount_shipping
+    type: bigint
+    description: Shipping amount in minor currency units.
+  - name: subtotal
+    type: bigint
+    description: Total before discounts and taxes, in minor currency units.
+  - name: subtotal_excluding_tax
+    type: bigint
+    description: Subtotal excluding tax, in minor currency units.
+  - name: total
+    type: bigint
+    description: Total after discounts and taxes, in minor currency units.
+  - name: total_excluding_tax
+    type: bigint
+    description: Total excluding tax, in minor currency units.
+  - name: tax
+    type: bigint
+    description: Tax charged on the invoice, in minor currency units.
+  - name: total_discount_amounts
+    type: json
+    description: Discount amounts applied to the invoice.
+  - name: total_tax_amounts
+    type: json
+    description: Tax amounts applied to the invoice.
+  - name: starting_balance
+    type: bigint
+    description: Customer balance applied at the start of the invoice.
+  - name: ending_balance
+    type: bigint
+    description: Customer balance remaining after the invoice.
+  - name: paid
+    type: boolean
+    description: Whether the invoice has been paid.
+  - name: paid_out_of_band
+    type: boolean
+    description: Whether the invoice was paid outside of Stripe.
+  - name: attempted
+    type: boolean
+    description: Whether payment of the invoice has been attempted.
+  - name: attempt_count
+    type: integer
+    description: Number of payment attempts made for the invoice.
+  - name: auto_advance
+    type: boolean
+    description: Whether Stripe performs automatic collection for the invoice.
+  - name: next_payment_attempt
+    type: bigint
+    description: Unix timestamp in seconds of the next scheduled payment attempt.
+  - name: due_date
+    type: bigint
+    description: Unix timestamp in seconds of when payment is due.
+  - name: effective_at
+    type: bigint
+    description: Unix timestamp in seconds of the invoice's effective date.
+  - name: period_start
+    type: bigint
+    description: Unix timestamp in seconds of the start of the invoiced period.
+  - name: period_end
+    type: bigint
+    description: Unix timestamp in seconds of the end of the invoiced period.
+  - name: webhooks_delivered_at
+    type: bigint
+    description: Unix timestamp in seconds of when invoice webhooks were delivered.
+  - name: lines
+    type: json
+    description: >
+      Invoice line items returned by Stripe, including the `has_more` flag. The
+      stage layer unnests them into `stripe_stage.invoice_line_items`.
+  - name: charge
+    type: varchar
+    description: Identifier of the charge that paid the invoice.
+  - name: payment_intent
+    type: varchar
+    description: Identifier of the payment intent created for the invoice.
+  - name: payment_settings
+    type: json
+    description: Payment settings applied to the invoice.
+  - name: quote
+    type: varchar
+    description: Identifier of the quote the invoice was generated from.
+  - name: latest_revision
+    type: varchar
+    description: Identifier of the most recent revision of the invoice.
+  - name: from_invoice
+    type: json
+    description: Reference to the invoice this one revises.
+  - name: default_payment_method
+    type: varchar
+    description: Payment method used when charging the invoice automatically.
+  - name: default_source
+    type: varchar
+    description: Payment source used when charging the invoice automatically.
+  - name: default_tax_rates
+    type: json
+    description: Tax rates applied to the whole invoice.
+  - name: discount
+    type: json
+    description: Discount applied to the invoice, if any.
+  - name: discounts
+    type: json
+    description: Discounts applied to the invoice.
+  - name: automatic_tax
+    type: json
+    description: Automatic tax configuration for the invoice.
+  - name: description
+    type: varchar
+    description: Invoice description shown to the customer.
+  - name: footer
+    type: varchar
+    description: Footer text shown on the invoice.
+  - name: custom_fields
+    type: json
+    description: Custom fields displayed on the invoice.
+  - name: rendering
+    type: json
+    description: Invoice rendering options, such as the PDF page size.
+  - name: hosted_invoice_url
+    type: varchar
+    description: URL of the Stripe-hosted invoice page.
+  - name: invoice_pdf
+    type: varchar
+    description: URL of the invoice PDF.
+  - name: receipt_number
+    type: varchar
+    description: Receipt number shown on the invoice receipt.
+  - name: statement_descriptor
+    type: varchar
+    description: Text shown on the customer's card statement.
+  - name: account_country
+    type: varchar
+    description: Country of the Stripe account that issued the invoice.
+  - name: account_name
+    type: varchar
+    description: Business name of the Stripe account that issued the invoice.
+  - name: account_tax_ids
+    type: json
+    description: Tax identifiers of the issuing Stripe account.
+  - name: customer_address
+    type: json
+    description: Customer's billing address captured on the invoice.
+  - name: customer_email
+    type: varchar
+    description: Customer's email address captured on the invoice.
+  - name: customer_name
+    type: varchar
+    description: Customer's name captured on the invoice.
+  - name: customer_phone
+    type: varchar
+    description: Customer's phone number captured on the invoice.
+  - name: customer_shipping
+    type: json
+    description: Customer's shipping details captured on the invoice.
+  - name: customer_tax_exempt
+    type: varchar
+    description: Customer's tax exemption status captured on the invoice.
+  - name: customer_tax_ids
+    type: json
+    description: Customer's tax identifiers captured on the invoice.
+  - name: shipping_cost
+    type: json
+    description: Shipping cost applied to the invoice.
+  - name: shipping_details
+    type: json
+    description: Shipping details applied to the invoice.
+  - name: issuer
+    type: json
+    description: Connect account that issued the invoice.
+  - name: on_behalf_of
+    type: varchar
+    description: Connected account the invoice is settled on behalf of.
+  - name: application
+    type: varchar
+    description: Identifier of the Connect application that created the invoice.
+  - name: application_fee_amount
+    type: bigint
+    description: Application fee in minor currency units.
+  - name: transfer_data
+    type: json
+    description: Destination and amount for transfers to a connected account.
+  - name: last_finalization_error
+    type: json
+    description: Error recorded by the most recent failed finalization attempt.
+  - name: post_payment_credit_notes_amount
+    type: bigint
+    description: Credit notes issued after payment, in minor currency units.
+  - name: pre_payment_credit_notes_amount
+    type: bigint
+    description: Credit notes issued before payment, in minor currency units.
+  - name: test_clock
+    type: varchar
+    description: Identifier of the test clock the invoice belongs to.
+  - name: metadata
+    type: json
+    description: Key-value metadata set on the Stripe invoice.
+  - name: livemode
+    type: boolean
+    description: Whether the object exists in Stripe live mode.

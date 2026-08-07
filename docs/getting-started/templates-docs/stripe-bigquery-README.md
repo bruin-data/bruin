@@ -49,16 +49,50 @@ stripe-bigquery/
 
 The `stripe_raw` dataset contains the six Stripe resources that underpin the
 billing models. Ingestr loads them with the shared `stripe-default` connection,
-and BigQuery is the destination. The source assets use Stripe's `created` field
-for incremental discovery and merge the records returned by Stripe.
+and BigQuery is the destination.
+
+Each source asset uses ingestr's
+[incremental Stripe mode](https://getbruin.com/docs/ingestr/supported-sources/stripe.html#incremental-loading)
+(`<endpoint>:sync:incremental`) with a `merge` materialization keyed on the
+Stripe object `id`, so a run only fetches the records created inside its own
+time window and upserts them.
+
+Incremental mode filters on Stripe's `created` timestamp and does not revisit
+records created in earlier windows. That matters for the mutable resources — a
+subscription cancelled or upgraded months after it was created, an invoice
+finalized, paid, or voided after its creation date. To pick those edits up,
+periodically re-run over a wider window:
+
+```bash
+bruin run --start-date 2023-01-01 --end-date $(date -u +%F) my-stripe-pipeline
+```
+
+Choose that cadence to match how current your reporting needs to be, or switch
+the mutable assets to `source_table: subscription` for
+[standard async loading](https://getbruin.com/docs/ingestr/supported-sources/stripe.html#standard-async-loading-default),
+which reloads full history on every run. See
+[loading modes and trade-offs](https://getbruin.com/docs/ingestr/supported-sources/stripe.html#loading-modes-and-trade-offs)
+for the comparison.
+
+Each raw asset also declares its full column schema, which pins those columns
+into the destination table. That matters for fields Stripe leaves null on some
+accounts: `invoice.due_date` is only set for invoices collected with
+`send_invoice`, and a schema inferred purely from the data would drop the column
+and break the stage model.
 
 ### Conformed billing models
 
 The `stripe_stage` dataset exposes typed customer, product, price,
-subscription, subscription-item, invoice, and invoice-line-item models. It
-also records immutable daily snapshots of subscription items and customer MRR
-by native currency. Run the pipeline daily after a consistent UTC cutoff so
-the snapshots represent a reliable observation history.
+subscription, subscription-item, invoice, and invoice-line-item models. It also
+builds daily snapshots of subscription items and customer MRR by native
+currency, stamped with the pipeline end date.
+
+Every stage and report asset is materialized as a `CREATE OR REPLACE TABLE`, so
+each run rebuilds its table from the current raw data. That keeps the
+pipeline idempotent and easy to reason about, and it also means the snapshot
+tables hold only the most recent run's observation rather than an accumulated
+history. To retain a snapshot history, switch the two snapshot assets to an
+incremental strategy such as `merge` on their existing primary keys.
 
 ### Billing reports
 
@@ -69,11 +103,22 @@ The `stripe_reports` dataset provides four ready-to-query tables:
 - `monthly_subscription_kpis` — recurring-revenue, retention, and customer-count metrics by currency.
 - `monthly_invoice_billings` — non-draft, non-void invoice billings by finalization month, with a labeled creation-date fallback.
 
+### Column-level documentation
+
+Every asset in all three layers declares its full column schema: each column
+carries a type, a description, and primary-key marks on the grain, so the
+reporting grain and the metric definitions are readable from the asset files
+themselves. `metadata_push` in `pipeline.yml` publishes those descriptions to
+the BigQuery table and column metadata, and `bruin docs my-stripe-pipeline`
+generates a browsable documentation site from the same schemas.
+
 ## Example report rows
 
 The following illustrative rows use minor currency units: `9900` USD means
-$99.00. Query the four tables in `stripe_reports` directly, then adapt the
-columns to the definitions used by your finance and revenue teams.
+$99.00. They show the shape of each table across several months, which assumes
+retained snapshot history; see [Conformed billing models](#conformed-billing-models).
+Query the four tables in `stripe_reports` directly, then adapt the columns to
+the definitions used by your finance and revenue teams.
 
 ### `monthly_mrr_by_customer`
 
@@ -118,8 +163,10 @@ discounted amounts are excluded. Run-rate ARR is MRR multiplied by 12; neither
 measure is recognized revenue, bookings, cash, or a financial statement.
 
 The daily snapshots capture the Stripe state visible when the pipeline runs.
-The first run creates a baseline observation and does not reconstruct prior
-daily MRR history from current Stripe records.
+They do not reconstruct prior daily MRR history from current Stripe records,
+and because every asset is rebuilt with create+replace, each run keeps only the
+latest observation. Month-over-month movement and retention metrics therefore
+need snapshot history retained first.
 
 ## Configure connections
 
@@ -136,11 +183,34 @@ environments:
       google_cloud_platform:
         - name: gcp-default
           project_id: your-gcp-project-id
-          service_account_file: /path/to/service-account.json
+          location: your-gcp-region
+          use_application_default_credentials: true
       stripe:
         - name: stripe-default
           api_key: ${STRIPE_API_KEY}
 ```
+
+Replace both BigQuery placeholders before running the pipeline:
+
+- `project_id` — the Google Cloud project that owns the BigQuery datasets this
+  pipeline writes to, for example `my-company-analytics`.
+- `location` — the region or multi-region of those datasets, for example `US`,
+  `EU`, or `europe-west3`. It must match the location of the existing datasets;
+  BigQuery cannot query a dataset from a different location. See
+  [BigQuery locations](https://cloud.google.com/bigquery/docs/locations).
+
+The connection uses [Application Default Credentials](https://cloud.google.com/docs/authentication/application-default-credentials),
+so authenticate with `gcloud` once:
+
+```bash
+gcloud auth application-default login
+```
+
+To use a service account instead, replace
+`use_application_default_credentials: true` with
+`service_account_file: /path/to/service-account.json`. Either way, the
+credentials need permission to create datasets and tables and to run queries in
+the project.
 
 Set the Stripe secret key in your shell before running the pipeline:
 
@@ -150,7 +220,10 @@ export STRIPE_API_KEY='sk_test_your_secret_key'
 
 Use either an `sk_test_...` or `sk_live_...` secret key. A publishable
 `pk_...` key cannot read Stripe data. Keep test and live data in separate
-BigQuery projects or datasets and do not commit credentials.
+BigQuery projects or datasets and do not commit credentials. The ingestr docs
+cover where to find the key and how to
+[create a restricted key](https://getbruin.com/docs/ingestr/supported-sources/stripe.html#setting-up-a-stripe-integration)
+with read-only access to the resources this pipeline loads.
 
 ## Run the pipeline
 
@@ -167,21 +240,19 @@ then run the fast validation checks:
 bruin validate --fast my-stripe-pipeline
 ```
 
-On a new BigQuery destination, load every table before running query validation:
+On a new BigQuery destination, load every table before running query validation.
+The raw assets load only their run window, so pass an explicit range to pull
+your Stripe history in the first load:
 
 ```bash
-bruin run --full-refresh --no-validation my-stripe-pipeline
+bruin run --start-date 2023-01-01 --end-date $(date -u +%F) \
+  --no-validation my-stripe-pipeline
 ```
 
-Run this pipeline-wide full refresh only for the first load, or when you
-intentionally reset the reporting history. It recreates the daily snapshot
-tables, so re-running it removes the observations used by the MRR movement and
-retention reports.
-
-After the initial load, run `bruin validate my-stripe-pipeline` and schedule
-the pipeline daily. The raw tables hold the Stripe objects returned by
-incremental discovery. When you need to reload older mutable Stripe records,
-use a targeted reload and keep the snapshot tables intact.
+After the initial load, run `bruin validate my-stripe-pipeline` and schedule the
+pipeline daily. The stage and report assets are rebuilt with create+replace, so
+any run is safe to repeat; the raw assets upsert on `id`, so re-running a window
+does not duplicate rows.
 
 ## Customize it
 
@@ -222,5 +293,6 @@ dac --config .bruin.yml serve --dir dashboards --port 8321
 This screenshot uses synthetic data solely to demonstrate the dashboard's
 layout and charts.
 
-The first snapshot month is a baseline, so MRR movement and retention metrics
-may be unavailable until a following contiguous monthly snapshot is present.
+MRR movement and retention metrics need two contiguous monthly snapshots, so
+they stay empty while the snapshot tables are rebuilt with create+replace on
+every run.

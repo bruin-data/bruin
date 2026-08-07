@@ -8,7 +8,6 @@ description: >
 
 materialization:
   type: table
-  strategy: truncate+insert
 
 depends:
   - stripe_raw.customer
@@ -27,6 +26,41 @@ columns:
     checks:
       - name: not_null
       - name: unique
+  - name: customer_created_at
+    type: TIMESTAMP
+    description: When the customer was created in Stripe.
+  - name: customer_name
+    type: STRING
+    description: Customer's full name or business name.
+  - name: customer_email
+    type: STRING
+    description: >
+      Customer's email address. It is kept here for operational lookups and is
+      not carried into the reporting layer.
+  - name: is_live_mode
+    type: BOOL
+    description: Whether the customer exists in Stripe live mode.
+  - name: customer_metadata
+    type: JSON
+    description: Full key-value metadata set on the Stripe customer.
+  - name: crm_account_id
+    type: STRING
+    description: >
+      CRM account identifier read from the `crm_account_id` metadata key. It is
+      null unless your Stripe customers carry that key.
+  - name: customer_segment
+    type: STRING
+    description: Customer segment read from the `segment` metadata key.
+  - name: customer_region
+    type: STRING
+    description: Customer region read from the `region` metadata key.
+  - name: sales_owner
+    type: STRING
+    description: Sales owner read from the `sales_owner` metadata key.
+  - name: acquisition_channel
+    type: STRING
+    description: >
+      Acquisition channel read from the `acquisition_channel` metadata key.
 @bruin */
 
 SELECT

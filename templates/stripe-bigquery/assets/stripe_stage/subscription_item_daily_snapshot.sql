@@ -2,13 +2,12 @@
 name: stripe_stage.subscription_item_daily_snapshot
 type: bq.sql
 description: >
-  Insert-only daily snapshot of current subscription-item MRR state. It starts
-  on the first pipeline run and cannot reconstruct historic state from mutable
+  Daily snapshot of current subscription-item MRR state, rebuilt on every run
+  for the pipeline end date. It cannot reconstruct historic state from mutable
   Stripe subscription records.
 
 materialization:
   type: table
-  strategy: merge
 
 depends:
   - stripe_stage.subscription_items
