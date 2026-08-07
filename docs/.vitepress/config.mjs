@@ -296,6 +296,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                                     {text: "Bruin", link: "/ingestion/bruin"},
                                     {text: "Chargebee", link: "/ingestion/chargebee"},
                                     {text: "Chess", link: "/ingestion/chess"},
+                                    {text: "CleverTap", link: "/ingestion/clevertap"},
                                     {text: "ClickUp", link: "/ingestion/clickup"},
                                     {text: "Couchbase", link: "/ingestion/couchbase"},
                                     {text: "Cursor", link: "/ingestion/cursor"},

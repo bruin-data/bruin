@@ -202,6 +202,19 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "annotations", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
 	},
 
+	// CleverTap - Customer engagement and retention analytics
+	"clevertap": {
+		{Name: "events", PrimaryKey: "", IncKey: "ts", IncStrategy: "delete+insert"},
+		{Name: "profiles", PrimaryKey: "object_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "campaigns", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "campaign_reports", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "content_blocks", PrimaryKey: "id", IncKey: "updatedAt", IncStrategy: "merge"},
+		{Name: "message_reports", PrimaryKey: "message_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "event_schema", PrimaryKey: "name", IncKey: "", IncStrategy: "replace"},
+		{Name: "user_properties", PrimaryKey: "name", IncKey: "", IncStrategy: "replace"},
+		{Name: "category_groups", PrimaryKey: "key", IncKey: "", IncStrategy: "replace"},
+	},
+
 	// ClickUp - Productivity platform
 	"clickup": {
 		{Name: "user", PrimaryKey: "id", IncKey: "", IncStrategy: "merge"},

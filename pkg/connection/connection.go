@@ -33,6 +33,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/cassandra"
 	"github.com/bruin-data/bruin/pkg/chargebee"
 	"github.com/bruin-data/bruin/pkg/chess"
+	"github.com/bruin-data/bruin/pkg/clevertap"
 	"github.com/bruin-data/bruin/pkg/clickhouse"
 	"github.com/bruin-data/bruin/pkg/clickup"
 	"github.com/bruin-data/bruin/pkg/config"
@@ -292,6 +293,7 @@ type Manager struct {
 	Dune                 map[string]*dune.Client
 	Vertica              map[string]*vertica.DB
 	CustomerIo           map[string]*customerio.Client
+	CleverTap            map[string]*clevertap.Client
 	Sendgrid             map[string]*sendgrid.Client
 	Twilio               map[string]*twilio.Client
 	Braze                map[string]*braze.Client
@@ -3610,6 +3612,28 @@ func (m *Manager) AddCustomerIoConnectionFromConfig(connection *config.CustomerI
 	return nil
 }
 
+func (m *Manager) AddCleverTapConnectionFromConfig(connection *config.CleverTapConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.CleverTap == nil {
+		m.CleverTap = make(map[string]*clevertap.Client)
+	}
+
+	client, err := clevertap.NewClient(clevertap.Config{
+		AccountID: connection.AccountID,
+		Passcode:  connection.Passcode,
+		Region:    connection.Region,
+		Timezone:  connection.Timezone,
+	})
+	if err != nil {
+		return err
+	}
+	m.CleverTap[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddSendgridConnectionFromConfig(connection *config.SendgridConnection) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -4297,6 +4321,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	}, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Vertica, connectionManager.AddVerticaConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.CustomerIo, connectionManager.AddCustomerIoConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.CleverTap, connectionManager.AddCleverTapConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Sendgrid, connectionManager.AddSendgridConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Twilio, connectionManager.AddTwilioConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Braze, connectionManager.AddBrazeConnectionFromConfig, &wg, &errList, &mu)

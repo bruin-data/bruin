@@ -579,6 +579,12 @@ environments:
         - name: "customerio-1"
           api_key: "test-api-key"
           region: "us"
+      clevertap:
+        - name: "clevertap-1"
+          account_id: "test-account-id"
+          passcode: "test-passcode"
+          region: "eu1"
+          timezone: "Asia/Kolkata"
       sendgrid:
         - name: "sendgrid-1"
           api_key: "test-api-key"
