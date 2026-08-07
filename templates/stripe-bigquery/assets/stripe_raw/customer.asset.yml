@@ -1,7 +1,102 @@
 name: stripe_raw.customer
 type: ingestr
 
-description: Raw-layer ingestion of Stripe customer data into BigQuery.
+description: >
+  Raw-layer Stripe customers loaded into BigQuery with ingestr's incremental
+  Stripe mode. Each run fetches the customers created inside its own time
+  window and merges them into the destination table on `id`. Customer edits
+  made after creation are only picked up by a run whose window covers them, or
+  by a wider backfill.
+
+materialization:
+  type: table
+  strategy: merge
+  incremental_key: created
 
 parameters:
-  source_table: customer
+  source_table: customer:sync:incremental
+  enforce_schema: true
+
+tags:
+  - stripe_raw
+  - stripe
+  - billing
+
+columns:
+  - name: id
+    type: varchar
+    description: Stripe customer identifier, for example `cus_NffrFeUfNV2Hib`.
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: object
+    type: varchar
+    description: Stripe object type, always `customer`.
+  - name: created
+    type: bigint
+    description: Unix timestamp in seconds of when the customer was created.
+    checks:
+      - name: not_null
+  - name: name
+    type: varchar
+    description: Customer's full name or business name.
+  - name: email
+    type: varchar
+    description: Customer's email address used for invoices and receipts.
+  - name: phone
+    type: varchar
+    description: Customer's phone number.
+  - name: description
+    type: varchar
+    description: Arbitrary description attached to the customer.
+  - name: address
+    type: json
+    description: Customer's billing address.
+  - name: shipping
+    type: json
+    description: Customer's shipping name, address, and phone.
+  - name: currency
+    type: varchar
+    description: Three-letter ISO currency code the customer is billed in.
+  - name: balance
+    type: bigint
+    description: >
+      Pending invoice credit or debit in minor currency units. A negative
+      balance is credited to the next invoice.
+  - name: delinquent
+    type: boolean
+    description: Whether the latest invoice charge for this customer failed.
+  - name: discount
+    type: json
+    description: Discount currently applied to the customer, if any.
+  - name: invoice_prefix
+    type: varchar
+    description: Prefix Stripe uses to generate the customer's invoice numbers.
+  - name: invoice_settings
+    type: json
+    description: Default invoice settings, including the default payment method.
+  - name: next_invoice_sequence
+    type: integer
+    description: Sequence number used on the customer's next invoice.
+  - name: preferred_locales
+    type: json
+    description: Languages the customer prefers, most preferred first.
+  - name: tax_exempt
+    type: varchar
+    description: Customer's tax exemption status, one of `none`, `exempt`, or `reverse`.
+  - name: default_source
+    type: varchar
+    description: Identifier of the customer's default payment source.
+  - name: test_clock
+    type: varchar
+    description: Identifier of the test clock the customer belongs to.
+  - name: metadata
+    type: json
+    description: >
+      Key-value metadata set on the Stripe customer. The stage layer reads
+      `crm_account_id`, `segment`, `region`, `sales_owner`, and
+      `acquisition_channel` from it.
+  - name: livemode
+    type: boolean
+    description: Whether the object exists in Stripe live mode.

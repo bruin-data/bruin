@@ -9,7 +9,6 @@ description: >
 
 materialization:
   type: table
-  strategy: truncate+insert
 
 depends:
   - stripe_stage.customer_currency_daily_mrr_snapshot
@@ -20,6 +19,71 @@ tags:
   - stripe
   - billing
   - mrr
+
+columns:
+  - name: metric_month
+    type: DATE
+    description: First day of the reporting month.
+    primary_key: true
+    checks:
+      - name: not_null
+  - name: as_of_snapshot_date
+    type: DATE
+    description: >
+      Latest daily snapshot date available in the month. Every customer-currency
+      row in the month is observed as of this one global date.
+    checks:
+      - name: not_null
+  - name: has_contiguous_global_prior_snapshot
+    type: BOOL
+    description: >
+      Whether a snapshot exists for the immediately preceding month. Movement
+      and retention metrics are only classified when it is true.
+  - name: stripe_customer_id
+    type: STRING
+    description: Stripe billing customer.
+    primary_key: true
+    checks:
+      - name: not_null
+  - name: currency
+    type: STRING
+    description: >
+      Native Stripe currency. Amounts are never converted, so do not sum across
+      currencies.
+    primary_key: true
+    checks:
+      - name: not_null
+  - name: crm_account_id
+    type: STRING
+    description: CRM account identifier carried from the customer metadata.
+  - name: customer_segment
+    type: STRING
+    description: Customer segment carried from the customer metadata.
+  - name: customer_region
+    type: STRING
+    description: Customer region carried from the customer metadata.
+  - name: sales_owner
+    type: STRING
+    description: Sales owner carried from the customer metadata.
+  - name: acquisition_channel
+    type: STRING
+    description: Acquisition channel carried from the customer metadata.
+  - name: active_subscription_count
+    type: INT64
+    description: Subscriptions with at least one MRR-eligible item at month end.
+  - name: active_subscription_item_count
+    type: INT64
+    description: MRR-eligible subscription items at month end.
+  - name: ending_mrr_minor
+    type: NUMERIC
+    description: >
+      Month-end gross list-price MRR in native-currency minor units. It is not
+      recognized revenue, cash, or bookings.
+  - name: run_rate_arr_minor
+    type: NUMERIC
+    description: >
+      Annualized run rate, `ending_mrr_minor` multiplied by 12. It is a run
+      rate, not a contracted or recognized annual amount.
 @bruin */
 
 WITH available_reporting_months AS (

@@ -1,7 +1,101 @@
 name: stripe_raw.price
 type: ingestr
 
-description: Raw-layer ingestion of Stripe price data into BigQuery.
+description: >
+  Raw-layer Stripe prices loaded into BigQuery with ingestr's incremental
+  Stripe mode. Each run fetches the prices created inside its own time window
+  and merges them into the destination table on `id`. Price edits made after
+  creation are only picked up by a run whose window covers them, or by a wider
+  backfill.
+
+materialization:
+  type: table
+  strategy: merge
+  incremental_key: created
 
 parameters:
-  source_table: price
+  source_table: price:sync:incremental
+  enforce_schema: true
+
+tags:
+  - stripe_raw
+  - stripe
+  - billing
+
+columns:
+  - name: id
+    type: varchar
+    description: Stripe price identifier, for example `price_1MoBy5LkdIwHu7ix`.
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: object
+    type: varchar
+    description: Stripe object type, always `price`.
+  - name: created
+    type: bigint
+    description: Unix timestamp in seconds of when the price was created.
+    checks:
+      - name: not_null
+  - name: product
+    type: varchar
+    description: Identifier of the product this price belongs to.
+  - name: active
+    type: boolean
+    description: Whether the price can be used for new purchases.
+  - name: type
+    type: varchar
+    description: >
+      Price type, either `one_time` or `recurring`. Only `recurring` prices
+      contribute to MRR in the stage layer.
+  - name: currency
+    type: varchar
+    description: Three-letter ISO currency code the price is charged in.
+  - name: unit_amount
+    type: bigint
+    description: Amount charged per unit in minor currency units, for example cents.
+  - name: unit_amount_decimal
+    type: varchar
+    description: >
+      Amount charged per unit in minor currency units with up to 12 decimal
+      places, returned by Stripe as a decimal string.
+  - name: billing_scheme
+    type: varchar
+    description: >
+      How the unit amount is computed, either `per_unit` or `tiered`. Tiered
+      prices carry no `unit_amount` and are excluded from MRR.
+  - name: recurring
+    type: json
+    description: >
+      Recurring configuration of the price. The stage layer reads `interval`,
+      `interval_count`, and `usage_type` from it.
+  - name: tiers_mode
+    type: varchar
+    description: How tiers are applied for tiered prices, `graduated` or `volume`.
+  - name: transform_quantity
+    type: json
+    description: Quantity transformation applied before the unit amount is charged.
+  - name: custom_unit_amount
+    type: json
+    description: Configuration allowing the customer to choose the amount.
+  - name: currency_options
+    type: json
+    description: Per-currency price overrides.
+  - name: lookup_key
+    type: varchar
+    description: Key used to look the price up instead of using its identifier.
+  - name: nickname
+    type: varchar
+    description: Internal price name, not shown to customers.
+  - name: tax_behavior
+    type: varchar
+    description: >
+      Whether the price is `inclusive` of tax, `exclusive` of tax, or
+      `unspecified`.
+  - name: metadata
+    type: json
+    description: Key-value metadata set on the Stripe price.
+  - name: livemode
+    type: boolean
+    description: Whether the object exists in Stripe live mode.

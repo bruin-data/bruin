@@ -5,7 +5,6 @@ description: Conformed Stripe product catalog for plan and packaging analysis.
 
 materialization:
   type: table
-  strategy: truncate+insert
 
 depends:
   - stripe_raw.product
@@ -24,6 +23,21 @@ columns:
     checks:
       - name: not_null
       - name: unique
+  - name: product_created_at
+    type: TIMESTAMP
+    description: When the product was created in Stripe.
+  - name: product_name
+    type: STRING
+    description: Product name shown to customers on invoices and receipts.
+  - name: is_active
+    type: BOOL
+    description: Whether the product is currently available for purchase.
+  - name: is_live_mode
+    type: BOOL
+    description: Whether the product exists in Stripe live mode.
+  - name: product_metadata
+    type: JSON
+    description: Full key-value metadata set on the Stripe product.
 @bruin */
 
 SELECT

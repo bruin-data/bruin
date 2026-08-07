@@ -2,14 +2,186 @@ name: stripe_raw.subscription
 type: ingestr
 
 description: >
-  Raw-layer ingestion of Stripe subscription data into BigQuery. Explicitly
-  types ended_at because Stripe can omit that nullable field when no
-  subscription has ended.
+  Raw-layer Stripe subscriptions loaded into BigQuery with ingestr's
+  incremental Stripe mode. Each run fetches the subscriptions created inside
+  its own time window and merges them into the destination table on `id`.
+  Subscriptions are mutable: a status change, cancellation, or plan change on
+  a subscription created in an earlier window is not picked up until a
+  backfill covers it. Column types are enforced because Stripe omits nullable
+  fields such as `ended_at` when no subscription has ended yet.
+
+materialization:
+  type: table
+  strategy: merge
+  incremental_key: created
 
 parameters:
-  source_table: subscription
+  source_table: subscription:sync:incremental
   enforce_schema: true
 
+tags:
+  - stripe_raw
+  - stripe
+  - billing
+
 columns:
+  - name: id
+    type: varchar
+    description: Stripe subscription identifier, for example `sub_1MowQVLkdIwHu7ix`.
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: object
+    type: varchar
+    description: Stripe object type, always `subscription`.
+  - name: created
+    type: bigint
+    description: Unix timestamp in seconds of when the subscription was created.
+    checks:
+      - name: not_null
+  - name: customer
+    type: varchar
+    description: Identifier of the customer who owns the subscription.
+  - name: status
+    type: varchar
+    description: >
+      Subscription status, one of `incomplete`, `incomplete_expired`,
+      `trialing`, `active`, `past_due`, `canceled`, `unpaid`, or `paused`. Only
+      `active` and `past_due` subscriptions contribute to MRR.
+  - name: currency
+    type: varchar
+    description: Three-letter ISO currency code the subscription is billed in.
+  - name: items
+    type: json
+    description: >
+      Subscription items on the subscription. The stage layer reads item detail
+      from `stripe_raw.subscription_item` instead of this field.
+  - name: start_date
+    type: bigint
+    description: Unix timestamp in seconds of when the subscription first started.
+  - name: current_period_start
+    type: bigint
+    description: >
+      Unix timestamp in seconds of the start of the current billing period.
+      Recent Stripe API versions report periods per subscription item, so the
+      stage layer falls back to the item-level value.
+  - name: current_period_end
+    type: bigint
+    description: >
+      Unix timestamp in seconds of the end of the current billing period.
+      Recent Stripe API versions report periods per subscription item, so the
+      stage layer falls back to the item-level value.
+  - name: billing_cycle_anchor
+    type: bigint
+    description: Unix timestamp in seconds the recurring billing cycle is anchored to.
+  - name: billing_cycle_anchor_config
+    type: json
+    description: Explicit billing cycle anchor configuration, when one is set.
+  - name: cancel_at
+    type: bigint
+    description: Unix timestamp in seconds of the scheduled cancellation.
+  - name: cancel_at_period_end
+    type: boolean
+    description: Whether the subscription cancels at the end of the current period.
+  - name: canceled_at
+    type: bigint
+    description: Unix timestamp in seconds of when cancellation was requested.
+  - name: cancellation_details
+    type: json
+    description: Reason, comment, and feedback recorded for the cancellation.
   - name: ended_at
+    type: bigint
+    description: >
+      Unix timestamp in seconds of when the subscription ended. Stripe omits
+      this field entirely when no subscription has ended.
+  - name: trial_start
+    type: bigint
+    description: Unix timestamp in seconds of when the trial period started.
+  - name: trial_end
+    type: bigint
+    description: Unix timestamp in seconds of when the trial period ends.
+  - name: trial_settings
+    type: json
+    description: Behavior applied when the trial ends.
+  - name: collection_method
+    type: varchar
+    description: >
+      How the subscription is collected, either `charge_automatically` or
+      `send_invoice`.
+  - name: days_until_due
     type: integer
+    description: Days after invoice finalization until payment is due.
+  - name: default_payment_method
+    type: varchar
+    description: Identifier of the payment method used for the subscription.
+  - name: default_source
+    type: varchar
+    description: Identifier of the payment source used for the subscription.
+  - name: default_tax_rates
+    type: json
+    description: Tax rates applied to every invoice line item.
+  - name: description
+    type: varchar
+    description: Subscription description shown on invoices.
+  - name: discount
+    type: json
+    description: Discount currently applied to the subscription, if any.
+  - name: discounts
+    type: json
+    description: Discounts applied to the subscription.
+  - name: automatic_tax
+    type: json
+    description: Automatic tax configuration for the subscription.
+  - name: application
+    type: varchar
+    description: Identifier of the Connect application that created the subscription.
+  - name: application_fee_percent
+    type: double
+    description: Percentage of each invoice transferred to the application owner.
+  - name: billing_thresholds
+    type: json
+    description: Usage thresholds that trigger an early invoice.
+  - name: invoice_settings
+    type: json
+    description: Invoice settings applied to subscription invoices.
+  - name: latest_invoice
+    type: varchar
+    description: Identifier of the most recent invoice for the subscription.
+  - name: next_pending_invoice_item_invoice
+    type: bigint
+    description: >
+      Unix timestamp in seconds of when pending invoice items will be invoiced.
+  - name: on_behalf_of
+    type: varchar
+    description: Connected account the subscription is settled on behalf of.
+  - name: pause_collection
+    type: json
+    description: Payment collection pause configuration.
+  - name: payment_settings
+    type: json
+    description: Payment settings applied to subscription invoices.
+  - name: pending_invoice_item_interval
+    type: json
+    description: Interval on which pending invoice items are invoiced.
+  - name: pending_setup_intent
+    type: varchar
+    description: Identifier of a setup intent awaiting customer action.
+  - name: pending_update
+    type: json
+    description: Subscription changes that are not applied yet.
+  - name: schedule
+    type: varchar
+    description: Identifier of the subscription schedule that governs the subscription.
+  - name: transfer_data
+    type: json
+    description: Destination and amount for transfers to a connected account.
+  - name: test_clock
+    type: varchar
+    description: Identifier of the test clock the subscription belongs to.
+  - name: metadata
+    type: json
+    description: Key-value metadata set on the Stripe subscription.
+  - name: livemode
+    type: boolean
+    description: Whether the object exists in Stripe live mode.

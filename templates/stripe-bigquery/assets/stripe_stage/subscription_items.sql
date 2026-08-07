@@ -10,7 +10,6 @@ description: >
 
 materialization:
   type: table
-  strategy: truncate+insert
 
 depends:
   - stripe_raw.subscription_item
@@ -36,6 +35,99 @@ columns:
     description: Stripe subscription that owns the item.
     checks:
       - name: not_null
+  - name: stripe_customer_id
+    type: STRING
+    description: Stripe billing customer that owns the subscription.
+  - name: subscription_status
+    type: STRING
+    description: Status of the owning subscription at the time of the run.
+  - name: cancel_at_period_end
+    type: BOOL
+    description: Whether the subscription cancels at the end of the current period.
+  - name: cancel_at
+    type: TIMESTAMP
+    description: Scheduled cancellation time of the owning subscription.
+  - name: trial_started_at
+    type: TIMESTAMP
+    description: Trial start time of the owning subscription.
+  - name: trial_ends_at
+    type: TIMESTAMP
+    description: Trial end time of the owning subscription.
+  - name: subscription_item_created_at
+    type: TIMESTAMP
+    description: When the subscription item was created in Stripe.
+  - name: current_period_started_at
+    type: TIMESTAMP
+    description: >
+      Start of the item's current billing period, falling back to the
+      subscription-level period when Stripe reports it there.
+  - name: current_period_ends_at
+    type: TIMESTAMP
+    description: >
+      End of the item's current billing period, falling back to the
+      subscription-level period when Stripe reports it there.
+  - name: stripe_price_id
+    type: STRING
+    description: Stripe price attached to the item.
+  - name: stripe_product_id
+    type: STRING
+    description: Stripe product resolved through the price.
+  - name: product_name
+    type: STRING
+    description: Product name resolved through the price.
+  - name: currency
+    type: STRING
+    description: Native Stripe currency of the price.
+  - name: recurring_interval
+    type: STRING
+    description: Billing interval of the price, for example `month` or `year`.
+  - name: recurring_interval_count
+    type: INT64
+    description: Number of intervals in one billing period of the price.
+  - name: recurring_usage_type
+    type: STRING
+    description: Usage type of the price, either `licensed` or `metered`.
+  - name: unit_amount_minor
+    type: NUMERIC
+    description: Price unit amount in native-currency minor units.
+  - name: quantity
+    type: INT64
+    description: Item quantity, defaulted to 1 when Stripe omits it.
+  - name: is_recurring
+    type: BOOL
+    description: Whether the attached price is recurring.
+  - name: is_mrr_eligible
+    type: BOOL
+    description: >
+      Whether the item contributes to gross list-price MRR. It requires an
+      active or past-due subscription and a licensed monthly or annual price
+      with a positive unit amount.
+  - name: mrr_exclusion_reason
+    type: STRING
+    description: >
+      Why the item is excluded from MRR, combining subscription status and price
+      shape. It is null for MRR-eligible items.
+  - name: gross_mrr_minor
+    type: NUMERIC
+    description: >
+      Gross list-price MRR in native-currency minor units, normalized to a
+      monthly amount. It is zero for items that are not MRR-eligible.
+  - name: price_based_mrr_exclusion_reason
+    type: STRING
+    description: >
+      Price-shape exclusion reason evaluated independently of subscription
+      status, for operational risk and trial-conversion reporting.
+  - name: price_based_recurring_mrr_minor
+    type: NUMERIC
+    description: >
+      Monthly-normalized price amount in minor units regardless of subscription
+      status. Use it for trial and at-risk pipeline reporting, not for MRR.
+  - name: is_live_mode
+    type: BOOL
+    description: Whether the owning subscription exists in Stripe live mode.
+  - name: subscription_item_metadata
+    type: JSON
+    description: Full key-value metadata set on the Stripe subscription item.
 @bruin */
 
 WITH raw_subscription_items AS (
