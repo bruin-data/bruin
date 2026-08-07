@@ -29,8 +29,10 @@ You need both exports already running and landing in BigQuery:
   `searchdata_url_impression`, and `ExportLog`.
 
 Neither export backfills. Both begin collecting from the day you enable them, so
-set `start_date` in `pipeline.yml` to the earliest date your exports actually
-cover.
+the earliest date you can report on is the day you turned each one on. The run
+window comes from `--start-date` and `--end-date` on the run command, which default
+to yesterday; `pipeline.yml` carries no `start_date` because it only takes effect
+with `catchup` enabled, and this pipeline does not use it.
 
 The service account behind the `gcp-default` connection needs read access to both
 export datasets and write access to the datasets this pipeline creates.
@@ -437,7 +439,7 @@ the bytes scanned to rise with it. The trend reports need at least
 bruin init google-web-analytics my-search-pipeline
 ```
 
-Set the dataset names, brand pattern, and `start_date`, then validate:
+Set the dataset names and brand pattern, then validate:
 
 ```bash
 bruin validate --fast my-search-pipeline
