@@ -11,7 +11,9 @@ description: >
 
 materialization:
   type: table
-  strategy: truncate+insert
+
+depends:
+  - sources.gsc_export_log_raw
 
 tags:
   - web_stage

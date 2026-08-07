@@ -22,6 +22,9 @@ materialization:
     - query_intent_type
     - query_brand_type
 
+depends:
+  - sources.gsc_searchdata_url_impression
+
 tags:
   - web_stage
   - search_console

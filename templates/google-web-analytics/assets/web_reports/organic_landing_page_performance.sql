@@ -45,7 +45,6 @@ description: >
 
 materialization:
   type: table
-  strategy: truncate+insert
 
 depends:
   - web_stage.gsc_url_query_daily

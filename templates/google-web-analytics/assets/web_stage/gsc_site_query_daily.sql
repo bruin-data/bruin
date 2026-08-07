@@ -18,6 +18,9 @@ materialization:
     - query_brand_type
     - device
 
+depends:
+  - sources.gsc_searchdata_site_impression
+
 tags:
   - web_stage
   - search_console

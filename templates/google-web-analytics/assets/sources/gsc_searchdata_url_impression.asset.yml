@@ -1,0 +1,60 @@
+name: sources.gsc_searchdata_url_impression
+type: bq.source
+description: >
+  Search Console bulk export at URL and query grain, read as
+  `<search_console_dataset>.searchdata_url_impression`. Created and owned by Google,
+  never written by this pipeline. This is the only export table carrying the page
+  and the query together, which makes it the source of every page-level and
+  query-level report.
+
+  Impressions here are counted per URL, so summing them across pages exceeds the
+  property totals in searchdata_site_impression. That is expected, not a defect.
+
+tags:
+  - source
+  - search_console
+
+columns:
+  - name: data_date
+    type: DATE
+    description: Reporting date, in Pacific Time.
+  - name: site_url
+    type: STRING
+    description: "Property, a URL prefix or an sc-domain: value."
+  - name: url
+    type: STRING
+    description: Canonical absolute URL shown in results.
+  - name: query
+    type: STRING
+    description: Search query, withheld on rare queries.
+  - name: is_anonymized_query
+    type: BOOL
+    description: Whether Google withheld the query for privacy.
+  - name: is_anonymized_discover
+    type: BOOL
+    description: Whether Discover detail was withheld.
+  - name: country
+    type: STRING
+    description: Three-letter country code of the searcher.
+  - name: search_type
+    type: STRING
+    description: Surface, such as WEB, IMAGE, VIDEO, NEWS, or DISCOVER.
+  - name: device
+    type: STRING
+    description: DESKTOP, MOBILE, or TABLET.
+  - name: impressions
+    type: INT64
+    description: URL-level impressions.
+  - name: clicks
+    type: INT64
+    description: Clicks through to the URL.
+  - name: sum_position
+    type: NUMERIC
+    description: >
+      Summed zero-based position. Average position is this divided by impressions,
+      plus one. Note the site-level table uses sum_top_position instead.
+
+# Names in this folder are stable logical identifiers rather than the real table
+# paths, because Bruin validates asset names before Jinja renders and a name may
+# not contain a variable or a wildcard. The real table each one stands for is in
+# its description above. These assets are no-op: bq.source never executes.

@@ -20,6 +20,9 @@ materialization:
     - page_path
     - session_default_channel_group
 
+depends:
+  - sources.ga4_events_intraday
+
 tags:
   - web_stage
   - ga4

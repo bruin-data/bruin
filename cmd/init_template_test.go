@@ -213,6 +213,10 @@ func TestGoogleWebAnalyticsTemplateHasFocusedAssetSet(t *testing.T) {
 	t.Parallel()
 
 	expectedAssets := []string{
+		"sources/ga4_events_intraday.asset.yml",
+		"sources/gsc_searchdata_url_impression.asset.yml",
+		"sources/gsc_searchdata_site_impression.asset.yml",
+		"sources/gsc_exportlog.asset.yml",
 		"web_stage/gsc_site_query_daily.sql",
 		"web_stage/gsc_url_query_daily.sql",
 		"web_stage/gsc_position_click_curve.sql",
@@ -243,7 +247,7 @@ func TestGoogleWebAnalyticsTemplateHasFocusedAssetSet(t *testing.T) {
 		return nil
 	})
 	require.NoError(t, err)
-	require.Len(t, actualAssets, 15)
+	require.Len(t, actualAssets, 19)
 	require.ElementsMatch(t, expectedAssets, actualAssets)
 
 	pipeline, err := templates.Templates.ReadFile("google-web-analytics/pipeline.yml")
@@ -433,6 +437,48 @@ func TestGoogleWebAnalyticsTemplateSupportsB2BSaaS(t *testing.T) {
 	queryValue := readTemplate("google-web-analytics/assets/web_reports/organic_query_value.sql")
 	require.Contains(t, queryValue, "modelled_outcome_value_per_click_usd")
 	require.Contains(t, queryValue, "modelled_demo_events")
+}
+
+func TestGoogleWebAnalyticsTemplateDeclaresSourcesForLineage(t *testing.T) {
+	t.Parallel()
+
+	readTemplate := func(path string) string {
+		t.Helper()
+		content, err := templates.Templates.ReadFile(path)
+		require.NoError(t, err)
+		return string(content)
+	}
+
+	// The Google exports are read but never written, so they are declared as no-op
+	// bq.source assets purely to give the staging models a visible upstream.
+	// Asset names are validated before Jinja renders, so these cannot carry the
+	// dataset variable or the wildcard -- hence stable logical names.
+	sources := map[string]string{
+		"ga4_events_intraday":            "sources.ga4_events_intraday",
+		"gsc_searchdata_url_impression":  "sources.gsc_searchdata_url_impression",
+		"gsc_searchdata_site_impression": "sources.gsc_searchdata_site_impression",
+		"gsc_exportlog":                  "sources.gsc_export_log_raw",
+	}
+	for file, name := range sources {
+		content := readTemplate("google-web-analytics/assets/sources/" + file + ".asset.yml")
+		require.Contains(t, content, "name: "+name, file)
+		require.Contains(t, content, "type: bq.source", file)
+		require.NotContains(t, content, "{{ var.", file)
+		require.NotContains(t, content, "*\n", file)
+	}
+
+	// Every staging model that reads an export must point at its source asset,
+	// otherwise the lineage graph starts mid-pipeline.
+	for asset, dep := range map[string]string{
+		"ga4_sessions":         "sources.ga4_events_intraday",
+		"ga4_page_daily":       "sources.ga4_events_intraday",
+		"gsc_url_query_daily":  "sources.gsc_searchdata_url_impression",
+		"gsc_site_query_daily": "sources.gsc_searchdata_site_impression",
+		"gsc_export_log":       "sources.gsc_export_log_raw",
+	} {
+		content := readTemplate("google-web-analytics/assets/web_stage/" + asset + ".sql")
+		require.Contains(t, content, "  - "+dep, asset)
+	}
 }
 
 func TestInitMigrationFivetranCopiesMigrationWorkspace(t *testing.T) {

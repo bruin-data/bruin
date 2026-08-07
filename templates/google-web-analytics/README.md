@@ -9,7 +9,7 @@ those exports land, conforms them in `web_stage`, and publishes nine reports in
 Every report answers a question GA4 and Search Console cannot answer themselves —
 not because the data is missing, but because it is split across two products that
 never join, capped at a thousand exported rows, or aggregated behind an "(other)"
-bucket. The template contains 15 assets and is meant to be edited.
+bucket. The template contains 19 assets and is meant to be edited.
 
 It is set up for a **B2B SaaS** motion out of the box — value carried by key events
 rather than ecommerce transactions, pages split by the job they do, and queries
@@ -45,6 +45,11 @@ google-web-analytics/
 │   ├── search.sql
 │   └── url.sql
 └── assets/
+    ├── sources/
+    │   ├── ga4_events_intraday.asset.yml
+    │   ├── gsc_searchdata_url_impression.asset.yml
+    │   ├── gsc_searchdata_site_impression.asset.yml
+    │   └── gsc_exportlog.asset.yml
     ├── web_stage/
     │   ├── gsc_site_query_daily.sql
     │   ├── gsc_url_query_daily.sql
@@ -127,6 +132,18 @@ are safe to use — `(levi's|levis)` and `(o'reilly|oreilly)` both work, because
 before it reaches SQL.
 
 ## What it creates
+
+### `sources` — the Google exports
+
+Four `bq.source` assets stand in for the tables Google owns. They never execute;
+they exist so the exports appear as the upstream of the staging models rather than
+the graph starting mid-pipeline, and so the columns the pipeline relies on are
+documented in one place.
+
+Their names are stable logical identifiers — `sources.ga4_events_intraday` and so
+on — because Bruin validates asset names before Jinja renders, so a name cannot
+contain the dataset variable or the `*` wildcard. The real table each one stands
+for is named in its description.
 
 ### `web_stage` — conformed models
 

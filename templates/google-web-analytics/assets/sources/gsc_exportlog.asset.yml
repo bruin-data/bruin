@@ -1,0 +1,33 @@
+name: sources.gsc_export_log_raw
+type: bq.source
+description: >
+  Publication log of the Search Console bulk export, read as
+  `<search_console_dataset>.ExportLog`. Created and owned by Google,
+  never written by this pipeline. Search Console revises history in place, so this
+  is the only way to tell a restatement from a real change in the site.
+
+tags:
+  - source
+  - search_console
+
+columns:
+  - name: agenda
+    type: STRING
+    description: Export agenda, currently always SEARCHDATA.
+  - name: namespace
+    type: STRING
+    description: Table the entry refers to.
+  - name: data_date
+    type: DATE
+    description: Reporting date covered, in Pacific Time.
+  - name: epoch_version
+    type: INT64
+    description: Increments each time Google republishes the same date.
+  - name: publish_time
+    type: TIMESTAMP
+    description: When the export for that date completed.
+
+# Names in this folder are stable logical identifiers rather than the real table
+# paths, because Bruin validates asset names before Jinja renders and a name may
+# not contain a variable or a wildcard. The real table each one stands for is in
+# its description above. These assets are no-op: bq.source never executes.
