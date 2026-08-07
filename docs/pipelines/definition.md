@@ -171,7 +171,7 @@ schedule: "0 0 * * *"
 
 ### Start date
 
-Set the earliest date from which runs should be considered. Useful for controlled backfills and catchup runs. When running with full refresh (`--full-refresh`), the pipeline will process data starting from this date.
+The earliest date the pipeline has data for. Bruin Cloud uses it as the anchor for scheduled backfills and [catchup](#catchup) runs, filling in any missed intervals between `start_date` and now.
 
 Example:
 
@@ -179,7 +179,9 @@ Example:
 start_date: "2024-01-01"
 ```
 
-- **Type:** `String` (ISO 8601 date, e.g., YYYY-MM-DD)
+- **Type:** `String` (ISO 8601 date, `YYYY-MM-DD`). The linter rejects any other format.
+
+> Local ad-hoc runs (`bruin run`) take their run window from the `--start-date` / `--end-date` flags (both default to yesterday) and do not read this field. To make a single asset start from a fixed date on `--full-refresh`, set [`start_date` on the asset](/assets/definition-schema#start_date) instead.
 
 ### Default connections
 
