@@ -86,6 +86,7 @@ variables:
 | `ga4_dataset` | `analytics_000000000` | GA4 export dataset. Qualify it with a project when the export lives outside the connection's project. |
 | `search_console_dataset` | `searchconsole` | Search Console export dataset. |
 | `brand_query_pattern` | `(example\|exampl\|examp1e)` | Case-insensitive RE2 pattern marking a query as branded. |
+| `ga4_table_mode` | `daily` | Which GA4 export tables to read. **Check this first** — a streaming-only export has no daily tables and every GA4 model returns nothing. |
 | `key_event_names` | `["sign_up", "trial_start", "demo_request", "generate_lead", "purchase"]` | GA4 events counted as conversions. Match these to the key events configured on your property. |
 | `key_event_values` | `{demo_request: 400, trial_start: 150, sign_up: 50, generate_lead: 120}` | USD value of the pipeline each key event creates. **Set this first** — without it every value metric reads zero on a site with no ecommerce revenue. |
 | `demo_event_names` | `["demo_request", "request_demo", "book_demo", "contact_sales"]` | Events meaning "the prospect asked to talk to sales". |
@@ -302,6 +303,63 @@ Nothing here is mandatory. Set `key_event_values` to your own events, point
 column then falls back to branded, commercial, and informational. A site with real
 ecommerce revenue can leave the weights empty and the value columns still work from
 `purchase_revenue_in_usd` alone.
+
+## Check your export shape before the first run
+
+Two properties of the GA4 export decide whether this template returns anything at
+all, and both fail quietly rather than loudly. Verified against a real
+streaming-only property, where the daily-table filter matched 0 rows for a window
+that held 9,089 rows in intraday tables.
+
+### Which tables exist
+
+```sql
+SELECT COUNTIF(REGEXP_CONTAINS(table_id, r'^events_[0-9]{8}$'))   AS daily,
+       COUNTIF(REGEXP_CONTAINS(table_id, r'^events_intraday_'))   AS intraday
+FROM `your_project.your_ga4_dataset.__TABLES__`
+```
+
+A property with the daily export enabled reports `daily > 0`; leave
+`ga4_table_mode` at `daily`. A property configured for streaming export only
+reports `daily = 0` and must set `ga4_table_mode: intraday`, because its entire
+history lives in `events_intraday_YYYYMMDD` and those tables are never replaced.
+
+### Whether session attribution is populated
+
+```sql
+SELECT COUNT(*) AS events,
+       COUNTIF(session_traffic_source_last_click.cross_channel_campaign
+                 .default_channel_group IS NOT NULL) AS session_scoped,
+       COUNTIF(traffic_source.medium IS NOT NULL)     AS user_first_touch
+FROM `your_project.your_ga4_dataset.events_*`
+WHERE _TABLE_SUFFIX >= '20260101'
+```
+
+Streaming-only exports return `session_scoped = 0`: Google does not populate
+session-scoped traffic source in intraday tables. `web_stage.ga4_sessions`
+therefore falls back through `collected_traffic_source` and then the user-scoped
+`traffic_source`, and records which one it used in `traffic_source_basis`.
+
+That fallback is what keeps the organic reports from being empty, but it is weaker
+than GA4's own session attribution and **will not tie out to the GA4 interface**.
+On the property tested, all 6,433 sessions resolved through `user_first_touch` or
+`event_collected`, none through `session_last_click`. Check the
+`traffic_source_basis` distribution before quoting any channel number:
+
+```sql
+SELECT traffic_source_basis, COUNT(*) FROM web_stage.ga4_sessions GROUP BY 1
+```
+
+### Your event names are probably not the defaults
+
+`key_event_names` and `key_event_values` ship with placeholder B2B SaaS events.
+The property tested had none of them — its form conversion fires `form_start`. List
+what you actually send before setting the weights:
+
+```sql
+SELECT event_name, COUNT(*) FROM `your_project.your_ga4_dataset.events_*`
+WHERE _TABLE_SUFFIX >= '20260101' GROUP BY 1 ORDER BY 2 DESC
+```
 
 ## Timing, freshness, and incremental behaviour
 

@@ -270,13 +270,28 @@ func TestGA4SearchConsoleBigQueryTemplateReadsExistingExports(t *testing.T) {
 		return string(content)
 	}
 
-	// Both GA4 models must skip the intraday tables that the events_* wildcard
-	// also matches, otherwise a partial day would be loaded as if it were final.
+	// Both GA4 models must pick their export tables through the shared macro. A
+	// property exporting only continuously has no events_YYYYMMDD tables at all, so
+	// a hard-coded daily filter returns an empty model rather than an error --
+	// verified against a real streaming-only export, which held 0 rows in daily
+	// tables and 9089 in intraday ones for the same window.
 	for _, asset := range []string{"ga4_sessions", "ga4_page_daily"} {
 		content := readTemplate("ga4-search-console-bigquery/assets/web_stage/" + asset + ".sql")
 		require.Contains(t, content, "`{{ var.ga4_dataset }}.events_*`", asset)
-		require.Contains(t, content, `REGEXP_CONTAINS(_TABLE_SUFFIX, r'^[0-9]{8}$')`, asset)
+		require.Contains(t, content, "ga4_events_table_filter(", asset)
 	}
+
+	macros := readTemplate("ga4-search-console-bigquery/macros/search.sql")
+	require.Contains(t, macros, `REGEXP_CONTAINS(_TABLE_SUFFIX, r'^[0-9]{8}$')`)
+	require.Contains(t, macros, `REGEXP_CONTAINS(_TABLE_SUFFIX, r'^intraday_[0-9]{8}$')`)
+
+	// Streaming-only exports leave every session-scoped traffic-source field NULL,
+	// which made every session look non-organic and emptied every organic report.
+	// The fallback chain and the basis column are what keep those reports usable.
+	sessions := readTemplate("ga4-search-console-bigquery/assets/web_stage/ga4_sessions.sql")
+	require.Contains(t, sessions, "collected_traffic_source.manual_medium")
+	require.Contains(t, sessions, "traffic_source.medium")
+	require.Contains(t, sessions, "traffic_source_basis")
 
 	siteImpression := readTemplate("ga4-search-console-bigquery/assets/web_stage/gsc_site_query_daily.sql")
 	require.Contains(t, siteImpression, "`{{ var.search_console_dataset }}.searchdata_site_impression`")
@@ -291,7 +306,6 @@ func TestGA4SearchConsoleBigQueryTemplateReadsExistingExports(t *testing.T) {
 	// The GA4 and Search Console sides only join when both derive page_path from
 	// the shared macro rather than normalizing inline.
 	require.Contains(t, urlImpression, "{{ page_path('url') }}")
-	sessions := readTemplate("ga4-search-console-bigquery/assets/web_stage/ga4_sessions.sql")
 	require.Contains(t, sessions, "{{ page_path('landing_page_location') }}")
 
 	// Search Console only reports Google, so the join must use the narrower flag.

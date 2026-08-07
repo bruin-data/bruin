@@ -81,15 +81,33 @@ columns:
   - name: session_default_channel_group
     type: STRING
     description: >
-      Session-scoped last non-direct channel group from
-      session_traffic_source_last_click. Google populates it on every event from
-      10 October 2024; earlier sessions fall back to 'Unassigned'.
+      Channel group for the session. Google's own session-scoped value is used when
+      the export supplies it; otherwise a small grouping is derived from medium so
+      organic traffic stays identifiable. Check traffic_source_basis to know which
+      applied, because a derived group will not tie out to the GA4 interface.
+  - name: last_click_channel_group
+    type: STRING
+    description: >
+      Google's own session-scoped channel group, NULL when the export does not
+      supply it. Streaming-only exports never populate it.
+  - name: traffic_source_basis
+    type: STRING
+    description: >
+      Which attribution basis the row used: 'session_last_click' when Google's
+      session-scoped fields were present, 'event_collected' from
+      collected_traffic_source, 'user_first_touch' from the user-scoped
+      traffic_source, or 'unavailable'. Anything other than the first is weaker
+      than GA4's own session attribution and will not tie out to the interface.
+    checks:
+      - name: not_null
+      - name: accepted_values
+        value: ["session_last_click", "event_collected", "user_first_touch", "unavailable"]
   - name: session_source
     type: STRING
-    description: Session-scoped last non-direct source, such as google or newsletter.
+    description: Source, resolved through the fallback chain in traffic_source_basis.
   - name: session_medium
     type: STRING
-    description: Session-scoped last non-direct medium, such as organic or cpc.
+    description: Medium, resolved through the fallback chain in traffic_source_basis.
   - name: session_campaign_name
     type: STRING
     description: Session-scoped last non-direct campaign name.
@@ -265,20 +283,37 @@ WITH source_events AS (
     device.operating_system AS operating_system,
     geo.country AS country,
     session_traffic_source_last_click.cross_channel_campaign.default_channel_group
-      AS session_default_channel_group,
-    session_traffic_source_last_click.manual_campaign.source AS session_source,
-    session_traffic_source_last_click.manual_campaign.medium AS session_medium,
-    session_traffic_source_last_click.manual_campaign.campaign_name AS session_campaign_name
+      AS last_click_channel_group,
+    -- Attribution falls back through three bases, best first. A streaming-only
+    -- export leaves every session-scoped field NULL, so without the fallback the
+    -- organic flags would be false for every session and every organic report
+    -- would come back empty rather than wrong. traffic_source_basis below records
+    -- which basis a row actually used.
+    COALESCE(
+      session_traffic_source_last_click.manual_campaign.source,
+      collected_traffic_source.manual_source,
+      traffic_source.source
+    ) AS session_source,
+    COALESCE(
+      session_traffic_source_last_click.manual_campaign.medium,
+      collected_traffic_source.manual_medium,
+      traffic_source.medium
+    ) AS session_medium,
+    COALESCE(
+      session_traffic_source_last_click.manual_campaign.campaign_name,
+      collected_traffic_source.manual_campaign_name,
+      traffic_source.name
+    ) AS session_campaign_name,
+    CASE
+      WHEN session_traffic_source_last_click.manual_campaign.medium IS NOT NULL
+        THEN 'session_last_click'
+      WHEN collected_traffic_source.manual_medium IS NOT NULL THEN 'event_collected'
+      WHEN traffic_source.medium IS NOT NULL THEN 'user_first_touch'
+      ELSE 'unavailable'
+    END AS traffic_source_basis
   FROM `{{ var.ga4_dataset }}.events_*`
-  WHERE _TABLE_SUFFIX
-      BETWEEN FORMAT_DATE(
-        '%Y%m%d',
-        DATE_SUB(DATE('{{ start_date }}'), INTERVAL {{ var.source_lookback_days }} DAY)
-      )
-      AND FORMAT_DATE('%Y%m%d', DATE('{{ end_date }}'))
-    -- The events_* wildcard also matches the events_intraday_ tables. Their
-    -- suffix is not eight digits, so this keeps the model on finalized days only.
-    AND REGEXP_CONTAINS(_TABLE_SUFFIX, r'^[0-9]{8}$')
+  WHERE {{ ga4_events_table_filter(
+      var.ga4_table_mode, start_date, end_date, var.source_lookback_days) }}
 ),
 
 sessionized AS (
@@ -300,7 +335,8 @@ sessionized AS (
     )[SAFE_OFFSET(0)] AS landing_page_location,
     -- Traffic source and channel group are session-scoped, so every event in the
     -- session carries the same value and MAX is a deterministic way to read it.
-    MAX(session_default_channel_group) AS session_default_channel_group,
+    MAX(last_click_channel_group) AS last_click_channel_group,
+    MIN(traffic_source_basis) AS traffic_source_basis,
     MAX(session_source) AS session_source,
     MAX(session_medium) AS session_medium,
     MAX(session_campaign_name) AS session_campaign_name,
@@ -349,13 +385,37 @@ SELECT
   -- rules are written against the same paths the reports join on.
   {{ page_role('landing_page_path', var.support_path_pattern, var.content_path_pattern) }}
     AS landing_page_role,
-  COALESCE(session_default_channel_group, 'Unassigned') AS session_default_channel_group,
+  -- Google's own channel group is preferred. When it is absent, which is always
+  -- the case for a streaming-only export, a deliberately small grouping is derived
+  -- from medium so organic traffic stays identifiable. It is not a reproduction of
+  -- GA4's full default channel grouping; traffic_source_basis says which applied.
+  COALESCE(
+    last_click_channel_group,
+    CASE
+      WHEN LOWER(session_medium) = 'organic' THEN 'Organic Search'
+      WHEN LOWER(session_medium) IN ('cpc', 'ppc', 'paid', 'paid_search') THEN 'Paid Search'
+      WHEN LOWER(session_medium) IN ('social', 'organic_social') THEN 'Organic Social'
+      WHEN LOWER(session_medium) IN ('paid_social', 'paidsocial') THEN 'Paid Social'
+      WHEN LOWER(session_medium) = 'email' THEN 'Email'
+      WHEN LOWER(session_medium) = 'referral' THEN 'Referral'
+      WHEN LOWER(session_medium) IN ('display', 'banner', 'cpm') THEN 'Display'
+      WHEN LOWER(session_medium) = 'affiliate' THEN 'Affiliates'
+      WHEN LOWER(session_medium) = '(none)' OR LOWER(session_source) = '(direct)' THEN 'Direct'
+      ELSE 'Unassigned'
+    END
+  ) AS session_default_channel_group,
+  last_click_channel_group,
+  traffic_source_basis,
   session_source,
   session_medium,
   session_campaign_name,
-  COALESCE(session_default_channel_group, 'Unassigned') = 'Organic Search'
+  LOWER(COALESCE(session_medium, '')) = 'organic'
+    OR COALESCE(last_click_channel_group, '') = 'Organic Search'
     AS is_organic_search_session,
-  COALESCE(session_default_channel_group, 'Unassigned') = 'Organic Search'
+  (
+    LOWER(COALESCE(session_medium, '')) = 'organic'
+    OR COALESCE(last_click_channel_group, '') = 'Organic Search'
+  )
     AND COALESCE(LOWER(session_source), '') LIKE '%google%'
     AS is_google_organic_session,
   COALESCE(ga_session_number = 1, FALSE) AS is_new_user_session,

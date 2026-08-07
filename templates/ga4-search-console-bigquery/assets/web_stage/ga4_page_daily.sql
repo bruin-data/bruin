@@ -156,19 +156,33 @@ WITH page_view_events AS (
       WHERE key = 'engagement_time_msec'
     ) AS engagement_time_msec,
     device.category AS device_category,
+    -- Same fallback chain as web_stage.ga4_sessions, so the organic flag on both
+    -- models agrees. A streaming-only export supplies none of the session-scoped
+    -- fields, which would otherwise make every page look non-organic.
+    COALESCE(
+      session_traffic_source_last_click.manual_campaign.medium,
+      collected_traffic_source.manual_medium,
+      traffic_source.medium
+    ) AS session_medium,
     COALESCE(
       session_traffic_source_last_click.cross_channel_campaign.default_channel_group,
-      'Unassigned'
+      CASE
+        WHEN LOWER(COALESCE(
+          session_traffic_source_last_click.manual_campaign.medium,
+          collected_traffic_source.manual_medium,
+          traffic_source.medium
+        )) = 'organic' THEN 'Organic Search'
+        ELSE 'Unassigned'
+      END
     ) AS session_default_channel_group,
-    session_traffic_source_last_click.manual_campaign.source AS session_source
+    COALESCE(
+      session_traffic_source_last_click.manual_campaign.source,
+      collected_traffic_source.manual_source,
+      traffic_source.source
+    ) AS session_source
   FROM `{{ var.ga4_dataset }}.events_*`
-  WHERE _TABLE_SUFFIX
-      BETWEEN FORMAT_DATE(
-        '%Y%m%d',
-        DATE_SUB(DATE('{{ start_date }}'), INTERVAL {{ var.source_lookback_days }} DAY)
-      )
-      AND FORMAT_DATE('%Y%m%d', DATE('{{ end_date }}'))
-    AND REGEXP_CONTAINS(_TABLE_SUFFIX, r'^[0-9]{8}$')
+  WHERE {{ ga4_events_table_filter(
+      var.ga4_table_mode, start_date, end_date, var.source_lookback_days) }}
     AND event_name = 'page_view'
 ),
 

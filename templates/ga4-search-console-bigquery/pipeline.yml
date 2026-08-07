@@ -99,6 +99,23 @@ variables:
     type: string
     default: "^/(blog|resources|guides|guide|learn|academy|glossary|templates|use-cases|comparisons)(/|$)"
 
+  # Which GA4 export tables to read.
+  #
+  # A property with the daily export enabled produces events_YYYYMMDD tables, and
+  # 'daily' reads those while skipping the still-filling intraday table. A property
+  # configured for streaming export only never produces a daily table at all — its
+  # entire history lives in events_intraday_YYYYMMDD — and must use 'intraday' or
+  # every GA4 model silently returns no rows.
+  #
+  # Check which you have before the first run:
+  #   SELECT COUNTIF(REGEXP_CONTAINS(table_id, r'^events_[0-9]{8}$')) AS daily,
+  #          COUNTIF(REGEXP_CONTAINS(table_id, r'^events_intraday_')) AS intraday
+  #   FROM `your_project.your_ga4_dataset.__TABLES__`
+  ga4_table_mode:
+    type: string
+    enum: ["daily", "intraday"]
+    default: daily
+
   # Extra days re-read before the run window. Search Console publishes with a
   # two-to-three day delay and revises history, and GA4 finalizes a daily table
   # after its intraday table is dropped. The staging models replace whole days,

@@ -106,3 +106,34 @@ IF(
 {% macro in_string_list(column, values) -%}
 {% if values %}{{ column }} IN ({% for value in values %}{{ sql_literal(value) }}{% if not loop.last %}, {% endif %}{% endfor %}){% else %}FALSE{% endif %}
 {%- endmacro %}
+
+{# Selects the GA4 export tables to read from the events_* wildcard.
+
+   The wildcard matches both events_YYYYMMDD and events_intraday_YYYYMMDD. Which
+   of the two exists depends on how the property's export is configured, and
+   getting it wrong returns an empty model rather than an error: a streaming-only
+   export has no daily tables whatsoever, so a daily-only filter matches nothing.
+
+   Both branches compare _TABLE_SUFFIX directly against a literal range so
+   BigQuery can still prune the wildcard. The prefix is constant within a branch,
+   so the lexicographic range also excludes the other table family on its own —
+   'intraday_20260801' sorts above any eight-digit suffix. #}
+{% macro ga4_events_table_filter(mode, start_date, end_date, lookback_days) -%}
+{% if mode == 'intraday' -%}
+REGEXP_CONTAINS(_TABLE_SUFFIX, r'^intraday_[0-9]{8}$')
+    AND _TABLE_SUFFIX
+      BETWEEN CONCAT('intraday_', FORMAT_DATE(
+        '%Y%m%d',
+        DATE_SUB(DATE('{{ start_date }}'), INTERVAL {{ lookback_days }} DAY)
+      ))
+      AND CONCAT('intraday_', FORMAT_DATE('%Y%m%d', DATE('{{ end_date }}')))
+{%- else -%}
+REGEXP_CONTAINS(_TABLE_SUFFIX, r'^[0-9]{8}$')
+    AND _TABLE_SUFFIX
+      BETWEEN FORMAT_DATE(
+        '%Y%m%d',
+        DATE_SUB(DATE('{{ start_date }}'), INTERVAL {{ lookback_days }} DAY)
+      )
+      AND FORMAT_DATE('%Y%m%d', DATE('{{ end_date }}'))
+{%- endif %}
+{%- endmacro %}
