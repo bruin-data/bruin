@@ -28,7 +28,18 @@ description: >
   'search_only' and once as 'ga4_only', rather than hiding the disagreement in a
   merged row.
 
-  Money is read from GA4's USD conversion so it stays additive across properties.
+  Value is read from session_outcome_value_usd, which prices key events using the
+  key_event_values variable and adds any real ecommerce revenue. That matters for a
+  B2B SaaS site: revenue is recognized in a CRM weeks after the visit, so the GA4
+  export carries no purchase amount and a revenue-only report would rank every page
+  at zero. Set those weights before trusting the value columns.
+
+  page_role separates the three jobs a B2B SaaS site's pages do. Documentation
+  regularly out-ranks the marketing site and its clicks are mostly existing
+  customers looking something up, so leaving support pages in the same pool as
+  pricing pages makes acquisition conversion rates look far worse than they are.
+  Filter to 'product' when judging acquisition.
+
   Session and click counts come from different measurement systems and will never
   match exactly; treat session_per_click_ratio as a health indicator, not a bug.
 
@@ -65,6 +76,12 @@ columns:
     primary_key: true
     checks:
       - name: not_null
+  - name: page_role
+    type: STRING
+    description: >
+      Whether the page is a 'product' page where buying decisions happen,
+      'content' marketing, or 'support' documentation. Filter to 'product' when
+      judging acquisition performance.
   - name: coverage_status
     type: STRING
     description: >
@@ -130,6 +147,41 @@ columns:
       pipeline variable.
     checks:
       - name: non_negative
+  - name: demo_events
+    type: INT64
+    description: >
+      Demo or contact-sales requests from organic sessions that landed here. The
+      bottom-of-funnel signal a B2B SaaS pipeline is measured on.
+    checks:
+      - name: non_negative
+  - name: signup_events
+    type: INT64
+    description: Self-serve signups and trial starts from organic sessions landing here.
+    checks:
+      - name: non_negative
+  - name: demo_events_per_hundred_clicks
+    type: FLOAT64
+    description: >
+      Demo requests per hundred search clicks. The comparable measure of whether a
+      page attracts buyers rather than readers.
+  - name: outcome_value_usd
+    type: FLOAT64
+    description: >
+      Modelled key-event value plus any ecommerce revenue from organic sessions
+      landing here. Partly modelled: rank pages with it, do not report it as
+      recognized revenue.
+    checks:
+      - name: non_negative
+  - name: outcome_value_per_search_click_usd
+    type: FLOAT64
+    description: >
+      Modelled value per organic click: what one more click on this page is worth.
+      This is the column to rank a B2B SaaS content roadmap by.
+  - name: outcome_value_per_thousand_impressions_usd
+    type: FLOAT64
+    description: >
+      Modelled value per thousand impressions, which prices the visibility a page
+      already has and shows where a ranking gain pays back most.
   - name: key_event_rate
     type: FLOAT64
     description: Key events per organic session.
@@ -213,6 +265,7 @@ search AS (
     daily.site_url,
     daily.page_hostname,
     daily.page_path,
+    daily.page_role,
     SUM(daily.impressions) AS search_impressions,
     SUM(daily.clicks) AS search_clicks,
     SUM(daily.sum_position) AS sum_position
@@ -221,7 +274,7 @@ search AS (
   WHERE daily.data_date > bounds.window_start
     AND daily.data_date <= bounds.window_end
     AND daily.search_type = 'WEB'
-  GROUP BY 1, 2, 3
+  GROUP BY 1, 2, 3, 4
 ),
 
 -- Search Console exports one property per dataset, so this resolves the property
@@ -236,11 +289,15 @@ landing AS (
   SELECT
     sessions.landing_page_hostname AS page_hostname,
     sessions.landing_page_path AS page_path,
+    MAX(sessions.landing_page_role) AS page_role,
     COUNT(*) AS organic_sessions,
     COUNTIF(sessions.is_engaged_session) AS engaged_sessions,
     COUNTIF(sessions.is_new_user_session) AS new_user_sessions,
     SUM(sessions.engagement_time_seconds) AS engagement_time_seconds,
     SUM(sessions.key_event_count) AS key_events,
+    SUM(sessions.demo_event_count) AS demo_events,
+    SUM(sessions.signup_event_count) AS signup_events,
+    SUM(sessions.session_outcome_value_usd) AS outcome_value_usd,
     SUM(sessions.purchase_revenue_in_usd) AS purchase_revenue_usd
   FROM web_stage.ga4_sessions AS sessions
   CROSS JOIN bounds
@@ -269,6 +326,7 @@ combined AS (
   SELECT
     COALESCE(search.page_hostname, landing.page_hostname) AS page_hostname,
     COALESCE(search.page_path, landing.page_path) AS page_path,
+    COALESCE(search.page_role, landing.page_role, 'unknown') AS page_role,
     search.site_url,
     COALESCE(search.search_impressions, 0) AS search_impressions,
     COALESCE(search.search_clicks, 0) AS search_clicks,
@@ -278,6 +336,9 @@ combined AS (
     COALESCE(landing.new_user_sessions, 0) AS new_user_sessions,
     landing.engagement_time_seconds,
     COALESCE(landing.key_events, 0) AS key_events,
+    COALESCE(landing.demo_events, 0) AS demo_events,
+    COALESCE(landing.signup_events, 0) AS signup_events,
+    COALESCE(landing.outcome_value_usd, 0) AS outcome_value_usd,
     COALESCE(landing.purchase_revenue_usd, 0) AS purchase_revenue_usd
   FROM search
   FULL OUTER JOIN landing
@@ -289,6 +350,7 @@ SELECT
   COALESCE(combined.site_url, observed_site.site_url) AS site_url,
   combined.page_hostname,
   combined.page_path,
+  combined.page_role,
   CASE
     WHEN combined.search_impressions = 0 THEN 'ga4_only'
     WHEN combined.organic_sessions = 0 THEN 'search_only'
@@ -318,6 +380,15 @@ SELECT
   SAFE_DIVIDE(combined.key_events, NULLIF(combined.organic_sessions, 0)) AS key_event_rate,
   SAFE_DIVIDE(combined.key_events, NULLIF(combined.search_clicks, 0)) * 100
     AS key_events_per_hundred_clicks,
+  combined.demo_events,
+  combined.signup_events,
+  SAFE_DIVIDE(combined.demo_events, NULLIF(combined.search_clicks, 0)) * 100
+    AS demo_events_per_hundred_clicks,
+  combined.outcome_value_usd,
+  SAFE_DIVIDE(combined.outcome_value_usd, NULLIF(combined.search_clicks, 0))
+    AS outcome_value_per_search_click_usd,
+  SAFE_DIVIDE(combined.outcome_value_usd, NULLIF(combined.search_impressions, 0)) * 1000
+    AS outcome_value_per_thousand_impressions_usd,
   combined.purchase_revenue_usd,
   SAFE_DIVIDE(combined.purchase_revenue_usd, NULLIF(combined.search_clicks, 0))
     AS revenue_per_search_click_usd,

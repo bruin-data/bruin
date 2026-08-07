@@ -224,8 +224,10 @@ func TestGA4SearchConsoleBigQueryTemplateHasFocusedAssetSet(t *testing.T) {
 		"web_reports/search_query_cannibalization.sql",
 		"web_reports/search_page_trend.sql",
 		"web_reports/search_new_and_lost_queries.sql",
+		"web_reports/search_competitor_visibility.sql",
 		"web_reports/organic_landing_page_performance.sql",
 		"web_reports/organic_query_value.sql",
+		"web_reports/organic_intent_pipeline.sql",
 	}
 
 	var actualAssets []string
@@ -241,7 +243,7 @@ func TestGA4SearchConsoleBigQueryTemplateHasFocusedAssetSet(t *testing.T) {
 		return nil
 	})
 	require.NoError(t, err)
-	require.Len(t, actualAssets, 13)
+	require.Len(t, actualAssets, 15)
 	require.ElementsMatch(t, expectedAssets, actualAssets)
 
 	pipeline, err := templates.Templates.ReadFile("ga4-search-console-bigquery/pipeline.yml")
@@ -314,10 +316,12 @@ func TestGA4SearchConsoleBigQueryTemplateKeepsHostsSeparate(t *testing.T) {
 	for _, asset := range []string{
 		"organic_landing_page_performance",
 		"organic_query_value",
+		"organic_intent_pipeline",
 		"search_page_trend",
 		"search_query_opportunities",
 		"search_query_cannibalization",
 		"search_new_and_lost_queries",
+		"search_competitor_visibility",
 	} {
 		content := readTemplate("ga4-search-console-bigquery/assets/web_reports/" + asset + ".sql")
 		require.Contains(t, content, "page_hostname", asset)
@@ -340,11 +344,82 @@ func TestGA4SearchConsoleBigQueryTemplateEscapesBrandPattern(t *testing.T) {
 	macros, err := templates.Templates.ReadFile("ga4-search-console-bigquery/macros/search.sql")
 	require.NoError(t, err)
 
-	// The brand pattern is interpolated into a string literal, and brands such as
-	// Levi's and O'Reilly carry an apostrophe. Without the triple quotes and the
-	// ['] rewrite, a bare apostrophe closes the literal and every asset that
-	// classifies a query fails to parse.
-	require.Contains(t, string(macros), `r'''{{ brand_pattern | replace("'", "[']") }}'''`)
+	// Configured patterns are interpolated into string literals, and plenty carry
+	// an apostrophe: brands such as Levi's and O'Reilly, competitors, path rules.
+	// Without the triple quotes and the ['] rewrite, a bare apostrophe closes the
+	// literal and every asset that classifies a query fails to parse. All patterns
+	// route through re_literal so the escaping cannot be forgotten in one place.
+	require.Contains(t, string(macros), `r'''{{ pattern | replace("'", "[']") }}'''`)
+	require.Contains(t, string(macros), "{{ re_literal(brand_pattern) }}")
+	require.Contains(t, string(macros), "{{ re_literal(commercial_pattern) }}")
+	require.Contains(t, string(macros), "{{ re_literal(pattern | lower) }}")
+
+	urlMacros, err := templates.Templates.ReadFile("ga4-search-console-bigquery/macros/url.sql")
+	require.NoError(t, err)
+	require.Contains(t, string(urlMacros), "{{ re_literal(support_pattern) }}")
+	require.Contains(t, string(urlMacros), "{{ re_literal(content_pattern) }}")
+}
+
+func TestGA4SearchConsoleBigQueryTemplateSupportsB2BSaaS(t *testing.T) {
+	t.Parallel()
+
+	readTemplate := func(path string) string {
+		t.Helper()
+		content, err := templates.Templates.ReadFile(path)
+		require.NoError(t, err)
+		return string(content)
+	}
+
+	pipeline := readTemplate("ga4-search-console-bigquery/pipeline.yml")
+	// B2B SaaS revenue is recognized in a CRM weeks after the visit, so the GA4
+	// export carries no purchase amount. Without priced key events every value
+	// metric in the reports reads zero.
+	require.Contains(t, pipeline, "key_event_values:")
+	require.Contains(t, pipeline, "demo_event_names:")
+	require.Contains(t, pipeline, "signup_event_names:")
+	require.Contains(t, pipeline, "competitor_names:")
+	require.Contains(t, pipeline, "support_path_pattern:")
+	require.Contains(t, pipeline, "content_path_pattern:")
+	// Weighting 'purchase' here as well as reading ecommerce revenue would double
+	// count it, so the default map must leave it out.
+	require.NotContains(t, pipeline, "      purchase:")
+
+	sessions := readTemplate("ga4-search-console-bigquery/assets/web_stage/ga4_sessions.sql")
+	require.Contains(t, sessions, "demo_event_count")
+	require.Contains(t, sessions, "signup_event_count")
+	require.Contains(t, sessions, "key_event_value_usd")
+	// The single column the reports rank by, so it works whether the site sells
+	// directly or hands off to sales.
+	require.Contains(t, sessions, "key_event_value_usd + COALESCE(purchase_revenue_in_usd, 0) AS session_outcome_value_usd")
+
+	// Documentation regularly out-ranks the marketing site and its clicks are
+	// existing customers, so every page-level model must carry the role.
+	for _, asset := range []string{
+		"web_stage/gsc_url_query_daily",
+		"web_stage/ga4_page_daily",
+	} {
+		require.Contains(t, readTemplate("ga4-search-console-bigquery/assets/"+asset+".sql"), "page_role")
+	}
+	require.Contains(t, sessions, "landing_page_role")
+
+	// Commercial intent has to reach both Search Console models for the intent
+	// reports to slice anything.
+	for _, asset := range []string{
+		"web_stage/gsc_url_query_daily",
+		"web_stage/gsc_site_query_daily",
+	} {
+		content := readTemplate("ga4-search-console-bigquery/assets/" + asset + ".sql")
+		require.Contains(t, content, "query_intent_type", asset)
+		require.Contains(t, content, "competitor_name", asset)
+	}
+
+	landingPages := readTemplate("ga4-search-console-bigquery/assets/web_reports/organic_landing_page_performance.sql")
+	require.Contains(t, landingPages, "outcome_value_per_search_click_usd")
+	require.Contains(t, landingPages, "demo_events_per_hundred_clicks")
+
+	queryValue := readTemplate("ga4-search-console-bigquery/assets/web_reports/organic_query_value.sql")
+	require.Contains(t, queryValue, "modelled_outcome_value_per_click_usd")
+	require.Contains(t, queryValue, "modelled_demo_events")
 }
 
 func TestInitMigrationFivetranCopiesMigrationWorkspace(t *testing.T) {

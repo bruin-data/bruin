@@ -49,8 +49,8 @@ AI agent skills are installed separately with `bruin ai skills`; see [AI Skills]
   <a class="template-card" href="./templates-docs/ga4-search-console-bigquery-README.html">
     <span class="template-card__category">Organic search analytics</span>
     <strong>ga4-search-console-bigquery</strong>
-    <span>Turns GA4 and Search Console exports already in BigQuery into staging models plus seven reports neither product can produce, including the landing-page join between search visibility and revenue.</span>
-    <span class="template-card__tags"><code>GA4</code><code>Search Console</code><code>BigQuery</code><code>SEO</code></span>
+    <span>Turns GA4 and Search Console exports already in BigQuery into staging models plus nine reports neither product can produce, including the landing-page join between search visibility and pipeline. Set up for a B2B SaaS motion.</span>
+    <span class="template-card__tags"><code>GA4</code><code>Search Console</code><code>BigQuery</code><code>SEO</code><code>B2B SaaS</code></span>
   </a>
   <a class="template-card" href="./templates-docs/demo-snowflake-sales-analytics-README.html">
     <span class="template-card__category">Demo pipeline</span>

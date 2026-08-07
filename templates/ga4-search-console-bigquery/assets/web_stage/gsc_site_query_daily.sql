@@ -49,6 +49,18 @@ columns:
       - name: not_null
       - name: accepted_values
         value: ["branded", "non_branded", "anonymized"]
+  - name: query_intent_type
+    type: STRING
+    description: >
+      Commercial intent of the query: 'competitor', 'branded', 'commercial',
+      'informational', or 'anonymized'. Independent of query_brand_type.
+    checks:
+      - name: not_null
+      - name: accepted_values
+        value: ["competitor", "branded", "commercial", "informational", "anonymized"]
+  - name: competitor_name
+    type: STRING
+    description: Which competitor the query mentions, NULL when it names none.
   - name: query_word_count
     type: INT64
     description: Whitespace-delimited word count of the query, 0 when anonymized.
@@ -122,12 +134,33 @@ custom_checks:
     value: 0
 @bruin */
 
+WITH source_rows AS (
+  SELECT
+    data_date,
+    site_url,
+    IF(is_anonymized_query, NULL, query) AS query,
+    is_anonymized_query,
+    country,
+    search_type,
+    device,
+    impressions,
+    clicks,
+    sum_top_position
+  FROM `{{ var.search_console_dataset }}.searchdata_site_impression`
+  WHERE data_date
+    BETWEEN DATE_SUB(DATE('{{ start_date }}'), INTERVAL {{ var.source_lookback_days }} DAY)
+    AND DATE('{{ end_date }}')
+)
+
 SELECT
   data_date,
   site_url,
-  IF(is_anonymized_query, NULL, query) AS query,
+  query,
   {{ query_brand_type('query', 'is_anonymized_query', var.brand_query_pattern) }} AS query_brand_type,
-  {{ query_word_count('IF(is_anonymized_query, NULL, query)') }} AS query_word_count,
+  {{ query_intent_type('query', 'is_anonymized_query', var.brand_query_pattern, var.competitor_names, var.commercial_query_pattern) }}
+    AS query_intent_type,
+  {{ competitor_name('query', var.competitor_names) }} AS competitor_name,
+  {{ query_word_count('query') }} AS query_word_count,
   is_anonymized_query,
   country,
   search_type,
@@ -136,8 +169,5 @@ SELECT
   SUM(clicks) AS clicks,
   SUM(sum_top_position) AS sum_top_position,
   {{ average_position('SUM(sum_top_position)', 'SUM(impressions)') }} AS avg_position
-FROM `{{ var.search_console_dataset }}.searchdata_site_impression`
-WHERE data_date
-  BETWEEN DATE_SUB(DATE('{{ start_date }}'), INTERVAL {{ var.source_lookback_days }} DAY)
-  AND DATE('{{ end_date }}')
-GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9;
+FROM source_rows
+GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11;

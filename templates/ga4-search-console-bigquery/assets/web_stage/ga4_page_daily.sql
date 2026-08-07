@@ -46,6 +46,14 @@ columns:
       Hostname of the viewed page. Part of the grain because two hosts on the same
       property can serve the same path.
     primary_key: true
+  - name: page_role
+    type: STRING
+    description: >
+      Whether the page is a 'product' page, 'content' marketing, or 'support'
+      documentation. Support pages draw mostly existing customers, so acquisition
+      reporting should exclude them.
+    checks:
+      - name: not_null
   - name: session_default_channel_group
     type: STRING
     description: Session-scoped last non-direct channel group of the viewing session.
@@ -162,12 +170,21 @@ WITH page_view_events AS (
       AND FORMAT_DATE('%Y%m%d', DATE('{{ end_date }}'))
     AND REGEXP_CONTAINS(_TABLE_SUFFIX, r'^[0-9]{8}$')
     AND event_name = 'page_view'
+),
+
+normalized AS (
+  SELECT
+    page_view_events.*,
+    {{ page_path('page_location') }} AS page_path,
+    {{ url_hostname('page_location') }} AS page_hostname
+  FROM page_view_events
 )
 
 SELECT
   page_date,
-  {{ page_path('page_location') }} AS page_path,
-  {{ url_hostname('page_location') }} AS page_hostname,
+  page_path,
+  page_hostname,
+  {{ page_role('page_path', var.support_path_pattern, var.content_path_pattern) }} AS page_role,
   session_default_channel_group,
   session_source,
   device_category,
@@ -179,8 +196,8 @@ SELECT
   COUNT(DISTINCT CONCAT(user_pseudo_id, '-', CAST(ga_session_id AS STRING))) AS distinct_sessions,
   COUNT(DISTINCT user_pseudo_id) AS distinct_users,
   SAFE_DIVIDE(SUM(engagement_time_msec), 1000) AS engagement_time_seconds
-FROM page_view_events
+FROM normalized
 WHERE page_location IS NOT NULL
   AND user_pseudo_id IS NOT NULL
   AND ga_session_id IS NOT NULL
-GROUP BY 1, 2, 3, 4, 5, 6, 7;
+GROUP BY 1, 2, 3, 4, 5, 6, 7, 8;

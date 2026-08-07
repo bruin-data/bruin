@@ -71,6 +71,13 @@ columns:
   - name: landing_page_hostname
     type: STRING
     description: Hostname of the landing page.
+  - name: landing_page_role
+    type: STRING
+    description: >
+      Whether the landing page is a 'product' page where buying decisions happen,
+      'content' marketing, or 'support' documentation. Support traffic is mostly
+      existing customers, so acquisition reporting should exclude it rather than
+      let it depress conversion rates.
   - name: session_default_channel_group
     type: STRING
     description: >
@@ -139,6 +146,30 @@ columns:
       to match the key events configured on the property.
     checks:
       - name: non_negative
+  - name: demo_event_count
+    type: INT64
+    description: >
+      Events matching demo_event_names: the prospect asked to talk to sales. This
+      is the bottom-of-funnel signal a B2B SaaS pipeline is measured on.
+    checks:
+      - name: non_negative
+  - name: signup_event_count
+    type: INT64
+    description: >
+      Events matching signup_event_names: self-serve product entry, kept apart
+      from demo requests because product-led and sales-led motions convert
+      differently.
+    checks:
+      - name: non_negative
+  - name: key_event_value_usd
+    type: FLOAT64
+    description: >
+      Modelled pipeline value of the session's key events, priced by the
+      key_event_values variable. This is what makes the value reports work for a
+      business whose revenue is recognized in a CRM weeks later rather than on the
+      site.
+    checks:
+      - name: non_negative
   - name: purchase_count
     type: INT64
     description: purchase events in the session.
@@ -157,6 +188,15 @@ columns:
   - name: distinct_transaction_count
     type: INT64
     description: Distinct ecommerce transaction identifiers in the session.
+  - name: session_outcome_value_usd
+    type: FLOAT64
+    description: >
+      Modelled key-event value plus any real ecommerce revenue, in USD. The single
+      column the reports rank by, so it works whether the site sells directly or
+      hands off to sales. Partly modelled: treat it as a way to compare pages and
+      queries, not as recognized revenue.
+    checks:
+      - name: non_negative
 
 custom_checks:
   - name: session grain is unique
@@ -272,6 +312,9 @@ sessionized AS (
     COUNTIF(event_name = 'page_view') AS page_view_count,
     SUM(engagement_time_msec) AS engagement_time_msec,
     COUNTIF({{ in_string_list('event_name', var.key_event_names) }}) AS key_event_count,
+    COUNTIF({{ in_string_list('event_name', var.demo_event_names) }}) AS demo_event_count,
+    COUNTIF({{ in_string_list('event_name', var.signup_event_names) }}) AS signup_event_count,
+    SUM({{ key_event_value('event_name', var.key_event_values) }}) AS key_event_value_usd,
     COUNTIF(event_name = 'purchase') AS purchase_count,
     SUM(IF(event_name = 'purchase', purchase_revenue, NULL)) AS purchase_revenue,
     SUM(IF(event_name = 'purchase', purchase_revenue_in_usd, NULL)) AS purchase_revenue_in_usd,
@@ -281,6 +324,14 @@ sessionized AS (
   WHERE user_pseudo_id IS NOT NULL
     AND ga_session_id IS NOT NULL
   GROUP BY 2, 3
+),
+
+resolved AS (
+  SELECT
+    sessionized.*,
+    {{ page_path('landing_page_location') }} AS landing_page_path,
+    {{ url_hostname('landing_page_location') }} AS landing_page_hostname
+  FROM sessionized
 )
 
 SELECT
@@ -292,8 +343,12 @@ SELECT
   session_start_timestamp,
   session_end_timestamp,
   landing_page_location,
-  {{ page_path('landing_page_location') }} AS landing_page_path,
-  {{ url_hostname('landing_page_location') }} AS landing_page_hostname,
+  landing_page_path,
+  landing_page_hostname,
+  -- Derived from the normalized path rather than the raw location, so the role
+  -- rules are written against the same paths the reports join on.
+  {{ page_role('landing_page_path', var.support_path_pattern, var.content_path_pattern) }}
+    AS landing_page_role,
   COALESCE(session_default_channel_group, 'Unassigned') AS session_default_channel_group,
   session_source,
   session_medium,
@@ -312,8 +367,12 @@ SELECT
   page_view_count,
   SAFE_DIVIDE(engagement_time_msec, 1000) AS engagement_time_seconds,
   key_event_count,
+  demo_event_count,
+  signup_event_count,
+  key_event_value_usd,
   purchase_count,
   purchase_revenue,
   purchase_revenue_in_usd,
-  distinct_transaction_count
-FROM sessionized;
+  distinct_transaction_count,
+  key_event_value_usd + COALESCE(purchase_revenue_in_usd, 0) AS session_outcome_value_usd
+FROM resolved;

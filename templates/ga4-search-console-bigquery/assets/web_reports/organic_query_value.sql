@@ -8,6 +8,12 @@ description: >
   keywords by click volume and discovering months later that the highest-traffic
   terms were the least valuable.
 
+  Value comes from session_outcome_value_usd, which prices key events with the
+  key_event_values variable and adds any real ecommerce revenue. For B2B SaaS that
+  is the only way this report says anything: revenue lands in a CRM weeks after the
+  visit, so a report built on GA4 purchase revenue alone would value every query at
+  zero. Set those weights before ranking anything by them.
+
   The numbers here are modelled, not measured. Each page's GA4 outcomes are split
   across the queries that sent clicks to it, in proportion to those clicks. Within
   a page the weights sum to one, so a page's whole outcome is distributed and page
@@ -102,6 +108,23 @@ columns:
   - name: modelled_key_events
     type: FLOAT64
     description: Key events allocated to this query.
+  - name: modelled_demo_events
+    type: FLOAT64
+    description: >
+      Demo or contact-sales requests allocated to this query. The clearest signal
+      that a query brings buyers rather than readers.
+  - name: modelled_signup_events
+    type: FLOAT64
+    description: Self-serve signups and trial starts allocated to this query.
+  - name: modelled_outcome_value_usd
+    type: FLOAT64
+    description: >
+      Modelled key-event value plus ecommerce revenue allocated to this query.
+  - name: modelled_outcome_value_per_click_usd
+    type: FLOAT64
+    description: >
+      Allocated value per search click. This is the ranking column for a B2B SaaS
+      keyword roadmap: what one more click on this query is worth.
   - name: modelled_revenue_usd
     type: FLOAT64
     description: Purchase revenue in USD allocated to this query.
@@ -150,6 +173,8 @@ custom_checks:
       FROM {{ this }}
       WHERE modelled_sessions < 0
         OR modelled_key_events < 0
+        OR modelled_demo_events < 0
+        OR modelled_outcome_value_usd < 0
         OR modelled_revenue_usd < 0
     value: 0
 @bruin */
@@ -200,6 +225,9 @@ page_outcomes AS (
     COUNT(*) AS organic_sessions,
     COUNTIF(sessions.is_engaged_session) AS engaged_sessions,
     SUM(sessions.key_event_count) AS key_events,
+    SUM(sessions.demo_event_count) AS demo_events,
+    SUM(sessions.signup_event_count) AS signup_events,
+    SUM(sessions.session_outcome_value_usd) AS outcome_value_usd,
     SUM(sessions.purchase_revenue_in_usd) AS purchase_revenue_usd
   FROM web_stage.ga4_sessions AS sessions
   CROSS JOIN bounds
@@ -224,6 +252,9 @@ allocated AS (
     COALESCE(outcomes.organic_sessions, 0) AS page_organic_sessions,
     COALESCE(outcomes.engaged_sessions, 0) AS page_engaged_sessions,
     COALESCE(outcomes.key_events, 0) AS page_key_events,
+    COALESCE(outcomes.demo_events, 0) AS page_demo_events,
+    COALESCE(outcomes.signup_events, 0) AS page_signup_events,
+    COALESCE(outcomes.outcome_value_usd, 0) AS page_outcome_value_usd,
     COALESCE(outcomes.purchase_revenue_usd, 0) AS page_purchase_revenue_usd
   FROM query_page
   JOIN page_click_totals AS totals
@@ -245,6 +276,9 @@ rolled_up AS (
     SUM(COALESCE(click_weight, 0) * page_organic_sessions) AS modelled_sessions,
     SUM(COALESCE(click_weight, 0) * page_engaged_sessions) AS modelled_engaged_sessions,
     SUM(COALESCE(click_weight, 0) * page_key_events) AS modelled_key_events,
+    SUM(COALESCE(click_weight, 0) * page_demo_events) AS modelled_demo_events,
+    SUM(COALESCE(click_weight, 0) * page_signup_events) AS modelled_signup_events,
+    SUM(COALESCE(click_weight, 0) * page_outcome_value_usd) AS modelled_outcome_value_usd,
     SUM(COALESCE(click_weight, 0) * page_purchase_revenue_usd) AS modelled_revenue_usd
   FROM allocated
   GROUP BY 1, 2
@@ -289,6 +323,11 @@ SELECT
   rolled_up.modelled_sessions,
   rolled_up.modelled_engaged_sessions,
   rolled_up.modelled_key_events,
+  rolled_up.modelled_demo_events,
+  rolled_up.modelled_signup_events,
+  rolled_up.modelled_outcome_value_usd,
+  SAFE_DIVIDE(rolled_up.modelled_outcome_value_usd, NULLIF(rolled_up.search_clicks, 0))
+    AS modelled_outcome_value_per_click_usd,
   rolled_up.modelled_revenue_usd,
   SAFE_DIVIDE(rolled_up.modelled_key_events, NULLIF(rolled_up.modelled_sessions, 0))
     AS modelled_key_event_rate,

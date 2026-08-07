@@ -37,3 +37,24 @@ LOWER(REGEXP_EXTRACT({{ url_column }}, r'^https?://([^/:]+)'))
 {% macro page_identity(hostname_column, path_column) -%}
 CONCAT(COALESCE({{ hostname_column }}, ''), {{ path_column }})
 {%- endmacro %}
+
+{# Splits a B2B SaaS site into the three roles its pages actually play, because
+   organic traffic to each means something different and mixing them corrupts
+   every acquisition metric.
+
+   'product' pages — pricing, features, integrations, comparisons — are where
+   buying decisions happen. 'content' is the blog and guides that earn top-of-
+   funnel demand. 'support' is documentation and help, and its organic traffic is
+   overwhelmingly existing customers looking something up. A docs site can easily
+   out-rank the marketing site and account for most organic sessions while
+   contributing nothing to pipeline, so counting it as acquisition makes
+   conversion rates look terrible for reasons that have nothing to do with
+   acquisition. #}
+{% macro page_role(path_column, support_pattern, content_pattern) -%}
+CASE
+  WHEN {{ path_column }} IS NULL THEN 'unknown'
+  WHEN REGEXP_CONTAINS({{ path_column }}, {{ re_literal(support_pattern) }}) THEN 'support'
+  WHEN REGEXP_CONTAINS({{ path_column }}, {{ re_literal(content_pattern) }}) THEN 'content'
+  ELSE 'product'
+END
+{%- endmacro %}

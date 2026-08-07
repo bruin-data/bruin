@@ -3,13 +3,18 @@
 `ga4-search-console-bigquery` builds an organic search reporting layer on top of
 GA4 and Search Console data you already have in BigQuery. It does not ingest
 anything: both products export to BigQuery natively, so this template starts where
-those exports land, conforms them in `web_stage`, and publishes seven reports in
+those exports land, conforms them in `web_stage`, and publishes nine reports in
 `web_reports`.
 
 Every report answers a question GA4 and Search Console cannot answer themselves —
 not because the data is missing, but because it is split across two products that
 never join, capped at a thousand exported rows, or aggregated behind an "(other)"
-bucket. The template contains 13 assets and is meant to be edited.
+bucket. The template contains 15 assets and is meant to be edited.
+
+It is set up for a **B2B SaaS** motion out of the box — value carried by key events
+rather than ecommerce transactions, pages split by the job they do, and queries
+split by commercial intent — while remaining usable for any site that runs both
+exports. See [B2B SaaS setup](#b2b-saas-setup).
 
 ## Requirements
 
@@ -52,8 +57,10 @@ ga4-search-console-bigquery/
         ├── search_query_cannibalization.sql
         ├── search_page_trend.sql
         ├── search_new_and_lost_queries.sql
+        ├── search_competitor_visibility.sql
         ├── organic_landing_page_performance.sql
-        └── organic_query_value.sql
+        ├── organic_query_value.sql
+        └── organic_intent_pipeline.sql
 ```
 
 ## Configure it
@@ -79,7 +86,14 @@ variables:
 | `ga4_dataset` | `analytics_000000000` | GA4 export dataset. Qualify it with a project when the export lives outside the connection's project. |
 | `search_console_dataset` | `searchconsole` | Search Console export dataset. |
 | `brand_query_pattern` | `(example\|exampl\|examp1e)` | Case-insensitive RE2 pattern marking a query as branded. |
-| `key_event_names` | `["purchase", "generate_lead", "sign_up"]` | GA4 events counted as conversions. Match these to the key events configured on your property. |
+| `key_event_names` | `["sign_up", "trial_start", "demo_request", "generate_lead", "purchase"]` | GA4 events counted as conversions. Match these to the key events configured on your property. |
+| `key_event_values` | `{demo_request: 400, trial_start: 150, sign_up: 50, generate_lead: 120}` | USD value of the pipeline each key event creates. **Set this first** — without it every value metric reads zero on a site with no ecommerce revenue. |
+| `demo_event_names` | `["demo_request", "request_demo", "book_demo", "contact_sales"]` | Events meaning "the prospect asked to talk to sales". |
+| `signup_event_names` | `["sign_up", "trial_start", "start_trial"]` | Self-serve product entry, kept separate from demo requests. |
+| `competitor_names` | `["competitor-one", "competitor-two"]` | Competitors named in comparison queries. Each labels the query, so visibility is tracked per rival. |
+| `commercial_query_pattern` | pricing, alternatives, vs, best, review, … | Modifiers marking a query as commercially motivated rather than informational. |
+| `support_path_pattern` | `^/(docs\|help\|support\|…)` | Paths whose organic traffic is existing customers, not prospects. |
+| `content_path_pattern` | `^/(blog\|resources\|guides\|…)` | Paths holding top-of-funnel content marketing. |
 | `source_lookback_days` | `4` | Extra days re-read before the run window, so late and revised data heals. |
 | `reporting_window_days` | `180` | Trailing days of history the reports aggregate. Bounds the bytes each report scans. |
 | `trend_window_days` | `28` | Length of the current and prior comparison windows. |
@@ -146,6 +160,8 @@ merged row. If you would rather see one row per path, aggregate over
 | `search_new_and_lost_queries` | What did I start and stop ranking for? | Comparing periods shows how shared queries moved, not which ones appeared or vanished. |
 | `organic_landing_page_performance` | What happened after the click? | Search Console stops at the click; GA4 never receives the query or the impression. |
 | `organic_query_value` | Which queries make money? | Google deliberately never passes the query to analytics. |
+| `search_competitor_visibility` | Where do I stand on each rival's comparison queries? | Search Console scatters them through a row-capped export with no idea they belong together. |
+| `organic_intent_pipeline` | Does content marketing actually produce pipeline? | Needs query intent, page role, and post-click outcomes at once. None of the three exists in either product. |
 
 ## Reading the reports
 
@@ -205,6 +221,87 @@ questions:
 Both are estimates from observed behaviour rather than forecasts; impressions move
 when position moves. `is_expected_ctr_reliable` tells you whether the click-curve
 bucket behind the comparison has enough impressions to trust.
+
+## B2B SaaS setup
+
+Three things about a B2B SaaS site break a conventional SEO reporting stack, and
+the template is built around them.
+
+### Revenue is not in GA4, so value comes from key events
+
+Revenue is recognized in a CRM or billing system weeks after the visit. The GA4
+export carries no purchase amount, so any report that ranks pages by
+`ecommerce.purchase_revenue` ranks every page at zero.
+
+`key_event_values` fixes that by pricing each key event. A reasonable starting
+point for each weight is your average deal size multiplied by the rate at which
+that event becomes a closed deal:
+
+```yaml
+key_event_values:
+  type: object
+  default:
+    demo_request: 400     # 20k ACV x 2% demo-to-close
+    trial_start: 150
+    sign_up: 50
+    generate_lead: 120
+```
+
+Every value column then works: `outcome_value_per_search_click_usd` on
+`organic_landing_page_performance` and `modelled_outcome_value_per_click_usd` on
+`organic_query_value` are the two columns to rank a content roadmap by. `purchase`
+is deliberately absent from the weights because real ecommerce revenue is added
+from the GA4 ecommerce fields instead; giving it a weight would double count it.
+
+These figures are **modelled**. They exist to rank pages and queries against each
+other, not to be reported as recognized revenue.
+
+### Documentation traffic is not acquisition traffic
+
+Docs and help centres routinely out-rank the marketing site. That traffic is
+overwhelmingly existing customers looking something up, and leaving it in the same
+pool as pricing pages makes acquisition conversion rates look far worse than they
+are for reasons that have nothing to do with acquisition.
+
+Every page therefore carries a `page_role` of `product`, `content`, or `support`,
+driven by `support_path_pattern` and `content_path_pattern`. Filter to `product`
+when judging acquisition. In a typical shape, support pages are a large share of
+organic clicks and none of the pipeline.
+
+### Clicks and pipeline are not the same demand
+
+`organic_intent_pipeline` crosses query intent with page role, which settles the
+recurring argument about whether content marketing works. A representative result:
+
+| intent | page role | clicks | click share | value share | value / click |
+| --- | --- | ---: | ---: | ---: | ---: |
+| informational | support | 7,840 | 41% | 0% | $0.00 |
+| informational | content | 7,448 | 39% | 13% | $3.38 |
+| commercial | product | 1,008 | 5% | 27% | $51.11 |
+| branded | product | 672 | 4% | 23% | $65.00 |
+| competitor | product | 616 | 3% | 25% | $77.27 |
+
+Informational demand is 80% of the clicks and 13% of the value; commercial,
+branded, and competitor demand is 12% of the clicks and 75% of the value. That is
+not automatically an argument against content marketing — informational content is
+how a site earns the authority to rank commercially later — but it is the number
+that should decide what gets built next.
+
+`search_competitor_visibility` breaks the highest-intent slice out per rival.
+Populate `competitor_names` with real competitors, then look at `position_band`:
+ranking eleventh for "rival alternatives" means the demand exists and you are
+nowhere a searcher will look, which is usually the cheapest pipeline available to
+a startup. `has_dedicated_comparison_page` flags where a blog post is accidentally
+ranking for a comparison query instead of a real comparison page.
+
+### If you are not B2B SaaS
+
+Nothing here is mandatory. Set `key_event_values` to your own events, point
+`support_path_pattern` and `content_path_pattern` at your own structure, and leave
+`competitor_names` empty to switch competitor classification off — the intent
+column then falls back to branded, commercial, and informational. A site with real
+ecommerce revenue can leave the weights empty and the value columns still work from
+`purchase_revenue_in_usd` alone.
 
 ## Timing, freshness, and incremental behaviour
 
@@ -266,7 +363,9 @@ bruin run --start-date 2026-06-01 --end-date 2026-06-30 my-search-pipeline
 The `web_stage` models are the interface; build your own reports on those rather
 than against the raw exports. Common first changes:
 
-- Set `key_event_names` to the key events your property actually reports.
+- Set `key_event_names` and `key_event_values` to the key events your property
+  actually reports, and price each one.
+- Put your real competitors in `competitor_names`.
 - Replace `brand_query_pattern` with a lookup table if one regex cannot describe
   your brand.
 - Adjust the `page_path` macro if your URLs carry meaningful query parameters or
