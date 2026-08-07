@@ -198,6 +198,7 @@ var defaultMapping = map[string]string{
 	"kafka":                 "kafka-default",
 	"doris":                 "doris-default",
 	"duckdb":                "duckdb-default",
+	"clevertap":             "clevertap-default",
 	"clickhouse":            "clickhouse-default",
 	"hubspot":               "hubspot-default",
 	"google_sheets":         "google-sheets-default",

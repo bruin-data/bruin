@@ -2099,6 +2099,18 @@ func (c CustomerIoConnection) GetName() string {
 	return c.Name
 }
 
+type CleverTapConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	AccountID          string `yaml:"account_id,omitempty" json:"account_id" mapstructure:"account_id"`
+	Passcode           string `yaml:"passcode,omitempty" json:"passcode" mapstructure:"passcode" sensitive:"true"`
+	Region             string `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
+	Timezone           string `yaml:"timezone,omitempty" json:"timezone,omitempty" mapstructure:"timezone"`
+}
+
+func (c CleverTapConnection) GetName() string {
+	return c.Name
+}
+
 type SendgridConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`

@@ -918,6 +918,15 @@ func TestLoadFromFile(t *testing.T) {
 					Region:             "us",
 				},
 			},
+			CleverTap: []CleverTapConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "clevertap-1"},
+					AccountID:          "test-account-id",
+					Passcode:           "test-passcode",
+					Region:             "eu1",
+					Timezone:           "Asia/Kolkata",
+				},
+			},
 			Sendgrid: []SendgridConnection{
 				{
 					ConnectionMetadata: ConnectionMetadata{Name: "sendgrid-1"},
@@ -2862,6 +2871,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Primer:              []PrimerConnection{{ConnectionMetadata: ConnectionMetadata{Name: "primer1"}}},
 				Indeed:              []IndeedConnection{{ConnectionMetadata: ConnectionMetadata{Name: "indeed1"}}},
 				CustomerIo:          []CustomerIoConnection{{ConnectionMetadata: ConnectionMetadata{Name: "customerio1"}}},
+				CleverTap:           []CleverTapConnection{{ConnectionMetadata: ConnectionMetadata{Name: "clevertap1"}}},
 				Sendgrid:            []SendgridConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sendgrid1"}}},
 				Twilio:              []TwilioConnection{{ConnectionMetadata: ConnectionMetadata{Name: "twilio1"}}},
 				Braze:               []BrazeConnection{{ConnectionMetadata: ConnectionMetadata{Name: "braze1"}}},
@@ -3000,6 +3010,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Primer:              []PrimerConnection{{ConnectionMetadata: ConnectionMetadata{Name: "primer1"}}},
 				Indeed:              []IndeedConnection{{ConnectionMetadata: ConnectionMetadata{Name: "indeed1"}}},
 				CustomerIo:          []CustomerIoConnection{{ConnectionMetadata: ConnectionMetadata{Name: "customerio1"}}},
+				CleverTap:           []CleverTapConnection{{ConnectionMetadata: ConnectionMetadata{Name: "clevertap1"}}},
 				Sendgrid:            []SendgridConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sendgrid1"}}},
 				Twilio:              []TwilioConnection{{ConnectionMetadata: ConnectionMetadata{Name: "twilio1"}}},
 				Braze:               []BrazeConnection{{ConnectionMetadata: ConnectionMetadata{Name: "braze1"}}},

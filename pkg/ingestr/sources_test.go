@@ -33,6 +33,38 @@ func TestAdaptySourceTables(t *testing.T) {
 	require.True(t, hasPaywalls)
 }
 
+func TestCleverTapSourceTables(t *testing.T) {
+	t.Parallel()
+
+	source, err := GetSourceTables("clevertap")
+	require.NoError(t, err)
+	require.Equal(t, "clevertap", source.Name)
+	require.NotEmpty(t, source.Tables)
+
+	var hasEvents, hasProfiles, hasContentBlocks bool
+	for _, table := range source.Tables {
+		switch table.Name {
+		case "events":
+			hasEvents = true
+			require.Equal(t, "ts", table.IncKey)
+			require.Equal(t, "delete+insert", table.IncStrategy)
+		case "profiles":
+			hasProfiles = true
+			require.Equal(t, "object_id", table.PrimaryKey)
+			require.Equal(t, "replace", table.IncStrategy)
+		case "content_blocks":
+			hasContentBlocks = true
+			require.Equal(t, "id", table.PrimaryKey)
+			require.Equal(t, "updatedAt", table.IncKey)
+			require.Equal(t, "merge", table.IncStrategy)
+		}
+	}
+
+	require.True(t, hasEvents)
+	require.True(t, hasProfiles)
+	require.True(t, hasContentBlocks)
+}
+
 func TestSharePointSourceTables(t *testing.T) {
 	t.Parallel()
 
