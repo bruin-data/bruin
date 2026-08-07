@@ -70,7 +70,7 @@ The `events` and `profiles` tables accept an `event_name` parameter that narrows
 | `user_properties` | name | – | replace | Every custom profile property defined in your project. |
 | `category_groups` | key | – | replace | Messaging subscription groups, with the channels each one covers. |
 
-The `events` table is loaded incrementally with a delete+insert strategy keyed on `ts`, and respects `--interval-start`/`--interval-end`. All other tables are loaded in full on every run.
+The `events` table is loaded incrementally with a delete+insert strategy keyed on `ts`, and respects `--interval-start`/`--interval-end`. The `content_blocks` table is loaded incrementally with a merge strategy keyed on `updatedAt`. All other tables are loaded in full on every run.
 
 > [!NOTE]
 > `campaigns` and `campaign_reports` only ever contain campaigns created through the CleverTap API. Campaigns built in the dashboard are not included, because CleverTap offers no way to list them.
