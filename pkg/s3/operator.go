@@ -22,25 +22,9 @@ import (
 	"github.com/pkg/errors"
 )
 
-func containsWildcard(key string) bool {
-	return objectpattern.ContainsWildcard(key)
-}
-
-// TODO: Use a globbing library to reduce complexity and have support for more characters in glob expression.
-func extractPrefix(key string) string {
-	return objectpattern.ExtractPrefix(key)
-}
-
-// Supported patterns:
-//   - * matches any characters except /
-//   - {a,b,c} matches any of the comma-separated alternatives
-func wildcardToRegex(pattern string) string {
-	return objectpattern.WildcardToRegex(pattern)
-}
-
 func matchWildcard(ctx context.Context, client *s3.Client, bucket, key string) (bool, error) {
-	prefix := extractPrefix(key)
-	re, err := regexp.Compile(wildcardToRegex(key))
+	prefix := objectpattern.ExtractPrefix(key)
+	re, err := regexp.Compile(objectpattern.WildcardToRegex(key))
 	if err != nil {
 		return false, errors.Wrap(err, "failed to compile wildcard pattern")
 	}
@@ -168,7 +152,7 @@ func (ks *KeySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipel
 		fmt.Fprintln(printer, "Poking S3:", bucketName+"/"+bucketKey)
 	}
 
-	isWildcard := containsWildcard(bucketKey)
+	isWildcard := objectpattern.ContainsWildcard(bucketKey)
 
 	sensorTimeout := helpers.GetSensorTimeout(t)
 	timeout := time.After(sensorTimeout)
