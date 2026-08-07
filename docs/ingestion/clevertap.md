@@ -4,7 +4,7 @@
 
 Bruin supports CleverTap as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from CleverTap into your data warehouse.
 
-To set up a CleverTap connection, you need the Account ID and Passcode from your CleverTap project (**Settings → Project**). For more information, please refer [here](https://getbruin.com/docs/ingestr/supported-sources/clevertap.html).
+To set up a CleverTap connection, you need the Account ID and Passcode from your CleverTap project (**Settings → Project**). Your region is the subdomain of your dashboard URL, so `in1.dashboard.clevertap.com` means `region: in1`; European projects have no subdomain and appear as `global`. For more information, please refer [here](https://getbruin.com/docs/ingestr/supported-sources/clevertap.html).
 
 Follow the steps below to correctly set up CleverTap as a data source and run ingestion:
 
@@ -50,7 +50,7 @@ parameters:
 - `source_connection`: The name of the CleverTap connection defined in .bruin.yml.
 - `source_table`: The name of the data table in CleverTap you want to ingest. For example, `profiles` would ingest your user profiles.
 
-The `events` and `profiles` tables accept an `event_name` parameter that narrows them to the events you name. The name must match your CleverTap dashboard exactly, and several comma-separated names can share one destination table:
+The `events` and `profiles` tables accept an `event_name` parameter that narrows them to the events you name. Each name must match your CleverTap dashboard exactly, and several comma-separated names can share one destination table:
 
 ```yaml
   source_table: 'events?event_name=Charged,App Launched'
@@ -70,10 +70,13 @@ The `events` and `profiles` tables accept an `event_name` parameter that narrows
 | `user_properties` | name | – | replace | Every custom profile property defined in your project. |
 | `category_groups` | key | – | replace | Messaging subscription groups, with the channels each one covers. |
 
-The `events` table is loaded incrementally with a delete+insert strategy keyed on `ts`, and respects `--interval-start`/`--interval-end`. The `content_blocks` table is loaded incrementally with a merge strategy keyed on `updatedAt`. All other tables are loaded in full on every run.
+The `events` table is loaded incrementally with a delete+insert strategy keyed on `ts`, and `content_blocks` with a merge strategy keyed on `updatedAt`. Both respect `--interval-start`/`--interval-end`. All other tables are loaded in full on every run.
 
 > [!NOTE]
 > `campaigns` and `campaign_reports` only ever contain campaigns created through the CleverTap API. Campaigns built in the dashboard are not included, because CleverTap offers no way to list them.
+
+> [!WARNING]
+> Join `events` to `profiles` on `identity`, not `object_id`. `object_id` identifies a single device, so someone using your app on both a phone and a laptop has a different one for each, and joining on it silently drops the events they raised on their other devices.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 
