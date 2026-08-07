@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 
@@ -394,6 +395,61 @@ type ParseCommand struct {
 	errorPrinter *color2.Color
 }
 
+// buildAssetDatabaseMap best-effort maps each asset name to its connection's
+// configured database (from .bruin.yml). Column-lineage resolution uses it to
+// match a table reference that is qualified with its database (e.g.
+// prod.schema.table) back to the two-part asset. Returns an empty map when no
+// config is available, in which case resolution falls back to exact matching.
+func buildAssetDatabaseMap(inputPath string, foundPipeline *pipeline.Pipeline) map[string]string {
+	result := map[string]string{}
+	fs := afero.NewOsFs()
+	repoRoot, err := git.FindRepoFromPath(inputPath)
+	if err != nil {
+		return result
+	}
+	configPath := filepath.Join(repoRoot.Path, ".bruin.yml")
+	if exists, _ := afero.Exists(fs, configPath); !exists {
+		return result
+	}
+	cm, err := config.LoadOrCreate(fs, configPath)
+	if err != nil || cm.SelectedEnvironment == nil {
+		return result
+	}
+	for _, asset := range foundPipeline.Assets {
+		connName, err := foundPipeline.GetConnectionNameForAsset(asset)
+		if err != nil || connName == "" {
+			continue
+		}
+		if db := connectionDatabase(cm.SelectedEnvironment.Connections.GetConnection(connName)); db != "" {
+			result[asset.Name] = db
+		}
+	}
+	return result
+}
+
+// connectionDatabase reads the "Database" field from a connection config of any
+// type. Most SQL connections (Fabric, MSSQL, Snowflake, Postgres, ...) expose
+// it; those that don't yield "".
+func connectionDatabase(conn any) string {
+	if conn == nil {
+		return ""
+	}
+	v := reflect.ValueOf(conn)
+	for v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return ""
+		}
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Struct {
+		return ""
+	}
+	if f := v.FieldByName("Database"); f.IsValid() && f.Kind() == reflect.String {
+		return f.String()
+	}
+	return ""
+}
+
 func (r *ParseCommand) ParsePipeline(ctx context.Context, assetPath string, lineage bool, slimResponse bool, variantName string) error {
 	// defer RecoverFromPanic()
 	var lineageWg conc.WaitGroup
@@ -465,7 +521,8 @@ func (r *ParseCommand) ParsePipeline(ctx context.Context, assetPath string, line
 
 		defer sqlParser.Close()
 		processedAssets := make(map[string]bool)
-		lineage := lineagepackage.NewLineageExtractor(sqlParser)
+		lineage := lineagepackage.NewLineageExtractor(sqlParser).
+			WithAssetDatabases(buildAssetDatabaseMap(assetPath, foundPipeline))
 		for _, asset := range foundPipeline.Assets {
 			errIssues := lineage.ColumnLineage(foundPipeline, asset, processedAssets)
 			if errIssues != nil {
@@ -662,7 +719,8 @@ func (r *ParseCommand) Run(ctx context.Context, assetPath string, lineage bool, 
 		defer sqlParser.Close()
 
 		processedAssets := make(map[string]bool)
-		lineageExtractor := lineagepackage.NewLineageExtractor(sqlParser)
+		lineageExtractor := lineagepackage.NewLineageExtractor(sqlParser).
+			WithAssetDatabases(buildAssetDatabaseMap(assetPath, foundPipeline))
 		lineageErrors := lineageExtractor.ColumnLineage(foundPipeline, asset, processedAssets)
 		if lineageErrors != nil {
 			for _, issue := range lineageErrors.Issues {

@@ -16,8 +16,9 @@ type sqlParser interface {
 }
 
 type LineageExtractor struct {
-	sqlParser sqlParser
-	renderer  *jinja.Renderer
+	sqlParser      sqlParser
+	renderer       *jinja.Renderer
+	assetDatabases map[string]string
 }
 
 type LineageError struct {
@@ -37,6 +38,39 @@ func NewLineageExtractor(parser sqlParser) *LineageExtractor {
 		sqlParser: parser,
 		renderer:  jinja.NewRendererWithYesterday("lineage-parser", "lineage-parser"),
 	}
+}
+
+// WithAssetDatabases attaches an asset-name -> database map (from .bruin.yml) so
+// column-lineage resolution can match a table reference that is qualified with
+// its database (e.g. prod.schema.table) back to the two-part asset schema.table.
+// Optional; when unset, resolution falls back to exact name matching.
+func (p *LineageExtractor) WithAssetDatabases(assetDatabases map[string]string) *LineageExtractor {
+	p.assetDatabases = assetDatabases
+	return p
+}
+
+// resolveUpstreamAsset finds the asset a column-lineage table reference points
+// to. It first tries an exact, case-insensitive match on the asset name. If that
+// fails and the reference is qualified with a leading database (e.g.
+// prod.schema.table against the asset schema.table), it qualifies each candidate
+// asset with its own connection's database and matches on the fully-qualified
+// name. Matching is case-insensitive and returns the canonical asset; a
+// genuinely external table (whose database does not match any asset's) resolves
+// to nil so no false edge is drawn.
+func (p *LineageExtractor) resolveUpstreamAsset(foundPipeline *pipeline.Pipeline, table string) *pipeline.Asset {
+	if asset := foundPipeline.GetAssetByNameCaseInsensitive(table); asset != nil {
+		return asset
+	}
+	for _, asset := range foundPipeline.Assets {
+		db := p.assetDatabases[asset.Name]
+		if db == "" {
+			continue
+		}
+		if strings.EqualFold(db+"."+asset.Name, table) {
+			return asset
+		}
+	}
+	return nil
 }
 
 // TableSchema extracts the table schema from the assets and stores it in the columnMetadata map.
@@ -164,7 +198,7 @@ func (p *LineageExtractor) parseLineage(foundPipeline *pipeline.Pipeline, asset 
 
 func (p *LineageExtractor) mergeAsteriskColumns(foundPipeline *pipeline.Pipeline, asset *pipeline.Asset, lineageCol sqlparser.ColumnLineage) error {
 	for _, upstream := range lineageCol.Upstream {
-		upstreamAsset := foundPipeline.GetAssetByNameCaseInsensitive(upstream.Table)
+		upstreamAsset := p.resolveUpstreamAsset(foundPipeline, upstream.Table)
 		if upstreamAsset == nil {
 			return nil
 		}
@@ -277,7 +311,7 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *pipeline.Pipelin
 				continue
 			}
 
-			upstreamAsset := foundPipeline.GetAssetByNameCaseInsensitive(upstream.Table)
+			upstreamAsset := p.resolveUpstreamAsset(foundPipeline, upstream.Table)
 			if upstreamAsset == nil {
 				if err := p.addColumnToAsset(asset, lineageCol.Name, &pipeline.Column{
 					Name:       lineageCol.Name,
