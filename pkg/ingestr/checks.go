@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -57,5 +58,42 @@ func (i IngestrCustomCheckOperator) Run(ctx context.Context, ti scheduler.TaskIn
 func NewCustomCheckOperator(configs *map[pipeline.AssetType]executor.Config) *IngestrCustomCheckOperator {
 	return &IngestrCustomCheckOperator{
 		configs: configs,
+	}
+}
+
+type IngestrMetadataPushOperator struct {
+	configs    *map[pipeline.AssetType]executor.Config
+	connection config.ConnectionGetter
+}
+
+func (i IngestrMetadataPushOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
+	asset := ti.GetAsset()
+	assetType, err := helpers.GetIngestrDestinationType(asset)
+	if err != nil {
+		return err
+	}
+
+	pusher, ok := (*i.configs)[assetType][scheduler.TaskInstanceTypeMetadataPush]
+	if _, isNoOp := pusher.(executor.NoOpOperator); !ok || isNoOp {
+		ti.MarkAs(scheduler.Skipped)
+		return nil
+	}
+
+	connName, err := ti.GetPipeline().GetConnectionNameForAsset(asset)
+	if err != nil {
+		return err
+	}
+	if i.connection.GetConnection(connName) == nil {
+		ti.MarkAs(scheduler.Skipped)
+		return nil
+	}
+
+	return pusher.Run(ctx, ti)
+}
+
+func NewMetadataPushOperator(configs *map[pipeline.AssetType]executor.Config, conn config.ConnectionGetter) *IngestrMetadataPushOperator {
+	return &IngestrMetadataPushOperator{
+		configs:    configs,
+		connection: conn,
 	}
 }

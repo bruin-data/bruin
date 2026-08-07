@@ -312,26 +312,15 @@ func printExecutionSummary(results []*scheduler.TaskExecutionResult, s *schedule
 
 	// Metadata push
 	if summary.MetadataPush.HasAny() {
-		metadataExecuted := summary.MetadataPush.Succeeded + summary.MetadataPush.Failed
-		if summary.MetadataPush.Failed > 0 {
+		if summary.MetadataPush.Failed > 0 || summary.MetadataPush.Skipped > 0 || summary.MetadataPush.NotStarted > 0 {
 			summaryPrinter.Printf(" %s Metadata pushed      %s\n",
 				color.New(color.FgRed).Sprint("✗"),
-				formatCount(metadataExecuted, summary.MetadataPush.Failed))
+				formatCountWithSkipped(summary.MetadataPush.Total, summary.MetadataPush.Failed, 0, summary.MetadataPush.Skipped, summary.MetadataPush.NotStarted))
 		} else {
 			summaryPrinter.Printf(" %s Metadata pushed      %d\n",
-				color.New(color.FgGreen).Sprint("✓"), metadataExecuted)
+				color.New(color.FgGreen).Sprint("✓"), summary.MetadataPush.Succeeded)
 		}
 	}
-}
-
-func formatCount(total, failed int) string {
-	if failed == 0 {
-		return strconv.Itoa(total)
-	}
-	succeeded := total - failed
-	return fmt.Sprintf("%s / %s",
-		color.New(color.FgRed).Sprintf("%d failed", failed),
-		color.New(color.FgGreen).Sprintf("%d succeeded", succeeded))
 }
 
 func formatCountWithSkipped(total, failed, failedDueToChecks, skipped, notStarted int) string {
@@ -417,9 +406,12 @@ func analyzeResults(results []*scheduler.TaskExecutionResult, s *scheduler.Sched
 			}
 		case *scheduler.MetadataPushInstance:
 			summary.MetadataPush.Total++
-			if succeeded {
+			switch {
+			case instance.GetStatus() == scheduler.Skipped:
+				summary.MetadataPush.Skipped++
+			case succeeded:
 				summary.MetadataPush.Succeeded++
-			} else {
+			default:
 				summary.MetadataPush.Failed++
 			}
 		}
@@ -2456,10 +2448,12 @@ func SetupExecutors(
 		}
 		ingestrCheckRunner := ingestr.NewColumnCheckOperator(&mainExecutors)
 		ingestrCustomCheckRunner := ingestr.NewCustomCheckOperator(&mainExecutors)
+		ingestrMetadataPushRunner := ingestr.NewMetadataPushOperator(&mainExecutors, conn)
 
 		mainExecutors[pipeline.AssetTypeIngestr][scheduler.TaskInstanceTypeMain] = ingestrOperator
 		mainExecutors[pipeline.AssetTypeIngestr][scheduler.TaskInstanceTypeColumnCheck] = ingestrCheckRunner
 		mainExecutors[pipeline.AssetTypeIngestr][scheduler.TaskInstanceTypeCustomCheck] = ingestrCustomCheckRunner
+		mainExecutors[pipeline.AssetTypeIngestr][scheduler.TaskInstanceTypeMetadataPush] = ingestrMetadataPushRunner
 	}
 
 	//nolint:dupl
