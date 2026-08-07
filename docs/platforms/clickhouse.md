@@ -98,13 +98,14 @@ Runs a materialized ClickHouse asset or an SQL script. An unmaterialized asset c
 | --- | --- | --- |
 | `create+replace` | Supported | Runs `CREATE OR REPLACE TABLE <target> PRIMARY KEY <key> AS <asset query>`. Requires `columns` and exactly one column marked `primary_key: true`. |
 | `append` | Supported | Runs `INSERT INTO <target> <asset query>`. Bruin does not add filtering or deduplicate rows; make the asset query select only the new rows. |
-| `delete+insert` | Supported | Refreshes the values returned for an `incremental_key`: it writes the query result to a temporary table, deletes target rows whose incremental-key value occurs in that table, inserts the temporary-table rows, then drops the temporary table. Requires `incremental_key`, `columns`, and exactly one `primary_key: true` column. |
-| `time_interval` | Supported | On a normal run, deletes target rows in the requested date or timestamp interval, then inserts the asset query result with `SETTINGS insert_deduplicate = 0` so a rerun of the same interval is not suppressed by ClickHouse insert deduplication. Requires `incremental_key`, `time_granularity` (`date` or `timestamp`), and an existing target table. The asset query must filter itself to the same interval. A `--full-refresh` runs `create+replace` instead, which requires `columns` and exactly one `primary_key: true` column. |
+| `delete+insert` | Supported | Refreshes the values returned for an `incremental_key`: it writes the query result to a temporary table, creates an empty target from that staged result if needed, deletes target rows whose incremental-key value occurs in the temporary table, inserts the staged rows, then drops the temporary table. Requires `incremental_key`, `columns`, and exactly one `primary_key: true` column. |
+| `time_interval` | Supported | On a normal run, creates an empty `MergeTree` target from the query schema if needed, deletes target rows in the requested date or timestamp interval, then inserts the asset query result with `SETTINGS insert_deduplicate = 0` so a rerun of the same interval is not suppressed by ClickHouse insert deduplication. Requires `incremental_key` and `time_granularity` (`date` or `timestamp`). The asset query must filter itself to the same interval. A `--full-refresh` runs `create+replace` instead, which requires `columns` and exactly one `primary_key: true` column. |
 | `truncate+insert` | Supported | Truncates the existing table, then inserts the asset query result. This is a full-table refresh that preserves the table definition; it is not an incremental strategy. |
 | `ddl` | Supported | Creates the table if it does not already exist from the defined columns, primary key, and optional `partition_by`. Do not include a query in a DDL asset. |
-| `merge`, `scd2_by_column`, `scd2_by_time` | Not supported | Use `delete+insert`, `time_interval`, or an explicit ClickHouse SQL implementation instead. |
+| `merge` | Supported | Stages the query result, creates an empty target with the configured primary key if needed, then replaces rows matching the primary key. |
+| `scd2_by_column`, `scd2_by_time` | Not supported | Use an explicit ClickHouse SQL implementation instead. |
 
-Create the target table with `create+replace` or `ddl` before its first `append`, `delete+insert`, `time_interval`, or `truncate+insert` run. `create+replace`, including a `--full-refresh` of a `time_interval` asset, requires `columns` and exactly one `primary_key: true` column. The primary key is used in the `CREATE OR REPLACE TABLE` statement; Bruin does not use it to deduplicate or merge rows.
+`delete+insert`, `merge`, and `time_interval` create the target automatically on their first run. Create the target table with `create+replace` or `ddl` before its first `append` or `truncate+insert` run. `create+replace`, including a `--full-refresh` of a `time_interval` asset, requires `columns` and exactly one `primary_key: true` column. The primary key is used in the `CREATE OR REPLACE TABLE` statement; Bruin does not use it to deduplicate rows.
 
 View materializations support only the default strategy, which creates or replaces the view. Table-only strategies, including all incremental strategies, are not supported for views.
 
@@ -172,7 +173,7 @@ Running `bruin run --full-refresh` changes every ClickHouse table materializatio
 
 Bruin does not translate or validate ClickHouse column types against its own allowlist. For `ddl` materializations, it passes `columns[].type` through to ClickHouse. `precision`/`scale` or `length` are added to an unparameterized type when you provide them separately. ClickHouse is therefore the authority for whether a type is available on your server version and configuration; see its [data type reference](https://clickhouse.com/docs/sql-reference/data-types) for the complete, current list.
 
-For `create+replace`, `delete+insert`, and a `--full-refresh`, ClickHouse derives a new table's column types from the asset query's `SELECT` result. For `append`, `truncate+insert`, and normal `time_interval` runs, ClickHouse uses the existing target table's schema.
+For `create+replace`, `delete+insert`, `merge`, `time_interval`, and a `--full-refresh`, ClickHouse derives a missing table's column types from the asset query's `SELECT` result. Once the target exists, `append`, `truncate+insert`, and normal incremental runs use its existing schema.
 
 Common ClickHouse column types include:
 
@@ -296,7 +297,7 @@ The compatibility check catches errors such as a different number of staged and 
 
 Unlike merge implementations that expose `source` and `target` aliases, ClickHouse's `DELETE` statement has no target alias. A ClickHouse `incremental_predicate` must therefore reference target columns without qualification, for example `event_date >= toDate('2026-07-01')` rather than `target.event_date >= toDate('2026-07-01')`.
 
-Merge assets must declare `columns` and at least one `primary_key` column. Composite primary keys are supported. On a full refresh, Bruin falls back to `create+replace` (creating the table from the query result) so the target exists for subsequent incremental merges.
+Merge assets must declare `columns` and at least one `primary_key` column. Composite primary keys are supported. A normal first run creates an empty target from the staged query result before merging. On a full refresh, Bruin falls back to `create+replace` and recreates the table from the query result.
 
 Here's a sample asset with `merge` materialization:
 

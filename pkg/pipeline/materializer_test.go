@@ -169,8 +169,23 @@ func (m listMaterializerWithCleanup) RenderWithCleanup(_ *Asset, _ string) ([]st
 }
 
 type listWithLocationMaterializer struct {
-	out         []string
-	gotLocation string
+	out              []string
+	initialOut       []string
+	gotLocation      string
+	gotInitialQuery  string
+	gotInitialTarget string
+	fullRefresh      bool
+}
+
+func (m *listWithLocationMaterializer) RenderInitialTable(asset *Asset, query, location string) ([]string, error) {
+	m.gotInitialTarget = asset.Name
+	m.gotInitialQuery = query
+	m.gotLocation = location
+	return m.initialOut, nil
+}
+
+func (m *listWithLocationMaterializer) IsFullRefresh() bool {
+	return m.fullRefresh
 }
 
 func (m *listWithLocationMaterializer) Render(_ *Asset, _ string, location string) ([]string, error) {
@@ -258,4 +273,27 @@ func TestHookWrapperMaterializerListWithLocation_Render(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"select 1;", "select 3", "select 2;"}, got)
 	assert.Equal(t, "s3://bucket", base.gotLocation)
+}
+
+func TestHookWrapperMaterializerListWithLocation_IncrementalInitialization(t *testing.T) {
+	t.Parallel()
+
+	asset := &Asset{
+		Name:  "analytics.events",
+		Hooks: Hooks{Pre: []Hook{{Query: "prepare raw events"}}},
+	}
+	base := &listWithLocationMaterializer{
+		initialOut:  []string{"create empty table"},
+		fullRefresh: true,
+	}
+	wrapper := HookWrapperMaterializerListWithLocation{Mat: base}
+
+	got, err := wrapper.RenderInitialTable(asset, "select event_date from raw_events", "s3://bucket")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"create empty table"}, got)
+	assert.Equal(t, asset.Name, base.gotInitialTarget)
+	assert.Equal(t, "select event_date from raw_events", base.gotInitialQuery)
+	assert.Equal(t, "s3://bucket", base.gotLocation)
+	assert.True(t, wrapper.IsFullRefresh())
+	assert.Equal(t, 1, wrapper.InitialTableInsertionIndex(asset))
 }
