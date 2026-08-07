@@ -107,40 +107,22 @@ IF(
 {% if values %}{{ column }} IN ({% for value in values %}{{ sql_literal(value) }}{% if not loop.last %}, {% endif %}{% endfor %}){% else %}FALSE{% endif %}
 {%- endmacro %}
 
-{# Selects the GA4 export tables to read from the events_* wildcard.
+{# Window over the GA4 streaming export tables.
 
-   The wildcard matches both events_YYYYMMDD and events_intraday_YYYYMMDD. Which
-   of the two exists depends on how the property's export is configured, and
-   getting it wrong returns an empty model rather than an error: a streaming-only
-   export has no daily tables whatsoever, so a daily-only filter matches nothing.
+   The template reads events_intraday_* only. Selecting through that wildcard
+   rather than events_* means _TABLE_SUFFIX is just the eight-digit date, so the
+   comparison below is a plain literal range that BigQuery can prune, and the
+   daily tables cannot be picked up by accident.
 
-   Both branches compare _TABLE_SUFFIX directly against a literal range so
-   BigQuery can still prune the wildcard. The prefix is constant within a branch,
-   so the lexicographic range also excludes the other table family on its own —
-   'intraday_20260801' sorts above any eight-digit suffix.
-
-   One asymmetry to know about. In 'daily' mode a still-filling day is impossible
-   to read because its table does not exist yet. In 'intraday' mode it is not: the
-   current day's table is present and partial, so a run whose end_date is today
-   loads a fraction of it. Whole days are replaced on every run and the lookback
-   window re-reads them, so the partial day heals on the next run; only a report
-   built during the same day sees it. #}
-{% macro ga4_events_table_filter(mode, start_date, end_date, lookback_days) -%}
-{% if mode == 'intraday' -%}
-REGEXP_CONTAINS(_TABLE_SUFFIX, r'^intraday_[0-9]{8}$')
-    AND _TABLE_SUFFIX
-      BETWEEN CONCAT('intraday_', FORMAT_DATE(
-        '%Y%m%d',
-        DATE_SUB(DATE('{{ start_date }}'), INTERVAL {{ lookback_days }} DAY)
-      ))
-      AND CONCAT('intraday_', FORMAT_DATE('%Y%m%d', DATE('{{ end_date }}')))
-{%- else -%}
-REGEXP_CONTAINS(_TABLE_SUFFIX, r'^[0-9]{8}$')
-    AND _TABLE_SUFFIX
+   One thing to know: the current day's table exists and is still filling, so a
+   run whose end_date is today reads a fraction of it. The default run window ends
+   yesterday, and whole days are replaced on every run, so it corrects itself on
+   the next one. #}
+{% macro ga4_intraday_window(start_date, end_date, lookback_days) -%}
+_TABLE_SUFFIX
       BETWEEN FORMAT_DATE(
         '%Y%m%d',
         DATE_SUB(DATE('{{ start_date }}'), INTERVAL {{ lookback_days }} DAY)
       )
       AND FORMAT_DATE('%Y%m%d', DATE('{{ end_date }}'))
-{%- endif %}
 {%- endmacro %}

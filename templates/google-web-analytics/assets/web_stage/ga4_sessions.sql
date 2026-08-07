@@ -11,7 +11,7 @@ description: >
   A session is keyed on user_pseudo_id and the ga_session_id event parameter, and
   dated by the earliest event_date it contains. event_date is stamped in the
   property's reporting timezone, which is the same basis the GA4 interface uses.
-  Sessions that cross midnight span two daily export tables, so the run window is
+  Sessions that cross midnight span two intraday export tables, so the run window is
   widened by source_lookback_days and whole days are replaced on every run; a
   session split by the window edge is completed by the following run.
 
@@ -311,9 +311,8 @@ WITH source_events AS (
       WHEN traffic_source.medium IS NOT NULL THEN 'user_first_touch'
       ELSE 'unavailable'
     END AS traffic_source_basis
-  FROM `{{ var.ga4_dataset }}.events_*`
-  WHERE {{ ga4_events_table_filter(
-      var.ga4_table_mode, start_date, end_date, var.source_lookback_days) }}
+  FROM `{{ var.ga4_dataset }}.events_intraday_*`
+  WHERE {{ ga4_intraday_window(start_date, end_date, var.source_lookback_days) }}
 ),
 
 sessionized AS (

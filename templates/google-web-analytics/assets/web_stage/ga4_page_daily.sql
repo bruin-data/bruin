@@ -180,9 +180,8 @@ WITH page_view_events AS (
       collected_traffic_source.manual_source,
       traffic_source.source
     ) AS session_source
-  FROM `{{ var.ga4_dataset }}.events_*`
-  WHERE {{ ga4_events_table_filter(
-      var.ga4_table_mode, start_date, end_date, var.source_lookback_days) }}
+  FROM `{{ var.ga4_dataset }}.events_intraday_*`
+  WHERE {{ ga4_intraday_window(start_date, end_date, var.source_lookback_days) }}
     AND event_name = 'page_view'
 ),
 

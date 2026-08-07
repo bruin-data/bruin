@@ -270,20 +270,19 @@ func TestGoogleWebAnalyticsTemplateReadsExistingExports(t *testing.T) {
 		return string(content)
 	}
 
-	// Both GA4 models must pick their export tables through the shared macro. A
-	// property exporting only continuously has no events_YYYYMMDD tables at all, so
-	// a hard-coded daily filter returns an empty model rather than an error --
-	// verified against a real streaming-only export, which held 0 rows in daily
-	// tables and 9089 in intraday ones for the same window.
+	// The template is scoped to the streaming export. Selecting through the
+	// events_intraday_* wildcard rather than events_* makes _TABLE_SUFFIX the bare
+	// date and makes it impossible to pick up a daily table by accident. Verified
+	// against a real property whose 981 export tables are all intraday.
 	for _, asset := range []string{"ga4_sessions", "ga4_page_daily"} {
 		content := readTemplate("google-web-analytics/assets/web_stage/" + asset + ".sql")
-		require.Contains(t, content, "`{{ var.ga4_dataset }}.events_*`", asset)
-		require.Contains(t, content, "ga4_events_table_filter(", asset)
+		require.Contains(t, content, "`{{ var.ga4_dataset }}.events_intraday_*`", asset)
+		require.Contains(t, content, "ga4_intraday_window(", asset)
+		// Out of scope: daily tables and the user-data export.
+		require.NotContains(t, content, "`{{ var.ga4_dataset }}.events_*`", asset)
+		require.NotContains(t, content, "pseudonymous_users", asset)
+		require.NotContains(t, content, "ga4_table_mode", asset)
 	}
-
-	macros := readTemplate("google-web-analytics/macros/search.sql")
-	require.Contains(t, macros, `REGEXP_CONTAINS(_TABLE_SUFFIX, r'^[0-9]{8}$')`)
-	require.Contains(t, macros, `REGEXP_CONTAINS(_TABLE_SUFFIX, r'^intraday_[0-9]{8}$')`)
 
 	// Streaming-only exports leave every session-scoped traffic-source field NULL,
 	// which made every session look non-organic and emptied every organic report.

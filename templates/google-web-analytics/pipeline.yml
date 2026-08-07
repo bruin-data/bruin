@@ -10,9 +10,9 @@ default_connections:
   google_cloud_platform: gcp-default
 
 variables:
-  # Dataset holding the GA4 BigQuery export, i.e. the one containing the
-  # events_YYYYMMDD tables. Qualify it with a project when the export lives
-  # outside the project configured on the gcp-default connection.
+  # Dataset holding the GA4 streaming export, i.e. the one containing the
+  # events_intraday_YYYYMMDD tables. Qualify it with a project when the export
+  # lives outside the project configured on the gcp-default connection.
   ga4_dataset:
     type: string
     default: analytics_000000000
@@ -98,27 +98,6 @@ variables:
   content_path_pattern:
     type: string
     default: "^/(blog|resources|guides|guide|learn|academy|glossary|templates|use-cases|comparisons)(/|$)"
-
-  # Which GA4 export tables to read.
-  #
-  # A property with the daily export enabled produces events_YYYYMMDD tables, and
-  # 'daily' reads those while skipping the still-filling intraday table. A property
-  # configured for streaming export only never produces a daily table at all — its
-  # entire history lives in events_intraday_YYYYMMDD — and must use 'intraday' or
-  # every GA4 model silently returns no rows.
-  #
-  # Check which you have before the first run:
-  #   SELECT COUNTIF(REGEXP_CONTAINS(table_id, r'^events_[0-9]{8}$')) AS daily,
-  #          COUNTIF(REGEXP_CONTAINS(table_id, r'^events_intraday_')) AS intraday
-  #   FROM `your_project.your_ga4_dataset.__TABLES__`
-  #
-  # In 'intraday' mode the current day's table exists and is still filling, so a
-  # run ending today reads a partial day. The default run window ends yesterday,
-  # and whole days are replaced on each run, so it heals by itself.
-  ga4_table_mode:
-    type: string
-    enum: ["daily", "intraday"]
-    default: daily
 
   # Extra days re-read before the run window. Search Console publishes with a
   # two-to-three day delay and revises history, and GA4 finalizes a daily table

@@ -20,9 +20,10 @@ exports. See [B2B SaaS setup](#b2b-saas-setup).
 
 You need both exports already running and landing in BigQuery:
 
-- The [GA4 BigQuery export](https://support.google.com/analytics/answer/9823238),
-  which creates a dataset named `analytics_<property_id>` containing
-  `events_YYYYMMDD` tables.
+- The [GA4 BigQuery export](https://support.google.com/analytics/answer/9823238)
+  with **streaming** export enabled, which creates a dataset named
+  `analytics_<property_id>` containing `events_intraday_YYYYMMDD` tables. The
+  template reads those and only those; see [Scope](#scope-streaming-export-only).
 - The [Search Console bulk data export](https://support.google.com/webmasters/answer/12918484),
   which creates a dataset containing `searchdata_site_impression`,
   `searchdata_url_impression`, and `ExportLog`.
@@ -86,7 +87,6 @@ variables:
 | `ga4_dataset` | `analytics_000000000` | GA4 export dataset. Qualify it with a project when the export lives outside the connection's project. |
 | `search_console_dataset` | `searchconsole` | Search Console export dataset. |
 | `brand_query_pattern` | `(example\|exampl\|examp1e)` | Case-insensitive RE2 pattern marking a query as branded. |
-| `ga4_table_mode` | `daily` | Which GA4 export tables to read. **Check this first** — a streaming-only export has no daily tables and every GA4 model returns nothing. |
 | `key_event_names` | `["sign_up", "trial_start", "demo_request", "generate_lead", "purchase"]` | GA4 events counted as conversions. Match these to the key events configured on your property. |
 | `key_event_values` | `{demo_request: 400, trial_start: 150, sign_up: 50, generate_lead: 120}` | USD value of the pipeline each key event creates. **Set this first** — without it every value metric reads zero on a site with no ecommerce revenue. |
 | `demo_event_names` | `["demo_request", "request_demo", "book_demo", "contact_sales"]` | Events meaning "the prospect asked to talk to sales". |
@@ -106,6 +106,18 @@ Override any of them per run without editing the file:
 ```bash
 bruin run --var reporting_window_days=365 google-web-analytics
 ```
+
+`brand_query_pattern`, `competitor_names`, `commercial_query_pattern`,
+`support_path_pattern`, and `content_path_pattern` are all evaluated **inside the
+staging models**, so their results are materialized. Changing any of them means
+rebuilding `web_stage`, not just the reports:
+
+```bash
+bruin run --full-refresh my-pipeline/assets/web_stage
+```
+
+Overriding one with `--var` on a report alone changes nothing, because the report
+reads the classification that staging already stored.
 
 The brand pattern is the one setting worth getting right before you read anything,
 because it splits the traffic that measures SEO work from the traffic that measures
@@ -311,26 +323,27 @@ all, and both fail quietly rather than loudly. Verified against a real
 streaming-only property, where the daily-table filter matched 0 rows for a window
 that held 9,089 rows in intraday tables.
 
-### Which tables exist
+### Scope: streaming export only
+
+This template reads `events_intraday_*` and nothing else. It does not read the
+daily `events_YYYYMMDD` tables, and it does not read `pseudonymous_users_*` or
+`users_*`. Confirm your property produces intraday tables:
 
 ```sql
-SELECT COUNTIF(REGEXP_CONTAINS(table_id, r'^events_[0-9]{8}$'))   AS daily,
-       COUNTIF(REGEXP_CONTAINS(table_id, r'^events_intraday_'))   AS intraday
+SELECT COUNTIF(REGEXP_CONTAINS(table_id, r'^events_intraday_')) AS intraday,
+       COUNTIF(REGEXP_CONTAINS(table_id, r'^events_[0-9]{8}$'))  AS daily
 FROM `your_project.your_ga4_dataset.__TABLES__`
 ```
 
-A property with the daily export enabled reports `daily > 0`; leave
-`ga4_table_mode` at `daily`. A property configured for streaming export only
-reports `daily = 0` and must set `ga4_table_mode: intraday`, because its entire
-history lives in `events_intraday_YYYYMMDD` and those tables are never replaced.
+A property with streaming export enabled reports `intraday > 0` and the template
+works as shipped. A property that produces only daily tables reports
+`intraday = 0`, and every GA4 model returns nothing — point `ga4_dataset` at a
+streaming-enabled property, or change the two GA4 models to read `events_*`.
 
-On the property tested, those intraday tables were complete days — events spanning
-00:00 to 23:5x with believable weekday and weekend volumes — so reading them is not
-a downgrade for historical dates. The exception is today: at midday it held 1,413
-events against 3,256 for the previous full day. `daily` mode cannot read a partial
-day because the table does not exist yet, but `intraday` mode can, so a run ending
-today loads part of it. Whole days are replaced on each run, so it corrects itself
-on the next one.
+Intraday tables are a complete record for past dates: on the property this was
+built against, 981 of them span 2023-12-01 onward with events covering full days.
+The one partial day is today, which the default run window excludes and which
+whole-day replacement corrects on the next run.
 
 ### Whether session attribution is populated
 
@@ -339,7 +352,7 @@ SELECT COUNT(*) AS events,
        COUNTIF(session_traffic_source_last_click.cross_channel_campaign
                  .default_channel_group IS NOT NULL) AS session_scoped,
        COUNTIF(traffic_source.medium IS NOT NULL)     AS user_first_touch
-FROM `your_project.your_ga4_dataset.events_*`
+FROM `your_project.your_ga4_dataset.events_intraday_*`
 WHERE _TABLE_SUFFIX >= '20260101'
 ```
 
@@ -365,7 +378,7 @@ The property tested had none of them — its form conversion fires `form_start`.
 what you actually send before setting the weights:
 
 ```sql
-SELECT event_name, COUNT(*) FROM `your_project.your_ga4_dataset.events_*`
+SELECT event_name, COUNT(*) FROM `your_project.your_ga4_dataset.events_intraday_*`
 WHERE _TABLE_SUFFIX >= '20260101' GROUP BY 1 ORDER BY 2 DESC
 ```
 
@@ -379,8 +392,8 @@ next run. `web_stage.gsc_export_log` is where you confirm what Google actually
 published: a bumped `epoch_version` means Google restated a date rather than the
 site changing.
 
-The GA4 models read the `events_*` wildcard but exclude the `events_intraday_`
-tables, so a day is only ever loaded once it is final.
+The GA4 models read the `events_intraday_*` wildcard, so the only partial day is
+today's; see [Scope](#scope-streaming-export-only).
 
 Two known edges, both documented on the assets:
 
