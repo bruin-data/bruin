@@ -59,6 +59,36 @@ queries:
       GROUP BY usage_date
       ORDER BY usage_date
 
+  model_usage:
+    sql: |
+      SELECT
+        platform,
+        model,
+        model_attribution,
+        platform || ' / ' || CASE
+          WHEN model_attribution = 'model_set' THEN model || ' (model set)'
+          WHEN model_attribution = 'unknown' THEN 'Unknown model'
+          ELSE model
+        END AS model_label,
+        COUNT(DISTINCT user_type || ':' || user_id) AS active_users,
+        COUNT(DISTINCT usage_date) AS active_days,
+        SUM(sessions) AS sessions,
+        SUM(requests) AS requests,
+        SUM(input_tokens) AS input_tokens,
+        SUM(output_tokens) AS output_tokens,
+        SUM(cache_read_tokens) AS cache_read_tokens,
+        SUM(cache_creation_tokens) AS cache_creation_tokens,
+        SUM(total_tokens) AS total_tokens,
+        ROUND(SUM(estimated_cost_usd), 2) AS estimated_cost_usd
+      FROM marts.ai_coding_usage_by_user_model_day
+      WHERE usage_date >= CAST('{{ filters.date_range.start }}' AS DATE)
+        AND usage_date <= CAST('{{ filters.date_range.end }}' AS DATE)
+      {% if filters.platform != 'All' %}
+        AND platform = '{{ filters.platform }}'
+      {% endif %}
+      GROUP BY platform, model, model_attribution
+      ORDER BY estimated_cost_usd DESC, total_tokens DESC
+
   user_summary:
     sql: |
       SELECT
@@ -185,6 +215,54 @@ rows:
         x: platform
         y: [requests]
         col: 6
+
+  - widgets:
+      - name: Tokens by Model
+        type: chart
+        chart: bar
+        query: model_usage
+        x: model_label
+        y: [total_tokens]
+        col: 6
+
+      - name: Cost by Model
+        type: chart
+        chart: bar
+        query: model_usage
+        x: model_label
+        y: [estimated_cost_usd]
+        col: 6
+
+  - widgets:
+      - name: Model Usage Breakdown
+        type: table
+        query: model_usage
+        col: 12
+        columns:
+          - name: platform
+            label: Platform
+          - name: model
+            label: Model / Model Set
+          - name: model_attribution
+            label: Attribution
+          - name: active_users
+            label: Active Users
+            format: number
+          - name: active_days
+            label: Active Days
+            format: number
+          - name: sessions
+            label: Sessions
+            format: number
+          - name: requests
+            label: Requests
+            format: number
+          - name: total_tokens
+            label: Total Tokens
+            format: number
+          - name: estimated_cost_usd
+            label: Estimated Cost
+            format: currency
 
   - widgets:
       - name: User Consumption
