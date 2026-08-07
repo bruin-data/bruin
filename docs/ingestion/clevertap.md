@@ -56,6 +56,8 @@ The `events` and `profiles` tables accept an `event_name` parameter that narrows
   source_table: 'events?event_name=Charged,App Launched'
 ```
 
+Leave the parameter out and `events` loads every event, while `profiles` covers everyone who has raised at least one of them. CleverTap reaches profiles through their activity, so a user whose only recorded activity is a notification event is not included.
+
 ## Available Source Tables
 
 | Table | PK | Inc Key | Inc Strategy | Details |
@@ -70,13 +72,34 @@ The `events` and `profiles` tables accept an `event_name` parameter that narrows
 | `user_properties` | name | – | replace | Every custom profile property defined in your project. |
 | `category_groups` | key | – | replace | Messaging subscription groups, with the channels each one covers. |
 
-The `events` table is loaded incrementally with a delete+insert strategy keyed on `ts`, and `content_blocks` with a merge strategy keyed on `updatedAt`. Both respect `--interval-start`/`--interval-end`. All other tables are loaded in full on every run.
+The `events` table is loaded incrementally with a delete+insert strategy keyed on `ts`, and `content_blocks` with a merge strategy keyed on `updatedAt`. Both respect `--interval-start`/`--interval-end`, where the end bound is exclusive of that day's activity, so use the following day to capture a full day. With no interval, everything is loaded. All other tables are loaded in full on every run.
 
 > [!NOTE]
 > `campaigns` and `campaign_reports` only ever contain campaigns created through the CleverTap API. Campaigns built in the dashboard are not included, because CleverTap offers no way to list them.
 
+> [!NOTE]
+> A campaign only has a report once it has completed and delivered. Campaigns that are still scheduled, running, paused, or stopped before delivering are skipped, so `campaign_reports` usually holds fewer rows than `campaigns`.
+
+> [!NOTE]
+> Notification events such as push impressions and clicks cannot be exported from CleverTap and are skipped automatically.
+
+> [!NOTE]
+> The `profile` column on `events` shows the user's details as they stand today, not as they were when the event happened. CleverTap keeps no history of past values, so point-in-time user attributes are not available from this source.
+
+### Joining events to profiles
+
+`events` carries two keys: `identity` identifies the person, and `object_id` identifies one device.
+
+```sql
+SELECT e.ts, e.event_name, p.name, p.profile_data
+FROM events e
+JOIN profiles p ON e.identity = p.identity
+```
+
 > [!WARNING]
-> Join `events` to `profiles` on `identity`, not `object_id`. `object_id` identifies a single device, so someone using your app on both a phone and a laptop has a different one for each, and joining on it silently drops the events they raised on their other devices.
+> Join on `identity`, not `object_id`. Someone using your app on both a phone and a laptop has a different `object_id` for each, so joining on it silently drops the events they raised on their other devices. Every device is still listed in `profiles.platform_info`.
+
+`identity` is only set for users who have logged in, so events from anonymous visitors have no profile to join to.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 
