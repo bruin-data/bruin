@@ -3408,7 +3408,22 @@ func TestWarnBlockingRelationshipsCheckReferencesDownstream(t *testing.T) {
 			},
 		},
 		{
-			name:   "warns when multiple blocking relationships complete a dependency cycle",
+			name:   "does not warn for independent assets with reciprocal relationships checks",
+			orders: orders,
+			customers: &pipeline.Asset{
+				Name: "customers",
+				Columns: []pipeline.Column{
+					{Name: "id"},
+					{
+						Name:       "order_id",
+						ForeignKey: &pipeline.ColumnReference{Table: "orders", Column: "id"},
+						Checks:     []pipeline.ColumnCheck{{Name: "relationships"}},
+					},
+				},
+			},
+		},
+		{
+			name:   "does not warn when assets are connected only through relationships checks",
 			orders: orders,
 			customers: &pipeline.Asset{
 				Name:      "customers",
@@ -3431,7 +3446,6 @@ func TestWarnBlockingRelationshipsCheckReferencesDownstream(t *testing.T) {
 					Upstreams: []pipeline.Upstream{{Type: "asset", Value: "orders"}},
 				},
 			},
-			want: "Column 'customer_id' has a blocking relationships check referencing downstream asset 'customers'; the check runs before that asset is refreshed. Set blocking to false or restructure the dependencies",
 		},
 	}
 

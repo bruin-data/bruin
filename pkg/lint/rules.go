@@ -1037,8 +1037,8 @@ func ValidateColumnMetadata(ctx context.Context, p *pipeline.Pipeline, asset *pi
 
 // WarnBlockingRelationshipsCheckReferencesDownstream warns when a blocking
 // relationships check references an asset that transitively depends on the
-// checked asset. The scheduler cannot wait for that referenced asset without
-// deadlocking, so it runs the check before the referenced asset is refreshed.
+// checked asset. Since downstream assets wait for blocking checks, the check
+// runs before the referenced asset is refreshed.
 func WarnBlockingRelationshipsCheckReferencesDownstream(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 
@@ -1091,21 +1091,6 @@ func assetTransitivelyDependsOn(p *pipeline.Pipeline, currentName, dependencyNam
 		}
 		if assetTransitivelyDependsOn(p, upstream.Value, dependencyName, visited) {
 			return true
-		}
-	}
-	for columnIndex := range current.Columns {
-		column := &current.Columns[columnIndex]
-		if column.ForeignKey == nil || column.ForeignKey.Table == "" {
-			continue
-		}
-		for checkIndex := range column.Checks {
-			check := &column.Checks[checkIndex]
-			if check.Name != "relationships" || !check.Blocking.Bool() {
-				continue
-			}
-			if assetTransitivelyDependsOn(p, column.ForeignKey.Table, dependencyName, visited) {
-				return true
-			}
 		}
 	}
 

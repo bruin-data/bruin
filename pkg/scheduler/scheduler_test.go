@@ -786,7 +786,7 @@ func TestScheduler_Run(t *testing.T) {
 	assert.True(t, finished)
 }
 
-func TestScheduler_RelationshipsCheckWaitsForReferencedAsset(t *testing.T) {
+func TestScheduler_RelationshipsCheckDoesNotWaitForReferencedAsset(t *testing.T) {
 	t.Parallel()
 
 	p := &pipeline.Pipeline{
@@ -808,20 +808,14 @@ func TestScheduler_RelationshipsCheckWaitsForReferencedAsset(t *testing.T) {
 	s := NewScheduler(zap.NewNop().Sugar(), p, "test")
 	check := s.taskNameMap["orders"][TaskInstanceTypeColumnCheck][0]
 
-	require.Len(t, check.GetUpstream(), 2)
-	assert.ElementsMatch(t, []string{"orders", "customers"}, []string{
-		check.GetUpstream()[0].GetHumanID(),
-		check.GetUpstream()[1].GetHumanID(),
-	})
+	require.Len(t, check.GetUpstream(), 1)
+	assert.Equal(t, "orders", check.GetUpstream()[0].GetHumanID())
 
 	markMainTaskStatus(s, "orders", Succeeded)
-	assert.NotContains(t, scheduleableHumanIDs(s), "orders:customer_id:relationships")
-
-	markMainTaskStatus(s, "customers", Succeeded)
 	assert.Contains(t, scheduleableHumanIDs(s), "orders:customer_id:relationships")
 }
 
-func TestScheduler_RelationshipsCheckDoesNotCreateDependencyCycle(t *testing.T) {
+func TestScheduler_BlockingRelationshipsCheckRunsBeforeReferencedDownstreamAsset(t *testing.T) {
 	t.Parallel()
 
 	p := &pipeline.Pipeline{
@@ -845,12 +839,25 @@ func TestScheduler_RelationshipsCheckDoesNotCreateDependencyCycle(t *testing.T) 
 
 	s := NewScheduler(zap.NewNop().Sugar(), p, "test")
 	check := s.taskNameMap["orders"][TaskInstanceTypeColumnCheck][0]
+	customers := s.taskNameMap["customers"][TaskInstanceTypeMain][0]
 
 	require.Len(t, check.GetUpstream(), 1)
 	assert.Equal(t, "orders", check.GetUpstream()[0].GetHumanID())
+	require.Len(t, customers.GetUpstream(), 2)
+	assert.ElementsMatch(t, []string{"orders", "orders:customer_id:relationships"}, []string{
+		customers.GetUpstream()[0].GetHumanID(),
+		customers.GetUpstream()[1].GetHumanID(),
+	})
+
+	markMainTaskStatus(s, "orders", Succeeded)
+	assert.Contains(t, scheduleableHumanIDs(s), "orders:customer_id:relationships")
+	assert.NotContains(t, scheduleableHumanIDs(s), "customers")
+
+	s.MarkTaskInstance(check, Succeeded, false)
+	assert.Contains(t, scheduleableHumanIDs(s), "customers")
 }
 
-func TestScheduler_NonBlockingRelationshipsCheckWaitsForReverseDependentAsset(t *testing.T) {
+func TestScheduler_NonBlockingRelationshipsCheckDoesNotWaitForReferencedAsset(t *testing.T) {
 	t.Parallel()
 
 	blocking := false
@@ -877,18 +884,15 @@ func TestScheduler_NonBlockingRelationshipsCheckWaitsForReverseDependentAsset(t 
 
 	s := NewScheduler(zap.NewNop().Sugar(), p, "test")
 	check := s.taskNameMap["orders"][TaskInstanceTypeColumnCheck][0]
+	customers := s.taskNameMap["customers"][TaskInstanceTypeMain][0]
 
-	require.Len(t, check.GetUpstream(), 2)
-	assert.ElementsMatch(t, []string{"orders", "customers"}, []string{
-		check.GetUpstream()[0].GetHumanID(),
-		check.GetUpstream()[1].GetHumanID(),
-	})
+	require.Len(t, check.GetUpstream(), 1)
+	assert.Equal(t, "orders", check.GetUpstream()[0].GetHumanID())
+	require.Len(t, customers.GetUpstream(), 1)
+	assert.Equal(t, "orders", customers.GetUpstream()[0].GetHumanID())
 
 	markMainTaskStatus(s, "orders", Succeeded)
 	assert.Contains(t, scheduleableHumanIDs(s), "customers")
-	assert.NotContains(t, scheduleableHumanIDs(s), "orders:customer_id:relationships")
-
-	markMainTaskStatus(s, "customers", Succeeded)
 	assert.Contains(t, scheduleableHumanIDs(s), "orders:customer_id:relationships")
 }
 

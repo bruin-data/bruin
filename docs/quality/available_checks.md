@@ -120,6 +120,10 @@ the child asset's connection and returns the number of child rows whose keys are
 missing from the parent. It does not verify that the referenced parent column is
 unique; add a `unique` check to that column separately when required.
 
+Neither `foreign_key` metadata nor a `relationships` check creates a scheduler
+dependency. Add the referenced asset to the child asset's `depends` list when it
+must be refreshed before the relationship check runs.
+
 ## Unique
 
 This check will verify that no value in the specified column appears more than once

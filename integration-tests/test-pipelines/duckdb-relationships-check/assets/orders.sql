@@ -5,6 +5,9 @@ type: duckdb.sql
 materialization:
   type: table
 
+depends:
+  - relationship_test.customers
+
 columns:
   - name: order_id
     type: integer

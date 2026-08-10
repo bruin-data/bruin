@@ -831,52 +831,6 @@ func (s *Scheduler) constructInstanceRelationships() {
 			}
 		}
 	}
-
-	// A relationships check reads both its child asset and the table referenced
-	// by the column's foreign_key metadata. Make the referenced asset an explicit
-	// prerequisite so independently scheduled assets cannot race the check.
-	for _, ti := range s.taskInstances {
-		check, ok := ti.(*ColumnCheckInstance)
-		if !ok || check.Check.Name != "relationships" || check.Column.ForeignKey == nil {
-			continue
-		}
-
-		parentAssetName := check.Column.ForeignKey.Table
-		if parentAssetName == "" || parentAssetName == check.GetAsset().Name {
-			continue
-		}
-
-		parentInstances, ok := s.taskNameMap[parentAssetName]
-		if !ok {
-			continue
-		}
-
-		for _, parent := range parentInstances[TaskInstanceTypeMain] {
-			if taskHasDownstreamPath(check, parent, make(map[TaskInstance]bool)) {
-				continue
-			}
-			check.AddUpstream(parent)
-			parent.AddDownstream(check)
-		}
-	}
-}
-
-func taskHasDownstreamPath(current, target TaskInstance, visited map[TaskInstance]bool) bool {
-	if current == target {
-		return true
-	}
-	if visited[current] {
-		return false
-	}
-	visited[current] = true
-
-	for _, downstream := range current.GetDownstream() {
-		if taskHasDownstreamPath(downstream, target, visited) {
-			return true
-		}
-	}
-
-	return false
 }
 
 func (s *Scheduler) Run(ctx context.Context) []*TaskExecutionResult {
