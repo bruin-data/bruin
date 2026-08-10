@@ -34,6 +34,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/emr_serverless"
 	"github.com/bruin-data/bruin/pkg/executor"
 	fabric "github.com/bruin-data/bruin/pkg/fabric"
+	"github.com/bruin-data/bruin/pkg/gcs"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/ingestr"
 	"github.com/bruin-data/bruin/pkg/jinja"
@@ -2601,6 +2602,17 @@ func SetupExecutors(
 	if s.WillRunTaskOfType(pipeline.AssetTypeS3KeySensor) {
 		s3KeySensor := s3.NewKeySensor(conn, sensorMode)
 		mainExecutors[pipeline.AssetTypeS3KeySensor][scheduler.TaskInstanceTypeMain] = s3KeySensor
+	}
+
+	gcsSensorTypes := []pipeline.AssetType{
+		pipeline.AssetTypeGCSObjectSensor,
+		pipeline.AssetTypeGCSPrefixSensor,
+		pipeline.AssetTypeGCSPrefixSensorLegacy,
+	}
+	for _, typ := range gcsSensorTypes {
+		if s.WillRunTaskOfType(typ) {
+			mainExecutors[typ][scheduler.TaskInstanceTypeMain] = gcs.NewObjectSensor(conn, sensorMode)
+		}
 	}
 
 	if s.WillRunTaskOfType(pipeline.AssetTypeMySQLQuery) ||

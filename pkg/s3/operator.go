@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"regexp"
-	"strings"
 	"time"
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
@@ -17,81 +16,15 @@ import (
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/helpers"
+	"github.com/bruin-data/bruin/pkg/objectpattern"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/pkg/errors"
 )
 
-func containsWildcard(key string) bool {
-	return strings.ContainsAny(key, "*{")
-}
-
-// TODO: Use a globbing library to reduce complexity and have support for more characters in glob expression.
-func extractPrefix(key string) string {
-	minIdx := len(key)
-	for _, ch := range []byte{'*', '{'} {
-		if idx := strings.IndexByte(key, ch); idx >= 0 && idx < minIdx {
-			minIdx = idx
-		}
-	}
-	prefix := key[:minIdx]
-	// Trim back to the last '/' to get a clean prefix boundary
-	if lastSlash := strings.LastIndex(prefix, "/"); lastSlash >= 0 {
-		return prefix[:lastSlash+1]
-	}
-	return prefix
-}
-
-// Supported patterns:
-//   - * matches any characters except /
-//   - {a,b,c} matches any of the comma-separated alternatives
-func wildcardToRegex(pattern string) string {
-	var b strings.Builder
-	b.WriteString("^")
-	i := 0
-	for i < len(pattern) {
-		ch := pattern[i]
-		switch ch {
-		case '*':
-			b.WriteString("[^/]*")
-			i++
-		case '{':
-			end := strings.IndexByte(pattern[i:], '}')
-			if end < 0 {
-				b.WriteString(regexp.QuoteMeta(string(ch)))
-				i++
-				continue
-			}
-			alternatives := pattern[i+1 : i+end]
-			parts := strings.Split(alternatives, ",")
-			b.WriteString("(")
-			for j, part := range parts {
-				if j > 0 {
-					b.WriteString("|")
-				}
-				part = strings.TrimSpace(part)
-				for _, c := range part {
-					if c == '*' {
-						b.WriteString("[^/]*")
-					} else {
-						b.WriteString(regexp.QuoteMeta(string(c)))
-					}
-				}
-			}
-			b.WriteString(")")
-			i += end + 1
-		default:
-			b.WriteString(regexp.QuoteMeta(string(ch)))
-			i++
-		}
-	}
-	b.WriteString("$")
-	return b.String()
-}
-
 func matchWildcard(ctx context.Context, client *s3.Client, bucket, key string) (bool, error) {
-	prefix := extractPrefix(key)
-	re, err := regexp.Compile(wildcardToRegex(key))
+	prefix := objectpattern.ExtractPrefix(key)
+	re, err := regexp.Compile(objectpattern.WildcardToRegex(key))
 	if err != nil {
 		return false, errors.Wrap(err, "failed to compile wildcard pattern")
 	}
@@ -219,7 +152,7 @@ func (ks *KeySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipel
 		fmt.Fprintln(printer, "Poking S3:", bucketName+"/"+bucketKey)
 	}
 
-	isWildcard := containsWildcard(bucketKey)
+	isWildcard := objectpattern.ContainsWildcard(bucketKey)
 
 	sensorTimeout := helpers.GetSensorTimeout(t)
 	timeout := time.After(sensorTimeout)

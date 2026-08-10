@@ -18,6 +18,18 @@ func TestConfig_GetIngestrURI_NoCredentials_ReturnsError(t *testing.T) {
 	require.Contains(t, err.Error(), "service_account") // service_account_file or service_account_json must be provided
 }
 
+func TestConfig_GetIngestrURI_ApplicationDefaultCredentials(t *testing.T) {
+	t.Parallel()
+	config := Config{
+		UseApplicationDefaultCredentials: true,
+		BucketName:                       "bucket",
+		PathToFile:                       "path",
+	}
+	got, err := config.GetIngestrURI()
+	require.NoError(t, err)
+	require.Equal(t, "gs://bucket/path?layout=", got)
+}
+
 // Source GCS: bucket/path is not set in .bruin.yml.
 func TestConfig_GetIngestrURI_EmptyBucketAndPath_ReturnsURIWithDoubleSlash(t *testing.T) {
 	t.Parallel()
