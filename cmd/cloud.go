@@ -2249,6 +2249,9 @@ func CloudAgents() *cli.Command {
 			cloudAgentsMessages(),
 			cloudAgentsGetPrompt(),
 			cloudAgentsSetPrompt(),
+			cloudAgentsGetMemory(),
+			cloudAgentsSetMemory(),
+			cloudAgentsClearMemory(),
 			cloudAgentsConnections(),
 			cloudAgentsMcp(),
 		},
@@ -3154,6 +3157,159 @@ func cloudAgentsSetPrompt() *cli.Command {
 			return nil
 		},
 	}
+}
+
+func cloudAgentsGetMemory() *cli.Command {
+	return &cli.Command{
+		Name:  "get-memory",
+		Usage: "Get an agent's long-term memory",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "agent-id",
+				Usage:    "agent ID",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			memory, err := client.GetAgentMemory(ctx, c.Int("agent-id"))
+			if err != nil {
+				printError(err, output, "Failed to get agent memory")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(memory, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			if memory.Memory == nil {
+				fmt.Println("(none)")
+				return nil
+			}
+			fmt.Println(*memory.Memory)
+			return nil
+		},
+	}
+}
+
+func cloudAgentsSetMemory() *cli.Command {
+	return &cli.Command{
+		Name:  "set-memory",
+		Usage: "Replace an agent's long-term memory from --memory or --memory-file",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "agent-id",
+				Usage:    "agent ID",
+				Required: true,
+			},
+			&cli.StringFlag{Name: "memory", Usage: "the new memory content"},
+			&cli.StringFlag{Name: "memory-file", Usage: "path to a file whose contents become the memory"},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			content, err := resolveMemoryContent(c)
+			if err != nil {
+				printError(err, output, "Invalid memory")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			memory, err := client.SetAgentMemory(ctx, c.Int("agent-id"), &content)
+			if err != nil {
+				printError(err, output, "Failed to set agent memory")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(memory, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			infoPrinter.Printf("Updated memory for agent %d (%s)\n", memory.ID, memory.Name)
+			return nil
+		},
+	}
+}
+
+func cloudAgentsClearMemory() *cli.Command {
+	return &cli.Command{
+		Name:  "clear-memory",
+		Usage: "Clear an agent's long-term memory",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "agent-id",
+				Usage:    "agent ID",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			memory, err := client.SetAgentMemory(ctx, c.Int("agent-id"), nil)
+			if err != nil {
+				printError(err, output, "Failed to clear agent memory")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(memory, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			infoPrinter.Printf("Cleared memory for agent %d (%s)\n", memory.ID, memory.Name)
+			return nil
+		},
+	}
+}
+
+// resolveMemoryContent reads the memory body from --memory or --memory-file.
+func resolveMemoryContent(c *cli.Command) (string, error) {
+	if c.IsSet("memory") && c.IsSet("memory-file") {
+		return "", errors.New("pass only one of --memory or --memory-file")
+	}
+	if c.IsSet("memory-file") {
+		data, err := os.ReadFile(c.String("memory-file"))
+		if err != nil {
+			return "", fmt.Errorf("failed to read --memory-file: %w", err)
+		}
+		return string(data), nil
+	}
+	if c.IsSet("memory") {
+		return c.String("memory"), nil
+	}
+	return "", errors.New("provide the memory with --memory or --memory-file")
 }
 
 func cloudAgentsMessages() *cli.Command {
