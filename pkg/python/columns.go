@@ -221,6 +221,12 @@ var ingestrSizedTypes = map[string]bool{
 	"text": true,
 }
 
+// ingestrPrecisionScaleTypes are the ingestr types that accept a precision and an
+// optional scale parameter, e.g. decimal(10,2).
+var ingestrPrecisionScaleTypes = map[string]bool{
+	"decimal": true,
+}
+
 // TypeHintOverlayForConnection returns DB-specific type aliases when the
 // connection implements IngestrTypeHintProvider; otherwise nil.
 func TypeHintOverlayForConnection(conn any) map[string]string {
@@ -262,7 +268,7 @@ func MergeTypeHints(base, overlay map[string]string) map[string]string {
 // resolveColumnTypeHint maps a declared column type to an ingestr hint, peeling
 // destination-specific transparent wrappers and resolving parameterized bases
 // (e.g. DateTime64(3)).
-func resolveColumnTypeHint(typ string, mapping map[string]string, wrappers map[string]bool) (hint string, known bool, inlineLength string) {
+func resolveColumnTypeHint(typ string, mapping map[string]string, wrappers map[string]bool) (hint string, known bool, inlineParams string) {
 	typ = NormaliseColumnType(typ)
 	for {
 		if h, ok := mapping[typ]; ok {
@@ -278,7 +284,7 @@ func resolveColumnTypeHint(typ string, mapping map[string]string, wrappers map[s
 			continue
 		}
 		if h, ok := mapping[base]; ok {
-			if ingestrSizedTypes[h] {
+			if ingestrSizedTypes[h] || ingestrPrecisionScaleTypes[h] {
 				return h, true, inner
 			}
 			return h, true, ""
@@ -295,17 +301,25 @@ func ColumnHints(cols []pipeline.Column, normaliseNames bool, overlay map[string
 	mapping := MergeTypeHints(TypeHintMapping, overlay)
 	hints := make([]string, 0)
 	for _, col := range cols {
-		hint, typeKnown, inlineLength := resolveColumnTypeHint(col.Type, mapping, wrappers)
+		hint, typeKnown, inlineParams := resolveColumnTypeHint(col.Type, mapping, wrappers)
 
 		if !typeKnown && col.SourceColumn == "" {
 			continue
 		}
 
-		// Append a length to sized types; an inline length takes precedence over the
-		// length field, and a non-numeric size is treated as unbounded.
-		if typeKnown && ingestrSizedTypes[hint] {
-			if length := sizedStringLength(inlineLength, col.Length); length != "" {
-				hint = fmt.Sprintf("%s(%s)", hint, length)
+		// Append size parameters to sized types. Inline parameters take precedence
+		// over the length/precision/scale fields, and an invalid size is treated as
+		// unbounded.
+		if typeKnown {
+			switch {
+			case ingestrSizedTypes[hint]:
+				if length := sizedStringLength(inlineParams, col.Length); length != "" {
+					hint = fmt.Sprintf("%s(%s)", hint, length)
+				}
+			case ingestrPrecisionScaleTypes[hint]:
+				if params := decimalParams(inlineParams, col.Precision, col.Scale); params != "" {
+					hint = fmt.Sprintf("%s(%s)", hint, params)
+				}
 			}
 		}
 
@@ -351,6 +365,43 @@ func sizedStringLength(inlineLength string, lengthField *int) string {
 		return strconv.Itoa(*lengthField)
 	}
 	return ""
+}
+
+// decimalParams resolves the precision/scale for a decimal type, preferring inline
+// "p" or "p,s" parameters over the precision/scale fields. Returns "" when no
+// positive precision is available.
+func decimalParams(inlineParams string, precision, scale *int) string {
+	if inlineParams != "" {
+		return normaliseDecimalParams(inlineParams)
+	}
+	if precision == nil || *precision <= 0 {
+		return ""
+	}
+	if scale != nil && *scale >= 0 {
+		return fmt.Sprintf("%d,%d", *precision, *scale)
+	}
+	return strconv.Itoa(*precision)
+}
+
+// normaliseDecimalParams validates an inline "p" or "p,s" spec, returning its
+// canonical form or "" when the precision is not a positive integer.
+func normaliseDecimalParams(inner string) string {
+	parts := strings.Split(inner, ",")
+	if len(parts) > 2 {
+		return ""
+	}
+	p, err := strconv.Atoi(strings.TrimSpace(parts[0]))
+	if err != nil || p <= 0 {
+		return ""
+	}
+	if len(parts) == 1 {
+		return strconv.Itoa(p)
+	}
+	s, err := strconv.Atoi(strings.TrimSpace(parts[1]))
+	if err != nil || s < 0 {
+		return strconv.Itoa(p)
+	}
+	return fmt.Sprintf("%d,%d", p, s)
 }
 
 func NormaliseColumnType(typ string) string {
