@@ -708,6 +708,27 @@ func TestSetAgentMemoryClear(t *testing.T) {
 	assert.Nil(t, memory.Memory)
 }
 
+func TestExportThread(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/agents/7/threads/42/export", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, map[string]any{
+			"export_version": "1.0",
+			"thread":         map[string]any{"id": 42},
+			"messages":       []any{},
+		})
+	})
+
+	export, err := client.ExportThread(t.Context(), 7, 42)
+	require.NoError(t, err)
+
+	var parsed map[string]any
+	require.NoError(t, json.Unmarshal(export, &parsed))
+	assert.Equal(t, "1.0", parsed["export_version"])
+}
+
 func TestListAgentMcpServers(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {

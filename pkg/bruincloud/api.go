@@ -665,6 +665,17 @@ func (c *APIClient) SetAgentMemory(ctx context.Context, agentID int, memory *str
 	return &result, nil
 }
 
+// ExportThread returns a chat thread as the canonical versioned JSON export.
+// The shape is server-defined, so the raw JSON is returned verbatim.
+func (c *APIClient) ExportThread(ctx context.Context, agentID, threadID int) (json.RawMessage, error) {
+	var result json.RawMessage
+	err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/agents/%d/threads/%d/export", agentID, threadID), nil, &result)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 func (c *APIClient) ListAgentMessages(ctx context.Context, agentID, threadID int, limit, offset int) ([]AgentMessage, error) {
 	params := url.Values{}
 	if limit > 0 {
