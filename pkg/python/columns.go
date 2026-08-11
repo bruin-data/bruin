@@ -215,20 +215,12 @@ var TypeHintMapping = map[string]string{
 
 var multipleSpacePattern = regexp.MustCompile(`\s+`)
 
-// sizeKind describes how a sized ingestr type is parameterized.
-type sizeKind int
-
-const (
-	sizeLength         sizeKind = iota // single length, e.g. text(50)
-	sizePrecisionScale                 // precision and optional scale, e.g. decimal(10,2)
-)
-
-// ingestrSizedTypes maps the ingestr types that accept size parameters to the
-// shape of those parameters. Add an entry if a source type starts mapping to
-// another sized ingestr type.
-var ingestrSizedTypes = map[string]sizeKind{
-	"text":    sizeLength,
-	"decimal": sizePrecisionScale,
+// ingestrSizedTypes are the ingestr types that accept size parameters: a single
+// length (e.g. text(50)) or, for decimal, precision and optional scale (e.g.
+// decimal(10,2)). Add an entry if a source type starts mapping to another sized type.
+var ingestrSizedTypes = map[string]bool{
+	"text":    true,
+	"decimal": true,
 }
 
 // TypeHintOverlayForConnection returns DB-specific type aliases when the
@@ -288,7 +280,7 @@ func resolveColumnTypeHint(typ string, mapping map[string]string, wrappers map[s
 			continue
 		}
 		if h, ok := mapping[base]; ok {
-			if _, sized := ingestrSizedTypes[h]; sized {
+			if ingestrSizedTypes[h] {
 				return h, true, inner
 			}
 			return h, true, ""
@@ -313,17 +305,14 @@ func ColumnHints(cols []pipeline.Column, normaliseNames bool, overlay map[string
 
 		// Append size parameters to sized types. Inline parameters take precedence
 		// over the length/precision/scale fields, and an invalid size is treated as
-		// unbounded.
-		if kind, sized := ingestrSizedTypes[hint]; typeKnown && sized {
-			switch kind {
-			case sizeLength:
-				if length := sizedStringLength(inlineParams, col.Length); length != "" {
-					hint = fmt.Sprintf("%s(%s)", hint, length)
-				}
-			case sizePrecisionScale:
+		// unbounded. decimal is the only precision/scale type; the rest take a length.
+		if typeKnown && ingestrSizedTypes[hint] {
+			if hint == "decimal" {
 				if params := decimalParams(inlineParams, col.Precision, col.Scale); params != "" {
 					hint = fmt.Sprintf("%s(%s)", hint, params)
 				}
+			} else if length := sizedStringLength(inlineParams, col.Length); length != "" {
+				hint = fmt.Sprintf("%s(%s)", hint, length)
 			}
 		}
 

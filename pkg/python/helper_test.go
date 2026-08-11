@@ -604,7 +604,7 @@ func TestColumnHints_SizedTypes(t *testing.T) {
 
 	sized := make(map[string]string) // source alias -> expected hint
 	for typ, hint := range TypeHintMapping {
-		if kind, ok := ingestrSizedTypes[hint]; ok && kind == sizeLength {
+		if ingestrSizedTypes[hint] && hint != "decimal" {
 			sized[typ] = hint
 		}
 	}
@@ -631,7 +631,7 @@ func TestColumnHints_PrecisionScaleTypes(t *testing.T) {
 
 	sized := make(map[string]string) // source alias -> expected hint
 	for typ, hint := range TypeHintMapping {
-		if kind, ok := ingestrSizedTypes[hint]; ok && kind == sizePrecisionScale {
+		if ingestrSizedTypes[hint] && hint == "decimal" {
 			sized[typ] = hint
 		}
 	}
