@@ -1,6 +1,7 @@
 package fabric
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -112,6 +113,40 @@ func TestBuildMergeQueryRejectsIncrementalPredicate(t *testing.T) {
 	}
 	_, err := buildMergeQuery(asset, "SELECT 1")
 	require.ErrorContains(t, err, "incremental_predicate is not supported for Fabric merge materialization")
+}
+
+func TestBuildTruncateInsertQuery(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		query string
+	}{
+		{
+			name:  "simple query",
+			query: "SELECT id, val FROM src;",
+		},
+		{
+			name:  "query with CTE",
+			query: "WITH cte AS (SELECT id, val FROM src) SELECT * FROM cte;",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			asset := &pipeline.Asset{Name: "dbo.Table"}
+			result, err := buildTruncateInsertQuery(asset, tt.query)
+			require.NoError(t, err)
+			expected := "DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp];\n" +
+				"CREATE TABLE [dbo].[Table__bruin_tmp] AS\n" +
+				strings.TrimSuffix(tt.query, ";") + ";\n" +
+				"TRUNCATE TABLE [dbo].[Table];\n" +
+				"INSERT INTO [dbo].[Table] SELECT * FROM [dbo].[Table__bruin_tmp];\n" +
+				"DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp];"
+			assert.Equal(t, expected, result)
+		})
+	}
 }
 
 func TestBuildDDLQuery(t *testing.T) {
