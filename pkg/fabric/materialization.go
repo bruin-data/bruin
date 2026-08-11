@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
@@ -111,11 +112,15 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 
 func buildTruncateInsertQuery(asset *pipeline.Asset, query string) (string, error) {
 	tableName := QuoteIdentifier(asset.Name)
-	tempName := QuoteIdentifier(asset.Name + "__bruin_tmp")
+	schemaName, _ := splitSchemaName(asset.Name)
+	tempFullName := "__bruin_tmp_" + helpers.PrefixGenerator()
+	if schemaName != "" {
+		tempFullName = schemaName + "." + tempFullName
+	}
+	tempName := QuoteIdentifier(tempFullName)
 	query = strings.TrimSuffix(query, ";")
 
 	queries := []string{
-		"DROP TABLE IF EXISTS " + tempName,
 		"CREATE TABLE " + tempName + " AS\n" + query,
 		"TRUNCATE TABLE " + tableName,
 		"INSERT INTO " + tableName + " SELECT * FROM " + tempName,

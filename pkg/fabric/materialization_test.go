@@ -138,12 +138,11 @@ func TestBuildTruncateInsertQuery(t *testing.T) {
 			asset := &pipeline.Asset{Name: "dbo.Table"}
 			result, err := buildTruncateInsertQuery(asset, tt.query)
 			require.NoError(t, err)
-			expected := "DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp];\n" +
-				"CREATE TABLE [dbo].[Table__bruin_tmp] AS\n" +
+			expected := "CREATE TABLE [dbo].[__bruin_tmp_abcefghi] AS\n" +
 				strings.TrimSuffix(tt.query, ";") + ";\n" +
 				"TRUNCATE TABLE [dbo].[Table];\n" +
-				"INSERT INTO [dbo].[Table] SELECT * FROM [dbo].[Table__bruin_tmp];\n" +
-				"DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp];"
+				"INSERT INTO [dbo].[Table] SELECT * FROM [dbo].[__bruin_tmp_abcefghi];\n" +
+				"DROP TABLE IF EXISTS [dbo].[__bruin_tmp_abcefghi];"
 			assert.Equal(t, expected, result)
 		})
 	}
