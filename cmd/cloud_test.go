@@ -310,7 +310,7 @@ func TestCloudAgentsCommand_Help(t *testing.T) {
 	cmd := CloudAgents()
 	require.NotNil(t, cmd)
 	assert.Equal(t, "agents", cmd.Name)
-	require.Len(t, cmd.Commands, 15)
+	require.Len(t, cmd.Commands, 16)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
@@ -321,6 +321,7 @@ func TestCloudAgentsCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "get-memory")
 	assert.Contains(t, subNames, "set-memory")
 	assert.Contains(t, subNames, "clear-memory")
+	assert.Contains(t, subNames, "export-thread")
 }
 
 func TestCloudDashboardsCommand_Help(t *testing.T) {

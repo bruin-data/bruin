@@ -2252,6 +2252,7 @@ func CloudAgents() *cli.Command {
 			cloudAgentsGetMemory(),
 			cloudAgentsSetMemory(),
 			cloudAgentsClearMemory(),
+			cloudAgentsExportThread(),
 			cloudAgentsConnections(),
 			cloudAgentsMcp(),
 		},
@@ -3310,6 +3311,67 @@ func resolveMemoryContent(c *cli.Command) (string, error) {
 		return c.String("memory"), nil
 	}
 	return "", errors.New("provide the memory with --memory or --memory-file")
+}
+
+func cloudAgentsExportThread() *cli.Command {
+	return &cli.Command{
+		Name:  "export-thread",
+		Usage: "Export a chat thread as JSON",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "agent-id",
+				Usage:    "agent ID",
+				Required: true,
+			},
+			&cli.IntFlag{
+				Name:     "thread-id",
+				Usage:    "thread ID",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:  "file",
+				Usage: "write the export to this file instead of stdout",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			export, err := client.ExportThread(ctx, c.Int("agent-id"), c.Int("thread-id"))
+			if err != nil {
+				printError(err, output, "Failed to export thread")
+				return cli.Exit("", 1)
+			}
+
+			// Re-indent the server's JSON for a readable file/stdout dump.
+			var obj any
+			if err := json.Unmarshal(export, &obj); err != nil {
+				printError(err, output, "Failed to parse export")
+				return cli.Exit("", 1)
+			}
+			pretty, _ := json.MarshalIndent(obj, "", "  ")
+
+			if file := c.String("file"); file != "" {
+				if err := os.WriteFile(file, pretty, 0o644); err != nil {
+					printError(err, output, "Failed to write file")
+					return cli.Exit("", 1)
+				}
+				infoPrinter.Printf("Exported thread %d to %s\n", c.Int("thread-id"), file)
+				return nil
+			}
+
+			fmt.Println(string(pretty))
+			return nil
+		},
+	}
 }
 
 func cloudAgentsMessages() *cli.Command {
