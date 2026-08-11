@@ -504,9 +504,11 @@ func TestColumnHints(t *testing.T) {
 			columns: []pipeline.Column{
 				{Name: "a", Type: "decimal(abc)"},
 				{Name: "b", Type: "decimal(0)"},
+				{Name: "c", Type: "decimal(10,abc)"},
+				{Name: "d", Type: "decimal(10,-1)"},
 			},
 			normalizeNames: false,
-			expected:       "a:decimal,b:decimal",
+			expected:       "a:decimal,b:decimal,c:decimal,d:decimal",
 		},
 		{
 			name: "sized string with source_column emits dest:text(n):source",
