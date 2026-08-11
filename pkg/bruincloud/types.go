@@ -176,6 +176,13 @@ type AgentPrompt struct {
 	SystemPrompt *string `json:"system_prompt"`
 }
 
+// AgentMemory represents an agent's long-term memory blob.
+type AgentMemory struct {
+	ID     int     `json:"id"`
+	Name   string  `json:"name"`
+	Memory *string `json:"memory"`
+}
+
 // AgentMessage represents a message in an agent thread.
 type AgentMessage struct {
 	ID                int             `json:"id"`

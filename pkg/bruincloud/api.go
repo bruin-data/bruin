@@ -645,6 +645,26 @@ func (c *APIClient) SetAgentPrompt(ctx context.Context, agentID int, systemPromp
 	return &result, nil
 }
 
+func (c *APIClient) GetAgentMemory(ctx context.Context, agentID int) (*AgentMemory, error) {
+	var result AgentMemory
+	err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/agents/%d/memory", agentID), nil, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// SetAgentMemory replaces the agent's memory. A nil memory clears it (sends JSON null).
+func (c *APIClient) SetAgentMemory(ctx context.Context, agentID int, memory *string) (*AgentMemory, error) {
+	body := map[string]any{"memory": memory}
+	var result AgentMemory
+	err := c.doRequest(ctx, http.MethodPut, fmt.Sprintf("/agents/%d/memory", agentID), body, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 func (c *APIClient) ListAgentMessages(ctx context.Context, agentID, threadID int, limit, offset int) ([]AgentMessage, error) {
 	params := url.Values{}
 	if limit > 0 {

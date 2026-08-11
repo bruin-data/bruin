@@ -648,6 +648,66 @@ func TestUpdateAgent(t *testing.T) {
 	assert.Equal(t, "renamed", agent.Name)
 }
 
+func TestGetAgentMemory(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/agents/7/memory", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+		mem := "remembered thing"
+		writeJSON(t, w, AgentMemory{ID: 7, Name: "an-agent", Memory: &mem})
+	})
+
+	memory, err := client.GetAgentMemory(t.Context(), 7)
+	require.NoError(t, err)
+	require.NotNil(t, memory.Memory)
+	assert.Equal(t, "remembered thing", *memory.Memory)
+}
+
+func TestSetAgentMemory(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPut, r.Method)
+		assert.Equal(t, "/agents/7/memory", r.URL.Path)
+
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, "new memory", body["memory"])
+
+		w.WriteHeader(http.StatusOK)
+		mem := "new memory"
+		writeJSON(t, w, AgentMemory{ID: 7, Name: "an-agent", Memory: &mem})
+	})
+
+	mem := "new memory"
+	memory, err := client.SetAgentMemory(t.Context(), 7, &mem)
+	require.NoError(t, err)
+	require.NotNil(t, memory.Memory)
+	assert.Equal(t, "new memory", *memory.Memory)
+}
+
+func TestSetAgentMemoryClear(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPut, r.Method)
+		assert.Equal(t, "/agents/7/memory", r.URL.Path)
+
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		// A nil memory clears it: the field is present and JSON null.
+		val, present := body["memory"]
+		assert.True(t, present)
+		assert.Nil(t, val)
+
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, AgentMemory{ID: 7, Name: "an-agent", Memory: nil})
+	})
+
+	memory, err := client.SetAgentMemory(t.Context(), 7, nil)
+	require.NoError(t, err)
+	assert.Nil(t, memory.Memory)
+}
+
 func TestListAgentMcpServers(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
