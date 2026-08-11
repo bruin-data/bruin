@@ -1922,6 +1922,16 @@ func (c FreshdeskConnection) GetName() string {
 	return c.Name
 }
 
+type OktaConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	Domain             string `yaml:"domain,omitempty" json:"domain" mapstructure:"domain"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
+}
+
+func (c OktaConnection) GetName() string {
+	return c.Name
+}
+
 type RedditAdsConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	AccessToken        string `yaml:"access_token,omitempty" json:"access_token,omitempty" mapstructure:"access_token" sensitive:"true"`

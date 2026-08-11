@@ -99,6 +99,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/mysql"
 	"github.com/bruin-data/bruin/pkg/notion"
+	"github.com/bruin-data/bruin/pkg/okta"
 	"github.com/bruin-data/bruin/pkg/onelake"
 	"github.com/bruin-data/bruin/pkg/oracle"
 	"github.com/bruin-data/bruin/pkg/paddle"
@@ -255,6 +256,7 @@ type Manager struct {
 	Frankfurter          map[string]*frankfurter.Client
 	Fluxx                map[string]*fluxx.Client
 	Freshdesk            map[string]*freshdesk.Client
+	Okta                 map[string]*okta.Client
 	FundraiseUp          map[string]*fundraiseup.Client
 	Fireflies            map[string]*fireflies.Client
 	Trello               map[string]*trello.Client
@@ -3410,6 +3412,28 @@ func (m *Manager) AddFreshdeskConnectionFromConfig(connection *config.FreshdeskC
 	return nil
 }
 
+func (m *Manager) AddOktaConnectionFromConfig(connection *config.OktaConnection) error {
+	m.mutex.Lock()
+	if m.Okta == nil {
+		m.Okta = make(map[string]*okta.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := okta.NewClient(okta.Config{
+		Domain: connection.Domain,
+		APIKey: connection.APIKey,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Okta[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddFundraiseUpConnectionFromConfig(connection *config.FundraiseUpConnection) error {
 	m.mutex.Lock()
 	if m.FundraiseUp == nil {
@@ -4287,6 +4311,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Frankfurter, connectionManager.AddFrankfurterConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Fluxx, connectionManager.AddFluxxConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Freshdesk, connectionManager.AddFreshdeskConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Okta, connectionManager.AddOktaConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.FundraiseUp, connectionManager.AddFundraiseUpConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Fireflies, connectionManager.AddFirefliesConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Trello, connectionManager.AddTrelloConnectionFromConfig, &wg, &errList, &mu)
