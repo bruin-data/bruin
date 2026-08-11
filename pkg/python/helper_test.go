@@ -521,6 +521,16 @@ func TestColumnHints(t *testing.T) {
 			expected:       "a:decimal,b:decimal",
 		},
 		{
+			name: "decimal precision above ingestr max stays unparameterized",
+			columns: []pipeline.Column{
+				{Name: "a", Type: "decimal(50,2)"},
+				{Name: "b", Type: "decimal", Precision: intPtr(76), Scale: intPtr(38)},
+				{Name: "c", Type: "decimal(38,2)"},
+			},
+			normalizeNames: false,
+			expected:       "a:decimal,b:decimal,c:decimal(38,2)",
+		},
+		{
 			name: "sized string with source_column emits dest:text(n):source",
 			columns: []pipeline.Column{
 				{Name: "email", SourceColumn: "eml", Type: "varchar(255)"},

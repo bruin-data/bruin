@@ -218,6 +218,11 @@ var multipleSpacePattern = regexp.MustCompile(`\s+`)
 // decimalHint is the ingestr type name for fixed-point decimals.
 const decimalHint = "decimal"
 
+// maxDecimalPrecision is the largest precision ingestr accepts (its Decimal128
+// ceiling). A larger precision is emitted as an unbounded decimal instead of a
+// hint ingestr would reject.
+const maxDecimalPrecision = 38
+
 // ingestrSizedTypes are the ingestr types that accept size parameters: a single
 // length (e.g. text(50)) or, for decimal, precision and optional scale (e.g.
 // decimal(10,2)). Add an entry if a source type starts mapping to another sized type.
@@ -383,7 +388,7 @@ func decimalParams(inlineParams string, precision, scale *int) string {
 	if inlineParams != "" {
 		return normaliseDecimalParams(inlineParams)
 	}
-	if precision == nil || *precision <= 0 {
+	if precision == nil || *precision <= 0 || *precision > maxDecimalPrecision {
 		return ""
 	}
 	if scale != nil {
@@ -396,15 +401,15 @@ func decimalParams(inlineParams string, precision, scale *int) string {
 }
 
 // normaliseDecimalParams validates an inline "p" or "p,s" spec, returning its
-// canonical form or "" when any parameter is malformed or the scale exceeds the
-// precision (treated as unbounded).
+// canonical form or "" (treated as unbounded) when any parameter is malformed,
+// the precision is out of range, or the scale exceeds the precision.
 func normaliseDecimalParams(inner string) string {
 	parts := strings.Split(inner, ",")
 	if len(parts) > 2 {
 		return ""
 	}
 	p, err := strconv.Atoi(strings.TrimSpace(parts[0]))
-	if err != nil || p <= 0 {
+	if err != nil || p <= 0 || p > maxDecimalPrecision {
 		return ""
 	}
 	if len(parts) == 1 {
