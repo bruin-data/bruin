@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -3351,13 +3352,14 @@ func cloudAgentsExportThread() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			// Re-indent the server's JSON for a readable file/stdout dump.
-			var obj any
-			if err := json.Unmarshal(export, &obj); err != nil {
-				printError(err, output, "Failed to parse export")
+			// Indent the raw bytes rather than round-tripping through `any`, which
+			// would coerce large integers through float64 and silently corrupt them.
+			var buf bytes.Buffer
+			if err := json.Indent(&buf, export, "", "  "); err != nil {
+				printError(err, output, "Failed to format export")
 				return cli.Exit("", 1)
 			}
-			pretty, _ := json.MarshalIndent(obj, "", "  ")
+			pretty := buf.Bytes()
 
 			if file := c.String("file"); file != "" {
 				if err := os.WriteFile(file, pretty, 0o600); err != nil {

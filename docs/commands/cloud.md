@@ -659,6 +659,23 @@ bruin cloud agents messages \
   --thread-id <thread-id>
 ```
 
+#### `export-thread`
+
+Export a whole thread as JSON (thread, agent, and every message pair with
+input/output, agent logs, and query logs). Prints to stdout, or writes to a file
+with `--file`:
+
+```bash
+bruin cloud agents export-thread \
+  --agent-id <agent-id> \
+  --thread-id <thread-id>
+
+bruin cloud agents export-thread \
+  --agent-id <agent-id> \
+  --thread-id <thread-id> \
+  --file thread.json
+```
+
 ### `connections`
 
 Manage the connections stored in Bruin Cloud. Connections live in your team's
