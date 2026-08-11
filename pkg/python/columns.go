@@ -219,21 +219,18 @@ var multipleSpacePattern = regexp.MustCompile(`\s+`)
 const decimalHint = "decimal"
 
 // maxDecimalPrecision is the largest precision ingestr accepts (its Decimal128
-// ceiling). A larger precision is emitted as an unbounded decimal instead of a
-// hint ingestr would reject.
+// ceiling); a larger precision is emitted as an unbounded decimal.
 const maxDecimalPrecision = 38
 
-// ingestrSizedTypes are the ingestr types that accept size parameters: a single
-// length (e.g. text(50)) or, for decimal, precision and optional scale (e.g.
-// decimal(10,2)). Add an entry if a source type starts mapping to another sized type.
+// ingestrSizedTypes accept size parameters: a length (text(50)) or, for decimal,
+// precision and optional scale (decimal(10,2)). Add an entry for new sized types.
 var ingestrSizedTypes = map[string]bool{
 	"text":      true,
 	decimalHint: true,
 }
 
-// precisionScaleDecimalBases are base names using decimal(P,S) semantics, derived
-// from the shared mapping. ClickHouse Decimal32/64/128/256 (lone arg = scale) live
-// only in the overlay and are excluded, so their scale is not misread as precision.
+// precisionScaleDecimalBases are base names with decimal(P,S) semantics, derived from
+// the shared mapping (excludes ClickHouse DecimalN, whose lone arg is a scale).
 var precisionScaleDecimalBases = func() map[string]bool {
 	bases := make(map[string]bool)
 	for name, hint := range TypeHintMapping {
@@ -324,9 +321,8 @@ func ColumnHints(cols []pipeline.Column, normaliseNames bool, overlay map[string
 			continue
 		}
 
-		// Append size parameters to sized types. Inline parameters take precedence
-		// over the length/precision/scale fields, and an invalid size is treated as
-		// unbounded. decimal is the only precision/scale type; the rest take a length.
+		// Append size params (inline wins over length/precision/scale fields; invalid
+		// sizes stay unbounded). Only decimal uses precision/scale; the rest take a length.
 		if typeKnown && ingestrSizedTypes[hint] {
 			if hint == decimalHint {
 				if params := decimalParams(inlineParams, col.Precision, col.Scale); params != "" {
@@ -381,9 +377,8 @@ func sizedStringLength(inlineLength string, lengthField *int) string {
 	return ""
 }
 
-// decimalParams resolves the precision/scale for a decimal type, preferring inline
-// "p" or "p,s" parameters over the precision/scale fields. Returns "" when no
-// positive precision is available.
+// decimalParams resolves a decimal's precision/scale, preferring inline "p"/"p,s"
+// over the fields. Returns "" (unbounded) when no positive in-range precision exists.
 func decimalParams(inlineParams string, precision, scale *int) string {
 	if inlineParams != "" {
 		return normaliseDecimalParams(inlineParams)
@@ -400,9 +395,8 @@ func decimalParams(inlineParams string, precision, scale *int) string {
 	return strconv.Itoa(*precision)
 }
 
-// normaliseDecimalParams validates an inline "p" or "p,s" spec, returning its
-// canonical form or "" (treated as unbounded) when any parameter is malformed,
-// the precision is out of range, or the scale exceeds the precision.
+// normaliseDecimalParams returns the canonical "p"/"p,s" form, or "" (unbounded) when
+// a param is malformed, the precision is out of range, or the scale exceeds precision.
 func normaliseDecimalParams(inner string) string {
 	parts := strings.Split(inner, ",")
 	if len(parts) > 2 {
