@@ -540,6 +540,19 @@ func TestColumnHints(t *testing.T) {
 			expected:       "bare:text,inline:text(100),field:text(50),renamed:text(255):src",
 		},
 		{
+			name: "overlay decimal alias with a lone scale arg is not forwarded as precision",
+			columns: []pipeline.Column{
+				{Name: "a", Type: "Decimal64(2)"},
+				{Name: "b", Type: "Decimal(18, 4)"},
+			},
+			normalizeNames: false,
+			overlay: map[string]string{
+				"decimal64": "decimal",
+				"decimal":   "decimal",
+			},
+			expected: "a:decimal,b:decimal(18,4)",
+		},
+		{
 			name: "destination overlay aliases are applied",
 			columns: []pipeline.Column{
 				{Name: "id", Type: "uint64"},
@@ -614,7 +627,7 @@ func TestColumnHints_SizedTypes(t *testing.T) {
 
 	sized := make(map[string]string) // source alias -> expected hint
 	for typ, hint := range TypeHintMapping {
-		if ingestrSizedTypes[hint] && hint != "decimal" {
+		if ingestrSizedTypes[hint] && hint != decimalHint {
 			sized[typ] = hint
 		}
 	}
@@ -641,7 +654,7 @@ func TestColumnHints_PrecisionScaleTypes(t *testing.T) {
 
 	sized := make(map[string]string) // source alias -> expected hint
 	for typ, hint := range TypeHintMapping {
-		if ingestrSizedTypes[hint] && hint == "decimal" {
+		if ingestrSizedTypes[hint] && hint == decimalHint {
 			sized[typ] = hint
 		}
 	}

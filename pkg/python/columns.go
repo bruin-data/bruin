@@ -215,13 +215,29 @@ var TypeHintMapping = map[string]string{
 
 var multipleSpacePattern = regexp.MustCompile(`\s+`)
 
+// decimalHint is the ingestr type name for fixed-point decimals.
+const decimalHint = "decimal"
+
 // ingestrSizedTypes are the ingestr types that accept size parameters: a single
 // length (e.g. text(50)) or, for decimal, precision and optional scale (e.g.
 // decimal(10,2)). Add an entry if a source type starts mapping to another sized type.
 var ingestrSizedTypes = map[string]bool{
-	"text":    true,
-	"decimal": true,
+	"text":      true,
+	decimalHint: true,
 }
+
+// precisionScaleDecimalBases are base names using decimal(P,S) semantics, derived
+// from the shared mapping. ClickHouse Decimal32/64/128/256 (lone arg = scale) live
+// only in the overlay and are excluded, so their scale is not misread as precision.
+var precisionScaleDecimalBases = func() map[string]bool {
+	bases := make(map[string]bool)
+	for name, hint := range TypeHintMapping {
+		if hint == decimalHint {
+			bases[name] = true
+		}
+	}
+	return bases
+}()
 
 // TypeHintOverlayForConnection returns DB-specific type aliases when the
 // connection implements IngestrTypeHintProvider; otherwise nil.
@@ -280,7 +296,7 @@ func resolveColumnTypeHint(typ string, mapping map[string]string, wrappers map[s
 			continue
 		}
 		if h, ok := mapping[base]; ok {
-			if ingestrSizedTypes[h] {
+			if ingestrSizedTypes[h] && (h != decimalHint || precisionScaleDecimalBases[base]) {
 				return h, true, inner
 			}
 			return h, true, ""
@@ -307,7 +323,7 @@ func ColumnHints(cols []pipeline.Column, normaliseNames bool, overlay map[string
 		// over the length/precision/scale fields, and an invalid size is treated as
 		// unbounded. decimal is the only precision/scale type; the rest take a length.
 		if typeKnown && ingestrSizedTypes[hint] {
-			if hint == "decimal" {
+			if hint == decimalHint {
 				if params := decimalParams(inlineParams, col.Precision, col.Scale); params != "" {
 					hint = fmt.Sprintf("%s(%s)", hint, params)
 				}
