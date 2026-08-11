@@ -506,9 +506,19 @@ func TestColumnHints(t *testing.T) {
 				{Name: "b", Type: "decimal(0)"},
 				{Name: "c", Type: "decimal(10,abc)"},
 				{Name: "d", Type: "decimal(10,-1)"},
+				{Name: "e", Type: "decimal(2,5)"},
 			},
 			normalizeNames: false,
-			expected:       "a:decimal,b:decimal,c:decimal,d:decimal",
+			expected:       "a:decimal,b:decimal,c:decimal,d:decimal,e:decimal",
+		},
+		{
+			name: "decimal fields with out-of-range scale stay unparameterized",
+			columns: []pipeline.Column{
+				{Name: "a", Type: "decimal", Precision: intPtr(2), Scale: intPtr(5)},
+				{Name: "b", Type: "decimal", Precision: intPtr(10), Scale: intPtr(-1)},
+			},
+			normalizeNames: false,
+			expected:       "a:decimal,b:decimal",
 		},
 		{
 			name: "sized string with source_column emits dest:text(n):source",

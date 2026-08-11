@@ -370,14 +370,18 @@ func decimalParams(inlineParams string, precision, scale *int) string {
 	if precision == nil || *precision <= 0 {
 		return ""
 	}
-	if scale != nil && *scale >= 0 {
+	if scale != nil {
+		if *scale < 0 || *scale > *precision {
+			return ""
+		}
 		return fmt.Sprintf("%d,%d", *precision, *scale)
 	}
 	return strconv.Itoa(*precision)
 }
 
 // normaliseDecimalParams validates an inline "p" or "p,s" spec, returning its
-// canonical form or "" when any parameter is malformed (treated as unbounded).
+// canonical form or "" when any parameter is malformed or the scale exceeds the
+// precision (treated as unbounded).
 func normaliseDecimalParams(inner string) string {
 	parts := strings.Split(inner, ",")
 	if len(parts) > 2 {
@@ -391,7 +395,7 @@ func normaliseDecimalParams(inner string) string {
 		return strconv.Itoa(p)
 	}
 	s, err := strconv.Atoi(strings.TrimSpace(parts[1]))
-	if err != nil || s < 0 {
+	if err != nil || s < 0 || s > p {
 		return ""
 	}
 	return fmt.Sprintf("%d,%d", p, s)
