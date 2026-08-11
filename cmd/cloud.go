@@ -3360,7 +3360,7 @@ func cloudAgentsExportThread() *cli.Command {
 			pretty, _ := json.MarshalIndent(obj, "", "  ")
 
 			if file := c.String("file"); file != "" {
-				if err := os.WriteFile(file, pretty, 0o644); err != nil {
+				if err := os.WriteFile(file, pretty, 0o600); err != nil {
 					printError(err, output, "Failed to write file")
 					return cli.Exit("", 1)
 				}
