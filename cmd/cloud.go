@@ -3993,6 +3993,7 @@ func CloudDashboards() *cli.Command {
 			cloudDashboardsGet(),
 			cloudDashboardsCreate(),
 			cloudDashboardsUpdate(),
+			cloudDashboardsDelete(),
 		},
 	}
 }
@@ -4407,6 +4408,45 @@ func cloudDashboardsUpdate() *cli.Command {
 			} else {
 				infoPrinter.Printf("Updated dashboard %d (%s).\n", dashboard.ID, title)
 			}
+			return nil
+		},
+	}
+}
+
+func cloudDashboardsDelete() *cli.Command {
+	return &cli.Command{
+		Name:  "delete",
+		Usage: "Delete a dashboard so it stops appearing",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "dashboard-id",
+				Usage:    "dashboard ID",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			if err := client.DeleteDashboard(ctx, c.Int("dashboard-id")); err != nil {
+				printError(err, output, "Failed to delete dashboard")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				fmt.Println(`{"success": true}`)
+				return nil
+			}
+
+			successPrinter.Printf("Deleted dashboard %d.\n", c.Int("dashboard-id"))
 			return nil
 		},
 	}

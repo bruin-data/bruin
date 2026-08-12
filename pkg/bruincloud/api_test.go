@@ -1249,6 +1249,18 @@ func TestUpdateDashboard(t *testing.T) {
 	assert.Equal(t, "Renamed", *dashboard.Title)
 }
 
+func TestDeleteDashboard(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodDelete, r.Method)
+		assert.Equal(t, "/dashboards/9", r.URL.Path)
+
+		writeJSON(t, w, map[string]bool{"success": true})
+	})
+
+	require.NoError(t, client.DeleteDashboard(t.Context(), 9))
+}
+
 func TestListScheduledAgents(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
