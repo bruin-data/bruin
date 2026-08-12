@@ -1011,3 +1011,52 @@ func TestExportResultsToMultipleCSV(t *testing.T) {
 		})
 	}
 }
+
+func TestWriteAggregatedQueryLog(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	logDir := filepath.Join(tmpDir, "logs", "queries")
+	require.NoError(t, os.MkdirAll(logDir, 0o755))
+
+	base := time.Date(2026, 8, 12, 10, 0, 0, 0, time.UTC)
+	// Write per-query files out of chronological order to prove the aggregate is sorted.
+	writeLog := func(name string, log QueryLog) {
+		data, err := json.MarshalIndent(log, "", "  ")
+		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(filepath.Join(logDir, name), data, 0o600))
+	}
+	writeLog("query_2.json", QueryLog{Query: "SELECT 2", Timestamp: base.Add(2 * time.Second), Connection: "duckdb", Success: true})
+	writeLog("query_1.json", QueryLog{Query: "SELECT 1", Timestamp: base.Add(1 * time.Second), Connection: "duckdb", Success: true})
+	// Non-JSON files must be ignored.
+	require.NoError(t, os.WriteFile(filepath.Join(logDir, "notes.txt"), []byte("ignore me"), 0o600))
+
+	targetPath := filepath.Join(tmpDir, "accumulated", "query-log.json")
+
+	require.NoError(t, writeAggregatedQueryLog(logDir, targetPath))
+
+	data, err := os.ReadFile(targetPath)
+	require.NoError(t, err)
+
+	var got []QueryLog
+	require.NoError(t, json.Unmarshal(data, &got))
+	require.Len(t, got, 2)
+	assert.Equal(t, "SELECT 1", got[0].Query, "entries should be sorted by timestamp ascending")
+	assert.Equal(t, "SELECT 2", got[1].Query)
+
+	// A subsequent query should be reflected without dropping earlier ones.
+	writeLog("query_3.json", QueryLog{Query: "SELECT 3", Timestamp: base.Add(3 * time.Second), Connection: "duckdb", Success: true})
+	require.NoError(t, writeAggregatedQueryLog(logDir, targetPath))
+
+	data, err = os.ReadFile(targetPath)
+	require.NoError(t, err)
+	got = nil
+	require.NoError(t, json.Unmarshal(data, &got))
+	require.Len(t, got, 3)
+	assert.Equal(t, "SELECT 3", got[2].Query)
+
+	// No leftover temp files in the target directory.
+	remaining, err := os.ReadDir(filepath.Dir(targetPath))
+	require.NoError(t, err)
+	assert.Len(t, remaining, 1, "only the accumulated file should remain")
+}
