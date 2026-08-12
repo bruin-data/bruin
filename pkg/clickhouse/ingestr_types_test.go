@@ -57,8 +57,8 @@ func TestIngestrTypeHints_CoversClickHouseTypes(t *testing.T) {
 		{"Decimal64", "decimal"},
 		{"Decimal128", "decimal"},
 		{"Decimal256", "decimal"},
-		{"Decimal64(2)", "decimal"},
-		{"Decimal(18, 4)", "decimal"},
+		{"Decimal64(2)", "decimal"}, // bit-width forms carry a scale, not a precision — keep bare
+		{"Decimal(18, 4)", "decimal(18,4)"},
 		// bool / string / uuid
 		{"Bool", "bool"},
 		{"String", "text"},

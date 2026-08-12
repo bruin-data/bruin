@@ -378,3 +378,22 @@ columns:
 ```
 
 If you set both, the inline length wins. A string type without a length creates an unbounded column.
+
+#### Sized decimal types
+
+You can give a `decimal`/`numeric` column a precision and an optional scale. Set them inline in the `type` or with the `precision` and `scale` fields (requires `enforce_schema: true`):
+
+```yaml
+parameters:
+  enforce_schema: "true"
+
+columns:
+  - name: amount
+    type: decimal(10,2)
+  - name: rate
+    type: decimal
+    precision: 18
+    scale: 4
+```
+
+If you set both, the inline parameters win. `decimal(10)` (or `precision` without `scale`) sets only the precision; a `decimal` without either creates a decimal with the destination's default precision and scale.
