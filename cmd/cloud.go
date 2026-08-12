@@ -69,7 +69,7 @@ func addTeamFlag(cmd *cli.Command) {
 func teamFlag() *cli.StringFlag {
 	return &cli.StringFlag{
 		Name:    "team",
-		Usage:   "act on this team (company prefix) instead of your current team",
+		Usage:   "act on this team instead of your current one, given as its company prefix (see 'bruin cloud teams list' for available prefixes)",
 		Sources: cli.EnvVars("BRUIN_CLOUD_TEAM"),
 	}
 }
