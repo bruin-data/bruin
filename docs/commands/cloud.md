@@ -947,6 +947,16 @@ bruin cloud dashboards update --dashboard-id 42 --state-file ./dashboard.json
 bruin cloud dashboards update --dashboard-id 42 --visibility team
 ```
 
+#### `delete`
+
+Delete a dashboard so it stops appearing. Requires manage-access (the dashboard
+creator or a team admin); repo (DAC) dashboards are managed in the repo and can't
+be deleted here.
+
+```bash
+bruin cloud dashboards delete --dashboard-id 42
+```
+
 ---
 
 ### `scheduled-agents`

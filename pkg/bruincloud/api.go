@@ -823,6 +823,12 @@ func (c *APIClient) UpdateDashboard(ctx context.Context, dashboardID int, fields
 	return &result, nil
 }
 
+// DeleteDashboard deletes a dashboard so it stops appearing (soft-deleted
+// server-side, mirroring the UI). Requires an owner or team admin.
+func (c *APIClient) DeleteDashboard(ctx context.Context, dashboardID int) error {
+	return c.doRequest(ctx, http.MethodDelete, fmt.Sprintf("/dashboards/%d", dashboardID), nil, nil)
+}
+
 func (c *APIClient) ListScheduledAgents(ctx context.Context) ([]ScheduledAgent, error) {
 	var resp struct {
 		ScheduledAgents []ScheduledAgent `json:"scheduled_agents"`
