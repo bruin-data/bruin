@@ -308,6 +308,15 @@ type Connection struct {
 	Type string `json:"type"`
 }
 
+// ConnectionSet represents a Bruin Cloud connection set (dev-env secret): a named
+// bundle of connections an agent runs against via its connection_set_id.
+type ConnectionSet struct {
+	ID        int    `json:"id"`
+	Name      string `json:"name"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
+}
+
 // Dashboard represents a Bruin Cloud dashboard. State is only populated by the
 // single-dashboard endpoint and carries the published definition as raw JSON.
 type Dashboard struct {

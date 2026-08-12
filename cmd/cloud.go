@@ -40,6 +40,7 @@ func Cloud(isDebug *bool) *cli.Command {
 			CloudGlossary(),
 			CloudAgents(),
 			CloudConnections(),
+			CloudConnectionSets(),
 			CloudDashboards(),
 			CloudScheduledAgents(),
 			CloudAuditLogs(),
@@ -2476,7 +2477,7 @@ func cloudAgentsGet() *cli.Command {
 func cloudAgentsUpdate() *cli.Command {
 	return &cli.Command{
 		Name:  "update",
-		Usage: "Update an agent's name, description or visibility",
+		Usage: "Update an agent's name, description, visibility or connection set",
 		Flags: []cli.Flag{
 			apiKeyFlag(),
 			outputFlag(),
@@ -2496,6 +2497,10 @@ func cloudAgentsUpdate() *cli.Command {
 			&cli.StringFlag{
 				Name:  "visibility",
 				Usage: "agent visibility: team or private",
+			},
+			&cli.IntFlag{
+				Name:  "connection-set-id",
+				Usage: "assign a connection set to the agent (0 to detach); see 'bruin cloud connection-sets list'",
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
@@ -2519,8 +2524,21 @@ func cloudAgentsUpdate() *cli.Command {
 				}
 				fields["visibility"] = visibility
 			}
+			if c.IsSet("connection-set-id") {
+				// >0 assigns, 0 detaches (explicit null); a negative id is a typo,
+				// not a detach — reject it rather than silently wiping the set.
+				switch id := c.Int("connection-set-id"); {
+				case id > 0:
+					fields["connection_set_id"] = id
+				case id == 0:
+					fields["connection_set_id"] = nil
+				default:
+					printError(fmt.Errorf("--connection-set-id must be >= 0 (0 detaches), got %d", id), output, "Invalid --connection-set-id")
+					return cli.Exit("", 1)
+				}
+			}
 			if len(fields) == 0 {
-				printError(errors.New("provide at least one of --name, --description or --visibility"), output, "Nothing to update")
+				printError(errors.New("provide at least one of --name, --description, --visibility or --connection-set-id"), output, "Nothing to update")
 				return cli.Exit("", 1)
 			}
 
@@ -3696,6 +3714,274 @@ func cloudConnectionsDelete() *cli.Command {
 			return nil
 		},
 	}
+}
+
+func CloudConnectionSets() *cli.Command {
+	return &cli.Command{
+		Name:  "connection-sets",
+		Usage: "Manage Bruin Cloud connection sets (named bundles of connections an agent runs against)",
+		Commands: []*cli.Command{
+			cloudConnectionSetsList(),
+			cloudConnectionSetsGet(),
+			cloudConnectionSetsCreate(),
+			cloudConnectionSetsUpdate(),
+			cloudConnectionSetsDelete(),
+		},
+	}
+}
+
+func cloudConnectionSetsList() *cli.Command {
+	return &cli.Command{
+		Name:  "list",
+		Usage: "List connection sets",
+		Flags: []cli.Flag{apiKeyFlag(), outputFlag()},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			sets, err := client.ListConnectionSets(ctx)
+			if err != nil {
+				printError(err, output, "Failed to list connection sets")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(sets, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			if len(sets) == 0 {
+				infoPrinter.Println("No connection sets found.")
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"ID", "Name", "Created", "Updated"})
+			for _, s := range sets {
+				t.AppendRow(table.Row{s.ID, s.Name, s.CreatedAt, s.UpdatedAt})
+			}
+			t.Render()
+			return nil
+		},
+	}
+}
+
+func cloudConnectionSetsGet() *cli.Command {
+	return &cli.Command{
+		Name:  "get",
+		Usage: "List the connections in a connection set (names and types only)",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{Name: "set-id", Usage: "connection set ID", Required: true},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			if c.Int("set-id") <= 0 {
+				printError(fmt.Errorf("--set-id must be a positive integer, got %d", c.Int("set-id")), output, "Invalid --set-id")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			conns, err := client.ListConnectionSetConnections(ctx, c.Int("set-id"))
+			if err != nil {
+				printError(err, output, "Failed to get connection set")
+				return cli.Exit("", 1)
+			}
+			if conns == nil {
+				conns = []bruincloud.Connection{}
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(conns, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			if len(conns) == 0 {
+				infoPrinter.Println("This connection set has no connections.")
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"Name", "Type"})
+			for _, conn := range conns {
+				t.AppendRow(table.Row{conn.Name, conn.Type})
+			}
+			t.Render()
+			return nil
+		},
+	}
+}
+
+func cloudConnectionSetsCreate() *cli.Command {
+	return &cli.Command{
+		Name:  "create",
+		Usage: "Create a connection set from connections in the local .bruin.yml",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.StringFlag{Name: "name", Usage: "the connection set name", Required: true},
+			&cli.StringSliceFlag{Name: "connection", Usage: "a connection name to include, read from the local .bruin.yml; repeat for multiple", Required: true},
+			&cli.StringFlag{Name: "environment", Usage: "the .bruin.yml environment to read from (default: selected environment)"},
+			&cli.StringFlag{Name: "config-file", Usage: "path to the .bruin.yml file"},
+			&cli.BoolFlag{Name: "skip-validation", Usage: "skip the live connection test"},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			inputs, err := connectionSetInputsFromConfig(ctx, c.StringSlice("connection"), c.String("environment"), c.String("config-file"))
+			if err != nil {
+				printError(err, output, "Failed to read connections")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			set, err := client.CreateConnectionSet(ctx, c.String("name"), inputs, c.Bool("skip-validation"))
+			if err != nil {
+				printError(err, output, "Failed to create connection set")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(set, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			printSuccessForOutput(output, fmt.Sprintf("Created connection set '%s' (ID %d) with %d connection(s)", set.Name, set.ID, len(inputs)))
+			return nil
+		},
+	}
+}
+
+func cloudConnectionSetsUpdate() *cli.Command {
+	return &cli.Command{
+		Name:  "update",
+		Usage: "Replace a connection set's connections with ones from the local .bruin.yml",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{Name: "set-id", Usage: "connection set ID", Required: true},
+			&cli.StringSliceFlag{Name: "connection", Usage: "a connection name to include, read from the local .bruin.yml; repeat for multiple. The set becomes exactly these connections.", Required: true},
+			&cli.StringFlag{Name: "environment", Usage: "the .bruin.yml environment to read from (default: selected environment)"},
+			&cli.StringFlag{Name: "config-file", Usage: "path to the .bruin.yml file"},
+			&cli.BoolFlag{Name: "skip-validation", Usage: "skip the live connection test"},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			if c.Int("set-id") <= 0 {
+				printError(fmt.Errorf("--set-id must be a positive integer, got %d", c.Int("set-id")), output, "Invalid --set-id")
+				return cli.Exit("", 1)
+			}
+
+			inputs, err := connectionSetInputsFromConfig(ctx, c.StringSlice("connection"), c.String("environment"), c.String("config-file"))
+			if err != nil {
+				printError(err, output, "Failed to read connections")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			if err := client.UpdateConnectionSet(ctx, c.Int("set-id"), inputs, c.Bool("skip-validation")); err != nil {
+				printError(err, output, "Failed to update connection set")
+				return cli.Exit("", 1)
+			}
+
+			printSuccessForOutput(output, fmt.Sprintf("Updated connection set %d (%d connection(s))", c.Int("set-id"), len(inputs)))
+			return nil
+		},
+	}
+}
+
+func cloudConnectionSetsDelete() *cli.Command {
+	return &cli.Command{
+		Name:  "delete",
+		Usage: "Delete a connection set",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{Name: "set-id", Usage: "connection set ID", Required: true},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			if c.Int("set-id") <= 0 {
+				printError(fmt.Errorf("--set-id must be a positive integer, got %d", c.Int("set-id")), output, "Invalid --set-id")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			if err := client.DeleteConnectionSet(ctx, c.Int("set-id")); err != nil {
+				printError(err, output, "Failed to delete connection set")
+				return cli.Exit("", 1)
+			}
+
+			printSuccessForOutput(output, fmt.Sprintf("Deleted connection set %d", c.Int("set-id")))
+			return nil
+		},
+	}
+}
+
+// connectionSetInputsFromConfig reads each named connection from the local
+// .bruin.yml and returns them as {type, name, config} inputs, inlining any
+// service_account_file into service_account_json (the cloud runner can't read
+// local files). Every connection is sent with a full config — the API takes no
+// partial edits.
+func connectionSetInputsFromConfig(ctx context.Context, names []string, environment, configFile string) ([]bruincloud.ConnectionSetInput, error) {
+	inputs := make([]bruincloud.ConnectionSetInput, 0, len(names))
+	for _, name := range names {
+		connType, credentials, err := connectionFromConfig(ctx, name, environment, configFile)
+		if err != nil {
+			return nil, fmt.Errorf("connection %q: %w", name, err)
+		}
+
+		if path, ok := credentials["service_account_file"].(string); ok && path != "" {
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return nil, fmt.Errorf("connection %q: failed to read service_account_file: %w", name, err)
+			}
+			credentials["service_account_json"] = string(data)
+			delete(credentials, "service_account_file")
+		}
+
+		inputs = append(inputs, bruincloud.ConnectionSetInput{Type: connType, Name: name, Config: credentials})
+	}
+	return inputs, nil
 }
 
 func CloudDashboards() *cli.Command {

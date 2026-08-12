@@ -149,7 +149,7 @@ func TestCloudCommand_Help(t *testing.T) {
 	cmd := Cloud(&isDebug)
 	require.NotNil(t, cmd)
 	assert.Equal(t, "cloud", cmd.Name)
-	assert.Len(t, cmd.Commands, 14)
+	assert.Len(t, cmd.Commands, 15)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
@@ -166,9 +166,28 @@ func TestCloudCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "glossary")
 	assert.Contains(t, subNames, "agents")
 	assert.Contains(t, subNames, "connections")
+	assert.Contains(t, subNames, "connection-sets")
 	assert.Contains(t, subNames, "dashboards")
 	assert.Contains(t, subNames, "scheduled-agents")
 	assert.Contains(t, subNames, "audit-logs")
+}
+
+func TestCloudConnectionSetsCommand_Help(t *testing.T) {
+	t.Parallel()
+	cmd := CloudConnectionSets()
+	require.NotNil(t, cmd)
+	assert.Equal(t, "connection-sets", cmd.Name)
+	require.Len(t, cmd.Commands, 5)
+
+	subNames := make([]string, len(cmd.Commands))
+	for i, sub := range cmd.Commands {
+		subNames[i] = sub.Name
+	}
+	assert.Contains(t, subNames, "list")
+	assert.Contains(t, subNames, "get")
+	assert.Contains(t, subNames, "create")
+	assert.Contains(t, subNames, "update")
+	assert.Contains(t, subNames, "delete")
 }
 
 func TestCloudLeafCommandsHaveTeamFlag(t *testing.T) {

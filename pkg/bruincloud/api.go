@@ -716,6 +716,57 @@ func (c *APIClient) DeleteConnection(ctx context.Context, name string) error {
 	return c.doRequest(ctx, http.MethodDelete, "/connections/"+url.PathEscape(name), nil, nil)
 }
 
+// --- Connection sets ---
+
+func (c *APIClient) ListConnectionSets(ctx context.Context) ([]ConnectionSet, error) {
+	var resp struct {
+		ConnectionSets []ConnectionSet `json:"connection_sets"`
+	}
+	err := c.doRequest(ctx, http.MethodGet, "/connection-sets", nil, &resp)
+	return resp.ConnectionSets, err
+}
+
+func (c *APIClient) ListConnectionSetConnections(ctx context.Context, setID int) ([]Connection, error) {
+	var resp struct {
+		Connections []Connection `json:"connections"`
+	}
+	err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/connection-sets/%d/connections", setID), nil, &resp)
+	return resp.Connections, err
+}
+
+// ConnectionSetInput is one connection in a create/update payload: a name, its
+// type, and its full credentials (the API requires full config, never partial).
+type ConnectionSetInput struct {
+	Type   string         `json:"type"`
+	Name   string         `json:"name"`
+	Config map[string]any `json:"config"`
+}
+
+func (c *APIClient) CreateConnectionSet(ctx context.Context, name string, connections []ConnectionSetInput, skipValidation bool) (*ConnectionSet, error) {
+	body := map[string]any{
+		"name":            name,
+		"connections":     connections,
+		"skip_validation": skipValidation,
+	}
+	var result ConnectionSet
+	if err := c.doRequest(ctx, http.MethodPost, "/connection-sets", body, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func (c *APIClient) UpdateConnectionSet(ctx context.Context, setID int, connections []ConnectionSetInput, skipValidation bool) error {
+	body := map[string]any{
+		"connections":     connections,
+		"skip_validation": skipValidation,
+	}
+	return c.doRequest(ctx, http.MethodPut, fmt.Sprintf("/connection-sets/%d", setID), body, nil)
+}
+
+func (c *APIClient) DeleteConnectionSet(ctx context.Context, setID int) error {
+	return c.doRequest(ctx, http.MethodDelete, fmt.Sprintf("/connection-sets/%d", setID), nil, nil)
+}
+
 // --- Dashboards ---
 
 func (c *APIClient) ListDashboards(ctx context.Context) ([]Dashboard, error) {
