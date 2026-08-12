@@ -1055,8 +1055,11 @@ func TestWriteAggregatedQueryLog(t *testing.T) {
 	require.Len(t, got, 3)
 	assert.Equal(t, "SELECT 3", got[2].Query)
 
-	// No leftover temp files in the target directory.
+	// No leftover temp files in the target directory (only the accumulated file
+	// and its lock file are expected).
 	remaining, err := os.ReadDir(filepath.Dir(targetPath))
 	require.NoError(t, err)
-	assert.Len(t, remaining, 1, "only the accumulated file should remain")
+	for _, entry := range remaining {
+		assert.NotContains(t, entry.Name(), ".tmp-", "no temp files should remain")
+	}
 }

@@ -28,6 +28,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	semantic "github.com/bruin-data/bruin/semantic-engine"
+	"github.com/gofrs/flock"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/pkg/errors"
 	gosnowflake "github.com/snowflakedb/gosnowflake"
@@ -1554,11 +1555,6 @@ func saveQueryLog(queryStr string, connName string, result *query.QueryResult, q
 		return errors.Wrap(err, "failed to write query log file")
 	}
 
-	// Optionally maintain a single accumulated JSON file with every query log,
-	// alongside the per-query files above. This lets an external watcher stream
-	// one stable path instead of tracking the logs/queries directory. Best-effort:
-	// the per-query write above is the source of truth, so a failure here only
-	// warns and never fails the query.
 	if targetPath := os.Getenv(aggregatedQueryLogPathEnv); targetPath != "" {
 		if aggErr := writeAggregatedQueryLog(logDir, targetPath); aggErr != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to update aggregated query log: %v\n", aggErr)
@@ -1568,22 +1564,10 @@ func saveQueryLog(queryStr string, connName string, result *query.QueryResult, q
 	return nil
 }
 
-// aggregatedQueryLogPathEnv names the environment variable that turns on the
-// single-file accumulated query log. When set to a file path, Bruin rewrites
-// that file after every query so it always holds the full set of query logs
-// (the same entries written individually under logs/queries). Unset disables it.
 const aggregatedQueryLogPathEnv = "BRUIN_QUERY_LOG_FILE"
 
-// queryLogAggregateMu serializes rebuilds of the accumulated query-log file so
-// concurrent saves within a single process can't interleave writes to it.
 var queryLogAggregateMu sync.Mutex
 
-// writeAggregatedQueryLog rebuilds the accumulated query-log file at targetPath
-// from every per-query JSON in logDir, sorted by timestamp. It derives the
-// output entirely from the directory rather than in-memory state, so it stays
-// correct even across separate Bruin processes sharing the same logs/queries
-// directory. The write is atomic (temp file in the target directory, then
-// rename) so a reader/watcher never observes a partially written file.
 func writeAggregatedQueryLog(logDir, targetPath string) error {
 	queryLogAggregateMu.Lock()
 	defer queryLogAggregateMu.Unlock()
@@ -1592,6 +1576,17 @@ func writeAggregatedQueryLog(logDir, targetPath string) error {
 	if err != nil {
 		absTarget = targetPath
 	}
+
+	targetDir := filepath.Dir(absTarget)
+	if err := os.MkdirAll(targetDir, 0o755); err != nil { //nolint:gosec // targetPath is operator-provided configuration.
+		return errors.Wrap(err, "failed to create aggregated query log directory")
+	}
+
+	lock := flock.New(absTarget + ".lock")
+	if err := lock.Lock(); err != nil {
+		return errors.Wrap(err, "failed to lock aggregated query log")
+	}
+	defer func() { _ = lock.Unlock() }()
 
 	entries, err := os.ReadDir(logDir)
 	if err != nil {
@@ -1605,8 +1600,6 @@ func writeAggregatedQueryLog(logDir, targetPath string) error {
 		}
 		filePath := filepath.Join(logDir, entry.Name())
 		if abs, absErr := filepath.Abs(filePath); absErr == nil && abs == absTarget {
-			// Never fold the accumulated file back into itself if it happens to
-			// live inside logs/queries.
 			continue
 		}
 
@@ -1617,8 +1610,6 @@ func writeAggregatedQueryLog(logDir, targetPath string) error {
 
 		var entryLog QueryLog
 		if err := json.Unmarshal(data, &entryLog); err != nil {
-			// The file may still be mid-write; skip it and pick it up on the next
-			// rebuild once it parses cleanly.
 			continue
 		}
 		logs = append(logs, entryLog)
@@ -1633,20 +1624,12 @@ func writeAggregatedQueryLog(logDir, targetPath string) error {
 		return errors.Wrap(err, "failed to marshal aggregated query logs")
 	}
 
-	targetDir := filepath.Dir(absTarget)
-	// #nosec G703: targetPath is operator-provided configuration (the
-	// BRUIN_QUERY_LOG_FILE env var), the same trust level as the other BRUIN_*
-	// path env vars, not untrusted end-user input.
-	if err := os.MkdirAll(targetDir, 0o755); err != nil {
-		return errors.Wrap(err, "failed to create aggregated query log directory")
-	}
-
 	tmp, err := os.CreateTemp(targetDir, filepath.Base(absTarget)+".tmp-*")
 	if err != nil {
 		return errors.Wrap(err, "failed to create temp aggregated query log")
 	}
 	tmpName := tmp.Name()
-	defer os.Remove(tmpName) // no-op once the rename below succeeds
+	defer os.Remove(tmpName)
 
 	if _, err := tmp.Write(jsonData); err != nil {
 		_ = tmp.Close()
@@ -1660,9 +1643,7 @@ func writeAggregatedQueryLog(logDir, targetPath string) error {
 		return errors.Wrap(err, "failed to close temp aggregated query log")
 	}
 
-	// #nosec G703: absTarget is operator-provided configuration (the
-	// BRUIN_QUERY_LOG_FILE env var), not untrusted end-user input.
-	if err := os.Rename(tmpName, absTarget); err != nil {
+	if err := os.Rename(tmpName, absTarget); err != nil { //nolint:gosec // targetPath is operator-provided configuration.
 		return errors.Wrap(err, "failed to finalize aggregated query log")
 	}
 
