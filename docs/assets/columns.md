@@ -87,10 +87,7 @@ the pipeline, and the referenced column must exist on it. Numeric type detail is
 checked — `precision`/`length` must be positive, `scale` must not be negative, and `scale`
 must not exceed `precision`.
 
-Adding the [`relationships`](../quality/available_checks.md#relationships) quality check
-turns the metadata into a runtime referential-integrity validation. Metadata alone does
-not cause Bruin to query the referenced table or create a scheduler dependency. Add the
-referenced asset to `depends` when it must be refreshed before the check runs.
+Adding the [`relationships`](../quality/available_checks.md#relationships) quality check turns the metadata into a runtime referential-integrity validation. Metadata alone does not cause Bruin to query the referenced table or create a scheduler dependency. Add the referenced asset to `depends` when it must be refreshed before the check runs.
 
 ### Type detail
 
