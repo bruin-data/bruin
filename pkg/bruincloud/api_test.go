@@ -1344,6 +1344,34 @@ func TestUpdateScheduledAgent(t *testing.T) {
 	assert.Equal(t, "Renamed", *run.Title)
 }
 
+func TestTriggerScheduledAgent(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/scheduled-agents/11/trigger", r.URL.Path)
+
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, ScheduledAgentExecution{ExecutionID: 42, ThreadID: 99})
+	})
+
+	execution, err := client.TriggerScheduledAgent(t.Context(), 11)
+	require.NoError(t, err)
+	assert.Equal(t, 42, execution.ExecutionID)
+	assert.Equal(t, 99, execution.ThreadID)
+}
+
+func TestDeleteScheduledAgent(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodDelete, r.Method)
+		assert.Equal(t, "/scheduled-agents/11", r.URL.Path)
+
+		writeJSON(t, w, map[string]bool{"success": true})
+	})
+
+	require.NoError(t, client.DeleteScheduledAgent(t.Context(), 11))
+}
+
 func TestGetCostExplorerSchema(t *testing.T) {
 	t.Parallel()
 	var gotPath string

@@ -863,6 +863,23 @@ func (c *APIClient) UpdateScheduledAgent(ctx context.Context, scheduledAgentID i
 	return &result, nil
 }
 
+// DeleteScheduledAgent deletes a scheduled agent so it stops firing
+// (soft-deleted server-side, mirroring the UI).
+func (c *APIClient) DeleteScheduledAgent(ctx context.Context, scheduledAgentID int) error {
+	return c.doRequest(ctx, http.MethodDelete, fmt.Sprintf("/scheduled-agents/%d", scheduledAgentID), nil, nil)
+}
+
+// TriggerScheduledAgent runs a scheduled agent immediately, off its schedule; the
+// schedule itself is untouched. Returns the execution that was stood up.
+func (c *APIClient) TriggerScheduledAgent(ctx context.Context, scheduledAgentID int) (*ScheduledAgentExecution, error) {
+	var result ScheduledAgentExecution
+	err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/scheduled-agents/%d/trigger", scheduledAgentID), nil, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 // --- Scheduled agent run state ---
 
 // ListRunStates returns the run-state ("memory") files persisted on a scheduled
