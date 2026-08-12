@@ -21,8 +21,9 @@ curl's stdin, stdout, and stderr directly to the caller.
 
 ## Referencing connections
 
-Call `bruin.connection("<name>")` from Jinja to retrieve a connection by its existing Bruin name.
-Its fields use the same snake_case names as `.bruin.yml`:
+Build the URL, headers, and body from the connection — do not hardcode hosts, project
+ids, or tokens. Call `bruin.connection("<name>")` from Jinja to retrieve a connection
+by its existing Bruin name. Its fields use the same snake_case names as `.bruin.yml`:
 
 ```yaml
 environments:
