@@ -4421,6 +4421,8 @@ func CloudScheduledAgents() *cli.Command {
 			cloudScheduledAgentsGet(),
 			cloudScheduledAgentsCreate(),
 			cloudScheduledAgentsUpdate(),
+			cloudScheduledAgentsTrigger(),
+			cloudScheduledAgentsDelete(),
 			cloudScheduledAgentsRunStates(),
 		},
 	}
@@ -4835,6 +4837,86 @@ func cloudScheduledAgentsUpdate() *cli.Command {
 			}
 
 			infoPrinter.Printf("Updated scheduled agent %d (%s).\n", run.ID, derefString(run.Title))
+			return nil
+		},
+	}
+}
+
+func cloudScheduledAgentsTrigger() *cli.Command {
+	return &cli.Command{
+		Name:  "trigger",
+		Usage: "Run a scheduled agent now, off its schedule (the schedule is untouched)",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "scheduled-agent-id",
+				Usage:    "scheduled agent ID",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			execution, err := client.TriggerScheduledAgent(ctx, c.Int("scheduled-agent-id"))
+			if err != nil {
+				printError(err, output, "Failed to trigger scheduled agent")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(execution, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			successPrinter.Printf("Triggered scheduled agent %d — execution %d is running in thread %d.\n", c.Int("scheduled-agent-id"), execution.ExecutionID, execution.ThreadID)
+			return nil
+		},
+	}
+}
+
+func cloudScheduledAgentsDelete() *cli.Command {
+	return &cli.Command{
+		Name:  "delete",
+		Usage: "Delete a scheduled agent so it stops firing",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "scheduled-agent-id",
+				Usage:    "scheduled agent ID",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			if err := client.DeleteScheduledAgent(ctx, c.Int("scheduled-agent-id")); err != nil {
+				printError(err, output, "Failed to delete scheduled agent")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				fmt.Println(`{"success": true}`)
+				return nil
+			}
+
+			successPrinter.Printf("Deleted scheduled agent %d.\n", c.Int("scheduled-agent-id"))
 			return nil
 		},
 	}

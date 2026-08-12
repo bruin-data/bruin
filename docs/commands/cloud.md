@@ -985,6 +985,24 @@ bruin cloud scheduled-agents update --scheduled-agent-id 42 --cron "0 8 * * 1"
 bruin cloud scheduled-agents update --scheduled-agent-id 42 --state-file ./plan.yaml
 ```
 
+#### `trigger`
+
+Run a scheduled agent now, off its schedule — the "Run now" action. The schedule
+is untouched (the next scheduled run still fires as planned). Refused while a run
+is already in progress. Prints the execution and thread ids.
+
+```bash
+bruin cloud scheduled-agents trigger --scheduled-agent-id 42
+```
+
+#### `delete`
+
+Delete a scheduled agent so it stops firing.
+
+```bash
+bruin cloud scheduled-agents delete --scheduled-agent-id 42
+```
+
 #### `run-states`
 
 Manage a scheduled agent's **run-state** files — the markdown "memory" the agent

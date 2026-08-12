@@ -360,6 +360,13 @@ type ScheduledAgent struct {
 	RecentExecutions  json.RawMessage `json:"recent_executions,omitempty"`
 }
 
+// ScheduledAgentExecution is the execution a trigger stands up: the run that was
+// just kicked off, and the thread it runs in.
+type ScheduledAgentExecution struct {
+	ExecutionID int `json:"execution_id"`
+	ThreadID    int `json:"thread_id"`
+}
+
 // AuditLog is one entry in a team's audit trail as returned by GET /audit-logs.
 // Metadata is event-specific and left raw.
 type AuditLog struct {
