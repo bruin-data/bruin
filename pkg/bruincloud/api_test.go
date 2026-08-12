@@ -588,6 +588,104 @@ func TestAddAgentConnection(t *testing.T) {
 	assert.Equal(t, "postgres", connections[0].Type)
 }
 
+func TestListConnectionSets(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/connection-sets", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, map[string]any{
+			"connection_sets": []ConnectionSet{{ID: 1, Name: "prod"}, {ID: 2, Name: "dev"}},
+		})
+	})
+
+	sets, err := client.ListConnectionSets(t.Context())
+	require.NoError(t, err)
+	require.Len(t, sets, 2)
+	assert.Equal(t, "prod", sets[0].Name)
+	assert.Equal(t, 2, sets[1].ID)
+}
+
+func TestListConnectionSetConnections(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/connection-sets/5/connections", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, map[string]any{
+			"connections": []Connection{{Name: "pg", Type: "postgres"}},
+		})
+	})
+
+	conns, err := client.ListConnectionSetConnections(t.Context(), 5)
+	require.NoError(t, err)
+	require.Len(t, conns, 1)
+	assert.Equal(t, "pg", conns[0].Name)
+	assert.Equal(t, "postgres", conns[0].Type)
+}
+
+func TestCreateConnectionSet(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/connection-sets", r.URL.Path)
+
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, "prod", body["name"])
+		assert.Equal(t, true, body["skip_validation"])
+		conns, _ := body["connections"].([]any)
+		assert.Len(t, conns, 1)
+		first, _ := conns[0].(map[string]any)
+		assert.Equal(t, "postgres", first["type"])
+		cfg, _ := first["config"].(map[string]any)
+		assert.Equal(t, "secret", cfg["password"])
+
+		w.WriteHeader(http.StatusCreated)
+		writeJSON(t, w, ConnectionSet{ID: 9, Name: "prod"})
+	})
+
+	set, err := client.CreateConnectionSet(t.Context(), "prod", []ConnectionSetInput{
+		{Type: "postgres", Name: "pg", Config: map[string]any{"password": "secret"}},
+	}, true)
+	require.NoError(t, err)
+	assert.Equal(t, 9, set.ID)
+	assert.Equal(t, "prod", set.Name)
+}
+
+func TestUpdateConnectionSet(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPut, r.Method)
+		assert.Equal(t, "/connection-sets/9", r.URL.Path)
+
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		conns, _ := body["connections"].([]any)
+		assert.Len(t, conns, 1)
+
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, map[string]any{"success": true})
+	})
+
+	err := client.UpdateConnectionSet(t.Context(), 9, []ConnectionSetInput{
+		{Type: "postgres", Name: "pg", Config: map[string]any{"password": "secret"}},
+	}, false)
+	require.NoError(t, err)
+}
+
+func TestDeleteConnectionSet(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodDelete, r.Method)
+		assert.Equal(t, "/connection-sets/9", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, map[string]any{"success": true})
+	})
+
+	require.NoError(t, client.DeleteConnectionSet(t.Context(), 9))
+}
+
 func TestCreateAgent(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {

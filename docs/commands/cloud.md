@@ -734,6 +734,60 @@ Delete a connection by name:
 bruin cloud connections delete --name my_pg
 ```
 
+### `connection-sets`
+
+Manage connection **sets** — named bundles of connections an agent runs against
+(assigned to an agent via its connection set). Distinct from individual
+connections. Credentials are write-only: reads never return config values, and
+create/update always send a full config per connection (read from the local
+`.bruin.yml`).
+
+#### `list`
+
+List the team's connection sets:
+
+```bash
+bruin cloud connection-sets list
+```
+
+#### `get`
+
+List the connections in a set (names and types only — never secret values):
+
+```bash
+bruin cloud connection-sets get --set-id 7
+```
+
+#### `create`
+
+Create a set from connections in the local `.bruin.yml` (repeat `--connection`):
+
+```bash
+bruin cloud connection-sets create --name prod \
+  --connection my_pg --connection my_bq
+```
+
+Use `--skip-validation` to skip the live connection test, and `--environment` /
+`--config-file` to pick a specific `.bruin.yml` / environment.
+
+#### `update`
+
+Replace a set's connections — the set becomes exactly the connections you pass:
+
+```bash
+bruin cloud connection-sets update --set-id 7 --connection my_pg
+```
+
+#### `delete`
+
+Delete a set (refused while an agent is still assigned to it):
+
+```bash
+bruin cloud connection-sets delete --set-id 7
+```
+
+To assign a set to an agent, use `bruin cloud agents update --agent-id <id> --connection-set-id <set-id>` (or `--connection-set-id 0` to detach).
+
 ### `dashboards`
 
 Read the dashboards in your Bruin Cloud team — useful for inspecting or
