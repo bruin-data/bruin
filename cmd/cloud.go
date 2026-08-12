@@ -4430,6 +4430,11 @@ func cloudDashboardsDelete() *cli.Command {
 			defer RecoverFromPanic()
 			output := c.String("output")
 
+			if c.Int("dashboard-id") <= 0 {
+				printError(fmt.Errorf("--dashboard-id must be a positive integer, got %d", c.Int("dashboard-id")), output, "Invalid --dashboard-id")
+				return cli.Exit("", 1)
+			}
+
 			client, err := newCloudClient(c)
 			if err != nil {
 				printError(err, output, "Failed to create API client")
