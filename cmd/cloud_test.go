@@ -343,6 +343,25 @@ func TestCloudAgentsCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "export-thread")
 }
 
+func TestCloudAgentsThreadsCommand_Help(t *testing.T) {
+	t.Parallel()
+	cmd := cloudAgentsThreads()
+	require.NotNil(t, cmd)
+	assert.Equal(t, "threads", cmd.Name)
+	// The bare command still lists (default Action); management verbs are subcommands.
+	require.NotNil(t, cmd.Action)
+	require.Len(t, cmd.Commands, 4)
+
+	subNames := make([]string, len(cmd.Commands))
+	for i, sub := range cmd.Commands {
+		subNames[i] = sub.Name
+	}
+	assert.Contains(t, subNames, "rename")
+	assert.Contains(t, subNames, "archive")
+	assert.Contains(t, subNames, "unarchive")
+	assert.Contains(t, subNames, "delete")
+}
+
 func TestCloudDashboardsCommand_Help(t *testing.T) {
 	t.Parallel()
 	cmd := CloudDashboards()

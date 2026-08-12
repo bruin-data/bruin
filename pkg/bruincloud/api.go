@@ -607,13 +607,16 @@ func (c *APIClient) GetAgentMessageStatus(ctx context.Context, agentID, threadID
 	return &resp.Data, nil
 }
 
-func (c *APIClient) ListAgentThreads(ctx context.Context, agentID int, limit, offset int) ([]AgentThread, error) {
+func (c *APIClient) ListAgentThreads(ctx context.Context, agentID int, limit, offset int, archived bool) ([]AgentThread, error) {
 	params := url.Values{}
 	if limit > 0 {
 		params.Set("limit", strconv.Itoa(limit))
 	}
 	if offset > 0 {
 		params.Set("offset", strconv.Itoa(offset))
+	}
+	if archived {
+		params.Set("archived", "true")
 	}
 	path := fmt.Sprintf("/agents/%d/threads", agentID)
 	if len(params) > 0 {
@@ -624,6 +627,22 @@ func (c *APIClient) ListAgentThreads(ctx context.Context, agentID int, limit, of
 	}
 	err := c.doRequest(ctx, http.MethodGet, path, nil, &resp)
 	return resp.Threads, err
+}
+
+// UpdateAgentThread renames a thread (title) and/or archives it (archived); the
+// server also unpins an archived thread.
+func (c *APIClient) UpdateAgentThread(ctx context.Context, agentID, threadID int, fields map[string]any) (*AgentThread, error) {
+	var result AgentThread
+	err := c.doRequest(ctx, http.MethodPatch, fmt.Sprintf("/agents/%d/threads/%d", agentID, threadID), fields, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// DeleteAgentThread soft-deletes a chat thread (mirroring the UI).
+func (c *APIClient) DeleteAgentThread(ctx context.Context, agentID, threadID int) error {
+	return c.doRequest(ctx, http.MethodDelete, fmt.Sprintf("/agents/%d/threads/%d", agentID, threadID), nil, nil)
 }
 
 func (c *APIClient) GetAgentPrompt(ctx context.Context, agentID int) (*AgentPrompt, error) {

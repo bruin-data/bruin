@@ -885,10 +885,54 @@ func TestListAgentThreads(t *testing.T) {
 		})
 	})
 
-	threads, err := client.ListAgentThreads(t.Context(), 1, 0, 0)
+	threads, err := client.ListAgentThreads(t.Context(), 1, 0, 0, false)
 	require.NoError(t, err)
 	require.Len(t, threads, 1)
 	assert.Equal(t, 10, threads[0].ID)
+}
+
+func TestListAgentThreadsArchived(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/agents/1/threads", r.URL.Path)
+		assert.Equal(t, "true", r.URL.Query().Get("archived"))
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, map[string]any{"threads": []AgentThread{}})
+	})
+
+	_, err := client.ListAgentThreads(t.Context(), 1, 0, 0, true)
+	require.NoError(t, err)
+}
+
+func TestUpdateAgentThread(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPatch, r.Method)
+		assert.Equal(t, "/agents/1/threads/10", r.URL.Path)
+
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, "Renamed", body["title"])
+
+		w.WriteHeader(http.StatusOK)
+		title := "Renamed"
+		writeJSON(t, w, AgentThread{ID: 10, AgentID: 1, Title: &title})
+	})
+
+	thread, err := client.UpdateAgentThread(t.Context(), 1, 10, map[string]any{"title": "Renamed"})
+	require.NoError(t, err)
+	assert.Equal(t, "Renamed", *thread.Title)
+}
+
+func TestDeleteAgentThread(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodDelete, r.Method)
+		assert.Equal(t, "/agents/1/threads/10", r.URL.Path)
+		writeJSON(t, w, map[string]bool{"success": true})
+	})
+
+	require.NoError(t, client.DeleteAgentThread(t.Context(), 1, 10))
 }
 
 func TestListAgentMessages(t *testing.T) {
