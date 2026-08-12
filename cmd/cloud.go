@@ -2525,11 +2525,16 @@ func cloudAgentsUpdate() *cli.Command {
 				fields["visibility"] = visibility
 			}
 			if c.IsSet("connection-set-id") {
-				// 0 (or negative) detaches — send an explicit null; a positive id assigns.
-				if id := c.Int("connection-set-id"); id > 0 {
+				// >0 assigns, 0 detaches (explicit null); a negative id is a typo,
+				// not a detach — reject it rather than silently wiping the set.
+				switch id := c.Int("connection-set-id"); {
+				case id > 0:
 					fields["connection_set_id"] = id
-				} else {
+				case id == 0:
 					fields["connection_set_id"] = nil
+				default:
+					printError(fmt.Errorf("--connection-set-id must be >= 0 (0 detaches), got %d", id), output, "Invalid --connection-set-id")
+					return cli.Exit("", 1)
 				}
 			}
 			if len(fields) == 0 {
