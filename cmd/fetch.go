@@ -10,7 +10,9 @@ import (
 	"os/signal"
 	path2 "path"
 	"path/filepath"
+	"sort"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -26,6 +28,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	semantic "github.com/bruin-data/bruin/semantic-engine"
+	"github.com/gofrs/flock"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/pkg/errors"
 	gosnowflake "github.com/snowflakedb/gosnowflake"
@@ -1550,6 +1553,98 @@ func saveQueryLog(queryStr string, connName string, result *query.QueryResult, q
 	err = os.WriteFile(logPath, jsonData, 0o600)
 	if err != nil {
 		return errors.Wrap(err, "failed to write query log file")
+	}
+
+	if targetPath := os.Getenv(aggregatedQueryLogPathEnv); targetPath != "" {
+		if aggErr := writeAggregatedQueryLog(logDir, targetPath); aggErr != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to update aggregated query log: %v\n", aggErr)
+		}
+	}
+
+	return nil
+}
+
+const aggregatedQueryLogPathEnv = "BRUIN_QUERY_LOG_FILE"
+
+var queryLogAggregateMu sync.Mutex
+
+func writeAggregatedQueryLog(logDir, targetPath string) error {
+	queryLogAggregateMu.Lock()
+	defer queryLogAggregateMu.Unlock()
+
+	absTarget, err := filepath.Abs(targetPath)
+	if err != nil {
+		absTarget = targetPath
+	}
+
+	targetDir := filepath.Dir(absTarget)
+	if err := os.MkdirAll(targetDir, 0o755); err != nil { //nolint:gosec // targetPath is operator-provided configuration.
+		return errors.Wrap(err, "failed to create aggregated query log directory")
+	}
+
+	lock := flock.New(absTarget + ".lock")
+	if err := lock.Lock(); err != nil {
+		return errors.Wrap(err, "failed to lock aggregated query log")
+	}
+	defer func() { _ = lock.Unlock() }()
+
+	entries, err := os.ReadDir(logDir)
+	if err != nil {
+		return errors.Wrap(err, "failed to read query log directory")
+	}
+
+	logs := make([]QueryLog, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
+			continue
+		}
+		filePath := filepath.Join(logDir, entry.Name())
+		if abs, absErr := filepath.Abs(filePath); absErr == nil && abs == absTarget {
+			continue
+		}
+
+		data, readErr := os.ReadFile(filePath)
+		if readErr != nil {
+			continue
+		}
+
+		var entryLog QueryLog
+		if err := json.Unmarshal(data, &entryLog); err != nil {
+			continue
+		}
+		logs = append(logs, entryLog)
+	}
+
+	sort.Slice(logs, func(i, j int) bool {
+		return logs[i].Timestamp.Before(logs[j].Timestamp)
+	})
+
+	jsonData, err := json.MarshalIndent(logs, "", "  ")
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal aggregated query logs")
+	}
+
+	tmp, err := os.CreateTemp(targetDir, filepath.Base(absTarget)+".tmp-*")
+	if err != nil {
+		return errors.Wrap(err, "failed to create temp aggregated query log")
+	}
+	tmpName := tmp.Name()
+	defer os.Remove(tmpName)
+
+	if _, err := tmp.Write(jsonData); err != nil {
+		_ = tmp.Close()
+		return errors.Wrap(err, "failed to write temp aggregated query log")
+	}
+	if err := tmp.Chmod(0o600); err != nil {
+		_ = tmp.Close()
+		return errors.Wrap(err, "failed to chmod temp aggregated query log")
+	}
+	if err := tmp.Close(); err != nil {
+		return errors.Wrap(err, "failed to close temp aggregated query log")
+	}
+
+	if err := os.Rename(tmpName, absTarget); err != nil { //nolint:gosec // targetPath is operator-provided configuration.
+		return errors.Wrap(err, "failed to finalize aggregated query log")
 	}
 
 	return nil

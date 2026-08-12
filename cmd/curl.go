@@ -38,7 +38,8 @@ func newCurlCommand(resolveConnections curlConnectionLookupResolver, execute cur
 		Usage:     "run curl with arguments rendered from Bruin connections",
 		ArgsUsage: "-- [curl options and URLs]",
 		Description: "Passes every argument after -- directly to the installed curl executable after Jinja rendering, without inspecting curl options. " +
-			"Connection fields are available as {{ bruin.connection(\"name\").field }}.",
+			"Build the URL, headers, and body from the connection — do not hardcode hosts, project ids, or tokens. " +
+			"Connection fields are available as {{ bruin.connection(\"name\").field }}; run `bruin connections list` for field names.",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "environment",
