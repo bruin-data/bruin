@@ -263,6 +263,7 @@ var defaultMapping = map[string]string{
 	"footballdata":          "footballdata-default",
 	"frankfurter":           "frankfurter-default",
 	"freshdesk":             "freshdesk-default",
+	"okta":                  "okta-default",
 	"fundraiseup":           "fundraiseup-default",
 	"g2":                    "g2-default",
 	"github":                "github-default",

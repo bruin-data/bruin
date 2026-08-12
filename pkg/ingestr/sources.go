@@ -753,6 +753,21 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "<database_id>", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
 	},
 
+	// Okta - Identity and access management platform
+	"okta": {
+		{Name: "users", PrimaryKey: "id", IncKey: "lastUpdated", IncStrategy: "merge"},
+		{Name: "groups", PrimaryKey: "id", IncKey: "lastUpdated", IncStrategy: "merge"},
+		{Name: "group_members", PrimaryKey: "group_id,id", IncKey: "", IncStrategy: "replace"},
+		{Name: "applications", PrimaryKey: "id", IncKey: "lastUpdated", IncStrategy: "merge"},
+		{Name: "application_users", PrimaryKey: "app_id,id", IncKey: "", IncStrategy: "replace"},
+		{Name: "application_groups", PrimaryKey: "app_id,id", IncKey: "", IncStrategy: "replace"},
+		{Name: "system_log_events", PrimaryKey: "uuid", IncKey: "published", IncStrategy: "merge"},
+		{Name: "devices", PrimaryKey: "id", IncKey: "lastUpdated", IncStrategy: "merge"},
+		{Name: "policies", PrimaryKey: "id", IncKey: "lastUpdated", IncStrategy: "merge"},
+		{Name: "policy_rules", PrimaryKey: "id", IncKey: "lastUpdated", IncStrategy: "merge"},
+		{Name: "roles", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+	},
+
 	// Personio - HR platform
 	"personio": {
 		{Name: "employees", PrimaryKey: "id", IncKey: "last_modified_at", IncStrategy: "merge"},

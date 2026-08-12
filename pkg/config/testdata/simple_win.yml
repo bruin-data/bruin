@@ -586,6 +586,10 @@ environments:
           passcode: "test-passcode"
           region: "eu1"
           timezone: "Asia/Kolkata"
+      okta:
+        - name: "okta-1"
+          domain: "dev-123456.okta.com"
+          api_key: "test-api-key"
       sendgrid:
         - name: "sendgrid-1"
           api_key: "test-api-key"

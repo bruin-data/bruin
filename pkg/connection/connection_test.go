@@ -21,6 +21,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/mysql"
 	"github.com/bruin-data/bruin/pkg/notion"
+	"github.com/bruin-data/bruin/pkg/okta"
 	"github.com/bruin-data/bruin/pkg/personio"
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/sharepoint"
@@ -549,6 +550,33 @@ func Test_AddCleverTapConnectionFromConfig(t *testing.T) {
 	assert.Contains(t, uri, "passcode=test-passcode")
 	assert.Contains(t, uri, "region=in1")
 	assert.Contains(t, uri, "timezone=Asia%2FKolkata")
+	assert.Equal(t, configuration, m.GetConnectionDetails("test"))
+}
+
+func Test_AddOktaConnectionFromConfig(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
+
+	configuration := &config.OktaConnection{
+		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
+		Domain:             "dev-123456.okta.com",
+		APIKey:             "test-api-key",
+	}
+
+	err := m.AddOktaConnectionFromConfig(configuration)
+	require.NoError(t, err)
+
+	res, ok := m.GetConnection("test").(*okta.Client)
+	require.True(t, ok)
+	require.NotNil(t, res)
+
+	uri, err := res.GetIngestrURI()
+	require.NoError(t, err)
+	assert.Equal(t, "okta://dev-123456.okta.com?api_key=test-api-key", uri)
 	assert.Equal(t, configuration, m.GetConnectionDetails("test"))
 }
 

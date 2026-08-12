@@ -149,6 +149,7 @@ type Connections struct {
 	Spark               []SparkConnection               `yaml:"spark,omitempty" json:"spark,omitempty" mapstructure:"spark"`
 	Fluxx               []FluxxConnection               `yaml:"fluxx,omitempty" json:"fluxx,omitempty" mapstructure:"fluxx"`
 	Freshdesk           []FreshdeskConnection           `yaml:"freshdesk,omitempty" json:"freshdesk,omitempty" mapstructure:"freshdesk"`
+	Okta                []OktaConnection                `yaml:"okta,omitempty" json:"okta,omitempty" mapstructure:"okta"`
 	FundraiseUp         []FundraiseUpConnection         `yaml:"fundraiseup,omitempty" json:"fundraiseup,omitempty" mapstructure:"fundraiseup"`
 	Fireflies           []FirefliesConnection           `yaml:"fireflies,omitempty" json:"fireflies,omitempty" mapstructure:"fireflies"`
 	Trello              []TrelloConnection              `yaml:"trello,omitempty" json:"trello,omitempty" mapstructure:"trello"`
@@ -1538,6 +1539,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Freshdesk = append(env.Connections.Freshdesk, conn)
+	case "okta":
+		var conn OktaConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Okta = append(env.Connections.Okta, conn)
 	case "frankfurter":
 		var conn FrankfurterConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -2104,6 +2112,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.AppLovin = removeConnection(env.Connections.AppLovin, connectionName)
 	case "freshdesk":
 		env.Connections.Freshdesk = removeConnection(env.Connections.Freshdesk, connectionName)
+	case "okta":
+		env.Connections.Okta = removeConnection(env.Connections.Okta, connectionName)
 	case "frankfurter":
 		env.Connections.Frankfurter = removeConnection(env.Connections.Frankfurter, connectionName)
 	case "salesforce":
@@ -2406,6 +2416,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Spark, source.Spark)
 	mergeConnectionList(&c.Fluxx, source.Fluxx)
 	mergeConnectionList(&c.Freshdesk, source.Freshdesk)
+	mergeConnectionList(&c.Okta, source.Okta)
 	mergeConnectionList(&c.FundraiseUp, source.FundraiseUp)
 	mergeConnectionList(&c.Fireflies, source.Fireflies)
 	mergeConnectionList(&c.Trello, source.Trello)

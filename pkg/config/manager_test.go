@@ -927,6 +927,13 @@ func TestLoadFromFile(t *testing.T) {
 					Timezone:           "Asia/Kolkata",
 				},
 			},
+			Okta: []OktaConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "okta-1"},
+					Domain:             "dev-123456.okta.com",
+					APIKey:             "test-api-key",
+				},
+			},
 			Sendgrid: []SendgridConnection{
 				{
 					ConnectionMetadata: ConnectionMetadata{Name: "sendgrid-1"},
@@ -2872,6 +2879,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Indeed:              []IndeedConnection{{ConnectionMetadata: ConnectionMetadata{Name: "indeed1"}}},
 				CustomerIo:          []CustomerIoConnection{{ConnectionMetadata: ConnectionMetadata{Name: "customerio1"}}},
 				CleverTap:           []CleverTapConnection{{ConnectionMetadata: ConnectionMetadata{Name: "clevertap1"}}},
+				Okta:                []OktaConnection{{ConnectionMetadata: ConnectionMetadata{Name: "okta1"}}},
 				Sendgrid:            []SendgridConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sendgrid1"}}},
 				Twilio:              []TwilioConnection{{ConnectionMetadata: ConnectionMetadata{Name: "twilio1"}}},
 				Braze:               []BrazeConnection{{ConnectionMetadata: ConnectionMetadata{Name: "braze1"}}},
@@ -3011,6 +3019,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Indeed:              []IndeedConnection{{ConnectionMetadata: ConnectionMetadata{Name: "indeed1"}}},
 				CustomerIo:          []CustomerIoConnection{{ConnectionMetadata: ConnectionMetadata{Name: "customerio1"}}},
 				CleverTap:           []CleverTapConnection{{ConnectionMetadata: ConnectionMetadata{Name: "clevertap1"}}},
+				Okta:                []OktaConnection{{ConnectionMetadata: ConnectionMetadata{Name: "okta1"}}},
 				Sendgrid:            []SendgridConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sendgrid1"}}},
 				Twilio:              []TwilioConnection{{ConnectionMetadata: ConnectionMetadata{Name: "twilio1"}}},
 				Braze:               []BrazeConnection{{ConnectionMetadata: ConnectionMetadata{Name: "braze1"}}},
