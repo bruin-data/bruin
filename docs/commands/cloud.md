@@ -1061,6 +1061,31 @@ bruin cloud scheduled-agents run-states delete --scheduled-agent-id 42 --name me
 
 ---
 
+### `skills`
+
+Manage the team **skill library** — named instruction snippets you attach to
+agents. Team-scoped (you only see your own team's skills).
+
+```bash
+# List
+bruin cloud skills list
+
+# Create (body inline or from a file; --all-agents applies it to every agent)
+bruin cloud skills create --name reporting --description "How to write reports" --body "Be concise."
+bruin cloud skills create --name reporting --description "How to write reports" --body-file ./skill.md --all-agents
+
+# Update (name, description and body are all replaced)
+bruin cloud skills update --skill-id 7 --name reporting --description "..." --body-file ./skill.md
+
+# Delete
+bruin cloud skills delete --skill-id 7
+
+# Set which agents have the skill (replaces the set; omit --agent-id to detach all)
+bruin cloud skills set-agents --skill-id 7 --agent-id 3 --agent-id 5
+```
+
+---
+
 ### `cost`
 
 Explore warehouse costs, mirroring the Cost Explorer in the Bruin Cloud UI.
