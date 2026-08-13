@@ -557,6 +557,15 @@ List available agents:
 bruin cloud agents list
 ```
 
+#### `delete`
+
+Delete an agent. Cascades to its scheduled agents, dashboards and chat threads,
+and revokes its Cloud-CLI token. Requires an owner or team admin.
+
+```bash
+bruin cloud agents delete --agent-id <agent-id>
+```
+
 #### `connections`
 
 List the connections available to an agent — names and types only (never

@@ -567,6 +567,12 @@ func (c *APIClient) UpdateAgent(ctx context.Context, agentID int, fields map[str
 	return &result, nil
 }
 
+// DeleteAgent deletes an agent and cascades to what it owns (scheduled agents,
+// dashboards, threads), revoking its Cloud-CLI token. Requires an owner or team admin.
+func (c *APIClient) DeleteAgent(ctx context.Context, agentID int) error {
+	return c.doRequest(ctx, http.MethodDelete, fmt.Sprintf("/agents/%d", agentID), nil, nil)
+}
+
 // ListAgentMcpServers returns the agent's current external MCP server picks
 // along with the supported kinds and the connections eligible for each.
 func (c *APIClient) ListAgentMcpServers(ctx context.Context, agentID int) (*AgentMcpServersResponse, error) {

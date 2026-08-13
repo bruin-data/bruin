@@ -746,6 +746,17 @@ func TestUpdateAgent(t *testing.T) {
 	assert.Equal(t, "renamed", agent.Name)
 }
 
+func TestDeleteAgent(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodDelete, r.Method)
+		assert.Equal(t, "/agents/7", r.URL.Path)
+		writeJSON(t, w, map[string]bool{"success": true})
+	})
+
+	require.NoError(t, client.DeleteAgent(t.Context(), 7))
+}
+
 func TestGetAgentMemory(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
