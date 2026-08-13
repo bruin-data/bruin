@@ -7,8 +7,34 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/spf13/afero"
 )
+
+func TestConnectionDatabase(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		conn any
+		want string
+	}{
+		{"fabric database", &config.FabricConnection{Database: "prod"}, "prod"},
+		{"mssql database", &config.MsSQLConnection{Database: "wh"}, "wh"},
+		{"databricks catalog", &config.DatabricksConnection{Catalog: "main"}, "main"},
+		{"trino catalog", &config.TrinoConnection{Catalog: "hive"}, "hive"},
+		{"bigquery project", &config.GoogleCloudPlatformConnection{ProjectID: "my-proj"}, "my-proj"},
+		{"no namespace field", struct{}{}, ""},
+		{"nil", nil, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := connectionDatabase(tt.conn); got != tt.want {
+				t.Errorf("connectionDatabase() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
 
 func BenchmarkInternalParsePipeline(b *testing.B) {
 	r := ParseCommand{

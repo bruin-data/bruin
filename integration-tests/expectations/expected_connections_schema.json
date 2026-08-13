@@ -707,6 +707,35 @@
         "players"
       ]
     },
+    "CleverTapConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "account_id": {
+          "type": "string"
+        },
+        "passcode": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        },
+        "timezone": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "account_id",
+        "passcode"
+      ]
+    },
     "ClickHouseConnection": {
       "properties": {
         "name": {
@@ -1513,6 +1542,12 @@
           },
           "type": "array"
         },
+        "okta": {
+          "items": {
+            "$ref": "#/$defs/OktaConnection"
+          },
+          "type": "array"
+        },
         "fundraiseup": {
           "items": {
             "$ref": "#/$defs/FundraiseUpConnection"
@@ -1570,6 +1605,12 @@
         "customerio": {
           "items": {
             "$ref": "#/$defs/CustomerIoConnection"
+          },
+          "type": "array"
+        },
+        "clevertap": {
+          "items": {
+            "$ref": "#/$defs/CleverTapConnection"
           },
           "type": "array"
         },
@@ -2507,6 +2548,12 @@
             "service_account_json"
           ],
           "title": "service_account_json"
+        },
+        {
+          "required": [
+            "use_application_default_credentials"
+          ],
+          "title": "use_application_default_credentials"
         }
       ],
       "properties": {
@@ -2521,6 +2568,9 @@
         },
         "service_account_json": {
           "type": "string"
+        },
+        "use_application_default_credentials": {
+          "type": "boolean"
         },
         "bucket_name": {
           "type": "string"
@@ -3678,6 +3728,29 @@
         "api_key"
       ]
     },
+    "OktaConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "domain": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "domain",
+        "api_key"
+      ]
+    },
     "OneLakeConnection": {
       "properties": {
         "name": {
@@ -4565,6 +4638,12 @@
           "type": "string"
         },
         "access_token": {
+          "type": "string"
+        },
+        "client_id": {
+          "type": "string"
+        },
+        "client_secret": {
           "type": "string"
         },
         "domain": {

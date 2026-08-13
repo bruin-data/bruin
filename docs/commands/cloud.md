@@ -557,6 +557,15 @@ List available agents:
 bruin cloud agents list
 ```
 
+#### `delete`
+
+Delete an agent. Cascades to its scheduled agents, dashboards and chat threads,
+and revokes its Cloud-CLI token. Requires an owner or team admin.
+
+```bash
+bruin cloud agents delete --agent-id <agent-id>
+```
+
 #### `connections`
 
 List the connections available to an agent — names and types only (never
@@ -643,10 +652,25 @@ bruin cloud agents status \
 
 #### `threads`
 
-List all threads for an agent:
+List an agent's threads (active by default; pass `--archived` for archived ones):
 
 ```bash
 bruin cloud agents threads --agent-id <agent-id>
+bruin cloud agents threads --agent-id <agent-id> --archived
+```
+
+Manage a thread with the subcommands:
+
+```bash
+# Rename
+bruin cloud agents threads rename --agent-id <agent-id> --thread-id <thread-id> --title "New title"
+
+# Archive / restore (archiving also unpins)
+bruin cloud agents threads archive   --agent-id <agent-id> --thread-id <thread-id>
+bruin cloud agents threads unarchive --agent-id <agent-id> --thread-id <thread-id>
+
+# Delete
+bruin cloud agents threads delete --agent-id <agent-id> --thread-id <thread-id>
 ```
 
 #### `messages`
@@ -657,6 +681,23 @@ List all messages in a thread:
 bruin cloud agents messages \
   --agent-id <agent-id> \
   --thread-id <thread-id>
+```
+
+#### `export-thread`
+
+Export a whole thread as JSON (thread, agent, and every message pair with
+input/output, agent logs, and query logs). Prints to stdout, or writes to a file
+with `--file`:
+
+```bash
+bruin cloud agents export-thread \
+  --agent-id <agent-id> \
+  --thread-id <thread-id>
+
+bruin cloud agents export-thread \
+  --agent-id <agent-id> \
+  --thread-id <thread-id> \
+  --file thread.json
 ```
 
 ### `connections`
@@ -716,6 +757,60 @@ Delete a connection by name:
 ```bash
 bruin cloud connections delete --name my_pg
 ```
+
+### `connection-sets`
+
+Manage connection **sets** — named bundles of connections an agent runs against
+(assigned to an agent via its connection set). Distinct from individual
+connections. Credentials are write-only: reads never return config values, and
+create/update always send a full config per connection (read from the local
+`.bruin.yml`).
+
+#### `list`
+
+List the team's connection sets:
+
+```bash
+bruin cloud connection-sets list
+```
+
+#### `get`
+
+List the connections in a set (names and types only — never secret values):
+
+```bash
+bruin cloud connection-sets get --set-id 7
+```
+
+#### `create`
+
+Create a set from connections in the local `.bruin.yml` (repeat `--connection`):
+
+```bash
+bruin cloud connection-sets create --name prod \
+  --connection my_pg --connection my_bq
+```
+
+Use `--skip-validation` to skip the live connection test, and `--environment` /
+`--config-file` to pick a specific `.bruin.yml` / environment.
+
+#### `update`
+
+Replace a set's connections — the set becomes exactly the connections you pass:
+
+```bash
+bruin cloud connection-sets update --set-id 7 --connection my_pg
+```
+
+#### `delete`
+
+Delete a set (refused while an agent is still assigned to it):
+
+```bash
+bruin cloud connection-sets delete --set-id 7
+```
+
+To assign a set to an agent, use `bruin cloud agents update --agent-id <id> --connection-set-id <set-id>` (or `--connection-set-id 0` to detach).
 
 ### `dashboards`
 
@@ -876,6 +971,16 @@ bruin cloud dashboards update --dashboard-id 42 --state-file ./dashboard.json
 bruin cloud dashboards update --dashboard-id 42 --visibility team
 ```
 
+#### `delete`
+
+Delete a dashboard so it stops appearing. Requires manage-access (the dashboard
+creator or a team admin); repo (DAC) dashboards are managed in the repo and can't
+be deleted here.
+
+```bash
+bruin cloud dashboards delete --dashboard-id 42
+```
+
 ---
 
 ### `scheduled-agents`
@@ -912,6 +1017,24 @@ the UI.
 ```bash
 bruin cloud scheduled-agents update --scheduled-agent-id 42 --cron "0 8 * * 1"
 bruin cloud scheduled-agents update --scheduled-agent-id 42 --state-file ./plan.yaml
+```
+
+#### `trigger`
+
+Run a scheduled agent now, off its schedule — the "Run now" action. The schedule
+is untouched (the next scheduled run still fires as planned). Refused while a run
+is already in progress. Prints the execution and thread ids.
+
+```bash
+bruin cloud scheduled-agents trigger --scheduled-agent-id 42
+```
+
+#### `delete`
+
+Delete a scheduled agent so it stops firing.
+
+```bash
+bruin cloud scheduled-agents delete --scheduled-agent-id 42
 ```
 
 #### `run-states`

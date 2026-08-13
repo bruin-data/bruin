@@ -171,7 +171,6 @@ require (
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/godbus/dbus v0.0.0-20190726142602-4481cbc300e2 // indirect
-	github.com/gofrs/flock v0.13.0 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.0 // indirect
 	github.com/golang-sql/civil v0.0.0-20220223132316-b832511892a9 // indirect
 	github.com/golang-sql/sqlexp v0.1.0 // indirect
@@ -292,6 +291,9 @@ require (
 	mvdan.cc/gofumpt v0.10.0 // indirect
 )
 
-require github.com/bruin-data/bruin/semantic-engine v0.0.0
+require (
+	github.com/bruin-data/bruin/semantic-engine v0.0.0
+	github.com/gofrs/flock v0.13.0
+)
 
 replace github.com/bruin-data/bruin/semantic-engine => ./semantic-engine

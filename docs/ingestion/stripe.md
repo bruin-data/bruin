@@ -4,7 +4,7 @@
 
 Bruin supports Stripe as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Stripe into your data warehouse.
 
-In order to set up Stripe connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file. You need `api_key`. For details on how to obtain these credentials, please refer [here](https://dlthub.com/docs/dlt-ecosystem/verified-sources/stripe#grab-credentials).
+In order to set up Stripe connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file. You need `api_key`. For details on how to obtain these credentials, please refer [here](https://getbruin.com/docs/ingestr/supported-sources/stripe.html#setting-up-a-stripe-integration).
 
 Follow the steps below to correctly set up Stripe as a data source and run ingestion.
 
@@ -43,9 +43,25 @@ parameters:
 - `type`: Specifies the type of the asset. Set this to ingestr to use the ingestr data pipeline.
 - `connection`: This is the destination connection, which defines where the data should be stored. For example: "postgres" indicates that the ingested data will be stored in a PostgreSQL database.
 - `source_connection`: The name of the Stripe connection defined in .bruin.yml.
-- `source_table`: The name of the data table in Stripe you want to ingest.
+- `source_table`: The name of the data table in Stripe you want to ingest, optionally suffixed with a loading mode. See [Loading modes](#loading-modes) below.
+
+## Loading modes
+
+Stripe endpoints can be loaded in three modes, selected through the `source_table` value:
+
+| `source_table` | Mode | Behavior |
+|----------------|------|----------|
+| `charge` | Standard async (default) | Loads in parallel using async processing, captures all historical data and updates. |
+| `charge:sync` | Sync | Loads in parallel using sync processing, captures all historical data and updates. |
+| `charge:sync:incremental` | Incremental | Runs synchronously and is limited to the pipeline's time window; it does not pick up updates to records created in earlier windows. |
+
+Use standard async or sync for initial loads and for tables whose records change after creation, such as `subscription` and `invoice`. Use incremental for the fastest loads when you only need records created inside the run window.
+
+For the exact syntax and the trade-offs between the modes, refer to the ingestr docs on [table name structure](https://getbruin.com/docs/ingestr/supported-sources/stripe.html#table-name-structure), [loading modes and trade-offs](https://getbruin.com/docs/ingestr/supported-sources/stripe.html#loading-modes-and-trade-offs), and [choosing the right approach](https://getbruin.com/docs/ingestr/supported-sources/stripe.html#choosing-the-right-approach).
 
 ## Available Source Tables
+
+The tables below are the endpoints Bruin documents; ingestr keeps the authoritative list in [all endpoints](https://getbruin.com/docs/ingestr/supported-sources/stripe.html#all-endpoints).
 
 | Table | PK | Inc Key | Inc Strategy | Details |
 |-------|----|---------|--------------|---------|

@@ -16,8 +16,9 @@ type sqlParser interface {
 }
 
 type LineageExtractor struct {
-	sqlParser sqlParser
-	renderer  *jinja.Renderer
+	sqlParser      sqlParser
+	renderer       *jinja.Renderer
+	assetDatabases map[string]string
 }
 
 type LineageError struct {
@@ -37,6 +38,32 @@ func NewLineageExtractor(parser sqlParser) *LineageExtractor {
 		sqlParser: parser,
 		renderer:  jinja.NewRendererWithYesterday("lineage-parser", "lineage-parser"),
 	}
+}
+
+// WithAssetDatabases attaches an asset-name -> database map used to resolve
+// database-qualified table references. Optional.
+func (p *LineageExtractor) WithAssetDatabases(assetDatabases map[string]string) *LineageExtractor {
+	p.assetDatabases = assetDatabases
+	return p
+}
+
+// resolveUpstreamAsset matches a table reference to an asset, falling back to a
+// database-qualified match (<database>.<name>) when the reference carries a
+// leading database the asset name omits. Unmatched references stay external.
+func (p *LineageExtractor) resolveUpstreamAsset(foundPipeline *pipeline.Pipeline, table string) *pipeline.Asset {
+	if asset := foundPipeline.GetAssetByNameCaseInsensitive(table); asset != nil {
+		return asset
+	}
+	for _, asset := range foundPipeline.Assets {
+		db := p.assetDatabases[asset.Name]
+		if db == "" {
+			continue
+		}
+		if strings.EqualFold(db+"."+asset.Name, table) {
+			return asset
+		}
+	}
+	return nil
 }
 
 // TableSchema extracts the table schema from the assets and stores it in the columnMetadata map.
@@ -164,7 +191,7 @@ func (p *LineageExtractor) parseLineage(foundPipeline *pipeline.Pipeline, asset 
 
 func (p *LineageExtractor) mergeAsteriskColumns(foundPipeline *pipeline.Pipeline, asset *pipeline.Asset, lineageCol sqlparser.ColumnLineage) error {
 	for _, upstream := range lineageCol.Upstream {
-		upstreamAsset := foundPipeline.GetAssetByNameCaseInsensitive(upstream.Table)
+		upstreamAsset := p.resolveUpstreamAsset(foundPipeline, upstream.Table)
 		if upstreamAsset == nil {
 			return nil
 		}
@@ -277,7 +304,7 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *pipeline.Pipelin
 				continue
 			}
 
-			upstreamAsset := foundPipeline.GetAssetByNameCaseInsensitive(upstream.Table)
+			upstreamAsset := p.resolveUpstreamAsset(foundPipeline, upstream.Table)
 			if upstreamAsset == nil {
 				if err := p.addColumnToAsset(asset, lineageCol.Name, &pipeline.Column{
 					Name:       lineageCol.Name,

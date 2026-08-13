@@ -21,6 +21,7 @@ The marts provide progressively broader reporting tables:
 - `marts.anthropic_usage_by_user_day`: One Anthropic record per user and day.
 - `marts.cursor_usage_by_user_day`: One Cursor record per user and day.
 - `marts.ai_coding_usage_by_user_day`: One normalized record per user, day, and platform.
+- `marts.ai_coding_usage_by_user_model_day`: Token and cost usage per user, day, platform, and exact model or source-provided model set.
 - `marts.ai_coding_user_daily_summary`: One cross-platform record per user and day.
 - `marts.ai_coding_daily_summary`: Organization-wide daily usage.
 - `marts.ai_coding_user_summary`: Per-user totals across loaded history.
@@ -112,7 +113,7 @@ ORDER BY usage_date DESC;
 
 ## Open the dashboard
 
-The template includes a DAC dashboard with date and platform filters, headline adoption and consumption metrics, daily trends, platform comparisons, and a per-user table. Install the DAC CLI, then run these commands from the generated pipeline directory after the Bruin pipeline has populated DuckDB:
+The template includes a DAC dashboard with date and platform filters, headline adoption and consumption metrics, daily trends, platform and model comparisons, and detailed per-model and per-user tables. Install the DAC CLI, then run these commands from the generated pipeline directory after the Bruin pipeline has populated DuckDB:
 
 ```shell
 dac validate --dir dashboards
@@ -130,6 +131,7 @@ dac build --dir dashboards --dashboard "AI Coding Usage" --output build
 
 - User email addresses are lowercased so the same person can be joined across Anthropic and Cursor. Anthropic API actors retain their API key name and use `user_type = 'api_key'`.
 - Anthropic costs and Cursor token-based event costs are converted from cents to US dollars.
+- Cursor model rows use each request event's exact model. The Anthropic ingestr source currently exposes exact totals for single-model records and aggregate totals plus a comma-separated model set for multi-model records; the model dashboard labels those aggregate rows as `model_set` instead of duplicating or estimating their tokens and cost.
 - Cursor request totals prefer daily Composer, chat, and agent counts; usage-event counts are used when daily request totals are unavailable.
 - Cursor total line changes and accepted AI line changes are kept separately.
 - Anthropic usage covers the first-party Anthropic API and does not include Claude Code traffic routed through Amazon Bedrock or Google Vertex AI.

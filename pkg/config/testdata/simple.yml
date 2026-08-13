@@ -464,6 +464,8 @@ environments:
           password: "password-123"
           token: "token-123"
           access_token: "access-token-123"
+          client_id: "client-id-123"
+          client_secret: "client-secret-123"
           domain: "mydomain.my.salesforce.com"
       sqlite:
         - name: "sqlite-1"
@@ -577,6 +579,16 @@ environments:
         - name: "customerio-1"
           api_key: "test-api-key"
           region: "us"
+      clevertap:
+        - name: "clevertap-1"
+          account_id: "test-account-id"
+          passcode: "test-passcode"
+          region: "eu1"
+          timezone: "Asia/Kolkata"
+      okta:
+        - name: "okta-1"
+          domain: "dev-123456.okta.com"
+          api_key: "test-api-key"
       sendgrid:
         - name: "sendgrid-1"
           api_key: "test-api-key"

@@ -1,7 +1,77 @@
 name: stripe_raw.subscription_item
 type: ingestr
 
-description: Raw-layer ingestion of Stripe subscription item data into BigQuery.
+description: >
+  Raw-layer Stripe subscription items loaded into BigQuery with ingestr's
+  incremental Stripe mode. Each run fetches the subscription items created
+  inside its own time window and merges them into the destination table on
+  `id`. Quantity and price changes on items created in earlier windows are not
+  picked up until a backfill covers them.
+
+materialization:
+  type: table
+  strategy: merge
+  incremental_key: created
 
 parameters:
-  source_table: subscription_item
+  source_table: subscription_item:sync:incremental
+  enforce_schema: true
+
+tags:
+  - stripe_raw
+  - stripe
+  - billing
+
+columns:
+  - name: id
+    type: varchar
+    description: Stripe subscription item identifier, for example `si_NcLYdDxLHxlAdM`.
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: object
+    type: varchar
+    description: Stripe object type, always `subscription_item`.
+  - name: created
+    type: bigint
+    description: Unix timestamp in seconds of when the subscription item was created.
+  - name: subscription
+    type: varchar
+    description: Identifier of the subscription the item belongs to.
+  - name: price
+    type: json
+    description: >
+      Price object attached to the item. The stage layer reads the price
+      identifier from it and joins to `stripe_stage.prices` for the recurring
+      configuration and unit amount.
+  - name: quantity
+    type: integer
+    description: >
+      Number of units of the price on this item. It defaults to 1 in the stage
+      layer when Stripe omits it, as it does for metered prices.
+  - name: current_period_start
+    type: bigint
+    description: >
+      Unix timestamp in seconds of the start of the item's current billing
+      period, reported by recent Stripe API versions.
+  - name: current_period_end
+    type: bigint
+    description: >
+      Unix timestamp in seconds of the end of the item's current billing period,
+      reported by recent Stripe API versions.
+  - name: plan
+    type: json
+    description: Legacy plan object corresponding to the item's price.
+  - name: discounts
+    type: json
+    description: Discounts applied to the subscription item.
+  - name: tax_rates
+    type: json
+    description: Tax rates applied to the subscription item.
+  - name: billing_thresholds
+    type: json
+    description: Usage threshold that triggers an early invoice for this item.
+  - name: metadata
+    type: json
+    description: Key-value metadata set on the Stripe subscription item.

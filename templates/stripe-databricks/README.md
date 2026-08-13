@@ -40,7 +40,7 @@ PermissionError: This API call cannot be made with a publishable API key. Please
 5. In the **"Standard Keys"** section, click **"Reveal test key"** (for test mode) or **"Reveal live key"** (for production) beside the **Secret Key**
 6. Copy the secret API key (it starts with `sk_test_` for test mode or `sk_live_` for production)
 
-> **Note:** The Stripe UI may change over time. For the most up-to-date instructions, refer to the [dlt Stripe documentation](https://dlthub.com/docs/dlt-ecosystem/verified-sources/stripe#grab-credentials). Since Bruin uses dlt's Stripe ingestion under the hood, the credential setup process is the same.
+> **Note:** The Stripe UI described above may change over time. For the most up-to-date instructions on managing API keys, see Stripe's own [API keys documentation](https://stripe.com/docs/keys).
 
 #### Configuring the Connection in Bruin
 

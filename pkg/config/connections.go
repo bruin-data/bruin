@@ -1305,12 +1305,13 @@ func (c LinearConnection) GetName() string {
 }
 
 type GCSConnection struct {
-	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" jsonschema:"oneof_required=service_account_file" mapstructure:"service_account_file"`
-	ServiceAccountJSON string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" jsonschema:"oneof_required=service_account_json" mapstructure:"service_account_json" sensitive:"true"`
-	BucketName         string `yaml:"bucket_name,omitempty" json:"bucket_name,omitempty" mapstructure:"bucket_name"`
-	PathToFile         string `yaml:"path_to_file,omitempty" json:"path_to_file,omitempty" mapstructure:"path_to_file"`
-	Layout             string `yaml:"layout,omitempty" json:"layout,omitempty" mapstructure:"layout"`
+	ConnectionMetadata               `yaml:",inline" mapstructure:",squash"`
+	ServiceAccountFile               string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" jsonschema:"oneof_required=service_account_file" mapstructure:"service_account_file"`
+	ServiceAccountJSON               string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" jsonschema:"oneof_required=service_account_json" mapstructure:"service_account_json" sensitive:"true"`
+	UseApplicationDefaultCredentials bool   `yaml:"use_application_default_credentials,omitempty" json:"use_application_default_credentials,omitempty" jsonschema:"oneof_required=use_application_default_credentials" mapstructure:"use_application_default_credentials"`
+	BucketName                       string `yaml:"bucket_name,omitempty" json:"bucket_name,omitempty" mapstructure:"bucket_name"`
+	PathToFile                       string `yaml:"path_to_file,omitempty" json:"path_to_file,omitempty" mapstructure:"path_to_file"`
+	Layout                           string `yaml:"layout,omitempty" json:"layout,omitempty" mapstructure:"layout"`
 }
 
 func (c GCSConnection) GetName() string {
@@ -1594,6 +1595,8 @@ type SalesforceConnection struct {
 	Password           string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password" sensitive:"true"`
 	Token              string `yaml:"token,omitempty" json:"token,omitempty" mapstructure:"token" sensitive:"true"`
 	AccessToken        string `yaml:"access_token,omitempty" json:"access_token,omitempty" mapstructure:"access_token" sensitive:"true"`
+	ClientID           string `yaml:"client_id,omitempty" json:"client_id,omitempty" mapstructure:"client_id"`
+	ClientSecret       string `yaml:"client_secret,omitempty" json:"client_secret,omitempty" mapstructure:"client_secret" sensitive:"true"`
 	Domain             string `yaml:"domain" json:"domain" mapstructure:"domain"`
 }
 
@@ -1919,6 +1922,16 @@ func (c FreshdeskConnection) GetName() string {
 	return c.Name
 }
 
+type OktaConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	Domain             string `yaml:"domain,omitempty" json:"domain" mapstructure:"domain"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
+}
+
+func (c OktaConnection) GetName() string {
+	return c.Name
+}
+
 type RedditAdsConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	AccessToken        string `yaml:"access_token,omitempty" json:"access_token,omitempty" mapstructure:"access_token" sensitive:"true"`
@@ -2094,6 +2107,18 @@ type CustomerIoConnection struct {
 }
 
 func (c CustomerIoConnection) GetName() string {
+	return c.Name
+}
+
+type CleverTapConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	AccountID          string `yaml:"account_id,omitempty" json:"account_id" mapstructure:"account_id"`
+	Passcode           string `yaml:"passcode,omitempty" json:"passcode" mapstructure:"passcode" sensitive:"true"`
+	Region             string `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
+	Timezone           string `yaml:"timezone,omitempty" json:"timezone,omitempty" mapstructure:"timezone"`
+}
+
+func (c CleverTapConnection) GetName() string {
 	return c.Name
 }
 

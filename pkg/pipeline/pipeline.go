@@ -69,6 +69,9 @@ const (
 	AssetTypeEmpty                     = AssetType("empty")
 	AssetTypeEMRServerlessPyspark      = AssetType("emr_serverless.pyspark")
 	AssetTypeEMRServerlessSpark        = AssetType("emr_serverless.spark")
+	AssetTypeGCSObjectSensor           = AssetType("gcs.sensor.object")
+	AssetTypeGCSPrefixSensor           = AssetType("gcs.sensor.prefix")
+	AssetTypeGCSPrefixSensorLegacy     = AssetType("gcs.sensor.object_sensor_with_prefix")
 	AssetTypeGoodData                  = AssetType("gooddata")
 	AssetTypeIceberg                   = AssetType("ingestr.iceberg") // ingestr-only mapping key (not an executable asset type)
 	AssetTypeGoogleSheets              = AssetType("gsheets")
@@ -198,6 +201,7 @@ var defaultMapping = map[string]string{
 	"kafka":                 "kafka-default",
 	"doris":                 "doris-default",
 	"duckdb":                "duckdb-default",
+	"clevertap":             "clevertap-default",
 	"clickhouse":            "clickhouse-default",
 	"hubspot":               "hubspot-default",
 	"google_sheets":         "google-sheets-default",
@@ -259,6 +263,7 @@ var defaultMapping = map[string]string{
 	"footballdata":          "footballdata-default",
 	"frankfurter":           "frankfurter-default",
 	"freshdesk":             "freshdesk-default",
+	"okta":                  "okta-default",
 	"fundraiseup":           "fundraiseup-default",
 	"g2":                    "g2-default",
 	"github":                "github-default",
@@ -1001,6 +1006,9 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeDynamoDB:                  "dynamodb",
 	AssetTypeElasticsearch:             "elasticsearch",
 	AssetTypeGoogleSheets:              "google_sheets",
+	AssetTypeGCSObjectSensor:           "gcs",
+	AssetTypeGCSPrefixSensor:           "gcs",
+	AssetTypeGCSPrefixSensorLegacy:     "gcs",
 	AssetTypeVerticaQuery:              "vertica",
 	AssetTypeVerticaSeed:               "vertica",
 	AssetTypeVerticaQuerySensor:        "vertica",
@@ -1017,7 +1025,10 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 // connection must consider both keys. Asset types absent here resolve through
 // their single AssetTypeConnectionMapping entry.
 var assetTypeConnectionAlternates = map[AssetType][]string{
-	AssetTypeMongoSource: {"mongo", "mongo_atlas"},
+	AssetTypeMongoSource:           {"mongo", "mongo_atlas"},
+	AssetTypeGCSObjectSensor:       {"gcs", "google_cloud_platform"},
+	AssetTypeGCSPrefixSensor:       {"gcs", "google_cloud_platform"},
+	AssetTypeGCSPrefixSensorLegacy: {"gcs", "google_cloud_platform"},
 }
 
 // connectionPlatformsForAssetType returns the connection platform keys to try when
@@ -2495,8 +2506,6 @@ func assetMainTaskIsConnectionless(assetType AssetType) bool {
 		AssetType("appsflyer.export.bq"),
 		AssetType("dbt"),
 		AssetType("dbt.test"),
-		AssetType("gcs.sensor.object"),
-		AssetType("gcs.sensor.object_sensor_with_prefix"),
 		AssetType("python.beta"),
 		AssetType("python.legacy"):
 		return true

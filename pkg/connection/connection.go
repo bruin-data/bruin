@@ -33,6 +33,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/cassandra"
 	"github.com/bruin-data/bruin/pkg/chargebee"
 	"github.com/bruin-data/bruin/pkg/chess"
+	"github.com/bruin-data/bruin/pkg/clevertap"
 	"github.com/bruin-data/bruin/pkg/clickhouse"
 	"github.com/bruin-data/bruin/pkg/clickup"
 	"github.com/bruin-data/bruin/pkg/config"
@@ -98,6 +99,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/mysql"
 	"github.com/bruin-data/bruin/pkg/notion"
+	"github.com/bruin-data/bruin/pkg/okta"
 	"github.com/bruin-data/bruin/pkg/onelake"
 	"github.com/bruin-data/bruin/pkg/oracle"
 	"github.com/bruin-data/bruin/pkg/paddle"
@@ -254,6 +256,7 @@ type Manager struct {
 	Frankfurter          map[string]*frankfurter.Client
 	Fluxx                map[string]*fluxx.Client
 	Freshdesk            map[string]*freshdesk.Client
+	Okta                 map[string]*okta.Client
 	FundraiseUp          map[string]*fundraiseup.Client
 	Fireflies            map[string]*fireflies.Client
 	Trello               map[string]*trello.Client
@@ -292,6 +295,7 @@ type Manager struct {
 	Dune                 map[string]*dune.Client
 	Vertica              map[string]*vertica.DB
 	CustomerIo           map[string]*customerio.Client
+	CleverTap            map[string]*clevertap.Client
 	Sendgrid             map[string]*sendgrid.Client
 	Twilio               map[string]*twilio.Client
 	Braze                map[string]*braze.Client
@@ -2645,11 +2649,12 @@ func (m *Manager) AddGCSConnectionFromConfig(connection *config.GCSConnection) e
 	m.mutex.Unlock()
 
 	client, err := gcs.NewClient(gcs.Config{
-		ServiceAccountFile: connection.ServiceAccountFile,
-		ServiceAccountJSON: connection.ServiceAccountJSON,
-		BucketName:         connection.BucketName,
-		PathToFile:         connection.PathToFile,
-		Layout:             connection.Layout,
+		ServiceAccountFile:               connection.ServiceAccountFile,
+		ServiceAccountJSON:               connection.ServiceAccountJSON,
+		UseApplicationDefaultCredentials: connection.UseApplicationDefaultCredentials,
+		BucketName:                       connection.BucketName,
+		PathToFile:                       connection.PathToFile,
+		Layout:                           connection.Layout,
 	})
 	if err != nil {
 		return err
@@ -3155,11 +3160,13 @@ func (m *Manager) AddSalesforceConnectionFromConfig(connection *config.Salesforc
 	m.mutex.Unlock()
 
 	client, err := salesforce.NewClient(salesforce.Config{
-		Username:    connection.Username,
-		Password:    connection.Password,
-		Token:       connection.Token,
-		AccessToken: connection.AccessToken,
-		Domain:      connection.Domain,
+		Username:     connection.Username,
+		Password:     connection.Password,
+		Token:        connection.Token,
+		AccessToken:  connection.AccessToken,
+		ClientID:     connection.ClientID,
+		ClientSecret: connection.ClientSecret,
+		Domain:       connection.Domain,
 	})
 	if err != nil {
 		return err
@@ -3405,6 +3412,28 @@ func (m *Manager) AddFreshdeskConnectionFromConfig(connection *config.FreshdeskC
 	return nil
 }
 
+func (m *Manager) AddOktaConnectionFromConfig(connection *config.OktaConnection) error {
+	m.mutex.Lock()
+	if m.Okta == nil {
+		m.Okta = make(map[string]*okta.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := okta.NewClient(okta.Config{
+		Domain: connection.Domain,
+		APIKey: connection.APIKey,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Okta[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddFundraiseUpConnectionFromConfig(connection *config.FundraiseUpConnection) error {
 	m.mutex.Lock()
 	if m.FundraiseUp == nil {
@@ -3603,6 +3632,28 @@ func (m *Manager) AddCustomerIoConnectionFromConfig(connection *config.CustomerI
 		return err
 	}
 	m.CustomerIo[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
+func (m *Manager) AddCleverTapConnectionFromConfig(connection *config.CleverTapConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.CleverTap == nil {
+		m.CleverTap = make(map[string]*clevertap.Client)
+	}
+
+	client, err := clevertap.NewClient(clevertap.Config{
+		AccountID: connection.AccountID,
+		Passcode:  connection.Passcode,
+		Region:    connection.Region,
+		Timezone:  connection.Timezone,
+	})
+	if err != nil {
+		return err
+	}
+	m.CleverTap[connection.Name] = client
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 	return nil
@@ -4260,6 +4311,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Frankfurter, connectionManager.AddFrankfurterConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Fluxx, connectionManager.AddFluxxConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Freshdesk, connectionManager.AddFreshdeskConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Okta, connectionManager.AddOktaConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.FundraiseUp, connectionManager.AddFundraiseUpConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Fireflies, connectionManager.AddFirefliesConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Trello, connectionManager.AddTrelloConnectionFromConfig, &wg, &errList, &mu)
@@ -4295,6 +4347,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	}, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Vertica, connectionManager.AddVerticaConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.CustomerIo, connectionManager.AddCustomerIoConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.CleverTap, connectionManager.AddCleverTapConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Sendgrid, connectionManager.AddSendgridConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Twilio, connectionManager.AddTwilioConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Braze, connectionManager.AddBrazeConnectionFromConfig, &wg, &errList, &mu)

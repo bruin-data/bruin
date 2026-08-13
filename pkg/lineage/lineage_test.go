@@ -1882,3 +1882,46 @@ func TestLineageError(t *testing.T) {
 		}
 	}
 }
+
+func TestResolveUpstreamAsset(t *testing.T) {
+	t.Parallel()
+
+	foundPipeline := &pipeline.Pipeline{
+		Assets: []*pipeline.Asset{
+			{Name: "raw.users"},
+			{Name: "Core.Orders"},
+		},
+	}
+	// Trigger the internal name index that GetAssetByNameCaseInsensitive reads;
+	// CreatePipelineFromPath does this in the real parse flow.
+	foundPipeline.GetAssetByName("raw.users")
+	extractor := NewLineageExtractor(nil).WithAssetDatabases(map[string]string{
+		"raw.users":   "prod",
+		"Core.Orders": "prod",
+	})
+
+	tests := []struct {
+		name  string
+		table string
+		want  string // "" means external (nil)
+	}{
+		{"exact two-part", "raw.users", "raw.users"},
+		{"case-insensitive two-part", "core.orders", "Core.Orders"},
+		{"database-qualified resolves to canonical", "prod.raw.users", "raw.users"},
+		{"database-qualified plus mixed case", "PROD.core.Orders", "Core.Orders"},
+		{"wrong database stays external", "staging.raw.users", ""},
+		{"unknown table stays external", "prod.raw.missing", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := extractor.resolveUpstreamAsset(foundPipeline, tt.table)
+			if tt.want == "" {
+				assert.Nil(t, got)
+				return
+			}
+			require.NotNil(t, got)
+			assert.Equal(t, tt.want, got.Name)
+		})
+	}
+}

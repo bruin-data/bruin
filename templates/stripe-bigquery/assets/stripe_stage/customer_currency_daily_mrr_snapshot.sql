@@ -2,14 +2,13 @@
 name: stripe_stage.customer_currency_daily_mrr_snapshot
 type: bq.sql
 description: >
-  Insert-only daily MRR snapshot at Stripe customer and native-currency grain.
-  It starts from subscriptions and left joins subscription items, retaining a
-  zero-MRR row when a cancelled or itemless subscription has no MRR-eligible
-  items.
+  Daily MRR snapshot at Stripe customer and native-currency grain, rebuilt on
+  every run for the pipeline end date. It starts from subscriptions and left
+  joins subscription items, retaining a zero-MRR row when a cancelled or
+  itemless subscription has no MRR-eligible items.
 
 materialization:
   type: table
-  strategy: merge
 
 depends:
   - stripe_stage.subscriptions

@@ -215,11 +215,31 @@ var TypeHintMapping = map[string]string{
 
 var multipleSpacePattern = regexp.MustCompile(`\s+`)
 
-// ingestrSizedTypes are the ingestr types that accept a single length parameter, e.g.
-// text(50). Add an entry if a source type starts mapping to another sized type.
+// decimalHint is the ingestr type name for fixed-point decimals.
+const decimalHint = "decimal"
+
+// maxDecimalPrecision is the largest precision ingestr accepts (its Decimal128
+// ceiling); a larger precision is emitted as an unbounded decimal.
+const maxDecimalPrecision = 38
+
+// ingestrSizedTypes accept size parameters: a length (text(50)) or, for decimal,
+// precision and optional scale (decimal(10,2)). Add an entry for new sized types.
 var ingestrSizedTypes = map[string]bool{
-	"text": true,
+	"text":      true,
+	decimalHint: true,
 }
+
+// precisionScaleDecimalBases are base names with decimal(P,S) semantics, derived from
+// the shared mapping (excludes ClickHouse DecimalN, whose lone arg is a scale).
+var precisionScaleDecimalBases = func() map[string]bool {
+	bases := make(map[string]bool)
+	for name, hint := range TypeHintMapping {
+		if hint == decimalHint {
+			bases[name] = true
+		}
+	}
+	return bases
+}()
 
 // TypeHintOverlayForConnection returns DB-specific type aliases when the
 // connection implements IngestrTypeHintProvider; otherwise nil.
@@ -262,7 +282,7 @@ func MergeTypeHints(base, overlay map[string]string) map[string]string {
 // resolveColumnTypeHint maps a declared column type to an ingestr hint, peeling
 // destination-specific transparent wrappers and resolving parameterized bases
 // (e.g. DateTime64(3)).
-func resolveColumnTypeHint(typ string, mapping map[string]string, wrappers map[string]bool) (hint string, known bool, inlineLength string) {
+func resolveColumnTypeHint(typ string, mapping map[string]string, wrappers map[string]bool) (hint string, known bool, inlineParams string) {
 	typ = NormaliseColumnType(typ)
 	for {
 		if h, ok := mapping[typ]; ok {
@@ -278,7 +298,7 @@ func resolveColumnTypeHint(typ string, mapping map[string]string, wrappers map[s
 			continue
 		}
 		if h, ok := mapping[base]; ok {
-			if ingestrSizedTypes[h] {
+			if ingestrSizedTypes[h] && (h != decimalHint || precisionScaleDecimalBases[base]) {
 				return h, true, inner
 			}
 			return h, true, ""
@@ -295,16 +315,20 @@ func ColumnHints(cols []pipeline.Column, normaliseNames bool, overlay map[string
 	mapping := MergeTypeHints(TypeHintMapping, overlay)
 	hints := make([]string, 0)
 	for _, col := range cols {
-		hint, typeKnown, inlineLength := resolveColumnTypeHint(col.Type, mapping, wrappers)
+		hint, typeKnown, inlineParams := resolveColumnTypeHint(col.Type, mapping, wrappers)
 
 		if !typeKnown && col.SourceColumn == "" {
 			continue
 		}
 
-		// Append a length to sized types; an inline length takes precedence over the
-		// length field, and a non-numeric size is treated as unbounded.
+		// Append size params (inline wins over length/precision/scale fields; invalid
+		// sizes stay unbounded). Only decimal uses precision/scale; the rest take a length.
 		if typeKnown && ingestrSizedTypes[hint] {
-			if length := sizedStringLength(inlineLength, col.Length); length != "" {
+			if hint == decimalHint {
+				if params := decimalParams(inlineParams, col.Precision, col.Scale); params != "" {
+					hint = fmt.Sprintf("%s(%s)", hint, params)
+				}
+			} else if length := sizedStringLength(inlineParams, col.Length); length != "" {
 				hint = fmt.Sprintf("%s(%s)", hint, length)
 			}
 		}
@@ -351,6 +375,45 @@ func sizedStringLength(inlineLength string, lengthField *int) string {
 		return strconv.Itoa(*lengthField)
 	}
 	return ""
+}
+
+// decimalParams resolves a decimal's precision/scale, preferring inline "p"/"p,s"
+// over the fields. Returns "" (unbounded) when no positive in-range precision exists.
+func decimalParams(inlineParams string, precision, scale *int) string {
+	if inlineParams != "" {
+		return normaliseDecimalParams(inlineParams)
+	}
+	if precision == nil || *precision <= 0 || *precision > maxDecimalPrecision {
+		return ""
+	}
+	if scale != nil {
+		if *scale < 0 || *scale > *precision {
+			return ""
+		}
+		return fmt.Sprintf("%d,%d", *precision, *scale)
+	}
+	return strconv.Itoa(*precision)
+}
+
+// normaliseDecimalParams returns the canonical "p"/"p,s" form, or "" (unbounded) when
+// a param is malformed, the precision is out of range, or the scale exceeds precision.
+func normaliseDecimalParams(inner string) string {
+	parts := strings.Split(inner, ",")
+	if len(parts) > 2 {
+		return ""
+	}
+	p, err := strconv.Atoi(strings.TrimSpace(parts[0]))
+	if err != nil || p <= 0 || p > maxDecimalPrecision {
+		return ""
+	}
+	if len(parts) == 1 {
+		return strconv.Itoa(p)
+	}
+	s, err := strconv.Atoi(strings.TrimSpace(parts[1]))
+	if err != nil || s < 0 || s > p {
+		return ""
+	}
+	return fmt.Sprintf("%d,%d", p, s)
 }
 
 func NormaliseColumnType(typ string) string {

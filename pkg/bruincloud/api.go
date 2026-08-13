@@ -567,6 +567,12 @@ func (c *APIClient) UpdateAgent(ctx context.Context, agentID int, fields map[str
 	return &result, nil
 }
 
+// DeleteAgent deletes an agent and cascades to what it owns (scheduled agents,
+// dashboards, threads), revoking its Cloud-CLI token. Requires an owner or team admin.
+func (c *APIClient) DeleteAgent(ctx context.Context, agentID int) error {
+	return c.doRequest(ctx, http.MethodDelete, fmt.Sprintf("/agents/%d", agentID), nil, nil)
+}
+
 // ListAgentMcpServers returns the agent's current external MCP server picks
 // along with the supported kinds and the connections eligible for each.
 func (c *APIClient) ListAgentMcpServers(ctx context.Context, agentID int) (*AgentMcpServersResponse, error) {
@@ -607,13 +613,16 @@ func (c *APIClient) GetAgentMessageStatus(ctx context.Context, agentID, threadID
 	return &resp.Data, nil
 }
 
-func (c *APIClient) ListAgentThreads(ctx context.Context, agentID int, limit, offset int) ([]AgentThread, error) {
+func (c *APIClient) ListAgentThreads(ctx context.Context, agentID int, limit, offset int, archived bool) ([]AgentThread, error) {
 	params := url.Values{}
 	if limit > 0 {
 		params.Set("limit", strconv.Itoa(limit))
 	}
 	if offset > 0 {
 		params.Set("offset", strconv.Itoa(offset))
+	}
+	if archived {
+		params.Set("archived", "true")
 	}
 	path := fmt.Sprintf("/agents/%d/threads", agentID)
 	if len(params) > 0 {
@@ -624,6 +633,22 @@ func (c *APIClient) ListAgentThreads(ctx context.Context, agentID int, limit, of
 	}
 	err := c.doRequest(ctx, http.MethodGet, path, nil, &resp)
 	return resp.Threads, err
+}
+
+// UpdateAgentThread renames a thread (title) and/or archives it (archived); the
+// server also unpins an archived thread.
+func (c *APIClient) UpdateAgentThread(ctx context.Context, agentID, threadID int, fields map[string]any) (*AgentThread, error) {
+	var result AgentThread
+	err := c.doRequest(ctx, http.MethodPatch, fmt.Sprintf("/agents/%d/threads/%d", agentID, threadID), fields, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// DeleteAgentThread soft-deletes a chat thread (mirroring the UI).
+func (c *APIClient) DeleteAgentThread(ctx context.Context, agentID, threadID int) error {
+	return c.doRequest(ctx, http.MethodDelete, fmt.Sprintf("/agents/%d/threads/%d", agentID, threadID), nil, nil)
 }
 
 func (c *APIClient) GetAgentPrompt(ctx context.Context, agentID int) (*AgentPrompt, error) {
@@ -643,6 +668,37 @@ func (c *APIClient) SetAgentPrompt(ctx context.Context, agentID int, systemPromp
 		return nil, err
 	}
 	return &result, nil
+}
+
+func (c *APIClient) GetAgentMemory(ctx context.Context, agentID int) (*AgentMemory, error) {
+	var result AgentMemory
+	err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/agents/%d/memory", agentID), nil, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// SetAgentMemory replaces the agent's memory. A nil memory clears it (sends JSON null).
+func (c *APIClient) SetAgentMemory(ctx context.Context, agentID int, memory *string) (*AgentMemory, error) {
+	body := map[string]any{"memory": memory}
+	var result AgentMemory
+	err := c.doRequest(ctx, http.MethodPut, fmt.Sprintf("/agents/%d/memory", agentID), body, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// ExportThread returns a chat thread as the canonical versioned JSON export.
+// The shape is server-defined, so the raw JSON is returned verbatim.
+func (c *APIClient) ExportThread(ctx context.Context, agentID, threadID int) (json.RawMessage, error) {
+	var result json.RawMessage
+	err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/agents/%d/threads/%d/export", agentID, threadID), nil, &result)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func (c *APIClient) ListAgentMessages(ctx context.Context, agentID, threadID int, limit, offset int) ([]AgentMessage, error) {
@@ -683,6 +739,57 @@ func (c *APIClient) CreateConnection(ctx context.Context, name, connType string,
 
 func (c *APIClient) DeleteConnection(ctx context.Context, name string) error {
 	return c.doRequest(ctx, http.MethodDelete, "/connections/"+url.PathEscape(name), nil, nil)
+}
+
+// --- Connection sets ---
+
+func (c *APIClient) ListConnectionSets(ctx context.Context) ([]ConnectionSet, error) {
+	var resp struct {
+		ConnectionSets []ConnectionSet `json:"connection_sets"`
+	}
+	err := c.doRequest(ctx, http.MethodGet, "/connection-sets", nil, &resp)
+	return resp.ConnectionSets, err
+}
+
+func (c *APIClient) ListConnectionSetConnections(ctx context.Context, setID int) ([]Connection, error) {
+	var resp struct {
+		Connections []Connection `json:"connections"`
+	}
+	err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/connection-sets/%d/connections", setID), nil, &resp)
+	return resp.Connections, err
+}
+
+// ConnectionSetInput is one connection in a create/update payload: a name, its
+// type, and its full credentials (the API requires full config, never partial).
+type ConnectionSetInput struct {
+	Type   string         `json:"type"`
+	Name   string         `json:"name"`
+	Config map[string]any `json:"config"`
+}
+
+func (c *APIClient) CreateConnectionSet(ctx context.Context, name string, connections []ConnectionSetInput, skipValidation bool) (*ConnectionSet, error) {
+	body := map[string]any{
+		"name":            name,
+		"connections":     connections,
+		"skip_validation": skipValidation,
+	}
+	var result ConnectionSet
+	if err := c.doRequest(ctx, http.MethodPost, "/connection-sets", body, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func (c *APIClient) UpdateConnectionSet(ctx context.Context, setID int, connections []ConnectionSetInput, skipValidation bool) error {
+	body := map[string]any{
+		"connections":     connections,
+		"skip_validation": skipValidation,
+	}
+	return c.doRequest(ctx, http.MethodPut, fmt.Sprintf("/connection-sets/%d", setID), body, nil)
+}
+
+func (c *APIClient) DeleteConnectionSet(ctx context.Context, setID int) error {
+	return c.doRequest(ctx, http.MethodDelete, fmt.Sprintf("/connection-sets/%d", setID), nil, nil)
 }
 
 // --- Dashboards ---
@@ -741,6 +848,12 @@ func (c *APIClient) UpdateDashboard(ctx context.Context, dashboardID int, fields
 	return &result, nil
 }
 
+// DeleteDashboard deletes a dashboard so it stops appearing (soft-deleted
+// server-side, mirroring the UI). Requires an owner or team admin.
+func (c *APIClient) DeleteDashboard(ctx context.Context, dashboardID int) error {
+	return c.doRequest(ctx, http.MethodDelete, fmt.Sprintf("/dashboards/%d", dashboardID), nil, nil)
+}
+
 func (c *APIClient) ListScheduledAgents(ctx context.Context) ([]ScheduledAgent, error) {
 	var resp struct {
 		ScheduledAgents []ScheduledAgent `json:"scheduled_agents"`
@@ -775,6 +888,23 @@ func (c *APIClient) CreateScheduledAgent(ctx context.Context, fields map[string]
 func (c *APIClient) UpdateScheduledAgent(ctx context.Context, scheduledAgentID int, fields map[string]any) (*ScheduledAgent, error) {
 	var result ScheduledAgent
 	err := c.doRequest(ctx, http.MethodPatch, fmt.Sprintf("/scheduled-agents/%d", scheduledAgentID), fields, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// DeleteScheduledAgent deletes a scheduled agent so it stops firing
+// (soft-deleted server-side, mirroring the UI).
+func (c *APIClient) DeleteScheduledAgent(ctx context.Context, scheduledAgentID int) error {
+	return c.doRequest(ctx, http.MethodDelete, fmt.Sprintf("/scheduled-agents/%d", scheduledAgentID), nil, nil)
+}
+
+// TriggerScheduledAgent runs a scheduled agent immediately, off its schedule; the
+// schedule itself is untouched. Returns the execution that was stood up.
+func (c *APIClient) TriggerScheduledAgent(ctx context.Context, scheduledAgentID int) (*ScheduledAgentExecution, error) {
+	var result ScheduledAgentExecution
+	err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/scheduled-agents/%d/trigger", scheduledAgentID), nil, &result)
 	if err != nil {
 		return nil, err
 	}

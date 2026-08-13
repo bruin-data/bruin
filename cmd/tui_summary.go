@@ -82,14 +82,13 @@ func printTUISummary(w io.Writer, results []*scheduler.TaskExecutionResult, s *s
 
 	// Metadata push
 	if summary.MetadataPush.HasAny() {
-		metadataExecuted := summary.MetadataPush.Succeeded + summary.MetadataPush.Failed
-		if summary.MetadataPush.Failed > 0 {
+		if summary.MetadataPush.Failed > 0 || summary.MetadataPush.Skipped > 0 || summary.MetadataPush.NotStarted > 0 {
 			fmt.Fprintf(w, "  %s Metadata pushed      %s\n",
 				color.New(color.FgRed).Sprint("✗"),
-				formatCount(metadataExecuted, summary.MetadataPush.Failed))
+				formatCountWithSkipped(summary.MetadataPush.Total, summary.MetadataPush.Failed, 0, summary.MetadataPush.Skipped, summary.MetadataPush.NotStarted))
 		} else {
 			fmt.Fprintf(w, "  %s Metadata pushed      %d\n",
-				color.New(color.FgGreen).Sprint("✓"), metadataExecuted)
+				color.New(color.FgGreen).Sprint("✓"), summary.MetadataPush.Succeeded)
 		}
 	}
 

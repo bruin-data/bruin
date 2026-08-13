@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -39,6 +40,7 @@ func Cloud(isDebug *bool) *cli.Command {
 			CloudGlossary(),
 			CloudAgents(),
 			CloudConnections(),
+			CloudConnectionSets(),
 			CloudDashboards(),
 			CloudScheduledAgents(),
 			CloudAuditLogs(),
@@ -68,7 +70,7 @@ func addTeamFlag(cmd *cli.Command) {
 func teamFlag() *cli.StringFlag {
 	return &cli.StringFlag{
 		Name:    "team",
-		Usage:   "act on this team (company prefix) instead of your current team",
+		Usage:   "act on this team instead of your current one, given as its company prefix (see 'bruin cloud teams list' for available prefixes)",
 		Sources: cli.EnvVars("BRUIN_CLOUD_TEAM"),
 	}
 }
@@ -2243,12 +2245,17 @@ func CloudAgents() *cli.Command {
 			cloudAgentsCreate(),
 			cloudAgentsGet(),
 			cloudAgentsUpdate(),
+			cloudAgentsDelete(),
 			cloudAgentsSend(),
 			cloudAgentsStatus(),
 			cloudAgentsThreads(),
 			cloudAgentsMessages(),
 			cloudAgentsGetPrompt(),
 			cloudAgentsSetPrompt(),
+			cloudAgentsGetMemory(),
+			cloudAgentsSetMemory(),
+			cloudAgentsClearMemory(),
+			cloudAgentsExportThread(),
 			cloudAgentsConnections(),
 			cloudAgentsMcp(),
 		},
@@ -2471,7 +2478,7 @@ func cloudAgentsGet() *cli.Command {
 func cloudAgentsUpdate() *cli.Command {
 	return &cli.Command{
 		Name:  "update",
-		Usage: "Update an agent's name, description or visibility",
+		Usage: "Update an agent's name, description, visibility or connection set",
 		Flags: []cli.Flag{
 			apiKeyFlag(),
 			outputFlag(),
@@ -2491,6 +2498,10 @@ func cloudAgentsUpdate() *cli.Command {
 			&cli.StringFlag{
 				Name:  "visibility",
 				Usage: "agent visibility: team or private",
+			},
+			&cli.IntFlag{
+				Name:  "connection-set-id",
+				Usage: "assign a connection set to the agent (0 to detach); see 'bruin cloud connection-sets list'",
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
@@ -2514,8 +2525,21 @@ func cloudAgentsUpdate() *cli.Command {
 				}
 				fields["visibility"] = visibility
 			}
+			if c.IsSet("connection-set-id") {
+				// >0 assigns, 0 detaches (explicit null); a negative id is a typo,
+				// not a detach — reject it rather than silently wiping the set.
+				switch id := c.Int("connection-set-id"); {
+				case id > 0:
+					fields["connection_set_id"] = id
+				case id == 0:
+					fields["connection_set_id"] = nil
+				default:
+					printError(fmt.Errorf("--connection-set-id must be >= 0 (0 detaches), got %d", id), output, "Invalid --connection-set-id")
+					return cli.Exit("", 1)
+				}
+			}
 			if len(fields) == 0 {
-				printError(errors.New("provide at least one of --name, --description or --visibility"), output, "Nothing to update")
+				printError(errors.New("provide at least one of --name, --description, --visibility or --connection-set-id"), output, "Nothing to update")
 				return cli.Exit("", 1)
 			}
 
@@ -2538,6 +2562,45 @@ func cloudAgentsUpdate() *cli.Command {
 			}
 
 			infoPrinter.Printf("Updated agent %d (%s)\n", agent.ID, agent.Name)
+			return nil
+		},
+	}
+}
+
+func cloudAgentsDelete() *cli.Command {
+	return &cli.Command{
+		Name:  "delete",
+		Usage: "Delete an agent (cascades to its scheduled agents, dashboards and threads)",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "agent-id",
+				Usage:    "agent ID",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			if err := client.DeleteAgent(ctx, c.Int("agent-id")); err != nil {
+				printError(err, output, "Failed to delete agent")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				fmt.Println(`{"success": true}`)
+				return nil
+			}
+
+			successPrinter.Printf("Deleted agent %d.\n", c.Int("agent-id"))
 			return nil
 		},
 	}
@@ -3019,14 +3082,26 @@ func cloudAgentsStatus() *cli.Command {
 func cloudAgentsThreads() *cli.Command {
 	return &cli.Command{
 		Name:  "threads",
-		Usage: "List threads for an agent",
+		Usage: "List an agent's threads, or manage one with the 'rename'/'archive'/'unarchive'/'delete' subcommands",
+		// Backward compatible: the bare command still lists (its Action below); the
+		// subcommands manage a thread. --agent-id is therefore not Required on the
+		// parent (that would also demand it for the subcommands); the Action validates it.
+		Commands: []*cli.Command{
+			cloudAgentsThreadsRename(),
+			cloudAgentsThreadsArchive(),
+			cloudAgentsThreadsUnarchive(),
+			cloudAgentsThreadsDelete(),
+		},
 		Flags: []cli.Flag{
 			apiKeyFlag(),
 			outputFlag(),
 			&cli.IntFlag{
-				Name:     "agent-id",
-				Usage:    "agent ID",
-				Required: true,
+				Name:  "agent-id",
+				Usage: "agent ID",
+			},
+			&cli.BoolFlag{
+				Name:  "archived",
+				Usage: "list archived threads instead of active ones",
 			},
 			limitFlag(),
 			offsetFlag(),
@@ -3035,13 +3110,18 @@ func cloudAgentsThreads() *cli.Command {
 			defer RecoverFromPanic()
 			output := c.String("output")
 
+			if c.Int("agent-id") <= 0 {
+				printError(fmt.Errorf("--agent-id must be a positive integer, got %d", c.Int("agent-id")), output, "Invalid --agent-id")
+				return cli.Exit("", 1)
+			}
+
 			client, err := newCloudClient(c)
 			if err != nil {
 				printError(err, output, "Failed to create API client")
 				return cli.Exit("", 1)
 			}
 
-			threads, err := client.ListAgentThreads(ctx, c.Int("agent-id"), c.Int("limit"), c.Int("offset"))
+			threads, err := client.ListAgentThreads(ctx, c.Int("agent-id"), c.Int("limit"), c.Int("offset"), c.Bool("archived"))
 			if err != nil {
 				printError(err, output, "Failed to list threads")
 				return cli.Exit("", 1)
@@ -3055,11 +3135,152 @@ func cloudAgentsThreads() *cli.Command {
 
 			t := table.NewWriter()
 			t.SetOutputMirror(os.Stdout)
-			t.AppendHeader(table.Row{"ID", "Agent ID", "Created At", "Updated At"})
+			t.AppendHeader(table.Row{"ID", "Agent ID", "Title", "Created At", "Updated At", "Archived At"})
 			for _, th := range threads {
-				t.AppendRow(table.Row{th.ID, th.AgentID, th.CreatedAt, th.UpdatedAt})
+				t.AppendRow(table.Row{th.ID, th.AgentID, derefString(th.Title), th.CreatedAt, th.UpdatedAt, derefString(th.ArchivedAt)})
 			}
 			t.Render()
+			return nil
+		},
+	}
+}
+
+// threadIDFlags are the required agent-id + thread-id flags shared by the thread
+// management subcommands.
+func threadIDFlags() []cli.Flag {
+	return []cli.Flag{
+		apiKeyFlag(),
+		outputFlag(),
+		&cli.IntFlag{Name: "agent-id", Usage: "agent ID", Required: true},
+		&cli.IntFlag{Name: "thread-id", Usage: "thread ID", Required: true},
+	}
+}
+
+func cloudAgentsThreadsRename() *cli.Command {
+	return &cli.Command{
+		Name:  "rename",
+		Usage: "Rename a thread",
+		Flags: append(threadIDFlags(), &cli.StringFlag{
+			Name:     "title",
+			Usage:    "the new thread title",
+			Required: true,
+		}),
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			thread, err := client.UpdateAgentThread(ctx, c.Int("agent-id"), c.Int("thread-id"), map[string]any{"title": c.String("title")})
+			if err != nil {
+				printError(err, output, "Failed to rename thread")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(thread, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			successPrinter.Printf("Renamed thread %d to %q.\n", thread.ID, derefString(thread.Title))
+			return nil
+		},
+	}
+}
+
+func cloudAgentsThreadsArchive() *cli.Command {
+	return &cli.Command{
+		Name:  "archive",
+		Usage: "Archive a thread",
+		Flags: threadIDFlags(),
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			if _, err := client.UpdateAgentThread(ctx, c.Int("agent-id"), c.Int("thread-id"), map[string]any{"archived": true}); err != nil {
+				printError(err, output, "Failed to archive thread")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				fmt.Println(`{"success": true}`)
+				return nil
+			}
+
+			successPrinter.Printf("Archived thread %d.\n", c.Int("thread-id"))
+			return nil
+		},
+	}
+}
+
+func cloudAgentsThreadsUnarchive() *cli.Command {
+	return &cli.Command{
+		Name:  "unarchive",
+		Usage: "Restore an archived thread",
+		Flags: threadIDFlags(),
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			if _, err := client.UpdateAgentThread(ctx, c.Int("agent-id"), c.Int("thread-id"), map[string]any{"archived": false}); err != nil {
+				printError(err, output, "Failed to unarchive thread")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				fmt.Println(`{"success": true}`)
+				return nil
+			}
+
+			successPrinter.Printf("Unarchived thread %d.\n", c.Int("thread-id"))
+			return nil
+		},
+	}
+}
+
+func cloudAgentsThreadsDelete() *cli.Command {
+	return &cli.Command{
+		Name:  "delete",
+		Usage: "Delete a thread",
+		Flags: threadIDFlags(),
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			if err := client.DeleteAgentThread(ctx, c.Int("agent-id"), c.Int("thread-id")); err != nil {
+				printError(err, output, "Failed to delete thread")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				fmt.Println(`{"success": true}`)
+				return nil
+			}
+
+			successPrinter.Printf("Deleted thread %d.\n", c.Int("thread-id"))
 			return nil
 		},
 	}
@@ -3151,6 +3372,221 @@ func cloudAgentsSetPrompt() *cli.Command {
 			}
 
 			infoPrinter.Printf("Updated system prompt for agent %d (%s)\n", prompt.ID, prompt.Name)
+			return nil
+		},
+	}
+}
+
+func cloudAgentsGetMemory() *cli.Command {
+	return &cli.Command{
+		Name:  "get-memory",
+		Usage: "Get an agent's long-term memory",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "agent-id",
+				Usage:    "agent ID",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			memory, err := client.GetAgentMemory(ctx, c.Int("agent-id"))
+			if err != nil {
+				printError(err, output, "Failed to get agent memory")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(memory, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			if memory.Memory == nil {
+				fmt.Println("(none)")
+				return nil
+			}
+			fmt.Println(*memory.Memory)
+			return nil
+		},
+	}
+}
+
+func cloudAgentsSetMemory() *cli.Command {
+	return &cli.Command{
+		Name:  "set-memory",
+		Usage: "Replace an agent's long-term memory from --memory or --memory-file",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "agent-id",
+				Usage:    "agent ID",
+				Required: true,
+			},
+			&cli.StringFlag{Name: "memory", Usage: "the new memory content"},
+			&cli.StringFlag{Name: "memory-file", Usage: "path to a file whose contents become the memory"},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			content, err := resolveMemoryContent(c)
+			if err != nil {
+				printError(err, output, "Invalid memory")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			memory, err := client.SetAgentMemory(ctx, c.Int("agent-id"), &content)
+			if err != nil {
+				printError(err, output, "Failed to set agent memory")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(memory, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			infoPrinter.Printf("Updated memory for agent %d (%s)\n", memory.ID, memory.Name)
+			return nil
+		},
+	}
+}
+
+func cloudAgentsClearMemory() *cli.Command {
+	return &cli.Command{
+		Name:  "clear-memory",
+		Usage: "Clear an agent's long-term memory",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "agent-id",
+				Usage:    "agent ID",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			memory, err := client.SetAgentMemory(ctx, c.Int("agent-id"), nil)
+			if err != nil {
+				printError(err, output, "Failed to clear agent memory")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(memory, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			infoPrinter.Printf("Cleared memory for agent %d (%s)\n", memory.ID, memory.Name)
+			return nil
+		},
+	}
+}
+
+// resolveMemoryContent reads the memory body from --memory or --memory-file.
+func resolveMemoryContent(c *cli.Command) (string, error) {
+	if c.IsSet("memory") && c.IsSet("memory-file") {
+		return "", errors.New("pass only one of --memory or --memory-file")
+	}
+	if c.IsSet("memory-file") {
+		data, err := os.ReadFile(c.String("memory-file"))
+		if err != nil {
+			return "", fmt.Errorf("failed to read --memory-file: %w", err)
+		}
+		return string(data), nil
+	}
+	if c.IsSet("memory") {
+		return c.String("memory"), nil
+	}
+	return "", errors.New("provide the memory with --memory or --memory-file")
+}
+
+func cloudAgentsExportThread() *cli.Command {
+	return &cli.Command{
+		Name:  "export-thread",
+		Usage: "Export a chat thread as JSON",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "agent-id",
+				Usage:    "agent ID",
+				Required: true,
+			},
+			&cli.IntFlag{
+				Name:     "thread-id",
+				Usage:    "thread ID",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:  "file",
+				Usage: "write the export to this file instead of stdout",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			export, err := client.ExportThread(ctx, c.Int("agent-id"), c.Int("thread-id"))
+			if err != nil {
+				printError(err, output, "Failed to export thread")
+				return cli.Exit("", 1)
+			}
+
+			// Indent the raw bytes rather than round-tripping through `any`, which
+			// would coerce large integers through float64 and silently corrupt them.
+			var buf bytes.Buffer
+			if err := json.Indent(&buf, export, "", "  "); err != nil {
+				printError(err, output, "Failed to format export")
+				return cli.Exit("", 1)
+			}
+			pretty := buf.Bytes()
+
+			if file := c.String("file"); file != "" {
+				if err := os.WriteFile(file, pretty, 0o600); err != nil {
+					printError(err, output, "Failed to write file")
+					return cli.Exit("", 1)
+				}
+				infoPrinter.Printf("Exported thread %d to %s\n", c.Int("thread-id"), file)
+				return nil
+			}
+
+			fmt.Println(string(pretty))
 			return nil
 		},
 	}
@@ -3478,6 +3914,274 @@ func cloudConnectionsDelete() *cli.Command {
 	}
 }
 
+func CloudConnectionSets() *cli.Command {
+	return &cli.Command{
+		Name:  "connection-sets",
+		Usage: "Manage Bruin Cloud connection sets (named bundles of connections an agent runs against)",
+		Commands: []*cli.Command{
+			cloudConnectionSetsList(),
+			cloudConnectionSetsGet(),
+			cloudConnectionSetsCreate(),
+			cloudConnectionSetsUpdate(),
+			cloudConnectionSetsDelete(),
+		},
+	}
+}
+
+func cloudConnectionSetsList() *cli.Command {
+	return &cli.Command{
+		Name:  "list",
+		Usage: "List connection sets",
+		Flags: []cli.Flag{apiKeyFlag(), outputFlag()},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			sets, err := client.ListConnectionSets(ctx)
+			if err != nil {
+				printError(err, output, "Failed to list connection sets")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(sets, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			if len(sets) == 0 {
+				infoPrinter.Println("No connection sets found.")
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"ID", "Name", "Created", "Updated"})
+			for _, s := range sets {
+				t.AppendRow(table.Row{s.ID, s.Name, s.CreatedAt, s.UpdatedAt})
+			}
+			t.Render()
+			return nil
+		},
+	}
+}
+
+func cloudConnectionSetsGet() *cli.Command {
+	return &cli.Command{
+		Name:  "get",
+		Usage: "List the connections in a connection set (names and types only)",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{Name: "set-id", Usage: "connection set ID", Required: true},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			if c.Int("set-id") <= 0 {
+				printError(fmt.Errorf("--set-id must be a positive integer, got %d", c.Int("set-id")), output, "Invalid --set-id")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			conns, err := client.ListConnectionSetConnections(ctx, c.Int("set-id"))
+			if err != nil {
+				printError(err, output, "Failed to get connection set")
+				return cli.Exit("", 1)
+			}
+			if conns == nil {
+				conns = []bruincloud.Connection{}
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(conns, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			if len(conns) == 0 {
+				infoPrinter.Println("This connection set has no connections.")
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"Name", "Type"})
+			for _, conn := range conns {
+				t.AppendRow(table.Row{conn.Name, conn.Type})
+			}
+			t.Render()
+			return nil
+		},
+	}
+}
+
+func cloudConnectionSetsCreate() *cli.Command {
+	return &cli.Command{
+		Name:  "create",
+		Usage: "Create a connection set from connections in the local .bruin.yml",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.StringFlag{Name: "name", Usage: "the connection set name", Required: true},
+			&cli.StringSliceFlag{Name: "connection", Usage: "a connection name to include, read from the local .bruin.yml; repeat for multiple", Required: true},
+			&cli.StringFlag{Name: "environment", Usage: "the .bruin.yml environment to read from (default: selected environment)"},
+			&cli.StringFlag{Name: "config-file", Usage: "path to the .bruin.yml file"},
+			&cli.BoolFlag{Name: "skip-validation", Usage: "skip the live connection test"},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			inputs, err := connectionSetInputsFromConfig(ctx, c.StringSlice("connection"), c.String("environment"), c.String("config-file"))
+			if err != nil {
+				printError(err, output, "Failed to read connections")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			set, err := client.CreateConnectionSet(ctx, c.String("name"), inputs, c.Bool("skip-validation"))
+			if err != nil {
+				printError(err, output, "Failed to create connection set")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(set, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			printSuccessForOutput(output, fmt.Sprintf("Created connection set '%s' (ID %d) with %d connection(s)", set.Name, set.ID, len(inputs)))
+			return nil
+		},
+	}
+}
+
+func cloudConnectionSetsUpdate() *cli.Command {
+	return &cli.Command{
+		Name:  "update",
+		Usage: "Replace a connection set's connections with ones from the local .bruin.yml",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{Name: "set-id", Usage: "connection set ID", Required: true},
+			&cli.StringSliceFlag{Name: "connection", Usage: "a connection name to include, read from the local .bruin.yml; repeat for multiple. The set becomes exactly these connections.", Required: true},
+			&cli.StringFlag{Name: "environment", Usage: "the .bruin.yml environment to read from (default: selected environment)"},
+			&cli.StringFlag{Name: "config-file", Usage: "path to the .bruin.yml file"},
+			&cli.BoolFlag{Name: "skip-validation", Usage: "skip the live connection test"},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			if c.Int("set-id") <= 0 {
+				printError(fmt.Errorf("--set-id must be a positive integer, got %d", c.Int("set-id")), output, "Invalid --set-id")
+				return cli.Exit("", 1)
+			}
+
+			inputs, err := connectionSetInputsFromConfig(ctx, c.StringSlice("connection"), c.String("environment"), c.String("config-file"))
+			if err != nil {
+				printError(err, output, "Failed to read connections")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			if err := client.UpdateConnectionSet(ctx, c.Int("set-id"), inputs, c.Bool("skip-validation")); err != nil {
+				printError(err, output, "Failed to update connection set")
+				return cli.Exit("", 1)
+			}
+
+			printSuccessForOutput(output, fmt.Sprintf("Updated connection set %d (%d connection(s))", c.Int("set-id"), len(inputs)))
+			return nil
+		},
+	}
+}
+
+func cloudConnectionSetsDelete() *cli.Command {
+	return &cli.Command{
+		Name:  "delete",
+		Usage: "Delete a connection set",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{Name: "set-id", Usage: "connection set ID", Required: true},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			if c.Int("set-id") <= 0 {
+				printError(fmt.Errorf("--set-id must be a positive integer, got %d", c.Int("set-id")), output, "Invalid --set-id")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			if err := client.DeleteConnectionSet(ctx, c.Int("set-id")); err != nil {
+				printError(err, output, "Failed to delete connection set")
+				return cli.Exit("", 1)
+			}
+
+			printSuccessForOutput(output, fmt.Sprintf("Deleted connection set %d", c.Int("set-id")))
+			return nil
+		},
+	}
+}
+
+// connectionSetInputsFromConfig reads each named connection from the local
+// .bruin.yml and returns them as {type, name, config} inputs, inlining any
+// service_account_file into service_account_json (the cloud runner can't read
+// local files). Every connection is sent with a full config — the API takes no
+// partial edits.
+func connectionSetInputsFromConfig(ctx context.Context, names []string, environment, configFile string) ([]bruincloud.ConnectionSetInput, error) {
+	inputs := make([]bruincloud.ConnectionSetInput, 0, len(names))
+	for _, name := range names {
+		connType, credentials, err := connectionFromConfig(ctx, name, environment, configFile)
+		if err != nil {
+			return nil, fmt.Errorf("connection %q: %w", name, err)
+		}
+
+		if path, ok := credentials["service_account_file"].(string); ok && path != "" {
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return nil, fmt.Errorf("connection %q: failed to read service_account_file: %w", name, err)
+			}
+			credentials["service_account_json"] = string(data)
+			delete(credentials, "service_account_file")
+		}
+
+		inputs = append(inputs, bruincloud.ConnectionSetInput{Type: connType, Name: name, Config: credentials})
+	}
+	return inputs, nil
+}
+
 func CloudDashboards() *cli.Command {
 	return &cli.Command{
 		Name:  "dashboards",
@@ -3487,6 +4191,7 @@ func CloudDashboards() *cli.Command {
 			cloudDashboardsGet(),
 			cloudDashboardsCreate(),
 			cloudDashboardsUpdate(),
+			cloudDashboardsDelete(),
 		},
 	}
 }
@@ -3906,6 +4611,50 @@ func cloudDashboardsUpdate() *cli.Command {
 	}
 }
 
+func cloudDashboardsDelete() *cli.Command {
+	return &cli.Command{
+		Name:  "delete",
+		Usage: "Delete a dashboard so it stops appearing",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "dashboard-id",
+				Usage:    "dashboard ID",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			if c.Int("dashboard-id") <= 0 {
+				printError(fmt.Errorf("--dashboard-id must be a positive integer, got %d", c.Int("dashboard-id")), output, "Invalid --dashboard-id")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			if err := client.DeleteDashboard(ctx, c.Int("dashboard-id")); err != nil {
+				printError(err, output, "Failed to delete dashboard")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				fmt.Println(`{"success": true}`)
+				return nil
+			}
+
+			successPrinter.Printf("Deleted dashboard %d.\n", c.Int("dashboard-id"))
+			return nil
+		},
+	}
+}
+
 func CloudScheduledAgents() *cli.Command {
 	return &cli.Command{
 		Name:  "scheduled-agents",
@@ -3915,6 +4664,8 @@ func CloudScheduledAgents() *cli.Command {
 			cloudScheduledAgentsGet(),
 			cloudScheduledAgentsCreate(),
 			cloudScheduledAgentsUpdate(),
+			cloudScheduledAgentsTrigger(),
+			cloudScheduledAgentsDelete(),
 			cloudScheduledAgentsRunStates(),
 		},
 	}
@@ -4329,6 +5080,86 @@ func cloudScheduledAgentsUpdate() *cli.Command {
 			}
 
 			infoPrinter.Printf("Updated scheduled agent %d (%s).\n", run.ID, derefString(run.Title))
+			return nil
+		},
+	}
+}
+
+func cloudScheduledAgentsTrigger() *cli.Command {
+	return &cli.Command{
+		Name:  "trigger",
+		Usage: "Run a scheduled agent now, off its schedule (the schedule is untouched)",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "scheduled-agent-id",
+				Usage:    "scheduled agent ID",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			execution, err := client.TriggerScheduledAgent(ctx, c.Int("scheduled-agent-id"))
+			if err != nil {
+				printError(err, output, "Failed to trigger scheduled agent")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(execution, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			successPrinter.Printf("Triggered scheduled agent %d — execution %d is running in thread %d.\n", c.Int("scheduled-agent-id"), execution.ExecutionID, execution.ThreadID)
+			return nil
+		},
+	}
+}
+
+func cloudScheduledAgentsDelete() *cli.Command {
+	return &cli.Command{
+		Name:  "delete",
+		Usage: "Delete a scheduled agent so it stops firing",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "scheduled-agent-id",
+				Usage:    "scheduled agent ID",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			if err := client.DeleteScheduledAgent(ctx, c.Int("scheduled-agent-id")); err != nil {
+				printError(err, output, "Failed to delete scheduled agent")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				fmt.Println(`{"success": true}`)
+				return nil
+			}
+
+			successPrinter.Printf("Deleted scheduled agent %d.\n", c.Int("scheduled-agent-id"))
 			return nil
 		},
 	}

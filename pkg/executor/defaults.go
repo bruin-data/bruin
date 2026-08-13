@@ -96,11 +96,15 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
 		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
 	},
-	"gcs.sensor.object_sensor_with_prefix": {
+	pipeline.AssetTypeGCSPrefixSensorLegacy: {
 		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
 		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
 	},
-	"gcs.sensor.object": {
+	pipeline.AssetTypeGCSPrefixSensor: {
+		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
+		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
+	},
+	pipeline.AssetTypeGCSObjectSensor: {
 		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
 		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
 	},

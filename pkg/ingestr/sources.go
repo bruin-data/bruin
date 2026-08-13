@@ -202,6 +202,19 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "annotations", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
 	},
 
+	// CleverTap - Customer engagement and retention analytics
+	"clevertap": {
+		{Name: "events", PrimaryKey: "", IncKey: "ts", IncStrategy: "delete+insert"},
+		{Name: "profiles", PrimaryKey: "object_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "campaigns", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "campaign_reports", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "content_blocks", PrimaryKey: "id", IncKey: "updatedAt", IncStrategy: "merge"},
+		{Name: "message_reports", PrimaryKey: "message_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "event_schema", PrimaryKey: "name", IncKey: "", IncStrategy: "replace"},
+		{Name: "user_properties", PrimaryKey: "name", IncKey: "", IncStrategy: "replace"},
+		{Name: "category_groups", PrimaryKey: "key", IncKey: "", IncStrategy: "replace"},
+	},
+
 	// ClickUp - Productivity platform
 	"clickup": {
 		{Name: "user", PrimaryKey: "id", IncKey: "", IncStrategy: "merge"},
@@ -738,6 +751,21 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 	// Notion - Workspace
 	"notion": {
 		{Name: "<database_id>", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+	},
+
+	// Okta - Identity and access management platform
+	"okta": {
+		{Name: "users", PrimaryKey: "id", IncKey: "lastUpdated", IncStrategy: "merge"},
+		{Name: "groups", PrimaryKey: "id", IncKey: "lastUpdated", IncStrategy: "merge"},
+		{Name: "group_members", PrimaryKey: "group_id,id", IncKey: "", IncStrategy: "replace"},
+		{Name: "applications", PrimaryKey: "id", IncKey: "lastUpdated", IncStrategy: "merge"},
+		{Name: "application_users", PrimaryKey: "app_id,id", IncKey: "", IncStrategy: "replace"},
+		{Name: "application_groups", PrimaryKey: "app_id,id", IncKey: "", IncStrategy: "replace"},
+		{Name: "system_log_events", PrimaryKey: "uuid", IncKey: "published", IncStrategy: "merge"},
+		{Name: "devices", PrimaryKey: "id", IncKey: "lastUpdated", IncStrategy: "merge"},
+		{Name: "policies", PrimaryKey: "id", IncKey: "lastUpdated", IncStrategy: "merge"},
+		{Name: "policy_rules", PrimaryKey: "id", IncKey: "lastUpdated", IncStrategy: "merge"},
+		{Name: "roles", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
 	},
 
 	// Personio - HR platform

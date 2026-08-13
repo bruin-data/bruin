@@ -122,6 +122,7 @@ For specific connection fields and configuration options, see the dedicated docu
 | `sail` | [Sail](/platforms/sail) |
 | `spark` | [Apache Spark](/platforms/spark) |
 | `s3` | [S3](/platforms/s3) |
+| `gcs` | [Google Cloud Storage](/platforms/gcs) |
 
 ## Ingestion Source Connections
 

@@ -149,7 +149,7 @@ func TestCloudCommand_Help(t *testing.T) {
 	cmd := Cloud(&isDebug)
 	require.NotNil(t, cmd)
 	assert.Equal(t, "cloud", cmd.Name)
-	assert.Len(t, cmd.Commands, 14)
+	assert.Len(t, cmd.Commands, 15)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
@@ -166,9 +166,28 @@ func TestCloudCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "glossary")
 	assert.Contains(t, subNames, "agents")
 	assert.Contains(t, subNames, "connections")
+	assert.Contains(t, subNames, "connection-sets")
 	assert.Contains(t, subNames, "dashboards")
 	assert.Contains(t, subNames, "scheduled-agents")
 	assert.Contains(t, subNames, "audit-logs")
+}
+
+func TestCloudConnectionSetsCommand_Help(t *testing.T) {
+	t.Parallel()
+	cmd := CloudConnectionSets()
+	require.NotNil(t, cmd)
+	assert.Equal(t, "connection-sets", cmd.Name)
+	require.Len(t, cmd.Commands, 5)
+
+	subNames := make([]string, len(cmd.Commands))
+	for i, sub := range cmd.Commands {
+		subNames[i] = sub.Name
+	}
+	assert.Contains(t, subNames, "list")
+	assert.Contains(t, subNames, "get")
+	assert.Contains(t, subNames, "create")
+	assert.Contains(t, subNames, "update")
+	assert.Contains(t, subNames, "delete")
 }
 
 func TestCloudLeafCommandsHaveTeamFlag(t *testing.T) {
@@ -310,14 +329,38 @@ func TestCloudAgentsCommand_Help(t *testing.T) {
 	cmd := CloudAgents()
 	require.NotNil(t, cmd)
 	assert.Equal(t, "agents", cmd.Name)
-	require.Len(t, cmd.Commands, 12)
+	require.Len(t, cmd.Commands, 17)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
 		subNames[i] = sub.Name
 	}
+	assert.Contains(t, subNames, "delete")
 	assert.Contains(t, subNames, "connections")
 	assert.Contains(t, subNames, "mcp")
+	assert.Contains(t, subNames, "get-memory")
+	assert.Contains(t, subNames, "set-memory")
+	assert.Contains(t, subNames, "clear-memory")
+	assert.Contains(t, subNames, "export-thread")
+}
+
+func TestCloudAgentsThreadsCommand_Help(t *testing.T) {
+	t.Parallel()
+	cmd := cloudAgentsThreads()
+	require.NotNil(t, cmd)
+	assert.Equal(t, "threads", cmd.Name)
+	// The bare command still lists (default Action); management verbs are subcommands.
+	require.NotNil(t, cmd.Action)
+	require.Len(t, cmd.Commands, 4)
+
+	subNames := make([]string, len(cmd.Commands))
+	for i, sub := range cmd.Commands {
+		subNames[i] = sub.Name
+	}
+	assert.Contains(t, subNames, "rename")
+	assert.Contains(t, subNames, "archive")
+	assert.Contains(t, subNames, "unarchive")
+	assert.Contains(t, subNames, "delete")
 }
 
 func TestCloudDashboardsCommand_Help(t *testing.T) {
@@ -325,7 +368,7 @@ func TestCloudDashboardsCommand_Help(t *testing.T) {
 	cmd := CloudDashboards()
 	require.NotNil(t, cmd)
 	assert.Equal(t, "dashboards", cmd.Name)
-	require.Len(t, cmd.Commands, 4)
+	require.Len(t, cmd.Commands, 5)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
@@ -335,6 +378,7 @@ func TestCloudDashboardsCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "get")
 	assert.Contains(t, subNames, "create")
 	assert.Contains(t, subNames, "update")
+	assert.Contains(t, subNames, "delete")
 }
 
 // cliRunMu serializes cli.Command.Run: urfave/cli's ensureHelp resets the
@@ -452,7 +496,7 @@ func TestCloudScheduledAgentsCommand_Help(t *testing.T) {
 	cmd := CloudScheduledAgents()
 	require.NotNil(t, cmd)
 	assert.Equal(t, "scheduled-agents", cmd.Name)
-	require.Len(t, cmd.Commands, 5)
+	require.Len(t, cmd.Commands, 7)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
@@ -462,6 +506,8 @@ func TestCloudScheduledAgentsCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "get")
 	assert.Contains(t, subNames, "create")
 	assert.Contains(t, subNames, "update")
+	assert.Contains(t, subNames, "trigger")
+	assert.Contains(t, subNames, "delete")
 	assert.Contains(t, subNames, "run-states")
 }
 

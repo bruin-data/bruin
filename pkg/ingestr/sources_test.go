@@ -33,6 +33,81 @@ func TestAdaptySourceTables(t *testing.T) {
 	require.True(t, hasPaywalls)
 }
 
+func TestCleverTapSourceTables(t *testing.T) {
+	t.Parallel()
+
+	source, err := GetSourceTables("clevertap")
+	require.NoError(t, err)
+	require.Equal(t, "clevertap", source.Name)
+	require.NotEmpty(t, source.Tables)
+
+	var hasEvents, hasProfiles, hasContentBlocks bool
+	for _, table := range source.Tables {
+		switch table.Name {
+		case "events":
+			hasEvents = true
+			require.Equal(t, "ts", table.IncKey)
+			require.Equal(t, "delete+insert", table.IncStrategy)
+		case "profiles":
+			hasProfiles = true
+			require.Equal(t, "object_id", table.PrimaryKey)
+			require.Equal(t, "replace", table.IncStrategy)
+		case "content_blocks":
+			hasContentBlocks = true
+			require.Equal(t, "id", table.PrimaryKey)
+			require.Equal(t, "updatedAt", table.IncKey)
+			require.Equal(t, "merge", table.IncStrategy)
+		}
+	}
+
+	require.True(t, hasEvents)
+	require.True(t, hasProfiles)
+	require.True(t, hasContentBlocks)
+}
+
+func TestOktaSourceTables(t *testing.T) {
+	t.Parallel()
+
+	source, err := GetSourceTables("okta")
+	require.NoError(t, err)
+	require.Equal(t, "okta", source.Name)
+	require.NotEmpty(t, source.Tables)
+
+	var hasUsers, hasGroupMembers, hasApplicationUsers, hasSystemLogEvents, hasRoles bool
+	for _, table := range source.Tables {
+		switch table.Name {
+		case "users":
+			hasUsers = true
+			require.Equal(t, "id", table.PrimaryKey)
+			require.Equal(t, "lastUpdated", table.IncKey)
+			require.Equal(t, "merge", table.IncStrategy)
+		case "group_members":
+			hasGroupMembers = true
+			require.Equal(t, "group_id,id", table.PrimaryKey)
+			require.Equal(t, "replace", table.IncStrategy)
+		case "application_users":
+			hasApplicationUsers = true
+			require.Equal(t, "app_id,id", table.PrimaryKey)
+			require.Equal(t, "replace", table.IncStrategy)
+		case "system_log_events":
+			hasSystemLogEvents = true
+			require.Equal(t, "uuid", table.PrimaryKey)
+			require.Equal(t, "published", table.IncKey)
+			require.Equal(t, "merge", table.IncStrategy)
+		case "roles":
+			hasRoles = true
+			require.Equal(t, "id", table.PrimaryKey)
+			require.Equal(t, "replace", table.IncStrategy)
+		}
+	}
+
+	require.True(t, hasUsers)
+	require.True(t, hasGroupMembers)
+	require.True(t, hasApplicationUsers)
+	require.True(t, hasSystemLogEvents)
+	require.True(t, hasRoles)
+}
+
 func TestSharePointSourceTables(t *testing.T) {
 	t.Parallel()
 

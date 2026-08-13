@@ -588,6 +588,104 @@ func TestAddAgentConnection(t *testing.T) {
 	assert.Equal(t, "postgres", connections[0].Type)
 }
 
+func TestListConnectionSets(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/connection-sets", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, map[string]any{
+			"connection_sets": []ConnectionSet{{ID: 1, Name: "prod"}, {ID: 2, Name: "dev"}},
+		})
+	})
+
+	sets, err := client.ListConnectionSets(t.Context())
+	require.NoError(t, err)
+	require.Len(t, sets, 2)
+	assert.Equal(t, "prod", sets[0].Name)
+	assert.Equal(t, 2, sets[1].ID)
+}
+
+func TestListConnectionSetConnections(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/connection-sets/5/connections", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, map[string]any{
+			"connections": []Connection{{Name: "pg", Type: "postgres"}},
+		})
+	})
+
+	conns, err := client.ListConnectionSetConnections(t.Context(), 5)
+	require.NoError(t, err)
+	require.Len(t, conns, 1)
+	assert.Equal(t, "pg", conns[0].Name)
+	assert.Equal(t, "postgres", conns[0].Type)
+}
+
+func TestCreateConnectionSet(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/connection-sets", r.URL.Path)
+
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, "prod", body["name"])
+		assert.Equal(t, true, body["skip_validation"])
+		conns, _ := body["connections"].([]any)
+		assert.Len(t, conns, 1)
+		first, _ := conns[0].(map[string]any)
+		assert.Equal(t, "postgres", first["type"])
+		cfg, _ := first["config"].(map[string]any)
+		assert.Equal(t, "secret", cfg["password"])
+
+		w.WriteHeader(http.StatusCreated)
+		writeJSON(t, w, ConnectionSet{ID: 9, Name: "prod"})
+	})
+
+	set, err := client.CreateConnectionSet(t.Context(), "prod", []ConnectionSetInput{
+		{Type: "postgres", Name: "pg", Config: map[string]any{"password": "secret"}},
+	}, true)
+	require.NoError(t, err)
+	assert.Equal(t, 9, set.ID)
+	assert.Equal(t, "prod", set.Name)
+}
+
+func TestUpdateConnectionSet(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPut, r.Method)
+		assert.Equal(t, "/connection-sets/9", r.URL.Path)
+
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		conns, _ := body["connections"].([]any)
+		assert.Len(t, conns, 1)
+
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, map[string]any{"success": true})
+	})
+
+	err := client.UpdateConnectionSet(t.Context(), 9, []ConnectionSetInput{
+		{Type: "postgres", Name: "pg", Config: map[string]any{"password": "secret"}},
+	}, false)
+	require.NoError(t, err)
+}
+
+func TestDeleteConnectionSet(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodDelete, r.Method)
+		assert.Equal(t, "/connection-sets/9", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, map[string]any{"success": true})
+	})
+
+	require.NoError(t, client.DeleteConnectionSet(t.Context(), 9))
+}
+
 func TestCreateAgent(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
@@ -648,6 +746,98 @@ func TestUpdateAgent(t *testing.T) {
 	assert.Equal(t, "renamed", agent.Name)
 }
 
+func TestDeleteAgent(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodDelete, r.Method)
+		assert.Equal(t, "/agents/7", r.URL.Path)
+		writeJSON(t, w, map[string]bool{"success": true})
+	})
+
+	require.NoError(t, client.DeleteAgent(t.Context(), 7))
+}
+
+func TestGetAgentMemory(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/agents/7/memory", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+		mem := "remembered thing"
+		writeJSON(t, w, AgentMemory{ID: 7, Name: "an-agent", Memory: &mem})
+	})
+
+	memory, err := client.GetAgentMemory(t.Context(), 7)
+	require.NoError(t, err)
+	require.NotNil(t, memory.Memory)
+	assert.Equal(t, "remembered thing", *memory.Memory)
+}
+
+func TestSetAgentMemory(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPut, r.Method)
+		assert.Equal(t, "/agents/7/memory", r.URL.Path)
+
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, "new memory", body["memory"])
+
+		w.WriteHeader(http.StatusOK)
+		mem := "new memory"
+		writeJSON(t, w, AgentMemory{ID: 7, Name: "an-agent", Memory: &mem})
+	})
+
+	mem := "new memory"
+	memory, err := client.SetAgentMemory(t.Context(), 7, &mem)
+	require.NoError(t, err)
+	require.NotNil(t, memory.Memory)
+	assert.Equal(t, "new memory", *memory.Memory)
+}
+
+func TestSetAgentMemoryClear(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPut, r.Method)
+		assert.Equal(t, "/agents/7/memory", r.URL.Path)
+
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		// A nil memory clears it: the field is present and JSON null.
+		val, present := body["memory"]
+		assert.True(t, present)
+		assert.Nil(t, val)
+
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, AgentMemory{ID: 7, Name: "an-agent", Memory: nil})
+	})
+
+	memory, err := client.SetAgentMemory(t.Context(), 7, nil)
+	require.NoError(t, err)
+	assert.Nil(t, memory.Memory)
+}
+
+func TestExportThread(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/agents/7/threads/42/export", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, map[string]any{
+			"export_version": "1.0",
+			"thread":         map[string]any{"id": 42},
+			"messages":       []any{},
+		})
+	})
+
+	export, err := client.ExportThread(t.Context(), 7, 42)
+	require.NoError(t, err)
+
+	var parsed map[string]any
+	require.NoError(t, json.Unmarshal(export, &parsed))
+	assert.Equal(t, "1.0", parsed["export_version"])
+}
+
 func TestListAgentMcpServers(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
@@ -706,10 +896,54 @@ func TestListAgentThreads(t *testing.T) {
 		})
 	})
 
-	threads, err := client.ListAgentThreads(t.Context(), 1, 0, 0)
+	threads, err := client.ListAgentThreads(t.Context(), 1, 0, 0, false)
 	require.NoError(t, err)
 	require.Len(t, threads, 1)
 	assert.Equal(t, 10, threads[0].ID)
+}
+
+func TestListAgentThreadsArchived(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/agents/1/threads", r.URL.Path)
+		assert.Equal(t, "true", r.URL.Query().Get("archived"))
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, map[string]any{"threads": []AgentThread{}})
+	})
+
+	_, err := client.ListAgentThreads(t.Context(), 1, 0, 0, true)
+	require.NoError(t, err)
+}
+
+func TestUpdateAgentThread(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPatch, r.Method)
+		assert.Equal(t, "/agents/1/threads/10", r.URL.Path)
+
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, "Renamed", body["title"])
+
+		w.WriteHeader(http.StatusOK)
+		title := "Renamed"
+		writeJSON(t, w, AgentThread{ID: 10, AgentID: 1, Title: &title})
+	})
+
+	thread, err := client.UpdateAgentThread(t.Context(), 1, 10, map[string]any{"title": "Renamed"})
+	require.NoError(t, err)
+	assert.Equal(t, "Renamed", *thread.Title)
+}
+
+func TestDeleteAgentThread(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodDelete, r.Method)
+		assert.Equal(t, "/agents/1/threads/10", r.URL.Path)
+		writeJSON(t, w, map[string]bool{"success": true})
+	})
+
+	require.NoError(t, client.DeleteAgentThread(t.Context(), 1, 10))
 }
 
 func TestListAgentMessages(t *testing.T) {
@@ -1070,6 +1304,18 @@ func TestUpdateDashboard(t *testing.T) {
 	assert.Equal(t, "Renamed", *dashboard.Title)
 }
 
+func TestDeleteDashboard(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodDelete, r.Method)
+		assert.Equal(t, "/dashboards/9", r.URL.Path)
+
+		writeJSON(t, w, map[string]bool{"success": true})
+	})
+
+	require.NoError(t, client.DeleteDashboard(t.Context(), 9))
+}
+
 func TestListScheduledAgents(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
@@ -1163,6 +1409,34 @@ func TestUpdateScheduledAgent(t *testing.T) {
 	run, err := client.UpdateScheduledAgent(t.Context(), 11, map[string]any{"title": "Renamed"})
 	require.NoError(t, err)
 	assert.Equal(t, "Renamed", *run.Title)
+}
+
+func TestTriggerScheduledAgent(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/scheduled-agents/11/trigger", r.URL.Path)
+
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, ScheduledAgentExecution{ExecutionID: 42, ThreadID: 99})
+	})
+
+	execution, err := client.TriggerScheduledAgent(t.Context(), 11)
+	require.NoError(t, err)
+	assert.Equal(t, 42, execution.ExecutionID)
+	assert.Equal(t, 99, execution.ThreadID)
+}
+
+func TestDeleteScheduledAgent(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodDelete, r.Method)
+		assert.Equal(t, "/scheduled-agents/11", r.URL.Path)
+
+		writeJSON(t, w, map[string]bool{"success": true})
+	})
+
+	require.NoError(t, client.DeleteScheduledAgent(t.Context(), 11))
 }
 
 func TestGetCostExplorerSchema(t *testing.T) {

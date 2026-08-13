@@ -454,14 +454,81 @@ func TestColumnHints(t *testing.T) {
 			expected:       "a:text,b:text,c:text",
 		},
 		{
-			name: "non-string parameterized types use base mapping without length",
+			name: "unsizable parameterized types use base mapping without params",
 			columns: []pipeline.Column{
 				{Name: "kept", Type: "int"},
 				{Name: "sized_int", Type: "int(11)"},
-				{Name: "sized_dec", Type: "decimal(10,2)"},
 			},
 			normalizeNames: false,
-			expected:       "kept:int,sized_int:int,sized_dec:decimal",
+			expected:       "kept:int,sized_int:int",
+		},
+		{
+			name: "inline decimal precision and scale are preserved",
+			columns: []pipeline.Column{
+				{Name: "a", Type: "decimal(10,2)"},
+				{Name: "b", Type: "numeric(18)"},
+				{Name: "c", Type: "money(12, 4)"},
+			},
+			normalizeNames: false,
+			expected:       "a:decimal(10,2),b:decimal(18),c:decimal(12,4)",
+		},
+		{
+			name: "decimal precision and scale fields are emitted",
+			columns: []pipeline.Column{
+				{Name: "a", Type: "decimal", Precision: intPtr(10), Scale: intPtr(2)},
+				{Name: "b", Type: "decimal", Precision: intPtr(18)},
+				{Name: "c", Type: "decimal", Scale: intPtr(2)},
+				{Name: "d", Type: "decimal"},
+			},
+			normalizeNames: false,
+			expected:       "a:decimal(10,2),b:decimal(18),c:decimal,d:decimal",
+		},
+		{
+			name: "inline decimal params take precedence over fields",
+			columns: []pipeline.Column{
+				{Name: "a", Type: "decimal(10,2)", Precision: intPtr(5), Scale: intPtr(1)},
+			},
+			normalizeNames: false,
+			expected:       "a:decimal(10,2)",
+		},
+		{
+			name: "decimal with source_column emits dest:decimal(p,s):source",
+			columns: []pipeline.Column{
+				{Name: "amount", SourceColumn: "amt", Type: "decimal", Precision: intPtr(12), Scale: intPtr(2)},
+			},
+			normalizeNames: false,
+			expected:       "amount:decimal(12,2):amt",
+		},
+		{
+			name: "invalid inline decimal params stay unparameterized",
+			columns: []pipeline.Column{
+				{Name: "a", Type: "decimal(abc)"},
+				{Name: "b", Type: "decimal(0)"},
+				{Name: "c", Type: "decimal(10,abc)"},
+				{Name: "d", Type: "decimal(10,-1)"},
+				{Name: "e", Type: "decimal(2,5)"},
+			},
+			normalizeNames: false,
+			expected:       "a:decimal,b:decimal,c:decimal,d:decimal,e:decimal",
+		},
+		{
+			name: "decimal fields with out-of-range scale stay unparameterized",
+			columns: []pipeline.Column{
+				{Name: "a", Type: "decimal", Precision: intPtr(2), Scale: intPtr(5)},
+				{Name: "b", Type: "decimal", Precision: intPtr(10), Scale: intPtr(-1)},
+			},
+			normalizeNames: false,
+			expected:       "a:decimal,b:decimal",
+		},
+		{
+			name: "decimal precision above ingestr max stays unparameterized",
+			columns: []pipeline.Column{
+				{Name: "a", Type: "decimal(50,2)"},
+				{Name: "b", Type: "decimal", Precision: intPtr(76), Scale: intPtr(38)},
+				{Name: "c", Type: "decimal(38,2)"},
+			},
+			normalizeNames: false,
+			expected:       "a:decimal,b:decimal,c:decimal(38,2)",
 		},
 		{
 			name: "sized string with source_column emits dest:text(n):source",
@@ -481,6 +548,19 @@ func TestColumnHints(t *testing.T) {
 			},
 			normalizeNames: false,
 			expected:       "bare:text,inline:text(100),field:text(50),renamed:text(255):src",
+		},
+		{
+			name: "overlay decimal alias with a lone scale arg is not forwarded as precision",
+			columns: []pipeline.Column{
+				{Name: "a", Type: "Decimal64(2)"},
+				{Name: "b", Type: "Decimal(18, 4)"},
+			},
+			normalizeNames: false,
+			overlay: map[string]string{
+				"decimal64": "decimal",
+				"decimal":   "decimal",
+			},
+			expected: "a:decimal,b:decimal(18,4)",
 		},
 		{
 			name: "destination overlay aliases are applied",
@@ -557,7 +637,7 @@ func TestColumnHints_SizedTypes(t *testing.T) {
 
 	sized := make(map[string]string) // source alias -> expected hint
 	for typ, hint := range TypeHintMapping {
-		if ingestrSizedTypes[hint] {
+		if ingestrSizedTypes[hint] && hint != decimalHint {
 			sized[typ] = hint
 		}
 	}
@@ -572,6 +652,33 @@ func TestColumnHints_SizedTypes(t *testing.T) {
 
 			field := ColumnHints([]pipeline.Column{{Name: "c", Type: typ, Length: intPtr(50)}}, false, nil, nil)
 			assert.Equal(t, want, field, "length field for %q", typ)
+		})
+	}
+}
+
+// TestColumnHints_PrecisionScaleTypes guards that every alias mapping to a
+// precision/scale ingestr type emits precision and scale, both via inline
+// parameters and via the precision/scale fields.
+func TestColumnHints_PrecisionScaleTypes(t *testing.T) {
+	t.Parallel()
+
+	sized := make(map[string]string) // source alias -> expected hint
+	for typ, hint := range TypeHintMapping {
+		if ingestrSizedTypes[hint] && hint == decimalHint {
+			sized[typ] = hint
+		}
+	}
+	require.NotEmpty(t, sized)
+
+	for typ, hint := range sized {
+		want := fmt.Sprintf("c:%s(10,2)", hint)
+		t.Run(typ, func(t *testing.T) {
+			t.Parallel()
+			inline := ColumnHints([]pipeline.Column{{Name: "c", Type: typ + "(10,2)"}}, false, nil, nil)
+			assert.Equal(t, want, inline, "inline params for %q", typ)
+
+			field := ColumnHints([]pipeline.Column{{Name: "c", Type: typ, Precision: intPtr(10), Scale: intPtr(2)}}, false, nil, nil)
+			assert.Equal(t, want, field, "precision/scale fields for %q", typ)
 		})
 	}
 }
@@ -787,6 +894,48 @@ func TestConsolidatedParameters_SourceColumn(t *testing.T) {
 		for _, arg := range result {
 			assert.NotEqual(t, "--columns", arg)
 		}
+	})
+}
+
+func TestConsolidatedParameters_DecimalPrecisionScale(t *testing.T) {
+	t.Parallel()
+
+	columnsValue := func(t *testing.T, cols []pipeline.Column) string {
+		t.Helper()
+		asset := &pipeline.Asset{
+			Parameters: pipeline.ParameterMap{"enforce_schema": "true"},
+			Columns:    cols,
+		}
+		result, err := ConsolidatedParameters(t.Context(), asset, []string{"--existing"}, &ColumnHintOptions{})
+		require.NoError(t, err)
+		for i, arg := range result {
+			if arg == "--columns" && i+1 < len(result) {
+				return result[i+1]
+			}
+		}
+		return ""
+	}
+
+	t.Run("inline precision and scale flow through to --columns", func(t *testing.T) {
+		t.Parallel()
+		got := columnsValue(t, []pipeline.Column{{Name: "amount", Type: "decimal(10,2)"}})
+		assert.Equal(t, "amount:decimal(10,2)", got)
+	})
+
+	t.Run("precision and scale fields flow through to --columns", func(t *testing.T) {
+		t.Parallel()
+		got := columnsValue(t, []pipeline.Column{
+			{Name: "amount", Type: "decimal", Precision: intPtr(18), Scale: intPtr(4)},
+		})
+		assert.Equal(t, "amount:decimal(18,4)", got)
+	})
+
+	t.Run("numeric alias and source_column rename keep the precision", func(t *testing.T) {
+		t.Parallel()
+		got := columnsValue(t, []pipeline.Column{
+			{Name: "amount", SourceColumn: "amt", Type: "numeric", Precision: intPtr(12), Scale: intPtr(2)},
+		})
+		assert.Equal(t, "amount:decimal(12,2):amt", got)
 	})
 }
 

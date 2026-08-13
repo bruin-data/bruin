@@ -163,10 +163,12 @@ type AgentConnection struct {
 
 // AgentThread represents a thread for an agent.
 type AgentThread struct {
-	ID        int    `json:"id"`
-	AgentID   int    `json:"agent_id"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
+	ID         int     `json:"id"`
+	AgentID    int     `json:"agent_id"`
+	Title      *string `json:"title"`
+	CreatedAt  string  `json:"created_at"`
+	UpdatedAt  string  `json:"updated_at"`
+	ArchivedAt *string `json:"archived_at"`
 }
 
 // AgentPrompt represents an agent's system prompt.
@@ -174,6 +176,13 @@ type AgentPrompt struct {
 	ID           int     `json:"id"`
 	Name         string  `json:"name"`
 	SystemPrompt *string `json:"system_prompt"`
+}
+
+// AgentMemory represents an agent's long-term memory blob.
+type AgentMemory struct {
+	ID     int     `json:"id"`
+	Name   string  `json:"name"`
+	Memory *string `json:"memory"`
 }
 
 // AgentMessage represents a message in an agent thread.
@@ -301,6 +310,15 @@ type Connection struct {
 	Type string `json:"type"`
 }
 
+// ConnectionSet represents a Bruin Cloud connection set (dev-env secret): a named
+// bundle of connections an agent runs against via its connection_set_id.
+type ConnectionSet struct {
+	ID        int    `json:"id"`
+	Name      string `json:"name"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
+}
+
 // Dashboard represents a Bruin Cloud dashboard. State is only populated by the
 // single-dashboard endpoint and carries the published definition as raw JSON.
 type Dashboard struct {
@@ -342,6 +360,13 @@ type ScheduledAgent struct {
 	Memory            json.RawMessage `json:"memory,omitempty"`
 	MonitorsDashboard json.RawMessage `json:"monitors_dashboard,omitempty"`
 	RecentExecutions  json.RawMessage `json:"recent_executions,omitempty"`
+}
+
+// ScheduledAgentExecution is the execution a trigger stands up: the run that was
+// just kicked off, and the thread it runs in.
+type ScheduledAgentExecution struct {
+	ExecutionID int `json:"execution_id"`
+	ThreadID    int `json:"thread_id"`
 }
 
 // AuditLog is one entry in a team's audit trail as returned by GET /audit-logs.

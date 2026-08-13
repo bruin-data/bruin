@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 
@@ -394,6 +395,59 @@ type ParseCommand struct {
 	errorPrinter *color2.Color
 }
 
+// buildAssetDatabaseMap best-effort maps each asset name to its connection's
+// database from .bruin.yml. Empty when no config is available.
+func buildAssetDatabaseMap(inputPath string, foundPipeline *pipeline.Pipeline) map[string]string {
+	result := map[string]string{}
+	fs := afero.NewOsFs()
+	repoRoot, err := git.FindRepoFromPath(inputPath)
+	if err != nil {
+		return result
+	}
+	configPath := filepath.Join(repoRoot.Path, ".bruin.yml")
+	if exists, _ := afero.Exists(fs, configPath); !exists {
+		return result
+	}
+	cm, err := config.LoadOrCreate(fs, configPath)
+	if err != nil || cm.SelectedEnvironment == nil {
+		return result
+	}
+	for _, asset := range foundPipeline.Assets {
+		connName, err := foundPipeline.GetConnectionNameForAsset(asset)
+		if err != nil || connName == "" {
+			continue
+		}
+		if db := connectionDatabase(cm.SelectedEnvironment.Connections.GetConnection(connName)); db != "" {
+			result[asset.Name] = db
+		}
+	}
+	return result
+}
+
+// connectionDatabase returns a connection's leading namespace: Database, or
+// Catalog (Databricks/Trino/Spark/StarRocks), or ProjectID (BigQuery). "" if none.
+func connectionDatabase(conn any) string {
+	if conn == nil {
+		return ""
+	}
+	v := reflect.ValueOf(conn)
+	for v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return ""
+		}
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Struct {
+		return ""
+	}
+	for _, field := range []string{"Database", "Catalog", "ProjectID"} {
+		if f := v.FieldByName(field); f.IsValid() && f.Kind() == reflect.String && f.String() != "" {
+			return f.String()
+		}
+	}
+	return ""
+}
+
 func (r *ParseCommand) ParsePipeline(ctx context.Context, assetPath string, lineage bool, slimResponse bool, variantName string) error {
 	// defer RecoverFromPanic()
 	var lineageWg conc.WaitGroup
@@ -465,7 +519,8 @@ func (r *ParseCommand) ParsePipeline(ctx context.Context, assetPath string, line
 
 		defer sqlParser.Close()
 		processedAssets := make(map[string]bool)
-		lineage := lineagepackage.NewLineageExtractor(sqlParser)
+		lineage := lineagepackage.NewLineageExtractor(sqlParser).
+			WithAssetDatabases(buildAssetDatabaseMap(assetPath, foundPipeline))
 		for _, asset := range foundPipeline.Assets {
 			errIssues := lineage.ColumnLineage(foundPipeline, asset, processedAssets)
 			if errIssues != nil {
@@ -662,7 +717,8 @@ func (r *ParseCommand) Run(ctx context.Context, assetPath string, lineage bool, 
 		defer sqlParser.Close()
 
 		processedAssets := make(map[string]bool)
-		lineageExtractor := lineagepackage.NewLineageExtractor(sqlParser)
+		lineageExtractor := lineagepackage.NewLineageExtractor(sqlParser).
+			WithAssetDatabases(buildAssetDatabaseMap(assetPath, foundPipeline))
 		lineageErrors := lineageExtractor.ColumnLineage(foundPipeline, asset, processedAssets)
 		if lineageErrors != nil {
 			for _, issue := range lineageErrors.Issues {

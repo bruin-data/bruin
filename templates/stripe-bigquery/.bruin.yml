@@ -6,7 +6,8 @@ environments:
       google_cloud_platform:
         - name: gcp-default
           project_id: your-gcp-project-id
-          service_account_file: /path/to/service-account.json
+          location: your-gcp-region
+          use_application_default_credentials: true
       stripe:
         - name: stripe-default
           api_key: ${STRIPE_API_KEY}
