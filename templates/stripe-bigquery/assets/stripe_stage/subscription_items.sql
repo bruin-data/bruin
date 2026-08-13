@@ -6,7 +6,9 @@ description: >
   is normalized from active or past-due monthly and annual licensed recurring
   prices only. price_based_recurring_mrr_minor normalizes the same price shape
   regardless of subscription status for operational risk and trial-conversion
-  reporting, with each currency reported independently.
+  reporting, with each currency reported independently. This model holds current
+  state only, because Stripe overwrites its own history; use the daily
+  subscription-item snapshot for as-of reporting over time.
 
 materialization:
   type: table

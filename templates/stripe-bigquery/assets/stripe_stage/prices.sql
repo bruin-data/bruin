@@ -94,13 +94,13 @@ SELECT
   p.billing_scheme,
   p.recurring AS recurring_config,
   p.type = 'recurring' AS is_recurring,
-  JSON_VALUE(p.recurring, '$.interval') AS recurring_interval,
+  LAX_STRING(p.recurring.interval) AS recurring_interval,
   COALESCE(
-    SAFE_CAST(JSON_VALUE(p.recurring, '$.interval_count') AS INT64),
+    LAX_INT64(p.recurring.interval_count),
     1
   ) AS recurring_interval_count,
   COALESCE(
-    JSON_VALUE(p.recurring, '$.usage_type'),
+    LAX_STRING(p.recurring.usage_type),
     'licensed'
   ) AS recurring_usage_type,
   p.metadata AS price_metadata

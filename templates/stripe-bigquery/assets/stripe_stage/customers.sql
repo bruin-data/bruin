@@ -70,9 +70,9 @@ SELECT
   email AS customer_email,
   livemode AS is_live_mode,
   metadata AS customer_metadata,
-  JSON_VALUE(metadata, '$.crm_account_id') AS crm_account_id,
-  JSON_VALUE(metadata, '$.segment') AS customer_segment,
-  JSON_VALUE(metadata, '$.region') AS customer_region,
-  JSON_VALUE(metadata, '$.sales_owner') AS sales_owner,
-  JSON_VALUE(metadata, '$.acquisition_channel') AS acquisition_channel
+  LAX_STRING(metadata.crm_account_id) AS crm_account_id,
+  LAX_STRING(metadata.segment) AS customer_segment,
+  LAX_STRING(metadata.region) AS customer_region,
+  LAX_STRING(metadata.sales_owner) AS sales_owner,
+  LAX_STRING(metadata.acquisition_channel) AS acquisition_channel
 FROM stripe_raw.customer;

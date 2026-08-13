@@ -13,11 +13,19 @@ filters:
 queries:
   latest_subscription_kpis:
     sql: |
+      WITH currency_units AS (
+        SELECT IF(UPPER('{{ filters.currency }}') IN (
+          'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA',
+          'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'
+        ), 1, 100) AS minor_unit_divisor
+      )
       SELECT
         metric_month,
         currency,
-        ending_mrr_minor,
-        ending_run_rate_arr_minor,
+        ending_mrr_minor
+          / (SELECT minor_unit_divisor FROM currency_units) AS ending_mrr,
+        ending_run_rate_arr_minor
+          / (SELECT minor_unit_divisor FROM currency_units) AS ending_run_rate_arr,
         ending_active_customer_count
       FROM `stripe_reports.monthly_subscription_kpis`
       WHERE metric_month >= CAST('{{ filters.date_range.start }}' AS DATE)
@@ -27,14 +35,22 @@ queries:
 
   latest_invoice_billings:
     sql: |
+      WITH currency_units AS (
+        SELECT IF(UPPER('{{ filters.currency }}') IN (
+          'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA',
+          'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'
+        ), 1, 100) AS minor_unit_divisor
+      )
       SELECT
         invoice_billing_month,
         currency,
         SUM(issued_invoice_count) AS issued_invoice_count,
         SUM(subscription_invoice_count) AS subscription_invoice_count,
-        SUM(invoiced_billings_minor) AS invoiced_billings_minor,
+        SUM(invoiced_billings_minor)
+          / (SELECT minor_unit_divisor FROM currency_units) AS invoiced_billings,
         SUM(invoiced_subscription_billings_minor)
-          AS invoiced_subscription_billings_minor
+          / (SELECT minor_unit_divisor FROM currency_units)
+          AS invoiced_subscription_billings
       FROM `stripe_reports.monthly_invoice_billings`
       WHERE invoice_billing_month >= CAST('{{ filters.date_range.start }}' AS DATE)
         AND invoice_billing_month <= CAST('{{ filters.date_range.end }}' AS DATE)
@@ -44,9 +60,16 @@ queries:
 
   monthly_mrr:
     sql: |
+      WITH currency_units AS (
+        SELECT IF(UPPER('{{ filters.currency }}') IN (
+          'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA',
+          'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'
+        ), 1, 100) AS minor_unit_divisor
+      )
       SELECT
         metric_month,
-        SUM(ending_mrr_minor) AS ending_mrr_minor
+        SUM(ending_mrr_minor)
+          / (SELECT minor_unit_divisor FROM currency_units) AS ending_mrr
       FROM `stripe_reports.monthly_mrr_by_customer`
       WHERE metric_month >= CAST('{{ filters.date_range.start }}' AS DATE)
         AND metric_month <= CAST('{{ filters.date_range.end }}' AS DATE)
@@ -56,14 +79,25 @@ queries:
 
   monthly_mrr_movements:
     sql: |
-      WITH monthly_movements AS (
+      WITH currency_units AS (
+        SELECT IF(UPPER('{{ filters.currency }}') IN (
+          'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA',
+          'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'
+        ), 1, 100) AS minor_unit_divisor
+      ),
+      monthly_movements AS (
         SELECT
           metric_month,
-          SUM(new_mrr_minor) AS new_mrr_minor,
-          SUM(reactivation_mrr_minor) AS reactivation_mrr_minor,
-          SUM(expansion_mrr_minor) AS expansion_mrr_minor,
-          -SUM(contraction_mrr_minor) AS contraction_mrr_loss_minor,
-          -SUM(churned_mrr_minor) AS churned_mrr_loss_minor
+          SUM(new_mrr_minor)
+            / (SELECT minor_unit_divisor FROM currency_units) AS new_mrr,
+          SUM(reactivation_mrr_minor)
+            / (SELECT minor_unit_divisor FROM currency_units) AS reactivation_mrr,
+          SUM(expansion_mrr_minor)
+            / (SELECT minor_unit_divisor FROM currency_units) AS expansion_mrr,
+          -SUM(contraction_mrr_minor)
+            / (SELECT minor_unit_divisor FROM currency_units) AS contraction_mrr_loss,
+          -SUM(churned_mrr_minor)
+            / (SELECT minor_unit_divisor FROM currency_units) AS churned_mrr_loss
         FROM `stripe_reports.monthly_mrr_movements`
         WHERE metric_month >= CAST('{{ filters.date_range.start }}' AS DATE)
           AND metric_month <= CAST('{{ filters.date_range.end }}' AS DATE)
@@ -73,23 +107,30 @@ queries:
       SELECT
         metric_month,
         movement_category,
-        movement_mrr_minor
+        movement_mrr
       FROM monthly_movements,
       UNNEST([
-        STRUCT('New' AS movement_category, new_mrr_minor AS movement_mrr_minor),
-        STRUCT('Reactivation', reactivation_mrr_minor),
-        STRUCT('Expansion', expansion_mrr_minor),
-        STRUCT('Contraction', contraction_mrr_loss_minor),
-        STRUCT('Churn', churned_mrr_loss_minor)
+        STRUCT('New' AS movement_category, new_mrr AS movement_mrr),
+        STRUCT('Reactivation', reactivation_mrr),
+        STRUCT('Expansion', expansion_mrr),
+        STRUCT('Contraction', contraction_mrr_loss),
+        STRUCT('Churn', churned_mrr_loss)
       ])
       ORDER BY metric_month, movement_category
 
   monthly_invoice_billings:
     sql: |
+      WITH currency_units AS (
+        SELECT IF(UPPER('{{ filters.currency }}') IN (
+          'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA',
+          'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'
+        ), 1, 100) AS minor_unit_divisor
+      )
       SELECT
         invoice_billing_month,
         invoice_billing_date_basis,
-        SUM(invoiced_billings_minor) AS invoiced_billings_minor
+        SUM(invoiced_billings_minor)
+          / (SELECT minor_unit_divisor FROM currency_units) AS invoiced_billings
       FROM `stripe_reports.monthly_invoice_billings`
       WHERE invoice_billing_month >= CAST('{{ filters.date_range.start }}' AS DATE)
         AND invoice_billing_month <= CAST('{{ filters.date_range.end }}' AS DATE)
@@ -99,7 +140,13 @@ queries:
 
   latest_customer_mrr:
     sql: |
-      WITH filtered_customer_mrr AS (
+      WITH currency_units AS (
+        SELECT IF(UPPER('{{ filters.currency }}') IN (
+          'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA',
+          'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'
+        ), 1, 100) AS minor_unit_divisor
+      ),
+      filtered_customer_mrr AS (
         SELECT
           metric_month,
           stripe_customer_id,
@@ -110,8 +157,10 @@ queries:
           customer_region,
           sales_owner,
           active_subscription_count,
-          ending_mrr_minor,
+          ending_mrr_minor
+            / (SELECT minor_unit_divisor FROM currency_units) AS ending_mrr,
           run_rate_arr_minor
+            / (SELECT minor_unit_divisor FROM currency_units) AS run_rate_arr
         FROM `stripe_reports.monthly_mrr_by_customer`
         WHERE metric_month >= CAST('{{ filters.date_range.start }}' AS DATE)
           AND metric_month <= CAST('{{ filters.date_range.end }}' AS DATE)
@@ -120,7 +169,7 @@ queries:
       SELECT *
       FROM filtered_customer_mrr
       QUALIFY metric_month = MAX(metric_month) OVER ()
-      ORDER BY ending_mrr_minor DESC, stripe_customer_id
+      ORDER BY ending_mrr DESC, stripe_customer_id
       LIMIT 20
 
 rows:
@@ -132,26 +181,26 @@ rows:
 
           Recurring revenue and billings are shown for one native currency at a time. Enter the three-letter Stripe currency code to avoid aggregating monetary amounts across currencies.
 
-          **Metric policy:** MRR is gross list-price run rate from eligible active and past-due subscriptions. It is not recognized revenue, bookings, cash, or a financial statement. Monetary amounts remain in native minor units.
+          **Metric policy:** MRR is gross list-price run rate from eligible active and past-due subscriptions. It is not recognized revenue, bookings, cash, or a financial statement. The `stripe_reports` tables store money in native minor units; these widgets divide by the currency's exponent to display major units, and apply no FX conversion.
         col: 12
 
   - widgets:
-      - name: Latest Ending MRR (minor units)
+      - name: Latest Ending MRR
         type: metric
         query: latest_subscription_kpis
         value:
-          field: ending_mrr_minor
+          field: ending_mrr
           type: number
-          format: ",.0f"
+          format: ",.2f"
         col: 3
 
-      - name: Latest Run-Rate ARR (minor units)
+      - name: Latest Run-Rate ARR
         type: metric
         query: latest_subscription_kpis
         value:
-          field: ending_run_rate_arr_minor
+          field: ending_run_rate_arr
           type: number
-          format: ",.0f"
+          format: ",.2f"
         col: 3
 
       - name: Active Customers
@@ -163,13 +212,13 @@ rows:
           format: ",.0f"
         col: 3
 
-      - name: Latest Invoice Billings (minor units)
+      - name: Latest Invoice Billings
         type: metric
         query: latest_invoice_billings
         value:
-          field: invoiced_billings_minor
+          field: invoiced_billings
           type: number
-          format: ",.0f"
+          format: ",.2f"
         col: 3
 
   - widgets:
@@ -180,41 +229,41 @@ rows:
         col: 12
 
   - widgets:
-      - name: Monthly Ending MRR (minor units)
+      - name: Monthly Ending MRR
         type: chart
         chart: line
         query: monthly_mrr
         x: { field: metric_month }
-        y: { field: [ending_mrr_minor] }
+        y: { field: [ending_mrr], type: number, format: ",.2f" }
         col: 6
 
-      - name: Monthly MRR Movement Components (minor units; requires prior snapshot)
+      - name: Monthly MRR Movement Components (requires prior snapshot)
         type: chart
         chart: bar
         query: monthly_mrr_movements
         x: { field: metric_month }
-        y: { field: [movement_mrr_minor] }
+        y: { field: [movement_mrr], type: number, format: ",.2f" }
         color: { field: movement_category }
         stacked: true
         col: 6
 
   - widgets:
-      - name: Monthly Invoice Billings by Date Basis (minor units)
+      - name: Monthly Invoice Billings by Date Basis
         type: chart
         chart: bar
         query: monthly_invoice_billings
         x: { field: invoice_billing_month }
-        y: { field: [invoiced_billings_minor] }
+        y: { field: [invoiced_billings], type: number, format: ",.2f" }
         color: { field: invoice_billing_date_basis }
         stacked: true
         col: 6
 
-      - name: Latest Customer MRR (minor units)
+      - name: Latest Customer MRR
         type: chart
         chart: bar
         query: latest_customer_mrr
         x: { field: customer_label }
-        y: { field: [ending_mrr_minor] }
+        y: { field: [ending_mrr], type: number, format: ",.2f" }
         col: 6
 
   - widgets:
@@ -235,10 +284,12 @@ rows:
             label: Sales owner
           - name: active_subscription_count
             label: Active subscriptions
-          - name: ending_mrr_minor
-            label: Ending MRR (minor units)
-          - name: run_rate_arr_minor
-            label: Run-rate ARR (minor units)
+          - name: ending_mrr
+            label: Ending MRR
+            number: ",.2f"
+          - name: run_rate_arr
+            label: Run-rate ARR
+            number: ",.2f"
 
   - widgets:
       - name: Sources and limitations
@@ -248,5 +299,5 @@ rows:
 
           **Method:** The MRR movement chart treats contraction and churn as negative values; its components reconcile to ending MRR only for contiguous monthly snapshots. Invoice billings use finalization date when available and flag creation-date fallback separately.
 
-          **Limitations:** The first snapshot month is a baseline, so retention and movement metrics may be unavailable until the next contiguous monthly observation. No FX conversion is applied.
+          **Limitations:** The first snapshot month is a baseline, so retention and movement metrics may be unavailable until the next contiguous monthly observation. Amounts are shown in the selected currency's major units; no FX conversion is applied.
         col: 12
