@@ -59,6 +59,27 @@ func TestBuildWarehouseQuery_RunsOnDuckDB(t *testing.T) {
 		require.EqualValues(t, 100, res.Rows[0][0])
 	})
 
+	t.Run("Fabric fixture injection preserves unaliased CTE column casing", func(t *testing.T) {
+		t.Parallel()
+		input := pipeline.UnitTestInput{
+			Asset: "dbo.DimAccount",
+			Rows:  []map[string]interface{}{{"AccountDimId": 1, "RevenueType": "Management Fees"}},
+		}
+		queries := []string{
+			"WITH a AS (SELECT AccountDimId FROM dbo.DimAccount) SELECT AccountDimId FROM a",
+			"WITH a AS (SELECT d.AccountDimId FROM dbo.DimAccount AS d) SELECT a.AccountDimId FROM a",
+		}
+
+		for _, assetSQL := range queries {
+			sql, err := unittest.BuildWarehouseQuery(parser, "fabric", assetSQL,
+				pipeline.UnitTest{Inputs: []pipeline.UnitTestInput{input}}, nil)
+			require.NoError(t, err)
+			require.Contains(t, sql, "AS AccountDimId")
+			require.NotContains(t, sql, "AS accountdimid")
+			require.NotContains(t, sql, "dbo.DimAccount")
+		}
+	})
+
 	t.Run("unmocked upstream is an empty typed CTE so a LEFT JOIN yields only mocked rows", func(t *testing.T) {
 		t.Parallel()
 		schemas := map[string][]pipeline.Column{
