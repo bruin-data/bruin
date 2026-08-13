@@ -3268,7 +3268,13 @@ func cloudAgentsUsageStats() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			raw, err := client.GetAgentUsageStats(ctx, c.String("start-date"), c.String("end-date"), c.Int("days"))
+			// An explicit start/end range wins server-side, so don't also send a
+			// contradictory --days alongside it.
+			days := c.Int("days")
+			if c.String("start-date") != "" && c.String("end-date") != "" {
+				days = 0
+			}
+			raw, err := client.GetAgentUsageStats(ctx, c.String("start-date"), c.String("end-date"), days)
 			if err != nil {
 				printError(err, output, "Failed to get usage stats")
 				return cli.Exit("", 1)
