@@ -2245,6 +2245,7 @@ func CloudAgents() *cli.Command {
 			cloudAgentsCreate(),
 			cloudAgentsGet(),
 			cloudAgentsUpdate(),
+			cloudAgentsDelete(),
 			cloudAgentsSend(),
 			cloudAgentsStatus(),
 			cloudAgentsThreads(),
@@ -2561,6 +2562,45 @@ func cloudAgentsUpdate() *cli.Command {
 			}
 
 			infoPrinter.Printf("Updated agent %d (%s)\n", agent.ID, agent.Name)
+			return nil
+		},
+	}
+}
+
+func cloudAgentsDelete() *cli.Command {
+	return &cli.Command{
+		Name:  "delete",
+		Usage: "Delete an agent (cascades to its scheduled agents, dashboards and threads)",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "agent-id",
+				Usage:    "agent ID",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			if err := client.DeleteAgent(ctx, c.Int("agent-id")); err != nil {
+				printError(err, output, "Failed to delete agent")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				fmt.Println(`{"success": true}`)
+				return nil
+			}
+
+			successPrinter.Printf("Deleted agent %d.\n", c.Int("agent-id"))
 			return nil
 		},
 	}
