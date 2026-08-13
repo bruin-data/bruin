@@ -557,6 +557,20 @@ List available agents:
 bruin cloud agents list
 ```
 
+#### `usage-stats`
+
+Show AI usage across the agents you can see — total messages/threads, the
+current month's counters, and a per-agent breakdown. Defaults to the last 30
+days; pass `--days`, or an explicit `--start-date`/`--end-date` window. Use
+`--output json` for the full payload (per-day/per-month/per-user series).
+
+```bash
+bruin cloud agents usage-stats
+bruin cloud agents usage-stats --days 7
+bruin cloud agents usage-stats --start-date 2026-01-01 --end-date 2026-01-31
+bruin cloud agents usage-stats --output json
+```
+
 #### `connections`
 
 List the connections available to an agent — names and types only (never

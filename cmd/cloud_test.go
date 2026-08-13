@@ -329,12 +329,13 @@ func TestCloudAgentsCommand_Help(t *testing.T) {
 	cmd := CloudAgents()
 	require.NotNil(t, cmd)
 	assert.Equal(t, "agents", cmd.Name)
-	require.Len(t, cmd.Commands, 16)
+	require.Len(t, cmd.Commands, 17)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
 		subNames[i] = sub.Name
 	}
+	assert.Contains(t, subNames, "usage-stats")
 	assert.Contains(t, subNames, "connections")
 	assert.Contains(t, subNames, "mcp")
 	assert.Contains(t, subNames, "get-memory")

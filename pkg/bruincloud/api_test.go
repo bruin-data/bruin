@@ -541,6 +541,21 @@ func TestListAgents(t *testing.T) {
 	assert.Equal(t, "test-agent", agents[0].Name)
 }
 
+func TestGetAgentUsageStats(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/agents/usage-stats", r.URL.Path)
+		assert.Equal(t, "2026-01-01", r.URL.Query().Get("startDate"))
+		assert.Equal(t, "2026-01-31", r.URL.Query().Get("endDate"))
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, map[string]any{"totals": map[string]any{"total_messages": 3, "total_threads": 1}})
+	})
+
+	raw, err := client.GetAgentUsageStats(t.Context(), "2026-01-01", "2026-01-31", 0)
+	require.NoError(t, err)
+	assert.Contains(t, string(raw), "total_messages")
+}
+
 func TestListAgentConnections(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {

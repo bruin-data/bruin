@@ -2242,6 +2242,7 @@ func CloudAgents() *cli.Command {
 		Usage: "Manage Bruin Cloud agents",
 		Commands: []*cli.Command{
 			cloudAgentsList(),
+			cloudAgentsUsageStats(),
 			cloudAgentsCreate(),
 			cloudAgentsGet(),
 			cloudAgentsUpdate(),
@@ -3244,6 +3245,92 @@ func cloudAgentsThreadsDelete() *cli.Command {
 			return nil
 		},
 	}
+}
+
+func cloudAgentsUsageStats() *cli.Command {
+	return &cli.Command{
+		Name:  "usage-stats",
+		Usage: "Show AI usage across the agents you can see (messages, threads, per-agent breakdown)",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{Name: "days", Usage: "window size in days (default 30); ignored if --start-date and --end-date are set"},
+			&cli.StringFlag{Name: "start-date", Usage: "range start (YYYY-MM-DD); use with --end-date"},
+			&cli.StringFlag{Name: "end-date", Usage: "range end (YYYY-MM-DD); use with --start-date"},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			raw, err := client.GetAgentUsageStats(ctx, c.String("start-date"), c.String("end-date"), c.Int("days"))
+			if err != nil {
+				printError(err, output, "Failed to get usage stats")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				var pretty bytes.Buffer
+				if json.Indent(&pretty, raw, "", "  ") == nil {
+					fmt.Println(pretty.String())
+				} else {
+					fmt.Println(string(raw))
+				}
+				return nil
+			}
+
+			var s struct {
+				Totals struct {
+					TotalMessages json.Number `json:"total_messages"`
+					TotalThreads  json.Number `json:"total_threads"`
+				} `json:"totals"`
+				CurrentMonth struct {
+					Messages int `json:"messages"`
+					Threads  int `json:"threads"`
+				} `json:"currentMonth"`
+				PerAgent []struct {
+					AgentName    string      `json:"agent_name"`
+					MessageCount json.Number `json:"message_count"`
+					ThreadCount  json.Number `json:"thread_count"`
+				} `json:"perAgent"`
+			}
+			if err := json.Unmarshal(raw, &s); err != nil {
+				// Fall back to the raw payload if the shape is unexpected.
+				fmt.Println(string(raw))
+				return nil
+			}
+
+			infoPrinter.Printf("Totals: %s messages across %s threads. This month: %d messages, %d threads.\n",
+				numOrZero(s.Totals.TotalMessages), numOrZero(s.Totals.TotalThreads), s.CurrentMonth.Messages, s.CurrentMonth.Threads)
+
+			if len(s.PerAgent) == 0 {
+				infoPrinter.Println("No per-agent activity in the selected range.")
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"Agent", "Messages", "Threads"})
+			for _, a := range s.PerAgent {
+				t.AppendRow(table.Row{a.AgentName, numOrZero(a.MessageCount), numOrZero(a.ThreadCount)})
+			}
+			t.Render()
+			return nil
+		},
+	}
+}
+
+// numOrZero renders a json.Number, defaulting a blank to "0".
+func numOrZero(n json.Number) string {
+	if n == "" {
+		return "0"
+	}
+	return n.String()
 }
 
 func cloudAgentsGetPrompt() *cli.Command {
