@@ -163,10 +163,12 @@ type AgentConnection struct {
 
 // AgentThread represents a thread for an agent.
 type AgentThread struct {
-	ID        int    `json:"id"`
-	AgentID   int    `json:"agent_id"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
+	ID         int     `json:"id"`
+	AgentID    int     `json:"agent_id"`
+	Title      *string `json:"title"`
+	CreatedAt  string  `json:"created_at"`
+	UpdatedAt  string  `json:"updated_at"`
+	ArchivedAt *string `json:"archived_at"`
 }
 
 // AgentPrompt represents an agent's system prompt.

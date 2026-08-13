@@ -643,10 +643,25 @@ bruin cloud agents status \
 
 #### `threads`
 
-List all threads for an agent:
+List an agent's threads (active by default; pass `--archived` for archived ones):
 
 ```bash
 bruin cloud agents threads --agent-id <agent-id>
+bruin cloud agents threads --agent-id <agent-id> --archived
+```
+
+Manage a thread with the subcommands:
+
+```bash
+# Rename
+bruin cloud agents threads rename --agent-id <agent-id> --thread-id <thread-id> --title "New title"
+
+# Archive / restore (archiving also unpins)
+bruin cloud agents threads archive   --agent-id <agent-id> --thread-id <thread-id>
+bruin cloud agents threads unarchive --agent-id <agent-id> --thread-id <thread-id>
+
+# Delete
+bruin cloud agents threads delete --agent-id <agent-id> --thread-id <thread-id>
 ```
 
 #### `messages`

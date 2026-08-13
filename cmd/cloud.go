@@ -3042,14 +3042,26 @@ func cloudAgentsStatus() *cli.Command {
 func cloudAgentsThreads() *cli.Command {
 	return &cli.Command{
 		Name:  "threads",
-		Usage: "List threads for an agent",
+		Usage: "List an agent's threads, or manage one with the 'rename'/'archive'/'unarchive'/'delete' subcommands",
+		// Backward compatible: the bare command still lists (its Action below); the
+		// subcommands manage a thread. --agent-id is therefore not Required on the
+		// parent (that would also demand it for the subcommands); the Action validates it.
+		Commands: []*cli.Command{
+			cloudAgentsThreadsRename(),
+			cloudAgentsThreadsArchive(),
+			cloudAgentsThreadsUnarchive(),
+			cloudAgentsThreadsDelete(),
+		},
 		Flags: []cli.Flag{
 			apiKeyFlag(),
 			outputFlag(),
 			&cli.IntFlag{
-				Name:     "agent-id",
-				Usage:    "agent ID",
-				Required: true,
+				Name:  "agent-id",
+				Usage: "agent ID",
+			},
+			&cli.BoolFlag{
+				Name:  "archived",
+				Usage: "list archived threads instead of active ones",
 			},
 			limitFlag(),
 			offsetFlag(),
@@ -3058,13 +3070,18 @@ func cloudAgentsThreads() *cli.Command {
 			defer RecoverFromPanic()
 			output := c.String("output")
 
+			if c.Int("agent-id") <= 0 {
+				printError(fmt.Errorf("--agent-id must be a positive integer, got %d", c.Int("agent-id")), output, "Invalid --agent-id")
+				return cli.Exit("", 1)
+			}
+
 			client, err := newCloudClient(c)
 			if err != nil {
 				printError(err, output, "Failed to create API client")
 				return cli.Exit("", 1)
 			}
 
-			threads, err := client.ListAgentThreads(ctx, c.Int("agent-id"), c.Int("limit"), c.Int("offset"))
+			threads, err := client.ListAgentThreads(ctx, c.Int("agent-id"), c.Int("limit"), c.Int("offset"), c.Bool("archived"))
 			if err != nil {
 				printError(err, output, "Failed to list threads")
 				return cli.Exit("", 1)
@@ -3078,11 +3095,152 @@ func cloudAgentsThreads() *cli.Command {
 
 			t := table.NewWriter()
 			t.SetOutputMirror(os.Stdout)
-			t.AppendHeader(table.Row{"ID", "Agent ID", "Created At", "Updated At"})
+			t.AppendHeader(table.Row{"ID", "Agent ID", "Title", "Created At", "Updated At", "Archived At"})
 			for _, th := range threads {
-				t.AppendRow(table.Row{th.ID, th.AgentID, th.CreatedAt, th.UpdatedAt})
+				t.AppendRow(table.Row{th.ID, th.AgentID, derefString(th.Title), th.CreatedAt, th.UpdatedAt, derefString(th.ArchivedAt)})
 			}
 			t.Render()
+			return nil
+		},
+	}
+}
+
+// threadIDFlags are the required agent-id + thread-id flags shared by the thread
+// management subcommands.
+func threadIDFlags() []cli.Flag {
+	return []cli.Flag{
+		apiKeyFlag(),
+		outputFlag(),
+		&cli.IntFlag{Name: "agent-id", Usage: "agent ID", Required: true},
+		&cli.IntFlag{Name: "thread-id", Usage: "thread ID", Required: true},
+	}
+}
+
+func cloudAgentsThreadsRename() *cli.Command {
+	return &cli.Command{
+		Name:  "rename",
+		Usage: "Rename a thread",
+		Flags: append(threadIDFlags(), &cli.StringFlag{
+			Name:     "title",
+			Usage:    "the new thread title",
+			Required: true,
+		}),
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			thread, err := client.UpdateAgentThread(ctx, c.Int("agent-id"), c.Int("thread-id"), map[string]any{"title": c.String("title")})
+			if err != nil {
+				printError(err, output, "Failed to rename thread")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(thread, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			successPrinter.Printf("Renamed thread %d to %q.\n", thread.ID, derefString(thread.Title))
+			return nil
+		},
+	}
+}
+
+func cloudAgentsThreadsArchive() *cli.Command {
+	return &cli.Command{
+		Name:  "archive",
+		Usage: "Archive a thread",
+		Flags: threadIDFlags(),
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			if _, err := client.UpdateAgentThread(ctx, c.Int("agent-id"), c.Int("thread-id"), map[string]any{"archived": true}); err != nil {
+				printError(err, output, "Failed to archive thread")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				fmt.Println(`{"success": true}`)
+				return nil
+			}
+
+			successPrinter.Printf("Archived thread %d.\n", c.Int("thread-id"))
+			return nil
+		},
+	}
+}
+
+func cloudAgentsThreadsUnarchive() *cli.Command {
+	return &cli.Command{
+		Name:  "unarchive",
+		Usage: "Restore an archived thread",
+		Flags: threadIDFlags(),
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			if _, err := client.UpdateAgentThread(ctx, c.Int("agent-id"), c.Int("thread-id"), map[string]any{"archived": false}); err != nil {
+				printError(err, output, "Failed to unarchive thread")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				fmt.Println(`{"success": true}`)
+				return nil
+			}
+
+			successPrinter.Printf("Unarchived thread %d.\n", c.Int("thread-id"))
+			return nil
+		},
+	}
+}
+
+func cloudAgentsThreadsDelete() *cli.Command {
+	return &cli.Command{
+		Name:  "delete",
+		Usage: "Delete a thread",
+		Flags: threadIDFlags(),
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			if err := client.DeleteAgentThread(ctx, c.Int("agent-id"), c.Int("thread-id")); err != nil {
+				printError(err, output, "Failed to delete thread")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				fmt.Println(`{"success": true}`)
+				return nil
+			}
+
+			successPrinter.Printf("Deleted thread %d.\n", c.Int("thread-id"))
 			return nil
 		},
 	}
