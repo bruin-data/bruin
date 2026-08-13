@@ -500,6 +500,29 @@ func (c *APIClient) ListAgents(ctx context.Context) ([]Agent, error) {
 	return resp.Agents, err
 }
 
+// GetAgentUsageStats returns AI-usage aggregates across the agents the token can
+// see. Pass startDate+endDate (YYYY-MM-DD) for an explicit window, else the last
+// days (0 = server default). The payload is nested and returned raw.
+func (c *APIClient) GetAgentUsageStats(ctx context.Context, startDate, endDate string, days int) (json.RawMessage, error) {
+	params := url.Values{}
+	if startDate != "" {
+		params.Set("startDate", startDate)
+	}
+	if endDate != "" {
+		params.Set("endDate", endDate)
+	}
+	if days > 0 {
+		params.Set("days", strconv.Itoa(days))
+	}
+	path := "/agents/usage-stats"
+	if len(params) > 0 {
+		path += "?" + params.Encode()
+	}
+	var result json.RawMessage
+	err := c.doRequest(ctx, http.MethodGet, path, nil, &result)
+	return result, err
+}
+
 // ListAgentConnections returns the connection names and types available to the
 // agent (from its dev-env secret) — names/types only, never credentials. Use it
 // to pick a connection the agent can actually query.
