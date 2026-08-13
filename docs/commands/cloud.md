@@ -1074,8 +1074,9 @@ bruin cloud skills list
 bruin cloud skills create --name reporting --description "How to write reports" --body "Be concise."
 bruin cloud skills create --name reporting --description "How to write reports" --body-file ./skill.md --all-agents
 
-# Update (name, description and body are all replaced)
-bruin cloud skills update --skill-id 7 --name reporting --description "..." --body-file ./skill.md
+# Update (only the fields you pass change)
+bruin cloud skills update --skill-id 7 --body-file ./skill.md
+bruin cloud skills update --skill-id 7 --all-agents=false
 
 # Delete
 bruin cloud skills delete --skill-id 7

@@ -814,8 +814,7 @@ func (c *APIClient) CreateSkill(ctx context.Context, fields map[string]any) (*Sk
 	return &resp.Skill, nil
 }
 
-// UpdateSkill replaces a skill's name, description, body and all_agents (the server
-// requires all of them).
+// UpdateSkill applies a partial update — only the fields present are changed.
 func (c *APIClient) UpdateSkill(ctx context.Context, skillID int, fields map[string]any) (*Skill, error) {
 	var resp struct {
 		Skill Skill `json:"skill"`

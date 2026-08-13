@@ -4248,6 +4248,32 @@ func skillFieldsFromFlags(c *cli.Command) (map[string]any, error) {
 	return fields, nil
 }
 
+// skillUpdateFields builds a partial update from only the flags that were set, so a
+// caller can change one field without resending the whole skill.
+func skillUpdateFields(c *cli.Command) (map[string]any, error) {
+	fields := map[string]any{}
+	if c.IsSet("name") {
+		fields["name"] = c.String("name")
+	}
+	if c.IsSet("description") {
+		fields["description"] = c.String("description")
+	}
+	if c.IsSet("body") || c.IsSet("body-file") {
+		body, err := resolveSkillBody(c)
+		if err != nil {
+			return nil, err
+		}
+		fields["body"] = body
+	}
+	if c.IsSet("all-agents") {
+		fields["all_agents"] = c.Bool("all-agents")
+	}
+	if len(fields) == 0 {
+		return nil, errors.New("provide at least one field to update (--name, --description, --body/--body-file or --all-agents)")
+	}
+	return fields, nil
+}
+
 func cloudSkillsList() *cli.Command {
 	return &cli.Command{
 		Name:  "list",
@@ -4337,15 +4363,24 @@ func cloudSkillsCreate() *cli.Command {
 func cloudSkillsUpdate() *cli.Command {
 	return &cli.Command{
 		Name:  "update",
-		Usage: "Update a skill (name, description and body are all replaced)",
-		Flags: append(skillContentFlags(), &cli.IntFlag{Name: "skill-id", Usage: "skill ID", Required: true}),
+		Usage: "Update a skill (only the fields you pass change)",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{Name: "skill-id", Usage: "skill ID", Required: true},
+			&cli.StringFlag{Name: "name", Usage: "new skill name"},
+			&cli.StringFlag{Name: "description", Usage: "new description"},
+			&cli.StringFlag{Name: "body", Usage: "new skill instructions"},
+			&cli.StringFlag{Name: "body-file", Usage: "path to a file with the new skill instructions"},
+			&cli.BoolFlag{Name: "all-agents", Usage: "apply to every agent on the team (--all-agents=false to unset)"},
+		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			defer RecoverFromPanic()
 			output := c.String("output")
 
-			fields, err := skillFieldsFromFlags(c)
+			fields, err := skillUpdateFields(c)
 			if err != nil {
-				printError(err, output, "Invalid skill")
+				printError(err, output, "Invalid update")
 				return cli.Exit("", 1)
 			}
 
