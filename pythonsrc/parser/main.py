@@ -602,16 +602,7 @@ _WRITE_NODES = (exp.Insert, exp.Update, exp.Delete, exp.Merge)
 
 
 def _preserve_fabric_derived_column_case(expression: exp.Expr) -> None:
-    """Keep unaliased Fabric CTE/subquery output names case-sensitive.
-
-    SQLGlot's T-SQL generator adds aliases to bare column projections in derived
-    tables, but normalizes those generated aliases to lowercase. Fabric can use
-    a case-sensitive collation, so an outer ``AccountDimId`` reference then no
-    longer binds to the generated ``accountdimid`` output. Adding the implicit
-    alias ourselves preserves the identifier's original spelling. Explicit
-    aliases and derived tables with a declared output-column list already
-    control their output names and are left alone.
-    """
+    """Preserve source casing for unaliased Fabric derived-table columns."""
     for derived in expression.find_all(exp.CTE, exp.Subquery):
         alias = derived.args.get("alias")
         if isinstance(alias, exp.TableAlias) and alias.columns:
