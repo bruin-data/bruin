@@ -41,6 +41,20 @@ parameters:
 - `source_connection`: The name of the Frankfurter connection defined in `.bruin.yml`.
 - `source_table`: The name of the Frankfurter table you want to ingest.
 
+### Setting the base currency
+
+Exchange rates are calculated against a base currency (default `EUR`). You can override it per table by appending the currency code to the `source_table` value after a colon:
+
+```yaml
+parameters:
+  source_connection: frankfurter
+  source_table: 'latest:USD'
+
+  destination: duckdb
+```
+
+This fetches the `latest` rates with `USD` as the base currency. It applies to the `latest` and `exchange_rates` tables.
+
 ## Available Source Tables
 
 Frankfurter source allows ingesting the following sources into separate tables:
