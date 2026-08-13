@@ -319,6 +319,17 @@ type ConnectionSet struct {
 	UpdatedAt string `json:"updated_at"`
 }
 
+// Skill is a team skill-library entry — a named instruction snippet attached to
+// agents. AgentIDs lists the agents it's attached to.
+type Skill struct {
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Body        string `json:"body"`
+	AllAgents   bool   `json:"all_agents"`
+	AgentIDs    []int  `json:"agent_ids"`
+}
+
 // Dashboard represents a Bruin Cloud dashboard. State is only populated by the
 // single-dashboard endpoint and carries the published definition as raw JSON.
 type Dashboard struct {

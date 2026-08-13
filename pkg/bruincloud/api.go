@@ -792,6 +792,57 @@ func (c *APIClient) DeleteConnectionSet(ctx context.Context, setID int) error {
 	return c.doRequest(ctx, http.MethodDelete, fmt.Sprintf("/connection-sets/%d", setID), nil, nil)
 }
 
+// --- Skills ---
+
+func (c *APIClient) ListSkills(ctx context.Context) ([]Skill, error) {
+	var resp struct {
+		Skills []Skill `json:"skills"`
+	}
+	err := c.doRequest(ctx, http.MethodGet, "/skills", nil, &resp)
+	return resp.Skills, err
+}
+
+// CreateSkill creates a team skill. fields must include name, description and body.
+func (c *APIClient) CreateSkill(ctx context.Context, fields map[string]any) (*Skill, error) {
+	var resp struct {
+		Skill Skill `json:"skill"`
+	}
+	err := c.doRequest(ctx, http.MethodPost, "/skills", fields, &resp)
+	if err != nil {
+		return nil, err
+	}
+	return &resp.Skill, nil
+}
+
+// UpdateSkill applies a partial update — only the fields present are changed.
+func (c *APIClient) UpdateSkill(ctx context.Context, skillID int, fields map[string]any) (*Skill, error) {
+	var resp struct {
+		Skill Skill `json:"skill"`
+	}
+	err := c.doRequest(ctx, http.MethodPatch, fmt.Sprintf("/skills/%d", skillID), fields, &resp)
+	if err != nil {
+		return nil, err
+	}
+	return &resp.Skill, nil
+}
+
+func (c *APIClient) DeleteSkill(ctx context.Context, skillID int) error {
+	return c.doRequest(ctx, http.MethodDelete, fmt.Sprintf("/skills/%d", skillID), nil, nil)
+}
+
+// SetSkillAgents replaces the agents a skill is attached to; ids outside the team
+// are dropped server-side. Returns the attached ids.
+func (c *APIClient) SetSkillAgents(ctx context.Context, skillID int, agentIDs []int) ([]int, error) {
+	if agentIDs == nil {
+		agentIDs = []int{}
+	}
+	var resp struct {
+		AgentIDs []int `json:"agent_ids"`
+	}
+	err := c.doRequest(ctx, http.MethodPut, fmt.Sprintf("/skills/%d/agents", skillID), map[string]any{"agent_ids": agentIDs}, &resp)
+	return resp.AgentIDs, err
+}
+
 // --- Dashboards ---
 
 func (c *APIClient) ListDashboards(ctx context.Context) ([]Dashboard, error) {

@@ -686,6 +686,80 @@ func TestDeleteConnectionSet(t *testing.T) {
 	require.NoError(t, client.DeleteConnectionSet(t.Context(), 9))
 }
 
+func TestListSkills(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/skills", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, map[string]any{"skills": []Skill{{ID: 1, Name: "reporting", AgentIDs: []int{5}}}})
+	})
+
+	skills, err := client.ListSkills(t.Context())
+	require.NoError(t, err)
+	require.Len(t, skills, 1)
+	assert.Equal(t, "reporting", skills[0].Name)
+	assert.Equal(t, []int{5}, skills[0].AgentIDs)
+}
+
+func TestCreateSkill(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/skills", r.URL.Path)
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, "sql_helper", body["name"])
+		w.WriteHeader(http.StatusCreated)
+		writeJSON(t, w, map[string]any{"skill": Skill{ID: 3, Name: "sql_helper"}})
+	})
+
+	skill, err := client.CreateSkill(t.Context(), map[string]any{"name": "sql_helper", "description": "d", "body": "b"})
+	require.NoError(t, err)
+	assert.Equal(t, 3, skill.ID)
+}
+
+func TestUpdateSkill(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPatch, r.Method)
+		assert.Equal(t, "/skills/3", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, map[string]any{"skill": Skill{ID: 3, Name: "renamed"}})
+	})
+
+	skill, err := client.UpdateSkill(t.Context(), 3, map[string]any{"name": "renamed", "description": "d", "body": "b"})
+	require.NoError(t, err)
+	assert.Equal(t, "renamed", skill.Name)
+}
+
+func TestDeleteSkill(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodDelete, r.Method)
+		assert.Equal(t, "/skills/3", r.URL.Path)
+		writeJSON(t, w, map[string]bool{"deleted": true})
+	})
+
+	require.NoError(t, client.DeleteSkill(t.Context(), 3))
+}
+
+func TestSetSkillAgents(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPut, r.Method)
+		assert.Equal(t, "/skills/3/agents", r.URL.Path)
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, []any{float64(5), float64(7)}, body["agent_ids"])
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, map[string]any{"agent_ids": []int{5, 7}})
+	})
+
+	ids, err := client.SetSkillAgents(t.Context(), 3, []int{5, 7})
+	require.NoError(t, err)
+	assert.Equal(t, []int{5, 7}, ids)
+}
+
 func TestCreateAgent(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
