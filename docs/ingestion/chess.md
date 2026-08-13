@@ -73,6 +73,24 @@ parameters:
 
 Players given this way take precedence over the connection's `players`, so a single connection can feed different players into different tables. This is the recommended approach; the connection-level `players` field is deprecated.
 
+### Using Chess without a connection
+
+Chess is a public API and needs no credentials, so you can skip the connection entirely. Set `source_connection: chess.com` and provide the players in the `source_table`; no `chess` entry is required in `.bruin.yml`:
+
+```yaml
+name: public.chess
+type: ingestr
+connection: postgres
+
+parameters:
+  source_connection: chess.com
+  source_table: 'profiles:MagnusCarlsen,Hikaru'
+
+  destination: postgres
+```
+
+If a connection with that same name is defined in `.bruin.yml`, it takes precedence and is used as before; the public source is only used when no such connection exists.
+
 ## Available Source Tables
 
 | Table     | PK | Inc Key | Inc Strategy | Details                                                          |

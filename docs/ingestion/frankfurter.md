@@ -55,6 +55,24 @@ parameters:
 
 This fetches the `latest` rates with `USD` as the base currency. It applies to the `latest` and `exchange_rates` tables.
 
+### Using Frankfurter without a connection
+
+Frankfurter is a public API and needs no credentials, so you can skip the connection entirely. Set `source_connection: frankfurter.dev`; no `frankfurter` entry is required in `.bruin.yml`:
+
+```yaml
+name: dataset.frankfurter
+type: ingestr
+connection: duckdb-default
+
+parameters:
+  source_connection: frankfurter.dev
+  source_table: 'latest:USD'
+
+  destination: duckdb
+```
+
+If a connection with that same name is defined in `.bruin.yml`, it takes precedence and is used as before; the public source is only used when no such connection exists.
+
 ## Available Source Tables
 
 Frankfurter source allows ingesting the following sources into separate tables:
