@@ -43,6 +43,7 @@ func Cloud(isDebug *bool) *cli.Command {
 			CloudConnectionSets(),
 			CloudDashboards(),
 			CloudScheduledAgents(),
+			CloudSkills(),
 			CloudAuditLogs(),
 			CloudCost(),
 		},
@@ -2246,6 +2247,7 @@ func CloudAgents() *cli.Command {
 			cloudAgentsCreate(),
 			cloudAgentsGet(),
 			cloudAgentsUpdate(),
+			cloudAgentsDelete(),
 			cloudAgentsSend(),
 			cloudAgentsStatus(),
 			cloudAgentsThreads(),
@@ -2562,6 +2564,45 @@ func cloudAgentsUpdate() *cli.Command {
 			}
 
 			infoPrinter.Printf("Updated agent %d (%s)\n", agent.ID, agent.Name)
+			return nil
+		},
+	}
+}
+
+func cloudAgentsDelete() *cli.Command {
+	return &cli.Command{
+		Name:  "delete",
+		Usage: "Delete an agent (cascades to its scheduled agents, dashboards and threads)",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "agent-id",
+				Usage:    "agent ID",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			if err := client.DeleteAgent(ctx, c.Int("agent-id")); err != nil {
+				printError(err, output, "Failed to delete agent")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				fmt.Println(`{"success": true}`)
+				return nil
+			}
+
+			successPrinter.Printf("Deleted agent %d.\n", c.Int("agent-id"))
 			return nil
 		},
 	}
@@ -4233,6 +4274,314 @@ func connectionSetInputsFromConfig(ctx context.Context, names []string, environm
 		inputs = append(inputs, bruincloud.ConnectionSetInput{Type: connType, Name: name, Config: credentials})
 	}
 	return inputs, nil
+}
+
+func CloudSkills() *cli.Command {
+	return &cli.Command{
+		Name:  "skills",
+		Usage: "Manage Bruin Cloud team skills (instruction snippets attached to agents)",
+		Commands: []*cli.Command{
+			cloudSkillsList(),
+			cloudSkillsCreate(),
+			cloudSkillsUpdate(),
+			cloudSkillsDelete(),
+			cloudSkillsSetAgents(),
+		},
+	}
+}
+
+// skillContentFlags are the create/update flags. The server requires name,
+// description and a body on both, so name/description are required here and the
+// body (via --body or --body-file) is validated in the action.
+func skillContentFlags() []cli.Flag {
+	return []cli.Flag{
+		apiKeyFlag(),
+		outputFlag(),
+		&cli.StringFlag{Name: "name", Usage: "skill name (letters, numbers, '_' and '-')", Required: true},
+		&cli.StringFlag{Name: "description", Usage: "short description", Required: true},
+		&cli.StringFlag{Name: "body", Usage: "the skill instructions"},
+		&cli.StringFlag{Name: "body-file", Usage: "path to a file with the skill instructions"},
+		&cli.BoolFlag{Name: "all-agents", Usage: "apply to every agent on the team"},
+	}
+}
+
+// resolveSkillBody reads the body from --body or --body-file (exactly one required).
+func resolveSkillBody(c *cli.Command) (string, error) {
+	body := c.String("body")
+	file := c.String("body-file")
+	if body != "" && file != "" {
+		return "", errors.New("pass only one of --body or --body-file")
+	}
+	if file != "" {
+		data, err := os.ReadFile(file)
+		if err != nil {
+			return "", fmt.Errorf("failed to read --body-file: %w", err)
+		}
+		return string(data), nil
+	}
+	if body == "" {
+		return "", errors.New("provide the skill body via --body or --body-file")
+	}
+	return body, nil
+}
+
+func skillFieldsFromFlags(c *cli.Command) (map[string]any, error) {
+	body, err := resolveSkillBody(c)
+	if err != nil {
+		return nil, err
+	}
+	fields := map[string]any{
+		"name":        c.String("name"),
+		"description": c.String("description"),
+		"body":        body,
+	}
+	if c.IsSet("all-agents") {
+		fields["all_agents"] = c.Bool("all-agents")
+	}
+	return fields, nil
+}
+
+// skillUpdateFields builds a partial update from only the flags that were set, so a
+// caller can change one field without resending the whole skill.
+func skillUpdateFields(c *cli.Command) (map[string]any, error) {
+	fields := map[string]any{}
+	if c.IsSet("name") {
+		fields["name"] = c.String("name")
+	}
+	if c.IsSet("description") {
+		fields["description"] = c.String("description")
+	}
+	if c.IsSet("body") || c.IsSet("body-file") {
+		body, err := resolveSkillBody(c)
+		if err != nil {
+			return nil, err
+		}
+		fields["body"] = body
+	}
+	if c.IsSet("all-agents") {
+		fields["all_agents"] = c.Bool("all-agents")
+	}
+	if len(fields) == 0 {
+		return nil, errors.New("provide at least one field to update (--name, --description, --body/--body-file or --all-agents)")
+	}
+	return fields, nil
+}
+
+func cloudSkillsList() *cli.Command {
+	return &cli.Command{
+		Name:  "list",
+		Usage: "List the team's skills",
+		Flags: []cli.Flag{apiKeyFlag(), outputFlag()},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			skills, err := client.ListSkills(ctx)
+			if err != nil {
+				printError(err, output, "Failed to list skills")
+				return cli.Exit("", 1)
+			}
+			if skills == nil {
+				skills = []bruincloud.Skill{}
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(skills, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			if len(skills) == 0 {
+				infoPrinter.Println("No skills yet.")
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"ID", "Name", "Description", "All Agents", "Agents"})
+			for _, s := range skills {
+				t.AppendRow(table.Row{s.ID, s.Name, s.Description, s.AllAgents, len(s.AgentIDs)})
+			}
+			t.Render()
+			return nil
+		},
+	}
+}
+
+func cloudSkillsCreate() *cli.Command {
+	return &cli.Command{
+		Name:  "create",
+		Usage: "Create a team skill",
+		Flags: skillContentFlags(),
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			fields, err := skillFieldsFromFlags(c)
+			if err != nil {
+				printError(err, output, "Invalid skill")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			skill, err := client.CreateSkill(ctx, fields)
+			if err != nil {
+				printError(err, output, "Failed to create skill")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(skill, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			successPrinter.Printf("Created skill %d (%s).\n", skill.ID, skill.Name)
+			return nil
+		},
+	}
+}
+
+func cloudSkillsUpdate() *cli.Command {
+	return &cli.Command{
+		Name:  "update",
+		Usage: "Update a skill (only the fields you pass change)",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{Name: "skill-id", Usage: "skill ID", Required: true},
+			&cli.StringFlag{Name: "name", Usage: "new skill name"},
+			&cli.StringFlag{Name: "description", Usage: "new description"},
+			&cli.StringFlag{Name: "body", Usage: "new skill instructions"},
+			&cli.StringFlag{Name: "body-file", Usage: "path to a file with the new skill instructions"},
+			&cli.BoolFlag{Name: "all-agents", Usage: "apply to every agent on the team (--all-agents=false to unset)"},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			fields, err := skillUpdateFields(c)
+			if err != nil {
+				printError(err, output, "Invalid update")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			skill, err := client.UpdateSkill(ctx, c.Int("skill-id"), fields)
+			if err != nil {
+				printError(err, output, "Failed to update skill")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(skill, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			successPrinter.Printf("Updated skill %d (%s).\n", skill.ID, skill.Name)
+			return nil
+		},
+	}
+}
+
+func cloudSkillsDelete() *cli.Command {
+	return &cli.Command{
+		Name:  "delete",
+		Usage: "Delete a skill",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{Name: "skill-id", Usage: "skill ID", Required: true},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			if err := client.DeleteSkill(ctx, c.Int("skill-id")); err != nil {
+				printError(err, output, "Failed to delete skill")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				fmt.Println(`{"deleted": true}`)
+				return nil
+			}
+
+			successPrinter.Printf("Deleted skill %d.\n", c.Int("skill-id"))
+			return nil
+		},
+	}
+}
+
+func cloudSkillsSetAgents() *cli.Command {
+	return &cli.Command{
+		Name:  "set-agents",
+		Usage: "Set which agents a skill is attached to (replaces the set; omit --agent-id to detach all)",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{Name: "skill-id", Usage: "skill ID", Required: true},
+			&cli.StringSliceFlag{Name: "agent-id", Usage: "agent ID to attach (repeatable)"},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			agentIDs := make([]int, 0, len(c.StringSlice("agent-id")))
+			for _, raw := range c.StringSlice("agent-id") {
+				id, err := strconv.Atoi(raw)
+				if err != nil {
+					printError(fmt.Errorf("invalid --agent-id %q: must be an integer", raw), output, "Invalid --agent-id")
+					return cli.Exit("", 1)
+				}
+				agentIDs = append(agentIDs, id)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			attached, err := client.SetSkillAgents(ctx, c.Int("skill-id"), agentIDs)
+			if err != nil {
+				printError(err, output, "Failed to set skill agents")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(map[string]any{"agent_ids": attached}, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			successPrinter.Printf("Skill %d is now attached to %d agent(s): %v\n", c.Int("skill-id"), len(attached), attached)
+			return nil
+		},
+	}
 }
 
 func CloudDashboards() *cli.Command {

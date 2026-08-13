@@ -571,6 +571,15 @@ bruin cloud agents usage-stats --start-date 2026-01-01 --end-date 2026-01-31
 bruin cloud agents usage-stats --output json
 ```
 
+#### `delete`
+
+Delete an agent. Cascades to its scheduled agents, dashboards and chat threads,
+and revokes its Cloud-CLI token. Requires an owner or team admin.
+
+```bash
+bruin cloud agents delete --agent-id <agent-id>
+```
+
 #### `connections`
 
 List the connections available to an agent — names and types only (never
@@ -1062,6 +1071,32 @@ bruin cloud scheduled-agents run-states set --scheduled-agent-id 42 --name memor
 
 # Delete a file
 bruin cloud scheduled-agents run-states delete --scheduled-agent-id 42 --name memory.md
+```
+
+---
+
+### `skills`
+
+Manage the team **skill library** — named instruction snippets you attach to
+agents. Team-scoped (you only see your own team's skills).
+
+```bash
+# List
+bruin cloud skills list
+
+# Create (body inline or from a file; --all-agents applies it to every agent)
+bruin cloud skills create --name reporting --description "How to write reports" --body "Be concise."
+bruin cloud skills create --name reporting --description "How to write reports" --body-file ./skill.md --all-agents
+
+# Update (only the fields you pass change)
+bruin cloud skills update --skill-id 7 --body-file ./skill.md
+bruin cloud skills update --skill-id 7 --all-agents=false
+
+# Delete
+bruin cloud skills delete --skill-id 7
+
+# Set which agents have the skill (replaces the set; omit --agent-id to detach all)
+bruin cloud skills set-agents --skill-id 7 --agent-id 3 --agent-id 5
 ```
 
 ---
