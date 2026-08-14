@@ -3813,3 +3813,49 @@ func TestAsset_PrefixUpstreams(t *testing.T) {
 	assert.Equal(t, "raw.dev_analytics.events", a.Upstreams[1].Value)
 	assert.Equal(t, "raw.analytics.events", a.Upstreams[2].Value)
 }
+
+func TestPipeline_GetAllConnectionNamesForAsset_ConnectionlessIngestr(t *testing.T) {
+	t.Parallel()
+
+	p := &pipeline.Pipeline{}
+
+	// source_connection naming a public source: only the destination is returned.
+	chess := &pipeline.Asset{
+		Type:       pipeline.AssetTypeIngestr,
+		Connection: "duck",
+		Parameters: pipeline.ParameterMap{
+			"source_connection": "chess.com",
+			"source_table":      "profiles:magnuscarlsen",
+			"destination":       "duckdb",
+		},
+	}
+	names, err := p.GetAllConnectionNamesForAsset(chess)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"duck"}, names)
+
+	// A missing source_connection still errors.
+	other := &pipeline.Asset{
+		Type:       pipeline.AssetTypeIngestr,
+		Connection: "duck",
+		Parameters: pipeline.ParameterMap{
+			"source_table": "table1",
+			"destination":  "duckdb",
+		},
+	}
+	_, err = p.GetAllConnectionNamesForAsset(other)
+	require.Error(t, err)
+
+	// With a source connection, both connections are returned (unchanged).
+	withConn := &pipeline.Asset{
+		Type:       pipeline.AssetTypeIngestr,
+		Connection: "duck",
+		Parameters: pipeline.ParameterMap{
+			"source_connection": "my-sf",
+			"source_table":      "table1",
+			"destination":       "duckdb",
+		},
+	}
+	names, err = p.GetAllConnectionNamesForAsset(withConn)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{"duck", "my-sf"}, names)
+}

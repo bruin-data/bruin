@@ -2460,6 +2460,12 @@ func (p *Pipeline) GetAllConnectionNamesForAsset(asset *Asset) ([]string, error)
 			return []string{}, err
 		}
 
+		// A public source (e.g. chess.com) is used connectionless, so it is not a
+		// real connection dependency.
+		if _, ok := ConnectionlessIngestrSources[ingestrSource]; ok {
+			return []string{ingestrDestination}, nil
+		}
+
 		return []string{ingestrDestination, ingestrSource}, nil
 	} else if assetMainTaskIsConnectionless(assetType) {
 		return nil, nil
@@ -2518,6 +2524,13 @@ func assetMainTaskIsConnectionless(assetType AssetType) bool {
 	default:
 		return false
 	}
+}
+
+// ConnectionlessIngestrSources maps public, credential-less ingestr sources to
+// their base URI, keyed by canonical domain name so short names stay connections.
+var ConnectionlessIngestrSources = map[string]string{
+	"chess.com":       "chess://",
+	"frankfurter.dev": "frankfurter://",
 }
 
 func assetSecretConnectionNames(asset *Asset) []string {

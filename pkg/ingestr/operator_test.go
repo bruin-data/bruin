@@ -639,6 +639,32 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 				"--full-refresh",
 			},
 		},
+		{
+			name: "public chess source via domain name (no connection defined)",
+			asset: &pipeline.Asset{
+				Name:       "asset-name",
+				Connection: "duck",
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "chess.com",
+					"source_table":      "profiles:magnuscarlsen",
+					"destination":       "duckdb",
+				},
+			},
+			want: []string{"ingest", "--source-uri", "chess://", "--source-table", "profiles:magnuscarlsen", "--dest-uri", "duckdb:////some/path", "--dest-table", "asset-name", "--yes", "--progress", "log"},
+		},
+		{
+			name: "public frankfurter source via domain name (no connection defined)",
+			asset: &pipeline.Asset{
+				Name:       "asset-name",
+				Connection: "duck",
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "frankfurter.dev",
+					"source_table":      "latest:USD",
+					"destination":       "duckdb",
+				},
+			},
+			want: []string{"ingest", "--source-uri", "frankfurter://", "--source-table", "latest:USD", "--dest-uri", "duckdb:////some/path", "--dest-table", "asset-name", "--yes", "--progress", "log"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -669,6 +695,52 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+// A connection whose name matches a public source (e.g. "chess") is defined, so
+// it must be used instead of the public chess:// fallback.
+func TestBasicOperator_DefinedConnectionWinsOverPublicSource(t *testing.T) {
+	t.Parallel()
+
+	mockChess := new(mockConnection)
+	mockChess.On("GetIngestrURI").Return("chess://?players=hikaru", nil)
+	mockDuck := new(mockConnection)
+	mockDuck.On("GetIngestrURI").Return("duckdb:////some/path", nil)
+
+	fetcher := simpleConnectionFetcher{
+		connections: map[string]*mockConnection{
+			"chess": mockChess,
+			"duck":  mockDuck,
+		},
+	}
+
+	runner := new(mockRunner)
+	want := []string{"ingest", "--source-uri", "chess://?players=hikaru", "--source-table", "profiles", "--dest-uri", "duckdb:////some/path", "--dest-table", "asset-name", "--yes", "--progress", "log"}
+	runner.On("RunIngestr", mock.Anything, want, mock.Anything, repo).Return(nil)
+
+	o := &BasicOperator{
+		conn:          &fetcher,
+		finder:        new(mockFinder),
+		runner:        runner,
+		jinjaRenderer: jinja.NewRendererWithYesterday("ingestr-test", "ingestr-test"),
+	}
+
+	ti := scheduler.AssetInstance{
+		Pipeline: &pipeline.Pipeline{},
+		Asset: &pipeline.Asset{
+			Name:       "asset-name",
+			Connection: "duck",
+			Parameters: pipeline.ParameterMap{
+				"source_connection": "chess",
+				"source_table":      "profiles",
+				"destination":       "duckdb",
+			},
+		},
+	}
+
+	ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, false)
+	require.NoError(t, o.Run(ctx, &ti))
+	runner.AssertExpectations(t)
 }
 
 func TestBasicOperator_ConvertTaskInstanceToIngestrCommand_IntervalStartAndEnd(t *testing.T) {

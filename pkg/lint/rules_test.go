@@ -2290,6 +2290,19 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 			wantErr:        assert.NoError,
 		},
 		{
+			name: "public source via source_connection is valid",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "chess.com",
+					"source_table":      "profiles:magnuscarlsen",
+					"destination":       "duckdb",
+				},
+			},
+			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
+		{
 			name: "ingestr asset with merge strategy but no primary key",
 			asset: &pipeline.Asset{
 				Type: pipeline.AssetTypeIngestr,

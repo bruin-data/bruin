@@ -213,9 +213,17 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		return errors.New("source connection not configured")
 	}
 
-	sourceURI, err := ingestruri.ForConnection(ctx, o.conn, "source", sourceConnectionName)
-	if err != nil {
-		return err
+	var sourceURI string
+	// A public source name with no matching connection is used directly; a
+	// defined connection always wins.
+	if uri, isPublic := pipeline.ConnectionlessIngestrSources[sourceConnectionName]; isPublic && o.conn.GetConnection(sourceConnectionName) == nil {
+		sourceURI = uri
+	} else {
+		resolved, err := ingestruri.ForConnection(ctx, o.conn, "source", sourceConnectionName)
+		if err != nil {
+			return err
+		}
+		sourceURI = resolved
 	}
 
 	sourceURI = ingestruri.Normalize(sourceURI)
