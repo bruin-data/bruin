@@ -928,6 +928,27 @@ func (c *APIClient) DeleteDashboard(ctx context.Context, dashboardID int) error 
 	return c.doRequest(ctx, http.MethodDelete, fmt.Sprintf("/dashboards/%d", dashboardID), nil, nil)
 }
 
+// ListDashboardVersions returns a dashboard's version-history snapshots (newest
+// first), metadata only — no state. Read-only.
+func (c *APIClient) ListDashboardVersions(ctx context.Context, dashboardID int) ([]DashboardVersion, error) {
+	var resp struct {
+		Versions []DashboardVersion `json:"versions"`
+	}
+	err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/dashboards/%d/versions", dashboardID), nil, &resp)
+	return resp.Versions, err
+}
+
+// GetDashboardVersion returns one snapshot including its full state, so the caller
+// can inspect exactly what that version contained.
+func (c *APIClient) GetDashboardVersion(ctx context.Context, dashboardID, versionID int) (*DashboardVersionDetail, error) {
+	var result DashboardVersionDetail
+	err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/dashboards/%d/versions/%d", dashboardID, versionID), nil, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 func (c *APIClient) ListScheduledAgents(ctx context.Context) ([]ScheduledAgent, error) {
 	var resp struct {
 		ScheduledAgents []ScheduledAgent `json:"scheduled_agents"`

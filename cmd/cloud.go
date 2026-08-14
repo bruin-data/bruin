@@ -4591,6 +4591,8 @@ func CloudDashboards() *cli.Command {
 		Commands: []*cli.Command{
 			cloudDashboardsList(),
 			cloudDashboardsGet(),
+			cloudDashboardsVersions(),
+			cloudDashboardsVersion(),
 			cloudDashboardsCreate(),
 			cloudDashboardsUpdate(),
 			cloudDashboardsDelete(),
@@ -4771,6 +4773,113 @@ func yamlNodeToValue(n *yaml.Node) (any, error) {
 			return nil, err
 		}
 		return v, nil
+	}
+}
+
+func cloudDashboardsVersions() *cli.Command {
+	return &cli.Command{
+		Name:  "versions",
+		Usage: "List a dashboard's version history (who changed what, when)",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "dashboard-id",
+				Usage:    "dashboard ID",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			versions, err := client.ListDashboardVersions(ctx, c.Int("dashboard-id"))
+			if err != nil {
+				printError(err, output, "Failed to list dashboard versions")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(versions, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"ID", "Kind", "Author", "Source", "Created At"})
+			for _, v := range versions {
+				source := "ui"
+				if v.ViaAPI {
+					source = "api"
+				}
+				t.AppendRow(table.Row{v.ID, v.Kind, v.Author, source, v.CreatedAt})
+			}
+			t.Render()
+			return nil
+		},
+	}
+}
+
+func cloudDashboardsVersion() *cli.Command {
+	return &cli.Command{
+		Name:  "version",
+		Usage: "Get a single dashboard version including its full definition",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "dashboard-id",
+				Usage:    "dashboard ID",
+				Required: true,
+			},
+			&cli.IntFlag{
+				Name:     "version-id",
+				Usage:    "version ID",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			version, err := client.GetDashboardVersion(ctx, c.Int("dashboard-id"), c.Int("version-id"))
+			if err != nil {
+				printError(err, output, "Failed to get dashboard version")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(version, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			infoPrinter.Printf("Version %d (%s) by %s at %s\n", version.ID, version.Kind, version.Author, version.CreatedAt)
+			// Print the definition (state) as pretty JSON so it can be inspected.
+			if len(version.State) > 0 {
+				var obj any
+				if err := json.Unmarshal(version.State, &obj); err == nil {
+					pretty, _ := json.MarshalIndent(obj, "", "  ")
+					fmt.Println(string(pretty))
+				} else {
+					fmt.Println(string(version.State))
+				}
+			}
+			return nil
+		},
 	}
 }
 
