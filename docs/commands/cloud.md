@@ -851,6 +851,27 @@ bruin cloud dashboards get --dashboard-id 42
 bruin cloud dashboards get --dashboard-id 42 --output json
 ```
 
+#### `versions`
+
+List a dashboard's version history — each snapshot's id, kind (draft/published),
+author, source (ui/api), and time. Metadata only; use `version` to read a
+snapshot's definition.
+
+```bash
+bruin cloud dashboards versions --dashboard-id 42
+bruin cloud dashboards versions --dashboard-id 42 --output json
+```
+
+#### `version`
+
+Get a single version snapshot including its full definition (`state`) — e.g. to see
+what a past version contained or to reconstruct it.
+
+```bash
+bruin cloud dashboards version --dashboard-id 42 --version-id 108
+bruin cloud dashboards version --dashboard-id 42 --version-id 108 --output json
+```
+
 #### `create`
 
 Create a dashboard from a definition. The definition is written to the dashboard's
