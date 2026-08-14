@@ -1293,6 +1293,19 @@ func TestSqlParser_ExtractSelect(t *testing.T) { //nolint
 		require.Contains(t, strings.ToUpper(got), "WITH")
 	})
 
+	t.Run("Fabric preserves the case of unaliased CTE column outputs", func(t *testing.T) {
+		queries := []string{
+			"WITH a AS (SELECT AccountDimId FROM dbo.DimAccount) SELECT AccountDimId FROM a",
+			"WITH a AS (SELECT d.AccountDimId FROM dbo.DimAccount AS d) SELECT a.AccountDimId FROM a",
+		}
+		for _, query := range queries {
+			got, err := parser.ExtractSelect(query, "fabric")
+			require.NoError(t, err)
+			require.Contains(t, got, "AS AccountDimId")
+			require.NotContains(t, got, "AS accountdimid")
+		}
+	})
+
 	t.Run("DDL with no inner SELECT is an error", func(t *testing.T) {
 		_, err := parser.ExtractSelect("CREATE TABLE analytics.t (id BIGINT, name VARCHAR)", "duckdb")
 		require.Error(t, err)

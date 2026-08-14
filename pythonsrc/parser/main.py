@@ -601,6 +601,24 @@ def is_single_select_query(query: str, dialect: str = None) -> dict:
 _WRITE_NODES = (exp.Insert, exp.Update, exp.Delete, exp.Merge)
 
 
+def _preserve_fabric_derived_column_case(expression: exp.Expr) -> None:
+    """Preserve source casing for unaliased Fabric derived-table columns."""
+    for derived in expression.find_all(exp.CTE, exp.Subquery):
+        alias = derived.args.get("alias")
+        if isinstance(alias, exp.TableAlias) and alias.columns:
+            continue
+
+        for projection in derived.this.selects:
+            if isinstance(projection, exp.Column) and not projection.alias:
+                projection.replace(
+                    exp.alias_(
+                        projection.copy(),
+                        projection.name,
+                        quoted=projection.this.quoted,
+                    )
+                )
+
+
 def extract_select(query: str, dialect: str = None) -> dict:
     """Reduce an asset statement to the read-only SELECT that produces its rows.
 
@@ -654,6 +672,9 @@ def extract_select(query: str, dialect: str = None) -> dict:
         return {
             "error": "asset contains a write statement and cannot be unit tested read-only"
         }
+
+    if dialect == "fabric":
+        _preserve_fabric_derived_column_case(inner)
 
     return {"query": inner.sql(dialect=dialect or None)}
 
