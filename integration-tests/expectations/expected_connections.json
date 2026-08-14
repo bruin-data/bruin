@@ -202,6 +202,28 @@
       },
       "schema_prefix": ""
     },
+    "env-duckdb-relationships-orphan": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-ddl",
+            "path": "duckdb-files/duckdb-relationships-orphan.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-duckdb-relationships-valid": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-ddl",
+            "path": "duckdb-files/duckdb-relationships-valid.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
     "env-ingestr": {
       "connections": {
         "duckdb": [

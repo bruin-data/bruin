@@ -3476,6 +3476,21 @@ func TestValidateColumnMetadata(t *testing.T) {
 			wantDescs: nil,
 		},
 		{
+			name: "self-referential relationships check is valid",
+			asset: &pipeline.Asset{
+				Name: "orders",
+				Columns: []pipeline.Column{
+					{Name: "id"},
+					{
+						Name:       "parent_order_id",
+						ForeignKey: &pipeline.ColumnReference{Table: "orders", Column: "id"},
+						Checks:     []pipeline.ColumnCheck{{Name: "relationships"}},
+					},
+				},
+			},
+			wantDescs: nil,
+		},
+		{
 			name: "foreign key missing table and column",
 			asset: &pipeline.Asset{
 				Name: "orders",
@@ -3486,6 +3501,18 @@ func TestValidateColumnMetadata(t *testing.T) {
 			wantDescs: []string{
 				"Column 'customer_id' has a foreign key without a referenced table",
 				"Column 'customer_id' has a foreign key without a referenced column",
+			},
+		},
+		{
+			name: "relationships check requires foreign key metadata",
+			asset: &pipeline.Asset{
+				Name: "orders",
+				Columns: []pipeline.Column{
+					{Name: "customer_id", Checks: []pipeline.ColumnCheck{{Name: "relationships"}}},
+				},
+			},
+			wantDescs: []string{
+				"Column 'customer_id' has a relationships check without foreign_key metadata",
 			},
 		},
 		{
@@ -3559,6 +3586,182 @@ func TestValidateColumnMetadata(t *testing.T) {
 			assert.ElementsMatch(t, tt.wantDescs, gotDescs)
 		})
 	}
+}
+
+func TestWarnBlockingRelationshipsCheckReferencesDownstream(t *testing.T) {
+	t.Parallel()
+
+	blocking := false
+	orders := &pipeline.Asset{
+		Name: "orders",
+		Columns: []pipeline.Column{
+			{
+				Name:       "customer_id",
+				ForeignKey: &pipeline.ColumnReference{Table: "customers", Column: "id"},
+				Checks:     []pipeline.ColumnCheck{{Name: "relationships"}},
+			},
+		},
+	}
+	nonBlockingOrders := &pipeline.Asset{
+		Name: "orders",
+		Columns: []pipeline.Column{
+			{
+				Name:       "customer_id",
+				ForeignKey: &pipeline.ColumnReference{Table: "customers", Column: "id"},
+				Checks: []pipeline.ColumnCheck{
+					{Name: "relationships", Blocking: pipeline.DefaultTrueBool{Value: &blocking}},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name             string
+		orders           *pipeline.Asset
+		customers        *pipeline.Asset
+		extraAsset       *pipeline.Asset
+		additionalAssets []*pipeline.Asset
+		want             string
+	}{
+		{
+			name:   "warns when referenced asset directly depends on checked asset",
+			orders: orders,
+			customers: &pipeline.Asset{
+				Name:      "customers",
+				Columns:   []pipeline.Column{{Name: "id"}},
+				Upstreams: []pipeline.Upstream{{Type: "asset", Value: "orders"}},
+			},
+			want: "Column 'customer_id' has a blocking relationships check referencing downstream asset 'customers'; the check runs before that asset is refreshed. Set blocking to false or restructure the dependencies",
+		},
+		{
+			name:   "warns for transitive downstream dependency",
+			orders: orders,
+			customers: &pipeline.Asset{
+				Name:      "customers",
+				Columns:   []pipeline.Column{{Name: "id"}},
+				Upstreams: []pipeline.Upstream{{Type: "asset", Value: "customer_staging"}},
+			},
+			extraAsset: &pipeline.Asset{
+				Name:      "customer_staging",
+				Upstreams: []pipeline.Upstream{{Type: "asset", Value: "orders"}},
+			},
+			want: "Column 'customer_id' has a blocking relationships check referencing downstream asset 'customers'; the check runs before that asset is refreshed. Set blocking to false or restructure the dependencies",
+		},
+		{
+			name:   "does not warn for non-blocking check",
+			orders: nonBlockingOrders,
+			customers: &pipeline.Asset{
+				Name:      "customers",
+				Columns:   []pipeline.Column{{Name: "id"}},
+				Upstreams: []pipeline.Upstream{{Type: "asset", Value: "orders"}},
+			},
+		},
+		{
+			name:   "does not warn for symbolic dependency",
+			orders: orders,
+			customers: &pipeline.Asset{
+				Name:      "customers",
+				Columns:   []pipeline.Column{{Name: "id"}},
+				Upstreams: []pipeline.Upstream{{Type: "asset", Value: "orders", Mode: pipeline.UpstreamModeSymbolic}},
+			},
+		},
+		{
+			name:   "does not warn when referenced asset is independent",
+			orders: orders,
+			customers: &pipeline.Asset{
+				Name:    "customers",
+				Columns: []pipeline.Column{{Name: "id"}},
+			},
+		},
+		{
+			name:   "does not warn for independent assets with reciprocal relationships checks",
+			orders: orders,
+			customers: &pipeline.Asset{
+				Name: "customers",
+				Columns: []pipeline.Column{
+					{Name: "id"},
+					{
+						Name:       "order_id",
+						ForeignKey: &pipeline.ColumnReference{Table: "orders", Column: "id"},
+						Checks:     []pipeline.ColumnCheck{{Name: "relationships"}},
+					},
+				},
+			},
+		},
+		{
+			name:   "does not warn when assets are connected only through relationships checks",
+			orders: orders,
+			customers: &pipeline.Asset{
+				Name:      "customers",
+				Columns:   []pipeline.Column{{Name: "id"}},
+				Upstreams: []pipeline.Upstream{{Type: "asset", Value: "customer_quality"}},
+			},
+			extraAsset: &pipeline.Asset{
+				Name: "customer_quality",
+				Columns: []pipeline.Column{
+					{
+						Name:       "order_id",
+						ForeignKey: &pipeline.ColumnReference{Table: "order_reporting", Column: "id"},
+						Checks:     []pipeline.ColumnCheck{{Name: "relationships"}},
+					},
+				},
+			},
+			additionalAssets: []*pipeline.Asset{
+				{
+					Name:      "order_reporting",
+					Upstreams: []pipeline.Upstream{{Type: "asset", Value: "orders"}},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assets := []*pipeline.Asset{tt.orders, tt.customers}
+			if tt.extraAsset != nil {
+				assets = append(assets, tt.extraAsset)
+			}
+			assets = append(assets, tt.additionalAssets...)
+			p := &pipeline.Pipeline{Assets: assets}
+
+			issues, err := WarnBlockingRelationshipsCheckReferencesDownstream(t.Context(), p, tt.orders)
+			require.NoError(t, err)
+			if tt.want == "" {
+				assert.Empty(t, issues)
+				return
+			}
+			require.Len(t, issues, 1)
+			assert.Same(t, tt.orders, issues[0].Task)
+			assert.Equal(t, tt.want, issues[0].Description)
+		})
+	}
+}
+
+func TestBlockingRelationshipsCheckReferencesDownstreamRuleIsWarning(t *testing.T) {
+	t.Parallel()
+
+	const ruleName = "blocking-relationships-check-references-downstream"
+	findRule := func(rules []Rule) Rule {
+		for _, rule := range rules {
+			if rule.Name() == ruleName {
+				return rule
+			}
+		}
+		return nil
+	}
+
+	rules, err := GetRules(afero.NewMemMapFs(), nil, false, nil, false)
+	require.NoError(t, err)
+	rule := findRule(rules)
+	require.NotNil(t, rule)
+	assert.Equal(t, ValidatorSeverityWarning, rule.GetSeverity())
+	assert.Contains(t, rule.GetApplicableLevels(), LevelAsset)
+
+	rulesWithoutWarnings, err := GetRules(afero.NewMemMapFs(), nil, true, nil, false)
+	require.NoError(t, err)
+	assert.Nil(t, findRule(rulesWithoutWarnings))
 }
 
 func TestValidateDuplicateTags(t *testing.T) {

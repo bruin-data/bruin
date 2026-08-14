@@ -1547,6 +1547,12 @@ func (a *Asset) PrefixSchema(prefix string) {
 	}
 
 	a.Name = prefixSchemaComponent(a.Name, prefix)
+	for i := range a.Columns {
+		if a.Columns[i].ForeignKey == nil {
+			continue
+		}
+		a.Columns[i].ForeignKey.Table = prefixSchemaComponent(a.Columns[i].ForeignKey.Table, prefix)
+	}
 }
 
 func (a *Asset) PrefixUpstreams(prefix string) {

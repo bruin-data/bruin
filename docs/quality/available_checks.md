@@ -8,6 +8,7 @@ Bruin provides the following checks to validate assets, ensuring that asset data
 - [**Not-Null**](#not-null)
 - [**Pattern**](#pattern)
 - [**Positive**](#positive)
+- [**Relationships**](#relationships)
 - [**Unique**](#unique)
 - [**Min**](#min)
 - [**Max**](#max)
@@ -96,6 +97,25 @@ columns:
     checks:
       - name: positive
 ```
+
+## Relationships
+
+This check verifies referential integrity: every non-null value in the checked column must exist in the column identified by its `foreign_key` metadata. Null values are ignored; add a separate `not_null` check when nulls should fail.
+
+```yaml
+columns:
+  - name: customer_id
+    type: integer
+    foreign_key:
+      table: analytics.customers
+      column: id
+    checks:
+      - name: relationships
+```
+
+The referenced table must be another asset in the pipeline. The check runs on the child asset's connection and returns the number of child rows whose keys are missing from the parent. It does not verify that the referenced parent column is unique; add a `unique` check to that column separately when required.
+
+Neither `foreign_key` metadata nor a `relationships` check creates a scheduler dependency. Add the referenced asset to the child asset's `depends` list when it must be refreshed before the relationship check runs.
 
 ## Unique
 

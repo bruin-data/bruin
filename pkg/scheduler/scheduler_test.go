@@ -786,6 +786,116 @@ func TestScheduler_Run(t *testing.T) {
 	assert.True(t, finished)
 }
 
+func TestScheduler_RelationshipsCheckDoesNotWaitForReferencedAsset(t *testing.T) {
+	t.Parallel()
+
+	p := &pipeline.Pipeline{
+		Assets: []*pipeline.Asset{
+			{Name: "customers"},
+			{
+				Name: "orders",
+				Columns: []pipeline.Column{
+					{
+						Name:       "customer_id",
+						ForeignKey: &pipeline.ColumnReference{Table: "customers", Column: "id"},
+						Checks:     []pipeline.ColumnCheck{{Name: "relationships"}},
+					},
+				},
+			},
+		},
+	}
+
+	s := NewScheduler(zap.NewNop().Sugar(), p, "test")
+	check := s.taskNameMap["orders"][TaskInstanceTypeColumnCheck][0]
+
+	require.Len(t, check.GetUpstream(), 1)
+	assert.Equal(t, "orders", check.GetUpstream()[0].GetHumanID())
+
+	markMainTaskStatus(s, "orders", Succeeded)
+	assert.Contains(t, scheduleableHumanIDs(s), "orders:customer_id:relationships")
+}
+
+func TestScheduler_BlockingRelationshipsCheckRunsBeforeReferencedDownstreamAsset(t *testing.T) {
+	t.Parallel()
+
+	p := &pipeline.Pipeline{
+		Assets: []*pipeline.Asset{
+			{
+				Name:      "customers",
+				Upstreams: []pipeline.Upstream{{Type: "asset", Value: "orders"}},
+			},
+			{
+				Name: "orders",
+				Columns: []pipeline.Column{
+					{
+						Name:       "customer_id",
+						ForeignKey: &pipeline.ColumnReference{Table: "customers", Column: "id"},
+						Checks:     []pipeline.ColumnCheck{{Name: "relationships"}},
+					},
+				},
+			},
+		},
+	}
+
+	s := NewScheduler(zap.NewNop().Sugar(), p, "test")
+	check := s.taskNameMap["orders"][TaskInstanceTypeColumnCheck][0]
+	customers := s.taskNameMap["customers"][TaskInstanceTypeMain][0]
+
+	require.Len(t, check.GetUpstream(), 1)
+	assert.Equal(t, "orders", check.GetUpstream()[0].GetHumanID())
+	require.Len(t, customers.GetUpstream(), 2)
+	assert.ElementsMatch(t, []string{"orders", "orders:customer_id:relationships"}, []string{
+		customers.GetUpstream()[0].GetHumanID(),
+		customers.GetUpstream()[1].GetHumanID(),
+	})
+
+	markMainTaskStatus(s, "orders", Succeeded)
+	assert.Contains(t, scheduleableHumanIDs(s), "orders:customer_id:relationships")
+	assert.NotContains(t, scheduleableHumanIDs(s), "customers")
+
+	s.MarkTaskInstance(check, Succeeded, false)
+	assert.Contains(t, scheduleableHumanIDs(s), "customers")
+}
+
+func TestScheduler_NonBlockingRelationshipsCheckDoesNotWaitForReferencedAsset(t *testing.T) {
+	t.Parallel()
+
+	blocking := false
+	p := &pipeline.Pipeline{
+		Assets: []*pipeline.Asset{
+			{
+				Name:      "customers",
+				Upstreams: []pipeline.Upstream{{Type: "asset", Value: "orders"}},
+			},
+			{
+				Name: "orders",
+				Columns: []pipeline.Column{
+					{
+						Name:       "customer_id",
+						ForeignKey: &pipeline.ColumnReference{Table: "customers", Column: "id"},
+						Checks: []pipeline.ColumnCheck{
+							{Name: "relationships", Blocking: pipeline.DefaultTrueBool{Value: &blocking}},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	s := NewScheduler(zap.NewNop().Sugar(), p, "test")
+	check := s.taskNameMap["orders"][TaskInstanceTypeColumnCheck][0]
+	customers := s.taskNameMap["customers"][TaskInstanceTypeMain][0]
+
+	require.Len(t, check.GetUpstream(), 1)
+	assert.Equal(t, "orders", check.GetUpstream()[0].GetHumanID())
+	require.Len(t, customers.GetUpstream(), 1)
+	assert.Equal(t, "orders", customers.GetUpstream()[0].GetHumanID())
+
+	markMainTaskStatus(s, "orders", Succeeded)
+	assert.Contains(t, scheduleableHumanIDs(s), "customers")
+	assert.Contains(t, scheduleableHumanIDs(s), "orders:customer_id:relationships")
+}
+
 func TestScheduler_MarkTasksAndDownstream(t *testing.T) {
 	t.Parallel()
 

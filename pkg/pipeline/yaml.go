@@ -20,6 +20,7 @@ var ValidQualityChecks = map[string]bool{
 	"min":             true,
 	"max":             true,
 	"accepted_values": true,
+	"relationships":   true,
 	"negative":        true,
 	"non_negative":    true,
 	"pattern":         true,
