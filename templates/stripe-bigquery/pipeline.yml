@@ -1,7 +1,6 @@
 name: stripe-bigquery
 schedule: daily
 start_date: "2023-01-01"
-catchup: false
 
 metadata_push:
   bigquery: true
