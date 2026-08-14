@@ -342,6 +342,22 @@ type Dashboard struct {
 	State      json.RawMessage `json:"state,omitempty"`
 }
 
+// DashboardVersion is one version-history snapshot's metadata (no state blob).
+type DashboardVersion struct {
+	ID         int    `json:"id"`
+	Kind       string `json:"kind"`        // "draft" | "published"
+	CreatedAt  string `json:"created_at"`  // ISO 8601; empty if unknown
+	Author     string `json:"author"`      // user / team / agent name; empty if unknown
+	AuthorKind string `json:"author_kind"` // "user" | "team" | "agent" | ""
+	ViaAPI     bool   `json:"via_api"`     // written through an API token (CLI) vs the UI
+}
+
+// DashboardVersionDetail is a snapshot including its full parsed state.
+type DashboardVersionDetail struct {
+	DashboardVersion
+	State json.RawMessage `json:"state"`
+}
+
 // ScheduledAgent represents a Bruin Cloud scheduled agent — a cron-based recurring
 // agent task. The nested plan fields (verified SQLs, memory, ...) are kept as raw
 // JSON so `--output json` round-trips the full server response faithfully.
