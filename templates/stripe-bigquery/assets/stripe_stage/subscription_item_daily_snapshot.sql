@@ -2,12 +2,20 @@
 name: stripe_stage.subscription_item_daily_snapshot
 type: bq.sql
 description: >
-  Daily snapshot of current subscription-item MRR state, rebuilt on every run
-  for the pipeline end date. It cannot reconstruct historic state from mutable
-  Stripe subscription records.
+  Daily observation history of subscription-item MRR state at item grain, kept
+  so a customer's MRR change can be traced to the price, plan, and quantity
+  behind it. Stripe subscription records are mutable and overwrite their own
+  past, so historic item state cannot be reconstructed from Stripe; this asset
+  records that state while it is still current. Each run observes the pipeline
+  end date and adds that day, replacing only the rows for the date being run, so
+  re-running a date is idempotent. History accrues from the first run onward and
+  cannot be backfilled.
 
 materialization:
   type: table
+  strategy: delete+insert
+  incremental_key: snapshot_date
+  partition_by: snapshot_date
 
 depends:
   - stripe_stage.subscription_items
@@ -52,7 +60,10 @@ custom_checks:
 columns:
   - name: snapshot_date
     type: DATE
-    description: UTC date represented by the snapshot.
+    description: >
+      UTC date this row observed. It is the incremental key and the partition
+      key, so a re-run replaces only its own day and leaves the rest of the
+      history in place.
     primary_key: true
     checks:
       - name: not_null

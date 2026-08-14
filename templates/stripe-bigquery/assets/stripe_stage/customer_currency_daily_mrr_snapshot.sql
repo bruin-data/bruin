@@ -2,13 +2,25 @@
 name: stripe_stage.customer_currency_daily_mrr_snapshot
 type: bq.sql
 description: >
-  Daily MRR snapshot at Stripe customer and native-currency grain, rebuilt on
-  every run for the pipeline end date. It starts from subscriptions and left
-  joins subscription items, retaining a zero-MRR row when a cancelled or
-  itemless subscription has no MRR-eligible items.
+  Daily MRR observation history at Stripe customer and native-currency grain,
+  and the snapshot every monthly report reads. Stripe subscription records are
+  mutable and overwrite their own past, so a repriced or cancelled subscription
+  reports only its current state and prior daily MRR cannot be recovered from
+  Stripe; this asset records that state while it is still current. Each run
+  observes the pipeline end date and adds that day, replacing only the rows for
+  the date being run, so re-running a date is idempotent. History accrues from
+  the first run onward and cannot be backfilled, and the movement and retention
+  reports need two contiguous monthly observations before they return anything.
+  It starts from subscriptions and left joins subscription items, retaining a
+  zero-MRR row when a cancelled or itemless subscription has no MRR-eligible
+  items, so a churned customer stays visible at zero instead of disappearing
+  from the snapshot and becoming indistinguishable from missing data.
 
 materialization:
   type: table
+  strategy: delete+insert
+  incremental_key: snapshot_date
+  partition_by: snapshot_date
 
 depends:
   - stripe_stage.subscriptions
@@ -62,7 +74,10 @@ custom_checks:
 columns:
   - name: snapshot_date
     type: DATE
-    description: UTC date represented by the snapshot.
+    description: >
+      UTC date this row observed. It is the incremental key and the partition
+      key, so a re-run replaces only its own day and leaves the rest of the
+      history in place.
     primary_key: true
     checks:
       - name: not_null

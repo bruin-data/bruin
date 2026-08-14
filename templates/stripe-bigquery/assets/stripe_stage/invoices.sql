@@ -110,9 +110,9 @@ SELECT
   customer AS stripe_customer_id,
   TIMESTAMP_SECONDS(SAFE_CAST(created AS INT64)) AS invoice_created_at,
   TIMESTAMP_SECONDS(SAFE_CAST(due_date AS INT64)) AS invoice_due_at,
-  TIMESTAMP_SECONDS(SAFE_CAST(
-    JSON_VALUE(status_transitions, '$.finalized_at') AS INT64
-  )) AS invoice_finalized_at,
+  TIMESTAMP_SECONDS(
+    LAX_INT64(status_transitions.finalized_at)
+  ) AS invoice_finalized_at,
   status AS invoice_status,
   billing_reason,
   collection_method,
@@ -131,6 +131,6 @@ SELECT
     'subscription_update',
     'subscription_threshold'
   ) AS is_subscription_invoice,
-  SAFE_CAST(JSON_VALUE(lines, '$.has_more') AS BOOL) AS invoice_lines_has_more,
+  LAX_BOOL(lines.has_more) AS invoice_lines_has_more,
   lines AS invoice_lines
 FROM stripe_raw.invoice;

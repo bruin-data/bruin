@@ -87,12 +87,22 @@ subscription, subscription-item, invoice, and invoice-line-item models. It also
 builds daily snapshots of subscription items and customer MRR by native
 currency, stamped with the pipeline end date.
 
-Every stage and report asset is materialized as a `CREATE OR REPLACE TABLE`, so
-each run rebuilds its table from the current raw data. That keeps the
-pipeline idempotent and easy to reason about, and it also means the snapshot
-tables hold only the most recent run's observation rather than an accumulated
-history. To retain a snapshot history, switch the two snapshot assets to an
-incremental strategy such as `merge` on their existing primary keys.
+Most stage and report assets are materialized as a `CREATE OR REPLACE TABLE`,
+so each run rebuilds its table from the current raw data. That keeps the
+pipeline idempotent and easy to reason about.
+
+The two daily snapshot assets are the exception. They use
+`delete+insert` on `snapshot_date`, so each run replaces only the day it
+observes and leaves earlier days in place. That accumulates the daily
+observation history the reports layer needs for month-over-month movement and
+retention, while keeping a re-run of any single date idempotent. Because
+`delete+insert` writes into an existing table, the first load has to create
+these two tables with `--full-refresh`; see
+[Run the pipeline](#run-the-pipeline).
+
+The snapshots record the Stripe state visible when the pipeline runs, so
+history builds up from the first run forward and cannot be backfilled from
+current Stripe records.
 
 ### Billing reports
 
@@ -102,6 +112,39 @@ The `stripe_reports` dataset provides four ready-to-query tables:
 - `monthly_mrr_movements` — customer-level new, reactivation, expansion, contraction, and churn movements.
 - `monthly_subscription_kpis` — recurring-revenue, retention, and customer-count metrics by currency.
 - `monthly_invoice_billings` — non-draft, non-void invoice billings by finalization month, with a labeled creation-date fallback.
+
+### Asset summary
+
+All 19 assets materialize as tables. `create+replace` is the default when no
+incremental strategy is listed, so those assets are rebuilt from their upstreams
+on every run.
+
+| Schema | Asset | Materialization | Incremental strategy | Partition | Purpose |
+| --- | --- | --- | --- | --- | --- |
+| `stripe_raw` | `customer` | table | `merge` (upsert on `id`, cursor `created`) | — | Load Stripe customers into BigQuery |
+| `stripe_raw` | `product` | table | `merge` (upsert on `id`, cursor `created`) | — | Load Stripe product catalog into BigQuery |
+| `stripe_raw` | `price` | table | `merge` (upsert on `id`, cursor `created`) | — | Load Stripe prices into BigQuery |
+| `stripe_raw` | `subscription` | table | `merge` (upsert on `id`, cursor `created`) | — | Load Stripe subscriptions into BigQuery |
+| `stripe_raw` | `subscription_item` | table | `merge` (upsert on `id`, cursor `created`) | — | Load Stripe subscription items into BigQuery |
+| `stripe_raw` | `invoice` | table | `merge` (upsert on `id`, cursor `created`) | — | Load Stripe invoices into BigQuery |
+| `stripe_stage` | `customers` | table | `create+replace` | — | Conform billing accounts and metadata keys |
+| `stripe_stage` | `products` | table | `create+replace` | — | Conform product catalog for packaging analysis |
+| `stripe_stage` | `prices` | table | `create+replace` | — | Conform prices with recurring-cadence attributes |
+| `stripe_stage` | `subscriptions` | table | `create+replace` | — | Conform current subscription, trial, and cancellation state |
+| `stripe_stage` | `subscription_items` | table | `create+replace` | — | Join items to prices and normalize gross MRR |
+| `stripe_stage` | `invoices` | table | `create+replace` | — | Conform invoice facts for billings and AR |
+| `stripe_stage` | `invoice_line_items` | table | `create+replace` | — | Flatten Stripe's embedded invoice-line payload |
+| `stripe_stage` | `subscription_item_daily_snapshot` | table | `delete+insert` on `snapshot_date` | `snapshot_date` | Accumulate daily subscription-item MRR observation history |
+| `stripe_stage` | `customer_currency_daily_mrr_snapshot` | table | `delete+insert` on `snapshot_date` | `snapshot_date` | Accumulate daily customer-currency MRR observation history |
+| `stripe_reports` | `monthly_mrr_by_customer` | table | `create+replace` | — | Month-end MRR and run-rate ARR per customer |
+| `stripe_reports` | `monthly_mrr_movements` | table | `create+replace` | — | Classify new, expansion, contraction, and churn movements |
+| `stripe_reports` | `monthly_subscription_kpis` | table | `create+replace` | — | Recurring-revenue, retention, and customer-count scorecard |
+| `stripe_reports` | `monthly_invoice_billings` | table | `create+replace` | — | Invoice billings by finalization month and currency |
+
+The two snapshot assets are partitioned on `snapshot_date` because they
+accumulate indefinitely: their per-run `DELETE` prunes to the single day being
+replaced instead of scanning the whole history. The other assets are rebuilt in
+full each run, so partitioning would not save any scan.
 
 ### Column-level documentation
 
@@ -115,8 +158,9 @@ generates a browsable documentation site from the same schemas.
 ## Example report rows
 
 The following illustrative rows use minor currency units: `9900` USD means
-$99.00. They show the shape of each table across several months, which assumes
-retained snapshot history; see [Conformed billing models](#conformed-billing-models).
+$99.00. They show the shape of each table across several months, which fills in
+once the snapshots have accumulated that many months of history; see
+[Conformed billing models](#conformed-billing-models).
 Query the four tables in `stripe_reports` directly, then adapt the columns to
 the definitions used by your finance and revenue teams.
 
@@ -154,8 +198,10 @@ the definitions used by your finance and revenue teams.
 
 ## Metric policy
 
-All monetary values remain in each currency's minor units. Do not add amounts
-across currencies without an FX source and explicit conversion policy.
+All monetary values in the `stripe_stage` and `stripe_reports` tables remain in
+each currency's minor units; only the dashboard converts to major units for
+display. Do not add amounts across currencies without an FX source and explicit
+conversion policy.
 
 MRR is a gross list-price run rate from active and past-due subscriptions with
 licensed recurring monthly or annual prices. Free, one-time, metered, and
@@ -163,10 +209,10 @@ discounted amounts are excluded. Run-rate ARR is MRR multiplied by 12; neither
 measure is recognized revenue, bookings, cash, or a financial statement.
 
 The daily snapshots capture the Stripe state visible when the pipeline runs.
-They do not reconstruct prior daily MRR history from current Stripe records,
-and because every asset is rebuilt with create+replace, each run keeps only the
-latest observation. Month-over-month movement and retention metrics therefore
-need snapshot history retained first.
+They do not reconstruct prior daily MRR history from current Stripe records, so
+the accumulated history starts at the first run. Month-over-month movement and
+retention metrics need two contiguous monthly observations, so they stay empty
+until the snapshots span a second month.
 
 ## Configure connections
 
@@ -242,17 +288,29 @@ bruin validate --fast my-stripe-pipeline
 
 On a new BigQuery destination, load every table before running query validation.
 The raw assets load only their run window, so pass an explicit range to pull
-your Stripe history in the first load:
+your Stripe history in the first load. Use `--full-refresh` on this first run:
+the two daily snapshot assets use `delete+insert`, which writes into an existing
+table, so their tables have to be created before a normal run can add days to
+them.
 
 ```bash
-bruin run --start-date 2023-01-01 --end-date $(date -u +%F) \
+bruin run --full-refresh --start-date 2023-01-01 --end-date $(date -u +%F) \
   --no-validation my-stripe-pipeline
 ```
 
 After the initial load, run `bruin validate my-stripe-pipeline` and schedule the
-pipeline daily. The stage and report assets are rebuilt with create+replace, so
-any run is safe to repeat; the raw assets upsert on `id`, so re-running a window
-does not duplicate rows.
+pipeline daily without `--full-refresh`:
+
+```bash
+bruin run --start-date $(date -u +%F) --end-date $(date -u +%F) my-stripe-pipeline
+```
+
+Any run is safe to repeat. The raw assets upsert on `id`, the other stage and
+report assets are rebuilt with create+replace, and the two snapshot assets
+replace only the `snapshot_date` they observe, so re-running a date does not
+duplicate rows or drop the days around it. Avoid `--full-refresh` after the
+initial load: it rebuilds the snapshot tables from scratch and discards the
+accumulated history.
 
 ## Customize it
 
@@ -265,8 +323,10 @@ definitions, identity mapping, and FX policy where required.
 
 The included DAC dashboard visualizes native-currency MRR, ARR, customer count,
 retention, movement components, invoice billings, and the latest customer MRR
-distribution. It deliberately filters to one currency at a time because the
-reporting tables retain money in native minor units and do not apply FX rates.
+distribution. It deliberately filters to one currency at a time because no FX
+rates are applied. The reporting tables retain money in native minor units; the
+dashboard queries divide by the selected currency's exponent so the widgets read
+in major units, using a divisor of 1 for Stripe's zero-decimal currencies.
 
 After configuring `gcp-default`, install a verified DAC release by following
 the [DAC installation guide](https://getbruin.com/docs/dac/getting-started/installation.html).
@@ -294,5 +354,4 @@ This screenshot uses synthetic data solely to demonstrate the dashboard's
 layout and charts.
 
 MRR movement and retention metrics need two contiguous monthly snapshots, so
-they stay empty while the snapshot tables are rebuilt with create+replace on
-every run.
+they stay empty until the accumulated snapshot history spans a second month.
