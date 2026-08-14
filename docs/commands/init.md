@@ -2,8 +2,7 @@
 
 ## Overview
 
-The `bruin init` command bootstraps a new **Bruin pipeline** from a predefined template.
-It automatically sets up the folder structure, initializes configuration files, and optionally creates a new Git repository.
+The `bruin init` command bootstraps a new **Bruin pipeline** from a predefined template. It automatically sets up the folder structure, initializes configuration files, and optionally creates a new Git repository.
 
 You can use it to start a new data pipeline project quickly, or to add a new pipeline inside an existing repository.
 
@@ -33,8 +32,7 @@ bruin init self-heal-demo
 
 When you run `bruin init`, it:
 
-1. Lists available templates from Bruin’s internal template registry.
-   You can interactively select one via a terminal UI.
+1. Lists available templates from Bruin’s internal template registry. You can interactively select one via a terminal UI.
 2. Copies all template files (e.g. `.asset.yml`, `.sql`, `.py`) into the target folder.
 3. Merges any template-level `.bruin.yml` configuration into your existing (or newly created) root `.bruin.yml`.
 4. Optionally initializes a **Git repository** if none exists.
@@ -76,8 +74,7 @@ If the selected template contains its own `.bruin.yml`, Bruin merges:
 * **Secrets**
 * **Default settings**
 
-into the existing `.bruin.yml` at your project root.
-This ensures shared environments (like `dev`, `prod`, etc.) stay consistent across pipelines.
+into the existing `.bruin.yml` at your project root. This ensures shared environments (like `dev`, `prod`, etc.) stay consistent across pipelines.
 
 ## Arguments
 

@@ -69,8 +69,7 @@ That's it, this asset will load data from the `chess` source and load it into yo
 
 ### Setting up your `.bruin.yml` file
 
-This file specifies environments and the connections your pipeline will use. To ensure assets you add work correctly, configure your environments and connections by editing your `.bruin.yml` file.
-If you used `bruin init default`, this is already included. Otherwise, add the following:
+This file specifies environments and the connections your pipeline will use. To ensure assets you add work correctly, configure your environments and connections by editing your `.bruin.yml` file. If you used `bruin init default`, this is already included. Otherwise, add the following:
 
 ```yaml
 default_environment: default
@@ -106,8 +105,7 @@ bruin run assets/players.asset.yml
 
 ### Creating a SQL asset
 
-The template includes a SQL asset in `assets/player_stats.sql`:
-The file in your directory might include extra sections such as `columns`, `checks`, or `custom_checks`. Later in this guide, we will cover adding quality checks.
+The template includes a SQL asset in `assets/player_stats.sql`: The file in your directory might include extra sections such as `columns`, `checks`, or `custom_checks`. Later in this guide, we will cover adding quality checks.
 
 ```bruin-sql
 /* @bruin
@@ -133,8 +131,7 @@ This asset has a few lines of configuration at the top:
 - `type`: `duckdb.sql` means DuckDB SQL, Bruin supports many other types of assets.
 - `materialization`: take the query result and materialize it as a table
 
-Bruin will take the result of the given query, and will create a `dataset.player_stats` table on DuckDB with it. You can also use `view`
-materialization type instead of `table` to create a view instead.
+Bruin will take the result of the given query, and will create a `dataset.player_stats` table on DuckDB with it. You can also use `view` materialization type instead of `table` to create a view instead.
 
 > [!INFO]
 > Bruin supports many [asset](/assets/definition-schema.html) types, including BigQuery, Snowflake, Python, R, Redshift, Databricks, and more.

@@ -193,9 +193,7 @@ bruin cloud runs trigger \
   --end-date 2024-01-31
 ```
 
-On success, the command prints the created run ID so you can match the invocation
-to its logs and status. With `--output json`, the response includes the ID in
-`run_id`.
+On success, the command prints the created run ID so you can match the invocation to its logs and status. With `--output json`, the response includes the ID in `run_id`.
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
@@ -210,9 +208,7 @@ to its logs and status. With `--output json`, the response includes the ID in
 | `--split` | str | - | Trigger a backfill, splitting the date range into one run per interval by unit: `minute`, `hour`, `day`, `week`, `month`, `year`. |
 | `--chunk-size` | int | `1` | Number of split units per batch (used with `--split`). |
 
-**Run only selected assets.** Select assets with `--asset` using their **full name**
-(`schema.table`, repeatable or comma-separated). Without a selection, the whole pipeline
-runs.
+**Run only selected assets.** Select assets with `--asset` using their **full name** (`schema.table`, repeatable or comma-separated). Without a selection, the whole pipeline runs.
 
 ```bash
 # Run a single asset (full schema.table name)
@@ -228,9 +224,7 @@ bruin cloud runs trigger \
   --asset analytics.raw_events,analytics.daily_summary
 ```
 
-**Include downstream assets.** Add `--downstream` to also run everything that depends on
-the selected `--asset`(s), following the pipeline's dependency graph. It requires
-`--asset`.
+**Include downstream assets.** Add `--downstream` to also run everything that depends on the selected `--asset`(s), following the pipeline's dependency graph. It requires `--asset`.
 
 ```bash
 # Run raw_events and everything downstream of it
@@ -240,9 +234,7 @@ bruin cloud runs trigger \
   --asset analytics.raw_events --downstream
 ```
 
-**Full refresh.** Pass `--full-refresh` (bare, no value) to truncate assets before
-running. It covers the `--asset` selection when you give one, otherwise every asset in
-the pipeline.
+**Full refresh.** Pass `--full-refresh` (bare, no value) to truncate assets before running. It covers the `--asset` selection when you give one, otherwise every asset in the pipeline.
 
 ```bash
 # Full-refresh the whole pipeline (every asset)
@@ -268,9 +260,7 @@ bruin cloud runs trigger \
 > `--full-refresh` truncates whatever the run covers: with `--asset` it refreshes only
 > the selected assets, without it the whole pipeline.
 
-**Override pipeline variables.** Each `--var` is `key=value`, where the **value is parsed
-as JSON**. So a string must be quoted (`"prod"`), while numbers and booleans are written
-bare. Repeat `--var` for multiple keys, or pass a whole JSON object at once.
+**Override pipeline variables.** Each `--var` is `key=value`, where the **value is parsed as JSON**. So a string must be quoted (`"prod"`), while numbers and booleans are written bare. Repeat `--var` for multiple keys, or pass a whole JSON object at once.
 
 ```bash
 # String value — note the JSON quotes (wrapped in single quotes for the shell)
@@ -292,10 +282,7 @@ bruin cloud runs trigger \
   --var '{"env":"prod","retries":3}'
 ```
 
-**Split a range into batches (monthly, weekly, …).** With `--split`, the trigger
-becomes a **backfill**: the date range is split into one run per interval
-(by unit and chunk size) as a single backfill. This is
-how you backfill selected assets with monthly batches:
+**Split a range into batches (monthly, weekly, …).** With `--split`, the trigger becomes a **backfill**: the date range is split into one run per interval (by unit and chunk size) as a single backfill. This is how you backfill selected assets with monthly batches:
 
 ```bash
 # One run per month across the quarter, for a single asset
@@ -306,8 +293,7 @@ bruin cloud runs trigger \
   --asset my_asset
 ```
 
-Use `--chunk-size` to group several split units into each batch. For example weekly
-batches via 7-day chunks, or two-month batches:
+Use `--chunk-size` to group several split units into each batch. For example weekly batches via 7-day chunks, or two-month batches:
 
 ```bash
 # One run per week (7-day chunks)
@@ -335,8 +321,7 @@ bruin cloud runs trigger \
 > include a final period, pass the date one period past it — e.g. `--end-date 2024-01-04`
 > to cover `2024-01-03` with `--split day`.
 
-When a `--split` trigger succeeds, the command prints a link to track the backfill
-in the dashboard:
+When a `--split` trigger succeeds, the command prints a link to track the backfill in the dashboard:
 
 ```text
 Successfully triggered backfill (split by day, chunk size 1) for pipeline 'my-pipeline' in project 'my-project'
@@ -426,14 +411,11 @@ List recent backfills, optionally filtered by project and pipeline:
 bruin cloud backfills list --project-id <project-id> --pipeline <pipeline-name>
 ```
 
-Each row shows the backfill ID (the `multiple_action_id`), its overall interval,
-and how many runs it fanned out into. Use `--limit` to control how many backfills
-are returned (default 20).
+Each row shows the backfill ID (the `multiple_action_id`), its overall interval, and how many runs it fanned out into. Use `--limit` to control how many backfills are returned (default 20).
 
 #### `runs`
 
-List the individual runs that make up a single backfill, using the backfill ID
-from `backfills list`:
+List the individual runs that make up a single backfill, using the backfill ID from `backfills list`:
 
 ```bash
 bruin cloud backfills runs --id <backfill-id>
@@ -545,9 +527,7 @@ bruin cloud glossary get --project-id <project-id> --entity <entity-name>
 
 ### `agents`
 
-Interact with Bruin Cloud AI agents from the terminal. Agents are scoped to your
-account (team) via the API key, not to a specific project, so these commands do
-not take a `--project-id`.
+Interact with Bruin Cloud AI agents from the terminal. Agents are scoped to your account (team) via the API key, not to a specific project, so these commands do not take a `--project-id`.
 
 #### `list`
 
@@ -559,10 +539,7 @@ bruin cloud agents list
 
 #### `usage-stats`
 
-Show AI usage across the agents you can see — total messages/threads, the
-current month's counters, and a per-agent breakdown. Defaults to the last 30
-days; pass `--days`, or an explicit `--start-date`/`--end-date` window. Use
-`--output json` for the full payload (per-day/per-month/per-user series).
+Show AI usage across the agents you can see — total messages/threads, the current month's counters, and a per-agent breakdown. Defaults to the last 30 days; pass `--days`, or an explicit `--start-date`/`--end-date` window. Use `--output json` for the full payload (per-day/per-month/per-user series).
 
 ```bash
 bruin cloud agents usage-stats
@@ -573,8 +550,7 @@ bruin cloud agents usage-stats --output json
 
 #### `delete`
 
-Delete an agent. Cascades to its scheduled agents, dashboards and chat threads,
-and revokes its Cloud-CLI token. Requires an owner or team admin.
+Delete an agent. Cascades to its scheduled agents, dashboards and chat threads, and revokes its Cloud-CLI token. Requires an owner or team admin.
 
 ```bash
 bruin cloud agents delete --agent-id <agent-id>
@@ -582,9 +558,7 @@ bruin cloud agents delete --agent-id <agent-id>
 
 #### `connections`
 
-List the connections available to an agent — names and types only (never
-credential values). Use it to pick a connection the agent can actually query,
-e.g. for a dashboard's `connection`:
+List the connections available to an agent — names and types only (never credential values). Use it to pick a connection the agent can actually query, e.g. for a dashboard's `connection`:
 
 ```bash
 bruin cloud agents connections --agent-id 7
@@ -593,10 +567,7 @@ bruin cloud agents connections --agent-id 7 --output json
 
 ##### `connections add`
 
-Add a connection to an agent's connection set so it can query it. By default the
-connection is read from your local `.bruin.yml` by name; alternatively pass the
-credentials inline with `--credentials` (JSON) and `--type`. Credential values
-are sent to Bruin Cloud but never printed.
+Add a connection to an agent's connection set so it can query it. By default the connection is read from your local `.bruin.yml` by name; alternatively pass the credentials inline with `--credentials` (JSON) and `--type`. Credential values are sent to Bruin Cloud but never printed.
 
 ```bash
 # From local .bruin.yml (reads type + credentials for the named connection)
@@ -612,8 +583,7 @@ bruin cloud agents connections add \
 
 #### `mcp`
 
-Manage an agent's external MCP servers (Linear, GitHub, Notion, …). Each MCP kind
-is backed by a `bruin.yml` connection from the agent's dev-env set.
+Manage an agent's external MCP servers (Linear, GitHub, Notion, …). Each MCP kind is backed by a `bruin.yml` connection from the agent's dev-env set.
 
 `list` shows the agent's current picks plus the connections eligible for each kind:
 
@@ -699,9 +669,7 @@ bruin cloud agents messages \
 
 #### `export-thread`
 
-Export a whole thread as JSON (thread, agent, and every message pair with
-input/output, agent logs, and query logs). Prints to stdout, or writes to a file
-with `--file`:
+Export a whole thread as JSON (thread, agent, and every message pair with input/output, agent logs, and query logs). Prints to stdout, or writes to a file with `--file`:
 
 ```bash
 bruin cloud agents export-thread \
@@ -716,13 +684,11 @@ bruin cloud agents export-thread \
 
 ### `connections`
 
-Manage the connections stored in Bruin Cloud. Connections live in your team's
-vault and are shared by your cloud pipelines.
+Manage the connections stored in Bruin Cloud. Connections live in your team's vault and are shared by your cloud pipelines.
 
 #### `add`
 
-Push a connection to Bruin Cloud. By default it reads the connection straight
-from your local `.bruin.yml`, so you don't have to retype credentials:
+Push a connection to Bruin Cloud. By default it reads the connection straight from your local `.bruin.yml`, so you don't have to retype credentials:
 
 ```bash
 # Reads the "my_pg" connection from the selected environment in .bruin.yml
@@ -735,16 +701,11 @@ bruin cloud connections add --name my_pg --environment prod
 bruin cloud connections add --name my_pg --config-file ./path/to/.bruin.yml
 ```
 
-When `--environment` is omitted, the `default_environment` from `.bruin.yml` is
-used (falling back to `default`).
+When `--environment` is omitted, the `default_environment` from `.bruin.yml` is used (falling back to `default`).
 
-For service-account based connections (BigQuery, GCS, Spanner, …) the CLI reads
-the local `service_account_file` and uploads its contents, since the cloud
-runner can't reach your local disk. A relative `service_account_file` is
-resolved against the `.bruin.yml` directory.
+For service-account based connections (BigQuery, GCS, Spanner, …) the CLI reads the local `service_account_file` and uploads its contents, since the cloud runner can't reach your local disk. A relative `service_account_file` is resolved against the `.bruin.yml` directory.
 
-To add a connection without a local `.bruin.yml` (e.g. in CI), pass the
-credentials inline. `--type` is required in this mode:
+To add a connection without a local `.bruin.yml` (e.g. in CI), pass the credentials inline. `--type` is required in this mode:
 
 ```bash
 bruin cloud connections add \
@@ -774,11 +735,7 @@ bruin cloud connections delete --name my_pg
 
 ### `connection-sets`
 
-Manage connection **sets** — named bundles of connections an agent runs against
-(assigned to an agent via its connection set). Distinct from individual
-connections. Credentials are write-only: reads never return config values, and
-create/update always send a full config per connection (read from the local
-`.bruin.yml`).
+Manage connection **sets** — named bundles of connections an agent runs against (assigned to an agent via its connection set). Distinct from individual connections. Credentials are write-only: reads never return config values, and create/update always send a full config per connection (read from the local `.bruin.yml`).
 
 #### `list`
 
@@ -805,8 +762,7 @@ bruin cloud connection-sets create --name prod \
   --connection my_pg --connection my_bq
 ```
 
-Use `--skip-validation` to skip the live connection test, and `--environment` /
-`--config-file` to pick a specific `.bruin.yml` / environment.
+Use `--skip-validation` to skip the live connection test, and `--environment` / `--config-file` to pick a specific `.bruin.yml` / environment.
 
 #### `update`
 
@@ -828,8 +784,7 @@ To assign a set to an agent, use `bruin cloud agents update --agent-id <id> --co
 
 ### `dashboards`
 
-Read the dashboards in your Bruin Cloud team — useful for inspecting or
-version-controlling a dashboard's definition.
+Read the dashboards in your Bruin Cloud team — useful for inspecting or version-controlling a dashboard's definition.
 
 #### `list`
 
@@ -853,12 +808,9 @@ bruin cloud dashboards get --dashboard-id 42 --output json
 
 #### `create`
 
-Create a dashboard from a definition. The definition is written to the dashboard's
-**draft** — it is never published automatically; publish it from the Bruin Cloud UI.
+Create a dashboard from a definition. The definition is written to the dashboard's **draft** — it is never published automatically; publish it from the Bruin Cloud UI.
 
-Pass `--agent-id` to bind the dashboard to an agent so its canvas chat and refresh
-work. If omitted, the server falls back to the agent encoded in a Cloud-CLI token;
-a generic team token has none, so the dashboard opens without a chat panel.
+Pass `--agent-id` to bind the dashboard to an agent so its canvas chat and refresh work. If omitted, the server falls back to the agent encoded in a Cloud-CLI token; a generic team token has none, so the dashboard opens without a chat panel.
 
 ```bash
 # Title only (empty draft)
@@ -948,10 +900,7 @@ filters:
     options: { query: "SELECT DISTINCT region FROM orders ORDER BY 1" }
 ```
 
-A widget's SQL references a filter with a double-brace placeholder named after the
-filter. Single-value filters (`date`, `text`, `number`, `select`) resolve to one
-value; a `date-range` filter resolves to a `.start` / `.end` pair; a multi-select
-(`select` with `multiple: true`) resolves to a list, so guard it and expand it:
+A widget's SQL references a filter with a double-brace placeholder named after the filter. Single-value filters (`date`, `text`, `number`, `select`) resolve to one value; a `date-range` filter resolves to a `.start` / `.end` pair; a multi-select (`select` with `multiple: true`) resolves to a list, so guard it and expand it:
 
 ```sql
 SELECT * FROM orders
@@ -967,11 +916,7 @@ Filters only act on `sql` widgets, so a dashboard built purely from inline data 
 
 #### `update`
 
-Update an existing dashboard's title, visibility, or definition. Only the flags
-you pass are changed. Like `create`, a new definition is written to the
-dashboard's **draft** — never published automatically; publish it from the Bruin
-Cloud UI. Changing visibility requires manage-access (the dashboard creator or a
-team admin).
+Update an existing dashboard's title, visibility, or definition. Only the flags you pass are changed. Like `create`, a new definition is written to the dashboard's **draft** — never published automatically; publish it from the Bruin Cloud UI. Changing visibility requires manage-access (the dashboard creator or a team admin).
 
 ```bash
 # Rename
@@ -987,9 +932,7 @@ bruin cloud dashboards update --dashboard-id 42 --visibility team
 
 #### `delete`
 
-Delete a dashboard so it stops appearing. Requires manage-access (the dashboard
-creator or a team admin); repo (DAC) dashboards are managed in the repo and can't
-be deleted here.
+Delete a dashboard so it stops appearing. Requires manage-access (the dashboard creator or a team admin); repo (DAC) dashboards are managed in the repo and can't be deleted here.
 
 ```bash
 bruin cloud dashboards delete --dashboard-id 42
@@ -1011,10 +954,7 @@ bruin cloud scheduled-agents get --scheduled-agent-id 42 --output json
 
 #### `create`
 
-Create a scheduled agent from a plan. It is stored as an inactive **draft** — a
-human reviews and activates it from the Bruin Cloud UI; the CLI never activates a
-run. Pass the plan with convenience flags, or the full plan via `--state-file`
-(JSON or YAML with `schedule`, `instructions`, `verified_sqls`, `memory`, ...).
+Create a scheduled agent from a plan. It is stored as an inactive **draft** — a human reviews and activates it from the Bruin Cloud UI; the CLI never activates a run. Pass the plan with convenience flags, or the full plan via `--state-file` (JSON or YAML with `schedule`, `instructions`, `verified_sqls`, `memory`, ...).
 
 ```bash
 bruin cloud scheduled-agents create --agent-id 7 --title "Daily revenue" \
@@ -1025,8 +965,7 @@ bruin cloud scheduled-agents create --agent-id 7 --state-file ./plan.yaml
 
 #### `update`
 
-Update a run's title or plan. Only the flags you pass change. Activation stays in
-the UI.
+Update a run's title or plan. Only the flags you pass change. Activation stays in the UI.
 
 ```bash
 bruin cloud scheduled-agents update --scheduled-agent-id 42 --cron "0 8 * * 1"
@@ -1035,9 +974,7 @@ bruin cloud scheduled-agents update --scheduled-agent-id 42 --state-file ./plan.
 
 #### `trigger`
 
-Run a scheduled agent now, off its schedule — the "Run now" action. The schedule
-is untouched (the next scheduled run still fires as planned). Refused while a run
-is already in progress. Prints the execution and thread ids.
+Run a scheduled agent now, off its schedule — the "Run now" action. The schedule is untouched (the next scheduled run still fires as planned). Refused while a run is already in progress. Prints the execution and thread ids.
 
 ```bash
 bruin cloud scheduled-agents trigger --scheduled-agent-id 42
@@ -1053,10 +990,7 @@ bruin cloud scheduled-agents delete --scheduled-agent-id 42
 
 #### `run-states`
 
-Manage a scheduled agent's **run-state** files — the markdown "memory" the agent
-persists across runs (keyed by name, upserted on write). Reads and writes both
-require only the `scheduled-agent:list` ability, so any Cloud-CLI-enabled agent
-can manage its own run state.
+Manage a scheduled agent's **run-state** files — the markdown "memory" the agent persists across runs (keyed by name, upserted on write). Reads and writes both require only the `scheduled-agent:list` ability, so any Cloud-CLI-enabled agent can manage its own run state.
 
 ```bash
 # List the files on a scheduled agent
@@ -1077,8 +1011,7 @@ bruin cloud scheduled-agents run-states delete --scheduled-agent-id 42 --name me
 
 ### `skills`
 
-Manage the team **skill library** — named instruction snippets you attach to
-agents. Team-scoped (you only see your own team's skills).
+Manage the team **skill library** — named instruction snippets you attach to agents. Team-scoped (you only see your own team's skills).
 
 ```bash
 # List
@@ -1171,9 +1104,7 @@ bruin cloud runs trigger \
   --end-date 2024-01-31
 ```
 
-To reprocess in batches — one run per month, week, or day — add `--split` (and
-optionally `--chunk-size`). Combine it with an `--asset` selection to backfill just
-part of the pipeline:
+To reprocess in batches — one run per month, week, or day — add `--split` (and optionally `--chunk-size`). Combine it with an `--asset` selection to backfill just part of the pipeline:
 
 ```bash
 # One run per month across the year, for a single asset

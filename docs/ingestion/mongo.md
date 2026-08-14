@@ -37,8 +37,7 @@ Bruin turns this configuration into a MongoDB URI in the following form:
 mongodb://testUser:testPass123@localhost:27017
 ```
 
-If `username` is empty, Bruin omits the username and password from the URI.
-If your username or password contains special characters, Bruin URL-encodes them when it builds the URI.
+If `username` is empty, Bruin omits the username and password from the URI. If your username or password contains special characters, Bruin URL-encodes them when it builds the URI.
 
 > [!CAUTION]
 > Always set `port` for `mongo` connections. The current configuration loader does not apply the schema default when reading `.bruin.yml`, so omitting `port` will build a URI with port `0`.

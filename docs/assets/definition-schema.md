@@ -75,8 +75,7 @@ Standalone YAML assets must use the file name suffix `<name>.asset.yml` or `<nam
 
 ## `name`
 
-The name of the asset, used for many things including dependencies, materialization and more. Corresponds to the `schema.table` convention.
-Must consist of letters and dot `.` character.
+The name of the asset, used for many things including dependencies, materialization and more. Corresponds to the `schema.table` convention. Must consist of letters and dot `.` character.
 
 - **Type:** `String`
 
@@ -184,8 +183,7 @@ enabled: "{{ var.asset_enabled }}"
 
 ## `connection`
 
-The connection name used to run this asset. If omitted, Bruin uses the pipeline-level `default_connections` value for the asset platform in most cases.
-For Python assets with `materialization.type: table`, `connection` must be set explicitly on the asset.
+The connection name used to run this asset. If omitted, Bruin uses the pipeline-level `default_connections` value for the asset platform in most cases. For Python assets with `materialization.type: table`, `connection` must be set explicitly on the asset.
 
 ```yaml
 connection: bigquery-default
@@ -223,9 +221,7 @@ Additional metadata for the asset stored as key-value pairs. This can be used to
 
 ## `depends`
 
-The list of assets this asset depends on. This list determines the execution order.
-In other words, the asset will be executed only when all of the assets in the `depends` list have succeeded.
-The items of this list can be just a `String` with the name of the asset in the same pipeline or an `Object` which can contain the following attributes
+The list of assets this asset depends on. This list determines the execution order. In other words, the asset will be executed only when all of the assets in the `depends` list have succeeded. The items of this list can be just a `String` with the name of the asset in the same pipeline or an `Object` which can contain the following attributes
 
 - `asset` : The name of the asset. Must be on the same pipeline
 - `uri` : The URI of the upstream asset. This is used in [cloud](../cloud/overview.md) when you want to have an upstream on a different pipeline. See [uri](#uri) above
@@ -259,8 +255,7 @@ interval_modifiers:
   start: '{% if start_timestamp|date_format("%H") == "00" %}-20d{% else %}0{% endif %}'
 ```
 
-Supported time units: `ns` (nanoseconds), `ms` (milliseconds), `s` (seconds), `m` (minutes), `h` (hours), `d` (days), `M` (months).
-See [interval modifiers](./interval-modifiers) for more details.
+Supported time units: `ns` (nanoseconds), `ms` (milliseconds), `s` (seconds), `m` (minutes), `h` (hours), `d` (days), `M` (months). See [interval modifiers](./interval-modifiers) for more details.
 
 - **Type:** `Object`
 
@@ -290,8 +285,7 @@ Sets the timeout for an asset. During `bruin run`, an execution step that exceed
 timeout: 1h30m
 ```
 
-If omitted, the asset inherits `default.timeout` from `pipeline.yml` when one is configured.
-The timeout must be at least one second. It is separate from the run-wide [`bruin run --timeout`](/commands/run) setting; whichever deadline is reached first cancels the execution.
+If omitted, the asset inherits `default.timeout` from `pipeline.yml` when one is configured. The timeout must be at least one second. It is separate from the run-wide [`bruin run --timeout`](/commands/run) setting; whichever deadline is reached first cancels the execution.
 
 - **Type:** `String` (Go duration)
 

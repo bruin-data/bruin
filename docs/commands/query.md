@@ -1,7 +1,6 @@
 # Query Command
 
-The `query` command executes and retrieves the results of a query on a specified connection and
-returns the results in table format, JSON, or CSV.
+The `query` command executes and retrieves the results of a query on a specified connection and returns the results in table format, JSON, or CSV.
 
 You can run it in three modes:
 
@@ -79,9 +78,7 @@ Each file includes the header row with column names.
 
 ## Template variables
 
-You can inject Jinja template variables into a query with `--var`. The flag can be passed
-multiple times and supports flat, nested, and JSON values, so you can test dashboard-style
-SQL — including nested `filters.*` variables — directly from the CLI.
+You can inject Jinja template variables into a query with `--var`. The flag can be passed multiple times and supports flat, nested, and JSON values, so you can test dashboard-style SQL — including nested `filters.*` variables — directly from the CLI.
 
 **Flat variables:**
 
@@ -93,8 +90,7 @@ bruin query --connection my_connection \
 
 **Nested variables (dot-notation):**
 
-Use a dotted key to build a nested object. This matches the nested `filters` object the
-dashboard runtime injects, so <span v-pre>`{{ filters.start_date }}`</span> resolves as expected:
+Use a dotted key to build a nested object. This matches the nested `filters` object the dashboard runtime injects, so <span v-pre>`{{ filters.start_date }}`</span> resolves as expected:
 
 ```bash
 bruin query --connection my_connection \
@@ -113,15 +109,11 @@ bruin query --connection my_connection \
   --var filters='{"start_date":"2026-05-20","end_date":"2026-05-27"}'
 ```
 
-Scalar values are kept as literal strings (matching how pipeline variables work in YAML);
-only values that look like a JSON object or array are parsed as JSON.
+Scalar values are kept as literal strings (matching how pipeline variables work in YAML); only values that look like a JSON object or array are parsed as JSON.
 
 ## Querying MongoDB
 
-MongoDB connections (`mongo` and `mongo_atlas`) are not SQL, so the `--query` value is a JSON
-object describing a single **find** or **aggregation** against one collection instead of a SQL
-statement. The returned documents are flattened into a table: columns are the union of the
-top-level fields (in first-seen order), and nested documents and arrays are shown as JSON.
+MongoDB connections (`mongo` and `mongo_atlas`) are not SQL, so the `--query` value is a JSON object describing a single **find** or **aggregation** against one collection instead of a SQL statement. The returned documents are flattened into a table: columns are the union of the top-level fields (in first-seen order), and nested documents and arrays are shown as JSON.
 
 The envelope fields are:
 
@@ -136,9 +128,7 @@ The envelope fields are:
 | `aggregate`  | Aggregation pipeline (an array of stages). Mutually exclusive with `filter`/`projection`/`sort`. |
 | `database`   | Override the connection's configured database for this query.               |
 
-Values are parsed as [MongoDB Extended JSON](https://www.mongodb.com/docs/manual/reference/mongodb-extended-json/),
-so query operators such as `$gt`, `$and`, and `$match` pass through unchanged while type wrappers
-such as `{"$oid":"..."}` and `{"$date":"..."}` are interpreted as the corresponding BSON types.
+Values are parsed as [MongoDB Extended JSON](https://www.mongodb.com/docs/manual/reference/mongodb-extended-json/), so query operators such as `$gt`, `$and`, and `$match` pass through unchanged while type wrappers such as `{"$oid":"..."}` and `{"$date":"..."}` are interpreted as the corresponding BSON types.
 
 > [!NOTE]
 > The SQL-oriented `--limit` flag does not apply to MongoDB queries. Set `"limit"` inside the

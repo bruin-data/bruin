@@ -55,8 +55,7 @@ View materialization is also supported. For local and single-node StarRocks clus
 
 #### Table layout
 
-Distribution and partitioning are taken from the standard materialization fields,
-so they work the same way as on the other platforms:
+Distribution and partitioning are taken from the standard materialization fields, so they work the same way as on the other platforms:
 
 - `materialization.cluster_by` → `DISTRIBUTED BY HASH(...)` (defaults to the key columns)
 - `materialization.partition_by` → `PARTITION BY (...)` (a column or expression such as `date_trunc('day', event_date)`)

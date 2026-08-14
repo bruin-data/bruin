@@ -145,8 +145,7 @@ node.data-dir=/data/trino
 
 ### Guide: Iceberg + Glue + S3 {#guide-glue-s3}
 
-Use this when you want AWS Glue as the Iceberg catalog.
-The Docker setup below is an example for local testing purposes.
+Use this when you want AWS Glue as the Iceberg catalog. The Docker setup below is an example for local testing purposes.
 
 `docker-compose.yml`:
 
@@ -187,8 +186,7 @@ s3.region=us-east-1
 
 ### Guide: Iceberg + Nessie (In-Memory) + S3 {#guide-nessie-in-memory-s3}
 
-Use this for local testing with ephemeral Nessie metadata.
-The Docker setup below is an example for local testing and documentation purposes.
+Use this for local testing with ephemeral Nessie metadata. The Docker setup below is an example for local testing and documentation purposes.
 
 ```yaml
 services:
@@ -235,16 +233,15 @@ iceberg.nessie-catalog.default-warehouse-dir=s3://example-lakehouse/warehouse
 fs.native-s3.enabled=true
 s3.region=us-east-1
 ```
-- `iceberg.nessie-catalog.uri` points to the Nessie API, 
-- `iceberg.nessie-catalog.ref` selects the active branch/ref, and 
+- `iceberg.nessie-catalog.uri` points to the Nessie API,
+- `iceberg.nessie-catalog.ref` selects the active branch/ref, and
 - `iceberg.nessie-catalog.default-warehouse-dir` sets where Iceberg data files are written in S3.
 
 <br>
 
 ### Guide: Iceberg + Nessie (In-Memory) + GCS {#guide-nessie-in-memory-gcs}
 
-Use this for local testing with ephemeral Nessie metadata and GCS object storage.
-The Docker setup below is an example for local testing and documentation purposes.
+Use this for local testing with ephemeral Nessie metadata and GCS object storage. The Docker setup below is an example for local testing and documentation purposes.
 
 `docker-compose.yml`:
 
