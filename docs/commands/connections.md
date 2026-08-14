@@ -132,8 +132,7 @@ bruin connections delete -e staging -n test-connection -o json
 
 ## Test Connection
 
-To test if a connection is valid, you can use the test command.
-This command runs a simple validation check for the connection.
+To test if a connection is valid, you can use the test command. This command runs a simple validation check for the connection.
 
 ```bash
 bruin connections test --name <connection-name> [--env <environment>]

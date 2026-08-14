@@ -43,8 +43,7 @@ This is useful when you only need to read from a shared DuckDB database and want
 
 ## Assets
 
-DuckDB assets should use the type `duckdb.sql` and if you specify a connection it must be of the `duckdb` type.
-For detailed parameters, you can check [Definition Schema](../assets/definition-schema.md) page.
+DuckDB assets should use the type `duckdb.sql` and if you specify a connection it must be of the `duckdb` type. For detailed parameters, you can check [Definition Schema](../assets/definition-schema.md) page.
 
 Asset names may be `table`, `schema.table`, or `catalog.schema.table`. A three-part name targets an attached database (catalog); Bruin creates the schema in that catalog automatically, but the catalog must already be attached.
 
@@ -278,8 +277,7 @@ catalog:
 
 #### S3
 
-Bruin currently only supports explicit AWS credentials in the `auth` block.
-Session tokens are supported for temporary credentials (AWS STS).
+Bruin currently only supports explicit AWS credentials in the `auth` block. Session tokens are supported for temporary credentials (AWS STS).
 
 ```yaml
 storage:
@@ -330,9 +328,7 @@ storage:
 
 #### GCS
 
-Bruin currently supports explicit GCS HMAC credentials in the `auth` block (`access_key` and `secret_key`).
-You need to create GCS HMAC keys first and declare them here.
-Quick link (GCP Console): [Interoperability settings](https://console.cloud.google.com/storage/settings;tab=interoperability)
+Bruin currently supports explicit GCS HMAC credentials in the `auth` block (`access_key` and `secret_key`). You need to create GCS HMAC keys first and declare them here. Quick link (GCP Console): [Interoperability settings](https://console.cloud.google.com/storage/settings;tab=interoperability)
 ```yaml
 storage:
   type: gcs
@@ -344,9 +340,7 @@ storage:
 
 #### Azure
 
-Bruin supports Azure Blob Storage for DuckLake. Authenticate either with an account-key
-`connection_string`, or with `account_name` alone to use DuckDB's credential chain
-(managed identity, `az login`, or environment credentials).
+Bruin supports Azure Blob Storage for DuckLake. Authenticate either with an account-key `connection_string`, or with `account_name` alone to use DuckDB's credential chain (managed identity, `az login`, or environment credentials).
 
 ```yaml
 storage:
@@ -365,9 +359,7 @@ storage:
     account_name: "${AZURE_STORAGE_ACCOUNT}"
 ```
 
-Bruin loads the `azure` extension and sets `azure_transport_option_type = 'curl'`
-(globally) so TLS to `*.blob.core.windows.net` uses the system CA bundle — required on
-Linux/containers, which must have `ca-certificates` installed.
+Bruin loads the `azure` extension and sets `azure_transport_option_type = 'curl'` (globally) so TLS to `*.blob.core.windows.net` uses the system CA bundle — required on Linux/containers, which must have `ca-certificates` installed.
 
 > [!NOTE]
 > DuckLake maintenance calls that delete/scan blobs (e.g.

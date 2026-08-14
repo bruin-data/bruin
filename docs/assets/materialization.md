@@ -346,8 +346,7 @@ Supported platforms for `merge_sql`:
 - Athena (Iceberg tables): supported
 - Databricks, ClickHouse, Trino, DuckDB, Dremio, Sail: not supported
 
-Spark `merge` requires a catalog and table format that implement row-level
-`MERGE INTO`, such as Iceberg with the Spark SQL extensions enabled.
+Spark `merge` requires a catalog and table format that implement row-level `MERGE INTO`, such as Iceberg with the Spark SQL extensions enabled.
 
 > [!INFO]
 > An important difference between `merge` and `delete+insert` is that `merge` will update the existing rows, while `delete+insert` will delete the existing rows and insert the new rows. This means if your source has deleted rows, `merge` will not delete them from the destination, whereas `delete+insert` will if their `incremental_key` matches.
@@ -463,12 +462,9 @@ The strategy will:
 
 ### `DDL`
 
-The `DDL` (Data Definition Language) strategy is used to create a new table using the information provided in the
-embedded YAML section of the asset. This is useful when you want to create a new table with a specific schema and structure
-and ensure that this table is only created once.
+The `DDL` (Data Definition Language) strategy is used to create a new table using the information provided in the embedded YAML section of the asset. This is useful when you want to create a new table with a specific schema and structure and ensure that this table is only created once.
 
-The `DDL` strategy defines the table structure via column definitions in the columns field of the asset.
-For this reason, you should not include any query after the embedded YAML section.
+The `DDL` strategy defines the table structure via column definitions in the columns field of the asset. For this reason, you should not include any query after the embedded YAML section.
 
 Here's an example of an asset with `DDL` materialization:
 
@@ -508,8 +504,7 @@ This strategy will:
 - Create a new empty table with the name `dashboard.products`
 - Use the provided schema to define the column names, column types as well as optional primary key constraints and descriptions.
 
-The strategy also supports partitioning and clustering for data warehouses that support these features. You can specify
-in the materialization definition with the following keys:
+The strategy also supports partitioning and clustering for data warehouses that support these features. You can specify in the materialization definition with the following keys:
 
 - `partition_by`
 - `cluster_by`
@@ -705,8 +700,7 @@ This strategy automatically detects changes in non-primary key columns and creat
 - At least one column must be marked as `primary_key: true`
 - The column names `_valid_from`, `_valid_until`, and `_is_current` are reserved and cannot be used in your column definitions
 
-**How it works:**
-When changes are detected in non-primary key columns:
+**How it works:** When changes are detected in non-primary key columns:
 
 1. The existing record is marked as historical (`_is_current: false`) and gets an end timestamp in `_valid_until`
 2. A new record is inserted with the updated values (`_is_current: true`) and `_valid_until` set to '9999-12-31'
@@ -869,8 +863,7 @@ The `scd2_by_time` strategy implements [Slowly Changing Dimension Type 2](https:
 - An `incremental_key` must be specified that references a column of type `TIMESTAMP` or `DATE`
 - The column names `_valid_from`, `_valid_until`, and `_is_current` are reserved and cannot be used in your column definitions
 
-**How it works:**
-The strategy tracks changes based on the time values in the `incremental_key` column:
+**How it works:** The strategy tracks changes based on the time values in the `incremental_key` column:
 
 1. When a record has a newer timestamp than existing records, it creates a new version
 2. Previous versions are marked as historical (`_is_current: false`) with their `_valid_until` updated

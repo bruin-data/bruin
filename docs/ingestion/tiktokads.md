@@ -48,16 +48,9 @@ parameters:
 - `type`: Specifies the type of the asset. Set this to ingestr to use the ingestr data pipeline.
 - `connection`: This is the destination connection, which defines where the data should be stored. For example: `postgres` indicates that the ingested data will be stored in a Postgres database.
 - `source_connection`: The name of the  TikTok Ads connection defined in .bruin.yml.
-- `source_table`: The custom report in TikTok Ads you want to ingest based on the dimension and metrics.
-Custom Table Format:
+- `source_table`: The custom report in TikTok Ads you want to ingest based on the dimension and metrics. Custom Table Format:
 
-`custom:<dimensions>:<metrics>[:<filter_name,filter_values>]`
-Parameters:
-`dimensions`(required): A comma-separated list of dimensions to retrieve.
-`metrics` (required): A comma-separated list of metrics to retrieve.
-`filters (optional): Filters are specified in the format <filter_name=filter_values>.
-`filter_name`: The name of the filter (e.g. campaign_ids).
-`filter_values`: A comma-separated list of one or more values associated with the filter name (e.g., camp_id123,camp_id456). Only the IN filter type is supported. Learn more about filters [here](https://business-api.tiktok.com/portal/docs?id=1751443975608321).
+`custom:<dimensions>:<metrics>[:<filter_name,filter_values>]` Parameters: `dimensions`(required): A comma-separated list of dimensions to retrieve. `metrics` (required): A comma-separated list of metrics to retrieve. `filters (optional): Filters are specified in the format <filter_name=filter_values>. `filter_name`: The name of the filter (e.g. campaign_ids). `filter_values`: A comma-separated list of one or more values associated with the filter name (e.g., camp_id123,camp_id456). Only the IN filter type is supported. Learn more about filters [here](https://business-api.tiktok.com/portal/docs?id=1751443975608321).
 
 ## Available Source Tables
 

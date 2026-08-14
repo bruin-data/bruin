@@ -2,12 +2,9 @@
 
 ## Overview
 
-A pipeline is a group of assets that are executed together in the right order.
-For instance, if you have an asset that ingests data from an API, and another one that creates another table from the
-ingested data, you have a pipeline.
+A pipeline is a group of assets that are executed together in the right order. For instance, if you have an asset that ingests data from an API, and another one that creates another table from the ingested data, you have a pipeline.
 
-A pipeline is defined with a `pipeline.yml` file, and all the assets need to be under a folder called `assets` next to
-this file:
+A pipeline is defined with a `pipeline.yml` file, and all the assets need to be under a folder called `assets` next to this file:
 
 ```diff
 my-pipeline/
@@ -143,9 +140,7 @@ name: analytics-daily
 
 ### Schedule
 
-Defines **how often** your pipeline should execute.
-This setting is used by your orchestrator (for example, Bruin Cloud or an external scheduler) to automatically trigger
-the pipeline at regular intervals.
+Defines **how often** your pipeline should execute. This setting is used by your orchestrator (for example, Bruin Cloud or an external scheduler) to automatically trigger the pipeline at regular intervals.
 
 You can use simple presets like `@daily` or `@hourly`, or define a custom **cron expression** for more granular control.
 
@@ -185,8 +180,7 @@ start_date: "2024-01-01"
 
 ### Default connections
 
-Define per‑platform default connection names that assets inherit automatically. Use this to avoid repeating connection
-settings; override at the asset level when an asset needs a different connection.
+Define per‑platform default connection names that assets inherit automatically. Use this to avoid repeating connection settings; override at the asset level when an asset needs a different connection.
 
 Example:
 
@@ -203,8 +197,7 @@ default_connections:
 
 ### Tags
 
-Attach labels to organize your pipeline and to target subsets of work. Useful for filtering in UIs/CLI (e.g., selecting
-by tag) and for reporting.
+Attach labels to organize your pipeline and to target subsets of work. Useful for filtering in UIs/CLI (e.g., selecting by tag) and for reporting.
 
 Example:
 
@@ -217,8 +210,7 @@ tags: [ "daily", "analytics" ]
 
 ### Domains
 
-Group your pipeline by business domain (e.g., marketing, finance) to improve discoverability and governance. Helps
-organize views and ownership in larger repos.
+Group your pipeline by business domain (e.g., marketing, finance) to improve discoverability and governance. Helps organize views and ownership in larger repos.
 
 Example:
 
@@ -231,8 +223,7 @@ domains: [ "marketing" ]
 
 ### Meta
 
-Add custom key/value annotations for cost attribution, or anything your team tracks. Great for search,
-dashboards, and lightweight governance.
+Add custom key/value annotations for cost attribution, or anything your team tracks. Great for search, dashboards, and lightweight governance.
 
 Example:
 
@@ -259,8 +250,7 @@ owner: data-platform
 
 ### Notifications
 
-Send alerts when runs succeed or fail so your team stays informed. Choose one or more channels and specify where to
-deliver the message (e.g., Slack channel or a webhook connection).
+Send alerts when runs succeed or fail so your team stays informed. Choose one or more channels and specify where to deliver the message (e.g., Slack channel or a webhook connection).
 
 Example:
 
@@ -293,8 +283,7 @@ notifications:
 
 ### Catchup
 
-Backfill any missed intervals between start_date and now. Turn this on when you need to automatically recover historical
-runs after downtime or late onboarding.
+Backfill any missed intervals between start_date and now. Turn this on when you need to automatically recover historical runs after downtime or late onboarding.
 
 `catchup` accepts either a boolean or a string mode:
 
@@ -315,8 +304,7 @@ catchup: active
 
 ### Metadata push
 
-Export pipeline and asset metadata to external systems (e.g., a data catalog). Enable when you want lineage, discovery,
-or governance powered by your warehouse or catalog tooling.
+Export pipeline and asset metadata to external systems (e.g., a data catalog). Enable when you want lineage, discovery, or governance powered by your warehouse or catalog tooling.
 
 Example:
 
@@ -335,8 +323,7 @@ Fields:
 
 ### Retries
 
-Control resilience to transient failures by retrying assets/runs a limited number of times. Increase for flaky
-networks/services; keep low to surface real issues.
+Control resilience to transient failures by retrying assets/runs a limited number of times. Increase for flaky networks/services; keep low to surface real issues.
 
 Example:
 
@@ -373,8 +360,7 @@ default:
 
 ### Concurrency
 
-Limit how many runs you can take at the same time for this pipeline in Bruin Cloud.
-Defaults to 1 for safety.
+Limit how many runs you can take at the same time for this pipeline in Bruin Cloud. Defaults to 1 for safety.
 
 Example:
 
@@ -411,13 +397,9 @@ max_active_steps: 8
 
 ### Default (pipeline-level defaults)
 
-Set sensible defaults for all assets in the pipeline so you don't repeat yourself. Override at the asset level only when
-a task needs something different. The `default` block accepts asset definition fields except file-derived/runtime-only
-fields such as `id`, `run`/executable file details, definition file details, and derived `retries_delay`.
+Set sensible defaults for all assets in the pipeline so you don't repeat yourself. Override at the asset level only when a task needs something different. The `default` block accepts asset definition fields except file-derived/runtime-only fields such as `id`, `run`/executable file details, definition file details, and derived `retries_delay`.
 
-Scalar defaults fill only empty asset fields. Maps such as `parameters`, `meta`, and `metadata` are merged without
-overwriting asset keys. Repeated fields such as `tags`, `domains`, `depends`, `extends`, `columns`, `custom_checks`,
-and `notifications` are added when they are not already present.
+Scalar defaults fill only empty asset fields. Maps such as `parameters`, `meta`, and `metadata` are merged without overwriting asset keys. Repeated fields such as `tags`, `domains`, `depends`, `extends`, `columns`, `custom_checks`, and `notifications` are added when they are not already present.
 
 Example:
 
@@ -472,8 +454,7 @@ Fields:
 | refresh_restricted | Boolean                    | —       | Default full-refresh restriction |
 | notifications      | Object                     | —       | Default asset notifications      |
 
-Asset identity/runtime fields such as `name`, `uri`, executable file metadata, definition file metadata, and `retries_delay`
-are not supported in pipeline defaults.
+Asset identity/runtime fields such as `name`, `uri`, executable file metadata, definition file metadata, and `retries_delay` are not supported in pipeline defaults.
 
 Secrets item:
 

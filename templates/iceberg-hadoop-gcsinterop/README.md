@@ -1,20 +1,14 @@
 # Bruin — Iceberg with no catalog service, on GCS
 
-Loads two tables from [Frankfurter](https://frankfurter.dev), a public
-exchange-rate API, into **Apache Iceberg** tables that need no catalog service at
-all. The `hadoop` catalog keeps its metadata in the warehouse itself, so the
-bucket is the only thing to provision.
+Loads two tables from [Frankfurter](https://frankfurter.dev), a public exchange-rate API, into **Apache Iceberg** tables that need no catalog service at all. The `hadoop` catalog keeps its metadata in the warehouse itself, so the bucket is the only thing to provision.
 
-Storage is Google Cloud Storage reached through its **S3 interoperability API**,
-the alternative to a service-account key.
+Storage is Google Cloud Storage reached through its **S3 interoperability API**, the alternative to a service-account key.
 
 ## Setup
 
-An **HMAC key** for the bucket: Cloud Storage → Settings → Interoperability →
-*Create a key*. It looks like an AWS key pair and is used as one.
+An **HMAC key** for the bucket: Cloud Storage → Settings → Interoperability → *Create a key*. It looks like an AWS key pair and is used as one.
 
-Then fill in the blanks in `.bruin.yml` — the connection is already there, only
-the marked values are missing:
+Then fill in the blanks in `.bruin.yml` — the connection is already there, only the marked values are missing:
 
 ```yaml
       iceberg:
@@ -32,8 +26,7 @@ the marked values are missing:
             allow-unsafe-commits: "true"
 ```
 
-Replace each `${...}` with the value, or export them as environment variables
-and leave the file alone — Bruin expands both:
+Replace each `${...}` with the value, or export them as environment variables and leave the file alone — Bruin expands both:
 
 ```bash
 export GCS_BUCKET=my-company-lake
@@ -55,10 +48,6 @@ bruin run iceberg-hadoop-gcsinterop
 > not for concurrent production writes. Move to Glue, REST or Postgres when that
 > matters.
 
-The storage block says `type: s3` with an `s3://` warehouse even though the
-bucket is Google's, because the S3 interop endpoint really is an S3 API — only
-`endpoint` points at Google. For native GCS instead, use `type: gcs`, a `gs://`
-warehouse and a service-account key, as in `iceberg-postgres-gcs`.
+The storage block says `type: s3` with an `s3://` warehouse even though the bucket is Google's, because the S3 interop endpoint really is an S3 API — only `endpoint` points at Google. For native GCS instead, use `type: gcs`, a `gs://` warehouse and a service-account key, as in `iceberg-postgres-gcs`.
 
-No `region` here: Google ignores it, and ingestr supplies the placeholder the
-AWS SDK insists on. AWS S3 still needs a real one.
+No `region` here: Google ignores it, and ingestr supplies the placeholder the AWS SDK insists on. AWS S3 still needs a real one.

@@ -16,8 +16,7 @@ In more concrete terms, an asset can be:
 - a machine learning model
 - an MS Excel/Google Sheets/Airbyte/Notion document
 
-This abstraction enables building multi-language data pipelines that are agnostic of a database/destinations.
-You will primarily be interacting with assets when using Bruin.
+This abstraction enables building multi-language data pipelines that are agnostic of a database/destinations. You will primarily be interacting with assets when using Bruin.
 
 Here's an example SQL asset:
 
@@ -62,9 +61,7 @@ The details on the asset definition can be seen [here](/assets/definition-schema
 
 ## Pipeline
 
-A pipeline is a group of assets that are executed together in the right order.
-For instance, if you have an asset that ingests data from an API, and another one that creates another table from the ingested data, you have a pipeline.
-Asset executions occur on a pipeline level.
+A pipeline is a group of assets that are executed together in the right order. For instance, if you have an asset that ingests data from an API, and another one that creates another table from the ingested data, you have a pipeline. Asset executions occur on a pipeline level.
 
 For complete pipeline documentation, see [Pipeline Definition](/pipelines/definition).
 
@@ -101,8 +98,7 @@ bruin run my-pipeline
 
 ## Asset Instance
 
-An asset instance is a single execution of an asset at a given time.
-For instance, if you have a Python asset and you run it, Bruin creates an asset instance that executes your code.
+An asset instance is a single execution of an asset at a given time. For instance, if you have a Python asset and you run it, Bruin creates an asset instance that executes your code.
 
 Asset instance is an internal concept, although it is relevant to understand since actual executions are based on asset instances.
 
@@ -129,8 +125,7 @@ When you run a pipeline, Bruin will find this file in the repo root, parse the c
 
 ## Default Connections
 
-Default connections are top-level defaults that reduces repetition by stating what connections to use on types of assets.
-For instance, a pipeline might have SQL queries that run on Google BigQuery or Snowflake, and based on the type of an asset Bruin picks the appropriate connection.
+Default connections are top-level defaults that reduces repetition by stating what connections to use on types of assets. For instance, a pipeline might have SQL queries that run on Google BigQuery or Snowflake, and based on the type of an asset Bruin picks the appropriate connection.
 
 ## Defaults
 

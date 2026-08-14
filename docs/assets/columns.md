@@ -8,8 +8,7 @@ Bruin supports column definitions inside assets to make them a part of your data
 
 ## Definition Schema
 
-The top level `columns` key is where you can define your columns. This is a list that contains all the columns defined
-with the asset, along with their quality checks and other metadata.
+The top level `columns` key is where you can define your columns. This is a list that contains all the columns defined with the asset, along with their quality checks and other metadata.
 
 Here's an example column definition:
 
@@ -61,9 +60,7 @@ Each column will have the following keys:
 
 ### Foreign keys
 
-`foreign_key` documents that a column references a column in another asset. It captures
-the relationship for documentation and lineage purposes; whether it is enforced depends on
-the target platform (most warehouses store it as metadata only).
+`foreign_key` documents that a column references a column in another asset. It captures the relationship for documentation and lineage purposes; whether it is enforced depends on the target platform (most warehouses store it as metadata only).
 
 ```yaml
 columns:
@@ -81,19 +78,13 @@ columns:
 | `table`  | String | yes  | The name of the referenced asset             |
 | `column` | String | yes  | The referenced column within that asset      |
 
-These fields are optional, but when set, `bruin validate` checks that they are well-formed:
-a foreign key must name both a `table` and a `column`, the referenced asset must exist in
-the pipeline, and the referenced column must exist on it. Numeric type detail is also
-checked — `precision`/`length` must be positive, `scale` must not be negative, and `scale`
-must not exceed `precision`.
+These fields are optional, but when set, `bruin validate` checks that they are well-formed: a foreign key must name both a `table` and a `column`, the referenced asset must exist in the pipeline, and the referenced column must exist on it. Numeric type detail is also checked — `precision`/`length` must be positive, `scale` must not be negative, and `scale` must not exceed `precision`.
 
 Adding the [`relationships`](../quality/available_checks.md#relationships) quality check turns the metadata into a runtime referential-integrity validation. Metadata alone does not cause Bruin to query the referenced table or create a scheduler dependency. Add the referenced asset to `depends` when it must be refreshed before the check runs.
 
 ### Type detail
 
-`precision`, `scale`, `length`, and `collation` complement `type` with the structured
-detail that databases keep at the column level. They do not replace `type`; you can set
-`type: decimal` and add `precision`/`scale` instead of encoding it as `decimal(10,2)`.
+`precision`, `scale`, `length`, and `collation` complement `type` with the structured detail that databases keep at the column level. They do not replace `type`; you can set `type: decimal` and add `precision`/`scale` instead of encoding it as `decimal(10,2)`.
 
 ```yaml
 columns:
@@ -110,12 +101,7 @@ columns:
 
 ### DDL generation
 
-When an asset uses the `ddl` [materialization](./materialization.md) strategy, these fields
-are emitted into the generated `CREATE TABLE` statement: `precision`/`scale`/`length` become
-type modifiers (e.g. `decimal(10, 2)`, `varchar(255)`), and `collation`, `default`, and
-`foreign_key` become column/table clauses. Foreign keys are emitted as `NOT ENFORCED` on
-platforms that only store them as metadata (e.g. BigQuery). Support is currently available
-for PostgreSQL, BigQuery, and Snowflake, and is being extended to the other platforms.
+When an asset uses the `ddl` [materialization](./materialization.md) strategy, these fields are emitted into the generated `CREATE TABLE` statement: `precision`/`scale`/`length` become type modifiers (e.g. `decimal(10, 2)`, `varchar(255)`), and `collation`, `default`, and `foreign_key` become column/table clauses. Foreign keys are emitted as `NOT ENFORCED` on platforms that only store them as metadata (e.g. BigQuery). Support is currently available for PostgreSQL, BigQuery, and Snowflake, and is being extended to the other platforms.
 
 ### Quality Checks
 
@@ -131,9 +117,7 @@ For more details on the quality checks, please refer to the  [Quality](../qualit
 
 ### Column name mapping (ingestr assets)
 
-For ingestr assets, you can rename a column on its way from the source to the destination
-by setting `source_column` on the column entry. The `name` field stays the destination
-column name; `source_column` is the column that exists on the source.
+For ingestr assets, you can rename a column on its way from the source to the destination by setting `source_column` on the column entry. The `name` field stays the destination column name; `source_column` is the column that exists on the source.
 
 ```yaml
 columns:
@@ -149,12 +133,9 @@ columns:
     type: timestamp
 ```
 
-With the mapping above, the source table's `fname`, `eml`, and `crtd_ts` columns land in
-the destination as `first_name`, `email`, and `created_at`. Columns without
-`source_column` keep their original source names.
+With the mapping above, the source table's `fname`, `eml`, and `crtd_ts` columns land in the destination as `first_name`, `email`, and `created_at`. Columns without `source_column` keep their original source names.
 
-For the mapping to take effect, `enforce_schema: "true"` must be set under the asset's
-`parameters` block. 
+For the mapping to take effect, `enforce_schema: "true"` must be set under the asset's `parameters` block.
 
 ```yaml
 parameters:
@@ -170,9 +151,7 @@ columns:
 
 ### Column masking (ingestr assets)
 
-For ingestr assets, you can define a column mask next to the column metadata. If `mask`
-contains only the masking method, Bruin qualifies it with the column name before passing
-it to ingestr:
+For ingestr assets, you can define a column mask next to the column metadata. If `mask` contains only the masking method, Bruin qualifies it with the column name before passing it to ingestr:
 
 ```yaml
 columns:
@@ -181,8 +160,7 @@ columns:
     mask: hash
 ```
 
-The example above is passed to ingestr as `--mask email:hash`. You can also provide the
-full ingestr mask rule directly:
+The example above is passed to ingestr as `--mask email:hash`. You can also provide the full ingestr mask rule directly:
 
 ```yaml
 columns:
