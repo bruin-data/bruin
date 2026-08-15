@@ -48,7 +48,7 @@ CASE
 END
 {%- endmacro %}
 
-{# Commercial intent, which is the split that decides where B2B SaaS SEO effort
+{# Commercial intent, which is the split that decides where SEO effort
    pays back. A comparison or pricing query is close to a buying decision; an
    informational query is someone learning. Neither Search Console nor GA4 knows
    the difference, so ranking pages by clicks treats a glossary post and a
@@ -80,12 +80,12 @@ END{% else %}CAST(NULL AS STRING){% endif %}
 
 {# Economic value of a single GA4 event, from the key_event_values variable.
 
-   B2B SaaS revenue is recognized in a CRM or billing system weeks after the
-   visit, so the GA4 export almost never carries a purchase amount. Without these
-   weights every value metric in the reports reads zero and the pipeline cannot
-   rank anything by worth. Assign each key event the average value of the
-   pipeline it creates — a demo request is worth far more than a newsletter
-   signup — and the value metrics become comparable across queries and pages. #}
+   When revenue is recognized outside GA4 — in a CRM, a biller, or an offline
+   sale — the export carries no purchase amount. Without these
+   weights every value metric in the reports reads zero and nothing can be
+   ranked by worth. Assign each key event the average value of the outcome it
+   creates — a quote request is worth far more than a newsletter signup — and
+   the value metrics become comparable across queries and pages. #}
 {% macro key_event_value(event_name_column, value_map) -%}
 {% if value_map %}CASE {{ event_name_column }}
 {% for name, value in value_map.items() %}  WHEN {{ sql_literal(name) }} THEN {{ value }}

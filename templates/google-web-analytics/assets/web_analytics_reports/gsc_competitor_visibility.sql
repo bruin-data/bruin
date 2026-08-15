@@ -3,8 +3,8 @@ name: web_analytics_reports.gsc_competitor_visibility
 type: bq.sql
 description: >
   How the property performs on queries that name a competitor, broken out per
-  rival. "acme vs notion", "notion alternatives", "notion pricing" — these are the
-  highest-intent non-branded queries a B2B SaaS company can rank for, because the
+  rival. "acme vs rival", "rival alternatives", "rival pricing" — these are usually
+  the highest-intent non-branded queries a site can rank for, because the
   searcher has already decided to buy something in the category and is choosing
   between vendors. Search Console will show them scattered through a thousand-row
   export with no notion that they belong together, and it cannot tell you which
@@ -31,7 +31,7 @@ tags:
   - web_analytics_reports
   - search_console
   - seo
-  - b2b_saas
+  - competitors
 
 columns:
   - name: site_url

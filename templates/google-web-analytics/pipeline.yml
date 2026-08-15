@@ -1,5 +1,11 @@
 name: google-web-analytics
 schedule: daily
+
+# Earliest date the sources hold data for. Bruin Cloud anchors scheduled
+# backfills here; local `bruin run` takes its window from --start-date and
+# --end-date instead. Neither export backfills past the day you switched it on,
+# so set this to the later of those two days; an earlier date buys no history.
+start_date: "2025-01-01"
 catchup: false
 
 default:
@@ -36,16 +42,18 @@ variables:
       type: string
     default: ["sign_up", "trial_start", "demo_request", "generate_lead", "purchase"]
 
-  # Average value in USD of the pipeline each key event creates. B2B SaaS revenue
-  # is recognized in a CRM or billing system weeks after the visit, so the GA4
-  # export almost never carries a purchase amount; without these weights every
-  # value metric in the reports reads zero and nothing can be ranked by worth.
+  # What each key event is worth, in a single currency of your choosing. When
+  # revenue is recognized outside GA4 — in a CRM, a biller, or an offline sale —
+  # the export carries no amount, so without these weights every value metric in
+  # the reports reads zero and nothing can be ranked by worth.
   #
-  # Set each one to what the event is really worth to you: a reasonable start is
-  # the average deal size multiplied by the rate at which that event becomes a
-  # closed deal. Any event named here contributes its value, and 'purchase' is
-  # deliberately absent because real ecommerce revenue is added from the GA4
-  # ecommerce fields instead — giving it a weight here would double count it.
+  # A reasonable start for each weight is the average value of a converted
+  # customer multiplied by the rate at which that event becomes one. Any event
+  # named here contributes its value. 'purchase' is deliberately absent because
+  # ecommerce revenue is read from the GA4 ecommerce fields instead — giving it a
+  # weight here would double count it. Leave the whole map empty if your site
+  # sends real ecommerce revenue, or if you would rather rank on clicks and
+  # engagement alone.
   key_event_values:
     type: object
     default:
@@ -54,16 +62,16 @@ variables:
       sign_up: 50
       generate_lead: 120
 
-  # Events that signal a prospect asked to talk to sales. These are the
-  # bottom-of-funnel signal a B2B SaaS pipeline is measured on.
+  # Events that signal someone asked to talk to a person — a demo, a quote, a
+  # sales contact. Usually the closest thing to intent a site can measure.
   demo_event_names:
     type: array
     items:
       type: string
     default: ["demo_request", "request_demo", "book_demo", "contact_sales"]
 
-  # Events that signal self-serve product entry, kept separate from demo requests
-  # because a product-led and a sales-led motion convert very differently.
+  # Events that signal self-serve entry — a registration, a trial, an account.
+  # Kept separate from the events above because the two convert very differently.
   signup_event_names:
     type: array
     items:
@@ -72,8 +80,9 @@ variables:
 
   # Competitors whose names appear in comparison queries. Each entry is matched
   # case-insensitively and labels the query, so visibility can be tracked per
-  # rival. "acme vs notion" and "notion alternatives" are the highest-intent
-  # non-branded demand a B2B SaaS company has.
+  # rival. Queries like "acme vs rival" and "rival alternatives" are usually the
+  # highest-intent non-branded demand there is. Leave the list empty to switch
+  # competitor classification off.
   competitor_names:
     type: array
     items:

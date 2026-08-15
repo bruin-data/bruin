@@ -210,8 +210,11 @@ paired AS (
     MAX(IF(page_rank = 2, avg_position, NULL)) AS competing_page_avg_position
   FROM ranked
   GROUP BY 1, 2, 3
-  HAVING MAX(ranking_page_count) >= 2
-    AND MAX(query_impressions) >= {{ var.min_query_impressions }}
+  -- Qualified with the CTE name on purpose: BigQuery resolves a bare column in
+  -- HAVING against the SELECT aliases first, which are themselves aggregates,
+  -- and rejects the result as an aggregation of an aggregation.
+  HAVING MAX(ranked.ranking_page_count) >= 2
+    AND MAX(ranked.query_impressions) >= {{ var.min_query_impressions }}
 )
 
 SELECT

@@ -1,0 +1,319 @@
+name: Web Analytics Overview
+description: >
+  Headline organic search performance from the web_analytics_staging and
+  web_analytics_reports layers. Search totals are property-level, counted once
+  per property per query; GA4 figures are restricted to Google organic sessions
+  so both sides describe the same traffic.
+connection: gcp-default
+
+filters:
+  - name: date_range
+    type: date-range
+    default: all_time
+  - name: search_type
+    type: select
+    default: WEB
+    options:
+      values: [WEB, IMAGE, VIDEO, NEWS]
+
+queries:
+  # Property-level Search Console totals. gsc_site_query_daily counts each
+  # impression once per property, so it is the grain that reconciles with the
+  # Search Console interface.
+  search_totals:
+    sql: |
+      SELECT
+        SUM(impressions) AS impressions,
+        SUM(clicks) AS clicks,
+        SAFE_DIVIDE(SUM(clicks), NULLIF(SUM(impressions), 0)) AS ctr,
+        SAFE_DIVIDE(SUM(sum_top_position), NULLIF(SUM(impressions), 0)) + 1
+          AS avg_position,
+        COUNT(DISTINCT IF(NOT is_anonymized_query, query, NULL))
+          AS distinct_query_count
+      FROM `web_analytics_staging.gsc_site_query_daily`
+      WHERE data_date BETWEEN DATE('{{ filters.date_range.start }}')
+                          AND DATE('{{ filters.date_range.end }}')
+        AND search_type = '{{ filters.search_type }}'
+
+  # GA4 side of the same traffic: Google organic sessions only, because Search
+  # Console has no visibility into other engines.
+  organic_session_totals:
+    sql: |
+      SELECT
+        COUNT(*) AS sessions,
+        SAFE_DIVIDE(COUNTIF(is_engaged_session), NULLIF(COUNT(*), 0))
+          AS engagement_rate,
+        SUM(key_event_count) AS key_events,
+        SUM(session_outcome_value_usd) AS outcome_value_usd
+      FROM `web_analytics_staging.ga4_sessions`
+      WHERE session_date BETWEEN DATE('{{ filters.date_range.start }}')
+                             AND DATE('{{ filters.date_range.end }}')
+        AND is_google_organic_session
+
+  weekly_search_trend:
+    sql: |
+      SELECT
+        DATE_TRUNC(data_date, WEEK(MONDAY)) AS week_start,
+        SUM(impressions) AS impressions,
+        SUM(clicks) AS clicks
+      FROM `web_analytics_staging.gsc_site_query_daily`
+      WHERE data_date BETWEEN DATE('{{ filters.date_range.start }}')
+                          AND DATE('{{ filters.date_range.end }}')
+        AND search_type = '{{ filters.search_type }}'
+      GROUP BY 1
+      ORDER BY 1
+
+  weekly_brand_mix:
+    sql: |
+      SELECT
+        DATE_TRUNC(data_date, WEEK(MONDAY)) AS week_start,
+        query_brand_type,
+        SUM(clicks) AS clicks
+      FROM `web_analytics_staging.gsc_site_query_daily`
+      WHERE data_date BETWEEN DATE('{{ filters.date_range.start }}')
+                          AND DATE('{{ filters.date_range.end }}')
+        AND search_type = '{{ filters.search_type }}'
+      GROUP BY 1, 2
+      ORDER BY 1, 2
+
+  brand_mix_totals:
+    sql: |
+      SELECT
+        query_brand_type,
+        SUM(clicks) AS clicks
+      FROM `web_analytics_staging.gsc_site_query_daily`
+      WHERE data_date BETWEEN DATE('{{ filters.date_range.start }}')
+                          AND DATE('{{ filters.date_range.end }}')
+        AND search_type = '{{ filters.search_type }}'
+      GROUP BY 1
+      ORDER BY clicks DESC
+
+  weekly_organic_sessions:
+    sql: |
+      SELECT
+        DATE_TRUNC(session_date, WEEK(MONDAY)) AS week_start,
+        COUNT(*) AS sessions,
+        COUNTIF(is_engaged_session) AS engaged_sessions,
+        SUM(key_event_count) AS key_events
+      FROM `web_analytics_staging.ga4_sessions`
+      WHERE session_date BETWEEN DATE('{{ filters.date_range.start }}')
+                             AND DATE('{{ filters.date_range.end }}')
+        AND is_google_organic_session
+      GROUP BY 1
+      ORDER BY 1
+
+rows:
+  - widgets:
+      - name: Search impressions
+        type: metric
+        query: search_totals
+        value: { field: impressions, type: number, format: ",.0f" }
+        col: 3
+      - name: Search clicks
+        type: metric
+        query: search_totals
+        value: { field: clicks, type: number, format: ",.0f" }
+        col: 3
+      - name: Search CTR
+        type: metric
+        query: search_totals
+        value: { field: ctr, type: number, format: ".2%" }
+        col: 3
+      - name: Average position
+        type: metric
+        description: One-based, impression-weighted. Lower is better.
+        query: search_totals
+        value: { field: avg_position, type: number, format: ",.1f" }
+        col: 3
+
+  - widgets:
+      - name: Organic sessions
+        type: metric
+        description: GA4 sessions attributed to Google organic search.
+        query: organic_session_totals
+        value: { field: sessions, type: number, format: ",.0f" }
+        col: 3
+      - name: Engagement rate
+        type: metric
+        query: organic_session_totals
+        value: { field: engagement_rate, type: number, format: ".1%" }
+        col: 3
+      - name: Key events
+        type: metric
+        description: Events named in the key_event_names variable.
+        query: organic_session_totals
+        value: { field: key_events, type: number, format: ",.0f" }
+        col: 3
+      - name: Modelled outcome value
+        type: metric
+        description: >
+          Priced key events plus ecommerce revenue. Modelled for ranking, not
+          recognized revenue.
+        query: organic_session_totals
+        value: { field: outcome_value_usd, type: number, format: "$,.0f" }
+        col: 3
+
+  - widgets:
+      - name: Impressions by week
+        type: chart
+        chart: bar
+        description: How much demand the property was shown for.
+        query: weekly_search_trend
+        x: { field: week_start, type: date }
+        y: { field: [impressions], type: number, format: ",.0f" }
+        col: 4
+      - name: Clicks by week
+        type: chart
+        chart: bar
+        description: >
+          Charted separately from impressions rather than on one axis, because
+          impressions outnumber clicks by orders of magnitude and would flatten
+          this series to zero.
+        query: weekly_search_trend
+        x: { field: week_start, type: date }
+        y: { field: [clicks], type: number, format: ",.0f" }
+        col: 4
+      - name: Clicks by brand type
+        type: chart
+        chart: pie
+        description: >
+          `anonymized` is demand Google withheld the query for. It is real
+          traffic and is kept so daily totals stay correct.
+        query: brand_mix_totals
+        label: query_brand_type
+        value: { field: clicks, type: number, format: ",.0f" }
+        col: 4
+
+  - widgets:
+      - name: Branded versus non-branded clicks by week
+        type: chart
+        chart: bar
+        description: >
+          Non-branded clicks measure SEO work; branded clicks track demand that
+          already knew the site.
+        query: weekly_brand_mix
+        x: { field: week_start, type: date }
+        y: { field: [clicks], type: number, format: ",.0f" }
+        color: { field: query_brand_type }
+        stacked: true
+        col: 6
+      - name: Organic sessions and engagement by week
+        type: chart
+        chart: combo
+        description: >
+          Engaged sessions as a line inside total sessions. Key events are a
+          metric card above rather than a series here, because on most
+          properties they are too rare to read on the same axis.
+        query: weekly_organic_sessions
+        x: { field: week_start, type: date }
+        y: { field: [sessions, engaged_sessions], type: number, format: ",.0f" }
+        lines: [engaged_sessions]
+        col: 6
+
+  - widgets:
+      - name: Where the two systems disagree
+        type: chart
+        chart: bar
+        description: >
+          coverage_status from the landing-page join. `search_only` is clicks
+          GA4 never recorded; `ga4_only` is organic traffic Search Console has
+          no data for.
+        sql: |
+          SELECT
+            coverage_status,
+            COUNT(*) AS pages,
+            SUM(search_clicks) AS search_clicks
+          FROM `web_analytics_reports.ga4_gsc_landing_page_performance`
+          GROUP BY 1
+          ORDER BY pages DESC
+        x: { field: coverage_status, type: category }
+        y: { field: [pages], type: number, format: ",.0f" }
+        col: 4
+      - name: Clicks by page role
+        type: chart
+        chart: bar
+        description: >
+          Support traffic is mostly existing customers. Filter it out before
+          judging acquisition.
+        sql: |
+          SELECT
+            page_role,
+            SUM(clicks) AS clicks
+          FROM `web_analytics_staging.gsc_url_query_daily`
+          WHERE data_date BETWEEN DATE('{{ filters.date_range.start }}')
+                              AND DATE('{{ filters.date_range.end }}')
+            AND search_type = '{{ filters.search_type }}'
+          GROUP BY 1
+          ORDER BY clicks DESC
+        x: { field: page_role, type: category }
+        y: { field: [clicks], type: number, format: ",.0f" }
+        col: 4
+      - name: Clicks by intent and page role
+        type: chart
+        chart: treemap
+        description: >
+          From ga4_gsc_intent_pipeline. Block size is clicks; compare it against
+          the value each cell produces in the GA4 tab. Cells read zero until
+          key_event_values is priced for events your property actually sends.
+        sql: |
+          SELECT
+            CONCAT(query_intent_type, ' / ', page_role) AS intent_and_role,
+            search_clicks,
+            modelled_outcome_value_usd
+          FROM `web_analytics_reports.ga4_gsc_intent_pipeline`
+          WHERE search_clicks > 0
+          ORDER BY search_clicks DESC
+        label: intent_and_role
+        value: { field: search_clicks, type: number, format: ",.0f" }
+        col: 4
+
+  - widgets:
+      - name: Landing pages by search visibility
+        type: table
+        description: >
+          The join the other reports lean on. session_per_click_ratio near 1 is
+          healthy; a low value is a tracking lead, not a reporting bug.
+        sql: |
+          SELECT
+            page_path,
+            page_hostname,
+            page_role,
+            coverage_status,
+            search_impressions,
+            search_clicks,
+            search_ctr,
+            search_avg_position,
+            organic_sessions,
+            session_per_click_ratio,
+            engagement_rate,
+            key_events,
+            outcome_value_usd
+          FROM `web_analytics_reports.ga4_gsc_landing_page_performance`
+          ORDER BY search_clicks DESC
+          LIMIT 100
+        columns:
+          - { name: page_path, label: Page }
+          - { name: page_hostname, label: Host }
+          - { name: page_role, label: Role }
+          - name: coverage_status
+            label: Coverage
+            format:
+              - { if: text_is_exactly, value: matched, backgroundColor: green }
+              - { if: text_is_exactly, value: session_shortfall, backgroundColor: amber }
+              - { if: text_is_exactly, value: search_only, backgroundColor: red }
+              - { if: text_is_exactly, value: ga4_only, backgroundColor: blue }
+          - { name: search_impressions, label: Impressions, number: number }
+          - { name: search_clicks, label: Clicks, number: number }
+          - { name: search_ctr, label: CTR, number: ".2%" }
+          - { name: search_avg_position, label: Position, number: ".1f" }
+          - { name: organic_sessions, label: Sessions, number: number }
+          - name: session_per_click_ratio
+            label: Sessions / click
+            number: ".2f"
+            format:
+              - { if: less_than, value: 0.5, backgroundColor: red }
+              - { if: less_than, value: 0.8, backgroundColor: amber }
+          - { name: engagement_rate, label: Engaged, number: ".1%" }
+          - { name: key_events, label: Key events, number: number }
+          - { name: outcome_value_usd, label: Value, number: currency }
+        col: 12

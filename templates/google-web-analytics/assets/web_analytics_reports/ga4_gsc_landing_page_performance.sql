@@ -29,12 +29,12 @@ description: >
   merged row.
 
   Value is read from session_outcome_value_usd, which prices key events using the
-  key_event_values variable and adds any real ecommerce revenue. That matters for a
-  B2B SaaS site: revenue is recognized in a CRM weeks after the visit, so the GA4
-  export carries no purchase amount and a revenue-only report would rank every page
-  at zero. Set those weights before trusting the value columns.
+  key_event_values variable and adds any real ecommerce revenue. That matters
+  wherever revenue is recognized outside GA4: the export carries no purchase amount
+  and a revenue-only report would rank every page at zero. Set those weights before
+  trusting the value columns.
 
-  page_role separates the three jobs a B2B SaaS site's pages do. Documentation
+  page_role separates the three jobs a site's pages do. Documentation
   regularly out-ranks the marketing site and its clicks are mostly existing
   customers looking something up, so leaving support pages in the same pool as
   pricing pages makes acquisition conversion rates look far worse than they are.
@@ -149,8 +149,8 @@ columns:
   - name: demo_events
     type: INT64
     description: >
-      Demo or contact-sales requests from organic sessions that landed here. The
-      bottom-of-funnel signal a B2B SaaS pipeline is measured on.
+      Demo or contact-sales requests from organic sessions that landed here.
+      Usually the closest measure of real intent a site has.
     checks:
       - name: non_negative
   - name: signup_events
@@ -175,7 +175,7 @@ columns:
     type: FLOAT64
     description: >
       Modelled value per organic click: what one more click on this page is worth.
-      This is the column to rank a B2B SaaS content roadmap by.
+      This is the column to rank a content roadmap by.
   - name: outcome_value_per_thousand_impressions_usd
     type: FLOAT64
     description: >

@@ -38,7 +38,7 @@ LOWER(REGEXP_EXTRACT({{ url_column }}, r'^https?://([^/:]+)'))
 CONCAT(COALESCE({{ hostname_column }}, ''), {{ path_column }})
 {%- endmacro %}
 
-{# Splits a B2B SaaS site into the three roles its pages actually play, because
+{# Splits a site into the three roles its pages actually play, because
    organic traffic to each means something different and mixing them corrupts
    every acquisition metric.
 

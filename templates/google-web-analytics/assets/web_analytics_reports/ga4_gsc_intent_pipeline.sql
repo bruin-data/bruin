@@ -3,10 +3,10 @@ name: web_analytics_reports.ga4_gsc_intent_pipeline
 type: bq.sql
 description: >
   What each kind of search demand actually contributes, crossed with the kind of
-  page that serves it. This is the report that settles the recurring B2B SaaS
-  argument about whether content marketing works: a blog earning fifty thousand
-  informational clicks and two demo requests, next to eleven hundred competitor
-  comparison clicks and forty, is an unambiguous answer that no dashboard in GA4 or
+  page that serves it. This is the report that settles the recurring argument about
+  whether content marketing works: a blog earning fifty thousand informational
+  clicks and two demo requests, next to eleven hundred competitor comparison clicks
+  and forty, is an unambiguous answer that no dashboard in GA4 or
   Search Console can produce. Search Console knows the query but not the outcome,
   GA4 knows the outcome but never receives the query, and neither has a concept of
   commercial intent at all.
@@ -37,7 +37,7 @@ tags:
   - search_console
   - ga4
   - seo
-  - b2b_saas
+  - intent
 
 columns:
   - name: site_url
@@ -111,8 +111,8 @@ columns:
   - name: modelled_demo_events
     type: FLOAT64
     description: >
-      Demo or contact-sales requests allocated to this cell. The bottom-of-funnel
-      measure a B2B SaaS pipeline is judged on.
+      Demo or contact-sales requests allocated to this cell. Usually the closest
+      measure of real intent a site has.
   - name: modelled_signup_events
     type: FLOAT64
     description: Self-serve signups and trial starts allocated to this cell.

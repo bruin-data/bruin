@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -379,7 +380,7 @@ func TestGoogleWebAnalyticsTemplateEscapesBrandPattern(t *testing.T) {
 	require.Contains(t, string(urlMacros), "{{ re_literal(content_pattern) }}")
 }
 
-func TestGoogleWebAnalyticsTemplateSupportsB2BSaaS(t *testing.T) {
+func TestGoogleWebAnalyticsTemplateModelsOutcomeValue(t *testing.T) {
 	t.Parallel()
 
 	readTemplate := func(path string) string {
@@ -390,9 +391,8 @@ func TestGoogleWebAnalyticsTemplateSupportsB2BSaaS(t *testing.T) {
 	}
 
 	pipeline := readTemplate("google-web-analytics/pipeline.yml")
-	// B2B SaaS revenue is recognized in a CRM weeks after the visit, so the GA4
-	// export carries no purchase amount. Without priced key events every value
-	// metric in the reports reads zero.
+	// Where revenue is recognized outside GA4 the export carries no purchase
+	// amount, so without priced key events every value metric reads zero.
 	require.Contains(t, pipeline, "key_event_values:")
 	require.Contains(t, pipeline, "demo_event_names:")
 	require.Contains(t, pipeline, "signup_event_names:")
@@ -629,5 +629,43 @@ func TestSelfHealDemoTemplateContainsDataProblemScenarios(t *testing.T) {
 		require.NotContains(t, entry.Name(), "quality")
 		require.NotContains(t, entry.Name(), "freshness")
 		require.NotContains(t, entry.Name(), "schema_drift")
+	}
+}
+
+func TestGoogleWebAnalyticsTemplateShipsDashboards(t *testing.T) {
+	t.Parallel()
+
+	// The dashboards are embedded through the top-level `*` directive, so a
+	// change to the embed rules could drop them from `bruin init` silently.
+	entries, err := templates.Templates.ReadDir("google-web-analytics/dashboards")
+	require.NoError(t, err)
+
+	names := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		names = append(names, entry.Name())
+	}
+	require.ElementsMatch(t, []string{
+		"01-overview.yml",
+		"02-ga4-insights.yml",
+		"03-gsc-insights.yml",
+	}, names)
+
+	for _, name := range names {
+		content, err := templates.Templates.ReadFile("google-web-analytics/dashboards/" + name)
+		require.NoError(t, err)
+		body := string(content)
+
+		// Dashboards must run on the same connection as the pipeline and carry
+		// no hard-coded project from whichever warehouse they were tested on.
+		require.Contains(t, body, "connection: gcp-default", name)
+		require.NotContains(t, body, "bruin-landing-page", name)
+
+		// Every table they read has to be one this pipeline builds, never the
+		// raw Google export, so the dashboards stay behind the staging contract.
+		refs := regexp.MustCompile("FROM `([^`]+)`").FindAllStringSubmatch(body, -1)
+		require.NotEmpty(t, refs, name)
+		for _, ref := range refs {
+			require.Regexp(t, `^web_analytics_(staging|reports)\.`, ref[1], name)
+		}
 	}
 }

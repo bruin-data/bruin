@@ -170,8 +170,8 @@ columns:
   - name: demo_event_count
     type: INT64
     description: >
-      Events matching demo_event_names: the prospect asked to talk to sales. This
-      is the bottom-of-funnel signal a B2B SaaS pipeline is measured on.
+      Events matching demo_event_names: someone asked to talk to a person.
+      Usually the closest measure of real intent a site has.
     checks:
       - name: non_negative
   - name: signup_event_count

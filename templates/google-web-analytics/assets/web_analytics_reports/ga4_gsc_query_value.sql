@@ -9,10 +9,10 @@ description: >
   terms were the least valuable.
 
   Value comes from session_outcome_value_usd, which prices key events with the
-  key_event_values variable and adds any real ecommerce revenue. For B2B SaaS that
-  is the only way this report says anything: revenue lands in a CRM weeks after the
-  visit, so a report built on GA4 purchase revenue alone would value every query at
-  zero. Set those weights before ranking anything by them.
+  key_event_values variable and adds any real ecommerce revenue. When revenue is
+  recognized outside GA4, those weights are the only way this report says anything:
+  a report built on GA4 purchase revenue alone would value every query at zero.
+  Set them before ranking anything by them.
 
   The numbers here are modelled, not measured. Each page's GA4 outcomes are split
   across the queries that sent clicks to it, in proportion to those clicks. Within
@@ -122,8 +122,8 @@ columns:
   - name: modelled_outcome_value_per_click_usd
     type: FLOAT64
     description: >
-      Allocated value per search click. This is the ranking column for a B2B SaaS
-      keyword roadmap: what one more click on this query is worth.
+      Allocated value per search click, and the column to rank a keyword roadmap
+      by: what one more click on this query is worth.
   - name: modelled_revenue_usd
     type: FLOAT64
     description: Purchase revenue in USD allocated to this query.
@@ -133,8 +133,9 @@ columns:
   - name: modelled_revenue_per_click_usd
     type: FLOAT64
     description: >
-      Allocated revenue per search click. This is the ranking column: it says what
-      one more click on this query is worth.
+      Allocated ecommerce revenue per search click. It is zero unless the property
+      sends purchase revenue; rank on modelled_outcome_value_per_click_usd instead,
+      which also counts priced key events.
   - name: modelled_value_per_thousand_impressions_usd
     type: FLOAT64
     description: >
@@ -281,7 +282,10 @@ rolled_up AS (
     SUM(COALESCE(click_weight, 0) * page_purchase_revenue_usd) AS modelled_revenue_usd
   FROM allocated
   GROUP BY 1, 2
-  HAVING SUM(search_impressions) >= {{ var.min_query_impressions }}
+  -- Qualified with the CTE name on purpose: BigQuery resolves a bare column in
+  -- HAVING against the SELECT aliases first, and `search_impressions` is itself
+  -- a SUM there, which it rejects as an aggregation of an aggregation.
+  HAVING SUM(allocated.search_impressions) >= {{ var.min_query_impressions }}
 ),
 
 top_page AS (
