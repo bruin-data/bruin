@@ -19,6 +19,43 @@ const bruinPythonGrammar = JSON.parse(
     fs.readFileSync(path.resolve(__dirname, "theme/bruinpython.json"), "utf8")
 );
 
+// VitePress intentionally lazy-loads local search and waits 200 ms after each
+// keystroke. That is a good default for small sites, but our large local index
+// made opening and using search feel sluggish. Keep the search code and index
+// warm, and use a short debounce so interaction stays below a frame or two.
+const fastLocalSearch = {
+    name: "bruin-fast-local-search",
+    enforce: "pre",
+    transform(code, id) {
+        if (id.endsWith("/theme-default/components/VPNavBarSearch.vue")) {
+            const searchState = "const showSearch = ref(false)";
+            if (!code.includes(searchState)) {
+                throw new Error("Unable to preload the VitePress local search component");
+            }
+
+            return code.replace(
+                searchState,
+                `${searchState}\n\n// Warm the search chunk without delaying the initial page render.\nonMounted(() => {\n  const runWhenIdle = window.requestIdleCallback || ((callback) => setTimeout(callback, 1))\n  runWhenIdle(() => import('./VPLocalSearchBox.vue'))\n})`,
+            );
+        }
+
+        if (id.endsWith("/theme-default/components/VPLocalSearchBox.vue")) {
+            const searchIndexDeclaration = "const searchIndexData = shallowRef(localSearchIndex)";
+            const debounce = "{ debounce: 200, immediate: true }";
+            if (!code.includes(searchIndexDeclaration) || !code.includes(debounce)) {
+                throw new Error("Unable to tune the VitePress local search implementation");
+            }
+
+            return code
+                .replace(
+                    searchIndexDeclaration,
+                    `${searchIndexDeclaration}\n\n// Download the index while the reader is browsing instead of after search opens.\nObject.values(localSearchIndex).forEach((load) => load())`,
+                )
+                .replace(debounce, "{ debounce: 25, immediate: true }");
+        }
+    },
+};
+
 // https://vitepress.dev/reference/site-config
 export default withMermaid({
     title: "Bruin CLI",
@@ -609,6 +646,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         class: "mermaid my-class", // set additional css classes for parent container
     },
     vite: {
+        plugins: [fastLocalSearch],
         optimizeDeps: {
             esbuildOptions: {
                 target: "esnext",
