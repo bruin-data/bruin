@@ -366,10 +366,12 @@ func TestGoogleWebAnalyticsTemplateEscapesBrandPattern(t *testing.T) {
 
 	// Configured patterns are interpolated into string literals, and plenty carry
 	// an apostrophe: brands such as Levi's and O'Reilly, competitors, path rules.
-	// Without the triple quotes and the ['] rewrite, a bare apostrophe closes the
-	// literal and every asset that classifies a query fails to parse. All patterns
-	// route through re_literal so the escaping cannot be forgotten in one place.
-	require.Contains(t, string(macros), `r'''{{ pattern | replace("'", "[']") }}'''`)
+	// The triple-quoted raw literal carries those through untouched. The pattern
+	// must reach RE2 byte for byte: rewriting an apostrophe to a character class
+	// would turn a pattern like [^']+ into [^[']]+ and silently change what it
+	// matches. All patterns route through re_literal so this holds everywhere.
+	require.Contains(t, string(macros), `r'''{{ pattern }}'''`)
+	require.NotContains(t, string(macros), `replace("'"`)
 	require.Contains(t, string(macros), "{{ re_literal(brand_pattern) }}")
 	require.Contains(t, string(macros), "{{ re_literal(commercial_pattern) }}")
 	require.Contains(t, string(macros), "{{ re_literal(pattern | lower) }}")

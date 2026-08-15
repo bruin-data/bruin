@@ -31,6 +31,15 @@ description: >
   nothing, which is why site totals here fall short of the site totals in
   web_analytics_reports.ga4_gsc_landing_page_performance.
 
+  The grain is one row per property and query, and the GA4 side is joined on
+  hostname and path alone because GA4 has no concept of a Search Console property.
+  If two properties covering the same pages export into one dataset — a domain
+  property alongside a URL-prefix property, say — each receives a full allocation
+  of those pages' outcomes. Per property the numbers are right, and that is how
+  this report is meant to be read; summing the modelled columns across properties
+  counts the same GA4 outcome once per property. Filter to one site_url before
+  aggregating.
+
 materialization:
   type: table
 

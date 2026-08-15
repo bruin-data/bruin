@@ -10,13 +10,21 @@ SAFE_DIVIDE({{ position_sum }}, NULLIF({{ impressions }}, 0)) + 1
 {# Renders a configured pattern as a BigQuery raw string literal.
 
    Patterns arrive from pipeline variables, and plenty of them need an
-   apostrophe: brands such as Levi's and O'Reilly, competitors, path rules. A
-   bare apostrophe would close the literal and break every asset that classifies
-   a query. Two things protect it. The literal is triple-quoted, and each
-   apostrophe becomes the RE2 character class ['], which still matches one
-   apostrophe but cannot end the literal or form a closing triple quote. #}
+   apostrophe: brands such as Levi's and O'Reilly, competitors, path rules. The
+   triple-quoted raw literal carries those through unchanged, because only three
+   consecutive apostrophes can close it. The pattern is therefore emitted exactly
+   as configured, so what you write is what RE2 matches.
+
+   Do not "escape" the apostrophe by rewriting it to a character class. That
+   changes the regex wherever an apostrophe already sits inside one: a pattern
+   such as [^']+ would become [^[']]+, which stops matching what it used to and
+   starts matching a bracket, silently misclassifying rows.
+
+   The one shape this cannot express is a pattern ending in an apostrophe, which
+   would meet the closing quotes and form a fourth. No brand, competitor, or path
+   pattern needs that. #}
 {% macro re_literal(pattern) -%}
-r'''{{ pattern | replace("'", "[']") }}'''
+r'''{{ pattern }}'''
 {%- endmacro %}
 
 {# Renders a configured value as a BigQuery string literal.
