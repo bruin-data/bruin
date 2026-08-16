@@ -1,0 +1,148 @@
+name: google-web-analytics
+schedule: daily
+
+# Earliest date the sources hold data for. Bruin Cloud anchors scheduled
+# backfills here; local `bruin run` takes its window from --start-date and
+# --end-date instead. Neither export backfills past the day you switched it on,
+# so set this to the later of those two days; an earlier date buys no history.
+start_date: "2025-01-01"
+catchup: false
+
+default:
+  type: bq.sql
+
+default_connections:
+  google_cloud_platform: gcp-default
+
+variables:
+  # Dataset holding the GA4 streaming export, i.e. the one containing the
+  # events_intraday_YYYYMMDD tables. Qualify it with a project when the export
+  # lives outside the project configured on the gcp-default connection.
+  ga4_dataset:
+    type: string
+    default: analytics_000000000
+
+  # Dataset holding the Search Console bulk data export. Google always names
+  # the tables searchdata_site_impression, searchdata_url_impression, and
+  # ExportLog inside it.
+  search_console_dataset:
+    type: string
+    default: searchconsole
+
+  # Case-insensitive RE2 pattern that marks a search query as branded. Include
+  # your brand name plus its common misspellings and transliterations.
+  brand_query_pattern:
+    type: string
+    default: "(example|exampl|examp1e)"
+
+  # GA4 event names counted as key events (conversions) in the reports.
+  key_event_names:
+    type: array
+    items:
+      type: string
+    default: ["sign_up", "trial_start", "demo_request", "generate_lead", "purchase"]
+
+  # What each key event is worth, in a single currency of your choosing. When
+  # revenue is recognized outside GA4 — in a CRM, a biller, or an offline sale —
+  # the export carries no amount, so without these weights every value metric in
+  # the reports reads zero and nothing can be ranked by worth.
+  #
+  # A reasonable start for each weight is the average value of a converted
+  # customer multiplied by the rate at which that event becomes one. Any event
+  # named here contributes its value. 'purchase' is deliberately absent because
+  # ecommerce revenue is read from the GA4 ecommerce fields instead — giving it a
+  # weight here would double count it. Leave the whole map empty if your site
+  # sends real ecommerce revenue, or if you would rather rank on clicks and
+  # engagement alone.
+  key_event_values:
+    type: object
+    default:
+      demo_request: 400
+      trial_start: 150
+      sign_up: 50
+      generate_lead: 120
+
+  # Events that signal someone asked to talk to a person — a demo, a quote, a
+  # sales contact. Usually the closest thing to intent a site can measure.
+  demo_event_names:
+    type: array
+    items:
+      type: string
+    default: ["demo_request", "request_demo", "book_demo", "contact_sales"]
+
+  # Events that signal self-serve entry — a registration, a trial, an account.
+  # Kept separate from the events above because the two convert very differently.
+  signup_event_names:
+    type: array
+    items:
+      type: string
+    default: ["sign_up", "trial_start", "start_trial"]
+
+  # Competitors whose names appear in comparison queries. Each entry is matched
+  # case-insensitively and labels the query, so visibility can be tracked per
+  # rival. Queries like "acme vs rival" and "rival alternatives" are usually the
+  # highest-intent non-branded demand there is. Leave the list empty to switch
+  # competitor classification off.
+  competitor_names:
+    type: array
+    items:
+      type: string
+    default: ["competitor-one", "competitor-two"]
+
+  # Modifiers that mark a query as commercially motivated rather than
+  # informational. This is the split that decides where SEO effort pays back.
+  commercial_query_pattern:
+    type: string
+    default: "(pricing|price|cost|quote|alternative|vs |versus|compare|comparison|best |top |review|software|tool|platform|solution|vendor|integration|api|demo|free trial|for enterprise|for teams)"
+
+  # Paths whose organic traffic is overwhelmingly existing customers rather than
+  # prospects. Documentation regularly out-ranks the marketing site, so counting
+  # it as acquisition makes conversion rates look far worse than they are.
+  support_path_pattern:
+    type: string
+    default: "^/(docs|documentation|help|support|kb|knowledge-base|faq|changelog|status|community)(/|$)"
+
+  # Paths holding top-of-funnel content marketing.
+  content_path_pattern:
+    type: string
+    default: "^/(blog|resources|guides|guide|learn|academy|glossary|templates|use-cases|comparisons)(/|$)"
+
+  # Extra days re-read before the run window. Search Console publishes with a
+  # two-to-three day delay and revises history, and GA4 finalizes a daily table
+  # after its intraday table is dropped. The staging models replace whole days,
+  # so a wider window heals late and revised data.
+  source_lookback_days:
+    type: integer
+    minimum: 0
+    maximum: 30
+    default: 4
+
+  # Trailing days of staged history each report aggregates. This bounds the
+  # bytes every report scans; raise it to report over more history.
+  reporting_window_days:
+    type: integer
+    minimum: 28
+    maximum: 730
+    default: 180
+
+  # Length of the current and prior comparison windows in the trend and
+  # new-versus-lost reports.
+  trend_window_days:
+    type: integer
+    minimum: 7
+    maximum: 90
+    default: 28
+
+  # Minimum window impressions a query needs before it appears in a
+  # query-grain report.
+  min_query_impressions:
+    type: integer
+    minimum: 1
+    default: 100
+
+  # Minimum window impressions a page needs before it appears in a page-grain
+  # report.
+  min_page_impressions:
+    type: integer
+    minimum: 1
+    default: 100

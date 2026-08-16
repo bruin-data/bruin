@@ -1,0 +1,440 @@
+name: GA4 Insights
+description: >
+  Session and page behaviour from web_analytics_staging.ga4_sessions and
+  ga4_page_daily, rebuilt from the raw event export so there is no sampling and
+  no "(other)" bucket. Every widget honours the filters below.
+connection: gcp-default
+
+filters:
+  - name: date_range
+    type: date-range
+    default: all_time
+  # GA4's default channel grouping is a fixed Google enum, so the whole list is
+  # spelled out rather than read from the data. Leaving a filter unselected means
+  # "no restriction", so an option your property never sends is harmless.
+  - name: channel
+    type: select
+    multiple: true
+    options:
+      values:
+        - Direct
+        - Organic Search
+        - Paid Search
+        - Organic Social
+        - Paid Social
+        - Organic Video
+        - Paid Video
+        - Organic Shopping
+        - Paid Shopping
+        - Display
+        - Cross-network
+        - AI Assistant
+        - Email
+        - Affiliates
+        - Referral
+        - Audio
+        - SMS
+        - Mobile Push Notifications
+        - Paid Other
+        - Unassigned
+  - name: device
+    type: select
+    multiple: true
+    options:
+      values: [desktop, mobile, tablet, smart tv]
+  - name: page_role
+    type: select
+    multiple: true
+    options:
+      values: [product, content, support]
+  # Free text rather than a list: country values are unbounded and differ per
+  # property, so a fixed set would be wrong on someone else's data. Matched
+  # case-insensitively as a substring, so "united" finds both United States and
+  # United Kingdom. Any apostrophe is rewritten to the single-character LIKE
+  # wildcard, so a name like Cote d'Ivoire matches instead of breaking the SQL.
+  - name: country
+    type: text
+    default: ""
+
+queries:
+  session_totals:
+    sql: |
+      SELECT
+        COUNT(*) AS sessions,
+        COUNT(DISTINCT user_pseudo_id) AS users,
+        SAFE_DIVIDE(COUNTIF(is_engaged_session), NULLIF(COUNT(*), 0))
+          AS engagement_rate,
+        SAFE_DIVIDE(SUM(engagement_time_seconds), NULLIF(COUNT(*), 0))
+          AS avg_engagement_seconds,
+        SAFE_DIVIDE(SUM(page_view_count), NULLIF(COUNT(*), 0))
+          AS pages_per_session,
+        SAFE_DIVIDE(COUNTIF(is_new_user_session), NULLIF(COUNT(*), 0))
+          AS new_user_share,
+        SUM(key_event_count) AS key_events,
+        SUM(session_outcome_value_usd) AS outcome_value_usd
+      FROM `web_analytics_staging.ga4_sessions`
+      WHERE session_date BETWEEN DATE('{{ filters.date_range.start }}')
+                             AND DATE('{{ filters.date_range.end }}')
+        {% if filters.channel and filters.channel | length > 0 %}
+        AND session_default_channel_group IN ('{{ filters.channel | join("','") }}')
+        {% endif %}
+        {% if filters.device and filters.device | length > 0 %}
+        AND device_category IN ('{{ filters.device | join("','") }}')
+        {% endif %}
+        {% if filters.page_role and filters.page_role | length > 0 %}
+        AND landing_page_role IN ('{{ filters.page_role | join("','") }}')
+        {% endif %}
+        {% if filters.country %}
+        AND LOWER(country) LIKE LOWER('%{{ filters.country | replace("'", "_") }}%')
+        {% endif %}
+
+  daily_sessions_by_channel:
+    sql: |
+      SELECT
+        session_date,
+        session_default_channel_group AS channel,
+        COUNT(*) AS sessions
+      FROM `web_analytics_staging.ga4_sessions`
+      WHERE session_date BETWEEN DATE('{{ filters.date_range.start }}')
+                             AND DATE('{{ filters.date_range.end }}')
+        {% if filters.channel and filters.channel | length > 0 %}
+        AND session_default_channel_group IN ('{{ filters.channel | join("','") }}')
+        {% endif %}
+        {% if filters.device and filters.device | length > 0 %}
+        AND device_category IN ('{{ filters.device | join("','") }}')
+        {% endif %}
+        {% if filters.page_role and filters.page_role | length > 0 %}
+        AND landing_page_role IN ('{{ filters.page_role | join("','") }}')
+        {% endif %}
+        {% if filters.country %}
+        AND LOWER(country) LIKE LOWER('%{{ filters.country | replace("'", "_") }}%')
+        {% endif %}
+      GROUP BY 1, 2
+      ORDER BY 1, 2
+
+rows:
+  - widgets:
+      - name: Sessions
+        type: metric
+        query: session_totals
+        value: { field: sessions, type: number, format: ",.0f" }
+        col: 3
+      - name: Users
+        type: metric
+        description: Distinct user_pseudo_id, so a signed-out visitor on two devices counts twice.
+        query: session_totals
+        value: { field: users, type: number, format: ",.0f" }
+        col: 3
+      - name: Engagement rate
+        type: metric
+        query: session_totals
+        value: { field: engagement_rate, type: number, format: ".1%" }
+        col: 3
+      - name: New user share
+        type: metric
+        query: session_totals
+        value: { field: new_user_share, type: number, format: ".1%" }
+        col: 3
+
+  - widgets:
+      - name: Avg engagement per session
+        type: metric
+        query: session_totals
+        value: { field: avg_engagement_seconds, type: number, format: ",.0f" }
+        col: 3
+      - name: Pages per session
+        type: metric
+        query: session_totals
+        value: { field: pages_per_session, type: number, format: ",.2f" }
+        col: 3
+      - name: Key events
+        type: metric
+        query: session_totals
+        value: { field: key_events, type: number, format: ",.0f" }
+        col: 3
+      - name: Modelled outcome value
+        type: metric
+        query: session_totals
+        value: { field: outcome_value_usd, type: number, format: "$,.0f" }
+        col: 3
+
+  - widgets:
+      - name: Sessions by day and channel
+        type: chart
+        chart: bar
+        query: daily_sessions_by_channel
+        x: { field: session_date, type: date }
+        y: { field: [sessions], type: number, format: ",.0f" }
+        color: { field: channel }
+        stacked: true
+        col: 12
+
+  - widgets:
+      - name: Attribution the intraday export could resolve
+        type: chart
+        chart: bar
+        description: >
+          Google does not populate session-scoped traffic source in
+          events_intraday_*, so ga4_sessions falls back through
+          collected_traffic_source and then user-scoped traffic_source.
+          `unavailable` sessions are never counted as organic and are absent
+          from every organic report — read the organic numbers as a floor.
+        sql: |
+          SELECT
+            traffic_source_basis,
+            COUNT(*) AS sessions,
+            COUNTIF(is_google_organic_session) AS google_organic_sessions
+          FROM `web_analytics_staging.ga4_sessions`
+          WHERE session_date BETWEEN DATE('{{ filters.date_range.start }}')
+                                 AND DATE('{{ filters.date_range.end }}')
+            {% if filters.device and filters.device | length > 0 %}
+            AND device_category IN ('{{ filters.device | join("','") }}')
+            {% endif %}
+            {% if filters.country %}
+            AND LOWER(country) LIKE LOWER('%{{ filters.country | replace("'", "_") }}%')
+            {% endif %}
+          GROUP BY 1
+          ORDER BY sessions DESC
+        x: { field: traffic_source_basis, type: category }
+        y: { field: [sessions, google_organic_sessions], type: number, format: ",.0f" }
+        col: 6
+      - name: Sessions by device
+        type: chart
+        chart: pie
+        sql: |
+          SELECT
+            device_category,
+            COUNT(*) AS sessions
+          FROM `web_analytics_staging.ga4_sessions`
+          WHERE session_date BETWEEN DATE('{{ filters.date_range.start }}')
+                                 AND DATE('{{ filters.date_range.end }}')
+            {% if filters.channel and filters.channel | length > 0 %}
+            AND session_default_channel_group IN ('{{ filters.channel | join("','") }}')
+            {% endif %}
+            {% if filters.page_role and filters.page_role | length > 0 %}
+            AND landing_page_role IN ('{{ filters.page_role | join("','") }}')
+            {% endif %}
+            {% if filters.country %}
+            AND LOWER(country) LIKE LOWER('%{{ filters.country | replace("'", "_") }}%')
+            {% endif %}
+          GROUP BY 1
+          ORDER BY sessions DESC
+        label: device_category
+        value: { field: sessions, type: number, format: ",.0f" }
+        col: 3
+      - name: Engagement by page role
+        type: chart
+        chart: bar
+        description: Landing-page role of the session, not the pages viewed after it.
+        sql: |
+          SELECT
+            landing_page_role,
+            SAFE_DIVIDE(COUNTIF(is_engaged_session), NULLIF(COUNT(*), 0))
+              AS engagement_rate
+          FROM `web_analytics_staging.ga4_sessions`
+          WHERE session_date BETWEEN DATE('{{ filters.date_range.start }}')
+                                 AND DATE('{{ filters.date_range.end }}')
+            AND landing_page_role IS NOT NULL
+            {% if filters.channel and filters.channel | length > 0 %}
+            AND session_default_channel_group IN ('{{ filters.channel | join("','") }}')
+            {% endif %}
+            {% if filters.device and filters.device | length > 0 %}
+            AND device_category IN ('{{ filters.device | join("','") }}')
+            {% endif %}
+            {% if filters.country %}
+            AND LOWER(country) LIKE LOWER('%{{ filters.country | replace("'", "_") }}%')
+            {% endif %}
+          GROUP BY 1
+          ORDER BY engagement_rate DESC
+        x: { field: landing_page_role, type: category }
+        y: { field: [engagement_rate], type: number, format: ".1%" }
+        col: 3
+
+  - widgets:
+      - name: Daily session volume
+        type: chart
+        chart: calendar
+        description: Weekday and seasonal shape, and any collection gaps.
+        sql: |
+          SELECT
+            session_date,
+            COUNT(*) AS sessions
+          FROM `web_analytics_staging.ga4_sessions`
+          WHERE session_date BETWEEN DATE('{{ filters.date_range.start }}')
+                                 AND DATE('{{ filters.date_range.end }}')
+            {% if filters.channel and filters.channel | length > 0 %}
+            AND session_default_channel_group IN ('{{ filters.channel | join("','") }}')
+            {% endif %}
+            {% if filters.device and filters.device | length > 0 %}
+            AND device_category IN ('{{ filters.device | join("','") }}')
+            {% endif %}
+            {% if filters.page_role and filters.page_role | length > 0 %}
+            AND landing_page_role IN ('{{ filters.page_role | join("','") }}')
+            {% endif %}
+            {% if filters.country %}
+            AND LOWER(country) LIKE LOWER('%{{ filters.country | replace("'", "_") }}%')
+            {% endif %}
+          GROUP BY 1
+          ORDER BY 1
+        x: { field: session_date, type: date }
+        value: { field: sessions, type: number, format: ",.0f" }
+        col: 12
+
+  - widgets:
+      - name: Top countries
+        type: chart
+        chart: bar
+        horizontal: true
+        sql: |
+          SELECT
+            country,
+            COUNT(*) AS sessions,
+            SAFE_DIVIDE(COUNTIF(is_engaged_session), NULLIF(COUNT(*), 0))
+              AS engagement_rate
+          FROM `web_analytics_staging.ga4_sessions`
+          WHERE session_date BETWEEN DATE('{{ filters.date_range.start }}')
+                                 AND DATE('{{ filters.date_range.end }}')
+            AND country IS NOT NULL
+            {% if filters.channel and filters.channel | length > 0 %}
+            AND session_default_channel_group IN ('{{ filters.channel | join("','") }}')
+            {% endif %}
+            {% if filters.device and filters.device | length > 0 %}
+            AND device_category IN ('{{ filters.device | join("','") }}')
+            {% endif %}
+            {% if filters.page_role and filters.page_role | length > 0 %}
+            AND landing_page_role IN ('{{ filters.page_role | join("','") }}')
+            {% endif %}
+          GROUP BY 1
+          ORDER BY sessions DESC
+          LIMIT 15
+        x: { field: country, type: category }
+        y: { field: [sessions], type: number, format: ",.0f" }
+        col: 6
+      - name: Landing page role mix over time
+        type: chart
+        chart: bar
+        normalized: true
+        stacked: true
+        description: Share of sessions entering on each kind of page, by month.
+        sql: |
+          SELECT
+            DATE_TRUNC(session_date, MONTH) AS month,
+            landing_page_role,
+            COUNT(*) AS sessions
+          FROM `web_analytics_staging.ga4_sessions`
+          WHERE session_date BETWEEN DATE('{{ filters.date_range.start }}')
+                                 AND DATE('{{ filters.date_range.end }}')
+            AND landing_page_role IS NOT NULL
+            {% if filters.channel and filters.channel | length > 0 %}
+            AND session_default_channel_group IN ('{{ filters.channel | join("','") }}')
+            {% endif %}
+            {% if filters.device and filters.device | length > 0 %}
+            AND device_category IN ('{{ filters.device | join("','") }}')
+            {% endif %}
+            {% if filters.country %}
+            AND LOWER(country) LIKE LOWER('%{{ filters.country | replace("'", "_") }}%')
+            {% endif %}
+          GROUP BY 1, 2
+          ORDER BY 1, 2
+        x: { field: month, type: date }
+        y: { field: [sessions], type: number, format: ",.0f" }
+        color: { field: landing_page_role }
+        col: 6
+
+  - widgets:
+      - name: Landing pages by organic sessions
+        type: table
+        description: >
+          Sessions that entered the site on this page from Google organic
+          search, with what they did next.
+        sql: |
+          SELECT
+            landing_page_path,
+            landing_page_hostname,
+            landing_page_role,
+            COUNT(*) AS sessions,
+            SAFE_DIVIDE(COUNTIF(is_engaged_session), NULLIF(COUNT(*), 0))
+              AS engagement_rate,
+            SAFE_DIVIDE(SUM(engagement_time_seconds), NULLIF(COUNT(*), 0))
+              AS avg_engagement_seconds,
+            SAFE_DIVIDE(SUM(page_view_count), NULLIF(COUNT(*), 0))
+              AS pages_per_session,
+            SAFE_DIVIDE(COUNTIF(is_new_user_session), NULLIF(COUNT(*), 0))
+              AS new_user_share,
+            SUM(key_event_count) AS key_events,
+            SUM(session_outcome_value_usd) AS outcome_value_usd
+          FROM `web_analytics_staging.ga4_sessions`
+          WHERE session_date BETWEEN DATE('{{ filters.date_range.start }}')
+                                 AND DATE('{{ filters.date_range.end }}')
+            AND is_google_organic_session
+            {% if filters.device and filters.device | length > 0 %}
+            AND device_category IN ('{{ filters.device | join("','") }}')
+            {% endif %}
+            {% if filters.page_role and filters.page_role | length > 0 %}
+            AND landing_page_role IN ('{{ filters.page_role | join("','") }}')
+            {% endif %}
+            {% if filters.country %}
+            AND LOWER(country) LIKE LOWER('%{{ filters.country | replace("'", "_") }}%')
+            {% endif %}
+          GROUP BY 1, 2, 3
+          ORDER BY sessions DESC
+          LIMIT 100
+        columns:
+          - { name: landing_page_path, label: Landing page }
+          - { name: landing_page_hostname, label: Host }
+          - { name: landing_page_role, label: Role }
+          - { name: sessions, label: Sessions, number: number }
+          - name: engagement_rate
+            label: Engaged
+            number: ".1%"
+            format:
+              - { backgroundColor: [red, white, green] }
+          - { name: avg_engagement_seconds, label: Avg seconds, number: ",.0f" }
+          - { name: pages_per_session, label: Pages / session, number: ",.2f" }
+          - { name: new_user_share, label: New users, number: ".1%" }
+          - { name: key_events, label: Key events, number: number }
+          - { name: outcome_value_usd, label: Value, number: currency }
+        col: 12
+
+  - widgets:
+      - name: Most viewed pages
+        type: table
+        description: >
+          From ga4_page_daily, which counts views from any session rather than
+          only sessions that landed on the page.
+        sql: |
+          SELECT
+            page_path,
+            page_hostname,
+            page_role,
+            SUM(page_views) AS page_views,
+            SUM(entrances) AS entrances,
+            SUM(distinct_sessions) AS sessions,
+            SUM(distinct_users) AS users,
+            SAFE_DIVIDE(SUM(engagement_time_seconds), NULLIF(SUM(distinct_sessions), 0))
+              AS avg_engagement_seconds
+          FROM `web_analytics_staging.ga4_page_daily`
+          WHERE page_date BETWEEN DATE('{{ filters.date_range.start }}')
+                              AND DATE('{{ filters.date_range.end }}')
+            {% if filters.channel and filters.channel | length > 0 %}
+            AND session_default_channel_group IN ('{{ filters.channel | join("','") }}')
+            {% endif %}
+            {% if filters.device and filters.device | length > 0 %}
+            AND device_category IN ('{{ filters.device | join("','") }}')
+            {% endif %}
+            {% if filters.page_role and filters.page_role | length > 0 %}
+            AND page_role IN ('{{ filters.page_role | join("','") }}')
+            {% endif %}
+          GROUP BY 1, 2, 3
+          ORDER BY page_views DESC
+          LIMIT 100
+        columns:
+          - { name: page_path, label: Page }
+          - { name: page_hostname, label: Host }
+          - { name: page_role, label: Role }
+          - { name: page_views, label: Views, number: number }
+          - { name: entrances, label: Entrances, number: number }
+          - { name: sessions, label: Sessions, number: number }
+          - { name: users, label: Users, number: number }
+          - { name: avg_engagement_seconds, label: Avg seconds, number: ",.0f" }
+        col: 12

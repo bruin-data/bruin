@@ -1,0 +1,66 @@
+name: web_analytics_raw.ga4_events_intraday
+type: bq.source
+description: >
+  GA4 streaming export, read as `<ga4_dataset>.events_intraday_*`, one table per
+  day behind that wildcard.
+  Created and owned by Google, never written by this pipeline. Declared here so
+  the GA4 models have a visible upstream in the lineage graph.
+
+  Only the fields the pipeline reads are documented below. The export carries far
+  more, including nested records this template does not use.
+
+tags:
+  - web_analytics_raw
+  - ga4
+
+columns:
+  - name: event_date
+    type: STRING
+    description: Event date as YYYYMMDD, in the property's reporting timezone.
+  - name: event_timestamp
+    type: INT64
+    description: Event time in UTC microseconds.
+  - name: event_name
+    type: STRING
+    description: Event name, such as page_view, session_start, or form_start.
+  - name: user_pseudo_id
+    type: STRING
+    description: Pseudonymous client identifier.
+  - name: user_id
+    type: STRING
+    description: Logged-in user identifier, NULL when the site sets none.
+  - name: event_params
+    type: ARRAY<STRUCT>
+    description: >
+      Repeated key/value parameters. The pipeline reads ga_session_id,
+      ga_session_number, session_engaged, engagement_time_msec, page_location,
+      and entrances.
+  - name: ecommerce
+    type: STRUCT
+    description: >
+      Purchase totals. Empty on sites that hand off to sales rather than
+      transacting on the site.
+  - name: device
+    type: STRUCT
+    description: Device attributes; the pipeline reads category and operating_system.
+  - name: geo
+    type: STRUCT
+    description: Location attributes; the pipeline reads country.
+  - name: traffic_source
+    type: STRUCT
+    description: >
+      User-scoped first-touch source. The last fallback in the attribution chain,
+      and the only one a streaming-only export reliably populates.
+  - name: collected_traffic_source
+    type: STRUCT
+    description: Event-scoped source collected with the hit.
+  - name: session_traffic_source_last_click
+    type: STRUCT
+    description: >
+      Session-scoped last non-direct attribution. Present as a struct but left
+      unpopulated by streaming-only exports.
+
+# Names in this folder are stable logical identifiers rather than the real table
+# paths, because Bruin validates asset names before Jinja renders and a name may
+# not contain a variable or a wildcard. The real table each one stands for is in
+# its description above. These assets are no-op: bq.source never executes.

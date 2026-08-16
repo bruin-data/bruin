@@ -1,0 +1,560 @@
+name: GSC Insights
+description: >
+  Search demand from web_analytics_staging plus the opportunity, decay, and
+  cannibalization reports. Query-grain widgets exclude the rows where Google
+  withheld the query; trend and totals keep them, so the two will not sum alike.
+connection: gcp-default
+
+filters:
+  - name: date_range
+    type: date-range
+    default: all_time
+  - name: search_type
+    type: select
+    default: WEB
+    options:
+      values: [WEB, IMAGE, VIDEO, NEWS]
+  - name: device
+    type: select
+    multiple: true
+    options:
+      values: [DESKTOP, MOBILE, TABLET]
+  - name: brand_type
+    type: select
+    multiple: true
+    options:
+      values: [branded, non_branded, anonymized]
+  - name: intent
+    type: select
+    multiple: true
+    options:
+      values: [branded, commercial, competitor, informational, anonymized]
+  - name: page_role
+    type: select
+    multiple: true
+    options:
+      values: [product, content, support]
+
+queries:
+  # URL-grain totals. Impressions here are per page, so summing across pages
+  # overstates property totals by design -- use the overview tab for those.
+  url_grain_totals:
+    sql: |
+      SELECT
+        SUM(impressions) AS impressions,
+        SUM(clicks) AS clicks,
+        SAFE_DIVIDE(SUM(clicks), NULLIF(SUM(impressions), 0)) AS ctr,
+        SAFE_DIVIDE(SUM(sum_position), NULLIF(SUM(impressions), 0)) + 1
+          AS avg_position,
+        COUNT(DISTINCT IF(NOT is_anonymized_query, query, NULL))
+          AS distinct_queries,
+        COUNT(DISTINCT CONCAT(page_hostname, page_path)) AS distinct_pages
+      FROM `web_analytics_staging.gsc_url_query_daily`
+      WHERE data_date BETWEEN DATE('{{ filters.date_range.start }}')
+                          AND DATE('{{ filters.date_range.end }}')
+        AND search_type = '{{ filters.search_type }}'
+        {% if filters.device and filters.device | length > 0 %}
+        AND device IN ('{{ filters.device | join("','") }}')
+        {% endif %}
+        {% if filters.brand_type and filters.brand_type | length > 0 %}
+        AND query_brand_type IN ('{{ filters.brand_type | join("','") }}')
+        {% endif %}
+        {% if filters.intent and filters.intent | length > 0 %}
+        AND query_intent_type IN ('{{ filters.intent | join("','") }}')
+        {% endif %}
+        {% if filters.page_role and filters.page_role | length > 0 %}
+        AND page_role IN ('{{ filters.page_role | join("','") }}')
+        {% endif %}
+
+  daily_demand:
+    sql: |
+      SELECT
+        data_date,
+        SUM(impressions) AS impressions,
+        SUM(clicks) AS clicks,
+        SAFE_DIVIDE(SUM(sum_position), NULLIF(SUM(impressions), 0)) + 1
+          AS avg_position
+      FROM `web_analytics_staging.gsc_url_query_daily`
+      WHERE data_date BETWEEN DATE('{{ filters.date_range.start }}')
+                          AND DATE('{{ filters.date_range.end }}')
+        AND search_type = '{{ filters.search_type }}'
+        {% if filters.device and filters.device | length > 0 %}
+        AND device IN ('{{ filters.device | join("','") }}')
+        {% endif %}
+        {% if filters.brand_type and filters.brand_type | length > 0 %}
+        AND query_brand_type IN ('{{ filters.brand_type | join("','") }}')
+        {% endif %}
+        {% if filters.intent and filters.intent | length > 0 %}
+        AND query_intent_type IN ('{{ filters.intent | join("','") }}')
+        {% endif %}
+        {% if filters.page_role and filters.page_role | length > 0 %}
+        AND page_role IN ('{{ filters.page_role | join("','") }}')
+        {% endif %}
+      GROUP BY 1
+      ORDER BY 1
+
+rows:
+  - widgets:
+      - name: Impressions
+        type: metric
+        description: URL-grain, so this exceeds the property total on the overview tab.
+        query: url_grain_totals
+        value: { field: impressions, type: number, format: ",.0f" }
+        col: 2
+      - name: Clicks
+        type: metric
+        query: url_grain_totals
+        value: { field: clicks, type: number, format: ",.0f" }
+        col: 2
+      - name: CTR
+        type: metric
+        query: url_grain_totals
+        value: { field: ctr, type: number, format: ".2%" }
+        col: 2
+      - name: Average position
+        type: metric
+        query: url_grain_totals
+        value: { field: avg_position, type: number, format: ",.1f" }
+        col: 2
+      - name: Distinct queries
+        type: metric
+        description: Withheld queries excluded, since they carry no query to count.
+        query: url_grain_totals
+        value: { field: distinct_queries, type: number, format: ",.0f" }
+        col: 2
+      - name: Ranking pages
+        type: metric
+        query: url_grain_totals
+        value: { field: distinct_pages, type: number, format: ",.0f" }
+        col: 2
+
+  - widgets:
+      - name: Impressions by day
+        type: chart
+        chart: line
+        query: daily_demand
+        x: { field: data_date, type: date }
+        y: { field: [impressions], type: number, format: ",.0f" }
+        col: 4
+      - name: Clicks by day
+        type: chart
+        chart: line
+        description: >
+          On its own axis: impressions outnumber clicks by orders of magnitude,
+          so a shared axis would flatten this line to zero.
+        query: daily_demand
+        x: { field: data_date, type: date }
+        y: { field: [clicks], type: number, format: ",.0f" }
+        col: 4
+      - name: Average position by day
+        type: chart
+        chart: line
+        description: Lower is better. Impression-weighted, one-based.
+        query: daily_demand
+        x: { field: data_date, type: date }
+        y: { field: [avg_position], type: number, format: ",.1f" }
+        col: 4
+
+  - widgets:
+      - name: The CTR this property earns at each position
+        type: chart
+        chart: line
+        description: >
+          From gsc_position_click_curve, measured on your own history rather
+          than an industry benchmark. It is what gsc_query_opportunities
+          compares each query against. Only buckets with enough impressions to
+          trust are shown.
+        sql: |
+          SELECT
+            position_bucket,
+            expected_ctr
+          FROM `web_analytics_staging.gsc_position_click_curve`
+          WHERE search_type = '{{ filters.search_type }}'
+            AND is_reliable_bucket
+          ORDER BY position_bucket
+        x: { field: position_bucket, type: number }
+        y: { field: [expected_ctr], type: number, format: ".2%" }
+        col: 6
+      - name: Where impressions sit by position
+        type: chart
+        chart: bar
+        description: >
+          Visibility concentrated deep in the results is demand you are shown
+          for but rarely clicked on.
+        sql: |
+          SELECT
+            position_bucket,
+            bucket_impressions
+          FROM `web_analytics_staging.gsc_position_click_curve`
+          WHERE search_type = '{{ filters.search_type }}'
+            AND is_reliable_bucket
+          ORDER BY position_bucket
+        x: { field: position_bucket, type: number }
+        y: { field: [bucket_impressions], type: number, format: ",.0f" }
+        col: 6
+
+  - widgets:
+      - name: Clicks by query intent
+        type: chart
+        chart: bar
+        horizontal: true
+        sql: |
+          SELECT
+            query_intent_type,
+            SUM(clicks) AS clicks,
+            SUM(impressions) AS impressions
+          FROM `web_analytics_staging.gsc_url_query_daily`
+          WHERE data_date BETWEEN DATE('{{ filters.date_range.start }}')
+                              AND DATE('{{ filters.date_range.end }}')
+            AND search_type = '{{ filters.search_type }}'
+            {% if filters.device and filters.device | length > 0 %}
+            AND device IN ('{{ filters.device | join("','") }}')
+            {% endif %}
+            {% if filters.page_role and filters.page_role | length > 0 %}
+            AND page_role IN ('{{ filters.page_role | join("','") }}')
+            {% endif %}
+          GROUP BY 1
+          ORDER BY clicks DESC
+        x: { field: query_intent_type, type: category }
+        y: { field: [clicks], type: number, format: ",.0f" }
+        col: 4
+      - name: Clicks by device
+        type: chart
+        chart: pie
+        sql: |
+          SELECT
+            device,
+            SUM(clicks) AS clicks
+          FROM `web_analytics_staging.gsc_url_query_daily`
+          WHERE data_date BETWEEN DATE('{{ filters.date_range.start }}')
+                              AND DATE('{{ filters.date_range.end }}')
+            AND search_type = '{{ filters.search_type }}'
+            {% if filters.brand_type and filters.brand_type | length > 0 %}
+            AND query_brand_type IN ('{{ filters.brand_type | join("','") }}')
+            {% endif %}
+            {% if filters.page_role and filters.page_role | length > 0 %}
+            AND page_role IN ('{{ filters.page_role | join("','") }}')
+            {% endif %}
+          GROUP BY 1
+          ORDER BY clicks DESC
+        label: device
+        value: { field: clicks, type: number, format: ",.0f" }
+        col: 4
+      - name: Clicks by page role
+        type: chart
+        chart: bar
+        horizontal: true
+        description: >
+          Support pages are mostly existing customers looking something up.
+          Filter them out before judging acquisition.
+        sql: |
+          SELECT
+            page_role,
+            SUM(clicks) AS clicks
+          FROM `web_analytics_staging.gsc_url_query_daily`
+          WHERE data_date BETWEEN DATE('{{ filters.date_range.start }}')
+                              AND DATE('{{ filters.date_range.end }}')
+            AND search_type = '{{ filters.search_type }}'
+            {% if filters.device and filters.device | length > 0 %}
+            AND device IN ('{{ filters.device | join("','") }}')
+            {% endif %}
+            {% if filters.brand_type and filters.brand_type | length > 0 %}
+            AND query_brand_type IN ('{{ filters.brand_type | join("','") }}')
+            {% endif %}
+            {% if filters.intent and filters.intent | length > 0 %}
+            AND query_intent_type IN ('{{ filters.intent | join("','") }}')
+            {% endif %}
+          GROUP BY 1
+          ORDER BY clicks DESC
+        x: { field: page_role, type: category }
+        y: { field: [clicks], type: number, format: ",.0f" }
+        col: 4
+
+  - widgets:
+      - name: Biggest click opportunities
+        type: table
+        description: >
+          clicks_at_expected_ctr is what fixing the title and description would
+          return at today's position. clicks_at_top_three_ctr is what ranking in
+          the top three would return at today's impressions. Both are estimates
+          from observed behaviour, not forecasts.
+        sql: |
+          SELECT
+            query,
+            opportunity_type,
+            top_page_path,
+            impressions,
+            clicks,
+            ctr,
+            expected_ctr,
+            ctr_gap,
+            avg_position,
+            clicks_at_expected_ctr,
+            clicks_at_top_three_ctr,
+            is_expected_ctr_reliable
+          FROM `web_analytics_reports.gsc_query_opportunities`
+          WHERE search_type = '{{ filters.search_type }}'
+            {% if filters.brand_type and filters.brand_type | length > 0 %}
+            AND query_brand_type IN ('{{ filters.brand_type | join("','") }}')
+            {% endif %}
+          ORDER BY clicks_at_expected_ctr DESC
+          LIMIT 100
+        columns:
+          - { name: query, label: Query }
+          - name: opportunity_type
+            label: Type
+            format:
+              - { if: text_is_exactly, value: striking_distance, backgroundColor: green }
+              - { if: text_is_exactly, value: impressions_no_clicks, backgroundColor: amber }
+              - { if: text_is_exactly, value: underperforming_ctr, backgroundColor: blue }
+          - { name: top_page_path, label: Top page }
+          - { name: impressions, label: Impressions, number: number }
+          - { name: clicks, label: Clicks, number: number }
+          - { name: ctr, label: CTR, number: ".2%" }
+          - { name: expected_ctr, label: Expected CTR, number: ".2%" }
+          - name: ctr_gap
+            label: Gap
+            number: ".2%"
+            format:
+              - { backgroundColor: [green, white, red] }
+          - { name: avg_position, label: Position, number: ".1f" }
+          - name: clicks_at_expected_ctr
+            label: Clicks at expected CTR
+            number: ",.0f"
+            format:
+              - { backgroundColor: [white, green] }
+          - { name: clicks_at_top_three_ctr, label: Clicks in top 3, number: ",.0f" }
+          - name: is_expected_ctr_reliable
+            label: Reliable
+            format:
+              - { if: text_is_exactly, value: "false", backgroundColor: amber }
+        col: 12
+
+  - widgets:
+      - name: Pages gaining and losing clicks
+        type: table
+        description: >
+          gsc_page_trend compares the last trend_window_days against the window
+          before it. Needs two full windows of staged history to be meaningful.
+        sql: |
+          SELECT
+            page_path,
+            page_hostname,
+            trend_class,
+            current_impressions,
+            prior_impressions,
+            current_clicks,
+            prior_clicks,
+            click_change,
+            click_change_rate,
+            current_avg_position,
+            position_change,
+            distinct_query_count
+          FROM `web_analytics_reports.gsc_page_trend`
+          ORDER BY ABS(click_change) DESC
+          LIMIT 100
+        columns:
+          - { name: page_path, label: Page }
+          - { name: page_hostname, label: Host }
+          - name: trend_class
+            label: Trend
+            format:
+              - { if: text_is_exactly, value: growing, backgroundColor: green }
+              - { if: text_is_exactly, value: new, backgroundColor: cyan }
+              - { if: text_is_exactly, value: declining, backgroundColor: amber }
+              - { if: text_is_exactly, value: lost, backgroundColor: red }
+          - { name: current_impressions, label: Impressions, number: number }
+          - { name: prior_impressions, label: Prior impressions, number: number }
+          - { name: current_clicks, label: Clicks, number: number }
+          - { name: prior_clicks, label: Prior clicks, number: number }
+          - name: click_change
+            label: Click change
+            number: ",.0f"
+            format:
+              - { backgroundColor: [red, white, green] }
+          - { name: click_change_rate, label: Change rate, number: ".1%" }
+          - { name: current_avg_position, label: Position, number: ".1f" }
+          - name: position_change
+            label: Position change (negative is better)
+            number: ",.1f"
+            format:
+              - { backgroundColor: [green, white, red] }
+          - { name: distinct_query_count, label: Queries, number: number }
+        col: 12
+
+  - widgets:
+      - name: Queries several pages compete for
+        type: table
+        description: >
+          One query, two of your own pages. Severity rises as the competing page
+          takes a larger share of the query's clicks.
+        sql: |
+          SELECT
+            query,
+            cannibalization_severity,
+            ranking_page_count,
+            query_impressions,
+            query_clicks,
+            primary_page_path,
+            primary_page_clicks,
+            primary_page_avg_position,
+            primary_page_click_share,
+            competing_page_path,
+            competing_page_clicks,
+            competing_page_avg_position
+          FROM `web_analytics_reports.gsc_query_cannibalization`
+          WHERE search_type = '{{ filters.search_type }}'
+            {% if filters.brand_type and filters.brand_type | length > 0 %}
+            AND query_brand_type IN ('{{ filters.brand_type | join("','") }}')
+            {% endif %}
+          ORDER BY query_impressions DESC
+          LIMIT 100
+        columns:
+          - { name: query, label: Query }
+          - name: cannibalization_severity
+            label: Severity
+            format:
+              - { if: text_is_exactly, value: high, backgroundColor: red }
+              - { if: text_is_exactly, value: medium, backgroundColor: amber }
+              - { if: text_is_exactly, value: low, backgroundColor: blue }
+          - { name: ranking_page_count, label: Pages, number: number }
+          - { name: query_impressions, label: Impressions, number: number }
+          - { name: query_clicks, label: Clicks, number: number }
+          - { name: primary_page_path, label: Primary page }
+          - { name: primary_page_clicks, label: Primary clicks, number: number }
+          - { name: primary_page_avg_position, label: Primary position, number: ".1f" }
+          - { name: primary_page_click_share, label: Primary share, number: ".1%" }
+          - { name: competing_page_path, label: Competing page }
+          - { name: competing_page_clicks, label: Competing clicks, number: number }
+          - { name: competing_page_avg_position, label: Competing position, number: ".1f" }
+        col: 12
+
+  - widgets:
+      - name: Queries won and lost
+        type: chart
+        chart: bar
+        horizontal: true
+        description: >
+          Queries that appeared or vanished between the two comparison windows,
+          rather than queries whose position merely moved.
+        sql: |
+          SELECT
+            query_change_type,
+            COUNT(*) AS queries,
+            SUM(current_impressions) AS current_impressions,
+            SUM(prior_impressions) AS prior_impressions
+          FROM `web_analytics_reports.gsc_new_and_lost_queries`
+          WHERE search_type = '{{ filters.search_type }}'
+          GROUP BY 1
+          ORDER BY queries DESC
+        x: { field: query_change_type, type: category }
+        y: { field: [queries], type: number, format: ",.0f" }
+        col: 4
+      - name: New and lost queries in detail
+        type: table
+        sql: |
+          SELECT
+            query,
+            query_change_type,
+            query_brand_type,
+            top_page_path,
+            current_impressions,
+            current_clicks,
+            current_avg_position,
+            prior_impressions,
+            prior_clicks
+          FROM `web_analytics_reports.gsc_new_and_lost_queries`
+          WHERE search_type = '{{ filters.search_type }}'
+            {% if filters.brand_type and filters.brand_type | length > 0 %}
+            AND query_brand_type IN ('{{ filters.brand_type | join("','") }}')
+            {% endif %}
+          ORDER BY GREATEST(current_impressions, prior_impressions) DESC
+          LIMIT 100
+        columns:
+          - { name: query, label: Query }
+          - name: query_change_type
+            label: Change
+            format:
+              - { if: text_is_exactly, value: new, backgroundColor: green }
+              - { if: text_is_exactly, value: lost, backgroundColor: red }
+          - { name: query_brand_type, label: Brand }
+          - { name: top_page_path, label: Top page }
+          - { name: current_impressions, label: Impressions, number: number }
+          - { name: current_clicks, label: Clicks, number: number }
+          - { name: current_avg_position, label: Position, number: ".1f" }
+          - { name: prior_impressions, label: Prior impressions, number: number }
+          - { name: prior_clicks, label: Prior clicks, number: number }
+        col: 8
+
+  - widgets:
+      - name: Competitor comparison queries
+        type: table
+        description: >
+          Populates once competitor_names in pipeline.yml holds real competitor
+          names; it is empty while the shipped placeholders are in place.
+          position_band shows whether you are anywhere a searcher will look.
+        sql: |
+          SELECT
+            competitor_name,
+            query,
+            search_impressions,
+            search_clicks,
+            search_ctr,
+            search_avg_position,
+            position_band,
+            top_page_path,
+            top_page_role,
+            has_dedicated_comparison_page
+          FROM `web_analytics_reports.gsc_competitor_visibility`
+          ORDER BY search_impressions DESC
+          LIMIT 100
+        columns:
+          - { name: competitor_name, label: Competitor }
+          - { name: query, label: Query }
+          - { name: search_impressions, label: Impressions, number: number }
+          - { name: search_clicks, label: Clicks, number: number }
+          - { name: search_ctr, label: CTR, number: ".2%" }
+          - { name: search_avg_position, label: Position, number: ".1f" }
+          - name: position_band
+            label: Band
+            format:
+              - { if: text_contains, value: top, backgroundColor: green }
+          - { name: top_page_path, label: Top page }
+          - { name: top_page_role, label: Role }
+          - name: has_dedicated_comparison_page
+            label: Comparison page
+            format:
+              - { if: text_is_exactly, value: "false", backgroundColor: amber }
+        col: 12
+
+  - widgets:
+      - name: Publication lag and restatements
+        type: table
+        description: >
+          From gsc_export_log. A bumped epoch_version means Google restated a
+          date rather than the site changing.
+        sql: |
+          SELECT
+            namespace,
+            data_date,
+            epoch_version,
+            publish_time,
+            publication_lag_days
+          FROM `web_analytics_staging.gsc_export_log`
+          WHERE is_latest_epoch
+          ORDER BY data_date DESC
+          LIMIT 30
+        columns:
+          - { name: namespace, label: Table }
+          - { name: data_date, label: Reporting date }
+          - name: epoch_version
+            label: Epoch
+            format:
+              - { if: greater_than, value: 0, backgroundColor: amber }
+          - { name: publish_time, label: Published }
+          - name: publication_lag_days
+            label: Lag (days)
+            number: ",.0f"
+            format:
+              - { if: greater_than_or_equal, value: 4, backgroundColor: amber }
+        col: 12
