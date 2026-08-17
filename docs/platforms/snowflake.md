@@ -9,7 +9,7 @@ To set up a Snowflake connection, add a `snowflake` connection to the `connectio
 Snowflake connections support two authentication methods:
 
 - Password authentication: provide `username` and `password`.
-- Key-pair authentication: provide `username` and either `private_key_path` or `private_key`.
+- Key-pair authentication: provide `username` and either `private_key_path` or `private_key`. If the private key is passphrase-protected, also set `password` to that passphrase.
 
 Both methods use the same Snowflake account, database, schema, warehouse, role, and region fields. Choose one authentication method and configure it as shown below.
 
@@ -58,13 +58,17 @@ SHOW USERS LIKE '<username>';
 <details>
 <summary>How to set this value</summary>
 
-Use this only for password authentication. Snowflake does not let you retrieve an existing password, so use the password that was set for the user or reset it.
+Use this for password authentication, or as the passphrase for an encrypted private key.
+
+For password authentication, Snowflake does not let you retrieve an existing password, so use the password that was set for the user or reset it.
 
 Programmatic method: an admin can set a new password with:
 
 ```sql
 ALTER USER <username> SET PASSWORD = '<new_password>';
 ```
+
+For key-pair authentication with an encrypted private key, set `password` to the passphrase you used when generating the key. Bruin uses it to decrypt `private_key` or the file at `private_key_path`.
 
 </details>
 
@@ -204,7 +208,7 @@ SELECT CURRENT_REGION();
 <details>
 <summary>How to get this value</summary>
 
-Use this only for key-pair authentication. It is the local path to the private key file generated for Bruin, such as `rsa_key.p8`.
+Use this only for key-pair authentication. It is the local path to the private key file generated for Bruin, such as `rsa_key.p8`. The file can be unencrypted or passphrase-protected.
 
 Programmatic method: after generating the key, print its absolute path from your terminal:
 
@@ -219,7 +223,7 @@ realpath rsa_key.p8
 <details>
 <summary>How to get this value</summary>
 
-Use this only for key-pair authentication when you want to paste the private key contents directly into `.bruin.yml` instead of referencing a file path.
+Use this only for key-pair authentication when you want to paste the private key contents directly into `.bruin.yml` instead of referencing a file path. The key can be unencrypted or passphrase-protected.
 
 Programmatic method: print the private key contents from your terminal:
 
@@ -247,14 +251,23 @@ cat rsa_key.p8
 
 ### Key-Pair Authentication
 
-For key-pair authentication, first generate a private/public key pair and register the public key with your Snowflake user. Then configure Bruin with the private key. Bruin can read the private key from a file path or directly from the `.bruin.yml` file.
+For key-pair authentication, first generate a private/public key pair and register the public key with your Snowflake user. Then configure Bruin with the private key. Bruin can read the private key from a file path or directly from the `.bruin.yml` file. If the private key is encrypted, put the passphrase in `password`.
 
 #### Step 1: Generate a key pair
 
-Open your terminal and run the following command to create a key pair. If you’re using a Mac, OpenSSL should be installed by default, so no additional setup is required. For Linux or Windows, you may need to [install OpenSSL first](https://docs.openssl.org/3.4/man7/ossl-guide-introduction/).
+Open your terminal and run one of the following commands to create a key pair. If you're using a Mac, OpenSSL should be installed by default, so no additional setup is required. For Linux or Windows, you may need to [install OpenSSL first](https://docs.openssl.org/3.4/man7/ossl-guide-introduction/).
+
+Unencrypted private key:
 
 ```bash
 openssl genrsa 2048 | openssl pkcs8 -topk8 -inform PEM -out rsa_key.p8 -nocrypt
+openssl rsa -in rsa_key.p8 -pubout -out rsa_key.pub
+```
+
+Passphrase-protected private key (OpenSSL will prompt for the passphrase):
+
+```bash
+openssl genrsa 2048 | openssl pkcs8 -topk8 -inform PEM -v2 aes-256-cbc -out rsa_key.p8
 openssl rsa -in rsa_key.p8 -pubout -out rsa_key.pub
 ```
 
@@ -277,7 +290,7 @@ This will show a column named `RSA_PUBLIC_KEY`. You should see your actual key t
 
 #### Step 4: Configure Bruin with the private key
 
-Choose one of the following private-key options in your `.bruin.yml` file.
+Choose one of the following private-key options in your `.bruin.yml` file. If the private key is passphrase-protected, add `password` with that passphrase. Bruin uses it to decrypt the key when both the key and the password are set.
 
 ##### Option 1: Private key file path
 
@@ -313,6 +326,44 @@ Choose one of the following private-key options in your `.bruin.yml` file.
             OEKLvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEIAoIBAQC0Xc2pIYcLxdve
             E+J5c5f...
             -----END PRIVATE KEY-----
+```
+
+##### Option 3: Passphrase-protected private key
+
+Set `password` to the passphrase you used when generating the key. This works with either `private_key_path` or `private_key`.
+
+```yaml
+    connections:
+      snowflake:
+        - name: "connection_name"
+          username: "sfuser"
+          password: "your_key_passphrase" # passphrase used to encrypt the private key
+          account: "organization-account"
+          database: "dev"
+          schema: "schema_name" # optional
+          warehouse: "warehouse_name" # optional
+          role: "data_analyst" # optional
+          region: "eu-west1" # required
+          private_key_path: "path/to/rsa_key.p8"
+```
+
+```yaml
+    connections:
+      snowflake:
+        - name: "connection_name"
+          username: "sfuser"
+          password: "your_key_passphrase"
+          account: "organization-account"
+          database: "dev"
+          schema: "schema_name" # optional
+          warehouse: "warehouse_name" # optional
+          role: "data_analyst" # optional
+          region: "eu-west1" # required
+          private_key: |
+            -----BEGIN ENCRYPTED PRIVATE KEY-----
+            OEKLvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEIAoIBAQC0Xc2pIYcLxdve
+            E+J5c5f...
+            -----END ENCRYPTED PRIVATE KEY-----
 ```
 
 For more details on how to set up key-pair authentication, see [this guide](https://select.dev/docs/snowflake-developer-guide/snowflake-key-pair).
