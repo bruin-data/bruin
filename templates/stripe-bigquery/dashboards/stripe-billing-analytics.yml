@@ -153,8 +153,8 @@ queries:
           customer_name,
           crm_account_id,
           COALESCE(
-            NULLIF(customer_name, ''),
-            NULLIF(crm_account_id, ''),
+            NULLIF(TRIM(customer_name), ''),
+            NULLIF(TRIM(crm_account_id), ''),
             stripe_customer_id
           ) AS customer_label,
           CONCAT('https://dashboard.stripe.com/customers/', stripe_customer_id)
