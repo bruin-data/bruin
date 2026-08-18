@@ -150,9 +150,15 @@ queries:
         SELECT
           metric_month,
           stripe_customer_id,
+          customer_name,
           crm_account_id,
-          COALESCE(NULLIF(crm_account_id, ''), stripe_customer_id)
-            AS customer_label,
+          COALESCE(
+            NULLIF(TRIM(customer_name), ''),
+            NULLIF(TRIM(crm_account_id), ''),
+            stripe_customer_id
+          ) AS customer_label,
+          CONCAT('https://dashboard.stripe.com/customers/', stripe_customer_id)
+            AS stripe_customer_url,
           customer_segment,
           customer_region,
           sales_owner,
@@ -272,6 +278,10 @@ rows:
         query: latest_customer_mrr
         col: 12
         columns:
+          - name: customer_name
+            label: Company
+          - name: stripe_customer_url
+            label: Stripe link
           - name: stripe_customer_id
             label: Stripe customer
           - name: crm_account_id

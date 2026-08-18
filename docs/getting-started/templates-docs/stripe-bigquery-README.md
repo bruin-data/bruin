@@ -226,7 +226,7 @@ Use the stage models as a stable interface for your own reports. Review the sele
 
 ## View the billing dashboard
 
-The included DAC dashboard visualizes native-currency MRR, ARR, customer count, retention, movement components, invoice billings, and the latest customer MRR distribution. It deliberately filters to one currency at a time because no FX rates are applied. The reporting tables retain money in native minor units; the dashboard queries divide by the selected currency's exponent so the widgets read in major units, using a divisor of 1 for Stripe's zero-decimal currencies.
+The included DAC dashboard visualizes native-currency MRR, ARR, customer count, retention, movement components, invoice billings, and the latest customer MRR distribution. The customer breakdown labels each account by company name (falling back to CRM account or Stripe customer id) and lists a deep link to open the customer in the Stripe Dashboard. It deliberately filters to one currency at a time because no FX rates are applied. The reporting tables retain money in native minor units; the dashboard queries divide by the selected currency's exponent so the widgets read in major units, using a divisor of 1 for Stripe's zero-decimal currencies.
 
 After configuring `gcp-default`, install a verified DAC release by following the [DAC installation guide](https://getbruin.com/docs/dac/getting-started/installation.html). Then install its dashboard-authoring skill from the project root:
 

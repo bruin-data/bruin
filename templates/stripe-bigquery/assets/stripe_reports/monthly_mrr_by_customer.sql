@@ -53,6 +53,9 @@ columns:
     primary_key: true
     checks:
       - name: not_null
+  - name: customer_name
+    type: STRING
+    description: Customer's full or business name carried from the customer record.
   - name: crm_account_id
     type: STRING
     description: CRM account identifier carried from the customer metadata.
@@ -112,6 +115,7 @@ SELECT
     ) = 1 AS has_contiguous_global_prior_snapshot,
   snapshot.stripe_customer_id,
   snapshot.currency,
+  customer.customer_name,
   customer.crm_account_id,
   customer.customer_segment,
   customer.customer_region,
