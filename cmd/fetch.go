@@ -1566,6 +1566,9 @@ func saveQueryLog(queryStr string, connName string, result *query.QueryResult, q
 
 const aggregatedQueryLogPathEnv = "BRUIN_QUERY_LOG_FILE"
 
+// aggregatedQueryLogMaxRows caps rows per query in the aggregated log; the per-query files under logs/queries keep every row.
+const aggregatedQueryLogMaxRows = 20
+
 var queryLogAggregateMu sync.Mutex
 
 func writeAggregatedQueryLog(logDir, targetPath string) error {
@@ -1611,6 +1614,9 @@ func writeAggregatedQueryLog(logDir, targetPath string) error {
 		var entryLog QueryLog
 		if err := json.Unmarshal(data, &entryLog); err != nil {
 			continue
+		}
+		if len(entryLog.Rows) > aggregatedQueryLogMaxRows {
+			entryLog.Rows = entryLog.Rows[:aggregatedQueryLogMaxRows]
 		}
 		logs = append(logs, entryLog)
 	}
