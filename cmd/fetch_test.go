@@ -1063,3 +1063,45 @@ func TestWriteAggregatedQueryLog(t *testing.T) {
 		assert.NotContains(t, entry.Name(), ".tmp-", "no temp files should remain")
 	}
 }
+
+func TestWriteAggregatedQueryLogCapsRows(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	logDir := filepath.Join(tmpDir, "logs", "queries")
+	require.NoError(t, os.MkdirAll(logDir, 0o755))
+
+	rows := make([][]interface{}, 0, 50)
+	for i := range 50 {
+		rows = append(rows, []interface{}{float64(i)})
+	}
+	perQueryPath := filepath.Join(logDir, "query_1.json")
+	data, err := json.MarshalIndent(QueryLog{
+		Query:      "SELECT n FROM big",
+		Timestamp:  time.Date(2026, 8, 12, 10, 0, 0, 0, time.UTC),
+		Connection: "duckdb",
+		Success:    true,
+		Columns:    []string{"n"},
+		Rows:       rows,
+	}, "", "  ")
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(perQueryPath, data, 0o600))
+
+	targetPath := filepath.Join(tmpDir, "accumulated", "query-log.json")
+	require.NoError(t, writeAggregatedQueryLog(logDir, targetPath))
+
+	aggData, err := os.ReadFile(targetPath)
+	require.NoError(t, err)
+	var got []QueryLog
+	require.NoError(t, json.Unmarshal(aggData, &got))
+	require.Len(t, got, 1)
+	assert.Len(t, got[0].Rows, aggregatedQueryLogMaxRows, "aggregate entry rows should be capped")
+	assert.InDelta(t, float64(0), got[0].Rows[0][0], 1e-9, "cap should keep the first rows in order")
+	assert.InDelta(t, float64(aggregatedQueryLogMaxRows-1), got[0].Rows[aggregatedQueryLogMaxRows-1][0], 1e-9)
+
+	perQueryData, err := os.ReadFile(perQueryPath)
+	require.NoError(t, err)
+	var perQuery QueryLog
+	require.NoError(t, json.Unmarshal(perQueryData, &perQuery))
+	assert.Len(t, perQuery.Rows, 50, "per-query file should be untouched")
+}
