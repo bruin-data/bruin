@@ -34,6 +34,8 @@ clickhouse/
         └── customer_regions.py
 ~~~
 
+> The tree above shows the template's own files. After `bruin init`, the `.bruin.yml` is merged into the `.bruin.yml` at your **project root** (never inside the pipeline folder). See [Project configuration](../../core-concepts/project.md).
+
 ## Pipeline at a glance
 
 ~~~text
