@@ -71,15 +71,6 @@ If Bruin detects no existing `.git` repository:
 * A new Git repository is created (via `git init`).
 * The pipeline is placed under `bruin/` unless `--in-place` is used.
 
-### Where `.bruin.yml` Goes
-
-`.bruin.yml` does not live next to `pipeline.yml`. Its location depends on where you run `init`:
-
-* **Inside an existing Git repo** → the repo root, which can be several levels above the pipeline folder.
-* **In a folder that is not a Git repo** → the new `bruin/` project root, or the current folder with `--in-place`.
-
-`init` prints the resolved path when it finishes, so you never have to guess.
-
 ### Configuration Merge
 
 If the selected template contains its own `.bruin.yml`, Bruin merges:
@@ -149,9 +140,9 @@ Next steps:
   3. Run: bruin run bruin-pipeline
 ```
 
-The summary always prints the resolved `.bruin.yml` path, so you know where to add your
-credentials. If a `.bruin.yml` was already there, Bruin says whether it merged the
-template's configuration into it:
+The summary always prints the resolved `.bruin.yml` path, so you never have to guess where
+it landed (see [Folder Structure](#folder-structure)). If a `.bruin.yml` was already there,
+Bruin says whether it merged the template's configuration into it:
 
 ```bash
 Using existing .bruin.yml at /Users/me/my-repo/.bruin.yml (merged template config).
