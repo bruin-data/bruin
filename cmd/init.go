@@ -334,8 +334,7 @@ func Init() *cli.Command {
 				configLocationNote = "This is your Git repo root, so it may sit several levels above the pipeline folder."
 			}
 
-			// Remember whether .bruin.yml was already there, so we can tell the user
-			// whether init created it or merged into an existing one.
+			// existed must be sampled before anything writes to bruinYmlPath.
 			configSummary := initConfigSummary{
 				path:         bruinYmlPath,
 				existed:      fileExists(bruinYmlPath),
@@ -516,17 +515,11 @@ func absOrSame(path string) string {
 	return abs
 }
 
-// initConfigSummary captures what happened to .bruin.yml during init, so the
-// command can report it accurately.
+// initConfigSummary captures what happened to .bruin.yml during init.
 type initConfigSummary struct {
-	// path is where .bruin.yml is expected, relative or absolute.
-	path string
-	// existed is true when a .bruin.yml was already there before init ran.
-	existed bool
-	// merged is true when init actually wrote template configuration into it.
-	// Templates that ship no .bruin.yml leave this false.
-	merged bool
-	// locationNote explains to the user why the config lives where it does.
+	path         string
+	existed      bool
+	merged       bool // false for templates that ship no .bruin.yml of their own
 	locationNote string
 }
 
