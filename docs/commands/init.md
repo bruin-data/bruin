@@ -150,11 +150,17 @@ Next steps:
 ```
 
 The summary always prints the resolved `.bruin.yml` path, so you know where to add your
-credentials. If a `.bruin.yml` was already there, Bruin merges the template config into it
-and says so instead:
+credentials. If a `.bruin.yml` was already there, Bruin says whether it merged the
+template's configuration into it:
 
 ```bash
 Using existing .bruin.yml at /Users/me/my-repo/.bruin.yml (merged template config).
+```
+
+or left it as it was, which happens for templates that ship no `.bruin.yml`:
+
+```bash
+Using existing .bruin.yml at /Users/me/my-repo/.bruin.yml (left unchanged).
 ```
 
 ### Initializing a Shopify template

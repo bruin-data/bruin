@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func captureInitSummary(t *testing.T, bruinYmlPath, pipelinePath string, configExisted, configAtRepoRoot bool) string {
+func captureInitSummary(t *testing.T, cfg initConfigSummary, pipelinePath string) string {
 	t.Helper()
 
 	buf := new(bytes.Buffer)
@@ -19,18 +19,30 @@ func captureInitSummary(t *testing.T, bruinYmlPath, pipelinePath string, configE
 	color.Output = buf
 	t.Cleanup(func() { color.Output = originalOutput })
 
-	printInitSummary(bruinYmlPath, pipelinePath, configExisted, configAtRepoRoot)
+	printInitSummary(cfg, pipelinePath)
 
 	return buf.String()
 }
 
+func writeBruinYml(t *testing.T, dir string) string {
+	t.Helper()
+
+	path := filepath.Join(dir, ".bruin.yml")
+	require.NoError(t, os.WriteFile(path, []byte("environments: {}\n"), 0o600))
+
+	return path
+}
+
 func TestPrintInitSummaryReportsCreatedConfigAtRepoRoot(t *testing.T) {
 	repoRoot := t.TempDir()
-	bruinYmlPath := filepath.Join(repoRoot, ".bruin.yml")
-	require.NoError(t, os.WriteFile(bruinYmlPath, []byte("environments: {}\n"), 0o600))
-
+	bruinYmlPath := writeBruinYml(t, repoRoot)
 	pipelinePath := filepath.Join(repoRoot, "nested", "my-pipeline")
-	output := captureInitSummary(t, bruinYmlPath, pipelinePath, false, true)
+
+	output := captureInitSummary(t, initConfigSummary{
+		path:         bruinYmlPath,
+		merged:       true,
+		locationNote: "This is your Git repo root, so it may sit several levels above the pipeline folder.",
+	}, pipelinePath)
 
 	require.Contains(t, output, "Config:   "+bruinYmlPath)
 	require.Contains(t, output, "Pipeline: "+pipelinePath)
@@ -41,33 +53,55 @@ func TestPrintInitSummaryReportsCreatedConfigAtRepoRoot(t *testing.T) {
 	require.Contains(t, output, "bruin run "+pipelinePath)
 }
 
-func TestPrintInitSummaryReportsReusedConfig(t *testing.T) {
+func TestPrintInitSummaryReportsMergedIntoExistingConfig(t *testing.T) {
 	projectRoot := t.TempDir()
-	bruinYmlPath := filepath.Join(projectRoot, ".bruin.yml")
-	require.NoError(t, os.WriteFile(bruinYmlPath, []byte("environments: {}\n"), 0o600))
+	bruinYmlPath := writeBruinYml(t, projectRoot)
 
-	output := captureInitSummary(t, bruinYmlPath, filepath.Join(projectRoot, "my-pipeline"), true, false)
+	output := captureInitSummary(t, initConfigSummary{
+		path:         bruinYmlPath,
+		existed:      true,
+		merged:       true,
+		locationNote: "This is your Bruin project root.",
+	}, filepath.Join(projectRoot, "my-pipeline"))
 
-	require.Contains(t, output, "Using existing .bruin.yml at "+bruinYmlPath)
-	require.Contains(t, output, "merged template config")
+	require.Contains(t, output, "Using existing .bruin.yml at "+bruinYmlPath+" (merged template config).")
 	require.NotContains(t, output, "Created .bruin.yml")
-	require.Contains(t, output, "Bruin project root")
+	require.Contains(t, output, "This is your Bruin project root.")
+}
+
+// Templates such as migration-fivetran ship no .bruin.yml, so init must not claim
+// it merged anything into the config it found.
+func TestPrintInitSummaryReportsUnchangedExistingConfig(t *testing.T) {
+	projectRoot := t.TempDir()
+	bruinYmlPath := writeBruinYml(t, projectRoot)
+
+	output := captureInitSummary(t, initConfigSummary{
+		path:    bruinYmlPath,
+		existed: true,
+	}, filepath.Join(projectRoot, "my-pipeline"))
+
+	require.Contains(t, output, "Using existing .bruin.yml at "+bruinYmlPath+" (left unchanged).")
+	require.NotContains(t, output, "merged template config")
+	require.NotContains(t, output, "Created .bruin.yml")
 }
 
 func TestPrintInitSummaryWithoutConfigFile(t *testing.T) {
 	projectRoot := t.TempDir()
-	bruinYmlPath := filepath.Join(projectRoot, ".bruin.yml")
 
-	output := captureInitSummary(t, bruinYmlPath, filepath.Join(projectRoot, "my-pipeline"), false, true)
+	output := captureInitSummary(t, initConfigSummary{
+		path:         filepath.Join(projectRoot, ".bruin.yml"),
+		locationNote: "This is your Bruin project root.",
+	}, filepath.Join(projectRoot, "my-pipeline"))
 
 	require.NotContains(t, output, "Config:")
+	require.NotContains(t, output, "This is your Bruin project root.")
 	require.Contains(t, output, "Create a .bruin.yml with your connection credentials")
+	require.Contains(t, output, "bruin validate ")
 }
 
 func TestFileExists(t *testing.T) {
 	dir := t.TempDir()
-	filePath := filepath.Join(dir, "file.yml")
-	require.NoError(t, os.WriteFile(filePath, []byte("x"), 0o600))
+	filePath := writeBruinYml(t, dir)
 
 	require.True(t, fileExists(filePath))
 	require.False(t, fileExists(filepath.Join(dir, "missing.yml")))
