@@ -287,6 +287,7 @@ func Init() *cli.Command {
 			}
 
 			var bruinYmlPath string
+			configAtRepoRoot := false
 			repoRoot, err := git.FindRepoFromPath(".")
 			//nolint:nestif
 			if err != nil {
@@ -328,7 +329,12 @@ func Init() *cli.Command {
 				}
 			} else {
 				bruinYmlPath = filepath.Join(repoRoot.Path, ".bruin.yml")
+				configAtRepoRoot = true
 			}
+
+			// Remember whether .bruin.yml was already there, so we can tell the user
+			// whether init created it or merged into an existing one.
+			bruinYmlExisted := fileExists(bruinYmlPath)
 
 			// Handle ecommerce template with interactive stack picker
 			if templateName == "ecommerce" {
@@ -384,10 +390,7 @@ func Init() *cli.Command {
 
 				successPrinter.Printf("\n\nEcommerce pipeline created successfully in folder '%s'.\n", inputPath)
 				printEcommerceSummary(ecommerceChoices)
-				infoPrinter.Println("\nNext steps:")
-				infoPrinter.Printf("  1. Edit .bruin.yml to add your real connection credentials\n")
-				infoPrinter.Printf("  2. Run: bruin validate %s\n", inputPath)
-				infoPrinter.Printf("  3. Run: bruin run %s\n\n", inputPath)
+				printInitSummary(bruinYmlPath, inputPath, bruinYmlExisted, configAtRepoRoot)
 
 				return nil
 			}
@@ -479,12 +482,65 @@ func Init() *cli.Command {
 			})
 
 			successPrinter.Printf("\n\nA new '%s' pipeline created successfully in folder '%s'.\n", templateName, inputPath)
-			infoPrinter.Println("\nYou can run the following commands to get started:")
-			infoPrinter.Printf("    bruin validate %s\n\n", inputPath)
+			printInitSummary(bruinYmlPath, inputPath, bruinYmlExisted, configAtRepoRoot)
 
 			return nil
 		},
 		Before: telemetry.BeforeCommand,
 		After:  telemetry.AfterCommand,
 	}
+}
+
+// fileExists reports whether the given path exists and is not a directory.
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
+}
+
+// absOrSame returns the absolute version of path, falling back to path itself
+// if it cannot be resolved.
+func absOrSame(path string) string {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return path
+	}
+
+	return abs
+}
+
+// printInitSummary tells the user where the pipeline and the .bruin.yml config
+// ended up, whether the config was created or reused, and what to do next.
+// The config location is not obvious: inside an existing Git repo it goes to the
+// repo root, which can be several levels above the pipeline folder.
+func printInitSummary(bruinYmlPath, pipelinePath string, configExisted, configAtRepoRoot bool) {
+	pipelineAbs := absOrSame(pipelinePath)
+
+	if fileExists(bruinYmlPath) {
+		configAbs := absOrSame(bruinYmlPath)
+
+		infoPrinter.Printf("\nConfig:   %s\n", configAbs)
+		infoPrinter.Printf("Pipeline: %s\n", pipelineAbs)
+
+		if configExisted {
+			infoPrinter.Printf("\nUsing existing .bruin.yml at %s (merged template config).\n", configAbs)
+		} else {
+			infoPrinter.Printf("\nCreated .bruin.yml at %s.\n", configAbs)
+		}
+
+		if configAtRepoRoot {
+			infoPrinter.Println("This is your Git repo root, so it may sit several levels above the pipeline folder.")
+		} else {
+			infoPrinter.Println("This is the new Bruin project root created for you.")
+		}
+
+		infoPrinter.Println("\nNext steps:")
+		infoPrinter.Printf("  1. Add your connection credentials to %s\n", configAbs)
+	} else {
+		infoPrinter.Printf("\nPipeline: %s\n", pipelineAbs)
+		infoPrinter.Println("\nNext steps:")
+		infoPrinter.Println("  1. Create a .bruin.yml with your connection credentials")
+	}
+
+	infoPrinter.Printf("  2. Run: bruin validate %s\n", pipelinePath)
+	infoPrinter.Printf("  3. Run: bruin run %s\n\n", pipelinePath)
 }

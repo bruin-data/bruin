@@ -71,6 +71,15 @@ If Bruin detects no existing `.git` repository:
 * A new Git repository is created (via `git init`).
 * The pipeline is placed under `bruin/` unless `--in-place` is used.
 
+### Where `.bruin.yml` Goes
+
+`.bruin.yml` does not live next to `pipeline.yml`. Its location depends on where you run `init`:
+
+* **Inside an existing Git repo** → the repo root, which can be several levels above the pipeline folder.
+* **In a folder that is not a Git repo** → the new `bruin/` project root, or the current folder with `--in-place`.
+
+`init` prints the resolved path when it finishes, so you never have to guess.
+
 ### Configuration Merge
 
 If the selected template contains its own `.bruin.yml`, Bruin merges:
@@ -128,8 +137,24 @@ Please select a template below:
 
 A new 'default' pipeline created successfully in folder 'bruin-pipeline'.
 
-You can run the following commands to get started:
-    bruin validate bruin-pipeline
+Config:   /Users/me/my-repo/.bruin.yml
+Pipeline: /Users/me/my-repo/deep/nested/bruin-pipeline
+
+Created .bruin.yml at /Users/me/my-repo/.bruin.yml.
+This is your Git repo root, so it may sit several levels above the pipeline folder.
+
+Next steps:
+  1. Add your connection credentials to /Users/me/my-repo/.bruin.yml
+  2. Run: bruin validate bruin-pipeline
+  3. Run: bruin run bruin-pipeline
+```
+
+The summary always prints the resolved `.bruin.yml` path, so you know where to add your
+credentials. If a `.bruin.yml` was already there, Bruin merges the template config into it
+and says so instead:
+
+```bash
+Using existing .bruin.yml at /Users/me/my-repo/.bruin.yml (merged template config).
 ```
 
 ### Initializing a Shopify template
