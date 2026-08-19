@@ -20,11 +20,14 @@ cd bruin/my-pipeline
 
 This command will:
 
-- Create a project named `my-pipeline`.
-- Generate a folder called `my-pipeline` containing the following:
+- Create a new Bruin project under a `bruin/` folder (your **project root**).
+- Place `.bruin.yml` at the project root (`bruin/.bruin.yml`) with sample duckdb connections used in this guide (you can edit it or use a secrets manager, see [Secrets](../../secrets/overview.md)).
+- Generate a pipeline folder `bruin/my-pipeline/` containing:
   - `assets/` with three sample assets: ingestr, Python, and SQL (we will walk through them below)
-  - `.bruin.yml` with sample duckdb connections used in this guide (you can edit it or use a secrets manager, see [Secrets](../../secrets/overview.md))
   - `pipeline.yml` file to manage your pipeline.
+
+> [!INFO]
+> `.bruin.yml` always lives at your project root, never inside the pipeline folder. If you run `bruin init` inside an existing Git repository, it is placed at the repo root instead of a new `bruin/` folder. See [Project configuration](../../core-concepts/project.md).
 
 Once you have the project structure, you can run the whole pipeline:
 

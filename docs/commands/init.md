@@ -37,20 +37,25 @@ When you run `bruin init`, it:
 3. Merges any template-level `.bruin.yml` configuration into your existing (or newly created) root `.bruin.yml`.
 4. Optionally initializes a **Git repository** if none exists.
 5. Outputs next steps, such as validating or running your new pipeline.
+
 ## Folder Structure
 
-Every initialized pipeline follows this convention:
+`bruin init` keeps your connection config (`.bruin.yml`) at the **project root** and places pipeline files in a named pipeline folder. `.bruin.yml` is **never** written inside the pipeline folder.
+
+For a brand-new project (no existing Git repo), Bruin creates a `bruin/` root:
 
 ```text
-my-pipeline/
-├─ pipeline.yml        # Defines the pipeline metadata
-└─ assets/             # Contains all assets for this pipeline
-   ├─ raw.orders.asset.yml
-   ├─ stg.orders.sql
-   └─ mart.sales_daily.sql
+bruin/                 # project root, created by bruin init
+├─ .bruin.yml          # environments & connections
+└─ my-pipeline/        # your pipeline
+   ├─ pipeline.yml     # defines the pipeline metadata
+   └─ assets/          # contains all assets for this pipeline
+      ├─ raw.orders.asset.yml
+      ├─ stg.orders.sql
+      └─ mart.sales_daily.sql
 ```
 
-If `--in-place` is used, the structure is created inside your current directory instead of nesting under `bruin/`.
+When you run `bruin init` **inside an existing Git repository**, no `bruin/` wrapper is created: the pipeline folder is created in your current directory, and `.bruin.yml` is placed at the **repository root** — which may be several levels above the pipeline folder. Use `--in-place` in a fresh project to skip the `bruin/` wrapper and use the current directory instead.
 
 ## Behavior Details
 
@@ -142,5 +147,5 @@ The `shopify-clickhouse` template creates raw Shopify ingestion assets, conforme
 ## Notes
 
 * Traversing up/down the filesystem (e.g., `../pipeline`) is not allowed for safety.
-* `.bruin.yml` is automatically created or updated during initialization.
+* `.bruin.yml` is automatically created or updated at your **project root** during initialization — the Git repository root when you are inside an existing repo, or a new `bruin/` folder for a fresh project.
 * The command is safe to run multiple times — Bruin intelligently merges existing configuration.

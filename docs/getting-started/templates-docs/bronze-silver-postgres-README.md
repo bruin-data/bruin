@@ -24,6 +24,8 @@ bronze-silver-postgres/
     └── silver_aggregated.sql
 ```
 
+> The tree above shows the template's own files. After `bruin init`, the `.bruin.yml` is merged into the `.bruin.yml` at your **project root** (never inside the pipeline folder). See [Project configuration](../../core-concepts/project.md).
+
 - **Bronze Layer (`bronze_raw_data.asset.yml`)**
   - Uses `ingestr` to pull daily FX rates from the Frankfurter API into PostgreSQL.
   - Adds column integrity checks, deduplication verification, and freshness monitoring.

@@ -22,24 +22,32 @@ Run the `bruin init chess` command to set up your Bruin project using the `chess
 bruin init chess
 ```
 
-After running the command you will see the following folder appear on your project :
+After running the command you will see the following structure appear on your project :
 
 ```plaintext
-chess/
-├─ assets/
-│  ├─ chess_games.asset.yml
-│  ├─ chess_profiles.asset.yml
-│  ├─ player_summary.sql
-│
-├─ .bruin.yml
-├─ pipeline.yml  
-├─ .gitignore
-└─ README.md
+your-project/          # project root — this is where .bruin.yml lives
+├─ .bruin.yml          # environments & connections
+└─ chess/              # your new pipeline
+   ├─ assets/
+   │  ├─ chess_games.asset.yml
+   │  ├─ chess_profiles.asset.yml
+   │  └─ player_summary.sql
+   ├─ pipeline.yml
+   └─ README.md
 ```
+
+> [!INFO]
+> **Where does `.bruin.yml` live?**
+> `.bruin.yml` is always created at your **project root**, never inside the pipeline folder (`chess/`).
+>
+> - If you run `bruin init` **inside an existing Git repository**, `.bruin.yml` is placed at the repository root — which may be **several levels above** your pipeline folder.
+> - If you run it in an **empty folder**, Bruin creates a new `bruin/` project root and puts `.bruin.yml` there (pass `--in-place` to use the current folder instead).
+>
+> See [Project configuration](../../core-concepts/project.md) for the full details.
 
 ## Step 2: Edit Your `.bruin.yml` file
 
-After initializing your project with `bruin init`, edit the `.bruin.yml` file to configure your environments and connections. This file specifies the default environment settings and connections your pipeline will use.
+After initializing your project with `bruin init`, edit the `.bruin.yml` file at your **project root** (see the note above about where it lives) to configure your environments and connections. This file specifies the default environment settings and connections your pipeline will use.
 
 Add or modify the `.bruin.yml` file as follows:
 
