@@ -128,8 +128,30 @@ Please select a template below:
 
 A new 'default' pipeline created successfully in folder 'bruin-pipeline'.
 
-You can run the following commands to get started:
-    bruin validate bruin-pipeline
+Config:   /Users/me/my-repo/.bruin.yml
+Pipeline: /Users/me/my-repo/deep/nested/bruin-pipeline
+
+Created .bruin.yml at /Users/me/my-repo/.bruin.yml.
+This is your Git repo root, so it may sit several levels above the pipeline folder.
+
+Next steps:
+  1. Add your connection credentials to /Users/me/my-repo/.bruin.yml
+  2. Run: bruin validate bruin-pipeline
+  3. Run: bruin run bruin-pipeline
+```
+
+The summary always prints the resolved `.bruin.yml` path, so you never have to guess where
+it landed (see [Folder Structure](#folder-structure)). If a `.bruin.yml` was already there,
+Bruin says whether it merged the template's configuration into it:
+
+```bash
+Using existing .bruin.yml at /Users/me/my-repo/.bruin.yml (merged template config).
+```
+
+or left it as it was, which happens for templates that ship no `.bruin.yml`:
+
+```bash
+Using existing .bruin.yml at /Users/me/my-repo/.bruin.yml (left unchanged).
 ```
 
 ### Initializing a Shopify template
