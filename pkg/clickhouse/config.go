@@ -7,7 +7,10 @@ import (
 	"strconv"
 
 	click_house "github.com/ClickHouse/clickhouse-go/v2"
+	"github.com/bruin-data/bruin/pkg/version"
 )
+
+const clientName = "bruin"
 
 type Config struct {
 	Username string
@@ -35,6 +38,14 @@ func (c *Config) ToClickHouseOptions() *click_house.Options {
 			Database: c.Database,
 			Username: c.Username,
 			Password: c.Password,
+		},
+		ClientInfo: click_house.ClientInfo{
+			Products: []struct {
+				Name    string
+				Version string
+			}{
+				{Name: clientName, Version: version.Version},
+			},
 		},
 	}
 	return &opt

@@ -1,6 +1,11 @@
 package clickhouse
 
-import "testing"
+import (
+	"strings"
+	"testing"
+
+	"github.com/bruin-data/bruin/pkg/version"
+)
 
 func TestConfig_ToClickHouseOptions(t *testing.T) {
 	t.Parallel()
@@ -24,5 +29,8 @@ func TestConfig_ToClickHouseOptions(t *testing.T) {
 	}
 	if options.Auth.Password != "password" {
 		t.Errorf("expected password, got %s", options.Auth.Password)
+	}
+	if userAgent := options.ClientInfo.String(); !strings.HasPrefix(userAgent, "bruin/"+version.Version+" clickhouse-go/") {
+		t.Errorf("expected ClickHouse user agent to identify Bruin, got %s", userAgent)
 	}
 }
