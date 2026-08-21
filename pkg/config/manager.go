@@ -302,6 +302,39 @@ type Config struct {
 	SelectedEnvironmentName string                 `yaml:"-" json:"selected_environment_name" mapstructure:"selected_environment_name"`
 	SelectedEnvironment     *Environment           `yaml:"-" json:"selected_environment" mapstructure:"selected_environment"`
 	Environments            map[string]Environment `yaml:"environments" json:"environments" mapstructure:"environments"`
+	Cloud                   *CloudConfig           `yaml:"cloud,omitempty" json:"cloud,omitempty" mapstructure:"cloud"`
+}
+
+// CloudConfig holds client-side Bruin Cloud settings. It lives at the top level
+// of the config, alongside the stored token, rather than inside any single
+// environment, so it applies to every cloud command run against this config.
+type CloudConfig struct {
+	// DefaultTeam is the team company_prefix the CLI sends as the X-Bruin-Team
+	// header when a cloud command omits --team. Empty means no default is set.
+	DefaultTeam string `yaml:"default_team,omitempty" json:"default_team,omitempty" mapstructure:"default_team"`
+}
+
+// GetDefaultTeam returns the configured default team company_prefix, or an empty
+// string when none is set.
+func (c *Config) GetDefaultTeam() string {
+	if c.Cloud == nil {
+		return ""
+	}
+	return c.Cloud.DefaultTeam
+}
+
+// SetDefaultTeam sets the default team company_prefix. Passing an empty string
+// clears the default (dropping the cloud section entirely when it holds nothing
+// else) so it is omitted from the persisted config.
+func (c *Config) SetDefaultTeam(team string) {
+	if team == "" {
+		c.Cloud = nil
+		return
+	}
+	if c.Cloud == nil {
+		c.Cloud = &CloudConfig{}
+	}
+	c.Cloud.DefaultTeam = team
 }
 
 var configEnvVarRegex = regexp.MustCompile(`\${([^}]+)}`)

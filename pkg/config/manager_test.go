@@ -1259,6 +1259,45 @@ environments:
 	assert.True(t, filepath.IsAbs(sheets), "sheets path should be absolute: %s", sheets)
 }
 
+func TestDefaultTeamRoundTrip(t *testing.T) {
+	t.Parallel()
+	fs := afero.NewMemMapFs()
+	configPath := "/repo/.bruin.yml"
+	yml := `default_environment: default
+environments:
+  default:
+    connections: {}
+`
+	require.NoError(t, afero.WriteFile(fs, configPath, []byte(yml), 0o644))
+
+	cfg, err := LoadOrCreate(fs, configPath)
+	require.NoError(t, err)
+	assert.Empty(t, cfg.GetDefaultTeam())
+
+	cfg.SetDefaultTeam("acme-corp")
+	assert.Equal(t, "acme-corp", cfg.GetDefaultTeam())
+	require.NoError(t, cfg.Persist())
+
+	// Reload from disk: the default team survives a round-trip.
+	reloaded, err := LoadFromFileOrEnv(fs, configPath)
+	require.NoError(t, err)
+	assert.Equal(t, "acme-corp", reloaded.GetDefaultTeam())
+
+	// Clearing it drops the cloud section so it isn't persisted at all.
+	reloaded.SetDefaultTeam("")
+	assert.Empty(t, reloaded.GetDefaultTeam())
+	assert.Nil(t, reloaded.Cloud)
+	require.NoError(t, reloaded.Persist())
+
+	buf, err := afero.ReadFile(fs, configPath)
+	require.NoError(t, err)
+	assert.NotContains(t, string(buf), "cloud")
+
+	cleared, err := LoadFromFileOrEnv(fs, configPath)
+	require.NoError(t, err)
+	assert.Empty(t, cleared.GetDefaultTeam())
+}
+
 func TestLoadDoesNotPrefixAnchoredCredentialPaths(t *testing.T) {
 	t.Parallel()
 	fs := afero.NewMemMapFs()

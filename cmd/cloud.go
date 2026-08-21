@@ -46,6 +46,7 @@ func Cloud(isDebug *bool) *cli.Command {
 			CloudSkills(),
 			CloudAuditLogs(),
 			CloudCost(),
+			CloudConfig(),
 		},
 	}
 	addTeamFlag(cmd)
@@ -59,6 +60,11 @@ func Cloud(isDebug *bool) *cli.Command {
 // parent so its children get the flag too.
 func addTeamFlag(cmd *cli.Command) {
 	for _, sub := range cmd.Commands {
+		// "cloud config" manages the default team itself; it doesn't act on a
+		// team, so it neither takes --team nor reads the default.
+		if sub.Name == "config" {
+			continue
+		}
 		if sub.Action != nil || len(sub.Commands) == 0 {
 			sub.Flags = append(sub.Flags, teamFlag())
 		}
@@ -142,23 +148,55 @@ func resolveAPIKey(c *cli.Command) (string, error) {
 		return key, nil
 	}
 
-	repoRoot, err := git.FindRepoFromPath(".")
-	if err == nil {
-		configFilePath := path2.Join(repoRoot.Path, ".bruin.yml")
-		cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
-		if err == nil {
-			for _, env := range cm.Environments {
-				if env.Connections != nil && len(env.Connections.BruinCloud) > 0 {
-					token := env.Connections.BruinCloud[0].APIToken
-					if token != "" {
-						return token, nil
-					}
+	if cm, err := loadCloudConfig(); err == nil {
+		for _, env := range cm.Environments {
+			if env.Connections != nil && len(env.Connections.BruinCloud) > 0 {
+				token := env.Connections.BruinCloud[0].APIToken
+				if token != "" {
+					return token, nil
 				}
 			}
 		}
 	}
 
 	return "", errors.New("API key is required: use --api-key flag, BRUIN_CLOUD_API_KEY env var, or configure a bruin connection in .bruin.yml")
+}
+
+// cloudConfigFilePath locates the .bruin.yml that stores cloud auth/config, at
+// the git repo root — the same file the token is read from.
+func cloudConfigFilePath() (string, error) {
+	repoRoot, err := git.FindRepoFromPath(".")
+	if err != nil {
+		return "", err
+	}
+	return path2.Join(repoRoot.Path, ".bruin.yml"), nil
+}
+
+// loadCloudConfig reads the CLI config without creating it. Used on the read
+// path (resolving the token and the default team), so a missing config is not a
+// side-effecting event.
+func loadCloudConfig() (*config.Config, error) {
+	configFilePath, err := cloudConfigFilePath()
+	if err != nil {
+		return nil, err
+	}
+	return config.LoadFromFileOrEnv(afero.NewOsFs(), configFilePath)
+}
+
+// resolveTeam picks the team a cloud command acts on, in precedence order:
+//  1. --team flag (explicit; its flag source also covers BRUIN_CLOUD_TEAM)
+//  2. cloud.default_team from the CLI config
+//  3. none — no header is sent and the API resolves the team from the token
+//
+// An empty --team ("") is treated as unset and falls through to the default.
+func resolveTeam(c *cli.Command) string {
+	if team := c.String("team"); team != "" {
+		return team
+	}
+	if cm, err := loadCloudConfig(); err == nil {
+		return cm.GetDefaultTeam()
+	}
+	return ""
 }
 
 func latestFlag() *cli.BoolFlag {
@@ -174,7 +212,7 @@ func newCloudClient(c *cli.Command) (*bruincloud.APIClient, error) {
 		return nil, err
 	}
 	client := bruincloud.NewAPIClient(key)
-	if team := c.String("team"); team != "" {
+	if team := resolveTeam(c); team != "" {
 		client.SetTeam(team)
 	}
 	return client, nil
@@ -296,6 +334,146 @@ func cloudTeamsList() *cli.Command {
 			return nil
 		},
 	}
+}
+
+// --- Config ---
+
+// CloudConfig groups the commands that manage client-side cloud settings, most
+// notably the default team used when a command omits --team.
+func CloudConfig() *cli.Command {
+	return &cli.Command{
+		Name:  "config",
+		Usage: "Manage local Bruin Cloud CLI settings (set a default team once, skip --team)",
+		Commands: []*cli.Command{
+			cloudConfigSetTeam(),
+			cloudConfigGetTeam(),
+			cloudConfigUnsetTeam(),
+		},
+	}
+}
+
+func cloudConfigSetTeam() *cli.Command {
+	return &cli.Command{
+		Name:      "set-team",
+		Usage:     "Set the default team (company prefix) so cloud commands don't need --team",
+		ArgsUsage: "<company_prefix>",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			prefix := c.Args().First()
+			if prefix == "" {
+				printError(errors.New("a team company prefix is required (see 'bruin cloud teams list')"), output, "Failed to set default team")
+				return cli.Exit("", 1)
+			}
+
+			// Best-effort validation: warn if the token can't see this team, but
+			// don't block — tokens and team membership change, and the API is the
+			// source of truth at request time.
+			warnIfTeamUnreachable(ctx, c, output, prefix)
+
+			if err := persistDefaultTeam(prefix); err != nil {
+				printError(err, output, "Failed to set default team")
+				return cli.Exit("", 1)
+			}
+
+			printSuccessForOutput(output, fmt.Sprintf("Default team set to %q. Cloud commands will use it unless you pass --team.", prefix))
+			return nil
+		},
+	}
+}
+
+func cloudConfigGetTeam() *cli.Command {
+	return &cli.Command{
+		Name:  "get-team",
+		Usage: "Print the current default team, or 'none' if unset",
+		Flags: []cli.Flag{
+			outputFlag(),
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			team := ""
+			if cm, err := loadCloudConfig(); err == nil {
+				team = cm.GetDefaultTeam()
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(map[string]string{"default_team": team}, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			if team == "" {
+				fmt.Println("none")
+				return nil
+			}
+			fmt.Println(team)
+			return nil
+		},
+	}
+}
+
+func cloudConfigUnsetTeam() *cli.Command {
+	return &cli.Command{
+		Name:  "unset-team",
+		Usage: "Clear the default team",
+		Flags: []cli.Flag{
+			outputFlag(),
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			if err := persistDefaultTeam(""); err != nil {
+				printError(err, output, "Failed to unset default team")
+				return cli.Exit("", 1)
+			}
+
+			printSuccessForOutput(output, "Default team cleared.")
+			return nil
+		},
+	}
+}
+
+// persistDefaultTeam writes (or clears, when team is empty) cloud.default_team in
+// the CLI config, creating the config file if it doesn't exist yet.
+func persistDefaultTeam(team string) error {
+	configFilePath, err := cloudConfigFilePath()
+	if err != nil {
+		return err
+	}
+	cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
+	if err != nil {
+		return err
+	}
+	cm.SetDefaultTeam(team)
+	return cm.Persist()
+}
+
+// warnIfTeamUnreachable prints a non-blocking warning when the current token
+// can't reach the given team prefix. Any lookup failure (no token, offline,
+// endpoint error) is silently skipped: this is a convenience check, not a gate.
+func warnIfTeamUnreachable(ctx context.Context, c *cli.Command, output, prefix string) {
+	client, err := newCloudClient(c)
+	if err != nil {
+		return
+	}
+	teams, err := client.ListTeams(ctx)
+	if err != nil {
+		return
+	}
+	for _, t := range teams {
+		if t.CompanyPrefix == prefix {
+			return
+		}
+	}
+	printWarningForOutput(output, fmt.Sprintf("team %q isn't among the teams your current token can reach; saving it anyway (run 'bruin cloud teams list' to see available prefixes)", prefix))
 }
 
 func CloudProjects() *cli.Command {
