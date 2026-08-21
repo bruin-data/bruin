@@ -8,11 +8,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/bruincloud"
+	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/fatih/color"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
@@ -143,13 +146,189 @@ func TestResolveProjectID_ListProjectsError(t *testing.T) {
 	assert.Contains(t, err.Error(), "boom")
 }
 
+const configWithDefaultTeamYML = `default_environment: default
+cloud:
+    default_team: acme-corp
+environments:
+    default:
+        connections: {}
+`
+
+const configWithoutCloudYML = `default_environment: default
+environments:
+    default:
+        connections: {}
+`
+
+// writeTempConfigRepo creates a temporary git repo (a bare .git dir is enough
+// for repo detection) holding the given .bruin.yml, and returns its path. Pass
+// an empty yaml to omit the config file entirely.
+func writeTempConfigRepo(t *testing.T, bruinYML string) string {
+	t.Helper()
+	dir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".git"), 0o755))
+	if bruinYML != "" {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, ".bruin.yml"), []byte(bruinYML), 0o644))
+	}
+	return dir
+}
+
+// resolveTeamInDir runs resolveTeam inside dir with the given extra args (e.g.
+// "--team", "x"), so precedence can be exercised against a real config on disk.
+func resolveTeamInDir(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	t.Setenv("BRUIN_CLOUD_TEAM", "")
+	t.Chdir(dir)
+
+	var got string
+	app := &cli.Command{
+		Name:  "test",
+		Flags: []cli.Flag{teamFlag()},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			got = resolveTeam(c)
+			return nil
+		},
+	}
+	require.NoError(t, app.Run(t.Context(), append([]string{"test"}, args...)))
+	return got
+}
+
+func TestResolveTeam_FlagWins(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	dir := writeTempConfigRepo(t, configWithDefaultTeamYML)
+	assert.Equal(t, "flag-team", resolveTeamInDir(t, dir, "--team", "flag-team"))
+}
+
+func TestResolveTeam_DefaultFromConfig(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	dir := writeTempConfigRepo(t, configWithDefaultTeamYML)
+	assert.Equal(t, "acme-corp", resolveTeamInDir(t, dir))
+}
+
+func TestResolveTeam_EmptyFlagFallsToDefault(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	dir := writeTempConfigRepo(t, configWithDefaultTeamYML)
+	assert.Equal(t, "acme-corp", resolveTeamInDir(t, dir, "--team", ""))
+}
+
+func TestResolveTeam_NoneWhenUnset(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	dir := writeTempConfigRepo(t, configWithoutCloudYML)
+	assert.Empty(t, resolveTeamInDir(t, dir))
+}
+
+func TestCloudConfigTeam_RoundTrip(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	// No token available, so set-team's best-effort validation stays offline.
+	t.Setenv("BRUIN_CLOUD_API_KEY", "")
+	dir := writeTempConfigRepo(t, configWithoutCloudYML)
+	t.Chdir(dir)
+	configPath := filepath.Join(dir, ".bruin.yml")
+
+	setCmd := cloudConfigSetTeam()
+	require.NoError(t, setCmd.Run(t.Context(), []string{"set-team", "acme-corp"}))
+
+	cm, err := config.LoadFromFileOrEnv(afero.NewOsFs(), configPath)
+	require.NoError(t, err)
+	assert.Equal(t, "acme-corp", cm.GetDefaultTeam())
+
+	unsetCmd := cloudConfigUnsetTeam()
+	require.NoError(t, unsetCmd.Run(t.Context(), []string{"unset-team"}))
+
+	cm, err = config.LoadFromFileOrEnv(afero.NewOsFs(), configPath)
+	require.NoError(t, err)
+	assert.Empty(t, cm.GetDefaultTeam())
+}
+
+func TestCloudConfigSetTeam_DoesNotClobberFileWhenEnvConfigSet(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	t.Setenv("BRUIN_CLOUD_API_KEY", "")
+	// A config injected via BRUIN_CONFIG_FILE_CONTENT (as CI does) must not be
+	// persisted back over the on-disk .bruin.yml, which would drop any
+	// environments/connections absent from the env-provided config.
+	t.Setenv("BRUIN_CONFIG_FILE_CONTENT", "default_environment: default\nenvironments:\n  default:\n    connections: {}\n")
+
+	onDisk := `default_environment: default
+environments:
+    default:
+        connections:
+            bruin:
+                - name: cloud
+                  api_token: on-disk-token
+`
+	dir := writeTempConfigRepo(t, onDisk)
+	t.Chdir(dir)
+	configPath := filepath.Join(dir, ".bruin.yml")
+
+	setCmd := cloudConfigSetTeam()
+	require.NoError(t, setCmd.Run(t.Context(), []string{"set-team", "acme-corp"}))
+
+	// Read the file back directly (ignoring the env var): the on-disk connection
+	// must survive and the default team must be written.
+	cm, err := config.LoadOrCreateWithoutPathAbsolutization(afero.NewOsFs(), configPath)
+	require.NoError(t, err)
+	assert.Equal(t, "acme-corp", cm.GetDefaultTeam())
+	require.NotNil(t, cm.Environments["default"].Connections)
+	require.Len(t, cm.Environments["default"].Connections.BruinCloud, 1)
+	assert.Equal(t, "on-disk-token", cm.Environments["default"].Connections.BruinCloud[0].APIToken)
+}
+
+// runCloudProjectsListCapturingTeam runs the full "cloud projects list" command
+// against a stub server and returns the X-Bruin-Team header it received (and
+// whether the header was present at all).
+func runCloudProjectsListCapturingTeam(t *testing.T, bruinYML string, args ...string) (string, bool) {
+	t.Helper()
+
+	var gotTeam string
+	var present bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotTeam = r.Header.Get("X-Bruin-Team")
+		_, present = r.Header["X-Bruin-Team"]
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`[]`))
+	}))
+	t.Cleanup(server.Close)
+
+	t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
+	t.Setenv("BRUIN_CLOUD_API_KEY", "test-key")
+	t.Setenv("BRUIN_CLOUD_TEAM", "")
+
+	dir := writeTempConfigRepo(t, bruinYML)
+	t.Chdir(dir)
+
+	isDebug := false
+	cmd := Cloud(&isDebug)
+	require.NoError(t, cmd.Run(t.Context(), append([]string{"cloud", "projects", "list"}, args...)))
+	return gotTeam, present
+}
+
+func TestCloudCommand_SendsDefaultTeamHeader(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	gotTeam, present := runCloudProjectsListCapturingTeam(t, configWithDefaultTeamYML)
+	assert.True(t, present, "X-Bruin-Team header should be sent when a default team is set")
+	assert.Equal(t, "acme-corp", gotTeam)
+}
+
+func TestCloudCommand_FlagOverridesDefaultTeamHeader(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	gotTeam, present := runCloudProjectsListCapturingTeam(t, configWithDefaultTeamYML, "--team", "override-team")
+	assert.True(t, present)
+	assert.Equal(t, "override-team", gotTeam)
+}
+
+func TestCloudCommand_NoTeamHeaderWhenUnset(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	_, present := runCloudProjectsListCapturingTeam(t, configWithoutCloudYML)
+	assert.False(t, present, "no X-Bruin-Team header should be sent when neither --team nor a default is set")
+}
+
+func TestTeamErrorHint(t *testing.T) {
+	t.Parallel()
+
+	assert.Contains(t, teamErrorHint(&bruincloud.APIError{Code: "team_required", StatusCode: 409}), "set-team")
+	assert.Contains(t, teamErrorHint(&bruincloud.APIError{Code: "team_not_in_scope", StatusCode: 403}), "unset-team")
+	assert.Empty(t, teamErrorHint(&bruincloud.APIError{Code: "something_else", StatusCode: 400}))
+	assert.Empty(t, teamErrorHint(errors.New("plain error")))
+}
+
 func TestCloudCommand_Help(t *testing.T) {
 	t.Parallel()
 	isDebug := false
 	cmd := Cloud(&isDebug)
 	require.NotNil(t, cmd)
 	assert.Equal(t, "cloud", cmd.Name)
-	assert.Len(t, cmd.Commands, 16)
+	assert.Len(t, cmd.Commands, 17)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
@@ -171,6 +350,7 @@ func TestCloudCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "scheduled-agents")
 	assert.Contains(t, subNames, "skills")
 	assert.Contains(t, subNames, "audit-logs")
+	assert.Contains(t, subNames, "config")
 }
 
 func TestCloudSkillsCommand_Help(t *testing.T) {
@@ -217,6 +397,11 @@ func TestCloudLeafCommandsHaveTeamFlag(t *testing.T) {
 	var walk func(*cli.Command)
 	walk = func(c *cli.Command) {
 		for _, sub := range c.Commands {
+			// "cloud config" manages the default team itself and doesn't act on a
+			// team, so its commands intentionally omit --team.
+			if sub.Name == "config" {
+				continue
+			}
 			// Every runnable command (a leaf, or a parent like "agents
 			// connections" that has its own action) must carry --team.
 			if sub.Action != nil || len(sub.Commands) == 0 {

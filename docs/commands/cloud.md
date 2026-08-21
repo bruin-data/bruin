@@ -40,7 +40,7 @@ These flags are available on all `cloud` subcommands:
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--api-key` | str | - | Bruin Cloud API key. Also reads from `BRUIN_CLOUD_API_KEY` env var or `.bruin.yml`. |
-| `--team` | str | - | Act on this team (company prefix) instead of your current team. Also reads from `BRUIN_CLOUD_TEAM`. Only applies to personal API keys, and only for teams you belong to. |
+| `--team` | str | - | Act on this team (company prefix) instead of your current team. Also reads from `BRUIN_CLOUD_TEAM`. Only applies to personal API keys, and only for teams you belong to. Omit it to fall back to the default set with [`cloud config set-team`](#config). |
 | `--output`, `-o` | str | `plain` | Output format: `plain` or `json`. Use `json` for scripting. |
 
 ## Subcommands
@@ -62,6 +62,59 @@ bruin cloud teams list
 | 2  | Globex | globex         |
 +----+--------+----------------+
 ```
+
+> [!TIP]
+> If your token belongs to more than one team, set a default once with
+> `bruin cloud config set-team <company_prefix>` and you can skip `--team` on
+> every command. See [`config`](#config) below.
+
+---
+
+### `config`
+
+Manage local CLI settings for Bruin Cloud. The main use is a **default team**: set it once and every `cloud` command targets that team unless you override it with `--team`.
+
+The default team is stored under a top-level `cloud` key in your `.bruin.yml`, alongside the cloud token:
+
+```yaml
+# .bruin.yml
+cloud:
+  default_team: acme
+```
+
+#### `set-team`
+
+Set the default team (its company prefix — see `bruin cloud teams list`):
+
+```bash
+bruin cloud config set-team acme
+```
+
+Bruin does a best-effort check that your current token can reach that team and warns if it can't, but still saves the value — tokens and team membership change, and the API validates the team on each request.
+
+#### `get-team`
+
+Print the current default team, or `none` if unset:
+
+```bash
+bruin cloud config get-team
+```
+
+#### `unset-team`
+
+Clear the default team:
+
+```bash
+bruin cloud config unset-team
+```
+
+**How the team is resolved.** For every command that targets a team, Bruin picks, in order:
+
+1. the `--team` flag (or `BRUIN_CLOUD_TEAM`) — always wins
+2. the `cloud.default_team` from `.bruin.yml`
+3. nothing — the API infers the team from your token
+
+So a single-team token needs no default at all; a multi-team token can either pass `--team` each time or set a default once and forget it.
 
 ---
 

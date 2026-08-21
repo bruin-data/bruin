@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/bruincloud"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/manifoldco/promptui"
 	"github.com/urfave/cli/v3"
@@ -129,9 +130,29 @@ func printErrors(errs []error, output string, message string) {
 func printError(err error, output string, message string) {
 	if output == "json" {
 		printErrorJSON(err)
-	} else {
-		errorPrinter.Printf("%s: %v\n", message, err)
+		return
 	}
+	errorPrinter.Printf("%s: %v\n", message, err)
+	if hint := teamErrorHint(err); hint != "" {
+		errorPrinter.Printf("%s\n", hint)
+	}
+}
+
+// teamErrorHint returns an actionable CLI hint for the team-scoping errors the
+// Bruin Cloud API raises, pointing users at the default-team shortcut. It
+// returns an empty string for any other error, so it's safe to call generically.
+func teamErrorHint(err error) string {
+	var apiErr *bruincloud.APIError
+	if !errors.As(err, &apiErr) {
+		return ""
+	}
+	switch apiErr.Code {
+	case "team_required":
+		return "hint: pass --team <company_prefix>, or set a default once with 'bruin cloud config set-team <company_prefix>'"
+	case "team_not_in_scope":
+		return "hint: your token can't act on that team; target another with --team, or update the default via 'bruin cloud config set-team <company_prefix>' (clear it with 'bruin cloud config unset-team')"
+	}
+	return ""
 }
 
 func NewRunID() string {
