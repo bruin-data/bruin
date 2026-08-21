@@ -235,6 +235,38 @@ func TestCloudConfigTeam_RoundTrip(t *testing.T) { //nolint:paralleltest // uses
 	assert.Empty(t, cm.GetDefaultTeam())
 }
 
+func TestCloudConfigSetTeam_DoesNotClobberFileWhenEnvConfigSet(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	t.Setenv("BRUIN_CLOUD_API_KEY", "")
+	// A config injected via BRUIN_CONFIG_FILE_CONTENT (as CI does) must not be
+	// persisted back over the on-disk .bruin.yml, which would drop any
+	// environments/connections absent from the env-provided config.
+	t.Setenv("BRUIN_CONFIG_FILE_CONTENT", "default_environment: default\nenvironments:\n  default:\n    connections: {}\n")
+
+	onDisk := `default_environment: default
+environments:
+    default:
+        connections:
+            bruin:
+                - name: cloud
+                  api_token: on-disk-token
+`
+	dir := writeTempConfigRepo(t, onDisk)
+	t.Chdir(dir)
+	configPath := filepath.Join(dir, ".bruin.yml")
+
+	setCmd := cloudConfigSetTeam()
+	require.NoError(t, setCmd.Run(t.Context(), []string{"set-team", "acme-corp"}))
+
+	// Read the file back directly (ignoring the env var): the on-disk connection
+	// must survive and the default team must be written.
+	cm, err := config.LoadOrCreateWithoutPathAbsolutization(afero.NewOsFs(), configPath)
+	require.NoError(t, err)
+	assert.Equal(t, "acme-corp", cm.GetDefaultTeam())
+	require.NotNil(t, cm.Environments["default"].Connections)
+	require.Len(t, cm.Environments["default"].Connections.BruinCloud, 1)
+	assert.Equal(t, "on-disk-token", cm.Environments["default"].Connections.BruinCloud[0].APIToken)
+}
+
 // runCloudProjectsListCapturingTeam runs the full "cloud projects list" command
 // against a stub server and returns the X-Bruin-Team header it received (and
 // whether the header was present at all).
