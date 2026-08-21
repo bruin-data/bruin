@@ -2160,6 +2160,142 @@ func TestWorkflowTasks(t *testing.T) {
 			},
 		},
 		{
+			// Copies the solvability checks into a fresh install and runs them. They
+			// live outside the template because their query text is the answer.
+			name: "murder_mystery_solvability",
+			workflow: e2e.Workflow{
+				Name: "murder_mystery_solvability",
+				Steps: []e2e.Task{
+					{
+						Name:    "murder_mystery: create the working directory",
+						Command: "mkdir",
+						Args:    []string{"-p", filepath.Join(tempdir, "murder-mystery-qa")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:       "murder_mystery: git init",
+						Command:    "git",
+						Args:       []string{"init"},
+						WorkingDir: filepath.Join(tempdir, "murder-mystery-qa"),
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:       "murder_mystery: init the template",
+						Command:    binary,
+						Args:       []string{"init", "murder-mystery", "yorkville-case"},
+						WorkingDir: filepath.Join(tempdir, "murder-mystery-qa"),
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "murder_mystery: copy the solvability checks in",
+						Command: "cp",
+						Args: []string{
+							"-R",
+							filepath.Join(currentFolder, "templates/qa-murder-mystery/checks"),
+							filepath.Join(tempdir, "murder-mystery-qa", "yorkville-case", "assets", "checks"),
+						},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						// The checks read _gen.actor_assignments, which the teardown drops.
+						Name:       "murder_mystery: seed and check with the scaffolding kept",
+						Command:    binary,
+						Args:       []string{"run", "--exclude-tag", "scaffolding", filepath.Join(tempdir, "murder-mystery-qa", "yorkville-case")},
+						WorkingDir: filepath.Join(tempdir, "murder-mystery-qa"),
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"bruin run completed successfully"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						// An ordinary install must not keep that schema.
+						Name:       "murder_mystery: init a second, ordinary install",
+						Command:    binary,
+						Args:       []string{"init", "murder-mystery", "played-case"},
+						WorkingDir: filepath.Join(tempdir, "murder-mystery-qa"),
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:       "murder_mystery: run it the way a player would",
+						Command:    binary,
+						Args:       []string{"run", filepath.Join(tempdir, "murder-mystery-qa", "played-case")},
+						WorkingDir: filepath.Join(tempdir, "murder-mystery-qa"),
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"bruin run completed successfully"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "murder_mystery: the played database keeps no scaffolding",
+						Command: binary,
+						Args: []string{
+							"query", "-c", "duckdb-yorkville", "-o", "json",
+							"-q", "SELECT count(*) AS gen_schemas FROM information_schema.schemata WHERE schema_name = '_gen'",
+						},
+						WorkingDir: filepath.Join(tempdir, "murder-mystery-qa"),
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{`"rows":[[0]]`},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "murder_mystery: the case papers are still readable",
+						Command: binary,
+						Args: []string{
+							"query", "-c", "duckdb-yorkville", "-o", "json",
+							"-q", "SELECT count(*) AS statements FROM casefile.witness_statements",
+						},
+						WorkingDir: filepath.Join(tempdir, "murder-mystery-qa"),
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{`"rows":[[38]]`},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+				},
+			},
+		},
+		{
 			name: "time_materialization",
 			workflow: e2e.Workflow{
 				Name: "time_materialization",
