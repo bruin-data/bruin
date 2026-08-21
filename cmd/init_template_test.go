@@ -671,3 +671,123 @@ func TestGoogleWebAnalyticsTemplateShipsDashboards(t *testing.T) {
 		}
 	}
 }
+
+func TestInitMurderMysteryCopiesTemplate(t *testing.T) {
+	targetRoot := t.TempDir()
+	t.Chdir(targetRoot)
+
+	gitInit := exec.CommandContext(t.Context(), "git", "init")
+	gitInit.Dir = targetRoot
+	out, err := gitInit.CombinedOutput()
+	require.NoError(t, err, string(out))
+
+	err = Init().Run(t.Context(), []string{"init", "murder-mystery", "ashmont-case"})
+	require.NoError(t, err)
+
+	pipelineRoot := filepath.Join(targetRoot, "ashmont-case")
+	require.FileExists(t, filepath.Join(targetRoot, ".bruin.yml"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "pipeline.yml"))
+
+	// The player-facing documents are the game: the briefing, the schema and the
+	// rules that stop an assistant from solving it for them.
+	for _, doc := range []string{"README.md", "CASE_FILE.md", "DATA_DICTIONARY.md", "AGENTS.md"} {
+		require.FileExists(t, filepath.Join(pipelineRoot, doc), doc)
+	}
+
+	// The generated database goes next to the project, so it has to be ignored.
+	// .gitignore needs its own embed directive; the top-level `*` skips dotfiles.
+	gitignore, err := os.ReadFile(filepath.Join(pipelineRoot, ".gitignore"))
+	require.NoError(t, err)
+	require.Contains(t, string(gitignore), "ashmont.db")
+
+	// Macros are loaded from the pipeline root by path, so a missing one turns
+	// every asset into a Jinja error rather than a bad row.
+	for _, macro := range []string{"rng.sql", "pools.sql", "calendar.sql", "places.sql", "format.sql"} {
+		require.FileExists(t, filepath.Join(pipelineRoot, "macros", macro), macro)
+	}
+
+	// The teardown asset must ship, or the played database keeps the scaffolding
+	// that says who did it.
+	require.FileExists(t, filepath.Join(pipelineRoot, "assets", "seed", "99_cleanup.sql"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "assets", "notebook", "rally_window_plate_reads.sql"))
+
+	seeds, err := os.ReadDir(filepath.Join(pipelineRoot, "assets", "seed"))
+	require.NoError(t, err)
+	require.Greater(t, len(seeds), 40, "the seed pipeline should be the whole town")
+}
+
+func TestMurderMysteryTemplateKeepsTheCaseOutOfItsOwnSource(t *testing.T) {
+	t.Parallel()
+
+	// The case has no answer-checking asset, so the only thing protecting it is
+	// that the generator never writes down who it picked. Roles are assigned by
+	// ranking a broad pool, never by naming anybody, and the words below would
+	// each be a sign that something started naming things instead.
+	//
+	// This deliberately does not check for the four culprits' names: they cannot
+	// be known without running the generator, and each of them is one entry in a
+	// pool of 64 given names or 168 surnames, so the tokens legitimately appear
+	// there. What must never appear is a citizen id or a full name, and neither
+	// can arise from a file that contains no name literals at all.
+	forbidden := regexp.MustCompile(`(?i)\b(culprit|guilty|hitman|spoiler|murderer|answer[ _-]?key|solution)\b`)
+	citizenID := regexp.MustCompile(`\bC\d{5}\b`)
+
+	err := iofs.WalkDir(templates.Templates, "murder-mystery", func(path string, d iofs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+
+		require.NotRegexp(t, forbidden, path, "file name gives the game away: %s", path)
+
+		body, err := templates.Templates.ReadFile(path)
+		require.NoError(t, err)
+		text := string(body)
+
+		// The vocabulary rule is about the generator naming things it should be
+		// ranking. The player-facing documents talk about the case in plain
+		// English on purpose, so they are exempt from it — but not from the id
+		// check below, which applies everywhere.
+		generated := strings.Contains(path, "/assets/") || strings.Contains(path, "/macros/")
+		if match := forbidden.FindString(text); generated && match != "" {
+			t.Errorf("%s contains %q, which names the case instead of generating it", path, match)
+		}
+		if match := citizenID.FindString(text); match != "" {
+			t.Errorf("%s contains the citizen id %q; roles must be assigned by ranking, never by id", path, match)
+		}
+
+		// Role assignment is only unreadable while it stays a ranking. A generator
+		// that filtered for the incriminating attributes together would hand a
+		// reader the whole deduction path.
+		if strings.HasSuffix(path, "02_actor_assignments.sql") {
+			require.Contains(t, text, "ORDER BY", path)
+			require.Contains(t, text, "LIMIT 1", path)
+		}
+
+		return nil
+	})
+	require.NoError(t, err)
+}
+
+func TestMurderMysteryTemplateDropsItsScaffolding(t *testing.T) {
+	t.Parallel()
+
+	// _gen holds the role assignment. If the teardown ever stops being its own
+	// tagged asset, either the played database keeps the answer in it, or the QA
+	// pipeline loses the only sanctioned way to read it.
+	body, err := templates.Templates.ReadFile("murder-mystery/assets/seed/99_cleanup.sql")
+	require.NoError(t, err)
+	text := string(body)
+
+	require.Contains(t, text, "DROP SCHEMA IF EXISTS _gen CASCADE")
+	require.Contains(t, text, "tags:")
+	require.Contains(t, text, "- scaffolding")
+
+	// A pipeline-level materialization default would be inherited here and wrap
+	// the DROP in a CREATE TABLE ... AS, which fails the run.
+	pipeline, err := templates.Templates.ReadFile("murder-mystery/pipeline.yml")
+	require.NoError(t, err)
+	require.NotContains(t, string(pipeline), "materialization:")
+}

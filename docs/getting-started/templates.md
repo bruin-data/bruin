@@ -75,6 +75,12 @@ AI agent skills are installed separately with `bruin ai skills`; see [AI Skills]
 ### Local and learning templates
 
 <div class="template-grid">
+  <a class="template-card" href="./templates-docs/murder-mystery-README.html">
+    <span class="template-card__category">SQL practice</span>
+    <strong>murder-mystery</strong>
+    <span>A playable SQL detective game. Seeds a whole fictional town into DuckDB — 12,400 residents, 4.9M cell tower registrations, one unsolved assassination — and asks you to name the four people who did it.</span>
+    <span class="template-card__tags"><code>DuckDB</code><code>learning</code><code>AI agents</code><code>no credentials</code></span>
+  </a>
   <a class="template-card" href="./templates-docs/duckdb-README.html">
     <span class="template-card__category">Local SQL</span>
     <strong>duckdb</strong>
