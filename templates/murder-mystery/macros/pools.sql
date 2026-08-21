@@ -1,7 +1,7 @@
 {#
-  Value pools for the Ashmont datasets.
+  Value pools for the Yorkville datasets.
 
-  Ashmont is invented, and so is every name in it: no real country, city, region
+  Yorkville is invented, and so is every name in it: no real country, city, region
   or person is referenced anywhere in the town. Pool sizes are chosen so that
   names repeat about as often as they do in a real town of this size — several
   residents share a surname, which is a fact the case relies on.
@@ -54,38 +54,36 @@
 ] %}
 
 {% set districts = [
-  'Foundry Quay', 'Kestrel Hill', 'Old Weirs', 'Marlpit', 'Corvid Row',
-  'Sallowfield', 'Northgate', 'Tanner Green'
+  'Nordheimer Vale', 'Wells Hill', 'Hillcrest', 'Bracondale',
+  'Loma Heights', 'Wychwood', 'Davenport North', 'Seaton Green'
 ] %}
 
 {% set streets = [
-  'Bellrope Walk', 'Cinder Way', 'Cooperage Street', 'Cradle Hill', 'Draper Street',
-  'Ember Lane', 'Fettle Street', 'Flax Walk', 'Forge Row', 'Gantry Street',
-  'Glasshouse Lane', 'Gravel Rise', 'Hackle Street', 'Halyard Walk', 'Almoner Street',
-  'Harrier Close', 'Heddon Street', 'Hollowbank', 'Ironmonger Row', 'Kiln Street',
-  'Lamplight Walk', 'Lathe Street', 'Limeburner Lane', 'Longshaw Road', 'Marl Street',
-  'Millrace Walk', 'Mortar Lane', 'Nettlebed Road', 'Oakum Street', 'Old Weir Road',
-  'Paternoster Walk', 'Pewter Lane', 'Pikestaff Row', 'Quill Street', 'Kestrel Lane',
-  'Rampart Road', 'Ratchet Lane', 'Rookery Walk', 'Ropewalk', 'Saltbox Lane',
-  'Sawyer Street', 'Scythe Row', 'Shuttle Street', 'Corvid Row', 'Foundry Row',
-  'Anvil Street', 'Sluice Lane', 'Smithy Walk', 'Spindle Street', 'Stanchion Road',
-  'Stonemason Row', 'Tallow Lane', 'Tanner Street', 'Tollgate Road', 'Threadneedle Walk',
-  'Tinderbox Lane', 'Trestle Street', 'Turnstile Walk', 'Vellum Lane', 'Verge Road',
-  'Wainwright Street', 'Warp Lane', 'Quarry Rise', 'Weaver Row', 'Wheelwright Walk',
-  'Whetstone Street', 'Wickerwork Lane', 'Windlass Road', 'Winnow Street', 'Yardarm Walk',
-  'Yoke Lane', 'Bastion Road', 'Beadle Walk', 'Brazier Lane', 'Buckler Street',
-  'Candlewick Row', 'Chandler Street', 'Clapper Lane', 'Coppice Road', 'Cordwainer Walk',
-  'Curfew Lane', 'Dovetail Street', 'Drawbridge Road', 'Fletcher Row', 'Gauntlet Lane',
-  'Grindstone Walk', 'Hoarstone Road', 'Joiner Street', 'Lockkeeper Lane', 'Mangle Walk'
+  'Alcina Avenue', 'Ardwold Gate', 'Barton Rise', 'Bathgate Lane', 'Benson Terrace', 'Boulton Walk', 'Bridgman Row', 'Burnside Drive',
+  'Caledonia Park Road', 'Cardigan Walk', 'Cavendish Mews', 'Cecil Rise', 'Chaplin Crescent', 'Christie Row', 'Russell Hill Road', 'Clarendon Avenue',
+  'Clifton Road', 'Colborne Lane', 'Cottingham Row', 'Croydon Walk', 'Dalton Mews', 'Deer Park Crescent', 'Delaware Row', 'Dewson Lane',
+  'Dunvegan Road', 'Elmsthorpe Avenue', 'Elgin Mews', 'Everden Road', 'Farnham Avenue', 'Follis Lane', 'Fraser Rise', 'Garfield Walk',
+  'Geneva Mews', 'Glenholme Row', 'Macpherson Mews', 'Gormley Lane', 'Hawthorn Gardens', 'Heath Street', 'Helena Avenue', 'Highbourne Road',
+  'Hilton Avenue', 'Humewood Drive', 'Kendal Avenue', 'Spadina Crescent', 'Austin Terrace', 'Walmer Road', 'Lauder Walk', 'Lonsdale Road',
+  'Lynwood Avenue', 'Madison Row', 'Marchmount Road', 'Maxwell Mews', 'Melgund Row', 'Davenport Road', 'Nina Street', 'Oakwood Rise',
+  'Old Forest Lane', 'Oriole Parkway', 'Palmerston Gardens', 'Pinewood Walk', 'Poplar Plains Road', 'Rathnelly Avenue', 'Nordheimer Rise', 'Regal Road',
+  'Ridge Hill Drive', 'Rosemount Row', 'Rushton Road', 'St Annes Walk', 'Shallmar Lane', 'Sherwood Rise', 'Springmount Avenue', 'Strathearn Row',
+  'Tarragona Walk', 'Tichester Lane', 'Turner Road', 'Tyrrel Avenue', 'Ulster Row', 'Vaughan Road', 'Warren Crescent', 'Wells Street',
+  'Westmount Walk', 'Whitaker Lane', 'Wickson Terrace', 'Willcocks Row', 'Winona Drive', 'Wolseley Mews', 'Wychwood Avenue', 'Yarmouth Gardens',
+  'Yorkview Lane', 'Zina Walk'
 ] %}
 
 {% set business_words_a = [
-  'Ashmont', 'Bellrope', 'Cinder', 'Coppice', 'Corvid', 'Draper', 'Ember', 'Fettle',
-  'Flax', 'Foundry', 'Gantry', 'Glasshouse', 'Halyard', 'Hollowbank', 'Ironmonger', 'Kestrel',
-  'Kiln', 'Lamplight', 'Lathe', 'Limeburner', 'Marlpit', 'Millrace', 'Northgate', 'Oakum',
-  'Paternoster', 'Pewter', 'Quarry', 'Rampart', 'Rookery', 'Ropewalk', 'Saltbox', 'Sawyer',
-  'Sluice', 'Spindle', 'Stanchion', 'Tallow', 'Tanner', 'Threadneedle', 'Tollgate', 'Trestle',
-  'Vellum', 'Wainwright', 'Weaver', 'Whetstone', 'Windlass', 'Winnow', 'Yardarm', 'Yoke'
+  'Alcina', 'Ardwold', 'Austin', 'Bathgate', 'Boulton',
+  'Bracondale', 'Bridgman', 'Burnside', 'Caledonia', 'Cardigan',
+  'Cavendish', 'Chaplin', 'Christie', 'Clarendon', 'Colborne',
+  'Cottingham', 'Davenport', 'Dunvegan', 'Elmsthorpe', 'Everden',
+  'Farnham', 'Follis', 'Glenholme', 'Hawthorn', 'Heath',
+  'Highbourne', 'Hillcrest', 'Humewood', 'Kendal', 'Loma',
+  'Lonsdale', 'Lynwood', 'Macpherson', 'Marchmount', 'Melgund',
+  'Nordheimer', 'Oriole', 'Palmerston', 'Poplar Plains', 'Rathnelly',
+  'Russell Hill', 'Seaton', 'Spadina', 'Strathearn', 'Tarragona',
+  'Walmer', 'Wells Hill', 'Wychwood'
 ] %}
 
 {% set business_words_b = [
@@ -103,18 +101,6 @@
   ['Kestrel', 'Vireo'], ['Kestrel', 'Merlin'], ['Kestrel', 'Kestrel']
 ] %}
 
-{% set merchant_names = [
-  'Tallow Lane Grocers', 'Foundry Row Bakery', 'Kestrel Provisions', 'Marlpit Outfitters',
-  'Anvil Street Hardware', 'Cinder Way Fuel', 'Northgate Fuel', 'Tollgate Services',
-  'Corvid Row Pharmacy', 'Weaver Row Butchers', 'Sluice Lane Fishmonger', 'Ropewalk Wines',
-  'Glasshouse Garden Centre', 'Spindle Street Books', 'Pewter Lane Hardware', 'Quarry Rise Feed',
-  'The Winnow Arms', 'The Trestle', 'Millrace Tearooms', 'Paternoster Cafe',
-  'Threadneedle Drapers', 'Lathe Street Cycles', 'Oakum Chandlery', 'Saltbox Deli',
-  'Kiln Street Pottery', 'Draper Street Chemists', 'Halyard Sports', 'Yardarm Angling',
-  'Rookery Newsagent', 'Stanchion Motors', 'Gantry Tyres', 'Vellum Stationers',
-  'Bellrope Hairdressers', 'Coppice Nurseries', 'Rampart Launderette', 'Winnow Street Bistro',
-  'Flax Walk Florist', 'Ember Lane Bicycles', 'Sawyer Timber', 'Wainwright Carpets'
-] %}
 
 {# Trade types, each with the category a card terminal reports under. #}
 {% set trade_types = [

@@ -1,7 +1,7 @@
 /* @bruin
 name: town.citizens
 description: |
-  The residents of Ashmont as the civic register holds them.
+  The residents of Yorkville as the civic register holds them.
 materialization:
   type: table
 depends:

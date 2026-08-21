@@ -24,9 +24,9 @@ They need the generation scaffolding alive, which the template's last asset drop
 run excludes it by tag:
 
 ```bash
-bruin init murder-mystery ashmont-case
-cp -R integration-tests/templates/qa-murder-mystery/checks ashmont-case/assets/checks
-bruin run --exclude-tag scaffolding ashmont-case
+bruin init murder-mystery yorkville-case
+cp -R integration-tests/templates/qa-murder-mystery/checks yorkville-case/assets/checks
+bruin run --exclude-tag scaffolding yorkville-case
 ```
 
 Any failing `custom_check` fails the run, which is the point. `integration_test.go` drives

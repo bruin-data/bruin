@@ -1,10 +1,10 @@
-name: ashmont_case
+name: yorkville_case
 schedule: daily
 start_date: "2026-05-15"
 catchup: false
 
 default_connections:
-  duckdb: "duckdb-default"
+  duckdb: "duckdb-yorkville"
 
 # Assets set their own materialization. A pipeline-level materialization default
 # would be inherited by the teardown asset too, wrapping its DROP in a CREATE

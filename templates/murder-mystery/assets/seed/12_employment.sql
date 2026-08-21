@@ -1,7 +1,7 @@
 /* @bruin
 name: town.employment
 description: |
-  Job spells recorded against Ashmont companies. A spell with a null end date is
+  Job spells recorded against Yorkville companies. A spell with a null end date is
   still running.
 materialization:
   type: table

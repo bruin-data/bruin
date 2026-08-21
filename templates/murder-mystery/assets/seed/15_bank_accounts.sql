@@ -1,7 +1,7 @@
 /* @bruin
 name: town.bank_accounts
 description: |
-  Current accounts held at Ashmont's banks, whether by a resident or a company.
+  Current accounts held at Yorkville's banks, whether by a resident or a company.
 materialization:
   type: table
 depends:

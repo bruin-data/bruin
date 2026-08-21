@@ -1,7 +1,7 @@
 /* @bruin
 name: _gen.range_squad
 description: |
-  Generation scaffolding. The Marlpit club's long-range competition squad, filled
+  Generation scaffolding. The Bracondale club's long-range competition squad, filled
   to a quota within each stature-and-training pool so the squad's composition is
   stable. Dropped with the rest of this schema at the end of the run.
 materialization:

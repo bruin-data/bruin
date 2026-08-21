@@ -1,7 +1,7 @@
 /* @bruin
 name: town.devices
 description: |
-  Handsets active on the Ashmont networks. Prepaid handsets are sold over the
+  Handsets active on the Yorkville networks. Prepaid handsets are sold over the
   counter and carry no subscriber record, so their citizen_id is null; around
   fourteen hundred residents use one as their only phone.
 materialization:

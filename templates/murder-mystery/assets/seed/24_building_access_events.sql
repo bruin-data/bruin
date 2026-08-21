@@ -97,7 +97,7 @@ pinned AS (
         'granted' AS result
     FROM _gen.access_scene sc
     JOIN town.badges b ON b.citizen_id = sc.citizen_id
-    JOIN reader_pool rp ON rp.building = 'Corvid Building' AND rp.zn = sc.zone_n
+    JOIN reader_pool rp ON rp.building = 'Loma House' AND rp.zn = sc.zone_n
 )
 SELECT
     'BA-' || lpad(row_number() OVER (ORDER BY ts, badge_id, reader_id, result)::VARCHAR, 6, '0') AS event_id,
@@ -107,7 +107,7 @@ SELECT
     result
 FROM (
     SELECT badge_id, reader_id, ts, result FROM drawn
-    WHERE NOT (building = 'Corvid Building'
+    WHERE NOT (building = 'Loma House'
                AND ts >= {{ rally_date() }}::TIMESTAMP + INTERVAL 17 HOUR + INTERVAL 30 MINUTE
                AND ts <  {{ rally_date() }}::TIMESTAMP + INTERVAL 19 HOUR + INTERVAL 30 MINUTE)
     UNION ALL

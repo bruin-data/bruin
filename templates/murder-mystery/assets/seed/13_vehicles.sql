@@ -1,8 +1,8 @@
 /* @bruin
 name: town.vehicles
 description: |
-  Vehicles taxed to an Ashmont address. Registration marks are three letters, a
-  dash and three digits. Ashmont's letter series were issued in blocks over the
+  Vehicles taxed to an Yorkville address. Registration marks are three letters, a
+  dash and three digits. Yorkville's letter series were issued in blocks over the
   years, so the leading letter clusters rather than spreading evenly.
 materialization:
   type: table

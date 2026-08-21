@@ -1,7 +1,7 @@
 /* @bruin
 name: town.businesses
 description: |
-  Companies registered in Ashmont: employers, fleet operators, trade contractors
+  Companies registered in Yorkville: employers, fleet operators, trade contractors
   and a handful of holding companies that own property rather than trade.
 materialization:
   type: table
@@ -73,10 +73,19 @@ spine AS (
 )
 SELECT
     s.business_id,
-    CASE
-        WHEN s.sector = 'holding'      THEN s.word_a || ' Estates'
-        WHEN s.sector = 'construction' THEN s.word_a || ' ' || {{ pick('s.n', 5013, ['Contracts', 'Building Works', 'Fabrication', 'Roofing', 'Joinery', 'Plant Hire']) }}
-        ELSE s.word_a || ' ' || s.word_b
+    -- the suffix follows the trade, so a filing never reads as a roofer while it
+    -- is registered as a surveyor
+    s.word_a || ' ' || CASE s.sector
+        WHEN 'holding'               THEN 'Estates'
+        WHEN 'construction'          THEN {{ pick('s.n', 5013, ['Contracts', 'Building Works', 'Fabrication', 'Roofing', 'Joinery', 'Plant Hire']) }}
+        WHEN 'logistics'             THEN {{ pick('s.n', 5014, ['Haulage', 'Removals', 'Freight', 'Depot', 'Couriers']) }}
+        WHEN 'motor trade'           THEN {{ pick('s.n', 5015, ['Motors', 'Garage', 'Tyres', 'Autobody', 'Servicing']) }}
+        WHEN 'retail'                THEN {{ pick('s.n', 5016, ['Provisions', 'Outfitters', 'Grocers', 'Hardware', 'Stores', 'Supply']) }}
+        WHEN 'hospitality'           THEN {{ pick('s.n', 5017, ['Kitchen', 'Tearooms', 'Tavern', 'Bakery', 'Catering']) }}
+        WHEN 'care'                  THEN {{ pick('s.n', 5018, ['Clinic', 'Care', 'Nursing', 'Surgery']) }}
+        WHEN 'agriculture'           THEN {{ pick('s.n', 5019, ['Farms', 'Nurseries', 'Feed', 'Growers']) }}
+        WHEN 'manufacturing'         THEN {{ pick('s.n', 5020, ['Ironworks', 'Fabrication', 'Works', 'Pressings']) }}
+        ELSE                              {{ pick('s.n', 5021, ['Partners', 'Chambers', 'Surveying', 'Group', 'Associates', 'Bookkeeping']) }}
     END                                                           AS name,
     s.sector,
     ({{ rally_date() }} - INTERVAL ({{ rnd_int('s.n', 5020, 400, 14000) }}) DAY)::DATE AS founded,

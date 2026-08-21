@@ -45,15 +45,15 @@ custom_checks:
   - name: H3 the runner-up has high volume, so volume alone is not the separator
     query: SELECT count(*) FROM qa.handler_stages WHERE stage = 'H3-runner-up' AND metric_b < 60
     value: 0
-  - name: H4 the rejected riverside motion was decided by a casting vote
-    query: SELECT count(*) FROM town.council_decisions WHERE affected_district = 'Foundry Quay' AND outcome = 'rejected' AND casting_vote_citizen_id IS NOT NULL AND decided_on = DATE '2026-03-11'
+  - name: H4 the rejected ravine motion was decided by a casting vote
+    query: SELECT count(*) FROM town.council_decisions WHERE affected_district = 'Nordheimer Vale' AND outcome = 'rejected' AND casting_vote_citizen_id IS NOT NULL AND decided_on = DATE '2026-03-11'
     value: 1
-  - name: H4 the riverside parcels are held by a company with a named principal
+  - name: H4 the ravine parcels are held by a company with a named principal
     query: |
       SELECT count(DISTINCT b.principal_citizen_id)
       FROM town.property_records p
       JOIN town.businesses b ON b.business_id = p.owner_business_id
-      WHERE p.district = 'Foundry Quay' AND p.zoning_class = 'undeveloped'
+      WHERE p.district = 'Nordheimer Vale' AND p.zoning_class = 'undeveloped'
     value: 1
   - name: H4 that principal also files a second company in the trades
     query: |
@@ -61,7 +61,7 @@ custom_checks:
       WHERE principal_citizen_id = (
         SELECT DISTINCT b.principal_citizen_id FROM town.property_records p
         JOIN town.businesses b ON b.business_id = p.owner_business_id
-        WHERE p.district = 'Foundry Quay' AND p.zoning_class = 'undeveloped')
+        WHERE p.district = 'Nordheimer Vale' AND p.zoning_class = 'undeveloped')
     value: 2
   - name: H5 the holding company paid two personal accounts
     query: |

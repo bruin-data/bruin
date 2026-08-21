@@ -1,7 +1,7 @@
 /* @bruin
 name: town.council_decisions
 description: |
-  Motions put to Ashmont town council and how they went. Where a vote is tied the
+  Motions put to Yorkville town council and how they went. Where a vote is tied the
   chair casts the deciding vote, and the minutes record who that was.
 materialization:
   type: table
@@ -52,13 +52,13 @@ spine AS (
 )
 SELECT
     'MO-' || lpad('1', 4, '0')                                AS motion_id,
-    'Rezoning application: Foundry Quay riverside parcels, from undeveloped to mixed'  AS motion,
+    'Rezoning application: Nordheimer Vale ravine lands, from undeveloped to mixed'  AS motion,
     DATE '2026-03-11'                                         AS decided_on,
     'rejected'                                                AS outcome,
     7                                                         AS votes_for,
     7                                                         AS votes_against,
     (SELECT actor_v FROM a)                                   AS casting_vote_citizen_id,
-    'Foundry Quay'                                            AS affected_district
+    'Nordheimer Vale'                                            AS affected_district
 UNION ALL
 SELECT
     'MO-' || lpad(s.n::VARCHAR, 4, '0'),

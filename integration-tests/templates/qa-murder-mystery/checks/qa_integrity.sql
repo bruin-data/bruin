@@ -67,7 +67,7 @@ custom_checks:
           SELECT b.citizen_id FROM town.building_access_events e
           JOIN town.building_readers r USING (reader_id)
           JOIN town.badges b USING (badge_id)
-          WHERE r.building = 'Corvid Building' AND r.zone = 'stairwell'
+          WHERE r.building = 'Loma House' AND r.zone = 'stairwell'
             AND e.ts BETWEEN TIMESTAMP '2026-05-14 18:00:00' AND TIMESTAMP '2026-05-14 18:20:00')
         AND v.admitted < TIMESTAMP '2026-05-14 18:47:00'
         AND v.discharged > TIMESTAMP '2026-05-14 18:47:00'

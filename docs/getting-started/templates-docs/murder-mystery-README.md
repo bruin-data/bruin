@@ -1,4 +1,4 @@
-# The Ashmont Case
+# The Yorkville Case
 
 A SQL detective game you play with Bruin.
 
@@ -15,12 +15,12 @@ Nobody hands you a suspect list. Every clue is a query.
 You need Bruin and nothing else. No credentials, no cloud account, no configuration.
 
 ```bash
-bruin init murder-mystery ashmont-case
-cd ashmont-case
+bruin init murder-mystery yorkville-case
+cd yorkville-case
 bruin run .
 ```
 
-The run takes about ten seconds and writes a 74 MB DuckDB file called `ashmont.db`
+The run takes about ten seconds and writes a 74 MB DuckDB file called `yorkville.db`
 next to your `.bruin.yml`. Every install produces the same town and the same four
 culprits, so you and a friend can compare answers.
 
@@ -32,13 +32,13 @@ Everything you need is `bruin query`:
 
 ```bash
 # the briefing, in the witnesses' own words
-bruin query -c duckdb-default -q "SELECT witness_ref, location, statement FROM casefile.witness_statements"
+bruin query -c duckdb-yorkville -q "SELECT witness_ref, location, statement FROM casefile.witness_statements"
 
 # what the laboratory found
-bruin query -c duckdb-default -q "SELECT discipline, finding FROM casefile.forensic_findings"
+bruin query -c duckdb-yorkville -q "SELECT discipline, finding FROM casefile.forensic_findings"
 
 # how many residents match a description on its own
-bruin query -c duckdb-default -q "
+bruin query -c duckdb-yorkville -q "
   SELECT count(*) FROM town.citizens
   WHERE sex = 'M' AND height_cm BETWEEN 186 AND 194"
 ```
@@ -62,7 +62,7 @@ near the square while the rally was breaking up. Copy its shape.
 ```bash
 # after adding a file under assets/notebook/
 bruin run assets/notebook/my_candidates.sql
-bruin query -c duckdb-default -q "SELECT * FROM notebook.my_candidates"
+bruin query -c duckdb-yorkville -q "SELECT * FROM notebook.my_candidates"
 ```
 
 Assets under `assets/notebook/` are yours. Add as many as you like. Bruin works out the
@@ -77,6 +77,11 @@ Bruin MCP configured, and let it run the queries for you.
 solves: it runs the step you ask for, reports what came back, and stops. If you ask it
 to solve the case it will decline. That is deliberate. An assistant that hands you the
 answer has taken the game away.
+
+If you want to hand the whole thing to an agent from a standing start, give it
+**`PLAY_WITH_AN_AGENT.md`**. That file walks it through installing Bruin, initializing
+the case and building the town, then stops and waits for you to start asking questions.
+You can pass it to an agent before you have Bruin installed at all.
 
 ## Two requests
 

@@ -1,7 +1,7 @@
 /* @bruin
 name: town.merchants
 description: |
-  Card terminals registered in Ashmont, one per trading premises.
+  Card terminals registered in Yorkville, one per trading premises.
 materialization:
   type: table
 depends:

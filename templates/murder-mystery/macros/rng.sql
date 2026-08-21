@@ -1,5 +1,5 @@
 {#
-  Deterministic value derivation for the Ashmont datasets.
+  Deterministic value derivation for the Yorkville datasets.
 
   Every generated value comes from an MD5 digest of the row's own identity plus a
   per-column salt. Nothing depends on row order, on how many rows came before, or

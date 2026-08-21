@@ -1,7 +1,7 @@
 /* @bruin
 name: town.firearm_licences
 description: |
-  Firearm certificates on the Ashmont register. Ashmont is a hunting town, so
+  Firearm certificates on the Yorkville register. Yorkville is a hunting town, so
   rifle certificates outnumber everything else and holding one says very little
   about a person.
 materialization:

@@ -1,7 +1,7 @@
 /* @bruin
 name: _gen.access_scene
 description: |
-  Generation scaffolding. Who was in the Corvid Building while the rally was on,
+  Generation scaffolding. Who was in the Loma House while the rally was on,
   and which badge opened which door. Dropped with the rest of this schema at the
   end of the run.
 materialization:

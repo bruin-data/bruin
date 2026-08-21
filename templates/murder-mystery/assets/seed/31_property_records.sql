@@ -1,8 +1,9 @@
 /* @bruin
 name: town.property_records
 description: |
-  The land register: every parcel in Ashmont, who holds it and how it is zoned.
-  The Foundry Quay parcels are the town's last large undeveloped riverside site.
+  The land register: every parcel in Yorkville, who holds it and how it is zoned.
+  The Nordheimer Vale parcels are the town's last large undeveloped tract, a shelf of
+  ravine land above the old brickyards.
 materialization:
   type: table
 depends:
@@ -56,8 +57,8 @@ sites AS (
     FROM town.addresses
 ),
 quay AS (
-    -- the eighteen riverside parcels the rezoning motion turned on
-    SELECT pn FROM sites WHERE district = 'Foundry Quay' ORDER BY pn LIMIT 18
+    -- the eighteen ravine parcels the rezoning motion turned on
+    SELECT pn FROM sites WHERE district = 'Nordheimer Vale' ORDER BY pn LIMIT 18
 )
 SELECT
     'P-' || lpad(s.pn::VARCHAR, 5, '0')                          AS parcel_id,

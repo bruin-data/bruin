@@ -2160,10 +2160,8 @@ func TestWorkflowTasks(t *testing.T) {
 			},
 		},
 		{
-			// The murder-mystery template ships no answer-checking asset, so these
-			// solvability checks are the only guarantee that the case has exactly
-			// one answer. They live outside the template because their query text
-			// is the deduction path; the run copies them into a fresh install.
+			// Copies the solvability checks into a fresh install and runs them. They
+			// live outside the template because their query text is the answer.
 			name: "murder_mystery_solvability",
 			workflow: e2e.Workflow{
 				Name: "murder_mystery_solvability",
@@ -2194,7 +2192,7 @@ func TestWorkflowTasks(t *testing.T) {
 					{
 						Name:       "murder_mystery: init the template",
 						Command:    binary,
-						Args:       []string{"init", "murder-mystery", "ashmont-case"},
+						Args:       []string{"init", "murder-mystery", "yorkville-case"},
 						WorkingDir: filepath.Join(tempdir, "murder-mystery-qa"),
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -2209,7 +2207,7 @@ func TestWorkflowTasks(t *testing.T) {
 						Args: []string{
 							"-R",
 							filepath.Join(currentFolder, "templates/qa-murder-mystery/checks"),
-							filepath.Join(tempdir, "murder-mystery-qa", "ashmont-case", "assets", "checks"),
+							filepath.Join(tempdir, "murder-mystery-qa", "yorkville-case", "assets", "checks"),
 						},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -2219,11 +2217,10 @@ func TestWorkflowTasks(t *testing.T) {
 						},
 					},
 					{
-						// The checks read _gen.actor_assignments to learn who the
-						// generator picked, so the teardown has to be skipped.
+						// The checks read _gen.actor_assignments, which the teardown drops.
 						Name:       "murder_mystery: seed and check with the scaffolding kept",
 						Command:    binary,
-						Args:       []string{"run", "--exclude-tag", "scaffolding", filepath.Join(tempdir, "murder-mystery-qa", "ashmont-case")},
+						Args:       []string{"run", "--exclude-tag", "scaffolding", filepath.Join(tempdir, "murder-mystery-qa", "yorkville-case")},
 						WorkingDir: filepath.Join(tempdir, "murder-mystery-qa"),
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -2235,8 +2232,7 @@ func TestWorkflowTasks(t *testing.T) {
 						},
 					},
 					{
-						// A second, ordinary install: the played database must not
-						// keep the schema that says who did it.
+						// An ordinary install must not keep that schema.
 						Name:       "murder_mystery: init a second, ordinary install",
 						Command:    binary,
 						Args:       []string{"init", "murder-mystery", "played-case"},
@@ -2266,7 +2262,7 @@ func TestWorkflowTasks(t *testing.T) {
 						Name:    "murder_mystery: the played database keeps no scaffolding",
 						Command: binary,
 						Args: []string{
-							"query", "-c", "duckdb-default", "-o", "json",
+							"query", "-c", "duckdb-yorkville", "-o", "json",
 							"-q", "SELECT count(*) AS gen_schemas FROM information_schema.schemata WHERE schema_name = '_gen'",
 						},
 						WorkingDir: filepath.Join(tempdir, "murder-mystery-qa"),
@@ -2283,7 +2279,7 @@ func TestWorkflowTasks(t *testing.T) {
 						Name:    "murder_mystery: the case papers are still readable",
 						Command: binary,
 						Args: []string{
-							"query", "-c", "duckdb-default", "-o", "json",
+							"query", "-c", "duckdb-yorkville", "-o", "json",
 							"-q", "SELECT count(*) AS statements FROM casefile.witness_statements",
 						},
 						WorkingDir: filepath.Join(tempdir, "murder-mystery-qa"),

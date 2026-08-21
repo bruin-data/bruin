@@ -1,7 +1,7 @@
 /* @bruin
 name: town.building_readers
 description: |
-  Badge readers in Ashmont's twelve managed commercial buildings. Every door with
+  Badge readers in Yorkville's twelve managed commercial buildings. Every door with
   a reader on it appears here, including the ones tenants rarely use.
 materialization:
   type: table
@@ -23,10 +23,10 @@ columns:
 
 WITH buildings AS (
     SELECT * FROM (VALUES
-        (1, 'Corvid Building'), (2, 'Foundry Exchange'), (3, 'Weirs Chambers'),
-        (4, 'Northgate House'), (5, 'Marlpit Works'),   (6, 'Tanner Green Offices'),
-        (7, 'Sallowfield Court'), (8, 'Kestrel House'), (9, 'Old Weirs Mill'),
-        (10, 'Corvid Row Annexe'), (11, 'Gantry House'), (12, 'Trestle Chambers')
+        (1, 'Loma House'), (2, 'Wychwood Exchange'), (3, 'Hillcrest Chambers'),
+        (4, 'Davenport House'), (5, 'Bracondale Works'),   (6, 'Seaton Green Offices'),
+        (7, 'Wells Hill Court'), (8, 'Walmer House'), (9, 'Tarragona Mill'),
+        (10, 'Spadina Annexe'), (11, 'Poplar Plains House'), (12, 'Clarendon Chambers')
     ) AS t(bn, building)
 ),
 zones AS (

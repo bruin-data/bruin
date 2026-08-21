@@ -1,7 +1,7 @@
 /* @bruin
 name: town.travel_records
 description: |
-  Departures and arrivals recorded against Ashmont residents at the regional
+  Departures and arrivals recorded against Yorkville residents at the regional
   terminals. Journeys by road within the region are not recorded here.
 materialization:
   type: table
@@ -60,8 +60,8 @@ legs AS (
             + INTERVAL ({{ rnd_int('s.seq * 10 + s.trip', 6703, 5, 22) }}) HOUR
             + INTERVAL ({{ rnd_int('s.seq * 10 + s.trip', 6704, 0, 59) }}) MINUTE)::TIMESTAMP AS out_ts,
         {{ rnd_int('s.seq * 10 + s.trip', 6705, 2, 21) }} AS nights,
-        {{ pick('s.seq * 10 + s.trip', 6706, ['Coastal Air', 'Northern Rail Link', 'Marlpit Coaches', 'Regional Air', 'Weirs Ferry']) }} AS carrier,
-        {{ pick('s.seq * 10 + s.trip', 6707, ['HRB', 'DNM', 'CWD', 'NTH', 'STW', 'THR', 'LDB', 'PDS', 'RVM', 'IKG', 'BYW', 'WNL']) }} AS destination_code,
+        {{ pick('s.seq * 10 + s.trip', 6706, ['Lakeshore Air', 'Northern Rail Link', 'Bracondale Coaches', 'Regional Air', 'Ridge Coachways']) }} AS carrier,
+        {{ pick('s.seq * 10 + s.trip', 6707, ['DPK', 'SMH', 'MRP', 'RTH', 'HMW', 'CDV', 'LYT', 'CHE', 'FHV', 'OKV', 'CRI', 'RGH']) }} AS destination_code,
         {{ weighted('s.seq * 10 + s.trip', 6708, [['international', 34], ['domestic', 100]]) }} AS destination_type
     FROM spine s
 ),
@@ -71,7 +71,7 @@ pinned AS (
         TIMESTAMP '2026-05-17 07:35:00'             AS out_ts,
         16                                          AS nights,
         'Coastal Air'                               AS carrier,
-        'HRB'                                       AS destination_code,
+        'DPK'                                       AS destination_code,
         'international'                              AS destination_type
 ),
 both_ways AS (

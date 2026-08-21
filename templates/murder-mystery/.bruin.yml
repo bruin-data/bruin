@@ -3,5 +3,9 @@ environments:
   default:
     connections:
       duckdb:
-        - name: "duckdb-default"
-          path: "ashmont.db"
+        # Named for this case rather than reusing duckdb-default. Nine other
+        # templates ship that name, and bruin init merges into one config per
+        # Git repository: in a repo that already had one of them, this pipeline
+        # would silently write the whole town into that template's database.
+        - name: "duckdb-yorkville"
+          path: "yorkville.db"

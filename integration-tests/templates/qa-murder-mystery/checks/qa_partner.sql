@@ -42,7 +42,7 @@ custom_checks:
     query: |
       SELECT count(*) FROM town.hotel_stays
       WHERE booker_citizen_id = (SELECT partner_citizen_id FROM qa.partner_stages WHERE in_p1)
-        AND check_in = DATE '2026-05-12' AND town_name <> 'Ashmont'
+        AND check_in = DATE '2026-05-12' AND town_name <> 'Yorkville'
     value: 1
   - name: P3 his handset is off the network for those two nights
     query: |

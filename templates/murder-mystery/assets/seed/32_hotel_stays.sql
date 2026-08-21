@@ -1,7 +1,7 @@
 /* @bruin
 name: town.hotel_stays
 description: |
-  Hotel bookings made by Ashmont residents, in the town and in the towns around
+  Hotel bookings made by Yorkville residents, in the town and in the towns around
   it. The booking is recorded against whoever paid for the room.
 materialization:
   type: table
@@ -55,7 +55,7 @@ drawn AS (
         ({{ ledger_start() }} + INTERVAL ({{ rnd_int('s.seq * 10 + s.trip', 6811, 0, 90) }}) DAY)::DATE AS check_in,
         {{ rnd_int('s.seq * 10 + s.trip', 6812, 1, 6) }}                 AS nights,
         {{ rnd_int('s.seq * 10 + s.trip', 6813, 1, 4) }}                 AS guests,
-        {{ pick('s.seq * 10 + s.trip', 6814, ['Ashmont', 'Wenlock', 'Harbrook', 'Dunmere', 'Cawdle', 'Netherhythe', 'Stanwix', 'Threave']) }} AS town_name
+        {{ pick('s.seq * 10 + s.trip', 6814, ['Yorkville', 'Deer Park', 'Summerhill', 'Moore Park', 'Rathnelly', 'Humewood', 'Cedarvale', 'Lytton Park']) }} AS town_name
     FROM spine s
 ),
 pinned AS (
@@ -65,7 +65,7 @@ pinned AS (
         DATE '2026-05-12'       AS check_in,
         2                       AS nights,
         2                       AS guests,
-        'Netherhythe'           AS town_name
+        'Humewood'              AS town_name
 )
 SELECT
     'HB-' || lpad(row_number() OVER (ORDER BY check_in, citizen_id, hotel_n, nights, guests, town_name)::VARCHAR, 5, '0') AS booking_id,

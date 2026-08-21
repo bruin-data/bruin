@@ -1,7 +1,7 @@
 /* @bruin
 name: town.addresses
 description: |
-  Every postal address in Ashmont. Each street has an anchor point on the town
+  Every postal address in Yorkville. Each street has an anchor point on the town
   grid and its addresses run along it, so neighbours really are neighbours and
   share a cell site.
 materialization:

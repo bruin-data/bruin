@@ -1,7 +1,7 @@
 /* @bruin
 name: town.clinic_visits
 description: |
-  Attendances at Ashmont General and the two branch surgeries over the last year.
+  Attendances at Yorkville General and the two branch surgeries over the last year.
   An admission with no discharge date was still open when the extract was taken.
 materialization:
   type: table
@@ -59,7 +59,7 @@ drawn AS (
         ({{ rally_date() }} - INTERVAL ({{ rnd_int('s.seq * 10 + s.visit', 6910, 1, 364) }}) DAY
             + INTERVAL ({{ rnd_int('s.seq * 10 + s.visit', 6911, 8, 21) }}) HOUR
             + INTERVAL ({{ rnd_int('s.seq * 10 + s.visit', 6912, 0, 59) }}) MINUTE)::TIMESTAMP AS admitted,
-        {{ weighted('s.seq * 10 + s.visit', 6913, [['CL-GENERAL', 58], ['CL-NORTHGATE', 80], ['CL-WEIRS', 100]]) }} AS clinic_id,
+        {{ weighted('s.seq * 10 + s.visit', 6913, [['CL-GENERAL', 58], ['CL-DAVENPORT', 80], ['CL-HILLCREST', 100]]) }} AS clinic_id,
         {{ pick('s.seq * 10 + s.visit', 6914, ['chest pain', 'persistent cough', 'sprained ankle', 'laceration to hand', 'migraine', 'abdominal pain', 'back pain', 'dizziness', 'rash', 'fracture, suspected', 'ear infection', 'shortness of breath', 'burn to forearm', 'eye injury', 'routine review', 'blood pressure check', 'wound dressing', 'vomiting', 'fall at home', 'dental abscess']) }} AS presenting_note,
         {{ weighted('s.seq * 10 + s.visit', 6915, [['treated and discharged', 74], ['referred', 87], ['admitted', 95], ['did not attend', 100]]) }} AS outcome,
         {{ rnd_int('s.seq * 10 + s.visit', 6916, 1, 96) }} AS stay_hours

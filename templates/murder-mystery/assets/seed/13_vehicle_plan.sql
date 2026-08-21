@@ -66,7 +66,7 @@ resolved AS (
     FROM owned o
     LEFT JOIN _gen.actor_overrides ov ON ov.citizen_id = o.owner_citizen_id
 ),
--- The T series was issued over a decade of Ashmont registrations, so a slice of
+-- The T series was issued over a decade of Yorkville registrations, so a slice of
 -- the light hatchbacks on the road carry it.
 series AS (
     SELECT

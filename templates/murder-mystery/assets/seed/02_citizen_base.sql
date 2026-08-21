@@ -1,7 +1,7 @@
 /* @bruin
 name: _gen.citizen_base
 description: |
-  Generation scaffolding. Every resident of Ashmont with their unadjusted
+  Generation scaffolding. Every resident of Yorkville with their unadjusted
   attributes, before the override pass in town.citizens. This schema is dropped
   at the end of the run and is not part of the played database.
 materialization:
@@ -122,8 +122,8 @@ SELECT
     END                                                          AS marital_status,
     ({{ rally_date() }} - INTERVAL ({{ rnd_int('z.seq', 2053, 30, 9000) }}) DAY)::DATE AS moved_in_date,
     CASE
-        WHEN {{ rnd('z.seq', 2054) }} < 0.61 THEN 'Ashmont'
-        ELSE {{ pick('z.seq', 2055, ['Wenlock', 'Harbrook', 'Dunmere', 'Cawdle', 'Netherhythe', 'Stanwix', 'Threave', 'Ludborough', 'Padstowe', 'Ravensmoor', 'Ilkeston Green', 'Byrewater']) }}
+        WHEN {{ rnd('z.seq', 2054) }} < 0.61 THEN 'Yorkville'
+        ELSE {{ pick('z.seq', 2055, ['Deer Park', 'Summerhill', 'Moore Park', 'Rathnelly', 'Humewood', 'Cedarvale', 'Lytton Park', 'Chaplin Estates', 'Forest Hill Village', 'Oakwood Vale', 'Corso Italia', 'Regal Heights']) }}
     END                                                          AS birth_town,
     z.prior_service,
     q.service_qualification_raw,

@@ -3,7 +3,7 @@
 Every table you can query, every column, and what it holds. Row counts are from a
 default install; they are identical on every install.
 
-Coordinates are a synthetic local grid for Ashmont. Only distances between points are
+Coordinates are a synthetic local grid for Yorkville. Only distances between points are
 meaningful — they do not correspond to anywhere real. All timestamps are naive local
 time in a single fixed zone with no daylight saving, so no clock arithmetic anywhere can
 produce a gap or a repeat.
@@ -30,7 +30,7 @@ produce a gap or a repeat.
 | `town.businesses` | 620 |
 | `town.employment` | 13,992 |
 | `town.badges` | 2,900 |
-| `town.building_access_events` | 85,501 |
+| `town.building_access_events` | 85,497 |
 | `town.property_records` | 4,900 |
 | `town.council_decisions` | 340 |
 | `town.firearm_licences` | 1,180 |
@@ -48,7 +48,7 @@ produce a gap or a repeat.
 
 ### `town.citizens` — 12,400 rows
 
-The residents of Ashmont as the civic register holds them.
+The residents of Yorkville as the civic register holds them.
 
 | Column | Type | Description |
 |---|---|---|
@@ -72,7 +72,7 @@ The residents of Ashmont as the civic register holds them.
 
 ### `town.addresses` — 4,900 rows
 
-Every postal address in Ashmont. Each street has an anchor point on the town grid and its addresses run along it, so neighbours really are neighbours and share a cell site.
+Every postal address in Yorkville. Each street has an anchor point on the town grid and its addresses run along it, so neighbours really are neighbours and share a cell site.
 
 | Column | Type | Description |
 |---|---|---|
@@ -88,7 +88,7 @@ Every postal address in Ashmont. Each street has an anchor point on the town gri
 
 ### `town.cell_towers` — 58 rows
 
-The 58 mobile cell sites covering Ashmont, laid out on the town's local coordinate grid. Coordinates are a synthetic local grid, not a real-world location; only distances between points are meaningful.
+The 58 mobile cell sites covering Yorkville, laid out on the town's local coordinate grid. Coordinates are a synthetic local grid, not a real-world location; only distances between points are meaningful.
 
 | Column | Type | Description |
 |---|---|---|
@@ -100,7 +100,7 @@ The 58 mobile cell sites covering Ashmont, laid out on the town's local coordina
 
 ### `town.cameras` — 24 rows
 
-Ashmont's automatic number plate cameras. Six of them cover the approaches to Foundry Square; the rest sit on through routes and the town boundary.
+Yorkville's automatic number plate cameras. Six of them cover the approaches to Wychwood Square; the rest sit on through routes and the town boundary.
 
 | Column | Type | Description |
 |---|---|---|
@@ -112,7 +112,7 @@ Ashmont's automatic number plate cameras. Six of them cover the approaches to Fo
 
 ### `town.building_readers` — 42 rows
 
-Badge readers in Ashmont's twelve managed commercial buildings. Every door with a reader on it appears here, including the ones tenants rarely use.
+Badge readers in Yorkville's twelve managed commercial buildings. Every door with a reader on it appears here, including the ones tenants rarely use.
 
 | Column | Type | Description |
 |---|---|---|
@@ -124,7 +124,7 @@ Badge readers in Ashmont's twelve managed commercial buildings. Every door with 
 
 ### `town.vehicles` — 7,600 rows
 
-Vehicles taxed to an Ashmont address. Registration marks are three letters, a dash and three digits. Ashmont's letter series were issued in blocks over the years, so the leading letter clusters rather than spreading evenly.
+Vehicles taxed to an Yorkville address. Registration marks are three letters, a dash and three digits. Yorkville's letter series were issued in blocks over the years, so the leading letter clusters rather than spreading evenly.
 
 | Column | Type | Description |
 |---|---|---|
@@ -153,7 +153,7 @@ Live motor policies. A policy may name an additional driver, which is how a vehi
 
 ### `town.plate_reads` — 299,010 rows
 
-Automatic number plate reads from Ashmont's 24 cameras. A vehicle is read only when it passes a camera, so an absence means either that the vehicle was parked or that it was on roads no camera covers.
+Automatic number plate reads from Yorkville's 24 cameras. A vehicle is read only when it passes a camera, so an absence means either that the vehicle was parked or that it was on roads no camera covers.
 
 | Column | Type | Description |
 |---|---|---|
@@ -180,7 +180,7 @@ Parking notices issued by the town wardens. The warden records the plate, not th
 
 ### `town.devices` — 14,200 rows
 
-Handsets active on the Ashmont networks. Prepaid handsets are sold over the counter and carry no subscriber record, so their citizen_id is null; around fourteen hundred residents use one as their only phone.
+Handsets active on the Yorkville networks. Prepaid handsets are sold over the counter and carry no subscriber record, so their citizen_id is null; around fourteen hundred residents use one as their only phone.
 
 | Column | Type | Description |
 |---|---|---|
@@ -192,7 +192,7 @@ Handsets active on the Ashmont networks. Prepaid handsets are sold over the coun
 
 ### `town.device_pings` — 4,902,081 rows
 
-Tower registrations for every handset on the Ashmont networks. A handset re-registers roughly every two hours while it is being carried; the six hours around the rally are kept at fifteen-minute resolution for every handset on the network, as operators do for any public event.
+Tower registrations for every handset on the Yorkville networks. A handset re-registers roughly every two hours while it is being carried; the six hours around the rally are kept at fifteen-minute resolution for every handset on the network, as operators do for any public event.
 
 | Column | Type | Description |
 |---|---|---|
@@ -202,7 +202,7 @@ Tower registrations for every handset on the Ashmont networks. A handset re-regi
 
 ### `town.call_records` — 602,625 rows
 
-Ninety days of connected and attempted calls on the Ashmont networks. A duration of zero means the call was not answered. cell_id is the site the calling handset was registered on when the call began.
+Ninety days of connected and attempted calls on the Yorkville networks. A duration of zero means the call was not answered. cell_id is the site the calling handset was registered on when the call began.
 
 | Column | Type | Description |
 |---|---|---|
@@ -218,7 +218,7 @@ Ninety days of connected and attempted calls on the Ashmont networks. A duration
 
 ### `town.bank_accounts` — 13,594 rows
 
-Current accounts held at Ashmont's banks, whether by a resident or a company.
+Current accounts held at Yorkville's banks, whether by a resident or a company.
 
 | Column | Type | Description |
 |---|---|---|
@@ -230,7 +230,7 @@ Current accounts held at Ashmont's banks, whether by a resident or a company.
 
 ### `town.merchants` — 740 rows
 
-Card terminals registered in Ashmont, one per trading premises.
+Card terminals registered in Yorkville, one per trading premises.
 
 | Column | Type | Description |
 |---|---|---|
@@ -257,7 +257,7 @@ Ninety days of account entries: card payments, cash machine use, standing paymen
 
 ### `town.businesses` — 620 rows
 
-Companies registered in Ashmont: employers, fleet operators, trade contractors and a handful of holding companies that own property rather than trade.
+Companies registered in Yorkville: employers, fleet operators, trade contractors and a handful of holding companies that own property rather than trade.
 
 | Column | Type | Description |
 |---|---|---|
@@ -271,7 +271,7 @@ Companies registered in Ashmont: employers, fleet operators, trade contractors a
 
 ### `town.employment` — 13,992 rows
 
-Job spells recorded against Ashmont companies. A spell with a null end date is still running.
+Job spells recorded against Yorkville companies. A spell with a null end date is still running.
 
 | Column | Type | Description |
 |---|---|---|
@@ -294,7 +294,7 @@ Access badges issued for the managed buildings. A badge is issued by whichever c
 | `building` | varchar | Building the badge opens |
 | `status` | varchar | active, expired or withdrawn |
 
-### `town.building_access_events` — 85,501 rows
+### `town.building_access_events` — 85,497 rows
 
 Badge presentations at the managed buildings. A refused presentation is still recorded, so an expired or withdrawn badge leaves a trail too.
 
@@ -308,7 +308,7 @@ Badge presentations at the managed buildings. A refused presentation is still re
 
 ### `town.property_records` — 4,900 rows
 
-The land register: every parcel in Ashmont, who holds it and how it is zoned. The Foundry Quay parcels are the town's last large undeveloped riverside site.
+The land register: every parcel in Yorkville, who holds it and how it is zoned. The Nordheimer Vale parcels are the town's last large undeveloped tract, a shelf of ravine land above the old brickyards.
 
 | Column | Type | Description |
 |---|---|---|
@@ -322,7 +322,7 @@ The land register: every parcel in Ashmont, who holds it and how it is zoned. Th
 
 ### `town.council_decisions` — 340 rows
 
-Motions put to Ashmont town council and how they went. Where a vote is tied the chair casts the deciding vote, and the minutes record who that was.
+Motions put to Yorkville town council and how they went. Where a vote is tied the chair casts the deciding vote, and the minutes record who that was.
 
 | Column | Type | Description |
 |---|---|---|
@@ -339,7 +339,7 @@ Motions put to Ashmont town council and how they went. Where a vote is tied the 
 
 ### `town.firearm_licences` — 1,180 rows
 
-Firearm certificates on the Ashmont register. Ashmont is a hunting town, so rifle certificates outnumber everything else and holding one says very little about a person.
+Firearm certificates on the Yorkville register. Yorkville is a hunting town, so rifle certificates outnumber everything else and holding one says very little about a person.
 
 | Column | Type | Description |
 |---|---|---|
@@ -353,7 +353,7 @@ Firearm certificates on the Ashmont register. Ashmont is a hunting town, so rifl
 
 ### `town.range_visits` — 24,680 rows
 
-Lane bookings at Ashmont's three shooting ranges over the last three years. Only the Marlpit ranges have butts beyond 300 metres.
+Lane bookings at Yorkville's three shooting ranges over the last three years. Only the Bracondale ranges have butts beyond 300 metres.
 
 | Column | Type | Description |
 |---|---|---|
@@ -369,7 +369,7 @@ Lane bookings at Ashmont's three shooting ranges over the last three years. Only
 
 ### `town.travel_records` — 10,843 rows
 
-Departures and arrivals recorded against Ashmont residents at the regional terminals. Journeys by road within the region are not recorded here.
+Departures and arrivals recorded against Yorkville residents at the regional terminals. Journeys by road within the region are not recorded here.
 
 | Column | Type | Description |
 |---|---|---|
@@ -383,7 +383,7 @@ Departures and arrivals recorded against Ashmont residents at the regional termi
 
 ### `town.hotel_stays` — 6,035 rows
 
-Hotel bookings made by Ashmont residents, in the town and in the towns around it. The booking is recorded against whoever paid for the room.
+Hotel bookings made by Yorkville residents, in the town and in the towns around it. The booking is recorded against whoever paid for the room.
 
 | Column | Type | Description |
 |---|---|---|
@@ -399,7 +399,7 @@ Hotel bookings made by Ashmont residents, in the town and in the towns around it
 
 ### `town.clinic_visits` — 27,113 rows
 
-Attendances at Ashmont General and the two branch surgeries over the last year. An admission with no discharge date was still open when the extract was taken.
+Attendances at Yorkville General and the two branch surgeries over the last year. An admission with no discharge date was still open when the extract was taken.
 
 | Column | Type | Description |
 |---|---|---|
@@ -413,7 +413,7 @@ Attendances at Ashmont General and the two branch surgeries over the last year. 
 
 ### `town.library_loans` — 27,026 rows
 
-Loans from Ashmont's public library over the last year, including the ones still out.
+Loans from Yorkville's public library over the last year, including the ones still out.
 
 | Column | Type | Description |
 |---|---|---|
@@ -426,7 +426,7 @@ Loans from Ashmont's public library over the last year, including the ones still
 
 ### `town.gym_checkins` — 163,850 rows
 
-Turnstile records from Ashmont's three fitness centres. High volume and, so far as the case goes, entirely beside the point.
+Turnstile records from Yorkville's three fitness centres. High volume and, so far as the case goes, entirely beside the point.
 
 | Column | Type | Description |
 |---|---|---|

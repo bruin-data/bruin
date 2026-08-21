@@ -1,7 +1,7 @@
 /* @bruin
 name: town.library_loans
 description: |
-  Loans from Ashmont's public library over the last year, including the ones
+  Loans from Yorkville's public library over the last year, including the ones
   still out.
 materialization:
   type: table
@@ -68,16 +68,16 @@ SELECT
     'LN-' || lpad(row_number() OVER (ORDER BY borrowed_on, citizen_id, title_idx, loan)::VARCHAR, 6, '0') AS loan_id,
     citizen_id,
     list_extract([
-        'The Weirs in Winter', 'Ashmont: A Short History', 'Kitchen Garden Almanac',
-        'Bridge Endings', 'The Longshaw Road Murders', 'Ironwork of the Old Foundries',
+        'The Ravine in Winter', 'Yorkville: A Short History', 'Kitchen Garden Almanac',
+        'Bridge Endings', 'The Davenport Road Murders', 'Ironwork of the Old Brickyards',
         'Rivers and Their Making', 'Small Boat Handling', 'Bread, Daily',
-        'Birds of the Marlpit', 'The Cabinetmaker''s Notebook', 'Winter Pruning',
+        'Birds of the Ravine', 'The Cabinetmaker''s Notebook', 'Winter Pruning',
         'Interior Ballistics: An Introduction', 'Rifle Marksmanship and the Long Shot',
         'Exterior Ballistics for Sporting Rifles', 'Reloading by the Book',
-        'Watercolour Without Fear', 'The Draper Street Letters', 'Coastal Walks',
+        'Watercolour Without Fear', 'The Walmer Road Letters', 'Coastal Walks',
         'Beekeeping Year One', 'A Field Guide to Fungi', 'Chess for the Impatient',
-        'The Tanner Green Papers', 'Repairing Old Clocks', 'Preserving and Pickling',
-        'Steam on the Northern Line', 'The Quarry Rise Poems', 'Knots and Splices'
+        'The Seaton Green Papers', 'Repairing Old Clocks', 'Preserving and Pickling',
+        'Steam on the Northern Line', 'The Nordheimer Poems', 'Knots and Splices'
     ], title_idx + 1)                                                       AS title,
     CASE
         WHEN title_idx BETWEEN 12 AND 15 THEN 'field sports'

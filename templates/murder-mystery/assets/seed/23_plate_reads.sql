@@ -1,7 +1,7 @@
 /* @bruin
 name: town.plate_reads
 description: |
-  Automatic number plate reads from Ashmont's 24 cameras. A vehicle is read only
+  Automatic number plate reads from Yorkville's 24 cameras. A vehicle is read only
   when it passes a camera, so an absence means either that the vehicle was parked
   or that it was on roads no camera covers.
 materialization:

@@ -1,7 +1,7 @@
 /* @bruin
 name: notebook.rally_window_plate_reads
 description: |
-  Every camera read on an approach to Foundry Square while the rally was breaking
+  Every camera read on an approach to Wychwood Square while the rally was breaking
   up, with the vehicle's description attached.
 
   This asset is here as a worked example of the one habit that makes this case
@@ -11,7 +11,7 @@ description: |
 
   Try it:
     bruin run assets/notebook/rally_window_plate_reads.sql
-    bruin query -c duckdb-default -q "SELECT * FROM notebook.rally_window_plate_reads LIMIT 20"
+    bruin query -c duckdb-yorkville -q "SELECT * FROM notebook.rally_window_plate_reads LIMIT 20"
 materialization:
   type: table
 depends:

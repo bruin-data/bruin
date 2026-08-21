@@ -681,54 +681,51 @@ func TestInitMurderMysteryCopiesTemplate(t *testing.T) {
 	out, err := gitInit.CombinedOutput()
 	require.NoError(t, err, string(out))
 
-	err = Init().Run(t.Context(), []string{"init", "murder-mystery", "ashmont-case"})
+	err = Init().Run(t.Context(), []string{"init", "murder-mystery", "yorkville-case"})
 	require.NoError(t, err)
 
-	pipelineRoot := filepath.Join(targetRoot, "ashmont-case")
+	pipelineRoot := filepath.Join(targetRoot, "yorkville-case")
 	require.FileExists(t, filepath.Join(targetRoot, ".bruin.yml"))
 	require.FileExists(t, filepath.Join(pipelineRoot, "pipeline.yml"))
 
-	// The player-facing documents are the game: the briefing, the schema and the
-	// rules that stop an assistant from solving it for them.
-	for _, doc := range []string{"README.md", "CASE_FILE.md", "DATA_DICTIONARY.md", "AGENTS.md"} {
+	for _, doc := range []string{"README.md", "CASE_FILE.md", "DATA_DICTIONARY.md", "AGENTS.md", "PLAY_WITH_AN_AGENT.md"} {
 		require.FileExists(t, filepath.Join(pipelineRoot, doc), doc)
 	}
 
-	// The generated database goes next to the project, so it has to be ignored.
 	// .gitignore needs its own embed directive; the top-level `*` skips dotfiles.
 	gitignore, err := os.ReadFile(filepath.Join(pipelineRoot, ".gitignore"))
 	require.NoError(t, err)
-	require.Contains(t, string(gitignore), "ashmont.db")
+	require.Contains(t, string(gitignore), "yorkville.db")
 
-	// Macros are loaded from the pipeline root by path, so a missing one turns
-	// every asset into a Jinja error rather than a bad row.
+	// Macros load from the pipeline root by path; a missing one breaks every asset.
 	for _, macro := range []string{"rng.sql", "pools.sql", "calendar.sql", "places.sql", "format.sql"} {
 		require.FileExists(t, filepath.Join(pipelineRoot, "macros", macro), macro)
 	}
 
-	// The teardown asset must ship, or the played database keeps the scaffolding
-	// that says who did it.
+	// Without the teardown, the played database keeps the answer in _gen.
 	require.FileExists(t, filepath.Join(pipelineRoot, "assets", "seed", "99_cleanup.sql"))
 	require.FileExists(t, filepath.Join(pipelineRoot, "assets", "notebook", "rally_window_plate_reads.sql"))
 
 	seeds, err := os.ReadDir(filepath.Join(pipelineRoot, "assets", "seed"))
 	require.NoError(t, err)
 	require.Greater(t, len(seeds), 40, "the seed pipeline should be the whole town")
+
+	// Nine other templates ship duckdb-default, and init merges into one config per
+	// repository, so sharing the name would send the town into their database.
+	config, err := os.ReadFile(filepath.Join(targetRoot, ".bruin.yml"))
+	require.NoError(t, err)
+	require.Contains(t, string(config), "name: duckdb-yorkville")
+	require.Contains(t, string(config), "path: yorkville.db")
+	require.NotContains(t, string(config), "duckdb-default")
 }
 
 func TestMurderMysteryTemplateKeepsTheCaseOutOfItsOwnSource(t *testing.T) {
 	t.Parallel()
 
-	// The case has no answer-checking asset, so the only thing protecting it is
-	// that the generator never writes down who it picked. Roles are assigned by
-	// ranking a broad pool, never by naming anybody, and the words below would
-	// each be a sign that something started naming things instead.
-	//
-	// This deliberately does not check for the four culprits' names: they cannot
-	// be known without running the generator, and each of them is one entry in a
-	// pool of 64 given names or 168 surnames, so the tokens legitimately appear
-	// there. What must never appear is a citizen id or a full name, and neither
-	// can arise from a file that contains no name literals at all.
+	// The case is only protected by the generator never writing down who it picked.
+	// Culprit names cannot be checked for directly — they are unknowable without
+	// running the generator, and each is one entry in a pool of 64 or 168. What must
+	// never appear is a citizen id or a full name.
 	forbidden := regexp.MustCompile(`(?i)\b(culprit|guilty|hitman|spoiler|murderer|answer[ _-]?key|solution)\b`)
 	citizenID := regexp.MustCompile(`\bC\d{5}\b`)
 
@@ -774,9 +771,8 @@ func TestMurderMysteryTemplateKeepsTheCaseOutOfItsOwnSource(t *testing.T) {
 func TestMurderMysteryTemplateDropsItsScaffolding(t *testing.T) {
 	t.Parallel()
 
-	// _gen holds the role assignment. If the teardown ever stops being its own
-	// tagged asset, either the played database keeps the answer in it, or the QA
-	// pipeline loses the only sanctioned way to read it.
+	// If the teardown stops being its own tagged asset, either the played database
+	// keeps the answer or the QA pipeline loses its only way to read it.
 	body, err := templates.Templates.ReadFile("murder-mystery/assets/seed/99_cleanup.sql")
 	require.NoError(t, err)
 	text := string(body)

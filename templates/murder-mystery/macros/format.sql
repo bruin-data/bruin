@@ -1,7 +1,7 @@
 {#
   Identifier formats used across the town.
 
-  Ashmont's own conventions, none of them borrowed from a real numbering plan.
+  Yorkville's own conventions, none of them borrowed from a real numbering plan.
 #}
 
 {#

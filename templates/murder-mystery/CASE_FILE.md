@@ -1,14 +1,14 @@
-# Ashmont Police — Case File 26/0514
+# Yorkville Police — Case File 26/0514
 
 **Status:** open, no arrest
-**Reporting officer:** Senior Investigating Officer, Ashmont Division
+**Reporting officer:** Senior Investigating Officer, Yorkville Division
 
 ---
 
 ## The offence
 
-At **18:47 on Thursday 14 May 2026**, **Adrien Volk**, mayor of Ashmont, was shot once
-and killed while speaking at a re-election rally in **Foundry Square**.
+At **18:47 on Thursday 14 May 2026**, **Adrien Volk**, mayor of Yorkville, was shot once
+and killed while speaking at a re-election rally in **Wychwood Square**.
 
 Roughly **800 people** were present. A single rifle round was fired from an elevated
 position on the **north side of the square**. Nobody in the crowd saw the shooter.
@@ -17,7 +17,7 @@ position on the **north side of the square**. Nobody in the crowd saw the shoote
 
 - One shot. No second impact anywhere on the platform or the hoardings behind it.
 - The victim was struck in the upper left chest and was pronounced dead at the scene.
-- The **Corvid Building** stands on the north side of the square. Its roof was
+- The **Loma House** stands on the north side of the square. Its roof was
   identified as the likely firing point on 16 May and examined on 17 May.
 - The roof access door was not forced. Its alarm had been out of order since February.
 - No weapon, no cartridge case and no fingerprints were recovered.
@@ -45,8 +45,8 @@ tell you what kind of person fired the shot and what kind of vehicle waited for 
 Neither will tell you a name; that is what the rest of the data is for.
 
 ```bash
-bruin query -c duckdb-default -q "SELECT witness_ref, location, statement FROM casefile.witness_statements"
-bruin query -c duckdb-default -q "SELECT discipline, finding FROM casefile.forensic_findings"
+bruin query -c duckdb-yorkville -q "SELECT witness_ref, location, statement FROM casefile.witness_statements"
+bruin query -c duckdb-yorkville -q "SELECT discipline, finding FROM casefile.forensic_findings"
 ```
 
 ## What counts as solving it

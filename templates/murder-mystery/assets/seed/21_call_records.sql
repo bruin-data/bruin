@@ -1,7 +1,7 @@
 /* @bruin
 name: town.call_records
 description: |
-  Ninety days of connected and attempted calls on the Ashmont networks. A
+  Ninety days of connected and attempted calls on the Yorkville networks. A
   duration of zero means the call was not answered. cell_id is the site the
   calling handset was registered on when the call began.
 materialization:

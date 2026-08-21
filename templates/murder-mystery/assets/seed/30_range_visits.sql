@@ -1,8 +1,8 @@
 /* @bruin
 name: town.range_visits
 description: |
-  Lane bookings at Ashmont's three shooting ranges over the last three years.
-  Only the Marlpit ranges have butts beyond 300 metres.
+  Lane bookings at Yorkville's three shooting ranges over the last three years.
+  Only the Bracondale ranges have butts beyond 300 metres.
 materialization:
   type: table
 depends:
@@ -154,8 +154,8 @@ SELECT
     'RV-' || lpad(row_number() OVER (ORDER BY citizen_id, visit_date, k)::VARCHAR, 6, '0') AS visit_id,
     citizen_id,
     CASE
-        WHEN lane_distance_m >= 600 THEN 'RNG-MARLPIT'
-        ELSE {{ weighted('seq * 1000 + k', 3240, [['RNG-MARLPIT', 44], ['RNG-WEIRS', 76], ['RNG-NORTHGATE', 100]]) }}
+        WHEN lane_distance_m >= 600 THEN 'RNG-BRACONDALE'
+        ELSE {{ weighted('seq * 1000 + k', 3240, [['RNG-BRACONDALE', 44], ['RNG-HILLCREST', 76], ['RNG-DAVENPORT', 100]]) }}
     END                                                              AS range_id,
     (visit_date + INTERVAL ({{ rnd_int('seq * 1000 + k', 3241, 8, 19) }}) HOUR
                 + INTERVAL ({{ rnd_int('seq * 1000 + k', 3242, 0, 59) }}) MINUTE)::TIMESTAMP AS check_in,

@@ -34,7 +34,7 @@ slots AS (
 ),
 kv AS (
     SELECT * FROM (VALUES
-        ('p', 'fixed_cell',        {{ corvid_cell() }}),
+        ('p', 'fixed_cell',        {{ loma_cell() }}),
         ('p', 'activated_date',    '2026-04-08'),
         ('p', 'evening_pattern',   'rooftop'),
         ('p', 'dark',              'true'),

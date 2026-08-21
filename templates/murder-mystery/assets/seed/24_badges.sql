@@ -71,7 +71,7 @@ SELECT
     i.citizen_id,
     i.business_id                                                 AS issued_by_business_id,
     coalesce(
-        CASE WHEN sc.citizen_id IS NOT NULL THEN 'Corvid Building' END,
+        CASE WHEN sc.citizen_id IS NOT NULL THEN 'Loma House' END,
         (SELECT building FROM sites WHERE bn = 1 + floor({{ rnd('i.citizen_id', 6202) }} * (SELECT n FROM site_count))::BIGINT)
     )                                                             AS building,
     CASE WHEN sc.citizen_id IS NOT NULL THEN 'active'

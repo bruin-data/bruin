@@ -36,7 +36,7 @@ FROM (VALUES
     ( 4, DATE '2026-05-16', 'trajectory',   'Entry and exit geometry place the firing point above and to the north, at an elevation of between eighteen and twenty-two metres.'),
     ( 5, DATE '2026-05-16', 'trajectory',   'Range from the firing point to the platform is a little over two hundred and ten metres.'),
     ( 6, DATE '2026-05-17', 'trajectory',   'Shot placement at this range and elevation, unsupported, is beyond a casual shooter. The examiner notes it as competent rather than exceptional.'),
-    ( 7, DATE '2026-05-17', 'scene',        'The Corvid Building roof parapet shows fresh disturbance to the gravel over a span of about one metre.'),
+    ( 7, DATE '2026-05-17', 'scene',        'The Loma House roof parapet shows fresh disturbance to the gravel over a span of about one metre.'),
     ( 8, DATE '2026-05-17', 'scene',        'A single boot impression in the gravel, partial but measurable. Continental size 46. Tread is a common industrial pattern.'),
     ( 9, DATE '2026-05-17', 'scene',        'Standing height at the parapet consistent with the impression and the sight line puts the shooter between 186 and 194 centimetres.'),
     (10, DATE '2026-05-18', 'scene',        'Two fibres recovered from the parapet edge. Dark navy, heavy cotton drill, consistent with workwear. No manufacturer identifiable.'),

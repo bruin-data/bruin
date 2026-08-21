@@ -1,7 +1,7 @@
 /* @bruin
 name: town.gym_checkins
 description: |
-  Turnstile records from Ashmont's three fitness centres. High volume and, so far
+  Turnstile records from Yorkville's three fitness centres. High volume and, so far
   as the case goes, entirely beside the point.
 materialization:
   type: table
@@ -49,7 +49,7 @@ spine AS (
 SELECT
     'GY-' || lpad(row_number() OVER (ORDER BY day, citizen_id, visit)::VARCHAR, 7, '0') AS checkin_id,
     citizen_id,
-    {{ weighted('seq * 1000 + day * 10 + visit', 7120, [['GY-FOUNDRY', 44], ['GY-NORTHGATE', 75], ['GY-WEIRS', 100]]) }} AS site_id,
+    {{ weighted('seq * 1000 + day * 10 + visit', 7120, [['GY-WYCHWOOD', 44], ['GY-DAVENPORT', 75], ['GY-HILLCREST', 100]]) }} AS site_id,
     ({{ ledger_start() }} + INTERVAL (day) DAY
         + INTERVAL ({{ rnd_int('seq * 1000 + day * 10 + visit', 7121, 6, 21) }}) HOUR
         + INTERVAL ({{ rnd_int('seq * 1000 + day * 10 + visit', 7122, 0, 59) }}) MINUTE)::TIMESTAMP AS ts,

@@ -1,7 +1,7 @@
 /* @bruin
 name: town.device_pings
 description: |
-  Tower registrations for every handset on the Ashmont networks. A handset
+  Tower registrations for every handset on the Yorkville networks. A handset
   re-registers roughly every two hours while it is being carried; the six hours
   around the rally are kept at fifteen-minute resolution for every handset on the
   network, as operators do for any public event.

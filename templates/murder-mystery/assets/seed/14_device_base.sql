@@ -1,7 +1,7 @@
 /* @bruin
 name: _gen.device_base
 description: |
-  Generation scaffolding. Every handset on the Ashmont networks with its ordinary
+  Generation scaffolding. Every handset on the Yorkville networks with its ordinary
   movement profile, before the scene overrides are applied. Dropped with the rest
   of this schema at the end of the run.
 materialization:
@@ -53,7 +53,7 @@ registered AS (
     FROM extras
 ),
 -- prepaid handsets are sold over the counter and carry no subscriber record;
--- around fourteen hundred people in Ashmont use one as their only phone
+-- around fourteen hundred people in Yorkville use one as their only phone
 prepaid AS (
     SELECT
         12400 + k                           AS n,
@@ -70,7 +70,7 @@ all_devices AS (
 ),
 -- Couples who keep two addresses alternate between them, and both handsets move
 -- together: on any given night they are either both at one address or both at
--- the other. Around a hundred and twenty pairs in Ashmont live this way.
+-- the other. Around a hundred and twenty pairs in Yorkville live this way.
 pairing AS (
     SELECT
         r.n,
