@@ -99,6 +99,7 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) (string, error) {
 	queries := []string{
 		"BEGIN TRANSACTION",
 		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, strings.TrimSuffix(query, ";")),
+		ansisql.BuildCreateTableIfNotExistsAsQuery(task.Name, "", "SELECT * FROM "+tempTableName),
 		fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", task.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", task.Name, tempTableName),
 		"DROP TABLE IF EXISTS " + tempTableName,
@@ -136,6 +137,7 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 		queries := []string{
 			"BEGIN TRANSACTION",
 			fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, query),
+			ansisql.BuildCreateTableIfNotExistsAsQuery(asset.Name, "", "SELECT * FROM "+tempTableName),
 			fmt.Sprintf("INSERT INTO %s (%s) SELECT %s FROM %s AS source WHERE NOT EXISTS (SELECT 1 FROM %s AS target WHERE %s)",
 				asset.Name, allColumnNames, allColumnNames, tempTableName, asset.Name, onCondition),
 			"DROP TABLE " + tempTableName,
@@ -158,6 +160,7 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 	queries := []string{
 		"BEGIN TRANSACTION",
 		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, query),
+		ansisql.BuildCreateTableIfNotExistsAsQuery(asset.Name, "", "SELECT * FROM "+tempTableName),
 		fmt.Sprintf("UPDATE %s AS target SET %s FROM %s AS source WHERE %s",
 			asset.Name, updateClause, tempTableName, onCondition),
 		fmt.Sprintf("INSERT INTO %s (%s) SELECT %s FROM %s AS source WHERE NOT EXISTS (SELECT 1 FROM %s AS target WHERE %s)",
@@ -216,6 +219,7 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 
 	queries := []string{
 		"BEGIN TRANSACTION",
+		ansisql.BuildCreateTableIfNotExistsAsQuery(asset.Name, "", query),
 		fmt.Sprintf(`DELETE FROM %s WHERE %s BETWEEN '%s' AND '%s'`,
 			asset.Name,
 			asset.Materialization.IncrementalKey,

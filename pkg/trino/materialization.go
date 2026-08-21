@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
@@ -69,6 +70,7 @@ func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) 
 
 	return fmt.Sprintf(
 		`
+%s;
 DELETE FROM %s 
 WHERE %s IN (
     SELECT DISTINCT %s 
@@ -77,6 +79,7 @@ WHERE %s IN (
 
 INSERT INTO %s
 SELECT * FROM (%s) AS new_data;`,
+		buildCreateTableIfNotExistsQuery(asset, query),
 		quoteIdentifier(asset.Name),
 		key,
 		key,
@@ -102,19 +105,8 @@ func buildTruncateInsertQuery(asset *pipeline.Asset, query string) (string, erro
 }
 
 func buildCreateReplaceQuery(asset *pipeline.Asset, query string) (string, error) {
-	mat := asset.Materialization
 	query = strings.TrimSuffix(query, ";")
-
-	withClauses := []string{"format = 'PARQUET'"}
-
-	if mat.PartitionBy != "" {
-		withClauses = append(withClauses, fmt.Sprintf("partitioning = ARRAY['%s']", mat.PartitionBy))
-	}
-
-	withClause := ""
-	if len(withClauses) > 0 {
-		withClause = fmt.Sprintf("WITH (%s)", strings.Join(withClauses, ", "))
-	}
+	withClause := buildTableOptions(asset.Materialization)
 
 	return fmt.Sprintf(
 		`
@@ -126,6 +118,23 @@ CREATE TABLE %s %s AS
 		withClause,
 		query,
 	), nil
+}
+
+func buildTableOptions(mat pipeline.Materialization) string {
+	withClauses := []string{"format = 'PARQUET'"}
+	if mat.PartitionBy != "" {
+		withClauses = append(withClauses, fmt.Sprintf("partitioning = ARRAY['%s']", mat.PartitionBy))
+	}
+
+	return fmt.Sprintf("WITH (%s)", strings.Join(withClauses, ", "))
+}
+
+func buildCreateTableIfNotExistsQuery(asset *pipeline.Asset, query string) string {
+	return ansisql.BuildCreateTableIfNotExistsAsQuery(
+		quoteIdentifier(asset.Name),
+		buildTableOptions(asset.Materialization),
+		query,
+	)
 }
 
 func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error) {
@@ -154,11 +163,13 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 
 	return fmt.Sprintf(
 		`
+%s;
 DELETE FROM %s 
 WHERE %s BETWEEN %s '%s' AND %s '%s';
 
 INSERT INTO %s
 %s;`,
+		buildCreateTableIfNotExistsQuery(asset, query),
 		quoteIdentifier(asset.Name),
 		key,
 		timePrefix,

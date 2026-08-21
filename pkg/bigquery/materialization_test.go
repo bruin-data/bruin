@@ -796,6 +796,17 @@ COMMIT TRANSACTION;`,
 			} else {
 				require.NoError(t, err)
 			}
+			strategy := tt.task.Materialization.Strategy
+			bootstrapStrategy := strategy == pipeline.MaterializationStrategyDeleteInsert ||
+				strategy == pipeline.MaterializationStrategyMerge ||
+				strategy == pipeline.MaterializationStrategyTimeInterval
+			if !tt.wantErr && !tt.fullRefresh && bootstrapStrategy {
+				bootstrap, bootstrapErr := buildCreateTableIfNotExistsQuery(tt.task, tt.query)
+				require.NoError(t, bootstrapErr)
+				bootstrap += ";\n"
+				assert.Contains(t, render, bootstrap)
+				render = strings.Replace(render, bootstrap, "", 1)
+			}
 
 			if tt.exactMatch {
 				assert.Equal(t, tt.want, render)
@@ -804,6 +815,35 @@ COMMIT TRANSACTION;`,
 			}
 		})
 	}
+}
+
+func TestBuildCreateTableIfNotExistsQueryIncludesBigQueryOptions(t *testing.T) {
+	t.Parallel()
+
+	asset := &pipeline.Asset{
+		Name: "analytics.events",
+		Columns: []pipeline.Column{
+			{Name: "account_id", Type: "INT64"},
+			{Name: "event_date", Type: "DATE", PrimaryKey: true},
+		},
+		Materialization: pipeline.Materialization{
+			Type:        pipeline.MaterializationTypeTable,
+			Strategy:    pipeline.MaterializationStrategyMerge,
+			PartitionBy: "event_date",
+			ClusterBy:   []string{"account_id"},
+		},
+		BigQuery: pipeline.BigQueryConfig{
+			RequirePartitionFilter:  boolp(true),
+			PartitionExpirationDays: floatp(7.5),
+		},
+	}
+
+	query, err := buildCreateTableIfNotExistsQuery(asset, "SELECT account_id, event_date FROM staging.events;")
+	require.NoError(t, err)
+	assert.Equal(t, `CREATE TABLE IF NOT EXISTS analytics.events PARTITION BY event_date CLUSTER BY account_id OPTIONS (require_partition_filter = TRUE, partition_expiration_days = 7.5) AS
+SELECT * FROM (
+SELECT account_id, event_date FROM staging.events
+) AS __bruin_bootstrap WHERE 1 = 0`, query)
 }
 
 func TestMergeRequiredPartitionFilterGeneratedSQL(t *testing.T) {
@@ -836,6 +876,15 @@ WHERE event_date >= DATE '2026-07-01';`
 	}
 
 	expectedFullSQL := `DECLARE bruin_merge_partitions_abcefghi ARRAY<DATE>;
+CREATE TABLE IF NOT EXISTS analytics.events PARTITION BY event_date OPTIONS (require_partition_filter = TRUE) AS
+SELECT * FROM (
+SELECT
+  id,
+  event_date,
+  payload
+FROM staging.events
+WHERE event_date >= DATE '2026-07-01'
+) AS __bruin_bootstrap WHERE 1 = 0;
 BEGIN TRANSACTION;
 CREATE TEMP TABLE __bruin_merge_source_abcefghi AS SELECT
   id,
@@ -895,6 +944,15 @@ WHERE DATE(created_at) = DATE '2026-07-27';`
 	}
 
 	expectedFullSQL := `DECLARE bruin_merge_partitions_abcefghi ARRAY<DATE>;
+CREATE TABLE IF NOT EXISTS analytics.events_by_day PARTITION BY DATE(created_at) OPTIONS (require_partition_filter = TRUE) AS
+SELECT * FROM (
+SELECT
+  id,
+  created_at,
+  payload
+FROM staging.raw_events
+WHERE DATE(created_at) = DATE '2026-07-27'
+) AS __bruin_bootstrap WHERE 1 = 0;
 BEGIN TRANSACTION;
 CREATE TEMP TABLE __bruin_merge_source_abcefghi AS SELECT
   id,

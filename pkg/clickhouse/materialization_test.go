@@ -1,6 +1,7 @@
 package clickhouse
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -457,8 +458,96 @@ func TestMaterializer_Render(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
+			strategy := tt.task.Materialization.Strategy
+			bootstrapStrategy := strategy == pipeline.MaterializationStrategyDeleteInsert ||
+				strategy == pipeline.MaterializationStrategyMerge ||
+				strategy == pipeline.MaterializationStrategyTimeInterval
+			if !tt.wantErr && !tt.fullRefresh && bootstrapStrategy {
+				withoutBootstrap := make([]string, 0, len(render)-1)
+				for _, statement := range render {
+					if strings.HasPrefix(statement, "CREATE TABLE IF NOT EXISTS ") {
+						assert.Contains(t, statement, tt.task.Name)
+						continue
+					}
+					withoutBootstrap = append(withoutBootstrap, statement)
+				}
+				require.Len(t, withoutBootstrap, len(render)-1)
+				render = withoutBootstrap
+			}
 
 			assert.Equal(t, tt.want, render)
+		})
+	}
+}
+
+func TestIncrementalBootstrapPreservesPartitioning(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		asset *pipeline.Asset
+		query string
+	}{
+		{
+			name: "delete+insert",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategyDeleteInsert,
+					IncrementalKey: "dt",
+					PartitionBy:    "toYYYYMM(dt)",
+				},
+				Columns: []pipeline.Column{{Name: "id", PrimaryKey: true}},
+			},
+			query: "SELECT 1 AS id, toDate('2026-08-05') AS dt",
+		},
+		{
+			name: "merge",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					Strategy:    pipeline.MaterializationStrategyMerge,
+					PartitionBy: "toYYYYMM(dt)",
+				},
+				Columns: []pipeline.Column{{Name: "id", PrimaryKey: true}},
+			},
+			query: "SELECT 1 AS id, toDate('2026-08-05') AS dt",
+		},
+		{
+			name: "time interval",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:            pipeline.MaterializationTypeTable,
+					Strategy:        pipeline.MaterializationStrategyTimeInterval,
+					IncrementalKey:  "dt",
+					TimeGranularity: pipeline.MaterializationTimeGranularityDate,
+					PartitionBy:     "toYYYYMM(dt)",
+				},
+			},
+			query: "SELECT toDate('{{start_date}}') AS dt",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			statements, err := NewMaterializer(false).Render(tt.asset, tt.query)
+			require.NoError(t, err)
+
+			var bootstrap string
+			for _, statement := range statements {
+				if strings.HasPrefix(statement, "CREATE TABLE IF NOT EXISTS ") {
+					bootstrap = statement
+					break
+				}
+			}
+
+			require.NotEmpty(t, bootstrap)
+			assert.Contains(t, bootstrap, " PARTITION BY (toYYYYMM(dt)) AS SELECT")
 		})
 	}
 }
