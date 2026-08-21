@@ -11,6 +11,11 @@ const route = useRoute()
 // Tracks whether the next click should expand or collapse every section.
 const allExpanded = ref(true)
 
+// Identifies the current toggle run. A new click or page navigation bumps this,
+// so any earlier run that is still awaiting a render bails out instead of
+// clobbering the newer state or the label.
+let runId = 0
+
 function collapsibleItems() {
   return Array.from(
     document.querySelectorAll('.VPSidebar .VPSidebarItem.collapsible')
@@ -25,7 +30,7 @@ function afterRender() {
   )
 }
 
-async function setAll(expand) {
+async function setAll(expand, myRun) {
   // Loop until stable: expanding a parent can reveal nested collapsible items,
   // and each pass must wait for the DOM to update before re-reading state.
   for (let pass = 0; pass < 20; pass++) {
@@ -37,17 +42,25 @@ async function setAll(expand) {
       item.querySelector(':scope > .item > .caret')?.click()
     }
     await afterRender()
+    // A newer toggle or a navigation happened while we waited — stop and let it win.
+    if (myRun !== runId) return false
   }
+  return true
 }
 
 async function toggleAll() {
   const expand = !allExpanded.value
-  await setAll(expand)
-  allExpanded.value = expand
+  const myRun = ++runId
+  const completed = await setAll(expand, myRun)
+  if (completed && myRun === runId) {
+    allExpanded.value = expand
+  }
 }
 
-// Reset the label when navigating to a new page (sidebar re-renders).
+// Cancel any in-flight run and reset the label when navigating to a new page
+// (the sidebar re-renders on navigation).
 watch(() => route.path, () => {
+  runId++
   allExpanded.value = true
 })
 </script>
