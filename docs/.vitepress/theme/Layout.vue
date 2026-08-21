@@ -8,12 +8,14 @@ const { Layout } = DefaultTheme
 const { frontmatter } = useData()
 const route = useRoute()
 
-// Tracks whether the next click should expand or collapse every section.
+// The desired state for every section, and the source of truth for the label.
+// It is flipped synchronously on each click so a rapid second click reverses an
+// in-flight operation instead of repeating its direction.
 const allExpanded = ref(true)
 
 // Identifies the current toggle run. A new click or page navigation bumps this,
 // so any earlier run that is still awaiting a render bails out instead of
-// clobbering the newer state or the label.
+// fighting the newer run.
 let runId = 0
 
 function collapsibleItems() {
@@ -49,12 +51,12 @@ async function setAll(expand, myRun) {
 }
 
 async function toggleAll() {
+  // Flip the desired state (and the label) immediately so a click that lands
+  // mid-render reverses the direction rather than reusing the stale one.
   const expand = !allExpanded.value
+  allExpanded.value = expand
   const myRun = ++runId
-  const completed = await setAll(expand, myRun)
-  if (completed && myRun === runId) {
-    allExpanded.value = expand
-  }
+  await setAll(expand, myRun)
 }
 
 // Cancel any in-flight run and reset the label when navigating to a new page
