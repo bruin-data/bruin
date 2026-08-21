@@ -1222,10 +1222,12 @@ func TestLoadOrCreate(t *testing.T) {
 	}
 }
 
+const testRepoConfigPath = "/repo/.bruin.yml"
+
 func TestLoadResolvesReadEmbedCredentialPaths(t *testing.T) {
 	t.Parallel()
 	fs := afero.NewMemMapFs()
-	configPath := "/repo/.bruin.yml"
+	configPath := testRepoConfigPath
 	yml := `default_environment: default
 environments:
   default:
@@ -1262,7 +1264,7 @@ environments:
 func TestDefaultTeamRoundTrip(t *testing.T) {
 	t.Parallel()
 	fs := afero.NewMemMapFs()
-	configPath := "/repo/.bruin.yml"
+	configPath := testRepoConfigPath
 	yml := `default_environment: default
 environments:
   default:
@@ -1294,7 +1296,7 @@ environments:
 func TestUpsertDefaultTeamPreservesSecretsAndComments(t *testing.T) { //nolint:paralleltest // uses t.Setenv
 	t.Setenv("BRUIN_TOKEN", "super-secret")
 	fs := afero.NewMemMapFs()
-	configPath := "/repo/.bruin.yml"
+	configPath := testRepoConfigPath
 	// A ${VAR} placeholder and a comment must survive the write untouched — a
 	// decode/re-marshal round-trip would expand the reference to its literal.
 	yml := `default_environment: default
@@ -1328,7 +1330,7 @@ environments:
 func TestUpsertDefaultTeamCreatesFileWhenMissing(t *testing.T) {
 	t.Parallel()
 	fs := afero.NewMemMapFs()
-	configPath := "/repo/.bruin.yml"
+	configPath := testRepoConfigPath
 
 	require.NoError(t, UpsertDefaultTeam(fs, configPath, "acme-corp"))
 
@@ -1340,7 +1342,7 @@ func TestUpsertDefaultTeamCreatesFileWhenMissing(t *testing.T) {
 func TestLoadDoesNotPrefixAnchoredCredentialPaths(t *testing.T) {
 	t.Parallel()
 	fs := afero.NewMemMapFs()
-	configPath := "/repo/.bruin.yml"
+	configPath := testRepoConfigPath
 	drivePath := `C:\Users\ColtonChilders\Documents\GCS Keys\plated-mesh.json`
 	rootedPath := `\Users\ColtonChilders\Documents\GCS Keys\plated-mesh.json`
 	slashRootedPath := "/Users/ColtonChilders/Documents/GCS Keys/plated-mesh.json"
