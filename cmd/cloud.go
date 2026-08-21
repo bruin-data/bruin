@@ -442,23 +442,16 @@ func cloudConfigUnsetTeam() *cli.Command {
 }
 
 // persistDefaultTeam writes (or clears, when team is empty) cloud.default_team in
-// the CLI config, creating the config file if it doesn't exist yet. It loads
-// straight from the on-disk file — not via LoadOrCreate, which would decode from
-// BRUIN_CONFIG_FILE_CONTENT when set and then persist that back over the
-// repository's .bruin.yml, dropping any environments/connections absent from the
-// env var. Reading the file directly also avoids rewriting credential paths to
-// absolute form on save.
+// the CLI config, creating the config file if it doesn't exist yet. It edits the
+// YAML in place rather than re-serializing a loaded Config: a full round-trip
+// would expand ${VAR} secret references into literals and drop content injected
+// via BRUIN_CONFIG_FILE_CONTENT, either of which would corrupt the on-disk file.
 func persistDefaultTeam(team string) error {
 	configFilePath, err := cloudConfigFilePath()
 	if err != nil {
 		return err
 	}
-	cm, err := config.LoadOrCreateWithoutPathAbsolutization(afero.NewOsFs(), configFilePath)
-	if err != nil {
-		return err
-	}
-	cm.SetDefaultTeam(team)
-	return cm.Persist()
+	return config.UpsertDefaultTeam(afero.NewOsFs(), configFilePath, team)
 }
 
 // warnIfTeamUnreachable prints a non-blocking warning when the current token

@@ -315,26 +315,13 @@ type CloudConfig struct {
 }
 
 // GetDefaultTeam returns the configured default team company_prefix, or an empty
-// string when none is set.
+// string when none is set. Writes go through UpsertDefaultTeam, which edits the
+// config file in place instead of persisting a decoded Config.
 func (c *Config) GetDefaultTeam() string {
 	if c.Cloud == nil {
 		return ""
 	}
 	return c.Cloud.DefaultTeam
-}
-
-// SetDefaultTeam sets the default team company_prefix. Passing an empty string
-// clears the default (dropping the cloud section entirely when it holds nothing
-// else) so it is omitted from the persisted config.
-func (c *Config) SetDefaultTeam(team string) {
-	if team == "" {
-		c.Cloud = nil
-		return
-	}
-	if c.Cloud == nil {
-		c.Cloud = &CloudConfig{}
-	}
-	c.Cloud.DefaultTeam = team
 }
 
 var configEnvVarRegex = regexp.MustCompile(`\${([^}]+)}`)
