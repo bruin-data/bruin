@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -41,6 +42,11 @@ type DependencyConfig struct {
 	ProjectRoot     string // Directory containing the dependency file
 	RequiresPython  string // The requires-python specifier from pyproject.toml (e.g., ">=3.13")
 }
+
+// pythonModulePath matches a dotted path whose every segment is a valid Python identifier.
+// Anything else — a leading dot (".claude/..."), a hyphen or a space in a segment — cannot be
+// imported, so such assets are executed by file path instead of with `--module`.
+var pythonModulePath = regexp.MustCompile(`^[A-Za-z_]\w*(\.[A-Za-z_]\w*)*$`)
 
 type ModulePathFinder struct {
 	PathSeparatorOverride int32

@@ -386,3 +386,21 @@ func TestFindDependencyConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestPythonModulePath(t *testing.T) {
+	t.Parallel()
+
+	for module, want := range map[string]bool{
+		"assets.my_asset":           true,
+		"a1.b2c":                    true,
+		".claude.my-assets.push_ad": false,
+		"assets.my-asset":           false,
+		"assets..my_asset":          false,
+		"assets.1st":                false,
+		"":                          false,
+	} {
+		if got := pythonModulePath.MatchString(module); got != want {
+			t.Errorf("pythonModulePath.MatchString(%q) = %v, want %v", module, got, want)
+		}
+	}
+}
