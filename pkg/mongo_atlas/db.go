@@ -26,28 +26,18 @@ func NewDB(c *Config) (*DB, error) {
 	return &DB{config: c, Name: c.Database}, nil
 }
 
-func NewClient(ctx context.Context, c *Config) (*DB, error) {
-	clientOptions := options.Client().ApplyURI(c.GetIngestrURI())
-
-	client, err := mongo.Connect(ctx, clientOptions)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create MongoDB client")
-	}
-
-	return &DB{
-		client: client,
-		config: c,
-		Name:   c.Database,
-	}, nil
+// NewClient returns a DB without opening a connection. The underlying MongoDB
+// client is created lazily by ensureClient on first actual use, so merely
+// registering the connection never starts driver monitoring or DNS discovery.
+func NewClient(_ context.Context, c *Config) (*DB, error) {
+	return &DB{config: c, Name: c.Database}, nil
 }
 
 func (db *DB) GetIngestrURI() (string, error) {
 	return db.config.GetIngestrURI(), nil
 }
 
-// ensureClient lazily establishes a connection. The connection manager builds
-// Atlas connections via NewClient (eager), but instances created through NewDB
-// connect on first use instead.
+// ensureClient lazily establishes the underlying MongoDB client on first use.
 func (db *DB) ensureClient(ctx context.Context) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
