@@ -274,7 +274,10 @@ type AssetInstanceCheck struct {
 
 // APIError represents an error response from the API.
 type APIError struct {
-	Message    string              `json:"message"`
+	Message string `json:"message"`
+	// Code is the API's machine-readable error identifier (e.g. "team_required",
+	// "team_not_in_scope"), when present, used to render actionable CLI hints.
+	Code       string              `json:"error,omitempty"`
 	Errors     map[string][]string `json:"errors,omitempty"`
 	StatusCode int                 `json:"-"`
 }

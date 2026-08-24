@@ -1222,10 +1222,12 @@ func TestLoadOrCreate(t *testing.T) {
 	}
 }
 
+const testRepoConfigPath = "/repo/.bruin.yml"
+
 func TestLoadResolvesReadEmbedCredentialPaths(t *testing.T) {
 	t.Parallel()
 	fs := afero.NewMemMapFs()
-	configPath := "/repo/.bruin.yml"
+	configPath := testRepoConfigPath
 	yml := `default_environment: default
 environments:
   default:
@@ -1259,10 +1261,88 @@ environments:
 	assert.True(t, filepath.IsAbs(sheets), "sheets path should be absolute: %s", sheets)
 }
 
+func TestDefaultTeamRoundTrip(t *testing.T) {
+	t.Parallel()
+	fs := afero.NewMemMapFs()
+	configPath := testRepoConfigPath
+	yml := `default_environment: default
+environments:
+  default:
+    connections: {}
+`
+	require.NoError(t, afero.WriteFile(fs, configPath, []byte(yml), 0o644))
+
+	cfg, err := LoadOrCreate(fs, configPath)
+	require.NoError(t, err)
+	assert.Empty(t, cfg.GetDefaultTeam())
+
+	// Set it, then reload from disk: the default team survives a round-trip.
+	require.NoError(t, UpsertDefaultTeam(fs, configPath, "acme-corp"))
+	reloaded, err := LoadFromFileOrEnv(fs, configPath)
+	require.NoError(t, err)
+	assert.Equal(t, "acme-corp", reloaded.GetDefaultTeam())
+
+	// Clearing it drops the cloud section so it isn't persisted at all.
+	require.NoError(t, UpsertDefaultTeam(fs, configPath, ""))
+	buf, err := afero.ReadFile(fs, configPath)
+	require.NoError(t, err)
+	assert.NotContains(t, string(buf), "cloud")
+
+	cleared, err := LoadFromFileOrEnv(fs, configPath)
+	require.NoError(t, err)
+	assert.Empty(t, cleared.GetDefaultTeam())
+}
+
+func TestUpsertDefaultTeamPreservesSecretsAndComments(t *testing.T) { //nolint:paralleltest // uses t.Setenv
+	t.Setenv("BRUIN_TOKEN", "super-secret")
+	fs := afero.NewMemMapFs()
+	configPath := testRepoConfigPath
+	// A ${VAR} placeholder and a comment must survive the write untouched — a
+	// decode/re-marshal round-trip would expand the reference to its literal.
+	yml := `default_environment: default
+environments:
+    default:
+        connections:
+            bruin:
+                # cloud token, injected from the environment
+                - name: cloud
+                  api_token: ${BRUIN_TOKEN}
+`
+	require.NoError(t, afero.WriteFile(fs, configPath, []byte(yml), 0o644))
+
+	require.NoError(t, UpsertDefaultTeam(fs, configPath, "acme-corp"))
+
+	buf, err := afero.ReadFile(fs, configPath)
+	require.NoError(t, err)
+	out := string(buf)
+	assert.Contains(t, out, "${BRUIN_TOKEN}", "secret placeholder must not be expanded on write")
+	assert.NotContains(t, out, "super-secret", "resolved secret must never be written to disk")
+	assert.Contains(t, out, "cloud token, injected from the environment", "comments must be preserved")
+	assert.Contains(t, out, "default_team: acme-corp")
+
+	// And it round-trips through the loader.
+	reloaded, err := LoadOrCreateWithoutPathAbsolutization(fs, configPath)
+	require.NoError(t, err)
+	assert.Equal(t, "acme-corp", reloaded.GetDefaultTeam())
+	require.Len(t, reloaded.Environments["default"].Connections.BruinCloud, 1)
+}
+
+func TestUpsertDefaultTeamCreatesFileWhenMissing(t *testing.T) {
+	t.Parallel()
+	fs := afero.NewMemMapFs()
+	configPath := testRepoConfigPath
+
+	require.NoError(t, UpsertDefaultTeam(fs, configPath, "acme-corp"))
+
+	buf, err := afero.ReadFile(fs, configPath)
+	require.NoError(t, err)
+	assert.Contains(t, string(buf), "default_team: acme-corp")
+}
+
 func TestLoadDoesNotPrefixAnchoredCredentialPaths(t *testing.T) {
 	t.Parallel()
 	fs := afero.NewMemMapFs()
-	configPath := "/repo/.bruin.yml"
+	configPath := testRepoConfigPath
 	drivePath := `C:\Users\ColtonChilders\Documents\GCS Keys\plated-mesh.json`
 	rootedPath := `\Users\ColtonChilders\Documents\GCS Keys\plated-mesh.json`
 	slashRootedPath := "/Users/ColtonChilders/Documents/GCS Keys/plated-mesh.json"
