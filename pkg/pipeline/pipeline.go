@@ -1360,6 +1360,36 @@ func (a *Asset) IsEnabled() bool {
 	return enabled
 }
 
+// FullRefreshRequested reports whether either the run-level flag or the asset's
+// parameters.full_refresh value requests a full refresh. The run-level flag is
+// a global override, so parameters.full_refresh=false cannot disable it.
+func (a *Asset) FullRefreshRequested(runFullRefresh bool) bool {
+	if runFullRefresh {
+		return true
+	}
+	if a == nil {
+		return false
+	}
+
+	value, ok := a.Parameters.GetString("full_refresh")
+	if !ok {
+		return false
+	}
+
+	requested, err := strconv.ParseBool(strings.TrimSpace(value))
+	return err == nil && requested
+}
+
+// FullRefreshEnabled applies the asset-level full-refresh restriction to the
+// effective request from FullRefreshRequested.
+func (a *Asset) FullRefreshEnabled(runFullRefresh bool) bool {
+	if !a.FullRefreshRequested(runFullRefresh) {
+		return false
+	}
+
+	return a == nil || a.RefreshRestricted == nil || !*a.RefreshRestricted
+}
+
 func (a *Asset) EnabledValue() (bool, error) {
 	if a == nil || a.Enabled == nil {
 		return true, nil

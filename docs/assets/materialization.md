@@ -196,7 +196,7 @@ The result will be a table `dashboard.hello_bq` with the result of the query.
 
 ## Full Refresh and `full_refresh_restricted`
 
-When running assets with the `--full-refresh` flag, Bruin will drop and recreate tables to ensure a clean state. However, there are cases where you may want to protect certain tables from being dropped during a full refresh, such as:
+When running assets with the `--full-refresh` flag, Bruin will drop and recreate tables to ensure a clean state. You can also opt a single asset into this behavior on every run with `parameters.full_refresh: true`. However, there are cases where you may want to protect certain tables from being dropped during a full refresh, such as:
 
 - Tables with external dependencies
 - Tables that take a long time to rebuild

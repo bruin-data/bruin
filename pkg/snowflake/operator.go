@@ -138,14 +138,15 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		}
 	}
 
-	if o.materializer.IsFullRefresh() {
+	fullRefresh := t.FullRefreshEnabled(o.materializer.IsFullRefresh())
+	if fullRefresh {
 		err = conn.RecreateTableOnMaterializationTypeMismatch(ctx, t)
 		if err != nil {
 			return err
 		}
 	}
 
-	if t.Materialization.IsSCD2() && !o.materializer.IsFullRefresh() {
+	if t.Materialization.IsSCD2() && !fullRefresh {
 		if err = scd2migration.Snowflake(ctx, conn, t.Name); err != nil {
 			return err
 		}

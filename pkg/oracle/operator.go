@@ -99,7 +99,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, asset 
 	// On the incremental SCD2 path the target table already exists and keeps its
 	// original column types. Migrate legacy naive bruin_valid_from/bruin_valid_until
 	// columns to timezone-aware types before writing tz-aware values into them.
-	if asset.Materialization.IsSCD2() && !o.materializer.IsFullRefresh() {
+	if asset.Materialization.IsSCD2() && !asset.FullRefreshEnabled(o.materializer.IsFullRefresh()) {
 		if err := scd2migration.Oracle(ctx, conn, asset.Name); err != nil {
 			return err
 		}

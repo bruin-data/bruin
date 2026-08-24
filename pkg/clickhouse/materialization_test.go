@@ -76,6 +76,27 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 		},
 		{
+			name: "materialize to a table, full refresh parameter defaults to create+replace",
+			task: &pipeline.Asset{
+				Name:       "my.asset",
+				Parameters: pipeline.ParameterMap{"full_refresh": true},
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+				Columns: []pipeline.Column{
+					{
+						Name:       "id",
+						PrimaryKey: true,
+					},
+				},
+			},
+			query: "SELECT 1",
+			want: []string{
+				"CREATE OR REPLACE TABLE my.asset PRIMARY KEY (id) AS SELECT 1",
+			},
+		},
+		{
 			name: "materialize to a table, full refresh with composite primary key falls back to create+replace",
 			task: &pipeline.Asset{
 				Name: "my.asset",

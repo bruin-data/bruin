@@ -182,7 +182,7 @@ from bruin import context, query
 
 
 def materialize():
-    # context.is_full_refresh is True when the run was invoked with --full-refresh.
+    # context.is_full_refresh is True when the run or asset enables full refresh.
     # Use it to branch between a full reload and an incremental slice.
     if context.is_full_refresh:
         sql = """
@@ -693,7 +693,7 @@ from bruin import context
 | `context.pipeline` | `str \| None` | `BRUIN_PIPELINE` | Pipeline name |
 | `context.asset_name` | `str \| None` | `BRUIN_ASSET` | Current asset name |
 | `context.connection` | `str \| None` | `BRUIN_CONNECTION` | Asset's default connection |
-| `context.is_full_refresh` | `bool` | `BRUIN_FULL_REFRESH` | `True` when `--full-refresh` flag is set |
+| `context.is_full_refresh` | `bool` | `BRUIN_FULL_REFRESH` | `True` when `--full-refresh` is set or the asset uses `parameters.full_refresh: true` |
 | `context.commit_hash` | `str \| None` | `BRUIN_COMMIT_HASH` | Git commit hash of the pipeline's repository |
 | `context.vars` | `dict` | `BRUIN_VARS` | Pipeline variables (types preserved from JSON Schema) |
 

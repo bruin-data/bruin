@@ -41,7 +41,7 @@ table td:first-child {
 | `--force` | bool | `false` | Do not ask for confirmation in a production environment. |
 | `--no-log-file` | bool | `false` | Do not create a log file for this run. |
 | `--sensor-mode` | str | `'once'` | Set sensor mode: `skip`, `once`, or `wait`. |
-| `--full-refresh` | bool | `false` | Truncate the table before running. Also sets the `full_refresh` jinja variable to `True` and `BRUIN_FULL_REFRESH` environment variable to `1`. |
+| `--full-refresh` | bool | `false` | Truncate tables before running. Also sets the `full_refresh` Jinja variable to `True` and `BRUIN_FULL_REFRESH` to `1`. A single asset can opt in on every run with `parameters.full_refresh: true`. |
 | `--apply-interval-modifiers` | bool | `false` | Apply [interval modifiers](/assets/interval-modifiers). Off by default on the CLI because you pass the dates yourself; Bruin Cloud applies them automatically. Ignored together with `--full-refresh`. |
 | `--continue` | bool | `false` | Continue from the last failed asset. |
 | `--selector` | str | - | Select assets with dbt-style syntax. Supports `tag:`, `path:`, `file:`, `fqn:`, `+`, `n+`, `@`, space unions, and comma intersections. |

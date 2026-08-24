@@ -19,6 +19,12 @@ func SetupVariables(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset
 	if err != nil {
 		return nil, err
 	}
+	if runFullRefresh, ok := ctx.Value(pipeline.RunConfigFullRefresh).(bool); ok {
+		env["BRUIN_FULL_REFRESH"] = ""
+		if t.FullRefreshEnabled(runFullRefresh) {
+			env["BRUIN_FULL_REFRESH"] = "1"
+		}
+	}
 
 	if selectedEnv, ok := ctx.Value(config.EnvironmentContextKey).(*config.Environment); ok && selectedEnv != nil {
 		env["BRUIN_SCHEMA_PREFIX"] = selectedEnv.SchemaPrefix
@@ -56,10 +62,11 @@ func envMutateIntervals(ctx context.Context, p *pipeline.Pipeline, t *pipeline.A
 	if !ok {
 		return nil, errors.New("run ID not found - please check if the run exists")
 	}
-	fullRefresh, ok := ctx.Value(pipeline.RunConfigFullRefresh).(bool)
+	runFullRefresh, ok := ctx.Value(pipeline.RunConfigFullRefresh).(bool)
 	if !ok {
 		return nil, errors.New("invalid or missing full refresh setting - must be true or false")
 	}
+	fullRefresh := t.FullRefreshEnabled(runFullRefresh)
 
 	modifiedStartDate := pipeline.ModifyDate(startDate, t.IntervalModifiers.Start)
 	modifiedEndDate := pipeline.ModifyDate(endDate, t.IntervalModifiers.End)

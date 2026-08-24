@@ -68,6 +68,23 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 		},
 		{
+			name: "materialize to a table, full refresh parameter defaults to create+replace",
+			task: &pipeline.Asset{
+				Name:       "my.asset",
+				Parameters: pipeline.ParameterMap{"full_refresh": true},
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+			},
+			query: "SELECT 1",
+			want: []string{
+				"CREATE TABLE my\\.__bruin_tmp_.+ AS SELECT 1;",
+				"DROP TABLE IF EXISTS my\\.asset;",
+				"ALTER TABLE my\\.__bruin_tmp_.+ RENAME TO my\\.asset;",
+			},
+		},
+		{
 			name: "materialize to a table with cluster, single field to cluster",
 			task: &pipeline.Asset{
 				Name: "my.asset",

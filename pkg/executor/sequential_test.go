@@ -93,6 +93,34 @@ func TestLocal_RunSingleTask(t *testing.T) {
 		mockOperator.AssertExpectations(t)
 	})
 
+	t.Run("full refresh asset parameter is applied before dispatch", func(t *testing.T) {
+		t.Parallel()
+
+		parameterAsset := &pipeline.Asset{
+			Name:       "parameter-task",
+			Type:       "test",
+			Parameters: pipeline.ParameterMap{"full_refresh": true},
+		}
+		parameterInstance := &scheduler.AssetInstance{Asset: parameterAsset}
+		mockOperator := new(mockOperator)
+		mockOperator.On("Run", mock.MatchedBy(func(ctx context.Context) bool {
+			fullRefresh, ok := ctx.Value(pipeline.RunConfigFullRefresh).(bool)
+			return ok && fullRefresh
+		}), parameterInstance).Return(nil)
+		l := Sequential{
+			TaskTypeMap: map[pipeline.AssetType]Config{
+				"test": {
+					scheduler.TaskInstanceTypeMain: mockOperator,
+				},
+			},
+		}
+
+		err := l.RunSingleTask(t.Context(), parameterInstance)
+
+		require.NoError(t, err)
+		mockOperator.AssertExpectations(t)
+	})
+
 	t.Run("missing instance is rejected", func(t *testing.T) {
 		t.Parallel()
 

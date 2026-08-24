@@ -326,4 +326,21 @@ func TestSetupVariables(t *testing.T) {
 
 		assert.Equal(t, "dev_", result["BRUIN_SCHEMA_PREFIX"])
 	})
+
+	t.Run("BRUIN_FULL_REFRESH is set from asset parameters", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := t.Context()
+		ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
+		ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC))
+		ctx = context.WithValue(ctx, pipeline.RunConfigExecutionDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
+		ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run")
+		ctx = context.WithValue(ctx, pipeline.RunConfigFullRefresh, false)
+
+		asset := &pipeline.Asset{Parameters: pipeline.ParameterMap{"full_refresh": true}}
+		result, err := env.SetupVariables(ctx, &pipeline.Pipeline{Name: "test-pipeline"}, asset, map[string]string{})
+		require.NoError(t, err)
+
+		assert.Equal(t, "1", result["BRUIN_FULL_REFRESH"])
+	})
 }

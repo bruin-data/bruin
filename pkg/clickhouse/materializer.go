@@ -26,7 +26,7 @@ func (m *Materializer) Render(asset *pipeline.Asset, query string) ([]string, er
 	}
 
 	strategy := mat.Strategy
-	if m.fullRefresh && mat.Type == pipeline.MaterializationTypeTable {
+	if asset.FullRefreshEnabled(m.fullRefresh) && mat.Type == pipeline.MaterializationTypeTable {
 		if mat.Strategy != pipeline.MaterializationStrategyDDL {
 			strategy = pipeline.MaterializationStrategyCreateReplace
 		}
@@ -50,7 +50,7 @@ func (m *Materializer) RenderWithCleanup(asset *pipeline.Asset, query string) ([
 	}
 
 	strategy := asset.Materialization.Strategy
-	if m.fullRefresh && asset.Materialization.Type == pipeline.MaterializationTypeTable && strategy != pipeline.MaterializationStrategyDDL {
+	if asset.FullRefreshEnabled(m.fullRefresh) && asset.Materialization.Type == pipeline.MaterializationTypeTable && strategy != pipeline.MaterializationStrategyDDL {
 		strategy = pipeline.MaterializationStrategyCreateReplace
 	}
 
@@ -94,7 +94,7 @@ func (r *Renderer) Render(asset *pipeline.Asset, query string) (string, error) {
 }
 
 func (m *Materializer) LogIfFullRefreshAndDDL(writer interface{}, asset *pipeline.Asset) error {
-	if !m.fullRefresh {
+	if !asset.FullRefreshEnabled(m.fullRefresh) {
 		return nil
 	}
 

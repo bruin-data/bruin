@@ -74,6 +74,7 @@ parameters:
   sql_limit: integer
   sql_exclude_columns: string
   no_inference: true|false
+  full_refresh: true|false
   mask: string
   trim_whitespace: true|false
   pipelines_dir: string
@@ -134,6 +135,7 @@ parameters:
 | `sql_limit` | No | `--sql-limit` | Applies a `LIMIT` clause when extracting from the source. |
 | `sql_exclude_columns` | No | `--sql-exclude-columns` | List of columns to skip during extraction. |
 | `no_inference` | No | `--no-inference` | Uses `columns` as the source schema for schema-less sources instead of inferring types. |
+| `full_refresh` | No | `--full-refresh` | Runs this asset in full-refresh mode on every run. The run-level `--full-refresh` flag still applies to all assets. |
 | `mask` | No | `--mask` | Adds a column masking rule such as `email:hash`. |
 | `pipelines_dir` | No | `--pipelines-dir` | Directory where Ingestr stores pipeline metadata. |
 | `staging_bucket` | No | `--staging-bucket` | Overrides the staging bucket that Ingestr uses for intermediate files. |
@@ -255,7 +257,7 @@ The incremental key must be returned by the query. For incremental runs, include
 Pipeline run options propagate to ingestr automatically:
 
 * When a run defines an interval start or end date, Bruin appends `--interval-start` and `--interval-end` with the resolved timestamps (including interval modifiers, when enabled).
-* Running with `--full-refresh` adds the `--full-refresh` flag to Ingestr.
+* Running with `--full-refresh`, or setting `parameters.full_refresh: true` on the asset, adds the `--full-refresh` flag to Ingestr.
 * For a streaming asset (`stream: true`), Bruin omits `--interval-end` so the live tail is not truncated, and does not pass `--full-refresh`.
 
 ## Streaming assets
