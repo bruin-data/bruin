@@ -3661,6 +3661,7 @@ func CloudConnections() *cli.Command {
 		Commands: []*cli.Command{
 			cloudConnectionsList(),
 			cloudConnectionsAdd(),
+			cloudConnectionsDuplicate(),
 			cloudConnectionsDelete(),
 		},
 	}
@@ -3910,6 +3911,50 @@ func cloudConnectionsDelete() *cli.Command {
 			}
 
 			printSuccessForOutput(output, fmt.Sprintf("Successfully deleted connection '%s'", name))
+			return nil
+		},
+	}
+}
+
+func cloudConnectionsDuplicate() *cli.Command {
+	return &cli.Command{
+		Name:  "duplicate",
+		Usage: "Duplicate a connection under a new name (credentials are copied server-side)",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.StringFlag{
+				Name:  "name",
+				Usage: "the name of the connection to duplicate",
+			},
+			&cli.StringFlag{
+				Name:  "as",
+				Usage: "the name for the duplicated connection",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			name := c.String("name")
+			target := c.String("as")
+			if name == "" || target == "" {
+				printError(errors.New("--name and --as are required"), output, "Missing required flags")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			if err := client.DuplicateConnection(ctx, name, target); err != nil {
+				printError(err, output, "Failed to duplicate connection")
+				return cli.Exit("", 1)
+			}
+
+			printSuccessForOutput(output, fmt.Sprintf("Successfully duplicated connection '%s' to '%s'", name, target))
 			return nil
 		},
 	}

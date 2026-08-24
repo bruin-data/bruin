@@ -510,6 +510,41 @@ func TestCloudAgentsConnectionsAdd_RequiresName(t *testing.T) {
 	assert.Equal(t, 1, exitCode)
 }
 
+func TestCloudConnectionsDuplicate_RequiresFlags(t *testing.T) {
+	t.Parallel()
+	// Missing --as must fail locally before any API call.
+	cmd := cloudConnectionsDuplicate()
+	exitCode := 0
+	cmd.ExitErrHandler = func(_ context.Context, _ *cli.Command, err error) {
+		var ec cli.ExitCoder
+		if errors.As(err, &ec) {
+			exitCode = ec.ExitCode()
+		}
+	}
+	_ = runCLI(t.Context(), cmd, []string{"duplicate", "--api-key", "k", "--name", "my_pg"})
+	assert.Equal(t, 1, exitCode)
+}
+
+func TestCloudConnectionsDuplicate_CallsAPI(t *testing.T) { //nolint:paralleltest // sets env
+	called := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/connections/my_pg/duplicate", r.URL.Path)
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"name":"my_pg_copy","type":"postgres","duplicated":true}`))
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
+
+	cmd := cloudConnectionsDuplicate()
+	err := runCLI(t.Context(), cmd, []string{
+		"duplicate", "--api-key", "test-key", "--name", "my_pg", "--as", "my_pg_copy",
+	})
+	require.NoError(t, err)
+	assert.True(t, called)
+}
+
 func TestCloudScheduledAgentsCommand_Help(t *testing.T) {
 	t.Parallel()
 	cmd := CloudScheduledAgents()

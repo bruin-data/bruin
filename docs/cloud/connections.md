@@ -36,6 +36,12 @@ Click **Create**. For most data platforms, Bruin Cloud validates the connection 
 
 Go back to your pipeline. The connection should appear in the right-hand list without the missing flag.
 
+## Duplicate a connection
+
+To create a near-identical connection, use the **Duplicate** button next to a connection in the list. Enter a new name and Bruin Cloud copies the connection — including its credentials — under that name. The credentials are copied entirely server-side, so you never have to re-enter (or even see) them.
+
+From the CLI: [`bruin cloud connections duplicate --name my_pg --as my_pg_copy`](/commands/cloud#duplicate).
+
 ## Generic secrets
 
 For text-based credentials that are not tied to a specific data platform (API keys, OAuth tokens, third-party secrets), use the **generic secret** connection type. They work the same way as named connections in `.bruin.yml`: pipelines and assets reference them by name.

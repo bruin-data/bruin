@@ -741,6 +741,13 @@ func (c *APIClient) DeleteConnection(ctx context.Context, name string) error {
 	return c.doRequest(ctx, http.MethodDelete, "/connections/"+url.PathEscape(name), nil, nil)
 }
 
+// DuplicateConnection copies an existing connection (including its credentials)
+// to a new name. The copy happens server-side; no credentials are transmitted.
+func (c *APIClient) DuplicateConnection(ctx context.Context, source, target string) error {
+	body := map[string]any{"name": target}
+	return c.doRequest(ctx, http.MethodPost, "/connections/"+url.PathEscape(source)+"/duplicate", body, nil)
+}
+
 // --- Connection sets ---
 
 func (c *APIClient) ListConnectionSets(ctx context.Context) ([]ConnectionSet, error) {

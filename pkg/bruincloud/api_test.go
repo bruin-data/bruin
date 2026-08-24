@@ -686,6 +686,34 @@ func TestDeleteConnectionSet(t *testing.T) {
 	require.NoError(t, client.DeleteConnectionSet(t.Context(), 9))
 }
 
+func TestDuplicateConnection(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/connections/my_pg/duplicate", r.URL.Path)
+
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, "my_pg_copy", body["name"])
+
+		w.WriteHeader(http.StatusCreated)
+		writeJSON(t, w, map[string]any{"name": "my_pg_copy", "type": "postgres", "duplicated": true})
+	})
+
+	require.NoError(t, client.DuplicateConnection(t.Context(), "my_pg", "my_pg_copy"))
+}
+
+func TestDuplicateConnectionEscapesSourceName(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/connections/weird%20name/duplicate", r.URL.EscapedPath())
+		w.WriteHeader(http.StatusCreated)
+		writeJSON(t, w, map[string]any{"name": "copy", "type": "postgres", "duplicated": true})
+	})
+
+	require.NoError(t, client.DuplicateConnection(t.Context(), "weird name", "copy"))
+}
+
 func TestListSkills(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {

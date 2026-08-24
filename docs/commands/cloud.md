@@ -750,6 +750,15 @@ bruin cloud connections list
 bruin cloud connections list --output json
 ```
 
+#### `duplicate`
+
+Copy an existing cloud connection to a new name. The credentials are copied
+entirely server-side — nothing is downloaded, displayed, or re-typed:
+
+```bash
+bruin cloud connections duplicate --name my_pg --as my_pg_copy
+```
+
 #### `delete`
 
 Delete a connection by name:
