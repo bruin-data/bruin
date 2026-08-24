@@ -39,9 +39,11 @@ func (e *AssetTimeoutError) Unwrap() error {
 
 func (s Sequential) RunSingleTask(ctx context.Context, instance scheduler.TaskInstance) error {
 	task := instance.GetAsset()
-	fullRefresh, _ := ctx.Value(pipeline.RunConfigFullRefresh).(bool)
-	if fullRefresh && task.RefreshRestricted != nil && *task.RefreshRestricted {
-		ctx = context.WithValue(ctx, pipeline.RunConfigFullRefresh, false)
+	runFullRefresh, _ := ctx.Value(pipeline.RunConfigFullRefresh).(bool)
+	fullRefreshRequested := task.FullRefreshRequested(runFullRefresh)
+	fullRefresh := task.FullRefreshEnabled(runFullRefresh)
+	ctx = context.WithValue(ctx, pipeline.RunConfigFullRefresh, fullRefresh)
+	if fullRefreshRequested && !fullRefresh {
 		if instance.GetType() == scheduler.TaskInstanceTypeMain {
 			if printer, ok := ctx.Value(KeyPrinter).(io.Writer); ok {
 				_, _ = fmt.Fprintf(printer, "Warning: full refresh is restricted for asset %q; running incrementally.\n", task.Name)

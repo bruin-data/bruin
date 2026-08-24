@@ -191,6 +191,21 @@ connection: bigquery-default
 
 - **Type:** `String`
 
+## `parameters`
+
+Asset-type-specific configuration. The supported keys depend on the asset type; for example, an ingestr asset uses parameters to select its source table and destination.
+
+`full_refresh` is available to every asset type. Set it to `true` to always run that asset in full-refresh mode, even when the pipeline run does not use `--full-refresh`:
+
+```yaml
+parameters:
+  full_refresh: true
+```
+
+This affects materialization, sets the built-in `full_refresh` Jinja variable, and exposes `BRUIN_FULL_REFRESH=1` to Python and R assets. The run-level `--full-refresh` flag remains a global override, so `parameters.full_refresh: false` does not opt an asset out of a full-refresh run. Use `full_refresh_restricted: true` for that protection; the restriction takes precedence over both forms.
+
+- **Type:** `Object`
+
 ## `owner`
 
 The owner of the asset, has no functional implications on Bruin CLI as of today, allows documenting the ownership information. On [Bruin Cloud](https://getbruin.com), it is used to analyze ownership information, used in governance reports and ownership lineage.

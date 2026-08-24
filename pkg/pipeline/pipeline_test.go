@@ -151,6 +151,77 @@ func TestParameterMapGetString(t *testing.T) {
 	assert.False(t, ok)
 }
 
+func TestAssetFullRefresh(t *testing.T) {
+	t.Parallel()
+
+	trueValue := true
+	tests := []struct {
+		name                string
+		asset               *pipeline.Asset
+		runFullRefresh      bool
+		expectedRequested   bool
+		expectedFullRefresh bool
+	}{
+		{
+			name:                "disabled by default",
+			asset:               &pipeline.Asset{},
+			expectedRequested:   false,
+			expectedFullRefresh: false,
+		},
+		{
+			name: "enabled by a boolean asset parameter",
+			asset: &pipeline.Asset{Parameters: pipeline.ParameterMap{
+				"full_refresh": true,
+			}},
+			expectedRequested:   true,
+			expectedFullRefresh: true,
+		},
+		{
+			name: "enabled by a string asset parameter",
+			asset: &pipeline.Asset{Parameters: pipeline.ParameterMap{
+				"full_refresh": "true",
+			}},
+			expectedRequested:   true,
+			expectedFullRefresh: true,
+		},
+		{
+			name: "false asset parameter does not disable the run flag",
+			asset: &pipeline.Asset{Parameters: pipeline.ParameterMap{
+				"full_refresh": false,
+			}},
+			runFullRefresh:      true,
+			expectedRequested:   true,
+			expectedFullRefresh: true,
+		},
+		{
+			name: "invalid asset parameter is ignored",
+			asset: &pipeline.Asset{Parameters: pipeline.ParameterMap{
+				"full_refresh": "sometimes",
+			}},
+			expectedRequested:   false,
+			expectedFullRefresh: false,
+		},
+		{
+			name: "restriction wins over an asset parameter",
+			asset: &pipeline.Asset{
+				Parameters:        pipeline.ParameterMap{"full_refresh": true},
+				RefreshRestricted: &trueValue,
+			},
+			expectedRequested:   true,
+			expectedFullRefresh: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.expectedRequested, tt.asset.FullRefreshRequested(tt.runFullRefresh))
+			assert.Equal(t, tt.expectedFullRefresh, tt.asset.FullRefreshEnabled(tt.runFullRefresh))
+		})
+	}
+}
+
 func TestAssetParametersYAMLSupportStructuredValues(t *testing.T) {
 	t.Parallel()
 

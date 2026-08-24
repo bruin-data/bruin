@@ -1260,23 +1260,29 @@ func TestRenderer_IsFullRefresh(t *testing.T) {
 		},
 	}
 
-	asset := &pipeline.Asset{
-		Name: "test-asset",
-	}
-
 	tests := []struct {
 		name                 string
-		fullRefresh          bool
+		runFullRefresh       bool
+		parameters           pipeline.ParameterMap
+		expectedFullRefresh  bool
 		expectedRenderedText string
 	}{
 		{
 			name:                 "full_refresh is false when full refresh is disabled",
-			fullRefresh:          false,
+			runFullRefresh:       false,
+			expectedFullRefresh:  false,
 			expectedRenderedText: "False",
 		},
 		{
 			name:                 "full_refresh is true when full refresh is enabled",
-			fullRefresh:          true,
+			runFullRefresh:       true,
+			expectedFullRefresh:  true,
+			expectedRenderedText: "True",
+		},
+		{
+			name:                 "full_refresh is true when enabled in asset parameters",
+			parameters:           pipeline.ParameterMap{"full_refresh": true},
+			expectedFullRefresh:  true,
 			expectedRenderedText: "True",
 		},
 	}
@@ -1290,7 +1296,11 @@ func TestRenderer_IsFullRefresh(t *testing.T) {
 			ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, endDate)
 			ctx = context.WithValue(ctx, pipeline.RunConfigExecutionDate, executionDate)
 			ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run-id")
-			ctx = context.WithValue(ctx, pipeline.RunConfigFullRefresh, tt.fullRefresh)
+			ctx = context.WithValue(ctx, pipeline.RunConfigFullRefresh, tt.runFullRefresh)
+			asset := &pipeline.Asset{
+				Name:       "test-asset",
+				Parameters: tt.parameters,
+			}
 
 			baseRenderer := NewRendererWithStartEndDates(&startDate, &endDate, &executionDate, basePipeline.Name, "test-run-id", basePipeline.Variables.Value())
 			clonedRenderer, err := baseRenderer.CloneForAsset(ctx, basePipeline, asset)
@@ -1306,7 +1316,7 @@ func TestRenderer_IsFullRefresh(t *testing.T) {
 			conditionalQuery := `{% if full_refresh %}full{% else %}incremental{% endif %}`
 			conditionalResult, err := clonedRenderer.Render(conditionalQuery)
 			require.NoError(t, err)
-			if tt.fullRefresh {
+			if tt.expectedFullRefresh {
 				require.Equal(t, "full", conditionalResult)
 			} else {
 				require.Equal(t, "incremental", conditionalResult)

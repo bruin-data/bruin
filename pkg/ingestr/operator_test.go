@@ -640,6 +640,41 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 			},
 		},
 		{
+			name: "full refresh parameter - incremental strategy, incremental key updated_at, multiple pk",
+			asset: &pipeline.Asset{
+				Name:       "asset-name",
+				Connection: "bq",
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "date", PrimaryKey: true},
+					{Name: "name"},
+					{Name: "updated_at"},
+				},
+				Parameters: pipeline.ParameterMap{
+					"source_connection":    "sf",
+					"source_table":         "source-table",
+					"destination":          "bigquery",
+					"incremental_strategy": "merge",
+					"incremental_key":      "updated_at",
+					"full_refresh":         true,
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "snowflake://uri-here",
+				"--source-table", "source-table",
+				"--dest-uri", "bigquery://uri-here",
+				"--dest-table", "asset-name",
+				"--yes",
+				"--progress", "log",
+				"--incremental-key", "updated_at",
+				"--incremental-strategy", "merge",
+				"--primary-key", "id",
+				"--primary-key", "date",
+				"--full-refresh",
+			},
+		},
+		{
 			name: "public chess source via domain name (no connection defined)",
 			asset: &pipeline.Asset{
 				Name:       "asset-name",

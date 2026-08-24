@@ -260,7 +260,8 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 		return r, nil
 	}
 
-	fullRefresh, _ := ctx.Value(pipeline.RunConfigFullRefresh).(bool)
+	runFullRefresh, _ := ctx.Value(pipeline.RunConfigFullRefresh).(bool)
+	fullRefresh := asset.FullRefreshEnabled(runFullRefresh)
 
 	applyModifiers, ok := ctx.Value(pipeline.RunConfigApplyIntervalModifiers).(bool)
 	if ok && applyModifiers {

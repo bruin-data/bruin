@@ -237,7 +237,8 @@ func Render() *cli.Command {
 				}
 			}
 
-			runCtx := context.WithValue(ctx, pipeline.RunConfigFullRefresh, c.Bool("full-refresh"))
+			fullRefresh = asset.FullRefreshEnabled(fullRefresh)
+			runCtx := context.WithValue(ctx, pipeline.RunConfigFullRefresh, fullRefresh)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigRunID, "your-run-id")
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)

@@ -124,7 +124,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, asset 
 		}
 	}
 
-	if asset.Materialization.IsSCD2() && !o.materializer.IsFullRefresh() {
+	if asset.Materialization.IsSCD2() && !asset.FullRefreshEnabled(o.materializer.IsFullRefresh()) {
 		if err := scd2migration.MySQL(ctx, conn, asset.Name); err != nil {
 			return err
 		}

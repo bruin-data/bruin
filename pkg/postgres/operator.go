@@ -126,7 +126,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		}
 	}
 
-	if t.Materialization.IsSCD2() && !o.materializer.IsFullRefresh() {
+	if t.Materialization.IsSCD2() && !t.FullRefreshEnabled(o.materializer.IsFullRefresh()) {
 		if err = scd2migration.Postgres(ctx, conn, t.Name); err != nil {
 			return err
 		}

@@ -181,6 +181,33 @@ func TestConsolidatedParameters_StreamGating(t *testing.T) {
 	})
 }
 
+func TestConsolidatedParameters_FullRefreshParameter(t *testing.T) {
+	t.Parallel()
+
+	asset := &pipeline.Asset{
+		StartDate: "2020-01-01",
+		Parameters: pipeline.ParameterMap{
+			"full_refresh": true,
+		},
+		IntervalModifiers: pipeline.IntervalModifiers{
+			Start: pipeline.TimeModifier{Days: 1},
+			End:   pipeline.TimeModifier{Days: 1},
+		},
+	}
+	ctx := context.WithValue(t.Context(), pipeline.RunConfigStartDate, time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC))
+	ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC))
+	ctx = context.WithValue(ctx, pipeline.RunConfigApplyIntervalModifiers, true)
+
+	result, err := ConsolidatedParameters(ctx, asset, []string{"--existing"}, nil)
+	require.NoError(t, err)
+	assert.Equal(t, []string{
+		"--existing",
+		"--interval-start", "2020-01-02T00:00:00Z",
+		"--interval-end", "2025-01-03T00:00:00Z",
+		"--full-refresh",
+	}, result)
+}
+
 func TestConsolidatedParameters_TrimWhitespace(t *testing.T) {
 	t.Parallel()
 

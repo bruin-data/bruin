@@ -18,6 +18,7 @@ func TestMaterializer_Render(t *testing.T) {
 		name              string
 		matMap            AssetMaterializationMap
 		fullRefresh       bool
+		parameters        ParameterMap
 		refreshRestricted *bool
 		query             string
 		expected          string
@@ -47,6 +48,19 @@ func TestMaterializer_Render(t *testing.T) {
 			fullRefresh: true,
 			query:       "SELECT * FROM table",
 			expected:    "SELECT 1;SELECT * FROM table",
+		},
+		{
+			name: "full refresh from asset parameters",
+			matMap: AssetMaterializationMap{
+				MaterializationTypeTable: {
+					MaterializationStrategyCreateReplace: func(task *Asset, query string) (string, error) {
+						return "SELECT 1;" + query, nil
+					},
+				},
+			},
+			parameters: ParameterMap{"full_refresh": true},
+			query:      "SELECT * FROM table",
+			expected:   "SELECT 1;SELECT * FROM table",
 		},
 		{
 			name: "full refresh respects refresh restricted",
@@ -81,6 +95,7 @@ func TestMaterializer_Render(t *testing.T) {
 					Type:     MaterializationTypeTable,
 					Strategy: MaterializationStrategyMerge,
 				},
+				Parameters:        tt.parameters,
 				RefreshRestricted: tt.refreshRestricted,
 			}
 

@@ -55,7 +55,8 @@ func isStreamingParams(params pipeline.ParameterMap) bool {
 }
 
 func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs []string, columnOpts *ColumnHintOptions) ([]string, error) {
-	fullRefresh, _ := ctx.Value(pipeline.RunConfigFullRefresh).(bool)
+	runFullRefresh, _ := ctx.Value(pipeline.RunConfigFullRefresh).(bool)
+	fullRefresh := asset.FullRefreshEnabled(runFullRefresh)
 	cmdArgs = appendIngestrParameterFlags(asset.Parameters, cmdArgs)
 	cmdArgs = appendIngestrMaskFlags(asset.Parameters, asset.Columns, cmdArgs, columnOpts != nil && columnOpts.NormalizeColumnNames)
 

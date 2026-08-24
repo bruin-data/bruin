@@ -27,11 +27,10 @@ func (m *Materializer) Render(asset *Asset, query string) (string, error) {
 	}
 
 	strategy := mat.Strategy
-	if m.FullRefresh && mat.Type == MaterializationTypeTable {
+	if asset.FullRefreshEnabled(m.FullRefresh) && mat.Type == MaterializationTypeTable {
 		// Only override to CreateReplace if strategy is not explicitly set to DDL
 		// This strategy should never be overridden, even with full refresh
-		// Also respect full refresh restriction - if true, don't drop/recreate the table
-		if mat.Strategy != MaterializationStrategyDDL && (asset.RefreshRestricted == nil || !*asset.RefreshRestricted) {
+		if mat.Strategy != MaterializationStrategyDDL {
 			// Data Vault strategies are only overridden on platforms that implement them, since
 			// those route CreateReplace back into their own builders. Overriding it elsewhere would
 			// silently produce a plain table dump with none of the Data Vault loading rules applied.
@@ -63,7 +62,7 @@ func (m *Materializer) IsFullRefresh() bool {
 }
 
 func (m *Materializer) LogIfFullRefreshAndDDL(writer interface{}, asset *Asset) error {
-	if !m.FullRefresh {
+	if !asset.FullRefreshEnabled(m.FullRefresh) {
 		return nil
 	}
 

@@ -110,3 +110,22 @@ func TestMaterializer_RenderWithCleanupFullRefreshDoesNotReturnMergeCleanup(t *t
 	require.Len(t, queries, 1)
 	require.Empty(t, cleanup)
 }
+
+func TestMaterializer_RenderWithCleanupFullRefreshParameterDoesNotReturnMergeCleanup(t *testing.T) {
+	t.Parallel()
+
+	asset := &pipeline.Asset{
+		Name:       "my.asset",
+		Parameters: pipeline.ParameterMap{"full_refresh": true},
+		Materialization: pipeline.Materialization{
+			Type:     pipeline.MaterializationTypeTable,
+			Strategy: pipeline.MaterializationStrategyMerge,
+		},
+		Columns: []pipeline.Column{{Name: "id", PrimaryKey: true}},
+	}
+
+	queries, cleanup, err := NewMaterializer(false).RenderWithCleanup(asset, "SELECT 1 AS id")
+	require.NoError(t, err)
+	require.Len(t, queries, 1)
+	require.Empty(t, cleanup)
+}
