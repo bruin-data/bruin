@@ -97,7 +97,7 @@ shared `posthog-default` connection with BigQuery as the destination:
 The PostHog source handles incrementality itself, so the assets do not declare
 a `materialization` block. Each table uses the primary key, incremental key,
 and strategy that the source defines — see
-[Available Source Tables](https://getbruin.com/docs/ingestion/posthog.html#available-source-tables)
+[Available Source Tables](https://getbruin.com/docs/bruin/ingestion/posthog.html#available-source-tables)
 for the full list, including `cohorts`, `annotations`, `event_definitions`, and
 the `property_definitions:*` tables you can add the same way.
 
@@ -253,7 +253,7 @@ carried onto historical months.
 
 ### Dashboard
 
-`dashboards/posthog-product-analytics.yml` is a [DAC](https://getbruin.com/docs/dashboards)
+`dashboards/posthog-product-analytics.yml` is a [DAC](https://getbruin.com/docs/dac/)
 dashboard over the reports layer: headline account KPIs, engagement trend by plan,
 a PQL leaderboard with conditional formatting, an expansion/churn-risk table,
 feature adoption, and retention.
@@ -475,6 +475,6 @@ bruin run --exclude-tag posthog_raw my-posthog-pipeline
 
 ## Documentation
 
-- [PostHog ingestion](https://getbruin.com/docs/ingestion/posthog.html)
-- [Ingestr assets](https://getbruin.com/docs/assets/ingestr.html)
-- [BigQuery platform](https://getbruin.com/docs/platforms/bigquery.html)
+- [PostHog ingestion](https://getbruin.com/docs/bruin/ingestion/posthog.html)
+- [Ingestr assets](https://getbruin.com/docs/bruin/assets/ingestr.html)
+- [BigQuery platform](https://getbruin.com/docs/bruin/platforms/bigquery.html)
