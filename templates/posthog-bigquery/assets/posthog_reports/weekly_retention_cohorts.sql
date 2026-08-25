@@ -66,13 +66,18 @@ columns:
   - name: is_complete_week
     type: BOOL
     description: >
-      Whether the warehouse holds event data for all seven days of this week.
-      This guards both ends of the event history, not just the recent end: the
-      last week of a curve is usually still in progress, and a cohort that
-      signed up before event collection started has early weeks the warehouse
-      cannot speak to at all. Both understate retention, and the second one
-      produces a curve that rises with time, which is impossible for real
-      retention. Filter on this before charting.
+      Whether this week falls inside the event history the warehouse holds. It
+      guards both ends, not just the recent one: the last week of a curve is
+      usually still in progress, and a cohort that signed up before event
+      collection started has early weeks the warehouse cannot speak to at all.
+      Both understate retention, and the second produces a curve that rises with
+      time, which is impossible for real retention. Filter on this before
+      charting. It compares against the first and last event date, so it bounds
+      the history rather than auditing it: a week missing days in the middle
+      because a load failed still reads as complete. Interior gaps are an
+      ingestion problem and belong to the freshness and row-count checks on the
+      raw layer, not to this column -- a week of genuinely low activity and a
+      week whose load failed are indistinguishable from here.
   - name: cohort_size
     type: INT64
     description: >

@@ -221,25 +221,51 @@ segment_population AS (
 ),
 
 first_exposures AS (
-  -- A person can be re-exposed on every page load, so collapse to the first
-  -- exposure per person and variant. That timestamp is the line conversion is
-  -- measured against.
+  -- A person can be re-exposed on every page load, so collapse to one row per
+  -- person and flag. Keying on the variant as well would split a person who was
+  -- re-bucketed across two arms, and because conversion is measured over a
+  -- window that starts at each arm's own first exposure, a single action taken
+  -- inside both windows would be credited to both -- inflating conversion on
+  -- each side and breaking the enabled-versus-held-out split, which is only
+  -- readable if it partitions the exposed population.
+  --
+  -- So the person is attributed to the arm PostHog answered with first and
+  -- stays there. That is first-touch assignment: later re-bucketing is itself
+  -- downstream of the rollout, so crediting the new arm with behaviour the old
+  -- one may have caused would be the same contamination in another direction.
   SELECT
     person_id,
     flag_key,
     -- Labelled rather than dropped. An evaluation PostHog answered with no
     -- response cannot be attributed to an arm, but discarding it would
-    -- understate exposure -- and `flag_variant` is part of the key here, so it
-    -- cannot simply stay null.
+    -- understate exposure -- and `flag_variant` is a grouping key downstream,
+    -- so it cannot simply stay null.
     COALESCE(flag_variant, 'unknown') AS flag_variant,
-    LOGICAL_OR(was_enabled) AS was_enabled,
-    MIN(exposed_at) AS first_exposed_at,
-    MAX(flag_name) AS flag_name,
-    LOGICAL_OR(COALESCE(flag_is_active, FALSE)) AS flag_is_active
-  FROM posthog_stage.feature_flag_exposures
-  WHERE person_id IS NOT NULL
-    AND flag_key IS NOT NULL
-  GROUP BY 1, 2, 3
+    was_enabled,
+    first_exposed_at,
+    flag_name,
+    flag_is_active
+  FROM (
+    SELECT
+      person_id,
+      flag_key,
+      flag_variant,
+      COALESCE(was_enabled, FALSE) AS was_enabled,
+      flag_name,
+      COALESCE(flag_is_active, FALSE) AS flag_is_active,
+      MIN(exposed_at) OVER (PARTITION BY person_id, flag_key) AS first_exposed_at,
+      -- The variant is a tiebreaker rather than a second grain: it only settles
+      -- which row wins when two exposures share a timestamp, so the choice is
+      -- stable across rebuilds of identical input.
+      ROW_NUMBER() OVER (
+        PARTITION BY person_id, flag_key
+        ORDER BY exposed_at, COALESCE(flag_variant, 'unknown')
+      ) AS exposure_rank
+    FROM posthog_stage.feature_flag_exposures
+    WHERE person_id IS NOT NULL
+      AND flag_key IS NOT NULL
+  )
+  WHERE exposure_rank = 1
 ),
 
 outcome_events AS (

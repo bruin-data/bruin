@@ -195,6 +195,12 @@ WITH reporting_window AS (
     DATE_SUB(MAX(event_date), INTERVAL {{ var.pql_window_days }} DAY) AS prior_window_end,
     DATE_SUB(MAX(event_date), INTERVAL {{ var.pql_window_days * 2 - 1 }} DAY) AS prior_window_start
   FROM posthog_stage.events
+  -- With no events there is no window to measure against, and MAX would still
+  -- return one all-null row. Left in, it would cross join every account into a
+  -- scored row with a null `as_of_date`, failing that column's not-null check
+  -- and reporting every paying account as a churn risk on no evidence. An empty
+  -- report is the honest answer.
+  HAVING MAX(event_date) IS NOT NULL
 ),
 
 windowed_events AS (
