@@ -2504,12 +2504,12 @@ func EnsureTimeIntervalIsValidForAsset(ctx context.Context, p *pipeline.Pipeline
 		return nil, err
 	}
 
-	parsedStartDate, err := time.Parse("2006-01-02T15:04:05", renderedStartDate)
+	parsedStartDate, err := time.Parse("2006-01-02T15:04:05", strings.TrimSpace(renderedStartDate))
 	if err != nil {
 		return nil, err
 	}
 
-	parsedEndDate, err := time.Parse("2006-01-02T15:04:05", renderedEndDate)
+	parsedEndDate, err := time.Parse("2006-01-02T15:04:05", strings.TrimSpace(renderedEndDate))
 	if err != nil {
 		return nil, err
 	}
