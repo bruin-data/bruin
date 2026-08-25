@@ -143,6 +143,27 @@ rulesets:
       - asset-name-must-be-layer-dot-schema-dot-table
 ```
 
+### Example: enforce that the asset name matches its file path
+
+Because `criteria` has access to the full asset struct, you can enforce a naming convention that ties an asset's name to where its file lives on disk. For example, to require that an asset named `bronze.transactions` is defined in `assets/bronze/transactions.sql` (or `.py`), match the asset's file path against the `{schema}/{table}` derived from its name:
+
+```yaml
+custom_rules:
+  - name: asset-name-matches-file-path
+    description: "Asset {schema}.{table} must live at assets/{schema}/{table}.*"
+    criteria: 'asset.ExecutableFile.Path contains ("/" + split(asset.Name, ".")[0] + "/" + split(asset.Name, ".")[1] + ".")'
+
+rulesets:
+  - name: std
+    rules:
+      - asset-name-matches-file-path
+```
+
+Notes:
+
+- `asset.ExecutableFile.Path` is the absolute path to the asset file. Using `contains` with a leading `/` and a trailing `.` matches `.../{schema}/{table}.sql` (or `.py`) without hardcoding the extension or the checkout location.
+- This example assumes a two-part `schema.table` name. For a three-part `layer.schema.table` convention, adjust the `split` indices accordingly (e.g. join the first two parts for the folder path).
+
 ### Variables
 
 `criteria` has the following variables available for use in your expressions:
