@@ -517,6 +517,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "python", link: "/getting-started/templates-docs/python-README"},
                             {text: "chess", link: "/getting-started/templates-docs/chess-README"},
                             {text: "frankfurter", link: "/getting-started/templates-docs/frankfurter-README"},
+                            {text: "murder-mystery", link: "/getting-started/templates-docs/murder-mystery-README"},
                         ],
                     },
                     {
