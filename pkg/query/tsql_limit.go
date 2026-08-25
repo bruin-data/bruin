@@ -5,30 +5,18 @@ import (
 	"strings"
 )
 
-// TSQLLimit wraps a T-SQL query (SQL Server, Azure Synapse, Microsoft Fabric)
-// so it returns at most `limit` rows.
+// TSQLLimit wraps a T-SQL query so it returns at most `limit` rows.
 //
-// For a plain query it uses a derived-table wrapper:
+// A plain query uses a derived-table wrapper: SELECT TOP N * FROM (<query>) as t.
+// That is invalid when the query starts with a CTE (T-SQL forbids WITH inside a
+// derived table), so CTE-leading queries append the final query as an extra CTE:
 //
-//	SELECT TOP N * FROM (<query>) as t
-//
-// T-SQL forbids a CTE (WITH ...) as the first token of a derived table, so that
-// wrapper produces "Incorrect syntax near ')'" for any query that starts with a
-// WITH clause. When the query begins with a CTE, the final query is appended to
-// the existing CTE list as an extra CTE and limited from there instead:
-//
-//	WITH <existing ctes>, __bruin_limited AS (
-//	<final query>
-//	)
+//	WITH <existing ctes>, __bruin_limited AS (<final query>)
 //	SELECT TOP N * FROM __bruin_limited
 //
-// The original text is preserved verbatim (no identifier rewriting), which
-// matters on Fabric's case-sensitive collation.
-//
-// A query whose final statement ends in a top-level ORDER BY is not limitable by
-// either form (T-SQL disallows ORDER BY in a CTE/derived table without TOP), so
-// it falls through to the derived-table wrapper unchanged — the same behaviour
-// as before this helper existed.
+// The query text is preserved verbatim so Fabric's case-sensitive identifiers
+// still resolve. A trailing top-level ORDER BY falls through to the wrapper
+// unchanged, as before.
 func TSQLLimit(sql string, limit int64) string {
 	sql = strings.TrimRight(sql, "; \n\t")
 	if prefix, body, ok := splitLeadingWith(sql); ok {
@@ -37,12 +25,10 @@ func TSQLLimit(sql string, limit int64) string {
 	return fmt.Sprintf("SELECT TOP %d * FROM (\n%s\n) as t", limit, sql)
 }
 
-// splitLeadingWith reports whether sql begins with a CTE (WITH ...) clause and,
-// if so, splits it into the prefix (through the last CTE definition) and the
-// trailing main query body. It is comment-, string-, and bracket-aware so it is
-// not fooled by WITH/AS/parentheses appearing inside literals or CTE bodies.
-// It returns ok=false for any query without a leading WITH clause, and also for
-// malformed input, so callers fall back to the plain derived-table wrapper.
+// splitLeadingWith splits a leading CTE clause into the prefix (through the last
+// CTE) and the trailing main query. It is comment-, string-, and bracket-aware.
+// ok is false when there is no leading WITH or the input is malformed, so callers
+// fall back to the plain wrapper.
 func splitLeadingWith(sql string) (prefix, body string, ok bool) {
 	i := skipSpaceAndComments(sql, 0)
 	if !matchKeyword(sql, i, "WITH") {
@@ -50,10 +36,8 @@ func splitLeadingWith(sql string) (prefix, body string, ok bool) {
 	}
 	i += len("WITH")
 
-	// Walk the comma-separated CTE list. Each CTE is:
-	//   name [ (col, ...) ] AS ( <body> )
-	// After a CTE body's closing paren, a comma means another CTE follows;
-	// anything else marks the start of the main query.
+	// Each CTE is `name [ (cols) ] AS ( body )`; a comma after a body means
+	// another CTE follows, anything else starts the main query.
 	for {
 		asIdx := findKeywordAtDepthZero(sql, i, "AS")
 		if asIdx < 0 {
@@ -76,15 +60,12 @@ func splitLeadingWith(sql string) (prefix, body string, ok bool) {
 		if next >= len(sql) {
 			return "", "", false
 		}
-		// Body keeps everything after the last CTE (comments included), with only
-		// surrounding whitespace trimmed.
 		return strings.TrimRight(sql[:i], " \t\r\n"), strings.TrimLeft(sql[i:], " \t\r\n"), true
 	}
 }
 
-// skipLiteral reports whether s[i] begins a single-quoted string, a bracketed or
-// double-quoted identifier, or a line/block comment, and if so returns the index
-// just past it. T-SQL escapes closing delimiters by doubling (” ]] "").
+// skipLiteral, if s[i] starts a quoted string, bracketed/quoted identifier, or
+// comment, returns the index just past it. T-SQL doubles closers to escape them.
 func skipLiteral(s string, i int) (int, bool) {
 	if i >= len(s) {
 		return i, false
@@ -110,22 +91,19 @@ func skipLiteral(s string, i int) (int, bool) {
 	return i, false
 }
 
-// skipDelimited scans from an opening delimiter at s[open] to the matching close
-// byte, treating a doubled close byte as an escape, and returns the index past
-// the closing delimiter (or len(s) if unterminated).
-func skipDelimited(s string, open int, close byte) int {
-	i := open + 1
-	for i < len(s) {
-		if s[i] == close {
-			if i+1 < len(s) && s[i+1] == close {
-				i += 2
+// skipDelimited scans from the opener at s[open] past the matching closer byte,
+// treating a doubled closer as an escape.
+func skipDelimited(s string, open int, closer byte) int {
+	for i := open + 1; i < len(s); i++ {
+		if s[i] == closer {
+			if i+1 < len(s) && s[i+1] == closer {
+				i++
 				continue
 			}
 			return i + 1
 		}
-		i++
 	}
-	return i
+	return len(s)
 }
 
 func skipSpaceAndComments(s string, i int) int {
@@ -146,26 +124,18 @@ func skipSpaceAndComments(s string, i int) int {
 	return i
 }
 
-// matchKeyword reports whether the keyword kw appears at s[i] on identifier word
-// boundaries, case-insensitively.
+// matchKeyword reports whether kw appears at s[i] on identifier boundaries.
 func matchKeyword(s string, i int, kw string) bool {
-	if i+len(kw) > len(s) {
-		return false
-	}
-	if !strings.EqualFold(s[i:i+len(kw)], kw) {
+	if i+len(kw) > len(s) || !strings.EqualFold(s[i:i+len(kw)], kw) {
 		return false
 	}
 	if i > 0 && isIdentChar(s[i-1]) {
 		return false
 	}
-	if i+len(kw) < len(s) && isIdentChar(s[i+len(kw)]) {
-		return false
-	}
-	return true
+	return i+len(kw) >= len(s) || !isIdentChar(s[i+len(kw)])
 }
 
-// findKeywordAtDepthZero returns the index of keyword kw at parenthesis depth 0,
-// skipping literals and comments, or -1 if not found.
+// findKeywordAtDepthZero returns the index of kw at paren depth 0, or -1.
 func findKeywordAtDepthZero(s string, start int, kw string) int {
 	depth := 0
 	for i := start; i < len(s); {
@@ -188,8 +158,7 @@ func findKeywordAtDepthZero(s string, start int, kw string) int {
 	return -1
 }
 
-// matchParen returns the index of the ')' matching the '(' at s[open], skipping
-// literals and comments, or -1 if unbalanced.
+// matchParen returns the index of the ')' matching the '(' at s[open], or -1.
 func matchParen(s string, open int) int {
 	depth := 0
 	for i := open; i < len(s); {

@@ -94,7 +94,7 @@ func TestTSQLLimit(t *testing.T) {
 			expected: "WITH a AS (SELECT 1 AS id),\n__bruin_limited AS (\nSELECT * FROM a UNION ALL SELECT 2\n)\nSELECT TOP 50 * FROM __bruin_limited",
 		},
 		{
-			name:     "word starting with with is not a CTE",
+			name:     "identifier prefixed by the with token is not a CTE",
 			query:    "SELECT withheld FROM t",
 			limit:    10,
 			expected: "SELECT TOP 10 * FROM (\nSELECT withheld FROM t\n) as t",
@@ -102,7 +102,6 @@ func TestTSQLLimit(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			assert.Equal(t, tt.expected, TSQLLimit(tt.query, tt.limit))
