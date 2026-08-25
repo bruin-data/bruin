@@ -151,7 +151,7 @@ Because `criteria` has access to the full asset struct, you can enforce a naming
 custom_rules:
   - name: asset-name-matches-file-path
     description: "Asset {schema}.{table} must live at assets/{schema}/{table}.*"
-    criteria: 'asset.ExecutableFile.Path contains ("/" + split(asset.Name, ".")[0] + "/" + split(asset.Name, ".")[1] + ".")'
+    criteria: 'asset.ExecutableFile.Path matches ("/assets/" + split(asset.Name, ".")[0] + "/" + split(asset.Name, ".")[1] + "[.][^/]+$")'
 
 rulesets:
   - name: std
@@ -161,7 +161,7 @@ rulesets:
 
 Notes:
 
-- `asset.ExecutableFile.Path` is the absolute path to the asset file. Using `contains` with a leading `/` and a trailing `.` matches `.../{schema}/{table}.sql` (or `.py`) without hardcoding the extension or the checkout location.
+- `asset.ExecutableFile.Path` is the absolute path to the asset file. The `matches` regex anchors the location: `/assets/{schema}/{table}.<ext>` must appear at the **end** of the path, so files stored elsewhere (e.g. `tasks/bronze/transactions.sql`) or nested deeper (e.g. `assets/archive/bronze/transactions.sql`) are still flagged. `[.][^/]+$` matches any single extension (`.sql`, `.py`, …) without hardcoding it.
 - This example assumes a two-part `schema.table` name. For a three-part `layer.schema.table` convention, adjust the `split` indices accordingly (e.g. join the first two parts for the folder path).
 
 ### Variables
