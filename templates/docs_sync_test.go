@@ -130,8 +130,8 @@ func TestTemplateDocsSyncIsClean(t *testing.T) {
 		t.Skip("python3 not available")
 	}
 
-	out, err := exec.Command(
-		python, filepath.Join("..", "scripts", "sync_template_docs.py"), "--check",
+	out, err := exec.CommandContext(
+		t.Context(), python, filepath.Join("..", "scripts", "sync_template_docs.py"), "--check",
 	).CombinedOutput()
 	assert.NoError(t, err, "sync check failed:\n%s", out)
 }
