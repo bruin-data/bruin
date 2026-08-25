@@ -3,6 +3,7 @@ package lint
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -132,6 +133,58 @@ func TestQueryValidatorRule_ValidateAssetWithHookScope(t *testing.T) {
 	validator.AssertExpectations(t)
 	extractor.AssertExpectations(t)
 	materializer.AssertExpectations(t)
+	connections.AssertExpectations(t)
+}
+
+func TestQueryValidatorRule_ValidateAssetWithPipelineMacro(t *testing.T) {
+	t.Parallel()
+
+	startDate := time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC)
+	endDate := time.Date(2024, time.January, 31, 0, 0, 0, 0, time.UTC)
+	ctx := context.WithValue(t.Context(), pipeline.RunConfigStartDate, startDate)
+	ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, endDate)
+	ctx = context.WithValue(ctx, pipeline.RunConfigExecutionDate, endDate)
+	ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run-id")
+
+	asset := &pipeline.Asset{
+		Name: "dataset.table",
+		Type: pipeline.AssetTypeBigqueryQuery,
+		ExecutableFile: pipeline.ExecutableFile{
+			Content: "{{ test_macro(1) }}",
+		},
+	}
+	p := &pipeline.Pipeline{
+		Name:   "test-pipeline",
+		Assets: []*pipeline.Asset{asset},
+		Macros: []pipeline.Macro{
+			`{% macro test_macro(value) %}SELECT {{ value }}{% endmacro %}`,
+		},
+		DefaultConnections: map[string]string{
+			"google_cloud_platform": "gcp-conn",
+		},
+	}
+
+	validator := new(mockValidator)
+	validator.On("IsValid", mock.Anything, mock.MatchedBy(func(q *query.Query) bool {
+		return strings.TrimSpace(q.Query) == "SELECT 1"
+	})).Return(true, nil)
+
+	connections := new(mockConnectionManager)
+	connections.On("GetConnection", "gcp-conn").Return(validator)
+
+	rule := &QueryValidatorRule{
+		TaskType:    pipeline.AssetTypeBigqueryQuery,
+		Connections: connections,
+		Extractor: &query.WholeFileExtractor{
+			Renderer: jinja.NewRendererWithYesterday("test-pipeline", "test-run-id"),
+		},
+		Logger: zap.NewNop().Sugar(),
+	}
+
+	issues, err := rule.ValidateAsset(ctx, p, asset)
+	require.NoError(t, err)
+	assert.Empty(t, issues)
+	validator.AssertExpectations(t)
 	connections.AssertExpectations(t)
 }
 

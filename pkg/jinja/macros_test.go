@@ -1,8 +1,12 @@
 package jinja
 
 import (
+	"context"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 )
@@ -196,17 +200,57 @@ SELECT * FROM {{ table_name }}
 	}
 }
 
-func TestRendererClonePreservesMacros(t *testing.T) {
+func TestRendererCloneLoadsPipelineMacros(t *testing.T) {
 	t.Parallel()
+
+	startDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	endDate := time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)
+	executionDate := endDate
+	ctx := context.WithValue(t.Context(), pipeline.RunConfigStartDate, startDate)
+	ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, endDate)
+	ctx = context.WithValue(ctx, pipeline.RunConfigExecutionDate, executionDate)
+	ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run-id")
+
+	pipe := &pipeline.Pipeline{
+		Name: "test-pipeline",
+		Macros: []pipeline.Macro{
+			`{% macro test_macro(value) %}SELECT {{ value }}{% endmacro %}`,
+		},
+	}
+	asset := &pipeline.Asset{Name: "test.asset"}
+	renderer := NewRendererWithYesterday("test-pipeline", "test-run-id")
+
+	clonedRenderer, err := renderer.CloneForAsset(ctx, pipe, asset)
+	require.NoError(t, err)
+
+	result, err := clonedRenderer.Render("{{ test_macro(1) }}")
+	require.NoError(t, err)
+	require.Equal(t, "SELECT 1", strings.TrimSpace(result))
+}
+
+func TestRendererClonePreservesExplicitMacros(t *testing.T) {
+	t.Parallel()
+
+	startDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	endDate := time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)
+	executionDate := endDate
+	ctx := context.WithValue(t.Context(), pipeline.RunConfigStartDate, startDate)
+	ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, endDate)
+	ctx = context.WithValue(ctx, pipeline.RunConfigExecutionDate, executionDate)
+	ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run-id")
 
 	macroContent := `{% macro test_macro() %}SELECT 1{% endmacro %}`
 	renderer := NewRendererWithMacros(Context{}, macroContent)
+	pipe := &pipeline.Pipeline{
+		Name:   "test-pipeline",
+		Macros: []pipeline.Macro{`{% macro test_macro() %}SELECT 2{% endmacro %}`},
+	}
+	asset := &pipeline.Asset{Name: "test.asset"}
 
-	// Render using the original renderer
-	result1, err := renderer.Render("{{ test_macro() }}")
+	clonedRenderer, err := renderer.CloneForAsset(ctx, pipe, asset)
 	require.NoError(t, err)
-	require.Equal(t, "\nSELECT 1", result1)
 
-	// The macro should work in the original renderer
-	require.Equal(t, macroContent, renderer.macroContent)
+	result, err := clonedRenderer.Render("{{ test_macro() }}")
+	require.NoError(t, err)
+	require.Equal(t, "\nSELECT 1", result)
 }
