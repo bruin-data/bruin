@@ -67,6 +67,20 @@ func LoadMacros(fs afero.Fs, macrosPath string) (string, error) {
 	return macroContent.String(), nil
 }
 
+func pipelineMacroContent(pipe *pipeline.Pipeline) string {
+	if pipe == nil || len(pipe.Macros) == 0 {
+		return ""
+	}
+
+	var macroContent strings.Builder
+	for _, macro := range pipe.Macros {
+		macroContent.WriteString(string(macro))
+		macroContent.WriteString("\n")
+	}
+
+	return macroContent.String()
+}
+
 func NewRenderer(context Context) *Renderer {
 	addBuiltinFunctions(context)
 	return &Renderer{
@@ -262,6 +276,10 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 
 	runFullRefresh, _ := ctx.Value(pipeline.RunConfigFullRefresh).(bool)
 	fullRefresh := asset.FullRefreshEnabled(runFullRefresh)
+	macroContent := r.macroContent
+	if macroContent == "" {
+		macroContent = pipelineMacroContent(pipe)
+	}
 
 	applyModifiers, ok := ctx.Value(pipeline.RunConfigApplyIntervalModifiers).(bool)
 	if ok && applyModifiers {
@@ -271,6 +289,7 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 		tempRenderer := &Renderer{
 			context:         exec.NewContext(tempContext),
 			queryRenderLock: &sync.Mutex{},
+			macroContent:    macroContent,
 		}
 		// Use non-mutating template resolution to avoid modifying the original asset
 		resolvedStartModifier, err := asset.IntervalModifiers.Start.ResolveTemplateToNew(tempRenderer)
@@ -300,7 +319,7 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 	return &Renderer{
 		context:         exec.NewContext(jinjaContext),
 		queryRenderLock: &sync.Mutex{},
-		macroContent:    r.macroContent, // Preserve macro content when cloning
+		macroContent:    macroContent,
 	}, nil
 }
 
