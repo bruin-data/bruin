@@ -169,9 +169,12 @@ func (db *DB) Ping(ctx context.Context) error {
 	return nil
 }
 
-func (db *DB) Limit(query string, limit int64) string {
-	query = strings.TrimRight(query, "; \n\t")
-	return fmt.Sprintf("SELECT TOP %d * FROM (\n%s\n) as t", limit, query)
+// Limit wraps the query so it returns at most `limit` rows. Queries that begin
+// with a CTE are limited via an appended CTE rather than a derived-table
+// wrapper, since T-SQL forbids a WITH clause inside a derived table (which would
+// otherwise fail with "Incorrect syntax near ')'").
+func (db *DB) Limit(q string, limit int64) string {
+	return query.TSQLLimit(q, limit)
 }
 
 func (db *DB) GetDatabases(ctx context.Context) ([]string, error) {
