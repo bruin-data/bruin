@@ -5,24 +5,26 @@ import (
 	"strings"
 )
 
-// TSQLLimit wraps a T-SQL query so it returns at most `limit` rows.
-//
-// A plain query uses a derived-table wrapper: SELECT TOP N * FROM (<query>) as t.
-// That is invalid when the query starts with a CTE (T-SQL forbids WITH inside a
-// derived table), so CTE-leading queries append the final query as an extra CTE:
-//
-//	WITH <existing ctes>, __bruin_limited AS (<final query>)
-//	SELECT TOP N * FROM __bruin_limited
-//
-// The query text is preserved verbatim so Fabric's case-sensitive identifiers
-// still resolve. A trailing top-level ORDER BY falls through to the wrapper
-// unchanged, as before.
+// TSQLLimit wraps a T-SQL query so it returns at most `limit` rows, preserving
+// the query text verbatim. CTE-leading queries are limited via an appended CTE,
+// since a derived-table wrapper is invalid T-SQL after a WITH clause.
 func TSQLLimit(sql string, limit int64) string {
 	sql = strings.TrimRight(sql, "; \n\t")
 	if prefix, body, ok := splitLeadingWith(sql); ok {
-		return fmt.Sprintf("%s,\n__bruin_limited AS (\n%s\n)\nSELECT TOP %d * FROM __bruin_limited", prefix, body, limit)
+		name := uniqueCTEName(sql)
+		return fmt.Sprintf("%s,\n%s AS (\n%s\n)\nSELECT TOP %d * FROM %s", prefix, name, body, limit, name)
 	}
 	return fmt.Sprintf("SELECT TOP %d * FROM (\n%s\n) as t", limit, sql)
+}
+
+// uniqueCTEName returns a limit CTE name that does not already occur in sql.
+func uniqueCTEName(sql string) string {
+	lower := strings.ToLower(sql)
+	name := "__bruin_limited"
+	for strings.Contains(lower, name) {
+		name += "_x"
+	}
+	return name
 }
 
 // splitLeadingWith splits a leading CTE clause into the prefix (through the last

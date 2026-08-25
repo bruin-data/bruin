@@ -99,6 +99,12 @@ func TestTSQLLimit(t *testing.T) {
 			limit:    10,
 			expected: "SELECT TOP 10 * FROM (\nSELECT withheld FROM t\n) as t",
 		},
+		{
+			name:     "limit CTE name avoids collision with an existing one",
+			query:    "WITH __bruin_limited AS (SELECT 1 AS id) SELECT * FROM __bruin_limited",
+			limit:    10,
+			expected: "WITH __bruin_limited AS (SELECT 1 AS id),\n__bruin_limited_x AS (\nSELECT * FROM __bruin_limited\n)\nSELECT TOP 10 * FROM __bruin_limited_x",
+		},
 	}
 
 	for _, tt := range tests {
