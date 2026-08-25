@@ -1,0 +1,559 @@
+name: PostHog Product Analytics
+description: >
+  Account-level product engagement, product-qualified accounts, feature adoption
+  by segment, and retention cohorts from the posthog_reports layer. These are the
+  views PostHog cannot produce on its own, because they need product usage joined
+  to warehouse account attributes like plan, seats, MRR, and industry.
+
+  Adoption widgets count only the people a flag actually enabled, and measure
+  conversion inside the window set by `conversion_window_days` in pipeline.yml.
+  Segments smaller than `min_segment_users` are excluded from the detail table,
+  where a rate over one or two people would read as a finding. Retention widgets
+  show only weeks the warehouse holds full event data for.
+connection: gcp-default
+
+filters:
+  - name: date_range
+    type: date-range
+    default: all_time
+  - name: plan
+    type: select
+    default: All
+    options:
+      values: [All, free, pro, enterprise, unknown]
+
+queries:
+  # ---- headline account KPIs, most recent month in range -----------------
+  latest_month_kpis:
+    sql: |
+      WITH scoped AS (
+        SELECT *
+        FROM `posthog_reports.account_engagement_monthly`
+        WHERE activity_month >= DATE_TRUNC(CAST('{{ filters.date_range.start }}' AS DATE), MONTH)
+          AND activity_month <= CAST('{{ filters.date_range.end }}' AS DATE)
+          {% if filters.plan != 'All' %}
+          AND plan = '{{ filters.plan }}'
+          {% endif %}
+      ),
+      latest AS (
+        SELECT MAX(activity_month) AS m FROM scoped
+      )
+      SELECT
+        COUNT(DISTINCT s.company)                        AS active_accounts,
+        SUM(s.active_users)                              AS active_users,
+        SUM(s.product_actions)                           AS product_actions,
+        ROUND(AVG(s.engagement_score), 1)                AS avg_engagement_score,
+        SUM(s.mrr)                                       AS total_mrr
+      FROM scoped s
+      JOIN latest l ON s.activity_month = l.m
+
+  pql_summary:
+    sql: |
+      SELECT
+        COUNTIF(pql_tier = 'hot')          AS hot_accounts,
+        COUNTIF(expansion_signal)          AS expansion_accounts,
+        COUNTIF(churn_risk_signal)         AS churn_risk_accounts,
+        COUNTIF(pql_tier = 'dormant')      AS dormant_accounts
+      FROM `posthog_reports.product_qualified_accounts`
+      {% if filters.plan != 'All' %}
+      WHERE plan = '{{ filters.plan }}'
+      {% endif %}
+
+  # ---- engagement trend ---------------------------------------------------
+  engagement_trend:
+    sql: |
+      SELECT
+        activity_month,
+        ROUND(AVG(engagement_score), 1) AS avg_engagement_score,
+        SUM(active_users)               AS active_users,
+        SUM(product_actions)            AS product_actions,
+        -- Actions and users are three orders of magnitude apart, so they are
+        -- never plotted on one axis. The ratio is the comparable figure.
+        ROUND(SAFE_DIVIDE(SUM(product_actions), NULLIF(SUM(active_users), 0)), 1)
+          AS actions_per_active_user
+      FROM `posthog_reports.account_engagement_monthly`
+      WHERE activity_month >= DATE_TRUNC(CAST('{{ filters.date_range.start }}' AS DATE), MONTH)
+        AND activity_month <= CAST('{{ filters.date_range.end }}' AS DATE)
+        {% if filters.plan != 'All' %}
+        AND plan = '{{ filters.plan }}'
+        {% endif %}
+      GROUP BY activity_month
+      ORDER BY activity_month
+
+  engagement_by_plan:
+    sql: |
+      -- Pivoted to one column per plan: DAC charts take multiple y fields
+      -- rather than a series/group-by encoding.
+      SELECT
+        activity_month,
+        ROUND(AVG(IF(plan = 'free', engagement_score, NULL)), 1)       AS free,
+        ROUND(AVG(IF(plan = 'pro', engagement_score, NULL)), 1)        AS pro,
+        ROUND(AVG(IF(plan = 'enterprise', engagement_score, NULL)), 1) AS enterprise
+      FROM `posthog_reports.account_engagement_monthly`
+      WHERE activity_month >= DATE_TRUNC(CAST('{{ filters.date_range.start }}' AS DATE), MONTH)
+        AND activity_month <= CAST('{{ filters.date_range.end }}' AS DATE)
+      GROUP BY activity_month
+      ORDER BY activity_month
+
+  # ---- product-qualified accounts ----------------------------------------
+  pql_leaderboard:
+    sql: |
+      SELECT
+        company,
+        plan,
+        industry,
+        mrr,
+        active_users_28d,
+        seat_utilization_28d,
+        features_used_28d,
+        power_user_count,
+        product_action_trend_rate,
+        pql_score,
+        pql_tier
+      FROM `posthog_reports.product_qualified_accounts`
+      {% if filters.plan != 'All' %}
+      WHERE plan = '{{ filters.plan }}'
+      {% endif %}
+      ORDER BY pql_score DESC
+      LIMIT 25
+
+  expansion_and_risk:
+    sql: |
+      SELECT
+        company,
+        plan,
+        mrr,
+        active_users_28d,
+        product_actions_28d,
+        product_action_trend_rate,
+        pql_score,
+        CASE
+          WHEN expansion_signal AND churn_risk_signal THEN 'conflicting'
+          WHEN expansion_signal                       THEN 'expansion'
+          WHEN churn_risk_signal                      THEN 'churn risk'
+        END AS signal
+      FROM `posthog_reports.product_qualified_accounts`
+      WHERE (expansion_signal OR churn_risk_signal)
+        {% if filters.plan != 'All' %}
+        AND plan = '{{ filters.plan }}'
+        {% endif %}
+      ORDER BY mrr DESC, pql_score DESC
+      LIMIT 25
+
+  pql_tier_mix:
+    sql: |
+      SELECT
+        pql_tier,
+        COUNT(*) AS accounts
+      FROM `posthog_reports.product_qualified_accounts`
+      {% if filters.plan != 'All' %}
+      WHERE plan = '{{ filters.plan }}'
+      {% endif %}
+      GROUP BY pql_tier
+      ORDER BY
+        CASE pql_tier WHEN 'hot' THEN 1 WHEN 'warm' THEN 2 WHEN 'cool' THEN 3 ELSE 4 END
+
+  # ---- feature adoption ---------------------------------------------------
+  # Adoption counts only the arms that were actually given the feature. A
+  # boolean flag answers `false` for everyone held out of the rollout, and those
+  # rows outnumber the `true` rows on a partial rollout -- charting them as
+  # exposure reads as adoption by people who never saw the feature.
+  adoption_by_flag:
+    sql: |
+      SELECT
+        flag_key,
+        flag_variant,
+        -- Variants are folded into the axis label; DAC has no series encoding.
+        IF(flag_variant = 'true', flag_key, CONCAT(flag_key, ' / ', flag_variant))
+          AS flag_label,
+        SUM(exposed_users)                                        AS exposed_users,
+        SUM(exposed_accounts)                                     AS exposed_accounts,
+        SAFE_DIVIDE(SUM(converted_users), NULLIF(SUM(exposed_users), 0)) AS conversion_rate,
+        -- Weighted, not AVG(avg_mrr): the per-segment averages cover wildly
+        -- different account counts, so averaging them would let a one-account
+        -- segment outweigh a fifty-account one.
+        ROUND(SAFE_DIVIDE(SUM(total_mrr), NULLIF(SUM(exposed_accounts), 0)), 0) AS avg_mrr
+      FROM `posthog_reports.feature_adoption_by_segment`
+      WHERE flag_is_active
+        AND was_enabled
+        -- Segments whose exposure window overlaps the selected range.
+        AND last_exposure_date >= CAST('{{ filters.date_range.start }}' AS DATE)
+        AND first_exposure_date <= CAST('{{ filters.date_range.end }}' AS DATE)
+        {% if filters.plan != 'All' %}
+        AND plan = '{{ filters.plan }}'
+        {% endif %}
+      GROUP BY flag_key, flag_variant, flag_label
+      ORDER BY flag_key, flag_variant
+
+  # The A/B comparison the exposure chart deliberately leaves out: enabled
+  # against held-out, pooled across segments so the arms are comparable.
+  adoption_holdout_split:
+    sql: |
+      SELECT
+        flag_key,
+        IF(was_enabled, 'enabled', 'held out') AS arm,
+        SUM(exposed_users) AS exposed_users,
+        SAFE_DIVIDE(SUM(converted_users), NULLIF(SUM(exposed_users), 0)) AS conversion_rate,
+        SAFE_DIVIDE(SUM(upgraded_users), NULLIF(SUM(exposed_users), 0)) AS upgrade_rate
+      FROM `posthog_reports.feature_adoption_by_segment`
+      WHERE flag_is_active
+        AND last_exposure_date >= CAST('{{ filters.date_range.start }}' AS DATE)
+        AND first_exposure_date <= CAST('{{ filters.date_range.end }}' AS DATE)
+        {% if filters.plan != 'All' %}
+        AND plan = '{{ filters.plan }}'
+        {% endif %}
+      GROUP BY flag_key, was_enabled
+      ORDER BY flag_key, arm
+
+  # `is_reportable` drops the cells holding one or two people, where a rate can
+  # only ever be 0% or 100% and reads as a finding.
+  adoption_detail:
+    sql: |
+      SELECT
+        flag_key,
+        flag_variant,
+        plan,
+        industry,
+        exposed_users,
+        exposed_accounts,
+        adoption_rate,
+        conversion_rate,
+        avg_mrr
+      FROM `posthog_reports.feature_adoption_by_segment`
+      WHERE flag_is_active
+        AND was_enabled
+        AND is_reportable
+        AND last_exposure_date >= CAST('{{ filters.date_range.start }}' AS DATE)
+        AND first_exposure_date <= CAST('{{ filters.date_range.end }}' AS DATE)
+        {% if filters.plan != 'All' %}
+        AND plan = '{{ filters.plan }}'
+        {% endif %}
+      ORDER BY exposed_users DESC
+      LIMIT 30
+
+  # ---- retention ----------------------------------------------------------
+  retention_curve:
+    sql: |
+      SELECT
+        weeks_since_signup,
+        SAFE_DIVIDE(SUM(retained_users), NULLIF(SUM(cohort_size), 0)) AS retention_rate
+      FROM `posthog_reports.weekly_retention_cohorts`
+      WHERE is_complete_week
+        -- The range picks which cohorts are on the curve, by the week they
+        -- signed up in. Their later weeks are always shown in full, because a
+        -- retention curve truncated at the range end would read as churn.
+        AND cohort_week >= DATE_TRUNC(CAST('{{ filters.date_range.start }}' AS DATE), WEEK(MONDAY))
+        AND cohort_week <= CAST('{{ filters.date_range.end }}' AS DATE)
+        {% if filters.plan != 'All' %}
+        AND plan = '{{ filters.plan }}'
+        {% endif %}
+      GROUP BY weeks_since_signup
+      ORDER BY weeks_since_signup
+
+  retention_by_source:
+    sql: |
+      SELECT
+        signup_source,
+        SUM(CASE WHEN weeks_since_signup = 0 THEN cohort_size END)    AS cohort_size,
+        SAFE_DIVIDE(
+          SUM(CASE WHEN weeks_since_signup = 1 THEN retained_users END),
+          NULLIF(SUM(CASE WHEN weeks_since_signup = 1 THEN cohort_size END), 0)
+        ) AS week_1,
+        SAFE_DIVIDE(
+          SUM(CASE WHEN weeks_since_signup = 4 THEN retained_users END),
+          NULLIF(SUM(CASE WHEN weeks_since_signup = 4 THEN cohort_size END), 0)
+        ) AS week_4,
+        SAFE_DIVIDE(
+          SUM(CASE WHEN weeks_since_signup = 8 THEN retained_users END),
+          NULLIF(SUM(CASE WHEN weeks_since_signup = 8 THEN cohort_size END), 0)
+        ) AS week_8
+      FROM `posthog_reports.weekly_retention_cohorts`
+      WHERE is_complete_week
+        -- The range picks which cohorts are on the curve, by the week they
+        -- signed up in. Their later weeks are always shown in full, because a
+        -- retention curve truncated at the range end would read as churn.
+        AND cohort_week >= DATE_TRUNC(CAST('{{ filters.date_range.start }}' AS DATE), WEEK(MONDAY))
+        AND cohort_week <= CAST('{{ filters.date_range.end }}' AS DATE)
+        {% if filters.plan != 'All' %}
+        AND plan = '{{ filters.plan }}'
+        {% endif %}
+      GROUP BY signup_source
+      HAVING cohort_size IS NOT NULL
+      ORDER BY cohort_size DESC
+
+rows:
+  # ======================= headline KPIs =================================
+  - widgets:
+      - name: Active Accounts
+        type: metric
+        query: latest_month_kpis
+        value: { field: active_accounts, type: number, format: ",.0f" }
+        col: 2
+      - name: Active Users
+        type: metric
+        query: latest_month_kpis
+        value: { field: active_users, type: number, format: ",.0f" }
+        col: 2
+      - name: Product Actions
+        type: metric
+        query: latest_month_kpis
+        value: { field: product_actions, type: number, format: ",.0f" }
+        col: 2
+      - name: Avg Engagement
+        type: metric
+        query: latest_month_kpis
+        value: { field: avg_engagement_score, type: number, format: ",.1f" }
+        col: 2
+      - name: Tracked MRR
+        type: metric
+        query: latest_month_kpis
+        value: { field: total_mrr, type: number, format: "$,.0f" }
+        col: 4
+
+  - widgets:
+      - name: Hot Accounts (28d)
+        type: metric
+        query: pql_summary
+        value: { field: hot_accounts, type: number, format: ",.0f" }
+        col: 3
+      - name: Expansion Signals (28d)
+        type: metric
+        query: pql_summary
+        value: { field: expansion_accounts, type: number, format: ",.0f" }
+        col: 3
+      - name: Churn Risk (28d)
+        type: metric
+        query: pql_summary
+        value: { field: churn_risk_accounts, type: number, format: ",.0f" }
+        col: 3
+      - name: Dormant Accounts (28d)
+        type: metric
+        query: pql_summary
+        value: { field: dormant_accounts, type: number, format: ",.0f" }
+        col: 3
+
+  # ======================= engagement ====================================
+  - widgets:
+      - name: Account Engagement Over Time
+        type: chart
+        chart: line
+        query: engagement_trend
+        x: { field: activity_month, type: date }
+        y: { field: [avg_engagement_score], type: number, format: ",.1f" }
+        col: 6
+      - name: Engagement by Plan (all plans)
+        type: chart
+        chart: line
+        query: engagement_by_plan
+        x: { field: activity_month, type: date }
+        y: { field: [free, pro, enterprise], type: number, format: ",.1f" }
+        col: 6
+
+  - widgets:
+      - name: Monthly Product Actions
+        type: chart
+        chart: bar
+        query: engagement_trend
+        x: { field: activity_month, type: date }
+        y: { field: [product_actions], type: number, format: ",.0f" }
+        col: 4
+      - name: Actions per Active User
+        type: chart
+        chart: line
+        query: engagement_trend
+        x: { field: activity_month, type: date }
+        y: { field: [actions_per_active_user], type: number, format: ",.1f" }
+        col: 4
+      - name: Account Mix by PQL Tier (28d)
+        type: chart
+        chart: bar
+        query: pql_tier_mix
+        x: { field: pql_tier, type: category }
+        y: { field: [accounts], type: number, format: ",.0f" }
+        col: 4
+
+  # ======================= product-qualified accounts ====================
+  - widgets:
+      - name: Product-Qualified Accounts (trailing 28 days)
+        type: table
+        query: pql_leaderboard
+        col: 12
+        columns:
+          - name: company
+          - name: plan
+          - name: industry
+          - name: mrr
+            number: currency
+          - name: active_users_28d
+            label: Active users (28d)
+            number: number
+          - name: seat_utilization_28d
+            label: Seat utilization
+            number: ".0%"
+            format:
+              - { backgroundColor: [white, green] }
+          - name: features_used_28d
+            label: Features used
+            number: number
+          - name: power_user_count
+            label: Power users
+            number: number
+          - name: product_action_trend_rate
+            label: Usage trend
+            number: "+.0%"
+            format:
+              - { if: greater_than, value: 0.1, textColor: green, bold: true }
+              - { if: less_than, value: -0.1, textColor: red, bold: true }
+          - name: pql_score
+            label: PQL score
+            number: ",.0f"
+            format:
+              - { backgroundColor: [red, amber, green], range: [0, 45, 100], unit: absolute }
+          - name: pql_tier
+            label: Tier
+            format:
+              - { if: text_is_exactly, value: hot, backgroundColor: green, bold: true }
+              - { if: text_is_exactly, value: warm, backgroundColor: amber }
+              - { if: text_is_exactly, value: dormant, textColor: red }
+
+  - widgets:
+      - name: Expansion & Churn-Risk Accounts (trailing 28 days)
+        type: table
+        query: expansion_and_risk
+        col: 12
+        columns:
+          - name: company
+          - name: plan
+          - name: mrr
+            number: currency
+          - name: active_users_28d
+            label: Active users (28d)
+            number: number
+          - name: product_actions_28d
+            label: Actions (28d)
+            number: number
+          - name: product_action_trend_rate
+            label: Usage trend
+            number: "+.0%"
+            format:
+              - { if: greater_than, value: 0, textColor: green }
+              - { if: less_than, value: 0, textColor: red }
+          - name: pql_score
+            label: PQL score
+            number: ",.0f"
+          - name: signal
+            format:
+              - { if: text_is_exactly, value: expansion, backgroundColor: green, bold: true }
+              - { if: text_is_exactly, value: churn risk, backgroundColor: red, bold: true }
+              - { if: text_is_exactly, value: conflicting, backgroundColor: amber }
+
+  # ======================= feature adoption ==============================
+  - widgets:
+      - name: Users Given the Feature
+        type: chart
+        chart: bar
+        query: adoption_by_flag
+        x: { field: flag_label, type: category }
+        y: { field: [exposed_users], type: number, format: ",.0f" }
+        col: 6
+      - name: Conversion After Exposure
+        type: chart
+        chart: bar
+        query: adoption_by_flag
+        x: { field: flag_label, type: category }
+        y: { field: [conversion_rate], type: number, format: ".1%" }
+        col: 6
+
+  - widgets:
+      - name: Enabled vs Held Out
+        type: table
+        query: adoption_holdout_split
+        col: 12
+        columns:
+          - name: flag_key
+            label: Flag
+          - name: arm
+            label: Arm
+            format:
+              - { if: text_is_exactly, value: enabled, backgroundColor: green }
+              - { if: text_is_exactly, value: held out, backgroundColor: amber }
+          - name: exposed_users
+            label: Users
+            number: number
+          - name: conversion_rate
+            label: Conversion
+            number: ".1%"
+            format:
+              - { backgroundColor: [white, green] }
+          - name: upgrade_rate
+            label: Upgrade
+            number: ".1%"
+            format:
+              - { backgroundColor: [white, blue] }
+
+  - widgets:
+      - name: Feature Adoption by Segment (reportable segments only)
+        type: table
+        query: adoption_detail
+        col: 12
+        columns:
+          - name: flag_key
+            label: Flag
+          - name: flag_variant
+            label: Variant
+          - name: plan
+          - name: industry
+          - name: exposed_users
+            label: Exposed users
+            number: number
+          - name: exposed_accounts
+            label: Exposed accounts
+            number: number
+          - name: adoption_rate
+            label: Adoption
+            number: ".0%"
+            format:
+              - { backgroundColor: [white, blue] }
+          - name: conversion_rate
+            label: Conversion
+            number: ".1%"
+            format:
+              - { backgroundColor: [white, green] }
+          - name: avg_mrr
+            label: Avg MRR
+            number: currency
+
+  # ======================= retention =====================================
+  - widgets:
+      - name: Retention Curve (weeks with full event coverage)
+        type: chart
+        chart: line
+        query: retention_curve
+        x: { field: weeks_since_signup, type: number }
+        y: { field: [retention_rate], type: number, format: ".0%" }
+        col: 6
+      - name: Retention by Signup Source
+        type: table
+        query: retention_by_source
+        col: 6
+        columns:
+          - name: signup_source
+            label: Source
+          - name: cohort_size
+            label: Cohort (wk 0)
+            number: number
+          - name: week_1
+            label: Week 1
+            number: ".0%"
+            format:
+              - { backgroundColor: [red, white, green], range: [0, 0.4, 0.8], unit: absolute }
+          - name: week_4
+            label: Week 4
+            number: ".0%"
+            format:
+              - { backgroundColor: [red, white, green], range: [0, 0.3, 0.6], unit: absolute }
+          - name: week_8
+            label: Week 8
+            number: ".0%"
+            format:
+              - { backgroundColor: [red, white, green], range: [0, 0.2, 0.5], unit: absolute }

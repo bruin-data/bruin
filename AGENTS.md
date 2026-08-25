@@ -299,7 +299,17 @@ make refresh-integration-expectations
 
 # Test complete pipeline parsing
 ./bin/bruin internal parse-pipeline path/to/pipeline
+
+# Regenerate the docs pages that mirror a template README
+make sync-template-docs
 ```
+
+Most templates have a docs page under `docs/getting-started/templates-docs/` that
+is written by hand and diverges from the template's own README. For the templates
+listed in `SYNCED` in `scripts/sync_template_docs.py`, the docs page is instead
+generated from the README: edit `templates/<name>/README.md`, run
+`make sync-template-docs`, and commit both. Those pages open with a
+`<!-- Generated from … -->` comment; `make test` fails if one has drifted.
 
 ### Database Connection Testing
 ```bash

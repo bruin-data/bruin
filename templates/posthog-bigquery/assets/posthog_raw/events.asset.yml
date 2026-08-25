@@ -1,0 +1,58 @@
+name: posthog_raw.events
+type: ingestr
+
+description: >
+  Raw-layer PostHog events loaded into BigQuery. The PostHog source filters the
+  events endpoint on `timestamp` server-side, so each run fetches only the
+  events that happened inside its own window and appends them to the
+  destination table. Events are immutable in PostHog, so nothing needs to be
+  revisited once a window has loaded.
+
+parameters:
+  source_table: events
+
+tags:
+  - posthog_raw
+  - posthog
+  - product_analytics
+
+columns:
+  - name: id
+    type: varchar
+    description: PostHog event identifier.
+    primary_key: true
+    checks:
+      - name: not_null
+  - name: distinct_id
+    type: varchar
+    description: >
+      Identifier of the user or device that triggered the event. PostHog merges
+      several distinct IDs into a single person over time, so join to
+      `posthog_raw.persons` through `distinct_ids` rather than assuming one
+      distinct ID per person.
+  - name: event
+    type: varchar
+    description: >
+      Name of the event, for example `$pageview`, `$autocapture`, or a custom
+      event your product sends.
+    checks:
+      - name: not_null
+  - name: timestamp
+    type: timestamp
+    description: When the event occurred, as reported by the client.
+    checks:
+      - name: not_null
+  - name: properties
+    type: json
+    description: >
+      Event properties. Includes PostHog's own `$`-prefixed properties such as
+      `$current_url`, `$browser`, `$session_id`, and `$feature_flag_response`,
+      alongside any custom properties you send.
+  - name: elements
+    type: json
+    description: >
+      DOM elements captured for autocaptured interactions, ordered from the
+      clicked element up through its ancestors.
+  - name: elements_chain
+    type: varchar
+    description: Serialized string form of `elements`, as stored by PostHog.
