@@ -549,6 +549,12 @@ func TestDB_Limit(t *testing.T) {
 	// so case-sensitive column aliases survive.
 	got := db.Limit("SELECT src.Account FROM (SELECT x AS Account FROM t) src;", 100)
 	assert.Equal(t, "SELECT TOP 100 * FROM (\nSELECT src.Account FROM (SELECT x AS Account FROM t) src\n) as t", got)
+
+	// A query that starts with a CTE cannot be wrapped in a derived table on
+	// T-SQL; it is limited via an appended CTE instead (regression: previously
+	// produced "Incorrect syntax near ')'").
+	gotCTE := db.Limit("WITH a AS (SELECT 1 AS id) SELECT * FROM a", 10)
+	assert.Equal(t, "WITH a AS (SELECT 1 AS id),\n__bruin_limited AS (\nSELECT * FROM a\n)\nSELECT TOP 10 * FROM __bruin_limited", gotCTE)
 }
 
 const expectedDatabaseSummaryQuery = `

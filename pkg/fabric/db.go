@@ -84,12 +84,13 @@ func (db *DB) RunQueryWithoutResult(ctx context.Context, q *query.Query) error {
 }
 
 // Limit wraps the query so it returns at most `limit` rows. It preserves the
-// original query verbatim inside a derived table rather than rewriting it,
-// which matters on Fabric's case-sensitive collation where a parser round-trip
-// would otherwise lowercase column aliases and break the outer references.
-func (db *DB) Limit(query string, limit int64) string {
-	query = strings.TrimRight(query, "; \n\t")
-	return fmt.Sprintf("SELECT TOP %d * FROM (\n%s\n) as t", limit, query)
+// original query verbatim rather than rewriting it, which matters on Fabric's
+// case-sensitive collation where a parser round-trip would otherwise lowercase
+// column aliases and break the outer references. Queries that begin with a CTE
+// are limited via an appended CTE instead of a derived-table wrapper, since
+// T-SQL forbids a WITH clause inside a derived table.
+func (db *DB) Limit(q string, limit int64) string {
+	return query.TSQLLimit(q, limit)
 }
 
 func (db *DB) Select(ctx context.Context, q *query.Query) ([][]interface{}, error) {
