@@ -1,0 +1,61 @@
+name: posthog_raw.persons
+type: ingestr
+
+description: >
+  Raw-layer PostHog persons loaded into BigQuery. The PostHog source merges
+  each run's window into the destination table on `id`, so profile edits are
+  picked up whenever a run covers them. Person properties are mutable and are
+  overwritten in place rather than versioned.
+
+parameters:
+  source_table: persons
+
+tags:
+  - posthog_raw
+  - posthog
+  - product_analytics
+
+columns:
+  - name: id
+    type: varchar
+    description: >
+      PostHog person identifier. A UUID string, not a number, and identical to
+      `uuid` on the same row.
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: uuid
+    type: varchar
+    description: >
+      Globally unique identifier of the person. PostHog returns the same value
+      here as in `id`.
+  - name: name
+    type: varchar
+    description: >
+      Display name PostHog derives from the person's properties, usually their
+      email address or first distinct ID.
+  - name: distinct_ids
+    type: json
+    description: >
+      All distinct IDs that PostHog has merged into this person. Use it to join
+      `posthog_raw.events.distinct_id` back to a single person.
+  - name: properties
+    type: json
+    description: >
+      Person properties set via `identify` calls, plus PostHog's own
+      `$`-prefixed properties such as `$initial_referring_domain` and
+      `$geoip_country_code`.
+  - name: is_identified
+    type: boolean
+    description: >
+      Whether the person has been through an `$identify` call rather than being
+      known only by an anonymous distinct ID.
+  - name: created_at
+    type: timestamp
+    description: When PostHog first created the person record.
+  - name: last_seen_at
+    type: timestamp
+    description: >
+      When PostHog last saw activity for this person. The source uses it as the
+      incremental key for this table.

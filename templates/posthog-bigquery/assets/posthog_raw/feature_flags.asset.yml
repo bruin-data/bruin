@@ -1,0 +1,67 @@
+name: posthog_raw.feature_flags
+type: ingestr
+
+description: >
+  Raw-layer PostHog feature flags loaded into BigQuery. The PostHog source
+  merges each run's window into the destination table on `id`. Pair it with the
+  `$feature_flag_called` events in `posthog_raw.events` to attribute behaviour
+  to the flag variant a user was served.
+
+parameters:
+  source_table: feature_flags
+
+tags:
+  - posthog_raw
+  - posthog
+  - product_analytics
+
+columns:
+  - name: id
+    type: bigint
+    description: PostHog feature flag identifier.
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: key
+    type: varchar
+    description: >
+      Flag key used in your code and reported on `$feature_flag_called` events.
+    checks:
+      - name: not_null
+  - name: name
+    type: varchar
+    description: Human-readable description of what the flag controls.
+  - name: active
+    type: boolean
+    description: Whether the flag is currently enabled in PostHog.
+  - name: deleted
+    type: boolean
+    description: Whether the flag has been soft-deleted.
+  - name: filters
+    type: json
+    description: >
+      Release conditions and multivariate variants, including rollout
+      percentages and the property filters that gate each group.
+  - name: created_by
+    type: json
+    description: PostHog user who created the flag.
+  - name: created_at
+    type: timestamp
+    description: When the flag was created.
+  - name: updated_at
+    type: timestamp
+    description: >
+      When the flag was last modified. The source uses it as the incremental
+      key for this table.
+  - name: last_called_at
+    type: timestamp
+    description: When the flag was most recently evaluated by a client.
+  - name: ensure_experience_continuity
+    type: boolean
+    description: >
+      Whether PostHog pins a user to their first evaluated variant so the
+      experience does not change mid-experiment.
+  - name: tags
+    type: json
+    description: Tags applied to the flag in PostHog.

@@ -1,0 +1,231 @@
+name: posthog-bigquery
+schedule: daily
+start_date: "2025-01-01"
+catchup: false
+
+metadata_push:
+  bigquery: true
+
+default:
+  type: ingestr
+  parameters:
+    source_connection: posthog-default
+    destination: bigquery
+    loader_file_format: jsonl
+
+default_connections:
+  google_cloud_platform: gcp-default
+  posthog: posthog-default
+
+variables:
+  # PostHog event names have no fixed schema — every project sends its own. The
+  # lists below are the only place the template names your events, so retarget
+  # it to your taxonomy by editing them here rather than by hunting through SQL.
+
+  # Events that represent real product work rather than navigation. These drive
+  # `product_actions`, `features_used`, and the breadth component of both the
+  # engagement and PQL scores. Replace them with the eight-or-so events that
+  # mean someone got value out of your product.
+  product_action_events:
+    type: array
+    items:
+      type: string
+    default:
+      - pipeline_run_started
+      - query_executed
+      - dashboard_viewed
+      - asset_created
+      - lineage_explored
+      - connection_tested
+      - csv_exported
+      - team_member_invited
+
+  # Events that mark someone converting. They set `sessions.converted` and the
+  # `converted_users` and `upgrade_rate` columns in the reports.
+  conversion_events:
+    type: array
+    items:
+      type: string
+    default:
+      - signed_up
+      - subscription_started
+
+  # Events that mark someone moving onto a paid plan. They drive `upgrade_rate`
+  # in the feature-adoption report, which is what makes an experiment readout
+  # about revenue rather than about clicks.
+  upgrade_events:
+    type: array
+    items:
+      type: string
+    default:
+      - subscription_started
+
+  # ---------------------------------------------------------------------------
+  # Scoring knobs. Everything below encodes an assumption about your product
+  # rather than a universal truth, which is exactly why it lives here instead of
+  # inside the SQL. The defaults are reasonable for a mid-market B2B SaaS tool;
+  # none of them are right for every product.
+  # ---------------------------------------------------------------------------
+
+  # Which population seat activation is measured against, and the single most
+  # consequential setting in the template — it carries 30 of the 100 engagement
+  # points and 20 of the 100 PQL points.
+  #
+  #   reachable  (default) active users over the people PostHog has actually
+  #              seen. PostHog only knows someone after an `identify` call, so
+  #              this asks "how much of the team we can see is active".
+  #   contracted           active users over the `seats` property, i.e. what the
+  #              account pays for. Only meaningful when your `identify` coverage
+  #              matches your billing; otherwise every account whose rollout
+  #              lags its licence count reads as disengaged, which in practice
+  #              means your largest accounts score worst.
+  #
+  # `posthog_stage.accounts.seat_coverage` reports the gap between the two
+  # either way, so switching to `reachable` does not lose the licence
+  # information — it moves it out of the engagement score, where a coverage
+  # problem was being reported as an engagement problem.
+  seat_denominator:
+    type: string
+    enum: [reachable, contracted]
+    default: reachable
+
+  # Length of the trailing window in `product_qualified_accounts`, and of the
+  # prior window it is compared against for the momentum component. Measured
+  # backwards from the last day of event data, not the wall clock, so the report
+  # stays interpretable when a load is late.
+  #
+  # The report's column names carry a `_28d` suffix from the default. Changing
+  # this changes the window but not the names, so a value other than 28 makes
+  # `active_users_28d` a misnomer — rename the columns if that will confuse
+  # whoever reads the table.
+  pql_window_days:
+    type: integer
+    minimum: 7
+    maximum: 90
+    default: 28
+
+  # Score bands for routing, checked in order: hot, then warm, then cool, then
+  # dormant. They must descend — set warm above hot and the warm band becomes
+  # unreachable, silently, because the hot test wins first.
+  #
+  # Raise them if too many accounts land in the top tier to action. The right
+  # values depend entirely on how your scores spread, so look at the quartiles
+  # on your own data first:
+  #
+  #   SELECT APPROX_QUANTILES(pql_score, 4) FROM posthog_reports.product_qualified_accounts
+  #
+  # Note that an account with no activity at all in the window is always
+  # `dormant`, whatever these are set to.
+  pql_hot_score:
+    type: integer
+    minimum: 1
+    maximum: 100
+    default: 70
+  pql_warm_score:
+    type: integer
+    minimum: 1
+    maximum: 100
+    default: 45
+  pql_cool_score:
+    type: integer
+    minimum: 1
+    maximum: 100
+    default: 20
+
+  # Minimum PQL score for `expansion_signal`, which sets the length of the sales
+  # queue. On a project where most accounts were genuinely active, 65 flagged a
+  # quarter of them — technically correct, operationally useless. Check the hit
+  # rate before wiring this into a workflow and raise it, not the headcount:
+  #
+  #   SELECT COUNTIF(expansion_signal) / COUNT(*)
+  #   FROM posthog_reports.product_qualified_accounts
+  expansion_min_score:
+    type: integer
+    minimum: 1
+    maximum: 100
+    default: 65
+
+  # Product actions per active user that earn full marks on the depth component
+  # of both scores — 25 of the 100 points in each. Set it near what a healthy
+  # account actually does per window, not to an aspiration: too high and the
+  # component reads near-zero for everyone, too low and it saturates and stops
+  # separating accounts. Either way it stops discriminating, which is easy to
+  # miss because the score still looks plausible. Sanity-check with:
+  #
+  #   SELECT APPROX_QUANTILES(SAFE_DIVIDE(product_actions_28d, active_users_28d), 4)
+  #   FROM posthog_reports.product_qualified_accounts
+  #
+  # Note this is per active user per window, not per account.
+  depth_target_actions:
+    type: integer
+    minimum: 1
+    maximum: 10000
+    default: 40
+
+  # Mean session minutes that earn full marks on the session-depth component of
+  # the engagement score — 15 of its 100 points. Sessions are PostHog's own,
+  # rotated after 30 minutes of inactivity, and single-event sessions have a
+  # duration of zero, so a product used in short bursts will score low here
+  # however engaged its users are. Lower it, or reweight the component, rather
+  # than reading it as a problem.
+  session_depth_target_minutes:
+    type: integer
+    minimum: 1
+    maximum: 1440
+    default: 10
+
+  # What makes someone a power user: sustained usage rather than one busy
+  # afternoon. Both conditions must hold inside the PQL window, so keep
+  # `power_user_min_active_days` well below `pql_window_days` — set it at or
+  # above the window and nobody can ever qualify, which reads as "no power
+  # users" rather than as a misconfiguration. Power-user share is 15 of the 100
+  # PQL points.
+  power_user_min_actions:
+    type: integer
+    minimum: 1
+    default: 20
+  power_user_min_active_days:
+    type: integer
+    minimum: 1
+    maximum: 90
+    default: 8
+
+  # How long after a flag exposure an action still counts as caused by it, in
+  # days. Bounding this is what keeps `conversion_rate` in the feature-adoption
+  # report meaningful: over an unbounded window every person who stays active
+  # eventually performs a product action, so every arm converges on 100% and the
+  # comparison between variants disappears. Two weeks is a reasonable default
+  # for an in-product change; shorten it for a flow you expect to act on
+  # immediately.
+  conversion_window_days:
+    type: integer
+    minimum: 1
+    maximum: 90
+    default: 14
+
+  # Smallest number of exposed people a feature-adoption segment needs before
+  # its rates are worth reading. The report is grained by flag, variant, plan,
+  # and industry, which produces cells holding one or two people where a rate
+  # can only be 0% or 100% and reads as a finding. Rows below this threshold are
+  # kept, so totals stay complete, but marked `is_reportable = false`.
+  #
+  # Ten is a floor rather than a significance threshold: it is the point below
+  # which a percentage is obviously meaningless. Raise it if you are making
+  # ship/no-ship calls off these numbers, and expect the detail table to thin
+  # out sharply as you do -- on a project with four flags and eight industries
+  # the tail is long.
+  min_segment_users:
+    type: integer
+    minimum: 1
+    default: 10
+
+  # Events whose `amount` property is money. PostHog's own convention is the
+  # `$revenue` property, which is always read; `amount` is only read on these
+  # events, because it is a common generic property name elsewhere.
+  revenue_events:
+    type: array
+    items:
+      type: string
+    default:
+      - invoice_paid
+      - subscription_started

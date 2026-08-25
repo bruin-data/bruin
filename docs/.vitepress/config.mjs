@@ -546,6 +546,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "shopify-bigquery", link: "/getting-started/templates-docs/shopify-bigquery-README"},
                             {text: "shopify-duckdb", link: "/getting-started/templates-docs/shopify-duckdb-README"},
                             {text: "stripe-bigquery", link: "/getting-started/templates-docs/stripe-bigquery-README"},
+                            {text: "posthog-bigquery", link: "/getting-started/templates-docs/posthog-bigquery-README"},
                             {text: "gsheet-bigquery", link: "/getting-started/templates-docs/gsheet-bigquery-README"},
                             {text: "gsheet-duckdb", link: "/getting-started/templates-docs/gsheet-duckdb-README"},
                             {text: "notion", link: "/getting-started/templates-docs/notion-README"},

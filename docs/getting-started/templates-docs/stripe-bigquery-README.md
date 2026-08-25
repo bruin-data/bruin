@@ -1,3 +1,4 @@
+<!-- Generated from templates/stripe-bigquery/README.md. Do not edit directly; run `make sync-template-docs`. -->
 # Stripe Billing Analytics to BigQuery
 
 `stripe-bigquery` is a focused Stripe billing analytics pipeline for BigQuery. It loads the customer, product, price, subscription, subscription-item, and invoice resources into `stripe_raw`; builds reusable billing models in `stripe_stage`; and publishes recurring-revenue and invoice-billing reports in `stripe_reports`.

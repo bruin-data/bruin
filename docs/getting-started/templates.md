@@ -194,6 +194,12 @@ An Iceberg connection is a **catalog** (where table metadata lives) plus **stora
     <span>Loads core Stripe billing data into BigQuery and builds focused subscription, MRR, and invoice-billing reports.</span>
     <span class="template-card__tags"><code>Stripe</code><code>BigQuery</code><code>billing</code></span>
   </a>
+  <a class="template-card" href="./templates-docs/posthog-bigquery-README.html">
+    <span class="template-card__category">Product analytics</span>
+    <strong>posthog-bigquery</strong>
+    <span>Models PostHog events, persons, and feature flags into BigQuery, then builds account-level engagement, product-qualified-account, feature-adoption, and retention reports with a DAC dashboard.</span>
+    <span class="template-card__tags"><code>PostHog</code><code>BigQuery</code><code>DAC</code></span>
+  </a>
   <a class="template-card" href="./templates-docs/gsheet-bigquery-README.html">
     <span class="template-card__category">Spreadsheet source</span>
     <strong>gsheet-bigquery</strong>
@@ -272,7 +278,7 @@ bruin init nyc-taxi my-taxi-pipeline
 | --- | --- |
 | Learn Bruin locally without cloud credentials | `duckdb`, `python`, `frankfurter`, `chess`, or `iceberg-sqlite-local` |
 | Load into an Iceberg lakehouse | `iceberg-sqlite-local` to try it, then `iceberg-glue-s3`, `iceberg-postgres-gcs`, `iceberg-rest-minio`, or `iceberg-hadoop-gcsinterop` |
-| Build a source-to-warehouse ingestion pipeline | `ai-coding-usage`, `shopify-bigquery`, `shopify-clickhouse`, `stripe-bigquery`, `gsheet-bigquery`, `notion`, or `gorgias` |
+| Build a source-to-warehouse ingestion pipeline | `ai-coding-usage`, `shopify-bigquery`, `shopify-clickhouse`, `stripe-bigquery`, `posthog-bigquery`, `gsheet-bigquery`, `notion`, or `gorgias` |
 | Migrate one Fivetran connection to a review-gated Bruin project | `migration-fivetran` |
 | Explore a complete demo with generated data | `demo-snowflake-sales-analytics` or `demo-snowflake-salesforce` |
 | Scaffold ecommerce reporting | `ecommerce` |

@@ -1,0 +1,15 @@
+default_environment: default
+
+environments:
+  default:
+    connections:
+      google_cloud_platform:
+        - name: gcp-default
+          project_id: your-gcp-project-id
+          location: your-gcp-region
+          use_application_default_credentials: true
+      posthog:
+        - name: posthog-default
+          personal_api_key: ${POSTHOG_PERSONAL_API_KEY}
+          project_id: ${POSTHOG_PROJECT_ID}
+          base_url: https://us.posthog.com
