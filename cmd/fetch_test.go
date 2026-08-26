@@ -6,12 +6,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/bruincloud"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
@@ -1104,4 +1107,56 @@ func TestWriteAggregatedQueryLogCapsRows(t *testing.T) {
 	var perQuery QueryLog
 	require.NoError(t, json.Unmarshal(perQueryData, &perQuery))
 	assert.Len(t, perQuery.Rows, 50, "per-query file should be untouched")
+}
+
+func TestIsCloudQueryMode(t *testing.T) {
+	cases := map[string]bool{
+		"1": true, "true": true, "TRUE": true, "yes": true, "on": true,
+		"": false, "0": false, "off": false, "no": false, "nope": false,
+	}
+	for val, want := range cases {
+		t.Run(val, func(t *testing.T) {
+			t.Setenv(cloudQueryModeEnv, val)
+			assert.Equal(t, want, isCloudQueryMode())
+		})
+	}
+}
+
+func TestCloudQuerierSelectWithSchema(t *testing.T) {
+	t.Run("maps the columnar result", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "/agents/9/query", r.URL.Path)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"columns":      []string{"n"},
+				"column_types": []string{"INT8"},
+				"rows":         [][]any{{1}},
+			})
+		}))
+		defer server.Close()
+		t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
+
+		q := &cloudQuerier{client: bruincloud.NewAPIClient("k"), agentID: 9, connectionName: "c"}
+		res, err := q.SelectWithSchema(context.Background(), &query.Query{Query: "SELECT 1 AS n"})
+		require.NoError(t, err)
+		assert.Equal(t, []string{"n"}, res.Columns)
+		assert.Equal(t, []string{"INT8"}, res.ColumnTypes)
+		assert.Equal(t, [][]interface{}{{float64(1)}}, res.Rows)
+	})
+
+	t.Run("pads column types when the server omits them", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"columns": []string{"a", "b", "c"},
+				"rows":    [][]any{},
+			})
+		}))
+		defer server.Close()
+		t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
+
+		q := &cloudQuerier{client: bruincloud.NewAPIClient("k"), agentID: 1, connectionName: "c"}
+		res, err := q.SelectWithSchema(context.Background(), &query.Query{Query: "SELECT * FROM t"})
+		require.NoError(t, err)
+		assert.Equal(t, []string{"a", "b", "c"}, res.Columns)
+		assert.Equal(t, []string{"", "", ""}, res.ColumnTypes)
+	})
 }

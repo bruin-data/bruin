@@ -547,6 +547,33 @@ func (c *APIClient) AddAgentConnection(ctx context.Context, agentID int, connTyp
 	return resp.Connections, err
 }
 
+// AgentQueryResult is the columnar result of running a query against one of an
+// agent's connections via the cloud query endpoint.
+type AgentQueryResult struct {
+	Columns     []string        `json:"columns"`
+	ColumnTypes []string        `json:"column_types"`
+	Rows        [][]interface{} `json:"rows"`
+	RenderedSQL string          `json:"rendered_sql"`
+}
+
+// RunAgentQuery runs a read-only SQL query against the named connection from the
+// agent's dev-env secret, server-side via the query service, and returns the
+// columnar result. queryParams are passed through for Jinja rendering (rendered
+// on the server, matching how dashboards run). A non-2xx response (e.g. a query
+// error or a non-read-only statement) surfaces as an *APIError.
+func (c *APIClient) RunAgentQuery(ctx context.Context, agentID int, connection, query string, queryParams map[string]any) (*AgentQueryResult, error) {
+	body := map[string]any{"connection": connection, "query": query}
+	if len(queryParams) > 0 {
+		body["query_params"] = queryParams
+	}
+	var result AgentQueryResult
+	err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/agents/%d/query", agentID), body, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 // CreateAgent creates a new agent. Optional fields are omitted when empty so the
 // server applies its defaults (null description/prompt, "team" visibility).
 func (c *APIClient) CreateAgent(ctx context.Context, name, description, systemPrompt, visibility string) (*Agent, error) {

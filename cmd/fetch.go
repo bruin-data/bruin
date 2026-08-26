@@ -11,6 +11,7 @@ import (
 	path2 "path"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/bigquery"
+	"github.com/bruin-data/bruin/pkg/bruincloud"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
@@ -177,8 +179,16 @@ func Query() *cli.Command {
 				return handleError(c.String("output"), err)
 			}
 
+			// Cloud mode has no local dialect to rewrite against, so the SQL parser
+			// (limit/schema-prefix) and dry-run don't apply; the server enforces its
+			// own row cap.
+			cloudMode := isCloudQueryMode()
+			if cloudMode && c.IsSet("limit") {
+				fmt.Fprintln(os.Stderr, "note: --limit is ignored in cloud query mode; the server enforces a row cap.")
+			}
+
 			var parser *sqlparser.SQLParser
-			needsParser := c.IsSet("limit") || (pipelineInfo != nil && pipelineInfo.Config.SelectedEnvironment.SchemaPrefix != "")
+			needsParser := !cloudMode && (c.IsSet("limit") || (pipelineInfo != nil && pipelineInfo.Config.SelectedEnvironment.SchemaPrefix != ""))
 
 			if needsParser {
 				parser, err = sqlparser.NewSQLParser(false)
@@ -211,6 +221,9 @@ func Query() *cli.Command {
 			}
 
 			if c.Bool("dry-run") {
+				if cloudMode {
+					return handleError(c.String("output"), errors.New("--dry-run is not supported in cloud query mode"))
+				}
 				ctx = query.WithQueryType(ctx, query.QueryTypeDryRun)
 				if c.Bool("export") {
 					return handleError(c.String("output"), errors.New("cannot combine --dry-run with --export"))
@@ -461,7 +474,101 @@ func validateFlags(connection, query, asset, pipelinePath string, hasSemanticFla
 	}
 }
 
+const (
+	// cloudQueryModeEnv toggles cloud query mode: when truthy, `bruin query`
+	// sends the SQL to the Bruin Cloud API instead of running it locally, and
+	// never touches .bruin.yml.
+	cloudQueryModeEnv = "BRUIN_CLOUD_QUERY"
+	// cloudAPIKeyEnv holds the Bruin Cloud API bearer token.
+	cloudAPIKeyEnv = "BRUIN_CLOUD_API_KEY" //nolint:gosec // G101: env var name, not a hardcoded credential
+	// cloudAgentIDEnv is the numeric id of the agent whose connections back the query.
+	cloudAgentIDEnv = "BRUIN_CLOUD_AGENT_ID"
+)
+
+// isCloudQueryMode reports whether cloud query mode is enabled via env.
+func isCloudQueryMode() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(cloudQueryModeEnv))) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
+}
+
+// cloudQuerier runs queries against an agent's connection through the Bruin Cloud
+// API. It implements schemaQuerier so the rest of the query command (output,
+// export, query-log) works unchanged.
+type cloudQuerier struct {
+	client         *bruincloud.APIClient
+	agentID        int
+	connectionName string
+	queryParams    map[string]any
+}
+
+func (q *cloudQuerier) SelectWithSchema(ctx context.Context, qq *query.Query) (*query.QueryResult, error) {
+	res, err := q.client.RunAgentQuery(ctx, q.agentID, q.connectionName, qq.Query, q.queryParams)
+	if err != nil {
+		return nil, err
+	}
+
+	// Pad column types to the column count so `-o json` (which indexes types by
+	// column) is safe against a cloud deployment that predates column_types.
+	columnTypes := res.ColumnTypes
+	if len(columnTypes) < len(res.Columns) {
+		padded := make([]string, len(res.Columns))
+		copy(padded, columnTypes)
+		columnTypes = padded
+	}
+
+	return &query.QueryResult{
+		Columns:     res.Columns,
+		Rows:        res.Rows,
+		ColumnTypes: columnTypes,
+	}, nil
+}
+
+// prepareCloudQueryExecution builds a cloud-backed querier from env + flags,
+// bypassing .bruin.yml entirely. The query is sent raw with its --var values as
+// query_params; Jinja is rendered server-side (matching how dashboards run).
+func prepareCloudQueryExecution(c *cli.Command, vars map[string]any) (string, interface{}, string, string, *ppInfo, error) {
+	if hasSemanticQueryFlags(c) {
+		return "", nil, "", "", nil, errors.New("semantic queries are not supported in cloud query mode")
+	}
+
+	connectionName := c.String("connection")
+	queryStr := c.String("query")
+	if connectionName == "" || queryStr == "" {
+		return "", nil, "", "", nil, errors.New("cloud query mode requires both --connection and --query")
+	}
+
+	apiKey := os.Getenv(cloudAPIKeyEnv)
+	if apiKey == "" {
+		return "", nil, "", "", nil, errors.Errorf("cloud query mode requires %s to be set", cloudAPIKeyEnv)
+	}
+
+	agentIDStr := os.Getenv(cloudAgentIDEnv)
+	if agentIDStr == "" {
+		return "", nil, "", "", nil, errors.Errorf("cloud query mode requires %s to be set", cloudAgentIDEnv)
+	}
+	agentID, err := strconv.Atoi(strings.TrimSpace(agentIDStr))
+	if err != nil {
+		return "", nil, "", "", nil, errors.Errorf("%s must be a numeric agent id, got %q", cloudAgentIDEnv, agentIDStr)
+	}
+
+	querier := &cloudQuerier{
+		client:         bruincloud.NewAPIClient(apiKey),
+		agentID:        agentID,
+		connectionName: connectionName,
+		queryParams:    vars,
+	}
+	return connectionName, querier, queryStr, "", nil, nil
+}
+
 func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, vars map[string]any) (string, interface{}, string, string, *ppInfo, error) {
+	if isCloudQueryMode() {
+		return prepareCloudQueryExecution(c, vars)
+	}
+
 	assetPath := c.String("asset")
 	queryStr := c.String("query")
 	env := c.String("environment")
