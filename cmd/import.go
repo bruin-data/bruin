@@ -396,7 +396,6 @@ func runImport(ctx context.Context, log logger.Logger, pipelinePath, connectionN
 
 	totalTables := 0
 	mergedTableCount := 0
-	skippedTableCount := 0
 	var warnings []importWarning
 
 	for _, schemaObj := range summary.Schemas {
@@ -435,10 +434,12 @@ func runImport(ctx context.Context, log logger.Logger, pipelinePath, connectionN
 				existingAssets[assetName] = createdAsset
 				totalTables++
 			case ingestrImport:
-				// ingestr assets carry no columns, so there is nothing to merge
-				// into an existing asset; skip it without re-persisting to avoid
-				// a misleading "Merged" count on re-runs.
-				skippedTableCount++
+				existingAsset := existingAssets[assetName]
+				mergeImportMetadata(existingAsset, createdAsset)
+				if err = existingAsset.Persist(fs, pipelineFound); err != nil {
+					return err
+				}
+				mergedTableCount++
 			default:
 				existingAsset := existingAssets[assetName]
 
@@ -473,10 +474,6 @@ func runImport(ctx context.Context, log logger.Logger, pipelinePath, connectionN
 
 	fmt.Printf("Imported %d tables and Merged %d from data warehouse '%s'%s into pipeline '%s'\n",
 		totalTables, mergedTableCount, summary.Name, filterDesc, pipelinePath)
-
-	if skippedTableCount > 0 {
-		fmt.Printf("Skipped %d existing assets (already present in the pipeline)\n", skippedTableCount)
-	}
 
 	if len(warnings) > 0 {
 		fmt.Printf("\nWarnings encountered during import (%d tables affected):\n", len(warnings))
@@ -891,6 +888,25 @@ func mergeImportMetadata(dst, src *pipeline.Asset) {
 	if src.Owner != "" {
 		dst.Owner = src.Owner
 	}
+}
+
+// formatNumber formats a number with commas for readability.
+func formatNumber(n int64) string {
+	if n < 1000 {
+		return strconv.FormatInt(n, 10)
+	}
+
+	s := strconv.FormatInt(n, 10)
+	var result strings.Builder
+
+	for i, c := range s {
+		if i > 0 && (len(s)-i)%3 == 0 {
+			result.WriteRune(',')
+		}
+		result.WriteRune(c)
+	}
+
+	return result.String()
 }
 
 // formatBytes formats a byte count into a human-readable string.

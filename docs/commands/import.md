@@ -27,6 +27,7 @@ The database import command streamlines the process of migrating existing databa
 - Connecting to your database using existing connection configurations
 - Scanning database schemas and tables
 - Creating asset definition files
+- Capturing table comments, ownership, and operational metadata
 - Optionally filling column metadata from the database schema
 - Organizing assets in the pipeline's `assets/` directory
 
@@ -87,6 +88,8 @@ For a source table named `public.Users`, it writes `assets/public/users.asset.ym
 ```yaml
 name: public.users
 type: ingestr
+metadata:
+  extracted_at: "2026-08-26T12:00:00Z"
 parameters:
   source_connection: postgres-source
   source_table: public.Users
@@ -95,7 +98,7 @@ parameters:
 
 The destination connection is resolved from the pipeline's default connection for the selected destination platform. Running the pipeline then transfers each source table directly to the identically named destination table. The source schema and table spelling is preserved in `source_table`, while the Bruin asset name and destination table name use the import command's existing lowercase convention.
 
-`--destination` is required and must be a supported ingestr destination. Passing it without `--ingestr` is rejected. Re-running an ingestr import skips assets that already exist instead of overwriting them. The older `--as-ingestr` spelling remains available as an alias for compatibility.
+`--destination` is required and must be a supported ingestr destination. Passing it without `--ingestr` is rejected. Re-running an ingestr import preserves the existing asset definition while refreshing its import-generated metadata and any owner reported by the database. The older `--as-ingestr` spelling remains available as an alias for compatibility.
 
 #### MongoDB
 
@@ -116,6 +119,8 @@ For a database `myDB` with a `Users` collection this writes `assets/mydb/users.a
 ```yaml
 name: mydb.users
 type: ingestr
+metadata:
+  extracted_at: "2026-08-26T12:00:00Z"
 parameters:
   source_connection: localMongo
   source_table: myDB.Users
@@ -191,7 +196,14 @@ Each imported table creates a YAML **source** asset file with the following stru
 
 ```yaml
 type: pg.source  # or sf.source, bq.source, ms.source, etc.
-description: "Imported table schema.table"
+description: Customer orders
+owner: analytics
+metadata:
+  extracted_at: "2026-08-26T12:00:00Z"
+  created_at: "2024-01-10T09:30:00Z"
+  last_modified: "2026-08-25T18:45:00Z"
+  row_count: "1234567"
+  size: 256.00 MB
 ```
 
 These are metadata-only source assets. SQL transformation assets live in `.sql` files, and `import database` does not generate SQL templates.
@@ -199,8 +211,12 @@ These are metadata-only source assets. SQL transformation assets live in `.sql` 
 The asset file includes:
 
 - **File Name**: `assets/<schema>/<table>.asset.yml` (lowercase)
-- **Description**: `"Imported table {schema}.{table}"`
+- **Description**: The database table comment, when available
+- **Owner**: The database table owner, when available
+- **Metadata**: The extraction timestamp and any creation time, last-modified time, row count, and size reported by the database
 - **Asset Type**: Automatically determined from connection type
+
+Re-importing refreshes the import-generated metadata and any owner reported by the database while preserving custom metadata keys and the existing description.
 
 > [!INFO]
 > **Asset Name** is derived from the file path, e.g. `assets/schema/table.asset.yml` -> `schema.table` (lowercase)
@@ -211,7 +227,12 @@ By default, the asset will include column metadata:
 
 ```yaml
 type: pg.source
-description: "Imported table schema.table"
+description: Customer orders
+owner: analytics
+metadata:
+  extracted_at: "2026-08-26T12:00:00Z"
+  row_count: "1234567"
+  size: 256.00 MB
 columns:
   - name: column_name
     type: column_type

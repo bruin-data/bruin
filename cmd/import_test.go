@@ -1113,8 +1113,10 @@ func TestCreateIngestrAsset(t *testing.T) {
 	// path are lowercased while source_table preserves the original case
 	// for databases with case-sensitive identifiers.
 	table := &ansisql.DBTable{
-		Name: "Users",
-		Type: ansisql.DBTableTypeTable,
+		Name:        "Users",
+		Type:        ansisql.DBTableTypeTable,
+		Description: "Application users",
+		Owner:       "identity_team",
 	}
 
 	got := createIngestrAsset(testAssetsPath, "myDB", "Users", "localMongo", "duckdb", table)
@@ -1131,12 +1133,12 @@ func TestCreateIngestrAsset(t *testing.T) {
 			"source_table":      "myDB.Users",
 			"destination":       "duckdb",
 		},
+		Description: "Application users",
+		Owner:       "identity_team",
 	}
 
-	assert.Contains(t, got.Description, "Imported table: myDB.Users")
-	assert.Contains(t, got.Description, "Extracted at:")
-
-	want.Description = got.Description
+	assert.NotEmpty(t, got.Metadata["extracted_at"])
+	want.Metadata = got.Metadata
 	assert.Equal(t, want, got)
 }
 
