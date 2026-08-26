@@ -31,6 +31,8 @@ var (
 	locationRegex        = regexp.MustCompile(`\(Line: \d+ Col: \d+, near ".*?"\)`)
 )
 
+const macroOutputBoundary = "__BRUIN_INTERNAL_MACRO_OUTPUT_BOUNDARY__"
+
 type Context map[string]any
 
 // LoadMacros loads all macro files from the given directory and returns them as a single string.
@@ -199,18 +201,35 @@ func NewRendererWithYesterday(pipelineName, runID string) *Renderer {
 func (r *Renderer) Render(query string) (string, error) {
 	r.queryRenderLock.Lock()
 
-	// Prepend macro content to the query if macros are loaded
+	// Prepend macro content so its definitions are available to the query, separated
+	// by a marker. Cutting the rendered output at the marker discards whatever the
+	// macro preamble emitted without changing any whitespace intentionally produced
+	// by the requested template.
 	fullQuery := query
+	outputMarker := ""
 	if r.macroContent != "" {
-		fullQuery = r.macroContent + "\n" + query
+		var preamble string
+		preamble, outputMarker = macroPreamble(r.macroContent)
+		fullQuery = preamble + query
 	}
 
 	tpl, err := gonja.FromString(fullQuery)
 	if err != nil {
-		r.queryRenderLock.Unlock()
 		customError := findParserErrorType(err)
+		if customError != "" && outputMarker != "" {
+			// Gonja reports locations relative to the combined macro preamble and query.
+			// Parse the query by itself after a recognized EOF error so the location we
+			// return refers to the template the user supplied. If the query parses on its
+			// own, keep the original error because it came from the macro preamble.
+			if _, queryErr := gonja.FromString(query); queryErr != nil {
+				if queryCustomError := findParserErrorType(queryErr); queryCustomError != "" {
+					customError = queryCustomError
+				}
+			}
+		}
+		r.queryRenderLock.Unlock()
 		if customError == "" {
-			return "", errors.Wrap(err, "you have found a bug in the jinja parser, please report it")
+			return "", errors.Wrap(hideMacroOutputMarker(err, outputMarker), "you have found a bug in the jinja parser, please report it")
 		}
 
 		return "", errors.New(customError)
@@ -223,38 +242,53 @@ func (r *Renderer) Render(query string) (string, error) {
 	if err != nil {
 		customError := findRenderErrorType(err)
 		if customError == "" {
-			return "", errors.Wrap(err, "you have found a bug in the jinja renderer, please report it")
+			return "", errors.Wrap(hideMacroOutputMarker(err, outputMarker), "you have found a bug in the jinja renderer, please report it")
 		}
 
 		return "", errors.New(customError)
 	}
 
-	if r.macroContent != "" {
-		out = cleanupExcessiveNewlines(out)
+	if outputMarker != "" {
+		_, renderedQuery, found := strings.Cut(out, outputMarker)
+		if !found {
+			return "", errors.New("failed to isolate the rendered query from the macro output, please ensure every block opened in your macros is also closed there")
+		}
+
+		out = renderedQuery
 	}
 
 	return out, nil
 }
 
-func cleanupExcessiveNewlines(s string) string {
-	lines := strings.Split(s, "\n")
-	var result []string
-	consecutiveEmpty := 0
-
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" {
-			consecutiveEmpty++
-			if consecutiveEmpty <= 2 {
-				result = append(result, line)
-			}
-		} else {
-			consecutiveEmpty = 0
-			result = append(result, line)
-		}
+// macroPreamble returns the macro content followed by the marker that separates it
+// from the query, along with the marker itself. The marker is preceded by a newline so
+// that it cannot be matched across the junction with the macro content, and it is
+// directly followed by the query so that nothing sits between the two: whitespace there
+// would be eaten by a query that opens with jinja whitespace control, which would leave
+// us unable to tell our own whitespace apart from the query's.
+func macroPreamble(macroContent string) (string, string) {
+	// Growing the marker past the length of the macro content is guaranteed to terminate
+	// the loop, and it makes the marker we insert the first occurrence in the output.
+	marker := macroOutputBoundary
+	for strings.Contains(macroContent, marker) {
+		marker += "_"
 	}
 
-	return strings.Join(result, "\n")
+	if !strings.HasSuffix(macroContent, "\n") {
+		macroContent += "\n"
+	}
+
+	return macroContent + marker, marker
+}
+
+// hideMacroOutputMarker keeps the internal marker out of the errors we surface, since
+// gonja quotes the template we handed it rather than the query the user wrote.
+func hideMacroOutputMarker(err error, marker string) error {
+	if marker == "" || !strings.Contains(err.Error(), marker) {
+		return err
+	}
+
+	return errors.New(strings.ReplaceAll(err.Error(), marker, ""))
 }
 
 //nolint:ireturn
