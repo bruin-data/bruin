@@ -371,7 +371,7 @@ falling back to a default.
 
 Two of these are worth checking against your own data before you trust a
 ranking. `seat_denominator` decides whether the heaviest component measures
-rollout or licence coverage, which [Reports](#reports-posthog_reports) covers in
+rollout or licence coverage, which [Reports](#reports-posthog-reports) covers in
 full. And `depth_target_actions` sets where the depth component saturates: too
 high and it reads near-zero for everyone, too low and it stops separating
 accounts.
