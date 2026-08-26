@@ -10,5 +10,6 @@ import (
 //go:embed stripe-bigquery/.gitignore
 //go:embed google-web-analytics/.gitignore
 //go:embed posthog-bigquery/.gitignore
+//go:embed academy-sql-beginner/.gitignore
 //go:embed migration-fivetran/.agents/skills/bruin-fivetran-migrator/*
 var Templates embed.FS

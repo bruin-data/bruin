@@ -157,6 +157,38 @@ func (m model) View() string {
 	return s.String()
 }
 
+// ensureLocalDuckDBFilesAreIgnored adds every relative DuckDB database path in the
+// config, and its write-ahead log, to the .gitignore next to .bruin.yml. DuckDB
+// resolves a relative path against the config file, so that directory is where the
+// database lands - which is not necessarily inside the pipeline folder, and so is
+// not covered by a .gitignore the template ships.
+func ensureLocalDuckDBFilesAreIgnored(fs afero.Fs, bruinYmlPath string, cfg *config.Config) error {
+	gitignoreDir := filepath.Dir(bruinYmlPath)
+
+	seen := make(map[string]bool)
+	for _, env := range cfg.Environments {
+		if env.Connections == nil {
+			continue
+		}
+
+		for _, conn := range env.Connections.DuckDB {
+			path := strings.TrimSpace(conn.Path)
+			if path == "" || filepath.IsAbs(path) || seen[path] {
+				continue
+			}
+			seen[path] = true
+
+			for _, pattern := range []string{path, path + ".wal"} {
+				if err := git.EnsureGivenPatternIsInGitignore(fs, gitignoreDir, pattern); err != nil {
+					return fmt.Errorf("failed to add %s: %w", pattern, err)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
 // mergeTemplateConfig merges environments and connections from a template's .bruin.yml into the central config.
 func mergeTemplateConfig(centralConfig *config.Config, templateBruinContent []byte) error {
 	var templateConfig config.Config
@@ -428,6 +460,14 @@ func Init() *cli.Command {
 					return err
 				}
 				configSummary.merged = true
+
+				// A template that ships a local DuckDB connection will create that
+				// database file next to .bruin.yml on the first run. Keep it out of
+				// git, the same way .bruin.yml itself is kept out.
+				if err := ensureLocalDuckDBFilesAreIgnored(afero.NewOsFs(), bruinYmlPath, centralConfig); err != nil {
+					errorPrinter.Printf("Could not update .gitignore: %v\n", err)
+					return err
+				}
 			}
 
 			err = fs2.WalkDir(templates.Templates, templateName, func(path string, d fs2.DirEntry, err error) error {
