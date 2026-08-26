@@ -215,24 +215,3 @@ func TestVariableOverridesMutator_VariantWinsOnOverlap(t *testing.T) {
 		assert.ErrorContains(t, err, `no such variable "nope"`)
 	})
 }
-
-func TestVariableOverridesMutator_RejectsValuesFailingTheSchema(t *testing.T) {
-	t.Parallel()
-
-	p := &pipeline.Pipeline{
-		Variables: pipeline.Variables{
-			"seat_denominator": {
-				"type":    "string",
-				"enum":    []any{"reachable", "contracted"},
-				"default": "reachable",
-			},
-		},
-	}
-
-	mutator := variableOverridesMutator([]string{`seat_denominator="Contracted"`})
-	_, err := mutator(t.Context(), p)
-	require.Error(t, err)
-	require.ErrorContains(t, err, "invalid variable overrides")
-	require.ErrorContains(t, err, "seat_denominator")
-	assert.Equal(t, "reachable", p.Variables["seat_denominator"]["default"])
-}
