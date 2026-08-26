@@ -182,8 +182,11 @@ func ensureLocalDuckDBFilesAreIgnored(fs afero.Fs, bruinYmlPath string, cfg *con
 		}
 
 		for _, conn := range env.Connections.DuckDB {
+			// IsLocal rather than !IsAbs: it also rejects a Windows rooted path and
+			// anything escaping the directory with "..", neither of which this
+			// repository's .gitignore has any business covering.
 			path := strings.TrimSpace(conn.Path)
-			if path == "" || filepath.IsAbs(path) || seen[path] {
+			if path == "" || !filepath.IsLocal(path) || seen[path] {
 				continue
 			}
 			seen[path] = true

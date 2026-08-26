@@ -930,17 +930,22 @@ func TestEnsureLocalDuckDBFilesAreIgnoredSkipsAbsoluteAndEmptyPaths(t *testing.T
 	cfg := &config.Config{Environments: map[string]config.Environment{
 		"default": {Connections: &config.Connections{DuckDB: []config.DuckDBConnection{
 			{ConnectionMetadata: config.ConnectionMetadata{Name: "relative"}, Path: "academy.duckdb"},
-			{ConnectionMetadata: config.ConnectionMetadata{Name: "absolute"}, Path: filepath.Join(string(filepath.Separator), "tmp", "elsewhere.duckdb")},
+			{ConnectionMetadata: config.ConnectionMetadata{Name: "rooted"}, Path: filepath.Join(string(filepath.Separator), "tmp", "elsewhere.duckdb")},
+			{ConnectionMetadata: config.ConnectionMetadata{Name: "escaping"}, Path: filepath.Join("..", "outside.duckdb")},
 			{ConnectionMetadata: config.ConnectionMetadata{Name: "blank"}, Path: "   "},
 		}}},
 	}}
 
-	require.NoError(t, ensureLocalDuckDBFilesAreIgnored(fs, filepath.Join("repo", ".bruin.yml"), cfg))
+	// Kept at the root so the assertion does not depend on how the gitignore
+	// helper joins a directory, which differs by separator on Windows.
+	require.NoError(t, ensureLocalDuckDBFilesAreIgnored(fs, ".bruin.yml", cfg))
 
-	written, err := afero.ReadFile(fs, filepath.Join("repo", ".gitignore"))
+	written, err := afero.ReadFile(fs, ".gitignore")
 	require.NoError(t, err)
 	require.Contains(t, string(written), "/academy.duckdb")
 	require.Contains(t, string(written), "/academy.duckdb.wal")
-	// An absolute path is not this repository's to ignore.
+	// Neither a rooted path nor one escaping the directory is this repository's to
+	// ignore. filepath.IsAbs would have let the Windows form of both through.
 	require.NotContains(t, string(written), "elsewhere.duckdb")
+	require.NotContains(t, string(written), "outside.duckdb")
 }
