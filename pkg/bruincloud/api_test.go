@@ -1755,3 +1755,16 @@ func TestRunAgentQuery_SurfacesAPIError(t *testing.T) {
 	assert.Equal(t, "query_error", apiErr.Code)
 	assert.Contains(t, apiErr.Message, "read-only")
 }
+
+func TestRunAgentQuery_PreservesLargeIntegerPrecision(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		// 2^53+1 cannot be represented as float64; default decoding would round it.
+		_, _ = w.Write([]byte(`{"columns":["id"],"rows":[[9007199254740993]]}`))
+	})
+
+	res, err := client.RunAgentQuery(t.Context(), 1, "c", "SELECT id", nil)
+	require.NoError(t, err)
+	require.Len(t, res.Rows, 1)
+	assert.Equal(t, json.Number("9007199254740993"), res.Rows[0][0])
+}

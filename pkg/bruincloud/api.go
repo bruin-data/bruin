@@ -566,10 +566,18 @@ func (c *APIClient) RunAgentQuery(ctx context.Context, agentID int, connection, 
 	if len(queryParams) > 0 {
 		body["query_params"] = queryParams
 	}
-	var result AgentQueryResult
-	err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/agents/%d/query", agentID), body, &result)
-	if err != nil {
+	var raw json.RawMessage
+	if err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/agents/%d/query", agentID), body, &raw); err != nil {
 		return nil, err
+	}
+
+	// Decode row cells as json.Number so integers beyond 2^53 keep full precision
+	// (default decoding would round them to float64).
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.UseNumber()
+	var result AgentQueryResult
+	if err := dec.Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to parse query result: %w", err)
 	}
 	return &result, nil
 }

@@ -1140,7 +1140,8 @@ func TestCloudQuerierSelectWithSchema(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, []string{"n"}, res.Columns)
 		assert.Equal(t, []string{"INT8"}, res.ColumnTypes)
-		assert.Equal(t, [][]interface{}{{float64(1)}}, res.Rows)
+		// Cells decode as json.Number to preserve precision.
+		assert.Equal(t, [][]interface{}{{json.Number("1")}}, res.Rows)
 	})
 
 	t.Run("pads column types when the server omits them", func(t *testing.T) {
