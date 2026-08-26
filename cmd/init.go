@@ -157,11 +157,21 @@ func (m model) View() string {
 	return s.String()
 }
 
-// ensureLocalDuckDBFilesAreIgnored adds every relative DuckDB database path in the
-// config, and its write-ahead log, to the .gitignore next to .bruin.yml. DuckDB
-// resolves a relative path against the config file, so that directory is where the
-// database lands - which is not necessarily inside the pipeline folder, and so is
-// not covered by a .gitignore the template ships.
+// gitignoreEscaper escapes the characters git treats as pattern syntax, so a
+// database path is matched literally.
+var gitignoreEscaper = strings.NewReplacer(`\`, `\\`, "*", `\*`, "?", `\?`, "[", `\[`, "]", `\]`)
+
+// gitignorePatternForPath turns a filesystem path into a gitignore pattern anchored
+// to the directory holding the .gitignore, so it cannot match a same-named file
+// elsewhere in the repository.
+func gitignorePatternForPath(path string) string {
+	return "/" + strings.TrimPrefix(gitignoreEscaper.Replace(filepath.ToSlash(path)), "/")
+}
+
+// ensureLocalDuckDBFilesAreIgnored gitignores every relative DuckDB path in the
+// config, and its write-ahead log. DuckDB resolves a relative path against the
+// config file, so the database lands next to .bruin.yml rather than inside the
+// pipeline folder.
 func ensureLocalDuckDBFilesAreIgnored(fs afero.Fs, bruinYmlPath string, cfg *config.Config) error {
 	gitignoreDir := filepath.Dir(bruinYmlPath)
 
@@ -178,7 +188,7 @@ func ensureLocalDuckDBFilesAreIgnored(fs afero.Fs, bruinYmlPath string, cfg *con
 			}
 			seen[path] = true
 
-			for _, pattern := range []string{path, path + ".wal"} {
+			for _, pattern := range []string{gitignorePatternForPath(path), gitignorePatternForPath(path + ".wal")} {
 				if err := git.EnsureGivenPatternIsInGitignore(fs, gitignoreDir, pattern); err != nil {
 					return fmt.Errorf("failed to add %s: %w", pattern, err)
 				}
@@ -461,12 +471,10 @@ func Init() *cli.Command {
 				}
 				configSummary.merged = true
 
-				// A template that ships a local DuckDB connection will create that
-				// database file next to .bruin.yml on the first run. Keep it out of
-				// git, the same way .bruin.yml itself is kept out.
+				// Cosmetic, so a failure here must not abort an init that has already
+				// written the config.
 				if err := ensureLocalDuckDBFilesAreIgnored(afero.NewOsFs(), bruinYmlPath, centralConfig); err != nil {
-					errorPrinter.Printf("Could not update .gitignore: %v\n", err)
-					return err
+					errorPrinter.Printf("Could not add the DuckDB database to .gitignore: %v\n", err)
 				}
 			}
 
