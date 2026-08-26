@@ -33,11 +33,13 @@ func (vs VariantSet) Names() []string {
 
 // Validate ensures the variant set is well-formed against the given Variables block.
 func (vs VariantSet) Validate(vars Variables) error {
-	for name, values := range vs {
+	for _, name := range vs.Names() {
+		values := vs[name]
 		if !variantNameRegex.MatchString(name) {
 			return fmt.Errorf("invalid variant name %q: must match [a-zA-Z0-9_-]+", name)
 		}
-		for key, value := range values {
+		for _, key := range sortedVariableKeys(values) {
+			value := values[key]
 			schema, ok := vars[key]
 			if !ok {
 				return fmt.Errorf("variant %q references unknown variable %q", name, key)
@@ -45,6 +47,24 @@ func (vs VariantSet) Validate(vars Variables) error {
 			if err := validateOverrideType(value, schema); err != nil {
 				return fmt.Errorf("variant %q variable %q: %w", name, key, err)
 			}
+		}
+	}
+
+	if len(vs) == 0 {
+		return nil
+	}
+
+	schema, err := vars.compiledSchema()
+	if err != nil {
+		return err
+	}
+	for _, name := range vs.Names() {
+		values := vs[name]
+		if values == nil {
+			values = map[string]any{}
+		}
+		if err := validateVariableValues(schema, values); err != nil {
+			return fmt.Errorf("variant %q: %w", name, err)
 		}
 	}
 	return nil
