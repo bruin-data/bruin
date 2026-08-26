@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"encoding/csv"
 	"encoding/json"
@@ -1712,8 +1713,11 @@ func writeAggregatedQueryLog(logDir, targetPath string) error {
 			continue
 		}
 
+		// UseNumber so integers beyond 2^53 keep full precision through aggregation.
+		dec := json.NewDecoder(bytes.NewReader(data))
+		dec.UseNumber()
 		var entryLog QueryLog
-		if err := json.Unmarshal(data, &entryLog); err != nil {
+		if err := dec.Decode(&entryLog); err != nil {
 			continue
 		}
 		if len(entryLog.Rows) > aggregatedQueryLogMaxRows {
