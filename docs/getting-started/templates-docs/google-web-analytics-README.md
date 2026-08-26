@@ -1,5 +1,16 @@
 # Google Analytics and Search Console Reporting on BigQuery
 
+## At a glance
+
+- Reads your existing GA4 and Search Console exports in BigQuery
+- Ingests nothing — it starts from data you already have
+- Joins two Google products that never talk to each other
+- Cleans both exports into one tidy staging layer
+- Publishes nine reports on your organic search performance
+- Answers questions neither Google tool can answer alone
+- Ships as a starter template you edit for your business
+- **Builds the foundational search models and context an AI agent can analyze and act on**
+
 `google-web-analytics` turns the GA4 and Google Search Console exports you already
 have in BigQuery into an organic search reporting layer. It ingests nothing: both
 products export to BigQuery natively, so the template starts where those exports

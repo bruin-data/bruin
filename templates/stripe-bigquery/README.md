@@ -1,5 +1,16 @@
 # Stripe Billing Analytics to BigQuery
 
+## At a glance
+
+- Pulls your Stripe customers, subscriptions, invoices, and prices into BigQuery
+- Cleans that raw data into tidy, reusable billing tables
+- Publishes monthly reports on recurring revenue, churn, and invoices
+- Tracks MRR and ARR per customer and per currency
+- Saves a daily snapshot so month-over-month trends build up over time
+- Comes with a ready-made dashboard for revenue, retention, and billings
+- Safe to re-run, and easy to adapt to your own reporting
+- **Builds the foundational billing models and context an AI agent can analyze and act on**
+
 `stripe-bigquery` is a focused Stripe billing analytics pipeline for BigQuery. It loads the customer, product, price, subscription, subscription-item, and invoice resources into `stripe_raw`; builds reusable billing models in `stripe_stage`; and publishes recurring-revenue and invoice-billing reports in `stripe_reports`.
 
 The template contains 19 assets across three layers. It is a practical starting point for analyzing Stripe subscription billing while keeping the data model small enough to adapt to your own reporting needs.

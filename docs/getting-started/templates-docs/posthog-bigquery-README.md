@@ -1,6 +1,17 @@
 <!-- Generated from templates/posthog-bigquery/README.md. Do not edit directly; run `make sync-template-docs`. -->
 # PostHog Product Analytics to BigQuery
 
+## At a glance
+
+- Loads your PostHog events, people, and feature flags into BigQuery
+- Cleans them into a tidy staging layer that is easy to query
+- Merges each visitor's many IDs into one real person
+- Groups events into sessions with duration, bounce, and conversions
+- Builds four reports at the account and user-segment level
+- Skips duplicate rows, so re-running a day stays correct
+- Comes with a ready-made dashboard on top of the reports
+- **Builds the foundational product-analytics models and context an AI agent can analyze and act on**
+
 `posthog-bigquery` turns raw PostHog product analytics into warehouse-ready
 account intelligence in BigQuery.
 
