@@ -2,6 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"io"
 	"os"
 
 	"github.com/bruin-data/bruin/cmd"
@@ -89,9 +92,21 @@ func main() {
 
 	err := app.Run(context.Background(), os.Args)
 	if err != nil {
+		printUnhandledError(err, os.Stderr)
 		cli.HandleExitCoder(err)
 		// Close the telemetry client manually as the defer is not called on os.Exit(1)
 		client.Close()
 		os.Exit(1) //nolint:gocritic
+	}
+}
+
+func printUnhandledError(err error, writer io.Writer) {
+	if err == nil {
+		return
+	}
+
+	var exitCoder cli.ExitCoder
+	if !errors.As(err, &exitCoder) {
+		_, _ = fmt.Fprintf(writer, "error: %v\n", err)
 	}
 }
