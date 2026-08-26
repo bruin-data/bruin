@@ -41,7 +41,8 @@ whose credentials can read both export datasets and write the three datasets thi
 pipeline creates.
 
 > Streaming export is required. See
-> [Scope: streaming export only](#scope-streaming-export-only) before your first run.
+> [Scope: streaming export only](#scope-streaming-export-only) in the appendix
+> before your first run.
 
 ## How it works
 
@@ -133,19 +134,9 @@ description.
 | `gsc_position_click_curve` | property × search type × position | The CTR your property actually earns at each position, measured from its own history. |
 | `gsc_export_log` | table × reporting date | When Google published each date, and whether it later restated it. |
 
-Both Search Console models keep the rows where Google withheld the query: the
-impressions and clicks are real, so dropping them would understate daily totals.
-They carry a NULL query and a `query_brand_type` of `anonymized`, and the
-query-grain reports exclude them explicitly.
-
-Every page-level report keeps `page_hostname` in its grain on purpose. A property
-that spans hosts routinely serves the same path on more than one, and a docs or
-blog subdomain is a different page from the marketing site even when both answer
-`/guide`. Joining on path alone would sum their impressions and value together.
-The cost is that when the two systems disagree about the canonical host, the page
-appears twice — once as `search_only`, once as `ga4_only` — instead of hiding the
-disagreement in a merged row. Aggregate over `page_hostname` in your own model if
-you would rather see one row per path.
+Two staging behaviours are worth knowing before you build on these — how rows with
+a withheld query are kept, and why page-level grains keep `page_hostname` — see
+[Staging model notes](#staging-model-notes) in the appendix.
 
 ### `web_analytics_reports`
 
@@ -161,180 +152,11 @@ you would rather see one row per path.
 | `ga4_gsc_query_value` | Which queries produce outcomes? | Google deliberately never passes the query to analytics. |
 | `ga4_gsc_intent_pipeline` | Does content marketing actually produce anything? | Needs query intent, page role, and post-click outcomes at once. None of the three exists in either product. |
 
-## Reading the reports
-
-### Start with `ga4_gsc_landing_page_performance`
-
-This is the join the other reports lean on. Each page carries its Search Console
-visibility next to what GA4 recorded afterwards, so the per-click and
-per-thousand-impression value columns rank pages by outcome rather than by traffic.
-
-It is a full outer join on purpose, and `coverage_status` explains every mismatch:
-
-| `coverage_status` | Meaning | Usual cause |
-| --- | --- | --- |
-| `matched` | Both systems agree the page gets Google search traffic. | |
-| `search_only` | Search Console reports clicks GA4 never recorded. | Missing or blocked tracking, a redirect chain, or bot filtering. |
-| `ga4_only` | GA4 recorded organic sessions Search Console has no data for. | Traffic from a non-Google engine, or a page excluded from the property. |
-| `session_shortfall` | GA4 saw fewer than half the reported clicks. | Consent-mode loss, slow tag load, or a redirect on entry. |
-
-The GA4 side is restricted to Google organic sessions, because Search Console has
-no visibility into other engines. `ga4_sessions` exposes both
-`is_organic_search_session` and the narrower `is_google_organic_session` so you can
-choose deliberately.
-
-### Opportunity sizing gives two different numbers
-
-`gsc_query_opportunities` answers two separate questions:
-
-- `clicks_at_expected_ctr` — what fixing the title and description alone would
-  return, holding position constant.
-- `clicks_at_top_three_ctr` — what ranking in the top three would return, holding
-  impressions constant.
-
-Both are estimates from your own observed behaviour, not forecasts; impressions
-move when position moves. `is_expected_ctr_reliable` tells you whether the
-click-curve bucket behind the comparison has enough impressions to trust.
-
-### `ga4_gsc_query_value` is modelled
-
-Google never passes the search query to analytics, so query-level outcomes cannot
-be measured — only allocated. Each page's GA4 outcomes are split across the queries
-that sent clicks to it, in proportion to those clicks. Within a page the weights
-sum to one, so page totals are preserved exactly and only the split between queries
-is estimated.
-
-The assumption is that every query sending traffic to a page converts at that
-page's average rate. That is wrong in a predictable direction: a high-intent query
-really does convert better than the page average, so its value is understated and a
-broad informational query's is overstated. Rank queries against each other with it;
-do not report the figure as measured.
-
-Clicks Google withheld are left out of the denominator, so their share of a page's
-outcome spreads across that page's disclosed queries. A page whose clicks were all
-withheld contributes nothing, which is why totals here fall short of those in
-`ga4_gsc_landing_page_performance`.
-
-## Scope and limitations
-
-Read this section before you quote a number from these tables to anyone.
-
-### Scope: streaming export only
-
-The template reads `events_intraday_*` and nothing else. It does not read the daily
-`events_YYYYMMDD` tables, `pseudonymous_users_*`, or `users_*`. Confirm your
-property produces intraday tables:
-
-```sql
-SELECT COUNTIF(REGEXP_CONTAINS(table_id, r'^events_intraday_')) AS intraday,
-       COUNTIF(REGEXP_CONTAINS(table_id, r'^events_[0-9]{8}$'))  AS daily
-FROM `your_project.your_ga4_dataset.__TABLES__`
-```
-
-`intraday > 0` and the template works as shipped. `intraday = 0` means every GA4
-model returns nothing — enable streaming export, or change the two GA4 models to
-read `events_*` instead. The failure is silent: empty tables, not an error.
-
-On a streaming-only property, intraday tables are a complete record of past days
-and are not cleaned up, so the wildcard covers your full history. The only partial
-day is today, which the default run window excludes and which whole-day replacement
-corrects on the next run.
-
-### GA4 session attribution is weaker in intraday tables
-
-Google does not populate session-scoped traffic source in intraday tables. Check
-your own property:
-
-```sql
-SELECT COUNT(*) AS events,
-       COUNTIF(session_traffic_source_last_click.cross_channel_campaign
-                 .default_channel_group IS NOT NULL) AS session_scoped,
-       COUNTIF(collected_traffic_source.manual_source IS NOT NULL) AS event_collected,
-       COUNTIF(traffic_source.source IS NOT NULL) AS user_first_touch
-FROM `your_project.your_ga4_dataset.events_intraday_*`
-WHERE _TABLE_SUFFIX >= '20260101'
-```
-
-Expect `session_scoped = 0`. `ga4_sessions` therefore falls back through
-`collected_traffic_source`, then the user-scoped `traffic_source`, and records
-which one it used in `traffic_source_basis`.
-
-Sessions where none of the three is populated get
-`traffic_source_basis = 'unavailable'` and a channel of `Unassigned`, and are never
-counted as organic. Expect that bucket to be large — two thirds of sessions on the
-property this was tested against.
-
-That sounds worse than it is. Checked against the GA4 interface, those
-`unavailable` sessions are almost exactly the ones GA4 itself labels **Direct**, so
-leaving them out of organic is mostly right rather than lost traffic. The real cost
-is narrower: organic sessions came in roughly 16% below what GA4 reported. Treat
-organic as a floor, not a total, but a close floor. Measure your own split before
-quoting any channel figure:
-
-```sql
-SELECT traffic_source_basis, COUNT(*) AS sessions
-FROM `your_project.web_analytics_staging.ga4_sessions`
-GROUP BY 1 ORDER BY sessions DESC
-```
-
-These numbers will not tie out to the GA4 interface, which applies its own
-attribution model on top of the same events.
-
-### Value columns are modelled, not recognized revenue
-
-Unless your site sends GA4 ecommerce revenue, all value in these reports comes from
-the weights you set in `key_event_values`. They exist to rank pages and queries
-against each other. They are not recognized revenue, bookings, or cash, and should
-not be reported as such.
-
-### The two systems will never tie out exactly
-
-Session counts and click counts come from different measurement systems.
-`session_per_click_ratio` sits near one on healthy pages; treat a low value as a
-tracking lead, not a bug in the report. Search Console dates are Pacific Time while
-GA4 `event_date` uses the property's reporting timezone, so where those differ a
-day's numbers are offset by a few hours of activity between the two systems.
-
-### Freshness, restatement, and window edges
-
-Search Console publishes with a two-to-three day delay and revises history in
-place. The staging models widen their read window by `source_lookback_days` and
-replace whole days, so late and restated data heals on the next run.
-`gsc_export_log` is where you confirm what Google actually published — a bumped
-`epoch_version` means Google restated a date rather than your site changing.
-
-Sessions that cross midnight span two daily export tables; a session split by the
-window edge is completed by the following run, because the lookback re-reads and
-replaces that day.
-
-The reports are rebuilt over a trailing `reporting_window_days` window, which
-bounds what each one scans. The trend reports need at least
-`2 × trend_window_days` of staged history before they say anything useful.
-
-### An event you do not send is a silently empty column
-
-The shipped `key_event_names` are placeholders. If your property does not fire
-them, the matching report columns are zero rather than an error. List what you
-actually send before configuring anything:
-
-```sql
-SELECT event_name, COUNT(*) AS events
-FROM `your_project.your_ga4_dataset.events_intraday_*`
-WHERE _TABLE_SUFFIX >= '20260101'
-GROUP BY 1 ORDER BY events DESC
-```
-
-### How closely this reconciles with Google's own interfaces
-
-Validated against both Google interfaces over a calendar month on a live property.
-
-Every Search Console figure matched exactly: clicks, impressions, CTR, and average
-position, and each of those again broken down by day, device, and country. The GA4
-side matched page views and users to within a fraction of a percent. Sessions came
-in about 2% below the interface, because the export itself holds slightly fewer
-sessions than GA4 reports — the models reproduce the export, and that residual gap
-is not something a transformation can close. Organic sessions are the one real gap,
-for the attribution reason above.
+For how to read each report — the `coverage_status` full outer join, opportunity
+sizing's two numbers, and why `ga4_gsc_query_value` is modelled — see
+[Reading the reports](#reading-the-reports). And before you quote any number from
+these tables to anyone, read [Scope and limitations](#scope-and-limitations). Both
+are in the appendix.
 
 ## Configure it
 
@@ -587,3 +409,196 @@ instead, replace `service_account_file` with
 Do not commit credentials. If either export lives in a different project from the
 one you write to, qualify the dataset variables with that project and grant read
 access there.
+
+## Appendix: notes, caveats & details
+
+### Staging model notes
+
+Both Search Console models keep the rows where Google withheld the query: the
+impressions and clicks are real, so dropping them would understate daily totals.
+They carry a NULL query and a `query_brand_type` of `anonymized`, and the
+query-grain reports exclude them explicitly.
+
+Every page-level report keeps `page_hostname` in its grain on purpose. A property
+that spans hosts routinely serves the same path on more than one, and a docs or
+blog subdomain is a different page from the marketing site even when both answer
+`/guide`. Joining on path alone would sum their impressions and value together.
+The cost is that when the two systems disagree about the canonical host, the page
+appears twice — once as `search_only`, once as `ga4_only` — instead of hiding the
+disagreement in a merged row. Aggregate over `page_hostname` in your own model if
+you would rather see one row per path.
+
+### Reading the reports
+
+#### Start with `ga4_gsc_landing_page_performance`
+
+This is the join the other reports lean on. Each page carries its Search Console
+visibility next to what GA4 recorded afterwards, so the per-click and
+per-thousand-impression value columns rank pages by outcome rather than by traffic.
+
+It is a full outer join on purpose, and `coverage_status` explains every mismatch:
+
+| `coverage_status` | Meaning | Usual cause |
+| --- | --- | --- |
+| `matched` | Both systems agree the page gets Google search traffic. | |
+| `search_only` | Search Console reports clicks GA4 never recorded. | Missing or blocked tracking, a redirect chain, or bot filtering. |
+| `ga4_only` | GA4 recorded organic sessions Search Console has no data for. | Traffic from a non-Google engine, or a page excluded from the property. |
+| `session_shortfall` | GA4 saw fewer than half the reported clicks. | Consent-mode loss, slow tag load, or a redirect on entry. |
+
+The GA4 side is restricted to Google organic sessions, because Search Console has
+no visibility into other engines. `ga4_sessions` exposes both
+`is_organic_search_session` and the narrower `is_google_organic_session` so you can
+choose deliberately.
+
+#### Opportunity sizing gives two different numbers
+
+`gsc_query_opportunities` answers two separate questions:
+
+- `clicks_at_expected_ctr` — what fixing the title and description alone would
+  return, holding position constant.
+- `clicks_at_top_three_ctr` — what ranking in the top three would return, holding
+  impressions constant.
+
+Both are estimates from your own observed behaviour, not forecasts; impressions
+move when position moves. `is_expected_ctr_reliable` tells you whether the
+click-curve bucket behind the comparison has enough impressions to trust.
+
+#### `ga4_gsc_query_value` is modelled
+
+Google never passes the search query to analytics, so query-level outcomes cannot
+be measured — only allocated. Each page's GA4 outcomes are split across the queries
+that sent clicks to it, in proportion to those clicks. Within a page the weights
+sum to one, so page totals are preserved exactly and only the split between queries
+is estimated.
+
+The assumption is that every query sending traffic to a page converts at that
+page's average rate. That is wrong in a predictable direction: a high-intent query
+really does convert better than the page average, so its value is understated and a
+broad informational query's is overstated. Rank queries against each other with it;
+do not report the figure as measured.
+
+Clicks Google withheld are left out of the denominator, so their share of a page's
+outcome spreads across that page's disclosed queries. A page whose clicks were all
+withheld contributes nothing, which is why totals here fall short of those in
+`ga4_gsc_landing_page_performance`.
+
+### Scope and limitations
+
+Read this section before you quote a number from these tables to anyone.
+
+#### Scope: streaming export only
+
+The template reads `events_intraday_*` and nothing else. It does not read the daily
+`events_YYYYMMDD` tables, `pseudonymous_users_*`, or `users_*`. Confirm your
+property produces intraday tables:
+
+```sql
+SELECT COUNTIF(REGEXP_CONTAINS(table_id, r'^events_intraday_')) AS intraday,
+       COUNTIF(REGEXP_CONTAINS(table_id, r'^events_[0-9]{8}$'))  AS daily
+FROM `your_project.your_ga4_dataset.__TABLES__`
+```
+
+`intraday > 0` and the template works as shipped. `intraday = 0` means every GA4
+model returns nothing — enable streaming export, or change the two GA4 models to
+read `events_*` instead. The failure is silent: empty tables, not an error.
+
+On a streaming-only property, intraday tables are a complete record of past days
+and are not cleaned up, so the wildcard covers your full history. The only partial
+day is today, which the default run window excludes and which whole-day replacement
+corrects on the next run.
+
+#### GA4 session attribution is weaker in intraday tables
+
+Google does not populate session-scoped traffic source in intraday tables. Check
+your own property:
+
+```sql
+SELECT COUNT(*) AS events,
+       COUNTIF(session_traffic_source_last_click.cross_channel_campaign
+                 .default_channel_group IS NOT NULL) AS session_scoped,
+       COUNTIF(collected_traffic_source.manual_source IS NOT NULL) AS event_collected,
+       COUNTIF(traffic_source.source IS NOT NULL) AS user_first_touch
+FROM `your_project.your_ga4_dataset.events_intraday_*`
+WHERE _TABLE_SUFFIX >= '20260101'
+```
+
+Expect `session_scoped = 0`. `ga4_sessions` therefore falls back through
+`collected_traffic_source`, then the user-scoped `traffic_source`, and records
+which one it used in `traffic_source_basis`.
+
+Sessions where none of the three is populated get
+`traffic_source_basis = 'unavailable'` and a channel of `Unassigned`, and are never
+counted as organic. Expect that bucket to be large — two thirds of sessions on the
+property this was tested against.
+
+That sounds worse than it is. Checked against the GA4 interface, those
+`unavailable` sessions are almost exactly the ones GA4 itself labels **Direct**, so
+leaving them out of organic is mostly right rather than lost traffic. The real cost
+is narrower: organic sessions came in roughly 16% below what GA4 reported. Treat
+organic as a floor, not a total, but a close floor. Measure your own split before
+quoting any channel figure:
+
+```sql
+SELECT traffic_source_basis, COUNT(*) AS sessions
+FROM `your_project.web_analytics_staging.ga4_sessions`
+GROUP BY 1 ORDER BY sessions DESC
+```
+
+These numbers will not tie out to the GA4 interface, which applies its own
+attribution model on top of the same events.
+
+#### Value columns are modelled, not recognized revenue
+
+Unless your site sends GA4 ecommerce revenue, all value in these reports comes from
+the weights you set in `key_event_values`. They exist to rank pages and queries
+against each other. They are not recognized revenue, bookings, or cash, and should
+not be reported as such.
+
+#### The two systems will never tie out exactly
+
+Session counts and click counts come from different measurement systems.
+`session_per_click_ratio` sits near one on healthy pages; treat a low value as a
+tracking lead, not a bug in the report. Search Console dates are Pacific Time while
+GA4 `event_date` uses the property's reporting timezone, so where those differ a
+day's numbers are offset by a few hours of activity between the two systems.
+
+#### Freshness, restatement, and window edges
+
+Search Console publishes with a two-to-three day delay and revises history in
+place. The staging models widen their read window by `source_lookback_days` and
+replace whole days, so late and restated data heals on the next run.
+`gsc_export_log` is where you confirm what Google actually published — a bumped
+`epoch_version` means Google restated a date rather than your site changing.
+
+Sessions that cross midnight span two daily export tables; a session split by the
+window edge is completed by the following run, because the lookback re-reads and
+replaces that day.
+
+The reports are rebuilt over a trailing `reporting_window_days` window, which
+bounds what each one scans. The trend reports need at least
+`2 × trend_window_days` of staged history before they say anything useful.
+
+#### An event you do not send is a silently empty column
+
+The shipped `key_event_names` are placeholders. If your property does not fire
+them, the matching report columns are zero rather than an error. List what you
+actually send before configuring anything:
+
+```sql
+SELECT event_name, COUNT(*) AS events
+FROM `your_project.your_ga4_dataset.events_intraday_*`
+WHERE _TABLE_SUFFIX >= '20260101'
+GROUP BY 1 ORDER BY events DESC
+```
+
+#### How closely this reconciles with Google's own interfaces
+
+Validated against both Google interfaces over a calendar month on a live property.
+
+Every Search Console figure matched exactly: clicks, impressions, CTR, and average
+position, and each of those again broken down by day, device, and country. The GA4
+side matched page views and users to within a fraction of a percent. Sessions came
+in about 2% below the interface, because the export itself holds slightly fewer
+sessions than GA4 reports — the models reproduce the export, and that residual gap
+is not something a transformation can close. Organic sessions are the one real gap,
+for the attribution reason above.

@@ -18,6 +18,9 @@ It lands `events`, `persons`, and `feature_flags` in BigQuery, models them into
 a clean staging layer, and builds four reports — two at account grain, two
 segmented — with a dashboard on top. 13 assets across three layers.
 
+It complements the PostHog UI rather than replacing it — see
+[how this differs from PostHog out of the box](#how-this-differs-from-posthog-out-of-the-box).
+
 ## Features
 
 - **Identity resolution.** PostHog merges anonymous visitors into identified
@@ -43,26 +46,6 @@ segmented — with a dashboard on top. 13 assets across three layers.
 - **Typed schemas with quality checks.** Every column is declared and described;
   `metadata_push` sends those descriptions to BigQuery.
 - **A DAC dashboard** over the reports layer, filterable by plan and date range.
-
-## How this differs from PostHog out of the box
-
-PostHog is good at what it does, and a lot of this template's value is *not* that
-PostHog can't answer these questions — it's that the answers live in your
-warehouse, next to everything else.
-
-| | PostHog out of the box | This template |
-| --- | --- | --- |
-| **Account-level analysis** | Group Analytics, but only if you sent `$groups` on events at capture time. It cannot be applied retroactively, and it's a paid add-on. | Accounts are derived in SQL from person properties, so it works on events you already collected. If you never instrumented `$groups`, the account reports still build. |
-| **Getting data out** | Batch export to BigQuery delivers the raw event stream. | The same data, plus deduplication, identity resolution, sessionization, account rollup, and reports — modeling, not just export. |
-| **Joining to billing / CRM / support** | Not possible; PostHog only knows what you send it. | `posthog_stage.persons` exposes `company` and `email` as ordinary columns. Join them to your own tables and the reports gain real revenue context. |
-| **Custom metrics** | Trends, funnels, retention, paths and stickiness, plus HogQL for anything else — but only over data PostHog holds. | The same SQL freedom over the joined warehouse. The PQL and engagement scores are weighted CTEs you can rewrite. |
-| **Experiment readout** | Conversion per variant, with built-in significance testing. | The same exposure data crossed with plan, industry, and MRR — which variant won *among accounts worth money*. |
-| **History** | Bounded by your plan's retention window. | Bounded by your warehouse, which is usually cheaper per GB-year. |
-
-What PostHog still does better, and what this template does not replace: session
-replay and heatmaps, real-time dashboards, built-in experiment statistics, and
-requiring no pipeline to maintain. Run both — this is a complement to the PostHog
-UI, not a substitute for it.
 
 ## Project structure
 
@@ -116,62 +99,10 @@ checks are pinned in BigQuery rather than inferred from whatever a run happens
 to return. `metadata_push` is on in `pipeline.yml`, so those descriptions are
 pushed to the BigQuery table and column metadata.
 
-### Backfilling `events`: use one day per run
-
-This matters more than anything else in the template.
-
-PostHog's `/events` REST API — the endpoint ingestr reads — does not return a
-complete history for a multi-day window, and gives no indication that anything
-is missing. Measured against one project, `--full-refresh` each time, three
-repeats per window (the results are deterministic):
-
-| Window | Days | Events in PostHog | Events loaded | Days actually covered |
-| ------ | ---- | ----------------- | ------------- | --------------------- |
-| 3 days | 3 | 1,679 | 545 | 1 |
-| 7 days | 7 | 3,090 | 2,619 | 7, but 15% short |
-| 31 days | 31 | 16,925 | 673 | 1 |
-| 95 days | 95 | 42,354 | 1,551 | 4 |
-| 205 days, sparse | 205 | 141 | 141 | all — complete |
-| one day | 1 | exact | exact | 93 days tested, all exact |
-
-The loss is not a function of how wide the window is. A three-day window
-returned a single day while a seven-day window spanned all seven, and a
-205-day window over sparse data returned everything — so the limit tracks the
-volume of events in the window, not its width. There is no usable rule to
-exploit, because the seven-day case *looks* complete and is 15% short. **A
-single day is the only window that is reliably exact.**
-
-So backfill a day at a time. Note the end date is the *next* day: `bruin`
-parses a bare date as midnight, so `--start-date D --end-date D` is a
-zero-width interval and fails with `interval-start must be earlier than
-interval-end`.
-
-```bash
-d=2026-05-23
-while [ "$d" != "2026-08-22" ]; do
-  nxt=$(date -j -v+1d -f %Y-%m-%d $d +%Y-%m-%d)   # GNU: date -d "$d +1 day" +%F
-  bruin run assets/posthog_raw/events.asset.yml --start-date $d --end-date $nxt
-  d=$nxt
-done
-```
-
-The same off-by-one applies to any single-day run, including `persons` and
-`feature_flags`: `--end-date 2026-08-21` stops at midnight, so a profile edited
-at 06:50 that morning is outside the window.
-
-`extract_partition_by` does not help here. Ingestr rejects it for this source —
-"source table `events` does not support extract partitioning; supported sources
-are postgres, mysql, mssql, sqlite, and ADBC-backed SQL sources" — because it
-windows SQL extractions and PostHog is a REST source. It is also mutually
-exclusive with `--full-refresh`.
-
-Day-to-day scheduled runs are unaffected, since each one already covers a
-single day. Only wide backfills are at risk.
-
-`events` is also append-only, so re-running a day duplicates its rows. The
-staging layer deduplicates on `id`, which makes re-runs safe.
-
-`persons` and `feature_flags` merge on `id` and are unaffected by any of this.
+> **Backfill `events` one day at a time.** A wider window silently returns
+> partial data with no sign anything is missing, so backfilling multiple days at
+> once is the single biggest way to load wrong data
+> ([why, with measurements](#backfilling-events-use-one-day-per-run)).
 
 ### Staging: `posthog_stage`
 
@@ -187,25 +118,9 @@ never `posthog_raw` directly.
 | `posthog_stage.sessions` | Sessionized activity: duration, depth, entry/exit page, bounce, and whether the session converted. |
 | `posthog_stage.feature_flag_exposures` | One row per `$feature_flag_called` event, joined to the flag definition. |
 
-Three details worth knowing.
-
-`posthog_raw.events` is append-loaded, so re-running a day duplicates rows
-there; `posthog_stage.events` keeps only the most recently loaded copy of each
-event id, which makes re-runs safe. The tiebreaker on `timestamp` keeps that
-choice stable, so rebuilding from unchanged input gives an identical table.
-
-PostHog merges anonymous visitors into identified people over time, so a person
-owns several distinct IDs. `person_distinct_ids` is the single place that
-resolution happens: it collapses the map to one person per distinct ID and
-asserts that with a `unique` check, so no downstream join can quietly fan an
-event out across two persons and inflate every count built on it.
-
-`accounts` exists for the same reason. PostHog has no account entity unless
-`$groups` was instrumented at capture time, so the rollup — highest plan tier
-anyone holds, `MAX` of seats and MRR, modal industry — is derived once here
-instead of being copy-pasted into four reports that could then drift apart.
-An account whose people carry no recognized plan gets `unknown` rather than
-`NULL`, so it stays reachable from the dashboard's plan filter.
+For how re-runs stay safe, how identity resolution collapses to one person per
+distinct ID, and why the account rollup is derived once here, see
+[staging internals](#staging-internals).
 
 ### Reports: `posthog_reports`
 
@@ -221,45 +136,9 @@ activation, depth, breadth, session depth, and consistency; `pql_score` weights
 breadth, depth, seat activation, power users, and momentum. Adjust the weights —
 they encode assumptions about your product, not universal truths.
 
-Two things about those components are worth knowing before you trust a ranking.
-
-**Seat activation is the heaviest component and the easiest to get backwards.**
-It carries 30 engagement points and 20 PQL points, and its denominator —
-`posthog_stage.accounts.licensed_seats`, set by the `seat_denominator`
-variable — has to reconcile two different populations. `seats` comes from billing; the numerator counts people PostHog has
-seen, which means people an `identify` call has run for. An account that bought
-400 seats and rolled out to 40 reads as 10% activated, so left unqualified the
-component ranks small accounts above large ones and inverts the plan comparison.
-The default is therefore `LEAST(seats, known_users)`, which measures activation
-against the reachable team and treats the gap to the contract as a coverage
-question. Switch it back to `seats` in `accounts.sql` if your `identify`
-coverage matches your billing — that is what `seat_denominator: contracted`
-does. The seats information is not lost either way:
-`posthog_stage.accounts.seat_coverage` reports known users over contracted seats
-on its own, so a rollout that has not reached most of its licences shows up as a
-coverage number rather than as a low engagement score.
-
-**The score thresholds set queue length, not truth.** `pql_hot_score`,
-`pql_warm_score`, `pql_cool_score`, and `expansion_min_score` decide how many
-accounts land in front of a human, and the right numbers depend on how your
-scores actually spread. On a test project where nearly every account was active,
-the default `expansion_min_score` of 65 fired on a quarter of them — technically
-correct, operationally useless. Look at `COUNTIF(expansion_signal) / COUNT(*)`
-and the `pql_score` quartiles on your own data, then raise the thresholds rather
-than the headcount.
-
-**Breadth saturates.** It is a count out of `product_action_events`, so once an
-account has touched every event on the list the component stops discriminating —
-on one test project half the accounts sat at the ceiling. This is the one
-component with no variable to tune, because the fix is a different measure rather
-than a different constant: count distinct days per feature, or weight the rarer
-actions, instead of the plain distinct count.
-
-Account attributes come from `posthog_stage.accounts`, so the rollup rule is
-stated once: plan is the highest tier held by anyone at the company, seats and
-MRR are `MAX` (they repeat on every person row), industry is the modal value.
-`persons` is a current-state snapshot with no history, so today's plan is
-carried onto historical months.
+Before you trust a ranking, read the [scoring caveats](#scoring-caveats): seat
+activation is the heaviest component and the easiest to get backwards, the score
+thresholds set queue length rather than truth, and breadth saturates.
 
 ### Dashboard
 
@@ -308,12 +187,9 @@ by signup source.
 
 ![Retention](images/posthog-retention.png)
 
-Two widget conventions are deliberate. The adoption widgets filter on
-`was_enabled`, so a boolean flag's `false` arm — everyone the rollout held out —
-is not counted as having adopted the feature; the "Enabled vs Held Out" table is
-where the two arms are compared. And the retention widgets filter on
-`is_complete_week`, which excludes weeks at either end of the event history that
-the warehouse cannot speak to.
+Two widget conventions — the adoption widgets filter on `was_enabled` and the
+retention widgets on `is_complete_week` — are deliberate
+([details](#dashboard-widget-conventions)).
 
 ## Adapt this to your project
 
@@ -359,19 +235,15 @@ numbers are bare and strings need quotes:
 bruin run --var pql_hot_score=85 --var seat_denominator='"contracted"' my-posthog-pipeline
 ```
 
-The `enum`, `minimum`, and `maximum` keywords on these variables are currently
-documentation rather than enforcement — Bruin validates that a variable has a
-default and little else, and `--var` overrides skip schema checks. Where getting
-a value wrong would silently produce plausible-but-wrong numbers rather than an
-obvious break, the SQL fails the run itself: an unrecognised `seat_denominator`
-stops `posthog_stage.accounts` with
-`seat_denominator must be "reachable" or "contracted", got …` instead of quietly
-falling back to a default.
+The `enum`, `minimum`, and `maximum` keywords on these variables document intent
+rather than enforce it, though the SQL still guards the values that would
+otherwise silently produce wrong numbers
+([details](#variable-validation-and-macro-loading)).
 
 Two of these are worth checking against your own data before you trust a
 ranking. `seat_denominator` decides whether the heaviest component measures
-rollout or licence coverage, which [Reports](#reports-posthog-reports) covers in
-full. And `depth_target_actions` sets where the depth component saturates: too
+rollout or licence coverage, which the [scoring caveats](#scoring-caveats) cover
+in full. And `depth_target_actions` sets where the depth component saturates: too
 high and it reads near-zero for everyone, too low and it stops separating
 accounts.
 
@@ -451,10 +323,9 @@ bruin validate my-posthog-pipeline
 bruin run my-posthog-pipeline
 ```
 
-`bruin validate` currently reports `in_string_list is not callable` for the
-assets that call the template's macros. The macros render correctly at run time;
-validation does not load the `macros/` folder
-([bruin#2588](https://github.com/bruin-data/bruin/issues/2588)).
+`bruin validate` reports a harmless `in_string_list is not callable` error for
+the assets that call the template's macros; the macros still render correctly at
+run time ([details](#variable-validation-and-macro-loading)).
 
 To load history, backfill `posthog_raw.events` with the one-day-per-run loop in
 [Backfilling `events`](#backfilling-events-use-one-day-per-run) — a wider window
@@ -488,3 +359,171 @@ bruin run --exclude-tag posthog_raw my-posthog-pipeline
 - [PostHog ingestion](https://getbruin.com/docs/bruin/ingestion/posthog.html)
 - [Ingestr assets](https://getbruin.com/docs/bruin/assets/ingestr.html)
 - [BigQuery platform](https://getbruin.com/docs/bruin/platforms/bigquery.html)
+
+## Appendix: notes, caveats & details
+
+### Backfilling `events`: use one day per run
+
+This matters more than anything else in the template.
+
+PostHog's `/events` REST API — the endpoint ingestr reads — does not return a
+complete history for a multi-day window, and gives no indication that anything
+is missing. Measured against one project, `--full-refresh` each time, three
+repeats per window (the results are deterministic):
+
+| Window | Days | Events in PostHog | Events loaded | Days actually covered |
+| ------ | ---- | ----------------- | ------------- | --------------------- |
+| 3 days | 3 | 1,679 | 545 | 1 |
+| 7 days | 7 | 3,090 | 2,619 | 7, but 15% short |
+| 31 days | 31 | 16,925 | 673 | 1 |
+| 95 days | 95 | 42,354 | 1,551 | 4 |
+| 205 days, sparse | 205 | 141 | 141 | all — complete |
+| one day | 1 | exact | exact | 93 days tested, all exact |
+
+The loss is not a function of how wide the window is. A three-day window
+returned a single day while a seven-day window spanned all seven, and a
+205-day window over sparse data returned everything — so the limit tracks the
+volume of events in the window, not its width. There is no usable rule to
+exploit, because the seven-day case *looks* complete and is 15% short. **A
+single day is the only window that is reliably exact.**
+
+So backfill a day at a time. Note the end date is the *next* day: `bruin`
+parses a bare date as midnight, so `--start-date D --end-date D` is a
+zero-width interval and fails with `interval-start must be earlier than
+interval-end`.
+
+```bash
+d=2026-05-23
+while [ "$d" != "2026-08-22" ]; do
+  nxt=$(date -j -v+1d -f %Y-%m-%d $d +%Y-%m-%d)   # GNU: date -d "$d +1 day" +%F
+  bruin run assets/posthog_raw/events.asset.yml --start-date $d --end-date $nxt
+  d=$nxt
+done
+```
+
+The same off-by-one applies to any single-day run, including `persons` and
+`feature_flags`: `--end-date 2026-08-21` stops at midnight, so a profile edited
+at 06:50 that morning is outside the window.
+
+`extract_partition_by` does not help here. Ingestr rejects it for this source —
+"source table `events` does not support extract partitioning; supported sources
+are postgres, mysql, mssql, sqlite, and ADBC-backed SQL sources" — because it
+windows SQL extractions and PostHog is a REST source. It is also mutually
+exclusive with `--full-refresh`.
+
+Day-to-day scheduled runs are unaffected, since each one already covers a
+single day. Only wide backfills are at risk.
+
+`events` is also append-only, so re-running a day duplicates its rows. The
+staging layer deduplicates on `id`, which makes re-runs safe.
+
+`persons` and `feature_flags` merge on `id` and are unaffected by any of this.
+
+### How this differs from PostHog out of the box
+
+PostHog is good at what it does, and a lot of this template's value is *not* that
+PostHog can't answer these questions — it's that the answers live in your
+warehouse, next to everything else.
+
+| | PostHog out of the box | This template |
+| --- | --- | --- |
+| **Account-level analysis** | Group Analytics, but only if you sent `$groups` on events at capture time. It cannot be applied retroactively, and it's a paid add-on. | Accounts are derived in SQL from person properties, so it works on events you already collected. If you never instrumented `$groups`, the account reports still build. |
+| **Getting data out** | Batch export to BigQuery delivers the raw event stream. | The same data, plus deduplication, identity resolution, sessionization, account rollup, and reports — modeling, not just export. |
+| **Joining to billing / CRM / support** | Not possible; PostHog only knows what you send it. | `posthog_stage.persons` exposes `company` and `email` as ordinary columns. Join them to your own tables and the reports gain real revenue context. |
+| **Custom metrics** | Trends, funnels, retention, paths and stickiness, plus HogQL for anything else — but only over data PostHog holds. | The same SQL freedom over the joined warehouse. The PQL and engagement scores are weighted CTEs you can rewrite. |
+| **Experiment readout** | Conversion per variant, with built-in significance testing. | The same exposure data crossed with plan, industry, and MRR — which variant won *among accounts worth money*. |
+| **History** | Bounded by your plan's retention window. | Bounded by your warehouse, which is usually cheaper per GB-year. |
+
+What PostHog still does better, and what this template does not replace: session
+replay and heatmaps, real-time dashboards, built-in experiment statistics, and
+requiring no pipeline to maintain. Run both — this is a complement to the PostHog
+UI, not a substitute for it.
+
+### Staging internals
+
+Three details worth knowing.
+
+`posthog_raw.events` is append-loaded, so re-running a day duplicates rows
+there; `posthog_stage.events` keeps only the most recently loaded copy of each
+event id, which makes re-runs safe. The tiebreaker on `timestamp` keeps that
+choice stable, so rebuilding from unchanged input gives an identical table.
+
+PostHog merges anonymous visitors into identified people over time, so a person
+owns several distinct IDs. `person_distinct_ids` is the single place that
+resolution happens: it collapses the map to one person per distinct ID and
+asserts that with a `unique` check, so no downstream join can quietly fan an
+event out across two persons and inflate every count built on it.
+
+`accounts` exists for the same reason. PostHog has no account entity unless
+`$groups` was instrumented at capture time, so the rollup — highest plan tier
+anyone holds, `MAX` of seats and MRR, modal industry — is derived once here
+instead of being copy-pasted into four reports that could then drift apart.
+An account whose people carry no recognized plan gets `unknown` rather than
+`NULL`, so it stays reachable from the dashboard's plan filter.
+
+### Scoring caveats
+
+Two things about those components are worth knowing before you trust a ranking.
+
+**Seat activation is the heaviest component and the easiest to get backwards.**
+It carries 30 engagement points and 20 PQL points, and its denominator —
+`posthog_stage.accounts.licensed_seats`, set by the `seat_denominator`
+variable — has to reconcile two different populations. `seats` comes from billing; the numerator counts people PostHog has
+seen, which means people an `identify` call has run for. An account that bought
+400 seats and rolled out to 40 reads as 10% activated, so left unqualified the
+component ranks small accounts above large ones and inverts the plan comparison.
+The default is therefore `LEAST(seats, known_users)`, which measures activation
+against the reachable team and treats the gap to the contract as a coverage
+question. Switch it back to `seats` in `accounts.sql` if your `identify`
+coverage matches your billing — that is what `seat_denominator: contracted`
+does. The seats information is not lost either way:
+`posthog_stage.accounts.seat_coverage` reports known users over contracted seats
+on its own, so a rollout that has not reached most of its licences shows up as a
+coverage number rather than as a low engagement score.
+
+**The score thresholds set queue length, not truth.** `pql_hot_score`,
+`pql_warm_score`, `pql_cool_score`, and `expansion_min_score` decide how many
+accounts land in front of a human, and the right numbers depend on how your
+scores actually spread. On a test project where nearly every account was active,
+the default `expansion_min_score` of 65 fired on a quarter of them — technically
+correct, operationally useless. Look at `COUNTIF(expansion_signal) / COUNT(*)`
+and the `pql_score` quartiles on your own data, then raise the thresholds rather
+than the headcount.
+
+**Breadth saturates.** It is a count out of `product_action_events`, so once an
+account has touched every event on the list the component stops discriminating —
+on one test project half the accounts sat at the ceiling. This is the one
+component with no variable to tune, because the fix is a different measure rather
+than a different constant: count distinct days per feature, or weight the rarer
+actions, instead of the plain distinct count.
+
+Account attributes come from `posthog_stage.accounts`, so the rollup rule is
+stated once: plan is the highest tier held by anyone at the company, seats and
+MRR are `MAX` (they repeat on every person row), industry is the modal value.
+`persons` is a current-state snapshot with no history, so today's plan is
+carried onto historical months.
+
+### Dashboard widget conventions
+
+Two widget conventions are deliberate. The adoption widgets filter on
+`was_enabled`, so a boolean flag's `false` arm — everyone the rollout held out —
+is not counted as having adopted the feature; the "Enabled vs Held Out" table is
+where the two arms are compared. And the retention widgets filter on
+`is_complete_week`, which excludes weeks at either end of the event history that
+the warehouse cannot speak to.
+
+### Variable validation and macro loading
+
+The `enum`, `minimum`, and `maximum` keywords on these variables are currently
+documentation rather than enforcement — Bruin validates that a variable has a
+default and little else, and `--var` overrides skip schema checks. Where getting
+a value wrong would silently produce plausible-but-wrong numbers rather than an
+obvious break, the SQL fails the run itself: an unrecognised `seat_denominator`
+stops `posthog_stage.accounts` with
+`seat_denominator must be "reachable" or "contracted", got …` instead of quietly
+falling back to a default.
+
+`bruin validate` currently reports `in_string_list is not callable` for the
+assets that call the template's macros. The macros render correctly at run time;
+validation does not load the `macros/` folder
+([bruin#2588](https://github.com/bruin-data/bruin/issues/2588)).
