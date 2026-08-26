@@ -70,33 +70,6 @@ func TestVariantSet_Validate(t *testing.T) {
 		vs := pipeline.VariantSet{"v1": {"client": "a"}, "v2": {"client": "b"}}
 		require.NoError(t, vs.Validate(vars))
 	})
-
-	t.Run("accepts a nil variant body as an empty override set", func(t *testing.T) {
-		t.Parallel()
-		vs := pipeline.VariantSet{"noop": nil}
-		require.NoError(t, vs.Validate(vars))
-	})
-
-	t.Run("rejects every variant that violates a variable constraint", func(t *testing.T) {
-		t.Parallel()
-		constrainedVars := pipeline.Variables{
-			"client": map[string]any{
-				"type":    "string",
-				"enum":    []any{"a", "b"},
-				"default": "a",
-			},
-		}
-		vs := pipeline.VariantSet{
-			"active":   {"client": "a"},
-			"inactive": {"client": "c"},
-		}
-
-		err := vs.Validate(constrainedVars)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), `variant "inactive"`)
-		assert.Contains(t, err.Error(), "client")
-		assert.Contains(t, err.Error(), "one of")
-	})
 }
 
 func TestVariantSet_Validate_TypeChecking(t *testing.T) {

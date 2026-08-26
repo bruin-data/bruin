@@ -29,7 +29,7 @@ variables:
 
 ## Supported JSON Schema Keywords
 
-Bruin accepts [JSON Schema draft-07](https://json-schema.org/draft-07/json-schema-release-notes.html) keywords in variable definitions. Each variable's `default` value is validated against its schema, and runtime or variant overrides must satisfy the same schema before replacing the default.
+Bruin accepts [JSON Schema draft-07](https://json-schema.org/draft-07/json-schema-release-notes.html) keywords in variable definitions. At parse time, it currently enforces that each variable has a `default` value; full schema validation is not yet enforced.
 
 | `type` value | Description | Example default |
 |--------------|-------------|-----------------|
@@ -39,13 +39,9 @@ Bruin accepts [JSON Schema draft-07](https://json-schema.org/draft-07/json-schem
 | `boolean`    | `true` / `false` flags | `false` |
 | `object`     | Maps with nested schemas | `{ "region": "us-east-1" }` |
 | `array`      | Lists of values | `["alice", "bob"]` |
-| `"null"`     | Explicitly nullable values | `null` |
+| `null`       | Explicitly nullable values | `null` |
 
-Quote `"null"` when using it as a `type`: YAML reads an unquoted `null` as an empty value rather than the string, and the variable then fails validation.
-
-Additional keywords: `enum`, `const`, `minimum`, `maximum`, `pattern`, `format`, `items`, `properties`, `required`.
-
-`pattern` is compiled with Go's RE2 engine, which has no lookahead or backreferences. `format` is enforced rather than advisory, so a `default` of `"team"` under `format: email` is rejected.
+Additional keywords: `enum`, `const`, `minimum`, `maximum`, `pattern`, `items`, `properties`, `required`.
 
 ## Complex Variable Examples
 
