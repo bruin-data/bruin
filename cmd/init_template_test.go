@@ -698,7 +698,9 @@ func TestInitAcademySqlBeginnerCopiesStarterTemplate(t *testing.T) {
 	require.FileExists(t, filepath.Join(pipelineRoot, "queries", "anchors.md"))
 	require.FileExists(t, filepath.Join(pipelineRoot, "queries", "audit-template.md"))
 	require.FileExists(t, filepath.Join(pipelineRoot, "queries", "audit-lab", "README.md"))
-	require.FileExists(t, filepath.Join(pipelineRoot, "queries", "audit-lab", "answer-key.md"))
+	// The answer key must NOT ship: it is underscore-prefixed so Go's embed skips it.
+	require.NoFileExists(t, filepath.Join(pipelineRoot, "queries", "audit-lab", "answer-key.md"))
+	require.NoFileExists(t, filepath.Join(pipelineRoot, "queries", "audit-lab", "_answer-key.md"))
 	require.FileExists(t, filepath.Join(pipelineRoot, "queries", "audit-lab", "findings-template.md"))
 	require.FileExists(t, filepath.Join(pipelineRoot, "queries", "audit-lab", "q01.sql"))
 	require.FileExists(t, filepath.Join(pipelineRoot, "queries", "audit-lab", "q10.sql"))
@@ -771,10 +773,14 @@ func TestAcademySqlBeginnerTemplateIsDeterministicByConstruction(t *testing.T) {
 		}
 	}
 
-	// The audit lab's answer key is an acceptance fixture: exactly six wrong.
-	answerKey, err := templates.Templates.ReadFile("academy-sql-beginner/queries/audit-lab/answer-key.md")
+	// The audit lab's answer key is an acceptance fixture: exactly six wrong. It is
+	// read from disk, not from the embedded FS, because it deliberately does not ship.
+	answerKey, err := os.ReadFile(filepath.Join("..", "templates", "academy-sql-beginner", "queries", "audit-lab", "_answer-key.md"))
 	require.NoError(t, err)
 	require.Contains(t, string(answerKey), "six are wrong (q02, q04, q05, q07, q08, q09)")
+
+	_, embedded := templates.Templates.ReadFile("academy-sql-beginner/queries/audit-lab/_answer-key.md")
+	require.Error(t, embedded, "the answer key must not be embedded - a student would find it with a repo-wide search")
 }
 
 // stripSQLCommentsForTest removes /* ... */ blocks and -- line comments so the

@@ -11,7 +11,7 @@ each one:
 1. Read the question and the query.
 2. Predict what a correct answer would look like before you run it.
 3. Run it:
-   `bruin query --connection duckdb-default --query "$(cat queries/audit-lab/q01.sql)"`
+   `bruin query --connection duckdb-default --description "audit lab q01" --query "$(cat queries/audit-lab/q01.sql)"`
 4. Decide: does this query actually answer the question that was asked? If not,
    what is wrong, and roughly how far off is the answer?
 
@@ -27,7 +27,11 @@ Some things worth checking every time:
 - Does an INNER JOIN drop rows that should have been kept?
 - Is there a duplicate row inflating a total?
 
-The numbers you trust in `../anchors.md` are your friend here. So is
-`../../docs/known-defects.md`, which lists what is deliberately wrong with the
-data - though the bugs in these queries are a separate matter from the defects
-in the data.
+The numbers you trust in `../anchors.md` are your friend here.
+
+`../../docs/known-defects.md` lists what is deliberately wrong with the *data*, which
+is a different question from what is wrong with these *queries*. It will not tell you
+which six are broken, and reading it hoping for that will mislead you.
+
+There is no answer key in this project on purpose. Commit to all ten verdicts first;
+the key is published with the course.

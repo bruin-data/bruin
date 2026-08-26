@@ -118,9 +118,20 @@ order, so a LEFT JOIN from customers to orders returns rows an INNER JOIN drops.
 | `ordered_at` | timestamp | When the order was placed (store-local). Business time. |
 | `_loaded_at` | timestamp | When the row was recorded by the source. Ingestion time - not the same as `ordered_at`. |
 | `promised_delivery_date` | date | Promised delivery, NULL on a few orders. |
-| `currency_code` | varchar | One of USD, EUR, GBP, CAD, AUD. |
+| `currency_code` | varchar | One of USD, EUR, GBP, CAD, AUD. A label only - see the note below. |
 | `order_status` | varchar | Lifecycle status. NULL on 24 orders. |
 | `order_total` | decimal(10,2) | Order-header total. Do NOT sum across a join to lines. It is a figure the source system supplies, and it does **not** equal the sum of the order's lines - see the note below. |
+
+### Currency is a label, not a conversion
+
+`currency_code` records which currency the order was priced in, but the amounts are
+**not** converted: the same product costs 699.00 whether the order says USD, EUR, GBP,
+CAD or AUD. So summing revenue across currencies is arithmetically fine here, and you
+do not need an exchange rate.
+
+This is a simplification, and a real dataset would not let you get away with it. The
+intermediate course adds an `fx_rates` table and makes multi-currency revenue a real
+problem. For this course, treat every amount as being in the same unit.
 
 ### `order_total` does not reconcile with the lines
 

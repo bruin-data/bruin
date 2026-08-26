@@ -24,6 +24,7 @@ academy-sql-beginner/
 ├─ .bruin.yml              # Connections and environments. (On init it moves to your repo root.)
 ├─ .gitignore              # Keeps the generated database and logs out of git.
 ├─ docs/                   # Reference to read to get oriented - cheaper than asking the database.
+│  ├─ failure-modes.md     # Start here: loud vs silent failures, and what NULL means.
 │  ├─ schema.md            # Every table and column, what "grain" means, and how they relate.
 │  ├─ writing-an-asset.md  # The asset file format, for when you save a query (Step 12).
 │  ├─ data-design.md       # How the data is generated, and why you must not change it casually.
@@ -38,8 +39,7 @@ academy-sql-beginner/
 │  └─ audit-lab/           # The signature exercise: ten queries, exactly six of them wrong.
 │     ├─ README.md            # The task and the rules.
 │     ├─ q01.sql … q10.sql    # One business question each. Run it, decide if the answer is right.
-│     ├─ findings-template.md # Where you record your verdict for each of the ten.
-│     └─ answer-key.md        # Spoilers: which six are wrong and why. Read this last.
+│     └─ findings-template.md # Where you record your verdict for each of the ten.
 └─ pipeline/               # The Bruin pipeline that builds the dataset.
    ├─ pipeline.yml         # Pipeline name, schedule, and default connection.
    └─ assets/              # Six generator assets. Do not edit these - but do read them.
@@ -57,8 +57,8 @@ format.
 
 ## Generate the data
 
-Two commands. The first one matters: every command below is run from inside the
-project folder, not from the repository root above it.
+Two commands. `bruin run` needs to be able to find the pipeline, so run it from
+inside the project folder rather than the repository root above it.
 
 ```bash
 cd academy-sql-beginner
@@ -99,6 +99,12 @@ MotherDuck.
 
 Full column details are in [`docs/schema.md`](docs/schema.md), and every generator
 asset in `pipeline/assets/` documents its own columns.
+
+## Where to start
+
+Read [`docs/failure-modes.md`](docs/failure-modes.md) before you write any SQL. It is
+two minutes, it explains the difference between a query that breaks and a query that
+lies, and it defines NULL - which the first three lessons all lean on.
 
 ## What is deliberately wrong with the data
 

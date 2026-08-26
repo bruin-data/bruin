@@ -60,7 +60,23 @@ LIMIT 10;
 --    order_status is NULL and NULL = 'completed' is never true. This is the
 --    quietest way to turn a LEFT JOIN back into an INNER one.
 --
--- 5. A warning about DISTINCT. Adding it to the broken query in step 1 makes the
---    number look plausible again without fixing the grain. If you find yourself
---    reaching for DISTINCT to make a total look right, the join is wrong. Treat
---    every DISTINCT in a query - yours or an agent's - as something to justify.
+-- 5. A warning about DISTINCT. The broken total in item 1 was 1449771.82. Someone
+--    who knows the answer is "too big" reaches for DISTINCT, and one form of it
+--    does seem to help:
+--      SELECT SUM(DISTINCT o.order_total)
+--      FROM orders o
+--      JOIN order_items oi ON o.order_id = oi.order_id;   -- 557280.93
+--
+--    557280.93 sits close to the right answer of 604065.00, so it looks fixed. It
+--    is not. It threw away every repeated value, and only 1,105 of the 1,200
+--    orders have a distinct total - so 95 real orders silently vanished. Check
+--    for yourself:
+--      SELECT COUNT(DISTINCT order_total), COUNT(*) FROM orders;
+--
+--    (Note that DISTINCT in the other position, SELECT DISTINCT SUM(...), changes
+--    nothing at all - the sum is one row already. Two things spelled almost the
+--    same, doing entirely different damage.)
+--
+--    If you find yourself reaching for DISTINCT to make a total look right, the
+--    join is wrong. Treat every DISTINCT in a query - yours or an agent's - as
+--    something to justify.

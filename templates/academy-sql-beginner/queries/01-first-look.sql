@@ -1,7 +1,8 @@
 -- Step 4 - A first look at the data
 --
 -- This is a plain SQL file, not a Bruin asset. Run it with:
---   bruin query --connection duckdb-default --query "$(cat queries/01-first-look.sql)"
+--   bruin query --connection duckdb-default --description "step 4 first look" \
+--     --query "$(cat queries/01-first-look.sql)"
 -- or just copy a query into your editor and run it there.
 --
 -- A SELECT reads columns FROM a table. WHERE keeps only some rows, ORDER BY

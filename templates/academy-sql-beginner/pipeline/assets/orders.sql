@@ -36,7 +36,11 @@ columns:
     description: "Delivery date promised at order time. Null on a small number of orders."
   - name: currency_code
     type: varchar
-    description: "Currency the order was priced in. One of USD, EUR, GBP, CAD, AUD."
+    description: >-
+      Which currency the order was priced in: USD, EUR, GBP, CAD or AUD. This is a
+      label only. The amounts are NOT converted - the same product costs 699.00 in
+      every one of them - so summing revenue across currencies needs no exchange
+      rate. See docs/schema.md.
   - name: order_status
     type: varchar
     description: >-

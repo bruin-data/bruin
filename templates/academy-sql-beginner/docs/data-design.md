@@ -13,7 +13,7 @@ single changed row can break a published page.
 
 **If you "improve" a generator, you will almost certainly break those numbers.**
 Before changing anything in `pipeline/assets/`, re-run the acceptance
-checks (see the beginner template spec, and `queries/audit-lab/answer-key.md`) and
+checks (see the beginner template spec, and `queries/audit-lab/_answer-key.md`) and
 update every number that moves, in lockstep, across the repo and the course. If
 you are not prepared to do that, do not change the generators.
 

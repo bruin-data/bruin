@@ -1,7 +1,7 @@
 # Audit lab - my findings
 
 Fill one row per query. Decide correct or wrong, say why, and note the answer you
-got. Do not peek at the answer key until you have committed to all ten.
+got. Commit to all ten before you check any of them against anything.
 
 | Query | Correct or wrong? | What it claims to answer | If wrong: what is wrong, and how far off | Answer I got |
 |---|---|---|---|---|
