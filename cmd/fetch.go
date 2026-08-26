@@ -11,7 +11,6 @@ import (
 	path2 "path"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -162,6 +161,21 @@ func Query() *cli.Command {
 				Usage:   "set Jinja template variables for query rendering. Supports flat (--var key=value), dot-notation nested (--var filters.start_date=2026-05-20) and JSON object/array values (--var filters='{\"start_date\":\"2026-05-20\"}').",
 				Sources: cli.EnvVars("BRUIN_VARS"),
 			},
+			&cli.BoolFlag{
+				Name:    "cloud",
+				Usage:   "run the query against Bruin Cloud instead of locally (uses --connection against the agent's connections; ignores .bruin.yml)",
+				Sources: cli.EnvVars("BRUIN_CLOUD_QUERY"),
+			},
+			&cli.IntFlag{
+				Name:    "cloud-agent-id",
+				Usage:   "Bruin Cloud agent id whose connections back the query (with --cloud)",
+				Sources: cli.EnvVars("BRUIN_CLOUD_AGENT_ID"),
+			},
+			&cli.StringFlag{
+				Name:    "cloud-api-key",
+				Usage:   "Bruin Cloud API key used to authenticate --cloud queries",
+				Sources: cli.EnvVars("BRUIN_CLOUD_API_KEY"),
+			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			fs := afero.NewOsFs()
@@ -180,12 +194,9 @@ func Query() *cli.Command {
 			}
 
 			// Cloud mode has no local dialect to rewrite against, so the SQL parser
-			// (limit/schema-prefix) and dry-run don't apply; the server enforces its
-			// own row cap.
-			cloudMode := isCloudQueryMode()
-			if cloudMode && c.IsSet("limit") {
-				fmt.Fprintln(os.Stderr, "note: --limit is ignored in cloud query mode; the server enforces a row cap.")
-			}
+			// (schema-prefix) and dry-run don't apply; --limit is honored client-side
+			// in cloudQuerier instead of via the parser.
+			cloudMode := c.Bool("cloud")
 
 			var parser *sqlparser.SQLParser
 			needsParser := !cloudMode && (c.IsSet("limit") || (pipelineInfo != nil && pipelineInfo.Config.SelectedEnvironment.SchemaPrefix != ""))
@@ -474,27 +485,6 @@ func validateFlags(connection, query, asset, pipelinePath string, hasSemanticFla
 	}
 }
 
-const (
-	// cloudQueryModeEnv toggles cloud query mode: when truthy, `bruin query`
-	// sends the SQL to the Bruin Cloud API instead of running it locally, and
-	// never touches .bruin.yml.
-	cloudQueryModeEnv = "BRUIN_CLOUD_QUERY"
-	// cloudAPIKeyEnv holds the Bruin Cloud API bearer token.
-	cloudAPIKeyEnv = "BRUIN_CLOUD_API_KEY" //nolint:gosec // G101: env var name, not a hardcoded credential
-	// cloudAgentIDEnv is the numeric id of the agent whose connections back the query.
-	cloudAgentIDEnv = "BRUIN_CLOUD_AGENT_ID"
-)
-
-// isCloudQueryMode reports whether cloud query mode is enabled via env.
-func isCloudQueryMode() bool {
-	switch strings.ToLower(strings.TrimSpace(os.Getenv(cloudQueryModeEnv))) {
-	case "1", "true", "yes", "on":
-		return true
-	default:
-		return false
-	}
-}
-
 // cloudQuerier runs queries against an agent's connection through the Bruin Cloud
 // API. It implements schemaQuerier so the rest of the query command (output,
 // export, query-log) works unchanged.
@@ -503,6 +493,7 @@ type cloudQuerier struct {
 	agentID        int
 	connectionName string
 	queryParams    map[string]any
+	limit          int64
 }
 
 func (q *cloudQuerier) SelectWithSchema(ctx context.Context, qq *query.Query) (*query.QueryResult, error) {
@@ -520,14 +511,20 @@ func (q *cloudQuerier) SelectWithSchema(ctx context.Context, qq *query.Query) (*
 		columnTypes = padded
 	}
 
+	rows := res.Rows
+	// The server enforces its own cap; a smaller --limit is applied client-side.
+	if q.limit > 0 && int64(len(rows)) > q.limit {
+		rows = rows[:q.limit]
+	}
+
 	return &query.QueryResult{
 		Columns:     res.Columns,
-		Rows:        res.Rows,
+		Rows:        rows,
 		ColumnTypes: columnTypes,
 	}, nil
 }
 
-// prepareCloudQueryExecution builds a cloud-backed querier from env + flags,
+// prepareCloudQueryExecution builds a cloud-backed querier from the --cloud flags,
 // bypassing .bruin.yml entirely. The query is sent raw with its --var values as
 // query_params; Jinja is rendered server-side (matching how dashboards run).
 func prepareCloudQueryExecution(c *cli.Command, vars map[string]any) (string, interface{}, string, string, *ppInfo, error) {
@@ -541,18 +538,14 @@ func prepareCloudQueryExecution(c *cli.Command, vars map[string]any) (string, in
 		return "", nil, "", "", nil, errors.New("cloud query mode requires both --connection and --query")
 	}
 
-	apiKey := os.Getenv(cloudAPIKeyEnv)
+	apiKey := c.String("cloud-api-key")
 	if apiKey == "" {
-		return "", nil, "", "", nil, errors.Errorf("cloud query mode requires %s to be set", cloudAPIKeyEnv)
+		return "", nil, "", "", nil, errors.New("cloud query mode requires --cloud-api-key (BRUIN_CLOUD_API_KEY)")
 	}
 
-	agentIDStr := os.Getenv(cloudAgentIDEnv)
-	if agentIDStr == "" {
-		return "", nil, "", "", nil, errors.Errorf("cloud query mode requires %s to be set", cloudAgentIDEnv)
-	}
-	agentID, err := strconv.Atoi(strings.TrimSpace(agentIDStr))
-	if err != nil {
-		return "", nil, "", "", nil, errors.Errorf("%s must be a numeric agent id, got %q", cloudAgentIDEnv, agentIDStr)
+	agentID := c.Int("cloud-agent-id")
+	if agentID <= 0 {
+		return "", nil, "", "", nil, errors.New("cloud query mode requires --cloud-agent-id (BRUIN_CLOUD_AGENT_ID)")
 	}
 
 	querier := &cloudQuerier{
@@ -560,12 +553,13 @@ func prepareCloudQueryExecution(c *cli.Command, vars map[string]any) (string, in
 		agentID:        agentID,
 		connectionName: connectionName,
 		queryParams:    vars,
+		limit:          c.Int64("limit"),
 	}
 	return connectionName, querier, queryStr, "", nil, nil
 }
 
 func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, vars map[string]any) (string, interface{}, string, string, *ppInfo, error) {
-	if isCloudQueryMode() {
+	if c.Bool("cloud") {
 		return prepareCloudQueryExecution(c, vars)
 	}
 

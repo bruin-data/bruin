@@ -1109,19 +1109,6 @@ func TestWriteAggregatedQueryLogCapsRows(t *testing.T) {
 	assert.Len(t, perQuery.Rows, 50, "per-query file should be untouched")
 }
 
-func TestIsCloudQueryMode(t *testing.T) {
-	cases := map[string]bool{
-		"1": true, "true": true, "TRUE": true, "yes": true, "on": true,
-		"": false, "0": false, "off": false, "no": false, "nope": false,
-	}
-	for val, want := range cases {
-		t.Run(val, func(t *testing.T) {
-			t.Setenv(cloudQueryModeEnv, val)
-			assert.Equal(t, want, isCloudQueryMode())
-		})
-	}
-}
-
 func TestCloudQuerierSelectWithSchema(t *testing.T) {
 	t.Run("maps the columnar result", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1159,5 +1146,21 @@ func TestCloudQuerierSelectWithSchema(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, []string{"a", "b", "c"}, res.Columns)
 		assert.Equal(t, []string{"", "", ""}, res.ColumnTypes)
+	})
+
+	t.Run("applies a smaller --limit client-side", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"columns": []string{"n"},
+				"rows":    [][]any{{1}, {2}, {3}, {4}, {5}},
+			})
+		}))
+		defer server.Close()
+		t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
+
+		q := &cloudQuerier{client: bruincloud.NewAPIClient("k"), agentID: 1, connectionName: "c", limit: 2}
+		res, err := q.SelectWithSchema(context.Background(), &query.Query{Query: "SELECT n FROM t"})
+		require.NoError(t, err)
+		assert.Len(t, res.Rows, 2)
 	})
 }
