@@ -12,18 +12,19 @@ import (
 func TestVariables(t *testing.T) {
 	t.Parallel()
 
-	// TODO: restore this test when meta-schema validation is implemented
-	// t.Run("Should return an error if the variables are not valid JSONSchema object", func(t *testing.T) {
-	// 	t.Parallel()
-	// 	vars := pipeline.Variables{
-	// 		"user": {
-	// 			"type": "complex",
-	// 		},
-	// 	}
-	// 	err := vars.Validate()
-	// 	require.Error(t, err)
-	// 	assert.Contains(t, err.Error(), "invalid variables schema")
-	// })
+	t.Run("Should return an error if the variables are not valid JSONSchema object", func(t *testing.T) {
+		t.Parallel()
+		vars := pipeline.Variables{
+			"user": {
+				"type":    "complex",
+				"default": "alice",
+			},
+		}
+		err := vars.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid variables schema")
+		assert.NotContains(t, err.Error(), "\n", "schema errors must stay on a single line to render as one lint issue")
+	})
 	t.Run("Should return an error if the default is not set", func(t *testing.T) {
 		t.Parallel()
 		vars := pipeline.Variables{
@@ -31,6 +32,16 @@ func TestVariables(t *testing.T) {
 				"type": "string",
 			},
 		}
+		err := vars.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "must have a default value")
+	})
+	t.Run("Should report the missing default for an empty variable body", func(t *testing.T) {
+		t.Parallel()
+		// A bare `foo:` in pipeline.yml decodes to a nil body. The missing-default
+		// check has to run before schema compilation, otherwise this surfaces as an
+		// opaque meta-schema type error instead.
+		vars := pipeline.Variables{"user": nil}
 		err := vars.Validate()
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "must have a default value")
@@ -45,6 +56,72 @@ func TestVariables(t *testing.T) {
 		}
 		err := vars.Validate()
 		require.NoError(t, err)
+	})
+	t.Run("Should blame the default, not the schema, when a default is not JSON-encodable", func(t *testing.T) {
+		t.Parallel()
+		// YAML decodes non-string mapping keys into map[any]any, which json.Marshal
+		// rejects. Defaults stay out of the compiled schema document so this reads as
+		// a problem with the default rather than with the variable's schema.
+		vars := pipeline.Variables{
+			"budgets": {
+				"type":    "object",
+				"default": map[any]any{2024: 100},
+			},
+		}
+		err := vars.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid variable defaults")
+		assert.Contains(t, err.Error(), "object keys must be strings")
+		assert.NotContains(t, err.Error(), "invalid variables schema")
+	})
+	t.Run("Should return an error if a default does not satisfy its enum", func(t *testing.T) {
+		t.Parallel()
+		vars := pipeline.Variables{
+			"seat_denominator": {
+				"type":    "string",
+				"enum":    []any{"reachable", "contracted"},
+				"default": "Contracted",
+			},
+		}
+		err := vars.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid variable defaults")
+		assert.Contains(t, err.Error(), "seat_denominator")
+	})
+	t.Run("Should return an error if a default is outside numeric bounds", func(t *testing.T) {
+		t.Parallel()
+		vars := pipeline.Variables{
+			"forecast_horizon_days": {
+				"type":    "integer",
+				"minimum": 7,
+				"maximum": 90,
+				"default": 0,
+			},
+		}
+		err := vars.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid variable defaults")
+		assert.Contains(t, err.Error(), "forecast_horizon_days")
+	})
+	t.Run("Should validate nested defaults", func(t *testing.T) {
+		t.Parallel()
+		vars := pipeline.Variables{
+			"users": {
+				"type": "array",
+				"items": map[string]any{
+					"type":     "object",
+					"required": []any{"name"},
+					"properties": map[string]any{
+						"name": map[string]any{"type": "string"},
+					},
+				},
+				"default": []any{map[string]any{"age": 42}},
+			},
+		}
+		err := vars.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "users.0")
+		assert.Contains(t, err.Error(), "name")
 	})
 	t.Run("Should use default values to construct the variables", func(t *testing.T) {
 		t.Parallel()
@@ -299,5 +376,79 @@ func TestVariables_Merge(t *testing.T) {
 
 		assert.Equal(t, "string", vars["foo"]["type"])
 		assert.Equal(t, "new", vars["foo"]["default"])
+	})
+
+	t.Run("rejects an override that does not satisfy its enum", func(t *testing.T) {
+		t.Parallel()
+
+		vars := pipeline.Variables{
+			"seat_denominator": {
+				"type":    "string",
+				"enum":    []any{"reachable", "contracted"},
+				"default": "reachable",
+			},
+		}
+
+		err := vars.Merge(map[string]any{"seat_denominator": "Contracted"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "schema validation failed")
+		assert.Contains(t, err.Error(), "seat_denominator")
+		assert.Equal(t, "reachable", vars["seat_denominator"]["default"])
+	})
+
+	t.Run("rejects overrides outside numeric bounds", func(t *testing.T) {
+		t.Parallel()
+
+		for _, value := range []int{0, 9999} {
+			vars := pipeline.Variables{
+				"forecast_horizon_days": {
+					"type":    "integer",
+					"minimum": 7,
+					"maximum": 90,
+					"default": 30,
+				},
+			}
+
+			err := vars.Merge(map[string]any{"forecast_horizon_days": value})
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "forecast_horizon_days")
+			assert.Equal(t, 30, vars["forecast_horizon_days"]["default"])
+		}
+	})
+
+	t.Run("overriding a variable declared with an empty body does not panic", func(t *testing.T) {
+		t.Parallel()
+
+		// A bare `foo:` in pipeline.yml decodes to a nil map, which cannot be
+		// assigned to.
+		vars := pipeline.Variables{"foo": nil}
+
+		err := vars.Merge(map[string]any{"foo": 1})
+		require.NoError(t, err)
+		assert.Equal(t, 1, vars["foo"]["default"])
+	})
+
+	t.Run("does not apply any overrides when one is invalid", func(t *testing.T) {
+		t.Parallel()
+
+		vars := pipeline.Variables{
+			"environment": {
+				"type":    "string",
+				"default": "dev",
+			},
+			"forecast_horizon_days": {
+				"type":    "integer",
+				"minimum": 7,
+				"default": 30,
+			},
+		}
+
+		err := vars.Merge(map[string]any{
+			"environment":           "prod",
+			"forecast_horizon_days": 0,
+		})
+		require.Error(t, err)
+		assert.Equal(t, "dev", vars["environment"]["default"])
+		assert.Equal(t, 30, vars["forecast_horizon_days"]["default"])
 	})
 }
