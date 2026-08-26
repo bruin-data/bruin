@@ -1048,6 +1048,11 @@ func TestValidateIngestrImportFlags(t *testing.T) {
 			ingestrImport: true,
 			destination:   "duckdb",
 		},
+		{
+			name:          "ingestr accepts fabric destination",
+			ingestrImport: true,
+			destination:   "fabric",
+		},
 	}
 
 	for _, tt := range tests {

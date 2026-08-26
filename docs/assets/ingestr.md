@@ -173,7 +173,7 @@ Bruin resolves the destination connection in this order:
 2. `parameters.destination_connection`, when set.
 3. The pipeline default connection for `parameters.destination`.
 
-When Bruin infers a destination connection from `parameters.destination`, the built-in destination values are `athena`, `bigquery`, `clickhouse`, `databricks`, `doris`, `duckdb`, `dynamodb`, `elasticsearch`, `gsheets`, `motherduck`, `mssql`, `oracle`, `postgres`, `redshift`, `snowflake`, `starrocks`, `synapse`, and `vertica`. Other ingestr destinations can still be used when you set `connection` or `destination_connection` to a compatible Bruin connection.
+When Bruin infers a destination connection from `parameters.destination`, the built-in destination values are `athena`, `bigquery`, `clickhouse`, `databricks`, `doris`, `duckdb`, `dynamodb`, `elasticsearch`, `fabric`, `gsheets`, `iceberg`, `motherduck`, `mssql`, `oracle`, `postgres`, `redshift`, `snowflake`, `starrocks`, `synapse`, and `vertica`. Other ingestr destinations can still be used when you set `connection` or `destination_connection` to a compatible Bruin connection.
 
 Bruin forwards these write strategies to ingestr:
 
@@ -203,9 +203,9 @@ Destination support depends on ingestr's destination implementation:
 | DuckDB, MotherDuck / `duckdb`, `motherduck`, `md` | Yes for `duckdb` and `motherduck` | `replace`, `append`, `merge`, `delete+insert`, `truncate+insert` |
 | DynamoDB / `dynamodb` | Yes | `replace`, `append`, `merge` |
 | Elasticsearch / `elasticsearch` | Yes | `replace`, `append` |
-| Fabric / `fabric` | No, set `connection` | `replace`, `append`, `merge`, `delete+insert`, `truncate+insert` |
+| Fabric / `fabric` | Yes | `replace`, `append`, `merge`, `delete+insert`, `truncate+insert` |
 | Google Sheets / `gsheets` | Yes | `replace`, `append` |
-| Iceberg / `iceberg`, `iceberg+rest`, etc. | No, set `connection` | `replace`, `append`, `merge`, `delete+insert`, `truncate+insert` |
+| Iceberg / `iceberg`, `iceberg+rest`, etc. | Yes for `iceberg` | `replace`, `append`, `merge`, `delete+insert`, `truncate+insert` |
 | MaxCompute / `maxcompute`, `odps` | No, set `connection` | `replace`, `append`, `truncate+insert` without primary keys |
 | MongoDB / `mongodb`, `mongodb+srv` | No, set `connection` | `replace`, `append`, `merge` |
 | MS SQL Server / `mssql` | Yes | `replace`, `append`, `merge`, `delete+insert`, `truncate+insert` |

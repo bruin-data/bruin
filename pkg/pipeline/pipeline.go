@@ -1051,6 +1051,7 @@ var IngestrTypeConnectionMapping = map[string]AssetType{
 	"mssql":         AssetTypeMsSQLQuery,
 	"databricks":    AssetTypeDatabricksQuery,
 	"synapse":       AssetTypeSynapseQuery,
+	"fabric":        AssetTypeFabricQuery,
 	"duckdb":        AssetTypeDuckDBQuery,
 	"clickhouse":    AssetTypeClickHouse,
 	"doris":         AssetTypeDorisQuery,
