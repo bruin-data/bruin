@@ -573,7 +573,7 @@ func TestCloudDashboardsCommand_Help(t *testing.T) {
 	cmd := CloudDashboards()
 	require.NotNil(t, cmd)
 	assert.Equal(t, "dashboards", cmd.Name)
-	require.Len(t, cmd.Commands, 7)
+	require.Len(t, cmd.Commands, 8)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
@@ -585,6 +585,7 @@ func TestCloudDashboardsCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "version")
 	assert.Contains(t, subNames, "create")
 	assert.Contains(t, subNames, "update")
+	assert.Contains(t, subNames, "publish")
 	assert.Contains(t, subNames, "delete")
 }
 
@@ -616,6 +617,24 @@ func TestCloudDashboardsCreate_RejectsNonPositiveAgentID(t *testing.T) {
 		}
 		_ = runCLI(t.Context(), cmd, []string{"create", "--title", "T", "--api-key", "k", "--agent-id", v})
 		assert.Equalf(t, 1, exitCode, "agent-id %q should be rejected", v)
+	}
+}
+
+func TestCloudDashboardsPublish_RejectsNonPositiveDashboardID(t *testing.T) {
+	t.Parallel()
+	// A non-positive --dashboard-id must fail locally rather than sending a bad
+	// request that resolves to a route mismatch.
+	for _, v := range []string{"0", "-3"} {
+		cmd := cloudDashboardsPublish()
+		exitCode := 0
+		cmd.ExitErrHandler = func(_ context.Context, _ *cli.Command, err error) {
+			var ec cli.ExitCoder
+			if errors.As(err, &ec) {
+				exitCode = ec.ExitCode()
+			}
+		}
+		_ = runCLI(t.Context(), cmd, []string{"publish", "--api-key", "k", "--dashboard-id", v})
+		assert.Equalf(t, 1, exitCode, "dashboard-id %q should be rejected", v)
 	}
 }
 

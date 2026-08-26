@@ -1405,6 +1405,23 @@ func TestDeleteDashboard(t *testing.T) {
 	require.NoError(t, client.DeleteDashboard(t.Context(), 9))
 }
 
+func TestPublishDashboard(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/dashboards/9/publish", r.URL.Path)
+
+		w.WriteHeader(http.StatusOK)
+		title := "Q1 Revenue"
+		writeJSON(t, w, Dashboard{ID: 9, Title: &title, Visibility: "team", URL: "https://cloud.getbruin.com/acme/dashboards/9"})
+	})
+
+	dashboard, err := client.PublishDashboard(t.Context(), 9)
+	require.NoError(t, err)
+	assert.Equal(t, 9, dashboard.ID)
+	assert.Equal(t, "Q1 Revenue", *dashboard.Title)
+}
+
 func TestListScheduledAgents(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
