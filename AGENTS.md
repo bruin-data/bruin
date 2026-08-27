@@ -9,7 +9,9 @@ This document gives AI agents the project-specific operating guidance needed to 
 1. **Format the code**: Run `make format` in the project root. Check `git diff` afterward — if there are formatting changes, stage and include them in your work.
 2. **Run the tests**: Run `make test` in the project root. If any tests fail, fix the issues before finishing.
 
-Do not consider an application-code task complete until both checks pass. Use the `/format-fix` and `/test` commands if needed.
+Do not consider an application-code task complete until both checks pass.
+
+Caveat on `make format` coverage: it only formats the paths in `GO_FORMAT_PATHS` (`cmd`, `pkg`, `semantic-engine`, `integration-tests/integration_test.go`, `main.go`). Go files elsewhere (`internal/`, `templates/`, `skills/`, other files under `integration-tests/`) are not touched by it — format those with `go tool gofumpt`/`go tool gci` directly if you edit them.
 
 For changes that only touch non-application files, such as documentation, GitHub Actions workflows, agent instructions, repository metadata, or other configuration that does not affect the Bruin binary/runtime behavior, do not run the full `make format` / `make test` suite by default. Instead, run the smallest relevant validation available for the changed files, such as YAML syntax checks, Markdown checks, workflow review, or `git diff` inspection, and clearly report what was and was not run.
 
@@ -73,9 +75,14 @@ Execution instances containing one or more asset instances with specific configu
 
 ### Prerequisites
 - **Go**: Use the version declared in `go.mod`
-- **Python**: For Python asset development and formatting
+- **Rust/cargo**: `make build` and `make test` first build the SQL-parser FFI static library (`pkg/sqlparser/rustffi/`, via the `rustsqlparser-lib` target). `make build-no-duckdb` legitimately skips it (the FFI is behind `cgo && (linux|darwin)` build tags with a stub otherwise).
+- **Python + uv**: For Python asset development; `make lint-python` runs ruff through `uv`/`uvx`
 - **CGO**: Required for DuckDB support
+- **jq**: Required by `make refresh-integration-expectations`
 - **Git**: For version control and repository detection
+
+### Go modules
+There are multiple Go modules: the root module, `semantic-engine/` (deliberately standalone so lightweight tools can consume the semantic engine without the full CLI dependency tree — it is tested and linted separately), and five cloud-integration modules under `integration-tests/cloud-integration-tests/{doris,spark,sail,clickhouse,starrocks}/`.
 
 ### Dependencies
 The project uses extensive Go dependencies including:
@@ -99,13 +106,16 @@ make build-no-duckdb # Build without DuckDB (CGO_ENABLED=0)
 
 #### Development Targets
 ```bash
-make deps           # Install dependencies and tools
+make setup          # Install the pinned golangci-lint (what CI uses)
+make deps           # go mod tidy (does NOT install tools)
 make clean          # Remove build artifacts
-make format         # Format Go/Python and run fast changed-package lint
-make lint           # Run fast lint on changed packages in every Go module
-make lint-full      # Run all Go linters across the primary Go modules
+make format         # Format Go/Python (go tool gci/gofumpt) and run fast changed-package lint
+make lint           # Fast diff-based lint on changed packages in every Go module
+make lint-full      # Run all Go linters across the root and semantic-engine modules
 make tools-update   # Update development tools
 ```
+
+`make lint` (via `hack/lint-changed.sh`) diffs against `LINT_MERGE_BASE` (default `origin/main`) and runs only a narrow linter subset (`errcheck,govet,ineffassign`) — it can be a no-op in a worktree without `origin/main`, and a clean `make format`/`make lint` is not a clean `make lint-full`. `gci`/`gofumpt` come from the `tool` block in `go.mod` (run via `go tool`); `golangci-lint` must be installed via `make setup` — nothing auto-installs it.
 
 #### Testing Targets
 ```bash
@@ -124,9 +134,13 @@ make refresh-integration-expectations # Update integration test expectations
 ```
 
 ### Build Configuration
-- **Build metadata**: The Makefile injects build metadata via linker flags
+- **Build metadata**: release builds (`.goreleaser.yaml`) inject `main.version`/`main.commit` via linker flags. Local `make build` binaries report version `dev` — don't rely on the version string when testing a local build.
 - **Telemetry**: Controlled via `TELEMETRY_KEY` and `TELEMETRY_OPTOUT` environment variables
 - **Tags**: Uses `no_duckdb_arrow` for standard builds, `bruin_no_duckdb` for no-DuckDB builds
+- **Rust FFI**: `make build`/`make test` first run `make rustsqlparser-lib` to build `pkg/sqlparser/rustffi/` into a static library
+
+### What CI runs
+`.github/workflows/build-test.yml` gates PRs on: `make test-full`, `make setup && make format-ci && make lint-full`, `make integration-test`, `make integration-test-mssql`, and `make build`. `.github/workflows/docsgen-app.yml` fails if `pkg/docsgen/static` is stale relative to `pkg/docsgen/web` — run `make docs-app` after touching the docs app.
 
 ## CLI Source of Truth
 
@@ -153,10 +167,10 @@ The codebase is organized into focused packages:
 - **`query/`**: Query execution and management
 
 #### Data Platform Packages
-Each supported platform has its own package:
-- **Database platforms**: `bigquery/`, `snowflake/`, `postgres/`, `mysql/`, `duckdb/`, `clickhouse/`, `athena/`, `mssql/`, `databricks/`, `oracle/`, `sqlite/`, `trino/`, `synapse/`, `hana/`, `spanner/`
-- **Cloud storage**: `s3/`, `gcs/`
-- **Ingestion sources**: 50+ packages for different data sources (e.g., `shopify/`, `hubspot/`, `salesforce/`, `stripe/`, etc.)
+Each supported platform has its own package (~180 directories under `pkg/` in total — the lists below are examples, not an inventory):
+- **Database platforms**: `bigquery/`, `snowflake/`, `postgres/`, `redshift/`, `mysql/`, `duckdb/`, `clickhouse/`, `athena/`, `mssql/`, `databricks/`, `oracle/`, `sqlite/`, `trino/`, `synapse/`, `hana/`, `spanner/`, `vertica/`, `db2/`, `dremio/`, `doris/`, `starrocks/`, `fabric/`, `spark/`, `sail/`, `iceberg/`, and more
+- **Cloud storage**: `s3/`, `gcs/`, `adls/`, `onelake/`, `sftp/`
+- **Ingestion sources**: 100+ packages for different data sources (e.g., `shopify/`, `hubspot/`, `salesforce/`, `stripe/`, etc.)
 
 #### Utility Packages
 - **`jinja/`**: Template processing
@@ -175,6 +189,14 @@ Each CLI command is implemented in its own file:
 - Flag parsing and validation
 - Business logic delegation to appropriate packages
 - Error handling and output formatting
+
+### Other Top-Level Directories
+- **`semantic-engine/`**: standalone Go module implementing the semantic layer (semantic models in a repo-root `semantic/` dir, queried via `bruin query`; user docs at `docs/core-concepts/semantic-layer.md`, JSON schemas in `semantic-engine/schemas/`).
+- **`skills/`**: Go package embedding the bundled agent skills (`//go:embed */SKILL.md`), installed into user repos by `bruin ai skills`. **Trap**: `skills/agents-md/AGENTS.md` is a user-facing template (with `<!-- BEGIN/END BRUIN AI AGENTS -->` markers), not this repo's AGENTS.md — don't confuse the two when editing.
+- **`internal/`**: `internal/bootstrap` (blank-imported from `main.go` to set env before driver inits) and `internal/data/` — **generated** embedded sqlglot wheels (regenerate via `internal/generate/`; the sqlglot version must match the `uv pip install sqlglot==…` pin in the Makefile). Never hand-edit `internal/data/`.
+- **`pythonsrc/`**: the embedded Python parser sources — the **only** tree `make lint-python` formats; Python elsewhere (e.g. `scripts/`) is not covered.
+- **`pkg/sqlparser/rustffi/`**: the Rust SQL-parser Cargo project behind the FFI build tags.
+- **`test-rerun-cooldown/`**: a tracked pipeline fixture at the repo root, referenced from `integration-tests/integration_test.go` — do not "clean it up".
 
 ## Testing Strategy
 
@@ -195,6 +217,8 @@ go test -tags="no_duckdb_arrow" ./cmd/... ./pkg/...
 # Required final unit-test command for application-code changes
 make test
 ```
+
+Note that `make test` does more than the ad-hoc loop above: it builds the Rust sqlparser library first, includes `./templates/...` (which contains the template-docs drift guard), and runs a second pass over the `semantic-engine/` module — so always finish with `make test`, not the narrow loop.
 
 #### Integration Tests
 - **Light Integration**: `make integration-test-light` (excludes ingestr)
@@ -220,10 +244,10 @@ Use `make integration-test-light` for changes that affect parsing, command workf
 ### Code Style & Formatting
 
 #### Go Code
-Tools automatically installed and run via `make format`:
-- **`gci`**: Import organization
-- **`gofumpt`**: Stricter Go formatting
-- **`golangci-lint`**: Fast changed-package linting; `make lint-full` runs the comprehensive suite
+Tools run via `make format`:
+- **`gci`**: Import organization (via `go tool`, declared in `go.mod`)
+- **`gofumpt`**: Stricter Go formatting (via `go tool`)
+- **`golangci-lint`**: Fast changed-package linting (install once with `make setup`); `make lint-full` runs the comprehensive suite
 - **`govet`**: Enabled through `golangci-lint`
 
 #### Python Code
@@ -239,9 +263,14 @@ Tools run via `make lint-python`:
 - `make refresh-integration-expectations` rewrites JSON expectations. Inspect the diff carefully and include only intentional expectation changes.
 - Do not commit build outputs, virtual environments, local caches, logs, or generated binaries unless the repository already tracks that exact artifact and the change is intentional.
 
+Two review rules (enforced by `greptile.json` and guard tests) when touching connection config:
+
+1. Every credential-bearing field added to `pkg/config/connections.go` or `pkg/config/lakehouse.go` must carry a `sensitive:"true"` or `sensitive_file:"true"` struct tag — or be explicitly allowlisted in `safeNonSecretKeys` in `pkg/config/connections_sensitive_test.go` (`TestConnectionSensitiveTagsComplete` fails otherwise).
+2. Any new credential encoding must be added to `forms()` in `pkg/mask/mask.go` so it gets masked in logs and output.
+
 ### Development Workflow
 
-1. **Setup**: `make deps` to install tools and dependencies
+1. **Setup**: `make setup` to install the pinned golangci-lint, `make deps` to tidy Go dependencies
 2. **Development**: Edit code with VS Code extension for enhanced experience  
 3. **Formatting**: `make format` before committing
 4. **Testing**: `make test` for unit tests, integration tests as appropriate
@@ -263,6 +292,10 @@ Tools run via `make lint-python`:
 4. **Register command**: In `main.go` commands slice
 5. **Add tests**: Command and business logic tests
 
+### Repo-Local Agent Skills
+
+`.agents/skills/` (symlinked as `.claude/skills/`) ships prescribed workflows for common tasks — notably `add-ingestr-source` (the full checklist for adding a new ingestr connection/source type), plus `create-dashboard`, `record-vhs-demo`, `ultra-review`, and `humanizer`. Prefer the skill's checklist over improvising when one covers your task.
+
 ## Common Development Tasks
 
 ### Running Locally
@@ -277,7 +310,7 @@ make build
 ```
 
 ### Adding New Asset Types
-1. Define asset type in `pkg/pipeline/asset.go`
+1. Define asset type in `pkg/pipeline/pipeline.go` (`type AssetType string` and its constants)
 2. Implement execution logic in `pkg/executor/`
 3. Add parsing logic if needed
 4. Update lineage detection if applicable
