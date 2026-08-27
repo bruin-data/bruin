@@ -167,3 +167,4 @@ logs/queries
 
 .devcontainer
 .codex/
+.amp/portals/*

@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# No services or credentials need reconnecting. Fail early with a useful
+# message if a stale orb snapshot is missing one of the prepared toolchains.
+for command in go cargo uv node; do
+  if ! command -v "$command" >/dev/null 2>&1; then
+    printf 'Orb toolchain is incomplete: %s is unavailable; rerun .agents/setup.\n' "$command" >&2
+    exit 1
+  fi
+done
