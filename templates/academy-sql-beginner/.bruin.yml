@@ -1,0 +1,17 @@
+default_environment: default
+
+environments:
+  # Local DuckDB. This is the default, so no course command ever names it.
+  default:
+    connections:
+      duckdb:
+        - name: "duckdb-default"
+          path: "academy.duckdb"
+
+  # Optional cloud path. Set MOTHERDUCK_TOKEN, then run with --environment cloud.
+  cloud:
+    connections:
+      motherduck:
+        - name: "duckdb-default"
+          token: "${MOTHERDUCK_TOKEN}"
+          database: "academy_sql"
