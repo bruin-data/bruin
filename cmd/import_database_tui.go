@@ -115,7 +115,6 @@ type dbSummaryLoadedMsg struct {
 type importCompleteMsg struct {
 	importedCount int
 	mergedCount   int
-	skippedCount  int
 	warnings      []importWarning
 	err           error
 }
@@ -222,7 +221,6 @@ type importDatabaseModel struct {
 
 	importedCount  int
 	mergedCount    int
-	skippedCount   int
 	importWarnings []importWarning
 	importError    error
 	importDone     bool
@@ -275,7 +273,6 @@ func (m *importDatabaseModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case importCompleteMsg:
 		m.importedCount = msg.importedCount
 		m.mergedCount = msg.mergedCount
-		m.skippedCount = msg.skippedCount
 		m.importWarnings = msg.warnings
 		m.importError = msg.err
 		m.importDone = true
@@ -604,10 +601,9 @@ func (m *importDatabaseModel) executeImportCmd() tea.Cmd {
 		assetType := determineAssetTypeFromConnection(connName, conn)
 
 		var (
-			totalTables       int
-			mergedTableCount  int
-			skippedTableCount int
-			warnings          []importWarning
+			totalTables      int
+			mergedTableCount int
+			warnings         []importWarning
 		)
 
 		for i, schema := range summary.Schemas {
@@ -644,10 +640,12 @@ func (m *importDatabaseModel) executeImportCmd() tea.Cmd {
 					existingAssets[assetName] = createdAsset
 					totalTables++
 				case ingestrImport:
-					// ingestr assets carry no columns, so there is nothing to
-					// merge into an existing asset; skip it without re-persisting
-					// to avoid a misleading "merged" count on re-runs.
-					skippedTableCount++
+					existingAsset := existingAssets[assetName]
+					mergeImportMetadata(existingAsset, createdAsset)
+					if pErr := existingAsset.Persist(fs, pipelineFound); pErr != nil {
+						return importCompleteMsg{err: pErr}
+					}
+					mergedTableCount++
 				default:
 					existingAsset := existingAssets[assetName]
 					existingColumns := make(map[string]pipeline.Column, len(existingAsset.Columns))
@@ -659,6 +657,7 @@ func (m *importDatabaseModel) executeImportCmd() tea.Cmd {
 							existingAsset.Columns = append(existingAsset.Columns, c)
 						}
 					}
+					mergeImportMetadata(existingAsset, createdAsset)
 					if pErr := existingAsset.Persist(fs, pipelineFound); pErr != nil {
 						return importCompleteMsg{err: pErr}
 					}
@@ -670,7 +669,6 @@ func (m *importDatabaseModel) executeImportCmd() tea.Cmd {
 		return importCompleteMsg{
 			importedCount: totalTables,
 			mergedCount:   mergedTableCount,
-			skippedCount:  skippedTableCount,
 			warnings:      warnings,
 		}
 	}
@@ -772,10 +770,6 @@ func runImportDatabaseTUI(ctx context.Context, pipelinePath, environment, config
 		successStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(colorSuccess)).Bold(true)
 		fmt.Println(successStyle.Render(fmt.Sprintf("✓ Imported %d tables, merged %d from '%s' into '%s'",
 			fm.importedCount, fm.mergedCount, fm.selectedConnName, pipelinePath)))
-
-		if fm.skippedCount > 0 {
-			fmt.Println(dbtuiDimStyle.Render(fmt.Sprintf("  Skipped %d existing assets (already present in the pipeline)", fm.skippedCount)))
-		}
 
 		if len(fm.importWarnings) > 0 {
 			fmt.Printf("\nWarnings (%d):\n", len(fm.importWarnings))
