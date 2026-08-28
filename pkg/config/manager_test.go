@@ -722,6 +722,12 @@ func TestLoadFromFile(t *testing.T) {
 					APIKey:             "key-123",
 				},
 			},
+			Sklik: []SklikConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "sklik-1"},
+					Token:              "token-123",
+				},
+			},
 			Salesforce: []SalesforceConnection{
 				{
 					ConnectionMetadata: ConnectionMetadata{Name: "salesforce-1"},
@@ -1746,6 +1752,17 @@ func TestConfig_AddConnection(t *testing.T) {
 			expectedErr: false,
 		},
 		{
+			name:     "Add Sklik connection",
+			envName:  "default",
+			connType: "sklik",
+			connName: "sklik-conn",
+			creds: map[string]interface{}{
+				"token":   "test-token",
+				"user_id": "123",
+			},
+			expectedErr: false,
+		},
+		{
 			name:     "Add Intercom connection",
 			envName:  "default",
 			connType: "intercom",
@@ -2016,6 +2033,25 @@ func TestDeleteConnection(t *testing.T) {
 							Connections: &Connections{
 								AwsConnection: []AwsConnection{
 									{ConnectionMetadata: ConnectionMetadata{Name: "aws-conn"}, AccessKey: "key", SecretKey: "secret"},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Delete existing Sklik connection",
+			envName:  "default",
+			connName: "sklik-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{
+						"default": {
+							Connections: &Connections{
+								Sklik: []SklikConnection{
+									{ConnectionMetadata: ConnectionMetadata{Name: "sklik-conn"}, Token: "token-123"},
 								},
 							},
 						},
@@ -2927,6 +2963,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				GoogleAnalytics:     []GoogleAnalyticsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "googleanalytics1"}}},
 				GSC:                 []GSCConnection{{Name: "gsc1"}},
 				AppLovin:            []AppLovinConnection{{ConnectionMetadata: ConnectionMetadata{Name: "applovin1"}}},
+				Sklik:               []SklikConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sklik1"}}},
 				Frankfurter:         []FrankfurterConnection{{ConnectionMetadata: ConnectionMetadata{Name: "frankfurter1"}}},
 				Salesforce:          []SalesforceConnection{{ConnectionMetadata: ConnectionMetadata{Name: "salesforce1"}}},
 				SQLite:              []SQLiteConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sqlite1"}}},
@@ -3067,6 +3104,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				GoogleAnalytics:     []GoogleAnalyticsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "googleanalytics1"}}},
 				GSC:                 []GSCConnection{{Name: "gsc1"}},
 				AppLovin:            []AppLovinConnection{{ConnectionMetadata: ConnectionMetadata{Name: "applovin1"}}},
+				Sklik:               []SklikConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sklik1"}}},
 				Frankfurter:         []FrankfurterConnection{{ConnectionMetadata: ConnectionMetadata{Name: "frankfurter1"}}},
 				Salesforce:          []SalesforceConnection{{ConnectionMetadata: ConnectionMetadata{Name: "salesforce1"}}},
 				SQLite:              []SQLiteConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sqlite1"}}},

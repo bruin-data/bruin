@@ -127,6 +127,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/sftp"
 	"github.com/bruin-data/bruin/pkg/sharepoint"
 	"github.com/bruin-data/bruin/pkg/shopify"
+	"github.com/bruin-data/bruin/pkg/sklik"
 	"github.com/bruin-data/bruin/pkg/slack"
 	"github.com/bruin-data/bruin/pkg/smartsheet"
 	"github.com/bruin-data/bruin/pkg/snapchatads"
@@ -271,6 +272,7 @@ type Manager struct {
 	GoogleAnalytics      map[string]*googleanalytics.Client
 	GSC                  map[string]*gsc.Client
 	AppLovin             map[string]*applovin.Client
+	Sklik                map[string]*sklik.Client
 	Salesforce           map[string]*salesforce.Client
 	SQLite               map[string]*sqlite.Client
 	DB2                  map[string]*db2.Client
@@ -2760,6 +2762,29 @@ func (m *Manager) AddAppLovinConnectionFromConfig(connection *config.AppLovinCon
 	return nil
 }
 
+func (m *Manager) AddSklikConnectionFromConfig(connection *config.SklikConnection) error {
+	m.mutex.Lock()
+	if m.Sklik == nil {
+		m.Sklik = make(map[string]*sklik.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := sklik.NewClient(sklik.Config{
+		Token:  connection.Token,
+		UserID: connection.UserID,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Sklik[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
 func (m *Manager) AddPipedriveConnectionFromConfig(connection *config.PipedriveConnection) error {
 	m.mutex.Lock()
 	if m.Pipedrive == nil {
@@ -4308,6 +4333,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.GoogleAnalytics, connectionManager.AddGoogleAnalyticsConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.GSC, connectionManager.AddGSCConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.AppLovin, connectionManager.AddAppLovinConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Sklik, connectionManager.AddSklikConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Frankfurter, connectionManager.AddFrankfurterConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Fluxx, connectionManager.AddFluxxConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Freshdesk, connectionManager.AddFreshdeskConnectionFromConfig, &wg, &errList, &mu)

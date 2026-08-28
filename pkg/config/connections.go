@@ -1581,6 +1581,16 @@ func (c AppLovinConnection) GetName() string {
 	return c.Name
 }
 
+type SklikConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	Token              string `yaml:"token,omitempty" json:"token" mapstructure:"token" sensitive:"true"`
+	UserID             string `yaml:"user_id,omitempty" json:"user_id,omitempty" mapstructure:"user_id"`
+}
+
+func (c SklikConnection) GetName() string {
+	return c.Name
+}
+
 type FrankfurterConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 }

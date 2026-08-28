@@ -87,6 +87,17 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "advertiser-ska-report", PrimaryKey: "day", IncKey: "day", IncStrategy: "merge"},
 	},
 
+	// Sklik - Seznam.cz paid-search advertising platform
+	"sklik": {
+		{Name: "campaigns", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "groups", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "ads", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "keywords", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "conversions", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "campaign_stats_daily", PrimaryKey: "id, date", IncKey: "date", IncStrategy: "merge"},
+		{Name: "search_queries", PrimaryKey: "query, keyword_id, date", IncKey: "date", IncStrategy: "merge"},
+	},
+
 	// AppLovin Max - Ad revenue optimization
 	"applovinmax": {
 		{Name: "user_ad_revenue", PrimaryKey: "partition_date", IncKey: "partition_date", IncStrategy: "merge"},

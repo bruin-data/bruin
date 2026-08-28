@@ -457,6 +457,9 @@ environments:
       applovin:
         - name: "applovin-1"
           api_key: "key-123"
+      sklik:
+        - name: "sklik-1"
+          token: "token-123"
       frankfurter:
         - name: "frankfurter-1"
       salesforce:
