@@ -113,16 +113,24 @@ done_step
 
 step "Configuring login shells"
 profile_marker="# Bruin orb toolchains"
+profile_end_marker="# End Bruin orb toolchains"
 profile_export="export PATH=\"$go_root/bin:$node_root/bin:\$HOME/.cargo/bin:\$HOME/.local/bin:\$PATH\""
+previous_profile_export="export PATH=\"$HOME/.local/share/go/1.25.0/bin:$node_root/bin:\$HOME/.cargo/bin:\$HOME/.local/bin:\$PATH\""
 touch "$HOME/.bash_profile"
-sed -i \
-  -e "\|^$profile_marker$|d" \
-  -e "\|^export PATH=\"$HOME/.local/share/go/[^/]*/bin:$HOME/.local/share/node/[^/]*/bin:\$HOME/.cargo/bin:\$HOME/.local/bin:\$PATH\"$|d" \
-  "$HOME/.bash_profile"
+profile_tmp="$(mktemp)"
+trap 'rm -f "$profile_tmp"' EXIT
+awk -v marker="$profile_marker" -v end_marker="$profile_end_marker" \
+  -v current="$profile_export" -v previous="$previous_profile_export" \
+  '$0 != marker && $0 != end_marker && $0 != current && $0 != previous' \
+  "$HOME/.bash_profile" > "$profile_tmp"
+cat "$profile_tmp" > "$HOME/.bash_profile"
+rm -f "$profile_tmp"
+trap - EXIT
 cat >> "$HOME/.bash_profile" <<EOF
 
 $profile_marker
 $profile_export
+$profile_end_marker
 EOF
 done_step
 
