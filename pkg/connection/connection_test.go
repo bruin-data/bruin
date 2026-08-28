@@ -529,10 +529,11 @@ func Test_AddSklikConnectionFromConfig(t *testing.T) {
 		availableConnections: make(map[string]any),
 	}
 
+	userID := int64(456)
 	configuration := &config.SklikConnection{
 		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
 		Token:              "token-123",
-		UserID:             "456",
+		UserID:             &userID,
 	}
 
 	err := m.AddSklikConnectionFromConfig(configuration)

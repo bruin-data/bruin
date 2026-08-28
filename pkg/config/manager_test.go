@@ -1758,7 +1758,7 @@ func TestConfig_AddConnection(t *testing.T) {
 			connName: "sklik-conn",
 			creds: map[string]interface{}{
 				"token":   "test-token",
-				"user_id": "123",
+				"user_id": 123,
 			},
 			expectedErr: false,
 		},

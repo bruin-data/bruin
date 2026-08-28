@@ -1,8 +1,9 @@
 package sklik
 
 import (
-	"fmt"
+	"errors"
 	"net/url"
+	"strconv"
 	"strings"
 )
 
@@ -10,8 +11,8 @@ import (
 type Config struct {
 	// Token is the permanent API token generated in the Sklik UI. Required.
 	Token string
-	// UserID optionally scopes the connection to a specific Sklik account id.
-	UserID string
+	// UserID optionally scopes the connection to a specific numeric Sklik account id.
+	UserID *int64
 }
 
 // GetIngestrURI builds the ingestr source URI for Sklik.
@@ -19,14 +20,14 @@ type Config struct {
 func (c *Config) GetIngestrURI() (string, error) {
 	token := strings.TrimSpace(c.Token)
 	if token == "" {
-		return "", fmt.Errorf("sklik: token must be provided")
+		return "", errors.New("sklik: token must be provided")
 	}
 
 	params := url.Values{}
 	params.Set("token", token)
 
-	if userID := strings.TrimSpace(c.UserID); userID != "" {
-		params.Set("user_id", userID)
+	if c.UserID != nil {
+		params.Set("user_id", strconv.FormatInt(*c.UserID, 10))
 	}
 
 	return "sklik://?" + params.Encode(), nil

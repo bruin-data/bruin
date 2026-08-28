@@ -7,6 +7,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func ptr(v int64) *int64 { return &v }
+
 func TestConfig_GetIngestrURI(t *testing.T) {
 	t.Parallel()
 
@@ -23,12 +25,12 @@ func TestConfig_GetIngestrURI(t *testing.T) {
 		},
 		{
 			name:   "token with user_id",
-			config: Config{Token: "tok-123", UserID: "456"},
+			config: Config{Token: "tok-123", UserID: ptr(456)},
 			want:   "sklik://?token=tok-123&user_id=456",
 		},
 		{
 			name:   "token is trimmed",
-			config: Config{Token: "  tok-123  ", UserID: "  456  "},
+			config: Config{Token: "  tok-123  ", UserID: ptr(456)},
 			want:   "sklik://?token=tok-123&user_id=456",
 		},
 		{
