@@ -377,10 +377,12 @@ func WarnIngestrCDCModeDeprecated(ctx context.Context, p *pipeline.Pipeline, ass
 	}}, nil
 }
 
-// WarnIngestrDestinationTableOnQueryable flags a `destination_table` override on an
-// ingestr asset whose destination is a queryable SQL warehouse, where it desyncs the
+// EnsureIngestrDestinationTableNotSetForQueryable forbids a `destination_table` override
+// on an ingestr asset whose destination is a queryable SQL warehouse, where it desyncs the
 // ingestion target from checks, lineage, and table-creation DDL (which key off asset.Name).
-func WarnIngestrDestinationTableOnQueryable(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+// The override exists for non-queryable targets (e.g. CleverTap) whose destination string
+// cannot be a valid asset name; on a warehouse the asset should be named after the table.
+func EnsureIngestrDestinationTableNotSetForQueryable(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	if asset.Type != pipeline.AssetTypeIngestr || asset.Parameters == nil {
 		return nil, nil
 	}
@@ -401,7 +403,7 @@ func WarnIngestrDestinationTableOnQueryable(ctx context.Context, p *pipeline.Pip
 
 	return []*Issue{{
 		Task:        asset,
-		Description: "'destination_table' only redirects the ingestion on a queryable destination; checks, column lineage, and table creation still target the asset name and will desync. Name the asset after the destination table instead.",
+		Description: "'destination_table' is not supported for queryable destinations: it only redirects the ingestion, while checks, column lineage, and table creation still target the asset name. Name the asset after the destination table instead.",
 	}}, nil
 }
 

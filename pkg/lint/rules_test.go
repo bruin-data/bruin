@@ -2800,7 +2800,7 @@ func TestWarnIngestrCDCModeDeprecated(t *testing.T) {
 	}
 }
 
-func TestWarnIngestrDestinationTableOnQueryable(t *testing.T) {
+func TestEnsureIngestrDestinationTableNotSetForQueryable(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -2855,7 +2855,7 @@ func TestWarnIngestrDestinationTableOnQueryable(t *testing.T) {
 			t.Parallel()
 
 			p := &pipeline.Pipeline{Assets: []*pipeline.Asset{tt.asset}}
-			got, err := WarnIngestrDestinationTableOnQueryable(t.Context(), p, tt.asset)
+			got, err := EnsureIngestrDestinationTableNotSetForQueryable(t.Context(), p, tt.asset)
 			require.NoError(t, err)
 			if tt.wantWarn {
 				assert.Len(t, got, 1)

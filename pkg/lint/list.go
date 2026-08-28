@@ -172,8 +172,8 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser sqlpa
 		&SimpleRule{
 			Identifier:       "ingestr-destination-table-on-queryable",
 			Fast:             true,
-			Severity:         ValidatorSeverityWarning,
-			AssetValidator:   WarnIngestrDestinationTableOnQueryable,
+			Severity:         ValidatorSeverityCritical,
+			AssetValidator:   EnsureIngestrDestinationTableNotSetForQueryable,
 			ApplicableLevels: []Level{LevelAsset},
 		},
 		&SimpleRule{
