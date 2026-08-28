@@ -400,7 +400,7 @@ func EnsureIngestrDestinationTableNotSetForQueryable(ctx context.Context, p *pip
 
 	return []*Issue{{
 		Task:        asset,
-		Description: "'destination_table' is not supported for queryable destinations: it only redirects the ingestion, while checks, column lineage, and table creation still target the asset name. Name the asset after the destination table instead.",
+		Description: "'destination_table' is not supported for queryable destinations; name the asset after the destination table instead.",
 	}}, nil
 }
 
