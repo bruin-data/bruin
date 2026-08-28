@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-go_version="1.25.0"
+go_version="1.25.13"
 go_root="$HOME/.local/share/go/$go_version"
 node_version="22.14.0"
 node_root="$HOME/.local/share/node/$node_version"
@@ -35,11 +35,11 @@ if [[ ! -x "$go_root/bin/go" ]]; then
   case "$(uname -m)" in
     x86_64)
       go_arch="amd64"
-      go_sha256="2852af0cb20a13139b3448992e69b868e50ed0f8a1e5940ee1de9e19a123b613"
+      go_sha256="39042a078ea9ceebe3ecda4a7188f0f5b96e14a071d27923ba7f40b456e85ae3"
       ;;
     aarch64 | arm64)
       go_arch="arm64"
-      go_sha256="05de75d6994a2783699815ee553bd5a9327d8b79991de36e38b66862782f54ae"
+      go_sha256="adad240fcb6bd180cf973b4b7c747baf4ec81d08b7d40ca35940ee4531971490"
       ;;
     *)
       printf 'Unsupported architecture: %s\n' "$(uname -m)" >&2
@@ -113,13 +113,15 @@ done_step
 
 step "Configuring login shells"
 profile_marker="# Bruin orb toolchains"
-if ! grep -Fqx "$profile_marker" "$HOME/.bash_profile" 2>/dev/null; then
-  cat >> "$HOME/.bash_profile" <<EOF
+profile_export="export PATH=\"$go_root/bin:$node_root/bin:\$HOME/.cargo/bin:\$HOME/.local/bin:\$PATH\""
+if grep -Fqx "$profile_marker" "$HOME/.bash_profile" 2>/dev/null; then
+  sed -i "\|^$profile_marker$|,+1d" "$HOME/.bash_profile"
+fi
+cat >> "$HOME/.bash_profile" <<EOF
 
 $profile_marker
-export PATH="$go_root/bin:$node_root/bin:\$HOME/.cargo/bin:\$HOME/.local/bin:\$PATH"
+$profile_export
 EOF
-fi
 done_step
 
 cd "$repo_root"
