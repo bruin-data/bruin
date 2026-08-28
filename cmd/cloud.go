@@ -4771,6 +4771,7 @@ func CloudDashboards() *cli.Command {
 			cloudDashboardsVersion(),
 			cloudDashboardsCreate(),
 			cloudDashboardsUpdate(),
+			cloudDashboardsPublish(),
 			cloudDashboardsDelete(),
 		},
 	}
@@ -5337,6 +5338,60 @@ func cloudDashboardsDelete() *cli.Command {
 			}
 
 			successPrinter.Printf("Deleted dashboard %d.\n", c.Int("dashboard-id"))
+			return nil
+		},
+	}
+}
+
+func cloudDashboardsPublish() *cli.Command {
+	return &cli.Command{
+		Name:  "publish",
+		Usage: "Publish a dashboard's pending draft so it goes live",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "dashboard-id",
+				Usage:    "dashboard ID",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			if c.Int("dashboard-id") <= 0 {
+				printError(fmt.Errorf("--dashboard-id must be a positive integer, got %d", c.Int("dashboard-id")), output, "Invalid --dashboard-id")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			dashboard, err := client.PublishDashboard(ctx, c.Int("dashboard-id"))
+			if err != nil {
+				printError(err, output, "Failed to publish dashboard")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(dashboard, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			title := ""
+			if dashboard.Title != nil {
+				title = *dashboard.Title
+			}
+			if dashboard.URL != "" {
+				successPrinter.Printf("Published dashboard %d (%s): %s\n", dashboard.ID, title, dashboard.URL)
+			} else {
+				successPrinter.Printf("Published dashboard %d (%s).\n", dashboard.ID, title)
+			}
 			return nil
 		},
 	}
