@@ -850,10 +850,21 @@ bruin cloud dashboards list --output json
 
 #### `get`
 
-Get a single dashboard including its published definition (`state`):
+Get a single dashboard including its definition (`state`). By default the caller
+gets the editable definition if it has edit access (the draft if one is pending,
+otherwise the published state), and the published state otherwise. The response's
+`has_draft`/`is_published` flags report which states exist, so a dashboard that
+only has a pending draft isn't mistaken for empty.
+
+Use `--state draft` or `--state published` to fetch a specific one. `published` is
+open to any viewer; `draft` needs edit access (drafts aren't exposed to non-editors).
 
 ```bash
 bruin cloud dashboards get --dashboard-id 42
+
+# Fetch a specific state explicitly
+bruin cloud dashboards get --dashboard-id 42 --state draft
+bruin cloud dashboards get --dashboard-id 42 --state published
 
 # Full payload, incl. the definition, as JSON
 bruin cloud dashboards get --dashboard-id 42 --output json

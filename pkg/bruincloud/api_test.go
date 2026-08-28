@@ -1307,19 +1307,47 @@ func TestGetDashboard(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodGet, r.Method)
 		assert.Equal(t, "/dashboards/3", r.URL.Path)
+		// No --state: the server default, so no query param.
+		assert.Empty(t, r.URL.RawQuery)
 		w.WriteHeader(http.StatusOK)
 		writeJSON(t, w, map[string]any{
-			"id":         3,
-			"title":      "Revenue",
-			"visibility": "team",
-			"state":      map[string]any{"widgets": []any{}},
+			"id":           3,
+			"title":        "Revenue",
+			"visibility":   "team",
+			"state":        map[string]any{"widgets": []any{}},
+			"has_draft":    true,
+			"is_published": false,
 		})
 	})
 
-	dashboard, err := client.GetDashboard(t.Context(), 3)
+	dashboard, err := client.GetDashboard(t.Context(), 3, "")
 	require.NoError(t, err)
 	assert.Equal(t, 3, dashboard.ID)
 	assert.JSONEq(t, `{"widgets":[]}`, string(dashboard.State))
+	require.NotNil(t, dashboard.HasDraft)
+	assert.True(t, *dashboard.HasDraft)
+	require.NotNil(t, dashboard.IsPublished)
+	assert.False(t, *dashboard.IsPublished)
+}
+
+func TestGetDashboardWithState(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/dashboards/3", r.URL.Path)
+		// --state draft is passed through as ?state=draft.
+		assert.Equal(t, "draft", r.URL.Query().Get("state"))
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, map[string]any{
+			"id":         3,
+			"visibility": "team",
+			"state":      map[string]any{"draft": true},
+		})
+	})
+
+	dashboard, err := client.GetDashboard(t.Context(), 3, "draft")
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"draft":true}`, string(dashboard.State))
 }
 
 func TestCreateDashboard(t *testing.T) {
