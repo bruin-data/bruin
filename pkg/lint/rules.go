@@ -377,11 +377,8 @@ func WarnIngestrCDCModeDeprecated(ctx context.Context, p *pipeline.Pipeline, ass
 	}}, nil
 }
 
-// EnsureIngestrDestinationTableNotSetForQueryable forbids a `destination_table` override
-// on an ingestr asset whose destination is a queryable SQL warehouse, where it desyncs the
-// ingestion target from checks, lineage, and table-creation DDL (which key off asset.Name).
-// The override exists for non-queryable targets (e.g. CleverTap) whose destination string
-// cannot be a valid asset name; on a warehouse the asset should be named after the table.
+// EnsureIngestrDestinationTableNotSetForQueryable forbids a `destination_table` override on a
+// queryable ingestr destination, where it desyncs ingestion from name-keyed checks/lineage/DDL.
 func EnsureIngestrDestinationTableNotSetForQueryable(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	if asset.Type != pipeline.AssetTypeIngestr || asset.Parameters == nil {
 		return nil, nil
