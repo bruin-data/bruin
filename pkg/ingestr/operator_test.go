@@ -419,6 +419,20 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 			want: []string{"ingest", "--source-uri", "snowflake://uri-here", "--source-table", "source-table", "--dest-uri", "bigquery://uri-here", "--dest-table", "asset-name", "--yes", "--progress", "log"},
 		},
 		{
+			name: "destination_table overrides the asset name",
+			asset: &pipeline.Asset{
+				Name:       "asset-name",
+				Connection: "bq",
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "sf",
+					"source_table":      "source-table",
+					"destination":       "bigquery",
+					"destination_table": "profiles?identity_column=email",
+				},
+			},
+			want: []string{"ingest", "--source-uri", "snowflake://uri-here", "--source-table", "source-table", "--dest-uri", "bigquery://uri-here", "--dest-table", "profiles?identity_column=email", "--yes", "--progress", "log"},
+		},
+		{
 			name: "trim whitespace",
 			asset: &pipeline.Asset{
 				Name:       "asset-name",

@@ -52,6 +52,15 @@ func TestGetIngestrDestinationType(t *testing.T) {
 			want: pipeline.AssetTypeGoogleSheets,
 		},
 		{
+			name: "clevertap",
+			asset: &pipeline.Asset{
+				Parameters: pipeline.ParameterMap{
+					"destination": "clevertap",
+				},
+			},
+			want: pipeline.AssetTypeCleverTap,
+		},
+		{
 			name: "not found",
 			asset: &pipeline.Asset{
 				Parameters: pipeline.ParameterMap{

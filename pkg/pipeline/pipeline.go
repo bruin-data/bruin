@@ -73,7 +73,8 @@ const (
 	AssetTypeGCSPrefixSensor           = AssetType("gcs.sensor.prefix")
 	AssetTypeGCSPrefixSensorLegacy     = AssetType("gcs.sensor.object_sensor_with_prefix")
 	AssetTypeGoodData                  = AssetType("gooddata")
-	AssetTypeIceberg                   = AssetType("ingestr.iceberg") // ingestr-only mapping key (not an executable asset type)
+	AssetTypeIceberg                   = AssetType("ingestr.iceberg")   // ingestr-only mapping key (not an executable asset type)
+	AssetTypeCleverTap                 = AssetType("ingestr.clevertap") // ingestr-only mapping key (not an executable asset type)
 	AssetTypeGoogleSheets              = AssetType("gsheets")
 	AssetTypeGrafana                   = AssetType("grafana")
 	AssetTypeIngestr                   = AssetType("ingestr")
@@ -977,6 +978,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeAthenaSource:              "athena",
 	AssetTypeDuckDBQuery:               "duckdb",
 	AssetTypeIceberg:                   "iceberg",
+	AssetTypeCleverTap:                 "clevertap",
 	AssetTypeDuckDBSeed:                "duckdb",
 	AssetTypeDuckDBQuerySensor:         "duckdb",
 	AssetTypeDuckDBSource:              "duckdb",
@@ -1063,6 +1065,7 @@ var IngestrTypeConnectionMapping = map[string]AssetType{
 	"gsheets":       AssetTypeGoogleSheets,
 	"vertica":       AssetTypeVerticaQuery,
 	"iceberg":       AssetTypeIceberg,
+	"clevertap":     AssetTypeCleverTap,
 }
 
 type SecretMapping struct {
