@@ -118,6 +118,7 @@ parameters:
 | `materialization` | No | `--incremental-*`, `--partition-by`, `--cluster-by` | Preferred way to define destination write behavior. Supports `type: table` with `create+replace`, `append`, `merge`, `delete+insert`, and `truncate+insert`. |
 | `destination` | Unless `connection` or `destination_connection` is set | _n/a_ | Logical destination type used for default connection inference. When `connection` and `destination_connection` are omitted, Bruin uses this value to choose the pipeline default destination connection. |
 | `destination_connection` | No | _n/a_ | Named destination connection to use when `connection` is omitted. This overrides default connection inference from `destination`. |
+| `destination_table` | No | `--dest-table` | Destination table identifier passed to Ingestr. Defaults to the asset `name`. Set this when the destination table needs characters that are not allowed in an asset name, such as the `?key=value` parameters a CleverTap destination expects. |
 | `incremental_strategy` | No | `--incremental-strategy` | Passes the incremental loading strategy (`replace`, `append`, `merge`, `delete+insert`, or `truncate+insert`) to Ingestr. Prefer `materialization.strategy` for new assets. |
 | `incremental_key` | No | `--incremental-key` | Column that determines incremental progress. When the column is defined with type `date`, Bruin also forwards it through the `--columns` option so Ingestr treats it as a date field. |
 | `partition_by` | No | `--partition-by` | Comma-separated list of destination columns to partition by. |

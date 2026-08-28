@@ -377,6 +377,34 @@ func WarnIngestrCDCModeDeprecated(ctx context.Context, p *pipeline.Pipeline, ass
 	}}, nil
 }
 
+// WarnIngestrDestinationTableOnQueryable flags a `destination_table` override on an
+// ingestr asset whose destination is a queryable SQL warehouse. The override only
+// redirects the ingestion (--dest-table); checks, column lineage, and table-creation
+// DDL still resolve against asset.Name, so pointing it at a different real table
+// silently desyncs them. On a warehouse the asset should simply be named after the
+// destination table; the override exists for non-queryable targets (e.g. CleverTap)
+// whose destination string cannot be a valid asset name.
+func WarnIngestrDestinationTableOnQueryable(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	if asset.Type != pipeline.AssetTypeIngestr || asset.Parameters == nil {
+		return nil, nil
+	}
+
+	destTable, ok := asset.Parameters.GetString("destination_table")
+	if !ok || destTable == "" || destTable == asset.Name {
+		return nil, nil
+	}
+
+	destType, err := helpers.GetIngestrDestinationType(asset)
+	if err != nil || !pipeline.IsSQLAssetType(destType) {
+		return nil, nil
+	}
+
+	return []*Issue{{
+		Task:        asset,
+		Description: "'destination_table' only redirects the ingestion on a queryable destination; checks, column lineage, and table creation still target the asset name and will desync. Name the asset after the destination table instead.",
+	}}, nil
+}
+
 func validateIngestrMaterialization(asset *pipeline.Asset, effectiveStrategy string) ([]*Issue, string) {
 	issues := make([]*Issue, 0)
 	mat := asset.Materialization

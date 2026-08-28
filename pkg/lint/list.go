@@ -170,6 +170,13 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser sqlpa
 			ApplicableLevels: []Level{LevelAsset},
 		},
 		&SimpleRule{
+			Identifier:       "ingestr-destination-table-on-queryable",
+			Fast:             true,
+			Severity:         ValidatorSeverityWarning,
+			AssetValidator:   WarnIngestrDestinationTableOnQueryable,
+			ApplicableLevels: []Level{LevelAsset},
+		},
+		&SimpleRule{
 			Identifier:       "valid-pipeline-start-date",
 			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
