@@ -1944,6 +1944,15 @@ func (c RedditAdsConnection) GetName() string {
 	return c.Name
 }
 
+type CloudflareRadarConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	APIToken           string `yaml:"api_token,omitempty" json:"api_token" mapstructure:"api_token" sensitive:"true"`
+}
+
+func (c CloudflareRadarConnection) GetName() string {
+	return c.Name
+}
+
 type ManifoldConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	QueryParams        map[string]string   `yaml:"query_params,omitempty" json:"query_params,omitempty" mapstructure:"query_params"`

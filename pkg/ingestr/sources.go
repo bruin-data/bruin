@@ -224,6 +224,25 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "tasks", PrimaryKey: "id", IncKey: "date_updated", IncStrategy: "merge"},
 	},
 
+	// Cloudflare Radar - Internet traffic, routing, and security insights
+	"cloudflare_radar": {
+		{Name: "annotations", PrimaryKey: "id", IncKey: "startDate", IncStrategy: "merge"},
+		{Name: "autonomous_systems", PrimaryKey: "asn", IncKey: "", IncStrategy: "replace"},
+		{Name: "bgp_hijacks", PrimaryKey: "id", IncKey: "min_hijack_ts", IncStrategy: "merge"},
+		{Name: "bgp_leaks", PrimaryKey: "id", IncKey: "detected_ts", IncStrategy: "merge"},
+		{Name: "bots", PrimaryKey: "slug", IncKey: "", IncStrategy: "replace"},
+		{Name: "certificate_authorities", PrimaryKey: "sha256Fingerprint", IncKey: "", IncStrategy: "replace"},
+		{Name: "certificate_logs", PrimaryKey: "slug", IncKey: "", IncStrategy: "replace"},
+		{Name: "datasets", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "geolocations", PrimaryKey: "geoId", IncKey: "", IncStrategy: "replace"},
+		{Name: "locations", PrimaryKey: "alpha2", IncKey: "", IncStrategy: "replace"},
+		{Name: "outages", PrimaryKey: "id", IncKey: "startDate", IncStrategy: "merge"},
+		{Name: "origins", PrimaryKey: "slug", IncKey: "", IncStrategy: "replace"},
+		{Name: "tlds", PrimaryKey: "tld", IncKey: "", IncStrategy: "replace"},
+		{Name: "traffic_anomalies", PrimaryKey: "uuid", IncKey: "startDate", IncStrategy: "merge"},
+		{Name: "api:<endpoint>?<params>", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+	},
+
 	// Couchbase - NoSQL database (user-defined tables)
 	"couchbase": {},
 

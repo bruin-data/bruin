@@ -301,6 +301,7 @@ var defaultMapping = map[string]string{
 	"quicksight":            "quicksight-default",
 	"rabbitmq":              "rabbitmq-default",
 	"reddit_ads":            "reddit_ads-default",
+	"cloudflare_radar":      "cloudflare_radar-default",
 	"revenuecat":            "revenuecat-default",
 	"sendgrid":              "sendgrid-default",
 	"sharepoint":            "sharepoint-default",
