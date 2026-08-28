@@ -2800,6 +2800,81 @@ func TestWarnIngestrCDCModeDeprecated(t *testing.T) {
 	}
 }
 
+func TestEnsureIngestrDestinationTableNotSetForQueryable(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		asset    *pipeline.Asset
+		wantWarn bool
+	}{
+		{
+			name: "non-ingestr asset is ignored",
+			asset: &pipeline.Asset{
+				Type:       pipeline.AssetTypePython,
+				Parameters: pipeline.ParameterMap{"destination_table": "other_table"},
+			},
+		},
+		{
+			name: "no destination_table is fine",
+			asset: &pipeline.Asset{
+				Name:       "asset_name",
+				Type:       pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{"destination": "bigquery"},
+			},
+		},
+		{
+			name: "destination_table equal to the asset name is fine",
+			asset: &pipeline.Asset{
+				Name:       "public.users",
+				Type:       pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{"destination": "bigquery", "destination_table": "public.users"},
+			},
+		},
+		{
+			name: "non-queryable destination (gsheets) is not flagged",
+			asset: &pipeline.Asset{
+				Name:       "sheet_export",
+				Type:       pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{"destination": "gsheets", "destination_table": "some_tab"},
+			},
+		},
+		{
+			name: "unknown destination is not flagged",
+			asset: &pipeline.Asset{
+				Name:       "clevertap_profiles",
+				Type:       pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{"destination": "clevertap", "destination_table": "profiles?identity_column=email"},
+			},
+		},
+		{
+			name: "diverging destination_table on a queryable destination warns",
+			asset: &pipeline.Asset{
+				Name:       "asset_name",
+				Type:       pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{"destination": "bigquery", "destination_table": "public.other_table"},
+			},
+			wantWarn: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			p := &pipeline.Pipeline{Assets: []*pipeline.Asset{tt.asset}}
+			got, err := EnsureIngestrDestinationTableNotSetForQueryable(t.Context(), p, tt.asset)
+			require.NoError(t, err)
+			if tt.wantWarn {
+				assert.Len(t, got, 1)
+				assert.Contains(t, got[0].Description, "destination_table")
+			} else {
+				assert.Empty(t, got)
+			}
+		})
+	}
+}
+
 func TestEnsurePipelineStartDateIsValid(t *testing.T) {
 	t.Parallel()
 
