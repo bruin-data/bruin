@@ -409,6 +409,10 @@ environments:
         - name: "fastspring-1"
           username: "user-123"
           password: "pass-123"
+      twocheckout:
+        - name: "twocheckout-1"
+          merchant_code: "merchant-123"
+          secret_key: "secret-123"
       payrails:
         - name: "payrails-1"
           client_id: "client-123"
