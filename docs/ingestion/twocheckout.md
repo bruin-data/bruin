@@ -55,8 +55,8 @@ parameters:
 |-------|----|--------------|---------|
 | orders | ref_no, status | merge | Orders with line items, payments, and refunds. Filtered server-side by the run's date interval. The key is `(ref_no, status)` so status transitions (e.g. `COMPLETE` → `REFUND`) are preserved as distinct rows rather than overwriting each other. |
 | subscriptions | subscription_reference | merge | Recurring subscriptions, including status, billing period, and pricing. Filtered on `ModifiedAfter`, so it captures subscriptions that changed within the interval. |
-| products | product_code | merge | Products in your catalog, including pricing and settings. Full snapshot each run. |
-| promotions | code | merge | Promotions and their discount configuration. Full snapshot each run. |
+| products | product_code | replace | Products in your catalog, including pricing and settings. Full snapshot each run. |
+| promotions | code | replace | Promotions and their discount configuration. Full snapshot each run. |
 
 `orders` and `subscriptions` support incremental date-range loads: the run's date interval — set with `--start-date` / `--end-date` (see [run](/commands/run)) — filters records to that window. `products` and `promotions` are full snapshots on every run.
 

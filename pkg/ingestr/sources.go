@@ -724,8 +724,8 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 	"twocheckout": {
 		{Name: "orders", PrimaryKey: "ref_no, status", IncStrategy: "merge"},
 		{Name: "subscriptions", PrimaryKey: "subscription_reference", IncStrategy: "merge"},
-		{Name: "products", PrimaryKey: "product_code", IncStrategy: "merge"},
-		{Name: "promotions", PrimaryKey: "code", IncStrategy: "merge"},
+		{Name: "products", PrimaryKey: "product_code", IncStrategy: "replace"},
+		{Name: "promotions", PrimaryKey: "code", IncStrategy: "replace"},
 	},
 
 	// Mixpanel - Analytics
