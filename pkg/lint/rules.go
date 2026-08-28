@@ -378,12 +378,8 @@ func WarnIngestrCDCModeDeprecated(ctx context.Context, p *pipeline.Pipeline, ass
 }
 
 // WarnIngestrDestinationTableOnQueryable flags a `destination_table` override on an
-// ingestr asset whose destination is a queryable SQL warehouse. The override only
-// redirects the ingestion (--dest-table); checks, column lineage, and table-creation
-// DDL still resolve against asset.Name, so pointing it at a different real table
-// silently desyncs them. On a warehouse the asset should simply be named after the
-// destination table; the override exists for non-queryable targets (e.g. CleverTap)
-// whose destination string cannot be a valid asset name.
+// ingestr asset whose destination is a queryable SQL warehouse, where it desyncs the
+// ingestion target from checks, lineage, and table-creation DDL (which key off asset.Name).
 func WarnIngestrDestinationTableOnQueryable(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	if asset.Type != pipeline.AssetTypeIngestr || asset.Parameters == nil {
 		return nil, nil
@@ -395,7 +391,11 @@ func WarnIngestrDestinationTableOnQueryable(ctx context.Context, p *pipeline.Pip
 	}
 
 	destType, err := helpers.GetIngestrDestinationType(asset)
-	if err != nil || !pipeline.IsSQLAssetType(destType) {
+	if err != nil {
+		// Unknown or unset destination: nothing to warn about here.
+		return nil, nil //nolint:nilerr
+	}
+	if !pipeline.IsSQLAssetType(destType) {
 		return nil, nil
 	}
 
