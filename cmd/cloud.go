@@ -4829,7 +4829,7 @@ func cloudDashboardsList() *cli.Command {
 func cloudDashboardsGet() *cli.Command {
 	return &cli.Command{
 		Name:  "get",
-		Usage: "Get a dashboard including its published definition",
+		Usage: "Get a dashboard including its definition (published by default; use --state draft to fetch the unpublished draft)",
 		Flags: []cli.Flag{
 			apiKeyFlag(),
 			outputFlag(),
@@ -4838,10 +4838,20 @@ func cloudDashboardsGet() *cli.Command {
 				Usage:    "dashboard ID",
 				Required: true,
 			},
+			&cli.StringFlag{
+				Name:  "state",
+				Usage: "which state to fetch: 'draft' or 'published'. Default: the editable definition for editors, published for viewers. 'draft' needs edit access.",
+			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			defer RecoverFromPanic()
 			output := c.String("output")
+
+			state := c.String("state")
+			if state != "" && state != "draft" && state != "published" {
+				printError(fmt.Errorf("invalid --state %q: use 'draft' or 'published'", state), output, "Invalid state")
+				return cli.Exit("", 1)
+			}
 
 			client, err := newCloudClient(c)
 			if err != nil {
@@ -4849,7 +4859,7 @@ func cloudDashboardsGet() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			dashboard, err := client.GetDashboard(ctx, c.Int("dashboard-id"))
+			dashboard, err := client.GetDashboard(ctx, c.Int("dashboard-id"), state)
 			if err != nil {
 				printError(err, output, "Failed to get dashboard")
 				return cli.Exit("", 1)
@@ -4866,6 +4876,16 @@ func cloudDashboardsGet() *cli.Command {
 				title = *dashboard.Title
 			}
 			infoPrinter.Printf("Dashboard %d: %s (visibility: %s)\n", dashboard.ID, title, dashboard.Visibility)
+
+			// Flag a pending draft so a draft-only dashboard isn't read as empty.
+			if dashboard.HasDraft != nil && *dashboard.HasDraft {
+				published := dashboard.IsPublished != nil && *dashboard.IsPublished
+				if published {
+					infoPrinter.Println("This dashboard has unpublished draft changes. Use --state draft to fetch them, --state published for the live version.")
+				} else {
+					infoPrinter.Println("This dashboard is an unpublished draft (nothing published yet).")
+				}
+			}
 
 			// Print the definition (state) as pretty JSON so it can be inspected or saved.
 			if len(dashboard.State) > 0 {

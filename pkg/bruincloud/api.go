@@ -876,9 +876,17 @@ func (c *APIClient) ListDashboards(ctx context.Context) ([]Dashboard, error) {
 	return resp.Dashboards, err
 }
 
-func (c *APIClient) GetDashboard(ctx context.Context, dashboardID int) (*Dashboard, error) {
+// GetDashboard returns a single dashboard. state selects which definition to
+// fetch: "draft", "published", or "" for the server default (the editable
+// definition for editors, published for viewers). The server gates "draft" to
+// callers with edit access.
+func (c *APIClient) GetDashboard(ctx context.Context, dashboardID int, state string) (*Dashboard, error) {
+	path := fmt.Sprintf("/dashboards/%d", dashboardID)
+	if state != "" {
+		path += "?state=" + url.QueryEscape(state)
+	}
 	var result Dashboard
-	err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/dashboards/%d", dashboardID), nil, &result)
+	err := c.doRequest(ctx, http.MethodGet, path, nil, &result)
 	if err != nil {
 		return nil, err
 	}
