@@ -86,7 +86,7 @@ func GetPipelinePathsWithExclusions(root string, pipelineDefinitionFile []string
 
 		// Check if the file matches any of the pipeline definition file names
 		for _, pipelineDefinition := range pipelineDefinitionFile {
-			if strings.HasSuffix(path, pipelineDefinition) {
+			if d.Name() == pipelineDefinition {
 				abs, err := filepath.Abs(path)
 				if err != nil {
 					return errors.Wrapf(err, "failed to get absolute path for %s", path)
