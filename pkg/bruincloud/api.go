@@ -928,9 +928,8 @@ func (c *APIClient) DeleteDashboard(ctx context.Context, dashboardID int) error 
 	return c.doRequest(ctx, http.MethodDelete, fmt.Sprintf("/dashboards/%d", dashboardID), nil, nil)
 }
 
-// PublishDashboard promotes a dashboard's pending draft to the live state,
-// mirroring the UI Publish button — create/update only ever write the draft.
-// Requires edit rights server-side; errors when there is no draft to publish.
+// PublishDashboard promotes a dashboard's pending draft to the live state (create/update
+// only ever write the draft). Requires edit rights; errors when there's no draft.
 func (c *APIClient) PublishDashboard(ctx context.Context, dashboardID int) (*Dashboard, error) {
 	var result Dashboard
 	err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/dashboards/%d/publish", dashboardID), nil, &result)
