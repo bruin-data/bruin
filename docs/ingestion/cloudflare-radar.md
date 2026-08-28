@@ -4,6 +4,10 @@
 
 Bruin supports Cloudflare Radar as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Cloudflare Radar into your data warehouse.
 
+:::warning Requires a newer ingestr release
+The Cloudflare Radar source is not part of the ingestr version currently pinned by Bruin, so running an asset against it will fail with an unsupported-source error until Bruin bumps to an ingestr release that ships this source. If you need it before then, point Bruin at a local ingestr build that includes the source (for example with `bruin run --debug-ingestr-src <path-to-ingestr>`).
+:::
+
 To set up a Cloudflare Radar connection, add a configuration item to `.bruin.yml` and reference it from an ingestr asset. You need an API token that can read Cloudflare Radar data. Radar's data endpoints are global, so the Cloudflare account ID is not part of the connection.
 
 ## Set up a connection
