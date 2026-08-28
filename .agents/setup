@@ -114,9 +114,11 @@ done_step
 step "Configuring login shells"
 profile_marker="# Bruin orb toolchains"
 profile_export="export PATH=\"$go_root/bin:$node_root/bin:\$HOME/.cargo/bin:\$HOME/.local/bin:\$PATH\""
-if grep -Fqx "$profile_marker" "$HOME/.bash_profile" 2>/dev/null; then
-  sed -i "\|^$profile_marker$|,+1d" "$HOME/.bash_profile"
-fi
+touch "$HOME/.bash_profile"
+sed -i \
+  -e "\|^$profile_marker$|d" \
+  -e "\|^export PATH=\"$HOME/.local/share/go/[^/]*/bin:$HOME/.local/share/node/[^/]*/bin:\$HOME/.cargo/bin:\$HOME/.local/bin:\$PATH\"$|d" \
+  "$HOME/.bash_profile"
 cat >> "$HOME/.bash_profile" <<EOF
 
 $profile_marker
