@@ -400,7 +400,7 @@ func EnsureIngestrDestinationTableNotSetForQueryable(ctx context.Context, p *pip
 
 	return []*Issue{{
 		Task:        asset,
-		Description: "'destination_table' is not supported for queryable destinations; name the asset after the destination table instead.",
+		Description: "'destination_table' is not supported for queryable destinations; set the asset `name` to the target table instead.",
 	}}, nil
 }
 
