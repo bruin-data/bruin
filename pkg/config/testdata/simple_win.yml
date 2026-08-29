@@ -466,8 +466,6 @@ environments:
           token: "token-123"
       frankfurter:
         - name: "frankfurter-1"
-      ripestat:
-        - name: "ripestat-1"
       salesforce:
         - name: "salesforce-1"
           username: "username-123"

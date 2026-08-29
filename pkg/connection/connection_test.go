@@ -24,7 +24,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/okta"
 	"github.com/bruin-data/bruin/pkg/personio"
 	"github.com/bruin-data/bruin/pkg/postgres"
-	"github.com/bruin-data/bruin/pkg/ripestat"
 	"github.com/bruin-data/bruin/pkg/sharepoint"
 	"github.com/bruin-data/bruin/pkg/shopify"
 	"github.com/bruin-data/bruin/pkg/sklik"
@@ -519,31 +518,6 @@ func Test_AddAdaptyConnectionFromConfig(t *testing.T) {
 	assert.Contains(t, uri, "api_key=secret_live_123")
 	assert.Contains(t, uri, "lookback_days=0")
 	assert.Contains(t, uri, "timezone=Europe%2FIstanbul")
-	assert.Equal(t, configuration, m.GetConnectionDetails("test"))
-}
-
-func Test_AddRipestatConnectionFromConfig(t *testing.T) {
-	t.Parallel()
-
-	m := Manager{
-		AllConnectionDetails: map[string]any{},
-		availableConnections: make(map[string]any),
-	}
-
-	configuration := &config.RipestatConnection{
-		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
-	}
-
-	err := m.AddRipestatConnectionFromConfig(configuration)
-	require.NoError(t, err)
-
-	res, ok := m.GetConnection("test").(*ripestat.Client)
-	require.True(t, ok)
-	require.NotNil(t, res)
-
-	uri, err := res.GetIngestrURI()
-	require.NoError(t, err)
-	assert.Equal(t, "ripestat://", uri)
 	assert.Equal(t, configuration, m.GetConnectionDetails("test"))
 }
 

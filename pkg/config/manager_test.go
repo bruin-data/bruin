@@ -723,11 +723,6 @@ func TestLoadFromFile(t *testing.T) {
 					ConnectionMetadata: ConnectionMetadata{Name: "frankfurter-1"},
 				},
 			},
-			Ripestat: []RipestatConnection{
-				{
-					ConnectionMetadata: ConnectionMetadata{Name: "ripestat-1"},
-				},
-			},
 			AppLovin: []AppLovinConnection{
 				{
 					ConnectionMetadata: ConnectionMetadata{Name: "applovin-1"},
@@ -3029,7 +3024,6 @@ func TestConnections_MergeFrom(t *testing.T) {
 				AppLovin:            []AppLovinConnection{{ConnectionMetadata: ConnectionMetadata{Name: "applovin1"}}},
 				Sklik:               []SklikConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sklik1"}}},
 				Frankfurter:         []FrankfurterConnection{{ConnectionMetadata: ConnectionMetadata{Name: "frankfurter1"}}},
-				Ripestat:            []RipestatConnection{{ConnectionMetadata: ConnectionMetadata{Name: "ripestat1"}}},
 				Salesforce:          []SalesforceConnection{{ConnectionMetadata: ConnectionMetadata{Name: "salesforce1"}}},
 				SQLite:              []SQLiteConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sqlite1"}}},
 				DB2:                 []DB2Connection{{ConnectionMetadata: ConnectionMetadata{Name: "db21"}}},
@@ -3173,7 +3167,6 @@ func TestConnections_MergeFrom(t *testing.T) {
 				AppLovin:            []AppLovinConnection{{ConnectionMetadata: ConnectionMetadata{Name: "applovin1"}}},
 				Sklik:               []SklikConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sklik1"}}},
 				Frankfurter:         []FrankfurterConnection{{ConnectionMetadata: ConnectionMetadata{Name: "frankfurter1"}}},
-				Ripestat:            []RipestatConnection{{ConnectionMetadata: ConnectionMetadata{Name: "ripestat1"}}},
 				Salesforce:          []SalesforceConnection{{ConnectionMetadata: ConnectionMetadata{Name: "salesforce1"}}},
 				SQLite:              []SQLiteConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sqlite1"}}},
 				DB2:                 []DB2Connection{{ConnectionMetadata: ConnectionMetadata{Name: "db21"}}},

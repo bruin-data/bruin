@@ -121,7 +121,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/recurly"
 	redditads "github.com/bruin-data/bruin/pkg/redditads"
 	"github.com/bruin-data/bruin/pkg/revenuecat"
-	"github.com/bruin-data/bruin/pkg/ripestat"
 	"github.com/bruin-data/bruin/pkg/s3"
 	"github.com/bruin-data/bruin/pkg/sail"
 	"github.com/bruin-data/bruin/pkg/salesforce"
@@ -260,7 +259,6 @@ type Manager struct {
 	Wistia               map[string]*wistia.Client
 	Zoom                 map[string]*zoom.Client
 	Frankfurter          map[string]*frankfurter.Client
-	Ripestat             map[string]*ripestat.Client
 	Fluxx                map[string]*fluxx.Client
 	Freshdesk            map[string]*freshdesk.Client
 	Okta                 map[string]*okta.Client
@@ -3444,25 +3442,6 @@ func (m *Manager) AddFrankfurterConnectionFromConfig(connection *config.Frankfur
 	return nil
 }
 
-func (m *Manager) AddRipestatConnectionFromConfig(connection *config.RipestatConnection) error {
-	m.mutex.Lock()
-	if m.Ripestat == nil {
-		m.Ripestat = make(map[string]*ripestat.Client)
-	}
-	m.mutex.Unlock()
-
-	client, err := ripestat.NewClient(ripestat.Config{})
-	if err != nil {
-		return err
-	}
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-	m.Ripestat[connection.Name] = client
-	m.availableConnections[connection.Name] = client
-	m.AllConnectionDetails[connection.Name] = connection
-	return nil
-}
-
 func (m *Manager) AddFluxxConnectionFromConfig(connection *config.FluxxConnection) error {
 	m.mutex.Lock()
 	if m.Fluxx == nil {
@@ -4408,7 +4387,6 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.AppLovin, connectionManager.AddAppLovinConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Sklik, connectionManager.AddSklikConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Frankfurter, connectionManager.AddFrankfurterConnectionFromConfig, &wg, &errList, &mu)
-	processConnections(cm.SelectedEnvironment.Connections.Ripestat, connectionManager.AddRipestatConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Fluxx, connectionManager.AddFluxxConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Freshdesk, connectionManager.AddFreshdeskConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Okta, connectionManager.AddOktaConnectionFromConfig, &wg, &errList, &mu)

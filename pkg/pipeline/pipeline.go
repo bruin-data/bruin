@@ -264,7 +264,6 @@ var defaultMapping = map[string]string{
 	"fluxx":                 "fluxx-default",
 	"footballdata":          "footballdata-default",
 	"frankfurter":           "frankfurter-default",
-	"ripestat":              "ripestat-default",
 	"freshdesk":             "freshdesk-default",
 	"okta":                  "okta-default",
 	"fundraiseup":           "fundraiseup-default",
