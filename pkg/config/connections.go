@@ -1417,6 +1417,17 @@ func (c FastspringConnection) GetName() string {
 	return c.Name
 }
 
+type TwoCheckoutConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	MerchantCode       string `yaml:"merchant_code,omitempty" json:"merchant_code" mapstructure:"merchant_code"`
+	SecretKey          string `yaml:"secret_key,omitempty" json:"secret_key" mapstructure:"secret_key" sensitive:"true"`
+	BaseURL            string `yaml:"base_url,omitempty" json:"base_url,omitempty" mapstructure:"base_url"`
+}
+
+func (c TwoCheckoutConnection) GetName() string {
+	return c.Name
+}
+
 type PayrailsConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	ClientID           string `yaml:"client_id,omitempty" json:"client_id" mapstructure:"client_id"`
@@ -1951,6 +1962,15 @@ type RedditAdsConnection struct {
 }
 
 func (c RedditAdsConnection) GetName() string {
+	return c.Name
+}
+
+type CloudflareRadarConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	APIToken           string `yaml:"api_token,omitempty" json:"api_token" mapstructure:"api_token" sensitive:"true"`
+}
+
+func (c CloudflareRadarConnection) GetName() string {
 	return c.Name
 }
 

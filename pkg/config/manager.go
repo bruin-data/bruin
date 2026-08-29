@@ -95,6 +95,7 @@ type Connections struct {
 	AppleAds            []AppleAdsConnection            `yaml:"appleads,omitempty" json:"appleads,omitempty" mapstructure:"appleads"`
 	LinkedInAds         []LinkedInAdsConnection         `yaml:"linkedinads,omitempty" json:"linkedinads,omitempty" mapstructure:"linkedinads"`
 	RedditAds           []RedditAdsConnection           `yaml:"reddit_ads,omitempty" json:"reddit_ads,omitempty" mapstructure:"reddit_ads"`
+	CloudflareRadar     []CloudflareRadarConnection     `yaml:"cloudflare_radar,omitempty" json:"cloudflare_radar,omitempty" mapstructure:"cloudflare_radar"`
 	Mailchimp           []MailchimpConnection           `yaml:"mailchimp,omitempty" json:"mailchimp,omitempty" mapstructure:"mailchimp"`
 	Manifold            []ManifoldConnection            `yaml:"manifold,omitempty" json:"manifold,omitempty" mapstructure:"manifold"`
 	RevenueCat          []RevenueCatConnection          `yaml:"revenuecat,omitempty" json:"revenuecat,omitempty" mapstructure:"revenuecat"`
@@ -110,6 +111,7 @@ type Connections struct {
 	Mixpanel            []MixpanelConnection            `yaml:"mixpanel,omitempty" json:"mixpanel,omitempty" mapstructure:"mixpanel"`
 	Amplitude           []AmplitudeConnection           `yaml:"amplitude,omitempty" json:"amplitude,omitempty" mapstructure:"amplitude"`
 	Fastspring          []FastspringConnection          `yaml:"fastspring,omitempty" json:"fastspring,omitempty" mapstructure:"fastspring"`
+	TwoCheckout         []TwoCheckoutConnection         `yaml:"twocheckout,omitempty" json:"twocheckout,omitempty" mapstructure:"twocheckout"`
 	Payrails            []PayrailsConnection            `yaml:"payrails,omitempty" json:"payrails,omitempty" mapstructure:"payrails"`
 	Clickup             []ClickupConnection             `yaml:"clickup,omitempty" json:"clickup,omitempty" mapstructure:"clickup"`
 	Jobtread            []JobtreadConnection            `yaml:"jobtread,omitempty" json:"jobtread,omitempty" mapstructure:"jobtread"`
@@ -1307,6 +1309,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.RedditAds = append(env.Connections.RedditAds, conn)
+	case "cloudflare_radar":
+		var conn CloudflareRadarConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.CloudflareRadar = append(env.Connections.CloudflareRadar, conn)
 	case "revenuecat":
 		var conn RevenueCatConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1440,6 +1449,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Fastspring = append(env.Connections.Fastspring, conn)
+	case "twocheckout":
+		var conn TwoCheckoutConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.TwoCheckout = append(env.Connections.TwoCheckout, conn)
 	case "payrails":
 		var conn PayrailsConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -2068,6 +2084,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.LinkedInAds = removeConnection(env.Connections.LinkedInAds, connectionName)
 	case "reddit_ads":
 		env.Connections.RedditAds = removeConnection(env.Connections.RedditAds, connectionName)
+	case "cloudflare_radar":
+		env.Connections.CloudflareRadar = removeConnection(env.Connections.CloudflareRadar, connectionName)
 	case "linear":
 		env.Connections.Linear = removeConnection(env.Connections.Linear, connectionName)
 	case "gcs":
@@ -2104,6 +2122,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Amplitude = removeConnection(env.Connections.Amplitude, connectionName)
 	case "fastspring":
 		env.Connections.Fastspring = removeConnection(env.Connections.Fastspring, connectionName)
+	case "twocheckout":
+		env.Connections.TwoCheckout = removeConnection(env.Connections.TwoCheckout, connectionName)
 	case "payrails":
 		env.Connections.Payrails = removeConnection(env.Connections.Payrails, connectionName)
 	case "pinterest":
@@ -2392,6 +2412,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.AppleAds, source.AppleAds)
 	mergeConnectionList(&c.LinkedInAds, source.LinkedInAds)
 	mergeConnectionList(&c.RedditAds, source.RedditAds)
+	mergeConnectionList(&c.CloudflareRadar, source.CloudflareRadar)
 	mergeConnectionList(&c.Mailchimp, source.Mailchimp)
 	mergeConnectionList(&c.Manifold, source.Manifold)
 	mergeConnectionList(&c.RevenueCat, source.RevenueCat)
@@ -2407,6 +2428,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Mixpanel, source.Mixpanel)
 	mergeConnectionList(&c.Amplitude, source.Amplitude)
 	mergeConnectionList(&c.Fastspring, source.Fastspring)
+	mergeConnectionList(&c.TwoCheckout, source.TwoCheckout)
 	mergeConnectionList(&c.Payrails, source.Payrails)
 	mergeConnectionList(&c.Clickup, source.Clickup)
 	mergeConnectionList(&c.Jobtread, source.Jobtread)

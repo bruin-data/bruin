@@ -411,6 +411,10 @@ environments:
         - name: "fastspring-1"
           username: "user-123"
           password: "pass-123"
+      twocheckout:
+        - name: "twocheckout-1"
+          merchant_code: "merchant-123"
+          secret_key: "secret-123"
       payrails:
         - name: "payrails-1"
           client_id: "client-123"
@@ -613,6 +617,9 @@ environments:
           client_id: "test-client-id"
           client_secret: "test-client-secret"
           refresh_token: "test-refresh-token"
+      cloudflare_radar:
+        - name: "cloudflareradar-1"
+          api_token: "test-api-token"
       espn:
         - name: "espn-1"
           sport: "football"

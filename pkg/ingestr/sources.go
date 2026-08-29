@@ -235,6 +235,25 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "tasks", PrimaryKey: "id", IncKey: "date_updated", IncStrategy: "merge"},
 	},
 
+	// Cloudflare Radar - Internet traffic, routing, and security insights
+	"cloudflare_radar": {
+		{Name: "annotations", PrimaryKey: "id", IncKey: "startDate", IncStrategy: "merge"},
+		{Name: "autonomous_systems", PrimaryKey: "asn", IncKey: "", IncStrategy: "replace"},
+		{Name: "bgp_hijacks", PrimaryKey: "id", IncKey: "min_hijack_ts", IncStrategy: "merge"},
+		{Name: "bgp_leaks", PrimaryKey: "id", IncKey: "detected_ts", IncStrategy: "merge"},
+		{Name: "bots", PrimaryKey: "slug", IncKey: "", IncStrategy: "replace"},
+		{Name: "certificate_authorities", PrimaryKey: "sha256Fingerprint", IncKey: "", IncStrategy: "replace"},
+		{Name: "certificate_logs", PrimaryKey: "slug", IncKey: "", IncStrategy: "replace"},
+		{Name: "datasets", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "geolocations", PrimaryKey: "geoId", IncKey: "", IncStrategy: "replace"},
+		{Name: "locations", PrimaryKey: "alpha2", IncKey: "", IncStrategy: "replace"},
+		{Name: "outages", PrimaryKey: "id", IncKey: "startDate", IncStrategy: "merge"},
+		{Name: "origins", PrimaryKey: "slug", IncKey: "", IncStrategy: "replace"},
+		{Name: "tlds", PrimaryKey: "tld", IncKey: "", IncStrategy: "replace"},
+		{Name: "traffic_anomalies", PrimaryKey: "uuid", IncKey: "startDate", IncStrategy: "merge"},
+		{Name: "api:<endpoint>?<params>", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+	},
+
 	// Couchbase - NoSQL database (user-defined tables)
 	"couchbase": {},
 
@@ -726,6 +745,17 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "coupons", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
 		{Name: "subscription_report", PrimaryKey: "subscription_id, transaction_date", IncKey: "sync_date", IncStrategy: "merge"},
 		{Name: "revenue_report", PrimaryKey: "order_id, transaction_date", IncKey: "syncdate", IncStrategy: "merge"},
+	},
+
+	// 2Checkout (Verifone) - Payments & Subscriptions
+	// The source filters server-side on the run interval (StartDate/EndDate for
+	// orders, ModifiedAfter for subscriptions) and serves products/promotions as
+	// snapshots, so it owns incrementality and no per-row cursor column is used.
+	"twocheckout": {
+		{Name: "orders", PrimaryKey: "ref_no, status", IncStrategy: "merge"},
+		{Name: "subscriptions", PrimaryKey: "subscription_reference", IncStrategy: "merge"},
+		{Name: "products", PrimaryKey: "product_code", IncStrategy: "replace"},
+		{Name: "promotions", PrimaryKey: "code", IncStrategy: "replace"},
 	},
 
 	// Mixpanel - Analytics
