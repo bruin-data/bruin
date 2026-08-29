@@ -1600,6 +1600,14 @@ func (c FrankfurterConnection) GetName() string {
 	return c.Name
 }
 
+type RipestatConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+}
+
+func (c RipestatConnection) GetName() string {
+	return c.Name
+}
+
 type SalesforceConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	Username           string `yaml:"username,omitempty" json:"username,omitempty" mapstructure:"username"`

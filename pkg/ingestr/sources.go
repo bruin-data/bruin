@@ -397,6 +397,18 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "exchange_rates", PrimaryKey: "date,currency_code,base_currency", IncKey: "date", IncStrategy: "merge"},
 	},
 
+	// RIPEstat - Public Internet routing, registration, and RPKI data API (RIPE NCC).
+	// Endpoints are dynamic: the source_table is the RIPEstat endpoint name plus its
+	// request parameters in URL query format (e.g. "as-overview?resource=AS3333").
+	// Loads default to the replace strategy since there is no common incremental key.
+	"ripestat": {
+		{Name: "as-overview?resource=AS3333", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "announced-prefixes?resource=AS3333", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "prefix-overview?resource=193.0.20.0%2F24", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "routing-history?resource=AS3333", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "example-resources", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+	},
+
 	// Freshdesk - Customer service platform
 	"freshdesk": {
 		{Name: "agents", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},

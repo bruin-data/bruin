@@ -127,6 +127,7 @@ type Connections struct {
 	GSC                 []GSCConnection                 `yaml:"gsc,omitempty" json:"gsc,omitempty" mapstructure:"gsc"`
 	AppLovin            []AppLovinConnection            `yaml:"applovin,omitempty" json:"applovin,omitempty" mapstructure:"applovin"`
 	Frankfurter         []FrankfurterConnection         `yaml:"frankfurter,omitempty" json:"frankfurter,omitempty" mapstructure:"frankfurter"`
+	Ripestat            []RipestatConnection            `yaml:"ripestat,omitempty" json:"ripestat,omitempty" mapstructure:"ripestat"`
 	Salesforce          []SalesforceConnection          `yaml:"salesforce,omitempty" json:"salesforce,omitempty" mapstructure:"salesforce"`
 	SQLite              []SQLiteConnection              `yaml:"sqlite,omitempty" json:"sqlite,omitempty" mapstructure:"sqlite"`
 	DB2                 []DB2Connection                 `yaml:"db2,omitempty" json:"db2,omitempty" mapstructure:"db2"`
@@ -1581,6 +1582,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Frankfurter = append(env.Connections.Frankfurter, conn)
+	case "ripestat":
+		var conn RipestatConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Ripestat = append(env.Connections.Ripestat, conn)
 	case "applovin":
 		var conn AppLovinConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -2146,6 +2154,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Okta = removeConnection(env.Connections.Okta, connectionName)
 	case "frankfurter":
 		env.Connections.Frankfurter = removeConnection(env.Connections.Frankfurter, connectionName)
+	case "ripestat":
+		env.Connections.Ripestat = removeConnection(env.Connections.Ripestat, connectionName)
 	case "salesforce":
 		env.Connections.Salesforce = removeConnection(env.Connections.Salesforce, connectionName)
 	case "sqlite":
@@ -2424,6 +2434,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.GSC, source.GSC)
 	mergeConnectionList(&c.AppLovin, source.AppLovin)
 	mergeConnectionList(&c.Frankfurter, source.Frankfurter)
+	mergeConnectionList(&c.Ripestat, source.Ripestat)
 	mergeConnectionList(&c.Salesforce, source.Salesforce)
 	mergeConnectionList(&c.SQLite, source.SQLite)
 	mergeConnectionList(&c.DB2, source.DB2)

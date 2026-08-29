@@ -714,6 +714,19 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 			},
 			want: []string{"ingest", "--source-uri", "frankfurter://", "--source-table", "latest:USD", "--dest-uri", "duckdb:////some/path", "--dest-table", "asset-name", "--yes", "--progress", "log"},
 		},
+		{
+			name: "public ripestat source via domain name (no connection defined)",
+			asset: &pipeline.Asset{
+				Name:       "asset-name",
+				Connection: "duck",
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "stat.ripe.net",
+					"source_table":      "as-overview?resource=AS3333",
+					"destination":       "duckdb",
+				},
+			},
+			want: []string{"ingest", "--source-uri", "ripestat://", "--source-table", "as-overview?resource=AS3333", "--dest-uri", "duckdb:////some/path", "--dest-table", "asset-name", "--yes", "--progress", "log"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

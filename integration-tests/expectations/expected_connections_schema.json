@@ -1410,6 +1410,12 @@
           },
           "type": "array"
         },
+        "ripestat": {
+          "items": {
+            "$ref": "#/$defs/RipestatConnection"
+          },
+          "type": "array"
+        },
         "salesforce": {
           "items": {
             "$ref": "#/$defs/SalesforceConnection"
@@ -4494,6 +4500,21 @@
         "name",
         "api_key",
         "project_id"
+      ]
+    },
+    "RipestatConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name"
       ]
     },
     "S3Connection": {
