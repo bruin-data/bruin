@@ -796,6 +796,25 @@
         "api_token"
       ]
     },
+    "CloudflareRadarConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "api_token": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_token"
+      ]
+    },
     "Connections": {
       "properties": {
         "aws": {
@@ -1215,6 +1234,12 @@
         "reddit_ads": {
           "items": {
             "$ref": "#/$defs/RedditAdsConnection"
+          },
+          "type": "array"
+        },
+        "cloudflare_radar": {
+          "items": {
+            "$ref": "#/$defs/CloudflareRadarConnection"
           },
           "type": "array"
         },

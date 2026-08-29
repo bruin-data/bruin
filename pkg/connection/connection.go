@@ -36,6 +36,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/clevertap"
 	"github.com/bruin-data/bruin/pkg/clickhouse"
 	"github.com/bruin-data/bruin/pkg/clickup"
+	"github.com/bruin-data/bruin/pkg/cloudflareradar"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/couchbase"
 	"github.com/bruin-data/bruin/pkg/cratedb"
@@ -229,6 +230,7 @@ type Manager struct {
 	Kalshi               map[string]*kalshi.Client
 	LinkedInAds          map[string]*linkedinads.Client
 	RedditAds            map[string]*redditads.Client
+	CloudflareRadar      map[string]*cloudflareradar.Client
 	Mailchimp            map[string]*mailchimp.Client
 	Manifold             map[string]*manifold.Client
 	Linear               map[string]*linear.Client
@@ -878,6 +880,29 @@ func (m *Manager) AddRedditAdsConnectionFromConfig(connection *config.RedditAdsC
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.RedditAds[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddCloudflareRadarConnectionFromConfig(connection *config.CloudflareRadarConnection) error {
+	m.mutex.Lock()
+	if m.CloudflareRadar == nil {
+		m.CloudflareRadar = make(map[string]*cloudflareradar.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := cloudflareradar.NewClient(cloudflareradar.Config{
+		APIToken: connection.APIToken,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.CloudflareRadar[connection.Name] = client
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 
@@ -4303,6 +4328,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Kalshi, connectionManager.AddKalshiConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.LinkedInAds, connectionManager.AddLinkedInAdsConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.RedditAds, connectionManager.AddRedditAdsConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.CloudflareRadar, connectionManager.AddCloudflareRadarConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Mailchimp, connectionManager.AddMailchimpConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Manifold, connectionManager.AddManifoldConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.RevenueCat, connectionManager.AddRevenueCatConnectionFromConfig, &wg, &errList, &mu)

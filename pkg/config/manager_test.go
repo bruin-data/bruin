@@ -973,6 +973,12 @@ func TestLoadFromFile(t *testing.T) {
 					RefreshToken:       "test-refresh-token",
 				},
 			},
+			CloudflareRadar: []CloudflareRadarConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "cloudflareradar-1"},
+					APIToken:           "test-api-token",
+				},
+			},
 			Espn: []EspnConnection{
 				{
 					ConnectionMetadata: ConnectionMetadata{Name: "espn-1"},
@@ -1753,6 +1759,16 @@ func TestConfig_AddConnection(t *testing.T) {
 			expectedErr: false,
 		},
 		{
+			name:     "Add Cloudflare Radar connection",
+			envName:  "default",
+			connType: "cloudflare_radar",
+			connName: "cloudflare-radar-conn",
+			creds: map[string]interface{}{
+				"api_token": "test-api-token",
+			},
+			expectedErr: false,
+		},
+		{
 			name:     "Add Intercom connection",
 			envName:  "default",
 			connType: "intercom",
@@ -1933,6 +1949,10 @@ func TestConfig_AddConnection(t *testing.T) {
 					assert.Len(t, env.Connections.Anthropic, 1)
 					assert.Equal(t, tt.connName, env.Connections.Anthropic[0].Name)
 					assert.Equal(t, tt.creds["api_key"], env.Connections.Anthropic[0].APIKey)
+				case "cloudflare_radar":
+					assert.Len(t, env.Connections.CloudflareRadar, 1)
+					assert.Equal(t, tt.connName, env.Connections.CloudflareRadar[0].Name)
+					assert.Equal(t, tt.creds["api_token"], env.Connections.CloudflareRadar[0].APIToken)
 				case "hostaway":
 					assert.Len(t, env.Connections.Hostaway, 1)
 					assert.Equal(t, tt.connName, env.Connections.Hostaway[0].Name)
@@ -2935,6 +2955,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				AppleAds:            []AppleAdsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "appleads1"}}},
 				LinkedInAds:         []LinkedInAdsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "linkedinads1"}}},
 				RedditAds:           []RedditAdsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "redditads1"}}},
+				CloudflareRadar:     []CloudflareRadarConnection{{ConnectionMetadata: ConnectionMetadata{Name: "cloudflareradar1"}}},
 				Mailchimp:           []MailchimpConnection{{ConnectionMetadata: ConnectionMetadata{Name: "mailchimp1"}}},
 				Manifold:            []ManifoldConnection{{ConnectionMetadata: ConnectionMetadata{Name: "manifold1"}}},
 				RevenueCat:          []RevenueCatConnection{{ConnectionMetadata: ConnectionMetadata{Name: "revenuecat1"}}},
@@ -3076,6 +3097,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				AppleAds:            []AppleAdsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "appleads1"}}},
 				LinkedInAds:         []LinkedInAdsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "linkedinads1"}}},
 				RedditAds:           []RedditAdsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "redditads1"}}},
+				CloudflareRadar:     []CloudflareRadarConnection{{ConnectionMetadata: ConnectionMetadata{Name: "cloudflareradar1"}}},
 				Mailchimp:           []MailchimpConnection{{ConnectionMetadata: ConnectionMetadata{Name: "mailchimp1"}}},
 				Manifold:            []ManifoldConnection{{ConnectionMetadata: ConnectionMetadata{Name: "manifold1"}}},
 				RevenueCat:          []RevenueCatConnection{{ConnectionMetadata: ConnectionMetadata{Name: "revenuecat1"}}},

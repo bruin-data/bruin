@@ -299,6 +299,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                                     {text: "Chess", link: "/ingestion/chess"},
                                     {text: "CleverTap", link: "/ingestion/clevertap"},
                                     {text: "ClickUp", link: "/ingestion/clickup"},
+                                    {text: "Cloudflare Radar", link: "/ingestion/cloudflare-radar"},
                                     {text: "Couchbase", link: "/ingestion/couchbase"},
                                     {text: "Cursor", link: "/ingestion/cursor"},
                                     {text: "Customer.io", link: "/ingestion/customerio"},
