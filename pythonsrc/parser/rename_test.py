@@ -216,6 +216,35 @@ test_cases_rename_tsql_three_part = [
 ]
 
 
+test_cases_rename_tsql_identifier_case = [
+    {
+        "name": "mixed-case derived column through subquery alias",
+        "query": """
+with src as (
+    select cast(1 as int) as BIN
+),
+base as (
+    select id from dbo.numbers
+),
+result as (
+    select base.id
+    from base
+    left join (
+        select distinct BIN
+        from src
+    ) as lmt
+        on base.id = lmt.BIN
+    where lmt.BIN is null
+)
+select id
+from result
+""",
+        "table_references": {"dbo.numbers": "repro_dbo.numbers"},
+        "expected": "WITH src AS (SELECT CAST(1 AS INTEGER) AS BIN), base AS (SELECT id AS id FROM repro_dbo.numbers), result AS (SELECT base.id AS id FROM base LEFT JOIN (SELECT DISTINCT BIN AS BIN FROM src) AS lmt ON base.id = lmt.BIN WHERE lmt.BIN IS NULL) SELECT id FROM result",
+    },
+]
+
+
 @pytest.mark.parametrize(
     "query,table_references,expected",
     [(tc["query"], tc["table_references"], tc["expected"]) for tc in test_cases_rename],
@@ -243,3 +272,19 @@ def test_replace_table_references_tsql_three_part(query, table_references, expec
         [q.sql(dialect="tsql") for q in parse(expected, dialect="tsql")]
     )
     assert result["error"] is None
+
+
+@pytest.mark.parametrize(
+    "query,table_references,expected",
+    [
+        (tc["query"], tc["table_references"], tc["expected"])
+        for tc in test_cases_rename_tsql_identifier_case
+    ],
+    ids=[tc["name"] for tc in test_cases_rename_tsql_identifier_case],
+)
+def test_replace_table_references_tsql_preserves_identifier_case(
+    query, table_references, expected
+):
+    result = replace_table_references(query, "tsql", table_references)
+    assert result["error"] is None
+    assert result["query"] == expected

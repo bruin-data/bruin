@@ -2,6 +2,7 @@ package fabric
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -180,5 +181,77 @@ func TestBasicOperator_RunTaskReturnsSchemaCreationError(t *testing.T) {
 
 	require.ErrorContains(t, err, "schema failed")
 	client.AssertNotCalled(t, "RunQueryWithoutResult", mock.Anything, mock.Anything)
+	client.AssertExpectations(t)
+}
+
+type recordingDevEnv struct {
+	modified []string
+}
+
+func (d *recordingDevEnv) Modify(
+	_ context.Context,
+	_ *pipeline.Pipeline,
+	_ *pipeline.Asset,
+	q *query.Query,
+) (*query.Query, error) {
+	d.modified = append(d.modified, q.Query)
+	return &query.Query{Query: strings.ReplaceAll(q.Query, "dbo.numbers", "dev_dbo.numbers")}, nil
+}
+
+func (d *recordingDevEnv) RegisterAssetForSchemaCache(
+	context.Context,
+	*pipeline.Pipeline,
+	*pipeline.Asset,
+	*query.Query,
+) error {
+	return nil
+}
+
+func TestBasicOperator_RunTaskAppliesDevEnvBeforeMaterialization(t *testing.T) {
+	t.Parallel()
+
+	rawQuery := "SELECT id FROM dbo.numbers"
+	rewrittenQuery := "SELECT id FROM dev_dbo.numbers"
+	renderedQuery := "CREATE TABLE [dev_dbo].[Products] AS\nSELECT id FROM dev_dbo.numbers"
+
+	asset := &pipeline.Asset{
+		Name: "dev_dbo.Products",
+		Type: pipeline.AssetTypeFabricQuery,
+		Materialization: pipeline.Materialization{
+			Type: pipeline.MaterializationTypeTable,
+		},
+		ExecutableFile: pipeline.ExecutableFile{
+			Path:    "products.sql",
+			Content: rawQuery,
+		},
+	}
+
+	extractor := new(mockFabricExtractor)
+	extractor.On("CloneForAsset", mock.Anything, mock.Anything, asset).Return(extractor, nil)
+	extractor.On("ExtractQueriesFromString", rawQuery).Return([]*query.Query{{Query: rawQuery}}, nil)
+
+	materializer := new(mockFabricMaterializer)
+	materializer.On("Render", asset, rewrittenQuery).Return(renderedQuery, nil)
+
+	client := new(mockFabricClient)
+	client.On("CreateSchemaIfNotExist", mock.Anything, asset).Return(nil).Once()
+	client.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: renderedQuery}).Return(nil).Once()
+
+	connections := new(mockFabricConnectionGetter)
+	connections.On("GetConnection", "fabric-default").Return(client)
+
+	devEnv := &recordingDevEnv{}
+	operator := BasicOperator{
+		connection:   connections,
+		extractor:    extractor,
+		materializer: materializer,
+		devEnv:       devEnv,
+	}
+
+	err := operator.RunTask(t.Context(), &pipeline.Pipeline{}, asset)
+
+	require.NoError(t, err)
+	require.Equal(t, []string{rawQuery}, devEnv.modified)
+	materializer.AssertExpectations(t)
 	client.AssertExpectations(t)
 }

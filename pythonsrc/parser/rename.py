@@ -1,6 +1,35 @@
 from sqlglot import exp, parse
 
 
+def _preserve_tsql_inferred_alias_case(parsed_query: exp.Expression) -> None:
+    from sqlglot.generators.tsql import qualify_derived_table_outputs
+
+    for node in list(parsed_query.find_all(exp.CTE, exp.Subquery)):
+        qualify_derived_table_outputs(node)
+
+    for alias in parsed_query.find_all(exp.Alias):
+        alias_ident = alias.args.get("alias")
+        if not isinstance(alias_ident, exp.Identifier):
+            continue
+
+        source = alias.this
+        source_ident = None
+        if isinstance(source, exp.Column) and isinstance(source.this, exp.Identifier):
+            source_ident = source.this
+        elif isinstance(source, exp.Identifier):
+            source_ident = source
+        if source_ident is None:
+            continue
+        if alias_ident.name.lower() != source_ident.name.lower():
+            continue
+        if alias_ident.name == source_ident.name:
+            continue
+
+        alias_ident.set("this", source_ident.name)
+        if "quoted" in source_ident.args:
+            alias_ident.set("quoted", source_ident.args.get("quoted"))
+
+
 def replace_table_references(
     query: str, dialect: str, table_references: dict[str, str]
 ):
@@ -102,6 +131,9 @@ def replace_table_references(
                 column_node.set("db", None)
                 column_node.set("catalog", None)
                 break
+
+        if dialect == "tsql" and parsed_query is not None:
+            _preserve_tsql_inferred_alias_case(parsed_query)
 
     return {
         "query": "; ".join([q.sql(dialect=dialect) for q in parsed_queries]),
