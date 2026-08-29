@@ -734,6 +734,12 @@ func TestLoadFromFile(t *testing.T) {
 					APIKey:             "key-123",
 				},
 			},
+			Sklik: []SklikConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "sklik-1"},
+					Token:              "token-123",
+				},
+			},
 			Salesforce: []SalesforceConnection{
 				{
 					ConnectionMetadata: ConnectionMetadata{Name: "salesforce-1"},
@@ -976,6 +982,12 @@ func TestLoadFromFile(t *testing.T) {
 					ClientID:           "test-client-id",
 					ClientSecret:       "test-client-secret",
 					RefreshToken:       "test-refresh-token",
+				},
+			},
+			CloudflareRadar: []CloudflareRadarConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "cloudflareradar-1"},
+					APIToken:           "test-api-token",
 				},
 			},
 			Espn: []EspnConnection{
@@ -1758,6 +1770,27 @@ func TestConfig_AddConnection(t *testing.T) {
 			expectedErr: false,
 		},
 		{
+			name:     "Add Sklik connection",
+			envName:  "default",
+			connType: "sklik",
+			connName: "sklik-conn",
+			creds: map[string]interface{}{
+				"token":   "test-token",
+				"user_id": 123,
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Add Cloudflare Radar connection",
+			envName:  "default",
+			connType: "cloudflare_radar",
+			connName: "cloudflare-radar-conn",
+			creds: map[string]interface{}{
+				"api_token": "test-api-token",
+			},
+			expectedErr: false,
+		},
+		{
 			name:     "Add Intercom connection",
 			envName:  "default",
 			connType: "intercom",
@@ -1938,6 +1971,10 @@ func TestConfig_AddConnection(t *testing.T) {
 					assert.Len(t, env.Connections.Anthropic, 1)
 					assert.Equal(t, tt.connName, env.Connections.Anthropic[0].Name)
 					assert.Equal(t, tt.creds["api_key"], env.Connections.Anthropic[0].APIKey)
+				case "cloudflare_radar":
+					assert.Len(t, env.Connections.CloudflareRadar, 1)
+					assert.Equal(t, tt.connName, env.Connections.CloudflareRadar[0].Name)
+					assert.Equal(t, tt.creds["api_token"], env.Connections.CloudflareRadar[0].APIToken)
 				case "hostaway":
 					assert.Len(t, env.Connections.Hostaway, 1)
 					assert.Equal(t, tt.connName, env.Connections.Hostaway[0].Name)
@@ -2039,6 +2076,25 @@ func TestDeleteConnection(t *testing.T) {
 							Connections: &Connections{
 								AwsConnection: []AwsConnection{
 									{ConnectionMetadata: ConnectionMetadata{Name: "aws-conn"}, AccessKey: "key", SecretKey: "secret"},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Delete existing Sklik connection",
+			envName:  "default",
+			connName: "sklik-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{
+						"default": {
+							Connections: &Connections{
+								Sklik: []SklikConnection{
+									{ConnectionMetadata: ConnectionMetadata{Name: "sklik-conn"}, Token: "token-123"},
 								},
 							},
 						},
@@ -2940,6 +2996,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				AppleAds:            []AppleAdsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "appleads1"}}},
 				LinkedInAds:         []LinkedInAdsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "linkedinads1"}}},
 				RedditAds:           []RedditAdsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "redditads1"}}},
+				CloudflareRadar:     []CloudflareRadarConnection{{ConnectionMetadata: ConnectionMetadata{Name: "cloudflareradar1"}}},
 				Mailchimp:           []MailchimpConnection{{ConnectionMetadata: ConnectionMetadata{Name: "mailchimp1"}}},
 				Manifold:            []ManifoldConnection{{ConnectionMetadata: ConnectionMetadata{Name: "manifold1"}}},
 				RevenueCat:          []RevenueCatConnection{{ConnectionMetadata: ConnectionMetadata{Name: "revenuecat1"}}},
@@ -2970,6 +3027,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				GoogleAnalytics:     []GoogleAnalyticsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "googleanalytics1"}}},
 				GSC:                 []GSCConnection{{Name: "gsc1"}},
 				AppLovin:            []AppLovinConnection{{ConnectionMetadata: ConnectionMetadata{Name: "applovin1"}}},
+				Sklik:               []SklikConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sklik1"}}},
 				Frankfurter:         []FrankfurterConnection{{ConnectionMetadata: ConnectionMetadata{Name: "frankfurter1"}}},
 				Ripestat:            []RipestatConnection{{ConnectionMetadata: ConnectionMetadata{Name: "ripestat1"}}},
 				Salesforce:          []SalesforceConnection{{ConnectionMetadata: ConnectionMetadata{Name: "salesforce1"}}},
@@ -3082,6 +3140,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				AppleAds:            []AppleAdsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "appleads1"}}},
 				LinkedInAds:         []LinkedInAdsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "linkedinads1"}}},
 				RedditAds:           []RedditAdsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "redditads1"}}},
+				CloudflareRadar:     []CloudflareRadarConnection{{ConnectionMetadata: ConnectionMetadata{Name: "cloudflareradar1"}}},
 				Mailchimp:           []MailchimpConnection{{ConnectionMetadata: ConnectionMetadata{Name: "mailchimp1"}}},
 				Manifold:            []ManifoldConnection{{ConnectionMetadata: ConnectionMetadata{Name: "manifold1"}}},
 				RevenueCat:          []RevenueCatConnection{{ConnectionMetadata: ConnectionMetadata{Name: "revenuecat1"}}},
@@ -3112,6 +3171,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				GoogleAnalytics:     []GoogleAnalyticsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "googleanalytics1"}}},
 				GSC:                 []GSCConnection{{Name: "gsc1"}},
 				AppLovin:            []AppLovinConnection{{ConnectionMetadata: ConnectionMetadata{Name: "applovin1"}}},
+				Sklik:               []SklikConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sklik1"}}},
 				Frankfurter:         []FrankfurterConnection{{ConnectionMetadata: ConnectionMetadata{Name: "frankfurter1"}}},
 				Ripestat:            []RipestatConnection{{ConnectionMetadata: ConnectionMetadata{Name: "ripestat1"}}},
 				Salesforce:          []SalesforceConnection{{ConnectionMetadata: ConnectionMetadata{Name: "salesforce1"}}},

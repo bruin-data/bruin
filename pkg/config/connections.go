@@ -1592,6 +1592,16 @@ func (c AppLovinConnection) GetName() string {
 	return c.Name
 }
 
+type SklikConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	Token              string `yaml:"token,omitempty" json:"token" mapstructure:"token" sensitive:"true"`
+	UserID             *int64 `yaml:"user_id,omitempty" json:"user_id,omitempty" mapstructure:"user_id"`
+}
+
+func (c SklikConnection) GetName() string {
+	return c.Name
+}
+
 type FrankfurterConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 }
@@ -1960,6 +1970,15 @@ type RedditAdsConnection struct {
 }
 
 func (c RedditAdsConnection) GetName() string {
+	return c.Name
+}
+
+type CloudflareRadarConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	APIToken           string `yaml:"api_token,omitempty" json:"api_token" mapstructure:"api_token" sensitive:"true"`
+}
+
+func (c CloudflareRadarConnection) GetName() string {
 	return c.Name
 }
 

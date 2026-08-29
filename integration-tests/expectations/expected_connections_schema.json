@@ -796,6 +796,25 @@
         "api_token"
       ]
     },
+    "CloudflareRadarConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "api_token": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_token"
+      ]
+    },
     "Connections": {
       "properties": {
         "aws": {
@@ -1218,6 +1237,12 @@
           },
           "type": "array"
         },
+        "cloudflare_radar": {
+          "items": {
+            "$ref": "#/$defs/CloudflareRadarConnection"
+          },
+          "type": "array"
+        },
         "mailchimp": {
           "items": {
             "$ref": "#/$defs/MailchimpConnection"
@@ -1401,6 +1426,12 @@
         "applovin": {
           "items": {
             "$ref": "#/$defs/AppLovinConnection"
+          },
+          "type": "array"
+        },
+        "sklik": {
+          "items": {
+            "$ref": "#/$defs/SklikConnection"
           },
           "type": "array"
         },
@@ -4780,6 +4811,28 @@
         "name",
         "url",
         "api_key"
+      ]
+    },
+    "SklikConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "token": {
+          "type": "string"
+        },
+        "user_id": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "token"
       ]
     },
     "SlackConnection": {

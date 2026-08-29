@@ -27,6 +27,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/ripestat"
 	"github.com/bruin-data/bruin/pkg/sharepoint"
 	"github.com/bruin-data/bruin/pkg/shopify"
+	"github.com/bruin-data/bruin/pkg/sklik"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -543,6 +544,36 @@ func Test_AddRipestatConnectionFromConfig(t *testing.T) {
 	uri, err := res.GetIngestrURI()
 	require.NoError(t, err)
 	assert.Equal(t, "ripestat://", uri)
+	assert.Equal(t, configuration, m.GetConnectionDetails("test"))
+}
+
+func Test_AddSklikConnectionFromConfig(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
+
+	userID := int64(456)
+	configuration := &config.SklikConnection{
+		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
+		Token:              "token-123",
+		UserID:             &userID,
+	}
+
+	err := m.AddSklikConnectionFromConfig(configuration)
+	require.NoError(t, err)
+
+	res, ok := m.GetConnection("test").(*sklik.Client)
+	require.True(t, ok)
+	require.NotNil(t, res)
+
+	uri, err := res.GetIngestrURI()
+	require.NoError(t, err)
+	assert.Contains(t, uri, "sklik://?")
+	assert.Contains(t, uri, "token=token-123")
+	assert.Contains(t, uri, "user_id=456")
 	assert.Equal(t, configuration, m.GetConnectionDetails("test"))
 }
 
