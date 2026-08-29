@@ -717,6 +717,17 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "revenue_report", PrimaryKey: "order_id, transaction_date", IncKey: "syncdate", IncStrategy: "merge"},
 	},
 
+	// 2Checkout (Verifone) - Payments & Subscriptions
+	// The source filters server-side on the run interval (StartDate/EndDate for
+	// orders, ModifiedAfter for subscriptions) and serves products/promotions as
+	// snapshots, so it owns incrementality and no per-row cursor column is used.
+	"twocheckout": {
+		{Name: "orders", PrimaryKey: "ref_no, status", IncStrategy: "merge"},
+		{Name: "subscriptions", PrimaryKey: "subscription_reference", IncStrategy: "merge"},
+		{Name: "products", PrimaryKey: "product_code", IncStrategy: "replace"},
+		{Name: "promotions", PrimaryKey: "code", IncStrategy: "replace"},
+	},
+
 	// Mixpanel - Analytics
 	"mixpanel": {
 		{Name: "events", PrimaryKey: "distinct_id", IncKey: "time", IncStrategy: "merge"},

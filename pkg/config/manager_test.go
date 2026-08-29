@@ -664,6 +664,13 @@ func TestLoadFromFile(t *testing.T) {
 					Password:           "pass-123",
 				},
 			},
+			TwoCheckout: []TwoCheckoutConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "twocheckout-1"},
+					MerchantCode:       "merchant-123",
+					SecretKey:          "secret-123",
+				},
+			},
 			Payrails: []PayrailsConnection{
 				{
 					ConnectionMetadata: ConnectionMetadata{Name: "payrails-1"},
@@ -1777,6 +1784,17 @@ func TestConfig_AddConnection(t *testing.T) {
 			expectedErr: false,
 		},
 		{
+			name:     "Add 2Checkout connection",
+			envName:  "default",
+			connType: "twocheckout",
+			connName: "twocheckout-conn",
+			creds: map[string]interface{}{
+				"merchant_code": "merchant-123",
+				"secret_key":    "secret-123",
+			},
+			expectedErr: false,
+		},
+		{
 			name:     "Add Trello connection",
 			envName:  "default",
 			connType: "trello",
@@ -2035,6 +2053,25 @@ func TestDeleteConnection(t *testing.T) {
 							Connections: &Connections{
 								Fabric: []FabricConnection{
 									{ConnectionMetadata: ConnectionMetadata{Name: "fabric-conn"}, Host: "fabric.example", Database: "warehouse", ClientID: "client-id"},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Delete existing 2Checkout connection",
+			envName:  "default",
+			connName: "twocheckout-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{
+						"default": {
+							Connections: &Connections{
+								TwoCheckout: []TwoCheckoutConnection{
+									{ConnectionMetadata: ConnectionMetadata{Name: "twocheckout-conn"}, MerchantCode: "merchant-123", SecretKey: "secret-123"},
 								},
 							},
 						},
@@ -2912,6 +2949,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Mixpanel:            []MixpanelConnection{{ConnectionMetadata: ConnectionMetadata{Name: "mixpanel1"}}},
 				Amplitude:           []AmplitudeConnection{{ConnectionMetadata: ConnectionMetadata{Name: "amplitude1"}}},
 				Fastspring:          []FastspringConnection{{ConnectionMetadata: ConnectionMetadata{Name: "fastspring1"}}},
+				TwoCheckout:         []TwoCheckoutConnection{{ConnectionMetadata: ConnectionMetadata{Name: "twocheckout1"}}},
 				Payrails:            []PayrailsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "payrails1"}}},
 				Clickup:             []ClickupConnection{{ConnectionMetadata: ConnectionMetadata{Name: "clickup1"}}},
 				Jobtread:            []JobtreadConnection{{ConnectionMetadata: ConnectionMetadata{Name: "jobtread1"}}},
@@ -3052,6 +3090,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Mixpanel:            []MixpanelConnection{{ConnectionMetadata: ConnectionMetadata{Name: "mixpanel1"}}},
 				Amplitude:           []AmplitudeConnection{{ConnectionMetadata: ConnectionMetadata{Name: "amplitude1"}}},
 				Fastspring:          []FastspringConnection{{ConnectionMetadata: ConnectionMetadata{Name: "fastspring1"}}},
+				TwoCheckout:         []TwoCheckoutConnection{{ConnectionMetadata: ConnectionMetadata{Name: "twocheckout1"}}},
 				Payrails:            []PayrailsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "payrails1"}}},
 				Clickup:             []ClickupConnection{{ConnectionMetadata: ConnectionMetadata{Name: "clickup1"}}},
 				Jobtread:            []JobtreadConnection{{ConnectionMetadata: ConnectionMetadata{Name: "jobtread1"}}},

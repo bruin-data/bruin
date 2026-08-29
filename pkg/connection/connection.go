@@ -146,6 +146,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/trino"
 	"github.com/bruin-data/bruin/pkg/trustpilot"
 	"github.com/bruin-data/bruin/pkg/twilio"
+	"github.com/bruin-data/bruin/pkg/twocheckout"
 	"github.com/bruin-data/bruin/pkg/typeform"
 	"github.com/bruin-data/bruin/pkg/vertica"
 	"github.com/bruin-data/bruin/pkg/vitess"
@@ -243,6 +244,7 @@ type Manager struct {
 	Mixpanel             map[string]*mixpanel.Client
 	Amplitude            map[string]*amplitude.Client
 	Fastspring           map[string]*fastspring.Client
+	TwoCheckout          map[string]*twocheckout.Client
 	Payrails             map[string]*payrails.Client
 	Clickup              map[string]*clickup.Client
 	Jobtread             map[string]*jobtread.Client
@@ -3077,6 +3079,29 @@ func (m *Manager) AddFastspringConnectionFromConfig(connection *config.Fastsprin
 	return nil
 }
 
+func (m *Manager) AddTwoCheckoutConnectionFromConfig(connection *config.TwoCheckoutConnection) error {
+	m.mutex.Lock()
+	if m.TwoCheckout == nil {
+		m.TwoCheckout = make(map[string]*twocheckout.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := twocheckout.NewClient(twocheckout.Config{
+		MerchantCode: connection.MerchantCode,
+		SecretKey:    connection.SecretKey,
+		BaseURL:      connection.BaseURL,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.TwoCheckout[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddPayrailsConnectionFromConfig(connection *config.PayrailsConnection) error {
 	m.mutex.Lock()
 	if m.Payrails == nil {
@@ -4295,6 +4320,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Mixpanel, connectionManager.AddMixpanelConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Amplitude, connectionManager.AddAmplitudeConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Fastspring, connectionManager.AddFastspringConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.TwoCheckout, connectionManager.AddTwoCheckoutConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Payrails, connectionManager.AddPayrailsConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Pinterest, connectionManager.AddPinterestConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Trustpilot, connectionManager.AddTrustpilotConnectionFromConfig, &wg, &errList, &mu)

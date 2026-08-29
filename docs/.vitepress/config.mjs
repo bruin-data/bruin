@@ -278,6 +278,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                                 text: "Sources",
                                 collapsed: false,
                                 items: [
+                                    {text: "2Checkout", link: "/ingestion/twocheckout"},
                                     {text: "Adapty", link: "/ingestion/adapty"},
                                     {text: "Adjust", link: "/ingestion/adjust"},
                                     {text: "Airtable", link: "/ingestion/airtable"},

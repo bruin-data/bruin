@@ -1308,6 +1308,12 @@
           },
           "type": "array"
         },
+        "twocheckout": {
+          "items": {
+            "$ref": "#/$defs/TwoCheckoutConnection"
+          },
+          "type": "array"
+        },
         "payrails": {
           "items": {
             "$ref": "#/$defs/PayrailsConnection"
@@ -5407,6 +5413,32 @@
       "required": [
         "name",
         "account_sid"
+      ]
+    },
+    "TwoCheckoutConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "merchant_code": {
+          "type": "string"
+        },
+        "secret_key": {
+          "type": "string"
+        },
+        "base_url": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "merchant_code",
+        "secret_key"
       ]
     },
     "TypeformConnection": {
