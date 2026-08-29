@@ -229,6 +229,7 @@ var defaultMapping = map[string]string{
 	"googleanalytics":       "googleanalytics-default",
 	"gsc":                   "gsc-default",
 	"applovin":              "applovin-default",
+	"sklik":                 "sklik-default",
 	"salesforce":            "salesforce-default",
 	"solidgate":             "solidgate-default",
 	"square":                "square-default",

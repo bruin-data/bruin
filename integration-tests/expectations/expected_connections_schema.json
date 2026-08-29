@@ -1429,6 +1429,12 @@
           },
           "type": "array"
         },
+        "sklik": {
+          "items": {
+            "$ref": "#/$defs/SklikConnection"
+          },
+          "type": "array"
+        },
         "frankfurter": {
           "items": {
             "$ref": "#/$defs/FrankfurterConnection"
@@ -4784,6 +4790,28 @@
         "name",
         "url",
         "api_key"
+      ]
+    },
+    "SklikConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "token": {
+          "type": "string"
+        },
+        "user_id": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "token"
       ]
     },
     "SlackConnection": {

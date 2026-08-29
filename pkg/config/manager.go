@@ -127,6 +127,7 @@ type Connections struct {
 	GoogleAnalytics     []GoogleAnalyticsConnection     `yaml:"googleanalytics,omitempty" json:"googleanalytics,omitempty" mapstructure:"googleanalytics"`
 	GSC                 []GSCConnection                 `yaml:"gsc,omitempty" json:"gsc,omitempty" mapstructure:"gsc"`
 	AppLovin            []AppLovinConnection            `yaml:"applovin,omitempty" json:"applovin,omitempty" mapstructure:"applovin"`
+	Sklik               []SklikConnection               `yaml:"sklik,omitempty" json:"sklik,omitempty" mapstructure:"sklik"`
 	Frankfurter         []FrankfurterConnection         `yaml:"frankfurter,omitempty" json:"frankfurter,omitempty" mapstructure:"frankfurter"`
 	Salesforce          []SalesforceConnection          `yaml:"salesforce,omitempty" json:"salesforce,omitempty" mapstructure:"salesforce"`
 	SQLite              []SQLiteConnection              `yaml:"sqlite,omitempty" json:"sqlite,omitempty" mapstructure:"sqlite"`
@@ -1596,6 +1597,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.AppLovin = append(env.Connections.AppLovin, conn)
+	case "sklik":
+		var conn SklikConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Sklik = append(env.Connections.Sklik, conn)
 	case "salesforce":
 		var conn SalesforceConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -2150,6 +2158,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.GSC = removeConnection(env.Connections.GSC, connectionName)
 	case "applovin":
 		env.Connections.AppLovin = removeConnection(env.Connections.AppLovin, connectionName)
+	case "sklik":
+		env.Connections.Sklik = removeConnection(env.Connections.Sklik, connectionName)
 	case "freshdesk":
 		env.Connections.Freshdesk = removeConnection(env.Connections.Freshdesk, connectionName)
 	case "okta":
@@ -2434,6 +2444,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.GoogleAnalytics, source.GoogleAnalytics)
 	mergeConnectionList(&c.GSC, source.GSC)
 	mergeConnectionList(&c.AppLovin, source.AppLovin)
+	mergeConnectionList(&c.Sklik, source.Sklik)
 	mergeConnectionList(&c.Frankfurter, source.Frankfurter)
 	mergeConnectionList(&c.Salesforce, source.Salesforce)
 	mergeConnectionList(&c.SQLite, source.SQLite)
