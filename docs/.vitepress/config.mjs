@@ -365,6 +365,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                                     {text: "Recurly", link: "/ingestion/recurly"},
                                     {text: "Reddit Ads", link: "/ingestion/reddit_ads"},
                                     {text: "Revenuecat", link: "/ingestion/revenuecat"},
+                                    {text: "RIPEstat", link: "/ingestion/ripestat"},
                                     {text: "Salesforce", link: "/ingestion/salesforce"},
                                     {text: "SAP HANA", link: "/ingestion/sap_hana"},
                                     {text: "S3", link: "/ingestion/s3"},

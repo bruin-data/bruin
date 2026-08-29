@@ -2568,6 +2568,7 @@ func assetMainTaskIsConnectionless(assetType AssetType) bool {
 var ConnectionlessIngestrSources = map[string]string{
 	"chess.com":       "chess://",
 	"frankfurter.dev": "frankfurter://",
+	"stat.ripe.net":   "ripestat://",
 }
 
 func assetSecretConnectionNames(asset *Asset) []string {
