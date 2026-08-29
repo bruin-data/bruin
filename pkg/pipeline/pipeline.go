@@ -229,6 +229,7 @@ var defaultMapping = map[string]string{
 	"googleanalytics":       "googleanalytics-default",
 	"gsc":                   "gsc-default",
 	"applovin":              "applovin-default",
+	"sklik":                 "sklik-default",
 	"salesforce":            "salesforce-default",
 	"solidgate":             "solidgate-default",
 	"square":                "square-default",
@@ -284,6 +285,7 @@ var defaultMapping = map[string]string{
 	"linkedinads":           "linkedinads-default",
 	"amplitude":             "amplitude-default",
 	"fastspring":            "fastspring-default",
+	"twocheckout":           "twocheckout-default",
 	"payrails":              "payrails-default",
 	"mailchimp":             "mailchimp-default",
 	"manifold":              "manifold-default",
@@ -301,6 +303,7 @@ var defaultMapping = map[string]string{
 	"quicksight":            "quicksight-default",
 	"rabbitmq":              "rabbitmq-default",
 	"reddit_ads":            "reddit_ads-default",
+	"cloudflare_radar":      "cloudflare_radar-default",
 	"revenuecat":            "revenuecat-default",
 	"sendgrid":              "sendgrid-default",
 	"sharepoint":            "sharepoint-default",
@@ -2565,6 +2568,7 @@ func assetMainTaskIsConnectionless(assetType AssetType) bool {
 var ConnectionlessIngestrSources = map[string]string{
 	"chess.com":       "chess://",
 	"frankfurter.dev": "frankfurter://",
+	"stat.ripe.net":   "ripestat://",
 }
 
 func assetSecretConnectionNames(asset *Asset) []string {

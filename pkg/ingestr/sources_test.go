@@ -33,6 +33,39 @@ func TestAdaptySourceTables(t *testing.T) {
 	require.True(t, hasPaywalls)
 }
 
+func TestSklikSourceTables(t *testing.T) {
+	t.Parallel()
+
+	source, err := GetSourceTables("sklik")
+	require.NoError(t, err)
+	require.Equal(t, "sklik", source.Name)
+	require.NotEmpty(t, source.Tables)
+
+	var hasCampaigns, hasCampaignStats, hasSearchQueries bool
+	for _, table := range source.Tables {
+		switch table.Name {
+		case "campaigns":
+			hasCampaigns = true
+			require.Equal(t, "id", table.PrimaryKey)
+			require.Equal(t, "merge", table.IncStrategy)
+		case "campaign_stats_daily":
+			hasCampaignStats = true
+			require.Equal(t, "id, date", table.PrimaryKey)
+			require.Equal(t, "date", table.IncKey)
+			require.Equal(t, "merge", table.IncStrategy)
+		case "search_queries":
+			hasSearchQueries = true
+			require.Equal(t, "query, keyword_id, date", table.PrimaryKey)
+			require.Equal(t, "date", table.IncKey)
+			require.Equal(t, "merge", table.IncStrategy)
+		}
+	}
+
+	require.True(t, hasCampaigns)
+	require.True(t, hasCampaignStats)
+	require.True(t, hasSearchQueries)
+}
+
 func TestCleverTapSourceTables(t *testing.T) {
 	t.Parallel()
 
@@ -130,4 +163,28 @@ func TestSharePointSourceTables(t *testing.T) {
 
 	require.True(t, hasExcelSheetExample)
 	require.True(t, hasCSVExample)
+}
+
+func TestRipestatSourceTables(t *testing.T) {
+	t.Parallel()
+
+	source, err := GetSourceTables("ripestat")
+	require.NoError(t, err)
+	require.Equal(t, "ripestat", source.Name)
+	require.NotEmpty(t, source.Tables)
+
+	var hasASOverview, hasExampleResources bool
+	for _, table := range source.Tables {
+		switch table.Name {
+		case "as-overview?resource=AS3333":
+			hasASOverview = true
+			require.Equal(t, "replace", table.IncStrategy)
+		case "example-resources":
+			hasExampleResources = true
+			require.Equal(t, "replace", table.IncStrategy)
+		}
+	}
+
+	require.True(t, hasASOverview)
+	require.True(t, hasExampleResources)
 }

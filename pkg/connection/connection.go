@@ -36,6 +36,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/clevertap"
 	"github.com/bruin-data/bruin/pkg/clickhouse"
 	"github.com/bruin-data/bruin/pkg/clickup"
+	"github.com/bruin-data/bruin/pkg/cloudflareradar"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/couchbase"
 	"github.com/bruin-data/bruin/pkg/cratedb"
@@ -127,6 +128,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/sftp"
 	"github.com/bruin-data/bruin/pkg/sharepoint"
 	"github.com/bruin-data/bruin/pkg/shopify"
+	"github.com/bruin-data/bruin/pkg/sklik"
 	"github.com/bruin-data/bruin/pkg/slack"
 	"github.com/bruin-data/bruin/pkg/smartsheet"
 	"github.com/bruin-data/bruin/pkg/snapchatads"
@@ -146,6 +148,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/trino"
 	"github.com/bruin-data/bruin/pkg/trustpilot"
 	"github.com/bruin-data/bruin/pkg/twilio"
+	"github.com/bruin-data/bruin/pkg/twocheckout"
 	"github.com/bruin-data/bruin/pkg/typeform"
 	"github.com/bruin-data/bruin/pkg/vertica"
 	"github.com/bruin-data/bruin/pkg/vitess"
@@ -228,6 +231,7 @@ type Manager struct {
 	Kalshi               map[string]*kalshi.Client
 	LinkedInAds          map[string]*linkedinads.Client
 	RedditAds            map[string]*redditads.Client
+	CloudflareRadar      map[string]*cloudflareradar.Client
 	Mailchimp            map[string]*mailchimp.Client
 	Manifold             map[string]*manifold.Client
 	Linear               map[string]*linear.Client
@@ -243,6 +247,7 @@ type Manager struct {
 	Mixpanel             map[string]*mixpanel.Client
 	Amplitude            map[string]*amplitude.Client
 	Fastspring           map[string]*fastspring.Client
+	TwoCheckout          map[string]*twocheckout.Client
 	Payrails             map[string]*payrails.Client
 	Clickup              map[string]*clickup.Client
 	Jobtread             map[string]*jobtread.Client
@@ -271,6 +276,7 @@ type Manager struct {
 	GoogleAnalytics      map[string]*googleanalytics.Client
 	GSC                  map[string]*gsc.Client
 	AppLovin             map[string]*applovin.Client
+	Sklik                map[string]*sklik.Client
 	Salesforce           map[string]*salesforce.Client
 	SQLite               map[string]*sqlite.Client
 	DB2                  map[string]*db2.Client
@@ -876,6 +882,29 @@ func (m *Manager) AddRedditAdsConnectionFromConfig(connection *config.RedditAdsC
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.RedditAds[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddCloudflareRadarConnectionFromConfig(connection *config.CloudflareRadarConnection) error {
+	m.mutex.Lock()
+	if m.CloudflareRadar == nil {
+		m.CloudflareRadar = make(map[string]*cloudflareradar.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := cloudflareradar.NewClient(cloudflareradar.Config{
+		APIToken: connection.APIToken,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.CloudflareRadar[connection.Name] = client
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 
@@ -2760,6 +2789,29 @@ func (m *Manager) AddAppLovinConnectionFromConfig(connection *config.AppLovinCon
 	return nil
 }
 
+func (m *Manager) AddSklikConnectionFromConfig(connection *config.SklikConnection) error {
+	m.mutex.Lock()
+	if m.Sklik == nil {
+		m.Sklik = make(map[string]*sklik.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := sklik.NewClient(sklik.Config{
+		Token:  connection.Token,
+		UserID: connection.UserID,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Sklik[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
 func (m *Manager) AddPipedriveConnectionFromConfig(connection *config.PipedriveConnection) error {
 	m.mutex.Lock()
 	if m.Pipedrive == nil {
@@ -3072,6 +3124,29 @@ func (m *Manager) AddFastspringConnectionFromConfig(connection *config.Fastsprin
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Fastspring[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
+func (m *Manager) AddTwoCheckoutConnectionFromConfig(connection *config.TwoCheckoutConnection) error {
+	m.mutex.Lock()
+	if m.TwoCheckout == nil {
+		m.TwoCheckout = make(map[string]*twocheckout.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := twocheckout.NewClient(twocheckout.Config{
+		MerchantCode: connection.MerchantCode,
+		SecretKey:    connection.SecretKey,
+		BaseURL:      connection.BaseURL,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.TwoCheckout[connection.Name] = client
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 	return nil
@@ -4278,6 +4353,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Kalshi, connectionManager.AddKalshiConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.LinkedInAds, connectionManager.AddLinkedInAdsConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.RedditAds, connectionManager.AddRedditAdsConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.CloudflareRadar, connectionManager.AddCloudflareRadarConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Mailchimp, connectionManager.AddMailchimpConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Manifold, connectionManager.AddManifoldConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.RevenueCat, connectionManager.AddRevenueCatConnectionFromConfig, &wg, &errList, &mu)
@@ -4295,6 +4371,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Mixpanel, connectionManager.AddMixpanelConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Amplitude, connectionManager.AddAmplitudeConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Fastspring, connectionManager.AddFastspringConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.TwoCheckout, connectionManager.AddTwoCheckoutConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Payrails, connectionManager.AddPayrailsConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Pinterest, connectionManager.AddPinterestConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Trustpilot, connectionManager.AddTrustpilotConnectionFromConfig, &wg, &errList, &mu)
@@ -4308,6 +4385,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.GoogleAnalytics, connectionManager.AddGoogleAnalyticsConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.GSC, connectionManager.AddGSCConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.AppLovin, connectionManager.AddAppLovinConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Sklik, connectionManager.AddSklikConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Frankfurter, connectionManager.AddFrankfurterConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Fluxx, connectionManager.AddFluxxConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Freshdesk, connectionManager.AddFreshdeskConnectionFromConfig, &wg, &errList, &mu)

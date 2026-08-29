@@ -87,6 +87,17 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "advertiser-ska-report", PrimaryKey: "day", IncKey: "day", IncStrategy: "merge"},
 	},
 
+	// Sklik - Seznam.cz paid-search advertising platform
+	"sklik": {
+		{Name: "campaigns", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "groups", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "ads", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "keywords", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "conversions", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "campaign_stats_daily", PrimaryKey: "id, date", IncKey: "date", IncStrategy: "merge"},
+		{Name: "search_queries", PrimaryKey: "query, keyword_id, date", IncKey: "date", IncStrategy: "merge"},
+	},
+
 	// AppLovin Max - Ad revenue optimization
 	"applovinmax": {
 		{Name: "user_ad_revenue", PrimaryKey: "partition_date", IncKey: "partition_date", IncStrategy: "merge"},
@@ -222,6 +233,25 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "spaces", PrimaryKey: "id", IncKey: "", IncStrategy: "merge"},
 		{Name: "lists", PrimaryKey: "id", IncKey: "", IncStrategy: "merge"},
 		{Name: "tasks", PrimaryKey: "id", IncKey: "date_updated", IncStrategy: "merge"},
+	},
+
+	// Cloudflare Radar - Internet traffic, routing, and security insights
+	"cloudflare_radar": {
+		{Name: "annotations", PrimaryKey: "id", IncKey: "startDate", IncStrategy: "merge"},
+		{Name: "autonomous_systems", PrimaryKey: "asn", IncKey: "", IncStrategy: "replace"},
+		{Name: "bgp_hijacks", PrimaryKey: "id", IncKey: "min_hijack_ts", IncStrategy: "merge"},
+		{Name: "bgp_leaks", PrimaryKey: "id", IncKey: "detected_ts", IncStrategy: "merge"},
+		{Name: "bots", PrimaryKey: "slug", IncKey: "", IncStrategy: "replace"},
+		{Name: "certificate_authorities", PrimaryKey: "sha256Fingerprint", IncKey: "", IncStrategy: "replace"},
+		{Name: "certificate_logs", PrimaryKey: "slug", IncKey: "", IncStrategy: "replace"},
+		{Name: "datasets", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "geolocations", PrimaryKey: "geoId", IncKey: "", IncStrategy: "replace"},
+		{Name: "locations", PrimaryKey: "alpha2", IncKey: "", IncStrategy: "replace"},
+		{Name: "outages", PrimaryKey: "id", IncKey: "startDate", IncStrategy: "merge"},
+		{Name: "origins", PrimaryKey: "slug", IncKey: "", IncStrategy: "replace"},
+		{Name: "tlds", PrimaryKey: "tld", IncKey: "", IncStrategy: "replace"},
+		{Name: "traffic_anomalies", PrimaryKey: "uuid", IncKey: "startDate", IncStrategy: "merge"},
+		{Name: "api:<endpoint>?<params>", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
 	},
 
 	// Couchbase - NoSQL database (user-defined tables)
@@ -395,6 +425,18 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "currencies", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
 		{Name: "latest", PrimaryKey: "date,currency_code,base_currency", IncKey: "", IncStrategy: "merge"},
 		{Name: "exchange_rates", PrimaryKey: "date,currency_code,base_currency", IncKey: "date", IncStrategy: "merge"},
+	},
+
+	// RIPEstat - Public Internet routing, registration, and RPKI data API (RIPE NCC).
+	// Endpoints are dynamic: the source_table is the RIPEstat endpoint name plus its
+	// request parameters in URL query format (e.g. "as-overview?resource=AS3333").
+	// Loads default to the replace strategy since there is no common incremental key.
+	"ripestat": {
+		{Name: "as-overview?resource=AS3333", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "announced-prefixes?resource=AS3333", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "prefix-overview?resource=193.0.20.0%2F24", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "routing-history?resource=AS3333", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "example-resources", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
 	},
 
 	// Freshdesk - Customer service platform
@@ -715,6 +757,17 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "coupons", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
 		{Name: "subscription_report", PrimaryKey: "subscription_id, transaction_date", IncKey: "sync_date", IncStrategy: "merge"},
 		{Name: "revenue_report", PrimaryKey: "order_id, transaction_date", IncKey: "syncdate", IncStrategy: "merge"},
+	},
+
+	// 2Checkout (Verifone) - Payments & Subscriptions
+	// The source filters server-side on the run interval (StartDate/EndDate for
+	// orders, ModifiedAfter for subscriptions) and serves products/promotions as
+	// snapshots, so it owns incrementality and no per-row cursor column is used.
+	"twocheckout": {
+		{Name: "orders", PrimaryKey: "ref_no, status", IncStrategy: "merge"},
+		{Name: "subscriptions", PrimaryKey: "subscription_reference", IncStrategy: "merge"},
+		{Name: "products", PrimaryKey: "product_code", IncStrategy: "replace"},
+		{Name: "promotions", PrimaryKey: "code", IncStrategy: "replace"},
 	},
 
 	// Mixpanel - Analytics

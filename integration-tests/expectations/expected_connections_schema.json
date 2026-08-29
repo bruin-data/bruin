@@ -796,6 +796,25 @@
         "api_token"
       ]
     },
+    "CloudflareRadarConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "api_token": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_token"
+      ]
+    },
     "Connections": {
       "properties": {
         "aws": {
@@ -1218,6 +1237,12 @@
           },
           "type": "array"
         },
+        "cloudflare_radar": {
+          "items": {
+            "$ref": "#/$defs/CloudflareRadarConnection"
+          },
+          "type": "array"
+        },
         "mailchimp": {
           "items": {
             "$ref": "#/$defs/MailchimpConnection"
@@ -1308,6 +1333,12 @@
           },
           "type": "array"
         },
+        "twocheckout": {
+          "items": {
+            "$ref": "#/$defs/TwoCheckoutConnection"
+          },
+          "type": "array"
+        },
         "payrails": {
           "items": {
             "$ref": "#/$defs/PayrailsConnection"
@@ -1395,6 +1426,12 @@
         "applovin": {
           "items": {
             "$ref": "#/$defs/AppLovinConnection"
+          },
+          "type": "array"
+        },
+        "sklik": {
+          "items": {
+            "$ref": "#/$defs/SklikConnection"
           },
           "type": "array"
         },
@@ -4755,6 +4792,28 @@
         "api_key"
       ]
     },
+    "SklikConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "token": {
+          "type": "string"
+        },
+        "user_id": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "token"
+      ]
+    },
     "SlackConnection": {
       "properties": {
         "name": {
@@ -5407,6 +5466,32 @@
       "required": [
         "name",
         "account_sid"
+      ]
+    },
+    "TwoCheckoutConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "merchant_code": {
+          "type": "string"
+        },
+        "secret_key": {
+          "type": "string"
+        },
+        "base_url": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "merchant_code",
+        "secret_key"
       ]
     },
     "TypeformConnection": {
