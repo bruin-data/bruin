@@ -71,6 +71,52 @@
         "api_key"
       ]
     },
+    "AbraFlexiConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "host": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "company": {
+          "type": "string"
+        },
+        "scheme": {
+          "type": "string"
+        },
+        "page_size": {
+          "type": "integer"
+        },
+        "rate_limit": {
+          "type": "number"
+        },
+        "include_expensive": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "host",
+        "username",
+        "password",
+        "company"
+      ]
+    },
     "AdaptyConnection": {
       "properties": {
         "name": {
@@ -1435,6 +1481,36 @@
           },
           "type": "array"
         },
+        "sumble": {
+          "items": {
+            "$ref": "#/$defs/SumbleConnection"
+          },
+          "type": "array"
+        },
+        "twenty": {
+          "items": {
+            "$ref": "#/$defs/TwentyConnection"
+          },
+          "type": "array"
+        },
+        "abraflexi": {
+          "items": {
+            "$ref": "#/$defs/AbraFlexiConnection"
+          },
+          "type": "array"
+        },
+        "satismeter": {
+          "items": {
+            "$ref": "#/$defs/SatisMeterConnection"
+          },
+          "type": "array"
+        },
+        "deel": {
+          "items": {
+            "$ref": "#/$defs/DeelConnection"
+          },
+          "type": "array"
+        },
         "frankfurter": {
           "items": {
             "$ref": "#/$defs/FrankfurterConnection"
@@ -1980,6 +2056,28 @@
         "region",
         "workspace",
         "execution_role"
+      ]
+    },
+    "DeelConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "environment": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
       ]
     },
     "DoceboConnection": {
@@ -4694,6 +4792,29 @@
         "domain"
       ]
     },
+    "SatisMeterConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "project_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key",
+        "project_id"
+      ]
+    },
     "SendgridConnection": {
       "properties": {
         "name": {
@@ -5215,6 +5336,25 @@
         "api_key"
       ]
     },
+    "SumbleConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
+      ]
+    },
     "SurveyMonkeyConnection": {
       "properties": {
         "name": {
@@ -5437,6 +5577,44 @@
       "required": [
         "name",
         "business_unit_id",
+        "api_key"
+      ]
+    },
+    "TwentyConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "host": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "scheme": {
+          "type": "string"
+        },
+        "base_path": {
+          "type": "string"
+        },
+        "page_size": {
+          "type": "integer"
+        },
+        "rate_limit": {
+          "type": "number"
+        },
+        "include_deleted": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "host",
         "api_key"
       ]
     },

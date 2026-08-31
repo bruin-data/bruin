@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/bruin-data/bruin/pkg/abraflexi"
 	"github.com/bruin-data/bruin/pkg/adapty"
 	"github.com/bruin-data/bruin/pkg/adjust"
 	"github.com/bruin-data/bruin/pkg/adls"
@@ -46,6 +47,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/databricks"
 	dataprocserverless "github.com/bruin-data/bruin/pkg/dataproc_serverless"
 	"github.com/bruin-data/bruin/pkg/db2"
+	"github.com/bruin-data/bruin/pkg/deel"
 	"github.com/bruin-data/bruin/pkg/docebo"
 	"github.com/bruin-data/bruin/pkg/doris"
 	"github.com/bruin-data/bruin/pkg/dremio"
@@ -124,6 +126,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/s3"
 	"github.com/bruin-data/bruin/pkg/sail"
 	"github.com/bruin-data/bruin/pkg/salesforce"
+	"github.com/bruin-data/bruin/pkg/satismeter"
 	"github.com/bruin-data/bruin/pkg/sendgrid"
 	"github.com/bruin-data/bruin/pkg/sftp"
 	"github.com/bruin-data/bruin/pkg/sharepoint"
@@ -141,12 +144,14 @@ import (
 	"github.com/bruin-data/bruin/pkg/square"
 	"github.com/bruin-data/bruin/pkg/starrocks"
 	"github.com/bruin-data/bruin/pkg/stripe"
+	"github.com/bruin-data/bruin/pkg/sumble"
 	"github.com/bruin-data/bruin/pkg/surveymonkey"
 	"github.com/bruin-data/bruin/pkg/tableau"
 	"github.com/bruin-data/bruin/pkg/tiktokads"
 	"github.com/bruin-data/bruin/pkg/trello"
 	"github.com/bruin-data/bruin/pkg/trino"
 	"github.com/bruin-data/bruin/pkg/trustpilot"
+	"github.com/bruin-data/bruin/pkg/twenty"
 	"github.com/bruin-data/bruin/pkg/twilio"
 	"github.com/bruin-data/bruin/pkg/twocheckout"
 	"github.com/bruin-data/bruin/pkg/typeform"
@@ -277,6 +282,11 @@ type Manager struct {
 	GSC                  map[string]*gsc.Client
 	AppLovin             map[string]*applovin.Client
 	Sklik                map[string]*sklik.Client
+	Sumble               map[string]*sumble.Client
+	Twenty               map[string]*twenty.Client
+	AbraFlexi            map[string]*abraflexi.Client
+	SatisMeter           map[string]*satismeter.Client
+	Deel                 map[string]*deel.Client
 	Salesforce           map[string]*salesforce.Client
 	SQLite               map[string]*sqlite.Client
 	DB2                  map[string]*db2.Client
@@ -2812,6 +2822,132 @@ func (m *Manager) AddSklikConnectionFromConfig(connection *config.SklikConnectio
 	return nil
 }
 
+func (m *Manager) AddSumbleConnectionFromConfig(connection *config.SumbleConnection) error {
+	m.mutex.Lock()
+	if m.Sumble == nil {
+		m.Sumble = make(map[string]*sumble.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := sumble.NewClient(sumble.Config{
+		APIKey: connection.APIKey,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Sumble[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddTwentyConnectionFromConfig(connection *config.TwentyConnection) error {
+	m.mutex.Lock()
+	if m.Twenty == nil {
+		m.Twenty = make(map[string]*twenty.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := twenty.NewClient(twenty.Config{
+		Host:           connection.Host,
+		APIKey:         connection.APIKey,
+		Scheme:         connection.Scheme,
+		BasePath:       connection.BasePath,
+		PageSize:       connection.PageSize,
+		RateLimit:      connection.RateLimit,
+		IncludeDeleted: connection.IncludeDeleted,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Twenty[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddAbraFlexiConnectionFromConfig(connection *config.AbraFlexiConnection) error {
+	m.mutex.Lock()
+	if m.AbraFlexi == nil {
+		m.AbraFlexi = make(map[string]*abraflexi.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := abraflexi.NewClient(abraflexi.Config{
+		Host:             connection.Host,
+		Path:             connection.Path,
+		Username:         connection.Username,
+		Password:         connection.Password,
+		Company:          connection.Company,
+		Scheme:           connection.Scheme,
+		PageSize:         connection.PageSize,
+		RateLimit:        connection.RateLimit,
+		IncludeExpensive: connection.IncludeExpensive,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.AbraFlexi[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddSatisMeterConnectionFromConfig(connection *config.SatisMeterConnection) error {
+	m.mutex.Lock()
+	if m.SatisMeter == nil {
+		m.SatisMeter = make(map[string]*satismeter.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := satismeter.NewClient(satismeter.Config{
+		APIKey:    connection.APIKey,
+		ProjectID: connection.ProjectID,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.SatisMeter[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddDeelConnectionFromConfig(connection *config.DeelConnection) error {
+	m.mutex.Lock()
+	if m.Deel == nil {
+		m.Deel = make(map[string]*deel.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := deel.NewClient(deel.Config{
+		APIKey:      connection.APIKey,
+		Environment: connection.Environment,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Deel[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
 func (m *Manager) AddPipedriveConnectionFromConfig(connection *config.PipedriveConnection) error {
 	m.mutex.Lock()
 	if m.Pipedrive == nil {
@@ -4389,6 +4525,11 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.GSC, connectionManager.AddGSCConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.AppLovin, connectionManager.AddAppLovinConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Sklik, connectionManager.AddSklikConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Sumble, connectionManager.AddSumbleConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Twenty, connectionManager.AddTwentyConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.AbraFlexi, connectionManager.AddAbraFlexiConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.SatisMeter, connectionManager.AddSatisMeterConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Deel, connectionManager.AddDeelConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Frankfurter, connectionManager.AddFrankfurterConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Fluxx, connectionManager.AddFluxxConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Freshdesk, connectionManager.AddFreshdeskConnectionFromConfig, &wg, &errList, &mu)
