@@ -605,6 +605,17 @@ func TestCloudAgentsRequestConnection_RefusesOutsideCloudChat(t *testing.T) { //
 	assert.Empty(t, path, "the API must not be called without a thread")
 }
 
+func TestCloudAgentsRequestConnection_HasNoIDFlagsToOverrideTheRunBinding(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	// The ids come only from the env; there is no --agent-id flag for an agent to
+	// pass, so it can't redirect the card to another thread.
+	t.Setenv("BRUIN_CLOUD_AGENT_ID", "7")
+	t.Setenv("BRUIN_THREAD_ID", "42")
+
+	path, _, err := runRequestConnection(t, "--reason", "x", "--agent-id", "999")
+	require.Error(t, err) // unknown flag
+	assert.Empty(t, path, "the API must not be called")
+}
+
 func TestCloudAgentsThreadsCommand_Help(t *testing.T) {
 	t.Parallel()
 	cmd := cloudAgentsThreads()

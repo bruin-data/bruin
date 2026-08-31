@@ -3864,12 +3864,8 @@ func cloudAgentsExportThread() *cli.Command {
 }
 
 // cloudAgentsRequestConnection surfaces an "add connection" card in the current
-// chat. It's internal (Hidden) and only meaningful inside a Bruin Cloud chat run:
-// the agent supplies just --reason and --connection-types, while --agent-id and
-// --thread-id come from the run's env (BRUIN_CLOUD_AGENT_ID / BRUIN_THREAD_ID) so
-// the agent can't address another thread and never handles the message pair —
-// the cloud endpoint resolves the in-flight pair itself. Absent that env it errors,
-// so a local run has nowhere to render a card and simply refuses.
+// chat. agent-id/thread-id are read straight from the run env, never flags, so an
+// agent can't point the card at another chat.
 func cloudAgentsRequestConnection() *cli.Command {
 	return &cli.Command{
 		Name:   "request-connection",
@@ -3878,16 +3874,6 @@ func cloudAgentsRequestConnection() *cli.Command {
 		Flags: []cli.Flag{
 			apiKeyFlag(),
 			outputFlag(),
-			&cli.IntFlag{
-				Name:    "agent-id",
-				Usage:   "agent ID (defaults to BRUIN_CLOUD_AGENT_ID)",
-				Sources: cli.EnvVars("BRUIN_CLOUD_AGENT_ID"),
-			},
-			&cli.IntFlag{
-				Name:    "thread-id",
-				Usage:   "thread ID (defaults to BRUIN_THREAD_ID)",
-				Sources: cli.EnvVars("BRUIN_THREAD_ID"),
-			},
 			&cli.StringFlag{
 				Name:     "reason",
 				Usage:    "short, user-facing reason the connection is needed",
@@ -3902,7 +3888,8 @@ func cloudAgentsRequestConnection() *cli.Command {
 			defer RecoverFromPanic()
 			output := c.String("output")
 
-			agentID, threadID := c.Int("agent-id"), c.Int("thread-id")
+			agentID, _ := strconv.Atoi(os.Getenv("BRUIN_CLOUD_AGENT_ID"))
+			threadID, _ := strconv.Atoi(os.Getenv("BRUIN_THREAD_ID"))
 			if agentID <= 0 || threadID <= 0 {
 				printError(errors.New("request-connection only works inside a Bruin Cloud chat run (BRUIN_CLOUD_AGENT_ID and BRUIN_THREAD_ID must be set)"), output, "Not in a cloud chat")
 				return cli.Exit("", 1)
