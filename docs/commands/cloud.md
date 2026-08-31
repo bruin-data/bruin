@@ -850,10 +850,21 @@ bruin cloud dashboards list --output json
 
 #### `get`
 
-Get a single dashboard including its published definition (`state`):
+Get a single dashboard including its definition (`state`). By default the caller
+gets the editable definition if it has edit access (the draft if one is pending,
+otherwise the published state), and the published state otherwise. The response's
+`has_draft`/`is_published` flags report which states exist, so a dashboard that
+only has a pending draft isn't mistaken for empty.
+
+Use `--state draft` or `--state published` to fetch a specific one. `published` is
+open to any viewer; `draft` needs edit access (drafts aren't exposed to non-editors).
 
 ```bash
 bruin cloud dashboards get --dashboard-id 42
+
+# Fetch a specific state explicitly
+bruin cloud dashboards get --dashboard-id 42 --state draft
+bruin cloud dashboards get --dashboard-id 42 --state published
 
 # Full payload, incl. the definition, as JSON
 bruin cloud dashboards get --dashboard-id 42 --output json
@@ -990,7 +1001,7 @@ Filters only act on `sql` widgets, so a dashboard built purely from inline data 
 
 #### `update`
 
-Update an existing dashboard's title, visibility, or definition. Only the flags you pass are changed. Like `create`, a new definition is written to the dashboard's **draft** — never published automatically; publish it from the Bruin Cloud UI. Changing visibility requires manage-access (the dashboard creator or a team admin).
+Update an existing dashboard's title, visibility, or definition. Only the flags you pass are changed. Like `create`, a new definition is written to the dashboard's **draft** — never published automatically; publish it with `dashboards publish` or from the Bruin Cloud UI. Changing visibility requires manage-access (the dashboard creator or a team admin).
 
 ```bash
 # Rename
@@ -1002,6 +1013,14 @@ bruin cloud dashboards update --dashboard-id 42 --state-file ./dashboard.json
 
 # Change visibility
 bruin cloud dashboards update --dashboard-id 42 --visibility team
+```
+
+#### `publish`
+
+Publish a dashboard's pending draft so it goes live — the same as clicking Publish in the Bruin Cloud UI. `create` and `update` only ever write the draft, so this is how a dashboard built or edited from the CLI becomes visible to the team. Requires edit rights on the dashboard; errors if there is no draft to publish, and repo (DAC) dashboards are published from the repo.
+
+```bash
+bruin cloud dashboards publish --dashboard-id 42
 ```
 
 #### `delete`

@@ -419,6 +419,20 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 			want: []string{"ingest", "--source-uri", "snowflake://uri-here", "--source-table", "source-table", "--dest-uri", "bigquery://uri-here", "--dest-table", "asset-name", "--yes", "--progress", "log"},
 		},
 		{
+			name: "destination_table overrides the asset name",
+			asset: &pipeline.Asset{
+				Name:       "asset-name",
+				Connection: "bq",
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "sf",
+					"source_table":      "source-table",
+					"destination":       "bigquery",
+					"destination_table": "profiles?identity_column=email",
+				},
+			},
+			want: []string{"ingest", "--source-uri", "snowflake://uri-here", "--source-table", "source-table", "--dest-uri", "bigquery://uri-here", "--dest-table", "profiles?identity_column=email", "--yes", "--progress", "log"},
+		},
+		{
 			name: "trim whitespace",
 			asset: &pipeline.Asset{
 				Name:       "asset-name",
@@ -699,6 +713,19 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 				},
 			},
 			want: []string{"ingest", "--source-uri", "frankfurter://", "--source-table", "latest:USD", "--dest-uri", "duckdb:////some/path", "--dest-table", "asset-name", "--yes", "--progress", "log"},
+		},
+		{
+			name: "public ripestat source via domain name (no connection defined)",
+			asset: &pipeline.Asset{
+				Name:       "asset-name",
+				Connection: "duck",
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "stat.ripe.net",
+					"source_table":      "as-overview?resource=AS3333",
+					"destination":       "duckdb",
+				},
+			},
+			want: []string{"ingest", "--source-uri", "ripestat://", "--source-table", "as-overview?resource=AS3333", "--dest-uri", "duckdb:////some/path", "--dest-table", "asset-name", "--yes", "--progress", "log"},
 		},
 	}
 	for _, tt := range tests {

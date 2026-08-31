@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.6
-FROM golang:1.25.4-trixie AS builder
+FROM golang:1.25.13-trixie AS builder
 
 # Build argument for version information
 ARG VERSION=dev

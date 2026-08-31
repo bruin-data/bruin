@@ -396,7 +396,6 @@ func runImport(ctx context.Context, log logger.Logger, pipelinePath, connectionN
 
 	totalTables := 0
 	mergedTableCount := 0
-	skippedTableCount := 0
 	var warnings []importWarning
 
 	for _, schemaObj := range summary.Schemas {
@@ -435,12 +434,16 @@ func runImport(ctx context.Context, log logger.Logger, pipelinePath, connectionN
 				existingAssets[assetName] = createdAsset
 				totalTables++
 			case ingestrImport:
-				// ingestr assets carry no columns, so there is nothing to merge
-				// into an existing asset; skip it without re-persisting to avoid
-				// a misleading "Merged" count on re-runs.
-				skippedTableCount++
+				existingAsset := existingAssets[assetName]
+				mergeImportMetadata(existingAsset, createdAsset)
+				if err = existingAsset.Persist(fs, pipelineFound); err != nil {
+					return err
+				}
+				mergedTableCount++
 			default:
 				existingAsset := existingAssets[assetName]
+
+				// Merge new columns — only add columns that don't already exist
 				existingColumns := make(map[string]pipeline.Column, len(existingAsset.Columns))
 				for _, column := range existingAsset.Columns {
 					existingColumns[column.Name] = column
@@ -450,6 +453,9 @@ func runImport(ctx context.Context, log logger.Logger, pipelinePath, connectionN
 						existingAsset.Columns = append(existingAsset.Columns, c)
 					}
 				}
+				// Refresh metadata and owner so they stay current on re-import
+				mergeImportMetadata(existingAsset, createdAsset)
+
 				err = existingAsset.Persist(fs, pipelineFound)
 				mergedTableCount++
 				if err != nil {
@@ -468,10 +474,6 @@ func runImport(ctx context.Context, log logger.Logger, pipelinePath, connectionN
 
 	fmt.Printf("Imported %d tables and Merged %d from data warehouse '%s'%s into pipeline '%s'\n",
 		totalTables, mergedTableCount, summary.Name, filterDesc, pipelinePath)
-
-	if skippedTableCount > 0 {
-		fmt.Printf("Skipped %d existing assets (already present in the pipeline)\n", skippedTableCount)
-	}
 
 	if len(warnings) > 0 {
 		fmt.Printf("\nWarnings encountered during import (%d tables affected):\n", len(warnings))
@@ -744,8 +746,9 @@ func createAsset(ctx context.Context, assetsPath, schemaName, tableName string, 
 		actualAssetType = convertSourceTypeToQueryType(assetType)
 	}
 
-	// Build enhanced description with metadata
-	description := buildEnhancedDescription(table, schemaName, tableName)
+	// Extract structured metadata from the table — metadata goes to the Metadata field
+	// so it can be refreshed on re-import, while description holds only the DB comment.
+	description, metadata, owner := buildImportMetadata(table)
 
 	// Build asset name as <schema>.<table>
 	assetName := fmt.Sprintf("%s.%s", strings.ToLower(schemaName), strings.ToLower(tableName))
@@ -759,6 +762,8 @@ func createAsset(ctx context.Context, assetsPath, schemaName, tableName string, 
 			Content: content,
 		},
 		Description: description,
+		Metadata:    metadata,
+		Owner:       owner,
 	}
 
 	// Set materialization for views
@@ -811,6 +816,7 @@ func supportsIngestrSource(conn any) bool {
 func createIngestrAsset(assetsPath, schemaName, tableName, sourceConnection, destination string, table *ansisql.DBTable) *pipeline.Asset {
 	schemaFolder := filepath.Join(assetsPath, strings.ToLower(schemaName))
 	fileName := strings.ToLower(tableName) + ".asset.yml"
+	description, metadata, owner := buildImportMetadata(table)
 
 	return &pipeline.Asset{
 		Name: fmt.Sprintf("%s.%s", strings.ToLower(schemaName), strings.ToLower(tableName)),
@@ -819,7 +825,9 @@ func createIngestrAsset(assetsPath, schemaName, tableName, sourceConnection, des
 			Name: fileName,
 			Path: filepath.Join(schemaFolder, fileName),
 		},
-		Description: buildEnhancedDescription(table, schemaName, tableName),
+		Description: description,
+		Metadata:    metadata,
+		Owner:       owner,
 		Parameters: pipeline.ParameterMap{
 			"source_connection": sourceConnection,
 			"source_table":      fmt.Sprintf("%s.%s", schemaName, tableName),
@@ -828,57 +836,58 @@ func createIngestrAsset(assetsPath, schemaName, tableName, sourceConnection, des
 	}
 }
 
-// getTableTypeDescription returns a human-readable description for the table type.
-func getTableTypeDescription(tableType ansisql.DBTableType) string {
-	if tableType == ansisql.DBTableTypeView {
-		return "view"
+// buildImportMetadata extracts structured metadata from a database table for import.
+// Returns the DB description, a metadata map for the Metadata field, and the table owner.
+// This keeps operational data (timestamps, sizes) in metadata where it can be refreshed
+// on re-import, while the description holds only the actual database comment.
+func buildImportMetadata(table *ansisql.DBTable) (string, map[string]string, string) {
+	metadata := make(map[string]string)
+
+	// Always record when this import was performed
+	metadata["extracted_at"] = time.Now().UTC().Format(time.RFC3339)
+
+	if table.CreatedAt != nil {
+		metadata["created_at"] = table.CreatedAt.UTC().Format(time.RFC3339)
 	}
-	return "table"
+
+	if table.LastModified != nil {
+		metadata["last_modified"] = table.LastModified.UTC().Format(time.RFC3339)
+	}
+
+	if table.RowCount != nil {
+		metadata["row_count"] = strconv.FormatInt(*table.RowCount, 10)
+	}
+
+	if table.SizeBytes != nil {
+		metadata["size"] = formatBytes(*table.SizeBytes)
+	}
+
+	return table.Description, metadata, table.Owner
 }
 
-// buildEnhancedDescription creates a rich description for imported assets with metadata.
-func buildEnhancedDescription(table *ansisql.DBTable, schemaName, tableName string) string {
-	var parts []string
+// importMetadataKeys are the keys written by buildImportMetadata.
+// These are cleared before re-merging so that absent metrics don't linger.
+var importMetadataKeys = []string{"extracted_at", "created_at", "last_modified", "row_count", "size"}
 
-	// Start with the original database description if available
-	if table.Description != "" {
-		parts = append(parts, table.Description)
-		parts = append(parts, "") // Empty line for separation
+// mergeImportMetadata refreshes the import-generated metadata on an existing asset.
+// It clears known import keys first (so absent metrics are removed), then copies
+// all keys from src. Any user-added custom keys on dst are preserved.
+func mergeImportMetadata(dst, src *pipeline.Asset) {
+	if src.Metadata != nil {
+		if dst.Metadata == nil {
+			dst.Metadata = make(pipeline.EmptyStringMap)
+		}
+		for _, k := range importMetadataKeys {
+			delete(dst.Metadata, k)
+		}
+		for k, v := range src.Metadata {
+			dst.Metadata[k] = v
+		}
 	}
 
-	// Add import metadata section
-	parts = append(parts, "Imported "+getTableTypeDescription(table.Type)+": "+schemaName+"."+tableName)
-
-	// Add extraction timestamp (current time)
-	extractedAt := time.Now().UTC().Format(time.RFC3339)
-	parts = append(parts, "Extracted at: "+extractedAt)
-
-	// Add creation timestamp if available
-	if table.CreatedAt != nil {
-		parts = append(parts, "Created at: "+table.CreatedAt.UTC().Format(time.RFC3339))
+	if src.Owner != "" {
+		dst.Owner = src.Owner
 	}
-
-	// Add last modification timestamp if available
-	if table.LastModified != nil {
-		parts = append(parts, "Last modified: "+table.LastModified.UTC().Format(time.RFC3339))
-	}
-
-	// Add row count if available
-	if table.RowCount != nil {
-		parts = append(parts, "Row count: "+formatNumber(*table.RowCount))
-	}
-
-	// Add size if available
-	if table.SizeBytes != nil {
-		parts = append(parts, "Size: "+formatBytes(*table.SizeBytes))
-	}
-
-	// Add owner if available
-	if table.Owner != "" {
-		parts = append(parts, "Owner: "+table.Owner)
-	}
-
-	return strings.Join(parts, "\n")
 }
 
 // formatNumber formats a number with commas for readability.

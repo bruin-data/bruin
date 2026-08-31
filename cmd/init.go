@@ -157,6 +157,51 @@ func (m model) View() string {
 	return s.String()
 }
 
+// gitignoreEscaper escapes the characters git treats as pattern syntax, so a
+// database path is matched literally.
+var gitignoreEscaper = strings.NewReplacer(`\`, `\\`, "*", `\*`, "?", `\?`, "[", `\[`, "]", `\]`)
+
+// gitignorePatternForPath turns a filesystem path into a gitignore pattern anchored
+// to the directory holding the .gitignore, so it cannot match a same-named file
+// elsewhere in the repository.
+func gitignorePatternForPath(path string) string {
+	return "/" + strings.TrimPrefix(gitignoreEscaper.Replace(filepath.ToSlash(path)), "/")
+}
+
+// ensureLocalDuckDBFilesAreIgnored gitignores every relative DuckDB path in the
+// config, and its write-ahead log. DuckDB resolves a relative path against the
+// config file, so the database lands next to .bruin.yml rather than inside the
+// pipeline folder.
+func ensureLocalDuckDBFilesAreIgnored(fs afero.Fs, bruinYmlPath string, cfg *config.Config) error {
+	gitignoreDir := filepath.Dir(bruinYmlPath)
+
+	seen := make(map[string]bool)
+	for _, env := range cfg.Environments {
+		if env.Connections == nil {
+			continue
+		}
+
+		for _, conn := range env.Connections.DuckDB {
+			// IsLocal rather than !IsAbs: it also rejects a Windows rooted path and
+			// anything escaping the directory with "..", neither of which this
+			// repository's .gitignore has any business covering.
+			path := strings.TrimSpace(conn.Path)
+			if path == "" || !filepath.IsLocal(path) || seen[path] {
+				continue
+			}
+			seen[path] = true
+
+			for _, pattern := range []string{gitignorePatternForPath(path), gitignorePatternForPath(path + ".wal")} {
+				if err := git.EnsureGivenPatternIsInGitignore(fs, gitignoreDir, pattern); err != nil {
+					return fmt.Errorf("failed to add %s: %w", pattern, err)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
 // mergeTemplateConfig merges environments and connections from a template's .bruin.yml into the central config.
 func mergeTemplateConfig(centralConfig *config.Config, templateBruinContent []byte) error {
 	var templateConfig config.Config
@@ -428,6 +473,12 @@ func Init() *cli.Command {
 					return err
 				}
 				configSummary.merged = true
+
+				// Cosmetic, so a failure here must not abort an init that has already
+				// written the config.
+				if err := ensureLocalDuckDBFilesAreIgnored(afero.NewOsFs(), bruinYmlPath, centralConfig); err != nil {
+					errorPrinter.Printf("Could not add the DuckDB database to .gitignore: %v\n", err)
+				}
 			}
 
 			err = fs2.WalkDir(templates.Templates, templateName, func(path string, d fs2.DirEntry, err error) error {

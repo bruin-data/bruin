@@ -33,6 +33,39 @@ func TestAdaptySourceTables(t *testing.T) {
 	require.True(t, hasPaywalls)
 }
 
+func TestSklikSourceTables(t *testing.T) {
+	t.Parallel()
+
+	source, err := GetSourceTables("sklik")
+	require.NoError(t, err)
+	require.Equal(t, "sklik", source.Name)
+	require.NotEmpty(t, source.Tables)
+
+	var hasCampaigns, hasCampaignStats, hasSearchQueries bool
+	for _, table := range source.Tables {
+		switch table.Name {
+		case "campaigns":
+			hasCampaigns = true
+			require.Equal(t, "id", table.PrimaryKey)
+			require.Equal(t, "merge", table.IncStrategy)
+		case "campaign_stats_daily":
+			hasCampaignStats = true
+			require.Equal(t, "id, date", table.PrimaryKey)
+			require.Equal(t, "date", table.IncKey)
+			require.Equal(t, "merge", table.IncStrategy)
+		case "search_queries":
+			hasSearchQueries = true
+			require.Equal(t, "query, keyword_id, date", table.PrimaryKey)
+			require.Equal(t, "date", table.IncKey)
+			require.Equal(t, "merge", table.IncStrategy)
+		}
+	}
+
+	require.True(t, hasCampaigns)
+	require.True(t, hasCampaignStats)
+	require.True(t, hasSearchQueries)
+}
+
 func TestCleverTapSourceTables(t *testing.T) {
 	t.Parallel()
 
@@ -130,4 +163,185 @@ func TestSharePointSourceTables(t *testing.T) {
 
 	require.True(t, hasExcelSheetExample)
 	require.True(t, hasCSVExample)
+}
+
+func TestRipestatSourceTables(t *testing.T) {
+	t.Parallel()
+
+	source, err := GetSourceTables("ripestat")
+	require.NoError(t, err)
+	require.Equal(t, "ripestat", source.Name)
+	require.NotEmpty(t, source.Tables)
+
+	var hasASOverview, hasExampleResources bool
+	for _, table := range source.Tables {
+		switch table.Name {
+		case "as-overview?resource=AS3333":
+			hasASOverview = true
+			require.Equal(t, "replace", table.IncStrategy)
+		case "example-resources":
+			hasExampleResources = true
+			require.Equal(t, "replace", table.IncStrategy)
+		}
+	}
+
+	require.True(t, hasASOverview)
+	require.True(t, hasExampleResources)
+}
+
+func TestSumbleSourceTables(t *testing.T) {
+	t.Parallel()
+
+	source, err := GetSourceTables("sumble")
+	require.NoError(t, err)
+	require.Equal(t, "sumble", source.Name)
+	require.NotEmpty(t, source.Tables)
+
+	var hasOrgLists, hasSignals, hasPrioritySignals bool
+	for _, table := range source.Tables {
+		switch table.Name {
+		case "organization_lists":
+			hasOrgLists = true
+			require.Equal(t, "id", table.PrimaryKey)
+			require.Equal(t, "replace", table.IncStrategy)
+		case "signals":
+			hasSignals = true
+			require.Equal(t, "_ingestr_id", table.PrimaryKey)
+			require.Equal(t, "date", table.IncKey)
+			require.Equal(t, "merge", table.IncStrategy)
+		case "priority_signals":
+			hasPrioritySignals = true
+			require.Equal(t, "id", table.PrimaryKey)
+			require.Equal(t, "date", table.IncKey)
+			require.Equal(t, "merge", table.IncStrategy)
+		}
+	}
+
+	require.True(t, hasOrgLists)
+	require.True(t, hasSignals)
+	require.True(t, hasPrioritySignals)
+}
+
+func TestTwentySourceTables(t *testing.T) {
+	t.Parallel()
+
+	source, err := GetSourceTables("twenty")
+	require.NoError(t, err)
+	require.Equal(t, "twenty", source.Name)
+	require.NotEmpty(t, source.Tables)
+
+	var hasPeople, hasCustom bool
+	for _, table := range source.Tables {
+		switch table.Name {
+		case "people":
+			hasPeople = true
+			require.Equal(t, "id", table.PrimaryKey)
+			require.Equal(t, "updatedAt", table.IncKey)
+			require.Equal(t, "merge", table.IncStrategy)
+		case "custom:<object_name>":
+			hasCustom = true
+			require.Equal(t, "id", table.PrimaryKey)
+			require.Equal(t, "updatedAt", table.IncKey)
+			require.Equal(t, "merge", table.IncStrategy)
+		}
+	}
+
+	require.True(t, hasPeople)
+	require.True(t, hasCustom)
+}
+
+func TestAbraFlexiSourceTables(t *testing.T) {
+	t.Parallel()
+
+	source, err := GetSourceTables("abraflexi")
+	require.NoError(t, err)
+	require.Equal(t, "abraflexi", source.Name)
+	require.NotEmpty(t, source.Tables)
+
+	var hasInvoices, hasAddressBook bool
+	for _, table := range source.Tables {
+		switch table.Name {
+		case "faktura-vydana":
+			hasInvoices = true
+			require.Equal(t, "id", table.PrimaryKey)
+			require.Equal(t, "lastUpdate", table.IncKey)
+			require.Equal(t, "merge", table.IncStrategy)
+		case "adresar":
+			hasAddressBook = true
+			require.Equal(t, "id", table.PrimaryKey)
+			require.Equal(t, "lastUpdate", table.IncKey)
+			require.Equal(t, "merge", table.IncStrategy)
+		}
+	}
+
+	require.True(t, hasInvoices)
+	require.True(t, hasAddressBook)
+}
+
+func TestSatisMeterSourceTables(t *testing.T) {
+	t.Parallel()
+
+	source, err := GetSourceTables("satismeter")
+	require.NoError(t, err)
+	require.Equal(t, "satismeter", source.Name)
+	require.NotEmpty(t, source.Tables)
+
+	var hasResponses, hasCampaigns, hasProject bool
+	for _, table := range source.Tables {
+		switch table.Name {
+		case "responses":
+			hasResponses = true
+			require.Equal(t, "id", table.PrimaryKey)
+			require.Equal(t, "created", table.IncKey)
+			require.Equal(t, "merge", table.IncStrategy)
+		case "campaigns":
+			hasCampaigns = true
+			require.Equal(t, "id", table.PrimaryKey)
+			require.Equal(t, "merge", table.IncStrategy)
+		case "project":
+			hasProject = true
+			require.Equal(t, "id", table.PrimaryKey)
+			require.Equal(t, "merge", table.IncStrategy)
+		}
+	}
+
+	require.True(t, hasResponses)
+	require.True(t, hasCampaigns)
+	require.True(t, hasProject)
+}
+
+func TestDeelSourceTables(t *testing.T) {
+	t.Parallel()
+
+	source, err := GetSourceTables("deel")
+	require.NoError(t, err)
+	require.Equal(t, "deel", source.Name)
+	require.NotEmpty(t, source.Tables)
+
+	var hasPeople, hasContractDetails, hasGrossToNet, hasCountries bool
+	for _, table := range source.Tables {
+		switch table.Name {
+		case "people":
+			hasPeople = true
+			require.Equal(t, "id", table.PrimaryKey)
+			require.Equal(t, "merge", table.IncStrategy)
+		case "contract_details":
+			hasContractDetails = true
+			require.Equal(t, "id", table.PrimaryKey)
+			require.Equal(t, "merge", table.IncStrategy)
+		case "gross_to_net_reports":
+			hasGrossToNet = true
+			require.Equal(t, "payroll_cycle_id, contract_oid", table.PrimaryKey)
+			require.Equal(t, "merge", table.IncStrategy)
+		case "countries":
+			hasCountries = true
+			require.Equal(t, "code", table.PrimaryKey)
+			require.Equal(t, "replace", table.IncStrategy)
+		}
+	}
+
+	require.True(t, hasPeople)
+	require.True(t, hasContractDetails)
+	require.True(t, hasGrossToNet)
+	require.True(t, hasCountries)
 }

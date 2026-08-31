@@ -579,6 +579,17 @@ func (c *APIClient) RunAgentQuery(ctx context.Context, agentID int, connection, 
 	return &result, nil
 }
 
+// RequestConnection posts an "add connection" card to the thread's in-flight
+// message pair. The cloud endpoint resolves the pair itself, so only the thread
+// is addressed here. connectionTypes may be empty.
+func (c *APIClient) RequestConnection(ctx context.Context, agentID, threadID int, reason string, connectionTypes []string) error {
+	body := map[string]any{"reason": reason}
+	if len(connectionTypes) > 0 {
+		body["connection_types"] = connectionTypes
+	}
+	return c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/agents/%d/threads/%d/connection-request", agentID, threadID), body, nil)
+}
+
 // CreateAgent creates a new agent. Optional fields are omitted when empty so the
 // server applies its defaults (null description/prompt, "team" visibility).
 func (c *APIClient) CreateAgent(ctx context.Context, name, description, systemPrompt, visibility string) (*Agent, error) {
@@ -908,9 +919,17 @@ func (c *APIClient) ListDashboards(ctx context.Context) ([]Dashboard, error) {
 	return resp.Dashboards, err
 }
 
-func (c *APIClient) GetDashboard(ctx context.Context, dashboardID int) (*Dashboard, error) {
+// GetDashboard returns a single dashboard. state selects which definition to
+// fetch: "draft", "published", or "" for the server default (the editable
+// definition for editors, published for viewers). The server gates "draft" to
+// callers with edit access.
+func (c *APIClient) GetDashboard(ctx context.Context, dashboardID int, state string) (*Dashboard, error) {
+	path := fmt.Sprintf("/dashboards/%d", dashboardID)
+	if state != "" {
+		path += "?state=" + url.QueryEscape(state)
+	}
 	var result Dashboard
-	err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/dashboards/%d", dashboardID), nil, &result)
+	err := c.doRequest(ctx, http.MethodGet, path, nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -958,6 +977,17 @@ func (c *APIClient) UpdateDashboard(ctx context.Context, dashboardID int, fields
 // server-side, mirroring the UI). Requires an owner or team admin.
 func (c *APIClient) DeleteDashboard(ctx context.Context, dashboardID int) error {
 	return c.doRequest(ctx, http.MethodDelete, fmt.Sprintf("/dashboards/%d", dashboardID), nil, nil)
+}
+
+// PublishDashboard promotes a dashboard's pending draft to the live state (create/update
+// only ever write the draft). Requires edit rights; errors when there's no draft.
+func (c *APIClient) PublishDashboard(ctx context.Context, dashboardID int) (*Dashboard, error) {
+	var result Dashboard
+	err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/dashboards/%d/publish", dashboardID), nil, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
 }
 
 // ListDashboardVersions returns a dashboard's version-history snapshots (newest

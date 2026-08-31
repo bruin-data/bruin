@@ -73,7 +73,8 @@ const (
 	AssetTypeGCSPrefixSensor           = AssetType("gcs.sensor.prefix")
 	AssetTypeGCSPrefixSensorLegacy     = AssetType("gcs.sensor.object_sensor_with_prefix")
 	AssetTypeGoodData                  = AssetType("gooddata")
-	AssetTypeIceberg                   = AssetType("ingestr.iceberg") // ingestr-only mapping key (not an executable asset type)
+	AssetTypeIceberg                   = AssetType("ingestr.iceberg")   // ingestr-only mapping key (not an executable asset type)
+	AssetTypeCleverTap                 = AssetType("ingestr.clevertap") // ingestr-only mapping key (not an executable asset type)
 	AssetTypeGoogleSheets              = AssetType("gsheets")
 	AssetTypeGrafana                   = AssetType("grafana")
 	AssetTypeIngestr                   = AssetType("ingestr")
@@ -228,6 +229,12 @@ var defaultMapping = map[string]string{
 	"googleanalytics":       "googleanalytics-default",
 	"gsc":                   "gsc-default",
 	"applovin":              "applovin-default",
+	"sklik":                 "sklik-default",
+	"sumble":                "sumble-default",
+	"twenty":                "twenty-default",
+	"abraflexi":             "abraflexi-default",
+	"satismeter":            "satismeter-default",
+	"deel":                  "deel-default",
 	"salesforce":            "salesforce-default",
 	"solidgate":             "solidgate-default",
 	"square":                "square-default",
@@ -283,6 +290,7 @@ var defaultMapping = map[string]string{
 	"linkedinads":           "linkedinads-default",
 	"amplitude":             "amplitude-default",
 	"fastspring":            "fastspring-default",
+	"twocheckout":           "twocheckout-default",
 	"payrails":              "payrails-default",
 	"mailchimp":             "mailchimp-default",
 	"manifold":              "manifold-default",
@@ -300,6 +308,7 @@ var defaultMapping = map[string]string{
 	"quicksight":            "quicksight-default",
 	"rabbitmq":              "rabbitmq-default",
 	"reddit_ads":            "reddit_ads-default",
+	"cloudflare_radar":      "cloudflare_radar-default",
 	"revenuecat":            "revenuecat-default",
 	"sendgrid":              "sendgrid-default",
 	"sharepoint":            "sharepoint-default",
@@ -977,6 +986,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeAthenaSource:              "athena",
 	AssetTypeDuckDBQuery:               "duckdb",
 	AssetTypeIceberg:                   "iceberg",
+	AssetTypeCleverTap:                 "clevertap",
 	AssetTypeDuckDBSeed:                "duckdb",
 	AssetTypeDuckDBQuerySensor:         "duckdb",
 	AssetTypeDuckDBSource:              "duckdb",
@@ -1063,6 +1073,7 @@ var IngestrTypeConnectionMapping = map[string]AssetType{
 	"gsheets":       AssetTypeGoogleSheets,
 	"vertica":       AssetTypeVerticaQuery,
 	"iceberg":       AssetTypeIceberg,
+	"clevertap":     AssetTypeCleverTap,
 }
 
 type SecretMapping struct {
@@ -2562,6 +2573,7 @@ func assetMainTaskIsConnectionless(assetType AssetType) bool {
 var ConnectionlessIngestrSources = map[string]string{
 	"chess.com":       "chess://",
 	"frankfurter.dev": "frankfurter://",
+	"stat.ripe.net":   "ripestat://",
 }
 
 func assetSecretConnectionNames(asset *Asset) []string {

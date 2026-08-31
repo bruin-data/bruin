@@ -334,15 +334,19 @@ type Skill struct {
 }
 
 // Dashboard represents a Bruin Cloud dashboard. State is only populated by the
-// single-dashboard endpoint and carries the published definition as raw JSON.
+// single-dashboard endpoint and carries the requested definition as raw JSON.
+// HasDraft/IsPublished are also only set by that endpoint and report which states
+// exist (so a draft-only dashboard isn't mistaken for empty).
 type Dashboard struct {
-	ID         int             `json:"id"`
-	Title      *string         `json:"title"`
-	Visibility string          `json:"visibility"`
-	UpdatedAt  *string         `json:"updated_at"`
-	URL        string          `json:"url"`
-	AgentID    *int            `json:"agent_id"`
-	State      json.RawMessage `json:"state,omitempty"`
+	ID          int             `json:"id"`
+	Title       *string         `json:"title"`
+	Visibility  string          `json:"visibility"`
+	UpdatedAt   *string         `json:"updated_at"`
+	URL         string          `json:"url"`
+	AgentID     *int            `json:"agent_id"`
+	State       json.RawMessage `json:"state,omitempty"`
+	HasDraft    *bool           `json:"has_draft,omitempty"`
+	IsPublished *bool           `json:"is_published,omitempty"`
 }
 
 // DashboardVersion is one version-history snapshot's metadata (no state blob).

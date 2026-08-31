@@ -603,6 +603,40 @@ func TestAddAgentConnection(t *testing.T) {
 	assert.Equal(t, "postgres", connections[0].Type)
 }
 
+func TestRequestConnection(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/agents/7/threads/42/connection-request", r.URL.Path)
+
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, "need snowflake", body["reason"])
+		assert.Equal(t, []any{"snowflake", "postgres"}, body["connection_types"])
+
+		w.WriteHeader(http.StatusCreated)
+		writeJSON(t, w, map[string]any{"status": "ok", "message_pair_id": 99})
+	})
+
+	require.NoError(t, client.RequestConnection(t.Context(), 7, 42, "need snowflake", []string{"snowflake", "postgres"}))
+}
+
+func TestRequestConnectionOmitsEmptyTypes(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, "just reason", body["reason"])
+		_, hasTypes := body["connection_types"]
+		assert.False(t, hasTypes) // omitted, not sent as an empty array
+
+		w.WriteHeader(http.StatusCreated)
+		writeJSON(t, w, map[string]any{"status": "ok"})
+	})
+
+	require.NoError(t, client.RequestConnection(t.Context(), 1, 2, "just reason", nil))
+}
+
 func TestListConnectionSets(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
@@ -1307,19 +1341,47 @@ func TestGetDashboard(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodGet, r.Method)
 		assert.Equal(t, "/dashboards/3", r.URL.Path)
+		// No --state: the server default, so no query param.
+		assert.Empty(t, r.URL.RawQuery)
 		w.WriteHeader(http.StatusOK)
 		writeJSON(t, w, map[string]any{
-			"id":         3,
-			"title":      "Revenue",
-			"visibility": "team",
-			"state":      map[string]any{"widgets": []any{}},
+			"id":           3,
+			"title":        "Revenue",
+			"visibility":   "team",
+			"state":        map[string]any{"widgets": []any{}},
+			"has_draft":    true,
+			"is_published": false,
 		})
 	})
 
-	dashboard, err := client.GetDashboard(t.Context(), 3)
+	dashboard, err := client.GetDashboard(t.Context(), 3, "")
 	require.NoError(t, err)
 	assert.Equal(t, 3, dashboard.ID)
 	assert.JSONEq(t, `{"widgets":[]}`, string(dashboard.State))
+	require.NotNil(t, dashboard.HasDraft)
+	assert.True(t, *dashboard.HasDraft)
+	require.NotNil(t, dashboard.IsPublished)
+	assert.False(t, *dashboard.IsPublished)
+}
+
+func TestGetDashboardWithState(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/dashboards/3", r.URL.Path)
+		// --state draft is passed through as ?state=draft.
+		assert.Equal(t, "draft", r.URL.Query().Get("state"))
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, map[string]any{
+			"id":         3,
+			"visibility": "team",
+			"state":      map[string]any{"draft": true},
+		})
+	})
+
+	dashboard, err := client.GetDashboard(t.Context(), 3, "draft")
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"draft":true}`, string(dashboard.State))
 }
 
 func TestCreateDashboard(t *testing.T) {
@@ -1403,6 +1465,23 @@ func TestDeleteDashboard(t *testing.T) {
 	})
 
 	require.NoError(t, client.DeleteDashboard(t.Context(), 9))
+}
+
+func TestPublishDashboard(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/dashboards/9/publish", r.URL.Path)
+
+		w.WriteHeader(http.StatusOK)
+		title := "Q1 Revenue"
+		writeJSON(t, w, Dashboard{ID: 9, Title: &title, Visibility: "team", URL: "https://cloud.getbruin.com/acme/dashboards/9"})
+	})
+
+	dashboard, err := client.PublishDashboard(t.Context(), 9)
+	require.NoError(t, err)
+	assert.Equal(t, 9, dashboard.ID)
+	assert.Equal(t, "Q1 Revenue", *dashboard.Title)
 }
 
 func TestListScheduledAgents(t *testing.T) {

@@ -95,6 +95,7 @@ type Connections struct {
 	AppleAds            []AppleAdsConnection            `yaml:"appleads,omitempty" json:"appleads,omitempty" mapstructure:"appleads"`
 	LinkedInAds         []LinkedInAdsConnection         `yaml:"linkedinads,omitempty" json:"linkedinads,omitempty" mapstructure:"linkedinads"`
 	RedditAds           []RedditAdsConnection           `yaml:"reddit_ads,omitempty" json:"reddit_ads,omitempty" mapstructure:"reddit_ads"`
+	CloudflareRadar     []CloudflareRadarConnection     `yaml:"cloudflare_radar,omitempty" json:"cloudflare_radar,omitempty" mapstructure:"cloudflare_radar"`
 	Mailchimp           []MailchimpConnection           `yaml:"mailchimp,omitempty" json:"mailchimp,omitempty" mapstructure:"mailchimp"`
 	Manifold            []ManifoldConnection            `yaml:"manifold,omitempty" json:"manifold,omitempty" mapstructure:"manifold"`
 	RevenueCat          []RevenueCatConnection          `yaml:"revenuecat,omitempty" json:"revenuecat,omitempty" mapstructure:"revenuecat"`
@@ -110,6 +111,7 @@ type Connections struct {
 	Mixpanel            []MixpanelConnection            `yaml:"mixpanel,omitempty" json:"mixpanel,omitempty" mapstructure:"mixpanel"`
 	Amplitude           []AmplitudeConnection           `yaml:"amplitude,omitempty" json:"amplitude,omitempty" mapstructure:"amplitude"`
 	Fastspring          []FastspringConnection          `yaml:"fastspring,omitempty" json:"fastspring,omitempty" mapstructure:"fastspring"`
+	TwoCheckout         []TwoCheckoutConnection         `yaml:"twocheckout,omitempty" json:"twocheckout,omitempty" mapstructure:"twocheckout"`
 	Payrails            []PayrailsConnection            `yaml:"payrails,omitempty" json:"payrails,omitempty" mapstructure:"payrails"`
 	Clickup             []ClickupConnection             `yaml:"clickup,omitempty" json:"clickup,omitempty" mapstructure:"clickup"`
 	Jobtread            []JobtreadConnection            `yaml:"jobtread,omitempty" json:"jobtread,omitempty" mapstructure:"jobtread"`
@@ -125,6 +127,12 @@ type Connections struct {
 	GoogleAnalytics     []GoogleAnalyticsConnection     `yaml:"googleanalytics,omitempty" json:"googleanalytics,omitempty" mapstructure:"googleanalytics"`
 	GSC                 []GSCConnection                 `yaml:"gsc,omitempty" json:"gsc,omitempty" mapstructure:"gsc"`
 	AppLovin            []AppLovinConnection            `yaml:"applovin,omitempty" json:"applovin,omitempty" mapstructure:"applovin"`
+	Sklik               []SklikConnection               `yaml:"sklik,omitempty" json:"sklik,omitempty" mapstructure:"sklik"`
+	Sumble              []SumbleConnection              `yaml:"sumble,omitempty" json:"sumble,omitempty" mapstructure:"sumble"`
+	Twenty              []TwentyConnection              `yaml:"twenty,omitempty" json:"twenty,omitempty" mapstructure:"twenty"`
+	AbraFlexi           []AbraFlexiConnection           `yaml:"abraflexi,omitempty" json:"abraflexi,omitempty" mapstructure:"abraflexi"`
+	SatisMeter          []SatisMeterConnection          `yaml:"satismeter,omitempty" json:"satismeter,omitempty" mapstructure:"satismeter"`
+	Deel                []DeelConnection                `yaml:"deel,omitempty" json:"deel,omitempty" mapstructure:"deel"`
 	Frankfurter         []FrankfurterConnection         `yaml:"frankfurter,omitempty" json:"frankfurter,omitempty" mapstructure:"frankfurter"`
 	Salesforce          []SalesforceConnection          `yaml:"salesforce,omitempty" json:"salesforce,omitempty" mapstructure:"salesforce"`
 	SQLite              []SQLiteConnection              `yaml:"sqlite,omitempty" json:"sqlite,omitempty" mapstructure:"sqlite"`
@@ -1306,6 +1314,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.RedditAds = append(env.Connections.RedditAds, conn)
+	case "cloudflare_radar":
+		var conn CloudflareRadarConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.CloudflareRadar = append(env.Connections.CloudflareRadar, conn)
 	case "revenuecat":
 		var conn RevenueCatConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1439,6 +1454,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Fastspring = append(env.Connections.Fastspring, conn)
+	case "twocheckout":
+		var conn TwoCheckoutConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.TwoCheckout = append(env.Connections.TwoCheckout, conn)
 	case "payrails":
 		var conn PayrailsConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1580,6 +1602,48 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.AppLovin = append(env.Connections.AppLovin, conn)
+	case "sklik":
+		var conn SklikConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Sklik = append(env.Connections.Sklik, conn)
+	case "sumble":
+		var conn SumbleConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Sumble = append(env.Connections.Sumble, conn)
+	case "twenty":
+		var conn TwentyConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Twenty = append(env.Connections.Twenty, conn)
+	case "abraflexi":
+		var conn AbraFlexiConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.AbraFlexi = append(env.Connections.AbraFlexi, conn)
+	case "satismeter":
+		var conn SatisMeterConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.SatisMeter = append(env.Connections.SatisMeter, conn)
+	case "deel":
+		var conn DeelConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Deel = append(env.Connections.Deel, conn)
 	case "salesforce":
 		var conn SalesforceConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -2060,6 +2124,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.LinkedInAds = removeConnection(env.Connections.LinkedInAds, connectionName)
 	case "reddit_ads":
 		env.Connections.RedditAds = removeConnection(env.Connections.RedditAds, connectionName)
+	case "cloudflare_radar":
+		env.Connections.CloudflareRadar = removeConnection(env.Connections.CloudflareRadar, connectionName)
 	case "linear":
 		env.Connections.Linear = removeConnection(env.Connections.Linear, connectionName)
 	case "gcs":
@@ -2096,6 +2162,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Amplitude = removeConnection(env.Connections.Amplitude, connectionName)
 	case "fastspring":
 		env.Connections.Fastspring = removeConnection(env.Connections.Fastspring, connectionName)
+	case "twocheckout":
+		env.Connections.TwoCheckout = removeConnection(env.Connections.TwoCheckout, connectionName)
 	case "payrails":
 		env.Connections.Payrails = removeConnection(env.Connections.Payrails, connectionName)
 	case "pinterest":
@@ -2130,6 +2198,18 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.GSC = removeConnection(env.Connections.GSC, connectionName)
 	case "applovin":
 		env.Connections.AppLovin = removeConnection(env.Connections.AppLovin, connectionName)
+	case "sklik":
+		env.Connections.Sklik = removeConnection(env.Connections.Sklik, connectionName)
+	case "sumble":
+		env.Connections.Sumble = removeConnection(env.Connections.Sumble, connectionName)
+	case "twenty":
+		env.Connections.Twenty = removeConnection(env.Connections.Twenty, connectionName)
+	case "abraflexi":
+		env.Connections.AbraFlexi = removeConnection(env.Connections.AbraFlexi, connectionName)
+	case "satismeter":
+		env.Connections.SatisMeter = removeConnection(env.Connections.SatisMeter, connectionName)
+	case "deel":
+		env.Connections.Deel = removeConnection(env.Connections.Deel, connectionName)
 	case "freshdesk":
 		env.Connections.Freshdesk = removeConnection(env.Connections.Freshdesk, connectionName)
 	case "okta":
@@ -2382,6 +2462,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.AppleAds, source.AppleAds)
 	mergeConnectionList(&c.LinkedInAds, source.LinkedInAds)
 	mergeConnectionList(&c.RedditAds, source.RedditAds)
+	mergeConnectionList(&c.CloudflareRadar, source.CloudflareRadar)
 	mergeConnectionList(&c.Mailchimp, source.Mailchimp)
 	mergeConnectionList(&c.Manifold, source.Manifold)
 	mergeConnectionList(&c.RevenueCat, source.RevenueCat)
@@ -2397,6 +2478,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Mixpanel, source.Mixpanel)
 	mergeConnectionList(&c.Amplitude, source.Amplitude)
 	mergeConnectionList(&c.Fastspring, source.Fastspring)
+	mergeConnectionList(&c.TwoCheckout, source.TwoCheckout)
 	mergeConnectionList(&c.Payrails, source.Payrails)
 	mergeConnectionList(&c.Clickup, source.Clickup)
 	mergeConnectionList(&c.Jobtread, source.Jobtread)
@@ -2412,6 +2494,12 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.GoogleAnalytics, source.GoogleAnalytics)
 	mergeConnectionList(&c.GSC, source.GSC)
 	mergeConnectionList(&c.AppLovin, source.AppLovin)
+	mergeConnectionList(&c.Sklik, source.Sklik)
+	mergeConnectionList(&c.Sumble, source.Sumble)
+	mergeConnectionList(&c.Twenty, source.Twenty)
+	mergeConnectionList(&c.AbraFlexi, source.AbraFlexi)
+	mergeConnectionList(&c.SatisMeter, source.SatisMeter)
+	mergeConnectionList(&c.Deel, source.Deel)
 	mergeConnectionList(&c.Frankfurter, source.Frankfurter)
 	mergeConnectionList(&c.Salesforce, source.Salesforce)
 	mergeConnectionList(&c.SQLite, source.SQLite)

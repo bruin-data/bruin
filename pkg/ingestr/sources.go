@@ -87,6 +87,156 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "advertiser-ska-report", PrimaryKey: "day", IncKey: "day", IncStrategy: "merge"},
 	},
 
+	// Sklik - Seznam.cz paid-search advertising platform
+	"sklik": {
+		{Name: "campaigns", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "groups", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "ads", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "keywords", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "conversions", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "campaign_stats_daily", PrimaryKey: "id, date", IncKey: "date", IncStrategy: "merge"},
+		{Name: "search_queries", PrimaryKey: "query, keyword_id, date", IncKey: "date", IncStrategy: "merge"},
+	},
+
+	// Sumble - Organization, people, and intent-signal data for go-to-market teams
+	"sumble": {
+		{Name: "organization_lists", PrimaryKey: "id", IncStrategy: "replace"},
+		{Name: "organization_list_organizations", PrimaryKey: "_ingestr_id", IncStrategy: "replace"},
+		{Name: "contact_lists", PrimaryKey: "id", IncStrategy: "replace"},
+		{Name: "contact_list_people", PrimaryKey: "_ingestr_id", IncStrategy: "replace"},
+		{Name: "signals", PrimaryKey: "_ingestr_id", IncKey: "date", IncStrategy: "merge"},
+		{Name: "priority_signals", PrimaryKey: "id", IncKey: "date", IncStrategy: "merge"},
+		{Name: "signal_configs", PrimaryKey: "id", IncStrategy: "replace"},
+	},
+
+	// Twenty CRM - Open-source CRM
+	"twenty": {
+		{Name: "companies", PrimaryKey: "id", IncKey: "updatedAt", IncStrategy: "merge"},
+		{Name: "notes", PrimaryKey: "id", IncKey: "updatedAt", IncStrategy: "merge"},
+		{Name: "opportunities", PrimaryKey: "id", IncKey: "updatedAt", IncStrategy: "merge"},
+		{Name: "people", PrimaryKey: "id", IncKey: "updatedAt", IncStrategy: "merge"},
+		{Name: "tasks", PrimaryKey: "id", IncKey: "updatedAt", IncStrategy: "merge"},
+		{Name: "workspaceMembers", PrimaryKey: "id", IncKey: "updatedAt", IncStrategy: "merge"},
+		{Name: "custom:<object_name>", PrimaryKey: "id", IncKey: "updatedAt", IncStrategy: "merge"},
+	},
+
+	// ABRA Flexi (Flexibee) - Czech cloud accounting and ERP system. Schema-driven:
+	// any evidence path in the company is a valid source table; these are common ones.
+	"abraflexi": {
+		{Name: "faktura-vydana", PrimaryKey: "id", IncKey: "lastUpdate", IncStrategy: "merge"},
+		{Name: "faktura-vydana-polozka", PrimaryKey: "id", IncKey: "lastUpdate", IncStrategy: "merge"},
+		{Name: "faktura-prijata", PrimaryKey: "id", IncKey: "lastUpdate", IncStrategy: "merge"},
+		{Name: "faktura-prijata-polozka", PrimaryKey: "id", IncKey: "lastUpdate", IncStrategy: "merge"},
+		{Name: "banka", PrimaryKey: "id", IncKey: "lastUpdate", IncStrategy: "merge"},
+		{Name: "banka-polozka", PrimaryKey: "id", IncKey: "lastUpdate", IncStrategy: "merge"},
+		{Name: "pokladni-pohyb", PrimaryKey: "id", IncKey: "lastUpdate", IncStrategy: "merge"},
+		{Name: "interni-doklad", PrimaryKey: "id", IncKey: "lastUpdate", IncStrategy: "merge"},
+		{Name: "interni-doklad-polozka", PrimaryKey: "id", IncKey: "lastUpdate", IncStrategy: "merge"},
+		{Name: "adresar", PrimaryKey: "id", IncKey: "lastUpdate", IncStrategy: "merge"},
+		{Name: "pohledavka", PrimaryKey: "id", IncKey: "lastUpdate", IncStrategy: "merge"},
+		{Name: "zavazek", PrimaryKey: "id", IncKey: "lastUpdate", IncStrategy: "merge"},
+		{Name: "ucetni-osnova", PrimaryKey: "id", IncKey: "lastUpdate", IncStrategy: "merge"},
+		{Name: "stredisko", PrimaryKey: "id", IncKey: "lastUpdate", IncStrategy: "merge"},
+	},
+
+	// SatisMeter - In-app NPS, CSAT and CES survey responses
+	"satismeter": {
+		{Name: "responses", PrimaryKey: "id", IncKey: "created", IncStrategy: "merge"},
+		{Name: "campaigns", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "project", PrimaryKey: "id", IncStrategy: "merge"},
+	},
+
+	// Deel - Global workforce platform (HR, payroll, contracts, recruiting, IT, immigration)
+	"deel": {
+		// Organization and workforce
+		{Name: "organizations", PrimaryKey: "id", IncStrategy: "replace"},
+		{Name: "legal_entities", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "people", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "people_details", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "people_personal", PrimaryKey: "person_id", IncStrategy: "replace"},
+		{Name: "people_positions", PrimaryKey: "person_id, id", IncStrategy: "replace"},
+		{Name: "people_worker_relations", PrimaryKey: "person_id, id", IncStrategy: "replace"},
+		{Name: "person_custom_field_values", PrimaryKey: "person_id, id", IncStrategy: "replace"},
+		{Name: "people_custom_fields", PrimaryKey: "id", IncStrategy: "replace"},
+		{Name: "departments", PrimaryKey: "id", IncStrategy: "replace"},
+		{Name: "teams", PrimaryKey: "id", IncStrategy: "replace"},
+		{Name: "groups", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "roles", PrimaryKey: "id", IncStrategy: "replace"},
+		{Name: "working_locations", PrimaryKey: "id", IncStrategy: "replace"},
+		{Name: "managers", PrimaryKey: "id", IncStrategy: "replace"},
+		{Name: "onboarding", PrimaryKey: "unique_id", IncStrategy: "replace"},
+		{Name: "offboarding", PrimaryKey: "unique_id", IncStrategy: "replace"},
+		{Name: "organization_tasks", PrimaryKey: "id", IncStrategy: "replace"},
+		{Name: "organization_structures", PrimaryKey: "id", IncStrategy: "replace"},
+		{Name: "worker_relation_types", PrimaryKey: "id", IncStrategy: "replace"},
+		{Name: "industries", PrimaryKey: "id", IncStrategy: "merge"},
+		// Contract, time, payroll, and accounting
+		{Name: "contracts", PrimaryKey: "id", IncStrategy: "replace"},
+		{Name: "contract_details", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "contract_templates", PrimaryKey: "id", IncStrategy: "replace"},
+		{Name: "contract_termination_reasons", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "contract_custom_fields", PrimaryKey: "id", IncStrategy: "replace"},
+		{Name: "contract_custom_field_values", PrimaryKey: "contract_id, id", IncStrategy: "replace"},
+		{Name: "contract_adjustments", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "contract_amendments", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "contract_ic_invoicing_taxes", PrimaryKey: "contract_id", IncStrategy: "replace"},
+		{Name: "contract_milestones", PrimaryKey: "id", IncStrategy: "replace"},
+		{Name: "contract_off_cycle_payments", PrimaryKey: "id", IncStrategy: "replace"},
+		{Name: "contract_payment_cycles", PrimaryKey: "contract_id, id", IncStrategy: "replace"},
+		{Name: "contract_tasks", PrimaryKey: "contract_id, id", IncStrategy: "replace"},
+		{Name: "eor_benefits", PrimaryKey: "contract_id, id", IncStrategy: "replace"},
+		{Name: "eor_amendments", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "eor_documents", PrimaryKey: "contract_id, document_type", IncStrategy: "replace"},
+		{Name: "timesheets", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "hourly_report_root_presets", PrimaryKey: "id", IncStrategy: "replace"},
+		{Name: "adjustment_categories", PrimaryKey: "id", IncStrategy: "replace"},
+		{Name: "invoice_adjustments", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "invoices", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "deel_invoices", PrimaryKey: "id", IncStrategy: "replace"},
+		{Name: "payments", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "refund_statements", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "time_offs", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "shift_rates", PrimaryKey: "external_id", IncStrategy: "merge"},
+		{Name: "shifts", PrimaryKey: "external_id", IncStrategy: "merge"},
+		{Name: "legal_entity_cost_centers", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "payroll_cycles", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "gross_to_net_reports", PrimaryKey: "payroll_cycle_id, contract_oid", IncStrategy: "merge"},
+		{Name: "gp_payroll_events", PrimaryKey: "id", IncStrategy: "replace"},
+		{Name: "gp_gross_to_net_reports", PrimaryKey: "payroll_event_id, contractId", IncStrategy: "merge"},
+		// Recruiting, IT, immigration, and webhooks
+		{Name: "ats_application_sources", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "ats_applications", PrimaryKey: "id", IncStrategy: "replace"},
+		{Name: "ats_candidates", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "ats_departments", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "ats_employment_types", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "ats_hiring_members", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "ats_job_boards", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "ats_jobs", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "ats_locations", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "ats_offers", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "ats_candidate_archivation_reasons", PrimaryKey: "id", IncStrategy: "replace"},
+		{Name: "ats_offer_rejection_reasons", PrimaryKey: "id", IncStrategy: "replace"},
+		{Name: "ats_job_closure_reasons", PrimaryKey: "id", IncStrategy: "replace"},
+		{Name: "ats_email_templates", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "ats_interviews", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "ats_job_postings", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "ats_openings", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "ats_tags", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "ats_teams", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "it_assets", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "it_orders", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "it_policies", PrimaryKey: "id", IncStrategy: "replace"},
+		{Name: "immigration_cases", PrimaryKey: "id", IncStrategy: "merge"},
+		{Name: "webhooks", PrimaryKey: "id", IncStrategy: "replace"},
+		{Name: "webhook_event_types", PrimaryKey: "id", IncStrategy: "merge"},
+		// Lookup
+		{Name: "countries", PrimaryKey: "code", IncStrategy: "replace"},
+		{Name: "currencies", PrimaryKey: "code", IncStrategy: "replace"},
+		{Name: "job_titles", PrimaryKey: "id", IncStrategy: "replace"},
+		{Name: "seniorities", PrimaryKey: "id", IncStrategy: "replace"},
+		{Name: "time_off_types", PrimaryKey: "name", IncStrategy: "replace"},
+	},
+
 	// AppLovin Max - Ad revenue optimization
 	"applovinmax": {
 		{Name: "user_ad_revenue", PrimaryKey: "partition_date", IncKey: "partition_date", IncStrategy: "merge"},
@@ -222,6 +372,25 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "spaces", PrimaryKey: "id", IncKey: "", IncStrategy: "merge"},
 		{Name: "lists", PrimaryKey: "id", IncKey: "", IncStrategy: "merge"},
 		{Name: "tasks", PrimaryKey: "id", IncKey: "date_updated", IncStrategy: "merge"},
+	},
+
+	// Cloudflare Radar - Internet traffic, routing, and security insights
+	"cloudflare_radar": {
+		{Name: "annotations", PrimaryKey: "id", IncKey: "startDate", IncStrategy: "merge"},
+		{Name: "autonomous_systems", PrimaryKey: "asn", IncKey: "", IncStrategy: "replace"},
+		{Name: "bgp_hijacks", PrimaryKey: "id", IncKey: "min_hijack_ts", IncStrategy: "merge"},
+		{Name: "bgp_leaks", PrimaryKey: "id", IncKey: "detected_ts", IncStrategy: "merge"},
+		{Name: "bots", PrimaryKey: "slug", IncKey: "", IncStrategy: "replace"},
+		{Name: "certificate_authorities", PrimaryKey: "sha256Fingerprint", IncKey: "", IncStrategy: "replace"},
+		{Name: "certificate_logs", PrimaryKey: "slug", IncKey: "", IncStrategy: "replace"},
+		{Name: "datasets", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "geolocations", PrimaryKey: "geoId", IncKey: "", IncStrategy: "replace"},
+		{Name: "locations", PrimaryKey: "alpha2", IncKey: "", IncStrategy: "replace"},
+		{Name: "outages", PrimaryKey: "id", IncKey: "startDate", IncStrategy: "merge"},
+		{Name: "origins", PrimaryKey: "slug", IncKey: "", IncStrategy: "replace"},
+		{Name: "tlds", PrimaryKey: "tld", IncKey: "", IncStrategy: "replace"},
+		{Name: "traffic_anomalies", PrimaryKey: "uuid", IncKey: "startDate", IncStrategy: "merge"},
+		{Name: "api:<endpoint>?<params>", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
 	},
 
 	// Couchbase - NoSQL database (user-defined tables)
@@ -395,6 +564,18 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "currencies", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
 		{Name: "latest", PrimaryKey: "date,currency_code,base_currency", IncKey: "", IncStrategy: "merge"},
 		{Name: "exchange_rates", PrimaryKey: "date,currency_code,base_currency", IncKey: "date", IncStrategy: "merge"},
+	},
+
+	// RIPEstat - Public Internet routing, registration, and RPKI data API (RIPE NCC).
+	// Endpoints are dynamic: the source_table is the RIPEstat endpoint name plus its
+	// request parameters in URL query format (e.g. "as-overview?resource=AS3333").
+	// Loads default to the replace strategy since there is no common incremental key.
+	"ripestat": {
+		{Name: "as-overview?resource=AS3333", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "announced-prefixes?resource=AS3333", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "prefix-overview?resource=193.0.20.0%2F24", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "routing-history?resource=AS3333", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "example-resources", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
 	},
 
 	// Freshdesk - Customer service platform
@@ -715,6 +896,17 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "coupons", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
 		{Name: "subscription_report", PrimaryKey: "subscription_id, transaction_date", IncKey: "sync_date", IncStrategy: "merge"},
 		{Name: "revenue_report", PrimaryKey: "order_id, transaction_date", IncKey: "syncdate", IncStrategy: "merge"},
+	},
+
+	// 2Checkout (Verifone) - Payments & Subscriptions
+	// The source filters server-side on the run interval (StartDate/EndDate for
+	// orders, ModifiedAfter for subscriptions) and serves products/promotions as
+	// snapshots, so it owns incrementality and no per-row cursor column is used.
+	"twocheckout": {
+		{Name: "orders", PrimaryKey: "ref_no, status", IncStrategy: "merge"},
+		{Name: "subscriptions", PrimaryKey: "subscription_reference", IncStrategy: "merge"},
+		{Name: "products", PrimaryKey: "product_code", IncStrategy: "replace"},
+		{Name: "promotions", PrimaryKey: "code", IncStrategy: "replace"},
 	},
 
 	// Mixpanel - Analytics

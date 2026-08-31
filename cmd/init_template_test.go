@@ -7,10 +7,14 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/config"
+	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/templates"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 )
 
@@ -670,4 +674,278 @@ func TestGoogleWebAnalyticsTemplateShipsDashboards(t *testing.T) {
 			require.Regexp(t, `^web_analytics_(staging|reports)\.`, ref[1], name)
 		}
 	}
+}
+
+func TestInitAcademySqlBeginnerCopiesStarterTemplate(t *testing.T) {
+	targetRoot := t.TempDir()
+	t.Chdir(targetRoot)
+
+	gitInit := exec.CommandContext(t.Context(), "git", "init")
+	gitInit.Dir = targetRoot
+	out, err := gitInit.CombinedOutput()
+	require.NoError(t, err, string(out))
+
+	err = Init().Run(t.Context(), []string{"init", "academy-sql-beginner"})
+	require.NoError(t, err)
+
+	pipelineRoot := filepath.Join(targetRoot, "academy-sql-beginner")
+	require.FileExists(t, filepath.Join(pipelineRoot, "README.md"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "AGENTS.md"))
+	require.FileExists(t, filepath.Join(pipelineRoot, ".gitignore"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "docs", "schema.md"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "docs", "data-design.md"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "docs", "known-defects.md"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "docs", "writing-an-asset.md"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "queries", "01-first-look.sql"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "queries", "anchors.md"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "queries", "audit-template.md"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "queries", "audit-lab", "README.md"))
+	// The answer key must NOT ship: it is underscore-prefixed so Go's embed skips it.
+	require.NoFileExists(t, filepath.Join(pipelineRoot, "queries", "audit-lab", "answer-key.md"))
+	require.NoFileExists(t, filepath.Join(pipelineRoot, "queries", "audit-lab", "_answer-key.md"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "queries", "audit-lab", "findings-template.md"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "queries", "audit-lab", "q01.sql"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "queries", "audit-lab", "q10.sql"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "pipeline", "pipeline.yml"))
+	// Single-segment names put the tables in DuckDB's default schema, so a plain
+	// SHOW TABLES finds them.
+	require.FileExists(t, filepath.Join(pipelineRoot, "pipeline", "assets", "orders.sql"))
+	require.NoDirExists(t, filepath.Join(pipelineRoot, "pipeline", "assets", "generate"))
+
+	pipeline, err := os.ReadFile(filepath.Join(pipelineRoot, "pipeline", "pipeline.yml"))
+	require.NoError(t, err)
+	require.Contains(t, string(pipeline), "name: retail")
+	require.Contains(t, string(pipeline), "duckdb: duckdb-default")
+
+	// init keeps default_environment: default, so the template's primary
+	// environment has to carry that name.
+	configContent, err := os.ReadFile(filepath.Join(targetRoot, ".bruin.yml"))
+	require.NoError(t, err)
+	require.Contains(t, string(configContent), "name: duckdb-default")
+	require.Contains(t, string(configContent), "path: academy.duckdb")
+
+	// The database lands next to .bruin.yml, above the pipeline folder and so
+	// outside the .gitignore the template ships.
+	gitignore, err := os.ReadFile(filepath.Join(targetRoot, ".gitignore"))
+	require.NoError(t, err)
+	require.Contains(t, string(gitignore), "/academy.duckdb")
+	require.Contains(t, string(gitignore), "/academy.duckdb.wal")
+}
+
+func TestAcademySqlBeginnerTemplateIsDeterministicByConstruction(t *testing.T) {
+	t.Parallel()
+
+	expectedGenerators := []string{
+		"dates.sql",
+		"stores.sql",
+		"products.sql",
+		"customers.sql",
+		"orders.sql",
+		"order_items.sql",
+	}
+
+	var actualGenerators []string
+	err := iofs.WalkDir(templates.Templates, "academy-sql-beginner/pipeline/assets", func(path string, entry iofs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		actualGenerators = append(actualGenerators, strings.TrimPrefix(path, "academy-sql-beginner/pipeline/assets/"))
+		return nil
+	})
+	require.NoError(t, err)
+	require.ElementsMatch(t, expectedGenerators, actualGenerators)
+
+	// Comments are stripped first: the generators name these functions in prose to
+	// warn against them.
+	forbidden := []string{"random(", "hash(", "md5(", "now(", "current_date", "current_timestamp", "today("}
+	for _, name := range expectedGenerators {
+		content, err := templates.Templates.ReadFile("academy-sql-beginner/pipeline/assets/" + name)
+		require.NoError(t, err)
+		sql := strings.ToLower(stripSQLCommentsForTest(string(content)))
+		for _, token := range forbidden {
+			require.NotContainsf(t, sql, token, "generator %s must not use %q (see docs/data-design.md)", name, token)
+		}
+	}
+
+	// Read from disk, not the embedded FS: the key deliberately does not ship.
+	answerKey, err := os.ReadFile(filepath.Join("..", "templates", "academy-sql-beginner", "queries", "audit-lab", "_answer-key.md"))
+	require.NoError(t, err)
+	require.Contains(t, string(answerKey), "six are wrong (q02, q04, q05, q07, q08, q09)")
+
+	_, embedded := templates.Templates.ReadFile("academy-sql-beginner/queries/audit-lab/_answer-key.md")
+	require.Error(t, embedded, "the answer key must not be embedded - a student would find it with a repo-wide search")
+}
+
+// stripSQLCommentsForTest removes /* ... */ blocks and -- line comments.
+func stripSQLCommentsForTest(sql string) string {
+	for {
+		start := strings.Index(sql, "/*")
+		if start == -1 {
+			break
+		}
+		rest := sql[start+2:]
+		end := strings.Index(rest, "*/")
+		if end == -1 {
+			sql = sql[:start]
+			break
+		}
+		sql = sql[:start] + rest[end+2:]
+	}
+
+	var b strings.Builder
+	for _, line := range strings.Split(sql, "\n") {
+		if idx := strings.Index(line, "--"); idx != -1 {
+			line = line[:idx]
+		}
+		b.WriteString(line)
+		b.WriteString("\n")
+	}
+	return b.String()
+}
+
+// TestAcademySqlBeginnerGeneratorsAreDeterministic generates the six tables into two
+// fresh databases and compares a checksum of each. The courses hard-code roughly
+// fifty numbers taken from this data, so nondeterminism breaks published pages.
+func TestAcademySqlBeginnerGeneratorsAreDeterministic(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping on Windows due to DuckDB file locking")
+	}
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	if err := duck.EnsureADBCDriverInstalled(t.Context()); err != nil {
+		t.Skipf("skipping test: ADBC DuckDB driver not available: %v", err)
+	}
+
+	first := academySQLBeginnerChecksums(t, filepath.Join(t.TempDir(), "first.duckdb"))
+	second := academySQLBeginnerChecksums(t, filepath.Join(t.TempDir(), "second.duckdb"))
+
+	require.Equal(t, first, second,
+		"the generators produced different data on two runs; something nondeterministic crept in - see templates/academy-sql-beginner/docs/data-design.md")
+
+	// Row counts the courses and the audit-lab answer key quote directly.
+	require.Equal(t, map[string]int{
+		"dates":       1096,
+		"stores":      6,
+		"products":    60,
+		"customers":   510,
+		"orders":      1200,
+		"order_items": 2880,
+	}, academySQLBeginnerRowCounts(t, first))
+}
+
+// academySQLBeginnerGeneratorOrder is dependency order: order_items reads from
+// both orders and products.
+var academySQLBeginnerGeneratorOrder = []string{"dates", "stores", "products", "customers", "orders", "order_items"}
+
+type academyTableSnapshot struct {
+	checksum string
+	rowCount int
+}
+
+func academySQLBeginnerChecksums(t *testing.T, dbPath string) map[string]academyTableSnapshot {
+	t.Helper()
+
+	db := openTestDuckDB(t, dbPath)
+	defer db.Close()
+
+	for _, name := range academySQLBeginnerGeneratorOrder {
+		raw, err := templates.Templates.ReadFile("academy-sql-beginner/pipeline/assets/" + name + ".sql")
+		require.NoError(t, err)
+
+		body := stripBruinHeaderForTest(string(raw))
+		require.NotEmpty(t, strings.TrimSpace(body), "generator %s has no SQL body", name)
+
+		execTestDuckDB(t, db, "CREATE OR REPLACE TABLE "+name+" AS "+strings.TrimSuffix(strings.TrimSpace(body), ";"))
+	}
+
+	snapshots := make(map[string]academyTableSnapshot, len(academySQLBeginnerGeneratorOrder))
+	for _, name := range academySQLBeginnerGeneratorOrder {
+		// Cast the whole row to text and hash the sorted concatenation, so the
+		// checksum covers every column and is independent of storage order.
+		row := db.QueryRowContext(t.Context(),
+			"SELECT md5(string_agg(row_text, '|' ORDER BY row_text)), COUNT(*) "+
+				"FROM (SELECT CAST(t AS VARCHAR) AS row_text FROM "+name+" AS t)")
+
+		var snapshot academyTableSnapshot
+		require.NoError(t, row.Scan(&snapshot.checksum, &snapshot.rowCount))
+		snapshots[name] = snapshot
+	}
+
+	return snapshots
+}
+
+func academySQLBeginnerRowCounts(t *testing.T, snapshots map[string]academyTableSnapshot) map[string]int {
+	t.Helper()
+
+	counts := make(map[string]int, len(snapshots))
+	for name, snapshot := range snapshots {
+		counts[name] = snapshot.rowCount
+	}
+	return counts
+}
+
+// stripBruinHeaderForTest strips the @bruin metadata block, leaving executable SQL.
+func stripBruinHeaderForTest(sql string) string {
+	start := strings.Index(sql, "/* @bruin")
+	if start == -1 {
+		return sql
+	}
+	end := strings.Index(sql[start:], "@bruin */")
+	if end == -1 {
+		return sql
+	}
+	return sql[start+end+len("@bruin */"):]
+}
+
+func TestGitignorePatternForPath(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name string
+		path string
+		want string
+	}{
+		{"anchors a bare filename", "academy.duckdb", "/academy.duckdb"},
+		{"anchors a nested path", "data/academy.duckdb", "/data/academy.duckdb"},
+		{"keeps a single anchor", "/data/academy.duckdb", "/data/academy.duckdb"},
+		{"normalises native separators", filepath.Join("data", "academy.duckdb"), "/data/academy.duckdb"},
+		{"escapes glob metacharacters", "my[test]*.duckdb", `/my\[test\]\*.duckdb`},
+		{"escapes a question mark", "why?.duckdb", `/why\?.duckdb`},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			require.Equal(t, tt.want, gitignorePatternForPath(tt.path))
+		})
+	}
+}
+
+func TestEnsureLocalDuckDBFilesAreIgnoredSkipsAbsoluteAndEmptyPaths(t *testing.T) {
+	t.Parallel()
+
+	fs := afero.NewMemMapFs()
+	cfg := &config.Config{Environments: map[string]config.Environment{
+		"default": {Connections: &config.Connections{DuckDB: []config.DuckDBConnection{
+			{ConnectionMetadata: config.ConnectionMetadata{Name: "relative"}, Path: "academy.duckdb"},
+			{ConnectionMetadata: config.ConnectionMetadata{Name: "rooted"}, Path: filepath.Join(string(filepath.Separator), "tmp", "elsewhere.duckdb")},
+			{ConnectionMetadata: config.ConnectionMetadata{Name: "escaping"}, Path: filepath.Join("..", "outside.duckdb")},
+			{ConnectionMetadata: config.ConnectionMetadata{Name: "blank"}, Path: "   "},
+		}}},
+	}}
+
+	// Kept at the root so the assertion does not depend on how the gitignore
+	// helper joins a directory, which differs by separator on Windows.
+	require.NoError(t, ensureLocalDuckDBFilesAreIgnored(fs, ".bruin.yml", cfg))
+
+	written, err := afero.ReadFile(fs, ".gitignore")
+	require.NoError(t, err)
+	require.Contains(t, string(written), "/academy.duckdb")
+	require.Contains(t, string(written), "/academy.duckdb.wal")
+	// Neither a rooted path nor one escaping the directory is this repository's to
+	// ignore. filepath.IsAbs would have let the Windows form of both through.
+	require.NotContains(t, string(written), "elsewhere.duckdb")
+	require.NotContains(t, string(written), "outside.duckdb")
 }

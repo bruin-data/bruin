@@ -411,6 +411,10 @@ environments:
         - name: "fastspring-1"
           username: "user-123"
           password: "pass-123"
+      twocheckout:
+        - name: "twocheckout-1"
+          merchant_code: "merchant-123"
+          secret_key: "secret-123"
       payrails:
         - name: "payrails-1"
           client_id: "client-123"
@@ -457,6 +461,30 @@ environments:
       applovin:
         - name: "applovin-1"
           api_key: "key-123"
+      sklik:
+        - name: "sklik-1"
+          token: "token-123"
+      sumble:
+        - name: "sumble-1"
+          api_key: "key-123"
+      twenty:
+        - name: "twenty-1"
+          host: "api.twenty.com"
+          api_key: "key-123"
+      abraflexi:
+        - name: "abraflexi-1"
+          host: "example.flexibee.eu"
+          username: "api-user"
+          password: "secret"
+          company: "acme_s_r_o_"
+      satismeter:
+        - name: "satismeter-1"
+          api_key: "key-123"
+          project_id: "proj-1"
+      deel:
+        - name: "deel-1"
+          api_key: "deel-key-123"
+          environment: "sandbox"
       frankfurter:
         - name: "frankfurter-1"
       salesforce:
@@ -610,6 +638,9 @@ environments:
           client_id: "test-client-id"
           client_secret: "test-client-secret"
           refresh_token: "test-refresh-token"
+      cloudflare_radar:
+        - name: "cloudflareradar-1"
+          api_token: "test-api-token"
       espn:
         - name: "espn-1"
           sport: "football"

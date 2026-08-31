@@ -2,7 +2,7 @@
 
 [CleverTap](https://clevertap.com/) is a customer engagement and retention platform that combines analytics, segmentation, and cross-channel campaigns for mobile and web apps.
 
-Bruin supports CleverTap as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from CleverTap into your data warehouse.
+Bruin supports CleverTap as both a source and a destination for [Ingestr assets](/assets/ingestr): you can ingest data from CleverTap into your data warehouse, and you can load user profiles and events from your warehouse back into CleverTap through its Upload API.
 
 To set up a CleverTap connection, you need the Account ID and Passcode from your CleverTap project (**Settings → Project**). Your region is the subdomain of your dashboard URL, so `in1.dashboard.clevertap.com` means `region: in1`; European projects have no subdomain and appear as `global`. For more information, please refer [here](https://getbruin.com/docs/ingestr/supported-sources/clevertap.html).
 
@@ -89,3 +89,64 @@ bruin run ingestr.clevertap.asset.yml
 ```
 
 As a result of this command, Bruin will ingest data from the given CleverTap table into your Postgres database.
+
+## CleverTap as a destination
+
+Bruin can also write user profiles and events **into** CleverTap through its [Upload API](https://developer.clevertap.com/docs/upload-user-profiles-api). Each source row is sent as one profile or event record, uploaded in bulk (up to 1000 records per request).
+
+Reuse the same connection as the source — the destination uses `account_id`, `passcode`, and `region`. `timezone` is not used when writing, because CleverTap timestamps are absolute.
+
+The `destination_table` parameter selects the record type — `profiles` or `events` — and the parameters after the `?` tell Bruin which columns carry the special fields. Every other column is uploaded as an attribute under its own name. (The record type and its parameters go in `destination_table` rather than the asset `name`, because an asset name may not contain `?`, `=`, or `&`.)
+
+### Profiles
+
+```yaml
+name: clevertap_profiles
+type: ingestr
+
+parameters:
+  source_connection: my-postgres
+  source_table: 'public.marketing_users'
+
+  destination: clevertap
+  destination_connection: my_clevertap
+  destination_table: 'profiles?identity_column=email'
+```
+
+| Parameter | Required? | Description |
+|-----------|-----------|-------------|
+| `identity_column` | **Required** | The source column holding each row's identifier. For example, `identity_column=email` takes each row's identifier from the `email` column. |
+| `id_type` | Optional | How CleverTap resolves the identifier: `identity` (default), `objectId`, `FBID`, or `GPID`. For example, `identity_column=device_id&id_type=objectId` sends each `device_id` value as an `objectId`. |
+| `on_error` | Optional | `fail` (default) fails the run if CleverTap rejects any record; `skip` warns and continues. Either way each rejected record is printed as it happens and listed with its error at the end. |
+
+Profiles are always upserted by identity on CleverTap's side, so re-sending a user updates their attributes instead of creating a duplicate. With no incremental key the whole table is re-sent each run; set an incremental key (such as `updated_at`) with an interval to send only the rows in that window.
+
+### Events
+
+```yaml
+name: clevertap_events
+type: ingestr
+
+parameters:
+  source_connection: my-bigquery
+  source_table: 'analytics.purchases'
+
+  destination: clevertap
+  destination_connection: my_clevertap
+  destination_table: 'events?identity_column=user_id&ts=purchased_at&event_name=Charged'
+
+  incremental_key: purchased_at
+```
+
+| Parameter | Required? | Description |
+|-----------|-----------|-------------|
+| `event_name` **or** `event_name_column` | **Required** | A fixed event name applied to every row (`event_name`), or a column whose value is the event name per row (`event_name_column`) for tables that mix event types. |
+| `identity_column` | **Required** | The source column holding each row's identifier. For example, `identity_column=email` takes each row's identifier from the `email` column. |
+| `id_type` | Optional | How CleverTap resolves the identifier: `identity` (default), `objectId`, `FBID`, or `GPID`. For example, `identity_column=device_id&id_type=objectId` sends each `device_id` value as an `objectId`. |
+| `ts` | Optional | The source column holding the event timestamp. If omitted, CleverTap stamps the upload time. |
+| `on_error` | Optional | `fail` (default) fails the run if CleverTap rejects any record; `skip` warns and continues. Either way each rejected record is printed as it happens and listed with its error at the end. |
+
+Events are always appended on CleverTap's side — each uploaded event is added to the user's timeline; CleverTap never replaces or de-duplicates events, so re-sending a row creates a duplicate. Use an incremental key (usually the same column as `ts`) with an interval to control exactly which events are sent each run.
+
+> [!NOTE]
+> Every record must carry an identifier; rows with an empty identity value are skipped. CleverTap accepts up to 1000 records per request and limits uploads to 3 concurrent requests per account; Bruin batches and rate-limits accordingly. For the full destination reference, see the [ingestr documentation](https://getbruin.com/docs/ingestr/supported-sources/clevertap.html).

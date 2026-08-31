@@ -2434,6 +2434,7 @@ func CloudAgents() *cli.Command {
 			cloudAgentsSetMemory(),
 			cloudAgentsClearMemory(),
 			cloudAgentsExportThread(),
+			cloudAgentsRequestConnection(),
 			cloudAgentsConnections(),
 			cloudAgentsMcp(),
 		},
@@ -3862,6 +3863,61 @@ func cloudAgentsExportThread() *cli.Command {
 	}
 }
 
+// cloudAgentsRequestConnection surfaces an "add connection" card in the current
+// chat. agent-id/thread-id are read straight from the run env, never flags, so an
+// agent can't point the card at another chat.
+func cloudAgentsRequestConnection() *cli.Command {
+	return &cli.Command{
+		Name:   "request-connection",
+		Usage:  "Surface an 'add connection' card in the current chat (internal; used by agent runs)",
+		Hidden: true,
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.StringFlag{
+				Name:     "reason",
+				Usage:    "short, user-facing reason the connection is needed",
+				Required: true,
+			},
+			&cli.StringSliceFlag{
+				Name:  "connection-types",
+				Usage: "likely connection type(s), e.g. snowflake,postgres; repeat or comma-separate",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			agentID, _ := strconv.Atoi(os.Getenv("BRUIN_CLOUD_AGENT_ID"))
+			threadID, _ := strconv.Atoi(os.Getenv("BRUIN_THREAD_ID"))
+			if agentID <= 0 || threadID <= 0 {
+				printError(errors.New("request-connection only works inside a Bruin Cloud chat run (BRUIN_CLOUD_AGENT_ID and BRUIN_THREAD_ID must be set)"), output, "Not in a cloud chat")
+				return cli.Exit("", 1)
+			}
+
+			reason := strings.TrimSpace(c.String("reason"))
+			if reason == "" {
+				printError(errors.New("--reason is required"), output, "Missing --reason")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			if err := client.RequestConnection(ctx, agentID, threadID, reason, c.StringSlice("connection-types")); err != nil {
+				printError(err, output, "Failed to request connection")
+				return cli.Exit("", 1)
+			}
+
+			printSuccessForOutput(output, "Connection request surfaced in the chat. Ask the user to add the connection there, then re-send their message.")
+			return nil
+		},
+	}
+}
+
 func cloudAgentsMessages() *cli.Command {
 	return &cli.Command{
 		Name:  "messages",
@@ -4771,6 +4827,7 @@ func CloudDashboards() *cli.Command {
 			cloudDashboardsVersion(),
 			cloudDashboardsCreate(),
 			cloudDashboardsUpdate(),
+			cloudDashboardsPublish(),
 			cloudDashboardsDelete(),
 		},
 	}
@@ -4829,7 +4886,7 @@ func cloudDashboardsList() *cli.Command {
 func cloudDashboardsGet() *cli.Command {
 	return &cli.Command{
 		Name:  "get",
-		Usage: "Get a dashboard including its published definition",
+		Usage: "Get a dashboard including its definition (published by default; use --state draft to fetch the unpublished draft)",
 		Flags: []cli.Flag{
 			apiKeyFlag(),
 			outputFlag(),
@@ -4838,10 +4895,20 @@ func cloudDashboardsGet() *cli.Command {
 				Usage:    "dashboard ID",
 				Required: true,
 			},
+			&cli.StringFlag{
+				Name:  "state",
+				Usage: "which state to fetch: 'draft' or 'published'. Default: the editable definition for editors, published for viewers. 'draft' needs edit access.",
+			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			defer RecoverFromPanic()
 			output := c.String("output")
+
+			state := c.String("state")
+			if state != "" && state != "draft" && state != "published" {
+				printError(fmt.Errorf("invalid --state %q: use 'draft' or 'published'", state), output, "Invalid state")
+				return cli.Exit("", 1)
+			}
 
 			client, err := newCloudClient(c)
 			if err != nil {
@@ -4849,7 +4916,7 @@ func cloudDashboardsGet() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			dashboard, err := client.GetDashboard(ctx, c.Int("dashboard-id"))
+			dashboard, err := client.GetDashboard(ctx, c.Int("dashboard-id"), state)
 			if err != nil {
 				printError(err, output, "Failed to get dashboard")
 				return cli.Exit("", 1)
@@ -4866,6 +4933,16 @@ func cloudDashboardsGet() *cli.Command {
 				title = *dashboard.Title
 			}
 			infoPrinter.Printf("Dashboard %d: %s (visibility: %s)\n", dashboard.ID, title, dashboard.Visibility)
+
+			// Flag a pending draft so a draft-only dashboard isn't read as empty.
+			if dashboard.HasDraft != nil && *dashboard.HasDraft {
+				published := dashboard.IsPublished != nil && *dashboard.IsPublished
+				if published {
+					infoPrinter.Println("This dashboard has unpublished draft changes. Use --state draft to fetch them, --state published for the live version.")
+				} else {
+					infoPrinter.Println("This dashboard is an unpublished draft (nothing published yet).")
+				}
+			}
 
 			// Print the definition (state) as pretty JSON so it can be inspected or saved.
 			if len(dashboard.State) > 0 {
@@ -5337,6 +5414,60 @@ func cloudDashboardsDelete() *cli.Command {
 			}
 
 			successPrinter.Printf("Deleted dashboard %d.\n", c.Int("dashboard-id"))
+			return nil
+		},
+	}
+}
+
+func cloudDashboardsPublish() *cli.Command {
+	return &cli.Command{
+		Name:  "publish",
+		Usage: "Publish a dashboard's pending draft so it goes live",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "dashboard-id",
+				Usage:    "dashboard ID",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			if c.Int("dashboard-id") <= 0 {
+				printError(fmt.Errorf("--dashboard-id must be a positive integer, got %d", c.Int("dashboard-id")), output, "Invalid --dashboard-id")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			dashboard, err := client.PublishDashboard(ctx, c.Int("dashboard-id"))
+			if err != nil {
+				printError(err, output, "Failed to publish dashboard")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(dashboard, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			title := ""
+			if dashboard.Title != nil {
+				title = *dashboard.Title
+			}
+			if dashboard.URL != "" {
+				successPrinter.Printf("Published dashboard %d (%s): %s\n", dashboard.ID, title, dashboard.URL)
+			} else {
+				successPrinter.Printf("Published dashboard %d (%s).\n", dashboard.ID, title)
+			}
 			return nil
 		},
 	}

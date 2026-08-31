@@ -1,6 +1,7 @@
 package path
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -52,6 +53,22 @@ func TestGetPipelinePaths(t *testing.T) {
 			require.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func TestGetPipelinePathsMatchesExactBasenames(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	pipelineDir := filepath.Join(root, "pipeline")
+	nonPipelineDir := filepath.Join(root, "non-pipeline")
+	require.NoError(t, os.MkdirAll(pipelineDir, 0o755))
+	require.NoError(t, os.MkdirAll(nonPipelineDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(pipelineDir, "pipeline.yml"), nil, 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(nonPipelineDir, "simple-pipeline.yml"), nil, 0o644))
+
+	got, err := GetPipelinePaths(root, []string{"pipeline.yml"})
+	require.NoError(t, err)
+	require.Equal(t, []string{pipelineDir}, got)
 }
 
 func TestGetAllPossibleAssetPaths(t *testing.T) {

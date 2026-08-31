@@ -355,6 +355,9 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	}
 
 	destTable := asset.Name
+	if dt, ok := asset.Parameters.GetString("destination_table"); ok && dt != "" {
+		destTable = dt
+	}
 
 	extraPackages = python.AddExtraPackages(destURI, sourceURI, extraPackages)
 

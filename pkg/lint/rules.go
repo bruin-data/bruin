@@ -377,6 +377,33 @@ func WarnIngestrCDCModeDeprecated(ctx context.Context, p *pipeline.Pipeline, ass
 	}}, nil
 }
 
+// EnsureIngestrDestinationTableNotSetForQueryable forbids a `destination_table` override on a
+// queryable ingestr destination, where it desyncs ingestion from name-keyed checks/lineage/DDL.
+func EnsureIngestrDestinationTableNotSetForQueryable(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	if asset.Type != pipeline.AssetTypeIngestr || asset.Parameters == nil {
+		return nil, nil
+	}
+
+	destTable, ok := asset.Parameters.GetString("destination_table")
+	if !ok || destTable == "" || destTable == asset.Name {
+		return nil, nil
+	}
+
+	destType, err := helpers.GetIngestrDestinationType(asset)
+	if err != nil {
+		// Unknown or unset destination: nothing to warn about here.
+		return nil, nil //nolint:nilerr
+	}
+	if !pipeline.IsSQLAssetType(destType) {
+		return nil, nil
+	}
+
+	return []*Issue{{
+		Task:        asset,
+		Description: "'destination_table' is not supported for queryable destinations; set the asset `name` to the target table instead.",
+	}}, nil
+}
+
 func validateIngestrMaterialization(asset *pipeline.Asset, effectiveStrategy string) ([]*Issue, string) {
 	issues := make([]*Issue, 0)
 	mat := asset.Materialization

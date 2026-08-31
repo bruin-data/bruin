@@ -664,6 +664,13 @@ func TestLoadFromFile(t *testing.T) {
 					Password:           "pass-123",
 				},
 			},
+			TwoCheckout: []TwoCheckoutConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "twocheckout-1"},
+					MerchantCode:       "merchant-123",
+					SecretKey:          "secret-123",
+				},
+			},
 			Payrails: []PayrailsConnection{
 				{
 					ConnectionMetadata: ConnectionMetadata{Name: "payrails-1"},
@@ -720,6 +727,48 @@ func TestLoadFromFile(t *testing.T) {
 				{
 					ConnectionMetadata: ConnectionMetadata{Name: "applovin-1"},
 					APIKey:             "key-123",
+				},
+			},
+			Sklik: []SklikConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "sklik-1"},
+					Token:              "token-123",
+				},
+			},
+			Sumble: []SumbleConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "sumble-1"},
+					APIKey:             "key-123",
+				},
+			},
+			Twenty: []TwentyConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "twenty-1"},
+					Host:               "api.twenty.com",
+					APIKey:             "key-123",
+				},
+			},
+			AbraFlexi: []AbraFlexiConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "abraflexi-1"},
+					Host:               "example.flexibee.eu",
+					Username:           "api-user",
+					Password:           "secret",
+					Company:            "acme_s_r_o_",
+				},
+			},
+			SatisMeter: []SatisMeterConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "satismeter-1"},
+					APIKey:             "key-123",
+					ProjectID:          "proj-1",
+				},
+			},
+			Deel: []DeelConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "deel-1"},
+					APIKey:             "deel-key-123",
+					Environment:        "sandbox",
 				},
 			},
 			Salesforce: []SalesforceConnection{
@@ -964,6 +1013,12 @@ func TestLoadFromFile(t *testing.T) {
 					ClientID:           "test-client-id",
 					ClientSecret:       "test-client-secret",
 					RefreshToken:       "test-refresh-token",
+				},
+			},
+			CloudflareRadar: []CloudflareRadarConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "cloudflareradar-1"},
+					APIToken:           "test-api-token",
 				},
 			},
 			Espn: []EspnConnection{
@@ -1746,6 +1801,84 @@ func TestConfig_AddConnection(t *testing.T) {
 			expectedErr: false,
 		},
 		{
+			name:     "Add Sklik connection",
+			envName:  "default",
+			connType: "sklik",
+			connName: "sklik-conn",
+			creds: map[string]interface{}{
+				"token":   "test-token",
+				"user_id": 123,
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Add Sumble connection",
+			envName:  "default",
+			connType: "sumble",
+			connName: "sumble-conn",
+			creds: map[string]interface{}{
+				"api_key": "test-api-key",
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Add Twenty connection",
+			envName:  "default",
+			connType: "twenty",
+			connName: "twenty-conn",
+			creds: map[string]interface{}{
+				"host":            "api.twenty.com",
+				"api_key":         "test-api-key",
+				"include_deleted": false,
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Add AbraFlexi connection",
+			envName:  "default",
+			connType: "abraflexi",
+			connName: "abraflexi-conn",
+			creds: map[string]interface{}{
+				"host":     "example.flexibee.eu",
+				"username": "api-user",
+				"password": "secret",
+				"company":  "acme_s_r_o_",
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Add SatisMeter connection",
+			envName:  "default",
+			connType: "satismeter",
+			connName: "satismeter-conn",
+			creds: map[string]interface{}{
+				"api_key":    "test-api-key",
+				"project_id": "proj-1",
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Add Deel connection",
+			envName:  "default",
+			connType: "deel",
+			connName: "deel-conn",
+			creds: map[string]interface{}{
+				"api_key":     "test-api-key",
+				"environment": "sandbox",
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Add Cloudflare Radar connection",
+			envName:  "default",
+			connType: "cloudflare_radar",
+			connName: "cloudflare-radar-conn",
+			creds: map[string]interface{}{
+				"api_token": "test-api-token",
+			},
+			expectedErr: false,
+		},
+		{
 			name:     "Add Intercom connection",
 			envName:  "default",
 			connType: "intercom",
@@ -1773,6 +1906,17 @@ func TestConfig_AddConnection(t *testing.T) {
 			connName: "fireflies-conn",
 			creds: map[string]interface{}{
 				"api_key": "test-api-key",
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Add 2Checkout connection",
+			envName:  "default",
+			connType: "twocheckout",
+			connName: "twocheckout-conn",
+			creds: map[string]interface{}{
+				"merchant_code": "merchant-123",
+				"secret_key":    "secret-123",
 			},
 			expectedErr: false,
 		},
@@ -1915,6 +2059,10 @@ func TestConfig_AddConnection(t *testing.T) {
 					assert.Len(t, env.Connections.Anthropic, 1)
 					assert.Equal(t, tt.connName, env.Connections.Anthropic[0].Name)
 					assert.Equal(t, tt.creds["api_key"], env.Connections.Anthropic[0].APIKey)
+				case "cloudflare_radar":
+					assert.Len(t, env.Connections.CloudflareRadar, 1)
+					assert.Equal(t, tt.connName, env.Connections.CloudflareRadar[0].Name)
+					assert.Equal(t, tt.creds["api_token"], env.Connections.CloudflareRadar[0].APIToken)
 				case "hostaway":
 					assert.Len(t, env.Connections.Hostaway, 1)
 					assert.Equal(t, tt.connName, env.Connections.Hostaway[0].Name)
@@ -2025,6 +2173,120 @@ func TestDeleteConnection(t *testing.T) {
 			expectedErr: false,
 		},
 		{
+			name:     "Delete existing Sklik connection",
+			envName:  "default",
+			connName: "sklik-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{
+						"default": {
+							Connections: &Connections{
+								Sklik: []SklikConnection{
+									{ConnectionMetadata: ConnectionMetadata{Name: "sklik-conn"}, Token: "token-123"},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Delete existing Sumble connection",
+			envName:  "default",
+			connName: "sumble-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{
+						"default": {
+							Connections: &Connections{
+								Sumble: []SumbleConnection{
+									{ConnectionMetadata: ConnectionMetadata{Name: "sumble-conn"}, APIKey: "key-123"},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Delete existing Twenty connection",
+			envName:  "default",
+			connName: "twenty-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{
+						"default": {
+							Connections: &Connections{
+								Twenty: []TwentyConnection{
+									{ConnectionMetadata: ConnectionMetadata{Name: "twenty-conn"}, Host: "api.twenty.com", APIKey: "key-123"},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Delete existing AbraFlexi connection",
+			envName:  "default",
+			connName: "abraflexi-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{
+						"default": {
+							Connections: &Connections{
+								AbraFlexi: []AbraFlexiConnection{
+									{ConnectionMetadata: ConnectionMetadata{Name: "abraflexi-conn"}, Host: "example.flexibee.eu", Username: "api-user", Password: "secret", Company: "acme_s_r_o_"},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Delete existing SatisMeter connection",
+			envName:  "default",
+			connName: "satismeter-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{
+						"default": {
+							Connections: &Connections{
+								SatisMeter: []SatisMeterConnection{
+									{ConnectionMetadata: ConnectionMetadata{Name: "satismeter-conn"}, APIKey: "key-123", ProjectID: "proj-1"},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Delete existing Deel connection",
+			envName:  "default",
+			connName: "deel-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{
+						"default": {
+							Connections: &Connections{
+								Deel: []DeelConnection{
+									{ConnectionMetadata: ConnectionMetadata{Name: "deel-conn"}, APIKey: "key-123", Environment: "sandbox"},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedErr: false,
+		},
+		{
 			name:     "Delete existing Fabric connection",
 			envName:  "default",
 			connName: "fabric-conn",
@@ -2035,6 +2297,25 @@ func TestDeleteConnection(t *testing.T) {
 							Connections: &Connections{
 								Fabric: []FabricConnection{
 									{ConnectionMetadata: ConnectionMetadata{Name: "fabric-conn"}, Host: "fabric.example", Database: "warehouse", ClientID: "client-id"},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Delete existing 2Checkout connection",
+			envName:  "default",
+			connName: "twocheckout-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{
+						"default": {
+							Connections: &Connections{
+								TwoCheckout: []TwoCheckoutConnection{
+									{ConnectionMetadata: ConnectionMetadata{Name: "twocheckout-conn"}, MerchantCode: "merchant-123", SecretKey: "secret-123"},
 								},
 							},
 						},
@@ -2898,6 +3179,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				AppleAds:            []AppleAdsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "appleads1"}}},
 				LinkedInAds:         []LinkedInAdsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "linkedinads1"}}},
 				RedditAds:           []RedditAdsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "redditads1"}}},
+				CloudflareRadar:     []CloudflareRadarConnection{{ConnectionMetadata: ConnectionMetadata{Name: "cloudflareradar1"}}},
 				Mailchimp:           []MailchimpConnection{{ConnectionMetadata: ConnectionMetadata{Name: "mailchimp1"}}},
 				Manifold:            []ManifoldConnection{{ConnectionMetadata: ConnectionMetadata{Name: "manifold1"}}},
 				RevenueCat:          []RevenueCatConnection{{ConnectionMetadata: ConnectionMetadata{Name: "revenuecat1"}}},
@@ -2912,6 +3194,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Mixpanel:            []MixpanelConnection{{ConnectionMetadata: ConnectionMetadata{Name: "mixpanel1"}}},
 				Amplitude:           []AmplitudeConnection{{ConnectionMetadata: ConnectionMetadata{Name: "amplitude1"}}},
 				Fastspring:          []FastspringConnection{{ConnectionMetadata: ConnectionMetadata{Name: "fastspring1"}}},
+				TwoCheckout:         []TwoCheckoutConnection{{ConnectionMetadata: ConnectionMetadata{Name: "twocheckout1"}}},
 				Payrails:            []PayrailsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "payrails1"}}},
 				Clickup:             []ClickupConnection{{ConnectionMetadata: ConnectionMetadata{Name: "clickup1"}}},
 				Jobtread:            []JobtreadConnection{{ConnectionMetadata: ConnectionMetadata{Name: "jobtread1"}}},
@@ -2927,6 +3210,12 @@ func TestConnections_MergeFrom(t *testing.T) {
 				GoogleAnalytics:     []GoogleAnalyticsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "googleanalytics1"}}},
 				GSC:                 []GSCConnection{{Name: "gsc1"}},
 				AppLovin:            []AppLovinConnection{{ConnectionMetadata: ConnectionMetadata{Name: "applovin1"}}},
+				Sklik:               []SklikConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sklik1"}}},
+				Sumble:              []SumbleConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sumble1"}}},
+				Twenty:              []TwentyConnection{{ConnectionMetadata: ConnectionMetadata{Name: "twenty1"}}},
+				AbraFlexi:           []AbraFlexiConnection{{ConnectionMetadata: ConnectionMetadata{Name: "abraflexi1"}}},
+				SatisMeter:          []SatisMeterConnection{{ConnectionMetadata: ConnectionMetadata{Name: "satismeter1"}}},
+				Deel:                []DeelConnection{{ConnectionMetadata: ConnectionMetadata{Name: "deel1"}}},
 				Frankfurter:         []FrankfurterConnection{{ConnectionMetadata: ConnectionMetadata{Name: "frankfurter1"}}},
 				Salesforce:          []SalesforceConnection{{ConnectionMetadata: ConnectionMetadata{Name: "salesforce1"}}},
 				SQLite:              []SQLiteConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sqlite1"}}},
@@ -3038,6 +3327,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				AppleAds:            []AppleAdsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "appleads1"}}},
 				LinkedInAds:         []LinkedInAdsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "linkedinads1"}}},
 				RedditAds:           []RedditAdsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "redditads1"}}},
+				CloudflareRadar:     []CloudflareRadarConnection{{ConnectionMetadata: ConnectionMetadata{Name: "cloudflareradar1"}}},
 				Mailchimp:           []MailchimpConnection{{ConnectionMetadata: ConnectionMetadata{Name: "mailchimp1"}}},
 				Manifold:            []ManifoldConnection{{ConnectionMetadata: ConnectionMetadata{Name: "manifold1"}}},
 				RevenueCat:          []RevenueCatConnection{{ConnectionMetadata: ConnectionMetadata{Name: "revenuecat1"}}},
@@ -3052,6 +3342,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Mixpanel:            []MixpanelConnection{{ConnectionMetadata: ConnectionMetadata{Name: "mixpanel1"}}},
 				Amplitude:           []AmplitudeConnection{{ConnectionMetadata: ConnectionMetadata{Name: "amplitude1"}}},
 				Fastspring:          []FastspringConnection{{ConnectionMetadata: ConnectionMetadata{Name: "fastspring1"}}},
+				TwoCheckout:         []TwoCheckoutConnection{{ConnectionMetadata: ConnectionMetadata{Name: "twocheckout1"}}},
 				Payrails:            []PayrailsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "payrails1"}}},
 				Clickup:             []ClickupConnection{{ConnectionMetadata: ConnectionMetadata{Name: "clickup1"}}},
 				Jobtread:            []JobtreadConnection{{ConnectionMetadata: ConnectionMetadata{Name: "jobtread1"}}},
@@ -3067,6 +3358,12 @@ func TestConnections_MergeFrom(t *testing.T) {
 				GoogleAnalytics:     []GoogleAnalyticsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "googleanalytics1"}}},
 				GSC:                 []GSCConnection{{Name: "gsc1"}},
 				AppLovin:            []AppLovinConnection{{ConnectionMetadata: ConnectionMetadata{Name: "applovin1"}}},
+				Sklik:               []SklikConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sklik1"}}},
+				Sumble:              []SumbleConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sumble1"}}},
+				Twenty:              []TwentyConnection{{ConnectionMetadata: ConnectionMetadata{Name: "twenty1"}}},
+				AbraFlexi:           []AbraFlexiConnection{{ConnectionMetadata: ConnectionMetadata{Name: "abraflexi1"}}},
+				SatisMeter:          []SatisMeterConnection{{ConnectionMetadata: ConnectionMetadata{Name: "satismeter1"}}},
+				Deel:                []DeelConnection{{ConnectionMetadata: ConnectionMetadata{Name: "deel1"}}},
 				Frankfurter:         []FrankfurterConnection{{ConnectionMetadata: ConnectionMetadata{Name: "frankfurter1"}}},
 				Salesforce:          []SalesforceConnection{{ConnectionMetadata: ConnectionMetadata{Name: "salesforce1"}}},
 				SQLite:              []SQLiteConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sqlite1"}}},

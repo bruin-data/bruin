@@ -10,10 +10,12 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/abraflexi"
 	"github.com/bruin-data/bruin/pkg/adapty"
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/clevertap"
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/deel"
 	"github.com/bruin-data/bruin/pkg/emr_serverless"
 	"github.com/bruin-data/bruin/pkg/gorgias"
 	"github.com/bruin-data/bruin/pkg/hana"
@@ -24,9 +26,13 @@ import (
 	"github.com/bruin-data/bruin/pkg/okta"
 	"github.com/bruin-data/bruin/pkg/personio"
 	"github.com/bruin-data/bruin/pkg/postgres"
+	"github.com/bruin-data/bruin/pkg/satismeter"
 	"github.com/bruin-data/bruin/pkg/sharepoint"
 	"github.com/bruin-data/bruin/pkg/shopify"
+	"github.com/bruin-data/bruin/pkg/sklik"
 	"github.com/bruin-data/bruin/pkg/snowflake"
+	"github.com/bruin-data/bruin/pkg/sumble"
+	"github.com/bruin-data/bruin/pkg/twenty"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/oauth2"
@@ -517,6 +523,180 @@ func Test_AddAdaptyConnectionFromConfig(t *testing.T) {
 	assert.Contains(t, uri, "api_key=secret_live_123")
 	assert.Contains(t, uri, "lookback_days=0")
 	assert.Contains(t, uri, "timezone=Europe%2FIstanbul")
+	assert.Equal(t, configuration, m.GetConnectionDetails("test"))
+}
+
+func Test_AddSklikConnectionFromConfig(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
+
+	userID := int64(456)
+	configuration := &config.SklikConnection{
+		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
+		Token:              "token-123",
+		UserID:             &userID,
+	}
+
+	err := m.AddSklikConnectionFromConfig(configuration)
+	require.NoError(t, err)
+
+	res, ok := m.GetConnection("test").(*sklik.Client)
+	require.True(t, ok)
+	require.NotNil(t, res)
+
+	uri, err := res.GetIngestrURI()
+	require.NoError(t, err)
+	assert.Contains(t, uri, "sklik://?")
+	assert.Contains(t, uri, "token=token-123")
+	assert.Contains(t, uri, "user_id=456")
+	assert.Equal(t, configuration, m.GetConnectionDetails("test"))
+}
+
+func Test_AddSumbleConnectionFromConfig(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
+
+	configuration := &config.SumbleConnection{
+		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
+		APIKey:             "key-123",
+	}
+
+	err := m.AddSumbleConnectionFromConfig(configuration)
+	require.NoError(t, err)
+
+	res, ok := m.GetConnection("test").(*sumble.Client)
+	require.True(t, ok)
+	require.NotNil(t, res)
+
+	uri, err := res.GetIngestrURI()
+	require.NoError(t, err)
+	assert.Contains(t, uri, "sumble://?")
+	assert.Contains(t, uri, "api_key=key-123")
+	assert.Equal(t, configuration, m.GetConnectionDetails("test"))
+}
+
+func Test_AddTwentyConnectionFromConfig(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
+
+	configuration := &config.TwentyConnection{
+		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
+		Host:               "api.twenty.com",
+		APIKey:             "eyJ123",
+	}
+
+	err := m.AddTwentyConnectionFromConfig(configuration)
+	require.NoError(t, err)
+
+	res, ok := m.GetConnection("test").(*twenty.Client)
+	require.True(t, ok)
+	require.NotNil(t, res)
+
+	uri, err := res.GetIngestrURI()
+	require.NoError(t, err)
+	assert.Contains(t, uri, "twenty://api.twenty.com?")
+	assert.Contains(t, uri, "api_key=eyJ123")
+	assert.Equal(t, configuration, m.GetConnectionDetails("test"))
+}
+
+func Test_AddAbraFlexiConnectionFromConfig(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
+
+	configuration := &config.AbraFlexiConnection{
+		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
+		Host:               "example.flexibee.eu",
+		Username:           "api-user",
+		Password:           "secret",
+		Company:            "acme_s_r_o_",
+	}
+
+	err := m.AddAbraFlexiConnectionFromConfig(configuration)
+	require.NoError(t, err)
+
+	res, ok := m.GetConnection("test").(*abraflexi.Client)
+	require.True(t, ok)
+	require.NotNil(t, res)
+
+	uri, err := res.GetIngestrURI()
+	require.NoError(t, err)
+	assert.Contains(t, uri, "abra://example.flexibee.eu?")
+	assert.Contains(t, uri, "company=acme_s_r_o_")
+	assert.Contains(t, uri, "username=api-user")
+	assert.Equal(t, configuration, m.GetConnectionDetails("test"))
+}
+
+func Test_AddSatisMeterConnectionFromConfig(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
+
+	configuration := &config.SatisMeterConnection{
+		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
+		APIKey:             "sm_abc123",
+		ProjectID:          "proj-1",
+	}
+
+	err := m.AddSatisMeterConnectionFromConfig(configuration)
+	require.NoError(t, err)
+
+	res, ok := m.GetConnection("test").(*satismeter.Client)
+	require.True(t, ok)
+	require.NotNil(t, res)
+
+	uri, err := res.GetIngestrURI()
+	require.NoError(t, err)
+	assert.Contains(t, uri, "satismeter://?")
+	assert.Contains(t, uri, "api_key=sm_abc123")
+	assert.Contains(t, uri, "project_id=proj-1")
+	assert.Equal(t, configuration, m.GetConnectionDetails("test"))
+}
+
+func Test_AddDeelConnectionFromConfig(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
+
+	configuration := &config.DeelConnection{
+		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
+		APIKey:             "deel_abc123",
+		Environment:        "sandbox",
+	}
+
+	err := m.AddDeelConnectionFromConfig(configuration)
+	require.NoError(t, err)
+
+	res, ok := m.GetConnection("test").(*deel.Client)
+	require.True(t, ok)
+	require.NotNil(t, res)
+
+	uri, err := res.GetIngestrURI()
+	require.NoError(t, err)
+	assert.Contains(t, uri, "deel://?")
+	assert.Contains(t, uri, "api_key=deel_abc123")
+	assert.Contains(t, uri, "environment=sandbox")
 	assert.Equal(t, configuration, m.GetConnectionDetails("test"))
 }
 

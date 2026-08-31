@@ -1,0 +1,167 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+go_version="1.25.13"
+go_root="$HOME/.local/share/go/$go_version"
+node_version="22.14.0"
+node_root="$HOME/.local/share/node/$node_version"
+
+step() {
+  printf '\n==> %s\n' "$1"
+  SECONDS=0
+}
+
+done_step() {
+  printf '    completed in %ss\n' "$SECONDS"
+}
+
+step "Installing system dependencies"
+packages=(build-essential ca-certificates curl jq make pkg-config r-base-core)
+missing_packages=()
+for package in "${packages[@]}"; do
+  if ! dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -Fq 'install ok installed'; then
+    missing_packages+=("$package")
+  fi
+done
+if ((${#missing_packages[@]})); then
+  sudo apt-get update
+  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${missing_packages[@]}"
+fi
+done_step
+
+step "Installing Go $go_version"
+if [[ ! -x "$go_root/bin/go" ]]; then
+  case "$(uname -m)" in
+    x86_64)
+      go_arch="amd64"
+      go_sha256="39042a078ea9ceebe3ecda4a7188f0f5b96e14a071d27923ba7f40b456e85ae3"
+      ;;
+    aarch64 | arm64)
+      go_arch="arm64"
+      go_sha256="adad240fcb6bd180cf973b4b7c747baf4ec81d08b7d40ca35940ee4531971490"
+      ;;
+    *)
+      printf 'Unsupported architecture: %s\n' "$(uname -m)" >&2
+      exit 1
+      ;;
+  esac
+
+  archive="$(mktemp)"
+  trap 'rm -f "$archive"' EXIT
+  curl --fail --location --retry 3 --output "$archive" \
+    "https://go.dev/dl/go${go_version}.linux-${go_arch}.tar.gz"
+  printf '%s  %s\n' "$go_sha256" "$archive" | sha256sum --check --status
+  mkdir -p "$(dirname "$go_root")"
+  extract_dir="$(mktemp -d)"
+  tar -C "$extract_dir" -xzf "$archive"
+  mv "$extract_dir/go" "$go_root"
+  rm -rf "$extract_dir" "$archive"
+  trap - EXIT
+fi
+done_step
+
+step "Installing Node.js $node_version and npm 11.10.0"
+mkdir -p "$HOME/.local/bin"
+if [[ ! -x "$node_root/bin/node" ]]; then
+  case "$(uname -m)" in
+    x86_64)
+      node_arch="x64"
+      node_sha256="69b09dba5c8dcb05c4e4273a4340db1005abeafe3927efda2bc5b249e80437ec"
+      ;;
+    aarch64 | arm64)
+      node_arch="arm64"
+      node_sha256="08bfbf538bad0e8cbb0269f0173cca28d705874a67a22f60b57d99dc99e30050"
+      ;;
+    *)
+      printf 'Unsupported architecture: %s\n' "$(uname -m)" >&2
+      exit 1
+      ;;
+  esac
+
+  archive="$(mktemp)"
+  trap 'rm -f "$archive"' EXIT
+  curl --fail --location --retry 3 --output "$archive" \
+    "https://nodejs.org/dist/v${node_version}/node-v${node_version}-linux-${node_arch}.tar.xz"
+  printf '%s  %s\n' "$node_sha256" "$archive" | sha256sum --check --status
+  mkdir -p "$node_root"
+  tar -C "$node_root" --strip-components=1 -xJf "$archive"
+  rm -f "$archive"
+  trap - EXIT
+fi
+export PATH="$node_root/bin:$PATH"
+if [[ "$(npm --version)" != "11.10.0" ]]; then
+  npm install --global npm@11.10.0 --no-audit --no-fund
+fi
+for executable in node npm npx corepack; do
+  ln -sfn "$node_root/bin/$executable" "$HOME/.local/bin/$executable"
+done
+done_step
+
+step "Installing Rust and uv"
+mkdir -p "$HOME/.local/bin"
+export PATH="$go_root/bin:$HOME/.cargo/bin:$HOME/.local/bin:$PATH"
+if ! command -v cargo >/dev/null 2>&1; then
+  curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error \
+    https://sh.rustup.rs | sh -s -- -y --profile minimal
+fi
+if ! command -v uv >/dev/null 2>&1; then
+  curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error \
+    https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="$HOME/.local/bin" sh
+fi
+done_step
+
+step "Configuring login shells"
+profile_marker="# Bruin orb toolchains"
+profile_end_marker="# End Bruin orb toolchains"
+profile_export="export PATH=\"$go_root/bin:$node_root/bin:\$HOME/.cargo/bin:\$HOME/.local/bin:\$PATH\""
+previous_profile_export="export PATH=\"$HOME/.local/share/go/1.25.0/bin:$node_root/bin:\$HOME/.cargo/bin:\$HOME/.local/bin:\$PATH\""
+touch "$HOME/.bash_profile"
+profile_tmp="$(mktemp)"
+trap 'rm -f "$profile_tmp"' EXIT
+awk -v marker="$profile_marker" -v end_marker="$profile_end_marker" \
+  -v current="$profile_export" -v previous="$previous_profile_export" \
+  '$0 != marker && $0 != end_marker && $0 != current && $0 != previous' \
+  "$HOME/.bash_profile" > "$profile_tmp"
+cat "$profile_tmp" > "$HOME/.bash_profile"
+rm -f "$profile_tmp"
+trap - EXIT
+cat >> "$HOME/.bash_profile" <<EOF
+
+$profile_marker
+$profile_export
+$profile_end_marker
+EOF
+done_step
+
+cd "$repo_root"
+
+step "Downloading Go and Rust dependencies"
+go mod download
+(cd semantic-engine && go mod download)
+cargo fetch --locked --manifest-path pkg/sqlparser/rustffi/Cargo.toml
+done_step
+
+step "Installing development tools"
+golangci_lint_version="v2.11.4"
+current_lint_version="$(golangci-lint version 2>/dev/null | awk '{ for (i = 1; i <= NF; i++) if ($i == "version") { print "v"$(i+1); exit } }' || true)"
+if [[ "$current_lint_version" != "$golangci_lint_version" ]]; then
+  curl --fail --location --silent --show-error \
+    "https://raw.githubusercontent.com/golangci/golangci-lint/${golangci_lint_version}/install.sh" |
+    sh -s -- -b "$HOME/.local/bin" "$golangci_lint_version"
+fi
+[[ -d .venv ]] || uv venv --quiet
+uv pip install --quiet sqlglot==30.13.0
+uvx ruff@0.15.4 --version >/dev/null
+done_step
+
+step "Installing Node dependencies"
+node_fingerprint="$(sha256sum package-lock.json | cut -d' ' -f1)-$(node --version)"
+node_marker="node_modules/.amp-orb-fingerprint"
+if [[ ! -f "$node_marker" ]] || [[ "$(<"$node_marker")" != "$node_fingerprint" ]]; then
+  npm ci --no-audit --no-fund
+  printf '%s\n' "$node_fingerprint" > "$node_marker"
+fi
+done_step
+
+printf '\nOrb setup complete.\n'
