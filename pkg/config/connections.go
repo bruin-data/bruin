@@ -2249,6 +2249,10 @@ type VerticaConnection struct {
 	Port               int    `yaml:"port,omitempty"     json:"port" mapstructure:"port" jsonschema:"default=5433"`
 	Database           string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
 	Schema             string `yaml:"schema,omitempty"   json:"schema,omitempty" mapstructure:"schema"`
+
+	TLSMode               string `yaml:"tlsmode,omitempty"                 json:"tlsmode,omitempty"                 mapstructure:"tlsmode"`
+	ConnectionLoadBalance *int   `yaml:"connection_load_balance,omitempty" json:"connection_load_balance,omitempty" mapstructure:"connection_load_balance"`
+	BackupServerNode      string `yaml:"backup_server_node,omitempty"      json:"backup_server_node,omitempty"      mapstructure:"backup_server_node"`
 }
 
 func (c VerticaConnection) GetName() string {

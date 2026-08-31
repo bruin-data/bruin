@@ -5542,6 +5542,15 @@
         },
         "schema": {
           "type": "string"
+        },
+        "tlsmode": {
+          "type": "string"
+        },
+        "connection_load_balance": {
+          "type": "integer"
+        },
+        "backup_server_node": {
+          "type": "string"
         }
       },
       "additionalProperties": false,

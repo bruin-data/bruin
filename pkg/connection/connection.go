@@ -4197,12 +4197,15 @@ func (m *Manager) AddVerticaConnectionFromConfig(connection *config.VerticaConne
 	m.mutex.Unlock()
 
 	client, err := vertica.NewDB(&vertica.Config{
-		Username: connection.Username,
-		Password: connection.Password,
-		Host:     connection.Host,
-		Port:     connection.Port,
-		Database: connection.Database,
-		Schema:   connection.Schema,
+		Username:              connection.Username,
+		Password:              connection.Password,
+		Host:                  connection.Host,
+		Port:                  connection.Port,
+		Database:              connection.Database,
+		Schema:                connection.Schema,
+		TLSMode:               connection.TLSMode,
+		ConnectionLoadBalance: connection.ConnectionLoadBalance,
+		BackupServerNode:      connection.BackupServerNode,
 	})
 	if err != nil {
 		return err
