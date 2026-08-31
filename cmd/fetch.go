@@ -164,7 +164,7 @@ func Query() *cli.Command {
 			},
 			&cli.BoolFlag{
 				Name:    "cloud",
-				Usage:   "run the query against Bruin Cloud instead of locally (uses --connection against the agent's connections; ignores .bruin.yml)",
+				Usage:   "run the query against Bruin Cloud instead of locally (uses --connection against the agent's connections; ignores .bruin.yml; --var is not applied)",
 				Sources: cli.EnvVars("BRUIN_CLOUD_QUERY"),
 			},
 			&cli.IntFlag{
