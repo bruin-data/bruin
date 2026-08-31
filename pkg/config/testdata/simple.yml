@@ -462,6 +462,27 @@ environments:
       sklik:
         - name: "sklik-1"
           token: "token-123"
+      sumble:
+        - name: "sumble-1"
+          api_key: "key-123"
+      twenty:
+        - name: "twenty-1"
+          host: "api.twenty.com"
+          api_key: "key-123"
+      abraflexi:
+        - name: "abraflexi-1"
+          host: "example.flexibee.eu"
+          username: "api-user"
+          password: "secret"
+          company: "acme_s_r_o_"
+      satismeter:
+        - name: "satismeter-1"
+          api_key: "key-123"
+          project_id: "proj-1"
+      deel:
+        - name: "deel-1"
+          api_key: "deel-key-123"
+          environment: "sandbox"
       frankfurter:
         - name: "frankfurter-1"
 

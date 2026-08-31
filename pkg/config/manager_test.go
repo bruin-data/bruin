@@ -735,6 +735,42 @@ func TestLoadFromFile(t *testing.T) {
 					Token:              "token-123",
 				},
 			},
+			Sumble: []SumbleConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "sumble-1"},
+					APIKey:             "key-123",
+				},
+			},
+			Twenty: []TwentyConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "twenty-1"},
+					Host:               "api.twenty.com",
+					APIKey:             "key-123",
+				},
+			},
+			AbraFlexi: []AbraFlexiConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "abraflexi-1"},
+					Host:               "example.flexibee.eu",
+					Username:           "api-user",
+					Password:           "secret",
+					Company:            "acme_s_r_o_",
+				},
+			},
+			SatisMeter: []SatisMeterConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "satismeter-1"},
+					APIKey:             "key-123",
+					ProjectID:          "proj-1",
+				},
+			},
+			Deel: []DeelConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "deel-1"},
+					APIKey:             "deel-key-123",
+					Environment:        "sandbox",
+				},
+			},
 			Salesforce: []SalesforceConnection{
 				{
 					ConnectionMetadata: ConnectionMetadata{Name: "salesforce-1"},
@@ -1776,6 +1812,63 @@ func TestConfig_AddConnection(t *testing.T) {
 			expectedErr: false,
 		},
 		{
+			name:     "Add Sumble connection",
+			envName:  "default",
+			connType: "sumble",
+			connName: "sumble-conn",
+			creds: map[string]interface{}{
+				"api_key": "test-api-key",
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Add Twenty connection",
+			envName:  "default",
+			connType: "twenty",
+			connName: "twenty-conn",
+			creds: map[string]interface{}{
+				"host":            "api.twenty.com",
+				"api_key":         "test-api-key",
+				"include_deleted": false,
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Add AbraFlexi connection",
+			envName:  "default",
+			connType: "abraflexi",
+			connName: "abraflexi-conn",
+			creds: map[string]interface{}{
+				"host":     "example.flexibee.eu",
+				"username": "api-user",
+				"password": "secret",
+				"company":  "acme_s_r_o_",
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Add SatisMeter connection",
+			envName:  "default",
+			connType: "satismeter",
+			connName: "satismeter-conn",
+			creds: map[string]interface{}{
+				"api_key":    "test-api-key",
+				"project_id": "proj-1",
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Add Deel connection",
+			envName:  "default",
+			connType: "deel",
+			connName: "deel-conn",
+			creds: map[string]interface{}{
+				"api_key":     "test-api-key",
+				"environment": "sandbox",
+			},
+			expectedErr: false,
+		},
+		{
 			name:     "Add Cloudflare Radar connection",
 			envName:  "default",
 			connType: "cloudflare_radar",
@@ -2090,6 +2183,101 @@ func TestDeleteConnection(t *testing.T) {
 							Connections: &Connections{
 								Sklik: []SklikConnection{
 									{ConnectionMetadata: ConnectionMetadata{Name: "sklik-conn"}, Token: "token-123"},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Delete existing Sumble connection",
+			envName:  "default",
+			connName: "sumble-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{
+						"default": {
+							Connections: &Connections{
+								Sumble: []SumbleConnection{
+									{ConnectionMetadata: ConnectionMetadata{Name: "sumble-conn"}, APIKey: "key-123"},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Delete existing Twenty connection",
+			envName:  "default",
+			connName: "twenty-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{
+						"default": {
+							Connections: &Connections{
+								Twenty: []TwentyConnection{
+									{ConnectionMetadata: ConnectionMetadata{Name: "twenty-conn"}, Host: "api.twenty.com", APIKey: "key-123"},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Delete existing AbraFlexi connection",
+			envName:  "default",
+			connName: "abraflexi-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{
+						"default": {
+							Connections: &Connections{
+								AbraFlexi: []AbraFlexiConnection{
+									{ConnectionMetadata: ConnectionMetadata{Name: "abraflexi-conn"}, Host: "example.flexibee.eu", Username: "api-user", Password: "secret", Company: "acme_s_r_o_"},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Delete existing SatisMeter connection",
+			envName:  "default",
+			connName: "satismeter-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{
+						"default": {
+							Connections: &Connections{
+								SatisMeter: []SatisMeterConnection{
+									{ConnectionMetadata: ConnectionMetadata{Name: "satismeter-conn"}, APIKey: "key-123", ProjectID: "proj-1"},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Delete existing Deel connection",
+			envName:  "default",
+			connName: "deel-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{
+						"default": {
+							Connections: &Connections{
+								Deel: []DeelConnection{
+									{ConnectionMetadata: ConnectionMetadata{Name: "deel-conn"}, APIKey: "key-123", Environment: "sandbox"},
 								},
 							},
 						},
@@ -3023,6 +3211,11 @@ func TestConnections_MergeFrom(t *testing.T) {
 				GSC:                 []GSCConnection{{Name: "gsc1"}},
 				AppLovin:            []AppLovinConnection{{ConnectionMetadata: ConnectionMetadata{Name: "applovin1"}}},
 				Sklik:               []SklikConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sklik1"}}},
+				Sumble:              []SumbleConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sumble1"}}},
+				Twenty:              []TwentyConnection{{ConnectionMetadata: ConnectionMetadata{Name: "twenty1"}}},
+				AbraFlexi:           []AbraFlexiConnection{{ConnectionMetadata: ConnectionMetadata{Name: "abraflexi1"}}},
+				SatisMeter:          []SatisMeterConnection{{ConnectionMetadata: ConnectionMetadata{Name: "satismeter1"}}},
+				Deel:                []DeelConnection{{ConnectionMetadata: ConnectionMetadata{Name: "deel1"}}},
 				Frankfurter:         []FrankfurterConnection{{ConnectionMetadata: ConnectionMetadata{Name: "frankfurter1"}}},
 				Salesforce:          []SalesforceConnection{{ConnectionMetadata: ConnectionMetadata{Name: "salesforce1"}}},
 				SQLite:              []SQLiteConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sqlite1"}}},
@@ -3166,6 +3359,11 @@ func TestConnections_MergeFrom(t *testing.T) {
 				GSC:                 []GSCConnection{{Name: "gsc1"}},
 				AppLovin:            []AppLovinConnection{{ConnectionMetadata: ConnectionMetadata{Name: "applovin1"}}},
 				Sklik:               []SklikConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sklik1"}}},
+				Sumble:              []SumbleConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sumble1"}}},
+				Twenty:              []TwentyConnection{{ConnectionMetadata: ConnectionMetadata{Name: "twenty1"}}},
+				AbraFlexi:           []AbraFlexiConnection{{ConnectionMetadata: ConnectionMetadata{Name: "abraflexi1"}}},
+				SatisMeter:          []SatisMeterConnection{{ConnectionMetadata: ConnectionMetadata{Name: "satismeter1"}}},
+				Deel:                []DeelConnection{{ConnectionMetadata: ConnectionMetadata{Name: "deel1"}}},
 				Frankfurter:         []FrankfurterConnection{{ConnectionMetadata: ConnectionMetadata{Name: "frankfurter1"}}},
 				Salesforce:          []SalesforceConnection{{ConnectionMetadata: ConnectionMetadata{Name: "salesforce1"}}},
 				SQLite:              []SQLiteConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sqlite1"}}},

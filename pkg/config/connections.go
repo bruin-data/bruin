@@ -1602,6 +1602,67 @@ func (c SklikConnection) GetName() string {
 	return c.Name
 }
 
+type SumbleConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
+}
+
+func (c SumbleConnection) GetName() string {
+	return c.Name
+}
+
+type TwentyConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	Host               string   `yaml:"host,omitempty" json:"host" mapstructure:"host"`
+	APIKey             string   `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
+	Scheme             string   `yaml:"scheme,omitempty" json:"scheme,omitempty" mapstructure:"scheme"`
+	BasePath           string   `yaml:"base_path,omitempty" json:"base_path,omitempty" mapstructure:"base_path"`
+	PageSize           *int     `yaml:"page_size,omitempty" json:"page_size,omitempty" mapstructure:"page_size"`
+	RateLimit          *float64 `yaml:"rate_limit,omitempty" json:"rate_limit,omitempty" mapstructure:"rate_limit"`
+	IncludeDeleted     *bool    `yaml:"include_deleted,omitempty" json:"include_deleted,omitempty" mapstructure:"include_deleted"`
+}
+
+func (c TwentyConnection) GetName() string {
+	return c.Name
+}
+
+type AbraFlexiConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	Host               string   `yaml:"host,omitempty" json:"host" mapstructure:"host"`
+	Path               string   `yaml:"path,omitempty" json:"path,omitempty" mapstructure:"path"`
+	Username           string   `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password           string   `yaml:"password,omitempty" json:"password" mapstructure:"password" sensitive:"true"`
+	Company            string   `yaml:"company,omitempty" json:"company" mapstructure:"company"`
+	Scheme             string   `yaml:"scheme,omitempty" json:"scheme,omitempty" mapstructure:"scheme"`
+	PageSize           *int     `yaml:"page_size,omitempty" json:"page_size,omitempty" mapstructure:"page_size"`
+	RateLimit          *float64 `yaml:"rate_limit,omitempty" json:"rate_limit,omitempty" mapstructure:"rate_limit"`
+	IncludeExpensive   *bool    `yaml:"include_expensive,omitempty" json:"include_expensive,omitempty" mapstructure:"include_expensive"`
+}
+
+func (c AbraFlexiConnection) GetName() string {
+	return c.Name
+}
+
+type SatisMeterConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
+	ProjectID          string `yaml:"project_id,omitempty" json:"project_id" mapstructure:"project_id"`
+}
+
+func (c SatisMeterConnection) GetName() string {
+	return c.Name
+}
+
+type DeelConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
+	Environment        string `yaml:"environment,omitempty" json:"environment,omitempty" mapstructure:"environment"`
+}
+
+func (c DeelConnection) GetName() string {
+	return c.Name
+}
+
 type FrankfurterConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 }

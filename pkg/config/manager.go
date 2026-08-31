@@ -128,6 +128,11 @@ type Connections struct {
 	GSC                 []GSCConnection                 `yaml:"gsc,omitempty" json:"gsc,omitempty" mapstructure:"gsc"`
 	AppLovin            []AppLovinConnection            `yaml:"applovin,omitempty" json:"applovin,omitempty" mapstructure:"applovin"`
 	Sklik               []SklikConnection               `yaml:"sklik,omitempty" json:"sklik,omitempty" mapstructure:"sklik"`
+	Sumble              []SumbleConnection              `yaml:"sumble,omitempty" json:"sumble,omitempty" mapstructure:"sumble"`
+	Twenty              []TwentyConnection              `yaml:"twenty,omitempty" json:"twenty,omitempty" mapstructure:"twenty"`
+	AbraFlexi           []AbraFlexiConnection           `yaml:"abraflexi,omitempty" json:"abraflexi,omitempty" mapstructure:"abraflexi"`
+	SatisMeter          []SatisMeterConnection          `yaml:"satismeter,omitempty" json:"satismeter,omitempty" mapstructure:"satismeter"`
+	Deel                []DeelConnection                `yaml:"deel,omitempty" json:"deel,omitempty" mapstructure:"deel"`
 	Frankfurter         []FrankfurterConnection         `yaml:"frankfurter,omitempty" json:"frankfurter,omitempty" mapstructure:"frankfurter"`
 	Salesforce          []SalesforceConnection          `yaml:"salesforce,omitempty" json:"salesforce,omitempty" mapstructure:"salesforce"`
 	SQLite              []SQLiteConnection              `yaml:"sqlite,omitempty" json:"sqlite,omitempty" mapstructure:"sqlite"`
@@ -1604,6 +1609,41 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Sklik = append(env.Connections.Sklik, conn)
+	case "sumble":
+		var conn SumbleConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Sumble = append(env.Connections.Sumble, conn)
+	case "twenty":
+		var conn TwentyConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Twenty = append(env.Connections.Twenty, conn)
+	case "abraflexi":
+		var conn AbraFlexiConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.AbraFlexi = append(env.Connections.AbraFlexi, conn)
+	case "satismeter":
+		var conn SatisMeterConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.SatisMeter = append(env.Connections.SatisMeter, conn)
+	case "deel":
+		var conn DeelConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Deel = append(env.Connections.Deel, conn)
 	case "salesforce":
 		var conn SalesforceConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -2160,6 +2200,16 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.AppLovin = removeConnection(env.Connections.AppLovin, connectionName)
 	case "sklik":
 		env.Connections.Sklik = removeConnection(env.Connections.Sklik, connectionName)
+	case "sumble":
+		env.Connections.Sumble = removeConnection(env.Connections.Sumble, connectionName)
+	case "twenty":
+		env.Connections.Twenty = removeConnection(env.Connections.Twenty, connectionName)
+	case "abraflexi":
+		env.Connections.AbraFlexi = removeConnection(env.Connections.AbraFlexi, connectionName)
+	case "satismeter":
+		env.Connections.SatisMeter = removeConnection(env.Connections.SatisMeter, connectionName)
+	case "deel":
+		env.Connections.Deel = removeConnection(env.Connections.Deel, connectionName)
 	case "freshdesk":
 		env.Connections.Freshdesk = removeConnection(env.Connections.Freshdesk, connectionName)
 	case "okta":
@@ -2445,6 +2495,11 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.GSC, source.GSC)
 	mergeConnectionList(&c.AppLovin, source.AppLovin)
 	mergeConnectionList(&c.Sklik, source.Sklik)
+	mergeConnectionList(&c.Sumble, source.Sumble)
+	mergeConnectionList(&c.Twenty, source.Twenty)
+	mergeConnectionList(&c.AbraFlexi, source.AbraFlexi)
+	mergeConnectionList(&c.SatisMeter, source.SatisMeter)
+	mergeConnectionList(&c.Deel, source.Deel)
 	mergeConnectionList(&c.Frankfurter, source.Frankfurter)
 	mergeConnectionList(&c.Salesforce, source.Salesforce)
 	mergeConnectionList(&c.SQLite, source.SQLite)
