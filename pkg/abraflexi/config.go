@@ -1,6 +1,7 @@
 package abraflexi
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -46,7 +47,7 @@ type requiredField struct {
 func (c *Config) GetIngestrURI() (string, error) {
 	host := strings.TrimSpace(c.Host)
 	if host == "" {
-		return "", fmt.Errorf("abraflexi: host must be provided")
+		return "", errors.New("abraflexi: host must be provided")
 	}
 
 	requiredFields := []requiredField{

@@ -1,6 +1,7 @@
 package deel
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -22,7 +23,7 @@ type Config struct {
 func (c *Config) GetIngestrURI() (string, error) {
 	apiKey := strings.TrimSpace(c.APIKey)
 	if apiKey == "" {
-		return "", fmt.Errorf("deel: api_key must be provided")
+		return "", errors.New("deel: api_key must be provided")
 	}
 
 	params := url.Values{}

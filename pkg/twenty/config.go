@@ -1,6 +1,7 @@
 package twenty
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -35,11 +36,11 @@ type Config struct {
 func (c *Config) GetIngestrURI() (string, error) {
 	host := strings.TrimSpace(c.Host)
 	if host == "" {
-		return "", fmt.Errorf("twenty: host must be provided")
+		return "", errors.New("twenty: host must be provided")
 	}
 	apiKey := strings.TrimSpace(c.APIKey)
 	if apiKey == "" {
-		return "", fmt.Errorf("twenty: api_key must be provided")
+		return "", errors.New("twenty: api_key must be provided")
 	}
 
 	params := url.Values{}
