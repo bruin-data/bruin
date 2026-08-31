@@ -44,7 +44,8 @@ type mockConnectionInstance struct {
 
 func (m *mockConnectionInstance) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
 	args := m.Called(ctx)
-	return args.Get(0).(*ansisql.DBDatabase), args.Error(1)
+	summary, _ := args.Get(0).(*ansisql.DBDatabase)
+	return summary, args.Error(1)
 }
 
 type mockTableCheckingConnectionInstance struct {
@@ -795,6 +796,132 @@ func TestTableExistsInDatabasePrefersMetadataChecker(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, exists)
 	connection.AssertExpectations(t)
+}
+
+func TestDevEnvQueryModifier_Modify_FetchesSummaryOnSecondConnection(t *testing.T) {
+	t.Parallel()
+
+	pipelineA := &pipeline.Pipeline{
+		DefaultConnections: map[string]string{"postgres": "conn-a"},
+	}
+	pipelineB := &pipeline.Pipeline{
+		DefaultConnections: map[string]string{"postgres": "conn-b"},
+	}
+	asset := &pipeline.Asset{
+		Name: "dev_schema1.table1",
+		Type: pipeline.AssetTypePostgresQuery,
+	}
+
+	connA := new(mockConnectionInstance)
+	connA.On("GetDatabaseSummary", mock.Anything).Return(&ansisql.DBDatabase{
+		Name: "db_a",
+		Schemas: []*ansisql.DBSchema{
+			{
+				Name: "dev_schema1",
+				Tables: []*ansisql.DBTable{
+					{Name: "table1"},
+				},
+			},
+		},
+	}, nil).Once()
+
+	connB := new(mockConnectionInstance)
+	connB.On("GetDatabaseSummary", mock.Anything).Return(&ansisql.DBDatabase{
+		Name:    "db_b",
+		Schemas: []*ansisql.DBSchema{},
+	}, nil).Once()
+
+	connectionFetcher := new(mockConnectionFetcher)
+	connectionFetcher.On("GetConnection", "conn-a").Return(connA)
+	connectionFetcher.On("GetConnection", "conn-b").Return(connB)
+
+	sqlParser := new(mockSQLParser)
+	queryA := "SELECT * FROM schema1.table1"
+	sqlParser.On("UsedTables", queryA, "postgres").Return([]string{"schema1.table1"}, nil)
+	sqlParser.On("RenameTables", queryA, "postgres", map[string]string{
+		"schema1.table1": "dev_schema1.table1",
+	}).Return("SELECT * FROM dev_schema1.table1", nil)
+
+	queryB := "SELECT * FROM otherdb.schema1.table1"
+	sqlParser.On("UsedTables", queryB, "postgres").Return([]string{"otherdb.schema1.table1"}, nil)
+	sqlParser.On("RenameTables", queryB, "postgres", map[string]string{
+		"schema1.table1": "dev_schema1.table1",
+	}).Return("SELECT * FROM otherdb.schema1.table1", nil)
+
+	modifier := &DevEnvQueryModifier{
+		Dialect: "postgres",
+		Conn:    connectionFetcher,
+		Parser:  sqlParser,
+	}
+	ctx := context.WithValue(t.Context(), config.EnvironmentContextKey, &config.Environment{SchemaPrefix: "dev_"})
+
+	gotA, err := modifier.Modify(ctx, pipelineA, asset, &query.Query{Query: queryA})
+	require.NoError(t, err)
+	require.Equal(t, &query.Query{Query: "SELECT * FROM dev_schema1.table1"}, gotA)
+
+	gotB, err := modifier.Modify(ctx, pipelineB, asset, &query.Query{Query: queryB})
+	require.NoError(t, err)
+	require.Equal(t, &query.Query{Query: queryB}, gotB)
+	sqlParser.AssertExpectations(t)
+	connA.AssertExpectations(t)
+	connB.AssertExpectations(t)
+}
+
+func TestDevEnvQueryModifier_Modify_DoesNotCacheFailedSummary(t *testing.T) {
+	t.Parallel()
+
+	p := &pipeline.Pipeline{
+		DefaultConnections: map[string]string{"postgres": "conn-a"},
+	}
+	asset := &pipeline.Asset{
+		Name: "dev_schema1.table1",
+		Type: pipeline.AssetTypePostgresQuery,
+	}
+
+	connA := new(mockConnectionInstance)
+	connA.On("GetDatabaseSummary", mock.Anything).
+		Return(nil, errors.New("failed to get db summary")).
+		Once()
+	connA.On("GetDatabaseSummary", mock.Anything).Return(&ansisql.DBDatabase{
+		Name: "db_a",
+		Schemas: []*ansisql.DBSchema{
+			{
+				Name: "dev_schema1",
+				Tables: []*ansisql.DBTable{
+					{Name: "table1"},
+				},
+			},
+		},
+	}, nil).Once()
+
+	connectionFetcher := new(mockConnectionFetcher)
+	connectionFetcher.On("GetConnection", "conn-a").Return(connA)
+
+	sqlParser := new(mockSQLParser)
+	queryA := "SELECT * FROM schema1.table1"
+	sqlParser.On("UsedTables", queryA, "postgres").Return([]string{"schema1.table1"}, nil)
+
+	queryB := "SELECT * FROM otherdb.schema.table"
+	sqlParser.On("UsedTables", queryB, "postgres").Return([]string{"otherdb.schema.table"}, nil)
+	sqlParser.On("RenameTables", queryB, "postgres", map[string]string{
+		"schema1.table1": "dev_schema1.table1",
+	}).Return("SELECT * FROM otherdb.schema.table", nil)
+
+	modifier := &DevEnvQueryModifier{
+		Dialect: "postgres",
+		Conn:    connectionFetcher,
+		Parser:  sqlParser,
+	}
+	ctx := context.WithValue(t.Context(), config.EnvironmentContextKey, &config.Environment{SchemaPrefix: "dev_"})
+
+	_, err := modifier.Modify(ctx, p, asset, &query.Query{Query: queryA})
+	require.EqualError(t, err, "failed to get db summary")
+
+	got, err := modifier.Modify(ctx, p, asset, &query.Query{Query: queryB})
+	require.NoError(t, err)
+	require.Equal(t, &query.Query{Query: queryB}, got)
+	sqlParser.AssertExpectations(t)
+	connA.AssertExpectations(t)
 }
 
 func TestDevEnvQueryModifierBatchesCrossCatalogTableChecks(t *testing.T) {

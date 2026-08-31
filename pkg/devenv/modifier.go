@@ -77,17 +77,20 @@ func (d *DevEnvQueryModifier) Modify(ctx context.Context, p *pipeline.Pipeline, 
 	d.connSchemaCacheLock.Lock()
 	if d.connSchemaCache == nil {
 		d.connSchemaCache = make(map[string]*ansisql.DBDatabase)
+	}
 
+	if dbSummary = d.connSchemaCache[connName]; dbSummary != nil {
+		d.connSchemaCacheLock.Unlock()
+	} else {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			dbSummary, dbSummaryErr = dbFetcherConn.GetDatabaseSummary(ctx)
-			d.connSchemaCache[connName] = dbSummary
+			if dbSummaryErr == nil && dbSummary != nil {
+				d.connSchemaCache[connName] = dbSummary
+			}
 			d.connSchemaCacheLock.Unlock()
 		}()
-	} else {
-		dbSummary = d.connSchemaCache[connName]
-		d.connSchemaCacheLock.Unlock()
 	}
 
 	wg.Wait()
@@ -97,6 +100,9 @@ func (d *DevEnvQueryModifier) Modify(ctx context.Context, p *pipeline.Pipeline, 
 
 	if dbSummaryErr != nil {
 		return nil, dbSummaryErr
+	}
+	if dbSummary == nil {
+		return nil, fmt.Errorf("database summary for connection '%s' is unavailable", connName)
 	}
 
 	crossCatalogTables := make([]string, 0)
