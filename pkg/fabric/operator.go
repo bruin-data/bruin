@@ -72,6 +72,13 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	}
 
 	q := queries[0]
+	if o.devEnv != nil {
+		q, err = o.devEnv.Modify(ctx, p, t, q)
+		if err != nil {
+			return err
+		}
+	}
+
 	materialized, err := o.materializer.Render(t, q.String())
 	if err != nil {
 		return err
@@ -101,17 +108,9 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	}
 
 	writer := ctx.Value(executor.KeyPrinter)
-	queryToRun := q
-	if o.devEnv != nil {
-		queryToRun, err = o.devEnv.Modify(ctx, p, t, q)
-		if err != nil {
-			return err
-		}
-	}
+	ansisql.LogQueryIfVerbose(ctx, writer, q.Query)
 
-	ansisql.LogQueryIfVerbose(ctx, writer, queryToRun.Query)
-
-	err = conn.RunQueryWithoutResult(ctx, queryToRun)
+	err = conn.RunQueryWithoutResult(ctx, q)
 	if err != nil {
 		return err
 	}
@@ -120,7 +119,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return nil
 	}
 
-	err = o.devEnv.RegisterAssetForSchemaCache(ctx, p, t, queryToRun)
+	err = o.devEnv.RegisterAssetForSchemaCache(ctx, p, t, q)
 	if err != nil {
 		return errors.Wrap(err, "cannot register asset for schema cache")
 	}
