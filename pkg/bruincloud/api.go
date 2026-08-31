@@ -558,14 +558,11 @@ type AgentQueryResult struct {
 
 // RunAgentQuery runs a read-only SQL query against the named connection from the
 // agent's dev-env secret, server-side via the query service, and returns the
-// columnar result. queryParams are passed through for Jinja rendering (rendered
-// on the server, matching how dashboards run). A non-2xx response (e.g. a query
-// error or a non-read-only statement) surfaces as an *APIError.
-func (c *APIClient) RunAgentQuery(ctx context.Context, agentID int, connection, query string, queryParams map[string]any) (*AgentQueryResult, error) {
+// columnar result. The SQL is sent verbatim — cloud query mode does not accept
+// template variables. A non-2xx response (e.g. a query error or a non-read-only
+// statement) surfaces as an *APIError.
+func (c *APIClient) RunAgentQuery(ctx context.Context, agentID int, connection, query string) (*AgentQueryResult, error) {
 	body := map[string]any{"connection": connection, "query": query}
-	if len(queryParams) > 0 {
-		body["query_params"] = queryParams
-	}
 	var raw json.RawMessage
 	if err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/agents/%d/query", agentID), body, &raw); err != nil {
 		return nil, err

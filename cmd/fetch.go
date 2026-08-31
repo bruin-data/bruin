@@ -493,12 +493,11 @@ type cloudQuerier struct {
 	client         *bruincloud.APIClient
 	agentID        int
 	connectionName string
-	queryParams    map[string]any
 	limit          int64
 }
 
 func (q *cloudQuerier) SelectWithSchema(ctx context.Context, qq *query.Query) (*query.QueryResult, error) {
-	res, err := q.client.RunAgentQuery(ctx, q.agentID, q.connectionName, qq.Query, q.queryParams)
+	res, err := q.client.RunAgentQuery(ctx, q.agentID, q.connectionName, qq.Query)
 	if err != nil {
 		return nil, err
 	}
@@ -526,9 +525,10 @@ func (q *cloudQuerier) SelectWithSchema(ctx context.Context, qq *query.Query) (*
 }
 
 // prepareCloudQueryExecution builds a cloud-backed querier from the --cloud flags,
-// bypassing .bruin.yml entirely. The query is sent raw with its --var values as
-// query_params; Jinja is rendered server-side (matching how dashboards run).
-func prepareCloudQueryExecution(c *cli.Command, vars map[string]any) (string, interface{}, string, string, *ppInfo, error) {
+// bypassing .bruin.yml entirely. The SQL is sent verbatim: cloud query mode does
+// not accept template variables (--var is ignored), so there is nothing to render
+// or interpolate.
+func prepareCloudQueryExecution(c *cli.Command) (string, interface{}, string, string, *ppInfo, error) {
 	if hasSemanticQueryFlags(c) {
 		return "", nil, "", "", nil, errors.New("semantic queries are not supported in cloud query mode")
 	}
@@ -553,7 +553,6 @@ func prepareCloudQueryExecution(c *cli.Command, vars map[string]any) (string, in
 		client:         bruincloud.NewAPIClient(apiKey),
 		agentID:        agentID,
 		connectionName: connectionName,
-		queryParams:    vars,
 		limit:          c.Int64("limit"),
 	}
 	return connectionName, querier, queryStr, "", nil, nil
@@ -561,7 +560,7 @@ func prepareCloudQueryExecution(c *cli.Command, vars map[string]any) (string, in
 
 func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, vars map[string]any) (string, interface{}, string, string, *ppInfo, error) {
 	if c.Bool("cloud") {
-		return prepareCloudQueryExecution(c, vars)
+		return prepareCloudQueryExecution(c)
 	}
 
 	assetPath := c.String("asset")

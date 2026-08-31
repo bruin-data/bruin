@@ -1706,34 +1706,21 @@ func TestRunAgentQuery_Success(t *testing.T) {
 		})
 	})
 
-	res, err := client.RunAgentQuery(t.Context(), 42, "warehouse_prod", "SELECT 1 AS n", map[string]any{"day": "2026-01-01"})
+	res, err := client.RunAgentQuery(t.Context(), 42, "warehouse_prod", "SELECT 1 AS n")
 	require.NoError(t, err)
 
 	assert.Equal(t, http.MethodPost, gotMethod)
 	assert.Equal(t, "/agents/42/query", gotPath)
 	assert.Equal(t, "warehouse_prod", gotBody["connection"])
 	assert.Equal(t, "SELECT 1 AS n", gotBody["query"])
-	assert.Equal(t, map[string]any{"day": "2026-01-01"}, gotBody["query_params"])
+	// Cloud query mode never sends template variables.
+	_, hasParams := gotBody["query_params"]
+	assert.False(t, hasParams, "query_params must never be sent")
 
 	assert.Equal(t, []string{"n", "label"}, res.Columns)
 	assert.Equal(t, []string{"INT8", "VARCHAR"}, res.ColumnTypes)
 	assert.Len(t, res.Rows, 2)
 	assert.Equal(t, "SELECT 1 AS n", res.RenderedSQL)
-}
-
-func TestRunAgentQuery_OmitsQueryParamsWhenEmpty(t *testing.T) {
-	t.Parallel()
-	var gotBody map[string]any
-	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-		gotBody = readJSON(t, r)
-		writeJSON(t, w, map[string]any{"columns": []string{}, "rows": [][]any{}})
-	})
-
-	_, err := client.RunAgentQuery(t.Context(), 7, "conn", "SELECT 1", nil)
-	require.NoError(t, err)
-
-	_, present := gotBody["query_params"]
-	assert.False(t, present, "query_params should be omitted when empty")
 }
 
 func TestRunAgentQuery_SurfacesAPIError(t *testing.T) {
@@ -1746,7 +1733,7 @@ func TestRunAgentQuery_SurfacesAPIError(t *testing.T) {
 		})
 	})
 
-	_, err := client.RunAgentQuery(t.Context(), 42, "conn", "DROP TABLE users", nil)
+	_, err := client.RunAgentQuery(t.Context(), 42, "conn", "DROP TABLE users")
 	require.Error(t, err)
 
 	var apiErr *APIError
@@ -1763,7 +1750,7 @@ func TestRunAgentQuery_PreservesLargeIntegerPrecision(t *testing.T) {
 		_, _ = w.Write([]byte(`{"columns":["id"],"rows":[[9007199254740993]]}`))
 	})
 
-	res, err := client.RunAgentQuery(t.Context(), 1, "c", "SELECT id", nil)
+	res, err := client.RunAgentQuery(t.Context(), 1, "c", "SELECT id")
 	require.NoError(t, err)
 	require.Len(t, res.Rows, 1)
 	assert.Equal(t, json.Number("9007199254740993"), res.Rows[0][0])
