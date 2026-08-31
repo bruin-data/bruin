@@ -582,7 +582,8 @@ func TestCloudAgentsRequestConnection_UsesEnvIDsAndBody(t *testing.T) { //nolint
 	t.Setenv("BRUIN_CLOUD_AGENT_ID", "7")
 	t.Setenv("BRUIN_THREAD_ID", "42")
 
-	path, body, err := runRequestConnection(t,
+	path, body, err := runRequestConnection(
+		t,
 		"--reason", "need snowflake",
 		"--connection-types", "snowflake", "--connection-types", "postgres",
 	)
