@@ -547,6 +547,17 @@ func (c *APIClient) AddAgentConnection(ctx context.Context, agentID int, connTyp
 	return resp.Connections, err
 }
 
+// RequestConnection posts an "add connection" card to the thread's in-flight
+// message pair. The cloud endpoint resolves the pair itself, so only the thread
+// is addressed here. connectionTypes may be empty.
+func (c *APIClient) RequestConnection(ctx context.Context, agentID, threadID int, reason string, connectionTypes []string) error {
+	body := map[string]any{"reason": reason}
+	if len(connectionTypes) > 0 {
+		body["connection_types"] = connectionTypes
+	}
+	return c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/agents/%d/threads/%d/connection-request", agentID, threadID), body, nil)
+}
+
 // CreateAgent creates a new agent. Optional fields are omitted when empty so the
 // server applies its defaults (null description/prompt, "team" visibility).
 func (c *APIClient) CreateAgent(ctx context.Context, name, description, systemPrompt, visibility string) (*Agent, error) {

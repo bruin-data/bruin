@@ -603,6 +603,40 @@ func TestAddAgentConnection(t *testing.T) {
 	assert.Equal(t, "postgres", connections[0].Type)
 }
 
+func TestRequestConnection(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/agents/7/threads/42/connection-request", r.URL.Path)
+
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, "need snowflake", body["reason"])
+		assert.Equal(t, []any{"snowflake", "postgres"}, body["connection_types"])
+
+		w.WriteHeader(http.StatusCreated)
+		writeJSON(t, w, map[string]any{"status": "ok", "message_pair_id": 99})
+	})
+
+	require.NoError(t, client.RequestConnection(t.Context(), 7, 42, "need snowflake", []string{"snowflake", "postgres"}))
+}
+
+func TestRequestConnectionOmitsEmptyTypes(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, "just reason", body["reason"])
+		_, hasTypes := body["connection_types"]
+		assert.False(t, hasTypes) // omitted, not sent as an empty array
+
+		w.WriteHeader(http.StatusCreated)
+		writeJSON(t, w, map[string]any{"status": "ok"})
+	})
+
+	require.NoError(t, client.RequestConnection(t.Context(), 1, 2, "just reason", nil))
+}
+
 func TestListConnectionSets(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
