@@ -533,7 +533,7 @@ func TestCloudAgentsCommand_Help(t *testing.T) {
 	cmd := CloudAgents()
 	require.NotNil(t, cmd)
 	assert.Equal(t, "agents", cmd.Name)
-	require.Len(t, cmd.Commands, 18)
+	require.Len(t, cmd.Commands, 19)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
@@ -547,6 +547,61 @@ func TestCloudAgentsCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "set-memory")
 	assert.Contains(t, subNames, "clear-memory")
 	assert.Contains(t, subNames, "export-thread")
+	assert.Contains(t, subNames, "request-connection")
+}
+
+// runRequestConnection runs "cloud agents request-connection" against a stub
+// server, returning the request path it hit (empty if never called) and the JSON
+// body it received.
+func runRequestConnection(t *testing.T, args ...string) (path string, body map[string]any, runErr error) {
+	t.Helper()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path = r.URL.Path
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"status":"ok","message_pair_id":99}`))
+	}))
+	t.Cleanup(server.Close)
+
+	t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
+	t.Setenv("BRUIN_CLOUD_API_KEY", "test-key")
+	t.Setenv("BRUIN_CLOUD_TEAM", "")
+	t.Chdir(writeTempConfigRepo(t, configWithoutCloudYML))
+
+	isDebug := false
+	cmd := Cloud(&isDebug)
+	// A cli.Exit from the action would otherwise os.Exit and kill the test binary;
+	// neutralize the handler so Run returns the error for us to assert on.
+	cmd.ExitErrHandler = func(context.Context, *cli.Command, error) {}
+	runErr = cmd.Run(t.Context(), append([]string{"cloud", "agents", "request-connection"}, args...))
+	return path, body, runErr
+}
+
+func TestCloudAgentsRequestConnection_UsesEnvIDsAndBody(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	t.Setenv("BRUIN_CLOUD_AGENT_ID", "7")
+	t.Setenv("BRUIN_THREAD_ID", "42")
+
+	path, body, err := runRequestConnection(t,
+		"--reason", "need snowflake",
+		"--connection-types", "snowflake", "--connection-types", "postgres",
+	)
+	require.NoError(t, err)
+	// agent + thread come from the run's env, never from the agent's own flags.
+	assert.Equal(t, "/agents/7/threads/42/connection-request", path)
+	assert.Equal(t, "need snowflake", body["reason"])
+	assert.Equal(t, []any{"snowflake", "postgres"}, body["connection_types"])
+}
+
+func TestCloudAgentsRequestConnection_RefusesOutsideCloudChat(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	// No thread in the env → nothing to render a card on; the command refuses
+	// instead of calling the API.
+	t.Setenv("BRUIN_CLOUD_AGENT_ID", "0")
+	t.Setenv("BRUIN_THREAD_ID", "0")
+
+	path, _, err := runRequestConnection(t, "--reason", "need snowflake")
+	require.Error(t, err)
+	assert.Empty(t, path, "the API must not be called without a thread")
 }
 
 func TestCloudAgentsThreadsCommand_Help(t *testing.T) {

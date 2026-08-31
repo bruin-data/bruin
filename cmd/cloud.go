@@ -2434,6 +2434,7 @@ func CloudAgents() *cli.Command {
 			cloudAgentsSetMemory(),
 			cloudAgentsClearMemory(),
 			cloudAgentsExportThread(),
+			cloudAgentsRequestConnection(),
 			cloudAgentsConnections(),
 			cloudAgentsMcp(),
 		},
@@ -3857,6 +3858,74 @@ func cloudAgentsExportThread() *cli.Command {
 			}
 
 			fmt.Println(string(pretty))
+			return nil
+		},
+	}
+}
+
+// cloudAgentsRequestConnection surfaces an "add connection" card in the current
+// chat. It's internal (Hidden) and only meaningful inside a Bruin Cloud chat run:
+// the agent supplies just --reason and --connection-types, while --agent-id and
+// --thread-id come from the run's env (BRUIN_CLOUD_AGENT_ID / BRUIN_THREAD_ID) so
+// the agent can't address another thread and never handles the message pair —
+// the cloud endpoint resolves the in-flight pair itself. Absent that env it errors,
+// so a local run has nowhere to render a card and simply refuses.
+func cloudAgentsRequestConnection() *cli.Command {
+	return &cli.Command{
+		Name:   "request-connection",
+		Usage:  "Surface an 'add connection' card in the current chat (internal; used by agent runs)",
+		Hidden: true,
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:    "agent-id",
+				Usage:   "agent ID (defaults to BRUIN_CLOUD_AGENT_ID)",
+				Sources: cli.EnvVars("BRUIN_CLOUD_AGENT_ID"),
+			},
+			&cli.IntFlag{
+				Name:    "thread-id",
+				Usage:   "thread ID (defaults to BRUIN_THREAD_ID)",
+				Sources: cli.EnvVars("BRUIN_THREAD_ID"),
+			},
+			&cli.StringFlag{
+				Name:     "reason",
+				Usage:    "short, user-facing reason the connection is needed",
+				Required: true,
+			},
+			&cli.StringSliceFlag{
+				Name:  "connection-types",
+				Usage: "likely connection type(s), e.g. snowflake,postgres; repeat or comma-separate",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			agentID, threadID := c.Int("agent-id"), c.Int("thread-id")
+			if agentID <= 0 || threadID <= 0 {
+				printError(errors.New("request-connection only works inside a Bruin Cloud chat run (BRUIN_CLOUD_AGENT_ID and BRUIN_THREAD_ID must be set)"), output, "Not in a cloud chat")
+				return cli.Exit("", 1)
+			}
+
+			reason := strings.TrimSpace(c.String("reason"))
+			if reason == "" {
+				printError(errors.New("--reason is required"), output, "Missing --reason")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			if err := client.RequestConnection(ctx, agentID, threadID, reason, c.StringSlice("connection-types")); err != nil {
+				printError(err, output, "Failed to request connection")
+				return cli.Exit("", 1)
+			}
+
+			printSuccessForOutput(output, "Connection request surfaced in the chat. Ask the user to add the connection there, then re-send their message.")
 			return nil
 		},
 	}
