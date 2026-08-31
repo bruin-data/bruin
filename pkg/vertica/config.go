@@ -3,6 +3,7 @@ package vertica
 import (
 	"fmt"
 	"net/url"
+	"strconv"
 )
 
 type Config struct {
@@ -26,7 +27,7 @@ func (c *Config) optionalQuery() url.Values {
 		query.Add("tlsmode", c.TLSMode)
 	}
 	if c.ConnectionLoadBalance != nil {
-		query.Add("connection_load_balance", fmt.Sprintf("%d", *c.ConnectionLoadBalance))
+		query.Add("connection_load_balance", strconv.Itoa(*c.ConnectionLoadBalance))
 	}
 	if c.BackupServerNode != "" {
 		query.Add("backup_server_node", c.BackupServerNode)
