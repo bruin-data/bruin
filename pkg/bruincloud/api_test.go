@@ -1768,3 +1768,69 @@ func TestDeleteRunState(t *testing.T) {
 	err := client.DeleteRunState(t.Context(), 7, "gone.md")
 	require.NoError(t, err)
 }
+
+func TestRunAgentQuery_Success(t *testing.T) {
+	t.Parallel()
+	var gotPath, gotMethod string
+	var gotBody map[string]any
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotMethod = r.Method
+		gotBody = readJSON(t, r)
+		writeJSON(t, w, map[string]any{
+			"columns":      []string{"n", "label"},
+			"column_types": []string{"INT8", "VARCHAR"},
+			"rows":         [][]any{{1, "a"}, {2, "b"}},
+			"rendered_sql": "SELECT 1 AS n",
+		})
+	})
+
+	res, err := client.RunAgentQuery(t.Context(), 42, "warehouse_prod", "SELECT 1 AS n")
+	require.NoError(t, err)
+
+	assert.Equal(t, http.MethodPost, gotMethod)
+	assert.Equal(t, "/agents/42/query", gotPath)
+	assert.Equal(t, "warehouse_prod", gotBody["connection"])
+	assert.Equal(t, "SELECT 1 AS n", gotBody["query"])
+	// Cloud query mode never sends template variables.
+	_, hasParams := gotBody["query_params"]
+	assert.False(t, hasParams, "query_params must never be sent")
+
+	assert.Equal(t, []string{"n", "label"}, res.Columns)
+	assert.Equal(t, []string{"INT8", "VARCHAR"}, res.ColumnTypes)
+	assert.Len(t, res.Rows, 2)
+	assert.Equal(t, "SELECT 1 AS n", res.RenderedSQL)
+}
+
+func TestRunAgentQuery_SurfacesAPIError(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		writeJSON(t, w, map[string]any{
+			"message": "Only read-only queries (SELECT / WITH) are allowed on this endpoint.",
+			"error":   "query_error",
+		})
+	})
+
+	_, err := client.RunAgentQuery(t.Context(), 42, "conn", "DROP TABLE users")
+	require.Error(t, err)
+
+	var apiErr *APIError
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, http.StatusUnprocessableEntity, apiErr.StatusCode)
+	assert.Equal(t, "query_error", apiErr.Code)
+	assert.Contains(t, apiErr.Message, "read-only")
+}
+
+func TestRunAgentQuery_PreservesLargeIntegerPrecision(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		// 2^53+1 cannot be represented as float64; default decoding would round it.
+		_, _ = w.Write([]byte(`{"columns":["id"],"rows":[[9007199254740993]]}`))
+	})
+
+	res, err := client.RunAgentQuery(t.Context(), 1, "c", "SELECT id")
+	require.NoError(t, err)
+	require.Len(t, res.Rows, 1)
+	assert.Equal(t, json.Number("9007199254740993"), res.Rows[0][0])
+}

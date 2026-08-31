@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"encoding/csv"
 	"encoding/json"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/bigquery"
+	"github.com/bruin-data/bruin/pkg/bruincloud"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
@@ -160,6 +162,21 @@ func Query() *cli.Command {
 				Usage:   "set Jinja template variables for query rendering. Supports flat (--var key=value), dot-notation nested (--var filters.start_date=2026-05-20) and JSON object/array values (--var filters='{\"start_date\":\"2026-05-20\"}').",
 				Sources: cli.EnvVars("BRUIN_VARS"),
 			},
+			&cli.BoolFlag{
+				Name:    "cloud",
+				Usage:   "run the query against Bruin Cloud instead of locally (uses --connection against the agent's connections; ignores .bruin.yml; --var is not applied)",
+				Sources: cli.EnvVars("BRUIN_CLOUD_QUERY"),
+			},
+			&cli.IntFlag{
+				Name:    "cloud-agent-id",
+				Usage:   "Bruin Cloud agent id whose connections back the query (with --cloud)",
+				Sources: cli.EnvVars("BRUIN_CLOUD_AGENT_ID"),
+			},
+			&cli.StringFlag{
+				Name:    "cloud-api-key",
+				Usage:   "Bruin Cloud API key used to authenticate --cloud queries",
+				Sources: cli.EnvVars("BRUIN_CLOUD_API_KEY"),
+			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			fs := afero.NewOsFs()
@@ -177,8 +194,13 @@ func Query() *cli.Command {
 				return handleError(c.String("output"), err)
 			}
 
+			// Cloud mode has no local dialect to rewrite against, so the SQL parser
+			// (schema-prefix) and dry-run don't apply; --limit is honored client-side
+			// in cloudQuerier instead of via the parser.
+			cloudMode := c.Bool("cloud")
+
 			var parser *sqlparser.SQLParser
-			needsParser := c.IsSet("limit") || (pipelineInfo != nil && pipelineInfo.Config.SelectedEnvironment.SchemaPrefix != "")
+			needsParser := !cloudMode && (c.IsSet("limit") || (pipelineInfo != nil && pipelineInfo.Config.SelectedEnvironment.SchemaPrefix != ""))
 
 			if needsParser {
 				parser, err = sqlparser.NewSQLParser(false)
@@ -211,6 +233,9 @@ func Query() *cli.Command {
 			}
 
 			if c.Bool("dry-run") {
+				if cloudMode {
+					return handleError(c.String("output"), errors.New("--dry-run is not supported in cloud query mode"))
+				}
 				ctx = query.WithQueryType(ctx, query.QueryTypeDryRun)
 				if c.Bool("export") {
 					return handleError(c.String("output"), errors.New("cannot combine --dry-run with --export"))
@@ -461,7 +486,83 @@ func validateFlags(connection, query, asset, pipelinePath string, hasSemanticFla
 	}
 }
 
+// cloudQuerier runs queries against an agent's connection through the Bruin Cloud
+// API. It implements schemaQuerier so the rest of the query command (output,
+// export, query-log) works unchanged.
+type cloudQuerier struct {
+	client         *bruincloud.APIClient
+	agentID        int
+	connectionName string
+	limit          int64
+}
+
+func (q *cloudQuerier) SelectWithSchema(ctx context.Context, qq *query.Query) (*query.QueryResult, error) {
+	res, err := q.client.RunAgentQuery(ctx, q.agentID, q.connectionName, qq.Query)
+	if err != nil {
+		return nil, err
+	}
+
+	// Pad column types to the column count so `-o json` (which indexes types by
+	// column) is safe against a cloud deployment that predates column_types.
+	columnTypes := res.ColumnTypes
+	if len(columnTypes) < len(res.Columns) {
+		padded := make([]string, len(res.Columns))
+		copy(padded, columnTypes)
+		columnTypes = padded
+	}
+
+	rows := res.Rows
+	// The server enforces its own cap; a smaller --limit is applied client-side.
+	if q.limit > 0 && int64(len(rows)) > q.limit {
+		rows = rows[:q.limit]
+	}
+
+	return &query.QueryResult{
+		Columns:     res.Columns,
+		Rows:        rows,
+		ColumnTypes: columnTypes,
+	}, nil
+}
+
+// prepareCloudQueryExecution builds a cloud-backed querier from the --cloud flags,
+// bypassing .bruin.yml entirely. The SQL is sent verbatim: cloud query mode does
+// not accept template variables (--var is ignored), so there is nothing to render
+// or interpolate.
+func prepareCloudQueryExecution(c *cli.Command) (string, interface{}, string, string, *ppInfo, error) {
+	if hasSemanticQueryFlags(c) {
+		return "", nil, "", "", nil, errors.New("semantic queries are not supported in cloud query mode")
+	}
+
+	connectionName := c.String("connection")
+	queryStr := c.String("query")
+	if connectionName == "" || queryStr == "" {
+		return "", nil, "", "", nil, errors.New("cloud query mode requires both --connection and --query")
+	}
+
+	apiKey := c.String("cloud-api-key")
+	if apiKey == "" {
+		return "", nil, "", "", nil, errors.New("cloud query mode requires --cloud-api-key (BRUIN_CLOUD_API_KEY)")
+	}
+
+	agentID := c.Int("cloud-agent-id")
+	if agentID <= 0 {
+		return "", nil, "", "", nil, errors.New("cloud query mode requires --cloud-agent-id (BRUIN_CLOUD_AGENT_ID)")
+	}
+
+	querier := &cloudQuerier{
+		client:         bruincloud.NewAPIClient(apiKey),
+		agentID:        agentID,
+		connectionName: connectionName,
+		limit:          c.Int64("limit"),
+	}
+	return connectionName, querier, queryStr, "", nil, nil
+}
+
 func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, vars map[string]any) (string, interface{}, string, string, *ppInfo, error) {
+	if c.Bool("cloud") {
+		return prepareCloudQueryExecution(c)
+	}
+
 	assetPath := c.String("asset")
 	queryStr := c.String("query")
 	env := c.String("environment")
@@ -1611,8 +1712,11 @@ func writeAggregatedQueryLog(logDir, targetPath string) error {
 			continue
 		}
 
+		// UseNumber so integers beyond 2^53 keep full precision through aggregation.
+		dec := json.NewDecoder(bytes.NewReader(data))
+		dec.UseNumber()
 		var entryLog QueryLog
-		if err := json.Unmarshal(data, &entryLog); err != nil {
+		if err := dec.Decode(&entryLog); err != nil {
 			continue
 		}
 		if len(entryLog.Rows) > aggregatedQueryLogMaxRows {

@@ -547,6 +547,38 @@ func (c *APIClient) AddAgentConnection(ctx context.Context, agentID int, connTyp
 	return resp.Connections, err
 }
 
+// AgentQueryResult is the columnar result of running a query against one of an
+// agent's connections via the cloud query endpoint.
+type AgentQueryResult struct {
+	Columns     []string        `json:"columns"`
+	ColumnTypes []string        `json:"column_types"`
+	Rows        [][]interface{} `json:"rows"`
+	RenderedSQL string          `json:"rendered_sql"`
+}
+
+// RunAgentQuery runs a read-only SQL query against the named connection from the
+// agent's dev-env secret, server-side via the query service, and returns the
+// columnar result. The SQL is sent verbatim — cloud query mode does not accept
+// template variables. A non-2xx response (e.g. a query error or a non-read-only
+// statement) surfaces as an *APIError.
+func (c *APIClient) RunAgentQuery(ctx context.Context, agentID int, connection, query string) (*AgentQueryResult, error) {
+	body := map[string]any{"connection": connection, "query": query}
+	var raw json.RawMessage
+	if err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/agents/%d/query", agentID), body, &raw); err != nil {
+		return nil, err
+	}
+
+	// Decode row cells as json.Number so integers beyond 2^53 keep full precision
+	// (default decoding would round them to float64).
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.UseNumber()
+	var result AgentQueryResult
+	if err := dec.Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to parse query result: %w", err)
+	}
+	return &result, nil
+}
+
 // RequestConnection posts an "add connection" card to the thread's in-flight
 // message pair. The cloud endpoint resolves the pair itself, so only the thread
 // is addressed here. connectionTypes may be empty.
