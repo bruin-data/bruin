@@ -108,6 +108,8 @@ environments:
           api_token: "bruin_pat_xxxxxxxx…"
 ```
 
+The CLI reads `.bruin.yml` from the Git repository root, so the `.bruin.yml` approach only works inside a repo — outside one (or to override it), use `--api-key` or `BRUIN_CLOUD_API_KEY` instead.
+
 If you're using a personal token scoped to more than one team, tell the CLI which team to act on with `--team <company_prefix>` (run `bruin cloud teams list` to see the prefixes), or set a default once so you can skip it:
 
 ```bash
