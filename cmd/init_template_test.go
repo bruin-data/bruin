@@ -872,6 +872,9 @@ func academySQLBeginnerChecksums(t *testing.T, dbPath string) map[string]academy
 
 		var snapshot academyTableSnapshot
 		require.NoError(t, row.Scan(&snapshot.checksum, &snapshot.rowCount))
+		// The ADBC driver backs the scanned string with an Arrow buffer it reuses
+		// on the next connection; clone it so this run's checksum stays durable.
+		snapshot.checksum = strings.Clone(snapshot.checksum)
 		snapshots[name] = snapshot
 	}
 
