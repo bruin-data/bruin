@@ -15,12 +15,12 @@ Both are bearer tokens and both expire.
 | Abilities | exactly what you grant | clamped to your role |
 | Teams | the team it's created in | one or more of your teams |
 | Who can create | team admins | any member (self-service) |
-| Managed in | Team Settings → API Tokens | Account → Personal Access Tokens |
+| Managed in | Team Settings → API Tokens | User menu → Access Tokens |
 
 ## Where to manage tokens
 
 - **Team tokens** — **Team Settings → API Tokens**. Creating and revoking them requires team-admin permission.
-- **Personal access tokens** — your account page, **Account → Personal Access Tokens** at `/account/api-tokens`. Self-service — no admin permission required. Your PATs also appear in the Team Settings panel alongside the team's shared tokens.
+- **Personal access tokens** — open the **user menu** (your avatar, top-right) and choose **Access Tokens** under *Manage Account*. This opens the **Personal Access Tokens** page (`/account/api-tokens`). Self-service — no admin permission required. Your PATs also appear in the Team Settings panel alongside the team's shared tokens.
 
 Each panel lists a token's name, status (active / expiring soon / expired), abilities, and last-used timestamp.
 
