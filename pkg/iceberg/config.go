@@ -21,6 +21,7 @@ var supportedCatalogTypes = []config.IcebergCatalogType{
 	config.IcebergCatalogHive,
 	config.IcebergCatalogHadoop,
 	config.IcebergCatalogSQL,
+	config.IcebergCatalogR2,
 }
 
 type Config struct {
@@ -146,6 +147,14 @@ func icebergCatalogURI(cat config.IcebergCatalog) (string, url.Values, error) {
 			q.Set("token", cat.Token)
 		}
 		return "iceberg+rest://" + hostPort(cat.Host, cat.Port), q, nil
+	case config.IcebergCatalogR2:
+		// Cloudflare R2 Data Catalog: account id + bucket build the URI, and R2 vends
+		// the S3 storage credentials through the catalog, so no storage block is needed.
+		if cat.CatalogID == "" || cat.Database == "" || cat.Token == "" {
+			return "", nil, fmt.Errorf("iceberg: r2 catalog requires %q (account id), %q (bucket), and %q (R2 API token)", "catalog_id", "database", "token")
+		}
+		q.Set("token", cat.Token)
+		return "iceberg+r2://" + cat.CatalogID + "/" + cat.Database, q, nil
 	case config.IcebergCatalogHive:
 		if cat.Host == "" {
 			return "", nil, fmt.Errorf("iceberg: hive catalog requires %q", "host")

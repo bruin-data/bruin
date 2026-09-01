@@ -252,6 +252,43 @@ func TestConfig_GetIngestrURI_RESTCatalog(t *testing.T) {
 	assert.Equal(t, "https://auth.internal/token", q.Get("oauth2-server-uri"))
 }
 
+func TestConfig_GetIngestrURI_R2Catalog(t *testing.T) {
+	t.Parallel()
+
+	// R2 needs no storage block: the catalog vends the S3 credentials.
+	c := Config{
+		Catalog: config.IcebergCatalog{
+			Type:      config.IcebergCatalogR2,
+			CatalogID: "a430f6cbf157ff5d1518cdab0cba50aa",
+			Database:  "ingestr-r2-test",
+			Token:     "cfat_secret",
+		},
+	}
+
+	got, err := c.GetIngestrURI()
+	require.NoError(t, err)
+	assert.True(t, strings.HasPrefix(got, "iceberg+r2://a430f6cbf157ff5d1518cdab0cba50aa/ingestr-r2-test?"), "got: %s", got)
+
+	scheme, q := parseQuery(t, got)
+	assert.Equal(t, "iceberg+r2", scheme)
+	assert.Equal(t, "cfat_secret", q.Get("token"))
+	assert.Empty(t, q.Get("warehouse"), "R2 derives the warehouse from the account/bucket in the URI")
+}
+
+func TestConfig_GetIngestrURI_R2CatalogRequiresAccountBucketToken(t *testing.T) {
+	t.Parallel()
+
+	for _, cat := range []config.IcebergCatalog{
+		{Type: config.IcebergCatalogR2, Database: "b", Token: "t"},
+		{Type: config.IcebergCatalogR2, CatalogID: "acct", Token: "t"},
+		{Type: config.IcebergCatalogR2, CatalogID: "acct", Database: "b"},
+	} {
+		_, err := Config{Catalog: cat}.GetIngestrURI()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "r2 catalog requires")
+	}
+}
+
 func TestConfig_GetIngestrURI_HadoopAndHive(t *testing.T) {
 	t.Parallel()
 
