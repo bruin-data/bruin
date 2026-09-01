@@ -278,7 +278,11 @@ func (u *UvPythonRunner) runWithNoMaterialization(ctx context.Context, execCtx *
 		flags = append(flags, "--with-requirements", execCtx.requirementsTxt)
 	}
 
-	flags = append(flags, "--module", execCtx.module)
+	if pythonModulePath.MatchString(execCtx.module) {
+		flags = append(flags, "--module", execCtx.module)
+	} else {
+		flags = append(flags, execCtx.asset.ExecutableFile.Path)
+	}
 
 	noDependencyCommand := &CommandInstance{
 		Name:    u.binaryFullPath,
@@ -318,7 +322,12 @@ func (u *UvPythonRunner) runWithPyproject(ctx context.Context, execCtx *executio
 	modulePath := u.calculateModuleFromProjectRoot(execCtx, depConfig.ProjectRoot)
 
 	// Build command: uv run --python <version> --module <module>
-	flags := []string{"run", "--python", pythonVersion, "--module", modulePath}
+	flags := []string{"run", "--python", pythonVersion}
+	if pythonModulePath.MatchString(modulePath) {
+		flags = append(flags, "--module", modulePath)
+	} else {
+		flags = append(flags, execCtx.asset.ExecutableFile.Path)
+	}
 
 	command := &CommandInstance{
 		Name:    u.binaryFullPath,
