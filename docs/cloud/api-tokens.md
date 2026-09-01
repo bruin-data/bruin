@@ -7,7 +7,7 @@ Bruin Cloud has two kinds of token:
 - **Team tokens** — owned by the team, act *as the team*. They carry **exactly** the abilities you grant them (they're not tied to any one person's role), which makes them the right choice for shared automation, CI/CD, and service integrations. Created and managed by team admins.
 - **Personal access tokens (PATs)** — owned by you, act *as you*. Their abilities are always clamped to your live role on each team, so a PAT can never do more than you can, and if your role is reduced the token loses those abilities immediately. Any team member can create one for their own CLI use and scripts.
 
-Both are bearer tokens, both expire, and both are prefixed with `bruin_pat_` so secret scanners can spot them if they leak.
+Both are bearer tokens and both expire.
 
 |  | Team token | Personal access token |
 |--|-----------|-----------------------|
@@ -38,7 +38,7 @@ The plain-text token appears once, in a modal. Copy it now — Bruin Cloud doesn
 The token is used as a bearer token:
 
 ```text
-Authorization: Bearer bruin_pat_xxxxxxxx…
+Authorization: Bearer <token>
 ```
 
 ## Team scope (personal tokens)
@@ -89,7 +89,7 @@ Click **Edit** on a token to change its abilities (and, for a personal token, it
 For HTTP calls, CI/CD, the [Cloud MCP](/cloud/mcp-setup), and any external system, send the token in the `Authorization` header:
 
 ```text
-Authorization: Bearer bruin_pat_xxxxxxxx…
+Authorization: Bearer <token>
 ```
 
 For a multi-team personal token, add `X-Bruin-Team: <company_prefix>` to target a specific team.
@@ -105,7 +105,7 @@ environments:
     connections:
       bruin:
         - name: "cloud"
-          api_token: "bruin_pat_xxxxxxxx…"
+          api_token: "your-token-here"
 ```
 
 The CLI reads `.bruin.yml` from the Git repository root, so the `.bruin.yml` approach only works inside a repo — outside one (or to override it), use `--api-key` or `BRUIN_CLOUD_API_KEY` instead.
