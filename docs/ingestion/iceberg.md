@@ -11,7 +11,7 @@ Bruin supports Iceberg as a **destination** for [Ingestr assets](/assets/ingestr
 
 | Catalog (`catalog.type`) | Storage (`storage.type`) |
 |---|---|
-| `glue`, `sqlite`, `postgres`, `rest`, `hive`, `hadoop`, `sql` | `s3`, `gcs`, `local` |
+| `glue`, `sqlite`, `postgres`, `rest`, `hive`, `hadoop`, `sql`, `r2` | `s3`, `gcs`, `local` |
 
 Table data is written to AWS S3 or any S3-compatible store (MinIO, Cloudflare R2, GCS interop), to Google Cloud Storage natively, or to the local filesystem.
 
@@ -69,6 +69,18 @@ Each catalog type takes different fields. Use the matching `catalog:` block belo
 > [!TIP]
 > A REST catalog is a **running server** you start and configure yourself — it holds its own warehouse location, storage backend, and credentials, and usually writes the table metadata to storage. Your connection's `storage` block still supplies the credentials Bruin uses to write the **data files**.
 > OAuth2 options such as `oauth2-server-uri` and `scope` go in the top-level [`properties`](#table-options) block.
+
+**Cloudflare R2 Data Catalog**
+```yaml
+          catalog:
+            type: r2                          # required
+            catalog_id: "<account_id>"        # required — Cloudflare account id
+            database: "<bucket>"              # required — R2 bucket with Data Catalog enabled
+            token: "${R2_TOKEN}"              # required — R2 API token (Admin Read & Write)
+```
+
+> [!TIP]
+> R2 Data Catalog is a managed Iceberg REST catalog. It vends the S3 storage credentials through the catalog, so **no `storage` block is needed** — the account id and bucket build the connection.
 
 **Hive**
 ```yaml

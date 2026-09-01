@@ -13,6 +13,7 @@ const (
 	IcebergCatalogHive     IcebergCatalogType = "hive"
 	IcebergCatalogHadoop   IcebergCatalogType = "hadoop"
 	IcebergCatalogSQL      IcebergCatalogType = "sql"
+	IcebergCatalogR2       IcebergCatalogType = "r2"
 )
 
 type IcebergStorageType string
@@ -36,7 +37,8 @@ type IcebergAuth struct {
 }
 
 // IcebergCatalog describes the Iceberg catalog backend. Which fields apply depends
-// on Type (glue: catalog_id/region; sqlite/hadoop: path; postgres/rest/hive: host).
+// on Type (glue: catalog_id/region; sqlite/hadoop: path; postgres/rest/hive: host;
+// r2: catalog_id/database/token).
 type IcebergCatalog struct {
 	Type      IcebergCatalogType `yaml:"type" json:"type" mapstructure:"type"`
 	CatalogID string             `yaml:"catalog_id,omitempty" json:"catalog_id,omitempty" mapstructure:"catalog_id"`
