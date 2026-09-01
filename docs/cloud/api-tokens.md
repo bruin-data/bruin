@@ -126,7 +126,7 @@ If you suspect a token has leaked, revoke first and ask questions later. A new t
 
 ## Limits
 
-You can hold up to **25** personal tokens at a time (per-run agent tokens don't count). The personal create/edit/delete actions are rate-limited, so bulk automation should reuse a token rather than churn new ones.
+You can hold a limited number of personal tokens at a time (per-run agent tokens don't count). The personal create/edit/delete actions are rate-limited, so bulk automation should reuse a token rather than churn new ones.
 
 ## Use cases
 
