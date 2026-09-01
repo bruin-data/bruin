@@ -71,7 +71,9 @@ func (r *LineageCommand) Run(ctx context.Context, assetPath string, fullLineage 
 		return cli.Exit("", 1)
 	}
 
-	opts := []pipeline.CreatePipelineOption{}
+	// mutating the pipeline is what fills in the derived fields of the assets, most notably the names
+	// of the assets that don't have an explicit name given, therefore we need it to resolve the lineage.
+	opts := []pipeline.CreatePipelineOption{pipeline.WithMutate()}
 	if variantName != "" {
 		opts = append(opts, pipeline.WithVariant(variantName))
 	}
