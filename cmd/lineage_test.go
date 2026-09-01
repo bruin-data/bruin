@@ -119,6 +119,73 @@ Asset has no downstream dependencies.
 `,
 			wantErr: assert.NoError,
 		},
+		{
+			name: "nameless asset gets its name resolved from its path",
+			args: args{
+				assetPath: path.AbsPathForTests(t, "./testdata/lineage-nameless/assets/nameless.sql"),
+			},
+			want: `
+Lineage: 'nameless'
+
+Upstream Dependencies
+========================
+Asset has no upstream dependencies.
+
+
+Downstream Dependencies
+========================
+- nested.nameless_nested (assets/nested/nameless_nested.sql)
+
+Total: 1
+`,
+			wantErr: assert.NoError,
+		},
+		{
+			name: "nested nameless asset resolves both its nameless upstream and its named downstream",
+			args: args{
+				assetPath: path.AbsPathForTests(t, "./testdata/lineage-nameless/assets/nested/nameless_nested.sql"),
+			},
+			want: `
+Lineage: 'nested.nameless_nested'
+
+Upstream Dependencies
+========================
+- nameless (assets/nameless.sql)
+
+Total: 1
+
+
+Downstream Dependencies
+========================
+- dashboard.named (assets/named.sql)
+
+Total: 1
+`,
+			wantErr: assert.NoError,
+		},
+		{
+			name: "named asset resolves its full upstream through the nameless assets",
+			args: args{
+				assetPath: path.AbsPathForTests(t, "./testdata/lineage-nameless/assets/named.sql"),
+				full:      true,
+			},
+			want: `
+Lineage: 'dashboard.named'
+
+Upstream Dependencies
+========================
+- nested.nameless_nested (assets/nested/nameless_nested.sql)
+- nameless (assets/nameless.sql)
+
+Total: 2
+
+
+Downstream Dependencies
+========================
+Asset has no downstream dependencies.
+`,
+			wantErr: assert.NoError,
+		},
 	}
 
 	for _, tt := range tests {
