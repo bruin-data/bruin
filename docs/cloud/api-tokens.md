@@ -58,7 +58,7 @@ See [Using a token with the CLI](#using-a-token-with-the-cli) for how the CLI ha
 
 ## Expiration
 
-Every token has an expiry. When creating one, pick **30 / 60 / 90 days**, **1 year**, a **custom date**, or **No expiration** (defaults to 90 days). Your team may cap the maximum lifetime, in which case longer presets and "No expiration" are hidden and a custom date is limited to the cap.
+Every token has an expiry. When creating one, pick **30 / 60 / 90 days**, **1 year**, a **custom date**, or **No expiration** (defaults to 90 days).
 
 Once a token is within **7 days** of expiring it's flagged **Expiring soon**, and (for personal tokens) its owner gets a one-time reminder email. After it expires the token stops authenticating and shows as **Expired** — create a fresh one to replace it.
 
