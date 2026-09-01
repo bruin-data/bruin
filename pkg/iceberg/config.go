@@ -150,12 +150,10 @@ func icebergCatalogURI(cat config.IcebergCatalog) (string, url.Values, error) {
 	case config.IcebergCatalogR2:
 		// Cloudflare R2 Data Catalog: account id + bucket build the URI, and R2 vends
 		// the S3 storage credentials through the catalog, so no storage block is needed.
-		if cat.CatalogID == "" || cat.Database == "" {
-			return "", nil, fmt.Errorf("iceberg: r2 catalog requires %q (account id) and %q (bucket)", "catalog_id", "database")
+		if cat.CatalogID == "" || cat.Database == "" || cat.Token == "" {
+			return "", nil, fmt.Errorf("iceberg: r2 catalog requires %q (account id), %q (bucket), and %q (R2 API token)", "catalog_id", "database", "token")
 		}
-		if cat.Token != "" {
-			q.Set("token", cat.Token)
-		}
+		q.Set("token", cat.Token)
 		return "iceberg+r2://" + cat.CatalogID + "/" + cat.Database, q, nil
 	case config.IcebergCatalogHive:
 		if cat.Host == "" {

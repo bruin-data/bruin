@@ -275,16 +275,18 @@ func TestConfig_GetIngestrURI_R2Catalog(t *testing.T) {
 	assert.Empty(t, q.Get("warehouse"), "R2 derives the warehouse from the account/bucket in the URI")
 }
 
-func TestConfig_GetIngestrURI_R2CatalogRequiresAccountAndBucket(t *testing.T) {
+func TestConfig_GetIngestrURI_R2CatalogRequiresAccountBucketToken(t *testing.T) {
 	t.Parallel()
 
-	_, err := Config{Catalog: config.IcebergCatalog{Type: config.IcebergCatalogR2, Database: "b"}}.GetIngestrURI()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "r2 catalog requires")
-
-	_, err = Config{Catalog: config.IcebergCatalog{Type: config.IcebergCatalogR2, CatalogID: "acct"}}.GetIngestrURI()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "r2 catalog requires")
+	for _, cat := range []config.IcebergCatalog{
+		{Type: config.IcebergCatalogR2, Database: "b", Token: "t"},
+		{Type: config.IcebergCatalogR2, CatalogID: "acct", Token: "t"},
+		{Type: config.IcebergCatalogR2, CatalogID: "acct", Database: "b"},
+	} {
+		_, err := Config{Catalog: cat}.GetIngestrURI()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "r2 catalog requires")
+	}
 }
 
 func TestConfig_GetIngestrURI_HadoopAndHive(t *testing.T) {
