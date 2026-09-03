@@ -42,6 +42,7 @@ func Cloud(isDebug *bool) *cli.Command {
 			CloudConnections(),
 			CloudConnectionSets(),
 			CloudDashboards(),
+			CloudSemanticLayers(),
 			CloudScheduledAgents(),
 			CloudSkills(),
 			CloudAuditLogs(),
@@ -4831,6 +4832,321 @@ func CloudDashboards() *cli.Command {
 			cloudDashboardsDelete(),
 		},
 	}
+}
+
+func CloudSemanticLayers() *cli.Command {
+	return &cli.Command{
+		Name:  "semantic-layers",
+		Usage: "Manage Bruin Cloud semantic layers",
+		Commands: []*cli.Command{
+			cloudSemanticLayersList(),
+			cloudSemanticLayersGet(),
+			cloudSemanticLayersCreate(),
+			cloudSemanticLayersUpdate(),
+			cloudSemanticLayersDelete(),
+		},
+	}
+}
+
+func cloudSemanticLayersList() *cli.Command {
+	return &cli.Command{
+		Name:  "list",
+		Usage: "List semantic layers",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			layers, err := client.ListSemanticLayers(ctx)
+			if err != nil {
+				printError(err, output, "Failed to list semantic layers")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(layers, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"ID", "Name", "Updated At"})
+			for _, l := range layers {
+				updated := ""
+				if l.UpdatedAt != nil {
+					updated = *l.UpdatedAt
+				}
+				t.AppendRow(table.Row{l.ID, l.Name, updated})
+			}
+			t.Render()
+			return nil
+		},
+	}
+}
+
+func cloudSemanticLayersGet() *cli.Command {
+	return &cli.Command{
+		Name:  "get",
+		Usage: "Get a semantic layer including its model definition",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "semantic-layer-id",
+				Usage:    "semantic layer ID",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			if c.Int("semantic-layer-id") <= 0 {
+				printError(fmt.Errorf("--semantic-layer-id must be a positive integer, got %d", c.Int("semantic-layer-id")), output, "Invalid --semantic-layer-id")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			layer, err := client.GetSemanticLayer(ctx, c.Int("semantic-layer-id"))
+			if err != nil {
+				printError(err, output, "Failed to get semantic layer")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(layer, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			infoPrinter.Printf("Semantic layer %d: %s\n", layer.ID, layer.Name)
+			if len(layer.State) > 0 {
+				fmt.Println(string(layer.State))
+			}
+			return nil
+		},
+	}
+}
+
+func cloudSemanticLayersCreate() *cli.Command {
+	return &cli.Command{
+		Name:  "create",
+		Usage: "Create a semantic layer from a name and model definition",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.StringFlag{
+				Name:     "name",
+				Usage:    "the semantic layer name",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:  "state",
+				Usage: "the model definition as a JSON or YAML string",
+			},
+			&cli.StringFlag{
+				Name:  "state-file",
+				Usage: "path to a file containing the model definition as JSON or YAML",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			state, err := parseSemanticStateFlags(c, output)
+			if err != nil {
+				return err
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			layer, err := client.CreateSemanticLayer(ctx, c.String("name"), state)
+			if err != nil {
+				printError(err, output, "Failed to create semantic layer")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(layer, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			successPrinter.Printf("Created semantic layer %d (%s).\n", layer.ID, layer.Name)
+			return nil
+		},
+	}
+}
+
+func cloudSemanticLayersUpdate() *cli.Command {
+	return &cli.Command{
+		Name:  "update",
+		Usage: "Update a semantic layer's name and/or model definition",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "semantic-layer-id",
+				Usage:    "semantic layer ID",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:  "name",
+				Usage: "a new name",
+			},
+			&cli.StringFlag{
+				Name:  "state",
+				Usage: "the model definition as a JSON or YAML string",
+			},
+			&cli.StringFlag{
+				Name:  "state-file",
+				Usage: "path to a file containing the model definition as JSON or YAML",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			if c.Int("semantic-layer-id") <= 0 {
+				printError(fmt.Errorf("--semantic-layer-id must be a positive integer, got %d", c.Int("semantic-layer-id")), output, "Invalid --semantic-layer-id")
+				return cli.Exit("", 1)
+			}
+
+			fields := map[string]any{}
+			if c.IsSet("name") {
+				fields["name"] = c.String("name")
+			}
+			if c.IsSet("state") || c.IsSet("state-file") {
+				state, err := parseSemanticStateFlags(c, output)
+				if err != nil {
+					return err
+				}
+				fields["state"] = state
+			}
+			if len(fields) == 0 {
+				printError(errors.New("nothing to update: pass --name and/or --state/--state-file"), output, "No fields")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			layer, err := client.UpdateSemanticLayer(ctx, c.Int("semantic-layer-id"), fields)
+			if err != nil {
+				printError(err, output, "Failed to update semantic layer")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(layer, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			successPrinter.Printf("Updated semantic layer %d (%s).\n", layer.ID, layer.Name)
+			return nil
+		},
+	}
+}
+
+func cloudSemanticLayersDelete() *cli.Command {
+	return &cli.Command{
+		Name:  "delete",
+		Usage: "Delete a semantic layer",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "semantic-layer-id",
+				Usage:    "semantic layer ID",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			if c.Int("semantic-layer-id") <= 0 {
+				printError(fmt.Errorf("--semantic-layer-id must be a positive integer, got %d", c.Int("semantic-layer-id")), output, "Invalid --semantic-layer-id")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			if err := client.DeleteSemanticLayer(ctx, c.Int("semantic-layer-id")); err != nil {
+				printError(err, output, "Failed to delete semantic layer")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				fmt.Println(`{"success": true}`)
+				return nil
+			}
+
+			successPrinter.Printf("Deleted semantic layer %d.\n", c.Int("semantic-layer-id"))
+			return nil
+		},
+	}
+}
+
+// parseSemanticStateFlags reads the model definition from --state or --state-file
+// (at most one). Returns nil when neither is set (name-only). Prints and returns
+// a cli.Exit error on failure. Accepts JSON or YAML (JSON is valid YAML).
+func parseSemanticStateFlags(c *cli.Command, output string) (map[string]any, error) {
+	if c.IsSet("state") && c.IsSet("state-file") {
+		printError(errors.New("pass only one of --state or --state-file"), output, "Ambiguous state")
+		return nil, cli.Exit("", 1)
+	}
+	if !c.IsSet("state") && !c.IsSet("state-file") {
+		return nil, nil
+	}
+
+	raw := c.String("state")
+	if file := c.String("state-file"); file != "" {
+		data, err := os.ReadFile(file)
+		if err != nil {
+			printError(fmt.Errorf("failed to read --state-file: %w", err), output, "Invalid state file")
+			return nil, cli.Exit("", 1)
+		}
+		raw = string(data)
+	}
+
+	state, err := parseJSONOrYAMLObject([]byte(raw))
+	if err != nil {
+		printError(fmt.Errorf("invalid semantic model (expected a JSON or YAML object): %w", err), output, "Invalid state")
+		return nil, cli.Exit("", 1)
+	}
+	if state == nil {
+		printError(errors.New("semantic model must be a JSON or YAML object"), output, "Invalid state")
+		return nil, cli.Exit("", 1)
+	}
+	return state, nil
 }
 
 func cloudDashboardsList() *cli.Command {

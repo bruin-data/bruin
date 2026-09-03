@@ -349,6 +349,16 @@ type Dashboard struct {
 	IsPublished *bool           `json:"is_published,omitempty"`
 }
 
+// SemanticLayer is a team semantic model. State (the semantic.Model definition)
+// is only present on a single get.
+type SemanticLayer struct {
+	ID        int             `json:"id"`
+	Name      string          `json:"name"`
+	UpdatedAt *string         `json:"updated_at"`
+	URL       string          `json:"url"`
+	State     json.RawMessage `json:"state,omitempty"`
+}
+
 // DashboardVersion is one version-history snapshot's metadata (no state blob).
 type DashboardVersion struct {
 	ID         int    `json:"id"`

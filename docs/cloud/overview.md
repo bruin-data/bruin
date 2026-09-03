@@ -33,6 +33,7 @@ From there:
 - [Catalog](/cloud/catalog): glossary, owners, and global lineage across pipelines.
 - [Insights](/cloud/insights): cost explorer, pipeline health, risk report, usage.
 - [Dashboards](/cloud/dashboards): AI-built dashboards your team can re-open without re-asking.
+- [Semantic Layers](/cloud/semantic-layers): reusable metric and dimension models that dashboards reference by name.
 - [AI Agents](/cloud/ai-agents/overview): create agents, chat with them, schedule them, deploy them to chat platforms.
 - [Integrations](/cloud/integrations/overview): connect agents to Slack, Microsoft Teams, Google Chat, Discord, WhatsApp, or Telegram.
 - [Notifications](/cloud/notifications): pipeline-level Slack, Teams, Discord, and webhook notifications.
