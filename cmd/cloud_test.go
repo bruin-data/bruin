@@ -334,7 +334,7 @@ func TestCloudCommand_Help(t *testing.T) {
 	cmd := Cloud(&isDebug)
 	require.NotNil(t, cmd)
 	assert.Equal(t, "cloud", cmd.Name)
-	assert.Len(t, cmd.Commands, 21)
+	assert.Len(t, cmd.Commands, 22)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
@@ -357,6 +357,7 @@ func TestCloudCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "connection-sets")
 	assert.Contains(t, subNames, "dashboards")
 	assert.Contains(t, subNames, "notification-rules")
+	assert.Contains(t, subNames, "semantic-layers")
 	assert.Contains(t, subNames, "scheduled-agents")
 	assert.Contains(t, subNames, "skills")
 	assert.Contains(t, subNames, "audit-logs")
