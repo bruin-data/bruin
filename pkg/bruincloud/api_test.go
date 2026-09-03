@@ -1834,3 +1834,102 @@ func TestRunAgentQuery_PreservesLargeIntegerPrecision(t *testing.T) {
 	require.Len(t, res.Rows, 1)
 	assert.Equal(t, json.Number("9007199254740993"), res.Rows[0][0])
 }
+
+func TestListSemanticLayers(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/semantic-layers", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, map[string]any{
+			"semantic_layers": []map[string]any{
+				{"id": 3, "name": "sales", "updated_at": "2026-07-06T10:00:00+00:00"},
+			},
+		})
+	})
+
+	layers, err := client.ListSemanticLayers(t.Context())
+	require.NoError(t, err)
+	require.Len(t, layers, 1)
+	assert.Equal(t, "sales", layers[0].Name)
+	require.NotNil(t, layers[0].UpdatedAt)
+	assert.Equal(t, "2026-07-06T10:00:00+00:00", *layers[0].UpdatedAt)
+}
+
+func TestGetSemanticLayer(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/semantic-layers/3", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, map[string]any{
+			"id": 3, "name": "sales", "state": map[string]any{"name": "sales", "source": map[string]any{"table": "raw.sales"}},
+		})
+	})
+
+	layer, err := client.GetSemanticLayer(t.Context(), 3)
+	require.NoError(t, err)
+	assert.Equal(t, 3, layer.ID)
+	assert.JSONEq(t, `{"name":"sales","source":{"table":"raw.sales"}}`, string(layer.State))
+}
+
+func TestCreateSemanticLayer(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/semantic-layers", r.URL.Path)
+
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, "sales", body["name"])
+		assert.NotNil(t, body["state"])
+
+		w.WriteHeader(http.StatusCreated)
+		writeJSON(t, w, SemanticLayer{ID: 9, Name: "sales", URL: "https://cloud.getbruin.com/acme/semantic-layers/9"})
+	})
+
+	layer, err := client.CreateSemanticLayer(t.Context(), "sales", map[string]any{"source": map[string]any{"table": "raw.sales"}})
+	require.NoError(t, err)
+	assert.Equal(t, 9, layer.ID)
+	assert.Equal(t, "https://cloud.getbruin.com/acme/semantic-layers/9", layer.URL)
+}
+
+func TestCreateSemanticLayerOmitsStateWhenNil(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, "sales", body["name"])
+		_, hasState := body["state"]
+		assert.False(t, hasState)
+		w.WriteHeader(http.StatusCreated)
+		writeJSON(t, w, SemanticLayer{ID: 9, Name: "sales"})
+	})
+
+	_, err := client.CreateSemanticLayer(t.Context(), "sales", nil)
+	require.NoError(t, err)
+}
+
+func TestUpdateSemanticLayer(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPatch, r.Method)
+		assert.Equal(t, "/semantic-layers/9", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, SemanticLayer{ID: 9, Name: "sales_v2"})
+	})
+
+	layer, err := client.UpdateSemanticLayer(t.Context(), 9, map[string]any{"name": "sales_v2"})
+	require.NoError(t, err)
+	assert.Equal(t, "sales_v2", layer.Name)
+}
+
+func TestDeleteSemanticLayer(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodDelete, r.Method)
+		assert.Equal(t, "/semantic-layers/9", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+	})
+
+	require.NoError(t, client.DeleteSemanticLayer(t.Context(), 9))
+}

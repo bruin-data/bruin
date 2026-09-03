@@ -979,6 +979,55 @@ func (c *APIClient) DeleteDashboard(ctx context.Context, dashboardID int) error 
 	return c.doRequest(ctx, http.MethodDelete, fmt.Sprintf("/dashboards/%d", dashboardID), nil, nil)
 }
 
+// ListSemanticLayers returns the team's semantic layers (metadata only, no state).
+func (c *APIClient) ListSemanticLayers(ctx context.Context) ([]SemanticLayer, error) {
+	var resp struct {
+		SemanticLayers []SemanticLayer `json:"semantic_layers"`
+	}
+	err := c.doRequest(ctx, http.MethodGet, "/semantic-layers", nil, &resp)
+	return resp.SemanticLayers, err
+}
+
+// GetSemanticLayer returns a single semantic layer including its model definition.
+func (c *APIClient) GetSemanticLayer(ctx context.Context, id int) (*SemanticLayer, error) {
+	var result SemanticLayer
+	err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/semantic-layers/%d", id), nil, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// CreateSemanticLayer creates a semantic layer from a name and optional model
+// definition. Empty state is omitted so the server stores none.
+func (c *APIClient) CreateSemanticLayer(ctx context.Context, name string, state map[string]any) (*SemanticLayer, error) {
+	body := map[string]any{"name": name}
+	if state != nil {
+		body["state"] = state
+	}
+	var result SemanticLayer
+	err := c.doRequest(ctx, http.MethodPost, "/semantic-layers", body, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// UpdateSemanticLayer applies a partial update. Only the fields present change.
+func (c *APIClient) UpdateSemanticLayer(ctx context.Context, id int, fields map[string]any) (*SemanticLayer, error) {
+	var result SemanticLayer
+	err := c.doRequest(ctx, http.MethodPatch, fmt.Sprintf("/semantic-layers/%d", id), fields, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// DeleteSemanticLayer permanently deletes a semantic layer. Requires an owner or team admin.
+func (c *APIClient) DeleteSemanticLayer(ctx context.Context, id int) error {
+	return c.doRequest(ctx, http.MethodDelete, fmt.Sprintf("/semantic-layers/%d", id), nil, nil)
+}
+
 // PublishDashboard promotes a dashboard's pending draft to the live state (create/update
 // only ever write the draft). Requires edit rights; errors when there's no draft.
 func (c *APIClient) PublishDashboard(ctx context.Context, dashboardID int) (*Dashboard, error) {

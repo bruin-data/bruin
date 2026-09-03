@@ -1033,6 +1033,55 @@ bruin cloud dashboards delete --dashboard-id 42
 
 ---
 
+### `semantic-layers`
+
+Manage the semantic layers in your Bruin Cloud team.
+
+#### `list`
+
+List the team's semantic layers (id, name, last updated):
+
+```bash
+bruin cloud semantic-layers list
+bruin cloud semantic-layers list --output json
+```
+
+#### `get`
+
+Get a single semantic layer including its definition:
+
+```bash
+bruin cloud semantic-layers get --semantic-layer-id 3
+bruin cloud semantic-layers get --semantic-layer-id 3 --output json
+```
+
+#### `create`
+
+Create a semantic layer from a name and a model definition (YAML or JSON). Names are unique within the team.
+
+```bash
+bruin cloud semantic-layers create --name sales --state-file model.yaml
+```
+
+#### `update`
+
+Update a semantic layer's name and/or definition. Only the flags you pass change; `--state`/`--state-file` replaces the whole definition.
+
+```bash
+bruin cloud semantic-layers update --semantic-layer-id 3 --name sales_v2
+bruin cloud semantic-layers update --semantic-layer-id 3 --state-file model.yaml
+```
+
+#### `delete`
+
+Delete a semantic layer:
+
+```bash
+bruin cloud semantic-layers delete --semantic-layer-id 3
+```
+
+---
+
 ### `scheduled-agents`
 
 Manage scheduled agents — cron-based recurring agent tasks.
