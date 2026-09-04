@@ -23,7 +23,7 @@ This is meant for pruning models that were removed from the repo but still linge
 ## Access
 
 - **View**: controlled by the `semantic:list` permission. Members with a role that grants it can browse the list and open a model to read its definition.
-- **Delete**: controlled by the `semantic:delete` permission, granted to team leads by default.
+- **Delete**: controlled by the `semantic:delete` permission, granted to team admins by default.
 
 ## Related
 
