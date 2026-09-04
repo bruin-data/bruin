@@ -344,9 +344,17 @@ type Dashboard struct {
 	UpdatedAt   *string         `json:"updated_at"`
 	URL         string          `json:"url"`
 	AgentID     *int            `json:"agent_id"`
+	FolderName  *string         `json:"folder_name"`
 	State       json.RawMessage `json:"state,omitempty"`
 	HasDraft    *bool           `json:"has_draft,omitempty"`
 	IsPublished *bool           `json:"is_published,omitempty"`
+}
+
+// DashboardFolder groups dashboards within a team.
+type DashboardFolder struct {
+	ID             int    `json:"id"`
+	Name           string `json:"name"`
+	DashboardCount int    `json:"dashboard_count"`
 }
 
 // DashboardVersion is one version-history snapshot's metadata (no state blob).

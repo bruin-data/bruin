@@ -848,6 +848,15 @@ bruin cloud dashboards list
 bruin cloud dashboards list --output json
 ```
 
+#### `folders`
+
+Lists the team's dashboard folders with their id, name, and dashboard count.
+
+```bash
+bruin cloud dashboards folders
+bruin cloud dashboards folders --output json
+```
+
 #### `get`
 
 Get a single dashboard including its definition (`state`). By default the caller
@@ -897,12 +906,17 @@ Create a dashboard from a definition. The definition is written to the dashboard
 
 Pass `--agent-id` to bind the dashboard to an agent so its canvas chat and refresh work. If omitted, the server falls back to the agent encoded in a Cloud-CLI token; a generic team token has none, so the dashboard opens without a chat panel.
 
+Pass `--folder` to file the dashboard in a folder (by name; created if it doesn't exist). Folder names are unique per team. `dashboards list`/`get` return each dashboard's `folder_name`, and [`dashboards folders`](#folders) lists all folders.
+
 ```bash
 # Title only (empty draft)
 bruin cloud dashboards create --title "Q1 Revenue"
 
 # Bind an agent so the dashboard's chat works
 bruin cloud dashboards create --title "Q1 Revenue" --agent-id 7
+
+# File it in a folder (created if it doesn't exist)
+bruin cloud dashboards create --title "Q1 Revenue" --agent-id 7 --folder "Finance"
 
 # With a definition, inline or from a file
 bruin cloud dashboards create --title "Q1 Revenue" --visibility team --state '{"widgets":[]}'
@@ -1001,7 +1015,9 @@ Filters only act on `sql` widgets, so a dashboard built purely from inline data 
 
 #### `update`
 
-Update an existing dashboard's title, visibility, or definition. Only the flags you pass are changed. Like `create`, a new definition is written to the dashboard's **draft** — never published automatically; publish it with `dashboards publish` or from the Bruin Cloud UI. Changing visibility requires manage-access (the dashboard creator or a team admin).
+Update an existing dashboard's title, visibility, folder, or definition. Only the flags you pass are changed. Like `create`, a new definition is written to the dashboard's **draft** — never published automatically; publish it with `dashboards publish` or from the Bruin Cloud UI. Changing visibility requires manage-access (the dashboard creator or a team admin).
+
+Pass `--folder` to move the dashboard into a folder (created if it doesn't exist), or `--folder none` to remove it from its folder.
 
 ```bash
 # Rename
@@ -1013,6 +1029,10 @@ bruin cloud dashboards update --dashboard-id 42 --state-file ./dashboard.json
 
 # Change visibility
 bruin cloud dashboards update --dashboard-id 42 --visibility team
+
+# Move it to a folder (created if missing), or remove it from its folder
+bruin cloud dashboards update --dashboard-id 42 --folder "Finance"
+bruin cloud dashboards update --dashboard-id 42 --folder none
 ```
 
 #### `publish`

@@ -4822,6 +4822,7 @@ func CloudDashboards() *cli.Command {
 		Usage: "Manage Bruin Cloud dashboards",
 		Commands: []*cli.Command{
 			cloudDashboardsList(),
+			cloudDashboardsFolders(),
 			cloudDashboardsGet(),
 			cloudDashboardsVersions(),
 			cloudDashboardsVersion(),
@@ -4865,17 +4866,63 @@ func cloudDashboardsList() *cli.Command {
 
 			t := table.NewWriter()
 			t.SetOutputMirror(os.Stdout)
-			t.AppendHeader(table.Row{"ID", "Title", "Visibility", "Updated At"})
+			t.AppendHeader(table.Row{"ID", "Title", "Visibility", "Folder", "Updated At"})
 			for _, d := range dashboards {
 				title := ""
 				if d.Title != nil {
 					title = *d.Title
 				}
+				folder := ""
+				if d.FolderName != nil {
+					folder = *d.FolderName
+				}
 				updated := ""
 				if d.UpdatedAt != nil {
 					updated = *d.UpdatedAt
 				}
-				t.AppendRow(table.Row{d.ID, title, d.Visibility, updated})
+				t.AppendRow(table.Row{d.ID, title, d.Visibility, folder, updated})
+			}
+			t.Render()
+			return nil
+		},
+	}
+}
+
+func cloudDashboardsFolders() *cli.Command {
+	return &cli.Command{
+		Name:  "folders",
+		Usage: "List dashboard folders.",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			folders, err := client.ListDashboardFolders(ctx)
+			if err != nil {
+				printError(err, output, "Failed to list dashboard folders")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(folders, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"ID", "Name", "Dashboards"})
+			for _, f := range folders {
+				t.AppendRow(table.Row{f.ID, f.Name, f.DashboardCount})
 			}
 			t.Render()
 			return nil
@@ -4932,7 +4979,11 @@ func cloudDashboardsGet() *cli.Command {
 			if dashboard.Title != nil {
 				title = *dashboard.Title
 			}
-			infoPrinter.Printf("Dashboard %d: %s (visibility: %s)\n", dashboard.ID, title, dashboard.Visibility)
+			folder := "none"
+			if dashboard.FolderName != nil && *dashboard.FolderName != "" {
+				folder = *dashboard.FolderName
+			}
+			infoPrinter.Printf("Dashboard %d: %s (visibility: %s, folder: %s)\n", dashboard.ID, title, dashboard.Visibility, folder)
 
 			// Flag a pending draft so a draft-only dashboard isn't read as empty.
 			if dashboard.HasDraft != nil && *dashboard.HasDraft {
@@ -5164,6 +5215,10 @@ func cloudDashboardsCreate() *cli.Command {
 				Name:  "state-file",
 				Usage: "path to a file containing the dashboard definition as JSON or YAML",
 			},
+			&cli.StringFlag{
+				Name:  "folder",
+				Usage: "place the dashboard in this folder (by name; created if it doesn't exist)",
+			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			defer RecoverFromPanic()
@@ -5228,7 +5283,7 @@ func cloudDashboardsCreate() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			dashboard, err := client.CreateDashboard(ctx, c.String("title"), visibility, c.Int("agent-id"), state)
+			dashboard, err := client.CreateDashboard(ctx, c.String("title"), visibility, c.Int("agent-id"), c.String("folder"), state)
 			if err != nil {
 				printError(err, output, "Failed to create dashboard")
 				return cli.Exit("", 1)
@@ -5288,6 +5343,10 @@ func cloudDashboardsUpdate() *cli.Command {
 				Name:  "state-file",
 				Usage: "path to a file containing the dashboard definition as JSON or YAML",
 			},
+			&cli.StringFlag{
+				Name:  "folder",
+				Usage: "move the dashboard to this folder (by name; created if it doesn't exist); pass \"none\" to remove it from its folder",
+			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			defer RecoverFromPanic()
@@ -5298,6 +5357,9 @@ func cloudDashboardsUpdate() *cli.Command {
 			fields := map[string]any{}
 			if c.IsSet("title") {
 				fields["title"] = c.String("title")
+			}
+			if c.IsSet("folder") {
+				fields["folder_name"] = c.String("folder")
 			}
 			if c.IsSet("visibility") {
 				visibility := c.String("visibility")
@@ -5339,7 +5401,7 @@ func cloudDashboardsUpdate() *cli.Command {
 			}
 
 			if len(fields) == 0 {
-				printError(errors.New("provide at least one of --title, --visibility, --state or --state-file"), output, "Nothing to update")
+				printError(errors.New("provide at least one of --title, --visibility, --state, --state-file or --folder"), output, "Nothing to update")
 				return cli.Exit("", 1)
 			}
 
