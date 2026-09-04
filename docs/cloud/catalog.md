@@ -1,6 +1,6 @@
 # Catalog
 
-The **Catalog** dropdown in the top nav covers everything you need to navigate, document, and trace your data: **Pipelines**, **Assets**, **Lineage**, and **Glossary**. **Owners** is a per-owner profile reached by clicking an owner name anywhere in the product.
+The **Catalog** dropdown in the top nav covers everything you need to navigate, document, and trace your data: **Pipelines**, **Assets**, **Lineage**, **Glossary**, and **Semantic Layers**. **Owners** is a per-owner profile reached by clicking an owner name anywhere in the product.
 
 This page covers Glossary, Owners, and the global Lineage view. For the per-asset and per-pipeline pages, see [Assets](/cloud/assets) and [Pipelines](/cloud/pipelines).
 
