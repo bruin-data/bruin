@@ -121,6 +121,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                     {text: "Catalog", link: "/cloud/catalog"},
                     {text: "Insights", link: "/cloud/insights"},
                     {text: "Dashboards", link: "/cloud/dashboards"},
+                    {text: "Semantic Layers", link: "/cloud/semantic-layers"},
                     {
                         text: "AI Agents",
                         collapsed: true,
