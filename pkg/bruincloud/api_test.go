@@ -1403,7 +1403,7 @@ func TestCreateDashboard(t *testing.T) {
 		writeJSON(t, w, Dashboard{ID: 9, Title: &title, Visibility: "private", URL: "https://cloud.getbruin.com/acme/dashboards/9?mode=edit", AgentID: &boundAgent})
 	})
 
-	dashboard, err := client.CreateDashboard(t.Context(), "New Dash", "private", 7, map[string]any{"widgets": []any{}})
+	dashboard, err := client.CreateDashboard(t.Context(), "New Dash", "private", 7, "", map[string]any{"widgets": []any{}})
 	require.NoError(t, err)
 	assert.Equal(t, 9, dashboard.ID)
 	assert.Equal(t, "https://cloud.getbruin.com/acme/dashboards/9?mode=edit", dashboard.URL)
@@ -1421,14 +1421,57 @@ func TestCreateDashboardOmitsAgentIDWhenZero(t *testing.T) {
 		// token-agent fallback rather than clearing the binding.
 		_, hasAgentID := body["agent_id"]
 		assert.False(t, hasAgentID)
+		// An empty folder name is omitted so the dashboard stays unfiled.
+		_, hasFolder := body["folder_name"]
+		assert.False(t, hasFolder)
 
 		w.WriteHeader(http.StatusCreated)
 		title := "New Dash"
 		writeJSON(t, w, Dashboard{ID: 9, Title: &title, Visibility: "team"})
 	})
 
-	_, err := client.CreateDashboard(t.Context(), "New Dash", "", 0, nil)
+	_, err := client.CreateDashboard(t.Context(), "New Dash", "", 0, "", nil)
 	require.NoError(t, err)
+}
+
+func TestCreateDashboardWithFolder(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		// A non-empty folder name is sent so the server files (or creates) the folder.
+		assert.Equal(t, "Finance", body["folder_name"])
+
+		w.WriteHeader(http.StatusCreated)
+		title := "New Dash"
+		folder := "Finance"
+		writeJSON(t, w, Dashboard{ID: 9, Title: &title, Visibility: "private", FolderName: &folder})
+	})
+
+	dashboard, err := client.CreateDashboard(t.Context(), "New Dash", "private", 0, "Finance", nil)
+	require.NoError(t, err)
+	require.NotNil(t, dashboard.FolderName)
+	assert.Equal(t, "Finance", *dashboard.FolderName)
+}
+
+func TestListDashboardFolders(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/dashboard-folders", r.URL.Path)
+
+		writeJSON(t, w, map[string]any{"folders": []DashboardFolder{
+			{ID: 1, Name: "Finance", DashboardCount: 2},
+			// An empty folder still comes back, with a zero count.
+			{ID: 2, Name: "Empty", DashboardCount: 0},
+		}})
+	})
+
+	folders, err := client.ListDashboardFolders(t.Context())
+	require.NoError(t, err)
+	require.Len(t, folders, 2)
+	assert.Equal(t, DashboardFolder{ID: 1, Name: "Finance", DashboardCount: 2}, folders[0])
+	assert.Equal(t, 0, folders[1].DashboardCount)
 }
 
 func TestUpdateDashboard(t *testing.T) {
