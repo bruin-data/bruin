@@ -277,7 +277,10 @@ The `data-diff` command includes specialized type mapping support for the follow
 - **BigQuery** - Native support for BigQuery types including `INT64`, `FLOAT64`, `BIGNUMERIC`, and BigQuery-specific formatting
 - **PostgreSQL & AWS Redshift** - Complete support for PostgreSQL types including `SERIAL` types, `MONEY`, network types (`CIDR`, `INET`), and `JSONB`
 - **Snowflake** - Full support for Snowflake types including `NUMBER`, `VARIANT`, and timezone-aware timestamp types
+- **ClickHouse** - Schema and full statistical comparison for numeric, string, Boolean, date/time, and JSON columns, including `Nullable` and `LowCardinality` wrappers. Primary keys are reported without implying uniqueness. Arrays, tuples, and other unsupported types are compared by schema only.
 - **MongoDB & MongoDB Atlas** - Schema is inferred from the documents themselves (see [MongoDB Collections](#mongodb-collections) below), mapping BSON types such as `objectId`, `double`, `decimal`, `date`, and nested `object`/`array` fields to common categories
+
+For ClickHouse, use `connection:table` or `connection:database.table`. Full comparisons use live `SELECT` queries rather than catalog row counts, so lightweight-deleted rows are excluded. As with other platforms, statistics are collected in separate queries; avoid concurrent writes when you need a consistent comparison.
 
 ### MongoDB Collections
 

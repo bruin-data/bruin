@@ -9,6 +9,7 @@ import (
 	click_house "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/pkg/errors"
 )
@@ -44,6 +45,8 @@ type Client struct {
 	connection connection
 	config     ClickHouseConfig
 }
+
+var _ diff.TableSummarizer = (*Client)(nil)
 
 type ClickHouseConfig interface {
 	ToClickHouseOptions() *click_house.Options
