@@ -1108,6 +1108,11 @@ type S3Connection struct {
 	SecretAccessKey    string `yaml:"secret_access_key,omitempty" json:"secret_access_key" mapstructure:"secret_access_key" sensitive:"true"`
 	EndpointURL        string `yaml:"endpoint_url,omitempty" json:"endpoint_url" mapstructure:"endpoint_url"`
 	Layout             string `yaml:"layout,omitempty" json:"layout" mapstructure:"layout"`
+	Region             string `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
+	URLStyle           string `yaml:"url_style,omitempty" json:"url_style,omitempty" mapstructure:"url_style"`
+	UseSSL             *bool  `yaml:"use_ssl,omitempty" json:"use_ssl,omitempty" mapstructure:"use_ssl"`
+	CABundle           string `yaml:"ca_bundle,omitempty" json:"ca_bundle,omitempty" mapstructure:"ca_bundle"`
+	SessionToken       string `yaml:"session_token,omitempty" json:"session_token,omitempty" mapstructure:"session_token" sensitive:"true"`
 }
 
 func (c S3Connection) GetName() string {
