@@ -24,6 +24,7 @@ bruin validate --help
 | Command | Description |
 |---------|-------------|
 | [`run`](/commands/run) | Execute pipelines or individual assets |
+| [`backfill`](/commands/backfill) | Execute and resume partitioned historical ranges |
 | [`validate`](/commands/validate) | Check pipeline configuration and syntax without executing |
 
 ### Project Management

@@ -1,5 +1,7 @@
 # `run` Command
 
+To split a historical range into resumable partitions, use [`bruin backfill`](/commands/backfill).
+
 This command is used to execute a Bruin pipeline or a specific asset within a pipeline.
 
 - You can run the pipeline from the current directory or a specific path to the pipeline/asset definition.
