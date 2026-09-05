@@ -65,6 +65,8 @@ The strategy used for the materialization, can be one of the following:
 - `scd2_by_column`: implement SCD2 logic that tracks changes based on column value differences.
 - `scd2_by_time`: implement SCD2 logic that tracks changes based on time-based incremental key.
 
+On their first incremental run, `delete+insert`, `merge`, and `time_interval` automatically create an empty target table when it does not exist. The table schema is derived from the asset query, and supported partitioning or clustering settings are applied before the normal incremental statements run. `append` and `truncate+insert` still require an existing target table.
+
 ### `materialization > partition_by`
 
 Define the column that will be used for the partitioning of the resulting table. This is used to instruct the data warehouse to set the column for the partition key.

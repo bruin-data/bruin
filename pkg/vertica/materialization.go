@@ -79,6 +79,7 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) (string, error) {
 	// The DELETE+INSERT is wrapped in a transaction for atomicity.
 	queries := []string{
 		fmt.Sprintf("CREATE LOCAL TEMPORARY TABLE %s ON COMMIT PRESERVE ROWS AS (%s)", tempTableName, query),
+		buildCreateTableIfNotExistsQuery(task.Name, "SELECT * FROM "+tempTableName),
 		"BEGIN TRANSACTION",
 		fmt.Sprintf("DELETE FROM %s WHERE %s IN (SELECT DISTINCT %s FROM %s)", task.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", task.Name, tempTableName),
@@ -140,7 +141,16 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 		fmt.Sprintf("WHEN NOT MATCHED THEN INSERT(%s) VALUES(%s)", allColumnValues, sourceValues),
 	}
 
-	return strings.Join(mergeLines, "\n") + ";", nil
+	return buildCreateTableIfNotExistsQuery(asset.Name, query) + ";\n" + strings.Join(mergeLines, "\n") + ";", nil
+}
+
+func buildCreateTableIfNotExistsQuery(tableName, query string) string {
+	query = strings.TrimSuffix(strings.TrimSpace(query), ";")
+	return fmt.Sprintf(
+		"CREATE TABLE IF NOT EXISTS %s AS (SELECT * FROM (%s) AS __bruin_bootstrap WHERE 1 = 0)",
+		tableName,
+		query,
+	)
 }
 
 func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error) {
@@ -164,6 +174,7 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 	}
 
 	queries := []string{
+		buildCreateTableIfNotExistsQuery(asset.Name, query),
 		"BEGIN TRANSACTION",
 		fmt.Sprintf(`DELETE FROM %s WHERE %s BETWEEN '%s' AND '%s'`,
 			asset.Name,

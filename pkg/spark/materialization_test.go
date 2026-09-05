@@ -32,7 +32,11 @@ func TestMaterializerMerge(t *testing.T) {
 	actual, err := NewMaterializer(false).Render(asset, "SELECT * FROM updates;")
 	require.NoError(t, err)
 	require.Equal(
-		t, "MERGE INTO `catalog`.`analytics`.`accounts` target\n"+
+		t, "CREATE TABLE IF NOT EXISTS `catalog`.`analytics`.`accounts` AS\n"+
+			"SELECT * FROM (\n"+
+			"SELECT * FROM updates\n"+
+			") AS __bruin_bootstrap WHERE 1 = 0;\n"+
+			"MERGE INTO `catalog`.`analytics`.`accounts` target\n"+
 			"USING (SELECT * FROM updates) source\n"+
 			"ON source.`account_id` <=> target.`account_id` AND source.`account_type` <=> target.`account_type` AND (target.created_at >= DATE '2026-01-01')\n"+
 			"WHEN MATCHED THEN UPDATE SET target.`account_name` = source.`account_name`, target.`score` = GREATEST(target.score, source.score)\n"+
@@ -209,6 +213,7 @@ func TestMaterializerQuotesIncrementalKeys(t *testing.T) {
 
 			actual, err := NewMaterializer(false).Render(asset, "SELECT * FROM updates")
 			require.NoError(t, err)
+			require.Contains(t, actual, "CREATE TABLE IF NOT EXISTS `catalog`.`analytics`.`events` AS")
 			require.Contains(t, actual, test.expected)
 		})
 	}
