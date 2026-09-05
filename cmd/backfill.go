@@ -95,14 +95,14 @@ func backfillFlags(c *cli.Command) map[string][]string {
 
 func runBackfill(ctx context.Context, c *cli.Command, debug bool) error {
 	if c.Args().Len() > 1 {
-		return fmt.Errorf("backfill accepts one pipeline or asset path; use --selector to select multiple assets")
+		return errors.New("backfill accepts one pipeline or asset path; use --selector to select multiple assets")
 	}
 	if c.String("output") != "text" && c.String("output") != "json" {
-		return fmt.Errorf("output must be text or json")
+		return errors.New("output must be text or json")
 	}
 	page := backfillPage{Offset: c.Int("offset"), Limit: c.Int("limit")}
 	if page.Offset < 0 || page.Limit < 0 {
-		return fmt.Errorf("offset and limit must not be negative")
+		return errors.New("offset and limit must not be negative")
 	}
 	options := backfill.Options{MaxParallel: c.Int("max-parallel"), Workers: c.Int("workers"), Retries: c.Int("retries"), OnFailure: c.String("on-failure"), Rerun: c.String("rerun"), Reverse: c.Bool("reverse")}
 	if err := options.Validate(); err != nil {
@@ -165,7 +165,7 @@ func runBackfill(ctx context.Context, c *cli.Command, debug bool) error {
 			return err
 		}
 		if c.String("start-date") == "" || c.String("end-date") == "" {
-			return fmt.Errorf("start-date and end-date are required for a new backfill")
+			return errors.New("start-date and end-date are required for a new backfill")
 		}
 		start, end, err := backfill.ParseRange(c.String("start-date"), c.String("end-date"), c.String("timezone"))
 		if err != nil {
@@ -198,7 +198,7 @@ func runBackfill(ctx context.Context, c *cli.Command, debug bool) error {
 	}
 	configPaths := m.Plan.RunFlags["config-file"]
 	if len(configPaths) != 1 || configPaths[0] == "" {
-		return fmt.Errorf("saved backfill is missing its config-file")
+		return errors.New("saved backfill is missing its config-file")
 	}
 	cm, err := config.LoadFromFileOrEnv(afero.NewOsFs(), configPaths[0])
 	if err != nil {
@@ -236,7 +236,7 @@ func runBackfill(ctx context.Context, c *cli.Command, debug bool) error {
 		return writeBackfillOutput(c.Writer, c.String("output"), m, state, options, summary, page)
 	}
 	if strings.Contains(strings.ToLower(environment), "prod") && !slices.Equal(m.Plan.RunFlags["force"], []string{"true"}) && !slices.Equal(m.Plan.RunFlags["only"], []string{"checks"}) {
-		return fmt.Errorf("backfill in a production environment requires --force on the initial invocation")
+		return errors.New("backfill in a production environment requires --force on the initial invocation")
 	}
 	lock, err := store.Lock()
 	if err != nil {
@@ -325,7 +325,9 @@ func runBackfillChild(ctx context.Context, binary string, m backfill.Manifest, s
 		return err
 	}
 	defer logFile.Close()
-	child := exec.CommandContext(ctx, binary, backfillChildArgs(m, i, workers, total, debug)...)
+	// binary is the path returned by os.Executable, and arguments are passed
+	// directly without invoking a shell.
+	child := exec.CommandContext(ctx, binary, backfillChildArgs(m, i, workers, total, debug)...) //nolint:gosec
 	child.Dir = m.Plan.WorkingDirectory
 	// Snapshot variable overrides in the plan; do not reapply a changed BRUIN_VARS
 	// or an inherited full-refresh/run ID to children on resume.

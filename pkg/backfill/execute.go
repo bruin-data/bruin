@@ -21,20 +21,20 @@ type Options struct {
 
 func (o Options) Validate() error {
 	if o.MaxParallel < 1 || o.Workers < 1 {
-		return fmt.Errorf("max-parallel and workers must be positive")
+		return errors.New("max-parallel and workers must be positive")
 	}
 	if o.Retries < 0 {
-		return fmt.Errorf("retries must not be negative")
+		return errors.New("retries must not be negative")
 	}
 	switch o.Rerun {
 	case "", "failed", "missing", "all":
 	default:
-		return fmt.Errorf("rerun must be failed, missing, or all")
+		return errors.New("rerun must be failed, missing, or all")
 	}
 	switch o.OnFailure {
 	case "continue", "stop", "fail-fast":
 	default:
-		return fmt.Errorf("on-failure must be continue, stop, or fail-fast")
+		return errors.New("on-failure must be continue, stop, or fail-fast")
 	}
 	return nil
 }
@@ -197,7 +197,7 @@ func executePartition(ctx context.Context, id string, s *Store, r Record, retrie
 	}
 	for n := 0; n <= retries; n++ {
 		if ctx.Err() != nil {
-			return r.Status, nil
+			return r.Status, ctx.Err()
 		}
 		a := Attempt{RunID: id + "__" + uuid.NewString(), Status: Running, StartedAt: time.Now().UTC()}
 		r.Status = Running

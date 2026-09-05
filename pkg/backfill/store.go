@@ -98,7 +98,7 @@ func (s *Store) Manifest() (Manifest, error) {
 		return m, fmt.Errorf("unsupported backfill store version %d", m.Version)
 	}
 	if m.ID != filepath.Base(s.Dir) {
-		return m, fmt.Errorf("backfill manifest ID does not match its directory")
+		return m, errors.New("backfill manifest ID does not match its directory")
 	}
 	return m, m.Plan.Validate()
 }
@@ -162,7 +162,10 @@ func writeJSON(path string, v any) error {
 	if err = f.Close(); err != nil {
 		return err
 	}
-	return os.Rename(f.Name(), path)
+	if err = os.Rename(f.Name(), path); err != nil {
+		return err
+	}
+	return syncParent(path)
 }
 
 // Records pages through materialized records only. Queued partitions are implicit
@@ -198,7 +201,7 @@ func (s *Store) Records(ctx context.Context) iter.Seq2[Record, error] {
 					return
 				}
 				if entry.Name() != r.ID+".json" {
-					yield(r, fmt.Errorf("partition filename does not match its ID"))
+					yield(r, errors.New("partition filename does not match its ID"))
 					return
 				}
 				if !yield(r, nil) {

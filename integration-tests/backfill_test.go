@@ -116,6 +116,7 @@ SELECT '{{ start_timestamp }}'::TIMESTAMPTZ AS start_at,
 // These tests are included in both make integration-test and the existing
 // TestWorkflowTasks prefix used by make integration-test-light.
 func TestWorkflowTasksBackfillDuckDBBoundaries(t *testing.T) {
+	t.Parallel()
 	f := newBackfillFixture(t)
 	f.query(t, "CREATE TABLE captures (start_at TIMESTAMPTZ, end_at TIMESTAMPTZ, run_id VARCHAR, marker VARCHAR)")
 	f.asset(t, "capture", captureBackfillSQL)
@@ -143,6 +144,7 @@ func TestWorkflowTasksBackfillDuckDBBoundaries(t *testing.T) {
 }
 
 func TestWorkflowTasksBackfillDuckDBTimeInterval(t *testing.T) {
+	t.Parallel()
 	f := newBackfillFixture(t)
 	f.query(t, "CREATE TABLE events (event_at TIMESTAMP)")
 	f.asset(t, "events", `/* @bruin
@@ -176,6 +178,7 @@ SELECT event_at FROM (VALUES
 }
 
 func TestWorkflowTasksBackfillDuckDBResumePartial(t *testing.T) {
+	t.Parallel()
 	f := newBackfillFixture(t)
 	f.query(t, "CREATE TABLE captures (start_at TIMESTAMPTZ, end_at TIMESTAMPTZ, run_id VARCHAR, marker VARCHAR)")
 	f.asset(t, "capture", captureBackfillSQL+"WHERE CASE WHEN '{{ start_date }}' = '2024-01-02' THEN error('injected failure') ELSE true END")
@@ -197,6 +200,7 @@ func TestWorkflowTasksBackfillDuckDBResumePartial(t *testing.T) {
 }
 
 func TestWorkflowTasksBackfillDuckDBRetries(t *testing.T) {
+	t.Parallel()
 	f := newBackfillFixture(t)
 	f.asset(t, "attempt", `/* @bruin
 name: attempts
@@ -222,6 +226,7 @@ FROM attempts WHERE day = '{{ start_date }}';`)
 }
 
 func TestWorkflowTasksBackfillDuckDBModifiersAndMonths(t *testing.T) {
+	t.Parallel()
 	f := newBackfillFixture(t)
 	f.query(t, "CREATE TABLE captures (start_at TIMESTAMPTZ, end_at TIMESTAMPTZ, run_id VARCHAR, marker VARCHAR)")
 	sql := strings.Replace(captureBackfillSQL, "tags: [capture]", "interval_modifiers:\n  start: -2h\n  end: -2h", 1)
@@ -232,6 +237,7 @@ func TestWorkflowTasksBackfillDuckDBModifiersAndMonths(t *testing.T) {
 }
 
 func TestWorkflowTasksBackfillDuckDBTimeout(t *testing.T) {
+	t.Parallel()
 	f := newBackfillFixture(t)
 	f.asset(t, "capture", captureBackfillSQL)
 	result := f.run(t, true, f.pipeline, "--start-date", "2024-01-01", "--end-date", "2024-01-02", "--timeout", "0")
@@ -241,6 +247,7 @@ func TestWorkflowTasksBackfillDuckDBTimeout(t *testing.T) {
 }
 
 func TestWorkflowTasksBackfillDuckDBCancellation(t *testing.T) {
+	t.Parallel()
 	if runtime.GOOS == "windows" {
 		t.Skip("os.Interrupt is unsupported on Windows")
 	}
@@ -298,6 +305,7 @@ func TestWorkflowTasksBackfillDuckDBCancellation(t *testing.T) {
 }
 
 func TestWorkflowTasksBackfillDuckDBParallelReadOnly(t *testing.T) {
+	t.Parallel()
 	f := newBackfillFixture(t)
 	f.query(t, "CREATE TABLE seed AS SELECT 1 AS n")
 	f.write(t, f.config, "default_environment: test\nenvironments:\n  test:\n    connections:\n      duckdb:\n        - name: local\n          path: data.duckdb\n          read_only: true\n          max_concurrent_assets: 3\n")
@@ -309,7 +317,7 @@ func TestWorkflowTasksBackfillDuckDBParallelReadOnly(t *testing.T) {
 		at    time.Time
 		delta int
 	}
-	events := []event{}
+	events := make([]event, 0, 2*len(result.Partitions))
 	for _, r := range result.Partitions {
 		a := r.Attempts[0]
 		events = append(events, event{a.StartedAt, 1}, event{*a.FinishedAt, -1})
@@ -325,11 +333,13 @@ func TestWorkflowTasksBackfillDuckDBParallelReadOnly(t *testing.T) {
 }
 
 func TestWorkflowTasksBackfillDuckDBMultiYear(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		partition, end string
 		count          int
 	}{{"daily", "2020-12-31", 731}, {"monthly", "2021-12-31", 36}} {
 		t.Run(tc.partition, func(t *testing.T) {
+			t.Parallel()
 			f := newBackfillFixture(t)
 			f.query(t, "CREATE TABLE captures (start_at TIMESTAMPTZ, end_at TIMESTAMPTZ, run_id VARCHAR, marker VARCHAR)")
 			f.asset(t, "capture", captureBackfillSQL)
@@ -344,6 +354,7 @@ func TestWorkflowTasksBackfillDuckDBMultiYear(t *testing.T) {
 }
 
 func TestWorkflowTasksBackfillSavedEnvironmentOverrides(t *testing.T) {
+	t.Parallel()
 	f := newBackfillFixture(t)
 	f.query(t, "CREATE TABLE captures (start_at TIMESTAMPTZ, end_at TIMESTAMPTZ, run_id VARCHAR, marker VARCHAR)")
 	f.asset(t, "capture", captureBackfillSQL)
@@ -412,6 +423,7 @@ func (f backfillFixture) assertRunRecords(t *testing.T, result backfillResult, w
 }
 
 func TestWorkflowTasksBackfillDuckDBFailurePolicies(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		policy            string
 		succeeded, queued int
@@ -419,6 +431,7 @@ func TestWorkflowTasksBackfillDuckDBFailurePolicies(t *testing.T) {
 		{"continue", 3, 0}, {"stop", 1, 2}, {"fail-fast", 1, 2},
 	} {
 		t.Run(tc.policy, func(t *testing.T) {
+			t.Parallel()
 			f := newBackfillFixture(t)
 			f.query(t, "CREATE TABLE captures (start_at TIMESTAMPTZ, end_at TIMESTAMPTZ, run_id VARCHAR, marker VARCHAR)")
 			f.asset(t, "capture", captureBackfillSQL+"WHERE CASE WHEN '{{ start_date }}' = '2024-01-02' THEN error('injected failure') ELSE true END")
@@ -437,6 +450,7 @@ func TestWorkflowTasksBackfillDuckDBFailurePolicies(t *testing.T) {
 }
 
 func TestWorkflowTasksBackfillDuckDBResumeMissing(t *testing.T) {
+	t.Parallel()
 	f := newBackfillFixture(t)
 	f.query(t, "CREATE TABLE captures (start_at TIMESTAMPTZ, end_at TIMESTAMPTZ, run_id VARCHAR, marker VARCHAR)")
 	f.asset(t, "capture", captureBackfillSQL+"WHERE CASE WHEN '{{ start_date }}' = '2024-01-02' THEN error('injected failure') ELSE true END")
@@ -464,6 +478,7 @@ func TestWorkflowTasksBackfillDuckDBResumeMissing(t *testing.T) {
 }
 
 func TestWorkflowTasksBackfillDuckDBFallDST(t *testing.T) {
+	t.Parallel()
 	f := newBackfillFixture(t)
 	f.query(t, "CREATE TABLE captures (start_at TIMESTAMPTZ, end_at TIMESTAMPTZ, run_id VARCHAR, marker VARCHAR)")
 	f.asset(t, "capture", captureBackfillSQL)
@@ -491,6 +506,7 @@ func TestWorkflowTasksBackfillDuckDBFallDST(t *testing.T) {
 }
 
 func TestWorkflowTasksBackfillDuckDBPagination(t *testing.T) {
+	t.Parallel()
 	f := newBackfillFixture(t)
 	f.asset(t, "capture", captureBackfillSQL)
 	args := []string{f.pipeline, "--start-date", "2024-01-01", "--end-date", "2024-01-04"}

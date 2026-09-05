@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"iter"
 	"strings"
@@ -14,6 +15,8 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/date"
 )
+
+const hourlyPartition = "hourly"
 
 // Plan contains the immutable inputs needed to regenerate a backfill. Intervals
 // are generated lazily; neither planning nor execution retains the whole range.
@@ -55,7 +58,7 @@ func ParseRange(start, end, zone string) (time.Time, time.Time, error) {
 			}
 		}
 		if t.Nanosecond()%1000 != 0 {
-			return t, fmt.Errorf("timestamps must have at most microsecond precision")
+			return t, errors.New("timestamps must have at most microsecond precision")
 		}
 		return t.In(loc), err
 	}
@@ -74,41 +77,44 @@ func ParseRange(start, end, zone string) (time.Time, time.Time, error) {
 		b = calendarStart(next.Year(), next.Month(), next.Day(), loc)
 	}
 	if !a.Before(b) {
-		return a, b, fmt.Errorf("start date must be before the exclusive end date")
+		return a, b, errors.New("start date must be before the exclusive end date")
 	}
 	return a, b, nil
 }
 
 func (p Plan) Validate() error {
 	if p.Target == "" {
-		return fmt.Errorf("backfill target is required")
+		return errors.New("backfill target is required")
 	}
 	if !p.Start.Before(p.End) || p.Start.Year() < 1 || p.End.Year() > 9999 {
-		return fmt.Errorf("invalid backfill date range")
+		return errors.New("invalid backfill date range")
 	}
 	if p.Start.Nanosecond()%1000 != 0 || p.End.Nanosecond()%1000 != 0 {
-		return fmt.Errorf("timestamps must have at most microsecond precision")
+		return errors.New("timestamps must have at most microsecond precision")
 	}
 	if p.Timezone == "" || p.Timezone == "Local" {
-		return fmt.Errorf("an explicit timezone is required")
+		return errors.New("an explicit timezone is required")
 	}
 	if _, err := time.LoadLocation(p.Timezone); err != nil {
 		return err
 	}
 	switch p.Partition {
-	case "hourly", "daily", "weekly", "monthly", "yearly":
+	case hourlyPartition, "daily", "weekly", "monthly", "yearly":
 		return nil
 	default:
 		d, err := time.ParseDuration(p.Partition)
 		if err != nil || d < time.Microsecond || d%time.Microsecond != 0 {
-			return fmt.Errorf("partition must be hourly, daily, weekly, monthly, yearly, or a positive duration in whole microseconds")
+			return errors.New("partition must be hourly, daily, weekly, monthly, yearly, or a positive duration in whole microseconds")
 		}
 	}
 	return nil
 }
 
 func digest(value any) string {
-	data, _ := json.Marshal(value) // only JSON-native structs are passed here
+	data, err := json.Marshal(value)
+	if err != nil {
+		panic(fmt.Errorf("marshal backfill identity: %w", err))
+	}
 	sum := sha256.Sum256(data)
 	return hex.EncodeToString(sum[:])
 }
@@ -121,7 +127,7 @@ func (p Plan) Intervals(reverse bool) iter.Seq[Interval] {
 		loc, _ := time.LoadLocation(p.Timezone)
 		start, end := p.Start.In(loc), p.End.In(loc)
 		duration, _ := time.ParseDuration(p.Partition)
-		if p.Partition == "hourly" {
+		if p.Partition == hourlyPartition {
 			duration = time.Hour
 		}
 		identity := p.identity()
@@ -165,7 +171,7 @@ func (p Plan) Intervals(reverse bool) iter.Seq[Interval] {
 }
 
 func floor(t time.Time, partition string) time.Time {
-	if partition == "hourly" {
+	if partition == hourlyPartition {
 		return t.Add(-time.Duration(t.Minute())*time.Minute - time.Duration(t.Second())*time.Second - time.Duration(t.Nanosecond()))
 	}
 	y, m, d := t.Date()
@@ -202,7 +208,7 @@ func advance(t time.Time, partition string) time.Time {
 	y, m, d := t.Date()
 	date := time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 	switch partition {
-	case "hourly":
+	case hourlyPartition:
 		return t.Add(time.Hour)
 	case "daily":
 		date = date.AddDate(0, 0, 1)
@@ -233,13 +239,13 @@ func (p Plan) Count(ctx context.Context) (int, error) {
 		return 0, err
 	}
 	d, _ := time.ParseDuration(p.Partition)
-	if p.Partition == "hourly" {
+	if p.Partition == hourlyPartition {
 		d = time.Hour
 	}
 	if d > 0 {
 		n := 1 + (p.End.UnixMicro()-p.Start.UnixMicro()-1)/d.Microseconds()
 		if int64(int(n)) != n {
-			return 0, fmt.Errorf("partition count exceeds this platform's integer capacity")
+			return 0, errors.New("partition count exceeds this platform's integer capacity")
 		}
 		return int(n), nil
 	}
@@ -264,24 +270,24 @@ func (p Plan) validateInterval(i Interval) error {
 	loc, _ := time.LoadLocation(p.Timezone)
 	start := i.Start.In(loc)
 	if start.Nanosecond()%1000 != 0 {
-		return fmt.Errorf("partition timestamp exceeds microsecond precision")
+		return errors.New("partition timestamp exceeds microsecond precision")
 	}
 	if start.Before(p.Start) || !start.Before(p.End) {
-		return fmt.Errorf("partition is outside the plan")
+		return errors.New("partition is outside the plan")
 	}
 	d, _ := time.ParseDuration(p.Partition)
-	if p.Partition == "hourly" {
+	if p.Partition == hourlyPartition {
 		d = time.Hour
 	}
 	var end time.Time
 	if d > 0 {
 		if (start.UnixMicro()-p.Start.UnixMicro())%d.Microseconds() != 0 {
-			return fmt.Errorf("partition is not aligned with the plan")
+			return errors.New("partition is not aligned with the plan")
 		}
 		end = start.Add(d)
 	} else {
 		if !start.Equal(p.Start) && !floor(start, p.Partition).Equal(start) {
-			return fmt.Errorf("partition is not aligned with the plan")
+			return errors.New("partition is not aligned with the plan")
 		}
 		end = advance(floor(start, p.Partition), p.Partition)
 	}

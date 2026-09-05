@@ -67,6 +67,7 @@ func TestBackfillOutputStreamsJSON(t *testing.T) {
 }
 
 func TestBackfillInvalidCLI(t *testing.T) {
+	t.Parallel()
 	for _, args := range [][]string{
 		{"--max-parallel", "0"},
 		{"--workers", "0"},
@@ -77,6 +78,7 @@ func TestBackfillInvalidCLI(t *testing.T) {
 		{"--state-dir", "unused", "--continue", "../../escape"},
 	} {
 		t.Run(args[0], func(t *testing.T) {
+			t.Parallel()
 			debug := false
 			c := Backfill(&debug)
 			c.Writer = io.Discard
@@ -88,6 +90,7 @@ func TestBackfillInvalidCLI(t *testing.T) {
 }
 
 func TestBackfillFlagDefinitions(t *testing.T) {
+	t.Parallel()
 	debug := false
 	names := map[string]bool{}
 	for _, flag := range Backfill(&debug).Flags {
