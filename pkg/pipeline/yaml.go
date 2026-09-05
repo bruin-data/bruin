@@ -19,6 +19,7 @@ var ValidQualityChecks = map[string]bool{
 	"positive":        true,
 	"min":             true,
 	"max":             true,
+	"freshness":       true,
 	"accepted_values": true,
 	"relationships":   true,
 	"negative":        true,

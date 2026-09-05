@@ -130,6 +130,7 @@ func NewColumnCheckOperator(manager config.ConnectionGetter) *ansisql.ColumnChec
 		"not_null":        ansisql.NewNotNullCheck(manager),
 		"unique":          ansisql.NewUniqueCheck(manager),
 		"relationships":   ansisql.NewRelationshipsCheck(manager, ansisql.QuoteIdentifierWithDoubleQuotes),
+		"freshness":       ansisql.NewFreshnessCheck(manager, ansisql.QuoteIdentifierWithDoubleQuotes),
 		"positive":        ansisql.NewPositiveCheck(manager),
 		"non_negative":    ansisql.NewNonNegativeCheck(manager),
 		"negative":        ansisql.NewNegativeCheck(manager),

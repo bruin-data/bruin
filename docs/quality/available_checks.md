@@ -12,8 +12,42 @@ Bruin provides the following checks to validate assets, ensuring that asset data
 - [**Unique**](#unique)
 - [**Min**](#min)
 - [**Max**](#max)
+- [**Freshness**](#freshness)
 
 You can find a detailed description of each check below.
+
+## Freshness
+
+Checks that the latest timestamp in a column is no older than the specified duration.
+Bruin queries `MAX(column)` and compares it with the current time on the machine
+running Bruin, not the pipeline's start or end date. Older rows do not cause a
+failure when the latest row is fresh.
+
+```yaml
+columns:
+  - name: retrieved_at
+    type: timestamp
+    checks:
+      - name: freshness
+        value: 30h
+```
+
+`value` must be a positive duration string, such as `30m`, `24h`, or `1h30m`.
+Use `24h` for one day; `d` and calendar-based units are not supported.
+The check passes at the exact age limit. Future timestamps also pass: this is
+a maximum-age check, not a check for clock skew.
+
+Empty tables and columns containing only nulls fail. Nulls alongside valid
+timestamps are ignored by `MAX`; add `not_null` to disallow them. Use a timestamp
+column, not a string or numeric epoch column. Timestamp offsets are respected;
+timestamps without a timezone must represent UTC. The runner's clock must be accurate.
+
+Like other column checks, freshness runs through the normal check lifecycle and
+supports `blocking: false`, `retries`, and check notifications. Setting
+`blocking: false` lets downstream assets run but does not turn a failed check into
+a successful run. Freshness does not run independently as a scheduled monitor or
+check materialization time. Each execution issues a `MAX` query, which may scan
+the column.
 
 ## Accepted values
 
