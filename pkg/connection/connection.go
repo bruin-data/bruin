@@ -2066,10 +2066,15 @@ func (m *Manager) AddSftpConnectionFromConfig(connection *config.SFTPConnection)
 	m.mutex.Unlock()
 
 	client, err := sftp.NewClient(sftp.Config{
-		Host:     connection.Host,
-		Port:     connection.Port,
-		Username: connection.Username,
-		Password: connection.Password,
+		Host:                     connection.Host,
+		Port:                     connection.Port,
+		Username:                 connection.Username,
+		Password:                 connection.Password,
+		KeyFile:                  connection.KeyFile,
+		KeyPassphrase:            connection.KeyPassphrase,
+		KnownHostsFile:           connection.KnownHostsFile,
+		HostKeyFingerprint:       connection.HostKeyFingerprint,
+		InsecureSkipHostKeyCheck: connection.InsecureSkipHostKeyCheck,
 	})
 	if err != nil {
 		return err

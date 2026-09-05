@@ -4683,6 +4683,24 @@
         },
         "password": {
           "type": "string"
+        },
+        "key_file": {
+          "type": "string"
+        },
+        "key_passphrase": {
+          "type": "string"
+        },
+        "known_hosts_file": {
+          "type": "string"
+        },
+        "host_key_fingerprint": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "insecure_skip_host_key_check": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false,

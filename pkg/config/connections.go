@@ -1804,11 +1804,16 @@ func (c AttioConnection) GetName() string {
 }
 
 type SFTPConnection struct {
-	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	Host               string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
-	Port               int    `yaml:"port,omitempty" json:"port" mapstructure:"port"`
-	Username           string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
-	Password           string `yaml:"password,omitempty" json:"password" mapstructure:"password" sensitive:"true"`
+	ConnectionMetadata       `yaml:",inline" mapstructure:",squash"`
+	Host                     string   `yaml:"host,omitempty" json:"host" mapstructure:"host"`
+	Port                     int      `yaml:"port,omitempty" json:"port" mapstructure:"port"`
+	Username                 string   `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password                 string   `yaml:"password,omitempty" json:"password" mapstructure:"password" sensitive:"true"`
+	KeyFile                  string   `yaml:"key_file,omitempty" json:"key_file,omitempty" mapstructure:"key_file" sensitive_file:"true"`
+	KeyPassphrase            string   `yaml:"key_passphrase,omitempty" json:"key_passphrase,omitempty" mapstructure:"key_passphrase" sensitive:"true"`
+	KnownHostsFile           string   `yaml:"known_hosts_file,omitempty" json:"known_hosts_file,omitempty" mapstructure:"known_hosts_file"`
+	HostKeyFingerprint       []string `yaml:"host_key_fingerprint,omitempty" json:"host_key_fingerprint,omitempty" mapstructure:"host_key_fingerprint"`
+	InsecureSkipHostKeyCheck bool     `yaml:"insecure_skip_host_key_check,omitempty" json:"insecure_skip_host_key_check,omitempty" mapstructure:"insecure_skip_host_key_check"`
 }
 
 func (c SFTPConnection) GetName() string {
