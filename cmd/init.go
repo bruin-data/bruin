@@ -2,12 +2,15 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	fs2 "io/fs"
 	"os"
 	"os/exec"
+	fspath "path"
 	"path/filepath"
 	"slices"
+	"sort"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/config"
@@ -245,6 +248,419 @@ func mergeEnvironment(centralConfig *config.Config, templateEnvName string, temp
 	return nil
 }
 
+type templateMergeFile struct {
+	// path is relative to the template's pipeline root, e.g. "assets/orders.sql"
+	// or "macros/aggregations.sql".
+	path    string
+	content []byte
+}
+
+// mergeableTemplateDirs are the pipeline-level directories copied by merge mode.
+// Assets routinely call macros, so copying "assets" alone would produce a
+// pipeline that fails to render.
+var mergeableTemplateDirs = []string{"assets", "macros"}
+
+// mergeableTemplateFiles are the pipeline-root dependency files that Python
+// assets resolve by walking up from their own directory.
+var mergeableTemplateFiles = []string{"requirements.txt", "pyproject.toml", "uv.lock"}
+
+// loadTemplateMergeFiles returns the mergeable files of every pipeline in a
+// template. Pipeline roots are found via their assets directory, because some
+// templates wrap or repeat their pipeline below the template root.
+func loadTemplateMergeFiles(templateName string) ([]templateMergeFile, error) {
+	assetRoots := make([]string, 0)
+	err := fs2.WalkDir(templates.Templates, templateName, func(entryPath string, d fs2.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if d.IsDir() && d.Name() == "assets" {
+			assetRoots = append(assetRoots, entryPath)
+			return fs2.SkipDir
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not inspect template %s: %w", templateName, err)
+	}
+	if len(assetRoots) == 0 {
+		return nil, fmt.Errorf("template %q does not contain an assets directory", templateName)
+	}
+
+	filesByPath := make(map[string]templateMergeFile)
+	for _, assetRoot := range assetRoots {
+		pipelineRoot := fspath.Dir(assetRoot)
+
+		for _, dirName := range mergeableTemplateDirs {
+			if err := collectTemplateMergeDir(templateName, fspath.Join(pipelineRoot, dirName), dirName, filesByPath); err != nil {
+				return nil, err
+			}
+		}
+
+		for _, fileName := range mergeableTemplateFiles {
+			content, err := templates.Templates.ReadFile(fspath.Join(pipelineRoot, fileName))
+			if errors.Is(err, fs2.ErrNotExist) {
+				continue
+			}
+			if err != nil {
+				return nil, fmt.Errorf("could not read %s from template %s: %w", fileName, templateName, err)
+			}
+			if err := addTemplateMergeFile(templateName, filesByPath, fileName, content); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	return sortedTemplateMergeFiles(filesByPath), nil
+}
+
+// collectTemplateMergeDir records every file below root under prefix. A missing
+// directory is not an error: most templates have no macros.
+func collectTemplateMergeDir(templateName, root, prefix string, filesByPath map[string]templateMergeFile) error {
+	if _, err := fs2.Stat(templates.Templates, root); err != nil {
+		if errors.Is(err, fs2.ErrNotExist) {
+			return nil
+		}
+
+		return fmt.Errorf("could not inspect %s in template %s: %w", root, templateName, err)
+	}
+
+	err := fs2.WalkDir(templates.Templates, root, func(entryPath string, d fs2.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+
+		content, err := templates.Templates.ReadFile(entryPath)
+		if err != nil {
+			return err
+		}
+
+		relativePath := fspath.Join(prefix, strings.TrimPrefix(entryPath, root+"/"))
+
+		return addTemplateMergeFile(templateName, filesByPath, relativePath, content)
+	})
+	if err != nil {
+		return fmt.Errorf("could not read %s from template %s: %w", prefix, templateName, err)
+	}
+
+	return nil
+}
+
+func addTemplateMergeFile(templateName string, filesByPath map[string]templateMergeFile, relativePath string, content []byte) error {
+	if !fs2.ValidPath(relativePath) || relativePath == "." {
+		return fmt.Errorf("template %q contains an invalid file path %q", templateName, relativePath)
+	}
+	if _, exists := filesByPath[relativePath]; exists {
+		return fmt.Errorf("template %q contains multiple files at %q", templateName, relativePath)
+	}
+
+	filesByPath[relativePath] = templateMergeFile{path: relativePath, content: content}
+
+	return nil
+}
+
+func sortedTemplateMergeFiles(filesByPath map[string]templateMergeFile) []templateMergeFile {
+	relativePaths := make([]string, 0, len(filesByPath))
+	for relativePath := range filesByPath {
+		relativePaths = append(relativePaths, relativePath)
+	}
+	sort.Strings(relativePaths)
+
+	files := make([]templateMergeFile, 0, len(relativePaths))
+	for _, relativePath := range relativePaths {
+		files = append(files, filesByPath[relativePath])
+	}
+
+	return files
+}
+
+func loadEcommerceMergeFiles(choices *EcommerceChoices) ([]templateMergeFile, error) {
+	generated, err := buildEcommerceFiles(choices)
+	if err != nil {
+		return nil, err
+	}
+
+	filesByPath := make(map[string]templateMergeFile)
+	for relativePath, content := range generated {
+		relativePath = filepath.ToSlash(relativePath)
+		if !isMergeableTemplatePath(relativePath) {
+			continue
+		}
+		if err := addTemplateMergeFile("ecommerce", filesByPath, relativePath, []byte(content)); err != nil {
+			return nil, err
+		}
+	}
+
+	return sortedTemplateMergeFiles(filesByPath), nil
+}
+
+func isMergeableTemplatePath(relativePath string) bool {
+	for _, dirName := range mergeableTemplateDirs {
+		if strings.HasPrefix(relativePath, dirName+"/") {
+			return true
+		}
+	}
+
+	return slices.Contains(mergeableTemplateFiles, relativePath)
+}
+
+func loadTemplateBruinConfig(templateName string) ([]byte, error) {
+	content, err := templates.Templates.ReadFile(templateName + "/.bruin.yml")
+	if errors.Is(err, fs2.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("could not read template config: %w", err)
+	}
+
+	return content, nil
+}
+
+// writeFileAtomically replaces path in one step, so a failed write cannot leave
+// a truncated file behind. An existing file keeps its own mode: .bruin.yml holds
+// credentials and may have been tightened to 0600 by hand.
+func writeFileAtomically(path string, content []byte) error {
+	mode := os.FileMode(0o644)
+	if info, err := os.Stat(path); err == nil {
+		mode = info.Mode().Perm()
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+
+	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*.tmp")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	defer os.Remove(tmpName)
+
+	if _, err := tmp.Write(content); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Chmod(mode); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+
+	return os.Rename(tmpName, path)
+}
+
+// mergeTemplateConfigIntoProject resolves the project from the destination
+// pipeline, then merges the template config into the project-level .bruin.yml.
+func mergeTemplateConfigIntoProject(pipelinePath string, templateBruinContent []byte) (initConfigSummary, error) {
+	repoRoot, err := git.FindRepoFromPath(pipelinePath)
+	if err != nil {
+		return initConfigSummary{}, fmt.Errorf("could not locate the Git project containing pipeline %q: %w", pipelinePath, err)
+	}
+
+	bruinYmlPath := filepath.Join(repoRoot.Path, ".bruin.yml")
+	summary := initConfigSummary{
+		path:         bruinYmlPath,
+		existed:      fileExists(bruinYmlPath),
+		merged:       true,
+		locationNote: "This is your Git repo root, so it may sit several levels above the pipeline folder.",
+	}
+
+	centralConfig, err := config.LoadOrCreateWithoutPathAbsolutization(afero.NewOsFs(), bruinYmlPath)
+	if err != nil {
+		return initConfigSummary{}, fmt.Errorf("could not load .bruin.yml file: %w", err)
+	}
+	if err := mergeTemplateConfig(centralConfig, templateBruinContent); err != nil {
+		return initConfigSummary{}, err
+	}
+
+	configBytes, err := yaml.Marshal(centralConfig)
+	if err != nil {
+		return initConfigSummary{}, fmt.Errorf("could not marshal .bruin.yml: %w", err)
+	}
+	if err := writeFileAtomically(bruinYmlPath, configBytes); err != nil {
+		return initConfigSummary{}, fmt.Errorf("could not write .bruin.yml file: %w", err)
+	}
+
+	// Cosmetic, so a failure here must not abort a merge that has already
+	// written the config.
+	if err := ensureLocalDuckDBFilesAreIgnored(afero.NewOsFs(), bruinYmlPath, centralConfig); err != nil {
+		errorPrinter.Printf("Could not add the DuckDB database to .gitignore: %v\n", err)
+	}
+
+	return summary, nil
+}
+
+// projectConfigSummary describes the project-level .bruin.yml without touching
+// it, for templates that ship no config of their own. A pipeline outside a Git
+// repository yields an empty summary, which prints as "no config yet".
+func projectConfigSummary(pipelinePath string) initConfigSummary {
+	repoRoot, err := git.FindRepoFromPath(pipelinePath)
+	if err != nil {
+		return initConfigSummary{}
+	}
+
+	bruinYmlPath := filepath.Join(repoRoot.Path, ".bruin.yml")
+
+	return initConfigSummary{
+		path:         bruinYmlPath,
+		existed:      fileExists(bruinYmlPath),
+		locationNote: "This is your Git repo root, so it may sit several levels above the pipeline folder.",
+	}
+}
+
+// validateMergeDestination reports whether pipelinePath is an existing Bruin
+// pipeline. It runs before anything is written so that a bad destination cannot
+// leave a half-merged project behind.
+func validateMergeDestination(pipelinePath string) error {
+	info, err := os.Stat(pipelinePath)
+	if err != nil {
+		return fmt.Errorf("could not open pipeline path %q: %w", pipelinePath, err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("pipeline path %q is not a directory", pipelinePath)
+	}
+	if _, err := getPipelineDefinitionFullPath(pipelinePath); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// findNonDirectoryParent returns the first directory relativePath needs that
+// already exists as something else, or "" when the path is clear. It walks
+// top-down so every Lstat is rooted at a known directory and cannot fail with a
+// bare ENOTDIR.
+func findNonDirectoryParent(root, relativePath string) (string, error) {
+	current := root
+	currentRelative := ""
+	for _, part := range strings.Split(filepath.Dir(relativePath), string(filepath.Separator)) {
+		if part == "" || part == "." {
+			continue
+		}
+
+		current = filepath.Join(current, part)
+		currentRelative = filepath.Join(currentRelative, part)
+
+		info, err := os.Lstat(current)
+		if os.IsNotExist(err) {
+			// Nothing below a directory that does not exist yet can conflict.
+			return "", nil
+		}
+		if err != nil {
+			return "", fmt.Errorf("could not inspect destination directory %q: %w", current, err)
+		}
+		if !info.IsDir() {
+			return currentRelative, nil
+		}
+	}
+
+	return "", nil
+}
+
+// collectMergeConflicts reports every destination path that is already taken. It
+// writes nothing, so a conflict leaves the project untouched.
+func collectMergeConflicts(pipelinePath string, files []templateMergeFile) error {
+	if err := validateMergeDestination(pipelinePath); err != nil {
+		return err
+	}
+
+	destinationRoot := filepath.Clean(pipelinePath)
+	conflicts := make([]string, 0)
+	for _, file := range files {
+		relativePath := filepath.FromSlash(file.path)
+		if !filepath.IsLocal(relativePath) {
+			return fmt.Errorf("template contains an invalid file path %q", file.path)
+		}
+
+		// Checked before the destination itself: a regular file in the parent
+		// chain makes the Lstat below fail with ENOTDIR instead of reporting it.
+		parentConflict, err := findNonDirectoryParent(destinationRoot, relativePath)
+		if err != nil {
+			return err
+		}
+		if parentConflict != "" {
+			conflicts = append(conflicts, parentConflict)
+			continue
+		}
+
+		destinationPath := filepath.Join(destinationRoot, relativePath)
+		if _, err := os.Lstat(destinationPath); err == nil {
+			conflicts = append(conflicts, relativePath)
+		} else if !os.IsNotExist(err) {
+			return fmt.Errorf("could not inspect destination file %q: %w", destinationPath, err)
+		}
+	}
+
+	if len(conflicts) > 0 {
+		sort.Strings(conflicts)
+		conflicts = slices.Compact(conflicts)
+		return fmt.Errorf("cannot merge template files because these paths already exist: %s", strings.Join(conflicts, ", "))
+	}
+
+	return nil
+}
+
+// writeTemplateFiles copies the files into the pipeline. It must only run after
+// collectMergeConflicts has passed: that is what makes each destination safe to
+// write and safe to remove again.
+func writeTemplateFiles(pipelinePath string, files []templateMergeFile) error {
+	destinationRoot := filepath.Clean(pipelinePath)
+	written := make([]string, 0, len(files))
+	for _, file := range files {
+		destinationPath := filepath.Join(destinationRoot, filepath.FromSlash(file.path))
+		if err := writeTemplateFile(destinationPath, file.content); err != nil {
+			// Roll back, otherwise a half-finished copy reports its own files as
+			// conflicts on the next attempt and the command can never succeed.
+			return errors.Join(err, removeTemplateFiles(written))
+		}
+
+		written = append(written, destinationPath)
+	}
+
+	return nil
+}
+
+func writeTemplateFile(destinationPath string, content []byte) error {
+	if err := os.MkdirAll(filepath.Dir(destinationPath), 0o755); err != nil {
+		return fmt.Errorf("could not create directory %q: %w", filepath.Dir(destinationPath), err)
+	}
+
+	out, err := os.OpenFile(destinationPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644) //nolint:gosec // destination is validated as a local path below the requested pipeline
+	if err != nil {
+		return fmt.Errorf("could not create file %q: %w", destinationPath, err)
+	}
+	// The file exists from here on, so every failure path removes it: a stub would
+	// be reported as a conflict on the next attempt.
+	if _, err := out.Write(content); err != nil {
+		_ = out.Close()
+		_ = os.Remove(destinationPath)
+		return fmt.Errorf("could not write file %q: %w", destinationPath, err)
+	}
+	if err := out.Close(); err != nil {
+		_ = os.Remove(destinationPath)
+		return fmt.Errorf("could not close file %q: %w", destinationPath, err)
+	}
+
+	return nil
+}
+
+// removeTemplateFiles deletes files a failed merge created. Directories are left
+// alone: an empty directory does not block a retry.
+func removeTemplateFiles(paths []string) error {
+	cleanupErrors := make([]error, 0)
+	for _, path := range paths {
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			cleanupErrors = append(cleanupErrors, fmt.Errorf("could not remove %q while undoing the merge: %w", path, err))
+		}
+	}
+
+	return errors.Join(cleanupErrors...)
+}
+
 // Init creates and returns the CLI command for initializing new Bruin pipelines from templates.
 func Init() *cli.Command {
 	folders, err := templates.Templates.ReadDir(".")
@@ -277,9 +693,28 @@ func Init() *cli.Command {
 				Name:  "in-place",
 				Usage: "initializes the template without creating a bruin repository parent folder",
 			},
+			&cli.BoolFlag{
+				Name:  "merge",
+				Usage: "merges the template's assets, macros and project config into an existing pipeline without overwriting existing files",
+			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			defer RecoverFromPanic()
+
+			inputPath := c.Args().Get(1)
+			merge := c.Bool("merge")
+			// Validated before the interactive template picker so a misuse of the
+			// flag fails immediately instead of after five prompts.
+			if merge {
+				if inputPath == "" {
+					errorPrinter.Printf("A path to an existing pipeline is required when using --merge.\n")
+					return cli.Exit("", 1)
+				}
+				if c.Bool("in-place") {
+					errorPrinter.Printf("--merge and --in-place cannot be used together.\n")
+					return cli.Exit("", 1)
+				}
+			}
 
 			templateName := c.Args().Get(0)
 			selectedViaInteractive := false
@@ -316,13 +751,107 @@ func Init() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			inputPath := c.Args().Get(1)
 			if inputPath == "" {
 				if templateName == DefaultTemplate {
 					inputPath = DefaultFolderName
 				} else {
 					inputPath = templateName
 				}
+			}
+
+			if merge {
+				// Checked before the ecommerce stack picker so a bad destination
+				// fails immediately rather than after five prompts.
+				if err := validateMergeDestination(inputPath); err != nil {
+					errorPrinter.Printf("Could not merge template %s: %v\n", templateName, err)
+					return cli.Exit("", 1)
+				}
+
+				var (
+					mergeFiles           []templateMergeFile
+					templateBruinContent []byte
+					ecommerceChoices     *EcommerceChoices
+				)
+				if templateName == "ecommerce" {
+					ecommerceChoices, err = runEcommerceStackPicker()
+					if err != nil {
+						errorPrinter.Printf("Error during stack selection: %v\n", err)
+						return cli.Exit("", 1)
+					}
+					if ecommerceChoices == nil {
+						return nil
+					}
+
+					mergeFiles, err = loadEcommerceMergeFiles(ecommerceChoices)
+					if err != nil {
+						errorPrinter.Printf("Could not generate ecommerce assets: %v\n", err)
+						return cli.Exit("", 1)
+					}
+					templateBruinContent = []byte(generateBruinYML(ecommerceChoices))
+				} else {
+					mergeFiles, err = loadTemplateMergeFiles(templateName)
+					if err != nil {
+						errorPrinter.Printf("Could not load template assets: %v\n", err)
+						return cli.Exit("", 1)
+					}
+
+					templateBruinContent, err = loadTemplateBruinConfig(templateName)
+					if err != nil {
+						errorPrinter.Printf("Could not load template config: %v\n", err)
+						return cli.Exit("", 1)
+					}
+				}
+
+				// Conflicts first so a clash aborts before anything is written, then
+				// the config, then the copy. Both writing steps are safe to repeat.
+				if err := collectMergeConflicts(inputPath, mergeFiles); err != nil {
+					errorPrinter.Printf("Could not merge template %s: %v\n", templateName, err)
+					return cli.Exit("", 1)
+				}
+
+				configSummary := projectConfigSummary(inputPath)
+				if templateBruinContent != nil {
+					configSummary, err = mergeTemplateConfigIntoProject(inputPath, templateBruinContent)
+					if err != nil {
+						errorPrinter.Printf("Could not merge template config: %v\n", err)
+						return cli.Exit("", 1)
+					}
+				}
+
+				if err := writeTemplateFiles(inputPath, mergeFiles); err != nil {
+					errorPrinter.Printf("Could not copy the '%s' template files into %s: %v\n", templateName, inputPath, err)
+					return cli.Exit("", 1)
+				}
+
+				telemetryFields := map[string]interface{}{
+					"template_name": templateName,
+					"interactive":   selectedViaInteractive,
+					"merge":         true,
+				}
+				if ecommerceChoices != nil {
+					// The stack picker always runs, so this path is interactive
+					// regardless of how the template itself was chosen.
+					telemetryFields["interactive"] = true
+					telemetryFields["warehouse"] = ecommerceChoices.Warehouse
+					telemetryFields["payments"] = ecommerceChoices.Payments
+					telemetryFields["marketing"] = ecommerceChoices.Marketing
+					telemetryFields["ads"] = ecommerceChoices.Ads
+					telemetryFields["analytics"] = ecommerceChoices.Analytics
+				}
+				telemetry.SetTemplateName(templateName)
+				telemetry.SendEvent("template_selected", telemetryFields)
+
+				fileLabel := "files"
+				if len(mergeFiles) == 1 {
+					fileLabel = "file"
+				}
+				successPrinter.Printf("\n\nMerged %d %s from the '%s' template into pipeline '%s'.\n", len(mergeFiles), fileLabel, templateName, inputPath)
+				if ecommerceChoices != nil {
+					printEcommerceSummary(ecommerceChoices)
+				}
+				printInitSummary(configSummary, inputPath)
+
+				return nil
 			}
 
 			dir, _ := filepath.Split(inputPath)
