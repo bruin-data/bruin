@@ -4670,13 +4670,7 @@
       "additionalProperties": false,
       "type": "object",
       "required": [
-        "name",
-        "bucket_name",
-        "path_to_file",
-        "access_key_id",
-        "secret_access_key",
-        "endpoint_url",
-        "layout"
+        "name"
       ]
     },
     "SFTPConnection": {

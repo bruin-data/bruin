@@ -37,7 +37,9 @@ func parseMetadataFilter(params pipeline.ParameterMap) (metadataFilter, error) {
 		}
 		f.minSize = size
 	}
-	if _, ok := params["last_modified_after"]; ok {
+	if timestamp, ok := params["last_modified_after"].(time.Time); ok {
+		f.modifiedAfter = timestamp
+	} else if _, ok := params["last_modified_after"]; ok {
 		value, _ := params.GetString("last_modified_after")
 		parsed, err := time.Parse(time.RFC3339, value)
 		if err != nil {

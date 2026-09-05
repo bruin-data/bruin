@@ -33,3 +33,17 @@ func TestGoogleCloudPlatformConnection_AccessTokenRoundTrip(t *testing.T) {
 	require.NoError(t, json.Unmarshal(jsonBytes, &fromJSON))
 	require.Equal(t, "ya29.some-token", fromJSON["access_token"])
 }
+
+func TestS3ConnectionSchemaOnlyRequiresName(t *testing.T) {
+	t.Parallel()
+
+	schema, err := GetConnectionsSchema()
+	require.NoError(t, err)
+	var document struct {
+		Definitions map[string]struct {
+			Required []string `json:"required"`
+		} `json:"$defs"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(schema), &document))
+	require.Equal(t, []string{"name"}, document.Definitions["S3Connection"].Required)
+}

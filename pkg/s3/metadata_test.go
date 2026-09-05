@@ -7,9 +7,11 @@ import (
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestKeySensor_Metadata(t *testing.T) {
@@ -27,7 +29,7 @@ func TestKeySensor_Metadata(t *testing.T) {
 		w.Header().Set("Content-Length", "42")
 		w.Header().Set("Last-Modified", "Mon, 02 Jan 2006 15:04:05 GMT")
 	}))
-	defer server.Close()
+	t.Cleanup(server.Close)
 	for _, key := range []string{"data/file.csv", "data/*.csv"} {
 		for _, tc := range []struct {
 			name    string
@@ -44,6 +46,8 @@ func TestKeySensor_Metadata(t *testing.T) {
 			{"all constraints", pipeline.ParameterMap{"etag": "provider-opaque-multipart-7", "min_size": "42", "last_modified_after": "2006-01-01T00:00:00Z"}, true},
 		} {
 			t.Run(key+"/"+tc.name, func(t *testing.T) {
+				t.Parallel()
+
 				conn := endpointConnection(server.URL)
 				sensor := NewKeySensor(&mockConnectionGetter{details: &conn}, "once")
 				tc.params["bucket_name"] = "test-bucket"
@@ -74,10 +78,31 @@ func TestParseMetadataFilter_Invalid(t *testing.T) {
 	}
 }
 
+func TestParseMetadataFilter_YAMLTimestamps(t *testing.T) {
+	t.Parallel()
+	for _, value := range []string{
+		`"2024-01-01T00:00:00Z"`,
+		`2024-01-01T00:00:00Z`,
+		`2024-01-01T03:00:00+03:00`,
+	} {
+		t.Run(value, func(t *testing.T) {
+			t.Parallel()
+
+			var params pipeline.ParameterMap
+			require.NoError(t, yaml.Unmarshal([]byte("last_modified_after: "+value), &params))
+			filter, err := parseMetadataFilter(params)
+			require.NoError(t, err)
+			require.True(t, filter.modifiedAfter.Equal(time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC)))
+		})
+	}
+}
+
 func TestKeySensor_WaitForMetadataAndTimeout(t *testing.T) {
 	t.Parallel()
 	for _, key := range []string{"file.csv", "*.csv"} {
 		t.Run(key, func(t *testing.T) {
+			t.Parallel()
+
 			var heads atomic.Int32
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.Method == http.MethodGet {

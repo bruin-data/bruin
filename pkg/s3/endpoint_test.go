@@ -21,6 +21,8 @@ import (
 )
 
 func TestKeySensor_CustomEndpointHeadUsesPathRegionAndSessionToken(t *testing.T) {
+	t.Parallel()
+
 	var called atomic.Bool
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called.Store(true)
@@ -52,6 +54,8 @@ func TestKeySensor_CustomEndpointHeadUsesPathRegionAndSessionToken(t *testing.T)
 }
 
 func TestKeySensor_CustomEndpointWildcardPagination(t *testing.T) {
+	t.Parallel()
+
 	var requests atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests.Add(1)
@@ -73,6 +77,8 @@ func TestKeySensor_CustomEndpointWildcardPagination(t *testing.T) {
 }
 
 func TestKeySensor_CustomEndpointStatusHandling(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name       string
 		status     int
@@ -83,6 +89,8 @@ func TestKeySensor_CustomEndpointStatusHandling(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(tt.status)
 			}))
@@ -95,6 +103,8 @@ func TestKeySensor_CustomEndpointStatusHandling(t *testing.T) {
 }
 
 func TestKeySensor_CustomEndpointCABundle(t *testing.T) {
+	t.Parallel()
+
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/test-bucket/file.csv", r.URL.Path)
 		w.WriteHeader(http.StatusOK)
@@ -118,6 +128,8 @@ func TestKeySensor_CustomEndpointCABundle(t *testing.T) {
 }
 
 func TestKeySensor_CustomEndpointValidationDoesNotLeakCredentials(t *testing.T) {
+	t.Parallel()
+
 	useHTTP := false
 	useHTTPS := true
 	tests := []struct {
@@ -136,6 +148,8 @@ func TestKeySensor_CustomEndpointValidationDoesNotLeakCredentials(t *testing.T) 
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			output := &bytes.Buffer{}
 			ctx := context.WithValue(t.Context(), executor.KeyPrinter, output)
 			err := runEndpointSensor(ctx, tt.connection, "file.csv")
