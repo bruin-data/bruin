@@ -738,8 +738,15 @@ func Run(isDebug *bool) *cli.Command {
 			},
 		},
 		DisableSliceFlagSeparator: true,
-		Action: func(ctx context.Context, c *cli.Command) error {
+		Action: func(ctx context.Context, c *cli.Command) (runErr error) {
 			defer RecoverFromPanic()
+			ctx, stopSignals := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
+			defer stopSignals()
+			defer func() {
+				if runErr == nil && ctx.Err() != nil {
+					runErr = cli.Exit(ctx.Err().Error(), 1)
+				}
+			}()
 			noColor := c.Bool("no-color")
 			disableColorIfRequested(noColor)
 
@@ -1416,13 +1423,17 @@ func Run(isDebug *bool) *cli.Command {
 				defer timeoutCancel()
 			}
 
-			// Combine timeout context with signal handling
-			exeCtx, cancel := signal.NotifyContext(timeoutCtx, syscall.SIGINT, syscall.SIGTERM)
-			defer cancel()
+			// runCtx already carries signal cancellation, including during setup.
+			exeCtx := timeoutCtx
+			defer func() {
+				if runErr == nil && exeCtx.Err() != nil {
+					runErr = cli.Exit(exeCtx.Err().Error(), 1)
+				}
+			}()
 
 			// Check ADC credentials for BigQuery connections used by pending assets
 			pendingAssets := getPendingAssets(s)
-			if err := bigquery.CheckADCCredentialsForPipeline(runCtx, foundPipeline, pendingAssets, connectionManager); err != nil {
+			if err := bigquery.CheckADCCredentialsForPipeline(exeCtx, foundPipeline, pendingAssets, connectionManager); err != nil {
 				errorPrinter.Printf("Failed to verify BigQuery ADC credentials: %v\n", err)
 				return cli.Exit("", 1)
 			}

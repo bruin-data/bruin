@@ -16,6 +16,23 @@ bruin run [FLAGS] [optional path to the pipeline/asset]
 
 Bruin omits ANSI color codes when `--no-color` is passed, when the `NO_COLOR` environment variable is set, or when standard output is not a terminal.
 
+## Stopping a run
+
+Press `Ctrl+C` (or send `SIGTERM`) to cancel a run, including connection setup.
+Bruin stops scheduling new tasks and allows up to 30 seconds for in-flight tasks
+to return before saving partial results. An interrupted or timed-out run exits
+with a nonzero status, even if no task returned an error before shutdown.
+
+BigQuery jobs receive an explicit cancellation request. The Snowflake and
+Databricks SQL drivers send server-side cancellation requests when their query
+contexts are cancelled. Other databases use their driver's cancellation behavior;
+for example, the MySQL driver closes the connection rather than issuing `KILL QUERY`.
+
+Cancellation is best-effort, not a rollback: completed statements can remain
+committed. A failed cancellation request, a network outage, a driver taking longer
+than the shutdown grace period, or a forced kill (`SIGKILL`) can leave remote work
+running. Check the warehouse's query history if termination is uncertain.
+
 <img alt="Bruin - init" src="/chesspipeline.gif" style="margin: 10px;" />
 
 <style>

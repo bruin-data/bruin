@@ -269,7 +269,10 @@ func (db *DB) selectOnce(ctx context.Context, query *query.Query, requestID *gos
 
 		result = append(result, columns)
 	}
-	return result, err
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func (db *DB) SelectOnlyLastResult(ctx context.Context, query *query.Query) ([][]interface{}, error) {

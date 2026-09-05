@@ -17,6 +17,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestRunQueryWithoutResult_RowCancellation(t *testing.T) {
+	t.Parallel()
+	conn, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer conn.Close()
+	db := &DB{conn: sqlx.NewDb(conn, "sqlmock")}
+	mock.ExpectQuery("SELECT 1").WillReturnRows(sqlmock.NewRows([]string{"value"}).
+		AddRow(1).AddRow(2).RowError(1, context.Canceled)).RowsWillBeClosed()
+
+	err = db.RunQueryWithoutResult(t.Context(), &query.Query{Query: "SELECT 1"})
+	require.ErrorIs(t, err, context.Canceled)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestDB_IsValid(t *testing.T) {
 	t.Parallel()
 

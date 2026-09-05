@@ -116,7 +116,10 @@ func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, 
 		result = append(result, columns)
 	}
 
-	return result, err
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func (db *DB) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {
