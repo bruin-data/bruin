@@ -14,7 +14,8 @@ The integration tests are designed to test Bruin's functionality in realistic sc
 
 ### Test Files
 
-- `integration_test.go`: Main test file containing all integration tests
+- `integration_test.go`: Individual task, workflow, and ingestion integration tests
+- `backfill_test.go`: Backfill CLI workflows using isolated local DuckDB databases
 - `test-pipelines/`: Directory containing test pipeline configurations
 
 ### Test Categories
@@ -41,13 +42,31 @@ ENABLE_PARALLEL=1 make integration-test
 #### Run Integration Tests Without Ingestr Tests
 
 ```bash
-# Run only individual task tests
+# Run individual task and workflow tests, including backfills
 make integration-test-light
-# Run only individual task tests in parallel
+# Run individual task and workflow tests in parallel
 ENABLE_PARALLEL=1 make integration-test-light
 ```
 
 **Note**: `ENABLE_PARALLEL=1` enables parallel test execution. By default, tests run sequentially.
+
+#### Run the Backfill Suite
+
+```bash
+make integration-test-backfill
+```
+
+This builds Bruin and runs the tests in `backfill_test.go`. Each test invokes the
+compiled CLI in a temporary Git repository with its own connection configuration
+and DuckDB database, then checks the database rows and persisted run records.
+No cloud credentials are required.
+
+Coverage includes multi-year daily and monthly ranges, both daylight-saving
+transitions, inclusive date boundaries, interval materializations and modifiers,
+selectors, variable overrides, failure policies, retries, missing/failed partition
+resumes, cancellation, connection limits, and paginated JSON output. The suite
+also runs automatically in `make integration-test-light` and `make integration-test`
+(the latter is used by CI).
 
 #### Run the Spark Suite
 

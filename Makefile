@@ -32,7 +32,7 @@ LINT_TIMEOUT ?= 10m
 LINT_BUILD_TAGS ?= no_duckdb_arrow
 LINT_FAST_LINTERS ?= errcheck,govet,ineffassign
 TEST_CONCURRENCY ?= 4
-GO_FORMAT_PATHS := cmd pkg semantic-engine integration-tests/integration_test.go main.go
+GO_FORMAT_PATHS := cmd pkg semantic-engine integration-tests/integration_test.go integration-tests/backfill_test.go main.go
 LINT_MODULES := . $(patsubst %/go.mod,%,$(filter-out go.mod,$(shell git ls-files '*go.mod')))
 
 # Suppress CGO linker warnings on macOS (not needed on Linux/Windows)
@@ -44,7 +44,7 @@ endif
 JQ_REL_PATH = jq --arg prefix "$$(pwd)" 'walk(if type == "object" and has("path") and (.path | type == "string") then .path |= (if . == $$prefix then "integration-tests" elif startswith($$prefix + "/") then .[($$prefix | length + 1):] elif startswith($$prefix) then .[($$prefix | length):] elif startswith("integration-tests/") then .[16:] else . end) else . end)'
 SPARK_INTEGRATION_TEST = cd integration-tests/cloud-integration-tests/spark && env SILENT=1 SF_DISABLE_MINICORE=true go test -count=1 -v -timeout 30m .
 
-.PHONY: all clean test test-full test-unit build build-no-duckdb docs-app format format-ci lint lint-fast lint-full lint-ci pre-commit refresh-integration-expectations integration-test integration-test-light integration-test-cloud integration-test-spark integration-test-mssql validate-links sync-template-docs setup tools-update
+.PHONY: all clean test test-full test-unit build build-no-duckdb docs-app format format-ci lint lint-fast lint-full lint-ci pre-commit refresh-integration-expectations integration-test integration-test-light integration-test-backfill integration-test-cloud integration-test-spark integration-test-mssql validate-links sync-template-docs setup tools-update
 all: clean deps test build
 
 deps: 
@@ -97,6 +97,11 @@ integration-test-light: build
 	@echo "$(OK_COLOR)==> Running integration tests (skipping ingestr tasks)...$(NO_COLOR)"
 	@cd integration-tests && git init
 	@cd integration-tests && env SILENT=1 SF_DISABLE_MINICORE=true go test -tags="no_duckdb_arrow" -v -count=1 -run "^(TestIndividualTasks|TestWorkflowTasks)" .
+
+# Backfill tests create isolated temporary repositories and DuckDB databases.
+integration-test-backfill: build
+	@echo "$(OK_COLOR)==> Running backfill integration tests with local DuckDB...$(NO_COLOR)"
+	@cd integration-tests && env SILENT=1 SF_DISABLE_MINICORE=true go test -tags="no_duckdb_arrow" -v -count=1 -timeout 10m -run "^TestWorkflowTasksBackfill" .
 
 integration-test-cloud: build
 	@touch integration-tests/cloud-integration-tests/.git

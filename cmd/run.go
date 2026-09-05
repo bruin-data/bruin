@@ -1566,6 +1566,10 @@ func Run(isDebug *bool) *cli.Command {
 					printExecutionSummary(results, s, duration, len(results))
 				}
 			}
+			// Backfill parents must not record an incomplete child as successful.
+			if backfillID != "" && exeCtx.Err() != nil {
+				return exeCtx.Err()
+			}
 			return nil
 		},
 		Before: telemetry.BeforeCommand,
