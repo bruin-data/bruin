@@ -265,9 +265,8 @@ var mergeableTemplateDirs = []string{"assets", "macros"}
 var mergeableTemplateFiles = []string{"requirements.txt", "pyproject.toml", "uv.lock"}
 
 // loadTemplateMergeFiles returns the mergeable files of every pipeline in a
-// template. Some templates wrap their pipeline in another directory, and some
-// contain more than one pipeline, so pipeline roots cannot be assumed to sit
-// directly below the template root.
+// template. Pipeline roots are found via their assets directory, because some
+// templates wrap or repeat their pipeline below the template root.
 func loadTemplateMergeFiles(templateName string) ([]templateMergeFile, error) {
 	assetRoots := make([]string, 0)
 	err := fs2.WalkDir(templates.Templates, templateName, func(entryPath string, d fs2.DirEntry, err error) error {
@@ -316,8 +315,8 @@ func loadTemplateMergeFiles(templateName string) ([]templateMergeFile, error) {
 	return sortedTemplateMergeFiles(filesByPath), nil
 }
 
-// collectTemplateMergeDir reads every file below root and records it under
-// prefix. A missing directory is not an error: most templates have no macros.
+// collectTemplateMergeDir records every file below root under prefix. A missing
+// directory is not an error: most templates have no macros.
 func collectTemplateMergeDir(templateName, root, prefix string, filesByPath map[string]templateMergeFile) error {
 	if _, err := fs2.Stat(templates.Templates, root); err != nil {
 		if errors.Is(err, fs2.ErrNotExist) {
@@ -421,6 +420,31 @@ func loadTemplateBruinConfig(templateName string) ([]byte, error) {
 	return content, nil
 }
 
+// writeFileAtomically replaces path in one step, so a failed write cannot leave
+// a truncated file behind.
+func writeFileAtomically(path string, content []byte) error {
+	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*.tmp")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	defer os.Remove(tmpName)
+
+	if _, err := tmp.Write(content); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Chmod(0o644); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+
+	return os.Rename(tmpName, path)
+}
+
 // mergeTemplateConfigIntoProject resolves the project from the destination
 // pipeline, then merges the template config into the project-level .bruin.yml.
 func mergeTemplateConfigIntoProject(pipelinePath string, templateBruinContent []byte) (initConfigSummary, error) {
@@ -449,7 +473,7 @@ func mergeTemplateConfigIntoProject(pipelinePath string, templateBruinContent []
 	if err != nil {
 		return initConfigSummary{}, fmt.Errorf("could not marshal .bruin.yml: %w", err)
 	}
-	if err := os.WriteFile(bruinYmlPath, configBytes, 0o644); err != nil { //nolint:gosec
+	if err := writeFileAtomically(bruinYmlPath, configBytes); err != nil {
 		return initConfigSummary{}, fmt.Errorf("could not write .bruin.yml file: %w", err)
 	}
 
@@ -498,11 +522,10 @@ func validateMergeDestination(pipelinePath string) error {
 	return nil
 }
 
-// findNonDirectoryParent walks the directories that relativePath needs, from
-// root downwards, and returns the first one that already exists as something
-// other than a directory. An empty result means the path is clear. Walking
-// top-down keeps every Lstat rooted at a known directory, so a conflict is
-// reported instead of a bare ENOTDIR.
+// findNonDirectoryParent returns the first directory relativePath needs that
+// already exists as something else, or "" when the path is clear. It walks
+// top-down so every Lstat is rooted at a known directory and cannot fail with a
+// bare ENOTDIR.
 func findNonDirectoryParent(root, relativePath string) (string, error) {
 	current := root
 	currentRelative := ""
@@ -531,8 +554,7 @@ func findNonDirectoryParent(root, relativePath string) (string, error) {
 }
 
 // collectMergeConflicts reports every destination path that is already taken. It
-// writes nothing, so callers can run it before any other part of the merge and
-// bail out with the project untouched.
+// writes nothing, so a conflict leaves the project untouched.
 func collectMergeConflicts(pipelinePath string, files []templateMergeFile) error {
 	if err := validateMergeDestination(pipelinePath); err != nil {
 		return err
@@ -546,9 +568,8 @@ func collectMergeConflicts(pipelinePath string, files []templateMergeFile) error
 			return fmt.Errorf("template contains an invalid file path %q", file.path)
 		}
 
-		// Parents are checked first: when one of them is a regular file, an
-		// Lstat of the full destination fails with ENOTDIR rather than
-		// reporting the actual conflict.
+		// Checked before the destination itself: a regular file in the parent
+		// chain makes the Lstat below fail with ENOTDIR instead of reporting it.
 		parentConflict, err := findNonDirectoryParent(destinationRoot, relativePath)
 		if err != nil {
 			return err
@@ -576,8 +597,8 @@ func collectMergeConflicts(pipelinePath string, files []templateMergeFile) error
 }
 
 // writeTemplateFiles copies the files into the pipeline. It must only run after
-// collectMergeConflicts has passed, which is what makes every destination path
-// safe to write and safe to remove again on failure.
+// collectMergeConflicts has passed: that is what makes each destination safe to
+// write and safe to remove again.
 func writeTemplateFiles(pipelinePath string, files []templateMergeFile) error {
 	destinationRoot := filepath.Clean(pipelinePath)
 	written := make([]string, 0, len(files))
@@ -604,8 +625,8 @@ func writeTemplateFile(destinationPath string, content []byte) error {
 	if err != nil {
 		return fmt.Errorf("could not create file %q: %w", destinationPath, err)
 	}
-	// The file exists from here on, so every failure path removes it: a stub left
-	// behind would be reported as a conflict on the next attempt.
+	// The file exists from here on, so every failure path removes it: a stub would
+	// be reported as a conflict on the next attempt.
 	if _, err := out.Write(content); err != nil {
 		_ = out.Close()
 		_ = os.Remove(destinationPath)
@@ -773,10 +794,8 @@ func Init() *cli.Command {
 					}
 				}
 
-				// Conflicts are collected first so that a destination clash aborts
-				// before the config is touched, and the config is merged before any
-				// file is copied. Both remaining steps are safe to repeat: the config
-				// merge is idempotent, and a failed copy removes what it wrote.
+				// Conflicts first so a clash aborts before anything is written, then
+				// the config, then the copy. Both writing steps are safe to repeat.
 				if err := collectMergeConflicts(inputPath, mergeFiles); err != nil {
 					errorPrinter.Printf("Could not merge template %s: %v\n", templateName, err)
 					return cli.Exit("", 1)

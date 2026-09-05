@@ -356,3 +356,41 @@ func TestInitMergeValidatesDestinationBeforeLoadingTheTemplate(t *testing.T) {
 	require.NoDirExists(t, filepath.Join(targetPath, "assets"))
 	require.NoFileExists(t, filepath.Join(targetRoot, ".bruin.yml"))
 }
+
+func TestWriteFileAtomicallyLeavesNoTemporaryFiles(t *testing.T) {
+	targetRoot := t.TempDir()
+	path := filepath.Join(targetRoot, ".bruin.yml")
+	require.NoError(t, os.WriteFile(path, []byte("old\n"), 0o644))
+
+	require.NoError(t, writeFileAtomically(path, []byte("new\n")))
+
+	content, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.Equal(t, "new\n", string(content))
+
+	entries, err := os.ReadDir(targetRoot)
+	require.NoError(t, err)
+	require.Len(t, entries, 1)
+	require.Equal(t, ".bruin.yml", entries[0].Name())
+}
+
+func TestWriteFileAtomicallyKeepsTheOriginalOnFailure(t *testing.T) {
+	if runtime.GOOS == osWindows {
+		t.Skip("directory permissions do not block file creation on Windows")
+	}
+	if os.Geteuid() == 0 {
+		t.Skip("root bypasses directory permissions")
+	}
+
+	targetRoot := t.TempDir()
+	path := filepath.Join(targetRoot, ".bruin.yml")
+	require.NoError(t, os.WriteFile(path, []byte("keep me\n"), 0o644))
+	require.NoError(t, os.Chmod(targetRoot, 0o555))
+	t.Cleanup(func() { _ = os.Chmod(targetRoot, 0o755) })
+
+	require.Error(t, writeFileAtomically(path, []byte("truncated")))
+
+	content, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.Equal(t, "keep me\n", string(content))
+}
