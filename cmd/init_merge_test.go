@@ -394,3 +394,34 @@ func TestWriteFileAtomicallyKeepsTheOriginalOnFailure(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "keep me\n", string(content))
 }
+
+func TestWriteFileAtomicallyPreservesExistingPermissions(t *testing.T) {
+	if runtime.GOOS == osWindows {
+		t.Skip("file modes are not meaningful on Windows")
+	}
+
+	targetRoot := t.TempDir()
+	path := filepath.Join(targetRoot, ".bruin.yml")
+	require.NoError(t, os.WriteFile(path, []byte("old\n"), 0o600))
+
+	require.NoError(t, writeFileAtomically(path, []byte("new\n")))
+
+	info, err := os.Stat(path)
+	require.NoError(t, err)
+	require.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+}
+
+func TestWriteFileAtomicallyUsesDefaultPermissionsForNewFiles(t *testing.T) {
+	if runtime.GOOS == osWindows {
+		t.Skip("file modes are not meaningful on Windows")
+	}
+
+	targetRoot := t.TempDir()
+	path := filepath.Join(targetRoot, ".bruin.yml")
+
+	require.NoError(t, writeFileAtomically(path, []byte("new\n")))
+
+	info, err := os.Stat(path)
+	require.NoError(t, err)
+	require.Equal(t, os.FileMode(0o644), info.Mode().Perm())
+}

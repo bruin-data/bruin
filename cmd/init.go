@@ -421,8 +421,16 @@ func loadTemplateBruinConfig(templateName string) ([]byte, error) {
 }
 
 // writeFileAtomically replaces path in one step, so a failed write cannot leave
-// a truncated file behind.
+// a truncated file behind. An existing file keeps its own mode: .bruin.yml holds
+// credentials and may have been tightened to 0600 by hand.
 func writeFileAtomically(path string, content []byte) error {
+	mode := os.FileMode(0o644)
+	if info, err := os.Stat(path); err == nil {
+		mode = info.Mode().Perm()
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+
 	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*.tmp")
 	if err != nil {
 		return err
@@ -434,7 +442,7 @@ func writeFileAtomically(path string, content []byte) error {
 		_ = tmp.Close()
 		return err
 	}
-	if err := tmp.Chmod(0o644); err != nil {
+	if err := tmp.Chmod(mode); err != nil {
 		_ = tmp.Close()
 		return err
 	}
