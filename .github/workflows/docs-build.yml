@@ -5,10 +5,20 @@ on:
     branches: [ main ]
     paths:
       - 'docs/**'
+      - '.github/workflows/docs-build.yml'
+      - '.github/workflows/deploy-docs.yml'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.npmrc'
   pull_request:
     branches: [ main ]
     paths:
       - 'docs/**'
+      - '.github/workflows/docs-build.yml'
+      - '.github/workflows/deploy-docs.yml'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.npmrc'
 
 jobs:
   docs-build:
@@ -20,16 +30,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          fetch-depth: 0
+          # VitePress lastUpdated is disabled; pages and sitemap need no history.
+          fetch-depth: 1
 
 
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22.14.0'
+          cache: npm
 
       - name: Install dependencies with npm@11 (for min-release-age support)
-        run: npx npm@11.10.0 install
+        run: npx npm@11.10.0 ci
 
 
       - name: Build documentation
