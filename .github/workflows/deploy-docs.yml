@@ -27,7 +27,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          fetch-depth: 0 # Not needed if lastUpdated is not enabled
+          # VitePress lastUpdated is disabled; pages and sitemap need no history.
+          fetch-depth: 1
       # - uses: pnpm/action-setup@v2 # Uncomment this if you're using pnpm
       # - uses: oven-sh/setup-bun@v1 # Uncomment this if you're using Bun
       - name: Setup Node
