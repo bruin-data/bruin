@@ -48,7 +48,10 @@ make integration-test-light
 ENABLE_PARALLEL=1 make integration-test-light
 ```
 
-**Note**: `ENABLE_PARALLEL=1` enables parallel test execution. By default, tests run sequentially.
+**Note**: `ENABLE_PARALLEL=1` enables parallel test execution. By default, tests in
+`integration_test.go` run sequentially because they share the `integration-tests`
+working tree. The backfill tests are the exception: each one owns a temporary Git
+repository and DuckDB file, so they always run in parallel with each other.
 
 #### Run the Backfill Suite
 

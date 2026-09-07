@@ -76,6 +76,58 @@ func (s *Store) Lock() (*flock.Flock, error) {
 	return lock, nil
 }
 
+const (
+	childLockFile       = ".children.lock"
+	executionGeneration = ".generation.json"
+)
+
+// BeginExecution changes the token accepted by child runs while holding an
+// exclusive lock. Child processes hold shared locks for their whole lifetime,
+// so an executor cannot resume while a child orphaned by an abrupt parent exit
+// is still active. A child that had not acquired its lock before the resume sees
+// the changed token and exits before doing any work.
+func (s *Store) BeginExecution(generation string) error {
+	if generation == "" {
+		return errors.New("backfill execution generation is required")
+	}
+	lock := flock.New(filepath.Join(s.Dir, childLockFile))
+	ok, err := lock.TryLock()
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return errors.New("backfill child processes are still running; wait for them to exit before continuing")
+	}
+	defer lock.Close()
+	return writeJSON(filepath.Join(s.Dir, executionGeneration), generation)
+}
+
+// AcquireChildLease holds a shared execution lock until Close is called and
+// rejects children from a superseded executor generation.
+func AcquireChildLease(dir, generation string) (io.Closer, error) {
+	if dir == "" || generation == "" {
+		return nil, errors.New("backfill child lease directory and generation are required")
+	}
+	lock := flock.New(filepath.Join(dir, childLockFile))
+	ok, err := lock.TryRLock()
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, errors.New("backfill execution changed before the child started")
+	}
+	var current string
+	if err := readJSON(filepath.Join(dir, executionGeneration), &current); err != nil {
+		_ = lock.Close()
+		return nil, err
+	}
+	if current != generation {
+		_ = lock.Close()
+		return nil, errors.New("backfill child belongs to a superseded execution")
+	}
+	return lock, nil
+}
+
 func (s *Store) Create(m Manifest) error {
 	if _, err := os.Stat(filepath.Join(s.Dir, "manifest.json")); err == nil {
 		return fmt.Errorf("backfill %s already exists", m.ID)

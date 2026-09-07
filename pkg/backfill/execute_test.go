@@ -222,6 +222,22 @@ func TestStoreLockAndValidation(t *testing.T) {
 	}
 }
 
+func TestChildLeaseBlocksResumeAndRejectsSupersededChildren(t *testing.T) {
+	t.Parallel()
+	_, s := testStore(t)
+	require.NoError(t, s.BeginExecution("first"))
+	lease, err := AcquireChildLease(s.Dir, "first")
+	require.NoError(t, err)
+	require.ErrorContains(t, s.BeginExecution("second"), "still running")
+	require.NoError(t, lease.Close())
+	require.NoError(t, s.BeginExecution("second"))
+	_, err = AcquireChildLease(s.Dir, "first")
+	require.ErrorContains(t, err, "superseded")
+	lease, err = AcquireChildLease(s.Dir, "second")
+	require.NoError(t, err)
+	require.NoError(t, lease.Close())
+}
+
 func TestHugeBackfillStartsWithoutMaterializingPlan(t *testing.T) {
 	t.Parallel()
 	m, s := testStore(t)

@@ -110,7 +110,7 @@ type Run func(context.Context, Interval, string) error
 
 // Execute keeps at most MaxParallel records in memory. The caller holds the store
 // lock. A stopped or interrupted invocation leaves unstarted partitions queued.
-func Execute(ctx context.Context, m Manifest, s *Store, o Options, run Run) (Summary, error) {
+func Execute(ctx context.Context, m Manifest, s *Store, o Options, run Run, observers ...func(Status, Record)) (Summary, error) {
 	if err := m.Plan.Validate(); err != nil {
 		return Summary{}, err
 	}
@@ -171,7 +171,7 @@ func Execute(ctx context.Context, m Manifest, s *Store, o Options, run Run) (Sum
 		active++
 		remaining--
 		go func(r Record) {
-			status, err := executePartition(runCtx, m.ID, s, r, o.Retries, run)
+			status, err := executePartition(runCtx, m.ID, s, r, o.Retries, run, observers...)
 			results <- result{status, err}
 		}(record)
 	}
@@ -187,7 +187,7 @@ func Execute(ctx context.Context, m Manifest, s *Store, o Options, run Run) (Sum
 	return summary, executionErr
 }
 
-func executePartition(ctx context.Context, id string, s *Store, r Record, retries int, run Run) (Status, error) {
+func executePartition(ctx context.Context, id string, s *Store, r Record, retries int, run Run, observers ...func(Status, Record)) (Status, error) {
 	// A running attempt after acquiring the exclusive lock was interrupted. Keep
 	// its history, but never confuse it with a completed success.
 	if len(r.Attempts) > 0 && r.Attempts[len(r.Attempts)-1].Status == Running {
@@ -200,10 +200,14 @@ func executePartition(ctx context.Context, id string, s *Store, r Record, retrie
 			return r.Status, ctx.Err()
 		}
 		a := Attempt{RunID: id + "__" + uuid.NewString(), Status: Running, StartedAt: time.Now().UTC()}
+		previous := r.Status
 		r.Status = Running
 		r.Attempts = append(r.Attempts, a)
 		if err := s.Save(r); err != nil {
 			return Running, err
+		}
+		for _, observe := range observers {
+			observe(previous, r)
 		}
 		err := run(ctx, r.Interval, a.RunID)
 		finished := time.Now().UTC()
@@ -222,6 +226,9 @@ func executePartition(ctx context.Context, id string, s *Store, r Record, retrie
 		attempt.Status = r.Status
 		if err := s.Save(r); err != nil {
 			return r.Status, err
+		}
+		for _, observe := range observers {
+			observe(Running, r)
 		}
 		if r.Status != Failed {
 			return r.Status, nil

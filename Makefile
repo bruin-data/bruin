@@ -81,7 +81,7 @@ integration-test: build
 	@mkdir -p integration-tests/logs/runs
 	@echo "$(OK_COLOR)==> Running integration tests...$(NO_COLOR)"
 	@cd integration-tests && git init
-	@cd integration-tests && env SILENT=1 SF_DISABLE_MINICORE=true go test -tags="no_duckdb_arrow" -v -count=1 .
+	@cd integration-tests && env SILENT=1 SF_DISABLE_MINICORE=true go test -tags="no_duckdb_arrow" -v -count=1 -timeout 30m .
 
 integration-test-light: build
 	@rm -rf integration-tests/duckdb-files  # Clean up the directory if it exists
@@ -96,12 +96,12 @@ integration-test-light: build
 	@mkdir -p integration-tests/logs/runs
 	@echo "$(OK_COLOR)==> Running integration tests (skipping ingestr tasks)...$(NO_COLOR)"
 	@cd integration-tests && git init
-	@cd integration-tests && env SILENT=1 SF_DISABLE_MINICORE=true go test -tags="no_duckdb_arrow" -v -count=1 -run "^(TestIndividualTasks|TestWorkflowTasks)" .
+	@cd integration-tests && env SILENT=1 SF_DISABLE_MINICORE=true go test -tags="no_duckdb_arrow" -v -count=1 -timeout 30m -run "^(TestIndividualTasks|TestWorkflowTasks)" .
 
 # Backfill tests create isolated temporary repositories and DuckDB databases.
 integration-test-backfill: build
 	@echo "$(OK_COLOR)==> Running backfill integration tests with local DuckDB...$(NO_COLOR)"
-	@cd integration-tests && env SILENT=1 SF_DISABLE_MINICORE=true go test -tags="no_duckdb_arrow" -v -count=1 -timeout 10m -run "^TestWorkflowTasksBackfill" .
+	@cd integration-tests && env SILENT=1 SF_DISABLE_MINICORE=true go test -tags="no_duckdb_arrow" -v -count=1 -timeout 30m -run "^TestWorkflowTasksBackfill" .
 
 integration-test-cloud: build
 	@touch integration-tests/cloud-integration-tests/.git

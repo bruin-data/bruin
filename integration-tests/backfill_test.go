@@ -118,6 +118,7 @@ SELECT '{{ start_timestamp }}'::TIMESTAMPTZ AS start_at,
 func TestWorkflowTasksBackfillDuckDBBoundaries(t *testing.T) {
 	t.Parallel()
 	f := newBackfillFixture(t)
+	f.write(t, filepath.Join(f.dir, ".gitignore"), "logs/backfills/\n")
 	f.query(t, "CREATE TABLE captures (start_at TIMESTAMPTZ, end_at TIMESTAMPTZ, run_id VARCHAR, marker VARCHAR)")
 	f.asset(t, "capture", captureBackfillSQL)
 	f.asset(t, "excluded", "/* @bruin\nname: excluded\ntype: duckdb.sql\ntags: [excluded]\n@bruin */\nSELECT error('excluded asset must not run')")
@@ -129,6 +130,9 @@ func TestWorkflowTasksBackfillDuckDBBoundaries(t *testing.T) {
 	require.True(t, os.IsNotExist(err), "dry-run must not create the store")
 	result := f.run(t, false, args...)
 	require.Equal(t, 3, result.Summary.Succeeded)
+	gitignore, err := os.ReadFile(filepath.Join(f.dir, ".gitignore"))
+	require.NoError(t, err)
+	require.Equal(t, 1, strings.Count(string(gitignore), "logs/backfills/"))
 	for n, record := range result.Partitions {
 		require.Equal(t, plan.Partitions[n].ID, record.ID)
 		require.Len(t, record.Attempts, 1)
@@ -234,6 +238,14 @@ func TestWorkflowTasksBackfillDuckDBModifiersAndMonths(t *testing.T) {
 	result := f.run(t, false, filepath.Join(f.pipeline, "assets", "capture.sql"), "--start-date", "2023-12-31", "--end-date", "2024-02-01", "--partition", "monthly", "--apply-interval-modifiers", "--var", `marker="shifted"`)
 	require.Equal(t, 3, result.Summary.Succeeded)
 	require.Equal(t, "first_at,last_at\n2023-12-30 22:00:00,2024-02-01 21:59:59.999999", f.query(t, "SELECT (min(start_at) AT TIME ZONE 'UTC')::VARCHAR AS first_at, (max(end_at) AT TIME ZONE 'UTC')::VARCHAR AS last_at FROM captures"))
+
+	// Child arguments contain numeric offsets, so the parent also passes the IANA
+	// location to preserve calendar-day modifiers across the DST boundary.
+	sql = strings.Replace(captureBackfillSQL, "tags: [capture]", "interval_modifiers:\n  start: -1d\n  end: -1d", 1)
+	f.asset(t, "capture", sql)
+	result = f.run(t, false, filepath.Join(f.pipeline, "assets", "capture.sql"), "--start-date", "2024-03-10", "--end-date", "2024-03-11", "--partition", "daily", "--timezone", "America/New_York", "--apply-interval-modifiers", "--var", `marker="dst"`)
+	require.Equal(t, 2, result.Summary.Succeeded)
+	require.Equal(t, "start_at,end_at\n2024-03-09 00:00:00,2024-03-09 23:59:59.999999\n2024-03-10 00:00:00,2024-03-10 23:59:59.999999", f.query(t, "SELECT (start_at AT TIME ZONE 'America/New_York')::VARCHAR AS start_at, (end_at AT TIME ZONE 'America/New_York')::VARCHAR AS end_at FROM captures WHERE marker = 'dst' ORDER BY start_at"))
 }
 
 func TestWorkflowTasksBackfillDuckDBTimeout(t *testing.T) {
@@ -537,4 +549,22 @@ func TestWorkflowTasksBackfillDuckDBPagination(t *testing.T) {
 	require.Len(t, all.Partitions, 4)
 	require.Equal(t, 4, all.Summary.Skipped)
 	require.Equal(t, "n\n4", f.query(t, "SELECT count(*) AS n FROM captures"))
+}
+
+func TestWorkflowTasksBackfillDuckDBPlainOutput(t *testing.T) {
+	f := newBackfillFixture(t)
+	f.query(t, "CREATE TABLE captures (start_at TIMESTAMPTZ, end_at TIMESTAMPTZ, run_id VARCHAR, marker VARCHAR)")
+	f.asset(t, "capture", captureBackfillSQL)
+	c := f.command(t.Context(), "backfill", f.pipeline, "--start-date", "2024-01-01", "--end-date", "2024-01-03")
+	var stdout, stderr bytes.Buffer
+	c.Stdout, c.Stderr = &stdout, &stderr
+	require.NoError(t, c.Run(), stderr.String())
+	require.NotContains(t, stdout.String(), "\x1b")
+	require.NotContains(t, stdout.String(), "Analyzed the pipeline")
+	require.NotContains(t, stderr.String(), "Running:")
+	require.Contains(t, stdout.String(), "3/3 succeeded")
+	require.Contains(t, stdout.String(), "Backfill complete")
+	require.NotContains(t, stdout.String(), "Resume:")
+	require.Contains(t, stdout.String(), "Logs:")
+	require.Contains(t, f.query(t, "SELECT count(*) AS n FROM captures"), "3")
 }

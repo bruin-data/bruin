@@ -18,6 +18,12 @@ import (
 
 const hourlyPartition = "hourly"
 
+// isDateOnly reports whether a layout returned by date.ParseTimeWithFormat names
+// a calendar date with no time of day, which ParseRange treats as inclusive.
+func isDateOnly(format string) bool {
+	return format == "2006-01-02" || format == "02 Jan 2006"
+}
+
 // Plan contains the immutable inputs needed to regenerate a backfill. Intervals
 // are generated lazily; neither planning nor execution retains the whole range.
 type Plan struct {
@@ -44,36 +50,40 @@ func ParseRange(start, end, zone string) (time.Time, time.Time, error) {
 	if err != nil || zone == "" || zone == "Local" {
 		return time.Time{}, time.Time{}, fmt.Errorf("timezone must be UTC or an IANA timezone: %q", zone)
 	}
-	parse := func(value string) (time.Time, error) {
+	parse := func(value string) (time.Time, string, error) {
 		t, format, err := date.ParseTimeWithFormat(value)
 		if err != nil {
-			return t, err
+			return t, format, err
 		}
-		if format == "2006-01-02" || format == "02 Jan 2006" {
+		if isDateOnly(format) {
 			t = calendarStart(t.Year(), t.Month(), t.Day(), loc)
 		} else if !strings.Contains(format, "Z07") {
 			t, err = time.ParseInLocation(format, value, loc)
 			if err == nil && t.Format(format) != value {
-				return t, fmt.Errorf("nonexistent local time %q; use a timestamp with an explicit offset", value)
+				return t, format, fmt.Errorf("nonexistent local time %q; use a timestamp with an explicit offset", value)
 			}
 		}
 		if t.Nanosecond()%1000 != 0 {
-			return t, errors.New("timestamps must have at most microsecond precision")
+			return t, format, errors.New("timestamps must have at most microsecond precision")
 		}
-		return t.In(loc), err
+		return t.In(loc), format, err
 	}
-	a, err := parse(start)
+	a, _, err := parse(start)
 	if err != nil {
 		return a, time.Time{}, fmt.Errorf("invalid start date: %w", err)
 	}
-	b, err := parse(end)
+	b, endFormat, err := parse(end)
 	if err != nil {
 		return a, b, fmt.Errorf("invalid end date: %w", err)
 	}
-	if len(end) == len("2006-01-02") || len(end) == len("02 Jan 2006") {
-		original, _ := date.ParseTime(end)
-		next := original.AddDate(0, 0, 1)
-		loc, _ := time.LoadLocation(zone)
+	if isDateOnly(endFormat) {
+		// Advance from the literal calendar date rather than from b: a date that the
+		// zone skips entirely rolls b forward to the next existing date already.
+		literal, err := time.Parse(endFormat, end)
+		if err != nil {
+			return a, b, fmt.Errorf("invalid end date: %w", err)
+		}
+		next := literal.AddDate(0, 0, 1)
 		b = calendarStart(next.Year(), next.Month(), next.Day(), loc)
 	}
 	if !a.Before(b) {

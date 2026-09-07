@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -66,24 +68,33 @@ func TestBackfillOutputStreamsJSON(t *testing.T) {
 	require.True(t, result.Partitions[0].End.Equal(end))
 }
 
+// Each case asserts the specific rejection, so a guard that stops firing cannot be
+// masked by an unrelated error raised later in runBackfill.
+//
 //nolint:paralleltest // urfave/cli mutates shared run flag definitions during setup.
 func TestBackfillInvalidCLI(t *testing.T) {
-	for _, args := range [][]string{
-		{"--max-parallel", "0"},
-		{"--workers", "0"},
-		{"--retries", "-1"},
-		{"--on-failure", "bad"},
-		{"--output", "bad"},
-		{"--state-dir", "unused", "--start-date", "2024-01-01"},
-		{"--state-dir", "unused", "--continue", "../../escape"},
+	for name, tc := range map[string]struct {
+		args    []string
+		wantErr string
+	}{
+		"max-parallel":     {[]string{"--max-parallel", "0"}, "max-parallel and workers must be positive"},
+		"workers":          {[]string{"--workers", "0"}, "max-parallel and workers must be positive"},
+		"retries":          {[]string{"--retries", "-1"}, "retries must not be negative"},
+		"on-failure":       {[]string{"--on-failure", "bad"}, "on-failure must be continue, stop, or fail-fast"},
+		"output":           {[]string{"--output", "bad"}, "output must be text or json"},
+		"missing end-date": {[]string{"--state-dir", "unused", "--start-date", "2024-01-01"}, "start-date and end-date are required"},
+		"escaping ID":      {[]string{"--state-dir", "unused", "--continue", "../../escape"}, "invalid backfill ID"},
+		// --rerun only selects partitions that already have a recorded status, so
+		// accepting it on a new backfill would silently execute nothing and exit 0.
+		"rerun without continue": {[]string{"--rerun", "failed"}, "requires --continue"},
 	} {
-		t.Run(args[0], func(t *testing.T) {
+		t.Run(name, func(t *testing.T) {
 			debug := false
 			c := Backfill(&debug)
 			c.Writer = io.Discard
 			c.ErrWriter = io.Discard
 			app := &cli.Command{Name: "bruin", Commands: []*cli.Command{c}, Writer: io.Discard, ErrWriter: io.Discard}
-			require.Error(t, app.Run(t.Context(), append([]string{"bruin", "backfill"}, args...)))
+			require.ErrorContains(t, app.Run(t.Context(), append([]string{"bruin", "backfill"}, tc.args...)), tc.wantErr)
 		})
 	}
 }
@@ -121,4 +132,63 @@ func TestBackfillOutputPagination(t *testing.T) {
 	require.Len(t, result.Partitions, 3)
 	require.Equal(t, start.Add(2*time.Microsecond), result.Partitions[0].Start)
 	require.Equal(t, start.Add(5*time.Microsecond), result.Partitions[2].End)
+}
+
+// The saved inputs define the partition identities, so a resume that silently
+// accepted a different selector or range would write records for a different plan.
+//
+//nolint:paralleltest // urfave/cli mutates shared run flag definitions during setup.
+func TestBackfillContinueRejectsChangedInputs(t *testing.T) {
+	root := t.TempDir()
+	const id = "saved-backfill"
+	store, err := backfill.Open(root, id)
+	require.NoError(t, err)
+	start, end, err := backfill.ParseRange("2024-01-01", "2024-01-02", "UTC")
+	require.NoError(t, err)
+	require.NoError(t, store.Create(backfill.Manifest{
+		Version: backfill.Version, ID: id, CreatedAt: time.Now().UTC(),
+		Plan: backfill.Plan{Target: "/repo/pipeline", Environment: "dev", Timezone: "UTC", Partition: "daily", Start: start, End: end},
+	}))
+	for _, args := range [][]string{
+		{"--selector", "tag:finance"},
+		{"--var", `region="eu"`},
+		{"--partition", "monthly"},
+		{"--start-date", "2024-02-01"},
+		{"--timezone", "America/New_York"},
+		{"--environment", "other"},
+	} {
+		t.Run(args[0], func(t *testing.T) {
+			debug := false
+			c := Backfill(&debug)
+			c.Writer, c.ErrWriter = io.Discard, io.Discard
+			app := &cli.Command{Name: "bruin", Commands: []*cli.Command{c}, Writer: io.Discard, ErrWriter: io.Discard}
+			err := app.Run(t.Context(), append([]string{"bruin", "backfill", "--state-dir", root, "--continue", id}, args...))
+			require.ErrorContains(t, err, "cannot be changed with --continue")
+		})
+	}
+}
+
+// A backfill writes to every partition unattended, so the production guard is the
+// only confirmation step; switchEnvironment's interactive prompt cannot apply here.
+//
+//nolint:paralleltest // urfave/cli mutates shared run flag definitions during setup.
+func TestBackfillRequiresForceInProduction(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, ".bruin.yml")
+	require.NoError(t, os.WriteFile(configPath, []byte("default_environment: production\nenvironments:\n  production:\n    connections:\n      duckdb:\n        - name: local\n          path: data.duckdb\n"), 0o600))
+	args := []string{
+		"bruin", "backfill", dir, "--state-dir", filepath.Join(dir, "state"), "--config-file", configPath,
+		"--environment", "production", "--start-date", "2024-01-01", "--end-date", "2024-01-01", "--dry-run",
+	}
+	run := func(args ...string) error {
+		debug := false
+		c := Backfill(&debug)
+		c.Writer, c.ErrWriter = io.Discard, io.Discard
+		app := &cli.Command{Name: "bruin", Commands: []*cli.Command{c}, Writer: io.Discard, ErrWriter: io.Discard}
+		return app.Run(t.Context(), args)
+	}
+	// --dry-run returns before the guard, so a preview of production is allowed.
+	require.NoError(t, run(args...))
+	require.ErrorContains(t, run(args[:len(args)-1]...), "production environment requires --force")
+	require.NoDirExists(t, filepath.Join(dir, "state"))
 }

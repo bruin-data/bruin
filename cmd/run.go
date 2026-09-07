@@ -21,6 +21,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/athena"
+	"github.com/bruin-data/bruin/pkg/backfill"
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/claudecode"
 	"github.com/bruin-data/bruin/pkg/clickhouse"
@@ -740,6 +741,20 @@ func Run(isDebug *bool) *cli.Command {
 		DisableSliceFlagSeparator: true,
 		Action: func(ctx context.Context, c *cli.Command) error {
 			defer RecoverFromPanic()
+			childState := os.Getenv(backfillChildStateEnv)
+			childGeneration := os.Getenv(backfillChildGenerationEnv)
+			childTimezone := os.Getenv(backfillTimezoneEnv)
+			childConfigured := childState != "" || childGeneration != "" || childTimezone != ""
+			if childConfigured && (childState == "" || childGeneration == "" || childTimezone == "") {
+				return errors.New("incomplete backfill child lease configuration")
+			}
+			if childState != "" {
+				lease, err := backfill.AcquireChildLease(childState, childGeneration)
+				if err != nil {
+					return err
+				}
+				defer lease.Close()
+			}
 			noColor := c.Bool("no-color")
 			disableColorIfRequested(noColor)
 
@@ -778,6 +793,14 @@ func Run(isDebug *bool) *cli.Command {
 			startDate, endDate, inputPath, err := ValidateRunConfig(runConfig, c.Args().Get(0), logger)
 			if err != nil {
 				return err
+			}
+			var childLocation *time.Location
+			if childTimezone != "" {
+				childLocation, err = time.LoadLocation(childTimezone)
+				if err != nil {
+					return fmt.Errorf("invalid backfill timezone %q: %w", childTimezone, err)
+				}
+				startDate, endDate = startDate.In(childLocation), endDate.In(childLocation)
 			}
 			repoRoot, err := git.FindRepoFromPath(inputPath)
 			if err != nil {
@@ -1142,6 +1165,9 @@ func Run(isDebug *bool) *cli.Command {
 			endDate, err = date.ParseTime(runConfig.EndDate)
 			if err != nil {
 				return err
+			}
+			if childLocation != nil {
+				startDate, endDate = startDate.In(childLocation), endDate.In(childLocation)
 			}
 			// Validate date range
 			if err := ValidateDateRange(startDate, endDate); err != nil {

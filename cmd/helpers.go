@@ -37,6 +37,12 @@ type WarningResponse struct {
 	Message string `json:"message"`
 }
 
+// isProductionEnvironment matches environments that look like production, which
+// require an explicit confirmation or --force before anything writes to them.
+func isProductionEnvironment(env string) bool {
+	return strings.Contains(strings.ToLower(env), "prod")
+}
+
 func switchEnvironment(env string, force bool, cm *config.Config, stdin io.ReadCloser, onlyTaskTypes ...[]string) error {
 	if env == "" {
 		return nil
@@ -52,7 +58,7 @@ func switchEnvironment(env string, force bool, cm *config.Config, stdin io.ReadC
 	onlyChecks := len(onlyTaskTypes) > 0 && len(onlyTaskTypes[0]) == 1 && onlyTaskTypes[0][0] == "checks"
 
 	// if env name is similar to "prod" ask for confirmation
-	if !force && !onlyChecks && strings.Contains(strings.ToLower(env), "prod") {
+	if !force && !onlyChecks && isProductionEnvironment(env) {
 		prompt := promptui.Prompt{
 			Label:     "You are using a production environment. Are you sure you want to continue?",
 			IsConfirm: true,

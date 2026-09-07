@@ -59,7 +59,7 @@ bruin backfill --continue <backfill-id> --rerun all
 bruin backfill --continue <backfill-id> --dry-run --output json
 ```
 
-Successful partitions are skipped by default. `--retries N` permits up to N additional attempts for each selected partition in the current invocation. Every attempt has its own child run ID and keeps its history.
+Successful partitions are skipped by default. `--rerun` filters partitions by their recorded status, so it is only accepted together with `--continue`. `--retries N` permits up to N additional attempts for each selected partition in the current invocation. Every attempt has its own child run ID and keeps its history.
 
 `--on-failure` controls what happens after a partition exhausts its retries:
 
@@ -99,7 +99,30 @@ State is stored under `<repository>/logs/backfills/<backfill-id>/`. Use `--state
 - `manifest.json`: immutable inputs used to regenerate the plan.
 - `partitions/<partition-id>.json`: independently and atomically written partition state.
 - `children/<child-run-id>.log`: logs for each attempt.
+- `.children.lock` and `.generation.json`: internal coordination that prevents a resumed executor from overlapping children left alive by an abrupt parent exit.
 
 A process lock prevents simultaneous execution of the same backfill. Partition identities are deterministic hashes of the target, environment, run options (including selectors and variables), and interval. Changing execution order does not change them. Queued partitions are represented by the plan until their first attempt; Bruin generates and reads partitions lazily instead of loading an entire historical plan into memory.
 
-The store is local, and its files include saved variable overrides. Keep it out of version control. Ordinary child run records also appear under `logs/runs` with the backfill group ID and partition count.
+The store is local, and its files include saved variable overrides. When the state directory is inside the target repository, Bruin adds its relative path to the repository's `.gitignore`. Ordinary child run records also appear under `logs/runs` with the backfill group ID and partition count.
+
+### Terminal dashboard and logs
+
+An interactive terminal automatically shows a live dashboard with the backfill
+range, completion bar, status counts, and an ordered list of partitions, including
+queued work. Rows update in place with statuses, attempts, and elapsed time. When
+the list exceeds the screen height, it automatically scrolls to follow execution.
+Use the arrow keys or Page Up/Page Down to browse, Home to return to the beginning,
+and `f` to resume automatic scrolling. Large plans render only the visible rows. Press `q` or `Ctrl+C` to stop scheduling and cancel
+active runs; the dashboard waits for child processes to exit before returning.
+
+Pipes, redirected output, and terminals without interactive input automatically
+use compact progress lines. Use `--no-progress` to select those lines explicitly.
+Colors are enabled on supported terminals; `--no-color` or `NO_COLOR` disables
+colors. `TERM=dumb` disables the dashboard and colors.
+
+Child run output is saved under the backfill's `children/` directory instead of
+being interleaved with progress. The final summary shows the outcome, range,
+duration, and nonzero status counts, with the log directory below. Incomplete
+backfills also show a resume command. `--output json` emits only the final JSON
+document on stdout.
+`--dry-run` continues to print a static, paginated plan.

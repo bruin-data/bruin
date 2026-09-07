@@ -20,6 +20,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/backfill"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/google/uuid"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
@@ -34,6 +35,12 @@ var backfillRunFlags = []string{
 	"mask-credentials", "timeout", "query-annotations",
 }
 
+const (
+	backfillChildStateEnv      = "BRUIN_BACKFILL_CHILD_STATE"
+	backfillChildGenerationEnv = "BRUIN_BACKFILL_CHILD_GENERATION"
+	backfillTimezoneEnv        = "BRUIN_BACKFILL_TIMEZONE"
+)
+
 func Backfill(isDebug *bool) *cli.Command {
 	flags := []cli.Flag{
 		&cli.StringFlag{Name: "start-date", Usage: "first date or timestamp to process"},
@@ -45,9 +52,10 @@ func Backfill(isDebug *bool) *cli.Command {
 		&cli.IntFlag{Name: "retries", Usage: "additional attempts per selected partition in this invocation"},
 		&cli.StringFlag{Name: "on-failure", Value: "stop", Usage: "continue, stop (drain active runs), or fail-fast (cancel active runs)"},
 		&cli.StringFlag{Name: "continue", Usage: "resume a persisted backfill ID"},
-		&cli.StringFlag{Name: "rerun", Usage: "select failed, missing (queued/interrupted), or all partitions; default: failed and missing"},
+		&cli.StringFlag{Name: "rerun", Usage: "with --continue, select failed, missing (queued/interrupted), or all partitions; default: failed and missing"},
 		&cli.BoolFlag{Name: "reverse", Usage: "process newest partitions first"},
 		&cli.BoolFlag{Name: "dry-run", Usage: "print the plan and current partition state without executing or writing records"},
+		&cli.BoolFlag{Name: "no-progress", Usage: "use plain progress lines instead of the terminal dashboard"},
 		&cli.StringFlag{Name: "output", Value: "text", Usage: "text or json (use --dry-run to emit just the plan)"},
 		&cli.IntFlag{Name: "limit", Value: 1000, Usage: "maximum partitions to print (0 prints all); execution always covers the full plan"},
 		&cli.IntFlag{Name: "offset", Usage: "number of partitions to skip in plan/state output"},
@@ -68,7 +76,12 @@ func Backfill(isDebug *bool) *cli.Command {
 	}
 	return &cli.Command{
 		Name: "backfill", Usage: "run resumable, partitioned local backfills", ArgsUsage: "[pipeline directory or asset file]", Flags: flags, DisableSliceFlagSeparator: true,
-		Action: func(ctx context.Context, c *cli.Command) error { return runBackfill(ctx, c, *isDebug) },
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			return runBackfill(ctx, c, *isDebug)
+		},
+		Before: telemetry.BeforeCommand,
+		After:  telemetry.AfterCommand,
 	}
 }
 
@@ -107,6 +120,11 @@ func runBackfill(ctx context.Context, c *cli.Command, debug bool) error {
 	options := backfill.Options{MaxParallel: c.Int("max-parallel"), Workers: c.Int("workers"), Retries: c.Int("retries"), OnFailure: c.String("on-failure"), Rerun: c.String("rerun"), Reverse: c.Bool("reverse")}
 	if err := options.Validate(); err != nil {
 		return err
+	}
+	// Every partition of a new backfill is queued, so a filter such as "failed"
+	// would select nothing and the command would exit successfully having run none.
+	if options.Rerun != "" && c.String("continue") == "" {
+		return errors.New("--rerun selects previously recorded partitions; it requires --continue")
 	}
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -149,7 +167,7 @@ func runBackfill(ctx context.Context, c *cli.Command, debug bool) error {
 			return fmt.Errorf("target does not match saved backfill %s", id)
 		}
 		for _, name := range append([]string{"start-date", "end-date", "partition", "timezone"}, backfillRunFlags...) {
-			if c.IsSet(name) {
+			if c.IsSet(name) && name != "no-color" {
 				return fmt.Errorf("--%s cannot be changed with --continue; the saved backfill inputs are reused", name)
 			}
 		}
@@ -235,8 +253,11 @@ func runBackfill(ctx context.Context, c *cli.Command, debug bool) error {
 		}
 		return writeBackfillOutput(c.Writer, c.String("output"), m, state, options, summary, page)
 	}
-	if strings.Contains(strings.ToLower(environment), "prod") && !slices.Equal(m.Plan.RunFlags["force"], []string{"true"}) && !slices.Equal(m.Plan.RunFlags["only"], []string{"checks"}) {
+	if isProductionEnvironment(environment) && !slices.Equal(m.Plan.RunFlags["force"], []string{"true"}) && !slices.Equal(m.Plan.RunFlags["only"], []string{"checks"}) {
 		return errors.New("backfill in a production environment requires --force on the initial invocation")
+	}
+	if err := ensureBackfillStateGitignored(root, m.Plan.Target); err != nil {
+		return err
 	}
 	lock, err := store.Lock()
 	if err != nil {
@@ -248,21 +269,43 @@ func runBackfill(ctx context.Context, c *cli.Command, debug bool) error {
 			return err
 		}
 	}
+	generation := uuid.NewString()
+	if err = store.BeginExecution(generation); err != nil {
+		return err
+	}
 	binary, err := os.Executable()
 	if err != nil {
 		return err
 	}
-	output := &backfill.LockedWriter{WriteFunc: c.ErrWriter.Write}
-	fmt.Fprintf(output, "Backfill %s; resume with: bruin backfill --state-dir %q --continue %s\n", id, root, id)
 	total, err := m.Plan.Count(ctx)
 	if err != nil {
 		return err
 	}
-	summary, runErr := backfill.Execute(ctx, m, store, options, func(ctx context.Context, i backfill.Interval, runID string) error {
-		return runBackfillChild(ctx, binary, m, store, i, runID, options.Workers, total, debug, output)
+	return executeBackfillWithDisplay(ctx, c, m, store, options, page, func(ctx context.Context, i backfill.Interval, runID string) error {
+		return runBackfillChild(ctx, binary, m, store, i, runID, generation, options.Workers, total, debug, io.Discard)
 	})
-	outputErr := writeBackfillOutput(c.Writer, c.String("output"), m, store, options, summary, page)
-	return errors.Join(runErr, outputErr)
+}
+
+func ensureBackfillStateGitignored(root, target string) error {
+	repo, err := git.FindRepoFromPath(target)
+	if err != nil {
+		return err
+	}
+	if !strings.EqualFold(filepath.VolumeName(repo.Path), filepath.VolumeName(root)) {
+		return nil
+	}
+	rel, err := filepath.Rel(repo.Path, root)
+	if err != nil {
+		return err
+	}
+	if rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
+		return nil
+	}
+	pattern := strings.TrimSuffix(filepath.ToSlash(rel), "/") + "/"
+	if err := git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repo.Path, pattern); err != nil {
+		return fmt.Errorf("failed to add the backfill state folder to .gitignore: %w", err)
+	}
+	return nil
 }
 
 // Reserve each child's worst-case use of each configured connection. This is
@@ -314,7 +357,7 @@ func backfillChildArgs(m backfill.Manifest, i backfill.Interval, workers, total 
 	return append(args, m.Plan.Target)
 }
 
-func runBackfillChild(ctx context.Context, binary string, m backfill.Manifest, s *backfill.Store, i backfill.Interval, runID string, workers, total int, debug bool, output io.Writer) error {
+func runBackfillChild(ctx context.Context, binary string, m backfill.Manifest, s *backfill.Store, i backfill.Interval, runID, generation string, workers, total int, debug bool, output io.Writer) error {
 	logDir := filepath.Join(s.Dir, "children")
 	if err := os.MkdirAll(logDir, 0o700); err != nil {
 		return err
@@ -333,11 +376,18 @@ func runBackfillChild(ctx context.Context, binary string, m backfill.Manifest, s
 	// or an inherited full-refresh/run ID to children on resume.
 	for _, env := range os.Environ() {
 		name, _, _ := strings.Cut(env, "=")
-		if name != "BRUIN_RUN_ID" && name != "BRUIN_VARS" && name != "BRUIN_FULL_REFRESH" && name != "BRUIN_SECRETS_BACKEND" && name != "BRUIN_QUERY_ANNOTATIONS" {
+		if name != "BRUIN_RUN_ID" && name != "BRUIN_VARS" && name != "BRUIN_FULL_REFRESH" && name != "BRUIN_SECRETS_BACKEND" && name != "BRUIN_QUERY_ANNOTATIONS" && name != backfillChildStateEnv && name != backfillChildGenerationEnv && name != backfillTimezoneEnv {
 			child.Env = append(child.Env, env)
 		}
 	}
-	child.Env = append(child.Env, "BRUIN_RUN_ID="+runID, "BRUIN_FULL_REFRESH=0")
+	child.Env = append(
+		child.Env,
+		"BRUIN_RUN_ID="+runID,
+		"BRUIN_FULL_REFRESH=0",
+		backfillChildStateEnv+"="+s.Dir,
+		backfillChildGenerationEnv+"="+generation,
+		backfillTimezoneEnv+"="+m.Plan.Timezone,
+	)
 	writer := &backfill.LockedWriter{WriteFunc: io.MultiWriter(logFile, output).Write}
 	child.Stdout, child.Stderr = writer, writer
 	configureBackfillChild(child)
