@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -14,6 +15,7 @@ import (
 )
 
 func TestBackfillDisplayTransitions(t *testing.T) {
+	t.Parallel()
 	var output bytes.Buffer
 	d := &backfillDisplay{summary: backfill.Summary{Total: 1, Queued: 1}, active: make(map[string]backfill.Record), writer: &output}
 	start := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -38,6 +40,7 @@ func TestBackfillDisplayTransitions(t *testing.T) {
 }
 
 func TestBackfillDashboardResizeAndCancel(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	d := &backfillDisplay{summary: backfill.Summary{Total: 100, Queued: 100}, active: make(map[string]backfill.Record), started: time.Now()}
@@ -58,6 +61,7 @@ func TestBackfillDashboardResizeAndCancel(t *testing.T) {
 }
 
 func TestBackfillDashboardWaitsForCancellation(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	started := make(chan struct{})
@@ -99,6 +103,7 @@ func TestBackfillDashboardWaitsForCancellation(t *testing.T) {
 }
 
 func TestBackfillSummaryOutcomes(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name   string
 		result backfillFinished
@@ -110,6 +115,7 @@ func TestBackfillSummaryOutcomes(t *testing.T) {
 		{"cancelled", backfillFinished{summary: backfill.Summary{Total: 3, Cancelled: 1, Queued: 2}, err: context.Canceled}, "Backfill stopped", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			var output bytes.Buffer
 			m := backfill.Manifest{ID: "demo", Plan: backfill.Plan{Target: "pipeline", Environment: "local", Partition: "daily"}}
 			require.NoError(t, writeBackfillSummary(&output, m, &backfill.Store{Dir: "logs/backfills/demo"}, tc.result, 37*time.Second, false))
@@ -123,8 +129,10 @@ func TestBackfillSummaryOutcomes(t *testing.T) {
 }
 
 func TestBackfillPartitionViewport(t *testing.T) {
+	t.Parallel()
 	for _, reverse := range []bool{false, true} {
-		t.Run(fmt.Sprint(reverse), func(t *testing.T) {
+		t.Run(strconv.FormatBool(reverse), func(t *testing.T) {
+			t.Parallel()
 			start := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 			plan := backfill.Plan{Target: "pipeline", Partition: "daily", Timezone: "UTC", Start: start, End: start.AddDate(0, 0, 10)}
 			var all []backfill.Interval
@@ -163,9 +171,11 @@ func TestBackfillPartitionViewport(t *testing.T) {
 }
 
 func TestBackfillScrollingBounds(t *testing.T) {
+	t.Parallel()
 	for _, reverse := range []bool{false, true} {
 		for _, total := range []int{3, 10} {
 			t.Run(fmt.Sprintf("reverse=%v/total=%d", reverse, total), func(t *testing.T) {
+				t.Parallel()
 				start := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 				plan := backfill.Plan{Target: "pipeline", Partition: "daily", Timezone: "UTC", Start: start, End: start.AddDate(0, 0, total)}
 				var all []backfill.Interval
@@ -174,7 +184,7 @@ func TestBackfillScrollingBounds(t *testing.T) {
 				}
 				d := &backfillDisplay{active: make(map[string]backfill.Record)}
 				m := backfillModel{display: d, manifest: backfill.Manifest{Plan: plan}, options: backfill.Options{Reverse: reverse}, height: 18}
-				for n := 0; n < 5; n++ {
+				for range 5 {
 					updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyPgDown})
 					m = updated.(backfillModel)
 				}
@@ -184,7 +194,7 @@ func TestBackfillScrollingBounds(t *testing.T) {
 				}
 				m.height = 30
 				require.Equal(t, all, m.window(), "resize should fill the available screen")
-				for n := 0; n < 5; n++ {
+				for range 5 {
 					m.scroll(-3)
 				}
 				require.Equal(t, all, m.window())

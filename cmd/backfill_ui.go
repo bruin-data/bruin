@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -108,6 +109,9 @@ type backfillFinished struct {
 }
 type backfillTick time.Time
 
+// Bubble Tea updates value models; pointer helpers mutate only the local update copy.
+//
+//nolint:recvcheck
 type backfillModel struct {
 	store         *backfill.Store
 	anchor        *backfill.Interval
@@ -200,11 +204,11 @@ func (m *backfillModel) clampAnchor() {
 	}
 	n := 0
 	for i := range m.manifest.Plan.Intervals(!m.options.Reverse) {
-		copy := i
+		anchor := i
 		n++
 		if n == m.rowCount() {
 			if (!m.options.Reverse && m.anchor.Start.After(i.Start)) || (m.options.Reverse && m.anchor.Start.Before(i.Start)) {
-				m.anchor = &copy
+				m.anchor = &anchor
 			}
 			return
 		}
@@ -228,8 +232,8 @@ func (m *backfillModel) follow() {
 			return
 		}
 	}
-	copy := *focus
-	m.anchor = &copy
+	anchor := *focus
+	m.anchor = &anchor
 	m.clampAnchor()
 }
 
@@ -251,8 +255,8 @@ func (m *backfillModel) scroll(delta int) {
 	}
 	n := 0
 	for i := range p.Intervals(reverse) {
-		copy := i
-		m.anchor = &copy
+		anchor := i
+		m.anchor = &anchor
 		if n == delta {
 			break
 		}
@@ -330,6 +334,8 @@ func (m backfillModel) View() string {
 		}
 		symbol, attempt, duration := "○", "—", "—"
 		switch r.Status {
+		case backfill.Queued:
+			symbol = "○"
 		case backfill.Running:
 			symbol = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}[m.frame%10]
 		case backfill.Succeeded:
@@ -345,7 +351,7 @@ func (m backfillModel) View() string {
 			if a.FinishedAt != nil {
 				elapsed = a.FinishedAt.Sub(a.StartedAt)
 			}
-			attempt = fmt.Sprint(len(r.Attempts))
+			attempt = strconv.Itoa(len(r.Attempts))
 			duration = elapsed.Round(time.Second).String()
 		}
 		status := backfillStatus(r.Status, d.color)

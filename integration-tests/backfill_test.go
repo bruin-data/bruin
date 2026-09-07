@@ -552,6 +552,7 @@ func TestWorkflowTasksBackfillDuckDBPagination(t *testing.T) {
 }
 
 func TestWorkflowTasksBackfillDuckDBPlainOutput(t *testing.T) {
+	t.Parallel()
 	f := newBackfillFixture(t)
 	f.query(t, "CREATE TABLE captures (start_at TIMESTAMPTZ, end_at TIMESTAMPTZ, run_id VARCHAR, marker VARCHAR)")
 	f.asset(t, "capture", captureBackfillSQL)

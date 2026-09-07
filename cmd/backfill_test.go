@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -191,4 +192,19 @@ func TestBackfillRequiresForceInProduction(t *testing.T) {
 	require.NoError(t, run(args...))
 	require.ErrorContains(t, run(args[:len(args)-1]...), "production environment requires --force")
 	require.NoDirExists(t, filepath.Join(dir, "state"))
+}
+
+func TestBackfillStateAtRepositoryRoot(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	require.NoError(t, exec.CommandContext(t.Context(), "git", "init", root).Run())
+	require.NoError(t, ensureBackfillStateGitignored(root, root, "backfill-example"))
+	contents, err := os.ReadFile(filepath.Join(root, ".gitignore"))
+	require.NoError(t, err)
+	require.Contains(t, string(contents), "backfill-example/")
+	require.NotContains(t, string(contents), "./")
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "backfill-example"), 0o700))
+	path := filepath.Join(root, "backfill-example", "manifest.json")
+	require.NoError(t, os.WriteFile(path, []byte("{}"), 0o600))
+	require.NoError(t, exec.CommandContext(t.Context(), "git", "-C", root, "check-ignore", path).Run())
 }

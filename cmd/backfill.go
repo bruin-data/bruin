@@ -256,7 +256,7 @@ func runBackfill(ctx context.Context, c *cli.Command, debug bool) error {
 	if isProductionEnvironment(environment) && !slices.Equal(m.Plan.RunFlags["force"], []string{"true"}) && !slices.Equal(m.Plan.RunFlags["only"], []string{"checks"}) {
 		return errors.New("backfill in a production environment requires --force on the initial invocation")
 	}
-	if err := ensureBackfillStateGitignored(root, m.Plan.Target); err != nil {
+	if err := ensureBackfillStateGitignored(root, m.Plan.Target, id); err != nil {
 		return err
 	}
 	lock, err := store.Lock()
@@ -286,7 +286,7 @@ func runBackfill(ctx context.Context, c *cli.Command, debug bool) error {
 	})
 }
 
-func ensureBackfillStateGitignored(root, target string) error {
+func ensureBackfillStateGitignored(root, target, id string) error {
 	repo, err := git.FindRepoFromPath(target)
 	if err != nil {
 		return err
@@ -298,8 +298,11 @@ func ensureBackfillStateGitignored(root, target string) error {
 	if err != nil {
 		return err
 	}
-	if rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
 		return nil
+	}
+	if rel == "." {
+		rel = id
 	}
 	pattern := strings.TrimSuffix(filepath.ToSlash(rel), "/") + "/"
 	if err := git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repo.Path, pattern); err != nil {

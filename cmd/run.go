@@ -2833,12 +2833,12 @@ func logOutput(logPath string, terminalWriter io.Writer, masker *mask.Masker) (f
 	var f *os.File
 	sinkTarget := terminalWriter
 	if logPath != "" {
-		if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil { //nolint:gosec // G703: local CLI log path derives from the caller-owned environment and pipeline.
 			return nil, errors.Wrap(err, "failed to create log directory")
 		}
 		// open read/write | create if not exist | truncate at open
 		var err error
-		f, err = os.OpenFile(logPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o644)
+		f, err = os.OpenFile(logPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o644) //nolint:gosec // G703: local CLI log path derives from the caller-owned environment and pipeline.
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to open log file")
 		}
