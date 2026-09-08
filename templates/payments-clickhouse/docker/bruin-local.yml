@@ -4,8 +4,8 @@
 # secrets, so this file is committed on purpose: the whole pipeline is runnable
 # end to end from a clean checkout with no personal configuration.
 #
-#   bruin validate bruin-payments-clickhouse \
-#     --config-file bruin-payments-clickhouse/docker/bruin-local.yml
+#   bruin validate payments-clickhouse \
+#     --config-file payments-clickhouse/docker/bruin-local.yml
 #
 # To run against ClickHouse Cloud instead, use your own .bruin.yml and drop the
 # --config-file flag.

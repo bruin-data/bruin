@@ -226,14 +226,18 @@ def _parse_bound(datetime_key, date_key, fallback):
 
     Bruin hands the interval over in the wall clock of the machine running the
     pipeline, and renders the same wall clock into the `{{ start_timestamp }}`
-    strings the SQL assets use. This pipeline reports in UTC, so the bound is
-    taken at face value and labelled UTC rather than converted -- converting here
-    would offset the seed from every downstream rollup window.
+    strings the SQL assets use. This pipeline reports in UTC, so a naive bound is
+    taken at face value and labelled UTC rather than converted -- converting a
+    naive bound would offset the seed from every downstream rollup window. A bound
+    that already carries an offset names a real instant, so it is converted to UTC
+    rather than relabelled, which would move the instant.
     """
     raw = os.environ.get(datetime_key) or ""
     if raw:
         parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
-        return parsed.replace(tzinfo=timezone.utc)
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
     raw = os.environ.get(date_key) or ""
     if raw:
         return datetime.fromisoformat(raw).replace(tzinfo=timezone.utc)

@@ -39,7 +39,8 @@ bruin init payments-clickhouse
 
 `bruin init` does not set the executable bit, so if that reports "permission denied", run
 `chmod +x payments-clickhouse/demo.sh` first, or call it as `bash payments-clickhouse/demo.sh`.
-The demo needs `docker`, `bruin` and `python3` on `PATH`, plus `dac` for the dashboard.
+The demo needs `docker`, `bruin` and `python3` on `PATH`, plus `dac`
+([bruin-data/dac](https://github.com/bruin-data/dac)) for the dashboard.
 
 | Command | What it does |
 |---|---|

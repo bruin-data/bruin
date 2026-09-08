@@ -125,6 +125,9 @@ func TestInitPaymentsClickHouseCopiesDemoTemplate(t *testing.T) {
 	require.FileExists(t, filepath.Join(pipelineRoot, "docker", "postgres-init.sql"))
 	require.FileExists(t, filepath.Join(pipelineRoot, "dashboards", "payments_risk.yml"))
 	require.FileExists(t, filepath.Join(pipelineRoot, "semantic", "payments_risk.yml"))
+	// The README links to both of these, so they have to come across on init.
+	require.FileExists(t, filepath.Join(pipelineRoot, "docs", "ingestion-boundaries.md"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "docs", "mode2-aggregating-mergetree.md"))
 	require.FileExists(t, filepath.Join(pipelineRoot, "assets", "ingestion", "raw_transaction_changes.asset.yml"))
 	require.FileExists(t, filepath.Join(pipelineRoot, "assets", "ingestion", "transactions_seed.py"))
 	require.FileExists(t, filepath.Join(pipelineRoot, "assets", "serving", "serving_realtime_risk.sql"))
@@ -184,6 +187,17 @@ func TestPaymentsClickHouseTemplateHasSelfContainedDemo(t *testing.T) {
 	// survives being generated into a differently named directory.
 	require.Contains(t, string(demo), `cd "$(dirname "$0")"`)
 	require.NotContains(t, string(demo), "bruin-payments-clickhouse/")
+
+	// The bundled Docker config and compose file carry copy-pasteable example
+	// commands in their headers; a leftover old-folder path there would fail for a
+	// user who pastes it after `bruin init`. The trailing slash is deliberate: it
+	// matches only the path form, never the bare `bruin-payments-*` container names
+	// the compose file and demo.sh must keep in lockstep.
+	for _, name := range []string{"docker/compose.yml", "docker/bruin-local.yml"} {
+		content, err := templates.Templates.ReadFile("payments-clickhouse/" + name)
+		require.NoError(t, err, name)
+		require.NotContains(t, string(content), "bruin-payments-clickhouse/", name)
+	}
 
 	// The live source is tagged apart from the generator so `--exclude-tag
 	// demo-seed` can repoint the pipeline at a real PostgreSQL database.

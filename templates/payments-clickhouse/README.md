@@ -70,8 +70,9 @@ next free one, so check the URL it prints.
 | `demo.sh down` | Stop and delete the containers and their data |
 | `demo.sh --help` | The same list |
 
-It needs `docker`, `bruin` and `python3` on `PATH`, plus `dac` for the dashboard, and it
-checks for them before doing anything.
+It needs `docker`, `bruin` and `python3` on `PATH`, plus `dac`
+([bruin-data/dac](https://github.com/bruin-data/dac)) for the dashboard. The full run and
+`serve` check for `dac` up front; `replay`, `status` and `down` do not need it.
 
 ---
 
@@ -420,6 +421,15 @@ One asset was added that the requirements did not call for:
 `stg_transaction_changes`. Ingestion infers every column as `Nullable`, and ClickHouse
 refuses a nullable sorting key, so the conformance has to happen somewhere. Doing it once
 in a view beats repeating `ifNull` in every rollup.
+
+A note for real-source mode (`--exclude-tag demo-seed`): the merge keys of
+`rollup_txn_1h` and `kpi_txn_daily` include the three reporting dimensions. The demo seed
+never changes a transaction's dimensions across restatements, so a version only ever
+updates its own key and the grains always reconcile. Against a real source where a
+correction can *move* a transaction to a different merchant category, network or country,
+the recompute would insert the new key without deleting the old one, leaving a stale
+aggregate. If your source can do that, widen the merge to delete the affected
+hour/date partitions before reinserting, rather than merging on the dimensioned key.
 
 There are no unit tests. `bruin unit-test` casts only the first mocked input row and emits
 later rows as untyped string literals, so a multi-row fixture with timestamp columns —

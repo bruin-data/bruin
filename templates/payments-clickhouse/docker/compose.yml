@@ -1,16 +1,16 @@
-# Local verification stack for bruin-payments-clickhouse.
+# Local verification stack for payments-clickhouse.
 #
 # Brings up the two systems the pipeline needs: the operational PostgreSQL
 # system of record (configured for logical replication so Bruin CDC can read it)
 # and a ClickHouse server that stands in for ClickHouse Cloud.
 #
-#   docker compose -f bruin-payments-clickhouse/docker/compose.yml up -d
-#   docker compose -f bruin-payments-clickhouse/docker/compose.yml down -v
+#   docker compose -f payments-clickhouse/docker/compose.yml up -d
+#   docker compose -f payments-clickhouse/docker/compose.yml down -v
 #
 # Credentials here are local-only demo values and are referenced by the `local`
 # environment in .bruin.yml.
 
-name: bruin-payments-clickhouse
+name: payments-clickhouse
 
 services:
     postgres:
@@ -28,8 +28,10 @@ services:
             - max_replication_slots=8
             - -c
             - max_wal_senders=8
+        # Bound to loopback: these are throwaway bruin/bruin demo credentials, so
+        # the source database must not be reachable from other hosts on the network.
         ports:
-            - "5432:5432"
+            - "127.0.0.1:5432:5432"
         volumes:
             - ./postgres-init.sql:/docker-entrypoint-initdb.d/10-payments.sql:ro
         healthcheck:
@@ -46,9 +48,10 @@ services:
             CLICKHOUSE_PASSWORD: bruin
             CLICKHOUSE_DB: bruin_payments
             CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+        # Bound to loopback for the same reason as PostgreSQL above.
         ports:
-            - "8123:8123"
-            - "9000:9000"
+            - "127.0.0.1:8123:8123"
+            - "127.0.0.1:9000:9000"
         ulimits:
             nofile:
                 soft: 262144

@@ -20,6 +20,10 @@
 
 set -euo pipefail
 
+# Resolve this script's own absolute path before the cd below, so `--help` can
+# read its own header no matter which directory it was called from.
+SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+
 # Everything runs relative to this pipeline folder, so the demo works whatever
 # the folder was named at `bruin init` time and from whatever directory it is
 # called.
@@ -38,6 +42,13 @@ step() { printf '\n==> %s\n' "$1"; }
 warehouse_reachable() {
   bruin query --config-file "$CFG" --connection clickhouse-default \
     --query "SELECT 1" >/dev/null 2>&1
+}
+
+require_positive_int() {  # require_positive_int <value> <what>
+  case "$1" in
+    '' | *[!0-9]*) die "$2 must be a positive integer, got '$1'" ;;
+  esac
+  [ "$1" -ge 1 ] || die "$2 must be at least 1, got '$1'"
 }
 
 require_tools() {
@@ -178,6 +189,12 @@ down() {
 case "${1:-up}" in
   up)
     require_tools
+    # Validate the minutes argument before starting containers, so a typo does
+    # not leave a half-started stack behind.
+    require_positive_int "${2:-$DEFAULT_MINUTES}" "minutes"
+    # The full run ends at the dashboard, so fail now rather than after the
+    # multi-minute replay if dac is missing.
+    command -v dac >/dev/null 2>&1 || die "the 'dac' CLI is not installed; see https://github.com/bruin-data/dac"
     compose_up
     replay "${2:-$DEFAULT_MINUTES}"
     summary
@@ -185,6 +202,7 @@ case "${1:-up}" in
     ;;
   replay)
     require_tools
+    require_positive_int "${2:-$DEFAULT_MINUTES}" "minutes"
     replay "${2:-$DEFAULT_MINUTES}"
     summary
     ;;
@@ -192,7 +210,7 @@ case "${1:-up}" in
   status) status ;;
   down)   down ;;
   -h|--help|help)
-    sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,20p' "$SELF" | sed 's/^# \{0,1\}//'
     ;;
   *)
     die "unknown command '$1'. Try: up | replay | serve | status | down"
