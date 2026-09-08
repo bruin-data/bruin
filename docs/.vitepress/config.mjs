@@ -175,6 +175,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "Audit Logs", link: "/cloud/audit-logs"},
                         ],
                     },
+                    {text: "Cloud Command", link: "/commands/cloud"},
                     {text: "Cloud MCP", link: "/cloud/mcp-setup"},
                     {text: "FAQ", link: "/cloud/faq"},
                 ],
