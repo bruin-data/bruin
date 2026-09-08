@@ -29,6 +29,7 @@ environments:
           schema: "non_public_schema"
           pool_max_conns: 5
           ssl_mode: "require"
+          read_only: true
 
       redshift:
         - name: conn4

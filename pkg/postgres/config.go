@@ -5,7 +5,10 @@ import (
 	"net"
 	"net/url"
 	"strconv"
+	"strings"
 )
+
+const readOnlySessionOption = "-c default_transaction_read_only=on"
 
 type Config struct {
 	Username     string
@@ -16,6 +19,7 @@ type Config struct {
 	Schema       string
 	PoolMaxConns int
 	SslMode      string
+	ReadOnly     bool
 }
 
 // ToDBConnectionURI returns a connection URI to be used with the pgx package.
@@ -32,6 +36,9 @@ func (c Config) ToDBConnectionURI() string {
 	if c.Schema != "" {
 		connectionURI += "&search_path=" + c.Schema
 	}
+	if c.ReadOnly {
+		connectionURI += "&options=" + url.QueryEscape(readOnlySessionOption)
+	}
 
 	return connectionURI
 }
@@ -45,8 +52,15 @@ func (c Config) GetIngestrURI() string {
 		c.Database,
 	)
 
+	queryParams := make([]string, 0, 2)
 	if c.SslMode != "" {
-		connString += "?sslmode=" + c.SslMode
+		queryParams = append(queryParams, "sslmode="+url.QueryEscape(c.SslMode))
+	}
+	if c.ReadOnly {
+		queryParams = append(queryParams, "options="+url.QueryEscape(readOnlySessionOption))
+	}
+	if len(queryParams) > 0 {
+		connString += "?" + strings.Join(queryParams, "&")
 	}
 
 	return connString

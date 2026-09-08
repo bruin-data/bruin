@@ -70,6 +70,7 @@ func TestLoadFromFile(t *testing.T) {
 					Port:               5432,
 					PoolMaxConns:       5,
 					SslMode:            "require",
+					ReadOnly:           true,
 				},
 			},
 			RedShift: []RedshiftConnection{
@@ -4052,6 +4053,7 @@ func TestGetConnectionFieldsForTypeIncludesMaxConcurrentAssets(t *testing.T) {
 	}
 
 	assert.Contains(t, names, "max_concurrent_assets")
+	assert.Contains(t, names, "read_only")
 	assert.NotContains(t, names, "name")
 }
 

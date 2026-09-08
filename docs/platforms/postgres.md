@@ -18,10 +18,13 @@ In order to set up a PostgreSQL connection, you need to add a configuration item
           ssl_mode: "allow" # optional
           schema: "schema_name" # optional
           pool_max_conns: 5 # optional
+          read_only: true # optional, defaults to false
 ```
 
 > [!NOTE]
 > `ssl_mode` should be one of the modes describe in the [documentation](https://www.postgresql.org/docs/current/libpq-ssl.html#LIBPQ-SSL-PROTECTION).
+
+When `read_only` is `true`, Bruin starts PostgreSQL sessions with `default_transaction_read_only` enabled. Write statements will fail unless the session explicitly overrides that setting. For strict access control, also grant the connection's PostgreSQL role read-only permissions.
 
 ## PostgreSQL Assets
 

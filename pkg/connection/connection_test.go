@@ -140,14 +140,20 @@ func TestManager_AddPgConnectionFromConfig(t *testing.T) {
 		Port:               15432,
 		SslMode:            "disable",
 		PoolMaxConns:       10,
+		ReadOnly:           true,
 	}
 
 	err := m.AddPgConnectionFromConfig(t.Context(), configuration)
 	require.NoError(t, err)
 
-	res, ok := m.GetConnection("test").(postgres.PgClient)
-	assert.True(t, ok)
-	assert.NotNil(t, res)
+	pgClient, ok := m.GetConnection("test").(*postgres.Client)
+	require.True(t, ok)
+	require.NotNil(t, pgClient)
+
+	uri, err := pgClient.GetIngestrURI()
+	require.NoError(t, err)
+	assert.Equal(t, "postgresql://user:pass@somehost:15432/db?sslmode=disable&options=-c+default_transaction_read_only%3Don", uri)
+	assert.Equal(t, configuration, m.GetConnectionDetails("test"))
 }
 
 func TestManager_AddRedshiftConnectionFromConfig(t *testing.T) {
