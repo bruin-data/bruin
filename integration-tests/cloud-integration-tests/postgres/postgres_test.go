@@ -3,12 +3,15 @@ package postgres
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/e2e"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestPostgresWorkflows(t *testing.T) {
@@ -671,6 +674,115 @@ func TestPostgresIndividualTasks(t *testing.T) {
 			t.Logf("Task '%s' completed successfully", task.Name)
 		})
 	}
+}
+
+func TestPostgresReadOnlyConnection(t *testing.T) {
+	currentFolder, err := os.Getwd()
+	require.NoError(t, err)
+
+	projectRoot := filepath.Join(currentFolder, "../../../")
+	binary := filepath.Join(projectRoot, "bin/bruin")
+	sourceConfigPath := filepath.Join(projectRoot, "integration-tests/cloud-integration-tests/.bruin.cloud.yml")
+	tempDir := t.TempDir()
+	readOnlyConfigPath := filepath.Join(tempDir, ".bruin.yml")
+	csvPath := filepath.Join(tempDir, "source.csv")
+	assetDir := filepath.Join(tempDir, "assets")
+	assetPath := filepath.Join(assetDir, "readonly.asset.yml")
+
+	require.NoError(t, os.MkdirAll(assetDir, 0o755))
+	require.NoError(t, os.WriteFile(csvPath, []byte("id,name\n1,test\n"), 0o600))
+	writeReadOnlyPostgresConfig(t, sourceConfigPath, readOnlyConfigPath, csvPath)
+	require.NoError(t, os.WriteFile(filepath.Join(tempDir, "pipeline.yml"), []byte("name: postgres-read-only-test\n"), 0o600))
+	require.NoError(t, os.WriteFile(assetPath, []byte(`name: public.bruin_read_only_ingestr_probe
+type: ingestr
+connection: postgres-readonly
+
+parameters:
+  source_connection: csv-readonly-source
+  source_table: sample
+  destination: postgres
+  strategy: replace
+`), 0o600))
+	gitInit := exec.Command("git", "init")
+	gitInit.Dir = tempDir
+	output, err := gitInit.CombinedOutput()
+	require.NoError(t, err, "failed to initialize test repository: %s", output)
+
+	cleanupTable := func(tableName string) {
+		cleanup := exec.Command(binary, "query", "--config-file", sourceConfigPath, "--connection", "postgres-default", "--query", "DROP TABLE IF EXISTS "+tableName+";") //nolint:gosec
+		_ = cleanup.Run()
+	}
+	cleanupTable("public.bruin_read_only_native_probe")
+	cleanupTable("public.bruin_read_only_ingestr_probe")
+	t.Cleanup(func() {
+		cleanupTable("public.bruin_read_only_native_probe")
+		cleanupTable("public.bruin_read_only_ingestr_probe")
+	})
+
+	output, err = exec.Command(binary, "query", "--config-file", readOnlyConfigPath, "--connection", "postgres-readonly", "--output", "csv", "--query", "SHOW default_transaction_read_only;").CombinedOutput() //nolint:gosec
+	require.NoError(t, err, "read query failed: %s", output)
+	normalizedOutput := strings.ReplaceAll(strings.ToLower(string(output)), "\r\n", "\n")
+	require.Contains(t, normalizedOutput, "\non\n")
+
+	output, err = exec.Command(binary, "query", "--config-file", readOnlyConfigPath, "--connection", "postgres-readonly", "--query", "CREATE TABLE public.bruin_read_only_native_probe (id integer);").CombinedOutput() //nolint:gosec
+	require.Error(t, err, "write unexpectedly succeeded: %s", output)
+	require.Contains(t, strings.ToLower(string(output)), "read-only transaction")
+
+	output, err = exec.Command(binary, "run", "--config-file", readOnlyConfigPath, "--env", "default", assetPath).CombinedOutput() //nolint:gosec
+	require.Error(t, err, "ingestr write unexpectedly succeeded: %s", output)
+	require.Contains(t, strings.ToLower(string(output)), "read-only transaction")
+}
+
+func writeReadOnlyPostgresConfig(t *testing.T, sourcePath, destinationPath, csvPath string) {
+	t.Helper()
+
+	data, err := os.ReadFile(sourcePath)
+	require.NoError(t, err)
+
+	var sourceConfig config.Config
+	require.NoError(t, yaml.Unmarshal(data, &sourceConfig))
+
+	environmentName := sourceConfig.DefaultEnvironmentName
+	if environmentName == "" {
+		environmentName = "default"
+	}
+	environment, ok := sourceConfig.Environments[environmentName]
+	require.True(t, ok, "environment %q not found", environmentName)
+	require.NotNil(t, environment.Connections)
+
+	var readOnlyConnection config.PostgresConnection
+	found := false
+	for _, connection := range environment.Connections.Postgres {
+		if connection.Name == "postgres-default" {
+			connection.Name = "postgres-readonly"
+			connection.ReadOnly = true
+			readOnlyConnection = connection
+			found = true
+			break
+		}
+	}
+	require.True(t, found, "postgres-default connection not found")
+
+	testConfig := config.Config{
+		DefaultEnvironmentName: "default",
+		Environments: map[string]config.Environment{
+			"default": {
+				Connections: &config.Connections{
+					Postgres: []config.PostgresConnection{readOnlyConnection},
+					CSV: []config.CSVConnection{
+						{
+							ConnectionMetadata: config.ConnectionMetadata{Name: "csv-readonly-source"},
+							Path:               csvPath,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	encoded, err := yaml.Marshal(testConfig)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(destinationPath, encoded, 0o600))
 }
 
 func readQueryFromFile(filePath string) string {
