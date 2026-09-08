@@ -188,11 +188,8 @@ func TestPaymentsClickHouseTemplateHasSelfContainedDemo(t *testing.T) {
 	require.Contains(t, string(demo), `cd "$(dirname "$0")"`)
 	require.NotContains(t, string(demo), "bruin-payments-clickhouse/")
 
-	// The bundled Docker config and compose file carry copy-pasteable example
-	// commands in their headers; a leftover old-folder path there would fail for a
-	// user who pastes it after `bruin init`. The trailing slash is deliberate: it
-	// matches only the path form, never the bare `bruin-payments-*` container names
-	// the compose file and demo.sh must keep in lockstep.
+	// Header comments here carry copy-pasteable commands, so a stale old-folder
+	// path would break them after init; the trailing slash spares the container names.
 	for _, name := range []string{"docker/compose.yml", "docker/bruin-local.yml"} {
 		content, err := templates.Templates.ReadFile("payments-clickhouse/" + name)
 		require.NoError(t, err, name)
