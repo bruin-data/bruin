@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -677,6 +678,8 @@ func TestPostgresIndividualTasks(t *testing.T) {
 }
 
 func TestPostgresReadOnlyConnection(t *testing.T) {
+	t.Parallel()
+
 	currentFolder, err := os.Getwd()
 	require.NoError(t, err)
 
@@ -703,32 +706,32 @@ parameters:
   destination: postgres
   strategy: replace
 `), 0o600))
-	gitInit := exec.Command("git", "init")
+	gitInit := exec.CommandContext(t.Context(), "git", "init")
 	gitInit.Dir = tempDir
 	output, err := gitInit.CombinedOutput()
 	require.NoError(t, err, "failed to initialize test repository: %s", output)
 
-	cleanupTable := func(tableName string) {
-		cleanup := exec.Command(binary, "query", "--config-file", sourceConfigPath, "--connection", "postgres-default", "--query", "DROP TABLE IF EXISTS "+tableName+";") //nolint:gosec
+	cleanupTable := func(ctx context.Context, tableName string) {
+		cleanup := exec.CommandContext(ctx, binary, "query", "--config-file", sourceConfigPath, "--connection", "postgres-default", "--query", "DROP TABLE IF EXISTS "+tableName+";") //nolint:gosec
 		_ = cleanup.Run()
 	}
-	cleanupTable("public.bruin_read_only_native_probe")
-	cleanupTable("public.bruin_read_only_ingestr_probe")
+	cleanupTable(t.Context(), "public.bruin_read_only_native_probe")
+	cleanupTable(t.Context(), "public.bruin_read_only_ingestr_probe")
 	t.Cleanup(func() {
-		cleanupTable("public.bruin_read_only_native_probe")
-		cleanupTable("public.bruin_read_only_ingestr_probe")
+		cleanupTable(context.Background(), "public.bruin_read_only_native_probe")
+		cleanupTable(context.Background(), "public.bruin_read_only_ingestr_probe")
 	})
 
-	output, err = exec.Command(binary, "query", "--config-file", readOnlyConfigPath, "--connection", "postgres-readonly", "--output", "csv", "--query", "SHOW default_transaction_read_only;").CombinedOutput() //nolint:gosec
+	output, err = exec.CommandContext(t.Context(), binary, "query", "--config-file", readOnlyConfigPath, "--connection", "postgres-readonly", "--output", "csv", "--query", "SHOW default_transaction_read_only;").CombinedOutput() //nolint:gosec
 	require.NoError(t, err, "read query failed: %s", output)
 	normalizedOutput := strings.ReplaceAll(strings.ToLower(string(output)), "\r\n", "\n")
 	require.Contains(t, normalizedOutput, "\non\n")
 
-	output, err = exec.Command(binary, "query", "--config-file", readOnlyConfigPath, "--connection", "postgres-readonly", "--query", "CREATE TABLE public.bruin_read_only_native_probe (id integer);").CombinedOutput() //nolint:gosec
+	output, err = exec.CommandContext(t.Context(), binary, "query", "--config-file", readOnlyConfigPath, "--connection", "postgres-readonly", "--query", "CREATE TABLE public.bruin_read_only_native_probe (id integer);").CombinedOutput() //nolint:gosec
 	require.Error(t, err, "write unexpectedly succeeded: %s", output)
 	require.Contains(t, strings.ToLower(string(output)), "read-only transaction")
 
-	output, err = exec.Command(binary, "run", "--config-file", readOnlyConfigPath, "--env", "default", assetPath).CombinedOutput() //nolint:gosec
+	output, err = exec.CommandContext(t.Context(), binary, "run", "--config-file", readOnlyConfigPath, "--env", "default", assetPath).CombinedOutput() //nolint:gosec
 	require.Error(t, err, "ingestr write unexpectedly succeeded: %s", output)
 	require.Contains(t, strings.ToLower(string(output)), "read-only transaction")
 }
