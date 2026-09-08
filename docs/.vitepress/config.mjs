@@ -516,6 +516,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "google-web-analytics", link: "/getting-started/templates-docs/google-web-analytics-README"},
                             {text: "demo-snowflake-sales-analytics", link: "/getting-started/templates-docs/demo-snowflake-sales-analytics-README"},
                             {text: "demo-snowflake-salesforce", link: "/getting-started/templates-docs/demo-snowflake-salesforce-README"},
+                            {text: "payments-clickhouse", link: "/getting-started/templates-docs/payments-clickhouse-README"},
                             {text: "self-heal-demo", link: "/getting-started/templates-docs/self-heal-demo-README"},
                         ],
                     },

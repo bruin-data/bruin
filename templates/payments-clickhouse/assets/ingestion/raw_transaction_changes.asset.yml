@@ -1,0 +1,145 @@
+name: bruin_payments.raw_transaction_changes
+type: ingestr
+description: Append-only change log of payments.transactions, captured from the operational PostgreSQL database. Each run selects rows whose updated_at falls in the run interval and appends them, so at the 1-minute pipeline schedule the log trails the source by about a minute. A transaction is mutable, so one transaction_id can appear several times, once per captured version; consumers collapse to the latest version at read time with argMax on updated_at. Nothing in ClickHouse is ever mutated.
+connection: clickhouse-default
+owner: risk-platform@example.com
+
+tags:
+  - layer:raw
+  - domain:payments
+  - source:postgres
+  - strategy:append
+  - requires-postgres
+domains:
+  - payments
+meta:
+  data_classification: confidential
+  grain: one row per captured version of a transaction, keyed on (transaction_id, updated_at)
+  source_system: postgres
+  source_connection: postgres-default
+  destination_system: clickhouse
+  capture_mechanism: cursor-based change capture on updated_at
+  capture_limitations: log-based CDC and the merge strategy are both unavailable for ClickHouse destinations today; see docs/ingestion-boundaries.md
+  incremental_key: updated_at
+  read_pattern: argMax(..., updated_at) GROUP BY transaction_id over a created_at-bounded window
+  duplicates: transaction_id is not unique here, and replaying an interval re-appends identical rows; both are harmless because every consumer collapses versions with argMax on transaction_id
+  deletes: not captured; the source only inserts and restates
+  freshness_sla: one minute behind the source
+
+materialization:
+  type: table
+  strategy: append
+  incremental_key: updated_at
+
+depends:
+  - payments.transactions
+
+parameters:
+  source_connection: postgres-default
+  source_table: payments.transactions
+  destination: clickhouse
+  engine: merge_tree
+
+custom_checks:
+  - name: each captured version is internally consistent
+    description: "Two rows sharing a transaction_id and updated_at describe the same version of the same transaction, so they must agree on every fact. Disagreement means the capture mixed versions."
+    query: |
+      SELECT count()
+      FROM (
+          SELECT transaction_id, updated_at
+          FROM bruin_payments.raw_transaction_changes
+          GROUP BY transaction_id, updated_at
+          HAVING uniqExact(status) > 1
+              OR uniqExact(amount_cents) > 1
+              OR uniqExact(created_at) > 1
+      )
+    value: 0
+    blocking: true
+  - name: no future authorizations
+    description: "An authorization cannot be timestamped in the future."
+    query: |
+      SELECT count()
+      FROM bruin_payments.raw_transaction_changes
+      WHERE created_at > now('UTC') + INTERVAL 1 MINUTE
+    value: 0
+    blocking: true
+  - name: restatements never precede their authorization
+    description: "A captured version must not be older than the authorization it restates."
+    query: |
+      SELECT count()
+      FROM bruin_payments.raw_transaction_changes
+      WHERE updated_at < created_at
+    value: 0
+    blocking: true
+
+columns:
+  - name: transaction_id
+    type: Int64
+    description: Authorization identifier. Repeats across versions, so it is not unique in this table.
+    checks:
+      - name: not_null
+  - name: created_at
+    type: DateTime64(6,'UTC')
+    description: Authorization time. Every rollup buckets on this column, never on updated_at.
+    checks:
+      - name: not_null
+  - name: updated_at
+    type: DateTime64(6,'UTC')
+    description: Source version cursor. Serves as both the capture high-water mark and the version used to pick the latest state.
+    checks:
+      - name: not_null
+  - name: merchant_id
+    type: Int64
+    description: Merchant that submitted the authorization.
+    checks:
+      - name: not_null
+  - name: card_id
+    type: Int64
+    description: Tokenized card reference, re-aggregated for the non-additive unique-cards KPI.
+    checks:
+      - name: not_null
+  - name: amount_cents
+    type: Int64
+    description: Authorization amount in USD minor units. Integer money keeps every downstream sum exact.
+    checks:
+      - name: positive
+  - name: currency
+    type: String
+    description: ISO currency code; always USD in this single-currency demo.
+  - name: status
+    type: String
+    description: Authorization state as of this captured version.
+    checks:
+      - name: not_null
+      - name: accepted_values
+        value:
+          - approved
+          - declined
+          - refunded
+          - chargeback
+  - name: decline_reason
+    type: String
+    description: Issuer decline reason; null unless the authorization was declined.
+  - name: card_network
+    type: String
+    description: Card scheme dimension.
+  - name: merchant_category
+    type: String
+    description: Merchant category dimension.
+    checks:
+      - name: not_null
+  - name: country
+    type: String
+    description: ISO-2 country dimension.
+    checks:
+      - name: not_null
+  - name: is_fraud
+    type: Bool
+    description: Fraud label from the source. Monitored, not modelled.
+    checks:
+      - name: not_null
+  - name: auth_latency_ms
+    type: Int64
+    description: Authorization latency in milliseconds; the input to the non-additive P95 KPI.
+    checks:
+      - name: positive

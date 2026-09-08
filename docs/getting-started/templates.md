@@ -70,6 +70,12 @@ AI agent skills are installed separately with `bruin ai skills`; see [AI Skills]
     <span>Local DuckDB project with separate seed and demo pipelines for realistic duplicate, freshness, schema drift, and quality failures.</span>
     <span class="template-card__tags"><code>DuckDB</code><code>AI agents</code><code>data quality</code></span>
   </a>
+  <a class="template-card" href="./templates-docs/payments-clickhouse-README.html">
+    <span class="template-card__category">Near-real-time demo</span>
+    <strong>payments-clickhouse</strong>
+    <span>Self-contained Docker demo: PostgreSQL change capture into ClickHouse, per-minute rollups, daily KPIs, and a live payments-risk dashboard.</span>
+    <span class="template-card__tags"><code>ClickHouse</code><code>PostgreSQL</code><code>CDC</code><code>payments</code></span>
+  </a>
 </div>
 
 ### Local and learning templates
@@ -280,7 +286,8 @@ bruin init nyc-taxi my-taxi-pipeline
 | Load into an Iceberg lakehouse | `iceberg-sqlite-local` to try it, then `iceberg-glue-s3`, `iceberg-postgres-gcs`, `iceberg-rest-minio`, or `iceberg-hadoop-gcsinterop` |
 | Build a source-to-warehouse ingestion pipeline | `ai-coding-usage`, `shopify-bigquery`, `shopify-clickhouse`, `stripe-bigquery`, `posthog-bigquery`, `gsheet-bigquery`, `notion`, or `gorgias` |
 | Migrate one Fivetran connection to a review-gated Bruin project | `migration-fivetran` |
-| Explore a complete demo with generated data | `demo-snowflake-sales-analytics` or `demo-snowflake-salesforce` |
+| Explore a complete demo with generated data | `demo-snowflake-sales-analytics`, `demo-snowflake-salesforce`, or `payments-clickhouse` |
+| See near-real-time change capture and rollups end to end | `payments-clickhouse` |
 | Scaffold ecommerce reporting | `ecommerce` |
 | Report on organic search using GA4 and Search Console data already in BigQuery | `google-web-analytics` |
 | Work with a specific database | `athena`, `clickhouse`, `bronze-silver-postgres`, `bigquery`, `databricks`, or `redshift` |

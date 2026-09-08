@@ -1,0 +1,34 @@
+# Bruin config for the local Docker verification stack (docker/compose.yml).
+#
+# These are throwaway local credentials that match the compose file, not
+# secrets, so this file is committed on purpose: the whole pipeline is runnable
+# end to end from a clean checkout with no personal configuration.
+#
+#   bruin validate bruin-payments-clickhouse \
+#     --config-file bruin-payments-clickhouse/docker/bruin-local.yml
+#
+# To run against ClickHouse Cloud instead, use your own .bruin.yml and drop the
+# --config-file flag.
+
+default_environment: local
+
+environments:
+    local:
+        connections:
+            clickhouse:
+                - name: clickhouse-default
+                  username: bruin
+                  password: bruin
+                  host: 127.0.0.1
+                  port: 9000
+                  http_port: 8123
+                  database: bruin_payments
+                  secure: 0
+            postgres:
+                - name: postgres-default
+                  username: bruin
+                  password: bruin
+                  host: 127.0.0.1
+                  port: 5432
+                  database: payments
+                  ssl_mode: disable

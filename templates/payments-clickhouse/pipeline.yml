@@ -1,0 +1,54 @@
+name: payments-clickhouse
+schedule: "* * * * *"
+start_date: "2026-08-01"
+catchup: false
+
+default_connections:
+    clickhouse: "clickhouse-default"
+    postgres: "postgres-default"
+
+variables:
+    txns_per_minute:
+        type: integer
+        minimum: 1
+        maximum: 5000
+        default: 40
+    restatement_rate:
+        type: number
+        minimum: 0
+        maximum: 0.5
+        default: 0.06
+    restatement_windows:
+        type: integer
+        minimum: 0
+        maximum: 24
+        default: 3
+    max_seed_rows:
+        type: integer
+        minimum: 1
+        maximum: 500000
+        default: 20000
+
+tags:
+    - clickhouse
+    - fintech
+    - payments
+    - cdc
+    - ingestr
+    - near-real-time
+
+domains:
+    - payments
+    - risk
+    - finance
+
+meta:
+    description: "Near-real-time payments authorization and fraud monitoring: PostgreSQL CDC into ClickHouse, incremental minute rollups, daily KPIs, and a DAC dashboard."
+    data_classification: confidential
+    source_mode: postgres-cdc
+    source_connection: postgres-default
+    destination_system: clickhouse
+    reporting_timezone: UTC
+    currency_policy: single-currency USD demo; no conversion is performed
+    freshness_sla: one minute behind the source at the pipeline schedule
+    lookback_policy: rollup and KPI assets declare interval_modifiers; runs must pass --apply-interval-modifiers
