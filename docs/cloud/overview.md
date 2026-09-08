@@ -41,6 +41,7 @@ From there:
 - [Instance Types](/cloud/instance-types): sizing assets at run time.
 - [Security](/cloud/security): network access and dedicated egress IPs for allowlisting.
 - [Team Settings](/cloud/team-settings), [API Tokens](/cloud/api-tokens), [Audit Logs](/cloud/audit-logs): team administration.
+- [`cloud` command](/commands/cloud): list projects, check runs, diagnose failures, and drive Bruin Cloud from your terminal.
 - [Cloud MCP](/cloud/mcp-setup): talk to Bruin Cloud from Cursor, Claude Code, or Codex.
 - [FAQ](/cloud/faq): short answers to common questions, including patterns that look plausible but are not real features.
 
