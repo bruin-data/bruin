@@ -11,7 +11,7 @@ It runs end to end against two Docker containers — no cloud account, no creden
 fill in.
 
 ```shell
-bruin init payments-clickhouse
+bruin init demo-payments-clickhouse
 ```
 
 The template uses the `bruin_payments` ClickHouse database and the connection names
@@ -33,12 +33,12 @@ One command starts the containers, replays traffic through the pipeline, and ope
 dashboard:
 
 ```shell
-bruin init payments-clickhouse
-./payments-clickhouse/demo.sh
+bruin init demo-payments-clickhouse
+./demo-payments-clickhouse/demo.sh
 ```
 
 `bruin init` does not set the executable bit, so if that reports "permission denied", run
-`chmod +x payments-clickhouse/demo.sh` first, or call it as `bash payments-clickhouse/demo.sh`.
+`chmod +x demo-payments-clickhouse/demo.sh` first, or call it as `bash demo-payments-clickhouse/demo.sh`.
 The demo needs `docker`, `bruin` and `python3` on `PATH`, plus `dac`
 ([bruin-data/dac](https://github.com/bruin-data/dac)) for the dashboard.
 
@@ -53,7 +53,7 @@ The demo needs `docker`, `bruin` and `python3` on `PATH`, plus `dac`
 ## Project structure
 
 ```text
-payments-clickhouse/
+demo-payments-clickhouse/
 ├── pipeline.yml
 ├── README.md
 ├── demo.sh                              # one entry point: start, replay, serve

@@ -11,7 +11,7 @@ It runs end to end from a fresh `bruin init` against two Docker containers. No c
 account, no credentials to fill in. The template uses the `bruin_payments` ClickHouse
 database and the connection names `clickhouse-default` and `postgres-default`; rename them
 consistently if they do not fit your project. This README assumes the generated folder is
-named `payments-clickhouse` (the `bruin init` default); adjust the paths if you named it
+named `demo-payments-clickhouse` (the `bruin init` default); adjust the paths if you named it
 something else.
 
 | | |
@@ -31,14 +31,14 @@ One command. It starts the containers, waits for them, replays 30 minutes of tra
 through the pipeline, and opens the dashboard.
 
 ```bash
-./payments-clickhouse/demo.sh
+./demo-payments-clickhouse/demo.sh
 ```
 
 `bruin init` does not set the executable bit, so if that reports "permission denied", run
-`chmod +x payments-clickhouse/demo.sh` first, or call it as `bash payments-clickhouse/demo.sh`.
+`chmod +x demo-payments-clickhouse/demo.sh` first, or call it as `bash demo-payments-clickhouse/demo.sh`.
 
 About three minutes, most of it the replay. Pass a different number of minutes as an
-argument: `./payments-clickhouse/demo.sh up 60`.
+argument: `./demo-payments-clickhouse/demo.sh up 60`.
 
 Before the dashboard opens it prints what you are about to look at:
 
@@ -81,9 +81,9 @@ It needs `docker`, `bruin` and `python3` on `PATH`, plus `dac`
 `demo.sh replay` is a loop around one command. To drive it yourself:
 
 ```bash
-CFG=payments-clickhouse/docker/bruin-local.yml
+CFG=demo-payments-clickhouse/docker/bruin-local.yml
 
-bruin run payments-clickhouse/pipeline.yml \
+bruin run demo-payments-clickhouse/pipeline.yml \
   --config-file $CFG \
   --apply-interval-modifiers \
   --start-date "2026-08-24 11:00:00" \
@@ -106,7 +106,7 @@ Four things matter:
    in. On a schedule, Bruin Cloud computes the interval and applies the modifiers itself,
    so a scheduled run needs no flag.
 
-All commands pass `--config-file payments-clickhouse/docker/bruin-local.yml`, a config
+All commands pass `--config-file demo-payments-clickhouse/docker/bruin-local.yml`, a config
 bundled with the template that points at the containers. Its credentials are local-only
 demo values, not secrets. To run against ClickHouse Cloud instead, fill in the
 `.bruin.yml` that `bruin init` wrote for you (its `clickhouse-default` and
@@ -114,21 +114,21 @@ demo values, not secrets. To run against ClickHouse Cloud instead, fill in the
 
 > The Bruin CLI writes a `.gitignore` next to any config file it loads, so a
 > `docker/.gitignore` listing `bruin-local.yml` appears after the first command. Keep
-> `docker/bruin-local.yml` tracked deliberately; `git add -f payments-clickhouse/docker/bruin-local.yml`
+> `docker/bruin-local.yml` tracked deliberately; `git add -f demo-payments-clickhouse/docker/bruin-local.yml`
 > re-adds it if it ever gets ignored.
 
 ### Other useful commands
 
 ```bash
-CFG=payments-clickhouse/docker/bruin-local.yml
+CFG=demo-payments-clickhouse/docker/bruin-local.yml
 
-bruin validate payments-clickhouse --config-file $CFG
-bruin run payments-clickhouse/pipeline.yml --config-file $CFG --only checks
-bruin lineage payments-clickhouse/assets/serving/serving_realtime_risk.sql --full
+bruin validate demo-payments-clickhouse --config-file $CFG
+bruin run demo-payments-clickhouse/pipeline.yml --config-file $CFG --only checks
+bruin lineage demo-payments-clickhouse/assets/serving/serving_realtime_risk.sql --full
 
 # validate the dashboard, and execute every widget query without a browser
-dac validate --dir payments-clickhouse --config $CFG
-dac check    --dir payments-clickhouse --config $CFG
+dac validate --dir demo-payments-clickhouse --config $CFG
+dac check    --dir demo-payments-clickhouse --config $CFG
 ```
 
 ---
@@ -198,8 +198,8 @@ dashboards/payments_risk.yml + semantic/payments_risk.yml  →  dac serve
 | `max_seed_rows` | 20000 | Hard cap per run, so a wide backfill window stays quick |
 
 ```bash
-bruin run payments-clickhouse/pipeline.yml \
-  --config-file payments-clickhouse/docker/bruin-local.yml \
+bruin run demo-payments-clickhouse/pipeline.yml \
+  --config-file demo-payments-clickhouse/docker/bruin-local.yml \
   --apply-interval-modifiers --var txns_per_minute=200 \
   --start-date "2026-08-24 11:00:00" --end-date "2026-08-24 11:00:59.999999"
 ```
@@ -231,7 +231,7 @@ Each run reprocesses the previous 15 minutes, so a restatement rewrites the minu
 belongs to. To watch it happen, find a transaction that went the whole way:
 
 ```bash
-bruin query --config-file payments-clickhouse/docker/bruin-local.yml \
+bruin query --config-file demo-payments-clickhouse/docker/bruin-local.yml \
   --connection clickhouse-default --query "
 WITH lifecycle AS (
     SELECT transaction_id, arrayStringConcat(groupArray(status), ' -> ') AS states
@@ -291,7 +291,7 @@ Unique cards and P95 latency do not survive it. Compare a naive rollup against t
 for the sealed day:
 
 ```bash
-bruin query --config-file payments-clickhouse/docker/bruin-local.yml \
+bruin query --config-file demo-payments-clickhouse/docker/bruin-local.yml \
   --connection clickhouse-default --query "
 SELECT
     (SELECT sum(unique_cards) FROM bruin_payments.kpi_txn_daily
@@ -384,14 +384,14 @@ description for every column. 81 checks run across the pipeline. Blocking ones c
   a minute boundary.
 
 ```bash
-bruin run payments-clickhouse/pipeline.yml \
-  --config-file payments-clickhouse/docker/bruin-local.yml --only checks
+bruin run demo-payments-clickhouse/pipeline.yml \
+  --config-file demo-payments-clickhouse/docker/bruin-local.yml --only checks
 ```
 
 Verify the grains agree:
 
 ```bash
-bruin query --config-file payments-clickhouse/docker/bruin-local.yml \
+bruin query --config-file demo-payments-clickhouse/docker/bruin-local.yml \
   --connection clickhouse-default --query "
 SELECT 'changelog' AS grain, uniqExact(transaction_id) AS n FROM bruin_payments.stg_transaction_changes
 UNION ALL SELECT 'minute',  sum(txns) FROM bruin_payments.rollup_txn_1m

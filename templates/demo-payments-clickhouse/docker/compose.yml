@@ -1,16 +1,16 @@
-# Local verification stack for payments-clickhouse.
+# Local verification stack for demo-payments-clickhouse.
 #
 # Brings up the two systems the pipeline needs: the operational PostgreSQL
 # system of record (configured for logical replication so Bruin CDC can read it)
 # and a ClickHouse server that stands in for ClickHouse Cloud.
 #
-#   docker compose -f payments-clickhouse/docker/compose.yml up -d
-#   docker compose -f payments-clickhouse/docker/compose.yml down -v
+#   docker compose -f demo-payments-clickhouse/docker/compose.yml up -d
+#   docker compose -f demo-payments-clickhouse/docker/compose.yml down -v
 #
 # Credentials here are local-only demo values and are referenced by the `local`
 # environment in .bruin.yml.
 
-name: payments-clickhouse
+name: demo-payments-clickhouse
 
 services:
     postgres:

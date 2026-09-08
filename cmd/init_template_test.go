@@ -111,10 +111,10 @@ func TestInitPaymentsClickHouseCopiesDemoTemplate(t *testing.T) {
 	out, err := gitInit.CombinedOutput()
 	require.NoError(t, err, string(out))
 
-	err = Init().Run(t.Context(), []string{"init", "payments-clickhouse"})
+	err = Init().Run(t.Context(), []string{"init", "demo-payments-clickhouse"})
 	require.NoError(t, err)
 
-	pipelineRoot := filepath.Join(targetRoot, "payments-clickhouse")
+	pipelineRoot := filepath.Join(targetRoot, "demo-payments-clickhouse")
 	require.FileExists(t, filepath.Join(pipelineRoot, "README.md"))
 	require.FileExists(t, filepath.Join(pipelineRoot, "pipeline.yml"))
 	require.FileExists(t, filepath.Join(pipelineRoot, "demo.sh"))
@@ -134,7 +134,7 @@ func TestInitPaymentsClickHouseCopiesDemoTemplate(t *testing.T) {
 
 	pipeline, err := os.ReadFile(filepath.Join(pipelineRoot, "pipeline.yml"))
 	require.NoError(t, err)
-	require.Contains(t, string(pipeline), "name: payments-clickhouse")
+	require.Contains(t, string(pipeline), "name: demo-payments-clickhouse")
 	require.Contains(t, string(pipeline), "clickhouse: \"clickhouse-default\"")
 	require.Contains(t, string(pipeline), "postgres: \"postgres-default\"")
 
@@ -166,14 +166,14 @@ func TestPaymentsClickHouseTemplateHasSelfContainedDemo(t *testing.T) {
 	}
 
 	var actualAssets []string
-	err := iofs.WalkDir(templates.Templates, "payments-clickhouse/assets", func(path string, entry iofs.DirEntry, err error) error {
+	err := iofs.WalkDir(templates.Templates, "demo-payments-clickhouse/assets", func(path string, entry iofs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 		if entry.IsDir() {
 			return nil
 		}
-		actualAssets = append(actualAssets, strings.TrimPrefix(path, "payments-clickhouse/assets/"))
+		actualAssets = append(actualAssets, strings.TrimPrefix(path, "demo-payments-clickhouse/assets/"))
 		return nil
 	})
 	require.NoError(t, err)
@@ -181,7 +181,7 @@ func TestPaymentsClickHouseTemplateHasSelfContainedDemo(t *testing.T) {
 
 	// demo.sh is embedded through the top-level `*` directive; a change to the
 	// embed rules could silently drop the one entry point the README points at.
-	demo, err := templates.Templates.ReadFile("payments-clickhouse/demo.sh")
+	demo, err := templates.Templates.ReadFile("demo-payments-clickhouse/demo.sh")
 	require.NoError(t, err)
 	// It has to locate itself rather than hard-code the folder name, so the demo
 	// survives being generated into a differently named directory.
@@ -191,22 +191,22 @@ func TestPaymentsClickHouseTemplateHasSelfContainedDemo(t *testing.T) {
 	// Header comments here carry copy-pasteable commands, so a stale old-folder
 	// path would break them after init; the trailing slash spares the container names.
 	for _, name := range []string{"docker/compose.yml", "docker/bruin-local.yml"} {
-		content, err := templates.Templates.ReadFile("payments-clickhouse/" + name)
+		content, err := templates.Templates.ReadFile("demo-payments-clickhouse/" + name)
 		require.NoError(t, err, name)
 		require.NotContains(t, string(content), "bruin-payments-clickhouse/", name)
 	}
 
 	// The live source is tagged apart from the generator so `--exclude-tag
 	// demo-seed` can repoint the pipeline at a real PostgreSQL database.
-	seed, err := templates.Templates.ReadFile("payments-clickhouse/assets/ingestion/transactions_seed.py")
+	seed, err := templates.Templates.ReadFile("demo-payments-clickhouse/assets/ingestion/transactions_seed.py")
 	require.NoError(t, err)
 	require.Contains(t, string(seed), "demo-seed")
 
-	rawChanges, err := templates.Templates.ReadFile("payments-clickhouse/assets/ingestion/raw_transaction_changes.asset.yml")
+	rawChanges, err := templates.Templates.ReadFile("demo-payments-clickhouse/assets/ingestion/raw_transaction_changes.asset.yml")
 	require.NoError(t, err)
 	require.Contains(t, string(rawChanges), "requires-postgres")
 
-	readme, err := templates.Templates.ReadFile("payments-clickhouse/README.md")
+	readme, err := templates.Templates.ReadFile("demo-payments-clickhouse/README.md")
 	require.NoError(t, err)
 	require.Contains(t, string(readme), "# Payments ClickHouse")
 }

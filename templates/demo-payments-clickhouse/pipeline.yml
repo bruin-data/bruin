@@ -1,4 +1,4 @@
-name: payments-clickhouse
+name: demo-payments-clickhouse
 schedule: "* * * * *"
 start_date: "2026-08-01"
 catchup: false
