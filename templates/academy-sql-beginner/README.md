@@ -1,6 +1,6 @@
 # academy-sql-beginner
 
-The starter project for the beginner course in the **Agentic Data Analysis**
+The starter project for the beginner course in the **SQL in the Age of AI**
 series on [getbruin.com/learn](https://getbruin.com/learn). It gives you a small,
 realistic retail dataset to learn SQL on - and to learn how to *audit* SQL, which
 is the real point of the course.
