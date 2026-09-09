@@ -24,7 +24,7 @@ connections:
 
 ### Read-only connections
 
-Set `read_only: true` to prevent SQL queries from modifying data. Defaults to `false`. Ingestr assets and seeds do not support this option.
+Set `read_only: true` to run SQL queries in read-only mode (default: `false`). MySQL still allows changes to temporary tables. Ingestr assets and seeds do not support this option.
 
 > [!TIP]
 > If you plan to execute any SQL containing multiple statements (e.g. Bruin table materializations), ensure the connection allows multi-statements. When using the built-in MySQL client in Bruin this flag is automatically appended to the DSN unless `read_only` is enabled.
