@@ -79,6 +79,6 @@ func (c *Config) GetDatabase() string {
 	return c.Database
 }
 
-func (c Config) IsReadOnly() bool {
+func (c *Config) IsReadOnly() bool {
 	return c.ReadOnly
 }
