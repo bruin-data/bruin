@@ -24,6 +24,13 @@ the cleaning that layer was supposed to do - the casing fix, the deduplication -
 that asset. Trace a mart asset's `depends` back far enough and it should always land on staging,
 never on `pipeline/assets/generate/`.
 
+One warning about the word "standardise", because the rubric below will pass an asset that still
+carries the bug. Folding case and trimming whitespace is not the same as folding spellings.
+`UPPER(TRIM('U.S.A.'))` is `U.S.A.`, not `USA`, and `UPPER(TRIM('complete'))` is `COMPLETE`, not
+`COMPLETED`. Both survive a correct-looking staging asset and both change an answer later. Deciding
+that two different strings mean the same thing is a mapping you write down, not a function you
+call, and staging is where it belongs.
+
 This project ships two kinds of duplicate, and they need two different fixes, which is the reason
 `stg_orders.sql` and `stg_order_items.sql` will not look alike. Twelve orders were resent by the
 source system with a changed status and a later `_loaded_at` - the two rows are not identical, so
@@ -37,17 +44,20 @@ would be solving a problem that is not there. `customers` needs the same `DISTIN
 ## Quiz
 1. Q: Why does `stg_orders.sql` need `QUALIFY ROW_NUMBER() ... = 1` instead of `DISTINCT`?
    A: Because the duplicate `order_id` rows are not identical - one was resent with a different `order_status` and a later `_loaded_at` - so `DISTINCT` would keep both copies. Ranking by `_loaded_at` and keeping rank 1 keeps only the latest.
-2. Q: A staging asset joins `orders` to `customers` to attach the customer's country. What layer rule does this break?
+2. Q: Your staging asset applies `UPPER(TRIM(country))` and `COUNT(DISTINCT country)` still returns 13 rather than 12. What is left?
+   A: A spelling variant, not a casing variant. `U.S.A.` survives case folding and whitespace trimming because it is a genuinely different string, so it needs an explicit mapping that says it means the same country as `USA`.
+3. Q: A staging asset joins `orders` to `customers` to attach the customer's country. What layer rule does this break?
    A: Staging does cleaning only, no joins and no business logic. Attaching another table's columns is core-layer work; putting it in staging blurs the boundary that makes staging trustworthy without a review of the SQL.
-3. Q: You trace a mart asset's `depends` chain and it ends at `pipeline/assets/generate/orders.sql`. What does that tell you?
+4. Q: You trace a mart asset's `depends` chain and it ends at `pipeline/assets/generate/orders.sql`. What does that tell you?
    A: The mart asset, or something it depends on, has skipped the staging layer, so it is reading data that was never deduplicated or cleaned - the rule that a mart asset never reads a raw table directly has been broken somewhere in the chain.
 
 ## Task
 Build the staging layer. Under `pipeline/assets/staging/`, write one asset per source table,
 named `stg_<table>.sql`: `stg_dates.sql`, `stg_stores.sql`, `stg_products.sql`,
 `stg_customers.sql`, `stg_orders.sql`, `stg_order_items.sql`, `stg_fx_rates.sql`. Each one
-standardises text casing and trims whitespace, casts types explicitly, deduplicates on the natural
-key, and carries a `description` stating what one row represents. Do not edit anything under
+standardises text casing and trims whitespace, folds the spelling variants that case folding leaves
+behind, casts types explicitly, deduplicates on the natural key, and carries a `description` stating
+what one row represents. Do not edit anything under
 `pipeline/assets/generate/`. Run `bruin validate` before `bruin run`, and report the row count
 before and after for each table.
 
@@ -57,8 +67,11 @@ before and after for each table.
 - [ ] `stg_orders.sql` uses `QUALIFY ROW_NUMBER() OVER (PARTITION BY order_id ORDER BY _loaded_at DESC) = 1`, not `DISTINCT`.
 - [ ] `stg_order_items.sql` uses `DISTINCT`, not `QUALIFY`.
 - [ ] No file under `pipeline/assets/staging/` contains a `JOIN`.
+- [ ] `stg_customers` maps every spelling of the home country to one value, so `SELECT COUNT(DISTINCT country) FROM stg_customers` returns 12, not 13 or 16. Case folding alone leaves `U.S.A.` standing apart and returns 13.
+- [ ] `stg_orders` maps every spelling of the finished state to one value, so `SELECT COUNT(DISTINCT order_status) FROM stg_orders` returns 5, down from 8 raw. Case folding alone leaves `COMPLETE` apart from `COMPLETED` and returns 6. The 24 NULL rows are a separate decision, and the student should say what they did with them.
 
 ## Done signal
-Confirm all seven assets exist, `bruin validate` and `bruin run` both succeed, and every
-before-and-after count matches the table above exactly. Carry forward: everything built from here
+Confirm all seven assets exist, `bruin validate` and `bruin run` both succeed, every
+before-and-after count matches the table above exactly, and the two distinct-value checks return 12
+and 5. Carry forward: everything built from here
 on reads staging, never `pipeline/assets/generate/`, directly.

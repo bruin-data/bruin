@@ -37,6 +37,21 @@ materialization:
   strategy: create+replace
 ```
 
+One thing to know before you convert an asset that has already run. DuckDB will not let a view take
+the name of an existing table, so re-running gives
+`Catalog Error: Existing object stg_dates is of type Table, trying to replace with type View`, and
+`--full-refresh` does not help. Drop the old object first:
+
+```bash
+bruin query --connection duckdb-default \
+  --description "drop the table so the view can take its name" \
+  --query "DROP TABLE IF EXISTS stg_dates"
+```
+
+Then run the pipeline again. This is worth meeting once rather than reading about: a
+materialization change is a change to the shape of the object in the warehouse, not only to the
+asset file, and something already sitting under that name has to go first.
+
 Beyond `create+replace`, Bruin supports incremental strategies - `delete+insert`, `merge`,
 `append`, among others - that update only the rows that changed instead of rebuilding the whole
 table. Name them here and stop: the advanced course covers when and how to use them.
@@ -46,19 +61,23 @@ table. Name them here and stop: the advanced course covers when and how to use t
    A: Whether the query is cheap or expensive to recompute, and whether the result needs to always be fresh or can tolerate the age of the last run - a view answers cheap-and-fresh, a table answers expensive-or-reused.
 2. Q: A staging asset is a view. Nobody has run the pipeline in three days. What does querying that asset return?
    A: The latest data available in the source tables it reads, computed at query time - a view has no age of its own, since it recomputes on every read instead of storing a stale copy.
-3. Q: Name two materialization strategies besides `create+replace` that update a table incrementally.
+3. Q: You change an asset from a table to a view and the run fails with `Existing object ... is of type Table, trying to replace with type View`. What happened, and what fixes it?
+   A: A table of that name is already in the warehouse, and DuckDB will not swap an object's type in place. Drop the table, then run again. `--full-refresh` does not help, because it rebuilds the object rather than replacing its type.
+4. Q: Name two materialization strategies besides `create+replace` that update a table incrementally.
    A: Any two of `delete+insert`, `truncate+insert`, `append`, or `merge` - the advanced course covers when each applies.
 
 ## Task
 Pick two of the staging assets built in lesson 8 and change their `materialization` block from
-`type: table` with `strategy: create+replace` to `type: view`. Run `bruin validate`, then run the
-pipeline again and confirm each asset's row count is unchanged from lesson 8's after-staging count.
+`type: table` with `strategy: create+replace` to `type: view`. Run `bruin validate`, drop the two
+existing tables as shown above, then run the pipeline again and confirm each asset's row count is
+unchanged from lesson 8's after-staging count.
 For each of the two, write one sentence saying why a view is the right call there. Then write one
 sentence naming a different asset in this project you would keep as a table, and why.
 
 ## Rubric (for `review my work`)
 - [ ] Exactly two staging assets carry `materialization: type: view`, with no `strategy` key.
 - [ ] `bruin validate` passes after the change.
+- [ ] The student hit or anticipated the `Existing object ... is of type Table, trying to replace with type View` error and resolved it by dropping the table, not by renaming the asset or reverting it to a table.
 - [ ] Each converted asset's row count still matches its lesson 8 after-staging number exactly (`dates` 1,096; `stores` 6; `products` 60; `customers` 500; `orders` 1,200; `order_items` 2,880; `fx_rates` 5,480 - whichever two were chosen).
 - [ ] Both reasons name cost or freshness, not a stated preference.
 - [ ] One further asset in this project is named as one to keep as a table, with a reason about reuse or latency.

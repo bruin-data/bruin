@@ -2,6 +2,9 @@
 
 Say `next lesson` to begin. The agent updates this file as you go.
 
+`- [x]` means passed. A lesson you skip stays unchecked and gains `(skipped)`, so you can tell it
+apart from one you have not reached yet.
+
 - [ ] 01 the-question-is-the-hard-part
 - [ ] 02 write-the-model-contract
 - [ ] 03 profile-before-you-model

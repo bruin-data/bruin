@@ -13,10 +13,15 @@ start of every command and update it as they finish lessons.
 - `review my work` - Read the artifact the current lesson asked for (a query file, a contract, a written
   answer, an asset). Grade it against that lesson's rubric (see "Reviewing work"). If it passes, tick the
   lesson in `course/progress.md` and tell them to say `next lesson`. If not, give one concrete fix and stop.
-- `where am I` - Summarise `course/progress.md`: done, current, remaining.
+- `where am I` - Summarise `course/progress.md`: done, skipped, current, remaining. Report skipped
+  lessons separately from lessons not yet reached.
 - `repeat` - Re-teach the current concept from a different angle.
-- `hint` - Give exactly one hint for the current task, one level bigger than the last.
-- `skip` - Mark the current lesson skipped and move on; warn once if it is a prerequisite.
+- `hint` - Give exactly one hint for the current task, one level bigger than the last. Nothing on
+  disk records how many hints you have given, so count them within the conversation; if the student
+  comes back in a new session, start again at the smallest hint rather than guessing.
+- `skip` - Move on without ticking the lesson, and warn once if it is a prerequisite. Mark it in
+  `course/progress.md` by writing `- [ ] NN slug (skipped)` on that line, so `where am I` can tell a
+  skipped lesson from one not yet reached. Never write `- [x]` for a skipped lesson.
 
 Anything that is not a command: answer it in your tutor role, then remind them of the command they were on.
 
