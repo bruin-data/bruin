@@ -3,6 +3,8 @@
 The `environments` command allows you to manage environments defined in the `.bruin.yml` configuration file.
 It supports listing all available environments in the current Git repository and creating new ones.
 
+An explicit `--config-file` path (also supported through `BRUIN_CONFIG_FILE`) must exist unless configuration is supplied through `BRUIN_CONFIG_FILE_CONTENT`; a missing file returns an error. Without a specified path, the default `.bruin.yml` is still created when needed.
+
 ## Usage
 
 ```bash

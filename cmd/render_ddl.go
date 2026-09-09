@@ -10,7 +10,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/clickhouse"
-	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/databricks"
 	"github.com/bruin-data/bruin/pkg/date"
 	"github.com/bruin-data/bruin/pkg/doris"
@@ -176,7 +175,7 @@ func RenderDDL() *cli.Command {
 					configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
 				}
 
-				cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
+				cm, err := loadConfig(afero.NewOsFs(), configFilePath, c.String("config-file") != "")
 				if err != nil {
 					printError(err, c.String("output"), fmt.Sprintf("Failed to load the config file at '%s':", configFilePath))
 					return cli.Exit("", 1)

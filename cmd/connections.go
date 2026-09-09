@@ -72,7 +72,7 @@ func ListConnections() *cli.Command {
 				configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
 			}
 
-			return r.ListConnections(path, c.String("output"), c.String("environment"), configFilePath)
+			return r.ListConnections(path, c.String("output"), c.String("environment"), configFilePath, c.String("config-file") != "")
 		},
 	}
 }
@@ -163,7 +163,7 @@ func AddConnection() *cli.Command {
 				configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
 			}
 
-			cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
+			cm, err := loadConfig(afero.NewOsFs(), configFilePath, c.String("config-file") != "")
 			if err != nil {
 				printErrorForOutput(output, errors2.Wrap(err, "failed to load or create config"))
 				return cli.Exit("", 1)
@@ -253,7 +253,7 @@ func DeleteConnection() *cli.Command {
 				configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
 			}
 
-			cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
+			cm, err := loadConfig(afero.NewOsFs(), configFilePath, c.String("config-file") != "")
 			if err != nil {
 				printErrorForOutput(output, errors2.Wrap(err, "failed to load or create config"))
 				return cli.Exit("", 1)
@@ -293,10 +293,10 @@ func DeleteConnection() *cli.Command {
 
 type ConnectionsCommand struct{}
 
-func (r *ConnectionsCommand) ListConnections(pathToProject, output, environment, configFilePath string) error {
+func (r *ConnectionsCommand) ListConnections(pathToProject, output, environment, configFilePath string, requireExistingConfig bool) error {
 	defer RecoverFromPanic()
 
-	cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
+	cm, err := loadConfig(afero.NewOsFs(), configFilePath, requireExistingConfig)
 	if err != nil {
 		errorPrinter.Printf("Failed to load or create the config file: %v\n", err)
 		return cli.Exit("", 1)
@@ -433,7 +433,7 @@ func PingConnection() *cli.Command {
 				configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
 			}
 
-			cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
+			cm, err := loadConfig(afero.NewOsFs(), configFilePath, c.String("config-file") != "")
 			if err != nil {
 				printErrorForOutput(output, errors2.Wrap(err, "failed to load or create config"))
 				return cli.Exit("", 1)

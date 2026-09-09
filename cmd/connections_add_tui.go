@@ -516,7 +516,7 @@ func runInteractiveAddConnection(c *cli.Command) error {
 		configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
 	}
 
-	cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
+	cm, err := loadConfig(afero.NewOsFs(), configFilePath, c.String("config-file") != "")
 	if err != nil {
 		errorPrinter.Printf("Failed to load or create config: %v\n", err)
 		return cli.Exit("", 1)

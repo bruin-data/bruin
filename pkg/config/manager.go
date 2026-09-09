@@ -740,6 +740,15 @@ func expandEnvVarReferences(value string) (string, bool) {
 	return expanded, matched
 }
 
+func Load(fs afero.Fs, path string) (*Config, error) {
+	config, err := LoadFromFileOrEnv(fs, path)
+	if err != nil {
+		return nil, err
+	}
+
+	return config, ensureConfigIsInGitignore(fs, path)
+}
+
 func LoadOrCreate(fs afero.Fs, path string) (*Config, error) {
 	config, err := LoadFromFileOrEnv(fs, path)
 	if err != nil && !errors.Is(err, fs2.ErrNotExist) {

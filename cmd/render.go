@@ -358,7 +358,7 @@ func loadRenderConfig(renderFS afero.Fs, inputPath, configuredConfigFilePath str
 	}
 
 	if createIfMissing {
-		return config.LoadOrCreate(renderFS, configFilePath)
+		return loadConfig(renderFS, configFilePath, configuredConfigFilePath != "")
 	}
 
 	if configuredConfigFilePath == "" && os.Getenv("BRUIN_CONFIG_FILE_CONTENT") == "" {
@@ -369,6 +369,10 @@ func loadRenderConfig(renderFS afero.Fs, inputPath, configuredConfigFilePath str
 		if !exists {
 			return nil, nil
 		}
+	}
+
+	if configuredConfigFilePath != "" {
+		return config.Load(renderFS, configFilePath)
 	}
 
 	return config.LoadFromFileOrEnv(renderFS, configFilePath)

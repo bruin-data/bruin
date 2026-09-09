@@ -262,7 +262,7 @@ func DataDiffCmd() *cli.Command {
 			}
 
 			// Load config
-			cm, err := config.LoadOrCreate(fs, configFilePath)
+			cm, err := loadConfig(fs, configFilePath, c.String("config-file") != "")
 			if err != nil {
 				return fmt.Errorf("failed to load or create config from '%s': %w", configFilePath, err)
 			}

@@ -682,11 +682,12 @@ func runImportDatabaseTUI(ctx context.Context, pipelinePath, environment, config
 		return fmt.Errorf("failed to find git repository root: %w", err)
 	}
 
+	requireExistingConfig := configFile != ""
 	if configFile == "" {
 		configFile = filepath.Join(repoRoot.Path, ".bruin.yml")
 	}
 
-	cfg, err := config.LoadOrCreate(fs, configFile)
+	cfg, err := loadConfig(fs, configFile, requireExistingConfig)
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}

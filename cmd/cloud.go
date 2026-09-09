@@ -4039,6 +4039,7 @@ func cloudConnectionsList() *cli.Command {
 // avoids any per-type mapping.
 func connectionFromConfig(ctx context.Context, name, environment, configFile string) (string, map[string]any, error) {
 	configFilePath := configFile
+	requireExistingConfig := configFilePath != ""
 	if configFilePath == "" {
 		repoRoot, err := git.FindRepoFromPath(".")
 		if err != nil {
@@ -4047,7 +4048,7 @@ func connectionFromConfig(ctx context.Context, name, environment, configFile str
 		configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
 	}
 
-	cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
+	cm, err := loadConfig(afero.NewOsFs(), configFilePath, requireExistingConfig)
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to load %s: %w", configFilePath, err)
 	}

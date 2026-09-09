@@ -7,7 +7,6 @@ import (
 	path2 "path"
 	"strings"
 
-	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
@@ -59,17 +58,17 @@ func ListEnvironments(isDebug *bool) *cli.Command {
 				configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
 			}
 
-			return r.Run(strings.ToLower(c.String("output")), configFilePath)
+			return r.Run(strings.ToLower(c.String("output")), configFilePath, c.String("config-file") != "")
 		},
 	}
 }
 
 type EnvironmentListCommand struct{}
 
-func (r *EnvironmentListCommand) Run(output, configFilePath string) error {
+func (r *EnvironmentListCommand) Run(output, configFilePath string, requireExistingConfig bool) error {
 	defer RecoverFromPanic()
 
-	cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
+	cm, err := loadConfig(afero.NewOsFs(), configFilePath, requireExistingConfig)
 	if err != nil {
 		printError(err, output, "Failed to load the config file at "+configFilePath)
 		return cli.Exit("", 1)
@@ -160,7 +159,7 @@ func CreateEnvironment(isDebug *bool) *cli.Command {
 				configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
 			}
 
-			cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
+			cm, err := loadConfig(afero.NewOsFs(), configFilePath, c.String("config-file") != "")
 			if err != nil {
 				printError(err, output, "Failed to load the config file at "+configFilePath)
 				return cli.Exit("", 1)
@@ -233,17 +232,17 @@ func UpdateEnvironment(isDebug *bool) *cli.Command {
 				configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
 			}
 
-			return r.Run(c.String("name"), c.String("new-name"), c.String("schema-prefix"), strings.ToLower(c.String("output")), configFilePath)
+			return r.Run(c.String("name"), c.String("new-name"), c.String("schema-prefix"), strings.ToLower(c.String("output")), configFilePath, c.String("config-file") != "")
 		},
 	}
 }
 
 type EnvironmentUpdateCommand struct{}
 
-func (r *EnvironmentUpdateCommand) Run(name, newName, schemaPrefix, output, configFilePath string) error {
+func (r *EnvironmentUpdateCommand) Run(name, newName, schemaPrefix, output, configFilePath string, requireExistingConfig bool) error {
 	defer RecoverFromPanic()
 
-	cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
+	cm, err := loadConfig(afero.NewOsFs(), configFilePath, requireExistingConfig)
 	if err != nil {
 		printError(err, output, "Failed to load the config file at "+configFilePath)
 		return cli.Exit("", 1)
@@ -346,17 +345,17 @@ func DeleteEnvironment(isDebug *bool) *cli.Command {
 				configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
 			}
 
-			return r.Run(c.String("name"), c.Bool("force"), strings.ToLower(c.String("output")), configFilePath)
+			return r.Run(c.String("name"), c.Bool("force"), strings.ToLower(c.String("output")), configFilePath, c.String("config-file") != "")
 		},
 	}
 }
 
 type EnvironmentDeleteCommand struct{}
 
-func (r *EnvironmentDeleteCommand) Run(name string, force bool, output, configFilePath string) error {
+func (r *EnvironmentDeleteCommand) Run(name string, force bool, output, configFilePath string, requireExistingConfig bool) error {
 	defer RecoverFromPanic()
 
-	cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
+	cm, err := loadConfig(afero.NewOsFs(), configFilePath, requireExistingConfig)
 	if err != nil {
 		printError(err, output, "Failed to load the config file at "+configFilePath)
 		return cli.Exit("", 1)
@@ -475,17 +474,17 @@ func CloneEnvironment(isDebug *bool) *cli.Command {
 				configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
 			}
 
-			return r.Run(c.String("source"), c.String("target"), c.String("schema-prefix"), strings.ToLower(c.String("output")), configFilePath)
+			return r.Run(c.String("source"), c.String("target"), c.String("schema-prefix"), strings.ToLower(c.String("output")), configFilePath, c.String("config-file") != "")
 		},
 	}
 }
 
 type EnvironmentCloneCommand struct{}
 
-func (r *EnvironmentCloneCommand) Run(sourceName, targetName, schemaPrefix, output, configFilePath string) error {
+func (r *EnvironmentCloneCommand) Run(sourceName, targetName, schemaPrefix, output, configFilePath string, requireExistingConfig bool) error {
 	defer RecoverFromPanic()
 
-	cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
+	cm, err := loadConfig(afero.NewOsFs(), configFilePath, requireExistingConfig)
 	if err != nil {
 		printError(err, output, "Failed to load the config file at "+configFilePath)
 		return cli.Exit("", 1)
