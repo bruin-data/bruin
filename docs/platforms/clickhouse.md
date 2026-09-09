@@ -23,7 +23,7 @@ connections:
 
 ### Read-only connections
 
-Set `read_only: true` to prevent SQL queries from modifying data. Defaults to `false`. Ingestr assets and seeds do not support this option.
+Set `read_only: true` to run SQL queries in read-only mode (default: `false`). Ingestr assets and seeds do not support this option.
 
 ## Ingestr Assets
 
