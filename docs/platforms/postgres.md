@@ -23,11 +23,7 @@ In order to set up a PostgreSQL connection, you need to add a configuration item
 
 ### Read-only connections
 
-Set `read_only: true` to enable native read-only execution. The default is `false`. Bruin runs each native SQL query in a `READ ONLY` transaction and rolls it back after reading the result. Multiple SQL statements in one query are rejected in this mode. See the [database transaction documentation](https://www.postgresql.org/docs/current/sql-set-transaction.html) for the native restrictions.
-
-This option applies to Bruin's native SQL client. Ingestr assets and seed loading through ingestr return an error for these connections because they open a separate connection that does not preserve this setting. Use a separate connection with database-enforced read-only credentials for ingestion sources.
-
-Native read-only mode follows the database's transaction and permission rules; use database-enforced privileges when running untrusted SQL.
+Set `read_only: true` to prevent SQL queries from modifying data. Defaults to `false`. Ingestr assets and seeds do not support this option.
 
 > [!NOTE]
 > `ssl_mode` should be one of the modes describe in the [documentation](https://www.postgresql.org/docs/current/libpq-ssl.html#LIBPQ-SSL-PROTECTION).

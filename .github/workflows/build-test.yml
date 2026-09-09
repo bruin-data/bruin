@@ -128,6 +128,13 @@ jobs:
           echo "R available after ${SECONDS}s"
       - name: Run integration tests
         run: make integration-test
+      - name: Run database read-only integration tests
+        run: |
+          for platform in postgres mysql; do
+            if [ -f "integration-tests/$platform/go.mod" ]; then
+              (cd "integration-tests/$platform" && go test -count=1 -v -timeout 10m .)
+            fi
+          done
       - name: Run MSSQL developer environment integration test
         run: make integration-test-mssql
   dockerBuild:

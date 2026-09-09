@@ -127,6 +127,10 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 		}, nil
 	}
 	if fieldDescriptions == nil {
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return nil, errors.Wrap(err, "failed to execute query")
+		}
 		return nil, errors.New("field descriptions are not available")
 	}
 	typeMap := pgtype.NewMap()
