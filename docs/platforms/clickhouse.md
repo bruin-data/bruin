@@ -25,12 +25,6 @@ connections:
 
 Set `read_only: true` to enable native read-only execution. The default is `false`. Bruin sends the native ClickHouse setting `readonly=1`, so the server rejects writes and changes to restricted settings.
 
-This option applies to Bruin's native SQL client. Ingestr assets and seed loading through ingestr return an error for these connections because they open a separate connection that does not preserve this setting. Use a separate connection with database-enforced read-only credentials for ingestion sources.
-
-Native read-only mode follows the database's transaction and permission rules; use database-enforced privileges when running untrusted SQL.
-
-Bruin uses `database` for direct ClickHouse assets and unqualified `clickhouse.seed` asset names. For an `ingestr` asset, the generated ClickHouse URI does not include this database: use `database.table` in the asset `name` when ClickHouse is the destination, or in `source_table` when it is the source. An unqualified ingestr table uses ClickHouse's `default` database.
-
 ## Ingestr Assets
 
 After adding a connection in `.bruin.yml`, create an [asset configuration](/assets/ingestr#asset-structure) file such as `stripe_ingestion.asset.yml` inside the `assets` directory. This file defines the flow from the source to the destination:
