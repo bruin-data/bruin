@@ -1,4 +1,4 @@
--- Step 6 - Joining tables, and the most important lesson in the course
+-- Lesson 07 (join-without-breaking) - Joining tables, and the most important lesson in the course
 --
 -- A JOIN lines up rows from two tables on a matching column. orders has
 -- one row per order; order_items has one row per line, about 2.4 lines

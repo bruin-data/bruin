@@ -15,8 +15,8 @@ each one:
 4. Decide: does this query actually answer the question that was asked? If not,
    what is wrong, and roughly how far off is the answer?
 
-Write your verdict for each query in `findings-template.md`. Do not change the
-query files - audit them where they sit.
+Copy `findings-template.md` to `findings.md` and write your verdict for each query
+there. Do not change the query files - audit them where they sit.
 
 Some things worth checking every time:
 
@@ -33,5 +33,6 @@ The numbers you trust in `../anchors.md` are your friend here.
 is a different question from what is wrong with these *queries*. It will not tell you
 which six are broken, and reading it hoping for that will mislead you.
 
-There is no answer key in this project on purpose. Commit to all ten verdicts first;
-the key is published with the course.
+The answer key ships as `course/answer-key.md` for your instructor agent to grade
+against - it is instructor-only. Commit to all ten verdicts in `findings.md` first;
+opening the key before you finish defeats the exercise.

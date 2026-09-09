@@ -117,7 +117,7 @@ chosen AS (
 ),
 priced AS (
     -- LEFT JOIN, not INNER: the orphan lines have no product row, and dropping
-    -- them here would delete the defect that Step 6 and the capstone rely on.
+    -- them here would delete the defect that the join lesson and the capstone rely on.
     -- They fall back to a fixed catalogue price and cost.
     SELECT
         c.order_id,

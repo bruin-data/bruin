@@ -1143,6 +1143,35 @@ func printInitSummary(cfg initConfigSummary, pipelinePath string) {
 }
 
 func printInitRunSteps(pipelinePath string) {
-	infoPrinter.Printf("  2. Run: bruin validate %s\n", pipelinePath)
-	infoPrinter.Printf("  3. Run: bruin run %s\n\n", pipelinePath)
+	runPath := pipelineRunPath(pipelinePath)
+	infoPrinter.Printf("  2. Run: bruin validate %s\n", runPath)
+	infoPrinter.Printf("  3. Run: bruin run %s\n\n", runPath)
+}
+
+// pipelineRunPath returns the path to hand `bruin run`/`bruin validate`. Some
+// templates nest pipeline.yml in a subdirectory, so the created folder is not
+// always runnable. Returns the single nested pipeline directory when there is
+// exactly one; otherwise falls back to pipelinePath unchanged.
+func pipelineRunPath(pipelinePath string) string {
+	if _, err := getPipelineDefinitionFullPath(pipelinePath); err == nil {
+		return pipelinePath
+	}
+
+	matches := make([]string, 0, 1)
+	_ = filepath.WalkDir(pipelinePath, func(path string, d fs2.DirEntry, err error) error {
+		if err != nil || !d.IsDir() {
+			return nil //nolint:nilerr // a missing or unreadable tree just yields the fallback below
+		}
+		if _, err := getPipelineDefinitionFullPath(path); err == nil {
+			matches = append(matches, path)
+			return fs2.SkipDir
+		}
+		return nil
+	})
+
+	if len(matches) == 1 {
+		return matches[0]
+	}
+
+	return pipelinePath
 }

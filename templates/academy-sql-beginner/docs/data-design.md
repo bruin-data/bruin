@@ -131,10 +131,10 @@ dimension fan-out visible.
 
 ### 40 customers have never ordered
 
-The general pool stops at 460, so customers 461-500 have no orders at all. Step 10
-asks what happens to a number when a customer has no orders; without these rows the
-question has nothing to point at, and a LEFT JOIN would look identical to an INNER
-JOIN.
+The general pool stops at 460, so customers 461-500 have no orders at all. The
+join-without-breaking lesson asks what happens to a number when a customer has no
+orders; without these rows the question has nothing to point at, and a LEFT JOIN
+would look identical to an INNER JOIN.
 
 ### One category dominates, and there is a long tail
 
@@ -149,11 +149,11 @@ intermediate course exists to fix.
 
 | Property | Depended on by |
 |---|---|
-| Two grains: orders vs order_items (2.4x) | Beginner Step 6, capstone, audit q02 |
-| `unit_price` differs from `net_price` | Beginner Step 5, audit q05 |
-| `order_total` is a header measure | Beginner Step 6, audit q02 |
-| 8 categories, 20 subcategories, 12 countries | Beginner Step 5 (GROUP BY) |
-| 40 customers with no orders | Beginner Step 6 and 10 (LEFT vs INNER JOIN) |
+| Two grains: orders vs order_items (2.4x) | Beginner join-without-breaking, capstone, audit q02 |
+| `unit_price` differs from `net_price` | Beginner join-without-breaking, audit q05 |
+| `order_total` is a header measure | Beginner join-without-breaking, audit q02 |
+| 8 categories, 20 subcategories, 12 countries | Beginner count-sum-group (GROUP BY) |
+| 40 customers with no orders | Beginner join-without-breaking (LEFT vs INNER JOIN) |
 | Volume ramp + Q3 2024 dip | Intermediate (YoY, LAG) |
 | Thin categories -> empty category-weeks | Intermediate (date spine) |
 | Revenue concentration | Beginner (top customers) |

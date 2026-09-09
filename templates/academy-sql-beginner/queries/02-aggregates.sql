@@ -1,4 +1,4 @@
--- Step 5 - Counting and totalling
+-- Lesson 06 (count-sum-group) - Counting and totalling
 --
 -- Aggregate functions collapse many rows into one number: COUNT, SUM, AVG, MIN,
 -- MAX. GROUP BY runs the aggregate once per group. One row of this result is one
@@ -39,4 +39,4 @@ ORDER BY orders DESC;
 --    Read the CASE aloud: "when the status is cancelled, count 1, otherwise 0."
 --
 -- 4. Which customer segments spend the most? Group customers... but
---    careful, spend lives in orders. That needs a join - Step 6.
+--    careful, spend lives in orders. That needs a join - the join-without-breaking lesson.
