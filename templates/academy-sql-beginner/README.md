@@ -72,9 +72,8 @@ bruin run academy-sql-beginner/pipeline
 (If `bruin init` told you to "add your connection credentials" - you do not need any.
 This project builds a local database file and needs no account and no password.)
 
-That builds all six tables into a local DuckDB database
-(`academy-sql-beginner/academy.duckdb`) in about a tenth of a second. Then look
-around:
+That builds all six tables into a local DuckDB database (`academy.duckdb`) in about a
+tenth of a second. Then look around:
 
 ```bash
 bruin query --connection duckdb-default --description "list the tables" \

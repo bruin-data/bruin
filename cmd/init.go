@@ -173,14 +173,8 @@ func gitignorePatternForPath(path string) string {
 
 // ensureLocalDuckDBFilesAreIgnored gitignores every relative DuckDB path in the
 // config, and its write-ahead log. DuckDB resolves a relative path against the
-// config file, so a bare filename lands next to .bruin.yml, which is usually the
-// repository root.
-//
-// Only a database that sits directly beside .bruin.yml is added here. A database
-// nested in a subdirectory (for example academy-sql-beginner/academy.duckdb) is
-// the pipeline folder's own concern, and templates that put it there ship that
-// folder's .gitignore; editing the repo-root ignore for it would leak an entry
-// into the user's root ignore file.
+// config file, so the database lands next to .bruin.yml rather than inside the
+// pipeline folder.
 func ensureLocalDuckDBFilesAreIgnored(fs afero.Fs, bruinYmlPath string, cfg *config.Config) error {
 	gitignoreDir := filepath.Dir(bruinYmlPath)
 
@@ -199,13 +193,6 @@ func ensureLocalDuckDBFilesAreIgnored(fs afero.Fs, bruinYmlPath string, cfg *con
 				continue
 			}
 			seen[path] = true
-
-			// filepath.Dir of a bare filename is ".". Anything else is a
-			// subdirectory database, ignored by the pipeline folder's own
-			// .gitignore rather than the repo root's.
-			if filepath.Dir(path) != "." {
-				continue
-			}
 
 			for _, pattern := range []string{gitignorePatternForPath(path), gitignorePatternForPath(path + ".wal")} {
 				if err := git.EnsureGivenPatternIsInGitignore(fs, gitignoreDir, pattern); err != nil {
@@ -1161,12 +1148,10 @@ func printInitRunSteps(pipelinePath string) {
 	infoPrinter.Printf("  3. Run: bruin run %s\n\n", runPath)
 }
 
-// pipelineRunPath returns the path the user should hand to `bruin run` and
-// `bruin validate`. Most templates keep pipeline.yml at the folder init creates,
-// but some nest it in a subdirectory (academy-sql-beginner keeps it under
-// pipeline/), so the created folder is not always a runnable pipeline path. When
-// exactly one pipeline definition lives at or below pipelinePath, return its
-// directory; otherwise fall back to pipelinePath unchanged.
+// pipelineRunPath returns the path to hand `bruin run`/`bruin validate`. Some
+// templates nest pipeline.yml in a subdirectory, so the created folder is not
+// always runnable. Returns the single nested pipeline directory when there is
+// exactly one; otherwise falls back to pipelinePath unchanged.
 func pipelineRunPath(pipelinePath string) string {
 	if _, err := getPipelineDefinitionFullPath(pipelinePath); err == nil {
 		return pipelinePath
