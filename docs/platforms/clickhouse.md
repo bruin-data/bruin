@@ -23,7 +23,7 @@ connections:
 
 ### Read-only connections
 
-Set `read_only: true` to enable native read-only execution. The default is `false`. Bruin sends the native ClickHouse setting `readonly=1`, so the server rejects writes and changes to restricted settings.
+Set `read_only: true` to prevent SQL queries from modifying data. Defaults to `false`. Ingestr assets and seeds do not support this option.
 
 ## Ingestr Assets
 
