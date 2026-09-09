@@ -4,7 +4,7 @@ description: Order-level revenue after post-checkout adjustments.
 depends:
   - staging.orders
 tags:
-  - self-heal-demo
+  - demo-self-heal-pipeline
   - quality-check-investigate
 materialization:
   type: table

@@ -59,9 +59,9 @@ The starter skills can be used by Bruin Cloud agents, local agents, and external
 
 In local development, the skills should rely on terminal commands such as `bruin validate`, `bruin render`, `bruin query`, and `bruin run`, plus the local `logs/` folder when it exists.
 
-### Test With `self-heal-demo`
+### Test With `demo-self-heal-pipeline`
 
-Use the regular `self-heal-demo` template project to test the data-problem skills locally with DuckDB:
+Use the regular `demo-self-heal-pipeline` template project to test the data-problem skills locally with DuckDB:
 
 ```bash
 mkdir tmp-pipeline
@@ -69,17 +69,17 @@ cd tmp-pipeline
 git init
 
 bruin ai skills all
-bruin init self-heal-demo
+bruin init demo-self-heal-pipeline
 
-bruin run self-heal-demo/demo-seed
-bruin validate self-heal-demo/demo-pipeline
-bruin run --tag duplicate-investigate self-heal-demo/demo-pipeline || true
-bruin run --tag quality-check-investigate self-heal-demo/demo-pipeline || true
-bruin run --tag freshness-check self-heal-demo/demo-pipeline || true
-bruin run --tag schema-drift-check self-heal-demo/demo-pipeline || true
+bruin run demo-self-heal-pipeline/demo-seed
+bruin validate demo-self-heal-pipeline/demo-pipeline
+bruin run --tag duplicate-investigate demo-self-heal-pipeline/demo-pipeline || true
+bruin run --tag quality-check-investigate demo-self-heal-pipeline/demo-pipeline || true
+bruin run --tag freshness-check demo-self-heal-pipeline/demo-pipeline || true
+bruin run --tag schema-drift-check demo-self-heal-pipeline/demo-pipeline || true
 ```
 
-The template includes `demo-seed` for raw DuckDB tables and `demo-pipeline` for intentional duplicate, quality, freshness, and schema drift issues in normal business-named SQL assets. See the generated `self-heal-demo/README.md` or the [template docs](/getting-started/templates-docs/self-heal-demo-README) for the scenario map, proof queries, and expected diagnoses.
+The template includes `demo-seed` for raw DuckDB tables and `demo-pipeline` for intentional duplicate, quality, freshness, and schema drift issues in normal business-named SQL assets. See the generated `demo-self-heal-pipeline/README.md` or the [template docs](/getting-started/templates-docs/demo-self-heal-pipeline-README) for the scenario map, proof queries, and expected diagnoses.
 
 ## Example
 

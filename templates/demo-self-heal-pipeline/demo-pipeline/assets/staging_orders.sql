@@ -2,7 +2,7 @@
 name: staging.orders
 description: Clean order headers shared by the self-heal demo marts.
 tags:
-  - self-heal-demo
+  - demo-self-heal-pipeline
   - duplicate-investigate
   - quality-check-investigate
 materialization:

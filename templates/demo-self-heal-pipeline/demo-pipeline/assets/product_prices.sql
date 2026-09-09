@@ -2,7 +2,7 @@
 name: catalog.product_prices
 description: Product pricing snapshot used by merchandising analytics.
 tags:
-  - self-heal-demo
+  - demo-self-heal-pipeline
   - schema-drift-check
 materialization:
   type: table
