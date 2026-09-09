@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	fs2 "io/fs"
 	"maps"
 	"os"
 	"path/filepath"
@@ -748,31 +749,93 @@ func Load(fs afero.Fs, path string) (*Config, error) {
 	return config, ensureConfigIsInGitignore(fs, path)
 }
 
+func LoadOrCreate(fs afero.Fs, path string) (*Config, error) {
+	config, err := LoadFromFileOrEnv(fs, path)
+	if err != nil && !errors.Is(err, fs2.ErrNotExist) {
+		return nil, err
+	}
+
+	if err == nil {
+		return config, ensureConfigIsInGitignore(fs, path)
+	}
+
+	defaultEnv := Environment{
+		Connections: &Connections{},
+	}
+	config = &Config{
+		fs:   fs,
+		path: path,
+
+		DefaultEnvironmentName:  "default",
+		SelectedEnvironment:     &defaultEnv,
+		SelectedEnvironmentName: "default",
+		Environments: map[string]Environment{
+			"default": defaultEnv,
+		},
+	}
+
+	err = config.Persist()
+	if err != nil {
+		return nil, fmt.Errorf("failed to persist config: %w", err)
+	}
+
+	config.SelectedEnvironment.Connections.buildConnectionKeyMap()
+
+	return config, ensureConfigIsInGitignore(fs, path)
+}
+
 func ensureConfigIsInGitignore(fs afero.Fs, filePath string) error {
 	return git.EnsureGivenPatternIsInGitignore(fs, filepath.Dir(filePath), filepath.Base(filePath))
 }
 
-func LoadWithoutPathAbsolutization(fs afero.Fs, path string) (*Config, error) {
+func LoadOrCreateWithoutPathAbsolutization(fs afero.Fs, path string) (*Config, error) {
 	var config Config
 
 	buf, err := readConfigYAML(fs, path)
+	if err == nil {
+		err = decodeConfigYAML(buf, &config)
+	}
+	if err != nil && !errors.Is(err, fs2.ErrNotExist) {
+		return nil, err
+	}
+
+	if err == nil {
+		config.fs = fs
+		config.path = path
+
+		if config.DefaultEnvironmentName == "" {
+			config.DefaultEnvironmentName = "default"
+		}
+
+		err = config.SelectEnvironment(config.DefaultEnvironmentName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to select default environment: %w", err)
+		}
+
+		return &config, ensureConfigIsInGitignore(fs, path)
+	}
+
+	defaultEnv := Environment{
+		Connections: &Connections{},
+	}
+	config = Config{
+		fs:   fs,
+		path: path,
+
+		DefaultEnvironmentName:  "default",
+		SelectedEnvironment:     &defaultEnv,
+		SelectedEnvironmentName: "default",
+		Environments: map[string]Environment{
+			"default": defaultEnv,
+		},
+	}
+
+	err = config.Persist()
 	if err != nil {
-		return nil, err
-	}
-	if err := decodeConfigYAML(buf, &config); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to persist config: %w", err)
 	}
 
-	config.fs = fs
-	config.path = path
-
-	if config.DefaultEnvironmentName == "" {
-		config.DefaultEnvironmentName = "default"
-	}
-
-	if err := config.SelectEnvironment(config.DefaultEnvironmentName); err != nil {
-		return nil, fmt.Errorf("failed to select default environment: %w", err)
-	}
+	config.SelectedEnvironment.Connections.buildConnectionKeyMap()
 
 	return &config, ensureConfigIsInGitignore(fs, path)
 }

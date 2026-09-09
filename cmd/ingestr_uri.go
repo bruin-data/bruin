@@ -100,9 +100,9 @@ func ingestrURIConfig(ctx context.Context, c *cli.Command) (context.Context, *co
 		configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
 	}
 
-	cm, err := config.Load(afero.NewOsFs(), configFilePath)
+	cm, err := loadConfig(afero.NewOsFs(), configFilePath, c.String("config-file") != "")
 	if err != nil {
-		return ctx, nil, errors.Wrap(err, "failed to load config")
+		return ctx, nil, errors.Wrap(err, "failed to load or create config")
 	}
 
 	environment := c.String("environment")

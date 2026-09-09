@@ -1007,12 +1007,13 @@ func getConnectionAndTypeFromConfigWithContext(ctx context.Context, env string, 
 		return nil, "", errors.Wrap(err, "failed to find the git repository root")
 	}
 
+	requireExistingConfig := configFilePath != ""
 	if configFilePath == "" {
 		configFilePath = filepath.Join(repoRoot.Path, ".bruin.yml")
 	}
-	cm, err := config.Load(fs, configFilePath)
+	cm, err := loadConfig(fs, configFilePath, requireExistingConfig)
 	if err != nil {
-		return nil, "", errors.Wrap(err, "failed to load config")
+		return nil, "", errors.Wrap(err, "failed to load or create config")
 	}
 
 	if env != "" {
@@ -1284,10 +1285,11 @@ func GetPipelineAndAsset(ctx context.Context, inputPath string, fs afero.Fs, con
 		errorPrinter.Printf("Failed to find the pipeline this task belongs to: '%s'\n", inputPath)
 		return nil, err
 	}
+	requireExistingConfig := configFilePath != ""
 	if configFilePath == "" {
 		configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
 	}
-	cm, err := config.Load(fs, configFilePath)
+	cm, err := loadConfig(fs, configFilePath, requireExistingConfig)
 	if err != nil {
 		errorPrinter.Printf("Failed to load the config file at '%s': %v\n", configFilePath, err)
 		return nil, err
@@ -1328,10 +1330,11 @@ func GetPipelineForQuery(ctx context.Context, inputPath string, fs afero.Fs, con
 		return nil, err
 	}
 
+	requireExistingConfig := configFilePath != ""
 	if configFilePath == "" {
 		configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
 	}
-	cm, err := config.Load(fs, configFilePath)
+	cm, err := loadConfig(fs, configFilePath, requireExistingConfig)
 	if err != nil {
 		errorPrinter.Printf("Failed to load the config file at '%s': %v\n", configFilePath, err)
 		return nil, err

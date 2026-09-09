@@ -205,7 +205,7 @@ func resolveConnectionManager(ctx context.Context, pipelinePath, env string) (co
 		return nil, fmt.Errorf("failed to find the git repository root: %w", err)
 	}
 	configFilePath := filepath.Join(repoRoot.Path, ".bruin.yml")
-	cm, err := config.Load(afero.NewOsFs(), configFilePath)
+	cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load the config: %w", err)
 	}

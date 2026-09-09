@@ -2,7 +2,6 @@ package config
 
 import (
 	"encoding/json"
-	"io/fs"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -1156,7 +1155,7 @@ func TestLoadFromFile(t *testing.T) {
 	}
 }
 
-func TestLoad(t *testing.T) {
+func TestLoadOrCreate(t *testing.T) {
 	t.Parallel()
 
 	var servicefile string
@@ -1197,10 +1196,18 @@ func TestLoad(t *testing.T) {
 		wantErr assert.ErrorAssertionFunc
 	}{
 		{
-			name: "missing path should return an error without creating anything",
-			wantErr: func(t assert.TestingT, err error, args ...interface{}) bool {
-				return assert.ErrorIs(t, err, fs.ErrNotExist, args...) && assert.ErrorContains(t, err, configPath, args...)
+			name: "missing path should create",
+			want: &Config{
+				DefaultEnvironmentName:  "default",
+				SelectedEnvironment:     &Environment{},
+				SelectedEnvironmentName: "default",
+				Environments: map[string]Environment{
+					"default": {
+						Connections: &Connections{},
+					},
+				},
 			},
+			wantErr: assert.NoError,
 		},
 		{
 			name: "if any other is returned from the fs then propagate the error",
@@ -1244,11 +1251,10 @@ func TestLoad(t *testing.T) {
 				tt.setup(t, a)
 			}
 
-			got, err := Load(a.fs, configPath)
+			got, err := LoadOrCreate(a.fs, configPath)
 			tt.wantErr(t, err)
 
 			if tt.want != nil {
-				require.NotNil(t, got)
 				assert.Equal(t, tt.want.SelectedEnvironmentName, got.SelectedEnvironmentName)
 
 				if tt.want.SelectedEnvironment != nil && tt.want.SelectedEnvironment.Connections != nil {
@@ -1260,13 +1266,7 @@ func TestLoad(t *testing.T) {
 
 			exists, err := afero.Exists(a.fs, configPath)
 			require.NoError(t, err)
-			assert.Equal(t, tt.setup != nil, exists)
-
-			if !exists {
-				gitignoreExists, err := afero.Exists(a.fs, filepath.Join(filepath.Dir(configPath), ".gitignore"))
-				require.NoError(t, err)
-				assert.False(t, gitignoreExists)
-			}
+			assert.True(t, exists)
 
 			if tt.want != nil {
 				content, err := afero.ReadFile(a.fs, "/some/path/to/.gitignore")
@@ -1297,7 +1297,7 @@ environments:
 `
 	require.NoError(t, afero.WriteFile(fs, configPath, []byte(yml), 0o644))
 
-	cfg, err := Load(fs, configPath)
+	cfg, err := LoadOrCreate(fs, configPath)
 	require.NoError(t, err)
 	absoluteConfigPath, err := filepath.Abs(configPath)
 	require.NoError(t, err)
@@ -1327,7 +1327,7 @@ environments:
 `
 	require.NoError(t, afero.WriteFile(fs, configPath, []byte(yml), 0o644))
 
-	cfg, err := Load(fs, configPath)
+	cfg, err := LoadOrCreate(fs, configPath)
 	require.NoError(t, err)
 	assert.Empty(t, cfg.GetDefaultTeam())
 
@@ -1376,7 +1376,7 @@ environments:
 	assert.Contains(t, out, "default_team: acme-corp")
 
 	// And it round-trips through the loader.
-	reloaded, err := LoadWithoutPathAbsolutization(fs, configPath)
+	reloaded, err := LoadOrCreateWithoutPathAbsolutization(fs, configPath)
 	require.NoError(t, err)
 	assert.Equal(t, "acme-corp", reloaded.GetDefaultTeam())
 	require.Len(t, reloaded.Environments["default"].Connections.BruinCloud, 1)
@@ -1440,7 +1440,7 @@ environments:
 `
 	require.NoError(t, afero.WriteFile(fs, configPath, []byte(yml), 0o644))
 
-	cfg, err := Load(fs, configPath)
+	cfg, err := LoadOrCreate(fs, configPath)
 	require.NoError(t, err)
 
 	require.Len(t, cfg.SelectedEnvironment.Connections.Snowflake, 1)
@@ -1571,7 +1571,7 @@ func TestHasAnchoredLocalPathPrefix(t *testing.T) {
 	}
 }
 
-func TestLoadWithoutPathAbsolutization(t *testing.T) {
+func TestLoadOrCreateWithoutPathAbsolutization(t *testing.T) {
 	t.Parallel()
 
 	servicefile := "path/to/service_account.json"
@@ -1607,10 +1607,18 @@ func TestLoadWithoutPathAbsolutization(t *testing.T) {
 		wantErr assert.ErrorAssertionFunc
 	}{
 		{
-			name: "missing path should return an error without creating anything",
-			wantErr: func(t assert.TestingT, err error, args ...interface{}) bool {
-				return assert.ErrorIs(t, err, fs.ErrNotExist, args...) && assert.ErrorContains(t, err, configPath, args...)
+			name: "missing path should create",
+			want: &Config{
+				DefaultEnvironmentName:  "default",
+				SelectedEnvironment:     &Environment{},
+				SelectedEnvironmentName: "default",
+				Environments: map[string]Environment{
+					"default": {
+						Connections: &Connections{},
+					},
+				},
 			},
+			wantErr: assert.NoError,
 		},
 		{
 			name: "if any other is returned from the fs then propagate the error",
@@ -1653,11 +1661,10 @@ func TestLoadWithoutPathAbsolutization(t *testing.T) {
 				tt.setup(t, a)
 			}
 
-			got, err := LoadWithoutPathAbsolutization(a.fs, configPath)
+			got, err := LoadOrCreateWithoutPathAbsolutization(a.fs, configPath)
 			tt.wantErr(t, err)
 
 			if tt.want != nil {
-				require.NotNil(t, got)
 				assert.Equal(t, tt.want.SelectedEnvironmentName, got.SelectedEnvironmentName)
 
 				if tt.want.SelectedEnvironment != nil && tt.want.SelectedEnvironment.Connections != nil {
@@ -1669,13 +1676,7 @@ func TestLoadWithoutPathAbsolutization(t *testing.T) {
 
 			exists, err := afero.Exists(a.fs, configPath)
 			require.NoError(t, err)
-			assert.Equal(t, tt.setup != nil, exists)
-
-			if !exists {
-				gitignoreExists, err := afero.Exists(a.fs, filepath.Join(filepath.Dir(configPath), ".gitignore"))
-				require.NoError(t, err)
-				assert.False(t, gitignoreExists)
-			}
+			assert.True(t, exists)
 
 			if tt.want != nil {
 				content, err := afero.ReadFile(a.fs, "some/path/to/.gitignore")

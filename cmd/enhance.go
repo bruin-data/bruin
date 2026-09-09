@@ -584,7 +584,7 @@ func getAnthropicAPIKey(ctx context.Context, fs afero.Fs, inputPath, environment
 	}
 
 	configFilePath := filepath.Join(repoRoot.Path, ".bruin.yml")
-	cm, err := config.Load(fs, configFilePath)
+	cm, err := config.LoadOrCreate(fs, configFilePath)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to load config")
 	}
@@ -709,7 +709,7 @@ func preFetchTableSummary(ctx context.Context, fs afero.Fs, assetPath string, as
 		return ""
 	}
 
-	cm, err := config.Load(fs, filepath.Join(repoRoot.Path, ".bruin.yml"))
+	cm, err := config.LoadOrCreate(fs, filepath.Join(repoRoot.Path, ".bruin.yml"))
 	if err != nil {
 		return ""
 	}

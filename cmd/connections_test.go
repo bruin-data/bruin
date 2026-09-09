@@ -268,7 +268,7 @@ func TestAddConnectionCommand_Run(t *testing.T) {
 			fs, configFile := setupTestConfig(t, testConfigWithConnections)
 
 			// Create a mock config using the in-memory filesystem
-			cm, err := config.Load(fs, configFile)
+			cm, err := config.LoadOrCreate(fs, configFile)
 			require.NoError(t, err)
 
 			// Capture the original state
@@ -321,7 +321,7 @@ func TestNewAddConnectionModel_SkipsEnvironmentSelectionForSingleEnvironment(t *
 	t.Parallel()
 
 	fs, configFile := setupTestConfig(t, emptyConfig)
-	cm, err := config.Load(fs, configFile)
+	cm, err := config.LoadOrCreate(fs, configFile)
 	require.NoError(t, err)
 
 	model := newAddConnectionModel(cm)
@@ -342,7 +342,7 @@ func TestNewAddConnectionModel_ShowsEnvironmentSelectionForMultipleEnvironments(
 	t.Parallel()
 
 	fs, configFile := setupTestConfig(t, testConfigWithConnections)
-	cm, err := config.Load(fs, configFile)
+	cm, err := config.LoadOrCreate(fs, configFile)
 	require.NoError(t, err)
 
 	model := newAddConnectionModel(cm)
@@ -431,7 +431,7 @@ func TestListConnectionsCommand_Run(t *testing.T) {
 			}
 
 			// Mock the filesystem operations by creating a config directly
-			cm, err := config.Load(fs, configFile)
+			cm, err := config.LoadOrCreate(fs, configFile)
 			require.NoError(t, err)
 
 			// Simulate the ListConnections logic
@@ -524,7 +524,7 @@ func TestListConnectionsCommand_ReturnsEmptyEnvironments(t *testing.T) {
 			fs, configFile := setupTestConfig(t, tt.configContent)
 
 			// Load the config
-			cm, err := config.Load(fs, configFile)
+			cm, err := config.LoadOrCreate(fs, configFile)
 			require.NoError(t, err)
 
 			// Verify all expected environments exist in the config
@@ -641,7 +641,7 @@ func TestDeleteConnectionCommand_Run(t *testing.T) {
 			fs, configFile := setupTestConfig(t, testConfigWithConnections)
 
 			// Create a mock config using the in-memory filesystem
-			cm, err := config.Load(fs, configFile)
+			cm, err := config.LoadOrCreate(fs, configFile)
 			require.NoError(t, err)
 
 			// Capture original state
@@ -753,7 +753,7 @@ func TestPingConnectionCommand_Run(t *testing.T) {
 			fs, configFile := setupTestConfig(t, testConfigWithConnections)
 
 			// Create a mock config using the in-memory filesystem
-			cm, err := config.Load(fs, configFile)
+			cm, err := config.LoadOrCreate(fs, configFile)
 			require.NoError(t, err)
 
 			// Select environment (default if empty)
@@ -851,8 +851,7 @@ func TestConnectionsCommand_ListConnections(t *testing.T) {
 			environment:   "",
 			configFile:    "nonexistent.yml",
 			configContent: "",
-			wantErr:       true,
-			expectedErr:   "failed to read file nonexistent.yml",
+			wantErr:       false, // LoadOrCreate will create a default config
 		},
 	}
 
@@ -871,7 +870,7 @@ func TestConnectionsCommand_ListConnections(t *testing.T) {
 			}
 
 			// Mock the filesystem operations by creating a config directly
-			cm, err := config.Load(fs, configFile)
+			cm, err := config.LoadOrCreate(fs, configFile)
 			if tt.wantErr {
 				require.Error(t, err)
 				if tt.expectedErr != "" {

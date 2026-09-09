@@ -205,31 +205,6 @@ func ensureLocalDuckDBFilesAreIgnored(fs afero.Fs, bruinYmlPath string, cfg *con
 	return nil
 }
 
-func loadAndMergeTemplateConfig(configPath string, templateContent []byte) (*config.Config, error) {
-	fs := afero.NewOsFs()
-	centralConfig, err := config.LoadWithoutPathAbsolutization(fs, configPath)
-	if errors.Is(err, fs2.ErrNotExist) {
-		var templateConfig config.Config
-		if err := yaml.Unmarshal(templateContent, &templateConfig); err != nil {
-			return nil, fmt.Errorf("could not parse template's .bruin.yml: %w", err)
-		}
-		if templateConfig.DefaultEnvironmentName == "" {
-			templateConfig.DefaultEnvironmentName = "default"
-		}
-		if err := git.EnsureGivenPatternIsInGitignore(fs, filepath.Dir(configPath), filepath.Base(configPath)); err != nil {
-			return nil, err
-		}
-		return &templateConfig, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	if err := mergeTemplateConfig(centralConfig, templateContent); err != nil {
-		return nil, err
-	}
-	return centralConfig, nil
-}
-
 // mergeTemplateConfig merges environments and connections from a template's .bruin.yml into the central config.
 func mergeTemplateConfig(centralConfig *config.Config, templateBruinContent []byte) error {
 	var templateConfig config.Config
@@ -494,9 +469,12 @@ func mergeTemplateConfigIntoProject(pipelinePath string, templateBruinContent []
 		locationNote: "This is your Git repo root, so it may sit several levels above the pipeline folder.",
 	}
 
-	centralConfig, err := loadAndMergeTemplateConfig(bruinYmlPath, templateBruinContent)
+	centralConfig, err := config.LoadOrCreateWithoutPathAbsolutization(afero.NewOsFs(), bruinYmlPath)
 	if err != nil {
 		return initConfigSummary{}, fmt.Errorf("could not load .bruin.yml file: %w", err)
+	}
+	if err := mergeTemplateConfig(centralConfig, templateBruinContent); err != nil {
+		return initConfigSummary{}, err
 	}
 
 	configBytes, err := yaml.Marshal(centralConfig)
@@ -948,10 +926,16 @@ func Init() *cli.Command {
 					return nil // user cancelled
 				}
 
-				bruinContent := generateBruinYML(ecommerceChoices)
-				centralConfig, err := loadAndMergeTemplateConfig(bruinYmlPath, []byte(bruinContent))
+				// Load or create .bruin.yml, then merge ecommerce connections into it
+				centralConfig, err := config.LoadOrCreateWithoutPathAbsolutization(afero.NewOsFs(), bruinYmlPath)
 				if err != nil {
-					errorPrinter.Printf("Could not prepare ecommerce config: %v\n", err)
+					errorPrinter.Printf("Could not load .bruin.yml file: %v\n", err)
+					return cli.Exit("", 1)
+				}
+
+				bruinContent := generateBruinYML(ecommerceChoices)
+				if err := mergeTemplateConfig(centralConfig, []byte(bruinContent)); err != nil {
+					errorPrinter.Printf("Could not merge ecommerce config: %v\n", err)
 					return cli.Exit("", 1)
 				}
 
@@ -995,9 +979,14 @@ func Init() *cli.Command {
 			templateBruinPath := templateName + "/.bruin.yml"
 			templateBruinContent, err := templates.Templates.ReadFile(templateBruinPath)
 			if err == nil { // Only process if file exists
-				centralConfig, err := loadAndMergeTemplateConfig(bruinYmlPath, templateBruinContent)
+				centralConfig, err := config.LoadOrCreateWithoutPathAbsolutization(afero.NewOsFs(), bruinYmlPath)
 				if err != nil {
 					errorPrinter.Printf("Could not write .bruin.yml file: %v\n", err)
+					return err
+				}
+
+				if err := mergeTemplateConfig(centralConfig, templateBruinContent); err != nil {
+					errorPrinter.Printf("%v\n", err)
 					return err
 				}
 

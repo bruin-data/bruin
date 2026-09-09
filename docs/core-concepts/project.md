@@ -15,7 +15,7 @@ bruin run --config-file /path/to/.bruin.yml
 export BRUIN_CONFIG_FILE=/path/to/.bruin.yml
 ```
 
-Commands that load configuration return an error if the configuration file does not exist; they do not create a file or an empty environment. You can provide configuration through `BRUIN_CONFIG_FILE_CONTENT` instead of a file. Use `bruin init` to create a project from a template, or create `.bruin.yml` yourself before running commands that need it. Bruin adds an existing configuration file to `.gitignore` to keep credentials secure.
+The first time you run `bruin run`, `bruin validate`, or most other commands that need configuration, the `.bruin.yml` file is automatically created and added to `.gitignore` to keep credentials secure. If you specify a configuration path with `--config-file` or `BRUIN_CONFIG_FILE`, the file must already exist; a missing file returns an error without creating a config or an empty environment. Configuration supplied through `BRUIN_CONFIG_FILE_CONTENT` continues to take precedence over the file.
 
 ## Configuration File Structure
 

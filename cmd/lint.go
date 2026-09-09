@@ -163,7 +163,7 @@ func Lint(isDebug *bool) *cli.Command {
 				configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
 			}
 
-			cm, err := config.Load(afero.NewOsFs(), configFilePath)
+			cm, err := loadConfig(afero.NewOsFs(), configFilePath, c.String("config-file") != "")
 			if err != nil {
 				printError(err, c.String("output"), fmt.Sprintf("Failed to load the config file at '%s'", configFilePath))
 				return cli.Exit("", 1)

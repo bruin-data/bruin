@@ -262,9 +262,9 @@ func DataDiffCmd() *cli.Command {
 			}
 
 			// Load config
-			cm, err := config.Load(fs, configFilePath)
+			cm, err := loadConfig(fs, configFilePath, c.String("config-file") != "")
 			if err != nil {
-				return fmt.Errorf("failed to load config from '%s': %w", configFilePath, err)
+				return fmt.Errorf("failed to load or create config from '%s': %w", configFilePath, err)
 			}
 
 			// Select the environment for the connections, defaulting to the config's default environment
