@@ -48,16 +48,20 @@ honest about what it does not cover and a stale one actively misleads.
 Rewrite `docs/glossary.md`. Replace the `Revenue` TODO with a real entry naming the exact expression
 and column. Add entries for every term listed in the stub's TODO line: AOV, active customer, churn,
 category, net vs gross, and fiscal period. State the grain of `orders` and of `order_items` somewhere
-in the file. For at least one entry, cite the asset file where that metric is actually computed.
+in the file. Be careful which table each grain statement is about: the raw tables are not one row
+per order and one row per line, and a glossary that says they are has published the exact
+assumption lesson 3 taught you to check. For at least one entry, cite the asset file where that
+metric is actually computed.
 
 ## Rubric (for `review my work`)
 - [ ] `docs/glossary.md` has a `Revenue` entry naming one exact expression (`quantity * net_price`) and the column it runs on (`order_items.net_price`).
 - [ ] Entries exist for all six stub-TODO terms: AOV, active customer, churn, category, net vs gross, fiscal period.
-- [ ] A grain statement appears for `orders` (one row per order) and for `order_items` (one row per line on an order).
+- [ ] A grain statement appears for `orders` and for `order_items`, and it is true of the table it names. Raw `orders` holds 1,212 rows for 1,200 orders and raw `order_items` holds 2,895 for 2,880, so "one row per order" is only correct about `stg_orders`. Accept either the deduplicated staging asset named explicitly, or the raw table described as one row per order as delivered by the source system.
 - [ ] At least one entry cites the specific asset file where that metric is defined.
 - [ ] The file no longer contains the word `TODO`.
 
 ## Done signal
 Confirm the `Revenue` entry names a column and an expression, all six TODO terms have entries, both
-grains are stated, and at least one citation points at a real file. Carry forward: a glossary that
+grains are stated and are true of the table each one names, and at least one citation points at a
+real file. Carry forward: a glossary that
 names a column is a decision; a glossary that names a concept is the same ambiguity, filed away.

@@ -90,7 +90,7 @@ Do not flatten any of this:
 - Order volume ramps 360 in 2023, 480 in 2024, 360 in 2025, with a deliberate dip in Q3 2024.
 - Revenue concentrates: one order in four goes to a pool of fifty regulars.
 - Customers 461 to 500 never order, so a `LEFT JOIN` from `customers` has something to show.
-- Two categories dominate, so 120 of the 416 category-weeks in 2023 are empty and the date-spine
+- Two categories dominate, so 128 of the 424 category-weeks in 2023 are empty and the date-spine
   lesson has something to fix.
 - FX rates drift, so converting revenue changes an answer across years rather than scaling it.
 
@@ -111,6 +111,6 @@ rubrics depend on are:
 | 2023 revenue in USD | 258,645.94 |
 | Same, joined on date alone | 1,324,631.05, exactly 5x |
 | Largest weekly drop in 2023 | Electronics, week of 2023-11-20, -6,193.24 |
-| Empty category-weeks in 2023 | 120 of 416 |
+| Empty category-weeks in 2023 | 128 of 424, over 53 week starts |
 | Orphan-product line revenue | 3,637.89 over 15 lines |
 | `drill-3.sql` as written / grain fixed | 373,614.70 / 348,521.23 |

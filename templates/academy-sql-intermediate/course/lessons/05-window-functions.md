@@ -48,6 +48,8 @@ Write a query in `queries/weekly-category.sql` that returns, for each product ca
 week of 2023: line revenue, the prior week's revenue, the week-over-week change, and a four-week
 moving average. Use `CAST(date_trunc('week', ordered_at) AS DATE)` for the week grain, and filter to
 `ordered_at >= TIMESTAMP '2023-01-01 00:00:00' AND ordered_at < TIMESTAMP '2024-01-01 00:00:00'`.
+That gives 53 week starts, not 52, because 2023-01-01 was a Sunday and falls in the week beginning
+2022-12-26.
 You have not been taught deduplication yet, so deduplicate the two sources this way for now: read
 order lines with `SELECT DISTINCT * FROM order_items`, and read orders with `QUALIFY ROW_NUMBER()
 OVER (PARTITION BY order_id ORDER BY _loaded_at DESC) = 1`. Lesson 6 explains why each is the right

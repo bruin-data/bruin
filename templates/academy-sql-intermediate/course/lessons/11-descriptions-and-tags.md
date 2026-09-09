@@ -25,8 +25,12 @@ project's own data:
   deduped orders it is 604,065.00, against 851,617.69 in line revenue for the same period. Do not
   use it as a revenue source.
 - `orders.order_status` - a bad description lists nothing. A good one says the finished state is
-  written four ways (`Completed`, `COMPLETED`, `complete`, `completed`) and 24 rows are NULL, so
-  any filter on this column needs `UPPER(TRIM(...))` and an explicit NULL decision.
+  written four ways (`Completed`, `COMPLETED`, `complete`, `completed`) and 24 rows are NULL, and
+  then says what to do about it: `UPPER(TRIM(...))` folds the first three together and leaves
+  `COMPLETE` standing apart from `COMPLETED`, because `complete` is a different word rather than a
+  different casing. The filter needs an explicit list - `IN ('COMPLETED', 'COMPLETE')` after
+  normalising - and an explicit NULL decision. Get that wrong and 143 finished orders disappear,
+  43 of them in 2023 alone.
 - `customers.customer_id` - a bad description says "the customer id". A good one says it is not
   unique in this table: 10 ids appear twice, 510 rows for 500 customers, so a naive join fans out.
 - `orders.currency_code` - a bad description says "the currency". A good one says it is a label
@@ -54,7 +58,9 @@ verify every claim it makes with a query before you keep it.
    A: It restates information the column name and type already give a reader; it adds nothing that could change how the column gets used.
 2. Q: Why is `orders.order_total` a case where the description has to carry a warning rather than a definition?
    A: Because the header value does not reconcile with the line-level detail - 604,065.00 summed on deduped orders against 851,617.69 in line revenue - so a description that only says "the order total" invites someone to sum it as if it were revenue.
-3. Q: Why verify `bruin ai enhance` output against the data instead of publishing it directly?
+3. Q: A description says `order_status` needs `UPPER(TRIM(...))` before filtering. Why is that description still wrong?
+   A: Because normalising case and whitespace turns `complete` into `COMPLETE`, not `COMPLETED`, so a filter on the normalised value still drops the 143 orders spelled `complete`. Folding those two takes an explicit synonym decision, and the description has to say so.
+4. Q: Why verify `bruin ai enhance` output against the data instead of publishing it directly?
    A: Because generated descriptions are a draft that can be plausible and wrong, and published research found LLM-generated context can lower task success while raising cost - a wrong description is worse than no description because it is trusted.
 
 ## Task
