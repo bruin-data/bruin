@@ -66,8 +66,6 @@ A rule can send to multiple destinations and can include multiple recipients or 
 | Microsoft Teams | [Add the Bruin bot to Teams](/cloud/integrations/teams). | The full conversation ID, starting with `19:`. |
 | Discord | [Connect the Bruin bot to Discord](/cloud/integrations/discord). | A numeric channel ID the bot can access. |
 
-Saved Microsoft Teams and Discord webhook connections are used only by [legacy notifications](/cloud/legacy-notifications), not by notification rules.
-
 Enter multiple values on separate lines or separate them with commas.
 
 <a href="notifications/notification-rule-destinations.png" target="_blank">
