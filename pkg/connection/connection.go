@@ -997,6 +997,7 @@ func (m *Manager) addRedshiftConnectionFromConfig(ctx context.Context, connectio
 	var client *postgres.Client
 	var err error
 	client, err = postgres.NewClient(ctx, postgres.RedShiftConfig{
+		ReadOnly: connection.ReadOnly,
 		Username: connection.Username,
 		Password: connection.Password,
 		Host:     connection.Host,
