@@ -59,12 +59,14 @@ Choose **all** to require every condition in a group, or **any** to require at l
 
 A rule can send to multiple destinations and can include multiple recipients or channels for a destination.
 
-| Destination | Value |
-| --- | --- |
-| Email | One or more email addresses. |
-| Slack | A Slack channel name or ID. |
-| Microsoft Teams | A Teams conversation ID. |
-| Discord | A Discord channel ID. |
+| Destination | Setup | Value |
+| --- | --- | --- |
+| Email | No connection is required. | One or more email addresses. |
+| Slack | [Connect Slack to Bruin](/cloud/integrations/slack). | A channel name or ID. |
+| Microsoft Teams | [Add the Bruin bot to Teams](/cloud/integrations/teams). | The full conversation ID, starting with `19:`. |
+| Discord | [Connect the Bruin bot to Discord](/cloud/integrations/discord). | A numeric channel ID the bot can access. |
+
+Saved Microsoft Teams and Discord webhook connections are used only by [legacy notifications](/cloud/legacy-notifications), not by notification rules.
 
 Enter multiple values on separate lines or separate them with commas.
 
