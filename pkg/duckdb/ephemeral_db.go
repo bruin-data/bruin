@@ -38,15 +38,7 @@ func NewEphemeralConnection(c DuckDBConfig) (*EphemeralConnection, error) {
 //
 //nolint:ireturn
 func (e *EphemeralConnection) openADBC(ctx context.Context) (adbc.Database, adbc.Connection, error) {
-	path := e.config.ToDBConnectionURI()
-	opts := map[string]string{
-		"driver": "duckdb",
-		"path":   path,
-	}
-
-	if cfg, ok := e.config.(Config); ok && cfg.ReadOnly {
-		opts["access_mode"] = "read_only"
-	}
+	opts := e.databaseOptions()
 
 	var drv drivermgr.Driver
 	adb, err := drv.NewDatabase(opts)
@@ -589,4 +581,20 @@ func convertAssign(dest, src any) error {
 	}
 
 	return fmt.Errorf("cannot assign %T to %T", src, dest)
+}
+
+func (e *EphemeralConnection) databaseOptions() map[string]string {
+	opts := map[string]string{
+		"driver": "duckdb",
+		"path":   e.config.ToDBConnectionURI(),
+	}
+
+	if cfg, ok := e.config.(Config); ok && cfg.ReadOnly {
+		opts["access_mode"] = "read_only"
+	}
+
+	if isReadOnlyMotherDuck(e.config) {
+		opts["access_mode"] = "read_only"
+	}
+	return opts
 }

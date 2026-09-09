@@ -12,12 +12,14 @@ Bruin supports connecting to MotherDuck databases using your MotherDuck token.
         - name: "connection_name"
           token: "your_motherduck_token"
           database: "database_name"  # optional
+          read_only: false
 ```
 
 **Parameters**:
 
 - `token`: Your MotherDuck authentication token (required)
 - `database`: The specific database to connect to in your MotherDuck account (optional)
+- `read_only`: Run SQL queries in read-only mode (default: `false`). Requires a MotherDuck read-scaling token. Ingestr assets and seeds do not support this option.
 
 If no database is specified, you'll connect to your default MotherDuck database.
 
