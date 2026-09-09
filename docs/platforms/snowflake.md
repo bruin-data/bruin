@@ -13,6 +13,30 @@ Snowflake connections support two authentication methods:
 
 Both methods use the same Snowflake account, database, schema, warehouse, role, and region fields. Choose one authentication method and configure it as shown below.
 
+### Read-only connections
+
+Set `read_only: true` on a Snowflake connection to validate SQL with SQLGlot before Bruin sends it to Snowflake:
+
+```yaml
+environments:
+  default:
+    connections:
+      snowflake:
+        - name: snowflake-default
+          account: your-account
+          username: your-user
+          password: your-password
+          warehouse: your-warehouse
+          database: your-database
+          read_only: true
+```
+
+The default is `false`. With this option enabled, Bruin allows SELECT queries (including CTEs and set operations), SHOW, DESCRIBE, and EXPLAIN of read queries. Every statement in a multi-statement query must pass validation before any statement executes.
+
+Bruin rejects writes, session changes, procedure calls, SELECT INTO, locking reads, sequence references, unknown or user-defined function calls, and SQL that cannot be parsed or classified. Unknown functions are rejected even when they happen to be read-only. Parser failures also prevent execution. Ingestr URI export is disabled for these connections because ingestr executes outside this validation path.
+
+This is a conservative SQL syntax check. SQLGlot cannot inspect view definitions or prove the absence of side effects in database objects. Use a Snowflake role with restricted privileges as well; `read_only` does not change server-side permissions.
+
 ### Connection Parameters
 
 Each parameter has a short heading for the page outline. Expand the details below a parameter to see where to find it in Snowflake and how to get it with a command or query.

@@ -1288,3 +1288,13 @@ func TestManagerMapsStayPaired(t *testing.T) {
 		}
 	}
 }
+
+func TestSnowflakeReadOnlyConnection(t *testing.T) {
+	t.Parallel()
+	db, err := newSnowflakeDBFromConnection(&config.SnowflakeConnection{
+		Account: "test", Username: "test", Password: "test", ReadOnly: true,
+	})
+	require.NoError(t, err)
+	_, err = db.GetIngestrURI()
+	require.ErrorContains(t, err, "read-only")
+}

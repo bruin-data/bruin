@@ -12,6 +12,7 @@ from parser.main import (
     get_column_lineage,
     get_tables,
     is_single_select_query,
+    is_read_only_query,
     select_cte,
 )
 
@@ -62,6 +63,9 @@ def main():
                 logging.info("got add-limit command")
                 c = cmd["contents"]
                 result = add_limit(c["query"], c["limit"], c["dialect"])
+            elif cmd["command"] == "is-read-only":
+                c = cmd["contents"]
+                result = is_read_only_query(c["query"], c["dialect"])
             elif cmd["command"] == "is-single-select":
                 logging.info("got is-single-select command")
                 c = cmd["contents"]

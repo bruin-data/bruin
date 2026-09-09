@@ -4191,3 +4191,25 @@ environments:
 	require.Equal(t, "gs://bucket/warehouse", remote.Storage.Path)
 	require.Equal(t, filepath.Join(configLocation, "creds/sa.json"), remote.Storage.KeyFile)
 }
+
+func TestSnowflakeReadOnlySerialization(t *testing.T) {
+	t.Parallel()
+	for _, readOnly := range []bool{false, true} {
+		conn := SnowflakeConnection{ConnectionMetadata: ConnectionMetadata{Name: "sf"}, Account: "account", ReadOnly: readOnly}
+		data, err := json.Marshal(conn)
+		require.NoError(t, err)
+		var jsonConn SnowflakeConnection
+		require.NoError(t, json.Unmarshal(data, &jsonConn))
+		require.Equal(t, readOnly, jsonConn.ReadOnly)
+		data, err = yaml.Marshal(conn)
+		require.NoError(t, err)
+		var yamlConn SnowflakeConnection
+		require.NoError(t, yaml.Unmarshal(data, &yamlConn))
+		require.Equal(t, readOnly, yamlConn.ReadOnly)
+		if readOnly {
+			require.Contains(t, string(data), "read_only: true")
+		} else {
+			require.NotContains(t, string(data), "read_only")
+		}
+	}
+}
