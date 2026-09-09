@@ -23,7 +23,7 @@ In order to set up a PostgreSQL connection, you need to add a configuration item
 
 ### Read-only connections
 
-Set `read_only: true` to prevent SQL queries from modifying data. Defaults to `false`. Ingestr assets and seeds do not support this option.
+Set `read_only: true` to run SQL queries in read-only mode (default: `false`). Ingestr assets and seeds do not support this option.
 
 > [!NOTE]
 > `ssl_mode` should be one of the modes describe in the [documentation](https://www.postgresql.org/docs/current/libpq-ssl.html#LIBPQ-SSL-PROTECTION).
