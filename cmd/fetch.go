@@ -1010,9 +1010,9 @@ func getConnectionAndTypeFromConfigWithContext(ctx context.Context, env string, 
 	if configFilePath == "" {
 		configFilePath = filepath.Join(repoRoot.Path, ".bruin.yml")
 	}
-	cm, err := config.LoadOrCreate(fs, configFilePath)
+	cm, err := config.Load(fs, configFilePath)
 	if err != nil {
-		return nil, "", errors.Wrap(err, "failed to load or create config")
+		return nil, "", errors.Wrap(err, "failed to load config")
 	}
 
 	if env != "" {
@@ -1287,7 +1287,7 @@ func GetPipelineAndAsset(ctx context.Context, inputPath string, fs afero.Fs, con
 	if configFilePath == "" {
 		configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
 	}
-	cm, err := config.LoadOrCreate(fs, configFilePath)
+	cm, err := config.Load(fs, configFilePath)
 	if err != nil {
 		errorPrinter.Printf("Failed to load the config file at '%s': %v\n", configFilePath, err)
 		return nil, err
@@ -1331,7 +1331,7 @@ func GetPipelineForQuery(ctx context.Context, inputPath string, fs afero.Fs, con
 	if configFilePath == "" {
 		configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
 	}
-	cm, err := config.LoadOrCreate(fs, configFilePath)
+	cm, err := config.Load(fs, configFilePath)
 	if err != nil {
 		errorPrinter.Printf("Failed to load the config file at '%s': %v\n", configFilePath, err)
 		return nil, err

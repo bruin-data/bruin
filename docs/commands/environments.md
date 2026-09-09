@@ -1,7 +1,7 @@
 # `environments` Command
 
 The `environments` command allows you to manage environments defined in the `.bruin.yml` configuration file.
-It supports listing all available environments in the current Git repository and creating new ones.
+It supports listing all available environments in the current Git repository and creating new ones. The configuration file must already exist unless configuration is supplied through `BRUIN_CONFIG_FILE_CONTENT`, including when creating an environment.
 
 ## Usage
 
@@ -11,7 +11,7 @@ bruin environments [subcommand]
 
 ## `list` Subcommand
 
-Displays the environments defined in the `.bruin.yml` configuration file in the current Git repository. The environments can be displayed in plain text or JSON format.
+Displays the environments defined in the `.bruin.yml` configuration file in the current Git repository. The environments can be displayed in plain text or JSON format. If the configuration file is missing and no `BRUIN_CONFIG_FILE_CONTENT` is provided, the command returns an error without creating anything.
 
 ### Flags
 

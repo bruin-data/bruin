@@ -686,7 +686,7 @@ func runImportDatabaseTUI(ctx context.Context, pipelinePath, environment, config
 		configFile = filepath.Join(repoRoot.Path, ".bruin.yml")
 	}
 
-	cfg, err := config.LoadOrCreate(fs, configFile)
+	cfg, err := config.Load(fs, configFile)
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}

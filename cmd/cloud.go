@@ -4047,7 +4047,7 @@ func connectionFromConfig(ctx context.Context, name, environment, configFile str
 		configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
 	}
 
-	cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
+	cm, err := config.Load(afero.NewOsFs(), configFilePath)
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to load %s: %w", configFilePath, err)
 	}

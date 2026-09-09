@@ -259,7 +259,7 @@ environments:
 
 	// Read the file back directly (ignoring the env var): the on-disk connection
 	// must survive and the default team must be written.
-	cm, err := config.LoadOrCreateWithoutPathAbsolutization(afero.NewOsFs(), configPath)
+	cm, err := config.LoadWithoutPathAbsolutization(afero.NewOsFs(), configPath)
 	require.NoError(t, err)
 	assert.Equal(t, "acme-corp", cm.GetDefaultTeam())
 	require.NotNil(t, cm.Environments["default"].Connections)

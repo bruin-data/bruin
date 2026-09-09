@@ -69,7 +69,7 @@ type EnvironmentListCommand struct{}
 func (r *EnvironmentListCommand) Run(output, configFilePath string) error {
 	defer RecoverFromPanic()
 
-	cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
+	cm, err := config.Load(afero.NewOsFs(), configFilePath)
 	if err != nil {
 		printError(err, output, "Failed to load the config file at "+configFilePath)
 		return cli.Exit("", 1)
@@ -160,7 +160,7 @@ func CreateEnvironment(isDebug *bool) *cli.Command {
 				configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
 			}
 
-			cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
+			cm, err := config.Load(afero.NewOsFs(), configFilePath)
 			if err != nil {
 				printError(err, output, "Failed to load the config file at "+configFilePath)
 				return cli.Exit("", 1)
@@ -243,7 +243,7 @@ type EnvironmentUpdateCommand struct{}
 func (r *EnvironmentUpdateCommand) Run(name, newName, schemaPrefix, output, configFilePath string) error {
 	defer RecoverFromPanic()
 
-	cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
+	cm, err := config.Load(afero.NewOsFs(), configFilePath)
 	if err != nil {
 		printError(err, output, "Failed to load the config file at "+configFilePath)
 		return cli.Exit("", 1)
@@ -356,7 +356,7 @@ type EnvironmentDeleteCommand struct{}
 func (r *EnvironmentDeleteCommand) Run(name string, force bool, output, configFilePath string) error {
 	defer RecoverFromPanic()
 
-	cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
+	cm, err := config.Load(afero.NewOsFs(), configFilePath)
 	if err != nil {
 		printError(err, output, "Failed to load the config file at "+configFilePath)
 		return cli.Exit("", 1)
@@ -485,7 +485,7 @@ type EnvironmentCloneCommand struct{}
 func (r *EnvironmentCloneCommand) Run(sourceName, targetName, schemaPrefix, output, configFilePath string) error {
 	defer RecoverFromPanic()
 
-	cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
+	cm, err := config.Load(afero.NewOsFs(), configFilePath)
 	if err != nil {
 		printError(err, output, "Failed to load the config file at "+configFilePath)
 		return cli.Exit("", 1)

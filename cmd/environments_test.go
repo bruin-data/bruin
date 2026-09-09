@@ -67,8 +67,8 @@ environments:
 			output:       "plain",
 			configFile:   "nonexistent.yml",
 			configExists: false,
-			wantErr:      false,
-			expectedOut:  "default",
+			wantErr:      true,
+			expectedOut:  "",
 		},
 	}
 
@@ -86,7 +86,7 @@ environments:
 			}
 
 			// Create a mock config using the in-memory filesystem
-			cm, err := config.LoadOrCreate(fs, tt.configFile)
+			cm, err := config.Load(fs, tt.configFile)
 			if err != nil {
 				if tt.wantErr {
 					assert.Error(t, err)
@@ -218,7 +218,7 @@ environments:
 			output:       "plain",
 			configFile:   "nonexistent.yml",
 			configExists: false,
-			wantErr:      false,
+			wantErr:      true,
 		},
 	}
 
@@ -237,7 +237,7 @@ environments:
 
 			// Create a mock config using the in-memory filesystem
 			// Create a modified version of the Run method that uses our mock filesystem
-			cm, err := config.LoadOrCreate(fs, tt.configFile)
+			cm, err := config.Load(fs, tt.configFile)
 			if err != nil {
 				if tt.wantErr {
 					assert.Error(t, err)
@@ -386,7 +386,7 @@ environments:
 			configExists:  false,
 			configContent: "",
 			wantErr:       true,
-			expectedErr:   "cannot delete the last environment",
+			expectedErr:   "failed to read file nonexistent.yml",
 		},
 	}
 
@@ -405,7 +405,7 @@ environments:
 
 			// Create a mock config using the in-memory filesystem
 			// Create a modified version of the Run method that uses our mock filesystem
-			cm, err := config.LoadOrCreate(fs, tt.configFile)
+			cm, err := config.Load(fs, tt.configFile)
 			if err != nil {
 				if tt.wantErr {
 					assert.Error(t, err)
@@ -477,7 +477,7 @@ environments:
 	require.NoError(t, err)
 
 	// Create a mock config using the in-memory filesystem
-	cm, err := config.LoadOrCreate(fs, ".bruin.yml")
+	cm, err := config.Load(fs, ".bruin.yml")
 	require.NoError(t, err)
 
 	// Test the cancellation logic - we can't easily test the actual CLI interaction

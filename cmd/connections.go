@@ -163,9 +163,9 @@ func AddConnection() *cli.Command {
 				configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
 			}
 
-			cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
+			cm, err := config.Load(afero.NewOsFs(), configFilePath)
 			if err != nil {
-				printErrorForOutput(output, errors2.Wrap(err, "failed to load or create config"))
+				printErrorForOutput(output, errors2.Wrap(err, "failed to load config"))
 				return cli.Exit("", 1)
 			}
 
@@ -253,9 +253,9 @@ func DeleteConnection() *cli.Command {
 				configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
 			}
 
-			cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
+			cm, err := config.Load(afero.NewOsFs(), configFilePath)
 			if err != nil {
-				printErrorForOutput(output, errors2.Wrap(err, "failed to load or create config"))
+				printErrorForOutput(output, errors2.Wrap(err, "failed to load config"))
 				return cli.Exit("", 1)
 			}
 
@@ -296,9 +296,9 @@ type ConnectionsCommand struct{}
 func (r *ConnectionsCommand) ListConnections(pathToProject, output, environment, configFilePath string) error {
 	defer RecoverFromPanic()
 
-	cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
+	cm, err := config.Load(afero.NewOsFs(), configFilePath)
 	if err != nil {
-		errorPrinter.Printf("Failed to load or create the config file: %v\n", err)
+		errorPrinter.Printf("Failed to load the config file: %v\n", err)
 		return cli.Exit("", 1)
 	}
 
@@ -433,9 +433,9 @@ func PingConnection() *cli.Command {
 				configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
 			}
 
-			cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
+			cm, err := config.Load(afero.NewOsFs(), configFilePath)
 			if err != nil {
-				printErrorForOutput(output, errors2.Wrap(err, "failed to load or create config"))
+				printErrorForOutput(output, errors2.Wrap(err, "failed to load config"))
 				return cli.Exit("", 1)
 			}
 			if environment == "" {

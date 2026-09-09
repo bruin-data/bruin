@@ -2,7 +2,7 @@
 
 Bruin has various commands to handle connections via its CLI.
 
-Bruin CLI offers convenience methods to manage connections when using `.bruin.yml` as our [secrets backend](../secrets/overview.md).
+Bruin CLI offers convenience methods to manage connections when using `.bruin.yml` as our [secrets backend](../secrets/overview.md). The configuration file must already exist unless configuration is supplied through `BRUIN_CONFIG_FILE_CONTENT`. A missing file returns an error, including when adding a connection.
 
 ## List Connections
 

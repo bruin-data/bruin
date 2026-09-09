@@ -408,7 +408,7 @@ func buildAssetDatabaseMap(inputPath string, foundPipeline *pipeline.Pipeline) m
 	if exists, _ := afero.Exists(fs, configPath); !exists {
 		return result
 	}
-	cm, err := config.LoadOrCreate(fs, configPath)
+	cm, err := config.Load(fs, configPath)
 	if err != nil || cm.SelectedEnvironment == nil {
 		return result
 	}

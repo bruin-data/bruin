@@ -339,7 +339,7 @@ func Render() *cli.Command {
 	}
 }
 
-func loadRenderConfig(renderFS afero.Fs, inputPath, configuredConfigFilePath string, createIfMissing bool) (*config.Config, error) {
+func loadRenderConfig(renderFS afero.Fs, inputPath, configuredConfigFilePath string, configRequired bool) (*config.Config, error) {
 	configFilePath := configuredConfigFilePath
 	if configFilePath == "" {
 		repoRoot, err := git.FindRepoFromPath(inputPath)
@@ -347,7 +347,7 @@ func loadRenderConfig(renderFS afero.Fs, inputPath, configuredConfigFilePath str
 			switch {
 			case os.Getenv("BRUIN_CONFIG_FILE_CONTENT") != "":
 				configFilePath = ".bruin.yml"
-			case createIfMissing:
+			case configRequired:
 				return nil, err
 			default:
 				return nil, nil
@@ -357,8 +357,8 @@ func loadRenderConfig(renderFS afero.Fs, inputPath, configuredConfigFilePath str
 		}
 	}
 
-	if createIfMissing {
-		return config.LoadOrCreate(renderFS, configFilePath)
+	if configRequired {
+		return config.Load(renderFS, configFilePath)
 	}
 
 	if configuredConfigFilePath == "" && os.Getenv("BRUIN_CONFIG_FILE_CONTENT") == "" {

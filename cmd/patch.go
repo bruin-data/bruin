@@ -456,7 +456,7 @@ func Patch() *cli.Command {
 							printErrorForOutput(output, fmt.Errorf("failed to find the git repository root: %w", err))
 							return cli.Exit("", 1)
 						}
-						cm, err := config.LoadOrCreate(fs, filepath.Join(repoRoot.Path, ".bruin.yml"))
+						cm, err := config.Load(fs, filepath.Join(repoRoot.Path, ".bruin.yml"))
 						if err != nil {
 							printErrorForOutput(output, fmt.Errorf("failed to load the config file: %w", err))
 							return cli.Exit("", 1)
