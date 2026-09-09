@@ -8,8 +8,11 @@ start of every command and update it as they finish lessons.
 
 ### Commands
 
-- `next lesson` - Find the next incomplete lesson in `course/progress.md`, open its file in
-  `course/lessons/`, and teach it (see "Teaching a lesson"). Do not run ahead to later lessons.
+- `next lesson` - Find the first lesson in `course/progress.md` that is neither ticked nor marked
+  `(skipped)`, open its file in `course/lessons/`, and teach it (see "Teaching a lesson"). A skipped
+  lesson stays unticked on purpose, so match on the `(skipped)` marker rather than on the checkbox,
+  or you will hand the student the lesson they have just skipped. Do not run ahead to later lessons.
+  If the student asks to go back to a skipped lesson by name, teach it and drop the marker.
 - `review my work` - Read the artifact the current lesson asked for (a query file, a contract, a written
   answer, an asset). Grade it against that lesson's rubric (see "Reviewing work"). If it passes, tick the
   lesson in `course/progress.md` and tell them to say `next lesson`. If not, give one concrete fix and stop.

@@ -68,10 +68,11 @@ before and after for each table.
 - [ ] `stg_order_items.sql` uses `DISTINCT`, not `QUALIFY`.
 - [ ] No file under `pipeline/assets/staging/` contains a `JOIN`.
 - [ ] `stg_customers` maps every spelling of the home country to one value, so `SELECT COUNT(DISTINCT country) FROM stg_customers` returns 12, not 13 or 16. Case folding alone leaves `U.S.A.` standing apart and returns 13.
-- [ ] `stg_orders` maps every spelling of the finished state to one value, so `SELECT COUNT(DISTINCT order_status) FROM stg_orders` returns 5, down from 8 raw. Case folding alone leaves `COMPLETE` apart from `COMPLETED` and returns 6. The 24 NULL rows are a separate decision, and the student should say what they did with them.
+- [ ] `stg_orders` maps every spelling of the finished state to one value, so `SELECT COUNT(DISTINCT order_status) FROM stg_orders WHERE UPPER(order_status) LIKE 'COMPLET%'` returns 1. Case folding alone leaves `COMPLETE` apart from `COMPLETED` and returns 2.
+- [ ] The student says what they did with the 24 rows that have no `order_status`. Leaving them NULL and mapping them to something like `UNKNOWN` are both defensible; not having decided is not. Do not grade this on a row count, because the two choices give different ones.
 
 ## Done signal
 Confirm all seven assets exist, `bruin validate` and `bruin run` both succeed, every
-before-and-after count matches the table above exactly, and the two distinct-value checks return 12
-and 5. Carry forward: everything built from here
+before-and-after count matches the table above exactly, the country check returns 12, the
+completed-state check returns 1, and the student has stated a policy for the missing statuses. Carry forward: everything built from here
 on reads staging, never `pipeline/assets/generate/`, directly.
