@@ -2,6 +2,7 @@
 
 ## Objectives
 - Keep a short list of anchors: numbers you have verified.
+- Interrogate an answer with four moves: why-this-not-that, what-if, show-me-a-second-way, and what-would-break-this.
 - Reconcile a surprising answer against an anchor, or explain the gap.
 
 ## Concepts to teach
@@ -10,6 +11,12 @@ build a few numbers you are sure of, then measure everything else against them. 
 are filled in already - 1,200 orders, 2,880 lines, 2.4 lines per order - and they are
 exact, because the data never drifts. When a later answer surprises you, an anchor tells
 you whether the query is wrong or the surprise is real.
+
+Interrogating an answer is four moves, and it helps to name them:
+- **why-this-not-that** - why this column, table, or filter and not the obvious alternative (why `unit_price` and not `net_price`)?
+- **what-if** - what changes if you relax an assumption (what if the NULL-status orders are included)?
+- **show-me-a-second-way** - compute the headline a genuinely different way and see if it agrees.
+- **what-would-break-this** - what input would make this answer wrong, and is that input present in the data?
 
 This is also where you push back on the agent. If it reports a number that does not
 reconcile with an anchor, do not accept "it ran". Either the query is wrong, or the gap
