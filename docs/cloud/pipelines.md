@@ -107,7 +107,7 @@ The menu (top right) lets you **disable** or **delete** the pipeline.
 ## Related
 
 - [Cross-pipeline dependencies](/cloud/cross-pipeline) for depending on assets in other pipelines.
-- [Notifications](/cloud/notifications) for Slack/Teams/Discord/webhook alerts on success and failure.
+- [Notifications](/cloud/notifications) for new notification rules and legacy `pipeline.yml` alerts.
 - [Instance Types](/cloud/instance-types) for sizing assets at run time.
 - [Pipeline definition](/pipelines/definition) — CLI schema for `pipeline.yml`, including schedule, defaults, and notifications.
 - [`bruin run`](/commands/run) — the underlying command and its flags (workers, selectors, full-refresh).
