@@ -200,6 +200,47 @@ func TestVariantSet_Validate_TypeChecking(t *testing.T) {
 	})
 }
 
+func TestVariantSet_Validate_Constraints(t *testing.T) {
+	t.Parallel()
+
+	vars := pipeline.Variables{
+		"region": map[string]any{
+			"type":    "string",
+			"enum":    []any{"us", "eu", "ap"},
+			"default": "us",
+		},
+		"forecast_days": map[string]any{
+			"type":    "integer",
+			"minimum": 7,
+			"maximum": 90,
+			"default": 30,
+		},
+	}
+
+	t.Run("rejects enum override that differs only by case", func(t *testing.T) {
+		t.Parallel()
+		vs := pipeline.VariantSet{"client_alpha": {"region": "US"}}
+		err := vs.Validate(vars)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), `variable "region"`)
+		assert.Contains(t, err.Error(), "not one of the allowed values")
+	})
+
+	t.Run("rejects override below minimum", func(t *testing.T) {
+		t.Parallel()
+		vs := pipeline.VariantSet{"client_alpha": {"forecast_days": 3}}
+		err := vs.Validate(vars)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "below minimum")
+	})
+
+	t.Run("accepts override on inclusive bounds and enum", func(t *testing.T) {
+		t.Parallel()
+		vs := pipeline.VariantSet{"client_alpha": {"region": "eu", "forecast_days": 7}}
+		require.NoError(t, vs.Validate(vars))
+	})
+}
+
 func TestPipeline_MaterializeVariant(t *testing.T) {
 	t.Parallel()
 

@@ -42,7 +42,7 @@ func (vs VariantSet) Validate(vars Variables) error {
 			if !ok {
 				return fmt.Errorf("variant %q references unknown variable %q", name, key)
 			}
-			if err := validateOverrideType(value, schema); err != nil {
+			if err := validateVariableValue(value, schema); err != nil {
 				return fmt.Errorf("variant %q variable %q: %w", name, key, err)
 			}
 		}

@@ -488,6 +488,6 @@ variables:
 
 - **Type:** `Object (map[string]variable-schema)`
 
-Each variable must include a `default` value. Variables are defined using [JSON Schema draft-07](https://json-schema.org/draft-07/json-schema-release-notes.html) keywords.
+Each variable must include a `default` value. Variables are defined using [JSON Schema draft-07](https://json-schema.org/draft-07/json-schema-release-notes.html) keywords. Bruin validates `type`, `enum`, `const`, `minimum`, and `maximum` on defaults, `--var` overrides, and variant values.
 
 See the **[Variables reference](/variables/overview)** for the full list of supported types, keywords (`enum`, `minimum`, `pattern`, etc.), complex type examples, and runtime overrides.
