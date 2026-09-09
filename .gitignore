@@ -168,3 +168,6 @@ logs/queries
 .devcontainer
 .codex/
 .amp/portals/*
+
+# Local partitioned backfill state
+logs/backfills/
