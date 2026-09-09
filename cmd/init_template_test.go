@@ -1069,3 +1069,315 @@ func TestEnsureLocalDuckDBFilesAreIgnoredSkipsAbsoluteAndEmptyPaths(t *testing.T
 	require.NotContains(t, string(written), "elsewhere.duckdb")
 	require.NotContains(t, string(written), "outside.duckdb")
 }
+
+func TestInitAcademySqlIntermediateCopiesStarterTemplate(t *testing.T) {
+	targetRoot := t.TempDir()
+	t.Chdir(targetRoot)
+
+	gitInit := exec.CommandContext(t.Context(), "git", "init")
+	gitInit.Dir = targetRoot
+	out, err := gitInit.CombinedOutput()
+	require.NoError(t, err, string(out))
+
+	err = Init().Run(t.Context(), []string{"init", "academy-sql-intermediate"})
+	require.NoError(t, err)
+
+	pipelineRoot := filepath.Join(targetRoot, "academy-sql-intermediate")
+	require.FileExists(t, filepath.Join(pipelineRoot, "README.md"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "AGENTS.md"))
+	require.FileExists(t, filepath.Join(pipelineRoot, ".gitignore"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "docs", "schema.md"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "docs", "glossary.md"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "docs", "contracts", "TEMPLATE.md"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "docs", "eval", "questions.md"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "docs", "eval", "answers.md"))
+
+	// The defect record is the contributor's copy. Finding the defects is the
+	// coursework, so an underscore keeps it out of the embed and off this disk.
+	require.NoFileExists(t, filepath.Join(pipelineRoot, "docs", "_data-design.md"))
+	require.NoFileExists(t, filepath.Join(pipelineRoot, "docs", "data-design.md"))
+	require.NoFileExists(t, filepath.Join(pipelineRoot, "docs", "known-defects.md"))
+
+	require.FileExists(t, filepath.Join(pipelineRoot, "queries", "profiling", "01-row-counts.sql"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "queries", "profiling", "06-categorical-values.sql"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "queries", "reading-drill", "README.md"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "queries", "reading-drill", "drill-3.sql"))
+
+	require.FileExists(t, filepath.Join(pipelineRoot, "pipeline", "pipeline.yml"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "pipeline", "assets", "generate", "orders.sql"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "pipeline", "assets", "generate", "fx_rates.sql"))
+
+	// The three layer folders teach the layering before the student writes a line.
+	// init only copies files, so each folder ships because its .gitkeep is named
+	// explicitly in the embed list - see templates/templates.go.
+	for _, layer := range []string{"staging", "core", "mart"} {
+		require.FileExists(t, filepath.Join(pipelineRoot, "pipeline", "assets", layer, ".gitkeep"), layer)
+	}
+
+	pipeline, err := os.ReadFile(filepath.Join(pipelineRoot, "pipeline", "pipeline.yml"))
+	require.NoError(t, err)
+	require.Contains(t, string(pipeline), "name: retail")
+	require.Contains(t, string(pipeline), "duckdb: duckdb-default")
+	require.Contains(t, string(pipeline), "domains:")
+
+	// init keeps default_environment: default, so the template's primary
+	// environment has to carry that name.
+	configContent, err := os.ReadFile(filepath.Join(targetRoot, ".bruin.yml"))
+	require.NoError(t, err)
+	require.Contains(t, string(configContent), "name: duckdb-default")
+	require.Contains(t, string(configContent), "path: academy.duckdb")
+
+	gitignore, err := os.ReadFile(filepath.Join(targetRoot, ".gitignore"))
+	require.NoError(t, err)
+	require.Contains(t, string(gitignore), "/academy.duckdb")
+	require.Contains(t, string(gitignore), "/academy.duckdb.wal")
+
+	// The course scaffolding drives the interactive lessons, so it has to ship.
+	require.FileExists(t, filepath.Join(pipelineRoot, "course", "README.md"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "course", "progress.md"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "course", "answer-key.md"))
+	for _, slug := range academySQLIntermediateLessons {
+		require.FileExists(t, filepath.Join(pipelineRoot, "course", "lessons", slug+".md"), slug)
+	}
+}
+
+// academySQLIntermediateLessons is the lesson order. The slugs also name the site
+// pages, so a student reading the page and a student talking to the agent are in
+// the same lesson.
+var academySQLIntermediateLessons = []string{
+	"01-the-question-is-the-hard-part",
+	"02-write-the-model-contract",
+	"03-profile-before-you-model",
+	"04-stage-the-work",
+	"05-window-functions",
+	"06-patterns-agents-get-wrong",
+	"07-read-a-query-fast",
+	"08-layer-the-project",
+	"09-views-and-tables",
+	"10-metric-in-the-asset",
+	"11-descriptions-and-tags",
+	"12-glossary-and-readme",
+	"13-measure-your-context",
+	"14-capstone-defend-the-answer",
+	"15-recap-and-next-steps",
+}
+
+// academySQLIntermediateLessonSections are the six headings every lesson file
+// carries, in this order. The agent teaches from them, so a missing or reordered
+// section changes how a lesson is delivered.
+var academySQLIntermediateLessonSections = []string{
+	"## Objectives",
+	"## Concepts to teach",
+	"## Quiz",
+	"## Task",
+	"## Rubric (for `review my work`)",
+	"## Done signal",
+}
+
+func TestAcademySqlIntermediateCourseIsWellFormed(t *testing.T) {
+	t.Parallel()
+
+	progress, err := templates.Templates.ReadFile("academy-sql-intermediate/course/progress.md")
+	require.NoError(t, err)
+
+	lessonFiles, err := iofs.ReadDir(templates.Templates, "academy-sql-intermediate/course/lessons")
+	require.NoError(t, err)
+	require.Len(t, lessonFiles, len(academySQLIntermediateLessons),
+		"every lesson in progress.md needs exactly one file, and nothing else belongs in that folder")
+
+	for i, slug := range academySQLIntermediateLessons {
+		require.Equal(t, slug+".md", lessonFiles[i].Name(), "lesson files must sort into lesson order")
+
+		// progress.md is the agent's source of truth for position, so a slug that
+		// is not listed there is a lesson the course can never reach.
+		require.Containsf(t, string(progress), "- [ ] "+slug[:2]+" "+slug[3:],
+			"progress.md is missing an unchecked entry for %s", slug)
+
+		content, err := templates.Templates.ReadFile("academy-sql-intermediate/course/lessons/" + slug + ".md")
+		require.NoError(t, err)
+		body := string(content)
+
+		require.Truef(t, strings.HasPrefix(body, "# Lesson "+slug[:2]+": "+slug[3:]+"\n"),
+			"%s must open with its own numbered title", slug)
+
+		at := 0
+		for _, section := range academySQLIntermediateLessonSections {
+			idx := strings.Index(body[at:], "\n"+section+"\n")
+			require.GreaterOrEqualf(t, idx, 0, "%s is missing %q, or has it out of order", slug, section)
+			at += idx + 1
+		}
+
+		// A rubric the agent cannot check point by point is a rubric it will fudge.
+		rubric := sectionBodyForTest(t, slug, body, "## Rubric (for `review my work`)", "## Done signal")
+		require.GreaterOrEqualf(t, strings.Count(rubric, "\n- [ ] "), 3,
+			"%s needs at least three checkable rubric items", slug)
+
+		quiz := sectionBodyForTest(t, slug, body, "## Quiz", "## Task")
+		require.GreaterOrEqualf(t, strings.Count(quiz, "   A: "), 3,
+			"%s needs three quiz questions, each shipping its model answer", slug)
+
+		require.Containsf(t, body, "Carry forward:", "%s must end its done signal with a carry-forward line", slug)
+	}
+
+	// The setup prompt is copied byte for byte onto the course index page. It is
+	// the one piece of text a student pastes, so drift between copies is a support
+	// ticket nobody can reproduce.
+	courseReadme, err := templates.Templates.ReadFile("academy-sql-intermediate/course/README.md")
+	require.NoError(t, err)
+	for _, line := range []string{
+		"bruin init academy-sql-intermediate",
+		"`orders` has 1,212 rows, `order_items` has 2,895 and `fx_rates` has 5,480",
+		"Do not teach lesson one yet",
+	} {
+		require.Contains(t, string(courseReadme), line)
+	}
+}
+
+func TestAcademySqlIntermediateTemplateIsDeterministicByConstruction(t *testing.T) {
+	t.Parallel()
+
+	expectedGenerators := []string{
+		"dates.sql",
+		"stores.sql",
+		"products.sql",
+		"customers.sql",
+		"orders.sql",
+		"order_items.sql",
+		"fx_rates.sql",
+	}
+
+	var actualGenerators []string
+	err := iofs.WalkDir(templates.Templates, "academy-sql-intermediate/pipeline/assets/generate", func(path string, entry iofs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		actualGenerators = append(actualGenerators, strings.TrimPrefix(path, "academy-sql-intermediate/pipeline/assets/generate/"))
+		return nil
+	})
+	require.NoError(t, err)
+	require.ElementsMatch(t, expectedGenerators, actualGenerators)
+
+	// Comments are stripped first: the generators name these functions in prose to
+	// warn against them.
+	forbidden := []string{"random(", "hash(", "md5(", "now(", "current_date", "current_timestamp", "today("}
+	for _, name := range expectedGenerators {
+		content, err := templates.Templates.ReadFile("academy-sql-intermediate/pipeline/assets/generate/" + name)
+		require.NoError(t, err)
+		sql := strings.ToLower(stripSQLCommentsForTest(string(content)))
+		for _, token := range forbidden {
+			require.NotContainsf(t, sql, token, "generator %s must not use %q (see docs/_data-design.md)", name, token)
+		}
+
+		// Column descriptions are what lesson 11 has the student write. A template
+		// that arrives documented makes that lesson hypothetical.
+		header, _, found := strings.Cut(string(content), "@bruin */")
+		require.True(t, found, "generator %s has no @bruin header", name)
+		_, columns, found := strings.Cut(header, "columns:")
+		require.True(t, found, "generator %s declares no columns", name)
+		require.NotContainsf(t, columns, "description:", "generator %s must not describe its columns", name)
+		require.NotContainsf(t, columns, "checks:", "generator %s must not carry column checks", name)
+		require.NotContainsf(t, columns, "primary_key:", "generator %s must not declare a primary key", name)
+	}
+
+	// Read from disk, not the embedded FS: the defect record deliberately does not ship.
+	design, err := os.ReadFile(filepath.Join("..", "templates", "academy-sql-intermediate", "docs", "_data-design.md"))
+	require.NoError(t, err)
+	require.Contains(t, string(design), "The nine defects and where they are injected")
+
+	_, embedded := templates.Templates.ReadFile("academy-sql-intermediate/docs/_data-design.md")
+	require.Error(t, embedded, "the defect record must not be embedded - a student would find it with a repo-wide search")
+}
+
+// academySQLIntermediateGeneratorOrder is dependency order: order_items reads from
+// both orders and products.
+var academySQLIntermediateGeneratorOrder = []string{"dates", "stores", "products", "customers", "orders", "order_items", "fx_rates"}
+
+// TestAcademySqlIntermediateGeneratorsAreDeterministic generates the seven tables
+// into two fresh databases and compares a checksum of each. The course hard-codes
+// every number it quotes from this data, so nondeterminism breaks published pages.
+func TestAcademySqlIntermediateGeneratorsAreDeterministic(t *testing.T) {
+	if runtime.GOOS == osWindows {
+		t.Skip("skipping on Windows due to DuckDB file locking")
+	}
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	if err := duck.EnsureADBCDriverInstalled(t.Context()); err != nil {
+		t.Skipf("skipping test: ADBC DuckDB driver not available: %v", err)
+	}
+
+	first := academySQLIntermediateChecksums(t, filepath.Join(t.TempDir(), "first.duckdb"))
+	second := academySQLIntermediateChecksums(t, filepath.Join(t.TempDir(), "second.duckdb"))
+
+	require.Equal(t, first, second,
+		"the generators produced different data on two runs; something nondeterministic crept in - see templates/academy-sql-intermediate/docs/_data-design.md")
+
+	// Row counts the course and the answer key quote directly. The gap between
+	// each of these and its clean value is a defect the student has to find.
+	counts := make(map[string]int, len(first))
+	for name, snapshot := range first {
+		counts[name] = snapshot.rowCount
+	}
+	require.Equal(t, map[string]int{
+		"dates":       1096,
+		"stores":      6,
+		"products":    60,
+		"customers":   510,
+		"orders":      1212,
+		"order_items": 2895,
+		"fx_rates":    5480,
+	}, counts)
+}
+
+func academySQLIntermediateChecksums(t *testing.T, dbPath string) map[string]academyTableSnapshot {
+	t.Helper()
+
+	db := openTestDuckDB(t, dbPath)
+	defer db.Close()
+
+	for _, name := range academySQLIntermediateGeneratorOrder {
+		raw, err := templates.Templates.ReadFile("academy-sql-intermediate/pipeline/assets/generate/" + name + ".sql")
+		require.NoError(t, err)
+
+		body := stripBruinHeaderForTest(string(raw))
+		require.NotEmpty(t, strings.TrimSpace(body), "generator %s has no SQL body", name)
+
+		execTestDuckDB(t, db, "CREATE OR REPLACE TABLE "+name+" AS "+strings.TrimSuffix(strings.TrimSpace(body), ";"))
+	}
+
+	snapshots := make(map[string]academyTableSnapshot, len(academySQLIntermediateGeneratorOrder))
+	for _, name := range academySQLIntermediateGeneratorOrder {
+		// Cast the whole row to text and hash the sorted concatenation, so the
+		// checksum covers every column and is independent of storage order.
+		row := db.QueryRowContext(t.Context(),
+			"SELECT md5(string_agg(row_text, '|' ORDER BY row_text)), COUNT(*) "+
+				"FROM (SELECT CAST(t AS VARCHAR) AS row_text FROM "+name+" AS t)")
+
+		var snapshot academyTableSnapshot
+		require.NoError(t, row.Scan(&snapshot.checksum, &snapshot.rowCount))
+		// The ADBC driver backs the scanned string with an Arrow buffer it reuses
+		// on the next connection; clone it so this run's checksum stays durable.
+		snapshot.checksum = strings.Clone(snapshot.checksum)
+		snapshots[name] = snapshot
+	}
+
+	return snapshots
+}
+
+// sectionBodyForTest returns the text between two headings in a lesson file. It
+// fails the test rather than slicing on a missing heading, which strings.Index
+// would report as -1 and turn into a panic several lines later.
+func sectionBodyForTest(t *testing.T, slug, body, from, to string) string {
+	t.Helper()
+
+	start := strings.Index(body, from)
+	require.GreaterOrEqualf(t, start, 0, "%s is missing %q", slug, from)
+
+	end := strings.Index(body[start:], to)
+	require.GreaterOrEqualf(t, end, 0, "%s is missing %q after %q", slug, to, from)
+
+	return body[start : start+end]
+}

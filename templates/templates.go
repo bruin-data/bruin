@@ -10,6 +10,10 @@ import (
 // is found by any repo-wide search and defeats the exercise. It stays in this repo
 // as the acceptance-test fixture.
 //
+// academy-sql-intermediate/docs/_data-design.md is excluded the same way. It is
+// the contributor-facing record of the nine defects that template injects on
+// purpose, and finding those defects is the coursework.
+//
 //go:embed *
 //go:embed */.bruin.yml
 //go:embed migration-fivetran/.gitignore
@@ -17,5 +21,9 @@ import (
 //go:embed google-web-analytics/.gitignore
 //go:embed posthog-bigquery/.gitignore
 //go:embed academy-sql-beginner/.gitignore
+//go:embed academy-sql-intermediate/.gitignore
+//go:embed academy-sql-intermediate/pipeline/assets/staging/.gitkeep
+//go:embed academy-sql-intermediate/pipeline/assets/core/.gitkeep
+//go:embed academy-sql-intermediate/pipeline/assets/mart/.gitkeep
 //go:embed migration-fivetran/.agents/skills/bruin-fivetran-migrator/*
 var Templates embed.FS
