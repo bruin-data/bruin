@@ -109,11 +109,7 @@ connections:
       read_only: true
 ```
 
-Bruin obtains OAuth tokens with only the `https://www.googleapis.com/auth/bigquery.readonly` scope. Queries and dry runs use the [jobs.query API](https://cloud.google.com/bigquery/docs/reference/rest/v2/jobs/query), which accepts this scope. Tokens are reused and refreshed automatically. The default is `read_only: false`.
-
-Read-only connections require `service_account_file` or `service_account_json`. Bruin rejects ADC, pre-minted access tokens, and preconfigured credential objects because it cannot restrict their existing scopes. Ingestr and BigQuery Data Transfer are also rejected for read-only connections.
-
-Configured query cost limits still apply. Read-only dry runs return byte estimates and schema, but do not return statement types or referenced table lists. BigQuery assigns query job IDs in this mode instead of Bruin's usual job ID prefix.
+Read-only mode requires `service_account_file` or `service_account_json`; ADC and access tokens are not supported. Ingestr and BigQuery Data Transfer are unavailable in this mode. Defaults to `false`.
 
 ## BigQuery Assets
 
