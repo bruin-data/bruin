@@ -49,6 +49,7 @@ type ClickHouseConfig interface {
 	ToClickHouseOptions() *click_house.Options
 	GetIngestrURI() string
 	GetDatabase() string
+	IsReadOnly() bool
 }
 
 type connection interface {
@@ -75,7 +76,7 @@ func (c *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) 
 }
 
 func (c *Client) GetIngestrURI() (string, error) {
-	if cfg, ok := c.config.(interface{ IsReadOnly() bool }); ok && cfg.IsReadOnly() {
+	if c.config.IsReadOnly() {
 		return "", errors.New("read_only connections cannot be used with ingestr")
 	}
 	return c.config.GetIngestrURI(), nil
