@@ -18,7 +18,16 @@ connections:
       database: "dev" # Default database for direct ClickHouse assets and unqualified seeds.
       http_port: 8443 # Optional; used only for ingestr and defaults to 8443.
       secure: 1 # Set to 1 for ClickHouse Cloud or another TLS connection.
+      read_only: false
 ```
+
+### Read-only connections
+
+Set `read_only: true` to enable native read-only execution. The default is `false`. Bruin sends the native ClickHouse setting `readonly=1`, so the server rejects writes and changes to restricted settings.
+
+This option applies to Bruin's native SQL client. Ingestr assets and seed loading through ingestr return an error for these connections because they open a separate connection that does not preserve this setting. Use a separate connection with database-enforced read-only credentials for ingestion sources.
+
+Native read-only mode follows the database's transaction and permission rules; use database-enforced privileges when running untrusted SQL.
 
 Bruin uses `database` for direct ClickHouse assets and unqualified `clickhouse.seed` asset names. For an `ingestr` asset, the generated ClickHouse URI does not include this database: use `database.table` in the asset `name` when ClickHouse is the destination, or in `source_table` when it is the source. An unqualified ingestr table uses ClickHouse's `default` database.
 
@@ -487,3 +496,15 @@ columns:
     type: "UInt32"
     description: "Time spent on the page in seconds"
 ```
+
+## Testing read-only connections
+
+The existing ClickHouse testcontainers suite starts a local server and exercises `bruin query` with writable and read-only connections. It verifies JSON results, rejects writes and attempts to disable read-only mode, and checks that the table is unchanged.
+
+```bash
+make build
+cd integration-tests/cloud-integration-tests/clickhouse
+go test -count=1 -v -run '^TestReadOnlyConnection$' .
+```
+
+Docker is required. `CLICKHOUSE_TEST_IMAGE` overrides the existing suite's default image.

@@ -34,3 +34,18 @@ func TestConfig_ToClickHouseOptions(t *testing.T) {
 		t.Errorf("expected ClickHouse user agent to identify Bruin, got %s", userAgent)
 	}
 }
+
+func TestConfigReadOnly(t *testing.T) {
+	t.Parallel()
+	for _, readOnly := range []bool{false, true} {
+		c := Config{ReadOnly: readOnly}
+		options := c.ToClickHouseOptions()
+		if readOnly {
+			if options.Settings["readonly"] != 1 {
+				t.Fatalf("expected readonly=1, got %v", options.Settings)
+			}
+		} else if _, ok := options.Settings["readonly"]; ok {
+			t.Fatal("readonly should be unset by default")
+		}
+	}
+}

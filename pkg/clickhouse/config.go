@@ -20,6 +20,7 @@ type Config struct {
 	Database string
 	HTTPPort int
 	Secure   *int
+	ReadOnly bool
 }
 
 func (c *Config) ToClickHouseOptions() *click_house.Options {
@@ -48,6 +49,9 @@ func (c *Config) ToClickHouseOptions() *click_house.Options {
 			},
 		},
 	}
+	if c.ReadOnly {
+		opt.Settings = click_house.Settings{"readonly": 1}
+	}
 	return &opt
 }
 
@@ -73,4 +77,8 @@ func (c *Config) GetIngestrURI() string {
 
 func (c *Config) GetDatabase() string {
 	return c.Database
+}
+
+func (c Config) IsReadOnly() bool {
+	return c.ReadOnly
 }

@@ -75,6 +75,9 @@ func (c *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) 
 }
 
 func (c *Client) GetIngestrURI() (string, error) {
+	if cfg, ok := c.config.(interface{ IsReadOnly() bool }); ok && cfg.IsReadOnly() {
+		return "", errors.New("read_only connections cannot be used with ingestr")
+	}
 	return c.config.GetIngestrURI(), nil
 }
 
