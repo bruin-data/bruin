@@ -67,6 +67,10 @@ html:not(.dark) .vp-code-dark {
   content: "\2713";
 }
 
+.docs-screenshot {
+  border: 1px solid var(--vp-c-divider);
+}
+
 .template-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));

@@ -155,6 +155,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                         ],
                     },
                     {text: "Notifications", link: "/cloud/notifications"},
+                    {text: "Legacy Notifications", link: "/cloud/legacy-notifications"},
                     {text: "Cross-pipeline Dependencies", link: "/cloud/cross-pipeline"},
                     {text: "Governance", link: "/cloud/governance"},
                     {text: "Instance Types", link: "/cloud/instance-types"},

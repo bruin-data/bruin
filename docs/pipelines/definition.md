@@ -250,7 +250,7 @@ owner: data-platform
 
 ### Notifications
 
-Send alerts when runs succeed or fail so your team stays informed. Choose one or more channels and specify where to deliver the message (e.g., Slack channel or a webhook connection).
+This block configures [legacy notifications](/cloud/legacy-notifications). After the team switches to the [new notification system](/cloud/notifications), settings in pipeline files are ignored.
 
 Example:
 
@@ -279,7 +279,7 @@ notifications:
 
 - **Type:** `Object`
 
-> This is a cloud related feature. See [Notifications](/cloud/notifications) page for more details.
+> This is a Cloud feature. See [Legacy notifications](/cloud/legacy-notifications) for configuration and migration details.
 
 ### Catchup
 

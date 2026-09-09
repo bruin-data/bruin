@@ -1,133 +1,93 @@
 # Notifications
 
-Bruin Cloud supports various types of notifications, starting with Slack & Microsoft Teams. These notifications allow you to receive updates on your data pipelines, such as when a pipeline has completed successfully, as well as when a pipeline has failed.
+Notification rules are managed under **Team Settings → Notifications**. A rule defines which events to watch, optional filters, and where Bruin sends the notification.
 
-Notifications are always defined at the pipeline level, inside the `pipeline.yml` file (see [Pipeline definition](/pipelines/definition) for the full schema). The connections they reference must exist in [Bruin Cloud Connections](/cloud/connections) first.
+Notification rules are separate from notification settings in pipeline files. If your team still manages notifications in `pipeline.yml`, see [Legacy notifications and migration](/cloud/legacy-notifications).
 
-## Slack
+## How rules work
 
-> [!INFO]
-> You need to create a Slack connection in Bruin Cloud before you can use Slack notifications. You can do this by navigating to the `Connections` tab in the Bruin Cloud UI.
+Each rule describes what you want to be notified about and who should receive the notification. For example, you can notify the data team in Slack when a production pipeline fails. Use filters to focus a rule on particular projects, pipelines, assets, or checks, and disable it whenever you want to pause notifications.
 
-Adding Slack notifications is just a few lines of code:
+A rule is built from:
 
-```yaml
-notifications:
-  slack:
-    # the only required field is `channel`. By default, this will send both success and failure notifications to this channel.   
-    - channel: "#channel1"
-    
-    # you can have multiple channels, all of them will be notified.
-    - channel: "#channel2"
-    
-    # you can also specify different channels for success and failure notifications
-    - channel: "#channel-for-only-success"
-      failure: false
+- **Trigger:** Selects the events to watch, such as a failed pipeline run or a successful column check. A rule can have several triggers and matches when any trigger matches.
+- **Condition:** Filters events by one field, such as `Pipeline name equals daily-orders`.
+- **Condition group:** Combines related conditions or other condition groups. Choose **all** when every item in the group must match, or **any** when at least one item must match.
+- **Destination:** Defines who receives the notification, such as an email address or Slack channel.
 
-    - channel: "#channel-for-only-failure"
-      success: false
+## Create a rule
 
-```
+Go to **Team Settings → Notifications** and click **New rule**.
 
-The full spec for Slack notifications is like this:
+1. Enter a name that describes the notification, such as `Production failures`.
+2. Select the events the rule should watch.
+3. Add filters if the rule should apply only to specific projects, pipelines, assets, or checks.
+4. Add one or more destinations.
+5. Choose whether the rule should start enabled, then click **Save rule**.
 
-```yaml
-notifications:
-  slack:
-    - channel: "#your-channel-name"
-      success: true
-      failure: true
-```
+### Triggers
 
-## Microsoft Teams
+A trigger can watch successful or failed events for:
 
-> [!INFO]
-> You need to create a Microsoft Teams connection in Bruin Cloud before you can use Teams notifications. You can do this by navigating to the `Connections` tab in the Bruin Cloud UI.
+| Event group | When it occurs |
+| --- | --- |
+| Pipeline runs | A pipeline run succeeds or fails. |
+| Assets | An asset execution succeeds or fails. |
+| Column checks | A column check succeeds or fails. |
+| Custom checks | A custom check succeeds or fails. |
 
-A Microsoft Teams webhook can be configured per channel, which means you can send notifications to multiple channels by adding separate connections.
+You can select several events in one trigger. You can also add another trigger when different groups of events need different filters. A rule matches when any of its triggers matches.
 
-The full spec for Microsoft Teams notifications is like this:
+### Filters
 
-```yaml
-notifications:
-  ms_teams:
-    - connection: "the-name-of-the-ms-teams-connection"
-      success: true
-      failure: true
-```
+Filters are optional. Without filters, a trigger matches every selected event for the team.
 
-## Discord
+You can filter by:
 
-> [!INFO]
-> You need to create a Discord connection in Bruin Cloud before you can use Discord notifications. You can do this by navigating to the `Connections` tab in the Bruin Cloud UI.
+- **Pipeline:** project ID or pipeline name.
+- **Run:** run ID.
+- **Asset:** name or type.
+- **Check:** name or column.
 
-A Discord webhook can be configured per channel, which means you can send notifications to multiple channels by adding separate connections.
+Choose **all** to require every condition in a group, or **any** to require at least one condition. In the **Order Fails** rule below, **all** requires the pipeline name to equal `pipeline-2`, while the nested **any** group accepts either `a_asset` or `b_asset`.
 
-The full spec for Discord notifications is like this:
+<a href="notifications/notification-rule-conditions.png" target="_blank">
+  <img class="docs-screenshot" src="/cloud/notifications/notification-rule-conditions.png" alt="A notification trigger with nested all and any condition groups">
+</a>
 
-```yaml
-notifications:
-  discord:
-    - connection: "the-name-of-the-discord-connection"
-      success: true
-      failure: true
-```
+### Destinations
 
-## Webhook
+A rule can send to multiple destinations and can include multiple recipients or channels for a destination.
 
-> [!INFO]
-> You need to create a Webhook connection in Bruin Cloud before you can use webhook notifications. You can do this by navigating to the `Connections` tab in the Bruin Cloud UI and adding a Webhook connection pointing to your endpoint.
+| Destination | Value |
+| --- | --- |
+| Email | One or more email addresses. |
+| Slack | A Slack channel name or ID. |
+| Microsoft Teams | A Teams conversation ID. |
+| Discord | A Discord channel ID. |
 
-Webhook notifications are generic and can target any HTTP endpoint you configure via a connection.
+Enter multiple values on separate lines or separate them with commas.
 
-The full spec for Webhook notifications is like this:
+<a href="notifications/notification-rule-destinations.png" target="_blank">
+  <img class="docs-screenshot" src="/cloud/notifications/notification-rule-destinations.png" alt="Email and Slack destinations in a notification rule">
+</a>
 
-```yaml
-notifications:
-  webhook:
-    - connection: "the-name-of-the-webhook-connection"
-      success: true
-      failure: true
-```
+## Manage rules
 
-Details:
+The notifications page shows each rule with its events, filters, destinations, and current status.
 
-- Method: POST
-- Auth: Basic Auth (configure username/password in the Webhook connection)
-- Body: JSON
-- Headers: `Content-Type: application/json`
+<a href="notifications/notification-rules-overview.png" target="_blank">
+  <img class="docs-screenshot" src="/cloud/notifications/notification-rules-overview.png" alt="Notification rules with one rule expanded">
+</a>
 
-Example payloads
+- Expand a rule to inspect the complete matching logic.
+- Use the switch to enable or disable a rule without deleting it.
+- Use **Edit** to change its triggers, filters, or destinations.
+- Use **Delete** to remove it permanently.
 
-Success
-
-```json
-{
-  "pipeline": "daily_orders",
-  "asset": null,
-  "column": null,
-  "check": null,
-  "run_id": "2025-09-03T12:34:56Z-8f3a2c",
-  "status": "success"
-}
-```
-
-Column check failure
-
-```json
-{
-  "pipeline": "daily_orders",
-  "asset": "orders_curated",
-  "column": "order_id",
-  "check": "not_null",
-  "run_id": "2025-09-03T00:00:00Z-42b1de",
-  "status": "failure"
-}
-```
+Changes apply to events received after the rule is saved. Disabling or deleting a rule does not affect notifications that were already sent.
 
 ## Related
 
-- [Connections](/cloud/connections) for setting up the Slack/Teams/Discord/Webhook connection used by these notifications.
-- [Pipelines](/cloud/pipelines) for how runs trigger notifications.
-- [Integrations](/cloud/integrations/overview) for AI agent chat in Slack/Teams/Discord (separate from pipeline notifications).
-- [Pipeline definition](/pipelines/definition) — full `pipeline.yml` schema including the `notifications:` block.
+- [Legacy notifications and migration](/cloud/legacy-notifications)
+- [Bruin Cloud integrations](/cloud/integrations/overview)

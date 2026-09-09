@@ -35,7 +35,7 @@ From there:
 - [Dashboards](/cloud/dashboards): AI-built dashboards your team can re-open without re-asking.
 - [AI Agents](/cloud/ai-agents/overview): create agents, chat with them, schedule them, deploy them to chat platforms.
 - [Integrations](/cloud/integrations/overview): connect agents to Slack, Microsoft Teams, Google Chat, Discord, WhatsApp, or Telegram.
-- [Notifications](/cloud/notifications): pipeline-level Slack, Teams, Discord, and webhook notifications.
+- [Notifications](/cloud/notifications): configurable rules for pipeline, asset, and check events, plus legacy `pipeline.yml` notifications.
 - [Cross-pipeline dependencies](/cloud/cross-pipeline): depend on assets that live in other pipelines.
 - [Governance](/cloud/governance): the rules that drive quality scores and the risk report.
 - [Instance Types](/cloud/instance-types): sizing assets at run time.

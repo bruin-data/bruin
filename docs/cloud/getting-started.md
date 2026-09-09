@@ -169,7 +169,7 @@ See [Connections](/cloud/connections) for connection types, naming rules, and th
 - **Lineage** for how assets connect. See [Catalog → Lineage](/cloud/catalog#global-lineage).
 - **New run** for ad-hoc runs, full refreshes, and backfills.
 
-**5. Set up notifications.** Configure pipeline-level alerts on success or failure in your `pipeline.yml`. Bruin Cloud supports Slack, Microsoft Teams, Discord, and generic webhooks. See [Notifications](/cloud/notifications).
+**5. Set up notifications.** Create rules under **Team Settings → Notifications**, or use legacy notification settings in `pipeline.yml`. See [Notifications](/cloud/notifications).
 
 **6. (Optional) Cross-pipeline dependencies.** If pipelines in different repos depend on each other's assets, wire them up with URIs instead of duplicating definitions. See [Cross-pipeline dependencies](/cloud/cross-pipeline).
 
