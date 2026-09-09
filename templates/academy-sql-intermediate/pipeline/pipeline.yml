@@ -1,0 +1,14 @@
+name: retail
+
+schedule: daily
+start_date: "2023-01-01"
+
+default_connections:
+  duckdb: duckdb-default
+
+# Applied to every asset in this pipeline, so no asset has to repeat it.
+# Lesson 11 covers what these do and why they are worth setting.
+default:
+  owner: "student@example.com"
+  domains:
+    - commerce
