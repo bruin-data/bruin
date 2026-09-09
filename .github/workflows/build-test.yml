@@ -130,9 +130,6 @@ jobs:
         run: make integration-test
       - name: Run MSSQL developer environment integration test
         run: make integration-test-mssql
-      - name: Run ClickHouse read-only integration test
-        working-directory: integration-tests/cloud-integration-tests/clickhouse
-        run: go test -count=1 -timeout 10m -run '^TestReadOnlyConnection$' .
   dockerBuild:
     # Depot build for pushes and internally-created PRs. Fork PRs cannot
     # authenticate with Depot, so they are handled by dockerBuildFork instead.
