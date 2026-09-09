@@ -1208,12 +1208,11 @@ func TestAcademySqlIntermediateCourseIsWellFormed(t *testing.T) {
 		}
 
 		// A rubric the agent cannot check point by point is a rubric it will fudge.
-		rubric := body[strings.Index(body, "## Rubric (for `review my work`)"):]
-		rubric = rubric[:strings.Index(rubric, "## Done signal")]
+		rubric := sectionBodyForTest(t, slug, body, "## Rubric (for `review my work`)", "## Done signal")
 		require.GreaterOrEqualf(t, strings.Count(rubric, "\n- [ ] "), 3,
 			"%s needs at least three checkable rubric items", slug)
 
-		quiz := body[strings.Index(body, "## Quiz"):strings.Index(body, "## Task")]
+		quiz := sectionBodyForTest(t, slug, body, "## Quiz", "## Task")
 		require.GreaterOrEqualf(t, strings.Count(quiz, "   A: "), 3,
 			"%s needs three quiz questions, each shipping its model answer", slug)
 
@@ -1276,7 +1275,8 @@ func TestAcademySqlIntermediateTemplateIsDeterministicByConstruction(t *testing.
 		// that arrives documented makes that lesson hypothetical.
 		header, _, found := strings.Cut(string(content), "@bruin */")
 		require.True(t, found, "generator %s has no @bruin header", name)
-		columns := header[strings.Index(header, "columns:"):]
+		_, columns, found := strings.Cut(header, "columns:")
+		require.True(t, found, "generator %s declares no columns", name)
 		require.NotContainsf(t, columns, "description:", "generator %s must not describe its columns", name)
 		require.NotContainsf(t, columns, "checks:", "generator %s must not carry column checks", name)
 		require.NotContainsf(t, columns, "primary_key:", "generator %s must not declare a primary key", name)
@@ -1299,7 +1299,7 @@ var academySQLIntermediateGeneratorOrder = []string{"dates", "stores", "products
 // into two fresh databases and compares a checksum of each. The course hard-codes
 // every number it quotes from this data, so nondeterminism breaks published pages.
 func TestAcademySqlIntermediateGeneratorsAreDeterministic(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == osWindows {
 		t.Skip("skipping on Windows due to DuckDB file locking")
 	}
 	if testing.Short() {
@@ -1365,4 +1365,19 @@ func academySQLIntermediateChecksums(t *testing.T, dbPath string) map[string]aca
 	}
 
 	return snapshots
+}
+
+// sectionBodyForTest returns the text between two headings in a lesson file. It
+// fails the test rather than slicing on a missing heading, which strings.Index
+// would report as -1 and turn into a panic several lines later.
+func sectionBodyForTest(t *testing.T, slug, body, from, to string) string {
+	t.Helper()
+
+	start := strings.Index(body, from)
+	require.GreaterOrEqualf(t, start, 0, "%s is missing %q", slug, from)
+
+	end := strings.Index(body[start:], to)
+	require.GreaterOrEqualf(t, end, 0, "%s is missing %q after %q", slug, to, from)
+
+	return body[start : start+end]
 }
