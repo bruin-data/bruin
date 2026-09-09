@@ -1,0 +1,21 @@
+default_environment: default
+environments:
+    default:
+        connections:
+            clickhouse:
+                - name: clickhouse-default
+                  username: "YOUR_CLICKHOUSE_USERNAME"
+                  password: "YOUR_CLICKHOUSE_PASSWORD"
+                  host: "YOUR_CLICKHOUSE_HOST"
+                  port: 9440
+                  http_port: 8443
+                  database: bruin_payments
+                  secure: 1
+            postgres:
+                - name: postgres-default
+                  username: "YOUR_POSTGRES_USERNAME"
+                  password: "YOUR_POSTGRES_PASSWORD"
+                  host: "YOUR_POSTGRES_HOST"
+                  port: 5432
+                  database: payments
+                  ssl_mode: require

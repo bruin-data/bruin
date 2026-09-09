@@ -1102,12 +1102,17 @@ func (c GenericConnection) GetName() string {
 
 type S3Connection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	BucketName         string `yaml:"bucket_name,omitempty" json:"bucket_name" mapstructure:"bucket_name"`
-	PathToFile         string `yaml:"path_to_file,omitempty" json:"path_to_file" mapstructure:"path_to_file"`
-	AccessKeyID        string `yaml:"access_key_id,omitempty" json:"access_key_id" mapstructure:"access_key_id" sensitive:"true"`
-	SecretAccessKey    string `yaml:"secret_access_key,omitempty" json:"secret_access_key" mapstructure:"secret_access_key" sensitive:"true"`
-	EndpointURL        string `yaml:"endpoint_url,omitempty" json:"endpoint_url" mapstructure:"endpoint_url"`
-	Layout             string `yaml:"layout,omitempty" json:"layout" mapstructure:"layout"`
+	BucketName         string `yaml:"bucket_name,omitempty" json:"bucket_name,omitempty" mapstructure:"bucket_name"`
+	PathToFile         string `yaml:"path_to_file,omitempty" json:"path_to_file,omitempty" mapstructure:"path_to_file"`
+	AccessKeyID        string `yaml:"access_key_id,omitempty" json:"access_key_id,omitempty" mapstructure:"access_key_id" sensitive:"true"`
+	SecretAccessKey    string `yaml:"secret_access_key,omitempty" json:"secret_access_key,omitempty" mapstructure:"secret_access_key" sensitive:"true"`
+	EndpointURL        string `yaml:"endpoint_url,omitempty" json:"endpoint_url,omitempty" mapstructure:"endpoint_url"`
+	Layout             string `yaml:"layout,omitempty" json:"layout,omitempty" mapstructure:"layout"`
+	Region             string `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
+	URLStyle           string `yaml:"url_style,omitempty" json:"url_style,omitempty" mapstructure:"url_style"`
+	UseSSL             *bool  `yaml:"use_ssl,omitempty" json:"use_ssl,omitempty" mapstructure:"use_ssl"`
+	CABundle           string `yaml:"ca_bundle,omitempty" json:"ca_bundle,omitempty" mapstructure:"ca_bundle"`
+	SessionToken       string `yaml:"session_token,omitempty" json:"session_token,omitempty" mapstructure:"session_token" sensitive:"true"`
 }
 
 func (c S3Connection) GetName() string {

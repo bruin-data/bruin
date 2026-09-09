@@ -4650,18 +4650,27 @@
         },
         "layout": {
           "type": "string"
+        },
+        "region": {
+          "type": "string"
+        },
+        "url_style": {
+          "type": "string"
+        },
+        "use_ssl": {
+          "type": "boolean"
+        },
+        "ca_bundle": {
+          "type": "string"
+        },
+        "session_token": {
+          "type": "string"
         }
       },
       "additionalProperties": false,
       "type": "object",
       "required": [
-        "name",
-        "bucket_name",
-        "path_to_file",
-        "access_key_id",
-        "secret_access_key",
-        "endpoint_url",
-        "layout"
+        "name"
       ]
     },
     "SFTPConnection": {

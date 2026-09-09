@@ -1,0 +1,223 @@
+name: Payments Risk Monitor
+description: >-
+  Near-real-time authorization and fraud monitoring. The single-stat row and the
+  breakdowns read the semantic model over the serving view; the throughput chart
+  reads the minute rollup directly, because that is the only object with
+  per-minute resolution.
+connection: clickhouse-default
+model: payments_risk
+
+filters:
+  - name: date_range
+    type: date-range
+    default: last_7_days
+  # Both dropdowns read their options from the warehouse rather than hardcoding a
+  # vocabulary, so a new merchant category or country shows up without a code change.
+  - name: merchant_category
+    type: select
+    default: All
+    options:
+      query: |
+        SELECT 'All' AS merchant_category
+        UNION ALL
+        SELECT DISTINCT merchant_category
+        FROM bruin_payments.serving_realtime_risk
+        ORDER BY merchant_category
+  - name: country
+    type: select
+    multiple: true
+    default: []
+    options:
+      query: |
+        SELECT DISTINCT country
+        FROM bruin_payments.serving_realtime_risk
+        ORDER BY country
+
+rows:
+  # Headline risk indicators.
+  - widgets:
+      - name: Approval rate
+        type: metric
+        metric: approval_rate
+        value:
+          field: approval_rate
+          type: number
+          format: ".2%"
+        col: 3
+      - name: Decline rate
+        type: metric
+        metric: decline_rate
+        value:
+          field: decline_rate
+          type: number
+          format: ".2%"
+        col: 3
+      - name: Fraud rate
+        type: metric
+        metric: fraud_rate
+        value:
+          field: fraud_rate
+          type: number
+          format: ".2%"
+        col: 3
+      - name: Approved volume
+        type: metric
+        metric: volume
+        value:
+          field: volume
+          type: number
+          format: "$,.0f"
+        col: 3
+
+  # Throughput and the approve/decline split, at per-minute resolution. These read
+  # bruin_payments.rollup_txn_1m rather than the semantic model because the serving
+  # view is at day grain; a minute-resolution chart has to go to the minute table.
+  - widgets:
+      - name: Authorizations per minute
+        type: chart
+        chart: line
+        col: 8
+        x:
+          field: minute
+          type: category
+          title: Minute (UTC)
+        y:
+          field: [authorizations, approved, declined]
+          type: number
+          title: Authorizations
+        sql: |
+          SELECT
+              -- %i is minutes in ClickHouse; %M is the full month name.
+              formatDateTime(txn_minute, '%Y-%m-%d %H:%i', 'UTC') AS minute,
+              sum(txns)      AS authorizations,
+              sum(approved)  AS approved,
+              sum(declined)  AS declined
+          FROM bruin_payments.rollup_txn_1m
+          WHERE txn_minute >= parseDateTime64BestEffort('{{ filters.date_range.start }}', 3, 'UTC')
+            AND txn_minute <  parseDateTime64BestEffort('{{ filters.date_range.end }}', 3, 'UTC') + INTERVAL 1 DAY
+          {% if filters.merchant_category != 'All' %}
+            AND merchant_category = '{{ filters.merchant_category }}'
+          {% endif %}
+          {% if filters.country %}
+            AND country IN ('{{ filters.country | join("','") }}')
+          {% endif %}
+          GROUP BY minute
+          ORDER BY minute
+      - name: P95 authorization latency
+        type: metric
+        col: 4
+        value:
+          field: value
+          type: number
+          format: ",.0f"
+        # A quantile cannot be summed out of the rollups, so the live figure is
+        # re-derived from the change log on every render. That cost is exactly what
+        # an AggregatingMergeTree with quantileState would remove.
+        sql: |
+          SELECT toUInt32(round(quantileExact(0.95)(auth_latency_ms))) AS value
+          FROM (
+              SELECT
+                  transaction_id,
+                  argMax(auth_latency_ms, updated_at) AS auth_latency_ms
+              FROM (
+                  SELECT *
+                  FROM bruin_payments.stg_transaction_changes
+                  WHERE created_at >= parseDateTime64BestEffort('{{ filters.date_range.start }}', 6, 'UTC')
+                    AND created_at <  parseDateTime64BestEffort('{{ filters.date_range.end }}', 6, 'UTC') + INTERVAL 1 DAY
+                  {% if filters.merchant_category != 'All' %}
+                    AND merchant_category = '{{ filters.merchant_category }}'
+                  {% endif %}
+                  {% if filters.country %}
+                    AND country IN ('{{ filters.country | join("','") }}')
+                  {% endif %}
+              )
+              GROUP BY transaction_id
+          )
+
+  # Where declines and volume are concentrated.
+  - widgets:
+      - name: Top decline reasons
+        type: chart
+        chart: bar
+        col: 6
+        x:
+          field: reason
+          type: category
+          title: Decline reason
+        y:
+          field: declines
+          type: number
+          title: Declines
+        # The reason counts are four separate additive columns. A bar chart needs them
+        # as four rows, so they are pivoted into rows rather than selected as four
+        # metrics, which would return a single row of four columns and plot nothing.
+        sql: |
+          WITH totals AS (
+              SELECT
+                  sum(declined_insufficient_funds) AS insufficient_funds,
+                  sum(declined_do_not_honor)       AS do_not_honor,
+                  sum(declined_fraud_suspected)    AS fraud_suspected,
+                  sum(declined_expired_card)       AS expired_card
+              FROM bruin_payments.serving_realtime_risk
+              WHERE txn_date >= toDate('{{ filters.date_range.start }}')
+                AND txn_date <= toDate('{{ filters.date_range.end }}')
+              {% if filters.merchant_category != 'All' %}
+                AND merchant_category = '{{ filters.merchant_category }}'
+              {% endif %}
+              {% if filters.country %}
+                AND country IN ('{{ filters.country | join("','") }}')
+              {% endif %}
+          )
+          SELECT reason, declines
+          FROM (
+              SELECT 'insufficient_funds' AS reason, insufficient_funds AS declines FROM totals
+              UNION ALL SELECT 'do_not_honor',    do_not_honor    FROM totals
+              UNION ALL SELECT 'fraud_suspected', fraud_suspected FROM totals
+              UNION ALL SELECT 'expired_card',    expired_card    FROM totals
+          )
+          ORDER BY declines DESC
+      - name: Approved volume by card network
+        type: chart
+        chart: bar
+        dimension: card_network
+        metrics: [volume]
+        sort:
+          - name: volume
+            direction: desc
+        col: 6
+
+  # Full breakdown across all three dimensions.
+  - widgets:
+      - name: Risk breakdown
+        type: table
+        dimensions:
+          - name: merchant_category
+          - name: card_network
+          - name: country
+        metrics: [authorizations, approval_rate, fraud_rate, chargeback_rate, volume]
+        sort:
+          - name: authorizations
+            direction: desc
+        columns:
+          - name: merchant_category
+            label: Category
+          - name: card_network
+            label: Network
+          - name: country
+            label: Country
+          - name: authorizations
+            label: Authorizations
+            format: ",.0f"
+          - name: approval_rate
+            label: Approval
+            format: ".2%"
+          - name: fraud_rate
+            label: Fraud
+            format: ".2%"
+          - name: chargeback_rate
+            label: Chargeback
+            format: ".2%"
+          - name: volume
+            label: Volume
+            format: "$,.2f"
+        col: 12

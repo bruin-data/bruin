@@ -1,0 +1,149 @@
+schema: v1
+name: payments_risk
+label: Payments Risk
+description: >-
+  Authorization, decline and fraud metrics over the payments serving view. Metrics
+  are defined once here and referenced by name from the dashboard, so a change to
+  the definition of approval rate lands everywhere at once.
+
+source:
+  table: bruin_payments.serving_realtime_risk
+
+dimensions:
+  - name: txn_date
+    label: Date
+    type: time
+    granularities:
+      day: toStartOfDay(txn_date)
+      week: toStartOfWeek(txn_date)
+      month: toStartOfMonth(txn_date)
+  - name: merchant_category
+    label: Merchant category
+    type: string
+  - name: card_network
+    label: Card network
+    type: string
+  - name: country
+    label: Country
+    type: string
+  - name: is_today
+    label: Live day
+    type: boolean
+    expression: is_today = 1
+
+metrics:
+  # Additive base metrics. Each one is a plain sum over the serving view, which is
+  # only possible because the minute rollup keeps them additive.
+  - name: authorizations
+    label: Authorizations
+    expression: sum(txns)
+    format:
+      type: number
+      decimals: 0
+  - name: approved
+    label: Approved
+    expression: sum(approved)
+    format:
+      type: number
+      decimals: 0
+  - name: declined
+    label: Declined
+    expression: sum(declined)
+    format:
+      type: number
+      decimals: 0
+  - name: chargebacks
+    label: Chargebacks
+    expression: sum(chargebacks)
+    format:
+      type: number
+      decimals: 0
+  - name: fraud_flagged
+    label: Fraud flagged
+    expression: sum(fraud_flagged)
+    format:
+      type: number
+      decimals: 0
+  - name: volume
+    label: Approved volume
+    expression: sum(approved_volume)
+    format:
+      type: currency
+      currency: USD
+      decimals: 2
+  - name: refunded_volume
+    label: Refunded volume
+    expression: sum(refunded_volume)
+    format:
+      type: currency
+      currency: USD
+      decimals: 2
+
+  # Ratio metrics, derived from the additive bases. Defining them as references
+  # rather than repeating the SQL means they stay consistent at every grain the
+  # dashboard slices by, and the generated SQL guards the division.
+  - name: approval_rate
+    label: Approval rate
+    expression: "{approved} / {authorizations}"
+    format:
+      type: percentage
+      decimals: 2
+  - name: decline_rate
+    label: Decline rate
+    expression: "{declined} / {authorizations}"
+    format:
+      type: percentage
+      decimals: 2
+  - name: fraud_rate
+    label: Fraud rate
+    expression: "{fraud_flagged} / {authorizations}"
+    format:
+      type: percentage
+      decimals: 2
+  - name: chargeback_rate
+    label: Chargeback rate
+    expression: "{chargebacks} / {authorizations}"
+    format:
+      type: percentage
+      decimals: 2
+  - name: avg_ticket
+    label: Average approved ticket
+    expression: "{volume} / {approved}"
+    format:
+      type: currency
+      currency: USD
+      decimals: 2
+
+  # Decline reason breakdown, as counts so they stay additive.
+  - name: declined_insufficient_funds
+    label: Insufficient funds
+    expression: sum(declined_insufficient_funds)
+    format:
+      type: number
+      decimals: 0
+  - name: declined_do_not_honor
+    label: Do not honor
+    expression: sum(declined_do_not_honor)
+    format:
+      type: number
+      decimals: 0
+  - name: declined_fraud_suspected
+    label: Fraud suspected
+    expression: sum(declined_fraud_suspected)
+    format:
+      type: number
+      decimals: 0
+  - name: declined_expired_card
+    label: Expired card
+    expression: sum(declined_expired_card)
+    format:
+      type: number
+      decimals: 0
+
+segments:
+  - name: live_day
+    filter: "is_today = 1"
+  - name: sealed_history
+    filter: "is_today = 0"
+  - name: fraud_only
+    filter: "fraud_flagged > 0"
