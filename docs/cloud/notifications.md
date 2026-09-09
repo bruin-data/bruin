@@ -63,10 +63,12 @@ A rule can send to multiple destinations and can include multiple recipients or 
 | --- | --- | --- |
 | Email | No connection is required. | One or more email addresses. |
 | Slack | [Connect Slack to Bruin](/cloud/integrations/slack). | A channel name or ID. |
-| Microsoft Teams | [Add the Bruin bot to Teams](/cloud/integrations/teams). | The full conversation ID, starting with `19:`. |
-| Discord | [Connect the Bruin bot to Discord](/cloud/integrations/discord). | A numeric channel ID the bot can access. |
+| Microsoft Teams | [Add the Bruin bot to Teams](/cloud/integrations/teams). | The full channel ID, starting with `19:`. Connection names are not supported. |
+| Discord | [Connect the Bruin bot to Discord](/cloud/integrations/discord). | A numeric channel ID the bot can access. Connection names are not supported. |
 
 Enter multiple values on separate lines or separate them with commas.
+
+To find a Microsoft Teams channel ID, copy the channel link. The encoded value after `/channel/` is the channel ID. Replace `%3A` with `:` and `%40` with `@`. For example, `19%3Aabc%40thread.tacv2` becomes `19:abc@thread.tacv2`.
 
 <a href="notifications/notification-rule-destinations.png" target="_blank">
   <img class="docs-screenshot" src="/cloud/notifications/notification-rule-destinations.png" alt="Email and Slack destinations in a notification rule">
