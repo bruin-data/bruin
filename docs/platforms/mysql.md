@@ -19,10 +19,19 @@ connections:
       ssl_ca_path: "path/to/ca.pem"       # optional
       ssl_cert_path: "path/to/cert.pem"   # optional
       ssl_key_path: "path/to/key.pem"     # optional
+      read_only: false
 ```
 
+### Read-only connections
+
+Set `read_only: true` to enable native read-only execution. The default is `false`. Bruin sets `transaction_read_only=1` on each native connection, disables multiple SQL statements per query, and runs each query in a read-only transaction. This requires a MySQL server that supports `transaction_read_only`.
+
+This option applies to Bruin's native SQL client. Ingestr assets and seed loading through ingestr return an error for these connections because they open a separate connection that does not preserve this setting. Use a separate connection with database-enforced read-only credentials for ingestion sources.
+
+Native read-only mode follows the database's transaction and permission rules; use database-enforced privileges when running untrusted SQL.
+
 > [!TIP]
-> If you plan to execute any SQL containing multiple statements (e.g. Bruin table materializations), ensure the connection allows multi-statements. When using the built-in MySQL client in Bruin this flag is automatically appended to the DSN.
+> If you plan to execute any SQL containing multiple statements (e.g. Bruin table materializations), ensure the connection allows multi-statements. When using the built-in MySQL client in Bruin this flag is automatically appended to the DSN unless `read_only` is enabled.
 
 ## MySQL Assets
 

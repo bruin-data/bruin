@@ -16,6 +16,7 @@ type Config struct {
 	SslCaPath   string
 	SslCertPath string
 	SslKeyPath  string
+	ReadOnly    bool
 }
 
 func (c Config) GetIngestrURI() string {
@@ -69,6 +70,10 @@ func (c Config) ToDBConnectionURI() string {
 		c.Database,
 	)
 
+	if c.ReadOnly {
+		return dsn + "?multiStatements=false&transaction_read_only=1"
+	}
+
 	if !strings.Contains(dsn, "?") {
 		dsn += "?multiStatements=true"
 	} else {
@@ -76,4 +81,8 @@ func (c Config) ToDBConnectionURI() string {
 	}
 
 	return dsn
+}
+
+func (c Config) IsReadOnly() bool {
+	return c.ReadOnly
 }

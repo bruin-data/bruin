@@ -1326,6 +1326,7 @@ func (m *Manager) AddMySQLConnectionFromConfig(connection *config.MySQLConnectio
 	m.mutex.Unlock()
 
 	client, err := mysql.NewClient(&mysql.Config{
+		ReadOnly: connection.ReadOnly,
 		Username: connection.Username,
 		Password: connection.Password,
 		Host:     connection.Host,
