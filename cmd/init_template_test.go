@@ -102,6 +102,115 @@ func TestInitShopifyClickHouseCopiesPipelineTemplate(t *testing.T) {
 	require.Contains(t, string(orderLinesAsset), "incremental_key: order_id")
 }
 
+func TestInitPaymentsClickHouseCopiesDemoTemplate(t *testing.T) {
+	targetRoot := t.TempDir()
+	t.Chdir(targetRoot)
+
+	gitInit := exec.CommandContext(t.Context(), "git", "init")
+	gitInit.Dir = targetRoot
+	out, err := gitInit.CombinedOutput()
+	require.NoError(t, err, string(out))
+
+	err = Init().Run(t.Context(), []string{"init", "demo-payments-clickhouse"})
+	require.NoError(t, err)
+
+	pipelineRoot := filepath.Join(targetRoot, "demo-payments-clickhouse")
+	require.FileExists(t, filepath.Join(pipelineRoot, "README.md"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "pipeline.yml"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "demo.sh"))
+	// The demo is self-contained: the Docker stack, its local config, and both
+	// consumer surfaces have to come across for `demo.sh` to run end to end.
+	require.FileExists(t, filepath.Join(pipelineRoot, "docker", "compose.yml"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "docker", "bruin-local.yml"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "docker", "postgres-init.sql"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "dashboards", "payments_risk.yml"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "semantic", "payments_risk.yml"))
+	// The README links to both of these, so they have to come across on init.
+	require.FileExists(t, filepath.Join(pipelineRoot, "docs", "ingestion-boundaries.md"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "docs", "mode2-aggregating-mergetree.md"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "assets", "ingestion", "raw_transaction_changes.asset.yml"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "assets", "ingestion", "transactions_seed.py"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "assets", "serving", "serving_realtime_risk.sql"))
+
+	pipeline, err := os.ReadFile(filepath.Join(pipelineRoot, "pipeline.yml"))
+	require.NoError(t, err)
+	require.Contains(t, string(pipeline), "name: demo-payments-clickhouse")
+	require.Contains(t, string(pipeline), "clickhouse: \"clickhouse-default\"")
+	require.Contains(t, string(pipeline), "postgres: \"postgres-default\"")
+
+	// The template ships a .bruin.yml, so init merges the Cloud connection
+	// placeholders into the central config rather than leaving the user unwired.
+	configContent, err := os.ReadFile(filepath.Join(targetRoot, ".bruin.yml"))
+	require.NoError(t, err)
+	require.Contains(t, string(configContent), "name: clickhouse-default")
+	require.Contains(t, string(configContent), "name: postgres-default")
+
+	// The lookback window is the whole point of the restatement lesson, so pin it.
+	rollup, err := os.ReadFile(filepath.Join(pipelineRoot, "assets", "rollups", "rollup_txn_1m.sql"))
+	require.NoError(t, err)
+	require.Contains(t, string(rollup), "strategy: time_interval")
+	require.Contains(t, string(rollup), "start: -15m")
+}
+
+func TestPaymentsClickHouseTemplateHasSelfContainedDemo(t *testing.T) {
+	t.Parallel()
+
+	expectedAssets := []string{
+		"ingestion/raw_transaction_changes.asset.yml",
+		"ingestion/transactions_seed.py",
+		"staging/stg_transaction_changes.sql",
+		"rollups/rollup_txn_1m.sql",
+		"rollups/rollup_txn_1h.sql",
+		"kpi/kpi_txn_daily.sql",
+		"serving/serving_realtime_risk.sql",
+	}
+
+	var actualAssets []string
+	err := iofs.WalkDir(templates.Templates, "demo-payments-clickhouse/assets", func(path string, entry iofs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		actualAssets = append(actualAssets, strings.TrimPrefix(path, "demo-payments-clickhouse/assets/"))
+		return nil
+	})
+	require.NoError(t, err)
+	require.ElementsMatch(t, expectedAssets, actualAssets)
+
+	// demo.sh is embedded through the top-level `*` directive; a change to the
+	// embed rules could silently drop the one entry point the README points at.
+	demo, err := templates.Templates.ReadFile("demo-payments-clickhouse/demo.sh")
+	require.NoError(t, err)
+	// It has to locate itself rather than hard-code the folder name, so the demo
+	// survives being generated into a differently named directory.
+	require.Contains(t, string(demo), `cd "$(dirname "$0")"`)
+	require.NotContains(t, string(demo), "bruin-payments-clickhouse/")
+
+	// Header comments here carry copy-pasteable commands, so a stale old-folder
+	// path would break them after init; the trailing slash spares the container names.
+	for _, name := range []string{"docker/compose.yml", "docker/bruin-local.yml"} {
+		content, err := templates.Templates.ReadFile("demo-payments-clickhouse/" + name)
+		require.NoError(t, err, name)
+		require.NotContains(t, string(content), "bruin-payments-clickhouse/", name)
+	}
+
+	// The live source is tagged apart from the generator so `--exclude-tag
+	// demo-seed` can repoint the pipeline at a real PostgreSQL database.
+	seed, err := templates.Templates.ReadFile("demo-payments-clickhouse/assets/ingestion/transactions_seed.py")
+	require.NoError(t, err)
+	require.Contains(t, string(seed), "demo-seed")
+
+	rawChanges, err := templates.Templates.ReadFile("demo-payments-clickhouse/assets/ingestion/raw_transaction_changes.asset.yml")
+	require.NoError(t, err)
+	require.Contains(t, string(rawChanges), "requires-postgres")
+
+	readme, err := templates.Templates.ReadFile("demo-payments-clickhouse/README.md")
+	require.NoError(t, err)
+	require.Contains(t, string(readme), "# Payments ClickHouse")
+}
+
 func TestInitStripeBigQueryCopiesStarterTemplate(t *testing.T) {
 	targetRoot := t.TempDir()
 	t.Chdir(targetRoot)
