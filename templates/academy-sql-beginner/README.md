@@ -23,19 +23,24 @@ academy-sql-beginner/
 ├─ AGENTS.md               # Turns a coding agent into your SQL instructor for the course.
 ├─ .bruin.yml              # Connections and environments. (On init it moves to your repo root.)
 ├─ .gitignore              # Keeps the generated database and logs out of git.
+├─ course/                 # The 15-lesson course the agent teaches from.
+│  ├─ README.md            # Syllabus and the setup prompt to paste once.
+│  ├─ progress.md          # Your checklist; the agent ticks it off as you go.
+│  ├─ answer-key.md        # Capstone key. Instructor-only - do not open it early.
+│  └─ lessons/             # One file per lesson, 01-start-here … 15-recap-and-next-steps.
 ├─ docs/                   # Reference to read to get oriented - cheaper than asking the database.
 │  ├─ failure-modes.md     # Start here: loud vs silent failures, and what NULL means.
 │  ├─ schema.md            # Every table and column, what "grain" means, and how they relate.
-│  ├─ writing-an-asset.md  # The asset file format, for when you save a query (Step 12).
+│  ├─ writing-an-asset.md  # The asset file format, for the save-a-query-as-an-asset lesson.
 │  ├─ data-design.md       # How the data is generated, and why you must not change it casually.
 │  └─ known-defects.md     # The four defects planted in the data, and the lesson each one serves.
 ├─ queries/                # Practice SQL. Plain files you run, not pipeline assets.
-│  ├─ 01-first-look.sql    # Step 4: SELECT, WHERE, ORDER BY, LIMIT.
-│  ├─ 02-aggregates.sql    # Step 5: COUNT, SUM, AVG, GROUP BY, HAVING, CASE.
-│  ├─ 03-joins.sql         # Step 6: INNER vs LEFT JOIN, grain, and the fan-out trap.
-│  ├─ 04-cte.sql           # Step 7: naming a step with WITH (a CTE), and execution order.
-│  ├─ anchors.md           # Numbers you have verified, to check later answers against (Step 10).
-│  ├─ audit-template.md    # The seven-point audit checklist to fill in (Step 9).
+│  ├─ 01-first-look.sql    # ask-one-table: SELECT, WHERE, ORDER BY, LIMIT.
+│  ├─ 02-aggregates.sql    # count-sum-group: COUNT, SUM, AVG, GROUP BY, HAVING, CASE.
+│  ├─ 03-joins.sql         # join-without-breaking: INNER vs LEFT JOIN, grain, and the fan-out trap.
+│  ├─ 04-cte.sql           # name-your-steps: naming a step with WITH (a CTE), and execution order.
+│  ├─ anchors.md           # Numbers you have verified, to check later answers against (interrogate-the-logic).
+│  ├─ audit-template.md    # The seven-point audit checklist to fill in (audit-what-it-wrote).
 │  └─ audit-lab/           # The signature exercise: ten queries, exactly six of them wrong.
 │     ├─ README.md            # The task and the rules.
 │     ├─ q01.sql … q10.sql    # One business question each. Run it, decide if the answer is right.
@@ -51,25 +56,25 @@ academy-sql-beginner/
       └─ order_items.sql       # order_items: 2,880 order lines (2.4 per order).
 ```
 
-Your own assets go in `pipeline/assets/` too, alongside those six. Step 12 has you
-create your first one; [`docs/writing-an-asset.md`](docs/writing-an-asset.md) is the
-format.
+Your own assets go in `pipeline/assets/` too, alongside those six. The
+save-a-query-as-an-asset lesson has you create your first one;
+[`docs/writing-an-asset.md`](docs/writing-an-asset.md) is the format.
 
 ## Generate the data
 
-Two commands. `bruin run` needs to be able to find the pipeline, so run it from
-inside the project folder rather than the repository root above it.
+One command, run from the folder where you ran `bruin init` (the path names the
+pipeline inside this project):
 
 ```bash
-cd academy-sql-beginner
-bruin run pipeline/
+bruin run academy-sql-beginner/pipeline
 ```
 
 (If `bruin init` told you to "add your connection credentials" - you do not need any.
 This project builds a local database file and needs no account and no password.)
 
-That builds all six tables into a local DuckDB database (`academy.duckdb`) in about a
-tenth of a second. Then look around:
+That builds all six tables into a local DuckDB database
+(`academy-sql-beginner/academy.duckdb`) in about a tenth of a second. Then look
+around:
 
 ```bash
 bruin query --connection duckdb-default --description "list the tables" \
@@ -104,7 +109,7 @@ asset in `pipeline/assets/` documents its own columns.
 
 Read [`docs/failure-modes.md`](docs/failure-modes.md) before you write any SQL. It is
 two minutes, it explains the difference between a query that breaks and a query that
-lies, and it defines NULL - which the first three lessons all lean on.
+lies, and it defines NULL - which the early SQL lessons all lean on.
 
 ## What is deliberately wrong with the data
 
@@ -153,7 +158,11 @@ to work at scale, in order of least to most setup:
 
 ## The course
 
-Written to be worked through alongside the beginner course at
-[getbruin.com/learn](https://getbruin.com/learn). `AGENTS.md` in this folder turns
-a coding agent into a SQL instructor for the course - open the project with your
-agent and ask it to help you start.
+This project is an interactive, agent-led course. `AGENTS.md` in this folder turns a
+coding agent into the instructor, and [`course/README.md`](course/README.md) is the
+syllabus and explains how the loop works. In short: open this project with a coding
+agent, paste the setup prompt from `course/README.md`, then drive with `next lesson`
+and `review my work`.
+
+It mirrors the beginner course at [getbruin.com/learn](https://getbruin.com/learn),
+so the two stay in sync.

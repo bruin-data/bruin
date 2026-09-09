@@ -5,8 +5,11 @@ environments:
   default:
     connections:
       duckdb:
+        # The path is relative to this .bruin.yml, which init writes at your repo
+        # root. Naming the project folder keeps academy.duckdb inside it, where the
+        # project's own .gitignore already ignores it, rather than loose at the root.
         - name: "duckdb-default"
-          path: "academy.duckdb"
+          path: "academy-sql-beginner/academy.duckdb"
 
   # Optional cloud path. Set MOTHERDUCK_TOKEN, then run with --environment cloud.
   cloud:

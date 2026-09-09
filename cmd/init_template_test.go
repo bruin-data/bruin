@@ -722,14 +722,30 @@ func TestInitAcademySqlBeginnerCopiesStarterTemplate(t *testing.T) {
 	configContent, err := os.ReadFile(filepath.Join(targetRoot, ".bruin.yml"))
 	require.NoError(t, err)
 	require.Contains(t, string(configContent), "name: duckdb-default")
-	require.Contains(t, string(configContent), "path: academy.duckdb")
+	// The path names the project folder so the database lands inside it, under the
+	// .gitignore the template ships, not loose at the repo root.
+	require.Contains(t, string(configContent), "path: academy-sql-beginner/academy.duckdb")
 
-	// The database lands next to .bruin.yml, above the pipeline folder and so
-	// outside the .gitignore the template ships.
+	// The database lives inside the project folder, so init must not leak its
+	// ignore entries into the user's repo-root .gitignore.
 	gitignore, err := os.ReadFile(filepath.Join(targetRoot, ".gitignore"))
 	require.NoError(t, err)
-	require.Contains(t, string(gitignore), "/academy.duckdb")
-	require.Contains(t, string(gitignore), "/academy.duckdb.wal")
+	require.NotContains(t, string(gitignore), "academy.duckdb")
+
+	// The project folder's own .gitignore is what keeps the generated database
+	// out of git.
+	projectGitignore, err := os.ReadFile(filepath.Join(pipelineRoot, ".gitignore"))
+	require.NoError(t, err)
+	require.Contains(t, string(projectGitignore), "*.duckdb")
+	require.Contains(t, string(projectGitignore), "*.duckdb.wal")
+
+	// The course scaffolding drives the interactive lessons, so it has to ship.
+	require.FileExists(t, filepath.Join(pipelineRoot, "course", "README.md"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "course", "progress.md"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "course", "answer-key.md"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "course", "lessons", "01-start-here.md"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "course", "lessons", "14-capstone-audit-lab.md"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "course", "lessons", "15-recap-and-next-steps.md"))
 }
 
 func TestAcademySqlBeginnerTemplateIsDeterministicByConstruction(t *testing.T) {

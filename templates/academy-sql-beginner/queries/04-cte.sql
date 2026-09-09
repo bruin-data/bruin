@@ -1,4 +1,4 @@
--- Step 7 - Common Table Expressions (CTEs)
+-- Lesson 08 (name-your-steps) - Common Table Expressions (CTEs)
 --
 -- A CTE is a named, temporary result you define with WITH and then use like a
 -- table. It lets you do one step at a time instead of nesting everything.
@@ -31,7 +31,7 @@ LIMIT 10;
 
 -- Because order_revenue already has one row per order, joining it to orders
 -- does NOT fan out. Aggregating to the right grain first is the usual fix for
--- the double-counting trap from Step 6.
+-- the double-counting trap from the join-without-breaking lesson.
 --
 -- The order you write a query in is not the order the database runs it in. This
 -- is the logical order of execution, and it explains most beginner surprises:

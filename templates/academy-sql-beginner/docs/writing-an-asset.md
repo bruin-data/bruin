@@ -5,7 +5,8 @@ is saved. An **asset** is the other thing. It is a query the project keeps, give
 name to, and rebuilds on command, so the answer becomes a table other queries can
 use.
 
-You need this for Step 12 of the course, where you turn your audited query into one.
+You need this for the save-a-query-as-an-asset lesson, where you turn your audited
+query into one.
 
 ## What an asset file looks like
 
@@ -70,9 +71,9 @@ the other strategies.
 ## Run it
 
 ```bash
-bruin validate pipeline/          # check the file is well-formed, no data touched
-bruin run pipeline/assets/category_revenue.sql   # build just this one
-bruin run pipeline/               # rebuild everything
+bruin validate academy-sql-beginner/pipeline          # check the file is well-formed, no data touched
+bruin run academy-sql-beginner/pipeline/assets/category_revenue.sql   # build just this one
+bruin run academy-sql-beginner/pipeline               # rebuild everything
 ```
 
 `validate` before `run`, every time. It catches a typo in the metadata block in a

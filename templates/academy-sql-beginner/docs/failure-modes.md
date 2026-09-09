@@ -19,7 +19,7 @@ by the time anyone notices, decisions have been made on it.
 Every trap in this course is a silent failure. That is why the course spends its
 time on reading and checking queries rather than on writing them faster.
 
-## The one word you need before Step 4: NULL
+## The one word you need before the ask-one-table lesson: NULL
 
 **NULL means "no value here."** Not zero, not an empty string, not "unknown to
 you" - the database is recording that it does not have this fact. An order whose

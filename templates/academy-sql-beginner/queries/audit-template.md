@@ -1,8 +1,8 @@
 # Audit: <the question you asked>
 
 Copy this file to `queries/audit_v1.md` and fill it in for the query the agent
-wrote in Step 8. Work down the list in order - the checks are arranged so that the
-cheap ones that invalidate everything else come first.
+wrote in the ask-the-agent lesson. Work down the list in order - the checks are
+arranged so that the cheap ones that invalidate everything else come first.
 
 **Query under audit:** `queries/agent_v1.sql`
 **Headline number it returned:**

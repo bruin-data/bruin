@@ -173,8 +173,14 @@ func gitignorePatternForPath(path string) string {
 
 // ensureLocalDuckDBFilesAreIgnored gitignores every relative DuckDB path in the
 // config, and its write-ahead log. DuckDB resolves a relative path against the
-// config file, so the database lands next to .bruin.yml rather than inside the
-// pipeline folder.
+// config file, so a bare filename lands next to .bruin.yml, which is usually the
+// repository root.
+//
+// Only a database that sits directly beside .bruin.yml is added here. A database
+// nested in a subdirectory (for example academy-sql-beginner/academy.duckdb) is
+// the pipeline folder's own concern, and templates that put it there ship that
+// folder's .gitignore; editing the repo-root ignore for it would leak an entry
+// into the user's root ignore file.
 func ensureLocalDuckDBFilesAreIgnored(fs afero.Fs, bruinYmlPath string, cfg *config.Config) error {
 	gitignoreDir := filepath.Dir(bruinYmlPath)
 
@@ -193,6 +199,13 @@ func ensureLocalDuckDBFilesAreIgnored(fs afero.Fs, bruinYmlPath string, cfg *con
 				continue
 			}
 			seen[path] = true
+
+			// filepath.Dir of a bare filename is ".". Anything else is a
+			// subdirectory database, ignored by the pipeline folder's own
+			// .gitignore rather than the repo root's.
+			if filepath.Dir(path) != "." {
+				continue
+			}
 
 			for _, pattern := range []string{gitignorePatternForPath(path), gitignorePatternForPath(path + ".wal")} {
 				if err := git.EnsureGivenPatternIsInGitignore(fs, gitignoreDir, pattern); err != nil {
@@ -1143,6 +1156,37 @@ func printInitSummary(cfg initConfigSummary, pipelinePath string) {
 }
 
 func printInitRunSteps(pipelinePath string) {
-	infoPrinter.Printf("  2. Run: bruin validate %s\n", pipelinePath)
-	infoPrinter.Printf("  3. Run: bruin run %s\n\n", pipelinePath)
+	runPath := pipelineRunPath(pipelinePath)
+	infoPrinter.Printf("  2. Run: bruin validate %s\n", runPath)
+	infoPrinter.Printf("  3. Run: bruin run %s\n\n", runPath)
+}
+
+// pipelineRunPath returns the path the user should hand to `bruin run` and
+// `bruin validate`. Most templates keep pipeline.yml at the folder init creates,
+// but some nest it in a subdirectory (academy-sql-beginner keeps it under
+// pipeline/), so the created folder is not always a runnable pipeline path. When
+// exactly one pipeline definition lives at or below pipelinePath, return its
+// directory; otherwise fall back to pipelinePath unchanged.
+func pipelineRunPath(pipelinePath string) string {
+	if _, err := getPipelineDefinitionFullPath(pipelinePath); err == nil {
+		return pipelinePath
+	}
+
+	matches := make([]string, 0, 1)
+	_ = filepath.WalkDir(pipelinePath, func(path string, d fs2.DirEntry, err error) error {
+		if err != nil || !d.IsDir() {
+			return nil //nolint:nilerr // a missing or unreadable tree just yields the fallback below
+		}
+		if _, err := getPipelineDefinitionFullPath(path); err == nil {
+			matches = append(matches, path)
+			return fs2.SkipDir
+		}
+		return nil
+	})
+
+	if len(matches) == 1 {
+		return matches[0]
+	}
+
+	return pipelinePath
 }
