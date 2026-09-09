@@ -4,7 +4,7 @@ description: Current order status snapshot for customer operations.
 depends:
   - staging.orders
 tags:
-  - self-heal-demo
+  - demo-self-heal-pipeline
   - duplicate-investigate
 materialization:
   type: table

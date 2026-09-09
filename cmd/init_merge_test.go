@@ -237,7 +237,7 @@ func TestMergeTemplateFilesCopiesMacros(t *testing.T) {
 }
 
 func TestLoadTemplateMergeFilesIncludesWrappedPipelines(t *testing.T) {
-	files, err := loadTemplateMergeFiles("self-heal-demo")
+	files, err := loadTemplateMergeFiles("demo-self-heal-pipeline")
 	require.NoError(t, err)
 
 	paths := mergeFilePaths(files)

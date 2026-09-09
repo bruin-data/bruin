@@ -2,7 +2,7 @@
 name: fulfillment.daily_activity
 description: Daily operational activity from fulfillment event traffic.
 tags:
-  - self-heal-demo
+  - demo-self-heal-pipeline
   - freshness-check
 materialization:
   type: table

@@ -6,7 +6,7 @@ Install the agent skills separately if you want an agent to use them:
 
 ```shell
 bruin ai skills all
-bruin init self-heal-demo
+bruin init demo-self-heal-pipeline
 ```
 
 ## What Is What
@@ -15,8 +15,8 @@ Load the raw tables first:
 
 | Pipeline | Assets | Purpose |
 | --- | --- | --- |
-| `self-heal-demo/demo-seed` | `raw.orders`, `raw.order_status_history`, `raw.order_adjustments`, `raw.fulfillment_events`, `raw.product_catalog` | Seeds DuckDB source tables used by the demo. |
-| `self-heal-demo/demo-pipeline` | `staging.orders`, `orders.status_snapshot`, `finance.order_margin`, `fulfillment.daily_activity`, `catalog.product_prices` | Runs the intentionally failing analytics branches. |
+| `demo-self-heal-pipeline/demo-seed` | `raw.orders`, `raw.order_status_history`, `raw.order_adjustments`, `raw.fulfillment_events`, `raw.product_catalog` | Seeds DuckDB source tables used by the demo. |
+| `demo-self-heal-pipeline/demo-pipeline` | `staging.orders`, `orders.status_snapshot`, `finance.order_margin`, `fulfillment.daily_activity`, `catalog.product_prices` | Runs the intentionally failing analytics branches. |
 
 The main pipeline uses normal business asset names. Scenario names appear only as tags:
 
@@ -29,11 +29,11 @@ The main pipeline uses normal business asset names. Scenario names appear only a
 
 ## Run
 
-From the generated project root, the directory that contains `.bruin.yml` and the `self-heal-demo/` folder:
+From the generated project root, the directory that contains `.bruin.yml` and the `demo-self-heal-pipeline/` folder:
 
 ```shell
-bruin run self-heal-demo/demo-seed
-bruin validate self-heal-demo/demo-pipeline
+bruin run demo-self-heal-pipeline/demo-seed
+bruin validate demo-self-heal-pipeline/demo-pipeline
 ```
 
 Validation should pass after seeding because the broken scenarios are runtime data or warehouse issues.
@@ -41,10 +41,10 @@ Validation should pass after seeding because the broken scenarios are runtime da
 Run one scenario branch at a time:
 
 ```shell
-bruin run --tag duplicate-investigate self-heal-demo/demo-pipeline || true
-bruin run --tag quality-check-investigate self-heal-demo/demo-pipeline || true
-bruin run --tag freshness-check self-heal-demo/demo-pipeline || true
-bruin run --tag schema-drift-check self-heal-demo/demo-pipeline || true
+bruin run --tag duplicate-investigate demo-self-heal-pipeline/demo-pipeline || true
+bruin run --tag quality-check-investigate demo-self-heal-pipeline/demo-pipeline || true
+bruin run --tag freshness-check demo-self-heal-pipeline/demo-pipeline || true
+bruin run --tag schema-drift-check demo-self-heal-pipeline/demo-pipeline || true
 ```
 
 ## Proof Queries
@@ -52,11 +52,11 @@ bruin run --tag schema-drift-check self-heal-demo/demo-pipeline || true
 After running a branch, use the DuckDB connection to inspect the specific bad row, partition, or schema.
 
 ```shell
-bruin query --connection self-heal-demo --query "SELECT order_id, count(*) AS row_count FROM orders.status_snapshot GROUP BY 1 HAVING count(*) > 1;"
-bruin query --connection self-heal-demo --query "SELECT order_id, gross_amount, adjustment_amount, net_amount FROM finance.order_margin WHERE net_amount <= 0;"
-bruin query --connection self-heal-demo --query "SELECT max(event_date) AS modeled_max_date FROM fulfillment.daily_activity;"
-bruin query --connection self-heal-demo --query "SELECT max(CAST(event_timestamp AS DATE)) AS raw_max_date FROM raw.fulfillment_events;"
-bruin query --connection self-heal-demo --query "DESCRIBE raw.product_catalog;"
+bruin query --connection demo-self-heal-pipeline --query "SELECT order_id, count(*) AS row_count FROM orders.status_snapshot GROUP BY 1 HAVING count(*) > 1;"
+bruin query --connection demo-self-heal-pipeline --query "SELECT order_id, gross_amount, adjustment_amount, net_amount FROM finance.order_margin WHERE net_amount <= 0;"
+bruin query --connection demo-self-heal-pipeline --query "SELECT max(event_date) AS modeled_max_date FROM fulfillment.daily_activity;"
+bruin query --connection demo-self-heal-pipeline --query "SELECT max(CAST(event_timestamp AS DATE)) AS raw_max_date FROM raw.fulfillment_events;"
+bruin query --connection demo-self-heal-pipeline --query "DESCRIBE raw.product_catalog;"
 ```
 
 Expected results:

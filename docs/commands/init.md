@@ -25,7 +25,7 @@ bruin init default ecommerce-pipeline
 bruin init default --in-place
 
 # Create the self-healing DuckDB demo pipeline
-bruin init self-heal-demo
+bruin init demo-self-heal-pipeline
 
 # Add the default template's assets to an existing pipeline
 bruin init default pipelines/existing --merge
@@ -151,7 +151,7 @@ exists, the command stops before copying anything and lists the conflicts;
 existing files are never overwritten. `--merge` cannot be combined with
 `--in-place`.
 
-If a template contains more than one pipeline (for example `self-heal-demo`), the
+If a template contains more than one pipeline (for example `demo-self-heal-pipeline`), the
 files of all of them are merged into the single destination pipeline.
 
 ## Example Output

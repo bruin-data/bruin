@@ -1,7 +1,0 @@
-default_environment: default
-environments:
-  default:
-    connections:
-      duckdb:
-        - name: self-heal-demo
-          path: self-heal-demo.duckdb

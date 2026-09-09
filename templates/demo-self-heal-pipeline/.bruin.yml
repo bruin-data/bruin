@@ -1,0 +1,7 @@
+default_environment: default
+environments:
+  default:
+    connections:
+      duckdb:
+        - name: demo-self-heal-pipeline
+          path: demo-self-heal-pipeline.duckdb
