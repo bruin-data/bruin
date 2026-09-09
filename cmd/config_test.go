@@ -42,9 +42,10 @@ func TestConfigFileSelection(t *testing.T) {
 						require.NoError(t, os.WriteFile(configPath, []byte("default_environment: default\nenvironments:\n  default:\n    connections: {}\n"), 0o600))
 					}
 					args := append([]string{"bruin"}, command.args...)
-					if source == "flag" {
+					switch source {
+					case "flag":
 						args = append(args, "--config-file", configPath)
-					} else if source == "env" {
+					case "env":
 						t.Setenv("BRUIN_CONFIG_FILE", configPath)
 					}
 					debug := false
