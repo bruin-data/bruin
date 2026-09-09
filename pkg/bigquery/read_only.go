@@ -44,7 +44,7 @@ func (d *Client) readOnlyDryRun(ctx context.Context, sql string) (*bigquery.Quer
 		return nil, errors.New(resp.Errors[0].Message)
 	}
 	stats := &bigquery.QueryStatistics{
-		TotalBytesProcessed: int64(resp.TotalBytesProcessed),
+		TotalBytesProcessed: resp.TotalBytesProcessed,
 		TotalBytesBilled:    resp.TotalBytesBilled,
 		CacheHit:            resp.CacheHit,
 	}

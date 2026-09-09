@@ -12,13 +12,13 @@ import (
 
 const readOnlyScope = "https://www.googleapis.com/auth/bigquery.readonly"
 
-func (c *Config) clientOptions(ctx context.Context) ([]option.ClientOption, error) {
+func (c Config) clientOptions(ctx context.Context) ([]option.ClientOption, error) {
 	if c.ReadOnly {
-		tokenSource, err := c.readOnlyTokenSource(ctx)
+		credentials, err := c.readOnlyCredentials(ctx)
 		if err != nil {
 			return nil, err
 		}
-		return []option.ClientOption{option.WithTokenSource(tokenSource)}, nil
+		return []option.ClientOption{option.WithTokenSource(credentials.TokenSource)}, nil
 	}
 
 	options := []option.ClientOption{option.WithScopes(scopes...)}
@@ -40,7 +40,7 @@ func (c *Config) clientOptions(ctx context.Context) ([]option.ClientOption, erro
 	return options, nil
 }
 
-func (c *Config) readOnlyTokenSource(ctx context.Context) (oauth2.TokenSource, error) {
+func (c Config) readOnlyCredentials(ctx context.Context) (*google.Credentials, error) {
 	if c.UseApplicationDefaultCredentials || c.AccessToken != "" || c.Credentials != nil {
 		return nil, errors.New("read_only requires service_account_json or service_account_file; ADC, access_token, and preconfigured credentials are not supported")
 	}
@@ -59,5 +59,5 @@ func (c *Config) readOnlyTokenSource(ctx context.Context) (oauth2.TokenSource, e
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create read-only BigQuery credentials")
 	}
-	return credentials.TokenSource, nil
+	return credentials, nil
 }

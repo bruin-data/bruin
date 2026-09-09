@@ -38,15 +38,23 @@ func TestReadOnlyBigQuery(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 				if r.URL.Path == "/token" {
-					require.NoError(t, r.ParseForm())
+					if !assert.NoError(t, r.ParseForm()) {
+						return
+					}
 					parts := strings.Split(r.Form.Get("assertion"), ".")
-					require.Len(t, parts, 3)
+					if !assert.Len(t, parts, 3) {
+						return
+					}
 					data, err := base64.RawURLEncoding.DecodeString(parts[1])
-					require.NoError(t, err)
+					if !assert.NoError(t, err) {
+						return
+					}
 					var claims struct {
 						Scope string `json:"scope"`
 					}
-					require.NoError(t, json.Unmarshal(data, &claims))
+					if !assert.NoError(t, json.Unmarshal(data, &claims)) {
+						return
+					}
 					assert.Equal(t, "https://www.googleapis.com/auth/bigquery.readonly", claims.Scope)
 					tokens.Add(1)
 					_, _ = w.Write([]byte(`{"access_token":"readonly-token","token_type":"Bearer","expires_in":3600}`))
@@ -59,7 +67,9 @@ func TestReadOnlyBigQuery(t *testing.T) {
 					return
 				}
 				var req bigqueryapi.QueryRequest
-				require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
+				if !assert.NoError(t, json.NewDecoder(r.Body).Decode(&req)) {
+					return
+				}
 				assert.Equal(t, "EU", req.Location)
 				assert.Equal(t, expectedMaxBytes.Load(), req.MaximumBytesBilled)
 				if strings.HasPrefix(req.Query, "DELETE") {
