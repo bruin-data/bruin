@@ -490,15 +490,3 @@ columns:
     type: "UInt32"
     description: "Time spent on the page in seconds"
 ```
-
-## Testing read-only connections
-
-The existing ClickHouse testcontainers suite starts a local server and exercises `bruin query` with writable and read-only connections. It verifies JSON results, rejects writes and attempts to disable read-only mode, and checks that the table is unchanged.
-
-```bash
-make build
-cd integration-tests/cloud-integration-tests/clickhouse
-go test -count=1 -v -run '^TestReadOnlyConnection$' .
-```
-
-Docker is required. `CLICKHOUSE_TEST_IMAGE` overrides the existing suite's default image.
