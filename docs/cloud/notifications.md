@@ -68,7 +68,7 @@ A rule can send to multiple destinations and can include multiple recipients or 
 
 Enter multiple values on separate lines or separate them with commas.
 
-To find a Microsoft Teams channel ID, copy the channel link. The encoded value after `/channel/` is the channel ID. Replace `%3A` with `:` and `%40` with `@`. For example, `19%3Aabc%40thread.tacv2` becomes `19:abc@thread.tacv2`.
+To find a Microsoft Teams channel ID, copy the channel link. The encoded value between `/channel/` and the next `/` is the channel ID. Replace `%3A` with `:` and `%40` with `@`. For example, `19%3Aabc%40thread.tacv2` becomes `19:abc@thread.tacv2`.
 
 <a href="notifications/notification-rule-destinations.png" target="_blank">
   <img class="docs-screenshot" src="/cloud/notifications/notification-rule-destinations.png" alt="Email and Slack destinations in a notification rule">
