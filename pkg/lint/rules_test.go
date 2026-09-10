@@ -2602,6 +2602,54 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 			wantErr:        assert.NoError,
 		},
 		{
+			name: "Change Tracking asset with a wildcard source table should fail",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection":    "conn1",
+					"source_table":         "*",
+					"destination":          "dest1",
+					"cdc":                  "true",
+					"cdc_sql_capture":      "change_tracking",
+					"incremental_strategy": "merge",
+				},
+			},
+			wantErrMessage: "SQL Server Change Tracking replicates a single table: name one in 'source_table', or use 'cdc_sql_capture: cdc' to replicate every table",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "Change Tracking asset with a single source table should pass",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection":    "conn1",
+					"source_table":         "dbo.users",
+					"destination":          "dest1",
+					"cdc":                  "true",
+					"cdc_sql_capture":      "change_tracking",
+					"incremental_strategy": "merge",
+				},
+			},
+			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "log-based CDC asset with a wildcard source table should pass",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection":    "conn1",
+					"source_table":         "*",
+					"destination":          "dest1",
+					"cdc":                  "true",
+					"cdc_sql_capture":      "cdc",
+					"incremental_strategy": "merge",
+				},
+			},
+			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
+		{
 			name: "CDC ingestr asset with publication and slot params should pass",
 			asset: &pipeline.Asset{
 				Type: pipeline.AssetTypeIngestr,

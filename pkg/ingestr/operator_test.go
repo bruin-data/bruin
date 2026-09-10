@@ -1822,9 +1822,10 @@ func TestBasicOperator_MongoMSSQLCDCMode(t *testing.T) {
 			},
 		},
 		{
-			// Change Tracking uses the +ct scheme and ignores query parameters, so
-			// capture_instance/poll_interval must not leak into the emitted URI.
-			name: "SQL Server Change Tracking uses +ct scheme without query params",
+			// Change Tracking uses the +ct scheme and reads poll_interval. It has no
+			// capture instance and replicates one table, so capture_instance and
+			// dest_schema must not leak into the emitted URI.
+			name: "SQL Server Change Tracking uses +ct scheme with poll interval only",
 			asset: &pipeline.Asset{
 				Name:       "ct-mssql-asset",
 				Connection: "bq",
@@ -1835,18 +1836,46 @@ func TestBasicOperator_MongoMSSQLCDCMode(t *testing.T) {
 					"cdc":                  "true",
 					"cdc_sql_capture":      "change_tracking",
 					"cdc_capture_instance": "dbo_users",
+					"cdc_dest_schema":      "replica",
 					"cdc_poll_interval":    "10s",
 				},
 			},
 			want: []string{
 				"ingest",
-				"--source-uri", "mssql+ct://user:pass@localhost:1433/db",
+				"--source-uri", "mssql+ct://user:pass@localhost:1433/db?poll_interval=10s",
 				"--source-table", "dbo.users",
 				"--dest-uri", "bigquery://uri-here",
 				"--dest-table", "ct-mssql-asset",
 				"--yes",
 				"--progress", "log",
 				"--incremental-strategy", "merge",
+			},
+		},
+		{
+			name: "SQL Server Change Tracking streams with a poll interval",
+			asset: &pipeline.Asset{
+				Name:       "ct-mssql-stream-asset",
+				Connection: "bq",
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "ms",
+					"source_table":      "dbo.users",
+					"destination":       "bigquery",
+					"cdc":               "true",
+					"cdc_sql_capture":   "change_tracking",
+					"cdc_poll_interval": "2s",
+					"stream":            "true",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "mssql+ct://user:pass@localhost:1433/db?poll_interval=2s",
+				"--source-table", "dbo.users",
+				"--dest-uri", "bigquery://uri-here",
+				"--dest-table", "ct-mssql-stream-asset",
+				"--yes",
+				"--progress", "log",
+				"--incremental-strategy", "merge",
+				"--stream",
 			},
 		},
 	}

@@ -333,6 +333,16 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 			Description: "Invalid 'cdc_sql_capture' value: must be 'cdc' or 'change_tracking'",
 		})
 	}
+	// Change Tracking has no multi-table mode, so the wildcard source table that
+	// log-based CDC accepts would leave ingestr without a table to replicate.
+	if capture, _ := asset.Parameters.GetString("cdc_sql_capture"); capture == "change_tracking" {
+		if table, _ := asset.Parameters.GetString("source_table"); table == "*" {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: "SQL Server Change Tracking replicates a single table: name one in 'source_table', or use 'cdc_sql_capture: cdc' to replicate every table",
+			})
+		}
+	}
 	if v, exists := asset.Parameters.GetString("version"); exists && v != "" && !ingestrVersionPattern.MatchString(v) {
 		issues = append(issues, &Issue{
 			Task:        asset,
