@@ -8,7 +8,7 @@
 ## Concepts to teach
 The source has 1,212 order rows. Five rows arrive more than 30 days after their business date, and all five are more than 90 days late; the concentrated 2024 batch exposes the difference between when an order happened and when it arrived. A seven-day lookback catches some late data but cannot catch the five extreme rows.
 
-Filter on `_loaded_at` to discover new rows, delete and insert the corresponding `ordered_at` partitions, and backfill with `bruin run --start-date … --end-date …`. On the Cloud path, `bruin backfill` orchestrates the chunks. `interval_modifiers` can add a single-unit lookback, but `1h30m` is not a valid single unit and requires `--apply-interval-modifiers`.
+Filter on `_loaded_at` to discover new rows, then let Bruin's incremental materialization replace the corresponding `ordered_at` partitions. This is a description of the strategy, not permission to issue a raw `DELETE`; the project guardrail forbids destructive statements. A bounded repair would use `bruin run --start-date 2024-10-01 --end-date 2024-12-31 pipeline`, while `bruin backfill` can orchestrate partitioned chunks. `interval_modifiers` can add a single-unit lookback, but `1h30m` is not a valid single unit and requires `--apply-interval-modifiers`.
 
 ## Quiz
 1. Q: Why does filtering only on `ordered_at >= last_run` miss a late row?

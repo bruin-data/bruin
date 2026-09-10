@@ -6,7 +6,7 @@
 - Explain what warehouse-side history adds beyond DuckDB.
 
 ## Concepts to teach
-Bruin stores run evidence under `logs/runs/<pipeline>/<run-id>.json`; `bruin validate --output json` is useful in CI. A Cloud agent can read run history, asset instances, logs, and validation errors through the Cloud MCP read tools, making structured triage a safe agent task.
+Bruin stores run evidence under `logs/runs/<pipeline>/<run-id>.json`; `bruin validate pipeline --output json` is useful in CI. A Cloud agent can read run history, asset instances, logs, and validation errors through the Cloud MCP read tools, making structured triage a safe agent task.
 
 DuckDB has no equivalent billing or shared query-history service. BigQuery and Snowflake expose query text, user, permissions, timing, bytes or credits, and cost through warehouse-side history. Treat cost claims as platform-specific evidence.
 
@@ -22,7 +22,7 @@ DuckDB has no equivalent billing or shared query-history service. BigQuery and S
 Write `docs/observability.md` describing the local log path, a JSON validation command, the Cloud MCP read surfaces, and the warehouse-side BigQuery and Snowflake evidence you would inspect. Include one read-only triage query command with `--description`.
 
 ## Rubric (for `review my work`)
-- [ ] Includes `logs/runs/<pipeline>/<run-id>.json` and `bruin validate --output json`.
+- [ ] Includes `logs/runs/<pipeline>/<run-id>.json` and `bruin validate pipeline --output json`.
 - [ ] Names run history, asset instances, logs, and validation errors as Cloud read surfaces.
 - [ ] Distinguishes DuckDB from BigQuery/Snowflake query history and cost evidence.
 

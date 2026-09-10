@@ -22,12 +22,14 @@ Do not silently continue after an unexpected error.
 You are going to set up and then teach me an interactive SQL course. Do this in order, and show me each command before you run it:
 
 1. Check that Git and Bruin are installed (`git --version`, `bruin version`). If Bruin is missing, install it with `curl -LsSf https://getbruin.com/install/cli | sh`, then check the version again.
-2. Run `bruin init academy-sql-advanced` in this folder.
+2. From the empty folder where you want the project to live, run `bruin init --in-place academy-sql-advanced`.
 3. Run `bruin validate academy-sql-advanced/pipeline`. Then generate the sample data with `bruin run academy-sql-advanced/pipeline`. The shipped project intentionally fails only on `mart.churn_risk`; stop if any other asset fails or if validation fails. After the expected failure, confirm `orders` has 1,212 rows and `order_items` has 2,895 rows.
 4. Read `academy-sql-advanced/AGENTS.md` and `academy-sql-advanced/course/README.md` so you know how to run the course.
 5. Greet me, show me the 15-lesson syllabus, and tell me to say "next lesson" to begin and "review my work" whenever I finish a task.
 
-Do not teach lesson one yet - just get set up and hand me the controls. If any command fails unexpectedly, stop and show me the error instead of trying something else.
+After setup, stay in the project root containing `.bruin.yml`; lesson paths such as `pipeline` and
+`queries/...` are relative to that directory. Do not teach lesson one yet - just get set up and hand me
+the controls. If any command fails unexpectedly, stop and show me the error instead of trying something else.
 ```
 
 The default environment is local DuckDB and needs no token. MotherDuck is optional: configure

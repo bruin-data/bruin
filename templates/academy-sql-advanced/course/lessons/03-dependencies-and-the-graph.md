@@ -21,7 +21,7 @@ a run to the affected portion. Parallel branches are safe only when they do not 
    A: `bruin lineage` and the parsed asset definitions.
 
 ## Task
-Write the target DAG as text in `docs/dag.md`, including every generated table, staging asset, core asset, and mart. Identify the critical path, parallel branches, and the deliberately missing dependency on the `fct_order_lines` relationships check. Verify your graph with `bruin lineage`.
+Write the target DAG as text in `docs/dag.md`, including every generated table, staging asset, core asset, and mart. Identify the critical path, parallel branches, and the deliberately missing dependency on the `fct_order_lines` relationships check. Verify your graph with `bruin lineage pipeline/assets/mart/weekly_category_revenue.sql --full`.
 
 ## Rubric (for `review my work`)
 - [ ] Includes all 8 generated tables, 4 staging assets, 3 core assets, and 2 marts.

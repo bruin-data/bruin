@@ -22,7 +22,7 @@ metric; more generic checks only add noise. A check should name the failure it c
    A: It compares the output to an independent source total and catches silent loss or duplication.
 
 ## Task
-Add a grain custom check and a source-reconciliation custom check to `pipeline/assets/mart/weekly_category_revenue.sql`. Run `bruin validate` and `bruin run --only checks`, recording the check names and results in `docs/checks.md`.
+Add a grain custom check and a source-reconciliation custom check to `pipeline/assets/mart/weekly_category_revenue.sql`. Run `bruin validate pipeline` and `bruin run --only checks pipeline`, recording the check names and results in `docs/checks.md`.
 
 ## Rubric (for `review my work`)
 - [ ] The grain check groups by `iso_week, category_name` and expects duplicate-group count `0`.

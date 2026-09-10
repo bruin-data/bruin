@@ -1436,7 +1436,7 @@ func TestAcademySqlAdvancedTemplateIsWellFormed(t *testing.T) {
 
 	readme, err := templates.Templates.ReadFile("academy-sql-advanced/course/README.md")
 	require.NoError(t, err)
-	require.Contains(t, string(readme), "bruin init academy-sql-advanced")
+	require.Contains(t, string(readme), "bruin init --in-place academy-sql-advanced")
 	require.Contains(t, string(readme), "fails only on `mart.churn_risk`")
 	require.Contains(t, string(readme), "orders` has 1,212 rows")
 
