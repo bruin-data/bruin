@@ -21,6 +21,8 @@ columns:
       column: product_id
     checks:
       - name: relationships
+  - name: source_product_id
+    type: integer
   - name: customer_id
     type: integer
   - name: ordered_at
@@ -44,7 +46,8 @@ columns:
 SELECT
     i.order_id,
     i.line_number,
-    i.product_id,
+    p.product_id,
+    i.product_id AS source_product_id,
     o.customer_id,
     o.ordered_at,
     o.ordered_at_utc,
@@ -56,5 +59,5 @@ SELECT
     CAST(i.quantity * i.net_price AS DECIMAL(12, 2)) AS line_revenue
 FROM stg_order_items AS i
 INNER JOIN stg_orders AS o ON i.order_id = o.order_id
-INNER JOIN stg_products AS p ON i.product_id = p.product_id
+LEFT JOIN stg_products AS p ON i.product_id = p.product_id
 ORDER BY i.order_id, i.line_number;

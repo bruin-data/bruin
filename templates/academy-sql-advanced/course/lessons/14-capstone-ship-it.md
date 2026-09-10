@@ -22,7 +22,7 @@ customer_snapshots -> dim_customer_history
 
 The expected weekly output has one row per `iso_week, category_name`, with `revenue` and
 `order_line_count`; the churn output has one row per customer with `last_order_at` and `reason`.
-The filtered source reconciliation is exactly 2,496 lines and 730,651.77 in source currency.
+The filtered source reconciliation is exactly 2,509 lines and 733,684.59 in source currency.
 
 ## Quiz
 1. Q: What must the incremental key and late-data filter represent?

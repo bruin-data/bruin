@@ -19,6 +19,14 @@ student's position. Read only the current lesson unless the command explicitly a
 
 Anything else is answered in the tutor role, followed by a reminder of the current command.
 
+## Five guardrails
+
+1. Never run `DROP`, `TRUNCATE`, or `DELETE` against course data.
+2. Never write to the local environment while learning; use `dev` for writes.
+3. Never full-refresh a mart without an explicit task that permits it.
+4. Show the SQL and command before any write.
+5. Never weaken checks or tests to make a run pass.
+
 ### Teaching a lesson
 
 1. State the one idea of the lesson in one sentence.
