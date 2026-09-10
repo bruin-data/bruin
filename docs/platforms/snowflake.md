@@ -33,7 +33,7 @@ environments:
 
 The default is `false`. With this option enabled, Bruin allows SELECT queries (including CTEs and set operations), SHOW, DESCRIBE, and EXPLAIN of read queries. Every statement in a multi-statement query must pass validation before any statement executes.
 
-Bruin rejects writes, session changes, procedure calls, SELECT INTO, locking reads, sequence references, unknown or user-defined function calls, and SQL that cannot be parsed or classified. Unknown functions are rejected even when they happen to be read-only. Parser failures also prevent execution. Ingestr URI export is disabled for these connections because ingestr executes outside this validation path.
+Bruin rejects writes, session changes, procedure calls, SELECT INTO, locking reads, sequence references, unknown or user-defined function calls, and SQL that cannot be parsed or classified. Function calls must use an unquoted, unqualified name from Bruin's Snowflake built-in allowlist. SQLGlot recognizing a function from another dialect does not make it allowed. User-defined functions, quoted function names, and dynamically resolved calls such as `IDENTIFIER('my_udf')(1)` are rejected, even when they happen to be read-only. Built-ins outside the allowlist are also rejected. Parser failures also prevent execution. Ingestr URI export is disabled for these connections because ingestr executes outside this validation path.
 
 This is a conservative SQL syntax check. SQLGlot cannot inspect view definitions or prove the absence of side effects in database objects. Use a Snowflake role with restricted privileges as well; `read_only` does not change server-side permissions.
 

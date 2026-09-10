@@ -7,6 +7,8 @@ from sqlglot.optimizer import optimize
 from sqlglot.optimizer.scope import build_scope, find_all_in_scope
 from sqlglot.tokens import TokenType
 
+from .readonly import ReadOnlyFunctionError, parse_read_only_statements
+
 
 def normalize_sqlglot_dialect(dialect: str | None) -> str | None:
     """Map Bruin dialect names that SQLGlot does not expose directly."""
@@ -830,7 +832,7 @@ def is_read_only_query(query: str, dialect: str = None) -> dict:
             return {"is_read_only": False, "error": ""}
         statements = [
             stmt
-            for stmt in parse(query, dialect=dialect)
+            for stmt in parse_read_only_statements(query, dialect)
             if stmt is not None and not isinstance(stmt, exp.Semicolon)
         ]
         if not statements:
@@ -839,6 +841,8 @@ def is_read_only_query(query: str, dialect: str = None) -> dict:
             if not _is_read_only_statement(statement, dialect):
                 return {"is_read_only": False, "error": ""}
         return {"is_read_only": True, "error": ""}
+    except ReadOnlyFunctionError:
+        return {"is_read_only": False, "error": ""}
     except Exception as e:
         return {"is_read_only": False, "error": str(e)}
 
@@ -849,7 +853,7 @@ def _is_read_only_statement(statement: exp.Expr, dialect: str | None) -> bool:
             statement.expression, exp.Literal
         ):
             return False
-        explained = parse(statement.expression.this, dialect=dialect)
+        explained = parse_read_only_statements(statement.expression.this, dialect)
         return (
             len(explained) == 1
             and isinstance(explained[0], exp.Query)
@@ -895,6 +899,11 @@ def _is_read_only_statement(statement: exp.Expr, dialect: str | None) -> bool:
         ):
             return False
         if isinstance(node, exp.Anonymous):
+            return False
+        if (
+            isinstance(node, exp.DynamicIdentifier)
+            and node.args.get("expressions") is not None
+        ):
             return False
         if isinstance(node, exp.Column) and node.name.upper() == "NEXTVAL":
             return False

@@ -11,6 +11,7 @@ import (
 )
 
 func TestDBReadOnly(t *testing.T) {
+	t.Parallel()
 	methods := []struct {
 		name    string
 		run     func(*DB, *query.Query) error
@@ -25,7 +26,8 @@ func TestDBReadOnly(t *testing.T) {
 	}
 	for _, method := range methods {
 		t.Run(method.name, func(t *testing.T) {
-			for _, sql := range []string{"DELETE FROM t", "SELECT 1; DROP TABLE t", "SELECT FROM", "SELECT SYSTEM$CANCEL_QUERY('id')"} {
+			t.Parallel()
+			for _, sql := range []string{"DELETE FROM t", "SELECT 1; DROP TABLE t", "SELECT FROM", "SELECT SYSTEM$CANCEL_QUERY('id')", "SELECT TIME_TO_STR(1, 'x')", "SELECT READ_CSV('x')", "SELECT 1; SELECT READ_CSV('x')", `SELECT "ABS"(1)`, "SELECT IDENTIFIER('my_udf')(1)"} {
 				db := &DB{config: &Config{ReadOnly: true}, connect: func(context.Context) (*sqlx.DB, error) {
 					t.Fatal("read-only validation must reject the query before connecting")
 					return nil, nil
@@ -59,6 +61,7 @@ func TestDBReadOnlyDisabledAllowsWrites(t *testing.T) {
 }
 
 func TestDBReadOnlyExplainVariableDefinitions(t *testing.T) {
+	t.Parallel()
 	db := &DB{config: &Config{ReadOnly: true}}
 	_, err := db.IsValid(t.Context(), &query.Query{Query: "SELECT 1", VariableDefinitions: []string{"DELETE FROM t"}})
 	require.ErrorContains(t, err, "read-only")

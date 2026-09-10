@@ -8,6 +8,7 @@ import (
 )
 
 func TestSQLParserIsReadOnlyQuery(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		query   string
@@ -23,6 +24,41 @@ func TestSQLParserIsReadOnlyQuery(t *testing.T) {
 		{name: "show", query: "SHOW TABLES", want: true},
 		{name: "describe", query: "DESCRIBE TABLE orders", want: true},
 		{name: "explain", query: "EXPLAIN SELECT COUNT(*) FROM orders", want: true},
+		{name: "built-in functions", query: "SELECT ABS(-1), LOWER('A'), COALESCE(NULL, 1), COUNT(*) FROM t", want: true},
+		{name: "built-in aliases", query: "SELECT LEN('abc'), NVL(NULL, 1), POW(2, 3), TO_VARCHAR(1)", want: true},
+		{name: "date functions", query: "SELECT DATEADD(day, 1, CURRENT_DATE()), CURRENT_TIMESTAMP, EXTRACT(year FROM CURRENT_DATE)", want: true},
+		{name: "casts and case", query: "SELECT CASE WHEN x > 0 THEN CAST(x AS INT) ELSE TRY_CAST('1' AS INT) END FROM t", want: true},
+		{name: "predicates", query: "SELECT * FROM t WHERE x IN (1, 2) AND EXISTS(SELECT 1 FROM s) AND x > ALL(SELECT x FROM s)", want: true},
+		{name: "window function", query: "SELECT ROW_NUMBER() OVER (PARTITION BY x ORDER BY y) FROM t", want: true},
+		{name: "CTE column names", query: "WITH x(a) AS (SELECT 1) SELECT a FROM x AS y(a)", want: true},
+		{name: "table function", query: "SELECT * FROM TABLE(FLATTEN(INPUT => PARSE_JSON('[1,2]')))", want: true},
+		{name: "escaped built-in function", query: "SELECT {fn ABS(-1)}", want: true},
+		{name: "parameterized casts", query: "SELECT CAST(x AS NUMBER(10,2)), x::VARCHAR(10) FROM t", want: true},
+		{name: "structured casts", query: "SELECT CAST(x AS ARRAY(NUMBER(10,2))) FROM t", want: true},
+		{name: "quoted function-like alias", query: `WITH "CAST"(x) AS (SELECT 1) SELECT CAST(x AS INT) FROM "CAST"`, want: true},
+		{name: "SQLGlot special function", query: "SELECT ARG_MAX(1,2)"},
+		{name: "SQLGlot cast alias", query: "SELECT SAFE_CAST(1 AS INT)"},
+		{name: "UDF in normalized argument", query: "SELECT DATEADD(TIME_TO_STR(1, 'x'), 1, CURRENT_DATE())"},
+		{name: "UDF sharing CTE name", query: "WITH READ_CSV(x) AS (SELECT 1) SELECT READ_CSV('x')"},
+		{name: "UDF after parameterized cast", query: "SELECT CAST(x AS NUMBER(10,2)), READ_CSV('x') FROM t"},
+		{name: "cross-dialect function", query: "SELECT TIME_TO_STR(1, 'x')"},
+		{name: "cross-dialect table function", query: "SELECT * FROM TABLE(READ_CSV('x'))"},
+		{name: "cross-dialect scalar function", query: "SELECT READ_CSV('x')"},
+		{name: "normalized function alias", query: "SELECT LOG10(10)"},
+		{name: "quoted built-in name", query: `SELECT "ABS"(1)`},
+		{name: "quoted mixed-case name", query: `SELECT "aBs"(1)`},
+		{name: "quoted unknown function", query: `SELECT "my_udf"(1)`},
+		{name: "dynamic function", query: "SELECT IDENTIFIER('my_udf')(1)"},
+		{name: "dynamic zero-argument function", query: "SELECT IDENTIFIER('my_udf')()"},
+		{name: "dynamic table function", query: "SELECT * FROM TABLE(IDENTIFIER('my_udf')(1))"},
+		{name: "escaped UDF", query: "SELECT {fn READ_CSV('x')}"},
+		{name: "nested UDF", query: "SELECT COALESCE(TIME_TO_STR(1, 'x'), 'fallback')"},
+		{name: "UDF in CTE", query: "WITH x AS (SELECT READ_CSV('x')) SELECT * FROM x"},
+		{name: "UDF in predicate", query: "SELECT * FROM t WHERE x = TIME_TO_STR(1, 'x')"},
+		{name: "UDF in later statement", query: "SELECT 1; SELECT READ_CSV('x')"},
+		{name: "UDF in explain", query: "EXPLAIN SELECT READ_CSV('x')"},
+		{name: "UDF text in literal", query: `SELECT 'READ_CSV(''x'')', '"ABS"(1)'`, want: true},
+		{name: "UDF text in comment", query: "SELECT 1 /* READ_CSV('x') */", want: true},
 		{name: "insert", query: "INSERT INTO t VALUES (1)"},
 		{name: "update", query: "UPDATE t SET a = 1"},
 		{name: "delete", query: "DELETE FROM t"},
@@ -57,6 +93,7 @@ func TestSQLParserIsReadOnlyQuery(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			dialect := tt.dialect
 			if dialect == "" {
 				dialect = "snowflake"

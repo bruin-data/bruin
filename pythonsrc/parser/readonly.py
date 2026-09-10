@@ -1,0 +1,107 @@
+from sqlglot import exp, parse, tokenize
+from sqlglot.parsers.snowflake import SnowflakeParser
+from sqlglot.tokens import TokenType
+
+
+SNOWFLAKE_READ_ONLY_FUNCTIONS = frozenset(
+    """
+ABS ACOS ACOSH ADD_MONTHS ANY_VALUE APPROX_COUNT_DISTINCT APPROX_PERCENTILE
+ARRAY_AGG ARRAY_APPEND ARRAY_CAT ARRAY_COMPACT ARRAY_CONSTRUCT ARRAY_CONSTRUCT_COMPACT
+ARRAY_CONTAINS ARRAY_DISTINCT ARRAY_EXCEPT ARRAY_FLATTEN ARRAY_GENERATE_RANGE
+ARRAY_INSERT ARRAY_INTERSECTION ARRAY_MAX ARRAY_MIN ARRAY_POSITION ARRAY_PREPEND
+ARRAY_REMOVE ARRAY_SIZE ARRAY_SLICE ARRAY_SORT ARRAY_TO_STRING ARRAYS_OVERLAP
+ASCII ASIN ASINH ATAN ATAN2 ATANH AVG BASE64_DECODE_BINARY BASE64_DECODE_STRING
+BASE64_ENCODE BITAND BITNOT BITOR BITSHIFTLEFT BITSHIFTRIGHT BITXOR BOOLAND_AGG
+BOOLOR_AGG BOOLXOR_AGG CAST CEIL CHAR CHARINDEX CHR COALESCE CONCAT CONCAT_WS
+CONTAINS CONVERT_TIMEZONE CORR COS COSH COT COUNT COUNT_IF COVAR_POP COVAR_SAMP
+CUME_DIST CURRENT_ACCOUNT CURRENT_DATABASE CURRENT_DATE CURRENT_ROLE CURRENT_SCHEMA
+CURRENT_SESSION CURRENT_TIME CURRENT_TIMESTAMP CURRENT_USER CURRENT_WAREHOUSE
+DATE DATEADD DATEDIFF DATE_FROM_PARTS DATE_PART DATE_TRUNC DAY DAYNAME DAYOFMONTH
+DAYOFWEEK DAYOFWEEKISO DAYOFYEAR DECODE DEGREES DENSE_RANK DIV0 DIV0NULL EDITDISTANCE
+ENDSWITH EQUAL_NULL EXP EXTRACT FIRST_VALUE FLATTEN FLOOR GENERATOR GET GET_PATH
+GREATEST HASH HASH_AGG HAVERSINE HEX_DECODE_BINARY HEX_DECODE_STRING HEX_ENCODE
+HOUR IFF IFNULL INITCAP IS_ARRAY IS_BOOLEAN IS_DATE IS_DECIMAL IS_DOUBLE IS_INTEGER
+IS_NULL_VALUE IS_OBJECT IS_REAL IS_TIME IS_VARCHAR LAG LAST_DAY LAST_VALUE LEAD
+LEAST LEFT LEN LENGTH LISTAGG LN LOG LOWER LPAD LTRIM MAX MD5 MEDIAN MIN
+MINUTE MOD MODE MONTH MONTHNAME NORMAL NTH_VALUE NTILE NULLIF NULLIFZERO NVL NVL2
+OBJECT_AGG OBJECT_CONSTRUCT OBJECT_CONSTRUCT_KEEP_NULL PARSE_JSON PARSE_URL
+PERCENTILE_CONT PERCENTILE_DISC PERCENT_RANK PI POSITION POW POWER QUARTER RADIANS
+RANDOM RANK REGEXP_COUNT REGEXP_INSTR REGEXP_LIKE REGEXP_REPLACE REGEXP_SUBSTR
+REGR_AVGX REGR_AVGY REGR_COUNT REGR_INTERCEPT REGR_R2 REGR_SLOPE REGR_SXX REGR_SXY
+REGR_SYY REPEAT REPLACE REVERSE RIGHT ROUND ROW_NUMBER RPAD RTRIM SECOND SHA1 SHA2
+SIGN SIN SINH SOUNDEX SPLIT SPLIT_PART SQRT SQUARE STARTSWITH STDDEV STDDEV_POP
+STDDEV_SAMP STRTOK SUBSTR SUBSTRING SUM SYSDATE TAN TANH TIME TIMEADD TIMEDIFF
+TIMESTAMPADD TIMESTAMPDIFF TIMESTAMP_FROM_PARTS TIME_FROM_PARTS TO_ARRAY TO_BINARY
+TO_BOOLEAN TO_CHAR TO_DATE TO_DECIMAL TO_DOUBLE TO_JSON TO_NUMBER TO_OBJECT
+TO_TIME TO_TIMESTAMP TO_TIMESTAMP_LTZ TO_TIMESTAMP_NTZ TO_TIMESTAMP_TZ TO_VARCHAR
+TO_VARIANT TRANSLATE TRIM TRUNC TRUNCATE TRY_CAST TRY_PARSE_JSON TRY_TO_BINARY
+TRY_TO_BOOLEAN TRY_TO_DATE TRY_TO_DECIMAL TRY_TO_DOUBLE TRY_TO_NUMBER TRY_TO_TIME
+TRY_TO_TIMESTAMP TRY_TO_TIMESTAMP_LTZ TRY_TO_TIMESTAMP_NTZ TRY_TO_TIMESTAMP_TZ
+TYPEOF UNIFORM UPPER UUID_STRING VARIANCE VARIANCE_POP VARIANCE_SAMP VAR_POP VAR_SAMP
+WEEK WEEKISO WEEKOFYEAR YEAR YEAROFWEEK YEAROFWEEKISO ZEROIFNULL
+    """.split()
+)
+
+SNOWFLAKE_READ_ONLY_SYNTAX = frozenset(
+    {"ALL", "ANY", "CASE", "EXISTS", "ILIKE", "LIKE", "RLIKE", "SOME", "TABLE", "UNION"}
+)
+
+
+class ReadOnlyFunctionError(Exception):
+    pass
+
+
+def parse_read_only_statements(query: str, dialect: str | None):
+    statements = parse(query, dialect=dialect)
+    if dialect != "snowflake":
+        return statements
+
+    alias_positions = {
+        node.this.meta.get("start")
+        for statement in statements
+        if statement is not None
+        for node in statement.find_all(exp.TableAlias)
+        if isinstance(node.this, exp.Identifier)
+    }
+    tokens = tokenize(query, dialect=dialect)
+    type_parameters_end = -1
+    for index, token in enumerate(tokens[:-1]):
+        if index <= type_parameters_end:
+            continue
+        if tokens[index + 1].token_type != TokenType.L_PAREN:
+            continue
+        name = token.text.upper()
+        if (
+            token.token_type not in SnowflakeParser.FUNC_TOKENS
+            and name not in SnowflakeParser.NO_PAREN_FUNCTION_PARSERS
+        ):
+            continue
+        if token.start in alias_positions:
+            continue
+        previous = tokens[index - 1].token_type if index else None
+        if token.token_type in SnowflakeParser.TYPE_TOKENS and previous in (
+            TokenType.ALIAS,
+            TokenType.DCOLON,
+        ):
+            depth = 0
+            for end in range(index + 1, len(tokens)):
+                if tokens[end].token_type == TokenType.L_PAREN:
+                    depth += 1
+                elif tokens[end].token_type == TokenType.R_PAREN:
+                    depth -= 1
+                    if depth == 0:
+                        type_parameters_end = end
+                        break
+            continue
+        if (
+            token.token_type == TokenType.IDENTIFIER
+            or previous == TokenType.DOT
+            or (
+                name not in SNOWFLAKE_READ_ONLY_FUNCTIONS
+                and name not in SNOWFLAKE_READ_ONLY_SYNTAX
+            )
+        ):
+            raise ReadOnlyFunctionError(
+                "function is not allowed on a read-only connection"
+            )
+    return statements
