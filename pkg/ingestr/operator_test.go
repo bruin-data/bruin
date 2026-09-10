@@ -1729,15 +1729,20 @@ func TestBasicOperator_MongoMSSQLCDCMode(t *testing.T) {
 	mockAtlas.On("GetIngestrURI").Return("mongodb+srv://user:pass@cluster.mongodb.net/db", nil)
 	mockMS := new(mockConnection)
 	mockMS.On("GetIngestrURI").Return("mssql://user:pass@localhost:1433/db", nil)
+	// What the mssql connection emits by default: pyodbc spellings, which the v1
+	// engine's Go SQL Server driver rejects until they are translated.
+	mockMSODBC := new(mockConnection)
+	mockMSODBC.On("GetIngestrURI").Return("mssql://user:pass@localhost:1433/db?TrustServerCertificate=yes&driver=ODBC+Driver+18+for+SQL+Server", nil)
 	mockBq := new(mockConnection)
 	mockBq.On("GetIngestrURI").Return("bigquery://uri-here", nil)
 
 	fetcher := simpleConnectionFetcher{
 		connections: map[string]*mockConnection{
-			"mongo": mockMongo,
-			"atlas": mockAtlas,
-			"ms":    mockMS,
-			"bq":    mockBq,
+			"mongo":   mockMongo,
+			"atlas":   mockAtlas,
+			"ms":      mockMS,
+			"ms_odbc": mockMSODBC,
+			"bq":      mockBq,
 		},
 	}
 
@@ -1849,6 +1854,57 @@ func TestBasicOperator_MongoMSSQLCDCMode(t *testing.T) {
 				"--yes",
 				"--progress", "log",
 				"--incremental-strategy", "merge",
+			},
+		},
+		{
+			// go-mssqldb parses TrustServerCertificate with strconv.ParseBool, so the
+			// ODBC "yes" the connection emits has to arrive as "true"; the ODBC driver
+			// name is dropped by ingestr itself and left alone here.
+			name: "SQL Server Change Tracking translates ODBC booleans for the v1 engine",
+			asset: &pipeline.Asset{
+				Name:       "ct-mssql-odbc-asset",
+				Connection: "bq",
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "ms_odbc",
+					"source_table":      "dbo.users",
+					"destination":       "bigquery",
+					"cdc":               "true",
+					"cdc_sql_capture":   "change_tracking",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "mssql+ct://user:pass@localhost:1433/db?TrustServerCertificate=true&driver=ODBC+Driver+18+for+SQL+Server",
+				"--source-table", "dbo.users",
+				"--dest-uri", "bigquery://uri-here",
+				"--dest-table", "ct-mssql-odbc-asset",
+				"--yes",
+				"--progress", "log",
+				"--incremental-strategy", "merge",
+			},
+		},
+		{
+			// The v0 engine connects through pyodbc, which is what the ODBC spellings
+			// are for, so its URI must survive untouched.
+			name: "SQL Server keeps ODBC booleans for the v0 engine",
+			asset: &pipeline.Asset{
+				Name:       "mssql-v0-asset",
+				Connection: "bq",
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "ms_odbc",
+					"source_table":      "dbo.users",
+					"destination":       "bigquery",
+					"version":           "v0",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "mssql://user:pass@localhost:1433/db?TrustServerCertificate=yes&driver=ODBC+Driver+18+for+SQL+Server",
+				"--source-table", "dbo.users",
+				"--dest-uri", "bigquery://uri-here",
+				"--dest-table", "mssql-v0-asset",
+				"--yes",
+				"--progress", "log",
 			},
 		},
 		{
@@ -2341,6 +2397,71 @@ func TestEnsureFabricEngineSupport(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
+		})
+	}
+}
+
+func TestAdaptURIForEngine(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		uri    string
+		engine resolvedEngine
+		want   string
+	}{
+		{
+			name:   "v1 translates the ODBC trust flag the mssql connection emits",
+			uri:    "mssql://user:pass@localhost:1433/db?TrustServerCertificate=yes&driver=ODBC+Driver+18+for+SQL+Server",
+			engine: resolvedEngine{family: versionFamilyV1},
+			want:   "mssql://user:pass@localhost:1433/db?TrustServerCertificate=true&driver=ODBC+Driver+18+for+SQL+Server",
+		},
+		{
+			name:   "v1 translates change tracking URIs",
+			uri:    "mssql+ct://user:pass@localhost:1433/db?TrustServerCertificate=yes&poll_interval=2s",
+			engine: resolvedEngine{family: versionFamilyV1},
+			want:   "mssql+ct://user:pass@localhost:1433/db?TrustServerCertificate=true&poll_interval=2s",
+		},
+		{
+			// Parameter names reach go-mssqldb case-insensitively, and a connection's
+			// options can spell them any way, so the match cannot be exact.
+			name:   "v1 matches parameters and values regardless of case",
+			uri:    "sqlserver://user:pass@localhost:1433/db?trustservercertificate=YES&encrypt=No",
+			engine: resolvedEngine{family: versionFamilyV1},
+			want:   "sqlserver://user:pass@localhost:1433/db?encrypt=false&trustservercertificate=true",
+		},
+		{
+			// "disable" and "strict" are encrypt values only the driver understands.
+			name:   "v1 leaves values it has no translation for untouched",
+			uri:    "mssql://user:pass@localhost:1433/db?TrustServerCertificate=true&encrypt=disable",
+			engine: resolvedEngine{family: versionFamilyV1},
+			want:   "mssql://user:pass@localhost:1433/db?TrustServerCertificate=true&encrypt=disable",
+		},
+		{
+			name:   "v0 keeps the ODBC spellings pyodbc needs",
+			uri:    "mssql://user:pass@localhost:1433/db?TrustServerCertificate=yes&driver=ODBC+Driver+18+for+SQL+Server",
+			engine: resolvedEngine{family: versionFamilyV0},
+			want:   "mssql://user:pass@localhost:1433/db?TrustServerCertificate=yes&driver=ODBC+Driver+18+for+SQL+Server",
+		},
+		{
+			name:   "other sources are left alone",
+			uri:    "postgresql://user:pass@localhost:5432/db?sslmode=require",
+			engine: resolvedEngine{family: versionFamilyV1},
+			want:   "postgresql://user:pass@localhost:5432/db?sslmode=require",
+		},
+		{
+			name:   "an unparseable uri is passed through",
+			uri:    "mssql-without-a-scheme-separator",
+			engine: resolvedEngine{family: versionFamilyV1},
+			want:   "mssql-without-a-scheme-separator",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, adaptURIForEngine(tt.uri, tt.engine))
 		})
 	}
 }
