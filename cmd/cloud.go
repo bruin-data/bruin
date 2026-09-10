@@ -4926,8 +4926,65 @@ func cloudDashboardsFolders() *cli.Command {
 				t.AppendRow(table.Row{f.ID, f.Name, f.DashboardCount})
 			}
 			t.Render()
+
+			printFolderTree(folders)
 			return nil
 		},
+	}
+}
+
+// printFolderTree renders the folders as an indented tree below the flat table,
+// so nesting (which the table's Name column can't show) is visible.
+func printFolderTree(folders []bruincloud.DashboardFolder) {
+	if len(folders) == 0 {
+		return
+	}
+
+	exists := make(map[int]bool, len(folders))
+	for _, f := range folders {
+		exists[f.ID] = true
+	}
+
+	children := make(map[int][]bruincloud.DashboardFolder)
+	var roots []bruincloud.DashboardFolder
+	for _, f := range folders {
+		// Treat a folder as top-level when it has no parent, or its parent isn't in
+		// the list (orphaned by pagination/permissions) — so every folder is shown.
+		if f.ParentID == nil || !exists[*f.ParentID] {
+			roots = append(roots, f)
+		} else {
+			children[*f.ParentID] = append(children[*f.ParentID], f)
+		}
+	}
+
+	// Guard against a cycle in the data (self/mutual parent) that would otherwise
+	// recurse until the process crashes.
+	visited := make(map[int]bool, len(folders))
+
+	// Draw subtrees with ├──/└── connectors and │ continuation lines.
+	var walk func(id int, prefix string)
+	walk = func(id int, prefix string) {
+		kids := children[id]
+		for i, c := range kids {
+			last := i == len(kids)-1
+			branch, next := "├── ", "│   "
+			if last {
+				branch, next = "└── ", "    "
+			}
+			fmt.Printf("%s%s%s\n", prefix, branch, c.Name)
+			if visited[c.ID] {
+				continue
+			}
+			visited[c.ID] = true
+			walk(c.ID, prefix+next)
+		}
+	}
+
+	fmt.Println("\nTree:")
+	for _, r := range roots {
+		visited[r.ID] = true
+		fmt.Println(r.Name) // top-level folders sit flush-left
+		walk(r.ID, "")
 	}
 }
 
