@@ -37,6 +37,8 @@ One of the beneficial features of the `validate` command is the ability to perfo
 
 Dry-run is automatically enabled for BigQuery and Snowflake.
 
+Semantic models in the repository-level `semantic/` directory are also validated. Model structure is checked on every run, including `--fast`. Dedicated `source.query` values and parenthesized `source.table` subqueries are dry-run against a pipeline SQL connection when one is available.
+
 However, there are also scenarios where dry-run is not the best suited tool:
 
 - Dry-run requires all the tables/views to be there, which means if you are running validation on a table that you haven't created yet, it'll fail.

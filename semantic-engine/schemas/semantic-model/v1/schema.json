@@ -60,13 +60,24 @@
   "$defs": {
     "source": {
       "type": "object",
-      "required": ["table"],
       "properties": {
         "table": {
           "type": "string",
           "minLength": 1
+        },
+        "query": {
+          "type": "string",
+          "minLength": 1
         }
       },
+      "oneOf": [
+        {
+          "required": ["table"]
+        },
+        {
+          "required": ["query"]
+        }
+      ],
       "patternProperties": {
         "^x-": true
       },

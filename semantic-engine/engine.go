@@ -90,8 +90,8 @@ func (e *Engine) validate() error {
 	if e.model.Name == "" {
 		return errors.New("model name is required")
 	}
-	if strings.TrimSpace(e.model.Source.Table) == "" {
-		return errors.New("source.table is required")
+	if err := e.model.Source.validate(); err != nil {
+		return err
 	}
 	if err := validateJoins(e.model); err != nil {
 		return err

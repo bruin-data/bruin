@@ -216,6 +216,126 @@ func TestLoadFile_AcceptsLegacyDacSchemaID(t *testing.T) {
 	}
 }
 
+func TestLoadFile_AcceptsQuerySource(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "orders.yml")
+	body := "name: orders\nsource:\n  query: |\n    select * from analytics.orders\n    where deleted_at is null\nmetrics:\n  - name: revenue\n    expression: sum(amount)\n"
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+
+	model, err := LoadFile(path)
+	if err != nil {
+		t.Fatalf("load model with source.query: %v", err)
+	}
+	if !model.Source.HasQuery() {
+		t.Fatal("expected source.query to be set")
+	}
+	if model.Source.Table != "" {
+		t.Fatalf("expected empty source.table, got %q", model.Source.Table)
+	}
+	want := "(select * from analytics.orders\nwhere deleted_at is null) AS orders"
+	if got := model.SourceRelation(); got != want {
+		t.Fatalf("SourceRelation() = %q, want %q", got, want)
+	}
+}
+
+func TestLoadFile_AcceptsParenthesizedTableSource(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "orders.yml")
+	body := "name: orders\nsource:\n  table: |\n    (\n      select * from analytics.orders\n      where deleted_at is null\n    ) as orders\nmetrics:\n  - name: revenue\n    expression: sum(amount)\n"
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+
+	model, err := LoadFile(path)
+	if err != nil {
+		t.Fatalf("load model with parenthesized source.table: %v", err)
+	}
+	if !model.Source.IsQueryable() {
+		t.Fatal("expected parenthesized source.table to be queryable")
+	}
+	if model.Source.HasQuery() {
+		t.Fatal("parenthesized source.table should not set source.query")
+	}
+}
+
+func TestLoadFile_RejectsTableAndQueryTogether(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "orders.yml")
+	body := "name: orders\nsource:\n  table: analytics.orders\n  query: select 1\n"
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+
+	if _, err := LoadFile(path); err == nil {
+		t.Fatal("expected error when both source.table and source.query are set")
+	}
+}
+
+func TestLoadFile_RejectsEmptySource(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "orders.yml")
+	if err := os.WriteFile(path, []byte("name: orders\nsource: {}\n"), 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+
+	if _, err := LoadFile(path); err == nil {
+		t.Fatal("expected error when source has neither table nor query")
+	}
+}
+
+func TestGenerateSQL_QuerySource(t *testing.T) {
+	t.Parallel()
+
+	engine := minimalEngine(t, &Model{
+		Name:    "orders",
+		Source:  Source{Query: "select * from analytics.orders where deleted_at is null"},
+		Metrics: []Metric{{Name: "revenue", Expression: "sum(amount)"}},
+	})
+
+	sql, err := engine.GenerateSQL(&Query{Metrics: []string{"revenue"}})
+	if err != nil {
+		t.Fatalf("GenerateSQL: %v", err)
+	}
+	expectContains(t, sql, "FROM (select * from analytics.orders where deleted_at is null) AS orders")
+}
+
+func TestGenerateSQL_ParenthesizedTableSource(t *testing.T) {
+	t.Parallel()
+
+	table := "(\n      select * from analytics.orders\n      where deleted_at is null\n    ) as orders"
+	engine := minimalEngine(t, &Model{
+		Name:    "orders",
+		Source:  Source{Table: table},
+		Metrics: []Metric{{Name: "revenue", Expression: "sum(amount)"}},
+	})
+
+	sql, err := engine.GenerateSQL(&Query{Metrics: []string{"revenue"}})
+	if err != nil {
+		t.Fatalf("GenerateSQL: %v", err)
+	}
+	expectContains(t, sql, "FROM "+table)
+}
+
+func TestSourceDryRunSQL(t *testing.T) {
+	t.Parallel()
+
+	querySource := Source{Query: "select 1 as id;"}
+	if got := querySource.DryRunSQL("orders"); got != "SELECT * FROM (select 1 as id) AS orders" {
+		t.Fatalf("query DryRunSQL = %q", got)
+	}
+
+	tableSource := Source{Table: "(select 1 as id) as orders"}
+	if got := tableSource.DryRunSQL("orders"); got != "SELECT * FROM (select 1 as id) as orders" {
+		t.Fatalf("table DryRunSQL = %q", got)
+	}
+}
+
 func TestLoadDir_EmptyDirIsOk(t *testing.T) {
 	t.Parallel()
 
@@ -801,9 +921,17 @@ func TestNewEngine_ValidationErrors(t *testing.T) {
 			want:  "model name is required",
 		},
 		{
-			name:  "missing source table",
+			name:  "missing source table and query",
 			model: Model{Name: "m"},
-			want:  "source.table is required",
+			want:  "source.table or source.query is required",
+		},
+		{
+			name: "table and query cannot both be set",
+			model: Model{
+				Name:   "m",
+				Source: Source{Table: "analytics.orders", Query: "select 1"},
+			},
+			want: "source.table and source.query cannot both be set",
 		},
 		{
 			name: "duplicate name across dim and metric",
