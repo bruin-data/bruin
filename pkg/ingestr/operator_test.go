@@ -1749,9 +1749,10 @@ func TestBasicOperator_MongoMSSQLCDCMode(t *testing.T) {
 	finder := new(mockFinder)
 
 	tests := []struct {
-		name  string
-		asset *pipeline.Asset
-		want  []string
+		name          string
+		asset         *pipeline.Asset
+		want          []string
+		extraPackages []string
 	}{
 		{
 			name: "MongoDB CDC transforms URI and auto-sets merge strategy",
@@ -1906,6 +1907,8 @@ func TestBasicOperator_MongoMSSQLCDCMode(t *testing.T) {
 				"--yes",
 				"--progress", "log",
 			},
+			// A plain mssql:// source runs on pyodbc, which the v0 engine installs.
+			extraPackages: []string{"pyodbc==5.1.0"},
 		},
 		{
 			name: "SQL Server Change Tracking streams with a poll interval",
@@ -1941,7 +1944,7 @@ func TestBasicOperator_MongoMSSQLCDCMode(t *testing.T) {
 			t.Parallel()
 
 			runner := new(mockRunner)
-			runner.On("RunIngestr", mock.Anything, tt.want, []string(nil), repo).Return(nil)
+			runner.On("RunIngestr", mock.Anything, tt.want, tt.extraPackages, repo).Return(nil)
 
 			startDate := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 			endDate := time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC)
