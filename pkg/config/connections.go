@@ -528,6 +528,7 @@ type RedshiftConnection struct {
 	Database           string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
 	Schema             string `yaml:"schema,omitempty" json:"schema" mapstructure:"schema"`
 	SslMode            string `yaml:"ssl_mode,omitempty" json:"ssl_mode,omitempty" mapstructure:"ssl_mode" default:"allow"`
+	ReadOnly           bool   `yaml:"read_only,omitempty" json:"read_only,omitempty" mapstructure:"read_only"`
 }
 
 func (c RedshiftConnection) GetName() string {

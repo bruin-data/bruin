@@ -4594,6 +4594,9 @@
         },
         "ssl_mode": {
           "type": "string"
+        },
+        "read_only": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false,

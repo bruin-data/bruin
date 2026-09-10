@@ -65,6 +65,7 @@ type RedShiftConfig struct {
 	Database string
 	Schema   string
 	SslMode  string
+	ReadOnly bool
 }
 
 // ToDBConnectionURI returns a connection URI to be used with the pgx package.
