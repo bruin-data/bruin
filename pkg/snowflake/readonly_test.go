@@ -35,7 +35,7 @@ func TestDBReadOnly(t *testing.T) {
 		t.Run(method.name, func(t *testing.T) {
 			t.Parallel()
 
-			for _, sql := range []string{"DELETE FROM t", "SELECT 1; DROP TABLE t", "SELECT FROM", "SELECT SYSTEM$CANCEL_QUERY('id')", "SELECT * FROM TABLE(TO_QUERY('SELECT 1'))", "SELECT 1; SELECT SYSTEM$CANCEL_QUERY('id')", `SELECT "SYSTEM$CANCEL_QUERY"('id')`, "SELECT IDENTIFIER('my_udf')(1)"} {
+			for _, sql := range []string{"DELETE FROM t", "SELECT 1; DROP TABLE t", "SELECT FROM", "SELECT IDENTIFIER('my_udf')(1)"} {
 				db := &DB{config: &Config{ReadOnly: true}, connect: func(context.Context) (*sqlx.DB, error) {
 					t.Fatal("read-only validation must reject the query before connecting")
 					return nil, nil
@@ -46,7 +46,7 @@ func TestDBReadOnly(t *testing.T) {
 			require.NoError(t, err)
 			defer mockDB.Close()
 			db := &DB{config: &Config{ReadOnly: true}, conn: sqlx.NewDb(mockDB, "sqlmock")}
-			for _, sql := range []string{"SELECT 1", "SELECT my_udf(1)", "SELECT db.schema.my_udf(1)", `SELECT "my_udf"(1)`, "SELECT COALESCE(my_udf(1), 0)"} {
+			for _, sql := range []string{"SELECT 1", "SELECT my_udf(1)", "SELECT db.schema.my_udf(1)", `SELECT "my_udf"(1)`, "SELECT COALESCE(my_udf(1), 0)", "SELECT SYSTEM$CANCEL_QUERY('id')", "SELECT * FROM TABLE(TO_QUERY('SELECT 1'))", "SELECT 1; SELECT SYSTEM$CANCEL_QUERY('id')", `SELECT "SYSTEM$CANCEL_QUERY"('id')`, "SELECT * FROM TABLE(GETNEXTVAL(seq))", "SELECT EXECUTE_AI_EVALUATION('id')"} {
 				expectedSQL := sql
 				if method.explain {
 					expectedSQL = "EXPLAIN " + sql + ";"
