@@ -1,0 +1,82 @@
+name: chargebee_raw.subscription
+type: ingestr
+
+description: >
+  Raw-layer Chargebee subscriptions loaded into BigQuery with ingestr's
+  incremental mode. Each run fetches the subscriptions whose `updated_at` falls
+  inside its own time window and merges them into the destination table on `id`,
+  so a status change, cancellation, or plan change on an existing subscription
+  is picked up by the run whose window covers it, or by a wider backfill.
+
+materialization:
+  type: table
+  strategy: merge
+  incremental_key: updated_at
+
+parameters:
+  source_table: subscriptions
+
+tags:
+  - chargebee_raw
+  - chargebee
+  - billing
+
+columns:
+  - name: id
+    type: varchar
+    description: Chargebee subscription identifier.
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: customer_id
+    type: varchar
+    description: Identifier of the customer the subscription belongs to.
+  - name: status
+    type: varchar
+    description: >
+      Subscription status, one of `future`, `in_trial`, `active`,
+      `non_renewing`, `paused`, or `cancelled`.
+  - name: currency_code
+    type: varchar
+    description: Three-letter ISO currency code the subscription is billed in.
+  - name: billing_period
+    type: integer
+    description: Number of billing period units between invoices.
+  - name: billing_period_unit
+    type: varchar
+    description: Unit of the billing period, one of `day`, `week`, `month`, or `year`.
+  - name: mrr
+    type: integer
+    description: Monthly recurring revenue for the subscription in minor currency units.
+  - name: current_term_start
+    type: integer
+    description: Unix timestamp in seconds of the start of the current term.
+  - name: current_term_end
+    type: integer
+    description: Unix timestamp in seconds of the end of the current term.
+  - name: next_billing_at
+    type: integer
+    description: Unix timestamp in seconds of the next billing date.
+  - name: started_at
+    type: integer
+    description: Unix timestamp in seconds of when the subscription started.
+  - name: activated_at
+    type: integer
+    description: Unix timestamp in seconds of when the subscription became active.
+  - name: cancelled_at
+    type: integer
+    description: Unix timestamp in seconds of when the subscription was cancelled.
+  - name: created_at
+    type: integer
+    description: Unix timestamp in seconds of when the subscription was created.
+    checks:
+      - name: not_null
+  - name: updated_at
+    type: integer
+    description: Unix timestamp in seconds of the last modification to the subscription.
+    checks:
+      - name: not_null
+  - name: deleted
+    type: boolean
+    description: Whether the subscription resource has been deleted.

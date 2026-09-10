@@ -183,6 +183,89 @@ func TestStripeBigQueryStarterTemplateHasFocusedAssetSet(t *testing.T) {
 	require.Contains(t, string(readme), "Stripe Billing Analytics to BigQuery")
 }
 
+func TestInitChargebeeBigQueryCopiesStarterTemplate(t *testing.T) {
+	targetRoot := t.TempDir()
+	t.Chdir(targetRoot)
+
+	gitInit := exec.CommandContext(t.Context(), "git", "init")
+	gitInit.Dir = targetRoot
+	out, err := gitInit.CombinedOutput()
+	require.NoError(t, err, string(out))
+
+	err = Init().Run(t.Context(), []string{"init", "chargebee-bigquery"})
+	require.NoError(t, err)
+
+	pipelineRoot := filepath.Join(targetRoot, "chargebee-bigquery")
+	require.FileExists(t, filepath.Join(pipelineRoot, "pipeline.yml"))
+	require.FileExists(t, filepath.Join(pipelineRoot, ".gitignore"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "macros", "chargebee.sql"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "dashboards", "chargebee-billing-analytics.yml"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "assets", "chargebee_raw", "customer.asset.yml"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "assets", "chargebee_stage", "subscriptions.sql"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "assets", "chargebee_stage", "customer_currency_daily_mrr_snapshot.sql"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "assets", "chargebee_reports", "monthly_subscription_kpis.sql"))
+
+	pipeline, err := os.ReadFile(filepath.Join(pipelineRoot, "pipeline.yml"))
+	require.NoError(t, err)
+	require.Contains(t, string(pipeline), "name: chargebee-bigquery")
+
+	configContent, err := os.ReadFile(filepath.Join(targetRoot, ".bruin.yml"))
+	require.NoError(t, err)
+	require.Contains(t, string(configContent), "name: gcp-default")
+	require.Contains(t, string(configContent), "name: chargebee-default")
+}
+
+func TestChargebeeBigQueryStarterTemplateHasFocusedAssetSet(t *testing.T) {
+	t.Parallel()
+
+	expectedAssets := []string{
+		"chargebee_raw/customer.asset.yml",
+		"chargebee_raw/subscription.asset.yml",
+		"chargebee_raw/invoice.asset.yml",
+		"chargebee_raw/transaction.asset.yml",
+		"chargebee_raw/event.asset.yml",
+		"chargebee_stage/customers.sql",
+		"chargebee_stage/subscriptions.sql",
+		"chargebee_stage/subscription_items.sql",
+		"chargebee_stage/invoices.sql",
+		"chargebee_stage/transactions.sql",
+		"chargebee_stage/customer_currency_daily_mrr_snapshot.sql",
+		"chargebee_reports/monthly_mrr_by_customer.sql",
+		"chargebee_reports/monthly_mrr_movements.sql",
+		"chargebee_reports/monthly_subscription_kpis.sql",
+		"chargebee_reports/monthly_invoice_billings.sql",
+		"chargebee_reports/mrr_by_plan.sql",
+		"chargebee_reports/revenue_concentration.sql",
+		"chargebee_reports/failed_payment_dunning.sql",
+	}
+
+	var actualAssets []string
+	err := iofs.WalkDir(templates.Templates, "chargebee-bigquery/assets", func(path string, entry iofs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+
+		actualAssets = append(actualAssets, strings.TrimPrefix(path, "chargebee-bigquery/assets/"))
+		return nil
+	})
+	require.NoError(t, err)
+	require.Len(t, actualAssets, 18)
+	require.ElementsMatch(t, expectedAssets, actualAssets)
+
+	pipeline, err := templates.Templates.ReadFile("chargebee-bigquery/pipeline.yml")
+	require.NoError(t, err)
+	require.Contains(t, string(pipeline), "name: chargebee-bigquery")
+	require.Contains(t, string(pipeline), "source_connection: chargebee-default")
+	require.Contains(t, string(pipeline), "destination: bigquery")
+
+	readme, err := templates.Templates.ReadFile("chargebee-bigquery/README.md")
+	require.NoError(t, err)
+	require.Contains(t, string(readme), "Chargebee to BigQuery")
+}
+
 func TestInitGoogleWebAnalyticsCopiesStarterTemplate(t *testing.T) {
 	targetRoot := t.TempDir()
 	t.Chdir(targetRoot)

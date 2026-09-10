@@ -1,0 +1,68 @@
+name: chargebee_raw.customer
+type: ingestr
+
+description: >
+  Raw-layer Chargebee customers loaded into BigQuery with ingestr's incremental
+  mode. Each run fetches the customers whose `updated_at` falls inside its own
+  time window and merges them into the destination table on `id`, so edits made
+  to an existing customer are picked up by the run whose window covers the
+  change, or by a wider backfill.
+
+materialization:
+  type: table
+  strategy: merge
+  incremental_key: updated_at
+
+parameters:
+  source_table: customers
+
+tags:
+  - chargebee_raw
+  - chargebee
+  - billing
+
+columns:
+  - name: id
+    type: varchar
+    description: Chargebee customer identifier.
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: first_name
+    type: varchar
+    description: Customer's first name.
+  - name: last_name
+    type: varchar
+    description: Customer's last name.
+  - name: email
+    type: varchar
+    description: Customer's email address used for invoices and receipts.
+  - name: company
+    type: varchar
+    description: Company name attached to the customer.
+  - name: phone
+    type: varchar
+    description: Customer's phone number.
+  - name: auto_collection
+    type: varchar
+    description: Whether payments are collected automatically, one of `on` or `off`.
+  - name: net_term_days
+    type: integer
+    description: Number of days within which an invoice must be paid.
+  - name: preferred_currency_code
+    type: varchar
+    description: Three-letter ISO currency code the customer is billed in.
+  - name: created_at
+    type: integer
+    description: Unix timestamp in seconds of when the customer was created in Chargebee.
+    checks:
+      - name: not_null
+  - name: updated_at
+    type: integer
+    description: Unix timestamp in seconds of the last modification to the customer.
+    checks:
+      - name: not_null
+  - name: deleted
+    type: boolean
+    description: Whether the customer resource has been deleted.
