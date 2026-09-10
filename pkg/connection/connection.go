@@ -410,6 +410,7 @@ func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatfo
 	// Note: ADC validation is deferred - it will only happen when the client is actually used.
 	// This allows pipelines without BigQuery assets to run even if ADC is not configured.
 	db, err := bigquery.NewDB(&bigquery.Config{
+		ReadOnly:                         connection.ReadOnly,
 		ProjectID:                        connection.ProjectID,
 		CredentialsFilePath:              connection.ServiceAccountFile,
 		CredentialsJSON:                  connection.ServiceAccountJSON,

@@ -22,6 +22,7 @@ type Config struct {
 	MaxQueryCost                     *float64
 	MaxBillableBytesSoft             *int64
 	MaxQueryCostSoft                 *float64
+	ReadOnly                         bool
 }
 
 func (c Config) IsValid() bool {
@@ -34,6 +35,9 @@ func (c Config) IsValid() bool {
 }
 
 func (c Config) GetConnectionURI() (string, error) {
+	if c.ReadOnly {
+		return "", errors.New("read_only connections cannot be used with ingestr")
+	}
 	// If using Application Default Credentials, return simple URI
 	// ingestr will use ADC automatically when no credentials are in the URI
 	if c.UseApplicationDefaultCredentials {

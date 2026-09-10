@@ -2923,6 +2923,9 @@
         },
         "max_query_cost_soft": {
           "type": "number"
+        },
+        "read_only": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false,

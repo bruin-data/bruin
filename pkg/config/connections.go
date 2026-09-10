@@ -76,6 +76,7 @@ type GoogleCloudPlatformConnection struct { //nolint:recvcheck
 	MaxQueryCost                     *float64 `yaml:"max_query_cost,omitempty" json:"max_query_cost,omitempty" mapstructure:"max_query_cost"`
 	MaxBillableBytesSoft             *int64   `yaml:"max_billable_bytes_soft,omitempty" json:"max_billable_bytes_soft,omitempty" mapstructure:"max_billable_bytes_soft"`
 	MaxQueryCostSoft                 *float64 `yaml:"max_query_cost_soft,omitempty" json:"max_query_cost_soft,omitempty" mapstructure:"max_query_cost_soft"`
+	ReadOnly                         bool     `yaml:"read_only,omitempty" json:"read_only,omitempty" mapstructure:"read_only"`
 	rawCredentials                   *google.Credentials
 }
 
@@ -96,6 +97,9 @@ func (c GoogleCloudPlatformConnection) MarshalYAML() (interface{}, error) {
 
 	if c.UseApplicationDefaultCredentials {
 		m["use_application_default_credentials"] = c.UseApplicationDefaultCredentials
+	}
+	if c.ReadOnly {
+		m["read_only"] = true
 	}
 	if c.MaxBillableBytes != nil {
 		m["max_billable_bytes"] = *c.MaxBillableBytes
@@ -149,6 +153,9 @@ func (c GoogleCloudPlatformConnection) MarshalJSON() ([]byte, error) {
 	}
 	if c.AccessToken != "" {
 		payload["access_token"] = c.AccessToken
+	}
+	if c.ReadOnly {
+		payload["read_only"] = true
 	}
 	addConnectionMetadataToMap(c.ConnectionMetadata, payload)
 	if c.MaxBillableBytes != nil {

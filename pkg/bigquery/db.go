@@ -24,6 +24,7 @@ import (
 	"github.com/sourcegraph/conc/pool"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	bigqueryapi "google.golang.org/api/bigquery/v2"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
@@ -82,60 +83,22 @@ func WithSoftQueryLimits(ctx context.Context) context.Context {
 }
 
 type Client struct {
-	client      *bigquery.Client
-	config      *Config
-	typeMapper  *diff.DatabaseTypeMapper
-	clientMutex sync.Mutex // Protects lazy client creation
+	client          *bigquery.Client
+	readOnlyService *bigqueryapi.Service
+	config          *Config
+	typeMapper      *diff.DatabaseTypeMapper
+	clientMutex     sync.Mutex // Protects lazy client creation
 }
 
 func NewDB(c *Config) (*Client, error) {
-	options := []option.ClientOption{
-		option.WithScopes(scopes...),
+	d := &Client{config: c, typeMapper: diff.NewBigQueryTypeMapper()}
+	if c.UseApplicationDefaultCredentials && !c.ReadOnly {
+		return d, nil
 	}
-
-	// If ADC is enabled, create the client lazily (when it's actually used)
-	// This allows pipelines without BigQuery assets to run even if ADC is not configured
-	if c.UseApplicationDefaultCredentials {
-		return &Client{
-			client:     nil, // Will be created lazily when ensureClientInitialized is called
-			config:     c,
-			typeMapper: diff.NewBigQueryTypeMapper(),
-		}, nil
+	if err := d.createClient(context.Background()); err != nil {
+		return nil, err
 	}
-
-	// For explicit credentials, create the client immediately
-	switch {
-	case c.CredentialsJSON != "":
-		options = append(options, option.WithAuthCredentialsJSON(option.ServiceAccount, []byte(c.CredentialsJSON)))
-	case c.CredentialsFilePath != "":
-		options = append(options, option.WithAuthCredentialsFile(option.ServiceAccount, c.CredentialsFilePath))
-	case c.AccessToken != "":
-		options = append(options, option.WithTokenSource(oauth2.StaticTokenSource(&oauth2.Token{AccessToken: c.AccessToken})))
-	case c.Credentials != nil:
-		options = append(options, option.WithCredentials(c.Credentials))
-	default:
-		return nil, errors.New("no credentials provided")
-	}
-
-	client, err := bigquery.NewClient(
-		context.Background(),
-		c.ProjectID,
-		options...,
-	)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create bigquery client")
-	}
-
-	// Set location if specified (used for query execution region)
-	if c.Location != "" {
-		client.Location = c.Location
-	}
-
-	return &Client{
-		client:     client,
-		config:     c,
-		typeMapper: diff.NewBigQueryTypeMapper(),
-	}, nil
+	return d, nil
 }
 
 func (d *Client) GetIngestrURI() (string, error) {
@@ -165,24 +128,9 @@ func (d *Client) createClient(ctx context.Context) error {
 		return nil
 	}
 
-	options := []option.ClientOption{
-		option.WithScopes(scopes...),
-	}
-
-	// If ADC is enabled, no explicit credentials are needed
-	if !d.config.UseApplicationDefaultCredentials {
-		switch {
-		case d.config.CredentialsJSON != "":
-			options = append(options, option.WithAuthCredentialsJSON(option.ServiceAccount, []byte(d.config.CredentialsJSON)))
-		case d.config.CredentialsFilePath != "":
-			options = append(options, option.WithAuthCredentialsFile(option.ServiceAccount, d.config.CredentialsFilePath))
-		case d.config.AccessToken != "":
-			options = append(options, option.WithTokenSource(oauth2.StaticTokenSource(&oauth2.Token{AccessToken: d.config.AccessToken})))
-		case d.config.Credentials != nil:
-			options = append(options, option.WithCredentials(d.config.Credentials))
-		default:
-			return errors.New("no credentials provided")
-		}
+	options, err := d.config.clientOptions(ctx)
+	if err != nil {
+		return err
 	}
 
 	client, err := bigquery.NewClient(
@@ -199,6 +147,14 @@ func (d *Client) createClient(ctx context.Context) error {
 		client.Location = d.config.Location
 	}
 
+	if d.config.ReadOnly {
+		service, err := bigqueryapi.NewService(ctx, options...)
+		if err != nil {
+			_ = client.Close()
+			return errors.Wrap(err, "failed to create read-only BigQuery service")
+		}
+		d.readOnlyService = service
+	}
 	d.client = client
 	return nil
 }
@@ -214,6 +170,9 @@ func (d *Client) ensureClientInitialized(ctx context.Context) error {
 }
 
 func (d *Client) NewDataTransferClient(ctx context.Context) (*datatransfer.Client, error) {
+	if d.config.ReadOnly {
+		return nil, errors.New("read_only connections cannot be used with BigQuery Data Transfer")
+	}
 	options := []option.ClientOption{
 		option.WithScopes(scopes...),
 	}
@@ -267,6 +226,10 @@ func (d *Client) IsValid(ctx context.Context, query *query.Query) (bool, error) 
 	if err := d.ensureClientInitialized(ctx); err != nil {
 		return false, err
 	}
+	if d.isReadOnly() {
+		_, err := d.readOnlyDryRun(ctx, query.ToDryRunQuery())
+		return err == nil, err
+	}
 	q := d.queryForExecution(ctx, query.ToDryRunQuery())
 	q.DryRun = true
 
@@ -316,13 +279,17 @@ func (d *Client) RunQueryWithoutResult(ctx context.Context, q *query.Query) erro
 		return err
 	}
 	bqQuery := d.queryForExecution(ctx, q.String())
-	job, err := bqQuery.Run(ctx)
+	job, rows, err := d.startQuery(ctx, bqQuery)
 	if err != nil {
 		return formatError(err)
 	}
 	defer cancelJobOnContextCancellation(ctx, job)
-	query.LogOrSinkQueryID(ctx, "BigQuery", job.ID())
-	_, err = job.Read(ctx)
+	if job != nil {
+		query.LogOrSinkQueryID(ctx, "BigQuery", job.ID())
+	}
+	if rows == nil {
+		_, err = job.Read(ctx)
+	}
 	if err != nil {
 		return formatError(err)
 	}
@@ -338,13 +305,17 @@ func (d *Client) Select(ctx context.Context, q *query.Query) ([][]interface{}, e
 		return nil, err
 	}
 	bqQuery := d.queryForExecution(ctx, q.String())
-	job, err := bqQuery.Run(ctx)
+	job, rows, err := d.startQuery(ctx, bqQuery)
 	if err != nil {
 		return nil, formatError(err)
 	}
 	defer cancelJobOnContextCancellation(ctx, job)
-	query.LogOrSinkQueryID(ctx, "BigQuery", job.ID())
-	rows, err := job.Read(ctx)
+	if job != nil {
+		query.LogOrSinkQueryID(ctx, "BigQuery", job.ID())
+	}
+	if rows == nil {
+		rows, err = job.Read(ctx)
+	}
 	if err != nil {
 		return nil, formatError(err)
 	}
@@ -379,13 +350,17 @@ func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 		return nil, err
 	}
 	bqQuery := d.queryForExecution(ctx, queryObj.String())
-	job, err := bqQuery.Run(ctx)
+	job, rows, err := d.startQuery(ctx, bqQuery)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run query: %w", formatError(err))
 	}
 	defer cancelJobOnContextCancellation(ctx, job)
-	query.LogOrSinkQueryID(ctx, "BigQuery", job.ID())
-	rows, err := job.Read(ctx)
+	if job != nil {
+		query.LogOrSinkQueryID(ctx, "BigQuery", job.ID())
+	}
+	if rows == nil {
+		rows, err = job.Read(ctx)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to read query results: %w", formatError(err))
 	}
@@ -428,7 +403,7 @@ func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 
 	// Store the column types in the result
 	result.ColumnTypes = columnTypes
-	if len(result.Rows) == 0 && !query.IsLikelyResultQuery(queryObj.String()) {
+	if job != nil && len(result.Rows) == 0 && !query.IsLikelyResultQuery(queryObj.String()) {
 		summary := d.queryExecutionSummary(ctx, job)
 		if query.IsNonResultStatement(summary) {
 			result.Execution = summary
@@ -537,7 +512,11 @@ func (d *Client) queryForExecution(ctx context.Context, queryString string) *big
 	if d.config != nil && d.config.MaxBillableBytes != nil {
 		bqQuery.MaxBytesBilled = *d.config.MaxBillableBytes
 	}
-	applyJobIDPrefix(ctx, bqQuery)
+	if d.isReadOnly() {
+		bqQuery.Location = d.client.Location
+	} else {
+		applyJobIDPrefix(ctx, bqQuery)
+	}
 	return bqQuery
 }
 
@@ -590,6 +569,9 @@ func formatBigQueryCostUSD(cost float64) string {
 func (d *Client) QueryDryRun(ctx context.Context, queryObj *query.Query) (*bigquery.QueryStatistics, error) {
 	if err := d.ensureClientInitialized(ctx); err != nil {
 		return nil, err
+	}
+	if d.isReadOnly() {
+		return d.readOnlyDryRun(ctx, queryObj.String())
 	}
 	q := d.queryForExecution(ctx, queryObj.String())
 	q.DryRun = true
