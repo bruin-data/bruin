@@ -139,14 +139,10 @@ func testReadOnlyQueries(t *testing.T, validate func(string, string) (bool, erro
 	}
 }
 
-func TestValidateReadOnlyQueryBackend(t *testing.T) {
+func TestValidateReadOnlyQueryAlwaysUsesPython(t *testing.T) {
 	t.Parallel()
 	require.NoError(t, ValidateReadOnlyQuery("SELECT 1; SELECT 2", "snowflake"))
-	if ensureRustSQLParserFFI() == nil {
-		require.IsType(t, &RustSQLParser{}, readOnlyParser)
-	} else {
-		require.IsType(t, &SQLParser{}, readOnlyParser)
-	}
+	require.IsType(t, &SQLParser{}, readOnlyParser)
 	require.ErrorContains(t, ValidateReadOnlyQuery("SELECT 1; SELECT my_udf(1)", "snowflake"), "read-only")
 	require.ErrorContains(t, ValidateReadOnlyQuery("SELECT FROM", "snowflake"), "read-only")
 }

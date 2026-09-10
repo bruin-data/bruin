@@ -10,19 +10,13 @@ import (
 
 var (
 	readOnlyParserOnce sync.Once
-	readOnlyParser     interface {
-		IsReadOnlyQuery(query, dialect string) (bool, error)
-	}
-	errReadOnlyParser error
+	readOnlyParser     *SQLParser
+	errReadOnlyParser  error
 )
 
 func ValidateReadOnlyQuery(query, dialect string) error {
 	readOnlyParserOnce.Do(func() {
-		if ensureRustSQLParserFFI() == nil {
-			readOnlyParser, errReadOnlyParser = NewRustSQLParser(false)
-		} else {
-			readOnlyParser, errReadOnlyParser = NewSQLParserCached()
-		}
+		readOnlyParser, errReadOnlyParser = NewSQLParserCached()
 	})
 	if errReadOnlyParser != nil {
 		return fmt.Errorf("read-only query validation failed: %w", errReadOnlyParser)
