@@ -35,3 +35,7 @@ func rustFFIHoistDeclares(query, dialect string) (string, error) {
 func rustFFIHoistDeclaresList(queriesJSON, dialect string) (string, error) {
 	return "", ensureRustSQLParserFFI()
 }
+
+func rustFFIIsReadOnly(query, dialect string) (string, error) {
+	return "", ensureRustSQLParserFFI()
+}

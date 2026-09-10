@@ -11,6 +11,7 @@ package sqlparser
 char* bruin_rustsqlparser_get_tables(const char* query, const char* dialect);
 char* bruin_rustsqlparser_rename_tables(const char* query, const char* dialect, const char* table_mapping_json);
 char* bruin_rustsqlparser_add_limit(const char* query, int64_t limit, const char* dialect);
+char* bruin_rustsqlparser_is_read_only(const char* query, const char* dialect);
 char* bruin_rustsqlparser_is_single_select(const char* query, const char* dialect);
 char* bruin_rustsqlparser_column_lineage(const char* query, const char* dialect, const char* schema_json);
 char* bruin_rustsqlparser_hoist_declares(const char* query, const char* dialect);
@@ -95,4 +96,12 @@ func rustFFIHoistDeclaresList(queriesJSON, dialect string) (string, error) {
 	defer C.free(unsafe.Pointer(cQueries))
 	defer C.free(unsafe.Pointer(cDialect))
 	return ffiCall(C.bruin_rustsqlparser_hoist_declares_list(cQueries, cDialect))
+}
+
+func rustFFIIsReadOnly(query, dialect string) (string, error) {
+	cQuery := C.CString(query)
+	defer C.free(unsafe.Pointer(cQuery))
+	cDialect := C.CString(dialect)
+	defer C.free(unsafe.Pointer(cDialect))
+	return ffiCall(C.bruin_rustsqlparser_is_read_only(cQuery, cDialect))
 }

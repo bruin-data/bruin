@@ -4,18 +4,25 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 )
 
 var (
 	readOnlyParserOnce sync.Once
-	readOnlyParser     *SQLParser
-	errReadOnlyParser  error
+	readOnlyParser     interface {
+		IsReadOnlyQuery(query, dialect string) (bool, error)
+	}
+	errReadOnlyParser error
 )
 
 func ValidateReadOnlyQuery(query, dialect string) error {
 	readOnlyParserOnce.Do(func() {
-		readOnlyParser, errReadOnlyParser = NewSQLParserCached()
+		if ensureRustSQLParserFFI() == nil {
+			readOnlyParser, errReadOnlyParser = NewRustSQLParser(false)
+		} else {
+			readOnlyParser, errReadOnlyParser = NewSQLParserCached()
+		}
 	})
 	if errReadOnlyParser != nil {
 		return fmt.Errorf("read-only query validation failed: %w", errReadOnlyParser)
@@ -41,6 +48,10 @@ func (s *SQLParser) IsReadOnlyQuery(query, dialect string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("failed to validate read-only query: %w", err)
 	}
+	return decodeReadOnlyResponse(payload)
+}
+
+func decodeReadOnlyResponse(payload string) (bool, error) {
 	var response struct {
 		ReadOnly bool   `json:"is_read_only"`
 		Error    string `json:"error"`
@@ -52,4 +63,15 @@ func (s *SQLParser) IsReadOnlyQuery(query, dialect string) (bool, error) {
 		return false, fmt.Errorf("cannot determine whether query is read-only: %s", response.Error)
 	}
 	return response.ReadOnly, nil
+}
+
+func (s *RustSQLParser) IsReadOnlyQuery(query, dialect string) (bool, error) {
+	if strings.ContainsRune(query, 0) || strings.ContainsRune(dialect, 0) {
+		return false, errors.New("cannot validate read-only SQL containing NUL bytes")
+	}
+	payload, err := rustFFIIsReadOnly(query, dialect)
+	if err != nil {
+		return false, fmt.Errorf("failed to validate read-only query: %w", err)
+	}
+	return decodeReadOnlyResponse(payload)
 }
