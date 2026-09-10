@@ -15,27 +15,9 @@ Both methods use the same Snowflake account, database, schema, warehouse, role, 
 
 ### Read-only connections
 
-Set `read_only: true` on a Snowflake connection to validate SQL with SQLGlot before Bruin sends it to Snowflake:
+Set `read_only: true` on a Snowflake connection in `.bruin.yml` (default: `false`). Bruin validates every statement before execution, allowing `SELECT`, `SHOW`, `DESCRIBE`, and `EXPLAIN` of read queries.
 
-```yaml
-environments:
-  default:
-    connections:
-      snowflake:
-        - name: snowflake-default
-          account: your-account
-          username: your-user
-          password: your-password
-          warehouse: your-warehouse
-          database: your-database
-          read_only: true
-```
-
-The default is `false`. With this option enabled, Bruin allows SELECT queries (including CTEs and set operations), SHOW, DESCRIBE, and EXPLAIN of read queries. Every statement in a multi-statement query must pass validation before any statement executes.
-
-Bruin rejects writes, session changes, procedure calls, SELECT INTO, locking reads, sequence references, unknown or user-defined function calls, and SQL that cannot be parsed or classified. Unknown functions are rejected even when they happen to be read-only. Parser failures also prevent execution. Ingestr URI export is disabled for these connections because ingestr executes outside this validation path.
-
-This is a conservative SQL syntax check. SQLGlot cannot inspect view definitions or prove the absence of side effects in database objects. Use a Snowflake role with restricted privileges as well; `read_only` does not change server-side permissions.
+Writes, session changes, procedure calls, sequence access, unapproved function calls, and unclassifiable SQL are rejected. Ingestr URI export is disabled. This check does not change Snowflake permissions or inspect view definitions; use a restricted role.
 
 ### Connection Parameters
 
