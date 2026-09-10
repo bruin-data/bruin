@@ -278,6 +278,105 @@ func TestAbraFlexiSourceTables(t *testing.T) {
 	require.True(t, hasAddressBook)
 }
 
+func TestExchangeRatesAPISourceTables(t *testing.T) {
+	t.Parallel()
+
+	source, err := GetSourceTables("exchangeratesapi")
+	require.NoError(t, err)
+	require.Equal(t, "exchangeratesapi", source.Name)
+	require.NotEmpty(t, source.Tables)
+
+	var hasExchangeRates, hasSymbols bool
+	for _, table := range source.Tables {
+		switch table.Name {
+		case "exchange_rates":
+			hasExchangeRates = true
+			require.Equal(t, "date,base,currency", table.PrimaryKey)
+			require.Equal(t, "date", table.IncKey)
+			require.Equal(t, "merge", table.IncStrategy)
+		case "symbols":
+			hasSymbols = true
+			require.Equal(t, "replace", table.IncStrategy)
+		}
+	}
+	require.True(t, hasExchangeRates)
+	require.True(t, hasSymbols)
+}
+
+func TestFakturoidSourceTables(t *testing.T) {
+	t.Parallel()
+
+	source, err := GetSourceTables("fakturoid")
+	require.NoError(t, err)
+	require.Equal(t, "fakturoid", source.Name)
+	require.NotEmpty(t, source.Tables)
+
+	var hasInvoices, hasVatRates bool
+	for _, table := range source.Tables {
+		switch table.Name {
+		case "invoices":
+			hasInvoices = true
+			require.Equal(t, "id", table.PrimaryKey)
+			require.Equal(t, "updated_at", table.IncKey)
+			require.Equal(t, "merge", table.IncStrategy)
+		case "invoices_vat_rates":
+			hasVatRates = true
+			require.Equal(t, "invoice_id,vat_rate", table.PrimaryKey)
+		}
+	}
+	require.True(t, hasInvoices)
+	require.True(t, hasVatRates)
+}
+
+func TestLumifySourceTables(t *testing.T) {
+	t.Parallel()
+
+	source, err := GetSourceTables("lumify")
+	require.NoError(t, err)
+	require.Equal(t, "lumify", source.Name)
+	require.NotEmpty(t, source.Tables)
+
+	var hasTeams, hasEvents bool
+	for _, table := range source.Tables {
+		switch table.Name {
+		case "teams":
+			hasTeams = true
+			require.Equal(t, "id", table.PrimaryKey)
+			require.Equal(t, "replace", table.IncStrategy)
+		case "events":
+			hasEvents = true
+			require.Equal(t, "merge", table.IncStrategy)
+		}
+	}
+	require.True(t, hasTeams)
+	require.True(t, hasEvents)
+}
+
+func TestBambooHRSourceTables(t *testing.T) {
+	t.Parallel()
+
+	source, err := GetSourceTables("bamboohr")
+	require.NoError(t, err)
+	require.Equal(t, "bamboohr", source.Name)
+	require.NotEmpty(t, source.Tables)
+
+	var hasEmployees, hasTimesheet bool
+	for _, table := range source.Tables {
+		switch table.Name {
+		case "employees":
+			hasEmployees = true
+			require.Equal(t, "employeeId", table.PrimaryKey)
+			require.Equal(t, "replace", table.IncStrategy)
+		case "timesheet_entries":
+			hasTimesheet = true
+			require.Equal(t, "date", table.IncKey)
+			require.Equal(t, "merge", table.IncStrategy)
+		}
+	}
+	require.True(t, hasEmployees)
+	require.True(t, hasTimesheet)
+}
+
 func TestSatisMeterSourceTables(t *testing.T) {
 	t.Parallel()
 

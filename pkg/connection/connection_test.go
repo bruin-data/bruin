@@ -12,13 +12,17 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/abraflexi"
 	"github.com/bruin-data/bruin/pkg/adapty"
+	"github.com/bruin-data/bruin/pkg/bamboohr"
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/clevertap"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/deel"
 	"github.com/bruin-data/bruin/pkg/emr_serverless"
+	"github.com/bruin-data/bruin/pkg/exchangeratesapi"
+	"github.com/bruin-data/bruin/pkg/fakturoid"
 	"github.com/bruin-data/bruin/pkg/gorgias"
 	"github.com/bruin-data/bruin/pkg/hana"
+	"github.com/bruin-data/bruin/pkg/lumify"
 	"github.com/bruin-data/bruin/pkg/mongo"
 	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/mysql"
@@ -639,6 +643,117 @@ func Test_AddAbraFlexiConnectionFromConfig(t *testing.T) {
 	assert.Contains(t, uri, "abra://example.flexibee.eu?")
 	assert.Contains(t, uri, "company=acme_s_r_o_")
 	assert.Contains(t, uri, "username=api-user")
+	assert.Equal(t, configuration, m.GetConnectionDetails("test"))
+}
+
+func Test_AddExchangeRatesAPIConnectionFromConfig(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
+
+	configuration := &config.ExchangeRatesAPIConnection{
+		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
+		AccessKey:          "secret-key",
+		Base:               "CZK",
+	}
+
+	err := m.AddExchangeRatesAPIConnectionFromConfig(configuration)
+	require.NoError(t, err)
+
+	res, ok := m.GetConnection("test").(*exchangeratesapi.Client)
+	require.True(t, ok)
+	require.NotNil(t, res)
+
+	uri, err := res.GetIngestrURI()
+	require.NoError(t, err)
+	assert.Equal(t, "exchangeratesapi://?access_key=secret-key&base=CZK", uri)
+	assert.Equal(t, configuration, m.GetConnectionDetails("test"))
+}
+
+func Test_AddFakturoidConnectionFromConfig(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
+
+	configuration := &config.FakturoidConnection{
+		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
+		ClientID:           "cid",
+		ClientSecret:       "csecret",
+		Slug:               "acme",
+		UserAgent:          "MyCompany (billing@mycompany.com)",
+	}
+
+	err := m.AddFakturoidConnectionFromConfig(configuration)
+	require.NoError(t, err)
+
+	res, ok := m.GetConnection("test").(*fakturoid.Client)
+	require.True(t, ok)
+	require.NotNil(t, res)
+
+	uri, err := res.GetIngestrURI()
+	require.NoError(t, err)
+	assert.Contains(t, uri, "fakturoid://?")
+	assert.Contains(t, uri, "slug=acme")
+	assert.Equal(t, configuration, m.GetConnectionDetails("test"))
+}
+
+func Test_AddLumifyConnectionFromConfig(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
+
+	configuration := &config.LumifyConnection{
+		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
+		APIKey:             "lmfy-secret",
+		Sport:              "nba",
+	}
+
+	err := m.AddLumifyConnectionFromConfig(configuration)
+	require.NoError(t, err)
+
+	res, ok := m.GetConnection("test").(*lumify.Client)
+	require.True(t, ok)
+	require.NotNil(t, res)
+
+	uri, err := res.GetIngestrURI()
+	require.NoError(t, err)
+	assert.Equal(t, "lumify://?api_key=lmfy-secret&sport=nba", uri)
+	assert.Equal(t, configuration, m.GetConnectionDetails("test"))
+}
+
+func Test_AddBambooHRConnectionFromConfig(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
+
+	configuration := &config.BambooHRConnection{
+		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
+		CompanyDomain:      "acme",
+		APIKey:             "secret",
+	}
+
+	err := m.AddBambooHRConnectionFromConfig(configuration)
+	require.NoError(t, err)
+
+	res, ok := m.GetConnection("test").(*bamboohr.Client)
+	require.True(t, ok)
+	require.NotNil(t, res)
+
+	uri, err := res.GetIngestrURI()
+	require.NoError(t, err)
+	assert.Equal(t, "bamboohr://acme?api_key=secret", uri)
 	assert.Equal(t, configuration, m.GetConnectionDetails("test"))
 }
 

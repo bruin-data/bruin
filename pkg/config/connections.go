@@ -1659,6 +1659,53 @@ func (c AbraFlexiConnection) GetName() string {
 	return c.Name
 }
 
+type ExchangeRatesAPIConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	AccessKey          string `yaml:"access_key,omitempty" json:"access_key" mapstructure:"access_key" sensitive:"true"`
+	Base               string `yaml:"base,omitempty" json:"base,omitempty" mapstructure:"base"`
+}
+
+func (c ExchangeRatesAPIConnection) GetName() string {
+	return c.Name
+}
+
+type FakturoidConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	ClientID           string   `yaml:"client_id,omitempty" json:"client_id" mapstructure:"client_id"`
+	ClientSecret       string   `yaml:"client_secret,omitempty" json:"client_secret" mapstructure:"client_secret" sensitive:"true"`
+	Slug               string   `yaml:"slug,omitempty" json:"slug" mapstructure:"slug"`
+	UserAgent          string   `yaml:"user_agent,omitempty" json:"user_agent" mapstructure:"user_agent"`
+	RateLimit          *float64 `yaml:"rate_limit,omitempty" json:"rate_limit,omitempty" mapstructure:"rate_limit"`
+}
+
+func (c FakturoidConnection) GetName() string {
+	return c.Name
+}
+
+type LumifyConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
+	Sport              string `yaml:"sport,omitempty" json:"sport,omitempty" mapstructure:"sport"`
+	League             string `yaml:"league,omitempty" json:"league,omitempty" mapstructure:"league"`
+	BaseURL            string `yaml:"base_url,omitempty" json:"base_url,omitempty" mapstructure:"base_url"`
+}
+
+func (c LumifyConnection) GetName() string {
+	return c.Name
+}
+
+type BambooHRConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	CompanyDomain      string `yaml:"company_domain,omitempty" json:"company_domain" mapstructure:"company_domain"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key,omitempty" mapstructure:"api_key" sensitive:"true"`
+	AccessToken        string `yaml:"access_token,omitempty" json:"access_token,omitempty" mapstructure:"access_token" sensitive:"true"`
+	Timezone           string `yaml:"timezone,omitempty" json:"timezone,omitempty" mapstructure:"timezone"`
+}
+
+func (c BambooHRConnection) GetName() string {
+	return c.Name
+}
+
 type SatisMeterConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`

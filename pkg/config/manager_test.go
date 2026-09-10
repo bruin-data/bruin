@@ -757,6 +757,36 @@ func TestLoadFromFile(t *testing.T) {
 					Company:            "acme_s_r_o_",
 				},
 			},
+			ExchangeRatesAPI: []ExchangeRatesAPIConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "exchangeratesapi-1"},
+					AccessKey:          "secret-key",
+					Base:               "CZK",
+				},
+			},
+			Fakturoid: []FakturoidConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "fakturoid-1"},
+					ClientID:           "cid",
+					ClientSecret:       "csecret",
+					Slug:               "acme",
+					UserAgent:          "MyCompany (billing@mycompany.com)",
+				},
+			},
+			Lumify: []LumifyConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "lumify-1"},
+					APIKey:             "lmfy-secret",
+					Sport:              "nba",
+				},
+			},
+			BambooHR: []BambooHRConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "bamboohr-1"},
+					CompanyDomain:      "acme",
+					APIKey:             "secret",
+				},
+			},
 			SatisMeter: []SatisMeterConnection{
 				{
 					ConnectionMetadata: ConnectionMetadata{Name: "satismeter-1"},
@@ -1847,6 +1877,52 @@ func TestConfig_AddConnection(t *testing.T) {
 			expectedErr: false,
 		},
 		{
+			name:     "Add ExchangeRatesAPI connection",
+			envName:  "default",
+			connType: "exchangeratesapi",
+			connName: "exchangeratesapi-conn",
+			creds: map[string]interface{}{
+				"access_key": "secret-key",
+				"base":       "CZK",
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Add Fakturoid connection",
+			envName:  "default",
+			connType: "fakturoid",
+			connName: "fakturoid-conn",
+			creds: map[string]interface{}{
+				"client_id":     "cid",
+				"client_secret": "csecret",
+				"slug":          "acme",
+				"user_agent":    "MyCompany (billing@mycompany.com)",
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Add Lumify connection",
+			envName:  "default",
+			connType: "lumify",
+			connName: "lumify-conn",
+			creds: map[string]interface{}{
+				"api_key": "lmfy-secret",
+				"sport":   "nba",
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Add BambooHR connection",
+			envName:  "default",
+			connType: "bamboohr",
+			connName: "bamboohr-conn",
+			creds: map[string]interface{}{
+				"company_domain": "acme",
+				"api_key":        "secret",
+			},
+			expectedErr: false,
+		},
+		{
 			name:     "Add SatisMeter connection",
 			envName:  "default",
 			connType: "satismeter",
@@ -2240,6 +2316,82 @@ func TestDeleteConnection(t *testing.T) {
 							Connections: &Connections{
 								AbraFlexi: []AbraFlexiConnection{
 									{ConnectionMetadata: ConnectionMetadata{Name: "abraflexi-conn"}, Host: "example.flexibee.eu", Username: "api-user", Password: "secret", Company: "acme_s_r_o_"},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Delete existing ExchangeRatesAPI connection",
+			envName:  "default",
+			connName: "exchangeratesapi-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{
+						"default": {
+							Connections: &Connections{
+								ExchangeRatesAPI: []ExchangeRatesAPIConnection{
+									{ConnectionMetadata: ConnectionMetadata{Name: "exchangeratesapi-conn"}, AccessKey: "secret-key"},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Delete existing Fakturoid connection",
+			envName:  "default",
+			connName: "fakturoid-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{
+						"default": {
+							Connections: &Connections{
+								Fakturoid: []FakturoidConnection{
+									{ConnectionMetadata: ConnectionMetadata{Name: "fakturoid-conn"}, ClientID: "cid", ClientSecret: "csecret", Slug: "acme", UserAgent: "MyCompany (billing@mycompany.com)"},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Delete existing Lumify connection",
+			envName:  "default",
+			connName: "lumify-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{
+						"default": {
+							Connections: &Connections{
+								Lumify: []LumifyConnection{
+									{ConnectionMetadata: ConnectionMetadata{Name: "lumify-conn"}, APIKey: "lmfy-secret"},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Delete existing BambooHR connection",
+			envName:  "default",
+			connName: "bamboohr-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{
+						"default": {
+							Connections: &Connections{
+								BambooHR: []BambooHRConnection{
+									{ConnectionMetadata: ConnectionMetadata{Name: "bamboohr-conn"}, CompanyDomain: "acme", APIKey: "secret"},
 								},
 							},
 						},
@@ -3214,6 +3366,10 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Sumble:              []SumbleConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sumble1"}}},
 				Twenty:              []TwentyConnection{{ConnectionMetadata: ConnectionMetadata{Name: "twenty1"}}},
 				AbraFlexi:           []AbraFlexiConnection{{ConnectionMetadata: ConnectionMetadata{Name: "abraflexi1"}}},
+				ExchangeRatesAPI:    []ExchangeRatesAPIConnection{{ConnectionMetadata: ConnectionMetadata{Name: "exchangeratesapi1"}}},
+				Fakturoid:           []FakturoidConnection{{ConnectionMetadata: ConnectionMetadata{Name: "fakturoid1"}}},
+				Lumify:              []LumifyConnection{{ConnectionMetadata: ConnectionMetadata{Name: "lumify1"}}},
+				BambooHR:            []BambooHRConnection{{ConnectionMetadata: ConnectionMetadata{Name: "bamboohr1"}}},
 				SatisMeter:          []SatisMeterConnection{{ConnectionMetadata: ConnectionMetadata{Name: "satismeter1"}}},
 				Deel:                []DeelConnection{{ConnectionMetadata: ConnectionMetadata{Name: "deel1"}}},
 				Frankfurter:         []FrankfurterConnection{{ConnectionMetadata: ConnectionMetadata{Name: "frankfurter1"}}},
@@ -3362,6 +3518,10 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Sumble:              []SumbleConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sumble1"}}},
 				Twenty:              []TwentyConnection{{ConnectionMetadata: ConnectionMetadata{Name: "twenty1"}}},
 				AbraFlexi:           []AbraFlexiConnection{{ConnectionMetadata: ConnectionMetadata{Name: "abraflexi1"}}},
+				ExchangeRatesAPI:    []ExchangeRatesAPIConnection{{ConnectionMetadata: ConnectionMetadata{Name: "exchangeratesapi1"}}},
+				Fakturoid:           []FakturoidConnection{{ConnectionMetadata: ConnectionMetadata{Name: "fakturoid1"}}},
+				Lumify:              []LumifyConnection{{ConnectionMetadata: ConnectionMetadata{Name: "lumify1"}}},
+				BambooHR:            []BambooHRConnection{{ConnectionMetadata: ConnectionMetadata{Name: "bamboohr1"}}},
 				SatisMeter:          []SatisMeterConnection{{ConnectionMetadata: ConnectionMetadata{Name: "satismeter1"}}},
 				Deel:                []DeelConnection{{ConnectionMetadata: ConnectionMetadata{Name: "deel1"}}},
 				Frankfurter:         []FrankfurterConnection{{ConnectionMetadata: ConnectionMetadata{Name: "frankfurter1"}}},
