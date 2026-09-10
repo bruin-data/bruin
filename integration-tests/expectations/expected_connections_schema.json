@@ -810,6 +810,9 @@
         },
         "secure": {
           "type": "integer"
+        },
+        "read_only": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false,

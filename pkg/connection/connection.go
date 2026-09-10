@@ -2201,6 +2201,7 @@ func (m *Manager) AddClickHouseConnectionFromConfig(connection *config.ClickHous
 	m.mutex.Unlock()
 
 	client, err := clickhouse.NewClient(&clickhouse.Config{
+		ReadOnly: connection.ReadOnly,
 		Host:     connection.Host,
 		Port:     connection.Port,
 		Username: connection.Username,

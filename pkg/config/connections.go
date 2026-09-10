@@ -1020,6 +1020,7 @@ type ClickHouseConnection struct {
 	Database           string `yaml:"database" json:"database" mapstructure:"database"`
 	HTTPPort           int    `yaml:"http_port,omitempty" json:"http_port,omitempty" mapstructure:"http_port"`
 	Secure             *int   `yaml:"secure,omitempty" json:"secure,omitempty" mapstructure:"secure"`
+	ReadOnly           bool   `yaml:"read_only,omitempty" json:"read_only,omitempty" mapstructure:"read_only"`
 }
 
 func (c ClickHouseConnection) GetName() string {

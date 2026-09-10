@@ -18,9 +18,12 @@ connections:
       database: "dev" # Default database for direct ClickHouse assets and unqualified seeds.
       http_port: 8443 # Optional; used only for ingestr and defaults to 8443.
       secure: 1 # Set to 1 for ClickHouse Cloud or another TLS connection.
+      read_only: false
 ```
 
-Bruin uses `database` for direct ClickHouse assets and unqualified `clickhouse.seed` asset names. For an `ingestr` asset, the generated ClickHouse URI does not include this database: use `database.table` in the asset `name` when ClickHouse is the destination, or in `source_table` when it is the source. An unqualified ingestr table uses ClickHouse's `default` database.
+### Read-only connections
+
+Set `read_only: true` to run SQL queries in read-only mode (default: `false`). Ingestr assets and seeds do not support this option.
 
 ## Ingestr Assets
 
