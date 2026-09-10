@@ -113,6 +113,12 @@ Out of scope. Answer in two sentences and say which course covers it properly:
 - Use `bruin query --connection duckdb-default --description "<what this proves>"
   --query "<SQL>"`. Always include `--description`.
 - Use `--limit` when exploring.
+- Use Bruin MCP and official Bruin documentation when Bruin behaviour or syntax is
+  uncertain.
+- Use the Bruin CLI for local queries, validation, and pipeline execution.
+- Retrieving documentation through MCP does not replace running the actual query or
+  pipeline locally.
+- Do not invent Bruin syntax when documentation is available.
 - Read the asset files in `pipeline/assets/generate/` before querying. Note that no
   column in this project has a description. That is deliberate - the student is going
   to write them.

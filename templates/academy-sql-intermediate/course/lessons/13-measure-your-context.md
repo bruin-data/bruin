@@ -13,11 +13,14 @@ the honest answer is that it depends on what you wrote.
 The method has four steps. **One**, `docs/eval/questions.md` ships eight questions with one
 defensible answer each, and the verified answers are in `docs/eval/answers.md`. Add two of your
 own, drawn from a mistake you actually saw an agent make in this project, so the set is ten.
-**Two**, in a fresh agent session with no context beyond the raw repository, ask all ten and record
-the answers. **Three**, score them against `answers.md`: one point each, exact match, no partial
-credit. **Four**, in another fresh session with your descriptions, glossary and `AGENTS.md` in
-place, ask the same ten and score again. Report both numbers and roughly how much longer the second
-set of answers took.
+**Two**, in a fresh agent session, use the untouched template and its built-in instructor
+instructions, ask all ten questions, and record the answers. **Three**, score them against
+`answers.md`: one point each, exact match, no partial credit. **Four**, in another fresh agent
+session, use the same base template plus the student-authored descriptions, glossary, `AGENTS.md`,
+and any other context additions made during the course; ask the same ten questions and score again.
+Report both numbers and roughly how much longer the second set of answers took. Both runs must use
+fresh agent sessions. Do not let the agent read `docs/eval/answers.md` before both scores are
+recorded; otherwise the measurement is contaminated.
 
 Then the framing that keeps this from being a sales pitch. Published measurements go both ways. A
 well-modelled semantic layer moved accuracy up seventeen to twenty-three points on a

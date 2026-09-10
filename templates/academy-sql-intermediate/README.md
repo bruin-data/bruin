@@ -112,9 +112,9 @@ MotherDuck. No lesson requires it.
 | `dates` | 1,096 | one calendar day, 2023-01-01 to 2025-12-31 |
 | `stores` | 6 | one store |
 | `products` | 60 | one product |
-| `customers` | 510 | one customer account |
-| `orders` | 1,212 | one order, as delivered by the source system |
-| `order_items` | 2,895 | one line on an order |
+| `customers` | 510 | source-system rows representing 500 customer IDs, including 10 duplicated IDs |
+| `orders` | 1,212 | source-system rows representing 1,200 order IDs; 12 IDs have a changed-status resend |
+| `order_items` | 2,895 | source-system rows representing 2,880 distinct order lines, including 15 exact duplicate rows |
 | `fx_rates` | 5,480 | one date and currency pair |
 
 [`docs/schema.md`](docs/schema.md) lists the columns. It does not say what they mean.

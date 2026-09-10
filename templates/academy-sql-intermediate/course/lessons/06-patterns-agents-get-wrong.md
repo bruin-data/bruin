@@ -42,10 +42,27 @@ not the whole day. The half-open form has no such trap: the boundary is unambigu
 time component the column carries.
 
 **Aggregate before you join** is the general fix behind the FX case in this lesson. `fx_rates` has
-5 currency pairs for every date. Join it to orders on date alone and every order line is multiplied
-by 5 - 2023 line revenue goes from a correct 264,926.21 to 1,324,631.05, exactly 5 times too
-high, because the join fanned out before the sum ran. Convert properly, matching on both the date
-and the order's own `currency_code`, and 2023 line revenue in USD is 258,645.94. The rule that
+5 currency pairs for every date. There are two different mistakes to keep apart:
+
+```sql
+-- Incorrect: date-only join; every order matches all five pairs for that date.
+ON CAST(o.ordered_at AS DATE) = f.rate_date
+```
+
+That casted date-only join returns 6,060 rows and multiplies every order line by 5 - 2023 line
+revenue goes from the correct **264,926.21** unconverted to **1,324,631.05**, exactly 5 times too
+high, because the join fanned out before the sum ran. A literal raw timestamp-to-date join,
+`ON o.ordered_at = f.rate_date`, is a separate type-mismatch problem; in this data it returns only
+335 rows. It is not the explanation for the 5x fan-out.
+
+```sql
+-- Correct: one matching rate for the order date, source currency, and USD target.
+ON CAST(o.ordered_at AS DATE) = f.rate_date
+AND o.currency_code = f.from_currency
+AND f.to_currency = 'USD'
+```
+
+Converting properly with all three predicates gives **258,645.94** in USD for 2023. The rule that
 generalises past FX: if a join is one-to-many and you need to sum something from the "one" side,
 aggregate first, then join the already-aggregated result - never sum after a fan-out join and hope
 the multiplication cancels out.
@@ -55,8 +72,8 @@ the multiplication cancels out.
    A: `order_items`'s 15 duplicates are byte-identical, so `SELECT DISTINCT *` removes them correctly. `orders`'s 12 duplicates share an `order_id` but differ in `order_status` and `_loaded_at`, so `DISTINCT` would keep both non-identical rows; only `QUALIFY ROW_NUMBER() OVER (PARTITION BY order_id ORDER BY _loaded_at DESC) = 1` picks the one to keep.
 2. Q: A weekly revenue chart has a gap in the middle. Is the gap more likely a missing-data problem or a missing-row problem, and what fixes it?
    A: Almost always a missing-row problem - the week had genuinely zero orders for that category, so it never appeared in the `GROUP BY` output. Building a spine from `dates` and `LEFT JOIN`ing the sales onto it turns the gap into an explicit zero.
-3. Q: Why does joining `fx_rates` to `orders` on date alone multiply revenue by exactly 5 rather than giving a wrong-but-plausible number?
-   A: Because `fx_rates` carries 5 currency pairs for every date, so each order line joins to 5 rows instead of 1, and summing after that join sums each line 5 times over - the fan-out factor is exactly the row multiplier, 5.
+3. Q: Why does the casted date-only join to `fx_rates` multiply revenue by exactly 5 rather than giving a wrong-but-plausible number, and what is a separate timestamp/date mistake?
+   A: Because `fx_rates` carries 5 currency pairs for every date, so each order line joins to 5 rows instead of 1, and summing after that join sums each line 5 times over. Comparing the raw `ordered_at` timestamp directly to `rate_date` is a separate type-mismatch problem; it returns only 335 rows here rather than the 6,060-row casted date-only join.
 
 ## Task
 Fix `queries/weekly-category.sql` from lesson 5 so that a category-week with no sales appears as
