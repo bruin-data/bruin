@@ -145,7 +145,7 @@ source: {}
 			},
 			ctx:         context.WithValue(context.Background(), config.ConfigFilePathContextKey, "/other/.bruin.yml"),
 			wantCount:   1,
-			wantContain: []string{"empty"},
+			wantContain: []string{"broken.yml"},
 		},
 		{
 			name: "reports only once for the same catalog",
