@@ -350,10 +350,13 @@ type Dashboard struct {
 	IsPublished *bool           `json:"is_published,omitempty"`
 }
 
-// DashboardFolder groups dashboards within a team.
+// DashboardFolder groups dashboards within a team. Folders can nest: ParentID is
+// the enclosing folder (nil at the top level) and Path is the full "A / B" path.
 type DashboardFolder struct {
 	ID             int    `json:"id"`
 	Name           string `json:"name"`
+	ParentID       *int   `json:"parent_id,omitempty"`
+	Path           string `json:"path,omitempty"`
 	DashboardCount int    `json:"dashboard_count"`
 }
 
