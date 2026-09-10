@@ -29,10 +29,7 @@ func (c *semanticLayerChecker) Validate(ctx context.Context, p *pipeline.Pipelin
 		return nil, nil
 	}
 
-	issues, models, err := loadSemanticCatalogIssues(c.fs, dir)
-	if err != nil {
-		return issues, nil
-	}
+	issues, models := loadSemanticCatalogIssues(c.fs, dir)
 
 	if names := semantic.Names(models); len(names) > 0 {
 		if _, err := semantic.NewEngineWithModels(models[names[0]], models); err != nil {
@@ -76,10 +73,7 @@ func (r *semanticQueryDryRunner) Validate(ctx context.Context, p *pipeline.Pipel
 		return nil, nil
 	}
 
-	_, models, err := loadSemanticCatalogIssues(r.fs, dir)
-	if err != nil {
-		return nil, nil
-	}
+	_, models := loadSemanticCatalogIssues(r.fs, dir)
 
 	queryable := queryableSemanticModels(models)
 	if len(queryable) == 0 {
@@ -114,12 +108,12 @@ func (r *semanticQueryDryRunner) Validate(ctx context.Context, p *pipeline.Pipel
 	return issues, nil
 }
 
-func loadSemanticCatalogIssues(fs afero.Fs, dir string) ([]*Issue, map[string]*semantic.Model, error) {
+func loadSemanticCatalogIssues(fs afero.Fs, dir string) ([]*Issue, map[string]*semantic.Model) {
 	models, invalid, err := semantic.LoadDirPartialFS(fs, dir)
 	if err != nil {
 		return []*Issue{{
 			Description: fmt.Sprintf("Failed to load semantic models from '%s': %s", dir, err),
-		}}, nil, err
+		}}, nil
 	}
 
 	names := make([]string, 0, len(invalid))
@@ -134,7 +128,7 @@ func loadSemanticCatalogIssues(fs afero.Fs, dir string) ([]*Issue, map[string]*s
 			Description: fmt.Sprintf("Semantic model %q is invalid: %s", name, invalid[name]),
 		})
 	}
-	return issues, models, nil
+	return issues, models
 }
 
 func queryableSemanticModels(models map[string]*semantic.Model) []*semantic.Model {

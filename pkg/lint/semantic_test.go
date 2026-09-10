@@ -81,7 +81,7 @@ source: {}
 		name        string
 		files       map[string][]byte
 		pipeline    *pipeline.Pipeline
-		ctx         context.Context
+		configPath  string
 		wantCount   int
 		wantContain []string
 	}{
@@ -143,7 +143,7 @@ source: {}
 			pipeline: &pipeline.Pipeline{
 				DefinitionFile: pipeline.DefinitionFile{Path: "/project/pipelines/daily/pipeline.yml"},
 			},
-			ctx:         context.WithValue(context.Background(), config.ConfigFilePathContextKey, "/other/.bruin.yml"),
+			configPath:  "/other/.bruin.yml",
 			wantCount:   1,
 			wantContain: []string{"empty", "source.table or source.query is required"},
 		},
@@ -170,9 +170,9 @@ source: {}
 			}
 
 			checker := &semanticLayerChecker{fs: fs}
-			ctx := tt.ctx
-			if ctx == nil {
-				ctx = t.Context()
+			ctx := t.Context()
+			if tt.configPath != "" {
+				ctx = context.WithValue(ctx, config.ConfigFilePathContextKey, tt.configPath)
 			}
 
 			got, err := checker.Validate(ctx, tt.pipeline)
