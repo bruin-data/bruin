@@ -66,10 +66,12 @@ Chargebee subscriptions are mutable — a repriced or cancelled subscription onl
 ever shows its *current* state, so past MRR cannot be read back from the API. The
 `customer_currency_daily_mrr_snapshot` model solves this: on every run it stamps
 the pipeline end date and records that day's MRR, replacing only that day's
-partition (idempotent re-runs). **History therefore accrues from your first run
-onward and cannot be backfilled**, and the movement/retention reports need two
-contiguous monthly snapshots before they classify anything. Run the pipeline on
-its daily schedule and the history builds itself.
+partition (idempotent re-runs). Historical subscription episodes can also be
+backfilled from their `started_at`/`cancelled_at` dates and normalized item MRR;
+repricing history still requires snapshots taken while each price was current.
+The movement/retention reports need two contiguous monthly snapshots before
+they classify anything. Run the pipeline on its daily schedule and the history
+builds itself.
 
 ## Customization (pipeline variables)
 

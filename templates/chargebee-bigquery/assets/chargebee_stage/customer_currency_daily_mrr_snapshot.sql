@@ -9,12 +9,13 @@ description: >
   recovered from Chargebee; this asset records that state while it is still
   current. Each run observes the pipeline end date and adds that day, replacing
   only the rows for the date being run, so re-running a date is idempotent.
-  History accrues from the first run onward and cannot be backfilled, and the
-  movement and retention reports need two contiguous monthly observations before
-  they classify anything. It sums the Chargebee-computed subscription MRR and
-  retains a zero-MRR row when a customer has only ineligible (e.g. cancelled)
-  subscriptions, so a churned customer stays visible at zero instead of
-  disappearing.
+  Historical subscription episodes can be backfilled from their
+  started_at/cancelled_at dates and normalized subscription-item MRR. Repricing
+  history still requires snapshots taken while each price was current. The
+  movement and retention reports need two contiguous monthly observations
+  before they classify anything. It retains a zero-MRR row when a customer has
+  only ineligible subscriptions, so a churned customer stays visible at zero
+  instead of disappearing.
 
 materialization:
   type: table
@@ -24,6 +25,7 @@ materialization:
 
 depends:
   - chargebee_stage.subscriptions
+  - chargebee_stage.subscription_items
 
 tags:
   - chargebee_stage
@@ -100,20 +102,48 @@ columns:
     description: Ending MRR in native-currency minor units.
 @bruin */
 
+WITH item_mrr AS (
+  SELECT
+    chargebee_subscription_id,
+    COALESCE(SUM(item_monthly_mrr_minor), CAST(0 AS NUMERIC))
+      AS item_monthly_mrr_minor
+  FROM chargebee_stage.subscription_items
+  GROUP BY 1
+),
+subscription_history AS (
+  SELECT
+    subscription.chargebee_customer_id,
+    subscription.currency_code,
+    subscription.is_mrr_eligible,
+    DATE(subscription.subscription_started_at) AS started_date,
+    DATE(subscription.cancelled_at) AS cancelled_date,
+    COALESCE(
+      NULLIF(subscription.subscription_mrr_minor, CAST(0 AS NUMERIC)),
+      item_mrr.item_monthly_mrr_minor,
+      CAST(0 AS NUMERIC)
+    ) AS historical_mrr_minor
+  FROM chargebee_stage.subscriptions AS subscription
+  LEFT JOIN item_mrr
+    ON subscription.chargebee_subscription_id = item_mrr.chargebee_subscription_id
+  WHERE subscription.chargebee_customer_id IS NOT NULL
+    AND subscription.currency_code IS NOT NULL
+)
 SELECT
   DATE('{{ end_date }}') AS snapshot_date,
   chargebee_customer_id,
   currency_code,
-  COUNTIF(COALESCE(is_mrr_eligible, FALSE)) AS active_subscription_count,
+  COUNTIF(is_historical_mrr_eligible) AS active_subscription_count,
   COALESCE(
-    SUM(IF(
-      COALESCE(is_mrr_eligible, FALSE),
-      subscription_mrr_minor,
-      CAST(0 AS NUMERIC)
-    )),
+    SUM(IF(is_historical_mrr_eligible, historical_mrr_minor, CAST(0 AS NUMERIC))),
     CAST(0 AS NUMERIC)
   ) AS ending_mrr_minor
-FROM chargebee_stage.subscriptions
-WHERE chargebee_customer_id IS NOT NULL
-  AND currency_code IS NOT NULL
+FROM (
+  SELECT
+    *,
+    started_date <= DATE('{{ end_date }}')
+      AND (cancelled_date IS NULL OR cancelled_date > DATE('{{ end_date }}'))
+      AND (is_mrr_eligible OR cancelled_date IS NOT NULL)
+      AS is_historical_mrr_eligible
+  FROM subscription_history
+)
 GROUP BY 1, 2, 3;

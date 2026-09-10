@@ -115,8 +115,10 @@ SELECT
   TIMESTAMP_SECONDS(SAFE_CAST(current_term_start AS INT64)) AS current_term_started_at,
   TIMESTAMP_SECONDS(SAFE_CAST(current_term_end AS INT64)) AS current_term_ends_at,
   TIMESTAMP_SECONDS(SAFE_CAST(next_billing_at AS INT64)) AS next_billing_at,
-  TIMESTAMP_SECONDS(SAFE_CAST(trial_start AS INT64)) AS trial_started_at,
-  TIMESTAMP_SECONDS(SAFE_CAST(trial_end AS INT64)) AS trial_ends_at,
+  -- Trial fields are absent from some Chargebee API schema variants. Keep the
+  -- conformed columns stable; trial timing can be reconstructed from events.
+  CAST(NULL AS TIMESTAMP) AS trial_started_at,
+  CAST(NULL AS TIMESTAMP) AS trial_ends_at,
   TIMESTAMP_SECONDS(SAFE_CAST(cancelled_at AS INT64)) AS cancelled_at,
   TIMESTAMP_SECONDS(SAFE_CAST(updated_at AS INT64)) AS subscription_updated_at
 FROM chargebee_raw.subscription;

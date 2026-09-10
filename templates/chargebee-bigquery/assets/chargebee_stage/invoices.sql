@@ -117,7 +117,10 @@ SELECT
   SAFE_CAST(write_off_amount AS NUMERIC) AS write_off_amount_minor,
   TIMESTAMP_SECONDS(SAFE_CAST(date AS INT64)) AS invoice_date,
   TIMESTAMP_SECONDS(SAFE_CAST(due_date AS INT64)) AS invoice_due_at,
-  TIMESTAMP_SECONDS(SAFE_CAST(paid_at AS INT64)) AS invoice_paid_at,
+  -- Chargebee does not expose `paid_at` on every invoice schema variant.
+  -- Keep a stable conformed column and derive payment timing from transactions
+  -- when it is needed downstream.
+  CAST(NULL AS TIMESTAMP) AS invoice_paid_at,
   TIMESTAMP_SECONDS(SAFE_CAST(updated_at AS INT64)) AS invoice_updated_at
 FROM chargebee_raw.invoice
 WHERE NOT COALESCE(deleted, FALSE);
