@@ -118,7 +118,7 @@ source: {}
 				DefinitionFile: pipeline.DefinitionFile{Path: "/project/pipelines/daily/pipeline.yml"},
 			},
 			wantCount:   1,
-			wantContain: []string{"both", "invalid"},
+			wantContain: []string{"both", "source.table and source.query cannot both be set"},
 		},
 		{
 			name: "rejects empty source",
@@ -130,7 +130,7 @@ source: {}
 				DefinitionFile: pipeline.DefinitionFile{Path: "/project/pipelines/daily/pipeline.yml"},
 			},
 			wantCount:   1,
-			wantContain: []string{"empty", "invalid"},
+			wantContain: []string{"empty", "source.table or source.query is required"},
 		},
 		{
 			name: "uses config file path from context",
@@ -145,7 +145,7 @@ source: {}
 			},
 			ctx:         context.WithValue(context.Background(), config.ConfigFilePathContextKey, "/other/.bruin.yml"),
 			wantCount:   1,
-			wantContain: []string{"broken.yml"},
+			wantContain: []string{"empty", "source.table or source.query is required"},
 		},
 		{
 			name: "reports only once for the same catalog",

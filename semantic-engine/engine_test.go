@@ -271,8 +271,12 @@ func TestLoadFile_RejectsTableAndQueryTogether(t *testing.T) {
 		t.Fatalf("write fixture: %v", err)
 	}
 
-	if _, err := LoadFile(path); err == nil {
+	_, err := LoadFile(path)
+	if err == nil {
 		t.Fatal("expected error when both source.table and source.query are set")
+	}
+	if !strings.Contains(err.Error(), "source.table and source.query cannot both be set") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -284,8 +288,12 @@ func TestLoadFile_RejectsEmptySource(t *testing.T) {
 		t.Fatalf("write fixture: %v", err)
 	}
 
-	if _, err := LoadFile(path); err == nil {
+	_, err := LoadFile(path)
+	if err == nil {
 		t.Fatal("expected error when source has neither table nor query")
+	}
+	if !strings.Contains(err.Error(), "source.table or source.query is required") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

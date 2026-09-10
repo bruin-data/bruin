@@ -70,14 +70,6 @@
           "minLength": 1
         }
       },
-      "oneOf": [
-        {
-          "required": ["table"]
-        },
-        {
-          "required": ["query"]
-        }
-      ],
       "patternProperties": {
         "^x-": true
       },
