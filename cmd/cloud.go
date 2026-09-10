@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	path2 "path"
 	"path/filepath"
@@ -4927,7 +4928,7 @@ func cloudDashboardsFolders() *cli.Command {
 			}
 			t.Render()
 
-			printFolderTree(folders)
+			printFolderTree(os.Stdout, folders)
 			return nil
 		},
 	}
@@ -4935,7 +4936,7 @@ func cloudDashboardsFolders() *cli.Command {
 
 // printFolderTree renders the folders as an indented tree below the flat table,
 // so nesting (which the table's Name column can't show) is visible.
-func printFolderTree(folders []bruincloud.DashboardFolder) {
+func printFolderTree(w io.Writer, folders []bruincloud.DashboardFolder) {
 	if len(folders) == 0 {
 		return
 	}
@@ -4971,7 +4972,7 @@ func printFolderTree(folders []bruincloud.DashboardFolder) {
 			if last {
 				branch, next = "└── ", "    "
 			}
-			fmt.Printf("%s%s%s\n", prefix, branch, c.Name)
+			fmt.Fprintf(w, "%s%s%s\n", prefix, branch, c.Name)
 			if visited[c.ID] {
 				continue
 			}
@@ -4980,11 +4981,22 @@ func printFolderTree(folders []bruincloud.DashboardFolder) {
 		}
 	}
 
-	fmt.Println("\nTree:")
+	renderRoot := func(f bruincloud.DashboardFolder) {
+		visited[f.ID] = true
+		fmt.Fprintln(w, f.Name) // top-level folders sit flush-left
+		walk(f.ID, "")
+	}
+
+	fmt.Fprintln(w, "\nTree:")
 	for _, r := range roots {
-		visited[r.ID] = true
-		fmt.Println(r.Name) // top-level folders sit flush-left
-		walk(r.ID, "")
+		renderRoot(r)
+	}
+	// Any folder still unvisited belongs to a pure cycle (self/mutual parent) with no
+	// acyclic root — surface it flush-left instead of silently dropping it.
+	for _, f := range folders {
+		if !visited[f.ID] {
+			renderRoot(f)
+		}
 	}
 }
 

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -1162,4 +1163,35 @@ func TestRemoveMcpServer(t *testing.T) {
 		assert.False(t, removed)
 		require.Len(t, out, 1)
 	})
+}
+
+func TestPrintFolderTree(t *testing.T) {
+	t.Parallel()
+
+	pid := func(i int) *int { return &i }
+	folders := []bruincloud.DashboardFolder{
+		{ID: 1, Name: "Marketing"},
+		{ID: 2, Name: "Reports", ParentID: pid(1)},
+		{ID: 3, Name: "Weekly", ParentID: pid(2)},
+		{ID: 4, Name: "Orphan", ParentID: pid(999)}, // parent absent from the list
+		{ID: 5, Name: "CycleA", ParentID: pid(6)},    // mutual cycle with CycleB
+		{ID: 6, Name: "CycleB", ParentID: pid(5)},
+	}
+
+	var buf bytes.Buffer
+	printFolderTree(&buf, folders) // must terminate despite the cycle
+	out := buf.String()
+
+	assert.Contains(t, out, "Tree:")
+	assert.Contains(t, out, "Marketing\n")
+	assert.Contains(t, out, "└── Reports")     // sole child of Marketing
+	assert.Contains(t, out, "    └── Weekly")  // nested under Reports
+	assert.Contains(t, out, "Orphan")          // orphan surfaced as a root
+	assert.Contains(t, out, "CycleA")          // cyclic component surfaced, not dropped
+	assert.Contains(t, out, "CycleB")
+
+	// Empty input renders nothing.
+	var empty bytes.Buffer
+	printFolderTree(&empty, nil)
+	assert.Empty(t, empty.String())
 }

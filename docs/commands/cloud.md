@@ -850,12 +850,24 @@ bruin cloud dashboards list --output json
 
 #### `folders`
 
-Lists the team's dashboard folders with their id, name, and dashboard count.
+Lists the team's dashboard folders with their id, name, and dashboard count. Folders
+can be nested, so below the flat table the command also prints an indented tree that
+shows the parent/child structure:
 
 ```bash
 bruin cloud dashboards folders
 bruin cloud dashboards folders --output json
 ```
+
+```
+Tree:
+Marketing
+└── Reports
+    └── Weekly
+Sales
+```
+
+With `--output json`, each folder also includes its `parent_id` and full `path`.
 
 #### `get`
 
@@ -906,7 +918,7 @@ Create a dashboard from a definition. The definition is written to the dashboard
 
 Pass `--agent-id` to bind the dashboard to an agent so its canvas chat and refresh work. If omitted, the server falls back to the agent encoded in a Cloud-CLI token; a generic team token has none, so the dashboard opens without a chat panel.
 
-Pass `--folder` to file the dashboard in a folder (by name; created if it doesn't exist). Folder names are unique per team. `dashboards list`/`get` return each dashboard's `folder_name`, and [`dashboards folders`](#folders) lists all folders.
+Pass `--folder` to file the dashboard in a folder, given as a path where `/` nests (e.g. `Marketing/Reports`); missing segments are created, and `--folder none` unfiles it. Names are unique per parent. `dashboards list`/`get` return each dashboard's `folder_name` as its full path, and [`dashboards folders`](#folders) lists all folders as a tree.
 
 ```bash
 # Title only (empty draft)
