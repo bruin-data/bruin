@@ -4962,21 +4962,23 @@ func printFolderTree(w io.Writer, folders []bruincloud.DashboardFolder) {
 	// recurse until the process crashes.
 	visited := make(map[int]bool, len(folders))
 
-	// Draw subtrees with ├──/└── connectors and │ continuation lines.
+	// Draw subtrees with ├──/└── connectors and │ continuation lines. Skip already
+	// visited children up front so a cycle can't print the same folder twice.
 	var walk func(id int, prefix string)
 	walk = func(id int, prefix string) {
-		kids := children[id]
-		for i, c := range kids {
-			last := i == len(kids)-1
+		var pending []bruincloud.DashboardFolder
+		for _, c := range children[id] {
+			if !visited[c.ID] {
+				visited[c.ID] = true
+				pending = append(pending, c)
+			}
+		}
+		for i, c := range pending {
 			branch, next := "├── ", "│   "
-			if last {
+			if i == len(pending)-1 {
 				branch, next = "└── ", "    "
 			}
 			fmt.Fprintf(w, "%s%s%s\n", prefix, branch, c.Name)
-			if visited[c.ID] {
-				continue
-			}
-			visited[c.ID] = true
 			walk(c.ID, prefix+next)
 		}
 	}

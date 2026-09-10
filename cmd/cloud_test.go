@@ -1174,7 +1174,7 @@ func TestPrintFolderTree(t *testing.T) {
 		{ID: 2, Name: "Reports", ParentID: pid(1)},
 		{ID: 3, Name: "Weekly", ParentID: pid(2)},
 		{ID: 4, Name: "Orphan", ParentID: pid(999)}, // parent absent from the list
-		{ID: 5, Name: "CycleA", ParentID: pid(6)},    // mutual cycle with CycleB
+		{ID: 5, Name: "CycleA", ParentID: pid(6)},   // mutual cycle with CycleB
 		{ID: 6, Name: "CycleB", ParentID: pid(5)},
 	}
 
@@ -1184,10 +1184,10 @@ func TestPrintFolderTree(t *testing.T) {
 
 	assert.Contains(t, out, "Tree:")
 	assert.Contains(t, out, "Marketing\n")
-	assert.Contains(t, out, "└── Reports")     // sole child of Marketing
-	assert.Contains(t, out, "    └── Weekly")  // nested under Reports
-	assert.Contains(t, out, "Orphan")          // orphan surfaced as a root
-	assert.Contains(t, out, "CycleA")          // cyclic component surfaced, not dropped
+	assert.Contains(t, out, "└── Reports")    // sole child of Marketing
+	assert.Contains(t, out, "    └── Weekly") // nested under Reports
+	assert.Contains(t, out, "Orphan")         // orphan surfaced as a root
+	assert.Contains(t, out, "CycleA")         // cyclic component surfaced, not dropped
 	assert.Contains(t, out, "CycleB")
 
 	// Empty input renders nothing.
