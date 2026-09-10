@@ -138,7 +138,7 @@ RUST_LIB = pkg/sqlparser/rustffi/target/release/libbruin_rustsqlparser.a
 
 rustsqlparser-lib: $(RUST_LIB)
 
-$(RUST_LIB): pkg/sqlparser/rustffi/Cargo.toml $(wildcard pkg/sqlparser/rustffi/src/*.rs) pythonsrc/parser/snowflake_read_only_functions.txt
+$(RUST_LIB): pkg/sqlparser/rustffi/Cargo.toml $(wildcard pkg/sqlparser/rustffi/src/*.rs) pythonsrc/parser/snowflake_blocked_functions.txt
 	@echo "$(OK_COLOR)==> Building Rust SQL parser static library$(NO_COLOR)"
 	@cargo build --release --manifest-path pkg/sqlparser/rustffi/Cargo.toml
 

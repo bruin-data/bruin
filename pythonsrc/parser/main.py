@@ -823,6 +823,8 @@ def add_ctes(query: str, dialect: str = None, ctes: list = None) -> dict:
 
 
 def is_read_only_query(query: str, dialect: str = None) -> dict:
+    if "\x00" in query:
+        return {"is_read_only": False, "error": ""}
     dialect = normalize_sqlglot_dialect(dialect)
     try:
         if dialect == "snowflake" and any(
@@ -898,7 +900,7 @@ def _is_read_only_statement(statement: exp.Expr, dialect: str | None) -> bool:
             ),
         ):
             return False
-        if isinstance(node, exp.Anonymous):
+        if dialect != "snowflake" and isinstance(node, exp.Anonymous):
             return False
         if (
             isinstance(node, exp.DynamicIdentifier)
@@ -907,6 +909,10 @@ def _is_read_only_statement(statement: exp.Expr, dialect: str | None) -> bool:
             return False
         if isinstance(node, exp.Column) and node.name.upper() == "NEXTVAL":
             return False
-        if isinstance(node, exp.Func) and isinstance(node.parent, exp.Dot):
+        if (
+            dialect != "snowflake"
+            and isinstance(node, exp.Func)
+            and isinstance(node.parent, exp.Dot)
+        ):
             return False
     return True

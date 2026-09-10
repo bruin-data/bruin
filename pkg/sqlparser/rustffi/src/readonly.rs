@@ -5,8 +5,8 @@ use serde_json::{json, Value};
 use std::collections::HashSet;
 use std::sync::LazyLock;
 
-static SNOWFLAKE_FUNCTIONS: LazyLock<HashSet<&str>> = LazyLock::new(|| {
-    include_str!("../../../../pythonsrc/parser/snowflake_read_only_functions.txt")
+static SNOWFLAKE_BLOCKED_FUNCTIONS: LazyLock<HashSet<&str>> = LazyLock::new(|| {
+    include_str!("../../../../pythonsrc/parser/snowflake_blocked_functions.txt")
         .split_whitespace()
         .collect()
 });
@@ -45,7 +45,7 @@ fn validate_query(query: &str, dialect: DialectType) -> Result<bool, String> {
             return Ok(false);
         }
         let value = serde_json::to_value(&statement).map_err(|error| error.to_string())?;
-        if !is_read_tree(&value) {
+        if !is_read_tree(&value, dialect) {
             return Ok(false);
         }
         collect_alias_names(&value, &mut aliases);
@@ -67,7 +67,7 @@ fn is_read_root(statement: &Expression) -> bool {
     }
 }
 
-fn is_read_tree(value: &Value) -> bool {
+fn is_read_tree(value: &Value, dialect: DialectType) -> bool {
     match value {
         Value::Object(object) => {
             for (key, child) in object {
@@ -118,24 +118,22 @@ fn is_read_tree(value: &Value) -> bool {
                     key.as_str(),
                     "function" | "anonymous" | "anonymous_agg_func"
                 ) {
-                    if child.get("quoted").and_then(Value::as_bool) == Some(true)
+                    if dialect != DialectType::Snowflake
                         || child
                             .get("name")
                             .and_then(Value::as_str)
-                            .is_some_and(|name| {
-                                name.contains('.') || name.eq_ignore_ascii_case("IDENTIFIER")
-                            })
+                            .is_some_and(|name| name.eq_ignore_ascii_case("IDENTIFIER"))
                     {
                         return false;
                     }
                 }
-                if !is_read_tree(child) {
+                if !is_read_tree(child, dialect) {
                     return false;
                 }
             }
             true
         }
-        Value::Array(values) => values.iter().all(is_read_tree),
+        Value::Array(values) => values.iter().all(|value| is_read_tree(value, dialect)),
         _ => true,
     }
 }
@@ -187,100 +185,20 @@ fn allowed_function_tokens(
     tokens: &[Token],
     aliases: &HashSet<String>,
 ) -> bool {
-    let mut type_parameters_end = None;
-    for (index, pair) in tokens.windows(2).enumerate() {
-        if type_parameters_end.is_some_and(|end| index <= end)
-            || pair[1].token_type != TokenType::LParen
-        {
+    for pair in tokens.windows(2) {
+        if pair[1].token_type != TokenType::LParen {
             continue;
         }
         let token = &pair[0];
         let name = token.text.to_ascii_uppercase();
-        if !matches!(
-            token.token_type,
-            TokenType::Var | TokenType::Identifier | TokenType::QuotedIdentifier
-        ) && !token.token_type.is_keyword()
-        {
-            continue;
-        }
         if aliases.contains(&name) && is_alias_token(query, dialect, token) {
             continue;
         }
-        let previous = index.checked_sub(1).map(|i| tokens[i].token_type);
-        if matches!(previous, Some(TokenType::As | TokenType::DColon))
-            && matches!(
-                name.as_str(),
-                "NUMBER"
-                    | "NUMERIC"
-                    | "DECIMAL"
-                    | "VARCHAR"
-                    | "CHAR"
-                    | "CHARACTER"
-                    | "BINARY"
-                    | "VARBINARY"
-                    | "ARRAY"
-                    | "OBJECT"
-                    | "VECTOR"
-                    | "TIME"
-                    | "TIMESTAMP"
-                    | "TIMESTAMP_NTZ"
-                    | "TIMESTAMP_LTZ"
-                    | "TIMESTAMP_TZ"
-            )
-        {
-            let mut depth = 0;
-            for (end, token) in tokens.iter().enumerate().skip(index + 1) {
-                match token.token_type {
-                    TokenType::LParen => depth += 1,
-                    TokenType::RParen => {
-                        depth -= 1;
-                        if depth == 0 {
-                            type_parameters_end = Some(end);
-                            break;
-                        }
-                    }
-                    _ => {}
-                }
-            }
-            continue;
-        }
-        if token.token_type == TokenType::QuotedIdentifier || previous == Some(TokenType::Dot) {
-            return false;
-        }
-        if !SNOWFLAKE_FUNCTIONS.contains(name.as_str())
-            && !matches!(
-                name.as_str(),
-                "ALL"
-                    | "ANY"
-                    | "CASE"
-                    | "EXISTS"
-                    | "ILIKE"
-                    | "LIKE"
-                    | "RLIKE"
-                    | "SOME"
-                    | "TABLE"
-                    | "UNION"
-                    | "AS"
-                    | "IN"
-                    | "OVER"
-                    | "SELECT"
-                    | "FROM"
-                    | "WHERE"
-                    | "AND"
-                    | "OR"
-                    | "NOT"
-                    | "ON"
-                    | "HAVING"
-                    | "QUALIFY"
-                    | "BY"
-                    | "JOIN"
-                    | "USING"
-                    | "WHEN"
-                    | "THEN"
-                    | "ELSE"
-                    | "DISTINCT"
-            )
-        {
+        if SNOWFLAKE_BLOCKED_FUNCTIONS.iter().any(|blocked| {
+            blocked
+                .strip_suffix('*')
+                .map_or(name == *blocked, |prefix| name.starts_with(prefix))
+        }) {
             return false;
         }
     }

@@ -2593,7 +2593,7 @@ def test_get_column_lineage_case_insensitive_schema():
 
 
 def test_read_only_validation_preserves_other_parser_operations():
-    query = "SELECT READ_CSV('x')"
+    query = "SELECT SYSTEM$CANCEL_QUERY('id')"
     before = parse_one(query, dialect="snowflake")
     assert parser_main.is_read_only_query(query, "snowflake")["is_read_only"] is False
     assert parse_one(query, dialect="snowflake") == before

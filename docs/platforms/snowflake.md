@@ -17,7 +17,7 @@ Both methods use the same Snowflake account, database, schema, warehouse, role, 
 
 Set `read_only: true` on a Snowflake connection in `.bruin.yml` (default: `false`). Bruin validates every statement before execution, allowing `SELECT`, `SHOW`, `DESCRIBE`, and `EXPLAIN` of read queries.
 
-Writes, session changes, procedure calls, sequence access, unapproved function calls, and unclassifiable SQL are rejected. Ingestr URI export is disabled. This check does not change Snowflake permissions or inspect view definitions; use a restricted role.
+Writes, session changes, `CALL` statements, direct sequence access, `SYSTEM$*` calls, `EXECUTE_AI_EVALUATION`, and unclassifiable SQL are rejected. UDFs are allowed; dynamic calls through `IDENTIFIER` or `TO_QUERY` and ingestr URI export are blocked. Bruin does not inspect view or UDF definitions and cannot prevent their indirect or external side effects. Use a restricted Snowflake role for database permissions.
 
 ### Connection Parameters
 
