@@ -3890,6 +3890,9 @@
         },
         "database": {
           "type": "string"
+        },
+        "read_only": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false,

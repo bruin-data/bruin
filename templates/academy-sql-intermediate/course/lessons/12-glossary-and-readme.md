@@ -29,6 +29,13 @@ and not `unit_price`. Anyone who later needs a different revenue definition for 
 should be adding a new, separately named term, not editing this one out from under the assets that
 depend on it.
 
+State grain with the source-row qualifier this project requires. Raw `customers` contains 510
+source rows for 500 customer IDs, raw `orders` contains 1,212 source rows for 1,200 order IDs, and
+raw `order_items` contains 2,895 source rows for 2,880 distinct order lines. After lesson 8, the
+deduplicated staging assets can describe `stg_customers`, `stg_orders`, and `stg_order_items` as one
+row per customer, order, and order line respectively. Do not use those staging grains to describe
+the raw tables.
+
 The maintenance rule is the part that gets skipped: these files decay. An `AGENTS.md` line stops
 being true the day the schema changes under it, and a glossary term stops being true the day someone
 redefines the metric without updating the entry. Update these files when the agent gets something
@@ -56,7 +63,7 @@ metric is actually computed.
 ## Rubric (for `review my work`)
 - [ ] `docs/glossary.md` has a `Revenue` entry naming one exact expression (`quantity * net_price`) and the column it runs on (`order_items.net_price`).
 - [ ] Entries exist for all six stub-TODO terms: AOV, active customer, churn, category, net vs gross, fiscal period.
-- [ ] A grain statement appears for `orders` and for `order_items`, and it is true of the table it names. Raw `orders` holds 1,212 rows for 1,200 orders and raw `order_items` holds 2,895 for 2,880, so "one row per order" is only correct about `stg_orders`. Accept either the deduplicated staging asset named explicitly, or the raw table described as one row per order as delivered by the source system.
+- [ ] A grain statement appears for `orders` and for `order_items`, and it is true of the table it names. Raw `orders` holds 1,212 source rows for 1,200 order IDs and raw `order_items` holds 2,895 source rows for 2,880 distinct lines. A one-row-per-order or one-row-per-line statement must name the deduplicated staging asset, not the raw table.
 - [ ] At least one entry cites the specific asset file where that metric is defined.
 - [ ] The file no longer contains the word `TODO`.
 

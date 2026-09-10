@@ -81,6 +81,18 @@ AI agent skills are installed separately with `bruin ai skills`; see [AI Skills]
 ### Local and learning templates
 
 <div class="template-grid">
+  <a class="template-card" href="https://github.com/bruin-data/bruin/tree/main/templates/academy-sql-beginner">
+    <span class="template-card__category">Beginner SQL course</span>
+    <strong>academy-sql-beginner</strong>
+    <span>Agent-led SQL course with a deterministic local retail dataset for learning SQL and auditing AI-written queries.</span>
+    <span class="template-card__tags"><code>DuckDB</code><code>SQL</code><code>AI agents</code></span>
+  </a>
+  <a class="template-card" href="https://github.com/bruin-data/bruin/tree/main/templates/academy-sql-intermediate">
+    <span class="template-card__category">Intermediate SQL course</span>
+    <strong>academy-sql-intermediate</strong>
+    <span>Agent-led course for profiling, modeling, documenting, and defending answers against an imperfect retail dataset.</span>
+    <span class="template-card__tags"><code>DuckDB</code><code>SQL</code><code>data modeling</code></span>
+  </a>
   <a class="template-card" href="./templates-docs/duckdb-README.html">
     <span class="template-card__category">Local SQL</span>
     <strong>duckdb</strong>

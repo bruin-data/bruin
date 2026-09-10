@@ -2190,6 +2190,7 @@ func (m *Manager) AddMotherduckConnectionFromConfig(connection *config.Motherduc
 	client, err := duck.NewClient(duck.MotherDuckConfig{
 		Token:    connection.Token,
 		Database: connection.Database,
+		ReadOnly: connection.ReadOnly,
 	})
 	if err != nil {
 		return err

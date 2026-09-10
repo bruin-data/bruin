@@ -1015,6 +1015,7 @@ type MotherduckConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	Token              string `yaml:"token,omitempty" json:"token" mapstructure:"token" sensitive:"true"`
 	Database           string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
+	ReadOnly           bool   `yaml:"read_only,omitempty" json:"read_only,omitempty" mapstructure:"read_only"`
 }
 
 func (m MotherduckConnection) GetName() string {
