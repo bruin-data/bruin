@@ -1381,3 +1381,103 @@ func sectionBodyForTest(t *testing.T, slug, body, from, to string) string {
 
 	return body[start : start+end]
 }
+
+var academySQLAdvancedLessons = []string{
+	"01-query-to-pipeline",
+	"02-ddl-dml-and-approval",
+	"03-dependencies-and-the-graph",
+	"04-checks-as-automated-audit",
+	"05-unit-test-the-logic",
+	"06-break-it-on-purpose",
+	"07-incremental-strategies",
+	"08-late-data-and-backfills",
+	"09-sargability-and-cost",
+	"10-dev-environments",
+	"11-guardrails",
+	"12-investigate-a-failure",
+	"13-logs-history-and-the-bill",
+	"14-capstone-ship-it",
+	"15-recap-and-next-steps",
+}
+
+func TestAcademySqlAdvancedTemplateIsWellFormed(t *testing.T) {
+	t.Parallel()
+
+	progress, err := templates.Templates.ReadFile("academy-sql-advanced/course/progress.md")
+	require.NoError(t, err)
+	lessons, err := iofs.ReadDir(templates.Templates, "academy-sql-advanced/course/lessons")
+	require.NoError(t, err)
+	require.Len(t, lessons, len(academySQLAdvancedLessons))
+
+	sections := []string{
+		"## Objectives",
+		"## Concepts to teach",
+		"## Quiz",
+		"## Task",
+		"## Rubric (for `review my work`)",
+		"## Done signal",
+	}
+	for _, slug := range academySQLAdvancedLessons {
+		require.Contains(t, string(progress), "- [ ] "+slug[:2]+" "+slug[3:])
+		content, readErr := templates.Templates.ReadFile("academy-sql-advanced/course/lessons/" + slug + ".md")
+		require.NoError(t, readErr)
+		body := string(content)
+		require.True(t, strings.HasPrefix(body, "# Lesson "+slug[:2]+": "+slug[3:]+"\n"))
+		at := 0
+		for _, section := range sections {
+			idx := strings.Index(body[at:], "\n"+section+"\n")
+			require.GreaterOrEqual(t, idx, 0, "%s missing or reordering %s", slug, section)
+			at += idx + 1
+		}
+		require.GreaterOrEqual(t, strings.Count(sectionBodyForTest(t, slug, body, "## Quiz", "## Task"), "   A: "), 3)
+		require.GreaterOrEqual(t, strings.Count(sectionBodyForTest(t, slug, body, "## Rubric (for `review my work`)", "## Done signal"), "\n- [ ] "), 3)
+		require.Contains(t, body, "Carry forward:")
+	}
+
+	readme, err := templates.Templates.ReadFile("academy-sql-advanced/course/README.md")
+	require.NoError(t, err)
+	require.Contains(t, string(readme), "bruin init academy-sql-advanced")
+	require.Contains(t, string(readme), "fails only on `mart.churn_risk`")
+	require.Contains(t, string(readme), "orders` has 1,212 rows")
+
+	_, err = templates.Templates.ReadFile("academy-sql-advanced/docs/_data-design.md")
+	require.Error(t, err)
+	_, err = templates.Templates.ReadFile("academy-sql-advanced/docs/_known-defects.md")
+	require.Error(t, err)
+}
+
+func TestAcademySqlAdvancedGeneratorsAreDeterministicByConstruction(t *testing.T) {
+	t.Parallel()
+
+	want := []string{
+		"customer_snapshots.sql",
+		"customers.sql",
+		"dates.sql",
+		"fx_rates.sql",
+		"order_items.sql",
+		"orders.sql",
+		"products.sql",
+		"stores.sql",
+	}
+	var got []string
+	err := iofs.WalkDir(templates.Templates, "academy-sql-advanced/pipeline/assets/generate", func(path string, entry iofs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if !entry.IsDir() {
+			got = append(got, strings.TrimPrefix(path, "academy-sql-advanced/pipeline/assets/generate/"))
+		}
+		return nil
+	})
+	require.NoError(t, err)
+	require.ElementsMatch(t, want, got)
+
+	for _, name := range want {
+		content, readErr := templates.Templates.ReadFile("academy-sql-advanced/pipeline/assets/generate/" + name)
+		require.NoError(t, readErr)
+		sql := strings.ToLower(stripSQLCommentsForTest(string(content)))
+		for _, forbidden := range []string{"random(", "hash(", "md5(", "now(", "current_date", "current_timestamp", "today("} {
+			require.NotContainsf(t, sql, forbidden, "%s uses forbidden nondeterministic function", name)
+		}
+	}
+}

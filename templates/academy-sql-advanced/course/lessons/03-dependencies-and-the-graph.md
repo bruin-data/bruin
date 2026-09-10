@@ -1,0 +1,32 @@
+# Lesson 03: dependencies-and-the-graph
+
+## Objectives
+- Read the full retail DAG from source through marts.
+- Distinguish a run dependency from a quality-check relationship.
+- Verify the graph with `bruin lineage`.
+
+## Concepts to teach
+The pipeline flows from eight generated sources through staging, core, and two marts. A `depends` edge controls execution order. A `relationships` check validates keys, but it does not guarantee that the referenced asset was refreshed first; the run graph still needs an explicit dependency.
+
+Use `bruin lineage` to inspect upstream and downstream assets. `mode: symbolic` lets a dependency
+stand for a selectable graph edge; `--downstream` and `--selector` with tag or path selectors bound
+a run to the affected portion. Parallel branches are safe only when they do not depend on one another.
+
+## Quiz
+1. Q: Does a relationships check create a run dependency?
+   A: No. Declare `depends` separately so execution order is explicit.
+2. Q: Why can staging branches run in parallel?
+   A: They read independent generated sources and have no dependency on each other.
+3. Q: What should verify a graph you inferred from file names?
+   A: `bruin lineage` and the parsed asset definitions.
+
+## Task
+Write the target DAG as text in `docs/dag.md`, including every generated table, staging asset, core asset, and mart. Identify the critical path, parallel branches, and the deliberately missing dependency on the `fct_order_lines` relationships check. Verify your graph with `bruin lineage`.
+
+## Rubric (for `review my work`)
+- [ ] Includes all 8 generated tables, 4 staging assets, 3 core assets, and 2 marts.
+- [ ] Shows staging → core → mart direction and both mart branches.
+- [ ] States that a relationships check alone does not create a run edge and records the CLI lineage result.
+
+## Done signal
+You can tell execution order from validation logic. Carry forward: checks are the automated form of the audit checklist.

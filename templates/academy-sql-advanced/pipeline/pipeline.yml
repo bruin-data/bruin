@@ -1,0 +1,24 @@
+name: retail
+
+schedule: daily
+start_date: "2023-01-01"
+catchup: false
+
+default_connections:
+  duckdb: duckdb-default
+
+default:
+  owner: "data-team@example.com"
+  domains:
+    - commerce
+  retries: 1
+
+variables:
+  data_source:
+    type: string
+    default: "local"
+    description: "Local generates the sample data without a network dependency."
+  churn_days:
+    type: integer
+    default: 90
+    description: "Days without an order before a customer is considered at risk."
