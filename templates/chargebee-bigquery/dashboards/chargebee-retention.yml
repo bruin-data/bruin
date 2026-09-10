@@ -64,9 +64,7 @@ queries:
           currency_code,
           ending_mrr_minor
         FROM `chargebee_reports.monthly_mrr_by_customer`
-        WHERE metric_month >= CAST('{{ filters.date_range.start }}' AS DATE)
-          AND metric_month <= CAST('{{ filters.date_range.end }}' AS DATE)
-          AND LOWER(currency_code) = LOWER('{{ filters.currency }}')
+        WHERE LOWER(currency_code) = LOWER('{{ filters.currency }}')
       ),
       first_positive AS (
         SELECT
@@ -108,12 +106,19 @@ queries:
           COUNT(DISTINCT chargebee_customer_id)
         ) AS logo_retention
       FROM cohort_rows
+      WHERE metric_month >= CAST('{{ filters.date_range.start }}' AS DATE)
+        AND metric_month <= CAST('{{ filters.date_range.end }}' AS DATE)
       GROUP BY 1, 2
       ORDER BY cohort_month, months_since_start
 
   churn_by_channel:
     sql: |
-      WITH latest AS (
+      WITH currency_units AS (
+        SELECT IF(UPPER('{{ filters.currency }}') IN (
+          'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA',
+          'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'
+        ), 1, 100) AS divisor
+      ), latest AS (
         SELECT MAX(metric_month) AS metric_month
         FROM `chargebee_reports.monthly_mrr_movements`
         WHERE metric_month >= CAST('{{ filters.date_range.start }}' AS DATE)
@@ -127,7 +132,7 @@ queries:
           SUM(churned_mrr_minor),
           NULLIF(SUM(beginning_mrr_minor), 0)
         ) AS revenue_churn_rate,
-        SUM(churned_mrr_minor) / 100 AS churned_mrr
+        SUM(churned_mrr_minor) / (SELECT divisor FROM currency_units) AS churned_mrr
       FROM `chargebee_reports.monthly_mrr_movements` AS movement, latest
       WHERE movement.metric_month = latest.metric_month
         AND LOWER(movement.currency_code) = LOWER('{{ filters.currency }}')

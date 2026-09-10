@@ -22,12 +22,17 @@ queries:
       ranked AS (
         SELECT
           kpi.*,
-          LAG(ending_mrr_minor) OVER (ORDER BY metric_month) AS prior_mrr_minor,
-          ROW_NUMBER() OVER (ORDER BY metric_month DESC) AS month_rank
+          LAG(ending_mrr_minor) OVER (ORDER BY metric_month) AS prior_mrr_minor
         FROM `chargebee_reports.monthly_subscription_kpis` AS kpi
+        WHERE LOWER(currency_code) = LOWER('{{ filters.currency }}')
+      ),
+      selected AS (
+        SELECT
+          ranked.*,
+          ROW_NUMBER() OVER (ORDER BY metric_month DESC) AS month_rank
+        FROM ranked
         WHERE metric_month >= CAST('{{ filters.date_range.start }}' AS DATE)
           AND metric_month <= CAST('{{ filters.date_range.end }}' AS DATE)
-          AND LOWER(currency_code) = LOWER('{{ filters.currency }}')
       )
       SELECT
         metric_month,
@@ -44,7 +49,7 @@ queries:
           - contraction_mrr_minor - churned_mrr_minor
         ) / (SELECT divisor FROM currency_units) AS net_new_mrr,
         SAFE_DIVIDE(ending_mrr_minor - prior_mrr_minor, NULLIF(prior_mrr_minor, 0)) AS mrr_growth
-      FROM ranked
+      FROM selected
       WHERE month_rank = 1
 
   monthly_mrr:
