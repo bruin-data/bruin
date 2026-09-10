@@ -19,10 +19,15 @@ connections:
       ssl_ca_path: "path/to/ca.pem"       # optional
       ssl_cert_path: "path/to/cert.pem"   # optional
       ssl_key_path: "path/to/key.pem"     # optional
+      read_only: false
 ```
 
+### Read-only connections
+
+Set `read_only: true` to run SQL queries in read-only mode (default: `false`). MySQL still allows changes to temporary tables. Ingestr assets and seeds do not support this option.
+
 > [!TIP]
-> If you plan to execute any SQL containing multiple statements (e.g. Bruin table materializations), ensure the connection allows multi-statements. When using the built-in MySQL client in Bruin this flag is automatically appended to the DSN.
+> If you plan to execute any SQL containing multiple statements (e.g. Bruin table materializations), ensure the connection allows multi-statements. When using the built-in MySQL client in Bruin this flag is automatically appended to the DSN unless `read_only` is enabled.
 
 ## MySQL Assets
 

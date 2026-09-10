@@ -107,7 +107,7 @@ func TestClient_SelectWithSchema(t *testing.T) {
 			name: "simple successful query with schema",
 			mockConnection: func(mock sqlmock.Sqlmock) {
 				mock.ExpectQuery(`SELECT first_name, last_name, age FROM users`).
-					WillReturnRows(sqlmock.NewRows([]string{"first_name", "last_name", "age"}).
+					WillReturnRows(sqlmock.NewRowsWithColumnDefinition(sqlmock.NewColumn("first_name").OfType("VARCHAR", ""), sqlmock.NewColumn("last_name").OfType("VARCHAR", ""), sqlmock.NewColumn("age").OfType("INT", 0)).
 						AddRow("jane", "doe", 30).
 						AddRow("joe", "doe", 28))
 			},
@@ -115,7 +115,8 @@ func TestClient_SelectWithSchema(t *testing.T) {
 				Query: "SELECT first_name, last_name, age FROM users",
 			},
 			want: &query.QueryResult{
-				Columns: []string{"first_name", "last_name", "age"},
+				Columns:     []string{"first_name", "last_name", "age"},
+				ColumnTypes: []string{"VARCHAR", "VARCHAR", "INT"},
 				Rows: [][]interface{}{
 					{"jane", "doe", int64(30)},
 					{"joe", "doe", int64(28)},
@@ -144,8 +145,9 @@ func TestClient_SelectWithSchema(t *testing.T) {
 				Query: "SELECT * FROM empty_table",
 			},
 			want: &query.QueryResult{
-				Columns: []string{"id", "name"},
-				Rows:    [][]interface{}{},
+				Columns:     []string{"id", "name"},
+				ColumnTypes: []string{"", ""},
+				Rows:        [][]interface{}{},
 			},
 		},
 	}

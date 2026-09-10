@@ -439,6 +439,7 @@ type MySQLConnection struct {
 	SslCaPath          string `yaml:"ssl_ca_path,omitempty" json:"ssl_ca_path,omitempty" mapstructure:"ssl_ca_path"`
 	SslCertPath        string `yaml:"ssl_cert_path,omitempty" json:"ssl_cert_path,omitempty" mapstructure:"ssl_cert_path"`
 	SslKeyPath         string `yaml:"ssl_key_path,omitempty" json:"ssl_key_path,omitempty" mapstructure:"ssl_key_path"`
+	ReadOnly           bool   `yaml:"read_only,omitempty" json:"read_only,omitempty" mapstructure:"read_only"`
 }
 
 func (c MySQLConnection) GetName() string {

@@ -3834,6 +3834,9 @@
         },
         "ssl_key_path": {
           "type": "string"
+        },
+        "read_only": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false,

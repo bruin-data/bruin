@@ -2,6 +2,7 @@ package mysql
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"sort"
 	"strings"
@@ -71,6 +72,9 @@ func (c *Client) initializeDB(ctx context.Context) error {
 }
 
 func (c *Client) GetIngestrURI() (string, error) {
+	if cfg, ok := c.config.(interface{ IsReadOnly() bool }); ok && cfg.IsReadOnly() {
+		return "", errors.New("read_only connections cannot be used with ingestr")
+	}
 	return c.config.GetIngestrURI(), nil
 }
 
@@ -83,7 +87,12 @@ func (c *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) 
 	if err := c.initializeDB(ctx); err != nil {
 		return err
 	}
-	_, err := c.conn.ExecContext(ctx, query.String())
+	conn, cleanup, err := c.queryConnection(ctx)
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+	_, err = conn.ExecContext(ctx, query.String())
 	if err != nil {
 		return errors.Wrap(err, "failed to execute query")
 	}
@@ -95,7 +104,12 @@ func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 	if err := c.initializeDB(ctx); err != nil {
 		return nil, err
 	}
-	rows, err := c.conn.QueryContext(ctx, query.String())
+	conn, cleanup, err := c.queryConnection(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer cleanup()
+	rows, err := conn.QueryContext(ctx, query.String())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to execute query")
 	}
@@ -141,7 +155,12 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 		return nil, err
 	}
 	queryString := queryObj.String()
-	rows, err := c.conn.QueryContext(ctx, queryString)
+	conn, cleanup, err := c.queryConnection(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer cleanup()
+	rows, err := conn.QueryContext(ctx, queryString)
 	if err != nil {
 		errorMessage := err.Error()
 		err = errors.New(strings.ReplaceAll(errorMessage, "\n", "  -  "))
@@ -160,6 +179,14 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 		return nil, errors.Wrap(err, "failed to retrieve column names")
 	}
 	result.Columns = cols
+	columnTypes, err := rows.ColumnTypes()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to retrieve column types")
+	}
+	result.ColumnTypes = make([]string, len(columnTypes))
+	for i, columnType := range columnTypes {
+		result.ColumnTypes[i] = columnType.DatabaseTypeName()
+	}
 
 	// Fetch rows and scan into result set
 	for rows.Next() {
@@ -395,4 +422,21 @@ func (c *Client) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Ass
 
 	queryString := "CREATE DATABASE IF NOT EXISTS " + schemaName
 	return c.RunQueryWithoutResult(ctx, &query.Query{Query: queryString})
+}
+
+type queryExecutor interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+}
+
+func (c *Client) queryConnection(ctx context.Context) (queryExecutor, func(), error) {
+	cfg, ok := c.config.(interface{ IsReadOnly() bool })
+	if !ok || !cfg.IsReadOnly() {
+		return c.conn, func() {}, nil
+	}
+	tx, err := c.conn.BeginTxx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed to start read-only transaction")
+	}
+	return tx, func() { _ = tx.Rollback() }, nil
 }
