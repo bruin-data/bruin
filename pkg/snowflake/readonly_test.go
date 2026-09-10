@@ -35,7 +35,7 @@ func TestDBReadOnly(t *testing.T) {
 		t.Run(method.name, func(t *testing.T) {
 			t.Parallel()
 
-			for _, sql := range []string{"DELETE FROM t", "SELECT 1; DROP TABLE t", "SELECT FROM", "SELECT SYSTEM$CANCEL_QUERY('id')"} {
+			for _, sql := range []string{"DELETE FROM t", "SELECT 1; DROP TABLE t", "SELECT FROM", "SELECT SYSTEM$CANCEL_QUERY('id')", "SELECT TIME_TO_STR(1, 'x')", "SELECT READ_CSV('x')", "SELECT 1; SELECT READ_CSV('x')", `SELECT "ABS"(1)`, "SELECT IDENTIFIER('my_udf')(1)"} {
 				db := &DB{config: &Config{ReadOnly: true}, connect: func(context.Context) (*sqlx.DB, error) {
 					t.Fatal("read-only validation must reject the query before connecting")
 					return nil, nil

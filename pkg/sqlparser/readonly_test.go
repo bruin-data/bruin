@@ -9,7 +9,21 @@ import (
 
 func TestSQLParserIsReadOnlyQuery(t *testing.T) {
 	t.Parallel()
+	testReadOnlyQueries(t, sharedSQLParser.IsReadOnlyQuery, false)
+}
 
+func TestRustSQLParserIsReadOnlyQuery(t *testing.T) {
+	t.Parallel()
+	if err := ensureRustSQLParserFFI(); err != nil {
+		t.Skip(err)
+	}
+	parser, err := NewRustSQLParser(false)
+	require.NoError(t, err)
+	testReadOnlyQueries(t, parser.IsReadOnlyQuery, true)
+}
+
+func testReadOnlyQueries(t *testing.T, validate func(string, string) (bool, error), allowRejectionError bool) {
+	t.Helper()
 	tests := []struct {
 		name    string
 		query   string
@@ -25,6 +39,54 @@ func TestSQLParserIsReadOnlyQuery(t *testing.T) {
 		{name: "show", query: "SHOW TABLES", want: true},
 		{name: "describe", query: "DESCRIBE TABLE orders", want: true},
 		{name: "explain", query: "EXPLAIN SELECT COUNT(*) FROM orders", want: true},
+		{name: "built-in functions", query: "SELECT ABS(-1), LOWER('A'), COALESCE(NULL, 1), COUNT(*) FROM t", want: true},
+		{name: "built-in aliases", query: "SELECT LEN('abc'), NVL(NULL, 1), POW(2, 3), TO_VARCHAR(1)", want: true},
+		{name: "date functions", query: "SELECT DATEADD(day, 1, CURRENT_DATE()), CURRENT_TIMESTAMP, EXTRACT(year FROM CURRENT_DATE)", want: true},
+		{name: "casts and case", query: "SELECT CASE WHEN x > 0 THEN CAST(x AS INT) ELSE TRY_CAST('1' AS INT) END FROM t", want: true},
+		{name: "predicates", query: "SELECT * FROM t WHERE x IN (1, 2) AND EXISTS(SELECT 1 FROM s) AND x > ALL(SELECT x FROM s)", want: true},
+		{name: "window function", query: "SELECT ROW_NUMBER() OVER (PARTITION BY x ORDER BY y) FROM t", want: true},
+		{name: "implicit table alias columns", query: "SELECT * FROM t y(a)", want: true},
+		{name: "subquery alias columns", query: "SELECT * FROM (SELECT 1) y(a)", want: true},
+		{name: "multiple CTE alias columns", query: "WITH x(a) AS (SELECT 1), y(b) AS (SELECT 2) SELECT * FROM x, y", want: true},
+		{name: "Unicode before alias", query: "WITH x AS (SELECT 'ç') SELECT * FROM x AS y(a)", want: true},
+		{name: "Unicode before UDF sharing alias", query: "WITH READ_CSV(x) AS (SELECT 'ç') SELECT READ_CSV(x) FROM READ_CSV"},
+		{name: "Unicode quoted alias", query: `WITH "ç"(x) AS (SELECT 1) SELECT * FROM "ç"`, want: true},
+		{name: "alias marker collision", query: "WITH BRUIN_READ_ONLY_ALIAS AS (SELECT 1), x(a) AS (SELECT 2) SELECT * FROM x", want: true},
+		{name: "function sharing table alias", query: "SELECT READ_CSV(x) FROM t AS READ_CSV(x)"},
+		{name: "function sharing quoted alias", query: `SELECT "ABS"(x) FROM t AS "ABS"(x)`},
+		{name: "table UDF sharing CTE alias", query: "WITH READ_CSV(x) AS (SELECT 1) SELECT * FROM TABLE(READ_CSV(x))"},
+		{name: "CTE column names", query: "WITH x(a) AS (SELECT 1) SELECT a FROM x AS y(a)", want: true},
+		{name: "table function", query: "SELECT * FROM TABLE(FLATTEN(INPUT => PARSE_JSON('[1,2]')))", want: true},
+		{name: "escaped built-in function", query: "SELECT {fn ABS(-1)}", want: true},
+		{name: "parameterized casts", query: "SELECT CAST(x AS NUMBER(10,2)), x::VARCHAR(10) FROM t", want: true},
+		{name: "structured casts", query: "SELECT CAST(x AS ARRAY(NUMBER(10,2))) FROM t", want: true},
+		{name: "quoted function-like alias", query: `WITH "CAST"(x) AS (SELECT 1) SELECT CAST(x AS INT) FROM "CAST"`, want: true},
+		{name: "SQLGlot special function", query: "SELECT ARG_MAX(1,2)"},
+		{name: "SQLGlot cast alias", query: "SELECT SAFE_CAST(1 AS INT)"},
+		{name: "UDF in normalized argument", query: "SELECT DATEADD(TIME_TO_STR(1, 'x'), 1, CURRENT_DATE())"},
+		{name: "UDF sharing CTE name", query: "WITH READ_CSV(x) AS (SELECT 1) SELECT READ_CSV('x')"},
+		{name: "UDF after parameterized cast", query: "SELECT CAST(x AS NUMBER(10,2)), READ_CSV('x') FROM t"},
+		{name: "cross-dialect function", query: "SELECT TIME_TO_STR(1, 'x')"},
+		{name: "cross-dialect table function", query: "SELECT * FROM TABLE(READ_CSV('x'))"},
+		{name: "cross-dialect scalar function", query: "SELECT READ_CSV('x')"},
+		{name: "normalized function alias", query: "SELECT LOG10(10)"},
+		{name: "quoted built-in name", query: `SELECT "ABS"(1)`},
+		{name: "quoted mixed-case name", query: `SELECT "aBs"(1)`},
+		{name: "quoted unknown function", query: `SELECT "my_udf"(1)`},
+		{name: "dynamic function", query: "SELECT IDENTIFIER('my_udf')(1)"},
+		{name: "dynamic zero-argument function", query: "SELECT IDENTIFIER('my_udf')()"},
+		{name: "dynamic table function", query: "SELECT * FROM TABLE(IDENTIFIER('my_udf')(1))"},
+		{name: "escaped UDF", query: "SELECT {fn READ_CSV('x')}"},
+		{name: "UDF with intervening comment", query: "SELECT READ_CSV /* harmless */ ('x')"},
+		{name: "qualified built-in with comments", query: "SELECT db./* harmless */ABS(1)"},
+		{name: "built-in with intervening comment", query: "SELECT ABS /* harmless */ (-1)", want: true},
+		{name: "nested UDF", query: "SELECT COALESCE(TIME_TO_STR(1, 'x'), 'fallback')"},
+		{name: "UDF in CTE", query: "WITH x AS (SELECT READ_CSV('x')) SELECT * FROM x"},
+		{name: "UDF in predicate", query: "SELECT * FROM t WHERE x = TIME_TO_STR(1, 'x')"},
+		{name: "UDF in later statement", query: "SELECT 1; SELECT READ_CSV('x')"},
+		{name: "UDF in explain", query: "EXPLAIN SELECT READ_CSV('x')"},
+		{name: "UDF text in literal", query: `SELECT 'READ_CSV(''x'')', '"ABS"(1)'`, want: true},
+		{name: "UDF text in comment", query: "SELECT 1 /* READ_CSV('x') */", want: true},
 		{name: "insert", query: "INSERT INTO t VALUES (1)"},
 		{name: "update", query: "UPDATE t SET a = 1"},
 		{name: "delete", query: "DELETE FROM t"},
@@ -55,23 +117,32 @@ func TestSQLParserIsReadOnlyQuery(t *testing.T) {
 		{name: "only comments", query: "-- SELECT 1", wantErr: true},
 		{name: "malformed", query: "SELECT FROM", wantErr: true},
 		{name: "unknown dialect", query: "SELECT 1", dialect: "unknown", wantErr: true},
+		{name: "NUL before write", query: "SELECT 1\x00; DELETE FROM t"},
+		{name: "NUL before UDF", query: "SELECT 1\x00; SELECT my_udf(1)"},
 		{name: "long write", query: "SELECT '" + strings.Repeat("a", 11000) + "'; DELETE FROM t"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-
 			dialect := tt.dialect
 			if dialect == "" {
 				dialect = "snowflake"
 			}
-			got, err := sharedSQLParser.IsReadOnlyQuery(tt.query, dialect)
+			got, err := validate(tt.query, dialect)
 			if tt.wantErr {
 				require.Error(t, err)
-			} else {
+			} else if tt.want || !allowRejectionError {
 				require.NoError(t, err)
 			}
 			require.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func TestValidateReadOnlyQueryAlwaysUsesPython(t *testing.T) {
+	t.Parallel()
+	require.NoError(t, ValidateReadOnlyQuery("SELECT 1; SELECT 2", "snowflake"))
+	require.IsType(t, &SQLParser{}, readOnlyParser)
+	require.ErrorContains(t, ValidateReadOnlyQuery("SELECT 1; SELECT my_udf(1)", "snowflake"), "read-only")
+	require.ErrorContains(t, ValidateReadOnlyQuery("SELECT FROM", "snowflake"), "read-only")
 }
