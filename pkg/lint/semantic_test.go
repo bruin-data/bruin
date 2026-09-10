@@ -57,10 +57,12 @@ segments:
     filter: "status = 'completed'"
 `
 
-func writeSemanticModel(t *testing.T, fs afero.Fs, dir, filename, content string) {
+const semanticTestDir = "/repo/semantic"
+
+func writeSemanticModel(t *testing.T, fs afero.Fs, filename, content string) {
 	t.Helper()
-	require.NoError(t, fs.MkdirAll(dir, 0o755))
-	require.NoError(t, afero.WriteFile(fs, filepath.Join(dir, filename), []byte(content), 0o644))
+	require.NoError(t, fs.MkdirAll(semanticTestDir, 0o755))
+	require.NoError(t, afero.WriteFile(fs, filepath.Join(semanticTestDir, filename), []byte(content), 0o644))
 }
 
 func semanticTestPipeline() *pipeline.Pipeline {
@@ -97,7 +99,7 @@ func TestSemanticQueryDryRunRule_InvalidModelReported(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	writeSemanticModel(t, fs, "/repo/semantic", "broken.yml", "name: broken\nsource: {}\n")
+	writeSemanticModel(t, fs, "broken.yml", "name: broken\nsource: {}\n")
 
 	rule := &SemanticQueryDryRunRule{
 		Connections: &semanticFakeConnManager{},
@@ -116,7 +118,7 @@ func TestSemanticQueryDryRunRule_ValidModelPassesDryRun(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	writeSemanticModel(t, fs, "/repo/semantic", "orders.yml", semanticTestModel)
+	writeSemanticModel(t, fs, "orders.yml", semanticTestModel)
 
 	validator := &semanticFakeValidator{valid: true}
 	rule := &SemanticQueryDryRunRule{
@@ -129,14 +131,14 @@ func TestSemanticQueryDryRunRule_ValidModelPassesDryRun(t *testing.T) {
 	issues, err := rule.ValidateCrossPipeline(t.Context(), []*pipeline.Pipeline{semanticTestPipeline()})
 	require.NoError(t, err)
 	assert.Empty(t, issues)
-	assert.Greater(t, validator.calls, 0, "expected at least one dry-run call")
+	assert.Positive(t, validator.calls, "expected at least one dry-run call")
 }
 
 func TestSemanticQueryDryRunRule_FailingDryRunReported(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	writeSemanticModel(t, fs, "/repo/semantic", "orders.yml", semanticTestModel)
+	writeSemanticModel(t, fs, "orders.yml", semanticTestModel)
 
 	validator := &semanticFakeValidator{valid: false, err: errors.New("column amount does not exist")}
 	rule := &SemanticQueryDryRunRule{
@@ -157,7 +159,7 @@ func TestSemanticQueryDryRunRule_NoValidatorsSkipsDryRun(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	writeSemanticModel(t, fs, "/repo/semantic", "orders.yml", semanticTestModel)
+	writeSemanticModel(t, fs, "orders.yml", semanticTestModel)
 
 	// Pipeline without SQL assets means no validators can be resolved.
 	rule := &SemanticQueryDryRunRule{
@@ -177,7 +179,7 @@ func TestSemanticQueryDryRunRule_PassesWhenAnyValidatorSucceeds(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	writeSemanticModel(t, fs, "/repo/semantic", "orders.yml", semanticTestModel)
+	writeSemanticModel(t, fs, "orders.yml", semanticTestModel)
 
 	failing := &semanticFakeValidator{valid: false, err: errors.New("not found")}
 	passing := &semanticFakeValidator{valid: true}
@@ -271,7 +273,7 @@ func TestSemanticDirFromConfigPath(t *testing.T) {
 	t.Parallel()
 
 	assert.Equal(t, filepath.Join("/repo", "semantic"), SemanticDirFromConfigPath("/repo/.bruin.yml"))
-	assert.Equal(t, "", SemanticDirFromConfigPath(""))
+	assert.Empty(t, SemanticDirFromConfigPath(""))
 }
 
 func TestGetSemanticQueryDryRunRule(t *testing.T) {

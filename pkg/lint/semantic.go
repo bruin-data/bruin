@@ -62,7 +62,10 @@ func (r *SemanticQueryDryRunRule) ValidateCrossPipeline(ctx context.Context, pip
 	}
 
 	exists, err := afero.DirExists(r.Fs, r.SemanticDir)
-	if err != nil || !exists {
+	if err != nil {
+		return issues, err
+	}
+	if !exists {
 		r.debugf("skipping semantic validation, directory '%s' not found", r.SemanticDir)
 		return issues, nil
 	}
