@@ -131,6 +131,10 @@ type Connections struct {
 	Sumble              []SumbleConnection              `yaml:"sumble,omitempty" json:"sumble,omitempty" mapstructure:"sumble"`
 	Twenty              []TwentyConnection              `yaml:"twenty,omitempty" json:"twenty,omitempty" mapstructure:"twenty"`
 	AbraFlexi           []AbraFlexiConnection           `yaml:"abraflexi,omitempty" json:"abraflexi,omitempty" mapstructure:"abraflexi"`
+	ExchangeRatesAPI    []ExchangeRatesAPIConnection    `yaml:"exchangeratesapi,omitempty" json:"exchangeratesapi,omitempty" mapstructure:"exchangeratesapi"`
+	Fakturoid           []FakturoidConnection           `yaml:"fakturoid,omitempty" json:"fakturoid,omitempty" mapstructure:"fakturoid"`
+	Lumify              []LumifyConnection              `yaml:"lumify,omitempty" json:"lumify,omitempty" mapstructure:"lumify"`
+	BambooHR            []BambooHRConnection            `yaml:"bamboohr,omitempty" json:"bamboohr,omitempty" mapstructure:"bamboohr"`
 	SatisMeter          []SatisMeterConnection          `yaml:"satismeter,omitempty" json:"satismeter,omitempty" mapstructure:"satismeter"`
 	Deel                []DeelConnection                `yaml:"deel,omitempty" json:"deel,omitempty" mapstructure:"deel"`
 	Frankfurter         []FrankfurterConnection         `yaml:"frankfurter,omitempty" json:"frankfurter,omitempty" mapstructure:"frankfurter"`
@@ -1639,6 +1643,34 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.AbraFlexi = append(env.Connections.AbraFlexi, conn)
+	case "exchangeratesapi":
+		var conn ExchangeRatesAPIConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.ExchangeRatesAPI = append(env.Connections.ExchangeRatesAPI, conn)
+	case "fakturoid":
+		var conn FakturoidConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Fakturoid = append(env.Connections.Fakturoid, conn)
+	case "lumify":
+		var conn LumifyConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Lumify = append(env.Connections.Lumify, conn)
+	case "bamboohr":
+		var conn BambooHRConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.BambooHR = append(env.Connections.BambooHR, conn)
 	case "satismeter":
 		var conn SatisMeterConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -2215,6 +2247,14 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Twenty = removeConnection(env.Connections.Twenty, connectionName)
 	case "abraflexi":
 		env.Connections.AbraFlexi = removeConnection(env.Connections.AbraFlexi, connectionName)
+	case "exchangeratesapi":
+		env.Connections.ExchangeRatesAPI = removeConnection(env.Connections.ExchangeRatesAPI, connectionName)
+	case "fakturoid":
+		env.Connections.Fakturoid = removeConnection(env.Connections.Fakturoid, connectionName)
+	case "lumify":
+		env.Connections.Lumify = removeConnection(env.Connections.Lumify, connectionName)
+	case "bamboohr":
+		env.Connections.BambooHR = removeConnection(env.Connections.BambooHR, connectionName)
 	case "satismeter":
 		env.Connections.SatisMeter = removeConnection(env.Connections.SatisMeter, connectionName)
 	case "deel":
@@ -2507,6 +2547,10 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Sumble, source.Sumble)
 	mergeConnectionList(&c.Twenty, source.Twenty)
 	mergeConnectionList(&c.AbraFlexi, source.AbraFlexi)
+	mergeConnectionList(&c.ExchangeRatesAPI, source.ExchangeRatesAPI)
+	mergeConnectionList(&c.Fakturoid, source.Fakturoid)
+	mergeConnectionList(&c.Lumify, source.Lumify)
+	mergeConnectionList(&c.BambooHR, source.BambooHR)
 	mergeConnectionList(&c.SatisMeter, source.SatisMeter)
 	mergeConnectionList(&c.Deel, source.Deel)
 	mergeConnectionList(&c.Frankfurter, source.Frankfurter)

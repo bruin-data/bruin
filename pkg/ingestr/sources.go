@@ -139,6 +139,47 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "stredisko", PrimaryKey: "id", IncKey: "lastUpdate", IncStrategy: "merge"},
 	},
 
+	// exchangeratesapi.io (APILayer) - Foreign exchange rates. The base currency can
+	// also be given in the table name, e.g. "exchange_rates:CZK".
+	"exchangeratesapi": {
+		{Name: "exchange_rates", PrimaryKey: "date,base,currency", IncKey: "date", IncStrategy: "merge"},
+		{Name: "latest", PrimaryKey: "date,base,currency", IncKey: "", IncStrategy: "merge"},
+		{Name: "symbols", PrimaryKey: "currency", IncKey: "", IncStrategy: "replace"},
+	},
+
+	// Fakturoid - Czech invoicing and accounting service (API v3). The two child
+	// tables are exploded from the invoice payload and carry invoice_id.
+	"fakturoid": {
+		{Name: "invoices", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "invoices_lines", PrimaryKey: "invoice_id,id", IncKey: "", IncStrategy: "merge"},
+		{Name: "invoices_vat_rates", PrimaryKey: "invoice_id,vat_rate", IncKey: "", IncStrategy: "merge"},
+		{Name: "subjects", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+	},
+
+	// Lumify - Agent-ready sports intelligence API (schedules, teams, players, events).
+	"lumify": {
+		{Name: "sports", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "leagues", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "seasons", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "teams", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "players", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "events", PrimaryKey: "id", IncKey: "", IncStrategy: "merge"},
+	},
+
+	// BambooHR - HR platform for employee records, time off, and time tracking.
+	"bamboohr": {
+		{Name: "employees", PrimaryKey: "employeeId", IncKey: "", IncStrategy: "replace"},
+		{Name: "employee_directory", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "employee_fields", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "users", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "locations", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "time_off_requests", PrimaryKey: "id", IncKey: "start", IncStrategy: "merge"},
+		{Name: "time_off_types", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "time_off_default_hours", PrimaryKey: "name", IncKey: "", IncStrategy: "replace"},
+		{Name: "time_off_policies", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "timesheet_entries", PrimaryKey: "id", IncKey: "date", IncStrategy: "merge"},
+	},
+
 	// SatisMeter - In-app NPS, CSAT and CES survey responses
 	"satismeter": {
 		{Name: "responses", PrimaryKey: "id", IncKey: "created", IncStrategy: "merge"},

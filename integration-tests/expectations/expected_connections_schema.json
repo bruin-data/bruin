@@ -517,6 +517,34 @@
         "api_key"
       ]
     },
+    "BambooHRConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "company_domain": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "access_token": {
+          "type": "string"
+        },
+        "timezone": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "company_domain"
+      ]
+    },
     "BrazeConnection": {
       "properties": {
         "name": {
@@ -1502,6 +1530,30 @@
           },
           "type": "array"
         },
+        "exchangeratesapi": {
+          "items": {
+            "$ref": "#/$defs/ExchangeRatesAPIConnection"
+          },
+          "type": "array"
+        },
+        "fakturoid": {
+          "items": {
+            "$ref": "#/$defs/FakturoidConnection"
+          },
+          "type": "array"
+        },
+        "lumify": {
+          "items": {
+            "$ref": "#/$defs/LumifyConnection"
+          },
+          "type": "array"
+        },
+        "bamboohr": {
+          "items": {
+            "$ref": "#/$defs/BambooHRConnection"
+          },
+          "type": "array"
+        },
         "satismeter": {
           "items": {
             "$ref": "#/$defs/SatisMeterConnection"
@@ -2385,6 +2437,28 @@
         "name"
       ]
     },
+    "ExchangeRatesAPIConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "access_key": {
+          "type": "string"
+        },
+        "base": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "access_key"
+      ]
+    },
     "FabricConnection": {
       "properties": {
         "name": {
@@ -2474,6 +2548,40 @@
         "name",
         "access_token",
         "account_id"
+      ]
+    },
+    "FakturoidConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "client_id": {
+          "type": "string"
+        },
+        "client_secret": {
+          "type": "string"
+        },
+        "slug": {
+          "type": "string"
+        },
+        "user_agent": {
+          "type": "string"
+        },
+        "rate_limit": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "client_id",
+        "client_secret",
+        "slug",
+        "user_agent"
       ]
     },
     "FastspringConnection": {
@@ -3570,6 +3678,34 @@
         "name",
         "access_token",
         "account_ids"
+      ]
+    },
+    "LumifyConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "sport": {
+          "type": "string"
+        },
+        "league": {
+          "type": "string"
+        },
+        "base_url": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
       ]
     },
     "MailchimpConnection": {
