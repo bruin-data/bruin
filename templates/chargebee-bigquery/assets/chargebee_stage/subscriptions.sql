@@ -9,7 +9,8 @@ description: >
   `mrr_active_statuses` pipeline variable (default active + non_renewing, the
   same set Chargebee uses). Subscriptions are mutable, so this holds current
   state only; the daily MRR snapshot is what accrues history. Deleted
-  subscriptions are filtered out.
+  subscription tombstones are retained with MRR eligibility forced off, allowing
+  the snapshot to emit a zero-MRR row for a customer's final deleted subscription.
 
 materialization:
   type: table
@@ -102,7 +103,8 @@ SELECT
   customer_id AS chargebee_customer_id,
   'chargebee' AS source_system,
   status AS subscription_status,
-  {{ in_string_list('status', var.mrr_active_statuses) }} AS is_mrr_eligible,
+  {{ in_string_list('status', var.mrr_active_statuses) }}
+    AND NOT COALESCE(deleted, FALSE) AS is_mrr_eligible,
   currency_code,
   SAFE_CAST(billing_period AS INT64) AS billing_period,
   billing_period_unit,
@@ -117,5 +119,4 @@ SELECT
   TIMESTAMP_SECONDS(SAFE_CAST(trial_end AS INT64)) AS trial_ends_at,
   TIMESTAMP_SECONDS(SAFE_CAST(cancelled_at AS INT64)) AS cancelled_at,
   TIMESTAMP_SECONDS(SAFE_CAST(updated_at AS INT64)) AS subscription_updated_at
-FROM chargebee_raw.subscription
-WHERE NOT COALESCE(deleted, FALSE);
+FROM chargebee_raw.subscription;

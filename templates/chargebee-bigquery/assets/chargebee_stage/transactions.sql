@@ -34,6 +34,9 @@ columns:
   - name: chargebee_subscription_id
     type: STRING
     description: Subscription linked to the transaction, when applicable.
+  - name: chargebee_invoice_id
+    type: STRING
+    description: First invoice linked to the transaction, when applicable.
   - name: source_system
     type: STRING
     description: Constant `chargebee`.
@@ -86,6 +89,7 @@ SELECT
   id AS chargebee_transaction_id,
   customer_id AS chargebee_customer_id,
   subscription_id AS chargebee_subscription_id,
+  JSON_VALUE(linked_invoices, '$[0].invoice_id') AS chargebee_invoice_id,
   'chargebee' AS source_system,
   type AS transaction_type,
   status AS transaction_status,

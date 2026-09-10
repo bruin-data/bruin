@@ -89,12 +89,12 @@ SELECT
         NULLIF(SAFE_CAST(LAX_INT64(item.billing_period) * 12 AS NUMERIC), 0)
       )
       WHEN 'week' THEN SAFE_DIVIDE(
-        SAFE_CAST(LAX_INT64(item.amount) * 12 AS NUMERIC),
-        NULLIF(SAFE_CAST(LAX_INT64(item.billing_period) * 52 AS NUMERIC), 0)
+        SAFE_CAST(LAX_INT64(item.amount) * 52 AS NUMERIC),
+        NULLIF(SAFE_CAST(LAX_INT64(item.billing_period) * 12 AS NUMERIC), 0)
       )
       WHEN 'day' THEN SAFE_DIVIDE(
-        SAFE_CAST(LAX_INT64(item.amount) * 12 AS NUMERIC),
-        NULLIF(SAFE_CAST(LAX_INT64(item.billing_period) * 365 AS NUMERIC), 0)
+        SAFE_CAST(LAX_INT64(item.amount) * 365 AS NUMERIC),
+        NULLIF(SAFE_CAST(LAX_INT64(item.billing_period) * 12 AS NUMERIC), 0)
       )
       ELSE NULL
     END,

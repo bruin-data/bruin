@@ -16,6 +16,7 @@ materialization:
 
 depends:
   - chargebee_stage.transactions
+  - chargebee_raw.transaction
 
 tags:
   - chargebee_reports
@@ -63,6 +64,9 @@ columns:
   - name: recoverable_failed_count
     type: INT64
     description: Count of failed payments still inside the retry window.
+  - name: recovered_failed_count
+    type: INT64
+    description: Failed payments later recovered by a successful payment on the same invoice.
   - name: at_risk_failed_count
     type: INT64
     description: Count of failed payments older than the retry window.
@@ -75,6 +79,32 @@ WITH bounds AS (
       DATE('{{ end_date }}'),
       INTERVAL {{ var.dunning_retry_window_days }} DAY
     )) AS retry_window_start
+),
+raw_invoice_links AS (
+  SELECT
+    id AS chargebee_transaction_id,
+    JSON_VALUE(linked_invoices, '$[0].invoice_id') AS chargebee_invoice_id
+  FROM chargebee_raw.transaction
+),
+payment_outcomes AS (
+  SELECT
+    failed.*,
+    failed_invoice.chargebee_invoice_id,
+    EXISTS(
+      SELECT 1
+      FROM chargebee_stage.transactions AS successful
+      INNER JOIN raw_invoice_links AS successful_invoice
+        ON successful.chargebee_transaction_id = successful_invoice.chargebee_transaction_id
+      WHERE successful.is_payment
+        AND successful.is_successful
+        AND successful.currency_code = failed.currency_code
+        AND successful_invoice.chargebee_invoice_id IS NOT NULL
+        AND successful_invoice.chargebee_invoice_id = failed_invoice.chargebee_invoice_id
+        AND successful.transaction_at > failed.transaction_at
+    ) AS was_recovered
+  FROM chargebee_stage.transactions AS failed
+  LEFT JOIN raw_invoice_links AS failed_invoice
+    ON failed.chargebee_transaction_id = failed_invoice.chargebee_transaction_id
 )
 
 SELECT
@@ -90,22 +120,28 @@ SELECT
   SUM(IF(transaction.is_failed_payment, transaction.amount_minor, CAST(0 AS NUMERIC)))
     AS failed_amount_minor,
   SUM(IF(
-    transaction.is_failed_payment AND transaction.transaction_at >= bounds.retry_window_start,
+    transaction.is_failed_payment AND NOT transaction.was_recovered
+      AND transaction.transaction_at >= bounds.retry_window_start,
     transaction.amount_minor,
     CAST(0 AS NUMERIC)
   )) AS recoverable_failed_amount_minor,
   SUM(IF(
-    transaction.is_failed_payment AND transaction.transaction_at < bounds.retry_window_start,
+    transaction.is_failed_payment AND NOT transaction.was_recovered
+      AND transaction.transaction_at < bounds.retry_window_start,
     transaction.amount_minor,
     CAST(0 AS NUMERIC)
   )) AS at_risk_failed_amount_minor,
   COUNTIF(
-    transaction.is_failed_payment AND transaction.transaction_at >= bounds.retry_window_start
+    transaction.is_failed_payment AND NOT transaction.was_recovered
+      AND transaction.transaction_at >= bounds.retry_window_start
   ) AS recoverable_failed_count,
+  COUNTIF(transaction.is_failed_payment AND transaction.was_recovered)
+    AS recovered_failed_count,
   COUNTIF(
-    transaction.is_failed_payment AND transaction.transaction_at < bounds.retry_window_start
+    transaction.is_failed_payment AND NOT transaction.was_recovered
+      AND transaction.transaction_at < bounds.retry_window_start
   ) AS at_risk_failed_count
-FROM chargebee_stage.transactions AS transaction
+FROM payment_outcomes AS transaction
 CROSS JOIN bounds
 WHERE transaction.currency_code IS NOT NULL
 GROUP BY 1, 2;
