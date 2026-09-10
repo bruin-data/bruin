@@ -10,11 +10,12 @@ description: >
   current. Each run observes the pipeline end date and adds that day, replacing
   only the rows for the date being run, so re-running a date is idempotent.
   Historical subscription episodes can be backfilled from their
-  started_at/cancelled_at dates and normalized subscription-item MRR. Repricing
-  history still requires snapshots taken while each price was current. The
-  movement and retention reports need two contiguous monthly observations
-  before they classify anything. It retains a zero-MRR row when a customer has
-  only ineligible subscriptions, so a churned customer stays visible at zero
+  started_at/activated_at/cancelled_at dates and normalized subscription-item
+  MRR. Repricing and status-transition history (for example, a past pause)
+  still requires snapshots taken while each state was current. The movement
+  and retention reports need two contiguous monthly observations before they
+  classify anything. It retains a zero-MRR row when a customer has only
+  ineligible subscriptions, so a churned customer stays visible at zero
   instead of disappearing.
 
 materialization:
@@ -116,6 +117,7 @@ subscription_history AS (
     subscription.currency_code,
     subscription.is_mrr_eligible,
     DATE(subscription.subscription_started_at) AS started_date,
+    DATE(subscription.subscription_activated_at) AS activated_date,
     DATE(subscription.cancelled_at) AS cancelled_date,
     COALESCE(
       NULLIF(subscription.subscription_mrr_minor, CAST(0 AS NUMERIC)),
@@ -140,9 +142,13 @@ SELECT
 FROM (
   SELECT
     *,
-    started_date <= DATE('{{ end_date }}')
+    COALESCE(activated_date, started_date) <= DATE('{{ end_date }}')
       AND (cancelled_date IS NULL OR cancelled_date > DATE('{{ end_date }}'))
-      AND (is_mrr_eligible OR cancelled_date IS NOT NULL)
+      AND (
+        (is_mrr_eligible AND COALESCE(activated_date, started_date)
+          <= DATE('{{ end_date }}'))
+        OR (cancelled_date IS NOT NULL AND activated_date IS NOT NULL)
+      )
       AS is_historical_mrr_eligible
   FROM subscription_history
 )
