@@ -16,6 +16,7 @@ type Config struct {
 	Schema       string
 	PoolMaxConns int
 	SslMode      string
+	ReadOnly     bool
 }
 
 // ToDBConnectionURI returns a connection URI to be used with the pgx package.

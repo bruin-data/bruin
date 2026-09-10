@@ -44,8 +44,13 @@ func NewClient(ctx context.Context, c PgConfig) (*Client, error) {
 		return nil, err
 	}
 
+	var queryConn connection = conn
+	if cfg, ok := c.(interface{ IsReadOnly() bool }); ok && cfg.IsReadOnly() {
+		queryConn = &readOnlyConnection{pool: conn}
+	}
+
 	return &Client{
-		connection:    conn,
+		connection:    queryConn,
 		config:        c,
 		schemaCreator: ansisql.NewSchemaCreator(),
 		schemaCache:   &sync.Map{},
@@ -63,6 +68,9 @@ func (c *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) 
 }
 
 func (c *Client) GetIngestrURI() (string, error) {
+	if cfg, ok := c.config.(interface{ IsReadOnly() bool }); ok && cfg.IsReadOnly() {
+		return "", errors.New("read_only connections cannot be used with ingestr")
+	}
 	return c.config.GetIngestrURI(), nil
 }
 
@@ -119,6 +127,10 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 		}, nil
 	}
 	if fieldDescriptions == nil {
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return nil, errors.Wrap(err, "failed to execute query")
+		}
 		return nil, errors.New("field descriptions are not available")
 	}
 	typeMap := pgtype.NewMap()

@@ -215,6 +215,15 @@ func TestClient_SelectWithSchema(t *testing.T) {
 			},
 		},
 		{
+			name:    "test missing schema preserves query error",
+			query:   "SELECT 1; SELECT 2",
+			wantErr: "failed to execute query: cannot insert multiple commands into a prepared statement",
+			setupMock: func(mock pgxmock.PgxPoolIface) {
+				rows := pgxmock.NewRowsWithColumnDefinition().RowError(-1, errors.New("cannot insert multiple commands into a prepared statement"))
+				mock.ExpectQuery("SELECT 1; SELECT 2").WillReturnRows(rows).RowsWillBeClosed()
+			},
+		},
+		{
 			name:    "test select errors with schema",
 			query:   "SELECT * FROM table",
 			wantErr: "failed to execute query: Some error", // Updated error message

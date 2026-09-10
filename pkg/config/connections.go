@@ -512,6 +512,7 @@ type PostgresConnection struct {
 	Schema             string `yaml:"schema,omitempty" json:"schema,omitempty" mapstructure:"schema"`
 	PoolMaxConns       int    `yaml:"pool_max_conns,omitempty" json:"pool_max_conns,omitempty" mapstructure:"pool_max_conns" default:"10"`
 	SslMode            string `yaml:"ssl_mode,omitempty" json:"ssl_mode,omitempty" mapstructure:"ssl_mode" default:"allow"`
+	ReadOnly           bool   `yaml:"read_only,omitempty" json:"read_only,omitempty" mapstructure:"read_only"`
 }
 
 func (c PostgresConnection) GetName() string {

@@ -1044,6 +1044,7 @@ func (m *Manager) addPgLikeConnectionFromConfig(ctx context.Context, connection 
 		})
 	} else {
 		client, err = postgres.NewClient(ctx, postgres.Config{
+			ReadOnly:     connection.ReadOnly,
 			Username:     connection.Username,
 			Password:     connection.Password,
 			Host:         connection.Host,

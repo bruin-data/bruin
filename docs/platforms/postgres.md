@@ -18,7 +18,12 @@ In order to set up a PostgreSQL connection, you need to add a configuration item
           ssl_mode: "allow" # optional
           schema: "schema_name" # optional
           pool_max_conns: 5 # optional
+          read_only: false
 ```
+
+### Read-only connections
+
+Set `read_only: true` to run SQL queries in read-only mode (default: `false`). Ingestr assets and seeds do not support this option.
 
 > [!NOTE]
 > `ssl_mode` should be one of the modes describe in the [documentation](https://www.postgresql.org/docs/current/libpq-ssl.html#LIBPQ-SSL-PROTECTION).
