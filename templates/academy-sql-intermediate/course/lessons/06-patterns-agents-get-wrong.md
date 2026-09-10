@@ -49,11 +49,12 @@ time component the column carries.
 ON CAST(o.ordered_at AS DATE) = f.rate_date
 ```
 
-That casted date-only join returns 6,060 rows and multiplies every order line by 5 - 2023 line
-revenue goes from the correct **264,926.21** unconverted to **1,324,631.05**, exactly 5 times too
-high, because the join fanned out before the sum ran. A literal raw timestamp-to-date join,
-`ON o.ordered_at = f.rate_date`, is a separate type-mismatch problem; in this data it returns only
-335 rows. It is not the explanation for the 5x fan-out.
+At the order-rate grain, across all generated orders, this casted date-only join returns 6,060 rows
+(1,212 orders times 5 rates). The 2023 line-revenue diagnostic is a different, cleaned line-level
+grain; its date-only join fans each line out by 5 before the sum. That is why 2023 line revenue goes
+from the correct **264,926.21** unconverted to **1,324,631.05**, exactly 5 times too high. A literal
+raw timestamp-to-date join, `ON o.ordered_at = f.rate_date`, is a separate type-mismatch problem; in
+this data it returns only 335 rows. It is not the explanation for the 5x fan-out.
 
 ```sql
 -- Correct: one matching rate for the order date, source currency, and USD target.

@@ -10,6 +10,11 @@ This is the lesson that makes the course honest. You have spent three lessons wr
 tags and a glossary on the argument that they make an agent more accurate. Now measure it, because
 the honest answer is that it depends on what you wrote.
 
+Before you add or edit course context, preserve an untouched copy for the before run. If the working
+copy has already changed, initialize `academy-sql-intermediate` again in a separate empty directory
+and use that pristine copy for the baseline session. This makes the comparison reproducible rather
+than asking the modified course copy to recreate its original state.
+
 The method has four steps. **One**, `docs/eval/questions.md` ships eight questions with one
 defensible answer each, and the verified answers are in `docs/eval/answers.md`. Add two of your
 own, drawn from a mistake you actually saw an agent make in this project, so the set is ten.

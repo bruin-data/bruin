@@ -122,8 +122,10 @@ That is the point - lesson 3 has you find out, and lesson 11 has you write it do
 
 ## What is wrong with this data
 
-Something. Several things. Finding them is lesson 3, and nothing in this repository
-tells you what they are before you get there.
+The table above records source-system grain, including known duplicate populations, so those raw
+rows are not mistaken for unique business entities. Lesson 3 still has you profile the actual
+tables, verify the counts, and quantify the impact; the detailed defect effects and fixes are not
+provided here.
 
 Do not fix anything you find before lesson 8. Profile first, decide what a defensible
 number is second, clean third. In that order, every time.
