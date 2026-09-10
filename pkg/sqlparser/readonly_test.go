@@ -9,21 +9,6 @@ import (
 
 func TestSQLParserIsReadOnlyQuery(t *testing.T) {
 	t.Parallel()
-	testReadOnlyQueries(t, sharedSQLParser.IsReadOnlyQuery, false)
-}
-
-func TestRustSQLParserIsReadOnlyQuery(t *testing.T) {
-	t.Parallel()
-	if err := ensureRustSQLParserFFI(); err != nil {
-		t.Skip(err)
-	}
-	parser, err := NewRustSQLParser(false)
-	require.NoError(t, err)
-	testReadOnlyQueries(t, parser.IsReadOnlyQuery, true)
-}
-
-func testReadOnlyQueries(t *testing.T, validate func(string, string) (bool, error), allowRejectionError bool) {
-	t.Helper()
 	tests := []struct {
 		name    string
 		query   string
@@ -139,10 +124,10 @@ func testReadOnlyQueries(t *testing.T, validate func(string, string) (bool, erro
 			if dialect == "" {
 				dialect = "snowflake"
 			}
-			got, err := validate(tt.query, dialect)
+			got, err := sharedSQLParser.IsReadOnlyQuery(tt.query, dialect)
 			if tt.wantErr {
 				require.Error(t, err)
-			} else if tt.want || !allowRejectionError {
+			} else {
 				require.NoError(t, err)
 			}
 			require.Equal(t, tt.want, got)

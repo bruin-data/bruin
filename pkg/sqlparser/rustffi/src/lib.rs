@@ -1,5 +1,4 @@
 mod compat;
-mod readonly;
 
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -169,18 +168,5 @@ pub extern "C" fn bruin_rustsqlparser_hoist_declares_list(
         };
         let result = compat::hoist_declares_list(queries, dialect);
         serde_json::to_string(&result).map_err(|e| e.to_string())
-    })
-}
-
-#[no_mangle]
-pub extern "C" fn bruin_rustsqlparser_is_read_only(
-    query: *const c_char,
-    dialect: *const c_char,
-) -> *mut c_char {
-    ffi_call(|| {
-        let query = read_cstr(query)?;
-        let dialect = read_dialect(dialect)?;
-        let result = readonly::is_read_only_query(query, dialect);
-        Ok(result.to_string())
     })
 }
