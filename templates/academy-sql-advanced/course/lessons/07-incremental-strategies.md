@@ -20,13 +20,26 @@ For this data, `ordered_at` is business time and `_loaded_at` is ingestion time.
    A: Historical versions of a dimension row with validity metadata.
 
 ## Task
-Convert `weekly_category_revenue` from `create+replace` to a suitable incremental strategy. Explain the strategy and both timestamps in `docs/incremental-decision.md`. Run the same date range twice and record row count and revenue total after each run. Then replace the empty query in `pipeline/assets/core/dim_customer_history.sql` with an SCD2 projection of `customer_snapshots`, declare `incremental_key: snapshot_at`, run that asset once with `bruin run --full-refresh pipeline/assets/core/dim_customer_history.sql`, and record the generated validity columns and row count in `docs/scd2-decision.md`. Do not full-refresh either mart.
+First change `weekly_category_revenue` from `create+replace` to `delete+insert` keyed by
+`iso_week`, add the `time_granularity: date` metadata, and filter the query to the requested
+`{{ start_datetime }}`/`{{ end_datetime }}` window. Run one bounded date range twice and record
+the row count and revenue total after each run. Then compare that design with `time_interval`:
+choose the strategy you would ship, explain the `delete+insert` → `time_interval` decision and both
+timestamps in `docs/incremental-decision.md`, and include the exact `iso_week` metadata and date
+filter in the evidence. For the supplied data, a full 2023-2025 result is 871 rows and
+733,684.59 revenue; the two identical reruns must preserve the same totals for the range you use.
+
+Next replace the empty query in `pipeline/assets/core/dim_customer_history.sql` with an SCD2
+projection of `customer_snapshots`, change its materialization strategy to `scd2_by_time`, declare
+`incremental_key: snapshot_at`, run that asset once with
+`bruin run --full-refresh pipeline/assets/core/dim_customer_history.sql`, and record the generated
+validity columns and row count in `docs/scd2-decision.md`. Do not full-refresh either mart.
 
 ## Rubric (for `review my work`)
 - [ ] The decision names `ordered_at` as business time and `_loaded_at` as ingestion time.
 - [ ] The same range run twice has identical row count and revenue total on both runs.
-- [ ] The chosen strategy declares its required incremental metadata and remains valid for a date range.
-- [ ] The SCD2 stub declares `incremental_key: snapshot_at`, preserves customer history, and records why its first run needs `--full-refresh`.
+- [ ] The evidence compares `delete+insert` with `time_interval`, names the chosen strategy, and includes `incremental_key: iso_week`, `time_granularity: date`, and a bounded date predicate.
+- [ ] The SCD2 asset uses `scd2_by_time` with `incremental_key: snapshot_at`, preserves customer history, and records why its first run needs `--full-refresh`.
 
 ## Done signal
 You can make reruns safe by matching the strategy to the grain and timestamps. Carry forward: late ingestion tests whether that choice is really correct.
