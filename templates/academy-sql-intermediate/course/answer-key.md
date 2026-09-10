@@ -21,7 +21,7 @@ when the student says it is.
 | Join and grain safety | 1 |
 | Governance | 2 |
 | Verification | 2 |
-| Defence | 1 |
+| Defence, including the currency basis | 1 |
 
 ## The nine objections, and the number each turns on
 
@@ -97,6 +97,10 @@ and check the number follows from it.
 - Three "independent" verifications that are the same query written three ways.
 - A mart asset that reads `orders` directly.
 - `docs/defence.md` that answers the four questions with confidence rather than with numbers.
+
+The currency-basis requirement belongs to the single Defence point. The student must state a basis
+that is true of the query and support it with the currency-composition query; this is not an
+additional point. The six rubric areas therefore total exactly 10 points.
 
 ## After the grade
 
