@@ -247,9 +247,9 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 
 		// SQL Server exposes two capture mechanisms. Log-based CDC (mssql+cdc) is the
 		// default; Change Tracking (mssql+ct) is selected per-asset because it can't be
-		// derived from the scheme alone. The +ct source takes no query parameters and is
-		// driven purely by --primary-key / --incremental-strategy merge, so its
-		// source-specific parameters below are skipped.
+		// derived from the scheme alone. Change Tracking is otherwise driven by
+		// --primary-key / --incremental-strategy merge, and the only query parameter it
+		// reads is poll_interval, so the +cdc-only parameters below skip it.
 		sqlCapture, _ := asset.Parameters.GetString("cdc_sql_capture")
 		changeTracking := isMSSQLScheme(baseScheme) && sqlCapture == "change_tracking"
 		if changeTracking {
@@ -282,15 +282,20 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		if tls, _ := asset.Parameters.GetString("cdc_tls"); tls != "" {
 			q.Set("tls", tls)
 		}
-		// SQL Server log-based CDC parameters, confined to the mssql source so they
-		// cannot leak into other CDC URIs. Change Tracking (+ct) ignores query
-		// parameters, so these are only forwarded for the mssql+cdc source.
-		if isMSSQLScheme(baseScheme) && !changeTracking {
-			if captureInstance, _ := asset.Parameters.GetString("cdc_capture_instance"); captureInstance != "" {
-				q.Set("capture_instance", captureInstance)
-			}
+		// SQL Server parameters, confined to the mssql source so they cannot leak into
+		// other CDC URIs. Both captures poll the source, so poll_interval applies to
+		// either; for Change Tracking it only takes effect while streaming, where it
+		// sets the delay between polls (ingestr defaults to 1s).
+		if isMSSQLScheme(baseScheme) {
 			if pollInterval, _ := asset.Parameters.GetString("cdc_poll_interval"); pollInterval != "" {
 				q.Set("poll_interval", pollInterval)
+			}
+			// A capture instance is a log-based change table, which Change Tracking has
+			// no equivalent of.
+			if !changeTracking {
+				if captureInstance, _ := asset.Parameters.GetString("cdc_capture_instance"); captureInstance != "" {
+					q.Set("capture_instance", captureInstance)
+				}
 			}
 		}
 		// MongoDB change-stream parameters, confined to the mongodb source.
@@ -306,7 +311,11 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		// deprecated ?mode= and rejects mode=stream unless --stream is also passed.
 		// Continuous ingestion is driven purely by the --stream flag, which we
 		// enable below for the deprecated cdc_mode: stream alias.
-		if destSchema, _ := asset.Parameters.GetString("cdc_dest_schema"); destSchema != "" {
+
+		// dest_schema routes a multi-table CDC run. Change Tracking replicates a single
+		// table per asset and passes any parameter it does not recognise on to the SQL
+		// Server driver, so it is left out there.
+		if destSchema, _ := asset.Parameters.GetString("cdc_dest_schema"); destSchema != "" && !changeTracking {
 			q.Set("dest_schema", destSchema)
 		}
 		if stateID, _ := asset.Parameters.GetString("cdc_state_id"); stateID != "" {

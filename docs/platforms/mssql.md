@@ -343,7 +343,7 @@ ALTER DATABASE MyDatabase SET CHANGE_TRACKING = ON (CHANGE_RETENTION = 2 DAYS, A
 ALTER TABLE dbo.users ENABLE CHANGE_TRACKING;
 ```
 
-Change Tracking requires each source table to have a primary key, and does not support streaming.
+Change Tracking requires each source table to have a primary key, and replicates one table per asset — the `"*"` wildcard source table is only available for log-based CDC.
 
 ### Parameters
 
@@ -353,9 +353,10 @@ CDC is enabled by setting `cdc: "true"` on an `ingestr` asset with a SQL Server 
 |-----------|----------|------------|-------------|
 | `cdc` | Yes | both | Set to `"true"` to enable CDC mode |
 | `cdc_sql_capture` | No | both | `"cdc"` (log-based, default) or `"change_tracking"` |
-| `cdc_mode` | No | log-based CDC | `"stream"` for continuous streaming or `"batch"` for batch replication |
+| `stream` | No | both | Set to `true` for continuous (real-time) streaming. Omit for batch replication (read up to the current change position and exit) |
+| `cdc_mode` | No | both | **Deprecated** — use `stream` instead. `cdc_mode: stream` is equivalent to `stream: true` |
 | `cdc_capture_instance` | No | log-based CDC | Capture instance name to read from |
-| `cdc_poll_interval` | No | log-based CDC | Poll interval for change tables, such as `10s` |
+| `cdc_poll_interval` | No | both | Delay between polls of the source, such as `10s`. Change Tracking only applies it while streaming, where it defaults to `1s` |
 | `cdc_dest_schema` | No | log-based CDC | Destination schema to use for multi-table CDC runs |
 | `source_table` | Yes | both | Source table in `schema.table` format |
 | `incremental_strategy` | No | both | Defaults to `"merge"` when CDC is enabled. CDC assets must use `"merge"`; Bruin rejects other strategies. |
@@ -391,3 +392,29 @@ parameters:
   cdc: "true"
   cdc_sql_capture: change_tracking
 ```
+
+#### Streaming Change Tracking
+```yaml
+name: dbo.orders
+type: ingestr
+connection: bigquery
+
+parameters:
+  source_connection: mssql_prod
+  source_table: dbo.orders
+  destination: bigquery
+  cdc: "true"
+  cdc_sql_capture: change_tracking
+  cdc_poll_interval: 2s
+  stream: true
+```
+
+A streaming CDC asset (`stream: true`) runs continuously, so it is excluded from a normal `bruin run` and is launched on its own:
+
+```bash
+bruin run --stream assets/dbo.orders.asset.yml
+```
+
+Change Tracking reports the net change to a row rather than every individual change, so a shorter `cdc_poll_interval` narrows the window in which several updates to the same row collapse into one. Use log-based CDC when you need the full change history. While a stream is idle, ingestr periodically restamps its resume cursor so the recorded version stays inside the database's `CHANGE_RETENTION` window and a restart can resume instead of taking a fresh snapshot.
+
+See [Streaming assets](../assets/ingestr.md#streaming-assets) for the full behaviour and restrictions.

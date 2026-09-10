@@ -157,7 +157,7 @@ parameters:
 | `cdc_grpc_host` | No | source URI query | Vitess VStream gRPC host override. |
 | `cdc_grpc_tls` | No | source URI query | Vitess VStream TLS setting. |
 | `cdc_capture_instance` | No | source URI query | SQL Server log-based CDC capture instance name. |
-| `cdc_poll_interval` | No | source URI query | SQL Server log-based CDC poll interval, such as `10s`. |
+| `cdc_poll_interval` | No | source URI query | SQL Server poll interval, such as `10s`. Applies to both captures; Change Tracking only reads it while streaming, where it defaults to `1s`. |
 | `cdc_max_await_time` | No | source URI query | MongoDB change-stream maximum await time, such as `5s`. |
 | `cdc_schema_sample_size` | No | source URI query | MongoDB number of documents sampled to infer the schema. |
 | `cdc_dest_schema` | No | source URI query | Destination schema used for multi-table CDC runs. |
