@@ -95,61 +95,12 @@ queries:
       )
       SELECT
         metric_month,
-        new_mrr AS new_business,
-        reactivation_mrr AS reactivation,
-        expansion_mrr AS expansion,
-        contraction_mrr AS contraction,
-        churn_mrr AS churn
+        new_mrr + reactivation_mrr + expansion_mrr AS `MRR added`,
+        contraction_mrr + churn_mrr AS `MRR lost`
       FROM monthly
       ORDER BY metric_month
 
-  latest_mrr_bridge:
-    sql: |
-      WITH currency_units AS (
-        SELECT IF(UPPER('{{ filters.currency }}') IN (
-          'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA',
-          'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'
-        ), 1, 100) AS divisor
-      ), latest AS (
-        SELECT MAX(metric_month) AS metric_month
-        FROM `chargebee_reports.monthly_mrr_movements`
-        WHERE metric_month >= CAST('{{ filters.date_range.start }}' AS DATE)
-          AND metric_month <= CAST('{{ filters.date_range.end }}' AS DATE)
-          AND LOWER(currency_code) = LOWER('{{ filters.currency }}')
-      )
-      SELECT movement_label, movement_mrr
-      FROM (
-        SELECT 'New business' AS movement_label,
-          SUM(new_mrr_minor) / (SELECT divisor FROM currency_units) AS movement_mrr,
-          1 AS sort_order
-        FROM `chargebee_reports.monthly_mrr_movements` AS movement, latest
-        WHERE movement.metric_month = latest.metric_month
-          AND LOWER(movement.currency_code) = LOWER('{{ filters.currency }}')
-        UNION ALL
-        SELECT 'Reactivation', SUM(reactivation_mrr_minor) / (SELECT divisor FROM currency_units), 2
-        FROM `chargebee_reports.monthly_mrr_movements` AS movement, latest
-        WHERE movement.metric_month = latest.metric_month
-          AND LOWER(movement.currency_code) = LOWER('{{ filters.currency }}')
-        UNION ALL
-        SELECT 'Expansion', SUM(expansion_mrr_minor) / (SELECT divisor FROM currency_units), 3
-        FROM `chargebee_reports.monthly_mrr_movements` AS movement, latest
-        WHERE movement.metric_month = latest.metric_month
-          AND LOWER(movement.currency_code) = LOWER('{{ filters.currency }}')
-        UNION ALL
-        SELECT 'Contraction', -SUM(contraction_mrr_minor) / (SELECT divisor FROM currency_units), 4
-        FROM `chargebee_reports.monthly_mrr_movements` AS movement, latest
-        WHERE movement.metric_month = latest.metric_month
-          AND LOWER(movement.currency_code) = LOWER('{{ filters.currency }}')
-        UNION ALL
-        SELECT 'Churn', -SUM(churned_mrr_minor) / (SELECT divisor FROM currency_units), 5
-        FROM `chargebee_reports.monthly_mrr_movements` AS movement, latest
-        WHERE movement.metric_month = latest.metric_month
-          AND LOWER(movement.currency_code) = LOWER('{{ filters.currency }}')
-      )
-      WHERE movement_mrr != 0
-      ORDER BY sort_order
-
-  latest_mrr_summary:
+  latest_mrr_flow:
     sql: |
       WITH currency_units AS (
         SELECT IF(UPPER('{{ filters.currency }}') IN (
@@ -164,30 +115,80 @@ queries:
           AND LOWER(currency_code) = LOWER('{{ filters.currency }}')
       )
       SELECT
-        movement_label,
-        added_mrr,
-        lost_mrr
-      FROM (
-        SELECT
-          'MRR added' AS movement_label,
-          SUM(new_mrr_minor + reactivation_mrr_minor + expansion_mrr_minor)
-            / (SELECT divisor FROM currency_units) AS added_mrr,
-          CAST(0 AS NUMERIC) AS lost_mrr,
-          1 AS sort_order
-        FROM `chargebee_reports.monthly_mrr_movements` AS movement, latest
-        WHERE movement.metric_month = latest.metric_month
-          AND LOWER(movement.currency_code) = LOWER('{{ filters.currency }}')
+        latest.metric_month,
+        SUM(new_mrr_minor + reactivation_mrr_minor + expansion_mrr_minor)
+          / (SELECT divisor FROM currency_units) AS mrr_added,
+        -SUM(contraction_mrr_minor + churned_mrr_minor)
+          / (SELECT divisor FROM currency_units) AS mrr_lost,
+        SUM(
+          new_mrr_minor + reactivation_mrr_minor + expansion_mrr_minor
+          - contraction_mrr_minor - churned_mrr_minor
+        ) / (SELECT divisor FROM currency_units) AS net_mrr_change,
+        COUNTIF(new_mrr_minor > 0 OR reactivation_mrr_minor > 0 OR expansion_mrr_minor > 0)
+          AS accounts_added,
+        COUNTIF(contraction_mrr_minor > 0 OR churned_mrr_minor > 0) AS accounts_lost
+      FROM `chargebee_reports.monthly_mrr_movements` AS movement
+      INNER JOIN latest ON movement.metric_month = latest.metric_month
+      WHERE LOWER(movement.currency_code) = LOWER('{{ filters.currency }}')
+      GROUP BY latest.metric_month
+
+  latest_movement_drivers:
+    sql: |
+      WITH currency_units AS (
+        SELECT IF(UPPER('{{ filters.currency }}') IN (
+          'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA',
+          'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'
+        ), 1, 100) AS divisor
+      ), latest AS (
+        SELECT MAX(metric_month) AS metric_month
+        FROM `chargebee_reports.monthly_mrr_movements`
+        WHERE metric_month >= CAST('{{ filters.date_range.start }}' AS DATE)
+          AND metric_month <= CAST('{{ filters.date_range.end }}' AS DATE)
+          AND LOWER(currency_code) = LOWER('{{ filters.currency }}')
+      ), drivers AS (
+        SELECT 'New business' AS movement, 1 AS sort_order,
+          COUNTIF(new_mrr_minor > 0) AS accounts,
+          SUM(new_mrr_minor) / (SELECT divisor FROM currency_units) AS mrr_impact,
+          'Keep acquisition efficient' AS next_action
+        FROM `chargebee_reports.monthly_mrr_movements` AS movement_data, latest
+        WHERE movement_data.metric_month = latest.metric_month
+          AND LOWER(movement_data.currency_code) = LOWER('{{ filters.currency }}')
         UNION ALL
-        SELECT
-          'MRR lost',
-          CAST(0 AS NUMERIC),
-          -SUM(contraction_mrr_minor + churned_mrr_minor)
-            / (SELECT divisor FROM currency_units),
-          2
-        FROM `chargebee_reports.monthly_mrr_movements` AS movement, latest
-        WHERE movement.metric_month = latest.metric_month
-          AND LOWER(movement.currency_code) = LOWER('{{ filters.currency }}')
+        SELECT 'Reactivation', 2, COUNTIF(reactivation_mrr_minor > 0),
+          SUM(reactivation_mrr_minor) / (SELECT divisor FROM currency_units),
+          'Scale win-back plays'
+        FROM `chargebee_reports.monthly_mrr_movements` AS movement_data, latest
+        WHERE movement_data.metric_month = latest.metric_month
+          AND LOWER(movement_data.currency_code) = LOWER('{{ filters.currency }}')
+        UNION ALL
+        SELECT 'Expansion', 3, COUNTIF(expansion_mrr_minor > 0),
+          SUM(expansion_mrr_minor) / (SELECT divisor FROM currency_units),
+          'Find upgrade triggers'
+        FROM `chargebee_reports.monthly_mrr_movements` AS movement_data, latest
+        WHERE movement_data.metric_month = latest.metric_month
+          AND LOWER(movement_data.currency_code) = LOWER('{{ filters.currency }}')
+        UNION ALL
+        SELECT 'Contraction', 4, COUNTIF(contraction_mrr_minor > 0),
+          -SUM(contraction_mrr_minor) / (SELECT divisor FROM currency_units),
+          'Prioritize save plays'
+        FROM `chargebee_reports.monthly_mrr_movements` AS movement_data, latest
+        WHERE movement_data.metric_month = latest.metric_month
+          AND LOWER(movement_data.currency_code) = LOWER('{{ filters.currency }}')
+        UNION ALL
+        SELECT 'Churn', 5, COUNTIF(churned_mrr_minor > 0),
+          -SUM(churned_mrr_minor) / (SELECT divisor FROM currency_units),
+          'Run churn interviews'
+        FROM `chargebee_reports.monthly_mrr_movements` AS movement_data, latest
+        WHERE movement_data.metric_month = latest.metric_month
+          AND LOWER(movement_data.currency_code) = LOWER('{{ filters.currency }}')
       )
+      SELECT
+        movement,
+        accounts,
+        mrr_impact,
+        SAFE_DIVIDE(ABS(mrr_impact), SUM(ABS(mrr_impact)) OVER ()) AS share_of_impact,
+        next_action
+      FROM drivers
       ORDER BY sort_order
 
   channel_mix:
@@ -629,7 +630,7 @@ rows:
 
           The first question is simple: **is the business growing, and is that growth durable?** This view keeps committed recurring revenue separate from invoicing and cash. All money is shown in native `{{ filters.currency | upper }}`; no FX conversion is applied.
 
-          Use the tabs for retention cohorts, monetization, and the account-level collection queue. In the bridge below, the purple series is MRR added and the teal series is MRR lost.
+          Use the tabs for retention cohorts, monetization, and the account-level collection queue. The overview is built around one operating question: **what changed in recurring revenue, and where should the team act next?**
         col: 12
 
   - tab: Overview
@@ -694,15 +695,61 @@ rows:
         query: monthly_mrr
         x: metric_month
         y: [ending_mrr]
-        col: 7
-      - name: Latest-month MRR added vs lost
-        type: chart
-        chart: bar
-        query: latest_mrr_summary
-        x: movement_label
-        y: [added_mrr, lost_mrr]
-        stacked: true
-        col: 5
+        col: 8
+      - name: Latest net MRR change
+        type: metric
+        query: latest_mrr_flow
+        column: net_mrr_change
+        format: "$,.0f"
+        col: 4
+
+  - tab: Overview
+    widgets:
+      - name: Latest MRR added
+        type: metric
+        query: latest_mrr_flow
+        column: mrr_added
+        format: "$,.0f"
+        col: 3
+      - name: Latest MRR lost
+        type: metric
+        query: latest_mrr_flow
+        column: mrr_lost
+        format: "$,.0f"
+        col: 3
+      - name: Accounts added
+        type: metric
+        query: latest_mrr_flow
+        column: accounts_added
+        format: ",.0f"
+        col: 3
+      - name: Accounts lost
+        type: metric
+        query: latest_mrr_flow
+        column: accounts_lost
+        format: ",.0f"
+        col: 3
+
+  - tab: Overview
+    widgets:
+      - name: Latest MRR movement drivers
+        type: table
+        query: latest_movement_drivers
+        col: 12
+        columns:
+          - name: movement
+            label: Movement
+          - name: accounts
+            label: Accounts
+            format: ",.0f"
+          - name: mrr_impact
+            label: MRR impact
+            format: "$,.0f"
+          - name: share_of_impact
+            label: Share of movement
+            format: ".0%"
+          - name: next_action
+            label: Suggested action
 
   - tab: Overview
     widgets:
@@ -767,7 +814,7 @@ rows:
 
           This tab answers **are existing customers keeping and growing their spend?** Revenue retention measures dollars; logo retention measures customers. They answer different questions, so they are intentionally shown together.
 
-          GRR excludes expansion. NRR is available in the KPI scorecard; it will diverge from GRR when upgrades or add-ons create expansion MRR.
+          GRR excludes expansion. NRR is available in the KPI scorecard; it will diverge from GRR when upgrades or add-ons create expansion MRR. In the monthly flow chart, **MRR added** combines new business, reactivation, and expansion; **MRR lost** combines contraction and churn and is shown as a negative value. The gap between them is net monthly movement.
         col: 12
 
   - tab: Retention & Expansion
@@ -789,14 +836,14 @@ rows:
 
   - tab: Retention & Expansion
     widgets:
-      - name: MRR movement by month
+      - name: "Monthly MRR flow: additions vs losses"
         type: chart
         chart: bar
         query: mrr_movement
         x: metric_month
-        y: [new_business, reactivation, expansion, contraction, churn]
+        y: ["MRR added", "MRR lost"]
         stacked: true
-        col: 8
+        col: 7
       - name: Churned MRR by channel
         type: chart
         chart: bar

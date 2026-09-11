@@ -94,8 +94,10 @@ the reporting layer. It is one dashboard with four tabs — Overview, Retention 
 Expansion, Monetization & Portfolio, and Collections & Risk — covering ending
 MRR / ARR, retention, signed MRR movements, customer mix, plan packaging, invoice
 collections, and account follow-up. All tabs are filterable by currency and date
-range. The movement bridge uses a cumulative waterfall so additions build MRR and
-losses step it down; the portfolio pie is customer count by MRR band,
+range. The Overview tab pairs the ending-MRR trend with net MRR change, gross
+MRR added/lost, and a movement-driver table that maps each driver to a suggested
+action. The Retention tab uses a two-series signed flow chart (MRR added vs MRR lost)
+and account-level movement details; the portfolio pie is customer count by MRR band,
 while plan-level revenue is kept in the table. Preview it locally:
 
 ```bash
