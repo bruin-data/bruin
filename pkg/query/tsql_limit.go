@@ -13,7 +13,9 @@ func TSQLLimit(sql string, limit int64) string {
 	// A query ending in a bare ORDER BY (no TOP/OFFSET/FETCH/FOR) cannot be put
 	// inside a derived table or CTE — T-SQL rejects it. Limit it in place by
 	// appending OFFSET/FETCH to the existing ORDER BY instead of wrapping.
-	if endsWithBareOrderBy(sql) {
+	// FETCH requires a positive count, so limit < 1 keeps the TOP wrapper (TOP 0
+	// is valid and preserves the historical "no rows" behavior).
+	if limit >= 1 && endsWithBareOrderBy(sql) {
 		return fmt.Sprintf("%s\nOFFSET 0 ROWS FETCH NEXT %d ROWS ONLY", sql, limit)
 	}
 	if prefix, body, ok := splitLeadingWith(sql); ok {
@@ -27,10 +29,16 @@ func TSQLLimit(sql string, limit int64) string {
 // clause that has no accompanying TOP, OFFSET/FETCH, or FOR — the exact shape
 // T-SQL forbids inside a derived table, subquery, or CTE. Only depth-0 (outer
 // query) keywords count; ORDER BY / OFFSET inside a nested subquery is ignored.
+//
+// A depth-0 TOP only legalizes the ORDER BY when it governs the same query, so
+// it is ignored for compound queries (UNION/EXCEPT/INTERSECT): a TOP in one
+// branch does not legalize the trailing ORDER BY of the whole compound, which
+// still needs the in-place OFFSET/FETCH treatment.
 func endsWithBareOrderBy(sql string) bool {
 	depth := 0
 	lastOrderBy := -1
 	hasTop := false
+	hasSetOp := false
 	offsetOrForAfter := false
 	for i := 0; i < len(sql); {
 		if ni, ok := skipLiteral(sql, i); ok {
@@ -51,6 +59,9 @@ func endsWithBareOrderBy(sql string) bool {
 			if matchKeyword(sql, i, "TOP") {
 				hasTop = true
 			}
+			if matchKeyword(sql, i, "UNION") || matchKeyword(sql, i, "EXCEPT") || matchKeyword(sql, i, "INTERSECT") {
+				hasSetOp = true
+			}
 			if matchKeyword(sql, i, "ORDER") {
 				j := skipSpaceAndComments(sql, i+len("ORDER"))
 				if matchKeyword(sql, j, "BY") {
@@ -67,7 +78,13 @@ func endsWithBareOrderBy(sql string) bool {
 		}
 		i++
 	}
-	return lastOrderBy >= 0 && !hasTop && !offsetOrForAfter
+	// A governing TOP (outer query's own TOP, absent any set operator) makes the
+	// derived-table wrapper valid and would conflict with OFFSET/FETCH, so such
+	// queries keep the wrapper rather than being limited in place.
+	if hasTop && !hasSetOp {
+		return false
+	}
+	return lastOrderBy >= 0 && !offsetOrForAfter
 }
 
 // uniqueCTEName returns a limit CTE name that does not already occur in sql.

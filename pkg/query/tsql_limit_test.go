@@ -147,6 +147,24 @@ func TestTSQLLimit(t *testing.T) {
 			limit:    100,
 			expected: "SELECT TOP 100 * FROM (\nSELECT id FROM t ORDER BY id FOR XML PATH\n) as t",
 		},
+		{
+			name:     "compound query with trailing ORDER BY is limited in place despite branch TOP",
+			query:    "SELECT TOP 10 id FROM t1 UNION SELECT id FROM t2 ORDER BY id",
+			limit:    50,
+			expected: "SELECT TOP 10 id FROM t1 UNION SELECT id FROM t2 ORDER BY id\nOFFSET 0 ROWS FETCH NEXT 50 ROWS ONLY",
+		},
+		{
+			name:     "compound query with trailing ORDER BY and no TOP is limited in place",
+			query:    "SELECT id FROM t1 UNION ALL SELECT id FROM t2 ORDER BY id",
+			limit:    50,
+			expected: "SELECT id FROM t1 UNION ALL SELECT id FROM t2 ORDER BY id\nOFFSET 0 ROWS FETCH NEXT 50 ROWS ONLY",
+		},
+		{
+			name:     "limit 0 with trailing ORDER BY keeps the TOP wrapper",
+			query:    "SELECT id FROM t ORDER BY id",
+			limit:    0,
+			expected: "SELECT TOP 0 * FROM (\nSELECT id FROM t ORDER BY id\n) as t",
+		},
 	}
 
 	for _, tt := range tests {
