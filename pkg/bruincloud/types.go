@@ -414,6 +414,17 @@ type ScheduledAgentExecution struct {
 	ThreadID    int `json:"thread_id"`
 }
 
+// NotificationRule routes matching Cloud events to one or more destinations.
+type NotificationRule struct {
+	ID            int             `json:"id"`
+	Name          string          `json:"name"`
+	Enabled       bool            `json:"enabled"`
+	Subscriptions json.RawMessage `json:"subscriptions"`
+	Deliveries    json.RawMessage `json:"deliveries"`
+	CreatedAt     *string         `json:"created_at"`
+	UpdatedAt     *string         `json:"updated_at"`
+}
+
 // AuditLog is one entry in a team's audit trail as returned by GET /audit-logs.
 // Metadata is event-specific and left raw.
 type AuditLog struct {

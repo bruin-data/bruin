@@ -44,6 +44,7 @@ func Cloud(isDebug *bool) *cli.Command {
 			CloudConnectionSets(),
 			CloudDashboards(),
 			CloudScheduledAgents(),
+			CloudNotificationRules(),
 			CloudSkills(),
 			CloudAuditLogs(),
 			CloudCost(),
@@ -6222,6 +6223,275 @@ func derefString(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+func CloudNotificationRules() *cli.Command {
+	return &cli.Command{
+		Name:  "notification-rules",
+		Usage: "Manage Bruin Cloud notification rules",
+		Commands: []*cli.Command{
+			cloudNotificationRulesSchema(),
+			cloudNotificationRulesList(),
+			cloudNotificationRulesCreate(),
+			cloudNotificationRulesUpdate(),
+			cloudNotificationRulesDelete(),
+		},
+	}
+}
+
+func notificationRuleIDFlag() *cli.IntFlag {
+	return &cli.IntFlag{
+		Name:     "notification-rule-id",
+		Usage:    "notification rule ID",
+		Required: true,
+	}
+}
+
+func notificationRuleID(c *cli.Command) (int, error) {
+	id := c.Int("notification-rule-id")
+	if id <= 0 {
+		return 0, fmt.Errorf("--notification-rule-id must be a positive integer, got %d", id)
+	}
+	return id, nil
+}
+
+func notificationRuleInputFlags() []cli.Flag {
+	return []cli.Flag{
+		apiKeyFlag(),
+		outputFlag(),
+		&cli.StringFlag{Name: "rule", Usage: "notification rule as a JSON or YAML object"},
+		&cli.StringFlag{Name: "rule-file", Usage: "path to a JSON or YAML notification rule"},
+	}
+}
+
+func notificationRuleFields(c *cli.Command) (map[string]any, error) {
+	if c.IsSet("rule") && c.IsSet("rule-file") {
+		return nil, errors.New("pass only one of --rule or --rule-file")
+	}
+	if !c.IsSet("rule") && !c.IsSet("rule-file") {
+		return nil, errors.New("provide the notification rule with --rule or --rule-file")
+	}
+
+	raw := c.String("rule")
+	if c.IsSet("rule-file") {
+		data, err := os.ReadFile(c.String("rule-file"))
+		if err != nil {
+			return nil, fmt.Errorf("failed to read --rule-file: %w", err)
+		}
+		raw = string(data)
+	}
+
+	fields, err := parseJSONOrYAMLObject([]byte(raw))
+	if err != nil {
+		return nil, fmt.Errorf("invalid notification rule (expected a JSON or YAML object): %w", err)
+	}
+	if fields == nil {
+		return nil, errors.New("notification rule must be a JSON or YAML object")
+	}
+	return fields, nil
+}
+
+func cloudNotificationRulesSchema() *cli.Command {
+	return &cli.Command{
+		Name:  "schema",
+		Usage: "Show the notification rule schema and example",
+		Flags: []cli.Flag{apiKeyFlag(), outputFlag()},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			schema, err := client.GetNotificationRuleSchema(ctx)
+			if err != nil {
+				printError(err, output, "Failed to get notification rule schema")
+				return cli.Exit("", 1)
+			}
+
+			var decoded any
+			if err := json.Unmarshal(schema, &decoded); err != nil {
+				printError(err, output, "Failed to parse notification rule schema")
+				return cli.Exit("", 1)
+			}
+			data, _ := json.MarshalIndent(decoded, "", "  ")
+			fmt.Println(string(data))
+			return nil
+		},
+	}
+}
+
+func cloudNotificationRulesList() *cli.Command {
+	return &cli.Command{
+		Name:  "list",
+		Usage: "List the team's notification rules",
+		Flags: []cli.Flag{apiKeyFlag(), outputFlag()},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			rules, err := client.ListNotificationRules(ctx)
+			if err != nil {
+				printError(err, output, "Failed to list notification rules")
+				return cli.Exit("", 1)
+			}
+			if rules == nil {
+				rules = []bruincloud.NotificationRule{}
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(rules, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			if len(rules) == 0 {
+				infoPrinter.Println("No notification rules yet.")
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"ID", "Name", "Enabled", "Updated"})
+			for _, rule := range rules {
+				t.AppendRow(table.Row{rule.ID, rule.Name, rule.Enabled, derefString(rule.UpdatedAt)})
+			}
+			t.Render()
+			return nil
+		},
+	}
+}
+
+func cloudNotificationRulesCreate() *cli.Command {
+	return &cli.Command{
+		Name:  "create",
+		Usage: "Create a notification rule",
+		Flags: notificationRuleInputFlags(),
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			fields, err := notificationRuleFields(c)
+			if err != nil {
+				printError(err, output, "Invalid notification rule")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			rule, err := client.CreateNotificationRule(ctx, fields)
+			if err != nil {
+				printError(err, output, "Failed to create notification rule")
+				return cli.Exit("", 1)
+			}
+			if err := printNotificationRuleResult(rule, output, "Created"); err != nil {
+				printError(err, output, "Failed to format notification rule")
+				return cli.Exit("", 1)
+			}
+			return nil
+		},
+	}
+}
+
+func cloudNotificationRulesUpdate() *cli.Command {
+	return &cli.Command{
+		Name:  "update",
+		Usage: "Replace a notification rule",
+		Flags: append(notificationRuleInputFlags(), notificationRuleIDFlag()),
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			id, err := notificationRuleID(c)
+			if err != nil {
+				printError(err, output, "Invalid notification rule ID")
+				return cli.Exit("", 1)
+			}
+			fields, err := notificationRuleFields(c)
+			if err != nil {
+				printError(err, output, "Invalid notification rule")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			rule, err := client.UpdateNotificationRule(ctx, id, fields)
+			if err != nil {
+				printError(err, output, "Failed to update notification rule")
+				return cli.Exit("", 1)
+			}
+			if err := printNotificationRuleResult(rule, output, "Updated"); err != nil {
+				printError(err, output, "Failed to format notification rule")
+				return cli.Exit("", 1)
+			}
+			return nil
+		},
+	}
+}
+
+func cloudNotificationRulesDelete() *cli.Command {
+	return &cli.Command{
+		Name:  "delete",
+		Usage: "Delete a notification rule",
+		Flags: []cli.Flag{apiKeyFlag(), outputFlag(), notificationRuleIDFlag()},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			id, err := notificationRuleID(c)
+			if err != nil {
+				printError(err, output, "Invalid notification rule ID")
+				return cli.Exit("", 1)
+			}
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+			if err := client.DeleteNotificationRule(ctx, id); err != nil {
+				printError(err, output, "Failed to delete notification rule")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.Marshal(map[string]any{"success": true, "deleted_rule_id": id})
+				fmt.Println(string(data))
+				return nil
+			}
+			successPrinter.Printf("Deleted notification rule %d.\n", id)
+			return nil
+		},
+	}
+}
+
+func printNotificationRuleResult(rule *bruincloud.NotificationRule, output, action string) error {
+	if output == "json" {
+		data, err := json.MarshalIndent(rule, "", "  ")
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(data))
+		return nil
+	}
+	successPrinter.Printf("%s notification rule %d (%s).\n", action, rule.ID, rule.Name)
+	return nil
 }
 
 func CloudAuditLogs() *cli.Command {

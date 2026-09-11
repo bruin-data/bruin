@@ -329,7 +329,7 @@ func TestCloudCommand_Help(t *testing.T) {
 	cmd := Cloud(&isDebug)
 	require.NotNil(t, cmd)
 	assert.Equal(t, "cloud", cmd.Name)
-	assert.Len(t, cmd.Commands, 17)
+	assert.Len(t, cmd.Commands, 18)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
@@ -348,6 +348,7 @@ func TestCloudCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "connections")
 	assert.Contains(t, subNames, "connection-sets")
 	assert.Contains(t, subNames, "dashboards")
+	assert.Contains(t, subNames, "notification-rules")
 	assert.Contains(t, subNames, "scheduled-agents")
 	assert.Contains(t, subNames, "skills")
 	assert.Contains(t, subNames, "audit-logs")
@@ -804,6 +805,62 @@ func TestCloudScheduledAgentsCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "trigger")
 	assert.Contains(t, subNames, "delete")
 	assert.Contains(t, subNames, "run-states")
+}
+
+func TestCloudNotificationRulesCommand_Help(t *testing.T) {
+	t.Parallel()
+	cmd := CloudNotificationRules()
+	require.NotNil(t, cmd)
+	assert.Equal(t, "notification-rules", cmd.Name)
+	require.Len(t, cmd.Commands, 5)
+
+	subNames := make([]string, len(cmd.Commands))
+	for i, sub := range cmd.Commands {
+		subNames[i] = sub.Name
+	}
+	assert.ElementsMatch(t, []string{"schema", "list", "create", "update", "delete"}, subNames)
+}
+
+func TestNotificationRuleFields(t *testing.T) {
+	t.Parallel()
+
+	t.Run("parses inline JSON", func(t *testing.T) {
+		t.Parallel()
+		var fields map[string]any
+		cmd := &cli.Command{
+			Name:  "test",
+			Flags: notificationRuleInputFlags(),
+			Action: func(_ context.Context, c *cli.Command) error {
+				var err error
+				fields, err = notificationRuleFields(c)
+				return err
+			},
+		}
+		err := runCLI(t.Context(), cmd, []string{"test", "--rule", `{"name":"Failures","enabled":false}`})
+		require.NoError(t, err)
+		assert.Equal(t, "Failures", fields["name"])
+		assert.Equal(t, false, fields["enabled"])
+	})
+
+	t.Run("parses YAML file", func(t *testing.T) {
+		t.Parallel()
+		path := filepath.Join(t.TempDir(), "rule.yml")
+		require.NoError(t, os.WriteFile(path, []byte("name: Failures\nenabled: true\n"), 0o600))
+		var fields map[string]any
+		cmd := &cli.Command{
+			Name:  "test",
+			Flags: notificationRuleInputFlags(),
+			Action: func(_ context.Context, c *cli.Command) error {
+				var err error
+				fields, err = notificationRuleFields(c)
+				return err
+			},
+		}
+		err := runCLI(t.Context(), cmd, []string{"test", "--rule-file", path})
+		require.NoError(t, err)
+		assert.Equal(t, "Failures", fields["name"])
+		assert.Equal(t, true, fields["enabled"])
+	})
 }
 
 func TestCloudScheduledAgentsRunStatesCommand_Help(t *testing.T) {
