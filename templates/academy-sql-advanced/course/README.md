@@ -28,7 +28,7 @@ You are going to set up and then teach me an interactive SQL course. Do this in 
 5. Greet me, show me the 15-lesson syllabus, and tell me to say "next lesson" to begin and "review my work" whenever I finish a task.
 
 After setup, stay in the project root containing `.bruin.yml`; lesson paths such as `pipeline` and
-`queries/...` are relative to that directory. Do not teach lesson one yet - just get set up and hand me
+`queries/...` are relative to that directory. Do not teach lesson one yet - get set up and hand me
 the controls. If any command fails unexpectedly, stop and show me the error instead of trying something else.
 ```
 
@@ -54,7 +54,7 @@ The default environment is local DuckDB and needs no token. MotherDuck is option
 - **07 incremental-strategies** - choose strategies and prove idempotence (14 min).
 - **08 late-data-and-backfills** - find late rows and backfill their business dates (12 min).
 - **09 sargability-and-cost** - compare predicates and label what local DuckDB proves (12 min).
-- **10 dev-environments** - experiment safely in a prefixed environment (10 min).
+- **10 dev-environments** - experiment safely in an isolated environment (10 min).
 
 ### Operate with an agent
 

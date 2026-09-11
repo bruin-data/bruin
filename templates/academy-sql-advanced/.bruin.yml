@@ -16,11 +16,14 @@ environments:
           path: "academy.duckdb"
 
   dev:
-    schema_prefix: dev_
     connections:
       duckdb:
         - name: "duckdb-default"
           path: "academy-dev.duckdb"
+        # This comparison handle lets data-diff compare both databases while
+        # the pipeline's default connection points at the dev database.
+        - name: "duckdb-prod"
+          path: "academy.duckdb"
 
   # Optional cloud path. Set MOTHERDUCK_TOKEN and run with --environment cloud.
   cloud:

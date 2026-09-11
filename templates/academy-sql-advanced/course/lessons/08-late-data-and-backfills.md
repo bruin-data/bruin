@@ -19,12 +19,20 @@ Filter on `_loaded_at` to discover new rows, then let Bruin's incremental materi
    A: No. It is a mitigation; the five rows over 90 days prove that a bounded lookback can still miss data.
 
 ## Task
-Use `queries/ops/late-arrival-audit.sql` and a monthly comparison to identify every moved 2024 month, its revenue delta, the five rows over 90 days, and the backfill command. Record the findings in `docs/late-data-findings.md` without running the proposed backfill.
+Use `queries/ops/late-arrival-audit.sql`, `queries/ops/timezone-dst-audit.sql`, and a monthly
+comparison to identify every moved 2024 month, its revenue delta, the five rows over 90 days, and
+the backfill command. Compare the store-local `ordered_at` with `ordered_at_utc` around both
+synthetic 2024 seasonal edge windows and explain why the UTC field is the safe cross-store ordering
+field. These windows are not claims that every region changes clocks on the same dates: use the
+reported `timezone` to interpret each offset. The result should include stable UTC timestamps for
+examples such as order 792 (Berlin, spring) and order 796 (New York, autumn edge). Record the
+findings in `docs/late-data-findings.md` without running the proposed backfill.
 
 ## Rubric (for `review my work`)
 - [ ] Reports exactly 5 order rows with delay greater than 90 days.
 - [ ] Reports exactly 5 rows over 30 days and lists the moved months and deltas: 2024-10 = 10,681.87, 2024-11 = 12,493.10, and 2024-12 = 6,030.35.
 - [ ] Explains `_loaded_at` discovery, `ordered_at` partition replacement, and gives both date flags for the proposed backfill.
+- [ ] Reports evidence from both seasonal edge windows, names the store timezone, and explains the local-time versus UTC distinction without claiming one transition date for every region.
 
 ## Done signal
 You can separate discovery time from business time and repair a bounded history. Carry forward: the next lesson asks whether the filter itself lets the engine prune work.

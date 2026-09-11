@@ -9,7 +9,7 @@ for review. Grade the capstone by checking the artifact and the evidence, not by
 - Every dependency and the target DAG are correct; relationship checks have corresponding run edges.
 - Grain is documented and enforced; source and mart totals reconcile with a blocking check.
 - At least four unit tests pass, including a no-order customer and a no-data week.
-- Dev runs clean in the `dev_` prefixed database; mart full refresh is restricted.
+- Dev runs clean in the isolated `academy-dev.duckdb` database; mart full refresh is restricted.
 - The student's injected source defect causes a named blocking check to fail.
 - `AGENTS.md` contains exactly five guardrails; enforcement is outside the markdown for the two
   controls identified in the lesson.
