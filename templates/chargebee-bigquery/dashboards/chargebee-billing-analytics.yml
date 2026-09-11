@@ -1,0 +1,1241 @@
+name: Chargebee SaaS Command Center
+description: "Four-tab operating view for B2B SaaS growth, retention, monetization, and collections."
+connection: gcp-default
+
+filters:
+  - name: date_range
+    type: date-range
+    default: all_time
+  - name: currency
+    type: text
+    default: usd
+
+queries:
+  latest_kpis:
+    sql: |
+      WITH currency_units AS (
+        SELECT IF(UPPER('{{ filters.currency }}') IN (
+          'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA',
+          'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'
+        ), 1, 100) AS divisor
+      ),
+      ranked AS (
+        SELECT
+          kpi.*,
+          LAG(ending_mrr_minor) OVER (ORDER BY metric_month) AS prior_mrr_minor
+        FROM `chargebee_reports.monthly_subscription_kpis` AS kpi
+        WHERE LOWER(currency_code) = LOWER('{{ filters.currency }}')
+      ),
+      selected AS (
+        SELECT
+          ranked.*,
+          ROW_NUMBER() OVER (ORDER BY metric_month DESC) AS month_rank
+        FROM ranked
+        WHERE metric_month >= CAST('{{ filters.date_range.start }}' AS DATE)
+          AND metric_month <= CAST('{{ filters.date_range.end }}' AS DATE)
+      )
+      SELECT
+        metric_month,
+        ending_mrr_minor / (SELECT divisor FROM currency_units) AS ending_mrr,
+        ending_run_rate_arr_minor / (SELECT divisor FROM currency_units) AS ending_arr,
+        ending_active_customer_count AS active_customers,
+        average_revenue_per_active_customer_minor / (SELECT divisor FROM currency_units) AS arpa,
+        net_revenue_retention_rate_excluding_reactivation * 100 AS nrr_pct,
+        gross_revenue_retention_rate * 100 AS grr_pct,
+        logo_churn_rate,
+        quick_ratio,
+        (
+          new_mrr_minor + reactivation_mrr_minor + expansion_mrr_minor
+          - contraction_mrr_minor - churned_mrr_minor
+        ) / (SELECT divisor FROM currency_units) AS net_new_mrr,
+        SAFE_DIVIDE(ending_mrr_minor - prior_mrr_minor, NULLIF(prior_mrr_minor, 0)) * 100 AS mrr_growth_pct
+      FROM selected
+      WHERE month_rank = 1
+
+  monthly_mrr:
+    sql: |
+      WITH currency_units AS (
+        SELECT IF(UPPER('{{ filters.currency }}') IN (
+          'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA',
+          'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'
+        ), 1, 100) AS divisor
+      )
+      SELECT
+        metric_month,
+        SUM(ending_mrr_minor) / (SELECT divisor FROM currency_units) AS ending_mrr,
+        COUNTIF(ending_mrr_minor > 0) AS active_customers
+      FROM `chargebee_reports.monthly_mrr_by_customer`
+      WHERE metric_month >= CAST('{{ filters.date_range.start }}' AS DATE)
+        AND metric_month <= CAST('{{ filters.date_range.end }}' AS DATE)
+        AND LOWER(currency_code) = LOWER('{{ filters.currency }}')
+      GROUP BY metric_month
+      ORDER BY metric_month
+
+  growth_quality:
+    sql: |
+      WITH ranked AS (
+        SELECT
+          metric_month,
+          ending_mrr_minor,
+          ending_active_customer_count,
+          LAG(ending_mrr_minor) OVER (ORDER BY metric_month) AS prior_mrr_minor,
+          LAG(ending_active_customer_count) OVER (ORDER BY metric_month) AS prior_active_customers
+        FROM `chargebee_reports.monthly_subscription_kpis`
+        WHERE metric_month >= CAST('{{ filters.date_range.start }}' AS DATE)
+          AND metric_month <= CAST('{{ filters.date_range.end }}' AS DATE)
+          AND LOWER(currency_code) = LOWER('{{ filters.currency }}')
+      )
+      SELECT
+        metric_month,
+        SAFE_DIVIDE(ending_mrr_minor - prior_mrr_minor, NULLIF(prior_mrr_minor, 0)) * 100 AS mrr_growth_pct,
+        SAFE_DIVIDE(ending_active_customer_count - prior_active_customers, NULLIF(prior_active_customers, 0)) * 100 AS logo_growth_pct,
+        ending_active_customer_count AS active_customers
+      FROM ranked
+      ORDER BY metric_month
+
+  monthly_flow_comparison:
+    sql: |
+      WITH currency_units AS (
+        SELECT IF(UPPER('{{ filters.currency }}') IN (
+          'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA',
+          'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'
+        ), 1, 100) AS divisor
+      )
+      SELECT
+        metric_month,
+        SUM(new_mrr_minor + reactivation_mrr_minor + expansion_mrr_minor)
+          / (SELECT divisor FROM currency_units) AS mrr_added,
+        SUM(contraction_mrr_minor + churned_mrr_minor)
+          / (SELECT divisor FROM currency_units) AS mrr_lost,
+        SUM(
+          new_mrr_minor + reactivation_mrr_minor + expansion_mrr_minor
+          - contraction_mrr_minor - churned_mrr_minor
+        ) / (SELECT divisor FROM currency_units) AS net_mrr_change
+      FROM `chargebee_reports.monthly_mrr_movements`
+      WHERE metric_month >= CAST('{{ filters.date_range.start }}' AS DATE)
+        AND metric_month <= CAST('{{ filters.date_range.end }}' AS DATE)
+        AND LOWER(currency_code) = LOWER('{{ filters.currency }}')
+      GROUP BY metric_month
+      ORDER BY metric_month
+
+  latest_mrr_bridge:
+    sql: |
+      WITH currency_units AS (
+        SELECT IF(UPPER('{{ filters.currency }}') IN (
+          'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA',
+          'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'
+        ), 1, 100) AS divisor
+      ), latest AS (
+        SELECT MAX(metric_month) AS metric_month
+        FROM `chargebee_reports.monthly_mrr_movements`
+        WHERE metric_month >= CAST('{{ filters.date_range.start }}' AS DATE)
+          AND metric_month <= CAST('{{ filters.date_range.end }}' AS DATE)
+          AND LOWER(currency_code) = LOWER('{{ filters.currency }}')
+      ), totals AS (
+        SELECT
+          SUM(beginning_mrr_minor) / (SELECT divisor FROM currency_units) AS opening_mrr,
+          SUM(new_mrr_minor) / (SELECT divisor FROM currency_units) AS new_business,
+          SUM(reactivation_mrr_minor) / (SELECT divisor FROM currency_units) AS reactivation,
+          SUM(expansion_mrr_minor) / (SELECT divisor FROM currency_units) AS expansion,
+          -SUM(contraction_mrr_minor) / (SELECT divisor FROM currency_units) AS contraction,
+          -SUM(churned_mrr_minor) / (SELECT divisor FROM currency_units) AS churn
+        FROM `chargebee_reports.monthly_mrr_movements` AS movement, latest
+        WHERE movement.metric_month = latest.metric_month
+          AND LOWER(movement.currency_code) = LOWER('{{ filters.currency }}')
+      )
+      SELECT 'Opening MRR' AS stage, 1 AS sort_order,
+        opening_mrr AS `Opening MRR`,
+        CAST(0 AS NUMERIC) AS `MRR added`,
+        CAST(0 AS NUMERIC) AS `MRR lost`
+      FROM totals
+      UNION ALL
+      SELECT 'New business', 2,
+        CAST(0 AS NUMERIC),
+        new_business,
+        CAST(0 AS NUMERIC)
+      FROM totals
+      WHERE new_business > 0
+      UNION ALL
+      SELECT 'Reactivation', 3,
+        CAST(0 AS NUMERIC),
+        reactivation,
+        CAST(0 AS NUMERIC)
+      FROM totals
+      WHERE reactivation > 0
+      UNION ALL
+      SELECT 'Expansion', 4,
+        CAST(0 AS NUMERIC),
+        expansion,
+        CAST(0 AS NUMERIC)
+      FROM totals
+      WHERE expansion > 0
+      UNION ALL
+      SELECT 'Contraction', 5,
+        CAST(0 AS NUMERIC),
+        CAST(0 AS NUMERIC),
+        contraction
+      FROM totals
+      WHERE contraction < 0
+      UNION ALL
+      SELECT 'Churn', 6,
+        CAST(0 AS NUMERIC),
+        CAST(0 AS NUMERIC),
+        churn
+      FROM totals
+      WHERE churn < 0
+      ORDER BY sort_order
+
+  latest_mrr_flow:
+    sql: |
+      WITH currency_units AS (
+        SELECT IF(UPPER('{{ filters.currency }}') IN (
+          'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA',
+          'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'
+        ), 1, 100) AS divisor
+      ), latest AS (
+        SELECT MAX(metric_month) AS metric_month
+        FROM `chargebee_reports.monthly_mrr_movements`
+        WHERE metric_month >= CAST('{{ filters.date_range.start }}' AS DATE)
+          AND metric_month <= CAST('{{ filters.date_range.end }}' AS DATE)
+          AND LOWER(currency_code) = LOWER('{{ filters.currency }}')
+      )
+      SELECT
+        latest.metric_month,
+        SUM(new_mrr_minor + reactivation_mrr_minor + expansion_mrr_minor)
+          / (SELECT divisor FROM currency_units) AS mrr_added,
+        -SUM(contraction_mrr_minor + churned_mrr_minor)
+          / (SELECT divisor FROM currency_units) AS mrr_lost,
+        SUM(
+          new_mrr_minor + reactivation_mrr_minor + expansion_mrr_minor
+          - contraction_mrr_minor - churned_mrr_minor
+        ) / (SELECT divisor FROM currency_units) AS net_mrr_change,
+        COUNTIF(new_mrr_minor > 0 OR reactivation_mrr_minor > 0 OR expansion_mrr_minor > 0)
+          AS accounts_added,
+        COUNTIF(contraction_mrr_minor > 0 OR churned_mrr_minor > 0) AS accounts_lost
+      FROM `chargebee_reports.monthly_mrr_movements` AS movement
+      INNER JOIN latest ON movement.metric_month = latest.metric_month
+      WHERE LOWER(movement.currency_code) = LOWER('{{ filters.currency }}')
+      GROUP BY latest.metric_month
+
+  latest_movement_drivers:
+    sql: |
+      WITH currency_units AS (
+        SELECT IF(UPPER('{{ filters.currency }}') IN (
+          'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA',
+          'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'
+        ), 1, 100) AS divisor
+      ), latest AS (
+        SELECT MAX(metric_month) AS metric_month
+        FROM `chargebee_reports.monthly_mrr_movements`
+        WHERE metric_month >= CAST('{{ filters.date_range.start }}' AS DATE)
+          AND metric_month <= CAST('{{ filters.date_range.end }}' AS DATE)
+          AND LOWER(currency_code) = LOWER('{{ filters.currency }}')
+      ), drivers AS (
+        SELECT 'New business' AS movement, 1 AS sort_order,
+          COUNTIF(new_mrr_minor > 0) AS accounts,
+          SUM(new_mrr_minor) / (SELECT divisor FROM currency_units) AS mrr_impact,
+          'Keep acquisition efficient' AS next_action
+        FROM `chargebee_reports.monthly_mrr_movements` AS movement_data, latest
+        WHERE movement_data.metric_month = latest.metric_month
+          AND LOWER(movement_data.currency_code) = LOWER('{{ filters.currency }}')
+        UNION ALL
+        SELECT 'Reactivation', 2, COUNTIF(reactivation_mrr_minor > 0),
+          SUM(reactivation_mrr_minor) / (SELECT divisor FROM currency_units),
+          'Scale win-back plays'
+        FROM `chargebee_reports.monthly_mrr_movements` AS movement_data, latest
+        WHERE movement_data.metric_month = latest.metric_month
+          AND LOWER(movement_data.currency_code) = LOWER('{{ filters.currency }}')
+        UNION ALL
+        SELECT 'Expansion', 3, COUNTIF(expansion_mrr_minor > 0),
+          SUM(expansion_mrr_minor) / (SELECT divisor FROM currency_units),
+          'Find upgrade triggers'
+        FROM `chargebee_reports.monthly_mrr_movements` AS movement_data, latest
+        WHERE movement_data.metric_month = latest.metric_month
+          AND LOWER(movement_data.currency_code) = LOWER('{{ filters.currency }}')
+        UNION ALL
+        SELECT 'Contraction', 4, COUNTIF(contraction_mrr_minor > 0),
+          -SUM(contraction_mrr_minor) / (SELECT divisor FROM currency_units),
+          'Prioritize save plays'
+        FROM `chargebee_reports.monthly_mrr_movements` AS movement_data, latest
+        WHERE movement_data.metric_month = latest.metric_month
+          AND LOWER(movement_data.currency_code) = LOWER('{{ filters.currency }}')
+        UNION ALL
+        SELECT 'Churn', 5, COUNTIF(churned_mrr_minor > 0),
+          -SUM(churned_mrr_minor) / (SELECT divisor FROM currency_units),
+          'Run churn interviews'
+        FROM `chargebee_reports.monthly_mrr_movements` AS movement_data, latest
+        WHERE movement_data.metric_month = latest.metric_month
+          AND LOWER(movement_data.currency_code) = LOWER('{{ filters.currency }}')
+      )
+      SELECT
+        movement,
+        accounts,
+        mrr_impact,
+        CONCAT(
+          CAST(ROUND(SAFE_DIVIDE(ABS(mrr_impact), SUM(ABS(mrr_impact)) OVER ()) * 100, 1) AS STRING),
+          '%'
+        ) AS share_of_impact,
+        next_action
+      FROM drivers
+      ORDER BY sort_order
+
+  channel_mix:
+    sql: |
+      WITH currency_units AS (
+        SELECT IF(UPPER('{{ filters.currency }}') IN (
+          'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA',
+          'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'
+        ), 1, 100) AS divisor
+      ), latest AS (
+        SELECT MAX(metric_month) AS metric_month
+        FROM `chargebee_reports.monthly_mrr_by_customer`
+        WHERE metric_month >= CAST('{{ filters.date_range.start }}' AS DATE)
+          AND metric_month <= CAST('{{ filters.date_range.end }}' AS DATE)
+          AND LOWER(currency_code) = LOWER('{{ filters.currency }}')
+      )
+      SELECT
+        COALESCE(NULLIF(mrr.acquisition_channel, ''), 'Unknown') AS channel,
+        COUNTIF(mrr.ending_mrr_minor > 0) AS active_customers,
+        SUM(mrr.ending_mrr_minor) / (SELECT divisor FROM currency_units) AS ending_mrr
+      FROM `chargebee_reports.monthly_mrr_by_customer` AS mrr, latest
+      WHERE mrr.metric_month = latest.metric_month
+        AND LOWER(mrr.currency_code) = LOWER('{{ filters.currency }}')
+      GROUP BY 1
+      HAVING ending_mrr > 0
+      ORDER BY ending_mrr DESC
+
+  portfolio_bands:
+    sql: |
+      WITH currency_units AS (
+        SELECT IF(UPPER('{{ filters.currency }}') IN (
+          'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA',
+          'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'
+        ), 1, 100) AS divisor
+      ), latest AS (
+        SELECT MAX(metric_month) AS metric_month
+        FROM `chargebee_reports.monthly_mrr_by_customer`
+        WHERE metric_month >= CAST('{{ filters.date_range.start }}' AS DATE)
+          AND metric_month <= CAST('{{ filters.date_range.end }}' AS DATE)
+          AND LOWER(currency_code) = LOWER('{{ filters.currency }}')
+      )
+      SELECT
+        CASE
+          WHEN mrr.ending_mrr_minor < 25000 THEN 'Starter · under $250'
+          WHEN mrr.ending_mrr_minor < 50000 THEN 'Core · $250–$499'
+          WHEN mrr.ending_mrr_minor < 100000 THEN 'Growth · $500–$999'
+          ELSE 'Scale · $1,000+'
+        END AS customer_band,
+        COUNT(*) AS active_customers,
+        SUM(mrr.ending_mrr_minor) / (SELECT divisor FROM currency_units) AS ending_mrr
+      FROM `chargebee_reports.monthly_mrr_by_customer` AS mrr, latest
+      WHERE mrr.metric_month = latest.metric_month
+        AND LOWER(mrr.currency_code) = LOWER('{{ filters.currency }}')
+        AND mrr.ending_mrr_minor > 0
+      GROUP BY 1
+      ORDER BY MIN(ending_mrr_minor)
+
+  billing_health:
+    sql: |
+      WITH currency_units AS (
+        SELECT IF(UPPER('{{ filters.currency }}') IN (
+          'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA',
+          'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'
+        ), 1, 100) AS divisor
+      ), latest AS (
+        SELECT MAX(invoice_billing_month) AS invoice_billing_month
+        FROM `chargebee_reports.monthly_invoice_billings`
+        WHERE invoice_billing_month >= CAST('{{ filters.date_range.start }}' AS DATE)
+          AND invoice_billing_month <= CAST('{{ filters.date_range.end }}' AS DATE)
+          AND LOWER(currency_code) = LOWER('{{ filters.currency }}')
+      )
+      SELECT
+        SUM(billed_total_minor) / (SELECT divisor FROM currency_units) AS billed,
+        SUM(collected_total_minor) / (SELECT divisor FROM currency_units) AS collected,
+        SUM(outstanding_due_minor) / (SELECT divisor FROM currency_units) AS outstanding,
+        SAFE_DIVIDE(SUM(collected_total_minor), NULLIF(SUM(billed_total_minor), 0)) * 100 AS collection_rate_pct
+      FROM `chargebee_reports.monthly_invoice_billings` AS billing, latest
+      WHERE billing.invoice_billing_month = latest.invoice_billing_month
+        AND LOWER(billing.currency_code) = LOWER('{{ filters.currency }}')
+
+  latest_collections:
+    sql: |
+      WITH currency_units AS (
+        SELECT IF(UPPER('{{ filters.currency }}') IN (
+          'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA',
+          'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'
+        ), 1, 100) AS divisor
+      ), latest AS (
+        SELECT MAX(invoice_billing_month) AS invoice_billing_month
+        FROM `chargebee_reports.monthly_invoice_billings`
+        WHERE invoice_billing_month >= CAST('{{ filters.date_range.start }}' AS DATE)
+          AND invoice_billing_month <= CAST('{{ filters.date_range.end }}' AS DATE)
+          AND LOWER(currency_code) = LOWER('{{ filters.currency }}')
+      )
+      SELECT
+        billing.invoice_billing_month,
+        SUM(billed_total_minor) / (SELECT divisor FROM currency_units) AS billed,
+        SUM(collected_total_minor) / (SELECT divisor FROM currency_units) AS collected,
+        SUM(outstanding_due_minor) / (SELECT divisor FROM currency_units) AS outstanding,
+        SUM(invoice_count) AS invoice_count,
+        SUM(paid_invoice_count) AS paid_invoice_count,
+        SAFE_DIVIDE(SUM(collected_total_minor), NULLIF(SUM(billed_total_minor), 0)) * 100 AS collection_rate_pct,
+        SAFE_DIVIDE(SUM(paid_invoice_count), NULLIF(SUM(invoice_count), 0)) * 100 AS paid_invoice_rate_pct
+      FROM `chargebee_reports.monthly_invoice_billings` AS billing, latest
+      WHERE billing.invoice_billing_month = latest.invoice_billing_month
+        AND LOWER(billing.currency_code) = LOWER('{{ filters.currency }}')
+      GROUP BY 1
+
+  cash_conversion_snapshot:
+    sql: |
+      WITH currency_units AS (
+        SELECT IF(UPPER('{{ filters.currency }}') IN (
+          'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA',
+          'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'
+        ), 1, 100) AS divisor
+      ), latest AS (
+        SELECT MAX(invoice_billing_month) AS invoice_billing_month
+        FROM `chargebee_reports.monthly_invoice_billings`
+        WHERE invoice_billing_month >= CAST('{{ filters.date_range.start }}' AS DATE)
+          AND invoice_billing_month <= CAST('{{ filters.date_range.end }}' AS DATE)
+          AND LOWER(currency_code) = LOWER('{{ filters.currency }}')
+      ), totals AS (
+        SELECT
+          SUM(collected_total_minor) / (SELECT divisor FROM currency_units) AS collected,
+          SUM(outstanding_due_minor) / (SELECT divisor FROM currency_units) AS outstanding
+        FROM `chargebee_reports.monthly_invoice_billings` AS billing, latest
+        WHERE billing.invoice_billing_month = latest.invoice_billing_month
+          AND LOWER(billing.currency_code) = LOWER('{{ filters.currency }}')
+      )
+      SELECT 'Collected' AS stage, 1 AS sort_order, collected AS amount FROM totals
+      UNION ALL
+      SELECT 'Outstanding', 2, outstanding FROM totals
+      ORDER BY sort_order
+
+  payment_risk_summary:
+    sql: |
+      WITH currency_units AS (
+        SELECT IF(UPPER('{{ filters.currency }}') IN (
+          'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA',
+          'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'
+        ), 1, 100) AS divisor
+      ), latest_invoice AS (
+        SELECT MAX(DATE(invoice_date)) AS invoice_date
+        FROM `chargebee_stage.invoices`
+        WHERE LOWER(currency_code) = LOWER('{{ filters.currency }}')
+      )
+      SELECT
+        COUNTIF(amount_due_minor > 0) AS open_invoices,
+        SUM(IF(amount_due_minor > 0, amount_due_minor, CAST(0 AS NUMERIC)))
+          / (SELECT divisor FROM currency_units) AS open_ar,
+        COUNTIF(amount_due_minor > 0 AND DATE(invoice_due_at) < CURRENT_DATE()) AS overdue_invoices,
+        SUM(IF(
+          amount_due_minor > 0 AND DATE(invoice_due_at) < CURRENT_DATE(),
+          amount_due_minor, CAST(0 AS NUMERIC)
+        )) / (SELECT divisor FROM currency_units) AS overdue_ar
+      FROM `chargebee_stage.invoices`, latest_invoice
+      WHERE LOWER(currency_code) = LOWER('{{ filters.currency }}')
+        AND invoice_status != 'voided'
+
+  payment_risk_bands:
+    sql: |
+      WITH currency_units AS (
+        SELECT IF(UPPER('{{ filters.currency }}') IN (
+          'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA',
+          'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'
+        ), 1, 100) AS divisor
+      ), latest_mrr AS (
+        SELECT MAX(metric_month) AS metric_month
+        FROM `chargebee_reports.monthly_mrr_by_customer`
+        WHERE LOWER(currency_code) = LOWER('{{ filters.currency }}')
+      ), invoice_risk AS (
+        SELECT
+          invoice.chargebee_invoice_id,
+          invoice.chargebee_customer_id,
+          invoice.currency_code,
+          invoice.amount_due_minor,
+          CASE
+            WHEN DATE(invoice.invoice_due_at) < DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY) THEN 1
+            WHEN DATE(invoice.invoice_due_at) < CURRENT_DATE() THEN 2
+            ELSE 3
+          END AS urgency_rank
+        FROM `chargebee_stage.invoices` AS invoice
+        WHERE invoice.amount_due_minor > 0
+          AND invoice.invoice_status != 'voided'
+          AND LOWER(invoice.currency_code) = LOWER('{{ filters.currency }}')
+      ), customer_risk AS (
+        SELECT
+          chargebee_customer_id,
+          currency_code,
+          MIN(urgency_rank) AS urgency_rank,
+          COUNT(DISTINCT chargebee_invoice_id) AS invoices,
+          SUM(amount_due_minor) AS open_amount
+        FROM invoice_risk
+        GROUP BY chargebee_customer_id, currency_code
+      )
+      SELECT
+        CASE
+          WHEN customer_risk.urgency_rank = 1 THEN 'Critical · 30+ days overdue'
+          WHEN customer_risk.urgency_rank = 2 THEN 'Overdue · 1–29 days'
+          ELSE 'Due · not overdue'
+        END AS urgency,
+        SUM(customer_risk.invoices) AS invoices,
+        SUM(customer_risk.open_amount) / (SELECT divisor FROM currency_units) AS open_amount,
+        SUM(COALESCE(mrr.ending_mrr_minor, 0)) / (SELECT divisor FROM currency_units) AS mrr_exposed
+      FROM customer_risk
+      CROSS JOIN latest_mrr
+      LEFT JOIN `chargebee_reports.monthly_mrr_by_customer` AS mrr
+        ON customer_risk.chargebee_customer_id = mrr.chargebee_customer_id
+        AND customer_risk.currency_code = mrr.currency_code
+        AND mrr.metric_month = latest_mrr.metric_month
+      GROUP BY 1
+      ORDER BY CASE urgency
+        WHEN 'Critical · 30+ days overdue' THEN 1
+        WHEN 'Overdue · 1–29 days' THEN 2
+        ELSE 3
+      END
+
+  risk_queue:
+    sql: |
+      WITH currency_units AS (
+        SELECT IF(UPPER('{{ filters.currency }}') IN (
+          'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA',
+          'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'
+        ), 1, 100) AS divisor
+      ), latest_invoice AS (
+        SELECT MAX(DATE(invoice_date)) AS invoice_date
+        FROM `chargebee_stage.invoices`
+        WHERE LOWER(currency_code) = LOWER('{{ filters.currency }}')
+      ), latest_mrr AS (
+        SELECT MAX(metric_month) AS metric_month
+        FROM `chargebee_reports.monthly_mrr_by_customer`
+        WHERE LOWER(currency_code) = LOWER('{{ filters.currency }}')
+      )
+      SELECT
+        COALESCE(NULLIF(customer.company_name, ''), customer.customer_name, invoice.chargebee_customer_id) AS account,
+        invoice.chargebee_invoice_id,
+        invoice.invoice_status AS status,
+        DATE(invoice.invoice_due_at) AS due_date,
+        DATE_DIFF(CURRENT_DATE(), DATE(invoice.invoice_due_at), DAY) AS days_past_due,
+        invoice.amount_due_minor / (SELECT divisor FROM currency_units) AS amount_due,
+        COALESCE(mrr.ending_mrr_minor, 0) / (SELECT divisor FROM currency_units) AS mrr_exposed,
+        CASE
+          WHEN DATE(invoice.invoice_due_at) < DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+            THEN 'Escalate · 30+ days'
+          WHEN DATE(invoice.invoice_due_at) < CURRENT_DATE()
+            THEN 'Follow up · overdue'
+          ELSE 'Confirm payment method'
+        END AS recommended_action
+      FROM `chargebee_stage.invoices` AS invoice
+      CROSS JOIN latest_invoice
+      CROSS JOIN latest_mrr
+      LEFT JOIN `chargebee_stage.customers` AS customer
+        USING (chargebee_customer_id)
+      LEFT JOIN `chargebee_reports.monthly_mrr_by_customer` AS mrr
+        ON invoice.chargebee_customer_id = mrr.chargebee_customer_id
+        AND mrr.currency_code = invoice.currency_code
+        AND mrr.metric_month = latest_mrr.metric_month
+      WHERE invoice.amount_due_minor > 0
+        AND invoice.invoice_status != 'voided'
+        AND LOWER(invoice.currency_code) = LOWER('{{ filters.currency }}')
+      QUALIFY ROW_NUMBER() OVER (
+        PARTITION BY invoice.chargebee_customer_id
+        ORDER BY invoice.amount_due_minor DESC, invoice.invoice_due_at
+      ) = 1
+      ORDER BY amount_due DESC, mrr_exposed DESC
+      LIMIT 30
+
+  retention_trend:
+    sql: |
+      SELECT
+        metric_month,
+        gross_revenue_retention_rate * 100 AS grr_pct,
+        (1 - logo_churn_rate) * 100 AS logo_retention_pct,
+        logo_churn_rate * 100 AS logo_churn_rate_pct,
+        SAFE_DIVIDE(expansion_mrr_minor, NULLIF(beginning_mrr_minor, 0)) * 100 AS expansion_rate_pct
+      FROM `chargebee_reports.monthly_subscription_kpis`
+      WHERE metric_month >= CAST('{{ filters.date_range.start }}' AS DATE)
+        AND metric_month <= CAST('{{ filters.date_range.end }}' AS DATE)
+        AND LOWER(currency_code) = LOWER('{{ filters.currency }}')
+      ORDER BY metric_month
+
+  cohort_retention:
+    sql: |
+      WITH history AS (
+        SELECT metric_month, chargebee_customer_id, currency_code, ending_mrr_minor
+        FROM `chargebee_reports.monthly_mrr_by_customer`
+        WHERE LOWER(currency_code) = LOWER('{{ filters.currency }}')
+      ), first_positive AS (
+        SELECT chargebee_customer_id, currency_code, MIN(metric_month) AS cohort_month
+        FROM history
+        WHERE ending_mrr_minor > 0
+        GROUP BY 1, 2
+      ), cohort_rows AS (
+        SELECT
+          first_positive.cohort_month,
+          history.metric_month,
+          history.chargebee_customer_id,
+          history.ending_mrr_minor,
+          MAX(IF(history.metric_month = first_positive.cohort_month,
+            history.ending_mrr_minor, CAST(0 AS NUMERIC))) OVER (
+              PARTITION BY history.chargebee_customer_id, history.currency_code
+          ) AS cohort_mrr_minor
+        FROM history
+        INNER JOIN first_positive USING (chargebee_customer_id, currency_code)
+        WHERE history.metric_month >= first_positive.cohort_month
+      )
+      SELECT
+        cohort_month,
+        DATE_DIFF(metric_month, cohort_month, MONTH) AS months_since_start,
+        COUNT(DISTINCT chargebee_customer_id) AS cohort_customers,
+        SAFE_DIVIDE(SUM(ending_mrr_minor), NULLIF(SUM(cohort_mrr_minor), 0)) * 100 AS mrr_retention_pct,
+        SAFE_DIVIDE(COUNTIF(ending_mrr_minor > 0), COUNT(DISTINCT chargebee_customer_id)) * 100 AS logo_retention_pct
+      FROM cohort_rows
+      WHERE metric_month >= CAST('{{ filters.date_range.start }}' AS DATE)
+        AND metric_month <= CAST('{{ filters.date_range.end }}' AS DATE)
+      GROUP BY 1, 2
+      ORDER BY cohort_month, months_since_start
+
+  churn_by_channel:
+    sql: |
+      WITH currency_units AS (
+        SELECT IF(UPPER('{{ filters.currency }}') IN (
+          'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA',
+          'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'
+        ), 1, 100) AS divisor
+      ), latest AS (
+        SELECT MAX(metric_month) AS metric_month
+        FROM `chargebee_reports.monthly_mrr_movements`
+        WHERE metric_month >= CAST('{{ filters.date_range.start }}' AS DATE)
+          AND metric_month <= CAST('{{ filters.date_range.end }}' AS DATE)
+          AND LOWER(currency_code) = LOWER('{{ filters.currency }}')
+      )
+      SELECT
+        COALESCE(NULLIF(acquisition_channel, ''), 'Unknown') AS channel,
+        COUNTIF(movement_type = 'churn') AS churned_customers,
+        SAFE_DIVIDE(SUM(churned_mrr_minor), NULLIF(SUM(beginning_mrr_minor), 0)) AS revenue_churn_rate,
+        SUM(churned_mrr_minor) / (SELECT divisor FROM currency_units) AS churned_mrr
+      FROM `chargebee_reports.monthly_mrr_movements` AS movement, latest
+      WHERE movement.metric_month = latest.metric_month
+        AND LOWER(movement.currency_code) = LOWER('{{ filters.currency }}')
+        AND has_contiguous_prior_snapshot
+      GROUP BY 1
+      HAVING churned_customers > 0
+      ORDER BY churned_mrr DESC
+
+  movement_impact_summary:
+    sql: |
+      WITH currency_units AS (
+        SELECT IF(UPPER('{{ filters.currency }}') IN (
+          'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA',
+          'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'
+        ), 1, 100) AS divisor
+      ), latest AS (
+        SELECT MAX(metric_month) AS metric_month
+        FROM `chargebee_reports.monthly_mrr_movements`
+        WHERE metric_month >= CAST('{{ filters.date_range.start }}' AS DATE)
+          AND metric_month <= CAST('{{ filters.date_range.end }}' AS DATE)
+          AND LOWER(currency_code) = LOWER('{{ filters.currency }}')
+      )
+      SELECT
+        movement_type,
+        SUM(CASE
+          WHEN movement_type = 'new' THEN new_mrr_minor
+          WHEN movement_type = 'reactivation' THEN reactivation_mrr_minor
+          WHEN movement_type = 'expansion' THEN expansion_mrr_minor
+          ELSE 0
+        END) / (SELECT divisor FROM currency_units) AS mrr_added,
+        SUM(CASE
+          WHEN movement_type = 'contraction' THEN contraction_mrr_minor
+          WHEN movement_type = 'churn' THEN churned_mrr_minor
+          ELSE 0
+        END) / (SELECT divisor FROM currency_units) AS mrr_lost
+      FROM `chargebee_reports.monthly_mrr_movements` AS movement, latest
+      WHERE movement.metric_month = latest.metric_month
+        AND LOWER(movement.currency_code) = LOWER('{{ filters.currency }}')
+        AND movement_type IN ('new', 'reactivation', 'expansion', 'contraction', 'churn')
+      GROUP BY movement_type
+      ORDER BY SUM(
+        new_mrr_minor + reactivation_mrr_minor + expansion_mrr_minor
+        + contraction_mrr_minor + churned_mrr_minor
+      ) DESC
+
+  movement_accounts:
+    sql: |
+      WITH currency_units AS (
+        SELECT IF(UPPER('{{ filters.currency }}') IN (
+          'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA',
+          'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'
+        ), 1, 100) AS divisor
+      ), latest AS (
+        SELECT MAX(metric_month) AS metric_month
+        FROM `chargebee_reports.monthly_mrr_movements`
+        WHERE metric_month >= CAST('{{ filters.date_range.start }}' AS DATE)
+          AND metric_month <= CAST('{{ filters.date_range.end }}' AS DATE)
+          AND LOWER(currency_code) = LOWER('{{ filters.currency }}')
+      )
+      SELECT
+        movement.chargebee_customer_id,
+        COALESCE(NULLIF(customer.company_name, ''), customer.customer_name, movement.chargebee_customer_id) AS company,
+        COALESCE(NULLIF(movement.acquisition_channel, ''), 'Unknown') AS channel,
+        movement.movement_type,
+        CASE movement.movement_type
+          WHEN 'expansion' THEN movement.expansion_mrr_minor
+          WHEN 'contraction' THEN -movement.contraction_mrr_minor
+          WHEN 'churn' THEN -movement.churned_mrr_minor
+          WHEN 'reactivation' THEN movement.reactivation_mrr_minor
+          ELSE movement.new_mrr_minor
+        END / (SELECT divisor FROM currency_units) AS mrr_change,
+        movement.beginning_mrr_minor / (SELECT divisor FROM currency_units) AS beginning_mrr
+      FROM `chargebee_reports.monthly_mrr_movements` AS movement
+      INNER JOIN latest ON movement.metric_month = latest.metric_month
+      LEFT JOIN `chargebee_stage.customers` AS customer USING (chargebee_customer_id)
+      WHERE LOWER(movement.currency_code) = LOWER('{{ filters.currency }}')
+        AND movement.movement_type IN ('expansion', 'contraction', 'churn', 'reactivation')
+      ORDER BY ABS(mrr_change) DESC, company
+      LIMIT 30
+
+  renewal_watch:
+    sql: |
+      WITH currency_units AS (
+        SELECT IF(UPPER('{{ filters.currency }}') IN (
+          'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA',
+          'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'
+        ), 1, 100) AS divisor
+      )
+      SELECT
+        COALESCE(NULLIF(customer.company_name, ''), customer.customer_name, subscription.chargebee_customer_id) AS company,
+        DATE(subscription.current_term_ends_at) AS term_ends,
+        subscription.subscription_status AS status,
+        subscription.subscription_mrr_minor / (SELECT divisor FROM currency_units) AS mrr
+      FROM `chargebee_stage.subscriptions` AS subscription
+      LEFT JOIN `chargebee_stage.customers` AS customer USING (chargebee_customer_id)
+      WHERE LOWER(subscription.currency_code) = LOWER('{{ filters.currency }}')
+        AND subscription.subscription_status = 'non_renewing'
+      ORDER BY term_ends, mrr DESC
+      LIMIT 25
+
+  plan_mix:
+    sql: |
+      WITH currency_units AS (
+        SELECT IF(UPPER('{{ filters.currency }}') IN (
+          'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA',
+          'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'
+        ), 1, 100) AS divisor
+      ), totals AS (
+        SELECT SUM(monthly_mrr_minor) AS total_mrr
+        FROM `chargebee_reports.mrr_by_plan`
+        WHERE LOWER(currency_code) = LOWER('{{ filters.currency }}')
+      )
+      SELECT
+        CASE
+          WHEN item_type = 'addon' THEN 'Add-on · ' || item_price_id
+          ELSE CONCAT(UPPER('{{ filters.currency }}'), ' ', REGEXP_EXTRACT(item_price_id, r'-(\d+)-monthly'), ' base plan')
+        END AS plan_label,
+        active_subscription_count AS active_subscriptions,
+        monthly_mrr_minor / (SELECT divisor FROM currency_units) AS mrr,
+        SAFE_DIVIDE(monthly_mrr_minor, NULLIF((SELECT total_mrr FROM totals), 0)) * 100 AS mrr_share_pct,
+        SAFE_DIVIDE(monthly_mrr_minor / (SELECT divisor FROM currency_units), NULLIF(active_subscription_count, 0)) AS arpa
+      FROM `chargebee_reports.mrr_by_plan`
+      WHERE LOWER(currency_code) = LOWER('{{ filters.currency }}')
+      ORDER BY mrr DESC
+
+  customer_bands:
+    sql: |
+      WITH currency_units AS (
+        SELECT IF(UPPER('{{ filters.currency }}') IN (
+          'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA',
+          'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'
+        ), 1, 100) AS divisor
+      ), latest AS (
+        SELECT MAX(metric_month) AS metric_month
+        FROM `chargebee_reports.monthly_mrr_by_customer`
+        WHERE metric_month >= CAST('{{ filters.date_range.start }}' AS DATE)
+          AND metric_month <= CAST('{{ filters.date_range.end }}' AS DATE)
+          AND LOWER(currency_code) = LOWER('{{ filters.currency }}')
+      )
+      SELECT
+        CASE
+          WHEN ending_mrr_minor < 25000 THEN 'Under $250'
+          WHEN ending_mrr_minor < 50000 THEN '$250–$499'
+          WHEN ending_mrr_minor < 100000 THEN '$500–$999'
+          ELSE '$1,000+'
+        END AS mrr_band,
+        COUNT(*) AS customers,
+        SUM(ending_mrr_minor) / (SELECT divisor FROM currency_units) AS mrr,
+        SAFE_DIVIDE(SUM(ending_mrr_minor) / (SELECT divisor FROM currency_units), COUNT(*)) AS arpa
+      FROM `chargebee_reports.monthly_mrr_by_customer` AS mrr, latest
+      WHERE mrr.metric_month = latest.metric_month
+        AND LOWER(mrr.currency_code) = LOWER('{{ filters.currency }}')
+        AND mrr.ending_mrr_minor > 0
+      GROUP BY 1
+      ORDER BY MIN(ending_mrr_minor)
+
+  plan_table:
+    sql: |
+      WITH currency_units AS (
+        SELECT IF(UPPER('{{ filters.currency }}') IN (
+          'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA',
+          'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'
+        ), 1, 100) AS divisor
+      ), totals AS (
+        SELECT SUM(monthly_mrr_minor) AS total_mrr
+        FROM `chargebee_reports.mrr_by_plan`
+        WHERE LOWER(currency_code) = LOWER('{{ filters.currency }}')
+      )
+      SELECT
+        CASE
+          WHEN item_type = 'addon' THEN 'Add-on · ' || item_price_id
+          ELSE CONCAT(UPPER('{{ filters.currency }}'), ' ', REGEXP_EXTRACT(item_price_id, r'-(\d+)-monthly'), ' base plan')
+        END AS plan,
+        item_type,
+        active_subscription_count AS customers,
+        total_quantity AS units,
+        monthly_mrr_minor / (SELECT divisor FROM currency_units) AS mrr,
+        CONCAT(
+          CAST(ROUND(SAFE_DIVIDE(monthly_mrr_minor, NULLIF((SELECT total_mrr FROM totals), 0)) * 100, 1) AS STRING),
+          '%'
+        ) AS mrr_share,
+        run_rate_arr_minor / (SELECT divisor FROM currency_units) AS arr
+      FROM `chargebee_reports.mrr_by_plan`
+      WHERE LOWER(currency_code) = LOWER('{{ filters.currency }}')
+      ORDER BY mrr DESC
+
+rows:
+  - tab: Overview
+    widgets:
+      - name: Executive growth cockpit
+        type: text
+        content: |
+          # Chargebee revenue command center
+
+          The first question is simple: **is the business growing, and is that growth durable?** This view keeps committed recurring revenue separate from invoicing and cash. All money is shown in native `{{ filters.currency | upper }}`; no FX conversion is applied.
+
+          Use the tabs for retention cohorts, monetization, and the account-level collection queue. The overview is built around one operating question: **what changed in recurring revenue, and where should the team act next?**
+        col: 12
+
+  - tab: Overview
+    widgets:
+      - name: Ending MRR
+        type: metric
+        query: latest_kpis
+        value: { field: ending_mrr, type: number, format: "$,.0f" }
+        col: 3
+      - name: MRR growth vs prior month (%)
+        type: metric
+        query: latest_kpis
+        value: { field: mrr_growth_pct, type: number, format: ",.1f" }
+        col: 3
+      - name: Run-rate ARR
+        type: metric
+        query: latest_kpis
+        value: { field: ending_arr, type: number, format: "$,.0f" }
+        col: 3
+      - name: Active logos
+        type: metric
+        query: latest_kpis
+        value: { field: active_customers, type: number, format: ",.0f" }
+        col: 3
+
+  - tab: Overview
+    widgets:
+      - name: Net Revenue Retention (%)
+        type: metric
+        query: latest_kpis
+        value: { field: nrr_pct, type: number, format: ",.1f" }
+        col: 3
+      - name: Gross Revenue Retention (%)
+        type: metric
+        query: latest_kpis
+        value: { field: grr_pct, type: number, format: ",.1f" }
+        col: 3
+      - name: SaaS quick ratio
+        type: metric
+        query: latest_kpis
+        value: { field: quick_ratio, type: number, format: ".2f" }
+        col: 3
+      - name: Latest collection rate (%)
+        type: metric
+        query: billing_health
+        value: { field: collection_rate_pct, type: number, format: ",.1f" }
+        col: 3
+
+  - tab: Overview
+    widgets:
+      - name: Latest MRR added
+        type: metric
+        query: latest_mrr_flow
+        value: { field: mrr_added, type: number, format: "$,.0f" }
+        col: 3
+      - name: Latest MRR lost
+        type: metric
+        query: latest_mrr_flow
+        value: { field: mrr_lost, type: number, format: "$,.0f" }
+        col: 3
+      - name: Accounts added
+        type: metric
+        query: latest_mrr_flow
+        value: { field: accounts_added, type: number, format: ",.0f" }
+        col: 3
+      - name: Accounts lost
+        type: metric
+        query: latest_mrr_flow
+        value: { field: accounts_lost, type: number, format: ",.0f" }
+        col: 3
+
+  - tab: Overview
+    widgets:
+      - name: MRR trajectory
+        type: chart
+        chart: area
+        query: monthly_mrr
+        x: { field: metric_month }
+        y: { field: [ending_mrr] }
+        col: 12
+
+  - tab: Overview
+    widgets:
+      - name: MRR growth vs logo growth (%)
+        type: chart
+        chart: line
+        query: growth_quality
+        x: { field: metric_month }
+        y: { field: [mrr_growth_pct, logo_growth_pct] }
+        col: 6
+      - name: Customer portfolio by MRR band
+        type: chart
+        chart: pie
+        query: portfolio_bands
+        label: customer_band
+        value: { field: active_customers }
+        col: 6
+
+  - tab: Overview
+    height: 540
+    widgets:
+      - name: Latest MRR bridge components
+        type: chart
+        chart: bar
+        query: latest_mrr_bridge
+        x: { field: stage }
+        y: { field: ["Opening MRR", "MRR added", "MRR lost"] }
+        col: 12
+
+  - tab: Overview
+    widgets:
+      - name: Active logos over time
+        type: chart
+        chart: line
+        query: monthly_mrr
+        x: { field: metric_month }
+        y: { field: [active_customers] }
+        col: 12
+
+  - tab: Overview
+    widgets:
+      - name: Latest MRR movement drivers
+        type: table
+        query: latest_movement_drivers
+        col: 12
+        columns:
+          - name: movement
+            label: Movement
+          - name: accounts
+            label: Accounts
+            number: number
+          - name: mrr_impact
+            label: MRR impact
+            number: currency
+          - name: share_of_impact
+            label: Share of movement
+          - name: next_action
+            label: Suggested action
+
+  - tab: Overview
+    widgets:
+      - name: How to read the cockpit
+        type: text
+        content: |
+          **Read the story:** the MRR bridge starts at opening MRR and ends at the current MRR after each movement; the growth-quality lines separate revenue growth from logo growth; the portfolio visuals show whether revenue is broad-based or concentrated in a small customer band.
+
+          **Important distinction:** invoice billings are not MRR, and open invoices are not confirmed involuntary churn. The Collections tab makes that payment-risk coverage explicit.
+        col: 12
+
+  - tab: Retention & Expansion
+    widgets:
+      - name: Retention & expansion
+        type: text
+        content: |
+          # Retention & expansion
+
+          This tab answers **are existing customers keeping and growing their spend?** Revenue retention measures dollars; logo retention measures customers. They answer different questions, so they are intentionally shown together.
+
+          GRR excludes expansion. NRR is available in the KPI scorecard; it will diverge from GRR when upgrades or add-ons create expansion MRR. The cohort heatmap exposes where retention deteriorates fastest, while the flow comparison makes the monthly acquisition-versus-loss gap easy to scan.
+        col: 12
+
+  - tab: Retention & Expansion
+    widgets:
+      - name: Gross revenue retention (%)
+        type: chart
+        chart: area
+        query: retention_trend
+        x: { field: metric_month }
+        y: { field: [grr_pct] }
+        col: 6
+      - name: Logo churn rate (%)
+        type: chart
+        chart: bar
+        query: retention_trend
+        x: { field: metric_month }
+        y: { field: [logo_churn_rate_pct] }
+        col: 6
+
+  - tab: Retention & Expansion
+    widgets:
+      - name: "Monthly MRR flow: additions vs losses"
+        type: chart
+        chart: combo
+        query: monthly_flow_comparison
+        x: { field: metric_month }
+        y: { field: [mrr_added, mrr_lost] }
+        col: 8
+      - name: "Latest movement MRR: wins vs losses"
+        type: chart
+        chart: combo
+        query: movement_impact_summary
+        x: { field: movement_type }
+        y: { field: [mrr_added, mrr_lost] }
+        col: 4
+
+  - tab: Retention & Expansion
+    widgets:
+      - name: Cohort MRR retention (%)
+        type: chart
+        chart: heatmap
+        query: cohort_retention
+        x: { field: months_since_start }
+        y: { field: [cohort_month] }
+        value: { field: mrr_retention_pct }
+        col: 12
+
+  - tab: Retention & Expansion
+    widgets:
+      - name: Non-renewing subscriptions
+        type: table
+        query: renewal_watch
+        col: 12
+        columns:
+          - name: company
+            label: Account
+          - name: term_ends
+            label: Term ends
+          - name: status
+            label: Status
+          - name: mrr
+            label: MRR
+            number: currency
+
+  - tab: Retention & Expansion
+    widgets:
+      - name: Latest movement accounts
+        type: table
+        query: movement_accounts
+        col: 12
+        columns:
+          - name: company
+            label: Account
+          - name: channel
+            label: Channel
+          - name: movement_type
+            label: Movement
+          - name: mrr_change
+            label: MRR change
+            number: currency
+          - name: beginning_mrr
+            label: Prior MRR
+            number: currency
+
+  - tab: Monetization & Portfolio
+    widgets:
+      - name: Monetization & portfolio
+        type: text
+        content: |
+          # Monetization & portfolio
+
+          Use this tab to decide **where packaging and customer mix are helping or holding back growth**. Plan-level MRR is current-state; customer bands show whether the portfolio is broad-based or dependent on a narrow tier.
+
+          The pie is a customer-count mix, not a revenue share chart. The plan table below carries the revenue view.
+        col: 12
+
+  - tab: Monetization & Portfolio
+    widgets:
+      - name: Revenue mix by customer value band
+        type: chart
+        chart: pie
+        query: customer_bands
+        label: mrr_band
+        value: { field: mrr }
+        col: 7
+      - name: Customer mix by MRR band
+        type: chart
+        chart: pie
+        query: customer_bands
+        label: mrr_band
+        value: { field: customers }
+        col: 5
+
+  - tab: Monetization & Portfolio
+    widgets:
+      - name: Plan portfolio table
+        type: table
+        query: plan_table
+        col: 12
+        columns:
+          - name: plan
+            label: Package
+          - name: item_type
+            label: Type
+          - name: customers
+            label: Customers
+            number: number
+          - name: units
+            label: Units
+            number: number
+          - name: mrr
+            label: MRR
+            number: currency
+          - name: mrr_share
+            label: MRR share
+          - name: arr
+            label: Run-rate ARR
+            number: currency
+
+  - tab: Monetization & Portfolio
+    widgets:
+      - name: Packaging readout
+        type: text
+        content: |
+          **Questions for the next pricing review:**
+
+          - Is the highest-value tier growing through upgrades, or only largest because of list price?
+          - Are add-ons attached to enough accounts to justify packaging and enablement work?
+          - Is ARPA rising alongside active logos, or are we buying growth at the low end?
+          - Which plan bands have the highest churn and expansion once CRM and product-usage data are joined?
+        col: 12
+
+  - tab: Collections & Risk
+    widgets:
+      - name: Collections & payment risk
+        type: text
+        content: |
+          # Collections & payment risk
+
+          This tab answers **are invoices turning into cash, and which accounts need a human follow-up?** It intentionally separates invoiced billings from recurring MRR.
+
+          **Coverage note:** this sandbox has no gateway failure attempts, so open invoices are a leading indicator—not confirmed involuntary churn. Once transaction-level failures and retries are synced, the queue can show recovery rate, last attempt, failure reason, and cancellation exposure.
+        col: 12
+
+  - tab: Collections & Risk
+    widgets:
+      - name: Latest billed
+        type: metric
+        query: latest_collections
+        value: { field: billed, type: number, format: "$,.0f" }
+        col: 3
+      - name: Latest collected
+        type: metric
+        query: latest_collections
+        value: { field: collected, type: number, format: "$,.0f" }
+        col: 3
+      - name: Latest outstanding
+        type: metric
+        query: latest_collections
+        value: { field: outstanding, type: number, format: "$,.0f" }
+        col: 3
+      - name: Paid invoice rate (%)
+        type: metric
+        query: latest_collections
+        value: { field: paid_invoice_rate_pct, type: number, format: ",.1f" }
+        col: 3
+
+  - tab: Collections & Risk
+    widgets:
+      - name: Open AR exposure
+        type: metric
+        query: payment_risk_summary
+        value: { field: open_ar, type: number, format: "$,.0f" }
+        col: 3
+      - name: Open invoices
+        type: metric
+        query: payment_risk_summary
+        value: { field: open_invoices, type: number, format: ",.0f" }
+        col: 3
+      - name: Overdue AR
+        type: metric
+        query: payment_risk_summary
+        value: { field: overdue_ar, type: number, format: "$,.0f" }
+        col: 3
+      - name: Collection rate (%)
+        type: metric
+        query: latest_collections
+        value: { field: collection_rate_pct, type: number, format: ",.1f" }
+        col: 3
+
+  - tab: Collections & Risk
+    widgets:
+      - name: Latest billed to cash conversion
+        type: chart
+        chart: pie
+        query: cash_conversion_snapshot
+        label: stage
+        value: { field: amount }
+        col: 12
+
+  - tab: Collections & Risk
+    widgets:
+      - name: At-risk MRR by payment urgency
+        type: chart
+        chart: bar
+        query: payment_risk_bands
+        x: { field: urgency }
+        y: { field: [mrr_exposed] }
+        col: 6
+      - name: Collections interpretation
+        type: text
+        content: |
+          **Decision rule:** prioritize the urgency band with the most MRR exposed, then work down the account queue by MRR. The conversion donut separates cash already collected from the amount still exposed; a fully outstanding donut is a payment-flow alert, not a revenue trend.
+        col: 6
+
+  - tab: Collections & Risk
+    widgets:
+      - name: Payment follow-up queue
+        type: table
+        query: risk_queue
+        col: 12
+        columns:
+          - name: account
+            label: Account
+          - name: chargebee_invoice_id
+            label: Invoice
+          - name: status
+            label: Status
+          - name: due_date
+            label: Due date
+          - name: days_past_due
+            label: Days past due
+            number: number
+          - name: amount_due
+            label: Open amount
+            number: currency
+          - name: mrr_exposed
+            label: MRR exposed
+            number: currency
+          - name: recommended_action
+            label: Recommended action
+
+  - tab: Collections & Risk
+    widgets:
+      - name: Finance interpretation
+        type: text
+        content: |
+          **What this means:** an open invoice is a collections task, not recognized revenue and not automatically a failed payment. For production, join the transaction ledger and dunning events to show recovery rate, last attempt, failure reason, and cancellation exposure per account.
+        col: 12

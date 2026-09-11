@@ -1,0 +1,76 @@
+name: chargebee_raw.transaction
+type: ingestr
+
+description: >
+  Raw-layer Chargebee transactions loaded into BigQuery with ingestr's
+  incremental mode. Each run fetches the transactions whose `updated_at` falls
+  inside its own time window and merges them into the destination table on `id`,
+  so status changes on an existing payment, refund, or credit are picked up by
+  the run whose window covers them, or by a wider backfill.
+
+materialization:
+  type: table
+  strategy: merge
+  incremental_key: updated_at
+
+parameters:
+  source_table: transactions
+
+tags:
+  - chargebee_raw
+  - chargebee
+  - billing
+
+columns:
+  - name: id
+    type: varchar
+    description: Chargebee transaction identifier.
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: customer_id
+    type: varchar
+    description: Identifier of the customer the transaction belongs to.
+  - name: subscription_id
+    type: varchar
+    description: Identifier of the subscription linked to the transaction, if any.
+  - name: payment_source_id
+    type: varchar
+    description: Identifier of the payment source used for the transaction.
+  - name: gateway
+    type: varchar
+    description: Payment gateway that processed the transaction.
+  - name: gateway_account_id
+    type: varchar
+    description: Identifier of the gateway account used.
+  - name: type
+    type: varchar
+    description: >
+      Transaction type, one of `authorization`, `payment`, `refund`, or
+      `payment_reversal`.
+  - name: status
+    type: varchar
+    description: >
+      Transaction status, one of `in_progress`, `success`, `voided`,
+      `failure`, `timeout`, or `needs_attention`.
+  - name: currency_code
+    type: varchar
+    description: Three-letter ISO currency code the transaction was made in.
+  - name: amount
+    type: integer
+    description: Transaction amount in minor currency units.
+  - name: date
+    type: integer
+    description: Unix timestamp in seconds of when the transaction occurred.
+  - name: settled_at
+    type: integer
+    description: Unix timestamp in seconds of when the transaction was settled.
+  - name: updated_at
+    type: integer
+    description: Unix timestamp in seconds of the last modification to the transaction.
+    checks:
+      - name: not_null
+  - name: deleted
+    type: boolean
+    description: Whether the transaction resource has been deleted.

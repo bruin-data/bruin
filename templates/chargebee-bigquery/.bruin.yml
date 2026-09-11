@@ -1,0 +1,14 @@
+default_environment: default
+
+environments:
+  default:
+    connections:
+      google_cloud_platform:
+        - name: gcp-default
+          project_id: your-gcp-project-id
+          location: your-gcp-region
+          use_application_default_credentials: true
+      chargebee:
+        - name: chargebee-default
+          site: ${CHARGEBEE_SITE}
+          api_key: ${CHARGEBEE_API_KEY}
