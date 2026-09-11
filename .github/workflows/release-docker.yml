@@ -46,6 +46,11 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
+      - name: Authenticate pinned ingestr and generate embedded hashes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/generate_ingestr_hashes.py
+
       - name: Determine release tag (workflow run)
         id: workflow_tag
         if: ${{ github.event_name == 'workflow_run' }}

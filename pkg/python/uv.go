@@ -44,7 +44,7 @@ const (
 	// IngestrVersionV0 is the legacy ingestr release pinned for parameters.version=v0.
 	IngestrVersionV0 = "0.14.155"
 	// IngestrVersionV1 is the current ingestr release used by default and for parameters.version=v1.
-	IngestrVersionV1 = "1.1.48"
+	IngestrVersionV1 = "1.1.54"
 	sqlfluffVersion  = "3.4.1"
 )
 
@@ -575,7 +575,7 @@ func isLegacyIngestrVersion(version string) bool {
 }
 
 // ingestrCommand resolves released v1+ versions to standalone binaries installed
-// by the official curl installer. Legacy v0 and local source checkouts continue to
+// from archives checked against embedded hashes. Legacy v0 and local source checkouts continue to
 // use uv because they are Python packages and have no compatible binary release.
 func (u *UvPythonRunner) ingestrCommand(ctx context.Context, extraPackages, args []string) (*CommandInstance, error) {
 	_, isLocal := u.ingestrPackage(ctx)

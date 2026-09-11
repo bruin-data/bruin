@@ -38,6 +38,63 @@ to your data warehouses:
 > [!INFO]
 > See the ingestr [platform catalog](https://getbruin.com/docs/ingestr/supported-sources/platforms.html), [ingest command reference](https://getbruin.com/docs/ingestr/commands/ingest.html), and [incremental loading guide](https://getbruin.com/docs/ingestr/getting-started/incremental-loading.html) for the upstream source, destination, and strategy behavior.
 
+## Installation and archive verification
+
+On first use, Bruin downloads the shared ingestr installer from a commit-pinned
+GitHub URL and checks its SHA-256 against the hash embedded in Bruin. Only after
+that check succeeds does Bruin execute those exact script bytes, passing the
+exact ingestr version and trusted archive hash via the installer's `-s` option.
+The script checks the archive before extraction or installation. A script hash
+mismatch or installer failure stops installation without an unchecked fallback.
+
+This applies to macOS and Linux on x86_64 and arm64, and Windows on x86_64 with
+a shell. On Windows without `sh`, Bruin downloads, hashes, and extracts the ZIP
+natively. The shared script uses existing system download, archive, and SHA-256
+tools; it does not bootstrap verification tooling. No GitHub CLI, signing tools,
+credentials, or checksum sidecars are needed on the user's machine. The
+distributed Bruin binary is the trust anchor.
+
+Builds automatically verify GitHub's immutable release attestation and each of
+the five archives using `gh release verify` and `gh release verify-asset`. The
+generator reads the source commit from the verified attestation, fetches the
+exact release tag using Git's object verification, and requires the fetched
+commit to match. It hashes `install.sh` from that authenticated Git tree without
+executing it. The commit and script hash are embedded alongside the archive
+hashes, with no separate script pin or manual hash maintenance.
+
+The generated manifest is a temporary build input ignored by Git, not a
+committed or manually maintained file. Release CI
+generates it in an authenticated verification job and passes it to the Unix,
+Windows, and Docker build jobs. The version-update workflow also verifies the
+candidate release before proposing a version bump. The pin is v1.1.54, which
+includes the installer's optional expected-archive-hash interface. Earlier
+releases such as v1.1.50 lack that interface; v1.1.48 also lacks the required
+immutable-release evidence.
+
+Fresh installs of explicit v1+ version overrides require a matching embedded
+hash. An unknown version fails with an error: use the pinned version (omit
+`parameters.version` or set it to `v1`), or upgrade Bruin. There is no unverified
+download fallback. Existing cached binaries are reused without revalidation.
+Legacy v0 Python packages and explicit local-source development still use uv;
+this archive-verification guarantee does not apply to those paths.
+
+`make build` and `make build-no-duckdb` regenerate the manifest automatically
+before compilation. Makefile test and Go lint targets also generate it so they
+work from a fresh checkout. Developers need Python 3.11+, Git, and a trusted GitHub CLI
+supporting release verification, authenticated using `gh auth login` or
+`GH_TOKEN`. Each invocation verifies the release again; missing credentials,
+unsupported tooling, or a verification/download failure stops the command
+before compilation. Existing generated output is never a fallback for a failed
+build verification.
+
+For direct `go build`, GoReleaser, or `docker build` commands, first run
+`make ingestr-hashes`. Go's `go:embed` requires the generated
+`pkg/python/ingestr_hashes.json`; a fresh checkout cannot compile without it.
+Docker builds use the generated file from the local build context, so no token
+needs to enter the image. Both Docker release workflows arrange this input
+automatically. CI's release verification job uses GitHub's maintained Ubuntu
+runner image rather than downloading an unverified verifier executable.
+
 ## Asset Structure
 
 ```yaml
@@ -114,7 +171,7 @@ parameters:
 | `source` | No | _n/a_ | Overrides the inferred source type. For example, set `gsheets` when reusing a BigQuery connection for Google Sheets. |
 | `source_table` | Yes | `--source-table` | Table, sheet, or resource identifier to pull from the source. |
 | `file_type` | No | `--source-table` suffix | Appended to the `source_table` as `table#type` for connectors that need a file format hint (`csv`, `jsonl`, `parquet`). |
-| `version` | No | _n/a_ | Selects the version of ingestr to install and use. Valid options are bare family markers such as `v1` or `v0`, or a full version pin such as `v1.0.71`. |
+| `version` | No | _n/a_ | Selects the version of ingestr to install and use: `v1`, `v0`, or an exact pin such as `v1.1.54`. Fresh v1+ downloads require a trusted embedded hash; see [archive verification](#installation-and-archive-verification). |
 | `materialization` | No | `--incremental-*`, `--partition-by`, `--cluster-by` | Preferred way to define destination write behavior. Supports `type: table` with `create+replace`, `append`, `merge`, `delete+insert`, and `truncate+insert`. |
 | `destination` | Unless `connection` or `destination_connection` is set | _n/a_ | Logical destination type used for default connection inference. When `connection` and `destination_connection` are omitted, Bruin uses this value to choose the pipeline default destination connection. |
 | `destination_connection` | No | _n/a_ | Named destination connection to use when `connection` is omitted. This overrides default connection inference from `destination`. |

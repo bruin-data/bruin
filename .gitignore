@@ -168,3 +168,7 @@ logs/queries
 .devcontainer
 .codex/
 .amp/portals/*
+
+# Authenticated build input; generated automatically, never maintained in Git.
+/pkg/python/ingestr_hashes.json
+/pkg/python/ingestr_hashes.json.tmp

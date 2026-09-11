@@ -10,7 +10,8 @@ permissions:
 
 jobs:
   update:
-    runs-on: depot-ubuntu-latest
+    # GitHub's maintained image supplies the authenticated release verifier.
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -28,6 +29,12 @@ jobs:
 
           latest=$(curl -fsSL "https://api.github.com/repos/bruin-data/ingestr/releases/latest" | jq -er '.tag_name')
           latest=${latest#v}
+          # Discovery is not trusted verification. Validate before passing the
+          # value to later steps; the generator authenticates this exact tag.
+          if [[ ! "$latest" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Expected a stable ingestr release tag" >&2
+            exit 1
+          fi
           current=$(sed -nE 's/^[[:space:]]*IngestrVersionV1[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' pkg/python/uv.go)
 
           if [[ -z "$current" ]]; then
@@ -67,6 +74,12 @@ jobs:
           fi
           
           echo "Changes staged successfully"
+
+      - name: Verify candidate ingestr release
+        if: steps.check.outputs.new == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/generate_ingestr_hashes.py
 
       - name: Create Pull Request
         id: create-pr
