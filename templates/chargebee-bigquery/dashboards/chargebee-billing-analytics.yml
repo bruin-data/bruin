@@ -117,10 +117,7 @@ queries:
           AND metric_month <= CAST('{{ filters.date_range.end }}' AS DATE)
           AND LOWER(currency_code) = LOWER('{{ filters.currency }}')
       )
-      SELECT
-        movement_label,
-        IF(movement_mrr > 0, movement_mrr, 0) AS inflow_mrr,
-        IF(movement_mrr < 0, movement_mrr, 0) AS loss_mrr
+      SELECT movement_label, movement_mrr
       FROM (
         SELECT 'New business' AS movement_label,
           SUM(new_mrr_minor) / (SELECT divisor FROM currency_units) AS movement_mrr,
@@ -657,12 +654,12 @@ rows:
         x: metric_month
         y: [ending_mrr]
         col: 7
-      - name: Latest-month MRR inflows & losses
+      - name: Latest-month MRR bridge
         type: chart
-        chart: bar
+        chart: waterfall
         query: latest_mrr_bridge
         x: movement_label
-        y: [inflow_mrr, loss_mrr]
+        y: [movement_mrr]
         col: 5
 
   - tab: Overview
