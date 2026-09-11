@@ -90,9 +90,13 @@ bruin run --var concentration_top_n=5 --var 'mrr_active_statuses=["active","non_
 ## Dashboard
 
 `dashboards/chargebee-billing-analytics.yml` is a ready-made DAC dashboard over
-the reporting layer: ending MRR / ARR, NRR / GRR / quick ratio, the MRR movement
-waterfall, MRR by plan, revenue concentration, invoice billings, and dunning
-risk — all filterable by currency and date range. Preview it locally:
+the reporting layer. It is one dashboard with four tabs — Overview, Retention &
+Expansion, Monetization & Portfolio, and Collections & Risk — covering ending
+MRR / ARR, retention, signed MRR movements, customer mix, plan packaging, invoice
+collections, and account follow-up. All tabs are filterable by currency and date
+range. The movement bridge uses signed inflow/loss bars so positive additions and
+negative losses are visually unambiguous; the portfolio pie is customer count by MRR band,
+while plan-level revenue is kept in the table. Preview it locally:
 
 ```bash
 dac serve --dir . --open
