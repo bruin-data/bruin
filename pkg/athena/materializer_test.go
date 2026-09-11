@@ -73,3 +73,32 @@ func TestLogIfFullRefreshAndDDL(t *testing.T) {
 		})
 	}
 }
+
+func TestMaterializer_RenderInitialTable(t *testing.T) {
+	t.Parallel()
+
+	asset := &pipeline.Asset{
+		Name: "analytics.events",
+		Materialization: pipeline.Materialization{
+			Type:        pipeline.MaterializationTypeTable,
+			Strategy:    pipeline.MaterializationStrategyTimeInterval,
+			PartitionBy: "event_date",
+		},
+	}
+
+	queries, err := NewMaterializer(false).RenderInitialTable(
+		asset,
+		"SELECT event_date, event_name FROM raw_events;",
+		"s3://bucket/results",
+	)
+	require.NoError(t, err)
+	require.Equal(t, []string{
+		"CREATE TABLE analytics.events WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/results/analytics.events', partitioning = ARRAY['event_date']) AS SELECT event_date, event_name FROM raw_events WITH NO DATA",
+	}, queries)
+}
+
+func TestMaterializer_IsFullRefresh(t *testing.T) {
+	t.Parallel()
+	require.False(t, NewMaterializer(false).IsFullRefresh())
+	require.True(t, NewMaterializer(true).IsFullRefresh())
+}

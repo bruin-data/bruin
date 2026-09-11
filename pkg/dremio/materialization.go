@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
@@ -86,6 +87,7 @@ func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) 
 
 	return fmt.Sprintf(
 		`
+%s;
 DELETE FROM %s
 WHERE %s IN (
     SELECT DISTINCT %s
@@ -94,7 +96,7 @@ WHERE %s IN (
 
 INSERT INTO %s
 SELECT * FROM (%s) AS new_data;`,
-		name, key, key, query, name, query,
+		ansisql.BuildCreateTableIfNotExistsAsQuery(name, "", query), name, key, key, query, name, query,
 	), nil
 }
 
@@ -131,12 +133,13 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 
 	return fmt.Sprintf(
 		`
+%s;
 DELETE FROM %s
 WHERE %s BETWEEN %s '%s' AND %s '%s';
 
 INSERT INTO %s
 %s;`,
-		name, key, timePrefix, startVar, timePrefix, endVar, name, query,
+		ansisql.BuildCreateTableIfNotExistsAsQuery(name, "", query), name, key, timePrefix, startVar, timePrefix, endVar, name, query,
 	), nil
 }
 

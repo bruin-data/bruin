@@ -33,6 +33,25 @@ func AddIncrementalPredicate(conditions []string, predicate string) []string {
 	return append(conditions, "("+predicate+")")
 }
 
+// BuildCreateTableIfNotExistsAsQuery builds an empty CTAS statement that
+// bootstraps a table without consuming the rows returned by the asset query.
+// Materializers can then run their normal incremental DML on both the first
+// and subsequent executions.
+func BuildCreateTableIfNotExistsAsQuery(tableName, tableOptions, query string) string {
+	query = strings.TrimSuffix(strings.TrimSpace(query), ";")
+	tableOptions = strings.TrimSpace(tableOptions)
+	if tableOptions != "" {
+		tableOptions = " " + tableOptions
+	}
+
+	return fmt.Sprintf(
+		"CREATE TABLE IF NOT EXISTS %s%s AS\nSELECT * FROM (\n%s\n) AS __bruin_bootstrap WHERE 1 = 0",
+		tableName,
+		tableOptions,
+		query,
+	)
+}
+
 // BuildTruncateInsertQuery creates a truncate+insert query that works for standard ANSI SQL databases.
 // This can be used by platforms that support standard TRUNCATE TABLE syntax with transactions.
 func BuildTruncateInsertQuery(task *pipeline.Asset, query string) (string, error) {

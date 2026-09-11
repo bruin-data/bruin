@@ -1,6 +1,7 @@
 package vertica
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -349,11 +350,36 @@ func TestMaterializer_Render(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
+				if !tt.fullRefresh && isBootstrapStrategy(tt.task.Materialization.Strategy) {
+					var found bool
+					render, found = removeVerticaBootstrap(render)
+					require.True(t, found, "expected missing-table bootstrap in rendered SQL")
+				}
 			}
 
 			assert.Regexp(t, tt.want, render)
 		})
 	}
+}
+
+func isBootstrapStrategy(strategy pipeline.MaterializationStrategy) bool {
+	return strategy == pipeline.MaterializationStrategyDeleteInsert ||
+		strategy == pipeline.MaterializationStrategyMerge ||
+		strategy == pipeline.MaterializationStrategyTimeInterval
+}
+
+func removeVerticaBootstrap(query string) (string, bool) {
+	start := strings.Index(query, "CREATE TABLE IF NOT EXISTS ")
+	if start < 0 {
+		return query, false
+	}
+	const endMarker = " AS __bruin_bootstrap WHERE 1 = 0);\n"
+	end := strings.Index(query[start:], endMarker)
+	if end < 0 {
+		return query, false
+	}
+	end += start + len(endMarker)
+	return query[:start] + query[end:], true
 }
 
 func intp(i int) *int { return &i }

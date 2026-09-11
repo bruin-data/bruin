@@ -427,12 +427,23 @@ func TestMaterializer_Render(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
+				if !tt.fullRefresh && isBootstrapStrategy(tt.task.Materialization.Strategy) {
+					bootstrap := buildCreateTableIfNotExistsQuery(tt.task, tt.query) + ";\n"
+					require.Contains(t, render, bootstrap)
+					render = strings.Replace(render, bootstrap, "", 1)
+				}
 				if !assert.Regexp(t, tt.want, render) {
 					t.Logf("\nWant (regex): %s\nGot: %s", tt.want, render)
 				}
 			}
 		})
 	}
+}
+
+func isBootstrapStrategy(strategy pipeline.MaterializationStrategy) bool {
+	return strategy == pipeline.MaterializationStrategyDeleteInsert ||
+		strategy == pipeline.MaterializationStrategyMerge ||
+		strategy == pipeline.MaterializationStrategyTimeInterval
 }
 
 func TestBuildSCD2ByColumnQuery(t *testing.T) {

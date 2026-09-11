@@ -40,12 +40,37 @@ func (m *Materializer) Render(asset *pipeline.Asset, query, location string) ([]
 	return []string{}, fmt.Errorf("unsupported materialization type - strategy combination: (`%s` - `%s`)", mat.Type, mat.Strategy)
 }
 
+// RenderInitialTable builds the CTAS statement used when an incremental target
+// is absent. Athena CTAS does not support IF NOT EXISTS, so the operator calls
+// this only after checking the Glue catalog through information_schema.
+func (m *Materializer) RenderInitialTable(asset *pipeline.Asset, query, location string) ([]string, error) {
+	query = strings.TrimSuffix(strings.TrimSpace(query), ";")
+
+	partitionBy := ""
+	if asset.Materialization.PartitionBy != "" {
+		partitionBy = fmt.Sprintf(", partitioning = ARRAY['%s']", asset.Materialization.PartitionBy)
+	}
+
+	return []string{fmt.Sprintf(
+		"CREATE TABLE %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS %s WITH NO DATA",
+		asset.Name,
+		location,
+		asset.Name,
+		partitionBy,
+		query,
+	)}, nil
+}
+
 func NewMaterializer(fullRefresh bool) *Materializer {
 	return &Materializer{
 		MaterializationMap: matMap,
 		fullRefresh:        fullRefresh,
 		randomName:         helpers.PrefixGenerator,
 	}
+}
+
+func (m *Materializer) IsFullRefresh() bool {
+	return m.fullRefresh
 }
 
 type Renderer struct {

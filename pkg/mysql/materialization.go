@@ -70,6 +70,7 @@ func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) 
 	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
 
 	queries := []string{
+		ansisql.BuildCreateTableIfNotExistsAsQuery(asset.Name, "", query),
 		"START TRANSACTION",
 		"DROP TEMPORARY TABLE IF EXISTS " + tempTableName,
 		fmt.Sprintf("CREATE TEMPORARY TABLE %s AS %s", tempTableName, strings.TrimSuffix(query, ";")),
@@ -135,6 +136,7 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 	}
 
 	queries := []string{
+		ansisql.BuildCreateTableIfNotExistsAsQuery(asset.Name, "", query),
 		"START TRANSACTION",
 		fmt.Sprintf("DELETE FROM %s WHERE %s BETWEEN '%s' AND '%s'",
 			asset.Name,
@@ -216,6 +218,7 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 	onClause = strings.Join(ansisql.AddIncrementalPredicate([]string{onClause}, asset.Materialization.IncrementalPredicate), " AND ")
 
 	queries := []string{
+		ansisql.BuildCreateTableIfNotExistsAsQuery(asset.Name, "", trimmedQuery),
 		"START TRANSACTION",
 		"DROP TEMPORARY TABLE IF EXISTS " + tempTableName,
 		fmt.Sprintf("CREATE TEMPORARY TABLE %s AS\n%s", tempTableName, trimmedQuery),

@@ -112,7 +112,6 @@ SELECT 1 as col;`,
 			result, err := buildCreateReplaceQuery(tt.asset, tt.query)
 
 			require.NoError(t, err)
-
 			// Normalize whitespace for comparison
 			normalizeWhitespace := func(s string) string {
 				return strings.TrimSpace(strings.ReplaceAll(s, "\n", " "))
@@ -446,6 +445,9 @@ GROUP BY u.user_id, u.name) AS new_data;`,
 			result, err := buildIncrementalQuery(tt.asset, tt.query)
 
 			require.NoError(t, err)
+			bootstrap := buildCreateTableIfNotExistsQuery(tt.asset, strings.TrimSuffix(tt.query, ";")) + ";"
+			require.Contains(t, result, bootstrap)
+			result = strings.Replace(result, bootstrap, "", 1)
 
 			// Normalize whitespace for comparison
 			normalizeWhitespace := func(s string) string {
@@ -618,6 +620,9 @@ GROUP BY DATE_TRUNC('hour', created_at);`,
 			result, err := buildTimeIntervalQuery(tt.asset, tt.query)
 
 			require.NoError(t, err)
+			bootstrap := buildCreateTableIfNotExistsQuery(tt.asset, strings.TrimSuffix(tt.query, ";")) + ";"
+			require.Contains(t, result, bootstrap)
+			result = strings.Replace(result, bootstrap, "", 1)
 
 			// Normalize whitespace for comparison
 			normalizeWhitespace := func(s string) string {

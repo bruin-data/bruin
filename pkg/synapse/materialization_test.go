@@ -1,6 +1,7 @@
 package synapse
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -292,13 +293,34 @@ func TestMaterializer_Render(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
+				if !tt.fullRefresh && isBootstrapStrategy(tt.task.Materialization.Strategy) {
+					var found bool
+					render, found = removeSynapseBootstrap(render)
+					require.True(t, found, "expected missing-table bootstrap in rendered SQL")
+				}
 			}
 
+			require.Len(t, render, len(tt.want))
 			for index, want := range tt.want {
 				assert.Regexp(t, want, render[index])
 			}
 		})
 	}
+}
+
+func isBootstrapStrategy(strategy pipeline.MaterializationStrategy) bool {
+	return strategy == pipeline.MaterializationStrategyDeleteInsert ||
+		strategy == pipeline.MaterializationStrategyMerge ||
+		strategy == pipeline.MaterializationStrategyTimeInterval
+}
+
+func removeSynapseBootstrap(queries []string) ([]string, bool) {
+	for index, query := range queries {
+		if strings.Contains(query, "IF OBJECT_ID(") && strings.Contains(query, "AS __bruin_bootstrap WHERE 1 = 0") {
+			return append(queries[:index:index], queries[index+1:]...), true
+		}
+	}
+	return queries, false
 }
 
 func intp(i int) *int { return &i }

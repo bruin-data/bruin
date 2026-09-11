@@ -214,6 +214,38 @@ func (m HookWrapperMaterializerListWithLocation) Render(asset *Asset, query, loc
 	return wrapHookQueriesList(materialized, asset.Hooks, m.Hoister, asset.Type), nil
 }
 
+// RenderInitialTable forwards optional first-run table initialization used by
+// location-aware materializers such as Athena.
+func (m HookWrapperMaterializerListWithLocation) RenderInitialTable(asset *Asset, query, location string) ([]string, error) {
+	if m.Mat == nil {
+		return nil, errors.New("hook wrapper materializer requires a base materializer")
+	}
+
+	initializer, ok := m.Mat.(interface {
+		RenderInitialTable(asset *Asset, query, location string) ([]string, error)
+	})
+	if !ok {
+		return nil, errors.New("base materializer does not support initial table rendering")
+	}
+
+	return initializer.RenderInitialTable(asset, query, location)
+}
+
+// InitialTableInsertionIndex keeps first-run table initialization after any
+// pre-hooks that may prepare objects referenced by the asset query.
+func (m HookWrapperMaterializerListWithLocation) InitialTableInsertionIndex(asset *Asset) int {
+	return len(formatHookQueries(asset.Hooks.Pre))
+}
+
+func (m HookWrapperMaterializerListWithLocation) IsFullRefresh() bool {
+	if m.Mat == nil {
+		return false
+	}
+
+	fullRefresh, ok := m.Mat.(interface{ IsFullRefresh() bool })
+	return ok && fullRefresh.IsFullRefresh()
+}
+
 func (m HookWrapperMaterializerListWithLocation) LogIfFullRefreshAndDDL(writer interface{}, asset *Asset) error {
 	if m.Mat == nil {
 		return errors.New("hook wrapper materializer requires a base materializer")

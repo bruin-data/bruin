@@ -61,6 +61,7 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) (string, error) {
 	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
 
 	queries := []string{
+		buildCreateTableIfNotExistsQuery(task, query),
 		"BEGIN TRANSACTION",
 		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, strings.TrimSuffix(query, ";")),
 		fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", task.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
@@ -88,6 +89,15 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query string) (string, error)
 	}
 
 	return fmt.Sprintf("CREATE OR REPLACE TABLE %s %s AS\n%s", task.Name, clusterByClause, query), nil
+}
+
+func buildCreateTableIfNotExistsQuery(asset *pipeline.Asset, query string) string {
+	clusterByClause := ""
+	if len(asset.Materialization.ClusterBy) > 0 {
+		clusterByClause = fmt.Sprintf("CLUSTER BY (%s)", strings.Join(asset.Materialization.ClusterBy, ", "))
+	}
+
+	return ansisql.BuildCreateTableIfNotExistsAsQuery(asset.Name, clusterByClause, query)
 }
 
 func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
@@ -135,7 +145,7 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 		fmt.Sprintf("WHEN NOT MATCHED THEN INSERT(%s) VALUES(%s)", allColumnValues, allColumnValues),
 	}
 
-	return strings.Join(mergeLines, "\n") + ";", nil
+	return buildCreateTableIfNotExistsQuery(asset, query) + ";\n" + strings.Join(mergeLines, "\n") + ";", nil
 }
 
 func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error) {
@@ -157,6 +167,7 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 		return "", errors.New("time_granularity must be either 'date', or 'timestamp'")
 	}
 	queries := []string{
+		buildCreateTableIfNotExistsQuery(asset, query),
 		"BEGIN TRANSACTION",
 		fmt.Sprintf(`DELETE FROM %s WHERE %s BETWEEN '%s' AND '%s'`,
 			asset.Name,
