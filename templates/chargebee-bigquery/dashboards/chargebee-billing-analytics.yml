@@ -149,6 +149,47 @@ queries:
       WHERE movement_mrr != 0
       ORDER BY sort_order
 
+  latest_mrr_summary:
+    sql: |
+      WITH currency_units AS (
+        SELECT IF(UPPER('{{ filters.currency }}') IN (
+          'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA',
+          'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'
+        ), 1, 100) AS divisor
+      ), latest AS (
+        SELECT MAX(metric_month) AS metric_month
+        FROM `chargebee_reports.monthly_mrr_movements`
+        WHERE metric_month >= CAST('{{ filters.date_range.start }}' AS DATE)
+          AND metric_month <= CAST('{{ filters.date_range.end }}' AS DATE)
+          AND LOWER(currency_code) = LOWER('{{ filters.currency }}')
+      )
+      SELECT
+        movement_label,
+        added_mrr,
+        lost_mrr
+      FROM (
+        SELECT
+          'MRR added' AS movement_label,
+          SUM(new_mrr_minor + reactivation_mrr_minor + expansion_mrr_minor)
+            / (SELECT divisor FROM currency_units) AS added_mrr,
+          CAST(0 AS NUMERIC) AS lost_mrr,
+          1 AS sort_order
+        FROM `chargebee_reports.monthly_mrr_movements` AS movement, latest
+        WHERE movement.metric_month = latest.metric_month
+          AND LOWER(movement.currency_code) = LOWER('{{ filters.currency }}')
+        UNION ALL
+        SELECT
+          'MRR lost',
+          CAST(0 AS NUMERIC),
+          -SUM(contraction_mrr_minor + churned_mrr_minor)
+            / (SELECT divisor FROM currency_units),
+          2
+        FROM `chargebee_reports.monthly_mrr_movements` AS movement, latest
+        WHERE movement.metric_month = latest.metric_month
+          AND LOWER(movement.currency_code) = LOWER('{{ filters.currency }}')
+      )
+      ORDER BY sort_order
+
   channel_mix:
     sql: |
       WITH currency_units AS (
@@ -588,7 +629,7 @@ rows:
 
           The first question is simple: **is the business growing, and is that growth durable?** This view keeps committed recurring revenue separate from invoicing and cash. All money is shown in native `{{ filters.currency | upper }}`; no FX conversion is applied.
 
-          Use the tabs for retention cohorts, monetization, and the account-level collection queue. Positive movement adds MRR; contraction and churn remove it.
+          Use the tabs for retention cohorts, monetization, and the account-level collection queue. In the bridge below, the purple series is MRR added and the teal series is MRR lost.
         col: 12
 
   - tab: Overview
@@ -654,12 +695,13 @@ rows:
         x: metric_month
         y: [ending_mrr]
         col: 7
-      - name: Latest-month MRR bridge
+      - name: Latest-month MRR added vs lost
         type: chart
-        chart: waterfall
-        query: latest_mrr_bridge
+        chart: bar
+        query: latest_mrr_summary
         x: movement_label
-        y: [movement_mrr]
+        y: [added_mrr, lost_mrr]
+        stacked: true
         col: 5
 
   - tab: Overview
