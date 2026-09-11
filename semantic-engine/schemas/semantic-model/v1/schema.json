@@ -60,9 +60,12 @@
   "$defs": {
     "source": {
       "type": "object",
-      "required": ["table"],
       "properties": {
         "table": {
+          "type": "string",
+          "minLength": 1
+        },
+        "query": {
           "type": "string",
           "minLength": 1
         }

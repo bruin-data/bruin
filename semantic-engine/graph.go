@@ -196,16 +196,16 @@ func (p *queryPlan) dimensionSQL(binding *dimensionBinding) string {
 
 func (p *queryPlan) fromSQL() string {
 	if len(p.joinOrder) == 0 {
-		return " FROM " + p.engine.model.Source.Table
+		return " FROM " + p.engine.model.SourceRelation()
 	}
 
 	var sql strings.Builder
 	sql.WriteString(" FROM (SELECT * FROM ")
-	sql.WriteString(p.engine.model.Source.Table)
+	sql.WriteString(p.engine.model.SourceRelation())
 	sql.WriteString(") base")
 	for _, spec := range p.joinOrder {
 		sql.WriteString(" LEFT JOIN (SELECT * FROM ")
-		sql.WriteString(spec.model.Source.Table)
+		sql.WriteString(spec.model.SourceRelation())
 		sql.WriteString(") ")
 		sql.WriteString(spec.alias)
 		sql.WriteString(" ON ")

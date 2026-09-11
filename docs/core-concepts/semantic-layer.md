@@ -123,12 +123,15 @@ Semantic query mode cannot be combined with `--query`.
 | `name` | Yes | Unique model name inside the repository. |
 | `label` | No | Human-readable display label. |
 | `description` | No | Longer model description. |
-| `source.table` | Yes | Table, view, or SQL subquery used as the model source. |
+| `source.table` | One of `table` or `query` | Table, view, or parenthesized SQL subquery used as the model source. |
+| `source.query` | One of `table` or `query` | SQL query compiled as `(query) AS <model_name>`. |
 | `primary_key` | No | Primary key used as the default target key for joins into this model. |
 | `joins` | No | Relationships from this model to other semantic models. |
 | `dimensions` | No | Groupable fields. |
 | `metrics` | No | Aggregations and derived metrics. |
 | `segments` | No | Reusable filters. |
+
+Exactly one of `source.table` or `source.query` is required.
 
 `source.table` can be a relation name or a parenthesized query:
 
@@ -140,6 +143,16 @@ source:
       from analytics.orders
       where deleted_at is null
     ) as orders
+```
+
+`source.query` is the dedicated form for the same idea. Bruin wraps it as `(query) AS <model_name>`:
+
+```yaml
+source:
+  query: |
+    select *
+    from analytics.orders
+    where deleted_at is null
 ```
 
 ## Dimensions
@@ -362,9 +375,12 @@ General `query` flags such as `--output`, `--limit`, `--timeout`, and `--export`
 
 ## Validation Rules
 
-Bruin validates semantic models when it loads the repository semantic catalog:
+`bruin validate` loads `semantic/` next to `.bruin.yml` and reports schema and engine errors. Query sources (`source.query` and parenthesized `source.table`) are also dry-run against the pipeline connection when a SQL validator is available. `--fast` still checks model structure.
 
-- `name` and `source.table` are required.
+Bruin also validates semantic models when it loads the repository semantic catalog for `bruin query`:
+
+- `name` is required.
+- Exactly one of `source.table` or `source.query` is required.
 - Metric names, dimension names, and segment names must be unique within a model.
 - Metrics require `expression`.
 - Segments require `filter`.
