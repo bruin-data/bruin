@@ -1,3 +1,4 @@
+<!-- Generated from templates/chargebee-bigquery/README.md. Do not edit directly; run `make sync-template-docs`. -->
 # Chargebee to BigQuery
 
 A Bruin pipeline that ingests Chargebee billing data into BigQuery and models it
@@ -108,9 +109,9 @@ dac serve --dir . --open
 
 ### Dashboard preview
 
-![Chargebee billing analytics dashboard overview](images/chargebee-dashboard-overview.png)
+![Chargebee billing analytics dashboard overview](/chargebee-dashboard-overview.png)
 
-![Chargebee retention and expansion dashboard](images/chargebee-dashboard-retention.png)
+![Chargebee retention and expansion dashboard](/chargebee-dashboard-retention.png)
 
 These previews use synthetic data to demonstrate the dashboard layout, metrics,
 and charts.
