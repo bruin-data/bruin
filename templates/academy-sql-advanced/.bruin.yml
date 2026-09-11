@@ -1,0 +1,31 @@
+default_environment: default
+
+environments:
+  # Bruin's default environment is the local DuckDB path. `local` is an explicit
+  # alias for teaching commands that want to name the destination.
+  default:
+    connections:
+      duckdb:
+        - name: "duckdb-default"
+          path: "academy.duckdb"
+
+  local:
+    connections:
+      duckdb:
+        - name: "duckdb-default"
+          path: "academy.duckdb"
+
+  dev:
+    schema_prefix: dev_
+    connections:
+      duckdb:
+        - name: "duckdb-default"
+          path: "academy-dev.duckdb"
+
+  # Optional cloud path. Set MOTHERDUCK_TOKEN and run with --environment cloud.
+  cloud:
+    connections:
+      motherduck:
+        - name: "duckdb-default"
+          token: "${MOTHERDUCK_TOKEN}"
+          database: "academy_sql"
