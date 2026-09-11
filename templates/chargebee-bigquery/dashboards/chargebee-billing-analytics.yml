@@ -447,27 +447,46 @@ queries:
         SELECT MAX(metric_month) AS metric_month
         FROM `chargebee_reports.monthly_mrr_by_customer`
         WHERE LOWER(currency_code) = LOWER('{{ filters.currency }}')
+      ), invoice_risk AS (
+        SELECT
+          invoice.chargebee_invoice_id,
+          invoice.chargebee_customer_id,
+          invoice.currency_code,
+          invoice.amount_due_minor,
+          CASE
+            WHEN DATE(invoice.invoice_due_at) < DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY) THEN 1
+            WHEN DATE(invoice.invoice_due_at) < CURRENT_DATE() THEN 2
+            ELSE 3
+          END AS urgency_rank
+        FROM `chargebee_stage.invoices` AS invoice
+        WHERE invoice.amount_due_minor > 0
+          AND invoice.invoice_status != 'voided'
+          AND LOWER(invoice.currency_code) = LOWER('{{ filters.currency }}')
+      ), customer_risk AS (
+        SELECT
+          chargebee_customer_id,
+          currency_code,
+          MIN(urgency_rank) AS urgency_rank,
+          COUNT(DISTINCT chargebee_invoice_id) AS invoices,
+          SUM(amount_due_minor) AS open_amount
+        FROM invoice_risk
+        GROUP BY chargebee_customer_id, currency_code
       )
       SELECT
         CASE
-          WHEN DATE(invoice.invoice_due_at) < DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
-            THEN 'Critical · 30+ days overdue'
-          WHEN DATE(invoice.invoice_due_at) < CURRENT_DATE()
-            THEN 'Overdue · 1–29 days'
+          WHEN customer_risk.urgency_rank = 1 THEN 'Critical · 30+ days overdue'
+          WHEN customer_risk.urgency_rank = 2 THEN 'Overdue · 1–29 days'
           ELSE 'Due · not overdue'
         END AS urgency,
-        COUNT(DISTINCT invoice.chargebee_invoice_id) AS invoices,
-        SUM(invoice.amount_due_minor) / (SELECT divisor FROM currency_units) AS open_amount,
+        SUM(customer_risk.invoices) AS invoices,
+        SUM(customer_risk.open_amount) / (SELECT divisor FROM currency_units) AS open_amount,
         SUM(COALESCE(mrr.ending_mrr_minor, 0)) / (SELECT divisor FROM currency_units) AS mrr_exposed
-      FROM `chargebee_stage.invoices` AS invoice
+      FROM customer_risk
       CROSS JOIN latest_mrr
       LEFT JOIN `chargebee_reports.monthly_mrr_by_customer` AS mrr
-        ON invoice.chargebee_customer_id = mrr.chargebee_customer_id
-        AND invoice.currency_code = mrr.currency_code
+        ON customer_risk.chargebee_customer_id = mrr.chargebee_customer_id
+        AND customer_risk.currency_code = mrr.currency_code
         AND mrr.metric_month = latest_mrr.metric_month
-      WHERE invoice.amount_due_minor > 0
-        AND invoice.invoice_status != 'voided'
-        AND LOWER(invoice.currency_code) = LOWER('{{ filters.currency }}')
       GROUP BY 1
       ORDER BY CASE urgency
         WHEN 'Critical · 30+ days overdue' THEN 1
