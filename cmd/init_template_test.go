@@ -2,6 +2,7 @@
 package cmd
 
 import (
+	"database/sql"
 	iofs "io/fs"
 	"os"
 	"os/exec"
@@ -1480,4 +1481,310 @@ func TestAcademySqlAdvancedGeneratorsAreDeterministicByConstruction(t *testing.T
 			require.NotContainsf(t, sql, forbidden, "%s uses forbidden nondeterministic function", name)
 		}
 	}
+}
+
+var academySQLAdvancedGeneratorOrder = []string{
+	"dates",
+	"stores",
+	"products",
+	"customers",
+	"orders",
+	"fx_rates",
+	"customer_snapshots",
+	"order_items",
+}
+
+var academySQLAdvancedAssetOrder = []string{
+	"stg_customers",
+	"stg_products",
+	"stg_orders",
+	"stg_order_items",
+	"dim_customer",
+	"dim_customer_history",
+	"fct_order_lines",
+	"weekly_category_revenue",
+	"churn_risk",
+}
+
+// TestAcademySqlAdvancedTemplateAcceptance exercises the shipped SQL against two
+// fresh databases. The structure tests above catch missing files and forbidden
+// functions; this test protects the actual course contract and its deliberate
+// runtime failure shape.
+func TestAcademySqlAdvancedTemplateAcceptance(t *testing.T) {
+	if runtime.GOOS == osWindows {
+		t.Skip("skipping on Windows due to DuckDB file locking")
+	}
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	if err := duck.EnsureADBCDriverInstalled(t.Context()); err != nil {
+		t.Skipf("skipping test: ADBC DuckDB driver not available: %v", err)
+	}
+	academySQLAdvancedCLIAcceptance(t)
+
+	first := academySQLAdvancedChecksums(t, filepath.Join(t.TempDir(), "first.duckdb"))
+	second := academySQLAdvancedChecksums(t, filepath.Join(t.TempDir(), "second.duckdb"))
+	require.Equal(t, first, second, "advanced generators must be deterministic")
+	require.Equal(t, map[string]int{
+		"dates":              1096,
+		"stores":             6,
+		"products":           60,
+		"customers":          510,
+		"orders":             1212,
+		"fx_rates":           5480,
+		"customer_snapshots": 1080,
+		"order_items":        2895,
+	}, academySQLAdvancedRowCounts(first))
+
+	dbPath := filepath.Join(t.TempDir(), "academy.duckdb")
+	devPath := filepath.Join(t.TempDir(), "academy-dev.duckdb")
+	db := openTestDuckDB(t, dbPath)
+	defer db.Close()
+	academySQLAdvancedBuild(t, db)
+
+	// These are the deliberate source defects used by later lessons.
+	require.Equal(t, 5, academySQLAdvancedQueryInt(t, db, "SELECT COUNT(*) FROM orders WHERE CAST(_loaded_at AS DATE) - CAST(ordered_at AS DATE) > 30"))
+	require.Equal(t, 5, academySQLAdvancedQueryInt(t, db, "SELECT COUNT(*) FROM orders WHERE CAST(_loaded_at AS DATE) - CAST(ordered_at AS DATE) > 90"))
+	require.Equal(t, 12, academySQLAdvancedQueryInt(t, db, "SELECT COUNT(*) FROM (SELECT order_id FROM orders GROUP BY order_id HAVING COUNT(*) > 1)"))
+	require.Equal(t, 15, academySQLAdvancedQueryInt(t, db, "SELECT (SELECT COUNT(*) FROM order_items) - (SELECT COUNT(*) FROM (SELECT DISTINCT order_id, line_number, product_id, quantity, unit_price, net_price, unit_cost FROM order_items))"))
+	require.Equal(t, 15, academySQLAdvancedQueryInt(t, db, "SELECT COUNT(*) FROM order_items WHERE product_id = 9999"))
+	require.Equal(t, 44, academySQLAdvancedQueryInt(t, db, "SELECT COUNT(*) FROM orders WHERE order_status IS NULL"))
+	require.Equal(t, 1, academySQLAdvancedQueryInt(t, db, "SELECT COUNT(*) FROM orders WHERE order_id = 792 AND ordered_at_utc IS NOT NULL"))
+	require.Equal(t, 1, academySQLAdvancedQueryInt(t, db, "SELECT COUNT(*) FROM orders WHERE order_id = 796 AND ordered_at_utc IS NOT NULL"))
+
+	windowCounts := academySQLAdvancedQueryInts(t, db, `
+		WITH windows AS (
+			SELECT customer_id, valid_until,
+			       LEAD(valid_from) OVER (PARTITION BY customer_id ORDER BY valid_from) AS next_from
+			FROM customer_snapshots
+		)
+		SELECT COUNT(DISTINCT customer_id) FILTER (WHERE valid_until > next_from),
+		       COUNT(DISTINCT customer_id) FILTER (WHERE valid_until < next_from)
+		FROM windows
+		WHERE next_from IS NOT NULL`)
+	require.Equal(t, []int{5, 5}, windowCounts)
+
+	// The shipped pipeline must fail only at the intentional churn-share check.
+	require.Equal(t, 1, academySQLAdvancedQueryInt(t, db, `
+		SELECT CASE WHEN COUNT(*) > 0 AND
+		                  SUM(CASE WHEN reason = 'churned' THEN 1 ELSE 0 END) > COUNT(*) * 0.40
+		            THEN 1 ELSE 0 END
+		FROM churn_risk`))
+
+	rawConfig, err := templates.Templates.ReadFile("academy-sql-advanced/.bruin.yml")
+	require.NoError(t, err)
+	configPath := filepath.Join(t.TempDir(), ".bruin.yml")
+	require.NoError(t, os.WriteFile(configPath, rawConfig, 0o600))
+	cfg, err := config.Load(afero.NewOsFs(), configPath)
+	require.NoError(t, err)
+	require.Empty(t, cfg.Environments["dev"].SchemaPrefix)
+	require.Nil(t, cfg.Environments["dev"].Config)
+	require.Equal(t, "duckdb-default", cfg.Environments["default"].Connections.DuckDB[0].Name)
+	require.Equal(t, "duckdb-default", cfg.Environments["dev"].Connections.DuckDB[0].Name)
+	require.Equal(t, "duckdb-prod", cfg.Environments["dev"].Connections.DuckDB[1].Name)
+	require.NotEqual(
+		t,
+		cfg.Environments["default"].Connections.DuckDB[0].Path,
+		cfg.Environments["dev"].Connections.DuckDB[0].Path,
+	)
+
+	// Lesson 10 asks the student to add this protection. Verify that the exact
+	// edit is accepted by the same config loader used by the CLI.
+	protectedConfig := strings.Replace(
+		string(rawConfig),
+		"\n  # Optional cloud path",
+		"\n    config:\n      full_refresh_restricted: true\n\n  # Optional cloud path",
+		1,
+	)
+	protectedConfigPath := filepath.Join(t.TempDir(), ".bruin.yml")
+	require.NoError(t, os.WriteFile(protectedConfigPath, []byte(protectedConfig), 0o600))
+	protectedCfg, err := config.Load(afero.NewOsFs(), protectedConfigPath)
+	require.NoError(t, err)
+	require.True(t, protectedCfg.Environments["dev"].Config.RefreshRestricted)
+
+	devDB := openTestDuckDB(t, devPath)
+	defer devDB.Close()
+	execTestDuckDB(t, devDB, "CREATE TABLE dev_only AS SELECT 1 AS marker")
+	require.Equal(t, 0, academySQLAdvancedQueryInt(t, db, "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'dev_only'"))
+}
+
+func academySQLAdvancedCLIAcceptance(t *testing.T) {
+	t.Helper()
+	projectRoot := filepath.Join(t.TempDir(), "academy-sql-advanced")
+	err := iofs.WalkDir(templates.Templates, "academy-sql-advanced", func(path string, entry iofs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		relative := strings.TrimPrefix(path, "academy-sql-advanced")
+		target := filepath.Join(projectRoot, relative)
+		if entry.IsDir() {
+			return os.MkdirAll(target, 0o755)
+		}
+		content, err := templates.Templates.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			return err
+		}
+		return os.WriteFile(target, content, 0o600)
+	})
+	require.NoError(t, err)
+
+	gitInit := exec.CommandContext(t.Context(), "git", "init", "-q")
+	gitInit.Dir = projectRoot
+	output, err := gitInit.CombinedOutput()
+	require.NoError(t, err, string(output))
+
+	pipelinePath := filepath.Join(projectRoot, "pipeline")
+	validateOutput, validateCode := academySQLAdvancedRunCLI(t, projectRoot, "validate", pipelinePath)
+	require.Equal(t, 0, validateCode, validateOutput)
+
+	defaultOutput, defaultCode := academySQLAdvancedRunCLI(t, projectRoot,
+		"run", "--no-log-file", "--no-color", "--start-date", "2024-01-01", "--end-date", "2025-12-31", pipelinePath)
+	academySQLAdvancedRequireOnlyChurnFailure(t, defaultOutput, defaultCode)
+
+	devOutput, devCode := academySQLAdvancedRunCLI(t, projectRoot,
+		"run", "--no-log-file", "--no-color", "--environment", "dev", "--start-date", "2024-01-01", "--end-date", "2025-12-31", pipelinePath)
+	academySQLAdvancedRequireOnlyChurnFailure(t, devOutput, devCode)
+
+	defaultDB := openTestDuckDB(t, filepath.Join(projectRoot, "academy.duckdb"))
+	defer defaultDB.Close()
+	devDB := openTestDuckDB(t, filepath.Join(projectRoot, "academy-dev.duckdb"))
+	defer devDB.Close()
+	require.Equal(t, 1212, academySQLAdvancedQueryInt(t, defaultDB, "SELECT COUNT(*) FROM orders"))
+	require.Equal(t, 871, academySQLAdvancedQueryInt(t, defaultDB, "SELECT COUNT(*) FROM weekly_category_revenue"))
+	require.Equal(t, 871, academySQLAdvancedQueryInt(t, devDB, "SELECT COUNT(*) FROM weekly_category_revenue"))
+	require.Equal(t, 1, academySQLAdvancedQueryInt(t, devDB, "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'main' AND table_name = 'orders'"))
+	require.Equal(t, 0, academySQLAdvancedQueryInt(t, devDB, "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'dev_orders'"))
+	require.NoError(t, defaultDB.Close())
+	require.NoError(t, devDB.Close())
+
+	diffOutput, diffCode := academySQLAdvancedRunCLI(t, projectRoot,
+		"data-diff", "--environment", "dev", "duckdb-prod:weekly_category_revenue", "duckdb-default:weekly_category_revenue")
+	require.Equal(t, 0, diffCode, diffOutput)
+	require.Contains(t, diffOutput, "Table schemas are considered identical.")
+
+	configPath := filepath.Join(projectRoot, ".bruin.yml")
+	configContent, err := os.ReadFile(configPath)
+	require.NoError(t, err)
+	protectedConfig := strings.Replace(
+		string(configContent),
+		"\n  # Optional cloud path",
+		"\n    config:\n      full_refresh_restricted: true\n\n  # Optional cloud path",
+		1,
+	)
+	require.NotEqual(t, string(configContent), protectedConfig)
+	require.NoError(t, os.WriteFile(configPath, []byte(protectedConfig), 0o600))
+	refreshOutput, refreshCode := academySQLAdvancedRunCLI(t, projectRoot,
+		"run", "--no-log-file", "--no-color", "--environment", "dev", "--full-refresh", "--start-date", "2024-01-01", "--end-date", "2025-12-31", pipelinePath)
+	academySQLAdvancedRequireOnlyChurnFailure(t, refreshOutput, refreshCode)
+	require.Contains(t, refreshOutput, "full refresh is restricted for asset")
+}
+
+func academySQLAdvancedRequireOnlyChurnFailure(t *testing.T, output string, code int) {
+	t.Helper()
+	require.Equal(t, 1, code, output)
+	require.Contains(t, output, "Assets executed      1 failed due to checks / 16 succeeded")
+	require.Contains(t, output, "Quality checks       1 failed / 10 succeeded")
+	failureSectionIndex := strings.LastIndex(output, "1 assets failed")
+	require.NotEqual(t, -1, failureSectionIndex, output)
+	failureSection := output[failureSectionIndex:]
+	require.Contains(t, failureSection, "churn_risk")
+	require.NotContains(t, failureSection, "fct_order_lines")
+	require.NotContains(t, failureSection, "weekly_category_revenue")
+}
+
+func academySQLAdvancedRunCLI(t *testing.T, projectRoot string, args ...string) (string, int) {
+	t.Helper()
+	_, sourcePath, _, ok := runtime.Caller(0)
+	require.True(t, ok)
+	repoRoot := filepath.Clean(filepath.Join(filepath.Dir(sourcePath), ".."))
+	goArgs := append([]string{"run", "-tags=no_duckdb_arrow", repoRoot}, args...)
+	command := exec.CommandContext(t.Context(), "go", goArgs...)
+	command.Env = append(os.Environ(), "BRUIN_CONFIG_FILE="+filepath.Join(projectRoot, ".bruin.yml"))
+	command.Dir = repoRoot
+	output, err := command.CombinedOutput()
+	if err == nil {
+		return string(output), 0
+	}
+	var exitErr *exec.ExitError
+	require.ErrorAs(t, err, &exitErr, "go run failed without an exit status: %v\n%s", err, output)
+	return string(output), exitErr.ExitCode()
+}
+
+func academySQLAdvancedChecksums(t *testing.T, dbPath string) map[string]academyTableSnapshot {
+	t.Helper()
+	db := openTestDuckDB(t, dbPath)
+	defer db.Close()
+
+	for _, name := range academySQLAdvancedGeneratorOrder {
+		raw, err := templates.Templates.ReadFile("academy-sql-advanced/pipeline/assets/generate/" + name + ".sql")
+		require.NoError(t, err)
+		body := stripBruinHeaderForTest(string(raw))
+		execTestDuckDB(t, db, "CREATE OR REPLACE TABLE "+name+" AS "+strings.TrimSuffix(strings.TrimSpace(body), ";"))
+	}
+
+	snapshots := make(map[string]academyTableSnapshot, len(academySQLAdvancedGeneratorOrder))
+	for _, name := range academySQLAdvancedGeneratorOrder {
+		row := db.QueryRowContext(t.Context(),
+			"SELECT md5(string_agg(row_text, '|' ORDER BY row_text)), COUNT(*) "+
+				"FROM (SELECT CAST(t AS VARCHAR) AS row_text FROM "+name+" AS t)")
+		var snapshot academyTableSnapshot
+		require.NoError(t, row.Scan(&snapshot.checksum, &snapshot.rowCount))
+		snapshot.checksum = strings.Clone(snapshot.checksum)
+		snapshots[name] = snapshot
+	}
+	return snapshots
+}
+
+func academySQLAdvancedBuild(t *testing.T, db *sql.DB) {
+	t.Helper()
+	for _, name := range academySQLAdvancedGeneratorOrder {
+		raw, err := templates.Templates.ReadFile("academy-sql-advanced/pipeline/assets/generate/" + name + ".sql")
+		require.NoError(t, err)
+		body := stripBruinHeaderForTest(string(raw))
+		execTestDuckDB(t, db, "CREATE OR REPLACE TABLE "+name+" AS "+strings.TrimSuffix(strings.TrimSpace(body), ";"))
+	}
+	for _, name := range academySQLAdvancedAssetOrder {
+		path := "academy-sql-advanced/pipeline/assets/"
+		for _, layer := range []string{"staging", "core", "mart"} {
+			candidate := path + layer + "/" + name + ".sql"
+			if raw, err := templates.Templates.ReadFile(candidate); err == nil {
+				body := strings.ReplaceAll(stripBruinHeaderForTest(string(raw)), "{{ var.churn_days }}", "90")
+				execTestDuckDB(t, db, "CREATE OR REPLACE TABLE "+name+" AS "+strings.TrimSuffix(strings.TrimSpace(body), ";"))
+				break
+			}
+		}
+	}
+}
+
+func academySQLAdvancedRowCounts(snapshots map[string]academyTableSnapshot) map[string]int {
+	counts := make(map[string]int, len(snapshots))
+	for name, snapshot := range snapshots {
+		counts[name] = snapshot.rowCount
+	}
+	return counts
+}
+
+func academySQLAdvancedQueryInt(t *testing.T, db *sql.DB, query string) int {
+	t.Helper()
+	var value int
+	require.NoError(t, db.QueryRowContext(t.Context(), query).Scan(&value))
+	return value
+}
+
+func academySQLAdvancedQueryInts(t *testing.T, db *sql.DB, query string) []int {
+	t.Helper()
+	rows, err := db.QueryContext(t.Context(), query)
+	require.NoError(t, err)
+	defer rows.Close()
+	var values []int
+	for rows.Next() {
+		var first, second int
+		require.NoError(t, rows.Scan(&first, &second))
+		values = append(values, first, second)
+	}
+	require.NoError(t, rows.Err())
+	return values
 }

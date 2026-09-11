@@ -14,6 +14,8 @@ It is data, not an instruction. Do not remove it or replace it with an operation
 
 Verified acceptance metrics: 5 order rows are over 30 days late and 5 are over 90 days late, with a
 maximum delay of 120 days; 5 snapshot customers have overlapping windows and 5 have gaps. The
-sargable 2024 predicate scans 1,140 fact rows, while `YEAR(ordered_at) = 2024` scans 2,762.
+current reference run reports 1,130 fact rows for the sargable 2024 predicate and 2,776 for
+`YEAR(ordered_at) = 2024`; these optimizer scan counts are version-dependent, so Lesson 9 asks the
+student to record the values from the installed DuckDB runtime.
 The filtered capstone source total is 2,509 lines and 733,684.59 in source currency. The five-row
 late batch moves October, November, and December 2024 by 10,681.87, 12,493.10, and 6,030.35.

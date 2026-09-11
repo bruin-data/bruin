@@ -35,6 +35,9 @@ columns:
     type: varchar
   - name: category_name
     type: varchar
+    checks:
+      - name: accepted_values
+        value: ['Apparel', 'Beauty', 'Books', 'Electronics', 'Garden', 'Home & Kitchen', 'Sports & Outdoors', 'Toys & Games', 'Unknown']
   - name: quantity
     type: integer
   - name: net_price

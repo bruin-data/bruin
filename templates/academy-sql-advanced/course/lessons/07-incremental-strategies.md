@@ -33,13 +33,18 @@ Next replace the empty query in `pipeline/assets/core/dim_customer_history.sql` 
 projection of `customer_snapshots`, change its materialization strategy to `scd2_by_time`, declare
 `incremental_key: snapshot_at`, run that asset once with
 `bruin run --full-refresh pipeline/assets/core/dim_customer_history.sql`, and record the generated
-validity columns and row count in `docs/scd2-decision.md`. Do not full-refresh either mart.
+validity columns and row count in `docs/scd2-decision.md`. Before changing the stub, use
+`customer_snapshots` to identify the five customers with overlapping validity windows and the five
+with gaps (`valid_until` compared with the next `valid_from`). State which invariant your SCD2
+contract will enforce and record the query and result in the same document. Do not full-refresh
+either mart.
 
 ## Rubric (for `review my work`)
 - [ ] The decision names `ordered_at` as business time and `_loaded_at` as ingestion time.
 - [ ] The same range run twice has identical row count and revenue total on both runs.
 - [ ] The evidence compares `delete+insert` with `time_interval`, names the chosen strategy, and includes `incremental_key: iso_week`, `time_granularity: date`, and a bounded date predicate.
 - [ ] The SCD2 asset uses `scd2_by_time` with `incremental_key: snapshot_at`, preserves customer history, and records why its first run needs `--full-refresh`.
+- [ ] An evidence query identifies five overlapping and five gapped customer validity sequences, and the chosen SCD2 window invariant is explicit.
 
 ## Done signal
 You can make reruns safe by matching the strategy to the grain and timestamps. Carry forward: late ingestion tests whether that choice is really correct.
