@@ -6234,8 +6234,6 @@ func CloudNotificationRules() *cli.Command {
 			cloudNotificationRulesList(),
 			cloudNotificationRulesCreate(),
 			cloudNotificationRulesUpdate(),
-			cloudNotificationRulesToggle("enable", true),
-			cloudNotificationRulesToggle("disable", false),
 			cloudNotificationRulesDelete(),
 		},
 	}
@@ -6440,41 +6438,6 @@ func cloudNotificationRulesUpdate() *cli.Command {
 				return cli.Exit("", 1)
 			}
 			if err := printNotificationRuleResult(rule, output, "Updated"); err != nil {
-				printError(err, output, "Failed to format notification rule")
-				return cli.Exit("", 1)
-			}
-			return nil
-		},
-	}
-}
-
-func cloudNotificationRulesToggle(name string, enabled bool) *cli.Command {
-	action := strings.ToUpper(name[:1]) + name[1:]
-	return &cli.Command{
-		Name:  name,
-		Usage: action + " a notification rule",
-		Flags: []cli.Flag{apiKeyFlag(), outputFlag(), notificationRuleIDFlag()},
-		Action: func(ctx context.Context, c *cli.Command) error {
-			defer RecoverFromPanic()
-			output := c.String("output")
-
-			id, err := notificationRuleID(c)
-			if err != nil {
-				printError(err, output, "Invalid notification rule ID")
-				return cli.Exit("", 1)
-			}
-			client, err := newCloudClient(c)
-			if err != nil {
-				printError(err, output, "Failed to create API client")
-				return cli.Exit("", 1)
-			}
-
-			rule, err := client.SetNotificationRuleEnabled(ctx, id, enabled)
-			if err != nil {
-				printError(err, output, "Failed to "+name+" notification rule")
-				return cli.Exit("", 1)
-			}
-			if err := printNotificationRuleResult(rule, output, action+"d"); err != nil {
 				printError(err, output, "Failed to format notification rule")
 				return cli.Exit("", 1)
 			}

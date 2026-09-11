@@ -1168,15 +1168,14 @@ deliveries:
     channels: ["#alerts"]
 ```
 
-Enable, disable, or delete a rule by ID:
+Set `enabled: true` or `enabled: false` in the full rule document and use `update` to enable or disable it. Delete a rule by ID:
 
 ```bash
-bruin cloud notification-rules disable --notification-rule-id 42
-bruin cloud notification-rules enable --notification-rule-id 42
+bruin cloud notification-rules update --notification-rule-id 42 --rule-file ./notification-rule.yml
 bruin cloud notification-rules delete --notification-rule-id 42
 ```
 
-`create`, `update`, and `delete` require the `notification-rule:manage` token ability. `schema` and `list` require `notification-rule:list`. `enable` and `disable` read the current rule before replacing it, so they require both abilities.
+`create`, `update`, and `delete` require the `notification-rule:manage` token ability. `schema` and `list` require `notification-rule:list`.
 
 ---
 

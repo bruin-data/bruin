@@ -812,13 +812,13 @@ func TestCloudNotificationRulesCommand_Help(t *testing.T) {
 	cmd := CloudNotificationRules()
 	require.NotNil(t, cmd)
 	assert.Equal(t, "notification-rules", cmd.Name)
-	require.Len(t, cmd.Commands, 7)
+	require.Len(t, cmd.Commands, 5)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
 		subNames[i] = sub.Name
 	}
-	assert.ElementsMatch(t, []string{"schema", "list", "create", "update", "enable", "disable", "delete"}, subNames)
+	assert.ElementsMatch(t, []string{"schema", "list", "create", "update", "delete"}, subNames)
 }
 
 func TestNotificationRuleFields(t *testing.T) {

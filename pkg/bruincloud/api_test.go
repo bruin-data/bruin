@@ -1723,35 +1723,6 @@ func TestUpdateNotificationRule(t *testing.T) {
 	assert.False(t, rule.Enabled)
 }
 
-func TestSetNotificationRuleEnabled(t *testing.T) {
-	t.Parallel()
-	requests := 0
-	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-		requests++
-		switch requests {
-		case 1:
-			assert.Equal(t, http.MethodGet, r.Method)
-			assert.Equal(t, "/notification-rules", r.URL.Path)
-			_, _ = w.Write([]byte(`{"rules":[{"id":7,"name":"Failures","enabled":true,"subscriptions":[{"event_types":["run_failed"]}],"deliveries":[{"type":"slack","channels":["alerts"]}]}]}`))
-		case 2:
-			assert.Equal(t, http.MethodPut, r.Method)
-			assert.Equal(t, "/notification-rules/7", r.URL.Path)
-			body := readJSON(t, r)
-			assert.Equal(t, "Failures", body["name"])
-			assert.Equal(t, false, body["enabled"])
-			assert.Equal(t, []any{map[string]any{"event_types": []any{"run_failed"}}}, body["subscriptions"])
-			_, _ = w.Write([]byte(`{"rule":{"id":7,"name":"Failures","enabled":false,"subscriptions":[],"deliveries":[]}}`))
-		default:
-			t.Fatalf("unexpected request %d", requests)
-		}
-	})
-
-	rule, err := client.SetNotificationRuleEnabled(t.Context(), 7, false)
-	require.NoError(t, err)
-	assert.False(t, rule.Enabled)
-	assert.Equal(t, 2, requests)
-}
-
 func TestDeleteNotificationRule(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
