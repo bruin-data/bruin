@@ -2,7 +2,11 @@ package python
 
 import (
 	"archive/zip"
+	"bytes"
 	"context"
+	"crypto/sha256"
+	_ "embed"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -23,10 +27,10 @@ import (
 )
 
 const (
-	ingestrInstallerURL          = "https://getbruin.com/install/ingestr"
-	ingestrInstallerShellCommand = `curl -LsSf "$1" | sh -s -- -b "$2" "$3"`
-	ingestrReleaseDownloadURL    = "https://github.com/bruin-data/ingestr/releases/download"
-	maxIngestrBinarySize         = 512 * 1024 * 1024
+	ingestrReleaseDownloadURL = "https://github.com/bruin-data/ingestr/releases/download"
+	ingestrScriptDownloadURL  = "https://raw.githubusercontent.com/bruin-data/ingestr"
+	maxIngestrBinarySize      = 512 * 1024 * 1024
+	maxIngestrScriptSize      = 1024 * 1024
 )
 
 // ingestrInstallMu prevents concurrent installations within the same Bruin
@@ -34,15 +38,26 @@ const (
 // directory and the completed binary is moved into place atomically.
 var ingestrInstallMu sync.Mutex
 
+//go:embed ingestr_hashes.json
+var ingestrHashesJSON []byte
+
 type ingestrInstallFunc func(ctx context.Context, output io.Writer, installDir, version string) error
+
+type ingestrReleaseHashes struct {
+	Archives        map[string]string `json:"archives"`
+	InstallerCommit string            `json:"installer_commit"`
+	InstallerSHA256 string            `json:"installer_sha256"`
+}
 
 type ingestrInstallerRuntime struct {
 	goos               string
 	goarch             string
-	findShell          func(string) (string, error)
-	runShell           func(context.Context, io.Writer, string, []string) error
+	hashes             map[string]ingestrReleaseHashes
 	httpClient         *http.Client
 	releaseDownloadURL string
+	scriptDownloadURL  string
+	findShell          func(string) (string, error)
+	runScript          func(context.Context, io.Writer, string, []byte, []string) error
 }
 
 // IngestrChecker installs and locates standalone ingestr releases.
@@ -51,7 +66,7 @@ type IngestrChecker struct {
 }
 
 // EnsureIngestrInstalled returns the path to an exact ingestr release, installing
-// it with the official curl-based installer when it is not already present.
+// it from an archive verified against embedded hashes when not already present.
 func (c *IngestrChecker) EnsureIngestrInstalled(ctx context.Context, version string) (string, error) {
 	if !semver.IsValid("v" + version) {
 		return "", fmt.Errorf("invalid ingestr version %q", version)
@@ -139,64 +154,94 @@ func ingestrBinaryName(goos string) string {
 }
 
 func runIngestrInstaller(ctx context.Context, output io.Writer, installDir, version string) error {
+	var hashes map[string]ingestrReleaseHashes
+	if err := json.Unmarshal(ingestrHashesJSON, &hashes); err != nil {
+		return errors.Wrap(err, "invalid embedded ingestr hashes")
+	}
 	installer := ingestrInstallerRuntime{
 		goos:               runtime.GOOS,
 		goarch:             runtime.GOARCH,
-		findShell:          exec.LookPath,
-		runShell:           runIngestrShellInstaller,
+		hashes:             hashes,
 		httpClient:         &http.Client{Timeout: 5 * time.Minute},
 		releaseDownloadURL: ingestrReleaseDownloadURL,
+		scriptDownloadURL:  ingestrScriptDownloadURL,
+		findShell:          exec.LookPath,
+		runScript:          runVerifiedIngestrScript,
 	}
 	return installer.install(ctx, output, installDir, version)
 }
 
 func (r ingestrInstallerRuntime) install(ctx context.Context, output io.Writer, installDir, version string) error {
+	archiveName, err := ingestrArchiveName(r.goos, r.goarch)
+	if err != nil {
+		return err
+	}
+	release := r.hashes[version]
+	expected := release.Archives[archiveName]
+	if len(expected) != sha256.Size*2 {
+		return fmt.Errorf("no trusted embedded ingestr hash for v%s %s/%s; upgrade Bruin or use its pinned ingestr version", version, r.goos, r.goarch)
+	}
+
 	shell, err := r.findShell("sh")
 	if err != nil {
 		if r.goos == "windows" {
-			return r.installWindowsRelease(ctx, output, installDir, version)
+			return r.installWindowsRelease(ctx, output, installDir, version, archiveName, expected)
 		}
 		return errors.Wrap(err, "the ingestr installer requires sh")
 	}
-
-	if err := r.runShell(ctx, output, shell, ingestrInstallerCommandArgs(installDir, version, r.goos)); err != nil {
-		if r.goos == "windows" && ctx.Err() == nil {
-			if fallbackErr := r.installWindowsRelease(ctx, output, installDir, version); fallbackErr != nil {
-				return fmt.Errorf(
-					"failed to install ingestr v%s with the shell installer: %w; native Windows fallback failed: %w",
-					version,
-					err,
-					fallbackErr,
-				)
-			}
-			return nil
-		}
-		return errors.Wrapf(err, "failed to install ingestr v%s", version)
+	if len(release.InstallerCommit) != 40 || len(release.InstallerSHA256) != sha256.Size*2 {
+		return fmt.Errorf("no trusted embedded ingestr installer hash for v%s", version)
+	}
+	scriptURL := strings.TrimRight(r.scriptDownloadURL, "/") + "/" + url.PathEscape(release.InstallerCommit) + "/install.sh"
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, scriptURL, nil)
+	if err != nil {
+		return errors.Wrap(err, "failed to create ingestr installer request")
+	}
+	response, err := r.httpClient.Do(request)
+	if err != nil {
+		return errors.Wrap(err, "failed to download ingestr installer")
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to download ingestr installer: server returned %s", response.Status)
+	}
+	script, err := io.ReadAll(io.LimitReader(response.Body, maxIngestrScriptSize+1))
+	if err != nil {
+		return errors.Wrap(err, "failed to read ingestr installer")
+	}
+	if len(script) > maxIngestrScriptSize || fmt.Sprintf("%x", sha256.Sum256(script)) != release.InstallerSHA256 {
+		return fmt.Errorf("ingestr installer SHA-256 verification failed")
+	}
+	if r.goos == "windows" {
+		// Git Bash/MSYS accepts drive-letter paths in slash form.
+		installDir = strings.ReplaceAll(installDir, `\`, "/")
+	}
+	args := []string{"-s", "--", "-b", installDir, "-s", expected, "v" + version}
+	if err := r.runScript(ctx, output, shell, script, args); err != nil {
+		return errors.Wrapf(err, "verified ingestr v%s installer failed", version)
 	}
 	return nil
 }
 
-func runIngestrShellInstaller(ctx context.Context, output io.Writer, shell string, args []string) error {
+func runVerifiedIngestrScript(ctx context.Context, output io.Writer, shell string, script []byte, args []string) error {
 	cmd := exec.CommandContext(ctx, shell, args...) //nolint:gosec
-	cmd.Env = environmentWithOverride(os.Environ(), "SHELL", "bruin-installer")
+	if runtime.GOOS == "windows" {
+		configureCommandCancellation(cmd)
+	} else {
+		// Give the installer's TERM trap time to stop downloads and clean up.
+		configureManagedCmd(cmd)
+	}
+	// Execute exactly the bytes verified in memory, never re-fetch the script.
+	cmd.Stdin = bytes.NewReader(script)
 	cmd.Stdout = output
 	cmd.Stderr = output
+	cmd.Env = append(os.Environ(), "SHELL=bruin-installer")
 	return cmd.Run()
 }
 
-func (r ingestrInstallerRuntime) installWindowsRelease(
-	ctx context.Context,
-	output io.Writer,
-	installDir string,
-	version string,
-) error {
-	archiveName, err := windowsIngestrArchiveName(r.goarch)
-	if err != nil {
-		return err
-	}
-
+func (r ingestrInstallerRuntime) installWindowsRelease(ctx context.Context, output io.Writer, installDir, version, archiveName, expected string) error {
 	downloadURL := strings.TrimRight(r.releaseDownloadURL, "/") + "/" + url.PathEscape("v"+version) + "/" + archiveName
-	_, _ = fmt.Fprintf(output, "Downloading ingestr v%s for Windows...\n", version)
+	_, _ = fmt.Fprintf(output, "Downloading ingestr v%s for %s/%s...\n", version, r.goos, r.goarch)
 
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
 	if err != nil {
@@ -212,14 +257,15 @@ func (r ingestrInstallerRuntime) installWindowsRelease(
 		return fmt.Errorf("failed to download ingestr v%s: server returned %s", version, response.Status)
 	}
 
-	archiveFile, err := os.CreateTemp(installDir, ".ingestr-*.zip")
+	archiveFile, err := os.CreateTemp(installDir, ".ingestr-*")
 	if err != nil {
 		return errors.Wrap(err, "failed to create temporary ingestr archive")
 	}
 	archivePath := archiveFile.Name()
 	defer os.Remove(archivePath)
 
-	_, copyErr := io.Copy(archiveFile, response.Body)
+	hash := sha256.New()
+	written, copyErr := io.Copy(io.MultiWriter(archiveFile, hash), io.LimitReader(response.Body, maxIngestrBinarySize+1))
 	closeErr := archiveFile.Close()
 	if copyErr != nil {
 		return errors.Wrap(copyErr, "failed to save ingestr release archive")
@@ -227,15 +273,24 @@ func (r ingestrInstallerRuntime) installWindowsRelease(
 	if closeErr != nil {
 		return errors.Wrap(closeErr, "failed to close ingestr release archive")
 	}
+	if written > maxIngestrBinarySize || fmt.Sprintf("%x", hash.Sum(nil)) != expected {
+		return fmt.Errorf("ingestr v%s %s archive SHA-256 verification failed", version, archiveName)
+	}
 
 	return extractWindowsIngestrArchive(archivePath, installDir)
 }
 
-func windowsIngestrArchiveName(goarch string) (string, error) {
-	if goarch != "amd64" {
-		return "", fmt.Errorf("ingestr standalone releases do not support windows/%s", goarch)
+func ingestrArchiveName(goos, goarch string) (string, error) {
+	osName := map[string]string{"linux": "Linux", "darwin": "Darwin", "windows": "Windows"}[goos]
+	archName := map[string]string{"amd64": "x86_64", "arm64": "arm64"}[goarch]
+	if osName == "" || archName == "" || (goos == "windows" && goarch != "amd64") {
+		return "", fmt.Errorf("ingestr standalone releases do not support %s/%s", goos, goarch)
 	}
-	return "ingestr_Windows_x86_64.zip", nil
+	ext := ".tar.gz"
+	if goos == "windows" {
+		ext = ".zip"
+	}
+	return "ingestr_" + osName + "_" + archName + ext, nil
 }
 
 func extractWindowsIngestrArchive(archivePath, installDir string) error {
@@ -285,31 +340,4 @@ func extractFileFromZip(source *zip.File, destination string) error {
 		return errors.Wrap(fileCloseErr, "failed to close ingestr binary")
 	}
 	return nil
-}
-
-func ingestrInstallerCommandArgs(installDir, version, goos string) []string {
-	if goos == "windows" {
-		// Git Bash/MSYS understands drive-letter paths in slash form.
-		installDir = strings.ReplaceAll(installDir, `\`, "/")
-	}
-	return []string{
-		"-c",
-		ingestrInstallerShellCommand,
-		"ingestr-installer",
-		ingestrInstallerURL,
-		installDir,
-		"v" + version,
-	}
-}
-
-func environmentWithOverride(environment []string, key, value string) []string {
-	prefix := key + "="
-	result := make([]string, 0, len(environment)+1)
-	for _, entry := range environment {
-		if strings.HasPrefix(entry, prefix) {
-			continue
-		}
-		result = append(result, entry)
-	}
-	return append(result, prefix+value)
 }

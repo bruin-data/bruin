@@ -30,6 +30,7 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || (github.ref == 'refs/heads/main' && github.sha || github.ref) }}
   cancel-in-progress: true
 env:
+  GH_TOKEN: ${{ github.token }}
   DOCKER_BUILDKIT: 1
   REGISTRY: ghcr.io
   IMAGE_NAME: bruin-data/bruin

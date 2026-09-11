@@ -575,7 +575,7 @@ func isLegacyIngestrVersion(version string) bool {
 }
 
 // ingestrCommand resolves released v1+ versions to standalone binaries installed
-// by the official curl installer. Legacy v0 and local source checkouts continue to
+// from archives checked against embedded hashes. Legacy v0 and local source checkouts continue to
 // use uv because they are Python packages and have no compatible binary release.
 func (u *UvPythonRunner) ingestrCommand(ctx context.Context, extraPackages, args []string) (*CommandInstance, error) {
 	_, isLocal := u.ingestrPackage(ctx)

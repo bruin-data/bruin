@@ -9,10 +9,29 @@ permissions:
   contents: write
 
 env:
+  GH_TOKEN: ${{ github.token }}
   REGISTRY: ghcr.io
   IMAGE_NAME: bruin-data/bruin
 
 jobs:
+  verify-ingestr:
+    # Use GitHub's maintained runner image for trusted gh provisioning.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Authenticate pinned ingestr and generate embedded hashes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/generate_ingestr_hashes.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ingestr-hashes
+          path: pkg/python/ingestr_hashes.json
+          if-no-files-found: error
+          retention-days: 1
+
   integration-tests:
     strategy:
       matrix:
@@ -145,11 +164,16 @@ jobs:
           go test -v -timeout 30m ./...
 
   prepare-darwin:
+    needs: [verify-ingestr]
     runs-on: depot-ubuntu-latest-8
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ingestr-hashes
+          path: pkg/python
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: 'go.mod'
@@ -168,11 +192,16 @@ jobs:
 
 
   prepare-linux:
+    needs: [verify-ingestr]
     runs-on: depot-ubuntu-latest-8
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ingestr-hashes
+          path: pkg/python
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: 'go.mod'
@@ -226,6 +255,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ingestr-hashes
+          path: pkg/python
 
       - uses: msys2/setup-msys2@66cd2cce69caa17b53920067426061ca1de3a884 # v2
         with:
@@ -275,6 +308,7 @@ jobs:
           prerelease: false
 
   dockerBuild:
+    needs: [verify-ingestr]
     runs-on: depot-ubuntu-latest
     name: Docker Build
     permissions:
@@ -285,6 +319,10 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ingestr-hashes
+          path: pkg/python
 
       - name: Log in to the Container registry
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
