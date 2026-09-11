@@ -465,6 +465,7 @@ func newSnowflakeDBFromConnection(connection *config.SnowflakeConnection) (*snow
 	}
 
 	return snowflake.NewDB(&snowflake.Config{
+		ReadOnly:   connection.ReadOnly,
 		Account:    connection.Account,
 		Username:   connection.Username,
 		Password:   connection.Password,

@@ -17,6 +17,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/tablename"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
@@ -213,6 +214,10 @@ func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, 
 }
 
 func (db *DB) selectOnce(ctx context.Context, query *query.Query, requestID *gosnowflake.UUID) ([][]interface{}, error) {
+	if err := db.validateReadOnlyQuery(query.String()); err != nil {
+		return nil, err
+	}
+
 	if err := db.initializeDB(ctx); err != nil {
 		return nil, err
 	}
@@ -284,6 +289,10 @@ func (db *DB) SelectOnlyLastResult(ctx context.Context, query *query.Query) ([][
 }
 
 func (db *DB) selectOnlyLastResultOnce(ctx context.Context, query *query.Query, requestID *gosnowflake.UUID) ([][]interface{}, error) {
+	if err := db.validateReadOnlyQuery(query.String()); err != nil {
+		return nil, err
+	}
+
 	if err := db.initializeDB(ctx); err != nil {
 		return nil, err
 	}
@@ -368,6 +377,10 @@ func (db *DB) IsValid(ctx context.Context, query *query.Query) (bool, error) {
 }
 
 func (db *DB) isValidOnce(ctx context.Context, query *query.Query, requestID *gosnowflake.UUID) (bool, error) {
+	if err := db.validateReadOnlyQuery(query.ToExplainQuery()); err != nil {
+		return false, err
+	}
+
 	if err := db.initializeDB(ctx); err != nil {
 		return false, err
 	}
@@ -448,6 +461,10 @@ func (db *DB) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*que
 }
 
 func (db *DB) selectWithSchemaOnce(ctx context.Context, queryObj *query.Query, requestID *gosnowflake.UUID) (*query.QueryResult, error) {
+	if err := db.validateReadOnlyQuery(queryObj.String()); err != nil {
+		return nil, err
+	}
+
 	if err := db.initializeDB(ctx); err != nil {
 		return nil, err
 	}
@@ -1475,4 +1492,11 @@ func (db *DB) BuildTableExistsQuery(tableName string) (string, error) {
 	)
 
 	return strings.TrimSpace(query), nil
+}
+
+func (db *DB) validateReadOnlyQuery(query string) error {
+	if db.config == nil || !db.config.ReadOnly {
+		return nil
+	}
+	return sqlparser.ValidateReadOnlyQuery(query, "snowflake")
 }

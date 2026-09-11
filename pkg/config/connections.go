@@ -555,6 +555,7 @@ type SnowflakeConnection struct {
 	Warehouse          string `yaml:"warehouse,omitempty" json:"warehouse,omitempty" mapstructure:"warehouse"`
 	PrivateKeyPath     string `yaml:"private_key_path,omitempty" json:"private_key_path,omitempty" jsonschema:"oneof_required=private_key_path" mapstructure:"private_key_path" sensitive_file:"true"`
 	PrivateKey         string `yaml:"private_key,omitempty" json:"private_key,omitempty" jsonschema:"oneof_required=private_key" mapstructure:"private_key" sensitive:"true"`
+	ReadOnly           bool   `yaml:"read_only,omitempty" json:"read_only,omitempty" mapstructure:"read_only"`
 	Token              string `yaml:"token,omitempty" json:"token,omitempty" jsonschema:"oneof_required=token" mapstructure:"token" sensitive:"true"`
 }
 
@@ -583,6 +584,9 @@ func (c SnowflakeConnection) MarshalJSON() ([]byte, error) {
 		"warehouse":   c.Warehouse,
 		"private_key": c.PrivateKey,
 		"token":       c.Token,
+	}
+	if c.ReadOnly {
+		payload["read_only"] = true
 	}
 	addConnectionMetadataToMap(c.ConnectionMetadata, payload)
 
@@ -688,6 +692,14 @@ func (c SnowflakeConnection) MarshalYAML() (interface{}, error) {
 			node.Content,
 			&yaml.Node{Kind: yaml.ScalarNode, Value: "token"},
 			&yaml.Node{Kind: yaml.ScalarNode, Value: c.Token},
+		)
+	}
+
+	if c.ReadOnly {
+		node.Content = append(
+			node.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "read_only"},
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!bool", Value: "true"},
 		)
 	}
 

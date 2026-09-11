@@ -1,10 +1,11 @@
 import logging
 from dataclasses import dataclass
 
-from sqlglot import exp, lineage, parse, parse_one
+from sqlglot import exp, lineage, parse, parse_one, tokenize
 from sqlglot.lineage import Node
 from sqlglot.optimizer import optimize
 from sqlglot.optimizer.scope import build_scope, find_all_in_scope
+from sqlglot.tokens import TokenType
 
 
 def normalize_sqlglot_dialect(dialect: str | None) -> str | None:
@@ -817,3 +818,97 @@ def add_ctes(query: str, dialect: str = None, ctes: list = None) -> dict:
         return {"error": str(e)}
 
     return {"query": parsed.sql(dialect=dialect or None)}
+
+
+def is_read_only_query(query: str, dialect: str = None) -> dict:
+    if "\x00" in query:
+        return {"is_read_only": False, "error": ""}
+    dialect = normalize_sqlglot_dialect(dialect)
+    try:
+        if dialect == "snowflake" and any(
+            token.token_type == TokenType.DARROW
+            for token in tokenize(query, dialect=dialect)
+        ):
+            return {"is_read_only": False, "error": ""}
+        statements = [
+            stmt
+            for stmt in parse(query, dialect=dialect)
+            if stmt is not None and not isinstance(stmt, exp.Semicolon)
+        ]
+        if not statements:
+            return {"is_read_only": False, "error": "cannot parse empty query"}
+        for statement in statements:
+            if not _is_read_only_statement(statement, dialect):
+                return {"is_read_only": False, "error": ""}
+        return {"is_read_only": True, "error": ""}
+    except Exception as e:
+        return {"is_read_only": False, "error": str(e)}
+
+
+def _is_read_only_statement(statement: exp.Expr, dialect: str | None) -> bool:
+    if isinstance(statement, exp.Command) and dialect == "snowflake":
+        if statement.name.upper() != "EXPLAIN" or not isinstance(
+            statement.expression, exp.Literal
+        ):
+            return False
+        explained = parse(statement.expression.this, dialect=dialect)
+        return (
+            len(explained) == 1
+            and isinstance(explained[0], exp.Query)
+            and _is_read_only_statement(explained[0], dialect)
+        )
+
+    if not isinstance(
+        statement,
+        (
+            exp.Select,
+            exp.Union,
+            exp.Intersect,
+            exp.Except,
+            exp.Subquery,
+            exp.Show,
+            exp.Describe,
+        ),
+    ):
+        return False
+
+    for node in statement.walk():
+        if isinstance(
+            node,
+            (
+                exp.DDL,
+                exp.DML,
+                exp.Drop,
+                exp.Alter,
+                exp.TruncateTable,
+                exp.Grant,
+                exp.Revoke,
+                exp.Execute,
+                exp.Transaction,
+                exp.Commit,
+                exp.Rollback,
+                exp.Use,
+                exp.Pragma,
+                exp.Into,
+                exp.Lock,
+                exp.Command,
+                exp.NextValueFor,
+            ),
+        ):
+            return False
+        if dialect != "snowflake" and isinstance(node, exp.Anonymous):
+            return False
+        if (
+            isinstance(node, exp.DynamicIdentifier)
+            and node.args.get("expressions") is not None
+        ):
+            return False
+        if isinstance(node, exp.Column) and node.name.upper() == "NEXTVAL":
+            return False
+        if (
+            dialect != "snowflake"
+            and isinstance(node, exp.Func)
+            and isinstance(node.parent, exp.Dot)
+        ):
+            return False
+    return True
