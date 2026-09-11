@@ -63,7 +63,7 @@ Rules:
 - **Variant name** must match `[a-zA-Z0-9_-]+`.
 - **Variable names** under each variant must reference variables already declared in the pipeline's `variables:` block. Unknown names fail validation with `references unknown variable "X"`.
 - A variant can override **any subset** of variables; unmentioned variables keep their `default` value.
-- Variant overrides must match the type of the underlying variable (e.g., a variable typed as `integer` cannot be overridden with a string).
+- Variant overrides must match the type of the underlying variable (e.g., a variable typed as `integer` cannot be overridden with a string) and any `enum`, `const`, `minimum`, or `maximum` constraints declared on that variable.
 
 ## Running a Variant
 
