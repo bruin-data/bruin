@@ -6399,7 +6399,10 @@ func cloudNotificationRulesCreate() *cli.Command {
 				printError(err, output, "Failed to create notification rule")
 				return cli.Exit("", 1)
 			}
-			printNotificationRuleResult(rule, output, "Created")
+			if err := printNotificationRuleResult(rule, output, "Created"); err != nil {
+				printError(err, output, "Failed to format notification rule")
+				return cli.Exit("", 1)
+			}
 			return nil
 		},
 	}
@@ -6436,7 +6439,10 @@ func cloudNotificationRulesUpdate() *cli.Command {
 				printError(err, output, "Failed to update notification rule")
 				return cli.Exit("", 1)
 			}
-			printNotificationRuleResult(rule, output, "Updated")
+			if err := printNotificationRuleResult(rule, output, "Updated"); err != nil {
+				printError(err, output, "Failed to format notification rule")
+				return cli.Exit("", 1)
+			}
 			return nil
 		},
 	}
@@ -6468,7 +6474,10 @@ func cloudNotificationRulesToggle(name string, enabled bool) *cli.Command {
 				printError(err, output, "Failed to "+name+" notification rule")
 				return cli.Exit("", 1)
 			}
-			printNotificationRuleResult(rule, output, action+"d")
+			if err := printNotificationRuleResult(rule, output, action+"d"); err != nil {
+				printError(err, output, "Failed to format notification rule")
+				return cli.Exit("", 1)
+			}
 			return nil
 		},
 	}
@@ -6509,13 +6518,17 @@ func cloudNotificationRulesDelete() *cli.Command {
 	}
 }
 
-func printNotificationRuleResult(rule *bruincloud.NotificationRule, output, action string) {
+func printNotificationRuleResult(rule *bruincloud.NotificationRule, output, action string) error {
 	if output == "json" {
-		data, _ := json.MarshalIndent(rule, "", "  ")
+		data, err := json.MarshalIndent(rule, "", "  ")
+		if err != nil {
+			return err
+		}
 		fmt.Println(string(data))
-		return
+		return nil
 	}
 	successPrinter.Printf("%s notification rule %d (%s).\n", action, rule.ID, rule.Name)
+	return nil
 }
 
 func CloudAuditLogs() *cli.Command {
