@@ -105,6 +105,48 @@ func TestTSQLLimit(t *testing.T) {
 			limit:    10,
 			expected: "WITH __bruin_limited AS (SELECT 1 AS id),\n__bruin_limited_x AS (\nSELECT * FROM __bruin_limited\n)\nSELECT TOP 10 * FROM __bruin_limited_x",
 		},
+		{
+			name:     "trailing bare ORDER BY is limited in place",
+			query:    "SELECT id, name FROM users ORDER BY name DESC",
+			limit:    1000,
+			expected: "SELECT id, name FROM users ORDER BY name DESC\nOFFSET 0 ROWS FETCH NEXT 1000 ROWS ONLY",
+		},
+		{
+			name:     "trailing bare ORDER BY with trailing semicolon",
+			query:    "SELECT * FROM users ORDER BY id;",
+			limit:    10,
+			expected: "SELECT * FROM users ORDER BY id\nOFFSET 0 ROWS FETCH NEXT 10 ROWS ONLY",
+		},
+		{
+			name:     "CTE query with trailing bare ORDER BY is limited in place",
+			query:    "WITH a AS (SELECT 1 AS id) SELECT * FROM a ORDER BY id",
+			limit:    5,
+			expected: "WITH a AS (SELECT 1 AS id) SELECT * FROM a ORDER BY id\nOFFSET 0 ROWS FETCH NEXT 5 ROWS ONLY",
+		},
+		{
+			name:     "ORDER BY inside a subquery does not count as trailing",
+			query:    "SELECT * FROM (SELECT TOP 5 id FROM t ORDER BY id) x",
+			limit:    10,
+			expected: "SELECT TOP 10 * FROM (\nSELECT * FROM (SELECT TOP 5 id FROM t ORDER BY id) x\n) as t",
+		},
+		{
+			name:     "outer query with TOP keeps the derived-table wrapper",
+			query:    "SELECT TOP 10 id FROM t ORDER BY id",
+			limit:    100,
+			expected: "SELECT TOP 100 * FROM (\nSELECT TOP 10 id FROM t ORDER BY id\n) as t",
+		},
+		{
+			name:     "ORDER BY already using OFFSET/FETCH keeps the wrapper",
+			query:    "SELECT id FROM t ORDER BY id OFFSET 0 ROWS FETCH NEXT 5 ROWS ONLY",
+			limit:    100,
+			expected: "SELECT TOP 100 * FROM (\nSELECT id FROM t ORDER BY id OFFSET 0 ROWS FETCH NEXT 5 ROWS ONLY\n) as t",
+		},
+		{
+			name:     "ORDER BY with FOR XML keeps the wrapper",
+			query:    "SELECT id FROM t ORDER BY id FOR XML PATH",
+			limit:    100,
+			expected: "SELECT TOP 100 * FROM (\nSELECT id FROM t ORDER BY id FOR XML PATH\n) as t",
+		},
 	}
 
 	for _, tt := range tests {

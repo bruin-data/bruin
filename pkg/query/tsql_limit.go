@@ -10,11 +10,64 @@ import (
 // since a derived-table wrapper is invalid T-SQL after a WITH clause.
 func TSQLLimit(sql string, limit int64) string {
 	sql = strings.TrimRight(sql, "; \n\t")
+	// A query ending in a bare ORDER BY (no TOP/OFFSET/FETCH/FOR) cannot be put
+	// inside a derived table or CTE — T-SQL rejects it. Limit it in place by
+	// appending OFFSET/FETCH to the existing ORDER BY instead of wrapping.
+	if endsWithBareOrderBy(sql) {
+		return fmt.Sprintf("%s\nOFFSET 0 ROWS FETCH NEXT %d ROWS ONLY", sql, limit)
+	}
 	if prefix, body, ok := splitLeadingWith(sql); ok {
 		name := uniqueCTEName(sql)
 		return fmt.Sprintf("%s,\n%s AS (\n%s\n)\nSELECT TOP %d * FROM %s", prefix, name, body, limit, name)
 	}
 	return fmt.Sprintf("SELECT TOP %d * FROM (\n%s\n) as t", limit, sql)
+}
+
+// endsWithBareOrderBy reports whether the outermost query ends with an ORDER BY
+// clause that has no accompanying TOP, OFFSET/FETCH, or FOR — the exact shape
+// T-SQL forbids inside a derived table, subquery, or CTE. Only depth-0 (outer
+// query) keywords count; ORDER BY / OFFSET inside a nested subquery is ignored.
+func endsWithBareOrderBy(sql string) bool {
+	depth := 0
+	lastOrderBy := -1
+	hasTop := false
+	offsetOrForAfter := false
+	for i := 0; i < len(sql); {
+		if ni, ok := skipLiteral(sql, i); ok {
+			i = ni
+			continue
+		}
+		switch sql[i] {
+		case '(':
+			depth++
+			i++
+			continue
+		case ')':
+			depth--
+			i++
+			continue
+		}
+		if depth == 0 {
+			if matchKeyword(sql, i, "TOP") {
+				hasTop = true
+			}
+			if matchKeyword(sql, i, "ORDER") {
+				j := skipSpaceAndComments(sql, i+len("ORDER"))
+				if matchKeyword(sql, j, "BY") {
+					lastOrderBy = i
+					offsetOrForAfter = false
+					i = j + len("BY")
+					continue
+				}
+			}
+			if lastOrderBy >= 0 &&
+				(matchKeyword(sql, i, "OFFSET") || matchKeyword(sql, i, "FETCH") || matchKeyword(sql, i, "FOR")) {
+				offsetOrForAfter = true
+			}
+		}
+		i++
+	}
+	return lastOrderBy >= 0 && !hasTop && !offsetOrForAfter
 }
 
 // uniqueCTEName returns a limit CTE name that does not already occur in sql.
