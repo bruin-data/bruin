@@ -1,0 +1,10 @@
+default_environment: default
+environments:
+  default:
+    connections:
+      frankfurter:
+        - name: "frankfurter-default"
+      google_cloud_platform:
+        - name: "gcp-default"
+          project_id: "your-gcp-project-id"
+          service_account_file: "/path/to/service-account.json"
