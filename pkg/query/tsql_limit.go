@@ -10,11 +10,8 @@ import (
 // since a derived-table wrapper is invalid T-SQL after a WITH clause.
 func TSQLLimit(sql string, limit int64) string {
 	sql = strings.TrimRight(sql, "; \n\t")
-	// A query ending in a bare ORDER BY (no TOP/OFFSET/FETCH/FOR) cannot be put
-	// inside a derived table or CTE — T-SQL rejects it. Limit it in place by
-	// appending OFFSET/FETCH to the existing ORDER BY instead of wrapping.
-	// FETCH requires a positive count, so limit < 1 keeps the TOP wrapper (TOP 0
-	// is valid and preserves the historical "no rows" behavior).
+	// A bare trailing ORDER BY is invalid inside a wrapper, so limit it in place.
+	// limit < 1 keeps the TOP wrapper since FETCH requires a positive count.
 	if limit >= 1 && endsWithBareOrderBy(sql) {
 		return fmt.Sprintf("%s\nOFFSET 0 ROWS FETCH NEXT %d ROWS ONLY", sql, limit)
 	}
@@ -25,15 +22,10 @@ func TSQLLimit(sql string, limit int64) string {
 	return fmt.Sprintf("SELECT TOP %d * FROM (\n%s\n) as t", limit, sql)
 }
 
-// endsWithBareOrderBy reports whether the outermost query ends with an ORDER BY
-// clause that has no accompanying TOP, OFFSET/FETCH, or FOR — the exact shape
-// T-SQL forbids inside a derived table, subquery, or CTE. Only depth-0 (outer
-// query) keywords count; ORDER BY / OFFSET inside a nested subquery is ignored.
-//
-// A depth-0 TOP only legalizes the ORDER BY when it governs the same query, so
-// it is ignored for compound queries (UNION/EXCEPT/INTERSECT): a TOP in one
-// branch does not legalize the trailing ORDER BY of the whole compound, which
-// still needs the in-place OFFSET/FETCH treatment.
+// endsWithBareOrderBy reports whether the outer query (depth-0 keywords only)
+// ends with an ORDER BY lacking TOP/OFFSET/FETCH/FOR — the shape T-SQL forbids
+// inside a derived table or CTE. A branch TOP does not count for compound
+// queries (UNION/EXCEPT/INTERSECT), whose ORDER BY still needs OFFSET/FETCH.
 func endsWithBareOrderBy(sql string) bool {
 	depth := 0
 	lastOrderBy := -1
@@ -78,9 +70,7 @@ func endsWithBareOrderBy(sql string) bool {
 		}
 		i++
 	}
-	// A governing TOP (outer query's own TOP, absent any set operator) makes the
-	// derived-table wrapper valid and would conflict with OFFSET/FETCH, so such
-	// queries keep the wrapper rather than being limited in place.
+	// A governing TOP makes the wrapper valid and conflicts with OFFSET/FETCH.
 	if hasTop && !hasSetOp {
 		return false
 	}
