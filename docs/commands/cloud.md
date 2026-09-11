@@ -1134,6 +1134,52 @@ bruin cloud scheduled-agents run-states delete --scheduled-agent-id 42 --name me
 
 ---
 
+### `notification-rules`
+
+Manage the team's Cloud notification rules. Start with `schema` to see the supported events, selector fields, delivery types, limits, and a complete example.
+
+```bash
+bruin cloud notification-rules schema
+bruin cloud notification-rules list
+```
+
+Create or fully replace a rule from inline JSON/YAML or a file:
+
+```bash
+bruin cloud notification-rules create --rule-file ./notification-rule.yml
+bruin cloud notification-rules update --notification-rule-id 42 --rule-file ./notification-rule.yml
+```
+
+Example rule:
+
+```yaml
+name: Production failures
+enabled: true
+subscriptions:
+  - event_types: [run_failed, asset_failed]
+    selector:
+      operator: and
+      children:
+        - field: pipeline.tags
+          operator: contains
+          value: prod
+deliveries:
+  - type: slack
+    channels: ["#alerts"]
+```
+
+Enable, disable, or delete a rule by ID:
+
+```bash
+bruin cloud notification-rules disable --notification-rule-id 42
+bruin cloud notification-rules enable --notification-rule-id 42
+bruin cloud notification-rules delete --notification-rule-id 42
+```
+
+`create`, `update`, and `delete` require the `notification-rule:manage` token ability. `schema` and `list` require `notification-rule:list`. `enable` and `disable` read the current rule before replacing it, so they require both abilities.
+
+---
+
 ### `skills`
 
 Manage the team **skill library** — named instruction snippets you attach to agents. Team-scoped (you only see your own team's skills).

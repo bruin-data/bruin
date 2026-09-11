@@ -1081,6 +1081,67 @@ func (c *APIClient) TriggerScheduledAgent(ctx context.Context, scheduledAgentID 
 	return &result, nil
 }
 
+// --- Notification rules ---
+
+func (c *APIClient) GetNotificationRuleSchema(ctx context.Context) (json.RawMessage, error) {
+	var schema json.RawMessage
+	err := c.doRequest(ctx, http.MethodGet, "/notification-rules/schema", nil, &schema)
+	return schema, err
+}
+
+func (c *APIClient) ListNotificationRules(ctx context.Context) ([]NotificationRule, error) {
+	var resp struct {
+		Rules []NotificationRule `json:"rules"`
+	}
+	err := c.doRequest(ctx, http.MethodGet, "/notification-rules", nil, &resp)
+	return resp.Rules, err
+}
+
+func (c *APIClient) CreateNotificationRule(ctx context.Context, fields map[string]any) (*NotificationRule, error) {
+	var resp struct {
+		Rule NotificationRule `json:"rule"`
+	}
+	err := c.doRequest(ctx, http.MethodPost, "/notification-rules", fields, &resp)
+	if err != nil {
+		return nil, err
+	}
+	return &resp.Rule, nil
+}
+
+func (c *APIClient) UpdateNotificationRule(ctx context.Context, notificationRuleID int, fields map[string]any) (*NotificationRule, error) {
+	var resp struct {
+		Rule NotificationRule `json:"rule"`
+	}
+	err := c.doRequest(ctx, http.MethodPut, fmt.Sprintf("/notification-rules/%d", notificationRuleID), fields, &resp)
+	if err != nil {
+		return nil, err
+	}
+	return &resp.Rule, nil
+}
+
+func (c *APIClient) SetNotificationRuleEnabled(ctx context.Context, notificationRuleID int, enabled bool) (*NotificationRule, error) {
+	rules, err := c.ListNotificationRules(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, rule := range rules {
+		if rule.ID != notificationRuleID {
+			continue
+		}
+		return c.UpdateNotificationRule(ctx, notificationRuleID, map[string]any{
+			"name":          rule.Name,
+			"enabled":       enabled,
+			"subscriptions": rule.Subscriptions,
+			"deliveries":    rule.Deliveries,
+		})
+	}
+	return nil, fmt.Errorf("notification rule %d not found", notificationRuleID)
+}
+
+func (c *APIClient) DeleteNotificationRule(ctx context.Context, notificationRuleID int) error {
+	return c.doRequest(ctx, http.MethodDelete, fmt.Sprintf("/notification-rules/%d", notificationRuleID), nil, nil)
+}
+
 // --- Scheduled agent run state ---
 
 // ListRunStates returns the run-state ("memory") files persisted on a scheduled
