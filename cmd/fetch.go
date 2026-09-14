@@ -1614,16 +1614,24 @@ func saveQueryLog(queryStr string, connName string, result *query.QueryResult, q
 	}
 
 	logDir := filepath.Join(repoRoot.Path, "logs/queries")
+	aggregatePath := os.Getenv(aggregatedQueryLogPathEnv)
 
-	// Best-effort: a read-only or unwritable .gitignore must not stop us from
-	// writing the query log itself.
+	// An unwritable .gitignore must not silently drop the query log. But we also
+	// must not leave the raw query/results as un-ignored files a later `git add -A`
+	// could commit, so when the ignore rule can't be secured we log outside the
+	// repo (next to the aggregate) instead, and skip entirely if there's nowhere.
 	if err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, "logs/queries"); err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: failed to add logs/queries to .gitignore: %v\n", err)
+		if aggregatePath == "" {
+			fmt.Fprintf(os.Stderr, "Warning: skipping query log; cannot ignore logs/queries: %v\n", err)
+			return nil //nolint:nilerr // logging is best-effort; the query itself already ran.
+		}
+		fmt.Fprintf(os.Stderr, "Warning: logging queries outside the repo; cannot ignore logs/queries: %v\n", err)
+		logDir = filepath.Join(filepath.Dir(aggregatePath), "queries")
 	}
 
 	err = os.MkdirAll(logDir, 0o755)
 	if err != nil {
-		return errors.Wrap(err, "failed to create logs/queries directory")
+		return errors.Wrap(err, "failed to create query log directory")
 	}
 
 	timestamp := time.Now()
@@ -1660,8 +1668,8 @@ func saveQueryLog(queryStr string, connName string, result *query.QueryResult, q
 		return errors.Wrap(err, "failed to write query log file")
 	}
 
-	if targetPath := os.Getenv(aggregatedQueryLogPathEnv); targetPath != "" {
-		if aggErr := writeAggregatedQueryLog(logDir, targetPath); aggErr != nil {
+	if aggregatePath != "" {
+		if aggErr := writeAggregatedQueryLog(logDir, aggregatePath); aggErr != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to update aggregated query log: %v\n", aggErr)
 		}
 	}

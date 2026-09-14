@@ -1164,3 +1164,33 @@ func TestCloudQuerierSelectWithSchema(t *testing.T) {
 		assert.Len(t, res.Rows, 2)
 	})
 }
+
+func TestSaveQueryLogKeepsLogsOutOfRepoWhenGitignoreUnwritable(t *testing.T) {
+	repoRoot := t.TempDir()
+	require.NoError(t, os.Mkdir(filepath.Join(repoRoot, ".git"), 0o755))
+	// A .gitignore that is a directory can be neither read nor appended, so the
+	// ignore update fails deterministically regardless of the test user.
+	require.NoError(t, os.Mkdir(filepath.Join(repoRoot, ".gitignore"), 0o755))
+
+	aggregatePath := filepath.Join(t.TempDir(), "accumulated", "query-log.json")
+	t.Setenv(aggregatedQueryLogPathEnv, aggregatePath)
+	t.Chdir(repoRoot)
+
+	err := saveQueryLog(
+		"SELECT secret FROM users",
+		"duckdb",
+		&query.QueryResult{Columns: []string{"secret"}, Rows: [][]interface{}{{"s3cr3t"}}},
+		nil,
+		QueryLogOptions{},
+	)
+	require.NoError(t, err)
+
+	// The query is still logged, via the aggregate that lives outside the repo.
+	data, err := os.ReadFile(aggregatePath)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), "SELECT secret FROM users")
+
+	// Nothing un-ignored is left behind inside the repo.
+	_, statErr := os.Stat(filepath.Join(repoRoot, "logs", "queries"))
+	assert.True(t, os.IsNotExist(statErr), "must not write query logs inside the repo when .gitignore can't be secured")
+}
