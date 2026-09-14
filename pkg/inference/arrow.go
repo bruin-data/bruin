@@ -51,10 +51,11 @@ func readRecord(ctx context.Context, conn any, sql string, maxRows int, columns 
 
 // recordFromQuery is the fallback for connections without native Arrow reads.
 // Unknown or lossy conversions fail rather than silently becoming strings.
+//
 //nolint:ireturn
 func recordFromQuery(input *query.QueryResult, columns []pipeline.Column) (arrow.RecordBatch, error) {
 	if input == nil {
-		return nil, fmt.Errorf("inference input query returned no result")
+		return nil, errors.New("inference input query returned no result")
 	}
 	fields := make([]arrow.Field, len(input.Columns))
 	for i, name := range input.Columns {
@@ -181,13 +182,13 @@ func appendArrowValue(builder array.Builder, value any) error {
 		case []byte:
 			b.Append(string(v))
 		default:
-			return fmt.Errorf("not a string")
+			return errors.New("not a string")
 		}
 		return nil
 	case *array.BinaryBuilder:
 		v, ok := value.([]byte)
 		if !ok {
-			return fmt.Errorf("not binary")
+			return errors.New("not binary")
 		}
 		b.Append(v)
 		return nil
@@ -199,7 +200,7 @@ func appendArrowValue(builder array.Builder, value any) error {
 	if dt, ok := builder.Type().(arrow.DecimalType); ok {
 		switch v := value.(type) {
 		case float32, float64:
-			return fmt.Errorf("decimal precision already lost to floating point")
+			return errors.New("decimal precision already lost to floating point")
 		case decimal128.Num:
 			text = v.ToString(dt.GetScale())
 		case decimal256.Num:
@@ -209,12 +210,12 @@ func appendArrowValue(builder array.Builder, value any) error {
 		}
 		exact, ok := new(big.Rat).SetString(text)
 		if !ok {
-			return fmt.Errorf("invalid decimal")
+			return errors.New("invalid decimal")
 		}
 		text = exact.FloatString(int(dt.GetScale()))
 		roundTrip, ok := new(big.Rat).SetString(text)
 		if !ok || roundTrip.Cmp(exact) != 0 {
-			return fmt.Errorf("decimal scale would round value")
+			return errors.New("decimal scale would round value")
 		}
 	}
 	if t, ok := value.(time.Time); ok {

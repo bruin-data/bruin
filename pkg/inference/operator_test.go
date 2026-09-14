@@ -218,7 +218,7 @@ func TestValidateAsset(t *testing.T) {
 			switch name {
 			case "provider":
 				a.Parameters["provider"] = "unknown"
-			case "prompt":
+			case "prompt": //nolint:goconst // parameter names repeat across validation switch
 				delete(a.Parameters, "prompt")
 			case "max_rows":
 				a.Parameters["max_rows"] = 0

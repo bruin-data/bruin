@@ -15,13 +15,14 @@ import (
 
 // SelectArrow returns an owned record batch without the JSON-oriented conversions
 // in SelectWithSchema. The caller must Release it. maxRows bounds buffered rows.
+//
 //nolint:ireturn
 func (c *Client) SelectArrow(ctx context.Context, q *query.Query, maxRows int) (arrow.RecordBatch, error) {
 	c.lockIfNeeded()
 	defer c.unlockIfNeeded()
 	e, ok := c.connection.(*EphemeralConnection)
 	if !ok {
-		return nil, errors.New("Arrow queries require an ADBC connection")
+		return nil, errors.New("arrow queries require an ADBC connection")
 	}
 	db, conn, err := e.openADBC(ctx)
 	if err != nil {

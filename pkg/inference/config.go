@@ -72,7 +72,7 @@ func readConfig(asset *pipeline.Asset) (*assetConfig, error) {
 	}
 	for name := range asset.Parameters {
 		switch name {
-		case "provider", "model", "prompt", "input_query", "input_asset", "output_column",
+		case "provider", "model", "prompt", "input_query", "input_asset", "output_column", //nolint:goconst // parameter names repeat across validation, tests use the same literals
 			"api_key_env", "max_rows", "max_output_tokens", "extract_parallelism", "force", "allowed_values":
 		default:
 			return nil, fmt.Errorf("unsupported inference parameter %q", name)
