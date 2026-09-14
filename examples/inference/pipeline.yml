@@ -1,0 +1,6 @@
+name: inference-example
+schedule: daily
+start_date: "2026-01-01"
+
+default_connections:
+  duckdb: inference-duckdb

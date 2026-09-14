@@ -135,6 +135,21 @@ func TestRenderAssetParamsMutatorPreservesStructuredParameters(t *testing.T) {
 	}, asset.Parameters["string_map"])
 }
 
+func TestRenderInferencePromptIsDeferred(t *testing.T) {
+	asset := &pipeline.Asset{
+		Type: pipeline.AssetTypeInference,
+		Parameters: pipeline.ParameterMap{
+			"prompt":      "Classify {{ row.body }}",
+			"input_query": "SELECT '{{ value }}' AS body",
+		},
+	}
+	mutator := renderAssetParamsMutator(jinja.NewRenderer(jinja.Context{"value": "ticket"}))
+	_, err := mutator(t.Context(), asset, &pipeline.Pipeline{})
+	require.NoError(t, err)
+	assert.Equal(t, "Classify {{ row.body }}", asset.Parameters["prompt"])
+	assert.Equal(t, "SELECT 'ticket' AS body", asset.Parameters["input_query"])
+}
+
 func TestVariableOverridesMutator_VariantWinsOnOverlap(t *testing.T) {
 	t.Parallel()
 
