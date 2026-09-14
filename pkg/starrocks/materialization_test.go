@@ -1,6 +1,7 @@
 package starrocks
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -348,9 +349,32 @@ func TestMaterializer_Render(t *testing.T) {
 			}
 
 			require.NoError(t, err)
+			strategy := tt.asset.Materialization.Strategy
+			bootstrapStrategy := strategy == pipeline.MaterializationStrategyDeleteInsert ||
+				strategy == pipeline.MaterializationStrategyTimeInterval
+			if !tt.fullRefresh && bootstrapStrategy {
+				var found bool
+				got, found = removeStarRocksBootstrap(got, tt.asset.Name)
+				assert.True(t, found, "incremental SQL should bootstrap a missing target")
+			}
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func removeStarRocksBootstrap(query, tableName string) (string, bool) {
+	start := strings.Index(query, "CREATE TABLE IF NOT EXISTS "+quoteIdentifier(tableName))
+	if start < 0 {
+		return query, false
+	}
+
+	endMarker := ") AS `__bruin_bootstrap` WHERE 1 = 0;\n"
+	end := strings.Index(query[start:], endMarker)
+	if end < 0 {
+		return query, false
+	}
+	end += start + len(endMarker)
+	return query[:start] + query[end:], true
 }
 
 func TestQuoteIdentifier(t *testing.T) {

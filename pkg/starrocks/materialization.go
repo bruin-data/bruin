@@ -101,6 +101,10 @@ func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) 
 		newRowsAlias,
 		incrementalKey,
 	)
+	bootstrapTable, err := buildCreateTableIfNotExistsQuery(asset, "SELECT * FROM "+quoteIdentifier(newRowsTable))
+	if err != nil {
+		return "", err
+	}
 
 	queries := []string{
 		"DROP TABLE IF EXISTS " + quoteIdentifier(newRowsTable),
@@ -108,6 +112,7 @@ func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) 
 PROPERTIES ("replication_num" = "1")
 AS
 %s`, quoteIdentifier(newRowsTable), trimmedQuery),
+		bootstrapTable,
 		"DROP TABLE IF EXISTS " + quoteIdentifier(replacementTable),
 		fmt.Sprintf(
 			`CREATE TABLE %s
@@ -242,8 +247,13 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 		startVar = "{{start_date}}"
 		endVar = "{{end_date}}"
 	}
+	bootstrapTable, err := buildCreateTableIfNotExistsQuery(asset, query)
+	if err != nil {
+		return "", err
+	}
 
 	queries := []string{
+		bootstrapTable,
 		fmt.Sprintf(
 			"DELETE FROM %s WHERE %s BETWEEN '%s' AND '%s'",
 			quoteIdentifier(asset.Name),
@@ -255,6 +265,26 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 	}
 
 	return strings.Join(queries, ";\n") + ";", nil
+}
+
+func buildCreateTableIfNotExistsQuery(asset *pipeline.Asset, query string) (string, error) {
+	if requiresTypedCreateTable(asset) {
+		return buildCreateTableStatement(asset, true)
+	}
+
+	query = strings.TrimSuffix(strings.TrimSpace(query), ";")
+	return fmt.Sprintf(
+		`CREATE TABLE IF NOT EXISTS %s
+PROPERTIES (%s)
+AS
+SELECT * FROM (
+%s
+) AS %s WHERE 1 = 0`,
+		quoteIdentifier(asset.Name),
+		buildStarRocksProperties(asset),
+		query,
+		quoteColumnName("__bruin_bootstrap"),
+	), nil
 }
 
 func buildDDLQuery(asset *pipeline.Asset, _ string) (string, error) {

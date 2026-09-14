@@ -8,6 +8,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestBuildCreateTableIfNotExistsAsQuery(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, `CREATE TABLE IF NOT EXISTS dataset.events PARTITION BY event_date AS
+SELECT * FROM (
+SELECT 1 AS id
+) AS __bruin_bootstrap WHERE 1 = 0`, BuildCreateTableIfNotExistsAsQuery(
+		"dataset.events",
+		"PARTITION BY event_date",
+		" SELECT 1 AS id; ",
+	))
+}
+
 func TestBuildTruncateInsertQuery(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
