@@ -1629,7 +1629,7 @@ func saveQueryLog(queryStr string, connName string, result *query.QueryResult, q
 		logDir = filepath.Join(filepath.Dir(aggregatePath), "queries")
 	}
 
-	err = os.MkdirAll(logDir, 0o755) //nolint:gosec // logDir is repo-relative or operator-provided ($BRUIN_QUERY_LOG_FILE) configuration.
+	err = os.MkdirAll(logDir, 0o755) //nolint:gosec // operator-provided query-log path
 	if err != nil {
 		return errors.Wrap(err, "failed to create query log directory")
 	}
@@ -1663,7 +1663,7 @@ func saveQueryLog(queryStr string, connName string, result *query.QueryResult, q
 		return errors.Wrap(err, "failed to marshal query log to JSON")
 	}
 
-	err = os.WriteFile(logPath, jsonData, 0o600) //nolint:gosec // logPath is repo-relative or operator-provided ($BRUIN_QUERY_LOG_FILE) configuration.
+	err = os.WriteFile(logPath, jsonData, 0o600) //nolint:gosec // operator-provided query-log path
 	if err != nil {
 		return errors.Wrap(err, "failed to write query log file")
 	}
@@ -1719,7 +1719,7 @@ func writeAggregatedQueryLog(logDir, targetPath string) error {
 			continue
 		}
 
-		data, readErr := os.ReadFile(filePath) //nolint:gosec // filePath is under the repo-relative or operator-provided ($BRUIN_QUERY_LOG_FILE) log dir.
+		data, readErr := os.ReadFile(filePath) //nolint:gosec // operator-provided query-log path
 		if readErr != nil {
 			continue
 		}
