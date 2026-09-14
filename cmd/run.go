@@ -37,6 +37,7 @@ import (
 	fabric "github.com/bruin-data/bruin/pkg/fabric"
 	"github.com/bruin-data/bruin/pkg/gcs"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/inference"
 	"github.com/bruin-data/bruin/pkg/ingestr"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/lint"
@@ -2010,6 +2011,10 @@ func SetupExecutors(
 	jinjaVariables := jinja.PythonEnvVariables(&startDate, &endDate, &executionDate, pipelineName, runID, fullRefresh, commitHash)
 	if s.WillRunTaskOfType(pipeline.AssetTypePython) {
 		mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(conn, jinjaVariables)
+	}
+
+	if s.WillRunTaskOfType(pipeline.AssetTypeInference) {
+		mainExecutors[pipeline.AssetTypeInference][scheduler.TaskInstanceTypeMain] = inference.NewOperator(conn)
 	}
 
 	if s.WillRunTaskOfType(pipeline.AssetTypeR) {

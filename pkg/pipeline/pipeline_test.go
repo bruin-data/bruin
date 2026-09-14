@@ -509,6 +509,75 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 	}
 }
 
+func Test_pipelineBuilder_RegistersInferenceInputAssetDependency(t *testing.T) {
+	t.Parallel()
+
+	build := func(t *testing.T, assets map[string]string) (*pipeline.Pipeline, error) {
+		t.Helper()
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "pipeline.yml"), []byte("name: inference-dependencies\n"), 0o644))
+		assetsDir := filepath.Join(dir, "assets")
+		require.NoError(t, os.Mkdir(assetsDir, 0o755))
+		for filename, definition := range assets {
+			require.NoError(t, os.WriteFile(filepath.Join(assetsDir, filename), []byte(definition), 0o644))
+		}
+
+		fs := afero.NewOsFs()
+		builder := pipeline.NewBuilder(pipeline.BuilderConfig{
+			PipelineFileName:    []string{"pipeline.yml"},
+			TasksDirectoryNames: []string{"assets"},
+			TasksFileSuffixes:   []string{"asset.yml"},
+		}, pipeline.CreateTaskFromYamlDefinition(fs), nil, fs, nil, nil)
+		return builder.CreatePipelineFromPath(t.Context(), dir, pipeline.WithMutate())
+	}
+
+	t.Run("missing dependency", func(t *testing.T) {
+		t.Parallel()
+		_, err := build(t, map[string]string{
+			"inference.asset.yml": "name: prediction\ntype: inference\nparameters:\n  input_asset: missing\n",
+		})
+		require.EqualError(t, err, `inference input_asset "missing" does not exist in pipeline`)
+	})
+
+	t.Run("self dependency", func(t *testing.T) {
+		t.Parallel()
+		_, err := build(t, map[string]string{
+			"inference.asset.yml": "name: prediction\ntype: inference\nparameters:\n  input_asset: prediction\n",
+		})
+		require.EqualError(t, err, `inference input_asset "prediction" cannot reference itself`)
+	})
+
+	t.Run("does not duplicate an explicit dependency", func(t *testing.T) {
+		t.Parallel()
+		got, err := build(t, map[string]string{
+			"source.asset.yml":    "name: source\ntype: python\n",
+			"inference.asset.yml": "name: prediction\ntype: inference\ndepends:\n  - source\nparameters:\n  input_asset: source\n",
+		})
+		require.NoError(t, err)
+		prediction := got.GetAssetByName("prediction")
+		require.Len(t, prediction.Upstreams, 1)
+		require.Len(t, prediction.GetUpstream(), 1)
+		assert.Equal(t, "source", prediction.GetUpstream()[0].Name)
+	})
+
+	t.Run("adds inferred dependency to asset ordering graph", func(t *testing.T) {
+		t.Parallel()
+		got, err := build(t, map[string]string{
+			"source.asset.yml":    "name: source\ntype: python\n",
+			"inference.asset.yml": "name: prediction\ntype: inference\nparameters:\n  input_asset: source\n",
+			"consumer.asset.yml":  "name: consumer\ntype: python\ndepends:\n  - prediction\n",
+		})
+		require.NoError(t, err)
+		source := got.GetAssetByName("source")
+		prediction := got.GetAssetByName("prediction")
+		consumer := got.GetAssetByName("consumer")
+		require.Equal(t, []*pipeline.Asset{source}, prediction.GetUpstream())
+		assert.Contains(t, source.GetDownstream(), prediction)
+		require.Equal(t, []*pipeline.Asset{prediction}, consumer.GetUpstream())
+		assert.Equal(t, []*pipeline.Asset{prediction, source}, consumer.GetFullUpstream())
+	})
+}
+
 func Test_Builder_ParseGitMetadata(t *testing.T) {
 	t.Parallel()
 	commit, err := git.CurrentCommit("testdata/git-metadata/")

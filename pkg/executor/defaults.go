@@ -8,6 +8,9 @@ import (
 type Config map[scheduler.TaskInstanceType]Operator
 
 var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
+	pipeline.AssetTypeInference: {
+		scheduler.TaskInstanceTypeMain: NoOpOperator{},
+	},
 	pipeline.AssetTypeBigqueryQuery: {
 		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
 		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
