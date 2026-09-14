@@ -29,12 +29,12 @@ var oracleNumberPrecision = regexp.MustCompile(`^number\((\d+)\)$`)
 func readRecord(ctx context.Context, conn any, sql string, maxRows int, columns []pipeline.Column) (arrow.RecordBatch, error) {
 	q := &query.Query{Query: sql}
 	if reader, ok := conn.(interface {
-		SelectArrow(ctx context.Context, *query.Query, int) (arrow.RecordBatch, error)
+		SelectArrow(ctx context.Context, query *query.Query, maxRows int) (arrow.RecordBatch, error)
 	}); ok {
 		return reader.SelectArrow(ctx, q, maxRows)
 	}
 	reader, ok := conn.(interface {
-		SelectWithSchema(ctx context.Context, *query.Query) (*query.QueryResult, error)
+		SelectWithSchema(ctx context.Context, query *query.Query) (*query.QueryResult, error)
 	})
 	if !ok {
 		return nil, errors.New("connection does not support inference input queries")

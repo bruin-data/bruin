@@ -103,7 +103,7 @@ type fallbackArrowTestConnection struct {
 	result *query.QueryResult
 }
 
-func (c fallbackArrowTestConnection) SelectWithSchema(ctx context.Context, *query.Query) (*query.QueryResult, error) {
+func (c fallbackArrowTestConnection) SelectWithSchema(ctx context.Context, query *query.Query) (*query.QueryResult, error) {
 	return c.result, nil
 }
 

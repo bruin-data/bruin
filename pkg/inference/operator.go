@@ -26,7 +26,7 @@ import (
 )
 
 type ingestrRunner interface {
-	RunIngestr(ctx context.Context, []string, []string, *git.Repo) error
+	RunIngestr(ctx context.Context, args, extraPackages []string, repo *git.Repo) error
 }
 
 // Operator enriches query results and publishes them through Bruin's ingestr writer.
