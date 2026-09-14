@@ -1,7 +1,6 @@
 package git
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"os"
@@ -27,7 +26,19 @@ func EnsureGivenPatternIsInGitignore(fs afero.Fs, repoRoot string, pattern strin
 		return nil
 	}
 
-	file, err := fs.OpenFile(gitignorePath, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0o644)
+	// Check for the pattern read-only first, so an already-ignored pattern never
+	// needs write access to .gitignore (which may be read-only for this user).
+	content, err := afero.ReadFile(fs, gitignorePath)
+	if err != nil {
+		return err
+	}
+	for line := range strings.SplitSeq(string(content), "\n") {
+		if strings.TrimSpace(line) == pattern {
+			return nil
+		}
+	}
+
+	file, err := fs.OpenFile(gitignorePath, os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		return err
 	}
@@ -37,14 +48,6 @@ func EnsureGivenPatternIsInGitignore(fs afero.Fs, repoRoot string, pattern strin
 			err = errors.Join(err, fmt.Errorf("failed to close file: %w", tempErr))
 		}
 	}(file)
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == pattern {
-			return nil
-		}
-	}
 
 	_, err = file.Write([]byte("\n" + pattern))
 	return err

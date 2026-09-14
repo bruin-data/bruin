@@ -1615,9 +1615,10 @@ func saveQueryLog(queryStr string, connName string, result *query.QueryResult, q
 
 	logDir := filepath.Join(repoRoot.Path, "logs/queries")
 
-	err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, "logs/queries")
-	if err != nil {
-		return errors.Wrap(err, "failed to add logs/queries to .gitignore")
+	// Best-effort: a read-only or unwritable .gitignore must not stop us from
+	// writing the query log itself.
+	if err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, "logs/queries"); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to add logs/queries to .gitignore: %v\n", err)
 	}
 
 	err = os.MkdirAll(logDir, 0o755)
