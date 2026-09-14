@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func roundTripArrow(t *testing.T, input arrow.RecordBatch, results []string) arrow.RecordBatch {
+func roundTripArrow(t *testing.T, input arrow.RecordBatch, results []string) arrow.RecordBatch { //nolint:ireturn
 	t.Helper()
 	f, err := os.CreateTemp(t.TempDir(), "inference-*.arrow")
 	require.NoError(t, err)
@@ -93,10 +93,33 @@ func TestRecordFromQueryRejectsLossyValuesAndUnknownTypes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			_, err := recordFromQuery(&query.QueryResult{
 				Columns: []string{"value"}, ColumnTypes: []string{tt.columnType}, Rows: [][]interface{}{{tt.value}},
 			}, nil)
 			require.Error(t, err)
 		})
 	}
+}
+
+func TestQueryArrowTypeMapsOracleNativeTypes(t *testing.T) {
+	t.Parallel()
+	dt, err := queryArrowType("VARCHAR2")
+	require.NoError(t, err)
+	require.Equal(t, arrow.BinaryTypes.String, dt)
+	dt, err = queryArrowType("VARCHAR2(100)")
+	require.NoError(t, err)
+	require.Equal(t, arrow.BinaryTypes.String, dt)
+	dt, err = queryArrowType("NUMBER")
+	require.NoError(t, err)
+	require.Equal(t, arrow.PrimitiveTypes.Int64, dt)
+	input, err := recordFromQuery(&query.QueryResult{
+		Columns:     []string{"name", "age"},
+		ColumnTypes: []string{"VARCHAR2", "NUMBER"},
+		Rows:        [][]any{{"jane", int64(30)}},
+	}, nil)
+	require.NoError(t, err)
+	defer input.Release()
+	require.Equal(t, arrow.BinaryTypes.String, input.Schema().Field(0).Type)
+	require.Equal(t, arrow.PrimitiveTypes.Int64, input.Schema().Field(1).Type)
 }

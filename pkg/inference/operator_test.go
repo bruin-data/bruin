@@ -217,7 +217,7 @@ func TestOperatorRejectsInvalidOutputAndEmptyReplace(t *testing.T) {
 
 func TestValidateAsset(t *testing.T) {
 	require.NoError(t, ValidateAsset(testAsset()))
-	for _, name := range []string{"provider", "context", "max_rows", "inference", "key", "view", "append", "connection", "output"} {
+	for _, name := range []string{"provider", "context", "max_rows", "inference", "key", "view", "append", "connection", "output", "unknown"} {
 		t.Run(name, func(t *testing.T) {
 			a := testAsset()
 			switch name {
@@ -239,6 +239,8 @@ func TestValidateAsset(t *testing.T) {
 				a.Connection = ""
 			case "output":
 				a.Columns[1].Type = "integer"
+			case "unknown":
+				a.Parameters["max_row"] = 10
 			}
 			require.Error(t, ValidateAsset(a))
 		})

@@ -532,6 +532,7 @@ func Test_pipelineBuilder_RegistersInferenceInputAssetDependency(t *testing.T) {
 	}
 
 	t.Run("missing dependency", func(t *testing.T) {
+		t.Parallel()
 		_, err := build(t, map[string]string{
 			"inference.asset.yml": "name: prediction\ntype: inference\nparameters:\n  input_asset: missing\n",
 		})
@@ -539,6 +540,7 @@ func Test_pipelineBuilder_RegistersInferenceInputAssetDependency(t *testing.T) {
 	})
 
 	t.Run("self dependency", func(t *testing.T) {
+		t.Parallel()
 		_, err := build(t, map[string]string{
 			"inference.asset.yml": "name: prediction\ntype: inference\nparameters:\n  input_asset: prediction\n",
 		})
@@ -546,6 +548,7 @@ func Test_pipelineBuilder_RegistersInferenceInputAssetDependency(t *testing.T) {
 	})
 
 	t.Run("does not duplicate an explicit dependency", func(t *testing.T) {
+		t.Parallel()
 		got, err := build(t, map[string]string{
 			"source.asset.yml":    "name: source\ntype: python\n",
 			"inference.asset.yml": "name: prediction\ntype: inference\ndepends:\n  - source\nparameters:\n  input_asset: source\n",
@@ -558,6 +561,7 @@ func Test_pipelineBuilder_RegistersInferenceInputAssetDependency(t *testing.T) {
 	})
 
 	t.Run("adds inferred dependency to asset ordering graph", func(t *testing.T) {
+		t.Parallel()
 		got, err := build(t, map[string]string{
 			"source.asset.yml":    "name: source\ntype: python\n",
 			"inference.asset.yml": "name: prediction\ntype: inference\nparameters:\n  input_asset: source\n",

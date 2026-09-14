@@ -159,6 +159,7 @@ columns:
 // This exercises real DuckDB reads and the real ingestr writer. Model requests
 // are mocked unless the separate paid live-test flag is enabled.
 func TestDuckDBMaterialization(t *testing.T) {
+	t.Parallel()
 	if os.Getenv("BRUIN_INFERENCE_INTEGRATION_TEST") != "1" {
 		t.Skip("set BRUIN_INFERENCE_INTEGRATION_TEST=1 for the DuckDB/ingestr integration test")
 	}

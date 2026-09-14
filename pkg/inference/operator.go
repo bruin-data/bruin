@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -23,7 +24,7 @@ import (
 )
 
 type ingestrRunner interface {
-	RunIngestr(context.Context, []string, []string, *git.Repo) error
+	RunIngestr(ctx context.Context, args, extraPackages []string, repo *git.Repo) error
 }
 
 // Operator enriches query results and publishes them through Bruin's ingestr writer.
@@ -177,7 +178,7 @@ func inputRows(input arrow.RecordBatch, primaryKeys []string, outputs []outputCo
 func fingerprint(value any) (string, error) {
 	data, err := json.Marshal(value)
 	if err != nil {
-		return "", fmt.Errorf("could not encode inference input identity")
+		return "", errors.New("could not encode inference input identity")
 	}
 	return fmt.Sprintf("%x", sha256.Sum256(data)), nil
 }
