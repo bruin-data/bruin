@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -93,7 +94,7 @@ func (o *Operator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
 		return err
 	}
 	if !locked {
-		return fmt.Errorf("inference asset is already running against this local cache")
+		return errors.New("inference asset is already running against this local cache")
 	}
 	defer lock.Unlock() //nolint:errcheck
 
@@ -190,7 +191,7 @@ func inputRows(input *query.QueryResult, primaryKeys []string, cfg *assetConfig)
 	columns := make(map[string]bool, len(input.Columns))
 	for _, name := range input.Columns {
 		if columns[name] || name == cfg.outputColumn {
-			return nil, nil, fmt.Errorf("inference input has duplicate columns or already contains output_column")
+			return nil, nil, errors.New("inference input has duplicate columns or already contains output_column")
 		}
 		columns[name] = true
 	}
@@ -232,7 +233,7 @@ func inputRows(input *query.QueryResult, primaryKeys []string, cfg *assetConfig)
 func fingerprint(value any) (string, error) {
 	data, err := json.Marshal(value)
 	if err != nil {
-		return "", fmt.Errorf("could not encode inference input identity")
+		return "", errors.New("could not encode inference input identity")
 	}
 	return fmt.Sprintf("%x", sha256.Sum256(data)), nil
 }

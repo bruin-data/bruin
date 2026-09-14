@@ -233,7 +233,7 @@ func appendArrowValue(builder array.Builder, value any) error {
 		}
 	}
 	if text == "(null)" {
-		return fmt.Errorf("not a valid typed value")
+		return errors.New("not a valid typed value")
 	}
 	return builder.AppendValueFromString(text)
 }
@@ -241,7 +241,7 @@ func appendArrowValue(builder array.Builder, value any) error {
 // writeArrow writes IPC file format, the same mmap:// contract as Python assets.
 func writeArrow(dst io.WriteSeeker, input arrow.RecordBatch, outputColumn string, results []string) error {
 	if int64(len(results)) != input.NumRows() {
-		return fmt.Errorf("inference result count does not match input")
+		return errors.New("inference result count does not match input")
 	}
 	builder := array.NewStringBuilder(memory.DefaultAllocator)
 	defer builder.Release()
