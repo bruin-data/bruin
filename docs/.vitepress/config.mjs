@@ -205,6 +205,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "SQL", link: "/assets/sql"},
                             {text: "Seed", link: "/assets/seed"},
                             {text: "Ingestr", link: "/assets/ingestr"},
+                            {text: "Inference", link: "/assets/inference"},
                             {text: "Python", link: "/assets/python", items: [
                                 {text: "Python SDK", link: "/assets/python-sdk"},
                             ]},
