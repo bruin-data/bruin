@@ -70,6 +70,14 @@ func readConfig(asset *pipeline.Asset) (*assetConfig, error) {
 	if !ok {
 		return nil, fmt.Errorf("unsupported inference provider %q: use opencode, openrouter, openai, anthropic or google", c.provider)
 	}
+	for name := range asset.Parameters {
+		switch name {
+		case "provider", "model", "prompt", "input_query", "input_asset", "output_column",
+			"api_key_env", "max_rows", "max_output_tokens", "extract_parallelism", "force", "allowed_values":
+		default:
+			return nil, fmt.Errorf("unsupported inference parameter %q", name)
+		}
+	}
 	if value, exists := asset.Parameters.GetString("api_key_env"); exists {
 		if value == "" {
 			return nil, fmt.Errorf("inference api_key_env cannot be empty")

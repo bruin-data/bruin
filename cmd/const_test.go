@@ -136,6 +136,7 @@ func TestRenderAssetParamsMutatorPreservesStructuredParameters(t *testing.T) {
 }
 
 func TestRenderInferencePromptIsDeferred(t *testing.T) {
+	t.Parallel()
 	asset := &pipeline.Asset{
 		Type: pipeline.AssetTypeInference,
 		Parameters: pipeline.ParameterMap{

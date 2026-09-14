@@ -2,6 +2,7 @@ package inference
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -22,18 +23,21 @@ import (
 
 var decimalType = regexp.MustCompile(`^(?:decimal|numeric|number)\((\d+),\s*(\d+)\)$`)
 
+var oracleNumberPrecision = regexp.MustCompile(`^number\((\d+)\)$`)
+
+//nolint:ireturn
 func readRecord(ctx context.Context, conn any, sql string, maxRows int, columns []pipeline.Column) (arrow.RecordBatch, error) {
 	q := &query.Query{Query: sql}
 	if reader, ok := conn.(interface {
-		SelectArrow(context.Context, *query.Query, int) (arrow.RecordBatch, error)
+		SelectArrow(ctx context.Context, *query.Query, int) (arrow.RecordBatch, error)
 	}); ok {
 		return reader.SelectArrow(ctx, q, maxRows)
 	}
 	reader, ok := conn.(interface {
-		SelectWithSchema(context.Context, *query.Query) (*query.QueryResult, error)
+		SelectWithSchema(ctx context.Context, *query.Query) (*query.QueryResult, error)
 	})
 	if !ok {
-		return nil, fmt.Errorf("connection does not support inference input queries")
+		return nil, errors.New("connection does not support inference input queries")
 	}
 	input, err := reader.SelectWithSchema(ctx, q)
 	if err != nil {
@@ -47,6 +51,7 @@ func readRecord(ctx context.Context, conn any, sql string, maxRows int, columns 
 
 // recordFromQuery is the fallback for connections without native Arrow reads.
 // Unknown or lossy conversions fail rather than silently becoming strings.
+//nolint:ireturn
 func recordFromQuery(input *query.QueryResult, columns []pipeline.Column) (arrow.RecordBatch, error) {
 	if input == nil {
 		return nil, fmt.Errorf("inference input query returned no result")
@@ -90,6 +95,7 @@ func recordFromQuery(input *query.QueryResult, columns []pipeline.Column) (arrow
 	return builder.NewRecordBatch(), nil
 }
 
+//nolint:ireturn
 func queryArrowType(name string) (arrow.DataType, error) {
 	name = strings.ToLower(strings.TrimSpace(name))
 	if parts := decimalType.FindStringSubmatch(name); parts != nil {
@@ -97,10 +103,35 @@ func queryArrowType(name string) (arrow.DataType, error) {
 		scale, _ := strconv.Atoi(parts[2])
 		if precision > 0 && precision <= 76 && scale <= precision {
 			if precision <= 38 {
-				return &arrow.Decimal128Type{Precision: int32(precision), Scale: int32(scale)}, nil
+				return &arrow.Decimal128Type{Precision: int32(precision), Scale: int32(scale)}, nil //nolint:gosec
 			}
-			return &arrow.Decimal256Type{Precision: int32(precision), Scale: int32(scale)}, nil
+			return &arrow.Decimal256Type{Precision: int32(precision), Scale: int32(scale)}, nil //nolint:gosec
 		}
+	}
+	// Oracle NUMBER with a single precision argument, e.g. NUMBER(10).
+	if parts := oracleNumberPrecision.FindStringSubmatch(name); parts != nil {
+		precision, _ := strconv.Atoi(parts[1])
+		if precision > 0 && precision <= 76 {
+			if precision <= 18 {
+				return arrow.PrimitiveTypes.Int64, nil
+			}
+			if precision <= 38 {
+				return &arrow.Decimal128Type{Precision: int32(precision)}, nil //nolint:gosec
+			}
+			return &arrow.Decimal256Type{Precision: int32(precision)}, nil //nolint:gosec
+		}
+	}
+	// Oracle DatabaseTypeName values, including optional length qualifiers
+	// such as VARCHAR2(100) or NVARCHAR2(50 CHAR).
+	for _, prefix := range []string{"varchar2", "nvarchar2", "nchar", "clob", "nclob"} {
+		if name == prefix || strings.HasPrefix(name, prefix+"(") {
+			return arrow.BinaryTypes.String, nil
+		}
+	}
+	// Bare Oracle NUMBER is the default integer column type (e.g. age NUMBER).
+	// Fractional numbers require an explicit columns.type decimal(p,s) declaration.
+	if name == "number" {
+		return arrow.PrimitiveTypes.Int64, nil
 	}
 	switch name {
 	case "bool", "boolean":
@@ -120,7 +151,8 @@ func queryArrowType(name string) (arrow.DataType, error) {
 		return arrow.PrimitiveTypes.Float32, nil
 	case "double", "double precision", "float8", "float64":
 		return arrow.PrimitiveTypes.Float64, nil
-	case "string", "text", "varchar", "char", "character varying", "nvarchar", "utf8":
+	case "string", "text", "varchar", "char", "character varying", "nvarchar", "utf8",
+		"varchar2", "nvarchar2", "nchar", "clob", "nclob":
 		return arrow.BinaryTypes.String, nil
 	case "binary", "varbinary", "blob", "bytea", "bytes":
 		return arrow.BinaryTypes.Binary, nil

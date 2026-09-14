@@ -14,7 +14,9 @@ func (c connectionWithType) GetConnectionDetails(string) any { return nil }
 func (c connectionWithType) GetConnectionType(string) string { return c.platform }
 
 func TestResolveInputQuery(t *testing.T) {
+	t.Parallel()
 	t.Run("query unchanged", func(t *testing.T) {
+		t.Parallel()
 		asset := testAsset()
 		query, err := resolveInputQuery(&pipeline.Pipeline{}, asset, connectionWithType{})
 		require.NoError(t, err)
@@ -27,6 +29,7 @@ func TestResolveInputQuery(t *testing.T) {
 		{"mssql", "SELECT * FROM [dbo].[tickets]"},
 	} {
 		t.Run(tc.platform, func(t *testing.T) {
+			t.Parallel()
 			asset := testAsset()
 			delete(asset.Parameters, "input_query")
 			sourceName := map[string]string{"google_cloud_platform": "project.dataset.tickets", "postgres": "analytics.tickets", "mssql": "dbo.tickets"}[tc.platform]
@@ -41,6 +44,7 @@ func TestResolveInputQuery(t *testing.T) {
 }
 
 func TestInferenceInputConfigExclusive(t *testing.T) {
+	t.Parallel()
 	asset := testAsset()
 	asset.Parameters["input_asset"] = "source"
 	require.ErrorContains(t, ValidateAsset(asset), "exactly one")
@@ -50,6 +54,7 @@ func TestInferenceInputConfigExclusive(t *testing.T) {
 }
 
 func TestResolveInputAssetRejectsInvalidReferences(t *testing.T) {
+	t.Parallel()
 	asset := testAsset()
 	delete(asset.Parameters, "input_query")
 	pipe := &pipeline.Pipeline{Assets: []*pipeline.Asset{asset}}

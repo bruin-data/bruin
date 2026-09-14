@@ -153,7 +153,7 @@ func (c *Client) do(ctx context.Context, endpoint string, body []byte) ([]byte, 
 		httpClient = &http.Client{Timeout: defaultTimeout}
 	}
 
-	for attempt := 0; attempt < maxAttempts; attempt++ {
+	for attempt := range maxAttempts {
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 		if err != nil {
 			return nil, errors.New("could not create inference request")
@@ -161,10 +161,10 @@ func (c *Client) do(ctx context.Context, endpoint string, body []byte) ([]byte, 
 		req.Header.Set("Content-Type", "application/json")
 		switch c.Provider {
 		case "anthropic":
-			req.Header.Set("x-api-key", c.APIKey)
-			req.Header.Set("anthropic-version", "2023-06-01")
+			req.Header.Set("X-Api-Key", c.APIKey)
+			req.Header.Set("Anthropic-Version", "2023-06-01")
 		case "google":
-			req.Header.Set("x-goog-api-key", c.APIKey)
+			req.Header.Set("X-Goog-Api-Key", c.APIKey)
 		default:
 			if c.APIKey != "" {
 				req.Header.Set("Authorization", "Bearer "+c.APIKey)

@@ -51,12 +51,12 @@ func (r *captureRunner) RunIngestr(_ context.Context, args, _ []string, _ *git.R
 			return err
 		}
 		defer reader.Close()
-		for batch := 0; batch < reader.NumRecords(); batch++ {
+		for batch := range reader.NumRecords() {
 			record, err := reader.RecordBatchAt(batch)
 			if err != nil {
 				return err
 			}
-			for j := 0; j < int(record.NumRows()); j++ {
+			for j := range int(record.NumRows()) {
 				row := make(map[string]any)
 				for k, field := range record.Schema().Fields() {
 					row[field.Name] = record.Column(k).GetOneForMarshal(j)
@@ -100,6 +100,7 @@ func fixture(t *testing.T) (*Operator, *scheduler.AssetInstance, *inputConnectio
 }
 
 func TestOperatorCacheAndMaterialization(t *testing.T) {
+	t.Parallel()
 	op, ti, conn, runner := fixture(t)
 	calls := 0
 	op.complete = func(_ context.Context, _ *Client, prompt string) (string, error) {
@@ -141,6 +142,7 @@ func TestOperatorCacheAndMaterialization(t *testing.T) {
 }
 
 func TestOperatorResumesFailureWithoutPublishingPartialResults(t *testing.T) {
+	t.Parallel()
 	op, ti, _, runner := fixture(t)
 	calls := 0
 	op.complete = func(context.Context, *Client, string) (string, error) {
@@ -165,8 +167,10 @@ func TestOperatorResumesFailureWithoutPublishingPartialResults(t *testing.T) {
 }
 
 func TestOperatorRejectsInvalidInputBeforeCallingModel(t *testing.T) {
+	t.Parallel()
 	for _, name := range []string{"duplicate", "null", "missing", "too many", "collision"} {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			op, ti, conn, runner := fixture(t)
 			switch name {
 			case "duplicate":
@@ -188,6 +192,7 @@ func TestOperatorRejectsInvalidInputBeforeCallingModel(t *testing.T) {
 }
 
 func TestOperatorRejectsInvalidOutputAndEmptyReplace(t *testing.T) {
+	t.Parallel()
 	op, ti, conn, runner := fixture(t)
 	calls := 0
 	op.complete = func(context.Context, *Client, string) (string, error) { calls++; return "unrecognized", nil }
@@ -204,9 +209,11 @@ func TestOperatorRejectsInvalidOutputAndEmptyReplace(t *testing.T) {
 }
 
 func TestValidateAsset(t *testing.T) {
+	t.Parallel()
 	require.NoError(t, ValidateAsset(testAsset()))
-	for _, name := range []string{"provider", "prompt", "max_rows", "allowed_values", "key", "view", "append", "connection", "output"} {
+	for _, name := range []string{"provider", "prompt", "max_rows", "allowed_values", "key", "view", "append", "connection", "output", "unknown"} {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			a := testAsset()
 			switch name {
 			case "provider":
@@ -227,6 +234,8 @@ func TestValidateAsset(t *testing.T) {
 				a.Connection = ""
 			case "output":
 				a.Columns[1].Type = "integer"
+			case "unknown":
+				a.Parameters["max_row"] = 10
 			}
 			require.Error(t, ValidateAsset(a))
 		})
@@ -234,6 +243,7 @@ func TestValidateAsset(t *testing.T) {
 }
 
 func TestOperatorParallelRequestsPreserveRows(t *testing.T) {
+	t.Parallel()
 	op, ti, conn, runner := fixture(t)
 	ti.Asset.Parameters["extract_parallelism"] = 2
 	ti.Asset.Parameters["prompt"] = "{{ row.body }}"
@@ -293,6 +303,7 @@ func TestOperatorParallelRequestsPreserveRows(t *testing.T) {
 }
 
 func TestOperatorParallelFailureCancelsRequests(t *testing.T) {
+	t.Parallel()
 	op, ti, conn, runner := fixture(t)
 	ti.Asset.Parameters["extract_parallelism"] = 2
 	conn.result.Rows = append(conn.result.Rows, []any{9, "must not start"})
@@ -321,6 +332,7 @@ func TestOperatorParallelFailureCancelsRequests(t *testing.T) {
 }
 
 func TestExtractParallelismConfig(t *testing.T) {
+	t.Parallel()
 	cfg, err := readConfig(testAsset())
 	require.NoError(t, err)
 	require.Equal(t, 4, cfg.parallelism)
@@ -337,6 +349,7 @@ func TestExtractParallelismConfig(t *testing.T) {
 }
 
 func TestZenLive(t *testing.T) {
+	t.Parallel()
 	if os.Getenv("BRUIN_INFERENCE_LIVE_TEST") != "1" {
 		t.Skip("set BRUIN_INFERENCE_LIVE_TEST=1 to call the paid Zen Muse Spark model with synthetic data")
 	}

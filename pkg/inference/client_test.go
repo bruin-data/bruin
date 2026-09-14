@@ -25,6 +25,7 @@ func response(status int, body string, headers ...http.Header) *http.Response {
 }
 
 func TestCompleteWireShapesAndExtraction(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name          string
 		client        Client
@@ -39,6 +40,7 @@ func TestCompleteWireShapesAndExtraction(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			tt.client.HTTPClient = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 				if req.URL.String() != tt.wantURL || req.Method != http.MethodPost {
 					t.Fatalf("unexpected request: %s %s", req.Method, req.URL)
@@ -74,6 +76,7 @@ func TestCompleteWireShapesAndExtraction(t *testing.T) {
 }
 
 func TestCompleteDirectProviderWireContracts(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name, provider, model, wantURL, response string
 		check                                    func(*testing.T, *http.Request, map[string]any)
@@ -92,7 +95,7 @@ func TestCompleteDirectProviderWireContracts(t *testing.T) {
 			response: `{"type":"message","role":"assistant","stop_reason":"end_turn","content":[{"type":"text","text":"anthropic answer"}]}`,
 			check: func(t *testing.T, req *http.Request, body map[string]any) {
 				messages := body["messages"].([]any)
-				if req.Header.Get("x-api-key") != "direct-secret" || req.Header.Get("anthropic-version") != "2023-06-01" || req.Header.Get("Authorization") != "" || body["max_tokens"] != float64(23) || messages[0].(map[string]any)["content"] != "prompt" {
+				if req.Header.Get("X-Api-Key") != "direct-secret" || req.Header.Get("Anthropic-Version") != "2023-06-01" || req.Header.Get("Authorization") != "" || body["max_tokens"] != float64(23) || messages[0].(map[string]any)["content"] != "prompt" {
 					t.Fatalf("unexpected Anthropic request: headers=%v body=%#v", req.Header, body)
 				}
 			},
@@ -104,7 +107,7 @@ func TestCompleteDirectProviderWireContracts(t *testing.T) {
 				contents := body["contents"].([]any)
 				parts := contents[0].(map[string]any)["parts"].([]any)
 				config := body["generationConfig"].(map[string]any)
-				if req.Header.Get("x-goog-api-key") != "direct-secret" || req.Header.Get("Authorization") != "" || config["maxOutputTokens"] != float64(23) || parts[0].(map[string]any)["text"] != "prompt" {
+				if req.Header.Get("X-Goog-Api-Key") != "direct-secret" || req.Header.Get("Authorization") != "" || config["maxOutputTokens"] != float64(23) || parts[0].(map[string]any)["text"] != "prompt" {
 					t.Fatalf("unexpected Google request: headers=%v body=%#v", req.Header, body)
 				}
 			},
@@ -112,6 +115,7 @@ func TestCompleteDirectProviderWireContracts(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			client := Client{Provider: tt.provider, Model: tt.model, APIKey: "direct-secret", MaxOutputTokens: 23}
 			client.HTTPClient = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 				if req.URL.String() != tt.wantURL {
@@ -136,8 +140,10 @@ func TestCompleteDirectProviderWireContracts(t *testing.T) {
 }
 
 func TestCompleteDirectProvidersRequireKeys(t *testing.T) {
+	t.Parallel()
 	for _, provider := range []string{"openai", "anthropic", "google"} {
 		t.Run(provider, func(t *testing.T) {
+			t.Parallel()
 			_, err := (&Client{Provider: provider, Model: "model"}).Complete(context.Background(), "prompt")
 			if err == nil || !strings.Contains(err.Error(), "key is required") {
 				t.Fatalf("error = %v", err)
@@ -147,6 +153,7 @@ func TestCompleteDirectProvidersRequireKeys(t *testing.T) {
 }
 
 func TestCompleteRetriesRetryableStatuses(t *testing.T) {
+	t.Parallel()
 	var calls atomic.Int32
 	c := Client{Provider: "opencode", Model: "model", HTTPClient: &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
 		if calls.Add(1) < 3 {
@@ -161,6 +168,7 @@ func TestCompleteRetriesRetryableStatuses(t *testing.T) {
 }
 
 func TestCompleteCancellationDuringBackoff(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	c := Client{Provider: "opencode", Model: "model", HTTPClient: &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
 		cancel()
@@ -174,6 +182,7 @@ func TestCompleteCancellationDuringBackoff(t *testing.T) {
 }
 
 func TestCompleteRejectsBadResponsesWithoutLeakingBody(t *testing.T) {
+	t.Parallel()
 	tests := []struct{ name, provider, body string }{
 		{"opencode incomplete", "opencode", `{"status":"incomplete","secret":"DO_NOT_LEAK"}`},
 		{"opencode refusal", "opencode", `{"status":"completed","output":[{"type":"message","role":"assistant","status":"completed","content":[{"type":"refusal","text":"DO_NOT_LEAK"}]}]}`},
@@ -194,6 +203,7 @@ func TestCompleteRejectsBadResponsesWithoutLeakingBody(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			c := Client{Provider: tt.provider, Model: "model", APIKey: "key", HTTPClient: &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) { return response(http.StatusOK, tt.body), nil })}}
 			_, err := c.Complete(context.Background(), "prompt")
 			if err == nil || strings.Contains(err.Error(), "DO_NOT_LEAK") {
@@ -204,6 +214,7 @@ func TestCompleteRejectsBadResponsesWithoutLeakingBody(t *testing.T) {
 }
 
 func TestProviderDefaultAPIKeyEnv(t *testing.T) {
+	t.Parallel()
 	wants := map[string]string{
 		"openai": "OPENAI_API_KEY", "anthropic": "ANTHROPIC_API_KEY", "google": "GOOGLE_API_KEY",
 	}
@@ -219,6 +230,7 @@ func TestProviderDefaultAPIKeyEnv(t *testing.T) {
 }
 
 func TestCompleteHTTPErrorDoesNotLeakResponse(t *testing.T) {
+	t.Parallel()
 	c := Client{Provider: "openrouter", Model: "model", APIKey: "key", HTTPClient: &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
 		return response(http.StatusBadRequest, "DO_NOT_LEAK"), nil
 	})}}
@@ -229,6 +241,7 @@ func TestCompleteHTTPErrorDoesNotLeakResponse(t *testing.T) {
 }
 
 func TestCompleteTransportErrorDoesNotLeakSecrets(t *testing.T) {
+	t.Parallel()
 	c := Client{Provider: "openai", Model: "model", APIKey: "DO_NOT_LEAK_KEY", HTTPClient: &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
 		return nil, errors.New("transport exposed DO_NOT_LEAK_KEY and prompt")
 	})}}

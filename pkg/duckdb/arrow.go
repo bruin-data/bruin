@@ -4,6 +4,7 @@ package duck
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/apache/arrow-go/v18/arrow"
@@ -14,12 +15,13 @@ import (
 
 // SelectArrow returns an owned record batch without the JSON-oriented conversions
 // in SelectWithSchema. The caller must Release it. maxRows bounds buffered rows.
+//nolint:ireturn
 func (c *Client) SelectArrow(ctx context.Context, q *query.Query, maxRows int) (arrow.RecordBatch, error) {
 	c.lockIfNeeded()
 	defer c.unlockIfNeeded()
 	e, ok := c.connection.(*EphemeralConnection)
 	if !ok {
-		return nil, fmt.Errorf("Arrow queries require an ADBC connection")
+		return nil, errors.New("Arrow queries require an ADBC connection")
 	}
 	db, conn, err := e.openADBC(ctx)
 	if err != nil {
@@ -40,7 +42,7 @@ func (c *Client) SelectArrow(ctx context.Context, q *query.Query, maxRows int) (
 		return nil, err
 	}
 	if reader == nil {
-		return nil, fmt.Errorf("input query did not return an Arrow schema")
+		return nil, errors.New("input query did not return an Arrow schema")
 	}
 	defer reader.Release()
 	var records []arrow.RecordBatch

@@ -73,7 +73,7 @@ Required: `provider`, `model`, exactly one of `input_query` or `input_asset`, `p
 | `extract_parallelism` | `4` | Number of concurrent row requests per asset. Any positive integer is accepted, with no additional concurrency cap. Named consistently with ingestr's `--extract-parallelism`; controls inference only, not destination loading. |
 | `force` | `false` | Call the model again even when a valid cached response exists. May incur charges. |
 
-`input_query` supports normal Bruin run-time templating. `prompt` is deferred until execution and supports `{{ row.column_name }}` with Jinja expressions. In this version its context contains only `row`, not run dates or pipeline variables. Include such values as input query columns if needed.
+`input_query` supports normal Bruin run-time templating. `prompt` is deferred until execution and supports <code v-pre>{{ row.column_name }}</code> with Jinja expressions. In this version its context contains only `row`, not run dates or pipeline variables. Include such values as input query columns if needed.
 
 ## Materialization and retries
 
