@@ -45,11 +45,12 @@ jobs:
           fetch-depth: 1
           fetch-tags: true
       - name: Setup Go
+        id: go
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: 'go.mod'
-          # Depot Linux already persists build/test results through GOCACHEPROG.
-          # Windows does not, so retain setup-go's combined cache there.
+          # Keep Linux module downloads separate from revision-specific results.
+          # Retain the existing combined cache on Windows.
           cache: ${{ runner.os == 'Windows' }}
           cache-dependency-path: 'go.sum'
       - name: Cache Go modules
@@ -58,6 +59,14 @@ jobs:
         with:
           path: ~/go/pkg/mod
           key: go-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/go.sum') }}
+      - name: Cache Linux unit build and test results
+        if: runner.os == 'Linux'
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/go-build
+          key: go-unit-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.go-version }}-${{ hashFiles('**/go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-unit-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.go-version }}-${{ hashFiles('**/go.sum') }}-
       - name: Cache Rust artifacts
         id: rust-cache
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
