@@ -163,18 +163,29 @@ func Query() *cli.Command {
 				Sources: cli.EnvVars("BRUIN_VARS"),
 			},
 			&cli.BoolFlag{
-				Name:    "cloud",
-				Usage:   "run the query against Bruin Cloud instead of locally (uses --connection against the agent's connections; ignores .bruin.yml; --var is not applied)",
+				Name: "cloud",
+				// Deprecated: prefer marking the connection with `use_cloud: true` in
+				// .bruin.yml. Kept working but hidden so it is not surfaced to users or
+				// agents. Forces cloud routing regardless of the connection config:
+				// uses --connection against the agent's connections, ignores .bruin.yml,
+				// and does not apply --var.
+				Hidden:  true,
 				Sources: cli.EnvVars("BRUIN_CLOUD_QUERY"),
 			},
 			&cli.IntFlag{
-				Name:    "cloud-agent-id",
-				Usage:   "Bruin Cloud agent id whose connections back the query (with --cloud)",
+				Name: "cloud-agent-id",
+				// Hidden: supplied by the Bruin Cloud sandbox environment via
+				// BRUIN_CLOUD_AGENT_ID; not surfaced to users or agents.
+				Hidden:  true,
+				Usage:   "Bruin Cloud agent id whose connections back the query when the connection runs in the cloud",
 				Sources: cli.EnvVars("BRUIN_CLOUD_AGENT_ID"),
 			},
 			&cli.StringFlag{
-				Name:    "cloud-api-key",
-				Usage:   "Bruin Cloud API key used to authenticate --cloud queries",
+				Name: "cloud-api-key",
+				// Hidden: supplied by the Bruin Cloud sandbox environment via
+				// BRUIN_CLOUD_API_KEY; not surfaced to users or agents.
+				Hidden:  true,
+				Usage:   "Bruin Cloud API key used to authenticate cloud queries",
 				Sources: cli.EnvVars("BRUIN_CLOUD_API_KEY"),
 			},
 		},
@@ -196,8 +207,10 @@ func Query() *cli.Command {
 
 			// Cloud mode has no local dialect to rewrite against, so the SQL parser
 			// (schema-prefix) and dry-run don't apply; --limit is honored client-side
-			// in cloudQuerier instead of via the parser.
-			cloudMode := c.Bool("cloud")
+			// in cloudQuerier instead of via the parser. Cloud mode is entered either
+			// via the hidden --cloud flag or a connection marked use_cloud: true, both
+			// of which resolve to a *cloudQuerier here.
+			_, cloudMode := conn.(*cloudQuerier)
 
 			var parser *sqlparser.SQLParser
 			needsParser := !cloudMode && (c.IsSet("limit") || (pipelineInfo != nil && pipelineInfo.Config.SelectedEnvironment.SchemaPrefix != ""))
@@ -524,10 +537,12 @@ func (q *cloudQuerier) SelectWithSchema(ctx context.Context, qq *query.Query) (*
 	}, nil
 }
 
-// prepareCloudQueryExecution builds a cloud-backed querier from the --cloud flags,
-// bypassing .bruin.yml entirely. The SQL is sent verbatim: cloud query mode does
-// not accept template variables (--var is ignored), so there is nothing to render
-// or interpolate.
+// prepareCloudQueryExecution builds a cloud-backed querier that runs the query
+// through the Bruin Cloud query service. It is used both when the connection is
+// marked use_cloud: true and when the hidden --cloud flag forces cloud routing.
+// The SQL is sent verbatim: cloud query mode does not accept template variables
+// (--var is ignored), so there is nothing to render or interpolate. The agent id
+// and API key come from --cloud-agent-id / --cloud-api-key (or their env vars).
 func prepareCloudQueryExecution(c *cli.Command) (string, interface{}, string, string, *ppInfo, error) {
 	if hasSemanticQueryFlags(c) {
 		return "", nil, "", "", nil, errors.New("semantic queries are not supported in cloud query mode")
@@ -541,12 +556,12 @@ func prepareCloudQueryExecution(c *cli.Command) (string, interface{}, string, st
 
 	apiKey := c.String("cloud-api-key")
 	if apiKey == "" {
-		return "", nil, "", "", nil, errors.New("cloud query mode requires --cloud-api-key (BRUIN_CLOUD_API_KEY)")
+		return "", nil, "", "", nil, errors.New("cloud query mode requires a Bruin Cloud API key (--cloud-api-key or BRUIN_CLOUD_API_KEY)")
 	}
 
 	agentID := c.Int("cloud-agent-id")
 	if agentID <= 0 {
-		return "", nil, "", "", nil, errors.New("cloud query mode requires --cloud-agent-id (BRUIN_CLOUD_AGENT_ID)")
+		return "", nil, "", "", nil, errors.New("cloud query mode requires a Bruin Cloud agent id (--cloud-agent-id or BRUIN_CLOUD_AGENT_ID)")
 	}
 
 	querier := &cloudQuerier{
@@ -587,6 +602,17 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, var
 
 	// Direct query mode (no asset path)
 	if assetPath == "" {
+		// A connection marked use_cloud: true routes through the Bruin Cloud query
+		// service. Detect it before building the connection manager, since a
+		// cloud-only connection may omit local credentials.
+		useCloud, err := connectionUsesCloud(fs, env, connectionName, c.String("config-file"))
+		if err != nil {
+			return "", nil, "", "", nil, err
+		}
+		if useCloud {
+			return prepareCloudQueryExecution(c)
+		}
+
 		conn, connType, err := getConnectionAndTypeFromConfigWithContext(ctx, env, connectionName, fs, c.String("config-file"))
 		if err != nil {
 			return "", nil, "", "", nil, err
@@ -1001,7 +1027,10 @@ func getConnectionFromConfigWithContext(ctx context.Context, env string, connect
 	return conn, err
 }
 
-func getConnectionAndTypeFromConfigWithContext(ctx context.Context, env string, connectionName string, fs afero.Fs, configFilePath string) (interface{}, string, error) {
+// loadQueryConfig loads the .bruin.yml config for the query command and selects
+// the requested environment. It returns the loaded config along with the
+// resolved config file path so callers can thread it into the context.
+func loadQueryConfig(fs afero.Fs, env string, configFilePath string) (*config.Config, string, error) {
 	repoRoot, err := git.FindRepoFromPath(".")
 	if err != nil {
 		return nil, "", errors.Wrap(err, "failed to find the git repository root")
@@ -1017,10 +1046,38 @@ func getConnectionAndTypeFromConfigWithContext(ctx context.Context, env string, 
 	}
 
 	if env != "" {
-		err := cm.SelectEnvironment(env)
-		if err != nil {
+		if err := cm.SelectEnvironment(env); err != nil {
 			return nil, "", errors.Wrapf(err, "failed to use the environment '%s'", env)
 		}
+	}
+
+	return cm, configFilePath, nil
+}
+
+// connectionUsesCloud reports whether the named connection is configured to run
+// its queries through Bruin Cloud (use_cloud: true). It is checked before the
+// connection manager is built because a cloud-only connection may omit local
+// credentials and would otherwise fail credential validation. A missing config
+// or unknown connection is not an error here: the caller falls through to the
+// local path, which produces the appropriate not-found error.
+func connectionUsesCloud(fs afero.Fs, env string, connectionName string, configFilePath string) (bool, error) {
+	cm, _, err := loadQueryConfig(fs, env, configFilePath)
+	if err != nil {
+		return false, err
+	}
+	if cm.SelectedEnvironment == nil || cm.SelectedEnvironment.Connections == nil {
+		return false, nil
+	}
+	if cc, ok := cm.SelectedEnvironment.Connections.GetConnection(connectionName).(interface{ IsCloud() bool }); ok {
+		return cc.IsCloud(), nil
+	}
+	return false, nil
+}
+
+func getConnectionAndTypeFromConfigWithContext(ctx context.Context, env string, connectionName string, fs afero.Fs, configFilePath string) (interface{}, string, error) {
+	cm, configFilePath, err := loadQueryConfig(fs, env, configFilePath)
+	if err != nil {
+		return nil, "", err
 	}
 
 	ctx = context.WithValue(ctx, config.ConfigFilePathContextKey, configFilePath)
