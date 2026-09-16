@@ -98,7 +98,7 @@ jobs:
           if [[ "${{ runner.os }}" == 'Linux' ]]; then
             # The non-short cmd suite runs in end2end below. Keep Windows'
             # existing full coverage while separating Linux CLI acceptance work.
-            make test-full TEST_FLAGS=-short TEST_CONCURRENCY=8
+            make test-full TEST_FLAGS=-short
           else
             make test-full
           fi
