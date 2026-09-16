@@ -5620,6 +5620,7 @@ func CloudScheduledAgents() *cli.Command {
 			cloudScheduledAgentsTrigger(),
 			cloudScheduledAgentsDelete(),
 			cloudScheduledAgentsRunStates(),
+			cloudScheduledAgentsPipelineTrigger(),
 		},
 	}
 }
@@ -6176,6 +6177,10 @@ func buildScheduledAgentFields(c *cli.Command) (map[string]any, error) {
 		fields = parsed
 	}
 
+	if _, exists := fields["pipeline_trigger"]; exists {
+		return nil, errors.New("pipeline_trigger is not a plan field; use bruin cloud scheduled-agents pipeline-trigger set or delete")
+	}
+
 	if c.IsSet("title") {
 		fields["title"] = c.String("title")
 	}
@@ -6210,6 +6215,9 @@ func printScheduledAgent(run *bruincloud.ScheduledAgent) {
 	infoPrinter.Printf("Scheduled agent %d: %s\n", run.ID, derefString(run.Title))
 	fmt.Printf("  Active:    %v\n", run.IsActive)
 	fmt.Printf("  Cron:      %s\n", derefString(run.ScheduleCron))
+	if run.PipelineTrigger != nil {
+		fmt.Printf("  Pipeline:  %s/%s\n", run.PipelineTrigger.ProjectID, run.PipelineTrigger.ID)
+	}
 	fmt.Printf("  Timezone:  %s\n", derefString(run.ScheduleTimezone))
 	fmt.Printf("  Next run:  %s\n", derefString(run.NextRunAt))
 	fmt.Printf("  Last run:  %s\n", derefString(run.LastRunAt))

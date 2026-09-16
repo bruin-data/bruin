@@ -792,7 +792,7 @@ func TestCloudScheduledAgentsCommand_Help(t *testing.T) {
 	cmd := CloudScheduledAgents()
 	require.NotNil(t, cmd)
 	assert.Equal(t, "scheduled-agents", cmd.Name)
-	require.Len(t, cmd.Commands, 7)
+	require.Len(t, cmd.Commands, 8)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
@@ -805,6 +805,7 @@ func TestCloudScheduledAgentsCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "trigger")
 	assert.Contains(t, subNames, "delete")
 	assert.Contains(t, subNames, "run-states")
+	assert.Contains(t, subNames, "pipeline-trigger")
 }
 
 func TestCloudNotificationRulesCommand_Help(t *testing.T) {
