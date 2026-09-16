@@ -417,6 +417,9 @@
         "max_concurrent_assets": {
           "type": "integer"
         },
+        "use_cloud": {
+          "type": "boolean"
+        },
         "access_key_id": {
           "type": "string"
         },
@@ -817,6 +820,9 @@
         },
         "max_concurrent_assets": {
           "type": "integer"
+        },
+        "use_cloud": {
+          "type": "boolean"
         },
         "username": {
           "type": "string"
@@ -1893,6 +1899,9 @@
         "max_concurrent_assets": {
           "type": "integer"
         },
+        "use_cloud": {
+          "type": "boolean"
+        },
         "username": {
           "type": "string"
         },
@@ -1968,6 +1977,9 @@
         "max_concurrent_assets": {
           "type": "integer"
         },
+        "use_cloud": {
+          "type": "boolean"
+        },
         "username": {
           "type": "string"
         },
@@ -2017,6 +2029,9 @@
         },
         "max_concurrent_assets": {
           "type": "integer"
+        },
+        "use_cloud": {
+          "type": "boolean"
         },
         "token": {
           "type": "string"
@@ -2178,6 +2193,9 @@
         "max_concurrent_assets": {
           "type": "integer"
         },
+        "use_cloud": {
+          "type": "boolean"
+        },
         "username": {
           "type": "string"
         },
@@ -2226,6 +2244,9 @@
         "max_concurrent_assets": {
           "type": "integer"
         },
+        "use_cloud": {
+          "type": "boolean"
+        },
         "host": {
           "type": "string"
         },
@@ -2266,6 +2287,9 @@
         },
         "max_concurrent_assets": {
           "type": "integer"
+        },
+        "use_cloud": {
+          "type": "boolean"
         },
         "path": {
           "type": "string"
@@ -2466,6 +2490,9 @@
         },
         "max_concurrent_assets": {
           "type": "integer"
+        },
+        "use_cloud": {
+          "type": "boolean"
         },
         "host": {
           "type": "string"
@@ -3002,6 +3029,9 @@
         "max_concurrent_assets": {
           "type": "integer"
         },
+        "use_cloud": {
+          "type": "boolean"
+        },
         "service_account_json": {
           "type": "string"
         },
@@ -3117,6 +3147,9 @@
         },
         "max_concurrent_assets": {
           "type": "integer"
+        },
+        "use_cloud": {
+          "type": "boolean"
         },
         "username": {
           "type": "string"
@@ -3885,6 +3918,9 @@
         "max_concurrent_assets": {
           "type": "integer"
         },
+        "use_cloud": {
+          "type": "boolean"
+        },
         "token": {
           "type": "string"
         },
@@ -3909,6 +3945,9 @@
         },
         "max_concurrent_assets": {
           "type": "integer"
+        },
+        "use_cloud": {
+          "type": "boolean"
         },
         "username": {
           "type": "string"
@@ -3948,6 +3987,9 @@
         },
         "max_concurrent_assets": {
           "type": "integer"
+        },
+        "use_cloud": {
+          "type": "boolean"
         },
         "username": {
           "type": "string"
@@ -4079,6 +4121,9 @@
         },
         "max_concurrent_assets": {
           "type": "integer"
+        },
+        "use_cloud": {
+          "type": "boolean"
         },
         "username": {
           "type": "string"
@@ -4468,6 +4513,9 @@
         "max_concurrent_assets": {
           "type": "integer"
         },
+        "use_cloud": {
+          "type": "boolean"
+        },
         "username": {
           "type": "string"
         },
@@ -4718,6 +4766,9 @@
         "max_concurrent_assets": {
           "type": "integer"
         },
+        "use_cloud": {
+          "type": "boolean"
+        },
         "username": {
           "type": "string"
         },
@@ -4865,6 +4916,9 @@
         },
         "max_concurrent_assets": {
           "type": "integer"
+        },
+        "use_cloud": {
+          "type": "boolean"
         },
         "path": {
           "type": "string"
@@ -5203,6 +5257,9 @@
         "max_concurrent_assets": {
           "type": "integer"
         },
+        "use_cloud": {
+          "type": "boolean"
+        },
         "account": {
           "type": "string"
         },
@@ -5307,6 +5364,9 @@
         "max_concurrent_assets": {
           "type": "integer"
         },
+        "use_cloud": {
+          "type": "boolean"
+        },
         "project_id": {
           "type": "string"
         },
@@ -5395,6 +5455,9 @@
         },
         "max_concurrent_assets": {
           "type": "integer"
+        },
+        "use_cloud": {
+          "type": "boolean"
         },
         "host": {
           "type": "string"
@@ -5551,6 +5614,9 @@
         "max_concurrent_assets": {
           "type": "integer"
         },
+        "use_cloud": {
+          "type": "boolean"
+        },
         "username": {
           "type": "string"
         },
@@ -5692,6 +5758,9 @@
         },
         "max_concurrent_assets": {
           "type": "integer"
+        },
+        "use_cloud": {
+          "type": "boolean"
         },
         "host": {
           "type": "string"
@@ -5867,6 +5936,9 @@
         },
         "max_concurrent_assets": {
           "type": "integer"
+        },
+        "use_cloud": {
+          "type": "boolean"
         },
         "username": {
           "type": "string"
