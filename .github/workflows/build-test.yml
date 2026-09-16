@@ -107,7 +107,9 @@ jobs:
           if [[ "${{ runner.os }}" == 'Linux' ]]; then
             # The non-short cmd suite runs in end2end below. Keep Windows'
             # existing full coverage while separating Linux CLI acceptance work.
-            make test-full TEST_FLAGS=-short
+            # CI does not attach a debugger; omit DWARF to reduce linking work.
+            # Go stack traces and race detection remain enabled.
+            make test-full TEST_FLAGS='-short -ldflags=-w'
           else
             make test-full
           fi
