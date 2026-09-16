@@ -88,14 +88,20 @@ jobs:
             /tmp/bruin-cli-embedded_0-python
             /tmp/bruin-cli-embedded_0-sqlglot-lib
           key: embedded-python-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.sum', 'internal/data/**') }}
-      - name: Run full test suite
+      - name: Run race-enabled unit tests
         shell: bash
         run: |
           # Race-enabled Windows binaries need the matching MinGW runtime DLLs.
           # Installer tests inject a missing shell, so the native fallback is
           # still covered without depending on this PATH.
           [[ "${{ runner.os }}" != 'Windows' ]] || export PATH="/c/mingw64/bin:$PATH"
-          make test-full
+          if [[ "${{ runner.os }}" == 'Linux' ]]; then
+            # The non-short cmd suite runs in end2end below. Keep Windows'
+            # existing full coverage while separating Linux CLI acceptance work.
+            make test-full TEST_FLAGS=-short TEST_CONCURRENCY=8
+          else
+            make test-full
+          fi
   end2end:
     strategy:
       matrix:
@@ -151,6 +157,8 @@ jobs:
         run: make integration-test
       - name: Run MSSQL developer environment integration test
         run: make integration-test-mssql
+      - name: Run full CLI test suite including database acceptance tests
+        run: env SF_DISABLE_MINICORE=true go test -tags=no_duckdb_arrow -race -p 4 -vet=off -timeout 10m ./cmd/...
   dockerBuild:
     # Depot build for pushes and internally-created PRs. Fork PRs cannot
     # authenticate with Depot, so they are handled by dockerBuildFork instead.
