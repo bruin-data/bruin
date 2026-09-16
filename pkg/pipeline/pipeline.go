@@ -32,6 +32,7 @@ const (
 	CommentTask TaskDefinitionType = "comment"
 	YamlTask    TaskDefinitionType = "yaml"
 
+	AssetTypeInference                 = AssetType("inference")
 	AssetTypeAgentClaudeCode           = AssetType("agent.claude_code")
 	AssetTypeAthenaQuery               = AssetType("athena.sql")
 	AssetTypeAthenaSeed                = AssetType("athena.seed")
@@ -3045,6 +3046,10 @@ func (b *Builder) CreatePipelineFromPath(ctx context.Context, pathToPipeline str
 		pipeline.TasksByType[task.Type] = append(pipeline.TasksByType[task.Type], task)
 		pipeline.tasksByName[task.Name] = task
 	}
+
+	if err := registerImplicitInputAssetDependencies(pipeline); err != nil {
+		return nil, err
+	}
 	var entities []*glossary.Entity
 	if b.GlossaryReader != nil {
 		entities, err = b.GlossaryReader.GetEntities(pathToPipeline)
@@ -3096,6 +3101,32 @@ func (b *Builder) CreatePipelineFromPath(ctx context.Context, pathToPipeline str
 	}
 
 	return pipeline, nil
+}
+
+// registerImplicitInputAssetDependencies keeps inference's input_asset contract
+// visible to scheduling and lineage without introducing a pipeline->inference cycle.
+func registerImplicitInputAssetDependencies(pipe *Pipeline) error {
+	for _, asset := range pipe.Assets {
+		if asset.Type != AssetTypeInference {
+			continue
+		}
+		raw, exists := asset.Parameters["input_asset"]
+		if !exists {
+			continue
+		}
+		name, ok := raw.(string)
+		if !ok || strings.TrimSpace(name) == "" {
+			continue // inference validation owns parameter shape errors
+		}
+		if name == asset.Name {
+			return fmt.Errorf("inference input_asset %q cannot reference itself", name)
+		}
+		if pipe.GetAssetByName(name) == nil {
+			return fmt.Errorf("inference input_asset %q does not exist in pipeline", name)
+		}
+		asset.Upstreams = appendMissingUpstreams(asset.Upstreams, []Upstream{{Value: name, Type: selectorAssetDependencyType, Mode: UpstreamModeFull}})
+	}
+	return nil
 }
 
 type assetFromFileResult struct {
