@@ -1,6 +1,8 @@
 package bigquery
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -10,6 +12,10 @@ import (
 
 func TestConfig_GetConnectionURI(t *testing.T) {
 	t.Parallel()
+	credsDir := t.TempDir()
+	credsPath := filepath.Join(credsDir, "creds.json")
+	require.NoError(t, os.WriteFile(credsPath, []byte(`{"creds":"some-creds"}`), 0o600))
+
 	tests := []struct {
 		Name                string
 		ProjectID           string
@@ -40,7 +46,7 @@ func TestConfig_GetConnectionURI(t *testing.T) {
 		{
 			Name:                "creds file doesn't exist",
 			ProjectID:           "project-id",
-			CredentialsFilePath: "./creds-fake.json",
+			CredentialsFilePath: filepath.Join(credsDir, "missing.json"),
 			CredentialsJSON:     "",
 			Credentials:         nil,
 			Location:            "location",
@@ -49,7 +55,7 @@ func TestConfig_GetConnectionURI(t *testing.T) {
 		{
 			Name:                "creds file",
 			ProjectID:           "project-id",
-			CredentialsFilePath: "./testdata/creds.json",
+			CredentialsFilePath: credsPath,
 			CredentialsJSON:     "",
 			Credentials:         nil,
 			Location:            "location",
