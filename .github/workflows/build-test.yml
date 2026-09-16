@@ -33,7 +33,7 @@ env:
   DOCKER_BUILDKIT: 1
   REGISTRY: ghcr.io
   IMAGE_NAME: bruin-data/bruin
-  CLOUDX_CACHE_TRIAL: improved-pair-2
+  CLOUDX_CACHE_TRIAL: improved-pair-3
 jobs:
   test:
     strategy:
