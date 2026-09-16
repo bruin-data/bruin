@@ -1,4 +1,4 @@
-# CI Checks workflow
+# CI Checks workflow. Keep Go caches isolated by workload and refreshed per run.
 
 name: CI Checks
 on:
