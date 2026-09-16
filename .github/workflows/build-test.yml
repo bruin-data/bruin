@@ -33,6 +33,7 @@ env:
   DOCKER_BUILDKIT: 1
   REGISTRY: ghcr.io
   IMAGE_NAME: bruin-data/bruin
+  CLOUDX_CACHE_TRIAL: improved-pair-1
 jobs:
   test:
     strategy:
@@ -44,29 +45,16 @@ jobs:
         with:
           fetch-depth: 1
           fetch-tags: true
-      - name: Setup Go
-        id: go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+      - name: Read Go version
+        id: go-version
+        shell: bash
+        run: echo "version=$(awk '/^go / {print $2}' go.mod)" >> "$GITHUB_OUTPUT"
+      - name: Setup Go with CloudX cache
+        uses: ./.github/actions/setup-go
         with:
-          go-version-file: 'go.mod'
-          # Keep Linux module downloads separate from revision-specific results.
-          # Retain the existing combined cache on Windows.
-          cache: ${{ runner.os == 'Windows' }}
-          cache-dependency-path: 'go.sum'
-      - name: Cache Go modules
-        if: runner.os == 'Linux'
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: ~/go/pkg/mod
-          key: go-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/go.sum') }}
-      - name: Cache Linux unit build and test results
-        if: runner.os == 'Linux'
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: ~/.cache/go-build
-          key: go-unit-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.go-version }}-${{ hashFiles('**/go.sum') }}-${{ github.sha }}
-          restore-keys: |
-            go-unit-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.go-version }}-${{ hashFiles('**/go.sum') }}-
+          go-version: ${{ steps.go-version.outputs.version }}
+          cache-key-prefix: ${{ env.CLOUDX_CACHE_TRIAL }}-${{ github.job }}-${{ matrix.platform }}
+          cache-dependency-path: '**/go.sum'
       - name: Cache Rust artifacts
         id: rust-cache
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
@@ -126,11 +114,16 @@ jobs:
         with:
           fetch-depth: 1
           fetch-tags: true
-      - name: Setup Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+      - name: Read Go version
+        id: go-version
+        shell: bash
+        run: echo "version=$(awk '/^go / {print $2}' go.mod)" >> "$GITHUB_OUTPUT"
+      - name: Setup Go with CloudX cache
+        uses: ./.github/actions/setup-go
         with:
-          go-version-file: 'go.mod'
-          cache-dependency-path: "go.sum"
+          go-version: ${{ steps.go-version.outputs.version }}
+          cache-key-prefix: ${{ env.CLOUDX_CACHE_TRIAL }}-${{ github.job }}-${{ matrix.platform }}
+          cache-dependency-path: '**/go.sum'
       - name: Cache Rust artifacts
         id: rust-cache
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
@@ -241,10 +234,16 @@ jobs:
     runs-on: depot-ubuntu-latest-8
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+      - name: Read Go version
+        id: go-version
+        shell: bash
+        run: echo "version=$(awk '/^go / {print $2}' go.mod)" >> "$GITHUB_OUTPUT"
+      - name: Setup Go with CloudX cache
+        uses: ./.github/actions/setup-go
         with:
-          go-version-file: 'go.mod'
-          cache-dependency-path: "go.sum"
+          go-version: ${{ steps.go-version.outputs.version }}
+          cache-key-prefix: ${{ env.CLOUDX_CACHE_TRIAL }}-${{ github.job }}
+          cache-dependency-path: '**/go.sum'
       - name: Cache golangci-lint analysis
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
