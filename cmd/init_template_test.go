@@ -1792,7 +1792,7 @@ func academySQLAdvancedCLI(t *testing.T, projectRoot string) func(...string) (st
 	repoRoot := filepath.Clean(filepath.Join(filepath.Dir(sourcePath), ".."))
 	// Reuse one executable instead of invoking the Go build tool for each command.
 	binaryPath := filepath.Join(t.TempDir(), "bruin")
-	build := exec.CommandContext(t.Context(), "go", "build", "-tags=no_duckdb_arrow", "-o", binaryPath, repoRoot)
+	build := exec.CommandContext(t.Context(), "go", "build", "-tags=no_duckdb_arrow", "-ldflags=-s -w", "-o", binaryPath, repoRoot)
 	build.Dir = repoRoot
 	output, err := build.CombinedOutput()
 	require.NoError(t, err, "building CLI: %s", output)
