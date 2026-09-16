@@ -27,7 +27,7 @@ func TestCloudPipelineTrigger(t *testing.T) {
 					assert.Equal(t, "analytics-team", r.Header.Get("X-Bruin-Team"))
 					if command == "set" {
 						var body map[string]any
-						require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+						assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
 						assert.Equal(t, map[string]any{"id": "daily-etl", "project_id": "analytics"}, body)
 					}
 					w.Header().Set("Content-Type", "application/json")
@@ -49,7 +49,7 @@ func TestCloudPipelineTrigger(t *testing.T) {
 				os.Stdout = writer
 				defer func() { os.Stdout = original }()
 				debug := false
-				runErr := Cloud(&debug).Run(t.Context(), args)
+				runErr := runCLI(t.Context(), Cloud(&debug), args)
 				require.NoError(t, writer.Close())
 				os.Stdout = original
 				data, err := io.ReadAll(reader)
@@ -85,7 +85,7 @@ func TestCloudPipelineTriggerErrors(t *testing.T) {
 				if command == "set" {
 					args = append(args, "--project-id", "analytics", "--pipeline", "daily-etl")
 				}
-				err := cmd.Run(t.Context(), args)
+				err := runCLI(t.Context(), cmd, args)
 				require.Error(t, err)
 				var exit cli.ExitCoder
 				require.ErrorAs(t, err, &exit)
@@ -107,7 +107,7 @@ func TestCloudPipelineTriggerInvalidFlags(t *testing.T) {
 	} {
 		cmd := cloudPipelineTriggerCommand(args[0], "test")
 		cmd.ExitErrHandler = func(context.Context, *cli.Command, error) {}
-		require.Error(t, cmd.Run(t.Context(), args))
+		require.Error(t, runCLI(t.Context(), cmd, args))
 	}
 }
 
@@ -122,6 +122,6 @@ func TestScheduledAgentPlanRejectsPipelineTrigger(t *testing.T) {
 				return err
 			},
 		}
-		require.ErrorContains(t, cmd.Run(t.Context(), []string{"plan", "--state", state}), "pipeline-trigger set or delete")
+		require.ErrorContains(t, runCLI(t.Context(), cmd, []string{"plan", "--state", state}), "pipeline-trigger set or delete")
 	}
 }

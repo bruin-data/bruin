@@ -79,11 +79,12 @@ func cloudPipelineTriggerCommand(name, usage string) *cli.Command {
 				fmt.Println(string(data))
 				return nil
 			}
-			if name == "delete" {
+			switch {
+			case name == "delete":
 				successPrinter.Printf("Removed pipeline trigger from scheduled agent %d.\n", id)
-			} else if result.PipelineTrigger == nil {
+			case result.PipelineTrigger == nil:
 				infoPrinter.Printf("Scheduled agent %d has no pipeline trigger.\n", id)
-			} else {
+			default:
 				infoPrinter.Printf("Scheduled agent %d pipeline trigger: %s/%s\n", id, result.PipelineTrigger.ProjectID, result.PipelineTrigger.ID)
 			}
 			return nil
