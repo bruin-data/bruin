@@ -74,6 +74,8 @@ jobs:
         uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
       - name: Run full test suite
         shell: bash
+        env:
+          GODEBUG: gocachetest=1
         run: |
           # Race-enabled Windows binaries need the matching MinGW runtime DLLs.
           # Installer tests inject a missing shell, so the native fallback is
