@@ -49,7 +49,7 @@ jobs:
         shell: bash
         run: echo "version=$(awk '/^go / {print $2; exit}' go.mod)" >> "$GITHUB_OUTPUT"
       - name: Setup Go
-        uses: cloudx-io/setup-go@87999fd1dd2296a747db09d0ff1eb294ee05758a
+        uses: ./.github/actions/setup-go
         with:
           go-version: ${{ steps.go-version.outputs.version }}
           cache-key-prefix: ci-${{ github.job }}-${{ matrix.platform }}
@@ -98,7 +98,7 @@ jobs:
         shell: bash
         run: echo "version=$(awk '/^go / {print $2; exit}' go.mod)" >> "$GITHUB_OUTPUT"
       - name: Setup Go
-        uses: cloudx-io/setup-go@87999fd1dd2296a747db09d0ff1eb294ee05758a
+        uses: ./.github/actions/setup-go
         with:
           go-version: ${{ steps.go-version.outputs.version }}
           cache-key-prefix: ci-${{ github.job }}-${{ matrix.platform }}
@@ -216,7 +216,7 @@ jobs:
         shell: bash
         run: echo "version=$(awk '/^go / {print $2; exit}' go.mod)" >> "$GITHUB_OUTPUT"
       - name: Setup Go
-        uses: cloudx-io/setup-go@87999fd1dd2296a747db09d0ff1eb294ee05758a
+        uses: ./.github/actions/setup-go
         with:
           go-version: ${{ steps.go-version.outputs.version }}
           cache-key-prefix: ci-${{ github.job }}
