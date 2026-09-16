@@ -1600,6 +1600,8 @@ func TestAcademySqlAdvancedTemplateAcceptance(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
+	t.Parallel()
+
 	if err := duck.EnsureADBCDriverInstalled(t.Context()); err != nil {
 		t.Skipf("skipping test: ADBC DuckDB driver not available: %v", err)
 	}
@@ -1720,15 +1722,18 @@ func academySQLAdvancedCLIAcceptance(t *testing.T) {
 	require.NoError(t, err, string(output))
 
 	pipelinePath := filepath.Join(projectRoot, "pipeline")
-	validateOutput, validateCode := academySQLAdvancedRunCLI(t, projectRoot, "validate", pipelinePath)
+	runCLI := academySQLAdvancedCLI(t, projectRoot)
+	validateOutput, validateCode := runCLI("validate", pipelinePath)
 	require.Equal(t, 0, validateCode, validateOutput)
 
-	defaultOutput, defaultCode := academySQLAdvancedRunCLI(t, projectRoot,
-		"run", "--no-log-file", "--no-color", "--start-date", "2024-01-01", "--end-date", "2025-12-31", pipelinePath)
+	defaultOutput, defaultCode := runCLI(
+		"run", "--no-log-file", "--no-color", "--start-date", "2024-01-01", "--end-date", "2025-12-31", pipelinePath,
+	)
 	academySQLAdvancedRequireOnlyChurnFailure(t, defaultOutput, defaultCode)
 
-	devOutput, devCode := academySQLAdvancedRunCLI(t, projectRoot,
-		"run", "--no-log-file", "--no-color", "--environment", "dev", "--start-date", "2024-01-01", "--end-date", "2025-12-31", pipelinePath)
+	devOutput, devCode := runCLI(
+		"run", "--no-log-file", "--no-color", "--environment", "dev", "--start-date", "2024-01-01", "--end-date", "2025-12-31", pipelinePath,
+	)
 	academySQLAdvancedRequireOnlyChurnFailure(t, devOutput, devCode)
 
 	defaultDB := openTestDuckDB(t, filepath.Join(projectRoot, "academy.duckdb"))
@@ -1743,8 +1748,9 @@ func academySQLAdvancedCLIAcceptance(t *testing.T) {
 	require.NoError(t, defaultDB.Close())
 	require.NoError(t, devDB.Close())
 
-	diffOutput, diffCode := academySQLAdvancedRunCLI(t, projectRoot,
-		"data-diff", "--environment", "dev", "duckdb-prod:weekly_category_revenue", "duckdb-default:weekly_category_revenue")
+	diffOutput, diffCode := runCLI(
+		"data-diff", "--environment", "dev", "duckdb-prod:weekly_category_revenue", "duckdb-default:weekly_category_revenue",
+	)
 	require.Equal(t, 0, diffCode, diffOutput)
 	require.Contains(t, diffOutput, "Table schemas are considered identical.")
 
@@ -1759,8 +1765,9 @@ func academySQLAdvancedCLIAcceptance(t *testing.T) {
 	)
 	require.NotEqual(t, string(configContent), protectedConfig)
 	require.NoError(t, os.WriteFile(configPath, []byte(protectedConfig), 0o600))
-	refreshOutput, refreshCode := academySQLAdvancedRunCLI(t, projectRoot,
-		"run", "--no-log-file", "--no-color", "--environment", "dev", "--full-refresh", "--start-date", "2024-01-01", "--end-date", "2025-12-31", pipelinePath)
+	refreshOutput, refreshCode := runCLI(
+		"run", "--no-log-file", "--no-color", "--environment", "dev", "--full-refresh", "--start-date", "2024-01-01", "--end-date", "2025-12-31", pipelinePath,
+	)
 	academySQLAdvancedRequireOnlyChurnFailure(t, refreshOutput, refreshCode)
 	require.Contains(t, refreshOutput, "full refresh is restricted for asset")
 }
@@ -1778,22 +1785,31 @@ func academySQLAdvancedRequireOnlyChurnFailure(t *testing.T, output string, code
 	require.NotContains(t, failureSection, "weekly_category_revenue")
 }
 
-func academySQLAdvancedRunCLI(t *testing.T, projectRoot string, args ...string) (string, int) {
+func academySQLAdvancedCLI(t *testing.T, projectRoot string) func(...string) (string, int) {
 	t.Helper()
 	_, sourcePath, _, ok := runtime.Caller(0)
 	require.True(t, ok)
 	repoRoot := filepath.Clean(filepath.Join(filepath.Dir(sourcePath), ".."))
-	goArgs := append([]string{"run", "-tags=no_duckdb_arrow", repoRoot}, args...)
-	command := exec.CommandContext(t.Context(), "go", goArgs...)
-	command.Env = append(os.Environ(), "BRUIN_CONFIG_FILE="+filepath.Join(projectRoot, ".bruin.yml"))
-	command.Dir = repoRoot
-	output, err := command.CombinedOutput()
-	if err == nil {
-		return string(output), 0
+	// Reuse one executable instead of invoking the Go build tool for each command.
+	binaryPath := filepath.Join(t.TempDir(), "bruin")
+	build := exec.CommandContext(t.Context(), "go", "build", "-tags=no_duckdb_arrow", "-o", binaryPath, repoRoot)
+	build.Dir = repoRoot
+	output, err := build.CombinedOutput()
+	require.NoError(t, err, "building CLI: %s", output)
+
+	return func(args ...string) (string, int) {
+		t.Helper()
+		command := exec.CommandContext(t.Context(), binaryPath, args...)
+		command.Env = append(os.Environ(), "BRUIN_CONFIG_FILE="+filepath.Join(projectRoot, ".bruin.yml"))
+		command.Dir = repoRoot
+		output, err := command.CombinedOutput()
+		if err == nil {
+			return string(output), 0
+		}
+		var exitErr *exec.ExitError
+		require.ErrorAs(t, err, &exitErr, "CLI failed without an exit status: %v\n%s", err, output)
+		return string(output), exitErr.ExitCode()
 	}
-	var exitErr *exec.ExitError
-	require.ErrorAs(t, err, &exitErr, "go run failed without an exit status: %v\n%s", err, output)
-	return string(output), exitErr.ExitCode()
 }
 
 func academySQLAdvancedChecksums(t *testing.T, dbPath string) map[string]academyTableSnapshot {

@@ -644,10 +644,11 @@ func TestLinter_LintAsset_WithURIDependencies(t *testing.T) {
 func TestLinter_LintAsset_CrossPipelineURIResolvesAgainstRepoRoot(t *testing.T) {
 	t.Parallel()
 
-	const (
-		downstreamRoot = "repo/downstream"
-		repoRoot       = "repo"
-	)
+	repoRoot := t.TempDir()
+	downstreamRoot := filepath.Join(repoRoot, "downstream")
+	upstreamRoot := filepath.Join(repoRoot, "upstream")
+	// Keep policy discovery inside this test's repository, not the checkout.
+	require.NoError(t, os.Mkdir(filepath.Join(repoRoot, ".git"), 0o755))
 
 	// newLinter builds a linter with fresh pipeline objects on every call so
 	// parallel subtests never share mutable pipeline state. When repoRootBroken
@@ -664,20 +665,20 @@ func TestLinter_LintAsset_CrossPipelineURIResolvesAgainstRepoRoot(t *testing.T) 
 					Upstreams: []pipeline.Upstream{{Type: "uri", Value: "external://repro_seed/upstream_seed"}},
 				},
 			},
-			DefinitionFile: pipeline.DefinitionFile{Path: "repo/downstream/pipeline.yml"},
+			DefinitionFile: pipeline.DefinitionFile{Path: filepath.Join(downstreamRoot, "pipeline.yml")},
 		}
 		upstreamPipeline := &pipeline.Pipeline{
 			Name: "upstream",
 			Assets: []*pipeline.Asset{
 				{Name: "upstream_seed", URI: "external://repro_seed/upstream_seed"},
 			},
-			DefinitionFile: pipeline.DefinitionFile{Path: "repo/upstream/pipeline.yml"},
+			DefinitionFile: pipeline.DefinitionFile{Path: filepath.Join(upstreamRoot, "pipeline.yml")},
 		}
 
 		m := new(mockPipelineBuilder)
-		m.On("CreatePipelineFromPath", mock.Anything, "repo/downstream", mock.FunctionalOptions(pipeline.WithMutate())).
+		m.On("CreatePipelineFromPath", mock.Anything, downstreamRoot, mock.FunctionalOptions(pipeline.WithMutate())).
 			Return(downstreamPipeline, nil)
-		m.On("CreatePipelineFromPath", mock.Anything, "repo/upstream", mock.FunctionalOptions(pipeline.WithMutate())).
+		m.On("CreatePipelineFromPath", mock.Anything, upstreamRoot, mock.FunctionalOptions(pipeline.WithMutate())).
 			Return(upstreamPipeline, nil)
 
 		return &Linter{
@@ -688,9 +689,9 @@ func TestLinter_LintAsset_CrossPipelineURIResolvesAgainstRepoRoot(t *testing.T) 
 					if repoRootBroken {
 						return nil, errors.New("nested pipelines found")
 					}
-					return []string{"repo/downstream", "repo/upstream"}, nil
+					return []string{downstreamRoot, upstreamRoot}, nil
 				}
-				return []string{"repo/downstream"}, nil
+				return []string{downstreamRoot}, nil
 			},
 			builder: m,
 			rules: []Rule{

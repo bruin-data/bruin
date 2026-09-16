@@ -1,4 +1,4 @@
-# CI Checks workflow. Keep Go caches isolated by workload and refreshed per run.
+# CI Checks workflow
 
 name: CI Checks
 on:
@@ -44,16 +44,20 @@ jobs:
         with:
           fetch-depth: 1
           fetch-tags: true
-      - name: Read Go version
-        id: go-version
-        shell: bash
-        run: echo "version=$(awk '/^go / {print $2; exit}' go.mod)" >> "$GITHUB_OUTPUT"
       - name: Setup Go
-        uses: ./.github/actions/setup-go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
-          go-version: ${{ steps.go-version.outputs.version }}
-          cache-key-prefix: ci-${{ github.job }}-${{ matrix.platform }}
-          cache-dependency-path: '**/go.sum'
+          go-version-file: 'go.mod'
+          # Depot Linux already persists build/test results through GOCACHEPROG.
+          # Windows does not, so retain setup-go's combined cache there.
+          cache: ${{ runner.os == 'Windows' }}
+          cache-dependency-path: 'go.sum'
+      - name: Cache Go modules
+        if: runner.os == 'Linux'
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/go/pkg/mod
+          key: go-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/go.sum') }}
       - name: Cache Rust artifacts
         id: rust-cache
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
@@ -95,16 +99,11 @@ jobs:
         with:
           fetch-depth: 1
           fetch-tags: true
-      - name: Read Go version
-        id: go-version
-        shell: bash
-        run: echo "version=$(awk '/^go / {print $2; exit}' go.mod)" >> "$GITHUB_OUTPUT"
       - name: Setup Go
-        uses: ./.github/actions/setup-go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
-          go-version: ${{ steps.go-version.outputs.version }}
-          cache-key-prefix: ci-${{ github.job }}-${{ matrix.platform }}
-          cache-dependency-path: '**/go.sum'
+          go-version-file: 'go.mod'
+          cache-dependency-path: "go.sum"
       - name: Cache Rust artifacts
         id: rust-cache
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
@@ -213,16 +212,10 @@ jobs:
     runs-on: depot-ubuntu-latest-8
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - name: Read Go version
-        id: go-version
-        shell: bash
-        run: echo "version=$(awk '/^go / {print $2; exit}' go.mod)" >> "$GITHUB_OUTPUT"
-      - name: Setup Go
-        uses: ./.github/actions/setup-go
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
-          go-version: ${{ steps.go-version.outputs.version }}
-          cache-key-prefix: ci-${{ github.job }}
-          cache-dependency-path: '**/go.sum'
+          go-version-file: 'go.mod'
+          cache-dependency-path: "go.sum"
       - name: Cache golangci-lint analysis
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
