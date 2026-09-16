@@ -1067,7 +1067,7 @@ bruin cloud dashboards delete --dashboard-id 42
 
 ### `scheduled-agents`
 
-Manage scheduled agents — cron-based recurring agent tasks.
+Manage scheduled agents — recurring agent tasks triggered by cron or pipeline success.
 
 #### `list` / `get`
 
@@ -1079,7 +1079,7 @@ bruin cloud scheduled-agents get --scheduled-agent-id 42 --output json
 
 #### `create`
 
-Create a scheduled agent from a plan. It is stored as an inactive **draft** — a human reviews and activates it from the Bruin Cloud UI; the CLI never activates a run. Pass the plan with convenience flags, or the full plan via `--state-file` (JSON or YAML with `schedule`, `instructions`, `verified_sqls`, `memory`, ...).
+Create a scheduled agent from a plan. A plan with a cron activates immediately; without a cron it stays an inactive **draft**. Pass the plan with convenience flags, or via `--state-file` (JSON or YAML with `schedule`, `instructions`, `verified_sqls`, `memory`, ...). Manage pipeline triggers separately with `pipeline-trigger set`; do not put `pipeline_trigger` in the plan.
 
 ```bash
 bruin cloud scheduled-agents create --agent-id 7 --title "Daily revenue" \
@@ -1090,7 +1090,7 @@ bruin cloud scheduled-agents create --agent-id 7 --state-file ./plan.yaml
 
 #### `update`
 
-Update a run's title or plan. Only the flags you pass change. Activation stays in the UI.
+Update a run's title, plan, or activation with `--active=true` / `--active=false`. Only the flags you pass change. Activating requires a cron or a configured pipeline trigger.
 
 ```bash
 bruin cloud scheduled-agents update --scheduled-agent-id 42 --cron "0 8 * * 1"
@@ -1112,6 +1112,37 @@ Delete a scheduled agent so it stops firing.
 ```bash
 bruin cloud scheduled-agents delete --scheduled-agent-id 42
 ```
+
+#### `pipeline-trigger get` / `set` / `delete`
+
+Configure which pipeline's successful scheduled run triggers the agent. Triggers
+are stored as notification rules, separate from the plan. Setting one preserves
+the agent's instructions, cron, and active/paused status.
+
+```bash
+bruin cloud scheduled-agents pipeline-trigger set --scheduled-agent-id 42 \
+  --project-id analytics --pipeline daily-etl
+bruin cloud scheduled-agents pipeline-trigger get --scheduled-agent-id 42 --output json
+bruin cloud scheduled-agents update --scheduled-agent-id 42 --active=true
+bruin cloud scheduled-agents pipeline-trigger delete --scheduled-agent-id 42
+```
+
+For a new pipeline-only task, first `create` with instructions and no cron, then
+`pipeline-trigger set`, then `update --active=true`. To switch an existing cron
+schedule to pipeline-only, set the pipeline trigger first, then remove the cron
+with `update --state '{"schedule":null}'`.
+
+Only successful **scheduled** pipeline runs trigger the task; manual runs,
+backfills, and failures do not. A cron can coexist with the pipeline trigger.
+Before deleting the last trigger of an active task, pause it with
+`update --active=false` or configure a cron. Otherwise the server rejects deletion.
+
+All three commands accept `--output json` and `--team`. JSON output is
+`{"pipeline_trigger":{"id":"daily-etl","project_id":"analytics"}}`, or
+`{"pipeline_trigger":null}` when no trigger remains. Reads require
+`scheduled-agent:list`; setting/removing requires `scheduled-agent:manage` and
+access to the scheduled agent. Availability is controlled by the Cloud team;
+unavailable teams receive an API error.
 
 #### `run-states`
 
