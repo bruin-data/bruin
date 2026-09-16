@@ -22,6 +22,9 @@ type contextKey string
 const (
 	excludeTagKey               contextKey = "exclude-tag"
 	assetWithExcludeTagCountKey contextKey = "asset-with-exclude-tag-count"
+	// AssetsToValidateKey limits asset-level checks without hiding upstream assets
+	// from dependency resolution. An absent value validates all pipeline assets.
+	AssetsToValidateKey contextKey = "assets-to-validate"
 )
 
 // ExcludeTagKey and AssetWithExcludeTagCountKey are the context keys the linter
@@ -488,6 +491,10 @@ func RunLintRulesOnPipeline(ctx context.Context, p *pipeline.Pipeline, rules []R
 	if len(policyRules) > 0 {
 		rules = slices.Concat([]Rule{}, rules, policyRules)
 	}
+	assets, ok := ctx.Value(AssetsToValidateKey).([]*pipeline.Asset)
+	if !ok {
+		assets = p.Assets
+	}
 	for _, rule := range rules {
 		levels := rule.GetApplicableLevels()
 		if slices.Contains(levels, LevelPipeline) {
@@ -499,7 +506,7 @@ func RunLintRulesOnPipeline(ctx context.Context, p *pipeline.Pipeline, rules []R
 				pipelineResult.Issues[rule] = append(pipelineResult.Issues[rule], issues...)
 			}
 		} else if slices.Contains(levels, LevelAsset) {
-			for _, asset := range p.Assets {
+			for _, asset := range assets {
 				if ContainsTag(asset.Tags, excludeTag) {
 					continue
 				}
