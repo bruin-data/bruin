@@ -44,11 +44,16 @@ jobs:
         with:
           fetch-depth: 1
           fetch-tags: true
+      - name: Read Go version
+        id: go-version
+        shell: bash
+        run: echo "version=$(awk '/^go / {print $2; exit}' go.mod)" >> "$GITHUB_OUTPUT"
       - name: Setup Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        uses: cloudx-io/setup-go@87999fd1dd2296a747db09d0ff1eb294ee05758a
         with:
-          go-version-file: 'go.mod'
-          cache-dependency-path: "go.sum"
+          go-version: ${{ steps.go-version.outputs.version }}
+          cache-key-prefix: ci-${{ github.job }}-${{ matrix.platform }}
+          cache-dependency-path: '**/go.sum'
       - name: Cache Rust artifacts
         id: rust-cache
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
@@ -88,11 +93,16 @@ jobs:
         with:
           fetch-depth: 1
           fetch-tags: true
+      - name: Read Go version
+        id: go-version
+        shell: bash
+        run: echo "version=$(awk '/^go / {print $2; exit}' go.mod)" >> "$GITHUB_OUTPUT"
       - name: Setup Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        uses: cloudx-io/setup-go@87999fd1dd2296a747db09d0ff1eb294ee05758a
         with:
-          go-version-file: 'go.mod'
-          cache-dependency-path: "go.sum"
+          go-version: ${{ steps.go-version.outputs.version }}
+          cache-key-prefix: ci-${{ github.job }}-${{ matrix.platform }}
+          cache-dependency-path: '**/go.sum'
       - name: Cache Rust artifacts
         id: rust-cache
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
@@ -201,10 +211,16 @@ jobs:
     runs-on: depot-ubuntu-latest-8
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+      - name: Read Go version
+        id: go-version
+        shell: bash
+        run: echo "version=$(awk '/^go / {print $2; exit}' go.mod)" >> "$GITHUB_OUTPUT"
+      - name: Setup Go
+        uses: cloudx-io/setup-go@87999fd1dd2296a747db09d0ff1eb294ee05758a
         with:
-          go-version-file: 'go.mod'
-          cache-dependency-path: "go.sum"
+          go-version: ${{ steps.go-version.outputs.version }}
+          cache-key-prefix: ci-${{ github.job }}
+          cache-dependency-path: '**/go.sum'
       - name: Cache golangci-lint analysis
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
