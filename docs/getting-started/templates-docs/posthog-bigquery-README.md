@@ -515,12 +515,12 @@ the warehouse cannot speak to.
 
 ### Variable validation and macro loading
 
-The `enum`, `minimum`, and `maximum` keywords on these variables are currently
-documentation rather than enforcement — Bruin validates that a variable has a
-default and little else, and `--var` overrides skip schema checks. Where getting
+The `enum`, `minimum`, and `maximum` keywords on these variables are enforced
+on defaults, `--var` overrides, and variant values. A typo such as
+`--var seat_denominator='"Contracted"'` fails before any asset runs. Where getting
 a value wrong would silently produce plausible-but-wrong numbers rather than an
-obvious break, the SQL fails the run itself: an unrecognised `seat_denominator`
-stops `posthog_stage.accounts` with
+obvious break, the SQL still fails the run itself as a second line of defence: an
+unrecognised `seat_denominator` stops `posthog_stage.accounts` with
 `seat_denominator must be "reachable" or "contracted", got …` instead of quietly
 falling back to a default.
 

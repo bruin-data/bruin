@@ -214,4 +214,35 @@ func TestVariableOverridesMutator_VariantWinsOnOverlap(t *testing.T) {
 		require.Error(t, err)
 		assert.ErrorContains(t, err, `no such variable "nope"`)
 	})
+
+	t.Run("invalid enum --var is rejected", func(t *testing.T) {
+		t.Parallel()
+		p := &pipeline.Pipeline{
+			Variables: pipeline.Variables{
+				"seat_denominator": {"type": "string", "enum": []any{"reachable", "contracted"}, "default": "reachable"},
+			},
+		}
+
+		mutator := variableOverridesMutator([]string{`seat_denominator="Contracted"`})
+		_, err := mutator(t.Context(), p)
+		require.Error(t, err)
+		assert.ErrorContains(t, err, `invalid variable "seat_denominator"`)
+		assert.ErrorContains(t, err, "not one of the allowed values")
+		assert.Equal(t, "reachable", p.Variables["seat_denominator"]["default"])
+	})
+
+	t.Run("out of range --var is rejected", func(t *testing.T) {
+		t.Parallel()
+		p := &pipeline.Pipeline{
+			Variables: pipeline.Variables{
+				"forecast_days": {"type": "integer", "minimum": 7, "maximum": 90, "default": int64(30)},
+			},
+		}
+
+		mutator := variableOverridesMutator([]string{"forecast_days=0"})
+		_, err := mutator(t.Context(), p)
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "below minimum")
+		assert.Equal(t, int64(30), p.Variables["forecast_days"]["default"])
+	})
 }

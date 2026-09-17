@@ -7,23 +7,12 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestVariables(t *testing.T) {
 	t.Parallel()
 
-	// TODO: restore this test when meta-schema validation is implemented
-	// t.Run("Should return an error if the variables are not valid JSONSchema object", func(t *testing.T) {
-	// 	t.Parallel()
-	// 	vars := pipeline.Variables{
-	// 		"user": {
-	// 			"type": "complex",
-	// 		},
-	// 	}
-	// 	err := vars.Validate()
-	// 	require.Error(t, err)
-	// 	assert.Contains(t, err.Error(), "invalid variables schema")
-	// })
 	t.Run("Should return an error if the default is not set", func(t *testing.T) {
 		t.Parallel()
 		vars := pipeline.Variables{
@@ -104,6 +93,143 @@ func TestVariables(t *testing.T) {
 			"active": true,
 		}
 		assert.Equal(t, expect, vars.Value())
+	})
+	t.Run("unknown type values stay permitted so in-progress templates still parse", func(t *testing.T) {
+		t.Parallel()
+		vars := pipeline.Variables{
+			"taxi_types": map[string]any{
+				"type":    "TODO",
+				"default": "TODO",
+			},
+		}
+		require.NoError(t, vars.Validate())
+	})
+}
+
+func TestVariables_ValidateConstraints(t *testing.T) {
+	t.Parallel()
+
+	t.Run("rejects a default that is not in enum", func(t *testing.T) {
+		t.Parallel()
+		vars := pipeline.Variables{
+			"seat_denominator": map[string]any{
+				"type":    "string",
+				"enum":    []any{"reachable", "contracted"},
+				"default": "Contracted",
+			},
+		}
+		err := vars.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), `invalid variable "seat_denominator"`)
+		assert.Contains(t, err.Error(), "not one of the allowed values")
+	})
+
+	t.Run("accepts a default that is in enum", func(t *testing.T) {
+		t.Parallel()
+		vars := pipeline.Variables{
+			"seat_denominator": map[string]any{
+				"type":    "string",
+				"enum":    []any{"reachable", "contracted"},
+				"default": "reachable",
+			},
+		}
+		require.NoError(t, vars.Validate())
+	})
+
+	t.Run("rejects a default below minimum", func(t *testing.T) {
+		t.Parallel()
+		vars := pipeline.Variables{
+			"forecast_horizon_days": map[string]any{
+				"type":    "integer",
+				"minimum": 7,
+				"maximum": 90,
+				"default": 0,
+			},
+		}
+		err := vars.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "below minimum")
+	})
+
+	t.Run("rejects a default above maximum", func(t *testing.T) {
+		t.Parallel()
+		vars := pipeline.Variables{
+			"forecast_horizon_days": map[string]any{
+				"type":    "integer",
+				"minimum": 7,
+				"maximum": 90,
+				"default": 9999,
+			},
+		}
+		err := vars.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "above maximum")
+	})
+
+	t.Run("accepts a default on the inclusive bounds", func(t *testing.T) {
+		t.Parallel()
+		vars := pipeline.Variables{
+			"forecast_horizon_days": map[string]any{
+				"type":    "integer",
+				"minimum": 7,
+				"maximum": 90,
+				"default": 7,
+			},
+		}
+		require.NoError(t, vars.Validate())
+	})
+
+	t.Run("rejects a default that does not match const", func(t *testing.T) {
+		t.Parallel()
+		vars := pipeline.Variables{
+			"env": map[string]any{
+				"type":    "string",
+				"const":   "prod",
+				"default": "staging",
+			},
+		}
+		err := vars.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "does not match const")
+	})
+
+	t.Run("rejects a default with the wrong type", func(t *testing.T) {
+		t.Parallel()
+		vars := pipeline.Variables{
+			"forecast_horizon_days": map[string]any{
+				"type":    "integer",
+				"default": "30",
+			},
+		}
+		err := vars.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "type mismatch")
+		assert.Contains(t, err.Error(), "expected integer")
+	})
+
+	t.Run("treats whole-number floats as integers for JSON-decoded defaults", func(t *testing.T) {
+		t.Parallel()
+		vars := pipeline.Variables{
+			"forecast_horizon_days": map[string]any{
+				"type":    "integer",
+				"minimum": 7.0,
+				"maximum": 90.0,
+				"default": 30.0,
+			},
+		}
+		require.NoError(t, vars.Validate())
+	})
+
+	t.Run("treats integer and whole-number float enum members as equal", func(t *testing.T) {
+		t.Parallel()
+		vars := pipeline.Variables{
+			"tier": map[string]any{
+				"type":    "integer",
+				"enum":    []any{1, 2, 3},
+				"default": float64(2),
+			},
+		}
+		require.NoError(t, vars.Validate())
 	})
 }
 
@@ -299,5 +425,139 @@ func TestVariables_Merge(t *testing.T) {
 
 		assert.Equal(t, "string", vars["foo"]["type"])
 		assert.Equal(t, "new", vars["foo"]["default"])
+	})
+
+	t.Run("rejects an enum override that differs only by case", func(t *testing.T) {
+		t.Parallel()
+
+		vars := pipeline.Variables{
+			"seat_denominator": map[string]any{
+				"type":    "string",
+				"enum":    []any{"reachable", "contracted"},
+				"default": "reachable",
+			},
+		}
+
+		err := vars.Merge(map[string]any{"seat_denominator": "Contracted"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), `invalid variable "seat_denominator"`)
+		assert.Contains(t, err.Error(), "not one of the allowed values")
+		assert.Equal(t, "reachable", vars["seat_denominator"]["default"], "invalid override must not replace the default")
+	})
+
+	t.Run("rejects an override outside numeric bounds", func(t *testing.T) {
+		t.Parallel()
+
+		vars := pipeline.Variables{
+			"forecast_horizon_days": map[string]any{
+				"type":    "integer",
+				"minimum": 7,
+				"maximum": 90,
+				"default": 30,
+			},
+		}
+
+		err := vars.Merge(map[string]any{"forecast_horizon_days": 0})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "below minimum")
+		assert.Equal(t, 30, vars["forecast_horizon_days"]["default"])
+
+		err = vars.Merge(map[string]any{"forecast_horizon_days": 9999})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "above maximum")
+		assert.Equal(t, 30, vars["forecast_horizon_days"]["default"])
+	})
+
+	t.Run("does not apply any override when one value is invalid", func(t *testing.T) {
+		t.Parallel()
+
+		vars := pipeline.Variables{
+			"env": map[string]any{
+				"type":    "string",
+				"enum":    []any{"dev", "prod"},
+				"default": "dev",
+			},
+			"count": map[string]any{
+				"type":    "integer",
+				"minimum": 1,
+				"default": 1,
+			},
+		}
+
+		err := vars.Merge(map[string]any{
+			"env":   "staging",
+			"count": 5,
+		})
+		require.Error(t, err)
+		assert.Equal(t, "dev", vars["env"]["default"])
+		assert.Equal(t, 1, vars["count"]["default"])
+	})
+
+	t.Run("accepts a valid enum and integer override", func(t *testing.T) {
+		t.Parallel()
+
+		vars := pipeline.Variables{
+			"seat_denominator": map[string]any{
+				"type":    "string",
+				"enum":    []any{"reachable", "contracted"},
+				"default": "reachable",
+			},
+			"forecast_horizon_days": map[string]any{
+				"type":    "integer",
+				"minimum": 7,
+				"maximum": 90,
+				"default": 30,
+			},
+		}
+
+		err := vars.Merge(map[string]any{
+			"seat_denominator":      "contracted",
+			"forecast_horizon_days": int64(14),
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "contracted", vars["seat_denominator"]["default"])
+		assert.Equal(t, int64(14), vars["forecast_horizon_days"]["default"])
+	})
+
+	t.Run("does not panic when merging into an empty-bodied variable", func(t *testing.T) {
+		t.Parallel()
+
+		vars := pipeline.Variables{
+			"foo": nil,
+		}
+
+		err := vars.Merge(map[string]any{"foo": "bar"})
+		require.NoError(t, err)
+		assert.Equal(t, "bar", vars["foo"]["default"])
+	})
+}
+
+func TestVariables_ValidateYAMLPipeline(t *testing.T) {
+	t.Parallel()
+
+	t.Run("enforces enum and bounds from pipeline.yml", func(t *testing.T) {
+		t.Parallel()
+
+		var parsed struct {
+			Variables pipeline.Variables `yaml:"variables"`
+		}
+		err := yaml.Unmarshal([]byte(`
+variables:
+  seat_denominator:
+    type: string
+    enum: [reachable, contracted]
+    default: reachable
+  forecast_horizon_days:
+    type: integer
+    minimum: 7
+    maximum: 90
+    default: 30
+`), &parsed)
+		require.NoError(t, err)
+		require.NoError(t, parsed.Variables.Validate())
+
+		err = parsed.Variables.Merge(map[string]any{"seat_denominator": "Contracted"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "not one of the allowed values")
 	})
 }
