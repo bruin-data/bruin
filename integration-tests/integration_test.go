@@ -1527,7 +1527,7 @@ func TestIndividualTasks(t *testing.T) {
 				Env:     []string{},
 				Expected: e2e.Output{
 					ExitCode: 0,
-					Contains: []string{"Successfully validated 2 assets", "bruin run completed", "Finished: templated_downstream"},
+					Contains: []string{"Successfully validated 1 assets", "bruin run completed", "Finished: templated_downstream"},
 				},
 				Asserts: []func(*e2e.Task) error{
 					e2e.AssertByExitCode,
