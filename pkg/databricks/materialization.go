@@ -64,6 +64,7 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) ([]string, error)
 
 	queries := []string{
 		fmt.Sprintf("CREATE TEMPORARY VIEW %s AS %s\n", tempTableName, query),
+		buildCreateTableIfNotExistsQuery(task, "SELECT * FROM "+tempTableName),
 		fmt.Sprintf("\nDELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", task.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", task.Name, tempTableName),
 		"DROP VIEW IF EXISTS " + tempTableName,
@@ -122,7 +123,7 @@ func buildMergeQuery(asset *pipeline.Asset, query string) ([]string, error) {
 	// Join all lines into a single MERGE statement
 	mergeQuery := strings.Join(mergeLines, "\n")
 
-	return []string{mergeQuery}, nil
+	return []string{buildCreateTableIfNotExistsQuery(asset, query), mergeQuery}, nil
 }
 
 func buildCreateReplaceQuery(task *pipeline.Asset, query string) ([]string, error) {
@@ -162,6 +163,15 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query string) ([]string, erro
 	}, nil
 }
 
+func buildCreateTableIfNotExistsQuery(asset *pipeline.Asset, query string) string {
+	partitionBy := ""
+	if asset.Materialization.PartitionBy != "" {
+		partitionBy = "PARTITIONED BY (" + asset.Materialization.PartitionBy + ")"
+	}
+
+	return ansisql.BuildCreateTableIfNotExistsAsQuery(asset.Name, partitionBy, query)
+}
+
 func buildTimeIntervalQuery(asset *pipeline.Asset, query string) ([]string, error) {
 	if asset.Materialization.IncrementalKey == "" {
 		return nil, errors.New("incremental_key is required for time_interval strategy")
@@ -183,6 +193,7 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) ([]string, erro
 	}
 
 	queries := []string{
+		buildCreateTableIfNotExistsQuery(asset, query),
 		fmt.Sprintf(`DELETE FROM %s WHERE %s BETWEEN '%s' AND '%s'`,
 			asset.Name,
 			asset.Materialization.IncrementalKey,

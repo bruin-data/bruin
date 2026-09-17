@@ -92,6 +92,12 @@ func buildDeleteInsertQuery(asset *pipeline.Asset, query string) (string, error)
 	queries := []string{
 		"DROP TABLE IF EXISTS " + tempName,
 		"CREATE TABLE " + tempName + " AS\n" + query,
+		fmt.Sprintf(
+			"IF OBJECT_ID('%s', 'U') IS NULL BEGIN CREATE TABLE %s AS SELECT * FROM %s WHERE 1 = 0 END",
+			strings.ReplaceAll(asset.Name, "'", "''"),
+			tableName,
+			tempName,
+		),
 		"DELETE FROM " + tableName + " WHERE EXISTS (\n  SELECT 1 FROM " + tempName + " WHERE " + deleteCondition + "\n)",
 		"INSERT INTO " + tableName + " SELECT * FROM " + tempName,
 		"DROP TABLE IF EXISTS " + tempName,

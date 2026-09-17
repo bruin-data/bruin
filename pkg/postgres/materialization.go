@@ -75,10 +75,15 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) (string, error) {
 
 	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
 	quotedIncrementalKey := QuoteIdentifier(mat.IncrementalKey)
+	bootstrap := ansisql.BuildCreateTableIfNotExistsAsQuery(QuoteIdentifier(task.Name), "", "SELECT * FROM "+tempTableName)
+	if task.Type == pipeline.AssetTypeRedshiftQuery {
+		bootstrap = buildRedshiftCreateTableIfNotExistsLike(task.Name, tempTableName)
+	}
 
 	queries := []string{
 		"BEGIN TRANSACTION",
 		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, strings.TrimSuffix(query, ";")),
+		bootstrap,
 		fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", QuoteIdentifier(task.Name), quotedIncrementalKey, quotedIncrementalKey, tempTableName),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", QuoteIdentifier(task.Name), tempTableName),
 		"DROP TABLE IF EXISTS " + tempTableName,
@@ -169,7 +174,7 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 		fmt.Sprintf("WHEN NOT MATCHED THEN INSERT(%s) VALUES(%s)", allColumnNamesStr, allColumnValuesStr),
 	}
 
-	return strings.Join(mergeLines, "\n") + ";", nil
+	return ansisql.BuildCreateTableIfNotExistsAsQuery(QuoteIdentifier(asset.Name), "", query) + ";\n" + strings.Join(mergeLines, "\n") + ";", nil
 }
 
 func buildRedshiftMergeQuery(asset *pipeline.Asset, query string) (string, error) {
@@ -226,14 +231,28 @@ func buildRedshiftMergeQuery(asset *pipeline.Asset, query string) (string, error
 		whenMatchedThenQuery = "WHEN MATCHED THEN UPDATE SET " + matchedUpdateQuery
 	}
 
+	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
 	mergeLines := []string{
 		"MERGE INTO " + targetTableName,
-		fmt.Sprintf("USING (%s) source ON %s", strings.TrimSuffix(query, ";"), onQuery),
+		fmt.Sprintf("USING %s source ON %s", tempTableName, onQuery),
 		whenMatchedThenQuery,
 		fmt.Sprintf("WHEN NOT MATCHED THEN INSERT(%s) VALUES(%s)", allColumnNamesStr, allColumnValuesStr),
 	}
 
-	return strings.Join(mergeLines, "\n") + ";", nil
+	queries := []string{
+		"BEGIN TRANSACTION",
+		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, strings.TrimSuffix(query, ";")),
+		buildRedshiftCreateTableIfNotExistsLike(asset.Name, tempTableName),
+		strings.Join(mergeLines, "\n"),
+		"DROP TABLE IF EXISTS " + tempTableName,
+		"COMMIT",
+	}
+
+	return strings.Join(queries, ";\n") + ";", nil
+}
+
+func buildRedshiftCreateTableIfNotExistsLike(tableName, sourceTableName string) string {
+	return fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (LIKE %s)", QuoteIdentifier(tableName), sourceTableName)
 }
 
 func buildCreateReplaceQuery(task *pipeline.Asset, query string) (string, error) {
@@ -277,9 +296,13 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 	if asset.Materialization.TimeGranularity != pipeline.MaterializationTimeGranularityTimestamp && asset.Materialization.TimeGranularity != pipeline.MaterializationTimeGranularityDate {
 		return "", errors.New("time_granularity must be either 'date', or 'timestamp'")
 	}
+	if asset.Type == pipeline.AssetTypeRedshiftQuery {
+		return buildRedshiftTimeIntervalQuery(asset, query, startVar, endVar), nil
+	}
 	quotedIncrementalKey := QuoteIdentifier(asset.Materialization.IncrementalKey)
 	queries := []string{
 		"BEGIN TRANSACTION",
+		ansisql.BuildCreateTableIfNotExistsAsQuery(QuoteIdentifier(asset.Name), "", query),
 		fmt.Sprintf(`DELETE FROM %s WHERE %s BETWEEN '%s' AND '%s'`,
 			QuoteIdentifier(asset.Name),
 			quotedIncrementalKey,
@@ -292,6 +315,27 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 	}
 
 	return strings.Join(queries, ";\n") + ";", nil
+}
+
+func buildRedshiftTimeIntervalQuery(asset *pipeline.Asset, query, startVar, endVar string) string {
+	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
+	queries := []string{
+		"BEGIN TRANSACTION",
+		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, strings.TrimSuffix(query, ";")),
+		buildRedshiftCreateTableIfNotExistsLike(asset.Name, tempTableName),
+		fmt.Sprintf(
+			`DELETE FROM %s WHERE %s BETWEEN '%s' AND '%s'`,
+			QuoteIdentifier(asset.Name),
+			QuoteIdentifier(asset.Materialization.IncrementalKey),
+			startVar,
+			endVar,
+		),
+		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", QuoteIdentifier(asset.Name), tempTableName),
+		"DROP TABLE IF EXISTS " + tempTableName,
+		"COMMIT",
+	}
+
+	return strings.Join(queries, ";\n") + ";"
 }
 
 func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
