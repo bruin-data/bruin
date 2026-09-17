@@ -1,5 +1,10 @@
 package semantic
 
+import (
+	"errors"
+	"strings"
+)
+
 // Model describes a single semantic model with dimensions, metrics, and segments.
 type Model struct {
 	Schema      string      `yaml:"schema,omitempty" json:"schema,omitempty"`
@@ -15,7 +20,64 @@ type Model struct {
 }
 
 type Source struct {
-	Table string `yaml:"table" json:"table"`
+	Table string `yaml:"table,omitempty" json:"table,omitempty"`
+	Query string `yaml:"query,omitempty" json:"query,omitempty"`
+}
+
+// Relation is the SQL fragment used in FROM. A dedicated query is compiled as
+// `(<query>) AS <alias>`. A table value is used as-is, including the accepted
+// parenthesized subquery form: `(select ...) as alias`.
+func (s Source) Relation(alias string) string {
+	query := strings.TrimRight(strings.TrimSpace(s.Query), ";")
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return s.Table
+	}
+	if alias == "" {
+		return "(" + query + ")"
+	}
+	return "(" + query + ") AS " + alias
+}
+
+// HasQuery reports whether the source is a dedicated SQL query.
+func (s Source) HasQuery() bool {
+	return strings.TrimSpace(s.Query) != ""
+}
+
+// IsQueryable reports whether the source is a SQL query rather than a relation
+// name. That includes source.query and a parenthesized source.table.
+func (s Source) IsQueryable() bool {
+	if s.HasQuery() {
+		return true
+	}
+	return strings.HasPrefix(strings.TrimSpace(s.Table), "(")
+}
+
+// DryRunSQL wraps the source so a validator can dry-run it as a complete query.
+func (s Source) DryRunSQL(alias string) string {
+	return "SELECT * FROM " + s.Relation(alias)
+}
+
+func (s Source) validate() error {
+	table := strings.TrimSpace(s.Table)
+	query := strings.TrimSpace(s.Query)
+	switch {
+	case table == "" && query == "":
+		return errors.New("source.table or source.query is required")
+	case table != "" && query != "":
+		return errors.New("source.table and source.query cannot both be set")
+	default:
+		return nil
+	}
+}
+
+// SourceRelation is the model's FROM relation, including the model name alias
+// when the source is a dedicated query.
+func (m *Model) SourceRelation() string {
+	if m == nil {
+		return ""
+	}
+	return m.Source.Relation(m.Name)
 }
 
 type Join struct {
