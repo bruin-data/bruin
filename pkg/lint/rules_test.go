@@ -6116,6 +6116,98 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			want:    []string{},
 			wantErr: assert.NoError,
 		},
+
+		// Fabric tests
+		{
+			name: "Fabric - no table parameter",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeFabricTableSensor,
+			},
+			want:    []string{"Fabric table sensor requires a `table` parameter"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Fabric - empty table parameter",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeFabricTableSensor,
+				Parameters: pipeline.ParameterMap{
+					"table": "",
+				},
+			},
+			want:    []string{"Fabric table sensor `table` parameter contains empty components, '' given"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Fabric - too many components",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeFabricTableSensor,
+				Parameters: pipeline.ParameterMap{
+					"table": "database.schema.table.extra",
+				},
+			},
+			want:    []string{"Fabric table sensor `table` parameter must be in format `table`, `schema.table`, or `database.schema.table`, 'database.schema.table.extra' given"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Fabric - valid table format",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeFabricTableSensor,
+				Parameters: pipeline.ParameterMap{
+					"table": "events",
+				},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Fabric - valid schema.table format",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeFabricTableSensor,
+				Parameters: pipeline.ParameterMap{
+					"table": "raw.events",
+				},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Fabric - valid database.schema.table format",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeFabricTableSensor,
+				Parameters: pipeline.ParameterMap{
+					"table": "warehouse.raw.events",
+				},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Fabric legacy - no table parameter",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeFabricTableSensorLegacy,
+			},
+			want:    []string{"Fabric table sensor requires a `table` parameter"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Fabric legacy - valid schema.table format",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeFabricTableSensorLegacy,
+				Parameters: pipeline.ParameterMap{
+					"table": "raw.events",
+				},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
 	}
 
 	ctx := t.Context()
