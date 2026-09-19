@@ -104,6 +104,81 @@ FROM source_table
 WHERE modified_date > '{{ start_date }}'
 ```
 
+## Sensors
+
+Sensors are a special type of asset used to wait on external signals before downstream assets run. Fabric sensors run against the Warehouse SQL endpoint, so they work with both Microsoft Entra ID and SQL authentication.
+
+Sensors are defined as YAML files ending in `.asset.yml`.
+
+The `--sensor-mode` flag on `bruin run` controls what happens when the signal is not there yet. The default, `once`, checks a single time and fails the asset if the condition is unmet. `wait` re-checks every `poke_interval` until the condition holds or `timeout` elapses, and `skip` bypasses the sensor entirely. The `poke_interval` parameter therefore only takes effect under `--sensor-mode wait`.
+
+### `fabric.sensor.table`
+
+Checks whether a table exists in the Fabric Warehouse.
+
+```yaml
+name: string
+type: string
+parameters:
+    table: string
+    poke_interval: int (optional)
+    timeout: duration (optional)
+```
+
+**Parameters**:
+
+- `table`: `database.schema.table`, `schema.table`, or `table` format. A bare `table` resolves against the default `dbo` schema.
+- `poke_interval`: The interval between retries in seconds (default 30 seconds). Only used under `--sensor-mode wait`.
+- `timeout`: How long to wait before the sensor fails. Uses single-unit duration syntax (`s`, `m`, `h`, `d`, `ms`, `ns`), e.g. `1h` or `90m`. Defaults to `24h`. See [Sensor Timeout](/assets/sensor#timeout).
+
+```yaml
+name: analytics.upstream_events
+type: fabric.sensor.table
+parameters:
+    table: raw.events
+```
+
+### `fabric.sensor.query`
+
+Runs a query that returns a single value and succeeds when that value is greater than zero.
+
+```yaml
+name: string
+type: string
+parameters:
+    query: string
+    poke_interval: int (optional)
+    timeout: duration (optional)
+```
+
+**Parameters**:
+
+- `query`: A query returning exactly one row with one column. The sensor is satisfied when that value is greater than zero; zero or no rows means the condition is unmet. Booleans are accepted, with `true` counting as `1`. A query returning multiple rows or columns fails the asset outright, so shape the query with `exists`, `count`, or a `case` expression as in the examples below.
+- `poke_interval`: The interval between retries in seconds (default 30 seconds). Only used under `--sensor-mode wait`.
+- `timeout`: How long to wait before the sensor fails. Uses single-unit duration syntax (`s`, `m`, `h`, `d`, `ms`, `ns`), e.g. `1h` or `90m`. Defaults to `24h`. See [Sensor Timeout](/assets/sensor#timeout).
+
+#### Example: Partitioned upstream table
+
+Checks whether data is available in the upstream table for the run's end date.
+
+```yaml
+name: analytics.events
+type: fabric.sensor.query
+parameters:
+    query: select case when exists(select 1 from upstream_table where dt = '{{ end_date }}') then 1 else 0 end
+```
+
+#### Example: Streaming upstream table
+
+Checks whether any data landed after the end timestamp, assuming older data is never appended.
+
+```yaml
+name: analytics.events
+type: fabric.sensor.query
+parameters:
+    query: select case when exists(select 1 from upstream_table where inserted_at > '{{ end_timestamp }}') then 1 else 0 end
+```
+
 ## Spark SQL on a Lakehouse
 
 Use `fabric.spark_sql` to execute Spark SQL through the [Fabric Livy API](https://learn.microsoft.com/fabric/data-engineering/api-livy-overview). It uses the same Spark SQL execution, checks, Jinja functions, and materialization machinery as `spark.sql`, while resolving the named connection from the `fabric` section.
