@@ -51,6 +51,12 @@
       "items": {
         "$ref": "#/$defs/segment"
       }
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/note"
+      }
     }
   },
   "patternProperties": {
@@ -65,6 +71,50 @@
         "table": {
           "type": "string",
           "minLength": 1
+        }
+      },
+      "patternProperties": {
+        "^x-": true
+      },
+      "additionalProperties": false
+    },
+    "note": {
+      "type": "object",
+      "required": ["id", "dimensions"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dimensions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/noteDimension"
+          }
+        }
+      },
+      "patternProperties": {
+        "^x-": true
+      },
+      "additionalProperties": false
+    },
+    "noteDimension": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "optional": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether this dimension may be left unselected when creating a note."
+        },
+        "multiselect": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether the note may target multiple values of this dimension."
         }
       },
       "patternProperties": {
