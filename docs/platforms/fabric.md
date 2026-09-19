@@ -138,7 +138,7 @@ parameters:
 
 ### `fabric.sensor.query`
 
-Checks whether a query returns any results, poking until it does.
+Runs a query that returns a single value and pokes until that value is greater than zero.
 
 ```yaml
 name: string
@@ -151,7 +151,7 @@ parameters:
 
 **Parameters**:
 
-- `query`: Query you expect to return any results.
+- `query`: A query returning exactly one row with one column. The sensor succeeds once that value is greater than zero, and keeps poking while it is zero or the query returns no rows. Booleans are accepted, with `true` counting as `1`. A query returning multiple rows or columns fails the asset rather than poking, so shape the query with `exists`, `count`, or a `case` expression as in the examples below.
 - `poke_interval`: The interval between retries in seconds (default 30 seconds).
 - `timeout`: How long to wait before the sensor fails. Uses single-unit duration syntax (`s`, `m`, `h`, `d`, `ms`, `ns`), e.g. `1h` or `90m`. Defaults to `24h`. See [Sensor Timeout](/assets/sensor#timeout).
 
