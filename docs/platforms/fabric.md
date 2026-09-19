@@ -108,11 +108,13 @@ WHERE modified_date > '{{ start_date }}'
 
 Sensors are a special type of asset used to wait on external signals before downstream assets run. Fabric sensors run against the Warehouse SQL endpoint, so they work with both Microsoft Entra ID and SQL authentication.
 
-Sensors are defined as YAML files ending in `.asset.yml`. Bruin runs sensors once by default; use the `--sensor-mode` flag on `bruin run` to switch to `wait` or `skip`.
+Sensors are defined as YAML files ending in `.asset.yml`.
+
+The `--sensor-mode` flag on `bruin run` controls what happens when the signal is not there yet. The default, `once`, checks a single time and fails the asset if the condition is unmet. `wait` re-checks every `poke_interval` until the condition holds or `timeout` elapses, and `skip` bypasses the sensor entirely. The `poke_interval` parameter therefore only takes effect under `--sensor-mode wait`.
 
 ### `fabric.sensor.table`
 
-Checks whether a table exists in the Fabric Warehouse, poking until it appears.
+Checks whether a table exists in the Fabric Warehouse.
 
 ```yaml
 name: string
@@ -126,7 +128,7 @@ parameters:
 **Parameters**:
 
 - `table`: `database.schema.table`, `schema.table`, or `table` format. A bare `table` resolves against the default `dbo` schema.
-- `poke_interval`: The interval between retries in seconds (default 30 seconds).
+- `poke_interval`: The interval between retries in seconds (default 30 seconds). Only used under `--sensor-mode wait`.
 - `timeout`: How long to wait before the sensor fails. Uses single-unit duration syntax (`s`, `m`, `h`, `d`, `ms`, `ns`), e.g. `1h` or `90m`. Defaults to `24h`. See [Sensor Timeout](/assets/sensor#timeout).
 
 ```yaml
@@ -138,7 +140,7 @@ parameters:
 
 ### `fabric.sensor.query`
 
-Runs a query that returns a single value and pokes until that value is greater than zero.
+Runs a query that returns a single value and succeeds when that value is greater than zero.
 
 ```yaml
 name: string
@@ -151,8 +153,8 @@ parameters:
 
 **Parameters**:
 
-- `query`: A query returning exactly one row with one column. The sensor succeeds once that value is greater than zero, and keeps poking while it is zero or the query returns no rows. Booleans are accepted, with `true` counting as `1`. A query returning multiple rows or columns fails the asset rather than poking, so shape the query with `exists`, `count`, or a `case` expression as in the examples below.
-- `poke_interval`: The interval between retries in seconds (default 30 seconds).
+- `query`: A query returning exactly one row with one column. The sensor is satisfied when that value is greater than zero; zero or no rows means the condition is unmet. Booleans are accepted, with `true` counting as `1`. A query returning multiple rows or columns fails the asset outright, so shape the query with `exists`, `count`, or a `case` expression as in the examples below.
+- `poke_interval`: The interval between retries in seconds (default 30 seconds). Only used under `--sensor-mode wait`.
 - `timeout`: How long to wait before the sensor fails. Uses single-unit duration syntax (`s`, `m`, `h`, `d`, `ms`, `ns`), e.g. `1h` or `90m`. Defaults to `24h`. See [Sensor Timeout](/assets/sensor#timeout).
 
 #### Example: Partitioned upstream table
