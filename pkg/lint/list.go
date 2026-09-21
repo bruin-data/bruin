@@ -352,6 +352,13 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser sqlpa
 			AssetValidator:   EnsureTimeIntervalIsValidForAsset,
 			ApplicableLevels: []Level{LevelAsset},
 		},
+		&SimpleRule{
+			Identifier:       "semantic-layer-valid",
+			Fast:             true,
+			Severity:         ValidatorSeverityCritical,
+			Validator:        (&semanticLayerChecker{fs: fs, finder: finder}).Validate,
+			ApplicableLevels: []Level{LevelPipeline},
+		},
 	}
 
 	if parser != nil {
