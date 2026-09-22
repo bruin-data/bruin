@@ -1230,7 +1230,7 @@ func cloudRunsRerun() *cli.Command {
 func cloudRunsMarkStatus() *cli.Command {
 	return &cli.Command{
 		Name:  "mark-status",
-		Usage: "Mark a pipeline run with a status",
+		Usage: "Mark a pipeline run or one of its asset instances with a status",
 		Flags: []cli.Flag{
 			apiKeyFlag(),
 			outputFlag(),
@@ -1238,6 +1238,10 @@ func cloudRunsMarkStatus() *cli.Command {
 			pipelineFlag(),
 			runIDFlag(),
 			latestFlag(),
+			&cli.StringFlag{
+				Name:  "asset",
+				Usage: "asset name to mark without affecting the rest of the run",
+			},
 			&cli.StringFlag{
 				Name:     "status",
 				Usage:    "status to set (success or failed)",
@@ -1267,13 +1271,27 @@ func cloudRunsMarkStatus() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			err = client.MarkRunStatus(ctx, project, pipeline, runID, c.String("status"))
+			asset := c.String("asset")
+			status := c.String("status")
+			if asset != "" {
+				err = client.MarkAssetInstanceStatus(ctx, project, pipeline, runID, asset, status)
+			} else {
+				err = client.MarkRunStatus(ctx, project, pipeline, runID, status)
+			}
 			if err != nil {
-				printError(err, output, "Failed to mark run status")
+				if asset != "" {
+					printError(err, output, "Failed to mark asset instance status")
+				} else {
+					printError(err, output, "Failed to mark run status")
+				}
 				return cli.Exit("", 1)
 			}
 
-			printSuccessForOutput(output, fmt.Sprintf("Successfully marked run '%s' as '%s'", runID, c.String("status")))
+			if asset != "" {
+				printSuccessForOutput(output, fmt.Sprintf("Successfully marked asset '%s' in run '%s' as '%s'", asset, runID, status))
+			} else {
+				printSuccessForOutput(output, fmt.Sprintf("Successfully marked run '%s' as '%s'", runID, status))
+			}
 			return nil
 		},
 	}

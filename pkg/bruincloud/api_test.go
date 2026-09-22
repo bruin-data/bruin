@@ -488,6 +488,31 @@ func TestMarkRunStatus(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestMarkAssetInstanceStatus(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/mark-asset-instances", r.URL.Path)
+		assert.Equal(t, http.MethodPost, r.Method)
+
+		body := readJSON(t, r)
+		assert.Equal(t, "success", body["status"])
+		assert.Equal(t, []any{"analytics.orders"}, body["asset_instance_ids"])
+		assert.Equal(t, []any{
+			map[string]any{
+				"project":  "proj",
+				"pipeline": "pipe",
+				"run_id":   "run-1",
+			},
+		}, body["pipeline_runs"])
+
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`200`))
+	})
+
+	err := client.MarkAssetInstanceStatus(t.Context(), "proj", "pipe", "run-1", "analytics.orders", "success")
+	require.NoError(t, err)
+}
+
 func TestListAssets(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {

@@ -344,6 +344,21 @@ func (c *APIClient) MarkRunStatus(ctx context.Context, project, pipeline, runID,
 	return c.doRequest(ctx, http.MethodPost, "/mark-pipeline-runs-status", body, nil)
 }
 
+func (c *APIClient) MarkAssetInstanceStatus(ctx context.Context, project, pipeline, runID, asset, status string) error {
+	body := map[string]any{
+		"status": status,
+		"pipeline_runs": []map[string]string{
+			{
+				"project":  project,
+				"pipeline": pipeline,
+				"run_id":   runID,
+			},
+		},
+		"asset_instance_ids": []string{asset},
+	}
+	return c.doRequest(ctx, http.MethodPost, "/mark-asset-instances", body, nil)
+}
+
 func (c *APIClient) GetLatestRun(ctx context.Context, project, pipeline string) (*PipelineRun, error) {
 	runs, err := c.ListRuns(ctx, project, pipeline, 1, 0)
 	if err != nil {

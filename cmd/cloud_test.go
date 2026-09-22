@@ -459,6 +459,33 @@ func TestCloudRunsCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "diagnose")
 }
 
+func TestCloudRunsMarkStatusCommand_MarksAssetInstance(t *testing.T) { //nolint:paralleltest // sets process environment
+	var body map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/mark-asset-instances", r.URL.Path)
+		assert.Equal(t, http.MethodPost, r.Method)
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`200`))
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
+
+	cmd := cloudRunsMarkStatus()
+	err := cmd.Run(t.Context(), []string{
+		"mark-status",
+		"--api-key", "test-key",
+		"--project-id", "proj",
+		"--pipeline", "pipe",
+		"--run-id", "run-1",
+		"--asset", "analytics.orders",
+		"--status", "success",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "success", body["status"])
+	assert.Equal(t, []any{"analytics.orders"}, body["asset_instance_ids"])
+}
+
 func TestCloudRunsTriggerCommand_OutputsCreatedRunID(t *testing.T) { //nolint:paralleltest // redirects global output
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/trigger-pipeline-run", r.URL.Path)
