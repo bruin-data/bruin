@@ -1,6 +1,7 @@
 package semantic
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -213,6 +214,144 @@ func TestLoadFile_AcceptsLegacyDacSchemaID(t *testing.T) {
 	}
 	if model.Schema != "https://getbruin.com/schemas/dac/semantic-model/v1" {
 		t.Fatalf("expected legacy schema id preserved, got %q", model.Schema)
+	}
+}
+
+func TestLoadFile_PreservesNoteDimensionOptions(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "sales.yml")
+	body := `name: sales
+source:
+  table: sales
+notes:
+  - id: regional_rollout
+    dimensions:
+      - name: region
+        required: true
+      - name: channel
+        multiselect: true
+`
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+
+	model, err := LoadFile(path)
+	if err != nil {
+		t.Fatalf("load model: %v", err)
+	}
+	if len(model.Notes) != 1 || len(model.Notes[0].Dimensions) != 2 {
+		t.Fatalf("unexpected notes: %#v", model.Notes)
+	}
+	required := model.Notes[0].Dimensions[0]
+	if !required.Required {
+		t.Fatal("expected required: true")
+	}
+	multi := model.Notes[0].Dimensions[1]
+	if multi.Required {
+		t.Fatal("expected omitted required to default to false")
+	}
+	if !multi.Multiselect {
+		t.Fatal("expected multiselect: true")
+	}
+}
+
+func TestLoadFile_PreservesEmptyNoteDimensions(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "sales.yml")
+	body := `name: sales
+source:
+  table: sales
+notes:
+  - id: dashboard_context
+    dimensions: []
+`
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+
+	model, err := LoadFile(path)
+	if err != nil {
+		t.Fatalf("load model: %v", err)
+	}
+	if len(model.Notes) != 1 || model.Notes[0].Dimensions == nil || len(model.Notes[0].Dimensions) != 0 {
+		t.Fatalf("expected an explicit empty dimensions list, got %#v", model.Notes)
+	}
+	encoded, err := json.Marshal(model.Notes[0])
+	if err != nil {
+		t.Fatalf("marshal note: %v", err)
+	}
+	if string(encoded) != `{"id":"dashboard_context","dimensions":[]}` {
+		t.Fatalf("unexpected note JSON: %s", encoded)
+	}
+}
+
+func TestLoadFile_RejectsInvalidNoteDimensionOptions(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "sales.yml")
+	body := `name: sales
+source:
+  table: sales
+notes:
+  - id: regional_rollout
+    dimensions:
+      - name: region
+        required: mandatory
+`
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+
+	if _, err := LoadFile(path); err == nil || !strings.Contains(err.Error(), "required") {
+		t.Fatalf("expected required validation error, got %v", err)
+	}
+}
+
+func TestLoadFile_RejectsDuplicateNoteIdentifiers(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		notes   string
+		message string
+	}{
+		{
+			name: "note ids",
+			notes: `
+  - id: rollout
+    dimensions: [{name: region}]
+  - id: rollout
+    dimensions: [{name: channel}]
+`,
+			message: "duplicate note id: rollout",
+		},
+		{
+			name: "dimension names",
+			notes: `
+  - id: rollout
+    dimensions:
+      - {name: region}
+      - {name: region}
+`,
+			message: `note "rollout": duplicate dimension "region"`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			path := filepath.Join(t.TempDir(), "sales.yml")
+			body := "name: sales\nsource:\n  table: sales\nnotes:" + test.notes
+			if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+				t.Fatalf("write fixture: %v", err)
+			}
+
+			if _, err := LoadFile(path); err == nil || !strings.Contains(err.Error(), test.message) {
+				t.Fatalf("expected %q validation error, got %v", test.message, err)
+			}
+		})
 	}
 }
 
@@ -804,6 +943,33 @@ func TestNewEngine_ValidationErrors(t *testing.T) {
 			name:  "missing source table",
 			model: Model{Name: "m"},
 			want:  "source.table is required",
+		},
+		{
+			name: "note without id",
+			model: Model{
+				Name:   "m",
+				Source: Source{Table: "t"},
+				Notes:  []Note{{Dimensions: []NoteDimension{{Name: "region"}}}},
+			},
+			want: "note id is required",
+		},
+		{
+			name: "note dimension without name",
+			model: Model{
+				Name:   "m",
+				Source: Source{Table: "t"},
+				Notes:  []Note{{ID: "rollout", Dimensions: []NoteDimension{{}}}},
+			},
+			want: "dimension name is required",
+		},
+		{
+			name: "note without dimensions",
+			model: Model{
+				Name:   "m",
+				Source: Source{Table: "t"},
+				Notes:  []Note{{ID: "rollout"}},
+			},
+			want: "dimensions is required",
 		},
 		{
 			name: "duplicate name across dim and metric",
