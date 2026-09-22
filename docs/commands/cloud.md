@@ -399,10 +399,20 @@ bruin cloud runs rerun --project-id <project-id> --run-id <run-id> --only-failed
 
 #### `mark-status`
 
-Manually mark a run as succeeded or failed:
+Manually mark a run as successful or failed:
 
 ```bash
-bruin cloud runs mark-status --project-id <project-id> --run-id <run-id> --status succeeded
+bruin cloud runs mark-status \
+  --project-id <project-id> --pipeline <pipeline-name> \
+  --run-id <run-id> --status success
+```
+
+To mark only one asset instance without affecting the rest of the run, pass its full name with `--asset`:
+
+```bash
+bruin cloud runs mark-status \
+  --project-id <project-id> --pipeline <pipeline-name> \
+  --run-id <run-id> --asset analytics.orders --status success
 ```
 
 #### `diagnose`

@@ -344,6 +344,21 @@ func (c *APIClient) MarkRunStatus(ctx context.Context, project, pipeline, runID,
 	return c.doRequest(ctx, http.MethodPost, "/mark-pipeline-runs-status", body, nil)
 }
 
+func (c *APIClient) MarkAssetInstancesStatus(ctx context.Context, project, pipeline, runID string, assetInstanceIDs []string, status string) error {
+	body := map[string]any{
+		"status": status,
+		"pipeline_runs": []map[string]string{
+			{
+				"project":  project,
+				"pipeline": pipeline,
+				"run_id":   runID,
+			},
+		},
+		"asset_instance_ids": assetInstanceIDs,
+	}
+	return c.doRequest(ctx, http.MethodPost, "/mark-asset-instances", body, nil)
+}
+
 func (c *APIClient) GetLatestRun(ctx context.Context, project, pipeline string) (*PipelineRun, error) {
 	runs, err := c.ListRuns(ctx, project, pipeline, 1, 0)
 	if err != nil {
@@ -457,6 +472,22 @@ func (c *APIClient) GetInstance(ctx context.Context, project, pipeline, runID, a
 	var result json.RawMessage
 	err := c.doRequest(ctx, http.MethodPost, "/asset-instance-details", body, &result)
 	return result, err
+}
+
+func (c *APIClient) GetInstanceParsed(ctx context.Context, project, pipeline, runID, assetName string) (*AssetInstanceInfo, error) {
+	body := map[string]string{
+		"project":    project,
+		"pipeline":   pipeline,
+		"run_id":     runID,
+		"asset_name": assetName,
+	}
+	var result struct {
+		AssetInstance AssetInstanceInfo `json:"asset_instance"`
+	}
+	if err := c.doRequest(ctx, http.MethodPost, "/asset-instance-details", body, &result); err != nil {
+		return nil, err
+	}
+	return &result.AssetInstance, nil
 }
 
 func (c *APIClient) GetInstanceLogs(ctx context.Context, project, pipeline, runID, stepID string, tryNumber int) (json.RawMessage, error) {
