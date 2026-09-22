@@ -1274,7 +1274,16 @@ func cloudRunsMarkStatus() *cli.Command {
 			asset := c.String("asset")
 			status := c.String("status")
 			if asset != "" {
-				err = client.MarkAssetInstanceStatus(ctx, project, pipeline, runID, asset, status)
+				instance, instanceErr := client.GetInstanceParsed(ctx, project, pipeline, runID, asset)
+				if instanceErr != nil {
+					printError(instanceErr, output, "Failed to resolve asset instance")
+					return cli.Exit("", 1)
+				}
+				if len(instance.StepIDs) == 0 {
+					printError(fmt.Errorf("asset '%s' has no step instances", asset), output, "Failed to resolve asset instance")
+					return cli.Exit("", 1)
+				}
+				err = client.MarkAssetInstancesStatus(ctx, project, pipeline, runID, instance.StepIDs, status)
 			} else {
 				err = client.MarkRunStatus(ctx, project, pipeline, runID, status)
 			}
