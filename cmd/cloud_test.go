@@ -464,7 +464,7 @@ func TestCloudRunsMarkStatusCommand_MarksAssetInstance(t *testing.T) { //nolint:
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/mark-asset-instances", r.URL.Path)
 		assert.Equal(t, http.MethodPost, r.Method)
-		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`200`))
 	}))
