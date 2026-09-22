@@ -26,3 +26,4 @@ jobs:
           "$GITHUB_WORKSPACE/bin/bruin" query --config-file .bruin.yml --connection duckdb-default --output json --query "SELECT COUNT(*) = COUNT(DISTINCT alert_key) AS is_idempotent FROM operations.fct_alert_outbox" | grep -F '"rows":[[true]]'
           "$GITHUB_WORKSPACE/bin/bruin" run --config-file .bruin.yml --workers 1 --var 'tracked_terms=["example alternative","Example Co","example alternative"]' --var 'excluded_authors=["public_user"]' .
           "$GITHUB_WORKSPACE/bin/bruin" query --config-file .bruin.yml --connection duckdb-default --output json --query "SELECT COUNT(*) FROM enrichment.fct_mention_assessment WHERE status = 'excluded'" | grep -F '"rows":[[1]]'
+          "$GITHUB_WORKSPACE/bin/bruin" query --config-file .bruin.yml --connection duckdb-default --output json --query "SELECT COUNT(*) FROM marts.mart_share_of_voice_monthly WHERE term_category = 'brand'" | grep -F '"rows":[[1]]'

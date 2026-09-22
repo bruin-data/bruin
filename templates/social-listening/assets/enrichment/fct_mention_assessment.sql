@@ -41,16 +41,18 @@ WITH ranked_matches AS (
   FROM ranked_matches match
   JOIN staging.stg_content_item item USING (content_id)
   WHERE match.row_num = 1
+), exclusions AS (
+  SELECT *, author IN (SELECT author FROM excluded_authors)
+      OR author IN (SELECT author FROM team_authors) AS is_excluded
+  FROM candidates
 ), components AS (
   SELECT *,
     CASE WHEN content_text LIKE '%looking for%' OR content_text LIKE '%recommend%' OR content_text LIKE '%alternative%' THEN 0.90 ELSE 0.55 END AS relevance_score,
     CASE WHEN content_text LIKE '%looking for%' OR content_text LIKE '%recommend%' THEN 0.85 ELSE 0.50 END AS intent_score,
-    author IN (SELECT author FROM excluded_authors)
-      OR author IN (SELECT author FROM team_authors) AS is_excluded,
     CASE WHEN is_excluded THEN 0.0 ELSE 0.80 END AS authenticity_score,
     LEAST(COALESCE(CAST(json_extract_string(metrics_json, '$.score') AS DOUBLE), 0) / 20.0, 1.0) AS engagement_score,
     CASE WHEN published_at >= CURRENT_TIMESTAMP - INTERVAL '{{ var.max_content_age_days }} days' THEN 1.0 ELSE 0.20 END AS freshness_score
-  FROM candidates
+  FROM exclusions
 )
 SELECT sha256(content_id || ':deterministic-1.0') AS assessment_id, content_id, 'deterministic-1.0' AS assessment_version,
   relevance_score, intent_score AS intent_fit_score, 0.75 AS fit_score, engagement_score, freshness_score, authenticity_score,
