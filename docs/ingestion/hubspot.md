@@ -2,7 +2,7 @@
 
 [HubSpot](https://www.hubspot.com/) is a customer relationship management software that helps businesses attract visitors, connect with customers, and close deals.
 
-Bruin supports HubSpot as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from HubSpot into your data warehouse.
+Bruin supports HubSpot as both a source and a destination for [Ingestr assets](/assets/ingestr): you can ingest data from HubSpot into your data warehouse, and you can write CRM records and record-to-record associations from your warehouse back into HubSpot (reverse ETL).
 
 In order to set up HubSpot connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file. You will need an `api_key`, which can be either a **private app access token** or a HubSpot **service key** — both are sent to HubSpot as a bearer token, so either works.
 
@@ -177,3 +177,104 @@ bruin run assets/hubspot_ingestion.yml
 As a result of this command, Bruin will ingest data from the given HubSpot table into your Postgres database.
 
 <img width="1124" alt="hubspot" src="https://github.com/user-attachments/assets/c88f2781-1e78-4d5b-8cb1-60b7993ea674">
+
+## HubSpot as a destination
+
+Bruin can also write CRM records and record-to-record associations **into** HubSpot (reverse ETL). Each source row becomes one HubSpot record (or one association link), sent in bulk through HubSpot's batch APIs. Reuse the same connection as the source (the `api_key`).
+
+The `destination_table` parameter selects the object type and, after the `?`, the property to match on; the `incremental_strategy` parameter selects the write behaviour. (These go in `destination_table` rather than the asset `name`, because an asset name may not contain `?`, `=`, or `&`.)
+
+### Strategies
+
+| Strategy | Behaviour |
+| -------- | --------- |
+| `merge` | Upsert — update the matching record, or create it if none matches. The usual choice. |
+| `update` | Update matching records only; rows with no match are rejected, never created. |
+| `append` | Always create a new record, never match. Re-running the same rows creates duplicates. |
+| `delete` | Archive (soft-delete) the matching records. |
+| `replace` | Mirror — upsert every source row, then archive any record of that object type whose match value is **not** in the source. Scans the whole object each run, so it is slow and expensive on large objects. |
+
+### Matching records
+
+Upsert/update/delete match on two things: **which HubSpot property** to match on, and **which source column** carries the value.
+
+- **Match property** — set with `id_property=<property>` on `destination_table`. Use the property's internal name (e.g. `numberofemployees`, not "Number of Employees"). `update` and `delete` default it to `hs_object_id` (the record id); `merge` and `replace` require it explicitly and it must be a **unique property** — not `hs_object_id`, since HubSpot has no upsert-by-record-id (use `update` to match existing records by id).
+- **Source column** — the column supplying the match value, marked with `primary_key: true` in the asset's `columns`. `update` and `delete` default to the `hs_object_id` column when none is marked.
+
+### Example: upsert contacts by email
+
+```yaml
+name: sync_contacts_to_hubspot
+type: ingestr
+
+parameters:
+  source_connection: my-postgres
+  source_table: 'public.marketing_contacts'
+
+  destination: hubspot
+  destination_connection: my-hubspot
+  destination_table: 'contacts?id_property=email'
+  incremental_strategy: merge
+
+columns:
+  - name: email
+    type: string
+    primary_key: true
+```
+
+Every other column in the source is written to the HubSpot property of the same internal name. HubSpot does not create properties on the fly — each column must map to a property that already exists on the object.
+
+### Associations
+
+An `obj1+obj2` destination table links records of one object to another (e.g. contacts to companies). Provide two match properties and two source key columns (one per side); `merge` adds links, `delete` unlinks, and `replace` mirrors each From record's links to exactly what the source lists.
+
+```yaml
+name: link_contacts_to_companies
+type: ingestr
+
+parameters:
+  source_connection: my-postgres
+  source_table: 'public.contact_company_map'
+
+  destination: hubspot
+  destination_connection: my-hubspot
+  destination_table: 'contacts+companies?id_property=email,domain'
+  incremental_strategy: merge
+
+columns:
+  - name: email
+    type: string
+    primary_key: true
+  - name: domain
+    type: string
+    primary_key: true
+```
+
+Optional `destination_table` parameters for associations: `label` (a custom association label to add/remove), `association_type`, and `association_category`. An empty side of `id_property` (e.g. `id_property=email,`) means that side's value is already a HubSpot record id.
+
+Custom objects work as a destination too — use the object's internal name (e.g. `license?id_property=sku`).
+
+### Run options
+
+Two optional parameters tune how a reverse-ETL run behaves:
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `reject_mode` | `fail` | How to handle a row HubSpot can't apply: `fail` writes the valid rows then errors with the reject list, `fail_fast` stops at the first bad row, `skip` writes the valid rows and succeeds while reporting the rejects. |
+| `write_nulls` | `true` | Whether a source NULL is written through to **clear** the HubSpot field. `write_nulls: false` omits null columns instead, leaving the existing value untouched (a partial update). |
+
+```yaml
+parameters:
+  source_connection: my-postgres
+  source_table: 'public.marketing_contacts'
+
+  destination: hubspot
+  destination_connection: my-hubspot
+  destination_table: 'contacts?id_property=email'
+  incremental_strategy: merge
+  reject_mode: skip
+  write_nulls: false
+```
+
+> [!NOTE]
+> For the full destination reference — every strategy, matching detail, association options, and null-handling — see the [ingestr documentation](https://getbruin.com/docs/ingestr/supported-sources/hubspot.html).
