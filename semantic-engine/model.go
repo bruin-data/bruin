@@ -23,7 +23,7 @@ type Note struct {
 
 type NoteDimension struct {
 	Name        string `yaml:"name" json:"name"`
-	Optional    *bool  `yaml:"optional,omitempty" json:"optional,omitempty"`
+	Required    bool   `yaml:"required,omitempty" json:"required,omitempty"`
 	Multiselect bool   `yaml:"multiselect,omitempty" json:"multiselect,omitempty"`
 }
 

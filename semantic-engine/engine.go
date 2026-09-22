@@ -141,6 +141,9 @@ func (e *Engine) validate() error {
 			return fmt.Errorf("duplicate note id: %s", note.ID)
 		}
 		noteIDs[note.ID] = true
+		if note.Dimensions == nil {
+			return fmt.Errorf("note %q: dimensions is required", note.ID)
+		}
 
 		dimensionNames := make(map[string]bool, len(note.Dimensions))
 		for _, dimension := range note.Dimensions {

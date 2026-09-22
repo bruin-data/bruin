@@ -106,10 +106,10 @@
           "type": "string",
           "minLength": 1
         },
-        "optional": {
+        "required": {
           "type": "boolean",
-          "default": true,
-          "description": "Whether this dimension may be left unselected when creating a note."
+          "default": false,
+          "description": "Whether this dimension must be selected when creating a note."
         },
         "multiselect": {
           "type": "boolean",
