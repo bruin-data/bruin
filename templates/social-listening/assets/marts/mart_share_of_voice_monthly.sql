@@ -11,10 +11,18 @@ columns:
     type: string
     checks: [{name: not_null}]
 @bruin */
-WITH matched AS (
+WITH team_authors AS (
+  {% if var.team_authors|length == 0 %}
+  SELECT CAST(NULL AS VARCHAR) AS author WHERE FALSE
+  {% else %}
+  {% for author in var.team_authors %}
+  SELECT '{{ author | replace("'", "''") }}' AS author{% if not loop.last %} UNION ALL{% endif %}
+  {% endfor %}
+  {% endif %}
+), matched AS (
   SELECT date_trunc('month', item.published_at)::DATE AS month_start, term.category AS term_category,
     item.content_id, item.author,
-    item.author IN ({% for author in var.team_authors %}'{{ author | replace("'", "''") }}'{% if not loop.last %}, {% endif %}{% endfor %} '') AS is_team_content
+    item.author IN (SELECT author FROM team_authors) AS is_team_content
   FROM staging.stg_content_item item
   JOIN enrichment.fct_term_match match USING (content_id)
   JOIN config.dim_term term USING (term_id)

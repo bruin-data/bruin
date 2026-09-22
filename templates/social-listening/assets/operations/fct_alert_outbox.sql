@@ -20,4 +20,7 @@ SELECT sha256(assessment.content_id || ':{{ var.notification_destination }}:v1')
        WHEN {{ var.notification_dry_run }} THEN 'dry_run' ELSE 'pending' END AS status,
   0 AS retry_count, CAST(NULL AS TIMESTAMP) AS delivered_at, CURRENT_TIMESTAMP AS created_at, CURRENT_TIMESTAMP AS updated_at
 FROM enrichment.fct_mention_assessment assessment
-WHERE assessment.priority_score >= {{ var.min_priority }} AND assessment.relevance_score >= {{ var.min_relevance }};
+WHERE assessment.status = 'eligible'
+  AND assessment.priority_score >= {{ var.min_priority }}
+  AND assessment.relevance_score >= {{ var.min_relevance }}
+  AND assessment.confidence_score >= {{ var.min_confidence }};

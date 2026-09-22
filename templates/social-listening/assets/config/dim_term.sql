@@ -32,8 +32,14 @@ WITH configured_terms AS (
   SELECT '{{ phrase | replace("'", "''") }}' AS phrase, 'competitor' AS category{% if not loop.last %} UNION ALL{% endif %}
   {% endfor %}
   {% endif %}
+), ranked_terms AS (
+  SELECT phrase, category,
+    ROW_NUMBER() OVER (PARTITION BY lower(trim(phrase)) ORDER BY
+      CASE category WHEN 'tracked_term' THEN 1 WHEN 'brand' THEN 2 ELSE 3 END) AS row_num
+  FROM (SELECT * FROM configured_terms UNION ALL SELECT * FROM brand UNION ALL SELECT * FROM competitors)
+  WHERE phrase IS NOT NULL AND trim(phrase) <> ''
 )
-SELECT sha256(lower(phrase)) AS term_id, phrase, category, 'all' AS platform_scope,
+SELECT sha256(lower(trim(phrase))) AS term_id, phrase, category, 'all' AS platform_scope,
   TRUE AS active, CURRENT_DATE AS valid_from, CAST(NULL AS DATE) AS valid_to
-FROM (SELECT * FROM configured_terms UNION ALL SELECT * FROM brand UNION ALL SELECT * FROM competitors)
-WHERE phrase IS NOT NULL;
+FROM ranked_terms
+WHERE row_num = 1;

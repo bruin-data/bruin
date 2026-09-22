@@ -9,7 +9,7 @@ bruin init social-listening
 cd social-listening
 cp .bruin.yml.example .bruin.yml
 bruin validate .
-bruin run --workers 1 .
+bruin run --config-file .bruin.yml --workers 1 .
 ```
 
 The fixtures produce Reddit and Hacker News records, deterministic term matches, explainable assessments, a review queue, and a dry-run outbox. Re-run the same window to confirm unique raw IDs and alert keys.
