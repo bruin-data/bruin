@@ -19,6 +19,7 @@ import (
 //
 //go:embed *
 //go:embed */.bruin.yml
+//go:embed social-listening/.bruin.yml.example
 //go:embed migration-fivetran/.gitignore
 //go:embed stripe-bigquery/.gitignore
 //go:embed chargebee-bigquery/.gitignore

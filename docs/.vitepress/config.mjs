@@ -525,6 +525,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "demo-snowflake-salesforce", link: "/getting-started/templates-docs/demo-snowflake-salesforce-README"},
                             {text: "demo-payments-clickhouse", link: "/getting-started/templates-docs/demo-payments-clickhouse-README"},
                             {text: "demo-self-heal-pipeline", link: "/getting-started/templates-docs/demo-self-heal-pipeline-README"},
+                            {text: "social-listening", link: "/getting-started/templates-docs/social-listening"},
                         ],
                     },
                     {

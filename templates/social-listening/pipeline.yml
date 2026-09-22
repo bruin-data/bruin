@@ -1,0 +1,46 @@
+name: social-listening
+schedule: "*/15 * * * *"
+start_date: "2026-01-01"
+catchup: false
+
+default_connections:
+  duckdb: duckdb-default
+
+# Policy belongs here; credentials belong in environment variables or a secrets backend.
+variables:
+  brand_name: {type: string, minLength: 1, default: "Example Co"}
+  brand_description: {type: string, default: "Product, ideal customer, exclusions and claims to avoid"}
+  competitors: {type: array, items: {type: string}, default: []}
+  tracked_terms: {type: array, items: {type: string}, minItems: 1, default: ["example alternative"]}
+  excluded_terms: {type: array, items: {type: string}, default: []}
+  excluded_authors: {type: array, items: {type: string}, default: []}
+  team_authors: {type: array, items: {type: string}, default: []}
+  reddit_enabled: {type: boolean, default: false}
+  reddit_communities_include: {type: array, items: {type: string}, default: []}
+  reddit_communities_exclude: {type: array, items: {type: string}, default: []}
+  reddit_poll_minutes: {type: integer, minimum: 5, maximum: 1440, default: 15}
+  hackernews_enabled: {type: boolean, default: true}
+  github_enabled: {type: boolean, default: false}
+  stackoverflow_enabled: {type: boolean, default: false}
+  slack_community_enabled: {type: boolean, default: false}
+  source_lookback_hours: {type: integer, minimum: 1, maximum: 720, default: 48}
+  max_pages_per_source: {type: integer, minimum: 1, maximum: 100, default: 5}
+  intent_taxonomy: {type: array, items: {type: string}, default: ["question", "comparison", "complaint", "praise", "other"]}
+  min_relevance: {type: number, minimum: 0, maximum: 1, default: 0.70}
+  min_priority: {type: number, minimum: 0, maximum: 1, default: 0.65}
+  min_confidence: {type: number, minimum: 0, maximum: 1, default: 0.60}
+  max_content_age_days: {type: integer, minimum: 1, maximum: 365, default: 30}
+  llm_enabled: {type: boolean, default: false}
+  llm_model: {type: string, default: ""}
+  notification_destination: {type: string, enum: ["none", "webhook", "slack_webhook"], default: "none"}
+  notification_dry_run: {type: boolean, default: true}
+  max_delivery_retries: {type: integer, minimum: 0, maximum: 10, default: 3}
+  reply_drafts_enabled: {type: boolean, default: false}
+  require_human_approval: {type: boolean, const: true, default: true}
+  allow_mutations: {type: boolean, const: false, default: false}
+
+tags: [social-listening, duckdb, safe-by-default]
+meta:
+  description: "Public-conversation discovery, explainable qualification, and draft-only human review."
+  source_policy: "Only public or explicitly authorised sources; no scraping or source mutation."
+  schedules: "Collection every 15 minutes, daily enrichment/aggregation, weekly reporting; enable Cloud schedules explicitly."

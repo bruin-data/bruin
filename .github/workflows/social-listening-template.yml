@@ -1,0 +1,24 @@
+name: Social listening template
+
+on:
+  pull_request:
+    paths: ["templates/social-listening/**", ".github/workflows/social-listening-template.yml"]
+  push:
+    paths: ["templates/social-listening/**", ".github/workflows/social-listening-template.yml"]
+
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: {go-version-file: go.mod}
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.x"}
+      - run: make build
+      - run: |
+          cp -R templates/social-listening /tmp/social-listening
+          cd /tmp/social-listening
+          "$GITHUB_WORKSPACE/bin/bruin" validate .
+          python3 -m unittest discover -s tests
+          "$GITHUB_WORKSPACE/bin/bruin" run --workers 1 .

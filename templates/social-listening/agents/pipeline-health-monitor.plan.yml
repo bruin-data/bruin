@@ -1,0 +1,15 @@
+title: Daily pipeline health monitor (draft)
+default_cron: "15 9 * * *"
+timezone: "UTC"
+permitted_warehouse_objects: ["marts.mart_pipeline_health"]
+verified_sql: |
+  SELECT * FROM marts.mart_pipeline_health
+  WHERE source_freshness_minutes > 90
+     OR delivery_error_count > 0
+     OR classification_lag_minutes > 180;
+output_format: "Only stale cursor, abnormal volume, errors, lag, or failed-delivery alerts with source and metric."
+late_arrival_window: "24 hours"
+state_file_name: "pipeline-health-monitor-alert-keys.json"
+no_result_response: "No pipeline-health conditions require review."
+delivery_target_placeholder: "<reviewed-health-destination>"
+blocked_data_response: "Health check blocked: approved health mart unavailable; do not trigger a backfill."

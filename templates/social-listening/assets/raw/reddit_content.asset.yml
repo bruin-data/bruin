@@ -1,0 +1,26 @@
+name: raw.raw_reddit_content
+type: duckdb.seed
+parameters:
+  path: ../../fixtures/reddit_content.csv
+columns:
+  - name: source
+    type: string
+    checks: [{name: not_null}, {name: accepted_values, value: [reddit]}]
+  - name: external_id
+    type: string
+    primary_key: true
+    checks: [{name: not_null}, {name: unique}]
+  - name: payload_json
+    type: string
+    checks: [{name: not_null}]
+  - name: published_at
+    type: timestamp
+    checks: [{name: not_null}]
+  - name: collected_at
+    type: timestamp
+    checks: [{name: not_null}]
+  - name: source_cursor
+    type: string
+  - name: ingest_run_id
+    type: string
+    checks: [{name: not_null}]
