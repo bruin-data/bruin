@@ -59,7 +59,7 @@ Most charts map result columns with `x` and `y`. Depending on the chart, you can
   chart: line
   query: monthly_revenue_by_channel
   x: { field: month, type: date, format: "%b %Y" }
-  y: { field: revenue, type: number, format: "$,.0f" }
+  y: { field: [revenue], type: number, format: "$,.0f" }
   color: { field: channel }
 ```
 
@@ -149,7 +149,7 @@ rows:
   - tab: Trends
     height: 420px
     widgets:
-      - { id: revenue_trend, name: Revenue trend, type: chart, chart: line, col: 12, query: monthly_revenue, x: { field: month }, y: { field: revenue } }
+      - { id: revenue_trend, name: Revenue trend, type: chart, chart: line, col: 12, query: monthly_revenue, x: { field: month }, y: { field: [revenue] } }
 ```
 
 ## Data sources
