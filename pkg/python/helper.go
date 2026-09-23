@@ -13,6 +13,7 @@ const ingestrIntervalTimestampFormat = "2006-01-02T15:04:05.999999Z07:00"
 var ingestrValueParameterFlags = []string{
 	"incremental_key",
 	"incremental_strategy",
+	"reject_mode",
 	"partition_by",
 	"cluster_by",
 	"schema_contract",
@@ -187,6 +188,13 @@ func appendIngestrParameterFlags(params pipeline.ParameterMap, cmdArgs []string)
 		if value, exists := params.GetString(param); exists && value == "true" {
 			cmdArgs = append(cmdArgs, "--"+strings.ReplaceAll(param, "_", "-"))
 		}
+	}
+
+	// write_nulls (reverse ETL) is a bool whose ingestr default is true (clear the
+	// field). Pass the value explicitly as --write-nulls=<bool> so write_nulls=false
+	// actually omits NULLs instead of falling back to the default.
+	if value, exists := params.GetString("write_nulls"); exists && value != "" {
+		cmdArgs = append(cmdArgs, "--write-nulls="+value)
 	}
 
 	// Flush flags are only valid alongside --stream; ingestr rejects them otherwise.
