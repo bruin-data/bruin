@@ -186,9 +186,9 @@ Set the destination with three parameters:
 
 - `destination: hubspot`
 - `destination_connection`: your HubSpot connection name
-- `destination_table: '<object>?<params>'` — the object type before the `?`, and matching parameters after it. (These go in `destination_table`, not the asset `name`, because an asset name may not contain `?`, `=`, or `&`.)
+- `destination_table: '<object>?<params>'` — the object type before the `?`, and matching parameters after it.
 
-The write behaviour is chosen with `incremental_strategy`, which is **required** — HubSpot has no default. Every source column is written to the HubSpot property whose **internal name** matches the column name (e.g. `numberofemployees`, never the display label "Number of Employees"); rename a column with [`source_column`](#column-name-mapping). Bruin's own bookkeeping columns are never sent.
+The write behaviour is chosen with `incremental_strategy`, which is **required** — HubSpot has no default. Every source column is written to the HubSpot property whose **internal name** matches the column name (e.g. `numberofemployees`, never the display label "Number of Employees"); rename a column with [`source_column`](#column-name-mapping). The metadata columns ingestr adds to every load (`_ingestr_loaded_at`, `_ingestr_run_id`) are never sent as properties.
 
 ### Strategies
 
@@ -212,6 +212,9 @@ Upsert/update/delete match on two independent things — **which HubSpot propert
 
 For `update` and `delete`, the match property need not be unique: if it is non-unique (e.g. `company_name`), every record with that value is updated/archived. (`merge`/`replace` still require a unique property, since upsert/mirror target a single record.)
 
+> [!WARNING]
+> Matching on a non-unique property is much slower: each value is resolved through HubSpot's Search API (which is rate-limited) instead of a direct batch lookup, so large runs take considerably longer. Prefer a unique property, or `hs_object_id`, when you can.
+
 ### Example: upsert contacts by email
 
 ```yaml
@@ -229,7 +232,6 @@ parameters:
 
 columns:
   - name: email
-    type: string
     primary_key: true
 ```
 
@@ -290,10 +292,8 @@ parameters:
 
 columns:
   - name: email          # obj1 (contacts) key — declared first
-    type: string
     primary_key: true
   - name: domain         # obj2 (companies) key
-    type: string
     primary_key: true
 ```
 
@@ -338,7 +338,6 @@ parameters:
 
 columns:
   - name: sku
-    type: string
     primary_key: true
 ```
 
