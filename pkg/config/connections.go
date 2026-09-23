@@ -1090,6 +1090,7 @@ type ClickHouseConnection struct {
 	Host               string `yaml:"host"     json:"host" mapstructure:"host"`
 	Port               int    `yaml:"port"     json:"port" mapstructure:"port"`
 	Database           string `yaml:"database" json:"database" mapstructure:"database"`
+	Cluster            string `yaml:"cluster,omitempty" json:"cluster,omitempty" mapstructure:"cluster"`
 	HTTPPort           int    `yaml:"http_port,omitempty" json:"http_port,omitempty" mapstructure:"http_port"`
 	Secure             *int   `yaml:"secure,omitempty" json:"secure,omitempty" mapstructure:"secure"`
 	ReadOnly           bool   `yaml:"read_only,omitempty" json:"read_only,omitempty" mapstructure:"read_only"`

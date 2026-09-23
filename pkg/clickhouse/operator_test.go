@@ -2,6 +2,7 @@ package clickhouse
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -11,6 +12,58 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
+
+type clusterQuerier struct {
+	mockQuerierWithResult
+	cluster string
+}
+
+func (c *clusterQuerier) GetCluster() string {
+	return c.cluster
+}
+
+func TestBasicOperatorClusterPerConnection(t *testing.T) {
+	t.Parallel()
+	extractor := new(mockExtractor)
+	extractor.On("ExtractQueriesFromString", "SELECT 1 AS id").
+		Return([]*query.Query{{Query: "SELECT 1 AS id"}}, nil)
+	connections := new(mockConnectionFetcher)
+	operator := NewBasicOperator(connections, extractor, false, nil, nil)
+	operator.devEnv = nil
+	pl := &pipeline.Pipeline{}
+	for _, cluster := range []string{"analytics", "", "replicas"} {
+		client := &clusterQuerier{cluster: cluster}
+		connections.On("GetConnection", cluster+"_connection").Return(client).Once()
+		pre := client.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "SELECT 'pre';"}).Return(nil).Once()
+		main := client.On("RunQueryWithoutResult", mock.Anything, mock.MatchedBy(func(q *query.Query) bool {
+			if !strings.HasPrefix(q.Query, "CREATE OR REPLACE VIEW warehouse.events") || !strings.Contains(q.Query, "SELECT 1 AS id") {
+				return false
+			}
+			if cluster == "" {
+				return !strings.Contains(q.Query, "ON CLUSTER")
+			}
+			return strings.Contains(q.Query, "ON CLUSTER") && strings.Contains(q.Query, cluster)
+		})).Return(nil).Once().NotBefore(pre)
+		client.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "SELECT 'post';"}).Return(nil).Once().NotBefore(main)
+		asset := &pipeline.Asset{
+			Name:       "warehouse.events",
+			Type:       pipeline.AssetTypeClickHouse,
+			Connection: cluster + "_connection",
+			Materialization: pipeline.Materialization{
+				Type: pipeline.MaterializationTypeView,
+			},
+			ExecutableFile: pipeline.ExecutableFile{Content: "SELECT 1 AS id"},
+			Hooks: pipeline.Hooks{
+				Pre:  []pipeline.Hook{{Query: "SELECT 'pre'"}},
+				Post: []pipeline.Hook{{Query: "SELECT 'post'"}},
+			},
+		}
+		require.NoError(t, operator.RunTask(t.Context(), pl, asset))
+		client.AssertExpectations(t)
+	}
+	connections.AssertExpectations(t)
+	extractor.AssertExpectations(t)
+}
 
 type mockExtractor struct {
 	mock.Mock

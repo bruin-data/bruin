@@ -18,6 +18,7 @@ type Config struct {
 	Host     string
 	Port     int
 	Database string
+	Cluster  string
 	HTTPPort int
 	Secure   *int
 	ReadOnly bool
@@ -52,6 +53,13 @@ func (c *Config) ToClickHouseOptions() *click_house.Options {
 	if c.ReadOnly {
 		opt.Settings = click_house.Settings{"readonly": 1}
 	}
+	if c.Cluster != "" {
+		if opt.Settings == nil {
+			opt.Settings = click_house.Settings{}
+		}
+		opt.Settings["distributed_ddl_output_mode"] = "throw"
+		opt.Settings["distributed_ddl_task_timeout"] = 180
+	}
 	return &opt
 }
 
@@ -77,6 +85,10 @@ func (c *Config) GetIngestrURI() string {
 
 func (c *Config) GetDatabase() string {
 	return c.Database
+}
+
+func (c *Config) GetCluster() string {
+	return c.Cluster
 }
 
 func (c *Config) IsReadOnly() bool {

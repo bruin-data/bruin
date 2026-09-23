@@ -2551,10 +2551,7 @@ func SetupExecutors(
 	//nolint:dupl
 	if s.WillRunTaskOfType(pipeline.AssetTypeClickHouse) || estimateCustomCheckType == pipeline.AssetTypeClickHouse ||
 		s.WillRunTaskOfType(pipeline.AssetTypeClickHouseSeed) || s.WillRunTaskOfType(pipeline.AssetTypeClickHouseQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeClickHouseTableSensor) {
-		clickHouseOperator := clickhouse.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializerList{
-			Mat:     clickhouse.NewMaterializer(fullRefresh),
-			Hoister: hoister,
-		}, parser)
+		clickHouseOperator := clickhouse.NewBasicOperator(conn, wholeFileExtractor, fullRefresh, hoister, parser)
 		checkRunner := clickhouse.NewColumnCheckOperator(conn)
 		clickHouseQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
 		clickHouseTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)

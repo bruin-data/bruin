@@ -839,6 +839,9 @@
         "database": {
           "type": "string"
         },
+        "cluster": {
+          "type": "string"
+        },
         "http_port": {
           "type": "integer"
         },

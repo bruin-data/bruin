@@ -37,10 +37,11 @@ type devEnv interface {
 }
 
 type BasicOperator struct {
-	connection   config.ConnectionGetter
-	extractor    query.QueryExtractor
-	materializer materializer
-	devEnv       devEnv
+	connection          config.ConnectionGetter
+	extractor           query.QueryExtractor
+	materializer        materializer
+	materializerFactory func(cluster string) materializer
+	devEnv              devEnv
 }
 
 func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
@@ -64,30 +65,6 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	if len(queries) > 1 && t.Materialization.Type != pipeline.MaterializationTypeNone {
 		return errors.New("cannot enable materialization for tasks with multiple queries")
 	}
-	writer := ctx.Value(executor.KeyPrinter)
-	err = o.materializer.LogIfFullRefreshAndDDL(writer, t)
-	if err != nil {
-		return err
-	}
-
-	q := queries[0]
-	var materializedQueries, cleanupQueries []string
-	if cleanupMaterializer, ok := o.materializer.(materializerWithCleanup); ok {
-		materializedQueries, cleanupQueries, err = cleanupMaterializer.RenderWithCleanup(t, q.String())
-	} else {
-		materializedQueries, err = o.materializer.Render(t, q.String())
-	}
-	if err != nil {
-		return err
-	}
-
-	if t.Materialization.Strategy == pipeline.MaterializationStrategyTimeInterval {
-		materializedQueries, err = extractor.ReextractQueriesFromSlice(materializedQueries)
-		if err != nil {
-			return err
-		}
-	}
-
 	connName, err := p.GetConnectionNameForAsset(t)
 	if err != nil {
 		return err
@@ -101,6 +78,38 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	conn, ok := rawConn.(ClickHouseClient)
 	if !ok {
 		return errors.Errorf("connection '%s' is not a clickhouse connection", connName)
+	}
+
+	mat := o.materializer
+	if o.materializerFactory != nil {
+		cluster := ""
+		if clusterConn, ok := rawConn.(interface{ GetCluster() string }); ok {
+			cluster = clusterConn.GetCluster()
+		}
+		mat = o.materializerFactory(cluster)
+	}
+	writer := ctx.Value(executor.KeyPrinter)
+	err = mat.LogIfFullRefreshAndDDL(writer, t)
+	if err != nil {
+		return err
+	}
+
+	q := queries[0]
+	var materializedQueries, cleanupQueries []string
+	if cleanupMaterializer, ok := mat.(materializerWithCleanup); ok {
+		materializedQueries, cleanupQueries, err = cleanupMaterializer.RenderWithCleanup(t, q.String())
+	} else {
+		materializedQueries, err = mat.Render(t, q.String())
+	}
+	if err != nil {
+		return err
+	}
+
+	if t.Materialization.Strategy == pipeline.MaterializationStrategyTimeInterval {
+		materializedQueries, err = extractor.ReextractQueriesFromSlice(materializedQueries)
+		if err != nil {
+			return err
+		}
 	}
 
 	var lastQuery *query.Query
@@ -173,11 +182,16 @@ func (o BasicOperator) cleanupAfterFailure(
 	return originalErr
 }
 
-func NewBasicOperator(conn config.ConnectionGetter, extractor query.QueryExtractor, materializer materializer, parser *sqlparser.SQLParser) *BasicOperator {
+func NewBasicOperator(conn config.ConnectionGetter, extractor query.QueryExtractor, fullRefresh bool, hoister pipeline.DeclareHoister, parser *sqlparser.SQLParser) *BasicOperator {
 	return &BasicOperator{
-		connection:   conn,
-		extractor:    extractor,
-		materializer: materializer,
+		connection: conn,
+		extractor:  extractor,
+		materializerFactory: func(cluster string) materializer {
+			return pipeline.HookWrapperMaterializerList{
+				Mat:     NewMaterializer(fullRefresh, cluster),
+				Hoister: hoister,
+			}
+		},
 		devEnv: &devenv.DevEnvQueryModifier{
 			Dialect: "clickhouse",
 			Conn:    conn,
