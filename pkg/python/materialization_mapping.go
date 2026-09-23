@@ -86,8 +86,7 @@ func GetSupportedPythonStrategiesString() string {
 }
 
 // SupportedIngestrStrategies lists the incremental strategies ingestr accepts for
-// any destination. The reverse-ETL-only strategies (update, delete) are tracked
-// separately in ReverseETLIngestrStrategies.
+// any destination. Reverse-ETL-only ones live in ReverseETLIngestrStrategies.
 var SupportedIngestrStrategies = []string{
 	"replace",
 	"append",
@@ -96,19 +95,15 @@ var SupportedIngestrStrategies = []string{
 	"truncate+insert",
 }
 
-// ReverseETLIngestrStrategies are incremental strategies ingestr accepts only when
-// the destination is a reverse-ETL destination (writes rows back to an external
-// API). ingestr gates these on the destination's IsReverseETL marker; anything
-// else fails at runtime.
+// ReverseETLIngestrStrategies are accepted only for reverse-ETL destinations;
+// ingestr rejects them elsewhere (gated on the destination's IsReverseETL marker).
 var ReverseETLIngestrStrategies = []string{
 	"update",
 	"delete",
 }
 
-// ReverseETLIngestrDestinations are the ingestr destinations that write rows back
-// to an external API and therefore accept ReverseETLIngestrStrategies. This mirrors
-// ingestr's own gate (destinations implementing IsReverseETL); add new reverse-ETL
-// destinations here as they gain the marker.
+// ReverseETLIngestrDestinations are the destinations that accept
+// ReverseETLIngestrStrategies. Add new ones as they gain ingestr's IsReverseETL marker.
 var ReverseETLIngestrDestinations = map[string]bool{
 	"hubspot": true,
 }
@@ -123,8 +118,6 @@ func IsIngestrStrategySupported(strategy string) bool {
 	return false
 }
 
-// IsReverseETLIngestrStrategy reports whether the strategy is a reverse-ETL-only
-// strategy (update/delete).
 func IsReverseETLIngestrStrategy(strategy string) bool {
 	for _, s := range ReverseETLIngestrStrategies {
 		if s == strategy {
@@ -134,8 +127,6 @@ func IsReverseETLIngestrStrategy(strategy string) bool {
 	return false
 }
 
-// IsReverseETLIngestrDestination reports whether the ingestr destination accepts
-// the reverse-ETL-only strategies.
 func IsReverseETLIngestrDestination(destination string) bool {
 	return ReverseETLIngestrDestinations[destination]
 }
