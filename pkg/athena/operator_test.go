@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 type mockExtractor struct {
@@ -40,6 +41,30 @@ func (m *mockMaterializer) Render(t *pipeline.Asset, query, location string) ([]
 
 func (m *mockMaterializer) LogIfFullRefreshAndDDL(writer interface{}, asset *pipeline.Asset) error {
 	return nil
+}
+
+type mockIncrementalMaterializer struct {
+	*mockMaterializer
+	fullRefresh bool
+}
+
+func (m *mockIncrementalMaterializer) RenderInitialTable(t *pipeline.Asset, query, location string) ([]string, error) {
+	res := m.Called(t, query, location)
+	return res.Get(0).([]string), res.Error(1)
+}
+
+func (m *mockIncrementalMaterializer) IsFullRefresh() bool {
+	return m.fullRefresh
+}
+
+type mockTableCheckingClient struct {
+	*mockQuerierWithResult
+	existsQuery string
+	buildErr    error
+}
+
+func (m *mockTableCheckingClient) BuildTableExistsQuery(_ string) (string, error) {
+	return m.existsQuery, m.buildErr
 }
 
 func TestBasicOperator_RunTask(t *testing.T) {
@@ -226,4 +251,90 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBasicOperator_InitializesMissingIncrementalTarget(t *testing.T) {
+	t.Parallel()
+
+	clientMock := new(mockQuerierWithResult)
+	client := &mockTableCheckingClient{
+		mockQuerierWithResult: clientMock,
+		existsQuery:           "SELECT COUNT(*) FROM information_schema.tables",
+	}
+	extractor := new(mockExtractor)
+	baseMaterializer := new(mockMaterializer)
+	materializer := &mockIncrementalMaterializer{mockMaterializer: baseMaterializer}
+	connections := new(mockConnectionFetcher)
+
+	asset := &pipeline.Asset{
+		Name: "analytics.events",
+		Type: pipeline.AssetTypeAthenaQuery,
+		ExecutableFile: pipeline.ExecutableFile{
+			Path:    "events.sql",
+			Content: "SELECT event_date FROM raw_events",
+		},
+		Materialization: pipeline.Materialization{
+			Type:           pipeline.MaterializationTypeTable,
+			Strategy:       pipeline.MaterializationStrategyDeleteInsert,
+			IncrementalKey: "event_date",
+		},
+	}
+
+	extractor.On("ExtractQueriesFromString", asset.ExecutableFile.Content).
+		Return([]*query.Query{{Query: asset.ExecutableFile.Content}}, nil)
+	baseMaterializer.On("Render", asset, asset.ExecutableFile.Content).
+		Return([]string{"DELETE FROM analytics.events", "INSERT INTO analytics.events SELECT event_date FROM raw_events"}, nil)
+	baseMaterializer.On(
+		"RenderInitialTable",
+		asset,
+		asset.ExecutableFile.Content,
+		"s3://test-bucket/test-location:",
+	).Return([]string{"CREATE TABLE analytics.events AS SELECT event_date FROM raw_events WITH NO DATA"}, nil)
+	clientMock.On(
+		"Select",
+		mock.Anything,
+		&query.Query{Query: client.existsQuery},
+	).Return([][]interface{}{{int64(0)}}, nil)
+	clientMock.On(
+		"RunQueryWithoutResult",
+		mock.Anything,
+		&query.Query{Query: "CREATE TABLE analytics.events AS SELECT event_date FROM raw_events WITH NO DATA"},
+	).Return(nil).Once()
+	clientMock.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "DELETE FROM analytics.events"}).Return(nil).Once()
+	clientMock.On(
+		"RunQueryWithoutResult",
+		mock.Anything,
+		&query.Query{Query: "INSERT INTO analytics.events SELECT event_date FROM raw_events"},
+	).Return(nil).Once()
+	connections.On("GetConnection", mock.Anything).Return(client)
+
+	operator := BasicOperator{
+		connection:   connections,
+		extractor:    extractor,
+		materializer: materializer,
+	}
+	require.NoError(t, operator.RunTask(t.Context(), &pipeline.Pipeline{}, asset))
+	baseMaterializer.AssertExpectations(t)
+	clientMock.AssertExpectations(t)
+}
+
+func TestShouldInitializeIncrementalTable(t *testing.T) {
+	t.Parallel()
+
+	for _, strategy := range []pipeline.MaterializationStrategy{
+		pipeline.MaterializationStrategyDeleteInsert,
+		pipeline.MaterializationStrategyMerge,
+		pipeline.MaterializationStrategyTimeInterval,
+	} {
+		asset := &pipeline.Asset{Materialization: pipeline.Materialization{
+			Type:     pipeline.MaterializationTypeTable,
+			Strategy: strategy,
+		}}
+		require.True(t, shouldInitializeIncrementalTable(asset))
+	}
+
+	require.False(t, shouldInitializeIncrementalTable(&pipeline.Asset{Materialization: pipeline.Materialization{
+		Type:     pipeline.MaterializationTypeTable,
+		Strategy: pipeline.MaterializationStrategyAppend,
+	}}))
 }

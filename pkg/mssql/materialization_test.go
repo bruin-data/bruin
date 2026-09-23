@@ -1,6 +1,7 @@
 package mssql
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -377,10 +378,38 @@ func TestMaterializer_Render(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
+			strategy := tt.task.Materialization.Strategy
+			bootstrapStrategy := strategy == pipeline.MaterializationStrategyDeleteInsert ||
+				strategy == pipeline.MaterializationStrategyMerge ||
+				strategy == pipeline.MaterializationStrategyTimeInterval
+			if !tt.wantErr && !tt.fullRefresh && bootstrapStrategy {
+				var found bool
+				render, found = removeMSSQLBootstrap(render)
+				assert.True(t, found, "incremental SQL should bootstrap a missing target")
+			}
 
 			assert.Regexp(t, tt.want, render)
 		})
 	}
+}
+
+func removeMSSQLBootstrap(query string) (string, bool) {
+	start := strings.Index(query, "IF OBJECT_ID(")
+	if start < 0 {
+		return query, false
+	}
+
+	end := strings.Index(query[start:], "\nEND")
+	if end < 0 {
+		return query, false
+	}
+	end += start + len("\nEND")
+	if strings.HasPrefix(query[end:], ";\n") {
+		end += len(";\n")
+	} else if strings.HasPrefix(query[end:], "\n") {
+		end++
+	}
+	return query[:start] + query[end:], true
 }
 
 func TestCreateReplaceWithTypedColumns(t *testing.T) {

@@ -139,6 +139,26 @@ COMMIT;`,
 				"COMMIT;$",
 		},
 		{
+			name: "redshift delete+insert bootstraps with like",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Type: pipeline.AssetTypeRedshiftQuery,
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategyDeleteInsert,
+					IncrementalKey: "dt",
+				},
+			},
+			query: "SELECT 1 as id, current_date as dt",
+			want: `^BEGIN TRANSACTION;
+CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1 as id, current_date as dt;
+CREATE TABLE IF NOT EXISTS "my"\."asset" \(LIKE __bruin_tmp_.+\);
+DELETE FROM "my"\."asset" WHERE "dt" in \(SELECT DISTINCT "dt" FROM __bruin_tmp_.+\);
+INSERT INTO "my"\."asset" SELECT \* FROM __bruin_tmp_.+;
+DROP TABLE IF EXISTS __bruin_tmp_.+;
+COMMIT;$`,
+		},
+		{
 			name: "merge without columns",
 			task: &pipeline.Asset{
 				Name: "my.asset",
@@ -205,7 +225,7 @@ WHEN NOT MATCHED THEN INSERT\("id", "name"\) VALUES\("id", "name"\);$`,
 			name: "redshift merge with primary keys",
 			task: &pipeline.Asset{
 				Name: "my.asset",
-				Type: "rs.sql",
+				Type: pipeline.AssetTypeRedshiftQuery,
 				Materialization: pipeline.Materialization{
 					Type:     pipeline.MaterializationTypeTable,
 					Strategy: pipeline.MaterializationStrategyMerge,
@@ -216,10 +236,15 @@ WHEN NOT MATCHED THEN INSERT\("id", "name"\) VALUES\("id", "name"\);$`,
 				},
 			},
 			query: "SELECT 1 as id, 'abc' as name",
-			want: `^MERGE INTO "my"\."asset"
-USING \(SELECT 1 as id, 'abc' as name\) source ON "my"\."asset"\."id" = source\."id"
+			want: `^BEGIN TRANSACTION;
+CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1 as id, 'abc' as name;
+CREATE TABLE IF NOT EXISTS "my"\."asset" \(LIKE __bruin_tmp_.+\);
+MERGE INTO "my"\."asset"
+USING __bruin_tmp_.+ source ON "my"\."asset"\."id" = source\."id"
 WHEN MATCHED THEN UPDATE SET "name" = source\."name"
-WHEN NOT MATCHED THEN INSERT\("id", "name"\) VALUES\(source."id", source."name"\);$`,
+WHEN NOT MATCHED THEN INSERT\("id", "name"\) VALUES\(source."id", source."name"\);
+DROP TABLE IF EXISTS __bruin_tmp_.+;
+COMMIT;$`,
 		},
 		{
 			name: "merge with incremental predicate",
@@ -388,6 +413,27 @@ WHEN NOT MATCHED THEN INSERT\("id", "col_a"\) VALUES\("id", "col_a"\);$`,
 				`COMMIT;$`,
 		},
 		{
+			name: "redshift time_interval bootstraps with like",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Type: pipeline.AssetTypeRedshiftQuery,
+				Materialization: pipeline.Materialization{
+					Type:            pipeline.MaterializationTypeTable,
+					Strategy:        pipeline.MaterializationStrategyTimeInterval,
+					TimeGranularity: pipeline.MaterializationTimeGranularityDate,
+					IncrementalKey:  "dt",
+				},
+			},
+			query: "SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}'",
+			want: `^BEGIN TRANSACTION;
+CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT dt, event_name from source_table where dt between '\{\{start_date\}\}' and '\{\{end_date\}\}';
+CREATE TABLE IF NOT EXISTS "my"\."asset" \(LIKE __bruin_tmp_.+\);
+DELETE FROM "my"\."asset" WHERE "dt" BETWEEN '\{\{start_date\}\}' AND '\{\{end_date\}\}';
+INSERT INTO "my"\."asset" SELECT \* FROM __bruin_tmp_.+;
+DROP TABLE IF EXISTS __bruin_tmp_.+;
+COMMIT;$`,
+		},
+		{
 			name: "empty table",
 			task: &pipeline.Asset{
 				Name: "empty_table",
@@ -491,10 +537,34 @@ WHEN NOT MATCHED THEN INSERT\("id", "col_a"\) VALUES\("id", "col_a"\);$`,
 			} else {
 				require.NoError(t, err)
 			}
+			strategy := tt.task.Materialization.Strategy
+			bootstrapStrategy := strategy == pipeline.MaterializationStrategyDeleteInsert ||
+				strategy == pipeline.MaterializationStrategyMerge ||
+				strategy == pipeline.MaterializationStrategyTimeInterval
+			if !tt.wantErr && !tt.fullRefresh && bootstrapStrategy && tt.task.Type != pipeline.AssetTypeRedshiftQuery {
+				var found bool
+				render, found = removePostgresBootstrap(render, tt.task.Name)
+				assert.True(t, found, "incremental SQL should bootstrap a missing target")
+			}
 
 			assert.Regexp(t, tt.want, render)
 		})
 	}
+}
+
+func removePostgresBootstrap(query, tableName string) (string, bool) {
+	start := strings.Index(query, "CREATE TABLE IF NOT EXISTS "+QuoteIdentifier(tableName))
+	if start < 0 {
+		return query, false
+	}
+
+	endMarker := ") AS __bruin_bootstrap WHERE 1 = 0;\n"
+	end := strings.Index(query[start:], endMarker)
+	if end < 0 {
+		return query, false
+	}
+	end += start + len(endMarker)
+	return query[:start] + query[end:], true
 }
 
 func TestDataVaultMaterializations(t *testing.T) {

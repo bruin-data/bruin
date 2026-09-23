@@ -172,7 +172,13 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 		),
 	)
 
-	return strings.Join(lines, "\n") + ";", nil
+	partitionBy := ""
+	if asset.Materialization.PartitionBy != "" {
+		partitionBy = "PARTITIONED BY (" + asset.Materialization.PartitionBy + ")"
+	}
+	bootstrap := ansisql.BuildCreateTableIfNotExistsAsQuery(quoteIdentifier(asset.Name), partitionBy, query)
+
+	return bootstrap + ";\n" + strings.Join(lines, "\n") + ";", nil
 }
 
 func buildSCD2ByColumnFullRefresh(asset *pipeline.Asset, query string) (string, error) {

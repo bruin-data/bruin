@@ -56,6 +56,8 @@ The result will be a table `dashboard.hello_bq` with the result of the query.
 
 `delete+insert` strategy is useful for incremental updates. It deletes the rows that are no longer present in the query results and inserts the new rows. This is useful when you have a large table and you want to minimize the amount of data that needs to be written.
 
+If the target table does not exist, Bruin first creates an empty table using the asset query's output schema. This first-run initialization also applies to the `merge` and `time_interval` strategies on platforms that support them.
+
 This strategy requires an `incremental_key` to be specified. This key is used to determine which rows to delete and which rows to insert.
 
 Bruin implements `delete+insert` strategy in the following way:

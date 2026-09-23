@@ -716,6 +716,12 @@ func TestMaterializer_Render(t *testing.T) {
 				require.NoError(t, err)
 				// Join all rendered queries for pattern matching
 				fullOutput := strings.Join(render, "\n")
+				strategy := tt.task.Materialization.Strategy
+				if !tt.fullRefresh && (strategy == pipeline.MaterializationStrategyDeleteInsert ||
+					strategy == pipeline.MaterializationStrategyMerge ||
+					strategy == pipeline.MaterializationStrategyTimeInterval) {
+					require.Contains(t, fullOutput, "CREATE TABLE IF NOT EXISTS "+tt.task.Name)
+				}
 				for _, want := range tt.want {
 					require.Regexp(t, want, fullOutput, "Pattern %q not found in output:\n%s", want, fullOutput)
 				}
