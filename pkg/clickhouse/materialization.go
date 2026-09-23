@@ -339,14 +339,34 @@ func buildSCD2Query(asset *pipeline.Asset, query string) ([]string, error) {
 }
 
 func createReplaceTableClauses(task *pipeline.Asset) ([]string, error) {
-	if len(task.Columns) == 0 && len(task.ClickHouse.OrderBy) == 0 && task.ClickHouse.Engine == "" {
+	if len(task.Columns) == 0 && len(sortingKey(task)) == 0 && task.ClickHouse.Engine == "" {
 		return nil, fmt.Errorf("materialization strategy %s requires the `columns` field to be set", task.Materialization.Strategy)
 	}
 	primaryKeys := task.ColumnNamesWithPrimaryKey()
-	if len(primaryKeys) == 0 && len(task.ClickHouse.OrderBy) == 0 && task.ClickHouse.Engine == "" {
+	if len(primaryKeys) == 0 && len(sortingKey(task)) == 0 && task.ClickHouse.Engine == "" {
 		return nil, fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column", task.Materialization.Strategy)
 	}
 	return tableDefinitionClauses(task)
+}
+
+// sortingKey resolves the target's ClickHouse sorting key. A ClickHouse
+// ORDER BY determines physical row order the same way `materialization.cluster_by`
+// does on the warehouses that support clustering, so cluster_by stands in when
+// clickhouse.order_by is absent.
+func sortingKey(asset *pipeline.Asset) []string {
+	if len(asset.ClickHouse.OrderBy) > 0 {
+		return asset.ClickHouse.OrderBy
+	}
+	return asset.Materialization.ClusterBy
+}
+
+// sortingKeyField names the field the sorting key came from, so errors point at
+// what the asset actually declared.
+func sortingKeyField(asset *pipeline.Asset) string {
+	if len(asset.ClickHouse.OrderBy) > 0 {
+		return "clickhouse.order_by"
+	}
+	return "materialization.cluster_by"
 }
 
 // tableDefinitionClauses is shared by the strategies that create the target
@@ -354,10 +374,11 @@ func createReplaceTableClauses(task *pipeline.Asset) ([]string, error) {
 func tableDefinitionClauses(asset *pipeline.Asset) ([]string, error) {
 	options := asset.ClickHouse
 	primaryKeys := asset.ColumnNamesWithPrimaryKey()
-	if len(options.OrderBy) > 0 {
+	orderBy := sortingKey(asset)
+	if len(orderBy) > 0 {
 		for i, key := range primaryKeys {
-			if i >= len(options.OrderBy) || unquoteKey(key) != unquoteKey(options.OrderBy[i]) {
-				return nil, errors.New("ClickHouse primary key columns must be a prefix of clickhouse.order_by")
+			if i >= len(orderBy) || unquoteKey(key) != unquoteKey(orderBy[i]) {
+				return nil, fmt.Errorf("ClickHouse primary key columns must be a prefix of %s", sortingKeyField(asset))
 			}
 		}
 	}
@@ -372,8 +393,8 @@ func tableDefinitionClauses(asset *pipeline.Asset) ([]string, error) {
 	if len(primaryKeys) > 0 {
 		clauses = append(clauses, "PRIMARY KEY ("+strings.Join(primaryKeys, ", ")+")")
 	}
-	if len(options.OrderBy) > 0 {
-		clauses = append(clauses, "ORDER BY ("+strings.Join(options.OrderBy, ", ")+")")
+	if len(orderBy) > 0 {
+		clauses = append(clauses, "ORDER BY ("+strings.Join(orderBy, ", ")+")")
 	}
 	if options.TTL != "" {
 		clauses = append(clauses, "TTL "+options.TTL)
@@ -495,8 +516,8 @@ func buildClusterQuery(asset *pipeline.Asset, query string, strategy pipeline.Ma
 		if !isReplicatedMergeTree(asset.ClickHouse.Engine) {
 			return nil, errors.New("ClickHouse cluster table replacement requires an explicit Replicated*MergeTree engine in clickhouse.engine, including Keeper arguments or configured server defaults")
 		}
-		if len(asset.ColumnNamesWithPrimaryKey()) == 0 && len(asset.ClickHouse.OrderBy) == 0 {
-			return nil, errors.New("ClickHouse cluster table replacement requires primary_key columns or clickhouse.order_by for the replicated engine")
+		if len(asset.ColumnNamesWithPrimaryKey()) == 0 && len(sortingKey(asset)) == 0 {
+			return nil, errors.New("ClickHouse cluster table replacement requires primary_key columns, clickhouse.order_by or materialization.cluster_by for the replicated engine")
 		}
 		clauses, err := createReplaceTableClauses(asset)
 		if err != nil {

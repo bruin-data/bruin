@@ -517,6 +517,7 @@ func TestMaterializer_TableDefinitionOptions(t *testing.T) {
 		name        string
 		options     pipeline.ClickHouseConfig
 		partitionBy string
+		clusterBy   []string
 		clauses     []string
 	}{
 		{
@@ -537,6 +538,17 @@ func TestMaterializer_TableDefinitionOptions(t *testing.T) {
 			name:    "sorting key with expression",
 			options: pipeline.ClickHouseConfig{OrderBy: []string{"id", "toStartOfInterval(ts, INTERVAL 1 HOUR)"}},
 			clauses: []string{"PRIMARY KEY (id)", "ORDER BY (id, toStartOfInterval(ts, INTERVAL 1 HOUR))"},
+		},
+		{
+			name:      "cluster_by stands in for the sorting key",
+			clusterBy: []string{"id", "ts"},
+			clauses:   []string{"PRIMARY KEY (id)", "ORDER BY (id, ts)"},
+		},
+		{
+			name:      "order_by wins over cluster_by",
+			options:   pipeline.ClickHouseConfig{OrderBy: []string{"id", "version"}},
+			clusterBy: []string{"id", "ts"},
+			clauses:   []string{"PRIMARY KEY (id)", "ORDER BY (id, version)"},
 		},
 		{
 			name:    "ttl",
@@ -577,6 +589,7 @@ func TestMaterializer_TableDefinitionOptions(t *testing.T) {
 					Name: "events", Type: pipeline.AssetTypeClickHouse, ClickHouse: tt.options,
 					Materialization: pipeline.Materialization{
 						Type: pipeline.MaterializationTypeTable, Strategy: strategy, PartitionBy: tt.partitionBy,
+						ClusterBy: tt.clusterBy,
 					},
 					Columns: []pipeline.Column{
 						{Name: "id", Type: "UInt64", PrimaryKey: true},
@@ -595,6 +608,54 @@ func TestMaterializer_TableDefinitionOptions(t *testing.T) {
 				assert.Equal(t, []string{want}, actual)
 			})
 		}
+	}
+}
+
+func TestMaterializer_ClusterByAsSortingKey(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name      string
+		columns   []pipeline.Column
+		clusterBy []string
+		want      string
+		wantErr   string
+	}{
+		{
+			name:      "sorting key without a primary key",
+			columns:   []pipeline.Column{{Name: "id", Type: "UInt64"}},
+			clusterBy: []string{"id"},
+			want:      "ORDER BY (id)",
+		},
+		{
+			name:      "sorting key without declared columns",
+			clusterBy: []string{"id"},
+			want:      "ORDER BY (id)",
+		},
+		{
+			name:      "primary key not leading",
+			columns:   []pipeline.Column{{Name: "id", Type: "UInt64", PrimaryKey: true}},
+			clusterBy: []string{"ts", "id"},
+			wantErr:   "primary key columns must be a prefix of materialization.cluster_by",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			asset := &pipeline.Asset{
+				Name: "events", Type: pipeline.AssetTypeClickHouse, Columns: tt.columns,
+				Materialization: pipeline.Materialization{
+					Type: pipeline.MaterializationTypeTable, ClusterBy: tt.clusterBy,
+				},
+			}
+			actual, err := NewMaterializer(false).Render(asset, "SELECT 1 AS id")
+			if tt.wantErr != "" {
+				require.ErrorContains(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			require.Len(t, actual, 1)
+			assert.Contains(t, actual[0], tt.want)
+		})
 	}
 }
 
@@ -1110,7 +1171,7 @@ func TestMaterializer_ClusterReplacementRequiresSortingKey(t *testing.T) {
 	}
 	mat := NewMaterializer(false, "analytics")
 	actual, err := mat.Render(asset, "SELECT 1 AS id")
-	require.ErrorContains(t, err, "primary_key columns or clickhouse.order_by")
+	require.ErrorContains(t, err, "primary_key columns, clickhouse.order_by or materialization.cluster_by")
 	assert.Empty(t, actual, "invalid sorting keys must not return a DROP statement")
 	asset.ClickHouse.OrderBy = []string{"tuple()"}
 	actual, err = mat.Render(asset, "SELECT 1 AS id")

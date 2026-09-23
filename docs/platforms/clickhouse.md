@@ -146,7 +146,7 @@ Runs a materialized ClickHouse asset or an SQL script. An unmaterialized asset c
 
 | Strategy | Support | How Bruin executes it |
 | --- | --- | --- |
-| `create+replace` | Supported | Runs `CREATE OR REPLACE TABLE <target> ... AS <asset query>` with the configured table options. If both `clickhouse.engine` and `clickhouse.order_by` are omitted, requires `columns` with at least one column marked `primary_key: true`. |
+| `create+replace` | Supported | Runs `CREATE OR REPLACE TABLE <target> ... AS <asset query>` with the configured table options. If `clickhouse.engine`, `clickhouse.order_by` and `materialization.cluster_by` are all omitted, requires `columns` with at least one column marked `primary_key: true`. |
 | `append` | Supported | Runs `INSERT INTO <target> <asset query>`. Bruin does not add filtering or deduplicate rows; make the asset query select only the new rows. |
 | `delete+insert` | Supported | Refreshes the values returned for an `incremental_key`: it writes the query result to a temporary table, deletes target rows whose incremental-key value occurs in that table, inserts the temporary-table rows, then drops the temporary table. Requires `incremental_key`, `columns`, and exactly one `primary_key: true` column. |
 | `time_interval` | Supported | On a normal run, deletes target rows in the requested date or timestamp interval, then inserts the asset query result with `SETTINGS insert_deduplicate = 0` so a rerun of the same interval is not suppressed by ClickHouse insert deduplication. Requires `incremental_key`, `time_granularity` (`date` or `timestamp`), and an existing target table. The asset query must filter itself to the same interval. A `--full-refresh` runs `create+replace` with its table options and key requirements. |
@@ -209,7 +209,7 @@ AS SELECT id, created_at, version FROM raw.events
 ```
 
 - `engine` is a ClickHouse SQL expression, such as `MergeTree()`, `ReplacingMergeTree(version)`, or `SummingMergeTree()`. If omitted, Bruin omits the engine clause and ClickHouse chooses its default engine. An explicit engine can be used without key metadata: for example, `Memory()` must omit primary and sorting keys, while MergeTree-family engines require a primary or sorting key.
-- `order_by` is a list of separate SQL expressions forming the sorting key. Use `order_by: ["tuple()"]` for an explicitly empty sorting key. It can be provided without any columns marked `primary_key: true`.
+- `order_by` is a list of separate SQL expressions forming the sorting key. Use `order_by: ["tuple()"]` for an explicitly empty sorting key. It can be provided without any columns marked `primary_key: true`. `materialization.cluster_by` means the same thing on ClickHouse and is used as the sorting key when `order_by` is omitted; when both are set, `order_by` wins.
 - `ttl` is the SQL TTL expression, without the `TTL` keyword.
 - `settings` is a mapping of table-engine setting names to SQL values. Bruin sorts setting names for stable SQL output. Numeric values can be written as `index_granularity: "8192"`; string literals need SQL quotes, for example `storage_policy: "'default'"`. For query settings, use the [connection's settings map](#query-settings).
 
