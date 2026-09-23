@@ -41,9 +41,9 @@ parameters:
 
 In this case, the ClickHouse database is `publicDB`. Ensure the configured user has the required permissions. For more details on credentials and permissions, see this [guide](https://dlthub.com/docs/dlt-ecosystem/destinations/clickhouse#2-setup-clickhouse-database).
 
-### Engine Settings
+### Ingestr destination engine settings
 
-You can configure the ClickHouse table engine and its settings via the `parameters` block. Use `engine` to set the table engine and `engine.<setting>` to pass engine-specific settings.
+For `ingestr` assets loading into ClickHouse, configure the table engine and its settings via the `parameters` block. Use `engine` to set the table engine and `engine.<setting>` to pass engine-specific settings. These parameters do not configure native `clickhouse.sql` assets; those use the [`clickhouse` block](#native-sql-table-definitions).
 
 ```yaml
 name: publicDB.events
@@ -99,20 +99,90 @@ Runs a materialized ClickHouse asset or an SQL script. An unmaterialized asset c
 
 | Strategy | Support | How Bruin executes it |
 | --- | --- | --- |
-| `create+replace` | Supported | Runs `CREATE OR REPLACE TABLE <target> PRIMARY KEY <key> AS <asset query>`. Requires `columns` and exactly one column marked `primary_key: true`. |
+| `create+replace` | Supported | Runs `CREATE OR REPLACE TABLE <target> ... AS <asset query>` with the configured table options. If both `clickhouse.engine` and `clickhouse.order_by` are omitted, requires `columns` with at least one column marked `primary_key: true`. |
 | `append` | Supported | Runs `INSERT INTO <target> <asset query>`. Bruin does not add filtering or deduplicate rows; make the asset query select only the new rows. |
 | `delete+insert` | Supported | Refreshes the values returned for an `incremental_key`: it writes the query result to a temporary table, deletes target rows whose incremental-key value occurs in that table, inserts the temporary-table rows, then drops the temporary table. Requires `incremental_key`, `columns`, and exactly one `primary_key: true` column. |
-| `time_interval` | Supported | On a normal run, deletes target rows in the requested date or timestamp interval, then inserts the asset query result with `SETTINGS insert_deduplicate = 0` so a rerun of the same interval is not suppressed by ClickHouse insert deduplication. Requires `incremental_key`, `time_granularity` (`date` or `timestamp`), and an existing target table. The asset query must filter itself to the same interval. A `--full-refresh` runs `create+replace` instead, which requires `columns` and exactly one `primary_key: true` column. |
+| `time_interval` | Supported | On a normal run, deletes target rows in the requested date or timestamp interval, then inserts the asset query result with `SETTINGS insert_deduplicate = 0` so a rerun of the same interval is not suppressed by ClickHouse insert deduplication. Requires `incremental_key`, `time_granularity` (`date` or `timestamp`), and an existing target table. The asset query must filter itself to the same interval. A `--full-refresh` runs `create+replace` with its table options and key requirements. |
 | `truncate+insert` | Supported | Truncates the existing table, then inserts the asset query result. This is a full-table refresh that preserves the table definition; it is not an incremental strategy. |
-| `ddl` | Supported | Creates the table if it does not already exist from the defined columns, primary key, and optional `partition_by`. Do not include a query in a DDL asset. |
-| `merge`, `scd2_by_column`, `scd2_by_time` | Not supported | Use `delete+insert`, `time_interval`, or an explicit ClickHouse SQL implementation instead. |
+| `ddl` | Supported | Creates the table if it does not already exist from the defined columns, primary key, optional `materialization.partition_by`, and `clickhouse` table options. Do not include a query in a DDL asset. |
+| `merge` | Supported | Stages the asset query in a MergeTree table, deletes target rows matching the staged primary keys, then inserts the staged rows. Requires `columns` with at least one column marked `primary_key: true`. |
+| `scd2_by_column`, `scd2_by_time` | Not supported | Use `delete+insert`, `time_interval`, or an explicit ClickHouse SQL implementation instead. |
 
-Create the target table with `create+replace` or `ddl` before its first `append`, `delete+insert`, `time_interval`, or `truncate+insert` run. `create+replace`, including a `--full-refresh` of a `time_interval` asset, requires `columns` and exactly one `primary_key: true` column. The primary key is used in the `CREATE OR REPLACE TABLE` statement; Bruin does not use it to deduplicate or merge rows.
+Create the target table with `create+replace` or `ddl` before its first `append`, `delete+insert`, `merge`, `time_interval`, or `truncate+insert` run. ClickHouse validates the chosen engine's key requirements. Declaring a primary key alone does not deduplicate rows during `create+replace`; deduplication depends on the chosen ClickHouse engine.
 
 View materializations support only the default strategy, which creates or replaces the view. Table-only strategies, including all incremental strategies, are not supported for views.
 
 > [!NOTE]
 > ClickHouse statements are executed one at a time and are not wrapped in a transaction. `create+replace` is a single `CREATE OR REPLACE TABLE` statement, but a failed `delete+insert`, `time_interval`, or `truncate+insert` run can leave the target table between steps. Use idempotent, date- or partition-bounded queries and rerun the asset to recover.
+
+#### Native SQL table definitions
+
+For native `clickhouse.sql` assets, use a top-level `clickhouse` block for table engine, sorting key, TTL, and settings. Partitioning stays in `materialization.partition_by`:
+
+```bruin-sql
+/* @bruin
+name: analytics.events
+type: clickhouse.sql
+materialization:
+  type: table
+  strategy: create+replace
+  partition_by: toYYYYMM(created_at)
+clickhouse:
+  engine: ReplacingMergeTree(version)
+  order_by:
+    - id
+    - created_at
+  ttl: created_at + INTERVAL 30 DAY
+  settings:
+    index_granularity: "8192"
+columns:
+  - name: id
+    type: UInt64
+    primary_key: true
+  - name: created_at
+    type: DateTime
+  - name: version
+    type: UInt64
+@bruin */
+
+SELECT id, created_at, version FROM raw.events
+```
+
+Bruin renders the table definition as:
+
+```sql
+CREATE OR REPLACE TABLE analytics.events
+ENGINE = ReplacingMergeTree(version)
+PARTITION BY (toYYYYMM(created_at))
+PRIMARY KEY (id)
+ORDER BY (id, created_at)
+TTL created_at + INTERVAL 30 DAY
+SETTINGS index_granularity = 8192
+AS SELECT id, created_at, version FROM raw.events
+```
+
+- `engine` is a ClickHouse SQL expression, such as `MergeTree()`, `ReplacingMergeTree(version)`, or `SummingMergeTree()`. If omitted, Bruin omits the engine clause and ClickHouse chooses its default engine. An explicit engine can be used without key metadata: for example, `Memory()` must omit primary and sorting keys, while MergeTree-family engines require a primary or sorting key.
+- `order_by` is a list of separate SQL expressions forming the sorting key. Use `order_by: ["tuple()"]` for an explicitly empty sorting key. It can be provided without any columns marked `primary_key: true`.
+- `ttl` is the SQL TTL expression, without the `TTL` keyword.
+- `settings` is a mapping of setting names to SQL values. Bruin sorts setting names for stable SQL output. Numeric values can be written as `index_granularity: "8192"`; string literals need SQL quotes, for example `storage_policy: "'default'"`.
+
+When both a primary key and `order_by` are provided, the primary-key columns must be a prefix of the sorting key, in column declaration order. For example, primary key `(id)` can use sorting key `(id, created_at)`. This follows the [ClickHouse MergeTree key requirements](https://clickhouse.com/docs/engines/table-engines/mergetree-family/mergetree). When only primary-key columns are declared, Bruin continues to emit `PRIMARY KEY` without an explicit `ORDER BY`.
+
+All of these clauses, including `partition_by`, apply when `create+replace`, the implicit table strategy, or `ddl` creates the target table. A full refresh uses the same options. `ddl` uses `CREATE TABLE IF NOT EXISTS`, so changing options does not alter an existing table. Normal `append`, `delete+insert`, `merge`, `time_interval`, and `truncate+insert` runs keep the existing target definition. Internal staging tables use MergeTree and do not inherit the target's options. Views and other asset types reject the `clickhouse` options.
+
+Set shared values in `pipeline.yml` under `default.clickhouse`:
+
+```yaml
+default:
+  clickhouse:
+    engine: MergeTree()
+    settings:
+      index_granularity: "8192"
+```
+
+Each asset inherits omitted or empty fields. Settings merge by name, with asset values taking precedence over defaults. Partitioning inherits through `default.materialization.partition_by`.
+
+The `clickhouse` block applies only to native SQL assets. Ingestr destinations use `parameters.engine` with names such as `replacing_merge_tree` and `parameters.engine.<setting>` instead; those parameters do not affect native SQL DDL.
 
 #### `delete+insert` example
 
@@ -169,7 +239,7 @@ Bruin deletes `analytics.daily_orders` rows whose `dt` falls within that interva
 
 #### Full refresh behavior
 
-Running `bruin run --full-refresh` changes every ClickHouse table materialization except `ddl` to `create+replace`, unless the asset has `full_refresh_restricted: true` (or its `refresh_restricted` alias). This includes `time_interval`: it does **not** use interval-based deletion during a full refresh. The rebuild runs `CREATE OR REPLACE TABLE` and requires `columns` and exactly one `primary_key: true` column. A `ddl` asset remains `CREATE TABLE IF NOT EXISTS` during a full refresh.
+Running `bruin run --full-refresh` changes every ClickHouse table materialization except `ddl` to `create+replace`, unless the asset has `full_refresh_restricted: true` (or its `refresh_restricted` alias). This includes `time_interval`: it does **not** use interval-based deletion during a full refresh. The rebuild runs `CREATE OR REPLACE TABLE` with the configured table options and the same key requirements as `create+replace`. A `ddl` asset remains `CREATE TABLE IF NOT EXISTS` during a full refresh.
 
 ### Column data types
 

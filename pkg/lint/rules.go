@@ -1476,6 +1476,31 @@ func EnsureAssetNotificationsAreValid(ctx context.Context, p *pipeline.Pipeline,
 
 func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
+	for _, option := range []struct {
+		name string
+		set  bool
+	}{
+		{"engine", asset.ClickHouse.Engine != ""},
+		{"order_by", len(asset.ClickHouse.OrderBy) > 0},
+		{"ttl", asset.ClickHouse.TTL != ""},
+		{"settings", len(asset.ClickHouse.Settings) > 0},
+	} {
+		if !option.set {
+			continue
+		}
+		if asset.Type != pipeline.AssetTypeClickHouse {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: fmt.Sprintf("ClickHouse option 'clickhouse.%s' is only supported for clickhouse.sql assets", option.name),
+			})
+		} else if asset.Materialization.Type == pipeline.MaterializationTypeView {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: fmt.Sprintf("ClickHouse option 'clickhouse.%s' is not supported for views", option.name),
+			})
+		}
+	}
+
 	if asset.Type == pipeline.AssetTypePython || asset.Type == pipeline.AssetTypeIngestr {
 		return issues, nil
 	}

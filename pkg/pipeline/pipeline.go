@@ -1251,6 +1251,26 @@ func (b BigQueryConfig) IsZero() bool {
 	return b.RequirePartitionFilter == nil && b.PartitionExpirationDays == nil && b.PartitionKeyImmutable == nil
 }
 
+type ClickHouseConfig struct {
+	Engine   string            `json:"engine,omitempty" yaml:"engine,omitempty" mapstructure:"engine"`
+	OrderBy  []string          `json:"order_by,omitempty" yaml:"order_by,omitempty" mapstructure:"order_by"`
+	TTL      string            `json:"ttl,omitempty" yaml:"ttl,omitempty" mapstructure:"ttl"`
+	Settings map[string]string `json:"settings,omitempty" yaml:"settings,omitempty" mapstructure:"settings"`
+}
+
+func (c ClickHouseConfig) MarshalJSON() ([]byte, error) {
+	if c.IsZero() {
+		return []byte("null"), nil
+	}
+
+	type Alias ClickHouseConfig
+	return json.Marshal(Alias(c))
+}
+
+func (c ClickHouseConfig) IsZero() bool {
+	return c.Engine == "" && len(c.OrderBy) == 0 && c.TTL == "" && len(c.Settings) == 0
+}
+
 type DorisConfig struct {
 	TableModel    string            `json:"table_model,omitempty" yaml:"table_model,omitempty" mapstructure:"table_model"`
 	DistributedBy []string          `json:"distributed_by,omitempty" yaml:"distributed_by,omitempty" mapstructure:"distributed_by"`
@@ -1351,6 +1371,7 @@ type Asset struct { //nolint:recvcheck
 	Snowflake         SnowflakeConfig    `json:"snowflake" yaml:"snowflake,omitempty" mapstructure:"snowflake"`
 	Athena            AthenaConfig       `json:"athena" yaml:"athena,omitempty" mapstructure:"athena"`
 	BigQuery          BigQueryConfig     `json:"bigquery" yaml:"bigquery,omitempty" mapstructure:"bigquery"`
+	ClickHouse        ClickHouseConfig   `json:"clickhouse,omitzero" yaml:"clickhouse,omitempty" mapstructure:"clickhouse"`
 	Doris             DorisConfig        `json:"doris,omitzero" yaml:"doris,omitempty" mapstructure:"doris"`
 	StarRocks         StarRocksConfig    `json:"starrocks,omitzero" yaml:"starrocks,omitempty" mapstructure:"starrocks"`
 	Routing           *RoutingConfig     `json:"routing,omitempty" yaml:"routing,omitempty" mapstructure:"routing"`
@@ -2392,6 +2413,7 @@ type DefaultValues struct {
 	Snowflake         SnowflakeConfig        `json:"snowflake,omitempty" yaml:"snowflake,omitempty" mapstructure:"snowflake"`
 	Athena            AthenaConfig           `json:"athena,omitempty" yaml:"athena,omitempty" mapstructure:"athena"`
 	BigQuery          BigQueryConfig         `json:"bigquery,omitempty" yaml:"bigquery,omitempty" mapstructure:"bigquery"`
+	ClickHouse        ClickHouseConfig       `json:"clickhouse,omitempty,omitzero" yaml:"clickhouse,omitempty" mapstructure:"clickhouse"`
 	Doris             DorisConfig            `json:"doris,omitempty,omitzero" yaml:"doris,omitempty" mapstructure:"doris"`
 	StarRocks         StarRocksConfig        `json:"starrocks,omitempty,omitzero" yaml:"starrocks,omitempty" mapstructure:"starrocks"`
 	Routing           *RoutingConfig         `json:"routing,omitempty" yaml:"routing,omitempty" mapstructure:"routing"`
@@ -2438,6 +2460,7 @@ func (d *DefaultValues) UnmarshalYAML(value *yaml.Node) error {
 		Snowflake:         asset.Snowflake,
 		Athena:            asset.Athena,
 		BigQuery:          asset.BigQuery,
+		ClickHouse:        asset.ClickHouse,
 		Doris:             asset.Doris,
 		StarRocks:         asset.StarRocks,
 		Routing:           asset.Routing,
@@ -3365,6 +3388,7 @@ func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 		asset.Athena.Location = defaults.Athena.Location
 	}
 	mergeBigQueryDefaults(&asset.BigQuery, defaults.BigQuery)
+	mergeClickHouseDefaults(&asset.ClickHouse, defaults.ClickHouse)
 	mergeDorisDefaults(&asset.Doris, defaults.Doris)
 	mergeStarRocksDefaults(&asset.StarRocks, defaults.StarRocks)
 	if !defaults.Routing.IsZero() {
@@ -3423,6 +3447,24 @@ func mergeBigQueryDefaults(target *BigQueryConfig, defaults BigQueryConfig) {
 	if target.PartitionKeyImmutable == nil && defaults.PartitionKeyImmutable != nil {
 		value := *defaults.PartitionKeyImmutable
 		target.PartitionKeyImmutable = &value
+	}
+}
+
+func mergeClickHouseDefaults(target *ClickHouseConfig, defaults ClickHouseConfig) {
+	applyStringDefault(&target.Engine, defaults.Engine)
+	applyStringDefault(&target.TTL, defaults.TTL)
+	if len(target.OrderBy) == 0 && len(defaults.OrderBy) > 0 {
+		target.OrderBy = append([]string(nil), defaults.OrderBy...)
+	}
+	if len(defaults.Settings) > 0 {
+		if target.Settings == nil {
+			target.Settings = make(map[string]string, len(defaults.Settings))
+		}
+		for key, value := range defaults.Settings {
+			if _, exists := target.Settings[key]; !exists {
+				target.Settings[key] = value
+			}
+		}
 	}
 }
 
