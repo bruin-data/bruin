@@ -31,6 +31,8 @@ var matMap = AssetMaterializationMap{
 		pipeline.MaterializationStrategyMerge:          buildMergeQuery,
 		pipeline.MaterializationStrategyTimeInterval:   buildTimeIntervalQuery,
 		pipeline.MaterializationStrategyDDL:            buildDDLQuery,
+		pipeline.MaterializationStrategySCD2ByTime:     buildSCD2ByTimeQuery,
+		pipeline.MaterializationStrategySCD2ByColumn:   buildSCD2ByColumnQuery,
 	},
 }
 
@@ -176,6 +178,163 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query string) ([]string, erro
 			strings.Join(clauses, " "),
 			query,
 		),
+	}, nil
+}
+
+const (
+	clickHouseSCD2Now = "now64(6, 'UTC')"
+	// This sentinel fits DateTime64 on ClickHouse versions predating the
+	// extended date range and keeps validity columns at microsecond precision.
+	clickHouseSCD2Max = "toDateTime64('2299-12-31 23:59:59', 6, 'UTC')"
+)
+
+func clickHouseIncrementalKeyType(asset *pipeline.Asset) (string, error) {
+	key := asset.Materialization.IncrementalKey
+	if key == "" {
+		return "", nil
+	}
+	column := asset.GetColumnWithName(key)
+	if column == nil {
+		return "", fmt.Errorf("incremental_key column %s not found", key)
+	}
+	columnType := strings.ToLower(strings.TrimSpace(column.Type))
+	if strings.HasPrefix(columnType, "nullable(") && strings.HasSuffix(columnType, ")") {
+		return "", fmt.Errorf("incremental_key must be non-nullable in %s strategy", asset.Materialization.Strategy)
+	}
+	if strings.Contains(columnType, "timestamp") || columnType == "date" || columnType == "date32" ||
+		columnType == "datetime" || strings.HasPrefix(columnType, "datetime(") ||
+		columnType == "datetime64" || strings.HasPrefix(columnType, "datetime64(") {
+		return column.Type, nil
+	}
+	return "", fmt.Errorf("incremental_key must be TIMESTAMP or DATE (DateTime, DateTime64, Date or Date32) in %s strategy", asset.Materialization.Strategy)
+}
+
+// scd2SourceQuery gives first runs, incremental runs and full refreshes the
+// same validity columns and validates the declared source schema.
+func scd2SourceQuery(asset *pipeline.Asset, query string) (string, error) {
+	if asset.Materialization.Strategy == pipeline.MaterializationStrategySCD2ByTime && asset.Materialization.IncrementalKey == "" {
+		return "", errors.New("incremental_key is required for SCD2_by_time strategy")
+	}
+	incrementalKeyType, err := clickHouseIncrementalKeyType(asset)
+	if err != nil {
+		return "", err
+	}
+	columns := make([]string, 0, len(asset.Columns)+3)
+	for _, column := range asset.Columns {
+		switch strings.ToLower(unquoteKey(column.Name)) {
+		case "_valid_from", "_valid_until", "_is_current":
+			return "", fmt.Errorf("column name %s is reserved for SCD-2 and cannot be used", column.Name)
+		}
+		columns = append(columns, "src."+column.Name)
+	}
+	if len(asset.ColumnNamesWithPrimaryKey()) == 0 {
+		return "", fmt.Errorf("materialization strategy %s requires the primary_key field to be set on at least one column", asset.Materialization.Strategy)
+	}
+	validFrom := clickHouseSCD2Now
+	if incrementalKeyType != "" {
+		validFrom = fmt.Sprintf("toDateTime64(src.%s, 6, 'UTC')", asset.Materialization.IncrementalKey)
+	}
+	columns = append(columns, validFrom+" AS _valid_from", clickHouseSCD2Max+" AS _valid_until", "TRUE AS _is_current")
+	return "SELECT " + strings.Join(columns, ", ") + "\nFROM (" + strings.TrimSuffix(strings.TrimSpace(query), ";") + "\n) AS src", nil
+}
+
+func buildSCD2ByTimeQuery(asset *pipeline.Asset, query string) ([]string, error) {
+	return buildSCD2Query(asset, query)
+}
+
+func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) ([]string, error) {
+	return buildSCD2Query(asset, query)
+}
+
+func buildSCD2ByTimeFullRefreshQuery(asset *pipeline.Asset, query string) ([]string, error) {
+	return buildSCD2FullRefreshQuery(asset, query, "")
+}
+
+func buildSCD2ByColumnFullRefreshQuery(asset *pipeline.Asset, query string) ([]string, error) {
+	return buildSCD2FullRefreshQuery(asset, query, "")
+}
+
+func buildSCD2FullRefreshQuery(asset *pipeline.Asset, query, cluster string) ([]string, error) {
+	source, err := scd2SourceQuery(asset, query)
+	if err != nil {
+		return nil, err
+	}
+	if cluster != "" {
+		return buildClusterQuery(asset, source, pipeline.MaterializationStrategyCreateReplace, cluster, buildCreateReplaceQuery)
+	}
+	return buildCreateReplaceQuery(asset, source)
+}
+
+func buildSCD2Query(asset *pipeline.Asset, query string) ([]string, error) {
+	source, err := scd2SourceQuery(asset, query)
+	if err != nil {
+		return nil, err
+	}
+	clauses, err := tableDefinitionClauses(asset)
+	if err != nil {
+		return nil, err
+	}
+	stage := "__bruin_tmp_" + helpers.PrefixGenerator()
+	if database, _, qualified := strings.Cut(asset.Name, "."); qualified {
+		stage = database + "." + stage
+	}
+	sourceTable, changesTable := stage+"_source", stage+"_changes"
+	primaryKeys := asset.ColumnNamesWithPrimaryKey()
+	keys := strings.Join(primaryKeys, ", ")
+	deleteKeys := keys
+	if len(primaryKeys) > 1 {
+		deleteKeys = "(" + keys + ")"
+	}
+	joinConditions := make([]string, 0, len(primaryKeys))
+	for _, key := range primaryKeys {
+		joinConditions = append(joinConditions, "t."+key+" = s."+key)
+	}
+	joinCondition := strings.Join(joinConditions, " AND ")
+	columns := make([]string, 0, len(asset.Columns)+3)
+	targetColumns := make([]string, 0, len(asset.Columns)+3)
+	sourceColumns := make([]string, 0, len(asset.Columns)+3)
+	changeConditions := make([]string, 0, len(asset.Columns))
+	for _, column := range asset.Columns {
+		columns = append(columns, column.Name)
+		targetColumns = append(targetColumns, "t."+column.Name)
+		sourceColumns = append(sourceColumns, "s."+column.Name)
+		if !column.PrimaryKey {
+			changeConditions = append(changeConditions, fmt.Sprintf("(ifNull(t.%[1]s != s.%[1]s, FALSE) OR isNull(t.%[1]s) != isNull(s.%[1]s))", column.Name))
+		}
+	}
+	changeCondition := "FALSE"
+	if asset.Materialization.Strategy == pipeline.MaterializationStrategySCD2ByTime {
+		changeCondition = "s._valid_from > t._valid_from"
+	} else if len(changeConditions) > 0 {
+		changeCondition = strings.Join(changeConditions, " OR ")
+	}
+	columns = append(columns, "_valid_from", "_valid_until", "_is_current")
+	allColumns := strings.Join(columns, ", ")
+	// The current flag doubles as a join match marker: source rows are always
+	// current, and unmatched rows are false or NULL depending on join_use_nulls.
+	sourceMissing := "ifNull(s._is_current, FALSE) = FALSE"
+	targetMissing := "ifNull(t._is_current, FALSE) = FALSE"
+	targetColumns = append(targetColumns, "t._valid_from", "if("+sourceMissing+", "+clickHouseSCD2Now+", s._valid_from) AS _valid_until", "FALSE AS _is_current")
+	sourceColumns = append(sourceColumns, "s._valid_from", "s._valid_until", "s._is_current")
+	currentTarget := "(SELECT " + allColumns + " FROM " + asset.Name + " WHERE _is_current = TRUE)"
+	changes := "SELECT " + strings.Join(targetColumns, ", ") + "\nFROM " + currentTarget + " AS t\n" +
+		"LEFT JOIN " + sourceTable + " AS s ON " + joinCondition + "\n" +
+		"WHERE " + sourceMissing + " OR (" + changeCondition + ")\nUNION ALL\n" +
+		"SELECT " + strings.Join(sourceColumns, ", ") + "\nFROM " + sourceTable + " AS s\n" +
+		"LEFT JOIN " + currentTarget + " AS t ON " + joinCondition + "\n" +
+		"WHERE " + targetMissing + " OR (" + changeCondition + ")"
+	// Materialize both sides of each replacement before deleting anything.
+	// Already expired versions are never selected or rewritten.
+	return []string{
+		fmt.Sprintf("CREATE TABLE %s ENGINE = MergeTree() PRIMARY KEY (%s) AS %s", sourceTable, keys, source),
+		fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s %s EMPTY AS SELECT * FROM %s", asset.Name, strings.Join(clauses, " "), sourceTable),
+		fmt.Sprintf("CREATE TABLE %s ENGINE = MergeTree() PRIMARY KEY (%s) AS %s", changesTable, keys, changes),
+		fmt.Sprintf("INSERT INTO %s (%s) SELECT %s FROM %s LIMIT 0", asset.Name, allColumns, allColumns, changesTable),
+		fmt.Sprintf("DELETE FROM %s WHERE _is_current = TRUE AND %s IN (SELECT %s FROM %s)", asset.Name, deleteKeys, keys, changesTable),
+		// A rerun after DELETE must not lose replacement rows to block deduplication.
+		fmt.Sprintf("INSERT INTO %s (%s) SETTINGS insert_deduplicate = 0 SELECT %s FROM %s", asset.Name, allColumns, allColumns, changesTable),
+		"DROP TABLE IF EXISTS " + changesTable,
+		"DROP TABLE IF EXISTS " + sourceTable,
 	}, nil
 }
 
@@ -329,7 +488,8 @@ func buildClusterQuery(asset *pipeline.Asset, query string, strategy pipeline.Ma
 	}
 
 	switch strategy {
-	case pipeline.MaterializationStrategyDeleteInsert, pipeline.MaterializationStrategyMerge:
+	case pipeline.MaterializationStrategyDeleteInsert, pipeline.MaterializationStrategyMerge,
+		pipeline.MaterializationStrategySCD2ByTime, pipeline.MaterializationStrategySCD2ByColumn:
 		return nil, fmt.Errorf("ClickHouse materialization strategy %s is not supported with cluster: staging data cannot be shared safely across replicas; use append, time_interval, or a full refresh", strategy)
 	case pipeline.MaterializationStrategyNone, pipeline.MaterializationStrategyCreateReplace:
 		if !isReplicatedMergeTree(asset.ClickHouse.Engine) {

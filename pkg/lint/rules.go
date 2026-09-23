@@ -1616,27 +1616,32 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 					Description: "Materialization strategy 'merge' requires the 'primary_key' field to be set on at least one column",
 				})
 			}
-		case pipeline.MaterializationStrategySCD2ByColumn:
-			primaryKeys := asset.ColumnNamesWithPrimaryKey()
-			if len(primaryKeys) == 0 {
+		case pipeline.MaterializationStrategySCD2ByColumn, pipeline.MaterializationStrategySCD2ByTime:
+			if asset.Materialization.Strategy == pipeline.MaterializationStrategySCD2ByTime && asset.Materialization.IncrementalKey == "" {
 				issues = append(issues, &Issue{
 					Task:        asset,
-					Description: "Materialization strategy 'scd2_by_column' requires the 'primary_key' field to be set on at least one column",
-				})
-			}
-		case pipeline.MaterializationStrategySCD2ByTime:
-			if asset.Materialization.IncrementalKey == "" {
-				issues = append(issues, &Issue{
-					Task:        asset,
-					Description: "Materialization strategy 'scd2_by_type' requires the 'incremental_key' field to be set",
+					Description: "Materialization strategy 'scd2_by_time' requires the 'incremental_key' field to be set",
 				})
 			}
 			primaryKeys := asset.ColumnNamesWithPrimaryKey()
 			if len(primaryKeys) == 0 {
 				issues = append(issues, &Issue{
 					Task:        asset,
-					Description: "Materialization strategy 'scd2_by_type' requires the 'primary_key' field to be set on at least one column",
+					Description: fmt.Sprintf("Materialization strategy '%s' requires the 'primary_key' field to be set on at least one column", asset.Materialization.Strategy),
 				})
+			}
+			for _, column := range asset.Columns {
+				name := strings.TrimSpace(column.Name)
+				if len(name) >= 2 && (name[0] == '`' || name[0] == '"') && name[len(name)-1] == name[0] {
+					name = name[1 : len(name)-1]
+				}
+				switch strings.ToLower(name) {
+				case "_valid_from", "_valid_until", "_is_current":
+					issues = append(issues, &Issue{
+						Task:        asset,
+						Description: fmt.Sprintf("Column name '%s' is reserved for SCD2 materialization strategies", column.Name),
+					})
+				}
 			}
 
 		case pipeline.MaterializationStrategyDataVaultHub:

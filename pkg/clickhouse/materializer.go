@@ -26,13 +26,22 @@ func (m *Materializer) Render(asset *pipeline.Asset, query string) ([]string, er
 	}
 
 	strategy := mat.Strategy
+	query = strings.TrimSuffix(strings.TrimSpace(query), ";")
 	if asset.FullRefreshEnabled(m.fullRefresh) && mat.Type == pipeline.MaterializationTypeTable {
+		if strategy == pipeline.MaterializationStrategySCD2ByTime || strategy == pipeline.MaterializationStrategySCD2ByColumn {
+			if m.cluster != "" {
+				return buildSCD2FullRefreshQuery(asset, query, m.cluster)
+			}
+			if strategy == pipeline.MaterializationStrategySCD2ByTime {
+				return buildSCD2ByTimeFullRefreshQuery(asset, query)
+			}
+			return buildSCD2ByColumnFullRefreshQuery(asset, query)
+		}
 		if mat.Strategy != pipeline.MaterializationStrategyDDL {
 			strategy = pipeline.MaterializationStrategyCreateReplace
 		}
 	}
 
-	query = strings.TrimSuffix(strings.TrimSpace(query), ";")
 	if matFunc, ok := m.MaterializationMap[mat.Type][strategy]; ok {
 		if m.cluster != "" {
 			return buildClusterQuery(asset, query, strategy, m.cluster, matFunc)
@@ -51,17 +60,19 @@ func (m *Materializer) RenderWithCleanup(asset *pipeline.Asset, query string) ([
 	if err != nil {
 		return nil, nil, err
 	}
+	if asset.Materialization.Type != pipeline.MaterializationTypeTable || len(queries) == 0 {
+		return queries, nil, nil
+	}
 
 	strategy := asset.Materialization.Strategy
 	if asset.FullRefreshEnabled(m.fullRefresh) && asset.Materialization.Type == pipeline.MaterializationTypeTable && strategy != pipeline.MaterializationStrategyDDL {
 		strategy = pipeline.MaterializationStrategyCreateReplace
 	}
 
-	if strategy != pipeline.MaterializationStrategyMerge && strategy != pipeline.MaterializationStrategyDeleteInsert {
-		return queries, nil, nil
+	if strategy == pipeline.MaterializationStrategySCD2ByTime || strategy == pipeline.MaterializationStrategySCD2ByColumn {
+		return queries, queries[len(queries)-2:], nil
 	}
-
-	if len(queries) == 0 {
+	if strategy != pipeline.MaterializationStrategyMerge && strategy != pipeline.MaterializationStrategyDeleteInsert {
 		return queries, nil, nil
 	}
 
