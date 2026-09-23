@@ -22,6 +22,8 @@ func TestClickHouseClusterForRender(t *testing.T) {
 			{ConnectionMetadata: config.ConnectionMetadata{Name: "local"}},
 		},
 	}}}
+	// Populate the connection cache before sharing it with parallel subtests.
+	require.NotNil(t, cm.SelectedEnvironment.Connections.GetConnection("default"))
 	pl := &pipeline.Pipeline{DefaultConnections: pipeline.EmptyStringMap{"clickhouse": "default"}}
 	for _, tc := range []struct {
 		name       string
@@ -38,6 +40,7 @@ func TestClickHouseClusterForRender(t *testing.T) {
 		{name: "other platform", assetType: pipeline.AssetTypePostgresQuery, config: cm},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			cluster, err := clickHouseClusterForRender(tc.config, pl, &pipeline.Asset{Type: tc.assetType, Connection: tc.connection})
 			require.NoError(t, err)
 			require.Equal(t, tc.want, cluster)

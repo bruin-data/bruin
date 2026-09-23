@@ -926,6 +926,8 @@ func TestMaterializer_ClusterEngineRequirements(t *testing.T) {
 				case pipeline.MaterializationStrategyTruncateInsert, pipeline.MaterializationStrategyTimeInterval:
 					mustReject = engine != "" && !strings.HasPrefix(engine, "Replicated")
 					wantErr = "Replicated"
+				default:
+					mustReject = false
 				}
 				actual, err := NewMaterializer(false, "analytics").Render(asset, "SELECT id FROM source")
 				if mustReject {
