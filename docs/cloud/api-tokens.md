@@ -108,7 +108,7 @@ environments:
           api_token: "your-token-here"
 ```
 
-The CLI reads `.bruin.yml` from the Git repository root, so the `.bruin.yml` approach only works inside a repo — outside one (or to override it), use `--api-key` or `BRUIN_CLOUD_API_KEY` instead.
+The CLI reads `.bruin.yml` from the Git repository root. Outside a repo, use `--api-key`, `BRUIN_CLOUD_API_KEY`, or a global login created by [`bruin login oauth --global`](/commands/login). Credential precedence is flag → environment variable → repository connection → global login. An invalid credential does not trigger fallback to another source.
 
 If you're using a personal token scoped to more than one team, tell the CLI which team to act on with `--team <company_prefix>` (run `bruin cloud teams list` to see the prefixes), or set a default once so you can skip it:
 

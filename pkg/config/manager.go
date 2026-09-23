@@ -324,6 +324,8 @@ type CloudConfig struct {
 	// DefaultTeam is the team company_prefix the CLI sends as the X-Bruin-Team
 	// header when a cloud command omits --team. Empty means no default is set.
 	DefaultTeam string `yaml:"default_team,omitempty" json:"default_team,omitempty" mapstructure:"default_team"`
+	Connection  string `yaml:"connection,omitempty" json:"connection,omitempty" mapstructure:"connection"`
+	Environment string `yaml:"environment,omitempty" json:"environment,omitempty" mapstructure:"environment"`
 }
 
 // GetDefaultTeam returns the configured default team company_prefix, or an empty

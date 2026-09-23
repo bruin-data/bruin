@@ -12,7 +12,10 @@ Every `cloud` subcommand needs an API key. Bruin resolves it in this order:
 
 1. **`--api-key` flag** — pass it directly on the command line
 2. **`BRUIN_CLOUD_API_KEY` environment variable** — great for CI/CD
-3. **`.bruin.yml` connection** — the most convenient option for local development
+3. **Repository `.bruin.yml` connection** — the selected `bruin` connection
+4. **Global login** — a token stored in the OS credential store by `bruin login oauth --global`
+
+Use [`bruin login oauth`](./login) for browser-based personal-token authorization. If several repository `bruin` connections exist, login selects the one subsequent commands use. A present but invalid credential fails instead of falling back to another source.
 
 To set up the `.bruin.yml` approach, add a `bruin` connection to any environment:
 

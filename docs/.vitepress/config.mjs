@@ -430,6 +430,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                     {text: "Format", link: "/commands/format"},
                     {text: "Import", link: "/commands/import"},
                     {text: "Lineage", link: "/commands/lineage"},
+                    {text: "Login & Authentication", link: "/commands/login"},
                     {text: "Patch", link: "/commands/patch"},
                     {text: "Render", link: "/commands/render"},
                     {text: "Query", link: "/commands/query"},

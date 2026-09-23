@@ -140,28 +140,11 @@ func offsetFlag() *cli.IntFlag {
 }
 
 func resolveAPIKey(c *cli.Command) (string, error) {
-	key := c.String("api-key")
-	if key != "" {
-		return key, nil
+	auth, err := resolveCloudAuth(c)
+	if err != nil {
+		return "", err
 	}
-
-	key = os.Getenv("BRUIN_CLOUD_API_KEY")
-	if key != "" {
-		return key, nil
-	}
-
-	if cm, err := loadCloudConfig(); err == nil {
-		for _, env := range cm.Environments {
-			if env.Connections != nil && len(env.Connections.BruinCloud) > 0 {
-				token := env.Connections.BruinCloud[0].APIToken
-				if token != "" {
-					return token, nil
-				}
-			}
-		}
-	}
-
-	return "", errors.New("API key is required: use --api-key flag, BRUIN_CLOUD_API_KEY env var, or configure a bruin connection in .bruin.yml")
+	return auth.token, nil
 }
 
 // cloudConfigFilePath locates the .bruin.yml that stores cloud auth/config, at
@@ -209,12 +192,16 @@ func latestFlag() *cli.BoolFlag {
 }
 
 func newCloudClient(c *cli.Command) (*bruincloud.APIClient, error) {
-	key, err := resolveAPIKey(c)
+	auth, err := resolveCloudAuth(c)
 	if err != nil {
 		return nil, err
 	}
-	client := bruincloud.NewAPIClient(key)
-	if team := resolveTeam(c); team != "" {
+	client := bruincloud.NewAPIClient(auth.token)
+	team := resolveTeam(c)
+	if team == "" && auth.source == "global" {
+		team = auth.team
+	}
+	if team != "" {
 		client.SetTeam(team)
 	}
 	return client, nil
