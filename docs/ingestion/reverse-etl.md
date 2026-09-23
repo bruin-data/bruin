@@ -4,7 +4,7 @@ Reverse ETL is ingestion in the other direction: instead of loading data **into*
 
 - The warehouse stays the source of truth.
 - Any Bruin source can feed a reverse-ETL destination.
-- The asset is a regular `ingestr` asset — you just point `destination` at a reverse-ETL platform. Rows are read the same way as any other ingestion (full table, or a window via an incremental key). Only the destination changes: each row becomes an API call, not a row in a table.
+- The asset is a regular `ingestr` asset — you just point `destination` at a reverse-ETL platform. Rows are read the same way as any other ingestion (full table, or a window via an incremental key). Only the destination changes: each row becomes a remote record operation, not a row in a table.
 
 ## How it's different from a warehouse destination
 
@@ -121,4 +121,4 @@ columns:
     primary_key: true
 ```
 
-The same shape works for CleverTap by swapping the destination — see each destination's page for the object types and parameters specific to it.
+The same overall asset shape works for CleverTap, but you must also adapt the destination table and matching parameters (CleverTap uses `profiles`/`events` and `identity_column`, not `contacts?id_property=email`) — see each destination's page for its object types and required parameters.
