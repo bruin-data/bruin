@@ -30,16 +30,277 @@ You can re-enter **Edit** at any time to keep iterating. While unpublished chang
 
 ## Widgets
 
-The agent can place four widget types on the canvas:
+The agent can place seven widget types on the canvas:
 
 | Type | What it shows |
 |---|---|
-| **Chart** | SQL-backed visualisation (line, bar, pie, area, etc.) |
-| **Metric** | Single KPI value with optional trend |
-| **Table** | Rows from a SQL query |
-| **Text** | Markdown blocks — section headers, narrative, links |
+| **Chart** | A data visualisation such as a line, bar, pie, funnel, or Sankey chart |
+| **Metric** | A single KPI value with optional number formatting |
+| **Table** | Query results with sorting, formatting, frozen columns, and image cells |
+| **Pivot table** | Query results grouped into rows, columns, subtotals, and aggregated values |
+| **Text** | Markdown blocks for section headers, narrative, and links |
+| **Image** | One image for each query result row, with optional titles and captions |
+| **Divider** | A horizontal separator between dashboard sections |
 
-Widgets are arranged in rows. Each row can hold multiple widgets side by side. The agent decides the layout; you can ask it to rearrange.
+### Charts
+
+Set `type: chart` and choose one of the chart types supported by Cloud:
+
+- Common charts: `line`, `bar`, `area`, `pie`, `donut`, `scatter`, `bubble`, `combo`, `histogram`, and `heatmap`.
+- Specialized charts: `sparkline`, `calendar`, `boxplot`, `funnel`, `sankey`, `treemap`, `waterfall`, `xmr`, `dumbbell`, `gauge`, `radar`, `candlestick`, and `forest`.
+- Custom charts: `vega-lite`, with a Vega-Lite `spec` that reads the query result from the `dac` dataset.
+
+Most charts map result columns with `x` and `y`. Depending on the chart, you can also use fields such as `color`, `y2`, `stacked`, `normalized`, `horizontal`, `size`, `lines`, `refLines`, and `refBands`.
+
+```yaml
+- id: revenue_trend
+  name: Revenue trend
+  type: chart
+  chart: line
+  query: monthly_revenue_by_channel
+  x: { field: month, type: date, format: "%b %Y" }
+  y: { field: revenue, type: number, format: "$,.0f" }
+  color: { field: channel }
+```
+
+### Tables and pivot tables
+
+A table infers its columns from the query result. Use `columns` when you need to rename, format, align, hide, freeze, or conditionally style a column. Set a column's `type` to `image` to render its URL values as thumbnails.
+
+A `pivot_table` reshapes flat query results in the browser. Its `pivot.values` list is required; `rows` and `columns` are optional.
+
+```yaml
+- id: revenue_pivot
+  name: Revenue by region and month
+  type: pivot_table
+  query: regional_revenue
+  pivot:
+    rows:
+      - { field: region, showTotals: true }
+    columns:
+      - { field: month }
+    values:
+      - field: revenue
+        summarize: sum
+        label: Total revenue
+        format:
+          - { backgroundColor: ["#DBEAFE", "#2563EB"] }
+```
+
+### Images
+
+An image widget is data-backed. `src`, `title`, `caption`, and `alt` name columns in the query result rather than containing literal display text. Only `src` is required. Each result row becomes an image; multiple rows form a horizontal gallery. `fit` can be `contain` (the default) or `cover`, and captions support Markdown.
+
+```yaml
+queries:
+  property_gallery:
+    sql: |
+      SELECT photo_url, address, price_label, alt_text
+      FROM analytics.listings
+      ORDER BY featured_at DESC
+      LIMIT 8
+
+rows:
+  - height: 360px
+    widgets:
+      - id: property_gallery
+        name: Featured properties
+        type: image
+        col: 12
+        query: property_gallery
+        src: photo_url
+        title: address
+        caption: price_label
+        alt: alt_text
+        fit: cover
+```
+
+### Text and dividers
+
+Text widgets render sanitized Markdown from `content`. A divider is a thin horizontal line used to separate dashboard sections. It does not need a query or title and is usually placed in its own full-width row between two groups of widgets.
+
+```yaml
+rows:
+  - widgets:
+      - id: revenue_heading
+        type: text
+        col: 12
+        content: |
+          ## Revenue performance
+          Results for the selected reporting period.
+  - widgets:
+      - id: revenue_divider
+        type: divider
+        col: 12
+```
+
+For the complete field reference for each widget and chart type, see the [DAC widget documentation](https://getbruin.com/docs/dac/dashboards/widgets.html).
+
+## Layout
+
+Widgets are arranged in rows on a 12-column grid. Set `col` from 1 to 12; when it is omitted, a widget spans the full row. A row can set `height` with a pixel number or CSS value. Add the same `tab` name to multiple rows to group them into a tab; rows without `tab` stay visible above the tab bar.
+
+```yaml
+rows:
+  - widgets:
+      - { id: revenue, name: Revenue, type: metric, col: 4, query: totals, value: { field: revenue } }
+      - { id: orders, name: Orders, type: metric, col: 4, query: totals, value: { field: orders } }
+      - { id: customers, name: Customers, type: metric, col: 4, query: totals, value: { field: customers } }
+  - tab: Trends
+    height: 420px
+    widgets:
+      - { id: revenue_trend, name: Revenue trend, type: chart, chart: line, col: 12, query: monthly_revenue, x: { field: month }, y: { field: revenue } }
+```
+
+## Data sources
+
+A data-backed widget can use inline `sql`, reference a top-level named query with `query`, run a semantic query with fields such as `model`, `dimensions`, and `metrics`, or use inline `data`. Named queries are useful when several widgets share one result. Inline data is intended for values supplied directly by the user and cannot react to dashboard filters.
+
+The dashboard-level `connection` is used by default. A named query or widget can override it with its own `connection`.
+
+SQL and semantic filter values support Jinja templating. Use the `bruin.user_email` template variable when a query should be scoped to the signed-in viewer.
+
+```yaml
+name: Revenue overview
+connection: warehouse
+
+queries:
+  monthly_revenue:
+    sql: |
+      SELECT month, SUM(revenue) AS revenue
+      FROM analytics.sales
+      GROUP BY month
+
+rows:
+  - widgets:
+      - id: revenue_table
+        name: Monthly revenue
+        type: table
+        query: monthly_revenue
+```
+
+## Filters
+
+Cloud supports `select`, `date-range`, `date`, `number`, and `text` filters. Select filters can use fixed values or a query, and support `multiple: true`. Reference current values in SQL with Jinja through `filters.<name>`; date ranges provide `.start` and `.end`.
+
+```yaml
+filters:
+  - name: period
+    type: date-range
+    default: last_30_days
+    options:
+      presets: [last_7_days, last_30_days, last_90_days, this_year]
+  - name: regions
+    type: select
+    multiple: true
+    default: []
+    options:
+      query: SELECT DISTINCT region FROM analytics.sales ORDER BY region
+
+queries:
+  filtered_revenue:
+    sql: |
+      SELECT order_date, SUM(revenue) AS revenue
+      FROM analytics.sales
+      WHERE order_date BETWEEN '{{ filters.period.start }}' AND '{{ filters.period.end }}'
+      {% if filters.regions %}
+      AND region IN (
+        {% for region in filters.regions %}
+        '{{ region }}'{% if not loop.last %}, {% endif %}
+        {% endfor %}
+      )
+      {% endif %}
+      GROUP BY order_date
+```
+
+Applied filter values are stored in the dashboard URL, so a shared link opens with the same filter state. For all filter fields and date presets, see the [DAC filter documentation](https://getbruin.com/docs/dac/dashboards/filters.html).
+
+## Notes
+
+Notes add human context to dashboard data. A note can apply to the whole dashboard, a widget, a table row, or a chart point, depending on the dimensions selected when it is created. Use the **Notes** button in the dashboard toolbar to browse and filter all notes, or use a note icon on a widget to work with notes in that widget's context.
+
+Before users can write a note, its reusable definition must exist in the dashboard YAML. Define notes at the top level and reference their IDs from the widgets where they should be available:
+
+```yaml
+name: Revenue overview
+connection: warehouse
+
+notes:
+  - id: revenue_context
+    dimensions:
+      - name: region
+        required: true
+      - name: channel
+        multiselect: true
+  - id: channel_context
+    dimensions:
+      - name: channel
+
+queries:
+  revenue_by_region:
+    sql: |
+      SELECT region, channel, SUM(revenue) AS revenue
+      FROM analytics.sales
+      GROUP BY region, channel
+
+rows:
+  - widgets:
+      - id: revenue_by_region
+        name: Revenue by region
+        type: table
+        query: revenue_by_region
+        notes:
+          - revenue_context
+          - channel_context
+```
+
+Each definition has a unique `id` and a `dimensions` list. Dimension values are optional and single-select by default. Set `required: true` when a value must be selected, and `multiselect: true` when the note may target multiple values. Note content is written in the dashboard UI.
+
+Widgets can also reference note definitions from their resolved [semantic model](/core-concepts/semantic-layer). Define the reusable note alongside the model's dimensions and metrics:
+
+```yaml
+# semantic/sales.yml
+schema: v1
+name: sales
+
+source:
+  table: analytics.sales
+
+dimensions:
+  - name: region
+    type: string
+
+metrics:
+  - name: revenue
+    expression: sum(revenue)
+
+notes:
+  - id: region_note
+    dimensions:
+      - name: region
+        required: true
+```
+
+Then reference its ID from a widget that resolves to that model:
+
+```yaml
+name: Sales overview
+model: sales
+
+rows:
+  - widgets:
+      - id: revenue_by_region
+        name: Revenue by region
+        type: table
+        model: sales
+        dimensions: [{ name: region }]
+        metrics: [revenue]
+        notes: [region_note]
+```
+
+The model is resolved from the named query, widget, or dashboard-level `model`. Without a resolved model, only dashboard-level note definitions are available.
+
+Dashboard changes are saved as a draft. After adding or changing a note definition, publish the dashboard before trying to create notes with it.
 
 ## Threads and chat history
 
