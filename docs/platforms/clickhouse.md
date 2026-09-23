@@ -180,7 +180,7 @@ default:
       index_granularity: "8192"
 ```
 
-Each asset inherits omitted or empty fields. Settings merge by name, with asset values taking precedence over defaults. Partitioning inherits through `default.materialization.partition_by`.
+Only native `clickhouse.sql` table assets inherit `default.clickhouse`; views and other asset types do not. Omitted or empty fields inherit their defaults. Settings merge by name, with asset values taking precedence over defaults. Partitioning inherits through `default.materialization.partition_by`.
 
 The `clickhouse` block applies only to native SQL assets. Ingestr destinations use `parameters.engine` with names such as `replacing_merge_tree` and `parameters.engine.<setting>` instead; those parameters do not affect native SQL DDL.
 

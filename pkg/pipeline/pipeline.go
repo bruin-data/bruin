@@ -3388,7 +3388,9 @@ func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 		asset.Athena.Location = defaults.Athena.Location
 	}
 	mergeBigQueryDefaults(&asset.BigQuery, defaults.BigQuery)
-	mergeClickHouseDefaults(&asset.ClickHouse, defaults.ClickHouse)
+	if asset.Type == AssetTypeClickHouse && asset.Materialization.Type == MaterializationTypeTable {
+		mergeClickHouseDefaults(&asset.ClickHouse, defaults.ClickHouse)
+	}
 	mergeDorisDefaults(&asset.Doris, defaults.Doris)
 	mergeStarRocksDefaults(&asset.StarRocks, defaults.StarRocks)
 	if !defaults.Routing.IsZero() {
