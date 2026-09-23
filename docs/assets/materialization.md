@@ -1011,4 +1011,8 @@ Notice how:
 | **Configuration** | Only requires primary_key columns; `incremental_key` is optional | Requires both primary_key columns and incremental_key |
 
 > [!WARNING]
-> SCD2 materializations are currently only supported for BigQuery, Snowflake, Postgres, Amazon Redshift, MySQL, DuckDB, Databricks, and Spark.
+> SCD2 materializations are currently only supported for BigQuery, Snowflake, Postgres, Amazon Redshift, MySQL, DuckDB, ClickHouse, Databricks, and Spark.
+
+ClickHouse uses `DateTime64(6, 'UTC')` for `_valid_from` and `_valid_until`, with `2299-12-31 23:59:59` as the current-record sentinel for compatibility with servers that cannot represent year 9999. Both strategies create the destination automatically on the first run; `--full-refresh` replaces all history with the current source snapshot. Incremental SCD2 runs use staged deletes and inserts, so they are not atomic and do not support `cluster` configuration.
+
+Use `MergeTree()` (the default) or `ReplicatedMergeTree()` to retain every historical version. Engines such as `ReplacingMergeTree()` can discard history when versions share the same sorting key. Keep the default synchronous lightweight deletes enabled (`lightweight_deletes_sync` on servers that expose this setting) so staging tables remain available until deletion completes.

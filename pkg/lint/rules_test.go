@@ -1387,6 +1387,123 @@ func TestEnsureMaterializationValuesAreValid_ClickHouseOptions(t *testing.T) {
 	}
 }
 
+func TestEnsureMaterializationValuesAreValid_ClickHouseSCD2(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		strategy       pipeline.MaterializationStrategy
+		incrementalKey string
+		columns        []pipeline.Column
+		want           []string
+	}{
+		{
+			name:     "column strategy requires a primary key",
+			strategy: pipeline.MaterializationStrategySCD2ByColumn,
+			columns:  []pipeline.Column{{Name: "id"}},
+			want:     []string{"Materialization strategy 'scd2_by_column' requires the 'primary_key' field to be set on at least one column"},
+		},
+		{
+			name:     "column strategy does not require an incremental key",
+			strategy: pipeline.MaterializationStrategySCD2ByColumn,
+			columns:  []pipeline.Column{{Name: "id", PrimaryKey: true}},
+		},
+		{
+			name:           "column strategy accepts an incremental key",
+			strategy:       pipeline.MaterializationStrategySCD2ByColumn,
+			incrementalKey: "updated_at",
+			columns:        []pipeline.Column{{Name: "id", PrimaryKey: true}, {Name: "updated_at", Type: "DateTime64(6)"}},
+		},
+		{
+			name:     "time strategy requires an incremental key",
+			strategy: pipeline.MaterializationStrategySCD2ByTime,
+			columns:  []pipeline.Column{{Name: "id", PrimaryKey: true}},
+			want:     []string{"Materialization strategy 'scd2_by_time' requires the 'incremental_key' field to be set"},
+		},
+		{
+			name:           "time strategy requires a primary key",
+			strategy:       pipeline.MaterializationStrategySCD2ByTime,
+			incrementalKey: "updated_at",
+			columns:        []pipeline.Column{{Name: "id"}, {Name: "updated_at", Type: "DateTime64(6)"}},
+			want:           []string{"Materialization strategy 'scd2_by_time' requires the 'primary_key' field to be set on at least one column"},
+		},
+		{
+			name:     "time strategy requires both keys",
+			strategy: pipeline.MaterializationStrategySCD2ByTime,
+			want: []string{
+				"Materialization strategy 'scd2_by_time' requires the 'incremental_key' field to be set",
+				"Materialization strategy 'scd2_by_time' requires the 'primary_key' field to be set on at least one column",
+			},
+		},
+		{
+			name:           "time strategy accepts both keys",
+			strategy:       pipeline.MaterializationStrategySCD2ByTime,
+			incrementalKey: "updated_at",
+			columns:        []pipeline.Column{{Name: "id", PrimaryKey: true}, {Name: "updated_at", Type: "DateTime64(6)"}},
+		},
+		{
+			name:     "reserved names remain available outside SCD2",
+			strategy: pipeline.MaterializationStrategyCreateReplace,
+			columns:  []pipeline.Column{{Name: "_valid_from"}, {Name: "_valid_until"}, {Name: "_is_current"}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			asset := &pipeline.Asset{
+				Type: pipeline.AssetTypeClickHouse,
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       tt.strategy,
+					IncrementalKey: tt.incrementalKey,
+				},
+				Columns: tt.columns,
+			}
+			issues, err := EnsureMaterializationValuesAreValidForSingleAsset(t.Context(), &pipeline.Pipeline{}, asset)
+			require.NoError(t, err)
+			var descriptions []string
+			for _, issue := range issues {
+				assert.Same(t, asset, issue.Task)
+				descriptions = append(descriptions, issue.Description)
+			}
+			assert.Equal(t, tt.want, descriptions)
+		})
+	}
+}
+
+func TestEnsureMaterializationValuesAreValid_SCD2ReservedColumns(t *testing.T) {
+	t.Parallel()
+
+	for _, assetType := range []pipeline.AssetType{pipeline.AssetTypeClickHouse, pipeline.AssetTypeDuckDBQuery} {
+		for _, strategy := range []pipeline.MaterializationStrategy{pipeline.MaterializationStrategySCD2ByColumn, pipeline.MaterializationStrategySCD2ByTime} {
+			for _, column := range []string{"_valid_from", "_valid_until", "_is_current", "_VALID_FROM", "_VALID_UNTIL", "_IS_CURRENT", "`_valid_from`", `"_valid_until"`} {
+				t.Run(string(assetType)+"/"+string(strategy)+"/"+column, func(t *testing.T) {
+					t.Parallel()
+					asset := &pipeline.Asset{
+						Type: assetType,
+						Materialization: pipeline.Materialization{
+							Type:           pipeline.MaterializationTypeTable,
+							Strategy:       strategy,
+							IncrementalKey: "updated_at",
+						},
+						Columns: []pipeline.Column{
+							{Name: "id", PrimaryKey: true},
+							{Name: "updated_at", Type: "timestamp"},
+							{Name: column},
+						},
+					}
+					issues, err := EnsureMaterializationValuesAreValidForSingleAsset(t.Context(), &pipeline.Pipeline{}, asset)
+					require.NoError(t, err)
+					require.Len(t, issues, 1)
+					assert.Same(t, asset, issues[0].Task)
+					assert.Equal(t, fmt.Sprintf("Column name '%s' is reserved for SCD2 materialization strategies", column), issues[0].Description)
+				})
+			}
+		}
+	}
+}
+
 func TestEnsureMaterializationValuesAreValid(t *testing.T) {
 	t.Parallel()
 
