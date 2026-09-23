@@ -25,7 +25,7 @@ func Auth() *cli.Command {
 				_, _ = fmt.Fprintf(writer, "Connection: %s/%s\n", auth.environment, auth.connection)
 			}
 			team := resolveTeam(c)
-			if team == "" && auth.source == "global" {
+			if team == "" && auth.source == cloudAuthGlobal {
 				team = auth.team
 			}
 			if team != "" {
@@ -40,10 +40,10 @@ func Auth() *cli.Command {
 func Logout() *cli.Command {
 	return &cli.Command{Name: "logout", Usage: "Remove a repository or global Bruin Cloud login", Flags: []cli.Flag{
 		&cli.BoolFlag{Name: "repo", Usage: "Remove the selected repository bruin connection"},
-		&cli.BoolFlag{Name: "global", Usage: "Remove the global login from the OS credential store"},
+		&cli.BoolFlag{Name: cloudAuthGlobal, Usage: "Remove the global login from the OS credential store"},
 		&cli.BoolFlag{Name: "revoke", Usage: "Also revoke the personal token in Cloud"},
 	}, Action: func(ctx context.Context, c *cli.Command) error {
-		if c.Bool("repo") == c.Bool("global") {
+		if c.Bool("repo") == c.Bool(cloudAuthGlobal) {
 			return errors.New("select exactly one of --repo or --global")
 		}
 		if c.Bool("repo") {

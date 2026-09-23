@@ -23,13 +23,16 @@ func TestOAuthLogin(t *testing.T) {
 	var challenge, redirect string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/cli/oauth/token", r.URL.Path)
-		require.NoError(t, r.ParseForm())
+		if !assert.NoError(t, r.ParseForm()) {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 		assert.Equal(t, ClientID, r.Form.Get("client_id"))
 		assert.Equal(t, redirect, r.Form.Get("redirect_uri"))
 		assert.Equal(t, "test-code", r.Form.Get("code"))
 		digest := sha256.Sum256([]byte(r.Form.Get("code_verifier")))
 		assert.Equal(t, challenge, base64.RawURLEncoding.EncodeToString(digest[:]))
-		require.NoError(t, json.NewEncoder(w).Encode(Credential{Token: "secret", TokenType: "Bearer", TokenID: "123", Account: "person@example.com", ExpiresAt: time.Now().Add(time.Hour)}))
+		assert.NoError(t, json.NewEncoder(w).Encode(Credential{Token: "secret", TokenType: "Bearer", TokenID: "123", Account: "person@example.com", ExpiresAt: time.Now().Add(time.Hour)}))
 	}))
 	defer server.Close()
 	var output bytes.Buffer
@@ -42,7 +45,9 @@ func TestOAuthLogin(t *testing.T) {
 		assert.Equal(t, "repo", query.Get("storage"))
 		challenge = query.Get("code_challenge")
 		redirect = query.Get("redirect_uri")
-		response, err := http.Get(redirect + "?state=wrong&code=attacker")
+		request, err := http.NewRequestWithContext(ctx, http.MethodGet, redirect+"?state=wrong&code=attacker", nil)
+		require.NoError(t, err)
+		response, err := http.DefaultClient.Do(request)
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusBadRequest, response.StatusCode)
 		body, err := io.ReadAll(response.Body)
@@ -51,7 +56,9 @@ func TestOAuthLogin(t *testing.T) {
 		assert.NotContains(t, string(body), "attacker")
 		require.NoError(t, response.Body.Close())
 		callback := redirect + "?" + url.Values{"state": {query.Get("state")}, "code": {"test-code"}}.Encode()
-		response, err = http.Get(callback)
+		request, err = http.NewRequestWithContext(ctx, http.MethodGet, callback, nil)
+		require.NoError(t, err)
+		response, err = http.DefaultClient.Do(request)
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, response.StatusCode)
 		assert.Equal(t, "text/html; charset=utf-8", response.Header.Get("Content-Type"))
@@ -81,7 +88,7 @@ func TestOAuthDeniedAndCancelled(t *testing.T) {
 			t.Parallel()
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
-			flow := OAuth{APIURL: DefaultAPIURL, Writer: io.Discard, OpenBrowser: func(_ context.Context, link string) error {
+			flow := OAuth{APIURL: DefaultAPIURL, Writer: io.Discard, OpenBrowser: func(ctx context.Context, link string) error {
 				if !denied {
 					cancel()
 					return nil
@@ -89,7 +96,10 @@ func TestOAuthDeniedAndCancelled(t *testing.T) {
 				parsed, err := url.Parse(link)
 				require.NoError(t, err)
 				query := parsed.Query()
-				response, err := http.Get(query.Get("redirect_uri") + "?" + url.Values{"state": {query.Get("state")}, "error": {"access_denied"}, "error_description": {"sensitive-detail"}}.Encode())
+				callback := query.Get("redirect_uri") + "?" + url.Values{"state": {query.Get("state")}, "error": {"access_denied"}, "error_description": {"sensitive-detail"}}.Encode()
+				request, err := http.NewRequestWithContext(ctx, http.MethodGet, callback, nil)
+				require.NoError(t, err)
+				response, err := http.DefaultClient.Do(request)
 				require.NoError(t, err)
 				body, err := io.ReadAll(response.Body)
 				require.NoError(t, err)

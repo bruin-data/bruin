@@ -20,7 +20,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
-	"golang.org/x/term"
 )
 
 type loginDependencies struct {
@@ -36,7 +35,7 @@ func Login() *cli.Command {
 			flow := cloudauth.OAuth{APIURL: cloudauth.APIURL(), OpenBrowser: openBrowser, Writer: writer, NoBrowser: noBrowser}
 			return flow.Login(ctx, target)
 		},
-		interactive: func() bool { return term.IsTerminal(int(os.Stdin.Fd())) },
+		interactive: isStdinTerminal,
 	})
 }
 
@@ -44,7 +43,7 @@ func loginCommand(deps loginDependencies) *cli.Command {
 	return &cli.Command{Name: "login", Usage: "Sign in to Bruin Cloud", Commands: []*cli.Command{
 		{Name: "oauth", Usage: "Create a personal token through browser authorization", Flags: []cli.Flag{
 			&cli.BoolFlag{Name: "repo", Usage: "Save a bruin connection in this Bruin project repository"},
-			&cli.BoolFlag{Name: "global", Usage: "Save the token in the OS credential store"},
+			&cli.BoolFlag{Name: cloudAuthGlobal, Usage: "Save the token in the OS credential store"},
 			&cli.BoolFlag{Name: "no-browser", Usage: "Print the authorization URL without opening a browser"},
 			&cli.BoolFlag{Name: "reauth", Usage: "Explicitly replace the selected login after browser approval"},
 			&cli.StringFlag{Name: "connection", Usage: "Bruin connection to select or create (repo only)"},
@@ -163,7 +162,7 @@ func (m loginMenu) View() string {
 }
 
 func runOAuthLogin(ctx context.Context, c *cli.Command, deps loginDependencies) error {
-	if c.Bool("repo") && c.Bool("global") {
+	if c.Bool("repo") && c.Bool(cloudAuthGlobal) {
 		return errors.New("--repo and --global cannot be used together")
 	}
 	if c.Args().Present() {
@@ -179,7 +178,7 @@ func runOAuthLogin(ctx context.Context, c *cli.Command, deps loginDependencies) 
 	}
 	prompt := loginPrompt{reader: input, writer: output, interactive: deps.interactive()}
 	var path string
-	if !c.Bool("global") {
+	if !c.Bool(cloudAuthGlobal) {
 		var err error
 		path, err = repoLoginConfigPath()
 		if err != nil {
@@ -188,8 +187,8 @@ func runOAuthLogin(ctx context.Context, c *cli.Command, deps loginDependencies) 
 	}
 	target := "repo"
 	switch {
-	case c.Bool("global"):
-		target = "global"
+	case c.Bool(cloudAuthGlobal):
+		target = cloudAuthGlobal
 	case c.Bool("repo"):
 		if path == "" {
 			return errors.New("--repo requires a Bruin project in a Git repository (.bruin.yml or pipeline.yml/pipeline.yaml); use --global")
@@ -199,7 +198,7 @@ func runOAuthLogin(ctx context.Context, c *cli.Command, deps loginDependencies) 
 			return errors.New("specify --repo or --global in a non-interactive terminal")
 		}
 		if path == "" {
-			target = "global"
+			target = cloudAuthGlobal
 			_, _ = fmt.Fprintln(output, "No Bruin project found; using global login.")
 		} else {
 			choice, err := prompt.choose(ctx, "Where should Bruin save this login?", []string{"This repository", "Global"})
@@ -207,17 +206,17 @@ func runOAuthLogin(ctx context.Context, c *cli.Command, deps loginDependencies) 
 				return err
 			}
 			if choice == 1 {
-				target = "global"
+				target = cloudAuthGlobal
 			}
 		}
 	}
-	if target == "global" && (c.String("connection") != "" || c.String("environment") != "") {
+	if target == cloudAuthGlobal && (c.String("connection") != "" || c.String("environment") != "") {
 		return errors.New("--connection and --environment require repo login")
 	}
 	var store cloudauth.Store
 	var expected []byte
 	var selected config.CloudConnectionRef
-	existing := false
+	var existing bool
 	if target == "repo" {
 		if os.Getenv("BRUIN_CONFIG_FILE_CONTENT") != "" {
 			return errors.New("BRUIN_CONFIG_FILE_CONTENT is set; unset it before saving a repository login")
@@ -286,7 +285,7 @@ func runOAuthLogin(ctx context.Context, c *cli.Command, deps loginDependencies) 
 			return nil
 		}
 	}
-	if target == "global" {
+	if target == cloudAuthGlobal {
 		if _, err := store.Open(); err != nil {
 			return err
 		}
@@ -305,7 +304,7 @@ func runOAuthLogin(ctx context.Context, c *cli.Command, deps loginDependencies) 
 		err = store.Save(*credential, expected)
 	}
 	if err != nil {
-		cleanupCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
 		defer cancel()
 		if cleanupErr := cloudauth.Revoke(cleanupCtx, credential); cleanupErr != nil {
 			_, _ = fmt.Fprintf(output, "Could not revoke the unsaved token %s. Remove it in Cloud → Personal Access Tokens.\n", credential.TokenID)
@@ -313,7 +312,7 @@ func runOAuthLogin(ctx context.Context, c *cli.Command, deps loginDependencies) 
 		return fmt.Errorf("could not save login; previous credentials were preserved: %w", err)
 	}
 	destination := path
-	if target == "global" {
+	if target == cloudAuthGlobal {
 		destination = store.Path + " (token in OS credential store)"
 	}
 	_, _ = fmt.Fprintf(output, "Signed in as %s. Saved to %s.\n", credential.Account, destination)
@@ -387,7 +386,7 @@ func chooseLoginConnection(ctx context.Context, c *cli.Command, cm *config.Confi
 		environment = cm.DefaultEnvironmentName
 	}
 	if environment == "" {
-		environment = "default"
+		environment = defaultCloudEnvironment
 	}
 	name := c.String("connection")
 	if name == "" {
@@ -407,7 +406,7 @@ func checkRepoLoginFile(ctx context.Context, path string) error {
 	if err == nil && !info.Mode().IsRegular() {
 		return errors.New("refusing to write a login to a non-regular .bruin.yml file")
 	}
-	command := exec.CommandContext(ctx, "git", "ls-files", "--error-unmatch", "--", filepath.Base(path))
+	command := exec.CommandContext(ctx, "git", "ls-files", "--error-unmatch", "--", ".bruin.yml")
 	command.Dir = filepath.Dir(path)
 	err = command.Run()
 	if err == nil {
@@ -425,7 +424,7 @@ func warnLoginOverride(output io.Writer, target string) {
 		_, _ = fmt.Fprintln(output, "BRUIN_CLOUD_API_KEY is set and takes precedence over this login.")
 		return
 	}
-	if target == "global" {
+	if target == cloudAuthGlobal {
 		if cm, err := loadCloudConfig(); err == nil && len(cm.CloudConnections()) > 0 {
 			_, _ = fmt.Fprintln(output, "This repository has a bruin connection and takes precedence over the global login.")
 		}

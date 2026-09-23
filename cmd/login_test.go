@@ -23,7 +23,7 @@ import (
 func loginTestRepo(t *testing.T, content string) string {
 	t.Helper()
 	dir := t.TempDir()
-	require.NoError(t, exec.Command("git", "init", "-q", dir).Run())
+	require.NoError(t, exec.CommandContext(t.Context(), "git", "init", "-q", dir).Run())
 	t.Chdir(dir)
 	t.Setenv("BRUIN_CONFIG_FILE_CONTENT", "")
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
@@ -38,6 +38,7 @@ func loginTestRepo(t *testing.T, content string) string {
 const loginExistingConfig = "default_environment: default\nenvironments:\n  default:\n    connections:\n      bruin:\n        - name: cloud\n          api_token: original-token\n"
 
 func TestLoginMenu(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name      string
 		keys      string
@@ -52,6 +53,7 @@ func TestLoginMenu(t *testing.T) {
 		{name: "escape", keys: "\x1b", cancelled: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			var output bytes.Buffer
 			prompt := loginPrompt{reader: strings.NewReader(tc.keys), writer: &output, interactive: true}
 			selected, err := prompt.choose(t.Context(), "Existing login", []string{"Use existing login", "Sign in again", "Cancel"})
@@ -66,7 +68,7 @@ func TestLoginMenu(t *testing.T) {
 	}
 }
 
-func TestLoginExistingConnectionDoesNotAuthorize(t *testing.T) {
+func TestLoginExistingConnectionDoesNotAuthorize(t *testing.T) { //nolint:paralleltest
 	dir := loginTestRepo(t, loginExistingConfig)
 	var output bytes.Buffer
 	deps := loginDependencies{interactive: func() bool { return true }, authorize: func(context.Context, string, bool, io.Writer) (*cloudauth.Credential, error) {
@@ -86,6 +88,7 @@ func TestLoginExistingConnectionDoesNotAuthorize(t *testing.T) {
 	assert.NotContains(t, output.String(), "original-token")
 }
 
+//nolint:paralleltest
 func TestLoginCreatesOrReplacesConnection(t *testing.T) {
 	for _, content := range []string{"", loginExistingConfig} {
 		t.Run(map[bool]string{true: "replace", false: "create"}[content != ""], func(t *testing.T) {
@@ -114,6 +117,7 @@ func TestLoginCreatesOrReplacesConnection(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest
 func TestLoginProjectDetection(t *testing.T) {
 	for _, tc := range []struct {
 		name      string
@@ -188,7 +192,7 @@ func TestLoginProjectDetection(t *testing.T) {
 				require.NoError(t, err)
 				require.Len(t, cm.CloudConnections(), 1)
 				assert.Equal(t, "new-token", cm.CloudConnections()[0].Connection.APIToken)
-				require.NoError(t, exec.Command("git", "-C", dir, "check-ignore", "-q", ".bruin.yml").Run())
+				require.NoError(t, exec.CommandContext(t.Context(), "git", "-C", dir, "check-ignore", "-q", ".bruin.yml").Run())
 				assert.NoFileExists(t, store.Path)
 			} else {
 				assert.NotContains(t, output.String(), "Where should Bruin save this login?")
@@ -210,7 +214,7 @@ func TestLoginProjectDetection(t *testing.T) {
 	}
 }
 
-func TestLoginDoesNotOverwriteOnDeniedAuthorization(t *testing.T) {
+func TestLoginDoesNotOverwriteOnDeniedAuthorization(t *testing.T) { //nolint:paralleltest
 	dir := loginTestRepo(t, loginExistingConfig)
 	deps := loginDependencies{interactive: func() bool { return false }, authorize: func(context.Context, string, bool, io.Writer) (*cloudauth.Credential, error) {
 		return nil, errors.New("denied")
@@ -223,12 +227,12 @@ func TestLoginDoesNotOverwriteOnDeniedAuthorization(t *testing.T) {
 	assert.Equal(t, loginExistingConfig, string(data))
 }
 
-func TestLoginTrackedConfigAndExistingNonInteractive(t *testing.T) {
+func TestLoginTrackedConfigAndExistingNonInteractive(t *testing.T) { //nolint:paralleltest
 	dir := loginTestRepo(t, loginExistingConfig)
 	deps := loginDependencies{interactive: func() bool { return false }}
 	err := loginCommand(deps).Run(t.Context(), []string{"login", "oauth", "--repo"})
 	require.ErrorContains(t, err, "interactive")
-	require.NoError(t, exec.Command("git", "-C", dir, "add", "-f", ".bruin.yml").Run())
+	require.NoError(t, exec.CommandContext(t.Context(), "git", "-C", dir, "add", "-f", ".bruin.yml").Run())
 	err = loginCommand(deps).Run(t.Context(), []string{"login", "oauth", "--repo", "--reauth"})
 	require.ErrorContains(t, err, "tracked")
 }
@@ -236,9 +240,10 @@ func TestLoginTrackedConfigAndExistingNonInteractive(t *testing.T) {
 func TestCloudAuthPrecedenceAndFailures(t *testing.T) {
 	dir := loginTestRepo(t, loginExistingConfig)
 	globalCalls := 0
+	var globalErr error
 	global := func() (*cloudauth.Credential, error) {
 		globalCalls++
-		return &cloudauth.Credential{Token: "global-token"}, nil
+		return &cloudauth.Credential{Token: "global-token"}, globalErr
 	}
 	resolve := func(args ...string) (string, error) {
 		var value string
@@ -272,9 +277,12 @@ func TestCloudAuthPrecedenceAndFailures(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "global-token", token)
 	assert.Equal(t, 1, globalCalls)
+	globalErr = errors.New("credential store unavailable")
+	_, err = resolve()
+	require.ErrorIs(t, err, globalErr)
 }
 
-func TestLogoutRemovesOnlySelectedConnection(t *testing.T) {
+func TestLogoutRemovesOnlySelectedConnection(t *testing.T) { //nolint:paralleltest
 	dir := loginTestRepo(t, loginExistingConfig)
 	cm, err := config.LoadFromFileOrEnv(afero.NewOsFs(), filepath.Join(dir, ".bruin.yml"))
 	require.NoError(t, err)
@@ -291,7 +299,7 @@ func TestLogoutRemovesOnlySelectedConnection(t *testing.T) {
 	assert.NotContains(t, output.String(), "original-token")
 }
 
-func TestAuthStatusDoesNotPrintToken(t *testing.T) {
+func TestAuthStatusDoesNotPrintToken(t *testing.T) { //nolint:paralleltest
 	loginTestRepo(t, loginExistingConfig)
 	var output bytes.Buffer
 	command := Auth()
@@ -302,7 +310,7 @@ func TestAuthStatusDoesNotPrintToken(t *testing.T) {
 	assert.NotContains(t, output.String(), "original-token")
 }
 
-func TestGlobalLoginKeepsTokenOutOfConfig(t *testing.T) {
+func TestGlobalLoginKeepsTokenOutOfConfig(t *testing.T) { //nolint:paralleltest
 	loginTestRepo(t, loginExistingConfig)
 	secrets := keyring.NewArrayKeyring(nil)
 	store := cloudauth.Store{Path: filepath.Join(t.TempDir(), "bruin", "cloud.yml"), Open: func() (cloudauth.SecretStore, error) { return secrets, nil }}

@@ -75,7 +75,7 @@ func (o OAuth) Login(ctx context.Context, target string) (*Credential, error) {
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
-	listener, err := net.Listen("tcp4", "127.0.0.1:0")
+	listener, err := (&net.ListenConfig{}).Listen(ctx, "tcp4", "127.0.0.1:0")
 	if err != nil {
 		return nil, errors.New("cannot start local OAuth callback listener")
 	}
@@ -116,12 +116,13 @@ func (o OAuth) Login(ctx context.Context, target string) (*Credential, error) {
 			return
 		}
 		response := result{}
-		if values.Get("error") != "" {
+		switch {
+		case values.Get("error") != "":
 			response.err = errors.New("OAuth authorization was denied or failed")
-		} else if len(values["code"]) != 1 || values.Get("code") == "" {
+		case len(values["code"]) != 1 || values.Get("code") == "":
 			writeCallbackPage(w, http.StatusBadRequest, "Authorization incomplete", "Return to your terminal and try signing in again.")
 			return
-		} else {
+		default:
 			response.code = values.Get("code")
 		}
 		accepted := false
@@ -169,7 +170,7 @@ func oauthOrigin(apiURL string) (string, error) {
 		return "", errors.New("invalid Bruin Cloud API URL")
 	}
 	loopback := endpoint.Hostname() == "127.0.0.1" || endpoint.Hostname() == "localhost" || endpoint.Hostname() == "::1"
-	if endpoint.Scheme != "https" && !(endpoint.Scheme == "http" && loopback) {
+	if endpoint.Scheme != "https" && (endpoint.Scheme != "http" || !loopback) {
 		return "", errors.New("OAuth requires HTTPS except for a local development server")
 	}
 	return endpoint.Scheme + "://" + endpoint.Host, nil

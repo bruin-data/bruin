@@ -32,9 +32,9 @@ type Credential struct {
 }
 
 type SecretStore interface {
-	Get(string) (keyring.Item, error)
-	Set(keyring.Item) error
-	Remove(string) error
+	Get(key string) (keyring.Item, error)
+	Set(item keyring.Item) error
+	Remove(key string) error
 }
 
 type Store struct {
@@ -54,20 +54,21 @@ func DefaultStore() (Store, error) {
 	if !filepath.IsAbs(root) {
 		return Store{}, errors.New("XDG_CONFIG_HOME must be an absolute path")
 	}
-	return Store{Path: filepath.Join(root, "bruin", "cloud.yml"), Open: openKeyring}, nil
-}
-
-func openKeyring() (SecretStore, error) {
-	store, err := keyring.Open(keyring.Config{
-		ServiceName:                    "bruin-cloud",
-		AllowedBackends:                []keyring.BackendType{keyring.KeychainBackend, keyring.WinCredBackend, keyring.SecretServiceBackend},
-		KeychainAccessibleWhenUnlocked: true,
-		KeychainSynchronizable:         false,
-	})
-	if err != nil {
-		return nil, errors.New("OS credential store is unavailable; unlock it or use BRUIN_CLOUD_API_KEY")
-	}
-	return store, nil
+	return Store{
+		Path: filepath.Join(root, "bruin", "cloud.yml"),
+		Open: func() (SecretStore, error) {
+			store, err := keyring.Open(keyring.Config{
+				ServiceName:                    "bruin-cloud",
+				AllowedBackends:                []keyring.BackendType{keyring.KeychainBackend, keyring.WinCredBackend, keyring.SecretServiceBackend},
+				KeychainAccessibleWhenUnlocked: true,
+				KeychainSynchronizable:         false,
+			})
+			if err != nil {
+				return nil, errors.New("OS credential store is unavailable; unlock it or use BRUIN_CLOUD_API_KEY")
+			}
+			return store, nil
+		},
+	}, nil
 }
 
 func (s Store) Metadata() (*Credential, []byte, error) {

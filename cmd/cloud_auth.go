@@ -10,6 +10,11 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
+const (
+	cloudAuthGlobal         = "global"
+	defaultCloudEnvironment = "default"
+)
+
 type resolvedCloudAuth struct {
 	token       string
 	source      string
@@ -56,11 +61,11 @@ func resolveCloudAuthWithStore(c *cli.Command, global func() (*cloudauth.Credent
 		return resolvedCloudAuth{}, err
 	}
 	if credential != nil {
-		return resolvedCloudAuth{token: credential.Token, source: "global", team: credential.DefaultTeam}, nil
+		return resolvedCloudAuth{token: credential.Token, source: cloudAuthGlobal, team: credential.DefaultTeam}, nil
 	}
 	return resolvedCloudAuth{}, errors.New("API key is required: run 'bruin login oauth', use --api-key or BRUIN_CLOUD_API_KEY, or configure a bruin connection in .bruin.yml")
 }
 
 func emptyCloudConfig() *config.Config {
-	return &config.Config{DefaultEnvironmentName: "default", Environments: map[string]config.Environment{}}
+	return &config.Config{DefaultEnvironmentName: defaultCloudEnvironment, Environments: map[string]config.Environment{}}
 }

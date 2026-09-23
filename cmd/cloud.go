@@ -198,7 +198,7 @@ func newCloudClient(c *cli.Command) (*bruincloud.APIClient, error) {
 	}
 	client := bruincloud.NewAPIClient(auth.token)
 	team := resolveTeam(c)
-	if team == "" && auth.source == "global" {
+	if team == "" && auth.source == cloudAuthGlobal {
 		team = auth.team
 	}
 	if team != "" {

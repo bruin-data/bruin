@@ -45,8 +45,7 @@ func (c *Config) ResolveCloudConnection() (*CloudConnectionRef, error) {
 				if found != nil {
 					return nil, errors.New("duplicate selected Bruin Cloud connection")
 				}
-				copy := ref
-				found = &copy
+				found = &ref
 			}
 		}
 		if found == nil {
@@ -62,7 +61,7 @@ func (c *Config) ResolveCloudConnection() (*CloudConnectionRef, error) {
 		return nil, nil
 	case 1:
 		if refs[0].Connection.APIToken == "" {
-			return nil, errors.New("Bruin Cloud connection has no API token")
+			return nil, errors.New("configured Bruin Cloud connection has no API token")
 		}
 		return &refs[0], nil
 	default:
