@@ -60,6 +60,10 @@ func renderAssetParamsMutator(renderer jinja.RendererInterface) pipeline.AssetMu
 			return nil, fmt.Errorf("error creating renderer for asset %s: %w", a.Name, err)
 		}
 		for key, value := range a.Parameters {
+			// Inference prompts are rendered once per input row by the operator.
+			if a.Type == pipeline.AssetTypeInference && key == "prompt" {
+				continue
+			}
 			renderedValue, err := renderParameterValue(renderer, value)
 			if err != nil {
 				return nil, fmt.Errorf("error rendering parameter %q: %w", key, err)
