@@ -85,13 +85,27 @@ func GetSupportedPythonStrategiesString() string {
 	return strings.Join(strategies, ", ")
 }
 
-// SupportedIngestrStrategies lists all incremental strategies supported by ingestr.
+// SupportedIngestrStrategies lists the incremental strategies ingestr accepts for
+// any destination. Reverse-ETL-only ones live in ReverseETLIngestrStrategies.
 var SupportedIngestrStrategies = []string{
 	"replace",
 	"append",
 	"merge",
 	"delete+insert",
 	"truncate+insert",
+}
+
+// ReverseETLIngestrStrategies are accepted only for reverse-ETL destinations;
+// ingestr rejects them elsewhere (gated on the destination's IsReverseETL marker).
+var ReverseETLIngestrStrategies = []string{
+	"update",
+	"delete",
+}
+
+// ReverseETLIngestrDestinations are the destinations that accept
+// ReverseETLIngestrStrategies. Add new ones as they gain ingestr's IsReverseETL marker.
+var ReverseETLIngestrDestinations = map[string]bool{
+	"hubspot": true,
 }
 
 // IsIngestrStrategySupported checks if a given strategy string is supported by ingestr.
@@ -102,6 +116,19 @@ func IsIngestrStrategySupported(strategy string) bool {
 		}
 	}
 	return false
+}
+
+func IsReverseETLIngestrStrategy(strategy string) bool {
+	for _, s := range ReverseETLIngestrStrategies {
+		if s == strategy {
+			return true
+		}
+	}
+	return false
+}
+
+func IsReverseETLIngestrDestination(destination string) bool {
+	return ReverseETLIngestrDestinations[destination]
 }
 
 // GetSupportedIngestrStrategiesString returns a comma-separated string of supported ingestr strategies.
