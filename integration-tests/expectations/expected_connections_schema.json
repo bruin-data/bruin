@@ -850,6 +850,22 @@
         },
         "read_only": {
           "type": "boolean"
+        },
+        "settings": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              }
+            ]
+          },
+          "type": "object"
         }
       },
       "additionalProperties": false,

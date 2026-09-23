@@ -1085,19 +1085,32 @@ func (m MotherduckConnection) GetName() string {
 type ClickHouseConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	CloudRouting       `yaml:",inline" mapstructure:",squash"`
-	Username           string `yaml:"username" json:"username" mapstructure:"username"`
-	Password           string `yaml:"password" json:"password" mapstructure:"password" sensitive:"true"`
-	Host               string `yaml:"host"     json:"host" mapstructure:"host"`
-	Port               int    `yaml:"port"     json:"port" mapstructure:"port"`
-	Database           string `yaml:"database" json:"database" mapstructure:"database"`
-	Cluster            string `yaml:"cluster,omitempty" json:"cluster,omitempty" mapstructure:"cluster"`
-	HTTPPort           int    `yaml:"http_port,omitempty" json:"http_port,omitempty" mapstructure:"http_port"`
-	Secure             *int   `yaml:"secure,omitempty" json:"secure,omitempty" mapstructure:"secure"`
-	ReadOnly           bool   `yaml:"read_only,omitempty" json:"read_only,omitempty" mapstructure:"read_only"`
+	Username           string         `yaml:"username" json:"username" mapstructure:"username"`
+	Password           string         `yaml:"password" json:"password" mapstructure:"password" sensitive:"true"`
+	Host               string         `yaml:"host"     json:"host" mapstructure:"host"`
+	Port               int            `yaml:"port"     json:"port" mapstructure:"port"`
+	Database           string         `yaml:"database" json:"database" mapstructure:"database"`
+	Cluster            string         `yaml:"cluster,omitempty" json:"cluster,omitempty" mapstructure:"cluster"`
+	HTTPPort           int            `yaml:"http_port,omitempty" json:"http_port,omitempty" mapstructure:"http_port"`
+	Secure             *int           `yaml:"secure,omitempty" json:"secure,omitempty" mapstructure:"secure"`
+	ReadOnly           bool           `yaml:"read_only,omitempty" json:"read_only,omitempty" mapstructure:"read_only"`
+	Settings           map[string]any `yaml:"settings,omitempty" json:"settings,omitempty" mapstructure:"settings"`
 }
 
 func (c ClickHouseConnection) GetName() string {
 	return c.Name
+}
+
+func (ClickHouseConnection) JSONSchemaExtend(s *jsonschema.Schema) {
+	if settings, ok := s.Properties.Get("settings"); ok {
+		settings.AdditionalProperties = &jsonschema.Schema{
+			AnyOf: []*jsonschema.Schema{
+				{Type: "string"},
+				{Type: "number"},
+				{Type: "boolean"},
+			},
+		}
+	}
 }
 
 type AppsflyerConnection struct {
