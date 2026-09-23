@@ -199,7 +199,7 @@ func clickHouseIncrementalKeyType(asset *pipeline.Asset) (string, error) {
 	}
 	columnType := strings.ToLower(strings.TrimSpace(column.Type))
 	if strings.HasPrefix(columnType, "nullable(") && strings.HasSuffix(columnType, ")") {
-		columnType = strings.TrimSpace(columnType[len("nullable(") : len(columnType)-1])
+		return "", fmt.Errorf("incremental_key must be non-nullable in %s strategy", asset.Materialization.Strategy)
 	}
 	if strings.Contains(columnType, "timestamp") || columnType == "date" || columnType == "date32" ||
 		columnType == "datetime" || strings.HasPrefix(columnType, "datetime(") ||

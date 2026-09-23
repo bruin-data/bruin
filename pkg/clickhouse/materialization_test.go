@@ -1274,7 +1274,7 @@ func TestMaterializer_SCD2IncrementalKeyTypes(t *testing.T) {
 		for _, fullRefresh := range []bool{false, true} {
 			for _, columnType := range []string{
 				"TIMESTAMP", "timestamp with time zone", "TIMESTAMPTZ", "DATE", "Date32", "DateTime", "DateTime('UTC')",
-				"DateTime64(6, 'UTC')", "Nullable(DateTime64(6, 'UTC'))", "Nullable(Date)", "UInt64", "String", "",
+				"DateTime64(6, 'UTC')", "Nullable(DateTime64(6, 'UTC'))", "Nullable(Date)", "Nullable(TIMESTAMP)", "UInt64", "String", "",
 			} {
 				mode := "incremental"
 				if fullRefresh {
@@ -1286,6 +1286,11 @@ func TestMaterializer_SCD2IncrementalKeyTypes(t *testing.T) {
 					asset.Materialization.IncrementalKey = "updated_at"
 					asset.Columns[2].Type = columnType
 					actual, err := NewMaterializer(fullRefresh).Render(asset, "SELECT id, name, updated_at FROM source")
+					if strings.HasPrefix(columnType, "Nullable(") {
+						require.ErrorContains(t, err, "incremental_key must be non-nullable")
+						assert.Empty(t, actual)
+						return
+					}
 					if columnType == "UInt64" || columnType == "String" || columnType == "" {
 						require.ErrorContains(t, err, "incremental_key")
 						assert.Empty(t, actual)
