@@ -916,7 +916,7 @@ func TestMaterializer_ClusterEngineRequirements(t *testing.T) {
 					Columns:    []pipeline.Column{{Name: "id", Type: "UInt64", PrimaryKey: true}},
 					ClickHouse: pipeline.ClickHouseConfig{Engine: engine},
 				}
-				mustReject := false
+				var mustReject bool
 				wantErr := "engine"
 				switch strategy {
 				case pipeline.MaterializationStrategyNone, pipeline.MaterializationStrategyCreateReplace:
