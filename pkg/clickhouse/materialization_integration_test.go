@@ -17,7 +17,7 @@ import (
 // ClickHouse endpoint configured in BRUIN_CLICKHOUSE_TEST_ADDR (host:port).
 // Optional credentials use BRUIN_CLICKHOUSE_TEST_USER and
 // BRUIN_CLICKHOUSE_TEST_PASSWORD. The user must be able to create databases.
-func TestMaterializer_ClickHouseServer(t *testing.T) { //nolint:paralleltest // Staging subtests share a temporary table name.
+func TestMaterializer_ClickHouseServer(t *testing.T) {
 	t.Parallel()
 	address := os.Getenv("BRUIN_CLICKHOUSE_TEST_ADDR")
 	if address == "" {
@@ -173,6 +173,7 @@ func TestMaterializer_ClickHouseServer(t *testing.T) { //nolint:paralleltest // 
 		}
 	}
 
+	//nolint:paralleltest // Staging subtests share a temporary table name.
 	for _, strategy := range []pipeline.MaterializationStrategy{
 		pipeline.MaterializationStrategyDeleteInsert,
 		pipeline.MaterializationStrategyMerge,
