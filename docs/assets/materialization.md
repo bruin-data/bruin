@@ -96,7 +96,7 @@ clickhouse:
 | Option | Type | Meaning |
 | --- | --- | --- |
 | `clickhouse.engine` | String | SQL engine expression, such as `MergeTree()`, `ReplacingMergeTree(version)`, or `SummingMergeTree()`. If omitted, Bruin leaves the engine clause to ClickHouse's default. |
-| `clickhouse.order_by` | String[] | SQL expressions forming the sorting key, in order. Use `["tuple()"]` for an explicitly empty sorting key. |
+| `clickhouse.order_by` | String[] | SQL expressions forming the sorting key, in order. Use `["tuple()"]` for an explicitly empty sorting key. `materialization.cluster_by` is an alias for this option; `order_by` wins when both are set. |
 | `clickhouse.ttl` | String | SQL TTL expression, without the `TTL` keyword. |
 | `clickhouse.settings` | Map of strings | Table settings rendered as SQL values. Include SQL quotes inside string values, for example `storage_policy: "'default'"`. |
 
@@ -112,6 +112,8 @@ Define the columns that will be used for the clustering of the resulting table. 
 
 - **Type:** `String[]`
 - **Default:** `[]`
+
+On ClickHouse there is no separate clustering clause: the sorting key determines physical row order, so `cluster_by` is used as the table's `ORDER BY`. It is an alias for [`clickhouse.order_by`](#clickhouse-table-options), which takes precedence when both are set. Primary-key columns must still be the leading entries of whichever one is used.
 
 ### `materialization > incremental_key`
 
