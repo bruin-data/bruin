@@ -277,6 +277,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                         collapsed: false,
                         items: [
                             {text: "Overview", link: "/ingestion/overview"},
+                            {text: "Reverse ETL", link: "/ingestion/reverse-etl"},
                             {
                                 text: "Sources",
                                 collapsed: false,
