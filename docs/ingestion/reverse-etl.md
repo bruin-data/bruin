@@ -121,4 +121,4 @@ columns:
     primary_key: true
 ```
 
-The same overall asset shape works for CleverTap, but you must also adapt the destination table and matching parameters (CleverTap uses `profiles`/`events` and `identity_column`, not `contacts?id_property=email`) — see each destination's page for its object types and required parameters.
+The same overall asset shape works for CleverTap, but you must also adapt the destination table and matching parameters (CleverTap writes `profiles`/`events` and takes its identity from a `primary_key: true` column, not `contacts?id_property=email`) — see each destination's page for its object types and required parameters.
