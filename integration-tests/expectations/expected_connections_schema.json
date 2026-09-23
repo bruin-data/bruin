@@ -850,6 +850,9 @@
         },
         "read_only": {
           "type": "boolean"
+        },
+        "settings": {
+          "type": "object"
         }
       },
       "additionalProperties": false,

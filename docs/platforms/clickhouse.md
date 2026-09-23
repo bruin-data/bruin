@@ -26,6 +26,52 @@ connections:
 
 Set `read_only: true` to run SQL queries in read-only mode (default: `false`). Ingestr assets and seeds do not support this option.
 
+### Query settings
+
+Use the connection's `settings` map to apply ClickHouse query settings to every statement Bruin executes through its native ClickHouse driver:
+
+```yaml
+connections:
+  clickhouse:
+    - name: clickhouse-default
+      host: localhost
+      port: 9000
+      username: default
+      password: ""
+      database: analytics
+      settings:
+        max_threads: 4
+        max_memory_usage: 10000000000
+        join_algorithm: grace_hash
+```
+
+Values are passed to [clickhouse-go's connection settings](https://github.com/ClickHouse/clickhouse-go/tree/v2.37.1#clickhouse-interface-formally-native-interface) as YAML numbers, booleans, or strings. String values do not need SQL quotes. ClickHouse validates setting names and values.
+
+These settings apply to the asset query, every generated materialization statement (including staging-table creation, deletes, inserts, and cleanup), quality checks, sensors, and queries run through the connection. They are sent separately from the SQL, so Bruin does not add another `SETTINGS` clause. Ingestr assets and `clickhouse.seed` use a separate client and do not inherit this map.
+
+Move query settings out of a materialized asset's trailing SQL `SETTINGS` clause and into the connection. A trailing clause only affects the statement containing that query, can be interpreted as table settings inside `CREATE TABLE ... AS SELECT`, and can conflict with Bruin's generated insert settings. The asset's [`clickhouse.settings`](#native-sql-table-definitions) remains a map of table-engine settings such as `index_granularity`; use the connection map for query settings such as `max_threads`.
+
+`read_only: true` forces `readonly = 1` even if the settings map specifies another value. When `read_only` is false or omitted, an explicit `settings.readonly` is preserved. With `cluster` configured, Bruin also enforces `distributed_ddl_output_mode = 'throw'` and `distributed_ddl_task_timeout = 180`. Other settings are preserved. Bruin's generated SQL still disables `insert_deduplicate` where reruns need to reinsert deleted rows and sets `mutations_sync = 2` for cluster interval deletes.
+
+For an asset that needs different query settings, define another named connection with those settings and select it using the asset's `connection` field:
+
+```bruin-sql
+/* @bruin
+name: analytics.large_result
+type: clickhouse.sql
+connection: clickhouse-large-queries
+materialization:
+  type: table
+clickhouse:
+  engine: MergeTree()
+  order_by: [id]
+@bruin */
+
+SELECT id FROM raw.events
+```
+
+Configure `clickhouse-large-queries` in `.bruin.yml` with the desired settings. This selects the same settings for the asset's generated statements and quality checks.
+
 ## Ingestr Assets
 
 After adding a connection in `.bruin.yml`, create an [asset configuration](/assets/ingestr#asset-structure) file such as `stripe_ingestion.asset.yml` inside the `assets` directory. This file defines the flow from the source to the destination:
@@ -165,7 +211,7 @@ AS SELECT id, created_at, version FROM raw.events
 - `engine` is a ClickHouse SQL expression, such as `MergeTree()`, `ReplacingMergeTree(version)`, or `SummingMergeTree()`. If omitted, Bruin omits the engine clause and ClickHouse chooses its default engine. An explicit engine can be used without key metadata: for example, `Memory()` must omit primary and sorting keys, while MergeTree-family engines require a primary or sorting key.
 - `order_by` is a list of separate SQL expressions forming the sorting key. Use `order_by: ["tuple()"]` for an explicitly empty sorting key. It can be provided without any columns marked `primary_key: true`.
 - `ttl` is the SQL TTL expression, without the `TTL` keyword.
-- `settings` is a mapping of setting names to SQL values. Bruin sorts setting names for stable SQL output. Numeric values can be written as `index_granularity: "8192"`; string literals need SQL quotes, for example `storage_policy: "'default'"`.
+- `settings` is a mapping of table-engine setting names to SQL values. Bruin sorts setting names for stable SQL output. Numeric values can be written as `index_granularity: "8192"`; string literals need SQL quotes, for example `storage_policy: "'default'"`. For query settings, use the [connection's settings map](#query-settings).
 
 When both a primary key and `order_by` are provided, the primary-key columns must be a prefix of the sorting key, in column declaration order. For example, primary key `(id)` can use sorting key `(id, created_at)`. This follows the [ClickHouse MergeTree key requirements](https://clickhouse.com/docs/engines/table-engines/mergetree-family/mergetree). When only primary-key columns are declared, Bruin continues to emit `PRIMARY KEY` without an explicit `ORDER BY`.
 

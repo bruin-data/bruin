@@ -2216,6 +2216,7 @@ func (m *Manager) AddClickHouseConnectionFromConfig(connection *config.ClickHous
 
 	client, err := clickhouse.NewClient(&clickhouse.Config{
 		ReadOnly: connection.ReadOnly,
+		Settings: connection.Settings,
 		Host:     connection.Host,
 		Port:     connection.Port,
 		Username: connection.Username,
