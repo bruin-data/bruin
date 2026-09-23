@@ -2221,6 +2221,7 @@ func (m *Manager) AddClickHouseConnectionFromConfig(connection *config.ClickHous
 		Username: connection.Username,
 		Password: connection.Password,
 		Database: connection.Database,
+		Cluster:  connection.Cluster,
 		HTTPPort: connection.HTTPPort,
 		Secure:   connection.Secure,
 	})

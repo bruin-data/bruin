@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/version"
+	"github.com/stretchr/testify/require"
 )
 
 func TestConfig_ToClickHouseOptions(t *testing.T) {
@@ -46,6 +47,29 @@ func TestConfigReadOnly(t *testing.T) {
 			}
 		} else if _, ok := options.Settings["readonly"]; ok {
 			t.Fatal("readonly should be unset by default")
+		}
+	}
+}
+
+func TestConfigClusterSettings(t *testing.T) {
+	t.Parallel()
+	for _, cluster := range []string{"", "analytics"} {
+		for _, readOnly := range []bool{false, true} {
+			c := Config{Cluster: cluster, ReadOnly: readOnly}
+			options := c.ToClickHouseOptions()
+			require.Equal(t, cluster, c.GetCluster())
+			if cluster == "" {
+				require.NotContains(t, options.Settings, "distributed_ddl_output_mode")
+				require.NotContains(t, options.Settings, "distributed_ddl_task_timeout")
+			} else {
+				require.Equal(t, "throw", options.Settings["distributed_ddl_output_mode"])
+				require.Equal(t, 180, options.Settings["distributed_ddl_task_timeout"])
+			}
+			if readOnly {
+				require.Equal(t, 1, options.Settings["readonly"])
+			} else {
+				require.NotContains(t, options.Settings, "readonly")
+			}
 		}
 	}
 }

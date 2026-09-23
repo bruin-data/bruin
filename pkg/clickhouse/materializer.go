@@ -10,13 +10,13 @@ import (
 	"github.com/pkg/errors"
 )
 
-// The other packages all use a materializer that renders the query to a single string. Due to the quirks of athena
-// we need to create a different materializer that returns a slice of strings, since athena server requires us to send separate batches
-// for certain things.
+// Materializer returns separate statements because ClickHouse executes each
+// step of a materialization independently.
 type Materializer struct {
 	MaterializationMap AssetMaterializationMap
 	fullRefresh        bool
 	randomName         func() string
+	cluster            string
 }
 
 func (m *Materializer) Render(asset *pipeline.Asset, query string) ([]string, error) {
@@ -34,6 +34,9 @@ func (m *Materializer) Render(asset *pipeline.Asset, query string) ([]string, er
 
 	query = strings.TrimSuffix(strings.TrimSpace(query), ";")
 	if matFunc, ok := m.MaterializationMap[mat.Type][strategy]; ok {
+		if m.cluster != "" {
+			return buildClusterQuery(asset, query, strategy, m.cluster, matFunc)
+		}
 		return matFunc(asset, query)
 	}
 
@@ -65,21 +68,25 @@ func (m *Materializer) RenderWithCleanup(asset *pipeline.Asset, query string) ([
 	return queries, []string{queries[len(queries)-1]}, nil
 }
 
-func NewMaterializer(fullRefresh bool) *Materializer {
-	return &Materializer{
+func NewMaterializer(fullRefresh bool, cluster ...string) *Materializer {
+	m := &Materializer{
 		MaterializationMap: matMap,
 		fullRefresh:        fullRefresh,
 		randomName:         helpers.PrefixGenerator,
 	}
+	if len(cluster) > 0 {
+		m.cluster = cluster[0]
+	}
+	return m
 }
 
 type Renderer struct {
 	mat *Materializer
 }
 
-func NewRenderer(fullRefresh bool) *Renderer {
+func NewRenderer(fullRefresh bool, cluster ...string) *Renderer {
 	return &Renderer{
-		mat: NewMaterializer(fullRefresh),
+		mat: NewMaterializer(fullRefresh, cluster...),
 	}
 }
 

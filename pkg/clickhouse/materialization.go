@@ -162,14 +162,7 @@ func buildTruncateInsertQuery(task *pipeline.Asset, query string) ([]string, err
 }
 
 func buildCreateReplaceQuery(task *pipeline.Asset, query string) ([]string, error) {
-	if len(task.Columns) == 0 && len(task.ClickHouse.OrderBy) == 0 && task.ClickHouse.Engine == "" {
-		return nil, fmt.Errorf("materialization strategy %s requires the `columns` field to be set", task.Materialization.Strategy)
-	}
-	primaryKeys := task.ColumnNamesWithPrimaryKey()
-	if len(primaryKeys) == 0 && len(task.ClickHouse.OrderBy) == 0 && task.ClickHouse.Engine == "" {
-		return nil, fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column", task.Materialization.Strategy)
-	}
-	clauses, err := tableDefinitionClauses(task)
+	clauses, err := createReplaceTableClauses(task)
 	if err != nil {
 		return nil, err
 	}
@@ -184,6 +177,17 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query string) ([]string, erro
 			query,
 		),
 	}, nil
+}
+
+func createReplaceTableClauses(task *pipeline.Asset) ([]string, error) {
+	if len(task.Columns) == 0 && len(task.ClickHouse.OrderBy) == 0 && task.ClickHouse.Engine == "" {
+		return nil, fmt.Errorf("materialization strategy %s requires the `columns` field to be set", task.Materialization.Strategy)
+	}
+	primaryKeys := task.ColumnNamesWithPrimaryKey()
+	if len(primaryKeys) == 0 && len(task.ClickHouse.OrderBy) == 0 && task.ClickHouse.Engine == "" {
+		return nil, fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column", task.Materialization.Strategy)
+	}
+	return tableDefinitionClauses(task)
 }
 
 // tableDefinitionClauses is shared by the strategies that create the target
@@ -239,6 +243,10 @@ func unquoteKey(key string) string {
 }
 
 func buildTimeIntervalQuery(asset *pipeline.Asset, query string) ([]string, error) {
+	return buildTimeIntervalQueryForCluster(asset, query, "")
+}
+
+func buildTimeIntervalQueryForCluster(asset *pipeline.Asset, query, clusterClause string) ([]string, error) {
 	if asset.Materialization.IncrementalKey == "" {
 		return nil, errors.New("incremental_key is required for time_interval strategy")
 	}
@@ -258,12 +266,13 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) ([]string, erro
 		endVar = "'{{end_date}}'"
 	}
 
+	predicate := fmt.Sprintf("%s BETWEEN %s AND %s", asset.Materialization.IncrementalKey, startVar, endVar)
+	deleteQuery := fmt.Sprintf("DELETE FROM %s WHERE %s", asset.Name, predicate)
+	if clusterClause != "" {
+		deleteQuery = fmt.Sprintf("ALTER TABLE %s%s DELETE WHERE %s SETTINGS mutations_sync = 2", asset.Name, clusterClause, predicate)
+	}
 	queries := []string{
-		fmt.Sprintf(`DELETE FROM %s WHERE %s BETWEEN %s AND %s`,
-			asset.Name,
-			asset.Materialization.IncrementalKey,
-			startVar,
-			endVar),
+		deleteQuery,
 		fmt.Sprintf(`INSERT INTO %s SETTINGS insert_deduplicate = 0 %s`,
 			asset.Name, query),
 	}
@@ -272,6 +281,10 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) ([]string, erro
 }
 
 func buildDDLQuery(asset *pipeline.Asset, query string) ([]string, error) {
+	return buildDDLQueryForCluster(asset, "")
+}
+
+func buildDDLQueryForCluster(asset *pipeline.Asset, clusterClause string) ([]string, error) {
 	columnDefs := make([]string, 0, len(asset.Columns))
 
 	for _, col := range asset.Columns {
@@ -292,10 +305,11 @@ func buildDDLQuery(asset *pipeline.Asset, query string) ([]string, error) {
 	}
 
 	ddl := fmt.Sprintf(
-		"CREATE TABLE IF NOT EXISTS %s (\n"+
+		"CREATE TABLE IF NOT EXISTS %s%s (\n"+
 			"%s\n"+
 			")",
 		asset.Name,
+		clusterClause,
 		strings.Join(columnDefs, ",\n"),
 	)
 	if len(clauses) > 0 {
@@ -303,4 +317,61 @@ func buildDDLQuery(asset *pipeline.Asset, query string) ([]string, error) {
 	}
 
 	return []string{ddl}, nil
+}
+
+func buildClusterQuery(asset *pipeline.Asset, query string, strategy pipeline.MaterializationStrategy, cluster string, fallback MaterializerFunc) ([]string, error) {
+	clusterClause := " ON CLUSTER `" + strings.NewReplacer("\\", "\\\\", "`", "\\`").Replace(cluster) + "`"
+	if asset.Materialization.Type == pipeline.MaterializationTypeView && strategy == pipeline.MaterializationStrategyNone {
+		return []string{fmt.Sprintf("CREATE OR REPLACE VIEW %s%s AS\n%s", asset.Name, clusterClause, query)}, nil
+	}
+	if asset.Materialization.Type != pipeline.MaterializationTypeTable {
+		return fallback(asset, query)
+	}
+
+	switch strategy {
+	case pipeline.MaterializationStrategyDeleteInsert, pipeline.MaterializationStrategyMerge:
+		return nil, fmt.Errorf("ClickHouse materialization strategy %s is not supported with cluster: staging data cannot be shared safely across replicas; use append, time_interval, or a full refresh", strategy)
+	case pipeline.MaterializationStrategyNone, pipeline.MaterializationStrategyCreateReplace:
+		if !isReplicatedMergeTree(asset.ClickHouse.Engine) {
+			return nil, errors.New("ClickHouse cluster table replacement requires an explicit Replicated*MergeTree engine in clickhouse.engine, including Keeper arguments or configured server defaults")
+		}
+		if len(asset.ColumnNamesWithPrimaryKey()) == 0 && len(asset.ClickHouse.OrderBy) == 0 {
+			return nil, errors.New("ClickHouse cluster table replacement requires primary_key columns or clickhouse.order_by for the replicated engine")
+		}
+		clauses, err := createReplaceTableClauses(asset)
+		if err != nil {
+			return nil, err
+		}
+		// SYNC releases the old replica's Keeper path before it is reused.
+		// EMPTY keeps the SELECT from inserting once per cluster member.
+		return []string{
+			fmt.Sprintf("DROP TABLE IF EXISTS %s%s SYNC", asset.Name, clusterClause),
+			fmt.Sprintf("CREATE TABLE %s%s %s EMPTY AS %s", asset.Name, clusterClause, strings.Join(clauses, " "), query),
+			fmt.Sprintf("INSERT INTO %s %s", asset.Name, query),
+		}, nil
+	case pipeline.MaterializationStrategyDDL:
+		if strings.TrimSpace(asset.ClickHouse.Engine) == "" {
+			return nil, errors.New("ClickHouse cluster ddl requires an explicit clickhouse.engine")
+		}
+		return buildDDLQueryForCluster(asset, clusterClause)
+	case pipeline.MaterializationStrategyTruncateInsert, pipeline.MaterializationStrategyTimeInterval:
+		if asset.ClickHouse.Engine != "" && !isReplicatedMergeTree(asset.ClickHouse.Engine) {
+			return nil, fmt.Errorf("ClickHouse cluster %s requires a local Replicated*MergeTree engine on a single shard; Distributed and non-replicated targets are not supported", strategy)
+		}
+		if strategy == pipeline.MaterializationStrategyTimeInterval {
+			return buildTimeIntervalQueryForCluster(asset, query, clusterClause)
+		}
+		return []string{
+			fmt.Sprintf("TRUNCATE TABLE %s%s SYNC", asset.Name, clusterClause),
+			fmt.Sprintf("INSERT INTO %s %s", asset.Name, query),
+		}, nil
+	default:
+		return fallback(asset, query)
+	}
+}
+
+func isReplicatedMergeTree(engine string) bool {
+	name, _, _ := strings.Cut(strings.TrimSpace(engine), "(")
+	name = strings.TrimSpace(name)
+	return strings.HasPrefix(name, "Replicated") && strings.HasSuffix(name, "MergeTree")
 }
