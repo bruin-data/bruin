@@ -1281,6 +1281,112 @@ func TestEnsurePipelineNotificationsAreValid(t *testing.T) {
 	}
 }
 
+func TestEnsureMaterializationValuesAreValid_ClickHouseOptions(t *testing.T) {
+	t.Parallel()
+
+	options := []struct {
+		name   string
+		config pipeline.ClickHouseConfig
+	}{
+		{"engine", pipeline.ClickHouseConfig{Engine: "ReplacingMergeTree()"}},
+		{"order_by", pipeline.ClickHouseConfig{OrderBy: []string{"id", "created_at"}}},
+		{"ttl", pipeline.ClickHouseConfig{TTL: "created_at + INTERVAL 30 DAY"}},
+		{"settings", pipeline.ClickHouseConfig{Settings: map[string]string{"index_granularity": "8192"}}},
+	}
+	type testCase struct {
+		name     string
+		asset    pipeline.Asset
+		wantRule string
+	}
+	tests := make([]testCase, 0, 12)
+	tests = append(tests, []testCase{
+		{
+			name: "clickhouse view",
+			asset: pipeline.Asset{
+				Type:            pipeline.AssetTypeClickHouse,
+				Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeView},
+			},
+			wantRule: "is not supported for views",
+		},
+		{
+			name: "postgres table",
+			asset: pipeline.Asset{
+				Type: pipeline.AssetTypePostgresQuery,
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyCreateReplace,
+				},
+			},
+			wantRule: "is only supported for clickhouse.sql assets",
+		},
+		{
+			name: "postgres implicit strategy",
+			asset: pipeline.Asset{
+				Type:            pipeline.AssetTypePostgresQuery,
+				Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeTable},
+			},
+			wantRule: "is only supported for clickhouse.sql assets",
+		},
+		{
+			name:     "python",
+			asset:    pipeline.Asset{Type: pipeline.AssetTypePython},
+			wantRule: "is only supported for clickhouse.sql assets",
+		},
+		{
+			name:     "ingestr",
+			asset:    pipeline.Asset{Type: pipeline.AssetTypeIngestr},
+			wantRule: "is only supported for clickhouse.sql assets",
+		},
+		{
+			name:     "clickhouse seed",
+			asset:    pipeline.Asset{Type: pipeline.AssetTypeClickHouseSeed},
+			wantRule: "is only supported for clickhouse.sql assets",
+		},
+		{
+			name:     "clickhouse source",
+			asset:    pipeline.Asset{Type: pipeline.AssetTypeClickHouseSource},
+			wantRule: "is only supported for clickhouse.sql assets",
+		},
+	}...)
+	for _, strategy := range []pipeline.MaterializationStrategy{
+		pipeline.MaterializationStrategyNone,
+		pipeline.MaterializationStrategyCreateReplace,
+		pipeline.MaterializationStrategyDDL,
+		pipeline.MaterializationStrategyAppend,
+		pipeline.MaterializationStrategyTruncateInsert,
+	} {
+		tests = append(tests, testCase{
+			name: "clickhouse table " + string(strategy),
+			asset: pipeline.Asset{
+				Type: pipeline.AssetTypeClickHouse,
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: strategy,
+				},
+			},
+		})
+	}
+
+	for _, option := range options {
+		for _, test := range tests {
+			t.Run(option.name+"/"+test.name, func(t *testing.T) {
+				t.Parallel()
+				asset := test.asset
+				asset.ClickHouse = option.config
+				issues, err := EnsureMaterializationValuesAreValidForSingleAsset(t.Context(), &pipeline.Pipeline{}, &asset)
+				require.NoError(t, err)
+				if test.wantRule == "" {
+					assert.Empty(t, issues)
+					return
+				}
+				require.Len(t, issues, 1)
+				assert.Same(t, &asset, issues[0].Task)
+				assert.Equal(t, fmt.Sprintf("ClickHouse option 'clickhouse.%s' %s", option.name, test.wantRule), issues[0].Description)
+			})
+		}
+	}
+}
+
 func TestEnsureMaterializationValuesAreValid(t *testing.T) {
 	t.Parallel()
 

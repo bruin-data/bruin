@@ -3,6 +3,7 @@ package clickhouse
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/helpers"
@@ -75,7 +76,7 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) ([]string, error)
 
 	queries := []string{
 		fmt.Sprintf(
-			"CREATE TABLE %s PRIMARY KEY %s AS %s",
+			"CREATE TABLE %s ENGINE = MergeTree() PRIMARY KEY %s AS %s",
 			tempTableName,
 			task.ColumnNamesWithPrimaryKey()[0],
 			query,
@@ -161,24 +162,80 @@ func buildTruncateInsertQuery(task *pipeline.Asset, query string) ([]string, err
 }
 
 func buildCreateReplaceQuery(task *pipeline.Asset, query string) ([]string, error) {
-	if len(task.Columns) == 0 {
+	if len(task.Columns) == 0 && len(task.ClickHouse.OrderBy) == 0 && task.ClickHouse.Engine == "" {
 		return nil, fmt.Errorf("materialization strategy %s requires the `columns` field to be set", task.Materialization.Strategy)
 	}
 	primaryKeys := task.ColumnNamesWithPrimaryKey()
-	if len(primaryKeys) == 0 {
+	if len(primaryKeys) == 0 && len(task.ClickHouse.OrderBy) == 0 && task.ClickHouse.Engine == "" {
 		return nil, fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column", task.Materialization.Strategy)
+	}
+	clauses, err := tableDefinitionClauses(task)
+	if err != nil {
+		return nil, err
 	}
 
 	query = strings.TrimSuffix(query, ";")
 
 	return []string{
 		fmt.Sprintf(
-			"CREATE OR REPLACE TABLE %s PRIMARY KEY (%s) AS %s",
+			"CREATE OR REPLACE TABLE %s %s AS %s",
 			task.Name,
-			strings.Join(primaryKeys, ", "),
+			strings.Join(clauses, " "),
 			query,
 		),
 	}, nil
+}
+
+// tableDefinitionClauses is shared by the strategies that create the target
+// table. Temporary staging tables use their own MergeTree definition.
+func tableDefinitionClauses(asset *pipeline.Asset) ([]string, error) {
+	options := asset.ClickHouse
+	primaryKeys := asset.ColumnNamesWithPrimaryKey()
+	if len(options.OrderBy) > 0 {
+		for i, key := range primaryKeys {
+			if i >= len(options.OrderBy) || unquoteKey(key) != unquoteKey(options.OrderBy[i]) {
+				return nil, errors.New("ClickHouse primary key columns must be a prefix of clickhouse.order_by")
+			}
+		}
+	}
+
+	var clauses []string
+	if options.Engine != "" {
+		clauses = append(clauses, "ENGINE = "+options.Engine)
+	}
+	if asset.Materialization.PartitionBy != "" {
+		clauses = append(clauses, "PARTITION BY ("+asset.Materialization.PartitionBy+")")
+	}
+	if len(primaryKeys) > 0 {
+		clauses = append(clauses, "PRIMARY KEY ("+strings.Join(primaryKeys, ", ")+")")
+	}
+	if len(options.OrderBy) > 0 {
+		clauses = append(clauses, "ORDER BY ("+strings.Join(options.OrderBy, ", ")+")")
+	}
+	if options.TTL != "" {
+		clauses = append(clauses, "TTL "+options.TTL)
+	}
+	if len(options.Settings) > 0 {
+		keys := make([]string, 0, len(options.Settings))
+		for key := range options.Settings {
+			keys = append(keys, key)
+		}
+		slices.Sort(keys)
+		settings := make([]string, 0, len(keys))
+		for _, key := range keys {
+			settings = append(settings, key+" = "+options.Settings[key])
+		}
+		clauses = append(clauses, "SETTINGS "+strings.Join(settings, ", "))
+	}
+	return clauses, nil
+}
+
+func unquoteKey(key string) string {
+	key = strings.TrimSpace(key)
+	if len(key) >= 2 && (key[0] == '`' || key[0] == '"') && key[len(key)-1] == key[0] {
+		return key[1 : len(key)-1]
+	}
+	return key
 }
 
 func buildTimeIntervalQuery(asset *pipeline.Asset, query string) ([]string, error) {
@@ -216,7 +273,6 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) ([]string, erro
 
 func buildDDLQuery(asset *pipeline.Asset, query string) ([]string, error) {
 	columnDefs := make([]string, 0, len(asset.Columns))
-	primaryKeys := ""
 
 	for _, col := range asset.Columns {
 		def := fmt.Sprintf("%s %s", col.Name, col.SQLType())
@@ -227,35 +283,24 @@ func buildDDLQuery(asset *pipeline.Asset, query string) ([]string, error) {
 		if col.Description != "" {
 			def += fmt.Sprintf(" COMMENT '%s'", col.Description)
 		}
-		if col.PrimaryKey {
-			if primaryKeys != "" {
-				primaryKeys += ", "
-			}
-			primaryKeys += col.Name
-		}
 		columnDefs = append(columnDefs, def)
 	}
 
-	if len(primaryKeys) > 0 {
-		primaryKeys = fmt.Sprintf("\nPRIMARY KEY (%s)", primaryKeys)
-	}
-
-	partitionBy := ""
-	if asset.Materialization.PartitionBy != "" {
-		partitionBy = fmt.Sprintf("\nPARTITION BY (%s)", asset.Materialization.PartitionBy)
+	clauses, err := tableDefinitionClauses(asset)
+	if err != nil {
+		return nil, err
 	}
 
 	ddl := fmt.Sprintf(
 		"CREATE TABLE IF NOT EXISTS %s (\n"+
 			"%s\n"+
-			")"+
-			"%s"+
-			"%s",
+			")",
 		asset.Name,
 		strings.Join(columnDefs, ",\n"),
-		primaryKeys,
-		partitionBy,
 	)
+	if len(clauses) > 0 {
+		ddl += "\n" + strings.Join(clauses, "\n")
+	}
 
 	return []string{ddl}, nil
 }
