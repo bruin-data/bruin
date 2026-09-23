@@ -1293,11 +1293,13 @@ func TestEnsureMaterializationValuesAreValid_ClickHouseOptions(t *testing.T) {
 		{"ttl", pipeline.ClickHouseConfig{TTL: "created_at + INTERVAL 30 DAY"}},
 		{"settings", pipeline.ClickHouseConfig{Settings: map[string]string{"index_granularity": "8192"}}},
 	}
-	tests := []struct {
+	type testCase struct {
 		name     string
 		asset    pipeline.Asset
 		wantRule string
-	}{
+	}
+	tests := make([]testCase, 0, 12)
+	tests = append(tests, []testCase{
 		{
 			name: "clickhouse view",
 			asset: pipeline.Asset{
@@ -1345,7 +1347,7 @@ func TestEnsureMaterializationValuesAreValid_ClickHouseOptions(t *testing.T) {
 			asset:    pipeline.Asset{Type: pipeline.AssetTypeClickHouseSource},
 			wantRule: "is only supported for clickhouse.sql assets",
 		},
-	}
+	}...)
 	for _, strategy := range []pipeline.MaterializationStrategy{
 		pipeline.MaterializationStrategyNone,
 		pipeline.MaterializationStrategyCreateReplace,
@@ -1353,11 +1355,7 @@ func TestEnsureMaterializationValuesAreValid_ClickHouseOptions(t *testing.T) {
 		pipeline.MaterializationStrategyAppend,
 		pipeline.MaterializationStrategyTruncateInsert,
 	} {
-		tests = append(tests, struct {
-			name     string
-			asset    pipeline.Asset
-			wantRule string
-		}{
+		tests = append(tests, testCase{
 			name: "clickhouse table " + string(strategy),
 			asset: pipeline.Asset{
 				Type: pipeline.AssetTypeClickHouse,
