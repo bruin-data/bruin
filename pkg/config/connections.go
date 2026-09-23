@@ -1101,6 +1101,18 @@ func (c ClickHouseConnection) GetName() string {
 	return c.Name
 }
 
+func (ClickHouseConnection) JSONSchemaExtend(s *jsonschema.Schema) {
+	if settings, ok := s.Properties.Get("settings"); ok {
+		settings.AdditionalProperties = &jsonschema.Schema{
+			AnyOf: []*jsonschema.Schema{
+				{Type: "string"},
+				{Type: "number"},
+				{Type: "boolean"},
+			},
+		}
+	}
+}
+
 type AppsflyerConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`

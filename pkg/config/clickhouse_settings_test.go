@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/stretchr/testify/require"
+	"github.com/xeipuuv/gojsonschema"
 	"gopkg.in/yaml.v3"
 )
 
@@ -65,16 +66,39 @@ func TestClickHouseConnectionSettingsSchema(t *testing.T) {
 	require.NoError(t, err)
 	var document struct {
 		Definitions map[string]struct {
-			Properties map[string]struct {
-				Type                 string `json:"type"`
-				AdditionalProperties any    `json:"additionalProperties"`
-			} `json:"properties"`
-			Required []string `json:"required"`
+			Properties map[string]json.RawMessage `json:"properties"`
+			Required   []string                   `json:"required"`
 		} `json:"$defs"`
 	}
 	require.NoError(t, json.Unmarshal([]byte(schema), &document))
 	definition := document.Definitions["ClickHouseConnection"]
-	require.Equal(t, "object", definition.Properties["settings"].Type)
-	require.NotEqual(t, false, definition.Properties["settings"].AdditionalProperties)
+	require.Contains(t, definition.Properties, "settings")
 	require.NotContains(t, definition.Required, "settings")
+	settingsSchema, err := gojsonschema.NewSchema(gojsonschema.NewBytesLoader(definition.Properties["settings"]))
+	require.NoError(t, err)
+
+	for _, tt := range []struct {
+		name     string
+		settings any
+		valid    bool
+	}{
+		{name: "empty map", settings: map[string]any{}, valid: true},
+		{name: "integer", settings: map[string]any{"max_threads": 4}, valid: true},
+		{name: "float", settings: map[string]any{"max_execution_time": 1.5}, valid: true},
+		{name: "boolean", settings: map[string]any{"allow_experimental_analyzer": true}, valid: true},
+		{name: "string", settings: map[string]any{"join_algorithm": "grace_hash"}, valid: true},
+		{name: "object value", settings: map[string]any{"max_threads": map[string]any{"value": 4}}},
+		{name: "array value", settings: map[string]any{"max_threads": []any{4}}},
+		{name: "null value", settings: map[string]any{"max_threads": nil}},
+		{name: "scalar instead of map", settings: 4},
+		{name: "array instead of map", settings: []any{4}},
+		{name: "null instead of map", settings: nil},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result, err := settingsSchema.Validate(gojsonschema.NewGoLoader(tt.settings))
+			require.NoError(t, err)
+			require.Equal(t, tt.valid, result.Valid(), "schema validation errors: %v", result.Errors())
+		})
+	}
 }

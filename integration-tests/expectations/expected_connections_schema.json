@@ -852,6 +852,19 @@
           "type": "boolean"
         },
         "settings": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              }
+            ]
+          },
           "type": "object"
         }
       },
