@@ -85,13 +85,32 @@ func GetSupportedPythonStrategiesString() string {
 	return strings.Join(strategies, ", ")
 }
 
-// SupportedIngestrStrategies lists all incremental strategies supported by ingestr.
+// SupportedIngestrStrategies lists the incremental strategies ingestr accepts for
+// any destination. The reverse-ETL-only strategies (update, delete) are tracked
+// separately in ReverseETLIngestrStrategies.
 var SupportedIngestrStrategies = []string{
 	"replace",
 	"append",
 	"merge",
 	"delete+insert",
 	"truncate+insert",
+}
+
+// ReverseETLIngestrStrategies are incremental strategies ingestr accepts only when
+// the destination is a reverse-ETL destination (writes rows back to an external
+// API). ingestr gates these on the destination's IsReverseETL marker; anything
+// else fails at runtime.
+var ReverseETLIngestrStrategies = []string{
+	"update",
+	"delete",
+}
+
+// ReverseETLIngestrDestinations are the ingestr destinations that write rows back
+// to an external API and therefore accept ReverseETLIngestrStrategies. This mirrors
+// ingestr's own gate (destinations implementing IsReverseETL); add new reverse-ETL
+// destinations here as they gain the marker.
+var ReverseETLIngestrDestinations = map[string]bool{
+	"hubspot": true,
 }
 
 // IsIngestrStrategySupported checks if a given strategy string is supported by ingestr.
@@ -102,6 +121,23 @@ func IsIngestrStrategySupported(strategy string) bool {
 		}
 	}
 	return false
+}
+
+// IsReverseETLIngestrStrategy reports whether the strategy is a reverse-ETL-only
+// strategy (update/delete).
+func IsReverseETLIngestrStrategy(strategy string) bool {
+	for _, s := range ReverseETLIngestrStrategies {
+		if s == strategy {
+			return true
+		}
+	}
+	return false
+}
+
+// IsReverseETLIngestrDestination reports whether the ingestr destination accepts
+// the reverse-ETL-only strategies.
+func IsReverseETLIngestrDestination(destination string) bool {
+	return ReverseETLIngestrDestinations[destination]
 }
 
 // GetSupportedIngestrStrategiesString returns a comma-separated string of supported ingestr strategies.

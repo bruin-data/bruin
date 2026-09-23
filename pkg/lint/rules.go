@@ -292,13 +292,22 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 
 	effectiveStrategy := ""
 	if value, exists := asset.Parameters.GetString("incremental_strategy"); exists && value != "" {
-		if !python.IsIngestrStrategySupported(value) {
+		destination, _ := asset.Parameters.GetString("destination")
+		switch {
+		case python.IsIngestrStrategySupported(value):
+			effectiveStrategy = value
+		case python.IsReverseETLIngestrStrategy(value) && python.IsReverseETLIngestrDestination(destination):
+			effectiveStrategy = value
+		case python.IsReverseETLIngestrStrategy(value):
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: fmt.Sprintf("Incremental strategy '%s' is only supported for reverse-ETL destinations (e.g. hubspot); destination '%s' does not support it.", value, destination),
+			})
+		default:
 			issues = append(issues, &Issue{
 				Task:        asset,
 				Description: fmt.Sprintf("Incremental strategy '%s' is not supported for ingestr assets. Supported strategies are: %s", value, python.GetSupportedIngestrStrategiesString()),
 			})
-		} else {
-			effectiveStrategy = value
 		}
 	}
 

@@ -2409,6 +2409,48 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 			wantErr:        assert.NoError,
 		},
 		{
+			name: "valid ingestr asset with reverse-ETL update strategy on hubspot",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection":    "conn1",
+					"source_table":         "table1",
+					"destination":          "hubspot",
+					"incremental_strategy": "update",
+				},
+			},
+			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "valid ingestr asset with reverse-ETL delete strategy on hubspot",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection":    "conn1",
+					"source_table":         "table1",
+					"destination":          "hubspot",
+					"incremental_strategy": "delete",
+				},
+			},
+			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "ingestr asset with reverse-ETL update strategy on a non-reverse-ETL destination",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection":    "conn1",
+					"source_table":         "table1",
+					"destination":          "duckdb",
+					"incremental_strategy": "update",
+				},
+			},
+			wantErrMessage: "Incremental strategy 'update' is only supported for reverse-ETL destinations (e.g. hubspot); destination 'duckdb' does not support it.",
+			wantErr:        assert.NoError,
+		},
+		{
 			name: "ingestr asset with merge strategy but no primary key",
 			asset: &pipeline.Asset{
 				Type: pipeline.AssetTypeIngestr,
