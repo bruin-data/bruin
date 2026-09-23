@@ -215,7 +215,8 @@ func scd2SourceQuery(asset *pipeline.Asset, query string) (string, error) {
 	if asset.Materialization.Strategy == pipeline.MaterializationStrategySCD2ByTime && asset.Materialization.IncrementalKey == "" {
 		return "", errors.New("incremental_key is required for SCD2_by_time strategy")
 	}
-	if _, err := clickHouseIncrementalKeyType(asset); err != nil {
+	incrementalKeyType, err := clickHouseIncrementalKeyType(asset)
+	if err != nil {
 		return "", err
 	}
 	columns := make([]string, 0, len(asset.Columns)+3)
@@ -230,7 +231,7 @@ func scd2SourceQuery(asset *pipeline.Asset, query string) (string, error) {
 		return "", fmt.Errorf("materialization strategy %s requires the primary_key field to be set on at least one column", asset.Materialization.Strategy)
 	}
 	validFrom := clickHouseSCD2Now
-	if asset.Materialization.IncrementalKey != "" {
+	if incrementalKeyType != "" {
 		validFrom = fmt.Sprintf("toDateTime64(src.%s, 6, 'UTC')", asset.Materialization.IncrementalKey)
 	}
 	columns = append(columns, validFrom+" AS _valid_from", clickHouseSCD2Max+" AS _valid_until", "TRUE AS _is_current")

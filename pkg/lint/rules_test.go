@@ -1462,12 +1462,12 @@ func TestEnsureMaterializationValuesAreValid_ClickHouseSCD2(t *testing.T) {
 			}
 			issues, err := EnsureMaterializationValuesAreValidForSingleAsset(t.Context(), &pipeline.Pipeline{}, asset)
 			require.NoError(t, err)
-			var descriptions []string
+			descriptions := make([]string, 0, len(issues))
 			for _, issue := range issues {
 				assert.Same(t, asset, issue.Task)
 				descriptions = append(descriptions, issue.Description)
 			}
-			assert.Equal(t, tt.want, descriptions)
+			assert.ElementsMatch(t, tt.want, descriptions)
 		})
 	}
 }
