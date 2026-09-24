@@ -18,13 +18,13 @@ The browser approval page selects the teams the personal token can access, its e
 
 ## Existing connections
 
-If the selected target already has a login, Bruin asks whether to use it, sign in again, or cancel before opening the browser. When several `bruin` connections exist, choose a connection first. Explicit selection is also available:
+If the selected target already has a login, Bruin asks whether to use it, sign in again, or cancel before opening the browser. When several `bruin` connections exist, choose which connection to update. You can also specify it directly:
 
 ```bash
 bruin login oauth --repo --environment production --connection cloud
 ```
 
-Selecting an existing connection preserves its token and stores `cloud.environment` and `cloud.connection` so later commands use the same connection. Signing in again replaces its token only after authorization succeeds.
+Keeping an existing connection leaves the configuration unchanged. Signing in again replaces its token only after authorization succeeds. The login flags choose where to save the token; they do not persist a connection selection for Cloud commands.
 
 Without an interactive terminal, specify `--repo` or `--global`. Use `--connection` and `--environment` to disambiguate existing connections, and `--reauth` to explicitly authorize replacing an existing login. Browser consent is still required.
 
@@ -42,10 +42,10 @@ environments:
           api_token: "<personal-token>"
           api_url: https://cloud.getbruin.com/api/v1
 cloud:
-  connection: cloud
-  environment: default
   default_team: acme
 ```
+
+The `cloud` section only stores `default_team`. You can change it later with `bruin cloud config set-team <company_prefix>`.
 
 The file is ignored by Git and written with owner-only permissions on POSIX systems. Bruin refuses to write a token if this file is already tracked by Git. Repository tokens remain plaintext and can be read by processes running as your user. Existing unrelated configuration and environment-variable references are preserved.
 
@@ -57,10 +57,10 @@ Cloud commands choose a token in this order:
 
 1. `--api-key`
 2. `BRUIN_CLOUD_API_KEY`
-3. The selected repository `bruin` connection
+3. The repository `bruin` connection
 4. Global login
 
-A single existing `bruin` connection continues to work without running login. Multiple connections require selection through `bruin login oauth --repo`. Invalid configuration, an empty selected token, or an expired or unauthorized token causes an error; Bruin does not silently try a lower-priority token.
+A single existing `bruin` connection continues to work without running login. When multiple `bruin` connections exist, supply the desired token using `--api-key` or `BRUIN_CLOUD_API_KEY`, or keep a single repository `bruin` connection. Invalid configuration, an empty repository token, or an expired or unauthorized token causes an error; Bruin does not silently try a lower-priority token.
 
 `--team` or `BRUIN_CLOUD_TEAM` overrides the repository's `cloud.default_team`. If neither supplies a team and the active token is global, the global login's default team is used.
 
@@ -75,9 +75,9 @@ bruin logout --global
 bruin logout --repo --revoke
 ```
 
-Status shows the locally selected credential source and team without displaying the token. It does not check API validity. Repository logout removes the selected `bruin` connection; global logout removes the credential and its metadata. Add `--revoke` to invalidate the personal token in Cloud too. Without it, other copies of that token remain usable.
+Status shows the locally selected credential source and team without displaying the token. It does not check API validity. Repository logout requires a single `bruin` connection and removes it; global logout removes the credential and its metadata. Add `--revoke` to invalidate the personal token in Cloud too. Without it, other copies of that token remain usable.
 
-Removing a repository login can expose a lower-priority global login or another repository connection. `--api-key` and environment variables are unaffected by logout.
+Removing a repository login can expose a lower-priority global login. `--api-key` and environment variables are unaffected by logout.
 
 ## Troubleshooting
 

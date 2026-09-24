@@ -53,7 +53,9 @@ func TestLoginExistingConnectionDoesNotAuthorize(t *testing.T) { //nolint:parall
 	selected, err := cm.ResolveCloudConnection()
 	require.NoError(t, err)
 	assert.Equal(t, "original-token", selected.Connection.APIToken)
-	assert.Equal(t, "cloud", cm.Cloud.Connection)
+	data, err := os.ReadFile(filepath.Join(dir, ".bruin.yml"))
+	require.NoError(t, err)
+	assert.Equal(t, loginExistingConfig, string(data))
 	assert.NotContains(t, output.String(), "original-token")
 }
 
@@ -184,20 +186,15 @@ func TestCloudAuthPrecedenceAndFailures(t *testing.T) {
 	require.ErrorIs(t, err, globalErr)
 }
 
-func TestLogoutRemovesOnlySelectedConnection(t *testing.T) { //nolint:paralleltest
+func TestLogoutRemovesRepositoryConnection(t *testing.T) { //nolint:paralleltest
 	dir := loginTestRepo(t, loginExistingConfig)
-	cm, err := config.LoadFromFileOrEnv(afero.NewOsFs(), filepath.Join(dir, ".bruin.yml"))
-	require.NoError(t, err)
-	ref := cm.CloudConnections()[0]
-	require.NoError(t, config.SaveCloudConnection(afero.NewOsFs(), filepath.Join(dir, ".bruin.yml"), []byte(loginExistingConfig), ref, false, ""))
 	var output bytes.Buffer
 	command := Logout()
 	command.Writer = &output
 	require.NoError(t, command.Run(t.Context(), []string{"logout", "--repo"}))
-	cm, err = config.LoadFromFileOrEnv(afero.NewOsFs(), filepath.Join(dir, ".bruin.yml"))
+	cm, err := config.LoadFromFileOrEnv(afero.NewOsFs(), filepath.Join(dir, ".bruin.yml"))
 	require.NoError(t, err)
 	assert.Empty(t, cm.CloudConnections())
-	assert.Empty(t, cm.Cloud.Connection)
 	assert.NotContains(t, output.String(), "original-token")
 }
 

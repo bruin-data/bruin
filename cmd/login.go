@@ -46,7 +46,7 @@ func loginCommand(deps loginDependencies) *cli.Command {
 			&cli.BoolFlag{Name: cloudAuthGlobal, Usage: "Save the token in the OS credential store"},
 			&cli.BoolFlag{Name: "no-browser", Usage: "Print the authorization URL without opening a browser"},
 			&cli.BoolFlag{Name: "reauth", Usage: "Explicitly replace the selected login after browser approval"},
-			&cli.StringFlag{Name: "connection", Usage: "Bruin connection to select or create (repo only)"},
+			&cli.StringFlag{Name: "connection", Usage: "Bruin connection to create or update (repo only)"},
 			&cli.StringFlag{Name: "environment", Usage: "Environment containing the bruin connection (repo only)"},
 		}, Action: func(ctx context.Context, c *cli.Command) error { return runOAuthLogin(ctx, c, deps) }},
 	}}
@@ -274,13 +274,10 @@ func runOAuthLogin(ctx context.Context, c *cli.Command, deps loginDependencies) 
 				if err := cloudauth.CheckDestination(selected.Connection.APIURL, cloudauth.APIURL()); err != nil {
 					return err
 				}
-				if err := config.SaveCloudConnection(afero.NewOsFs(), path, expected, selected, false, ""); err != nil {
-					return err
-				}
 			} else if _, err := store.Read(cloudauth.APIURL()); err != nil {
 				return err
 			}
-			_, _ = fmt.Fprintln(output, "Existing login selected. No browser authorization was started.")
+			_, _ = fmt.Fprintln(output, "Existing login kept. No browser authorization was started.")
 			warnLoginOverride(output, target)
 			return nil
 		}
@@ -298,7 +295,7 @@ func runOAuthLogin(ctx context.Context, c *cli.Command, deps loginDependencies) 
 		if err = checkRepoLoginFile(ctx, path); err == nil {
 			selected.Connection.APIToken = credential.Token
 			selected.Connection.APIURL = credential.APIURL
-			err = config.SaveCloudConnection(afero.NewOsFs(), path, expected, selected, true, credential.DefaultTeam)
+			err = config.SaveCloudConnection(afero.NewOsFs(), path, expected, selected, credential.DefaultTeam)
 		}
 	} else {
 		err = store.Save(*credential, expected)

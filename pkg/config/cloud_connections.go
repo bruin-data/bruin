@@ -38,24 +38,6 @@ func (c *Config) CloudConnections() []CloudConnectionRef {
 
 func (c *Config) ResolveCloudConnection() (*CloudConnectionRef, error) {
 	refs := c.CloudConnections()
-	if c.Cloud != nil && (c.Cloud.Connection != "" || c.Cloud.Environment != "") {
-		var found *CloudConnectionRef
-		for _, ref := range refs {
-			if ref.Environment == c.Cloud.Environment && ref.Connection.Name == c.Cloud.Connection {
-				if found != nil {
-					return nil, errors.New("duplicate selected Bruin Cloud connection")
-				}
-				found = &ref
-			}
-		}
-		if found == nil {
-			return nil, errors.New("selected Bruin Cloud connection was not found; run 'bruin login oauth --repo'")
-		}
-		if found.Connection.APIToken == "" {
-			return nil, errors.New("selected Bruin Cloud connection has no API token")
-		}
-		return found, nil
-	}
 	switch len(refs) {
 	case 0:
 		return nil, nil
@@ -65,11 +47,11 @@ func (c *Config) ResolveCloudConnection() (*CloudConnectionRef, error) {
 		}
 		return &refs[0], nil
 	default:
-		return nil, errors.New("multiple Bruin Cloud connections found; run 'bruin login oauth --repo' to select one")
+		return nil, errors.New("multiple Bruin Cloud connections found; keep a single bruin connection for Cloud commands")
 	}
 }
 
-func SaveCloudConnection(files afero.Fs, path string, expected []byte, ref CloudConnectionRef, replace bool, team string) error {
+func SaveCloudConnection(files afero.Fs, path string, expected []byte, ref CloudConnectionRef, team string) error {
 	current, err := afero.ReadFile(files, path)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return err
@@ -89,53 +71,49 @@ func SaveCloudConnection(files afero.Fs, path string, expected []byte, ref Cloud
 	if err != nil {
 		return err
 	}
-	setScalarChild(cloud, "connection", ref.Connection.Name)
-	setScalarChild(cloud, "environment", ref.Environment)
-	if replace {
-		environments, err := cloudChildMapping(root, "environments")
-		if err != nil {
-			return err
+	environments, err := cloudChildMapping(root, "environments")
+	if err != nil {
+		return err
+	}
+	environment, err := cloudChildMapping(environments, ref.Environment)
+	if err != nil {
+		return err
+	}
+	connections, err := cloudChildMapping(environment, "connections")
+	if err != nil {
+		return err
+	}
+	bruin := mappingValue(connections, "bruin")
+	if bruin == nil {
+		bruin = &yaml.Node{Kind: yaml.SequenceNode}
+		appendMappingKey(connections, "bruin", bruin)
+	}
+	if bruin.Kind != yaml.SequenceNode {
+		return errors.New("bruin connections must be a YAML sequence")
+	}
+	var target *yaml.Node
+	for _, entry := range bruin.Content {
+		if entry.Kind != yaml.MappingNode {
+			return errors.New("bruin connection must be a YAML mapping")
 		}
-		environment, err := cloudChildMapping(environments, ref.Environment)
-		if err != nil {
-			return err
-		}
-		connections, err := cloudChildMapping(environment, "connections")
-		if err != nil {
-			return err
-		}
-		bruin := mappingValue(connections, "bruin")
-		if bruin == nil {
-			bruin = &yaml.Node{Kind: yaml.SequenceNode}
-			appendMappingKey(connections, "bruin", bruin)
-		}
-		if bruin.Kind != yaml.SequenceNode {
-			return errors.New("bruin connections must be a YAML sequence")
-		}
-		var target *yaml.Node
-		for _, entry := range bruin.Content {
-			if entry.Kind != yaml.MappingNode {
-				return errors.New("bruin connection must be a YAML mapping")
+		name := mappingValue(entry, "name")
+		if name != nil && name.Value == ref.Connection.Name {
+			if target != nil {
+				return errors.New("duplicate Bruin Cloud connection name")
 			}
-			name := mappingValue(entry, "name")
-			if name != nil && name.Value == ref.Connection.Name {
-				if target != nil {
-					return errors.New("duplicate Bruin Cloud connection name")
-				}
-				target = entry
-			}
+			target = entry
 		}
-		if target == nil {
-			target = &yaml.Node{Kind: yaml.MappingNode}
-			setScalarChild(target, "name", ref.Connection.Name)
-			bruin.Content = append(bruin.Content, target)
-		}
-		setScalarChild(target, "api_token", ref.Connection.APIToken)
-		setScalarChild(target, "api_url", ref.Connection.APIURL)
-		setScalarChild(cloud, "default_team", team)
-		if mappingValue(root, "default_environment") == nil {
-			setScalarChild(root, "default_environment", ref.Environment)
-		}
+	}
+	if target == nil {
+		target = &yaml.Node{Kind: yaml.MappingNode}
+		setScalarChild(target, "name", ref.Connection.Name)
+		bruin.Content = append(bruin.Content, target)
+	}
+	setScalarChild(target, "api_token", ref.Connection.APIToken)
+	setScalarChild(target, "api_url", ref.Connection.APIURL)
+	setScalarChild(cloud, "default_team", team)
+	if mappingValue(root, "default_environment") == nil {
+		setScalarChild(root, "default_environment", ref.Environment)
 	}
 	data, err := yaml.Marshal(&doc)
 	if err != nil {
@@ -228,13 +206,7 @@ func RemoveCloudConnection(files afero.Fs, path string, expected []byte, ref Clo
 	}
 	cloud := mappingValue(root, "cloud")
 	if cloud != nil && cloud.Kind == yaml.MappingNode {
-		connection := mappingValue(cloud, "connection")
-		environment := mappingValue(cloud, "environment")
-		if (connection == nil && environment == nil) || (connection != nil && environment != nil && connection.Value == ref.Connection.Name && environment.Value == ref.Environment) {
-			deleteMappingKey(cloud, "connection")
-			deleteMappingKey(cloud, "environment")
-			deleteMappingKey(cloud, "default_team")
-		}
+		deleteMappingKey(cloud, "default_team")
 	}
 	data, err := yaml.Marshal(&doc)
 	if err != nil {

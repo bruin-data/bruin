@@ -15,7 +15,7 @@ func TestSaveCloudConnectionPreservesConfig(t *testing.T) {
 	original := []byte("# retain this\ndefault_environment: prod\nenvironments:\n  prod:\n    connections:\n      generic:\n        - name: unrelated\n          value: ${SECRET}\n      bruin:\n        - name: existing\n          api_token: old-token\ncloud:\n  default_team: old-team\n")
 	require.NoError(t, afero.WriteFile(files, "/repo/.bruin.yml", original, 0o644))
 	ref := CloudConnectionRef{Environment: "prod", Connection: BruinCloudConnection{ConnectionMetadata: ConnectionMetadata{Name: "existing"}, APIToken: "new-token", APIURL: "https://cloud.getbruin.com/api/v1"}}
-	require.NoError(t, SaveCloudConnection(files, "/repo/.bruin.yml", original, ref, true, "acme"))
+	require.NoError(t, SaveCloudConnection(files, "/repo/.bruin.yml", original, ref, "acme"))
 	data, err := afero.ReadFile(files, "/repo/.bruin.yml")
 	require.NoError(t, err)
 	assert.Contains(t, string(data), "# retain this")
@@ -27,10 +27,13 @@ func TestSaveCloudConnectionPreservesConfig(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "new-token", selected.Connection.APIToken)
 	assert.Equal(t, "acme", loaded.GetDefaultTeam())
+	assert.Contains(t, string(data), "cloud:\n    default_team: acme\n")
+	assert.NotContains(t, string(data), "    connection:")
+	assert.NotContains(t, string(data), "    environment:")
 	info, err := files.Stat("/repo/.bruin.yml")
 	require.NoError(t, err)
 	assert.EqualValues(t, 0o600, info.Mode().Perm())
-	require.ErrorContains(t, SaveCloudConnection(files, "/repo/.bruin.yml", original, ref, true, "acme"), "changed")
+	require.ErrorContains(t, SaveCloudConnection(files, "/repo/.bruin.yml", original, ref, "acme"), "changed")
 }
 
 func TestResolveCloudConnection(t *testing.T) {
@@ -41,11 +44,11 @@ func TestResolveCloudConnection(t *testing.T) {
 	}}
 	_, err := cm.ResolveCloudConnection()
 	require.ErrorContains(t, err, "multiple")
-	cm.Cloud = &CloudConfig{Connection: "one", Environment: "dev"}
+	delete(cm.Environments, "prod")
 	ref, err := cm.ResolveCloudConnection()
 	require.NoError(t, err)
 	assert.Equal(t, "read", ref.Connection.APIToken)
-	cm.Cloud.Connection = "missing"
+	cm.Environments["dev"].Connections.BruinCloud[0].APIToken = ""
 	_, err = cm.ResolveCloudConnection()
-	require.ErrorContains(t, err, "not found")
+	require.ErrorContains(t, err, "no API token")
 }
