@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/99designs/keyring"
 	"github.com/bruin-data/bruin/pkg/cloudauth"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/spf13/afero"
@@ -210,7 +211,8 @@ func TestAuthStatusDoesNotPrintToken(t *testing.T) { //nolint:paralleltest
 
 func TestGlobalLoginOutsideBruinProject(t *testing.T) { //nolint:paralleltest
 	dir := loginTestRepo(t, "")
-	store := cloudauth.Store{Path: filepath.Join(t.TempDir(), "cloud.yml")}
+	secrets := keyring.NewArrayKeyring(nil)
+	store := cloudauth.Store{Path: filepath.Join(t.TempDir(), "cloud.yml"), Open: func() (cloudauth.SecretStore, error) { return secrets, nil }}
 	deps := loginDependencies{interactive: func() bool { return true }, globalStore: func() (cloudauth.Store, error) { return store, nil }, authorize: func(_ context.Context, target string, _ bool, _ io.Writer) (*cloudauth.Credential, error) {
 		assert.Equal(t, "global", target)
 		return &cloudauth.Credential{Token: "global-private-token", TokenID: "1", APIURL: cloudauth.DefaultAPIURL}, nil

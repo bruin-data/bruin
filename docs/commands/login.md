@@ -49,7 +49,24 @@ The `cloud` section only stores `default_team`. You can change it later with `br
 
 The file is ignored by Git and written with owner-only permissions on POSIX systems. Bruin refuses to write a token if this file is already tracked by Git. Repository tokens remain plaintext and can be read by processes running as your user. Existing unrelated configuration and environment-variable references are preserved.
 
-Global login saves the same YAML structure, including the token in `api_token`, to `$XDG_CONFIG_HOME/bruin/cloud.yml`, or `~/.config/bruin/cloud.yml` when that variable is unset. On POSIX systems, the file is written with `0600` permissions and its directory is created with `0700` permissions. Global tokens are plaintext, just like repository tokens.
+Global login uses the same YAML structure in `$XDG_CONFIG_HOME/bruin/cloud.yml`, or `~/.config/bruin/cloud.yml` when that variable is unset. Its `api_token` contains a credential-store reference instead of the token:
+
+```yaml
+default_environment: default
+environments:
+  default:
+    connections:
+      bruin:
+        - name: cloud
+          api_token: keyring://bruin-cloud-<hash>/123
+          api_url: https://cloud.getbruin.com/api/v1
+cloud:
+  default_team: acme
+```
+
+The token is stored in macOS Keychain, Windows Credential Manager, or Linux Secret Service. The reference is bound to the configuration's location and Cloud API destination. A missing or locked credential store causes an error; Bruin does not fall back to plaintext. If a development version saved a plaintext global token, run `bruin login oauth --global --reauth` to replace it with a credential-store reference.
+
+On POSIX systems, the global file is written with `0600` permissions and its directory is created with `0700` permissions.
 
 ## Credential precedence
 
@@ -75,7 +92,7 @@ bruin logout --global
 bruin logout --repo --revoke
 ```
 
-Status shows the locally selected credential source and team without displaying the token. It does not check API validity. Repository logout requires a single `bruin` connection and removes it; global logout removes its `bruin` connection from the global file. Add `--revoke` to invalidate the personal token in Cloud too. Without it, other copies of that token remain usable.
+Status shows the locally selected credential source and team without displaying the token. It does not check API validity. Repository logout requires a single `bruin` connection and removes it; global logout removes its `bruin` connection and the credential-store record. Logging out when no login exists returns an error. Add `--revoke` to invalidate the personal token in Cloud too. Without it, other copies of that token remain usable.
 
 Removing a repository login can expose a lower-priority global login. `--api-key` and environment variables are unaffected by logout.
 
