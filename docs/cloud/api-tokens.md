@@ -1,13 +1,8 @@
 # API Tokens
 
-API tokens let you talk to Bruin Cloud programmatically — from the [Bruin CLI](/commands/cloud), CI pipelines, custom scripts, the [Cloud MCP](/cloud/mcp-setup), or any external system that needs to read or trigger things in your team. Each token carries a scoped set of abilities and an expiry date, so you can hand a CI job a token that can only trigger runs without giving it permission to delete pipelines.
+For the CLI, [sign in with `bruin login oauth`](/commands/login). You do not need to create or copy a token manually.
 
-Bruin Cloud has two kinds of token:
-
-- **Team tokens** — owned by the team, act *as the team*. They carry **exactly** the abilities you grant them (they're not tied to any one person's role), which makes them the right choice for shared automation, CI/CD, and service integrations. Created and managed by team admins.
-- **Personal access tokens (PATs)** — owned by you, act *as you*. Their abilities are always clamped to your live role on each team, so a PAT can never do more than you can, and if your role is reduced the token loses those abilities immediately. Any team member can create one for their own CLI use and scripts.
-
-Both are bearer tokens and both expire.
+For CI, scripts, or other integrations, create a token in Cloud. Choose the type for your use:
 
 |  | Team token | Personal access token |
 |--|-----------|-----------------------|
@@ -30,10 +25,10 @@ Each panel lists a token's name, status (active / expiring soon / expired), abil
 2. Give it a **name** (e.g. `ci-trigger`, `mcp-cursor`, `prod-monitoring`).
 3. For a personal token, choose the **teams** it may act on (see [Team scope](#team-scope-personal-tokens)).
 4. Pick an **expiration** (see [Expiration](#expiration)).
-5. Select the **abilities** the token should have — the smallest set the consumer actually needs (see [Permissions](#permissions)).
+5. Choose an [access level](#permissions). Select **Custom** to pick individual permissions.
 6. Click **Create**.
 
-The plain-text token appears once, in a modal. Copy it now — Bruin Cloud doesn't store the plaintext and won't show it again. If you lose it, delete the token and create a new one.
+Copy the token when it appears and save it somewhere secure. You cannot view it again; if you lose it, delete it and create another.
 
 The token is used as a bearer token:
 
@@ -64,19 +59,16 @@ Once a token is within **7 days** of expiring it's flagged **Expiring soon**, an
 
 ## Permissions
 
-Abilities are grouped in the create/edit form by what they unlock. Only abilities that actually gate an API endpoint are offered, so there are no dead checkboxes. The groups:
+Choose an access level when creating or editing a token:
 
-- **Pipelines & Runs** — list/show/update/delete pipelines and assets; list, trigger, re-run, and mark the status of runs (`pipeline:list`, `pipeline:run:trigger`, `pipeline:run:re-run`, `pipeline:run:mark-as`, …).
-- **Connections** — `connection:list`, `connection:create`, `connection:delete`.
-- **AI Agents** — talk to and manage agents, threads, and connection sets (`agent:list`, `agent:message:send`, `agent:thread:export`, `connection-set:list`, …).
-- **Dashboards** — `dashboard:list`, `dashboard:create`, `dashboard:update`, `dashboard:publish`, `dashboard:delete`, …
-- **Scheduled Agents** — `scheduled-agent:list`, `scheduled-agent:manage`, …
-- **Glossary** — `glossary:entity:list`, `glossary:entity:show`.
-- **Team & Admin** — `team:update`, `audit-log:list`, and `mcp:token` (required for the [Cloud MCP](/cloud/mcp-setup)).
+| Access level | Choose it to |
+|--------------|--------------|
+| **Read only** | View pipelines, runs, dashboards, and agents. |
+| **Read & write (no delete)** | Run pipelines, chat with agents, and create or edit resources without deletion access. |
+| **Read & write** | Include deletion access for actions your role permits. |
+| **Custom** | Select individual permissions. |
 
-A team token carries exactly the abilities you tick. A personal token carries the same set clamped to your role, so the checkboxes you see depend on your permissions; if your role later drops an ability the token was created with, the token keeps working for everything else and the UI marks that ability as **Restricted**. Destructive abilities (anything with `delete`) are shown in red as a reminder.
-
-Pick the smallest set the consumer needs. See [Use cases](#use-cases) below for common combinations.
+For **Custom**, select the permissions needed by your commands or integration. See [Use cases](#use-cases) for examples.
 
 ## Edit abilities and scope
 
@@ -96,7 +88,23 @@ For a multi-team personal token, add `X-Bruin-Team: <company_prefix>` to target 
 
 ### Using a token with the CLI
 
-The [`bruin cloud`](/commands/cloud) commands work with either token type. Point them at your token with the `--api-key` flag, the `BRUIN_CLOUD_API_KEY` environment variable, or a `bruin` connection in `.bruin.yml`:
+To sign in through your browser:
+
+```bash
+bruin login oauth
+bruin cloud projects list
+```
+
+See the [login instructions](/commands/login) for repository and global login options.
+
+To use a token you already created, pass `--api-key` or set `BRUIN_CLOUD_API_KEY`:
+
+```bash
+export BRUIN_CLOUD_API_KEY="your-token-here"
+bruin cloud projects list
+```
+
+To save it for a repository, add this connection to `.bruin.yml` at the Git root:
 
 ```yaml
 # .bruin.yml
@@ -108,7 +116,7 @@ environments:
           api_token: "your-token-here"
 ```
 
-The CLI reads `.bruin.yml` from the Git repository root. Outside a repo, use `--api-key`, `BRUIN_CLOUD_API_KEY`, or a global login created by [`bruin login oauth --global`](/commands/login). Credential precedence is flag → environment variable → repository connection → global login. An invalid credential does not trigger fallback to another source.
+Run `bruin auth status` to check which login you are using. For command options, see the [Cloud command reference](/commands/cloud#authentication).
 
 If you're using a personal token scoped to more than one team, tell the CLI which team to act on with `--team <company_prefix>` (run `bruin cloud teams list` to see the prefixes), or set a default once so you can skip it:
 

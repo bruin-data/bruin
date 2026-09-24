@@ -1,6 +1,6 @@
 # `cloud` Command
 
-The `cloud` command lets you interact with [Bruin Cloud](https://cloud.getbruin.com) directly from your terminal. Instead of switching between the CLI and the web dashboard, you can list projects, check pipeline runs, diagnose failures, and even chat with AI agents — all without leaving your editor.
+Run Bruin Cloud commands from your terminal:
 
 ```bash
 bruin cloud <subcommand> [flags]
@@ -8,16 +8,25 @@ bruin cloud <subcommand> [flags]
 
 ## Authentication
 
-Every `cloud` subcommand needs an API key. Bruin resolves it in this order:
+[Sign in to Cloud](./login), then run a command:
 
-1. **`--api-key` flag** — pass it directly on the command line
-2. **`BRUIN_CLOUD_API_KEY` environment variable** — great for CI/CD
-3. **Repository `.bruin.yml` connection** — the single `bruin` connection
-4. **Global login** — a token stored in the OS credential store and referenced by the global configuration file, saved with `bruin login oauth --global`
+```bash
+bruin login oauth
+bruin cloud projects list
+```
 
-Use [`bruin login oauth`](./login) for browser-based personal-token authorization. If several repository `bruin` connections exist, supply the desired token with `--api-key` or `BRUIN_CLOUD_API_KEY`, or keep a single `bruin` connection. A present but invalid credential fails instead of falling back to another source.
+Outside a Bruin project, or to sign in across projects, use `bruin login oauth --global`.
 
-To set up the `.bruin.yml` approach, add a `bruin` connection to any environment:
+For CI or an existing API token, set `BRUIN_CLOUD_API_KEY` or pass `--api-key`:
+
+```bash
+export BRUIN_CLOUD_API_KEY="your-api-key-here"
+bruin cloud projects list
+```
+
+Authentication priority is `--api-key` → `BRUIN_CLOUD_API_KEY` → repository login → global login. Run `bruin auth status` to check which one you are using. If your repository has multiple `bruin` connections, specify the token with `--api-key` or `BRUIN_CLOUD_API_KEY`.
+
+To save an existing token for a repository, add a `bruin` connection to its `.bruin.yml`:
 
 ```yaml
 # .bruin.yml
@@ -29,10 +38,9 @@ environments:
           api_token: "your-api-key-here"
 ```
 
-Once that's in place, you can drop the `--api-key` flag entirely:
+Then run Cloud commands from that repository:
 
 ```bash
-# no --api-key needed!
 bruin cloud projects list
 ```
 
