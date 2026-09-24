@@ -11,11 +11,11 @@ bruin cloud <subcommand> [flags]
 [Sign in to Cloud](./login), then run a command:
 
 ```bash
-bruin login oauth
+bruin cloud login
 bruin cloud projects list
 ```
 
-Outside a Bruin project, or to sign in across projects, use `bruin login oauth --global`.
+Outside a Bruin project, or to sign in across projects, use `bruin cloud login --global`.
 
 For CI or an existing API token, set `BRUIN_CLOUD_API_KEY` or pass `--api-key`:
 
@@ -46,7 +46,7 @@ bruin cloud projects list
 
 ## Global Flags
 
-These flags are available on all `cloud` subcommands:
+These flags are available on Cloud API subcommands. `cloud login` has its own [login options](./login#options).
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
@@ -55,6 +55,16 @@ These flags are available on all `cloud` subcommands:
 | `--output`, `-o` | str | `plain` | Output format: `plain` or `json`. Use `json` for scripting. |
 
 ## Subcommands
+
+### `login`
+
+Sign in through your browser:
+
+```bash
+bruin cloud login
+```
+
+See the [login instructions](./login) for repository and global login options.
 
 ### `teams`
 

@@ -28,7 +28,7 @@ type loginDependencies struct {
 	interactive func() bool
 }
 
-func Login() *cli.Command {
+func CloudLogin() *cli.Command {
 	return loginCommand(loginDependencies{
 		globalStore: cloudauth.DefaultStore,
 		authorize: func(ctx context.Context, target string, noBrowser bool, writer io.Writer) (*cloudauth.Credential, error) {
@@ -40,16 +40,19 @@ func Login() *cli.Command {
 }
 
 func loginCommand(deps loginDependencies) *cli.Command {
-	return &cli.Command{Name: "login", Usage: "Sign in to Bruin Cloud", Commands: []*cli.Command{
-		{Name: "oauth", Usage: "Create a personal token through browser authorization", Flags: []cli.Flag{
+	return &cli.Command{
+		Name:  "login",
+		Usage: "Sign in to Bruin Cloud",
+		Flags: []cli.Flag{
 			&cli.BoolFlag{Name: "repo", Usage: "Save a bruin connection in this Bruin project repository"},
 			&cli.BoolFlag{Name: cloudAuthGlobal, Usage: "Save the token in the OS credential store"},
 			&cli.BoolFlag{Name: "no-browser", Usage: "Print the authorization URL without opening a browser"},
 			&cli.BoolFlag{Name: "reauth", Usage: "Explicitly replace the selected login after browser approval"},
 			&cli.StringFlag{Name: "connection", Usage: "Bruin connection to create or update (repo only)"},
 			&cli.StringFlag{Name: "environment", Usage: "Environment containing the bruin connection (repo only)"},
-		}, Action: func(ctx context.Context, c *cli.Command) error { return runOAuthLogin(ctx, c, deps) }},
-	}}
+		},
+		Action: func(ctx context.Context, c *cli.Command) error { return runOAuthLogin(ctx, c, deps) },
+	}
 }
 
 type loginPrompt struct {
@@ -166,7 +169,7 @@ func runOAuthLogin(ctx context.Context, c *cli.Command, deps loginDependencies) 
 		return errors.New("--repo and --global cannot be used together")
 	}
 	if c.Args().Present() {
-		return errors.New("unexpected argument; use 'bruin login oauth --help'")
+		return errors.New("unexpected argument; use 'bruin cloud login --help'")
 	}
 	input := c.Root().Reader
 	if input == nil {

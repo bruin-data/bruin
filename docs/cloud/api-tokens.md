@@ -1,6 +1,6 @@
 # API Tokens
 
-For the CLI, [sign in with `bruin login oauth`](/commands/login). You do not need to create or copy a token manually.
+For the CLI, [sign in with `bruin cloud login`](/commands/login). You do not need to create or copy a token manually.
 
 For CI, scripts, or other integrations, create a token in Cloud. Choose the type for your use:
 
@@ -91,7 +91,7 @@ For a multi-team personal token, add `X-Bruin-Team: <company_prefix>` to target 
 To sign in through your browser:
 
 ```bash
-bruin login oauth
+bruin cloud login
 bruin cloud projects list
 ```
 

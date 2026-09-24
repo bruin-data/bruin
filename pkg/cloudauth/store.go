@@ -195,7 +195,7 @@ func (s Store) key(tokenID, apiURL string) (string, error) {
 
 func (s Store) validateReference(credential *Credential) error {
 	if credential.key == "" || credential.TokenID == "" || credential.APIURL == "" {
-		return errors.New("global login requires a credential-store reference; run 'bruin login oauth --global --reauth'")
+		return errors.New("global login requires a credential-store reference; run 'bruin cloud login --global --reauth'")
 	}
 	expected, err := s.key(credential.TokenID, credential.APIURL)
 	if err != nil {
