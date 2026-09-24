@@ -3,6 +3,7 @@ package mask
 import (
 	"bytes"
 	"encoding/base64"
+	"math/rand"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -219,9 +220,8 @@ func TestWriterLongSecretSplitAcrossWrites(t *testing.T) {
 	}
 }
 
-// TestWriterSecretStartOnlyNotEmitted covers the exact reported case: a write
-// holding only the start of a secret must emit nothing until the rest arrives,
-// because the retained window is maxLen-1 (the longest form's length).
+// A write holding only the start of a secret must emit nothing until the rest
+// arrives: the whole buffer is a form prefix, so it is held back.
 func TestWriterSecretStartOnlyNotEmitted(t *testing.T) {
 	t.Parallel()
 	secret := "abcdefghijklmnopqrstuvwxyz0123456789ABCD" // 40 bytes
@@ -599,5 +599,180 @@ func TestMaskConnectionEndToEnd(t *testing.T) {
 		if !strings.Contains(out, visible) {
 			t.Errorf("expected %q visible in:\n%s", visible, out)
 		}
+	}
+}
+
+// saJSON stands in for a service-account file, which SensitiveValues reads
+// whole: a multi-kilobyte secret whose base64 form is larger still.
+const saJSON = `{"type":"service_account","project_id":"analytics-12345",` +
+	`"private_key":"-----BEGIN PRIVATE KEY-----\n` +
+	"MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7VJTUt9Us8cKj" +
+	"MzEfYyjiWA4R4M2bS1GB4t7NXp98C3SC6dVMvDuictGeurT8jNbvJZHtCSuYEvu" +
+	"NMoSfm76oqFvAp8Gy0iz5sxjZmSnXyCdPEovGhLa0VzMaQ8sCLOyS56YyCFGeJZ" +
+	"qgtzJ6GR3eqoYSW9b9UMvkBpZODSctWSNGj3P7jRFDO5VoTwCQAWbFnOjDfH5Ul" +
+	"gp2PKSQnSJP3AJLQNFNe7br1XbrhVeOt51mIpGSDCUv3E0DDFcWDTH9cXDTTlRZ" +
+	"VEiR2BwpZOOkEZ0BVnhZYL71oZV34bKfWjQIt6VisSMahdsAASACp4ZTGtwiVuN" +
+	`\n-----END PRIVATE KEY-----\n","client_email":"runner@analytics-12345.iam.gserviceaccount.com"}`
+
+// Output that cannot start a secret must reach the sink on the write that
+// produced it, however large the secrets are.
+func TestWriterEmitsOrdinaryOutputImmediately(t *testing.T) {
+	t.Parallel()
+	r := New([]string{saJSON})
+	var buf bytes.Buffer
+	w := r.Writer(&buf)
+
+	const line = "Info: Sensor didn't return the expected result, waiting for 30 seconds\n"
+	if _, err := w.Write([]byte(line)); err != nil {
+		t.Fatal(err)
+	}
+	if buf.String() != line {
+		t.Fatalf("line withheld or altered: emitted %d of %d bytes: %q",
+			buf.Len(), len(line), buf.String())
+	}
+}
+
+// Wherever the write boundaries fall, no secret survives and the surrounding
+// text stays intact.
+func TestWriterNoLeakUnderArbitraryChunking(t *testing.T) {
+	t.Parallel()
+	secrets := []string{saJSON, "hunter2password", "sk-abc123XYZdef456"}
+	r := New(secrets)
+	rng := rand.New(rand.NewSource(7)) //nolint:gosec // G404: deterministic chunking for the test, not cryptographic.
+
+	for iter := range 200 {
+		full := "start " + secrets[iter%len(secrets)] + " middle " +
+			secrets[(iter+1)%len(secrets)] + " end\n"
+		var buf bytes.Buffer
+		w := r.Writer(&buf)
+		for i := 0; i < len(full); {
+			n := 1 + rng.Intn(64)
+			if i+n > len(full) {
+				n = len(full) - i
+			}
+			if _, err := w.Write([]byte(full[i : i+n])); err != nil {
+				t.Fatal(err)
+			}
+			i += n
+		}
+		if err := w.Flush(); err != nil {
+			t.Fatal(err)
+		}
+		got := buf.String()
+		for _, secret := range secrets {
+			if strings.Contains(got, secret) {
+				t.Fatalf("iter %d: secret leaked: %q", iter, got)
+			}
+		}
+		if !strings.HasPrefix(got, "start ") || !strings.HasSuffix(got, " end\n") {
+			t.Fatalf("iter %d: surrounding text mangled: %q", iter, got)
+		}
+	}
+}
+
+// TestPendingPrefix checks the retained length directly.
+func TestPendingPrefix(t *testing.T) {
+	t.Parallel()
+	r := New([]string{"abcdefghij"})
+	tests := []struct {
+		name string
+		in   string
+		want int
+	}{
+		{"no overlap", "ordinary log line\n", 0},
+		{"whole buffer is a prefix", "abcde", 5},
+		{"prefix at the tail", "log line abc", 3},
+		{"single leading byte", "log line a", 1},
+		{"complete secret is masked, not retained", "log " + Mask, 0},
+		{"prefix-looking bytes in the middle only", "abc middle\n", 0},
+		{"empty", "", 0},
+	}
+	for _, tt := range tests {
+		if got := r.pendingPrefix([]byte(tt.in)); got != tt.want {
+			t.Errorf("%s: pendingPrefix(%q) = %d, want %d", tt.name, tt.in, got, tt.want)
+		}
+	}
+}
+
+// No complete secret may appear in the output, for any secrets, surrounding
+// text, or write boundaries.
+func TestNoSecretSurvivesAnyChunking(t *testing.T) {
+	rng := rand.New(rand.NewSource(1))
+	alphabet := "ab{%\n\x00\xff Xz="
+	randStr := func(n int) string {
+		var b strings.Builder
+		for range n {
+			b.WriteByte(alphabet[rng.Intn(len(alphabet))])
+		}
+		return b.String()
+	}
+
+	for iter := range 4000 {
+		nSecrets := 1 + rng.Intn(3)
+		var secrets []string
+		for range nSecrets {
+			secrets = append(secrets, randStr(1+rng.Intn(12)))
+		}
+		r := New(secrets)
+
+		var full strings.Builder
+		for range 1 + rng.Intn(6) {
+			full.WriteString(randStr(rng.Intn(20)))
+			full.WriteString(secrets[rng.Intn(len(secrets))])
+		}
+		full.WriteString(randStr(rng.Intn(20)))
+		text := full.String()
+
+		var out bytes.Buffer
+		w := r.Writer(&out)
+		for i := 0; i < len(text); {
+			n := 1 + rng.Intn(7)
+			if i+n > len(text) {
+				n = len(text) - i
+			}
+			if _, err := w.Write([]byte(text[i : i+n])); err != nil {
+				t.Fatal(err)
+			}
+			i += n
+		}
+		if err := w.Flush(); err != nil {
+			t.Fatal(err)
+		}
+		for _, secret := range secrets {
+			if strings.Contains(out.String(), secret) {
+				t.Fatalf("iter %d: secret %q survived\ninput    %q\nstreamed %q",
+					iter, secret, text, out.String())
+			}
+		}
+	}
+}
+
+// The retained buffer must stay bounded however much passes through.
+func TestBufferStaysBounded(t *testing.T) {
+	r := New([]string{strings.Repeat("S", 500)})
+	w := r.Writer(&bytes.Buffer{})
+	for range 2000 {
+		if _, err := w.Write([]byte("SSSSSSSSSS ordinary log line SSSS\n")); err != nil {
+			t.Fatal(err)
+		}
+		if len(w.buf) > r.maxLen {
+			t.Fatalf("buffer grew to %d, above maxLen %d", len(w.buf), r.maxLen)
+		}
+	}
+}
+
+// An empty masker must not panic through the writer path.
+func TestEmptyMaskerWriter(t *testing.T) {
+	r := New(nil)
+	var out bytes.Buffer
+	w := r.Writer(&out)
+	if _, err := w.Write([]byte("hello\n")); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	if out.String() != "hello\n" {
+		t.Fatalf("got %q", out.String())
 	}
 }

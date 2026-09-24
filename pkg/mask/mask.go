@@ -3,6 +3,7 @@
 package mask
 
 import (
+	"bytes"
 	"encoding/base64"
 	"io"
 	"net/url"
@@ -192,6 +193,10 @@ func (c *collector) readSecretFile(path string) {
 type Masker struct {
 	ordered []string // all secret forms, longest-first
 	maxLen  int      // length of the longest form
+	// Forms indexed by first byte, plus the same membership test as a 256-bit
+	// bitmap: 32 cached bytes, where indexing the slice array costs a miss.
+	byFirstByte  [256][][]byte
+	firstByteSet [4]uint64
 }
 
 // New builds a Masker from raw secret values, expanding each into the forms
@@ -214,7 +219,12 @@ func New(values []string) *Masker {
 	if len(ordered) > 0 {
 		maxLen = len(ordered[0])
 	}
-	return &Masker{ordered: ordered, maxLen: maxLen}
+	m := &Masker{ordered: ordered, maxLen: maxLen}
+	for _, f := range ordered {
+		m.byFirstByte[f[0]] = append(m.byFirstByte[f[0]], []byte(f))
+		m.firstByteSet[f[0]>>6] |= 1 << (f[0] & 63)
+	}
+	return m
 }
 
 // Empty reports whether there is nothing to mask.
@@ -233,14 +243,36 @@ func (r *Masker) Mask(s string) string {
 	return s
 }
 
+// pendingPrefix returns how many trailing bytes of s must be held back: the
+// longest suffix that is a proper prefix of a form, i.e. a half-arrived secret.
+func (r *Masker) pendingPrefix(s []byte) int {
+	start := 0
+	if len(s) > r.maxLen-1 {
+		start = len(s) - (r.maxLen - 1)
+	}
+	for i := start; i < len(s); i++ {
+		if c := s[i]; r.firstByteSet[c>>6]&(1<<(c&63)) == 0 {
+			continue
+		}
+		suffix := s[i:]
+		for _, f := range r.byFirstByte[s[i]] {
+			// A suffix equal to a whole form was already replaced by Mask.
+			if len(f) > len(suffix) && bytes.HasPrefix(f, suffix) {
+				return len(suffix)
+			}
+		}
+	}
+	return 0
+}
+
 // Writer wraps w in a masking writer. Call Flush once writing is done to emit
 // the retained trailing bytes.
 func (r *Masker) Writer(w io.Writer) *LineWriter {
 	return &LineWriter{r: r, w: w}
 }
 
-// LineWriter masks output, always holding back a trailing window the width of the
-// longest secret form so a secret split across writes is masked whole, not leaked.
+// LineWriter masks output, holding back only trailing bytes that could start a
+// secret so a secret split across writes is masked whole, not leaked.
 type LineWriter struct {
 	r   *Masker
 	w   io.Writer
@@ -252,13 +284,10 @@ func (lw *LineWriter) Write(p []byte) (int, error) {
 	lw.mu.Lock()
 	defer lw.mu.Unlock()
 	lw.buf = append(lw.buf, p...)
-	// Mask the whole buffer and emit all but a trailing window that could still be
-	// the start of a later secret. Retained bytes are masked; Mask is idempotent.
+	// Mask first: a split point chosen on raw bytes can fall inside a finished
+	// secret and emit its leading half. Retained bytes are masked; Mask is idempotent.
 	masked := []byte(lw.r.Mask(string(lw.buf)))
-	keep := lw.r.maxLen - 1
-	if keep < 0 {
-		keep = 0
-	}
+	keep := lw.r.pendingPrefix(masked)
 	if len(masked) > keep {
 		if _, err := lw.w.Write(masked[:len(masked)-keep]); err != nil {
 			return 0, err
