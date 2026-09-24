@@ -697,6 +697,7 @@ func TestPendingPrefix(t *testing.T) {
 // No complete secret may appear in the output, for any secrets, surrounding
 // text, or write boundaries.
 func TestNoSecretSurvivesAnyChunking(t *testing.T) {
+	t.Parallel()
 	rng := rand.New(rand.NewSource(1))
 	alphabet := "ab{%\n\x00\xff Xz="
 	randStr := func(n int) string {
@@ -709,7 +710,7 @@ func TestNoSecretSurvivesAnyChunking(t *testing.T) {
 
 	for iter := range 4000 {
 		nSecrets := 1 + rng.Intn(3)
-		var secrets []string
+		secrets := make([]string, 0, nSecrets)
 		for range nSecrets {
 			secrets = append(secrets, randStr(1+rng.Intn(12)))
 		}
@@ -749,6 +750,7 @@ func TestNoSecretSurvivesAnyChunking(t *testing.T) {
 
 // The retained buffer must stay bounded however much passes through.
 func TestBufferStaysBounded(t *testing.T) {
+	t.Parallel()
 	r := New([]string{strings.Repeat("S", 500)})
 	w := r.Writer(&bytes.Buffer{})
 	for range 2000 {
@@ -763,6 +765,7 @@ func TestBufferStaysBounded(t *testing.T) {
 
 // An empty masker must not panic through the writer path.
 func TestEmptyMaskerWriter(t *testing.T) {
+	t.Parallel()
 	r := New(nil)
 	var out bytes.Buffer
 	w := r.Writer(&out)
