@@ -52,10 +52,10 @@
         "$ref": "#/$defs/segment"
       }
     },
-    "notes": {
+    "notebooks": {
       "type": "array",
       "items": {
-        "$ref": "#/$defs/note"
+        "$ref": "#/$defs/notebook"
       }
     }
   },
@@ -78,7 +78,7 @@
       },
       "additionalProperties": false
     },
-    "note": {
+    "notebook": {
       "type": "object",
       "required": ["id", "dimensions"],
       "properties": {
@@ -89,7 +89,7 @@
         "dimensions": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/noteDimension"
+            "$ref": "#/$defs/notebookDimension"
           }
         }
       },
@@ -98,7 +98,7 @@
       },
       "additionalProperties": false
     },
-    "noteDimension": {
+    "notebookDimension": {
       "type": "object",
       "required": ["name"],
       "properties": {
@@ -109,12 +109,12 @@
         "required": {
           "type": "boolean",
           "default": false,
-          "description": "Whether this dimension must be selected when creating a note."
+          "description": "Whether this dimension must be selected when creating a notebook."
         },
         "multiselect": {
           "type": "boolean",
           "default": false,
-          "description": "Whether the note may target multiple values of this dimension."
+          "description": "Whether the notebook may target multiple values of this dimension."
         }
       },
       "patternProperties": {

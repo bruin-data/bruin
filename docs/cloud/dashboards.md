@@ -215,17 +215,17 @@ queries:
 
 Applied filter values are stored in the dashboard URL, so a shared link opens with the same filter state. For all filter fields and date presets, see the [DAC filter documentation](https://getbruin.com/docs/dac/dashboards/filters.html).
 
-## Notes
+## Notebooks
 
-Notes add human context to dashboard data. A note can apply to the whole dashboard, a widget, a table row, or a chart point, depending on the dimensions selected when it is created. Use the **Notes** button in the dashboard toolbar to browse and filter all notes, or use a note icon on a widget to work with notes in that widget's context.
+Notebooks add human context to dashboard data. A notebook can apply to the whole dashboard, a widget, a table row, or a chart point, depending on the dimensions selected when it is created. Use the **Notebooks** button in the dashboard toolbar to browse and filter all notebooks, or use a notebook icon on a widget to work with notebooks in that widget's context.
 
-Before users can write a note, its reusable definition must exist in the dashboard YAML. Define notes at the top level and reference their IDs from the widgets where they should be available:
+Before users can write a notebook, its reusable definition must exist in the dashboard YAML. Define notebooks at the top level and reference their IDs from the widgets where they should be available:
 
 ```yaml
 name: Revenue overview
 connection: warehouse
 
-notes:
+notebooks:
   - id: revenue_context
     dimensions:
       - name: region
@@ -249,14 +249,14 @@ rows:
         name: Revenue by region
         type: table
         query: revenue_by_region
-        notes:
+        notebooks:
           - revenue_context
           - channel_context
 ```
 
-Each definition has a unique `id` and a `dimensions` list. Dimension values are optional and single-select by default. Set `required: true` when a value must be selected, and `multiselect: true` when the note may target multiple values. Note content is written in the dashboard UI.
+Each definition has a unique `id` and a `dimensions` list. Dimension values are optional and single-select by default. Set `required: true` when a value must be selected, and `multiselect: true` when the notebook may target multiple values. Notebook content is written in the dashboard UI.
 
-Widgets can also reference note definitions from their resolved [semantic model](/core-concepts/semantic-layer). Define the reusable note alongside the model's dimensions and metrics:
+Widgets can also reference notebook definitions from their resolved [semantic model](/core-concepts/semantic-layer). Define the reusable notebook alongside the model's dimensions and metrics:
 
 ```yaml
 # semantic/sales.yml
@@ -274,8 +274,8 @@ metrics:
   - name: revenue
     expression: sum(revenue)
 
-notes:
-  - id: region_note
+notebooks:
+  - id: region_context
     dimensions:
       - name: region
         required: true
@@ -295,12 +295,12 @@ rows:
         model: sales
         dimensions: [{ name: region }]
         metrics: [revenue]
-        notes: [region_note]
+        notebooks: [region_context]
 ```
 
-The model is resolved from the named query, widget, or dashboard-level `model`. Without a resolved model, only dashboard-level note definitions are available.
+The model is resolved from the named query, widget, or dashboard-level `model`. Without a resolved model, only dashboard-level notebook definitions are available.
 
-Dashboard changes are saved as a draft. After adding or changing a note definition, publish the dashboard before trying to create notes with it.
+Dashboard changes are saved as a draft. After adding or changing a notebook definition, publish the dashboard before trying to create notebooks with it.
 
 ## Threads and chat history
 
