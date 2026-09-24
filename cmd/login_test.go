@@ -20,6 +20,7 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
+//nolint:paralleltest
 func TestCloudLoginCommand(t *testing.T) {
 	for _, tc := range []struct {
 		name      string
