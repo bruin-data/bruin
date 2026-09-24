@@ -154,7 +154,7 @@ func cloudConfigFilePath() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return path2.Join(repoRoot.Path, ".bruin.yml"), nil
+	return filepath.Join(repoRoot.Path, ".bruin.yml"), nil
 }
 
 // loadCloudConfig reads the CLI config without creating it. Used on the read
