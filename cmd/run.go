@@ -1371,7 +1371,10 @@ func Run(isDebug *bool) *cli.Command {
 			if pipelineInfo.ValidateOnlyAssetLevel {
 				checkLint = CheckLintAssetOnly
 			}
-			if err := Validate(shouldValidate, s, checkLint, runCtx, pipelineInfo.Pipeline, inputPath, logger); err != nil {
+			assetsToValidate := getPendingAssets(s)
+			validationCtx := context.WithValue(runCtx, lint.AssetsToValidateKey, assetsToValidate)
+			validationCtx = context.WithValue(validationCtx, lint.AssetWithExcludeTagCountKey, len(foundPipeline.Assets)-len(assetsToValidate))
+			if err := Validate(shouldValidate, s, checkLint, validationCtx, pipelineInfo.Pipeline, inputPath, logger); err != nil {
 				return err
 			}
 

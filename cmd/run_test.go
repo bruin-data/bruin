@@ -11,6 +11,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/executor"
+	"github.com/bruin-data/bruin/pkg/lint"
 	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -1679,6 +1680,44 @@ func TestCheckLintFunc(t *testing.T) {
 
 			err := CheckLint(ctx, tt.foundPipeline, tt.pipelinePath, logger, false)
 			require.NoError(t, err, "Expected no error but got one")
+		})
+	}
+}
+
+func TestRunValidation_SelectedAssets(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name      string
+		filter    Filter
+		wantError bool
+	}{
+		{name: "include tag", filter: Filter{IncludeTag: "discovery"}},
+		{name: "exclude tag", filter: Filter{ExcludeTag: "post-extract"}},
+		{name: "multiple exclude tags", filter: Filter{ExcludeTags: []string{"post-extract", "unused"}}},
+		{name: "both filters", filter: Filter{IncludeTag: "discovery", ExcludeTag: "post-extract"}},
+		{name: "selected invalid asset", filter: Filter{IncludeTag: "post-extract"}, wantError: true},
+		{name: "unfiltered pipeline", wantError: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			discovery := &pipeline.Asset{Name: "discovery", Type: pipeline.AssetTypeDuckDBQuery, Tags: []string{"discovery"}}
+			postExtract := &pipeline.Asset{
+				Name: "post_extract", Type: pipeline.AssetTypeDuckDBQuery, Tags: []string{"post-extract"},
+				Upstreams: []pipeline.Upstream{{Type: "asset", Value: "generated_asset"}},
+			}
+			p := &pipeline.Pipeline{Name: "repro", Concurrency: 1, Assets: []*pipeline.Asset{discovery, postExtract}}
+			log := zap.NewNop().Sugar()
+			s := scheduler.NewScheduler(log, p, "test-run")
+			require.NoError(t, ApplyAllFilters(t.Context(), &tt.filter, s, p))
+			ctx := context.WithValue(t.Context(), lint.AssetsToValidateKey, getPendingAssets(s))
+			err := Validate(true, s, CheckLint, ctx, p, t.TempDir(), log)
+			if tt.wantError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Len(t, p.Assets, 2)
 		})
 	}
 }

@@ -806,6 +806,50 @@ func TestPipelineAnalysisResult_ErrorCount(t *testing.T) {
 	}
 }
 
+func TestRunLintRulesOnPipeline_SelectedAssets(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name       string
+		selected   []int
+		scoped     bool
+		wantIssues int
+	}{
+		{name: "selected asset can reference excluded upstream", scoped: true, selected: []int{0}},
+		{name: "excluded upstream is still checked when selected", scoped: true, selected: []int{1}, wantIssues: 1},
+		{name: "empty selection", scoped: true},
+		{name: "standalone validation checks all assets", wantIssues: 1},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			p := &pipeline.Pipeline{Assets: []*pipeline.Asset{
+				{Name: "selected", Upstreams: []pipeline.Upstream{{Type: "asset", Value: "excluded"}}},
+				{Name: "excluded", Upstreams: []pipeline.Upstream{{Type: "asset", Value: "missing"}}},
+			}}
+			ctx := t.Context()
+			if tt.scoped {
+				assets := make([]*pipeline.Asset, 0, len(tt.selected))
+				for _, i := range tt.selected {
+					assets = append(assets, p.Assets[i])
+				}
+				ctx = context.WithValue(ctx, AssetsToValidateKey, assets)
+			}
+			rule := &SimpleRule{
+				Identifier:       "dependency-exists",
+				ApplicableLevels: []Level{LevelAsset},
+				AssetValidator:   EnsureDependencyExistsForASingleAsset,
+			}
+			result, err := RunLintRulesOnPipeline(ctx, p, []Rule{rule}, nil)
+			require.NoError(t, err)
+			require.Len(t, result.Issues[rule], tt.wantIssues)
+			if tt.wantIssues > 0 {
+				assert.Equal(t, "Dependency 'missing' does not exist", result.Issues[rule][0].Description)
+			}
+			assert.Len(t, p.Assets, 2)
+		})
+	}
+}
+
 func TestRunLintRulesOnPipeline_ExcludeTag(t *testing.T) {
 	t.Parallel()
 
