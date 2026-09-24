@@ -12,21 +12,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type memorySecrets struct{ values map[string]keyring.Item }
-
-func (s memorySecrets) Get(key string) (keyring.Item, error) {
-	item, ok := s.values[key]
-	if !ok {
-		return item, keyring.ErrKeyNotFound
-	}
-	return item, nil
-}
-func (s memorySecrets) Set(item keyring.Item) error { s.values[item.Key] = item; return nil }
-func (s memorySecrets) Remove(key string) error     { delete(s.values, key); return nil }
-
 func TestGlobalStore(t *testing.T) {
 	t.Parallel()
-	secrets := memorySecrets{values: map[string]keyring.Item{}}
+	secrets := keyring.NewArrayKeyring(nil)
 	store := Store{Path: filepath.Join(t.TempDir(), "bruin", "cloud.yml"), Open: func() (SecretStore, error) { return secrets, nil }}
 	credential := Credential{Token: "private-token", TokenID: "123", APIURL: DefaultAPIURL, ExpiresAt: time.Now().Add(time.Hour), DefaultTeam: "acme"}
 	require.NoError(t, store.Save(credential, nil))
@@ -46,7 +34,9 @@ func TestGlobalStore(t *testing.T) {
 	credential.TokenID = "456"
 	credential.Token = "replacement"
 	require.NoError(t, store.Save(credential, data))
-	assert.Len(t, secrets.values, 1)
+	keys, err := secrets.Keys()
+	require.NoError(t, err)
+	assert.Len(t, keys, 1)
 	loaded, err = store.Read(DefaultAPIURL)
 	require.NoError(t, err)
 	assert.Equal(t, "replacement", loaded.Token)
@@ -54,7 +44,7 @@ func TestGlobalStore(t *testing.T) {
 
 func TestGlobalSaveFailureKeepsPreviousCredential(t *testing.T) {
 	t.Parallel()
-	secrets := memorySecrets{values: map[string]keyring.Item{}}
+	secrets := keyring.NewArrayKeyring(nil)
 	store := Store{Path: filepath.Join(t.TempDir(), "cloud.yml"), Open: func() (SecretStore, error) { return secrets, nil }}
 	require.NoError(t, store.Save(Credential{Token: "old", TokenID: "1", APIURL: DefaultAPIURL}, nil))
 	err := store.Save(Credential{Token: "new", TokenID: "2", APIURL: DefaultAPIURL}, nil)
@@ -62,7 +52,9 @@ func TestGlobalSaveFailureKeepsPreviousCredential(t *testing.T) {
 	loaded, err := store.Read(DefaultAPIURL)
 	require.NoError(t, err)
 	assert.Equal(t, "old", loaded.Token)
-	assert.Len(t, secrets.values, 1)
+	keys, err := secrets.Keys()
+	require.NoError(t, err)
+	assert.Len(t, keys, 1)
 	store.Open = func() (SecretStore, error) { return nil, errors.New("locked") }
 	_, err = store.Read(DefaultAPIURL)
 	require.ErrorContains(t, err, "locked")
@@ -70,13 +62,15 @@ func TestGlobalSaveFailureKeepsPreviousCredential(t *testing.T) {
 
 func TestGlobalStoreUnavailableAndExpired(t *testing.T) {
 	t.Parallel()
-	secrets := memorySecrets{values: map[string]keyring.Item{}}
+	secrets := keyring.NewArrayKeyring(nil)
 	store := Store{Path: filepath.Join(t.TempDir(), "cloud.yml"), Open: func() (SecretStore, error) { return secrets, nil }}
 	require.NoError(t, store.Save(Credential{Token: "secret", TokenID: "1", APIURL: DefaultAPIURL, ExpiresAt: time.Now().Add(-time.Hour)}, nil))
 	_, err := store.Read(DefaultAPIURL)
 	require.ErrorContains(t, err, "expired")
 	require.NoError(t, store.Delete())
-	assert.Empty(t, secrets.values)
+	keys, err := secrets.Keys()
+	require.NoError(t, err)
+	assert.Empty(t, keys)
 	_, err = os.Stat(store.Path)
 	require.ErrorIs(t, err, os.ErrNotExist)
 	store.Open = func() (SecretStore, error) { return nil, errors.New("unavailable") }
@@ -87,7 +81,7 @@ func TestGlobalStoreUnavailableAndExpired(t *testing.T) {
 
 func TestCopiedGlobalConfigurationCanBeReauthenticated(t *testing.T) {
 	t.Parallel()
-	secrets := memorySecrets{values: map[string]keyring.Item{}}
+	secrets := keyring.NewArrayKeyring(nil)
 	original := Store{Path: filepath.Join(t.TempDir(), "cloud.yml"), Open: func() (SecretStore, error) { return secrets, nil }}
 	require.NoError(t, original.Save(Credential{Token: "original", TokenID: "1", APIURL: DefaultAPIURL}, nil))
 	data, err := os.ReadFile(original.Path)
