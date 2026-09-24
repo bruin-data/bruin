@@ -63,6 +63,7 @@ func TestResolveAPIKey_EnvVarFallback(t *testing.T) {
 }
 
 func TestResolveAPIKey_NoKeyError(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	t.Setenv("BRUIN_CLOUD_API_KEY", "")
 
 	// Run from a temp directory so resolveAPIKey can't find a .bruin.yml in the repo.
@@ -166,6 +167,7 @@ environments:
 // an empty yaml to omit the config file entirely.
 func writeTempConfigRepo(t *testing.T, bruinYML string) string {
 	t.Helper()
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	dir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".git"), 0o755))
 	if bruinYML != "" {

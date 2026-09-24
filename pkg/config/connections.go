@@ -2311,6 +2311,7 @@ func (c PlusVibeAIConnection) GetName() string {
 type BruinCloudConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	APIToken           string `yaml:"api_token,omitempty" json:"api_token" mapstructure:"api_token" sensitive:"true"`
+	APIURL             string `yaml:"api_url,omitempty" json:"api_url,omitempty" mapstructure:"api_url"`
 }
 
 func (c BruinCloudConnection) GetName() string {

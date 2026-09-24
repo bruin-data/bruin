@@ -581,6 +581,9 @@
         },
         "api_token": {
           "type": "string"
+        },
+        "api_url": {
+          "type": "string"
         }
       },
       "additionalProperties": false,
