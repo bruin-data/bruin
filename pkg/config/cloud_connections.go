@@ -59,29 +59,39 @@ func SaveCloudConnection(files afero.Fs, path string, expected []byte, ref Cloud
 	if !bytes.Equal(current, expected) {
 		return errors.New("configuration changed during login; retry without overwriting the changes")
 	}
-	var doc yaml.Node
-	if err := yaml.Unmarshal(current, &doc); err != nil {
-		return errors.New("cannot update invalid YAML configuration")
-	}
-	if len(doc.Content) > 0 && doc.Content[0].Kind != yaml.MappingNode {
-		return errors.New("configuration must be a YAML mapping")
-	}
-	root := documentMapping(&doc)
-	cloud, err := cloudChildMapping(root, "cloud")
+	data, err := MarshalCloudConnection(current, ref, team)
 	if err != nil {
 		return err
+	}
+	if err := ensureConfigIsInGitignore(files, path); err != nil {
+		return err
+	}
+	return WriteCloudFile(files, path, expected, data)
+}
+
+func MarshalCloudConnection(current []byte, ref CloudConnectionRef, team string) ([]byte, error) {
+	var doc yaml.Node
+	if err := yaml.Unmarshal(current, &doc); err != nil {
+		return nil, errors.New("cannot update invalid YAML configuration")
+	}
+	if len(doc.Content) > 0 && doc.Content[0].Kind != yaml.MappingNode {
+		return nil, errors.New("configuration must be a YAML mapping")
+	}
+	root := documentMapping(&doc)
+	if mappingValue(root, "default_environment") == nil {
+		setScalarChild(root, "default_environment", ref.Environment)
 	}
 	environments, err := cloudChildMapping(root, "environments")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	environment, err := cloudChildMapping(environments, ref.Environment)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	connections, err := cloudChildMapping(environment, "connections")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	bruin := mappingValue(connections, "bruin")
 	if bruin == nil {
@@ -89,17 +99,17 @@ func SaveCloudConnection(files afero.Fs, path string, expected []byte, ref Cloud
 		appendMappingKey(connections, "bruin", bruin)
 	}
 	if bruin.Kind != yaml.SequenceNode {
-		return errors.New("bruin connections must be a YAML sequence")
+		return nil, errors.New("bruin connections must be a YAML sequence")
 	}
 	var target *yaml.Node
 	for _, entry := range bruin.Content {
 		if entry.Kind != yaml.MappingNode {
-			return errors.New("bruin connection must be a YAML mapping")
+			return nil, errors.New("bruin connection must be a YAML mapping")
 		}
 		name := mappingValue(entry, "name")
 		if name != nil && name.Value == ref.Connection.Name {
 			if target != nil {
-				return errors.New("duplicate Bruin Cloud connection name")
+				return nil, errors.New("duplicate Bruin Cloud connection name")
 			}
 			target = entry
 		}
@@ -111,18 +121,12 @@ func SaveCloudConnection(files afero.Fs, path string, expected []byte, ref Cloud
 	}
 	setScalarChild(target, "api_token", ref.Connection.APIToken)
 	setScalarChild(target, "api_url", ref.Connection.APIURL)
-	setScalarChild(cloud, "default_team", team)
-	if mappingValue(root, "default_environment") == nil {
-		setScalarChild(root, "default_environment", ref.Environment)
-	}
-	data, err := yaml.Marshal(&doc)
+	cloud, err := cloudChildMapping(root, "cloud")
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if err := ensureConfigIsInGitignore(files, path); err != nil {
-		return err
-	}
-	return WriteCloudFile(files, path, expected, data)
+	setScalarChild(cloud, "default_team", team)
+	return yaml.Marshal(&doc)
 }
 
 func cloudChildMapping(parent *yaml.Node, key string) (*yaml.Node, error) {

@@ -1,98 +1,80 @@
 package cloudauth
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
-	"time"
 
-	"github.com/99designs/keyring"
+	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestGlobalStore(t *testing.T) {
 	t.Parallel()
-	secrets := keyring.NewArrayKeyring(nil)
-	store := Store{Path: filepath.Join(t.TempDir(), "bruin", "cloud.yml"), Open: func() (SecretStore, error) { return secrets, nil }}
-	credential := Credential{Token: "private-token", TokenID: "123", APIURL: DefaultAPIURL, ExpiresAt: time.Now().Add(time.Hour), DefaultTeam: "acme"}
+	store := Store{Path: filepath.Join(t.TempDir(), "bruin", "cloud.yml")}
+	credential := Credential{Token: "private-token", APIURL: DefaultAPIURL, DefaultTeam: "acme"}
 	require.NoError(t, store.Save(credential, nil))
 	data, err := os.ReadFile(store.Path)
 	require.NoError(t, err)
-	assert.NotContains(t, string(data), "private-token")
+	var cm config.Config
+	require.NoError(t, yaml.Unmarshal(data, &cm))
+	assert.Equal(t, "default", cm.DefaultEnvironmentName)
+	assert.Equal(t, "acme", cm.GetDefaultTeam())
+	ref, err := cm.ResolveCloudConnection()
+	require.NoError(t, err)
+	require.NotNil(t, ref)
+	assert.Equal(t, "cloud", ref.Connection.Name)
+	assert.Equal(t, credential.Token, ref.Connection.APIToken)
+	assert.Equal(t, DefaultAPIURL, ref.Connection.APIURL)
+	if runtime.GOOS != "windows" {
+		info, err := os.Stat(store.Path)
+		require.NoError(t, err)
+		assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+		info, err = os.Stat(filepath.Dir(store.Path))
+		require.NoError(t, err)
+		assert.Equal(t, os.FileMode(0o700), info.Mode().Perm())
+	}
 	loaded, err := store.Read(DefaultAPIURL)
 	require.NoError(t, err)
 	assert.Equal(t, credential.Token, loaded.Token)
 	assert.Equal(t, "acme", loaded.DefaultTeam)
 	_, err = store.Read("https://attacker.example/api/v1")
-	require.Error(t, err)
-	copied := Store{Path: filepath.Join(t.TempDir(), "cloud.yml"), Open: store.Open}
-	require.NoError(t, os.WriteFile(copied.Path, data, 0o600))
-	_, err = copied.Read(DefaultAPIURL)
-	require.ErrorContains(t, err, "reference")
-	credential.TokenID = "456"
+	require.ErrorContains(t, err, "different Cloud API destination")
 	credential.Token = "replacement"
 	require.NoError(t, store.Save(credential, data))
-	keys, err := secrets.Keys()
-	require.NoError(t, err)
-	assert.Len(t, keys, 1)
 	loaded, err = store.Read(DefaultAPIURL)
 	require.NoError(t, err)
 	assert.Equal(t, "replacement", loaded.Token)
-}
-
-func TestGlobalSaveFailureKeepsPreviousCredential(t *testing.T) {
-	t.Parallel()
-	secrets := keyring.NewArrayKeyring(nil)
-	store := Store{Path: filepath.Join(t.TempDir(), "cloud.yml"), Open: func() (SecretStore, error) { return secrets, nil }}
-	require.NoError(t, store.Save(Credential{Token: "old", TokenID: "1", APIURL: DefaultAPIURL}, nil))
-	err := store.Save(Credential{Token: "new", TokenID: "2", APIURL: DefaultAPIURL}, nil)
-	require.Error(t, err)
-	loaded, err := store.Read(DefaultAPIURL)
-	require.NoError(t, err)
-	assert.Equal(t, "old", loaded.Token)
-	keys, err := secrets.Keys()
-	require.NoError(t, err)
-	assert.Len(t, keys, 1)
-	store.Open = func() (SecretStore, error) { return nil, errors.New("locked") }
-	_, err = store.Read(DefaultAPIURL)
-	require.ErrorContains(t, err, "locked")
-}
-
-func TestGlobalStoreUnavailableAndExpired(t *testing.T) {
-	t.Parallel()
-	secrets := keyring.NewArrayKeyring(nil)
-	store := Store{Path: filepath.Join(t.TempDir(), "cloud.yml"), Open: func() (SecretStore, error) { return secrets, nil }}
-	require.NoError(t, store.Save(Credential{Token: "secret", TokenID: "1", APIURL: DefaultAPIURL, ExpiresAt: time.Now().Add(-time.Hour)}, nil))
-	_, err := store.Read(DefaultAPIURL)
-	require.ErrorContains(t, err, "expired")
 	require.NoError(t, store.Delete())
-	keys, err := secrets.Keys()
+	loaded, err = store.Read(DefaultAPIURL)
 	require.NoError(t, err)
-	assert.Empty(t, keys)
-	_, err = os.Stat(store.Path)
-	require.ErrorIs(t, err, os.ErrNotExist)
-	store.Open = func() (SecretStore, error) { return nil, errors.New("unavailable") }
-	require.ErrorContains(t, store.Save(Credential{Token: "secret", TokenID: "2", APIURL: DefaultAPIURL}, nil), "unavailable")
-	_, err = os.Stat(store.Path)
-	require.ErrorIs(t, err, os.ErrNotExist)
+	assert.Nil(t, loaded)
+	require.NoError(t, store.Delete())
 }
 
-func TestCopiedGlobalConfigurationCanBeReauthenticated(t *testing.T) {
+func TestGlobalStorePreservesExistingConfig(t *testing.T) {
 	t.Parallel()
-	secrets := keyring.NewArrayKeyring(nil)
-	original := Store{Path: filepath.Join(t.TempDir(), "cloud.yml"), Open: func() (SecretStore, error) { return secrets, nil }}
-	require.NoError(t, original.Save(Credential{Token: "original", TokenID: "1", APIURL: DefaultAPIURL}, nil))
-	data, err := os.ReadFile(original.Path)
+	store := Store{Path: filepath.Join(t.TempDir(), "cloud.yml")}
+	original := []byte("default_environment: production\nenvironments:\n  production:\n    connections:\n      bruin:\n        - name: existing\n          api_token: old\n      postgres:\n        - name: warehouse\n          password: '${WAREHOUSE_PASSWORD}'\n")
+	require.NoError(t, os.WriteFile(store.Path, original, 0o600))
+	credential := Credential{Token: "new", APIURL: DefaultAPIURL}
+	require.ErrorContains(t, store.Save(credential, nil), "configuration changed")
+	data, err := os.ReadFile(store.Path)
 	require.NoError(t, err)
-	copied := Store{Path: filepath.Join(t.TempDir(), "cloud.yml"), Open: original.Open}
-	require.NoError(t, os.WriteFile(copied.Path, data, 0o600))
-	require.NoError(t, copied.Save(Credential{Token: "replacement", TokenID: "2", APIURL: DefaultAPIURL}, data))
-	loaded, err := copied.Read(DefaultAPIURL)
+	assert.Equal(t, original, data)
+	require.NoError(t, store.Save(credential, original))
+	loaded, _, err := store.Load()
 	require.NoError(t, err)
-	assert.Equal(t, "replacement", loaded.Token)
-	loaded, err = original.Read(DefaultAPIURL)
+	assert.Equal(t, "new", loaded.Token)
+	assert.Equal(t, "production", loaded.connection.Environment)
+	assert.Equal(t, "existing", loaded.connection.Connection.Name)
+	require.NoError(t, store.Delete())
+	data, err = os.ReadFile(store.Path)
 	require.NoError(t, err)
-	assert.Equal(t, "original", loaded.Token)
+	assert.Contains(t, string(data), "name: warehouse")
+	assert.Contains(t, string(data), "'${WAREHOUSE_PASSWORD}'")
+	assert.NotContains(t, string(data), "api_token:")
 }

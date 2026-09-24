@@ -40,7 +40,7 @@ func Auth() *cli.Command {
 func Logout() *cli.Command {
 	return &cli.Command{Name: "logout", Usage: "Remove a repository or global Bruin Cloud login", Flags: []cli.Flag{
 		&cli.BoolFlag{Name: "repo", Usage: "Remove the selected repository bruin connection"},
-		&cli.BoolFlag{Name: cloudAuthGlobal, Usage: "Remove the global login from the OS credential store"},
+		&cli.BoolFlag{Name: cloudAuthGlobal, Usage: "Remove the login from the global configuration file"},
 		&cli.BoolFlag{Name: "revoke", Usage: "Also revoke the personal token in Cloud"},
 	}, Action: func(ctx context.Context, c *cli.Command) error {
 		if c.Bool("repo") == c.Bool(cloudAuthGlobal) {

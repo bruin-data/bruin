@@ -11,7 +11,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/99designs/keyring"
 	"github.com/bruin-data/bruin/pkg/cloudauth"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/spf13/afero"
@@ -181,7 +180,7 @@ func TestCloudAuthPrecedenceAndFailures(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "global-token", token)
 	assert.Equal(t, 1, globalCalls)
-	globalErr = errors.New("credential store unavailable")
+	globalErr = errors.New("global configuration unavailable")
 	_, err = resolve()
 	require.ErrorIs(t, err, globalErr)
 }
@@ -211,8 +210,7 @@ func TestAuthStatusDoesNotPrintToken(t *testing.T) { //nolint:paralleltest
 
 func TestGlobalLoginOutsideBruinProject(t *testing.T) { //nolint:paralleltest
 	dir := loginTestRepo(t, "")
-	secrets := keyring.NewArrayKeyring(nil)
-	store := cloudauth.Store{Path: filepath.Join(t.TempDir(), "cloud.yml"), Open: func() (cloudauth.SecretStore, error) { return secrets, nil }}
+	store := cloudauth.Store{Path: filepath.Join(t.TempDir(), "cloud.yml")}
 	deps := loginDependencies{interactive: func() bool { return true }, globalStore: func() (cloudauth.Store, error) { return store, nil }, authorize: func(_ context.Context, target string, _ bool, _ io.Writer) (*cloudauth.Credential, error) {
 		assert.Equal(t, "global", target)
 		return &cloudauth.Credential{Token: "global-private-token", TokenID: "1", APIURL: cloudauth.DefaultAPIURL}, nil

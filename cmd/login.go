@@ -43,7 +43,7 @@ func loginCommand(deps loginDependencies) *cli.Command {
 	return &cli.Command{Name: "login", Usage: "Sign in to Bruin Cloud", Commands: []*cli.Command{
 		{Name: "oauth", Usage: "Create a personal token through browser authorization", Flags: []cli.Flag{
 			&cli.BoolFlag{Name: "repo", Usage: "Save a bruin connection in this Bruin project repository"},
-			&cli.BoolFlag{Name: cloudAuthGlobal, Usage: "Save the token in the OS credential store"},
+			&cli.BoolFlag{Name: cloudAuthGlobal, Usage: "Save the login in the global configuration file"},
 			&cli.BoolFlag{Name: "no-browser", Usage: "Print the authorization URL without opening a browser"},
 			&cli.BoolFlag{Name: "reauth", Usage: "Explicitly replace the selected login after browser approval"},
 			&cli.StringFlag{Name: "connection", Usage: "Bruin connection to create or update (repo only)"},
@@ -246,12 +246,12 @@ func runOAuthLogin(ctx context.Context, c *cli.Command, deps loginDependencies) 
 		if err != nil {
 			return err
 		}
-		metadata, raw, err := store.Metadata()
+		credential, raw, err := store.Load()
 		if err != nil {
 			return err
 		}
 		expected = raw
-		existing = metadata != nil
+		existing = credential != nil
 	}
 	if existing && !c.Bool("reauth") {
 		label := "A global Bruin Cloud login already exists."
@@ -282,11 +282,6 @@ func runOAuthLogin(ctx context.Context, c *cli.Command, deps loginDependencies) 
 			return nil
 		}
 	}
-	if target == cloudAuthGlobal {
-		if _, err := store.Open(); err != nil {
-			return err
-		}
-	}
 	credential, err := deps.authorize(ctx, target, c.Bool("no-browser"), output)
 	if err != nil {
 		return err
@@ -310,7 +305,7 @@ func runOAuthLogin(ctx context.Context, c *cli.Command, deps loginDependencies) 
 	}
 	destination := path
 	if target == cloudAuthGlobal {
-		destination = store.Path + " (token in OS credential store)"
+		destination = store.Path
 	}
 	_, _ = fmt.Fprintf(output, "Signed in as %s. Saved to %s.\n", credential.Account, destination)
 	if !credential.ExpiresAt.IsZero() {
