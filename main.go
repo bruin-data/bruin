@@ -85,7 +85,6 @@ func main() {
 			cmd.Import(&isDebug),
 			cmd.Upgrade(),
 			cmd.Cloud(&isDebug),
-			cmd.Login(),
 			cmd.Auth(),
 			cmd.Logout(),
 			mcp.MCPCmd(),

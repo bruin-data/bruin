@@ -20,6 +20,37 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
+//nolint:paralleltest
+func TestCloudLoginCommand(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		args      []string
+		wantError string
+	}{
+		{name: "help", args: []string{"--help"}},
+		{name: "conflicting scope", args: []string{"--repo", "--global"}, wantError: "--repo and --global cannot be used together"},
+		{name: "removed oauth subcommand", args: []string{"oauth"}, wantError: "unexpected argument; use 'bruin cloud login --help'"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var output bytes.Buffer
+			isDebug := false
+			command := &cli.Command{Name: "bruin", Writer: &output, Commands: []*cli.Command{Cloud(&isDebug)}}
+			err := command.Run(t.Context(), append([]string{"bruin", "cloud", "login"}, tc.args...))
+			if tc.wantError != "" {
+				require.ErrorContains(t, err, tc.wantError)
+				return
+			}
+			require.NoError(t, err)
+			assert.Contains(t, output.String(), "bruin cloud login")
+			for _, flag := range []string{"--repo", "--global", "--no-browser", "--reauth", "--connection", "--environment"} {
+				assert.Contains(t, output.String(), flag)
+			}
+			assert.NotContains(t, output.String(), "oauth")
+			assert.NotContains(t, output.String(), "--team")
+		})
+	}
+}
+
 func loginTestRepo(t *testing.T, content string) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -47,7 +78,7 @@ func TestLoginExistingConnectionDoesNotAuthorize(t *testing.T) { //nolint:parall
 	command := loginCommand(deps)
 	command.Reader = strings.NewReader("\r")
 	command.Writer = &output
-	require.NoError(t, command.Run(t.Context(), []string{"login", "oauth", "--repo"}))
+	require.NoError(t, command.Run(t.Context(), []string{"login", "--repo"}))
 	cm, err := config.LoadFromFileOrEnv(afero.NewOsFs(), filepath.Join(dir, ".bruin.yml"))
 	require.NoError(t, err)
 	selected, err := cm.ResolveCloudConnection()
@@ -68,11 +99,11 @@ func TestLoginCreatesConnection(t *testing.T) { //nolint:paralleltest
 		assert.NoFileExists(t, filepath.Join(dir, ".bruin.yml"))
 		return &cloudauth.Credential{Token: "new-token", TokenID: "123", APIURL: cloudauth.DefaultAPIURL, DefaultTeam: "acme"}, nil
 	}}
-	require.ErrorContains(t, loginCommand(deps).Run(t.Context(), []string{"login", "oauth", "--repo"}), "--repo requires a Bruin project")
+	require.ErrorContains(t, loginCommand(deps).Run(t.Context(), []string{"login", "--repo"}), "--repo requires a Bruin project")
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "pipeline.yml"), []byte("name: test\n"), 0o600))
 	command := loginCommand(deps)
 	command.Writer = &output
-	require.NoError(t, command.Run(t.Context(), []string{"login", "oauth", "--repo", "--no-browser"}))
+	require.NoError(t, command.Run(t.Context(), []string{"login", "--repo", "--no-browser"}))
 	cm, err := config.LoadFromFileOrEnv(afero.NewOsFs(), filepath.Join(dir, ".bruin.yml"))
 	require.NoError(t, err)
 	require.Len(t, cm.CloudConnections(), 1)
@@ -124,7 +155,7 @@ func TestLoginDoesNotOverwriteOnDeniedAuthorization(t *testing.T) { //nolint:par
 		return nil, errors.New("denied")
 	}}
 	command := loginCommand(deps)
-	err := command.Run(t.Context(), []string{"login", "oauth", "--repo", "--reauth"})
+	err := command.Run(t.Context(), []string{"login", "--repo", "--reauth"})
 	require.ErrorContains(t, err, "denied")
 	data, err := os.ReadFile(filepath.Join(dir, ".bruin.yml"))
 	require.NoError(t, err)
@@ -134,10 +165,10 @@ func TestLoginDoesNotOverwriteOnDeniedAuthorization(t *testing.T) { //nolint:par
 func TestLoginTrackedConfigAndExistingNonInteractive(t *testing.T) { //nolint:paralleltest
 	dir := loginTestRepo(t, loginExistingConfig)
 	deps := loginDependencies{interactive: func() bool { return false }}
-	err := loginCommand(deps).Run(t.Context(), []string{"login", "oauth", "--repo"})
+	err := loginCommand(deps).Run(t.Context(), []string{"login", "--repo"})
 	require.ErrorContains(t, err, "interactive")
 	require.NoError(t, exec.CommandContext(t.Context(), "git", "-C", dir, "add", "-f", ".bruin.yml").Run())
-	err = loginCommand(deps).Run(t.Context(), []string{"login", "oauth", "--repo", "--reauth"})
+	err = loginCommand(deps).Run(t.Context(), []string{"login", "--repo", "--reauth"})
 	require.ErrorContains(t, err, "tracked")
 }
 
@@ -221,7 +252,7 @@ func TestGlobalLoginOutsideBruinProject(t *testing.T) { //nolint:paralleltest
 	command := loginCommand(deps)
 	command.Reader = strings.NewReader("")
 	command.Writer = &output
-	require.NoError(t, command.Run(t.Context(), []string{"login", "oauth"}))
+	require.NoError(t, command.Run(t.Context(), []string{"login"}))
 	assert.NoFileExists(t, filepath.Join(dir, ".bruin.yml"))
 	assert.NotContains(t, output.String(), "global-private-token")
 	credential, err := store.Read(cloudauth.DefaultAPIURL)

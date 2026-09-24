@@ -1,9 +1,9 @@
-# `login` Command
+# `cloud login` Command
 
 Sign in to Bruin Cloud:
 
 ```bash
-bruin login oauth
+bruin cloud login
 ```
 
 1. Choose **This repository** to use the login for your current project, or **Global** to use it across projects. Outside a Bruin project, use Global.
@@ -24,13 +24,13 @@ bruin cloud projects list
 From your Bruin project directory, save the login for that repository:
 
 ```bash
-bruin login oauth --repo
+bruin cloud login --repo
 ```
 
 To use the login across projects:
 
 ```bash
-bruin login oauth --global
+bruin cloud login --global
 ```
 
 If you already have a login, select **Use existing login**, **Sign in again**, or **Cancel**.
@@ -38,7 +38,7 @@ If you already have a login, select **Use existing login**, **Sign in again**, o
 To renew access or choose different permissions:
 
 ```bash
-bruin login oauth --repo --reauth
+bruin cloud login --repo --reauth
 ```
 
 Use `--global --reauth` to replace a global login.
@@ -96,7 +96,7 @@ bruin logout --global --revoke
 For a specific repository connection:
 
 ```bash
-bruin login oauth --repo --environment production --connection cloud
+bruin cloud login --repo --environment production --connection cloud
 ```
 
 Without an interactive terminal, specify `--repo` or `--global`; add `--reauth` when replacing an existing login. You still need to approve access in a browser. For CI, use an [API token](/cloud/api-tokens#using-a-token-with-the-cli).
