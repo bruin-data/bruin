@@ -29,7 +29,7 @@ variables:
 
 ## Supported JSON Schema Keywords
 
-Bruin accepts [JSON Schema draft-07](https://json-schema.org/draft-07/json-schema-release-notes.html) keywords in variable definitions. At parse time, it currently enforces that each variable has a `default` value; full schema validation is not yet enforced.
+Bruin accepts [JSON Schema draft-07](https://json-schema.org/draft-07/json-schema-release-notes.html) keywords in variable definitions. At parse time it requires a `default` and checks that the default — and any `--var` or variant override — matches the declared `type`, `enum`, `const`, `minimum`, and `maximum`. Nested keywords such as `items`, `properties`, and `pattern` are stored for documentation and downstream tools but are not compiled as a full JSON Schema.
 
 | `type` value | Description | Example default |
 |--------------|-------------|-----------------|
