@@ -12,7 +12,6 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/jinja"
-	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
@@ -4554,6 +4553,12 @@ func TestWarnAssetHookApplicableTypeIgnored(t *testing.T) {
 func TestWarnRegularYamlFiles_WarnRegularYamlFilesInRepo(t *testing.T) {
 	t.Parallel()
 
+	fs := afero.NewMemMapFs()
+	for _, name := range []string{"pipeline1/assets/file1.yml", "pipeline2/assets/file1.asset.yml"} {
+		require.NoError(t, fs.MkdirAll(filepath.Dir(name), 0o755))
+		require.NoError(t, afero.WriteFile(fs, name, []byte("name: test\n"), 0o600))
+	}
+
 	tests := []struct {
 		name    string
 		p       *pipeline.Pipeline
@@ -4564,7 +4569,7 @@ func TestWarnRegularYamlFiles_WarnRegularYamlFilesInRepo(t *testing.T) {
 			name: "no regular yaml files",
 			p: &pipeline.Pipeline{
 				DefinitionFile: pipeline.DefinitionFile{
-					Path: path.AbsPathForTests(t, "./testdata/regular-yaml-files/pipeline2/pipeline.yml"),
+					Path: filepath.Join("pipeline2", "pipeline.yml"),
 				},
 			},
 			want:    noIssues,
@@ -4574,7 +4579,7 @@ func TestWarnRegularYamlFiles_WarnRegularYamlFilesInRepo(t *testing.T) {
 			name: "regular yaml files are caught",
 			p: &pipeline.Pipeline{
 				DefinitionFile: pipeline.DefinitionFile{
-					Path: path.AbsPathForTests(t, "./testdata/regular-yaml-files/pipeline1/pipeline.yml"),
+					Path: filepath.Join("pipeline1", "pipeline.yml"),
 				},
 			},
 			want: []*Issue{
@@ -4595,7 +4600,7 @@ func TestWarnRegularYamlFiles_WarnRegularYamlFilesInRepo(t *testing.T) {
 			t.Parallel()
 
 			w := &WarnRegularYamlFiles{
-				fs: afero.NewOsFs(),
+				fs: fs,
 			}
 			got, err := w.WarnRegularYamlFilesInRepo(ctx, tt.p)
 			if !tt.wantErr(t, err, fmt.Sprintf("WarnRegularYamlFilesInRepo(%v)", tt.p)) {

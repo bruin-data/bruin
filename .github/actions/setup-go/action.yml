@@ -1,0 +1,73 @@
+# Compatibility copy of cloudx-io/setup-go at
+# 87999fd1dd2296a747db09d0ff1eb294ee05758a (MIT; see LICENSE).
+# Only behavioral change: replace unsupported $/trim-gocache with its pinned
+# upstream reference. The upstream cache and trimming implementation is unchanged.
+name: 'Setup Go with Isolated Cache'
+description: 'Install Go and cache GOCACHE/GOMODCACHE with per-job isolation, branch-aware restore, and working-set trimming.'
+author: 'CloudX'
+branding:
+  icon: 'package'
+  color: 'blue'
+
+inputs:
+  cache-key-prefix:
+    description: 'Prefix for the cache key to prevent collisions between jobs that build different things'
+    required: true
+  go-version:
+    description: 'The Go version to download (if necessary) and use.'
+    required: true
+  cache-dependency-path:
+    description: 'Glob hashed into the cache key. Use a single glob; defaults to go.sum files.'
+    required: false
+    default: '**/go.sum'
+  max-staleness-hours:
+    description: 'Whole hours to retain GOCACHE entries before the job start time.'
+    required: false
+    default: '2'
+
+outputs:
+  cache-hit:
+    description: 'True if an exact cache key match was restored'
+    value: ${{ steps.cache.outputs.cache-hit }}
+
+runs:
+  using: composite
+  steps:
+    - name: install go binary
+      id: install-go
+      uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+      with:
+        go-version: ${{ inputs.go-version }}
+        cache: false
+    - name: get cache paths
+      id: get-cache-paths
+      shell: bash
+      run: |
+        echo "gocache=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+        echo "gomodcache=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+    - name: cache
+      id: cache
+      uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+      with:
+        path: |
+          ${{ steps.get-cache-paths.outputs.gocache }}
+          ${{ steps.get-cache-paths.outputs.gomodcache }}
+        key: go-cache-${{ runner.os }}-${{ runner.arch }}-${{ inputs.cache-key-prefix }}-${{ inputs.go-version }}-${{ github.head_ref || github.ref_name }}-${{ hashFiles(inputs.cache-dependency-path) }}-${{ github.run_id }}
+        restore-keys: |
+          go-cache-${{ runner.os }}-${{ runner.arch }}-${{ inputs.cache-key-prefix }}-${{ inputs.go-version }}-${{ github.head_ref || github.ref_name }}-${{ hashFiles(inputs.cache-dependency-path) }}-
+          go-cache-${{ runner.os }}-${{ runner.arch }}-${{ inputs.cache-key-prefix }}-${{ inputs.go-version }}-${{ github.head_ref || github.ref_name }}-
+          go-cache-${{ runner.os }}-${{ runner.arch }}-${{ inputs.cache-key-prefix }}-${{ inputs.go-version }}-${{ github.event.repository.default_branch }}-${{ hashFiles(inputs.cache-dependency-path) }}-
+          go-cache-${{ runner.os }}-${{ runner.arch }}-${{ inputs.cache-key-prefix }}-${{ inputs.go-version }}-${{ github.event.repository.default_branch }}-
+    # Trim GOCACHE to this run's working set. This action's post-hook runs
+    # in reverse declaration order: after the consumer workflow's main steps
+    # populate the cache, and before actions/cache's post-save uploads it.
+    # Without this, every save accretes another layer of stale compile
+    # outputs (Go has no GOCACHEMAXSIZE knob, and its 5-day age trim never
+    # fires anything in CI that compiles daily). Go touches mtimes on cache
+    # use, so entries untouched since job start went unused this run and
+    # are dropped.
+    - name: trim GOCACHE
+      uses: cloudx-io/setup-go/trim-gocache@87999fd1dd2296a747db09d0ff1eb294ee05758a
+      with:
+        gocache: ${{ steps.get-cache-paths.outputs.gocache }}
+        max-staleness-hours: ${{ inputs.max-staleness-hours }}
