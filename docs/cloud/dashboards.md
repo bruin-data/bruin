@@ -249,11 +249,21 @@ By default a filter sits in the bar at the top of the dashboard. Set `tab` to on
 filters:
   - name: region
     type: select
+    default: EU
     options: { values: [EU, US, APAC] }
   - name: cohort
     type: select
     tab: Retention
+    default: 2024-Q1
     options: { values: [2024-Q1, 2024-Q2] }
+
+queries:
+  retention:
+    sql: |
+      SELECT month_since, active_users
+      FROM analytics.retention
+      WHERE region = '{{ filters.region }}'
+        AND cohort = '{{ filters.cohort }}'
 
 rows:
   - tab: Retention
@@ -261,7 +271,7 @@ rows:
       - { id: retention, name: Retention, type: table, query: retention }
 ```
 
-The `tab` must match a tab used by a row; saving a dashboard whose filter points at a missing tab fails with a validation error. All filters share one `filters.<name>` namespace, so a tab filter can still be referenced from any widget. Apply re-runs only the widgets that reference a changed filter, and edits you haven't applied are dropped when you switch tabs.
+The `tab` must match a tab used by a row. Saving the dashboard YAML with a filter that points at a missing tab fails with a validation error; if a tab loses its last row later, its filters move to the top bar. All filters share one `filters.<name>` namespace, so a tab filter can still be referenced from any widget. Apply re-runs only the widgets that reference a changed filter, and edits you haven't applied are dropped when you switch tabs.
 
 ## Notes
 
