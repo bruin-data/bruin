@@ -12,16 +12,16 @@ type Model struct {
 	Dimensions  []Dimension `yaml:"dimensions,omitempty" json:"dimensions,omitempty"`
 	Metrics     []Metric    `yaml:"metrics,omitempty" json:"metrics,omitempty"`
 	Segments    []Segment   `yaml:"segments,omitempty" json:"segments,omitempty"`
-	Notes       []Note      `yaml:"notes,omitempty" json:"notes,omitempty"`
+	Notebooks   []Notebook  `yaml:"notebooks,omitempty" json:"notebooks,omitempty"`
 }
 
-// Note is a reusable annotation matched to rows/points by its dimensions.
-type Note struct {
-	ID         string          `yaml:"id" json:"id"`
-	Dimensions []NoteDimension `yaml:"dimensions" json:"dimensions"`
+// Notebook is a reusable annotation matched to rows/points by its dimensions.
+type Notebook struct {
+	ID         string              `yaml:"id" json:"id"`
+	Dimensions []NotebookDimension `yaml:"dimensions" json:"dimensions"`
 }
 
-type NoteDimension struct {
+type NotebookDimension struct {
 	Name        string `yaml:"name" json:"name"`
 	Required    bool   `yaml:"required,omitempty" json:"required,omitempty"`
 	Multiselect bool   `yaml:"multiselect,omitempty" json:"multiselect,omitempty"`

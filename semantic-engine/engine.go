@@ -132,26 +132,26 @@ func (e *Engine) validate() error {
 		names[s.Name] = true
 	}
 
-	noteIDs := make(map[string]bool, len(e.model.Notes))
-	for _, note := range e.model.Notes {
-		if note.ID == "" {
-			return errors.New("note id is required")
+	notebookIDs := make(map[string]bool, len(e.model.Notebooks))
+	for _, notebook := range e.model.Notebooks {
+		if notebook.ID == "" {
+			return errors.New("notebook id is required")
 		}
-		if noteIDs[note.ID] {
-			return fmt.Errorf("duplicate note id: %s", note.ID)
+		if notebookIDs[notebook.ID] {
+			return fmt.Errorf("duplicate notebook id: %s", notebook.ID)
 		}
-		noteIDs[note.ID] = true
-		if note.Dimensions == nil {
-			return fmt.Errorf("note %q: dimensions is required", note.ID)
+		notebookIDs[notebook.ID] = true
+		if notebook.Dimensions == nil {
+			return fmt.Errorf("notebook %q: dimensions is required", notebook.ID)
 		}
 
-		dimensionNames := make(map[string]bool, len(note.Dimensions))
-		for _, dimension := range note.Dimensions {
+		dimensionNames := make(map[string]bool, len(notebook.Dimensions))
+		for _, dimension := range notebook.Dimensions {
 			if dimension.Name == "" {
-				return fmt.Errorf("note %q: dimension name is required", note.ID)
+				return fmt.Errorf("notebook %q: dimension name is required", notebook.ID)
 			}
 			if dimensionNames[dimension.Name] {
-				return fmt.Errorf("note %q: duplicate dimension %q", note.ID, dimension.Name)
+				return fmt.Errorf("notebook %q: duplicate dimension %q", notebook.ID, dimension.Name)
 			}
 			dimensionNames[dimension.Name] = true
 		}

@@ -217,14 +217,14 @@ func TestLoadFile_AcceptsLegacyDacSchemaID(t *testing.T) {
 	}
 }
 
-func TestLoadFile_PreservesNoteDimensionOptions(t *testing.T) {
+func TestLoadFile_PreservesNotebookDimensionOptions(t *testing.T) {
 	t.Parallel()
 
 	path := filepath.Join(t.TempDir(), "sales.yml")
 	body := `name: sales
 source:
   table: sales
-notes:
+notebooks:
   - id: regional_rollout
     dimensions:
       - name: region
@@ -240,14 +240,14 @@ notes:
 	if err != nil {
 		t.Fatalf("load model: %v", err)
 	}
-	if len(model.Notes) != 1 || len(model.Notes[0].Dimensions) != 2 {
-		t.Fatalf("unexpected notes: %#v", model.Notes)
+	if len(model.Notebooks) != 1 || len(model.Notebooks[0].Dimensions) != 2 {
+		t.Fatalf("unexpected notebooks: %#v", model.Notebooks)
 	}
-	required := model.Notes[0].Dimensions[0]
+	required := model.Notebooks[0].Dimensions[0]
 	if !required.Required {
 		t.Fatal("expected required: true")
 	}
-	multi := model.Notes[0].Dimensions[1]
+	multi := model.Notebooks[0].Dimensions[1]
 	if multi.Required {
 		t.Fatal("expected omitted required to default to false")
 	}
@@ -256,14 +256,14 @@ notes:
 	}
 }
 
-func TestLoadFile_PreservesEmptyNoteDimensions(t *testing.T) {
+func TestLoadFile_PreservesEmptyNotebookDimensions(t *testing.T) {
 	t.Parallel()
 
 	path := filepath.Join(t.TempDir(), "sales.yml")
 	body := `name: sales
 source:
   table: sales
-notes:
+notebooks:
   - id: dashboard_context
     dimensions: []
 `
@@ -275,26 +275,26 @@ notes:
 	if err != nil {
 		t.Fatalf("load model: %v", err)
 	}
-	if len(model.Notes) != 1 || model.Notes[0].Dimensions == nil || len(model.Notes[0].Dimensions) != 0 {
-		t.Fatalf("expected an explicit empty dimensions list, got %#v", model.Notes)
+	if len(model.Notebooks) != 1 || model.Notebooks[0].Dimensions == nil || len(model.Notebooks[0].Dimensions) != 0 {
+		t.Fatalf("expected an explicit empty dimensions list, got %#v", model.Notebooks)
 	}
-	encoded, err := json.Marshal(model.Notes[0])
+	encoded, err := json.Marshal(model.Notebooks[0])
 	if err != nil {
-		t.Fatalf("marshal note: %v", err)
+		t.Fatalf("marshal notebook: %v", err)
 	}
 	if string(encoded) != `{"id":"dashboard_context","dimensions":[]}` {
-		t.Fatalf("unexpected note JSON: %s", encoded)
+		t.Fatalf("unexpected notebook JSON: %s", encoded)
 	}
 }
 
-func TestLoadFile_RejectsInvalidNoteDimensionOptions(t *testing.T) {
+func TestLoadFile_RejectsInvalidNotebookDimensionOptions(t *testing.T) {
 	t.Parallel()
 
 	path := filepath.Join(t.TempDir(), "sales.yml")
 	body := `name: sales
 source:
   table: sales
-notes:
+notebooks:
   - id: regional_rollout
     dimensions:
       - name: region
@@ -309,33 +309,33 @@ notes:
 	}
 }
 
-func TestLoadFile_RejectsDuplicateNoteIdentifiers(t *testing.T) {
+func TestLoadFile_RejectsDuplicateNotebookIdentifiers(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name    string
-		notes   string
-		message string
+		name      string
+		notebooks string
+		message   string
 	}{
 		{
-			name: "note ids",
-			notes: `
+			name: "notebook ids",
+			notebooks: `
   - id: rollout
     dimensions: [{name: region}]
   - id: rollout
     dimensions: [{name: channel}]
 `,
-			message: "duplicate note id: rollout",
+			message: "duplicate notebook id: rollout",
 		},
 		{
 			name: "dimension names",
-			notes: `
+			notebooks: `
   - id: rollout
     dimensions:
       - {name: region}
       - {name: region}
 `,
-			message: `note "rollout": duplicate dimension "region"`,
+			message: `notebook "rollout": duplicate dimension "region"`,
 		},
 	}
 
@@ -343,7 +343,7 @@ func TestLoadFile_RejectsDuplicateNoteIdentifiers(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			path := filepath.Join(t.TempDir(), "sales.yml")
-			body := "name: sales\nsource:\n  table: sales\nnotes:" + test.notes
+			body := "name: sales\nsource:\n  table: sales\nnotebooks:" + test.notebooks
 			if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 				t.Fatalf("write fixture: %v", err)
 			}
@@ -945,29 +945,29 @@ func TestNewEngine_ValidationErrors(t *testing.T) {
 			want:  "source.table is required",
 		},
 		{
-			name: "note without id",
+			name: "notebook without id",
 			model: Model{
-				Name:   "m",
-				Source: Source{Table: "t"},
-				Notes:  []Note{{Dimensions: []NoteDimension{{Name: "region"}}}},
+				Name:      "m",
+				Source:    Source{Table: "t"},
+				Notebooks: []Notebook{{Dimensions: []NotebookDimension{{Name: "region"}}}},
 			},
-			want: "note id is required",
+			want: "notebook id is required",
 		},
 		{
-			name: "note dimension without name",
+			name: "notebook dimension without name",
 			model: Model{
-				Name:   "m",
-				Source: Source{Table: "t"},
-				Notes:  []Note{{ID: "rollout", Dimensions: []NoteDimension{{}}}},
+				Name:      "m",
+				Source:    Source{Table: "t"},
+				Notebooks: []Notebook{{ID: "rollout", Dimensions: []NotebookDimension{{}}}},
 			},
 			want: "dimension name is required",
 		},
 		{
-			name: "note without dimensions",
+			name: "notebook without dimensions",
 			model: Model{
-				Name:   "m",
-				Source: Source{Table: "t"},
-				Notes:  []Note{{ID: "rollout"}},
+				Name:      "m",
+				Source:    Source{Table: "t"},
+				Notebooks: []Notebook{{ID: "rollout"}},
 			},
 			want: "dimensions is required",
 		},
