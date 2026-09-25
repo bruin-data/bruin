@@ -1,0 +1,29 @@
+name: Social listening template
+
+on:
+  pull_request:
+    paths: ["templates/social-listening/**", ".github/workflows/social-listening-template.yml"]
+  push:
+    paths: ["templates/social-listening/**", ".github/workflows/social-listening-template.yml"]
+
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: {go-version-file: go.mod}
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.x"}
+      - run: make build
+      - run: |
+          cd templates/social-listening
+          "$GITHUB_WORKSPACE/bin/bruin" validate .
+          python3 -m unittest discover -s tests
+          "$GITHUB_WORKSPACE/bin/bruin" run --config-file .bruin.yml --workers 1 .
+          "$GITHUB_WORKSPACE/bin/bruin" run --config-file .bruin.yml --workers 1 .
+          "$GITHUB_WORKSPACE/bin/bruin" query --config-file .bruin.yml --connection duckdb-default --output json --query "SELECT COUNT(*) AS rows, COUNT(DISTINCT external_id) AS distinct_ids FROM raw.raw_reddit_content" | grep -F '"rows":[[2,2]]'
+          "$GITHUB_WORKSPACE/bin/bruin" query --config-file .bruin.yml --connection duckdb-default --output json --query "SELECT COUNT(*) = COUNT(DISTINCT alert_key) AS is_idempotent FROM operations.fct_alert_outbox" | grep -F '"rows":[[true]]'
+          "$GITHUB_WORKSPACE/bin/bruin" run --config-file .bruin.yml --workers 1 --var 'tracked_terms=["example alternative","Example Co","example alternative"]' --var 'excluded_authors=["public_user"]' .
+          "$GITHUB_WORKSPACE/bin/bruin" query --config-file .bruin.yml --connection duckdb-default --output json --query "SELECT COUNT(*) FROM enrichment.fct_mention_assessment WHERE status = 'excluded'" | grep -F '"rows":[[1]]'
+          "$GITHUB_WORKSPACE/bin/bruin" query --config-file .bruin.yml --connection duckdb-default --output json --query "SELECT COUNT(*) FROM marts.mart_share_of_voice_monthly WHERE term_category = 'brand'" | grep -F '"rows":[[1]]'

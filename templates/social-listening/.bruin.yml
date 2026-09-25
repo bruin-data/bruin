@@ -1,0 +1,6 @@
+environments:
+  default:
+    connections:
+      duckdb:
+        - name: duckdb-default
+          path: social_listening.duckdb

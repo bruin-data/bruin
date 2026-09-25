@@ -1,0 +1,2 @@
+source,external_id,payload_json,published_at,collected_at,source_cursor,ingest_run_id
+hackernews,hn-1,"{""type"":""comment"",""url"":""https://news.ycombinator.com/item?id=1"",""author"":""hn_reader"",""parent_id"":null,""title"":""Tool selection"",""body"":""We compared an example alternative while evaluating tools."",""points"":8,""community"":""news""}",2026-01-10T12:00:00Z,2026-01-10T12:05:00Z,fixture-hn-1,fixture-run

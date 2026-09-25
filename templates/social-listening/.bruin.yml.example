@@ -1,0 +1,7 @@
+# Copy to .bruin.yml for a local DuckDB demo. Do not put source or webhook secrets here.
+environments:
+  default:
+    connections:
+      duckdb:
+        - name: duckdb-default
+          path: social_listening.duckdb

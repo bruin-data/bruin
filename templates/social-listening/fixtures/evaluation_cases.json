@@ -1,0 +1,7 @@
+[
+  {"case": "true_positive", "text": "Looking for an example alternative for a small team", "expected": "qualified"},
+  {"case": "false_positive", "text": "This example alternative is unrelated to product selection", "expected": "review"},
+  {"case": "ambiguous_term", "text": "An example alternative in a classroom exercise", "expected": "review"},
+  {"case": "competitor_context", "text": "Comparing Example competitor with an example alternative", "expected": "qualified"},
+  {"case": "excluded_self_content", "text": "Example Co announcement", "expected": "excluded"}
+]

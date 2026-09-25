@@ -1,0 +1,15 @@
+title: Weekday mention digest (draft)
+default_cron: "0 9 * * 1-5"
+timezone: "UTC"
+permitted_warehouse_objects: ["marts.mart_mention_queue"]
+verified_sql: |
+  SELECT content_id, source, source_url, matched_text, priority_score, reasons_json, routing_status
+  FROM marts.mart_mention_queue
+  WHERE published_at >= CURRENT_TIMESTAMP - INTERVAL '30 hours'
+  ORDER BY priority_score DESC, published_at DESC;
+output_format: "Concise digest with source links, evidence, uncertainty labels, and alert keys."
+late_arrival_window: "6 hours"
+state_file_name: "weekday-mention-digest-alert-keys.json"
+no_result_response: "No new qualified mentions in the 24-hour window (including late-arrival lookback)."
+delivery_target_placeholder: "<reviewed-digest-destination>"
+blocked_data_response: "Digest blocked: the approved mention queue is unavailable or stale; no external action taken."
