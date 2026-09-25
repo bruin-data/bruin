@@ -30,7 +30,7 @@ You can re-enter **Edit** at any time to keep iterating. While unpublished chang
 
 ## Widgets
 
-The agent can place seven widget types on the canvas:
+The agent can place eight widget types on the canvas:
 
 | Type | What it shows |
 |---|---|
@@ -41,6 +41,7 @@ The agent can place seven widget types on the canvas:
 | **Text** | Markdown blocks for section headers, narrative, and links |
 | **Image** | One image for each query result row, with optional titles and captions |
 | **Divider** | A horizontal separator between dashboard sections |
+| **Tabs** | Several widgets in one box, switched with a tab bar |
 
 ### Charts
 
@@ -151,6 +152,31 @@ rows:
     widgets:
       - { id: revenue_trend, name: Revenue trend, type: chart, chart: line, col: 12, query: monthly_revenue, x: { field: month }, y: { field: [revenue] } }
 ```
+
+### Widget tabs
+
+A `type: tabs` widget holds several views in one box and switches between them with a tab bar. Each tab is a complete widget with its own `type`, data source, encodings, and `notes`. The container takes only `type`, `name` (optional — the tab bar labels it), `description`, `col`, `id`, and `tabs`. Every tab needs a `name` that is unique within the widget, and tabs can't be nested.
+
+```yaml
+rows:
+  - widgets:
+      - id: sales
+        name: Sales
+        type: tabs
+        col: 8
+        tabs:
+          - name: Revenue
+            type: chart
+            chart: bar
+            query: monthly_revenue
+            x: { field: month }
+            y: { field: [revenue] }
+          - name: Details
+            type: table
+            query: monthly_revenue
+```
+
+Downloads, the SQL view, and query results in the widget panel follow the open tab.
 
 ## Data sources
 
