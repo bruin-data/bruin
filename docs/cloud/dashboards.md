@@ -241,6 +241,38 @@ queries:
 
 Applied filter values are stored in the dashboard URL, so a shared link opens with the same filter state. For all filter fields and date presets, see the [DAC filter documentation](https://getbruin.com/docs/dac/dashboards/filters.html).
 
+### Per-tab filters
+
+By default a filter sits in the bar at the top of the dashboard. Set `tab` to one of the row tab names to move it into that tab's own filter bar, shown only while the tab is open:
+
+```yaml
+filters:
+  - name: region
+    type: select
+    default: EU
+    options: { values: [EU, US, APAC] }
+  - name: cohort
+    type: select
+    tab: Retention
+    default: 2024-Q1
+    options: { values: [2024-Q1, 2024-Q2] }
+
+queries:
+  retention:
+    sql: |
+      SELECT month_since, active_users
+      FROM analytics.retention
+      WHERE region = '{{ filters.region }}'
+        AND cohort = '{{ filters.cohort }}'
+
+rows:
+  - tab: Retention
+    widgets:
+      - { id: retention, name: Retention, type: table, query: retention }
+```
+
+The `tab` must match a tab used by a row. Saving the dashboard YAML with a filter that points at a missing tab fails with a validation error; if a tab loses its last row later, its filters move to the top bar. All filters share one `filters.<name>` namespace, so a tab filter can still be referenced from any widget. Apply re-runs only the widgets that reference a changed filter, and edits you haven't applied are dropped when you switch tabs.
+
 ## Notes
 
 Notes add human context to dashboard data. A note can apply to the whole dashboard, a widget, a table row, or a chart point, depending on the dimensions selected when it is created. Use the **Notes** button in the dashboard toolbar to browse and filter all notes, or use a note icon on a widget to work with notes in that widget's context.
