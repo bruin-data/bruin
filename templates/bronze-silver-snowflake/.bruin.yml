@@ -1,0 +1,14 @@
+default_environment: default
+environments:
+  default:
+    connections:
+      frankfurter:
+        - name: "frankfurter-default"
+      snowflake:
+        - name: "snowflake-default"
+          account: "ACCOUNT-NAME"
+          user: "USERNAME"
+          password: "PASSWORD"
+          database: "SNOWFLAKE_DATABASE"
+          warehouse: "COMPUTE_WAREHOUSE"
+          schema: "PUBLIC"
