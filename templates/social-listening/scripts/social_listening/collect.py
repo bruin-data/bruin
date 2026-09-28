@@ -72,15 +72,20 @@ def build_http(ctx: RunContext, route, min_interval: float) -> tuple[HttpClient,
 
 
 def stored_keys(source: str, ctx: RunContext) -> set[str]:
-    """Event keys already in raw for this window, so reruns never rewrite a row."""
+    """Event keys already in raw for this window and mode, so reruns never rewrite a row.
+
+    Demo rows never block live rows: a live record with the same key replaces the demo row.
+    """
     from . import warehouse
 
     table = f"raw_{source}_content"
     if not warehouse.table_exists("raw", table):
         return set()
     start = ctx.collection_window().start.replace(tzinfo=None).isoformat(sep=" ")
+    mode = "demo" if ctx.vars.get("demo_mode", True) else "live"
     rows = warehouse.read(
         f"SELECT event_key FROM raw.{table} WHERE record_kind = 'content' "
+        f"AND collection_mode = {warehouse.literal(mode)} "
         f"AND published_at >= CAST({warehouse.literal(start)} AS TIMESTAMP)"
     )
     return {r["event_key"] for r in rows}

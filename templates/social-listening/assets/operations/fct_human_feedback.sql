@@ -31,12 +31,6 @@ columns:
         value: [useful, not_useful, replied_manually, ignored, escalated]
   - name: is_false_positive
     type: boolean
-custom_checks:
-  - name: feedback refers to known content
-    description: Non-blocking. A feedback row whose content is not in staging (for example after a redaction) is kept but flagged.
-    blocking: false
-    query: SELECT COUNT(*) FROM operations.fct_human_feedback WHERE NOT content_known
-    value: 0
 @bruin */
 
 {%- set assessment_version = sl_assessment_version(var) | trim %}

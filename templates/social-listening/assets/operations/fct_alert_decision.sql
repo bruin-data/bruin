@@ -30,8 +30,9 @@ hooks:
           confidence DOUBLE, assessment_status VARCHAR, model_generated BOOLEAN, published_at TIMESTAMP,
           payload_json VARCHAR, routed_at TIMESTAMP
         )
-    # Redacted or retention-deleted content is removed from the routing log too (payloads hold snippets).
-    - query: DELETE FROM operations.fct_alert_decision WHERE content_id NOT IN (SELECT content_id FROM staging.stg_content_item)
+    # Redacted content, and content deleted from raw (retention), leaves this table too.
+    # Switching demo_mode does not delete anything: raw keeps both modes.
+    - query: DELETE FROM operations.fct_alert_decision WHERE content_id IN (SELECT md5(source || ':' || external_id) FROM config.redaction_request) OR content_id NOT IN (SELECT md5(source || ':' || external_id) FROM raw.raw_reddit_content UNION SELECT md5(source || ':' || external_id) FROM raw.raw_hackernews_content UNION SELECT md5(source || ':' || external_id) FROM raw.raw_github_content UNION SELECT md5(source || ':' || external_id) FROM raw.raw_stackoverflow_content UNION SELECT md5(source || ':' || external_id) FROM raw.raw_authorised_export_content)
 columns:
   - name: alert_key
     type: varchar

@@ -54,7 +54,7 @@ IMAGE_REF = re.compile(r"\]\(images/([^)]+)\)")
 
 def render(name: str) -> str:
     """Return the docs-page content for a template's README."""
-    readme = (TEMPLATES / name / "README.md").read_text()
+    readme = (TEMPLATES / name / "README.md").read_text(encoding="utf-8")
     return HEADER.format(name=name) + IMAGE_REF.sub(r"](/\1)", readme)
 
 
@@ -74,7 +74,7 @@ def render_docs(name: str, source: str) -> str:
         return f"]({GITHUB_TREE}/{name}/{'/'.join(parts)}{match.group(2) or ''})"
 
     header = HEADER.format(name=name).replace("README.md", source)
-    return header + RELATIVE_LINK.sub(absolute, path.read_text())
+    return header + RELATIVE_LINK.sub(absolute, path.read_text(encoding="utf-8"))
 
 
 def sync_images(name: str) -> list[str]:
@@ -106,21 +106,21 @@ def main() -> int:
         page = DOCS / f"{name}-README.md"
         want = render_docs(name, source)
         if args.check:
-            if not page.exists() or page.read_text() != want:
+            if not page.exists() or page.read_text(encoding="utf-8") != want:
                 drifted.append(str(page.relative_to(REPO)))
             continue
-        if not page.exists() or page.read_text() != want:
-            page.write_text(want)
+        if not page.exists() or page.read_text(encoding="utf-8") != want:
+            page.write_text(want, encoding="utf-8")
             print(f"wrote {page.relative_to(REPO)}")
     for name in SYNCED:
         page = DOCS / f"{name}-README.md"
         want = render(name)
         if args.check:
-            if not page.exists() or page.read_text() != want:
+            if not page.exists() or page.read_text(encoding="utf-8") != want:
                 drifted.append(str(page.relative_to(REPO)))
             continue
-        if not page.exists() or page.read_text() != want:
-            page.write_text(want)
+        if not page.exists() or page.read_text(encoding="utf-8") != want:
+            page.write_text(want, encoding="utf-8")
             print(f"wrote {page.relative_to(REPO)}")
         for image in sync_images(name):
             print(f"wrote {(PUBLIC / image).relative_to(REPO)}")

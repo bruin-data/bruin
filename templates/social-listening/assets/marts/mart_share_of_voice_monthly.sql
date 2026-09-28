@@ -12,7 +12,7 @@ description: |
   * denominator_organic_mentions: organic brand plus competitor mentions for
     the same month and source. share_of_voice = organic_mentions / that
     denominator, for brand and competitor rows only (NULL for topics).
-  * coverage: days covered by successful collection windows for the source
+  * coverage: days covered by complete (status ok, not partial) collection windows for the source
     divided by days elapsed in the month (as of the run), and the list of
     sources that contributed. Low coverage means the share is not comparable
     across months.
@@ -128,10 +128,11 @@ denominator AS (
 ),
 
 covered_days AS (
-    -- Days covered by successful collection windows (works for backfills too).
+    -- Days covered by complete collection windows (works for backfills too).
+    -- Partial runs (a query or community failed) do not count as coverage.
     SELECT source, {{ sl_days_in_range("window_start", "window_end") }} AS covered_day
     FROM operations.fct_source_run
-    WHERE run_status IN ('ok', 'partial') AND window_end > window_start
+    WHERE run_status = 'ok' AND window_end > window_start
 ),
 
 collection_days AS (

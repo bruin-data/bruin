@@ -29,6 +29,19 @@ columns:
     checks:
       - name: accepted_values
         value: [ok, partial, failed, disabled]
+custom_checks:
+  - name: every enabled source collected recently
+    description: Freshness check. Fails when an enabled source has had no successful collection within stale_after_minutes (for example when only the enrich tier is scheduled). marts.mart_pipeline_health shows which source.
+    query: |
+      SELECT COUNT(*) FROM (
+        SELECT source
+        FROM operations.fct_source_run
+        GROUP BY source
+        HAVING MAX(CASE WHEN run_status <> 'disabled' THEN collected_at END) IS NOT NULL
+           AND COALESCE(MAX(CASE WHEN run_status IN ('ok', 'partial') THEN collected_at END), TIMESTAMP '1970-01-01')
+               < CAST(timezone('UTC', current_timestamp) AS TIMESTAMP) - INTERVAL {{ var.stale_after_minutes }} MINUTE
+      )
+    value: 0
 @bruin */
 
 WITH summaries AS (
