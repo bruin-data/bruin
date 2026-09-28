@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -24,7 +25,12 @@ func TestCompileVariableSchemaBlocksExternalLoading(t *testing.T) {
 	t.Cleanup(server.Close)
 	file := filepath.Join(t.TempDir(), "schema.json")
 	require.NoError(t, os.WriteFile(file, []byte(`{"type":"integer"}`), 0o600))
-	fileURL := (&url.URL{Scheme: "file", Path: file}).String()
+	// Windows paths need a leading slash to form file:///C:/... URLs.
+	filePath := filepath.ToSlash(file)
+	if !strings.HasPrefix(filePath, "/") {
+		filePath = "/" + filePath
+	}
+	fileURL := (&url.URL{Scheme: "file", Path: filePath}).String()
 
 	t.Cleanup(func() { assert.Zero(t, requests.Load()) })
 	for name, document := range map[string]map[string]any{

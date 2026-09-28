@@ -397,6 +397,69 @@ func TestIndividualTasks(t *testing.T) {
 			},
 		},
 		{
+			name: "validate-variable-schema-warning",
+			task: e2e.Task{
+				Name:    "validate-variable-schema-warning",
+				Command: binary,
+				Args: []string{
+					"validate", "--var", `users=[1]`,
+					filepath.Join(currentFolder, "test-pipelines/variables-interpolation"),
+				},
+				Env: []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"variables.users: value does not satisfy its schema: 0: Invalid type. Expected: string, given: integer (valid-variable-schemas)", "found 1 warning"},
+				},
+				WorkingDir: currentFolder,
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "validate-variable-schema-warning-fast",
+			task: e2e.Task{
+				Name:    "validate-variable-schema-warning-fast",
+				Command: binary,
+				Args: []string{
+					"validate", "--fast", "--var", `users=[1]`,
+					filepath.Join(currentFolder, "test-pipelines/variables-interpolation"),
+				},
+				Env: []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"variables.users: value does not satisfy its schema: 0: Invalid type. Expected: string, given: integer (valid-variable-schemas)", "found 1 warning"},
+				},
+				WorkingDir: currentFolder,
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "validate-variable-schema-exclude-warnings",
+			task: e2e.Task{
+				Name:    "validate-variable-schema-exclude-warnings",
+				Command: binary,
+				Args: []string{
+					"validate", "--exclude-warnings", "--var", `users=[1]`,
+					filepath.Join(currentFolder, "test-pipelines/variables-interpolation"),
+				},
+				Env: []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"Successfully validated 2 assets across 1 pipeline"},
+				},
+				WorkingDir: currentFolder,
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
 			name: "render-start-date-flag",
 			task: e2e.Task{
 				Name:    "render-start-date-flag",
