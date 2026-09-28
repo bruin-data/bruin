@@ -52,10 +52,12 @@ deps: ingestr-hashes
 	@go mod tidy
 
 .PHONY: ingestr-hashes
-ingestr-hashes: pkg/python/ingestr_hashes.json
-
-pkg/python/ingestr_hashes.json: pkg/python/uv.go scripts/generate_ingestr_hashes.py
-	@python3 scripts/generate_ingestr_hashes.py
+ingestr-hashes:
+	@if [ "$(INGESTR_HASHES_PREVERIFIED)" = "1" ]; then \
+		test -s pkg/python/ingestr_hashes.json || { echo "preverified ingestr hash manifest is missing" >&2; exit 1; }; \
+	else \
+		python3 scripts/generate_ingestr_hashes.py; \
+	fi
 
 build: deps
 	@echo "$(OK_COLOR)==> Building the application...$(NO_COLOR)"

@@ -88,7 +88,9 @@ supporting release verification, authenticated using `gh auth login` or
 `GH_TOKEN`. Each invocation verifies the release again; missing credentials,
 unsupported tooling, or a verification/download failure stops the command
 before compilation. Existing generated output is never a fallback for a failed
-build verification.
+build verification. CI consumer jobs are the exception: the dedicated verifier
+sets `INGESTR_HASHES_PREVERIFIED=1` and passes them the manifest generated in the
+same workflow run. That mode fails if the artifact is missing or empty.
 
 For direct `go build`, GoReleaser, or `docker build` commands, first run
 `make ingestr-hashes`. Go's `go:embed` requires the generated
