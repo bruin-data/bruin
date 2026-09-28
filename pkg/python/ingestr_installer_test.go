@@ -270,5 +270,9 @@ func TestRunVerifiedIngestrScript(t *testing.T) {
 	script := []byte("printf '%s|%s|%s' \"$SHELL\" \"$1\" \"$2\"\n")
 	err = runVerifiedIngestrScript(t.Context(), &output, shell, script, []string{"-s", "--", "path with spaces", "$(echo injected)"})
 	require.NoError(t, err)
-	assert.Equal(t, "bruin-installer|path with spaces|$(echo injected)", output.String())
+	parts := strings.Split(output.String(), "|")
+	require.Len(t, parts, 3)
+	assert.Equal(t, "bruin-installer", filepath.Base(parts[0]))
+	assert.Equal(t, "path with spaces", parts[1])
+	assert.Equal(t, "$(echo injected)", parts[2])
 }
