@@ -105,7 +105,8 @@ var ReverseETLIngestrStrategies = []string{
 // ReverseETLIngestrDestinations are the destinations that accept
 // ReverseETLIngestrStrategies. Add new ones as they gain ingestr's IsReverseETL marker.
 var ReverseETLIngestrDestinations = map[string]bool{
-	"hubspot": true,
+	"hubspot":    true,
+	"salesforce": true,
 }
 
 // IsIngestrStrategySupported checks if a given strategy string is supported by ingestr.

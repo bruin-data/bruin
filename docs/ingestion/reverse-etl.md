@@ -24,6 +24,7 @@ Two things follow from this:
 | Destination | What you can write |
 | ----------- | ------------------ |
 | [HubSpot](/ingestion/hubspot#hubspot-as-a-destination) | CRM records (contacts, companies, deals, custom objects) and associations |
+| [Salesforce](/ingestion/salesforce#salesforce-as-a-destination) | Records of any standard or custom object, and the links between them |
 | [CleverTap](/ingestion/clevertap#clevertap-as-a-destination) | User profiles and events |
 
 Each destination's page has its own connection setup, object types, and quirks. This page covers what they share.
@@ -52,10 +53,10 @@ On a destination that supports deletion, `replace` removes **every** record that
 
 `merge`, `update`, and `delete` need to find the existing record. That's two separate things:
 
-- **Remote field to match on** — a destination-side property, set on `destination_table` (e.g. `destination_table: 'contacts?id_property=email'`).
+- **Remote field to match on** — a destination-side field, set on `destination_table` (e.g. `'contacts?id_property=email'` on HubSpot, `'Contact?external_id=Email'` on Salesforce).
 - **Source column with the value** — the column marked `primary_key: true` in the asset's `columns`.
 
-They're independent — the `id_property` names the remote property, and the `primary_key` column supplies the value matched against it.
+They're independent — the `destination_table` parameter names the remote field, and the `primary_key` column supplies the value matched against it.
 
 The exact identity rules differ per destination — what counts as a valid match field, and whether more than one key is allowed, depends on the API. See each page.
 

@@ -2554,6 +2554,34 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 			wantErr:        assert.NoError,
 		},
 		{
+			name: "valid ingestr asset with reverse-ETL update strategy on salesforce",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection":    "conn1",
+					"source_table":         "table1",
+					"destination":          "salesforce",
+					"incremental_strategy": "update",
+				},
+			},
+			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "valid ingestr asset with reverse-ETL delete strategy on salesforce",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection":    "conn1",
+					"source_table":         "table1",
+					"destination":          "salesforce",
+					"incremental_strategy": "delete",
+				},
+			},
+			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
+		{
 			name: "ingestr asset with reverse-ETL update strategy on a non-reverse-ETL destination",
 			asset: &pipeline.Asset{
 				Type: pipeline.AssetTypeIngestr,
