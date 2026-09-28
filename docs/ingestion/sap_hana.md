@@ -83,7 +83,7 @@ parameters:
 
 - `name`: The destination table in SAP HANA, as `schema.table` or `table`.
 - `connection`: The name of the SAP HANA connection defined in `.bruin.yml`, used as the destination.
-- `source_connection`: The name of the source connection (e.g., Postgres), which must also be defined in `.bruin.yml`.
+- `source_connection`: The name of the source connection (e.g., Postgres), which must also be configured as a Bruin connection.
 - `source_table`: The table from the source to ingest.
 - `destination`: Set to `hana` to use SAP HANA as the destination.
 
