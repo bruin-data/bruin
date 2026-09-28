@@ -33,6 +33,7 @@ jobs:
           retention-days: 1
 
   integration-tests:
+    needs: [verify-ingestr]
     strategy:
       matrix:
         platform: [ depot-ubuntu-latest-4, depot-macos-15, depot-windows-latest-4 ]
@@ -46,6 +47,10 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ingestr-hashes
+          path: pkg/python
       - name: Setup Go
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
@@ -103,11 +108,16 @@ jobs:
 
   cloud-integration-tests:
     name: Cloud Integration Tests (BigQuery)
+    needs: [verify-ingestr]
     runs-on: depot-ubuntu-latest-4
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ingestr-hashes
+          path: pkg/python
 
       - name: Setup Go
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6

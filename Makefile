@@ -52,7 +52,9 @@ deps: ingestr-hashes
 	@go mod tidy
 
 .PHONY: ingestr-hashes
-ingestr-hashes:
+ingestr-hashes: pkg/python/ingestr_hashes.json
+
+pkg/python/ingestr_hashes.json: pkg/python/uv.go scripts/generate_ingestr_hashes.py
 	@python3 scripts/generate_ingestr_hashes.py
 
 build: deps

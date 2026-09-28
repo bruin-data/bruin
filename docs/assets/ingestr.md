@@ -65,9 +65,12 @@ hashes, with no separate script pin or manual hash maintenance.
 The generated manifest is a temporary build input ignored by Git, not a
 committed or manually maintained file. Release CI
 generates it in an authenticated verification job and passes it to the Unix,
-Windows, and Docker build jobs. The version-update workflow also verifies the
-candidate release before proposing a version bump. The pin is v1.1.54, which
-includes the installer's optional expected-archive-hash interface. Earlier
+Windows, and Docker build jobs. Pull-request CI uses the same mechanism: it
+generates one authenticated manifest on GitHub's maintained runner and passes
+those exact bytes to every test, lint, integration, and Docker build job. The
+version-update workflow also verifies the candidate release before proposing a
+version bump. The pin is v1.1.57, which includes the installer's optional
+expected-archive-hash interface. Earlier
 releases such as v1.1.50 lack that interface; v1.1.48 also lacks the required
 immutable-release evidence.
 
@@ -171,7 +174,7 @@ parameters:
 | `source` | No | _n/a_ | Overrides the inferred source type. For example, set `gsheets` when reusing a BigQuery connection for Google Sheets. |
 | `source_table` | Yes | `--source-table` | Table, sheet, or resource identifier to pull from the source. |
 | `file_type` | No | `--source-table` suffix | Appended to the `source_table` as `table#type` for connectors that need a file format hint (`csv`, `jsonl`, `parquet`). |
-| `version` | No | _n/a_ | Selects the version of ingestr to install and use: `v1`, `v0`, or an exact pin such as `v1.1.54`. Fresh v1+ downloads require a trusted embedded hash; see [archive verification](#installation-and-archive-verification). |
+| `version` | No | _n/a_ | Selects the version of ingestr to install and use: `v1`, `v0`, or an exact pin such as `v1.1.57`. Fresh v1+ downloads require a trusted embedded hash; see [archive verification](#installation-and-archive-verification). |
 | `materialization` | No | `--incremental-*`, `--partition-by`, `--cluster-by` | Preferred way to define destination write behavior. Supports `type: table` with `create+replace`, `append`, `merge`, `delete+insert`, and `truncate+insert`. |
 | `destination` | Unless `connection` or `destination_connection` is set | _n/a_ | Logical destination type used for default connection inference. When `connection` and `destination_connection` are omitted, Bruin uses this value to choose the pipeline default destination connection. |
 | `destination_connection` | No | _n/a_ | Named destination connection to use when `connection` is omitted. This overrides default connection inference from `destination`. |
