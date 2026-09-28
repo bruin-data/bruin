@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -44,7 +45,8 @@ func TestIngestrCheckerInstallsAndCachesExactRelease(t *testing.T) {
 func TestIngestrCheckerFailedInstallation(t *testing.T) {
 	t.Parallel()
 	for _, missing := range []bool{false, true} {
-		t.Run(fmt.Sprint(missing), func(t *testing.T) {
+		t.Run(strconv.FormatBool(missing), func(t *testing.T) {
+			t.Parallel()
 			home := t.TempDir()
 			checker := &IngestrChecker{install: func(context.Context, io.Writer, string, string) error {
 				if missing {
@@ -71,7 +73,7 @@ func TestIngestrCheckerRejectsInvalidVersion(t *testing.T) {
 func TestIngestrFreshDownload(t *testing.T) {
 	t.Parallel()
 	for _, platform := range []struct{ os, arch, archive string }{
-		{"windows", "amd64", "ingestr_Windows_x86_64.zip"},
+		{windowsOS, "amd64", "ingestr_Windows_x86_64.zip"},
 	} {
 		t.Run(platform.os+platform.arch, func(t *testing.T) {
 			t.Parallel()
@@ -95,7 +97,7 @@ func TestIngestrFreshDownload(t *testing.T) {
 						requests++
 						assert.Equal(t, "/v1.2.3/"+platform.archive, r.URL.Path)
 						if scenario == "http-error" {
-							w.WriteHeader(404)
+							w.WriteHeader(http.StatusNotFound)
 							return
 						}
 						_, _ = w.Write(archive)
@@ -151,7 +153,7 @@ func TestEmbeddedIngestrHashes(t *testing.T) {
 	}
 	assert.Regexp(t, "^[a-f0-9]{40}$", hashes[IngestrVersionV1].InstallerCommit)
 	assert.Regexp(t, "^[a-f0-9]{64}$", hashes[IngestrVersionV1].InstallerSHA256)
-	_, err := ingestrArchiveName("windows", "arm64")
+	_, err := ingestrArchiveName(windowsOS, "arm64")
 	require.Error(t, err)
 	// The real default installer must fail closed before any network request.
 	require.ErrorContains(t, runIngestrInstaller(t.Context(), io.Discard, t.TempDir(), "99.0.0"), "no trusted embedded")
@@ -159,7 +161,7 @@ func TestEmbeddedIngestrHashes(t *testing.T) {
 
 func ingestrTestArchive(t *testing.T, goos, name, contents string) []byte {
 	t.Helper()
-	require.Equal(t, "windows", goos)
+	require.Equal(t, windowsOS, goos)
 	var buffer bytes.Buffer
 	archive := zip.NewWriter(&buffer)
 	file, err := archive.Create(name)
@@ -177,7 +179,7 @@ func TestIngestrVerifiedScript(t *testing.T) {
 		{"linux", "arm64", "ingestr_Linux_arm64.tar.gz"},
 		{"darwin", "amd64", "ingestr_Darwin_x86_64.tar.gz"},
 		{"darwin", "arm64", "ingestr_Darwin_arm64.tar.gz"},
-		{"windows", "amd64", "ingestr_Windows_x86_64.zip"},
+		{windowsOS, "amd64", "ingestr_Windows_x86_64.zip"},
 	} {
 		t.Run(platform.os+platform.arch, func(t *testing.T) {
 			t.Parallel()
@@ -218,7 +220,7 @@ func TestIngestrVerifiedScript(t *testing.T) {
 							assert.Equal(t, "test-sh", shell)
 							assert.Equal(t, script, contents)
 							wantDir := dir
-							if platform.os == "windows" {
+							if platform.os == windowsOS {
 								wantDir = strings.ReplaceAll(dir, `\`, "/")
 							}
 							assert.Equal(t, []string{"-s", "--", "-b", wantDir, "-s", archiveHash, "v1.2.3"}, args)

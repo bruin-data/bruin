@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/sha256"
 	_ "embed"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -31,6 +32,7 @@ const (
 	ingestrScriptDownloadURL  = "https://raw.githubusercontent.com/bruin-data/ingestr"
 	maxIngestrBinarySize      = 512 * 1024 * 1024
 	maxIngestrScriptSize      = 1024 * 1024
+	windowsOS                 = "windows"
 )
 
 // ingestrInstallMu prevents concurrent installations within the same Bruin
@@ -147,7 +149,7 @@ func isIngestrBinary(path string) bool {
 }
 
 func ingestrBinaryName(goos string) string {
-	if goos == "windows" {
+	if goos == windowsOS {
 		return "ingestr.exe"
 	}
 	return "ingestr"
@@ -184,7 +186,7 @@ func (r ingestrInstallerRuntime) install(ctx context.Context, output io.Writer, 
 
 	shell, err := r.findShell("sh")
 	if err != nil {
-		if r.goos == "windows" {
+		if r.goos == windowsOS {
 			return r.installWindowsRelease(ctx, output, installDir, version, archiveName, expected)
 		}
 		return errors.Wrap(err, "the ingestr installer requires sh")
@@ -210,9 +212,9 @@ func (r ingestrInstallerRuntime) install(ctx context.Context, output io.Writer, 
 		return errors.Wrap(err, "failed to read ingestr installer")
 	}
 	if len(script) > maxIngestrScriptSize || fmt.Sprintf("%x", sha256.Sum256(script)) != release.InstallerSHA256 {
-		return fmt.Errorf("ingestr installer SHA-256 verification failed")
+		return errors.New("ingestr installer SHA-256 verification failed")
 	}
-	if r.goos == "windows" {
+	if r.goos == windowsOS {
 		// Git Bash/MSYS accepts drive-letter paths in slash form.
 		installDir = strings.ReplaceAll(installDir, `\`, "/")
 	}
@@ -225,7 +227,7 @@ func (r ingestrInstallerRuntime) install(ctx context.Context, output io.Writer, 
 
 func runVerifiedIngestrScript(ctx context.Context, output io.Writer, shell string, script []byte, args []string) error {
 	cmd := exec.CommandContext(ctx, shell, args...) //nolint:gosec
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == windowsOS {
 		configureCommandCancellation(cmd)
 	} else {
 		// Give the installer's TERM trap time to stop downloads and clean up.
@@ -273,7 +275,7 @@ func (r ingestrInstallerRuntime) installWindowsRelease(ctx context.Context, outp
 	if closeErr != nil {
 		return errors.Wrap(closeErr, "failed to close ingestr release archive")
 	}
-	if written > maxIngestrBinarySize || fmt.Sprintf("%x", hash.Sum(nil)) != expected {
+	if written > maxIngestrBinarySize || hex.EncodeToString(hash.Sum(nil)) != expected {
 		return fmt.Errorf("ingestr v%s %s archive SHA-256 verification failed", version, archiveName)
 	}
 
@@ -281,13 +283,13 @@ func (r ingestrInstallerRuntime) installWindowsRelease(ctx context.Context, outp
 }
 
 func ingestrArchiveName(goos, goarch string) (string, error) {
-	osName := map[string]string{"linux": "Linux", "darwin": "Darwin", "windows": "Windows"}[goos]
+	osName := map[string]string{"linux": "Linux", "darwin": "Darwin", windowsOS: "Windows"}[goos]
 	archName := map[string]string{"amd64": "x86_64", "arm64": "arm64"}[goarch]
-	if osName == "" || archName == "" || (goos == "windows" && goarch != "amd64") {
+	if osName == "" || archName == "" || (goos == windowsOS && goarch != "amd64") {
 		return "", fmt.Errorf("ingestr standalone releases do not support %s/%s", goos, goarch)
 	}
 	ext := ".tar.gz"
-	if goos == "windows" {
+	if goos == windowsOS {
 		ext = ".zip"
 	}
 	return "ingestr_" + osName + "_" + archName + ext, nil
