@@ -31,21 +31,22 @@ columns:
         value: [ok, partial, failed, disabled]
 custom_checks:
   - name: every enabled source collected recently
-    description: Freshness check. Fails when a source whose latest run is enabled has had no successful collection within stale_after_minutes (for example when only the enrich tier is scheduled). Sources whose latest run is disabled are ignored. Non-blocking, so enrichment still runs; marts.mart_pipeline_health shows which source.
+    description: Freshness check. Fails when a source enabled in the current settings has had no successful collection within stale_after_minutes (for example when only the enrich tier is scheduled). Non-blocking, so enrichment still runs; marts.mart_pipeline_health shows which source.
     blocking: false
     query: |
-      WITH ranked AS (
-        SELECT source, run_status, collected_at,
-               ROW_NUMBER() OVER (PARTITION BY source ORDER BY collected_at DESC, run_key) AS rn
-        FROM operations.fct_source_run
-      )
       SELECT COUNT(*) FROM (
-        SELECT l.source
-        FROM ranked l
+        SELECT e.source
+        FROM (
+          SELECT 'reddit' AS source, {{ sl_bool(var.reddit_enabled) }} AS enabled
+          UNION ALL SELECT 'hackernews', {{ sl_bool(var.hackernews_enabled) }}
+          UNION ALL SELECT 'github', {{ sl_bool(var.github_enabled) }}
+          UNION ALL SELECT 'stackoverflow', {{ sl_bool(var.stackoverflow_enabled) }}
+          UNION ALL SELECT 'authorised_export', {{ sl_bool(var.authorised_export_enabled) }}
+        ) e
         LEFT JOIN operations.fct_source_run r
-          ON r.source = l.source AND r.run_status IN ('ok', 'partial')
-        WHERE l.rn = 1 AND l.run_status <> 'disabled'
-        GROUP BY l.source
+          ON r.source = e.source AND r.run_status IN ('ok', 'partial')
+        WHERE e.enabled
+        GROUP BY e.source
         HAVING COALESCE(MAX(r.collected_at), TIMESTAMP '1970-01-01')
                < CAST(timezone('UTC', current_timestamp) AS TIMESTAMP) - INTERVAL {{ var.stale_after_minutes }} MINUTE
       )
