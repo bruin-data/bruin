@@ -3777,6 +3777,50 @@ func TestBlockingRelationshipsCheckReferencesDownstreamRuleIsWarning(t *testing.
 	assert.Nil(t, findRule(rulesWithoutWarnings))
 }
 
+func TestVariableSchemaValidationIsAWarning(t *testing.T) {
+	t.Parallel()
+
+	const ruleName = "valid-variable-schemas"
+	findRule := func(rules []Rule) Rule {
+		for _, rule := range rules {
+			if rule.Name() == ruleName {
+				return rule
+			}
+		}
+		return nil
+	}
+
+	rules, err := GetRules(afero.NewMemMapFs(), nil, false, nil, false)
+	require.NoError(t, err)
+	rule := findRule(rules)
+	require.NotNil(t, rule)
+	assert.Equal(t, ValidatorSeverityWarning, rule.GetSeverity())
+	assert.Contains(t, rule.GetApplicableLevels(), LevelPipeline)
+
+	rulesWithoutWarnings, err := GetRules(afero.NewMemMapFs(), nil, true, nil, false)
+	require.NoError(t, err)
+	assert.Nil(t, findRule(rulesWithoutWarnings), "live run validation excludes warning rules")
+}
+
+func TestValidateVariableSchemas(t *testing.T) {
+	t.Parallel()
+
+	p := &pipeline.Pipeline{
+		Variables: pipeline.Variables{
+			"days": {
+				"type":    "array",
+				"items":   map[string]any{"type": "int"},
+				"default": []any{1, 2, 3},
+			},
+		},
+	}
+
+	issues, err := ValidateVariableSchemas(t.Context(), p)
+	require.NoError(t, err)
+	require.Len(t, issues, 1)
+	assert.Equal(t, `variables.days.items.type: legacy type "int" is treated as "integer"`, issues[0].Description)
+}
+
 func TestValidateDuplicateTags(t *testing.T) {
 	t.Parallel()
 
