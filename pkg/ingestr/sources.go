@@ -1077,6 +1077,8 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "accounts", PrimaryKey: "id", IncKey: "lastupdatedtime", IncStrategy: "merge"},
 		{Name: "vendors", PrimaryKey: "id", IncKey: "lastupdatedtime", IncStrategy: "merge"},
 		{Name: "payments", PrimaryKey: "id", IncKey: "lastupdatedtime", IncStrategy: "merge"},
+		{Name: "purchases", PrimaryKey: "id", IncKey: "lastupdatedtime", IncStrategy: "merge"},
+		{Name: "bills", PrimaryKey: "id", IncKey: "lastupdatedtime", IncStrategy: "merge"},
 	},
 
 	// RevenueCat - Subscription management
