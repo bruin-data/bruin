@@ -401,3 +401,23 @@ class SendTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SlackEscapingTest(unittest.TestCase):
+    def test_content_cannot_ping_or_fake_links(self):
+        from social_listening.delivery import format_slack
+
+        text = format_slack(
+            {
+                "source": "reddit",
+                "content_type": "post",
+                "url": "https://www.reddit.com/r/x/comments/1/",
+                "title": "<!channel> see <https://evil.example|docs> & more",
+                "matched_text": "Example Co",
+                "intent": "question",
+            }
+        )["text"]
+        self.assertNotIn("<!channel>", text)
+        self.assertNotIn("<https://evil.example|docs>", text)
+        self.assertIn("&lt;!channel&gt;", text)
+        self.assertIn("&amp; more", text)

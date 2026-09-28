@@ -277,3 +277,25 @@ class ExportTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class GitHubPullRequestToggleTest(unittest.TestCase):
+    def queries(self, overrides):
+        from social_listening import collect
+        from social_listening.sources import github
+
+        ctx = make_ctx({"github_enabled": True, **overrides})
+        http, _ = collect.build_http(ctx, github.fixture_route, 0.0)
+        list(github.GitHubCollector(ctx, http).collect(ctx.collection_window()))
+        return [u for u in http.transport.requests if "search/issues" in u]
+
+    def test_issues_only_by_default(self):
+        self.assertTrue(all("is%3Aissue" in u for u in self.queries({})))
+
+    def test_pull_requests_opt_in(self):
+        self.assertTrue(
+            all(
+                "is%3Aissue" not in u
+                for u in self.queries({"github_include_pull_requests": True})
+            )
+        )

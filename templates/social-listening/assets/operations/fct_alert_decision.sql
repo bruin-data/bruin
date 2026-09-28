@@ -30,6 +30,8 @@ hooks:
           confidence DOUBLE, assessment_status VARCHAR, model_generated BOOLEAN, published_at TIMESTAMP,
           payload_json VARCHAR, routed_at TIMESTAMP
         )
+    # Redacted or retention-deleted content is removed from the routing log too (payloads hold snippets).
+    - query: DELETE FROM operations.fct_alert_decision WHERE content_id NOT IN (SELECT content_id FROM staging.stg_content_item)
 columns:
   - name: alert_key
     type: varchar
@@ -41,10 +43,6 @@ columns:
     type: varchar
     checks:
       - name: not_null
-      - name: relationships
-    foreign_key:
-      table: staging.stg_content_item
-      column: content_id
   - name: assessment_id
     type: varchar
     checks:
@@ -157,11 +155,11 @@ SELECT
         'relevance', 'relevance',
         'priority', 'priority',
         'confidence', 'confidence',
-        'components', sl_json_object(['relevance', 'relevance', 'intent', 'intent_score', 'fit', 'fit', 'engagement', 'engagement', 'freshness', 'freshness', 'authenticity', 'authenticity']),
+        'components', sl_json_object_nested(['relevance', 'relevance', 'intent', 'intent_score', 'fit', 'fit', 'engagement', 'engagement', 'freshness', 'freshness', 'authenticity', 'authenticity']),
         'assessment_status', 'assessment_status',
         'model_generated', 'model_generated',
         'data_warnings', "CASE WHEN model_generated THEN 'model-generated assessment' WHEN assessment_status <> 'deterministic' THEN 'model unavailable; rule-based score' END",
-        'published_at', 'CAST(published_at AS VARCHAR)'
+        'published_at', sl_iso_utc('published_at')
     ]) }} AS payload_json,
     {{ sl_now_utc() }} AS routed_at
 FROM keyed

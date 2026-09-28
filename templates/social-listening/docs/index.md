@@ -88,7 +88,7 @@ Design choices:
 
 - **Warehouse-first.** Everything is a table in your warehouse. Staging, matching, scoring, routing, marts and data-quality checks are SQL. Python is used only where something external happens: source APIs, the model call and webhook delivery.
 - **Bounded windows.** Each collector reads Bruin's run interval, widened by `late_arrival_hours`. A run can never read more than `source_window_max_days`.
-- **Idempotent by key.** Raw rows are keyed by source, external ID and payload hash. Alerts are keyed by content, destination and routing policy. Delivery attempts are keyed by alert and attempt number. Re-running any window is safe.
+- **Idempotent by key.** Raw rows are keyed by source, external ID and a hash of the content (engagement counters excluded). Alerts are keyed by content, destination and routing policy. Delivery attempts are keyed by alert and attempt number. Re-running any window is safe.
 - **Explainable.** Each score component is stored separately, next to the rule or model that produced it, and the priority formula is checked on every run.
 - **Portable.** Warehouse-specific SQL lives in `macros/social_listening.sql`. Python assets read the warehouse through the Bruin Python SDK.
 
@@ -120,15 +120,16 @@ Python assets install `bruin-sdk` from `requirements.txt` with uv on first run. 
    ```
    For lasting settings, change the defaults in `pipeline.yml` instead of passing `--var` every time.
 4. Review `marts.mart_mention_queue`, `marts.mart_pipeline_health` and `operations.fct_alert_outbox`, and tune the thresholds.
+   Start the live warehouse from a clean state: staging only reads rows from the current mode, but the demo rows stay in raw, so use a new DuckDB file (or `--environment production`) for live data. Replace every demo term too: set `brand_aliases`, `competitors`, `tracked_terms` and `term_rules` (use `[]` to clear), or they will generate live queries.
 5. Enable delivery: set `SL_SLACK_WEBHOOK_URL` (Slack incoming webhook) or `SL_WEBHOOK_URL` with `notification_destination="webhook"`, and set `notification_dry_run=false`.
 
 ### Cloud warehouse: MotherDuck
 
-MotherDuck runs the same DuckDB SQL, so no asset changes are needed:
+MotherDuck runs the same DuckDB SQL, so no asset changes are needed. `requirements.txt` pins `duckdb` to a release MotherDuck accepts; raise it only when MotherDuck supports the newer version. Runs take several minutes on MotherDuck (each quality check is a network round trip) versus under a minute locally.
 
 1. Create a MotherDuck database (for example `social_listening`) and a token.
 2. In your project `.bruin.yml`, add an environment whose warehouse is a `motherduck` connection named `social-listening-warehouse`. `.bruin.yml.example` has a complete `production` environment.
-3. Run with `--environment production`.
+3. Run with `--environment production --force`. Bruin asks for confirmation before running against an environment whose name contains "prod"; `--force` skips the prompt for scheduled runs.
 
 For Bruin Cloud, create the same connection names there. See [bruin-cloud-setup.md](bruin-cloud-setup.md). For other warehouses, see [Porting to another warehouse](#porting-to-another-warehouse).
 
@@ -182,7 +183,8 @@ All policy lives in `pipeline.yml` as typed custom variables. Change the default
 | `reddit_poll_minutes` | integer 5–1440 | `15` | Intended collection cadence. Must be at least 5, and `stale_after_minutes` must be at least twice this. |
 | `hackernews_enabled` | boolean | `true` | Collect Hacker News. |
 | `hackernews_include_comments` | boolean | `true` | Include comments as well as stories. |
-| `github_enabled` | boolean | `false` | Collect public GitHub issues and pull requests. Needs `sl-github-token` when live. |
+| `github_enabled` | boolean | `false` | Collect public GitHub issues. Needs `sl-github-token` when live. |
+| `github_include_pull_requests` | boolean | `false` | Also collect pull requests. They are high volume; expect many more candidates. |
 | `stackoverflow_enabled` | boolean | `false` | Collect Stack Overflow questions. |
 | `slack_community_enabled` | boolean | `false` | Interface only; `true` fails validation. |
 | `authorised_export_enabled` | boolean | `false` | Load an authorised export CSV. |
@@ -316,7 +318,7 @@ Extra source fields belong in `payload_json` (raw), `metrics_json` and `metadata
 
 ## How an item is processed
 
-1. **Collect.** A collector reads the bounded window, follows pagination and rate limits, keeps a minimal field set, and writes immutable rows keyed by `event_key = sha256(source, external_id, sha256(payload))`. The same response read twice gives the same key, so the merge adds nothing. An edited record gets a new key and becomes a new version. Each run writes a `run_summary` row with its counts, errors and high watermark.
+1. **Collect.** A collector reads the bounded window, follows pagination and rate limits, keeps a minimal field set, and writes rows keyed by `event_key = sha256(source, external_id, content_hash)`, where the content hash leaves out engagement counters (score, points, comment counts). Reading the same record again gives the same key; the collector skips keys already stored, so raw rows are never rewritten (engagement counters are those at first collection). An edited title or body gets a new key and becomes a new version. Each run writes a `run_summary` row with its counts, errors and high watermark.
 2. **Normalise.** `stg_content_item` keeps the latest version per source record, cleans HTML, builds a stable `content_id = md5(source || ':' || external_id)`, and removes redacted records.
 3. **De-duplicate.** Records are de-duplicated by source ID first. The only secondary rule is a Reddit cross-post whose original is also present; it is marked `is_syndicated_duplicate` and excluded. The same link shared on two platforms counts as two conversations.
 4. **Match.** `fct_term_match` finds each phrase on word boundaries (case-insensitive), within the term's platform scope and validity dates, and records the exact text. Context rules then accept or reject the match: `phrase_boundary.v1`, `phrase_boundary+context.v1`, `rejected.context_missing.v1` or `rejected.excluded_context.v1`.
@@ -336,7 +338,7 @@ Extra source fields belong in `payload_json` (raw), `metrics_json` and `metadata
 
    `priority = Σ priority_weights[c] × component[c]`, rounded to 4 places. A custom check recomputes it on every run. `reasons_json` lists the human-readable reasons.
 8. **Route.** An eligible assessment whose status is `deterministic` or `llm_assessed` routes when it meets `min_relevance`, `min_priority`, `min_confidence` and `min_intent_score`. Routing writes one row to `fct_alert_decision` with `alert_key = md5(content_id | destination | routing_policy_version)`. The row is never updated, so backfills, late arrivals and model re-assessments cannot alert twice.
-9. **Deliver.** `alert_delivery_attempt` sends pending alerts for the current destination: highest priority first, at most `max_alerts_per_run`, one attempt per alert per run, up to `max_delivery_attempts` in total. Each request carries `Idempotency-Key: <alert_key>`. Transient HTTP errors are retried within the attempt (`http_max_retries`). Dry-run records one `dry_run` row and sends nothing. Delivery never touches the source.
+9. **Deliver.** `alert_delivery_attempt` sends pending alerts for the current destination: highest priority first, at most `max_alerts_per_run`, one attempt per alert per run, up to `max_delivery_attempts` in total. Each request carries `Idempotency-Key: <alert_key>`. Delivery is at-least-once: if a run dies after sending but before recording the attempt, the next run sends again. Webhook receivers can drop the repeat by that key; Slack incoming webhooks ignore it. Transient HTTP errors are retried within the attempt (`http_max_retries`). Dry-run records one `dry_run` row and sends nothing. Delivery never touches the source.
 10. **Review.** Reviewers record outcomes in `assets/operations/review/human_feedback.csv`, which feeds `fct_human_feedback`. Drafts are approved or rejected in `reply_draft_reviews.csv`. Feedback is evidence for evaluation and threshold reviews. Nothing reads it to change rules or scores automatically.
 
 ## Operations
@@ -354,24 +356,26 @@ Extra source fields belong in `payload_json` (raw), `metrics_json` and `metadata
 With cron, CI or any scheduler:
 
 ```bash
-bash scripts/run_tier.sh collect 15 --environment production --var demo_mode=false
-bash scripts/run_tier.sh enrich --environment production --var demo_mode=false
-bash scripts/run_tier.sh report --environment production --var demo_mode=false
+bash scripts/run_tier.sh collect 15 --environment production --force --var demo_mode=false
+bash scripts/run_tier.sh enrich --environment production --force --var demo_mode=false
+bash scripts/run_tier.sh report --environment production --force --var demo_mode=false
 ```
 
 Run the whole pipeline once before scheduling tiers, so every table exists.
 
-In Bruin Cloud a pipeline has one schedule. The simplest setup is to add `schedule: "*/15 * * * *"` (or `hourly`) to `pipeline.yml`, so each run collects its own interval and processes it. The per-run cost is small because enrichment only touches matched content. If you need separate cadences in Cloud, copy the pipeline folder and give each copy a schedule and a tag filter. See [bruin-cloud-setup.md](bruin-cloud-setup.md).
+In Bruin Cloud a pipeline has one schedule. The simplest setup is to add `schedule: "*/15 * * * *"` (or `hourly`) to `pipeline.yml`, so each run collects its own interval and processes it. The per-run cost is small because enrichment only touches matched content. Cloud schedules cannot filter by tag, so for separate cadences run the tiers from your own scheduler with `scripts/run_tier.sh`. See [bruin-cloud-setup.md](bruin-cloud-setup.md).
 
 ### Backfills and watermarks
 
 - The collection window is Bruin's interval `[start, end)`, widened by `late_arrival_hours`, and capped at `source_window_max_days`. Backfill in chunks:
   ```bash
   for day in 2026-01-01 2026-01-02 2026-01-03; do
-    bruin run . --var demo_mode=false --start-date "$day" --end-date "$day"
+    next=$(python3 -c "import datetime,sys; print(datetime.date.fromisoformat(sys.argv[1]) + datetime.timedelta(days=1))" "$day")
+    bruin run . --var demo_mode=false --start-date "$day" --end-date "$next"
   done
   ```
 - Re-running a window is safe. Identical records add nothing, and alerts are keyed by content, not by run.
+- Reddit search counts back from now and caps results, so deep Reddit backfills are incomplete; Hacker News, GitHub and Stack Overflow filter by date on the server.
 - Backfilled content older than `alert_max_age_hours` is recorded as `expired` in the outbox instead of being sent.
 - Each run records its high watermark (newest `published_at` seen) and source cursor in `operations.fct_source_run`. `mart_pipeline_health.watermark_lag_hours` shows how far behind a source is.
 
@@ -410,7 +414,7 @@ Change thresholds or rules on purpose, bump `scoring_version` or `matcher_versio
 | Risk | Control |
 | --- | --- |
 | Posting, DMs or CRM changes | No adapter can post or write back. `allow_mutations=true` fails validation. Drafts have no publishing fields. |
-| Accidental notification spam | Dry-run by default; per-run cap; alert keys stable across backfills; expiry for old content; changing destination never re-sends old alerts. |
+| Accidental notification spam | Dry-run by default; per-run cap; alert keys stable across backfills; expiry for old content; changing the destination stops delivery to the old one (the new destination gets its own alerts for items younger than `alert_max_age_hours`). |
 | Duplicate delivery | Delivered alerts are never re-sent. Idempotency-Key header. A custom check fails the run if any alert is delivered twice. |
 | Invented model output | Validated JSON only; evidence must be verbatim; failures keep NULL scores; `model_generated` and `score_basis` labels; routing ignores failed items by default. |
 | Prompt injection from content | Content is sent as quoted data and the prompt says to ignore instructions in it. The model can only return scores; it cannot act. |
@@ -460,7 +464,9 @@ The SQL assets use ANSI SQL plus the macros in `macros/social_listening.sql`. To
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| `Invalid social-listening configuration:` followed by a list | A variable failed validation. | Fix each listed item. The message names the variable or connection. |
+| `Invalid social-listening configuration:` followed by a list | A variable failed validation. `bruin validate` checks asset definitions only; these policy checks run in `config.settings` at the start of `bruin run`. | Fix each listed item. The message names the variable or connection. |
+| `Your DuckDB version … is not yet supported by MotherDuck` | The Python environment has a newer DuckDB than MotherDuck supports. | Keep the `duckdb==` pin in `requirements.txt` at a supported release. |
+| Run hangs or exits with `The operation is cancelled` | Bruin asks for confirmation on environments named like "prod". | Add `--force` for unattended runs. |
 | `requires a value for the generic connection 'sl-…'` | A live source or delivery is enabled without its secret. | Export the `SL_…` variable, or add the connection in Bruin Cloud. |
 | `Could not set lock on file "….duckdb"` | Another process has the DuckDB file open (for example a DuckDB shell or IDE). | Close it. Keep `max_concurrent_assets: 1` on the DuckDB connection. |
 | `collection window … is longer than source_window_max_days` | The backfill range is too long for one run. | Run it in daily chunks. |
@@ -471,7 +477,7 @@ The SQL assets use ANSI SQL plus the macros in `macros/social_listening.sql`. To
 | Too many false positives | Ambiguous phrases. | Add a `term_rules` entry with `requires_context_any` or `excludes_context_any`, or add `excluded_terms`. |
 | Items stuck in `needs_review_model` | The model failed or is over budget. | Check `llm_error_message`; raise `llm_max_items_per_run`; fix the provider settings. |
 | Outbox shows `failed_permanent` | The webhook rejected every attempt. | Check `last_error` and `last_http_status`, fix the receiver, then bump `routing_policy_version` only if you want the items re-alerted. |
-| Nothing delivered after turning off dry-run | Alerts for content older than `alert_max_age_hours` are expired, or the destination changed. | Expected. New content will alert. |
+| Nothing delivered after turning off dry-run | Alerts for content older than `alert_max_age_hours` are expired. | Expected. New content will alert. |
 | First run of a Python asset is slow | uv installs `bruin-sdk` into a cached environment. | Later runs reuse it. |
 
 ## Testing and CI

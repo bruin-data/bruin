@@ -109,6 +109,16 @@ def plan_attempts(
     return plan
 
 
+def slack_escape(value: Any) -> str:
+    """Escape Slack mrkdwn control characters so post text cannot ping or fake links."""
+    return (
+        str(value if value is not None else "")
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
+
+
 def format_slack(payload: Mapping[str, Any]) -> dict[str, Any]:
     basis = (
         "model-assessed (verify before acting)"
@@ -116,13 +126,13 @@ def format_slack(payload: Mapping[str, Any]) -> dict[str, Any]:
         else "rule-based score"
     )
     lines = [
-        f"*Social listening* · {payload.get('source')} {payload.get('content_type')} · priority {payload.get('priority')} ({basis})",
-        f"<{payload.get('url')}|{(payload.get('title') or payload.get('snippet') or 'open')[:150]}>",
-        f"Matched: {payload.get('matched_text')} · rule {payload.get('rule_ids')}",
-        f"Intent: {payload.get('intent')} · relevance {payload.get('relevance')} · confidence {payload.get('confidence')}",
+        f"*Social listening* · {slack_escape(payload.get('source'))} {slack_escape(payload.get('content_type'))} · priority {payload.get('priority')} ({basis})",
+        f"<{slack_escape(payload.get('url')).replace('|', '%7C')}|{slack_escape((payload.get('title') or payload.get('snippet') or 'open')[:150])}>",
+        f"Matched: {slack_escape(payload.get('matched_text'))} · rule {slack_escape(payload.get('rule_ids'))}",
+        f"Intent: {slack_escape(payload.get('intent'))} · relevance {payload.get('relevance')} · confidence {payload.get('confidence')}",
     ]
     if payload.get("data_warnings"):
-        lines.append(f"Data warnings: {payload.get('data_warnings')}")
+        lines.append(f"Data warnings: {slack_escape(payload.get('data_warnings'))}")
     lines.append(
         f"Review in the queue (alert {str(payload.get('alert_key'))[:12]}). Reply manually on the source platform."
     )

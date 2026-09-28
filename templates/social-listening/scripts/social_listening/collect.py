@@ -71,12 +71,30 @@ def build_http(ctx: RunContext, route, min_interval: float) -> tuple[HttpClient,
     return client, "demo" if demo else "live"
 
 
-def run_source(source: str, ctx: RunContext | None = None) -> list[dict[str, Any]]:
+def stored_keys(source: str, ctx: RunContext) -> set[str]:
+    """Event keys already in raw for this window, so reruns never rewrite a row."""
+    from . import warehouse
+
+    table = f"raw_{source}_content"
+    if not warehouse.table_exists("raw", table):
+        return set()
+    start = ctx.collection_window().start.replace(tzinfo=None).isoformat(sep=" ")
+    rows = warehouse.read(
+        f"SELECT event_key FROM raw.{table} WHERE record_kind = 'content' "
+        f"AND published_at >= CAST({warehouse.literal(start)} AS TIMESTAMP)"
+    )
+    return {r["event_key"] for r in rows}
+
+
+def run_source(
+    source: str, ctx: RunContext | None = None, *, lookup_stored: bool = False
+) -> list[dict[str, Any]]:
     ctx = ctx or load_context()
     cls, route, flag, min_interval = SOURCES[source]
     http, mode = build_http(ctx, route, min_interval)
     enabled = bool(ctx.vars.get(flag, False))
     collector = cls(ctx, http) if enabled else None
+    stored = stored_keys(source, ctx) if (enabled and lookup_stored) else set()
     rows = collect_rows(
         ctx,
         source,
@@ -84,6 +102,7 @@ def run_source(source: str, ctx: RunContext | None = None) -> list[dict[str, Any
         enabled=enabled,
         mode=mode,
         suppressed=redacted_ids(source),
+        stored=stored,
     )
     content = sum(1 for r in rows if r["record_kind"] == "content")
     print(

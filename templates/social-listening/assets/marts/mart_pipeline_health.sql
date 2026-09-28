@@ -15,7 +15,9 @@ description: |
     delivery_failed  alerts in failed_permanent or retrying
     lag              median classification lag above stale_after_minutes
 
-  Times are measured against the run's interval end (data_as_of).
+  Run-based signals (staleness, errors, rate limits) are measured against the
+  current time; content volume is measured against the run's interval end
+  (data_as_of), so backfills report the volume of the window they cover.
 tags: [enrich, report, health, mart]
 depends:
   - operations.fct_source_run
@@ -58,10 +60,10 @@ run_stats AS (
         source,
         MAX(CASE WHEN run_status IN ('ok', 'partial') THEN collected_at END) AS last_success_at,
         MAX(high_watermark) AS high_watermark,
-        SUM(CASE WHEN collected_at > {{ as_of }} - INTERVAL 24 HOUR AND run_status = 'failed' THEN 1 ELSE 0 END) AS failed_runs_24h,
-        SUM(CASE WHEN collected_at > {{ as_of }} - INTERVAL 24 HOUR THEN COALESCE(http_errors, 0) + COALESCE(partial_error_count, 0) ELSE 0 END) AS errors_24h,
-        SUM(CASE WHEN collected_at > {{ as_of }} - INTERVAL 24 HOUR THEN COALESCE(rate_limit_waits, 0) ELSE 0 END) AS rate_limit_waits_24h,
-        SUM(CASE WHEN collected_at > {{ as_of }} - INTERVAL 24 HOUR THEN COALESCE(duplicates_in_run, 0) ELSE 0 END) AS in_run_duplicates_24h
+        SUM(CASE WHEN collected_at > {{ sl_now_utc() }} - INTERVAL 24 HOUR AND run_status = 'failed' THEN 1 ELSE 0 END) AS failed_runs_24h,
+        SUM(CASE WHEN collected_at > {{ sl_now_utc() }} - INTERVAL 24 HOUR THEN COALESCE(http_errors, 0) + COALESCE(partial_error_count, 0) ELSE 0 END) AS errors_24h,
+        SUM(CASE WHEN collected_at > {{ sl_now_utc() }} - INTERVAL 24 HOUR THEN COALESCE(rate_limit_waits, 0) ELSE 0 END) AS rate_limit_waits_24h,
+        SUM(CASE WHEN collected_at > {{ sl_now_utc() }} - INTERVAL 24 HOUR THEN COALESCE(duplicates_in_run, 0) ELSE 0 END) AS in_run_duplicates_24h
     FROM runs
     GROUP BY source
 ),
@@ -110,7 +112,7 @@ source_rows AS (
         CAST(NULL AS INTEGER) AS failed_alerts,
         CASE WHEN l.run_status = 'disabled' THEN 'disabled' END AS forced_status,
         {{ sl_json_array_of([
-            "CASE WHEN l.run_status <> 'disabled' AND (r.last_success_at IS NULL OR " ~ sl_minutes_between("r.last_success_at", as_of) ~ " > " ~ var.stale_after_minutes ~ ") THEN 'stale' END",
+            "CASE WHEN l.run_status <> 'disabled' AND (r.last_success_at IS NULL OR " ~ sl_minutes_between("r.last_success_at", sl_now_utc()) ~ " > " ~ var.stale_after_minutes ~ ") THEN 'stale' END",
             "CASE WHEN l.run_status <> 'disabled' AND ((COALESCE(c.avg_daily_items_7d, 0) > 0 AND COALESCE(c.items_24h, 0) > " ~ var.volume_anomaly_ratio ~ " * c.avg_daily_items_7d AND COALESCE(c.items_24h, 0) >= 10) OR (COALESCE(c.avg_daily_items_7d, 0) >= 5 AND COALESCE(c.items_24h, 0) = 0)) THEN 'abnormal_volume' END",
             "CASE WHEN r.failed_runs_24h + r.errors_24h > 0 THEN 'errors' END",
             "CASE WHEN cl.median_classification_lag_minutes > " ~ var.stale_after_minutes ~ " THEN 'lag' END"

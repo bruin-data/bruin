@@ -30,6 +30,11 @@ def _clean(value: Any) -> Any:
     return value
 
 
+def literal(value: str) -> str:
+    """A SQL string literal (single quotes doubled)."""
+    return "'" + str(value).replace("'", "''") + "'"
+
+
 def read(
     sql: str, connection: str | None = None, attempts: int = 6
 ) -> list[dict[str, Any]]:
@@ -57,7 +62,7 @@ def read(
 def table_exists(schema: str, table: str, connection: str | None = None) -> bool:
     rows = read(
         "SELECT COUNT(*) AS n FROM information_schema.tables "
-        f"WHERE lower(table_schema) = '{schema.lower()}' AND lower(table_name) = '{table.lower()}'",
+        f"WHERE lower(table_schema) = {literal(schema.lower())} AND lower(table_name) = {literal(table.lower())}",
         connection,
     )
     return bool(rows and rows[0]["n"])

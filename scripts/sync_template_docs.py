@@ -35,6 +35,15 @@ SYNCED = (
     "stripe-bigquery",
 )
 
+# Templates whose docs page is generated from a full documentation file rather
+# than the README. Relative links to sibling files, which only resolve inside
+# the template, are rewritten to the file on GitHub.
+SYNCED_DOCS = {
+    "social-listening": "docs/index.md",
+}
+GITHUB_TREE = "https://github.com/bruin-data/bruin/blob/main/templates"
+RELATIVE_LINK = re.compile(r"\]\((?!https?://|#|/)([^)#]+)(#[^)]*)?\)")
+
 HEADER = (
     "<!-- Generated from templates/{name}/README.md. Do not edit directly; "
     "run `make sync-template-docs`. -->\n"
@@ -47,6 +56,25 @@ def render(name: str) -> str:
     """Return the docs-page content for a template's README."""
     readme = (TEMPLATES / name / "README.md").read_text()
     return HEADER.format(name=name) + IMAGE_REF.sub(r"](/\1)", readme)
+
+
+def render_docs(name: str, source: str) -> str:
+    """Return the docs-page content for a template's documentation file."""
+    path = TEMPLATES / name / source
+    base = pathlib.PurePosixPath(source).parent
+
+    def absolute(match: re.Match) -> str:
+        target = pathlib.PurePosixPath(base / match.group(1))
+        parts: list[str] = []
+        for part in target.parts:
+            if part == "..":
+                parts.pop()
+            elif part != ".":
+                parts.append(part)
+        return f"]({GITHUB_TREE}/{name}/{'/'.join(parts)}{match.group(2) or ''})"
+
+    header = HEADER.format(name=name).replace("README.md", source)
+    return header + RELATIVE_LINK.sub(absolute, path.read_text())
 
 
 def sync_images(name: str) -> list[str]:
@@ -74,6 +102,16 @@ def main() -> int:
     args = parser.parse_args()
 
     drifted = []
+    for name, source in SYNCED_DOCS.items():
+        page = DOCS / f"{name}-README.md"
+        want = render_docs(name, source)
+        if args.check:
+            if not page.exists() or page.read_text() != want:
+                drifted.append(str(page.relative_to(REPO)))
+            continue
+        if not page.exists() or page.read_text() != want:
+            page.write_text(want)
+            print(f"wrote {page.relative_to(REPO)}")
     for name in SYNCED:
         page = DOCS / f"{name}-README.md"
         want = render(name)

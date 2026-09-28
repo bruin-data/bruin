@@ -1,4 +1,4 @@
--- Raw tables are keyed by event_key (source + external ID + payload hash).
+-- Raw tables are keyed by event_key (source + external ID + content hash; engagement counters excluded).
 SELECT 'reddit' AS source_table, event_key, COUNT(*) AS copies
 FROM raw.raw_reddit_content GROUP BY event_key HAVING COUNT(*) > 1
 UNION ALL

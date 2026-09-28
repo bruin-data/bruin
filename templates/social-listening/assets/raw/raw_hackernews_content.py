@@ -3,10 +3,11 @@ name: raw.raw_hackernews_content
 type: python
 description: |
   Hacker News stories and comments through the public Algolia HN Search API. No credentials needed.
-  Immutable source records for the run's bounded window (Bruin's interval
-  widened by late_arrival_hours). Keyed by an event key of source, external ID
-  and payload hash, so re-running a window adds nothing and an edited record is
-  kept as a new version. Each run also writes one run_summary row with request,
+  Source records for the run's bounded window (Bruin's interval widened by
+  late_arrival_hours). Keyed by an event key of source, external ID and a hash
+  of the content (engagement counters excluded). Rows are never rewritten: a
+  record already stored is skipped, so re-running a window adds nothing, and an
+  edited record is kept as a new version. Each run also writes one run_summary row with request,
   retry, rate-limit and error counts and the high watermark.
 tags: [collect, raw]
 depends:
@@ -75,4 +76,4 @@ from social_listening.sources.base import RAW_COLUMNS  # noqa: E402
 
 
 def materialize():
-    return to_frame(run_source("hackernews"), RAW_COLUMNS)
+    return to_frame(run_source("hackernews", lookup_stored=True), RAW_COLUMNS)

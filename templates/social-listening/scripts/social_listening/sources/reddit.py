@@ -10,6 +10,10 @@
 * Excluded communities are dropped before storage.
 * Only a minimal set of public fields is kept (see ``KEEP_FIELDS``).
 
+Reddit search only reaches back so far and returns at most about 1,000 results
+per query, so deep backfills are incomplete; the run summary records a partial
+error when pagination stops before the window start.
+
 Reddit's API terms require a registered app, a descriptive User-Agent, and
 honouring deletion. See docs/sources-and-privacy.md.
 """
@@ -18,7 +22,7 @@ from __future__ import annotations
 
 import base64
 import urllib.parse
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Iterator
 
 from ..http import utc_from_epoch
@@ -52,8 +56,10 @@ KEEP_FIELDS = (
 MAX_QUERY_CHARS = 400
 
 
-def time_filter(window: Window) -> str:
-    span = window.end - window.start
+def time_filter(window: Window, now: datetime | None = None) -> str:
+    """Reddit's ``t`` filter counts back from now, so it must cover now - window.start."""
+    now = now or datetime.now(timezone.utc)
+    span = now - window.start
     for name, limit in (
         ("hour", 1 / 24),
         ("day", 1),

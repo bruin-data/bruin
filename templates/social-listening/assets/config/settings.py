@@ -11,7 +11,7 @@ description: |
 tags: [collect, enrich, report]
 materialization:
   type: table
-  strategy: create+replace
+  strategy: merge
 secrets:
   - key: sl-reddit-client-id
     inject_as: REDDIT_CLIENT_ID
@@ -21,6 +21,8 @@ secrets:
     inject_as: REDDIT_USER_AGENT
   - key: sl-github-token
     inject_as: GITHUB_TOKEN
+  - key: sl-stackexchange-key
+    inject_as: STACKEXCHANGE_KEY
   - key: sl-webhook-url
     inject_as: SOCIAL_LISTENING_WEBHOOK_URL
   - key: sl-slack-webhook-url
@@ -30,6 +32,7 @@ secrets:
 columns:
   - name: run_id
     type: varchar
+    primary_key: true
     checks:
       - name: not_null
       - name: unique

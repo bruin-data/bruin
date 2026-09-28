@@ -297,7 +297,8 @@ def validate_policy(ctx: RunContext) -> list[str]:
     if window.end - window.start > timedelta(days=max_days):
         errors.append(
             f"collection window {window.start.isoformat()} .. {window.end.isoformat()} is longer than "
-            f"source_window_max_days={max_days}; run the backfill in smaller chunks"
+            f"source_window_max_days={max_days} (the run interval plus late_arrival_hours="
+            f"{v.get('late_arrival_hours', 0)}); run the backfill in smaller chunks"
         )
 
     # Thresholds.

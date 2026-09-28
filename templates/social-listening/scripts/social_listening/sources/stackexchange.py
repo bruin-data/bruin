@@ -72,6 +72,11 @@ class StackExchangeCollector(SourceCollector):
                         self.http.pause(float(body["backoff"]))
                     if not body.get("has_more"):
                         break
+                else:
+                    self.partial_error(
+                        f"query {phrase!r}",
+                        RuntimeError(f"stopped after max_pages_per_source={max_pages}"),
+                    )
             except Exception as err:
                 if getattr(err, "status", None) in (401, 403):
                     raise

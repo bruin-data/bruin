@@ -312,3 +312,28 @@ class RedactUrlTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TransportFailureRetryTest(unittest.TestCase):
+    def test_connection_errors_are_retried(self):
+        import urllib.error
+
+        from social_listening.http import HttpClient, Response, Transport
+
+        class Flaky(Transport):
+            def __init__(self):
+                self.calls = 0
+
+            def send(self, method, url, headers, body, timeout):
+                self.calls += 1
+                if self.calls == 1:
+                    raise urllib.error.URLError("connection reset")
+                return Response(200, {}, b"{}")
+
+        transport = Flaky()
+        client = HttpClient(
+            transport, min_interval_seconds=0, max_retries=2, sleep=lambda s: None
+        )
+        self.assertEqual(client.request("GET", "https://example.invalid/").status, 200)
+        self.assertEqual(transport.calls, 2)
+        self.assertEqual(client.stats.retries, 1)

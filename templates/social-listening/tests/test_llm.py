@@ -277,12 +277,14 @@ class FixtureProviderTest(unittest.TestCase):
 
 class BuildMessagesTest(unittest.TestCase):
     def test_content_is_wrapped_and_brand_is_configured(self):
-        v = default_vars(brand_name="Acme Widgets", competitors=["Globex", "Initech"])
+        v = default_vars(
+            brand_name="Sample Brand", competitors=["Other Tool", "Third Tool"]
+        )
         candidate = reddit_candidate("t3_p1")
         system, user = build_messages(candidate, v)
-        self.assertIn("Acme Widgets", system)
+        self.assertIn("Sample Brand", system)
         self.assertIn(v["brand_description"], system)
-        self.assertIn("Globex, Initech", system)
+        self.assertIn("Other Tool, Third Tool", system)
         self.assertIn("seeking_recommendation", system)
         self.assertIn("general_discussion", system)
         self.assertNotIn("{{", system)

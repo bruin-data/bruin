@@ -5,13 +5,14 @@ description: |
   per source and across all sources (source = 'all').
 
   * Scope: content with an accepted term match that was not excluded as spam,
-    a bot, a duplicate, an excluded author or community, unsupported or stale.
-    Team and self content stays in scope but is counted separately.
+    a bot, a duplicate, an excluded author or community, or unsupported.
+    Content older than max_content_age_days stays in scope, so past months keep
+    their counts. Team and self content stays in scope but is counted separately.
   * organic_* columns exclude team and self content (team_authors).
   * denominator_organic_mentions: organic brand plus competitor mentions for
     the same month and source. share_of_voice = organic_mentions / that
     denominator, for brand and competitor rows only (NULL for topics).
-  * coverage: days with at least one successful collection run for the source
+  * coverage: days covered by successful collection windows for the source
     divided by days elapsed in the month (as of the run), and the list of
     sources that contributed. Low coverage means the share is not comparable
     across months.
@@ -76,7 +77,7 @@ WITH in_scope AS (
     FROM enrichment.fct_mention_assessment a
     JOIN staging.stg_content_item s ON s.content_id = a.content_id
     WHERE a.assessment_version = {{ sl_str(assessment_version) }}
-      AND (a.is_eligible OR a.exclusion_reason = 'team_or_self_content')
+      AND (a.is_eligible OR a.exclusion_reason IN ('team_or_self_content', 'stale_content'))
 ),
 
 mentions AS (
@@ -126,16 +127,19 @@ denominator AS (
     GROUP BY month, source
 ),
 
+covered_days AS (
+    -- Days covered by successful collection windows (works for backfills too).
+    SELECT source, {{ sl_days_in_range("window_start", "window_end") }} AS covered_day
+    FROM operations.fct_source_run
+    WHERE run_status IN ('ok', 'partial') AND window_end > window_start
+),
+
 collection_days AS (
-    SELECT month, source, COUNT(DISTINCT run_day) AS days_collected
+    SELECT month, source, COUNT(DISTINCT covered_day) AS days_collected
     FROM (
-        SELECT {{ sl_month("collected_at") }} AS month, source, CAST(collected_at AS DATE) AS run_day
-        FROM operations.fct_source_run
-        WHERE run_status IN ('ok', 'partial')
+        SELECT {{ sl_month("covered_day") }} AS month, source, covered_day FROM covered_days
         UNION ALL
-        SELECT {{ sl_month("collected_at") }} AS month, 'all' AS source, CAST(collected_at AS DATE) AS run_day
-        FROM operations.fct_source_run
-        WHERE run_status IN ('ok', 'partial')
+        SELECT {{ sl_month("covered_day") }} AS month, 'all' AS source, covered_day FROM covered_days
     ) runs
     GROUP BY month, source
 ),

@@ -39,6 +39,9 @@ class GitHubCollector(SourceCollector):
         max_pages = int(self.ctx.vars.get("max_pages_per_source", 5))
         # GitHub's created: range is inclusive on both ends; the collector's window check trims the end.
         q = f'"{phrase}" in:title,body is:public created:{_iso(window.start)}..{_iso(window.end)}'
+        if not self.ctx.vars.get("github_include_pull_requests", False):
+            # Pull requests are high volume and rarely conversations; issues only by default.
+            q += " is:issue"
         for page in range(1, max_pages + 1):
             body = self.http.get_json(
                 API,

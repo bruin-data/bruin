@@ -27,6 +27,7 @@ from social_listening.sources.base import (
     SourceCollector,
     canonical_json,
     collect_rows,
+    content_hash,
     event_key,
     sha256,
 )
@@ -84,7 +85,11 @@ class DedupeTest(unittest.TestCase):
         self.assertEqual(row["payload_sha256"], sha256(row["payload_json"]))
         self.assertEqual(
             row["event_key"],
-            event_key("reddit", row["external_id"], row["payload_sha256"]),
+            event_key(
+                "reddit",
+                row["external_id"],
+                content_hash(json.loads(row["payload_json"])),
+            ),
         )
         self.assertNotIn("author_fullname", json.loads(row["payload_json"]))
 
@@ -113,13 +118,40 @@ class IdempotencyTest(unittest.TestCase):
         merged = {r["event_key"]: r for r in first + second}  # merge on the primary key
         self.assertEqual(len(merged), len(first))
 
-    def test_changed_payload_yields_a_new_key(self):
+    def test_engagement_changes_keep_the_key(self):
         ctx = make_ctx()
 
         def bump_score(url, body):
             for child in (body.get("data") or {}).get("children") or []:
                 if child["data"].get("name") == "t3_p1":
                     child["data"]["score"] += 1
+                    child["data"]["num_comments"] += 3
+            return body
+
+        before = {r["external_id"]: r for r in content(reddit_rows(ctx))}
+        after = {
+            r["external_id"]: r
+            for r in content(
+                reddit_rows(
+                    ctx,
+                    MutatingTransport(
+                        fixture_transport(ctx, reddit.fixture_route), bump_score
+                    ),
+                )
+            )
+        }
+        self.assertEqual(before["t3_p1"]["event_key"], after["t3_p1"]["event_key"])
+        self.assertNotEqual(
+            before["t3_p1"]["payload_sha256"], after["t3_p1"]["payload_sha256"]
+        )
+
+    def test_changed_payload_yields_a_new_key(self):
+        ctx = make_ctx()
+
+        def bump_score(url, body):
+            for child in (body.get("data") or {}).get("children") or []:
+                if child["data"].get("name") == "t3_p1":
+                    child["data"]["selftext"] += " (edited)"
             return body
 
         before = content(reddit_rows(ctx))
@@ -307,3 +339,50 @@ class RunSourceTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class OutageTest(unittest.TestCase):
+    def test_every_request_failing_is_fatal(self):
+        class AlwaysFails(SourceCollector):
+            source = "hackernews"
+
+            def collect(self, window):
+                self.partial_error("query 'a'", RuntimeError("HTTP 503"))
+                self.partial_error("query 'b'", RuntimeError("HTTP 503"))
+                return iter(())
+
+        ctx = make_ctx()
+        with self.assertRaises(RuntimeError):
+            collect_rows(
+                ctx,
+                "hackernews",
+                AlwaysFails(ctx, make_client(None)),
+                enabled=True,
+                mode="demo",
+            )
+        rows = collect_rows(
+            make_ctx({"fail_on_source_error": False}),
+            "hackernews",
+            AlwaysFails(ctx, make_client(None)),
+            enabled=True,
+            mode="demo",
+        )
+        self.assertEqual(summary(rows)["status"], "failed")
+        self.assertIn("no request succeeded", summary(rows)["fatal_error"])
+
+
+class StoredKeysTest(unittest.TestCase):
+    def test_already_stored_records_are_not_rewritten(self):
+        ctx = make_ctx()
+        first = content(reddit_rows(ctx))
+        http, mode = collect.build_http(ctx, reddit.fixture_route, 0.0)
+        rows = collect_rows(
+            ctx,
+            "reddit",
+            RedditCollector(ctx, http),
+            enabled=True,
+            mode=mode,
+            stored={r["event_key"] for r in first},
+        )
+        self.assertEqual(content(rows), [])
+        self.assertEqual(summary(rows)["already_stored"], len(first))

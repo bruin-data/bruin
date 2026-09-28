@@ -136,8 +136,8 @@ def materialize():
         if warehouse.table_exists("enrichment", "llm_assessment_result"):
             for row in warehouse.read(
                 f"SELECT content_id, status, attempt_count FROM {TABLE} "
-                f"WHERE record_kind = 'result' AND provider = '{provider_name}' "
-                f"AND model_id = '{model_id}' AND prompt_version = '{prompt_version}'"
+                f"WHERE record_kind = 'result' AND provider = {warehouse.literal(provider_name)} "
+                f"AND model_id = {warehouse.literal(model_id)} AND prompt_version = {warehouse.literal(prompt_version)}"
             ):
                 previous[row["content_id"]] = row
         candidates = warehouse.read(

@@ -63,6 +63,13 @@ columns:
     checks:
       - name: non_negative
 custom_checks:
+  - name: content was collected recently
+    description: Non-blocking freshness check. Fails when no source has delivered content within stale_after_minutes; see marts.mart_pipeline_health for which one.
+    blocking: false
+    query: |
+      SELECT CASE WHEN MAX(collected_at) >= CAST(timezone('UTC', current_timestamp) AS TIMESTAMP) - INTERVAL {{ var.stale_after_minutes }} MINUTE THEN 0 ELSE 1 END
+      FROM staging.stg_content_item
+    value: 0
   - name: no source record appears twice
     query: |
       SELECT COUNT(*) FROM (
@@ -94,12 +101,14 @@ WITH raw_content AS (
 ),
 
 versioned AS (
+    -- Demo fixtures and live data never mix: only rows from the current mode are used.
     SELECT
         *,
         ROW_NUMBER() OVER (PARTITION BY source, external_id ORDER BY collected_at DESC, event_key DESC) AS version_rank,
         COUNT(*) OVER (PARTITION BY source, external_id) AS version_count,
         MIN(collected_at) OVER (PARTITION BY source, external_id) AS first_collected_at
     FROM raw_content
+    WHERE collection_mode = {% if var.demo_mode %}'demo'{% else %}'live'{% endif %}
 ),
 
 latest AS (

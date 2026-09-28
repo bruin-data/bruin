@@ -103,6 +103,9 @@ variables:
   github_enabled:
     type: boolean
     default: false
+  github_include_pull_requests:
+    type: boolean
+    default: false
   stackoverflow_enabled:
     type: boolean
     default: false
@@ -157,6 +160,7 @@ variables:
     default: ["(?i)^automoderator$", "(?i)bot$", "(?i)^\\[deleted\\]$"]
   supported_content_types:
     type: array
+    minItems: 1
     items: {type: string, enum: [post, comment, story, issue, pull_request, question, export_item]}
     default: [post, comment, story, issue, pull_request, question, export_item]
   max_content_age_days:

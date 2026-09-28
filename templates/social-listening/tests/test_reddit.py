@@ -234,7 +234,7 @@ class QueryChunksTest(unittest.TestCase):
 
 
 class TimeFilterTest(unittest.TestCase):
-    def test_smallest_covering_filter(self):
+    def test_smallest_filter_covering_now_minus_start(self):
         cases = [
             (1, "hour"),
             (2, "day"),
@@ -247,9 +247,18 @@ class TimeFilterTest(unittest.TestCase):
         for hours, expected in cases:
             with self.subTest(hours=hours):
                 self.assertEqual(
-                    time_filter(Window(ANCHOR - timedelta(hours=hours), ANCHOR)),
+                    time_filter(
+                        Window(ANCHOR - timedelta(hours=hours), ANCHOR), now=ANCHOR
+                    ),
                     expected,
                 )
+
+    def test_old_backfill_window_uses_a_wide_filter(self):
+        # Reddit counts `t` back from now: a one-day window 40 days ago needs "year", not "day".
+        start = ANCHOR - timedelta(days=40)
+        self.assertEqual(
+            time_filter(Window(start, start + timedelta(days=1)), now=ANCHOR), "year"
+        )
 
 
 if __name__ == "__main__":

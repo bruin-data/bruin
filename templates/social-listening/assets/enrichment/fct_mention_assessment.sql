@@ -47,6 +47,8 @@ hooks:
           freshness DOUBLE, authenticity DOUBLE, confidence DOUBLE, priority DOUBLE,
           reasons_json VARCHAR, first_assessed_at TIMESTAMP, assessed_at TIMESTAMP
         )
+    # Content that left staging (redaction, retention clean-up) leaves the history too.
+    - query: DELETE FROM enrichment.fct_mention_assessment WHERE content_id NOT IN (SELECT content_id FROM staging.stg_content_item)
 columns:
   - name: assessment_id
     type: varchar
@@ -59,10 +61,6 @@ columns:
     update_on_merge: false
     checks:
       - name: not_null
-      - name: relationships
-    foreign_key:
-      table: enrichment.fct_mention_candidate
-      column: content_id
   - name: assessment_version
     type: varchar
     update_on_merge: false

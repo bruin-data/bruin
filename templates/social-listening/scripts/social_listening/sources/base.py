@@ -4,9 +4,12 @@ Every source adapter implements ``SourceCollector.collect(window)`` and yields
 ``RawRecord`` objects. ``collect_rows`` turns those into rows for the source's
 ``raw.raw_<source>_content`` table:
 
-* one ``content`` row per source record, keyed by an immutable event key
-  (source + external ID + payload hash), so re-reading a window never adds a
-  duplicate and an edited record becomes a new, auditable version;
+* one ``content`` row per source record, keyed by an event key of source,
+  external ID and a hash of the record's content (engagement counters such as
+  score or comment count are left out of the hash). Re-reading a window never
+  adds a row: a record already stored under the same key is skipped, so raw
+  rows are never rewritten, while an edited title or body becomes a new,
+  auditable version;
 * one ``run_summary`` row per run with request, retry, rate-limit and error
   counts plus the high watermark. ``marts.mart_pipeline_health`` reads these.
 
@@ -65,6 +68,7 @@ class CollectStats:
     skipped_outside_window: int = 0
     duplicates_in_run: int = 0
     redacted_skipped: int = 0
+    already_stored: int = 0
     partial_errors: list[str] = field(default_factory=list)
     high_watermark: datetime | None = None
     cursor: str = ""
@@ -112,6 +116,27 @@ def _naive_utc(ts: datetime | None) -> datetime | None:
     return ts.astimezone(timezone.utc).replace(tzinfo=None)
 
 
+# Engagement counters change on every poll; they are stored but not part of the event key.
+VOLATILE_FIELDS = frozenset(
+    {
+        "score",
+        "num_comments",
+        "points",
+        "comments",
+        "reactions",
+        "view_count",
+        "answer_count",
+        "metrics",
+    }
+)
+
+
+def content_hash(payload: dict[str, Any]) -> str:
+    return sha256(
+        canonical_json({k: v for k, v in payload.items() if k not in VOLATILE_FIELDS})
+    )
+
+
 def event_key(source: str, external_id: str, payload_hash: str) -> str:
     return sha256(f"{source}\x1f{external_id}\x1f{payload_hash}")
 
@@ -124,6 +149,7 @@ def collect_rows(
     enabled: bool,
     mode: str,
     suppressed: set[str] | None = None,
+    stored: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     window = ctx.collection_window()
     collected_at = _naive_utc(datetime.now(timezone.utc).replace(microsecond=0))
@@ -145,11 +171,17 @@ def collect_rows(
                     continue
                 payload = canonical_json(record.payload)
                 digest = sha256(payload)
-                key = event_key(source, record.external_id, digest)
+                key = event_key(
+                    source, record.external_id, content_hash(record.payload)
+                )
                 if key in seen:
                     stats.duplicates_in_run += 1
                     continue
                 seen.add(key)
+                if stored and key in stored:
+                    # Already in raw from an earlier run: keep that immutable row as it is.
+                    stats.already_stored += 1
+                    continue
                 stats.records += 1
                 if (
                     stats.high_watermark is None
@@ -177,6 +209,9 @@ def collect_rows(
         except HttpError as err:
             # Authentication, permission and exhausted-retry errors stop the source.
             fatal = str(err)
+        if fatal is None and stats.partial_errors and stats.pages == 0:
+            # Every request failed: that is an outage, not a partial result.
+            fatal = f"no request succeeded ({len(stats.partial_errors)} errors); first: {stats.partial_errors[0]}"
         if stats.partial_errors and fatal is None:
             status = "partial"
 
@@ -191,6 +226,7 @@ def collect_rows(
         "skipped_outside_window": stats.skipped_outside_window,
         "duplicates_in_run": stats.duplicates_in_run,
         "redacted_skipped": stats.redacted_skipped,
+        "already_stored": stats.already_stored,
         "requests": http.requests if http else 0,
         "retries": http.retries if http else 0,
         "rate_limit_waits": http.rate_limit_waits if http else 0,

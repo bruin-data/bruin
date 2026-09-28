@@ -19,7 +19,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
-RETRYABLE_STATUS = {429, 500, 502, 503, 504}
+# 599 is used for transport failures (connection reset, DNS, timeout).
+RETRYABLE_STATUS = {429, 500, 502, 503, 504, 599}
 TIME_KEYS = {"created_utc", "created_at_i", "creation_date", "last_activity_date", "ts"}
 
 

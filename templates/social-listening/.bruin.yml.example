@@ -42,7 +42,7 @@ environments:
 
   # Cloud-warehouse deployment path: MotherDuck runs the same DuckDB SQL unchanged.
   # Remove the duckdb entry above in this environment and declare the warehouse
-  # under the same name, then run with `--environment production`.
+  # under the same name, then run with `--environment production --force`.
   production:
     connections:
       motherduck:
