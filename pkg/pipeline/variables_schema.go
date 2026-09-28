@@ -3,6 +3,7 @@ package pipeline
 import (
 	_ "embed"
 	"errors"
+	"sync"
 
 	"github.com/xeipuuv/gojsonschema"
 )
@@ -13,6 +14,15 @@ import (
 //
 //go:embed schemas/draft-07.json
 var variableMetaSchema string
+
+// compiledVariableMetaSchema is compiled once and shared; gojsonschema does not
+// mutate a compiled schema during validation. It lives in its own loader:
+// gojsonschema registers $id values even in annotations, allowing user data to
+// shadow its URL when automatic meta-schema validation shares the user schema's
+// reference pool.
+var compiledVariableMetaSchema = sync.OnceValues(func() (*gojsonschema.Schema, error) {
+	return compileVariableSchema(gojsonschema.NewStringLoader(variableMetaSchema))
+})
 
 func compileVariableSchema(document gojsonschema.JSONLoader) (*gojsonschema.Schema, error) {
 	loader := gojsonschema.NewSchemaLoader()

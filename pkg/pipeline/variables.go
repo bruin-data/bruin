@@ -69,10 +69,7 @@ func (v *Variables) SchemaDiagnostics() []string {
 		return diagnostics
 	}
 
-	// Keep the bundled meta-schema in a separate loader: gojsonschema registers
-	// $id values even in annotations, allowing user data to shadow its URL when
-	// automatic meta-schema validation shares the user schema's reference pool.
-	metaSchema, err := compileVariableSchema(gojsonschema.NewStringLoader(variableMetaSchema))
+	metaSchema, err := compiledVariableMetaSchema()
 	if err != nil {
 		return append(diagnostics, "failed to load variable meta-schema: "+err.Error())
 	}
