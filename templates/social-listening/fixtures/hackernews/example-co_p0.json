@@ -1,0 +1,46 @@
+{
+ "hits": [
+  {
+   "objectID": "9001",
+   "_tags": [
+    "story",
+    "author_hn_builder",
+    "story_9001"
+   ],
+   "author": "hn_builder",
+   "created_at_i": -5400,
+   "title": "Show HN: Example Co now supports warehouse alerts",
+   "url": null,
+   "story_text": "We built alerts for small data teams.",
+   "comment_text": null,
+   "points": 120,
+   "num_comments": 45,
+   "parent_id": null,
+   "story_id": null,
+   "story_title": null
+  },
+  {
+   "objectID": "9002",
+   "_tags": [
+    "comment",
+    "author_curious_dev",
+    "story_9001"
+   ],
+   "author": "curious_dev",
+   "created_at_i": -3000,
+   "title": null,
+   "url": null,
+   "story_text": null,
+   "comment_text": "I love Example Co but how do I get retries working in my pipeline? It keeps failing on the second step.",
+   "points": null,
+   "num_comments": null,
+   "parent_id": 9001,
+   "story_id": 9001,
+   "story_title": "Show HN: Example Co now supports warehouse alerts"
+  }
+ ],
+ "nbHits": 3,
+ "nbPages": 2,
+ "page": 0,
+ "hitsPerPage": 100
+}

@@ -1,0 +1,348 @@
+name: social-listening
+# No schedule by default: Cloud schedules are opt-in. See docs/index.md#schedules
+# for the collect / enrich / report cadence and how to enable it.
+start_date: "2026-01-01"
+catchup: false
+
+default_connections:
+  duckdb: social-listening-warehouse
+
+default:
+  type: duckdb.sql
+  connection: social-listening-warehouse
+  image: python:3.11
+  tags: [social-listening]
+
+# Every policy choice lives here as a typed custom variable. Override with
+#   bruin run --var 'min_priority=0.8' --var 'competitors=["Other Co"]' .
+# Values are validated by the config.settings asset before anything runs.
+# Credentials never go here; see .bruin.yml.example.
+variables:
+  # ------------------------------------------------------------ brand and terms
+  brand_name:
+    type: string
+    minLength: 1
+    default: "Example Co"
+  brand_description:
+    type: string
+    default: "Example Co makes a workflow tool for small data teams. Ideal customers run a warehouse and want fewer manual steps. Exclude job posts and students. Never claim guaranteed savings or certifications."
+  brand_aliases:
+    type: array
+    items: {type: string}
+    default: ["exampleco"]
+  competitors:
+    type: array
+    items: {type: string}
+    default: ["Rival Suite"]
+  tracked_terms:
+    type: array
+    items: {type: string}
+    default: ["example alternative"]
+  term_rules:
+    type: array
+    items:
+      type: object
+      required: [term_id, phrases, category]
+      properties:
+        term_id: {type: string, pattern: "^[a-z0-9][a-z0-9_-]*$"}
+        phrases: {type: array, items: {type: string}, minItems: 1}
+        category: {type: string, enum: [brand, competitor, topic]}
+        platforms: {type: array, items: {type: string}}
+        requires_context_any: {type: array, items: {type: string}}
+        excludes_context_any: {type: array, items: {type: string}}
+        valid_from: {type: string, pattern: "^\\d{4}-\\d{2}-\\d{2}$"}
+        valid_to: {type: string, pattern: "^\\d{4}-\\d{2}-\\d{2}$"}
+        active: {type: boolean}
+    default:
+      - term_id: topic-social-listening
+        phrases: ["social listening"]
+        category: topic
+        platforms: []
+        requires_context_any: ["tool", "alerts", "workflow", "monitor"]
+        excludes_context_any: ["therapy", "relationship", "counselling"]
+        valid_from: "2026-01-01"
+        valid_to: "2099-12-31"
+        active: true
+  excluded_terms:
+    type: array
+    items: {type: string}
+    default: ["we're hiring", "job opening"]
+  matcher_version:
+    type: string
+    default: "v1"
+
+  # ------------------------------------------------------------ sources
+  demo_mode:
+    type: boolean
+    default: true
+  reddit_enabled:
+    type: boolean
+    default: true
+  reddit_communities_include:
+    type: array
+    items: {type: string}
+    default: []
+  reddit_communities_exclude:
+    type: array
+    items: {type: string}
+    default: []
+  reddit_include_comments:
+    type: boolean
+    default: true
+  reddit_poll_minutes:
+    type: integer
+    minimum: 5
+    maximum: 1440
+    default: 15
+  hackernews_enabled:
+    type: boolean
+    default: true
+  hackernews_include_comments:
+    type: boolean
+    default: true
+  github_enabled:
+    type: boolean
+    default: false
+  stackoverflow_enabled:
+    type: boolean
+    default: false
+  slack_community_enabled:
+    type: boolean
+    default: false
+  authorised_export_enabled:
+    type: boolean
+    default: false
+  authorised_export_path:
+    type: string
+    default: "fixtures/exports/sample_export.csv"
+  late_arrival_hours:
+    type: integer
+    minimum: 0
+    maximum: 168
+    default: 6
+  source_window_max_days:
+    type: integer
+    minimum: 1
+    maximum: 31
+    default: 7
+  max_pages_per_source:
+    type: integer
+    minimum: 1
+    maximum: 50
+    default: 5
+  http_max_retries:
+    type: integer
+    minimum: 0
+    maximum: 8
+    default: 3
+  fail_on_source_error:
+    type: boolean
+    default: true
+
+  # ------------------------------------------------------------ exclusions
+  excluded_authors:
+    type: array
+    items: {type: string}
+    default: []
+  team_authors:
+    type: array
+    items: {type: string}
+    default: ["exampleco_team"]
+  route_team_content:
+    type: boolean
+    default: false
+  bot_author_patterns:
+    type: array
+    items: {type: string}
+    default: ["(?i)^automoderator$", "(?i)bot$", "(?i)^\\[deleted\\]$"]
+  supported_content_types:
+    type: array
+    items: {type: string, enum: [post, comment, story, issue, pull_request, question, export_item]}
+    default: [post, comment, story, issue, pull_request, question, export_item]
+  max_content_age_days:
+    type: integer
+    minimum: 1
+    maximum: 365
+    default: 30
+  author_enrichment_enabled:
+    type: boolean
+    default: false
+
+  # ------------------------------------------------------------ scoring
+  intent_taxonomy:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      required: [intent, keywords, score]
+      properties:
+        intent: {type: string, pattern: "^[a-z][a-z_]*$"}
+        keywords: {type: array, items: {type: string}, minItems: 1}
+        score: {type: number, minimum: 0, maximum: 1}
+    default:
+      - {intent: seeking_recommendation, score: 0.95, keywords: ["alternative to", "recommend", "looking for", "any suggestions", "what do you use"]}
+      - {intent: comparison, score: 0.85, keywords: [" vs ", "versus", "compared to", "switching from", "migrate from"]}
+      - {intent: problem_report, score: 0.7, keywords: ["not working", "broken", "issue with", "frustrated", "keeps failing"]}
+      - {intent: question, score: 0.6, keywords: ["how do i", "how to", "does anyone know", "?"]}
+      - {intent: praise, score: 0.35, keywords: ["love", "great experience", "impressed"]}
+  fit_keywords:
+    type: array
+    items: {type: string}
+    default: ["warehouse", "data team", "pipeline", "small team", "startup"]
+  disqualifying_keywords:
+    type: array
+    items: {type: string}
+    default: ["homework", "internship", "for my class"]
+  priority_weights:
+    type: object
+    required: [relevance, intent, fit, engagement, freshness, authenticity]
+    properties:
+      relevance: {type: number, minimum: 0, maximum: 1}
+      intent: {type: number, minimum: 0, maximum: 1}
+      fit: {type: number, minimum: 0, maximum: 1}
+      engagement: {type: number, minimum: 0, maximum: 1}
+      freshness: {type: number, minimum: 0, maximum: 1}
+      authenticity: {type: number, minimum: 0, maximum: 1}
+    default: {relevance: 0.3, intent: 0.25, fit: 0.15, engagement: 0.1, freshness: 0.1, authenticity: 0.1}
+  category_relevance:
+    type: object
+    required: [brand, competitor, topic]
+    properties:
+      brand: {type: number, minimum: 0, maximum: 1}
+      competitor: {type: number, minimum: 0, maximum: 1}
+      topic: {type: number, minimum: 0, maximum: 1}
+    default: {brand: 0.9, competitor: 0.85, topic: 0.75}
+  freshness_half_life_hours:
+    type: number
+    minimum: 1
+    maximum: 720
+    default: 48
+  engagement_saturation:
+    type: number
+    minimum: 1
+    default: 200
+  min_relevance:
+    type: number
+    minimum: 0
+    maximum: 1
+    default: 0.70
+  min_priority:
+    type: number
+    minimum: 0
+    maximum: 1
+    default: 0.65
+  min_confidence:
+    type: number
+    minimum: 0
+    maximum: 1
+    default: 0.50
+  min_intent_score:
+    type: number
+    minimum: 0
+    maximum: 1
+    default: 0.50
+  scoring_version:
+    type: string
+    default: "v1"
+
+  # ------------------------------------------------------------ model
+  llm_enabled:
+    type: boolean
+    default: false
+  llm_provider:
+    type: string
+    enum: [fixture, anthropic, openai_compatible]
+    default: fixture
+  llm_model:
+    type: string
+    default: ""
+  llm_base_url:
+    type: string
+    default: ""
+  llm_prompt_version:
+    type: string
+    default: "v1"
+  llm_max_items_per_run:
+    type: integer
+    minimum: 1
+    maximum: 500
+    default: 25
+  llm_max_attempts:
+    type: integer
+    minimum: 1
+    maximum: 5
+    default: 3
+  llm_timeout_seconds:
+    type: integer
+    minimum: 5
+    maximum: 120
+    default: 30
+  route_on_llm_error:
+    type: boolean
+    default: false
+
+  # ------------------------------------------------------------ notifications
+  notification_destination:
+    type: string
+    enum: [none, webhook, slack_webhook]
+    default: slack_webhook
+  notification_dry_run:
+    type: boolean
+    default: true
+  max_delivery_attempts:
+    type: integer
+    minimum: 1
+    maximum: 10
+    default: 3
+  max_alerts_per_run:
+    type: integer
+    minimum: 1
+    maximum: 200
+    default: 20
+  alert_max_age_hours:
+    type: integer
+    minimum: 1
+    maximum: 720
+    default: 72
+  payload_version:
+    type: string
+    enum: [v1]
+    default: v1
+  routing_policy_version:
+    type: string
+    default: "v1"
+
+  # ------------------------------------------------------------ replies and mutations
+  reply_drafts_enabled:
+    type: boolean
+    default: false
+  require_human_approval:
+    type: boolean
+    default: true
+  reply_eligible_intents:
+    type: array
+    items: {type: string}
+    default: [seeking_recommendation, comparison, question]
+  reply_disclosure:
+    type: string
+    minLength: 1
+    default: "Disclosure: I work on {brand}."
+  reply_claims_to_avoid:
+    type: array
+    items: {type: string}
+    default: ["guaranteed", "certified", "best in the world"]
+  allow_mutations:
+    type: boolean
+    default: false
+
+  # ------------------------------------------------------------ health
+  stale_after_minutes:
+    type: integer
+    minimum: 15
+    maximum: 10080
+    default: 180
+  volume_anomaly_ratio:
+    type: number
+    minimum: 1.5
+    maximum: 100
+    default: 4

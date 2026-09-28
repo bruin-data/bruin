@@ -1,0 +1,29 @@
+# Demo configuration merged into your project's .bruin.yml by `bruin init`.
+# Every secret is read from an environment variable and is empty by default,
+# so the DuckDB demo runs with no credentials. See .bruin.yml.example.
+default_environment: default
+environments:
+  default:
+    connections:
+      duckdb:
+        - name: social-listening-warehouse
+          path: social-listening.duckdb
+          # A DuckDB file allows one writer at a time; serialise assets on it.
+          max_concurrent_assets: 1
+      generic:
+        - name: sl-reddit-client-id
+          value: "${SL_REDDIT_CLIENT_ID}"
+        - name: sl-reddit-client-secret
+          value: "${SL_REDDIT_CLIENT_SECRET}"
+        - name: sl-reddit-user-agent
+          value: "${SL_REDDIT_USER_AGENT}"
+        - name: sl-github-token
+          value: "${SL_GITHUB_TOKEN}"
+        - name: sl-stackexchange-key
+          value: "${SL_STACKEXCHANGE_KEY}"
+        - name: sl-webhook-url
+          value: "${SL_WEBHOOK_URL}"
+        - name: sl-slack-webhook-url
+          value: "${SL_SLACK_WEBHOOK_URL}"
+        - name: sl-llm-api-key
+          value: "${SL_LLM_API_KEY}"

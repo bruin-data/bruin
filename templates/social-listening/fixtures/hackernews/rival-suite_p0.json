@@ -1,0 +1,27 @@
+{
+ "hits": [
+  {
+   "objectID": "9004",
+   "_tags": [
+    "story",
+    "ask_hn",
+    "author_ask_alex"
+   ],
+   "author": "ask_alex",
+   "created_at_i": -9000,
+   "title": "Ask HN: Rival Suite alternatives for a small team?",
+   "url": null,
+   "story_text": "Rival Suite raised prices again. What do you use instead for pipeline scheduling on a small data team?",
+   "comment_text": null,
+   "points": 64,
+   "num_comments": 38,
+   "parent_id": null,
+   "story_id": null,
+   "story_title": null
+  }
+ ],
+ "nbHits": 1,
+ "nbPages": 1,
+ "page": 0,
+ "hitsPerPage": 100
+}

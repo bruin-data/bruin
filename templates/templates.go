@@ -17,6 +17,9 @@ import (
 // for the same reason. The advanced template deliberately fails at runtime on
 // one mart asset; these notes are for maintainers, not students.
 //
+// The same rule drops Python package markers (__init__.py), so templates that ship
+// importable packages list them explicitly below.
+//
 //go:embed *
 //go:embed */.bruin.yml
 //go:embed migration-fivetran/.gitignore
@@ -35,4 +38,8 @@ import (
 //go:embed academy-sql-intermediate/pipeline/assets/core/.gitkeep
 //go:embed academy-sql-intermediate/pipeline/assets/mart/.gitkeep
 //go:embed migration-fivetran/.agents/skills/bruin-fivetran-migrator/*
+//go:embed social-listening/.bruin.yml.example
+//go:embed social-listening/scripts/social_listening/__init__.py
+//go:embed social-listening/scripts/social_listening/sources/__init__.py
+//go:embed social-listening/tests/__init__.py
 var Templates embed.FS

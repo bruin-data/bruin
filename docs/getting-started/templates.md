@@ -76,6 +76,12 @@ AI agent skills are installed separately with `bruin ai skills`; see [AI Skills]
     <span>Self-contained Docker demo: PostgreSQL change capture into ClickHouse, per-minute rollups, daily KPIs, and a live payments-risk dashboard.</span>
     <span class="template-card__tags"><code>ClickHouse</code><code>PostgreSQL</code><code>CDC</code><code>payments</code></span>
   </a>
+  <a class="template-card" href="./templates-docs/social-listening-README.html">
+    <span class="template-card__category">Brand monitoring</span>
+    <strong>social-listening</strong>
+    <span>Find, qualify and route public conversations about your brand, with draft-only replies for human review.</span>
+    <span class="template-card__tags"><code>DuckDB</code><code>Python</code><code>Reddit</code><code>Hacker News</code><code>Agents</code></span>
+  </a>
 </div>
 
 ### Local and learning templates
@@ -302,6 +308,7 @@ bruin init nyc-taxi my-taxi-pipeline
 | See near-real-time change capture and rollups end to end | `demo-payments-clickhouse` |
 | Scaffold ecommerce reporting | `ecommerce` |
 | Report on organic search using GA4 and Search Console data already in BigQuery | `google-web-analytics` |
+| Monitor public conversations about your brand and competitors, with human-reviewed reply drafts | `social-listening` |
 | Work with a specific database | `athena`, `clickhouse`, `bronze-silver-postgres`, `bigquery`, `databricks`, or `redshift` |
 
 Most templates include placeholder connection values only. Replace the generated `.bruin.yml` values before running the pipeline.

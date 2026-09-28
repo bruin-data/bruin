@@ -1,0 +1,265 @@
+# Pipeline health monitor: DRAFT scheduled-agent plan.
+#
+# This file is a draft for an operator to review. Installing the template does not
+# create, schedule or activate anything. Review the SQL, output, timezone and delivery
+# target, create the scheduled agent without a cron (it stays a draft), run it once by
+# hand, then activate it. Full steps: agents/README.md and docs/bruin-cloud-setup.md.
+#
+# This plan only reports. It never triggers, reruns or backfills a pipeline or asset.
+# When a fix needs a run, the message names the manual command for a human to run.
+#
+# How the fields map to `bruin cloud scheduled-agents create`:
+#   --agent-id           the mention-ops agent (agents/mention-ops.prompt.md)
+#   --title              title
+#   --instructions       this whole file: --instructions "$(cat agents/pipeline-health-monitor.plan.yml)"
+#   --output-formatting  output_format.summary
+#   --connection         connection (the agent's read-only warehouse connection)
+#   --cron, --timezone   proposed_schedule.cron / proposed_schedule.timezone. Leave them
+#                        off at create time. A plan with a cron is active immediately.
+#                        Set them with `scheduled-agents update` after the manual test.
+#   --state-file         not this file. --state-file takes the full Cloud plan object
+#                        (schedule, instructions, verified_sqls, ...), and this file is
+#                        not in that shape.
+#   state.file           a run-state file on the scheduled agent, managed with
+#                        `bruin cloud scheduled-agents run-states get|set|delete`.
+
+title: Social listening pipeline health
+status: draft
+connection: <READONLY_WAREHOUSE_CONNECTION>
+
+proposed_schedule:
+  cron: "30 8 * * *"
+  timezone: "UTC"   # replace with the team's timezone, e.g. <TIMEZONE>
+  note: Apply only after one successful manual run.
+
+delivery:
+  target: <SLACK_CHANNEL>   # a channel of a messaging integration already attached to the agent
+  send_when: Only when health_sql returns at least one row after suppression.
+  note: >
+    Delivery goes through the agent's Bruin Cloud messaging integration. Never give this
+    plan or the agent the pipeline's webhook URLs (sl-webhook-url, sl-slack-webhook-url).
+
+permitted_objects:
+  - marts.mart_pipeline_health
+  - operations.fct_alert_outbox
+
+parameters:
+  max_data_age_hours: 30          # the health mart itself is stale after this
+  repeat_suppression_hours: 24    # see state.rules for the one-hour tolerance
+
+checks:
+  stale: A source has had no successful collection within stale_after_minutes (source cursor not advancing).
+  abnormal_volume: A source's 24-hour volume is far above its 7-day daily average, or zero when that average is at least 5.
+  errors: Failed collection runs, HTTP errors or partial errors in the last 24 hours.
+  model_errors: Model calls failed or returned invalid output in the last 24 hours.
+  lag: Median classification lag is above stale_after_minutes.
+  failed_delivery: Alerts in the outbox with status failed_permanent or retrying.
+  stale_health_mart: The health mart has not been rebuilt for more than 30 hours.
+
+state:
+  file: pipeline-health-monitor.state.json
+  schema: |
+    {
+      "alerted": [
+        {"issue_key": "<component>|<reason>", "alerted_at": "YYYY-MM-DDTHH:MM:SSZ"}
+      ],
+      "last_run_at": "YYYY-MM-DDTHH:MM:SSZ"
+    }
+  rules:
+    - >-
+      Read the file at the start of the run. If it does not exist or is not valid JSON,
+      start from {"alerted": [], "last_run_at": null}.
+    - >-
+      Replace <SUPPRESSED_ISSUE_KEYS> in health_sql with a SQL list of the issue_key values
+      whose alerted_at is less than 23 hours ago (a 24-hour window with one hour of
+      tolerance, so an issue that is still open is reported again at the next daily run),
+      e.g. ['source:reddit|stale'], or [] when there are none. Include only values made of
+      letters, digits and the characters : _ - |.
+    - >-
+      After a message has been posted, set alerted_at = now for every issue_key you
+      reported (issue_key = component || '|' || reason).
+    - >-
+      Remove entries whose issue did not appear in this run's unsuppressed or suppressed
+      results, so a problem that comes back after being fixed alerts immediately. To see
+      suppressed issues too, run health_sql once more with <SUPPRESSED_ISSUE_KEYS> = [].
+    - >-
+      Set last_run_at to the time the run started and write the file back, including on
+      runs that send no message.
+    - >-
+      The state holds issue keys and timestamps only. Never store error text, URLs or any
+      credential in it.
+
+steps:
+  - >-
+    Run health_sql with the state values substituted. If it fails, send
+    blocked_data_response and stop.
+  - >-
+    If it returns no rows, send nothing (no_issue_response). Update the state and stop.
+  - >-
+    Otherwise format the rows as described in output_format, send them to the delivery
+    target, and update the state.
+
+health_sql: |
+  WITH params AS (
+      SELECT
+          CAST(timezone('UTC', current_timestamp) AS TIMESTAMP) AS now_utc,
+          30 AS max_data_age_hours,
+          CAST(<SUPPRESSED_ISSUE_KEYS> AS VARCHAR[]) AS suppressed_issue_keys
+  ),
+  component_issues AS (
+      SELECT
+          h.component,
+          r.reason,
+          h.last_run_status,
+          h.last_success_at,
+          h.source_cursor,
+          h.high_watermark,
+          h.watermark_lag_hours,
+          h.volume_24h,
+          h.avg_daily_volume_7d,
+          h.error_count_24h,
+          h.median_classification_lag_minutes,
+          CAST(NULL AS BIGINT) AS outbox_failed_permanent,
+          CAST(NULL AS BIGINT) AS outbox_retrying,
+          CAST(NULL AS INTEGER) AS last_http_status,
+          CAST(NULL AS TIMESTAMP) AS last_failed_attempt_at,
+          h.data_as_of
+      FROM marts.mart_pipeline_health h,
+           unnest(from_json(h.health_reasons_json, '["VARCHAR"]')) AS r(reason)
+      WHERE h.health_status = 'attention'
+        -- the outbox row below reports failed delivery with more detail
+        AND NOT (h.component = 'delivery' AND r.reason = 'delivery_failed')
+  ),
+  outbox AS (
+      SELECT
+          COUNT(*) FILTER (WHERE status = 'failed_permanent') AS failed_permanent,
+          COUNT(*) FILTER (WHERE status = 'retrying') AS retrying,
+          MAX(last_attempt_at) FILTER (WHERE status IN ('failed_permanent', 'retrying')) AS last_failed_attempt_at,
+          MAX(last_http_status) FILTER (WHERE status IN ('failed_permanent', 'retrying')) AS last_http_status
+      FROM operations.fct_alert_outbox
+  ),
+  outbox_issue AS (
+      SELECT
+          'outbox' AS component,
+          'failed_delivery' AS reason,
+          CAST(NULL AS VARCHAR) AS last_run_status,
+          CAST(NULL AS TIMESTAMP) AS last_success_at,
+          CAST(NULL AS VARCHAR) AS source_cursor,
+          CAST(NULL AS TIMESTAMP) AS high_watermark,
+          CAST(NULL AS DOUBLE) AS watermark_lag_hours,
+          CAST(NULL AS INTEGER) AS volume_24h,
+          CAST(NULL AS DOUBLE) AS avg_daily_volume_7d,
+          CAST(NULL AS INTEGER) AS error_count_24h,
+          CAST(NULL AS DOUBLE) AS median_classification_lag_minutes,
+          o.failed_permanent AS outbox_failed_permanent,
+          o.retrying AS outbox_retrying,
+          o.last_http_status,
+          o.last_failed_attempt_at,
+          CAST(NULL AS TIMESTAMP) AS data_as_of
+      FROM outbox o
+      WHERE o.failed_permanent + o.retrying > 0
+  ),
+  mart_freshness AS (
+      SELECT
+          'health_mart' AS component,
+          'stale_health_mart' AS reason,
+          CAST(NULL AS VARCHAR) AS last_run_status,
+          CAST(NULL AS TIMESTAMP) AS last_success_at,
+          CAST(NULL AS VARCHAR) AS source_cursor,
+          CAST(NULL AS TIMESTAMP) AS high_watermark,
+          -- for this row: hours since the health mart's data_as_of
+          ROUND(date_diff('second', MAX(h.data_as_of), MAX(p.now_utc)) / 3600.0, 2) AS watermark_lag_hours,
+          CAST(NULL AS INTEGER) AS volume_24h,
+          CAST(NULL AS DOUBLE) AS avg_daily_volume_7d,
+          CAST(NULL AS INTEGER) AS error_count_24h,
+          CAST(NULL AS DOUBLE) AS median_classification_lag_minutes,
+          CAST(NULL AS BIGINT) AS outbox_failed_permanent,
+          CAST(NULL AS BIGINT) AS outbox_retrying,
+          CAST(NULL AS INTEGER) AS last_http_status,
+          CAST(NULL AS TIMESTAMP) AS last_failed_attempt_at,
+          MAX(h.data_as_of) AS data_as_of
+      FROM marts.mart_pipeline_health h
+      CROSS JOIN params p
+      HAVING MAX(h.data_as_of) IS NULL
+          OR MAX(h.data_as_of) < MAX(p.now_utc) - to_hours(MAX(p.max_data_age_hours))
+  ),
+  all_issues AS (
+      SELECT * FROM component_issues
+      UNION ALL
+      SELECT * FROM outbox_issue
+      UNION ALL
+      SELECT * FROM mart_freshness
+  )
+  SELECT
+      i.component || '|' || i.reason AS issue_key,
+      i.*
+  FROM all_issues i
+  CROSS JOIN params p
+  WHERE NOT list_contains(p.suppressed_issue_keys, i.component || '|' || i.reason)
+  ORDER BY i.component, i.reason
+  LIMIT 50
+
+output_format:
+  summary: >
+    Short Markdown alert listing each unhealthy component and reason with the numbers
+    behind it and a suggested manual next step. Sent only when something is wrong.
+  template: |
+    # Social listening health: <N> issue(s), <YYYY-MM-DD HH:MM> UTC
+
+    ### <component>: <reason>
+    - Evidence: <the non-NULL columns that explain the reason, e.g. "last success 2026-01-15 03:10 UTC, cursor <source_cursor>, watermark lag 14.2 h">
+    - Suggested manual step: <from next_steps>
+
+    Data as of <data_as_of> UTC. This alert was generated from marts.mart_pipeline_health
+    and operations.fct_alert_outbox. No action was taken.
+  next_steps:
+    stale: >-
+      Check the latest run of the collect assets in Bruin Cloud and that source's
+      credentials. After fixing, an operator can rerun it, for example
+      `bruin cloud runs trigger --project-id <PROJECT_ID> --pipeline social-listening --start-date <YYYY-MM-DD> --end-date <YYYY-MM-DD>`.
+    abnormal_volume: >-
+      Open marts.mart_mention_queue for the source and look for a spike from one thread or
+      a change in term rules. No rerun needed unless collection was wrong.
+    errors: >-
+      Read the failed run's logs in Bruin Cloud (rate limits, expired credentials, HTTP 4xx
+      or 5xx).
+    model_errors: >-
+      Check the model provider status and the sl-llm-api-key connection. Affected items keep
+      rule-based scores and route only if route_on_llm_error is true.
+    lag: >-
+      Check whether the enrich assets are running on schedule.
+    failed_delivery: >-
+      Check the delivery connection (sl-webhook-url or sl-slack-webhook-url) in Bruin Cloud.
+      Items in retrying are retried on the next run; failed_permanent items are not.
+    stale_health_mart: >-
+      The pipeline has not rebuilt its marts. Check the latest pipeline run in Bruin Cloud
+      and whether the pipeline schedule is enabled.
+  rules:
+    - >-
+      Report only rows returned by health_sql. Do not infer causes beyond next_steps.
+    - >-
+      Do not paste error messages or URLs. Report last_http_status as a number.
+    - >-
+      Run nothing. Commands in next_steps are suggestions for a human.
+
+no_issue_response: >-
+  Send no message. All components are healthy, disabled, or already reported in the last
+  24 hours. Record the run in the state file only.
+
+blocked_data_response: |
+  # Social listening health: check could not run
+
+  Reason: query failed: <error message>
+  Health is unknown. Nothing was guessed and no action was taken.
+  Next step for a human: check that the read-only warehouse connection works and that
+  marts.mart_pipeline_health exists.
+
+never:
+  - >-
+    Trigger, rerun, backfill or mark a pipeline, run or asset, even if a tool allows it.
+  - >-
+    Change a schedule, connection, variable or secret.
+  - >-
+    Write to any table. The only thing this plan writes is its own state file.
+  - >-
+    Query objects outside permitted_objects.

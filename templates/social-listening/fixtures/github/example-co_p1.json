@@ -1,0 +1,24 @@
+{
+ "total_count": 1,
+ "incomplete_results": false,
+ "items": [
+  {
+   "id": 7001,
+   "number": 12,
+   "html_url": "https://github.com/example-org/example-repo/issues/12",
+   "repository_url": "https://api.github.com/repos/example-org/example-repo",
+   "title": "Example Co integration: retries not working",
+   "body": "The Example Co scheduler keeps failing when the warehouse is busy. How do I configure retries?",
+   "user": {
+    "login": "gh_user",
+    "type": "User"
+   },
+   "created_at": "@-4000",
+   "comments": 3,
+   "reactions": {
+    "total_count": 2
+   },
+   "state": "open"
+  }
+ ]
+}
