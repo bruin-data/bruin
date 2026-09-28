@@ -19,4 +19,4 @@ bash scripts/run_checks.sh --env production
 | `model_failures_have_no_scores.sql` | A failed or invalid model call never produces a model score. |
 | `queue_items_are_explainable.sql` | Every queue item has a source link, matched text, rule, reasons and all score components. |
 | `drafts_are_review_only.sql` | Reply drafts need human approval, and the table has no publishing columns. |
-| `redactions_are_applied.sql` | Redacted records are absent from staging and every downstream table. |
+| `redactions_are_applied.sql` | Redacted records are absent from raw, staging and the queue. |

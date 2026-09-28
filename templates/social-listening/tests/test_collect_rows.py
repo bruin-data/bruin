@@ -253,10 +253,30 @@ class RunSourceTest(unittest.TestCase):
 
     def test_hackernews_demo(self):
         rows, _ = self.run_source("hackernews")
+        # 9006 is in assets/config/redaction_requests.csv, so it never reaches raw.
         self.assertEqual(
             sorted(r["external_id"] for r in content(rows)),
-            ["9001", "9002", "9003", "9004", "9005", "9006"],
+            ["9001", "9002", "9003", "9004", "9005"],
         )
+        self.assertEqual(summary(rows)["redacted_skipped"], 1)
+
+    def test_redacted_ids_are_read_per_source(self):
+        self.assertEqual(collect.redacted_ids("hackernews"), {"9006"})
+        self.assertEqual(collect.redacted_ids("reddit"), set())
+
+    def test_redacted_records_are_not_written_to_raw(self):
+        ctx = make_ctx()
+        http, mode = collect.build_http(ctx, reddit.fixture_route, 0.0)
+        rows = collect_rows(
+            ctx,
+            "reddit",
+            RedditCollector(ctx, http),
+            enabled=True,
+            mode=mode,
+            suppressed={"t3_p1"},
+        )
+        self.assertNotIn("t3_p1", [r["external_id"] for r in content(rows)])
+        self.assertEqual(summary(rows)["redacted_skipped"], 1)
 
     def test_disabled_source(self):
         rows, out = self.run_source("github")

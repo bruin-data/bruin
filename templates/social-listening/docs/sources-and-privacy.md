@@ -86,7 +86,7 @@ bruin run .
 
 The script:
 
-1. appends the request to `assets/config/redaction_requests.csv`, so `staging.stg_content_item` drops the record on every future run even if a collector sees it again (commit this file);
+1. appends the request to `assets/config/redaction_requests.csv` (commit this file). Collectors read it and never write that record to raw again, and `staging.stg_content_item` filters it as a second line of defence;
 2. deletes the raw versions, the model result, the assessment, the routing decision and the delivery attempts for that content ID.
 
 The next run rebuilds staging, matches, candidates, the queue, share of voice and drafts without it. `checks/redactions_are_applied.sql` confirms nothing is left.

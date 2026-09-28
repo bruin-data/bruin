@@ -64,6 +64,7 @@ class CollectStats:
     records: int = 0
     skipped_outside_window: int = 0
     duplicates_in_run: int = 0
+    redacted_skipped: int = 0
     partial_errors: list[str] = field(default_factory=list)
     high_watermark: datetime | None = None
     cursor: str = ""
@@ -122,6 +123,7 @@ def collect_rows(
     *,
     enabled: bool,
     mode: str,
+    suppressed: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     window = ctx.collection_window()
     collected_at = _naive_utc(datetime.now(timezone.utc).replace(microsecond=0))
@@ -136,6 +138,10 @@ def collect_rows(
         try:
             for record in collector.collect(window):
                 if not collector.keep(record, window):
+                    continue
+                if suppressed and record.external_id in suppressed:
+                    # Redaction requests apply at the source, so deleted content never returns to raw.
+                    stats.redacted_skipped += 1
                     continue
                 payload = canonical_json(record.payload)
                 digest = sha256(payload)
@@ -184,6 +190,7 @@ def collect_rows(
         "records": stats.records,
         "skipped_outside_window": stats.skipped_outside_window,
         "duplicates_in_run": stats.duplicates_in_run,
+        "redacted_skipped": stats.redacted_skipped,
         "requests": http.requests if http else 0,
         "retries": http.retries if http else 0,
         "rate_limit_waits": http.rate_limit_waits if http else 0,

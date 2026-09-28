@@ -1,8 +1,9 @@
 name: config.redaction_request
 type: duckdb.seed
 description: |
-  Deletion and redaction requests by source and external ID. Rows listed here
-  are dropped from staging and everything downstream on the next run. To purge
+  Deletion and redaction requests by source and external ID. Collectors read
+  the CSV and never write these records to raw again; staging also drops them,
+  and everything downstream is rebuilt without them on the next run. To purge
   the raw record as well, follow docs/sources-and-privacy.md#deletion-and-redaction
   (scripts/redact.sh does both). Keep this file in version control so a
   re-collected record stays suppressed.

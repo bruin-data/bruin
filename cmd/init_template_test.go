@@ -1939,12 +1939,12 @@ func TestSocialListeningTemplateIsSafeByDefault(t *testing.T) {
 		"reply_drafts_enabled",
 		"require_human_approval",
 	} {
-		require.Regexp(t, regexp.MustCompile(`(?m)^  `+regexp.QuoteMeta(variable)+`:\s*$`), string(pipeline),
+		require.Regexp(t, `(?m)^  `+regexp.QuoteMeta(variable)+`:\s*$`, string(pipeline),
 			"pipeline.yml should declare variable %q", variable)
 	}
 
 	// Cloud schedules are opt-in: the template must not ship one.
-	require.NotRegexp(t, regexp.MustCompile(`(?m)^schedule:`), string(pipeline))
+	require.NotRegexp(t, `(?m)^schedule:`, string(pipeline))
 
 	secretPatterns := []*regexp.Regexp{
 		regexp.MustCompile(`xox[bpa]-[0-9A-Za-z-]{10,}`),
@@ -1977,7 +1977,7 @@ func TestSocialListeningTemplateIsSafeByDefault(t *testing.T) {
 	require.Positive(t, files)
 }
 
-// go:embed silently drops files whose names start with "." or "_" (such as
+// Go's embed directive silently drops files whose names start with "." or "_" (such as
 // __init__.py and .bruin.yml.example) unless templates.go lists them. Every
 // file in the template directory, other than Python bytecode caches, must ship.
 func TestSocialListeningTemplateEmbedsEveryFile(t *testing.T) {
