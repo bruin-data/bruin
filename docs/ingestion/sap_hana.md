@@ -63,7 +63,7 @@ As a result of this command, Bruin will ingest data from the given SAP HANA tabl
 
 ## Using SAP HANA as a Destination
 
-SAP HANA can also be used as a destination to load data from other sources. The supported incremental strategies are `replace`, `append`, `merge`, `delete+insert`, and `scd2`.
+SAP HANA can also be used as a destination to load data from other sources. The supported incremental strategies are `replace`, `append`, `merge`, and `delete+insert`.
 
 ### Example: Loading data into SAP HANA
 
@@ -83,7 +83,7 @@ parameters:
 
 - `name`: The destination table in SAP HANA, as `schema.table` or `table`.
 - `connection`: The name of the SAP HANA connection defined in `.bruin.yml`, used as the destination.
-- `source_connection`: The name of the source connection (e.g., Postgres).
+- `source_connection`: The name of the source connection (e.g., Postgres), which must also be defined in `.bruin.yml`.
 - `source_table`: The table from the source to ingest.
 - `destination`: Set to `hana` to use SAP HANA as the destination.
 
