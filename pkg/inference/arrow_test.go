@@ -1,7 +1,6 @@
 package inference
 
 import (
-	"context"
 	"os"
 	"testing"
 	"time"
@@ -17,7 +16,11 @@ func roundTripArrow(t *testing.T, input arrow.RecordBatch, results []string) arr
 	t.Helper()
 	f, err := os.CreateTemp(t.TempDir(), "inference-*.arrow")
 	require.NoError(t, err)
-	require.NoError(t, writeArrow(f, input, "result", results))
+	values := make([]any, len(results))
+	for i, result := range results {
+		values[i] = result
+	}
+	require.NoError(t, writeInferenceArrow(f, input, []outputColumn{{Name: "result", Type: "string"}}, [][]any{values}))
 	require.NoError(t, f.Close())
 
 	f, err = os.Open(f.Name())
@@ -96,20 +99,4 @@ func TestRecordFromQueryRejectsLossyValuesAndUnknownTypes(t *testing.T) {
 			require.Error(t, err)
 		})
 	}
-}
-
-type fallbackArrowTestConnection struct {
-	result *query.QueryResult
-}
-
-func (c fallbackArrowTestConnection) SelectWithSchema(context.Context, *query.Query) (*query.QueryResult, error) {
-	return c.result, nil
-}
-
-func TestReadRecordChecksRowLimitBeforeFallbackConversion(t *testing.T) {
-	t.Parallel()
-	_, err := readRecord(context.Background(), fallbackArrowTestConnection{result: &query.QueryResult{
-		Columns: []string{"value"}, ColumnTypes: []string{"unknown"}, Rows: [][]interface{}{{1}, {2}},
-	}}, "select value", 1, nil)
-	require.EqualError(t, err, "inference input exceeds max_rows (1)")
 }

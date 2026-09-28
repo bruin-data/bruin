@@ -11,11 +11,7 @@ import (
 
 // resolveInputQuery resolves input_asset after the complete pipeline has been built.
 // input_query is returned byte-for-byte unchanged.
-func resolveInputQuery(pipe *pipeline.Pipeline, asset *pipeline.Asset, conn config.ConnectionGetter) (string, error) {
-	cfg, err := readConfig(asset)
-	if err != nil {
-		return "", err
-	}
+func resolveInputQuery(pipe *pipeline.Pipeline, asset *pipeline.Asset, cfg *assetConfig, conn config.ConnectionAndDetailsGetter) (string, error) {
 	if cfg.inputAsset == "" {
 		return cfg.inputQuery, nil
 	}
@@ -34,10 +30,7 @@ func resolveInputQuery(pipe *pipeline.Pipeline, asset *pipeline.Asset, conn conf
 		return "", fmt.Errorf("inference input_asset %q uses connection %q, but inference asset uses %q; cross-connection inference is not supported", cfg.inputAsset, sourceConnection, asset.Connection)
 	}
 
-	platform := ""
-	if details, ok := conn.(config.ConnectionDetailsGetter); ok {
-		platform = details.GetConnectionType(asset.Connection)
-	}
+	platform := conn.GetConnectionType(asset.Connection)
 	if platform == "" {
 		platform = pipeline.AssetTypeConnectionMapping[source.Type]
 	}

@@ -1,7 +1,6 @@
 package inference
 
 import (
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -10,10 +9,12 @@ import (
 )
 
 type assetConfig struct {
-	provider, model, prompt, inputQuery, inputAsset, outputColumn, keyEnv string
-	maxRows, maxTokens, parallelism                                       int
-	allowedValues                                                         []string
-	force                                                                 bool
+	provider, model, inputQuery, inputAsset string
+	maxRows, maxTokens, parallelism         int
+	cache                                   bool
+	context, instructions                   string
+	groups                                  []requestGroup
+	outputs                                 []outputColumn
 }
 
 // ValidateAsset validates the first-version inference contract without making requests.
@@ -22,23 +23,35 @@ func ValidateAsset(asset *pipeline.Asset) error {
 	return err
 }
 
-// ProviderDefaultAPIKeyEnv returns the conventional API key environment variable for provider.
-func ProviderDefaultAPIKeyEnv(provider string) (string, bool) {
-	value, ok := map[string]string{
-		"opencode":   "OPENCODE_API_KEY",
-		"openrouter": "OPENROUTER_API_KEY",
-		"openai":     "OPENAI_API_KEY",
-		"anthropic":  "ANTHROPIC_API_KEY",
-		"google":     "GOOGLE_API_KEY",
-	}[provider]
-	return value, ok
+func supportedProvider(provider string) bool {
+	switch provider {
+	case "opencode", "openrouter", "openai", "anthropic", "google", "typesafe":
+		return true
+	default:
+		return false
+	}
 }
 
 func readConfig(asset *pipeline.Asset) (*assetConfig, error) {
-	c := &assetConfig{maxRows: 1000, maxTokens: defaultMaxOutputTokens, parallelism: 4}
+	c := &assetConfig{maxRows: 1000, maxTokens: defaultMaxOutputTokens, parallelism: 4, cache: true}
+	if _, exists := asset.Parameters["api_key_env"]; exists {
+		return nil, fmt.Errorf("api_key_env is not supported; use a Bruin provider connection")
+	}
+	if raw, exists := asset.Parameters["inference_connection"]; exists {
+		connection, ok := raw.(string)
+		if !ok || strings.TrimSpace(connection) == "" {
+			return nil, fmt.Errorf("inference_connection must be a nonempty Bruin connection name")
+		}
+	}
 	fields := map[string]*string{
-		"provider": &c.provider, "model": &c.model, "prompt": &c.prompt,
-		"output_column": &c.outputColumn,
+		"provider": &c.provider, "model": &c.model, "context": &c.context,
+	}
+	if raw, exists := asset.Parameters["instructions"]; exists {
+		var ok bool
+		c.instructions, ok = raw.(string)
+		if !ok {
+			return nil, fmt.Errorf("inference instructions must be a string")
+		}
 	}
 	for name, dest := range fields {
 		value, ok := asset.Parameters.GetString(name)
@@ -65,16 +78,14 @@ func readConfig(asset *pipeline.Asset) (*assetConfig, error) {
 			return nil, fmt.Errorf("inference parameters.input_asset must be a nonempty string")
 		}
 	}
-	var ok bool
-	c.keyEnv, ok = ProviderDefaultAPIKeyEnv(c.provider)
-	if !ok {
-		return nil, fmt.Errorf("unsupported inference provider %q: use opencode, openrouter, openai, anthropic or google", c.provider)
+	if !supportedProvider(c.provider) {
+		return nil, fmt.Errorf("unsupported inference provider %q: use opencode, openrouter, openai, anthropic, google or typesafe", c.provider)
 	}
-	if value, exists := asset.Parameters.GetString("api_key_env"); exists {
-		if value == "" {
-			return nil, fmt.Errorf("inference api_key_env cannot be empty")
-		}
-		c.keyEnv = value
+	if err := c.readColumns(asset); err != nil {
+		return nil, err
+	}
+	if len(c.outputs) == 0 {
+		return nil, fmt.Errorf("inference requires at least one column with an inference definition")
 	}
 	for name, dest := range map[string]*int{"max_rows": &c.maxRows, "max_output_tokens": &c.maxTokens, "extract_parallelism": &c.parallelism} {
 		if value, exists := asset.Parameters[name]; exists {
@@ -85,17 +96,15 @@ func readConfig(asset *pipeline.Asset) (*assetConfig, error) {
 			*dest = n
 		}
 	}
-	if value, exists := asset.Parameters.GetString("force"); exists {
-		if value != "true" && value != "false" {
-			return nil, fmt.Errorf("inference force must be true or false")
-		}
-		c.force = value == "true"
+	if _, exists := asset.Parameters["force"]; exists {
+		return nil, fmt.Errorf("inference force is not supported; use cache: false to disable caching")
 	}
-	if values, exists := asset.Parameters["allowed_values"]; exists {
-		encoded, err := json.Marshal(values)
-		if err != nil || json.Unmarshal(encoded, &c.allowedValues) != nil || len(c.allowedValues) == 0 {
-			return nil, fmt.Errorf("inference allowed_values must be a nonempty list of strings")
+	if _, exists := asset.Parameters["cache"]; exists {
+		value, ok := asset.Parameters.GetString("cache")
+		if !ok || (value != "true" && value != "false") {
+			return nil, fmt.Errorf("inference cache must be true or false")
 		}
+		c.cache = value == "true"
 	}
 	if asset.Connection == "" {
 		return nil, fmt.Errorf("inference requires an explicit warehouse connection")
@@ -110,20 +119,10 @@ func readConfig(asset *pipeline.Asset) (*assetConfig, error) {
 	if len(asset.ColumnNamesWithPrimaryKey()) == 0 {
 		return nil, fmt.Errorf("inference requires primary key columns for result identity")
 	}
-	found := false
 	for _, column := range asset.Columns {
 		if len(column.Checks) != 0 {
 			return nil, fmt.Errorf("inference checks are not yet supported; define checks on a downstream SQL asset")
 		}
-		if column.Name == c.outputColumn {
-			found = true
-			if column.PrimaryKey || column.Type != "string" {
-				return nil, fmt.Errorf("inference output_column must be a declared non-primary-key string column")
-			}
-		}
-	}
-	if !found {
-		return nil, fmt.Errorf("inference output_column must be declared in columns with type string")
 	}
 	if len(asset.CustomChecks) != 0 || len(asset.Hooks.Pre) != 0 || len(asset.Hooks.Post) != 0 {
 		return nil, fmt.Errorf("inference custom checks and hooks are not yet supported")

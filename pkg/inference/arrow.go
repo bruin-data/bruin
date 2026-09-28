@@ -205,18 +205,37 @@ func appendArrowValue(builder array.Builder, value any) error {
 	return builder.AppendValueFromString(text)
 }
 
-// writeArrow writes IPC file format, the same mmap:// contract as Python assets.
-func writeArrow(dst io.WriteSeeker, input arrow.RecordBatch, outputColumn string, results []string) error {
-	if int64(len(results)) != input.NumRows() {
-		return fmt.Errorf("inference result count does not match input")
+// writeInferenceArrow uses the same mmap:// IPC file contract as Python assets.
+func writeInferenceArrow(dst io.WriteSeeker, input arrow.RecordBatch, outputs []outputColumn, results [][]any) error {
+	fields := input.Schema().Fields()
+	columns := append([]arrow.Array(nil), input.Columns()...)
+	for i, output := range outputs {
+		var dt arrow.DataType
+		switch output.Type {
+		case "string":
+			dt = arrow.BinaryTypes.String
+		case "boolean":
+			dt = arrow.FixedWidthTypes.Boolean
+		case "integer":
+			dt = arrow.PrimitiveTypes.Int64
+		case "number":
+			dt = arrow.PrimitiveTypes.Float64
+		default:
+			return fmt.Errorf("unsupported inference output type")
+		}
+		builder := array.NewBuilder(memory.DefaultAllocator, dt)
+		for _, value := range results[i] {
+			if err := appendArrowValue(builder, value); err != nil {
+				builder.Release()
+				return err
+			}
+		}
+		values := builder.NewArray()
+		builder.Release()
+		defer values.Release()
+		fields = append(fields, arrow.Field{Name: output.Name, Type: dt, Nullable: true})
+		columns = append(columns, values)
 	}
-	builder := array.NewStringBuilder(memory.DefaultAllocator)
-	defer builder.Release()
-	builder.AppendValues(results, nil)
-	output := builder.NewStringArray()
-	defer output.Release()
-	fields := append(input.Schema().Fields(), arrow.Field{Name: outputColumn, Type: arrow.BinaryTypes.String, Nullable: true})
-	columns := append(append([]arrow.Array(nil), input.Columns()...), output)
 	schema := arrow.NewSchema(fields, nil)
 	record := array.NewRecordBatch(schema, columns, input.NumRows())
 	defer record.Release()

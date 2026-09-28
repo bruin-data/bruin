@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -28,115 +27,6 @@ type Client struct {
 	APIKey          string
 	MaxOutputTokens int
 	HTTPClient      *http.Client
-}
-
-// Complete sends prompt to the configured provider and returns its completed text response.
-func (c *Client) Complete(ctx context.Context, prompt string) (string, error) {
-	if c.Model == "" {
-		return "", errors.New("inference model is required")
-	}
-	if c.MaxOutputTokens < 0 {
-		return "", errors.New("max output tokens must not be negative")
-	}
-
-	tokens := c.MaxOutputTokens
-	if tokens == 0 {
-		tokens = defaultMaxOutputTokens
-	}
-
-	var endpoint string
-	var payload any
-	switch c.Provider {
-	case "opencode":
-		endpoint = "https://opencode.ai/zen/v1/responses"
-		payload = struct {
-			Input           string `json:"input"`
-			Model           string `json:"model"`
-			MaxOutputTokens int    `json:"max_output_tokens"`
-			Store           bool   `json:"store"`
-		}{prompt, c.Model, tokens, false}
-	case "openai":
-		if c.APIKey == "" {
-			return "", errors.New("openai API key is required")
-		}
-		endpoint = "https://api.openai.com/v1/responses"
-		payload = struct {
-			Input           string `json:"input"`
-			Model           string `json:"model"`
-			MaxOutputTokens int    `json:"max_output_tokens"`
-			Store           bool   `json:"store"`
-		}{prompt, c.Model, tokens, false}
-	case "openrouter":
-		if c.APIKey == "" {
-			return "", errors.New("openrouter API key is required")
-		}
-		endpoint = "https://openrouter.ai/api/v1/chat/completions"
-		payload = struct {
-			Messages  []chatMessage `json:"messages"`
-			Model     string        `json:"model"`
-			MaxTokens int           `json:"max_tokens"`
-		}{[]chatMessage{{Role: "user", Content: prompt}}, c.Model, tokens}
-	case "anthropic":
-		if c.APIKey == "" {
-			return "", errors.New("anthropic API key is required")
-		}
-		endpoint = "https://api.anthropic.com/v1/messages"
-		payload = struct {
-			Messages  []chatMessage `json:"messages"`
-			Model     string        `json:"model"`
-			MaxTokens int           `json:"max_tokens"`
-		}{[]chatMessage{{Role: "user", Content: prompt}}, c.Model, tokens}
-	case "google":
-		if c.APIKey == "" {
-			return "", errors.New("google API key is required")
-		}
-		endpoint = "https://generativelanguage.googleapis.com/v1beta/models/" + url.PathEscape(c.Model) + ":generateContent"
-		googlePayload := struct {
-			Contents []struct {
-				Role  string `json:"role"`
-				Parts []struct {
-					Text string `json:"text"`
-				} `json:"parts"`
-			} `json:"contents"`
-			GenerationConfig struct {
-				MaxOutputTokens int `json:"maxOutputTokens"`
-			} `json:"generationConfig"`
-		}{}
-		googlePayload.Contents = append(googlePayload.Contents, struct {
-			Role  string `json:"role"`
-			Parts []struct {
-				Text string `json:"text"`
-			} `json:"parts"`
-		}{Role: "user", Parts: []struct {
-			Text string `json:"text"`
-		}{{Text: prompt}}})
-		googlePayload.GenerationConfig.MaxOutputTokens = tokens
-		payload = googlePayload
-	default:
-		return "", fmt.Errorf("unsupported inference provider %q", c.Provider)
-	}
-
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return "", errors.New("could not encode inference request")
-	}
-	response, err := c.do(ctx, endpoint, body)
-	if err != nil {
-		return "", err
-	}
-
-	switch c.Provider {
-	case "opencode", "openai":
-		return parseOpenCode(response)
-	case "openrouter":
-		return parseOpenRouter(response)
-	case "anthropic":
-		return parseAnthropic(response)
-	case "google":
-		return parseGoogle(response)
-	default:
-		panic("provider validated above")
-	}
 }
 
 type chatMessage struct {

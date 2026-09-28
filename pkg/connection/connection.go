@@ -1695,6 +1695,14 @@ func (m *Manager) AddAnthropicConnectionFromConfig(connection *config.AnthropicC
 	return nil
 }
 
+func (m *Manager) AddAPIKeyConnectionFromConfig(connection *config.APIKeyConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.availableConnections[connection.Name] = connection
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddIntercomConnectionFromConfig(connection *config.IntercomConnection) error {
 	m.mutex.Lock()
 	if m.Intercom == nil {
@@ -4574,6 +4582,11 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.SurveyMonkey, connectionManager.AddSurveyMonkeyConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Typeform, connectionManager.AddTypeformConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Anthropic, connectionManager.AddAnthropicConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.OpenAI, connectionManager.AddAPIKeyConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.OpenCode, connectionManager.AddAPIKeyConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.OpenRouter, connectionManager.AddAPIKeyConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Google, connectionManager.AddAPIKeyConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Typesafe, connectionManager.AddAPIKeyConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Intercom, connectionManager.AddIntercomConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.FacebookAds, connectionManager.AddFacebookAdsConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Stripe, connectionManager.AddStripeConnectionFromConfig, &wg, &errList, &mu)

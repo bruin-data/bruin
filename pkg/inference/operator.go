@@ -8,21 +8,18 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"slices"
-	"sync/atomic"
 
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/ingestruri"
-	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/python"
-	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
+	"github.com/bruin-data/bruin/pkg/user"
 	"github.com/gofrs/flock"
-	"golang.org/x/sync/errgroup"
+	"github.com/spf13/afero"
 )
 
 type ingestrRunner interface {
@@ -31,19 +28,21 @@ type ingestrRunner interface {
 
 // Operator enriches query results and publishes them through Bruin's ingestr writer.
 type Operator struct {
-	conn     config.ConnectionGetter
-	runner   ingestrRunner
-	complete func(context.Context, *Client, string) (string, error)
-	cacheDir string
+	conn       config.ConnectionAndDetailsGetter
+	runner     ingestrRunner
+	structured func(context.Context, *Client, string, string, []outputColumn) (map[string]any, error)
+	cacheDir   string
 }
 
-func NewOperator(conn config.ConnectionGetter) *Operator {
+func NewOperator(conn config.ConnectionAndDetailsGetter) *Operator {
 	return &Operator{
 		conn: conn,
 		runner: &python.UvPythonRunner{
 			UvInstaller: &python.UvChecker{}, IngestrInstaller: &python.IngestrChecker{}, Cmd: &python.CommandRunner{},
 		},
-		complete: func(ctx context.Context, c *Client, prompt string) (string, error) { return c.Complete(ctx, prompt) },
+		structured: func(ctx context.Context, c *Client, state, instructions string, columns []outputColumn) (map[string]any, error) {
+			return c.CompleteStructured(ctx, state, instructions, columns)
+		},
 	}
 }
 
@@ -53,12 +52,12 @@ func (o *Operator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
 	if err != nil {
 		return err
 	}
-	client := &Client{Provider: cfg.provider, Model: cfg.model, APIKey: os.Getenv(cfg.keyEnv), MaxOutputTokens: cfg.maxTokens}
-	if client.APIKey == "" && cfg.provider != "opencode" {
-		return fmt.Errorf("inference requires environment variable %s", cfg.keyEnv)
+	groups, err := o.resolveGroups(ti.GetPipeline(), cfg)
+	if err != nil {
+		return err
 	}
 	conn := o.conn.GetConnection(asset.Connection)
-	inputQuery, err := resolveInputQuery(ti.GetPipeline(), asset, o.conn)
+	inputQuery, err := resolveInputQuery(ti.GetPipeline(), asset, cfg, o.conn)
 	if err != nil {
 		return err
 	}
@@ -71,31 +70,34 @@ func (o *Operator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
 	if err != nil {
 		return err
 	}
-	cacheRoot := o.cacheDir
-	if cacheRoot == "" {
-		cacheRoot, err = os.UserCacheDir()
+	var cachePath string
+	if cfg.cache {
+		cacheRoot := o.cacheDir
+		if cacheRoot == "" {
+			cacheRoot, err = user.NewConfigManager(afero.NewOsFs()).EnsureAndGetBruinHomeDir()
+			if err != nil {
+				return err
+			}
+			cacheRoot = filepath.Join(cacheRoot, "inference")
+		}
+		namespace, err := fingerprint([]string{repo.Path, ti.GetPipeline().Name, asset.Name, asset.Connection, destURI})
 		if err != nil {
 			return err
 		}
-		cacheRoot = filepath.Join(cacheRoot, "bruin", "inference")
+		cachePath = filepath.Join(cacheRoot, namespace)
+		if err := os.MkdirAll(cachePath, 0o700); err != nil {
+			return err
+		}
+		lock := flock.New(filepath.Join(cachePath, ".lock"))
+		locked, err := lock.TryLock()
+		if err != nil {
+			return err
+		}
+		if !locked {
+			return fmt.Errorf("inference asset is already running against this local cache")
+		}
+		defer lock.Unlock() //nolint:errcheck
 	}
-	namespace, err := fingerprint([]string{repo.Path, ti.GetPipeline().Name, asset.Name, asset.Connection, destURI})
-	if err != nil {
-		return err
-	}
-	cachePath := filepath.Join(cacheRoot, namespace)
-	if err := os.MkdirAll(cachePath, 0o700); err != nil {
-		return err
-	}
-	lock := flock.New(filepath.Join(cachePath, ".lock"))
-	locked, err := lock.TryLock()
-	if err != nil {
-		return err
-	}
-	if !locked {
-		return fmt.Errorf("inference asset is already running against this local cache")
-	}
-	defer lock.Unlock() //nolint:errcheck
 
 	// input_query is rendered by Bruin's parameter mutator. Never render it twice.
 	record, err := readRecord(ctx, conn, inputQuery, cfg.maxRows, asset.Columns)
@@ -103,17 +105,7 @@ func (o *Operator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
 		return fmt.Errorf("inference input query failed: %w", err)
 	}
 	defer record.Release()
-	input := &query.QueryResult{Columns: make([]string, record.NumCols()), Rows: make([][]any, record.NumRows())}
-	for i, field := range record.Schema().Fields() {
-		input.Columns[i] = field.Name
-	}
-	for i := range input.Rows {
-		input.Rows[i] = make([]any, record.NumCols())
-		for j, column := range record.Columns() {
-			input.Rows[i][j] = column.GetOneForMarshal(i)
-		}
-	}
-	rows, keys, err := inputRows(input, asset.ColumnNamesWithPrimaryKey(), cfg)
+	rows, err := inputRows(record, asset.ColumnNamesWithPrimaryKey(), cfg.outputs)
 	if err != nil {
 		return err
 	}
@@ -124,109 +116,62 @@ func (o *Operator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
 		}
 	}
 
-	results := make([]string, len(rows))
-	var called, reused atomic.Int64
-	group, requestCtx := errgroup.WithContext(ctx)
-	group.SetLimit(cfg.parallelism)
-	for i, row := range rows {
-		group.Go(func() error {
-			if err := requestCtx.Err(); err != nil {
-				return err
-			}
-			// A fresh renderer keeps row values isolated between concurrent assets.
-			renderer := jinja.NewRenderer(jinja.Context{"row": row})
-			prompt, err := renderer.Render(cfg.prompt)
-			if err != nil {
-				return fmt.Errorf("could not render inference prompt for input row %d", i+1)
-			}
-			key, err := fingerprint([]any{keys[i], cfg.provider, cfg.model, cfg.maxTokens, cfg.outputColumn, cfg.allowedValues, prompt})
-			if err != nil {
-				return err
-			}
-			path := filepath.Join(cachePath, key+".json")
-			var result string
-			cached, readErr := os.ReadFile(path)
-			if readErr != nil && !os.IsNotExist(readErr) {
-				return readErr
-			}
-			if !cfg.force && readErr == nil {
-				if json.Unmarshal(cached, &result) != nil || result == "" || (len(cfg.allowedValues) != 0 && !slices.Contains(cfg.allowedValues, result)) {
-					return fmt.Errorf("invalid inference cache entry; remove %s and retry", path)
-				}
-				reused.Add(1)
-			} else {
-				result, err = o.complete(requestCtx, client, prompt)
-				if err != nil {
-					return fmt.Errorf("inference failed for input row %d: %w", i+1, err)
-				}
-				called.Add(1)
-				if result == "" || (len(cfg.allowedValues) != 0 && !slices.Contains(cfg.allowedValues, result)) {
-					return fmt.Errorf("inference output for input row %d is empty or not in allowed_values", i+1)
-				}
-				if err := saveResult(path, result); err != nil {
-					return err
-				}
-			}
-			results[i] = result
-			return nil
-		})
-	}
-	if err := group.Wait(); err != nil {
+	results, called, reused, err := o.inferRows(ctx, cfg, groups, rows, cachePath)
+	if err != nil {
 		return err
 	}
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 	if out, ok := ctx.Value(executor.KeyPrinter).(io.Writer); ok {
-		_, _ = fmt.Fprintf(out, "Inference: %d rows, %d model calls, %d cached results\n", len(rows), called.Load(), reused.Load())
+		_, _ = fmt.Fprintf(out, "Inference: %d rows, %d model calls, %d cached results\n", len(rows), called, reused)
 	}
-	return o.publish(ctx, asset, repo, destURI, record, cfg.outputColumn, results)
+	return o.publish(ctx, asset, repo, destURI, record, cfg.outputs, results)
 }
 
-func inputRows(input *query.QueryResult, primaryKeys []string, cfg *assetConfig) ([]map[string]any, [][]any, error) {
-	if input == nil || len(input.Rows) > cfg.maxRows {
-		return nil, nil, fmt.Errorf("inference input is missing or exceeds max_rows (%d); no model calls were made", cfg.maxRows)
+func inputRows(input arrow.RecordBatch, primaryKeys []string, outputs []outputColumn) ([]map[string]any, error) {
+	fields := input.Schema().Fields()
+	columns := make(map[string]bool, len(fields))
+	generated := make(map[string]bool, len(outputs))
+	for _, column := range outputs {
+		generated[column.Name] = true
 	}
-	columns := make(map[string]bool, len(input.Columns))
-	for _, name := range input.Columns {
-		if columns[name] || name == cfg.outputColumn {
-			return nil, nil, fmt.Errorf("inference input has duplicate columns or already contains output_column")
+	for _, field := range fields {
+		if columns[field.Name] || generated[field.Name] {
+			return nil, fmt.Errorf("inference input has duplicate columns or already contains a generated column")
 		}
-		columns[name] = true
+		columns[field.Name] = true
 	}
 	for _, key := range primaryKeys {
 		if !columns[key] {
-			return nil, nil, fmt.Errorf("inference primary key %s is missing from input", key)
+			return nil, fmt.Errorf("inference primary key %s is missing from input", key)
 		}
 	}
-	rows := make([]map[string]any, len(input.Rows))
-	keys := make([][]any, len(input.Rows))
+	rows := make([]map[string]any, input.NumRows())
 	seen := make(map[string]bool, len(rows))
-	for i, values := range input.Rows {
-		if len(values) != len(input.Columns) {
-			return nil, nil, fmt.Errorf("inference input row %d has an invalid column count", i+1)
+	for i := range rows {
+		row := make(map[string]any, len(fields))
+		for j, column := range input.Columns() {
+			row[fields[j].Name] = column.GetOneForMarshal(i)
 		}
-		row := make(map[string]any, len(values)+1)
-		for j, value := range values {
-			row[input.Columns[j]] = value
-		}
+		keys := make([]any, 0, len(primaryKeys))
 		for _, name := range primaryKeys {
 			if row[name] == nil {
-				return nil, nil, fmt.Errorf("inference primary keys cannot be null (row %d)", i+1)
+				return nil, fmt.Errorf("inference primary keys cannot be null (row %d)", i+1)
 			}
-			keys[i] = append(keys[i], row[name])
+			keys = append(keys, row[name])
 		}
-		key, err := fingerprint(keys[i])
+		key, err := fingerprint(keys)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		if seen[key] {
-			return nil, nil, fmt.Errorf("inference input contains duplicate primary keys (row %d)", i+1)
+			return nil, fmt.Errorf("inference input contains duplicate primary keys (row %d)", i+1)
 		}
 		seen[key] = true
 		rows[i] = row
 	}
-	return rows, keys, nil
+	return rows, nil
 }
 
 func fingerprint(value any) (string, error) {
@@ -257,13 +202,13 @@ func saveResult(path, result string) error {
 	return os.Rename(file.Name(), path)
 }
 
-func (o *Operator) publish(ctx context.Context, asset *pipeline.Asset, repo *git.Repo, destURI string, record arrow.RecordBatch, outputColumn string, results []string) error {
+func (o *Operator) publish(ctx context.Context, asset *pipeline.Asset, repo *git.Repo, destURI string, record arrow.RecordBatch, outputs []outputColumn, results [][]any) error {
 	file, err := os.CreateTemp("", "bruin-inference-*.arrow")
 	if err != nil {
 		return err
 	}
 	defer os.Remove(file.Name())
-	if err := writeArrow(file, record, outputColumn, results); err != nil {
+	if err := writeInferenceArrow(file, record, outputs, results); err != nil {
 		_ = file.Close()
 		return fmt.Errorf("could not write inference Arrow output: %w", err)
 	}

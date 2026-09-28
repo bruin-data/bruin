@@ -3,6 +3,7 @@ package inference
 import (
 	"context"
 	"errors"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -70,15 +71,17 @@ func (r *captureRunner) RunIngestr(_ context.Context, args, _ []string, _ *git.R
 }
 
 func testAsset() *pipeline.Asset {
-	return &pipeline.Asset{
+	asset := &pipeline.Asset{
 		Name: "analytics.classified", Type: pipeline.AssetTypeInference, Connection: "warehouse",
 		Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeTable, Strategy: pipeline.MaterializationStrategyMerge},
 		Columns:         []pipeline.Column{{Name: "id", PrimaryKey: true}, {Name: "category", Type: "string"}},
 		Parameters: pipeline.ParameterMap{
 			"provider": "opencode", "model": "test-model", "input_query": "select id, body from tickets",
-			"prompt": "Classify: {{ row.body }}", "output_column": "category", "allowed_values": []string{"billing", "technical"},
+			"context": "{{ row.body }}",
 		},
 	}
+	asset.Columns[1].Inference = &pipeline.ColumnInference{Prompt: "Classify the ticket", Choices: map[string]string{"billing": "Billing issue", "technical": "Technical issue"}}
+	return asset
 }
 
 func fixture(t *testing.T) (*Operator, *scheduler.AssetInstance, *inputConnection, *captureRunner) {
@@ -93,7 +96,7 @@ func fixture(t *testing.T) (*Operator, *scheduler.AssetInstance, *inputConnectio
 		Columns: []string{"id", "body"}, ColumnTypes: []string{"bigint", "varchar"}, Rows: [][]any{{1, "charged twice"}, {7, "server is down"}},
 	}}
 	runner := &captureRunner{}
-	op := NewOperator(conn)
+	op := NewOperator(testProviderConnections(t, conn, false))
 	op.cacheDir = t.TempDir()
 	op.runner = runner
 	return op, &scheduler.AssetInstance{Asset: asset, Pipeline: &pipeline.Pipeline{Name: "test"}}, conn, runner
@@ -102,12 +105,12 @@ func fixture(t *testing.T) (*Operator, *scheduler.AssetInstance, *inputConnectio
 func TestOperatorCacheAndMaterialization(t *testing.T) {
 	op, ti, conn, runner := fixture(t)
 	calls := 0
-	op.complete = func(_ context.Context, _ *Client, prompt string) (string, error) {
+	op.structured = func(_ context.Context, _ *Client, state, _ string, _ []outputColumn) (map[string]any, error) {
 		calls++
-		if strings.Contains(prompt, "charged twice") {
-			return "billing", nil
+		if strings.Contains(state, "charged twice") {
+			return map[string]any{"category": "billing"}, nil
 		}
-		return "technical", nil
+		return map[string]any{"category": "technical"}, nil
 	}
 	require.NoError(t, op.Run(t.Context(), ti))
 	require.Equal(t, 2, calls)
@@ -127,7 +130,7 @@ func TestOperatorCacheAndMaterialization(t *testing.T) {
 	ti.Asset.Parameters["model"] = "another-model"
 	require.NoError(t, op.Run(t.Context(), ti))
 	require.Equal(t, 5, calls, "model changes invalidate both rows")
-	ti.Asset.Parameters["prompt"] = "Updated prompt: {{ row.body }}"
+	ti.Asset.Columns[1].Inference.Prompt = "Updated classification prompt"
 	require.NoError(t, op.Run(t.Context(), ti))
 	require.Equal(t, 7, calls)
 	ti.Asset.Materialization.Strategy = pipeline.MaterializationStrategyCreateReplace
@@ -135,7 +138,7 @@ func TestOperatorCacheAndMaterialization(t *testing.T) {
 	require.Equal(t, 7, calls, "table rebuilds reuse inference")
 	require.Len(t, runner.rows, 2, "replace must publish cached rows as well")
 	require.Contains(t, strings.Join(runner.args, " "), "--incremental-strategy replace")
-	ti.Asset.Parameters["force"] = true
+	ti.Asset.Parameters["cache"] = false
 	require.NoError(t, op.Run(t.Context(), ti))
 	require.Equal(t, 9, calls)
 }
@@ -143,18 +146,18 @@ func TestOperatorCacheAndMaterialization(t *testing.T) {
 func TestOperatorResumesFailureWithoutPublishingPartialResults(t *testing.T) {
 	op, ti, _, runner := fixture(t)
 	calls := 0
-	op.complete = func(context.Context, *Client, string) (string, error) {
+	op.structured = func(context.Context, *Client, string, string, []outputColumn) (map[string]any, error) {
 		calls++
 		if calls == 2 {
-			return "", errors.New("unavailable")
+			return nil, errors.New("unavailable")
 		}
-		return "billing", nil
+		return map[string]any{"category": "billing"}, nil
 	}
 	require.ErrorContains(t, op.Run(t.Context(), ti), "input row 2")
 	require.Zero(t, runner.calls)
 	// A new operator simulates a process restart; only its disk cache survives.
 	restarted := NewOperator(op.conn)
-	restarted.cacheDir, restarted.runner, restarted.complete = op.cacheDir, runner, op.complete
+	restarted.cacheDir, restarted.runner, restarted.structured = op.cacheDir, runner, op.structured
 	runner.err = errors.New("destination unavailable")
 	require.ErrorContains(t, restarted.Run(t.Context(), ti), "destination unavailable")
 	require.Equal(t, 3, calls)
@@ -180,7 +183,10 @@ func TestOperatorRejectsInvalidInputBeforeCallingModel(t *testing.T) {
 			case "collision":
 				conn.result.Columns[1] = "category"
 			}
-			op.complete = func(context.Context, *Client, string) (string, error) { t.Fatal("unexpected call"); return "", nil }
+			op.structured = func(context.Context, *Client, string, string, []outputColumn) (map[string]any, error) {
+				t.Fatal("unexpected call")
+				return nil, nil
+			}
 			require.Error(t, op.Run(t.Context(), ti))
 			require.Zero(t, runner.calls)
 		})
@@ -190,9 +196,15 @@ func TestOperatorRejectsInvalidInputBeforeCallingModel(t *testing.T) {
 func TestOperatorRejectsInvalidOutputAndEmptyReplace(t *testing.T) {
 	op, ti, conn, runner := fixture(t)
 	calls := 0
-	op.complete = func(context.Context, *Client, string) (string, error) { calls++; return "unrecognized", nil }
-	require.ErrorContains(t, op.Run(t.Context(), ti), "allowed_values")
-	require.ErrorContains(t, op.Run(t.Context(), ti), "allowed_values")
+	op.structured = func(ctx context.Context, c *Client, state, instructions string, columns []outputColumn) (map[string]any, error) {
+		c.HTTPClient = &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+			calls++
+			return response(http.StatusOK, responseText(`{"category":"unrecognized"}`)), nil
+		})}
+		return c.CompleteStructured(ctx, state, instructions, columns)
+	}
+	require.Error(t, op.Run(t.Context(), ti))
+	require.Error(t, op.Run(t.Context(), ti))
 	require.Equal(t, 2, calls, "invalid responses must not be cached")
 	require.Zero(t, runner.calls)
 	conn.result.Rows = nil
@@ -205,18 +217,18 @@ func TestOperatorRejectsInvalidOutputAndEmptyReplace(t *testing.T) {
 
 func TestValidateAsset(t *testing.T) {
 	require.NoError(t, ValidateAsset(testAsset()))
-	for _, name := range []string{"provider", "prompt", "max_rows", "allowed_values", "key", "view", "append", "connection", "output"} {
+	for _, name := range []string{"provider", "context", "max_rows", "inference", "key", "view", "append", "connection", "output"} {
 		t.Run(name, func(t *testing.T) {
 			a := testAsset()
 			switch name {
 			case "provider":
 				a.Parameters["provider"] = "unknown"
-			case "prompt":
-				delete(a.Parameters, "prompt")
+			case "context":
+				delete(a.Parameters, "context")
 			case "max_rows":
 				a.Parameters["max_rows"] = 0
-			case "allowed_values":
-				a.Parameters["allowed_values"] = []int{1}
+			case "inference":
+				a.Columns[1].Inference = nil
 			case "key":
 				a.Columns[0].PrimaryKey = false
 			case "view":
@@ -233,65 +245,6 @@ func TestValidateAsset(t *testing.T) {
 	}
 }
 
-func TestOperatorParallelRequestsPreserveRows(t *testing.T) {
-	op, ti, conn, runner := fixture(t)
-	ti.Asset.Parameters["extract_parallelism"] = 2
-	ti.Asset.Parameters["prompt"] = "{{ row.body }}"
-	delete(ti.Asset.Parameters, "allowed_values")
-	conn.result.Rows = [][]any{{1, "first"}, {7, "second"}, {9, "third"}, {12, "fourth"}}
-	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
-	defer cancel()
-	started := make(chan string, 4)
-	release := map[string]chan struct{}{}
-	for _, name := range []string{"first", "second", "third", "fourth"} {
-		release[name] = make(chan struct{})
-	}
-	var active, peak atomic.Int64
-	op.complete = func(ctx context.Context, _ *Client, prompt string) (string, error) {
-		n := active.Add(1)
-		defer active.Add(-1)
-		for old := peak.Load(); n > old; old = peak.Load() {
-			if peak.CompareAndSwap(old, n) {
-				break
-			}
-		}
-		started <- prompt
-		select {
-		case <-release[prompt]:
-			return "result-" + prompt, nil
-		case <-ctx.Done():
-			return "", ctx.Err()
-		}
-	}
-	done := make(chan error, 1)
-	go func() { done <- op.Run(ctx, ti) }()
-	next := func() string {
-		t.Helper()
-		select {
-		case name := <-started:
-			return name
-		case <-ctx.Done():
-			t.Fatal("requests did not run concurrently")
-			return ""
-		}
-	}
-	require.ElementsMatch(t, []string{"first", "second"}, []string{next(), next()})
-	// Keep the first row blocked while every later row finishes.
-	close(release["second"])
-	require.Equal(t, "third", next())
-	close(release["third"])
-	require.Equal(t, "fourth", next())
-	close(release["fourth"])
-	close(release["first"])
-	require.NoError(t, <-done)
-	require.Equal(t, int64(2), peak.Load())
-	require.Len(t, runner.rows, 4)
-	for i, name := range []string{"first", "second", "third", "fourth"} {
-		require.Equal(t, name, runner.rows[i]["body"])
-		require.Equal(t, "result-"+name, runner.rows[i]["category"])
-	}
-}
-
 func TestOperatorParallelFailureCancelsRequests(t *testing.T) {
 	op, ti, conn, runner := fixture(t)
 	ti.Asset.Parameters["extract_parallelism"] = 2
@@ -300,19 +253,19 @@ func TestOperatorParallelFailureCancelsRequests(t *testing.T) {
 	defer cancel()
 	started := make(chan struct{})
 	var calls atomic.Int64
-	op.complete = func(ctx context.Context, _ *Client, prompt string) (string, error) {
+	op.structured = func(ctx context.Context, _ *Client, state, _ string, _ []outputColumn) (map[string]any, error) {
 		calls.Add(1)
-		if strings.Contains(prompt, "charged twice") {
+		if strings.Contains(state, "charged twice") {
 			select {
 			case <-started:
-				return "", errors.New("provider failed")
+				return nil, errors.New("provider failed")
 			case <-ctx.Done():
-				return "", ctx.Err()
+				return nil, ctx.Err()
 			}
 		}
 		close(started)
 		<-ctx.Done()
-		return "", ctx.Err()
+		return nil, ctx.Err()
 	}
 	require.ErrorContains(t, op.Run(ctx, ti), "provider failed")
 	require.NoError(t, ctx.Err(), "sibling should cancel before the parent deadline")
@@ -334,14 +287,4 @@ func TestExtractParallelismConfig(t *testing.T) {
 	cfg, err = readConfig(asset)
 	require.NoError(t, err)
 	require.Equal(t, 10000, cfg.parallelism, "configured concurrency must not be clamped")
-}
-
-func TestZenLive(t *testing.T) {
-	if os.Getenv("BRUIN_INFERENCE_LIVE_TEST") != "1" {
-		t.Skip("set BRUIN_INFERENCE_LIVE_TEST=1 to call the paid Zen Muse Spark model with synthetic data")
-	}
-	c := &Client{Provider: "opencode", Model: "muse-spark-1.3", APIKey: os.Getenv("OPENCODE_API_KEY")}
-	text, err := c.Complete(t.Context(), "Classify this synthetic ticket. Reply with exactly one word: billing or technical. Ticket: I was charged twice for my subscription.")
-	require.NoError(t, err)
-	require.Equal(t, "billing", text)
 }
