@@ -2,7 +2,7 @@
 
 [Salesforce](https://www.Salesforce.com/) is a cloud-based customer relationship management (CRM) platform that helps businesses manage sales, customer interactions, and business processes. It provides tools for sales automation, customer service, marketing, analytics, and application development.
 
-Bruin supports Salesforce as a source for [ingestr assets](/assets/ingestr), and you can use it to ingest data from Salesforce into your data platform.
+Bruin supports Salesforce as a source for [ingestr assets](/assets/ingestr), and you can use it to ingest data from Salesforce into your data platform. Salesforce can also be a [reverse-ETL destination](#salesforce-as-a-destination), to write data back into Salesforce.
 
 Bruin's Salesforce ingestr connection supports three credential forms:
 
@@ -219,6 +219,152 @@ bruin run assets/salesforce_asset.yml
 ```
 
 As a result of this command, Bruin will ingest data from the given Salesforce table into your destination database.
+
+## Salesforce as a destination
+
+Bruin can also write records **into** Salesforce ([reverse ETL](/ingestion/reverse-etl)). Each source row creates, updates or deletes one Salesforce record. Reuse the same `salesforce` connection as the source. The user it logs in with needs **Create**, **Edit** and, for `delete`/`replace`, **Delete** permission on the object, plus **Edit** access to every field you write.
+
+Set the destination with three parameters:
+
+- `destination: salesforce`
+- `destination_connection`: your Salesforce connection name
+- `destination_table: '<object>?external_id=<field>&load_method=<load_method>'`
+  - `<object>`: the Salesforce object to write to, e.g. `Contact`. See [Objects and fields](#objects-and-fields).
+  - `external_id`: the field used to find existing records. Needed for `merge` and `replace`. See [Matching records](#matching-records).
+  - `load_method` *(optional)*: `bulk` (default) or `rest`. See [Load method](#load-method).
+
+`incremental_strategy` is **required**. Salesforce has no default.
+
+### Example: upsert contacts by an External ID
+
+```yaml
+name: sync_contacts_to_salesforce
+type: ingestr
+
+parameters:
+  source_connection: my-postgres
+  source_table: 'public.customers'
+
+  destination: salesforce
+  destination_connection: my-salesforce
+  destination_table: 'Contact?external_id=External_Id__c'
+  incremental_strategy: merge
+
+columns:
+  - name: External_Id__c
+    primary_key: true
+```
+
+For every row, this finds the Contact whose `External_Id__c` equals the row's `External_Id__c` column: if it exists it is updated, otherwise it is created. The other source columns (`FirstName`, `Email`, …) are written to the Contact fields of the same name.
+
+### Objects and fields
+
+- The object is its **API name**: `Contact`, `Account`, `Opportunity`, or a custom object such as `Invoice__c`.
+- Each source column is written to the field with the same **API name**, e.g. `FirstName` or `Amount__c`. Names are not case-sensitive.
+- Find API names in Setup → **Object Manager**. Labels don't work:
+
+| | Label | API name to use |
+|---|---|---|
+| Custom object | Invoice | `Invoice__c` |
+| Custom field | Amount | `Amount__c` |
+| Object from a managed package | Invoice (package `acme`) | `acme__Invoice__c` |
+
+- Bruin doesn't create objects or fields. A source column that isn't a field, or is read-only (a formula, or a system field like `CreatedDate`), stops the run **before anything is written**. Drop such columns, for example with `sql_exclude_columns`.
+- A source column named `Id` is only used to find records, never written. The `_ingestr_loaded_at` and `_ingestr_run_id` columns are never sent.
+
+### Strategies
+
+| Strategy | What it does | What it needs |
+|---|---|---|
+| `merge` | Updates the matching record, or creates it if there is none | `external_id=` and a `primary_key` column |
+| `update` | Updates matching records only; a row with no match is rejected | nothing when matching by record `Id` |
+| `append` | Always creates new records | nothing |
+| `delete` | Deletes matching records | nothing when matching by record `Id` |
+| `replace` | Like `merge`, then deletes every record that isn't in the source | `external_id=` and a `primary_key` column |
+
+- **`append`** never matches, so re-running it creates duplicates, unless a unique field on the object refuses them (`DUPLICATE_VALUE`). `external_id=` isn't allowed with it; a `primary_key` column is accepted and only names rejected rows in the report.
+- **`delete`** moves records to the Recycle Bin, where they can be restored for 15 days.
+
+> [!WARNING]
+> `replace` deletes **every** record of the object that isn't in your source, including ones created in Salesforce or by other tools. Use it only when your source is the complete list. As a safety net, a run with **0 source rows** deletes nothing, and with the default `reject_mode: fail` a run with any rejected row deletes nothing either.
+
+### Matching records
+
+Two settings decide which record a row updates or deletes:
+
+| Setting | Set with | Example |
+|---|---|---|
+| The **Salesforce field** to match on | `external_id=` in `destination_table` | `Contact?external_id=External_Id__c` |
+| The **source column** that holds the value | `primary_key: true` on the column | `- name: External_Id__c` |
+
+**`merge` and `replace`** need both. The field must be marked **External ID** in Salesforce, or be a standard lookup field such as a Contact's or Lead's `Email`. Standard objects have no External ID field by default, so create one first: Setup → Object Manager → *object* → Fields & Relationships → New, and tick **External ID**. The record `Id` can't be used, because Salesforce can't create a record with an id you choose.
+
+**`update` and `delete`** match by the Salesforce record id by default, using a source column named `Id`:
+
+```yaml
+parameters:
+  source_connection: my-postgres
+  source_table: 'public.churned_contacts'   # has an Id column
+  destination: salesforce
+  destination_connection: my-salesforce
+  destination_table: 'Contact'
+  incremental_strategy: delete
+```
+
+They can also match on any other text, number or id field with `external_id=`, even one that isn't unique. Then **every** matching record is updated or deleted.
+
+### Linking records
+
+A record points to its parent through a **lookup field**. A Contact's Account, for example, is stored in the Contact's `AccountId` field. Write it like any other column, in one of two ways:
+
+| You have | Column name | Example value |
+|---|---|---|
+| The parent's Salesforce record id | The lookup field, e.g. `AccountId` | `001WU00002EGrguYAD` |
+| Your own key for the parent | `<Relationship>.<Field>`, e.g. `Account.Ext_Id__c` | `ACC-1` |
+
+- The **relationship** is usually the lookup field without `Id`: `AccountId` → `Account`, `OwnerId` → `Owner`. For a custom lookup, replace `__c` with `__r`: `Parent__c` → `Parent__r`.
+- The **field** must identify one parent: a field marked External ID, or a unique field such as a user's email (`Owner.Email`).
+- An empty (null) value removes the link. Set `write_nulls: false` to leave existing links alone.
+- Lookups that can point to more than one object, like a Task's `Who` (a Contact or a Lead), need the object in the middle: `Who.Contact.Ext_Id__c`. `Owner.Email` always means a User.
+- Many-to-many links, such as `OpportunityContactRole` or `CampaignMember`, are records of their own. Write them as their own object, with one lookup column per side.
+
+### Load method
+
+- **`bulk`** *(default)*: uses Salesforce's Bulk API. It uses far fewer API calls than `rest` on large tables, and reports rejected rows when the load finishes.
+- **`rest`**: writes records in small batches and reports results right away, but uses more API calls on large tables.
+
+```yaml
+destination_table: 'Contact?external_id=External_Id__c&load_method=rest'
+```
+
+Use `rest` if you need `reject_mode: fail_fast`, upload files (such as `ContentVersion.VersionData`), or write text that is exactly `#N/A`, which bulk reads as an empty value. Every strategy works the same with both.
+
+### Run options
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `reject_mode` | `fail` | How to handle a row Salesforce refuses, or that matches no record. `fail`: write the valid rows, then error with the reject list. `fail_fast`: stop at the first bad row; needs `load_method=rest`. `skip`: write the valid rows, report the rejects, and still succeed. |
+| `write_nulls` | `true` | Whether a source NULL clears the Salesforce field. `false` leaves the existing value untouched. No effect on `delete`. |
+
+Problems that affect the whole run, such as an expired login, always stop it, whatever the `reject_mode`. Salesforce writes can't be rolled back, so with `fail` or `fail_fast` some records may already be written when the run stops.
+
+### Column name mapping
+
+When a source column name differs from the Salesforce field, set `source_column` on the column entry: `name` is the field's **API name**, `source_column` is the source column. This requires `enforce_schema: "true"`, and you must **omit `type`**, since Salesforce owns the field types:
+
+```yaml
+parameters:
+  # ...
+  enforce_schema: "true"
+
+columns:
+  - name: FirstName
+    source_column: first_name
+  - name: Account.Ext_Id__c
+    source_column: account_code
+```
+
+A `primary_key` column uses its Salesforce name (`name`), not the source name.
 
 ## Troubleshooting
 

@@ -196,7 +196,7 @@ The write behaviour is chosen with `incremental_strategy`, which is **required**
 | -------- | --------- |
 | `merge` | Upsert — update the matching record, or create it if none matches. The usual choice. |
 | `update` | Update matching records only; rows with no match are rejected, never created (honoring `reject_mode`). |
-| `append` | Always create a new record, never match. Re-running the same rows creates duplicates — scope each run with an incremental key, or use `merge` to stay idempotent. |
+| `append` | Always create a new record, never match. Re-running the same rows creates duplicates — scope each run with an incremental key, or use `merge` to stay idempotent. `id_property` isn't allowed with it; a `primary_key` column is accepted and only names rejected rows. |
 | `delete` | Archive (soft-delete) the matching records. Rows with no match honor `reject_mode`. |
 | `replace` | Mirror — upsert every source row, then archive any record of that object type whose match value is **not** in the source. |
 
