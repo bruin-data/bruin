@@ -33,16 +33,16 @@ You can simply switch the environment using the `--environment` flag, e.g.:
 
 ## Running the pipeline
 
-bruin CLI can run the whole pipeline or any task with the downstreams:
+Run these commands from the generated `frankfurter` pipeline directory. To run the whole pipeline:
 
 ```shell
-bruin run ./frankfurter/pipeline.yml
+bruin run .
 ```
 
 You can also run a single task:
 
 ```shell
-bruin run assets/hello.py                            
+bruin run assets/frankfurter_raw/rates.asset.yml
 ```
 
 ```shell

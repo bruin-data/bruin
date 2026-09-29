@@ -33,7 +33,7 @@ environments:
 Bruin CLI can run the whole pipeline or any task with the downstreams:
 
 ```shell
-❯ bruin run ./templates/gsheet-bigquery/                                                       (bruin) 
+❯ bruin run .                                                       (bruin)
 Analyzed the pipeline 'bruin-init' with 1 assets.
 
 Pipeline: bruin-init (.)
@@ -49,7 +49,7 @@ Executed 1 assets in 9.656s
 You can also run a single task:
 
 ```shell
-❯ bruin run ./templates/gsheet-bigquery/                                                     (bruin) 
+❯ bruin run .                                                     (bruin)
 Analyzed the pipeline 'bruin-init' with 1 assets.
 
 Pipeline: bruin-init (.)

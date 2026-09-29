@@ -37,7 +37,7 @@ Bruin CLI can run the whole pipeline or any task with the downstreams:
 
 ```shell
 # this will get all the satisfaction surveys starting from 2024-01-01
-bruin --start-date 2024-01-01 run assets/satisfaction_surveys.asset.yml
+bruin run --start-date 2024-01-01 assets/satisfaction_surveys.asset.yml
 ```
 
 ```shell
@@ -55,7 +55,7 @@ Executed 2 assets in 1.798s
 You can also run a single task:
 
 ```shell
-bruin run assets/hello.py                            
+bruin run assets/satisfaction_surveys.asset.yml
 ```
 
 ```shell

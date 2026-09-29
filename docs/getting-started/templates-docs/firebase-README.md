@@ -39,10 +39,10 @@ Review TODOs: The SQL files events/events.sql, user_model/users_daily.sql, and e
 
 ## Running the pipeline
 
-Bruin CLI can run the whole pipeline or any task with the downstreams:
+Run these commands from the generated `firebase` pipeline directory. To run the whole pipeline:
 
 ```shell
-bruin run ./firebase/pipeline.yml
+bruin run .
 ```
 
 ```shell
@@ -60,7 +60,7 @@ Executed 2 assets in 1.798s
 You can also run a single task:
 
 ```shell
-bruin run assets/hello.py                            
+bruin run assets/events/events.sql
 ```
 
 ```shell

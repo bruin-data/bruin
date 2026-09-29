@@ -7,9 +7,11 @@ Loads two tables from [Frankfurter](https://frankfurter.dev), a public exchange-
 
 ## Run it
 
+Run these commands from the generated `iceberg-rest-minio` pipeline directory:
+
 ```bash
 docker compose up -d          # MinIO + the bucket + the REST catalog
-bruin run iceberg-rest-minio
+bruin run .
 ```
 
 Browse what landed in the MinIO console at `localhost:9001` (`minioadmin` / `minioadmin`), under `warehouse/raw/`:
@@ -44,4 +46,3 @@ An Iceberg connection is a **catalog** (where table metadata lives) and **storag
 ```
 
 Two things about that `endpoint`. It marks the store as S3-*compatible* rather than S3, which ingestr turns into `s3.compat-mode` — MinIO does not need it, but GCS over its S3 endpoint does. And the REST catalog reaches storage **itself** to write metadata, which is why the same MinIO credentials appear in `docker-compose.yml`; the ones above configure only Bruin.
-

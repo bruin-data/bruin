@@ -23,7 +23,7 @@ environments:
                   path: "/path/to/your/database.db"
 
             chess:
-                - name: "chess-connection"
+                - name: "chess-default"
                   players:
                       - "FabianoCaruana"
                       - "Hikaru"
@@ -41,16 +41,16 @@ You can simply switch the environment using the `--environment` flag, e.g.:
 
 ## Running the pipeline
 
-Bruin CLI can run the whole pipeline or any task with the downstreams:
+Run these commands from the generated `chess` pipeline directory. To run the whole pipeline:
 
 ```shell
-bruin run ./chess/pipeline.yml
+bruin run .
 ```
 
 You can also run a single task:
 
 ```shell
-bruin run assets/hello.py                            
+bruin run assets/player_summary.sql
 ```
 
 ```shell

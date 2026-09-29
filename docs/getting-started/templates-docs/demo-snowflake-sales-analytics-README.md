@@ -17,6 +17,8 @@ The template includes only placeholder Snowflake connection values. Replace them
 
 Initialize the template:
 
+Run this from the root of an existing Git project so Bruin adds the pipeline there:
+
 ```bash
 bruin init demo-snowflake-sales-analytics my-sales-demo
 cd my-sales-demo

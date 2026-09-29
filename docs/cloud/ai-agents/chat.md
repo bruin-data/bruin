@@ -51,7 +51,7 @@ The agent runs the CLI commands it needs and reports back with the numbers and t
 ## How chats are scoped
 
 - The agent's project, connection set, integrations, and CLI access are set on the agent itself. Pick the agent in the chat dropdown to switch context.
-- Each chat runs in a sandbox that clones the connected repo and builds context from your `AGENTS.md` files. See the [Slack AI Analyst tutorial](/cloud/ai-agents/slack-ai-analyst#6-add-agent-instructions) for an example `AGENTS.md`.
+- Each chat runs in a sandbox that clones the connected repo and builds context from your `AGENTS.md` files. See the [Slack AI Analyst tutorial](/cloud/ai-agents/slack-ai-analyst#_6-add-agent-instructions) for an example `AGENTS.md`.
 - For data access and retention details, see [Does the agent see my actual data?](/cloud/faq#does-the-agent-see-my-actual-data) in the FAQ.
 
 ## Next

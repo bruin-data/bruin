@@ -182,6 +182,13 @@ default:
     destination: duckdb`
   },
   {
+    path: 'chess-advance/requirements.txt',
+    language: 'text',
+    content: `bruin-sdk[duckdb]
+pandas
+requests`
+  },
+  {
     path: 'chess-advance/assets/raw/ingestr_games.asset.yml',
     language: 'yaml',
     content: `# FEATURE: ingestr ingestion (type inherited from pipeline defaults).
@@ -298,10 +305,16 @@ def materialize():
     players = ["MagnusCarlsen", "Hikaru", "FabianoCaruana", "AnishGiri", "GothamChess"]
     rows = []
     for p in players:
-        stats = requests.get(f"https://api.chess.com/pub/player/{p}/stats").json()
+        response = requests.get(
+            f"https://api.chess.com/pub/player/{p}/stats",
+            headers={"User-Agent": "bruin-docs-example/1.0 (https://github.com/bruin-data/bruin)"},
+            timeout=30,
+        )
+        response.raise_for_status()
+        stats = response.json()
         rating = stats.get(f"chess_{category}", {}).get("last", {}).get("rating")
         if rating is not None:
-            rows.append({"username": p, "rating": rating, "category": category})
+            rows.append({"username": p.lower(), "rating": rating, "category": category})
 
     return pd.DataFrame(rows)`
   },
@@ -383,20 +396,19 @@ columns:
 
 # Custom checks execute arbitrary SQL and assert on the returned value.
 custom_checks:
-  - name: covers_all_top_players
-    description: "Every seeded top player should appear in the summary."
+  - name: meets_min_games
+    description: "Every player in the summary meets the selected game threshold."
     query: |
       SELECT COUNT(*)
-      FROM chess_advance.seed_top_players tp
-      LEFT JOIN chess_advance.sql_with_checks_player_summary ps USING (username)
-      WHERE ps.username IS NULL
+      FROM chess_advance.sql_with_checks_player_summary
+      WHERE total_games < {{ var.min_games }}
     value: 0
   - name: has_grandmasters
     description: "At least one GM must be present in the summary."
     query: |
-      SELECT COUNT(*)
+      SELECT COUNT(*) > 0
       FROM chess_advance.sql_with_checks_player_summary ps
-      JOIN chess_advance.seed_top_players tp USING (username)
+      JOIN chess_advance.seed_top_players tp ON lower(ps.username) = lower(tp.username)
       WHERE tp.title = 'GM'
     value: 1
     blocking: true
@@ -567,6 +579,8 @@ That's it — enough to run an end-to-end ingest + transform flow locally.
 
 ## Setup
 
+Save the files shown above into a directory with the same structure, and run the commands below from that directory. It must be inside a Git repository; if this is a new standalone project, run `git init` first.
+
 Fill in `.bruin.yml` with your connections. You can read more about connections [here](/connections/overview).
 
 Both pipelines share the pre-configured list of 10 popular Chess.com players. You can modify the `players` list in your chess connection to track different players.
@@ -577,9 +591,11 @@ Run a whole pipeline by pointing at its folder:
 
 ```shell
 bruin run chess-basic
-# or
-bruin run chess-advance
+# First advanced run: create the incremental table before updating it.
+bruin run --workers 1 --full-refresh chess-advance
 ```
+
+Use `--workers 1` for the advanced pipeline because its seed, ingestion, and Python assets share one DuckDB file. After the first successful run, use `bruin run --workers 1 chess-advance` for incremental runs. The Python dependencies are declared in `chess-advance/requirements.txt` and installed by Bruin.
 
 Or run a single asset:
 
@@ -590,7 +606,7 @@ bruin run chess-advance/assets/reports/sql_with_checks_player_summary.sql
 Override a custom variable for a single run (chess-advance only):
 
 ```shell
-bruin run --var min_games=250 --var rating_category=blitz chess-advance
+bruin run --workers 1 --var min_games=250 --var rating_category='"blitz"' chess-advance
 ```
 
 You can optionally pass a `--downstream` flag to run an asset with all of its downstreams.

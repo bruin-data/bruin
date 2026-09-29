@@ -52,11 +52,11 @@ environments:
 Bruin CLI can run the whole pipeline or any task with the downstreams:
 
 ```shell
-bruin run assets/shopify.asset.yml
+bruin run assets/shopify.orders.asset.yml
 ```
 
 ```shell
-❯ bruin run ./templates/shopify-bigquery/                                                       (bruin) 
+❯ bruin run .                                                       (bruin)
 Analyzed the pipeline 'bruin-init' with 1 assets.
 
 Pipeline: bruin-init (.)
@@ -74,11 +74,11 @@ Executed 1 assets in 9.656s
 You can also run a single task:
 
 ```shell
-bruin run assets/hello.py                            
+bruin run assets/shopify.orders.asset.yml
 ```
 
 ```shell
-❯ bruin run ./templates/shopify-bigquery/                                                       (bruin) 
+❯ bruin run .                                                       (bruin)
 Analyzed the pipeline 'bruin-init' with 1 assets.
 
 Pipeline: bruin-init (.)

@@ -50,7 +50,7 @@ Executed 2 assets in 1.798s
 You can also run a single task:
 
 ```shell
-bruin run assets/hello.py                            
+bruin run assets/notion.asset.yml
 ```
 
 ```shell

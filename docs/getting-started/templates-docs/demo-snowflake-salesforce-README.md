@@ -18,6 +18,8 @@ The template includes only placeholder connection values. Replace them in `.brui
 
 Initialize the template:
 
+Run this from the root of an existing Git project so Bruin adds the pipeline there:
+
 ```bash
 bruin init demo-snowflake-salesforce my-salesforce-demo
 cd my-salesforce-demo

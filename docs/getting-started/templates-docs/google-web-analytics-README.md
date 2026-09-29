@@ -302,6 +302,8 @@ later — but it is the number that should decide what gets built next.
 
 ## Run it
 
+Run this from the root of an existing Git project so Bruin adds the pipeline there:
+
 ```bash
 bruin init google-web-analytics my-search-pipeline
 ```

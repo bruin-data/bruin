@@ -15,24 +15,23 @@ environments:
   default:
     connections:
       duckdb:
-        - name: "duckdb_default"
+        - name: "duckdb-default"
           path: "/path/to/your/database.db"
       
 ```
 
 ## Running the pipeline
 
-Bruin CLI can run the whole pipeline or any task with the downstreams:
+Run these commands from the generated `duckdb` pipeline directory. To run the whole pipeline:
 
 ```shell
-
-bruin run ./duckdb/pipeline.yml
+bruin run .
 ```
 
 You can also run a single task:
 
 ```shell
-bruin run assets/hello.py                            
+bruin run assets/example.sql
 ```
 
 ```shell

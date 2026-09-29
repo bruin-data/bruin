@@ -115,7 +115,7 @@ The configuration block must:
 - Contain valid YAML configuration between the markers
 - Preserve proper YAML indentation
 
-All standard asset parameters are supported. See the [SQL asset documentation](/assets/sql#definition) for a complete list of available configuration options including:
+All standard asset parameters are supported. See the [asset definition schema](/assets/definition-schema) for a complete list of available configuration options including:
 
 - Dependencies (`depends`)
 - Secrets and connections (`secrets`)

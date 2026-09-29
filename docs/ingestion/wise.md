@@ -4,7 +4,7 @@
 
 Bruin supports Wise as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Wise into your data platform.
 
-To set up a Wise connection, you must add a configuration item in the `.bruin.yml` and `asset` file. You need `api_key`. For details on how to obtain these credentials, please refer [here](https://dlthub.com/docs/dlt-ecosystem/verified-sources/Wise#grab-api-token).
+To set up a Wise connection, you must add a configuration item in the `.bruin.yml` and `asset` file. You need `api_key`. For details on how to obtain these credentials, see Wise's guide to [personal API tokens](https://docs.wise.com/guides/developer/auth-and-security/personal-api-token).
 
 Follow the steps below to set up Wise correctly as a data source and run ingestion.
 

@@ -25,6 +25,8 @@ Arguments:
 - **template-name**: The template to use. If omitted, Bruin uses the default template.
 - **folder-name**: The folder to create. If omitted, Bruin uses `bruin-pipeline` for the default template and the template name for other templates.
 
+Outside an existing Git repository, Bruin creates a `bruin/` project root and places the pipeline inside it. Enter `bruin/<folder-name>` before running commands that use `assets/` or `pipeline.yml`. Inside an existing Git repository, enter `<folder-name>` instead. The connection configuration `.bruin.yml` lives at the project root, not inside the pipeline directory.
+
 To see the complete list available in your installed Bruin version:
 
 ```bash

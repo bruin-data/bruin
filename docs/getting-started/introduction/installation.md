@@ -68,8 +68,10 @@ That's it, you are ready to roll with Bruin.
 When installing the Bruin CLI, you may encounter a `'Permission Denied'` error. This typically happens if the user doesn't have permission to write the binary to the `~/.local/bin` directory.
 
 **Solution**  
-To resolve this, ensure that you have the necessary write permissions for the `~/.local/bin` directory. You can do this by running the following command with sudo:
+Ensure that your user has write permission to `~/.local/bin`, then rerun the installer without `sudo`. Running the default installer with `sudo` can install Bruin into root's home instead of your own.
+
+Alternatively, on macOS or Linux, install system-wide by explicitly selecting a directory on your `PATH`:
 
 ```shell
-curl -LsSf https://getbruin.com/install/cli | sudo sh
+curl -LsSf https://getbruin.com/install/cli | sudo sh -s -- -b /usr/local/bin
 ```

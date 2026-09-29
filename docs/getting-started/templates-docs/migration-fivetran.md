@@ -6,6 +6,8 @@ The `migration-fivetran` template provides a review-gated workspace for migratin
 
 Create a new project, then move into it:
 
+Run this from the root of an existing Git project so Bruin adds the migration workspace there:
+
 ```bash
 bruin init migration-fivetran my-migration-project
 cd my-migration-project
