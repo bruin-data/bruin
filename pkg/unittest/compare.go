@@ -4,6 +4,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"math"
+	"math/big"
 	"sort"
 	"strconv"
 	"strings"
@@ -226,8 +227,12 @@ func rowsToMaps(columns []string, rows [][]interface{}) []map[string]interface{}
 
 // normalizeCell unwraps driver-specific value types so comparison sees plain Go
 // values. Postgres' pgx returns NUMERIC as pgtype.Numeric (a driver.Valuer whose
-// Value() is the numeric string), and some drivers return text as []byte.
+// Value() is the numeric string), BigQuery returns NUMERIC and BIGNUMERIC as
+// *big.Rat, and some drivers return text as []byte.
 func normalizeCell(v interface{}) interface{} {
+	if r, ok := v.(*big.Rat); ok && r != nil {
+		return ratString(r)
+	}
 	if valuer, ok := v.(driver.Valuer); ok {
 		if dv, err := valuer.Value(); err == nil {
 			v = dv
@@ -237,6 +242,16 @@ func normalizeCell(v interface{}) interface{} {
 		return string(b)
 	}
 	return v
+}
+
+// ratString renders an exact decimal as its shortest decimal string, for
+// example 45.5 rather than 91/2, so it compares numerically and reads cleanly.
+func ratString(r *big.Rat) string {
+	if r.IsInt() {
+		return r.Num().String()
+	}
+	s := strings.TrimRight(r.FloatString(38), "0")
+	return strings.TrimSuffix(s, ".")
 }
 
 func formatRow(row map[string]interface{}) string {

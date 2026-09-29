@@ -37,7 +37,19 @@ This mocks `analytics.orders` with those three rows, runs the query on the `snow
 
 ## Inputs
 
-Each entry under `inputs:` is a table the query reads (`asset:`) and the rows that stand in for it. Rows are sparse: any column you leave out is `NULL`. When the input is itself a pipeline asset with declared `columns:`, Bruin casts the fixture to those types, so an all-null column still gets the right type instead of the database guessing.
+Each entry under `inputs:` is a table the query reads (`asset:`) and the rows that stand in for it. Rows are sparse: any column you leave out is `NULL`. When the input is itself a pipeline asset with declared `columns:`, Bruin casts the fixture to those types, so an all-null column still gets the right type instead of the database guessing, and every declared column exists even if no row sets it.
+
+A nested value, a YAML object or list, is written as JSON text, so it can fill a `json` column. On BigQuery, declared `json` columns are built with `PARSE_JSON`:
+
+```yaml
+inputs:
+  - asset: raw.invoices
+    rows:
+      - id: "1"
+        customer_ref: {value: "7", name: "Acme"}
+        line:
+          - {Amount: 100, DetailType: SalesItemLineDetail}
+```
 
 You only mock the tables you care about. A table the query reads but you do not list is replaced with an empty table, so a `LEFT JOIN` to a dimension you are ignoring just contributes no rows. This works as long as that table is a pipeline asset with declared `columns:`; if it has no declared columns, the test errors instead of reading real data.
 

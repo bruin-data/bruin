@@ -5,6 +5,7 @@
 package unittest
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -96,7 +97,7 @@ func buildInjected(p Rewriter, dialect, renderedSQL string, test pipeline.UnitTe
 	// matches the read it stands in for regardless of case or quoting.
 	mockedBodies := make(map[string]string, len(test.Inputs))
 	for _, in := range test.Inputs {
-		body, err := fixtureSelect(in, normalizedSchemas[normalizeName(in.Asset)])
+		body, err := fixtureSelect(in, normalizedSchemas[normalizeName(in.Asset)], dialect)
 		if err != nil {
 			return "", err
 		}
@@ -161,12 +162,17 @@ func buildInjected(p Rewriter, dialect, renderedSQL string, test pipeline.UnitTe
 // database infer it); a UNION ALL takes its column names and types from that
 // first branch, so later rows are positional. This portable shape avoids the
 // `VALUES … AS t(cols)` table-alias form, which BigQuery rejects.
-func fixtureSelect(input pipeline.UnitTestInput, schema []pipeline.Column) (string, error) {
+//
+// BigQuery cannot CAST a string to JSON and does not coerce string literals to
+// JSON across a UNION ALL, so declared JSON columns are built with PARSE_JSON
+// on every row there.
+func fixtureSelect(input pipeline.UnitTestInput, schema []pipeline.Column, dialect string) (string, error) {
 	if len(input.Rows) == 0 {
 		return "", fmt.Errorf("input %q has no rows", input.Asset)
 	}
 	cols := collectColumns(input.Rows)
 	declared := declaredTypes(schema)
+	cols = appendUnlistedDeclared(cols, schema)
 
 	// Column identifiers are emitted unquoted so they case-fold the same way the
 	// asset query's (conventionally unquoted) references do. Quoting would pin a
@@ -177,6 +183,12 @@ func fixtureSelect(input pipeline.UnitTestInput, schema []pipeline.Column) (stri
 		for j, c := range cols {
 			lit := sqlLiteral(row[c])
 			switch {
+			case row[c] != nil && isBigQueryJSON(dialect, declared[c]):
+				lit = "PARSE_JSON(" + lit + ")"
+				if i == 0 {
+					lit += " AS " + c
+				}
+				exprs[j] = lit
 			case i != 0:
 				exprs[j] = lit // names/types come from the first SELECT
 			case declared[c] != "":
@@ -248,6 +260,30 @@ func declaredTypes(schema []pipeline.Column) map[string]string {
 	return out
 }
 
+// appendUnlistedDeclared adds the declared columns no fixture row sets, so they
+// read as typed NULLs instead of failing the query that selects them.
+func appendUnlistedDeclared(cols []string, schema []pipeline.Column) []string {
+	listed := make(map[string]struct{}, len(cols))
+	for _, c := range cols {
+		listed[strings.ToLower(c)] = struct{}{}
+	}
+	for _, c := range schema {
+		if c.Name == "" {
+			continue
+		}
+		if _, ok := listed[strings.ToLower(c.Name)]; ok {
+			continue
+		}
+		listed[strings.ToLower(c.Name)] = struct{}{}
+		cols = append(cols, c.Name)
+	}
+	return cols
+}
+
+func isBigQueryJSON(dialect, typ string) bool {
+	return dialect == "bigquery" && strings.EqualFold(typ, "JSON")
+}
+
 func collectColumns(rows []map[string]interface{}) []string {
 	set := make(map[string]struct{})
 	for _, row := range rows {
@@ -291,6 +327,13 @@ func sqlLiteral(v interface{}) string {
 		return quoteStringLiteral(formatTimeLiteral(val))
 	case string:
 		return quoteStringLiteral(val)
+	case map[string]interface{}, []interface{}:
+		// Nested YAML (an object or a list) is written as JSON text, so it can
+		// fill a JSON column instead of rendering in Go's map syntax.
+		if b, err := json.Marshal(val); err == nil {
+			return quoteStringLiteral(string(b))
+		}
+		return quoteStringLiteral(fmt.Sprintf("%v", val))
 	default:
 		return quoteStringLiteral(fmt.Sprintf("%v", val))
 	}

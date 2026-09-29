@@ -2,6 +2,7 @@ package unittest
 
 import (
 	"database/sql/driver"
+	"math/big"
 	"testing"
 	"time"
 
@@ -168,6 +169,17 @@ func TestCompareResult(t *testing.T) {
 			[][]interface{}{{stringValuer{"12.48"}}},
 		)
 		require.True(t, res.Passed, res.Message)
+	})
+
+	t.Run("BigQuery NUMERIC as *big.Rat is compared numerically", func(t *testing.T) {
+		t.Parallel()
+		res := CompareResult(
+			pipeline.UnitTestExpected{Rows: []map[string]interface{}{{"amount": 45.5, "total": 900}}},
+			[]string{"amount", "total"},
+			[][]interface{}{{big.NewRat(91, 2), big.NewRat(900, 1)}},
+		)
+		require.True(t, res.Passed, res.Message)
+		require.Equal(t, "-0.125", ratString(big.NewRat(-1, 8)))
 	})
 
 	t.Run("[]byte text is decoded to string", func(t *testing.T) {
