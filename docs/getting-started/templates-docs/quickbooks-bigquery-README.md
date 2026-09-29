@@ -91,7 +91,9 @@ export QUICKBOOKS_CLIENT_SECRET='...'
 export QUICKBOOKS_REFRESH_TOKEN='AB11...'
 ```
 
-Set `environment: sandbox` when connecting to an Intuit sandbox company. Intuit can rotate or expire refresh tokens, so if a run fails with `invalid_grant`, generate a new token in the playground. Do not commit credentials.
+Set `environment: sandbox` when connecting to an Intuit sandbox company. Do not commit credentials.
+
+Intuit rotates refresh tokens roughly once a day, and ingestr does not write the new token back to `.bruin.yml`. Once the token has rotated, runs fail with `invalid_grant` until you generate a new refresh token in the playground and update `QUICKBOOKS_REFRESH_TOKEN`.
 
 ## Run the pipeline
 
@@ -102,11 +104,14 @@ bruin init quickbooks-bigquery my-quickbooks-pipeline
 bruin validate --fast my-quickbooks-pipeline
 ```
 
-For the first load, run with `--full-refresh` and a start date earlier than the oldest record edit in your company. The window filters on each record's QuickBooks `LastUpdatedTime`, not its transaction date.
+For the first load, run with `--full-refresh` over a window that covers every record edit in your company, from before the QuickBooks Online company was created up to now. The window filters on each record's QuickBooks `LastUpdatedTime`, not its transaction date, so an early start date loads records that haven't changed in years. The API does the filtering, so the early start date costs nothing extra:
 
 ```bash
-bruin run --full-refresh --start-date 2020-01-01 --end-date $(date -u +%F) my-quickbooks-pipeline
+bruin run --full-refresh --start-date 2000-01-01 --end-date "$(date -u +%Y-%m-%dT%H:%M:%S)" \
+  my-quickbooks-pipeline
 ```
+
+The end time is the current UTC time, so today's edits are included. A date-only `--end-date` stops at midnight at the start of that day.
 
 After the initial load, schedule a daily run without `--full-refresh`. By default a run covers the previous UTC day, fetches the records updated inside that window, and merges them on `id`, so re-running a window never duplicates rows:
 
