@@ -22,6 +22,8 @@ The pipeline includes the following SQL assets located in the `assets/` folder:
 
 ## Running the pipeline
 
+Run these commands from the pipeline directory.
+
 bruin CLI can run the whole pipeline or any task with the downstreams:
 
 ```shell

@@ -7,6 +7,8 @@ Loads two tables from [Frankfurter](https://frankfurter.dev), a public exchange-
 
 ## Run it
 
+Run these commands from the pipeline directory:
+
 ```bash
 docker compose up -d          # MinIO + the bucket + the REST catalog
 bruin run .

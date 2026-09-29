@@ -32,11 +32,13 @@ environments:
 
 ##  Important Note
 1- Rename `analytics_123456789` (folder + references in `stg_events.sql`) to your Firebase analytics ID.
-2- Keep only `events_intraday.asset.yaml` or `events.asset.yaml` depending on your use case. We recommend `events_intraday` since streaming data is not bound by the 1M events/day limit. `stg_events.sql` defaults to the intraday sensor — update its `depends:` block if you use daily export instead.
+2- Keep only `events_intraday.asset.yaml` or `events.asset.yaml` depending on your use case. We recommend `events_intraday` since streaming data is not bound by the 1M events/day limit. `stg_events.sql` defaults to the intraday sensor — update its `depends:` block and replace `your-project-id` in `events.asset.yaml` if you use daily export instead.
 3- Review TODOs: `events/stg_events.sql`, `events/events.sql`, and `user_model/stg_users_daily.sql` contain TODO comments. These indicate sections where you should make adjustments based on your data and project requirements (analytics ID, user_id vs user_pseudo_id, app-specific event params and metrics).
 
 
 ## Running the pipeline
+
+Run these commands from the pipeline directory.
 
 bruin CLI can run the whole pipeline or any task with the downstreams:
 

@@ -29,6 +29,8 @@ environments:
 
 ## Running the pipeline
 
+Run these commands from the pipeline directory.
+
 bruin CLI can run the whole pipeline or any task with the downstreams:
 
 ```shell
