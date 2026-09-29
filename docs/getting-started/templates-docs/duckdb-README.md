@@ -34,17 +34,6 @@ You can also run a single task:
 bruin run assets/example.sql
 ```
 
-```shell
-Starting the pipeline execution...
-
-[2023-03-16T18:25:59Z] [worker-0] Running: hello
-[2023-03-16T18:26:00Z] [worker-0] [hello] >> Hello, world!
-[2023-03-16T18:26:00Z] [worker-0] Completed: hello (103ms)
-
-
-Executed 1 assets in 103ms
-```
-
 You can optionally pass a `--downstream` flag to run the task with all of its downstreams.
 
 That's it, good luck!

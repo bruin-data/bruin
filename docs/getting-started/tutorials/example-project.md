@@ -396,12 +396,23 @@ columns:
 
 # Custom checks execute arbitrary SQL and assert on the returned value.
 custom_checks:
-  - name: meets_min_games
-    description: "Every player in the summary meets the selected game threshold."
+  - name: covers_eligible_top_players
+    description: "Every seeded player with enough source games appears in the summary."
     query: |
+      WITH eligible_players AS (
+        SELECT p.username
+        FROM chess_advance.seed_top_players tp
+        JOIN chess_advance.ingestr_profiles p ON lower(tp.username) = lower(p.username)
+        LEFT JOIN chess_advance.ingestr_games g
+          ON p.aid IN (g.white->>'@id', g.black->>'@id')
+        GROUP BY p.username
+        HAVING COUNT(*) >= {{ var.min_games }}
+      )
       SELECT COUNT(*)
-      FROM chess_advance.sql_with_checks_player_summary
-      WHERE total_games < {{ var.min_games }}
+      FROM eligible_players ep
+      LEFT JOIN chess_advance.sql_with_checks_player_summary ps
+        ON lower(ep.username) = lower(ps.username)
+      WHERE ps.username IS NULL
     value: 0
   - name: has_grandmasters
     description: "At least one GM must be present in the summary."

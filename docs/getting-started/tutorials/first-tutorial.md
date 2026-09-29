@@ -45,13 +45,13 @@ your-project/          # project root — this is where .bruin.yml lives
 >
 > See [Project configuration](../../core-concepts/project.md) for the full details.
 
-Run the remaining commands from the directory containing `chess/`. If you initialized outside a Git repository, enter the new project root first:
+Run the remaining commands from the directory containing `chess/`. If you initialized outside a Git repository without `--in-place`, enter the new project root first:
 
 ```bash
 cd bruin
 ```
 
-Skip this `cd` if you initialized inside an existing Git repository.
+Skip this `cd` if you initialized inside an existing Git repository or used `--in-place`.
 
 ## Step 2: Edit Your `.bruin.yml` file
 

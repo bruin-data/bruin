@@ -33,34 +33,13 @@ environments:
 Bruin CLI can run the whole pipeline or any task with the downstreams:
 
 ```shell
-❯ bruin run .                                                       (bruin)
-Analyzed the pipeline 'bruin-init' with 1 assets.
-
-Pipeline: bruin-init (.)
-  No issues found
-
-✓ Successfully validated 1 assets across 1 pipeline, all good.
-
-Starting the pipeline execution...
-
-Executed 1 assets in 9.656s
+bruin run .
 ```
 
 You can also run a single task:
 
 ```shell
-❯ bruin run .                                                     (bruin)
-Analyzed the pipeline 'bruin-init' with 1 assets.
-
-Pipeline: bruin-init (.)
-  No issues found
-
-✓ Successfully validated 1 assets across 1 pipeline, all good.
-
-Starting the pipeline execution...
-
-
-Executed 1 assets in 9.656s
+bruin run assets/gsheet.asset.yml
 ```
 
 You can optionally pass a `--downstream` flag to run the task with all of its downstreams.
