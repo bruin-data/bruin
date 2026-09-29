@@ -98,6 +98,8 @@ Reuse the same connection as the source — the destination uses `account_id`, `
 
 The `destination_table` parameter selects the record type — `profiles` or `events` — and the parameters after the `?` tell Bruin which columns carry the special fields. Every other column is uploaded as an attribute under its own name. (The record type and its parameters go in `destination_table` rather than the asset `name`, because an asset name may not contain `?`, `=`, or `&`.)
 
+The CleverTap identity for each row comes from the column marked `primary_key: true` in the asset's `columns` — a single column whose value identifies the user. A composite (multi-column) primary key is rejected, since CleverTap resolves a user by one field.
+
 ### Profiles
 
 ```yaml
@@ -110,14 +112,17 @@ parameters:
 
   destination: clevertap
   destination_connection: my_clevertap
-  destination_table: 'profiles?identity_column=email'
+  destination_table: 'profiles'
+
+columns:
+  - name: email
+    primary_key: true
 ```
 
 | Parameter | Required? | Description |
 |-----------|-----------|-------------|
-| `identity_column` | **Required** | The source column holding each row's identifier. For example, `identity_column=email` takes each row's identifier from the `email` column. |
-| `id_type` | Optional | How CleverTap resolves the identifier: `identity` (default), `objectId`, `FBID`, or `GPID`. For example, `identity_column=device_id&id_type=objectId` sends each `device_id` value as an `objectId`. |
-| `on_error` | Optional | `fail` (default) fails the run if CleverTap rejects any record; `skip` warns and continues. Either way each rejected record is printed as it happens and listed with its error at the end. |
+| `primary_key` column | **Required** | The source column marked `primary_key: true` holds each row's identifier. For example, marking `email` takes each row's identifier from the `email` column. Must be a single column. |
+| `id_type` | Optional | A `destination_table` parameter for how CleverTap resolves the identifier: `identity` (default), `objectId`, `FBID`, or `GPID`. For example, `destination_table: 'profiles?id_type=objectId'` sends each identifier value as an `objectId`. |
 
 Profiles are always upserted by identity on CleverTap's side, so re-sending a user updates their attributes instead of creating a duplicate. With no incremental key the whole table is re-sent each run; set an incremental key (such as `updated_at`) with an interval to send only the rows in that window.
 
@@ -133,20 +138,32 @@ parameters:
 
   destination: clevertap
   destination_connection: my_clevertap
-  destination_table: 'events?identity_column=user_id&ts=purchased_at&event_name=Charged'
+  destination_table: 'events?ts=purchased_at&event_name=Charged'
 
   incremental_key: purchased_at
+
+columns:
+  - name: user_id
+    primary_key: true
 ```
 
 | Parameter | Required? | Description |
 |-----------|-----------|-------------|
-| `event_name` **or** `event_name_column` | **Required** | A fixed event name applied to every row (`event_name`), or a column whose value is the event name per row (`event_name_column`) for tables that mix event types. |
-| `identity_column` | **Required** | The source column holding each row's identifier. For example, `identity_column=email` takes each row's identifier from the `email` column. |
-| `id_type` | Optional | How CleverTap resolves the identifier: `identity` (default), `objectId`, `FBID`, or `GPID`. For example, `identity_column=device_id&id_type=objectId` sends each `device_id` value as an `objectId`. |
-| `ts` | Optional | The source column holding the event timestamp. If omitted, CleverTap stamps the upload time. |
-| `on_error` | Optional | `fail` (default) fails the run if CleverTap rejects any record; `skip` warns and continues. Either way each rejected record is printed as it happens and listed with its error at the end. |
+| `event_name` **or** `event_name_column` | **Required** | A fixed event name applied to every row (`event_name`), or a column whose value is the event name per row (`event_name_column`) for tables that mix event types. Both are `destination_table` parameters. |
+| `primary_key` column | **Required** | The source column marked `primary_key: true` holds each row's identifier. For example, marking `user_id` takes each row's identifier from the `user_id` column. Must be a single column. |
+| `id_type` | Optional | A `destination_table` parameter for how CleverTap resolves the identifier: `identity` (default), `objectId`, `FBID`, or `GPID`. |
+| `ts` | Optional | A `destination_table` parameter naming the source column that holds the event timestamp. If omitted, CleverTap stamps the upload time. |
 
 Events are always appended on CleverTap's side — each uploaded event is added to the user's timeline; CleverTap never replaces or de-duplicates events, so re-sending a row creates a duplicate. Use an incremental key (usually the same column as `ts`) with an interval to control exactly which events are sent each run.
+
+### Run options
+
+Two top-level parameters control how records are written:
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `reject_mode` | `fail` | How to handle a record CleverTap rejects. `fail`: report the rejects and fail the run. `fail_fast`: stop at the first rejected record. `skip`: report the rejects but still succeed. Each rejection is printed as it happens. |
+| `write_nulls` | `true` | Profiles only. `true` sends a source `NULL` through to clear the CleverTap attribute; `false` omits `NULL` cells, leaving the stored value untouched. Event attributes are append-only, so `NULL` cells are always omitted there. |
 
 > [!NOTE]
 > Every record must carry an identifier; rows with an empty identity value are skipped. CleverTap accepts up to 1000 records per request and limits uploads to 3 concurrent requests per account; Bruin batches and rate-limits accordingly. For the full destination reference, see the [ingestr documentation](https://getbruin.com/docs/ingestr/supported-sources/clevertap.html).

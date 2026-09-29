@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -62,6 +63,7 @@ func TestResolveAPIKey_EnvVarFallback(t *testing.T) {
 }
 
 func TestResolveAPIKey_NoKeyError(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	t.Setenv("BRUIN_CLOUD_API_KEY", "")
 
 	// Run from a temp directory so resolveAPIKey can't find a .bruin.yml in the repo.
@@ -165,6 +167,7 @@ environments:
 // an empty yaml to omit the config file entirely.
 func writeTempConfigRepo(t *testing.T, bruinYML string) string {
 	t.Helper()
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	dir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".git"), 0o755))
 	if bruinYML != "" {
@@ -328,12 +331,13 @@ func TestCloudCommand_Help(t *testing.T) {
 	cmd := Cloud(&isDebug)
 	require.NotNil(t, cmd)
 	assert.Equal(t, "cloud", cmd.Name)
-	assert.Len(t, cmd.Commands, 17)
+	assert.Len(t, cmd.Commands, 19)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
 		subNames[i] = sub.Name
 	}
+	assert.Contains(t, subNames, "login")
 	assert.Contains(t, subNames, "teams")
 	assert.Contains(t, subNames, "cost")
 	assert.Contains(t, subNames, "projects")
@@ -347,6 +351,7 @@ func TestCloudCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "connections")
 	assert.Contains(t, subNames, "connection-sets")
 	assert.Contains(t, subNames, "dashboards")
+	assert.Contains(t, subNames, "notification-rules")
 	assert.Contains(t, subNames, "scheduled-agents")
 	assert.Contains(t, subNames, "skills")
 	assert.Contains(t, subNames, "audit-logs")
@@ -399,7 +404,7 @@ func TestCloudLeafCommandsHaveTeamFlag(t *testing.T) {
 		for _, sub := range c.Commands {
 			// "cloud config" manages the default team itself and doesn't act on a
 			// team, so its commands intentionally omit --team.
-			if sub.Name == "config" {
+			if sub.Name == "config" || sub.Name == "login" {
 				continue
 			}
 			// Every runnable command (a leaf, or a parent like "agents
@@ -455,6 +460,45 @@ func TestCloudRunsCommand_Help(t *testing.T) {
 		subNames[i] = sub.Name
 	}
 	assert.Contains(t, subNames, "diagnose")
+}
+
+func TestCloudRunsMarkStatusCommand_MarksAssetInstance(t *testing.T) { //nolint:paralleltest // sets process environment
+	var markBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/asset-instance-details":
+			w.WriteHeader(http.StatusOK)
+			assert.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+				"asset_instance": map[string]any{
+					"asset":    "analytics.orders",
+					"step_ids": []string{"step-1"},
+				},
+			}))
+		case "/mark-asset-instances":
+			assert.Equal(t, http.MethodPost, r.Method)
+			assert.NoError(t, json.NewDecoder(r.Body).Decode(&markBody))
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`200`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
+
+	cmd := cloudRunsMarkStatus()
+	err := cmd.Run(t.Context(), []string{
+		"mark-status",
+		"--api-key", "test-key",
+		"--project-id", "proj",
+		"--pipeline", "pipe",
+		"--run-id", "run-1",
+		"--asset", "analytics.orders",
+		"--status", "success",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "success", markBody["status"])
+	assert.Equal(t, []any{"step-1"}, markBody["asset_instance_ids"])
 }
 
 func TestCloudRunsTriggerCommand_OutputsCreatedRunID(t *testing.T) { //nolint:paralleltest // redirects global output
@@ -790,7 +834,7 @@ func TestCloudScheduledAgentsCommand_Help(t *testing.T) {
 	cmd := CloudScheduledAgents()
 	require.NotNil(t, cmd)
 	assert.Equal(t, "scheduled-agents", cmd.Name)
-	require.Len(t, cmd.Commands, 7)
+	require.Len(t, cmd.Commands, 8)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
@@ -803,6 +847,63 @@ func TestCloudScheduledAgentsCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "trigger")
 	assert.Contains(t, subNames, "delete")
 	assert.Contains(t, subNames, "run-states")
+	assert.Contains(t, subNames, "pipeline-trigger")
+}
+
+func TestCloudNotificationRulesCommand_Help(t *testing.T) {
+	t.Parallel()
+	cmd := CloudNotificationRules()
+	require.NotNil(t, cmd)
+	assert.Equal(t, "notification-rules", cmd.Name)
+	require.Len(t, cmd.Commands, 5)
+
+	subNames := make([]string, len(cmd.Commands))
+	for i, sub := range cmd.Commands {
+		subNames[i] = sub.Name
+	}
+	assert.ElementsMatch(t, []string{"schema", "list", "create", "update", "delete"}, subNames)
+}
+
+func TestNotificationRuleFields(t *testing.T) {
+	t.Parallel()
+
+	t.Run("parses inline JSON", func(t *testing.T) {
+		t.Parallel()
+		var fields map[string]any
+		cmd := &cli.Command{
+			Name:  "test",
+			Flags: notificationRuleInputFlags(),
+			Action: func(_ context.Context, c *cli.Command) error {
+				var err error
+				fields, err = notificationRuleFields(c)
+				return err
+			},
+		}
+		err := runCLI(t.Context(), cmd, []string{"test", "--rule", `{"name":"Failures","enabled":false}`})
+		require.NoError(t, err)
+		assert.Equal(t, "Failures", fields["name"])
+		assert.Equal(t, false, fields["enabled"])
+	})
+
+	t.Run("parses YAML file", func(t *testing.T) {
+		t.Parallel()
+		path := filepath.Join(t.TempDir(), "rule.yml")
+		require.NoError(t, os.WriteFile(path, []byte("name: Failures\nenabled: true\n"), 0o600))
+		var fields map[string]any
+		cmd := &cli.Command{
+			Name:  "test",
+			Flags: notificationRuleInputFlags(),
+			Action: func(_ context.Context, c *cli.Command) error {
+				var err error
+				fields, err = notificationRuleFields(c)
+				return err
+			},
+		}
+		err := runCLI(t.Context(), cmd, []string{"test", "--rule-file", path})
+		require.NoError(t, err)
+		assert.Equal(t, "Failures", fields["name"])
+		assert.Equal(t, true, fields["enabled"])
+	})
 }
 
 func TestCloudScheduledAgentsRunStatesCommand_Help(t *testing.T) {
@@ -1162,4 +1263,35 @@ func TestRemoveMcpServer(t *testing.T) {
 		assert.False(t, removed)
 		require.Len(t, out, 1)
 	})
+}
+
+func TestPrintFolderTree(t *testing.T) {
+	t.Parallel()
+
+	pid := func(i int) *int { return &i }
+	folders := []bruincloud.DashboardFolder{
+		{ID: 1, Name: "Marketing"},
+		{ID: 2, Name: "Reports", ParentID: pid(1)},
+		{ID: 3, Name: "Weekly", ParentID: pid(2)},
+		{ID: 4, Name: "Orphan", ParentID: pid(999)}, // parent absent from the list
+		{ID: 5, Name: "CycleA", ParentID: pid(6)},   // mutual cycle with CycleB
+		{ID: 6, Name: "CycleB", ParentID: pid(5)},
+	}
+
+	var buf bytes.Buffer
+	printFolderTree(&buf, folders) // must terminate despite the cycle
+	out := buf.String()
+
+	assert.Contains(t, out, "Tree:")
+	assert.Contains(t, out, "Marketing\n")
+	assert.Contains(t, out, "└── Reports")    // sole child of Marketing
+	assert.Contains(t, out, "    └── Weekly") // nested under Reports
+	assert.Contains(t, out, "Orphan")         // orphan surfaced as a root
+	assert.Contains(t, out, "CycleA")         // cyclic component surfaced, not dropped
+	assert.Contains(t, out, "CycleB")
+
+	// Empty input renders nothing.
+	var empty bytes.Buffer
+	printFolderTree(&empty, nil)
+	assert.Empty(t, empty.String())
 }

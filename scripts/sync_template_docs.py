@@ -30,6 +30,7 @@ PUBLIC = REPO / "docs" / "public"
 
 # Templates whose docs page is generated from the template README.
 SYNCED = (
+    "chargebee-bigquery",
     "posthog-bigquery",
     "stripe-bigquery",
 )

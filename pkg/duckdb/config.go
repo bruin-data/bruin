@@ -1,6 +1,10 @@
 package duck
 
-import "github.com/bruin-data/bruin/pkg/config"
+import (
+	"net/url"
+
+	"github.com/bruin-data/bruin/pkg/config"
+)
 
 type Config struct {
 	Path      string
@@ -35,20 +39,32 @@ func (c Config) GetLakehouseAlias() string {
 }
 
 type MotherDuckConfig struct {
+	ReadOnly bool
 	Token    string
 	Database string
 }
 
 func (c MotherDuckConfig) ToDBConnectionURI() string {
 	if c.Database != "" {
-		return "md:" + c.Database + "?motherduck_token=" + c.Token
+		return "md:" + c.Database + "?motherduck_token=" + url.QueryEscape(c.Token)
 	}
-	return "md:?motherduck_token=" + c.Token
+	return "md:?motherduck_token=" + url.QueryEscape(c.Token)
 }
 
 func (c MotherDuckConfig) GetIngestrURI() string {
 	if c.Database != "" {
-		return "motherduck://" + c.Database + "?token=" + c.Token
+		return "motherduck://" + c.Database + "?token=" + url.QueryEscape(c.Token)
 	}
-	return "motherduck://?token=" + c.Token
+	return "motherduck://?token=" + url.QueryEscape(c.Token)
+}
+
+func isReadOnlyMotherDuck(c DuckDBConfig) bool {
+	switch cfg := c.(type) {
+	case MotherDuckConfig:
+		return cfg.ReadOnly
+	case *MotherDuckConfig:
+		return cfg.ReadOnly
+	default:
+		return false
+	}
 }

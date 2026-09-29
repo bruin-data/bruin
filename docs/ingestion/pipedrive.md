@@ -4,7 +4,7 @@
 
 Bruin supports Pipedrive as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Pipedrive into your data platform.
 
-To set up a Pipedrive connection, you must add a configuration item in the `.bruin.yml` and `asset` file. You need `api_token`. For details on how to obtain these credentials, please refer [here](https://dlthub.com/docs/dlt-ecosystem/verified-sources/Pipedrive#grab-api-token).
+To set up a Pipedrive connection, you must add a configuration item in the `.bruin.yml` and `asset` file. You need `api_token`. For details on how to obtain these credentials, see Pipedrive's guide on [how to find the API token](https://pipedrive.readme.io/docs/how-to-find-the-api-token).
 
 Follow the steps below to set up Pipedrive correctly as a data source and run ingestion.
 

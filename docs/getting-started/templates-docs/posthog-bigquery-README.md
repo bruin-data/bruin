@@ -280,6 +280,8 @@ If your properties have different names, change the `JSON_VALUE` paths in
 
 ### 1. Create the pipeline
 
+Run this from the root of an existing Git project so Bruin adds the pipeline there:
+
 ```bash
 bruin init posthog-bigquery my-posthog-pipeline
 ```
@@ -394,11 +396,19 @@ zero-width interval and fails with `interval-start must be earlier than
 interval-end`.
 
 ```bash
+next_day() {
+  if date --version >/dev/null 2>&1; then
+    date -d "$1 +1 day" +%F                 # Linux (GNU date)
+  else
+    date -j -v+1d -f %Y-%m-%d "$1" +%F     # macOS (BSD date)
+  fi
+}
+
 d=2026-05-23
 while [ "$d" != "2026-08-22" ]; do
-  nxt=$(date -j -v+1d -f %Y-%m-%d $d +%Y-%m-%d)   # GNU: date -d "$d +1 day" +%F
-  bruin run assets/posthog_raw/events.asset.yml --start-date $d --end-date $nxt
-  d=$nxt
+  nxt=$(next_day "$d")
+  bruin run assets/posthog_raw/events.asset.yml --start-date "$d" --end-date "$nxt"
+  d="$nxt"
 done
 ```
 

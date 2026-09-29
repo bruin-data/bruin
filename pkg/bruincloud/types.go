@@ -350,10 +350,13 @@ type Dashboard struct {
 	IsPublished *bool           `json:"is_published,omitempty"`
 }
 
-// DashboardFolder groups dashboards within a team.
+// DashboardFolder groups dashboards within a team. Folders can nest: ParentID is
+// the enclosing folder (nil at the top level) and Path is the full "A / B" path.
 type DashboardFolder struct {
 	ID             int    `json:"id"`
 	Name           string `json:"name"`
+	ParentID       *int   `json:"parent_id,omitempty"`
+	Path           string `json:"path,omitempty"`
 	DashboardCount int    `json:"dashboard_count"`
 }
 
@@ -389,19 +392,20 @@ type RunState struct {
 // recurring agent task. The nested plan fields (verified SQLs, memory, ...) are
 // kept as raw JSON so `--output json` round-trips the full server response.
 type ScheduledAgent struct {
-	ID                int             `json:"id"`
-	Title             *string         `json:"title"`
-	IsActive          bool            `json:"is_active"`
-	ScheduleCron      *string         `json:"schedule_cron"`
-	ScheduleTimezone  *string         `json:"schedule_timezone"`
-	NextRunAt         *string         `json:"next_run_at"`
-	LastRunAt         *string         `json:"last_run_at"`
-	Instructions      *string         `json:"instructions"`
-	OutputFormatting  *string         `json:"output_formatting"`
-	VerifiedSqls      json.RawMessage `json:"verified_sqls,omitempty"`
-	Memory            json.RawMessage `json:"memory,omitempty"`
-	MonitorsDashboard json.RawMessage `json:"monitors_dashboard,omitempty"`
-	RecentExecutions  json.RawMessage `json:"recent_executions,omitempty"`
+	PipelineTrigger   *ScheduledAgentPipelineTrigger `json:"pipeline_trigger"`
+	ID                int                            `json:"id"`
+	Title             *string                        `json:"title"`
+	IsActive          bool                           `json:"is_active"`
+	ScheduleCron      *string                        `json:"schedule_cron"`
+	ScheduleTimezone  *string                        `json:"schedule_timezone"`
+	NextRunAt         *string                        `json:"next_run_at"`
+	LastRunAt         *string                        `json:"last_run_at"`
+	Instructions      *string                        `json:"instructions"`
+	OutputFormatting  *string                        `json:"output_formatting"`
+	VerifiedSqls      json.RawMessage                `json:"verified_sqls,omitempty"`
+	Memory            json.RawMessage                `json:"memory,omitempty"`
+	MonitorsDashboard json.RawMessage                `json:"monitors_dashboard,omitempty"`
+	RecentExecutions  json.RawMessage                `json:"recent_executions,omitempty"`
 }
 
 // ScheduledAgentExecution is the execution a trigger stands up: the run that was
@@ -409,6 +413,17 @@ type ScheduledAgent struct {
 type ScheduledAgentExecution struct {
 	ExecutionID int `json:"execution_id"`
 	ThreadID    int `json:"thread_id"`
+}
+
+// NotificationRule routes matching Cloud events to one or more destinations.
+type NotificationRule struct {
+	ID            int             `json:"id"`
+	Name          string          `json:"name"`
+	Enabled       bool            `json:"enabled"`
+	Subscriptions json.RawMessage `json:"subscriptions"`
+	Deliveries    json.RawMessage `json:"deliveries"`
+	CreatedAt     *string         `json:"created_at"`
+	UpdatedAt     *string         `json:"updated_at"`
 }
 
 // AuditLog is one entry in a team's audit trail as returned by GET /audit-logs.
@@ -488,4 +503,13 @@ type CostExplorerResponse struct {
 	Truncated     bool             `json:"truncated"`
 	NextOffset    *int             `json:"next_offset,omitempty"`
 	Rows          []map[string]any `json:"rows"`
+}
+
+type ScheduledAgentPipelineTrigger struct {
+	ID        string `json:"id"`
+	ProjectID string `json:"project_id"`
+}
+
+type ScheduledAgentPipelineTriggerResponse struct {
+	PipelineTrigger *ScheduledAgentPipelineTrigger `json:"pipeline_trigger"`
 }

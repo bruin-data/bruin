@@ -292,13 +292,22 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 
 	effectiveStrategy := ""
 	if value, exists := asset.Parameters.GetString("incremental_strategy"); exists && value != "" {
-		if !python.IsIngestrStrategySupported(value) {
+		destination, _ := asset.Parameters.GetString("destination")
+		switch {
+		case python.IsIngestrStrategySupported(value):
+			effectiveStrategy = value
+		case python.IsReverseETLIngestrStrategy(value) && python.IsReverseETLIngestrDestination(destination):
+			effectiveStrategy = value
+		case python.IsReverseETLIngestrStrategy(value):
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: fmt.Sprintf("Incremental strategy '%s' is only supported for reverse-ETL destinations (e.g. hubspot); destination '%s' does not support it.", value, destination),
+			})
+		default:
 			issues = append(issues, &Issue{
 				Task:        asset,
 				Description: fmt.Sprintf("Incremental strategy '%s' is not supported for ingestr assets. Supported strategies are: %s", value, python.GetSupportedIngestrStrategiesString()),
 			})
-		} else {
-			effectiveStrategy = value
 		}
 	}
 
@@ -332,6 +341,16 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 			Task:        asset,
 			Description: "Invalid 'cdc_sql_capture' value: must be 'cdc' or 'change_tracking'",
 		})
+	}
+	// Change Tracking has no multi-table mode, so the wildcard source table that
+	// log-based CDC accepts would leave ingestr without a table to replicate.
+	if capture, _ := asset.Parameters.GetString("cdc_sql_capture"); capture == "change_tracking" {
+		if table, _ := asset.Parameters.GetString("source_table"); table == "*" {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: "SQL Server Change Tracking replicates a single table: name one in 'source_table', or use 'cdc_sql_capture: cdc' to replicate every table",
+			})
+		}
 	}
 	if v, exists := asset.Parameters.GetString("version"); exists && v != "" && !ingestrVersionPattern.MatchString(v) {
 		issues = append(issues, &Issue{
@@ -1466,6 +1485,31 @@ func EnsureAssetNotificationsAreValid(ctx context.Context, p *pipeline.Pipeline,
 
 func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
+	for _, option := range []struct {
+		name string
+		set  bool
+	}{
+		{"engine", asset.ClickHouse.Engine != ""},
+		{"order_by", len(asset.ClickHouse.OrderBy) > 0},
+		{"ttl", asset.ClickHouse.TTL != ""},
+		{"settings", len(asset.ClickHouse.Settings) > 0},
+	} {
+		if !option.set {
+			continue
+		}
+		if asset.Type != pipeline.AssetTypeClickHouse {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: fmt.Sprintf("ClickHouse option 'clickhouse.%s' is only supported for clickhouse.sql assets", option.name),
+			})
+		} else if asset.Materialization.Type == pipeline.MaterializationTypeView {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: fmt.Sprintf("ClickHouse option 'clickhouse.%s' is not supported for views", option.name),
+			})
+		}
+	}
+
 	if asset.Type == pipeline.AssetTypePython || asset.Type == pipeline.AssetTypeIngestr {
 		return issues, nil
 	}
@@ -1572,27 +1616,32 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 					Description: "Materialization strategy 'merge' requires the 'primary_key' field to be set on at least one column",
 				})
 			}
-		case pipeline.MaterializationStrategySCD2ByColumn:
-			primaryKeys := asset.ColumnNamesWithPrimaryKey()
-			if len(primaryKeys) == 0 {
+		case pipeline.MaterializationStrategySCD2ByColumn, pipeline.MaterializationStrategySCD2ByTime:
+			if asset.Materialization.Strategy == pipeline.MaterializationStrategySCD2ByTime && asset.Materialization.IncrementalKey == "" {
 				issues = append(issues, &Issue{
 					Task:        asset,
-					Description: "Materialization strategy 'scd2_by_column' requires the 'primary_key' field to be set on at least one column",
-				})
-			}
-		case pipeline.MaterializationStrategySCD2ByTime:
-			if asset.Materialization.IncrementalKey == "" {
-				issues = append(issues, &Issue{
-					Task:        asset,
-					Description: "Materialization strategy 'scd2_by_type' requires the 'incremental_key' field to be set",
+					Description: "Materialization strategy 'scd2_by_time' requires the 'incremental_key' field to be set",
 				})
 			}
 			primaryKeys := asset.ColumnNamesWithPrimaryKey()
 			if len(primaryKeys) == 0 {
 				issues = append(issues, &Issue{
 					Task:        asset,
-					Description: "Materialization strategy 'scd2_by_type' requires the 'primary_key' field to be set on at least one column",
+					Description: fmt.Sprintf("Materialization strategy '%s' requires the 'primary_key' field to be set on at least one column", asset.Materialization.Strategy),
 				})
+			}
+			for _, column := range asset.Columns {
+				name := strings.TrimSpace(column.Name)
+				if len(name) >= 2 && (name[0] == '`' || name[0] == '"') && name[len(name)-1] == name[0] {
+					name = name[1 : len(name)-1]
+				}
+				switch strings.ToLower(name) {
+				case "_valid_from", "_valid_until", "_is_current":
+					issues = append(issues, &Issue{
+						Task:        asset,
+						Description: fmt.Sprintf("Column name '%s' is reserved for SCD2 materialization strategies", column.Name),
+					})
+				}
 			}
 
 		case pipeline.MaterializationStrategyDataVaultHub:
@@ -1891,35 +1940,39 @@ func EnsureSnowflakeSensorHasQueryParameterForASingleAsset(ctx context.Context, 
 }
 
 var TableSensorAllowedAssetTypes = map[pipeline.AssetType]bool{
-	pipeline.AssetTypeBigqueryTableSensor:   true,
-	pipeline.AssetTypeSnowflakeTableSensor:  true,
-	pipeline.AssetTypeAthenaTableSensor:     true,
-	pipeline.AssetTypeRedshiftTableSensor:   true,
-	pipeline.AssetTypeDatabricksTableSensor: true,
-	pipeline.AssetTypeClickHouseTableSensor: true,
-	pipeline.AssetTypeMsSQLTableSensor:      true,
-	pipeline.AssetTypePostgresTableSensor:   true,
-	pipeline.AssetTypeSynapseTableSensor:    true,
-	pipeline.AssetTypeMySQLTableSensor:      true,
-	pipeline.AssetTypeDorisTableSensor:      true,
-	pipeline.AssetTypeStarRocksTableSensor:  true,
-	pipeline.AssetTypeSparkTableSensor:      true,
+	pipeline.AssetTypeBigqueryTableSensor:     true,
+	pipeline.AssetTypeSnowflakeTableSensor:    true,
+	pipeline.AssetTypeAthenaTableSensor:       true,
+	pipeline.AssetTypeRedshiftTableSensor:     true,
+	pipeline.AssetTypeDatabricksTableSensor:   true,
+	pipeline.AssetTypeClickHouseTableSensor:   true,
+	pipeline.AssetTypeMsSQLTableSensor:        true,
+	pipeline.AssetTypePostgresTableSensor:     true,
+	pipeline.AssetTypeSynapseTableSensor:      true,
+	pipeline.AssetTypeMySQLTableSensor:        true,
+	pipeline.AssetTypeDorisTableSensor:        true,
+	pipeline.AssetTypeStarRocksTableSensor:    true,
+	pipeline.AssetTypeSparkTableSensor:        true,
+	pipeline.AssetTypeFabricTableSensor:       true,
+	pipeline.AssetTypeFabricTableSensorLegacy: true,
 }
 
 var platformNames = map[pipeline.AssetType]string{
-	pipeline.AssetTypeBigqueryTableSensor:   "BigQuery",
-	pipeline.AssetTypeSnowflakeTableSensor:  "Snowflake",
-	pipeline.AssetTypeDatabricksTableSensor: "Databricks",
-	pipeline.AssetTypeAthenaTableSensor:     "Athena",
-	pipeline.AssetTypePostgresTableSensor:   "PostgreSQL",
-	pipeline.AssetTypeRedshiftTableSensor:   "Redshift",
-	pipeline.AssetTypeMsSQLTableSensor:      "MS SQL",
-	pipeline.AssetTypeClickHouseTableSensor: "ClickHouse",
-	pipeline.AssetTypeSynapseTableSensor:    "Synapse",
-	pipeline.AssetTypeMySQLTableSensor:      "MySQL",
-	pipeline.AssetTypeDorisTableSensor:      "Doris",
-	pipeline.AssetTypeStarRocksTableSensor:  "StarRocks",
-	pipeline.AssetTypeSparkTableSensor:      "Spark",
+	pipeline.AssetTypeBigqueryTableSensor:     "BigQuery",
+	pipeline.AssetTypeSnowflakeTableSensor:    "Snowflake",
+	pipeline.AssetTypeDatabricksTableSensor:   "Databricks",
+	pipeline.AssetTypeAthenaTableSensor:       "Athena",
+	pipeline.AssetTypePostgresTableSensor:     "PostgreSQL",
+	pipeline.AssetTypeRedshiftTableSensor:     "Redshift",
+	pipeline.AssetTypeMsSQLTableSensor:        "MS SQL",
+	pipeline.AssetTypeClickHouseTableSensor:   "ClickHouse",
+	pipeline.AssetTypeSynapseTableSensor:      "Synapse",
+	pipeline.AssetTypeMySQLTableSensor:        "MySQL",
+	pipeline.AssetTypeDorisTableSensor:        "Doris",
+	pipeline.AssetTypeStarRocksTableSensor:    "StarRocks",
+	pipeline.AssetTypeSparkTableSensor:        "Spark",
+	pipeline.AssetTypeFabricTableSensor:       "Fabric",
+	pipeline.AssetTypeFabricTableSensorLegacy: "Fabric",
 }
 
 func ValidateTableSensorTableParameter(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {

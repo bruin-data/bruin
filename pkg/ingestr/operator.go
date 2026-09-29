@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
@@ -207,6 +208,13 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		return err
 	}
 
+	// The engine is resolved before the URIs are built because the two ingestr
+	// families do not read every URI the same way.
+	engine, err := resolveIngestrEngine(asset)
+	if err != nil {
+		return err
+	}
+
 	// Source connection
 	sourceConnectionName, ok := asset.Parameters.GetString("source_connection")
 	if !ok {
@@ -234,6 +242,8 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		sourceURI = strings.ReplaceAll(sourceURI, "bigquery://", "gsheets://")
 	}
 
+	sourceURI = adaptURIForEngine(sourceURI, engine)
+
 	// Handle CDC mode - transform the source URI into ingestr's CDC scheme and auto-set merge strategy.
 	if cdcVal, _ := asset.Parameters.GetString("cdc"); cdcVal == "true" {
 		parsedURI, err := ingestruri.Parse(sourceURI)
@@ -247,9 +257,9 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 
 		// SQL Server exposes two capture mechanisms. Log-based CDC (mssql+cdc) is the
 		// default; Change Tracking (mssql+ct) is selected per-asset because it can't be
-		// derived from the scheme alone. The +ct source takes no query parameters and is
-		// driven purely by --primary-key / --incremental-strategy merge, so its
-		// source-specific parameters below are skipped.
+		// derived from the scheme alone. Change Tracking is otherwise driven by
+		// --primary-key / --incremental-strategy merge, and the only query parameter it
+		// reads is poll_interval, so the +cdc-only parameters below skip it.
 		sqlCapture, _ := asset.Parameters.GetString("cdc_sql_capture")
 		changeTracking := isMSSQLScheme(baseScheme) && sqlCapture == "change_tracking"
 		if changeTracking {
@@ -282,15 +292,20 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		if tls, _ := asset.Parameters.GetString("cdc_tls"); tls != "" {
 			q.Set("tls", tls)
 		}
-		// SQL Server log-based CDC parameters, confined to the mssql source so they
-		// cannot leak into other CDC URIs. Change Tracking (+ct) ignores query
-		// parameters, so these are only forwarded for the mssql+cdc source.
-		if isMSSQLScheme(baseScheme) && !changeTracking {
-			if captureInstance, _ := asset.Parameters.GetString("cdc_capture_instance"); captureInstance != "" {
-				q.Set("capture_instance", captureInstance)
-			}
+		// SQL Server parameters, confined to the mssql source so they cannot leak into
+		// other CDC URIs. Both captures poll the source, so poll_interval applies to
+		// either; for Change Tracking it only takes effect while streaming, where it
+		// sets the delay between polls (ingestr defaults to 1s).
+		if isMSSQLScheme(baseScheme) {
 			if pollInterval, _ := asset.Parameters.GetString("cdc_poll_interval"); pollInterval != "" {
 				q.Set("poll_interval", pollInterval)
+			}
+			// A capture instance is a log-based change table, which Change Tracking has
+			// no equivalent of.
+			if !changeTracking {
+				if captureInstance, _ := asset.Parameters.GetString("cdc_capture_instance"); captureInstance != "" {
+					q.Set("capture_instance", captureInstance)
+				}
 			}
 		}
 		// MongoDB change-stream parameters, confined to the mongodb source.
@@ -306,7 +321,11 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		// deprecated ?mode= and rejects mode=stream unless --stream is also passed.
 		// Continuous ingestion is driven purely by the --stream flag, which we
 		// enable below for the deprecated cdc_mode: stream alias.
-		if destSchema, _ := asset.Parameters.GetString("cdc_dest_schema"); destSchema != "" {
+
+		// dest_schema routes a multi-table CDC run. Change Tracking replicates a single
+		// table per asset and passes any parameter it does not recognise on to the SQL
+		// Server driver, so it is left out there.
+		if destSchema, _ := asset.Parameters.GetString("cdc_dest_schema"); destSchema != "" && !changeTracking {
 			q.Set("dest_schema", destSchema)
 		}
 		if stateID, _ := asset.Parameters.GetString("cdc_state_id"); stateID != "" {
@@ -353,6 +372,8 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	if strings.HasPrefix(destURI, "clickhouse://") {
 		destURI = applyClickHouseEngineParams(destURI, asset.Parameters)
 	}
+
+	destURI = adaptURIForEngine(destURI, engine)
 
 	destTable := asset.Name
 	if dt, ok := asset.Parameters.GetString("destination_table"); ok && dt != "" {
@@ -423,10 +444,6 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		defer duck.UnlockDatabase(sourceURI)
 	}
 
-	engine, err := resolveIngestrEngine(asset)
-	if err != nil {
-		return err
-	}
 	if err := ensureFabricEngineSupport(engine, sourceURI, destURI); err != nil {
 		return err
 	}
@@ -624,6 +641,71 @@ func isMSSQLScheme(scheme string) bool {
 	return strings.HasPrefix(scheme, "mssql") || strings.HasPrefix(scheme, "sqlserver")
 }
 
+// odbcBooleanParameters are the SQL Server connection parameters whose values are
+// spelled the ODBC way ("yes"/"no") rather than as Go booleans.
+var odbcBooleanParameters = []string{"trustservercertificate", "encrypt"}
+
+// adaptURIForEngine rewrites a connection URI into the dialect the resolved
+// ingestr engine speaks.
+//
+// Only SQL Server needs this today. Bruin builds its SQL Server URIs the way the
+// v0 engine wants them, because that engine connects through pyodbc, where
+// booleans are written "TrustServerCertificate=yes"; a connection's `options`
+// carries the same spelling. The v1 engine reaches SQL Server through
+// go-mssqldb, which runs those values through strconv.ParseBool and fails the
+// run before it connects: "invalid trust server certificate 'yes'". Only the
+// values differ between the two, so they are translated in place and the rest of
+// the URI is left for ingestr to interpret.
+func adaptURIForEngine(uri string, engine resolvedEngine) string {
+	if engine.family != versionFamilyV1 {
+		return uri
+	}
+
+	parsed, err := ingestruri.Parse(uri)
+	if err != nil || !isMSSQLScheme(strings.ToLower(parsed.Scheme)) {
+		return uri
+	}
+
+	query := parsed.Query()
+	rewritten := false
+	for key, values := range query {
+		if !slices.Contains(odbcBooleanParameters, strings.ToLower(key)) {
+			continue
+		}
+		for i, value := range values {
+			converted, ok := odbcBooleanToGo(value)
+			if !ok {
+				continue
+			}
+			values[i] = converted
+			rewritten = true
+		}
+	}
+
+	if !rewritten {
+		return uri
+	}
+
+	parsed.RawQuery = query.Encode()
+
+	return parsed.String()
+}
+
+// odbcBooleanToGo converts an ODBC boolean literal into one strconv.ParseBool
+// accepts, and reports whether it converted anything. Every other value is left
+// alone: it is either already a Go boolean or one only the driver can judge
+// (encrypt also takes "disable" and "strict").
+func odbcBooleanToGo(value string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "yes":
+		return "true", true
+	case "no":
+		return "false", true
+	}
+
+	return "", false
+}
+
 // isMongoDBScheme reports whether scheme belongs to the MongoDB family (mongodb,
 // mongodb+srv), which understands the change-stream CDC parameters.
 func isMongoDBScheme(scheme string) bool {
@@ -750,6 +832,13 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 		return err
 	}
 
+	engine, err := resolveIngestrEngine(asset)
+	if err != nil {
+		return err
+	}
+
+	destURI = adaptURIForEngine(destURI, engine)
+
 	destTable := o.resolveSeedDestinationTableName(destConnectionName, destURI, asset.Name)
 
 	extraPackages = python.AddExtraPackages(destURI, sourceURI, extraPackages)
@@ -790,10 +879,6 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 		return errors.Wrap(err, "failed to find repo to run Ingestr")
 	}
 
-	engine, err := resolveIngestrEngine(asset)
-	if err != nil {
-		return err
-	}
 	if err := ensureFabricEngineSupport(engine, destURI); err != nil {
 		return err
 	}

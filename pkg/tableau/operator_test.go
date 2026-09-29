@@ -2,12 +2,59 @@ package tableau
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/stretchr/testify/require"
 )
+
+type testConnectionGetter func(string) any
+
+func (get testConnectionGetter) GetConnection(name string) any { return get(name) }
+
+func TestRunTaskConnectionRequirements(t *testing.T) {
+	t.Parallel()
+
+	for _, assetType := range []pipeline.AssetType{
+		pipeline.AssetTypeTableau, pipeline.AssetTypeTableauDatasource, pipeline.AssetTypeTableauWorkbook,
+		pipeline.AssetTypeTableauWorksheet, pipeline.AssetTypeTableauDashboard,
+	} {
+		for _, fullRefresh := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/full-refresh=%t", assetType, fullRefresh), func(t *testing.T) {
+				t.Parallel()
+				ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, fullRefresh)
+				p := &pipeline.Pipeline{}
+				asset := &pipeline.Asset{Name: "tableau", Type: assetType}
+				// A nil getter proves no connection lookup occurs for a no-op.
+				op := NewBasicOperator(nil)
+				require.NoError(t, op.RunTask(ctx, p, asset))
+				asset.Connection = "unavailable"
+				asset.Parameters = pipeline.ParameterMap{"refresh": "false"}
+				require.NoError(t, op.RunTask(ctx, p, asset))
+
+				asset.Parameters["refresh"] = "true"
+				if assetType == pipeline.AssetTypeTableauWorksheet || assetType == pipeline.AssetTypeTableauDashboard {
+					require.NoError(t, op.RunTask(ctx, p, asset))
+					return
+				}
+				asset.Connection = ""
+				require.ErrorContains(t, op.RunTask(ctx, p, asset), "no connection mapping found")
+				asset.Connection = "tableau-prod"
+				op = NewBasicOperator(testConnectionGetter(func(name string) any {
+					require.Equal(t, "tableau-prod", name)
+					return nil
+				}))
+				require.Error(t, op.RunTask(ctx, p, asset))
+				op = NewBasicOperator(testConnectionGetter(func(string) any { return "wrong connection type" }))
+				require.ErrorContains(t, op.RunTask(ctx, p, asset), "is not a tableau connection")
+				op = NewBasicOperator(testConnectionGetter(func(string) any { return &Client{} }))
+				require.ErrorContains(t, op.RunTask(ctx, p, asset), "requires either")
+			})
+		}
+	}
+}
 
 type incrementalTestCase struct {
 	name       string

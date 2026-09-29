@@ -19,11 +19,58 @@ connections:
       http_port: 8443 # Optional; used only for ingestr and defaults to 8443.
       secure: 1 # Set to 1 for ClickHouse Cloud or another TLS connection.
       read_only: false
+      # cluster: "analytics_cluster" # Optional; see self-hosted clusters below.
 ```
 
 ### Read-only connections
 
 Set `read_only: true` to run SQL queries in read-only mode (default: `false`). Ingestr assets and seeds do not support this option.
+
+### Query settings
+
+Use the connection's `settings` map to apply ClickHouse query settings to every statement Bruin executes through its native ClickHouse driver:
+
+```yaml
+connections:
+  clickhouse:
+    - name: clickhouse-default
+      host: localhost
+      port: 9000
+      username: default
+      password: ""
+      database: analytics
+      settings:
+        max_threads: 4
+        max_memory_usage: 10000000000
+        join_algorithm: grace_hash
+```
+
+Values are passed to [clickhouse-go's connection settings](https://github.com/ClickHouse/clickhouse-go/tree/v2.37.1#clickhouse-interface-formally-native-interface) as YAML numbers, booleans, or strings. String values do not need SQL quotes. ClickHouse validates setting names and values.
+
+These settings apply to the asset query, every generated materialization statement (including staging-table creation, deletes, inserts, and cleanup), quality checks, sensors, and queries run through the connection. They are sent separately from the SQL, so Bruin does not add another `SETTINGS` clause. Ingestr assets and `clickhouse.seed` use a separate client and do not inherit this map.
+
+Move query settings out of a materialized asset's trailing SQL `SETTINGS` clause and into the connection. A trailing clause only affects the statement containing that query, can be interpreted as table settings inside `CREATE TABLE ... AS SELECT`, and can conflict with Bruin's generated insert settings. The asset's [`clickhouse.settings`](#native-sql-table-definitions) remains a map of table-engine settings such as `index_granularity`; use the connection map for query settings such as `max_threads`.
+
+`read_only: true` forces `readonly = 1` even if the settings map specifies another value. When `read_only` is false or omitted, an explicit `settings.readonly` is preserved. With `cluster` configured, Bruin also enforces `distributed_ddl_output_mode = 'throw'` and `distributed_ddl_task_timeout = 180`. Other settings are preserved. Bruin's generated SQL still disables `insert_deduplicate` where reruns need to reinsert deleted rows and sets `mutations_sync = 2` for cluster interval deletes.
+
+For an asset that needs different query settings, define another named connection with those settings and select it using the asset's `connection` field:
+
+```bruin-sql
+/* @bruin
+name: analytics.large_result
+type: clickhouse.sql
+connection: clickhouse-large-queries
+materialization:
+  type: table
+clickhouse:
+  engine: MergeTree()
+  order_by: [id]
+@bruin */
+
+SELECT id FROM raw.events
+```
+
+Configure `clickhouse-large-queries` in `.bruin.yml` with the desired settings. This selects the same settings for the asset's generated statements and quality checks.
 
 ## Ingestr Assets
 
@@ -41,9 +88,9 @@ parameters:
 
 In this case, the ClickHouse database is `publicDB`. Ensure the configured user has the required permissions. For more details on credentials and permissions, see this [guide](https://dlthub.com/docs/dlt-ecosystem/destinations/clickhouse#2-setup-clickhouse-database).
 
-### Engine Settings
+### Ingestr destination engine settings
 
-You can configure the ClickHouse table engine and its settings via the `parameters` block. Use `engine` to set the table engine and `engine.<setting>` to pass engine-specific settings.
+For `ingestr` assets loading into ClickHouse, configure the table engine and its settings via the `parameters` block. Use `engine` to set the table engine and `engine.<setting>` to pass engine-specific settings. These parameters do not configure native `clickhouse.sql` assets; those use the [`clickhouse` block](#native-sql-table-definitions).
 
 ```yaml
 name: publicDB.events
@@ -95,28 +142,157 @@ Runs a materialized ClickHouse asset or an SQL script. An unmaterialized asset c
 
 ### Materialization and incremental strategies
 
-`clickhouse.sql` supports table and view materializations. For a table with no explicit strategy, Bruin uses `create+replace`.
+`clickhouse.sql` supports table and view materializations. For a table with no explicit strategy, Bruin uses `create+replace`. The following table describes connections without `cluster`, including ClickHouse Cloud. See [self-hosted clusters](#self-hosted-clusters) for cluster-specific behavior and restrictions.
 
 | Strategy | Support | How Bruin executes it |
 | --- | --- | --- |
-| `create+replace` | Supported | Runs `CREATE OR REPLACE TABLE <target> PRIMARY KEY <key> AS <asset query>`. Requires `columns` and exactly one column marked `primary_key: true`. |
+| `create+replace` | Supported | Runs `CREATE OR REPLACE TABLE <target> ... AS <asset query>` with the configured table options. If `clickhouse.engine`, `clickhouse.order_by` and `materialization.cluster_by` are all omitted, requires `columns` with at least one column marked `primary_key: true`. |
 | `append` | Supported | Runs `INSERT INTO <target> <asset query>`. Bruin does not add filtering or deduplicate rows; make the asset query select only the new rows. |
 | `delete+insert` | Supported | Refreshes the values returned for an `incremental_key`: it writes the query result to a temporary table, deletes target rows whose incremental-key value occurs in that table, inserts the temporary-table rows, then drops the temporary table. Requires `incremental_key`, `columns`, and exactly one `primary_key: true` column. |
-| `time_interval` | Supported | On a normal run, deletes target rows in the requested date or timestamp interval, then inserts the asset query result with `SETTINGS insert_deduplicate = 0` so a rerun of the same interval is not suppressed by ClickHouse insert deduplication. Requires `incremental_key`, `time_granularity` (`date` or `timestamp`), and an existing target table. The asset query must filter itself to the same interval. A `--full-refresh` runs `create+replace` instead, which requires `columns` and exactly one `primary_key: true` column. |
+| `time_interval` | Supported | On a normal run, deletes target rows in the requested date or timestamp interval, then inserts the asset query result with `SETTINGS insert_deduplicate = 0` so a rerun of the same interval is not suppressed by ClickHouse insert deduplication. Requires `incremental_key`, `time_granularity` (`date` or `timestamp`), and an existing target table. The asset query must filter itself to the same interval. A `--full-refresh` runs `create+replace` with its table options and key requirements. |
 | `truncate+insert` | Supported | Truncates the existing table, then inserts the asset query result. This is a full-table refresh that preserves the table definition; it is not an incremental strategy. |
-| `ddl` | Supported | Creates the table if it does not already exist from the defined columns, primary key, and optional `partition_by`. Do not include a query in a DDL asset. |
-| `merge`, `scd2_by_column`, `scd2_by_time` | Not supported | Use `delete+insert`, `time_interval`, or an explicit ClickHouse SQL implementation instead. |
+| `ddl` | Supported | Creates the table if it does not already exist from the defined columns, primary key, optional `materialization.partition_by`, and `clickhouse` table options. Do not include a query in a DDL asset. |
+| `merge` | Supported | Stages the asset query in a MergeTree table, deletes target rows matching the staged primary keys, then inserts the staged rows. Requires `columns` with at least one column marked `primary_key: true`. |
+| `scd2_by_column`, `scd2_by_time` | Supported | Maintains `_valid_from`, `_valid_until` and `_is_current` history columns, creating the destination on the first run. Changes are staged in temporary tables, then applied as deletes and inserts. Both require `columns` with at least one `primary_key: true` column; `scd2_by_time` also requires a non-nullable date or timestamp `incremental_key`. A `--full-refresh` replaces all history with the current source snapshot. See [SCD2 materializations](/assets/materialization.html#scd2-by-column). |
 
-Create the target table with `create+replace` or `ddl` before its first `append`, `delete+insert`, `time_interval`, or `truncate+insert` run. `create+replace`, including a `--full-refresh` of a `time_interval` asset, requires `columns` and exactly one `primary_key: true` column. The primary key is used in the `CREATE OR REPLACE TABLE` statement; Bruin does not use it to deduplicate or merge rows.
+Create the target table with `create+replace` or `ddl` before its first `append`, `delete+insert`, `merge`, `time_interval`, or `truncate+insert` run. ClickHouse validates the chosen engine's key requirements. Declaring a primary key alone does not deduplicate rows during `create+replace`; deduplication depends on the chosen ClickHouse engine.
 
 View materializations support only the default strategy, which creates or replaces the view. Table-only strategies, including all incremental strategies, are not supported for views.
 
 > [!NOTE]
-> ClickHouse statements are executed one at a time and are not wrapped in a transaction. `create+replace` is a single `CREATE OR REPLACE TABLE` statement, but a failed `delete+insert`, `time_interval`, or `truncate+insert` run can leave the target table between steps. Use idempotent, date- or partition-bounded queries and rerun the asset to recover.
+> ClickHouse statements are executed one at a time and are not wrapped in a transaction. Without `cluster`, `create+replace` is a single `CREATE OR REPLACE TABLE` statement, but a failed `delete+insert`, `merge`, `time_interval`, or `truncate+insert` run can leave the target table between steps. Use idempotent, date- or partition-bounded queries and rerun the asset to recover.
+
+#### Native SQL table definitions
+
+For native `clickhouse.sql` assets, use a top-level `clickhouse` block for table engine, sorting key, TTL, and settings. Partitioning stays in `materialization.partition_by`:
+
+```bruin-sql
+/* @bruin
+name: analytics.events
+type: clickhouse.sql
+materialization:
+  type: table
+  strategy: create+replace
+  partition_by: toYYYYMM(created_at)
+clickhouse:
+  engine: ReplacingMergeTree(version)
+  order_by:
+    - id
+    - created_at
+  ttl: created_at + INTERVAL 30 DAY
+  settings:
+    index_granularity: "8192"
+columns:
+  - name: id
+    type: UInt64
+    primary_key: true
+  - name: created_at
+    type: DateTime
+  - name: version
+    type: UInt64
+@bruin */
+
+SELECT id, created_at, version FROM raw.events
+```
+
+Bruin renders the table definition as:
+
+```sql
+CREATE OR REPLACE TABLE analytics.events
+ENGINE = ReplacingMergeTree(version)
+PARTITION BY (toYYYYMM(created_at))
+PRIMARY KEY (id)
+ORDER BY (id, created_at)
+TTL created_at + INTERVAL 30 DAY
+SETTINGS index_granularity = 8192
+AS SELECT id, created_at, version FROM raw.events
+```
+
+- `engine` is a ClickHouse SQL expression, such as `MergeTree()`, `ReplacingMergeTree(version)`, or `SummingMergeTree()`. If omitted, Bruin omits the engine clause and ClickHouse chooses its default engine. An explicit engine can be used without key metadata: for example, `Memory()` must omit primary and sorting keys, while MergeTree-family engines require a primary or sorting key.
+- `order_by` is a list of separate SQL expressions forming the sorting key. Use `order_by: ["tuple()"]` for an explicitly empty sorting key. It can be provided without any columns marked `primary_key: true`. `materialization.cluster_by` means the same thing on ClickHouse and is used as the sorting key when `order_by` is omitted; when both are set, `order_by` wins.
+- `ttl` is the SQL TTL expression, without the `TTL` keyword.
+- `settings` is a mapping of table-engine setting names to SQL values. Bruin sorts setting names for stable SQL output. Numeric values can be written as `index_granularity: "8192"`; string literals need SQL quotes, for example `storage_policy: "'default'"`. For query settings, use the [connection's settings map](#query-settings).
+
+When both a primary key and `order_by` are provided, the primary-key columns must be a prefix of the sorting key, in column declaration order. For example, primary key `(id)` can use sorting key `(id, created_at)`. This follows the [ClickHouse MergeTree key requirements](https://clickhouse.com/docs/engines/table-engines/mergetree-family/mergetree). When only primary-key columns are declared, Bruin continues to emit `PRIMARY KEY` without an explicit `ORDER BY`.
+
+All of these clauses, including `partition_by`, apply when `create+replace`, the implicit table strategy, or `ddl` creates the target table. A full refresh uses the same options. `ddl` uses `CREATE TABLE IF NOT EXISTS`, so changing options does not alter an existing table. Normal `append`, `delete+insert`, `merge`, `time_interval`, and `truncate+insert` runs keep the existing target definition. Internal staging tables use MergeTree and do not inherit the target's options. Views and other asset types reject the `clickhouse` options.
+
+Set shared values in `pipeline.yml` under `default.clickhouse`:
+
+```yaml
+default:
+  clickhouse:
+    engine: MergeTree()
+    settings:
+      index_granularity: "8192"
+```
+
+Only native `clickhouse.sql` table assets inherit `default.clickhouse`; views and other asset types do not. Omitted or empty fields inherit their defaults. Settings merge by name, with asset values taking precedence over defaults. Partitioning inherits through `default.materialization.partition_by`.
+
+The `clickhouse` block applies only to native SQL assets. Ingestr destinations use `parameters.engine` with names such as `replacing_merge_tree` and `parameters.engine.<setting>` instead; those parameters do not affect native SQL DDL.
+
+#### Self-hosted clusters
+
+Set the connection's `cluster` to a ClickHouse cluster name to add `ON CLUSTER` to generated native SQL materialization DDL. Leave it unset for ClickHouse Cloud, standalone servers, and databases that already distribute DDL implicitly. There is no per-asset cluster override: select a different connection on an asset when it needs a different cluster or local execution.
+
+```yaml
+connections:
+  clickhouse:
+    - name: clickhouse-replicated
+      host: clickhouse-replica-1.example.com
+      port: 9000
+      username: bruin
+      password: "XXXXXXXXXX"
+      database: analytics
+      secure: 0
+      cluster: analytics_cluster
+```
+
+Use an existing `Atomic` database on every node, with the same cluster configuration, a working ClickHouse Keeper or ZooKeeper service, and permissions to execute distributed DDL. For data refreshes, the configured host must belong to the named cluster, and that cluster must contain every replica of the target's single shard. Otherwise, dropping and recreating replicas can leave old data outside the cluster. Bruin does not provision the cluster, databases, replicas, or sharding. See [ClickHouse's distributed DDL requirements](https://clickhouse.com/docs/sql-reference/distributed-ddl).
+
+| Operation | Supported topology and behavior |
+| --- | --- |
+| Views and `ddl` | Creates definitions on all nodes, including multi-shard clusters. `ddl` requires an explicit `clickhouse.engine`; it can create local or `Distributed` tables. Referenced objects must exist on every relevant node. |
+| `create+replace`, implicit table strategy, and full refresh | Supports one shard with replicated tables. Requires an explicit `Replicated*MergeTree` engine. Drops the target on all nodes with `SYNC`, creates empty tables with `ON CLUSTER`, then inserts once through the configured host. |
+| `append` | Inserts once. The target may be a local replicated table in a single shard, or a separately provisioned `Distributed` table routing writes across shards. |
+| `truncate+insert` | Supports an existing local replicated table in a single shard. Runs `TRUNCATE TABLE ... ON CLUSTER ... SYNC`, then inserts once. |
+| `time_interval` | Supports an existing local replicated table in a single shard. Uses `ALTER TABLE ... ON CLUSTER ... DELETE WHERE ... SETTINGS mutations_sync = 2`, then inserts once with `insert_deduplicate = 0`. |
+| `delete+insert`, `merge`, `scd2_by_column` and `scd2_by_time` | Normal runs are rejected. Their staging-table and key-subquery operations require a consistent staged dataset on every replica; Bruin does not yet coordinate this. An unrestricted full refresh instead uses the cluster `create+replace` path. |
+
+`INSERT` has no `ON CLUSTER` clause. Bruin assumes that its one insert reaches the intended data: local replicated tables replicate that write within one shard; a `Distributed` target handles sharding itself. For replicated shards behind a `Distributed` table, configure `internal_replication: true` in ClickHouse. The asset query runs through the connected host and must select the complete input dataset. Bruin does not run one insert per node or automatically convert a local source into a distributed query. See [ClickHouse's distributed writes](https://clickhouse.com/docs/engines/table-engines/special/distributed#writing-data).
+
+Multi-shard refreshes of local tables, refreshes or mutations through `Distributed` targets, and data materializations into independent non-replicated tables are unsupported. An explicitly non-replicated engine is rejected for cluster `truncate+insert` and `time_interval`; omitting the engine for these strategies assumes the existing target is a replicated local table. Bruin does not inspect the deployed topology or existing engine. Append through a `Distributed` table is supported, but Bruin does not create or maintain the underlying local tables automatically.
+
+Choose replication arguments explicitly, for example:
+
+```yaml
+clickhouse:
+  engine: "ReplicatedReplacingMergeTree('/clickhouse/tables/{shard}/{database}/{table}', '{replica}', version)"
+  order_by: [id]
+```
+
+Bruin preserves the engine expression, including all arguments; it does not prepend replication parameters or convert engines. The Keeper path must be unique per table and shard and identical across that shard's replicas. The replica name must differ per replica, normally through the `{replica}` server macro. `ReplicatedMergeTree()` and variants with omitted replication arguments use the server's `default_replica_path` and `default_replica_name`; configure these consistently. See [replicated engine arguments](https://clickhouse.com/docs/engines/table-engines/mergetree-family/replication#replicatedmergetree-parameters).
+
+For example, a cluster `create+replace` emits:
+
+```sql
+DROP TABLE IF EXISTS analytics.events ON CLUSTER `analytics_cluster` SYNC;
+CREATE TABLE analytics.events ON CLUSTER `analytics_cluster`
+ENGINE = ReplicatedMergeTree('/clickhouse/tables/{shard}/{database}/{table}', '{replica}')
+ORDER BY (id)
+EMPTY AS SELECT id FROM raw.events;
+INSERT INTO analytics.events SELECT id FROM raw.events;
+```
+
+`EMPTY AS SELECT` infers the schema without inserting the source data on every node. It requires ClickHouse 22.7 or newer, and the schema query's sources must be accessible on every node. The synchronous drop allows recreation with a fixed Keeper path. This refresh is **not atomic**: readers can see a missing or empty table, and a failure can leave a partially rebuilt target. The source query must not read the target being dropped, truncated, or deleted from.
+
+Bruin waits for distributed DDL completion with `distributed_ddl_output_mode = 'throw'` and a 180-second `distributed_ddl_task_timeout`. `TRUNCATE ... SYNC` waits across replicas; interval deletion uses synchronous [mutation processing](https://clickhouse.com/docs/sql-reference/statements/alter/delete). A DDL error or timeout stops subsequent statements, but a timeout does not cancel queued DDL: restore cluster health and check its completion before retrying. Inserts retain ClickHouse's replication and durability settings; completion does not guarantee immediate visibility on every replica.
+
+The connection's `cluster` applies only to Bruin-generated native SQL materializations. Raw SQL scripts are executed as written, and seeds and ingestr assets do not gain cluster support from this field.
 
 #### `delete+insert` example
 
-Use `delete+insert` when the query returns complete replacements for one or more incremental-key values. For example, this refreshes every `dt` returned by the query:
+On connections without `cluster`, use `delete+insert` when the query returns complete replacements for one or more incremental-key values. For example, this refreshes every `dt` returned by the query:
 
 ```bruin-sql
 /* @bruin
@@ -169,7 +345,7 @@ Bruin deletes `analytics.daily_orders` rows whose `dt` falls within that interva
 
 #### Full refresh behavior
 
-Running `bruin run --full-refresh` changes every ClickHouse table materialization except `ddl` to `create+replace`, unless the asset has `full_refresh_restricted: true` (or its `refresh_restricted` alias). This includes `time_interval`: it does **not** use interval-based deletion during a full refresh. The rebuild runs `CREATE OR REPLACE TABLE` and requires `columns` and exactly one `primary_key: true` column. A `ddl` asset remains `CREATE TABLE IF NOT EXISTS` during a full refresh.
+Running `bruin run --full-refresh` changes every ClickHouse table materialization except `ddl` to `create+replace`, unless the asset has `full_refresh_restricted: true` (or its `refresh_restricted` alias). This includes `time_interval`: it does **not** use interval-based deletion during a full refresh. Without `cluster`, the rebuild runs `CREATE OR REPLACE TABLE` with the configured table options and the same key requirements as `create+replace`. With `cluster`, it uses the drop, empty create, and single insert sequence described above and requires an explicit replicated engine. A `ddl` asset remains `CREATE TABLE IF NOT EXISTS` during a full refresh.
 
 ### Column data types
 

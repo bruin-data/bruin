@@ -101,6 +101,8 @@ bruin run --continue
 
 As detailed in the flag section above, the  `--tag`, `--downstream`, `--exclude-tag`, and `--only` flags provide powerful ways to filter and control which assets and execution steps in your pipeline are executed. These flags can also be combined to fine-tune pipeline runs, allowing you to execute specific subsets of assets based on tags, include their downstream dependencies, and restrict execution to certain execution types.
 
+Before execution, Bruin runs asset-level validation only for assets with pending tasks. Assets excluded by filters such as `--tag` or `--exclude-tag` skip these checks, including dependency validation. Selected assets must still declare dependencies that exist in the pipeline, even if those upstream assets will not execute. Pipeline-wide checks still run. Use `bruin validate` to check the full pipeline independently of a run.
+
 Let's explore how combining these flags enables highly targeted pipeline execution scenarios:
 
 ### dbt-style Selectors
@@ -288,7 +290,7 @@ bruin run --full-refresh
 ```
 
 > [!TIP]
-> You can protect assets from being dropped during full refresh by setting `full_refresh_restricted: true` in an asset definition, or for an entire environment under `.bruin.yml` `config.full_refresh_restricted`. Asset-level `refresh_restricted` is still supported as an alias. See [Materialization](../assets/materialization.md#full-refresh-and-full_refresh_restricted) for more details.
+> You can protect assets from being dropped during full refresh by setting `full_refresh_restricted: true` in an asset definition, or for an entire environment under `.bruin.yml` `config.full_refresh_restricted`. Asset-level `refresh_restricted` is still supported as an alias. See [Materialization](../assets/materialization.md#full-refresh-and-full-refresh-restricted) for more details.
 
 Run with default query annotations:
 

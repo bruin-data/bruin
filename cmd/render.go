@@ -211,6 +211,11 @@ func Render() *cli.Command {
 			if cm != nil {
 				applyEnvironmentRefreshRestrictionToAsset(cm.SelectedEnvironment, asset)
 			}
+			clickHouseCluster, err := clickHouseClusterForRender(cm, pl, asset)
+			if err != nil {
+				printError(err, c.String("output"), "Failed to get the connection name for the asset:")
+				return cli.Exit("", 1)
+			}
 
 			resultsLocation := "s3://{destination-bucket}"
 			if asset.Type == pipeline.AssetTypeAthenaQuery {
@@ -320,8 +325,8 @@ func Render() *cli.Command {
 					pipeline.AssetTypeAthenaSQLSensor:         athena.NewRenderer(fullRefresh, resultsLocation),
 					pipeline.AssetTypeDuckDBQuery:             duck.NewMaterializer(fullRefresh),
 					pipeline.AssetTypeDuckDBQuerySensor:       duck.NewMaterializer(fullRefresh),
-					pipeline.AssetTypeClickHouse:              clickhouse.NewRenderer(fullRefresh),
-					pipeline.AssetTypeClickHouseQuerySensor:   clickhouse.NewRenderer(fullRefresh),
+					pipeline.AssetTypeClickHouse:              clickhouse.NewRenderer(fullRefresh, clickHouseCluster),
+					pipeline.AssetTypeClickHouseQuerySensor:   clickhouse.NewRenderer(fullRefresh, clickHouseCluster),
 				},
 				builder:  DefaultPipelineBuilder,
 				writer:   os.Stdout,
@@ -337,6 +342,22 @@ func Render() *cli.Command {
 			return r.Run(pl, asset, modifierInfo)
 		},
 	}
+}
+
+func clickHouseClusterForRender(cm *config.Config, pl *pipeline.Pipeline, asset *pipeline.Asset) (string, error) {
+	if cm == nil || cm.SelectedEnvironment == nil || cm.SelectedEnvironment.Connections == nil ||
+		(asset.Type != pipeline.AssetTypeClickHouse && asset.Type != pipeline.AssetTypeClickHouseQuerySensor) {
+		return "", nil
+	}
+	connName, err := pl.GetConnectionNameForAsset(asset)
+	if err != nil {
+		return "", err
+	}
+	conn, ok := cm.SelectedEnvironment.Connections.GetConnection(connName).(*config.ClickHouseConnection)
+	if !ok {
+		return "", nil
+	}
+	return conn.Cluster, nil
 }
 
 func loadRenderConfig(renderFS afero.Fs, inputPath, configuredConfigFilePath string, createIfMissing bool) (*config.Config, error) {

@@ -117,10 +117,10 @@ A stacked column chart plots memory hours over time. Below it, a table shows GB-
 | **Free credit** | 100 USD, 10 memory hours | Same defaults; usage above billed |
 | **Headline card** | Hidden | Memory Hours Used |
 
-Free-tier limits are the defaults set in `PaygoUsageLimitService`. Your team's actual cap may differ — check [Team Settings → Usage & Billing](/cloud/team-settings#usage--billing).
+Free-tier limits are the defaults set in `PaygoUsageLimitService`. Your team's actual cap may differ — check [Team Settings → Usage & Billing](/cloud/team-settings#usage-billing).
 
 ## Related
 
 - [Governance](/cloud/governance) — rules that drive the Risk Report.
-- [Team Settings → Usage & Billing](/cloud/team-settings#usage--billing) — change plans, set thresholds, manage Stripe.
+- [Team Settings → Usage & Billing](/cloud/team-settings#usage-billing) — change plans, set thresholds, manage Stripe.
 - [Pipelines](/cloud/pipelines) — operate the pipelines whose runs feed these views.

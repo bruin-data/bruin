@@ -3,6 +3,7 @@ package clickhouse
 import (
 	"crypto/tls"
 	"fmt"
+	"maps"
 	"net/url"
 	"strconv"
 
@@ -18,9 +19,11 @@ type Config struct {
 	Host     string
 	Port     int
 	Database string
+	Cluster  string
 	HTTPPort int
 	Secure   *int
 	ReadOnly bool
+	Settings map[string]any
 }
 
 func (c *Config) ToClickHouseOptions() *click_house.Options {
@@ -33,8 +36,9 @@ func (c *Config) ToClickHouseOptions() *click_house.Options {
 		}
 	}
 	opt := click_house.Options{
-		TLS:  tlsConfig,
-		Addr: []string{fmt.Sprintf("%s:%d", c.Host, c.Port)},
+		Settings: maps.Clone(click_house.Settings(c.Settings)),
+		TLS:      tlsConfig,
+		Addr:     []string{fmt.Sprintf("%s:%d", c.Host, c.Port)},
 		Auth: click_house.Auth{
 			Database: c.Database,
 			Username: c.Username,
@@ -50,7 +54,17 @@ func (c *Config) ToClickHouseOptions() *click_house.Options {
 		},
 	}
 	if c.ReadOnly {
-		opt.Settings = click_house.Settings{"readonly": 1}
+		if opt.Settings == nil {
+			opt.Settings = click_house.Settings{}
+		}
+		opt.Settings["readonly"] = 1
+	}
+	if c.Cluster != "" {
+		if opt.Settings == nil {
+			opt.Settings = click_house.Settings{}
+		}
+		opt.Settings["distributed_ddl_output_mode"] = "throw"
+		opt.Settings["distributed_ddl_task_timeout"] = 180
 	}
 	return &opt
 }
@@ -77,6 +91,10 @@ func (c *Config) GetIngestrURI() string {
 
 func (c *Config) GetDatabase() string {
 	return c.Database
+}
+
+func (c *Config) GetCluster() string {
+	return c.Cluster
 }
 
 func (c *Config) IsReadOnly() bool {

@@ -434,6 +434,7 @@ type taskDefinition struct {
 	Snowflake             snowflake         `yaml:"snowflake"`
 	Athena                athena            `yaml:"athena"`
 	BigQuery              bigquery          `yaml:"bigquery"`
+	ClickHouse            ClickHouseConfig  `yaml:"clickhouse"`
 	Doris                 doris             `yaml:"doris"`
 	StarRocks             starrocks         `yaml:"starrocks"`
 	Routing               *RoutingConfig    `yaml:"routing"`
@@ -659,6 +660,7 @@ func taskDefinitionToAsset(definition taskDefinition) (*Asset, error) {
 			PartitionExpirationDays: definition.BigQuery.PartitionExpirationDays,
 			PartitionKeyImmutable:   definition.BigQuery.PartitionKeyImmutable,
 		},
+		ClickHouse: definition.ClickHouse,
 		Doris: DorisConfig{
 			TableModel:    definition.Doris.TableModel,
 			DistributedBy: definition.Doris.DistributedBy,

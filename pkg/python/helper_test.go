@@ -125,6 +125,47 @@ func TestConsolidatedParameters_IngestrFlagPassthrough(t *testing.T) {
 	}, result)
 }
 
+func TestConsolidatedParameters_ReverseETLFlags(t *testing.T) {
+	t.Parallel()
+
+	t.Run("reject_mode and write_nulls=false", func(t *testing.T) {
+		t.Parallel()
+		asset := &pipeline.Asset{
+			Parameters: pipeline.ParameterMap{
+				"reject_mode": "skip",
+				"write_nulls": "false",
+			},
+		}
+		result, err := ConsolidatedParameters(t.Context(), asset, nil, nil)
+		require.NoError(t, err)
+		assert.Contains(t, result, "--reject-mode")
+		assert.Contains(t, result, "skip")
+		assert.Contains(t, result, "--write-nulls=false",
+			"write_nulls=false must be passed explicitly, not dropped to ingestr's clear default")
+	})
+
+	t.Run("write_nulls=true", func(t *testing.T) {
+		t.Parallel()
+		asset := &pipeline.Asset{
+			Parameters: pipeline.ParameterMap{"write_nulls": "true"},
+		}
+		result, err := ConsolidatedParameters(t.Context(), asset, nil, nil)
+		require.NoError(t, err)
+		assert.Contains(t, result, "--write-nulls=true")
+	})
+
+	t.Run("neither set emits nothing", func(t *testing.T) {
+		t.Parallel()
+		asset := &pipeline.Asset{Parameters: pipeline.ParameterMap{}}
+		result, err := ConsolidatedParameters(t.Context(), asset, nil, nil)
+		require.NoError(t, err)
+		for _, arg := range result {
+			assert.NotContains(t, arg, "reject-mode")
+			assert.NotContains(t, arg, "write-nulls")
+		}
+	})
+}
+
 func TestConsolidatedParameters_StreamGating(t *testing.T) {
 	t.Parallel()
 

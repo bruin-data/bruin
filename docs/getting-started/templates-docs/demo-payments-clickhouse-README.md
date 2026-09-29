@@ -10,6 +10,8 @@ a minute.
 It runs end to end against two Docker containers — no cloud account, no credentials to
 fill in.
 
+Run `bruin init` from the root of an existing Git project so Bruin adds the pipeline there:
+
 ```shell
 bruin init demo-payments-clickhouse
 ```
@@ -31,6 +33,8 @@ your project.
 
 One command starts the containers, replays traffic through the pipeline, and opens the
 dashboard:
+
+Run these commands from the root of an existing Git project:
 
 ```shell
 bruin init demo-payments-clickhouse

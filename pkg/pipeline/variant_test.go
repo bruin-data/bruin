@@ -566,6 +566,12 @@ func buildFullyPopulatedPipelineForVisitorTest() *pipeline.Pipeline {
 			Post: []pipeline.Hook{{Query: "q"}},
 		},
 		Metadata: map[string]string{"k": "v"},
+		ClickHouse: pipeline.ClickHouseConfig{
+			Engine:   "ReplacingMergeTree(version)",
+			OrderBy:  []string{"id"},
+			TTL:      "created_at + INTERVAL 30 DAY",
+			Settings: map[string]string{"index_granularity": "8192"},
+		},
 		Doris: pipeline.DorisConfig{
 			TableModel:    "duplicate_key",
 			DistributedBy: []string{"id"},
@@ -621,6 +627,12 @@ func buildFullyPopulatedPipelineForVisitorTest() *pipeline.Pipeline {
 			Metadata:  map[string]string{"k": "v"},
 			Snowflake: pipeline.SnowflakeConfig{Warehouse: "wh"},
 			Athena:    pipeline.AthenaConfig{Location: "loc"},
+			ClickHouse: pipeline.ClickHouseConfig{
+				Engine:   "ReplacingMergeTree(version)",
+				OrderBy:  []string{"id"},
+				TTL:      "created_at + INTERVAL 30 DAY",
+				Settings: map[string]string{"index_granularity": "8192"},
+			},
 			Doris: pipeline.DorisConfig{
 				TableModel:    "duplicate_key",
 				DistributedBy: []string{"id"},

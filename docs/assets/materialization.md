@@ -72,12 +72,48 @@ Define the column that will be used for the partitioning of the resulting table.
 - **Type:** `String`
 - **Default:** none
 
+For native `clickhouse.sql` assets, this can be a ClickHouse SQL expression such as `toYYYYMM(created_at)`. Bruin emits `PARTITION BY` when creating the target table with `create+replace` (including the default table strategy and full refresh) or `ddl`.
+
+### ClickHouse table options
+
+Native `clickhouse.sql` assets configure their engine, sorting key, TTL, and table settings in a top-level `clickhouse` block alongside `materialization`:
+
+```yaml
+materialization:
+  type: table
+  strategy: create+replace
+  partition_by: toYYYYMM(created_at)
+clickhouse:
+  engine: ReplacingMergeTree(version)
+  order_by:
+    - id
+    - created_at
+  ttl: created_at + INTERVAL 30 DAY
+  settings:
+    index_granularity: "8192"
+```
+
+| Option | Type | Meaning |
+| --- | --- | --- |
+| `clickhouse.engine` | String | SQL engine expression, such as `MergeTree()`, `ReplacingMergeTree(version)`, or `SummingMergeTree()`. If omitted, Bruin leaves the engine clause to ClickHouse's default. |
+| `clickhouse.order_by` | String[] | SQL expressions forming the sorting key, in order. Use `["tuple()"]` for an explicitly empty sorting key. `materialization.cluster_by` is an alias for this option; `order_by` wins when both are set. |
+| `clickhouse.ttl` | String | SQL TTL expression, without the `TTL` keyword. |
+| `clickhouse.settings` | Map of strings | Table settings rendered as SQL values. Include SQL quotes inside string values, for example `storage_policy: "'default'"`. |
+
+These options apply to target-table creation with `create+replace`, the implicit table strategy, `ddl`, and full refresh. Normal incremental runs preserve the target's definition, and transient staging tables do not inherit these options. Views and other asset types reject the `clickhouse` options.
+
+If columns have `primary_key: true`, they must be the leading entries of `clickhouse.order_by`, in column declaration order. With neither `engine` nor `order_by`, Bruin preserves the primary-key-only behavior. An explicit `order_by` or engine allows `create+replace` without declaring a primary key; ClickHouse validates the chosen engine's key requirements. Engines such as `Memory()` do not support sorting or primary-key clauses. Pipeline defaults can set the same options under `default.clickhouse`, which only native `clickhouse.sql` table assets inherit. Nonempty asset fields override defaults, and settings merge by name with asset values taking precedence.
+
+These options are separate from ingestr destination parameters (`parameters.engine` and `parameters.engine.<setting>`). See [ClickHouse table definitions](../platforms/clickhouse.md#native-sql-table-definitions) for a complete native SQL example.
+
 ### `materialization > cluster_by`
 
 Define the columns that will be used for the clustering of the resulting table. This is used to instruct the data warehouse to set the columns for the clustering.
 
 - **Type:** `String[]`
 - **Default:** `[]`
+
+On ClickHouse there is no separate clustering clause: the sorting key determines physical row order, so `cluster_by` is used as the table's `ORDER BY`. It is an alias for [`clickhouse.order_by`](#clickhouse-table-options), which takes precedence when both are set. Primary-key columns must still be the leading entries of whichever one is used.
 
 ### `materialization > incremental_key`
 
@@ -977,4 +1013,10 @@ Notice how:
 | **Configuration** | Only requires primary_key columns; `incremental_key` is optional | Requires both primary_key columns and incremental_key |
 
 > [!WARNING]
-> SCD2 materializations are currently only supported for BigQuery, Snowflake, Postgres, Amazon Redshift, MySQL, DuckDB, Databricks, and Spark.
+> SCD2 materializations are currently only supported for BigQuery, Snowflake, Postgres, Amazon Redshift, MySQL, DuckDB, ClickHouse, Databricks, and Spark.
+
+ClickHouse uses `DateTime64(6, 'UTC')` for `_valid_from` and `_valid_until`, with `2299-12-31 23:59:59` as the current-record sentinel for compatibility with servers that cannot represent year 9999. Both strategies create the destination automatically on the first run; `--full-refresh` replaces all history with the current source snapshot. Incremental SCD2 runs use staged deletes and inserts, so they are not atomic and do not support `cluster` configuration.
+
+When an `incremental_key` is configured, it must have a non-nullable date or timestamp type and contain no NULL values. Nullable incremental-key types are rejected because a NULL `_valid_from` would prevent later time-based updates from being detected.
+
+Use `MergeTree()` (the default) or `ReplicatedMergeTree()` to retain every historical version. Engines such as `ReplacingMergeTree()` can discard history when versions share the same sorting key. Keep the default synchronous lightweight deletes enabled (`lightweight_deletes_sync` on servers that expose this setting) so staging tables remain available until deletion completes.

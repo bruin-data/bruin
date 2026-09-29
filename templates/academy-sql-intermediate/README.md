@@ -112,9 +112,9 @@ MotherDuck. No lesson requires it.
 | `dates` | 1,096 | one calendar day, 2023-01-01 to 2025-12-31 |
 | `stores` | 6 | one store |
 | `products` | 60 | one product |
-| `customers` | 510 | one customer account |
-| `orders` | 1,212 | one order, as delivered by the source system |
-| `order_items` | 2,895 | one line on an order |
+| `customers` | 510 | source-system rows representing 500 customer IDs, including 10 duplicated IDs |
+| `orders` | 1,212 | source-system rows representing 1,200 order IDs; 12 IDs have a changed-status resend |
+| `order_items` | 2,895 | source-system rows representing 2,880 distinct order lines, including 15 exact duplicate rows |
 | `fx_rates` | 5,480 | one date and currency pair |
 
 [`docs/schema.md`](docs/schema.md) lists the columns. It does not say what they mean.
@@ -122,8 +122,10 @@ That is the point - lesson 3 has you find out, and lesson 11 has you write it do
 
 ## What is wrong with this data
 
-Something. Several things. Finding them is lesson 3, and nothing in this repository
-tells you what they are before you get there.
+The table above records source-system grain, including known duplicate populations, so those raw
+rows are not mistaken for unique business entities. Lesson 3 still has you profile the actual
+tables, verify the counts, and quantify the impact; the detailed defect effects and fixes are not
+provided here.
 
 Do not fix anything you find before lesson 8. Profile first, decide what a defensible
 number is second, clean third. In that order, every time.

@@ -1281,6 +1281,229 @@ func TestEnsurePipelineNotificationsAreValid(t *testing.T) {
 	}
 }
 
+func TestEnsureMaterializationValuesAreValid_ClickHouseOptions(t *testing.T) {
+	t.Parallel()
+
+	options := []struct {
+		name   string
+		config pipeline.ClickHouseConfig
+	}{
+		{"engine", pipeline.ClickHouseConfig{Engine: "ReplacingMergeTree()"}},
+		{"order_by", pipeline.ClickHouseConfig{OrderBy: []string{"id", "created_at"}}},
+		{"ttl", pipeline.ClickHouseConfig{TTL: "created_at + INTERVAL 30 DAY"}},
+		{"settings", pipeline.ClickHouseConfig{Settings: map[string]string{"index_granularity": "8192"}}},
+	}
+	type testCase struct {
+		name     string
+		asset    pipeline.Asset
+		wantRule string
+	}
+	tests := make([]testCase, 0, 12)
+	tests = append(tests, []testCase{
+		{
+			name: "clickhouse view",
+			asset: pipeline.Asset{
+				Type:            pipeline.AssetTypeClickHouse,
+				Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeView},
+			},
+			wantRule: "is not supported for views",
+		},
+		{
+			name: "postgres table",
+			asset: pipeline.Asset{
+				Type: pipeline.AssetTypePostgresQuery,
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyCreateReplace,
+				},
+			},
+			wantRule: "is only supported for clickhouse.sql assets",
+		},
+		{
+			name: "postgres implicit strategy",
+			asset: pipeline.Asset{
+				Type:            pipeline.AssetTypePostgresQuery,
+				Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeTable},
+			},
+			wantRule: "is only supported for clickhouse.sql assets",
+		},
+		{
+			name:     "python",
+			asset:    pipeline.Asset{Type: pipeline.AssetTypePython},
+			wantRule: "is only supported for clickhouse.sql assets",
+		},
+		{
+			name:     "ingestr",
+			asset:    pipeline.Asset{Type: pipeline.AssetTypeIngestr},
+			wantRule: "is only supported for clickhouse.sql assets",
+		},
+		{
+			name:     "clickhouse seed",
+			asset:    pipeline.Asset{Type: pipeline.AssetTypeClickHouseSeed},
+			wantRule: "is only supported for clickhouse.sql assets",
+		},
+		{
+			name:     "clickhouse source",
+			asset:    pipeline.Asset{Type: pipeline.AssetTypeClickHouseSource},
+			wantRule: "is only supported for clickhouse.sql assets",
+		},
+	}...)
+	for _, strategy := range []pipeline.MaterializationStrategy{
+		pipeline.MaterializationStrategyNone,
+		pipeline.MaterializationStrategyCreateReplace,
+		pipeline.MaterializationStrategyDDL,
+		pipeline.MaterializationStrategyAppend,
+		pipeline.MaterializationStrategyTruncateInsert,
+	} {
+		tests = append(tests, testCase{
+			name: "clickhouse table " + string(strategy),
+			asset: pipeline.Asset{
+				Type: pipeline.AssetTypeClickHouse,
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: strategy,
+				},
+			},
+		})
+	}
+
+	for _, option := range options {
+		for _, test := range tests {
+			t.Run(option.name+"/"+test.name, func(t *testing.T) {
+				t.Parallel()
+				asset := test.asset
+				asset.ClickHouse = option.config
+				issues, err := EnsureMaterializationValuesAreValidForSingleAsset(t.Context(), &pipeline.Pipeline{}, &asset)
+				require.NoError(t, err)
+				if test.wantRule == "" {
+					assert.Empty(t, issues)
+					return
+				}
+				require.Len(t, issues, 1)
+				assert.Same(t, &asset, issues[0].Task)
+				assert.Equal(t, fmt.Sprintf("ClickHouse option 'clickhouse.%s' %s", option.name, test.wantRule), issues[0].Description)
+			})
+		}
+	}
+}
+
+func TestEnsureMaterializationValuesAreValid_ClickHouseSCD2(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		strategy       pipeline.MaterializationStrategy
+		incrementalKey string
+		columns        []pipeline.Column
+		want           []string
+	}{
+		{
+			name:     "column strategy requires a primary key",
+			strategy: pipeline.MaterializationStrategySCD2ByColumn,
+			columns:  []pipeline.Column{{Name: "id"}},
+			want:     []string{"Materialization strategy 'scd2_by_column' requires the 'primary_key' field to be set on at least one column"},
+		},
+		{
+			name:     "column strategy does not require an incremental key",
+			strategy: pipeline.MaterializationStrategySCD2ByColumn,
+			columns:  []pipeline.Column{{Name: "id", PrimaryKey: true}},
+		},
+		{
+			name:           "column strategy accepts an incremental key",
+			strategy:       pipeline.MaterializationStrategySCD2ByColumn,
+			incrementalKey: "updated_at",
+			columns:        []pipeline.Column{{Name: "id", PrimaryKey: true}, {Name: "updated_at", Type: "DateTime64(6)"}},
+		},
+		{
+			name:     "time strategy requires an incremental key",
+			strategy: pipeline.MaterializationStrategySCD2ByTime,
+			columns:  []pipeline.Column{{Name: "id", PrimaryKey: true}},
+			want:     []string{"Materialization strategy 'scd2_by_time' requires the 'incremental_key' field to be set"},
+		},
+		{
+			name:           "time strategy requires a primary key",
+			strategy:       pipeline.MaterializationStrategySCD2ByTime,
+			incrementalKey: "updated_at",
+			columns:        []pipeline.Column{{Name: "id"}, {Name: "updated_at", Type: "DateTime64(6)"}},
+			want:           []string{"Materialization strategy 'scd2_by_time' requires the 'primary_key' field to be set on at least one column"},
+		},
+		{
+			name:     "time strategy requires both keys",
+			strategy: pipeline.MaterializationStrategySCD2ByTime,
+			want: []string{
+				"Materialization strategy 'scd2_by_time' requires the 'incremental_key' field to be set",
+				"Materialization strategy 'scd2_by_time' requires the 'primary_key' field to be set on at least one column",
+			},
+		},
+		{
+			name:           "time strategy accepts both keys",
+			strategy:       pipeline.MaterializationStrategySCD2ByTime,
+			incrementalKey: "updated_at",
+			columns:        []pipeline.Column{{Name: "id", PrimaryKey: true}, {Name: "updated_at", Type: "DateTime64(6)"}},
+		},
+		{
+			name:     "reserved names remain available outside SCD2",
+			strategy: pipeline.MaterializationStrategyCreateReplace,
+			columns:  []pipeline.Column{{Name: "_valid_from"}, {Name: "_valid_until"}, {Name: "_is_current"}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			asset := &pipeline.Asset{
+				Type: pipeline.AssetTypeClickHouse,
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       tt.strategy,
+					IncrementalKey: tt.incrementalKey,
+				},
+				Columns: tt.columns,
+			}
+			issues, err := EnsureMaterializationValuesAreValidForSingleAsset(t.Context(), &pipeline.Pipeline{}, asset)
+			require.NoError(t, err)
+			descriptions := make([]string, 0, len(issues))
+			for _, issue := range issues {
+				assert.Same(t, asset, issue.Task)
+				descriptions = append(descriptions, issue.Description)
+			}
+			assert.ElementsMatch(t, tt.want, descriptions)
+		})
+	}
+}
+
+func TestEnsureMaterializationValuesAreValid_SCD2ReservedColumns(t *testing.T) {
+	t.Parallel()
+
+	for _, assetType := range []pipeline.AssetType{pipeline.AssetTypeClickHouse, pipeline.AssetTypeDuckDBQuery} {
+		for _, strategy := range []pipeline.MaterializationStrategy{pipeline.MaterializationStrategySCD2ByColumn, pipeline.MaterializationStrategySCD2ByTime} {
+			for _, column := range []string{"_valid_from", "_valid_until", "_is_current", "_VALID_FROM", "_VALID_UNTIL", "_IS_CURRENT", "`_valid_from`", `"_valid_until"`} {
+				t.Run(string(assetType)+"/"+string(strategy)+"/"+column, func(t *testing.T) {
+					t.Parallel()
+					asset := &pipeline.Asset{
+						Type: assetType,
+						Materialization: pipeline.Materialization{
+							Type:           pipeline.MaterializationTypeTable,
+							Strategy:       strategy,
+							IncrementalKey: "updated_at",
+						},
+						Columns: []pipeline.Column{
+							{Name: "id", PrimaryKey: true},
+							{Name: "updated_at", Type: "timestamp"},
+							{Name: column},
+						},
+					}
+					issues, err := EnsureMaterializationValuesAreValidForSingleAsset(t.Context(), &pipeline.Pipeline{}, asset)
+					require.NoError(t, err)
+					require.Len(t, issues, 1)
+					assert.Same(t, asset, issues[0].Task)
+					assert.Equal(t, fmt.Sprintf("Column name '%s' is reserved for SCD2 materialization strategies", column), issues[0].Description)
+				})
+			}
+		}
+	}
+}
+
 func TestEnsureMaterializationValuesAreValid(t *testing.T) {
 	t.Parallel()
 
@@ -2303,6 +2526,76 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 			wantErr:        assert.NoError,
 		},
 		{
+			name: "valid ingestr asset with reverse-ETL update strategy on hubspot",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection":    "conn1",
+					"source_table":         "table1",
+					"destination":          "hubspot",
+					"incremental_strategy": "update",
+				},
+			},
+			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "valid ingestr asset with reverse-ETL delete strategy on hubspot",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection":    "conn1",
+					"source_table":         "table1",
+					"destination":          "hubspot",
+					"incremental_strategy": "delete",
+				},
+			},
+			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "valid ingestr asset with reverse-ETL update strategy on salesforce",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection":    "conn1",
+					"source_table":         "table1",
+					"destination":          "salesforce",
+					"incremental_strategy": "update",
+				},
+			},
+			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "valid ingestr asset with reverse-ETL delete strategy on salesforce",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection":    "conn1",
+					"source_table":         "table1",
+					"destination":          "salesforce",
+					"incremental_strategy": "delete",
+				},
+			},
+			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "ingestr asset with reverse-ETL update strategy on a non-reverse-ETL destination",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection":    "conn1",
+					"source_table":         "table1",
+					"destination":          "duckdb",
+					"incremental_strategy": "update",
+				},
+			},
+			wantErrMessage: "Incremental strategy 'update' is only supported for reverse-ETL destinations (e.g. hubspot); destination 'duckdb' does not support it.",
+			wantErr:        assert.NoError,
+		},
+		{
 			name: "ingestr asset with merge strategy but no primary key",
 			asset: &pipeline.Asset{
 				Type: pipeline.AssetTypeIngestr,
@@ -2599,6 +2892,54 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 				},
 			},
 			wantErrMessage: "Invalid 'cdc_mode' value: must be 'stream' or 'batch'",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "Change Tracking asset with a wildcard source table should fail",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection":    "conn1",
+					"source_table":         "*",
+					"destination":          "dest1",
+					"cdc":                  "true",
+					"cdc_sql_capture":      "change_tracking",
+					"incremental_strategy": "merge",
+				},
+			},
+			wantErrMessage: "SQL Server Change Tracking replicates a single table: name one in 'source_table', or use 'cdc_sql_capture: cdc' to replicate every table",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "Change Tracking asset with a single source table should pass",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection":    "conn1",
+					"source_table":         "dbo.users",
+					"destination":          "dest1",
+					"cdc":                  "true",
+					"cdc_sql_capture":      "change_tracking",
+					"incremental_strategy": "merge",
+				},
+			},
+			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "log-based CDC asset with a wildcard source table should pass",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection":    "conn1",
+					"source_table":         "*",
+					"destination":          "dest1",
+					"cdc":                  "true",
+					"cdc_sql_capture":      "cdc",
+					"incremental_strategy": "merge",
+				},
+			},
+			wantErrMessage: "",
 			wantErr:        assert.NoError,
 		},
 		{
@@ -6063,6 +6404,98 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 				Type: pipeline.AssetTypeBigqueryTableSensor,
 				Parameters: pipeline.ParameterMap{
 					"table": "my-project.data_set.table-name",
+				},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+
+		// Fabric tests
+		{
+			name: "Fabric - no table parameter",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeFabricTableSensor,
+			},
+			want:    []string{"Fabric table sensor requires a `table` parameter"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Fabric - empty table parameter",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeFabricTableSensor,
+				Parameters: pipeline.ParameterMap{
+					"table": "",
+				},
+			},
+			want:    []string{"Fabric table sensor `table` parameter contains empty components, '' given"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Fabric - too many components",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeFabricTableSensor,
+				Parameters: pipeline.ParameterMap{
+					"table": "database.schema.table.extra",
+				},
+			},
+			want:    []string{"Fabric table sensor `table` parameter must be in format `table`, `schema.table`, or `database.schema.table`, 'database.schema.table.extra' given"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Fabric - valid table format",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeFabricTableSensor,
+				Parameters: pipeline.ParameterMap{
+					"table": "events",
+				},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Fabric - valid schema.table format",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeFabricTableSensor,
+				Parameters: pipeline.ParameterMap{
+					"table": "raw.events",
+				},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Fabric - valid database.schema.table format",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeFabricTableSensor,
+				Parameters: pipeline.ParameterMap{
+					"table": "warehouse.raw.events",
+				},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Fabric legacy - no table parameter",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeFabricTableSensorLegacy,
+			},
+			want:    []string{"Fabric table sensor requires a `table` parameter"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Fabric legacy - valid schema.table format",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeFabricTableSensorLegacy,
+				Parameters: pipeline.ParameterMap{
+					"table": "raw.events",
 				},
 			},
 			want:    []string{},

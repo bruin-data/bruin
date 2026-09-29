@@ -417,6 +417,9 @@
         "max_concurrent_assets": {
           "type": "integer"
         },
+        "use_cloud": {
+          "type": "boolean"
+        },
         "access_key_id": {
           "type": "string"
         },
@@ -517,6 +520,34 @@
         "api_key"
       ]
     },
+    "BambooHRConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "company_domain": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "access_token": {
+          "type": "string"
+        },
+        "timezone": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "company_domain"
+      ]
+    },
     "BrazeConnection": {
       "properties": {
         "name": {
@@ -549,6 +580,9 @@
           "type": "integer"
         },
         "api_token": {
+          "type": "string"
+        },
+        "api_url": {
           "type": "string"
         }
       },
@@ -790,6 +824,9 @@
         "max_concurrent_assets": {
           "type": "integer"
         },
+        "use_cloud": {
+          "type": "boolean"
+        },
         "username": {
           "type": "string"
         },
@@ -805,6 +842,9 @@
         "database": {
           "type": "string"
         },
+        "cluster": {
+          "type": "string"
+        },
         "http_port": {
           "type": "integer"
         },
@@ -813,6 +853,22 @@
         },
         "read_only": {
           "type": "boolean"
+        },
+        "settings": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              }
+            ]
+          },
+          "type": "object"
         }
       },
       "additionalProperties": false,
@@ -1502,6 +1558,30 @@
           },
           "type": "array"
         },
+        "exchangeratesapi": {
+          "items": {
+            "$ref": "#/$defs/ExchangeRatesAPIConnection"
+          },
+          "type": "array"
+        },
+        "fakturoid": {
+          "items": {
+            "$ref": "#/$defs/FakturoidConnection"
+          },
+          "type": "array"
+        },
+        "lumify": {
+          "items": {
+            "$ref": "#/$defs/LumifyConnection"
+          },
+          "type": "array"
+        },
+        "bamboohr": {
+          "items": {
+            "$ref": "#/$defs/BambooHRConnection"
+          },
+          "type": "array"
+        },
         "satismeter": {
           "items": {
             "$ref": "#/$defs/SatisMeterConnection"
@@ -1841,6 +1921,9 @@
         "max_concurrent_assets": {
           "type": "integer"
         },
+        "use_cloud": {
+          "type": "boolean"
+        },
         "username": {
           "type": "string"
         },
@@ -1916,6 +1999,9 @@
         "max_concurrent_assets": {
           "type": "integer"
         },
+        "use_cloud": {
+          "type": "boolean"
+        },
         "username": {
           "type": "string"
         },
@@ -1965,6 +2051,9 @@
         },
         "max_concurrent_assets": {
           "type": "integer"
+        },
+        "use_cloud": {
+          "type": "boolean"
         },
         "token": {
           "type": "string"
@@ -2126,6 +2215,9 @@
         "max_concurrent_assets": {
           "type": "integer"
         },
+        "use_cloud": {
+          "type": "boolean"
+        },
         "username": {
           "type": "string"
         },
@@ -2174,6 +2266,9 @@
         "max_concurrent_assets": {
           "type": "integer"
         },
+        "use_cloud": {
+          "type": "boolean"
+        },
         "host": {
           "type": "string"
         },
@@ -2214,6 +2309,9 @@
         },
         "max_concurrent_assets": {
           "type": "integer"
+        },
+        "use_cloud": {
+          "type": "boolean"
         },
         "path": {
           "type": "string"
@@ -2385,6 +2483,28 @@
         "name"
       ]
     },
+    "ExchangeRatesAPIConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "access_key": {
+          "type": "string"
+        },
+        "base": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "access_key"
+      ]
+    },
     "FabricConnection": {
       "properties": {
         "name": {
@@ -2392,6 +2512,9 @@
         },
         "max_concurrent_assets": {
           "type": "integer"
+        },
+        "use_cloud": {
+          "type": "boolean"
         },
         "host": {
           "type": "string"
@@ -2474,6 +2597,40 @@
         "name",
         "access_token",
         "account_id"
+      ]
+    },
+    "FakturoidConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "client_id": {
+          "type": "string"
+        },
+        "client_secret": {
+          "type": "string"
+        },
+        "slug": {
+          "type": "string"
+        },
+        "user_agent": {
+          "type": "string"
+        },
+        "rate_limit": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "client_id",
+        "client_secret",
+        "slug",
+        "user_agent"
       ]
     },
     "FastspringConnection": {
@@ -2894,6 +3051,9 @@
         "max_concurrent_assets": {
           "type": "integer"
         },
+        "use_cloud": {
+          "type": "boolean"
+        },
         "service_account_json": {
           "type": "string"
         },
@@ -2923,6 +3083,9 @@
         },
         "max_query_cost_soft": {
           "type": "number"
+        },
+        "read_only": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false,
@@ -3006,6 +3169,9 @@
         },
         "max_concurrent_assets": {
           "type": "integer"
+        },
+        "use_cloud": {
+          "type": "boolean"
         },
         "username": {
           "type": "string"
@@ -3569,6 +3735,34 @@
         "account_ids"
       ]
     },
+    "LumifyConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "sport": {
+          "type": "string"
+        },
+        "league": {
+          "type": "string"
+        },
+        "base_url": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
+      ]
+    },
     "MailchimpConnection": {
       "properties": {
         "name": {
@@ -3746,11 +3940,17 @@
         "max_concurrent_assets": {
           "type": "integer"
         },
+        "use_cloud": {
+          "type": "boolean"
+        },
         "token": {
           "type": "string"
         },
         "database": {
           "type": "string"
+        },
+        "read_only": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false,
@@ -3767,6 +3967,9 @@
         },
         "max_concurrent_assets": {
           "type": "integer"
+        },
+        "use_cloud": {
+          "type": "boolean"
         },
         "username": {
           "type": "string"
@@ -3806,6 +4009,9 @@
         },
         "max_concurrent_assets": {
           "type": "integer"
+        },
+        "use_cloud": {
+          "type": "boolean"
         },
         "username": {
           "type": "string"
@@ -3937,6 +4143,9 @@
         },
         "max_concurrent_assets": {
           "type": "integer"
+        },
+        "use_cloud": {
+          "type": "boolean"
         },
         "username": {
           "type": "string"
@@ -4326,6 +4535,9 @@
         "max_concurrent_assets": {
           "type": "integer"
         },
+        "use_cloud": {
+          "type": "boolean"
+        },
         "username": {
           "type": "string"
         },
@@ -4576,6 +4788,9 @@
         "max_concurrent_assets": {
           "type": "integer"
         },
+        "use_cloud": {
+          "type": "boolean"
+        },
         "username": {
           "type": "string"
         },
@@ -4723,6 +4938,9 @@
         },
         "max_concurrent_assets": {
           "type": "integer"
+        },
+        "use_cloud": {
+          "type": "boolean"
         },
         "path": {
           "type": "string"
@@ -5061,6 +5279,9 @@
         "max_concurrent_assets": {
           "type": "integer"
         },
+        "use_cloud": {
+          "type": "boolean"
+        },
         "account": {
           "type": "string"
         },
@@ -5090,6 +5311,9 @@
         },
         "private_key": {
           "type": "string"
+        },
+        "read_only": {
+          "type": "boolean"
         },
         "token": {
           "type": "string"
@@ -5161,6 +5385,9 @@
         },
         "max_concurrent_assets": {
           "type": "integer"
+        },
+        "use_cloud": {
+          "type": "boolean"
         },
         "project_id": {
           "type": "string"
@@ -5250,6 +5477,9 @@
         },
         "max_concurrent_assets": {
           "type": "integer"
+        },
+        "use_cloud": {
+          "type": "boolean"
         },
         "host": {
           "type": "string"
@@ -5406,6 +5636,9 @@
         "max_concurrent_assets": {
           "type": "integer"
         },
+        "use_cloud": {
+          "type": "boolean"
+        },
         "username": {
           "type": "string"
         },
@@ -5547,6 +5780,9 @@
         },
         "max_concurrent_assets": {
           "type": "integer"
+        },
+        "use_cloud": {
+          "type": "boolean"
         },
         "host": {
           "type": "string"
@@ -5722,6 +5958,9 @@
         },
         "max_concurrent_assets": {
           "type": "integer"
+        },
+        "use_cloud": {
+          "type": "boolean"
         },
         "username": {
           "type": "string"

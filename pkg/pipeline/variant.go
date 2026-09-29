@@ -305,6 +305,7 @@ func assetFromDefaultValues(dv *DefaultValues) *Asset {
 		Snowflake:         dv.Snowflake,
 		Athena:            dv.Athena,
 		BigQuery:          dv.BigQuery,
+		ClickHouse:        dv.ClickHouse,
 		Doris:             dv.Doris,
 		StarRocks:         dv.StarRocks,
 		Routing:           dv.Routing,
@@ -346,6 +347,7 @@ func copyAssetToDefaultValues(dv *DefaultValues, asset *Asset) {
 	dv.Snowflake = asset.Snowflake
 	dv.Athena = asset.Athena
 	dv.BigQuery = asset.BigQuery
+	dv.ClickHouse = asset.ClickHouse
 	dv.Doris = asset.Doris
 	dv.StarRocks = asset.StarRocks
 	dv.Routing = asset.Routing
@@ -445,6 +447,22 @@ func renderAssetStrings(render RenderFunc, a *Asset) error {
 	}
 	if a.Athena.Location, err = maybeRender(render, fmt.Sprintf("asset[%s].athena.location", originalName), a.Athena.Location); err != nil {
 		return err
+	}
+	if a.ClickHouse.Engine, err = maybeRender(render, fmt.Sprintf("asset[%s].clickhouse.engine", originalName), a.ClickHouse.Engine); err != nil {
+		return err
+	}
+	if a.ClickHouse.TTL, err = maybeRender(render, fmt.Sprintf("asset[%s].clickhouse.ttl", originalName), a.ClickHouse.TTL); err != nil {
+		return err
+	}
+	for i, expression := range a.ClickHouse.OrderBy {
+		if a.ClickHouse.OrderBy[i], err = maybeRender(render, fmt.Sprintf("asset[%s].clickhouse.order_by[%d]", originalName, i), expression); err != nil {
+			return err
+		}
+	}
+	for key, value := range a.ClickHouse.Settings {
+		if a.ClickHouse.Settings[key], err = maybeRender(render, fmt.Sprintf("asset[%s].clickhouse.settings[%s]", originalName, key), value); err != nil {
+			return err
+		}
 	}
 	if a.Doris.TableModel, err = maybeRender(render, fmt.Sprintf("asset[%s].doris.table_model", originalName), a.Doris.TableModel); err != nil {
 		return err

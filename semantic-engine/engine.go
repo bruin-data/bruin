@@ -132,6 +132,31 @@ func (e *Engine) validate() error {
 		names[s.Name] = true
 	}
 
+	noteIDs := make(map[string]bool, len(e.model.Notes))
+	for _, note := range e.model.Notes {
+		if note.ID == "" {
+			return errors.New("note id is required")
+		}
+		if noteIDs[note.ID] {
+			return fmt.Errorf("duplicate note id: %s", note.ID)
+		}
+		noteIDs[note.ID] = true
+		if note.Dimensions == nil {
+			return fmt.Errorf("note %q: dimensions is required", note.ID)
+		}
+
+		dimensionNames := make(map[string]bool, len(note.Dimensions))
+		for _, dimension := range note.Dimensions {
+			if dimension.Name == "" {
+				return fmt.Errorf("note %q: dimension name is required", note.ID)
+			}
+			if dimensionNames[dimension.Name] {
+				return fmt.Errorf("note %q: duplicate dimension %q", note.ID, dimension.Name)
+			}
+			dimensionNames[dimension.Name] = true
+		}
+	}
+
 	for _, m := range e.model.Metrics {
 		if isDerived(&m) && !isWindow(&m) {
 			if err := e.validateRefs(m.Name, map[string]bool{}); err != nil {

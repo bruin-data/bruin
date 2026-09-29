@@ -82,6 +82,13 @@ func (c *Client) GetIngestrURI() (string, error) {
 	return c.config.GetIngestrURI(), nil
 }
 
+func (c *Client) GetCluster() string {
+	if config, ok := c.config.(interface{ GetCluster() string }); ok {
+		return config.GetCluster()
+	}
+	return ""
+}
+
 // Select runs a query and returns the results.
 func (c *Client) Select(ctx context.Context, q *query.Query) ([][]interface{}, error) {
 	sql := q.String()

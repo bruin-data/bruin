@@ -59,9 +59,12 @@ it, or hint at what it lists until the student's defence is written.
 - [ ] Layering, 2 points: staging assets contain no `JOIN`; one core asset and one mart asset exist; the mart's `depends` names no asset from `pipeline/assets/generate/`.
 - [ ] Join and grain safety, 1 point: order rows are deduplicated with `QUALIFY ROW_NUMBER() ... ORDER BY _loaded_at DESC`, order lines with `DISTINCT`, and the customer join does not fan out.
 - [ ] Governance, 2 points: every mart column has a description, and `meta` carries both a metric definition and a known limitation.
-- [ ] The currency basis in `meta.currency` is true of the query. Orders are priced in five currencies and are not converted, so a headline figure that sums them untouched is not an amount in any currency. Either the figure is converted through `fx_rates` on both date and currency, or `meta.currency` says the number is a mixed-currency sum and the defence says why that is acceptable. Ask for the query that shows the currency composition behind the figure - do not accept the `meta` field on its own.
 - [ ] Verification, 2 points: three checks of the headline figure by three different routes, each with its number recorded.
-- [ ] Defence, 1 point: `docs/defence.md` answers all four questions and anticipates at least six of the nine objections in the key.
+- [ ] Defence, 1 point: `docs/defence.md` answers all four questions, anticipates at least six of the nine objections in the key, and states a currency basis that is true of the query. Orders are priced in five currencies and are not converted, so a headline figure that sums them untouched is not an amount in any currency. Either convert through `fx_rates` on both date and currency, or state that the figure is a mixed-currency sum and explain why it is acceptable. Ask for the query showing the currency composition; do not accept `meta.currency` alone.
+
+The rubric totals exactly 10 points: Contract quality (2) + Layering (2) + Join and grain safety
+(1) + Governance (2) + Verification (2) + Defence (1). The currency-basis requirement is part
+of the single Defence point, not an additional point.
 
 ## Done signal
 Confirm all five deliverables exist on disk, that the headline figure is stated with a currency

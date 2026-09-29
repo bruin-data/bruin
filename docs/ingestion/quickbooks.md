@@ -59,6 +59,8 @@ parameters:
 | `accounts` | id | lastupdatedtime | merge | Retrieves details of accounts. |
 | `vendors` | id | lastupdatedtime | merge | Retrieves vendor records. |
 | `payments` | id | lastupdatedtime | merge | Retrieves payments recorded. |
+| `purchases` | id | lastupdatedtime | merge | Retrieves expense transactions such as cash expenses, checks and credit card charges. |
+| `bills` | id | lastupdatedtime | merge | Retrieves vendor bills. |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 

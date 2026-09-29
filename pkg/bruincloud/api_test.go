@@ -488,6 +488,58 @@ func TestMarkRunStatus(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestMarkAssetInstancesStatus(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/mark-asset-instances", r.URL.Path)
+		assert.Equal(t, http.MethodPost, r.Method)
+
+		body := readJSON(t, r)
+		assert.Equal(t, "success", body["status"])
+		assert.Equal(t, []any{"step-1", "step-2"}, body["asset_instance_ids"])
+		assert.Equal(t, []any{
+			map[string]any{
+				"project":  "proj",
+				"pipeline": "pipe",
+				"run_id":   "run-1",
+			},
+		}, body["pipeline_runs"])
+
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`200`))
+	})
+
+	err := client.MarkAssetInstancesStatus(t.Context(), "proj", "pipe", "run-1", []string{"step-1", "step-2"}, "success")
+	require.NoError(t, err)
+}
+
+func TestGetInstanceParsed(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/asset-instance-details", r.URL.Path)
+		assert.Equal(t, http.MethodPost, r.Method)
+
+		body := readJSON(t, r)
+		assert.Equal(t, "proj", body["project"])
+		assert.Equal(t, "pipe", body["pipeline"])
+		assert.Equal(t, "run-1", body["run_id"])
+		assert.Equal(t, "analytics.orders", body["asset_name"])
+
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, map[string]any{
+			"asset_instance": AssetInstanceInfo{
+				Asset:   "analytics.orders",
+				StepIDs: []string{"step-1"},
+			},
+		})
+	})
+
+	instance, err := client.GetInstanceParsed(t.Context(), "proj", "pipe", "run-1", "analytics.orders")
+	require.NoError(t, err)
+	assert.Equal(t, "analytics.orders", instance.Asset)
+	assert.Equal(t, []string{"step-1"}, instance.StepIDs)
+}
+
 func TestListAssets(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
@@ -1648,6 +1700,90 @@ func TestDeleteScheduledAgent(t *testing.T) {
 	})
 
 	require.NoError(t, client.DeleteScheduledAgent(t.Context(), 11))
+}
+
+func TestGetNotificationRuleSchema(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/notification-rules/schema", r.URL.Path)
+		writeJSON(t, w, map[string]any{"schema_version": 1})
+	})
+
+	schema, err := client.GetNotificationRuleSchema(t.Context())
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"schema_version":1}`, string(schema))
+}
+
+func TestListNotificationRules(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/notification-rules", r.URL.Path)
+		writeJSON(t, w, map[string]any{
+			"rules": []map[string]any{{
+				"id": 4, "name": "Failures", "enabled": true,
+				"subscriptions": []any{}, "deliveries": []any{},
+			}},
+		})
+	})
+
+	rules, err := client.ListNotificationRules(t.Context())
+	require.NoError(t, err)
+	require.Len(t, rules, 1)
+	assert.Equal(t, 4, rules[0].ID)
+	assert.Equal(t, "Failures", rules[0].Name)
+	assert.True(t, rules[0].Enabled)
+}
+
+func TestCreateNotificationRule(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/notification-rules", r.URL.Path)
+		body := readJSON(t, r)
+		assert.Equal(t, "Failures", body["name"])
+		assert.Equal(t, true, body["enabled"])
+		w.WriteHeader(http.StatusCreated)
+		writeJSON(t, w, map[string]any{"rule": map[string]any{
+			"id": 5, "name": "Failures", "enabled": true,
+			"subscriptions": []any{}, "deliveries": []any{},
+		}})
+	})
+
+	rule, err := client.CreateNotificationRule(t.Context(), map[string]any{"name": "Failures", "enabled": true})
+	require.NoError(t, err)
+	assert.Equal(t, 5, rule.ID)
+	assert.Equal(t, "Failures", rule.Name)
+}
+
+func TestUpdateNotificationRule(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPut, r.Method)
+		assert.Equal(t, "/notification-rules/5", r.URL.Path)
+		body := readJSON(t, r)
+		assert.Equal(t, false, body["enabled"])
+		writeJSON(t, w, map[string]any{"rule": map[string]any{
+			"id": 5, "name": "Failures", "enabled": false,
+			"subscriptions": []any{}, "deliveries": []any{},
+		}})
+	})
+
+	rule, err := client.UpdateNotificationRule(t.Context(), 5, map[string]any{"enabled": false})
+	require.NoError(t, err)
+	assert.False(t, rule.Enabled)
+}
+
+func TestDeleteNotificationRule(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodDelete, r.Method)
+		assert.Equal(t, "/notification-rules/8", r.URL.Path)
+		writeJSON(t, w, map[string]any{"success": true, "deleted_rule_id": 8})
+	})
+
+	require.NoError(t, client.DeleteNotificationRule(t.Context(), 8))
 }
 
 func TestGetCostExplorerSchema(t *testing.T) {

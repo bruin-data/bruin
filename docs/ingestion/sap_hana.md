@@ -2,7 +2,7 @@
 
 SAP HANA is an in-memory, column-oriented, relational database management system.
 
-Bruin supports SAP HANA  as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from SAP HANA into your data warehouse.
+Bruin supports SAP HANA both as a source and as a destination for [Ingestr assets](/assets/ingestr). You can use it to ingest data from SAP HANA into your data warehouse, or load data from other sources into SAP HANA.
 
 In order to set up SAP HANA connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file.
 Follow the steps below to correctly set up SAP HANA as a data source and run ingestion.
@@ -60,3 +60,33 @@ bruin run assets/hana_ingestion.yml
 ```
 
 As a result of this command, Bruin will ingest data from the given SAP HANA table into your Postgres database.
+
+## Using SAP HANA as a Destination
+
+SAP HANA can also be used as a destination to load data from other sources. The supported incremental strategies are `replace`, `append`, `merge`, and `delete+insert`.
+
+### Example: Loading data into SAP HANA
+
+To use SAP HANA as a destination, create an asset file that specifies SAP HANA as the `destination`:
+
+```yaml
+name: analytics.users
+type: ingestr
+connection: connection_name
+
+parameters:
+  source_connection: postgres
+  source_table: 'public.users'
+
+  destination: hana
+```
+
+- `name`: The destination table in SAP HANA, as `schema.table` or `table`.
+- `connection`: The name of the SAP HANA connection defined in `.bruin.yml`, used as the destination.
+- `source_connection`: The name of the source connection (e.g., Postgres), which must also be configured as a Bruin connection.
+- `source_table`: The table from the source to ingest.
+- `destination`: Set to `hana` to use SAP HANA as the destination.
+
+When you run this asset, Bruin will load data from the source into the specified SAP HANA table.
+
+For SAP HANA Cloud, use port `443` in the connection; TLS is enabled automatically.

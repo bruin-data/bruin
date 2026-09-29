@@ -344,6 +344,21 @@ func (c *APIClient) MarkRunStatus(ctx context.Context, project, pipeline, runID,
 	return c.doRequest(ctx, http.MethodPost, "/mark-pipeline-runs-status", body, nil)
 }
 
+func (c *APIClient) MarkAssetInstancesStatus(ctx context.Context, project, pipeline, runID string, assetInstanceIDs []string, status string) error {
+	body := map[string]any{
+		"status": status,
+		"pipeline_runs": []map[string]string{
+			{
+				"project":  project,
+				"pipeline": pipeline,
+				"run_id":   runID,
+			},
+		},
+		"asset_instance_ids": assetInstanceIDs,
+	}
+	return c.doRequest(ctx, http.MethodPost, "/mark-asset-instances", body, nil)
+}
+
 func (c *APIClient) GetLatestRun(ctx context.Context, project, pipeline string) (*PipelineRun, error) {
 	runs, err := c.ListRuns(ctx, project, pipeline, 1, 0)
 	if err != nil {
@@ -457,6 +472,22 @@ func (c *APIClient) GetInstance(ctx context.Context, project, pipeline, runID, a
 	var result json.RawMessage
 	err := c.doRequest(ctx, http.MethodPost, "/asset-instance-details", body, &result)
 	return result, err
+}
+
+func (c *APIClient) GetInstanceParsed(ctx context.Context, project, pipeline, runID, assetName string) (*AssetInstanceInfo, error) {
+	body := map[string]string{
+		"project":    project,
+		"pipeline":   pipeline,
+		"run_id":     runID,
+		"asset_name": assetName,
+	}
+	var result struct {
+		AssetInstance AssetInstanceInfo `json:"asset_instance"`
+	}
+	if err := c.doRequest(ctx, http.MethodPost, "/asset-instance-details", body, &result); err != nil {
+		return nil, err
+	}
+	return &result.AssetInstance, nil
 }
 
 func (c *APIClient) GetInstanceLogs(ctx context.Context, project, pipeline, runID, stepID string, tryNumber int) (json.RawMessage, error) {
@@ -1079,6 +1110,48 @@ func (c *APIClient) TriggerScheduledAgent(ctx context.Context, scheduledAgentID 
 		return nil, err
 	}
 	return &result, nil
+}
+
+// --- Notification rules ---
+
+func (c *APIClient) GetNotificationRuleSchema(ctx context.Context) (json.RawMessage, error) {
+	var schema json.RawMessage
+	err := c.doRequest(ctx, http.MethodGet, "/notification-rules/schema", nil, &schema)
+	return schema, err
+}
+
+func (c *APIClient) ListNotificationRules(ctx context.Context) ([]NotificationRule, error) {
+	var resp struct {
+		Rules []NotificationRule `json:"rules"`
+	}
+	err := c.doRequest(ctx, http.MethodGet, "/notification-rules", nil, &resp)
+	return resp.Rules, err
+}
+
+func (c *APIClient) CreateNotificationRule(ctx context.Context, fields map[string]any) (*NotificationRule, error) {
+	var resp struct {
+		Rule NotificationRule `json:"rule"`
+	}
+	err := c.doRequest(ctx, http.MethodPost, "/notification-rules", fields, &resp)
+	if err != nil {
+		return nil, err
+	}
+	return &resp.Rule, nil
+}
+
+func (c *APIClient) UpdateNotificationRule(ctx context.Context, notificationRuleID int, fields map[string]any) (*NotificationRule, error) {
+	var resp struct {
+		Rule NotificationRule `json:"rule"`
+	}
+	err := c.doRequest(ctx, http.MethodPut, fmt.Sprintf("/notification-rules/%d", notificationRuleID), fields, &resp)
+	if err != nil {
+		return nil, err
+	}
+	return &resp.Rule, nil
+}
+
+func (c *APIClient) DeleteNotificationRule(ctx context.Context, notificationRuleID int) error {
+	return c.doRequest(ctx, http.MethodDelete, fmt.Sprintf("/notification-rules/%d", notificationRuleID), nil, nil)
 }
 
 // --- Scheduled agent run state ---

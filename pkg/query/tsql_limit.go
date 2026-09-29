@@ -10,11 +10,71 @@ import (
 // since a derived-table wrapper is invalid T-SQL after a WITH clause.
 func TSQLLimit(sql string, limit int64) string {
 	sql = strings.TrimRight(sql, "; \n\t")
+	// A bare trailing ORDER BY is invalid inside a wrapper, so limit it in place.
+	// limit < 1 keeps the TOP wrapper since FETCH requires a positive count.
+	if limit >= 1 && endsWithBareOrderBy(sql) {
+		return fmt.Sprintf("%s\nOFFSET 0 ROWS FETCH NEXT %d ROWS ONLY", sql, limit)
+	}
 	if prefix, body, ok := splitLeadingWith(sql); ok {
 		name := uniqueCTEName(sql)
 		return fmt.Sprintf("%s,\n%s AS (\n%s\n)\nSELECT TOP %d * FROM %s", prefix, name, body, limit, name)
 	}
 	return fmt.Sprintf("SELECT TOP %d * FROM (\n%s\n) as t", limit, sql)
+}
+
+// endsWithBareOrderBy reports whether the outer query (depth-0 keywords only)
+// ends with an ORDER BY lacking TOP/OFFSET/FETCH/FOR — the shape T-SQL forbids
+// inside a derived table or CTE. A branch TOP does not count for compound
+// queries (UNION/EXCEPT/INTERSECT), whose ORDER BY still needs OFFSET/FETCH.
+func endsWithBareOrderBy(sql string) bool {
+	depth := 0
+	lastOrderBy := -1
+	hasTop := false
+	hasSetOp := false
+	offsetOrForAfter := false
+	for i := 0; i < len(sql); {
+		if ni, ok := skipLiteral(sql, i); ok {
+			i = ni
+			continue
+		}
+		switch sql[i] {
+		case '(':
+			depth++
+			i++
+			continue
+		case ')':
+			depth--
+			i++
+			continue
+		}
+		if depth == 0 {
+			if matchKeyword(sql, i, "TOP") {
+				hasTop = true
+			}
+			if matchKeyword(sql, i, "UNION") || matchKeyword(sql, i, "EXCEPT") || matchKeyword(sql, i, "INTERSECT") {
+				hasSetOp = true
+			}
+			if matchKeyword(sql, i, "ORDER") {
+				j := skipSpaceAndComments(sql, i+len("ORDER"))
+				if matchKeyword(sql, j, "BY") {
+					lastOrderBy = i
+					offsetOrForAfter = false
+					i = j + len("BY")
+					continue
+				}
+			}
+			if lastOrderBy >= 0 &&
+				(matchKeyword(sql, i, "OFFSET") || matchKeyword(sql, i, "FETCH") || matchKeyword(sql, i, "FOR")) {
+				offsetOrForAfter = true
+			}
+		}
+		i++
+	}
+	// A governing TOP makes the wrapper valid and conflicts with OFFSET/FETCH.
+	if hasTop && !hasSetOp {
+		return false
+	}
+	return lastOrderBy >= 0 && !offsetOrForAfter
 }
 
 // uniqueCTEName returns a limit CTE name that does not already occur in sql.

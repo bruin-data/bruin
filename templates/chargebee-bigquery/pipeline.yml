@@ -1,0 +1,47 @@
+name: chargebee-bigquery
+schedule: daily
+start_date: "2023-01-01"
+
+metadata_push:
+  bigquery: true
+
+default:
+  type: ingestr
+  parameters:
+    source_connection: chargebee-default
+    destination: bigquery
+    loader_file_format: jsonl
+
+default_connections:
+  google_cloud_platform: gcp-default
+  chargebee: chargebee-default
+
+# Pipeline-level knobs. Every company defines "active revenue", "concentration",
+# and "involuntary churn" slightly differently, so the reporting layer reads
+# these instead of hard-coding them. Override per run with, e.g.:
+#   bruin run --var concentration_top_n=5 .
+variables:
+  # Subscription statuses that count toward MRR. Chargebee's own MRR includes
+  # active and non_renewing subscriptions and excludes future, in_trial, paused,
+  # and cancelled. Add "in_trial" here if you count trials as committed MRR.
+  mrr_active_statuses:
+    type: array
+    items:
+      type: string
+    default: ["active", "non_renewing"]
+
+  # Number of top customers to rank in the revenue-concentration report. The
+  # report also always emits the top-1 and top-5 shares regardless of this value.
+  concentration_top_n:
+    type: integer
+    minimum: 1
+    maximum: 100
+    default: 10
+
+  # A failed payment is still considered recoverable through dunning for this
+  # many days; older unrecovered failures are treated as involuntary-churn risk.
+  dunning_retry_window_days:
+    type: integer
+    minimum: 1
+    maximum: 180
+    default: 30

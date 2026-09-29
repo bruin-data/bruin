@@ -45,6 +45,14 @@ your-project/          # project root — this is where .bruin.yml lives
 >
 > See [Project configuration](../../core-concepts/project.md) for the full details.
 
+Run the remaining commands from the directory containing `chess/`. If you initialized outside a Git repository without `--in-place`, enter the new project root first:
+
+```bash
+cd bruin
+```
+
+Skip this `cd` if you initialized inside an existing Git repository or used `--in-place`.
+
 ## Step 2: Edit Your `.bruin.yml` file
 
 After initializing your project with `bruin init`, edit the `.bruin.yml` file at your **project root** (see the note above about where it lives) to configure your environments and connections. This file specifies the default environment settings and connections your pipeline will use.
@@ -96,9 +104,12 @@ Just like in Step 3, the pipeline.yml file also comes pre-configured for our tas
 
 ```yaml
 name: chess_duckdb
-default_connections:
-    duckdb: "duckdb-default"
-    chess: "chess-default"
+catchup: false
+default:
+  type: ingestr
+  parameters:
+    source_connection: chess-default
+    destination: duckdb
 ```
 
 > [!INFO]

@@ -475,6 +475,24 @@ environments:
           username: "api-user"
           password: "secret"
           company: "acme_s_r_o_"
+      exchangeratesapi:
+        - name: "exchangeratesapi-1"
+          access_key: "secret-key"
+          base: "CZK"
+      fakturoid:
+        - name: "fakturoid-1"
+          client_id: "cid"
+          client_secret: "csecret"
+          slug: "acme"
+          user_agent: "MyCompany (billing@mycompany.com)"
+      lumify:
+        - name: "lumify-1"
+          api_key: "lmfy-secret"
+          sport: "nba"
+      bamboohr:
+        - name: "bamboohr-1"
+          company_domain: "acme"
+          api_key: "secret"
       satismeter:
         - name: "satismeter-1"
           api_key: "key-123"

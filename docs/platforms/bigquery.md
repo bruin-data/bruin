@@ -96,6 +96,21 @@ access_token: "ya29...."
 
 **Note:** Access-token connections cannot be used for ingestr assets — use a service account for those.
 
+### Read-only connections
+
+Set `read_only: true` with a service account file or inline service account JSON:
+
+```yaml
+connections:
+  google_cloud_platform:
+    - name: bigquery-reader
+      project_id: my-project
+      service_account_file: /path/to/service-account.json
+      read_only: true
+```
+
+Read-only mode requires `service_account_file` or `service_account_json`; ADC and access tokens are not supported. Ingestr and BigQuery Data Transfer are unavailable in this mode. Defaults to `false`.
+
 ## BigQuery Assets
 
 ### `bq.sql`

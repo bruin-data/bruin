@@ -1,6 +1,6 @@
 # `cloud` Command
 
-The `cloud` command lets you interact with [Bruin Cloud](https://cloud.getbruin.com) directly from your terminal. Instead of switching between the CLI and the web dashboard, you can list projects, check pipeline runs, diagnose failures, and even chat with AI agents — all without leaving your editor.
+Run Bruin Cloud commands from your terminal:
 
 ```bash
 bruin cloud <subcommand> [flags]
@@ -8,13 +8,25 @@ bruin cloud <subcommand> [flags]
 
 ## Authentication
 
-Every `cloud` subcommand needs an API key. Bruin resolves it in this order:
+[Sign in to Cloud](./login), then run a command:
 
-1. **`--api-key` flag** — pass it directly on the command line
-2. **`BRUIN_CLOUD_API_KEY` environment variable** — great for CI/CD
-3. **`.bruin.yml` connection** — the most convenient option for local development
+```bash
+bruin cloud login
+bruin cloud projects list
+```
 
-To set up the `.bruin.yml` approach, add a `bruin` connection to any environment:
+Outside a Bruin project, or to sign in across projects, use `bruin cloud login --global`.
+
+For CI or an existing API token, set `BRUIN_CLOUD_API_KEY` or pass `--api-key`:
+
+```bash
+export BRUIN_CLOUD_API_KEY="your-api-key-here"
+bruin cloud projects list
+```
+
+Authentication priority is `--api-key` → `BRUIN_CLOUD_API_KEY` → repository login → global login. Run `bruin auth status` to check which one you are using. If your repository has multiple `bruin` connections, specify the token with `--api-key` or `BRUIN_CLOUD_API_KEY`.
+
+To save an existing token for a repository, add a `bruin` connection to its `.bruin.yml`:
 
 ```yaml
 # .bruin.yml
@@ -26,16 +38,15 @@ environments:
           api_token: "your-api-key-here"
 ```
 
-Once that's in place, you can drop the `--api-key` flag entirely:
+Then run Cloud commands from that repository:
 
 ```bash
-# no --api-key needed!
 bruin cloud projects list
 ```
 
 ## Global Flags
 
-These flags are available on all `cloud` subcommands:
+These flags are available on Cloud API subcommands. `cloud login` has its own [login options](./login#options).
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
@@ -44,6 +55,16 @@ These flags are available on all `cloud` subcommands:
 | `--output`, `-o` | str | `plain` | Output format: `plain` or `json`. Use `json` for scripting. |
 
 ## Subcommands
+
+### `login`
+
+Sign in through your browser:
+
+```bash
+bruin cloud login
+```
+
+See the [login instructions](./login) for repository and global login options.
 
 ### `teams`
 
@@ -399,10 +420,20 @@ bruin cloud runs rerun --project-id <project-id> --run-id <run-id> --only-failed
 
 #### `mark-status`
 
-Manually mark a run as succeeded or failed:
+Manually mark a run as successful or failed:
 
 ```bash
-bruin cloud runs mark-status --project-id <project-id> --run-id <run-id> --status succeeded
+bruin cloud runs mark-status \
+  --project-id <project-id> --pipeline <pipeline-name> \
+  --run-id <run-id> --status success
+```
+
+To mark only one asset instance without affecting the rest of the run, pass its full name with `--asset`:
+
+```bash
+bruin cloud runs mark-status \
+  --project-id <project-id> --pipeline <pipeline-name> \
+  --run-id <run-id> --asset analytics.orders --status success
 ```
 
 #### `diagnose`
@@ -850,12 +881,24 @@ bruin cloud dashboards list --output json
 
 #### `folders`
 
-Lists the team's dashboard folders with their id, name, and dashboard count.
+Lists the team's dashboard folders with their id, name, and dashboard count. Folders
+can be nested, so below the flat table the command also prints an indented tree that
+shows the parent/child structure:
 
 ```bash
 bruin cloud dashboards folders
 bruin cloud dashboards folders --output json
 ```
+
+```
+Tree:
+Marketing
+└── Reports
+    └── Weekly
+Sales
+```
+
+With `--output json`, each folder also includes its `parent_id` and full `path`.
 
 #### `get`
 
@@ -906,7 +949,7 @@ Create a dashboard from a definition. The definition is written to the dashboard
 
 Pass `--agent-id` to bind the dashboard to an agent so its canvas chat and refresh work. If omitted, the server falls back to the agent encoded in a Cloud-CLI token; a generic team token has none, so the dashboard opens without a chat panel.
 
-Pass `--folder` to file the dashboard in a folder (by name; created if it doesn't exist). Folder names are unique per team. `dashboards list`/`get` return each dashboard's `folder_name`, and [`dashboards folders`](#folders) lists all folders.
+Pass `--folder` to file the dashboard in a folder, given as a path where `/` nests (e.g. `Marketing/Reports`); missing segments are created, and `--folder none` unfiles it. Names are unique per parent. `dashboards list`/`get` return each dashboard's `folder_name` as its full path, and [`dashboards folders`](#folders) lists all folders as a tree.
 
 ```bash
 # Title only (empty draft)
@@ -1055,7 +1098,7 @@ bruin cloud dashboards delete --dashboard-id 42
 
 ### `scheduled-agents`
 
-Manage scheduled agents — cron-based recurring agent tasks.
+Manage scheduled agents — recurring agent tasks triggered by cron or pipeline success.
 
 #### `list` / `get`
 
@@ -1067,7 +1110,7 @@ bruin cloud scheduled-agents get --scheduled-agent-id 42 --output json
 
 #### `create`
 
-Create a scheduled agent from a plan. It is stored as an inactive **draft** — a human reviews and activates it from the Bruin Cloud UI; the CLI never activates a run. Pass the plan with convenience flags, or the full plan via `--state-file` (JSON or YAML with `schedule`, `instructions`, `verified_sqls`, `memory`, ...).
+Create a scheduled agent from a plan. A plan with a cron activates immediately; without a cron it stays an inactive **draft**. Pass the plan with convenience flags, or via `--state-file` (JSON or YAML with `schedule`, `instructions`, `verified_sqls`, `memory`, ...). Manage pipeline triggers separately with `pipeline-trigger set`; do not put `pipeline_trigger` in the plan.
 
 ```bash
 bruin cloud scheduled-agents create --agent-id 7 --title "Daily revenue" \
@@ -1078,7 +1121,7 @@ bruin cloud scheduled-agents create --agent-id 7 --state-file ./plan.yaml
 
 #### `update`
 
-Update a run's title or plan. Only the flags you pass change. Activation stays in the UI.
+Update a run's title, plan, or activation with `--active=true` / `--active=false`. Only the flags you pass change. Activating requires a cron or a configured pipeline trigger.
 
 ```bash
 bruin cloud scheduled-agents update --scheduled-agent-id 42 --cron "0 8 * * 1"
@@ -1101,6 +1144,37 @@ Delete a scheduled agent so it stops firing.
 bruin cloud scheduled-agents delete --scheduled-agent-id 42
 ```
 
+#### `pipeline-trigger get` / `set` / `delete`
+
+Configure which pipeline's successful scheduled run triggers the agent. Triggers
+are stored as notification rules, separate from the plan. Setting one preserves
+the agent's instructions, cron, and active/paused status.
+
+```bash
+bruin cloud scheduled-agents pipeline-trigger set --scheduled-agent-id 42 \
+  --project-id analytics --pipeline daily-etl
+bruin cloud scheduled-agents pipeline-trigger get --scheduled-agent-id 42 --output json
+bruin cloud scheduled-agents update --scheduled-agent-id 42 --active=true
+bruin cloud scheduled-agents pipeline-trigger delete --scheduled-agent-id 42
+```
+
+For a new pipeline-only task, first `create` with instructions and no cron, then
+`pipeline-trigger set`, then `update --active=true`. To switch an existing cron
+schedule to pipeline-only, set the pipeline trigger first, then remove the cron
+with `update --state '{"schedule":null}'`.
+
+Only successful **scheduled** pipeline runs trigger the task; manual runs,
+backfills, and failures do not. A cron can coexist with the pipeline trigger.
+Before deleting the last trigger of an active task, pause it with
+`update --active=false` or configure a cron. Otherwise the server rejects deletion.
+
+All three commands accept `--output json` and `--team`. JSON output is
+`{"pipeline_trigger":{"id":"daily-etl","project_id":"analytics"}}`, or
+`{"pipeline_trigger":null}` when no trigger remains. Reads require
+`scheduled-agent:list`; setting/removing requires `scheduled-agent:manage` and
+access to the scheduled agent. Availability is controlled by the Cloud team;
+unavailable teams receive an API error.
+
 #### `run-states`
 
 Manage a scheduled agent's **run-state** files — the markdown "memory" the agent persists across runs (keyed by name, upserted on write). Reads and writes both require only the `scheduled-agent:list` ability, so any Cloud-CLI-enabled agent can manage its own run state.
@@ -1119,6 +1193,51 @@ bruin cloud scheduled-agents run-states set --scheduled-agent-id 42 --name memor
 # Delete a file
 bruin cloud scheduled-agents run-states delete --scheduled-agent-id 42 --name memory.md
 ```
+
+---
+
+### `notification-rules`
+
+Manage the team's Cloud notification rules. Start with `schema` to see the supported events, selector fields, delivery types, limits, and a complete example.
+
+```bash
+bruin cloud notification-rules schema
+bruin cloud notification-rules list
+```
+
+Create or fully replace a rule from inline JSON/YAML or a file:
+
+```bash
+bruin cloud notification-rules create --rule-file ./notification-rule.yml
+bruin cloud notification-rules update --notification-rule-id 42 --rule-file ./notification-rule.yml
+```
+
+Example rule:
+
+```yaml
+name: Production failures
+enabled: true
+subscriptions:
+  - event_types: [run_failed, asset_failed]
+    selector:
+      operator: and
+      children:
+        - field: pipeline.tags
+          operator: contains
+          value: prod
+deliveries:
+  - type: slack
+    channels: ["#alerts"]
+```
+
+Set `enabled: true` or `enabled: false` in the full rule document and use `update` to enable or disable it. Delete a rule by ID:
+
+```bash
+bruin cloud notification-rules update --notification-rule-id 42 --rule-file ./notification-rule.yml
+bruin cloud notification-rules delete --notification-rule-id 42
+```
+
+`create`, `update`, and `delete` require the `notification-rule:manage` token ability. `schema` and `list` require `notification-rule:list`.
 
 ---
 

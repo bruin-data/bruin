@@ -13,6 +13,7 @@ import (
 )
 
 type Config struct {
+	ReadOnly   bool
 	Account    string
 	Username   string
 	Password   string
@@ -60,6 +61,10 @@ func (c Config) DSN() (string, error) {
 }
 
 func (c Config) GetIngestrURI() (string, error) {
+	if c.ReadOnly {
+		return "", errors.New("read-only Snowflake connections cannot be used with ingestr because SQL validation cannot be enforced")
+	}
+
 	u := &url.URL{
 		Scheme: "snowflake",
 		Path:   c.Database,

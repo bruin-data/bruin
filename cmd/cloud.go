@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	path2 "path"
 	"path/filepath"
@@ -30,6 +31,7 @@ func Cloud(isDebug *bool) *cli.Command {
 		Name:  "cloud",
 		Usage: "Interact with Bruin Cloud API",
 		Commands: []*cli.Command{
+			CloudLogin(),
 			CloudTeams(),
 			CloudProjects(),
 			CloudPipelines(),
@@ -43,6 +45,7 @@ func Cloud(isDebug *bool) *cli.Command {
 			CloudConnectionSets(),
 			CloudDashboards(),
 			CloudScheduledAgents(),
+			CloudNotificationRules(),
 			CloudSkills(),
 			CloudAuditLogs(),
 			CloudCost(),
@@ -62,7 +65,7 @@ func addTeamFlag(cmd *cli.Command) {
 	for _, sub := range cmd.Commands {
 		// "cloud config" manages the default team itself; it doesn't act on a
 		// team, so it neither takes --team nor reads the default.
-		if sub.Name == "config" {
+		if sub.Name == "config" || sub.Name == "login" {
 			continue
 		}
 		if sub.Action != nil || len(sub.Commands) == 0 {
@@ -138,28 +141,11 @@ func offsetFlag() *cli.IntFlag {
 }
 
 func resolveAPIKey(c *cli.Command) (string, error) {
-	key := c.String("api-key")
-	if key != "" {
-		return key, nil
+	auth, err := resolveCloudAuth(c)
+	if err != nil {
+		return "", err
 	}
-
-	key = os.Getenv("BRUIN_CLOUD_API_KEY")
-	if key != "" {
-		return key, nil
-	}
-
-	if cm, err := loadCloudConfig(); err == nil {
-		for _, env := range cm.Environments {
-			if env.Connections != nil && len(env.Connections.BruinCloud) > 0 {
-				token := env.Connections.BruinCloud[0].APIToken
-				if token != "" {
-					return token, nil
-				}
-			}
-		}
-	}
-
-	return "", errors.New("API key is required: use --api-key flag, BRUIN_CLOUD_API_KEY env var, or configure a bruin connection in .bruin.yml")
+	return auth.token, nil
 }
 
 // cloudConfigFilePath locates the .bruin.yml that stores cloud auth/config, at
@@ -169,7 +155,7 @@ func cloudConfigFilePath() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return path2.Join(repoRoot.Path, ".bruin.yml"), nil
+	return filepath.Join(repoRoot.Path, ".bruin.yml"), nil
 }
 
 // loadCloudConfig reads the CLI config without creating it. Used on the read
@@ -207,12 +193,16 @@ func latestFlag() *cli.BoolFlag {
 }
 
 func newCloudClient(c *cli.Command) (*bruincloud.APIClient, error) {
-	key, err := resolveAPIKey(c)
+	auth, err := resolveCloudAuth(c)
 	if err != nil {
 		return nil, err
 	}
-	client := bruincloud.NewAPIClient(key)
-	if team := resolveTeam(c); team != "" {
+	client := bruincloud.NewAPIClient(auth.token)
+	team := resolveTeam(c)
+	if team == "" && auth.source == cloudAuthGlobal {
+		team = auth.team
+	}
+	if team != "" {
 		client.SetTeam(team)
 	}
 	return client, nil
@@ -1228,7 +1218,7 @@ func cloudRunsRerun() *cli.Command {
 func cloudRunsMarkStatus() *cli.Command {
 	return &cli.Command{
 		Name:  "mark-status",
-		Usage: "Mark a pipeline run with a status",
+		Usage: "Mark a pipeline run or one of its asset instances with a status",
 		Flags: []cli.Flag{
 			apiKeyFlag(),
 			outputFlag(),
@@ -1236,6 +1226,10 @@ func cloudRunsMarkStatus() *cli.Command {
 			pipelineFlag(),
 			runIDFlag(),
 			latestFlag(),
+			&cli.StringFlag{
+				Name:  "asset",
+				Usage: "asset name to mark without affecting the rest of the run",
+			},
 			&cli.StringFlag{
 				Name:     "status",
 				Usage:    "status to set (success or failed)",
@@ -1265,13 +1259,36 @@ func cloudRunsMarkStatus() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			err = client.MarkRunStatus(ctx, project, pipeline, runID, c.String("status"))
+			asset := c.String("asset")
+			status := c.String("status")
+			if asset != "" {
+				instance, instanceErr := client.GetInstanceParsed(ctx, project, pipeline, runID, asset)
+				if instanceErr != nil {
+					printError(instanceErr, output, "Failed to resolve asset instance")
+					return cli.Exit("", 1)
+				}
+				if len(instance.StepIDs) == 0 {
+					printError(fmt.Errorf("asset '%s' has no step instances", asset), output, "Failed to resolve asset instance")
+					return cli.Exit("", 1)
+				}
+				err = client.MarkAssetInstancesStatus(ctx, project, pipeline, runID, instance.StepIDs, status)
+			} else {
+				err = client.MarkRunStatus(ctx, project, pipeline, runID, status)
+			}
 			if err != nil {
-				printError(err, output, "Failed to mark run status")
+				if asset != "" {
+					printError(err, output, "Failed to mark asset instance status")
+				} else {
+					printError(err, output, "Failed to mark run status")
+				}
 				return cli.Exit("", 1)
 			}
 
-			printSuccessForOutput(output, fmt.Sprintf("Successfully marked run '%s' as '%s'", runID, c.String("status")))
+			if asset != "" {
+				printSuccessForOutput(output, fmt.Sprintf("Successfully marked asset '%s' in run '%s' as '%s'", asset, runID, status))
+			} else {
+				printSuccessForOutput(output, fmt.Sprintf("Successfully marked run '%s' as '%s'", runID, status))
+			}
 			return nil
 		},
 	}
@@ -4926,8 +4943,78 @@ func cloudDashboardsFolders() *cli.Command {
 				t.AppendRow(table.Row{f.ID, f.Name, f.DashboardCount})
 			}
 			t.Render()
+
+			printFolderTree(os.Stdout, folders)
 			return nil
 		},
+	}
+}
+
+// printFolderTree renders the folders as an indented tree below the flat table,
+// so nesting (which the table's Name column can't show) is visible.
+func printFolderTree(w io.Writer, folders []bruincloud.DashboardFolder) {
+	if len(folders) == 0 {
+		return
+	}
+
+	exists := make(map[int]bool, len(folders))
+	for _, f := range folders {
+		exists[f.ID] = true
+	}
+
+	children := make(map[int][]bruincloud.DashboardFolder)
+	var roots []bruincloud.DashboardFolder
+	for _, f := range folders {
+		// Treat a folder as top-level when it has no parent, or its parent isn't in
+		// the list (orphaned by pagination/permissions) — so every folder is shown.
+		if f.ParentID == nil || !exists[*f.ParentID] {
+			roots = append(roots, f)
+		} else {
+			children[*f.ParentID] = append(children[*f.ParentID], f)
+		}
+	}
+
+	// Guard against a cycle in the data (self/mutual parent) that would otherwise
+	// recurse until the process crashes.
+	visited := make(map[int]bool, len(folders))
+
+	// Draw subtrees with ├──/└── connectors and │ continuation lines. Skip already
+	// visited children up front so a cycle can't print the same folder twice.
+	var walk func(id int, prefix string)
+	walk = func(id int, prefix string) {
+		var pending []bruincloud.DashboardFolder
+		for _, c := range children[id] {
+			if !visited[c.ID] {
+				visited[c.ID] = true
+				pending = append(pending, c)
+			}
+		}
+		for i, c := range pending {
+			branch, next := "├── ", "│   "
+			if i == len(pending)-1 {
+				branch, next = "└── ", "    "
+			}
+			fmt.Fprintf(w, "%s%s%s\n", prefix, branch, c.Name)
+			walk(c.ID, prefix+next)
+		}
+	}
+
+	renderRoot := func(f bruincloud.DashboardFolder) {
+		visited[f.ID] = true
+		fmt.Fprintln(w, f.Name) // top-level folders sit flush-left
+		walk(f.ID, "")
+	}
+
+	fmt.Fprintln(w, "\nTree:")
+	for _, r := range roots {
+		renderRoot(r)
+	}
+	// Any folder still unvisited belongs to a pure cycle (self/mutual parent) with no
+	// acyclic root — surface it flush-left instead of silently dropping it.
+	for _, f := range folders {
+		if !visited[f.ID] {
+			renderRoot(f)
+		}
 	}
 }
 
@@ -5548,6 +5635,7 @@ func CloudScheduledAgents() *cli.Command {
 			cloudScheduledAgentsTrigger(),
 			cloudScheduledAgentsDelete(),
 			cloudScheduledAgentsRunStates(),
+			cloudScheduledAgentsPipelineTrigger(),
 		},
 	}
 }
@@ -6104,6 +6192,10 @@ func buildScheduledAgentFields(c *cli.Command) (map[string]any, error) {
 		fields = parsed
 	}
 
+	if _, exists := fields["pipeline_trigger"]; exists {
+		return nil, errors.New("pipeline_trigger is not a plan field; use bruin cloud scheduled-agents pipeline-trigger set or delete")
+	}
+
 	if c.IsSet("title") {
 		fields["title"] = c.String("title")
 	}
@@ -6138,6 +6230,9 @@ func printScheduledAgent(run *bruincloud.ScheduledAgent) {
 	infoPrinter.Printf("Scheduled agent %d: %s\n", run.ID, derefString(run.Title))
 	fmt.Printf("  Active:    %v\n", run.IsActive)
 	fmt.Printf("  Cron:      %s\n", derefString(run.ScheduleCron))
+	if run.PipelineTrigger != nil {
+		fmt.Printf("  Pipeline:  %s/%s\n", run.PipelineTrigger.ProjectID, run.PipelineTrigger.ID)
+	}
 	fmt.Printf("  Timezone:  %s\n", derefString(run.ScheduleTimezone))
 	fmt.Printf("  Next run:  %s\n", derefString(run.NextRunAt))
 	fmt.Printf("  Last run:  %s\n", derefString(run.LastRunAt))
@@ -6151,6 +6246,275 @@ func derefString(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+func CloudNotificationRules() *cli.Command {
+	return &cli.Command{
+		Name:  "notification-rules",
+		Usage: "Manage Bruin Cloud notification rules",
+		Commands: []*cli.Command{
+			cloudNotificationRulesSchema(),
+			cloudNotificationRulesList(),
+			cloudNotificationRulesCreate(),
+			cloudNotificationRulesUpdate(),
+			cloudNotificationRulesDelete(),
+		},
+	}
+}
+
+func notificationRuleIDFlag() *cli.IntFlag {
+	return &cli.IntFlag{
+		Name:     "notification-rule-id",
+		Usage:    "notification rule ID",
+		Required: true,
+	}
+}
+
+func notificationRuleID(c *cli.Command) (int, error) {
+	id := c.Int("notification-rule-id")
+	if id <= 0 {
+		return 0, fmt.Errorf("--notification-rule-id must be a positive integer, got %d", id)
+	}
+	return id, nil
+}
+
+func notificationRuleInputFlags() []cli.Flag {
+	return []cli.Flag{
+		apiKeyFlag(),
+		outputFlag(),
+		&cli.StringFlag{Name: "rule", Usage: "notification rule as a JSON or YAML object"},
+		&cli.StringFlag{Name: "rule-file", Usage: "path to a JSON or YAML notification rule"},
+	}
+}
+
+func notificationRuleFields(c *cli.Command) (map[string]any, error) {
+	if c.IsSet("rule") && c.IsSet("rule-file") {
+		return nil, errors.New("pass only one of --rule or --rule-file")
+	}
+	if !c.IsSet("rule") && !c.IsSet("rule-file") {
+		return nil, errors.New("provide the notification rule with --rule or --rule-file")
+	}
+
+	raw := c.String("rule")
+	if c.IsSet("rule-file") {
+		data, err := os.ReadFile(c.String("rule-file"))
+		if err != nil {
+			return nil, fmt.Errorf("failed to read --rule-file: %w", err)
+		}
+		raw = string(data)
+	}
+
+	fields, err := parseJSONOrYAMLObject([]byte(raw))
+	if err != nil {
+		return nil, fmt.Errorf("invalid notification rule (expected a JSON or YAML object): %w", err)
+	}
+	if fields == nil {
+		return nil, errors.New("notification rule must be a JSON or YAML object")
+	}
+	return fields, nil
+}
+
+func cloudNotificationRulesSchema() *cli.Command {
+	return &cli.Command{
+		Name:  "schema",
+		Usage: "Show the notification rule schema and example",
+		Flags: []cli.Flag{apiKeyFlag(), outputFlag()},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			schema, err := client.GetNotificationRuleSchema(ctx)
+			if err != nil {
+				printError(err, output, "Failed to get notification rule schema")
+				return cli.Exit("", 1)
+			}
+
+			var decoded any
+			if err := json.Unmarshal(schema, &decoded); err != nil {
+				printError(err, output, "Failed to parse notification rule schema")
+				return cli.Exit("", 1)
+			}
+			data, _ := json.MarshalIndent(decoded, "", "  ")
+			fmt.Println(string(data))
+			return nil
+		},
+	}
+}
+
+func cloudNotificationRulesList() *cli.Command {
+	return &cli.Command{
+		Name:  "list",
+		Usage: "List the team's notification rules",
+		Flags: []cli.Flag{apiKeyFlag(), outputFlag()},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			rules, err := client.ListNotificationRules(ctx)
+			if err != nil {
+				printError(err, output, "Failed to list notification rules")
+				return cli.Exit("", 1)
+			}
+			if rules == nil {
+				rules = []bruincloud.NotificationRule{}
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(rules, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			if len(rules) == 0 {
+				infoPrinter.Println("No notification rules yet.")
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"ID", "Name", "Enabled", "Updated"})
+			for _, rule := range rules {
+				t.AppendRow(table.Row{rule.ID, rule.Name, rule.Enabled, derefString(rule.UpdatedAt)})
+			}
+			t.Render()
+			return nil
+		},
+	}
+}
+
+func cloudNotificationRulesCreate() *cli.Command {
+	return &cli.Command{
+		Name:  "create",
+		Usage: "Create a notification rule",
+		Flags: notificationRuleInputFlags(),
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			fields, err := notificationRuleFields(c)
+			if err != nil {
+				printError(err, output, "Invalid notification rule")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			rule, err := client.CreateNotificationRule(ctx, fields)
+			if err != nil {
+				printError(err, output, "Failed to create notification rule")
+				return cli.Exit("", 1)
+			}
+			if err := printNotificationRuleResult(rule, output, "Created"); err != nil {
+				printError(err, output, "Failed to format notification rule")
+				return cli.Exit("", 1)
+			}
+			return nil
+		},
+	}
+}
+
+func cloudNotificationRulesUpdate() *cli.Command {
+	return &cli.Command{
+		Name:  "update",
+		Usage: "Replace a notification rule",
+		Flags: append(notificationRuleInputFlags(), notificationRuleIDFlag()),
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			id, err := notificationRuleID(c)
+			if err != nil {
+				printError(err, output, "Invalid notification rule ID")
+				return cli.Exit("", 1)
+			}
+			fields, err := notificationRuleFields(c)
+			if err != nil {
+				printError(err, output, "Invalid notification rule")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			rule, err := client.UpdateNotificationRule(ctx, id, fields)
+			if err != nil {
+				printError(err, output, "Failed to update notification rule")
+				return cli.Exit("", 1)
+			}
+			if err := printNotificationRuleResult(rule, output, "Updated"); err != nil {
+				printError(err, output, "Failed to format notification rule")
+				return cli.Exit("", 1)
+			}
+			return nil
+		},
+	}
+}
+
+func cloudNotificationRulesDelete() *cli.Command {
+	return &cli.Command{
+		Name:  "delete",
+		Usage: "Delete a notification rule",
+		Flags: []cli.Flag{apiKeyFlag(), outputFlag(), notificationRuleIDFlag()},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			id, err := notificationRuleID(c)
+			if err != nil {
+				printError(err, output, "Invalid notification rule ID")
+				return cli.Exit("", 1)
+			}
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+			if err := client.DeleteNotificationRule(ctx, id); err != nil {
+				printError(err, output, "Failed to delete notification rule")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.Marshal(map[string]any{"success": true, "deleted_rule_id": id})
+				fmt.Println(string(data))
+				return nil
+			}
+			successPrinter.Printf("Deleted notification rule %d.\n", id)
+			return nil
+		},
+	}
+}
+
+func printNotificationRuleResult(rule *bruincloud.NotificationRule, output, action string) error {
+	if output == "json" {
+		data, err := json.MarshalIndent(rule, "", "  ")
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(data))
+		return nil
+	}
+	successPrinter.Printf("%s notification rule %d (%s).\n", action, rule.ID, rule.Name)
+	return nil
 }
 
 func CloudAuditLogs() *cli.Command {

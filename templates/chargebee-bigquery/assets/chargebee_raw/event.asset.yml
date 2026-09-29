@@ -1,0 +1,60 @@
+name: chargebee_raw.event
+type: ingestr
+
+description: >
+  Raw-layer Chargebee events loaded into BigQuery with ingestr's incremental
+  mode. Events are immutable: each run fetches the events whose `occurred_at`
+  falls inside its own time window and merges them into the destination table on
+  `id`. Because events are never updated after they are emitted, `occurred_at`
+  is used as the incremental key instead of `updated_at`.
+
+materialization:
+  type: table
+  strategy: merge
+  incremental_key: occurred_at
+
+parameters:
+  source_table: events
+
+tags:
+  - chargebee_raw
+  - chargebee
+  - billing
+
+columns:
+  - name: id
+    type: varchar
+    description: Chargebee event identifier.
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: occurred_at
+    type: integer
+    description: Unix timestamp in seconds of when the event occurred.
+    checks:
+      - name: not_null
+  - name: event_type
+    type: varchar
+    description: >
+      Type of the event, for example `subscription_created`,
+      `payment_succeeded`, or `customer_changed`.
+  - name: source
+    type: varchar
+    description: >
+      Origin of the event, one of `admin_console`, `api`, `scheduled_job`,
+      `hosted_page`, `portal`, `system`, `none`, `js_api`, or `migration`.
+  - name: api_version
+    type: varchar
+    description: Chargebee API version the event payload conforms to.
+  - name: webhook_status
+    type: varchar
+    description: >
+      Delivery status of the event's webhooks, one of `not_configured`,
+      `scheduled`, `succeeded`, `re_scheduled`, `failed`, `skipped`, or
+      `not_applicable`.
+  - name: content
+    type: json
+    description: >
+      Snapshot of the resources affected by the event, such as the subscription,
+      customer, or invoice involved.

@@ -65,7 +65,7 @@ list_price        DECIMAL
 
 ## customers
 
-One row per customer account.
+510 source-system rows representing 500 customer IDs, including 10 duplicated IDs.
 
 ```text
 customer_id   INTEGER
@@ -80,7 +80,8 @@ segment       VARCHAR
 
 ## orders
 
-One row per order, as delivered by the source system.
+1,212 source-system rows representing 1,200 order IDs. Twelve IDs have a later
+resend with a changed status, so the raw table is not one row per order.
 
 ```text
 order_id                INTEGER
@@ -96,7 +97,8 @@ order_total             DECIMAL
 
 ## order_items
 
-One row per line on an order.
+2,895 source-system rows representing 2,880 distinct order lines, including 15
+exact duplicate rows.
 
 ```text
 order_id     INTEGER

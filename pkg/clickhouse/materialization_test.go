@@ -1,6 +1,8 @@
 package clickhouse
 
 import (
+	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -170,7 +172,7 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 			query: "SELECT 1",
 			want: []string{
-				"CREATE TABLE my.__bruin_tmp_abcefghi PRIMARY KEY id AS SELECT 1",
+				"CREATE TABLE my.__bruin_tmp_abcefghi ENGINE = MergeTree() PRIMARY KEY id AS SELECT 1",
 				"DELETE FROM my.asset WHERE dt in (SELECT DISTINCT dt FROM my.__bruin_tmp_abcefghi)",
 				"INSERT INTO my.asset SETTINGS insert_deduplicate = 0 SELECT * FROM my.__bruin_tmp_abcefghi",
 				"DROP TABLE IF EXISTS my.__bruin_tmp_abcefghi",
@@ -435,8 +437,8 @@ func TestMaterializer_Render(t *testing.T) {
 					"id INT64,\n" +
 					"timestamp TIMESTAMP COMMENT 'Event timestamp'\n" +
 					")" +
-					"\nPRIMARY KEY (id)" +
-					"\nPARTITION BY (timestamp)",
+					"\nPARTITION BY (timestamp)" +
+					"\nPRIMARY KEY (id)",
 			},
 		},
 		{
@@ -461,8 +463,8 @@ func TestMaterializer_Render(t *testing.T) {
 					"timestamp TIMESTAMP COMMENT 'Event timestamp',\n" +
 					"location STRING\n" +
 					")" +
-					"\nPRIMARY KEY (id)" +
-					"\nPARTITION BY (timestamp, location)",
+					"\nPARTITION BY (timestamp, location)" +
+					"\nPRIMARY KEY (id)",
 			},
 		},
 	}
@@ -502,4 +504,1009 @@ func TestColumnMetadataDDL(t *testing.T) {
 	require.Contains(t, createTable, "Decimal(10, 2)")
 	require.Contains(t, createTable, "DEFAULT 0")
 	require.NotContains(t, createTable, "REFERENCES")
+}
+
+func TestMaterializer_TableDefinitionOptions(t *testing.T) {
+	t.Parallel()
+	strategies := []pipeline.MaterializationStrategy{
+		pipeline.MaterializationStrategyNone,
+		pipeline.MaterializationStrategyCreateReplace,
+		pipeline.MaterializationStrategyDDL,
+	}
+	tests := []struct {
+		name        string
+		options     pipeline.ClickHouseConfig
+		partitionBy string
+		clusterBy   []string
+		clauses     []string
+	}{
+		{
+			name:    "primary key only",
+			clauses: []string{"PRIMARY KEY (id)"},
+		},
+		{
+			name:    "engine with arguments",
+			options: pipeline.ClickHouseConfig{Engine: "ReplacingMergeTree(version)"},
+			clauses: []string{"ENGINE = ReplacingMergeTree(version)", "PRIMARY KEY (id)"},
+		},
+		{
+			name:    "summing engine",
+			options: pipeline.ClickHouseConfig{Engine: "SummingMergeTree()"},
+			clauses: []string{"ENGINE = SummingMergeTree()", "PRIMARY KEY (id)"},
+		},
+		{
+			name:    "sorting key with expression",
+			options: pipeline.ClickHouseConfig{OrderBy: []string{"id", "toStartOfInterval(ts, INTERVAL 1 HOUR)"}},
+			clauses: []string{"PRIMARY KEY (id)", "ORDER BY (id, toStartOfInterval(ts, INTERVAL 1 HOUR))"},
+		},
+		{
+			name:      "cluster_by stands in for the sorting key",
+			clusterBy: []string{"id", "ts"},
+			clauses:   []string{"PRIMARY KEY (id)", "ORDER BY (id, ts)"},
+		},
+		{
+			name:      "order_by wins over cluster_by",
+			options:   pipeline.ClickHouseConfig{OrderBy: []string{"id", "version"}},
+			clusterBy: []string{"id", "ts"},
+			clauses:   []string{"PRIMARY KEY (id)", "ORDER BY (id, version)"},
+		},
+		{
+			name:    "ttl",
+			options: pipeline.ClickHouseConfig{TTL: "ts + INTERVAL 30 DAY DELETE"},
+			clauses: []string{"PRIMARY KEY (id)", "TTL ts + INTERVAL 30 DAY DELETE"},
+		},
+		{
+			name: "settings sorted with SQL literals preserved",
+			options: pipeline.ClickHouseConfig{Settings: map[string]string{
+				"storage_policy": "'default'", "index_granularity": "4096",
+			}},
+			clauses: []string{"PRIMARY KEY (id)", "SETTINGS index_granularity = 4096, storage_policy = 'default'"},
+		},
+		{
+			name:        "partitioning without clickhouse block",
+			partitionBy: "toYYYYMM(ts), region",
+			clauses:     []string{"PARTITION BY (toYYYYMM(ts), region)", "PRIMARY KEY (id)"},
+		},
+		{
+			name: "all options in clause order",
+			options: pipeline.ClickHouseConfig{
+				Engine: "ReplacingMergeTree(version)", OrderBy: []string{"id", "ts"},
+				TTL: "ts + INTERVAL 30 DAY", Settings: map[string]string{"index_granularity": "4096", "allow_nullable_key": "1"},
+			},
+			partitionBy: "toYYYYMM(ts)",
+			clauses: []string{
+				"ENGINE = ReplacingMergeTree(version)", "PARTITION BY (toYYYYMM(ts))",
+				"PRIMARY KEY (id)", "ORDER BY (id, ts)", "TTL ts + INTERVAL 30 DAY",
+				"SETTINGS allow_nullable_key = 1, index_granularity = 4096",
+			},
+		},
+	}
+	for _, strategy := range strategies {
+		for _, tt := range tests {
+			t.Run(string(strategy)+"/"+tt.name, func(t *testing.T) {
+				t.Parallel()
+				asset := &pipeline.Asset{
+					Name: "events", Type: pipeline.AssetTypeClickHouse, ClickHouse: tt.options,
+					Materialization: pipeline.Materialization{
+						Type: pipeline.MaterializationTypeTable, Strategy: strategy, PartitionBy: tt.partitionBy,
+						ClusterBy: tt.clusterBy,
+					},
+					Columns: []pipeline.Column{
+						{Name: "id", Type: "UInt64", PrimaryKey: true},
+						{Name: "ts", Type: "DateTime"},
+						{Name: "version", Type: "UInt64"},
+						{Name: "region", Type: "String"},
+					},
+				}
+				query := "SELECT id, ts, version, region FROM source"
+				want := "CREATE OR REPLACE TABLE events " + strings.Join(tt.clauses, " ") + " AS " + query
+				if strategy == pipeline.MaterializationStrategyDDL {
+					want = "CREATE TABLE IF NOT EXISTS events (\nid UInt64,\nts DateTime,\nversion UInt64,\nregion String\n)\n" + strings.Join(tt.clauses, "\n")
+				}
+				actual, err := NewMaterializer(false).Render(asset, query+";\n")
+				require.NoError(t, err)
+				assert.Equal(t, []string{want}, actual)
+			})
+		}
+	}
+}
+
+func TestMaterializer_ClusterByAsSortingKey(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name      string
+		columns   []pipeline.Column
+		clusterBy []string
+		want      string
+		wantErr   string
+	}{
+		{
+			name:      "sorting key without a primary key",
+			columns:   []pipeline.Column{{Name: "id", Type: "UInt64"}},
+			clusterBy: []string{"id"},
+			want:      "ORDER BY (id)",
+		},
+		{
+			name:      "sorting key without declared columns",
+			clusterBy: []string{"id"},
+			want:      "ORDER BY (id)",
+		},
+		{
+			name:      "primary key not leading",
+			columns:   []pipeline.Column{{Name: "id", Type: "UInt64", PrimaryKey: true}},
+			clusterBy: []string{"ts", "id"},
+			wantErr:   "primary key columns must be a prefix of materialization.cluster_by",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			asset := &pipeline.Asset{
+				Name: "events", Type: pipeline.AssetTypeClickHouse, Columns: tt.columns,
+				Materialization: pipeline.Materialization{
+					Type: pipeline.MaterializationTypeTable, ClusterBy: tt.clusterBy,
+				},
+			}
+			actual, err := NewMaterializer(false).Render(asset, "SELECT 1 AS id")
+			if tt.wantErr != "" {
+				require.ErrorContains(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			require.Len(t, actual, 1)
+			assert.Contains(t, actual[0], tt.want)
+		})
+	}
+}
+
+func TestMaterializer_SortingAndPrimaryKeys(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		columns []pipeline.Column
+		engine  string
+		orderBy []string
+		want    string
+		wantErr string
+	}{
+		{
+			name: "engine without keys", engine: "Memory()",
+			want: "ENGINE = Memory()",
+		},
+		{
+			name: "order by without column metadata", orderBy: []string{"id", "ts"},
+			want: "ORDER BY (id, ts)",
+		},
+		{
+			name: "empty sorting key expression", orderBy: []string{"tuple()"},
+			want: "ORDER BY (tuple())",
+		},
+		{
+			name: "columns without primary key", columns: []pipeline.Column{{Name: "id", Type: "UInt64"}},
+			orderBy: []string{"id"}, want: "ORDER BY (id)",
+		},
+		{
+			name:    "composite prefix",
+			columns: []pipeline.Column{{Name: "id", PrimaryKey: true}, {Name: "ts", PrimaryKey: true}},
+			orderBy: []string{"id", "ts", "version"}, want: "PRIMARY KEY (id, ts) ORDER BY (id, ts, version)",
+		},
+		{
+			name: "quoted prefix", columns: []pipeline.Column{{Name: "id", PrimaryKey: true}, {Name: "ts", PrimaryKey: true}},
+			orderBy: []string{" `id` ", `"ts"`}, want: "PRIMARY KEY (id, ts) ORDER BY ( `id` , \"ts\")",
+		},
+		{
+			name: "primary key not leading", columns: []pipeline.Column{{Name: "id", PrimaryKey: true}},
+			orderBy: []string{"ts", "id"}, wantErr: "primary key columns must be a prefix",
+		},
+		{
+			name:    "sorting key shorter than primary key",
+			columns: []pipeline.Column{{Name: "id", PrimaryKey: true}, {Name: "ts", PrimaryKey: true}},
+			orderBy: []string{"id"}, wantErr: "primary key columns must be a prefix",
+		},
+		{
+			name: "expression does not match primary key", columns: []pipeline.Column{{Name: "id", PrimaryKey: true}},
+			orderBy: []string{"toString(id)"}, wantErr: "primary key columns must be a prefix",
+		},
+	}
+	for _, strategy := range []pipeline.MaterializationStrategy{pipeline.MaterializationStrategyNone, pipeline.MaterializationStrategyCreateReplace, pipeline.MaterializationStrategyDDL} {
+		for _, tt := range tests {
+			t.Run(string(strategy)+"/"+tt.name, func(t *testing.T) {
+				t.Parallel()
+				asset := &pipeline.Asset{
+					Name: "events", Columns: tt.columns,
+					Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeTable, Strategy: strategy},
+					ClickHouse:      pipeline.ClickHouseConfig{Engine: tt.engine, OrderBy: tt.orderBy},
+				}
+				actual, err := NewMaterializer(false).Render(asset, "SELECT 1 AS id")
+				if tt.wantErr != "" {
+					require.ErrorContains(t, err, tt.wantErr)
+					return
+				}
+				require.NoError(t, err)
+				require.Len(t, actual, 1)
+				assert.Contains(t, strings.ReplaceAll(actual[0], "\n", " "), tt.want)
+				if len(asset.ColumnNamesWithPrimaryKey()) == 0 {
+					assert.NotContains(t, actual[0], "PRIMARY KEY")
+				}
+			})
+		}
+	}
+}
+
+func TestMaterializer_IncrementalTableOptions(t *testing.T) {
+	t.Parallel()
+	for _, strategy := range []pipeline.MaterializationStrategy{
+		pipeline.MaterializationStrategyAppend, pipeline.MaterializationStrategyTruncateInsert,
+		pipeline.MaterializationStrategyDeleteInsert, pipeline.MaterializationStrategyMerge, pipeline.MaterializationStrategyTimeInterval,
+	} {
+		t.Run(string(strategy), func(t *testing.T) {
+			t.Parallel()
+			asset := &pipeline.Asset{
+				Name: "events", Columns: []pipeline.Column{{Name: "id", PrimaryKey: true}},
+				Materialization: pipeline.Materialization{
+					Type: pipeline.MaterializationTypeTable, Strategy: strategy,
+					IncrementalKey: "ts", TimeGranularity: pipeline.MaterializationTimeGranularityTimestamp,
+				},
+			}
+			query := "SELECT id, ts, version FROM source"
+			withoutOptions, err := NewMaterializer(false).Render(asset, query)
+			require.NoError(t, err)
+			asset.ClickHouse = pipeline.ClickHouseConfig{
+				Engine: "ReplacingMergeTree(version)", OrderBy: []string{"id", "ts"},
+				TTL: "ts + INTERVAL 30 DAY", Settings: map[string]string{"index_granularity": "4096"},
+			}
+			asset.Materialization.PartitionBy = "toYYYYMM(ts)"
+			withOptions, err := NewMaterializer(false).Render(asset, query)
+			require.NoError(t, err)
+			assert.Equal(t, withoutOptions, withOptions)
+			if strategy == pipeline.MaterializationStrategyDeleteInsert || strategy == pipeline.MaterializationStrategyMerge {
+				assert.Contains(t, withOptions[0], "ENGINE = MergeTree()")
+			}
+			want := []string{"CREATE OR REPLACE TABLE events ENGINE = ReplacingMergeTree(version) PARTITION BY (toYYYYMM(ts)) PRIMARY KEY (id) ORDER BY (id, ts) TTL ts + INTERVAL 30 DAY SETTINGS index_granularity = 4096 AS " + query}
+			fullRefresh, err := NewMaterializer(true).Render(asset, query)
+			require.NoError(t, err)
+			assert.Equal(t, want, fullRefresh)
+			asset.Parameters = pipeline.ParameterMap{"full_refresh": true}
+			fullRefresh, err = NewMaterializer(false).Render(asset, query)
+			require.NoError(t, err)
+			assert.Equal(t, want, fullRefresh)
+		})
+	}
+}
+
+func TestMaterializer_ClusterStrategies(t *testing.T) {
+	t.Parallel()
+	const engine = "ReplicatedMergeTree('/clickhouse/tables/{shard}/events', '{replica}')"
+	const query = "SELECT id, ts FROM source"
+	tests := []struct {
+		name        string
+		matType     pipeline.MaterializationType
+		strategy    pipeline.MaterializationStrategy
+		granularity pipeline.MaterializationTimeGranularity
+		local       []string
+		cluster     []string
+		clusterErr  string
+	}{
+		{
+			name: "raw", matType: pipeline.MaterializationTypeNone,
+			local: []string{query + ";\n"}, cluster: []string{query + ";\n"},
+		},
+		{
+			name: "view", matType: pipeline.MaterializationTypeView,
+			local:   []string{"CREATE OR REPLACE VIEW events AS\n" + query},
+			cluster: []string{"CREATE OR REPLACE VIEW events ON CLUSTER `analytics` AS\n" + query},
+		},
+		{
+			name: "default table", matType: pipeline.MaterializationTypeTable,
+			local: []string{"CREATE OR REPLACE TABLE events ENGINE = " + engine + " PRIMARY KEY (id) AS " + query},
+			cluster: []string{
+				"DROP TABLE IF EXISTS events ON CLUSTER `analytics` SYNC",
+				"CREATE TABLE events ON CLUSTER `analytics` ENGINE = " + engine + " PRIMARY KEY (id) EMPTY AS " + query,
+				"INSERT INTO events " + query,
+			},
+		},
+		{
+			name: "create+replace", matType: pipeline.MaterializationTypeTable, strategy: pipeline.MaterializationStrategyCreateReplace,
+			local: []string{"CREATE OR REPLACE TABLE events ENGINE = " + engine + " PRIMARY KEY (id) AS " + query},
+			cluster: []string{
+				"DROP TABLE IF EXISTS events ON CLUSTER `analytics` SYNC",
+				"CREATE TABLE events ON CLUSTER `analytics` ENGINE = " + engine + " PRIMARY KEY (id) EMPTY AS " + query,
+				"INSERT INTO events " + query,
+			},
+		},
+		{
+			name: "append", matType: pipeline.MaterializationTypeTable, strategy: pipeline.MaterializationStrategyAppend,
+			local: []string{"INSERT INTO events " + query}, cluster: []string{"INSERT INTO events " + query},
+		},
+		{
+			name: "truncate+insert", matType: pipeline.MaterializationTypeTable, strategy: pipeline.MaterializationStrategyTruncateInsert,
+			local:   []string{"TRUNCATE TABLE events", "INSERT INTO events " + query},
+			cluster: []string{"TRUNCATE TABLE events ON CLUSTER `analytics` SYNC", "INSERT INTO events " + query},
+		},
+		{
+			name: "delete+insert", matType: pipeline.MaterializationTypeTable, strategy: pipeline.MaterializationStrategyDeleteInsert,
+			local: []string{
+				"CREATE TABLE __bruin_tmp_abcefghi ENGINE = MergeTree() PRIMARY KEY id AS " + query,
+				"DELETE FROM events WHERE ts in (SELECT DISTINCT ts FROM __bruin_tmp_abcefghi)",
+				"INSERT INTO events SETTINGS insert_deduplicate = 0 SELECT * FROM __bruin_tmp_abcefghi",
+				"DROP TABLE IF EXISTS __bruin_tmp_abcefghi",
+			},
+			clusterErr: "staging",
+		},
+		{
+			name: "merge", matType: pipeline.MaterializationTypeTable, strategy: pipeline.MaterializationStrategyMerge,
+			local: []string{
+				"CREATE TABLE __bruin_tmp_abcefghi ENGINE = MergeTree() PRIMARY KEY (id) AS " + query,
+				"INSERT INTO events SELECT * FROM __bruin_tmp_abcefghi LIMIT 0",
+				"DELETE FROM events WHERE id IN (SELECT id FROM __bruin_tmp_abcefghi)",
+				"INSERT INTO events SETTINGS insert_deduplicate = 0 SELECT * FROM __bruin_tmp_abcefghi",
+				"DROP TABLE IF EXISTS __bruin_tmp_abcefghi",
+			},
+			clusterErr: "staging",
+		},
+		{
+			name: "time_interval date", matType: pipeline.MaterializationTypeTable, strategy: pipeline.MaterializationStrategyTimeInterval,
+			granularity: pipeline.MaterializationTimeGranularityDate,
+			local: []string{
+				"DELETE FROM events WHERE ts BETWEEN '{{start_date}}' AND '{{end_date}}'",
+				"INSERT INTO events SETTINGS insert_deduplicate = 0 " + query,
+			},
+			cluster: []string{
+				"ALTER TABLE events ON CLUSTER `analytics` DELETE WHERE ts BETWEEN '{{start_date}}' AND '{{end_date}}' SETTINGS mutations_sync = 2",
+				"INSERT INTO events SETTINGS insert_deduplicate = 0 " + query,
+			},
+		},
+		{
+			name: "time_interval timestamp", matType: pipeline.MaterializationTypeTable, strategy: pipeline.MaterializationStrategyTimeInterval,
+			granularity: pipeline.MaterializationTimeGranularityTimestamp,
+			local: []string{
+				"DELETE FROM events WHERE ts BETWEEN toDateTime64('{{ start_timestamp | date_format('%Y-%m-%d %H:%M:%S.%f') }}', 6) AND toDateTime64('{{ end_timestamp | date_format('%Y-%m-%d %H:%M:%S.%f') }}', 6)",
+				"INSERT INTO events SETTINGS insert_deduplicate = 0 " + query,
+			},
+			cluster: []string{
+				"ALTER TABLE events ON CLUSTER `analytics` DELETE WHERE ts BETWEEN toDateTime64('{{ start_timestamp | date_format('%Y-%m-%d %H:%M:%S.%f') }}', 6) AND toDateTime64('{{ end_timestamp | date_format('%Y-%m-%d %H:%M:%S.%f') }}', 6) SETTINGS mutations_sync = 2",
+				"INSERT INTO events SETTINGS insert_deduplicate = 0 " + query,
+			},
+		},
+		{
+			name: "ddl", matType: pipeline.MaterializationTypeTable, strategy: pipeline.MaterializationStrategyDDL,
+			local:   []string{"CREATE TABLE IF NOT EXISTS events (\nid UInt64,\nts DateTime\n)\nENGINE = " + engine + "\nPRIMARY KEY (id)"},
+			cluster: []string{"CREATE TABLE IF NOT EXISTS events ON CLUSTER `analytics` (\nid UInt64,\nts DateTime\n)\nENGINE = " + engine + "\nPRIMARY KEY (id)"},
+		},
+	}
+	for _, tt := range tests {
+		for _, cluster := range []string{"", "analytics"} {
+			t.Run(tt.name+"/cluster="+cluster, func(t *testing.T) {
+				t.Parallel()
+				asset := &pipeline.Asset{
+					Name: "events",
+					Materialization: pipeline.Materialization{
+						Type: tt.matType, Strategy: tt.strategy, IncrementalKey: "ts", TimeGranularity: tt.granularity,
+					},
+					Columns:    []pipeline.Column{{Name: "id", Type: "UInt64", PrimaryKey: true}, {Name: "ts", Type: "DateTime"}},
+					ClickHouse: pipeline.ClickHouseConfig{Engine: engine},
+				}
+				before, err := json.Marshal(asset)
+				require.NoError(t, err)
+				actual, cleanup, err := NewMaterializer(false, cluster).RenderWithCleanup(asset, query+";\n")
+				if cluster != "" && tt.clusterErr != "" {
+					require.ErrorContains(t, err, tt.clusterErr)
+					assert.Contains(t, err.Error(), string(tt.strategy))
+					assert.Empty(t, actual)
+					assert.Empty(t, cleanup)
+				} else {
+					require.NoError(t, err)
+					want := tt.local
+					if cluster != "" {
+						want = tt.cluster
+					}
+					assert.Equal(t, want, actual)
+					if cluster == "" && (tt.strategy == pipeline.MaterializationStrategyMerge || tt.strategy == pipeline.MaterializationStrategyDeleteInsert) {
+						assert.Equal(t, []string{"DROP TABLE IF EXISTS __bruin_tmp_abcefghi"}, cleanup)
+					} else {
+						assert.Empty(t, cleanup)
+					}
+				}
+				after, err := json.Marshal(asset)
+				require.NoError(t, err)
+				assert.JSONEq(t, string(before), string(after), "rendering must not modify the asset")
+			})
+		}
+	}
+}
+
+func TestMaterializer_ClusterFullRefresh(t *testing.T) {
+	t.Parallel()
+	const engine = "ReplicatedReplacingMergeTree('/clickhouse/tables/{shard}/{uuid}', '{replica}', version)"
+	for _, strategy := range []pipeline.MaterializationStrategy{
+		pipeline.MaterializationStrategyNone, pipeline.MaterializationStrategyCreateReplace,
+		pipeline.MaterializationStrategyAppend, pipeline.MaterializationStrategyDeleteInsert,
+		pipeline.MaterializationStrategyMerge, pipeline.MaterializationStrategyTruncateInsert,
+		pipeline.MaterializationStrategyTimeInterval, pipeline.MaterializationStrategyDDL,
+	} {
+		for _, global := range []bool{false, true} {
+			name := "asset parameter"
+			if global {
+				name = "global flag"
+			}
+			t.Run(string(strategy)+"/"+name, func(t *testing.T) {
+				t.Parallel()
+				asset := &pipeline.Asset{
+					Name:            "events",
+					Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeTable, Strategy: strategy},
+					Columns:         []pipeline.Column{{Name: "id", Type: "UInt64", PrimaryKey: true}},
+					ClickHouse:      pipeline.ClickHouseConfig{Engine: engine},
+				}
+				if !global {
+					asset.Parameters = pipeline.ParameterMap{"full_refresh": true}
+				}
+				actual, cleanup, err := NewMaterializer(global, "analytics").RenderWithCleanup(asset, "SELECT id FROM source;\n")
+				require.NoError(t, err)
+				assert.Empty(t, cleanup)
+				if strategy == pipeline.MaterializationStrategyDDL {
+					assert.Equal(t, []string{"CREATE TABLE IF NOT EXISTS events ON CLUSTER `analytics` (\nid UInt64\n)\nENGINE = " + engine + "\nPRIMARY KEY (id)"}, actual)
+				} else {
+					assert.Equal(t, []string{
+						"DROP TABLE IF EXISTS events ON CLUSTER `analytics` SYNC",
+						"CREATE TABLE events ON CLUSTER `analytics` ENGINE = " + engine + " PRIMARY KEY (id) EMPTY AS SELECT id FROM source",
+						"INSERT INTO events SELECT id FROM source",
+					}, actual)
+				}
+				assert.Equal(t, strategy, asset.Materialization.Strategy)
+			})
+		}
+	}
+}
+
+func TestMaterializer_ClusterEngineRequirements(t *testing.T) {
+	t.Parallel()
+	for _, strategy := range []pipeline.MaterializationStrategy{
+		pipeline.MaterializationStrategyNone, pipeline.MaterializationStrategyCreateReplace,
+		pipeline.MaterializationStrategyDDL, pipeline.MaterializationStrategyAppend,
+		pipeline.MaterializationStrategyTruncateInsert, pipeline.MaterializationStrategyTimeInterval,
+	} {
+		for _, engine := range []string{"", "MergeTree()", "SharedMergeTree()", "Distributed(analytics, default, events_local, rand())", "ReplicatedMergeTree('/tables/{shard}/events', '{replica}')", "ReplicatedReplacingMergeTree()"} {
+			t.Run(string(strategy)+"/engine="+engine, func(t *testing.T) {
+				t.Parallel()
+				asset := &pipeline.Asset{
+					Name: "events",
+					Materialization: pipeline.Materialization{
+						Type: pipeline.MaterializationTypeTable, Strategy: strategy,
+						IncrementalKey: "ts", TimeGranularity: pipeline.MaterializationTimeGranularityDate,
+					},
+					Columns:    []pipeline.Column{{Name: "id", Type: "UInt64", PrimaryKey: true}},
+					ClickHouse: pipeline.ClickHouseConfig{Engine: engine},
+				}
+				var mustReject bool
+				wantErr := "engine"
+				switch strategy {
+				case pipeline.MaterializationStrategyNone, pipeline.MaterializationStrategyCreateReplace:
+					mustReject = !strings.HasPrefix(engine, "Replicated")
+				case pipeline.MaterializationStrategyDDL:
+					mustReject = engine == ""
+				case pipeline.MaterializationStrategyTruncateInsert, pipeline.MaterializationStrategyTimeInterval:
+					mustReject = engine != "" && !strings.HasPrefix(engine, "Replicated")
+					wantErr = "Replicated"
+				default:
+					mustReject = false
+				}
+				actual, err := NewMaterializer(false, "analytics").Render(asset, "SELECT id FROM source")
+				if mustReject {
+					require.ErrorContains(t, err, wantErr)
+					assert.Empty(t, actual)
+					return
+				}
+				require.NoError(t, err)
+				require.NotEmpty(t, actual)
+				if strategy == pipeline.MaterializationStrategyDDL || strategy == pipeline.MaterializationStrategyNone || strategy == pipeline.MaterializationStrategyCreateReplace {
+					assert.Contains(t, strings.Join(actual, "\n"), "ENGINE = "+engine)
+				}
+			})
+		}
+	}
+}
+
+func TestMaterializer_ClusterTableOptions(t *testing.T) {
+	t.Parallel()
+	const engine = "ReplicatedReplacingMergeTree('/clickhouse/tables/{shard}/events', '{replica}', version)"
+	for _, strategy := range []pipeline.MaterializationStrategy{pipeline.MaterializationStrategyCreateReplace, pipeline.MaterializationStrategyDDL} {
+		t.Run(string(strategy), func(t *testing.T) {
+			t.Parallel()
+			asset := &pipeline.Asset{
+				Name:            "events",
+				Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeTable, Strategy: strategy, PartitionBy: "toYYYYMM(ts)"},
+				Columns:         []pipeline.Column{{Name: "id", Type: "UInt64", PrimaryKey: true}, {Name: "ts", Type: "DateTime"}},
+				ClickHouse: pipeline.ClickHouseConfig{
+					Engine: engine, OrderBy: []string{"id", "ts"}, TTL: "ts + INTERVAL 30 DAY",
+					Settings: map[string]string{"index_granularity": "4096", "allow_nullable_key": "1"},
+				},
+			}
+			actual, err := NewMaterializer(false, "analytics").Render(asset, "SELECT id, ts FROM source")
+			require.NoError(t, err)
+			clauses := []string{
+				"ENGINE = " + engine, "PARTITION BY (toYYYYMM(ts))", "PRIMARY KEY (id)",
+				"ORDER BY (id, ts)", "TTL ts + INTERVAL 30 DAY", "SETTINGS allow_nullable_key = 1, index_granularity = 4096",
+			}
+			if strategy == pipeline.MaterializationStrategyDDL {
+				assert.Equal(t, []string{"CREATE TABLE IF NOT EXISTS events ON CLUSTER `analytics` (\nid UInt64,\nts DateTime\n)\n" + strings.Join(clauses, "\n")}, actual)
+			} else {
+				assert.Equal(t, []string{
+					"DROP TABLE IF EXISTS events ON CLUSTER `analytics` SYNC",
+					"CREATE TABLE events ON CLUSTER `analytics` " + strings.Join(clauses, " ") + " EMPTY AS SELECT id, ts FROM source",
+					"INSERT INTO events SELECT id, ts FROM source",
+				}, actual)
+			}
+			asset.ClickHouse.OrderBy = []string{"ts", "id"}
+			actual, err = NewMaterializer(false, "analytics").Render(asset, "SELECT id, ts FROM source")
+			require.ErrorContains(t, err, "primary key columns must be a prefix")
+			assert.Empty(t, actual)
+		})
+	}
+}
+
+func TestRenderer_ClusterIdentifier(t *testing.T) {
+	t.Parallel()
+	asset := &pipeline.Asset{
+		Name: "events", Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeView},
+	}
+	actual, err := NewRenderer(false, "analytics\\` ; DROP TABLE events; --").Render(asset, "SELECT 1")
+	require.NoError(t, err)
+	assert.Equal(t, "CREATE OR REPLACE VIEW events ON CLUSTER `analytics\\\\\\` ; DROP TABLE events; --` AS\nSELECT 1", actual)
+}
+
+func TestMaterializer_ClusterTimeIntervalValidation(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name        string
+		key         string
+		granularity pipeline.MaterializationTimeGranularity
+		wantErr     string
+	}{
+		{name: "missing incremental key", granularity: pipeline.MaterializationTimeGranularityDate, wantErr: "incremental_key is required"},
+		{name: "missing granularity", key: "ts", wantErr: "time_granularity is required"},
+		{name: "invalid granularity", key: "ts", granularity: "hour", wantErr: "time_granularity must be either"},
+	} {
+		for _, cluster := range []string{"", "analytics"} {
+			t.Run(tt.name+"/cluster="+cluster, func(t *testing.T) {
+				t.Parallel()
+				asset := &pipeline.Asset{
+					Name: "events",
+					Materialization: pipeline.Materialization{
+						Type: pipeline.MaterializationTypeTable, Strategy: pipeline.MaterializationStrategyTimeInterval,
+						IncrementalKey: tt.key, TimeGranularity: tt.granularity,
+					},
+				}
+				actual, cleanup, err := NewMaterializer(false, cluster).RenderWithCleanup(asset, "SELECT ts FROM source")
+				require.ErrorContains(t, err, tt.wantErr)
+				assert.Empty(t, actual)
+				assert.Empty(t, cleanup)
+			})
+		}
+	}
+}
+
+func TestMaterializer_ClusterFullRefreshRequiresReplicatedEngine(t *testing.T) {
+	t.Parallel()
+	for _, strategy := range []pipeline.MaterializationStrategy{
+		pipeline.MaterializationStrategyAppend, pipeline.MaterializationStrategyDeleteInsert,
+		pipeline.MaterializationStrategyMerge, pipeline.MaterializationStrategyTruncateInsert,
+		pipeline.MaterializationStrategyTimeInterval,
+	} {
+		for _, engine := range []string{"", "MergeTree()"} {
+			t.Run(string(strategy)+"/engine="+engine, func(t *testing.T) {
+				t.Parallel()
+				asset := &pipeline.Asset{
+					Name:            "events",
+					Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeTable, Strategy: strategy},
+					Columns:         []pipeline.Column{{Name: "id", Type: "UInt64", PrimaryKey: true}},
+					ClickHouse:      pipeline.ClickHouseConfig{Engine: engine},
+				}
+				actual, cleanup, err := NewMaterializer(true, "analytics").RenderWithCleanup(asset, "SELECT id FROM source")
+				require.ErrorContains(t, err, "Replicated")
+				assert.Empty(t, actual)
+				assert.Empty(t, cleanup)
+				assert.Equal(t, strategy, asset.Materialization.Strategy)
+			})
+		}
+	}
+}
+
+func TestMaterializer_ClusterIsolation(t *testing.T) {
+	t.Parallel()
+	asset := &pipeline.Asset{
+		Name: "events", Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeView},
+	}
+	first := NewMaterializer(false, "first")
+	second := NewMaterializer(false, "second")
+	local := NewMaterializer(false)
+	for _, tt := range []struct {
+		materializer *Materializer
+		want         string
+	}{
+		{first, "CREATE OR REPLACE VIEW events ON CLUSTER `first` AS\nSELECT 1"},
+		{second, "CREATE OR REPLACE VIEW events ON CLUSTER `second` AS\nSELECT 1"},
+		{local, "CREATE OR REPLACE VIEW events AS\nSELECT 1"},
+		{first, "CREATE OR REPLACE VIEW events ON CLUSTER `first` AS\nSELECT 1"},
+	} {
+		actual, err := tt.materializer.Render(asset, "SELECT 1")
+		require.NoError(t, err)
+		assert.Equal(t, []string{tt.want}, actual)
+	}
+}
+
+func TestMaterializer_ClusterRefreshRestricted(t *testing.T) {
+	t.Parallel()
+	for _, strategy := range []pipeline.MaterializationStrategy{
+		pipeline.MaterializationStrategyAppend,
+		pipeline.MaterializationStrategyMerge,
+		pipeline.MaterializationStrategyDeleteInsert,
+	} {
+		t.Run(string(strategy), func(t *testing.T) {
+			t.Parallel()
+			restricted := true
+			asset := &pipeline.Asset{
+				Name:              "events",
+				Materialization:   pipeline.Materialization{Type: pipeline.MaterializationTypeTable, Strategy: strategy},
+				RefreshRestricted: &restricted,
+			}
+			actual, cleanup, err := NewMaterializer(true, "analytics").RenderWithCleanup(asset, "SELECT 1")
+			assert.Empty(t, cleanup)
+			if strategy == pipeline.MaterializationStrategyAppend {
+				require.NoError(t, err)
+				assert.Equal(t, []string{"INSERT INTO events SELECT 1"}, actual)
+			} else {
+				require.ErrorContains(t, err, "staging")
+				assert.Empty(t, actual)
+			}
+		})
+	}
+}
+
+func TestMaterializer_ClusterReplacementRequiresSortingKey(t *testing.T) {
+	t.Parallel()
+	asset := &pipeline.Asset{
+		Name:            "events",
+		Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeTable},
+		ClickHouse:      pipeline.ClickHouseConfig{Engine: "ReplicatedMergeTree()"},
+	}
+	mat := NewMaterializer(false, "analytics")
+	actual, err := mat.Render(asset, "SELECT 1 AS id")
+	require.ErrorContains(t, err, "primary_key columns, clickhouse.order_by or materialization.cluster_by")
+	assert.Empty(t, actual, "invalid sorting keys must not return a DROP statement")
+	asset.ClickHouse.OrderBy = []string{"tuple()"}
+	actual, err = mat.Render(asset, "SELECT 1 AS id")
+	require.NoError(t, err)
+	require.Len(t, actual, 3)
+	assert.Contains(t, actual[1], "ORDER BY (tuple()) EMPTY AS SELECT 1 AS id")
+}
+
+func scd2TestAsset(strategy pipeline.MaterializationStrategy) *pipeline.Asset {
+	asset := &pipeline.Asset{
+		Name: "my.history",
+		Materialization: pipeline.Materialization{
+			Type: pipeline.MaterializationTypeTable, Strategy: strategy,
+		},
+		Columns: []pipeline.Column{
+			{Name: "id", Type: "UInt64", PrimaryKey: true},
+			{Name: "name", Type: "Nullable(String)"},
+			{Name: "updated_at", Type: "DateTime64(6, 'UTC')"},
+		},
+	}
+	if strategy == pipeline.MaterializationStrategySCD2ByTime {
+		asset.Materialization.IncrementalKey = "updated_at"
+	}
+	return asset
+}
+
+func TestMaterializer_SCD2InitialAndIncremental(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name           string
+		strategy       pipeline.MaterializationStrategy
+		incrementalKey string
+		validFrom      string
+	}{
+		{
+			name: "by time", strategy: pipeline.MaterializationStrategySCD2ByTime, incrementalKey: "updated_at",
+			validFrom: "toDateTime64(src.updated_at, 6, 'UTC')",
+		},
+		{
+			name: "by column using current time", strategy: pipeline.MaterializationStrategySCD2ByColumn,
+			validFrom: "now64(6, 'UTC')",
+		},
+		{
+			name: "by column using incremental key", strategy: pipeline.MaterializationStrategySCD2ByColumn, incrementalKey: "updated_at",
+			validFrom: "toDateTime64(src.updated_at, 6, 'UTC')",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			asset := scd2TestAsset(tt.strategy)
+			asset.Materialization.IncrementalKey = tt.incrementalKey
+			const query = "SELECT id, name, updated_at FROM source"
+			const sourceTable = "my.__bruin_tmp_abcefghi_source"
+			const changesTable = "my.__bruin_tmp_abcefghi_changes"
+			const columns = "id, name, updated_at, _valid_from, _valid_until, _is_current"
+			before, err := json.Marshal(asset)
+			require.NoError(t, err)
+			actual, cleanup, err := NewMaterializer(false).RenderWithCleanup(asset, query+";\n")
+			require.NoError(t, err)
+			require.Len(t, actual, 8)
+
+			t.Run("first run", func(t *testing.T) {
+				t.Parallel()
+				assert.Contains(t, actual[0], "CREATE TABLE "+sourceTable)
+				assert.Contains(t, actual[0], "src.id, src.name, src.updated_at")
+				assert.Contains(t, actual[0], tt.validFrom+" AS _valid_from")
+				assert.Contains(t, actual[0], "toDateTime64('2299-12-31 23:59:59', 6, 'UTC') AS _valid_until")
+				assert.Contains(t, actual[0], "TRUE AS _is_current")
+				assert.Contains(t, actual[0], "FROM ("+query)
+				assert.NotContains(t, actual[0], ";")
+				assert.Equal(t, "CREATE TABLE IF NOT EXISTS my.history PRIMARY KEY (id) EMPTY AS SELECT * FROM "+sourceTable, actual[1])
+			})
+
+			t.Run("incremental run", func(t *testing.T) {
+				t.Parallel()
+				assert.Contains(t, actual[2], "CREATE TABLE "+changesTable)
+				assert.Contains(t, actual[2], "UNION ALL")
+				assert.Contains(t, actual[2], "t._valid_from")
+				assert.Contains(t, actual[2], "FALSE AS _is_current")
+				assert.Equal(t, 2, strings.Count(actual[2], "(SELECT "+columns+" FROM my.history WHERE _is_current = TRUE) AS t"), "both joins must exclude expired history")
+				assert.Contains(t, actual[2], "if(ifNull(s._is_current, FALSE) = FALSE, now64(6, 'UTC'), s._valid_from) AS _valid_until")
+				assert.Contains(t, actual[2], "WHERE ifNull(s._is_current, FALSE) = FALSE OR (")
+				assert.Contains(t, actual[2], "WHERE ifNull(t._is_current, FALSE) = FALSE OR (")
+				if tt.strategy == pipeline.MaterializationStrategySCD2ByTime {
+					assert.Contains(t, actual[2], "s._valid_from > t._valid_from")
+					assert.NotContains(t, actual[2], "t.name != s.name")
+				} else {
+					assert.Contains(t, actual[2], "(ifNull(t.name != s.name, FALSE) OR isNull(t.name) != isNull(s.name))")
+					assert.Contains(t, actual[2], "(ifNull(t.updated_at != s.updated_at, FALSE) OR isNull(t.updated_at) != isNull(s.updated_at))")
+					assert.NotContains(t, actual[2], "t.id != s.id")
+				}
+				assert.Equal(t, "INSERT INTO my.history ("+columns+") SELECT "+columns+" FROM "+changesTable+" LIMIT 0", actual[3])
+				assert.Equal(t, "DELETE FROM my.history WHERE _is_current = TRUE AND id IN (SELECT id FROM "+changesTable+")", actual[4])
+				assert.Equal(t, "INSERT INTO my.history ("+columns+") SETTINGS insert_deduplicate = 0 SELECT "+columns+" FROM "+changesTable, actual[5])
+				assert.NotContains(t, strings.Join(actual, "\n"), "CREATE OR REPLACE")
+			})
+
+			assert.Equal(t, []string{"DROP TABLE IF EXISTS " + changesTable, "DROP TABLE IF EXISTS " + sourceTable}, actual[6:])
+			assert.Equal(t, actual[6:], cleanup)
+			after, err := json.Marshal(asset)
+			require.NoError(t, err)
+			assert.JSONEq(t, string(before), string(after), "rendering must not modify the asset")
+		})
+	}
+}
+
+func TestMaterializer_SCD2FullRefresh(t *testing.T) {
+	t.Parallel()
+	for _, strategy := range []pipeline.MaterializationStrategy{
+		pipeline.MaterializationStrategySCD2ByTime, pipeline.MaterializationStrategySCD2ByColumn,
+	} {
+		for _, tt := range []struct {
+			name       string
+			global     bool
+			parameters pipeline.ParameterMap
+			restricted bool
+			wantFull   bool
+		}{
+			{name: "global flag", global: true, wantFull: true},
+			{name: "asset parameter", parameters: pipeline.ParameterMap{"full_refresh": true}, wantFull: true},
+			{name: "global flag overrides false parameter", global: true, parameters: pipeline.ParameterMap{"full_refresh": false}, wantFull: true},
+			{name: "false parameter", parameters: pipeline.ParameterMap{"full_refresh": false}},
+			{name: "refresh restricted", global: true, restricted: true},
+		} {
+			t.Run(string(strategy)+"/"+tt.name, func(t *testing.T) {
+				t.Parallel()
+				asset := scd2TestAsset(strategy)
+				asset.Parameters = tt.parameters
+				asset.RefreshRestricted = &tt.restricted
+				actual, cleanup, err := NewMaterializer(tt.global).RenderWithCleanup(asset, "SELECT id, name, updated_at FROM source;\n")
+				require.NoError(t, err)
+				if !tt.wantFull {
+					require.Len(t, actual, 8)
+					assert.Len(t, cleanup, 2)
+					assert.Contains(t, actual[1], "CREATE TABLE IF NOT EXISTS")
+					return
+				}
+				require.Len(t, actual, 1)
+				assert.Empty(t, cleanup)
+				assert.Contains(t, actual[0], "CREATE OR REPLACE TABLE my.history PRIMARY KEY (id) AS SELECT src.id, src.name, src.updated_at,")
+				if strategy == pipeline.MaterializationStrategySCD2ByTime {
+					assert.Contains(t, actual[0], "toDateTime64(src.updated_at, 6, 'UTC') AS _valid_from")
+				} else {
+					assert.Contains(t, actual[0], "now64(6, 'UTC') AS _valid_from")
+				}
+				assert.Contains(t, actual[0], "toDateTime64('2299-12-31 23:59:59', 6, 'UTC') AS _valid_until")
+				assert.Contains(t, actual[0], "TRUE AS _is_current")
+				assert.NotContains(t, actual[0], ";")
+				assert.NotContains(t, actual[0], "__bruin_tmp_")
+				assert.Equal(t, strategy, asset.Materialization.Strategy)
+			})
+		}
+	}
+}
+
+func TestMaterializer_SCD2IncrementalKeyTypes(t *testing.T) {
+	t.Parallel()
+	for _, strategy := range []pipeline.MaterializationStrategy{
+		pipeline.MaterializationStrategySCD2ByTime, pipeline.MaterializationStrategySCD2ByColumn,
+	} {
+		for _, fullRefresh := range []bool{false, true} {
+			for _, columnType := range []string{
+				"TIMESTAMP", "timestamp with time zone", "TIMESTAMPTZ", "DATE", "Date32", "DateTime", "DateTime('UTC')",
+				"DateTime64(6, 'UTC')", "Nullable(DateTime64(6, 'UTC'))", "Nullable(Date)", "Nullable(TIMESTAMP)", "UInt64", "String", "",
+			} {
+				mode := "incremental"
+				if fullRefresh {
+					mode = "full refresh"
+				}
+				t.Run(string(strategy)+"/"+mode+"/"+columnType, func(t *testing.T) {
+					t.Parallel()
+					asset := scd2TestAsset(strategy)
+					asset.Materialization.IncrementalKey = "updated_at"
+					asset.Columns[2].Type = columnType
+					actual, err := NewMaterializer(fullRefresh).Render(asset, "SELECT id, name, updated_at FROM source")
+					if strings.HasPrefix(columnType, "Nullable(") {
+						require.ErrorContains(t, err, "incremental_key must be non-nullable")
+						assert.Empty(t, actual)
+						return
+					}
+					if columnType == "UInt64" || columnType == "String" || columnType == "" {
+						require.ErrorContains(t, err, "incremental_key")
+						assert.Empty(t, actual)
+						return
+					}
+					require.NoError(t, err)
+					assert.Contains(t, actual[0], "toDateTime64(src.updated_at, 6, 'UTC') AS _valid_from")
+				})
+			}
+		}
+	}
+}
+
+func TestMaterializer_SCD2Validation(t *testing.T) {
+	t.Parallel()
+	for _, strategy := range []pipeline.MaterializationStrategy{
+		pipeline.MaterializationStrategySCD2ByTime, pipeline.MaterializationStrategySCD2ByColumn,
+	} {
+		for _, fullRefresh := range []bool{false, true} {
+			for _, tt := range []struct {
+				name    string
+				modify  func(*pipeline.Asset)
+				wantErr string
+			}{
+				{name: "missing primary key", modify: func(a *pipeline.Asset) { a.Columns[0].PrimaryKey = false }, wantErr: "primary_key"},
+				{name: "missing incremental column", modify: func(a *pipeline.Asset) { a.Materialization.IncrementalKey = "missing" }, wantErr: "not found"},
+				{name: "reserved valid from", modify: func(a *pipeline.Asset) { a.Columns = append(a.Columns, pipeline.Column{Name: "_valid_from"}) }, wantErr: "reserved"},
+				{name: "reserved valid until", modify: func(a *pipeline.Asset) { a.Columns = append(a.Columns, pipeline.Column{Name: "_valid_until"}) }, wantErr: "reserved"},
+				{name: "reserved current", modify: func(a *pipeline.Asset) { a.Columns = append(a.Columns, pipeline.Column{Name: "_is_current"}) }, wantErr: "reserved"},
+				{name: "quoted reserved column", modify: func(a *pipeline.Asset) { a.Columns = append(a.Columns, pipeline.Column{Name: "`_valid_from`"}) }, wantErr: "reserved"},
+			} {
+				mode := "incremental"
+				if fullRefresh {
+					mode = "full refresh"
+				}
+				t.Run(string(strategy)+"/"+mode+"/"+tt.name, func(t *testing.T) {
+					t.Parallel()
+					asset := scd2TestAsset(strategy)
+					tt.modify(asset)
+					actual, cleanup, err := NewMaterializer(fullRefresh).RenderWithCleanup(asset, "SELECT * FROM source")
+					require.ErrorContains(t, err, tt.wantErr)
+					assert.Empty(t, actual)
+					assert.Empty(t, cleanup)
+				})
+			}
+		}
+	}
+	for _, fullRefresh := range []bool{false, true} {
+		asset := scd2TestAsset(pipeline.MaterializationStrategySCD2ByTime)
+		asset.Materialization.IncrementalKey = ""
+		actual, err := NewMaterializer(fullRefresh).Render(asset, "SELECT * FROM source")
+		require.ErrorContains(t, err, "incremental_key")
+		assert.Empty(t, actual)
+	}
+}
+
+func TestMaterializer_SCD2TableOptions(t *testing.T) {
+	t.Parallel()
+	for _, strategy := range []pipeline.MaterializationStrategy{
+		pipeline.MaterializationStrategySCD2ByTime, pipeline.MaterializationStrategySCD2ByColumn,
+	} {
+		t.Run(string(strategy), func(t *testing.T) {
+			t.Parallel()
+			asset := scd2TestAsset(strategy)
+			asset.Materialization.PartitionBy = "toYYYYMM(_valid_from)"
+			asset.ClickHouse = pipeline.ClickHouseConfig{
+				Engine: "MergeTree()", OrderBy: []string{"id", "_valid_from"},
+				TTL: "_valid_until + INTERVAL 1 YEAR", Settings: map[string]string{"index_granularity": "4096"},
+			}
+			const clauses = "ENGINE = MergeTree() PARTITION BY (toYYYYMM(_valid_from)) PRIMARY KEY (id) ORDER BY (id, _valid_from) TTL _valid_until + INTERVAL 1 YEAR SETTINGS index_granularity = 4096"
+			incremental, err := NewMaterializer(false).Render(asset, "SELECT * FROM source")
+			require.NoError(t, err)
+			assert.Contains(t, incremental[1], clauses)
+			assert.NotContains(t, incremental[0], "PARTITION BY")
+			assert.NotContains(t, incremental[2], "TTL")
+			fullRefresh, err := NewMaterializer(true).Render(asset, "SELECT * FROM source")
+			require.NoError(t, err)
+			assert.Contains(t, fullRefresh[0], clauses)
+		})
+	}
+}
+
+func TestMaterializer_SCD2PrimaryKeys(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name      string
+		strategy  pipeline.MaterializationStrategy
+		composite bool
+	}{
+		{name: "by time composite key", strategy: pipeline.MaterializationStrategySCD2ByTime, composite: true},
+		{name: "by column composite key", strategy: pipeline.MaterializationStrategySCD2ByColumn, composite: true},
+		{name: "by column primary key only", strategy: pipeline.MaterializationStrategySCD2ByColumn},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			asset := scd2TestAsset(tt.strategy)
+			asset.Name = "history"
+			if tt.composite {
+				asset.Columns = append(asset.Columns, pipeline.Column{Name: "tenant", Type: "UInt64", PrimaryKey: true})
+			} else {
+				asset.Columns = asset.Columns[:1]
+			}
+			actual, err := NewMaterializer(false).Render(asset, "SELECT * FROM source")
+			require.NoError(t, err)
+			require.Len(t, actual, 8)
+			assert.Contains(t, actual[0], "CREATE TABLE __bruin_tmp_abcefghi_source")
+			if tt.composite {
+				assert.Contains(t, actual[0], "PRIMARY KEY (id, tenant)")
+				assert.Equal(t, 2, strings.Count(actual[2], "ON t.id = s.id AND t.tenant = s.tenant"))
+				assert.Equal(t, "DELETE FROM history WHERE _is_current = TRUE AND (id, tenant) IN (SELECT id, tenant FROM __bruin_tmp_abcefghi_changes)", actual[4])
+			} else {
+				assert.Contains(t, actual[2], "WHERE ifNull(s._is_current, FALSE) = FALSE OR (FALSE)")
+				assert.Contains(t, actual[2], "WHERE ifNull(t._is_current, FALSE) = FALSE OR (FALSE)")
+			}
+		})
+	}
+}
+
+func TestMaterializer_SCD2Cluster(t *testing.T) {
+	t.Parallel()
+	for _, strategy := range []pipeline.MaterializationStrategy{
+		pipeline.MaterializationStrategySCD2ByTime, pipeline.MaterializationStrategySCD2ByColumn,
+	} {
+		for _, tt := range []struct {
+			name        string
+			fullRefresh bool
+			engine      string
+			wantErr     string
+		}{
+			{name: "incremental requires local staging", engine: "ReplicatedMergeTree()", wantErr: "staging"},
+			{name: "full refresh", fullRefresh: true, engine: "ReplicatedMergeTree()"},
+			{name: "full refresh requires replicated engine", fullRefresh: true, engine: "MergeTree()", wantErr: "Replicated"},
+		} {
+			t.Run(string(strategy)+"/"+tt.name, func(t *testing.T) {
+				t.Parallel()
+				asset := scd2TestAsset(strategy)
+				asset.ClickHouse.Engine = tt.engine
+				actual, cleanup, err := NewMaterializer(tt.fullRefresh, "analytics").RenderWithCleanup(asset, "SELECT * FROM source")
+				assert.Empty(t, cleanup)
+				if tt.wantErr != "" {
+					require.ErrorContains(t, err, tt.wantErr)
+					assert.Empty(t, actual)
+					return
+				}
+				require.NoError(t, err)
+				require.Len(t, actual, 3)
+				assert.Equal(t, "DROP TABLE IF EXISTS my.history ON CLUSTER `analytics` SYNC", actual[0])
+				assert.Contains(t, actual[1], "CREATE TABLE my.history ON CLUSTER `analytics` ENGINE = ReplicatedMergeTree() PRIMARY KEY (id) EMPTY AS SELECT")
+				assert.Contains(t, actual[2], "INSERT INTO my.history SELECT")
+				for _, query := range actual[1:] {
+					assert.Contains(t, query, " AS _valid_from")
+					assert.Contains(t, query, " AS _valid_until")
+					assert.Contains(t, query, "TRUE AS _is_current")
+				}
+			})
+		}
+	}
 }

@@ -200,7 +200,7 @@ func (w *sqlxWrapper) QueryRowContext(ctx context.Context, query string, args ..
 }
 
 func NewClient(c DuckDBConfig) (*Client, error) {
-	readOnly := false
+	readOnly := isReadOnlyMotherDuck(c)
 	if cfg, ok := c.(Config); ok {
 		readOnly = cfg.ReadOnly
 	}
@@ -248,6 +248,9 @@ func (c *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) 
 }
 
 func (c *Client) GetIngestrURI() (string, error) {
+	if isReadOnlyMotherDuck(c.config) {
+		return "", errors.New("read_only MotherDuck connections cannot be used with ingestr")
+	}
 	return c.config.GetIngestrURI(), nil
 }
 

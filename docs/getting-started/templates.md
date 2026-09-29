@@ -25,6 +25,8 @@ Arguments:
 - **template-name**: The template to use. If omitted, Bruin uses the default template.
 - **folder-name**: The folder to create. If omitted, Bruin uses `bruin-pipeline` for the default template and the template name for other templates.
 
+Outside an existing Git repository, Bruin creates a `bruin/` project root and places the pipeline inside it. Enter `bruin/<folder-name>` before running commands that use `assets/` or `pipeline.yml`. Inside an existing Git repository, or when you pass `--in-place`, enter `<folder-name>` instead. The connection configuration `.bruin.yml` lives at the project root, not inside the pipeline directory.
+
 To see the complete list available in your installed Bruin version:
 
 ```bash
@@ -81,6 +83,18 @@ AI agent skills are installed separately with `bruin ai skills`; see [AI Skills]
 ### Local and learning templates
 
 <div class="template-grid">
+  <a class="template-card" href="https://github.com/bruin-data/bruin/tree/main/templates/academy-sql-beginner">
+    <span class="template-card__category">Beginner SQL course</span>
+    <strong>academy-sql-beginner</strong>
+    <span>Agent-led SQL course with a deterministic local retail dataset for learning SQL and auditing AI-written queries.</span>
+    <span class="template-card__tags"><code>DuckDB</code><code>SQL</code><code>AI agents</code></span>
+  </a>
+  <a class="template-card" href="https://github.com/bruin-data/bruin/tree/main/templates/academy-sql-intermediate">
+    <span class="template-card__category">Intermediate SQL course</span>
+    <strong>academy-sql-intermediate</strong>
+    <span>Agent-led course for profiling, modeling, documenting, and defending answers against an imperfect retail dataset.</span>
+    <span class="template-card__tags"><code>DuckDB</code><code>SQL</code><code>data modeling</code></span>
+  </a>
   <a class="template-card" href="./templates-docs/duckdb-README.html">
     <span class="template-card__category">Local SQL</span>
     <strong>duckdb</strong>

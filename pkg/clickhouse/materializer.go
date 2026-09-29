@@ -10,13 +10,13 @@ import (
 	"github.com/pkg/errors"
 )
 
-// The other packages all use a materializer that renders the query to a single string. Due to the quirks of athena
-// we need to create a different materializer that returns a slice of strings, since athena server requires us to send separate batches
-// for certain things.
+// Materializer returns separate statements because ClickHouse executes each
+// step of a materialization independently.
 type Materializer struct {
 	MaterializationMap AssetMaterializationMap
 	fullRefresh        bool
 	randomName         func() string
+	cluster            string
 }
 
 func (m *Materializer) Render(asset *pipeline.Asset, query string) ([]string, error) {
@@ -26,14 +26,26 @@ func (m *Materializer) Render(asset *pipeline.Asset, query string) ([]string, er
 	}
 
 	strategy := mat.Strategy
+	query = strings.TrimSuffix(strings.TrimSpace(query), ";")
 	if asset.FullRefreshEnabled(m.fullRefresh) && mat.Type == pipeline.MaterializationTypeTable {
+		if strategy == pipeline.MaterializationStrategySCD2ByTime || strategy == pipeline.MaterializationStrategySCD2ByColumn {
+			if m.cluster != "" {
+				return buildSCD2FullRefreshQuery(asset, query, m.cluster)
+			}
+			if strategy == pipeline.MaterializationStrategySCD2ByTime {
+				return buildSCD2ByTimeFullRefreshQuery(asset, query)
+			}
+			return buildSCD2ByColumnFullRefreshQuery(asset, query)
+		}
 		if mat.Strategy != pipeline.MaterializationStrategyDDL {
 			strategy = pipeline.MaterializationStrategyCreateReplace
 		}
 	}
 
-	query = strings.TrimSuffix(strings.TrimSpace(query), ";")
 	if matFunc, ok := m.MaterializationMap[mat.Type][strategy]; ok {
+		if m.cluster != "" {
+			return buildClusterQuery(asset, query, strategy, m.cluster, matFunc)
+		}
 		return matFunc(asset, query)
 	}
 
@@ -48,38 +60,44 @@ func (m *Materializer) RenderWithCleanup(asset *pipeline.Asset, query string) ([
 	if err != nil {
 		return nil, nil, err
 	}
+	if asset.Materialization.Type != pipeline.MaterializationTypeTable || len(queries) == 0 {
+		return queries, nil, nil
+	}
 
 	strategy := asset.Materialization.Strategy
 	if asset.FullRefreshEnabled(m.fullRefresh) && asset.Materialization.Type == pipeline.MaterializationTypeTable && strategy != pipeline.MaterializationStrategyDDL {
 		strategy = pipeline.MaterializationStrategyCreateReplace
 	}
 
-	if strategy != pipeline.MaterializationStrategyMerge && strategy != pipeline.MaterializationStrategyDeleteInsert {
-		return queries, nil, nil
+	if strategy == pipeline.MaterializationStrategySCD2ByTime || strategy == pipeline.MaterializationStrategySCD2ByColumn {
+		return queries, queries[len(queries)-2:], nil
 	}
-
-	if len(queries) == 0 {
+	if strategy != pipeline.MaterializationStrategyMerge && strategy != pipeline.MaterializationStrategyDeleteInsert {
 		return queries, nil, nil
 	}
 
 	return queries, []string{queries[len(queries)-1]}, nil
 }
 
-func NewMaterializer(fullRefresh bool) *Materializer {
-	return &Materializer{
+func NewMaterializer(fullRefresh bool, cluster ...string) *Materializer {
+	m := &Materializer{
 		MaterializationMap: matMap,
 		fullRefresh:        fullRefresh,
 		randomName:         helpers.PrefixGenerator,
 	}
+	if len(cluster) > 0 {
+		m.cluster = cluster[0]
+	}
+	return m
 }
 
 type Renderer struct {
 	mat *Materializer
 }
 
-func NewRenderer(fullRefresh bool) *Renderer {
+func NewRenderer(fullRefresh bool, cluster ...string) *Renderer {
 	return &Renderer{
-		mat: NewMaterializer(fullRefresh),
+		mat: NewMaterializer(fullRefresh, cluster...),
 	}
 }
 

@@ -28,6 +28,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/attio"
 	"github.com/bruin-data/bruin/pkg/balldontlie"
+	"github.com/bruin-data/bruin/pkg/bamboohr"
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/braze"
 	"github.com/bruin-data/bruin/pkg/bruincloud"
@@ -57,8 +58,10 @@ import (
 	"github.com/bruin-data/bruin/pkg/elasticsearch"
 	"github.com/bruin-data/bruin/pkg/emr_serverless"
 	"github.com/bruin-data/bruin/pkg/espn"
+	"github.com/bruin-data/bruin/pkg/exchangeratesapi"
 	fabric "github.com/bruin-data/bruin/pkg/fabric"
 	"github.com/bruin-data/bruin/pkg/facebookads"
+	"github.com/bruin-data/bruin/pkg/fakturoid"
 	"github.com/bruin-data/bruin/pkg/fastspring"
 	"github.com/bruin-data/bruin/pkg/fireflies"
 	"github.com/bruin-data/bruin/pkg/fluxx"
@@ -93,6 +96,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/klaviyo"
 	"github.com/bruin-data/bruin/pkg/linear"
 	"github.com/bruin-data/bruin/pkg/linkedinads"
+	"github.com/bruin-data/bruin/pkg/lumify"
 	"github.com/bruin-data/bruin/pkg/mailchimp"
 	"github.com/bruin-data/bruin/pkg/manifold"
 	"github.com/bruin-data/bruin/pkg/mixpanel"
@@ -285,6 +289,10 @@ type Manager struct {
 	Sumble               map[string]*sumble.Client
 	Twenty               map[string]*twenty.Client
 	AbraFlexi            map[string]*abraflexi.Client
+	ExchangeRatesAPI     map[string]*exchangeratesapi.Client
+	Fakturoid            map[string]*fakturoid.Client
+	Lumify               map[string]*lumify.Client
+	BambooHR             map[string]*bamboohr.Client
 	SatisMeter           map[string]*satismeter.Client
 	Deel                 map[string]*deel.Client
 	Salesforce           map[string]*salesforce.Client
@@ -410,6 +418,7 @@ func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatfo
 	// Note: ADC validation is deferred - it will only happen when the client is actually used.
 	// This allows pipelines without BigQuery assets to run even if ADC is not configured.
 	db, err := bigquery.NewDB(&bigquery.Config{
+		ReadOnly:                         connection.ReadOnly,
 		ProjectID:                        connection.ProjectID,
 		CredentialsFilePath:              connection.ServiceAccountFile,
 		CredentialsJSON:                  connection.ServiceAccountJSON,
@@ -456,6 +465,7 @@ func newSnowflakeDBFromConnection(connection *config.SnowflakeConnection) (*snow
 	}
 
 	return snowflake.NewDB(&snowflake.Config{
+		ReadOnly:   connection.ReadOnly,
 		Account:    connection.Account,
 		Username:   connection.Username,
 		Password:   connection.Password,
@@ -2181,6 +2191,7 @@ func (m *Manager) AddMotherduckConnectionFromConfig(connection *config.Motherduc
 	client, err := duck.NewClient(duck.MotherDuckConfig{
 		Token:    connection.Token,
 		Database: connection.Database,
+		ReadOnly: connection.ReadOnly,
 	})
 	if err != nil {
 		return err
@@ -2205,11 +2216,13 @@ func (m *Manager) AddClickHouseConnectionFromConfig(connection *config.ClickHous
 
 	client, err := clickhouse.NewClient(&clickhouse.Config{
 		ReadOnly: connection.ReadOnly,
+		Settings: connection.Settings,
 		Host:     connection.Host,
 		Port:     connection.Port,
 		Username: connection.Username,
 		Password: connection.Password,
 		Database: connection.Database,
+		Cluster:  connection.Cluster,
 		HTTPPort: connection.HTTPPort,
 		Secure:   connection.Secure,
 	})
@@ -2900,6 +2913,105 @@ func (m *Manager) AddAbraFlexiConnectionFromConfig(connection *config.AbraFlexiC
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.AbraFlexi[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddExchangeRatesAPIConnectionFromConfig(connection *config.ExchangeRatesAPIConnection) error {
+	m.mutex.Lock()
+	if m.ExchangeRatesAPI == nil {
+		m.ExchangeRatesAPI = make(map[string]*exchangeratesapi.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := exchangeratesapi.NewClient(exchangeratesapi.Config{
+		AccessKey: connection.AccessKey,
+		Base:      connection.Base,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.ExchangeRatesAPI[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddFakturoidConnectionFromConfig(connection *config.FakturoidConnection) error {
+	m.mutex.Lock()
+	if m.Fakturoid == nil {
+		m.Fakturoid = make(map[string]*fakturoid.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := fakturoid.NewClient(fakturoid.Config{
+		ClientID:     connection.ClientID,
+		ClientSecret: connection.ClientSecret,
+		Slug:         connection.Slug,
+		UserAgent:    connection.UserAgent,
+		RateLimit:    connection.RateLimit,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Fakturoid[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddLumifyConnectionFromConfig(connection *config.LumifyConnection) error {
+	m.mutex.Lock()
+	if m.Lumify == nil {
+		m.Lumify = make(map[string]*lumify.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := lumify.NewClient(lumify.Config{
+		APIKey:  connection.APIKey,
+		Sport:   connection.Sport,
+		League:  connection.League,
+		BaseURL: connection.BaseURL,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Lumify[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddBambooHRConnectionFromConfig(connection *config.BambooHRConnection) error {
+	m.mutex.Lock()
+	if m.BambooHR == nil {
+		m.BambooHR = make(map[string]*bamboohr.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := bamboohr.NewClient(bamboohr.Config{
+		CompanyDomain: connection.CompanyDomain,
+		APIKey:        connection.APIKey,
+		AccessToken:   connection.AccessToken,
+		Timezone:      connection.Timezone,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.BambooHR[connection.Name] = client
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 
@@ -4532,6 +4644,10 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Sumble, connectionManager.AddSumbleConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Twenty, connectionManager.AddTwentyConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.AbraFlexi, connectionManager.AddAbraFlexiConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.ExchangeRatesAPI, connectionManager.AddExchangeRatesAPIConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Fakturoid, connectionManager.AddFakturoidConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Lumify, connectionManager.AddLumifyConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.BambooHR, connectionManager.AddBambooHRConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.SatisMeter, connectionManager.AddSatisMeterConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Deel, connectionManager.AddDeelConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Frankfurter, connectionManager.AddFrankfurterConnectionFromConfig, &wg, &errList, &mu)
