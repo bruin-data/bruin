@@ -180,6 +180,70 @@ custom_checks:
         HAVING COUNT(*) > 1
       )
     value: 0
+unit_tests:
+  - name: signs_and_flags_purchase_lines
+    description: >
+      Card charges are positive, card credits negative, card payoffs are not
+      expenses, item-based lines count as expenses, and placeholder accounts
+      are flagged.
+    inputs:
+      - asset: quickbooks_raw.purchases
+        rows:
+          - id: "p1"
+            txn_date: "2026-03-02"
+            payment_type: CreditCard
+            credit: false
+            account_ref: {value: "card", name: "Brex Card"}
+            entity_ref: {value: "v1", name: "Figma", type: "Vendor"}
+            currency_ref: {value: "USD"}
+            line:
+              - {Id: "1", Amount: 45.5, DetailType: AccountBasedExpenseLineDetail, AccountBasedExpenseLineDetail: {AccountRef: {value: "software"}}}
+              - {Amount: 10, DetailType: SubTotalLineDetail, SubTotalLineDetail: {}}
+          - id: "p2"
+            txn_date: "2026-03-05"
+            payment_type: CreditCard
+            credit: true
+            account_ref: {value: "card", name: "Brex Card"}
+            line:
+              - {Id: "1", Amount: 20, DetailType: AccountBasedExpenseLineDetail, AccountBasedExpenseLineDetail: {AccountRef: {value: "software"}}}
+          - id: "p3"
+            txn_date: "2026-03-06"
+            payment_type: Check
+            account_ref: {value: "bank", name: "Checking"}
+            line:
+              - {Id: "1", Amount: 500, DetailType: AccountBasedExpenseLineDetail, AccountBasedExpenseLineDetail: {AccountRef: {value: "card"}}}
+              - {Id: "2", Amount: 80, DetailType: ItemBasedExpenseLineDetail, ItemBasedExpenseLineDetail: {ItemRef: {value: "item9"}, BillableStatus: Billable, CustomerRef: {value: "c7"}}}
+              - {Id: "3", Amount: 12, DetailType: AccountBasedExpenseLineDetail, AccountBasedExpenseLineDetail: {AccountRef: {value: "uncat"}}}
+      - asset: quickbooks_stage.accounts
+        rows:
+          - {account_id: "software", account_name: "Software", account_type: "Expense", classification: "Expense"}
+          - {account_id: "card", account_name: "Brex Card", account_type: "Credit Card", classification: "Liability"}
+          - {account_id: "uncat", account_name: "Uncategorized Expense", account_type: "Expense", classification: "Expense"}
+    expected:
+      match: exact
+      rows:
+        - {source_type: purchase, transaction_id: "p1", line_index: 0, line_type: account_based, payee_id: "v1", payee_type: Vendor, account_name: Software, amount: 45.5, is_expense: true, is_uncategorized: false, is_billable: false}
+        - {source_type: purchase, transaction_id: "p2", line_index: 0, line_type: account_based, amount: -20, is_expense: true, is_uncategorized: false}
+        - {source_type: purchase, transaction_id: "p3", line_index: 0, line_type: account_based, account_classification: Liability, amount: 500, is_expense: false, is_uncategorized: false}
+        - {source_type: purchase, transaction_id: "p3", line_index: 1, line_type: item_based, account_id: null, item_id: "item9", amount: 80, is_expense: true, is_billable: true, billable_customer_id: "c7"}
+        - {source_type: purchase, transaction_id: "p3", line_index: 2, line_type: account_based, amount: 12, is_expense: true, is_uncategorized: true}
+  - name: bill_lines_are_positive_vendor_spend
+    inputs:
+      - asset: quickbooks_raw.bills
+        rows:
+          - id: "b1"
+            txn_date: "2026-04-01"
+            vendor_ref: {value: "v2", name: "Pilot"}
+            ap_account_ref: {value: "ap", name: "Accounts Payable (A/P)"}
+            line:
+              - {Id: "1", Amount: 900, DetailType: AccountBasedExpenseLineDetail, AccountBasedExpenseLineDetail: {AccountRef: {value: "acct"}}}
+      - asset: quickbooks_stage.accounts
+        rows:
+          - {account_id: "acct", account_name: "Accounting Fees", account_type: "Expense", classification: "Expense"}
+    expected:
+      match: exact
+      rows:
+        - {source_type: bill, transaction_id: "b1", payment_type: Bill, paid_from_account_id: "ap", payee_id: "v2", payee_type: Vendor, amount: 900, is_expense: true}
 @bruin */
 
 WITH purchase_lines AS (

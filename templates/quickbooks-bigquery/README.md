@@ -73,7 +73,7 @@ The `quickbooks_stage` dataset turns the raw objects into typed tables with read
 
 `expense_lines` combines purchases and bills, so it holds every spend line whether it was paid at the point of sale or billed first. Lines are dated by their transaction, so a bill counts in the month it was billed, not the month it was paid. Lines can also post to balance sheet accounts, for example a check that pays off the credit card, so filter on `is_expense` for profit-and-loss spend; otherwise card payoffs double count the card charges. `is_expense` also counts item-based lines, whose item account is not loaded. Filter on `is_uncategorized` to find spend still sitting in `Uncategorized Expense`, `Uncategorized Asset`, or `Ask My Accountant`.
 
-Every asset declares its full column schema with types, descriptions, and checks. `enforce_schema: true` passes those types to ingestr, and `metadata_push` in `pipeline.yml` publishes the descriptions to BigQuery. `bruin docs my-quickbooks-pipeline` builds a browsable documentation site from the same definitions.
+Every asset declares its full column schema with types, descriptions, and checks. `enforce_schema: true` passes those types to ingestr, and `metadata_push` in `pipeline.yml` publishes the descriptions to BigQuery. The staging models also carry `unit_tests` that pin their parsing logic (line signs, statuses, payment links, and account mapping) against fixture rows; run them with `bruin unit-test my-quickbooks-pipeline`. They run as read-only queries on your BigQuery connection and write nothing. `bruin docs my-quickbooks-pipeline` builds a browsable documentation site from the same definitions.
 
 ## Configure connections
 

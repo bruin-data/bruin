@@ -117,6 +117,22 @@ custom_checks:
       FROM {{ this }}
       WHERE open_balance > total_amount
     value: 0
+unit_tests:
+  - name: derives_status_and_tax
+    inputs:
+      - asset: quickbooks_raw.invoices
+        rows:
+          - {id: "paid", total_amt: 500, balance: 0, customer_ref: {value: "c1"}, txn_tax_detail: {TotalTax: 40}}
+          - {id: "partial", total_amt: 500, balance: 200}
+          - {id: "open", total_amt: 500, balance: 500}
+          - {id: "void", total_amt: 0, balance: 0}
+    expected:
+      match: exact
+      rows:
+        - {invoice_id: "paid", customer_id: "c1", tax_amount: 40, open_balance: 0, amount_paid: 500, invoice_status: paid}
+        - {invoice_id: "partial", tax_amount: 0, amount_paid: 300, invoice_status: partially_paid}
+        - {invoice_id: "open", amount_paid: 0, invoice_status: open}
+        - {invoice_id: "void", invoice_status: zero_amount}
 @bruin */
 
 WITH invoices AS (

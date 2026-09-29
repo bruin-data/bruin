@@ -99,6 +99,22 @@ columns:
     description: When the account was last modified in QuickBooks.
     checks:
       - name: not_null
+unit_tests:
+  - name: maps_classification_to_statement
+    inputs:
+      - asset: quickbooks_raw.accounts
+        rows:
+          - {id: "1", name: "Checking", classification: Asset, parent_ref: null}
+          - {id: "2", name: "Subscription Revenue", classification: Revenue}
+          - {id: "3", name: "AWS", classification: Expense, sub_account: true, parent_ref: {value: "9", name: "Hosting"}}
+          - {id: "4", name: "SAFE Investments", classification: Equity}
+    expected:
+      match: exact
+      rows:
+        - {account_id: "1", financial_statement: balance_sheet, is_sub_account: false, is_active: true}
+        - {account_id: "2", financial_statement: income_statement}
+        - {account_id: "3", financial_statement: income_statement, parent_account_id: "9", is_sub_account: true}
+        - {account_id: "4", financial_statement: balance_sheet}
 @bruin */
 
 SELECT

@@ -90,6 +90,27 @@ custom_checks:
       FROM {{ this }}
     value: 0
     blocking: false
+unit_tests:
+  - name: links_payments_to_invoices_only
+    description: >
+      Credit memos applied inside a payment are excluded, and days to pay are
+      measured from the invoice and due dates.
+    inputs:
+      - asset: quickbooks_raw.payments
+        rows:
+          - id: "pay1"
+            txn_date: "2026-06-20"
+            customer_ref: {value: "c1"}
+            line:
+              - {Amount: 700, LinkedTxn: [{TxnId: "inv1", TxnType: Invoice}]}
+              - {Amount: 50, LinkedTxn: [{TxnId: "cm1", TxnType: CreditMemo}]}
+      - asset: quickbooks_stage.invoices
+        rows:
+          - {invoice_id: "inv1", invoice_date: "2026-06-01", due_date: "2026-06-15"}
+    expected:
+      match: exact
+      rows:
+        - {payment_id: "pay1", line_index: 0, invoice_id: "inv1", customer_id: "c1", applied_amount: 700, days_to_pay: 19, days_past_due: 5}
 @bruin */
 
 WITH applications AS (

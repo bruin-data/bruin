@@ -117,6 +117,25 @@ custom_checks:
       )
     value: 0
     blocking: false
+unit_tests:
+  - name: keeps_item_and_discount_lines
+    description: Discounts are negative and subtotal lines are dropped.
+    inputs:
+      - asset: quickbooks_raw.invoices
+        rows:
+          - id: "i1"
+            txn_date: "2026-05-01"
+            customer_ref: {value: "c1", name: "Acme"}
+            currency_ref: {value: "USD"}
+            line:
+              - {Id: "1", LineNum: 1, Amount: 1000, Description: "Growth plan", DetailType: SalesItemLineDetail, SalesItemLineDetail: {ItemRef: {value: "19", name: "Platform Subscription"}, ItemAccountRef: {value: "400", name: "Subscription Revenue"}, Qty: 1, UnitPrice: 1000}}
+              - {Amount: 1000, DetailType: SubTotalLineDetail, SubTotalLineDetail: {}}
+              - {Amount: 100, DetailType: DiscountLineDetail, DiscountLineDetail: {PercentBased: true, DiscountPercent: 10, DiscountAccountRef: {value: "450", name: "Discounts given"}}}
+    expected:
+      match: exact
+      rows:
+        - {invoice_id: "i1", line_index: 0, line_id: "1", line_type: sales_item, customer_id: "c1", currency: USD, item_id: "19", income_account_id: "400", quantity: 1, unit_price: 1000, amount: 1000}
+        - {invoice_id: "i1", line_index: 2, line_type: discount, item_id: null, income_account_id: "450", income_account_name: "Discounts given", amount: -100}
 @bruin */
 
 WITH lines AS (
