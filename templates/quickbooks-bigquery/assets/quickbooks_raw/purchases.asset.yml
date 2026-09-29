@@ -1,0 +1,142 @@
+name: quickbooks_raw.purchases
+type: ingestr
+
+description: >
+  Raw QuickBooks Online Purchase records (Accounting API v3) loaded into
+  BigQuery by ingestr. A purchase is money spent at the point of sale: a cash
+  expense, a check, or a credit card charge, recorded against the bank or card
+  account in `account_ref`. Credit card refunds are purchases with
+  `credit = true`. Each run fetches records whose `MetaData.LastUpdatedTime`
+  falls inside the run window and merges them on `id`, so edits are picked up
+  by the run that covers them. Records deleted in QuickBooks are not removed
+  from this table.
+
+materialization:
+  type: table
+  strategy: merge
+
+parameters:
+  source_table: purchases
+  enforce_schema: true
+
+tags:
+  - quickbooks_raw
+  - quickbooks
+  - accounting
+  - purchases
+
+columns:
+  - name: id
+    type: varchar
+    description: QuickBooks purchase identifier, unique within the company file.
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: lastupdatedtime
+    type: timestamp
+    description: >
+      `MetaData.LastUpdatedTime`, when the record was last modified in
+      QuickBooks. The source selects each run's records by it.
+    checks:
+      - name: not_null
+  - name: txn_date
+    type: date
+    description: Date the money was spent.
+    checks:
+      - name: not_null
+  - name: payment_type
+    type: varchar
+    description: 'How the purchase was paid: `Cash`, `Check`, or `CreditCard`.'
+    checks:
+      - name: not_null
+      - name: accepted_values
+        value:
+          - Cash
+          - Check
+          - CreditCard
+  - name: account_ref
+    type: json
+    description: >
+      Reference `{value, name}` where `value` is the QuickBooks `id` of the
+      bank or credit card account (Account) the purchase is paid from.
+    checks:
+      - name: not_null
+  - name: entity_ref
+    type: json
+    description: >
+      Reference `{value, name, type}` to the payee, where `type` is `Vendor`,
+      `Customer`, or `Employee`. Null when no payee was recorded.
+  - name: credit
+    type: boolean
+    description: >
+      Whether the purchase is a credit card refund or credit rather than a
+      charge. Only set for `CreditCard` purchases.
+  - name: total_amt
+    type: double
+    description: Total amount of the purchase, positive for charges and refunds alike.
+    checks:
+      - name: not_null
+      - name: non_negative
+  - name: doc_number
+    type: varchar
+    description: Reference number, such as a check number.
+  - name: private_note
+    type: varchar
+    description: Internal memo on the purchase.
+  - name: currency_ref
+    type: json
+    description: >
+      Reference `{value, name}` where `value` is the QuickBooks `id` of the
+      related currency.
+  - name: line
+    type: json
+    description: >
+      Array of purchase lines. `AccountBasedExpenseLineDetail` lines carry the
+      expense `AccountRef`, and `ItemBasedExpenseLineDetail` lines carry an
+      `ItemRef`; both can carry `CustomerRef` and `BillableStatus` for
+      rebillable costs.
+  - name: txn_tax_detail
+    type: json
+    description: >
+      Transaction-level tax detail, including `TotalTax` and per-rate tax
+      lines.
+  - name: payment_method_ref
+    type: json
+    description: >
+      Reference `{value, name}` where `value` is the QuickBooks `id` of the
+      related payment method (PaymentMethod).
+  - name: department_ref
+    type: json
+    description: >
+      Reference `{value, name}` where `value` is the QuickBooks `id` of the
+      related department or location (Department).
+  - name: remit_to_addr
+    type: json
+    description: Address the check is mailed to.
+  - name: print_status
+    type: varchar
+    description: 'Print status for checks: `NotSet`, `NeedToPrint`, or `PrintComplete`.'
+  - name: custom_field
+    type: json
+    description: Array of custom field definitions and values set on the purchase.
+  - name: purchase_ex
+    type: json
+    description: QuickBooks extension data for the purchase.
+  - name: meta_data
+    type: json
+    description: >
+      QuickBooks `MetaData` object holding `CreateTime` and `LastUpdatedTime`.
+  - name: sync_token
+    type: varchar
+    description: >
+      QuickBooks optimistic-concurrency version number; increments on every
+      update.
+  - name: domain
+    type: varchar
+    description: QuickBooks API domain, always `QBO`.
+  - name: sparse
+    type: boolean
+    description: >
+      Whether the API returned a sparse object containing only a subset of
+      fields.
