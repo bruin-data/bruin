@@ -60,7 +60,8 @@ jobs:
               echo "lychee did not produce a report; see the run logs."
             fi
           } > issue.md
-          number=$(gh issue list --state open --search "in:title \"${TITLE}\"" --json number --jq '.[0].number')
+          number=$(gh issue list --state open --author app/github-actions --search "in:title \"${TITLE}\"" \
+            --json number,title --jq '[.[] | select(.title == env.TITLE)][0].number // empty')
           if [ -n "${number}" ]; then
             gh issue edit "${number}" --body-file issue.md
           else
@@ -74,7 +75,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TITLE: 'Broken external links in docs'
         run: |
-          number=$(gh issue list --state open --search "in:title \"${TITLE}\"" --json number --jq '.[0].number')
+          number=$(gh issue list --state open --author app/github-actions --search "in:title \"${TITLE}\"" \
+            --json number,title --jq '[.[] | select(.title == env.TITLE)][0].number // empty')
           if [ -n "${number}" ]; then
             gh issue close "${number}" --comment "All external links pass as of ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}."
           fi
