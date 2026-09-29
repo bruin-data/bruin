@@ -49,7 +49,18 @@ func (s Source) Relation(alias string) string {
 	if alias == "" {
 		return "(" + query + ")"
 	}
-	return "(" + query + ") AS " + alias
+	return "(" + query + ") AS " + quoteAlias(alias)
+}
+
+// quoteAlias renders a model name as a SQL alias. Names that are plain,
+// non-reserved identifiers are left bare so generated SQL stays readable;
+// anything else (e.g. `order-items`, `sales model`, or a reserved keyword)
+// is double-quoted so the generated query stays valid.
+func quoteAlias(alias string) string {
+	if simpleIdentifierPattern.MatchString(alias) && !sqlIdentifierKeywords[strings.ToUpper(alias)] {
+		return alias
+	}
+	return `"` + strings.ReplaceAll(alias, `"`, `""`) + `"`
 }
 
 // HasQuery reports whether the source is a dedicated SQL query.

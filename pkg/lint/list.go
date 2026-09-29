@@ -356,8 +356,9 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser sqlpa
 			Identifier:       "semantic-layer-valid",
 			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
-			Validator:        (&semanticLayerChecker{fs: fs, finder: finder}).Validate,
-			ApplicableLevels: []Level{LevelPipeline},
+			Validator:        newSemanticLayerChecker(fs, finder).Validate,
+			AssetValidator:   newSemanticLayerChecker(fs, finder).ValidateAsset,
+			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
 		},
 	}
 

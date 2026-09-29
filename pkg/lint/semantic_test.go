@@ -31,6 +31,26 @@ func TestGetRulesIncludesSemanticLayerValid(t *testing.T) {
 	assert.True(t, found.IsFast())
 	assert.Equal(t, ValidatorSeverityCritical, found.GetSeverity())
 	assert.Contains(t, found.GetApplicableLevels(), LevelPipeline)
+	assert.Contains(t, found.GetApplicableLevels(), LevelAsset)
+}
+
+func TestSemanticLayerValidRunsOnAssetLevel(t *testing.T) {
+	t.Parallel()
+
+	fs := afero.NewMemMapFs()
+	require.NoError(t, afero.WriteFile(fs, "/project/.bruin.yml", []byte("environments:\n  default:\n    connections: {}\n"), 0o644))
+	require.NoError(t, afero.WriteFile(fs, "/project/semantic/empty.yml", []byte("schema: v1\nname: empty\nsource: {}\n"), 0o644))
+
+	p := &pipeline.Pipeline{
+		DefinitionFile: pipeline.DefinitionFile{Path: "/project/pipelines/daily/pipeline.yml"},
+	}
+	asset := &pipeline.Asset{Name: "some-asset"}
+
+	checker := newSemanticLayerChecker(fs, nil)
+	issues, err := checker.ValidateAsset(t.Context(), p, asset)
+	require.NoError(t, err)
+	require.Len(t, issues, 1)
+	assert.Contains(t, issues[0].Description, "empty")
 }
 
 func TestSemanticLayerValid(t *testing.T) {
@@ -336,7 +356,24 @@ metrics:
 		assert.Equal(t, "semantic-query-dry-run", rule.Name())
 		assert.False(t, rule.IsFast())
 		assert.Contains(t, rule.GetApplicableLevels(), LevelPipeline)
+		assert.Contains(t, rule.GetApplicableLevels(), LevelAsset)
 		assert.Equal(t, ValidatorSeverityCritical, rule.GetSeverity())
+	})
+
+	t.Run("dry-run rule validates at asset level", func(t *testing.T) {
+		t.Parallel()
+
+		fs := afero.NewMemMapFs()
+		writeCatalog(t, fs, map[string][]byte{"filtered.yml": queryModel})
+		runner := &semanticQueryDryRunner{
+			fs:          fs,
+			connections: &fakeConnectionManager{validator: &fakeQueryValidator{isValid: false}},
+		}
+
+		issues, err := runner.ValidateAsset(t.Context(), p, sqlAsset)
+		require.NoError(t, err)
+		require.Len(t, issues, 1)
+		assert.Contains(t, issues[0].Description, `Semantic model "filtered_orders" query is invalid`)
 	})
 }
 

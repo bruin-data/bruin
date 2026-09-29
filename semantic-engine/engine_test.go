@@ -345,6 +345,28 @@ func TestSourceDryRunSQL(t *testing.T) {
 	}
 }
 
+func TestSourceRelation_QuotesUnsafeAliases(t *testing.T) {
+	t.Parallel()
+
+	querySource := Source{Query: "select 1 as id"}
+	cases := []struct {
+		alias string
+		want  string
+	}{
+		{alias: "orders", want: "(select 1 as id) AS orders"},
+		{alias: "order-items", want: `(select 1 as id) AS "order-items"`},
+		{alias: "sales model", want: `(select 1 as id) AS "sales model"`},
+		{alias: "order", want: `(select 1 as id) AS "order"`},
+		{alias: `we"ird`, want: `(select 1 as id) AS "we""ird"`},
+	}
+
+	for _, tc := range cases {
+		if got := querySource.Relation(tc.alias); got != tc.want {
+			t.Fatalf("Relation(%q) = %q, want %q", tc.alias, got, tc.want)
+		}
+	}
+}
+
 func TestLoadFile_PreservesNoteDimensionOptions(t *testing.T) {
 	t.Parallel()
 

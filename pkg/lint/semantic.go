@@ -20,6 +20,10 @@ type semanticLayerChecker struct {
 	seen   sync.Map
 }
 
+func newSemanticLayerChecker(fs afero.Fs, finder repoFinder) *semanticLayerChecker {
+	return &semanticLayerChecker{fs: fs, finder: finder}
+}
+
 func (c *semanticLayerChecker) Validate(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
 	dir := semanticDirForPipeline(ctx, c.fs, p, c.finder)
 	if dir == "" || !semanticDirExists(c.fs, dir) {
@@ -30,7 +34,6 @@ func (c *semanticLayerChecker) Validate(ctx context.Context, p *pipeline.Pipelin
 	}
 
 	issues, models := loadSemanticCatalogIssues(c.fs, dir)
-
 	if names := semantic.Names(models); len(names) > 0 {
 		if _, err := semantic.NewEngineWithModels(models[names[0]], models); err != nil {
 			issues = append(issues, &Issue{
@@ -40,6 +43,14 @@ func (c *semanticLayerChecker) Validate(ctx context.Context, p *pipeline.Pipelin
 	}
 
 	return issues, nil
+}
+
+// ValidateAsset runs the same catalog check when `bruin validate` targets a
+// single asset. The semantic catalog is repository-scoped, so an invalid
+// catalog must fail asset-scoped validation too instead of being skipped
+// with the other pipeline-level rules.
+func (c *semanticLayerChecker) ValidateAsset(ctx context.Context, p *pipeline.Pipeline, _ *pipeline.Asset) ([]*Issue, error) {
+	return c.Validate(ctx, p)
 }
 
 type semanticQueryDryRunner struct {
@@ -60,7 +71,8 @@ func GetSemanticQueryDryRunRule(fs afero.Fs, finder repoFinder, connections conn
 		Fast:             false,
 		Severity:         ValidatorSeverityCritical,
 		Validator:        runner.Validate,
-		ApplicableLevels: []Level{LevelPipeline},
+		AssetValidator:   runner.ValidateAsset,
+		ApplicableLevels: []Level{LevelPipeline, LevelAsset},
 	}
 }
 
@@ -106,6 +118,13 @@ func (r *semanticQueryDryRunner) Validate(ctx context.Context, p *pipeline.Pipel
 	}
 
 	return issues, nil
+}
+
+// ValidateAsset dry-runs query sources when `bruin validate` targets a
+// single asset, mirroring Validate. Query sources are repository-scoped, so
+// they must not be skipped by asset-scoped validation.
+func (r *semanticQueryDryRunner) ValidateAsset(ctx context.Context, p *pipeline.Pipeline, _ *pipeline.Asset) ([]*Issue, error) {
+	return r.Validate(ctx, p)
 }
 
 func loadSemanticCatalogIssues(fs afero.Fs, dir string) ([]*Issue, map[string]*semantic.Model) {
