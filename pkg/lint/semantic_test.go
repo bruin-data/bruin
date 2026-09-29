@@ -375,6 +375,69 @@ metrics:
 		require.Len(t, issues, 1)
 		assert.Contains(t, issues[0].Description, `Semantic model "filtered_orders" query is invalid`)
 	})
+
+	t.Run("asset validation prefers the selected asset connection", func(t *testing.T) {
+		t.Parallel()
+
+		fs := afero.NewMemMapFs()
+		writeCatalog(t, fs, map[string][]byte{"filtered.yml": queryModel})
+
+		sibling := &pipeline.Asset{Name: "sibling", Type: pipeline.AssetTypeSnowflakeQuery, Connection: "snowflake-conn"}
+		selected := &pipeline.Asset{Name: "selected", Type: pipeline.AssetTypeBigqueryQuery, Connection: "bq-conn"}
+		multi := &pipeline.Pipeline{
+			DefinitionFile: pipeline.DefinitionFile{Path: "/project/pipelines/daily/pipeline.yml"},
+			Assets:         []*pipeline.Asset{sibling, selected},
+		}
+
+		siblingValidator := &recordingQueryValidator{valid: true}
+		selectedValidator := &recordingQueryValidator{valid: true}
+		runner := &semanticQueryDryRunner{
+			fs: fs,
+			connections: &mapConnectionManager{conns: map[string]any{
+				"snowflake-conn": siblingValidator,
+				"bq-conn":        selectedValidator,
+			}},
+		}
+
+		_, err := runner.ValidateAsset(t.Context(), multi, selected)
+		require.NoError(t, err)
+		assert.Empty(t, siblingValidator.queries)
+		require.Len(t, selectedValidator.queries, 1)
+	})
+
+	t.Run("asset validation falls back to the pipeline connection", func(t *testing.T) {
+		t.Parallel()
+
+		fs := afero.NewMemMapFs()
+		writeCatalog(t, fs, map[string][]byte{"filtered.yml": queryModel})
+
+		sibling := &pipeline.Asset{Name: "sibling", Type: pipeline.AssetTypeSnowflakeQuery, Connection: "snowflake-conn"}
+		nonSQL := &pipeline.Asset{Name: "script", Type: pipeline.AssetTypePython, Connection: "py-conn"}
+		multi := &pipeline.Pipeline{
+			DefinitionFile: pipeline.DefinitionFile{Path: "/project/pipelines/daily/pipeline.yml"},
+			Assets:         []*pipeline.Asset{sibling, nonSQL},
+		}
+
+		siblingValidator := &recordingQueryValidator{valid: true}
+		runner := &semanticQueryDryRunner{
+			fs: fs,
+			connections: &mapConnectionManager{conns: map[string]any{
+				"snowflake-conn": siblingValidator,
+			}},
+		}
+
+		_, err := runner.ValidateAsset(t.Context(), multi, nonSQL)
+		require.NoError(t, err)
+		require.Len(t, siblingValidator.queries, 1)
+	})
+}
+
+type mapConnectionManager struct {
+	conns map[string]any
+}
+
+func (m *mapConnectionManager) GetConnection(name string) any {
+	return m.conns[name]
 }
 
 type recordingQueryValidator struct {

@@ -77,6 +77,10 @@ func GetSemanticQueryDryRunRule(fs afero.Fs, finder repoFinder, connections conn
 }
 
 func (r *semanticQueryDryRunner) Validate(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
+	return r.validateWithPreferredAsset(ctx, p, nil)
+}
+
+func (r *semanticQueryDryRunner) validateWithPreferredAsset(ctx context.Context, p *pipeline.Pipeline, preferred *pipeline.Asset) ([]*Issue, error) {
 	dir := semanticDirForPipeline(ctx, r.fs, p, r.finder)
 	if dir == "" || !semanticDirExists(r.fs, dir) {
 		return nil, nil
@@ -93,7 +97,7 @@ func (r *semanticQueryDryRunner) Validate(ctx context.Context, p *pipeline.Pipel
 		return nil, nil
 	}
 
-	validator := queryValidatorForPipeline(p, r.connections)
+	validator := queryValidatorForPipeline(p, r.connections, preferred)
 	if validator == nil {
 		return nil, nil
 	}
@@ -122,9 +126,11 @@ func (r *semanticQueryDryRunner) Validate(ctx context.Context, p *pipeline.Pipel
 
 // ValidateAsset dry-runs query sources when `bruin validate` targets a
 // single asset, mirroring Validate. Query sources are repository-scoped, so
-// they must not be skipped by asset-scoped validation.
-func (r *semanticQueryDryRunner) ValidateAsset(ctx context.Context, p *pipeline.Pipeline, _ *pipeline.Asset) ([]*Issue, error) {
-	return r.Validate(ctx, p)
+// they must not be skipped by asset-scoped validation. The dry-run prefers
+// the selected asset's connection so the queries are checked in the right
+// SQL dialect instead of a sibling asset's connection.
+func (r *semanticQueryDryRunner) ValidateAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	return r.validateWithPreferredAsset(ctx, p, asset)
 }
 
 func loadSemanticCatalogIssues(fs afero.Fs, dir string) ([]*Issue, map[string]*semantic.Model) {
@@ -162,25 +168,37 @@ func queryableSemanticModels(models map[string]*semantic.Model) []*semantic.Mode
 	return out
 }
 
-func queryValidatorForPipeline(p *pipeline.Pipeline, connections connectionManager) queryValidator {
+func queryValidatorForPipeline(p *pipeline.Pipeline, connections connectionManager, preferred *pipeline.Asset) queryValidator {
 	if p == nil || connections == nil {
 		return nil
 	}
+	if validator := queryValidatorForAsset(p, connections, preferred); validator != nil {
+		return validator
+	}
 	for _, asset := range p.Assets {
-		if asset == nil || !asset.IsSQLAsset() {
+		if asset != nil && asset == preferred {
 			continue
 		}
-		name, err := p.GetConnectionNameForAsset(asset)
-		if err != nil || name == "" {
-			continue
-		}
-		conn := connections.GetConnection(name)
-		validator, ok := conn.(queryValidator)
-		if ok {
+		if validator := queryValidatorForAsset(p, connections, asset); validator != nil {
 			return validator
 		}
 	}
 	return nil
+}
+
+func queryValidatorForAsset(p *pipeline.Pipeline, connections connectionManager, asset *pipeline.Asset) queryValidator {
+	if p == nil || connections == nil || asset == nil || !asset.IsSQLAsset() {
+		return nil
+	}
+	name, err := p.GetConnectionNameForAsset(asset)
+	if err != nil || name == "" {
+		return nil
+	}
+	validator, ok := connections.GetConnection(name).(queryValidator)
+	if !ok {
+		return nil
+	}
+	return validator
 }
 
 func semanticDirForPipeline(ctx context.Context, fs afero.Fs, p *pipeline.Pipeline, finder repoFinder) string {
