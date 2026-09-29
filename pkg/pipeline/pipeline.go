@@ -2536,7 +2536,7 @@ func (p *Pipeline) GetAllConnectionNamesForAsset(asset *Asset) ([]string, error)
 		}
 
 		return []string{ingestrDestination, ingestrSource}, nil
-	} else if assetMainTaskIsConnectionless(assetType) {
+	} else if assetMainTaskIsConnectionless(asset) {
 		return nil, nil
 	} else {
 		conn, err := p.GetConnectionNameForAsset(asset)
@@ -2548,8 +2548,11 @@ func (p *Pipeline) GetAllConnectionNamesForAsset(asset *Asset) ([]string, error)
 	}
 }
 
-func assetMainTaskIsConnectionless(assetType AssetType) bool {
-	switch assetType {
+func assetMainTaskIsConnectionless(asset *Asset) bool {
+	switch asset.Type {
+	case AssetTypeTableau, AssetTypeTableauDatasource, AssetTypeTableauWorkbook:
+		refresh, _ := asset.Parameters.GetString("refresh")
+		return refresh != "true"
 	case AssetTypeAthenaSource,
 		AssetTypeBigquerySource,
 		AssetTypeClickHouseSource,
