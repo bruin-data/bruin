@@ -380,7 +380,7 @@ func (c *Config) Persist() error {
 }
 
 func (c *Config) PersistToFs(fs afero.Fs) error {
-	return path2.WriteYaml(fs, c.path, c)
+	return path2.WriteSecretYaml(fs, c.path, c)
 }
 
 func (c *Config) SelectEnvironment(name string) error {
