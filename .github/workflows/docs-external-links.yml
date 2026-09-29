@@ -54,11 +54,27 @@ jobs:
             echo "The weekly [external link check](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}) found broken links."
             echo "Fix the link, or add a pattern to \`lychee.toml\` if the URL is a placeholder or blocks automated checkers."
             echo
-            head -c 60000 lychee-report.md
+            if [ -s lychee-report.md ]; then
+              head -c 60000 lychee-report.md
+            else
+              echo "lychee did not produce a report; see the run logs."
+            fi
           } > issue.md
           number=$(gh issue list --state open --search "in:title \"${TITLE}\"" --json number --jq '.[0].number')
           if [ -n "${number}" ]; then
             gh issue edit "${number}" --body-file issue.md
           else
             gh issue create --title "${TITLE}" --body-file issue.md
+          fi
+
+
+      - name: Close the broken links issue
+        if: steps.lychee.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TITLE: 'Broken external links in docs'
+        run: |
+          number=$(gh issue list --state open --search "in:title \"${TITLE}\"" --json number --jq '.[0].number')
+          if [ -n "${number}" ]; then
+            gh issue close "${number}" --comment "All external links pass as of ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}."
           fi

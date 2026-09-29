@@ -10,6 +10,9 @@ user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36
 # 401/403/429 mean the site blocked or rate-limited the checker, not that the page is gone.
 accept = ["200..=299", "401", "403", "429"]
 
+# CLAUDE.md is a symlink to AGENTS.md.
+exclude_path = ["CLAUDE.md"]
+
 exclude_loopback = true
 exclude_private = true
 

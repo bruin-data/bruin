@@ -315,10 +315,10 @@ generated from the README: edit `templates/<name>/README.md`, run
 ```bash
 npm run docs:build              # Fails on links to missing pages
 scripts/check_docs_links.sh     # Internal pages and #anchors in the built site; CI blocks on this
-make validate-links             # External URLs; also runs weekly in CI and opens an issue
+make validate-links             # External URLs in docs, templates and root Markdown; runs weekly in CI
 ```
 
-Checks need [lychee](https://lychee.cli.rs/installation/) (`brew install lychee`).
+Checks need [lychee](https://github.com/lycheeverse/lychee#installation) (`brew install lychee`).
 
 VitePress builds anchors differently from GitHub, so copy them from the rendered
 page instead of guessing: `` `.bruin.yml` `` → `#bruin-yml`, `Usage & Billing` →

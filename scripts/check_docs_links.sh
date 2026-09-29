@@ -3,7 +3,7 @@
 #
 #   scripts/check_docs_links.sh             Internal pages and #anchors in the built site.
 #                                           Offline; run `npm run docs:build` first.
-#   scripts/check_docs_links.sh --external  External URLs in the Markdown sources.
+#   scripts/check_docs_links.sh --external  External URLs in docs, template and root Markdown.
 #
 # Extra arguments are passed through to lychee.
 set -euo pipefail
@@ -11,13 +11,13 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 if ! command -v lychee >/dev/null 2>&1; then
-  echo "lychee not found. Install it with 'brew install lychee' or see https://lychee.cli.rs/installation/" >&2
+  echo "lychee not found. Install it with 'brew install lychee' or see https://github.com/lycheeverse/lychee#installation" >&2
   exit 1
 fi
 
 if [ "${1:-}" = "--external" ]; then
   shift
-  exec lychee --config lychee.toml --scheme https --scheme http --root-dir "$PWD/docs" "$@" 'docs/**/*.md' README.md CONTRIBUTING.md
+  exec lychee --config lychee.toml --scheme https --scheme http --root-dir "$PWD/docs" "$@" '*.md' 'docs/**/*.md' 'templates/**/*.md'
 fi
 
 dist=docs/.vitepress/dist
