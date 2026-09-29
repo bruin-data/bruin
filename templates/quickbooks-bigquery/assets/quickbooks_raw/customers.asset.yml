@@ -1,0 +1,159 @@
+name: quickbooks_raw.customers
+type: ingestr
+
+description: >
+  Raw QuickBooks Online Customer records (Accounting API v3) loaded into
+  BigQuery by ingestr. Each run fetches records whose `MetaData.LastUpdatedTime`
+  falls inside the run window and merges them on `id`, so edits are picked up by
+  the run that covers them. Records deleted in QuickBooks are not removed from
+  this table. Inactive customers are excluded by the QuickBooks query API and
+  stay as their last loaded version. Sub-customers and projects are stored as
+  separate rows linked through `parent_ref`.
+
+materialization:
+  type: table
+  strategy: merge
+
+parameters:
+  source_table: customers
+  enforce_schema: true
+
+tags:
+  - quickbooks_raw
+  - quickbooks
+  - accounting
+  - customers
+
+columns:
+  - name: id
+    type: varchar
+    description: QuickBooks customer identifier, unique within the company file.
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: lastupdatedtime
+    type: timestamp
+    description: >
+      `MetaData.LastUpdatedTime`, when the record was last modified in
+      QuickBooks. The source selects each run's records by it.
+    checks:
+      - name: not_null
+  - name: display_name
+    type: varchar
+    description: >
+      Name shown in QuickBooks lists; unique across customers, vendors, and
+      employees.
+    checks:
+      - name: not_null
+      - name: unique
+  - name: company_name
+    type: varchar
+    description: Company name of the customer.
+  - name: given_name
+    type: varchar
+    description: First name of the primary contact.
+  - name: family_name
+    type: varchar
+    description: Last name of the primary contact.
+  - name: fully_qualified_name
+    type: varchar
+    description: >
+      Display name prefixed by parent customer names, separated by colons, for
+      sub-customers.
+  - name: print_on_check_name
+    type: varchar
+    description: Name to print on checks issued to the customer.
+  - name: active
+    type: boolean
+    description: Whether the customer is active.
+    checks:
+      - name: not_null
+  - name: balance
+    type: double
+    description: Open balance owed by this customer, excluding sub-customers.
+  - name: balance_with_jobs
+    type: double
+    description: Open balance owed by this customer including sub-customers and jobs.
+  - name: currency_ref
+    type: json
+    description: >
+      Reference `{value, name}` where `value` is the QuickBooks `id` of the
+      related currency.
+  - name: primary_email_addr
+    type: json
+    description: Primary email address object `{Address}`.
+  - name: primary_phone
+    type: json
+    description: Primary phone number object `{FreeFormNumber}`.
+  - name: web_addr
+    type: json
+    description: Website address object `{URI}`.
+  - name: bill_addr
+    type: json
+    description: >
+      Billing address object with line, city, country subdivision, and postal
+      code fields.
+  - name: ship_addr
+    type: json
+    description: >
+      Shipping address object with line, city, country subdivision, and postal
+      code fields.
+  - name: notes
+    type: varchar
+    description: Free-form notes on the customer.
+  - name: sales_term_ref
+    type: json
+    description: >
+      Reference `{value, name}` where `value` is the QuickBooks `id` of the
+      related payment term (Term).
+  - name: preferred_delivery_method
+    type: varchar
+    description: >
+      Preferred delivery method for sales forms, for example `Print`, `Email`,
+      or `None`.
+  - name: taxable
+    type: boolean
+    description: Whether the customer is taxable.
+  - name: default_tax_code_ref
+    type: json
+    description: >
+      Reference `{value, name}` where `value` is the QuickBooks `id` of the
+      related tax code (TaxCode).
+  - name: job
+    type: boolean
+    description: >
+      Whether this record is a job (sub-customer) rather than a top-level
+      customer.
+  - name: is_project
+    type: boolean
+    description: Whether this record is a QuickBooks project.
+  - name: bill_with_parent
+    type: boolean
+    description: Whether the customer is billed with its parent customer.
+  - name: parent_ref
+    type: json
+    description: >
+      Reference `{value, name}` where `value` is the QuickBooks `id` of the
+      related parent customer (Customer). Only present for sub-customers and
+      jobs.
+  - name: meta_data
+    type: json
+    description: >
+      QuickBooks `MetaData` object holding `CreateTime` and `LastUpdatedTime`.
+  - name: sync_token
+    type: varchar
+    description: >
+      QuickBooks optimistic-concurrency version number; increments on every
+      update.
+  - name: domain
+    type: varchar
+    description: QuickBooks API domain, always `QBO`.
+  - name: sparse
+    type: boolean
+    description: >
+      Whether the API returned a sparse object containing only a subset of
+      fields.
+  - name: v4_id_pseudonym
+    type: varchar
+    description: Intuit's pseudonymous identifier for the record.

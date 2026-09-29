@@ -32,6 +32,7 @@ PUBLIC = REPO / "docs" / "public"
 SYNCED = (
     "chargebee-bigquery",
     "posthog-bigquery",
+    "quickbooks-bigquery",
     "stripe-bigquery",
 )
 
