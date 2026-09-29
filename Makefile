@@ -238,12 +238,8 @@ refresh-integration-expectations: build
 	@echo "$(OK_COLOR)==> Integration expectations refreshed successfully!$(NO_COLOR)"
 
 validate-links:
-	@echo "$(OK_COLOR)==> Validating web links in repository...$(NO_COLOR)"
-	@if ! command -v python3 > /dev/null 2>&1; then \
-		echo "$(ERROR_COLOR)Python 3 not found. Please install Python 3 to validate links.$(NO_COLOR)"; \
-		exit 1; \
-	fi
-	@python3 scripts/validate_links.py . || (echo "$(ERROR_COLOR)Link validation found broken links. Please fix them.$(NO_COLOR)" && exit 1)
+	@echo "$(OK_COLOR)==> Validating external links in docs...$(NO_COLOR)"
+	@scripts/check_docs_links.sh --external || (echo "$(ERROR_COLOR)Link validation found broken links. Please fix them.$(NO_COLOR)" && exit 1)
 
 # sometimes vendoring doesn't move the precompiled library
 duck-db-static-lib:

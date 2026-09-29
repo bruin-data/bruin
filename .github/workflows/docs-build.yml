@@ -10,6 +10,8 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - '.npmrc'
+      - 'lychee.toml'
+      - 'scripts/check_docs_links.sh'
   pull_request:
     branches: [ main ]
     paths:
@@ -19,6 +21,8 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - '.npmrc'
+      - 'lychee.toml'
+      - 'scripts/check_docs_links.sh'
 
 jobs:
   docs-build:
@@ -54,3 +58,20 @@ jobs:
             echo "Docs build failed: Output directory not found!"
             exit 1
           fi
+
+
+      - name: Install lychee
+        env:
+          LYCHEE_VERSION: '0.24.2'
+          LYCHEE_SHA256: '1f4e0ef7f6554a6ed33dd7ac144fb2e1bbed98598e7af973042fc5cd43951c9a'
+        run: |
+          archive="lychee-x86_64-unknown-linux-gnu.tar.gz"
+          curl -sSfL -o "${RUNNER_TEMP}/${archive}" \
+            "https://github.com/lycheeverse/lychee/releases/download/lychee-v${LYCHEE_VERSION}/${archive}"
+          echo "${LYCHEE_SHA256}  ${RUNNER_TEMP}/${archive}" | sha256sum -c -
+          tar -xzf "${RUNNER_TEMP}/${archive}" -C "${RUNNER_TEMP}" --strip-components=1
+          echo "${RUNNER_TEMP}" >> "${GITHUB_PATH}"
+
+
+      - name: Check internal links and anchors
+        run: scripts/check_docs_links.sh

@@ -311,6 +311,20 @@ generated from the README: edit `templates/<name>/README.md`, run
 `make sync-template-docs`, and commit both. Those pages open with a
 `<!-- Generated from … -->` comment; `make test` fails if one has drifted.
 
+### Checking Docs Links
+```bash
+npm run docs:build              # Fails on links to missing pages
+scripts/check_docs_links.sh     # Internal pages and #anchors in the built site; CI blocks on this
+make validate-links             # External URLs; also runs weekly in CI and opens an issue
+```
+
+Checks need [lychee](https://lychee.cli.rs/installation/) (`brew install lychee`).
+
+VitePress builds anchors differently from GitHub, so copy them from the rendered
+page instead of guessing: `` `.bruin.yml` `` → `#bruin-yml`, `Usage & Billing` →
+`#usage-billing`, `6. Add instructions` → `#_6-add-instructions`. When renaming a
+heading, search `docs/` for its old anchor.
+
 ### Database Connection Testing
 ```bash
 # List connections

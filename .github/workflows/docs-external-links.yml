@@ -1,0 +1,64 @@
+name: Docs External Links
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  external-links:
+    name: Check external links
+    runs-on: depot-ubuntu-latest
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 1
+
+
+      - name: Install lychee
+        env:
+          LYCHEE_VERSION: '0.24.2'
+          LYCHEE_SHA256: '1f4e0ef7f6554a6ed33dd7ac144fb2e1bbed98598e7af973042fc5cd43951c9a'
+        run: |
+          archive="lychee-x86_64-unknown-linux-gnu.tar.gz"
+          curl -sSfL -o "${RUNNER_TEMP}/${archive}" \
+            "https://github.com/lycheeverse/lychee/releases/download/lychee-v${LYCHEE_VERSION}/${archive}"
+          echo "${LYCHEE_SHA256}  ${RUNNER_TEMP}/${archive}" | sha256sum -c -
+          tar -xzf "${RUNNER_TEMP}/${archive}" -C "${RUNNER_TEMP}" --strip-components=1
+          echo "${RUNNER_TEMP}" >> "${GITHUB_PATH}"
+
+
+      - name: Check external links
+        id: lychee
+        continue-on-error: true
+        env:
+          # Avoids GitHub rate limits on github.com links.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: scripts/check_docs_links.sh --external --format markdown --output lychee-report.md
+
+
+      - name: Open or update the broken links issue
+        if: steps.lychee.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TITLE: 'Broken external links in docs'
+        run: |
+          {
+            echo "The weekly [external link check](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}) found broken links."
+            echo "Fix the link, or add a pattern to \`lychee.toml\` if the URL is a placeholder or blocks automated checkers."
+            echo
+            head -c 60000 lychee-report.md
+          } > issue.md
+          number=$(gh issue list --state open --search "in:title \"${TITLE}\"" --json number --jq '.[0].number')
+          if [ -n "${number}" ]; then
+            gh issue edit "${number}" --body-file issue.md
+          else
+            gh issue create --title "${TITLE}" --body-file issue.md
+          fi
