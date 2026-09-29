@@ -69,9 +69,9 @@ The `quickbooks_stage` dataset turns the raw objects into typed tables with read
 | `payments` | One row per customer payment | Amount received, applied and unapplied amounts, and deposit account |
 | `payment_applications` | One row per payment applied to an invoice | Applied amount, `days_to_pay`, and `days_past_due` for collections analysis |
 | `bills` | One row per vendor bill | Amounts, open balance, and `bill_status` |
-| `expense_lines` | One row per purchase or bill line | All spend in one table with payee, paid-from account, expense account, and an `is_uncategorized` flag; card refunds are negative |
+| `expense_lines` | One row per purchase or bill line | All spend in one table with payee, paid-from account, category account, and `is_expense` and `is_uncategorized` flags; card refunds are negative |
 
-`expense_lines` combines purchases and bills, so it holds every spend line whether it was paid at the point of sale or billed first. Lines are dated by their transaction, so a bill counts in the month it was billed, not the month it was paid. Lines can also post to balance sheet accounts, for example a check that pays off the credit card, so filter on `account_classification = 'Expense'` for profit-and-loss spend; otherwise card payoffs double count the card charges. Filter on `is_uncategorized` to find spend still sitting in `Uncategorized Expense`, `Uncategorized Asset`, or `Ask My Accountant`.
+`expense_lines` combines purchases and bills, so it holds every spend line whether it was paid at the point of sale or billed first. Lines are dated by their transaction, so a bill counts in the month it was billed, not the month it was paid. Lines can also post to balance sheet accounts, for example a check that pays off the credit card, so filter on `is_expense` for profit-and-loss spend; otherwise card payoffs double count the card charges. `is_expense` also counts item-based lines, whose item account is not loaded. Filter on `is_uncategorized` to find spend still sitting in `Uncategorized Expense`, `Uncategorized Asset`, or `Ask My Accountant`.
 
 Every asset declares its full column schema with types, descriptions, and checks. `enforce_schema: true` passes those types to ingestr, and `metadata_push` in `pipeline.yml` publishes the descriptions to BigQuery. `bruin docs my-quickbooks-pipeline` builds a browsable documentation site from the same definitions.
 
@@ -164,4 +164,4 @@ bruin run my-quickbooks-pipeline
 
 ## Customize it
 
-Build your own reports on top of the `quickbooks_stage` tables, for example MRR from `invoice_lines`, AR aging from open `invoices`, collections from `payment_applications`, or monthly spend by category and vendor from `expense_lines` filtered to expense accounts. Map your own placeholder account names in `expense_lines.sql` if your books use different ones, and review the column checks before relying on the data for financial reporting.
+Build your own reports on top of the `quickbooks_stage` tables, for example MRR from `invoice_lines`, AR aging from open `invoices`, collections from `payment_applications`, or monthly spend by category and vendor from `expense_lines` filtered on `is_expense`. Map your own placeholder account names in `expense_lines.sql` if your books use different ones, and review the column checks before relying on the data for financial reporting.

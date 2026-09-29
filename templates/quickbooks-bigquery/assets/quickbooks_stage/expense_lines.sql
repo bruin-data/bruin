@@ -7,8 +7,8 @@ description: >
   line is categorized to resolved. Card refunds carry a negative amount. Lines
   can post to balance sheet accounts as well as expenses, for example a check
   that pays down a credit card or loan, an owner's draw, or a capitalized
-  purchase, so filter on `account_classification = 'Expense'` for
-  profit-and-loss spend; otherwise card payoffs double count card charges.
+  purchase, so filter on `is_expense` for profit-and-loss spend; otherwise
+  card payoffs double count card charges.
   Vendor credits are not loaded, so they are not netted. Lines are dated by
   their transaction, so bills count when billed, not when paid.
 
@@ -56,6 +56,18 @@ columns:
   - name: line_id
     type: STRING
     description: QuickBooks line identifier within the transaction.
+  - name: line_type
+    type: STRING
+    description: >
+      `account_based` for lines categorized directly to an account,
+      `item_based` for lines that record a product or service item, which post
+      to the item's expense or inventory account.
+    checks:
+      - name: not_null
+      - name: accepted_values
+        value:
+          - account_based
+          - item_based
   - name: transaction_date
     type: DATE
     description: Date of the purchase or bill.
@@ -112,6 +124,16 @@ columns:
       Classification of the categorized account. `Expense` for profit-and-loss
       spend; `Asset`, `Liability`, or `Equity` for capitalized purchases, debt
       or card payoffs, and owner's draws.
+  - name: is_expense
+    type: BOOL
+    description: >
+      Whether the line counts as profit-and-loss spend: account-based lines on
+      an `Expense` account, and all item-based lines. The item's own account
+      is not loaded, so purchases of inventory items are counted as spend too.
+      False for lines on balance sheet accounts, such as card or loan payoffs,
+      owner's draws, and capitalized purchases.
+    checks:
+      - name: not_null
   - name: is_uncategorized
     type: BOOL
     description: >
@@ -226,6 +248,7 @@ SELECT
   line.transaction_id,
   line.line_index,
   JSON_VALUE(line.line, '$.Id') AS line_id,
+  IF(line.detail_type = 'ItemBasedExpenseLineDetail', 'item_based', 'account_based') AS line_type,
   line.transaction_date,
   line.payment_type,
   line.paid_from_account_id,
@@ -237,6 +260,10 @@ SELECT
   COALESCE(account.account_name, JSON_VALUE(line.detail, '$.AccountRef.name')) AS account_name,
   account.account_type,
   account.classification AS account_classification,
+  IFNULL(
+    line.detail_type = 'ItemBasedExpenseLineDetail' OR account.classification = 'Expense',
+    FALSE
+  ) AS is_expense,
   IFNULL(
     COALESCE(account.account_name, JSON_VALUE(line.detail, '$.AccountRef.name'))
       IN ('Uncategorized Expense', 'Uncategorized Asset', 'Ask My Accountant'),
