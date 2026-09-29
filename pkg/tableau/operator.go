@@ -29,6 +29,14 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 }
 
 func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) error {
+	// Lineage-only assets do not use a Tableau connection, even on full-refresh runs.
+	if refresh, _ := t.Parameters.GetString("refresh"); refresh != "true" {
+		return nil
+	}
+	if t.Type == pipeline.AssetTypeTableauWorksheet || t.Type == pipeline.AssetTypeTableauDashboard {
+		return nil
+	}
+
 	connName, err := p.GetConnectionNameForAsset(t)
 	if err != nil {
 		return errors.Wrap(err, "failed to get connection name for asset")
@@ -44,17 +52,11 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return errors.Errorf("connection '%s' is not a tableau connection", connName)
 	}
 
-	if refreshVal, _ := t.Parameters.GetString("refresh"); refreshVal == "" {
-		return nil
-	}
-
 	switch t.Type {
 	case pipeline.AssetTypeTableauDatasource:
 		return o.handleDatasourceRefresh(ctx, client, t)
 	case pipeline.AssetTypeTableauWorkbook:
 		return o.handleWorkbookRefresh(ctx, client, t)
-	case pipeline.AssetTypeTableauWorksheet, pipeline.AssetTypeTableauDashboard:
-		return nil
 	case pipeline.AssetTypeTableau:
 		return o.handleWorkbookRefresh(ctx, client, t)
 	default:
