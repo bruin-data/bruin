@@ -212,6 +212,12 @@ An Iceberg connection is a **catalog** (where table metadata lives) plus **stora
     <span>Loads core Stripe billing data into BigQuery and builds focused subscription, MRR, and invoice-billing reports.</span>
     <span class="template-card__tags"><code>Stripe</code><code>BigQuery</code><code>billing</code></span>
   </a>
+  <a class="template-card" href="./templates-docs/quickbooks-bigquery-README.html">
+    <span class="template-card__category">Accounting source</span>
+    <strong>quickbooks-bigquery</strong>
+    <span>Loads QuickBooks Online customers, invoices, payments, vendors, and the chart of accounts into BigQuery with documented, checked raw tables.</span>
+    <span class="template-card__tags"><code>QuickBooks</code><code>BigQuery</code><code>ingestr</code></span>
+  </a>
   <a class="template-card" href="./templates-docs/posthog-bigquery-README.html">
     <span class="template-card__category">Product analytics</span>
     <strong>posthog-bigquery</strong>
@@ -296,7 +302,7 @@ bruin init nyc-taxi my-taxi-pipeline
 | --- | --- |
 | Learn Bruin locally without cloud credentials | `duckdb`, `python`, `frankfurter`, `chess`, or `iceberg-sqlite-local` |
 | Load into an Iceberg lakehouse | `iceberg-sqlite-local` to try it, then `iceberg-glue-s3`, `iceberg-postgres-gcs`, `iceberg-rest-minio`, or `iceberg-hadoop-gcsinterop` |
-| Build a source-to-warehouse ingestion pipeline | `ai-coding-usage`, `shopify-bigquery`, `shopify-clickhouse`, `stripe-bigquery`, `posthog-bigquery`, `gsheet-bigquery`, `notion`, or `gorgias` |
+| Build a source-to-warehouse ingestion pipeline | `ai-coding-usage`, `shopify-bigquery`, `shopify-clickhouse`, `stripe-bigquery`, `quickbooks-bigquery`, `posthog-bigquery`, `gsheet-bigquery`, `notion`, or `gorgias` |
 | Migrate one Fivetran connection to a review-gated Bruin project | `migration-fivetran` |
 | Explore a complete demo with generated data | `demo-snowflake-sales-analytics`, `demo-snowflake-salesforce`, or `demo-payments-clickhouse` |
 | See near-real-time change capture and rollups end to end | `demo-payments-clickhouse` |

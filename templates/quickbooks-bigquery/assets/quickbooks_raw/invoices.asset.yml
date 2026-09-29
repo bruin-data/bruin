@@ -1,0 +1,164 @@
+name: quickbooks_raw.invoices
+type: ingestr
+
+description: >
+  Raw QuickBooks Online Invoice records (Accounting API v3) loaded into BigQuery
+  by ingestr. Each run fetches records whose `MetaData.LastUpdatedTime` falls
+  inside the run window and merges them on `id`, so edits are picked up by the
+  run that covers them. Records deleted in QuickBooks are not removed from this
+  table. `balance` is the current open amount at the time of the last load, so
+  it drops as payments are applied and the invoice reappears in the run that
+  covers the payment.
+
+materialization:
+  type: table
+  strategy: merge
+
+parameters:
+  source_table: invoices
+  enforce_schema: true
+
+tags:
+  - quickbooks_raw
+  - quickbooks
+  - accounting
+  - invoices
+
+columns:
+  - name: id
+    type: varchar
+    description: QuickBooks invoice identifier, unique within the company file.
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: lastupdatedtime
+    type: timestamp
+    description: >
+      `MetaData.LastUpdatedTime`, when the record was last modified in
+      QuickBooks. The source selects each run's records by it.
+    checks:
+      - name: not_null
+  - name: doc_number
+    type: varchar
+    description: >
+      Customer-facing invoice number; can be blank when custom transaction
+      numbers are off.
+  - name: txn_date
+    type: date
+    description: Date the invoice was issued.
+    checks:
+      - name: not_null
+  - name: due_date
+    type: date
+    description: Date the invoice payment is due.
+  - name: customer_ref
+    type: json
+    description: >
+      Reference `{value, name}` where `value` is the QuickBooks `id` of the
+      billed customer (Customer).
+    checks:
+      - name: not_null
+  - name: sales_term_ref
+    type: json
+    description: >
+      Reference `{value, name}` where `value` is the QuickBooks `id` of the
+      related payment term (Term).
+  - name: total_amt
+    type: double
+    description: Total invoice amount including tax and discounts.
+    checks:
+      - name: not_null
+      - name: non_negative
+  - name: balance
+    type: double
+    description: Current open amount still owed on the invoice.
+    checks:
+      - name: non_negative
+  - name: currency_ref
+    type: json
+    description: >
+      Reference `{value, name}` where `value` is the QuickBooks `id` of the
+      related currency.
+  - name: line
+    type: json
+    description: >
+      Array of invoice lines. `SalesItemLineDetail` lines carry `ItemRef`,
+      `Qty`, `UnitPrice`, `ItemAccountRef` (income account), and `TaxCodeRef`;
+      `SubTotalLineDetail` and `DiscountLineDetail` lines hold subtotals and
+      discounts.
+  - name: linked_txn
+    type: json
+    description: >
+      Array of transactions linked to the invoice, such as payments and
+      estimates, each with `TxnId` and `TxnType`.
+  - name: txn_tax_detail
+    type: json
+    description: >
+      Transaction-level tax detail, including `TotalTax` and per-rate tax
+      lines.
+  - name: customer_memo
+    type: json
+    description: Memo shown to the customer on the invoice `{value}`.
+  - name: private_note
+    type: varchar
+    description: Internal note not shown to the customer.
+  - name: bill_email
+    type: json
+    description: Email address the invoice is sent to `{Address}`.
+  - name: bill_addr
+    type: json
+    description: Billing address object.
+  - name: ship_from_addr
+    type: json
+    description: Address the goods ship from.
+  - name: custom_field
+    type: json
+    description: Array of custom field definitions and values set on the invoice.
+  - name: email_status
+    type: varchar
+    description: 'Email delivery status: `NotSet`, `NeedToSend`, or `EmailSent`.'
+  - name: print_status
+    type: varchar
+    description: 'Print status: `NotSet`, `NeedToPrint`, or `PrintComplete`.'
+  - name: apply_tax_after_discount
+    type: boolean
+    description: Whether tax is calculated after discounts are applied.
+  - name: free_form_address
+    type: boolean
+    description: Whether the billing address is entered as free-form text.
+  - name: allow_ipn_payment
+    type: boolean
+    description: Whether Intuit Payment Network payment is allowed on the invoice.
+  - name: allow_online_payment
+    type: boolean
+    description: Whether online payment is enabled for the invoice.
+  - name: allow_online_credit_card_payment
+    type: boolean
+    description: Whether online credit card payment is allowed.
+  - name: allow_online_ach_payment
+    type: boolean
+    description: Whether online ACH bank transfer payment is allowed.
+  - name: allow_online_pay_pal_payment
+    type: boolean
+    description: Whether online PayPal payment is allowed.
+  - name: allow_online_affirm_payment
+    type: boolean
+    description: Whether online Affirm payment is allowed.
+  - name: meta_data
+    type: json
+    description: >
+      QuickBooks `MetaData` object holding `CreateTime` and `LastUpdatedTime`.
+  - name: sync_token
+    type: varchar
+    description: >
+      QuickBooks optimistic-concurrency version number; increments on every
+      update.
+  - name: domain
+    type: varchar
+    description: QuickBooks API domain, always `QBO`.
+  - name: sparse
+    type: boolean
+    description: >
+      Whether the API returned a sparse object containing only a subset of
+      fields.

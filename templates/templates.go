@@ -22,6 +22,7 @@ import (
 //go:embed migration-fivetran/.gitignore
 //go:embed stripe-bigquery/.gitignore
 //go:embed chargebee-bigquery/.gitignore
+//go:embed quickbooks-bigquery/.gitignore
 //go:embed google-web-analytics/.gitignore
 //go:embed posthog-bigquery/.gitignore
 //go:embed academy-sql-beginner/.gitignore

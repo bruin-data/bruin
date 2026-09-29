@@ -1,0 +1,132 @@
+name: quickbooks_raw.accounts
+type: ingestr
+
+description: >
+  Raw QuickBooks Online Account records (the chart of accounts, Accounting API
+  v3) loaded into BigQuery by ingestr. Each run fetches records whose
+  `MetaData.LastUpdatedTime` falls inside the run window and merges them on
+  `id`, so edits are picked up by the run that covers them. Records deleted in
+  QuickBooks are not removed from this table. Inactive accounts are excluded by
+  the QuickBooks query API and stay as their last loaded version.
+  `current_balance` is the balance at the time of the last load.
+
+materialization:
+  type: table
+  strategy: merge
+
+parameters:
+  source_table: accounts
+  enforce_schema: true
+
+tags:
+  - quickbooks_raw
+  - quickbooks
+  - accounting
+  - chart_of_accounts
+
+columns:
+  - name: id
+    type: varchar
+    description: QuickBooks account identifier, unique within the company file.
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: lastupdatedtime
+    type: timestamp
+    description: >
+      `MetaData.LastUpdatedTime`, when the record was last modified in
+      QuickBooks. The source selects each run's records by it.
+    checks:
+      - name: not_null
+  - name: name
+    type: varchar
+    description: Account name as shown in the chart of accounts.
+    checks:
+      - name: not_null
+  - name: fully_qualified_name
+    type: varchar
+    description: Account name prefixed by parent account names, separated by colons.
+  - name: account_type
+    type: varchar
+    description: QuickBooks account type, for example `Bank`, `Expense`, or `Income`.
+    checks:
+      - name: not_null
+      - name: accepted_values
+        value:
+          - Bank
+          - Other Current Asset
+          - Fixed Asset
+          - Other Asset
+          - Accounts Receivable
+          - Equity
+          - Expense
+          - Other Expense
+          - Cost of Goods Sold
+          - Accounts Payable
+          - Credit Card
+          - Long Term Liability
+          - Other Current Liability
+          - Income
+          - Other Income
+  - name: account_sub_type
+    type: varchar
+    description: >
+      More specific account category within `account_type`, for example
+      `Checking`.
+  - name: classification
+    type: varchar
+    description: High-level classification derived from the account type.
+    checks:
+      - name: accepted_values
+        value:
+          - Asset
+          - Equity
+          - Expense
+          - Liability
+          - Revenue
+  - name: acct_num
+    type: varchar
+    description: User-defined account number.
+  - name: description
+    type: varchar
+    description: Free-form description of the account.
+  - name: active
+    type: boolean
+    description: Whether the account is active.
+  - name: sub_account
+    type: boolean
+    description: Whether the account is a sub-account of another account.
+  - name: parent_ref
+    type: json
+    description: >
+      Reference `{value, name}` where `value` is the QuickBooks `id` of the
+      related parent account (Account). Only present for sub-accounts.
+  - name: current_balance
+    type: double
+    description: Current balance of the account, excluding sub-accounts.
+  - name: current_balance_with_sub_accounts
+    type: double
+    description: Current balance of the account including sub-accounts.
+  - name: currency_ref
+    type: json
+    description: >
+      Reference `{value, name}` where `value` is the QuickBooks `id` of the
+      related currency.
+  - name: meta_data
+    type: json
+    description: >
+      QuickBooks `MetaData` object holding `CreateTime` and `LastUpdatedTime`.
+  - name: sync_token
+    type: varchar
+    description: >
+      QuickBooks optimistic-concurrency version number; increments on every
+      update.
+  - name: domain
+    type: varchar
+    description: QuickBooks API domain, always `QBO`.
+  - name: sparse
+    type: boolean
+    description: >
+      Whether the API returned a sparse object containing only a subset of
+      fields.

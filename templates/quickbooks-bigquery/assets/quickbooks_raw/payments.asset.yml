@@ -1,0 +1,107 @@
+name: quickbooks_raw.payments
+type: ingestr
+
+description: >
+  Raw QuickBooks Online Payment records (Accounting API v3) loaded into BigQuery
+  by ingestr. These are customer payments received against invoices, not vendor
+  payments. Each run fetches records whose `MetaData.LastUpdatedTime` falls
+  inside the run window and merges them on `id`, so edits are picked up by the
+  run that covers them. Records deleted in QuickBooks are not removed
+  from this table.
+
+materialization:
+  type: table
+  strategy: merge
+
+parameters:
+  source_table: payments
+  enforce_schema: true
+
+tags:
+  - quickbooks_raw
+  - quickbooks
+  - accounting
+  - payments
+
+columns:
+  - name: id
+    type: varchar
+    description: QuickBooks payment identifier, unique within the company file.
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: lastupdatedtime
+    type: timestamp
+    description: >
+      `MetaData.LastUpdatedTime`, when the record was last modified in
+      QuickBooks. The source selects each run's records by it.
+    checks:
+      - name: not_null
+  - name: txn_date
+    type: date
+    description: Date the payment was received.
+    checks:
+      - name: not_null
+  - name: customer_ref
+    type: json
+    description: >
+      Reference `{value, name}` where `value` is the QuickBooks `id` of the
+      paying customer (Customer).
+    checks:
+      - name: not_null
+  - name: total_amt
+    type: double
+    description: Total amount of the payment received.
+    checks:
+      - name: not_null
+      - name: non_negative
+  - name: unapplied_amt
+    type: double
+    description: Portion of the payment not yet applied to an invoice.
+  - name: currency_ref
+    type: json
+    description: >
+      Reference `{value, name}` where `value` is the QuickBooks `id` of the
+      related currency.
+  - name: line
+    type: json
+    description: >
+      Array of payment lines. Each line's `LinkedTxn` references the invoice
+      the payment is applied to, and `Amount` is the applied amount.
+  - name: deposit_to_account_ref
+    type: json
+    description: >
+      Reference `{value, name}` where `value` is the QuickBooks `id` of the
+      bank or Undeposited Funds account (Account) the payment is deposited to.
+  - name: payment_method_ref
+    type: json
+    description: >
+      Reference `{value, name}` where `value` is the QuickBooks `id` of the
+      related payment method (PaymentMethod).
+  - name: payment_ref_num
+    type: varchar
+    description: Reference number for the payment, such as a check number.
+  - name: private_note
+    type: varchar
+    description: Internal note not shown to the customer.
+  - name: process_payment
+    type: boolean
+    description: Whether the payment is processed through QuickBooks Payments.
+  - name: meta_data
+    type: json
+    description: >
+      QuickBooks `MetaData` object holding `CreateTime` and `LastUpdatedTime`.
+  - name: sync_token
+    type: varchar
+    description: >
+      QuickBooks optimistic-concurrency version number; increments on every
+      update.
+  - name: domain
+    type: varchar
+    description: QuickBooks API domain, always `QBO`.
+  - name: sparse
+    type: boolean
+    description: >
+      Whether the API returned a sparse object containing only a subset of
+      fields.
