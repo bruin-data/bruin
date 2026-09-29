@@ -8,7 +8,7 @@ The pipeline includes two sample assets already:
 
 ## Setup
 
-The pipeline already includes an empty `.bruin.yml` file, fill it with your connections and environments. You can read more about connections [here](https://getbruin.com/docs/bruin/commands/connections.html).
+Add your connections and environments to the `.bruin.yml` file at your project root, not inside the pipeline folder. You can read more about connections [here](https://getbruin.com/docs/bruin/commands/connections.html).
 
 Here's a sample `.bruin.yml` file:
 
@@ -22,7 +22,7 @@ environments:
                   path: "<path to database>"
 
             shopify:
-                - name: "my-shopify-connection"
+                - name: "shopify-default"
                   api_key: "********"
                   url: "******.myshopify.com"
 ```
@@ -39,7 +39,7 @@ environments:
                   path: "<path to database>"
 
             shopify:
-                - name: "my-shopify-connection"
+                - name: "shopify-default"
                   url: "******.myshopify.com"
                   client_id: "your_client_id"
                   client_secret: "your_client_secret"
@@ -50,7 +50,7 @@ environments:
 Bruin CLI can run the whole pipeline or any task with the downstreams:
 
 ```shell
-bruin run assets/shopify.orders.asset.yml
+bruin run .
 ```
 
 You can also run a single task:

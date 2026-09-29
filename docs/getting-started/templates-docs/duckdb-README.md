@@ -6,7 +6,7 @@ like `not_null`, `unique`, and `primary_key`.
 
 ## Setup
 
-The pipeline already includes an empty `.bruin.yml` file, fill it with your connections and environments. You can read more about connections [here](https://getbruin.com/docs/bruin/commands/connections.html).
+Add your connections and environments to the `.bruin.yml` file at your project root, not inside the pipeline folder. You can read more about connections [here](https://getbruin.com/docs/bruin/commands/connections.html).
 
 Here's a sample `.bruin.yml` file:
 

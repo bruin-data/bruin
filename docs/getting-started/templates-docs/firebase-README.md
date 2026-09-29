@@ -4,22 +4,20 @@ This pipeline is a simple example of a Bruin pipeline for Firebase.
 
 The pipeline includes several sample assets:
 
-- `events/events.asset.yaml`: Monitors for new events data in BigQuery to trigger downstream assets when new data is detected.
-- `events/events.sql`: Defines a BigQuery view for formatted Firebase Analytics event data to support ad-hoc analysis.
-- `fn/date_in_range.sql`: A function asset that checks if a date is within a specified range.
-- `fn/get_params_to_json.sql`: A function asset that converts parameter data to JSON format.
-- `fn/get_param_bool.sql`, `fn/get_param_double.sql`, `fn/get_param_int.sql`, `fn/get_param_str.sql`: SQL assets that retrieve specific types of parameters (boolean, double, integer, string).
-- `fn/parse_version.sql`: A function asset for parsing version information from a string.
-- `fn/user_properties_to_json.sql`: A function asset that converts user properties into JSON format, excluding certain fields.
-- `user_model/cohorts.sql`: A SQL asset that defines cohort-based aggregations for user data.
-- `user_model/users.sql`: A SQL asset that defines the users table structure.
-- `user_model/users_daily.sql`: A SQL asset that manages daily updates for user data.
+- `analytics_123456789/events.asset.yaml` / `events_intraday.asset.yaml`: Sensors that watch for new Firebase export tables in BigQuery and trigger downstream tasks. Keep one depending on your export type (daily vs intraday).
+- `analytics_123456789/parse_version.sql`: BigQuery UDF that normalizes app version strings (e.g. `1.20.3` → `001.020.003`) for sortable comparisons.
+- `events/stg_events.sql`: View over the raw `analytics_*.events_*` wildcard table. Owns all parsing/flattening logic (event_params, user_properties, experiments, device, geo).
+- `events/events_json.sql`: Materialized incremental table over `stg_events`, partitioned by `dt`, clustered by `event_name` + `user_pseudo_id`. Used for historical queries.
+- `events/events.sql`: View that unions `events_json` (history, `dt <= end_date`) with `stg_events` (intraday, `dt > end_date`) for near-real-time coverage without re-scanning history. Adds typed columns (screen, session, ads, idfa/idfv).
+- `user_model/stg_users_daily.sql`: Incremental table with daily user-level aggregates (sessions, ad/IAP revenue, first/last device & geo of day) from `events.events`.
+- `user_model/users.sql`: User-level table with install-time attributes and cohorted retention/revenue metrics (`ret_d{1..90}`, `{metric}_d{N}`).
+- `user_model/users_daily.sql`: Enriched daily rollup that joins `stg_users_daily` back with `users` to tag each daily row with install context, `days_since_install`, and `nth_active_day`.
 
 For a more detailed description of each asset, refer to the **description** section within each sql asset. Each file provides specific details and instructions relevant to its functionality.
 
 ## Setup
 
-The pipeline includes a `.bruin.yml` file where you need to configure your connections and environments. You can read more about connections [here](https://getbruin.com/docs/bruin/commands/connections.html).
+Add your connections and environments to the `.bruin.yml` file at your project root, not inside the pipeline folder. You can read more about connections [here](https://getbruin.com/docs/bruin/commands/connections.html).
 
 Here's a sample `.bruin.yml` configuration:
 
@@ -35,7 +33,9 @@ environments:
 
 ## Important Notes
 
-Review TODOs: The SQL files events/events.sql, user_model/users_daily.sql, and events_json.sql contain TODO comments. These indicate sections where you should make adjustments based on your data and project requirements.
+1- Rename `analytics_123456789` (folder + references in `stg_events.sql`) to your Firebase analytics ID.
+2- Keep only `events_intraday.asset.yaml` or `events.asset.yaml` depending on your use case. We recommend `events_intraday` since streaming data is not bound by the 1M events/day limit. `stg_events.sql` defaults to the intraday sensor — update its `depends:` block if you use daily export instead.
+3- Review TODOs: `events/stg_events.sql`, `events/events.sql`, and `user_model/stg_users_daily.sql` contain TODO comments. These indicate sections where you should make adjustments based on your data and project requirements (analytics ID, user_id vs user_pseudo_id, app-specific event params and metrics).
 
 ## Running the pipeline
 

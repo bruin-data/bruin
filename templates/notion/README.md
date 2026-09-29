@@ -8,7 +8,7 @@ The pipeline includes two sample assets already:
   - Feel free to change the type from `bq.sql` to anything.
 
 ## Setup
-The pipeline already includes an empty `.bruin.yml` file, fill it with your connections and environments. You can read more about connections [here](https://getbruin.com/docs/bruin/commands/connections.html).
+Add your connections and environments to the `.bruin.yml` file at your project root, not inside the pipeline folder. You can read more about connections [here](https://getbruin.com/docs/bruin/commands/connections.html).
 
 Here's a sample `.bruin.yml` file:
 
@@ -30,36 +30,13 @@ environments:
 bruin CLI can run the whole pipeline or any task with the downstreams:
 
 ```shell
-bruin run assets/notion.asset.yml
-```
-
-```shell
-Starting the pipeline execution...
-
-[2023-03-16T18:25:14Z] [worker-0] Running: dashboard.bruin-test
-[2023-03-16T18:25:16Z] [worker-0] Completed: dashboard.bruin-test (1.681s)
-[2023-03-16T18:25:16Z] [worker-4] Running: hello
-[2023-03-16T18:25:16Z] [worker-4] [hello] >> Hello, world!
-[2023-03-16T18:25:16Z] [worker-4] Completed: hello (116ms)
-
-Executed 2 tasks in 1.798s
+bruin run .
 ```
 
 You can also run a single task:
 
 ```shell
-bruin run assets/hello.py                            
-```
-
-```shell
-Starting the pipeline execution...
-
-[2023-03-16T18:25:59Z] [worker-0] Running: hello
-[2023-03-16T18:26:00Z] [worker-0] [hello] >> Hello, world!
-[2023-03-16T18:26:00Z] [worker-0] Completed: hello (103ms)
-
-
-Executed 1 tasks in 103ms
+bruin run assets/notion.asset.yml
 ```
 
 You can optionally pass a `--downstream` flag to run the task with all of its downstreams.
