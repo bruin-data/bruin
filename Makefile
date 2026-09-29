@@ -238,8 +238,8 @@ refresh-integration-expectations: build
 	@echo "$(OK_COLOR)==> Integration expectations refreshed successfully!$(NO_COLOR)"
 
 validate-links:
-	@echo "$(OK_COLOR)==> Validating external links in docs...$(NO_COLOR)"
-	@scripts/check_docs_links.sh --external || (echo "$(ERROR_COLOR)Link validation found broken links. Please fix them.$(NO_COLOR)" && exit 1)
+	@echo "$(OK_COLOR)==> Validating external links in docs, templates and root Markdown...$(NO_COLOR)"
+	@lychee --config lychee.toml --scheme https --scheme http --root-dir . '*.md' 'docs/**/*.md' 'templates/**/*.md' || (echo "$(ERROR_COLOR)Link validation found broken links. Please fix them.$(NO_COLOR)" && exit 1)
 
 # sometimes vendoring doesn't move the precompiled library
 duck-db-static-lib:

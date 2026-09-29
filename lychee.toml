@@ -1,5 +1,5 @@
-# Shared lychee settings for scripts/check_docs_links.sh.
-# Internal checks run with --offline; these settings mostly shape the external check.
+# Shared lychee settings for the docs link checks (docs-build.yml, docs-external-links.yml, make validate-links).
+# The internal check runs with --offline; these settings mostly shape the external check.
 
 no_progress = true
 max_concurrency = 32
