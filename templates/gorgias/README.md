@@ -10,7 +10,7 @@ This pipeline is a simple example of a Bruin pipeline that copies data from Gorg
 > Gorgias has very strict rate limits as of the time of building this pipeline, 2 req/s. This means that we cannot extract data from Gorgias in parallel, therefore all of these steps here are built to run sequentially. This is not a problem for small datasets, but it can be a bottleneck for larger datasets.
 
 ## Setup
-The pipeline already includes an empty `.bruin.yml` file, fill it with your connections and environments. You can read more about connections [here](https://getbruin.com/docs/bruin/ingestion/gorgias).
+Add your connections and environments to the `.bruin.yml` file at your project root, not inside the pipeline folder. You can read more about connections [here](https://getbruin.com/docs/bruin/ingestion/gorgias).
 
 Here's a sample `.bruin.yml` file:
 
@@ -35,36 +35,13 @@ bruin CLI can run the whole pipeline or any task with the downstreams:
 
 ```shell
 # this will get all the satisfaction surveys starting from 2024-01-01
-bruin --start-date 2024-01-01 run assets/satisfaction_surveys.asset.yml
-```
-
-```shell
-Starting the pipeline execution...
-
-[2023-03-16T18:25:14Z] [worker-0] Running: dashboard.bruin-test
-[2023-03-16T18:25:16Z] [worker-0] Completed: dashboard.bruin-test (1.681s)
-[2023-03-16T18:25:16Z] [worker-4] Running: hello
-[2023-03-16T18:25:16Z] [worker-4] [hello] >> Hello, world!
-[2023-03-16T18:25:16Z] [worker-4] Completed: hello (116ms)
-
-Executed 2 tasks in 1.798s
+bruin run --start-date 2024-01-01 assets/satisfaction_surveys.asset.yml
 ```
 
 You can also run a single task:
 
 ```shell
-bruin run assets/hello.py                            
-```
-
-```shell
-Starting the pipeline execution...
-
-[2023-03-16T18:25:59Z] [worker-0] Running: hello
-[2023-03-16T18:26:00Z] [worker-0] [hello] >> Hello, world!
-[2023-03-16T18:26:00Z] [worker-0] Completed: hello (103ms)
-
-
-Executed 1 tasks in 103ms
+bruin run assets/satisfaction_surveys.asset.yml
 ```
 
 You can optionally pass a `--downstream` flag to run the task with all of its downstreams.

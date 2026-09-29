@@ -151,6 +151,8 @@ Use either an `sk_test_...` or `sk_live_...` secret key. A publishable `pk_...` 
 
 Initialize a project from the template:
 
+Run this from the root of an existing Git project so Bruin adds the pipeline there:
+
 ```bash
 bruin init stripe-bigquery my-stripe-pipeline
 ```

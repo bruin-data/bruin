@@ -4,6 +4,8 @@ The **ecommerce** template is an interactive template that scaffolds a complete 
 
 ## Usage
 
+Run these commands from the root of an existing Git project so Bruin adds the `ecommerce` pipeline there.
+
 ```bash
 bruin init ecommerce
 ```

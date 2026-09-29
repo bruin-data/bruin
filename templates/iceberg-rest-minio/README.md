@@ -9,7 +9,7 @@ Loads two tables from [Frankfurter](https://frankfurter.dev), a public exchange-
 
 ```bash
 docker compose up -d          # MinIO + the bucket + the REST catalog
-bruin run iceberg-rest-minio
+bruin run .
 ```
 
 Browse what landed in the MinIO console at `localhost:9001` (`minioadmin` / `minioadmin`), under `warehouse/raw/`:

@@ -13,7 +13,7 @@ The pipeline includes the following example assets:
 
 ## Setup
 
-The pipeline already includes an empty `.bruin.yml` file, fill it with your connections and environments. You can read more about connections [here](https://getbruin.com/docs/bruin/commands/connections.html).
+Add your connections and environments to the `.bruin.yml` file at your project root, not inside the pipeline folder. You can read more about connections [here](https://getbruin.com/docs/bruin/commands/connections.html).
 
 Here's a sample `.bruin.yml` file:
 
@@ -33,27 +33,16 @@ You can simply switch the environment using the `--environment` flag, e.g.:
 
 ## Running the pipeline
 
-bruin CLI can run the whole pipeline or any task with the downstreams:
+Run these commands from the generated `frankfurter` pipeline directory. To run the whole pipeline:
 
 ```shell
-bruin run ./frankfurter/pipeline.yml
+bruin run .
 ```
 
 You can also run a single task:
 
 ```shell
-bruin run assets/hello.py                            
-```
-
-```shell
-Starting the pipeline execution...
-
-[2023-03-16T18:25:59Z] [worker-0] Running: hello
-[2023-03-16T18:26:00Z] [worker-0] [hello] >> Hello, world!
-[2023-03-16T18:26:00Z] [worker-0] Completed: hello (103ms)
-
-
-Executed 1 assets in 103ms
+bruin run assets/frankfurter_raw/rates.asset.yml
 ```
 
 You can optionally pass a `--downstream` flag to run the task with all of its downstreams.

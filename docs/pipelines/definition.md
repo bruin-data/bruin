@@ -176,7 +176,7 @@ start_date: "2024-01-01"
 
 - **Type:** `String` (ISO 8601 date, `YYYY-MM-DD`). The linter rejects any other format.
 
-> Local ad-hoc runs (`bruin run`) take their run window from the `--start-date` / `--end-date` flags (both default to yesterday) and do not read this field. To make a single asset start from a fixed date on `--full-refresh`, set [`start_date` on the asset](/assets/definition-schema#start_date) instead.
+> Local ad-hoc runs (`bruin run`) take their run window from the `--start-date` / `--end-date` flags (both default to yesterday) and do not read this field. To make a single asset start from a fixed date on `--full-refresh`, set [`start_date` on the asset](/assets/definition-schema#start-date) instead.
 
 ### Default connections
 

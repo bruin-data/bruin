@@ -21,27 +21,16 @@ The pipeline includes the following SQL assets located in the `assets/` folder:
 
 ## Running the pipeline
 
-Bruin CLI can run the whole pipeline or any task with the downstreams:
+Run these commands from the generated `athena` pipeline directory. To run the whole pipeline:
 
 ```shell
-bruin --start-date 2024-01-01 run ./athena/pipeline.yml
+bruin run --start-date 2024-01-01 .
 ```
 
 You can also run a single task:
 
 ```shell
-bruin run assets/hello.py                            
-```
-
-```shell
-Starting the pipeline execution...
-
-[2023-03-16T18:25:59Z] [worker-0] Running: hello
-[2023-03-16T18:26:00Z] [worker-0] [hello] >> Hello, world!
-[2023-03-16T18:26:00Z] [worker-0] Completed: hello (103ms)
-
-
-Executed 1 assets in 103ms
+bruin run assets/cars.sql
 ```
 
 You can optionally pass a `--downstream` flag to run the task with all of its downstreams.

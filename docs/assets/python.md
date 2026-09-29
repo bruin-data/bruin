@@ -310,7 +310,7 @@ for cohort in vars["experiment_cohorts"]:
 :::
 
 ::: tip
-You can override the value of variables at runtime using `--var` [flag](/assets/templating/templating#overriding-variables).
+You can override the value of variables at runtime using the `--var` [flag](/variables/overview#overriding-variables-at-runtime).
 :::
 
 ## Materialization

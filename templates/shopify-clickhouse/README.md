@@ -86,16 +86,16 @@ bruin init shopify-clickhouse
 cd shopify-clickhouse
 ```
 
-Set `start_date` in `pipeline.yml` to the earliest Shopify history you need, then validate the generated pipeline from the repository root:
+Set `start_date` in `pipeline.yml` to the earliest Shopify history you need, then validate the generated pipeline:
 
 ```bash
-bruin validate shopify-clickhouse
+bruin validate .
 ```
 
 For the first load, run a full refresh over the same historical period. Replace the dates with your desired range:
 
 ```bash
-bruin run shopify-clickhouse \
+bruin run . \
   --full-refresh \
   --start-date "2020-01-01 00:00:00" \
   --end-date "YYYY-MM-DD 23:59:59.999999"
@@ -104,7 +104,7 @@ bruin run shopify-clickhouse \
 After the initial load, run the pipeline on its daily schedule or supply a bounded interval to safely reprocess changed records:
 
 ```bash
-bruin run shopify-clickhouse \
+bruin run . \
   --start-date "YYYY-MM-DD 00:00:00" \
   --end-date "YYYY-MM-DD 23:59:59.999999"
 ```

@@ -1,6 +1,6 @@
 # IBM Db2
 
-[IBM Db2](https://www.ibm.com/db2) is a high-performance, enterprise-grade relational database system designed for reliability, scalability, and transactional integrity.
+[IBM Db2](https://www.ibm.com/products/db2) is a high-performance, enterprise-grade relational database system designed for reliability, scalability, and transactional integrity.
 
 Bruin supports DB2 as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from DB2 into your data warehouse.
 

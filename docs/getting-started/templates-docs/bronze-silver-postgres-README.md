@@ -58,6 +58,8 @@ Feel free to parameterize the credentials with environment variables or secrets 
 
 ## Try it out
 
+Run these commands from the root of an existing Git project so Bruin adds `fx-demo` there. Configure the generated project-root `.bruin.yml` with your PostgreSQL credentials before validation and execution.
+
 ```bash
 bruin init bronze-silver-postgres fx-demo
 cd fx-demo

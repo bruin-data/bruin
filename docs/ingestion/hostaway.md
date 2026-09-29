@@ -99,5 +99,5 @@ curl -X DELETE 'https://api.hostaway.com/v1/accessTokens?token=YOUR_ACCESS_TOKEN
 
 - **Authentication**: Hostaway uses OAuth 2.0 client credentials authentication. Access tokens are JWTs with configurable expiration times - manage them securely and rotate them as needed.
 - **Incremental Loading**: Only `listings` and `listing_fee_settings` support incremental loading. Use `--interval-start` and `--interval-end` parameters for these tables.
-- **API Documentation**: More details on the Hostaway API can be found in the [official API documentation](https://api-docs.hostaway.com/).
+- **API Documentation**: More details on the Hostaway API can be found in the [official API documentation](https://api.hostaway.com/documentation).
 - **Rate Limits**: Be aware of Hostaway API rate limits when ingesting large amounts of data.
