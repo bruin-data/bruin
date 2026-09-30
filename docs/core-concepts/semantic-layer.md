@@ -406,7 +406,7 @@ dimensions:
 | `min` | number or string | Every value is greater than or equal to `value`. |
 | `max` | number or string | Every value is less than or equal to `value`. |
 | `accepted_values` | list | Every value is in the list. |
-| `pattern` | string | Every value matches the regular expression. Bruin uses the regex operator of the connection's platform. MSSQL, Synapse, and Fabric have no regex operator, so Bruin uses `LIKE` with the value there. |
+| `pattern` | string | Every value matches the regular expression. Bruin uses the regex operator of the connection's platform. MSSQL, Synapse, and Fabric have no regex operator, so there the value must be a `LIKE` pattern such as `[A-Z][A-Z]`, and values starting with `^` or ending with `$` are rejected. |
 
 As with column checks, every dimension check except `not_null` ignores null values.
 

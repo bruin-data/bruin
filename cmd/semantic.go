@@ -121,6 +121,11 @@ func semanticCheckCommand(isDebug *bool) *cli.Command {
 			defer catalog.Close()
 
 			report := runSemanticChecks(ctx, catalog)
+			// A run that executes nothing should not look like a passing run in CI.
+			if len(report.Results) == 0 && len(report.Errors) == 0 {
+				printError(errors.New("the selected semantic models define no quality checks"), output, "No semantic quality checks to run")
+				return cli.Exit("", 1)
+			}
 			if output == "json" {
 				if err := printSemanticJSON(report); err != nil {
 					return err

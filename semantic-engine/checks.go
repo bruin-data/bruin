@@ -489,6 +489,12 @@ func (e *Engine) compileDimensionCheck(d *Dimension, check Check, opts CompileCh
 		}
 	case checkPattern:
 		pattern, _ := check.Value.(string)
+		// T-SQL platforms have no regex operator, so the pattern runs through
+		// LIKE, matching Bruin's MSSQL column check. Regex anchors are
+		// meaningless there and would silently fail every value.
+		if usesLikePatterns(opts.Dialect) && (strings.HasPrefix(pattern, "^") || strings.HasSuffix(pattern, "$")) {
+			return CompiledCheck{}, fmt.Errorf("pattern %q looks like a regular expression, but pattern checks use LIKE syntax on this platform, for example '[A-Z][A-Z]'", pattern)
+		}
 		sql = fmt.Sprintf("SELECT count(*) AS "+checkValueColumn+" FROM %s WHERE %s", table, patternMismatchSQL(expr, pattern, opts.Dialect))
 		failure = func(count int64) string {
 			return fmt.Sprintf("dimension '%s' has %d values that do not match the pattern", d.Name, count)
@@ -594,12 +600,16 @@ func (e *Engine) compileModelCheck(check ModelCheck) (CompiledCheck, error) {
 
 	// SQL Server and its relatives reject ORDER BY inside a derived table, and
 	// both the count wrapper below and the validation probe wrap the query in
-	// one. Dropping the sort avoids that, and normally changes neither the rows
-	// returned nor whether the query is valid.
+	// one. Dropping the sort avoids that. When the sort also feeds the grouping
+	// (see sortGroupingDimensions), those fields are selected as dimensions
+	// instead, so the query still returns the same number of rows.
 	unsorted := sql
-	if len(check.Query.Sort) > 0 && !e.sortChangesGrouping(check.Query) {
+	if len(check.Query.Sort) > 0 {
 		withoutSort := *check.Query
 		withoutSort.Sort = nil
+		if extra := e.sortGroupingDimensions(check.Query); len(extra) > 0 {
+			withoutSort.Dimensions = append(append([]DimensionRef(nil), check.Query.Dimensions...), extra...)
+		}
 		if unsorted, err = e.GenerateSQL(&withoutSort); err != nil {
 			return CompiledCheck{}, err
 		}
@@ -671,25 +681,27 @@ func (e *Engine) compileModelCheck(check ModelCheck) (CompiledCheck, error) {
 	return compiled, nil
 }
 
-// sortChangesGrouping reports whether dropping a query's sort would change the
-// rows it returns rather than just their order. A window-wrapped query promotes
-// each sort entry that is not a metric and not already selected into the inner
-// GROUP BY (see collectInnerDimensions), so there the sort is part of the
-// grouping.
-func (e *Engine) sortChangesGrouping(q *Query) bool {
+// sortGroupingDimensions returns the sort entries that also shape a query's
+// grouping. A window-wrapped query promotes each sort entry that is not a
+// metric and not already selected into the inner GROUP BY (see
+// collectInnerDimensions), so dropping those entries would change the rows the
+// query returns rather than just their order.
+func (e *Engine) sortGroupingDimensions(q *Query) []DimensionRef {
 	if len(q.Sort) == 0 || !e.needsWindowWrap(q.Metrics) {
-		return false
+		return nil
 	}
 	selected := make(map[string]bool, len(q.Dimensions))
 	for _, d := range q.Dimensions {
 		selected[d.Name] = true
 	}
+	var result []DimensionRef
 	for _, s := range q.Sort {
 		if e.metrics[s.Name] == nil && !selected[s.Name] {
-			return true
+			result = append(result, DimensionRef{Name: s.Name})
+			selected[s.Name] = true
 		}
 	}
-	return false
+	return result
 }
 
 // expectedCell is one column expectation inside an expected row.
@@ -831,6 +843,10 @@ func sortedStringKeys(m map[string]interface{}) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+func usesLikePatterns(dialect string) bool {
+	return dialect == "tsql" || dialect == "fabric"
 }
 
 func patternMismatchSQL(expr, pattern, dialect string) string {

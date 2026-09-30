@@ -127,6 +127,26 @@ func TestCompileChecksOrderAndModelOrdering(t *testing.T) {
 	}
 }
 
+func TestPatternCheckRejectsRegexOnLikeDialects(t *testing.T) {
+	t.Parallel()
+	model := func(pattern string) *Model {
+		return &Model{
+			Name:       "orders",
+			Source:     Source{Table: "analytics.orders"},
+			Dimensions: []Dimension{{Name: "country", Checks: []Check{{Name: "pattern", Value: pattern}}}},
+		}
+	}
+	if _, err := minimalEngine(t, model("^[A-Z]{2}$")).CompileChecks(CompileChecksOptions{Dialect: "tsql"}); err == nil || !strings.Contains(err.Error(), "LIKE syntax") {
+		t.Fatalf("expected a LIKE syntax error, got %v", err)
+	}
+	if _, err := minimalEngine(t, model("[A-Z][A-Z]")).CompileChecks(CompileChecksOptions{Dialect: "fabric"}); err != nil {
+		t.Fatalf("LIKE pattern should compile: %v", err)
+	}
+	if _, err := minimalEngine(t, model("^[A-Z]{2}$")).CompileChecks(CompileChecksOptions{Dialect: "postgres"}); err != nil {
+		t.Fatalf("regex pattern should compile on postgres: %v", err)
+	}
+}
+
 func TestPatternMismatchSQLByDialect(t *testing.T) {
 	t.Parallel()
 	cases := map[string]string{
@@ -1122,9 +1142,13 @@ func TestModelCheckKeepsSortWhenItChangesGrouping(t *testing.T) {
 		t.Fatalf("CompileChecks: %v", err)
 	}
 	grouped := compiledByID(t, checks, "orders.check.grouped")
-	// Dropping the sort here would drop region from the inner GROUP BY and
-	// count a different number of rows, so the sort stays.
-	expectContains(t, grouped.SQL, "ORDER BY base.region ASC) bruin_check")
+	// Dropping the sort alone would drop region from the inner GROUP BY and
+	// count a different number of rows, so region is selected as a dimension
+	// instead. The derived table must not keep an ORDER BY, which SQL Server
+	// rejects.
+	if strings.Contains(grouped.SQL, "ORDER BY base.region") {
+		t.Fatalf("count SQL should not sort inside the derived table:\n%s", grouped.SQL)
+	}
 	expectContains(t, grouped.SQL, "SELECT region AS region, order_date AS order_date")
 }
 

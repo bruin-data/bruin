@@ -60,7 +60,7 @@ bruin semantic check [path to semantic directory] [flags]
 
 Every model that has checks needs a connection, so pass `--connection` or set `source.connection` in the model. Bruin processes models one at a time and runs each model's checks in parallel.
 
-The command exits with code 1 if any check fails or errors, or if a model's checks cannot run, for example because the model has no connection.
+The command exits with code 1 if any check fails or errors, if a model's checks cannot run (for example, because the model has no connection), or if the selected models define no checks at all.
 
 `checks` and `run-checks` are aliases for `check`.
 

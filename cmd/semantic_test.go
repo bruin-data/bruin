@@ -516,4 +516,16 @@ checks:
 	require.NoError(t, json.Unmarshal([]byte(checkOut), &checkReport))
 	require.Len(t, checkReport.Errors, 1)
 	assert.Contains(t, checkReport.Errors[0], "model 'events' has no connection")
+
+	noChecks := `name: plain
+source:
+  connection: duckdb-semantic
+  table: (SELECT 1 AS id) AS plain
+dimensions:
+  - name: id
+`
+	require.NoError(t, os.WriteFile(filepath.Join(root, "semantic", "plain.yml"), []byte(noChecks), 0o600))
+	emptyOut, emptyCode := runSemanticCommandCapturingStdout(t, "check", "--config-file", configFile, "--output", "json", "--model", "plain")
+	require.Equal(t, 1, emptyCode, emptyOut)
+	assert.Contains(t, emptyOut, "define no quality checks")
 }
