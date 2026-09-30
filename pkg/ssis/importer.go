@@ -137,8 +137,33 @@ func Import(ctx context.Context, fs afero.Fs, opts ImportOptions) (*ImportResult
 	if err := validateDestination(fs, opts, assets); err != nil {
 		return nil, err
 	}
-	if err := fs.MkdirAll(filepath.Join(opts.PipelinePath, "assets"), 0o755); err != nil {
+	if err := fs.MkdirAll(opts.PipelinePath, 0o755); err != nil {
 		return nil, err
+	}
+	writeFile := func(path string, content []byte) error {
+		if err := fs.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return err
+		}
+		return afero.WriteFile(fs, path, content, 0o644)
+	}
+	if _, ok := fs.(*afero.OsFs); ok {
+		root, err := os.OpenRoot(opts.PipelinePath)
+		if err != nil {
+			return nil, err
+		}
+		defer root.Close()
+		// Keep the write boundary enforced even if a path is replaced with a
+		// symlink after preflight. Include pipeline.yml, not only assets.
+		writeFile = func(path string, content []byte) error {
+			relative, err := filepath.Rel(opts.PipelinePath, path)
+			if err != nil {
+				return err
+			}
+			if err := root.MkdirAll(filepath.Dir(relative), 0o755); err != nil {
+				return err
+			}
+			return root.WriteFile(relative, content, 0o644)
+		}
 	}
 	result := &ImportResult{}
 	pipelineFile := filepath.Join(opts.PipelinePath, "pipeline.yml")
@@ -148,7 +173,11 @@ func Import(ctx context.Context, fs afero.Fs, opts ImportOptions) (*ImportResult
 	}
 	if !exists {
 		p := &pipeline.Pipeline{Name: safeName(filepath.Base(filepath.Clean(opts.PipelinePath))), DefinitionFile: pipeline.DefinitionFile{Path: pipelineFile}}
-		if err := p.Persist(fs); err != nil {
+		content, err := p.FormatContent()
+		if err != nil {
+			return nil, err
+		}
+		if err := writeFile(pipelineFile, content); err != nil {
 			return nil, err
 		}
 		result.PipelineCreated = true
@@ -165,10 +194,12 @@ func Import(ctx context.Context, fs afero.Fs, opts ImportOptions) (*ImportResult
 			result.SkippedAssets++
 			continue
 		}
-		if err := fs.MkdirAll(filepath.Dir(asset.ExecutableFile.Path), 0o755); err != nil {
+		formatted := *asset // FormatContent removes inferred defaults from the receiver.
+		content, err := formatted.FormatContent()
+		if err != nil {
 			return nil, err
 		}
-		if err := asset.Persist(fs); err != nil {
+		if err := writeFile(asset.ExecutableFile.Path, content); err != nil {
 			return nil, err
 		}
 		if asset.Type == "python" {

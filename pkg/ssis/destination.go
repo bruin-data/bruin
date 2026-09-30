@@ -1,6 +1,7 @@
 package ssis
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -15,10 +16,6 @@ import (
 // to replace generated paths, not to delete same-named assets elsewhere.
 func validateDestination(fs afero.Fs, opts ImportOptions, assets []*pipeline.Asset) error {
 	directory := filepath.Join(opts.PipelinePath, "assets")
-	exists, err := afero.Exists(fs, directory)
-	if err != nil || !exists {
-		return err
-	}
 	byPath, byName := map[string]string{}, map[string]string{}
 	for _, asset := range assets {
 		path := filepath.Clean(asset.ExecutableFile.Path)
@@ -26,8 +23,14 @@ func validateDestination(fs afero.Fs, opts ImportOptions, assets []*pipeline.Ass
 		byName[asset.Name] = path
 	}
 	return afero.Walk(fs, directory, func(path string, info os.FileInfo, err error) error {
+		if path == directory && errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
 		if err != nil {
 			return err
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("destination symlink %s must be removed before importing", path)
 		}
 		expected := byPath[path]
 		if info.IsDir() {

@@ -235,3 +235,44 @@ func TestStagedScriptSymlinks(t *testing.T) {
 		})
 	}
 }
+
+func TestDestinationSymlinksDoNotWriteOutsidePipeline(t *testing.T) {
+	t.Parallel()
+	for _, kind := range []string{"file", "python directory", "assets directory", "dangling assets directory"} {
+		t.Run(kind, func(t *testing.T) {
+			t.Parallel()
+			directory := t.TempDir()
+			outside := t.TempDir()
+			sentinel := filepath.Join(outside, "sentinel.sql")
+			require.NoError(t, os.WriteFile(sentinel, []byte("must not change"), 0o600))
+			assets := filepath.Join(directory, "assets")
+			target, link := outside, assets
+			switch kind {
+			case "file":
+				require.NoError(t, os.Mkdir(assets, 0o755))
+				target, link = sentinel, filepath.Join(assets, "education.prepare.sql")
+			case "python directory":
+				require.NoError(t, os.Mkdir(assets, 0o755))
+				link = filepath.Join(assets, "education")
+			case "dangling assets directory":
+				target = filepath.Join(outside, "missing")
+			}
+			if err := os.Symlink(target, link); err != nil {
+				if runtime.GOOS == "windows" {
+					t.Skipf("symlinks unavailable: %v", err)
+				}
+				require.NoError(t, err)
+			}
+			_, err := Import(t.Context(), afero.NewOsFs(), ImportOptions{
+				SourcePath: "testdata/education.dtsx", PipelinePath: directory, Overwrite: kind == "file",
+			})
+			require.ErrorContains(t, err, "destination symlink")
+			require.Equal(t, "must not change", read(t, afero.NewOsFs(), sentinel))
+			entries, err := os.ReadDir(outside)
+			require.NoError(t, err)
+			require.Len(t, entries, 1)
+			_, err = os.Stat(filepath.Join(directory, "pipeline.yml"))
+			require.ErrorIs(t, err, os.ErrNotExist)
+		})
+	}
+}

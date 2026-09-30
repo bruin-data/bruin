@@ -40,6 +40,8 @@ of overwriting another task. Existing target files are skipped only when their
 asset name matches; use `--overwrite` to replace them. Existing `pipeline.yml` is never
 overwritten. All source files and dependency graphs are validated before writing;
 filesystem errors during writing can leave partial output.
+Symlinks in the destination `assets/` tree are rejected, including with
+`--overwrite`; output writes are confined to the selected pipeline directory.
 
 ### Supported transformations
 
