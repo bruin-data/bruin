@@ -40,7 +40,7 @@ func validateDestination(fs afero.Fs, opts ImportOptions, assets []*pipeline.Ass
 			return nil
 		}
 		var asset *pipeline.Asset
-		if strings.HasSuffix(path, ".asset.yml") || strings.HasSuffix(path, ".asset.yaml") || strings.HasSuffix(path, ".task.yml") || strings.HasSuffix(path, ".task.yaml") {
+		if strings.HasSuffix(path, "asset.yml") || strings.HasSuffix(path, "asset.yaml") || strings.HasSuffix(path, "task.yml") || strings.HasSuffix(path, "task.yaml") {
 			data, readErr := afero.ReadFile(fs, path)
 			if readErr != nil {
 				return readErr

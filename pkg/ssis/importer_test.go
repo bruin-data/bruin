@@ -181,6 +181,7 @@ func TestDestinationConflictsFailBeforeWriting(t *testing.T) {
 		{"non-asset target", "education.prepare.sql", "SELECT 1;", "expected", false},
 		{"other SQL path", "other.sql", "/* @bruin\nname: education.prepare\n@bruin */\nSELECT 1;", "conflicts", false},
 		{"other YAML path", "other.asset.yml", "name: education.prepare\ntype: ms.sql\n", "conflicts", true},
+		{"bare YAML filename", "asset.yml", "name: education.prepare\ntype: ms.sql\n", "conflicts", false},
 		{"inferred name", "education/prepare.py", "\"\"\"@bruin\ndescription: inferred name\n@bruin\"\"\"\nprint(1)", "conflicts", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
