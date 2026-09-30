@@ -1305,6 +1305,7 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 	// Paddle - Billing and subscriptions
 	"paddle": {
 		{Name: "customers", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "addresses", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
 		{Name: "products", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
 		{Name: "prices", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
 		{Name: "discounts", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
