@@ -619,6 +619,22 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "example-resources", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
 	},
 
+	// Yahoo Finance - Public market data. Every table takes Yahoo ticker symbols after a
+	// colon (e.g. "history:AAPL,MSFT"); options go in URL query format ("?interval=1h").
+	"yfinance": {
+		{Name: "history:AAPL,MSFT", PrimaryKey: "symbol,interval,date", IncKey: "timestamp", IncStrategy: "merge"},
+		{Name: "history:AAPL,MSFT?interval=1h", PrimaryKey: "symbol,interval,timestamp", IncKey: "timestamp", IncStrategy: "merge"},
+		{Name: "dividends:AAPL,MSFT", PrimaryKey: "symbol,date", IncKey: "date", IncStrategy: "merge"},
+		{Name: "splits:AAPL,MSFT", PrimaryKey: "symbol,date", IncKey: "date", IncStrategy: "merge"},
+		{Name: "quotes:AAPL,MSFT", PrimaryKey: "symbol", IncKey: "", IncStrategy: "replace"},
+		{Name: "info:AAPL,MSFT", PrimaryKey: "symbol", IncKey: "", IncStrategy: "replace"},
+		{Name: "options:AAPL", PrimaryKey: "contractSymbol", IncKey: "", IncStrategy: "replace"},
+		{Name: "income_statement:AAPL,MSFT", PrimaryKey: "symbol,frequency,as_of_date,metric", IncKey: "", IncStrategy: "merge"},
+		{Name: "balance_sheet:AAPL,MSFT", PrimaryKey: "symbol,frequency,as_of_date,metric", IncKey: "", IncStrategy: "merge"},
+		{Name: "cash_flow:AAPL,MSFT", PrimaryKey: "symbol,frequency,as_of_date,metric", IncKey: "", IncStrategy: "merge"},
+		{Name: "news:AAPL,MSFT", PrimaryKey: "uuid", IncKey: "providerPublishTime", IncStrategy: "merge"},
+	},
+
 	// Freshdesk - Customer service platform
 	"freshdesk": {
 		{Name: "agents", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},

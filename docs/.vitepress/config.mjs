@@ -403,6 +403,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                                     {text: "Typeform", link: "/ingestion/typeform"},
                                     {text: "Vitess", link: "/ingestion/vitess"},
                                     {text: "Wise", link: "/ingestion/wise"},
+                                    {text: "Yahoo Finance", link: "/ingestion/yfinance"},
                                     {text: "Zendesk", link: "/ingestion/zendesk"},
                                     {text: "Zoom", link: "/ingestion/zoom"},
                                 ],

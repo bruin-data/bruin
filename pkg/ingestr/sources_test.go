@@ -444,3 +444,22 @@ func TestDeelSourceTables(t *testing.T) {
 	require.True(t, hasGrossToNet)
 	require.True(t, hasCountries)
 }
+
+func TestYFinanceSourceTables(t *testing.T) {
+	t.Parallel()
+
+	source, err := GetSourceTables("yfinance")
+	require.NoError(t, err)
+	require.Equal(t, "yfinance", source.Name)
+
+	tables := map[string]*SourceTable{}
+	for _, table := range source.Tables {
+		tables[table.Name] = table
+	}
+
+	require.Contains(t, tables, "history:AAPL,MSFT")
+	require.Equal(t, "symbol,interval,date", tables["history:AAPL,MSFT"].PrimaryKey)
+	require.Equal(t, "merge", tables["history:AAPL,MSFT"].IncStrategy)
+	require.Contains(t, tables, "quotes:AAPL,MSFT")
+	require.Equal(t, "replace", tables["quotes:AAPL,MSFT"].IncStrategy)
+}
