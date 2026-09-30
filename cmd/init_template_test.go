@@ -132,7 +132,7 @@ func TestEcommerceTemplateEstimatesRevenueWithoutDateOnlyAttribution(t *testing.
 }
 
 func TestEcommerceTemplateReconcilesEstimatedRevenueAcrossAllChannels(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == osWindows {
 		t.Skip("skipping on Windows due to DuckDB file locking")
 	}
 	if err := duck.EnsureADBCDriverInstalled(t.Context()); err != nil {
@@ -216,7 +216,7 @@ func TestEcommerceTemplateReconcilesEstimatedRevenueAcrossAllChannels(t *testing
 		t.Context(),
 		"SELECT CAST(sum(estimated_attributed_revenue) AS DOUBLE) FROM marketing_roi",
 	).Scan(&totalAttributedRevenue))
-	require.Equal(t, 100.0, totalAttributedRevenue)
+	require.InDelta(t, 100.0, totalAttributedRevenue, 0.001)
 }
 
 func TestInitPaymentsClickHouseCopiesDemoTemplate(t *testing.T) {
