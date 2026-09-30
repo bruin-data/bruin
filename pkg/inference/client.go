@@ -50,10 +50,10 @@ func (c *Client) do(ctx context.Context, endpoint string, body []byte) ([]byte, 
 		}
 		req.Header.Set("Content-Type", "application/json")
 		switch c.Provider {
-		case "anthropic":
+		case providerAnthropic:
 			req.Header.Set("X-Api-Key", c.APIKey)
 			req.Header.Set("Anthropic-Version", "2023-06-01")
-		case "google":
+		case providerGoogle:
 			req.Header.Set("X-Goog-Api-Key", c.APIKey)
 		default:
 			if c.APIKey != "" {

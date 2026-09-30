@@ -55,9 +55,11 @@ columns:
 }
 
 func TestColumnInferenceConfig(t *testing.T) {
+	t.Parallel()
 	require.NoError(t, ValidateAsset(columnAsset(t)))
 	for _, scenario := range []string{"provider without model", "duplicate", "bounds on boolean"} {
 		t.Run(scenario, func(t *testing.T) {
+			t.Parallel()
 			a := columnAsset(t)
 			switch scenario {
 			case "provider without model":
@@ -74,6 +76,7 @@ func TestColumnInferenceConfig(t *testing.T) {
 }
 
 func TestTypeSafeColumnConfig(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name, kind, extra string
 		valid             bool
@@ -95,6 +98,7 @@ func TestTypeSafeColumnConfig(t *testing.T) {
 		{"numeric threshold", "number", "threshold: 0.8", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			asset := columnAsset(t)
 			parsed, err := pipeline.ConvertYamlToTask([]byte("name: test\ncolumns:\n  - name: value\n    type: " + tc.kind + "\n    inference:\n      prompt: Evaluate the ticket\n      " + tc.extra + "\n"))
 			require.NoError(t, err)
@@ -122,6 +126,7 @@ func TestTypeSafeColumnConfig(t *testing.T) {
 }
 
 func TestGroupedRequestsShareConcurrencyAndPreserveRows(t *testing.T) {
+	t.Parallel()
 	op, ti, _, runner := fixture(t)
 	asset := columnAsset(t)
 	asset.DefinitionFile = ti.Asset.DefinitionFile

@@ -245,19 +245,20 @@ func writeInferenceArrow(dst io.WriteSeeker, input arrow.RecordBatch, outputs []
 	for i, output := range outputs {
 		var dt arrow.DataType
 		switch output.Type {
-		case "string":
+		case colTypeString:
 			dt = arrow.BinaryTypes.String
-		case "boolean":
+		case colTypeBoolean:
 			dt = arrow.FixedWidthTypes.Boolean
-		case "integer":
+		case colTypeInteger:
 			dt = arrow.PrimitiveTypes.Int64
-		case "number":
+		case colTypeNumber:
 			dt = arrow.PrimitiveTypes.Float64
 		default:
-			return fmt.Errorf("unsupported inference output type")
+			return errors.New("unsupported inference output type")
 		}
 		builder := array.NewBuilder(memory.DefaultAllocator, dt)
-		for _, value := range results[i] {
+		// inferRows sizes results to match outputs exactly.
+		for _, value := range results[i] { //nolint:gosec
 			if err := appendArrowValue(builder, value); err != nil {
 				builder.Release()
 				return err

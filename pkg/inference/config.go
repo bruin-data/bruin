@@ -24,9 +24,19 @@ func ValidateAsset(asset *pipeline.Asset) error {
 	return err
 }
 
+// Supported inference providers.
+const (
+	providerAnthropic  = "anthropic"
+	providerGoogle     = "google"
+	providerOpenAI     = "openai"
+	providerOpenCode   = "opencode"
+	providerOpenRouter = "openrouter"
+	providerTypeSafe   = "typesafe"
+)
+
 func supportedProvider(provider string) bool {
 	switch provider {
-	case "opencode", "openrouter", "openai", "anthropic", "google", "typesafe":
+	case providerOpenCode, providerOpenRouter, providerOpenAI, providerAnthropic, providerGoogle, providerTypeSafe:
 		return true
 	default:
 		return false
@@ -36,12 +46,12 @@ func supportedProvider(provider string) bool {
 func readConfig(asset *pipeline.Asset) (*assetConfig, error) {
 	c := &assetConfig{maxRows: 1000, maxTokens: defaultMaxOutputTokens, parallelism: 4, cache: true}
 	if _, exists := asset.Parameters["api_key_env"]; exists {
-		return nil, fmt.Errorf("api_key_env is not supported; use a Bruin provider connection")
+		return nil, errors.New("api_key_env is not supported; use a Bruin provider connection")
 	}
 	if raw, exists := asset.Parameters["inference_connection"]; exists {
 		connection, ok := raw.(string)
 		if !ok || strings.TrimSpace(connection) == "" {
-			return nil, fmt.Errorf("inference_connection must be a nonempty Bruin connection name")
+			return nil, errors.New("inference_connection must be a nonempty Bruin connection name")
 		}
 	}
 	fields := map[string]*string{
@@ -51,7 +61,7 @@ func readConfig(asset *pipeline.Asset) (*assetConfig, error) {
 		var ok bool
 		c.instructions, ok = raw.(string)
 		if !ok {
-			return nil, fmt.Errorf("inference instructions must be a string")
+			return nil, errors.New("inference instructions must be a string")
 		}
 	}
 	for name, dest := range fields {
@@ -86,7 +96,7 @@ func readConfig(asset *pipeline.Asset) (*assetConfig, error) {
 		return nil, err
 	}
 	if len(c.outputs) == 0 {
-		return nil, fmt.Errorf("inference requires at least one column with an inference definition")
+		return nil, errors.New("inference requires at least one column with an inference definition")
 	}
 	for name := range asset.Parameters {
 		switch name {
@@ -106,12 +116,12 @@ func readConfig(asset *pipeline.Asset) (*assetConfig, error) {
 		}
 	}
 	if _, exists := asset.Parameters["force"]; exists {
-		return nil, fmt.Errorf("inference force is not supported; use cache: false to disable caching")
+		return nil, errors.New("inference force is not supported; use cache: false to disable caching")
 	}
 	if _, exists := asset.Parameters["cache"]; exists {
 		value, ok := asset.Parameters.GetString("cache")
 		if !ok || (value != "true" && value != "false") {
-			return nil, fmt.Errorf("inference cache must be true or false")
+			return nil, errors.New("inference cache must be true or false")
 		}
 		c.cache = value == "true"
 	}

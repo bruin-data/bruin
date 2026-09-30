@@ -92,6 +92,7 @@ type failingCredentialResolver struct {
 func (c failingCredentialResolver) ResolveConnection(string) (any, error) { return nil, c.err }
 
 func TestManagedInferencePreservesBackendError(t *testing.T) {
+	t.Parallel()
 	backendErr := errors.New("secret backend unavailable")
 	op := NewOperator(failingCredentialResolver{inferenceConnections: testProviderConnections(t, nil, false), err: backendErr})
 	_, err := op.resolveGroups(nil, &assetConfig{groups: []requestGroup{{provider: "openai"}}})
@@ -99,6 +100,7 @@ func TestManagedInferencePreservesBackendError(t *testing.T) {
 }
 
 func TestManagedInferenceGroupingAndDependencies(t *testing.T) {
+	t.Parallel()
 	asset := columnAsset(t)
 	asset.Parameters["inference_connection"] = "opencode-default"
 	asset.Columns[3].Inference.Connection = "other-account"

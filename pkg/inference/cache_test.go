@@ -13,6 +13,7 @@ import (
 )
 
 func TestResultCacheLayersAndEviction(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	cache := newResultCache(dir, 2)
 	calls := 0
@@ -40,11 +41,12 @@ func TestResultCacheLayersAndEviction(t *testing.T) {
 }
 
 func TestResultCacheConcurrentDuplicates(t *testing.T) {
+	t.Parallel()
 	cache := newResultCache(t.TempDir(), 2)
 	synctest.Test(t, func(t *testing.T) {
 		release := make(chan struct{})
 		var calls atomic.Int64
-		load := func() (string, error) {
+		load := func() (string, error) { //nolint:unparam
 			calls.Add(1)
 			<-release
 			return "shared", nil
@@ -66,6 +68,7 @@ func TestResultCacheConcurrentDuplicates(t *testing.T) {
 }
 
 func TestResultCacheFailureAndDisabled(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	cache := newResultCache(dir, 2)
 	failure := errors.New("provider failed")
@@ -95,6 +98,7 @@ func TestResultCacheFailureAndDisabled(t *testing.T) {
 }
 
 func TestOperatorDeduplicatesRenderedRequests(t *testing.T) {
+	t.Parallel()
 	op, ti, conn, runner := fixture(t)
 	asset := columnAsset(t)
 	asset.DefinitionFile = ti.Asset.DefinitionFile
@@ -143,6 +147,7 @@ func TestOperatorCacheUsesBruinHome(t *testing.T) {
 }
 
 func TestOperatorCacheDisabledDoesNotTouchFilesystem(t *testing.T) {
+	t.Parallel()
 	op, ti, _, runner := fixture(t)
 	ti.Asset.Parameters["cache"] = false
 	op.cacheDir = filepath.Join(t.TempDir(), "absent")
@@ -161,6 +166,7 @@ func TestOperatorCacheDisabledDoesNotTouchFilesystem(t *testing.T) {
 }
 
 func TestCacheParameter(t *testing.T) {
+	t.Parallel()
 	asset := testAsset()
 	cfg, err := readConfig(asset)
 	require.NoError(t, err)

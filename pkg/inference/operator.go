@@ -95,7 +95,7 @@ func (o *Operator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
 			return err
 		}
 		if !locked {
-			return fmt.Errorf("inference asset is already running against this local cache")
+			return errors.New("inference asset is already running against this local cache")
 		}
 		defer lock.Unlock() //nolint:errcheck
 	}
@@ -139,7 +139,7 @@ func inputRows(input arrow.RecordBatch, primaryKeys []string, outputs []outputCo
 	}
 	for _, field := range fields {
 		if columns[field.Name] || generated[field.Name] {
-			return nil, fmt.Errorf("inference input has duplicate columns or already contains a generated column")
+			return nil, errors.New("inference input has duplicate columns or already contains a generated column")
 		}
 		columns[field.Name] = true
 	}

@@ -52,12 +52,12 @@ func (r *captureRunner) RunIngestr(_ context.Context, args, _ []string, _ *git.R
 			return err
 		}
 		defer reader.Close()
-		for batch := 0; batch < reader.NumRecords(); batch++ {
+		for batch := range reader.NumRecords() {
 			record, err := reader.RecordBatchAt(batch)
 			if err != nil {
 				return err
 			}
-			for j := 0; j < int(record.NumRows()); j++ {
+			for j := range int(record.NumRows()) {
 				row := make(map[string]any)
 				for k, field := range record.Schema().Fields() {
 					row[field.Name] = record.Column(k).GetOneForMarshal(j)
@@ -103,6 +103,7 @@ func fixture(t *testing.T) (*Operator, *scheduler.AssetInstance, *inputConnectio
 }
 
 func TestOperatorCacheAndMaterialization(t *testing.T) {
+	t.Parallel()
 	op, ti, conn, runner := fixture(t)
 	calls := 0
 	op.structured = func(_ context.Context, _ *Client, state, _ string, _ []outputColumn) (map[string]any, error) {
@@ -144,6 +145,7 @@ func TestOperatorCacheAndMaterialization(t *testing.T) {
 }
 
 func TestOperatorResumesFailureWithoutPublishingPartialResults(t *testing.T) {
+	t.Parallel()
 	op, ti, _, runner := fixture(t)
 	calls := 0
 	op.structured = func(context.Context, *Client, string, string, []outputColumn) (map[string]any, error) {
@@ -168,8 +170,10 @@ func TestOperatorResumesFailureWithoutPublishingPartialResults(t *testing.T) {
 }
 
 func TestOperatorRejectsInvalidInputBeforeCallingModel(t *testing.T) {
+	t.Parallel()
 	for _, name := range []string{"duplicate", "null", "missing", "too many", "collision"} {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			op, ti, conn, runner := fixture(t)
 			switch name {
 			case "duplicate":
@@ -194,6 +198,7 @@ func TestOperatorRejectsInvalidInputBeforeCallingModel(t *testing.T) {
 }
 
 func TestOperatorRejectsInvalidOutputAndEmptyReplace(t *testing.T) {
+	t.Parallel()
 	op, ti, conn, runner := fixture(t)
 	calls := 0
 	op.structured = func(ctx context.Context, c *Client, state, instructions string, columns []outputColumn) (map[string]any, error) {
@@ -216,9 +221,11 @@ func TestOperatorRejectsInvalidOutputAndEmptyReplace(t *testing.T) {
 }
 
 func TestValidateAsset(t *testing.T) {
+	t.Parallel()
 	require.NoError(t, ValidateAsset(testAsset()))
 	for _, name := range []string{"provider", "context", "max_rows", "inference", "key", "view", "append", "connection", "output", "unknown"} {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			a := testAsset()
 			switch name {
 			case "provider":
@@ -248,6 +255,7 @@ func TestValidateAsset(t *testing.T) {
 }
 
 func TestOperatorParallelFailureCancelsRequests(t *testing.T) {
+	t.Parallel()
 	op, ti, conn, runner := fixture(t)
 	ti.Asset.Parameters["extract_parallelism"] = 2
 	conn.result.Rows = append(conn.result.Rows, []any{9, "must not start"})
@@ -276,6 +284,7 @@ func TestOperatorParallelFailureCancelsRequests(t *testing.T) {
 }
 
 func TestExtractParallelismConfig(t *testing.T) {
+	t.Parallel()
 	cfg, err := readConfig(testAsset())
 	require.NoError(t, err)
 	require.Equal(t, 4, cfg.parallelism)

@@ -2539,7 +2539,8 @@ func (p *Pipeline) GetInferenceConnectionName(provider, name string) string {
 
 func (p *Pipeline) GetAllConnectionNamesForAsset(asset *Asset) ([]string, error) {
 	assetType := asset.Type
-	if assetType == AssetTypeInference {
+	switch assetType {
+	case AssetTypeInference:
 		connectionNames := []string{asset.Connection}
 		for _, column := range asset.Columns {
 			if column.Inference == nil {
@@ -2552,7 +2553,7 @@ func (p *Pipeline) GetAllConnectionNamesForAsset(asset *Asset) ([]string, error)
 			}
 		}
 		return connectionNames, nil
-	} else if assetType == AssetTypePython { //nolint
+	case AssetTypePython: //nolint
 		connectionNames := assetSecretConnectionNames(asset)
 		if asset.Connection != "" {
 			connectionNames = append(connectionNames, asset.Connection)
@@ -2564,13 +2565,13 @@ func (p *Pipeline) GetAllConnectionNamesForAsset(asset *Asset) ([]string, error)
 			connectionNames = append(connectionNames, conn)
 		}
 		return connectionNames, nil
-	} else if assetType == AssetTypeR {
+	case AssetTypeR:
 		connectionNames := assetSecretConnectionNames(asset)
 		if asset.Connection != "" {
 			connectionNames = append(connectionNames, asset.Connection)
 		}
 		return connectionNames, nil
-	} else if assetType == AssetTypeIngestr {
+	case AssetTypeIngestr:
 		ingestrSource, ok := asset.Parameters.GetString("source_connection")
 		if !ok {
 			return []string{}, errors.Errorf("No source connection in asset")
@@ -2588,9 +2589,10 @@ func (p *Pipeline) GetAllConnectionNamesForAsset(asset *Asset) ([]string, error)
 		}
 
 		return []string{ingestrDestination, ingestrSource}, nil
-	} else if assetMainTaskIsConnectionless(assetType) {
-		return nil, nil
-	} else {
+	default:
+		if assetMainTaskIsConnectionless(assetType) {
+			return nil, nil
+		}
 		conn, err := p.GetConnectionNameForAsset(asset)
 		if err != nil {
 			return []string{}, err

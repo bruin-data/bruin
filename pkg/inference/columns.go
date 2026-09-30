@@ -1,11 +1,27 @@
 package inference
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
+)
+
+// Supported inference output column types.
+const (
+	colTypeString  = "string"
+	colTypeBoolean = "boolean"
+	colTypeInteger = "integer"
+	colTypeNumber  = "number"
+)
+
+// TypeSafe question kinds.
+const (
+	kindChoice = "choice"
+	kindNoul   = "noul"
+	kindScore  = "score"
 )
 
 // outputColumn is the provider-independent generated field contract.
@@ -26,35 +42,35 @@ type requestGroup struct {
 // typeSafeKind derives the request primitive from a validated column.
 func (c outputColumn) typeSafeKind() string {
 	if c.Levels != nil {
-		return "score"
+		return kindScore
 	}
-	if c.Type == "string" {
-		return "choice"
+	if c.Type == colTypeString {
+		return kindChoice
 	}
-	return "noul"
+	return kindNoul
 }
 
 func validateTypeSafeColumn(column outputColumn) error {
-	if column.Threshold != nil && (column.Type != "boolean" || math.IsNaN(*column.Threshold) || *column.Threshold < 0 || *column.Threshold > 1) {
-		return fmt.Errorf("threshold requires a boolean column and a finite value between 0 and 1")
+	if column.Threshold != nil && (column.Type != colTypeBoolean || math.IsNaN(*column.Threshold) || *column.Threshold < 0 || *column.Threshold > 1) {
+		return errors.New("threshold requires a boolean column and a finite value between 0 and 1")
 	}
 	switch column.typeSafeKind() {
-	case "score":
-		if column.Type != "number" || len(column.Levels) < 2 || len(column.Levels) > 10 {
-			return fmt.Errorf("Score requires type number and 2 to 10 ordered levels")
+	case kindScore:
+		if column.Type != colTypeNumber || len(column.Levels) < 2 || len(column.Levels) > 10 {
+			return errors.New("score requires type number and 2 to 10 ordered levels")
 		}
 		for _, level := range column.Levels {
 			if strings.TrimSpace(level) == "" {
-				return fmt.Errorf("Score levels must have nonempty descriptions")
+				return errors.New("score levels must have nonempty descriptions")
 			}
 		}
-	case "choice":
+	case kindChoice:
 		if len(column.Choices) < 2 || len(column.Choices) > 255 {
-			return fmt.Errorf("Choice requires type string and 2 to 255 choices")
+			return errors.New("choice requires type string and 2 to 255 choices")
 		}
-	case "noul":
-		if column.Type != "boolean" && column.Type != "number" {
-			return fmt.Errorf("TypeSafe supports string Choice, boolean or number Noul, and number Score columns")
+	case kindNoul:
+		if column.Type != colTypeBoolean && column.Type != colTypeNumber {
+			return errors.New("TypeSafe supports string Choice, boolean or number Noul, and number Score columns")
 		}
 	}
 	return nil
@@ -64,7 +80,7 @@ func (c *assetConfig) readColumns(asset *pipeline.Asset) error {
 	seen := make(map[string]bool)
 	for _, column := range asset.Columns {
 		if seen[column.Name] || column.Name == "" {
-			return fmt.Errorf("inference column names must be nonempty and unique")
+			return errors.New("inference column names must be nonempty and unique")
 		}
 		seen[column.Name] = true
 		spec := column.Inference
@@ -76,21 +92,21 @@ func (c *assetConfig) readColumns(asset *pipeline.Asset) error {
 		}
 		out := outputColumn{Name: column.Name, Type: column.Type, Prompt: spec.Prompt, Choices: spec.Choices, Minimum: spec.Minimum, Maximum: spec.Maximum, Levels: spec.Levels, Threshold: spec.Threshold}
 		switch column.Type {
-		case "string", "boolean", "integer", "number":
+		case colTypeString, colTypeBoolean, colTypeInteger, colTypeNumber:
 		default:
 			return fmt.Errorf("inference column %q has an unsupported type", column.Name)
 		}
 		if spec.Minimum != nil && spec.Maximum != nil && *spec.Minimum > *spec.Maximum {
 			return fmt.Errorf("inference column %q has invalid numeric bounds", column.Name)
 		}
-		if len(spec.Choices) != 0 && column.Type != "string" {
+		if len(spec.Choices) != 0 && column.Type != colTypeString {
 			return fmt.Errorf("inference column %q choices require a string type", column.Name)
 		}
-		if (spec.Minimum != nil || spec.Maximum != nil) && column.Type != "integer" && column.Type != "number" {
+		if (spec.Minimum != nil || spec.Maximum != nil) && column.Type != colTypeInteger && column.Type != colTypeNumber {
 			return fmt.Errorf("inference column %q numeric bounds require integer or number type", column.Name)
 		}
 		for _, bound := range []*float64{spec.Minimum, spec.Maximum} {
-			if bound != nil && (math.IsNaN(*bound) || math.IsInf(*bound, 0) || (column.Type == "integer" && math.Abs(*bound) > 1<<53)) {
+			if bound != nil && (math.IsNaN(*bound) || math.IsInf(*bound, 0) || (column.Type == colTypeInteger && math.Abs(*bound) > 1<<53)) {
 				return fmt.Errorf("inference column %q has an unsupported numeric bound", column.Name)
 			}
 		}
@@ -108,7 +124,7 @@ func (c *assetConfig) readColumns(asset *pipeline.Asset) error {
 		if !supportedProvider(provider) || strings.TrimSpace(model) == "" {
 			return fmt.Errorf("inference column %q requires a supported provider and model", column.Name)
 		}
-		if provider == "typesafe" {
+		if provider == providerTypeSafe {
 			if err := validateTypeSafeColumn(out); err != nil {
 				return fmt.Errorf("TypeSafe column %q: %w", column.Name, err)
 			}

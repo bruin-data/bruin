@@ -26,6 +26,7 @@ func (g warehouseGetter) GetConnection(string) any { return g.client }
 // The API transport is the only mocked layer: YAML parsing, provider request /
 // response conversion, Arrow, ingestr, and DuckDB all execute normally.
 func TestTypeSafeDuckDBTypes(t *testing.T) {
+	t.Parallel()
 	if os.Getenv("BRUIN_INFERENCE_INTEGRATION_TEST") != "1" {
 		t.Skip("set BRUIN_INFERENCE_INTEGRATION_TEST=1 for the DuckDB/ingestr integration test")
 	}
@@ -269,6 +270,7 @@ func TestDuckDBMaterialization(t *testing.T) {
 // real DuckDB reads and the real ingestr writer. OpenCode is always mocked; the
 // TypeSafe group is live only when the separate paid-test flag is enabled.
 func TestGroupedDuckDBMaterialization(t *testing.T) {
+	t.Parallel()
 	if os.Getenv("BRUIN_INFERENCE_INTEGRATION_TEST") != "1" {
 		t.Skip("set BRUIN_INFERENCE_INTEGRATION_TEST=1 for the DuckDB/ingestr integration test")
 	}

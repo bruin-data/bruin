@@ -14,6 +14,7 @@ import (
 )
 
 func TestTypeSafeNoulAndScore(t *testing.T) {
+	t.Parallel()
 	threshold := 0.8
 	columns := []outputColumn{
 		{Name: "probability", Type: "number", Prompt: "Does this need help?"},
@@ -62,6 +63,7 @@ func TestTypeSafeNoulAndScore(t *testing.T) {
 }
 
 func TestCompleteStructuredWireContracts(t *testing.T) {
+	t.Parallel()
 	columns := []outputColumn{{Name: "category", Type: "string", Prompt: "Choose a category", Choices: map[string]string{"a": "Alpha", "b": "Beta"}}}
 	tests := []struct {
 		provider, url, response string
@@ -103,26 +105,27 @@ func TestCompleteStructuredWireContracts(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.provider, func(t *testing.T) {
+			t.Parallel()
 			model, wantURL := "model", tt.url
-			if tt.provider == "google" {
+			if tt.provider == providerGoogle {
 				model = "publishers/acme models/gemini?preview"
 				wantURL = "https://generativelanguage.googleapis.com/v1beta/models/publishers%2Facme%20models%2Fgemini%3Fpreview:generateContent"
 			}
 			client := Client{Provider: tt.provider, Model: model, APIKey: "secret", MaxOutputTokens: 23, HTTPClient: &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
-				if req.URL.String() != wantURL || req.Header.Get("Authorization") != "Bearer secret" && tt.provider != "anthropic" && tt.provider != "google" {
+				if req.URL.String() != wantURL || req.Header.Get("Authorization") != "Bearer secret" && tt.provider != providerAnthropic && tt.provider != providerGoogle {
 					t.Fatalf("unexpected request URL or authorization")
 				}
-				if tt.provider == "anthropic" && (req.Header.Get("x-api-key") != "secret" || req.Header.Get("anthropic-version") != "2023-06-01") {
+				if tt.provider == "anthropic" && (req.Header.Get("X-Api-Key") != "secret" || req.Header.Get("Anthropic-Version") != "2023-06-01") {
 					t.Fatalf("unexpected Anthropic authentication headers")
 				}
-				if tt.provider == "google" && req.Header.Get("x-goog-api-key") != "secret" {
+				if tt.provider == providerGoogle && req.Header.Get("X-Goog-Api-Key") != "secret" {
 					t.Fatalf("unexpected Google authentication headers")
 				}
 				var body map[string]any
 				if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
 					t.Fatal(err)
 				}
-				if tt.provider != "google" && body["model"] != model {
+				if tt.provider != providerGoogle && body["model"] != model {
 					t.Fatalf("model = %#v, want %q", body["model"], model)
 				}
 				switch tt.provider {
@@ -134,7 +137,7 @@ func TestCompleteStructuredWireContracts(t *testing.T) {
 					if body["max_tokens"] != float64(23) {
 						t.Fatalf("unexpected token limit: %#v", body)
 					}
-				case "google":
+				case providerGoogle:
 					if body["generationConfig"].(map[string]any)["maxOutputTokens"] != float64(23) {
 						t.Fatalf("unexpected token limit: %#v", body)
 					}
@@ -155,6 +158,7 @@ func responseText(text string) string {
 }
 
 func TestValidateStructuredResultTypedAndExactInteger(t *testing.T) {
+	t.Parallel()
 	minimum, maximum := 1.5, 2.5
 	columns := []outputColumn{
 		{Name: "kind", Type: "string", Choices: map[string]string{"safe": ""}},
@@ -173,6 +177,7 @@ func TestValidateStructuredResultTypedAndExactInteger(t *testing.T) {
 }
 
 func TestValidateStructuredResultRejectsInvalidOutputWithoutLeaks(t *testing.T) {
+	t.Parallel()
 	zero, ten := 0.0, 10.0
 	columns := []outputColumn{{Name: "secret_name", Type: "integer", Minimum: &zero, Maximum: &ten}}
 	for _, data := range []string{
@@ -188,6 +193,7 @@ func TestValidateStructuredResultRejectsInvalidOutputWithoutLeaks(t *testing.T) 
 }
 
 func TestCompleteStructuredRejectsBadTypeSafeAnswers(t *testing.T) {
+	t.Parallel()
 	columns := []outputColumn{{Name: "category", Type: "string", Choices: map[string]string{"good": "Good", "bad": "Bad"}}}
 	for _, body := range []string{
 		`{"answers":{}}`,
@@ -206,6 +212,7 @@ func TestCompleteStructuredRejectsBadTypeSafeAnswers(t *testing.T) {
 }
 
 func TestTypeSafeLive(t *testing.T) {
+	t.Parallel()
 	if os.Getenv("BRUIN_TYPESAFE_LIVE_TEST") != "1" {
 		t.Skip("set BRUIN_TYPESAFE_LIVE_TEST=1 to run")
 	}
@@ -222,6 +229,7 @@ func TestTypeSafeLive(t *testing.T) {
 }
 
 func TestZenStructuredLive(t *testing.T) {
+	t.Parallel()
 	if os.Getenv("BRUIN_INFERENCE_LIVE_TEST") != "1" {
 		t.Skip("set BRUIN_INFERENCE_LIVE_TEST=1 for a paid structured Zen request")
 	}
@@ -240,6 +248,7 @@ func TestZenStructuredLive(t *testing.T) {
 }
 
 func TestAnthropicBoundsAndChoiceDescriptions(t *testing.T) {
+	t.Parallel()
 	minimum, maximum := 1.0, 5.0
 	columns := []outputColumn{
 		{Name: "rank", Type: "integer", Prompt: "Rate severity.", Minimum: &minimum, Maximum: &maximum},
