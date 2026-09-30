@@ -2,6 +2,7 @@ package ssis
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -273,6 +274,39 @@ func TestDestinationSymlinksDoNotWriteOutsidePipeline(t *testing.T) {
 			require.Len(t, entries, 1)
 			_, err = os.Stat(filepath.Join(directory, "pipeline.yml"))
 			require.ErrorIs(t, err, os.ErrNotExist)
+		})
+	}
+}
+
+func TestWriteDoesNotFollowLateSymlink(t *testing.T) {
+	t.Parallel()
+	for _, overwrite := range []bool{false, true} {
+		t.Run(fmt.Sprintf("overwrite=%v", overwrite), func(t *testing.T) {
+			t.Parallel()
+			directory := t.TempDir()
+			definition := filepath.Join(directory, "pipeline.yml")
+			require.NoError(t, os.WriteFile(definition, []byte("name: preserved\n"), 0o600))
+			root, err := os.OpenRoot(directory)
+			require.NoError(t, err)
+			defer root.Close()
+			// Simulate a link inserted after preflight and the existence check.
+			if err := os.Symlink("pipeline.yml", filepath.Join(directory, "asset.sql")); err != nil {
+				if runtime.GOOS == "windows" {
+					t.Skipf("symlinks unavailable: %v", err)
+				}
+				require.NoError(t, err)
+			}
+			err = writeRootFile(root, "asset.sql", []byte("SELECT 42;"), overwrite)
+			if overwrite {
+				require.NoError(t, err)
+				require.Equal(t, "SELECT 42;", read(t, afero.NewOsFs(), filepath.Join(directory, "asset.sql")))
+			} else {
+				require.ErrorIs(t, err, os.ErrExist)
+			}
+			require.Equal(t, "name: preserved\n", read(t, afero.NewOsFs(), definition))
+			entries, err := os.ReadDir(directory)
+			require.NoError(t, err)
+			require.Len(t, entries, 2) // No temporary output left behind.
 		})
 	}
 }

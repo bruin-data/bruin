@@ -1,6 +1,7 @@
 package ssis
 
 import (
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"os"
@@ -74,4 +75,27 @@ func validateDestination(fs afero.Fs, opts ImportOptions, assets []*pipeline.Ass
 		}
 		return nil
 	})
+}
+
+// Never open an existing destination for truncation: it may have become a
+// symlink or hard link since preflight. Exclusive creation protects new files;
+// rename replaces an overwritten directory entry without following that link.
+func writeRootFile(root *os.Root, path string, content []byte, overwrite bool) error {
+	writePath := path
+	if overwrite {
+		writePath = filepath.Join(filepath.Dir(path), ".bruin-import-"+rand.Text())
+		defer func() { _ = root.Remove(writePath) }()
+	}
+	file, err := root.OpenFile(writePath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	if err != nil {
+		return err
+	}
+	_, err = file.Write(content)
+	if err := errors.Join(err, file.Close()); err != nil {
+		return err
+	}
+	if overwrite {
+		return root.Rename(writePath, path)
+	}
+	return nil
 }

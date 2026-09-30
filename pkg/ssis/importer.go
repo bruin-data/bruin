@@ -140,11 +140,20 @@ func Import(ctx context.Context, fs afero.Fs, opts ImportOptions) (*ImportResult
 	if err := fs.MkdirAll(opts.PipelinePath, 0o755); err != nil {
 		return nil, err
 	}
-	writeFile := func(path string, content []byte) error {
+	writeFile := func(path string, content []byte, overwrite bool) error {
 		if err := fs.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			return err
 		}
-		return afero.WriteFile(fs, path, content, 0o644)
+		flags := os.O_WRONLY | os.O_CREATE | os.O_EXCL
+		if overwrite {
+			flags = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
+		}
+		file, err := fs.OpenFile(path, flags, 0o644)
+		if err != nil {
+			return err
+		}
+		_, err = file.Write(content)
+		return errors.Join(err, file.Close())
 	}
 	if _, ok := fs.(*afero.OsFs); ok {
 		root, err := os.OpenRoot(opts.PipelinePath)
@@ -154,7 +163,7 @@ func Import(ctx context.Context, fs afero.Fs, opts ImportOptions) (*ImportResult
 		defer root.Close()
 		// Keep the write boundary enforced even if a path is replaced with a
 		// symlink after preflight. Include pipeline.yml, not only assets.
-		writeFile = func(path string, content []byte) error {
+		writeFile = func(path string, content []byte, overwrite bool) error {
 			relative, err := filepath.Rel(opts.PipelinePath, path)
 			if err != nil {
 				return err
@@ -162,7 +171,7 @@ func Import(ctx context.Context, fs afero.Fs, opts ImportOptions) (*ImportResult
 			if err := root.MkdirAll(filepath.Dir(relative), 0o755); err != nil {
 				return err
 			}
-			return root.WriteFile(relative, content, 0o644)
+			return writeRootFile(root, relative, content, overwrite)
 		}
 	}
 	result := &ImportResult{}
@@ -177,7 +186,7 @@ func Import(ctx context.Context, fs afero.Fs, opts ImportOptions) (*ImportResult
 		if err != nil {
 			return nil, err
 		}
-		if err := writeFile(pipelineFile, content); err != nil {
+		if err := writeFile(pipelineFile, content, false); err != nil {
 			return nil, err
 		}
 		result.PipelineCreated = true
@@ -199,7 +208,7 @@ func Import(ctx context.Context, fs afero.Fs, opts ImportOptions) (*ImportResult
 		if err != nil {
 			return nil, err
 		}
-		if err := writeFile(asset.ExecutableFile.Path, content); err != nil {
+		if err := writeFile(asset.ExecutableFile.Path, content, opts.Overwrite); err != nil {
 			return nil, err
 		}
 		if asset.Type == "python" {
