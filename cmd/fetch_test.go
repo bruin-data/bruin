@@ -402,11 +402,10 @@ func TestValidateFlagsSemanticMode(t *testing.T) {
 			wantErr:          "semantic query mode requires --asset or --pipeline",
 		},
 		{
-			name:             "pipeline semantic mode requires connection without asset",
+			name:             "pipeline semantic mode without connection defers to the model connection",
 			pipeline:         "path/to/pipeline",
 			hasSemanticFlags: true,
 			semanticModel:    "sales",
-			wantErr:          "semantic query mode with --pipeline requires --connection",
 		},
 		{
 			name:     "pipeline flag is semantic-only",

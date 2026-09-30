@@ -49,6 +49,7 @@ bruin validate --help
 | [`render`](/commands/render) | Preview rendered Jinja templates |
 | [`lineage`](/commands/lineage) | Visualize asset dependencies |
 | [`query`](/commands/query) | Execute ad-hoc queries against connections |
+| [`semantic`](/commands/semantic) | Validate semantic models and run their quality checks |
 | [`curl`](/commands/curl) | Call remote services with connection-aware Jinja rendering |
 | [`data-diff`](/commands/data-diff) | Compare data between connections |
 

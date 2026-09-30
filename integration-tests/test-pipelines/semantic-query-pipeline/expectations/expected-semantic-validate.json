@@ -1,0 +1,249 @@
+{
+  "path": "integration-tests/semantic",
+  "valid": true,
+  "models": [
+    {
+      "name": "customers",
+      "connection": "duckdb-semantic-query",
+      "checks": 2,
+      "valid": true,
+      "check_validations": [
+        {
+          "id": "customers.dimension.country.not_null",
+          "model": "customers",
+          "scope": "dimension",
+          "target": "country",
+          "name": "not_null",
+          "sql": "SELECT count(*) AS bruin_check_value FROM (\n  SELECT 101 AS customer_id, 'US' AS country, 'enterprise' AS segment\n  UNION ALL SELECT 102, 'US', 'startup'\n  UNION ALL SELECT 201, 'DE', 'enterprise'\n) AS customers\n WHERE country IS NULL",
+          "status": "passed",
+          "duration_ms": 0
+        },
+        {
+          "id": "customers.dimension.segment.accepted_values",
+          "model": "customers",
+          "scope": "dimension",
+          "target": "segment",
+          "name": "accepted_values",
+          "sql": "SELECT count(*) AS bruin_check_value FROM (\n  SELECT 101 AS customer_id, 'US' AS country, 'enterprise' AS segment\n  UNION ALL SELECT 102, 'US', 'startup'\n  UNION ALL SELECT 201, 'DE', 'enterprise'\n) AS customers\n WHERE segment NOT IN ('enterprise', 'startup')",
+          "status": "passed",
+          "duration_ms": 0
+        }
+      ]
+    },
+    {
+      "name": "orders",
+      "connection": "duckdb-semantic-query",
+      "checks": 21,
+      "valid": true,
+      "check_validations": [
+        {
+          "id": "orders.dimension.order_id.not_null",
+          "model": "orders",
+          "scope": "dimension",
+          "target": "order_id",
+          "name": "not_null",
+          "sql": "SELECT count(*) AS bruin_check_value FROM (\n  SELECT 1 AS order_id, 101 AS customer_id, DATE '2025-01-15' AS order_date, 'US' AS country, 'completed' AS status, 'electronics' AS category, 100 AS amount\n  UNION ALL SELECT 2, 102, DATE '2025-01-20', 'US', 'completed', 'accessories', 50\n  UNION ALL SELECT 3, 101, DATE '2025-02-05', 'US', 'pending', 'electronics', 70\n  UNION ALL SELECT 4, 201, DATE '2025-02-10', 'DE', 'completed', 'electronics', 200\n  UNION ALL SELECT 5, 101, DATE '2025-03-01', 'US', 'completed', 'furniture', 300\n  UNION ALL SELECT 6, 201, DATE '2025-03-15', 'DE', 'cancelled', 'furniture', 10\n  UNION ALL SELECT 7, 102, DATE '2025-03-20', 'US', 'completed', 'electronics', 80\n) AS orders\n WHERE order_id IS NULL",
+          "status": "passed",
+          "duration_ms": 0
+        },
+        {
+          "id": "orders.dimension.order_id.unique",
+          "model": "orders",
+          "scope": "dimension",
+          "target": "order_id",
+          "name": "unique",
+          "sql": "SELECT count(order_id) - count(DISTINCT order_id) AS bruin_check_value FROM (\n  SELECT 1 AS order_id, 101 AS customer_id, DATE '2025-01-15' AS order_date, 'US' AS country, 'completed' AS status, 'electronics' AS category, 100 AS amount\n  UNION ALL SELECT 2, 102, DATE '2025-01-20', 'US', 'completed', 'accessories', 50\n  UNION ALL SELECT 3, 101, DATE '2025-02-05', 'US', 'pending', 'electronics', 70\n  UNION ALL SELECT 4, 201, DATE '2025-02-10', 'DE', 'completed', 'electronics', 200\n  UNION ALL SELECT 5, 101, DATE '2025-03-01', 'US', 'completed', 'furniture', 300\n  UNION ALL SELECT 6, 201, DATE '2025-03-15', 'DE', 'cancelled', 'furniture', 10\n  UNION ALL SELECT 7, 102, DATE '2025-03-20', 'US', 'completed', 'electronics', 80\n) AS orders\n",
+          "status": "passed",
+          "duration_ms": 0
+        },
+        {
+          "id": "orders.dimension.order_id.positive",
+          "model": "orders",
+          "scope": "dimension",
+          "target": "order_id",
+          "name": "positive",
+          "sql": "SELECT count(*) AS bruin_check_value FROM (\n  SELECT 1 AS order_id, 101 AS customer_id, DATE '2025-01-15' AS order_date, 'US' AS country, 'completed' AS status, 'electronics' AS category, 100 AS amount\n  UNION ALL SELECT 2, 102, DATE '2025-01-20', 'US', 'completed', 'accessories', 50\n  UNION ALL SELECT 3, 101, DATE '2025-02-05', 'US', 'pending', 'electronics', 70\n  UNION ALL SELECT 4, 201, DATE '2025-02-10', 'DE', 'completed', 'electronics', 200\n  UNION ALL SELECT 5, 101, DATE '2025-03-01', 'US', 'completed', 'furniture', 300\n  UNION ALL SELECT 6, 201, DATE '2025-03-15', 'DE', 'cancelled', 'furniture', 10\n  UNION ALL SELECT 7, 102, DATE '2025-03-20', 'US', 'completed', 'electronics', 80\n) AS orders\n WHERE order_id <= 0",
+          "status": "passed",
+          "duration_ms": 0
+        },
+        {
+          "id": "orders.dimension.country.accepted_values",
+          "model": "orders",
+          "scope": "dimension",
+          "target": "country",
+          "name": "accepted_values",
+          "sql": "SELECT count(*) AS bruin_check_value FROM (\n  SELECT 1 AS order_id, 101 AS customer_id, DATE '2025-01-15' AS order_date, 'US' AS country, 'completed' AS status, 'electronics' AS category, 100 AS amount\n  UNION ALL SELECT 2, 102, DATE '2025-01-20', 'US', 'completed', 'accessories', 50\n  UNION ALL SELECT 3, 101, DATE '2025-02-05', 'US', 'pending', 'electronics', 70\n  UNION ALL SELECT 4, 201, DATE '2025-02-10', 'DE', 'completed', 'electronics', 200\n  UNION ALL SELECT 5, 101, DATE '2025-03-01', 'US', 'completed', 'furniture', 300\n  UNION ALL SELECT 6, 201, DATE '2025-03-15', 'DE', 'cancelled', 'furniture', 10\n  UNION ALL SELECT 7, 102, DATE '2025-03-20', 'US', 'completed', 'electronics', 80\n) AS orders\n WHERE country NOT IN ('US', 'DE')",
+          "status": "passed",
+          "duration_ms": 0
+        },
+        {
+          "id": "orders.dimension.country.pattern",
+          "model": "orders",
+          "scope": "dimension",
+          "target": "country",
+          "name": "pattern",
+          "sql": "SELECT count(*) AS bruin_check_value FROM (\n  SELECT 1 AS order_id, 101 AS customer_id, DATE '2025-01-15' AS order_date, 'US' AS country, 'completed' AS status, 'electronics' AS category, 100 AS amount\n  UNION ALL SELECT 2, 102, DATE '2025-01-20', 'US', 'completed', 'accessories', 50\n  UNION ALL SELECT 3, 101, DATE '2025-02-05', 'US', 'pending', 'electronics', 70\n  UNION ALL SELECT 4, 201, DATE '2025-02-10', 'DE', 'completed', 'electronics', 200\n  UNION ALL SELECT 5, 101, DATE '2025-03-01', 'US', 'completed', 'furniture', 300\n  UNION ALL SELECT 6, 201, DATE '2025-03-15', 'DE', 'cancelled', 'furniture', 10\n  UNION ALL SELECT 7, 102, DATE '2025-03-20', 'US', 'completed', 'electronics', 80\n) AS orders\n WHERE country !~ '^[A-Z]{2}$'",
+          "status": "passed",
+          "duration_ms": 0
+        },
+        {
+          "id": "orders.dimension.status.not_null",
+          "model": "orders",
+          "scope": "dimension",
+          "target": "status",
+          "name": "not_null",
+          "sql": "SELECT count(*) AS bruin_check_value FROM (\n  SELECT 1 AS order_id, 101 AS customer_id, DATE '2025-01-15' AS order_date, 'US' AS country, 'completed' AS status, 'electronics' AS category, 100 AS amount\n  UNION ALL SELECT 2, 102, DATE '2025-01-20', 'US', 'completed', 'accessories', 50\n  UNION ALL SELECT 3, 101, DATE '2025-02-05', 'US', 'pending', 'electronics', 70\n  UNION ALL SELECT 4, 201, DATE '2025-02-10', 'DE', 'completed', 'electronics', 200\n  UNION ALL SELECT 5, 101, DATE '2025-03-01', 'US', 'completed', 'furniture', 300\n  UNION ALL SELECT 6, 201, DATE '2025-03-15', 'DE', 'cancelled', 'furniture', 10\n  UNION ALL SELECT 7, 102, DATE '2025-03-20', 'US', 'completed', 'electronics', 80\n) AS orders\n WHERE status IS NULL",
+          "status": "passed",
+          "duration_ms": 0
+        },
+        {
+          "id": "orders.dimension.amount.non_negative",
+          "model": "orders",
+          "scope": "dimension",
+          "target": "amount",
+          "name": "non_negative",
+          "sql": "SELECT count(*) AS bruin_check_value FROM (\n  SELECT 1 AS order_id, 101 AS customer_id, DATE '2025-01-15' AS order_date, 'US' AS country, 'completed' AS status, 'electronics' AS category, 100 AS amount\n  UNION ALL SELECT 2, 102, DATE '2025-01-20', 'US', 'completed', 'accessories', 50\n  UNION ALL SELECT 3, 101, DATE '2025-02-05', 'US', 'pending', 'electronics', 70\n  UNION ALL SELECT 4, 201, DATE '2025-02-10', 'DE', 'completed', 'electronics', 200\n  UNION ALL SELECT 5, 101, DATE '2025-03-01', 'US', 'completed', 'furniture', 300\n  UNION ALL SELECT 6, 201, DATE '2025-03-15', 'DE', 'cancelled', 'furniture', 10\n  UNION ALL SELECT 7, 102, DATE '2025-03-20', 'US', 'completed', 'electronics', 80\n) AS orders\n WHERE amount < 0",
+          "status": "passed",
+          "duration_ms": 0
+        },
+        {
+          "id": "orders.dimension.amount.min",
+          "model": "orders",
+          "scope": "dimension",
+          "target": "amount",
+          "name": "min",
+          "sql": "SELECT count(*) AS bruin_check_value FROM (\n  SELECT 1 AS order_id, 101 AS customer_id, DATE '2025-01-15' AS order_date, 'US' AS country, 'completed' AS status, 'electronics' AS category, 100 AS amount\n  UNION ALL SELECT 2, 102, DATE '2025-01-20', 'US', 'completed', 'accessories', 50\n  UNION ALL SELECT 3, 101, DATE '2025-02-05', 'US', 'pending', 'electronics', 70\n  UNION ALL SELECT 4, 201, DATE '2025-02-10', 'DE', 'completed', 'electronics', 200\n  UNION ALL SELECT 5, 101, DATE '2025-03-01', 'US', 'completed', 'furniture', 300\n  UNION ALL SELECT 6, 201, DATE '2025-03-15', 'DE', 'cancelled', 'furniture', 10\n  UNION ALL SELECT 7, 102, DATE '2025-03-20', 'US', 'completed', 'electronics', 80\n) AS orders\n WHERE amount < 10",
+          "status": "passed",
+          "duration_ms": 0
+        },
+        {
+          "id": "orders.dimension.amount.max",
+          "model": "orders",
+          "scope": "dimension",
+          "target": "amount",
+          "name": "max",
+          "sql": "SELECT count(*) AS bruin_check_value FROM (\n  SELECT 1 AS order_id, 101 AS customer_id, DATE '2025-01-15' AS order_date, 'US' AS country, 'completed' AS status, 'electronics' AS category, 100 AS amount\n  UNION ALL SELECT 2, 102, DATE '2025-01-20', 'US', 'completed', 'accessories', 50\n  UNION ALL SELECT 3, 101, DATE '2025-02-05', 'US', 'pending', 'electronics', 70\n  UNION ALL SELECT 4, 201, DATE '2025-02-10', 'DE', 'completed', 'electronics', 200\n  UNION ALL SELECT 5, 101, DATE '2025-03-01', 'US', 'completed', 'furniture', 300\n  UNION ALL SELECT 6, 201, DATE '2025-03-15', 'DE', 'cancelled', 'furniture', 10\n  UNION ALL SELECT 7, 102, DATE '2025-03-20', 'US', 'completed', 'electronics', 80\n) AS orders\n WHERE amount > 300",
+          "status": "passed",
+          "duration_ms": 0
+        },
+        {
+          "id": "orders.metric.revenue.positive",
+          "model": "orders",
+          "scope": "metric",
+          "target": "revenue",
+          "name": "positive",
+          "sql": "SELECT sum(amount) AS revenue FROM (\n  SELECT 1 AS order_id, 101 AS customer_id, DATE '2025-01-15' AS order_date, 'US' AS country, 'completed' AS status, 'electronics' AS category, 100 AS amount\n  UNION ALL SELECT 2, 102, DATE '2025-01-20', 'US', 'completed', 'accessories', 50\n  UNION ALL SELECT 3, 101, DATE '2025-02-05', 'US', 'pending', 'electronics', 70\n  UNION ALL SELECT 4, 201, DATE '2025-02-10', 'DE', 'completed', 'electronics', 200\n  UNION ALL SELECT 5, 101, DATE '2025-03-01', 'US', 'completed', 'furniture', 300\n  UNION ALL SELECT 6, 201, DATE '2025-03-15', 'DE', 'cancelled', 'furniture', 10\n  UNION ALL SELECT 7, 102, DATE '2025-03-20', 'US', 'completed', 'electronics', 80\n) AS orders\n",
+          "status": "passed",
+          "duration_ms": 0
+        },
+        {
+          "id": "orders.metric.revenue.equals",
+          "model": "orders",
+          "scope": "metric",
+          "target": "revenue",
+          "name": "equals",
+          "sql": "SELECT sum(amount) AS revenue FROM (\n  SELECT 1 AS order_id, 101 AS customer_id, DATE '2025-01-15' AS order_date, 'US' AS country, 'completed' AS status, 'electronics' AS category, 100 AS amount\n  UNION ALL SELECT 2, 102, DATE '2025-01-20', 'US', 'completed', 'accessories', 50\n  UNION ALL SELECT 3, 101, DATE '2025-02-05', 'US', 'pending', 'electronics', 70\n  UNION ALL SELECT 4, 201, DATE '2025-02-10', 'DE', 'completed', 'electronics', 200\n  UNION ALL SELECT 5, 101, DATE '2025-03-01', 'US', 'completed', 'furniture', 300\n  UNION ALL SELECT 6, 201, DATE '2025-03-15', 'DE', 'cancelled', 'furniture', 10\n  UNION ALL SELECT 7, 102, DATE '2025-03-20', 'US', 'completed', 'electronics', 80\n) AS orders\n",
+          "status": "passed",
+          "duration_ms": 0
+        },
+        {
+          "id": "orders.metric.order_count.not_null",
+          "model": "orders",
+          "scope": "metric",
+          "target": "order_count",
+          "name": "not_null",
+          "sql": "SELECT count(distinct order_id) AS order_count FROM (\n  SELECT 1 AS order_id, 101 AS customer_id, DATE '2025-01-15' AS order_date, 'US' AS country, 'completed' AS status, 'electronics' AS category, 100 AS amount\n  UNION ALL SELECT 2, 102, DATE '2025-01-20', 'US', 'completed', 'accessories', 50\n  UNION ALL SELECT 3, 101, DATE '2025-02-05', 'US', 'pending', 'electronics', 70\n  UNION ALL SELECT 4, 201, DATE '2025-02-10', 'DE', 'completed', 'electronics', 200\n  UNION ALL SELECT 5, 101, DATE '2025-03-01', 'US', 'completed', 'furniture', 300\n  UNION ALL SELECT 6, 201, DATE '2025-03-15', 'DE', 'cancelled', 'furniture', 10\n  UNION ALL SELECT 7, 102, DATE '2025-03-20', 'US', 'completed', 'electronics', 80\n) AS orders\n",
+          "status": "passed",
+          "duration_ms": 0
+        },
+        {
+          "id": "orders.metric.order_count.max",
+          "model": "orders",
+          "scope": "metric",
+          "target": "order_count",
+          "name": "max",
+          "description": "intentionally failing check used by the integration tests",
+          "sql": "SELECT count(distinct order_id) AS order_count FROM (\n  SELECT 1 AS order_id, 101 AS customer_id, DATE '2025-01-15' AS order_date, 'US' AS country, 'completed' AS status, 'electronics' AS category, 100 AS amount\n  UNION ALL SELECT 2, 102, DATE '2025-01-20', 'US', 'completed', 'accessories', 50\n  UNION ALL SELECT 3, 101, DATE '2025-02-05', 'US', 'pending', 'electronics', 70\n  UNION ALL SELECT 4, 201, DATE '2025-02-10', 'DE', 'completed', 'electronics', 200\n  UNION ALL SELECT 5, 101, DATE '2025-03-01', 'US', 'completed', 'furniture', 300\n  UNION ALL SELECT 6, 201, DATE '2025-03-15', 'DE', 'cancelled', 'furniture', 10\n  UNION ALL SELECT 7, 102, DATE '2025-03-20', 'US', 'completed', 'electronics', 80\n) AS orders\n",
+          "status": "passed",
+          "duration_ms": 0
+        },
+        {
+          "id": "orders.metric.avg_order_value.min",
+          "model": "orders",
+          "scope": "metric",
+          "target": "avg_order_value",
+          "name": "min",
+          "sql": "SELECT sum(amount) / NULLIF(count(distinct order_id), 0) AS avg_order_value FROM (\n  SELECT 1 AS order_id, 101 AS customer_id, DATE '2025-01-15' AS order_date, 'US' AS country, 'completed' AS status, 'electronics' AS category, 100 AS amount\n  UNION ALL SELECT 2, 102, DATE '2025-01-20', 'US', 'completed', 'accessories', 50\n  UNION ALL SELECT 3, 101, DATE '2025-02-05', 'US', 'pending', 'electronics', 70\n  UNION ALL SELECT 4, 201, DATE '2025-02-10', 'DE', 'completed', 'electronics', 200\n  UNION ALL SELECT 5, 101, DATE '2025-03-01', 'US', 'completed', 'furniture', 300\n  UNION ALL SELECT 6, 201, DATE '2025-03-15', 'DE', 'cancelled', 'furniture', 10\n  UNION ALL SELECT 7, 102, DATE '2025-03-20', 'US', 'completed', 'electronics', 80\n) AS orders\n",
+          "status": "passed",
+          "duration_ms": 0
+        },
+        {
+          "id": "orders.check.completed_revenue",
+          "model": "orders",
+          "scope": "model",
+          "name": "completed_revenue",
+          "description": "completed orders add up to 730",
+          "sql": "SELECT sum(amount) AS revenue FROM (\n  SELECT 1 AS order_id, 101 AS customer_id, DATE '2025-01-15' AS order_date, 'US' AS country, 'completed' AS status, 'electronics' AS category, 100 AS amount\n  UNION ALL SELECT 2, 102, DATE '2025-01-20', 'US', 'completed', 'accessories', 50\n  UNION ALL SELECT 3, 101, DATE '2025-02-05', 'US', 'pending', 'electronics', 70\n  UNION ALL SELECT 4, 201, DATE '2025-02-10', 'DE', 'completed', 'electronics', 200\n  UNION ALL SELECT 5, 101, DATE '2025-03-01', 'US', 'completed', 'furniture', 300\n  UNION ALL SELECT 6, 201, DATE '2025-03-15', 'DE', 'cancelled', 'furniture', 10\n  UNION ALL SELECT 7, 102, DATE '2025-03-20', 'US', 'completed', 'electronics', 80\n) AS orders\n WHERE status = 'completed'",
+          "status": "passed",
+          "duration_ms": 0
+        },
+        {
+          "id": "orders.check.customer_countries",
+          "model": "orders",
+          "scope": "model",
+          "name": "customer_countries",
+          "sql": "SELECT count(*) AS bruin_check_value FROM (SELECT customers.country AS customers_country, sum(base.amount) AS revenue FROM (SELECT * FROM (\n  SELECT 1 AS order_id, 101 AS customer_id, DATE '2025-01-15' AS order_date, 'US' AS country, 'completed' AS status, 'electronics' AS category, 100 AS amount\n  UNION ALL SELECT 2, 102, DATE '2025-01-20', 'US', 'completed', 'accessories', 50\n  UNION ALL SELECT 3, 101, DATE '2025-02-05', 'US', 'pending', 'electronics', 70\n  UNION ALL SELECT 4, 201, DATE '2025-02-10', 'DE', 'completed', 'electronics', 200\n  UNION ALL SELECT 5, 101, DATE '2025-03-01', 'US', 'completed', 'furniture', 300\n  UNION ALL SELECT 6, 201, DATE '2025-03-15', 'DE', 'cancelled', 'furniture', 10\n  UNION ALL SELECT 7, 102, DATE '2025-03-20', 'US', 'completed', 'electronics', 80\n) AS orders\n) base LEFT JOIN (SELECT * FROM (\n  SELECT 101 AS customer_id, 'US' AS country, 'enterprise' AS segment\n  UNION ALL SELECT 102, 'US', 'startup'\n  UNION ALL SELECT 201, 'DE', 'enterprise'\n) AS customers\n) customers ON base.customer_id = customers.customer_id GROUP BY 1) bruin_check",
+          "status": "passed",
+          "duration_ms": 0
+        },
+        {
+          "id": "orders.check.monthly_revenue_positive",
+          "model": "orders",
+          "scope": "model",
+          "name": "monthly_revenue_positive",
+          "sql": "SELECT count(*) AS bruin_check_value FROM (SELECT date_trunc('month', order_date) AS order_date, sum(amount) AS revenue FROM (\n  SELECT 1 AS order_id, 101 AS customer_id, DATE '2025-01-15' AS order_date, 'US' AS country, 'completed' AS status, 'electronics' AS category, 100 AS amount\n  UNION ALL SELECT 2, 102, DATE '2025-01-20', 'US', 'completed', 'accessories', 50\n  UNION ALL SELECT 3, 101, DATE '2025-02-05', 'US', 'pending', 'electronics', 70\n  UNION ALL SELECT 4, 201, DATE '2025-02-10', 'DE', 'completed', 'electronics', 200\n  UNION ALL SELECT 5, 101, DATE '2025-03-01', 'US', 'completed', 'furniture', 300\n  UNION ALL SELECT 6, 201, DATE '2025-03-15', 'DE', 'cancelled', 'furniture', 10\n  UNION ALL SELECT 7, 102, DATE '2025-03-20', 'US', 'completed', 'electronics', 80\n) AS orders\n GROUP BY 1 HAVING sum(amount) <= 0) bruin_check",
+          "status": "passed",
+          "duration_ms": 0
+        },
+        {
+          "id": "orders.check.no_negative_amounts",
+          "model": "orders",
+          "scope": "model",
+          "name": "no_negative_amounts",
+          "sql": "SELECT count(*) AS bruin_check_value FROM (SELECT order_id AS order_id FROM (\n  SELECT 1 AS order_id, 101 AS customer_id, DATE '2025-01-15' AS order_date, 'US' AS country, 'completed' AS status, 'electronics' AS category, 100 AS amount\n  UNION ALL SELECT 2, 102, DATE '2025-01-20', 'US', 'completed', 'accessories', 50\n  UNION ALL SELECT 3, 101, DATE '2025-02-05', 'US', 'pending', 'electronics', 70\n  UNION ALL SELECT 4, 201, DATE '2025-02-10', 'DE', 'completed', 'electronics', 200\n  UNION ALL SELECT 5, 101, DATE '2025-03-01', 'US', 'completed', 'furniture', 300\n  UNION ALL SELECT 6, 201, DATE '2025-03-15', 'DE', 'cancelled', 'furniture', 10\n  UNION ALL SELECT 7, 102, DATE '2025-03-20', 'US', 'completed', 'electronics', 80\n) AS orders\n WHERE amount < 0 GROUP BY 1) bruin_check",
+          "status": "passed",
+          "duration_ms": 0
+        },
+        {
+          "id": "orders.check.revenue_by_country",
+          "model": "orders",
+          "scope": "model",
+          "name": "revenue_by_country",
+          "sql": "SELECT country AS country, sum(amount) AS revenue, count(distinct order_id) AS order_count FROM (\n  SELECT 1 AS order_id, 101 AS customer_id, DATE '2025-01-15' AS order_date, 'US' AS country, 'completed' AS status, 'electronics' AS category, 100 AS amount\n  UNION ALL SELECT 2, 102, DATE '2025-01-20', 'US', 'completed', 'accessories', 50\n  UNION ALL SELECT 3, 101, DATE '2025-02-05', 'US', 'pending', 'electronics', 70\n  UNION ALL SELECT 4, 201, DATE '2025-02-10', 'DE', 'completed', 'electronics', 200\n  UNION ALL SELECT 5, 101, DATE '2025-03-01', 'US', 'completed', 'furniture', 300\n  UNION ALL SELECT 6, 201, DATE '2025-03-15', 'DE', 'cancelled', 'furniture', 10\n  UNION ALL SELECT 7, 102, DATE '2025-03-20', 'US', 'completed', 'electronics', 80\n) AS orders\n GROUP BY 1 ORDER BY revenue DESC",
+          "status": "passed",
+          "duration_ms": 0
+        },
+        {
+          "id": "orders.check.revenue_by_country_mismatch",
+          "model": "orders",
+          "scope": "model",
+          "name": "revenue_by_country_mismatch",
+          "description": "intentionally failing check used by the integration tests",
+          "sql": "SELECT customers.country AS customers_country, sum(base.amount) AS revenue FROM (SELECT * FROM (\n  SELECT 1 AS order_id, 101 AS customer_id, DATE '2025-01-15' AS order_date, 'US' AS country, 'completed' AS status, 'electronics' AS category, 100 AS amount\n  UNION ALL SELECT 2, 102, DATE '2025-01-20', 'US', 'completed', 'accessories', 50\n  UNION ALL SELECT 3, 101, DATE '2025-02-05', 'US', 'pending', 'electronics', 70\n  UNION ALL SELECT 4, 201, DATE '2025-02-10', 'DE', 'completed', 'electronics', 200\n  UNION ALL SELECT 5, 101, DATE '2025-03-01', 'US', 'completed', 'furniture', 300\n  UNION ALL SELECT 6, 201, DATE '2025-03-15', 'DE', 'cancelled', 'furniture', 10\n  UNION ALL SELECT 7, 102, DATE '2025-03-20', 'US', 'completed', 'electronics', 80\n) AS orders\n) base LEFT JOIN (SELECT * FROM (\n  SELECT 101 AS customer_id, 'US' AS country, 'enterprise' AS segment\n  UNION ALL SELECT 102, 'US', 'startup'\n  UNION ALL SELECT 201, 'DE', 'enterprise'\n) AS customers\n) customers ON base.customer_id = customers.customer_id GROUP BY 1",
+          "status": "passed",
+          "duration_ms": 0
+        },
+        {
+          "id": "orders.check.orders_without_customers",
+          "model": "orders",
+          "scope": "model",
+          "name": "orders_without_customers",
+          "description": "intentionally failing check used by the integration tests",
+          "sql": "SELECT count(*) AS bruin_check_value FROM (SELECT base.order_id AS order_id FROM (SELECT * FROM (\n  SELECT 1 AS order_id, 101 AS customer_id, DATE '2025-01-15' AS order_date, 'US' AS country, 'completed' AS status, 'electronics' AS category, 100 AS amount\n  UNION ALL SELECT 2, 102, DATE '2025-01-20', 'US', 'completed', 'accessories', 50\n  UNION ALL SELECT 3, 101, DATE '2025-02-05', 'US', 'pending', 'electronics', 70\n  UNION ALL SELECT 4, 201, DATE '2025-02-10', 'DE', 'completed', 'electronics', 200\n  UNION ALL SELECT 5, 101, DATE '2025-03-01', 'US', 'completed', 'furniture', 300\n  UNION ALL SELECT 6, 201, DATE '2025-03-15', 'DE', 'cancelled', 'furniture', 10\n  UNION ALL SELECT 7, 102, DATE '2025-03-20', 'US', 'completed', 'electronics', 80\n) AS orders\n) base LEFT JOIN (SELECT * FROM (\n  SELECT 101 AS customer_id, 'US' AS country, 'enterprise' AS segment\n  UNION ALL SELECT 102, 'US', 'startup'\n  UNION ALL SELECT 201, 'DE', 'enterprise'\n) AS customers\n) customers ON base.customer_id = customers.customer_id WHERE customers.country IS NULL GROUP BY 1) bruin_check",
+          "status": "passed",
+          "duration_ms": 0
+        }
+      ]
+    }
+  ]
+}
