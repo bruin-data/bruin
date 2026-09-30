@@ -54,7 +54,7 @@ Cleaned and joined models across the raw sources:
 - `rpt_marketing_roi`: spend, session-share-estimated attributed revenue, and estimated ROAS per channel
 - `rpt_daily_kpis`: top-level KPIs (revenue, orders, AOV, sessions, conversion)
 
-`rpt_marketing_roi` allocates each day's paid order revenue in proportion to that day's sessions per channel. The source models do not share a stable user or session identifier, so this is a directional estimate rather than user- or session-level attribution. Adapt the report to join on a stable identifier if your sources provide one.
+`rpt_marketing_roi` allocates each day's paid order revenue in proportion to that day's sessions per channel. Channels without spend are included so the allocated revenue still reconciles to the daily total; their ROAS is null. The source models do not share a stable user or session identifier, so this is a directional estimate rather than user- or session-level attribution. Adapt the report to join on a stable identifier if your sources provide one.
 
 ## Folder structure
 

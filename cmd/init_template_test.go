@@ -122,12 +122,101 @@ func TestEcommerceTemplateEstimatesRevenueWithoutDateOnlyAttribution(t *testing.
 			report := files["assets/reports/rpt_marketing_roi.sql"]
 			require.Contains(t, report, "daily_sessions AS (")
 			require.Contains(t, report, "daily_revenue AS (")
+			require.Contains(t, report, "report_channels AS (")
 			require.Contains(t, report, "total_revenue * sess.sessions")
 			require.Contains(t, report, "estimated_attributed_revenue")
 			require.Contains(t, report, "estimated_roas")
 			require.NotContains(t, report, "JOIN staging.stg_web_sessions")
 		})
 	}
+}
+
+func TestEcommerceTemplateReconcilesEstimatedRevenueAcrossAllChannels(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping on Windows due to DuckDB file locking")
+	}
+	if err := duck.EnsureADBCDriverInstalled(t.Context()); err != nil {
+		t.Skipf("skipping test: ADBC DuckDB driver not available: %v", err)
+	}
+
+	files, err := buildEcommerceFiles(&EcommerceChoices{
+		Warehouse: warehouseSnowflake,
+		Payments:  paymentsStripe,
+		Marketing: marketingKlaviyo,
+		Ads:       []string{adsFacebook},
+		Analytics: analyticsGA4,
+	})
+	require.NoError(t, err)
+
+	db := openTestDuckDB(t, filepath.Join(t.TempDir(), "ecommerce.duckdb"))
+	defer db.Close()
+
+	execTestDuckDB(t, db, "CREATE SCHEMA staging")
+	execTestDuckDB(t, db, `CREATE TABLE staging.stg_marketing_spend (
+        spend_date DATE, channel VARCHAR, spend DECIMAL(12,2),
+        impressions INTEGER, clicks INTEGER, conversions INTEGER
+    )`)
+	execTestDuckDB(t, db, `INSERT INTO staging.stg_marketing_spend VALUES
+        ('2026-01-01', 'paid_ads', 20, 100, 10, 2)`)
+	execTestDuckDB(t, db, `CREATE TABLE staging.stg_web_sessions (
+        session_date DATE, channel VARCHAR, total_sessions INTEGER,
+        new_users INTEGER, purchase_events INTEGER
+    )`)
+	execTestDuckDB(t, db, `INSERT INTO staging.stg_web_sessions VALUES
+        ('2026-01-01', 'paid_ads', 30, 10, 2),
+        ('2026-01-01', 'direct', 70, 30, 8)`)
+	execTestDuckDB(t, db, `CREATE TABLE staging.stg_orders (
+        order_date TIMESTAMP, order_total DECIMAL(12,2), payment_status VARCHAR
+    )`)
+	execTestDuckDB(t, db, `INSERT INTO staging.stg_orders VALUES
+        ('2026-01-01 10:00:00', 40, 'paid'),
+        ('2026-01-01 11:00:00', 60, 'paid'),
+        ('2026-01-01 12:00:00', 999, 'pending')`)
+
+	report := strings.TrimSpace(stripBruinHeaderForTest(files["assets/reports/rpt_marketing_roi.sql"]))
+	execTestDuckDB(t, db, "CREATE TABLE marketing_roi AS "+report)
+
+	rows, err := db.QueryContext(t.Context(), `
+        SELECT
+            channel,
+            CAST(total_spend AS DOUBLE),
+            CAST(estimated_attributed_revenue AS DOUBLE),
+            CAST(estimated_roas AS DOUBLE)
+        FROM marketing_roi
+        ORDER BY channel`)
+	require.NoError(t, err)
+	defer rows.Close()
+
+	type result struct {
+		channel           string
+		spend             float64
+		attributedRevenue float64
+		roas              sql.NullFloat64
+	}
+	var results []result
+	for rows.Next() {
+		var current result
+		require.NoError(t, rows.Scan(
+			&current.channel,
+			&current.spend,
+			&current.attributedRevenue,
+			&current.roas,
+		))
+		current.channel = strings.Clone(current.channel)
+		results = append(results, current)
+	}
+	require.NoError(t, rows.Err())
+	require.Equal(t, []result{
+		{channel: "direct", spend: 0, attributedRevenue: 70},
+		{channel: "paid_ads", spend: 20, attributedRevenue: 30, roas: sql.NullFloat64{Float64: 1.5, Valid: true}},
+	}, results)
+
+	var totalAttributedRevenue float64
+	require.NoError(t, db.QueryRowContext(
+		t.Context(),
+		"SELECT CAST(sum(estimated_attributed_revenue) AS DOUBLE) FROM marketing_roi",
+	).Scan(&totalAttributedRevenue))
+	require.Equal(t, 100.0, totalAttributedRevenue)
 }
 
 func TestInitPaymentsClickHouseCopiesDemoTemplate(t *testing.T) {

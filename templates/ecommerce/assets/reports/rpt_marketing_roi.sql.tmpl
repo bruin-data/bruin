@@ -62,14 +62,25 @@ daily_revenue AS (
     GROUP BY order_date::DATE
 {{- end }}
 ),
+report_channels AS (
+    SELECT
+        spend_date AS report_date,
+        channel
+    FROM channel_spend
+    UNION
+    SELECT
+        session_date AS report_date,
+        channel
+    FROM channel_sessions
+),
 channel_performance AS (
     SELECT
-        cs.spend_date AS report_date,
-        cs.channel,
-        cs.total_spend,
-        cs.total_impressions,
-        cs.total_clicks,
-        cs.total_conversions,
+        rc.report_date,
+        rc.channel,
+        COALESCE(cs.total_spend, 0) AS total_spend,
+        COALESCE(cs.total_impressions, 0) AS total_impressions,
+        COALESCE(cs.total_clicks, 0) AS total_clicks,
+        COALESCE(cs.total_conversions, 0) AS total_conversions,
         sess.sessions,
         sess.new_users,
 {{- if .IsClickHouse }}
@@ -77,14 +88,17 @@ channel_performance AS (
 {{- else }}
         round(dr.total_revenue * sess.sessions / NULLIF(ds.sessions, 0), 2) AS estimated_attributed_revenue
 {{- end }}
-    FROM channel_spend cs
+    FROM report_channels rc
+    LEFT JOIN channel_spend cs
+        ON rc.report_date = cs.spend_date
+        AND rc.channel = cs.channel
     LEFT JOIN channel_sessions sess
-        ON cs.spend_date = sess.session_date
-        AND cs.channel = sess.channel
+        ON rc.report_date = sess.session_date
+        AND rc.channel = sess.channel
     LEFT JOIN daily_sessions ds
-        ON cs.spend_date = ds.session_date
+        ON rc.report_date = ds.session_date
     LEFT JOIN daily_revenue dr
-        ON cs.spend_date = dr.order_date
+        ON rc.report_date = dr.order_date
 )
 SELECT
     report_date,
