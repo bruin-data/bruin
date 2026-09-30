@@ -82,15 +82,33 @@ func validateDestination(fs afero.Fs, opts ImportOptions, assets []*pipeline.Ass
 // rename replaces an overwritten directory entry without following that link.
 func writeRootFile(root *os.Root, path string, content []byte, overwrite bool) error {
 	writePath := path
+	mode := os.FileMode(0o644)
+	preserveMode := false
 	if overwrite {
+		info, err := root.Lstat(path)
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		if info != nil {
+			mode = 0o600
+			if info.Mode().IsRegular() {
+				mode = info.Mode().Perm()
+				preserveMode = true
+			}
+		}
 		writePath = filepath.Join(filepath.Dir(path), ".bruin-import-"+rand.Text())
-		defer func() { _ = root.Remove(writePath) }()
 	}
-	file, err := root.OpenFile(writePath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	file, err := root.OpenFile(writePath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode)
 	if err != nil {
 		return err
 	}
+	if overwrite {
+		defer func() { _ = root.Remove(writePath) }()
+	}
 	_, err = file.Write(content)
+	if err == nil && preserveMode {
+		err = file.Chmod(mode)
+	}
 	if err := errors.Join(err, file.Close()); err != nil {
 		return err
 	}

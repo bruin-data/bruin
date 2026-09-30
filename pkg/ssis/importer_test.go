@@ -310,3 +310,27 @@ func TestWriteDoesNotFollowLateSymlink(t *testing.T) {
 		})
 	}
 }
+
+func TestOverwritePreservesFilePermissions(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX permission bits are not supported on Windows")
+	}
+	for _, mode := range []os.FileMode{0o600, 0o640, 0o400} {
+		t.Run(fmt.Sprintf("%o", mode), func(t *testing.T) {
+			t.Parallel()
+			directory := t.TempDir()
+			path := filepath.Join(directory, "asset.sql")
+			require.NoError(t, os.WriteFile(path, []byte("old"), mode))
+			require.NoError(t, os.Chmod(path, mode))
+			root, err := os.OpenRoot(directory)
+			require.NoError(t, err)
+			defer root.Close()
+			require.NoError(t, writeRootFile(root, "asset.sql", []byte("replacement"), true))
+			info, err := os.Stat(path)
+			require.NoError(t, err)
+			require.Equal(t, mode, info.Mode().Perm())
+			require.Equal(t, "replacement", read(t, afero.NewOsFs(), path))
+		})
+	}
+}
