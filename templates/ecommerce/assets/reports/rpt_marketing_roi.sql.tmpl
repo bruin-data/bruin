@@ -35,59 +35,75 @@ channel_sessions AS (
     FROM staging.stg_web_sessions
     GROUP BY session_date, channel
 ),
-channel_revenue AS (
+daily_sessions AS (
+    SELECT
+        session_date,
+        sum(sessions) AS sessions
+    FROM channel_sessions
+    GROUP BY session_date
+),
+daily_revenue AS (
     SELECT
 {{- if .IsClickHouse }}
-        toDate(o.order_date) AS order_date,
+        toDate(order_date) AS order_date,
 {{- else if .IsBigQuery }}
-        DATE(o.order_date) AS order_date,
+        DATE(order_date) AS order_date,
 {{- else }}
         order_date::DATE AS order_date,
 {{- end }}
-        ws.channel,
-        sum(o.order_total) AS attributed_revenue
-    FROM staging.stg_orders o
-    INNER JOIN staging.stg_web_sessions ws
+        sum(order_total) AS total_revenue
+    FROM staging.stg_orders
+    WHERE payment_status = 'paid'
 {{- if .IsClickHouse }}
-        ON toDate(o.order_date) = ws.session_date
+    GROUP BY toDate(order_date)
 {{- else if .IsBigQuery }}
-        ON DATE(o.order_date) = ws.session_date
+    GROUP BY DATE(order_date)
 {{- else }}
-        ON order_date::DATE = ws.session_date
+    GROUP BY order_date::DATE
 {{- end }}
-    WHERE o.payment_status = 'paid'
+),
+channel_performance AS (
+    SELECT
+        cs.spend_date AS report_date,
+        cs.channel,
+        cs.total_spend,
+        cs.total_impressions,
+        cs.total_clicks,
+        cs.total_conversions,
+        sess.sessions,
+        sess.new_users,
 {{- if .IsClickHouse }}
-    GROUP BY toDate(o.order_date), ws.channel
-{{- else if .IsBigQuery }}
-    GROUP BY DATE(o.order_date), ws.channel
+        round(dr.total_revenue * sess.sessions / nullIf(ds.sessions, 0), 2) AS estimated_attributed_revenue
 {{- else }}
-    GROUP BY order_date::DATE, ws.channel
+        round(dr.total_revenue * sess.sessions / NULLIF(ds.sessions, 0), 2) AS estimated_attributed_revenue
 {{- end }}
+    FROM channel_spend cs
+    LEFT JOIN channel_sessions sess
+        ON cs.spend_date = sess.session_date
+        AND cs.channel = sess.channel
+    LEFT JOIN daily_sessions ds
+        ON cs.spend_date = ds.session_date
+    LEFT JOIN daily_revenue dr
+        ON cs.spend_date = dr.order_date
 )
 SELECT
-    cs.spend_date AS report_date,
-    cs.channel,
-    cs.total_spend,
-    cs.total_impressions,
-    cs.total_clicks,
-    cs.total_conversions,
-    sess.sessions,
-    sess.new_users,
-    cr.attributed_revenue,
+    report_date,
+    channel,
+    total_spend,
+    total_impressions,
+    total_clicks,
+    total_conversions,
+    sessions,
+    new_users,
+    estimated_attributed_revenue,
 {{- if .IsClickHouse }}
-    round(cr.attributed_revenue / nullIf(cs.total_spend, 0), 2) AS roas,
-    round(cs.total_spend / nullIf(cs.total_conversions, 0), 2) AS cost_per_acquisition,
-    round(cs.total_clicks / nullIf(cs.total_impressions, 0) * 100, 2) AS click_through_rate
+    round(estimated_attributed_revenue / nullIf(total_spend, 0), 2) AS estimated_roas,
+    round(total_spend / nullIf(total_conversions, 0), 2) AS cost_per_acquisition,
+    round(total_clicks / nullIf(total_impressions, 0) * 100, 2) AS click_through_rate
 {{- else }}
-    round(cr.attributed_revenue / NULLIF(cs.total_spend, 0), 2) AS roas,
-    round(cs.total_spend / NULLIF(cs.total_conversions, 0), 2) AS cost_per_acquisition,
-    round(cs.total_clicks / NULLIF(cs.total_impressions, 0) * 100, 2) AS click_through_rate
+    round(estimated_attributed_revenue / NULLIF(total_spend, 0), 2) AS estimated_roas,
+    round(total_spend / NULLIF(total_conversions, 0), 2) AS cost_per_acquisition,
+    round(total_clicks / NULLIF(total_impressions, 0) * 100, 2) AS click_through_rate
 {{- end }}
-FROM channel_spend cs
-LEFT JOIN channel_sessions sess
-    ON cs.spend_date = sess.session_date
-    AND cs.channel = sess.channel
-LEFT JOIN channel_revenue cr
-    ON cs.spend_date = cr.order_date
-    AND cs.channel = cr.channel
-ORDER BY cs.spend_date DESC, cs.total_spend DESC
+FROM channel_performance
+ORDER BY report_date DESC, total_spend DESC

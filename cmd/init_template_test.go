@@ -103,6 +103,33 @@ func TestInitShopifyClickHouseCopiesPipelineTemplate(t *testing.T) {
 	require.Contains(t, string(orderLinesAsset), "incremental_key: order_id")
 }
 
+func TestEcommerceTemplateEstimatesRevenueWithoutDateOnlyAttribution(t *testing.T) {
+	t.Parallel()
+
+	for _, warehouse := range []string{warehouseClickHouse, warehouseBigQuery, warehouseSnowflake} {
+		t.Run(warehouse, func(t *testing.T) {
+			t.Parallel()
+
+			files, err := buildEcommerceFiles(&EcommerceChoices{
+				Warehouse: warehouse,
+				Payments:  paymentsStripe,
+				Marketing: marketingKlaviyo,
+				Ads:       []string{adsFacebook},
+				Analytics: analyticsGA4,
+			})
+			require.NoError(t, err)
+
+			report := files["assets/reports/rpt_marketing_roi.sql"]
+			require.Contains(t, report, "daily_sessions AS (")
+			require.Contains(t, report, "daily_revenue AS (")
+			require.Contains(t, report, "total_revenue * sess.sessions")
+			require.Contains(t, report, "estimated_attributed_revenue")
+			require.Contains(t, report, "estimated_roas")
+			require.NotContains(t, report, "JOIN staging.stg_web_sessions")
+		})
+	}
+}
+
 func TestInitPaymentsClickHouseCopiesDemoTemplate(t *testing.T) {
 	targetRoot := t.TempDir()
 	t.Chdir(targetRoot)
