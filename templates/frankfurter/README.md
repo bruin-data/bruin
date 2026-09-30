@@ -31,6 +31,8 @@ You can simply switch the environment using the `--environment` flag, e.g.:
 
 ## Running the pipeline
 
+Run these commands from the pipeline directory.
+
 bruin CLI can run the whole pipeline or any task with the downstreams:
 
 ```shell

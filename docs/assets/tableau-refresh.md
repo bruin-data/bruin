@@ -55,6 +55,8 @@ connections:
 - `tableau.worksheet` — Represents a Tableau worksheet (no-op, for lineage/clarity)
 - `tableau.dashboard` — Represents a Tableau dashboard (no-op, for lineage/clarity)
 
+Tableau assets without `refresh: true` remain enabled for lineage and dependency ordering without requiring a Tableau connection. A connection is required only when refreshing a datasource or workbook. The run-level `--full-refresh` flag changes the refresh mode; it does not enable refreshing an asset whose `refresh` parameter is omitted or false.
+
 ## Refreshing Tableau Assets
 
 To trigger a refresh, set the `refresh` parameter to `true` on a supported asset type. You must provide either the asset's ID or its name for lookup:

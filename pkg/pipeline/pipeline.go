@@ -2590,7 +2590,7 @@ func (p *Pipeline) GetAllConnectionNamesForAsset(asset *Asset) ([]string, error)
 
 		return []string{ingestrDestination, ingestrSource}, nil
 	default:
-		if assetMainTaskIsConnectionless(assetType) {
+		if assetMainTaskIsConnectionless(asset) {
 			return nil, nil
 		}
 		conn, err := p.GetConnectionNameForAsset(asset)
@@ -2602,8 +2602,11 @@ func (p *Pipeline) GetAllConnectionNamesForAsset(asset *Asset) ([]string, error)
 	}
 }
 
-func assetMainTaskIsConnectionless(assetType AssetType) bool {
-	switch assetType {
+func assetMainTaskIsConnectionless(asset *Asset) bool {
+	switch asset.Type {
+	case AssetTypeTableau, AssetTypeTableauDatasource, AssetTypeTableauWorkbook:
+		refresh, _ := asset.Parameters.GetString("refresh")
+		return refresh != "true"
 	case AssetTypeAthenaSource,
 		AssetTypeBigquerySource,
 		AssetTypeClickHouseSource,
@@ -2652,9 +2655,10 @@ func assetMainTaskIsConnectionless(assetType AssetType) bool {
 // ConnectionlessIngestrSources maps public, credential-less ingestr sources to
 // their base URI, keyed by canonical domain name so short names stay connections.
 var ConnectionlessIngestrSources = map[string]string{
-	"chess.com":       "chess://",
-	"frankfurter.dev": "frankfurter://",
-	"stat.ripe.net":   "ripestat://",
+	"chess.com":         "chess://",
+	"frankfurter.dev":   "frankfurter://",
+	"stat.ripe.net":     "ripestat://",
+	"finance.yahoo.com": "yfinance://",
 }
 
 func assetSecretConnectionNames(asset *Asset) []string {

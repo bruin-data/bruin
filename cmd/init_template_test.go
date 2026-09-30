@@ -376,6 +376,70 @@ func TestChargebeeBigQueryStarterTemplateHasFocusedAssetSet(t *testing.T) {
 	require.Contains(t, string(readme), "Chargebee to BigQuery")
 }
 
+func TestInitQuickBooksBigQueryCopiesStarterTemplate(t *testing.T) {
+	targetRoot := t.TempDir()
+	t.Chdir(targetRoot)
+
+	gitInit := exec.CommandContext(t.Context(), "git", "init")
+	gitInit.Dir = targetRoot
+	out, err := gitInit.CombinedOutput()
+	require.NoError(t, err, string(out))
+
+	err = Init().Run(t.Context(), []string{"init", "quickbooks-bigquery"})
+	require.NoError(t, err)
+
+	pipelineRoot := filepath.Join(targetRoot, "quickbooks-bigquery")
+	require.FileExists(t, filepath.Join(pipelineRoot, "pipeline.yml"))
+	require.FileExists(t, filepath.Join(pipelineRoot, ".gitignore"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "assets", "quickbooks_raw", "invoices.asset.yml"))
+
+	pipeline, err := os.ReadFile(filepath.Join(pipelineRoot, "pipeline.yml"))
+	require.NoError(t, err)
+	require.Contains(t, string(pipeline), "name: quickbooks-bigquery")
+
+	configContent, err := os.ReadFile(filepath.Join(targetRoot, ".bruin.yml"))
+	require.NoError(t, err)
+	require.Contains(t, string(configContent), "name: gcp-default")
+	require.Contains(t, string(configContent), "name: quickbooks-default")
+}
+
+func TestQuickBooksBigQueryStarterTemplateHasFocusedAssetSet(t *testing.T) {
+	t.Parallel()
+
+	expectedAssets := []string{
+		"quickbooks_raw/accounts.asset.yml",
+		"quickbooks_raw/customers.asset.yml",
+		"quickbooks_raw/invoices.asset.yml",
+		"quickbooks_raw/payments.asset.yml",
+		"quickbooks_raw/vendors.asset.yml",
+	}
+
+	var actualAssets []string
+	err := iofs.WalkDir(templates.Templates, "quickbooks-bigquery/assets", func(path string, entry iofs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+
+		actualAssets = append(actualAssets, strings.TrimPrefix(path, "quickbooks-bigquery/assets/"))
+		return nil
+	})
+	require.NoError(t, err)
+	require.ElementsMatch(t, expectedAssets, actualAssets)
+
+	pipeline, err := templates.Templates.ReadFile("quickbooks-bigquery/pipeline.yml")
+	require.NoError(t, err)
+	require.Contains(t, string(pipeline), "name: quickbooks-bigquery")
+	require.Contains(t, string(pipeline), "source_connection: quickbooks-default")
+	require.Contains(t, string(pipeline), "destination: bigquery")
+
+	readme, err := templates.Templates.ReadFile("quickbooks-bigquery/README.md")
+	require.NoError(t, err)
+	require.Contains(t, string(readme), "QuickBooks to BigQuery")
+}
+
 func TestInitGoogleWebAnalyticsCopiesStarterTemplate(t *testing.T) {
 	targetRoot := t.TempDir()
 	t.Chdir(targetRoot)

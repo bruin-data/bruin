@@ -1,0 +1,17 @@
+name: quickbooks-bigquery
+schedule: daily
+start_date: "2000-01-01"
+
+metadata_push:
+  bigquery: true
+
+default:
+  type: ingestr
+  parameters:
+    source_connection: quickbooks-default
+    destination: bigquery
+    loader_file_format: jsonl
+
+default_connections:
+  google_cloud_platform: gcp-default
+  quickbooks: quickbooks-default

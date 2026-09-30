@@ -1,0 +1,125 @@
+name: quickbooks_raw.vendors
+type: ingestr
+
+description: >
+  Raw QuickBooks Online Vendor records (Accounting API v3) loaded into BigQuery
+  by ingestr. Each run fetches records whose `MetaData.LastUpdatedTime` falls
+  inside the run window and merges them on `id`, so edits are picked up by the
+  run that covers them. Records deleted in QuickBooks are not removed from this
+  table. Inactive vendors are excluded by the QuickBooks query API and stay as
+  their last loaded version. `balance` is the open accounts payable amount at
+  the time of the last load.
+
+materialization:
+  type: table
+  strategy: merge
+
+parameters:
+  source_table: vendors
+  enforce_schema: true
+
+tags:
+  - quickbooks_raw
+  - quickbooks
+  - accounting
+  - vendors
+
+columns:
+  - name: id
+    type: varchar
+    description: QuickBooks vendor identifier, unique within the company file.
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: lastupdatedtime
+    type: timestamp
+    description: >
+      `MetaData.LastUpdatedTime`, when the record was last modified in
+      QuickBooks. The source selects each run's records by it.
+    checks:
+      - name: not_null
+  - name: display_name
+    type: varchar
+    description: >
+      Name shown in QuickBooks lists; unique across customers, vendors, and
+      employees.
+    checks:
+      - name: not_null
+      - name: unique
+  - name: company_name
+    type: varchar
+    description: Company name of the vendor.
+  - name: given_name
+    type: varchar
+    description: First name of the primary contact.
+  - name: family_name
+    type: varchar
+    description: Last name of the primary contact.
+  - name: print_on_check_name
+    type: varchar
+    description: Name to print on checks issued to the vendor.
+  - name: acct_num
+    type: varchar
+    description: Account number the vendor uses to identify the company.
+  - name: active
+    type: boolean
+    description: Whether the vendor is active.
+    checks:
+      - name: not_null
+  - name: vendor1099
+    type: boolean
+    description: Whether the vendor is tracked for 1099-NEC reporting.
+  - name: balance
+    type: double
+    description: Open accounts payable balance owed to the vendor.
+  - name: bill_rate
+    type: double
+    description: Default hourly billing rate for the vendor.
+  - name: currency_ref
+    type: json
+    description: >
+      Reference `{value, name}` where `value` is the QuickBooks `id` of the
+      related currency.
+  - name: term_ref
+    type: json
+    description: >
+      Reference `{value, name}` where `value` is the QuickBooks `id` of the
+      related payment term (Term).
+  - name: primary_email_addr
+    type: json
+    description: Primary email address object `{Address}`.
+  - name: primary_phone
+    type: json
+    description: Primary phone number object `{FreeFormNumber}`.
+  - name: mobile
+    type: json
+    description: Mobile phone number object `{FreeFormNumber}`.
+  - name: web_addr
+    type: json
+    description: Website address object `{URI}`.
+  - name: bill_addr
+    type: json
+    description: >
+      Billing address object with line, city, country subdivision, and postal
+      code fields.
+  - name: meta_data
+    type: json
+    description: >
+      QuickBooks `MetaData` object holding `CreateTime` and `LastUpdatedTime`.
+  - name: sync_token
+    type: varchar
+    description: >
+      QuickBooks optimistic-concurrency version number; increments on every
+      update.
+  - name: domain
+    type: varchar
+    description: QuickBooks API domain, always `QBO`.
+  - name: sparse
+    type: boolean
+    description: >
+      Whether the API returned a sparse object containing only a subset of
+      fields.
+  - name: v4_id_pseudonym
+    type: varchar
+    description: Intuit's pseudonymous identifier for the record.

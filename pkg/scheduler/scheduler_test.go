@@ -518,8 +518,9 @@ func TestScheduler_getScheduleableTasksLimitsRefreshableDashboardMainTasks(t *te
 		t.Parallel()
 
 		s := newConnectionLimitTestScheduler(t, []*pipeline.Asset{
-			{Name: "tableau-first", Type: pipeline.AssetTypeTableauDatasource, Connection: "tableau-prod"},
-			{Name: "tableau-second", Type: pipeline.AssetTypeTableauWorkbook, Connection: "tableau-prod"},
+			{Name: "tableau-first", Type: pipeline.AssetTypeTableauDatasource, Connection: "tableau-prod", Parameters: pipeline.ParameterMap{"refresh": "true"}},
+			{Name: "tableau-second", Type: pipeline.AssetTypeTableauWorkbook, Connection: "tableau-prod", Parameters: pipeline.ParameterMap{"refresh": "true"}},
+			{Name: "tableau-alias", Type: pipeline.AssetTypeTableau, Connection: "tableau-prod", Parameters: pipeline.ParameterMap{"refresh": "true"}},
 		}, map[string]int{"tableau-prod": 1})
 
 		assert.Equal(t, []string{"tableau-first"}, scheduleableHumanIDs(s))
@@ -535,6 +536,44 @@ func TestScheduler_getScheduleableTasksLimitsRefreshableDashboardMainTasks(t *te
 
 		assert.Equal(t, []string{"quicksight-first"}, scheduleableHumanIDs(s))
 	})
+}
+
+func TestScheduler_TableauLineageOnly(t *testing.T) {
+	t.Parallel()
+
+	for _, assetType := range []pipeline.AssetType{pipeline.AssetTypeTableau, pipeline.AssetTypeTableauDatasource, pipeline.AssetTypeTableauWorkbook} {
+		for _, refresh := range []string{"", "false"} {
+			t.Run(string(assetType)+"/refresh="+refresh, func(t *testing.T) {
+				t.Parallel()
+				asset := &pipeline.Asset{
+					Name: "tableau", Type: assetType,
+					Upstreams: []pipeline.Upstream{{Type: "asset", Value: "upstream"}},
+				}
+				if refresh != "" {
+					asset.Parameters = pipeline.ParameterMap{"refresh": refresh}
+				}
+				s := NewScheduler(zap.NewNop().Sugar(), &pipeline.Pipeline{Assets: []*pipeline.Asset{
+					{Name: "upstream", Type: pipeline.AssetTypeEmpty},
+					asset,
+					{Name: "downstream", Type: pipeline.AssetTypeEmpty, Upstreams: []pipeline.Upstream{{Type: "asset", Value: "tableau"}}},
+				}}, "test")
+				limits, err := s.ConnectionLimitsFromDetails(nil, connectionLimitDetailsGetter{})
+				require.NoError(t, err)
+				require.Empty(t, limits)
+				require.NoError(t, s.SetConnectionLimits(map[string]int{"unrelated": 1}))
+				assert.Equal(t, []string{"upstream"}, scheduleableHumanIDs(s))
+				markMainTaskStatus(s, "upstream", Succeeded)
+				assert.Equal(t, []string{"tableau"}, scheduleableHumanIDs(s))
+				markMainTaskStatus(s, "tableau", Succeeded)
+				assert.Equal(t, []string{"downstream"}, scheduleableHumanIDs(s))
+
+				asset.Parameters = pipeline.ParameterMap{"refresh": "true"}
+				markMainTaskStatus(s, "tableau", Pending)
+				_, err = s.ConnectionLimitsFromDetails(nil, connectionLimitDetailsGetter{})
+				require.ErrorContains(t, err, "no connection mapping found for asset type")
+			})
+		}
+	}
 }
 
 func TestScheduler_getScheduleableTasksChecksUsePrimaryConnectionOnly(t *testing.T) {
