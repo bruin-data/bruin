@@ -67,7 +67,7 @@ report_channels AS (
         spend_date AS report_date,
         channel
     FROM channel_spend
-    UNION
+    UNION DISTINCT
     SELECT
         session_date AS report_date,
         channel

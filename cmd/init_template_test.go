@@ -132,6 +132,9 @@ func TestEcommerceTemplateEstimatesRevenueWithoutDateOnlyAttribution(t *testing.
 }
 
 func TestEcommerceTemplateReconcilesEstimatedRevenueAcrossAllChannels(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
 	if runtime.GOOS == osWindows {
 		t.Skip("skipping on Windows due to DuckDB file locking")
 	}
