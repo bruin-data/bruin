@@ -7,8 +7,98 @@ The `import` commands allow you to automatically import existing resources as Br
 - `bruin import database` - Import database tables as Bruin assets
 - `bruin import bq-scheduled-queries` - Import BigQuery scheduled queries as Bruin assets
 - `bruin import odi` - Import Oracle Data Integrator XML exports as Bruin assets
+- `bruin import ssis` - Import SSIS packages and SQL Server Agent exports as SQL/Python assets
 - `bruin import tableau` - Import Tableau dashboards, workbooks, and data sources as Bruin assets
 - `bruin import quicksight` - Import QuickSight datasets and dashboards as Bruin assets
+
+---
+
+## `import ssis`
+
+Import a modern, unencrypted SSIS `.dtsx` package, a SQL Server Agent JSON export,
+or a directory containing either format. Directories are scanned recursively.
+The importer reads local files only: it does not connect to SQL Server or execute
+any imported code.
+
+```bash
+bruin import ssis --connection sqlserver-prod ./exports ./pipelines/school
+bruin import ssis --connection sqlserver-prod ./School.dtsx ./pipelines/school
+bruin import ssis --connection sqlserver-prod --overwrite ./jobs.json ./pipelines/school
+```
+
+`--connection` (`-c`) is required and names an existing Bruin MSSQL connection.
+It is assigned to every imported SQL asset; SSIS connection managers and their
+credentials are not migrated. Review each task's database context, particularly
+when a package uses multiple connection managers.
+
+The importer creates `pipeline.yml` if absent and one asset per task under
+`assets/`, named `<normalized-package-or-job>.<normalized-task>.sql` or `.py`.
+Name collisions fail instead of overwriting another task. Existing asset files
+are skipped unless `--overwrite` is passed. Existing `pipeline.yml` is never
+overwritten. All source files and dependency graphs are validated before writing;
+filesystem errors during writing can leave partial output.
+
+### Supported transformations
+
+- **SSIS Execute SQL:** direct-input SQL becomes `ms.sql`, with the SQL text
+  preserved. Success/AND precedence constraints become Bruin `depends` entries;
+  tasks without constraints remain independent.
+- **SSIS Execute Process:** `python`, `python3`, or their `.exe` equivalents
+  invoking one relative `.py` file become Python assets. Stage the script beside
+  the export (subdirectories and a quoted filename are supported). Script
+  arguments, working-directory overrides, and process variable bindings are
+  not supported.
+- **SQL Server Agent:** enabled jobs with sequential success transitions and
+  quit-on-failure steps are imported in step-ID order. `TSQL` steps become
+  `ms.sql`; `database_name` is preserved with `USE [database]`. `CmdExec` steps
+  of the form `python script.py` become Python assets.
+
+SQL containing `sp_execute_external_script @language=N'Python'` stays SQL.
+The Python continues to run inside SQL Server, preserving `INSERT ... EXEC`,
+input/output datasets, parameters, and quoting. Moving that Python to Bruin's
+Python runtime requires a separate manual rewrite of its database bindings.
+
+### Exporting the SQL Server Agent jobs shown in SSMS
+
+SQL Server Agent jobs are not SSIS packages. Run this read-only query in SSMS
+against `msdb` and save the complete JSON result as `jobs.json` (not the SSMS
+grid headers or a truncated cell). Adjust the filter for the jobs to migrate.
+
+```sql
+SELECT j.name, j.enabled, j.start_step_id,
+       JSON_QUERY((
+           SELECT s.step_id, s.step_name, s.subsystem, s.command,
+                  s.database_name, s.on_success_action, s.on_fail_action
+           FROM msdb.dbo.sysjobsteps AS s
+           WHERE s.job_id = j.job_id
+           ORDER BY s.step_id
+           FOR JSON PATH
+       )) AS steps
+FROM msdb.dbo.sysjobs AS j
+WHERE j.enabled = 1 AND j.name LIKE 'CH[_]%'
+FOR JSON PATH;
+```
+
+### Review before running
+
+Unsupported task types, Data Flow/Script Tasks, nested containers, loops,
+variables/parameters, SQL result bindings, expressions, failure/completion/OR
+branches, unresolved references, and cycles fail the import with an error.
+Agent jumps, non-default starting steps, disabled jobs, and Agent tokens also
+require manual migration. This is a transformation importer, not a complete
+SSIS runtime emulator.
+
+Schedules, notifications, retries, proxies, execution identities, package
+configuration, and Python environments are not migrated. Add `requirements.txt`
+and any supporting Python modules/data files yourself; only the entry script is
+copied. Review relative file access after relocation. Configure the target
+pipeline's schedule and connections before running it.
+
+::: warning Credentials in source code
+SQL and Python bodies are preserved verbatim. If credentials are hard-coded in
+those bodies, they will also appear in the generated assets. Replace them with
+Bruin connection/secret references before committing the output.
+:::
 
 ---
 
