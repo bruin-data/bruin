@@ -60,15 +60,12 @@ func TestWriteSecretYamlCreatesOwnerOnlyFile(t *testing.T) {
 
 func TestWriteYamlKeepsCommittableMode(t *testing.T) {
 	t.Parallel()
-	if runtime.GOOS == "windows" {
-		t.Skip("file modes are not meaningful on Windows")
-	}
 
-	path := filepath.Join(t.TempDir(), "pipeline.yml")
-	require.NoError(t, WriteYaml(afero.NewOsFs(), path, map[string]string{"name": "p"}))
+	// MemMapFs records the requested mode without applying the process umask.
+	fs := afero.NewMemMapFs()
+	require.NoError(t, WriteYaml(fs, "pipeline.yml", map[string]string{"name": "p"}))
 
-	info, err := os.Stat(path)
+	info, err := fs.Stat("pipeline.yml")
 	require.NoError(t, err)
-	// 0o644 minus whatever the umask strips; group/other must stay readable.
-	require.NotZero(t, info.Mode().Perm()&0o044)
+	require.Equal(t, os.FileMode(0o644), info.Mode().Perm())
 }
