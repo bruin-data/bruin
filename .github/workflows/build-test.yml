@@ -265,3 +265,89 @@ jobs:
         run: make format-ci
       - name: Run full lint suite
         run: make lint-full
+
+  release-dry-run-unix:
+    # Temporary release-packaging probe; no tag, publish token, or upload.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    needs: [verify-ingestr]
+    runs-on: depot-ubuntu-latest-8
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        goos: [linux, darwin]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ingestr-hashes
+          path: pkg/python
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: 'go.mod'
+      - name: Package release snapshot without publishing
+        env:
+          GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
+          COMMIT_SHA: ${{ github.sha }}
+          VERSION: v0.0.0-dry-run
+          TELEMETRY_KEY: ${{ secrets.TELEMETRY_KEY }}
+          GGOOS: ${{ matrix.goos }}
+        run: |
+          test -s pkg/python/ingestr_hashes.json
+          docker run --privileged -v /var/run/docker.sock:/var/run/docker.sock \
+            -e GGOOS -e GORELEASER_KEY -e COMMIT_SHA -e VERSION -e TELEMETRY_KEY \
+            -v "$(pwd):/src" -w /src goreleaser/goreleaser-cross-pro:v1.23 \
+            release --snapshot --clean --split --verbose
+          test -n "$(find dist -name 'bruin*' -type f -print -quit)"
+
+  release-dry-run-windows:
+    # Same snapshot path as release-windows; never uploads a release asset.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    needs: [verify-ingestr]
+    runs-on: depot-windows-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ingestr-hashes
+          path: pkg/python
+      - uses: msys2/setup-msys2@66cd2cce69caa17b53920067426061ca1de3a884 # v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >
+            git
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-gcc-libs
+            mingw-w64-ucrt-x86_64-winpthreads
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: 'go.mod'
+      - name: Check downloaded manifest
+        run: test -s pkg/python/ingestr_hashes.json
+      - name: Package Windows release snapshot without publishing
+        uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
+        with:
+          version: v2.3.2
+          distribution: goreleaser-pro
+          args: release --snapshot --clean --split
+        env:
+          GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
+          VERSION: v0.0.0-dry-run
+          COMMIT_SHA: ${{ github.sha }}
+          TELEMETRY_KEY: ${{ secrets.TELEMETRY_KEY }}
+          GGOOS: windows
+          CGO_ENABLED: 1
+          CC: x86_64-w64-mingw32-gcc
+          CGO_LDFLAGS: "-static-libgcc -static-libstdc++ -Wl,-Bstatic -lwinpthread -Wl,-Bdynamic"
+      - name: Check packaged Windows binary
+        run: test -f dist/windows/bruin_Windows_x86_64.zip
