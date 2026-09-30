@@ -2,6 +2,7 @@ package ssis
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -37,7 +38,7 @@ func parseJobs(fs afero.Fs, source string, data []byte) ([]workflow, error) {
 	var workflows []workflow
 	for _, job := range jobs {
 		if job.Name == "" || len(job.Steps) == 0 || job.Enabled == nil || *job.Enabled != 1 {
-			return nil, fmt.Errorf("expected a named, enabled job with steps")
+			return nil, errors.New("expected a named, enabled job with steps")
 		}
 		sort.Slice(job.Steps, func(i, j int) bool { return job.Steps[i].ID < job.Steps[j].ID })
 		if job.StartStepID != job.Steps[0].ID {

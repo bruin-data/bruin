@@ -3,16 +3,22 @@ package ssis
 import (
 	"context"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/python"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 )
 
-func fixtureFS(t *testing.T) afero.Fs {
+func fixtureFS(t *testing.T) *afero.MemMapFs {
 	t.Helper()
-	fs := afero.NewMemMapFs()
+	fs := &afero.MemMapFs{}
 	require.NoError(t, fs.MkdirAll("input", 0o755))
 	for _, file := range []string{"education.dtsx", "transform.py", "jobs.json"} {
 		data, err := os.ReadFile("testdata/" + file)
@@ -30,6 +36,7 @@ func read(t *testing.T, fs afero.Fs, path string) string {
 }
 
 func TestImport(t *testing.T) {
+	t.Parallel()
 	fs := fixtureFS(t)
 	opts := ImportOptions{SourcePath: "input", PipelinePath: "output", Connection: "school-db"}
 	result, err := Import(t.Context(), fs, opts)
@@ -40,10 +47,10 @@ func TestImport(t *testing.T) {
 	require.Contains(t, prepare, "connection: school-db")
 	require.NotContains(t, prepare, "depends:")
 	require.True(t, strings.HasSuffix(prepare, "TRUNCATE TABLE dbo.pupils;\n"))
-	python := read(t, fs, "output/assets/education.transform.py")
-	require.True(t, strings.HasPrefix(python, `"""@bruin`)) // Python is inferred from the extension.
-	require.Contains(t, python, "education.prepare")
-	require.True(t, strings.HasSuffix(python, "print(\"transform pupils\")\n"))
+	pythonCode := read(t, fs, "output/assets/education/transform.py")
+	require.True(t, strings.HasPrefix(pythonCode, `"""@bruin`)) // Python is inferred from the extension.
+	require.Contains(t, pythonCode, "education.prepare")
+	require.True(t, strings.HasSuffix(pythonCode, "print(\"transform pupils\")\n"))
 	publish := read(t, fs, "output/assets/education.publish.sql")
 	require.Contains(t, publish, "education.transform")
 	require.Contains(t, publish, "grade > 3;")
@@ -52,12 +59,13 @@ func TestImport(t *testing.T) {
 	require.Contains(t, extract, "USE [source];\nINSERT INTO dbo.pupils EXEC sp_execute_external_script")
 	require.Contains(t, extract, `O''Brien`)
 
-	require.NoError(t, afero.WriteFile(fs, "output/assets/education.prepare.sql", []byte("user edit"), 0o600))
+	edited := prepare + "-- user edit\n"
+	require.NoError(t, afero.WriteFile(fs, "output/assets/education.prepare.sql", []byte(edited), 0o600))
 	require.NoError(t, afero.WriteFile(fs, "output/pipeline.yml", []byte("name: existing\n"), 0o600))
 	result, err = Import(t.Context(), fs, opts)
 	require.NoError(t, err)
 	require.Equal(t, 5, result.SkippedAssets)
-	require.Equal(t, "user edit", read(t, fs, "output/assets/education.prepare.sql"))
+	require.Equal(t, edited, read(t, fs, "output/assets/education.prepare.sql"))
 	opts.Overwrite = true
 	_, err = Import(t.Context(), fs, opts)
 	require.NoError(t, err)
@@ -66,6 +74,7 @@ func TestImport(t *testing.T) {
 }
 
 func TestRejectPackageBeforeWriting(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct{ name, old, replacement, message string }{
 		{"failure", `DTS:LogicalAnd="True"`, `DTS:Value="1"`, "success precedence"},
 		{"expression", `DTS:LogicalAnd="True"`, `DTS:EvalOp="2"`, "expression precedence"},
@@ -81,6 +90,7 @@ func TestRejectPackageBeforeWriting(t *testing.T) {
 		{"missing script", `&quot;transform.py&quot;`, `missing.py`, "read Python"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			fs := fixtureFS(t)
 			data := strings.Replace(read(t, fs, "input/education.dtsx"), tc.old, tc.replacement, 1)
 			require.NoError(t, afero.WriteFile(fs, "input/education.dtsx", []byte(data), 0o600))
@@ -94,6 +104,7 @@ func TestRejectPackageBeforeWriting(t *testing.T) {
 }
 
 func TestRejectJobControlFlow(t *testing.T) {
+	t.Parallel()
 	for _, replacement := range []string{`"on_fail_action": 3`, `"on_fail_action": 1`, `"on_fail_action": 0`} {
 		fs := fixtureFS(t)
 		data := strings.ReplaceAll(read(t, fs, "input/jobs.json"), `"on_fail_action": 2`, replacement)
@@ -103,6 +114,7 @@ func TestRejectJobControlFlow(t *testing.T) {
 }
 
 func TestCanceledImport(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	_, err := Import(ctx, fixtureFS(t), ImportOptions{SourcePath: "input", PipelinePath: "output"})
@@ -110,6 +122,7 @@ func TestCanceledImport(t *testing.T) {
 }
 
 func TestPackageParallelRootsAndJoin(t *testing.T) {
+	t.Parallel()
 	fs := fixtureFS(t)
 	data := read(t, fs, "input/education.dtsx")
 	// Prepare and Transform are independent, and Publish waits for both.
@@ -122,6 +135,7 @@ func TestPackageParallelRootsAndJoin(t *testing.T) {
 }
 
 func TestAgentPythonAndDatabaseEscaping(t *testing.T) {
+	t.Parallel()
 	fs := fixtureFS(t)
 	data := `[{
 	  "name":"job", "enabled":1, "start_step_id":4,
@@ -136,4 +150,87 @@ func TestAgentPythonAndDatabaseEscaping(t *testing.T) {
 	require.Equal(t, "print(\"transform pupils\")\n", workflows[0].tasks[0].code)
 	require.Equal(t, "USE [school]]archive];\nSELECT 7;", workflows[0].tasks[1].code)
 	require.Equal(t, []string{"4"}, workflows[0].tasks[1].upstream)
+}
+
+func TestGeneratedPythonRunsAsModule(t *testing.T) {
+	t.Parallel()
+	interpreter, err := exec.LookPath("python3")
+	if err != nil {
+		t.Skip("python3 is not installed")
+	}
+	directory := t.TempDir()
+	_, err = Import(t.Context(), afero.NewOsFs(), ImportOptions{SourcePath: "testdata/education.dtsx", PipelinePath: directory})
+	require.NoError(t, err)
+	finder := &python.ModulePathFinder{}
+	module, err := finder.FindModulePath(&git.Repo{Path: directory}, &pipeline.ExecutableFile{Path: filepath.Join(directory, "assets", "education", "transform.py")})
+	require.NoError(t, err)
+	command := exec.CommandContext(t.Context(), interpreter, "-m", module)
+	command.Dir = directory
+	output, err := command.CombinedOutput()
+	require.NoError(t, err, string(output))
+	require.Equal(t, "transform pupils", strings.TrimSpace(string(output)))
+}
+
+func TestDestinationConflictsFailBeforeWriting(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name, path, code, message string
+		overwrite                 bool
+	}{
+		{"renamed target", "education.prepare.sql", "/* @bruin\nname: manually.renamed\n@bruin */\nSELECT 1;", "expected", false},
+		{"non-asset target", "education.prepare.sql", "SELECT 1;", "expected", false},
+		{"other SQL path", "other.sql", "/* @bruin\nname: education.prepare\n@bruin */\nSELECT 1;", "conflicts", false},
+		{"other YAML path", "other.asset.yml", "name: education.prepare\ntype: ms.sql\n", "conflicts", true},
+		{"inferred name", "education/prepare.py", "\"\"\"@bruin\ndescription: inferred name\n@bruin\"\"\"\nprint(1)", "conflicts", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			fs := fixtureFS(t)
+			path := filepath.Join("output", "assets", tc.path)
+			require.NoError(t, fs.MkdirAll(filepath.Dir(path), 0o755))
+			require.NoError(t, afero.WriteFile(fs, path, []byte(tc.code), 0o600))
+			_, err := Import(t.Context(), fs, ImportOptions{SourcePath: "input", PipelinePath: "output", Overwrite: tc.overwrite})
+			require.ErrorContains(t, err, tc.message)
+			require.Equal(t, tc.code, read(t, fs, path))
+			exists, err := afero.Exists(fs, "output/pipeline.yml")
+			require.NoError(t, err)
+			require.False(t, exists)
+		})
+	}
+}
+
+func TestStagedScriptSymlinks(t *testing.T) {
+	t.Parallel()
+	for _, kind := range []string{"file", "directory", "contained"} {
+		t.Run(kind, func(t *testing.T) {
+			t.Parallel()
+			root := t.TempDir()
+			staging := filepath.Join(root, "staging")
+			require.NoError(t, os.Mkdir(staging, 0o755))
+			target := filepath.Join(root, "outside.py")
+			require.NoError(t, os.WriteFile(target, []byte("outside sentinel"), 0o600))
+			link, argument := filepath.Join(staging, "script.py"), "script.py"
+			switch kind {
+			case "directory":
+				target, link, argument = root, filepath.Join(staging, "linked"), "linked/outside.py"
+			case "contained":
+				target = "inside.py"
+				require.NoError(t, os.WriteFile(filepath.Join(staging, target), []byte("inside sentinel"), 0o600))
+			}
+			if err := os.Symlink(target, link); err != nil {
+				if runtime.GOOS == "windows" {
+					t.Skipf("symlinks unavailable: %v", err)
+				}
+				require.NoError(t, err)
+			}
+			code, err := pythonScript(afero.NewOsFs(), filepath.Join(staging, "package.dtsx"), "python", argument)
+			if kind == "contained" {
+				require.NoError(t, err)
+				require.Equal(t, "inside sentinel", code)
+			} else {
+				require.Error(t, err)
+				require.Empty(t, code)
+			}
+		})
+	}
 }

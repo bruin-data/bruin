@@ -3,6 +3,7 @@ package ssis
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -54,7 +55,7 @@ func safeName(s string) string {
 // or copies connection-manager credentials into the destination.
 func Import(ctx context.Context, fs afero.Fs, opts ImportOptions) (*ImportResult, error) {
 	if opts.SourcePath == "" || opts.PipelinePath == "" {
-		return nil, fmt.Errorf("source and pipeline paths are required")
+		return nil, errors.New("source and pipeline paths are required")
 	}
 	var files []string
 	err := afero.Walk(fs, opts.SourcePath, func(path string, info os.FileInfo, err error) error {
@@ -70,7 +71,7 @@ func Import(ctx context.Context, fs afero.Fs, opts ImportOptions) (*ImportResult
 		return nil, err
 	}
 	if len(files) == 0 {
-		return nil, fmt.Errorf("no .dtsx or SQL Server Agent .json exports found")
+		return nil, errors.New("no .dtsx or SQL Server Agent .json exports found")
 	}
 	var assets []*pipeline.Asset
 	names := map[string]bool{}
@@ -112,13 +113,15 @@ func Import(ctx context.Context, fs afero.Fs, opts ImportOptions) (*ImportResult
 				}
 				assetType, ext := pipeline.AssetType("ms.sql"), ".sql"
 				connection := opts.Connection
+				assetPath := byID[t.id]
 				if t.python {
 					assetType, ext, connection = pipeline.AssetType("python"), ".py", ""
+					assetPath = filepath.Join(safeName(w.name), safeName(t.name))
 				}
 				a := &pipeline.Asset{
 					Name: byID[t.id], Type: assetType, Connection: connection,
 					ExecutableFile: pipeline.ExecutableFile{
-						Path: filepath.Join(opts.PipelinePath, "assets", byID[t.id]+ext), Content: t.code,
+						Path: filepath.Join(opts.PipelinePath, "assets", assetPath+ext), Content: t.code,
 					},
 				}
 				for _, id := range t.upstream {
@@ -129,7 +132,10 @@ func Import(ctx context.Context, fs afero.Fs, opts ImportOptions) (*ImportResult
 		}
 	}
 	if len(assets) == 0 {
-		return nil, fmt.Errorf("no supported tasks found")
+		return nil, errors.New("no supported tasks found")
+	}
+	if err := validateDestination(fs, opts, assets); err != nil {
+		return nil, err
 	}
 	if err := fs.MkdirAll(filepath.Join(opts.PipelinePath, "assets"), 0o755); err != nil {
 		return nil, err
@@ -158,6 +164,9 @@ func Import(ctx context.Context, fs afero.Fs, opts ImportOptions) (*ImportResult
 		if exists && !opts.Overwrite {
 			result.SkippedAssets++
 			continue
+		}
+		if err := fs.MkdirAll(filepath.Dir(asset.ExecutableFile.Path), 0o755); err != nil {
+			return nil, err
 		}
 		if err := asset.Persist(fs); err != nil {
 			return nil, err
@@ -214,7 +223,7 @@ func validateGraph(w workflow) error {
 func pythonScript(fs afero.Fs, source, executable, arguments string) (string, error) {
 	exe := strings.ToLower(filepath.Base(strings.ReplaceAll(executable, `\`, "/")))
 	if exe != "python" && exe != "python.exe" && exe != "python3" && exe != "python3.exe" {
-		return "", fmt.Errorf("only Python Execute Process tasks are supported")
+		return "", errors.New("only Python Execute Process tasks are supported")
 	}
 	path := strings.TrimSpace(arguments)
 	if len(path) >= 2 && path[0] == '"' && path[len(path)-1] == '"' {
@@ -222,11 +231,41 @@ func pythonScript(fs afero.Fs, source, executable, arguments string) (string, er
 	}
 	path = strings.ReplaceAll(path, `\`, "/")
 	if !filepath.IsLocal(path) || strings.ContainsAny(path, ":\"\r\n") || !strings.HasSuffix(path, ".py") {
-		return "", fmt.Errorf("Python arguments must be a relative .py path without script arguments")
+		return "", errors.New("expected a relative .py path without script arguments")
 	}
-	data, err := afero.ReadFile(fs, filepath.Join(filepath.Dir(source), path))
+	data, err := readStagedScript(fs, filepath.Dir(source), path)
 	if err != nil {
 		return "", fmt.Errorf("read Python script: %w", err)
 	}
 	return string(data), nil
+}
+
+func readStagedScript(fs afero.Fs, directory, path string) ([]byte, error) {
+	if _, ok := fs.(*afero.OsFs); ok {
+		// Root confines symlink resolution too, without a check-then-open race.
+		root, err := os.OpenRoot(directory)
+		if err != nil {
+			return nil, err
+		}
+		defer root.Close()
+		return root.ReadFile(path)
+	}
+	// Virtual filesystems cannot use os.Root. Reject symlinks in every path
+	// component rather than trusting a lexical containment check alone.
+	lstater, ok := fs.(afero.Lstater)
+	if !ok {
+		return nil, errors.New("filesystem cannot verify staged script paths")
+	}
+	current := directory
+	for _, part := range strings.Split(filepath.Clean(path), string(filepath.Separator)) {
+		current = filepath.Join(current, part)
+		info, _, err := lstater.LstatIfPossible(current)
+		if err != nil {
+			return nil, err
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return nil, errors.New("symlinks in staged script paths are not supported by this filesystem")
+		}
+	}
+	return afero.ReadFile(fs, current)
 }

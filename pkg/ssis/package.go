@@ -3,6 +3,7 @@ package ssis
 import (
 	"bytes"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -60,7 +61,7 @@ func parsePackage(fs afero.Fs, source string, data []byte) (workflow, error) {
 	}
 	w := workflow{name: root.value("ObjectName")}
 	if root.XMLName.Local != "Executable" || w.name == "" {
-		return w, fmt.Errorf("expected an unencrypted SSIS package with ObjectName")
+		return w, errors.New("expected an unencrypted SSIS package with ObjectName")
 	}
 	for _, name := range []string{"PropertyExpression", "EventHandler", "Variable", "PackageParameter"} {
 		if len(root.descendants(name)) > 0 {
@@ -69,15 +70,15 @@ func parsePackage(fs afero.Fs, source string, data []byte) (workflow, error) {
 	}
 	for _, n := range append([]node{root}, root.descendants("Executable")...) {
 		if v := n.value("Disabled"); v != "" && v != "0" && !strings.EqualFold(v, "false") {
-			return w, fmt.Errorf("disabled executables require manual migration")
+			return w, errors.New("disabled executables require manual migration")
 		}
 		if v := n.value("TransactionOption"); v == "2" || strings.EqualFold(v, "Required") {
-			return w, fmt.Errorf("required SSIS transactions cannot be preserved")
+			return w, errors.New("required SSIS transactions cannot be preserved")
 		}
 	}
 	containers := root.children("Executables")
 	if len(containers) != 1 {
-		return w, fmt.Errorf("expected one Executables collection (modern .dtsx format)")
+		return w, errors.New("expected one Executables collection (modern .dtsx format)")
 	}
 	for _, executable := range containers[0].children("Executable") {
 		t := task{id: executable.value("refId"), name: executable.value("ObjectName")}
@@ -121,13 +122,13 @@ func parsePackage(fs afero.Fs, source string, data []byte) (workflow, error) {
 	}
 	for _, constraint := range root.descendants("PrecedenceConstraint") {
 		if v := constraint.value("Value"); v != "" && v != "0" && v != "Success" {
-			return w, fmt.Errorf("only success precedence constraints are supported")
+			return w, errors.New("only success precedence constraints are supported")
 		}
 		if v := constraint.value("EvalOp"); (v != "" && v != "0" && v != "Constraint") || constraint.value("Expression") != "" {
-			return w, fmt.Errorf("expression precedence constraints require manual migration")
+			return w, errors.New("expression precedence constraints require manual migration")
 		}
 		if v := constraint.value("LogicalAnd"); v == "0" || strings.EqualFold(v, "false") {
-			return w, fmt.Errorf("OR precedence constraints require manual migration")
+			return w, errors.New("OR precedence constraints require manual migration")
 		}
 		found := false
 		for i := range w.tasks {

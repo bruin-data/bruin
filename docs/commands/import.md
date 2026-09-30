@@ -32,9 +32,12 @@ credentials are not migrated. Review each task's database context, particularly
 when a package uses multiple connection managers.
 
 The importer creates `pipeline.yml` if absent and one asset per task under
-`assets/`, named `<normalized-package-or-job>.<normalized-task>.sql` or `.py`.
-Name collisions fail instead of overwriting another task. Existing asset files
-are skipped unless `--overwrite` is passed. Existing `pipeline.yml` is never
+`assets/`. SQL files use `<normalized-package-or-job>.<normalized-task>.sql`;
+Python files use `<normalized-package-or-job>/<normalized-task>.py` so Bruin can
+execute them as modules. Both use `<normalized-package-or-job>.<normalized-task>`
+as the asset name. Name collisions with generated or existing assets fail instead
+of overwriting another task. Existing target files are skipped only when their
+asset name matches; use `--overwrite` to replace them. Existing `pipeline.yml` is never
 overwritten. All source files and dependency graphs are validated before writing;
 filesystem errors during writing can leave partial output.
 
@@ -45,7 +48,8 @@ filesystem errors during writing can leave partial output.
   tasks without constraints remain independent.
 - **SSIS Execute Process:** `python`, `python3`, or their `.exe` equivalents
   invoking one relative `.py` file become Python assets. Stage the script beside
-  the export (subdirectories and a quoted filename are supported). Script
+  the export (subdirectories and a quoted filename are supported). Script paths,
+  including symlink targets, must stay inside that export's directory. Script
   arguments, working-directory overrides, and process variable bindings are
   not supported.
 - **SQL Server Agent:** enabled jobs with sequential success transitions and
