@@ -26,6 +26,7 @@ Two things follow from this:
 | [HubSpot](/ingestion/hubspot#hubspot-as-a-destination) | CRM records (contacts, companies, deals, custom objects) and associations |
 | [Salesforce](/ingestion/salesforce#salesforce-as-a-destination) | Records of any standard or custom object, and the links between them |
 | [CleverTap](/ingestion/clevertap#clevertap-as-a-destination) | User profiles and events |
+| [Attio](/ingestion/attio#attio-as-a-destination) | Records of any standard or custom object (people, companies, deals, …), and the links between them |
 
 Each destination's page has its own connection setup, object types, and quirks. This page covers what they share.
 
@@ -43,17 +44,21 @@ Notes:
 
 - Not every destination supports every strategy — check its page.
 - Impossible combinations are rejected before the run starts, not silently mishandled.
-- **Some destinations don't act on the strategy at all.** CleverTap, for example, always upserts profiles and always appends events regardless of the strategy you pass — so `merge`, `delete`, and `replace` don't perform the operations above (a `delete` or `replace` run can succeed while removing nothing). The strategy semantics here apply only where the destination's page says the strategy is honoured.
+- **Some destinations only take one strategy per table.** CleverTap always upserts profiles (`merge`) and always appends events (`append`); any other strategy is refused.
 
 ::: warning
 On a destination that supports deletion, `replace` removes **every** record that isn't in your source — including ones created by hand or by other tools. Use it only when the source is the complete system of record. A run with 0 source rows removes nothing (a safety guard). To remove specific records, use `delete`.
 :::
 
+### Full refresh
+
+`bruin run --full-refresh` doesn't change how a reverse-ETL asset writes: there's no table to rebuild, so it runs with its own `incremental_strategy`. The source is still read as in any full refresh, from the asset's `start_date` if one is set. To remove records that aren't in the source, use `replace`.
+
 ## Matching records
 
 `merge`, `update`, and `delete` need to find the existing record. That's two separate things:
 
-- **Remote field to match on** — a destination-side field, set on `destination_table` (e.g. `'contacts?id_property=email'` on HubSpot, `'Contact?external_id=Email'` on Salesforce).
+- **Remote field to match on** — a destination-side field, set on `destination_table` (e.g. `'contacts?id_property=email'` on HubSpot, `'Contact?external_id=Email'` on Salesforce, `'people?matching_attribute=email_addresses'` on Attio).
 - **Source column with the value** — the column marked `primary_key: true` in the asset's `columns`.
 
 They're independent — the `destination_table` parameter names the remote field, and the `primary_key` column supplies the value matched against it.

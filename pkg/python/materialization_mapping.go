@@ -1,6 +1,7 @@
 package python
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -102,11 +103,13 @@ var ReverseETLIngestrStrategies = []string{
 	"delete",
 }
 
-// ReverseETLIngestrDestinations are the destinations that accept
-// ReverseETLIngestrStrategies. Add new ones as they gain ingestr's IsReverseETL marker.
-var ReverseETLIngestrDestinations = map[string]bool{
-	"hubspot":    true,
-	"salesforce": true,
+// ReverseETLIngestrDestinations write to an API rather than a table, each mapped to the
+// incremental strategies it accepts. ingestr refuses --full-refresh for all of them.
+var ReverseETLIngestrDestinations = map[string][]string{
+	"attio":      {"merge", "update", "append", "delete", "replace"},
+	"clevertap":  {"merge", "append"},
+	"hubspot":    {"merge", "update", "append", "delete", "replace"},
+	"salesforce": {"merge", "update", "append", "delete", "replace"},
 }
 
 // IsIngestrStrategySupported checks if a given strategy string is supported by ingestr.
@@ -129,7 +132,12 @@ func IsReverseETLIngestrStrategy(strategy string) bool {
 }
 
 func IsReverseETLIngestrDestination(destination string) bool {
-	return ReverseETLIngestrDestinations[destination]
+	_, ok := ReverseETLIngestrDestinations[destination]
+	return ok
+}
+
+func ReverseETLDestinationSupportsStrategy(destination, strategy string) bool {
+	return slices.Contains(ReverseETLIngestrDestinations[destination], strategy)
 }
 
 // GetSupportedIngestrStrategiesString returns a comma-separated string of supported ingestr strategies.

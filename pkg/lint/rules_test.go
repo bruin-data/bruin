@@ -2582,6 +2582,63 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 			wantErr:        assert.NoError,
 		},
 		{
+			name: "valid ingestr asset with reverse-ETL update strategy on attio",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection":    "conn1",
+					"source_table":         "table1",
+					"destination":          "attio",
+					"incremental_strategy": "update",
+				},
+			},
+			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "valid ingestr asset with reverse-ETL delete strategy on attio",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection":    "conn1",
+					"source_table":         "table1",
+					"destination":          "attio",
+					"incremental_strategy": "delete",
+				},
+			},
+			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "valid ingestr asset with merge strategy on clevertap",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection":    "conn1",
+					"source_table":         "table1",
+					"destination":          "clevertap",
+					"incremental_strategy": "merge",
+				},
+				Columns: []pipeline.Column{{Name: "id", PrimaryKey: true}},
+			},
+			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "ingestr asset with a strategy clevertap does not support",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection":    "conn1",
+					"source_table":         "table1",
+					"destination":          "clevertap",
+					"incremental_strategy": "delete",
+				},
+			},
+			wantErrMessage: "Incremental strategy 'delete' is not supported for destination 'clevertap'. Supported strategies are: merge, append",
+			wantErr:        assert.NoError,
+		},
+		{
 			name: "ingestr asset with reverse-ETL update strategy on a non-reverse-ETL destination",
 			asset: &pipeline.Asset{
 				Type: pipeline.AssetTypeIngestr,
