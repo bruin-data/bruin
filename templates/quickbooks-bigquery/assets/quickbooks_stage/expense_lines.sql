@@ -8,7 +8,8 @@ description: >
   can post to balance sheet accounts as well as expenses, for example a check
   that pays down a credit card or loan, an owner's draw, or a capitalized
   purchase, so filter on `is_expense` for profit-and-loss spend; otherwise
-  card payoffs double count card charges.
+  card payoffs double count card charges. Item-based lines have a null
+  `is_expense` because their item account is not loaded.
   Vendor credits are not loaded, so they are not netted. Lines are dated by
   their transaction, so bills count when billed, not when paid.
 
@@ -127,13 +128,11 @@ columns:
   - name: is_expense
     type: BOOL
     description: >
-      Whether the line counts as profit-and-loss spend: account-based lines on
-      an `Expense` account, and all item-based lines. The item's own account
-      is not loaded, so purchases of inventory items are counted as spend too.
-      False for lines on balance sheet accounts, such as card or loan payoffs,
-      owner's draws, and capitalized purchases.
-    checks:
-      - name: not_null
+      Whether the line counts as profit-and-loss spend: true for lines on an
+      `Expense` account, false for lines on balance sheet accounts, such as
+      card or loan payoffs, owner's draws, and capitalized purchases. Null for
+      item-based lines, whose item account is not loaded, so they can be
+      either an expense or an inventory purchase; review them separately.
   - name: is_uncategorized
     type: BOOL
     description: >
@@ -184,8 +183,8 @@ unit_tests:
   - name: signs_and_flags_purchase_lines
     description: >
       Card charges are positive, card credits negative, card payoffs are not
-      expenses, item-based lines count as expenses, and placeholder accounts
-      are flagged.
+      expenses, item-based lines are left unclassified, and placeholder
+      accounts are flagged.
     inputs:
       - asset: quickbooks_raw.purchases
         rows:
@@ -226,7 +225,7 @@ unit_tests:
         - {source_type: purchase, transaction_id: "p1", line_index: 0, line_type: account_based, payee_id: "v1", payee_type: Vendor, account_name: Software, amount: 45.5, is_expense: true, is_uncategorized: false, is_billable: false}
         - {source_type: purchase, transaction_id: "p2", line_index: 0, line_type: account_based, amount: -20, is_expense: true, is_uncategorized: false}
         - {source_type: purchase, transaction_id: "p3", line_index: 0, line_type: account_based, account_classification: Liability, amount: 500, is_expense: false, is_uncategorized: false}
-        - {source_type: purchase, transaction_id: "p3", line_index: 1, line_type: item_based, account_id: null, item_id: "item9", amount: 80, is_expense: true, is_billable: true, billable_customer_id: "c7"}
+        - {source_type: purchase, transaction_id: "p3", line_index: 1, line_type: item_based, account_id: null, item_id: "item9", amount: 80, is_expense: null, is_billable: true, billable_customer_id: "c7"}
         - {source_type: purchase, transaction_id: "p3", line_index: 2, line_type: account_based, amount: 12, is_expense: true, is_uncategorized: true}
   - name: bill_lines_are_positive_vendor_spend
     inputs:
@@ -327,10 +326,10 @@ SELECT
   COALESCE(account.account_name, JSON_VALUE(line.detail, '$.AccountRef.name')) AS account_name,
   account.account_type,
   account.classification AS account_classification,
-  IFNULL(
-    line.detail_type = 'ItemBasedExpenseLineDetail' OR account.classification = 'Expense',
-    FALSE
-  ) AS is_expense,
+  CASE
+    WHEN line.detail_type = 'ItemBasedExpenseLineDetail' THEN NULL
+    ELSE IFNULL(account.classification = 'Expense', FALSE)
+  END AS is_expense,
   IFNULL(
     COALESCE(account.account_name, JSON_VALUE(line.detail, '$.AccountRef.name'))
       IN ('Uncategorized Expense', 'Uncategorized Asset', 'Ask My Accountant'),
