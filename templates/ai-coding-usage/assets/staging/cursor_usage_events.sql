@@ -45,7 +45,9 @@ WITH typed AS (
     CASE
       WHEN TRY_CAST("timestamp" AS BIGINT) IS NOT NULL
         THEN EPOCH_MS(TRY_CAST("timestamp" AS BIGINT))
-      ELSE TRY_CAST("timestamp" AS TIMESTAMPTZ) AT TIME ZONE 'UTC'
+      WHEN REGEXP_MATCHES(CAST("timestamp" AS VARCHAR), '[T ]\d{2}:\d{2}.*(Z|[+-]\d{2}(:?\d{2})?)$')
+        THEN TRY_CAST("timestamp" AS TIMESTAMPTZ) AT TIME ZONE 'UTC'
+      ELSE TRY_CAST("timestamp" AS TIMESTAMP)
     END AS event_timestamp,
     LOWER(TRIM(CAST("userEmail" AS VARCHAR))) AS user_id,
     CAST(model AS VARCHAR) AS model,
