@@ -105,6 +105,16 @@ var ReverseETLIngestrStrategies = []string{
 // ReverseETLIngestrDestinations are the destinations that accept
 // ReverseETLIngestrStrategies. Add new ones as they gain ingestr's IsReverseETL marker.
 var ReverseETLIngestrDestinations = map[string]bool{
+	"attio":      true,
+	"hubspot":    true,
+	"salesforce": true,
+}
+
+// fullRefreshUnsupportedDestinations write to an API with no table to rebuild,
+// so ingestr refuses --full-refresh for them.
+var fullRefreshUnsupportedDestinations = map[string]bool{
+	"attio":      true,
+	"clevertap":  true,
 	"hubspot":    true,
 	"salesforce": true,
 }
@@ -130,6 +140,10 @@ func IsReverseETLIngestrStrategy(strategy string) bool {
 
 func IsReverseETLIngestrDestination(destination string) bool {
 	return ReverseETLIngestrDestinations[destination]
+}
+
+func IsFullRefreshUnsupportedDestination(destination string) bool {
+	return fullRefreshUnsupportedDestinations[destination]
 }
 
 // GetSupportedIngestrStrategiesString returns a comma-separated string of supported ingestr strategies.

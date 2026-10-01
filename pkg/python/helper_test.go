@@ -3,6 +3,7 @@ package python
 import (
 	"context"
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -164,6 +165,31 @@ func TestConsolidatedParameters_ReverseETLFlags(t *testing.T) {
 			assert.NotContains(t, arg, "write-nulls")
 		}
 	})
+}
+
+func TestConsolidatedParameters_FullRefreshSkippedForReverseETL(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		destination string
+		want        bool
+	}{
+		{"postgres", true},
+		{"attio", false},
+		{"clevertap", false},
+		{"hubspot", false},
+		{"salesforce", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.destination, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, true)
+			asset := &pipeline.Asset{Parameters: pipeline.ParameterMap{"destination": tt.destination}}
+			result, err := ConsolidatedParameters(ctx, asset, nil, nil)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, slices.Contains(result, "--full-refresh"))
+		})
+	}
 }
 
 func TestConsolidatedParameters_StreamGating(t *testing.T) {
