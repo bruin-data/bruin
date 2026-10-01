@@ -280,7 +280,7 @@ materialization:
 SELECT event_id, user_id, page, viewed_at
 FROM raw.page_views
 WHERE viewed_at >= '{{ start_timestamp }}'
-  AND viewed_at < '{{ end_timestamp }}'
+  AND viewed_at <= '{{ end_timestamp }}'
 ```
 
 **How it works:** `INSERT INTO analytics.page_views <query>`.
@@ -510,6 +510,8 @@ The window comes from the run's start and end dates. By default, that is yesterd
 bruin run --start-date "2024-03-01" --end-date "2024-03-31" path/to/asset.sql
 ```
 
+A date-only `--end-date` means midnight at the start of that day. That is enough for `time_granularity: date`, but with `timestamp` it leaves out almost all of the last day. For timestamp backfills, pass the end time explicitly, for example `--end-date "2024-03-31 23:59:59.999999"`.
+
 **Good to know:**
 
 - Bruin deletes the window but does not filter your query. Filter the query to the same window with the [date variables](../variables/built-in.md), or rows outside the window are inserted next to the existing ones.
@@ -669,13 +671,13 @@ product_id | product_name | stock | _is_current | _valid_from         | _valid_u
 2          | Smartphone   | 150   | true        | 2025-04-02 00:00:00 | 9999-12-31 23:59:59
 3          | Headphones   | 175   | false       | 2025-04-02 00:00:00 | 2025-06-02 00:00:00
 3          | Headphones   | 900   | true        | 2025-06-02 00:00:00 | 9999-12-31 23:59:59
-4          | Monitor      | 25    | false       | 2025-04-02 00:00:00 | 2025-06-02 00:00:00
+4          | Monitor      | 25    | false       | 2025-04-02 00:00:00 | 2025-06-03 08:15:00
 5          | PS5          | 25    | true        | 2025-06-02 00:00:00 | 9999-12-31 23:59:59
 ```
 
 - The Laptop and Smartphone did not change, so their versions stay current.
 - The Headphones have a newer `dt`, so the old version is closed and a new one is added.
-- The Monitor is closed because it left the source.
+- The Monitor is closed because it left the source. Records that disappear are closed at the run time (`CURRENT_TIMESTAMP()`), not at an `incremental_key` value.
 - The PS5 is added as a new current version.
 
 On Oracle, the `incremental_key` must be `TIMESTAMP` or `DATE`, not `TIMESTAMP WITH TIME ZONE`. MySQL also accepts `DATETIME`.
