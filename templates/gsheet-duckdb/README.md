@@ -23,7 +23,7 @@ environments:
                   path: "<Path to your DuckDB database file>"
             google_sheets:
                 - name: "gsheet-default"
-                  credentials_path: "<Path to your Google Sheets credentials JSON file>"
+                  service_account_file: "<Path to your Google service account JSON file>"
 ```
 
 ## Running the pipeline
