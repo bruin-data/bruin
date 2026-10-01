@@ -1,32 +1,78 @@
 # Materialization
 
-Materialization is the idea of taking a simple `SELECT` query, and applying the necessary logic to materialize the results into a table or view.
-
-Bruin supports various materialization strategies catered to different use cases.
-
-Here's a sample asset with materialization:
+Materialization turns a plain `SELECT` query into a table or view. You write the query, and Bruin generates the `CREATE`, `INSERT`, `DELETE`, or `MERGE` statements needed to store its result in the destination.
 
 ```bruin-sql
 /* @bruin
 
-name: dashboard.hello_bq
+name: analytics.daily_revenue
 type: bq.sql
 
 materialization:
-    type: table
+  type: table # [!code focus]
 
 @bruin */
 
-select 1 as one
-union all
-select 2 as one
+SELECT order_date, SUM(amount) AS revenue
+FROM raw.orders
+GROUP BY order_date
 ```
 
-## Definition Schema
+Each run rebuilds `analytics.daily_revenue` from the query result. Swap `type: table` for a different [strategy](#strategies) to load the table incrementally, track history, or keep a view instead.
 
-The top level `materialization` key determines how the asset will be materialized.
+> [!TIP]
+> Run `bruin render path/to/asset.sql` to print the exact SQL Bruin will execute for an asset, and add `--full-refresh` to see the full-refresh version.
 
-Here's an example materialization definition:
+## Overview
+
+### Materialization types
+
+| `type` | What Bruin builds | Strategies |
+| --- | --- | --- |
+| *(not set)* | Nothing. Bruin runs the SQL as written, so the asset must create or write to its own table. | None |
+| `view` | `CREATE OR REPLACE VIEW` over the query (`CREATE OR ALTER VIEW` on MSSQL and Fabric). | None. Setting `strategy`, `incremental_key`, `incremental_predicate`, `partition_by`, or `cluster_by` on a view is a validation error. |
+| `table` | A physical table loaded with the selected `strategy`. | All strategies below. Defaults to `create+replace`. |
+
+### Strategies at a glance
+
+| Strategy | What each run does | Requires |
+| --- | --- | --- |
+| **Full rebuilds** | | |
+| [`create+replace`](#create-replace) *(default)* | Rebuilds the table from the query result. | — |
+| [`truncate+insert`](#truncate-insert) | Empties the existing table, then inserts the query result. | — |
+| [`ddl`](#ddl) | Creates an empty table from the declared `columns`. There is no query. | `columns` |
+| **Incremental loads** | | |
+| [`append`](#append) | Inserts the query result. Never updates or deletes. | — |
+| [`delete+insert`](#delete-insert) | Deletes rows whose `incremental_key` value appears in the new result, then inserts the result. | `incremental_key` |
+| [`merge`](#merge) | Updates rows that match on the primary key and inserts the rest. | `primary_key` |
+| [`time_interval`](#time-interval) | Deletes rows inside the run's date range, then inserts the result. | `incremental_key`, `time_granularity` |
+| **History tracking** | | |
+| [`scd2_by_column`](#scd2-by-column) | Adds a new version when any non-key column changes. | `primary_key` |
+| [`scd2_by_time`](#scd2-by-time) | Adds a new version when the `incremental_key` timestamp moves forward. | `primary_key`, `incremental_key` |
+| **Data Vault** | | |
+| [`datavault_hub`](#datavault-hub) | Inserts business keys that are not yet in the hub. | Column roles |
+| [`datavault_link`](#datavault-link) | Inserts relationships that are not yet in the link. | Column roles |
+| [`datavault_satellite`](#datavault-satellite) | Inserts changed descriptive rows. | Column roles |
+
+Not every platform supports every strategy. Check the [platform support matrix](#platform-support) before you choose one.
+
+### Choosing a strategy
+
+| If you need to… | Use |
+| --- | --- |
+| Rebuild the table from scratch on every run | `create+replace` |
+| Rebuild from scratch but keep the existing table object and its permissions | `truncate+insert` |
+| Add new rows that never change | `append` |
+| Reprocess a date range, including backfills | `time_interval` |
+| Replace every row belonging to a batch key, such as `load_id` or `country` | `delete+insert` |
+| Insert new records and update existing ones by primary key | `merge` |
+| Keep every historical version of a record | `scd2_by_column` or `scd2_by_time` |
+| Create an empty table that something else fills | `ddl` |
+| Expose the query without storing data | `type: view` |
+
+## Configuration reference
+
+All materialization settings live under the top-level `materialization` key of the asset definition:
 
 ```yaml
 materialization:
@@ -39,103 +85,322 @@ materialization:
     - user_id
 ```
 
-### `materialization > type`
+| Key | Type | Description |
+| --- | --- | --- |
+| `type` | `table` \| `view` | What to build. When omitted, Bruin runs the query as-is. |
+| `strategy` | String | How Bruin loads a table. One of the [strategies](#strategies). **Default:** `create+replace`. |
+| `incremental_key` | String | Column used to decide which rows to replace or how to version them. Required by `delete+insert`, `time_interval`, and `scd2_by_time`; optional for `scd2_by_column`; not allowed with other strategies. |
+| `time_granularity` | `date` \| `timestamp` | Whether the `time_interval` window is applied to a `DATE` or a `TIMESTAMP` column. Required by `time_interval`. |
+| `incremental_predicate` | String | Extra SQL condition that limits which destination rows a `merge` considers. See [`incremental_predicate`](#incremental-predicate). |
+| `partition_by` | String | Column or expression used to partition the table. See [Partitioning and clustering](#partitioning-and-clustering). |
+| `cluster_by` | String[] | Columns used to cluster or sort the table. See [Partitioning and clustering](#partitioning-and-clustering). |
 
-The type of the materialization, can be one of the following:
+Some strategies also read column-level settings from the asset's [`columns`](./columns.md):
 
-- `table`
-- `view`
+| Column key | Used by | Effect |
+| --- | --- | --- |
+| `primary_key: true` | `merge`, SCD2, Data Vault, `ddl` | Identifies a row. Required by `merge` and both SCD2 strategies. |
+| `update_on_merge: true` | `merge` | When a row matches, overwrite this column with the new value. |
+| `merge_sql: <expression>` | `merge` | When a row matches, set this column to a custom expression such as `GREATEST(target.score, source.score)`. Takes precedence over `update_on_merge`. |
+| `meta.datavault_role` | Data Vault | Marks a column's [Data Vault role](#data-vault-column-roles). |
 
-**Default:** none
+### Pipeline defaults
 
-### `materialization > strategy`
-
-The strategy used for the materialization, can be one of the following:
-
-- `create+replace`: overwrite the existing table with the new version.
-- `delete+insert`: incrementally update the table by only refreshing a certain partition.
-- `truncate+insert`: truncate the entire table and insert new data (full refresh without DROP/CREATE).
-- `append`: only append the new data to the table, never overwrite.
-- `merge`: merge the existing records with the new records, requires a primary key to be set.
-- `time_interval`: incrementally load time-based data within specific time windows.
-- `ddl`: create a new table using a DDL (Data Definition Language) statement.
-- `datavault_hub`: incrementally load unique business entities into a Data Vault hub.
-- `datavault_link`: incrementally load unique relationships into a Data Vault link.
-- `datavault_satellite`: incrementally load descriptive history into a Data Vault satellite.
-- `scd2_by_column`: implement SCD2 logic that tracks changes based on column value differences.
-- `scd2_by_time`: implement SCD2 logic that tracks changes based on time-based incremental key.
-
-### `materialization > partition_by`
-
-Define the column that will be used for the partitioning of the resulting table. This is used to instruct the data warehouse to set the column for the partition key.
-
-- **Type:** `String`
-- **Default:** none
-
-For native `clickhouse.sql` assets, this can be a ClickHouse SQL expression such as `toYYYYMM(created_at)`. Bruin emits `PARTITION BY` when creating the target table with `create+replace` (including the default table strategy and full refresh) or `ddl`.
-
-### ClickHouse table options
-
-Native `clickhouse.sql` assets configure their engine, sorting key, TTL, and table settings in a top-level `clickhouse` block alongside `materialization`:
+To share a materialization across many assets, set it once under `default.materialization` in `pipeline.yml`:
 
 ```yaml
-materialization:
-  type: table
-  strategy: create+replace
-  partition_by: toYYYYMM(created_at)
-clickhouse:
-  engine: ReplacingMergeTree(version)
-  order_by:
-    - id
-    - created_at
-  ttl: created_at + INTERVAL 30 DAY
-  settings:
-    index_granularity: "8192"
+# pipeline.yml
+default:
+  materialization:
+    type: table
+    strategy: create+replace
 ```
 
-| Option | Type | Meaning |
+Defaults only fill in fields an asset leaves empty, so each asset can still override any key.
+
+### Partitioning and clustering
+
+`partition_by` and `cluster_by` are applied when Bruin creates the table: during `create+replace`, `ddl`, and full refreshes. Incremental runs write into the existing table and do not change its layout.
+
+| Platform | `partition_by` | `cluster_by` |
 | --- | --- | --- |
-| `clickhouse.engine` | String | SQL engine expression, such as `MergeTree()`, `ReplacingMergeTree(version)`, or `SummingMergeTree()`. If omitted, Bruin leaves the engine clause to ClickHouse's default. |
-| `clickhouse.order_by` | String[] | SQL expressions forming the sorting key, in order. Use `["tuple()"]` for an explicitly empty sorting key. `materialization.cluster_by` is an alias for this option; `order_by` wins when both are set. |
-| `clickhouse.ttl` | String | SQL TTL expression, without the `TTL` keyword. |
-| `clickhouse.settings` | Map of strings | Table settings rendered as SQL values. Include SQL quotes inside string values, for example `storage_policy: "'default'"`. |
+| BigQuery | `PARTITION BY` | `CLUSTER BY` |
+| Snowflake | Ignored | `CLUSTER BY` |
+| Databricks | `ddl` only | `ddl` only; `create+replace` rejects it |
+| Spark | `PARTITIONED BY` | `WRITE ORDERED BY` |
+| Athena (Iceberg) | Iceberg partitioning | Ignored |
+| Trino | `partitioning` table property | Ignored |
+| ClickHouse | `PARTITION BY` expression, for example `toYYYYMM(created_at)` | Used as the `ORDER BY` sorting key. See [ClickHouse table options](#clickhouse-table-options). |
+| StarRocks | `PARTITION BY` | `DISTRIBUTED BY HASH` columns |
+| MSSQL, Synapse, Vertica | Ignored | Rejected with an error |
+| Doris | Ignored (use the `doris` block) | Ignored (use `doris.distributed_by`) |
+| PostgreSQL, Redshift, DuckDB, MySQL, Oracle, Dremio, Sail, Fabric | Ignored | Ignored |
 
-These options apply to target-table creation with `create+replace`, the implicit table strategy, `ddl`, and full refresh. Normal incremental runs preserve the target's definition, and transient staging tables do not inherit these options. Views and other asset types reject the `clickhouse` options.
+BigQuery-specific options such as `require_partition_filter` live in a separate `bigquery` block. See [BigQuery table options](../platforms/bigquery.md#bigquery-table-options).
 
-If columns have `primary_key: true`, they must be the leading entries of `clickhouse.order_by`, in column declaration order. With neither `engine` nor `order_by`, Bruin preserves the primary-key-only behavior. An explicit `order_by` or engine allows `create+replace` without declaring a primary key; ClickHouse validates the chosen engine's key requirements. Engines such as `Memory()` do not support sorting or primary-key clauses. Pipeline defaults can set the same options under `default.clickhouse`, which only native `clickhouse.sql` table assets inherit. Nonempty asset fields override defaults, and settings merge by name with asset values taking precedence.
+## Strategies
 
-These options are separate from ingestr destination parameters (`parameters.engine` and `parameters.engine.<setting>`). See [ClickHouse table definitions](../platforms/clickhouse.md#native-sql-table-definitions) for a complete native SQL example.
+Strategies fall into four groups:
 
-### `materialization > cluster_by`
+- **Full rebuilds** (`create+replace`, `truncate+insert`, `ddl`) recreate or reset the table on each run.
+- **Incremental loads** (`append`, `delete+insert`, `merge`, `time_interval`) change only part of an existing table.
+- **History tracking** (`scd2_by_column`, `scd2_by_time`) keep every version of each record.
+- **Data Vault** (`datavault_hub`, `datavault_link`, `datavault_satellite`) load a Raw Data Vault.
 
-Define the columns that will be used for the clustering of the resulting table. This is used to instruct the data warehouse to set the columns for the clustering.
+> [!IMPORTANT]
+> Incremental strategies write into an existing table, and on most platforms they do not create it. For a new asset, do the first run with `--full-refresh` so Bruin creates the table with `create+replace`, then let later runs load it incrementally. The Data Vault strategies, ClickHouse SCD2, and StarRocks `merge` create the target automatically.
 
-- **Type:** `String[]`
-- **Default:** `[]`
+### Full rebuilds
 
-On ClickHouse there is no separate clustering clause: the sorting key determines physical row order, so `cluster_by` is used as the table's `ORDER BY`. It is an alias for [`clickhouse.order_by`](#clickhouse-table-options), which takes precedence when both are set. Primary-key columns must still be the leading entries of whichever one is used.
+#### `create+replace` {#create-replace}
 
-### `materialization > incremental_key`
+Rebuilds the table from the query result on every run. This is the default for `type: table`.
 
-This is the column of the table that will be used for incremental updates of the table.
+**Use it when** the table is cheap enough to recompute every time and you want the simplest, always-correct result.
 
-- **Type:** `String`
-- **Default:** `""`
+```bruin-sql
+/* @bruin
 
-### `materialization > incremental_predicate`
+name: analytics.customers
+type: bq.sql
 
-An additional boolean SQL expression added to the match condition of a `merge` materialization. It limits the destination rows considered for a match and can reduce the number of destination partitions scanned by warehouses such as BigQuery.
+materialization:
+  type: table
+  strategy: create+replace # optional, this is the default
 
-The generated merge exposes two aliases:
+@bruin */
+
+SELECT customer_id, email, country
+FROM raw.customers
+```
+
+**How it works:** Bruin runs `CREATE OR REPLACE TABLE analytics.customers AS <query>`, or the platform's equivalent drop-and-create.
+
+**Good to know:**
+
+- Cost and run time grow with the size of the full result, because nothing is reused between runs.
+- Recreating the table can reset grants and other table-level settings on some platforms. Use `truncate+insert` if you need to keep them.
+
+#### `truncate+insert` {#truncate-insert}
+
+Removes every row from the existing table, then inserts the query result. The table object itself, with its schema, permissions, and indexes, is kept.
+
+**Use it when** you want a full refresh but other users or tools depend on the table object staying in place.
+
+```bruin-sql
+/* @bruin
+
+name: analytics.daily_snapshot
+type: bq.sql
+
+materialization:
+  type: table
+  strategy: truncate+insert
+
+@bruin */
+
+SELECT
+    CURRENT_DATE() AS snapshot_date,
+    COUNT(*) AS total_users,
+    SUM(revenue) AS total_revenue
+FROM raw.users
+```
+
+**How it works:** `TRUNCATE TABLE analytics.daily_snapshot`, then `INSERT INTO analytics.daily_snapshot <query>`.
+
+**Good to know:**
+
+- `TRUNCATE` is usually faster than `DELETE` for removing every row, and no `incremental_key` is needed.
+- The table must already exist. Create it on the first run with `--full-refresh`.
+- On platforms where `TRUNCATE` participates in transactions, such as BigQuery, Bruin runs both statements in one transaction. A failed insert rolls the truncate back, and readers never see the table empty. On engines where `TRUNCATE` commits implicitly, the statements run separately, so a failure between them can leave the table empty.
+
+#### `ddl`
+
+Creates an empty table from the `columns` defined in the asset. A `ddl` asset has no query.
+
+**Use it when** you need a table with an exact schema that another process, such as an ingestion job or a Python asset, loads.
+
+```bruin-sql
+/* @bruin
+
+name: raw.products
+type: bq.sql
+
+materialization:
+  type: table
+  strategy: ddl
+  partition_by: product_category
+
+columns:
+  - name: product_id
+    type: INTEGER
+    description: "Unique identifier for the product"
+    primary_key: true
+  - name: product_category
+    type: VARCHAR
+    description: "Category of the product"
+  - name: product_name
+    type: VARCHAR
+    description: "Name of the product"
+  - name: price
+    type: FLOAT
+    description: "Price of the product in USD"
+
+@bruin */
+```
+
+**How it works:** Bruin runs `CREATE TABLE IF NOT EXISTS raw.products (...)` using the column names, types, primary key, and descriptions. `partition_by` and `cluster_by` are applied where the platform supports them.
+
+**Good to know:**
+
+- Adding a query after the `@bruin` block is a validation error.
+- The table is created once and never dropped, even with `--full-refresh`.
+- Changing `columns` later does not alter an existing table. Migrate it yourself.
+
+### Incremental loads
+
+#### `append`
+
+Inserts the query result into the table. Existing rows are never updated or deleted.
+
+**Use it when** each run produces rows that are new by definition, such as events or audit logs.
+
+```bruin-sql
+/* @bruin
+
+name: analytics.page_views
+type: bq.sql
+
+materialization:
+  type: table
+  strategy: append
+
+@bruin */
+
+SELECT event_id, user_id, page, viewed_at
+FROM raw.page_views
+WHERE viewed_at >= '{{ start_timestamp }}'
+  AND viewed_at < '{{ end_timestamp }}'
+```
+
+**How it works:** `INSERT INTO analytics.page_views <query>`.
+
+**Good to know:**
+
+- Bruin does not deduplicate. Filter the query to only new rows, typically with the [run's date variables](../variables/built-in.md). Running the same window twice inserts the rows twice.
+- If you need reruns to be safe, use `time_interval` or `delete+insert` instead.
+
+#### `delete+insert` {#delete-insert}
+
+Replaces every row that shares an `incremental_key` value with the new query result.
+
+**Use it when** data arrives in batches identified by a key, such as a date, a load ID, or a tenant, and a new batch should fully replace the old one.
+
+```bruin-sql
+/* @bruin
+
+name: analytics.daily_orders
+type: bq.sql
+
+materialization:
+  type: table
+  strategy: delete+insert
+  incremental_key: order_date
+
+@bruin */
+
+SELECT order_date, customer_id, COUNT(*) AS orders
+FROM raw.orders
+WHERE order_date BETWEEN '{{ start_date }}' AND '{{ end_date }}'
+GROUP BY order_date, customer_id
+```
+
+**How it works:**
+
+1. Run the query and store the result in a temporary table.
+2. Find the distinct `incremental_key` values in that result.
+3. Delete every target row with one of those values.
+4. Insert the temporary table into the target.
+
+**Good to know:**
+
+- Only keys present in the new result are touched. If the result contains no rows for `2024-03-01`, the existing rows for that date stay.
+- Because the batch is deleted and reinserted, rows that disappeared from the source within a batch are removed from the target. `merge` cannot do that.
+- On Fabric, `delete+insert` matches on the primary key columns instead of `incremental_key`.
+
+#### `merge`
+
+Upserts the query result into the table by primary key. Matching rows are updated and new rows are inserted.
+
+**Use it when** records are identified by a stable key and their attributes change over time, such as customers, orders, or subscriptions.
+
+Mark the key with `primary_key: true` and tell Bruin which columns to update when a row matches:
+
+- `update_on_merge: true` overwrites the column with the new value.
+- `merge_sql: <expression>` sets the column to a custom expression. Use `target.<column>` for the existing value and `source.<column>` for the new one.
+
+```bruin-sql
+/* @bruin
+
+name: analytics.players
+type: bq.sql
+
+materialization:
+  type: table
+  strategy: merge
+
+columns:
+  - name: player_id
+    type: integer
+    primary_key: true
+  - name: username
+    type: string
+    update_on_merge: true
+  - name: high_score
+    type: integer
+    merge_sql: GREATEST(target.high_score, source.high_score)
+
+@bruin */
+
+SELECT player_id, username, high_score
+FROM raw.player_scores
+```
+
+**How it works:** on platforms with a native `MERGE`, Bruin generates:
+
+```sql
+MERGE analytics.players AS target
+USING (<query>) AS source
+ON source.player_id = target.player_id
+WHEN MATCHED THEN UPDATE SET
+  target.username = source.username,
+  target.high_score = GREATEST(target.high_score, source.high_score)
+WHEN NOT MATCHED THEN INSERT (player_id, username, high_score)
+  VALUES (source.player_id, source.username, source.high_score);
+```
+
+**Good to know:**
+
+- Without any `update_on_merge` or `merge_sql` column, most platforms only insert new keys and leave matched rows untouched. MySQL, ClickHouse, Fabric, and StarRocks behave differently: they replace matched rows entirely. See [platform notes](#platform-notes).
+- `merge` never deletes. Rows removed from the source stay in the target. Use `delete+insert` if deletions must propagate.
+- `incremental_key` cannot be combined with `merge`. To limit the rows read from the source, filter the query. To limit the destination rows scanned, use `incremental_predicate`.
+- `merge_sql` is supported on BigQuery, Snowflake, PostgreSQL, Redshift, MySQL, MSSQL, Oracle, Athena (Iceberg), DuckDB, Spark, Doris, and Vertica. Databricks, Synapse, ClickHouse, and Fabric ignore it, and StarRocks rejects it.
+- Spark `merge` needs a catalog and table format that implement row-level `MERGE INTO`, such as Iceberg with the Spark SQL extensions enabled.
+
+##### `incremental_predicate` {#incremental-predicate}
+
+`incremental_predicate` adds a boolean SQL expression to the merge's match condition. It limits the destination rows considered for a match, which can greatly reduce the partitions a warehouse such as BigQuery has to scan.
+
+The expression can reference two aliases:
 
 | Alias | Refers to |
 | --- | --- |
 | `source` | The rows returned by the asset query for the current run. |
-| `target` | The existing rows in the destination table named by the asset. |
+| `target` | The existing rows in the destination table. |
 
-The predicate may reference either alias. Provide only the expression, without a leading `WHERE` or `AND` and without a trailing semicolon.
+Provide only the expression, without a leading `WHERE` or `AND` and without a trailing semicolon.
 
-The following BigQuery asset reads seven days from its source and restricts matching to the same seven days in the partitioned destination table:
+The following BigQuery asset reads seven days from its source and restricts matching to the same seven days of the partitioned destination:
 
 ```bruin-sql
 /* @bruin
@@ -166,7 +431,7 @@ FROM raw.events
 WHERE event_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY) -- [!code focus]
 ```
 
-Bruin adds the predicate to the primary-key comparison in the generated merge. The relevant part is equivalent to:
+Bruin adds the predicate to the primary-key comparison. The relevant part of the generated merge is equivalent to:
 
 ```sql
 MERGE analytics.events AS target -- [!code focus]
@@ -186,273 +451,183 @@ WHEN NOT MATCHED THEN
   VALUES (source.event_id, source.event_date, source.payload);
 ```
 
-`incremental_predicate` does not filter the asset query. Filter the asset query separately when source processing should use the same or a narrower window.
+In one BigQuery benchmark, merging a 5,000-row source into a 1.8-million-row destination processed 1.92 GB without the predicate and 10.5 MB with the seven-day predicate above: 99.45% fewer bytes processed, 98.91% fewer bytes billed, and 93.88% less slot usage. Actual savings depend on the destination size, its partitioning, and the window you choose.
 
-This pattern can significantly reduce cost and execution work when the destination is large and partitioned. In one BigQuery benchmark, merging a 5,000-row source into a 1.8-million-row destination processed 1.92 GB without the predicate and 10.5 MB with the seven-day destination predicate shown above. That was a 99.45% reduction in bytes processed (a factor-of-183 reduction), with 98.91% fewer billed bytes and 93.88% less slot usage. Actual savings depend on the destination size, partitioning, and the selected window.
+**Good to know:**
 
-- **Type:** `String`
-- **Default:** `""`
-- **Supported platforms:** BigQuery, Athena, Databricks, Doris, DuckDB, MSSQL, MySQL, Oracle, PostgreSQL, Snowflake, Synapse, and Vertica. It is not supported for Redshift (whose `MERGE` only accepts equality predicates in its match condition), Ingestr assets, or Python assets.
+- The predicate does not filter the asset query. Filter the query separately.
+- The predicate is inserted as-is, without validation. It must cover every destination row that could match the source data. A row outside the window cannot match, so its key is inserted again as a duplicate. Choose a window that covers late-arriving data and the full period in which existing rows can change.
+- Supported on BigQuery, Athena, Databricks, Doris, DuckDB, MSSQL, MySQL, Oracle, PostgreSQL, Snowflake, Synapse, and Vertica. It is not supported on Redshift, whose `MERGE` only accepts equality predicates in its match condition, or on Fabric, Python, or ingestr assets.
 
-The predicate is database-specific SQL and is inserted without validation. It must include every destination row that could match the source data. If a primary key already exists outside the predicate, that row cannot match and the merge may insert a duplicate. Account for late-arriving data and the full period in which existing rows can change when choosing the destination window.
+#### `time_interval` {#time-interval}
 
-## Strategies
+Replaces the rows inside the run's time window with the query result.
 
-Bruin supports various materialization strategies that take your code and convert it to another structure behind the scenes to materialize the execution results of your assets.
-
-### Default: no materialization
-
-By default, Bruin does not apply any materialization to the assets. This means that the query will be executed every time the asset is run, and you are responsible for storing the results in a table via a `CREATE TABLE` or a similar statement in your SQL asset.
-
-### `create+replace`
-
-This materialization strategy is useful when you want to create a table if it does not exist, and replace the contents of the table with the results of the query. This is useful when you want to ensure that the table is always up-to-date with the query results.
-
-`create+replace` strategy does not do any incremental logic, which means it's a full refresh every time the asset is run. This can be expensive for large tables.
-
-Here's an example of an asset with `create+replace` materialization:
+**Use it when** the table is organized by date or timestamp and you want idempotent daily or hourly loads and easy backfills.
 
 ```bruin-sql
 /* @bruin
 
-name: dashboard.hello_bq
-type: bq.sql
-
-materialization:
-    type: table
-
-@bruin */
-
-select 1 as one
-union all
-select 2 as one
-```
-
-The result will be a table `dashboard.hello_bq` with the result of the query.
-
-## Full Refresh and `full_refresh_restricted`
-
-When running assets with the `--full-refresh` flag, Bruin will drop and recreate tables to ensure a clean state. You can also opt a single asset into this behavior on every run with `parameters.full_refresh: true`. However, there are cases where you may want to protect certain tables from being dropped during a full refresh, such as:
-
-- Tables with external dependencies
-- Tables that take a long time to rebuild
-- Critical production tables that should never be accidentally dropped
-
-You can use the `full_refresh_restricted` flag to prevent an asset from being dropped during a full refresh:
-
-```bruin-sql
-/* @bruin
-
-name: dashboard.critical_table
-type: bq.sql
-
-materialization:
-    type: table
-
-full_refresh_restricted: true
-
-@bruin */
-
-select * from important_data
-```
-
-**Behavior:**
-
-- `full_refresh_restricted: true` - Table will NOT be dropped during full refresh. The asset will use its normal materialization strategy instead.
-- `full_refresh_restricted: false` or not set - Table will be dropped and recreated during full refresh (default behavior).
-
-The older asset-level `refresh_restricted` field is still supported as an alias.
-
-You can also apply the same protection to every asset in an environment from `.bruin.yml`:
-
-```yaml
-environments:
-  production:
-    config:
-      full_refresh_restricted: true
-    connections:
-      # ...
-```
-
-This is useful when you want to run `bruin run --full-refresh` on your entire pipeline but protect specific critical tables from being dropped.
-
-### `delete+insert`
-
-`delete+insert` strategy is useful for incremental updates. It deletes the rows that are no longer present in the query results and inserts the new rows. This is useful when you have a large table and you want to minimize the amount of data that needs to be written.
-
-This strategy requires an `incremental_key` to be specified. This key is used to determine which rows to delete and which rows to insert.
-
-Bruin implements `delete+insert` strategy in the following way:
-
-- run the asset query, put the results in a temp table
-- run a `SELECT DISTINCT` query on the temp table to get the unique values of the `incremental_key`
-- run a `DELETE` query on the target table to delete all the rows that match the `incremental_key` values determined above
-- run an `INSERT` query to insert the new rows from the temp table
-
-Here's an example of an asset with `delete+insert` materialization:
-
-```bruin-sql
-/* @bruin
-
-name: dashboard.hello_bq
-type: bq.sql
-
-materialization:
-    type: table
-    strategy: delete+insert
-    incremental_key: UserId
-
-@bruin */
-
-select 1 as UserId, 'Alice' as Name
-union all
-select 2 as UserId, 'Bob' as Name
-```
-
-### `truncate+insert`
-
-`truncate+insert` strategy is useful for full table replacement when you want to clear all existing data and insert fresh data. Unlike `create+replace`, this strategy maintains the existing table structure (schema, permissions, indices, etc.) and only removes the data.
-
-This strategy is more efficient than `delete+insert` for full table refreshes because:
-
-- TRUNCATE is generally faster than DELETE for removing all rows
-- It doesn't require an `incremental_key`
-- It maintains table metadata and permissions
-
-Here's an example of an asset with `truncate+insert` materialization:
-
-```bruin-sql
-/* @bruin
-
-name: dashboard.daily_snapshot
-type: bq.sql
-
-materialization:
-    type: table
-    strategy: truncate+insert
-
-@bruin */
-
-select 
-    current_date as snapshot_date,
-    count(*) as total_users,
-    sum(revenue) as total_revenue
-from users
-```
-
-> [!NOTE]
-> On platforms where `TRUNCATE` participates in transactions (such as BigQuery), Bruin wraps the truncate and insert in a single transaction. A failed insert rolls back the truncate, and readers never observe the table in its intermediate empty state. On engines where `TRUNCATE` implicitly commits, the truncate and insert run as separate statements, so a failure between them can leave the table empty.
-
-### `append`
-
-`append` strategy is useful when you want to add new rows to the table without overwriting the existing rows. This is useful when you have a table that is constantly being updated and you want to keep the history of the data.
-
-Bruin will simply run the query, and insert the results into the destination table.
-
-```bruin-sql
-/* @bruin
-
-name: dashboard.hello_bq
-type: bq.sql
-
-materialization:
-    type: table
-    strategy: append
-
-@bruin */
-
-select 1 as one
-union all
-select 2 as one
-```
-
-### `merge`
-
-`merge` strategy is useful when you want to merge the existing rows with the new rows. This is useful when you have a table with a primary key and you want to update the existing rows and insert the new rows, helping you avoid duplication while keeping the most up-to-date version of the data in the table incrementally.
-
-Merge strategy requires columns to be defined and marked with `primary_key` and optionally `update_on_merge` or `merge_sql`:
-
-- `primary_key` determines which rows to update vs insert.
-- `update_on_merge` marks columns to update with `source.col` when a row matches.
-- `merge_sql` lets you specify a custom expression per column for matches, e.g. `GREATEST(target.col, source.col)`. When present, `merge_sql` takes precedence over `update_on_merge`.
-
-Supported platforms for `merge_sql`:
-
-- BigQuery, Snowflake, Postgres, mssql, MySQL, Spark: supported
-- Athena (Iceberg tables): supported
-- Databricks, ClickHouse, Trino, DuckDB, Dremio, Sail: not supported
-
-Spark `merge` requires a catalog and table format that implement row-level `MERGE INTO`, such as Iceberg with the Spark SQL extensions enabled.
-
-> [!INFO]
-> An important difference between `merge` and `delete+insert` is that `merge` will update the existing rows, while `delete+insert` will delete the existing rows and insert the new rows. This means if your source has deleted rows, `merge` will not delete them from the destination, whereas `delete+insert` will if their `incremental_key` matches.
-
-Here's a sample asset with `merge` materialization:
-
-```bruin-sql
-/* @bruin
-
-name: dashboard.hello_bq
-type: bq.sql
-
-materialization:
-    type: table
-    strategy: merge
-
-columns:
-  - name: UserId
-    type: integer
-    primary_key: true
-  - name: UserName
-    type: string
-    update_on_merge: true
-  - name: Score
-    type: integer
-    merge_sql: GREATEST(target.Score, source.Score)
-
-@bruin */
-
-select 1 as UserId, 'Alice' as UserName
-union all
-select 2 as UserId, 'Bob' as UserName
-```
-
-### `time_interval`
-
-> [!NOTE]
-> The `time_interval` strategy is only supported for SQL assets. Python assets do not support this strategy.
-
-The `time_interval` strategy is designed for incrementally loading time-based data. It's useful when you want to process data within specific time windows, ensuring efficient updates of historical data while maintaining data consistency.
-
-This strategy requires the following configuration:
-
-- `incremental_key`: The column used for time-based filtering
-- `time_granularity`: Must be either 'date' or 'timestamp'
-  - Use 'date' when your incremental_key is a DATE column (e.g., '2024-03-20')
-  - Use 'timestamp' when your incremental_key is a TIMESTAMP column (e.g., '2024-03-20 15:30:00')
-
-When running assets with time_interval strategy, you can specify the time window using the start and end date flags:
-
-```bash
-bruin run --start-date "2024-03-01" --end-date "2024-03-31" path/to/your/asset
-```
-
-By default:
-
-- `start-date`: Beginning of yesterday (00:00:00.000000)
-- `end-date`: End of yesterday (23:59:59.999999)
-
-Here's a sample asset with `time_interval` materialization:
-
-```bruin-sql
-/* @bruin
-name: dashboard.hello_bq
+name: analytics.product_stock
 type: bq.sql
 
 materialization:
   type: table
   strategy: time_interval
+  incremental_key: dt
   time_granularity: date
+
+columns:
+  - name: product_id
+    type: INTEGER
+    primary_key: true
+  - name: stock
+    type: INTEGER
+  - name: dt
+    type: DATE
+
+@bruin */
+
+SELECT product_id, stock, dt
+FROM raw.inventory
+WHERE dt BETWEEN '{{ start_date }}' AND '{{ end_date }}'
+```
+
+**How it works:** inside a transaction on most platforms, Bruin runs:
+
+```sql
+DELETE FROM analytics.product_stock
+WHERE dt BETWEEN '{{ start_date }}' AND '{{ end_date }}';
+
+INSERT INTO analytics.product_stock <query>;
+```
+
+With `time_granularity: timestamp`, the delete uses `{{ start_timestamp }}` and `{{ end_timestamp }}` instead.
+
+The window comes from the run's start and end dates. By default, that is yesterday, from `00:00:00.000000` to `23:59:59.999999`. Pass a different range to backfill:
+
+```bash
+bruin run --start-date "2024-03-01" --end-date "2024-03-31" path/to/asset.sql
+```
+
+**Good to know:**
+
+- Bruin deletes the window but does not filter your query. Filter the query to the same window with the [date variables](../variables/built-in.md), or rows outside the window are inserted next to the existing ones.
+- Use `date` for a `DATE` column and `timestamp` for a `TIMESTAMP` column.
+- `BETWEEN` includes both ends of the window.
+- [Interval modifiers](./interval-modifiers.md) can widen the window, for example to reprocess late-arriving data.
+- Databricks and ClickHouse run the delete and insert without a wrapping transaction.
+
+### History tracking (SCD2)
+
+The SCD2 strategies implement [Slowly Changing Dimension Type 2](https://en.wikipedia.org/wiki/Slowly_changing_dimension). Instead of overwriting a changed record, Bruin closes the old version and inserts a new one, so the table keeps every version.
+
+|  | `scd2_by_column` | `scd2_by_time` |
+| --- | --- | --- |
+| **Detects a change when** | Any non-key column differs from the current version | The `incremental_key` value is newer than the current version |
+| **`_valid_from` comes from** | `CURRENT_TIMESTAMP()`, or the `incremental_key` if you set one | The `incremental_key` |
+| **Requires** | A `primary_key` | A `primary_key` and a `DATE` or `TIMESTAMP` `incremental_key` |
+| **Use it when** | The source has no reliable change timestamp | The source records when each row changed, such as `updated_at` |
+
+Both strategies:
+
+- Add three columns. `_valid_from` and `_valid_until` hold when a version became active and inactive, and `_is_current` is `true` for the current version. Current versions have `_valid_until` set to `9999-12-31`.
+- Mark records that disappeared from the source as historical.
+- Reserve the names `_valid_from`, `_valid_until`, and `_is_current`. Using them in `columns` is a validation error.
+- Partition by `_valid_from` on BigQuery, Athena, Snowflake, and Spark, and cluster by `_is_current` plus the primary key on BigQuery, Snowflake, and Spark, unless you set `partition_by` or `cluster_by`.
+- Are supported on BigQuery, Snowflake, PostgreSQL, Redshift, MySQL, DuckDB, ClickHouse, Databricks, Athena, and Spark. Oracle supports `scd2_by_time` only.
+
+> [!WARNING]
+> A `--full-refresh` rebuilds an SCD2 table from the current source snapshot and discards its history. Set [`full_refresh_restricted: true`](#full-refresh-and-full-refresh-restricted) on SCD2 assets to protect them.
+
+#### `scd2_by_column` {#scd2-by-column}
+
+Creates a new version of a record whenever any non-primary-key column changes.
+
+```bruin-sql
+/* @bruin
+
+name: dim.product_catalog
+type: bq.sql
+
+materialization:
+  type: table
+  strategy: scd2_by_column
+
+columns:
+  - name: ID
+    type: INTEGER
+    description: "Unique identifier for Product"
+    primary_key: true
+  - name: Name
+    type: VARCHAR
+    description: "Name of the Product"
+  - name: Price
+    type: FLOAT
+    description: "Price of the Product"
+
+@bruin */
+
+SELECT 1 AS ID, 'Wireless Mouse' AS Name, 29.99 AS Price
+UNION ALL
+SELECT 2 AS ID, 'USB Cable' AS Name, 12.99 AS Price
+UNION ALL
+SELECT 3 AS ID, 'Keyboard' AS Name, 89.99 AS Price
+```
+
+The first run, with `--full-refresh`, creates:
+
+```text
+ID | Name           | Price  | _is_current | _valid_from         | _valid_until
+1  | Wireless Mouse | 29.99  | true        | 2024-01-01 10:00:00 | 9999-12-31 23:59:59
+2  | USB Cable      | 12.99  | true        | 2024-01-01 10:00:00 | 9999-12-31 23:59:59
+3  | Keyboard       | 89.99  | true        | 2024-01-01 10:00:00 | 9999-12-31 23:59:59
+```
+
+Suppose the next source snapshot raises the Wireless Mouse price to 39.99, drops the Keyboard, and adds a Monitor. After the next run, the table is:
+
+```text
+ID | Name           | Price  | _is_current | _valid_from         | _valid_until
+1  | Wireless Mouse | 29.99  | false       | 2024-01-01 10:00:00 | 2024-01-02 14:30:00
+1  | Wireless Mouse | 39.99  | true        | 2024-01-02 14:30:00 | 9999-12-31 23:59:59
+2  | USB Cable      | 12.99  | true        | 2024-01-01 10:00:00 | 9999-12-31 23:59:59
+3  | Keyboard       | 89.99  | false       | 2024-01-01 10:00:00 | 2024-01-02 14:30:00
+4  | Monitor        | 199.99 | true        | 2024-01-02 14:30:00 | 9999-12-31 23:59:59
+```
+
+- The Wireless Mouse now has two versions: the old price, closed, and the new price, current.
+- The USB Cable did not change, so its version stays current.
+- The Keyboard is closed because it left the source.
+- The Monitor is added as a new current version.
+
+**Use business timestamps instead of processing time.** By default, versions are stamped with `CURRENT_TIMESTAMP()`. If the source records when a change happened, set it as the `incremental_key`:
+
+```yaml
+materialization:
+  type: table
+  strategy: scd2_by_column
+  incremental_key: updated_at
+```
+
+With an `incremental_key`:
+
+- New and changed versions get `_valid_from` from the `incremental_key` column.
+- A version closed by a change gets `_valid_until` from the new version's `incremental_key`.
+- A version closed because the record left the source still uses `CURRENT_TIMESTAMP()`.
+
+#### `scd2_by_time` {#scd2-by-time}
+
+Creates a new version of a record when its `incremental_key` moves forward in time.
+
+```bruin-sql
+/* @bruin
+
+name: dim.products
+type: bq.sql
+
+materialization:
+  type: table
+  strategy: scd2_by_time
   incremental_key: dt
 
 columns:
@@ -463,102 +638,98 @@ columns:
   - name: product_name
     type: VARCHAR
     description: "Name of the product"
-  - name: price
-    type: FLOAT
-    description: "Price of the product in USD"
   - name: stock
     type: INTEGER
     description: "Number of units in stock"
   - name: dt
     type: DATE
     description: "Date when the product was last updated"
+
 @bruin */
 
-
-SELECT
-    1 AS product_id,
-    'Laptop' AS product_name,
-    999.99 AS price,
-    10 AS stock,
-    DATE '2025-03-15' AS dt
-UNION ALL
-SELECT
-    2 AS product_id,
-    'Smartphone' AS product_name,
-    699.99 AS price,
-    50 AS stock,
-    DATE '2024-03-16' AS dt;
+SELECT product_id, product_name, stock, dt
+FROM raw.products
 ```
 
-The strategy will:
+The first run, with `--full-refresh`, creates:
 
-1. Begin a transaction
-2. Delete existing records within the specified time interval
-3. Insert new records from the query given in the asset
-
-### `DDL`
-
-The `DDL` (Data Definition Language) strategy is used to create a new table using the information provided in the embedded YAML section of the asset. This is useful when you want to create a new table with a specific schema and structure and ensure that this table is only created once.
-
-The `DDL` strategy defines the table structure via column definitions in the columns field of the asset. For this reason, you should not include any query after the embedded YAML section.
-
-Here's an example of an asset with `DDL` materialization:
-
-```bruin-sql
-/* @bruin
-name: dashboard.products
-type: bq.sql
-
-materialization:
-  type: table
-  strategy: ddl
-  partition_by: product_category
-
-columns:
-  - name: product_id
-    type: INTEGER
-    description: "Unique identifier for the product"
-    primary_key: true
-  - name: product_category
-    type: VARCHAR
-    description: "Category of the product"
-  - name: product_name
-    type: VARCHAR
-    description: "Name of the product"
-  - name: price
-    type: FLOAT
-    description: "Price of the product in USD"
-  - name: stock
-    type: INTEGER
-    description: "Number of units in stock"
-@bruin */
-
+```text
+product_id | product_name | stock | _is_current | _valid_from         | _valid_until
+1          | Laptop       | 100   | true        | 2025-04-02 00:00:00 | 9999-12-31 23:59:59
+2          | Smartphone   | 150   | true        | 2025-04-02 00:00:00 | 9999-12-31 23:59:59
+3          | Headphones   | 175   | true        | 2025-04-02 00:00:00 | 9999-12-31 23:59:59
+4          | Monitor      | 25    | true        | 2025-04-02 00:00:00 | 9999-12-31 23:59:59
 ```
 
-This strategy will:
+Suppose the next source snapshot changes the Headphones stock to 900 with `dt = 2025-06-02`, drops the Monitor, and adds a PS5. After the next run, the table is:
 
-- Create a new empty table with the name `dashboard.products`
-- Use the provided schema to define the column names, column types as well as optional primary key constraints and descriptions.
+```text
+product_id | product_name | stock | _is_current | _valid_from         | _valid_until
+1          | Laptop       | 100   | true        | 2025-04-02 00:00:00 | 9999-12-31 23:59:59
+2          | Smartphone   | 150   | true        | 2025-04-02 00:00:00 | 9999-12-31 23:59:59
+3          | Headphones   | 175   | false       | 2025-04-02 00:00:00 | 2025-06-02 00:00:00
+3          | Headphones   | 900   | true        | 2025-06-02 00:00:00 | 9999-12-31 23:59:59
+4          | Monitor      | 25    | false       | 2025-04-02 00:00:00 | 2025-06-02 00:00:00
+5          | PS5          | 25    | true        | 2025-06-02 00:00:00 | 9999-12-31 23:59:59
+```
 
-The strategy also supports partitioning and clustering for data warehouses that support these features. You can specify in the materialization definition with the following keys:
+- The Laptop and Smartphone did not change, so their versions stay current.
+- The Headphones have a newer `dt`, so the old version is closed and a new one is added.
+- The Monitor is closed because it left the source.
+- The PS5 is added as a new current version.
 
-- `partition_by`
-- `cluster_by`
+On Oracle, the `incremental_key` must be `TIMESTAMP` or `DATE`, not `TIMESTAMP WITH TIME ZONE`. MySQL also accepts `DATETIME`.
 
-### Data Vault strategies
+#### SCD2 timestamps and time zones
 
-Bruin provides three strategies for loading a Raw Data Vault: `datavault_hub`, `datavault_link`, and `datavault_satellite`. They are supported for PostgreSQL and DuckDB SQL assets with `type: table` materialization. On any other platform, including Redshift, both incremental and `--full-refresh` runs fail with an unsupported strategy error, which `bruin validate` does not flag.
+`_valid_from` and `_valid_until` are timezone-aware, so each value is an unambiguous instant stored in UTC:
 
-The asset query must calculate the hash keys and hashdiff and return every column declared in `columns`. Bruin uses those values to apply the loading rules; it does not calculate hashes. Every declared column must have both a `name` and a database-compatible `type`.
+| Platform | Column type |
+| --- | --- |
+| DuckDB, MotherDuck, PostgreSQL, Redshift, Athena, Oracle | `TIMESTAMP WITH TIME ZONE` / `TIMESTAMPTZ` |
+| Snowflake | `TIMESTAMP_TZ` |
+| BigQuery, Databricks | `TIMESTAMP`, which is already an absolute instant |
+| ClickHouse | `DateTime64(6, 'UTC')` |
+| MySQL | `DATETIME`, timezone-naive and stored in UTC, because MySQL's `TIMESTAMP` cannot hold the `9999-12-31` sentinel |
+
+When the `incremental_key` is a timezone-naive column, its values are read as UTC, not in the database session's time zone, so results do not depend on where the pipeline runs.
+
+::: tip Migrating existing tables
+SCD2 tables created before these columns became timezone-aware are upgraded on their next **incremental** run. Existing `_valid_from` and `_valid_until` values are converted to UTC, with no `--full-refresh` and no loss of history. This temporary migration was added in July 2026 and will be removed once existing tables have been upgraded.
+:::
+
+#### SCD2 on ClickHouse
+
+- Both strategies create the destination on the first run. `--full-refresh` replaces all history with the current source snapshot.
+- The current-version sentinel is `2299-12-31 23:59:59`, for servers that cannot represent year 9999.
+- Incremental runs use staged deletes and inserts. They are not atomic and do not support a `cluster` connection setting.
+- If set, the `incremental_key` must have a non-nullable date or timestamp type and contain no `NULL` values. A `NULL` `_valid_from` would prevent later changes from being detected.
+- Use `MergeTree()`, the default, or `ReplicatedMergeTree()` to keep every version. Engines such as `ReplacingMergeTree()` can discard versions that share a sorting key.
+- Keep synchronous lightweight deletes enabled (`lightweight_deletes_sync`, on servers that expose it) so staging tables stay available until deletes finish.
+
+### Data Vault
+
+Bruin provides three strategies for loading a Raw Data Vault: `datavault_hub`, `datavault_link`, and `datavault_satellite`. They are supported for PostgreSQL and DuckDB SQL assets with `type: table`. On other platforms, including Redshift, the run fails with an unsupported strategy error, which `bruin validate` does not flag.
+
+The asset query must calculate the hash keys and hashdiff and return every column declared in `columns`. Bruin applies the loading rules to those values but does not calculate hashes. Every declared column needs a `name` and a database-compatible `type`.
+
+All three strategies:
+
+- Create the schema, when the asset name has the form `schema.table`, and create the target table if it does not exist.
+- Define every role-bearing column as `NOT NULL`: hash keys, business keys, the satellite hashdiff, the load datetime, and the record source. Source rows with `NULL` in any of these are skipped. A column declared with `nullable: false` is also `NOT NULL`, but it is not part of the skip filter, so a `NULL` there fails the run instead of dropping the row.
+- Run table creation and the incremental load in one transaction.
+- Drop and recreate the target on `--full-refresh`, then apply the same loading rules to the refreshed data. An asset with `full_refresh_restricted: true` keeps loading incrementally and is not dropped.
+
+On incremental runs, `CREATE TABLE IF NOT EXISTS` does not alter an existing table. If you change the declared columns or their types, migrate the table yourself or run a full refresh.
 
 #### Data Vault column roles
 
-Set a column's role with `meta.datavault_role`. Explicit roles are recommended, especially when an asset contains multiple hash key columns.
+Set a column's role with `meta.datavault_role`. Explicit roles are recommended, especially when an asset has several hash key columns.
 
-| Column purpose | Accepted `datavault_role` values | Naming or configuration fallback |
+| Column purpose | Accepted `datavault_role` values | Fallback when no role is set |
 | --- | --- | --- |
 | Hub hash key | `hash_key`, `hub_hash_key` | First column with `primary_key: true`, or the only column ending in `_hk` |
-| Hub business key | `business_key` | Columns ending in `_bk`, in addition to the explicitly roled columns |
+| Hub business key | `business_key` | Columns ending in `_bk`, in addition to explicitly roled columns |
 | Link hash key | `link_hash_key`, `hash_key` | First column with `primary_key: true`, or the only column ending in `_hk` |
 | Related hash keys in a link | `hub_hash_key`, `parent_hash_key`, `foreign_hash_key` | Other columns ending in `_hk` |
 | Satellite parent hash key | `parent_hash_key`, `hub_hash_key`, `hash_key` | First column with `primary_key: true`, or the only column ending in `_hk` |
@@ -566,29 +737,15 @@ Set a column's role with `meta.datavault_role`. Explicit roles are recommended, 
 | Load datetime | `load_datetime`, `load_dts` | A column named `load_dts`, `load_datetime`, or `loaded_at` |
 | Record source | `record_source` | A column named `record_source` |
 
-Role values and naming fallbacks are case-insensitive. For a link with several `_hk` columns, identify the link hash key explicitly with `datavault_role: link_hash_key` or `primary_key: true`; Bruin treats the remaining `_hk` columns as related hash keys.
+Role values and naming fallbacks are case-insensitive. For a link with several `_hk` columns, identify the link hash key with `datavault_role: link_hash_key` or `primary_key: true`; Bruin treats the remaining `_hk` columns as related hash keys.
 
-In a hub, every column ending in `_bk` is added to the business keys, and in a link every column ending in `_hk` other than the link hash key is added to the related hash keys. Both happen in addition to the explicitly roled columns rather than instead of them, so a descriptive column carrying one of those suffixes becomes a required column. Rename such columns if you do not want them to take part in the key.
+Suffix fallbacks apply in addition to explicit roles, not instead of them. In a hub, every column ending in `_bk` becomes a business key, and in a link every `_hk` column other than the link hash key becomes a related hash key. A descriptive column with one of those suffixes therefore becomes a required key column. Rename it if it should not be part of the key.
 
-All three strategies:
+#### `datavault_hub` {#datavault-hub}
 
-- Create the schema, when the asset name has the form `schema.table`, and create the target table if it does not exist.
-- Define every role-bearing column as `NOT NULL`, meaning hash keys, business keys, the satellite hashdiff, the load datetime, and the record source, and skip source rows that contain `NULL` in any of them. A column you declare with `nullable: false` also becomes `NOT NULL` in the table definition, but it takes no part in the skip filter, so a `NULL` there fails the run instead of dropping the row.
-- Run the table creation and incremental load in one transaction.
-- Drop and recreate the target table when the asset runs with `--full-refresh`, then apply the same Data Vault loading rules to the refreshed data. An asset with `full_refresh_restricted: true` keeps its incremental behavior and is not dropped.
+Loads one row per hub hash key. Within the current query result, Bruin keeps the row with the earliest load datetime for each hash key, and inserts it only if the hash key is not already in the target. Repeated loads are idempotent.
 
-On incremental runs, `CREATE TABLE IF NOT EXISTS` does not alter an existing target. If you change the declared columns or their types, migrate the table separately or run a full refresh.
-
-#### `datavault_hub`
-
-The `datavault_hub` strategy loads one row per hub hash key. Within the current asset query, Bruin keeps the row with the earliest load datetime for each hash key. It inserts that row only when the hash key does not already exist in the target, making repeated loads idempotent.
-
-A hub requires:
-
-- One hub hash key
-- One or more business keys
-- One load datetime
-- One record source
+A hub requires one hub hash key, one or more business keys, one load datetime, and one record source.
 
 ```bruin-sql
 /* @bruin
@@ -622,18 +779,13 @@ SELECT customer_hk, customer_id, load_dts, record_source
 FROM stg.customer_hashed
 ```
 
-Bruin creates `customer_hk` as the target table's primary key.
+Bruin creates `customer_hk` as the table's primary key.
 
-#### `datavault_link`
+#### `datavault_link` {#datavault-link}
 
-The `datavault_link` strategy loads one row per link hash key. As with hubs, Bruin keeps the earliest row per link hash key from the current query and inserts it only when that key does not already exist in the target.
+Loads one row per link hash key. As with hubs, Bruin keeps the earliest row per link hash key from the current query and inserts it only if that key is not already in the target.
 
-A link requires:
-
-- One link hash key
-- One or more related hub, parent, or foreign hash keys
-- One load datetime
-- One record source
+A link requires one link hash key, one or more related hub, parent, or foreign hash keys, one load datetime, and one record source.
 
 ```bruin-sql
 /* @bruin
@@ -671,21 +823,15 @@ SELECT customer_order_hk, customer_hk, order_hk, load_dts, record_source
 FROM stg.customer_orders_hashed
 ```
 
-Bruin creates `customer_order_hk` as the target table's primary key.
+Bruin creates `customer_order_hk` as the table's primary key.
 
-#### `datavault_satellite`
+#### `datavault_satellite` {#datavault-satellite}
 
-The `datavault_satellite` strategy preserves descriptive history for a parent hash key. Bruin orders incoming rows for each parent by load datetime, compares their hashdiff values with the latest target row and with the preceding row in the current batch, and inserts only new changes. Consecutive rows with an unchanged hashdiff are not inserted.
+Keeps the descriptive history of a parent hash key. Bruin orders incoming rows for each parent by load datetime and compares each hashdiff with the latest target row and with the previous row in the batch. Only real changes are inserted; consecutive rows with the same hashdiff are skipped.
 
-Bruin loads at most one row per target primary key, which is the parent hash key and load datetime by default. Rows that collide on that key within a batch are collapsed into one, and rows whose key already exists in the target are skipped rather than updated. Give each version of a parent a distinct load datetime so that no version is dropped.
+Bruin loads at most one row per target primary key, which by default is the parent hash key plus the load datetime. Rows that collide on that key within a batch are collapsed into one, and rows whose key already exists in the target are skipped, not updated. Give each version of a parent a distinct load datetime so that no version is dropped.
 
-A satellite requires:
-
-- One parent hash key
-- One hashdiff
-- One load datetime
-- One record source
-- Any number of descriptive columns
+A satellite requires one parent hash key, one hashdiff, one load datetime, one record source, and any number of descriptive columns.
 
 ```bruin-sql
 /* @bruin
@@ -723,300 +869,160 @@ SELECT customer_hk, hashdiff, load_dts, record_source, customer_name, email
 FROM stg.customer_hashed
 ```
 
-By default, Bruin creates a composite primary key from the parent hash key and load datetime. You can define a different primary key by marking its columns with `primary_key: true`; marking only the parent hash key keeps the default parent-hash-key and load-datetime primary key. When you define a custom primary key, set `datavault_role: parent_hash_key` on the parent hash key column as well, because Bruin otherwise falls back to the first `primary_key: true` column and can pick the wrong one.
+To use a different primary key, mark its columns with `primary_key: true`. Marking only the parent hash key keeps the default key of parent hash key plus load datetime. With a custom primary key, also set `datavault_role: parent_hash_key` on the parent hash key column; otherwise Bruin falls back to the first `primary_key: true` column and can pick the wrong one.
 
-### `scd2_by_column`
+## Full refresh and `full_refresh_restricted` {#full-refresh-and-full-refresh-restricted}
 
-The `scd2_by_column` strategy implements [Slowly Changing Dimension Type 2](https://en.wikipedia.org/wiki/Slowly_changing_dimension) logic, which maintains a full history of data changes over time. This strategy is useful when you want to track changes to records and preserve the historical state of your data.
+A full refresh rebuilds a table from scratch. Trigger it for a whole run with `bruin run --full-refresh`, or for a single asset on every run with `parameters.full_refresh: true`.
 
-This strategy automatically detects changes in non-primary key columns and creates new versions of records when changes occur, while marking previous versions as historical.
+During a full refresh, table assets are rebuilt with `create+replace` instead of their configured strategy:
 
-**Requirements:**
+| Strategy | Full-refresh behavior |
+| --- | --- |
+| `create+replace`, `truncate+insert`, `append`, `delete+insert`, `merge`, `time_interval` | The table is recreated from the full query result. |
+| `ddl` | Unchanged. The table is never dropped or recreated. |
+| `scd2_by_column`, `scd2_by_time` | A new SCD2 table is built from the current source snapshot. Existing history is lost. |
+| Data Vault | The table is dropped and recreated, then loaded with the Data Vault rules. |
+| `type: view` | Unchanged. Views are always replaced. |
 
-- At least one column must be marked as `primary_key: true`
-- The column names `_valid_from`, `_valid_until`, and `_is_current` are reserved and cannot be used in your column definitions
+Because the full query result is loaded, remember to widen or remove date filters in incremental queries when `full_refresh` is set. The `{{ full_refresh }}` [Jinja variable](../variables/built-in.md) lets the query branch on it:
 
-**How it works:** When changes are detected in non-primary key columns:
+```sql
+SELECT *
+FROM raw.events
+{% if not full_refresh %}
+WHERE event_date BETWEEN '{{ start_date }}' AND '{{ end_date }}'
+{% endif %}
+```
 
-1. The existing record is marked as historical (`_is_current: false`) and gets an end timestamp in `_valid_until`
-2. A new record is inserted with the updated values (`_is_current: true`) and `_valid_until` set to '9999-12-31'
-3. Records that no longer exist in the source are marked as historical
+### Protecting tables with `full_refresh_restricted`
 
-**Automatically added columns:**
+Some tables should never be dropped, for example when they:
 
-- `_valid_from`: TIMESTAMP when the record version became active (defaults to `CURRENT_TIMESTAMP()`, or uses `incremental_key` value if specified)
-- `_valid_until`: TIMESTAMP when the record version became inactive (set to `TIMESTAMP('9999-12-31')` for current records, or uses `incremental_key` value when a record is expired due to changes)
-- `_is_current`: BOOLEAN indicating if this is the current version of the record
+- have external dependencies,
+- take a long time to rebuild, or
+- hold history that cannot be recomputed, such as SCD2 tables.
 
-`_valid_from` and `_valid_until` are created as timezone-aware timestamps so that both columns represent an unambiguous absolute instant (values are stored in UTC). The exact type depends on the platform: `TIMESTAMP WITH TIME ZONE` / `TIMESTAMPTZ` on DuckDB, MotherDuck, Postgres, Redshift, Athena and Oracle; `TIMESTAMP_TZ` on Snowflake; and BigQuery's / Databricks' `TIMESTAMP` (which is already an absolute-instant type). When the `incremental_key` is a timezone-naive column, its values are interpreted as **UTC** (not the database session timezone), so `_valid_from`/`_valid_until` are deterministic regardless of where the pipeline runs.
+Set `full_refresh_restricted: true` to keep the asset on its normal strategy during a full refresh:
 
-MySQL is the one exception: both columns are `DATETIME` (timezone-naive, stored in UTC), because MySQL's timezone-aware `TIMESTAMP` type cannot represent the far-future `9999-12-31` sentinel used for current records.
+```bruin-sql
+/* @bruin
 
-::: tip Migrating existing tables
-SCD2 tables created before the timezone-aware columns were introduced are upgraded automatically on the next **incremental** run: the existing `_valid_from`/`_valid_until` values are converted to **UTC**, with no `--full-refresh` and no loss of history. This is a temporary migration (added July 2026) that will be removed once existing tables have been upgraded.
-:::
+name: dashboard.critical_table
+type: bq.sql
 
-**Optional: Using `incremental_key` for timestamps:**
+materialization:
+  type: table
+  strategy: merge
 
-By default, `_valid_from` and `_valid_until` are set using `CURRENT_TIMESTAMP()`. However, if your source data has a column that indicates when changes actually occurred (e.g., an `updated_at` timestamp), you can specify it using the `incremental_key` option:
+full_refresh_restricted: true # [!code focus]
+
+@bruin */
+
+SELECT * FROM important_data
+```
+
+| Setting | Behavior on a full refresh |
+| --- | --- |
+| `full_refresh_restricted: true` | The table is not dropped. The asset runs with its normal strategy, and Bruin prints a warning. |
+| `full_refresh_restricted: false` or not set | The table is dropped and recreated (default). |
+
+The older asset-level `refresh_restricted` field is still supported as an alias. The restriction takes precedence over both `--full-refresh` and `parameters.full_refresh`.
+
+To protect every asset in an environment, set it in `.bruin.yml`:
+
+```yaml
+environments:
+  production:
+    config:
+      full_refresh_restricted: true
+    connections:
+      # ...
+```
+
+## Platform support
+
+`bruin validate` checks that your materialization configuration is complete, for example that `merge` has a primary key. It does not check whether your platform supports the strategy; that error appears when the asset runs.
+
+Every platform below supports views and the `create+replace`, `truncate+insert`, `ddl`, `append`, and `delete+insert` strategies. Support for the remaining strategies varies:
+
+| Platform | merge | time_interval | SCD2 by column | SCD2 by time | Data Vault |
+| --- | :---: | :---: | :---: | :---: | :---: |
+| [BigQuery](../platforms/bigquery.md) | ✅ | ✅ | ✅ | ✅ | ❌ |
+| [Snowflake](../platforms/snowflake.md) | ✅ | ✅ | ✅ | ✅ | ❌ |
+| [PostgreSQL](../platforms/postgres.md) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| [Redshift](../platforms/redshift.md) | ✅ | ✅ | ✅ | ✅ | ❌ |
+| [DuckDB](../platforms/duckdb.md) / [MotherDuck](../platforms/motherduck.md) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| [MySQL](../platforms/mysql.md) | ✅ | ✅ | ✅ | ✅ | ❌ |
+| [Databricks](../platforms/databricks.md) | ✅ | ✅ | ✅ | ✅ | ❌ |
+| [Athena](../platforms/athena.md) | ✅ | ✅ | ✅ | ✅ | ❌ |
+| [Spark](../platforms/spark.md) | ✅ | ✅ | ✅ | ✅ | ❌ |
+| [ClickHouse](../platforms/clickhouse.md) | ✅ | ✅ | ✅ | ✅ | ❌ |
+| Oracle | ✅ | ✅ | ❌ | ✅ | ❌ |
+| [MSSQL](../platforms/mssql.md) | ✅ | ✅ | ❌ | ❌ | ❌ |
+| [Synapse](../platforms/synapse.md) | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Vertica | ✅ | ✅ | ❌ | ❌ | ❌ |
+| [Fabric](../platforms/fabric.md) | ✅ | ❌ | ❌ | ❌ | ❌ |
+| [Doris](../platforms/doris.md) | ✅ | ✅ | ❌ | ❌ | ❌ |
+| [StarRocks](../platforms/starrocks.md) | ✅ | ✅ | ❌ | ❌ | ❌ |
+| [Trino](../platforms/trino.md) | ❌ | ✅ | ❌ | ❌ | ❌ |
+| [Dremio](../platforms/dremio.md) | ❌ | ✅ | ❌ | ❌ | ❌ |
+| [Sail](../platforms/sail.md) | ❌ | ✅ | ❌ | ❌ | ❌ |
+
+### Platform notes
+
+- **MySQL `merge`** stages the result, deletes matched target rows, and reinserts every staged row. Matched rows are fully replaced, even when no column has `update_on_merge`.
+- **ClickHouse `merge`** is a delete and insert on the primary key, so matched rows are fully replaced. `delete+insert` requires exactly one `primary_key` column. Statements run one at a time, without a transaction. See [ClickHouse materialization](../platforms/clickhouse.md#materialization-and-incremental-strategies) for cluster restrictions.
+- **Fabric** implements `merge` and `delete+insert` as a delete and insert on the primary key. Both require `columns` with a primary key, and `delete+insert` ignores `incremental_key`.
+- **StarRocks `merge`** is a primary-key upsert. It requires `starrocks.table_model: primary_key`, creates the table if missing, and rejects `merge_sql`.
+- **Doris `merge`** requires `doris.table_model: unique_key`.
+- **Databricks and Synapse `merge`** update only `update_on_merge` columns and ignore `merge_sql`.
+- **Redshift `merge`** does not support `incremental_predicate`.
+- **Athena** materializations always create Iceberg tables. See [Athena](../platforms/athena.md).
+- **Trino, Dremio, and Sail** `delete+insert` runs the asset query twice instead of staging it in a temporary table.
+
+### ClickHouse table options
+
+Native `clickhouse.sql` assets configure their engine, sorting key, TTL, and table settings in a top-level `clickhouse` block alongside `materialization`:
 
 ```yaml
 materialization:
   type: table
-  strategy: scd2_by_column
-  incremental_key: updated_at
+  strategy: create+replace
+  partition_by: toYYYYMM(created_at)
+clickhouse:
+  engine: ReplacingMergeTree(version)
+  order_by:
+    - id
+    - created_at
+  ttl: created_at + INTERVAL 30 DAY
+  settings:
+    index_granularity: "8192"
 ```
 
-When `incremental_key` is specified:
+| Option | Type | Meaning |
+| --- | --- | --- |
+| `clickhouse.engine` | String | SQL engine expression, such as `MergeTree()`, `ReplacingMergeTree(version)`, or `SummingMergeTree()`. If omitted, Bruin leaves the engine clause to ClickHouse's default. |
+| `clickhouse.order_by` | String[] | SQL expressions forming the sorting key, in order. Use `["tuple()"]` for an explicitly empty sorting key. `materialization.cluster_by` is an alias for this option; `order_by` wins when both are set. |
+| `clickhouse.ttl` | String | SQL TTL expression, without the `TTL` keyword. |
+| `clickhouse.settings` | Map of strings | Table settings rendered as SQL values. Include SQL quotes inside string values, for example `storage_policy: "'default'"`. |
 
-- `_valid_from` for new/updated records will be set to the value of the `incremental_key` column
-- `_valid_until` for records being expired (due to changes) will be set to the value of the `incremental_key` column from the new record
-- Records expiring because they're no longer in the source data will still use `CURRENT_TIMESTAMP()` for `_valid_until`
+These options apply when the target table is created: with `create+replace`, the default table strategy, `ddl`, and full refresh. Incremental runs keep the target's definition, and temporary staging tables do not inherit these options. Views and other asset types reject the `clickhouse` options.
 
-This is useful when you want the SCD2 timeline to reflect the actual business timestamps from your source data rather than the processing time.
+If columns have `primary_key: true`, they must be the leading entries of `clickhouse.order_by`, in column declaration order. With neither `engine` nor `order_by`, Bruin keeps the primary-key-only behavior. An explicit `order_by` or engine allows `create+replace` without a primary key; ClickHouse validates the chosen engine's key requirements. Engines such as `Memory()` do not support sorting or primary-key clauses.
 
-**NOTE:**
+Pipeline defaults can set the same options under `default.clickhouse`, which only native `clickhouse.sql` table assets inherit. Non-empty asset fields override defaults, and `settings` merge by name with asset values taking precedence.
 
-- Unless otherwise specified by `partition_by`, the SCD2 table will be partitioned by `_valid_from` for platforms which support partitioning (BigQuery, Athena, Snowflake, Spark).
-- Unless otherwise specified by `cluster_by`, the SCD2 table will be clustered using `_is_current` AND `primary key(s)` for platforms which support clustering (BigQuery, Snowflake, Spark).
+These options are separate from ingestr destination parameters (`parameters.engine` and `parameters.engine.<setting>`). See [ClickHouse table definitions](../platforms/clickhouse.md#native-sql-table-definitions) for a complete example.
 
-Here's an example of an asset with `scd2_by_column` materialization:
+## Materialization in other asset types
 
-```bruin-sql
-/* @bruin
-name: test.product_catalog
-type: bq.sql
+The `materialization` block is shared by other asset types, with a smaller set of strategies:
 
-materialization:
-  type: table
-  strategy: scd2_by_column
+| Asset type | `type` | Strategies |
+| --- | --- | --- |
+| [Python](./python.md#materialization) | `table` only, with a `connection` | `create+replace`, `append`, `merge`, `delete+insert` |
+| [Ingestr](./ingestr.md) | `table` only | `create+replace`, `append`, `merge`, `delete+insert`, `truncate+insert` |
+| [Seed](./seed.md) | Not supported | — |
 
-columns:
-  - name: ID
-    type: INTEGER
-    description: "Unique identifier for Product"
-    primary_key: true
-  - name: Name
-    type: VARCHAR
-    description: "Name of the Product"
-  - name: Price
-    type: FLOAT
-    description: "Price of the Product"
-@bruin */
-
-SELECT 1 AS ID, 'Wireless Mouse' AS Name, 29.99 AS Price
-UNION ALL
-SELECT 2 AS ID, 'USB Cable' AS Name, 12.99 AS Price
-UNION ALL
-SELECT 3 AS ID, 'Keyboard' AS Name, 89.99 AS Price
-```
-
-**Example with `incremental_key`:**
-
-When you want `_valid_from` and `_valid_until` to reflect actual business timestamps instead of processing time:
-
-```bruin-sql
-/* @bruin
-name: test.product_catalog
-type: bq.sql
-
-materialization:
-  type: table
-  strategy: scd2_by_column
-  incremental_key: updated_at
-
-columns:
-  - name: ID
-    type: INTEGER
-    description: "Unique identifier for Product"
-    primary_key: true
-  - name: Name
-    type: VARCHAR
-    description: "Name of the Product"
-  - name: Price
-    type: FLOAT
-    description: "Price of the Product"
-  - name: updated_at
-    type: TIMESTAMP
-    description: "When the product was last modified in the source system"
-@bruin */
-
-SELECT 1 AS ID, 'Wireless Mouse' AS Name, 29.99 AS Price, TIMESTAMP '2024-01-15 10:30:00' AS updated_at
-UNION ALL
-SELECT 2 AS ID, 'USB Cable' AS Name, 12.99 AS Price, TIMESTAMP '2024-01-14 14:00:00' AS updated_at
-```
-
-In this case, `_valid_from` will be set to the `updated_at` value from each record, preserving the actual business timeline of when changes occurred.
-
-**Example behavior:**
-
-Let's say you want to create a new table to track product catalog with SCD2. If the table doesn't exist yet, you'll need an initial run with the `--full-refresh` flag:
-
-```bash
-bruin run --full-refresh path/to/your/product_catalog.sql
-```
-
-This initial run creates:
-
-```text
-ID | Name          | Price | _is_current | _valid_from         | _valid_until
-1  | Wireless Mouse| 29.99 | true        | 2024-01-01 10:00:00| 9999-12-31 23:59:59
-2  | USB Cable     | 12.99 | true        | 2024-01-01 10:00:00| 9999-12-31 23:59:59
-3  | Keyboard      | 89.99 | true        | 2024-01-01 10:00:00| 9999-12-31 23:59:59
-```
-
-Now lets say you have new incoming data that updates Wireless Mouse price to 39.99, removes Keyboard from the catalog, and adds a new item Monitor. When you run the asset again:
-
-```bash
-bruin run path/to/your/product_catalog.sql
-```
-
-The table becomes:
-
-```text
-ID | Name          | Price | _is_current | _valid_from         | _valid_until
-1  | Wireless Mouse| 29.99 | false       | 2024-01-01 10:00:00| 2024-01-02 14:30:00
-1  | Wireless Mouse| 39.99 | true        | 2024-01-02 14:30:00| 9999-12-31 23:59:59
-2  | USB Cable     | 12.99 | true        | 2024-01-01 10:00:00| 9999-12-31 23:59:59
-3  | Keyboard      | 89.99 | false       | 2024-01-01 10:00:00| 2024-01-02 14:30:00
-4  | Monitor       | 199.99| true        | 2024-01-02 14:30:00| 9999-12-31 23:59:59
-```
-
-Notice how:
-
-- Wireless Mouse (ID=1) now has two records: the old price (marked as historical) and the new price (current)
-- USB Cable (ID=2) remains unchanged with its original record still current
-- Keyboard (ID=3) is marked as historical since it's no longer in the source data
-- Monitor (ID=4) is added as a new current record
-
-### `scd2_by_time`
-
-The `scd2_by_time` strategy implements [Slowly Changing Dimension Type 2](https://en.wikipedia.org/wiki/Slowly_changing_dimension) logic based on a time-based incremental key. This strategy is ideal when your source data includes timestamps or dates that indicate when records were last modified, and you want to maintain historical versions based on these time changes.
-
-**Requirements:**
-
-- At least one column must be marked as `primary_key: true`
-- An `incremental_key` must be specified that references a column of type `TIMESTAMP` or `DATE`
-- The column names `_valid_from`, `_valid_until`, and `_is_current` are reserved and cannot be used in your column definitions
-
-**How it works:** The strategy tracks changes based on the time values in the `incremental_key` column:
-
-1. When a record has a newer timestamp than existing records, it creates a new version
-2. Previous versions are marked as historical (`_is_current: false`) with their `_valid_until` updated
-3. Records no longer present in the source are marked as historical
-
-**Automatically added columns:**
-
-- `_valid_from`: TIMESTAMP when the record version became active (derived from the `incremental_key`)
-- `_valid_until`: TIMESTAMP when the record version became inactive (set to `TIMESTAMP('9999-12-31')` for current records)
-- `_is_current`: BOOLEAN indicating if this is the current version of the record
-
-`_valid_from` and `_valid_until` are created as timezone-aware timestamps so that both columns represent an unambiguous absolute instant (values are stored in UTC). The exact type depends on the platform: `TIMESTAMP WITH TIME ZONE` / `TIMESTAMPTZ` on DuckDB, MotherDuck, Postgres, Redshift, Athena and Oracle; `TIMESTAMP_TZ` on Snowflake; and BigQuery's / Databricks' `TIMESTAMP` (which is already an absolute-instant type). When the `incremental_key` is a timezone-naive column, its values are interpreted as **UTC** (not the database session timezone), so `_valid_from`/`_valid_until` are deterministic regardless of where the pipeline runs.
-
-MySQL is the one exception: both columns are `DATETIME` (timezone-naive, stored in UTC), because MySQL's timezone-aware `TIMESTAMP` type cannot represent the far-future `9999-12-31` sentinel used for current records.
-
-::: tip Migrating existing tables
-SCD2 tables created before the timezone-aware columns were introduced are upgraded automatically on the next **incremental** run — the existing `_valid_from`/`_valid_until` values are converted to **UTC**, with no `--full-refresh` and no loss of history. This is a temporary migration (added July 2026) that will be removed once existing tables have been upgraded.
-:::
-
-Here's an example of an asset with `scd2_by_time` materialization:
-
-```bruin-sql
-/* @bruin
-name: test.products
-type: bq.sql
-
-materialization:
-  type: table
-  strategy: scd2_by_time
-  incremental_key: dt
-
-columns:
-  - name: product_id
-    type: INTEGER
-    description: "Unique identifier for the product"
-    primary_key: true
-  - name: product_name
-    type: VARCHAR
-    description: "Name of the product"
-  - name: stock
-    type: INTEGER
-    description: "Number of units in stock"
-  - name: dt
-    type: DATE
-    description: "Date when the product was last updated"
-@bruin */
-
-SELECT
-    1 AS product_id,
-    'Laptop' AS product_name,
-    100 AS stock,
-    DATE '2025-04-02' AS dt
-UNION ALL
-SELECT
-    2 AS product_id,
-    'Smartphone' AS product_name,
-    150 AS stock,
-    DATE '2025-04-02' AS dt
-```
-
-**Example behavior:**
-
-Let's say you want to create a new table to track product inventory with SCD2 based on time. If the table doesn't exist yet, you'll need an initial run with the `--full-refresh` flag:
-
-```bash
-bruin run --full-refresh path/to/your/products.sql
-```
-
-This initial run creates:
-
-```text
-product_id | product_name | stock | _is_current | _valid_from         | _valid_until
-1          | Laptop       | 100   | true        | 2025-04-02 00:00:00| 9999-12-31 23:59:59
-2          | Smartphone   | 150   | true        | 2025-04-02 00:00:00| 9999-12-31 23:59:59
-3          | Headphones   | 175   | true        | 2025-04-02 00:00:00| 9999-12-31 23:59:59
-4          | Monitor      | 25    | true        | 2025-04-02 00:00:00| 9999-12-31 23:59:59
-```
-
-Now lets say you have new incoming data with updates: Headphones stock changed from 175 to 900 with a new date (2025-06-02), Monitor is no longer available, and a new product PS5 is added. When you run the asset again:
-
-```bash
-bruin run path/to/your/products.sql
-```
-
-The table becomes:
-
-```text
-product_id | product_name | stock | _is_current | _valid_from         | _valid_until
-1          | Laptop       | 100   | true        | 2025-04-02 00:00:00| 9999-12-31 23:59:59
-2          | Smartphone   | 150   | true        | 2025-04-02 00:00:00| 9999-12-31 23:59:59
-3          | Headphones   | 175   | false       | 2025-04-02 00:00:00| 2025-06-02 00:00:00
-3          | Headphones   | 900   | true        | 2025-06-02 00:00:00| 9999-12-31 23:59:59
-4          | Monitor      | 25    | false       | 2025-04-02 00:00:00| 2025-06-02 00:00:00
-5          | PS5          | 25    | true        | 2025-06-02 00:00:00| 9999-12-31 23:59:59
-```
-
-Notice how:
-
-- Laptop (ID=1) and Smartphone (ID=2) remain unchanged with their original records still current
-- Headphones (ID=3) now has two records: the old stock level (marked as historical) and the new stock level (current) based on the newer date
-- Monitor (ID=4) is marked as historical since it's no longer in the source data
-- PS5 (ID=5) is added as a new current record with the latest date
-
-**Key differences between scd2_by_column and scd2_by_time:**
-
-| Aspect | scd2_by_column | scd2_by_time |
-|--------|----------------|--------------|
-| **Change Detection** | Automatically detects changes in any non-primary key column | Based on time values in the incremental_key column |
-| **_valid_from Value** | Set to `CURRENT_TIMESTAMP()` by default, or uses `incremental_key` value if specified | Always derived from the incremental_key column value |
-| **Use Case** | When you want to track any column changes; optionally use `incremental_key` for business timestamps | When your source data has reliable timestamps indicating when changes happened |
-| **Configuration** | Only requires primary_key columns; `incremental_key` is optional | Requires both primary_key columns and incremental_key |
-
-> [!WARNING]
-> SCD2 materializations are currently only supported for BigQuery, Snowflake, Postgres, Amazon Redshift, MySQL, DuckDB, ClickHouse, Databricks, and Spark.
-
-ClickHouse uses `DateTime64(6, 'UTC')` for `_valid_from` and `_valid_until`, with `2299-12-31 23:59:59` as the current-record sentinel for compatibility with servers that cannot represent year 9999. Both strategies create the destination automatically on the first run; `--full-refresh` replaces all history with the current source snapshot. Incremental SCD2 runs use staged deletes and inserts, so they are not atomic and do not support `cluster` configuration.
-
-When an `incremental_key` is configured, it must have a non-nullable date or timestamp type and contain no NULL values. Nullable incremental-key types are rejected because a NULL `_valid_from` would prevent later time-based updates from being detected.
-
-Use `MergeTree()` (the default) or `ReplicatedMergeTree()` to retain every historical version. Engines such as `ReplacingMergeTree()` can discard history when versions share the same sorting key. Keep the default synchronous lightweight deletes enabled (`lightweight_deletes_sync` on servers that expose this setting) so staging tables remain available until deletion completes.
+`incremental_predicate` is not supported for Python or ingestr assets.
