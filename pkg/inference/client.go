@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand/v2"
 	"net/http"
 	"strconv"
 	"strings"
@@ -16,7 +17,7 @@ import (
 const (
 	defaultMaxOutputTokens = 1024
 	maxResponseBytes       = 1 << 20
-	maxAttempts            = 3
+	maxAttempts            = 10
 	defaultTimeout         = 120 * time.Second
 )
 
@@ -35,17 +36,16 @@ type chatMessage struct {
 }
 
 func (c *Client) do(ctx context.Context, endpoint string, body []byte) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
-	defer cancel()
-
 	httpClient := c.HTTPClient
 	if httpClient == nil {
 		httpClient = &http.Client{Timeout: defaultTimeout}
 	}
 
 	for attempt := range maxAttempts {
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+		attemptCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
+		req, err := http.NewRequestWithContext(attemptCtx, http.MethodPost, endpoint, bytes.NewReader(body))
 		if err != nil {
+			cancel()
 			return nil, errors.New("could not create inference request")
 		}
 		req.Header.Set("Content-Type", "application/json")
@@ -63,14 +63,17 @@ func (c *Client) do(ctx context.Context, endpoint string, body []byte) ([]byte, 
 
 		resp, err := httpClient.Do(req)
 		if err != nil {
-			if ctx.Err() != nil {
-				return nil, ctx.Err()
+			contextErr := attemptCtx.Err()
+			cancel()
+			if contextErr != nil {
+				return nil, contextErr
 			}
 			return nil, errors.New("inference request failed")
 		}
 
 		responseBody, readErr := readBounded(resp.Body)
 		resp.Body.Close()
+		cancel()
 		if readErr != nil {
 			return nil, readErr
 		}
@@ -78,7 +81,7 @@ func (c *Client) do(ctx context.Context, endpoint string, body []byte) ([]byte, 
 			return responseBody, nil
 		}
 		if (resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500) && attempt+1 < maxAttempts {
-			if err := waitForRetry(ctx, retryDelay(resp.Header.Get("Retry-After"), attempt)); err != nil {
+			if err := waitForRetry(ctx, retryDelay(resp.Header, attempt, time.Now())); err != nil {
 				return nil, err
 			}
 			continue
@@ -99,15 +102,46 @@ func readBounded(body io.Reader) ([]byte, error) {
 	return data, nil
 }
 
-func retryDelay(value string, attempt int) time.Duration {
-	const maxDelay = 10 * time.Second
-	if seconds, err := strconv.Atoi(strings.TrimSpace(value)); err == nil && seconds >= 0 {
-		return min(time.Duration(seconds)*time.Second, maxDelay)
+func retryDelay(headers http.Header, attempt int, now time.Time) time.Duration {
+	value := strings.TrimSpace(headers.Get("Retry-After"))
+	if delay, err := time.ParseDuration(value + "s"); err == nil && delay >= 0 {
+		return delay
 	}
 	if when, err := http.ParseTime(value); err == nil {
-		return min(max(time.Until(when), 0), maxDelay)
+		return max(when.Sub(now), 0)
 	}
-	return time.Duration(100*(1<<attempt)) * time.Millisecond
+	if delay, err := time.ParseDuration(strings.TrimSpace(headers.Get("Retry-After-Ms")) + "ms"); err == nil && delay >= 0 {
+		return delay
+	}
+	// Only exhausted quotas should delay a retry. Take the latest reset if
+	// multiple quotas are exhausted; another bucket may still have capacity.
+	var resetDelay time.Duration
+	for _, quota := range []struct{ remaining, reset string }{
+		{"X-Ratelimit-Remaining-Requests", "X-Ratelimit-Reset-Requests"},
+		{"X-Ratelimit-Remaining-Tokens", "X-Ratelimit-Reset-Tokens"},
+		{"X-Ratelimit-Remaining-Project-Tokens", "X-Ratelimit-Reset-Project-Tokens"},
+		{"Anthropic-Ratelimit-Requests-Remaining", "Anthropic-Ratelimit-Requests-Reset"},
+		{"Anthropic-Ratelimit-Input-Tokens-Remaining", "Anthropic-Ratelimit-Input-Tokens-Reset"},
+		{"Anthropic-Ratelimit-Output-Tokens-Remaining", "Anthropic-Ratelimit-Output-Tokens-Reset"},
+		{"Anthropic-Ratelimit-Tokens-Remaining", "Anthropic-Ratelimit-Tokens-Reset"},
+	} {
+		remaining, err := strconv.ParseInt(headers.Get(quota.remaining), 10, 64)
+		if err != nil || remaining > 0 {
+			continue
+		}
+		value := headers.Get(quota.reset)
+		if delay, err := time.ParseDuration(value); err == nil {
+			resetDelay = max(resetDelay, delay)
+		} else if when, err := time.Parse(time.RFC3339, value); err == nil {
+			resetDelay = max(resetDelay, when.Sub(now))
+		}
+	}
+	if resetDelay > 0 {
+		return resetDelay
+	}
+	// Equal jitter avoids synchronized retries while keeping the fallback bounded.
+	delay := min(time.Second<<attempt, time.Minute)
+	return delay/2 + time.Duration(rand.Int64N(int64(delay/2))) //nolint:gosec // Retry jitter does not require cryptographic randomness.
 }
 
 func waitForRetry(ctx context.Context, delay time.Duration) error {

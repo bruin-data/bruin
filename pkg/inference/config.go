@@ -44,7 +44,7 @@ func supportedProvider(provider string) bool {
 }
 
 func readConfig(asset *pipeline.Asset) (*assetConfig, error) {
-	c := &assetConfig{maxRows: 1000, maxTokens: defaultMaxOutputTokens, parallelism: 4, cache: true}
+	c := &assetConfig{maxRows: 1000, maxTokens: defaultMaxOutputTokens, parallelism: 16, cache: true}
 	if _, exists := asset.Parameters["api_key_env"]; exists {
 		return nil, errors.New("api_key_env is not supported; use a Bruin provider connection")
 	}

@@ -287,7 +287,7 @@ func TestExtractParallelismConfig(t *testing.T) {
 	t.Parallel()
 	cfg, err := readConfig(testAsset())
 	require.NoError(t, err)
-	require.Equal(t, 4, cfg.parallelism)
+	require.Equal(t, 16, cfg.parallelism)
 	for _, value := range []any{0, -1, "no", 1.5, true} {
 		asset := testAsset()
 		asset.Parameters["extract_parallelism"] = value
