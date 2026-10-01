@@ -34,6 +34,14 @@ func TestIngestrTemplateAssetsHaveUniqueSourceTables(t *testing.T) {
 			continue
 		}
 
+		// Assets may inherit type and parameters from the pipeline defaults.
+		var pipeline struct {
+			Default ingestrAsset `yaml:"default"`
+		}
+		if content, err := os.ReadFile(filepath.Join(dir.Name(), "pipeline.yml")); err == nil {
+			require.NoError(t, yaml.Unmarshal(content, &pipeline))
+		}
+
 		seen := map[string]string{}
 		err := filepath.WalkDir(dir.Name(), func(path string, d fs.DirEntry, err error) error {
 			if err != nil || d.IsDir() || !strings.HasSuffix(path, ".asset.yml") {
@@ -45,7 +53,7 @@ func TestIngestrTemplateAssetsHaveUniqueSourceTables(t *testing.T) {
 				return err
 			}
 
-			var asset ingestrAsset
+			asset := pipeline.Default
 			if err := yaml.Unmarshal(content, &asset); err != nil || asset.Type != "ingestr" {
 				return nil //nolint:nilerr // non-asset or templated YAML is out of scope here
 			}
