@@ -43,6 +43,26 @@ func WriteYaml(fs afero.Fs, path string, content interface{}) error {
 	return nil
 }
 
+// WriteSecretFile writes a file that may hold credentials, such as .bruin.yml.
+// New files are created owner-only (0600); an existing file keeps its mode.
+func WriteSecretFile(fs afero.Fs, path string, data []byte) error {
+	return afero.WriteFile(fs, path, data, 0o600)
+}
+
+// WriteSecretYaml is WriteYaml for files that may hold credentials.
+func WriteSecretYaml(fs afero.Fs, path string, content interface{}) error {
+	buf, err := yaml.Marshal(content)
+	if err != nil {
+		return errors.Wrapf(err, "failed to marshal object to yaml")
+	}
+
+	if err := WriteSecretFile(fs, path, buf); err != nil {
+		return errors.Wrapf(err, "failed to write YAML file to %s", path)
+	}
+
+	return nil
+}
+
 func ConvertYamlToObject(buf []byte, out interface{}) error {
 	err := yaml.Unmarshal(buf, out)
 	if err != nil {

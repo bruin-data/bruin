@@ -4,6 +4,7 @@ import (
 	"errors"
 	fs2 "io/fs"
 
+	path2 "github.com/bruin-data/bruin/pkg/path"
 	errors2 "github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"gopkg.in/yaml.v3"
@@ -53,7 +54,7 @@ func UpsertDefaultTeam(fs afero.Fs, path, team string) error {
 	if err != nil {
 		return errors2.Wrapf(err, "failed to serialize config")
 	}
-	if err := afero.WriteFile(fs, path, out, 0o644); err != nil {
+	if err := path2.WriteSecretFile(fs, path, out); err != nil {
 		return errors2.Wrapf(err, "failed to write config file %s", path)
 	}
 	return ensureConfigIsInGitignore(fs, path)

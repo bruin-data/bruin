@@ -15,6 +15,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/bruin-data/bruin/templates"
 	tea "github.com/charmbracelet/bubbletea"
@@ -421,10 +422,10 @@ func loadTemplateBruinConfig(templateName string) ([]byte, error) {
 }
 
 // writeFileAtomically replaces path in one step, so a failed write cannot leave
-// a truncated file behind. An existing file keeps its own mode: .bruin.yml holds
-// credentials and may have been tightened to 0600 by hand.
+// a truncated file behind. .bruin.yml holds credentials, so a new file is
+// owner-only; an existing file keeps its own mode.
 func writeFileAtomically(path string, content []byte) error {
-	mode := os.FileMode(0o644)
+	mode := os.FileMode(0o600)
 	if info, err := os.Stat(path); err == nil {
 		mode = info.Mode().Perm()
 	} else if !os.IsNotExist(err) {
@@ -945,7 +946,7 @@ func Init() *cli.Command {
 					return cli.Exit("", 1)
 				}
 
-				if err := os.WriteFile(bruinYmlPath, configBytes, 0o644); err != nil { //nolint:gosec
+				if err := path.WriteSecretFile(afero.NewOsFs(), bruinYmlPath, configBytes); err != nil {
 					errorPrinter.Printf("Could not write .bruin.yml file: %v\n", err)
 					return cli.Exit("", 1)
 				}
@@ -997,7 +998,7 @@ func Init() *cli.Command {
 					return err
 				}
 
-				if err := os.WriteFile(bruinYmlPath, configBytes, 0o644); err != nil { //nolint:gosec
+				if err := path.WriteSecretFile(afero.NewOsFs(), bruinYmlPath, configBytes); err != nil {
 					errorPrinter.Printf("Could not write .bruin.yml file: %v\n", err)
 					return err
 				}

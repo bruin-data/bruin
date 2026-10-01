@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/config"
@@ -67,4 +68,23 @@ func readTestBruinConfig(t *testing.T, path string) config.Config {
 	var cm config.Config
 	require.NoError(t, yaml.Unmarshal(content, &cm))
 	return cm
+}
+
+func TestEnsureAIConnectionsCreatesOwnerOnlyConfig(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == osWindows {
+		t.Skip("file modes are not meaningful on Windows")
+	}
+
+	targetRoot := t.TempDir()
+	_, err := ensureAIConnections(context.Background(), targetRoot, []aiConnectionType{aiConnectionBruinCloud}, aiConnectionOptions{
+		connectionResolver: func(connection aiConnectionType) (bool, error) {
+			return true, nil
+		},
+	})
+	require.NoError(t, err)
+
+	info, err := os.Stat(filepath.Join(targetRoot, ".bruin.yml"))
+	require.NoError(t, err)
+	require.Equal(t, os.FileMode(0o600), info.Mode().Perm())
 }
