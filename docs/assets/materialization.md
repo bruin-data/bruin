@@ -901,6 +901,7 @@ WHERE viewed_at >= '{{ start_timestamp }}'
 **Good to know:**
 
 - Bruin does not deduplicate. Filter the query to only new rows, typically with the [run's date variables](../variables/built-in.md). Running the same window twice inserts the rows twice.
+- The example includes both ends of the window, so successive runs must not share a boundary instant. Bruin's default daily windows end at `23:59:59.999999` and do not overlap. For backfills, end each range just before the next one starts, for example `--end-date "2024-03-30 23:59:59.999999"` followed by `--start-date "2024-03-31"`.
 - If you need reruns to be safe, use `time_interval` or `delete+insert` instead.
 
 #### `delete+insert` {#delete-insert}
