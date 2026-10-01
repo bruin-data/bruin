@@ -1,3 +1,582 @@
+<script setup>
+const materializationFiles = [
+  {
+    path: '.bruin.yml',
+    language: 'yaml',
+    content: `default_environment: default
+environments:
+  default:
+    connections:
+      duckdb:
+        - name: duckdb-default
+          path: shop.db`
+  },
+  {
+    path: 'assets/1_full_rebuilds/customers.sql',
+    language: 'sql',
+    content: `/* @bruin
+
+name: analytics.customers
+type: duckdb.sql
+description: Rebuilt from the query on every run.
+
+depends:
+  - raw.customers
+
+materialization:
+  type: table
+  strategy: create+replace # default for tables
+
+@bruin */
+
+SELECT customer_id, name, email, country
+FROM raw.customers`
+  },
+  {
+    path: 'assets/1_full_rebuilds/order_events.sql',
+    language: 'sql',
+    content: `/* @bruin
+
+name: landing.order_events
+type: duckdb.sql
+description: Empty table that another process loads.
+
+materialization:
+  type: table
+  strategy: ddl
+
+columns:
+  - name: event_id
+    type: INTEGER
+    primary_key: true
+  - name: order_id
+    type: INTEGER
+  - name: event_type
+    type: VARCHAR
+  - name: received_at
+    type: TIMESTAMP
+
+@bruin */`
+  },
+  {
+    path: 'assets/1_full_rebuilds/shop_snapshot.sql',
+    language: 'sql',
+    content: `/* @bruin
+
+name: analytics.shop_snapshot
+type: duckdb.sql
+description: Emptied and refilled; the table is kept.
+
+depends:
+  - raw.customers
+  - raw.orders
+
+materialization:
+  type: table
+  strategy: truncate+insert
+
+@bruin */
+
+SELECT
+    CURRENT_DATE AS snapshot_date,
+    (SELECT COUNT(*) FROM raw.customers) AS customers,
+    (SELECT COUNT(*) FROM raw.orders) AS orders,
+    (SELECT SUM(amount) FROM raw.orders) AS revenue`
+  },
+  {
+    path: 'assets/2_incremental/customer_order_stats.sql',
+    language: 'sql',
+    content: `/* @bruin
+
+name: analytics.customer_order_stats
+type: duckdb.sql
+description: Replaces rows for customers who ordered.
+
+depends:
+  - raw.orders
+
+materialization:
+  type: table
+  strategy: delete+insert
+  incremental_key: customer_id
+
+@bruin */
+
+SELECT
+    customer_id,
+    COUNT(*) AS orders,
+    SUM(amount) AS lifetime_revenue
+FROM raw.orders
+WHERE customer_id IN (
+    SELECT customer_id
+    FROM raw.orders
+    WHERE order_date
+        BETWEEN '{{ start_date }}' AND '{{ end_date }}'
+)
+GROUP BY customer_id`
+  },
+  {
+    path: 'assets/2_incremental/customer_profiles.sql',
+    language: 'sql',
+    content: `/* @bruin
+
+name: analytics.customer_profiles
+type: duckdb.sql
+description: Upserts customers by primary key.
+
+depends:
+  - raw.customers
+
+materialization:
+  type: table
+  strategy: merge
+
+columns:
+  - name: customer_id
+    type: INTEGER
+    primary_key: true
+  - name: email
+    type: VARCHAR
+    update_on_merge: true
+  - name: country
+    type: VARCHAR
+    update_on_merge: true
+  - name: last_updated_at
+    type: TIMESTAMP
+    merge_sql: >-
+      GREATEST(target.last_updated_at,
+               source.last_updated_at)
+
+@bruin */
+
+SELECT
+    customer_id,
+    email,
+    country,
+    updated_at AS last_updated_at
+FROM raw.customers`
+  },
+  {
+    path: 'assets/2_incremental/daily_revenue.sql',
+    language: 'sql',
+    content: `/* @bruin
+
+name: analytics.daily_revenue
+type: duckdb.sql
+description: Replaces the days in the run's window.
+
+depends:
+  - raw.orders
+
+materialization:
+  type: table
+  strategy: time_interval
+  incremental_key: order_date
+  time_granularity: date
+
+@bruin */
+
+SELECT
+    order_date,
+    COUNT(*) AS orders,
+    SUM(amount) AS revenue
+FROM raw.orders
+WHERE order_date
+    BETWEEN '{{ start_date }}' AND '{{ end_date }}'
+GROUP BY order_date`
+  },
+  {
+    path: 'assets/2_incremental/page_views.sql',
+    language: 'sql',
+    content: `/* @bruin
+
+name: analytics.page_views
+type: duckdb.sql
+description: Appends the events from the run's window.
+
+depends:
+  - raw.page_views
+
+materialization:
+  type: table
+  strategy: append
+
+@bruin */
+
+SELECT event_id, customer_id, page, viewed_at
+FROM raw.page_views
+WHERE viewed_at
+    BETWEEN '{{ start_datetime }}' AND '{{ end_datetime }}'`
+  },
+  {
+    path: 'assets/3_history/customers_history.sql',
+    language: 'sql',
+    content: `/* @bruin
+
+name: dim.customers_history
+type: duckdb.sql
+description: New version when updated_at moves forward.
+
+depends:
+  - raw.customers
+
+materialization:
+  type: table
+  strategy: scd2_by_time
+  incremental_key: updated_at
+
+columns:
+  - name: customer_id
+    type: INTEGER
+    primary_key: true
+  - name: email
+    type: VARCHAR
+  - name: country
+    type: VARCHAR
+  - name: updated_at
+    type: TIMESTAMP
+
+@bruin */
+
+SELECT customer_id, email, country, updated_at
+FROM raw.customers`
+  },
+  {
+    path: 'assets/3_history/products_history.sql',
+    language: 'sql',
+    content: `/* @bruin
+
+name: dim.products_history
+type: duckdb.sql
+description: New version when any column changes.
+
+depends:
+  - raw.products
+
+materialization:
+  type: table
+  strategy: scd2_by_column
+
+columns:
+  - name: product_id
+    type: INTEGER
+    primary_key: true
+  - name: product_name
+    type: VARCHAR
+  - name: price
+    type: DOUBLE
+  - name: stock
+    type: INTEGER
+
+@bruin */
+
+SELECT product_id, product_name, price, stock
+FROM raw.products`
+  },
+  {
+    path: 'assets/4_data_vault/hub_customer.sql',
+    language: 'sql',
+    content: `/* @bruin
+
+name: rdv.hub_customer
+type: duckdb.sql
+description: One row per customer business key.
+
+depends:
+  - raw.customers
+
+materialization:
+  type: table
+  strategy: datavault_hub
+
+columns:
+  - name: customer_hk
+    type: VARCHAR
+    meta:
+      datavault_role: hash_key
+  - name: customer_id
+    type: VARCHAR
+    meta:
+      datavault_role: business_key
+  - name: load_dts
+    type: TIMESTAMP
+    meta:
+      datavault_role: load_datetime
+  - name: record_source
+    type: VARCHAR
+    meta:
+      datavault_role: record_source
+
+@bruin */
+
+SELECT
+    md5(customer_id::VARCHAR) AS customer_hk,
+    customer_id::VARCHAR AS customer_id,
+    updated_at AS load_dts,
+    'raw.customers' AS record_source
+FROM raw.customers`
+  },
+  {
+    path: 'assets/4_data_vault/link_customer_order.sql',
+    language: 'sql',
+    content: `/* @bruin
+
+name: rdv.link_customer_order
+type: duckdb.sql
+description: One row per customer-order pair.
+
+depends:
+  - raw.orders
+
+materialization:
+  type: table
+  strategy: datavault_link
+
+columns:
+  - name: customer_order_hk
+    type: VARCHAR
+    meta:
+      datavault_role: link_hash_key
+  - name: customer_hk
+    type: VARCHAR
+    meta:
+      datavault_role: hub_hash_key
+  - name: order_hk
+    type: VARCHAR
+    meta:
+      datavault_role: hub_hash_key
+  - name: load_dts
+    type: TIMESTAMP
+    meta:
+      datavault_role: load_datetime
+  - name: record_source
+    type: VARCHAR
+    meta:
+      datavault_role: record_source
+
+@bruin */
+
+SELECT
+    md5(concat_ws('|', customer_id, order_id))
+        AS customer_order_hk,
+    md5(customer_id::VARCHAR) AS customer_hk,
+    md5(order_id::VARCHAR) AS order_hk,
+    CAST(order_date AS TIMESTAMP) AS load_dts,
+    'raw.orders' AS record_source
+FROM raw.orders`
+  },
+  {
+    path: 'assets/4_data_vault/sat_customer_details.sql',
+    language: 'sql',
+    content: `/* @bruin
+
+name: rdv.sat_customer_details
+type: duckdb.sql
+description: History of each customer's attributes.
+
+depends:
+  - raw.customers
+
+materialization:
+  type: table
+  strategy: datavault_satellite
+
+columns:
+  - name: customer_hk
+    type: VARCHAR
+    meta:
+      datavault_role: parent_hash_key
+  - name: hashdiff
+    type: VARCHAR
+    meta:
+      datavault_role: hashdiff
+  - name: load_dts
+    type: TIMESTAMP
+    meta:
+      datavault_role: load_datetime
+  - name: record_source
+    type: VARCHAR
+    meta:
+      datavault_role: record_source
+  - name: customer_name
+    type: VARCHAR
+  - name: email
+    type: VARCHAR
+  - name: country
+    type: VARCHAR
+
+@bruin */
+
+SELECT
+    md5(customer_id::VARCHAR) AS customer_hk,
+    md5(concat_ws('|', name, email, country)) AS hashdiff,
+    updated_at AS load_dts,
+    'raw.customers' AS record_source,
+    name AS customer_name,
+    email,
+    country
+FROM raw.customers`
+  },
+  {
+    path: 'assets/5_views/customer_orders.sql',
+    language: 'sql',
+    content: `/* @bruin
+
+name: analytics.customer_orders
+type: duckdb.sql
+description: A view; no data is stored.
+
+depends:
+  - analytics.customers
+  - raw.orders
+
+materialization:
+  type: view
+
+@bruin */
+
+SELECT
+    c.customer_id,
+    c.name,
+    o.order_id,
+    o.order_date,
+    o.amount
+FROM analytics.customers AS c
+JOIN raw.orders AS o USING (customer_id)`
+  },
+  {
+    path: 'assets/raw/customers.asset.yml',
+    language: 'yaml',
+    content: `name: raw.customers
+type: duckdb.seed
+
+parameters:
+  path: customers.csv
+
+columns:
+  - name: customer_id
+    type: integer
+  - name: name
+    type: varchar
+  - name: email
+    type: varchar
+  - name: country
+    type: varchar
+  - name: updated_at
+    type: timestamp`
+  },
+  {
+    path: 'assets/raw/customers.csv',
+    language: 'text',
+    content: `customer_id,name,email,country,updated_at
+1,Ada Lovelace,ada@example.com,UK,2024-06-01 09:00:00
+2,Alan Turing,alan@example.com,UK,2024-06-01 10:30:00
+3,Grace Hopper,grace@example.com,US,2024-06-02 08:15:00
+4,Edsger Dijkstra,edsger@example.com,NL,2024-06-03 14:45:00`
+  },
+  {
+    path: 'assets/raw/orders.asset.yml',
+    language: 'yaml',
+    content: `name: raw.orders
+type: duckdb.seed
+
+parameters:
+  path: orders.csv
+
+columns:
+  - name: order_id
+    type: integer
+  - name: customer_id
+    type: integer
+  - name: order_date
+    type: date
+  - name: amount
+    type: double
+  - name: status
+    type: varchar`
+  },
+  {
+    path: 'assets/raw/orders.csv',
+    language: 'text',
+    content: `order_id,customer_id,order_date,amount,status
+101,1,2024-06-01,120.00,shipped
+102,2,2024-06-01,75.50,shipped
+103,1,2024-06-02,42.00,pending
+104,3,2024-06-02,310.25,shipped
+105,4,2024-06-03,18.99,cancelled
+106,3,2024-06-03,99.00,pending`
+  },
+  {
+    path: 'assets/raw/page_views.asset.yml',
+    language: 'yaml',
+    content: `name: raw.page_views
+type: duckdb.seed
+
+parameters:
+  path: page_views.csv
+
+columns:
+  - name: event_id
+    type: integer
+  - name: customer_id
+    type: integer
+  - name: page
+    type: varchar
+  - name: viewed_at
+    type: timestamp`
+  },
+  {
+    path: 'assets/raw/page_views.csv',
+    language: 'text',
+    content: `event_id,customer_id,page,viewed_at
+1,1,/home,2024-06-01 09:01:00
+2,1,/products/42,2024-06-01 09:03:10
+3,2,/home,2024-06-02 11:20:00
+4,3,/checkout,2024-06-02 18:45:30
+5,4,/home,2024-06-03 07:12:00`
+  },
+  {
+    path: 'assets/raw/products.asset.yml',
+    language: 'yaml',
+    content: `name: raw.products
+type: duckdb.seed
+
+parameters:
+  path: products.csv
+
+columns:
+  - name: product_id
+    type: integer
+  - name: product_name
+    type: varchar
+  - name: price
+    type: double
+  - name: stock
+    type: integer
+  - name: updated_at
+    type: date`
+  },
+  {
+    path: 'assets/raw/products.csv',
+    language: 'text',
+    content: `product_id,product_name,price,stock,updated_at
+1,Wireless Mouse,29.99,120,2024-06-01
+2,USB Cable,12.99,300,2024-06-01
+3,Keyboard,89.99,45,2024-06-02`
+  },
+  {
+    path: 'pipeline.yml',
+    language: 'yaml',
+    content: `name: materialization_examples
+schedule: daily
+start_date: "2024-06-01"
+
+default_connections:
+  duckdb: duckdb-default`
+  }
+]
+</script>
+
 # Materialization
 
 Materialization turns a plain `SELECT` query into a table or view. You write the query, and Bruin generates the `CREATE`, `INSERT`, `DELETE`, or `MERGE` statements needed to store its result in the destination.
@@ -70,6 +649,34 @@ Not every platform supports every strategy. Check the [platform support matrix](
 | Create an empty table that something else fills | `ddl` |
 | Expose the query without storing data | `type: view` |
 
+### Explore an example project
+
+The project below has one asset for each strategy, built on DuckDB around a small shop dataset. Click through the files to compare their `materialization` blocks.
+
+<CodeViewer :files="materializationFiles" title="materialization-examples/" default-file="assets/1_full_rebuilds/customers.sql" :collapsed-folders="['assets/raw']" />
+
+| Folder | What it shows |
+| --- | --- |
+| `assets/raw/` | CSV [seed](./seed.md) assets that load the source tables. |
+| `assets/1_full_rebuilds/` | `create+replace`, `truncate+insert`, and `ddl`. |
+| `assets/2_incremental/` | `append`, `delete+insert`, `merge`, and `time_interval`. |
+| `assets/3_history/` | `scd2_by_column` and `scd2_by_time`. |
+| `assets/4_data_vault/` | A hub, a link, and a satellite. |
+| `assets/5_views/` | A `type: view` asset. |
+
+To run it, copy the files into a new folder, run `git init` there, and load the first two days with a full refresh. Then run the third day incrementally:
+
+```bash
+# Days 1 and 2: create every table
+bruin run --full-refresh \
+  --start-date 2024-06-01 --end-date "2024-06-02 23:59:59" .
+
+# Day 3: load incrementally
+bruin run --start-date 2024-06-03 --end-date "2024-06-03 23:59:59" .
+```
+
+The second run adds June 3 to the incremental tables without touching earlier days. To watch the SCD2 tables add a new version, change a price in `products.csv`, or a country together with its `updated_at` in `customers.csv`, and run again.
+
 ## Configuration reference
 
 All materialization settings live under the top-level `materialization` key of the asset definition:
@@ -125,16 +732,20 @@ Defaults only fill in fields an asset leaves empty, so each asset can still over
 | Platform | `partition_by` | `cluster_by` |
 | --- | --- | --- |
 | BigQuery | `PARTITION BY` | `CLUSTER BY` |
-| Snowflake | Ignored | `CLUSTER BY` |
-| Databricks | `ddl` only | `ddl` only; `create+replace` rejects it |
+| Snowflake | — | `CLUSTER BY` |
+| Databricks | `ddl` only | `ddl` only |
 | Spark | `PARTITIONED BY` | `WRITE ORDERED BY` |
-| Athena (Iceberg) | Iceberg partitioning | Ignored |
-| Trino | `partitioning` table property | Ignored |
-| ClickHouse | `PARTITION BY` expression, for example `toYYYYMM(created_at)` | Used as the `ORDER BY` sorting key. See [ClickHouse table options](#clickhouse-table-options). |
-| StarRocks | `PARTITION BY` | `DISTRIBUTED BY HASH` columns |
-| MSSQL, Synapse, Vertica | Ignored | Rejected with an error |
-| Doris | Ignored (use the `doris` block) | Ignored (use `doris.distributed_by`) |
-| PostgreSQL, Redshift, DuckDB, MySQL, Oracle, Dremio, Sail, Fabric | Ignored | Ignored |
+| Athena | Iceberg partitioning | — |
+| Trino | `partitioning` property | — |
+| ClickHouse | `PARTITION BY` | Sorting key |
+| StarRocks | `PARTITION BY` | `DISTRIBUTED BY HASH` |
+| MSSQL, Synapse, Vertica | — | Error |
+
+— means the key is ignored. Both keys are also ignored on PostgreSQL, Redshift, DuckDB, MySQL, Oracle, Dremio, Sail, Fabric, and Doris.
+
+- **Databricks:** `create+replace` fails if `cluster_by` is set.
+- **ClickHouse:** `partition_by` accepts an expression such as `toYYYYMM(created_at)`, and `cluster_by` becomes the `ORDER BY` sorting key. See [ClickHouse table options](#clickhouse-table-options).
+- **Doris:** set the layout in the `doris` block, for example `doris.distributed_by`.
 
 BigQuery-specific options such as `require_partition_filter` live in a separate `bigquery` block. See [BigQuery table options](../platforms/bigquery.md#bigquery-table-options).
 

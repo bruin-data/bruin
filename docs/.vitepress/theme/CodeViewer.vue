@@ -70,6 +70,10 @@ const props = defineProps({
   collapsedFolders: {
     type: Array,
     default: () => []
+  },
+  defaultFile: {
+    type: String,
+    default: ''
   }
 })
 
@@ -83,7 +87,11 @@ function firstFilePath(files) {
   return sorted[0]?.path || ''
 }
 
-const selectedPath = ref(firstFilePath(props.files))
+const selectedPath = ref(
+  props.files.some(f => f.path === props.defaultFile)
+    ? props.defaultFile
+    : firstFilePath(props.files)
+)
 const copied = ref(false)
 
 function buildTree(files) {
