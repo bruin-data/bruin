@@ -104,7 +104,22 @@ unit_tests:
     inputs:
       - asset: quickbooks_raw.accounts
         rows:
-          - {id: "1", name: "Checking", classification: Asset, parent_ref: null}
+          - id: "1"
+            name: "Checking"
+            classification: Asset
+            fully_qualified_name: null
+            account_type: null
+            account_sub_type: null
+            acct_num: null
+            description: null
+            parent_ref: null
+            sub_account: null
+            active: null
+            current_balance: null
+            current_balance_with_sub_accounts: null
+            currency_ref: null
+            meta_data: null
+            lastupdatedtime: null
           - {id: "2", name: "Subscription Revenue", classification: Revenue}
           - {id: "3", name: "AWS", classification: Expense, sub_account: true, parent_ref: {value: "9", name: "Hosting"}}
           - {id: "4", name: "SAFE Investments", classification: Equity}

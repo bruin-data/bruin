@@ -122,7 +122,21 @@ unit_tests:
     inputs:
       - asset: quickbooks_raw.invoices
         rows:
-          - {id: "paid", total_amt: 500, balance: 0, customer_ref: {value: "c1"}, txn_tax_detail: {TotalTax: 40}}
+          - id: "paid"
+            total_amt: 500
+            balance: 0
+            customer_ref: {value: "c1"}
+            txn_tax_detail: {TotalTax: 40}
+            doc_number: null
+            txn_date: null
+            due_date: null
+            sales_term_ref: null
+            currency_ref: null
+            customer_memo: null
+            private_note: null
+            email_status: null
+            meta_data: null
+            lastupdatedtime: null
           - {id: "partial", total_amt: 500, balance: 200}
           - {id: "open", total_amt: 500, balance: 500}
           - {id: "void", total_amt: 0, balance: 0}

@@ -196,6 +196,7 @@ unit_tests:
             account_ref: {value: "card", name: "Brex Card"}
             entity_ref: {value: "v1", name: "Figma", type: "Vendor"}
             currency_ref: {value: "USD"}
+            private_note: null
             line:
               - {Id: "1", Amount: 45.5, DetailType: AccountBasedExpenseLineDetail, AccountBasedExpenseLineDetail: {AccountRef: {value: "software"}}}
               - {Amount: 10, DetailType: SubTotalLineDetail, SubTotalLineDetail: {}}
@@ -235,6 +236,8 @@ unit_tests:
             txn_date: "2026-04-01"
             vendor_ref: {value: "v2", name: "Pilot"}
             ap_account_ref: {value: "ap", name: "Accounts Payable (A/P)"}
+            currency_ref: null
+            private_note: null
             line:
               - {Id: "1", Amount: 900, DetailType: AccountBasedExpenseLineDetail, AccountBasedExpenseLineDetail: {AccountRef: {value: "acct"}}}
       - asset: quickbooks_stage.accounts
