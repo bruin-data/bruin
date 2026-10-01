@@ -32,6 +32,7 @@ LINT_TIMEOUT ?= 10m
 LINT_BUILD_TAGS ?= no_duckdb_arrow
 LINT_FAST_LINTERS ?= errcheck,govet,ineffassign
 TEST_CONCURRENCY ?= 4
+TEST_FLAGS ?=
 GO_FORMAT_PATHS := cmd pkg semantic-engine integration-tests/integration_test.go integration-tests/backfill_test.go main.go
 LINT_MODULES := . $(patsubst %/go.mod,%,$(filter-out go.mod,$(shell git ls-files '*go.mod')))
 
@@ -135,7 +136,7 @@ test-unit:
 test-full:
 	@echo "$(OK_COLOR)==> Running the unit tests (full)$(NO_COLOR)"
 	@$(MAKE) rustsqlparser-lib
-	@env SF_DISABLE_MINICORE=true go test -tags="no_duckdb_arrow" -race -p "$(TEST_CONCURRENCY)" -vet=off -timeout 10m ./cmd/... ./pkg/... ./templates/...
+	@env SF_DISABLE_MINICORE=true go test $(TEST_FLAGS) -tags="no_duckdb_arrow" -race -p "$(TEST_CONCURRENCY)" -vet=off -timeout 10m ./cmd/... ./pkg/... ./templates/...
 	@echo "$(OK_COLOR)==> Running the semantic-engine module tests with race detection$(NO_COLOR)"
 	@cd semantic-engine && env SF_DISABLE_MINICORE=true go test -race -p "$(TEST_CONCURRENCY)" -timeout 10m ./...
 

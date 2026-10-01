@@ -33,6 +33,7 @@ env:
   DOCKER_BUILDKIT: 1
   REGISTRY: ghcr.io
   IMAGE_NAME: bruin-data/bruin
+  CLOUDX_CACHE_TRIAL: improved-pair-3
 jobs:
   test:
     strategy:
@@ -44,11 +45,16 @@ jobs:
         with:
           fetch-depth: 1
           fetch-tags: true
-      - name: Setup Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+      - name: Read Go version
+        id: go-version
+        shell: bash
+        run: echo "version=$(awk '/^go / {print $2}' go.mod)" >> "$GITHUB_OUTPUT"
+      - name: Setup Go with CloudX cache
+        uses: ./.github/actions/setup-go
         with:
-          go-version-file: 'go.mod'
-          cache-dependency-path: "go.sum"
+          go-version: ${{ steps.go-version.outputs.version }}
+          cache-key-prefix: ${{ env.CLOUDX_CACHE_TRIAL }}-${{ github.job }}-${{ matrix.platform }}
+          cache-dependency-path: '**/go.sum'
       - name: Cache Rust artifacts
         id: rust-cache
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
@@ -67,14 +73,34 @@ jobs:
       - name: Setup Rust
         if: steps.rust-cache.outputs.cache-hit != 'true'
         uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
-      - name: Run full test suite
+      - name: Cache embedded Python runtime
+        if: runner.os == 'Linux'
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          # Cache only the stable parser runtimes, never randomized test dirs.
+          # Renderer source is content-hashed and extracted separately by Bruin.
+          path: |
+            /tmp/bruin-cli-embedded-cached-python
+            /tmp/bruin-cli-embedded-cached-sqlglot-lib
+            /tmp/bruin-cli-embedded_0-python
+            /tmp/bruin-cli-embedded_0-sqlglot-lib
+          key: embedded-python-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.sum', 'internal/data/**') }}
+      - name: Run race-enabled unit tests
         shell: bash
         run: |
           # Race-enabled Windows binaries need the matching MinGW runtime DLLs.
           # Installer tests inject a missing shell, so the native fallback is
           # still covered without depending on this PATH.
           [[ "${{ runner.os }}" != 'Windows' ]] || export PATH="/c/mingw64/bin:$PATH"
-          make test-full
+          if [[ "${{ runner.os }}" == 'Linux' ]]; then
+            # The non-short cmd suite runs in end2end below. Keep Windows'
+            # existing full coverage while separating Linux CLI acceptance work.
+            # CI does not attach a debugger; omit DWARF to reduce linking work.
+            # Go stack traces and race detection remain enabled.
+            make test-full TEST_FLAGS='-short -ldflags=-w'
+          else
+            make test-full
+          fi
   end2end:
     strategy:
       matrix:
@@ -88,11 +114,16 @@ jobs:
         with:
           fetch-depth: 1
           fetch-tags: true
-      - name: Setup Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+      - name: Read Go version
+        id: go-version
+        shell: bash
+        run: echo "version=$(awk '/^go / {print $2}' go.mod)" >> "$GITHUB_OUTPUT"
+      - name: Setup Go with CloudX cache
+        uses: ./.github/actions/setup-go
         with:
-          go-version-file: 'go.mod'
-          cache-dependency-path: "go.sum"
+          go-version: ${{ steps.go-version.outputs.version }}
+          cache-key-prefix: ${{ env.CLOUDX_CACHE_TRIAL }}-${{ github.job }}-${{ matrix.platform }}
+          cache-dependency-path: '**/go.sum'
       - name: Cache Rust artifacts
         id: rust-cache
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
@@ -130,6 +161,8 @@ jobs:
         run: make integration-test
       - name: Run MSSQL developer environment integration test
         run: make integration-test-mssql
+      - name: Run full CLI test suite including database acceptance tests
+        run: env SF_DISABLE_MINICORE=true go test -tags=no_duckdb_arrow -race -p 4 -vet=off -timeout 10m ./cmd/...
   dockerBuild:
     # Depot build for pushes and internally-created PRs. Fork PRs cannot
     # authenticate with Depot, so they are handled by dockerBuildFork instead.
@@ -201,10 +234,16 @@ jobs:
     runs-on: depot-ubuntu-latest-8
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+      - name: Read Go version
+        id: go-version
+        shell: bash
+        run: echo "version=$(awk '/^go / {print $2}' go.mod)" >> "$GITHUB_OUTPUT"
+      - name: Setup Go with CloudX cache
+        uses: ./.github/actions/setup-go
         with:
-          go-version-file: 'go.mod'
-          cache-dependency-path: "go.sum"
+          go-version: ${{ steps.go-version.outputs.version }}
+          cache-key-prefix: ${{ env.CLOUDX_CACHE_TRIAL }}-${{ github.job }}
+          cache-dependency-path: '**/go.sum'
       - name: Cache golangci-lint analysis
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
