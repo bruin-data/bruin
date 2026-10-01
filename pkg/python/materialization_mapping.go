@@ -112,11 +112,6 @@ var ReverseETLIngestrDestinations = map[string][]string{
 	"salesforce": {"merge", "update", "append", "delete", "replace"},
 }
 
-// reverseETLTableStrategies narrows a destination's strategies for tables that take only one.
-var reverseETLTableStrategies = map[string]map[string][]string{
-	"clevertap": {"profiles": {"merge"}, "profile": {"merge"}, "events": {"append"}, "event": {"append"}},
-}
-
 // IsIngestrStrategySupported checks if a given strategy string is supported by ingestr.
 func IsIngestrStrategySupported(strategy string) bool {
 	for _, s := range SupportedIngestrStrategies {
@@ -141,25 +136,8 @@ func IsReverseETLIngestrDestination(destination string) bool {
 	return ok
 }
 
-// ReverseETLStrategies returns the strategies a reverse-ETL destination accepts for the table.
-func ReverseETLStrategies(destination, table string) []string {
-	if s, ok := reverseETLTableStrategies[destination][reverseETLObject(table)]; ok {
-		return s
-	}
-	return ReverseETLIngestrDestinations[destination]
-}
-
-func ReverseETLDestinationSupportsStrategy(destination, table, strategy string) bool {
-	return slices.Contains(ReverseETLStrategies(destination, table), strategy)
-}
-
-// reverseETLObject is the object a destination table names: "events?ts=time" -> "events".
-func reverseETLObject(table string) string {
-	table, _, _ = strings.Cut(table, "?")
-	if i := strings.LastIndex(table, "."); i >= 0 {
-		table = table[i+1:]
-	}
-	return strings.ToLower(strings.TrimSpace(table))
+func ReverseETLDestinationSupportsStrategy(destination, strategy string) bool {
+	return slices.Contains(ReverseETLIngestrDestinations[destination], strategy)
 }
 
 // GetSupportedIngestrStrategiesString returns a comma-separated string of supported ingestr strategies.
