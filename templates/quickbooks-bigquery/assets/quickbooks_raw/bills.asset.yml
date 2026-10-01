@@ -1,0 +1,134 @@
+name: quickbooks_raw.bills
+type: ingestr
+
+description: >
+  Raw QuickBooks Online Bill records (Accounting API v3) loaded into BigQuery
+  by ingestr. A bill is a vendor invoice recorded in accounts payable and paid
+  later with a bill payment. Each run fetches records whose
+  `MetaData.LastUpdatedTime` falls inside the run window and merges them on
+  `id`, so edits are picked up by the run that covers them. Records deleted in
+  QuickBooks are not removed from this table. `balance` is the current open
+  amount at the time of the last load, so it drops as bill payments are
+  applied and the bill reappears in the run that covers the payment.
+
+materialization:
+  type: table
+  strategy: merge
+
+parameters:
+  source_table: bills
+  enforce_schema: true
+
+tags:
+  - quickbooks_raw
+  - quickbooks
+  - accounting
+  - bills
+
+columns:
+  - name: id
+    type: varchar
+    description: QuickBooks bill identifier, unique within the company file.
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: lastupdatedtime
+    type: timestamp
+    description: >
+      `MetaData.LastUpdatedTime`, when the record was last modified in
+      QuickBooks. The source selects each run's records by it.
+    checks:
+      - name: not_null
+  - name: doc_number
+    type: varchar
+    description: The vendor's invoice or reference number for the bill.
+  - name: txn_date
+    type: date
+    description: Date the bill was issued.
+    checks:
+      - name: not_null
+  - name: due_date
+    type: date
+    description: Date the bill payment is due.
+  - name: vendor_ref
+    type: json
+    description: >
+      Reference `{value, name}` where `value` is the QuickBooks `id` of the
+      billing vendor (Vendor).
+    checks:
+      - name: not_null
+  - name: ap_account_ref
+    type: json
+    description: >
+      Reference `{value, name}` where `value` is the QuickBooks `id` of the
+      accounts payable account (Account) the bill is posted to.
+  - name: sales_term_ref
+    type: json
+    description: >
+      Reference `{value, name}` where `value` is the QuickBooks `id` of the
+      related payment term (Term).
+  - name: total_amt
+    type: double
+    description: Total bill amount including tax.
+    checks:
+      - name: not_null
+      - name: non_negative
+  - name: balance
+    type: double
+    description: Current open amount still owed on the bill.
+    checks:
+      - name: non_negative
+  - name: currency_ref
+    type: json
+    description: >
+      Reference `{value, name}` where `value` is the QuickBooks `id` of the
+      related currency.
+  - name: line
+    type: json
+    description: >
+      Array of bill lines. `AccountBasedExpenseLineDetail` lines carry the
+      expense `AccountRef`, and `ItemBasedExpenseLineDetail` lines carry an
+      `ItemRef`; both can carry `CustomerRef` and `BillableStatus` for
+      rebillable costs.
+  - name: linked_txn
+    type: json
+    description: >
+      Array of transactions linked to the bill, such as bill payments and
+      purchase orders, each with `TxnId` and `TxnType`.
+  - name: txn_tax_detail
+    type: json
+    description: >
+      Transaction-level tax detail, including `TotalTax` and per-rate tax
+      lines.
+  - name: private_note
+    type: varchar
+    description: Internal memo on the bill.
+  - name: department_ref
+    type: json
+    description: >
+      Reference `{value, name}` where `value` is the QuickBooks `id` of the
+      related department or location (Department).
+  - name: vendor_addr
+    type: json
+    description: Vendor address printed on the bill.
+  - name: custom_field
+    type: json
+    description: Array of custom field definitions and values set on the bill.
+  - name: meta_data
+    type: json
+    description: >
+      QuickBooks `MetaData` object holding `CreateTime` and `LastUpdatedTime`.
+  - name: sync_token
+    type: varchar
+    description: >
+      QuickBooks optimistic-concurrency version number; increments on every
+      update.
+  - name: domain
+    type: varchar
+    description: QuickBooks API domain, always `QBO`.
+  - name: sparse
+    type: boolean
+    description: >
+      Whether the API returned a sparse object containing only a subset of
+      fields.

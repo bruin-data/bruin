@@ -217,7 +217,7 @@ An Iceberg connection is a **catalog** (where table metadata lives) plus **stora
   <a class="template-card" href="./templates-docs/quickbooks-bigquery-README.html">
     <span class="template-card__category">Accounting source</span>
     <strong>quickbooks-bigquery</strong>
-    <span>Loads QuickBooks Online customers, invoices, payments, vendors, and the chart of accounts into BigQuery with documented, checked raw tables.</span>
+    <span>Loads QuickBooks Online customers, vendors, accounts, invoices, payments, purchases, and bills into BigQuery and cleans them into documented, checked staging tables.</span>
     <span class="template-card__tags"><code>QuickBooks</code><code>BigQuery</code><code>ingestr</code></span>
   </a>
   <a class="template-card" href="./templates-docs/posthog-bigquery-README.html">

@@ -527,10 +527,21 @@ func TestQuickBooksBigQueryStarterTemplateHasFocusedAssetSet(t *testing.T) {
 
 	expectedAssets := []string{
 		"quickbooks_raw/accounts.asset.yml",
+		"quickbooks_raw/bills.asset.yml",
 		"quickbooks_raw/customers.asset.yml",
 		"quickbooks_raw/invoices.asset.yml",
 		"quickbooks_raw/payments.asset.yml",
+		"quickbooks_raw/purchases.asset.yml",
 		"quickbooks_raw/vendors.asset.yml",
+		"quickbooks_stage/accounts.sql",
+		"quickbooks_stage/bills.sql",
+		"quickbooks_stage/customers.sql",
+		"quickbooks_stage/expense_lines.sql",
+		"quickbooks_stage/invoice_lines.sql",
+		"quickbooks_stage/invoices.sql",
+		"quickbooks_stage/payment_applications.sql",
+		"quickbooks_stage/payments.sql",
+		"quickbooks_stage/vendors.sql",
 	}
 
 	var actualAssets []string
