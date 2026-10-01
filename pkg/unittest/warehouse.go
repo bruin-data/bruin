@@ -172,7 +172,6 @@ func fixtureSelect(input pipeline.UnitTestInput, schema []pipeline.Column, diale
 	}
 	cols := collectColumns(input.Rows)
 	declared := declaredTypes(schema)
-	cols = appendUnlistedDeclared(cols, schema)
 
 	// Column identifiers are emitted unquoted so they case-fold the same way the
 	// asset query's (conventionally unquoted) references do. Quoting would pin a
@@ -184,7 +183,7 @@ func fixtureSelect(input pipeline.UnitTestInput, schema []pipeline.Column, diale
 			lit := sqlLiteral(row[c])
 			switch {
 			case row[c] != nil && isBigQueryJSON(dialect, declared[c]):
-				lit = "PARSE_JSON(" + lit + ")"
+				lit = "PARSE_JSON(" + bigQueryStringLiteral(jsonText(row[c])) + ")"
 				if i == 0 {
 					lit += " AS " + c
 				}
@@ -260,28 +259,28 @@ func declaredTypes(schema []pipeline.Column) map[string]string {
 	return out
 }
 
-// appendUnlistedDeclared adds the declared columns no fixture row sets, so they
-// read as typed NULLs instead of failing the query that selects them.
-func appendUnlistedDeclared(cols []string, schema []pipeline.Column) []string {
-	listed := make(map[string]struct{}, len(cols))
-	for _, c := range cols {
-		listed[strings.ToLower(c)] = struct{}{}
-	}
-	for _, c := range schema {
-		if c.Name == "" {
-			continue
-		}
-		if _, ok := listed[strings.ToLower(c.Name)]; ok {
-			continue
-		}
-		listed[strings.ToLower(c.Name)] = struct{}{}
-		cols = append(cols, c.Name)
-	}
-	return cols
-}
-
 func isBigQueryJSON(dialect, typ string) bool {
 	return dialect == "bigquery" && strings.EqualFold(typ, "JSON")
+}
+
+// jsonText renders a fixture value for a JSON column: a string is taken as JSON
+// text already, and anything else (an object, list, number, or boolean) is
+// marshaled, so a scalar becomes PARSE_JSON('1') rather than PARSE_JSON(1).
+func jsonText(v interface{}) string {
+	if s, ok := v.(string); ok {
+		return s
+	}
+	if b, err := json.Marshal(v); err == nil {
+		return string(b)
+	}
+	return fmt.Sprintf("%v", v)
+}
+
+// bigQueryStringLiteral quotes s for BigQuery, which treats a backslash in a
+// quoted string as an escape: JSON's \" must reach PARSE_JSON intact.
+func bigQueryStringLiteral(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	return "'" + strings.ReplaceAll(s, "'", `\'`) + "'"
 }
 
 func collectColumns(rows []map[string]interface{}) []string {

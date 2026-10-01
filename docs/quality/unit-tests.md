@@ -37,9 +37,9 @@ This mocks `analytics.orders` with those three rows, runs the query on the `snow
 
 ## Inputs
 
-Each entry under `inputs:` is a table the query reads (`asset:`) and the rows that stand in for it. Rows are sparse: any column you leave out is `NULL`. When the input is itself a pipeline asset with declared `columns:`, Bruin casts the fixture to those types, so an all-null column still gets the right type instead of the database guessing, and every declared column exists even if no row sets it.
+Each entry under `inputs:` is a table the query reads (`asset:`) and the rows that stand in for it. Rows are sparse: a column you leave out of a row is `NULL` in that row. Only columns that at least one row sets exist in the mock, so list every column the query reads, using `null` where the value doesn't matter. When the input is itself a pipeline asset with declared `columns:`, Bruin casts the fixture to those types, so an all-null column still gets the right type instead of the database guessing.
 
-A nested value, a YAML object or list, is written as JSON text, so it can fill a `json` column. On BigQuery, declared `json` columns are built with `PARSE_JSON`:
+A nested value, a YAML object or list, is written as JSON text, so it can fill a `json` column. On BigQuery, declared `json` columns are built with `PARSE_JSON`.:
 
 ```yaml
 inputs:
