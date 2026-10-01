@@ -117,7 +117,7 @@ func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs 
 	// command rejects the combination up front, but guard here as well.
 	// Reverse-ETL destinations have no table to rebuild, so they run as usual.
 	destination, _ := asset.Parameters.GetString("destination")
-	if fullRefresh && !streaming && !IsFullRefreshUnsupportedDestination(destination) {
+	if fullRefresh && !streaming && !IsReverseETLIngestrDestination(destination) {
 		cmdArgs = append(cmdArgs, "--full-refresh")
 	}
 
