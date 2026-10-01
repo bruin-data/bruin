@@ -47,9 +47,17 @@ SPARK_INTEGRATION_TEST = cd integration-tests/cloud-integration-tests/spark && e
 .PHONY: all clean test test-full test-unit build build-no-duckdb docs-app format format-ci lint lint-fast lint-full lint-ci pre-commit refresh-integration-expectations integration-test integration-test-light integration-test-backfill integration-test-cloud integration-test-spark integration-test-mssql validate-links sync-template-docs setup tools-update
 all: clean deps test build
 
-deps: 
+deps: ingestr-hashes
 	@printf "$(OK_COLOR)==> Installing dependencies$(NO_COLOR)\n"
 	@go mod tidy
+
+.PHONY: ingestr-hashes
+ingestr-hashes:
+	@if [ "$(INGESTR_HASHES_PREVERIFIED)" = "1" ]; then \
+		test -s pkg/python/ingestr_hashes.json || { echo "preverified ingestr hash manifest is missing" >&2; exit 1; }; \
+	else \
+		python3 scripts/generate_ingestr_hashes.py; \
+	fi
 
 build: deps
 	@echo "$(OK_COLOR)==> Building the application...$(NO_COLOR)"
@@ -125,15 +133,17 @@ clean:
 
 test: test-unit
 
-test-unit:
+test-unit: ingestr-hashes
 	@echo "$(OK_COLOR)==> Running the unit tests (fast)$(NO_COLOR)"
+	@python3 -m unittest discover -s scripts -p 'test_generate_ingestr_hashes.py'
 	@$(MAKE) rustsqlparser-lib
 	@env SF_DISABLE_MINICORE=true go test -tags="no_duckdb_arrow" -p "$(TEST_CONCURRENCY)" -vet=off -timeout 10m ./cmd/... ./pkg/... ./templates/...
 	@echo "$(OK_COLOR)==> Running the semantic-engine module tests$(NO_COLOR)"
 	@cd semantic-engine && env SF_DISABLE_MINICORE=true go test -p "$(TEST_CONCURRENCY)" -timeout 10m ./...
 
-test-full:
+test-full: ingestr-hashes
 	@echo "$(OK_COLOR)==> Running the unit tests (full)$(NO_COLOR)"
+	@python3 -m unittest discover -s scripts -p 'test_generate_ingestr_hashes.py'
 	@$(MAKE) rustsqlparser-lib
 	@env SF_DISABLE_MINICORE=true go test -tags="no_duckdb_arrow" -race -p "$(TEST_CONCURRENCY)" -vet=off -timeout 10m ./cmd/... ./pkg/... ./templates/...
 	@echo "$(OK_COLOR)==> Running the semantic-engine module tests with race detection$(NO_COLOR)"
@@ -156,7 +166,7 @@ format: lint-python
 
 # Fast edit-loop check on changed Go packages. `go vet` is deliberately absent
 # because govet is already enabled by golangci-lint.
-lint:
+lint: ingestr-hashes
 	@echo "$(OK_COLOR)==> Running fast linters on packages changed since $(LINT_MERGE_BASE)$(NO_COLOR)"
 	@set -e; \
 	for module in $(LINT_MODULES); do \
@@ -168,7 +178,7 @@ lint:
 lint-fast: lint
 
 # Full check for CI and pre-merge validation.
-lint-full:
+lint-full: ingestr-hashes
 	@echo "$(OK_COLOR)==> Running all linters across the repository$(NO_COLOR)"
 	@golangci-lint run --timeout "$(LINT_TIMEOUT)" --concurrency "$(LINT_CONCURRENCY)" $(LINT_PARALLEL_FLAGS) --build-tags="$(LINT_BUILD_TAGS)" ./...
 	@cd semantic-engine && golangci-lint run --timeout "$(LINT_TIMEOUT)" --concurrency "$(LINT_CONCURRENCY)" $(LINT_PARALLEL_FLAGS) ./...
