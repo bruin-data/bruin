@@ -31,6 +31,9 @@ columns:
   - name: isTokenBasedCall
     type: boolean
     description: Whether token-level usage and cost are available.
+  - name: chargedCents
+    type: numeric
+    description: Total amount charged in cents, including the Cursor Token Rate for third-party models.
   - name: tokenUsage
     type: json
     description: Input, output, cache, and cost details for token-based calls.

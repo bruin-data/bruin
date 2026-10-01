@@ -28,6 +28,21 @@ queries:
       GROUP BY usage_date
       ORDER BY usage_date
 
+  daily_tokens_by_platform:
+    sql: |
+      SELECT
+        usage_date,
+        platform,
+        COALESCE(SUM(total_tokens), 0) AS total_tokens
+      FROM marts.ai_coding_usage_by_user_day
+      WHERE usage_date >= CAST('{{ filters.date_range.start }}' AS DATE)
+        AND usage_date <= CAST('{{ filters.date_range.end }}' AS DATE)
+      {% if filters.platform != 'All' %}
+        AND platform = '{{ filters.platform }}'
+      {% endif %}
+      GROUP BY usage_date, platform
+      ORDER BY usage_date, platform
+
   platform_usage:
     sql: |
       SELECT
@@ -117,17 +132,17 @@ rows:
       - name: Daily Tokens
         type: chart
         chart: bar
-        query: daily_token_usage
-        x: usage_date
-        y: [anthropic_tokens, cursor_tokens]
+        query: daily_tokens_by_platform
+        x: { field: usage_date }
+        y: { field: [total_tokens], type: number, format: ",.0f" }
+        color: { field: platform }
         stacked: true
         col: 12
 
   - widgets:
       - name: Active Users
         type: metric
-        column: value
-        format: number
+        value: { field: value, type: number, format: ",.0f" }
         col: 3
         sql: |
           SELECT COUNT(DISTINCT user_type || ':' || user_id) AS value
@@ -141,8 +156,7 @@ rows:
 
       - name: Total Tokens
         type: metric
-        column: value
-        format: number
+        value: { field: value, type: number, format: ",.0f" }
         col: 3
         sql: |
           SELECT COALESCE(SUM(total_tokens), 0) AS value
@@ -155,9 +169,7 @@ rows:
 
       - name: Estimated Cost
         type: metric
-        column: value
-        prefix: "$"
-        format: number
+        value: { field: value, type: number, format: "$,.2f" }
         col: 3
         sql: |
           SELECT ROUND(COALESCE(SUM(estimated_cost_usd), 0), 2) AS value
@@ -170,8 +182,7 @@ rows:
 
       - name: Requests
         type: metric
-        column: value
-        format: number
+        value: { field: value, type: number, format: ",.0f" }
         col: 3
         sql: |
           SELECT COALESCE(SUM(requests), 0) AS value
@@ -187,16 +198,16 @@ rows:
         type: chart
         chart: area
         query: daily_token_usage
-        x: usage_date
-        y: [anthropic_tokens, cursor_tokens]
+        x: { field: usage_date }
+        y: { field: [anthropic_tokens, cursor_tokens], type: number, format: ",.0f" }
         col: 8
 
       - name: Cost by Platform
         type: chart
         chart: bar
         query: platform_usage
-        x: platform
-        y: [estimated_cost_usd]
+        x: { field: platform }
+        y: { field: [estimated_cost_usd], type: number, format: ",.2f" }
         col: 4
 
   - widgets:
@@ -204,16 +215,16 @@ rows:
         type: chart
         chart: line
         query: daily_active_users
-        x: usage_date
-        y: [active_users]
+        x: { field: usage_date }
+        y: { field: [active_users], type: number, format: ",.0f" }
         col: 6
 
       - name: Requests by Platform
         type: chart
         chart: bar
         query: platform_usage
-        x: platform
-        y: [requests]
+        x: { field: platform }
+        y: { field: [requests], type: number, format: ",.0f" }
         col: 6
 
   - widgets:
@@ -221,16 +232,16 @@ rows:
         type: chart
         chart: bar
         query: model_usage
-        x: model_label
-        y: [total_tokens]
+        x: { field: model_label }
+        y: { field: [total_tokens], type: number, format: ",.0f" }
         col: 6
 
       - name: Cost by Model
         type: chart
         chart: bar
         query: model_usage
-        x: model_label
-        y: [estimated_cost_usd]
+        x: { field: model_label }
+        y: { field: [estimated_cost_usd], type: number, format: ",.2f" }
         col: 6
 
   - widgets:
@@ -247,22 +258,22 @@ rows:
             label: Attribution
           - name: active_users
             label: Active Users
-            format: number
+            number: number
           - name: active_days
             label: Active Days
-            format: number
+            number: number
           - name: sessions
             label: Sessions
-            format: number
+            number: number
           - name: requests
             label: Requests
-            format: number
+            number: number
           - name: total_tokens
             label: Total Tokens
-            format: number
+            number: number
           - name: estimated_cost_usd
             label: Estimated Cost
-            format: currency
+            number: currency
 
   - widgets:
       - name: User Consumption
@@ -278,22 +289,22 @@ rows:
             label: Platforms
           - name: active_days
             label: Active Days
-            format: number
+            number: number
           - name: sessions
             label: Sessions
-            format: number
+            number: number
           - name: requests
             label: Requests
-            format: number
+            number: number
           - name: total_tokens
             label: Tokens
-            format: number
+            number: number
           - name: estimated_cost_usd
             label: Estimated Cost
-            format: currency
+            number: currency
           - name: ai_lines_added
             label: AI Lines Added
-            format: number
+            number: number
           - name: ai_lines_removed
             label: AI Lines Removed
-            format: number
+            number: number
