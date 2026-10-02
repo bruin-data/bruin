@@ -2428,6 +2428,20 @@ func ValidateVariables(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, err
 	return issues, nil
 }
 
+func ValidateVariableSchemas(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+
+	if p.Variables == nil {
+		return issues, nil
+	}
+
+	for _, diagnostic := range p.Variables.SchemaDiagnostics() {
+		issues = append(issues, &Issue{Description: diagnostic})
+	}
+
+	return issues, nil
+}
+
 func EnsurePipelineConcurrencyIsValid(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 	if p.Concurrency <= 0 {

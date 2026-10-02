@@ -1,0 +1,5 @@
+draft-07.json is the Draft 7 meta-schema from gojsonschema v1.2.0, draft.go, reformatted as JSON.
+https://github.com/xeipuuv/gojsonschema/blob/v1.2.0/draft.go
+
+Copyright 2018 johandorland (https://github.com/johandorland)
+Licensed under the Apache License, Version 2.0. See LICENSE.
