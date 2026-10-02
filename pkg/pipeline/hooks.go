@@ -88,7 +88,7 @@ func maybeHoistList(queries []string, hoister DeclareHoister, assetType AssetTyp
 // hasDeclareKeyword performs a cheap case-insensitive substring scan for
 // the keyword "declare". When it returns false the input is guaranteed to
 // contain no DECLARE statement and the caller can skip the hoister
-// entirely — saving a CGo round-trip per hook wrap in the common case
+// entirely — saving a Python IPC round-trip per hook wrap in the common case
 // (hooks without DECLAREs). False positives (e.g. "declare" inside a
 // string literal) are fine: the hoister then runs and classifies them
 // correctly. False negatives are impossible since any real DECLARE

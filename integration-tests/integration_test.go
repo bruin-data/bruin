@@ -375,6 +375,19 @@ func TestIndividualTasks(t *testing.T) {
 			},
 		},
 		{
+			name: "render-hook-declarations",
+			task: e2e.Task{
+				Name:    "render-hook-declarations",
+				Command: binary,
+				Args:    []string{"render", filepath.Join(currentFolder, "test-pipelines/render-hook-declarations/assets/test_hoist.sql")},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"DECLARE first_var array<STRING>;\nDECLARE last_var INT64 DEFAULT 29;\nSELECT 'pre; 雪' AS message;\nSELECT first_var;\nSELECT last_var;"},
+				},
+				Asserts: []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByContains},
+			},
+		},
+		{
 			name: "render-variables-override-key-val",
 			task: e2e.Task{
 				Name:    "render-variables-override-key-val",

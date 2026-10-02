@@ -268,6 +268,55 @@ func (s *SQLParser) RenameTables(sql string, dialect string, tableMapping map[st
 	})
 }
 
+// HoistDeclares moves top-level declarations ahead of other statements without
+// regenerating their SQL. On failure it returns the original input.
+func (s *SQLParser) HoistDeclares(sql string, assetType pipeline.AssetType) (string, error) {
+	dialect, err := AssetTypeToDialect(assetType)
+	if err != nil {
+		return sql, err
+	}
+	query, err := s.sendQueryCommand("hoist-declares", map[string]interface{}{
+		"query":   sql,
+		"dialect": dialect,
+	})
+	if err != nil {
+		return sql, err
+	}
+	return query, nil
+}
+
+// HoistDeclaresList preserves whole query entries, including their formatting.
+func (s *SQLParser) HoistDeclaresList(queries []string, assetType pipeline.AssetType) ([]string, error) {
+	dialect, err := AssetTypeToDialect(assetType)
+	if err != nil {
+		return queries, err
+	}
+	if len(queries) == 0 {
+		return queries, nil
+	}
+	if err := s.Start(); err != nil {
+		return queries, errors.Wrap(err, "failed to start sql parser")
+	}
+	payload, err := s.sendCommand(&parserCommand{
+		Command:  "hoist-declares-list",
+		Contents: map[string]interface{}{"queries": queries, "dialect": dialect},
+	})
+	if err != nil {
+		return queries, errors.Wrap(err, "failed to hoist declares list")
+	}
+	var resp struct {
+		Queries []string `json:"queries"`
+		Error   string   `json:"error"`
+	}
+	if err := json.Unmarshal([]byte(payload), &resp); err != nil {
+		return queries, errors.Wrap(err, "failed to unmarshal response")
+	}
+	if resp.Error != "" {
+		return queries, errors.New(resp.Error)
+	}
+	return resp.Queries, nil
+}
+
 func (s *SQLParser) sendCommand(pc *parserCommand) (string, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -376,7 +425,7 @@ func AssetTypeToDialect(assetType pipeline.AssetType) (string, error) {
 
 // connectionTypeDialectMap maps the connection type identifier used in the
 // connection manager (the yaml tag of each connection field in
-// config.Connections) to the dialect string the rust SQL parser understands.
+// config.Connections) to the dialect string the SQL parser understands.
 // This is used to pick a dialect for queries that are run directly against a
 // connection without going through a Bruin asset (where we'd otherwise know
 // the asset type).
@@ -405,7 +454,7 @@ var connectionTypeDialectMap = map[string]string{
 }
 
 // ConnectionTypeToDialect maps a connection type identifier (e.g. "clickhouse")
-// to the dialect string used by the rust SQL parser. Returns the empty string
+// to the dialect string used by the SQL parser. Returns the empty string
 // when no dialect is registered for the type.
 func ConnectionTypeToDialect(connectionType string) string {
 	return connectionTypeDialectMap[connectionType]

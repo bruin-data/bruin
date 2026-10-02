@@ -860,7 +860,6 @@ func TestSqlParser_RenameTables(t *testing.T) {
 		tableMappings     map[string]string
 		want              string
 		normalizeExpected bool
-		runForRust        bool
 		wantErr           bool
 	}{
 		{
@@ -887,7 +886,6 @@ func TestSqlParser_RenameTables(t *testing.T) {
 			},
 			want:              "SELECT * FROM t1 AS items",
 			normalizeExpected: true,
-			runForRust:        true,
 		},
 		{
 			name:  "python parity multi table with schemas",
@@ -898,7 +896,6 @@ func TestSqlParser_RenameTables(t *testing.T) {
 			},
 			want:              "SELECT * FROM t1 AS items JOIN raw_dev.t2 AS orders ON items.item_id = orders.item_id",
 			normalizeExpected: true,
-			runForRust:        true,
 		},
 		{
 			name:  "python parity multiple queries",
@@ -909,7 +906,6 @@ func TestSqlParser_RenameTables(t *testing.T) {
 			},
 			want:              "DELETE FROM t1 AS items WHERE item_id = 1; SELECT * FROM t1 AS items JOIN raw_dev.t2 AS orders ON items.item_id = orders.item_id",
 			normalizeExpected: true,
-			runForRust:        true,
 		},
 		{
 			name: "python parity table name in select",
@@ -931,7 +927,6 @@ func TestSqlParser_RenameTables(t *testing.T) {
 			},
 			want:              "SELECT items.item_id AS item_id, CASE WHEN price > 1000 AND t2.somecol < 250 THEN 'high' WHEN price > 100 THEN 'medium' ELSE 'low' END AS price_category FROM t1 AS items JOIN raw_dev.orders AS t2 ON items.item_id = t2.item_id WHERE in_stock = TRUE",
 			normalizeExpected: true,
-			runForRust:        true,
 		},
 		{
 			name: "python parity subquery",
@@ -947,7 +942,6 @@ func TestSqlParser_RenameTables(t *testing.T) {
 			},
 			want:              "SELECT emp_id, (SELECT AVG(salary) FROM raw_dev.salaries WHERE salaries.emp_id = employees.emp_id) AS avg_salary FROM raw_dev.employees",
 			normalizeExpected: true,
-			runForRust:        true,
 		},
 		{
 			name: "python parity complex ctes",
@@ -985,7 +979,6 @@ GROUP BY 1`,
 			},
 			want:              "WITH ufd AS (SELECT user_id, MIN(date_utc) AS my_date_col FROM fact_dev.some_other_table GROUP BY 1), user_retention AS (SELECT d.user_id, MAX(CASE WHEN DATEDIFF(day, f.my_date_col, d.date_utc) = 1 THEN 1 ELSE 0 END) AS some_day1_metric FROM fact_dev.some_daily_metrics AS d INNER JOIN ufd AS f ON d.user_id = f.user_id GROUP BY 1) SELECT d.user_id, DATEDIFF(day, MAX(d.date_utc), CURRENT_DATE()) AS recency, COUNT(DISTINCT d.date_utc) AS active_days, MIN_BY(d.first_device_type, d.first_activity_timestamp) AS first_device_type, AVG(NULLIF(d.estimated_session_duration, 0)) AS avg_session_duration, SUM(d.event_start) AS total_event_start, MAX(r.some_day1_metric) AS some_day1_metric, CASE WHEN sum(d.event_start) > 0 THEN 'Player' ELSE 'Visitor' END AS user_type FROM fact_dev.some_daily_metrics AS d LEFT JOIN user_retention AS r ON d.user_id = r.user_id GROUP BY 1",
 			normalizeExpected: true,
-			runForRust:        true,
 		},
 		{
 			name: "python parity cte with similar names",
@@ -1016,7 +1009,6 @@ join t2
 			},
 			want:              "WITH t1 AS (SELECT t1.col1, col2 FROM raw_dev.table1 AS t1), t2 AS (SELECT t2.col1, col3 FROM raw_dev.table1 AS t2), t3 AS (SELECT table1.col1, col3 FROM raw_dev.table1) SELECT * FROM t1 JOIN t2 USING (col1)",
 			normalizeExpected: true,
-			runForRust:        true,
 		},
 		{
 			name:  `SELECT from unnest`,
@@ -1034,10 +1026,6 @@ join t2
 		t.Run(parser.name, func(t *testing.T) {
 			for _, tt := range tests { //nolint
 				t.Run(tt.name, func(t *testing.T) {
-					if parser.name == "rust" && !tt.runForRust {
-						t.Skip("non-python rename case")
-					}
-
 					got, err := parser.parser.RenameTables(tt.query, "bigquery", tt.tableMappings)
 					if tt.wantErr {
 						require.Error(t, err)
@@ -1167,8 +1155,8 @@ func TestSqlParser_AddLimit(t *testing.T) { //nolint
 		},
 		{
 			// Regression for https://github.com/bruin-data/bruin/issues/2239:
-			// the rust parser's generic dialect uppercases function names,
-			// which breaks ClickHouse (case-sensitive function lookup).
+			// Generic dialects can uppercase function names, which breaks
+			// ClickHouse (case-sensitive function lookup).
 			// Round-tripping with the clickhouse dialect must preserve the
 			// original camelCase function names.
 			name:     "clickhouse dialect preserves camelCase function names",
@@ -1903,48 +1891,21 @@ func loadFixture[T any](t *testing.T, filename string) []T {
 func startParsersForParity(t *testing.T) []startedParser {
 	t.Helper()
 
-	started := make([]startedParser, 0, 2)
-	started = append(started, startedParser{name: "sqlglot", parser: sharedSQLParser})
-
-	if err := ensureRustSQLParserFFI(); err != nil {
-		t.Logf("skipping rust parser parity tests: %v", err)
-		return started
-	}
-
-	rustParser, err := NewRustSQLParser(true)
-	require.NoError(t, err)
-	require.NoError(t, rustParser.Start())
-	t.Cleanup(func() {
-		require.NoError(t, rustParser.Close())
-	})
-	started = append(started, startedParser{name: "rust", parser: rustParser})
-
-	return started
+	return []startedParser{{name: "sqlglot", parser: sharedSQLParser}}
 }
 
 func getLineageWithRawSchema(t *testing.T, parser Parser, query, dialect string, schema map[string]any) *Lineage {
 	t.Helper()
 
-	schemaJSON, err := json.Marshal(schema)
-	require.NoError(t, err)
-
-	var responsePayload string
-	switch p := parser.(type) {
-	case *SQLParser:
-		command := &parserCommand{
-			Command: "lineage",
-			Contents: map[string]any{
-				"query":   query,
-				"dialect": dialect,
-				"schema":  schema,
-			},
-		}
-		responsePayload, err = p.sendCommand(command)
-	case *RustSQLParser:
-		responsePayload, err = p.columnLineageRawJSON(query, dialect, string(schemaJSON))
-	default:
-		t.Fatalf("unsupported parser type %T", parser)
+	command := &parserCommand{
+		Command: "lineage",
+		Contents: map[string]any{
+			"query":   query,
+			"dialect": dialect,
+			"schema":  schema,
+		},
 	}
+	responsePayload, err := parser.(*SQLParser).sendCommand(command)
 	require.NoError(t, err)
 
 	var result Lineage

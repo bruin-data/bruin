@@ -8,10 +8,6 @@ ARG BRANCH_NAME=unknown
 # Install build dependencies including C++ standard library for DuckDB
 RUN apt-get update && apt-get install -y git gcc g++ libc6-dev curl
 
-# Install Rust toolchain for the SQL parser FFI
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-ENV PATH="/root/.cargo/bin:${PATH}"
-
 # Set working directory
 WORKDIR /src
 
@@ -25,23 +21,8 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
     go mod download
 
-# Copy Rust project files first (changes less frequently than Go source)
-COPY pkg/sqlparser/rustffi/Cargo.toml pkg/sqlparser/rustffi/Cargo.lock pkg/sqlparser/rustffi/
-COPY pkg/sqlparser/rustffi/src pkg/sqlparser/rustffi/src
-
-# Build the Rust SQL parser static library with cache mount
-RUN --mount=type=cache,target=/root/.cargo/registry \
-    --mount=type=cache,target=/root/.cargo/git \
-    --mount=type=cache,target=/src/pkg/sqlparser/rustffi/target \
-    cargo build --release --manifest-path pkg/sqlparser/rustffi/Cargo.toml && \
-    cp pkg/sqlparser/rustffi/target/release/libbruin_rustsqlparser.a /tmp/libbruin_rustsqlparser.a
-
 # Copy source code
 COPY . .
-
-# Restore cached Rust artifact (cache mount is not persisted in the layer)
-RUN mkdir -p pkg/sqlparser/rustffi/target/release && \
-    cp /tmp/libbruin_rustsqlparser.a pkg/sqlparser/rustffi/target/release/libbruin_rustsqlparser.a
 
 # Build the application with version information from build args (with build cache for incremental builds)
 RUN --mount=type=cache,target=/root/.cache/go-build \
