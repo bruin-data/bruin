@@ -64,17 +64,29 @@ Change both DuckDB paths if you want the database file stored elsewhere. The pip
 
 ## Run the pipeline
 
-Validate and run the previous UTC day's data:
+Validate the pipeline, then do the first run with `--full-refresh`:
 
 ```shell
 bruin validate .
+
+# Set an interval of at most 30 days when your organization has usage.
+START_DATE=2026-09-01
+END_DATE=2026-09-30
+bruin run --full-refresh --start-date "$START_DATE" --end-date "$END_DATE" .
+```
+
+The per-platform marts load incrementally, and an incremental run writes into an existing table without creating it. On a new database a plain `bruin run` fails because those tables don't exist yet. `--full-refresh` creates them, loading the requested interval. Use `--full-refresh` only for this first run: a later full refresh replaces the loaded history with whatever interval that run covers.
+
+After that, run without the flag. With no dates, a run loads the previous UTC day:
+
+```shell
 bruin run .
 ```
 
 Use an explicit interval to backfill historical data:
 
 ```shell
-bruin run . --start-date 2025-01-01 --end-date 2025-01-30
+bruin run . --start-date 2026-08-01 --end-date 2026-08-30
 ```
 
 Cursor limits each analytics request to 30 days. For longer backfills, run multiple non-overlapping intervals of at most 30 days. The per-platform marts use interval-aware materialization, so each run updates only its requested dates while preserving previously loaded history. Both APIs return UTC data.
