@@ -21,8 +21,14 @@ func parseFileFS(fs afero.Fs, path string) (*Model, error) {
 		return nil, err
 	}
 
+	var doc yaml.Node
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		return nil, fmt.Errorf("parsing semantic model YAML: %w", err)
+	}
+	keepTimestampsAsText(&doc)
+
 	var model Model
-	if err := yaml.Unmarshal(data, &model); err != nil {
+	if err := doc.Decode(&model); err != nil {
 		return nil, fmt.Errorf("parsing semantic model YAML: %w", err)
 	}
 	if model.Schema == "" {
@@ -30,6 +36,18 @@ func parseFileFS(fs afero.Fs, path string) (*Model, error) {
 	}
 
 	return &model, nil
+}
+
+// keepTimestampsAsText retags unquoted dates and timestamps as strings so
+// free-form values (filter values, check thresholds, expected rows) keep the
+// text the user wrote instead of decoding into time.Time.
+func keepTimestampsAsText(node *yaml.Node) {
+	if node.Kind == yaml.ScalarNode && node.ShortTag() == "!!timestamp" {
+		node.Tag = "!!str"
+	}
+	for _, child := range node.Content {
+		keepTimestampsAsText(child)
+	}
 }
 
 // LoadFile loads and validates a semantic model from a YAML file.

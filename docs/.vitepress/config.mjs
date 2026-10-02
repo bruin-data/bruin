@@ -436,6 +436,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                     {text: "Patch", link: "/commands/patch"},
                     {text: "Render", link: "/commands/render"},
                     {text: "Query", link: "/commands/query"},
+                    {text: "Semantic", link: "/commands/semantic"},
                     {text: "AI Enhance", link: "/commands/ai-enhance"},
                     {text: "Cloud", link: "/commands/cloud"},
                 ],

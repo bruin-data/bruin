@@ -1,6 +1,6 @@
 ---
 name: bruin-semantic-layer
-description: Use when creating, editing, reviewing, or troubleshooting Bruin semantic layer models, semantic query CLI usage, metric and dimension definitions, joins, segments, filters, windows, or semantic-layer tests and docs in a Bruin repository.
+description: Use when creating, editing, reviewing, or troubleshooting Bruin semantic layer models, semantic query CLI usage, metric and dimension definitions, joins, segments, filters, windows, semantic quality checks, or semantic-layer tests and docs in a Bruin repository.
 ---
 
 # Bruin Semantic Layer
@@ -8,10 +8,10 @@ description: Use when creating, editing, reviewing, or troubleshooting Bruin sem
 ## Workflow
 
 1. Find the repository root and inspect `semantic/` before editing. Bruin loads every `.yml` and `.yaml` model under the repository-level `semantic/` directory next to `.bruin.yml`.
-2. Use local source of truth before guessing: `docs/core-concepts/semantic-layer.md`, `docs/commands/query.md`, `pkg/semantic/model.go`, `pkg/semantic/engine.go`, and `pkg/semantic/graph.go`.
+2. Use local source of truth before guessing: `docs/core-concepts/semantic-layer.md`, `docs/commands/query.md`, `docs/commands/semantic.md`, `semantic-engine/model.go`, `semantic-engine/engine.go`, `semantic-engine/graph.go`, and `semantic-engine/checks.go`.
 3. Keep model names unique across the semantic catalog. New models should set `schema: v1`, although omitted schema defaults to `v1`.
 4. Prefer reusable, business-named metrics, dimensions, and segments. Avoid putting dashboard-specific logic into one large SQL query.
-5. Validate with a narrow semantic query first, then run the repository-required final checks before finishing.
+5. Validate with `bruin semantic validate`, run `bruin semantic check` when a connection is available, then run the repository-required final checks before finishing.
 
 ## Model Pattern
 
@@ -25,6 +25,7 @@ description: Revenue and order metrics
 
 source:
   table: analytics.orders
+  connection: warehouse
 
 primary_key: order_id
 
@@ -34,6 +35,13 @@ joins:
     foreign_key: customer_id
 
 dimensions:
+  - name: order_id
+    type: string
+    checks:
+      - name: not_null
+      - name: unique
+  - name: amount
+    type: number
   - name: order_date
     type: time
     expression: created_at
@@ -42,6 +50,10 @@ dimensions:
       month: date_trunc('month', created_at)
   - name: country
     type: string
+    checks:
+      - name: not_null
+      - name: accepted_values
+        value: [US, DE]
   - name: is_first_order
     type: boolean
     expression: customer_order_number = 1
@@ -53,6 +65,8 @@ metrics:
       type: currency
       currency: USD
       decimals: 2
+    checks:
+      - name: positive
   - name: order_count
     expression: count(distinct order_id)
   - name: avg_order_value
@@ -71,11 +85,27 @@ metrics:
 segments:
   - name: completed
     filter: "status = 'completed'"
+
+checks:
+  - name: completed_revenue_matches_finance
+    query:
+      metrics: [revenue]
+      segments: [completed]
+    value: 730
+  - name: no_negative_amounts
+    query:
+      dimensions: [order_id]
+      filters:
+        - dimension: amount
+          operator: lt
+          value: 0
+    count: 0
 ```
 
 ## Default Model Behavior
 
 - `source.table` is required and can be a relation name or a parenthesized SQL subquery with an alias.
+- `source.connection` is optional. `bruin semantic validate`, `bruin semantic check`, and `bruin query --pipeline` use it when `--connection` is not passed.
 - `label`, `description`, `group`, `hidden`, and `format` metadata help consumers but do not change SQL generation.
 - Dimension `expression` defaults to the dimension `name`.
 - Dimension `type` can be `string`, `number`, `boolean`, or `time`; only `time` dimensions can use granularities.
@@ -103,6 +133,7 @@ Window metrics calculate after an inner grouped query and must use `expression: 
 - `partition_by` entries must reference dimensions.
 - `percent_of_total` does not require `order_by`; it can use `partition_by`.
 - Filters and segments are applied inside the inner query before the window expression runs.
+- Window metrics cannot have `checks`, because they return one row per `order_by` group. Use a model check instead.
 
 ## Filters And Segments
 
@@ -124,6 +155,21 @@ Window metrics calculate after an inner grouped query and must use `expression: 
 - For `foreign_key` joins, Bruin joins the current model's `foreign_key` to the target model's `target_key`; if `target_key` is omitted, the target model must define `primary_key`.
 - Custom join SQL can reference aliases such as `{orders}`, `{customers}`, or the join name placeholder.
 
+## Quality Checks
+
+- Dimension checks (`dimensions[].checks`) work like column checks: `not_null`, `unique`, `positive`, `non_negative`, `negative`, `min`, `max`, `accepted_values`, and `pattern`. They test every row of the model source, and all of them except `not_null` ignore nulls.
+- Metric checks (`metrics[].checks`) test the metric computed over the whole model: `not_null`, `positive`, `non_negative`, `negative`, `min`, `max`, and `equals`. A null metric fails every metric check.
+- Model checks (top-level `checks`) need a unique `name` and a `query`. The query is a semantic query with `dimensions`, `metrics`, `filters`, `segments`, `sort`, and `limit`, and accepts the `name:granularity` and `name:direction` shorthands. There is no raw SQL option.
+- To assert that rows should not exist, select a dimension, filter down to the bad rows, and set `count: 0`. To find unmatched join rows, filter on a null joined dimension.
+- A model check sets either `value` or `count`, never both. `count` wraps the query in `SELECT count(*)`. `value` can be:
+  - a scalar, for a single-column, single-row result;
+  - a mapping, for exactly one row;
+  - a list, for the full result set, with one mapping per row keyed by dimension or metric name. Single-column queries can use bare values.
+- Only the listed columns are compared, and rows are compared in order only when the query has a `sort`. Without `value` or `count`, the check expects `0`.
+- `min`, `max`, and `equals` require a value, `accepted_values` requires a non-empty list, and `pattern` requires a string. Other checks reject a value. A check name can appear only once per dimension or metric.
+- `bruin semantic validate` validates definitions, and dry-runs the compiled SQL when it finds a connection (`--connection`, then `source.connection`). A model without a usable connection only gets structural validation and a warning.
+- `bruin semantic check` runs the checks and exits non-zero on any failure. Use `--model` to limit it to specific models and `--output json` for machine-readable results.
+
 ## Query Pattern
 
 Use an anchor SQL asset when Bruin should infer the pipeline, connection, and dialect:
@@ -140,7 +186,7 @@ bruin query \
   --output json
 ```
 
-Use a pipeline path when there is no anchor asset, and pass the connection explicitly:
+Use a pipeline path when there is no anchor asset. Pass the connection explicitly, or leave out `--connection` if the model sets `source.connection`:
 
 ```bash
 bruin query \
@@ -163,4 +209,4 @@ Semantic query mode requires at least one dimension or metric and cannot be comb
 - Joined dimensions must resolve through a safe join path.
 - Unknown metrics, dimensions, segments, filter operators, sort fields, and granularities fail semantic query compilation.
 
-For behavior changes, update the implementation, tests, and user-facing docs together: `pkg/semantic/`, `docs/core-concepts/semantic-layer.md`, and `docs/commands/query.md`.
+For behavior changes, update the implementation, tests, and user-facing docs together: `semantic-engine/`, `pkg/semanticcheck/`, `cmd/semantic.go`, `docs/core-concepts/semantic-layer.md`, `docs/commands/query.md`, and `docs/commands/semantic.md`.
