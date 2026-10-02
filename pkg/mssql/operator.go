@@ -138,19 +138,24 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 func runMaterializedQuery(ctx context.Context, conn MsClient, asset *pipeline.Asset, q *query.Query) error {
 	// Error 1205 rolls back the victim transaction. Replay only materializations
 	// that use one transaction or one statement. Hooks, arbitrary scripts, and
-	// DDL can commit work before a later statement deadlocks.
+	// DDL or append batches can commit work before a later statement deadlocks.
 	retryable := false
 	if len(asset.Hooks.Pre) == 0 && len(asset.Hooks.Post) == 0 {
-		if asset.Materialization.Type == pipeline.MaterializationTypeView {
+		switch asset.Materialization.Type {
+		case pipeline.MaterializationTypeView:
 			retryable = true
-		} else if asset.Materialization.Type == pipeline.MaterializationTypeTable {
+		case pipeline.MaterializationTypeTable:
 			switch asset.Materialization.Strategy {
 			case pipeline.MaterializationStrategyNone, pipeline.MaterializationStrategyCreateReplace,
-				pipeline.MaterializationStrategyAppend, pipeline.MaterializationStrategyMerge,
+				pipeline.MaterializationStrategyMerge,
 				pipeline.MaterializationStrategyDeleteInsert, pipeline.MaterializationStrategyTimeInterval,
 				pipeline.MaterializationStrategyTruncateInsert:
 				retryable = true
+			default:
+				// Only the explicitly listed strategies are safe to replay.
 			}
+		default:
+			// Unmaterialized scripts may contain independently committed statements.
 		}
 	}
 
@@ -166,7 +171,7 @@ func runMaterializedQuery(ctx context.Context, conn MsClient, asset *pipeline.As
 
 		// Exponential backoff with jitter keeps concurrent victims from retrying
 		// in lockstep. Cancellation also interrupts the wait.
-		delay := (250 * time.Millisecond << attempt) + time.Duration(rand.IntN(250))*time.Millisecond
+		delay := (250 * time.Millisecond << attempt) + time.Duration(rand.IntN(250))*time.Millisecond //nolint:gosec // Retry jitter does not require cryptographic randomness.
 		timer := time.NewTimer(delay)
 		select {
 		case <-ctx.Done():

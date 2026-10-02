@@ -28,7 +28,7 @@ func TestRunMaterializedQuery(t *testing.T) {
 	}{
 		{name: "default table retries", mat: pipeline.Materialization{Type: pipeline.MaterializationTypeTable}, failures: 1, err: deadlock},
 		{name: "create replace retries wrapped driver errors", mat: pipeline.Materialization{Type: pipeline.MaterializationTypeTable, Strategy: pipeline.MaterializationStrategyCreateReplace}, failures: 1, err: errors.Wrap(deadlock, "execute")},
-		{name: "append retries", mat: pipeline.Materialization{Type: pipeline.MaterializationTypeTable, Strategy: pipeline.MaterializationStrategyAppend}, failures: 1, err: deadlock},
+		{name: "append batch not replayed", mat: pipeline.Materialization{Type: pipeline.MaterializationTypeTable, Strategy: pipeline.MaterializationStrategyAppend}, failures: 1, err: deadlock, wantErr: deadlock},
 		{name: "merge retries", mat: pipeline.Materialization{Type: pipeline.MaterializationTypeTable, Strategy: pipeline.MaterializationStrategyMerge}, failures: 1, err: deadlock},
 		{name: "delete insert retries", mat: pipeline.Materialization{Type: pipeline.MaterializationTypeTable, Strategy: pipeline.MaterializationStrategyDeleteInsert}, failures: 1, err: deadlock},
 		{name: "time interval retries", mat: pipeline.Materialization{Type: pipeline.MaterializationTypeTable, Strategy: pipeline.MaterializationStrategyTimeInterval}, failures: 1, err: deadlock},

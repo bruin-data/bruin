@@ -131,7 +131,7 @@ For table assets using the default or `create+replace` materialization strategy,
 
 Concurrent SQL Server assets can deadlock on data or schema/metadata locks, even when they write different tables. SQL Server rolls back the victim transaction and returns error 1205.
 
-Bruin retries that error up to ten times (eleven attempts total) with exponential backoff and jitter for generated table materializations (except `ddl`) and views. Assets with pre/post hooks and unmaterialized SQL scripts are not automatically retried: an earlier statement may already have committed. Other errors, including duplicate column names, fail immediately.
+Bruin retries that error up to ten times (eleven attempts total) with exponential backoff and jitter for generated table materializations (except `ddl` and `append`) and views. Assets with pre/post hooks and unmaterialized SQL scripts are not automatically retried: an earlier statement may already have committed. The same applies to `append`, which can include additional statements outside a transaction. Other errors, including duplicate column names, fail immediately.
 
 Retries leave MERGE parallelism and locking unchanged: Bruin adds neither a table-lock hint nor a parallelism limit. Backoff applies only after a deadlock; successful executions have no added delay. Persistent contention can still exhaust the retry limit and fail the asset.
 
