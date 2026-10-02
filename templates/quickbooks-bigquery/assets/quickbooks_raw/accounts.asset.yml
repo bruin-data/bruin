@@ -1,5 +1,6 @@
 name: quickbooks_raw.accounts
 type: ingestr
+owner: finance@example.com
 
 description: >
   Raw QuickBooks Online Account records (the chart of accounts, Accounting API
@@ -22,7 +23,14 @@ tags:
   - quickbooks_raw
   - quickbooks
   - accounting
-  - chart_of_accounts
+  - chart-of-accounts
+
+domains:
+  - finance
+
+meta:
+  grain: one row per account in the chart of accounts
+  contains_pii: "false"
 
 columns:
   - name: id

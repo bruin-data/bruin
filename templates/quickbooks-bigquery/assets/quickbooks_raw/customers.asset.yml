@@ -1,5 +1,6 @@
 name: quickbooks_raw.customers
 type: ingestr
+owner: finance@example.com
 
 description: >
   Raw QuickBooks Online Customer records (Accounting API v3) loaded into
@@ -23,6 +24,14 @@ tags:
   - quickbooks
   - accounting
   - customers
+
+domains:
+  - finance
+
+meta:
+  grain: one row per QuickBooks customer
+  contains_pii: "true"
+  pii_note: Holds contact details (names, emails, phone numbers, addresses).
 
 columns:
   - name: id

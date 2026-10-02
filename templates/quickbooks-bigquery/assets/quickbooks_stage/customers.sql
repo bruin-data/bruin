@@ -1,6 +1,7 @@
 /* @bruin
 name: quickbooks_stage.customers
 type: bq.sql
+owner: finance@example.com
 description: >
   One row per QuickBooks customer, with typed columns, flattened contact
   details, and the parent customer resolved for sub-customers (jobs). The
@@ -17,6 +18,14 @@ tags:
   - quickbooks
   - accounting
   - customers
+
+domains:
+  - finance
+
+meta:
+  grain: one row per customer
+  contains_pii: "true"
+  pii_note: Holds contact details (names, emails, phone numbers, addresses).
 
 columns:
   - name: customer_id

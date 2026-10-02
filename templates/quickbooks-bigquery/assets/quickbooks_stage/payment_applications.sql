@@ -1,6 +1,7 @@
 /* @bruin
 name: quickbooks_stage.payment_applications
 type: bq.sql
+owner: finance@example.com
 description: >
   Links customer payments to the invoices they paid, one row per payment line
   applied to an invoice. Use it for collections and days-to-pay analysis.
@@ -20,6 +21,13 @@ tags:
   - accounting
   - payments
   - collections
+
+domains:
+  - finance
+
+meta:
+  grain: one row per payment line applied to an invoice
+  contains_pii: "false"
 
 columns:
   - name: payment_id

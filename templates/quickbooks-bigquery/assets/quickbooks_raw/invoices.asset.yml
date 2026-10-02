@@ -1,5 +1,6 @@
 name: quickbooks_raw.invoices
 type: ingestr
+owner: finance@example.com
 
 description: >
   Raw QuickBooks Online Invoice records (Accounting API v3) loaded into BigQuery
@@ -23,6 +24,14 @@ tags:
   - quickbooks
   - accounting
   - invoices
+
+domains:
+  - finance
+
+meta:
+  grain: one row per invoice, with lines nested in `line`
+  contains_pii: "true"
+  pii_note: Holds contact details (names, emails, phone numbers, addresses).
 
 columns:
   - name: id

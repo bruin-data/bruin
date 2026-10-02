@@ -1,6 +1,7 @@
 /* @bruin
 name: quickbooks_stage.payments
 type: bq.sql
+owner: finance@example.com
 description: >
   One row per customer payment received in QuickBooks, with typed amounts and
   the deposit account and payment method resolved. `applied_amount` is the
@@ -17,6 +18,14 @@ tags:
   - quickbooks
   - accounting
   - payments
+
+domains:
+  - finance
+
+meta:
+  grain: one row per customer payment
+  contains_pii: "true"
+  pii_note: Includes customer names.
 
 columns:
   - name: payment_id
