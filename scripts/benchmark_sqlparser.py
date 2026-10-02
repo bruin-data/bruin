@@ -100,6 +100,10 @@ def benchmark(python, runs, repetitions):
                                 },
                             }
                         )
+                        assert result["errors"] == [], (
+                            fixture["name"],
+                            result["errors"],
+                        )
                         assert normalized_columns(
                             result["columns"]
                         ) == normalized_columns(fixture["expected"]), fixture["name"]
