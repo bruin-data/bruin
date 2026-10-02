@@ -86,7 +86,7 @@ bruin run .
 Use an explicit interval to backfill historical data:
 
 ```shell
-bruin run . --start-date 2026-08-01 --end-date 2026-08-31
+bruin run . --start-date 2026-08-01 --end-date 2026-08-30
 ```
 
 Cursor limits each analytics request to 30 days. For longer backfills, run multiple non-overlapping intervals of at most 30 days. The per-platform marts use interval-aware materialization, so each run updates only its requested dates while preserving previously loaded history. Both APIs return UTC data.
