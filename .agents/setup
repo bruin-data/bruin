@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-go_version="1.25.13"
+go_version="1.26.8"
 go_root="$HOME/.local/share/go/$go_version"
 node_version="22.14.0"
 node_root="$HOME/.local/share/node/$node_version"
@@ -35,11 +35,11 @@ if [[ ! -x "$go_root/bin/go" ]]; then
   case "$(uname -m)" in
     x86_64)
       go_arch="amd64"
-      go_sha256="39042a078ea9ceebe3ecda4a7188f0f5b96e14a071d27923ba7f40b456e85ae3"
+      go_sha256="d0f743b33e8d8945e6b1f432edd15785c70507121d6e2a723b21285eddf8b57b"
       ;;
     aarch64 | arm64)
       go_arch="arm64"
-      go_sha256="adad240fcb6bd180cf973b4b7c747baf4ec81d08b7d40ca35940ee4531971490"
+      go_sha256="211ffced9dcb9633a55eac6364816ec0ddd951389a740e88fa8b3337971bdda0"
       ;;
     *)
       printf 'Unsupported architecture: %s\n' "$(uname -m)" >&2
@@ -150,7 +150,8 @@ if [[ "$current_lint_version" != "$golangci_lint_version" ]]; then
     sh -s -- -b "$HOME/.local/bin" "$golangci_lint_version"
 fi
 [[ -d .venv ]] || uv venv --quiet
-uv pip install --quiet sqlglot==30.13.0
+uv pip uninstall --quiet sqlglotc
+uv pip install --quiet -r internal/requirements.txt
 uvx ruff@0.15.4 --version >/dev/null
 done_step
 

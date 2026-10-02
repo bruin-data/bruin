@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -43,6 +44,61 @@ func TestSQLParserCloseResetsStarted(t *testing.T) {
 	require.NoError(t, parser.Close())
 	require.False(t, parser.started)
 	require.NoError(t, parser.Close())
+}
+
+func TestSQLParserCacheIsolatesLegacyPayloads(t *testing.T) {
+	cacheRoot := t.TempDir()
+	for _, key := range []string{"TMPDIR", "TMP", "TEMP"} {
+		t.Setenv(key, cacheRoot)
+	}
+	base := filepath.Join(os.TempDir(), "parser-upgrade")
+	for _, suffix := range []string{"-python", "-sqlglot-lib"} {
+		legacy := base + suffix
+		require.NoError(t, os.MkdirAll(legacy, 0o755))
+		// Extraction used to leave files removed from newer payloads in place.
+		require.NoError(t, os.WriteFile(filepath.Join(legacy, "obsolete"), []byte("old payload"), 0o600))
+	}
+
+	parser := newSQLParserInternal("parser-upgrade", false, 10000)
+	t.Cleanup(func() { require.NoError(t, parser.Close()) })
+	entries, err := os.ReadDir(cacheRoot)
+	require.NoError(t, err)
+	require.Len(t, entries, 2, "construction must not extract any payloads")
+	require.NoError(t, parser.Start())
+
+	paths := make(map[string]string)
+	for _, setting := range parser.cmd.Env {
+		key, value, _ := strings.Cut(setting, "=")
+		switch key {
+		case "PYTHONHOME":
+			paths["-python"] = value
+		case "PYTHONPATH":
+			paths["-sqlglot-lib"] = value
+		}
+	}
+	require.Len(t, paths, 2)
+	for suffix, path := range paths {
+		require.True(t, strings.HasPrefix(path, base+suffix+"-"), path)
+		require.NoFileExists(t, filepath.Join(path, "obsolete"))
+		require.FileExists(t, filepath.Join(base+suffix, "obsolete"))
+	}
+
+	pythonPath, pythonEnv := parser.cmd.Path, parser.cmd.Env
+	cmd := exec.CommandContext(t.Context(), pythonPath, "-c", "import sqlglot.parser; assert sqlglot.parser.__file__.endswith('.py'), sqlglot.parser.__file__")
+	cmd.Env = pythonEnv
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(output))
+	require.NoError(t, parser.Close())
+
+	// Closing a non-randomized parser must preserve its versioned cache for reuse.
+	for _, path := range paths {
+		require.DirExists(t, path)
+	}
+	again := newSQLParserInternal("parser-upgrade", false, 10000)
+	t.Cleanup(func() { require.NoError(t, again.Close()) })
+	require.NoError(t, again.Start())
+	require.Equal(t, pythonPath, again.cmd.Path)
+	require.Equal(t, pythonEnv, again.cmd.Env)
 }
 
 func TestGetLineageForRunner(t *testing.T) {

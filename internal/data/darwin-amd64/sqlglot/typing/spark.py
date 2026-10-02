@@ -7,15 +7,26 @@ from sqlglot.typing.spark2 import EXPRESSION_METADATA
 EXPRESSION_METADATA = {
     **EXPRESSION_METADATA,
     **{
-        exp_type: {"returns": exp.DType.DOUBLE}
+        exp_type: {"returns": exp.DType.BINARY}
         for exp_type in {
-            exp.Sec,
+            exp.BitmapConstructAgg,
+            exp.ToBinary,
         }
     },
     **{
-        exp_type: {"returns": exp.DType.INT}
+        exp_type: {"returns": exp.DType.DATE}
         for exp_type in {
-            exp.ArraySize,
+            exp.DateFromUnixDate,
+            # 2-arg `date_add(startDate, numDays)` / `date_sub` are routed to
+            # TsOrDsAdd by Hive/Spark parsers; both return DATE per the Spark
+            # and Databricks contracts.
+            exp.TsOrDsAdd,
+        }
+    },
+    **{
+        exp_type: {"returns": exp.DType.DOUBLE}
+        for exp_type in {
+            exp.Sec,
         }
     },
     **{
@@ -24,6 +35,7 @@ EXPRESSION_METADATA = {
             exp.Collation,
             exp.CurrentTimezone,
             exp.Randstr,
+            exp.ToChar,
         }
     },
     **{
@@ -34,15 +46,11 @@ EXPRESSION_METADATA = {
             exp.BitwiseAndAgg,
             exp.BitwiseOrAgg,
             exp.BitwiseXorAgg,
+            exp.Left,
             exp.Overlay,
         }
     },
     exp.BitmapCount: {"returns": exp.DType.BIGINT},
+    exp.Grouping: {"returns": exp.DType.TINYINT},
     exp.Localtimestamp: {"returns": exp.DType.TIMESTAMPNTZ},
-    exp.ToBinary: {"returns": exp.DType.BINARY},
-    exp.DateFromUnixDate: {"returns": exp.DType.DATE},
-    # 2-arg `date_add(startDate, numDays)` / `date_sub` are routed to
-    # TsOrDsAdd by Hive/Spark parsers; both return DATE per the Spark
-    # and Databricks contracts.
-    exp.TsOrDsAdd: {"returns": exp.DType.DATE},
 }

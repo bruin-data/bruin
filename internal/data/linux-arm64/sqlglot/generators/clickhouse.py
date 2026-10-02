@@ -17,7 +17,7 @@ from sqlglot.dialects.dialect import (
     sha256_sql,
     strposition_sql,
     var_map_sql,
-    unit_to_str,
+    weekstart_unit_to_str,
     unit_to_var,
     trim_sql,
     sha2_digest_sql,
@@ -174,6 +174,8 @@ class ClickHouseGenerator(generator.Generator):
     QUERY_HINTS = False
     STRUCT_DELIMITER = ("(", ")")
     NVL2_SUPPORTED = False
+    ALTER_SET_TYPE = "TYPE"
+    SUPPORTS_ALTER_COLUMN_IF_EXISTS = True
     TABLESAMPLE_REQUIRES_PARENS = False
     TABLESAMPLE_SIZE_IS_ROWS = False
     TABLESAMPLE_KEYWORDS = "SAMPLE"
@@ -184,8 +186,10 @@ class ClickHouseGenerator(generator.Generator):
     TABLE_HINTS = False
     GROUPINGS_SEP = ""
     SET_OP_MODIFIERS = False
+    SET_OP_LIMITS = True
     ARRAY_SIZE_NAME = "LENGTH"
     WRAP_DERIVED_VALUES = False
+    AUTO_REFRESH_BARE_INTERVALS = True
 
     STRING_TYPE_MAPPING: t.ClassVar = {
         exp.DType.BLOB: "String",
@@ -273,7 +277,7 @@ class ClickHouseGenerator(generator.Generator):
     }
 
     TRANSFORMS = {
-        **generator.Generator.TRANSFORMS,
+        **{k: v for k, v in generator.Generator.TRANSFORMS.items() if k != exp.AutoRefreshProperty},
         exp.AnyValue: rename_func("any"),
         exp.ApproxDistinct: rename_func("uniq"),
         exp.ArrayDistinct: rename_func("arrayDistinct"),
@@ -366,15 +370,12 @@ class ClickHouseGenerator(generator.Generator):
         exp.UnixToTime: _unix_to_time_sql,
         exp.Trim: lambda self, e: trim_sql(self, e, default_trim_type="BOTH"),
         exp.Variance: rename_func("varSamp"),
+        exp.VariancePop: rename_func("varPop"),
         exp.SchemaCommentProperty: lambda self, e: self.naked_property(e),
         exp.Stddev: rename_func("stddevSamp"),
         exp.Chr: rename_func("CHAR"),
-        exp.Lag: lambda self, e: self.func(
-            "lagInFrame", e.this, e.args.get("offset"), e.args.get("default")
-        ),
-        exp.Lead: lambda self, e: self.func(
-            "leadInFrame", e.this, e.args.get("offset"), e.args.get("default")
-        ),
+        exp.Lag: rename_func("lag"),
+        exp.Lead: rename_func("lead"),
         exp.Levenshtein: unsupported_args("ins_cost", "del_cost", "sub_cost", "max_dist")(
             rename_func("editDistance")
         ),
@@ -385,6 +386,7 @@ class ClickHouseGenerator(generator.Generator):
 
     PROPERTIES_LOCATION = {
         **generator.Generator.PROPERTIES_LOCATION,
+        exp.AutoRefreshProperty: exp.Properties.Location.POST_NAME,
         exp.DefinerProperty: exp.Properties.Location.POST_SCHEMA,
         exp.OnCluster: exp.Properties.Location.POST_NAME,
         exp.PartitionedByProperty: exp.Properties.Location.POST_SCHEMA,
@@ -395,7 +397,7 @@ class ClickHouseGenerator(generator.Generator):
 
     # There's no list in docs, but it can be found in Clickhouse code
     # see `ClickHouse/src/Parsers/ParserCreate*.cpp`
-    ON_CLUSTER_TARGETS = {
+    ON_CLUSTER_TARGETS: t.ClassVar = {
         "SCHEMA",  # Transpiled CREATE SCHEMA may have OnCluster property set
         "DATABASE",
         "TABLE",
@@ -407,7 +409,7 @@ class ClickHouseGenerator(generator.Generator):
     }
 
     # https://clickhouse.com/docs/en/sql-reference/data-types/nullable
-    NON_NULLABLE_TYPES = {
+    NON_NULLABLE_TYPES: t.ClassVar = {
         exp.DType.ARRAY,
         exp.DType.MAP,
         exp.DType.STRUCT,
@@ -444,6 +446,15 @@ class ClickHouseGenerator(generator.Generator):
             )
 
         return self.func("groupConcat", this)
+
+    def select_sql(self, expression: exp.Select) -> str:
+        limit = expression.args.get("limit")
+        if isinstance(limit, exp.Fetch) and not expression.args.get("order"):
+            count = limit.args.get("count")
+            expression.set(
+                "limit", exp.Limit(expression=count if count is not None else exp.Literal.number(1))
+            )
+        return super().select_sql(expression)
 
     def offset_sql(self, expression: exp.Offset) -> str:
         offset = super().offset_sql(expression)
@@ -577,6 +588,29 @@ class ClickHouseGenerator(generator.Generator):
     def oncluster_sql(self, expression: exp.OnCluster) -> str:
         return f"ON CLUSTER {self.sql(expression, 'this')}"
 
+    def _refresh_interval_sql(self, expression: exp.Expr) -> str:
+        if isinstance(expression, exp.Add):
+            return f"{self._refresh_interval_sql(expression.this)} {self._refresh_interval_sql(expression.expression)}"
+        return self.sql(expression.assert_is(exp.Interval))
+
+    def autorefreshproperty_sql(self, expression: exp.AutoRefreshProperty) -> str:
+        cadence = self.sql(expression, "cadence")
+        interval = expression.this
+        schedule = (
+            f" {cadence} {self._refresh_interval_sql(interval)}" if cadence and interval else ""
+        )
+        offset = expression.args.get("offset")
+        offset = f" OFFSET {self._refresh_interval_sql(offset)}" if offset else ""
+        randomize = expression.args.get("randomize")
+        randomize = f" RANDOMIZE FOR {self._refresh_interval_sql(randomize)}" if randomize else ""
+        dependencies = self.expressions(expression, flat=True)
+        dependencies = f" DEPENDS ON {dependencies}" if dependencies else ""
+        settings = self.sql(expression, "settings")
+        settings = f" {settings}" if settings else ""
+        append = " APPEND" if expression.args.get("append") else ""
+
+        return f"REFRESH{schedule}{offset}{randomize}{dependencies}{settings}{append}"
+
     def createable_sql(self, expression: exp.Create, locations: defaultdict) -> str:
         if expression.kind in self.ON_CLUSTER_TARGETS and locations.get(
             exp.Properties.Location.POST_NAME
@@ -685,7 +719,7 @@ class ClickHouseGenerator(generator.Generator):
         return super().values_sql(expression, values_as_table=values_as_table)
 
     def timestamptrunc_sql(self, expression: exp.DateTrunc | exp.TimestampTrunc) -> str:
-        unit = unit_to_str(expression)
+        unit = weekstart_unit_to_str(self, expression)
         # https://clickhouse.com/docs/whats-new/changelog/2023#improvement
         if self.dialect.version < (23, 12) and unit and unit.is_string:
             unit = exp.Literal.string(unit.name.lower())

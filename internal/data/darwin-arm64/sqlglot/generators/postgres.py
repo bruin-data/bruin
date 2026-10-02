@@ -7,6 +7,7 @@ from sqlglot.dialects.dialect import (
     DATE_ADD_OR_SUB,
     JSON_EXTRACT_TYPE,
     any_value_to_max_sql,
+    arrow_json_extract_sql,
     array_append_sql,
     array_concat_sql,
     bool_xor_sql,
@@ -39,7 +40,7 @@ from sqlglot.dialects.dialect import (
     ts_or_ds_add_cast,
 )
 from sqlglot.generator import unsupported_args
-from sqlglot.helper import seq_get
+from sqlglot.helper import ensure_list, seq_get
 
 
 DATE_DIFF_FACTOR = {
@@ -75,6 +76,18 @@ def _date_add_sql(kind: str) -> t.Callable[[PostgresGenerator, DATE_ADD_OR_SUB],
         return f"{this} {kind} {self.sql(exp.Interval(this=e, unit=unit))}"
 
     return func
+
+
+def _day_month_year_sql(self: PostgresGenerator, expression: exp.Day | exp.Month | exp.Year) -> str:
+    this = expression.this
+    value = this.this if isinstance(this, exp.TsOrDsToDate) else this
+
+    if value.is_type(*exp.DataType.INTEGER_TYPES) and (
+        default_date := this.args.get("default_date")
+    ):
+        this = exp.cast(default_date, exp.DType.DATE) + value
+
+    return self.sql(exp.Extract(this=exp.var(expression.sql_name()), expression=this))
 
 
 def _date_diff_sql(self: PostgresGenerator, expression: exp.DateDiff | exp.TsOrDsDiff) -> str:
@@ -172,6 +185,17 @@ def _json_extract_sql(
     name: str, op: str
 ) -> t.Callable[[PostgresGenerator, JSON_EXTRACT_TYPE], str]:
     def _generate(self: PostgresGenerator, expression: JSON_EXTRACT_TYPE) -> str:
+        path = expression.expression
+        # Single non-literal segment: render as infix, not JSON_EXTRACT_PATH[_TEXT] (jsonb-unsafe).
+        if not isinstance(path, (exp.JSONPath, exp.Variadic)) and not ensure_list(
+            expression.args.get("expressions")
+        ):
+            return arrow_json_extract_sql(self, expression, op=op)
+
+        # JSON_EXTRACT_PATH requires a key, so use an empty variadic array for the root path
+        if len(path.expressions) == 1 and isinstance(path.expressions[0], exp.JSONPathRoot):
+            expression.set("expression", exp.Variadic(this=exp.Literal.string("{}")))
+
         if expression.args.get("only_json_types"):
             return json_extract_segments(name, quoted_index=False, op=op)(self, expression)
         return json_extract_segments(name)(self, expression)
@@ -312,6 +336,7 @@ class PostgresGenerator(generator.Generator):
         exp.DateDiff: _date_diff_sql,
         exp.DateStrToDate: datestrtodate_sql,
         exp.DateSub: _date_add_sql("-"),
+        exp.Day: _day_month_year_sql,
         exp.Explode: rename_func("UNNEST"),
         exp.ExplodingGenerateSeries: rename_func("GENERATE_SERIES"),
         exp.GenerateSeries: generate_series_sql("GENERATE_SERIES"),
@@ -327,9 +352,8 @@ class PostgresGenerator(generator.Generator):
         ),
         exp.JSONExtract: _json_extract_sql("JSON_EXTRACT_PATH", "->"),
         exp.JSONExtractScalar: _json_extract_sql("JSON_EXTRACT_PATH_TEXT", "->>"),
-        exp.JSONBExtract: lambda self, e: self.binary(e, "#>"),
-        exp.JSONBExtractScalar: lambda self, e: self.binary(e, "#>>"),
-        exp.JSONBContains: lambda self, e: self.binary(e, "?"),
+        exp.JSONBExtract: lambda self, e: arrow_json_extract_sql(self, e, op="#>"),
+        exp.JSONBExtractScalar: lambda self, e: arrow_json_extract_sql(self, e, op="#>>"),
         exp.ParseJSON: lambda self, e: self.sql(exp.cast(e.this, exp.DType.JSON)),
         exp.JSONPathKey: json_path_key_only_name,
         exp.JSONPathRoot: lambda *_: "",
@@ -341,6 +365,7 @@ class PostgresGenerator(generator.Generator):
         exp.MapFromEntries: no_map_from_entries_sql,
         exp.Min: min_or_least,
         exp.Merge: merge_without_target_sql,
+        exp.Month: _day_month_year_sql,
         exp.PartitionedByProperty: lambda self, e: f"PARTITION BY {self.sql(e, 'this')}",
         exp.PercentileCont: transforms.preprocess([transforms.add_within_group_for_percentiles]),
         exp.PercentileDisc: transforms.preprocess([transforms.add_within_group_for_percentiles]),
@@ -389,6 +414,7 @@ class PostgresGenerator(generator.Generator):
         exp.VariancePop: rename_func("VAR_POP"),
         exp.Variance: rename_func("VAR_SAMP"),
         exp.Xor: bool_xor_sql,
+        exp.Year: _day_month_year_sql,
         exp.Unicode: rename_func("ASCII"),
         exp.UnixToTime: _unix_to_time_sql,
         exp.Levenshtein: _levenshtein_sql,

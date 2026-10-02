@@ -26,6 +26,7 @@ class MySQL(Dialect):
 
     TIME_FORMAT = "'%Y-%m-%d %T'"
     DPIPE_IS_STRING_CONCAT = False
+    CONCAT_WS_COALESCE = True
     SUPPORTS_USER_DEFINED_TYPES = False
     SAFE_DIVISION = True
     SAFE_TO_ELIMINATE_DOUBLE_NEGATION = False
@@ -44,8 +45,11 @@ class MySQL(Dialect):
         "%u": "%W",
         "%k": "%-H",
         "%l": "%-I",
+        "%r": "%I:%M:%S %p",
         "%T": "%H:%M:%S",
         "%W": "%A",
+        "%x": "%G",
+        # %v (ISO week) is unmapped due to collision with %V (roundtrip issue)
     }
 
     VALID_INTERVAL_UNITS = {
@@ -96,7 +100,6 @@ class MySQL(Dialect):
             "SERIAL": TokenType.SERIAL,
             "SIGNED": TokenType.BIGINT,
             "SIGNED INTEGER": TokenType.BIGINT,
-            "SOUNDS LIKE": TokenType.SOUNDS_LIKE,
             "START": TokenType.BEGIN,
             "TIMESTAMP": TokenType.TIMESTAMPTZ,
             "TINYBLOB": TokenType.TINYBLOB,

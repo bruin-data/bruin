@@ -88,12 +88,6 @@ class MySQLParser(parser.Parser):
 
     RANGE_PARSERS = {
         **parser.Parser.RANGE_PARSERS,
-        TokenType.SOUNDS_LIKE: lambda self, this: self.expression(
-            exp.EQ(
-                this=self.expression(exp.Soundex(this=this)),
-                expression=self.expression(exp.Soundex(this=self._parse_term())),
-            )
-        ),
         TokenType.MEMBER_OF: lambda self, this: self.expression(
             exp.JSONArrayContains(this=this, expression=self._parse_wrapped(self._parse_expression))
         ),
@@ -245,6 +239,7 @@ class MySQLParser(parser.Parser):
 
     CONSTRAINT_PARSERS = {
         **parser.Parser.CONSTRAINT_PARSERS,
+        "BINARY": lambda self: self.expression(exp.BinaryColumnConstraint()),
         "FULLTEXT": lambda self: self._parse_index_constraint(kind="FULLTEXT"),
         "INDEX": lambda self: self._parse_index_constraint(),
         "KEY": lambda self: self._parse_index_constraint(),
@@ -258,6 +253,7 @@ class MySQLParser(parser.Parser):
         "CHANGE": lambda self: self._parse_alter_table_modify(rename=True),
         "MODIFY": lambda self: self._parse_alter_table_modify(),
         "AUTO_INCREMENT": lambda self: self._parse_property_assignment(exp.AutoIncrementProperty),
+        "COMMENT": lambda self: self._parse_property_assignment(exp.SchemaCommentProperty),
     }
 
     ALTER_ALTER_PARSERS = {
@@ -273,7 +269,7 @@ class MySQLParser(parser.Parser):
         "SPATIAL",
     }
 
-    PROFILE_TYPES: parser.OPTIONS_TYPE = {
+    PROFILE_TYPES: t.ClassVar[parser.OPTIONS_TYPE] = {
         **dict.fromkeys(("ALL", "CPU", "IPC", "MEMORY", "SOURCE", "SWAPS"), tuple()),
         "BLOCK": ("IO",),
         "CONTEXT": ("SWITCHES",),
@@ -305,6 +301,28 @@ class MySQLParser(parser.Parser):
     STRING_ALIASES = True
     VALUES_FOLLOWED_BY_PAREN = False
     SUPPORTS_PARTITION_SELECTION = True
+
+    def _parse_column_constraint(self) -> exp.Expr | None:
+        if self._match(TokenType.KEY):
+            return self.expression(exp.ColumnConstraint(kind=self._parse_primary_key()))
+
+        return super()._parse_column_constraint()
+
+    def _parse_range(self, this: exp.Expr | None = None) -> exp.Expr | None:
+        this = this or self._parse_bitwise()
+
+        if self._match_text_seq("SOUNDS", "LIKE"):
+            this = self.expression(
+                exp.EQ(
+                    this=self.expression(exp.Soundex(this=this)),
+                    expression=self.expression(exp.Soundex(this=self._parse_bitwise())),
+                )
+            )
+            # MySQL evaluates = and IS left to right because they have the same precedence.
+            if self._match(TokenType.IS, advance=False):
+                this = self.expression(exp.Paren(this=this))
+
+        return super()._parse_range(this)
 
     def _parse_alter_table_rename(self):
         if self._match_texts(("INDEX", "KEY")):
@@ -371,14 +389,42 @@ class MySQLParser(parser.Parser):
         self._match_r_paren()
         return self.expression(exp.ColumnPrefix(this=this, expression=expression))
 
+    def _parse_index_constraint_part(self) -> exp.Expr | None:
+        # key_part: {col_name [(length)] | (expr)}, so only a prefixed column is followed by "("
+        if (
+            not self._match(TokenType.L_PAREN, advance=False)
+            and self._next
+            and self._next.token_type == TokenType.L_PAREN
+        ):
+            return self._parse_primary_key_part()
+
+        return self._parse_disjunction()
+
+    def _parse_index_key_part(self) -> exp.Expr | None:
+        # Only keep the Ordered wrapper for an explicit ASC/DESC, otherwise the implicit
+        # nulls_first leaks into other dialects as NULLS FIRST
+        ordered = self._parse_ordered(self._parse_index_constraint_part)
+        return ordered.this if ordered and ordered.args.get("desc") is None else ordered
+
     def _parse_index_constraint(self, kind: str | None = None) -> exp.IndexColumnConstraint:
         if kind:
             self._match_texts(("INDEX", "KEY"))
 
         this = self._parse_id_var(any_token=False)
         index_type = self._match(TokenType.USING) and self._advance_any() and self._prev.text
-        expressions = self._parse_wrapped_csv(self._parse_ordered)
+        expressions = self._parse_wrapped_csv(self._parse_index_key_part)
 
+        return self.expression(
+            exp.IndexColumnConstraint(
+                this=this,
+                expressions=expressions,
+                kind=kind,
+                index_type=index_type,
+                options=self._parse_index_constraint_options(),
+            )
+        )
+
+    def _parse_index_constraint_options(self) -> list[exp.IndexConstraintOption]:
         options = []
         while True:
             if self._match_text_seq("KEY_BLOCK_SIZE"):
@@ -408,15 +454,32 @@ class MySQLParser(parser.Parser):
 
             options.append(opt)
 
+        return options
+
+    def _parse_unique(self) -> exp.UniqueColumnConstraint:
+        self._match_texts(("KEY", "INDEX"))
+        this = self._parse_unique_key()
+        index_type = self._parse_index_type()
+
+        # UNIQUE [INDEX | KEY] [index_name] [index_type] (key_part,...) [index_option] ...
+        if not self._match(TokenType.L_PAREN, advance=False):
+            return self.expression(exp.UniqueColumnConstraint(this=this, index_type=index_type))
+
+        expressions = self._parse_wrapped_csv(self._parse_index_key_part)
+
         return self.expression(
-            exp.IndexColumnConstraint(
-                this=this,
-                expressions=expressions,
-                kind=kind,
-                index_type=index_type,
-                options=options,
+            exp.UniqueColumnConstraint(
+                this=self.expression(exp.Schema(this=this, expressions=expressions)),
+                index_type=index_type or self._parse_index_type(),
+                options=self._parse_index_constraint_options(),
             )
         )
+
+    def _parse_index_type(self) -> str | None:
+        if self._match(TokenType.USING) and self._advance_any():
+            return self._prev.text
+
+        return None
 
     def _parse_show_mysql(
         self,

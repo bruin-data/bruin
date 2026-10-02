@@ -53,6 +53,8 @@ def _build_dateadd(args: list) -> exp.Expr:
 
 
 class SparkParser(Spark2Parser):
+    DECIMAL_LITERALS_ALLOW_NEGATIVE_SCALE = False
+
     NO_PAREN_FUNCTIONS = {
         **Spark2Parser.NO_PAREN_FUNCTIONS,
         TokenType.SESSION_USER: exp.SessionUser,
@@ -123,7 +125,6 @@ class SparkParser(Spark2Parser):
 
     STATEMENT_PARSERS = {
         **Spark2Parser.STATEMENT_PARSERS,
-        TokenType.DECLARE: lambda self: self._parse_declare(),
     }
 
     def _parse_generated_as_identity(

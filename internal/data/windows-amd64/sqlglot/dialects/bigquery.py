@@ -10,6 +10,7 @@ from sqlglot._typing import E
 from sqlglot.parsers.bigquery import BigQueryParser
 from sqlglot.generators.bigquery import BigQueryGenerator
 from sqlglot.dialects.dialect import (
+    ASCII_LOWER,
     Dialect,
     NormalizationStrategy,
 )
@@ -50,6 +51,7 @@ class BigQuery(Dialect):
 
     # https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical#case_sensitivity
     NORMALIZATION_STRATEGY = NormalizationStrategy.CASE_INSENSITIVE
+    ASCII_ONLY_NORMALIZATION = True
 
     # bigquery udfs are case sensitive
     NORMALIZE_FUNCTIONS = False
@@ -152,7 +154,7 @@ class BigQuery(Dialect):
                 or expression.meta_get("is_table")
             )
             if not case_sensitive:
-                expression.set("this", expression.this.lower())
+                expression.set("this", expression.this.translate(ASCII_LOWER))
 
             return t.cast(E, expression)
 
@@ -193,11 +195,8 @@ class BigQuery(Dialect):
             "EXCEPTION": TokenType.COMMAND,
             "EXPORT": TokenType.EXPORT,
             "FLOAT64": TokenType.DOUBLE,
-            "FOR SYSTEM TIME": TokenType.TIMESTAMP_SNAPSHOT,
-            "FOR SYSTEM_TIME": TokenType.TIMESTAMP_SNAPSHOT,
             "LOOP": TokenType.COMMAND,
             "MODEL": TokenType.MODEL,
-            "NOT DETERMINISTIC": TokenType.VOLATILE,
             "RECORD": TokenType.STRUCT,
             "REPEAT": TokenType.COMMAND,
             "TIMESTAMP": TokenType.TIMESTAMPTZ,

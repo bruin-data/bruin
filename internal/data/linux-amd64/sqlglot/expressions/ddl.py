@@ -250,6 +250,7 @@ class AlterColumn(Expression):
         "allow_null": False,
         "visible": False,
         "rename_to": False,
+        "exists": False,
     }
 
 
@@ -344,8 +345,8 @@ class MergeTreeTTL(Expression):
 
 class Drop(Expression):
     arg_types = {
-        "this": False,
         "kind": False,
+        "tables": False,
         "expressions": False,
         "exists": False,
         "temporary": False,
@@ -358,6 +359,7 @@ class Drop(Expression):
         "concurrently": False,
         "sync": False,
         "iceberg": False,
+        "force": False,
     }
 
     @property

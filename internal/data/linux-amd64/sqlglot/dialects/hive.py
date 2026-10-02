@@ -52,18 +52,19 @@ class Hive(Dialect):
         "yy": "%y",
         "MMMM": "%B",
         "MMM": "%b",
-        # Hive 4.0+ parses MM/dd strictly (java.time.DateTimeFormatter, see HIVE-25458/HIVE-25576)
+        # Hive 4.0+ parses MM/dd/HH/hh/mm/ss strictly (java.time.DateTimeFormatter, see
+        # HIVE-25458/HIVE-25576)
         "MM": "%mstrict",
         "M": "%-m",
         "dd": "%dstrict",
         "d": "%-d",
-        "HH": "%H",
+        "HH": "%Hstrict",
         "H": "%-H",
-        "hh": "%I",
+        "hh": "%Istrict",
         "h": "%-I",
-        "mm": "%M",
+        "mm": "%Mstrict",
         "m": "%-M",
-        "ss": "%S",
+        "ss": "%Sstrict",
         "s": "%-S",
         "SSSSSS": "%f",
         "a": "%p",
@@ -108,8 +109,6 @@ class Hive(Dialect):
             "MINUS": TokenType.EXCEPT,
             "MSCK REPAIR": TokenType.COMMAND,
             "REFRESH": TokenType.REFRESH,
-            "TIMESTAMP AS OF": TokenType.TIMESTAMP_SNAPSHOT,
-            "VERSION AS OF": TokenType.VERSION_SNAPSHOT,
             "SERDEPROPERTIES": TokenType.SERDE_PROPERTIES,
         }
 

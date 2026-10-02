@@ -17,6 +17,8 @@ from sqlglot.dialects.dialect import (
     no_pivot_sql,
     no_tablesample_sql,
     no_trycast_sql,
+    if_sql,
+    remove_ts_or_ds_to_date,
     rename_func,
     strposition_sql,
     unit_to_var,
@@ -29,7 +31,12 @@ from collections import defaultdict
 
 def _date_trunc_sql(self: MySQLGenerator, expression: exp.DateTrunc) -> str:
     expr = self.sql(expression, "this")
-    unit = expression.text("unit").upper()
+    unit_expr = expression.args.get("unit")
+    unit = (
+        self.weekstart_name(unit_expr)
+        if isinstance(unit_expr, exp.WeekStart)
+        else expression.text("unit").upper()
+    )
 
     if unit == "WEEK":
         concat = f"CONCAT(YEAR({expr}), ' ', WEEK({expr}, 1), ' 1')"
@@ -102,23 +109,6 @@ def _ts_or_ds_to_date_sql(self: MySQLGenerator, expression: exp.TsOrDsToDate) ->
     return _str_to_date_sql(self, expression) if time_format else self.func("DATE", expression.this)
 
 
-def _remove_ts_or_ds_to_date(
-    to_sql: t.Callable[[MySQLGenerator, exp.Expr], str] | None = None,
-    args: tuple[str, ...] = ("this",),
-) -> t.Callable[[MySQLGenerator, exp.Func], str]:
-    def func(self: MySQLGenerator, expression: exp.Func) -> str:
-        for arg_key in args:
-            arg = expression.args.get(arg_key)
-            if isinstance(arg, (exp.TsOrDsToDate, exp.TsOrDsToTimestamp)) and not arg.args.get(
-                "format"
-            ):
-                expression.set(arg_key, arg.this)
-
-        return to_sql(self, expression) if to_sql else self.function_fallback_sql(expression)
-
-    return func
-
-
 class MySQLGenerator(generator.Generator):
     SELECT_KINDS: tuple[str, ...] = ()
     TRY_SUPPORTED = False
@@ -126,6 +116,7 @@ class MySQLGenerator(generator.Generator):
     SUPPORTS_DECODE_CASE = False
     SUPPORTS_MODIFY_COLUMN = True
     SUPPORTS_CHANGE_COLUMN = True
+    SUPPORTS_ALTER_COLUMN_NULLABILITY = True
 
     AFTER_HAVING_MODIFIER_TRANSFORMS = generator.AFTER_HAVING_MODIFIER_TRANSFORMS
 
@@ -160,28 +151,30 @@ class MySQLGenerator(generator.Generator):
         exp.Chr: lambda self, e: self.chr_sql(e, "CHAR"),
         exp.CurrentDate: no_paren_current_date_sql,
         exp.CurrentVersion: rename_func("VERSION"),
-        exp.DateDiff: _remove_ts_or_ds_to_date(
+        exp.DateDiff: remove_ts_or_ds_to_date(
             lambda self, e: self.func("DATEDIFF", e.this, e.expression), ("this", "expression")
         ),
-        exp.DateAdd: _remove_ts_or_ds_to_date(date_add_sql("ADD")),
+        exp.DateAdd: date_add_sql("ADD"),
         exp.DateStrToDate: datestrtodate_sql,
-        exp.DateSub: _remove_ts_or_ds_to_date(date_add_sql("SUB")),
+        exp.DateSub: date_add_sql("SUB"),
         exp.DateTrunc: _date_trunc_sql,
-        exp.Day: _remove_ts_or_ds_to_date(),
-        exp.DayOfMonth: _remove_ts_or_ds_to_date(rename_func("DAYOFMONTH")),
-        exp.DayOfWeek: _remove_ts_or_ds_to_date(rename_func("DAYOFWEEK")),
-        exp.DayOfYear: _remove_ts_or_ds_to_date(rename_func("DAYOFYEAR")),
+        exp.Day: remove_ts_or_ds_to_date(),
+        exp.DayOfMonth: remove_ts_or_ds_to_date(rename_func("DAYOFMONTH")),
+        exp.DayOfWeek: remove_ts_or_ds_to_date(rename_func("DAYOFWEEK")),
+        exp.DayOfYear: remove_ts_or_ds_to_date(rename_func("DAYOFYEAR")),
         exp.GroupConcat: lambda self, e: (
             f"""GROUP_CONCAT({self.sql(e, "this")} SEPARATOR {self.sql(e, "separator") or "','"})"""
         ),
         exp.ILike: no_ilike_sql,
+        # https://dev.mysql.com/doc/refman/9.7/en/flow-control-functions.html#function_if
+        exp.If: if_sql(false_value="NULL"),
         exp.JSONExtractScalar: arrow_json_extract_sql,
         exp.Length: length_or_char_length_sql,
         exp.LogicalOr: rename_func("MAX"),
         exp.LogicalAnd: rename_func("MIN"),
         exp.Max: max_or_greatest,
         exp.Min: min_or_least,
-        exp.Month: _remove_ts_or_ds_to_date(),
+        exp.Month: remove_ts_or_ds_to_date(),
         exp.NullSafeEQ: lambda self, e: self.binary(e, "<=>"),
         exp.NullSafeNEQ: lambda self, e: f"NOT {self.binary(e, '<=>')}",
         exp.NumberToStr: rename_func("FORMAT"),
@@ -215,7 +208,7 @@ class MySQLGenerator(generator.Generator):
             e,
             include_precision=not e.args.get("zone"),
         ),
-        exp.TimeToStr: _remove_ts_or_ds_to_date(
+        exp.TimeToStr: remove_ts_or_ds_to_date(
             lambda self, e: self.func("DATE_FORMAT", e.this, self.format_time(e))
         ),
         exp.Trim: trim_sql,
@@ -226,14 +219,14 @@ class MySQLGenerator(generator.Generator):
         exp.TsOrDsToDate: _ts_or_ds_to_date_sql,
         exp.Unicode: lambda self, e: f"ORD(CONVERT({self.sql(e.this)} USING utf32))",
         exp.UnixToTime: _unix_to_time_sql,
-        exp.Week: _remove_ts_or_ds_to_date(),
-        exp.WeekOfYear: _remove_ts_or_ds_to_date(rename_func("WEEKOFYEAR")),
-        exp.Year: _remove_ts_or_ds_to_date(),
+        exp.Week: remove_ts_or_ds_to_date(),
+        exp.WeekOfYear: remove_ts_or_ds_to_date(rename_func("WEEKOFYEAR")),
+        exp.Year: remove_ts_or_ds_to_date(),
         exp.UtcTimestamp: rename_func("UTC_TIMESTAMP"),
         exp.UtcTime: rename_func("UTC_TIME"),
     }
 
-    UNSIGNED_TYPE_MAPPING = {
+    UNSIGNED_TYPE_MAPPING: t.ClassVar = {
         exp.DType.UBIGINT: "BIGINT",
         exp.DType.UINT: "INT",
         exp.DType.UMEDIUMINT: "MEDIUMINT",
@@ -243,7 +236,7 @@ class MySQLGenerator(generator.Generator):
         exp.DType.UDOUBLE: "DOUBLE",
     }
 
-    TIMESTAMP_TYPE_MAPPING = {
+    TIMESTAMP_TYPE_MAPPING: t.ClassVar = {
         exp.DType.DATETIME2: "DATETIME",
         exp.DType.SMALLDATETIME: "DATETIME",
         exp.DType.TIMESTAMP: "DATETIME",
@@ -312,7 +305,7 @@ class MySQLGenerator(generator.Generator):
 
     # MySQL doesn't support many datatypes in cast.
     # https://dev.mysql.com/doc/refman/8.0/en/cast-functions.html#function_cast
-    CAST_MAPPING = {
+    CAST_MAPPING: t.ClassVar = {
         exp.DType.LONGTEXT: "CHAR",
         exp.DType.LONGBLOB: "CHAR",
         exp.DType.MEDIUMBLOB: "CHAR",
@@ -330,7 +323,7 @@ class MySQLGenerator(generator.Generator):
         exp.DType.UBIGINT: "UNSIGNED",
     }
 
-    TIMESTAMP_FUNC_TYPES = {
+    TIMESTAMP_FUNC_TYPES: t.ClassVar = {
         exp.DType.TIMESTAMPTZ,
         exp.DType.TIMESTAMPLTZ,
     }
@@ -601,7 +594,7 @@ class MySQLGenerator(generator.Generator):
         "zerofill",
     }
 
-    SQL_SECURITY_VIEW_LOCATION = exp.Properties.Location.POST_CREATE
+    SQL_SECURITY_VIEW_LOCATION: t.ClassVar = exp.Properties.Location.POST_CREATE
 
     def makeinterval_sql(self: MySQLGenerator, expression: exp.MakeInterval) -> str:
         intervals: list[exp.Interval] = []
@@ -702,6 +695,15 @@ class MySQLGenerator(generator.Generator):
         global_ = " GLOBAL" if expression.args.get("global_") else ""
 
         target = self.sql(expression, "target")
+
+        # SHOW CREATE ... takes a possibly qualified name, it has no FROM clause
+        # https://dev.mysql.com/doc/refman/8.4/en/show-create-table.html
+        if expression.name.startswith("CREATE") and (db_id := self.sql(expression, "db")):
+            target = f"{db_id}.{target}"
+            db = ""
+        else:
+            db = self._prefixed_sql("FROM", expression, "db")
+
         target = f" {target}" if target else ""
         if expression.name in ("COLUMNS", "INDEX"):
             target = f" FROM{target}"
@@ -711,8 +713,6 @@ class MySQLGenerator(generator.Generator):
             target = f" ON{target}" if target else ""
         elif expression.name == "PROJECTIONS":
             target = f" ON TABLE{target}" if target else ""
-
-        db = self._prefixed_sql("FROM", expression, "db")
 
         like = self._prefixed_sql("LIKE", expression, "like")
         where = self.sql(expression, "where")
@@ -758,8 +758,12 @@ class MySQLGenerator(generator.Generator):
         if not dtype:
             return super().altercolumn_sql(expression)
 
+        if expression.args.get("exists"):
+            self.unsupported("ALTER COLUMN IF EXISTS is not supported by this dialect")
+
         this = self.sql(expression, "this")
-        return f"MODIFY COLUMN {this} {dtype}"
+        null_constraint = self._alter_column_null_constraint_sql(expression)
+        return f"MODIFY COLUMN {this} {dtype}{null_constraint}"
 
     def _prefixed_sql(self, prefix: str, expression: exp.Expr, arg: str) -> str:
         sql = self.sql(expression, arg)
@@ -775,6 +779,8 @@ class MySQLGenerator(generator.Generator):
 
     def timestamptrunc_sql(self, expression: exp.TimestampTrunc) -> str:
         unit = expression.args.get("unit")
+        if isinstance(unit, exp.WeekStart):
+            unit = exp.var(self.weekstart_name(unit))
 
         # Pick an old-enough date to avoid negative timestamp diffs
         start_ts = "'0000-01-01 00:00:00'"
