@@ -1,0 +1,27 @@
+{
+ "hits": [
+  {
+   "objectID": "9003",
+   "_tags": [
+    "comment",
+    "author_recruiter_rita",
+    "story_9001"
+   ],
+   "author": "recruiter_rita",
+   "created_at_i": -2500,
+   "title": null,
+   "url": null,
+   "story_text": null,
+   "comment_text": "We&#x27;re hiring! Example Co job opening for data engineers, apply via our careers page.",
+   "points": null,
+   "num_comments": null,
+   "parent_id": 9001,
+   "story_id": 9001,
+   "story_title": "Show HN: Example Co now supports warehouse alerts"
+  }
+ ],
+ "nbHits": 3,
+ "nbPages": 2,
+ "page": 1,
+ "hitsPerPage": 100
+}

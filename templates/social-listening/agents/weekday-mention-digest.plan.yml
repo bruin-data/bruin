@@ -1,0 +1,266 @@
+# Weekday mention digest: DRAFT scheduled-agent plan.
+#
+# This file is a draft for an operator to review. Installing the template does not
+# create, schedule or activate anything. Review the SQL, output, timezone and delivery
+# target, create the scheduled agent without a cron (it stays a draft), run it once by
+# hand, then activate it. Full steps: agents/README.md and docs/bruin-cloud-setup.md.
+# Replace <BRAND> with brand_name from pipeline.yml before creating the plan.
+#
+# How the fields map to `bruin cloud scheduled-agents create`:
+#   --agent-id           the mention-ops agent (agents/mention-ops.prompt.md)
+#   --title              title
+#   --instructions       this whole file: --instructions "$(cat agents/weekday-mention-digest.plan.yml)"
+#   --output-formatting  output_format.summary
+#   --connection         connection (the agent's read-only warehouse connection)
+#   --cron, --timezone   proposed_schedule.cron / proposed_schedule.timezone. Leave them
+#                        off at create time. A plan with a cron is active immediately.
+#                        Set them with `scheduled-agents update` after the manual test.
+#   --state-file         not this file. --state-file takes the full Cloud plan object
+#                        (schedule, instructions, verified_sqls, ...), and this file is
+#                        not in that shape.
+#   state.file           a run-state file on the scheduled agent, managed with
+#                        `bruin cloud scheduled-agents run-states get|set|delete`.
+
+title: Weekday mention digest
+status: draft
+connection: <READONLY_WAREHOUSE_CONNECTION>
+
+proposed_schedule:
+  cron: "0 9 * * 1-5"
+  timezone: "UTC"   # replace with the team's timezone, e.g. <TIMEZONE>
+  note: Apply only after one successful manual run.
+
+delivery:
+  target: <SLACK_CHANNEL>   # a channel of a messaging integration already attached to the agent
+  note: >
+    Delivery goes through the agent's Bruin Cloud messaging integration. Never give this
+    plan or the agent the pipeline's webhook URLs (sl-webhook-url, sl-slack-webhook-url).
+
+permitted_objects:
+  - marts.mart_mention_queue
+  - marts.mart_pipeline_health
+  - operations.fct_alert_outbox
+
+parameters:
+  late_arrival_hours: 6       # keep equal to late_arrival_hours in pipeline.yml
+  default_window_hours: 24    # used when the state file has no last_run_at
+  max_window_hours: 96        # never look further back than this, even after a long gap
+  max_items: 25
+  max_data_age_hours: 30      # marts older than this are stale
+
+late_arrival_window: >
+  The digest covers items routed since the previous digest (last_run_at in the state file,
+  or 24 hours ago on the first run, and never more than 96 hours ago), extended back by
+  late_arrival_hours (6) so that items collected late are not missed. Both routed_at and
+  published_at must fall inside that window, so a backfill of old content does not flood
+  the digest. Monday's run reaches back to Friday's run through last_run_at. Items already
+  sent in an earlier digest are excluded by alert_key, so the overlap never repeats an item.
+
+state:
+  file: weekday-mention-digest.state.json
+  schema: |
+    {
+      "delivered_alert_keys": [
+        {"alert_key": "<32 hex characters>", "sent_at": "YYYY-MM-DDTHH:MM:SSZ"}
+      ],
+      "last_run_at": "YYYY-MM-DDTHH:MM:SSZ"
+    }
+  rules:
+    - >-
+      Read the file at the start of the run. If it does not exist or is not valid JSON,
+      start from {"delivered_alert_keys": [], "last_run_at": null} and say so in the
+      digest's data notes.
+    - >-
+      Replace <DELIVERED_ALERT_KEYS> in digest_sql with a SQL list of the stored keys,
+      e.g. ['0a1b...', '9f8e...'], or [] when there are none. Include only values that are
+      exactly 32 lowercase hex characters; drop anything else.
+    - >-
+      Replace <LAST_RUN_AT> with the stored last_run_at as a quoted UTC timestamp,
+      e.g. '2026-01-15 09:00:00', or NULL when there is none.
+    - >-
+      After the digest (or the no-new-items message) has been posted, add every alert_key
+      you sent with sent_at = now, set last_run_at to the time the run started, and write
+      the file back.
+    - >-
+      Drop entries whose sent_at is more than 14 days old. Keep at most 2000 entries,
+      dropping the oldest first.
+    - >-
+      Do not update the state when the run ends with the blocked-data response. The next
+      run then covers the same window again.
+    - >-
+      The state holds alert keys and timestamps only. Never store mention text, URLs,
+      author handles or any credential in it.
+
+steps:
+  - >-
+    Run health_precheck_sql. If it fails, send blocked_data_response and stop.
+  - >-
+    Run digest_sql with the state values substituted. If it fails, send
+    blocked_data_response and stop.
+  - >-
+    If digest_sql returns no rows and health_precheck_sql shows stale data, send
+    blocked_data_response (not the no-new-items message) and stop.
+  - >-
+    If digest_sql returns no rows and the data is fresh, send no_new_items_response.
+  - >-
+    Otherwise format the rows as described in output_format and send them to the
+    delivery target.
+  - >-
+    Update the state file as described in state.rules.
+
+health_precheck_sql: |
+  SELECT
+      component,
+      health_status,
+      health_reasons_json,
+      last_success_at,
+      data_as_of,
+      data_as_of < CAST(timezone('UTC', current_timestamp) AS TIMESTAMP) - INTERVAL 30 HOUR AS marts_stale
+  FROM marts.mart_pipeline_health
+  WHERE health_status <> 'disabled'
+  ORDER BY component
+  LIMIT 20
+
+health_precheck_interpretation:
+  - >-
+    No rows at all means there is no health data. Treat it as stale.
+  - >-
+    marts_stale = true on any row means the marts are more than 30 hours old: stale.
+  - >-
+    A source:<name> row with "stale" in health_reasons_json means that source may be
+    missing items after its last_success_at. Treat it as stale for that source.
+  - >-
+    Rows with other reasons (errors, model_errors, delivery_failed, abnormal_volume, lag)
+    do not block the digest. List them in the data notes and point to the
+    pipeline-health-monitor plan.
+  - >-
+    If every row has health_status = 'ok' and marts_stale = false, the data is fresh.
+
+digest_sql: |
+  WITH params AS (
+      SELECT
+          CAST(timezone('UTC', current_timestamp) AS TIMESTAMP) AS now_utc,
+          6 AS late_arrival_hours,
+          24 AS default_window_hours,
+          96 AS max_window_hours,
+          CAST(<LAST_RUN_AT> AS TIMESTAMP) AS last_run_at,
+          CAST(<DELIVERED_ALERT_KEYS> AS VARCHAR[]) AS delivered_alert_keys
+  ),
+  bounds AS (
+      SELECT
+          now_utc,
+          delivered_alert_keys,
+          GREATEST(
+              COALESCE(last_run_at, now_utc - to_hours(default_window_hours)),
+              now_utc - to_hours(max_window_hours)
+          ) - to_hours(late_arrival_hours) AS window_start
+      FROM params
+  )
+  SELECT
+      q.alert_key,
+      q.content_id,
+      q.source,
+      q.content_type,
+      q.community,
+      q.source_url,
+      q.title,
+      substr(q.snippet, 1, 160) AS snippet,
+      q.matched_text,
+      q.rule_ids,
+      q.categories,
+      q.intent,
+      ROUND(q.priority, 2) AS priority,
+      ROUND(q.relevance, 2) AS relevance,
+      ROUND(q.intent_score, 2) AS intent_score,
+      ROUND(q.fit, 2) AS fit,
+      ROUND(q.engagement, 2) AS engagement,
+      ROUND(q.freshness, 2) AS freshness,
+      ROUND(q.authenticity, 2) AS authenticity,
+      ROUND(q.confidence, 2) AS confidence,
+      q.assessment_status,
+      q.score_basis,
+      q.model_generated,
+      q.model_id,
+      q.delivery_status,
+      q.delivery_attempts,
+      q.delivered_at,
+      o.routed_at,
+      q.published_at,
+      q.feedback_outcome,
+      q.draft_status,
+      q.data_as_of,
+      b.window_start
+  FROM marts.mart_mention_queue q
+  JOIN operations.fct_alert_outbox o ON o.alert_key = q.alert_key
+  CROSS JOIN bounds b
+  WHERE q.queue_state = 'routed'
+    AND o.routed_at >= b.window_start
+    AND q.published_at >= b.window_start
+    AND NOT list_contains(b.delivered_alert_keys, q.alert_key)
+  ORDER BY q.priority DESC, o.routed_at DESC, q.alert_key
+  LIMIT 25
+
+output_format:
+  summary: >
+    Markdown digest with a header, a numbered item list ordered by priority, and data
+    notes. Every item has its source link, quoted matched text, rule, intent, priority
+    with its six components, an assessment label and delivery status.
+  template: |
+    # <BRAND> mentions: <YYYY-MM-DD>
+
+    <N> new routed items. Window: <window_start> to <now_utc> UTC, including a 6-hour
+    late-arrival lookback. Data as of <data_as_of> UTC.
+
+    ## Items
+
+    ### 1. <title, or the first 80 characters of snippet>
+    - Link: [<source> <content_type> in <community>](<source_url>)
+    - Matched: "<matched_text>" (rule: <rule_ids>; categories: <categories>)
+    - Intent: <intent>
+    - Priority: <priority> (relevance <relevance>, intent <intent_score>, fit <fit>, engagement <engagement>, freshness <freshness>, authenticity <authenticity>); confidence <confidence>
+    - Assessment: <label>
+    - Delivery: <delivery_status>, routed <routed_at> UTC
+    - Review: feedback <feedback_outcome or "none">; draft <draft_status or "none">
+
+    ## Data notes
+    - <health rows from health_precheck_sql, or "All components healthy.">
+    - <"Showing the top 25; more items matched." when 25 rows came back>
+  assessment_labels:
+    deterministic: "Rule-based assessment."
+    llm_assessed: "Model-generated assessment (<model_id>). Check the source before acting."
+    llm_error: "Model failed; rule-based values shown."
+    llm_invalid_response: "Model returned invalid output; rule-based values shown."
+    low_confidence: "Append \"Low confidence.\" when confidence < 0.6."
+  rules:
+    - >-
+      Use only values returned by the queries. Do not add commentary on the authors.
+    - >-
+      Do not show author handles.
+    - >-
+      Quote matched_text exactly. Do not paraphrase the snippet.
+    - >-
+      Keep items in the SQL order.
+
+no_new_items_response: |
+  # <BRAND> mentions: <YYYY-MM-DD>
+
+  No new routed items between <window_start> and <now_utc> UTC. Data as of <data_as_of> UTC; all sources fresh.
+
+blocked_data_response: |
+  # <BRAND> mentions: <YYYY-MM-DD>: digest not produced
+
+  Reason: <query failed: <error message> | data stale: marts as of <data_as_of> UTC | source <name> stale since <last_success_at> UTC>
+  No items are listed because the data cannot be trusted. Nothing was guessed.
+  Next step for a human: check the latest social-listening pipeline run in Bruin Cloud.
+
+never:
+  - >-
+    Post, reply, comment, vote or send DMs on any source platform.
+  - >-
+    Trigger, rerun or backfill a pipeline or asset, or change any schedule.
+  - >-
+    Write to any table. The only thing this plan writes is its own state file.
+  - >-
+    Query objects outside permitted_objects, or open source_url pages.
+  - >-
+    Guess who an author is.

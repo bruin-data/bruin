@@ -1,0 +1,3 @@
+feedback_id,source,external_id,reviewer,reviewed_at,outcome,corrected_relevance,corrected_intent,is_false_positive,notes
+fb-001,reddit,t3_p5,reviewer_a,2026-01-15T10:00:00Z,not_useful,0.0,general_discussion,true,"Grocery co-op, not the brand."
+fb-002,reddit,t3_p1,reviewer_a,2026-01-15T10:05:00Z,replied_manually,,seeking_recommendation,false,Replied on the thread with a disclosure.

@@ -1,0 +1,101 @@
+{
+ "kind": "Listing",
+ "data": {
+  "after": null,
+  "children": [
+   {
+    "kind": "t3",
+    "data": {
+     "id": "p6",
+     "name": "t3_p6",
+     "subreddit": "datascience",
+     "author": "pipeline_pat",
+     "title": "Looking for an example alternative for our small data team",
+     "selftext": "We run a warehouse and our current scheduler keeps failing every night. Any suggestions? Has anyone tried Example Co for this kind of pipeline?",
+     "permalink": "/r/datascience/comments/p6/demo/",
+     "url": "https://www.reddit.com/r/datascience/comments/p6/demo/",
+     "created_utc": -3000,
+     "score": 5,
+     "num_comments": 1,
+     "over_18": false,
+     "stickied": false,
+     "distinguished": null,
+     "removed_by_category": null,
+     "is_self": true,
+     "author_fullname": "t2_should_not_be_stored",
+     "crosspost_parent_list": [
+      {
+       "name": "t3_p1"
+      }
+     ]
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "id": "p7",
+     "name": "t3_p7",
+     "subreddit": "dataengineering",
+     "author": "AutoModerator",
+     "title": "Weekly thread: example alternative and tooling questions",
+     "selftext": "Post your tooling questions here. Remember the rules.",
+     "permalink": "/r/dataengineering/comments/p7/demo/",
+     "url": "https://www.reddit.com/r/dataengineering/comments/p7/demo/",
+     "created_utc": -20000,
+     "score": 3,
+     "num_comments": 40,
+     "over_18": false,
+     "stickied": false,
+     "distinguished": null,
+     "removed_by_category": null,
+     "is_self": true,
+     "author_fullname": "t2_should_not_be_stored"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "id": "p2",
+     "name": "t3_p2",
+     "subreddit": "analytics",
+     "author": "metrics_mo",
+     "title": "Rival Suite vs Example Co for a startup?",
+     "selftext": "Comparing Rival Suite versus Example Co for our data team pipeline. Which one handles retries better?",
+     "permalink": "/r/analytics/comments/p2/demo/",
+     "url": "https://www.reddit.com/r/analytics/comments/p2/demo/",
+     "created_utc": -7200,
+     "score": 15,
+     "num_comments": 9,
+     "over_18": false,
+     "stickied": false,
+     "distinguished": null,
+     "removed_by_category": null,
+     "is_self": true,
+     "author_fullname": "t2_should_not_be_stored"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "id": "p8",
+     "name": "t3_p8",
+     "subreddit": "dataengineering",
+     "author": "old_timer",
+     "title": "Example Co pricing thread from last month",
+     "selftext": "Old discussion that is outside the collection window and should be skipped.",
+     "permalink": "/r/dataengineering/comments/p8/demo/",
+     "url": "https://www.reddit.com/r/dataengineering/comments/p8/demo/",
+     "created_utc": -200000,
+     "score": 50,
+     "num_comments": 20,
+     "over_18": false,
+     "stickied": false,
+     "distinguished": null,
+     "removed_by_category": null,
+     "is_self": true,
+     "author_fullname": "t2_should_not_be_stored"
+    }
+   }
+  ]
+ }
+}

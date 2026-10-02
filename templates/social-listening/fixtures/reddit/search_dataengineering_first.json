@@ -1,0 +1,30 @@
+{
+ "kind": "Listing",
+ "data": {
+  "after": null,
+  "children": [
+   {
+    "kind": "t3",
+    "data": {
+     "id": "p1",
+     "name": "t3_p1",
+     "subreddit": "dataengineering",
+     "author": "pipeline_pat",
+     "title": "Looking for an example alternative for our small data team",
+     "selftext": "We run a warehouse and our current scheduler keeps failing every night. Any suggestions? Has anyone tried Example Co for this kind of pipeline?",
+     "permalink": "/r/dataengineering/comments/p1/demo/",
+     "url": "https://www.reddit.com/r/dataengineering/comments/p1/demo/",
+     "created_utc": -3600,
+     "score": 42,
+     "num_comments": 17,
+     "over_18": false,
+     "stickied": false,
+     "distinguished": null,
+     "removed_by_category": null,
+     "is_self": true,
+     "author_fullname": "t2_should_not_be_stored"
+    }
+   }
+  ]
+ }
+}

@@ -1,0 +1,26 @@
+name: operations.review_reply_draft_submission
+type: duckdb.seed
+description: |
+  Reply drafts submitted by a person or by the on-demand reply-drafter agent
+  (agents/reply-drafter.prompt.md returns a CSV row in this format). They enter
+  operations.fct_reply_draft with status needs_review.
+tags: [enrich, review]
+parameters:
+  path: ./review/reply_draft_submissions.csv
+columns:
+  - name: submission_id
+    type: varchar
+  - name: source
+    type: varchar
+  - name: external_id
+    type: varchar
+  - name: approach
+    type: varchar
+  - name: draft_body
+    type: varchar
+  - name: evidence_json
+    type: varchar
+  - name: submitted_by
+    type: varchar
+  - name: submitted_at
+    type: varchar
