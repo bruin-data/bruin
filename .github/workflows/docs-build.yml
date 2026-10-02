@@ -10,6 +10,7 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - '.npmrc'
+      - 'lychee.toml'
   pull_request:
     branches: [ main ]
     paths:
@@ -19,6 +20,7 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - '.npmrc'
+      - 'lychee.toml'
 
 jobs:
   docs-build:
@@ -54,3 +56,21 @@ jobs:
             echo "Docs build failed: Output directory not found!"
             exit 1
           fi
+
+
+      - name: Stage site under /bruin/
+        run: |
+          mkdir -p "${RUNNER_TEMP}/site"
+          cp -R docs/.vitepress/dist "${RUNNER_TEMP}/site/bruin"
+
+
+      # Same flags as scripts/check_docs_links.sh; keep them in sync.
+      - name: Check internal links and anchors
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          lycheeVersion: v0.24.2
+          args: >-
+            --config lychee.toml --offline --include-fragments
+            --fallback-extensions html --index-files index.html
+            --root-dir ${{ runner.temp }}/site
+            '${{ runner.temp }}/site/bruin/**/*.html'

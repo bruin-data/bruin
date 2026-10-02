@@ -1,0 +1,38 @@
+# Shared lychee settings for scripts/check_docs_links.sh.
+# Internal checks run with --offline; these settings mostly shape the external check.
+
+no_progress = true
+max_concurrency = 32
+max_retries = 2
+timeout = 20
+user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
+
+# 401/403/429 mean the site blocked or rate-limited the checker, not that the page is gone.
+accept = ["200..=299", "401", "403", "429"]
+
+# CLAUDE.md is a symlink to AGENTS.md.
+exclude_path = ["CLAUDE.md"]
+
+exclude_loopback = true
+exclude_private = true
+
+exclude = [
+  # Placeholders in examples
+  'your[-_]?(company|domain|account|username|access_token)',
+  'my[-_]?company',
+  'example\.(com|org)',
+  '\{[^}]*\}',
+  # API base URLs and endpoints shown in examples, not pages meant to be opened
+  '^https?://api[.-]',
+  '^https?://[^/]+/api/v\d',
+  '^https?://oauth2\.googleapis\.com/token',
+  # Hosts that only exist inside a user's network
+  '^https?://nessie:',
+  '^https?://tableau\.company\.com',
+  # Sample IDs and pages that need a login or block automated checkers
+  '^https://docs\.google\.com/spreadsheets/d/1VTtCiw7UM1sadasdfas',
+  '^https://dev\.shopify\.com/dashboard',
+  '^https://developers\.facebook\.com/',
+  # Template tag manager URL with the id appended at runtime
+  '^https://www\.googletagmanager\.com/gtm\.js',
+]
