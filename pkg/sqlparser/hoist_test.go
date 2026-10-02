@@ -1,6 +1,8 @@
 package sqlparser
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -223,16 +225,28 @@ func TestSQLParser_HooksAcrossAssetTypes(t *testing.T) {
 
 func TestSQLParser_HoistingStartsLazilyAndPreservesErrors(t *testing.T) {
 	t.Parallel()
-	parser, err := NewSQLParserCached()
+	root := t.TempDir()
+	dir, err := filepath.Rel(os.TempDir(), filepath.Join(root, "parser"))
 	require.NoError(t, err)
+	parser := newSQLParserInternal(dir, false, 10000)
 	t.Cleanup(func() { require.NoError(t, parser.Close()) })
 	hooks := pipeline.Hooks{Pre: []pipeline.Hook{{Query: "SELECT 17"}}}
 	require.Equal(t, "SELECT 17;\nSELECT 29;", pipeline.WrapHooks("SELECT 29", hooks, parser, pipeline.AssetTypeBigqueryQuery))
 	require.False(t, parser.started)
+	files, err := os.ReadDir(root)
+	require.NoError(t, err)
+	require.Empty(t, files, "constructing an unused hoister must not extract embedded files")
 	got, err := parser.HoistDeclaresList([]string{"SELECT 17", "DECLARE x INT64"}, pipeline.AssetTypeBigqueryQuery)
 	require.NoError(t, err)
 	require.Equal(t, []string{"DECLARE x INT64", "SELECT 17"}, got)
 	require.True(t, parser.started)
+	files, err = os.ReadDir(root)
+	require.NoError(t, err)
+	require.NotEmpty(t, files)
+	require.NoError(t, parser.Close())
+	got, err = parser.HoistDeclaresList([]string{"SELECT 29", "DECLARE y INT64"}, pipeline.AssetTypeBigqueryQuery)
+	require.NoError(t, err)
+	require.Equal(t, []string{"DECLARE y INT64", "SELECT 29"}, got)
 	bad := "DECLARE x STRING; SELECT 'unterminated"
 	unchanged, err := parser.HoistDeclares(bad, pipeline.AssetTypeBigqueryQuery)
 	require.Error(t, err)

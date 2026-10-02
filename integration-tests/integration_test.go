@@ -382,7 +382,7 @@ func TestIndividualTasks(t *testing.T) {
 				Args:    []string{"render", filepath.Join(currentFolder, "test-pipelines/render-hook-declarations/assets/test_hoist.sql")},
 				Expected: e2e.Output{
 					ExitCode: 0,
-					Contains: []string{"DECLARE first_var array<STRING>;\nDECLARE last_var INT64 DEFAULT 29;\nSELECT 'pre; 雪' AS message;\nSELECT first_var;\nSELECT last_var;"},
+					Contains: []string{"DECLARE first_var array<STRING>;\nDECLARE last_var INT64 DEFAULT 29;\nSELECT 'pre; \u96ea' AS message;\nSELECT first_var;\nSELECT last_var;"},
 				},
 				Asserts: []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByContains},
 			},
