@@ -13,11 +13,12 @@ from sqlglot.dialects.dialect import (
     timestamptrunc_sql,
     date_add_interval_sql,
     timestampdiff_sql,
+    remove_ts_or_ds_to_date,
 )
 from sqlglot.expressions import DataType
 from sqlglot import generator
 from sqlglot.generator import unsupported_args
-from sqlglot.generators.mysql import MySQLGenerator, _remove_ts_or_ds_to_date, date_add_sql
+from sqlglot.generators.mysql import MySQLGenerator, date_add_sql
 
 
 def _unicode_substitute(m: re.Match[str]) -> str:
@@ -26,6 +27,7 @@ def _unicode_substitute(m: re.Match[str]) -> str:
 
 class SingleStoreGenerator(MySQLGenerator):
     SUPPORTS_UESCAPE = False
+    SUPPORTS_ALTER_COLUMN_NULLABILITY = False
     NULL_ORDERING_SUPPORTED: bool | None = True
     MATCH_AGAINST_TABLE_PREFIX: str | None = "TABLE "
     STRUCT_DELIMITER = ("(", ")")
@@ -121,7 +123,7 @@ class SingleStoreGenerator(MySQLGenerator):
             f"(DATE_FORMAT({self.sql(e, 'this')}, {self.dialect.DATEINT_FORMAT}) :> INT)"
         ),
         exp.Time: unsupported_args("zone")(lambda self, e: f"{self.sql(e, 'this')} :> TIME"),
-        exp.DatetimeAdd: _remove_ts_or_ds_to_date(date_add_sql("ADD")),
+        exp.DatetimeAdd: remove_ts_or_ds_to_date(date_add_sql("ADD")),
         exp.DatetimeTrunc: unsupported_args("zone")(timestamptrunc_sql()),
         exp.DatetimeSub: date_add_interval_sql("DATE", "SUB"),
         exp.DatetimeDiff: timestampdiff_sql,
@@ -1452,6 +1454,17 @@ class SingleStoreGenerator(MySQLGenerator):
 
         return self.sql(res)
 
+    def withingroup_sql(self, expression: exp.WithinGroup) -> str:
+        # SingleStore includes trailing NULLs in percentile calculations, so we sort them first
+        if isinstance(expression.this, (exp.PercentileCont, exp.PercentileDisc)) and isinstance(
+            expression.expression, exp.Order
+        ):
+            expression = expression.copy()
+            for ordered in expression.expression.expressions:
+                ordered.set("nulls_first", True)
+
+        return super().withingroup_sql(expression)
+
     def all_sql(self, expression: exp.All) -> str:
         self.unsupported("ALL subquery predicate is not supported in SingleStore")
         return super().all_sql(expression)
@@ -1516,7 +1529,12 @@ class SingleStoreGenerator(MySQLGenerator):
 
     def collate_sql(self, expression: exp.Collate) -> str:
         # SingleStore does not support setting a collation for column in the SELECT query,
-        # so we cast column to a LONGTEXT type with specific collation
+        # so we cast column to a LONGTEXT type with specific collation. If the cast is
+        # already there (e.g. when regenerating previously generated SQL), don't add
+        # another one, so that generation stays idempotent.
+        this = expression.this
+        if isinstance(this, exp.Cast) and this.to.this == exp.DType.LONGTEXT:
+            return self.binary(expression, "COLLATE")
         return self.binary(expression, ":> LONGTEXT COLLATE")
 
     def currentdate_sql(self, expression: exp.CurrentDate) -> str:
@@ -1584,7 +1602,7 @@ class SingleStoreGenerator(MySQLGenerator):
         return f"CHANGE {old_column} {new_column}"
 
     def altercolumn_sql(self, expression: exp.AlterColumn) -> str:
-        for arg_name in ("drop", "comment", "allow_null", "visible", "using"):
+        for arg_name in ("drop", "comment", "visible", "using"):
             if expression.args.get(arg_name):
                 self.unsupported(f"ALTER COLUMN does not support {arg_name}")
         alter = super().altercolumn_sql(expression)

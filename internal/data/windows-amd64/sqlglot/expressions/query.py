@@ -12,6 +12,7 @@ from sqlglot.expressions.core import (
     Condition,
     Distinct,
     Dot,
+    DynamicIdentifier,
     Expr,
     Expression,
     Func,
@@ -444,7 +445,7 @@ class RecursiveWithSearch(Expression):
 
 
 class With(Expression):
-    arg_types = {"expressions": True, "recursive": False, "search": False}
+    arg_types = {"expressions": False, "recursive": False, "search": False, "udfs": False}
 
     @property
     def recursive(self) -> bool:
@@ -803,6 +804,19 @@ class Lateral(Expression, UDTF):
         "ordinality": False,
     }
 
+    @property
+    def selects(self) -> list[Expr]:
+        from sqlglot.expressions.array import Unnest
+
+        columns = super().selects
+
+        # UNNEST ... WITH ORDINALITY stores the ordinality column's name in Unnest.offset
+        offset = self.this.args.get("offset") if isinstance(self.this, Unnest) else None
+        if isinstance(offset, Identifier):
+            columns = columns + [offset]
+
+        return columns
+
 
 class TableFromRows(Expression, UDTF):
     arg_types = {
@@ -966,9 +980,10 @@ class Table(Expression, Selectable):
 
     @property
     def name(self) -> str:
-        if not self.this or isinstance(self.this, Func):
+        this = self.this
+        if not this or (isinstance(this, Func) and not isinstance(this, DynamicIdentifier)):
             return ""
-        return self.this.name
+        return this.name
 
     @property
     def db(self) -> str:
@@ -1018,6 +1033,20 @@ class Table(Expression, Selectable):
         return col
 
 
+def _is_star(expression: Expr) -> bool:
+    stack = [expression]
+    while stack:
+        node = stack.pop()
+        if isinstance(node, SetOperation):
+            stack.append(node.this)
+            stack.append(node.expression)
+        elif isinstance(node, Subquery):
+            stack.append(node.this)
+        elif node.is_star:
+            return True
+    return False
+
+
 class SetOperation(Expression, Query):
     arg_types = {
         "with_": False,
@@ -1050,12 +1079,17 @@ class SetOperation(Expression, Query):
     def named_selects(self) -> list[str]:
         expr: Expr = self
         while isinstance(expr, SetOperation):
+            if expr.args.get("by_name"):
+                left = t.cast(Selectable, expr.this.unnest()).named_selects
+                right = t.cast(Selectable, expr.expression.unnest()).named_selects
+                return list(dict.fromkeys(left + right))
+
             expr = expr.this.unnest()
         return _named_selects(expr)
 
     @property
     def is_star(self) -> bool:
-        return self.this.is_star or self.expression.is_star
+        return _is_star(self)
 
     @property
     def selects(self) -> list[Expr]:
@@ -1713,7 +1747,7 @@ class Subquery(Expression, DerivedTable, Query):
 
     @property
     def is_star(self) -> bool:
-        return self.this.is_star
+        return _is_star(self)
 
     @property
     def output_name(self) -> str:
@@ -1761,6 +1795,7 @@ class Pivot(Expression):
         "identify_pivot_strings": False,
         "prefixed_pivot_columns": False,
         "pivot_column_naming": False,
+        "value_columns_first": False,
     }
 
     @property
@@ -1814,7 +1849,13 @@ class Pivot(Expression):
                 for ident in (e.expressions if isinstance(e, Tuple) else [e])
                 if isinstance(ident, Identifier)
             ]
-            outputs = [i.name for i in name_columns + value_columns]
+            # T-SQL emits the value column(s) ahead of the name column, everyone else emits them after it
+            ordered = (
+                value_columns + name_columns
+                if self.args.get("value_columns_first")
+                else name_columns + value_columns
+            )
+            outputs = [i.name for i in ordered]
         else:
             excluded = {c.output_name for c in self.find_all(Column)}
             outputs = [c.output_name for c in self.args.get("columns") or []]
@@ -1879,7 +1920,7 @@ class Where(Expression):
 class Analyze(Expression):
     arg_types = {
         "kind": False,
-        "this": False,
+        "tables": False,
         "options": False,
         "mode": False,
         "partition": False,
@@ -2105,19 +2146,49 @@ class StoredProcedure(Expression):
 
 
 class Block(Expression):
-    arg_types = {"expressions": True}
+    arg_types = {"expressions": True, "begin": False}
 
 
 class IfBlock(Expression):
     arg_types = {"this": True, "true": True, "false": False}
 
 
+class CaseStatement(Expression):
+    arg_types = {"this": False, "ifs": True, "default": False}
+
+
 class WhileBlock(Expression):
-    arg_types = {"this": True, "body": True}
+    arg_types = {"this": True, "body": True, "label": False}
+
+
+class LoopBlock(Expression):
+    arg_types = {"body": True, "label": False}
+
+
+class RepeatBlock(Expression):
+    arg_types = {"body": True, "until": True, "label": False}
+
+
+class Leave(Expression):
+    pass
+
+
+class Iterate(Expression):
+    pass
 
 
 class EndStatement(Expression):
     arg_types = {}
+
+
+# https://trino.io/docs/current/udf.html
+class FunctionSpecification(Expression):
+    arg_types = {
+        "this": True,
+        "characteristics": False,
+        "properties": False,
+        "expression": True,
+    }
 
 
 UNWRAPPED_QUERIES = (Select, SetOperation)

@@ -10,12 +10,14 @@ from sqlglot.dialects.dialect import (
     generatedasidentitycolumnconstraint_sql,
     max_or_greatest,
     min_or_least,
+    remove_ts_or_ds_to_date,
     rename_func,
     strposition_sql,
     timestrtotime_sql,
     trim_sql,
 )
 from sqlglot.helper import seq_get
+from sqlglot.optimizer.scope import find_in_scope
 from sqlglot.parsers.tsql import OPTIONS_THAT_REQUIRE_EQUAL
 from sqlglot.time import format_time
 from collections import defaultdict
@@ -27,6 +29,8 @@ DATE_PART_UNMAPPING = {
 }
 
 BIT_TYPES = {exp.EQ, exp.NEQ, exp.Is, exp.In, exp.Select, exp.Alias}
+
+SET_OP_MODIFIERS = ("limit", "offset", "order", "for_", "options")
 
 
 def _format_sql(self: TSQLGenerator, expression: exp.NumberToStr | exp.TimeToStr) -> str:
@@ -48,7 +52,7 @@ def _format_sql(self: TSQLGenerator, expression: exp.NumberToStr | exp.TimeToStr
 
 def _string_agg_sql(self: TSQLGenerator, expression: exp.GroupConcat) -> str:
     this = expression.this
-    distinct = expression.find(exp.Distinct)
+    distinct = find_in_scope(expression, exp.Distinct)
     if distinct:
         # exp.Distinct can appear below an exp.Order or an exp.GroupConcat expression
         self.unsupported("T-SQL STRING_AGG doesn't support DISTINCT.")
@@ -101,7 +105,16 @@ def qualify_derived_table_outputs(expression: exp.Expr) -> exp.Expr:
 def _json_extract_sql(
     self: TSQLGenerator, expression: exp.JSONExtract | exp.JSONExtractScalar
 ) -> str:
+    # JSON_QUERY returns objects and arrays, JSON_VALUE returns scalars. A scalar-only
+    # extraction maps to JSON_VALUE; a source that also returns non-scalar values as
+    # text (e.g. SQLite's ->>) needs to try both, like a generic JSONExtract does
+    if isinstance(expression, exp.JSONExtractScalar) and expression.args.get("scalar_only"):
+        return self.func("JSON_VALUE", expression.this, expression.expression)
+
     json_query = self.func("JSON_QUERY", expression.this, expression.expression)
+    if expression.args.get("json_query"):
+        return json_query
+
     json_value = self.func("JSON_VALUE", expression.this, expression.expression)
     return self.func("ISNULL", json_query, json_value)
 
@@ -125,6 +138,7 @@ class TSQLGenerator(generator.Generator):
     AFTER_HAVING_MODIFIER_TRANSFORMS = generator.AFTER_HAVING_MODIFIER_TRANSFORMS
 
     LIMIT_IS_TOP = True
+    SET_OP_LIMITS = True
     QUERY_HINTS = False
     RETURNING_END = False
     NVL2_SUPPORTED = False
@@ -139,12 +153,12 @@ class TSQLGenerator(generator.Generator):
     SUPPORTS_SELECT_INTO = True
     JSON_PATH_BRACKETED_KEY_SUPPORTED = False
     SUPPORTS_TO_NUMBER = False
-    SET_OP_MODIFIERS = False
     COPY_PARAMS_EQ_REQUIRED = True
     PARSE_JSON_NAME: str | None = None
     EXCEPT_INTERSECT_SUPPORT_ALL_CLAUSE = False
     ALTER_SET_WRAPPED = True
     ALTER_SET_TYPE = ""
+    SUPPORTS_ALTER_COLUMN_NULLABILITY = True
 
     EXPRESSIONS_WITHOUT_NESTED_CTES = {
         exp.Create,
@@ -201,6 +215,7 @@ class TSQLGenerator(generator.Generator):
         exp.CurrentTimestamp: rename_func("GETDATE"),
         exp.CurrentTimestampLTZ: rename_func("SYSDATETIMEOFFSET"),
         exp.DateStrToDate: datestrtodate_sql,
+        exp.Day: remove_ts_or_ds_to_date(),
         exp.GeneratedAsIdentityColumnConstraint: generatedasidentitycolumnconstraint_sql,
         exp.GroupConcat: _string_agg_sql,
         exp.If: rename_func("IIF"),
@@ -211,6 +226,7 @@ class TSQLGenerator(generator.Generator):
         exp.Max: max_or_greatest,
         exp.MD5: lambda self, e: self.func("HASHBYTES", exp.Literal.string("MD5"), e.this),
         exp.Min: min_or_least,
+        exp.Month: remove_ts_or_ds_to_date(),
         exp.NumberToStr: _format_sql,
         exp.Repeat: rename_func("REPLICATE"),
         exp.CurrentSchema: rename_func("SCHEMA_NAME"),
@@ -247,6 +263,7 @@ class TSQLGenerator(generator.Generator):
             exp.Literal.number(1),
         ),
         exp.Uuid: lambda *_: "NEWID()",
+        exp.Year: remove_ts_or_ds_to_date(),
         exp.DateFromParts: rename_func("DATEFROMPARTS"),
     }
 
@@ -259,6 +276,64 @@ class TSQLGenerator(generator.Generator):
         return f"{scope_name}::{rhs}"
 
     def select_sql(self, expression: exp.Select) -> str:
+        self._prepare_limit_offset(expression)
+
+        # Handles transpiling a query like the following to T-SQL:
+        #   SELECT 1 AS x ORDER BY x NULLS FIRST FETCH FIRST 1 ROWS ONLY UNION ALL SELECT 2 AS x
+        if isinstance(expression.parent, exp.SetOperation) and isinstance(
+            expression.args.get("limit"), exp.Fetch
+        ):
+            return self.sql(
+                exp.select("*").from_(expression.subquery("_l_0", copy=False), copy=False)
+            )
+
+        return super().select_sql(expression)
+
+    def set_operations(self, expression: exp.SetOperation) -> str:
+        limit = expression.args.get("limit")
+        offset = expression.args.get("offset")
+        order = expression.args.get("order")
+
+        # Set operations cannot order by the CASE used to emulate null ordering,
+        # or by expressions that aren't in their select list.
+        wrap_order = False
+        if order:
+            selects = {select.unalias().unnest() for select in expression.selects}
+            for ordered in order.expressions:
+                this = ordered.this.unnest()
+                if this.is_int:
+                    continue
+
+                desc = ordered.args.get("desc")
+                nulls_first = ordered.args.get("nulls_first")
+
+                emulate_null_ordering = (desc and nulls_first) or (not desc and not nulls_first)
+                if emulate_null_ordering or (
+                    not isinstance(this, exp.Column) and this not in selects
+                ):
+                    wrap_order = True
+                    break
+
+        if (
+            wrap_order
+            or (isinstance(limit, exp.Limit) and not offset)
+            or (not order and (offset or isinstance(limit, exp.Fetch)))
+        ):
+            select = self._move_ctes_to_top_level(
+                exp.subquery(expression, "_l_0", copy=False).select("*", copy=False)
+            )
+            for arg in SET_OP_MODIFIERS:
+                value = expression.args.get(arg)
+                if value:
+                    expression.set(arg, None)
+                    select.set(arg, value)
+
+            return self.sql(select)
+
+        self._prepare_limit_offset(expression)
+        return super().set_operations(expression)
+
+    def _prepare_limit_offset(self, expression: exp.Query) -> None:
         limit = expression.args.get("limit")
         offset = expression.args.get("offset")
 
@@ -279,8 +354,6 @@ class TSQLGenerator(generator.Generator):
                 # TOP and OFFSET can't be combined, we need use FETCH instead of TOP
                 # we replace here because otherwise TOP would be generated in select_sql
                 limit.replace(exp.Fetch(direction="FIRST", count=limit.expression))
-
-        return super().select_sql(expression)
 
     def convert_sql(self, expression: exp.Convert) -> str:
         name = "TRY_CONVERT" if expression.args.get("safe") else "CONVERT"
@@ -378,9 +451,10 @@ class TSQLGenerator(generator.Generator):
         return "(1 = 1)" if expression.this else "(1 = 0)"
 
     def is_sql(self, expression: exp.Is) -> str:
+        negate = expression.args.get("negate")
         if isinstance(expression.expression, exp.Boolean):
-            return self.binary(expression, "=")
-        return self.binary(expression, "IS")
+            return self.binary(expression, "<>" if negate else "=")
+        return self.binary(expression, "IS NOT" if negate else "IS")
 
     def createable_sql(self, expression: exp.Create, locations: defaultdict) -> str:
         sql = self.sql(expression, "this")
@@ -589,7 +663,8 @@ class TSQLGenerator(generator.Generator):
 
     def drop_sql(self, expression: exp.Drop) -> str:
         if expression.args["kind"] == "VIEW":
-            expression.this.set("catalog", None)
+            for table in expression.args.get("tables") or []:
+                table.set("catalog", None)
         return super().drop_sql(expression)
 
     def options_modifier(self, expression: exp.Expr) -> str:

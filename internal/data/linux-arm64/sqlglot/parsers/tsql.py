@@ -46,7 +46,7 @@ DATE_DELTA_INTERVAL = {
     "d": "day",
 }
 
-DATE_FMT_RE = re.compile("([dD]{1,2})|([mM]{1,2})|([yY]{1,4})|([hH]{1,2})|([sS]{1,2})")
+DATE_FMT_RE = re.compile("([dD]{1,2})|([mM]{1,2})|([yY]{1,4})|([hH]{1,2})|([sS]{1,2})|([fF]{2,7})")
 
 # N = Numeric, C=Currency
 TRANSPILE_SAFE_NUMBER_FMT = {"N", "C"}
@@ -305,7 +305,9 @@ def _build_json_query(args: list, dialect: Dialect) -> exp.JSONExtract:
         # value for path, JSON_QUERY returns the input expression.
         args.append(exp.Literal.string("$"))
 
-    return parser.build_extract_json_with_path(exp.JSONExtract)(args, dialect)
+    json_extract = parser.build_extract_json_with_path(exp.JSONExtract)(args, dialect)
+    json_extract.set("json_query", True)
+    return json_extract
 
 
 def _build_datetrunc(args: list) -> exp.TimestampTrunc:
@@ -323,6 +325,7 @@ class TSQLParser(parser.Parser):
     LOG_DEFAULTS_TO_LN = True
     STRING_ALIASES = True
     NO_PAREN_IF_COMMANDS = False
+    UNPIVOT_VALUE_COLUMNS_FIRST = True
 
     NO_PAREN_FUNCTIONS = {
         **parser.Parser.NO_PAREN_FUNCTIONS,
@@ -363,6 +366,11 @@ class TSQLParser(parser.Parser):
         ),
         "DATENAME": _build_formatted_time(exp.TimeToStr, full_format_mapping=True),
         "DATETIMEFROMPARTS": _build_datetimefromparts,
+        "DAY": lambda args: exp.Day(
+            this=exp.TsOrDsToDate(
+                this=seq_get(args, 0), default_date=exp.Literal.string("1900-01-01")
+            )
+        ),
         "EOMONTH": _build_eomonth,
         "FORMAT": _build_format,
         "GETDATE": exp.CurrentTimestamp.from_arg_list,
@@ -372,6 +380,11 @@ class TSQLParser(parser.Parser):
         "JSON_VALUE": parser.build_extract_json_with_path(exp.JSONExtractScalar),
         "LEN": _build_with_arg_as_text(exp.Length),
         "LEFT": _build_with_arg_as_text(exp.Left),
+        "MONTH": lambda args: exp.Month(
+            this=exp.TsOrDsToDate(
+                this=seq_get(args, 0), default_date=exp.Literal.string("1900-01-01")
+            )
+        ),
         "NEWID": exp.Uuid.from_arg_list,
         "RIGHT": _build_with_arg_as_text(exp.Right),
         "PARSENAME": _build_parsename,
@@ -385,6 +398,11 @@ class TSQLParser(parser.Parser):
         "SYSTEM_USER": exp.CurrentUser.from_arg_list,
         "TIMEFROMPARTS": _build_timefromparts,
         "DATETRUNC": _build_datetrunc,
+        "YEAR": lambda args: exp.Year(
+            this=exp.TsOrDsToDate(
+                this=seq_get(args, 0), default_date=exp.Literal.string("1900-01-01")
+            )
+        ),
     }
 
     JOIN_HINTS = {"LOOP", "HASH", "MERGE", "REMOTE"}
@@ -393,16 +411,15 @@ class TSQLParser(parser.Parser):
         ("ENCRYPTION", "RECOMPILE", "SCHEMABINDING", "NATIVE_COMPILATION", "EXECUTE"), tuple()
     )
 
-    COLUMN_DEFINITION_MODES = {"OUT", "OUTPUT", "READONLY"}
+    COLUMN_DEFINITION_MODES: t.ClassVar = {"OUT", "OUTPUT", "READONLY"}
 
-    RETURNS_TABLE_TOKENS = parser.Parser.ID_VAR_TOKENS - {
+    RETURNS_TABLE_TOKENS: t.ClassVar = parser.Parser.ID_VAR_TOKENS - {
         TokenType.TABLE,
         *parser.Parser.TYPE_TOKENS,
     }
 
     STATEMENT_PARSERS = {
         **parser.Parser.STATEMENT_PARSERS,
-        TokenType.DECLARE: lambda self: self._parse_declare(),
         TokenType.EXECUTE: lambda self: self._parse_execute(),
     }
 
@@ -442,7 +459,7 @@ class TSQLParser(parser.Parser):
         ),
     }
 
-    SET_OP_MODIFIERS = {"offset"}
+    SET_OP_MODIFIERS = {"order", "limit", "offset", "options", "for_"}
 
     ODBC_DATETIME_LITERALS = {
         "d": exp.Date,
@@ -791,6 +808,12 @@ class TSQLParser(parser.Parser):
             if isinstance(collation, exp.Column) and isinstance(collation.this, exp.Identifier):
                 identifier = collation.this
                 collation.set("this", exp.Var(this=identifier.name))
+
+            if expression.args.get("dtype"):
+                if self._match_pair(TokenType.NOT, TokenType.NULL):
+                    expression.set("allow_null", False)
+                elif self._match(TokenType.NULL):
+                    expression.set("allow_null", True)
 
         return expression
 

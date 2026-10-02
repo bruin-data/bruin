@@ -54,7 +54,6 @@ EXPRESSION_METADATA: ExprMetadataType = {
         for expr_type in {
             exp.All,
             exp.Any,
-            exp.ArrayContains,
             exp.Between,
             exp.Boolean,
             exp.Contains,
@@ -65,7 +64,6 @@ EXPRESSION_METADATA: ExprMetadataType = {
             exp.IsNan,
             exp.LogicalAnd,
             exp.LogicalOr,
-            exp.RegexpLike,
             exp.StartsWith,
         }
     },
@@ -148,6 +146,7 @@ EXPRESSION_METADATA: ExprMetadataType = {
             exp.DayOfMonth,
             exp.DayOfWeek,
             exp.DayOfYear,
+            exp.Floor,
             exp.Getbit,
             exp.Hour,
             exp.TimestampDiff,
@@ -224,6 +223,7 @@ EXPRESSION_METADATA: ExprMetadataType = {
             exp.ConcatWs,
             exp.Chr,
             exp.CurrentCatalog,
+            exp.CurrentRole,
             exp.CurrentSchema,
             exp.CurrentVersion,
             exp.CurrentUser,

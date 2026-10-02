@@ -1,6 +1,6 @@
 module github.com/bruin-data/bruin
 
-go 1.25.13
+go 1.26.8
 
 tool (
 	github.com/daixiang0/gci
@@ -49,7 +49,7 @@ require (
 	github.com/jedib0t/go-pretty/v6 v6.6.7
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/josephburnett/jd v1.9.2
-	github.com/kluctl/go-embed-python v0.0.0-3.13.1-20241219-1
+	github.com/kluctl/go-embed-python v0.0.0-3.13.14-20260610-1
 	github.com/manifoldco/promptui v0.9.0
 	github.com/microsoft/go-mssqldb v1.8.2
 	github.com/muesli/termenv v0.16.0

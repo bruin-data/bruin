@@ -79,13 +79,13 @@ func (s *SQLParser) Start() error {
 
 	// Extract only when parsing is needed, not when an unused hook hoister is
 	// constructed. Keep preparation under the same lock as subprocess startup.
-	withHashInDir := s.randomize // randomized instances use hash-suffixed dirs; others reuse cached dirs.
-
-	ep, err := python.NewEmbeddedPythonWithTmpDir(s.tmpDir+"-python", withHashInDir)
+	// Reuse each payload's cache across invocations, but isolate upgrades. Extraction
+	// does not remove obsolete files, such as SQLGlot's former native extensions.
+	ep, err := python.NewEmbeddedPythonWithTmpDir(s.tmpDir+"-python", true)
 	if err != nil {
 		return err
 	}
-	sqlglotDir, err := embed_util.NewEmbeddedFilesWithTmpDir(data.Data, s.tmpDir+"-sqlglot-lib", withHashInDir)
+	sqlglotDir, err := embed_util.NewEmbeddedFilesWithTmpDir(data.Data, s.tmpDir+"-sqlglot-lib", true)
 	if err != nil {
 		return err
 	}
