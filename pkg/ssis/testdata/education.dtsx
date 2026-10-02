@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<DTS:Executable xmlns:DTS="www.microsoft.com/SqlServer/Dts" DTS:ObjectName="Education" DTS:ExecutableType="Microsoft.Package" DTS:refId="Package">
+  <DTS:Executables>
+    <DTS:Executable DTS:refId="Package\Prepare" DTS:ObjectName="Prepare" DTS:ExecutableType="Microsoft.ExecuteSQLTask">
+      <DTS:ObjectData><SQLTask:SqlTaskData xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask" SQLTask:SqlStatementSource="TRUNCATE TABLE dbo.pupils;" SQLTask:ResultType="ResultSetType_None" /></DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable DTS:refId="Package\Transform" DTS:ObjectName="Transform" DTS:ExecutableType="Microsoft.ExecuteProcess">
+      <DTS:ObjectData><ExecuteProcessData Executable="C:\Python\python.exe" Arguments="&quot;transform.py&quot;" /></DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable DTS:refId="Package\Publish" DTS:ObjectName="Publish" DTS:ExecutableType="Microsoft.ExecuteSQLTask">
+      <DTS:ObjectData><SQLTask:SqlTaskData xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask" SQLTask:SqlStatementSource="INSERT INTO dbo.summary SELECT COUNT(*) FROM dbo.pupils WHERE grade &gt; 3;" /></DTS:ObjectData>
+    </DTS:Executable>
+  </DTS:Executables>
+  <DTS:PrecedenceConstraints>
+    <DTS:PrecedenceConstraint DTS:From="Package\Prepare" DTS:To="Package\Transform" DTS:LogicalAnd="True" />
+    <DTS:PrecedenceConstraint DTS:From="Package\Transform" DTS:To="Package\Publish" DTS:LogicalAnd="True" />
+  </DTS:PrecedenceConstraints>
+</DTS:Executable>
