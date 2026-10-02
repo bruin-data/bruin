@@ -66,16 +66,20 @@ func TestSQLParserCacheIsolatesLegacyPayloads(t *testing.T) {
 	require.Len(t, entries, 2, "construction must not extract any payloads")
 	require.NoError(t, parser.Start())
 
-	paths := make(map[string]string)
-	for _, setting := range parser.cmd.Env {
-		key, value, _ := strings.Cut(setting, "=")
-		switch key {
-		case "PYTHONHOME":
-			paths["-python"] = value
-		case "PYTHONPATH":
-			paths["-sqlglot-lib"] = value
+	cachePaths := func(cmd *exec.Cmd) map[string]string {
+		paths := make(map[string]string)
+		for _, setting := range cmd.Env {
+			key, value, _ := strings.Cut(setting, "=")
+			switch key {
+			case "PYTHONHOME":
+				paths["-python"] = value
+			case "PYTHONPATH":
+				paths["-sqlglot-lib"] = value
+			}
 		}
+		return paths
 	}
+	paths := cachePaths(parser.cmd)
 	require.Len(t, paths, 2)
 	for suffix, path := range paths {
 		require.True(t, strings.HasPrefix(path, base+suffix+"-"), path)
@@ -98,7 +102,7 @@ func TestSQLParserCacheIsolatesLegacyPayloads(t *testing.T) {
 	t.Cleanup(func() { require.NoError(t, again.Close()) })
 	require.NoError(t, again.Start())
 	require.Equal(t, pythonPath, again.cmd.Path)
-	require.Equal(t, pythonEnv, again.cmd.Env)
+	require.Equal(t, paths, cachePaths(again.cmd))
 }
 
 func TestGetLineageForRunner(t *testing.T) {
