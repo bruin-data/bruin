@@ -68,10 +68,14 @@ Validate the pipeline, then do the first run with `--full-refresh`:
 
 ```shell
 bruin validate .
-bruin run --full-refresh --start-date <start-date> --end-date <end-date> .
+
+# Set an interval of at most 30 days when your organization has usage.
+START_DATE=2026-09-01
+END_DATE=2026-09-30
+bruin run --full-refresh --start-date "$START_DATE" --end-date "$END_DATE" .
 ```
 
-The per-platform marts load incrementally, and an incremental run writes into an existing table without creating it. On a new database a plain `bruin run` fails because those tables don't exist yet. `--full-refresh` creates them, loading the requested interval. Pick `YYYY-MM-DD` dates covering at most 30 days when your organization has usage, such as the last 30 days. Use `--full-refresh` only for this first run: a later full refresh replaces the loaded history with whatever interval that run covers.
+The per-platform marts load incrementally, and an incremental run writes into an existing table without creating it. On a new database a plain `bruin run` fails because those tables don't exist yet. `--full-refresh` creates them, loading the requested interval. Use `--full-refresh` only for this first run: a later full refresh replaces the loaded history with whatever interval that run covers.
 
 After that, run without the flag. With no dates, a run loads the previous UTC day:
 
@@ -82,7 +86,7 @@ bruin run .
 Use an explicit interval to backfill historical data:
 
 ```shell
-bruin run . --start-date <start-date> --end-date <end-date>
+bruin run . --start-date 2026-08-01 --end-date 2026-08-31
 ```
 
 Cursor limits each analytics request to 30 days. For longer backfills, run multiple non-overlapping intervals of at most 30 days. The per-platform marts use interval-aware materialization, so each run updates only its requested dates while preserving previously loaded history. Both APIs return UTC data.
