@@ -511,6 +511,9 @@ func TestInitQuickBooksBigQueryCopiesStarterTemplate(t *testing.T) {
 	require.FileExists(t, filepath.Join(pipelineRoot, "pipeline.yml"))
 	require.FileExists(t, filepath.Join(pipelineRoot, ".gitignore"))
 	require.FileExists(t, filepath.Join(pipelineRoot, "assets", "quickbooks_raw", "invoices.asset.yml"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "assets", "quickbooks_stage", "account_mapping.csv"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "dashboards", "quickbooks-finance.yml"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "AGENTS.md"))
 
 	pipeline, err := os.ReadFile(filepath.Join(pipelineRoot, "pipeline.yml"))
 	require.NoError(t, err)
@@ -533,6 +536,18 @@ func TestQuickBooksBigQueryStarterTemplateHasFocusedAssetSet(t *testing.T) {
 		"quickbooks_raw/payments.asset.yml",
 		"quickbooks_raw/purchases.asset.yml",
 		"quickbooks_raw/vendors.asset.yml",
+		"quickbooks_reports/ar_aging.sql",
+		"quickbooks_reports/cash_runway.sql",
+		"quickbooks_reports/customer_concentration.sql",
+		"quickbooks_reports/customer_mrr_movements.sql",
+		"quickbooks_reports/expense_review_queue.sql",
+		"quickbooks_reports/monthly_collections.sql",
+		"quickbooks_reports/monthly_kpis.sql",
+		"quickbooks_reports/monthly_pnl.sql",
+		"quickbooks_reports/vendor_spend.sql",
+		"quickbooks_stage/account_categories.sql",
+		"quickbooks_stage/account_mapping.asset.yml",
+		"quickbooks_stage/account_mapping.csv",
 		"quickbooks_stage/accounts.sql",
 		"quickbooks_stage/bills.sql",
 		"quickbooks_stage/customers.sql",

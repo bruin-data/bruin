@@ -1,6 +1,7 @@
 /* @bruin
 name: quickbooks_stage.accounts
 type: bq.sql
+owner: finance@example.com
 description: >
   The QuickBooks chart of accounts, one row per account, with the financial
   statement each account reports on and its parent account resolved. Use it to
@@ -17,6 +18,13 @@ tags:
   - quickbooks
   - accounting
   - accounts
+
+domains:
+  - finance
+
+meta:
+  grain: one row per account
+  contains_pii: "false"
 
 columns:
   - name: account_id

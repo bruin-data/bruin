@@ -1,5 +1,6 @@
 name: quickbooks_raw.bills
 type: ingestr
+owner: finance@example.com
 
 description: >
   Raw QuickBooks Online Bill records (Accounting API v3) loaded into BigQuery
@@ -24,6 +25,14 @@ tags:
   - quickbooks
   - accounting
   - bills
+
+domains:
+  - finance
+
+meta:
+  grain: one row per vendor bill, with lines nested in `line`
+  contains_pii: "true"
+  pii_note: Vendors can be people, such as contractors.
 
 columns:
   - name: id

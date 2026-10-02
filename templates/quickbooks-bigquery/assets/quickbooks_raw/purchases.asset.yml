@@ -1,5 +1,6 @@
 name: quickbooks_raw.purchases
 type: ingestr
+owner: finance@example.com
 
 description: >
   Raw QuickBooks Online Purchase records (Accounting API v3) loaded into
@@ -24,6 +25,14 @@ tags:
   - quickbooks
   - accounting
   - purchases
+
+domains:
+  - finance
+
+meta:
+  grain: one row per purchase, with lines nested in `line`
+  contains_pii: "true"
+  pii_note: Payees and descriptions can name people.
 
 columns:
   - name: id

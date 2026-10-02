@@ -1,6 +1,7 @@
 /* @bruin
 name: quickbooks_stage.vendors
 type: bq.sql
+owner: finance@example.com
 description: >
   One row per QuickBooks vendor, with typed columns and flattened contact
   details. The open balance is the accounts payable balance QuickBooks
@@ -17,6 +18,14 @@ tags:
   - quickbooks
   - accounting
   - vendors
+
+domains:
+  - finance
+
+meta:
+  grain: one row per vendor
+  contains_pii: "true"
+  pii_note: Holds contact details (names, emails, phone numbers, addresses).
 
 columns:
   - name: vendor_id

@@ -1,6 +1,7 @@
 /* @bruin
 name: quickbooks_stage.invoice_lines
 type: bq.sql
+owner: finance@example.com
 description: >
   Product and discount lines flattened from QuickBooks invoices, one row per
   line, with the item and income account resolved. Discount lines carry a
@@ -20,6 +21,13 @@ tags:
   - accounting
   - invoices
   - invoice-lines
+
+domains:
+  - finance
+
+meta:
+  grain: one row per product or discount line on an invoice
+  contains_pii: "false"
 
 columns:
   - name: invoice_id

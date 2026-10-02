@@ -1,6 +1,7 @@
 /* @bruin
 name: quickbooks_stage.expense_lines
 type: bq.sql
+owner: finance@example.com
 description: >
   Lines from purchases (cash expenses, checks, and card charges) and vendor
   bills in one table, one row per line, with the payee and the account each
@@ -28,6 +29,14 @@ tags:
   - expenses
   - purchases
   - bills
+
+domains:
+  - finance
+
+meta:
+  grain: one row per purchase or bill line
+  contains_pii: "true"
+  pii_note: Payees and descriptions can name people.
 
 columns:
   - name: source_type

@@ -1,6 +1,7 @@
 /* @bruin
 name: quickbooks_stage.invoices
 type: bq.sql
+owner: finance@example.com
 description: >
   One row per QuickBooks invoice, with typed amounts, the billed customer and
   payment terms resolved, and a payment status derived from the open balance.
@@ -18,6 +19,14 @@ tags:
   - quickbooks
   - accounting
   - invoices
+
+domains:
+  - finance
+
+meta:
+  grain: one row per invoice
+  contains_pii: "true"
+  pii_note: Includes customer names and memos.
 
 columns:
   - name: invoice_id

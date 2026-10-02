@@ -1,5 +1,6 @@
 name: quickbooks_raw.vendors
 type: ingestr
+owner: finance@example.com
 
 description: >
   Raw QuickBooks Online Vendor records (Accounting API v3) loaded into BigQuery
@@ -23,6 +24,14 @@ tags:
   - quickbooks
   - accounting
   - vendors
+
+domains:
+  - finance
+
+meta:
+  grain: one row per QuickBooks vendor
+  contains_pii: "true"
+  pii_note: Holds contact details (names, emails, phone numbers, addresses).
 
 columns:
   - name: id

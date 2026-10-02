@@ -2,6 +2,21 @@ name: quickbooks-bigquery
 schedule: daily
 start_date: "2000-01-01"
 
+variables:
+  close_days:
+    type: integer
+    description: >
+      Days after a month ends before its books are treated as closed. The
+      latest month is flagged preliminary until then.
+    default: 10
+  review_window_days:
+    type: integer
+    description: >
+      How far back, in days from the run's end date, the expense review queue
+      flags duplicates, spikes, unusual accounts, and new vendors.
+      Uncategorized lines are always flagged.
+    default: 90
+
 metadata_push:
   bigquery: true
 

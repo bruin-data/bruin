@@ -1,6 +1,7 @@
 /* @bruin
 name: quickbooks_stage.bills
 type: bq.sql
+owner: finance@example.com
 description: >
   One row per QuickBooks vendor bill, with typed amounts, the vendor and
   payment terms resolved, and a payment status derived from the open balance.
@@ -20,6 +21,14 @@ tags:
   - accounting
   - bills
   - accounts-payable
+
+domains:
+  - finance
+
+meta:
+  grain: one row per vendor bill
+  contains_pii: "true"
+  pii_note: Vendors can be people, such as contractors.
 
 columns:
   - name: bill_id

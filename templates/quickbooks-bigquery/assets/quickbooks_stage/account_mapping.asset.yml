@@ -1,0 +1,68 @@
+name: quickbooks_stage.account_mapping
+type: bq.seed
+owner: finance@example.com
+
+description: >
+  Editable mapping from QuickBooks account names to the profit-and-loss lines
+  the reports use. Edit `account_mapping.csv` to match your own chart of
+  accounts: one row per income or expense account. Accounts that are not
+  listed fall back to a default line based on their QuickBooks account type,
+  so the reports stay complete while you fill it in.
+
+parameters:
+  path: account_mapping.csv
+
+tags:
+  - quickbooks_stage
+  - quickbooks
+  - accounting
+  - seed
+
+domains:
+  - finance
+
+meta:
+  grain: one row per QuickBooks account name
+  contains_pii: "false"
+  agent_notes: >
+    Recategorizing an account means changing this file, not the report SQL.
+    Propose the change; edit the CSV only when the user asks. Rows are matched
+    to accounts by exact account name.
+
+columns:
+  - name: account_name
+    type: STRING
+    description: QuickBooks account name, matched exactly to `quickbooks_stage.accounts.account_name`.
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: pnl_group
+    type: STRING
+    description: >
+      Profit-and-loss section: `revenue`, `cogs`, `operating_expense`,
+      `other_income`, or `other_expense`.
+    checks:
+      - name: not_null
+      - name: accepted_values
+        value:
+          - revenue
+          - cogs
+          - operating_expense
+          - other_income
+          - other_expense
+  - name: category
+    type: STRING
+    description: Report line within the section, for example `Payroll` or `Software`.
+    checks:
+      - name: not_null
+  - name: department
+    type: STRING
+    description: >
+      Department the cost belongs to, for example `Research & Development`;
+      blank when the account is not tied to one.
+  - name: is_recurring_revenue
+    type: BOOL
+    description: Whether lines on the account count toward MRR.
+    checks:
+      - name: not_null
