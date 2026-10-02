@@ -46,7 +46,7 @@ func TestMissingDependenciesContractRenderingAndErrors(t *testing.T) {
 		{"jinja comment is not SQL", "SELECT 1 {# FROM raw.orders #}", pipeline.AssetTypeDuckDBQuery, nil, []string{}, ""},
 		{"cte itself is not a dependency", "WITH raw_orders AS (SELECT * FROM raw.orders) SELECT * FROM raw_orders", pipeline.AssetTypeDuckDBQuery, nil, []string{"raw.orders"}, ""},
 		{"rendering error", "SELECT {{", pipeline.AssetTypeDuckDBQuery, nil, []string{}, "failed to render the query before parsing the SQL"},
-		{"parse error", "SELECT * FROM", pipeline.AssetTypeDuckDBQuery, nil, []string{}, "failed to get used tables"},
+		{"parse error", "SELECT * FROM", pipeline.AssetTypeDuckDBQuery, nil, []string{}, "failed to get used tables: " + contractSelectStarFromError},
 		{"unsupported asset bypasses rendering", "SELECT {{", pipeline.AssetTypePython, nil, []string{}, ""},
 	}
 	for _, tc := range cases {
@@ -55,11 +55,44 @@ func TestMissingDependenciesContractRenderingAndErrors(t *testing.T) {
 			pl := &pipeline.Pipeline{Assets: []*pipeline.Asset{asset, {Name: "raw.orders"}, {Name: "raw_orders"}}, Macros: tc.macros}
 			got, err := sharedSQLParser.GetMissingDependenciesForAsset(asset, pl, jinja.NewRendererWithYesterday("contract", "test"))
 			if tc.errorText != "" {
-				require.ErrorContains(t, err, tc.errorText)
+				require.EqualError(t, err, tc.errorText)
 			} else {
 				require.NoError(t, err)
 			}
 			require.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestMissingDependenciesContractNamesAndDeduplication(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name, assetName, query string
+		upstreams              []pipeline.Upstream
+		want                   []string
+	}{
+		// Self suppression compares a lowercased reference with the unnormalized
+		// asset name, so case-insensitive matching is not consistent here.
+		{"mixed case self reported", "Raw.Self", "SELECT * FROM raw.self", nil, []string{"raw.self"}},
+		{"exact case self excluded", "Raw.Self", "SELECT * FROM Raw.Self", nil, []string{}},
+		{"lowercase self excluded", "raw.self", "SELECT * FROM RAW.SELF", nil, []string{}},
+		// UsedTables sorts before deduplication; the last spelling survives.
+		{"case duplicate keeps last spelling", "result", "SELECT * FROM RAW.A JOIN raw.a ON 1=1", nil, []string{"raw.a"}},
+		{"qualified and unqualified are different", "result", "SELECT * FROM a JOIN raw.a ON 1=1", nil, []string{"raw.a"}},
+		{"unqualified does not match qualified asset", "result", "SELECT * FROM a", nil, []string{}},
+		{"asset upstream case ignored", "result", "SELECT * FROM raw.a", []pipeline.Upstream{{Type: "asset", Value: "RAW.A"}}, []string{}},
+		{"uri upstream does not suppress", "result", "SELECT * FROM raw.a", []pipeline.Upstream{{Type: "uri", Value: "raw.a"}}, []string{"raw.a"}},
+		{"multiple results are an unordered set", "result", "SELECT * FROM raw.b JOIN raw.a ON 1=1 JOIN raw.b b ON 1=1 JOIN external_source ON 1=1", nil, []string{"raw.a", "raw.b"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			asset := &pipeline.Asset{Name: tc.assetName, Type: pipeline.AssetTypeDuckDBQuery, Upstreams: tc.upstreams, ExecutableFile: pipeline.ExecutableFile{Content: tc.query}}
+			pl := &pipeline.Pipeline{Assets: []*pipeline.Asset{asset, {Name: "raw.a"}, {Name: "raw.b"}}}
+			got, err := sharedSQLParser.GetMissingDependenciesForAsset(asset, pl, jinja.NewRendererWithYesterday("contract", "test"))
+			require.NoError(t, err)
+			require.NotNil(t, got)
+			// The Go map iteration order is not part of the API contract.
+			require.ElementsMatch(t, tc.want, got)
 		})
 	}
 }

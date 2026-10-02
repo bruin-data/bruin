@@ -41,6 +41,12 @@ func TestAddLimitContract(t *testing.T) {
 		{"mysql offset comma syntax", "SELECT * FROM t LIMIT 2, 10", "mysql", "SELECT * FROM t LIMIT 7 OFFSET 2", 7},
 		// Replacing a per-group limit currently drops BY, making it global.
 		{"clickhouse limit by removed", "SELECT * FROM t LIMIT 3 BY id", "clickhouse", "SELECT * FROM t LIMIT 7", 7},
+		{"parenthesized set keeps branch limit and gains outer", "(SELECT 1 UNION ALL SELECT 2 LIMIT 8)", "postgres", "(SELECT 1 UNION ALL SELECT 2 LIMIT 8) LIMIT 3", 3},
+		{"placeholder limit replaced offset retained", "SELECT * FROM t LIMIT ? OFFSET ?", "postgres", "SELECT * FROM t LIMIT 5 OFFSET ?", 5},
+		{"fetch ties replaced with plain limit", "SELECT * FROM t ORDER BY id FETCH FIRST 10 ROWS WITH TIES", "postgres", "SELECT * FROM t ORDER BY id LIMIT 5", 5},
+		{"oracle rownum is not recognized as limit", "SELECT * FROM t WHERE ROWNUM <= 10", "oracle", "SELECT * FROM t WHERE ROWNUM <= 10 FETCH FIRST 5 ROWS ONLY", 5},
+		// ClickHouse's comma offset plus BY keeps both modifiers when its count is replaced.
+		{"clickhouse comma offset and by retained", "SELECT * FROM t LIMIT 4, 10 BY k", "clickhouse", "SELECT * FROM t LIMIT 7 OFFSET 4 BY k", 7},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -49,16 +55,20 @@ func TestAddLimitContract(t *testing.T) {
 			require.Equal(t, tc.want, got)
 		})
 	}
-	for _, tc := range []struct{ name, query, dialect, fragment string }{
+	for _, tc := range []struct{ name, query, dialect, errorText string }{
 		{"empty", "", "duckdb", "cannot parse query"},
 		{"malformed", "SELECT * FROM", "duckdb", "cannot parse query"},
-		{"multiple statements form block", "SELECT 1; SELECT 2", "duckdb", "object has no attribute 'limit'"},
-		{"insert is not limitable", "INSERT INTO dest SELECT id FROM src", "postgres", "object has no attribute 'limit'"},
+		{"multiple statements form block", "SELECT 1; SELECT 2", "duckdb", "'Block' object has no attribute 'limit'"},
+		{"insert is not limitable", "INSERT INTO dest SELECT id FROM src", "postgres", "'Insert' object has no attribute 'limit'"},
 		{"invalid dialect", "SELECT 1", "not-a-dialect", "cannot parse query"},
+		{"malformed query wins no detail over invalid dialect", "SELECT * FROM", "not-a-dialect", "cannot parse query"},
+		// SQLGlot currently rejects ClickHouse's valid per-key plus global LIMIT form.
+		{"clickhouse per-key and global limit", "SELECT * FROM t LIMIT 2 BY id LIMIT 9", "clickhouse", "cannot parse query"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := sharedSQLParser.AddLimit(tc.query, 1, tc.dialect)
-			require.ErrorContains(t, err, tc.fragment)
+			got, err := sharedSQLParser.AddLimit(tc.query, 1, tc.dialect)
+			require.EqualError(t, err, tc.errorText)
+			require.Equal(t, "", got)
 		})
 	}
 }

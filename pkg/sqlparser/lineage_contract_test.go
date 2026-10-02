@@ -53,8 +53,11 @@ func TestSQLParserColumnLineageContractAllDialects(t *testing.T) {
 					{Name: "GROSS", Upstream: uc("AMOUNT", "SALES.ORDERS"), Type: "DECIMAL(12, 2)"},
 				}
 			}
-			require.Equal(t, want, got.Columns)
-			require.Empty(t, got.Errors)
+			wantNonSelected := []ColumnLineage{{"active", uc("active", "sales.orders"), ""}, {"customer_id", uc("customer_id", "sales.orders"), ""}, {"id", uc("id", "crm.customers"), ""}}
+			if upper {
+				wantNonSelected = []ColumnLineage{{"ACTIVE", uc("ACTIVE", "SALES.ORDERS"), ""}, {"CUSTOMER_ID", uc("CUSTOMER_ID", "SALES.ORDERS"), ""}, {"ID", uc("ID", "CRM.CUSTOMERS"), ""}}
+			}
+			require.Equal(t, &Lineage{Columns: want, NonSelectedColumns: wantNonSelected, Errors: []string{}}, got)
 		})
 	}
 }
@@ -91,12 +94,23 @@ func TestSQLParserColumnLineageContractPlatformFeatures(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := sharedSQLParser.ColumnLineage(tt.query, tt.dialect, tt.schema)
 			require.NoError(t, err)
-			require.Equal(t, tt.want, got.Columns)
-			if tt.wantErrors == nil {
-				require.Equal(t, []string{}, got.Errors)
-			} else {
-				require.Equal(t, tt.wantErrors, got.Errors)
+			wantNonSelected := []ColumnLineage{}
+			switch tt.name {
+			case "bigquery arrays structs unnest qualify":
+				wantNonSelected = []ColumnLineage{{"items", uc("items", "app.users"), ""}}
+			case "snowflake variant flatten qualify":
+				wantNonSelected = []ColumnLineage{{"PAYLOAD", uc("PAYLOAD", "EVENTS"), ""}}
+			case "postgres json lateral distinct on":
+				wantNonSelected = []ColumnLineage{{"payload", uc("payload", "app.users"), ""}}
+			case "trino unnest ordinality":
+				wantNonSelected = []ColumnLineage{{"items", uc("items", "events"), ""}}
+			case "tsql cross apply":
+				wantNonSelected = []ColumnLineage{{"id", uc("id", "orders"), ""}, {"order_id", uc("order_id", "payments"), ""}}
 			}
+			if tt.wantErrors == nil {
+				tt.wantErrors = []string{}
+			}
+			require.Equal(t, &Lineage{Columns: tt.want, NonSelectedColumns: wantNonSelected, Errors: tt.wantErrors}, got)
 		})
 	}
 }
@@ -112,8 +126,11 @@ func TestSQLParserNonSelectedLineageContractAllDialects(t *testing.T) {
 			if dialect == "oracle" || dialect == "snowflake" {
 				want = []ColumnLineage{{"ACTIVE", uc("ACTIVE", "SALES.ORDERS"), ""}, {"AMOUNT", uc("AMOUNT", "SALES.ORDERS"), ""}, {"CUSTOMER_ID", uc("CUSTOMER_ID", "SALES.ORDERS"), ""}, {"ID", uc("ID", "CRM.CUSTOMERS"), ""}}
 			}
-			require.Equal(t, want, got.NonSelectedColumns)
-			require.Equal(t, []string{}, got.Errors)
+			columns := []ColumnLineage{{"amount", uc("amount", "sales.orders"), "DOUBLE"}}
+			if dialect == "oracle" || dialect == "snowflake" {
+				columns = []ColumnLineage{{"AMOUNT", uc("AMOUNT", "SALES.ORDERS"), "DOUBLE"}}
+			}
+			require.Equal(t, &Lineage{Columns: columns, NonSelectedColumns: want, Errors: []string{}}, got)
 		})
 	}
 }
@@ -143,12 +160,11 @@ func TestSQLParserColumnLineageProjectionContracts(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := sharedSQLParser.ColumnLineage(tc.query, tc.dialect, tc.schema)
 			require.NoError(t, err)
-			require.Equal(t, tc.want, got.Columns)
 			wantErrors := tc.wantErrors
 			if wantErrors == nil {
 				wantErrors = []string{}
 			}
-			require.Equal(t, wantErrors, got.Errors)
+			require.Equal(t, &Lineage{Columns: tc.want, NonSelectedColumns: []ColumnLineage{}, Errors: wantErrors}, got)
 		})
 	}
 }
@@ -174,8 +190,26 @@ func TestSQLParserNonSelectedLineageClauseContracts(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := sharedSQLParser.ColumnLineage(tc.query, tc.dialect, tc.schema)
 			require.NoError(t, err)
-			require.Equal(t, []string{}, got.Errors)
-			require.Equal(t, tc.want, got.NonSelectedColumns)
+			var columns []ColumnLineage
+			switch tc.name {
+			case "where deduplicates":
+				columns = []ColumnLineage{{"amount", uc("amount", "t"), "INT"}}
+			case "having and order omitted":
+				columns = []ColumnLineage{{"total", uc("amount", "t"), "BIGINT"}}
+			case "qualify omitted":
+				columns = []ColumnLineage{{"amount", uc("amount", "t"), "INT"}}
+			case "window clauses omitted":
+				columns = []ColumnLineage{{"total", []UpstreamColumn{{"amount", "t"}, {"region", "t"}, {"ts", "t"}}, "BIGINT"}}
+			case "cte filters reach physical table":
+				columns = []ColumnLineage{{"amount", uc("amount", "t"), "INT"}}
+			case "same column from different tables":
+				columns = []ColumnLineage{{"value", uc("value", "a"), "INT"}}
+			case "using join becomes predicate":
+				columns = []ColumnLineage{{"id", []UpstreamColumn{{"id", "a"}, {"id", "b"}}, "INT"}}
+			case "unnest input is join dependency":
+				columns = []ColumnLineage{{"item", uc("items", "events"), "VARCHAR"}}
+			}
+			require.Equal(t, &Lineage{Columns: columns, NonSelectedColumns: tc.want, Errors: []string{}}, got)
 		})
 	}
 }
@@ -203,14 +237,11 @@ func TestSQLParserColumnLineageContractBoundaryAndInvalidInputs(t *testing.T) {
 	require.Equal(t, &Lineage{}, nilSchema)
 	emptySchema, err := sharedSQLParser.ColumnLineage("SELECT 1 AS one", "postgres", Schema{})
 	require.NoError(t, err)
-	require.Equal(t, []ColumnLineage{{"one", []UpstreamColumn{}, "INT"}}, emptySchema.Columns)
+	require.Equal(t, &Lineage{Columns: []ColumnLineage{{"one", []UpstreamColumn{}, "INT"}}, NonSelectedColumns: []ColumnLineage{}, Errors: []string{}}, emptySchema)
 
 	malformed, err := sharedSQLParser.ColumnLineage("SELECT FROM", "postgres", Schema{})
 	require.NoError(t, err)
-	require.Equal(t, []ColumnLineage{}, malformed.Columns)
-	require.Equal(t, []ColumnLineage{}, malformed.NonSelectedColumns)
-	require.Len(t, malformed.Errors, 1)
-	require.Contains(t, malformed.Errors[0], "Parse error: Expected table name")
+	require.Equal(t, &Lineage{Columns: []ColumnLineage{}, NonSelectedColumns: []ColumnLineage{}, Errors: []string{"Parse error: " + contractSelectFromError}}, malformed)
 
 	// Multiple statements become a Block rather than a Query, rejected in-band.
 	multi, err := sharedSQLParser.ColumnLineage("SELECT 1 AS first; SELECT 2 AS second", "postgres", Schema{})

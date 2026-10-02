@@ -7,23 +7,21 @@ import (
 )
 
 type classificationContractCase struct {
-	name    string
-	query   string
-	want    bool
-	wantErr bool
+	name, query, wantError string
+	want                   bool
 }
 
 func TestIsSingleSelectQueryContractAcrossDialects(t *testing.T) {
 	t.Parallel()
 	cases := []classificationContractCase{
-		{"select", "SELECT 1", true, false},
-		{"cte union", "WITH x AS (SELECT 1) SELECT * FROM x UNION ALL SELECT 2", true, false},
-		{"semicolon in literal", "SELECT 'a;b'", true, false},
-		{"multiple reads", "SELECT 1; SELECT 2", false, false},
-		{"write", "DELETE FROM t", false, false},
-		{"comments only", "-- SELECT 1", false, false},
-		{"empty", "", false, true},
-		{"malformed", "SELECT FROM", false, true},
+		{"select", "SELECT 1", "", true},
+		{"cte union", "WITH x AS (SELECT 1) SELECT * FROM x UNION ALL SELECT 2", "", true},
+		{"semicolon in literal", "SELECT 'a;b'", "", true},
+		{"multiple reads", "SELECT 1; SELECT 2", "", false},
+		{"write", "DELETE FROM t", "", false},
+		{"comments only", "-- SELECT 1", "", false},
+		{"empty", "", "cannot parse query", false},
+		{"malformed", "SELECT FROM", contractSelectFromError, false},
 	}
 	for _, dialect := range contractDialects {
 		dialect := dialect
@@ -32,7 +30,11 @@ func TestIsSingleSelectQueryContractAcrossDialects(t *testing.T) {
 			for _, tc := range cases {
 				t.Run(tc.name, func(t *testing.T) {
 					got, err := sharedSQLParser.IsSingleSelectQuery(tc.query, dialect)
-					require.Equal(t, tc.wantErr, err != nil)
+					if tc.wantError == "" {
+						require.NoError(t, err)
+					} else {
+						require.EqualError(t, err, tc.wantError)
+					}
 					require.Equal(t, tc.want, got)
 				})
 			}
@@ -43,40 +45,82 @@ func TestIsSingleSelectQueryContractAcrossDialects(t *testing.T) {
 func TestIsSingleSelectQueryContractStatementShape(t *testing.T) {
 	t.Parallel()
 	cases := []classificationContractCase{
-		{"array and lambda", "SELECT TRANSFORM(ARRAY(1, 2), x -> x + 1)", true, false},
-		{"table function", "SELECT * FROM TABLE(FLATTEN(INPUT => PARSE_JSON('[1,2]')))", true, false},
-		{"select into is still select", "SELECT * INTO backup FROM t", true, false},
-		{"write CTE is still select", "WITH x AS (DELETE FROM t RETURNING *) SELECT * FROM x", true, false},
-		{"locking select is still select", "SELECT * FROM t FOR UPDATE", true, false},
-		{"show is not select", "SHOW TABLES", false, false},
-		{"describe is not select", "DESCRIBE orders", false, false},
-		{"explain is not select", "EXPLAIN SELECT 1", false, false},
-		{"NUL does not itself error", "SELECT 1\x00; DELETE FROM t", false, false},
+		{"array and lambda", "SELECT TRANSFORM(ARRAY(1, 2), x -> x + 1)", "", true},
+		{"table function", "SELECT * FROM TABLE(FLATTEN(INPUT => PARSE_JSON('[1,2]')))", "", true},
+		{"select into is still select", "SELECT * INTO backup FROM t", "", true},
+		{"write CTE is still select", "WITH x AS (DELETE FROM t RETURNING *) SELECT * FROM x", "", true},
+		{"locking select is still select", "SELECT * FROM t FOR UPDATE", "", true},
+		{"show is not select", "SHOW TABLES", "", false},
+		{"describe is not select", "DESCRIBE orders", "", false},
+		{"explain is not select", "EXPLAIN SELECT 1", "", false},
+		{"NUL does not itself error", "SELECT 1\x00; DELETE FROM t", "", false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := sharedSQLParser.IsSingleSelectQuery(tc.query, "snowflake")
-			require.Equal(t, tc.wantErr, err != nil)
+			if tc.wantError == "" {
+				require.NoError(t, err)
+			} else {
+				require.EqualError(t, err, tc.wantError)
+			}
 			require.Equal(t, tc.want, got)
 		})
 	}
 	got, err := sharedSQLParser.IsSingleSelectQuery("SELECT 1", "not-a-dialect")
 	require.False(t, got)
-	require.Error(t, err)
+	require.EqualError(t, err, "Unknown dialect 'not-a-dialect'.")
+}
+
+func TestClassificationContractParserEdges(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name, dialect, query       string
+		single, readOnly           bool
+		singleError, readOnlyError string
+	}{
+		{"values", "mysql", "VALUES (1)", false, false, "", ""},
+		{"parenthesized select", "postgres", "(SELECT 1)", true, true, "", ""},
+		{"extra separator", "mysql", "SELECT 1;;", false, true, "", ""},
+		{"extra comma accepted", "postgres", "SELECT 1,,2", true, true, "", ""},
+		{"executable comment", "mysql", "/*!50000 DROP TABLE t */", false, false, "", "cannot determine whether query is read-only: cannot parse empty query"},
+		{"user variable assignment", "mysql", "SET @x := 1", false, false, "", ""},
+		{"outfile rejected", "mysql", "SELECT * FROM t INTO OUTFILE \"/tmp/x\"", false, false, "Invalid expression / Unexpected token. Line 1, Col: 20.\n  SELECT * FROM t \x1b[4mINTO\x1b[0m OUTFILE \"/tmp/x\"", "cannot determine whether query is read-only: Invalid expression / Unexpected token. Line 1, Col: 20.\n  SELECT * FROM t \x1b[4mINTO\x1b[0m OUTFILE \"/tmp/x\""},
+		{"client delimiter rejected", "mysql", "DELIMITER //", false, false, "Required keyword: 'expression' missing for <class 'sqlglot.expressions.core.Div'>. Line 1, Col: 12.\n  DELIMITER /\x1b[4m/\x1b[0m", "cannot determine whether query is read-only: Required keyword: 'expression' missing for <class 'sqlglot.expressions.core.Div'>. Line 1, Col: 12.\n  DELIMITER /\x1b[4m/\x1b[0m"},
+		{"plain nextval column", "postgres", "SELECT nextval FROM t", true, false, "", ""},
+		{"nextval function", "postgres", "SELECT nextval('s')", true, false, "", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := sharedSQLParser.IsSingleSelectQuery(tc.query, tc.dialect)
+			require.Equal(t, tc.single, got)
+			if tc.singleError == "" {
+				require.NoError(t, err)
+			} else {
+				require.EqualError(t, err, tc.singleError)
+			}
+			got, err = sharedSQLParser.IsReadOnlyQuery(tc.query, tc.dialect)
+			require.Equal(t, tc.readOnly, got)
+			if tc.readOnlyError == "" {
+				require.NoError(t, err)
+			} else {
+				require.EqualError(t, err, tc.readOnlyError)
+			}
+		})
+	}
 }
 
 func TestIsReadOnlyQueryContractAcrossDialects(t *testing.T) {
 	t.Parallel()
 	cases := []classificationContractCase{
-		{"select", "SELECT 1", true, false},
-		{"multiple reads", "SELECT 1; SELECT 2", true, false},
-		{"semicolon in literal", "SELECT 'DELETE; DROP'", true, false},
-		{"write", "DELETE FROM t", false, false},
-		{"select into", "SELECT * INTO backup FROM t", false, false},
-		{"NUL", "SELECT 1\x00; SELECT 2", false, false},
-		{"comments only", "/* SELECT 1 */", false, true},
-		{"empty statements", ";;", false, true},
-		{"malformed", "SELECT FROM", false, true},
+		{"select", "SELECT 1", "", true},
+		{"multiple reads", "SELECT 1; SELECT 2", "", true},
+		{"semicolon in literal", "SELECT 'DELETE; DROP'", "", true},
+		{"write", "DELETE FROM t", "", false},
+		{"select into", "SELECT * INTO backup FROM t", "", false},
+		{"NUL", "SELECT 1\x00; SELECT 2", "", false},
+		{"comments only", "/* SELECT 1 */", "cannot determine whether query is read-only: cannot parse empty query", false},
+		{"empty statements", ";;", "cannot determine whether query is read-only: cannot parse empty query", false},
+		{"malformed", "SELECT FROM", "cannot determine whether query is read-only: " + contractSelectFromError, false},
 	}
 	for _, dialect := range contractDialects {
 		dialect := dialect
@@ -85,7 +129,11 @@ func TestIsReadOnlyQueryContractAcrossDialects(t *testing.T) {
 			for _, tc := range cases {
 				t.Run(tc.name, func(t *testing.T) {
 					got, err := sharedSQLParser.IsReadOnlyQuery(tc.query, dialect)
-					require.Equal(t, tc.wantErr, err != nil)
+					if tc.wantError == "" {
+						require.NoError(t, err)
+					} else {
+						require.EqualError(t, err, tc.wantError)
+					}
 					require.Equal(t, tc.want, got)
 				})
 			}
@@ -147,7 +195,22 @@ func TestIsReadOnlyQueryContractPlatformStatements(t *testing.T) {
 	}
 	got, err := sharedSQLParser.IsReadOnlyQuery("SELECT 1", "not-a-dialect")
 	require.False(t, got)
-	require.Error(t, err)
+	require.EqualError(t, err, "cannot determine whether query is read-only: Unknown dialect 'not-a-dialect'.")
+}
+
+func TestIsReadOnlyQueryContractMetadataStatements(t *testing.T) {
+	t.Parallel()
+	for _, dialect := range contractDialects {
+		t.Run(dialect, func(t *testing.T) {
+			t.Parallel()
+			for _, query := range []string{"SHOW TABLES", "EXPLAIN SELECT 1"} {
+				want := dialect == "mysql" || dialect == "doris" || dialect == "starrocks" || dialect == "snowflake" || (dialect == "duckdb" && query == "SHOW TABLES")
+				got, err := sharedSQLParser.IsReadOnlyQuery(query, dialect)
+				require.NoError(t, err)
+				require.Equal(t, want, got, query)
+			}
+		})
+	}
 }
 
 func TestValidateReadOnlyQueryContractErrors(t *testing.T) {
@@ -155,9 +218,7 @@ func TestValidateReadOnlyQueryContractErrors(t *testing.T) {
 	require.NoError(t, ValidateReadOnlyQuery("SELECT 1; SELECT 2", "snowflake"))
 	require.EqualError(t, ValidateReadOnlyQuery("DELETE FROM t", "snowflake"), "query is not allowed on a read-only connection")
 	parseErr := ValidateReadOnlyQuery("SELECT FROM", "snowflake")
-	require.Error(t, parseErr)
-	require.ErrorContains(t, parseErr, "read-only query validation failed: cannot determine whether query is read-only:")
+	require.EqualError(t, parseErr, "read-only query validation failed: cannot determine whether query is read-only: "+contractSelectFromError)
 	dialectErr := ValidateReadOnlyQuery("SELECT 1", "not-a-dialect")
-	require.Error(t, dialectErr)
-	require.ErrorContains(t, dialectErr, "read-only query validation failed: cannot determine whether query is read-only:")
+	require.EqualError(t, dialectErr, "read-only query validation failed: cannot determine whether query is read-only: Unknown dialect 'not-a-dialect'.")
 }

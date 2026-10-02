@@ -48,6 +48,10 @@ func TestFreezeTimeContract(t *testing.T) {
 		{"invalid time string accepted", "SELECT NOW(), clock_timestamp(), CURRENT_TIME(3)", "postgres", "not-a-date", "SELECT CAST('not-a-date' AS TIMESTAMP), CLOCK_TIMESTAMP(), CAST('00:00:00' AS TIME)"},
 		{"clickhouse clock functions unchanged", "SELECT now(), today(), now64()", "clickhouse", "2024-02-03 04:05:06", "SELECT now(), today(), now64()"},
 		{"cte and predicate", "WITH x AS (SELECT CURRENT_DATE AS d) SELECT d FROM x WHERE d < CURRENT_DATE", "duckdb", "2024-02-03", "WITH x AS (SELECT CAST('2024-02-03' AS DATE) AS d) SELECT d FROM x WHERE d < CAST('2024-02-03' AS DATE)"},
+		{"precision retained from execution time not function", "SELECT CURRENT_TIMESTAMP(3), CURRENT_TIME(2)", "postgres", "2024-02-03 04:05:06.789123", "SELECT CAST('2024-02-03 04:05:06.789123' AS TIMESTAMP), CAST('04:05:06.789123' AS TIME)"},
+		{"local time functions unchanged", "SELECT LOCALTIME, LOCALTIMESTAMP", "postgres", "2024-02-03T04:05:06+05:30", "SELECT LOCALTIME, LOCALTIMESTAMP"},
+		{"tsql utc and offset functions unchanged", "SELECT GETUTCDATE(), SYSDATETIMEOFFSET()", "tsql", "2024-02-03T04:05:06.123456+02:00", "SELECT GETUTCDATE(), SYSDATETIMEOFFSET()"},
+		{"aliases replaced expressions but qualified identifier retained", "SELECT current_timestamp AS current_date, current_date AS current_timestamp, t.current_time FROM t", "postgres", "2024-02-03 04:05:06", "SELECT CAST('2024-02-03 04:05:06' AS TIMESTAMP) AS current_date, CAST('2024-02-03' AS DATE) AS current_timestamp, t.current_time FROM t"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := sharedSQLParser.FreezeTime(tc.query, tc.dialect, tc.at)
@@ -55,15 +59,19 @@ func TestFreezeTimeContract(t *testing.T) {
 			require.Equal(t, tc.want, got)
 		})
 	}
-	for _, tc := range []struct{ name, query, dialect, at, fragment string }{
+	for _, tc := range []struct{ name, query, dialect, at, errorText string }{
 		{"missing time", "SELECT CURRENT_TIMESTAMP", "duckdb", "", "execution_time is required"},
+		// Argument validation precedes SQL and dialect parsing.
+		{"missing time wins over malformed query and dialect", "SELECT * FROM", "not-a-dialect", "", "execution_time is required"},
 		{"empty", "", "duckdb", "2024-01-01", "cannot parse query"},
-		{"malformed", "SELECT * FROM", "duckdb", "2024-01-01", "Expected table name"},
-		{"invalid dialect", "SELECT 1", "not-a-dialect", "2024-01-01", "Unknown dialect"},
+		{"malformed", "SELECT * FROM", "duckdb", "2024-01-01", contractSelectStarFromError},
+		{"invalid dialect", "SELECT 1", "not-a-dialect", "2024-01-01", "Unknown dialect 'not-a-dialect'."},
+		{"invalid dialect wins over malformed query", "SELECT * FROM", "not-a-dialect", "2024-01-01", "Unknown dialect 'not-a-dialect'."},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := sharedSQLParser.FreezeTime(tc.query, tc.dialect, tc.at)
-			require.ErrorContains(t, err, tc.fragment)
+			got, err := sharedSQLParser.FreezeTime(tc.query, tc.dialect, tc.at)
+			require.EqualError(t, err, tc.errorText)
+			require.Equal(t, "", got)
 		})
 	}
 }

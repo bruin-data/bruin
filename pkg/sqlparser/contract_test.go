@@ -27,6 +27,13 @@ var contractDialects = []string{
 	"spark", "starrocks", "trino", "tsql",
 }
 
+// SQLGlot's error location and ANSI highlighting are observable in Go errors.
+// These literals deliberately do not ask the parser to format expectations.
+const (
+	contractSelectFromError     = "Expected table name but got <Token token_type: TokenType.SENTINEL, text: SENTINEL, line: 1, col: 1, start: 0, end: 0, comments: []>. Line 1, Col: 11.\n  SELECT \x1b[4mFROM\x1b[0m"
+	contractSelectStarFromError = "Expected table name but got <Token token_type: TokenType.SENTINEL, text: SENTINEL, line: 1, col: 1, start: 0, end: 0, comments: []>. Line 1, Col: 13.\n  SELECT * \x1b[4mFROM\x1b[0m"
+)
+
 func TestSQLParserContractDialectCoverage(t *testing.T) {
 	t.Parallel()
 

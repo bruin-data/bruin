@@ -66,6 +66,20 @@ func TestRenameTablesContractPlatformFeatures(t *testing.T) {
 		// Go's JSON encoder sorts map keys; mappings are then applied sequentially,
 		// so a -> b -> c is a cascade, not a simultaneous replacement.
 		{"cascading mappings", "postgres", "SELECT * FROM a JOIN b ON a.id=b.id", map[string]string{"a": "b", "b": "c"}, "SELECT * FROM c AS a JOIN c AS b ON a.id = b.id"},
+		{"lexical order masks longest match", "postgres", "SELECT * FROM z.s.t", map[string]string{"t": "leaf", "z.s.t": "catalog"}, "SELECT * FROM leaf AS t"},
+		// Mapping keys are applied in sorted order, so later replacements can
+		// rewrite the output of earlier ones rather than matching the input once.
+		{"overlapping leaf schema catalog priority", "postgres", "SELECT * FROM cat.s.t", map[string]string{"t": "leaf", "s.t": "schema", "cat.s.t": "catalog"}, "SELECT * FROM catalog AS t"},
+		{"reverse cycle cascades", "postgres", "SELECT * FROM a", map[string]string{"a": "b", "b": "a"}, "SELECT * FROM a AS a"},
+		// Although c maps to b and b maps to a, sorted key application visits b
+		// before c, so the newly produced b is not revisited.
+		{"reverse mapping chain follows lexical order", "postgres", "SELECT * FROM c", map[string]string{"b": "a", "c": "b"}, "SELECT * FROM b AS c"},
+		{"same leaf distinct scopes collapse qualifiers", "postgres", "SELECT * FROM s1.t JOIN s2.t ON s1.t.id=s2.t.id", map[string]string{"s1.t": "x", "s2.t": "y"}, "SELECT * FROM x AS t JOIN y AS t ON t.id = t.id"},
+		{"unmatched qualifier is rewritten", "postgres", "SELECT raw.orders.id FROM elsewhere", map[string]string{"raw.orders": "fixture"}, "SELECT orders.id FROM elsewhere"},
+		// Destination parsing currently double-quotes the final quoted component.
+		{"quoted destination identifiers quirk", "postgres", "SELECT * FROM src", map[string]string{"src": `"Odd Schema"."Odd Table"`}, `SELECT * FROM "Odd Schema".""Odd Table"" AS src`},
+		{"stage source is treated as table", "snowflake", "SELECT * FROM @mystage/path", map[string]string{"@mystage/path": "fixture"}, "SELECT * FROM fixture AS @mystage/path"},
+		{"table function source is not renamed", "snowflake", "SELECT * FROM TABLE(GENERATOR(ROWCOUNT => 3))", map[string]string{"GENERATOR": "fixture"}, "SELECT * FROM TABLE(GENERATOR(ROWCOUNT => 3))"},
 		{"unnest", "bigquery", "SELECT e.id, x FROM `p.raw.events` e, UNNEST(e.items) x", map[string]string{"p.raw.events": "fixture"}, "SELECT e.id, x FROM `fixture` AS e CROSS JOIN UNNEST(e.items) AS x"},
 		{"flatten inferred columns", "snowflake", "SELECT f.value FROM raw.events e, LATERAL FLATTEN(input => e.payload) f", map[string]string{"raw.events": "fixture"}, "SELECT f.value FROM fixture AS e, LATERAL FLATTEN(input => e.payload) AS f(SEQ, KEY, PATH, INDEX, VALUE, THIS)"},
 		{"final prewhere", "clickhouse", "SELECT * FROM db.events FINAL PREWHERE active=1", map[string]string{"db.events": "fixture"}, "SELECT * FROM fixture AS events FINAL PREWHERE active = 1"},
@@ -79,6 +93,7 @@ func TestRenameTablesContractPlatformFeatures(t *testing.T) {
 		// ExtractSelect, a different operation, has the case-preservation hook).
 		{"inferred column case", "fabric", "WITH a AS (SELECT MixedCase FROM dbo.orders) SELECT * FROM a", map[string]string{"dbo.orders": "fixture"}, "WITH a AS (SELECT MixedCase AS mixedcase FROM fixture AS orders) SELECT * FROM a"},
 		{"inferred column case", "tsql", "WITH a AS (SELECT MixedCase FROM dbo.orders) SELECT * FROM a", map[string]string{"dbo.orders": "fixture"}, "WITH a AS (SELECT MixedCase AS MixedCase FROM fixture AS orders) SELECT * FROM a"},
+		{"explicit alias case override", "tsql", "SELECT MixedCase AS mixedcase FROM dbo.t", map[string]string{}, "SELECT MixedCase AS MixedCase FROM dbo.t"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.dialect+"/"+tc.name, func(t *testing.T) {
@@ -92,23 +107,28 @@ func TestRenameTablesContractPlatformFeatures(t *testing.T) {
 func TestRenameTablesContractInvalidInputs(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct{ name, query, dialect, errorText string }{
-		{"empty", "", "postgres", "object has no attribute 'find_all'"},
-		{"comment only", "-- comment", "postgres", "object has no attribute 'find_all'"},
-		{"extra separator", "SELECT 1;;", "postgres", "object has no attribute 'find_all'"},
-		{"malformed", "SELECT * FROM", "postgres", "Expected table name"},
-		{"unknown dialect", "SELECT 1", "not-a-dialect", "Unknown dialect"},
+		{"empty", "", "postgres", "'NoneType' object has no attribute 'find_all'"},
+		{"comment only", "-- comment", "postgres", "'NoneType' object has no attribute 'find_all'"},
+		{"extra separator", "SELECT 1;;", "postgres", "'NoneType' object has no attribute 'find_all'"},
+		{"malformed", "SELECT * FROM", "postgres", contractSelectStarFromError},
+		{"unknown dialect", "SELECT 1", "not-a-dialect", "Unknown dialect 'not-a-dialect'."},
 		// Unlike other operations, RenameTables does not normalize vertica.
-		{"vertica alias unsupported", "SELECT 1", "vertica", "Unknown dialect"},
+		{"vertica alias unsupported", "SELECT 1", "vertica", "Unknown dialect 'vertica'."},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := sharedSQLParser.RenameTables(tc.query, tc.dialect, map[string]string{})
-			require.ErrorContains(t, err, tc.errorText)
-			require.Empty(t, got)
+			require.EqualError(t, err, tc.errorText)
+			require.Equal(t, "", got)
 		})
 	}
-	t.Run("nil mapping differs from empty mapping", func(t *testing.T) {
+	t.Run("nil mapping with table differs from empty mapping", func(t *testing.T) {
 		got, err := sharedSQLParser.RenameTables("SELECT * FROM orders", "postgres", nil)
-		require.ErrorContains(t, err, "object has no attribute 'items'")
-		require.Empty(t, got)
+		require.EqualError(t, err, "'NoneType' object has no attribute 'items'")
+		require.Equal(t, "", got)
+	})
+	t.Run("nil mapping without table succeeds", func(t *testing.T) {
+		got, err := sharedSQLParser.RenameTables("SELECT 1", "postgres", nil)
+		require.NoError(t, err)
+		require.Equal(t, "SELECT 1", got)
 	})
 }
