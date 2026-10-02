@@ -267,16 +267,12 @@ func Render() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			// Best-effort: the rust sql parser drives DECLARE hoisting in
-			// hook-wrapped SQL. It's in-process via CGo so initialization
-			// is cheap; on failure we render without hoisting rather than
-			// failing the command.
+			// Hoisting starts the Python parser only when the SQL contains
+			// DECLARE. On failure, hook wrapping preserves the original SQL.
 			var hoister pipeline.DeclareHoister
-			if rp, parserErr := sqlparser.NewRustSQLParser(false); parserErr == nil {
-				defer rp.Close()
-				if startErr := rp.Start(); startErr == nil {
-					hoister = rp
-				}
+			if p, parserErr := sqlparser.NewSQLParser(false); parserErr == nil {
+				defer p.Close()
+				hoister = p
 			}
 
 			r := RenderCommand{

@@ -61,7 +61,6 @@ ingestr-hashes:
 
 build: deps
 	@echo "$(OK_COLOR)==> Building the application...$(NO_COLOR)"
-	@$(MAKE) rustsqlparser-lib
 	@CGO_ENABLED=1 go build -v -tags="no_duckdb_arrow" -ldflags="-s -w -X main.Version=$(or $(tag), dev-$(shell git describe --tags --abbrev=0)) -X main.telemetryKey=$(TELEMETRY_KEY)" -o "$(BUILD_DIR)/$(NAME)" "$(BUILD_SRC)"
 
 build-no-duckdb: deps
@@ -136,7 +135,6 @@ test: test-unit
 test-unit: ingestr-hashes
 	@echo "$(OK_COLOR)==> Running the unit tests (fast)$(NO_COLOR)"
 	@python3 -m unittest discover -s scripts -p 'test_generate_ingestr_hashes.py'
-	@$(MAKE) rustsqlparser-lib
 	@env SF_DISABLE_MINICORE=true go test -tags="no_duckdb_arrow" -p "$(TEST_CONCURRENCY)" -vet=off -timeout 10m ./cmd/... ./pkg/... ./templates/...
 	@echo "$(OK_COLOR)==> Running the semantic-engine module tests$(NO_COLOR)"
 	@cd semantic-engine && env SF_DISABLE_MINICORE=true go test -p "$(TEST_CONCURRENCY)" -timeout 10m ./...
@@ -144,18 +142,9 @@ test-unit: ingestr-hashes
 test-full: ingestr-hashes
 	@echo "$(OK_COLOR)==> Running the unit tests (full)$(NO_COLOR)"
 	@python3 -m unittest discover -s scripts -p 'test_generate_ingestr_hashes.py'
-	@$(MAKE) rustsqlparser-lib
 	@env SF_DISABLE_MINICORE=true go test -tags="no_duckdb_arrow" -race -p "$(TEST_CONCURRENCY)" -vet=off -timeout 10m ./cmd/... ./pkg/... ./templates/...
 	@echo "$(OK_COLOR)==> Running the semantic-engine module tests with race detection$(NO_COLOR)"
 	@cd semantic-engine && env SF_DISABLE_MINICORE=true go test -race -p "$(TEST_CONCURRENCY)" -timeout 10m ./...
-
-RUST_LIB = pkg/sqlparser/rustffi/target/release/libbruin_rustsqlparser.a
-
-rustsqlparser-lib: $(RUST_LIB)
-
-$(RUST_LIB): pkg/sqlparser/rustffi/Cargo.toml $(wildcard pkg/sqlparser/rustffi/src/*.rs)
-	@echo "$(OK_COLOR)==> Building Rust SQL parser static library$(NO_COLOR)"
-	@cargo build --release --manifest-path pkg/sqlparser/rustffi/Cargo.toml
 
 format: lint-python
 	@echo "$(OK_COLOR)>> [gci] formatting$(NO_COLOR)"

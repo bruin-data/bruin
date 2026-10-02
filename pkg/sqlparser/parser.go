@@ -24,9 +24,6 @@ import (
 )
 
 type SQLParser struct {
-	ep             *python.EmbeddedPython
-	sqlglotDir     *embed_util.EmbeddedFiles
-	rendererSrc    *embed_util.EmbeddedFiles
 	tmpDir         string
 	started        bool
 	randomize      bool
@@ -48,7 +45,7 @@ func NewSQLParser(randomize bool) (*SQLParser, error) {
 // from a stable temp directory path. This is significantly faster when files already exist
 // (skips ~3s of file extraction) and is safe for concurrent reads across test packages.
 func NewSQLParserCached() (*SQLParser, error) {
-	return newSQLParserInternal("bruin-cli-embedded-cached", false, 10000)
+	return newSQLParserInternal("bruin-cli-embedded-cached", false, 10000), nil
 }
 
 func NewSQLParserWithConfig(randomize bool, maxQueryLength int) (*SQLParser, error) {
@@ -62,39 +59,15 @@ func NewSQLParserWithConfig(randomize bool, maxQueryLength int) (*SQLParser, err
 		randomInt = int(b[0])
 	}
 	tmpDirName := fmt.Sprintf("bruin-cli-embedded_%d", randomInt)
-	return newSQLParserInternal(tmpDirName, randomize, maxQueryLength)
+	return newSQLParserInternal(tmpDirName, randomize, maxQueryLength), nil
 }
 
-func newSQLParserInternal(tmpDirName string, randomize bool, maxQueryLength int) (*SQLParser, error) {
-	tmpDir := filepath.Join(os.TempDir(), tmpDirName)
-	withHashInDir := randomize // only use hash-suffixed dirs for randomized parser instances; reuse cached dirs.
-
-	ep, err := python.NewEmbeddedPythonWithTmpDir(tmpDir+"-python", withHashInDir)
-	if err != nil {
-		return nil, err
-	}
-	sqlglotDir, err := embed_util.NewEmbeddedFilesWithTmpDir(data.Data, tmpDir+"-sqlglot-lib", withHashInDir)
-	if err != nil {
-		return nil, err
-	}
-	ep.AddPythonPath(sqlglotDir.GetExtractedPath())
-
-	// Keep the parser source content-hashed so cached parser instances cannot reuse
-	// stale Python code after pythonsrc changes. This directory is small compared to
-	// the embedded Python/runtime directories above.
-	rendererSrc, err := embed_util.NewEmbeddedFilesWithTmpDir(pythonsrc.RendererSource, tmpDir+"-jinja2-renderer", true)
-	if err != nil {
-		return nil, err
-	}
-
+func newSQLParserInternal(tmpDirName string, randomize bool, maxQueryLength int) *SQLParser {
 	return &SQLParser{
-		ep:             ep,
-		sqlglotDir:     sqlglotDir,
-		rendererSrc:    rendererSrc,
-		tmpDir:         tmpDir,
+		tmpDir:         filepath.Join(os.TempDir(), tmpDirName),
 		randomize:      randomize,
 		MaxQueryLength: maxQueryLength,
-	}, nil
+	}
 }
 
 func (s *SQLParser) Start() error {
@@ -103,9 +76,31 @@ func (s *SQLParser) Start() error {
 	if s.started {
 		return nil
 	}
-	var err error
-	args := []string{filepath.Join(s.rendererSrc.GetExtractedPath(), "main.py")}
-	s.cmd, err = s.ep.PythonCmd(args...)
+
+	// Extract only when parsing is needed, not when an unused hook hoister is
+	// constructed. Keep preparation under the same lock as subprocess startup.
+	withHashInDir := s.randomize // randomized instances use hash-suffixed dirs; others reuse cached dirs.
+
+	ep, err := python.NewEmbeddedPythonWithTmpDir(s.tmpDir+"-python", withHashInDir)
+	if err != nil {
+		return err
+	}
+	sqlglotDir, err := embed_util.NewEmbeddedFilesWithTmpDir(data.Data, s.tmpDir+"-sqlglot-lib", withHashInDir)
+	if err != nil {
+		return err
+	}
+	ep.AddPythonPath(sqlglotDir.GetExtractedPath())
+
+	// Keep the parser source content-hashed so cached parser instances cannot reuse
+	// stale Python code after pythonsrc changes. This directory is small compared to
+	// the embedded Python/runtime directories above.
+	rendererSrc, err := embed_util.NewEmbeddedFilesWithTmpDir(pythonsrc.RendererSource, s.tmpDir+"-jinja2-renderer", true)
+	if err != nil {
+		return err
+	}
+
+	args := []string{filepath.Join(rendererSrc.GetExtractedPath(), "main.py")}
+	s.cmd, err = ep.PythonCmd(args...)
 	if err != nil {
 		return err
 	}
@@ -268,6 +263,55 @@ func (s *SQLParser) RenameTables(sql string, dialect string, tableMapping map[st
 	})
 }
 
+// HoistDeclares moves top-level declarations ahead of other statements without
+// regenerating their SQL. On failure it returns the original input.
+func (s *SQLParser) HoistDeclares(sql string, assetType pipeline.AssetType) (string, error) {
+	dialect, err := AssetTypeToDialect(assetType)
+	if err != nil {
+		return sql, err
+	}
+	query, err := s.sendQueryCommand("hoist-declares", map[string]interface{}{
+		"query":   sql,
+		"dialect": dialect,
+	})
+	if err != nil {
+		return sql, err
+	}
+	return query, nil
+}
+
+// HoistDeclaresList preserves whole query entries, including their formatting.
+func (s *SQLParser) HoistDeclaresList(queries []string, assetType pipeline.AssetType) ([]string, error) {
+	dialect, err := AssetTypeToDialect(assetType)
+	if err != nil {
+		return queries, err
+	}
+	if len(queries) == 0 {
+		return queries, nil
+	}
+	if err := s.Start(); err != nil {
+		return queries, errors.Wrap(err, "failed to start sql parser")
+	}
+	payload, err := s.sendCommand(&parserCommand{
+		Command:  "hoist-declares-list",
+		Contents: map[string]interface{}{"queries": queries, "dialect": dialect},
+	})
+	if err != nil {
+		return queries, errors.Wrap(err, "failed to hoist declares list")
+	}
+	var resp struct {
+		Queries []string `json:"queries"`
+		Error   string   `json:"error"`
+	}
+	if err := json.Unmarshal([]byte(payload), &resp); err != nil {
+		return queries, errors.Wrap(err, "failed to unmarshal response")
+	}
+	if resp.Error != "" {
+		return queries, errors.New(resp.Error)
+	}
+	return resp.Queries, nil
+}
+
 func (s *SQLParser) sendCommand(pc *parserCommand) (string, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -376,7 +420,7 @@ func AssetTypeToDialect(assetType pipeline.AssetType) (string, error) {
 
 // connectionTypeDialectMap maps the connection type identifier used in the
 // connection manager (the yaml tag of each connection field in
-// config.Connections) to the dialect string the rust SQL parser understands.
+// config.Connections) to the dialect string the SQL parser understands.
 // This is used to pick a dialect for queries that are run directly against a
 // connection without going through a Bruin asset (where we'd otherwise know
 // the asset type).
@@ -405,7 +449,7 @@ var connectionTypeDialectMap = map[string]string{
 }
 
 // ConnectionTypeToDialect maps a connection type identifier (e.g. "clickhouse")
-// to the dialect string used by the rust SQL parser. Returns the empty string
+// to the dialect string used by the SQL parser. Returns the empty string
 // when no dialect is registered for the type.
 func ConnectionTypeToDialect(connectionType string) string {
 	return connectionTypeDialectMap[connectionType]

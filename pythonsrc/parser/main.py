@@ -1,7 +1,7 @@
 import logging
 from dataclasses import dataclass
 
-from sqlglot import exp, lineage, parse, parse_one, tokenize
+from sqlglot import Dialect, exp, lineage, parse, parse_one, tokenize
 from sqlglot.lineage import Node
 from sqlglot.optimizer import optimize
 from sqlglot.optimizer.scope import build_scope, find_all_in_scope
@@ -13,6 +13,128 @@ def normalize_sqlglot_dialect(dialect: str | None) -> str | None:
     if dialect == "vertica":
         return "postgres"
     return dialect
+
+
+def _top_level_semicolons(query: str, dialect: str | None) -> list[int]:
+    """Return source offsets of statement separators outside procedural blocks."""
+    dialect = Dialect.get_or_raise(dialect)
+    # COMMAND tokens normally collapse everything up to the next semicolon
+    # into a string. That hides nested BEGIN/CASE/END tokens from the splitter.
+    tokenizer = type("ScriptTokenizer", (dialect.tokenizer_class,), {"COMMANDS": set()})
+    tokens = tokenizer(dialect=dialect).tokenize(query)
+    paren_depth = 0
+    begin_depth = 0
+    case_depth = 0
+
+    positions = []
+    for index, token in enumerate(tokens):
+        token_type = token.token_type
+        if token_type == TokenType.L_PAREN:
+            paren_depth += 1
+        elif token_type == TokenType.R_PAREN:
+            paren_depth = max(0, paren_depth - 1)
+        elif token_type == TokenType.CASE:
+            case_depth += 1
+        elif (
+            token_type
+            in (
+                TokenType.BEGIN,
+                TokenType.COMMAND,
+            )
+            and token.text.upper().split()[0] == "BEGIN"
+        ):
+            # BigQuery's tokenizer emits procedural BEGIN as COMMAND, while
+            # BEGIN TRANSACTION is one BEGIN token (other dialects may emit a
+            # separate TRANSACTION token).
+            words = token.text.upper().split()
+            next_is_transaction = len(words) > 1 and words[1] == "TRANSACTION"
+            if not next_is_transaction and index + 1 < len(tokens):
+                # SQLGlot has no TRANSACTION TokenType in all supported
+                # versions, so inspect the tokenizer's text here.
+                next_is_transaction = tokens[index + 1].text.upper() == "TRANSACTION"
+            if not next_is_transaction:
+                begin_depth += 1
+        elif token_type == TokenType.END:
+            if case_depth:
+                case_depth -= 1
+            elif begin_depth:
+                begin_depth -= 1
+        elif (
+            token_type == TokenType.SEMICOLON and paren_depth == 0 and begin_depth == 0
+        ):
+            positions.append(token.start)
+    return positions
+
+
+def _is_declare_statement(query: str, dialect: str | None) -> bool:
+    # Some SQLGlot dialects treat DECLARE as an opaque command or identifier.
+    # Use BigQuery's declaration grammar as a fallback, matching the previous
+    # parser's cross-dialect recognition without regenerating any source text.
+    for read_dialect in dict.fromkeys((dialect, "bigquery")):
+        try:
+            if isinstance(parse_one(query, dialect=read_dialect), exp.Declare):
+                return True
+        except Exception:
+            pass
+    return False
+
+
+def hoist_declares(query: str, dialect: str | None) -> dict:
+    """Stably move top-level DECLARE statements ahead of other statements."""
+    if not query.strip():
+        return {"query": query, "error": ""}
+
+    dialect = normalize_sqlglot_dialect(dialect)
+    try:
+        positions = _top_level_semicolons(query, dialect)
+    except Exception as e:
+        return {"query": query, "error": str(e)}
+
+    slices = []
+    previous = 0
+    for position in positions:
+        slices.append(query[previous:position])
+        previous = position + 1
+    if previous < len(query):
+        slices.append(query[previous:])
+
+    declares = []
+    rest = []
+    saw_non_declare = False
+    needs_reorder = False
+    for statement in (statement.strip() for statement in slices):
+        if not statement:
+            continue
+        if _is_declare_statement(statement, dialect):
+            declares.append(statement)
+            needs_reorder |= saw_non_declare
+        else:
+            rest.append(statement)
+            saw_non_declare = True
+
+    if not declares or not needs_reorder:
+        return {"query": query, "error": ""}
+    return {"query": ";\n".join(declares + rest) + ";", "error": ""}
+
+
+def hoist_declares_list(queries: list[str], dialect: str | None) -> dict:
+    """Stably partition complete query entries without splitting or rewriting them."""
+    dialect = normalize_sqlglot_dialect(dialect)
+    declares = []
+    rest = []
+    saw_non_declare = False
+    needs_reorder = False
+    for query in queries:
+        if _is_declare_statement(query.strip(), dialect):
+            declares.append(query)
+            needs_reorder |= saw_non_declare
+        else:
+            rest.append(query)
+            saw_non_declare = True
+
+    if not declares or not needs_reorder:
+        return {"queries": queries, "error": ""}
+    return {"queries": declares + rest, "error": ""}
 
 
 @dataclass(frozen=True)

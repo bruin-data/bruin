@@ -11,6 +11,8 @@ from parser.main import (
     freeze_time,
     get_column_lineage,
     get_tables,
+    hoist_declares,
+    hoist_declares_list,
     is_single_select_query,
     is_read_only_query,
     select_cte,
@@ -88,6 +90,12 @@ def main():
                 result = freeze_time(
                     c["query"], c.get("dialect"), c.get("execution_time")
                 )
+            elif cmd["command"] == "hoist-declares":
+                c = cmd["contents"]
+                result = hoist_declares(c["query"], c.get("dialect"))
+            elif cmd["command"] == "hoist-declares-list":
+                c = cmd["contents"]
+                result = hoist_declares_list(c["queries"], c.get("dialect"))
             elif cmd["command"] == "exit":
                 logging.info("got exit command amx")
                 break

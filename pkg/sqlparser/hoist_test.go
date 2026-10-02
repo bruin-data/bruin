@@ -1,23 +1,18 @@
-//go:build cgo && (darwin || linux)
-
 package sqlparser
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/stretchr/testify/require"
 )
 
-func TestRustSQLParserSmoke(t *testing.T) {
+func TestSQLParserSmoke(t *testing.T) {
 	t.Parallel()
 
-	parser, err := NewRustSQLParser(false)
-	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		require.NoError(t, parser.Close())
-	})
+	parser := sharedSQLParser
 
 	lineage, err := parser.ColumnLineage(
 		"SELECT IF(col1 IS NOT NULL, 1, 0) AS x FROM t",
@@ -48,13 +43,10 @@ func TestRustSQLParserSmoke(t *testing.T) {
 	require.Equal(t, []string{"raw.my_cte"}, tables)
 }
 
-func TestRustSQLParser_HoistDeclares(t *testing.T) {
+func TestSQLParser_HoistDeclares(t *testing.T) {
 	t.Parallel()
 
-	parser, err := NewRustSQLParser(false)
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, parser.Close()) })
-	require.NoError(t, parser.Start())
+	parser := sharedSQLParser
 
 	t.Run("no declare is a no-op", func(t *testing.T) {
 		t.Parallel()
@@ -177,13 +169,10 @@ func TestRustSQLParser_HoistDeclares(t *testing.T) {
 	})
 }
 
-func TestRustSQLParser_HoistDeclaresList(t *testing.T) {
+func TestSQLParser_HoistDeclaresList(t *testing.T) {
 	t.Parallel()
 
-	parser, err := NewRustSQLParser(false)
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, parser.Close()) })
-	require.NoError(t, parser.Start())
+	parser := sharedSQLParser
 
 	t.Run("no declare is a no-op", func(t *testing.T) {
 		t.Parallel()
@@ -200,4 +189,67 @@ func TestRustSQLParser_HoistDeclaresList(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, []string{"DECLARE y INT64", "SET x = 1", "SELECT 1"}, got)
 	})
+
+	t.Run("unsupported asset preserves list", func(t *testing.T) {
+		t.Parallel()
+		in := []string{"SELECT 1", "DECLARE y INT64"}
+		got, err := parser.HoistDeclaresList(in, pipeline.AssetTypePython)
+		require.Error(t, err)
+		require.Equal(t, in, got)
+	})
+
+	t.Run("empty lists retain nil or empty shape", func(t *testing.T) {
+		t.Parallel()
+		for _, in := range [][]string{nil, {}} {
+			got, err := parser.HoistDeclaresList(in, pipeline.AssetTypeBigqueryQuery)
+			require.NoError(t, err)
+			require.Equal(t, in, got)
+		}
+	})
+}
+
+func TestSQLParser_HooksAcrossAssetTypes(t *testing.T) {
+	t.Parallel()
+	for assetType := range assetTypeDialectMap {
+		t.Run(string(assetType), func(t *testing.T) {
+			t.Parallel()
+			hooks := pipeline.Hooks{
+				Pre:  []pipeline.Hook{{Query: "SELECT 17"}},
+				Post: []pipeline.Hook{{Query: "DECLARE last_var INT"}, {Query: "SELECT 42"}},
+			}
+			got := pipeline.WrapHooks("DECLARE first_var INT;\nSELECT 29", hooks, sharedSQLParser, assetType)
+			require.Equal(t, "DECLARE first_var INT;\nDECLARE last_var INT;\nSELECT 17;\nSELECT 29;\nSELECT 42;", got)
+		})
+	}
+}
+
+func TestSQLParser_HoistingStartsLazilyAndPreservesErrors(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	dir, err := filepath.Rel(os.TempDir(), filepath.Join(root, "parser"))
+	require.NoError(t, err)
+	parser := newSQLParserInternal(dir, false, 10000)
+	t.Cleanup(func() { require.NoError(t, parser.Close()) })
+	hooks := pipeline.Hooks{Pre: []pipeline.Hook{{Query: "SELECT 17"}}}
+	require.Equal(t, "SELECT 17;\nSELECT 29;", pipeline.WrapHooks("SELECT 29", hooks, parser, pipeline.AssetTypeBigqueryQuery))
+	require.False(t, parser.started)
+	files, err := os.ReadDir(root)
+	require.NoError(t, err)
+	require.Empty(t, files, "constructing an unused hoister must not extract embedded files")
+	got, err := parser.HoistDeclaresList([]string{"SELECT 17", "DECLARE x INT64"}, pipeline.AssetTypeBigqueryQuery)
+	require.NoError(t, err)
+	require.Equal(t, []string{"DECLARE x INT64", "SELECT 17"}, got)
+	require.True(t, parser.started)
+	files, err = os.ReadDir(root)
+	require.NoError(t, err)
+	require.NotEmpty(t, files)
+	require.NoError(t, parser.Close())
+	got, err = parser.HoistDeclaresList([]string{"SELECT 29", "DECLARE y INT64"}, pipeline.AssetTypeBigqueryQuery)
+	require.NoError(t, err)
+	require.Equal(t, []string{"DECLARE y INT64", "SELECT 29"}, got)
+	bad := "DECLARE x STRING; SELECT 'unterminated"
+	unchanged, err := parser.HoistDeclares(bad, pipeline.AssetTypeBigqueryQuery)
+	require.Error(t, err)
+	require.Equal(t, bad, unchanged)
+	require.Equal(t, "SELECT 17;\n"+bad+";", pipeline.WrapHooks(bad, hooks, parser, pipeline.AssetTypeBigqueryQuery))
 }

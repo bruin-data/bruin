@@ -1390,35 +1390,18 @@ func Run(isDebug *bool) *cli.Command {
 				}
 			}
 
+			// Share the parser between hook hoisting and dev-mode rewriting.
+			// Its subprocess starts lazily when either operation needs it.
 			var parser *sqlparser.SQLParser
-			if cm.SelectedEnvironment.SchemaPrefix != "" {
-				// we use the sql parser to rename the tables for dev mode
-				parser, err = sqlparser.NewSQLParser(false)
-				if err != nil {
-					printError(err, c.String("output"), "Could not initialize sql parser")
-				}
-				defer parser.Close()
-
-				go func() {
-					err := parser.Start()
-					if err != nil {
-						printError(err, c.String("output"), "Could not start sql parser")
-					}
-				}()
-			}
-
-			// The Rust SQL parser is in-process and effectively free to
-			// instantiate. We use it as the DECLARE hoister on every hook
-			// wrapper so detecting "no reorder needed" is a single CGo
-			// call rather than a Python IPC round trip.
 			var hoister pipeline.DeclareHoister
-			if rustParser, rustErr := sqlparser.NewRustSQLParser(false); rustErr == nil {
-				if startErr := rustParser.Start(); startErr == nil {
-					hoister = rustParser
+			if p, parserErr := sqlparser.NewSQLParser(false); parserErr == nil {
+				defer p.Close()
+				hoister = p
+				if cm.SelectedEnvironment.SchemaPrefix != "" {
+					parser = p
 				}
-				defer rustParser.Close()
 			} else {
-				printError(rustErr, c.String("output"), "Could not initialize rust sql parser")
+				printError(parserErr, c.String("output"), "Could not initialize sql parser")
 			}
 
 			mainExecutors, err := SetupExecutors(s, connectionManager, startDate, endDate, defaultExecutionDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.SensorMode, renderer, parser, hoister, foundPipeline.Commit)
