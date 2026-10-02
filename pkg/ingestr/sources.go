@@ -699,8 +699,10 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 
 	// Gorgias - E-commerce helpdesk
 	"gorgias": {
-		{Name: "customers", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
-		{Name: "tickets", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "customers", PrimaryKey: "id", IncKey: "updated_datetime", IncStrategy: "merge"},
+		{Name: "tickets", PrimaryKey: "id", IncKey: "updated_datetime", IncStrategy: "merge"},
+		{Name: "ticket_messages", PrimaryKey: "id", IncKey: "updated_datetime", IncStrategy: "merge"},
+		{Name: "satisfaction_surveys", PrimaryKey: "id", IncKey: "updated_datetime", IncStrategy: "merge"},
 	},
 
 	// Granola - AI meeting notes
