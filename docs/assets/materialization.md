@@ -206,7 +206,7 @@ materialization:
 SELECT event_id, customer_id, page, viewed_at
 FROM raw.page_views
 WHERE viewed_at
-    BETWEEN '{{ start_datetime }}' AND '{{ end_datetime }}'`
+    BETWEEN '{{ start_timestamp }}' AND '{{ end_timestamp }}'`
   },
   {
     path: 'assets/3_history/customers_history.sql',
@@ -669,10 +669,11 @@ To run it, copy the files into a new folder, run `git init` there, and load the 
 ```bash
 # Days 1 and 2: create every table
 bruin run --full-refresh \
-  --start-date 2024-06-01 --end-date "2024-06-02 23:59:59" .
+  --start-date 2024-06-01 --end-date "2024-06-02 23:59:59.999999" .
 
 # Day 3: load incrementally
-bruin run --start-date 2024-06-03 --end-date "2024-06-03 23:59:59" .
+bruin run --start-date 2024-06-03 \
+  --end-date "2024-06-03 23:59:59.999999" .
 ```
 
 The second run adds June 3 to the date-windowed tables, such as `analytics.page_views` and `analytics.daily_revenue`, without touching earlier days. To watch the SCD2 tables add a new version, change a price in `products.csv`, or a country together with its `updated_at` in `customers.csv`, and run again.
@@ -723,7 +724,7 @@ default:
     strategy: create+replace
 ```
 
-Defaults fill in every field an asset leaves empty, and an asset can override a default but cannot remove it. They also apply to every asset in the pipeline, not only SQL tables: with the defaults above, `type: view` assets fail validation because they inherit `strategy`, and seed and Python assets fail because they inherit `type`. Only set `default.materialization` when it fits every asset in the pipeline.
+Defaults fill in every field an asset leaves empty, and an asset can override a default but cannot remove it. They also apply to every asset in the pipeline, not only SQL tables: with the defaults above, `type: view` assets fail validation because they inherit `strategy`, and seed assets fail because they inherit `type`. Python assets also inherit `type: table`, which turns on [Python materialization](./python.md#materialization), so each one needs a `connection`. Only set `default.materialization` when it fits every asset in the pipeline.
 
 ### Partitioning and clustering
 
