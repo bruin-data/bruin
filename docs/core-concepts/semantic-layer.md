@@ -372,4 +372,6 @@ Bruin validates semantic models when it loads the repository semantic catalog:
 - Window metrics must reference exactly one metric, for example `expression: "{revenue}"`.
 - Joined dimensions must resolve through a safe join path.
 
+`bruin validate` additionally dry-runs the compiled queries for every semantic model (dimensions, metrics, granularities, segments, and joins) using the same dry-run capabilities as SQL asset validation. Queries are checked against the dry-run-capable connections referenced by your pipelines, so invalid table or column references in `source.table`, dimension expressions, metric expressions, segment filters, and join conditions are reported as validation errors.
+
 Invalid semantic models cause semantic query compilation to fail, so fix validation errors before querying the semantic layer.
