@@ -3,13 +3,80 @@ package mssql
 import (
 	"context"
 	"testing"
+	"testing/synctest"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	mssqldb "github.com/microsoft/go-mssqldb"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
+
+func TestRunMaterializedQuery(t *testing.T) {
+	t.Parallel()
+	deadlock := mssqldb.Error{Number: 1205, Message: "deadlock victim"}
+	duplicateColumn := mssqldb.Error{Number: 8156, Message: "column specified multiple times for source"}
+	tests := []struct {
+		name     string
+		mat      pipeline.Materialization
+		hooks    pipeline.Hooks
+		failures int
+		err      error
+		wantErr  error
+	}{
+		{name: "default table retries", mat: pipeline.Materialization{Type: pipeline.MaterializationTypeTable}, failures: 1, err: deadlock},
+		{name: "create replace retries wrapped driver errors", mat: pipeline.Materialization{Type: pipeline.MaterializationTypeTable, Strategy: pipeline.MaterializationStrategyCreateReplace}, failures: 1, err: errors.Wrap(deadlock, "execute")},
+		{name: "append retries", mat: pipeline.Materialization{Type: pipeline.MaterializationTypeTable, Strategy: pipeline.MaterializationStrategyAppend}, failures: 1, err: deadlock},
+		{name: "merge retries", mat: pipeline.Materialization{Type: pipeline.MaterializationTypeTable, Strategy: pipeline.MaterializationStrategyMerge}, failures: 1, err: deadlock},
+		{name: "delete insert retries", mat: pipeline.Materialization{Type: pipeline.MaterializationTypeTable, Strategy: pipeline.MaterializationStrategyDeleteInsert}, failures: 1, err: deadlock},
+		{name: "time interval retries", mat: pipeline.Materialization{Type: pipeline.MaterializationTypeTable, Strategy: pipeline.MaterializationStrategyTimeInterval}, failures: 1, err: deadlock},
+		{name: "truncate insert retries", mat: pipeline.Materialization{Type: pipeline.MaterializationTypeTable, Strategy: pipeline.MaterializationStrategyTruncateInsert}, failures: 1, err: deadlock},
+		{name: "view retries", mat: pipeline.Materialization{Type: pipeline.MaterializationTypeView}, failures: 1, err: deadlock},
+		{name: "last retry succeeds", mat: pipeline.Materialization{Type: pipeline.MaterializationTypeTable}, failures: 10, err: deadlock},
+		{name: "retry limit", mat: pipeline.Materialization{Type: pipeline.MaterializationTypeTable}, failures: 11, err: deadlock, wantErr: deadlock},
+		{name: "permanent error", mat: pipeline.Materialization{Type: pipeline.MaterializationTypeTable}, failures: 1, err: duplicateColumn, wantErr: duplicateColumn},
+		{name: "script not replayed", failures: 1, err: deadlock, wantErr: deadlock},
+		{name: "ddl not replayed", mat: pipeline.Materialization{Type: pipeline.MaterializationTypeTable, Strategy: pipeline.MaterializationStrategyDDL}, failures: 1, err: deadlock, wantErr: deadlock},
+		{name: "pre hook not replayed", mat: pipeline.Materialization{Type: pipeline.MaterializationTypeTable}, hooks: pipeline.Hooks{Pre: []pipeline.Hook{{Query: "INSERT INTO audit VALUES (1)"}}}, failures: 1, err: deadlock, wantErr: deadlock},
+		{name: "post hook not replayed", mat: pipeline.Materialization{Type: pipeline.MaterializationTypeTable}, hooks: pipeline.Hooks{Post: []pipeline.Hook{{Query: "INSERT INTO audit VALUES (1)"}}}, failures: 1, err: deadlock, wantErr: deadlock},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			conn := new(mockQuerierWithResult)
+			q := &query.Query{Query: "materialized SQL", Args: []interface{}{42}}
+			conn.On("RunQueryWithoutResult", mock.Anything, q).Return(tt.err).Times(tt.failures)
+			if tt.wantErr == nil {
+				conn.On("RunQueryWithoutResult", mock.Anything, q).Return(nil).Once()
+			}
+			synctest.Test(t, func(t *testing.T) {
+				err := runMaterializedQuery(t.Context(), conn, &pipeline.Asset{Materialization: tt.mat, Hooks: tt.hooks}, q)
+				if tt.wantErr == nil {
+					require.NoError(t, err)
+				} else {
+					require.Equal(t, tt.wantErr, err)
+				}
+			})
+			conn.AssertExpectations(t)
+		})
+	}
+}
+
+func TestRunMaterializedQueryCancellation(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	conn := new(mockQuerierWithResult)
+	q := &query.Query{Query: "materialized SQL"}
+	conn.On("RunQueryWithoutResult", mock.Anything, q).
+		Run(func(mock.Arguments) { cancel() }).
+		Return(mssqldb.Error{Number: 1205}).Once()
+	asset := &pipeline.Asset{Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeTable}}
+	require.ErrorIs(t, runMaterializedQuery(ctx, conn, asset, q), context.Canceled)
+	conn.AssertExpectations(t)
+}
 
 type mockExtractor struct {
 	mock.Mock

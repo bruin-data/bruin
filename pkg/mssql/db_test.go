@@ -2,15 +2,45 @@ package mssql
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jmoiron/sqlx"
+	mssqldb "github.com/microsoft/go-mssqldb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestDB_RunQueryWithoutResult(t *testing.T) {
+	t.Parallel()
+	for _, executionErr := range []error{nil, mssqldb.Error{Number: 1205, Message: "deadlock victim"}} {
+		t.Run(fmt.Sprint(executionErr), func(t *testing.T) {
+			t.Parallel()
+			mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+			require.NoError(t, err)
+			defer mockDB.Close()
+			db := DB{conn: sqlx.NewDb(mockDB, "sqlmock")}
+			q := &query.Query{Query: "SELECT 1; UPDATE target SET value = @p1", Args: []interface{}{7}}
+			expectation := mock.ExpectExec(q.Query).WithArgs(7)
+			if executionErr == nil {
+				expectation.WillReturnResult(sqlmock.NewResult(0, 1))
+			} else {
+				expectation.WillReturnError(executionErr)
+			}
+			err = db.RunQueryWithoutResult(t.Context(), q)
+			require.Equal(t, executionErr, err)
+			if executionErr != nil {
+				var sqlErr mssqldb.Error
+				require.ErrorAs(t, err, &sqlErr)
+				require.Equal(t, int32(1205), sqlErr.Number)
+			}
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
 
 func TestDB_Select(t *testing.T) {
 	t.Parallel()
@@ -468,15 +498,15 @@ func TestDB_Ping(t *testing.T) {
 		{
 			name: "successful ping",
 			mockConnection: func(mock sqlmock.Sqlmock) {
-				mock.ExpectQuery(`SELECT 1`).
-					WillReturnRows(sqlmock.NewRows([]string{"column"}).AddRow(1))
+				mock.ExpectExec(`SELECT 1`).
+					WillReturnResult(sqlmock.NewResult(0, 0))
 			},
 			wantErr: false,
 		},
 		{
 			name: "connection failure",
 			mockConnection: func(mock sqlmock.Sqlmock) {
-				mock.ExpectQuery(`SELECT 1`).
+				mock.ExpectExec(`SELECT 1`).
 					WillReturnError(errors.New("connection refused"))
 			},
 			wantErr:      true,
@@ -485,7 +515,7 @@ func TestDB_Ping(t *testing.T) {
 		{
 			name: "database unavailable",
 			mockConnection: func(mock sqlmock.Sqlmock) {
-				mock.ExpectQuery(`SELECT 1`).
+				mock.ExpectExec(`SELECT 1`).
 					WillReturnError(errors.New("database is not available"))
 			},
 			wantErr:      true,

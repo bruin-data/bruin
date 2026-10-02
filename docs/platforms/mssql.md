@@ -127,6 +127,18 @@ Asset names may be `table`, `schema.table`, or `database.schema.table`. A three-
 
 For table assets using the default or `create+replace` materialization strategy, Bruin honors the asset's `columns` schema when every column defines a `type`: it creates the table with the declared column types and then inserts the query result. If any declared column has no type, Bruin keeps SQL Server's `SELECT INTO` behavior so column metadata used only for checks or documentation can still rely on SQL Server type inference.
 
+#### Deadlocks during parallel runs
+
+Concurrent SQL Server assets can deadlock on data or schema/metadata locks, even when they write different tables. SQL Server rolls back the victim transaction and returns error 1205.
+
+Bruin retries that error up to ten times (eleven attempts total) with exponential backoff and jitter for generated table materializations (except `ddl`) and views. Assets with pre/post hooks and unmaterialized SQL scripts are not automatically retried: an earlier statement may already have committed. Other errors, including duplicate column names, fail immediately.
+
+Retries leave MERGE parallelism and locking unchanged: Bruin adds neither a table-lock hint nor a parallelism limit. Backoff applies only after a deadlock; successful executions have no added delay. Persistent contention can still exhaust the retry limit and fail the asset.
+
+Avoid generating data from catalog views such as `sys.objects` inside `create+replace` queries. Replacement holds catalog locks for its DDL, and reading catalog rows modified by another DDL transaction can form a deadlock. For number/date generation, use a numbers table or a `VALUES`-based sequence instead. Bruin keeps the replacement atomic; it does not commit the table drop separately.
+
+If deadlocks persist, reduce concurrency with `bruin run --workers 1 <pipeline-path>` and inspect the SQL Server `xml_deadlock_report` Extended Event to identify the competing statements and locks. Check that every table read by an asset is represented in its dependencies; a dependency on one ingestion asset does not prevent other ingestion assets from running concurrently.
+
 ::: warning Three-part `ddl` assets across databases
 With the `ddl` materialization strategy, Bruin auto-creates the asset's schema in the connection's *current* database. If a `database.schema.table` asset targets a different database, the schema must already exist there or the run fails with a "schema does not exist" error. Other strategies (e.g. `create+replace`) create the table directly and are unaffected.
 :::
