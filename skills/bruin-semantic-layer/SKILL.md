@@ -8,7 +8,7 @@ description: Use when creating, editing, reviewing, or troubleshooting Bruin sem
 ## Workflow
 
 1. Find the repository root and inspect `semantic/` before editing. Bruin loads every `.yml` and `.yaml` model under the repository-level `semantic/` directory next to `.bruin.yml`.
-2. Use local source of truth before guessing: `docs/core-concepts/semantic-layer.md`, `docs/commands/query.md`, `pkg/semantic/model.go`, `pkg/semantic/engine.go`, and `pkg/semantic/graph.go`.
+2. Use local source of truth before guessing: `docs/core-concepts/semantic-layer.md`, `docs/commands/query.md`, `semantic-engine/model.go`, `semantic-engine/engine.go`, and `semantic-engine/graph.go`.
 3. Keep model names unique across the semantic catalog. New models should set `schema: v1`, although omitted schema defaults to `v1`.
 4. Prefer reusable, business-named metrics, dimensions, and segments. Avoid putting dashboard-specific logic into one large SQL query.
 5. Validate with a narrow semantic query first, then run the repository-required final checks before finishing.
@@ -75,7 +75,9 @@ segments:
 
 ## Default Model Behavior
 
-- `source.table` is required and can be a relation name or a parenthesized SQL subquery with an alias.
+- Exactly one of `source.table` or `source.query` is required.
+- `source.table` can be a relation name or a parenthesized SQL subquery with an alias.
+- `source.query` is compiled as `(query) AS <model_name>`.
 - `label`, `description`, `group`, `hidden`, and `format` metadata help consumers but do not change SQL generation.
 - Dimension `expression` defaults to the dimension `name`.
 - Dimension `type` can be `string`, `number`, `boolean`, or `time`; only `time` dimensions can use granularities.
@@ -156,11 +158,12 @@ Semantic query mode requires at least one dimension or metric and cannot be comb
 
 ## Validation Notes
 
-- Required model fields: `name` and `source.table`.
+- Required model fields: `name` and exactly one of `source.table` or `source.query`.
+- `bruin validate` loads `semantic/` next to `.bruin.yml` (`semantic-layer-valid`, fast) and dry-runs query sources (`semantic-query-dry-run`).
 - Required item fields: dimension `name`, metric `name` and `expression`, segment `name` and `filter`.
 - Window metrics must reference exactly one metric, for example `expression: "{revenue}"`.
 - Window `order_by` and `partition_by` values must reference dimensions on the model.
 - Joined dimensions must resolve through a safe join path.
 - Unknown metrics, dimensions, segments, filter operators, sort fields, and granularities fail semantic query compilation.
 
-For behavior changes, update the implementation, tests, and user-facing docs together: `pkg/semantic/`, `docs/core-concepts/semantic-layer.md`, and `docs/commands/query.md`.
+For behavior changes, update the implementation, tests, and user-facing docs together: `semantic-engine/`, `docs/core-concepts/semantic-layer.md`, and `docs/commands/query.md`.
