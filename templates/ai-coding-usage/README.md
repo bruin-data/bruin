@@ -132,7 +132,15 @@ dac build --dir dashboards --dashboard "AI Coding Usage" --output build
 - User email addresses are lowercased so the same person can be joined across Anthropic and Cursor. Anthropic API actors retain their API key name and use `user_type = 'api_key'`.
 - Anthropic costs and Cursor event costs are converted from cents to US dollars. Cursor costs use the event's `chargedCents` (model cost plus any Cursor Token Rate), which reconciles with Cursor billing; older events without it fall back to `tokenUsage.totalCents`.
 - Cursor dates and timestamps are converted to UTC regardless of the DuckDB session time zone; ISO timestamps without an offset are treated as UTC.
-- Earlier versions of this template could store Cursor rows one day early when DuckDB ran west of UTC. If you loaded data with an earlier version, rebuild once with `bruin run --full-refresh .` so the incremental marts drop the shifted rows.
+- Earlier versions of this template could store Cursor rows one day early when DuckDB ran west of UTC. If you loaded data with an earlier version, rebuild the staging and mart tables once from the existing raw data, covering your full loaded history:
+
+  ```shell
+  bruin run --full-refresh \
+    --start-date <first-loaded-date> --end-date <last-loaded-date> \
+    --selector "path:assets/staging path:assets/marts" .
+  ```
+
+  The selector skips the raw ingestion assets, so nothing is re-fetched from the APIs. Without an explicit date range, the incremental marts are recreated with only the default one-day interval.
 - Cursor model rows use each request event's exact model. The Anthropic ingestr source currently exposes exact totals for single-model records and aggregate totals plus a comma-separated model set for multi-model records; the model dashboard labels those aggregate rows as `model_set` instead of duplicating or estimating their tokens and cost.
 - Cursor request totals prefer daily Composer, chat, and agent counts; usage-event counts are used when daily request totals are unavailable.
 - Cursor total line changes and accepted AI line changes are kept separately.
