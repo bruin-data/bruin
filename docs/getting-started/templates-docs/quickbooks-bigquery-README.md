@@ -200,7 +200,7 @@ The `quickbooks_stage` dataset turns the raw objects into typed tables with read
 
 ### Account mapping
 
-The reports group transactions into P&L lines through `assets/quickbooks_stage/account_mapping.csv`. Each row maps a QuickBooks account name to a P&L section (`revenue`, `cogs`, `operating_expense`, `other_income`, or `other_expense`), a report line such as `Payroll` or `Software`, an optional department, and whether the account counts toward MRR. The file ships with a typical SaaS chart of accounts. Edit it to match yours: an account it doesn't list still appears in the reports under a default line for its QuickBooks account type, with `is_mapped = false` in `account_categories`.
+The reports group transactions into P&L lines through `assets/quickbooks_stage/account_mapping.csv`. Each row maps a QuickBooks account, by its fully qualified name such as `Payroll:Engineering` or by its short name when no other account shares it, to a P&L section (`revenue`, `cogs`, `operating_expense`, `other_income`, or `other_expense`), a report line such as `Payroll` or `Software`, an optional department, and whether the account counts toward MRR. The file ships with a typical SaaS chart of accounts. Edit it to match yours: an account it doesn't list still appears in the reports under a default line for its QuickBooks account type, with `is_mapped = false` in `account_categories`.
 
 Mark your subscription income accounts `is_recurring_revenue = true`. MRR counts only invoice lines on those accounts, and a non-blocking check on `monthly_kpis` warns when a month has revenue but no MRR. Another check on `monthly_pnl` warns when an account with activity is missing from the CSV.
 
@@ -218,9 +218,9 @@ The `quickbooks_reports` dataset answers the questions a founder or finance agen
 | `monthly_collections` | One row per month | Invoiced, collected, month-end receivables, DSO, days to pay, and on-time payment rate |
 | `vendor_spend` | Payee | Total, recent, and trailing 12-month spend, estimated annual cost, main category, and recurring and new-vendor flags for SaaS tool sprawl |
 | `expense_review_queue` | Flagged spend line | Lines to review: uncategorized, possible duplicates, amount spikes, unusual accounts, and new vendors, with a suggested account from the payee's history |
-| `cash_runway` | One row | Cash, card balance owed, receivables, payables, average net burn over the last three months, and runway in months |
+| `cash_runway` | One row | Cash, card balance owed, receivables, payables, average net burn over the last three closed months, and runway in months |
 
-Revenue and costs are on an accrual basis: invoices count on their invoice date and bills on their bill date. `net_burn` is total costs less cash collected from customers and other income, so it approximates cash burn, and `runway_months` divides the bank balance by the three-month average. Treat both as estimates. MRR is the recurring revenue invoiced in the month, before discounts, with sub-customers rolled up to their parent. It assumes monthly billing: an annual invoice shows as a one-month spike followed by churn.
+Revenue and costs are on an accrual basis: invoices count on their invoice date and bills on their bill date. `net_burn` is total costs less cash collected from customers and other income, so it approximates cash burn, and `runway_months` divides the bank balance by the average of the last three months that are not preliminary. Treat both as estimates. MRR is the recurring revenue invoiced in the month, before discounts, with sub-customers rolled up to their parent. It assumes monthly billing: an annual invoice shows as a one-month spike followed by churn.
 
 These reports only see invoices, purchases, and bills. Payroll booked as journal entries and revenue booked as sales receipts or deposits, which is how many Stripe integrations sync, are missing from the P&L, MRR, burn, and runway. Item-based spend lines are also left out, because their item account isn't loaded. Compare `monthly_pnl` with the QuickBooks Profit and Loss report before relying on it.
 

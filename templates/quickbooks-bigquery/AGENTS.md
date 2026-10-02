@@ -36,7 +36,7 @@ Spend on a specific event or trip, for example "travel for Snowflake Summit", us
 - **MRR**: recurring revenue invoiced to a customer in the month, from accounts marked `is_recurring_revenue` in `account_mapping.csv`. Annual invoices show as a one-month spike.
 - **Movements**: `opening` (first month of data), `new`, `expansion`, `contraction`, `churn` (MRR went to 0), `reactivation`, `retained`.
 - **Net burn**: cost of revenue plus operating and other expenses, less cash collected from customers and other income. Positive means spending more than coming in.
-- **Runway**: bank balance divided by the average net burn of the last three complete months. Null when not burning, 0 when cash is gone.
+- **Runway**: bank balance divided by the average net burn of the last three complete months that are not preliminary. Null when not burning, 0 when cash is gone.
 - **DSO**: month-end receivables divided by the month's invoicing, times the days in the month.
 - **Spend**: `expense_lines` where `is_expense` is true. Card payoffs and other balance sheet postings are excluded; item-based lines have a null `is_expense`, are left out of the P&L, and need a look on their own.
 - **MRR caveats**: MRR is before discounts, and sub-customers roll up to their parent. Annual or quarterly billing shows as churn followed by reactivation, so check a customer's invoices before calling it churn.

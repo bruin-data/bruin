@@ -4,8 +4,8 @@ type: bq.sql
 owner: finance@example.com
 description: >
   Open invoices with how overdue each one is, as of the run's end date. One
-  row per invoice with an open balance, using the balance QuickBooks reported
-  at the last load. Use it to answer who owes money and how late it is.
+  row per invoice issued by that date with an open balance, using the balance
+  QuickBooks reported at the last load. Use it to answer who owes money and how late it is.
 
 materialization:
   type: table
@@ -126,7 +126,8 @@ unit_tests:
       - asset: quickbooks_stage.invoices
         rows:
           - {invoice_id: i1, invoice_number: INV-1, customer_id: c1, customer_name: Acme, invoice_date: "1999-12-01", due_date: "2000-01-01", total_amount: 100, open_balance: 100}
-          - {invoice_id: i2, customer_id: c1, invoice_date: "2099-01-01", due_date: "2099-01-31", total_amount: 80, open_balance: 50}
+          - {invoice_id: i2, customer_id: c1, invoice_date: "2000-02-01", due_date: "2099-01-31", total_amount: 80, open_balance: 50}
+          - {invoice_id: i4, customer_id: c1, invoice_date: "2099-01-01", due_date: "2099-01-31", total_amount: 60, open_balance: 60}
           - {invoice_id: i3, customer_id: c2, invoice_date: "2000-01-01", due_date: "2000-01-31", total_amount: 70, open_balance: 0}
       - asset: quickbooks_stage.customers
         rows:
@@ -145,6 +146,7 @@ WITH open_invoices AS (
     GREATEST(DATE_DIFF(DATE('{{ end_date }}'), COALESCE(invoice.due_date, invoice.invoice_date), DAY), 0) AS days_overdue
   FROM quickbooks_stage.invoices AS invoice
   WHERE invoice.open_balance > 0
+    AND invoice.invoice_date <= DATE('{{ end_date }}')
 )
 
 SELECT

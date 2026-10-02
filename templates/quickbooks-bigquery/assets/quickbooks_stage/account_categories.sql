@@ -5,9 +5,10 @@ owner: finance@example.com
 description: >
   Every income-statement account with the profit-and-loss section, report
   line, and department it rolls up to. Lines come from the editable
-  `quickbooks_stage.account_mapping` seed; accounts the seed does not list
-  fall back to a default based on their QuickBooks account type and are
-  flagged with `is_mapped = false`.
+  `quickbooks_stage.account_mapping` seed, matched on the account's fully
+  qualified name (`Parent:Child`), or on its short name when no other account
+  shares it. Accounts the seed does not match fall back to a default based on
+  their QuickBooks account type and are flagged with `is_mapped = false`.
 
 materialization:
   type: table
@@ -113,7 +114,22 @@ SELECT
   mapping.department,
   IFNULL(mapping.is_recurring_revenue, FALSE) AS is_recurring_revenue,
   mapping.account_name IS NOT NULL AS is_mapped
-FROM quickbooks_stage.accounts AS account
+FROM (
+  SELECT
+    *,
+    COUNT(*) OVER (PARTITION BY account_name) = 1 AS has_unique_name
+  FROM quickbooks_stage.accounts
+) AS account
 LEFT JOIN quickbooks_stage.account_mapping AS mapping
-  ON account.account_name = mapping.account_name
-WHERE account.financial_statement = 'income_statement';
+  ON mapping.account_name = COALESCE(account.fully_qualified_name, account.account_name)
+  OR (
+    account.has_unique_name
+    AND account.fully_qualified_name != account.account_name
+    AND mapping.account_name = account.account_name
+  )
+WHERE account.financial_statement = 'income_statement'
+-- A sub-account listed by both its full and short name takes the full-name row.
+QUALIFY ROW_NUMBER() OVER (
+  PARTITION BY account.account_id
+  ORDER BY IF(mapping.account_name = account.fully_qualified_name, 0, 1)
+) = 1;

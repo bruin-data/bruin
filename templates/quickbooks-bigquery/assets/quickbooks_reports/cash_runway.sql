@@ -80,10 +80,14 @@ columns:
       - name: not_null
   - name: burn_months
     type: STRING
-    description: The complete months averaged for burn, for example `2026-07 to 2026-09`.
+    description: >
+      The months averaged for burn, for example `2026-06 to 2026-08`;
+      preliminary months are skipped.
   - name: avg_monthly_net_burn
     type: NUMERIC
-    description: Average `net_burn` over the last three complete months.
+    description: >
+      Average `net_burn` over the last three complete months that are not
+      preliminary.
   - name: avg_monthly_revenue
     type: NUMERIC
     description: Average revenue over the same months.
@@ -118,6 +122,7 @@ burn AS (
   FROM (
     SELECT month, net_burn, revenue
     FROM quickbooks_reports.monthly_kpis
+    WHERE NOT is_preliminary
     ORDER BY month DESC
     LIMIT 3
   )

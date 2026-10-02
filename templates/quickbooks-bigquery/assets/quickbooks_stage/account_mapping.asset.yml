@@ -27,12 +27,14 @@ meta:
   agent_notes: >
     Recategorizing an account means changing this file, not the report SQL.
     Propose the change; edit the CSV only when the user asks. Rows are matched
-    to accounts by exact account name.
+    to accounts by fully qualified name, or by short name when it is unique.
 
 columns:
   - name: account_name
     type: STRING
-    description: QuickBooks account name, matched exactly to `quickbooks_stage.accounts.account_name`.
+    description: >
+      QuickBooks account to map: its fully qualified name (`Parent:Child`), or
+      its short name when no other account shares it.
     primary_key: true
     checks:
       - name: not_null

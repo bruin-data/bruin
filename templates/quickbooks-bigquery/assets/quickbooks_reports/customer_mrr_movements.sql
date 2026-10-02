@@ -167,6 +167,7 @@ unit_tests:
         - {month: "2025-02-01", customer_id: c2, mrr: 200, movement: new}
         - {month: "2025-03-01", customer_id: c2, mrr: 100, mrr_change: -100, movement: contraction}
         - {month: "2025-04-01", customer_id: c2, mrr: 100, movement: retained}
+        - {month: "2025-05-01", customer_id: c2, mrr: 0, mrr_change: -100, movement: churn}
         - {month: "2025-01-01", customer_id: c3, mrr: 50, movement: opening}
         - {month: "2025-02-01", customer_id: c3, mrr: 0, mrr_change: -50, movement: churn}
         - {month: "2025-03-01", customer_id: c3, mrr: 50, previous_mrr: 0, movement: reactivation}
@@ -190,7 +191,11 @@ WITH customer_months AS (
 ),
 
 bounds AS (
-  SELECT MIN(month) AS first_month, MAX(month) AS last_month
+  -- Run the spine to the last complete month, so customers who stop billing
+  -- near the end still get a churn row.
+  SELECT
+    MIN(month) AS first_month,
+    DATE_SUB(DATE_TRUNC(DATE_ADD(DATE('{{ end_date }}'), INTERVAL 1 DAY), MONTH), INTERVAL 1 MONTH) AS last_month
   FROM customer_months
 ),
 
