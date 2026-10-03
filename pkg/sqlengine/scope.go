@@ -97,6 +97,11 @@ const (
 	cacheReferences
 )
 
+type scopeWithMaps struct {
+	s    Scope
+	maps [3]omap[Source]
+}
+
 // NewScope mirrors Scope(expression, sources, outer_columns, parent, scope_type, lateral_sources, cte_sources, can_be_correlated).
 func NewScope(expression *Expr, sources *omap[Source], outerColumns []string, parent *Scope, scopeType ScopeType,
 	lateralSources, cteSources *omap[Source], canBeCorrelated bool,
@@ -104,7 +109,24 @@ func NewScope(expression *Expr, sources *omap[Source], outerColumns []string, pa
 	if scopeType == 0 {
 		scopeType = ScopeRoot
 	}
-	s := &Scope{
+	var s *Scope
+	if sources == nil || lateralSources == nil || cteSources == nil {
+		// Allocate the scope together with the empty mappings it needs.
+		b := new(scopeWithMaps)
+		s = &b.s
+		if sources == nil {
+			sources = &b.maps[0]
+		}
+		if lateralSources == nil {
+			lateralSources = &b.maps[1]
+		}
+		if cteSources == nil {
+			cteSources = &b.maps[2]
+		}
+	} else {
+		s = new(Scope)
+	}
+	*s = Scope{
 		Expression:      expression,
 		Sources:         sources,
 		LateralSources:  lateralSources,
@@ -113,19 +135,6 @@ func NewScope(expression *Expr, sources *omap[Source], outerColumns []string, pa
 		Parent:          parent,
 		Type:            scopeType,
 		CanBeCorrelated: canBeCorrelated,
-	}
-	if s.Sources == nil || s.LateralSources == nil || s.CTESources == nil {
-		// One allocation for the empty mappings.
-		fresh := new([3]omap[Source])
-		if s.Sources == nil {
-			s.Sources = &fresh[0]
-		}
-		if s.LateralSources == nil {
-			s.LateralSources = &fresh[1]
-		}
-		if s.CTESources == nil {
-			s.CTESources = &fresh[2]
-		}
 	}
 	if s.OuterColumns == nil {
 		s.OuterColumns = []string{}
