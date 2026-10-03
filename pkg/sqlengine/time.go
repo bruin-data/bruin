@@ -1,5 +1,7 @@
 package sqlengine
 
+import "strings"
+
 // formatTime mirrors sqlglot.time.format_time. Returns ("", false) for None.
 func formatTime(s string, mapping map[string]string, tr *trie) (string, bool) {
 	if s == "" {
@@ -40,12 +42,14 @@ func formatTime(s string, mapping map[string]string, tr *trie) (string, bool) {
 		}
 	}
 	out := ""
+	var outSb43 strings.Builder
 	for _, c := range chunks {
 		if m, ok := mapping[c]; ok {
-			out += m
+			outSb43.WriteString(m)
 		} else {
-			out += c
+			outSb43.WriteString(c)
 		}
 	}
+	out += outSb43.String()
 	return out, true
 }

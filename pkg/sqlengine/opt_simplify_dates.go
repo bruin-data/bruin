@@ -292,7 +292,7 @@ func smpIsDigitByte(c byte) bool { return c >= '0' && c <= '9' }
 
 // parseDigits mirrors parse_digits: returns the new position, or -1 on failure.
 func (b smpISOBuf) parseDigits(p int, v *int, n int) int {
-	for i := 0; i < n; i++ {
+	for range n {
 		c := b.at(p)
 		p++
 		if !smpIsDigitByte(c) {
@@ -401,7 +401,7 @@ func (b smpISOBuf) parseHhMmSsFf(p, pEnd int, hour, minute, second, usec *int) i
 	*hour, *minute, *second, *usec = 0, 0, 0, 0
 	vals := []*int{hour, minute, second}
 	hasSeparator := true
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		p = b.parseDigits(p, vals[i], 2)
 		if p < 0 {
 			return -3

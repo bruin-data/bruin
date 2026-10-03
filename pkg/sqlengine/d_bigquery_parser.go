@@ -411,11 +411,10 @@ const bigqueryDomainDot = "\x00"
 func bigquerySplitNumWords(value, sep string, minNumWords int) []*string {
 	words := strings.Split(value, sep)
 	var out []*string
-	for i := 0; i < minNumWords-len(words); i++ {
+	for range minNumWords - len(words) {
 		out = append(out, nil)
 	}
 	for _, w := range words {
-		w := w
 		out = append(out, &w)
 	}
 	return out
@@ -668,6 +667,7 @@ func bigqueryParseTablePart(p *Parser, schema bool) *Expr {
 	// https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical#table_names
 	if this.IsA(KIdentifier) {
 		tableName := this.Name()
+		var dashedParts strings.Builder
 		for p.matchNoAdvance(TK_DASH) && p.next.ok() {
 			start := p.curr
 			for p.isConnected() && !p.matchSetNoAdvance(p.s.DASHED_TABLE_PART_FOLLOW_TOKENS) {
@@ -678,8 +678,9 @@ func bigqueryParseTablePart(p *Parser, schema bool) *Expr {
 				break
 			}
 
-			tableName += p.findSQL(start, p.prev)
+			dashedParts.WriteString(p.findSQL(start, p.prev))
 		}
+		tableName += dashedParts.String()
 
 		this = New(KIdentifier, "this", tableName, "quoted", this.Arg("quoted")).updatePositionsFrom(this)
 	} else if this.IsA(KLiteral) {
@@ -843,7 +844,7 @@ func bigqueryParseJsonObject(p *Parser, agg bool) *Expr {
 
 		n := min(len(keys), len(values))
 		kvs := make([]*Expr, 0, n)
-		for i := 0; i < n; i++ {
+		for i := range n {
 			kvs = append(kvs, New(KJSONKeyValue, "this", keys[i], "expression", values[i]))
 		}
 		jsonObject.Set("expressions", kvs)

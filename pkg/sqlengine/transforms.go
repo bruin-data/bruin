@@ -488,7 +488,7 @@ func transformUnnestToExplodeFull(expression *Expr, unnestUsingArraysZip bool) *
 				}
 
 				n := min(len(exprs), len(aliasCols))
-				for k := 0; k < n; k++ {
+				for k := range n {
 					expression.Append("laterals", New(
 						KLateral,
 						"this", New(udtfType(unnest, hasMultiExpr), "this", exprs[k]),

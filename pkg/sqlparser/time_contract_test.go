@@ -71,7 +71,7 @@ func TestFreezeTimeContract(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := sharedSQLParser.FreezeTime(tc.query, tc.dialect, tc.at)
 			require.EqualError(t, err, tc.errorText)
-			require.Equal(t, "", got)
+			require.Empty(t, got)
 		})
 	}
 }

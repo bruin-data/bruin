@@ -201,7 +201,7 @@ func GetDialect(spec string) (*Dialect, error) {
 		for len(vs) < 3 {
 			vs = append(vs, "0")
 		}
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			n, err := strconv.Atoi(vs[i])
 			if err != nil {
 				return nil, &ValueError{Msg: "invalid literal for int() with base 10: '" + vs[i] + "'"}
@@ -301,7 +301,7 @@ func isSafeIdentifier(s string) bool {
 		return false
 	}
 	rest := strings.TrimSuffix(s[1:], "\n")
-	for i := 0; i < len(rest); i++ {
+	for i := range len(rest) {
 		c := rest[i]
 		if c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') {
 			continue

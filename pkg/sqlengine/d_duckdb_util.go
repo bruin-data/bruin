@@ -7,6 +7,7 @@ package sqlengine
 import (
 	"fmt"
 	"math/big"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -24,7 +25,7 @@ func duckdbFunc(name string, args ...any) *Expr {
 		case string:
 			converted = append(converted, MaybeParse(x, KNone, "", d))
 		case int:
-			converted = append(converted, MaybeParse(fmt.Sprint(x), KNone, "", d))
+			converted = append(converted, MaybeParse(strconv.Itoa(x), KNone, "", d))
 		case nil:
 			panic(parsePanic{&ParseError{Msg: "SQL cannot be None"}})
 		default:
@@ -113,7 +114,7 @@ func duckdbMaybeParse(v any, copy bool) *Expr {
 	case string:
 		return MaybeParse(x, KNone, "", nil)
 	case int:
-		return MaybeParse(fmt.Sprint(x), KNone, "", nil)
+		return MaybeParse(strconv.Itoa(x), KNone, "", nil)
 	case nil:
 		panic(parsePanic{&ParseError{Msg: "SQL cannot be None"}})
 	}
@@ -324,7 +325,7 @@ func duckdbDecimalDivStr(i, n int) string {
 		if adjusted >= 0 {
 			s += "+"
 		}
-		s += fmt.Sprint(adjusted)
+		s += strconv.Itoa(adjusted)
 	}
 	if neg {
 		s = "-" + s

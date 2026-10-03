@@ -121,7 +121,6 @@ func customizeSpark2Parser(d *Dialect) {
 		"BROADCAST", "BROADCASTJOIN", "MAPJOIN", "MERGE", "SHUFFLEMERGE", "MERGEJOIN",
 		"SHUFFLE_HASH", "SHUFFLE_REPLICATE_NL",
 	} {
-		hint := hint
 		FP[hint] = func(p *Parser) *Expr { return p.parseJoinHint(hint) }
 	}
 

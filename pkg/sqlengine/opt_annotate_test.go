@@ -197,7 +197,7 @@ func TestAnnotateTypesParity(t *testing.T) {
 
 	failures := 0
 	for _, c := range fx.Cases {
-		c := c
+
 		name := fmt.Sprintf("%s/%v/%s", c.Dialect, c.Schema, c.SQL)
 		func() {
 			defer func() {

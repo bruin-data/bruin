@@ -1335,7 +1335,7 @@ func QualifyOutputsScope(scope *Scope, dialect *Dialect) {
 	if len(scope.OuterColumns) > n {
 		n = len(scope.OuterColumns)
 	}
-	for i := 0; i < n; i++ {
+	for i := range n {
 		var selection *Expr
 		if i < len(selects) {
 			selection = selects[i]

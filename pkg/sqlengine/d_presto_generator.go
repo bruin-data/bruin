@@ -1,7 +1,7 @@
 package sqlengine
 
 import (
-	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -222,7 +222,7 @@ func prestoDateDiffSQL(g *Generator, e *Expr) string {
 				shiftDays = 1
 			}
 			if shiftDays != 0 {
-				delta := New(KInterval, "this", LiteralString(fmt.Sprint(shiftDays)), "unit", VarChecked("DAY"))
+				delta := New(KInterval, "this", LiteralString(strconv.Itoa(shiftDays)), "unit", VarChecked("DAY"))
 				this = New(KAdd, "this", this, "expression", delta)
 				expr = New(KAdd, "this", expr, "expression", delta.Copy())
 			}

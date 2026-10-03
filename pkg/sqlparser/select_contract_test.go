@@ -68,7 +68,7 @@ func TestExtractSelectContract(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := sharedSQLParser.ExtractSelect(tc.query, tc.dialect)
 			require.EqualError(t, err, tc.errorText)
-			require.Equal(t, "", got)
+			require.Empty(t, got)
 		})
 	}
 }

@@ -442,7 +442,7 @@ func (s *Scope) References() []scopeRef {
 				node = e.UnnestSubqueryOrParen()
 			}
 			if !node.IsA(KSelectable) {
-				panic(&ValueError{Msg: fmt.Sprintf("%s is not <class 'sqlglot.expressions.query.Selectable'>.", exprSQL(node))})
+				panic(&ValueError{Msg: exprSQL(node) + " is not <class 'sqlglot.expressions.query.Selectable'>."})
 			}
 			s.references = append(s.references, scopeRef{getSourceAlias(e), node})
 		}

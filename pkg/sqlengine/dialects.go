@@ -41,7 +41,6 @@ func init() {
 		{"snowflake", "Snowflake", "", nil, dialectSettings_snowflake, tokenizerSettings_snowflake, parserSettings_snowflake, generatorSettings_snowflake},
 	}
 	for _, sp := range specs {
-		sp := sp
 		registerDialect(&dialectDef{
 			name:      sp.name,
 			className: sp.className,

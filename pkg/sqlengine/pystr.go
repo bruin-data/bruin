@@ -15,14 +15,14 @@ func itoa(i int) string { return strconv.Itoa(i) }
 func pyUpperEq(s, upper string) bool {
 	if len(s) != len(upper) {
 		// An ASCII s uppercases to the same length; only non-ASCII input can change length.
-		for i := 0; i < len(s); i++ {
+		for i := range len(s) {
 			if s[i] >= 0x80 {
 				return pyUpper(s) == upper
 			}
 		}
 		return false
 	}
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		c := s[i]
 		if c >= 0x80 {
 			return pyUpper(s) == upper
@@ -45,7 +45,7 @@ func upperASCII(buf []byte, s string) ([]byte, bool) {
 	if len(s) > len(buf) {
 		return nil, false
 	}
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		c := s[i]
 		if c >= 0x80 {
 			return nil, false
@@ -60,7 +60,7 @@ func upperASCII(buf []byte, s string) ([]byte, bool) {
 
 func pyUpper(s string) string {
 	ascii := true
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		if s[i] >= 0x80 {
 			ascii = false
 			break
@@ -83,7 +83,7 @@ func pyUpper(s string) string {
 // pyLower mirrors str.lower().
 func pyLower(s string) string {
 	ascii := true
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		if s[i] >= 0x80 {
 			ascii = false
 			break

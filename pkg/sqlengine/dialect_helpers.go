@@ -1977,7 +1977,7 @@ func dhFromISOFormatMicrosecond(s string) (int, bool) {
 	isDigit := func(c rune) bool { return c >= '0' && c <= '9' }
 	parseDigits := func(p, num int) (int, int, bool) {
 		v := 0
-		for i := 0; i < num; i++ {
+		for i := range num {
 			c := at(p + i)
 			if !isDigit(c) {
 				return 0, p, false
@@ -2137,9 +2137,9 @@ func dhParseHHMMSSFF(at func(int) rune, p, pEnd int) (hour, minute, second, micr
 	isDigit := func(c rune) bool { return c >= '0' && c <= '9' }
 	vals := [3]int{}
 	hasSeparator := true
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		v := 0
-		for j := 0; j < 2; j++ {
+		for j := range 2 {
 			c := at(p + j)
 			if !isDigit(c) {
 				return 0, 0, 0, 0, -3
@@ -2181,7 +2181,7 @@ func dhParseHHMMSSFF(at func(int) rune, p, pEnd int) (hour, minute, second, micr
 		toParse = 6
 	}
 	us := 0
-	for j := 0; j < toParse; j++ {
+	for j := range toParse {
 		c := at(p + j)
 		if !isDigit(c) {
 			return 0, 0, 0, 0, -3

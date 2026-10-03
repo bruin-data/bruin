@@ -118,13 +118,13 @@ func TestRenameTablesContractInvalidInputs(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := sharedSQLParser.RenameTables(tc.query, tc.dialect, map[string]string{})
 			require.EqualError(t, err, tc.errorText)
-			require.Equal(t, "", got)
+			require.Empty(t, got)
 		})
 	}
 	t.Run("nil mapping with table differs from empty mapping", func(t *testing.T) {
 		got, err := sharedSQLParser.RenameTables("SELECT * FROM orders", "postgres", nil)
 		require.EqualError(t, err, "'NoneType' object has no attribute 'items'")
-		require.Equal(t, "", got)
+		require.Empty(t, got)
 	})
 	t.Run("nil mapping without table succeeds", func(t *testing.T) {
 		got, err := sharedSQLParser.RenameTables("SELECT 1", "postgres", nil)

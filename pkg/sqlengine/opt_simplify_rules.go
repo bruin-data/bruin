@@ -4,7 +4,10 @@ package sqlengine
 // _simplify) and every rewrite rule. Rules decorated with @annotate_types_on_change in Python
 // are exported wrappers calling s.onChange around the unexported implementation.
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // Value ranges for byte-sized signed/unsigned integers.
 const (
@@ -1387,14 +1390,7 @@ func (s *Simplifier) simplifyConcat(expression *Expr) *Expr {
 			for k, str := range group {
 				names[k] = str.Name()
 			}
-			joined := ""
-			for k, n := range names {
-				if k > 0 {
-					joined += sep
-				}
-				joined += n
-			}
-			newArgs = append(newArgs, LiteralString(joined))
+			newArgs = append(newArgs, LiteralString(strings.Join(names, sep)))
 		} else {
 			newArgs = append(newArgs, group...)
 		}
@@ -1432,7 +1428,7 @@ func (s *Simplifier) simplifyConditionals(expression *Expr) *Expr {
 		this := expression.This()
 		// Python iterates the live `ifs` list while popping from it (popped elements shift the
 		// following ones, which are then skipped).
-		for idx := 0; idx < len(expression.ArgL("ifs")); idx++ {
+		for idx := 0; idx < len(expression.ArgL("ifs")); idx++ { //nolint:intrange // the list shrinks while iterating, like the Python loop
 			c := expression.ArgL("ifs")[idx]
 			cond := c.This()
 			if this != nil {

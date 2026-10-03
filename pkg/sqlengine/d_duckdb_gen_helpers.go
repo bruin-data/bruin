@@ -5,6 +5,7 @@ package sqlengine
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -889,12 +890,12 @@ func duckdbBuildWeekTruncExpression(dateExpr *Expr, startDow int, preserveStartD
 		return truncated
 	}
 
-	shift := New(KInterval, "this", LiteralString(fmt.Sprint(shiftDays)), "unit", VarExpr("DAY"))
+	shift := New(KInterval, "this", LiteralString(strconv.Itoa(shiftDays)), "unit", VarExpr("DAY"))
 	shiftedDate := New(KDateAdd, "this", dateExpr, "expression", shift)
 	truncated.Set("this", shiftedDate)
 
 	if preserveStartDay {
-		interval := New(KInterval, "this", LiteralString(fmt.Sprint(-shiftDays)), "unit", VarExpr("DAY"))
+		interval := New(KInterval, "this", LiteralString(strconv.Itoa(-shiftDays)), "unit", VarExpr("DAY"))
 		return CastExpr(New(KDateAdd, "this", truncated, "expression", interval), DT_DATE, false, nil)
 	}
 
@@ -1156,7 +1157,7 @@ func duckdbLiteralSQLWithWSChr(g *Generator, literal string) string {
 		if isWSControl {
 			for _, ch := range group {
 				duckdbCharCode := duckdbWSControlCharsToDuck[ch]
-				sqlSegments = append(sqlSegments, g.fn("CHR", LiteralNumber(fmt.Sprint(duckdbCharCode))))
+				sqlSegments = append(sqlSegments, g.fn("CHR", LiteralNumber(strconv.Itoa(duckdbCharCode))))
 			}
 		} else {
 			sqlSegments = append(sqlSegments, g.sql(LiteralString(string(group))))
@@ -1489,7 +1490,7 @@ func duckdbExplodeToUnnestSQL(g *Generator, e *Expr) string {
 			// we need to provide a table name if not present
 			idx := "None"
 			if e.Index() >= 0 {
-				idx = fmt.Sprint(e.Index())
+				idx = strconv.Itoa(e.Index())
 			}
 			aliasExpr.Set("this", ToIdentifier("_u_"+idx, nil))
 		}

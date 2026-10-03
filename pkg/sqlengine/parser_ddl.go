@@ -504,7 +504,7 @@ func (p *Parser) baseParseCreate() *Expr {
 				var options []*Expr
 				// `for prop in props` iterates the live expressions list while prop.pop() removes
 				// items from it, so re-read the list on every step (like Python's list iterator).
-				for i := 0; i < len(props.Expressions()); i++ {
+				for i := 0; i < len(props.Expressions()); i++ { //nolint:intrange // the list shrinks while iterating, like the Python loop
 					prop := props.Expressions()[i]
 					if prop.IsA(KSequenceProperties) {
 						for _, arg := range prop.ArgKeys() {

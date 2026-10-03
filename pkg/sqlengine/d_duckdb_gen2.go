@@ -4,6 +4,7 @@ package sqlengine
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -461,7 +462,7 @@ func duckdbBase64encodeSQL(g *Generator, e *Expr) string {
 			positive = v.Sign() > 0
 			if isInt {
 				i, _ := duckdbToPyInt(maxLineLength)
-				lineLength = fmt.Sprint(i)
+				lineLength = strconv.Itoa(i)
 			} else {
 				lineLength = maxLineLength.ThisS()
 			}
@@ -873,7 +874,7 @@ func duckdbRegexpExtractSQL(g *Generator, e *Expr) string {
 	validatedFlags := duckdbValidateRegexpFlags(g, params, "cims")
 
 	// Strip default group when no following params (DuckDB default is same as group=0)
-	if validatedFlags == "" && group != nil && group.Name() == fmt.Sprint(g.d.S.REGEXP_EXTRACT_DEFAULT_GROUP) {
+	if validatedFlags == "" && group != nil && group.Name() == strconv.Itoa(g.d.S.REGEXP_EXTRACT_DEFAULT_GROUP) {
 		group = nil
 	}
 

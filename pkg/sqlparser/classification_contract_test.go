@@ -24,7 +24,6 @@ func TestIsSingleSelectQueryContractAcrossDialects(t *testing.T) {
 		{"malformed", "SELECT FROM", contractSelectFromError, false},
 	}
 	for _, dialect := range contractDialects {
-		dialect := dialect
 		t.Run(dialect, func(t *testing.T) {
 			t.Parallel()
 			for _, tc := range cases {
@@ -123,7 +122,6 @@ func TestIsReadOnlyQueryContractAcrossDialects(t *testing.T) {
 		{"malformed", "SELECT FROM", "cannot determine whether query is read-only: " + contractSelectFromError, false},
 	}
 	for _, dialect := range contractDialects {
-		dialect := dialect
 		t.Run(dialect, func(t *testing.T) {
 			t.Parallel()
 			for _, tc := range cases {

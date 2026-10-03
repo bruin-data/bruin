@@ -157,7 +157,7 @@ func chunkCTableToColumn(t *Expr, copy bool) *Expr {
 			n = 4
 		}
 		rev := make([]*Expr, 4)
-		for i := 0; i < n; i++ {
+		for i := range n {
 			rev[i] = parts[n-1-i]
 		}
 		var fields []*Expr

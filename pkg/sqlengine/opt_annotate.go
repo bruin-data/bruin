@@ -928,7 +928,7 @@ func (a *TypeAnnotator) getUnpivotColumnTypes(pivot *Expr, srcTypes *omap[any]) 
 func (a *TypeAnnotator) getPivotColumnTypes(pivot *Expr, srcTypes *omap[any]) *omap[any] {
 	firstField := seqGet(pivot.ArgL("fields"), 0)
 	if !firstField.IsA(KIn) {
-		panic(&OptimizeError{Msg: fmt.Sprintf("Expected In expression for pivot field, got %s", annPyTypeRepr(firstField))})
+		panic(&OptimizeError{Msg: "Expected In expression for pivot field, got " + annPyTypeRepr(firstField)})
 	}
 
 	pivotConstants := firstField.Expressions()
@@ -1603,7 +1603,7 @@ func annIsDigit(c byte) bool { return c >= '0' && c <= '9' }
 // annParseDigits mirrors parse_digits: returns the value, the new position and success.
 func annParseDigits(b annCStr, p int, numDigits int) (int, int, bool) {
 	v := 0
-	for i := 0; i < numDigits; i++ {
+	for range numDigits {
 		c := b.at(p)
 		p++
 		if !annIsDigit(c) {
@@ -1806,7 +1806,7 @@ func annParseHHMMSSFF(b annCStr, start, end int, hour, minute, second, microseco
 	hasSeparator := true
 
 	// Parse [HH[:?MM[:?SS]]]
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		v, np, ok := annParseDigits(b, p, 2)
 		p = np
 		if !ok {

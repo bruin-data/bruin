@@ -602,12 +602,14 @@ func (g *Generator) updateFromJoinsSQL(expression *Expr) (string, string) {
 	}
 
 	joinSQL := g.sql(New(KJoin, "this", table, "on", Boolean(true)))
+	var nestedJoinSQL strings.Builder
 	for _, nested := range nestedJoins {
 		if !nested.ArgB("on") && !nested.ArgB("using") {
 			nested.Set("on", Boolean(true))
 		}
-		joinSQL += g.sql(nested)
+		nestedJoinSQL.WriteString(g.sql(nested))
 	}
+	joinSQL += nestedJoinSQL.String()
 
 	return joinSQL, ""
 }
@@ -673,7 +675,7 @@ func (g *Generator) baseValuesSQL(expression *Expr, valuesAsTable bool) string {
 				n = len(columnNames)
 			}
 			aliased := make([]*Expr, 0, n)
-			for j := 0; j < n; j++ {
+			for j := range n {
 				aliased = append(aliased, gchunkBAlias(row[j], columnNames[j]))
 			}
 			row = aliased

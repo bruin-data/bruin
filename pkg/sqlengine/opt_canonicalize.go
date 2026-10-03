@@ -415,7 +415,7 @@ func optxIsDigit(c byte) bool { return c >= '0' && c <= '9' }
 // optxParseDigits mirrors _datetimemodule.c parse_digits.
 func optxParseDigits(s string, p int, numDigits int) (int, int, bool) {
 	v := 0
-	for i := 0; i < numDigits; i++ {
+	for range numDigits {
 		c := optxCharAt(s, p)
 		p++
 		if !optxIsDigit(c) {
@@ -559,7 +559,7 @@ func optxParseHHMMSSFF(tstr string, end int) (hour, minute, second, microsecond,
 	hasSeparator := true
 
 	// Parse [HH[:?MM[:?SS]]]
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		var ok bool
 		vals[i], p, ok = optxParseDigits(tstr, p, 2)
 		if !ok {

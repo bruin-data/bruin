@@ -30,7 +30,7 @@ func bigqueryDerivedTableValuesToUnnest(g *Generator, expression *Expr) string {
 		fields := tup.Expressions()
 		n := min(len(fieldAliases), len(fields))
 		expressions := make([]*Expr, 0, n)
-		for i := 0; i < n; i++ {
+		for i := range n {
 			expressions = append(expressions, New(
 				KPropertyEQ,
 				"this", ToIdentifierAny(fieldAliases[i], nil, true),
@@ -147,7 +147,7 @@ func bigqueryPushdownCTEColumnNames(expression *Expr) *Expr {
 
 		selects := cteQuery.Selects()
 		n := min(len(columnNames), len(selects))
-		for i := 0; i < n; i++ {
+		for i := range n {
 			name := columnNames[i]
 			sel := selects[i]
 			toReplace := sel

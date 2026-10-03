@@ -122,7 +122,7 @@ func typingSnowflakeToPyInt(param *Expr) int {
 			}
 		}
 	}
-	panic(&ValueError{Msg: fmt.Sprintf("Unsupported type parameter for Snowflake type annotation: %s", annPyTypeName(this))})
+	panic(&ValueError{Msg: "Unsupported type parameter for Snowflake type annotation: " + annPyTypeName(this)})
 }
 
 // typingSnowflakeAnnotateMedian annotates the MEDIAN function with the correct return type.

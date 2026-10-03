@@ -291,7 +291,7 @@ func (r *Resolver) GetSourceColumns(name string, onlyVisible bool) []string {
 				n = len(columnAliases)
 			}
 			aliased := make([]string, n)
-			for i := 0; i < n; i++ {
+			for i := range n {
 				var colName, alias string
 				if i < len(columns) {
 					colName = columns[i]

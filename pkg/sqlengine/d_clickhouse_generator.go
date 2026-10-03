@@ -125,7 +125,7 @@ func clickhouseTimestrtotimeSQL(g *Generator, e *Expr) string {
 		// it's part of the timestamp string
 		tsWithoutTz, ok := clickhouseISOFormatWithoutTz(tsString)
 		if !ok {
-			panic(&ValueError{Msg: fmt.Sprintf("Invalid isoformat string: %s", pyRepr(tsString))})
+			panic(&ValueError{Msg: "Invalid isoformat string: " + pyRepr(tsString)})
 		}
 		ts = LiteralString(tsWithoutTz)
 	}
@@ -174,7 +174,7 @@ func clickhouseFromISOFormat(s string) (year, month, day, hour, minute, second, 
 	isDigit := func(c rune) bool { return c >= '0' && c <= '9' }
 	parseDigits := func(p, num int) (int, int, bool) {
 		v := 0
-		for i := 0; i < num; i++ {
+		for i := range num {
 			c := at(p + i)
 			if !isDigit(c) {
 				return 0, p, false

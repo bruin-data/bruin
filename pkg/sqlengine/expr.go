@@ -1436,7 +1436,7 @@ func (e *Expr) Hash() uint64 {
 func writeLower(h *maphash.Hash, s string) {
 	var buf [64]byte
 	n := 0
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		c := s[i]
 		if c >= utf8.RuneSelf {
 			h.Write(buf[:n])
@@ -1458,7 +1458,7 @@ func writeLower(h *maphash.Hash, s string) {
 
 func writeU64(h *maphash.Hash, v uint64) {
 	var b [8]byte
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		b[i] = byte(v >> (8 * i))
 	}
 	h.Write(b[:])

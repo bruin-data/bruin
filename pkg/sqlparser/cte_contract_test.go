@@ -52,7 +52,7 @@ func TestSelectFromCTEContract(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := sharedSQLParser.SelectFromCTE(tc.query, tc.dialect, tc.cte)
 			require.EqualError(t, err, tc.errorText)
-			require.Equal(t, "", got)
+			require.Empty(t, got)
 		})
 	}
 }
@@ -120,7 +120,7 @@ func TestPrependCTEsContract(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := sharedSQLParser.PrependCTEs(tc.query, tc.dialect, tc.ctes)
 			require.EqualError(t, err, tc.errorText)
-			require.Equal(t, "", got)
+			require.Empty(t, got)
 		})
 	}
 }

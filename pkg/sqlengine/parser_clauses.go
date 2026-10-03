@@ -1,6 +1,6 @@
 package sqlengine
 
-import "fmt"
+import "errors"
 
 // Port of sqlglot/parser.py (chunk C, part 2): WHERE / PREWHERE, GROUP BY, HAVING, QUALIFY,
 // CONNECT BY, INTERPOLATE, ORDER BY, LIMIT / OFFSET / FETCH, named window detection, locks
@@ -154,7 +154,7 @@ func (p *Parser) baseParseConnectWithPrior() *Expr {
 	connect := p.parseDisjunction()
 	// dict.pop("PRIOR") raises KeyError if a nested CONNECT BY already removed it
 	if !p.popNoParenOverlay("PRIOR") {
-		panic(fmt.Errorf("KeyError: 'PRIOR'"))
+		panic(errors.New("KeyError: 'PRIOR'"))
 	}
 	return connect
 }

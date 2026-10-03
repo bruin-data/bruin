@@ -255,7 +255,7 @@ func (t *tokenizerCore) tokenize(sql string) (tokens []*Token, err error) {
 	t.reset()
 	t.src = sql
 	t.ascii = true
-	for i := 0; i < len(sql); i++ {
+	for i := range len(sql) {
 		if sql[i] >= utf8.RuneSelf {
 			t.ascii = false
 			break
@@ -266,7 +266,7 @@ func (t *tokenizerCore) tokenize(sql string) (tokens []*Token, err error) {
 			t.sql = make([]rune, len(sql))
 		}
 		t.sql = t.sql[:len(sql)]
-		for i := 0; i < len(sql); i++ {
+		for i := range len(sql) {
 			t.sql[i] = rune(sql[i])
 		}
 	} else {
@@ -830,13 +830,15 @@ func (t *tokenizerCore) scanNumber() {
 			t.advance(1, false)
 		} else if t.peek != noChar && pyIsIdentifierRune(t.peek) {
 			numberText = t.text()
+			var literalText strings.Builder
 			for t.peek != noChar && !pyIsSpaceRune(t.peek) {
 				if _, ok := t.single(t.peek); ok {
 					break
 				}
-				numericLiteral += string(t.peek)
+				literalText.WriteString(string(t.peek))
 				t.advance(1, false)
 			}
+			numericLiteral += literalText.String()
 			if lit, ok := t.numericLiterals[pyUpper(numericLiteral)]; ok {
 				numericType = t.keywords[lit]
 			} else {

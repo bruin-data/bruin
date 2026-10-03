@@ -70,7 +70,6 @@ func customizeAthenaParser(d *Dialect, trino, hive *Dialect) {
 	// AthenaParser.parse_into
 	expressionParsers := make(map[Kind]parseFn, len(P.EXPRESSION_PARSERS))
 	for k := range P.EXPRESSION_PARSERS {
-		k := k
 		expressionParsers[k] = func(p *Parser) *Expr {
 			if p.s == P {
 				if p.curr.Type == TK_HIVE_TOKEN_STREAM {

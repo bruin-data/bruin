@@ -1849,11 +1849,12 @@ func (p *Parser) parseOperator(this *Expr) *Expr {
 			break
 		}
 
-		op := ""
+		var opText strings.Builder
 		for p.curr.ok() && !p.match(TK_R_PAREN) {
-			op += p.curr.Text
+			opText.WriteString(p.curr.Text)
 			p.advance(1)
 		}
+		op := opText.String()
 
 		comments := p.prevComments
 		e := New(KOperator, "this", this, "operator", op, "expression", p.parseBitwise())
