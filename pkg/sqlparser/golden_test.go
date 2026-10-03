@@ -31,8 +31,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-
-	"github.com/bruin-data/bruin/pkg/sqlengine"
 )
 
 var updateGolden = flag.Bool("update", false, "rewrite testdata/golden/*.json.gz from the current output")
@@ -68,10 +66,6 @@ func replayGolden(t *testing.T, name string) {
 	t.Helper()
 	path := filepath.Join("testdata", "golden", name+".json.gz")
 	recs := readGolden(t, path)
-
-	// The recordings were made after the BigQuery dialect was loaded, which changes type coercion
-	// for every dialect (see TRADEOFFS.md).
-	_, _ = sqlengine.GetDialect("bigquery")
 
 	step := 1
 	if raceEnabled && !*updateGolden {

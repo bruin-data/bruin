@@ -1,5 +1,9 @@
 """Records sqlglot parse trees and same-dialect roundtrip SQL for the conformance corpus."""
-import gzip, json, sys, enum
+
+import gzip
+import json
+import sys
+import enum
 from sqlglot import exp
 from sqlglot.dialects.dialect import Dialect
 
@@ -40,4 +44,8 @@ for r in corpus:
     out.append(rec)
 with gzip.open(sys.argv[2], "wt") as f:
     json.dump(out, f)
-print(len(out), sum(1 for r in out if "error" in r), sum(1 for r in out if "gen_error" in r))
+print(
+    len(out),
+    sum(1 for r in out if "error" in r),
+    sum(1 for r in out if "gen_error" in r),
+)

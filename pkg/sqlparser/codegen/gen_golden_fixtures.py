@@ -43,22 +43,36 @@ FIXTURES = [
 
 def sorted_schema(schema):
     # Go marshals map keys sorted; Python received them in that order.
-    return {t: {c: str(schema[t][c]) for c in sorted(schema[t])} for t in sorted(schema)}
+    return {
+        t: {c: str(schema[t][c]) for c in sorted(schema[t])} for t in sorted(schema)
+    }
 
 
 def process(item):
     sql, schema, dialect = item
     q = {"query": sql, "dialect": dialect}
-    return g.record([
-        {"command": "lineage", "contents": {**q, "schema": sorted_schema(schema)}},
-        {"command": "lineage", "contents": {**q, "schema": {}}},
-        {"command": "get-tables", "contents": dict(q)},
-        {"command": "replace-table-references", "contents": {**q, "table_mapping": {t: "dev_" + t for t in sorted(schema)}}},
-    ])
+    return g.record(
+        [
+            {"command": "lineage", "contents": {**q, "schema": sorted_schema(schema)}},
+            {"command": "lineage", "contents": {**q, "schema": {}}},
+            {"command": "get-tables", "contents": dict(q)},
+            {
+                "command": "replace-table-references",
+                "contents": {
+                    **q,
+                    "table_mapping": {t: "dev_" + t for t in sorted(schema)},
+                },
+            },
+        ]
+    )
 
 
 if __name__ == "__main__":
-    out = sys.argv[2] if len(sys.argv) > 2 else os.path.join(g.GOLDEN_DIR, "fixtures.json.gz")
+    out = (
+        sys.argv[2]
+        if len(sys.argv) > 2
+        else os.path.join(g.GOLDEN_DIR, "fixtures.json.gz")
+    )
     items = []
     for path, schema in FIXTURES:
         for _meta, sql, _ in load_sql_fixture_pairs(path):

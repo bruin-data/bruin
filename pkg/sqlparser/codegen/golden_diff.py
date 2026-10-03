@@ -20,13 +20,15 @@ def load(path):
 old, new = load(sys.argv[1]), load(sys.argv[2])
 limit = int(sys.argv[3]) if len(sys.argv) > 3 else 20
 if [r["cmd"] for r in old] != [r["cmd"] for r in new]:
-    print("the command lists differ (different generator inputs); comparing by position anyway")
+    print(
+        "the command lists differ (different generator inputs); comparing by position anyway"
+    )
 by_cmd = collections.Counter()
 shown = 0
 for a, b in zip(old, new):
     if a["want"] == b["want"]:
         continue
-    by_cmd[f'{a["cmd"]["command"]}/{a["cmd"]["contents"].get("dialect")}'] += 1
+    by_cmd[f"{a['cmd']['command']}/{a['cmd']['contents'].get('dialect')}"] += 1
     if shown < limit:
         shown += 1
         print(json.dumps(a["cmd"]))

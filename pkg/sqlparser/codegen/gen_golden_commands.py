@@ -23,15 +23,29 @@ def commands_for(entry):
         {"command": "is-single-select", "contents": dict(q)},
         {"command": "add-limit", "contents": {**q, "limit": 10}},
         {"command": "extract-select", "contents": dict(q)},
-        {"command": "freeze-time", "contents": {**q, "execution_time": "2024-05-06T07:08:09"}},
+        {
+            "command": "freeze-time",
+            "contents": {**q, "execution_time": "2024-05-06T07:08:09"},
+        },
         {"command": "hoist-declares", "contents": dict(q)},
-        {"command": "add-ctes", "contents": {**q, "ctes": [{"name": "bruin_cte", "query": "SELECT 1 AS x"}]}},
+        {
+            "command": "add-ctes",
+            "contents": {
+                **q,
+                "ctes": [{"name": "bruin_cte", "query": "SELECT 1 AS x"}],
+            },
+        },
         {"command": "lineage", "contents": {**q, "schema": {}}},
     ]
     tables = g.run({"command": "get-tables", "contents": dict(q)}).get("tables") or []
     if tables:
         mapping = {t: "renamed_" + t.replace(".", "_") for t in sorted(tables)}
-        cmds.append({"command": "replace-table-references", "contents": {**q, "table_mapping": mapping}})
+        cmds.append(
+            {
+                "command": "replace-table-references",
+                "contents": {**q, "table_mapping": mapping},
+            }
+        )
         cols = []
         try:
             parsed = sqlglot.parse_one(sql, dialect=d)
@@ -63,7 +77,11 @@ def process(entry):
 
 
 if __name__ == "__main__":
-    out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(g.GOLDEN_DIR, "commands.json.gz")
+    out = (
+        sys.argv[1]
+        if len(sys.argv) > 1
+        else os.path.join(g.GOLDEN_DIR, "commands.json.gz")
+    )
     corpus = g.load_corpus()
     with mp.get_context("fork").Pool(mp.cpu_count(), initializer=g.init_worker) as pool:
         results = []

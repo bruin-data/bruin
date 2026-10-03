@@ -113,12 +113,14 @@ conformance tests point at exactly what changed.
   semantics of one command at a time per `SQLParser` instance (previously one Python process each)
   via a per-instance mutex; different instances run in parallel. Validated by replaying the full
   145k-command differential from 8 goroutines under `go test -race`: no data races, identical outputs.
-- **BigQuery's global coercion side effect.** Importing SQLGlot's BigQuery dialect mutates the shared
-  `TypeAnnotator.COERCES_TO` table (DECIMAL/BIGINT gain BIGDECIMAL, VARCHAR gains date/time types), so
-  in Python, type inference for *every* dialect changes once BigQuery has been used in the process
-  (e.g. by the DECLARE-hoisting BigQuery probe). The port mirrors this: the extra coercions apply once
-  the BigQuery dialect has been instantiated in the process. (In Python this state was per parser
-  process; in Go it is per OS process.)
+- **BigQuery's global coercion side effect is not reproduced.** Importing SQLGlot's BigQuery
+  dialect mutates the shared `TypeAnnotator.COERCES_TO` table (DECIMAL/BIGINT gain BIGDECIMAL,
+  VARCHAR gains date/time types). In Python, type inference for *every* dialect therefore depended on
+  whether BigQuery had already been used in that parser process (for example by the DECLARE-hoisting
+  BigQuery probe). In Go that state would be shared by all parser instances in the process, so the
+  port drops the leak: BigQuery uses its own extended table and every other dialect uses the original
+  one, regardless of history. Recording the golden tests with and without the leak gives identical
+  results, so no recorded output depends on it.
 - **Import-order-dependent quirks.** Two more SQLGlot behaviors depend on which dialect module
   Python imported first (Hive/Databricks snapshot the coercion table; Athena's Trino generator keeps
   JSON-path transforms only if Athena loads before Trino). The port picks the order Bruin's Python

@@ -14,6 +14,8 @@ OS_ARCH:=$(shell go env GOOS)_$(shell go env GOARCH)
 LINT_MERGE_BASE ?= origin/main
 GCI_VERSION ?= v0.14.0
 GOFUMPT_VERSION ?= v0.10.0
+RUFF_VERSION ?= 0.15.4
+PY_FORMAT_PATHS := pkg/sqlengine/codegen pkg/sqlparser/codegen
 # Pinned, not @latest. v2.12.x made its cache checkout-independent, but cached
 # diagnostics still contain absolute paths from the checkout that produced
 # them. That makes shared-cache results unsafe across worktrees. Re-test before
@@ -145,7 +147,7 @@ test-full: ingestr-hashes
 	@echo "$(OK_COLOR)==> Running the semantic-engine module tests with race detection$(NO_COLOR)"
 	@cd semantic-engine && env SF_DISABLE_MINICORE=true go test -race -p "$(TEST_CONCURRENCY)" -timeout 10m ./...
 
-format:
+format: lint-python
 	@echo "$(OK_COLOR)>> [gci] formatting$(NO_COLOR)"
 	@go tool gci write $(GO_FORMAT_PATHS)
 	@echo "$(OK_COLOR)>> [gofumpt] formatting$(NO_COLOR)"
@@ -197,6 +199,13 @@ tools-update:
 	go get mvdan.cc/gofumpt@$(GOFUMPT_VERSION)
 	$(GOLANGCI_LINT_INSTALL)
 	@go mod tidy
+
+# Formats and lints the Python codegen scripts (they record the parser test fixtures).
+lint-python:
+	@echo "$(OK_COLOR)==> Running Python formatting with ruff...$(NO_COLOR)"
+	@uvx ruff@$(RUFF_VERSION) format $(PY_FORMAT_PATHS)
+	@echo "$(OK_COLOR)==> Running Python linting with ruff...$(NO_COLOR)"
+	@uvx ruff@$(RUFF_VERSION) check --fix $(PY_FORMAT_PATHS)
 
 refresh-integration-expectations: build
 	@echo "$(OK_COLOR)==> Refreshing integration expectations...$(NO_COLOR)"

@@ -58,19 +58,24 @@ def timed_run(cmd):
 def process(item):
     d, sql = item
     q = {"query": sql, "dialect": d}
-    return g.record([
-        {"command": "get-tables", "contents": dict(q)},
-        {"command": "lineage", "contents": {**q, "schema": {}}},
-        {"command": "is-single-select", "contents": dict(q)},
-        {"command": "is-read-only", "contents": dict(q)},
-        {"command": "add-limit", "contents": {**q, "limit": 5}},
-        {"command": "hoist-declares", "contents": dict(q)},
-        {"command": "extract-select", "contents": dict(q)},
-    ], runner=timed_run)
+    return g.record(
+        [
+            {"command": "get-tables", "contents": dict(q)},
+            {"command": "lineage", "contents": {**q, "schema": {}}},
+            {"command": "is-single-select", "contents": dict(q)},
+            {"command": "is-read-only", "contents": dict(q)},
+            {"command": "add-limit", "contents": {**q, "limit": 5}},
+            {"command": "hoist-declares", "contents": dict(q)},
+            {"command": "extract-select", "contents": dict(q)},
+        ],
+        runner=timed_run,
+    )
 
 
 if __name__ == "__main__":
-    out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(g.GOLDEN_DIR, "fuzz.json.gz")
+    out = (
+        sys.argv[1] if len(sys.argv) > 1 else os.path.join(g.GOLDEN_DIR, "fuzz.json.gz")
+    )
     seed = int(sys.argv[2]) if len(sys.argv) > 2 else 1
     rnd = random.Random(seed)
     items = []

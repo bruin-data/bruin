@@ -17,8 +17,23 @@ CORPUS = os.path.join(HERE, "..", "..", "sqlengine", "testdata", "parse.json.gz"
 GOLDEN_DIR = os.path.join(HERE, "..", "testdata", "golden")
 
 BRUIN_DIALECTS = {
-    "", "athena", "bigquery", "clickhouse", "databricks", "doris", "duckdb", "fabric", "mysql",
-    "oracle", "postgres", "redshift", "snowflake", "spark", "starrocks", "trino", "tsql",
+    "",
+    "athena",
+    "bigquery",
+    "clickhouse",
+    "databricks",
+    "doris",
+    "duckdb",
+    "fabric",
+    "mysql",
+    "oracle",
+    "postgres",
+    "redshift",
+    "snowflake",
+    "spark",
+    "starrocks",
+    "trino",
+    "tsql",
 }
 
 
@@ -26,17 +41,30 @@ def load_corpus():
     """The corpus statements in Bruin's dialects, in corpus order."""
     with gzip.open(CORPUS, "rt") as f:
         entries = json.load(f)
-    return [{"dialect": e["dialect"], "sql": e["sql"]} for e in entries if e["dialect"] in BRUIN_DIALECTS]
+    return [
+        {"dialect": e["dialect"], "sql": e["sql"]}
+        for e in entries
+        if e["dialect"] in BRUIN_DIALECTS
+    ]
 
 
 def init_worker():
-    # Deterministic BigQuery coercion side effect: dialects that snapshot TypeAnnotator.COERCES_TO
-    # are imported first, then BigQuery (the Go port applies it once BigQuery is used, and the Go
-    # golden test loads BigQuery before replaying).
+    # Importing BigQuery mutates the sets of the shared TypeAnnotator.COERCES_TO table (its own table
+    # is a shallow copy), so in a plain Python process every dialect's type coercion depends on
+    # whether BigQuery was used before. The Go port does not reproduce that leak; record without it:
+    # load Hive and Databricks (which copy the base table) and BigQuery up front, then restore the
+    # base table's original sets.
+    import copy
+    import logging
+
+    from sqlglot.optimizer.annotate_types import TypeAnnotator
+
+    pristine = copy.deepcopy(TypeAnnotator.COERCES_TO)
     import sqlglot.dialects.hive  # noqa: F401
     import sqlglot.dialects.databricks  # noqa: F401
     import sqlglot.dialects.bigquery  # noqa: F401
-    import logging
+
+    TypeAnnotator.COERCES_TO.update(pristine)
 
     logging.disable(logging.CRITICAL)
 

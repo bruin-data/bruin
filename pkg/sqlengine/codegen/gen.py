@@ -14,17 +14,12 @@ import enum
 import inspect
 import os
 import subprocess
-import re
 import sys
-import types
-import typing as t
 
 import sqlglot
 from sqlglot import exp
-from sqlglot.dialects.dialect import Dialect, NormalizationStrategy
-from sqlglot.generator import Generator
-from sqlglot.parser import Parser
-from sqlglot.tokens import Tokenizer, TokenType
+from sqlglot.dialects.dialect import Dialect
+from sqlglot.tokens import TokenType
 
 SQLGLOT_VERSION = sqlglot.__version__
 assert SQLGLOT_VERSION == "30.13.0", SQLGLOT_VERSION
@@ -105,11 +100,15 @@ def tok(tt: TokenType) -> str:
 
 
 def gen_tokens() -> None:
-    lines = ["// TokenType mirrors sqlglot.tokens.TokenType.\ntype TokenType uint16\n\nconst (\n"]
+    lines = [
+        "// TokenType mirrors sqlglot.tokens.TokenType.\ntype TokenType uint16\n\nconst (\n"
+    ]
     lines.append("\tTK_NONE TokenType = 0\n")
     for tt in TOKEN_TYPES:
         lines.append("\t%s TokenType = %d\n" % (tok(tt), tt.value))
-    lines.append(")\n\nconst numTokenTypes = %d\n\n" % (max(t.value for t in TOKEN_TYPES) + 1))
+    lines.append(
+        ")\n\nconst numTokenTypes = %d\n\n" % (max(t.value for t in TOKEN_TYPES) + 1)
+    )
     lines.append("var tokenTypeNames = [numTokenTypes]string{\n")
     for tt in TOKEN_TYPES:
         lines.append("\t%s: %s,\n" % (tok(tt), gostr(tt.name)))
@@ -129,7 +128,9 @@ def dt(d) -> str:
 
 
 def gen_dtypes() -> None:
-    lines = ["// DType mirrors sqlglot.expressions.DataType.Type.\ntype DType uint16\n\nconst (\n"]
+    lines = [
+        "// DType mirrors sqlglot.expressions.DataType.Type.\ntype DType uint16\n\nconst (\n"
+    ]
     lines.append("\tDT_NONE DType = 0\n")
     for i, d in enumerate(DTYPES):
         lines.append("\t%s DType = %d\n" % (dt(d), i + 1))
@@ -145,7 +146,8 @@ def gen_dtypes() -> None:
         v = getattr(exp.DataType, attr)
         if attr.isupper() and isinstance(v, (set, frozenset)):
             lines.append(
-                "var DataType_%s = newDTypeSet(%s)\n" % (attr, ", ".join(dt(x) for x in sorted(v, key=lambda x: x.name)))
+                "var DataType_%s = newDTypeSet(%s)\n"
+                % (attr, ", ".join(dt(x) for x in sorted(v, key=lambda x: x.name)))
             )
     write("zz_dtypes.go", "".join(lines))
 
@@ -165,6 +167,7 @@ def all_expr_classes() -> list[type]:
             walk(s)
 
     walk(exp.Expr)
+
     # Stable order: definition order by module/line keeps related kinds together.
     def key(c):
         try:
@@ -184,7 +187,9 @@ def kind(c) -> str:
 
 
 def gen_kinds() -> None:
-    lines = ["// Kind identifies a sqlglot expression class.\ntype Kind uint16\n\nconst (\n"]
+    lines = [
+        "// Kind identifies a sqlglot expression class.\ntype Kind uint16\n\nconst (\n"
+    ]
     lines.append("\tKNone Kind = 0\n")
     for i, c in enumerate(EXPR_CLASSES):
         lines.append("\t%s Kind = %d\n" % (kind(c), i + 1))
@@ -192,13 +197,30 @@ def gen_kinds() -> None:
     lines.append("var kindInfos = [numKinds]kindInfo{\n")
     for c in EXPR_CLASSES:
         mro = [kind(b) for b in c.__mro__ if b in KIND_OF]
-        args = ", ".join("{%s, %s}" % (gostr(k), "true" if v else "false") for k, v in c.arg_types.items())
+        args = ", ".join(
+            "{%s, %s}" % (gostr(k), "true" if v else "false")
+            for k, v in c.arg_types.items()
+        )
         flags = []
-        for flag in ("is_var_len_args", "_hash_raw_args", "is_subquery", "is_cast", "is_data_type", "is_primitive"):
+        for flag in (
+            "is_var_len_args",
+            "_hash_raw_args",
+            "is_subquery",
+            "is_cast",
+            "is_data_type",
+            "is_primitive",
+        ):
             if getattr(c, flag, False):
-                flags.append({"is_var_len_args": "kfVarLenArgs", "_hash_raw_args": "kfHashRawArgs",
-                              "is_subquery": "kfSubquery", "is_cast": "kfCast", "is_data_type": "kfDataType",
-                              "is_primitive": "kfPrimitive"}[flag])
+                flags.append(
+                    {
+                        "is_var_len_args": "kfVarLenArgs",
+                        "_hash_raw_args": "kfHashRawArgs",
+                        "is_subquery": "kfSubquery",
+                        "is_cast": "kfCast",
+                        "is_data_type": "kfDataType",
+                        "is_primitive": "kfPrimitive",
+                    }[flag]
+                )
         sql_names = []
         if issubclass(c, exp.Func) and c is not exp.Func:
             try:
@@ -227,11 +249,16 @@ def gen_kinds() -> None:
         lines.append("\t%s: %s,\n" % (gostr(c.key), kind(c)))
     lines.append("}\n\n")
     # FUNCTION_BY_NAME
-    lines.append("// FUNCTION_BY_NAME mirrors sqlglot.expressions.FUNCTION_BY_NAME.\nvar FUNCTION_BY_NAME = map[string]Kind{\n")
+    lines.append(
+        "// FUNCTION_BY_NAME mirrors sqlglot.expressions.FUNCTION_BY_NAME.\nvar FUNCTION_BY_NAME = map[string]Kind{\n"
+    )
     for name, c in sorted(exp.FUNCTION_BY_NAME.items()):
         lines.append("\t%s: %s,\n" % (gostr(name), kind(c)))
     lines.append("}\n\n")
-    lines.append("// ALL_FUNCTIONS mirrors sqlglot.expressions.ALL_FUNCTIONS.\nvar ALL_FUNCTIONS = []Kind{%s}\n\n" % ", ".join(kind(c) for c in exp.ALL_FUNCTIONS))
+    lines.append(
+        "// ALL_FUNCTIONS mirrors sqlglot.expressions.ALL_FUNCTIONS.\nvar ALL_FUNCTIONS = []Kind{%s}\n\n"
+        % ", ".join(kind(c) for c in exp.ALL_FUNCTIONS)
+    )
     write("zz_kinds.go", "".join(lines))
 
 
@@ -267,15 +294,26 @@ def classify(v):
             return "emptyset", ""
         sample = next(iter(v))
         if isinstance(sample, TokenType):
-            return "TokenSet", "newTokenSet(%s)" % ", ".join(tok(x) for x in sorted(v, key=lambda x: x.value))
+            return "TokenSet", "newTokenSet(%s)" % ", ".join(
+                tok(x) for x in sorted(v, key=lambda x: x.value)
+            )
         if isinstance(sample, exp.DType):
-            return "DTypeSet", "newDTypeSet(%s)" % ", ".join(dt(x) for x in sorted(v, key=lambda x: x.name))
+            return "DTypeSet", "newDTypeSet(%s)" % ", ".join(
+                dt(x) for x in sorted(v, key=lambda x: x.name)
+            )
         if isinstance(sample, str):
             return "StrSet", "newStrSet(%s)" % ", ".join(gostr(x) for x in sorted(v))
         if isinstance(sample, type) and sample in KIND_OF:
-            return "KindSet", "newKindSet(%s)" % ", ".join(kind(x) for x in sorted(v, key=lambda x: x.__name__))
+            return "KindSet", "newKindSet(%s)" % ", ".join(
+                kind(x) for x in sorted(v, key=lambda x: x.__name__)
+            )
         raise Unsupported("set of %r" % type(sample))
-    if isinstance(v, tuple) and len(v) == 2 and isinstance(v[0], str) and isinstance(v[1], TokenType):
+    if (
+        isinstance(v, tuple)
+        and len(v) == 2
+        and isinstance(v[0], str)
+        and isinstance(v[1], TokenType)
+    ):
         return "formatString", "formatString{%s, %s}" % (gostr(v[0]), tok(v[1]))
     if isinstance(v, (tuple, list)):
         if not v:
@@ -284,16 +322,28 @@ def classify(v):
             return "[]TokenType", "[]TokenType{%s}" % ", ".join(tok(x) for x in v)
         if all(isinstance(x, int) and not isinstance(x, (bool, enum.Enum)) for x in v):
             return "[]int", "[]int{%s}" % ", ".join(str(x) for x in v)
-        if all(isinstance(x, (tuple, list)) and all(isinstance(y, int) for y in x) for x in v):
-            return "[][]int", "[][]int{%s}" % ", ".join("{%s}" % ", ".join(str(y) for y in x) for x in v)
+        if all(
+            isinstance(x, (tuple, list)) and all(isinstance(y, int) for y in x)
+            for x in v
+        ):
+            return "[][]int", "[][]int{%s}" % ", ".join(
+                "{%s}" % ", ".join(str(y) for y in x) for x in v
+            )
         if all(isinstance(x, type) and x in KIND_OF for x in v):
             return "[]Kind", "[]Kind{%s}" % ", ".join(kind(x) for x in v)
         if all(isinstance(x, str) for x in v):
             return "[]string", "[]string{%s}" % ", ".join(gostr(x) for x in v)
         if all(isinstance(x, TokenType) for x in v):
             return "[]TokenType", "[]TokenType{%s}" % ", ".join(tok(x) for x in v)
-        if all(isinstance(x, (tuple, list)) and all(isinstance(y, str) for y in x) and len(x) == 2 for x in v):
-            return "[][2]string", "[][2]string{%s}" % ", ".join("{%s, %s}" % (gostr(a), gostr(b)) for a, b in v)
+        if all(
+            isinstance(x, (tuple, list))
+            and all(isinstance(y, str) for y in x)
+            and len(x) == 2
+            for x in v
+        ):
+            return "[][2]string", "[][2]string{%s}" % ", ".join(
+                "{%s, %s}" % (gostr(a), gostr(b)) for a, b in v
+            )
         if all(isinstance(x, (str, tuple)) for x in v):
             # mixed list of str | (str, str) as used by QUOTES/IDENTIFIERS etc.
             parts = []
@@ -308,11 +358,30 @@ def classify(v):
         if not v:
             return "emptydict", ""
         items = list(v.items())
-        if all(isinstance(k, str) for k in v) and all(
-            isinstance(val, (tuple, list)) and all(isinstance(x, str) or (isinstance(x, (tuple, list)) and all(isinstance(y, str) for y in x)) for x in val)
-            for val in v.values()
-        ) and any(isinstance(x, (tuple, list)) for val in v.values() for x in val) or (
-            all(isinstance(k, str) for k in v) and all(isinstance(val, (tuple, list)) and all(isinstance(x, str) for x in val) for val in v.values()) and any(isinstance(val, tuple) for val in v.values())
+        if (
+            all(isinstance(k, str) for k in v)
+            and all(
+                isinstance(val, (tuple, list))
+                and all(
+                    isinstance(x, str)
+                    or (
+                        isinstance(x, (tuple, list))
+                        and all(isinstance(y, str) for y in x)
+                    )
+                    for x in val
+                )
+                for val in v.values()
+            )
+            and any(isinstance(x, (tuple, list)) for val in v.values() for x in val)
+            or (
+                all(isinstance(k, str) for k in v)
+                and all(
+                    isinstance(val, (tuple, list))
+                    and all(isinstance(x, str) for x in val)
+                    for val in v.values()
+                )
+                and any(isinstance(val, tuple) for val in v.values())
+            )
         ):
             entries = []
             for k, val in items:
@@ -339,7 +408,14 @@ def classify(v):
         vts.discard("nil")
         if had_nil and vts == {"bool"}:
             vts = {"Tri"}
-            vals = [(k, "Tri", {"nil": "TriNone", "true": "TriTrue", "false": "TriFalse"}[vl]) for k, _vt, vl in vals]
+            vals = [
+                (
+                    k,
+                    "Tri",
+                    {"nil": "TriNone", "true": "TriTrue", "false": "TriFalse"}[vl],
+                )
+                for k, _vt, vl in vals
+            ]
         if len(vts) > 1:
             if vts <= {"emptyset", "StrSet"}:
                 vts = {"StrSet"}
@@ -356,7 +432,14 @@ def classify(v):
             vt = "[]string"
         kgo, keylit = kt
         entries = []
-        zero = {"string": '""', "Kind": "KNone", "TokenType": "TK_NONE", "DType": "DT_NONE", "int": "0", "bool": "false"}
+        zero = {
+            "string": '""',
+            "Kind": "KNone",
+            "TokenType": "TK_NONE",
+            "DType": "DT_NONE",
+            "int": "0",
+            "bool": "false",
+        }
         for k, _vt, vl in vals:
             if vl == "nil" and vt in zero:
                 vl = zero[vt]
@@ -404,7 +487,7 @@ def class_data_attrs(cls, base) -> dict:
             v = getattr(cls, name)
         except Exception:
             continue
-        if inspect.isclass(v) and not (v in KIND_OF):
+        if inspect.isclass(v) and v not in KIND_OF:
             continue
         out[name] = v
     return out
@@ -418,7 +501,9 @@ def go_dialect_id(name: str) -> str:
     return name or "base"
 
 
-def emit_settings_struct(struct_name: str, per_dialect: dict[str, dict], skip=()) -> tuple[str, dict[str, str], list[str]]:
+def emit_settings_struct(
+    struct_name: str, per_dialect: dict[str, dict], skip=()
+) -> tuple[str, dict[str, str], list[str]]:
     """Builds a struct type with one field per attribute and returns field go types."""
     field_types: dict[str, str] = {}
     unsupported: list[str] = []
@@ -431,7 +516,9 @@ def emit_settings_struct(struct_name: str, per_dialect: dict[str, dict], skip=()
                 gt, _ = classify(v)
             except Exception as e:
                 if not isinstance(e, Unsupported):
-                    print("warning: %s.%s: %r" % (struct_name, name, e), file=sys.stderr)
+                    print(
+                        "warning: %s.%s: %r" % (struct_name, name, e), file=sys.stderr
+                    )
                 if name not in unsupported:
                     unsupported.append(name)
                 continue
@@ -444,15 +531,26 @@ def emit_settings_struct(struct_name: str, per_dialect: dict[str, dict], skip=()
                 pass
             elif {prev, gt} <= {"[]string", "[][2]string"}:
                 field_types[name] = "[][2]string"
-            elif prev.startswith("map[") and gt.startswith("map[") and prev.split("]")[0] == gt.split("]")[0] and {prev.split("]",1)[1], gt.split("]",1)[1]} <= {"bool", "Tri", "any"}:
+            elif (
+                prev.startswith("map[")
+                and gt.startswith("map[")
+                and prev.split("]")[0] == gt.split("]")[0]
+                and {prev.split("]", 1)[1], gt.split("]", 1)[1]}
+                <= {"bool", "Tri", "any"}
+            ):
                 field_types[name] = prev.split("]")[0] + "]Tri"
-            elif "OptionsType" in (prev, gt) and {prev, gt} - {"OptionsType"} <= {"emptydict", "map[string][]string"}:
+            elif "OptionsType" in (prev, gt) and {prev, gt} - {"OptionsType"} <= {
+                "emptydict",
+                "map[string][]string",
+            }:
                 field_types[name] = "OptionsType"
             elif {prev, gt} <= {"string", "bool"}:
                 # e.g. NORMALIZE_FUNCTIONS: "upper" | "lower" | False. False -> "", True -> "true".
                 field_types[name] = "string"
             else:
-                raise SystemExit("type conflict for %s.%s: %s vs %s" % (struct_name, name, prev, gt))
+                raise SystemExit(
+                    "type conflict for %s.%s: %s vs %s" % (struct_name, name, prev, gt)
+                )
     for name in list(field_types):
         if name in unsupported:
             del field_types[name]
@@ -473,7 +571,6 @@ def go_field_type(gt: str) -> str:
         "emptylist": "[]string",
         "emptydict": "map[string]string",
     }.get(gt, gt)
-
 
 
 def literal_for(gt: str, v) -> str:
@@ -497,33 +594,47 @@ def literal_for(gt: str, v) -> str:
             return "KNone"
         return "nil"
     if vt == "emptyset":
-        return {"TokenSet": "newTokenSet()", "DTypeSet": "newDTypeSet()", "StrSet": "newStrSet()", "KindSet": "newKindSet()"}.get(gt, "newStrSet()")
+        return {
+            "TokenSet": "newTokenSet()",
+            "DTypeSet": "newDTypeSet()",
+            "StrSet": "newStrSet()",
+            "KindSet": "newKindSet()",
+        }.get(gt, "newStrSet()")
     if vt == "emptylist":
         return "nil"
     if vt == "emptydict":
         return "%s{}" % go_field_type(gt)
     if vt == "[]string" and gt == "[][2]string":
-        return "[][2]string{%s}" % ", ".join("{%s, %s}" % (gostr(x), gostr(x)) for x in v)
+        return "[][2]string{%s}" % ", ".join(
+            "{%s, %s}" % (gostr(x), gostr(x)) for x in v
+        )
     if gt.endswith("]Tri") and (vt.endswith("]bool") or vt.endswith("]any")):
         vl = vl.replace(": nil", ": TriNone")
         vl = vl.replace(": true", ": TriTrue").replace(": false", ": TriFalse")
-        return gt + vl[vl.index("{"):]
+        return gt + vl[vl.index("{") :]
     if vt != gt and gt.startswith("map[") and vt.startswith("map["):
         # re-emit with declared type
-        return gt + vl[vl.index("{"):]
+        return gt + vl[vl.index("{") :]
     return vl
 
 
-def gen_settings(kind_name: str, struct_name: str, getter, filename: str, skip=()) -> dict:
+def gen_settings(
+    kind_name: str, struct_name: str, getter, filename: str, skip=()
+) -> dict:
     per_dialect = {}
     for d in DIALECTS:
         cls = getter(d)
         per_dialect[d] = class_data_attrs(cls, None)
-    struct, field_types, unsupported = emit_settings_struct(struct_name, per_dialect, skip)
+    struct, field_types, unsupported = emit_settings_struct(
+        struct_name, per_dialect, skip
+    )
     body = [struct]
     for d in DIALECTS:
         attrs = per_dialect[d]
-        body.append("func %s_%s() *%s {\n\treturn &%s{\n" % (kind_name, go_dialect_id(d), struct_name, struct_name))
+        body.append(
+            "func %s_%s() *%s {\n\treturn &%s{\n"
+            % (kind_name, go_dialect_id(d), struct_name, struct_name)
+        )
         for name in sorted(field_types):
             if name not in attrs:
                 continue
@@ -539,15 +650,39 @@ def gen_settings(kind_name: str, struct_name: str, getter, filename: str, skip=(
 
 
 PROPS = [
-    "name", "output_name", "is_star", "alias_or_name", "selects", "named_selects", "parts", "this",
-    "to_py", "is_type", "unnest", "ctes", "kind", "side", "left", "right", "select", "unit", "alias",
-    "table", "db", "catalog", "key", "is_string", "expressions",
+    "name",
+    "output_name",
+    "is_star",
+    "alias_or_name",
+    "selects",
+    "named_selects",
+    "parts",
+    "this",
+    "to_py",
+    "is_type",
+    "unnest",
+    "ctes",
+    "kind",
+    "side",
+    "left",
+    "right",
+    "select",
+    "unit",
+    "alias",
+    "table",
+    "db",
+    "catalog",
+    "key",
+    "is_string",
+    "expressions",
 ]
 
 
 def gen_props() -> None:
-    lines = ["// propOwner_X[k] is the class (first in k's MRO) that defines property X, or KNone when\n"
-             "// it is the Expression default.\n"]
+    lines = [
+        "// propOwner_X[k] is the class (first in k's MRO) that defines property X, or KNone when\n"
+        "// it is the Expression default.\n"
+    ]
     for prop in PROPS:
         entries = []
         for c in EXPR_CLASSES:
@@ -559,7 +694,9 @@ def gen_props() -> None:
             if owner is None or owner in (exp.Expr, exp.Expression):
                 continue
             entries.append("\t%s: %s,\n" % (kind(c), kind(owner)))
-        lines.append("var propOwner_%s = [numKinds]Kind{\n%s}\n\n" % (prop, "".join(entries)))
+        lines.append(
+            "var propOwner_%s = [numKinds]Kind{\n%s}\n\n" % (prop, "".join(entries))
+        )
     write("zz_props.go", "".join(lines))
 
 
@@ -569,25 +706,29 @@ def gen_unicode() -> None:
         if 0xD800 <= cp <= 0xDFFF:
             continue
         c = chr(cp)
-        u, l = c.upper(), c.lower()
+        u, lc = c.upper(), c.lower()
         if u != c:
             up.append((cp, u))
-        if l != c:
-            low.append((cp, l))
-    lines = ["// Python str.upper()/str.lower() per code point (only entries that change).\n"]
+        if lc != c:
+            low.append((cp, lc))
+    lines = [
+        "// Python str.upper()/str.lower() per code point (only entries that change).\n"
+    ]
     lines.append("var pyUpperMap = map[rune]string{\n")
     for cp, u in up:
         lines.append("\t0x%X: %s,\n" % (cp, gostr(u)))
     lines.append("}\n\nvar pyLowerMap = map[rune]string{\n")
-    for cp, l in low:
-        lines.append("\t0x%X: %s,\n" % (cp, gostr(l)))
+    for cp, lc in low:
+        lines.append("\t0x%X: %s,\n" % (cp, gostr(lc)))
     lines.append("}\n")
     write("zz_unicode.go", "".join(lines))
 
 
 def gen_exp_constants() -> None:
     P = exp.Properties
-    lines = ["// Properties.NAME_TO_PROPERTY / PROPERTY_TO_NAME.\nvar NAME_TO_PROPERTY = map[string]Kind{\n"]
+    lines = [
+        "// Properties.NAME_TO_PROPERTY / PROPERTY_TO_NAME.\nvar NAME_TO_PROPERTY = map[string]Kind{\n"
+    ]
     for k, v in P.NAME_TO_PROPERTY.items():
         lines.append("\t%s: %s,\n" % (gostr(k), kind(v)))
     lines.append("}\n\nvar PROPERTY_TO_NAME = map[Kind]string{\n")
@@ -597,9 +738,21 @@ def gen_exp_constants() -> None:
     for loc in P.Location:
         lines.append("\tLoc_%s = %s\n" % (loc.name, gostr(loc.value)))
     lines.append(")\n\n")
-    lines.append("// Locations in definition order.\nvar PropertiesLocations = []string{%s}\n\n" % ", ".join(gostr(l.value) for l in P.Location))
-    lines.append("// QUERY_MODIFIERS mirrors exp.QUERY_MODIFIERS (ordered).\nvar QUERY_MODIFIERS = []string{%s}\n\n" % ", ".join(gostr(k) for k in exp.QUERY_MODIFIERS))
-    lines.append("var TABLE_PARTS = []string{%s}\nvar COLUMN_PARTS = []string{%s}\n" % (", ".join(gostr(x) for x in exp.TABLE_PARTS), ", ".join(gostr(x) for x in exp.COLUMN_PARTS)))
+    lines.append(
+        "// Locations in definition order.\nvar PropertiesLocations = []string{%s}\n\n"
+        % ", ".join(gostr(loc.value) for loc in P.Location)
+    )
+    lines.append(
+        "// QUERY_MODIFIERS mirrors exp.QUERY_MODIFIERS (ordered).\nvar QUERY_MODIFIERS = []string{%s}\n\n"
+        % ", ".join(gostr(k) for k in exp.QUERY_MODIFIERS)
+    )
+    lines.append(
+        "var TABLE_PARTS = []string{%s}\nvar COLUMN_PARTS = []string{%s}\n"
+        % (
+            ", ".join(gostr(x) for x in exp.TABLE_PARTS),
+            ", ".join(gostr(x) for x in exp.COLUMN_PARTS),
+        )
+    )
     write("zz_exp_constants.go", "".join(lines))
 
 
@@ -610,10 +763,30 @@ def main() -> None:
     gen_tokens()
     gen_dtypes()
     gen_kinds()
-    gen_settings("tokenizerSettings", "TokenizerSettings", lambda d: dialect_class(d).tokenizer_class, "zz_tokenizer_settings.go")
-    gen_settings("dialectSettings", "DialectSettings", lambda d: dialect_class(d), "zz_dialect_settings.go")
-    gen_settings("parserSettings", "ParserData", lambda d: dialect_class(d).parser_class, "zz_parser_settings.go")
-    gen_settings("generatorSettings", "GeneratorData", lambda d: dialect_class(d).generator_class, "zz_generator_settings.go")
+    gen_settings(
+        "tokenizerSettings",
+        "TokenizerSettings",
+        lambda d: dialect_class(d).tokenizer_class,
+        "zz_tokenizer_settings.go",
+    )
+    gen_settings(
+        "dialectSettings",
+        "DialectSettings",
+        lambda d: dialect_class(d),
+        "zz_dialect_settings.go",
+    )
+    gen_settings(
+        "parserSettings",
+        "ParserData",
+        lambda d: dialect_class(d).parser_class,
+        "zz_parser_settings.go",
+    )
+    gen_settings(
+        "generatorSettings",
+        "GeneratorData",
+        lambda d: dialect_class(d).generator_class,
+        "zz_generator_settings.go",
+    )
     # Same formatter as `make format` (run from the Bruin repository root).
     subprocess.run(["go", "tool", "gofumpt", "-w", *WRITTEN], check=True)
 

@@ -13,7 +13,7 @@ import (
 // *Expr (DataType), a DType or nil. Use annT to turn a possibly-nil *Expr into such a value
 // (a typed nil *Expr must never be stored in an `any`).
 
-// BIGINT_EXTRACT_DATE_PARTS: EXTRACT/DATE_PART specifiers that return BIGINT instead of INT
+// BIGINT_EXTRACT_DATE_PARTS: EXTRACT/DATE_PART specifiers that return BIGINT instead of INT.
 var BIGINT_EXTRACT_DATE_PARTS = newStrSet(
 	"EPOCH_SECOND",
 	"EPOCH_MILLISECOND",
@@ -146,14 +146,14 @@ func annCopyCoercesTo(m map[DType]DTypeSet) map[DType]DTypeSet {
 //	COERCES_TO[BIGINT] |= {BIGDECIMAL}
 //	COERCES_TO[VARCHAR] |= {DATE, DATETIME, TIME, TIMESTAMP, TIMESTAMPTZ}
 //
-// so TypeAnnotator.COERCES_TO depends on whether BigQuery has been loaded. We mirror that by
-// checking whether the BigQuery dialect has been instantiated (the Go analog of importing the
-// module). Hive and Databricks deep-copy the base table when they are imported; we use the
-// pristine base table for them (i.e. assume they were loaded before BigQuery).
+// so in Python, TypeAnnotator.COERCES_TO (used by every dialect without its own table) depends on
+// whether BigQuery has been loaded in the process. The port does not reproduce that leak: BigQuery
+// uses its own extended table and every other dialect the pristine base table, so results never
+// depend on which dialects were used before. Hive and Databricks deep-copy the base table when
+// they are imported; they get the pristine one too (as if loaded before BigQuery).
 var (
 	annCoercesOnce            sync.Once
 	annBaseCoercesTo          map[DType]DTypeSet // _COERCES_TO before BigQuery is imported
-	annBaseCoercesToBQ        map[DType]DTypeSet // _COERCES_TO after BigQuery is imported
 	annBigQueryCoercesTo      map[DType]DTypeSet
 	annHiveCoercesTo          map[DType]DTypeSet
 	annDatabricksCoercesTo    map[DType]DTypeSet
@@ -169,7 +169,6 @@ func annInitCoercions() {
 		mutated[DT_DECIMAL] = mutated[DT_DECIMAL].With(DT_BIGDECIMAL)
 		mutated[DT_BIGINT] = mutated[DT_BIGINT].With(DT_BIGDECIMAL)
 		mutated[DT_VARCHAR] = mutated[DT_VARCHAR].With(DT_DATE, DT_DATETIME, DT_TIME, DT_TIMESTAMP, DT_TIMESTAMPTZ)
-		annBaseCoercesToBQ = mutated
 		annBigQueryCoercesTo = annCopyCoercesTo(mutated)
 		annBigQueryCoercesTo[DT_BIGDECIMAL] = newDTypeSet(DT_DOUBLE)
 
@@ -192,20 +191,10 @@ func annInitCoercions() {
 	})
 }
 
-// annBigQueryLoaded reports whether the BigQuery dialect has been instantiated.
-func annBigQueryLoaded() bool {
-	dialectMu.Lock()
-	defer dialectMu.Unlock()
-	_, ok := dialectCache["bigquery"]
-	return ok
-}
-
-// typeAnnotatorCoercesTo mirrors TypeAnnotator.COERCES_TO (see the comment on the tables above).
+// typeAnnotatorCoercesTo mirrors TypeAnnotator.COERCES_TO, without BigQuery's leak (see the
+// comment on the tables above).
 func typeAnnotatorCoercesTo() map[DType]DTypeSet {
 	annInitCoercions()
-	if annBigQueryLoaded() {
-		return annBaseCoercesToBQ
-	}
 	return annBaseCoercesTo
 }
 
@@ -1528,7 +1517,7 @@ func (s *annExprSet) values() []*Expr {
 // Ports of sqlglot.helper date helpers (Python's datetime.date/datetime.fromisoformat, which in
 // CPython 3.13 are implemented in C: Modules/_datetimemodule.c).
 
-// DATE_UNITS: interval units that operate on date components
+// DATE_UNITS: interval units that operate on date components.
 var annDATE_UNITS = newStrSet("day", "week", "month", "quarter", "year", "year_month")
 
 // annIsDateUnit mirrors sqlglot.helper.is_date_unit.

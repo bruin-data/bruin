@@ -149,6 +149,7 @@ if [[ "$current_lint_version" != "$golangci_lint_version" ]]; then
     "https://raw.githubusercontent.com/golangci/golangci-lint/${golangci_lint_version}/install.sh" |
     sh -s -- -b "$HOME/.local/bin" "$golangci_lint_version"
 fi
+uvx ruff@0.15.4 --version >/dev/null
 done_step
 
 step "Installing Node dependencies"
