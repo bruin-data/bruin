@@ -3,6 +3,7 @@ package sqlengine
 import (
 	"fmt"
 	"strings"
+	"sync"
 )
 
 // Port of sqlglot/schema.py (MappingSchema and helpers).
@@ -29,7 +30,7 @@ type MappingSchema struct {
 
 	typeMappingCache     map[string]*Expr
 	normalizedTableCache map[string]*Expr
-	normalizedNameCache  map[string]string
+	normalizedNameCache  map[normNameKey]string
 	findCache            map[string]*findCacheEntry
 	depthCache           int
 }
@@ -49,7 +50,7 @@ func NewMappingSchema(schema *SchemaMap, visible *SchemaMap, dialect *Dialect, n
 		dialect:              dialect,
 		typeMappingCache:     map[string]*Expr{},
 		normalizedTableCache: map[string]*Expr{},
-		normalizedNameCache:  map[string]string{},
+		normalizedNameCache:  map[normNameKey]string{},
 		findCache:            map[string]*findCacheEntry{},
 	}
 	if s.visible == nil {
@@ -466,13 +467,46 @@ func (s *MappingSchema) normalizeName(name string, dialect *Dialect, isTable boo
 	if dialect == nil {
 		dialect = s.dialect
 	}
-	key := fmt.Sprintf("%s|%p|%v|%v", name, dialect, isTable, norm)
+	key := normNameKey{name, dialect, isTable, norm}
 	if c, ok := s.normalizedNameCache[key]; ok && c != "" {
 		return c
 	}
-	result := normalizeNameStr(name, dialect, isTable, norm).Name()
+	result := normalizedNameStr(key)
 	s.normalizedNameCache[key] = result
 	return result
+}
+
+// normNameKey mirrors the (name, dialect, is_table, normalize) cache key of _normalize_name.
+type normNameKey struct {
+	name    string
+	dialect *Dialect
+	isTable bool
+	norm    bool
+}
+
+// globalNormNames memoizes normalize_name(str, ...).name across schemas: for string input it is a
+// pure function of the key (parse_identifier + the dialect's normalize_identifier on a fresh node),
+// and MappingSchema construction would otherwise re-parse every table and column name.
+var globalNormNames struct {
+	sync.RWMutex
+	m map[normNameKey]string
+}
+
+func normalizedNameStr(key normNameKey) string {
+	globalNormNames.RLock()
+	r, ok := globalNormNames.m[key]
+	globalNormNames.RUnlock()
+	if ok {
+		return r
+	}
+	r = normalizeNameStr(key.name, key.dialect, key.isTable, key.norm).Name()
+	globalNormNames.Lock()
+	if globalNormNames.m == nil || len(globalNormNames.m) >= 1<<17 {
+		globalNormNames.m = map[normNameKey]string{}
+	}
+	globalNormNames.m[key] = r
+	globalNormNames.Unlock()
+	return r
 }
 
 func (s *MappingSchema) normalizeIdentName(id *Expr, dialect *Dialect, isTable bool, normalize *bool) string {
@@ -483,7 +517,7 @@ func (s *MappingSchema) normalizeIdentName(id *Expr, dialect *Dialect, isTable b
 	if dialect == nil {
 		dialect = s.dialect
 	}
-	key := fmt.Sprintf("%s|%p|%v|%v", id.Name(), dialect, isTable, norm)
+	key := normNameKey{id.Name(), dialect, isTable, norm}
 	if c, ok := s.normalizedNameCache[key]; ok && c != "" {
 		return c
 	}

@@ -12,7 +12,14 @@ import (
 //
 // Argument values are one of: nil, *Expr, []*Expr, string, bool, int, DType.
 type Expr struct {
-	kind     Kind
+	kind   Kind
+	hashed bool
+	// posSet reports that posLine..posEnd hold the line/col/start/end position metadata
+	// (Python's meta["line"], ...), kept inline instead of in the meta map.
+	posSet   bool
+	posLine  int32
+	posCol   int32
+	posStart int32
 	args     []arg
 	parent   *Expr
 	argKey   string
@@ -21,7 +28,7 @@ type Expr struct {
 	typ      *Expr
 	meta     map[string]any
 	hash     uint64
-	hashed   bool
+	posEnd   int32
 }
 
 type arg struct {
@@ -35,9 +42,10 @@ func New(kind Kind, kv ...any) *Expr {
 	if kind == KDateTrunc {
 		kv = dateTruncCtorArgs(kv)
 	}
-	e := &Expr{kind: kind, index: -1}
+	e := newExprArgs(len(kv) / 2)
+	e.kind = kind
+	e.index = -1
 	if len(kv) > 0 {
-		e.args = make([]arg, 0, len(kv)/2)
 		for i := 0; i+1 < len(kv); i += 2 {
 			key := kv[i].(string)
 			val := normalizeArg(kv[i+1])
@@ -50,6 +58,70 @@ func New(kind Kind, kv ...any) *Expr {
 	if kind.IsA(KTimeUnit) {
 		timeUnitCtor(e)
 	}
+	return e
+}
+
+// Expressions are allocated together with the backing array of their arguments (one
+// allocation per node instead of two); args beyond the inline capacity grow normally.
+type (
+	exprArgs1 struct {
+		e Expr
+		a [1]arg
+	}
+	exprArgs2 struct {
+		e Expr
+		a [2]arg
+	}
+	exprArgs3 struct {
+		e Expr
+		a [3]arg
+	}
+	exprArgs4 struct {
+		e Expr
+		a [4]arg
+	}
+	exprArgs6 struct {
+		e Expr
+		a [6]arg
+	}
+	exprArgs8 struct {
+		e Expr
+		a [8]arg
+	}
+)
+
+// newExprArgs allocates a zero Expr with room for n arguments.
+func newExprArgs(n int) *Expr {
+	switch {
+	case n <= 0:
+		return &Expr{}
+	case n == 1:
+		x := &exprArgs1{}
+		x.e.args = x.a[:0]
+		return &x.e
+	case n == 2:
+		x := &exprArgs2{}
+		x.e.args = x.a[:0]
+		return &x.e
+	case n == 3:
+		x := &exprArgs3{}
+		x.e.args = x.a[:0]
+		return &x.e
+	case n == 4:
+		x := &exprArgs4{}
+		x.e.args = x.a[:0]
+		return &x.e
+	case n <= 6:
+		x := &exprArgs6{}
+		x.e.args = x.a[:0]
+		return &x.e
+	case n <= 8:
+		x := &exprArgs8{}
+		x.e.args = x.a[:0]
+		return &x.e
+	}
+	e := &Expr{}
+	e.args = make([]arg, 0, n)
 	return e
 }
 
@@ -630,12 +702,39 @@ func (e *Expr) Meta() map[string]any {
 	return e.meta
 }
 
-// MetaGet reads a metadata value without allocating.
+// MetaGet reads a metadata value without allocating. Explicit map entries take precedence over
+// the inline position fields.
 func (e *Expr) MetaGet(key string) any {
-	if e.meta == nil {
-		return nil
+	if e.meta != nil {
+		if v, ok := e.meta[key]; ok {
+			return v
+		}
 	}
-	return e.meta[key]
+	if e.posSet {
+		switch key {
+		case "line":
+			return int(e.posLine)
+		case "col":
+			return int(e.posCol)
+		case "start":
+			return int(e.posStart)
+		case "end":
+			return int(e.posEnd)
+		}
+	}
+	return nil
+}
+
+// setPositions sets the line/col/start/end position metadata.
+func (e *Expr) setPositions(line, col, start, end int) {
+	e.posLine, e.posCol, e.posStart, e.posEnd = int32(line), int32(col), int32(start), int32(end)
+	e.posSet = true
+	if e.meta != nil {
+		delete(e.meta, "line")
+		delete(e.meta, "col")
+		delete(e.meta, "start")
+		delete(e.meta, "end")
+	}
 }
 
 // Copy returns a deep copy of the tree rooted at e.
@@ -647,7 +746,9 @@ func (e *Expr) Copy() *Expr {
 }
 
 func (e *Expr) deepCopy() *Expr {
-	c := &Expr{kind: e.kind, index: -1, hash: e.hash, hashed: e.hashed}
+	c := newExprArgs(len(e.args))
+	c.kind, c.index, c.hash, c.hashed = e.kind, -1, e.hash, e.hashed
+	c.posSet, c.posLine, c.posCol, c.posStart, c.posEnd = e.posSet, e.posLine, e.posCol, e.posStart, e.posEnd
 	if e.Comments != nil {
 		c.Comments = append([]string{}, e.Comments...)
 	}
@@ -661,7 +762,7 @@ func (e *Expr) deepCopy() *Expr {
 		}
 	}
 	if len(e.args) > 0 {
-		c.args = make([]arg, len(e.args))
+		c.args = c.args[:len(e.args)]
 		for i, a := range e.args {
 			c.args[i].key = a.key
 			switch v := a.val.(type) {
@@ -762,7 +863,11 @@ func (e *Expr) PopComments() []string {
 
 // IterExpressions yields child expressions in argument order.
 func (e *Expr) IterExpressions(reverse bool) []*Expr {
-	var out []*Expr
+	return e.appendChildren(nil, reverse)
+}
+
+// appendChildren appends e's child expressions (IterExpressions order) to out.
+func (e *Expr) appendChildren(out []*Expr, reverse bool) []*Expr {
 	if !reverse {
 		for _, a := range e.args {
 			switch v := a.val.(type) {
@@ -805,20 +910,30 @@ func (e *Expr) IterExpressions(reverse bool) []*Expr {
 	return out
 }
 
-// BFS mirrors Expression.bfs.
+// BFS mirrors Expression.bfs. Children are collected after the consumer has seen their parent,
+// like Python's lazy iter_expressions.
 func (e *Expr) BFS(prune func(*Expr) bool) iter.Seq[*Expr] {
 	return func(yield func(*Expr) bool) {
-		queue := []*Expr{e}
-		for len(queue) > 0 {
-			node := queue[0]
-			queue = queue[1:]
+		var buf [32]*Expr
+		queue := append(buf[:0], e)
+		head := 0
+		for head < len(queue) {
+			node := queue[head]
+			queue[head] = nil
+			head++
 			if !yield(node) {
 				return
 			}
 			if prune != nil && prune(node) {
 				continue
 			}
-			queue = append(queue, node.IterExpressions(false)...)
+			if head == len(queue) {
+				queue, head = queue[:0], 0
+			} else if head >= 64 && head*2 >= len(queue) {
+				n := copy(queue, queue[head:])
+				queue, head = queue[:n], 0
+			}
+			queue = node.appendChildren(queue, false)
 		}
 	}
 }
@@ -826,7 +941,8 @@ func (e *Expr) BFS(prune func(*Expr) bool) iter.Seq[*Expr] {
 // DFS mirrors Expression.dfs.
 func (e *Expr) DFS(prune func(*Expr) bool) iter.Seq[*Expr] {
 	return func(yield func(*Expr) bool) {
-		stack := []*Expr{e}
+		var buf [32]*Expr
+		stack := append(buf[:0], e)
 		for len(stack) > 0 {
 			node := stack[len(stack)-1]
 			stack = stack[:len(stack)-1]
@@ -836,7 +952,7 @@ func (e *Expr) DFS(prune func(*Expr) bool) iter.Seq[*Expr] {
 			if prune != nil && prune(node) {
 				continue
 			}
-			stack = append(stack, node.IterExpressions(true)...)
+			stack = node.appendChildren(stack, true)
 		}
 	}
 }

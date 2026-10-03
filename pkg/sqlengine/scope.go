@@ -874,7 +874,8 @@ func WalkInScope(expression *Expr, prune func(*Expr) bool) iter.Seq[*Expr] {
 }
 
 func walkInScopeImpl(expression *Expr, prune func(*Expr) bool, yield func(*Expr) bool) bool {
-	stack := []*Expr{expression}
+	var buf [32]*Expr
+	stack := append(buf[:0], expression)
 	for len(stack) > 0 {
 		node := stack[len(stack)-1]
 		stack = stack[:len(stack)-1]
@@ -904,7 +905,7 @@ func walkInScopeImpl(expression *Expr, prune func(*Expr) bool, yield func(*Expr)
 			// Python: walking None fails on `node.args`.
 			panic(&ValueError{Msg: "'NoneType' object has no attribute 'args'"})
 		}
-		stack = append(stack, node.IterExpressions(true)...)
+		stack = node.appendChildren(stack, true)
 	}
 	return true
 }

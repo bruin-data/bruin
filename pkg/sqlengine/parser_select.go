@@ -8,11 +8,7 @@ package sqlengine
 // from "*" (including the positions recorded by _parse_star_ops).
 func chunkBSelectStar() *Expr {
 	star := New(KStar, "ilike", nil, "except_", nil, "replace", nil, "rename", nil)
-	m := star.Meta()
-	m["line"] = 1
-	m["col"] = 1
-	m["start"] = 0
-	m["end"] = 0
+	star.setPositions(1, 1, 0, 0)
 	sel := New(KSelect)
 	sel.Set("expressions", []*Expr{star})
 	return sel

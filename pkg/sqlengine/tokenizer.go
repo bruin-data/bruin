@@ -3,6 +3,8 @@ package sqlengine
 import (
 	"fmt"
 	"strings"
+	"sync"
+	"unicode/utf8"
 )
 
 // Token mirrors sqlglot.tokens.Token. Positions are in Unicode code points, like Python.
@@ -70,6 +72,10 @@ type tokenizerConfig struct {
 	numbersCanHaveDecimals           bool
 	identifiersCanStartWithDigit     bool
 	unescapedSequences               map[string]string
+	// identEscapes holds, per identifier delimiter, IDENTIFIER_ESCAPES plus the delimiter.
+	identEscapes map[string]StrSet
+	// kwText interns the KEYWORDS keys (token texts of keyword tokens).
+	kwText map[string]string
 }
 
 func newTokenizerConfig(s *TokenizerSettings, d *DialectSettings) *tokenizerConfig {
@@ -116,6 +122,16 @@ func newTokenizerConfig(s *TokenizerSettings, d *DialectSettings) *tokenizerConf
 		c.unescapedSequences = d.UNESCAPED_SEQUENCES
 	}
 	c.keywordTrie = buildKeywordTrie(s)
+	c.identEscapes = map[string]StrSet{}
+	for _, end := range c.identifiers {
+		escapes := c.identifierEscapes.Clone()
+		escapes[end] = struct{}{}
+		c.identEscapes[end] = escapes
+	}
+	c.kwText = make(map[string]string, len(c.keywords))
+	for k := range c.keywords {
+		c.kwText[k] = k
+	}
 	return c
 }
 
@@ -154,6 +170,10 @@ const noChar rune = -1
 type tokenizerCore struct {
 	*tokenizerConfig
 	sql           []rune
+	src           string // the input; token texts are substrings of it when ascii
+	ascii         bool
+	kwBuf         []rune
+	slab          []Token
 	size          int
 	tokens        []*Token
 	start         int
@@ -169,12 +189,32 @@ type tokenizerCore struct {
 
 type tokenPanic struct{ msg string }
 
+var tokenizerPool = sync.Pool{New: func() any { return &tokenizerCore{} }}
+
 func newTokenizerCore(c *tokenizerConfig) *tokenizerCore {
-	return &tokenizerCore{tokenizerConfig: c}
+	t := tokenizerPool.Get().(*tokenizerCore)
+	t.tokenizerConfig = c
+	return t
+}
+
+// release returns the core to the pool; the returned tokens do not reference its buffers.
+func (t *tokenizerCore) release() {
+	t.tokenizerConfig = nil
+	t.tokens = nil
+	t.comments = nil
+	t.slab = nil
+	t.src = ""
+	if cap(t.sql) > 1<<16 {
+		t.sql = nil
+	}
+	tokenizerPool.Put(t)
 }
 
 func (t *tokenizerCore) reset() {
-	t.sql = nil
+	t.sql = t.sql[:0]
+	t.src = ""
+	t.ascii = false
+	t.slab = nil
 	t.size = 0
 	t.tokens = nil
 	t.start = 0
@@ -190,9 +230,29 @@ func (t *tokenizerCore) reset() {
 
 // tokenize mirrors TokenizerCore.tokenize.
 func (t *tokenizerCore) tokenize(sql string) (tokens []*Token, err error) {
+	defer t.release()
 	t.reset()
-	t.sql = []rune(sql)
+	t.src = sql
+	t.ascii = true
+	for i := 0; i < len(sql); i++ {
+		if sql[i] >= utf8.RuneSelf {
+			t.ascii = false
+			break
+		}
+	}
+	if t.ascii {
+		if cap(t.sql) < len(sql) {
+			t.sql = make([]rune, len(sql))
+		}
+		t.sql = t.sql[:len(sql)]
+		for i := 0; i < len(sql); i++ {
+			t.sql[i] = rune(sql[i])
+		}
+	} else {
+		t.sql = append(t.sql[:0], []rune(sql)...)
+	}
 	t.size = len(t.sql)
+	t.tokens = make([]*Token, 0, t.size/4+4)
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -265,20 +325,44 @@ func (t *tokenizerCore) scan(checkSemicolon bool) {
 	}
 }
 
+// span returns the source text of runes [a, b) without copying when the input is ASCII.
+func (t *tokenizerCore) span(a, b int) string {
+	if t.ascii {
+		return t.src[a:b]
+	}
+	return string(t.sql[a:b])
+}
+
+// asciiStrings holds the one-character strings of the ASCII range (no allocation per char).
+var asciiStrings = func() (out [utf8.RuneSelf]string) {
+	for i := range out {
+		out[i] = string(rune(i))
+	}
+	return
+}()
+
+// runeString is string(r) without allocating for ASCII.
+func runeString(r rune) string {
+	if r >= 0 && r < utf8.RuneSelf {
+		return asciiStrings[r]
+	}
+	return string(r)
+}
+
 func (t *tokenizerCore) chars(size int) string {
 	if size == 1 {
 		if t.char == noChar {
 			return ""
 		}
-		return string(t.char)
+		return runeString(t.char)
 	}
 	start := t.current - 1
 	end := start + size
 	if end <= t.size {
 		if start < 0 {
-			return string(t.sql[:end])
+			return t.span(0, end)
 		}
-		return string(t.sql[start:end])
+		return t.span(start, end)
 	}
 	return ""
 }
@@ -319,26 +403,45 @@ func (t *tokenizerCore) advance(i int, alnum bool) {
 	}
 }
 
-func (t *tokenizerCore) text() string { return string(t.sql[t.start:t.current]) }
+func (t *tokenizerCore) text() string { return t.span(t.start, t.current) }
 
-func (t *tokenizerCore) add(tt TokenType, text *string) {
+// add0 adds a token whose text is the current span.
+func (t *tokenizerCore) add0(tt TokenType) { t.push(tt, t.span(t.start, t.current)) }
+
+// addS adds a token with explicit text.
+func (t *tokenizerCore) addS(tt TokenType, text string) { t.push(tt, text) }
+
+// newToken allocates tokens in slabs.
+func (t *tokenizerCore) newToken() *Token {
+	if len(t.slab) == cap(t.slab) {
+		// First slab sized from the input (SQL averages about one token per 4 characters), later
+		// ones grow with the token count.
+		n := len(t.tokens)/2 + 8
+		if len(t.tokens) == 0 {
+			n = t.size/4 + 4
+		}
+		if n > 1024 {
+			n = 1024
+		}
+		t.slab = make([]Token, 0, n)
+	}
+	t.slab = t.slab[:len(t.slab)+1]
+	return &t.slab[len(t.slab)-1]
+}
+
+func (t *tokenizerCore) push(tt TokenType, txt string) {
 	t.prevTokenLine = t.line
 	if len(t.comments) > 0 && tt == TK_SEMICOLON && len(t.tokens) > 0 {
 		last := t.tokens[len(t.tokens)-1]
 		last.Comments = append(last.Comments, t.comments...)
 		t.comments = nil
 	}
-	var txt string
-	if text == nil {
-		txt = string(t.sql[t.start:t.current])
-	} else {
-		txt = *text
-	}
 	comments := t.comments
 	if comments == nil {
 		comments = []string{}
 	}
-	t.tokens = append(t.tokens, &Token{
+	tok := t.newToken()
+	*tok = Token{
 		Type:     tt,
 		Text:     txt,
 		Line:     t.line,
@@ -346,7 +449,8 @@ func (t *tokenizerCore) add(tt TokenType, text *string) {
 		Start:    t.start,
 		End:      t.current - 1,
 		Comments: comments,
-	})
+	}
+	t.tokens = append(t.tokens, tok)
 	t.comments = nil
 
 	if t.commands.Has(tt) && t.peek != ';' &&
@@ -355,9 +459,9 @@ func (t *tokenizerCore) add(tt TokenType, text *string) {
 		n := len(t.tokens)
 		t.scan(true)
 		t.tokens = t.tokens[:n]
-		s := pyStrip(string(t.sql[start:t.current]))
+		s := pyStrip(t.span(start, t.current))
 		if s != "" {
-			t.add(TK_STRING, &s)
+			t.addS(TK_STRING, s)
 		}
 	}
 }
@@ -373,24 +477,25 @@ func asciiUpperRune(r rune) rune {
 
 func (t *tokenizerCore) scanKeywords() {
 	size := 0
-	var word string
+	wordLen := 0
 	hasWord := false
-	chars := string(t.char)
+	// chars is accumulated in a reusable rune buffer; word is its prefix at the last trie end.
+	chars := append(t.kwBuf[:0], t.char)
 	char := t.char
 	prevSpace := false
 	skip := false
 	tr := t.keywordTrie
 	_, singleToken := t.singleTokens[char]
 
-	for chars != "" {
+	for len(chars) > 0 {
 		if !skip {
-			sub := tr.get(string(asciiUpperRune(char)))
+			sub := tr.getRune(asciiUpperRune(char))
 			if sub == nil {
 				break
 			}
 			tr = sub
 			if tr.end {
-				word = chars
+				wordLen = len(chars)
 				hasWord = true
 			}
 		}
@@ -406,7 +511,7 @@ func (t *tokenizerCore) scanKeywords() {
 				if isSpace {
 					char = ' '
 				}
-				chars += string(char)
+				chars = append(chars, char)
 				prevSpace = isSpace
 				skip = false
 			} else {
@@ -417,31 +522,82 @@ func (t *tokenizerCore) scanKeywords() {
 			break
 		}
 	}
+	t.kwBuf = chars
 
 	if hasWord {
-		if t.scanString(word) {
+		word := chars[:wordLen]
+		if t.scanString(runesString(word)) {
 			return
 		}
-		if t.scanComment(word) {
+		if t.scanComment(runesString(word)) {
 			return
 		}
 		if prevSpace || singleToken || char == noChar {
 			t.advance(size-1, false)
-			w := pyUpper(word)
-			tt, ok := t.keywords[w]
+			w, ok := t.keywordText(word)
 			if !ok {
 				t.fail("KeyError")
 			}
-			t.add(tt, &w)
+			t.addS(t.keywords[w], w)
 			return
 		}
 	}
 
 	if tt, ok := t.singleTokens[t.char]; ok {
-		t.add(tt, strp(string(t.char)))
+		t.addS(tt, runeString(t.char))
 		return
 	}
 	t.scanVar()
+}
+
+// runesString converts a short rune slice to a string (no allocation for one ASCII rune).
+func runesString(r []rune) string {
+	if len(r) == 1 {
+		return runeString(r[0])
+	}
+	return string(r)
+}
+
+// keywordText returns the interned KEYWORDS key equal to pyUpper(word), if any.
+func (t *tokenizerCore) keywordText(word []rune) (string, bool) {
+	var buf [64]byte
+	n := 0
+	for _, r := range word {
+		if r >= utf8.RuneSelf || n == len(buf) {
+			w, ok := t.kwText[pyUpper(string(word))]
+			return w, ok
+		}
+		if r >= 'a' && r <= 'z' {
+			r -= 32
+		}
+		buf[n] = byte(r)
+		n++
+	}
+	w, ok := t.kwText[string(buf[:n])]
+	return w, ok
+}
+
+// keywordType mirrors `KEYWORDS.get(text.upper())` for the source span [a, b).
+func (t *tokenizerCore) keywordType(a, b int) (TokenType, bool) {
+	var buf [64]byte
+	if b-a > len(buf) {
+		tt, ok := t.keywords[pyUpper(t.span(a, b))]
+		return tt, ok
+	}
+	n := 0
+	for _, r := range t.sql[a:b] {
+		if r >= utf8.RuneSelf {
+			tt, ok := t.keywords[pyUpper(t.span(a, b))]
+			return tt, ok
+		}
+		if r >= 'a' && r <= 'z' {
+			r -= 32
+		}
+		buf[n] = byte(r)
+		n++
+	}
+	tt, ok := t.keywords[string(buf[:n])]
+	return tt, ok
 }
 
 func (t *tokenizerCore) scanComment(commentStart string) bool {
@@ -482,7 +638,7 @@ func (t *tokenizerCore) scanComment(commentStart string) bool {
 	}
 
 	if commentStart == t.hintStart && len(t.tokens) > 0 && t.tokensPrecedingHint.Has(t.tokens[len(t.tokens)-1].Type) {
-		t.add(TK_HINT, nil)
+		t.add0(TK_HINT)
 	}
 
 	if commentStartLine == t.prevTokenLine {
@@ -533,14 +689,14 @@ func (t *tokenizerCore) scanNumber() {
 			if t.hasBitStrings {
 				t.scanBits()
 			} else {
-				t.add(TK_NUMBER, nil)
+				t.add0(TK_NUMBER)
 			}
 			return
 		} else if peek == 'X' {
 			if t.hasHexStrings {
 				t.scanHex()
 			} else {
-				t.add(TK_NUMBER, nil)
+				t.add0(TK_NUMBER)
 			}
 			return
 		}
@@ -596,7 +752,7 @@ func (t *tokenizerCore) scanNumber() {
 			if numericType != TK_NONE {
 				break
 			} else if t.identifiersCanStartWithDigit {
-				t.add(TK_VAR, nil)
+				t.add0(TK_VAR)
 				return
 			}
 			t.advance(-len([]rune(numericLiteral)), false)
@@ -607,15 +763,15 @@ func (t *tokenizerCore) scanNumber() {
 	}
 
 	if numberText == "" {
-		numberText = string(t.sql[t.start:t.current])
+		numberText = t.span(t.start, t.current)
 	}
 	if isUnderscoreSeparated {
 		numberText = strings.ReplaceAll(numberText, "_", "")
 	}
-	t.add(TK_NUMBER, &numberText)
+	t.addS(TK_NUMBER, numberText)
 	if numericType != TK_NONE {
-		t.add(TK_DCOLON, strp("::"))
-		t.add(numericType, &numericLiteral)
+		t.addS(TK_DCOLON, "::")
+		t.addS(numericType, numericLiteral)
 	}
 }
 
@@ -623,9 +779,9 @@ func (t *tokenizerCore) scanBits() {
 	t.advance(1, false)
 	value := t.extractValue()
 	if pyIntParse(value, 2) {
-		t.add(TK_BIT_STRING, strp(pySlice([]rune(value), 2, len([]rune(value)))))
+		t.addS(TK_BIT_STRING, pySlice([]rune(value), 2, len([]rune(value))))
 	} else {
-		t.add(TK_IDENTIFIER, nil)
+		t.add0(TK_IDENTIFIER)
 	}
 }
 
@@ -633,9 +789,9 @@ func (t *tokenizerCore) scanHex() {
 	t.advance(1, false)
 	value := t.extractValue()
 	if pyIntParse(value, 16) {
-		t.add(TK_HEX_STRING, strp(pySlice([]rune(value), 2, len([]rune(value)))))
+		t.addS(TK_HEX_STRING, pySlice([]rune(value), 2, len([]rune(value))))
 	} else {
-		t.add(TK_IDENTIFIER, nil)
+		t.add0(TK_IDENTIFIER)
 	}
 }
 
@@ -717,7 +873,7 @@ func (t *tokenizerCore) scanString(start string) bool {
 		case TK_HEREDOC_STRING:
 			t.advance(1, false)
 			var tag string
-			if string(t.char) == end {
+			if runeString(t.char) == end {
 				tag = ""
 			} else {
 				tag = t.extractString(end, nil, true, !t.heredocTagIsIdentifier)
@@ -727,7 +883,7 @@ func (t *tokenizerCore) scanString(start string) bool {
 					t.advance(-1, false)
 				}
 				t.advance(-len([]rune(tag)), false)
-				t.add(t.heredocStringAlternative, nil)
+				t.add0(t.heredocStringAlternative)
 				return true
 			}
 			end = start + tag + end
@@ -748,16 +904,19 @@ func (t *tokenizerCore) scanString(start string) bool {
 			t.fail(fmt.Sprintf("Numeric string contains invalid characters from %d:%d", t.line, t.start))
 		}
 	}
-	t.add(tokenType, &text)
+	t.addS(tokenType, text)
 	return true
 }
 
 func (t *tokenizerCore) scanIdentifier(identifierEnd string) {
 	t.advance(1, false)
-	escapes := t.identifierEscapes.Clone()
-	escapes[identifierEnd] = struct{}{}
+	escapes, ok := t.identEscapes[identifierEnd]
+	if !ok {
+		escapes = t.identifierEscapes.Clone()
+		escapes[identifierEnd] = struct{}{}
+	}
 	text := t.extractString(identifierEnd, escapes, false, true)
-	t.add(TK_IDENTIFIER, &text)
+	t.addS(TK_IDENTIFIER, text)
 }
 
 func (t *tokenizerCore) scanVar() {
@@ -766,7 +925,7 @@ func (t *tokenizerCore) scanVar() {
 		if peek == noChar || pyIsSpaceRune(peek) {
 			break
 		}
-		if !t.varSingleTokens.Has(string(peek)) {
+		if !t.varSingleTokens.Has(runeString(peek)) {
 			if _, ok := t.singleTokens[peek]; ok {
 				break
 			}
@@ -775,11 +934,11 @@ func (t *tokenizerCore) scanVar() {
 	}
 	tt := TK_VAR
 	if !(len(t.tokens) > 0 && t.tokens[len(t.tokens)-1].Type == TK_PARAMETER) {
-		if kw, ok := t.keywords[pyUpper(string(t.sql[t.start:t.current]))]; ok {
+		if kw, ok := t.keywordType(t.start, t.current); ok {
 			tt = kw
 		}
 	}
-	t.add(tt, nil)
+	t.add0(tt)
 }
 
 func (t *tokenizerCore) extractString(delimiter string, escapes StrSet, rawString bool, raiseUnmatched bool) string {
@@ -828,13 +987,13 @@ func (t *tokenizerCore) extractString(delimiter string, escapes StrSet, rawStrin
 			} else {
 				t.peek = sql[t.current]
 			}
-			return string(sql[pos:endPos])
+			return t.span(pos, endPos)
 		}
 	}
 
 	for {
-		if !rawString && len(t.unescapedSequences) > 0 && t.peek != noChar && escapes.Has(string(t.char)) {
-			if seq, ok := t.unescapedSequences[string(t.char)+string(t.peek)]; ok {
+		if !rawString && len(t.unescapedSequences) > 0 && t.peek != noChar && escapes.Has(runeString(t.char)) {
+			if seq, ok := t.unescapedSequences[runeString(t.char)+runeString(t.peek)]; ok {
 				t.advance(2, false)
 				text.WriteString(seq)
 				continue
@@ -881,7 +1040,7 @@ func (t *tokenizerCore) extractString(delimiter string, escapes StrSet, rawStrin
 			}
 			current := t.current - 1
 			t.advance(1, true)
-			text.WriteString(string(sql[current : t.current-1]))
+			text.WriteString(t.span(current, t.current-1))
 		}
 	}
 	return text.String()
@@ -896,7 +1055,7 @@ func runeStr(r rune) string {
 	if r == noChar {
 		return ""
 	}
-	return string(r)
+	return runeString(r)
 }
 
 func containsRune(s []rune, r rune) bool {

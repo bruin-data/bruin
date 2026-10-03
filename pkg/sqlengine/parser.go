@@ -492,21 +492,22 @@ func (p *Parser) expressionC(e *Expr, comments []string) *Expr {
 }
 
 func (e *Expr) updatePositionsTok(tok *Token) {
-	m := e.Meta()
-	m["line"] = tok.Line
-	m["col"] = tok.Col
-	m["start"] = tok.Start
-	m["end"] = tok.End
+	e.setPositions(tok.Line, tok.Col, tok.Start, tok.End)
 }
 
 // updatePositionsFrom mirrors update_positions(other_expression).
 func (e *Expr) updatePositionsFrom(other *Expr) *Expr {
-	if other == nil || other.meta == nil {
+	if other == nil {
 		return e
 	}
-	for _, k := range []string{"line", "col", "start", "end"} {
-		if v, ok := other.meta[k]; ok {
-			e.Meta()[k] = v
+	if other.posSet {
+		e.setPositions(int(other.posLine), int(other.posCol), int(other.posStart), int(other.posEnd))
+	}
+	if other.meta != nil {
+		for _, k := range [...]string{"line", "col", "start", "end"} {
+			if v, ok := other.meta[k]; ok {
+				e.Meta()[k] = v
+			}
 		}
 	}
 	return e

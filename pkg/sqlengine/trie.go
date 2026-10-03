@@ -1,11 +1,15 @@
 package sqlengine
 
+import "unicode/utf8"
+
 // trie mirrors sqlglot.trie: nested maps keyed by a single "character" (rune or word),
 // with end marking the presence of a complete key.
 type trie struct {
 	children map[string]*trie
 	order    []string // insertion order of children (Python dict order)
 	end      bool
+	// runeKids indexes the single-rune children by rune (fast path for keyword scanning).
+	runeKids map[rune]*trie
 }
 
 type trieResult int
@@ -52,10 +56,24 @@ func (t *trie) add(key []string) {
 			next = newTrie()
 			cur.children[c] = next
 			cur.order = append(cur.order, c)
+			if r, size := utf8.DecodeRuneInString(c); size == len(c) && size > 0 {
+				if cur.runeKids == nil {
+					cur.runeKids = map[rune]*trie{}
+				}
+				cur.runeKids[r] = next
+			}
 		}
 		cur = next
 	}
 	cur.end = true
+}
+
+// getRune returns the child for the single-character key r.
+func (t *trie) getRune(r rune) *trie {
+	if t == nil || t.runeKids == nil {
+		return nil
+	}
+	return t.runeKids[r]
 }
 
 func (t *trie) get(c string) *trie {
