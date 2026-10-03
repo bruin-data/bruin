@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"math/big"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -23,32 +23,65 @@ func (c *Client) CompleteStructured(ctx context.Context, state, instructions str
 		tokens = defaultMaxOutputTokens
 	}
 	schema := structuredSchema(columns)
-	prompt := instructions
-	if prompt != "" {
-		prompt += "\n\n"
+	shared := instructions
+	if shared == "" {
+		shared = "Produce the requested fields using the tasks and constraints in the output schema."
 	}
-	prompt += state
 
 	var endpoint string
 	var payload any
+	var parse func([]byte) (string, error)
 	switch c.Provider {
 	case providerOpenCode, providerOpenAI:
+		parse = parseOpenCode
 		endpoint = "https://opencode.ai/zen/v1/responses"
 		if c.Provider == providerOpenAI {
 			endpoint = "https://api.openai.com/v1/responses"
 		}
-		payload = map[string]any{
-			"model": c.Model, "input": prompt, "max_output_tokens": tokens, "store": false,
+		block := map[string]any{"type": "input_text", "text": shared}
+		request := map[string]any{
+			"model": c.Model, "max_output_tokens": tokens, "store": false,
+			"input": []any{
+				map[string]any{"role": "developer", "content": []any{block}},
+				chatMessage{Role: "user", Content: state},
+			},
 			"text": map[string]any{"format": map[string]any{"type": "json_schema", "name": "inference_result", "strict": true, "schema": schema}},
 		}
+		// Older OpenAI models and Zen do not promise support for these fields.
+		if c.Provider == providerOpenAI && supportsOpenAICacheBreakpoints(c.Model) {
+			request["prompt_cache_options"] = map[string]string{"mode": "explicit"}
+			block["prompt_cache_breakpoint"] = map[string]string{"mode": "explicit"}
+		}
+		payload = request
 	case providerOpenRouter:
+		parse = parseOpenRouter
 		endpoint = "https://openrouter.ai/api/v1/chat/completions"
-		payload = map[string]any{
-			"model": c.Model, "messages": []chatMessage{{Role: "user", Content: prompt}}, "max_tokens": tokens,
+		block := map[string]any{"type": "text", "text": shared}
+		if strings.HasPrefix(c.Model, "anthropic/") || strings.HasPrefix(c.Model, "google/") || strings.HasPrefix(c.Model, "qwen/") {
+			block["cache_control"] = map[string]string{"type": "ephemeral"}
+		}
+		// Default gateway routing hashes the first user message, which varies
+		// per row. Use the shared prefix instead, without exposing its content.
+		session, err := fingerprint([]any{c.Model, shared, schema})
+		if err != nil {
+			return nil, err
+		}
+		request := map[string]any{
+			"model": c.Model, "max_tokens": tokens, "session_id": session,
+			"messages": []any{
+				map[string]any{"role": "system", "content": []any{block}},
+				chatMessage{Role: "user", Content: state},
+			},
 			"response_format": map[string]any{"type": "json_schema", "json_schema": map[string]any{"name": "inference_result", "strict": true, "schema": schema}},
 			"provider":        map[string]any{"require_parameters": true},
 		}
+		if model, ok := strings.CutPrefix(c.Model, "openai/"); ok && supportsOpenAICacheBreakpoints(model) {
+			request["prompt_cache_options"] = map[string]string{"mode": "explicit"}
+			block["prompt_cache_breakpoint"] = map[string]string{"mode": "explicit"}
+		}
+		payload = request
 	case providerAnthropic:
+		parse = parseAnthropic
 		// Anthropic's schema subset does not accept numeric bounds. Keep them
 		// in field descriptions and enforce them locally on every response.
 		for _, raw := range schema["properties"].(map[string]any) {
@@ -58,14 +91,17 @@ func (c *Client) CompleteStructured(ctx context.Context, state, instructions str
 		}
 		endpoint = "https://api.anthropic.com/v1/messages"
 		payload = map[string]any{
-			"model": c.Model, "messages": []chatMessage{{Role: "user", Content: prompt}}, "max_tokens": tokens,
+			"model": c.Model, "messages": []chatMessage{{Role: "user", Content: state}}, "max_tokens": tokens,
+			"system":        []any{map[string]any{"type": "text", "text": shared, "cache_control": map[string]string{"type": "ephemeral"}}},
 			"output_config": map[string]any{"format": map[string]any{"type": "json_schema", "schema": schema}},
 		}
 	case providerGoogle:
+		parse = parseGoogle
 		endpoint = "https://generativelanguage.googleapis.com/v1beta/models/" + url.PathEscape(c.Model) + ":generateContent"
 		payload = map[string]any{
-			"contents":         []any{map[string]any{"role": "user", "parts": []any{map[string]any{"text": prompt}}}},
-			"generationConfig": map[string]any{"maxOutputTokens": tokens, "responseMimeType": "application/json", "responseJsonSchema": schema},
+			"systemInstruction": map[string]any{"parts": []any{map[string]any{"text": shared}}},
+			"contents":          []any{map[string]any{"role": "user", "parts": []any{map[string]any{"text": state}}}},
+			"generationConfig":  map[string]any{"maxOutputTokens": tokens, "responseMimeType": "application/json", "responseJsonSchema": schema},
 		}
 	case providerTypeSafe:
 		questions := make(map[string]any, len(columns))
@@ -95,24 +131,29 @@ func (c *Client) CompleteStructured(ctx context.Context, state, instructions str
 	if err != nil {
 		return nil, err
 	}
+	c.reportCacheUsage(response)
 	if c.Provider == providerTypeSafe {
 		return parseTypeSafeStructured(response, columns)
 	}
-	var data string
-	switch c.Provider {
-	case providerOpenCode, providerOpenAI:
-		data, err = parseOpenCode(response)
-	case providerOpenRouter:
-		data, err = parseOpenRouter(response)
-	case providerAnthropic:
-		data, err = parseAnthropic(response)
-	case providerGoogle:
-		data, err = parseGoogle(response)
-	}
+	data, err := parse(response)
 	if err != nil {
 		return nil, err
 	}
 	return validateStructuredResult(data, columns)
+}
+
+// Explicit breakpoints are supported starting with GPT-5.6. Unknown model
+// aliases keep the compatible message layout without unsupported cache fields.
+func supportsOpenAICacheBreakpoints(model string) bool {
+	version, ok := strings.CutPrefix(model, "gpt-")
+	if !ok {
+		return false
+	}
+	version, _, _ = strings.Cut(version, "-")
+	majorText, minorText, _ := strings.Cut(version, ".")
+	major, err := strconv.Atoi(majorText)
+	minor, _ := strconv.Atoi(minorText)
+	return err == nil && (major >= 6 || (major == 5 && minor >= 6))
 }
 
 func structuredSchema(columns []outputColumn) map[string]any {
@@ -187,8 +228,8 @@ func validateStructuredResult(data string, columns []outputColumn) (map[string]a
 				return nil, errors.New("inference provider returned a structured output field with the wrong type")
 			}
 			integer, err := number.Int64()
-			if err != nil || (column.Minimum != nil && new(big.Float).SetInt64(integer).Cmp(new(big.Float).SetFloat64(*column.Minimum)) < 0) ||
-				(column.Maximum != nil && new(big.Float).SetInt64(integer).Cmp(new(big.Float).SetFloat64(*column.Maximum)) > 0) {
+			if err != nil || (column.Minimum != nil && integer < int64(math.Ceil(*column.Minimum))) ||
+				(column.Maximum != nil && integer > int64(math.Floor(*column.Maximum))) {
 				return nil, errors.New("inference provider returned an invalid integer structured output field")
 			}
 			object[column.Name] = integer
@@ -198,7 +239,7 @@ func validateStructuredResult(data string, columns []outputColumn) (map[string]a
 				return nil, errors.New("inference provider returned a structured output field with the wrong type")
 			}
 			floating, err := number.Float64()
-			if err != nil || math.IsInf(floating, 0) || math.IsNaN(floating) || !withinBounds(floating, column) {
+			if err != nil || !withinBounds(floating, column) {
 				return nil, errors.New("inference provider returned an invalid numeric structured output field")
 			}
 			object[column.Name] = floating
@@ -311,7 +352,7 @@ func parseTypeSafeStructured(data []byte, columns []outputColumn) (map[string]an
 		if kind == kindScore {
 			maximum = float64(len(column.Levels) - 1)
 		}
-		if err != nil || math.IsNaN(value) || math.IsInf(value, 0) || value < 0 || value > maximum || !withinBounds(value, column) {
+		if err != nil || value < 0 || value > maximum || !withinBounds(value, column) {
 			return nil, errors.New("inference provider returned an out-of-range TypeSafe answer")
 		}
 		if column.Type == colTypeBoolean {

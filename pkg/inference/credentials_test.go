@@ -26,6 +26,15 @@ func (c inferenceConnections) GetConnection(name string) any {
 	return c.ConnectionAndDetailsGetter.GetConnection(name)
 }
 
+func (c inferenceConnections) GetConnectionType(name string) string {
+	if name == "warehouse" {
+		if typed, ok := c.warehouse.(interface{ GetConnectionType(name string) string }); ok {
+			return typed.GetConnectionType(name)
+		}
+	}
+	return c.ConnectionAndDetailsGetter.GetConnectionType(name)
+}
+
 func testProviderConnections(t *testing.T, warehouse config.ConnectionGetter, live bool) inferenceConnections {
 	t.Helper()
 	cfg := &config.Config{Environments: map[string]config.Environment{"default": {Connections: &config.Connections{}}}}

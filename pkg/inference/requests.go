@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"slices"
 	"sync/atomic"
 
+	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"golang.org/x/sync/errgroup"
 )
@@ -21,7 +23,7 @@ func (o *Operator) inferRows(ctx context.Context, cfg *assetConfig, groups []req
 		results[i] = make([]any, len(rows))
 		indices[column.Name] = i
 	}
-	var called, reused atomic.Int64
+	var called, reused, usageReported, cacheRead, cacheWrite atomic.Int64
 	workers, requestCtx := errgroup.WithContext(ctx)
 	workers.SetLimit(cfg.parallelism)
 	for i, row := range rows {
@@ -53,7 +55,8 @@ func (o *Operator) inferRows(ctx context.Context, cfg *assetConfig, groups []req
 						return err
 					}
 				}
-				identity := []any{"structured-v3", group.provider, group.model, group.connection, cfg.maxTokens, state, instructions, columns}
+				// Message roles and cache boundaries changed the effective prompt.
+				identity := []any{"structured-v4", group.provider, group.model, group.connection, cfg.maxTokens, state, instructions, columns}
 				key, err := fingerprint(identity)
 				if err != nil {
 					return err
@@ -61,6 +64,11 @@ func (o *Operator) inferRows(ctx context.Context, cfg *assetConfig, groups []req
 				var values map[string]any
 				result, err := cache.get(key, cfg.cache, func() (string, error) {
 					client := &Client{Provider: group.provider, Model: group.model, APIKey: group.apiKey, MaxOutputTokens: cfg.maxTokens}
+					client.OnCacheUsage = func(read, written int64) {
+						usageReported.Add(1)
+						cacheRead.Add(read)
+						cacheWrite.Add(written)
+					}
 					var err error
 					values, err = o.structured(requestCtx, client, state, instructions, columns)
 					if err != nil {
@@ -88,5 +96,9 @@ func (o *Operator) inferRows(ctx context.Context, cfg *assetConfig, groups []req
 		}
 	}
 	err := workers.Wait()
+	if out, ok := ctx.Value(executor.KeyPrinter).(io.Writer); ok && err == nil && called.Load() > 0 {
+		_, _ = fmt.Fprintf(out, "Provider prompt cache: %d tokens read, %d tokens written (usage reported by %d/%d model calls)\n",
+			cacheRead.Load(), cacheWrite.Load(), usageReported.Load(), called.Load())
+	}
 	return results, called.Load(), reused.Load(), err
 }

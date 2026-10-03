@@ -9,9 +9,11 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/bruin-data/bruin/pkg/config"
+	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/ingestruri"
@@ -101,7 +103,7 @@ func (o *Operator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
 	}
 
 	// input_query is rendered by Bruin's parameter mutator. Never render it twice.
-	record, err := readRecord(ctx, conn, inputQuery, cfg.maxRows, asset.Columns)
+	record, err := readRecord(ctx, conn, o.conn.GetConnectionType(asset.Connection), inputQuery, cfg.maxRows, asset.Columns)
 	if err != nil {
 		return fmt.Errorf("inference input query failed: %w", err)
 	}
@@ -133,18 +135,22 @@ func (o *Operator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
 func inputRows(input arrow.RecordBatch, primaryKeys []string, outputs []outputColumn) ([]map[string]any, error) {
 	fields := input.Schema().Fields()
 	columns := make(map[string]bool, len(fields))
-	generated := make(map[string]bool, len(outputs))
 	for _, column := range outputs {
-		generated[column.Name] = true
+		name := strings.ToLower(column.Name)
+		if columns[name] {
+			return nil, errors.New("inference generated columns must have distinct case-insensitive names")
+		}
+		columns[name] = true
 	}
 	for _, field := range fields {
-		if columns[field.Name] || generated[field.Name] {
+		name := strings.ToLower(field.Name)
+		if columns[name] {
 			return nil, errors.New("inference input has duplicate columns or already contains a generated column")
 		}
-		columns[field.Name] = true
+		columns[name] = true
 	}
 	for _, key := range primaryKeys {
-		if !columns[key] {
+		if len(input.Schema().FieldIndices(key)) == 0 {
 			return nil, fmt.Errorf("inference primary key %s is missing from input", key)
 		}
 	}
@@ -223,9 +229,22 @@ func (o *Operator) publish(ctx context.Context, asset *pipeline.Asset, repo *git
 	args, err := python.ConsolidatedParameters(ctx, &writeAsset, []string{
 		"ingest", "--source-uri", "mmap://" + file.Name(), "--source-table", "inference",
 		"--dest-uri", destURI, "--dest-table", asset.Name, "--yes", "--progress", "log",
+		"--schema-naming", "direct",
 	}, nil)
 	if err != nil {
 		return err
+	}
+	if o.conn.GetConnectionType(asset.Connection) == "duckdb" {
+		conn := o.conn.GetConnection(asset.Connection).(interface{ GetDBConnectionURI() (string, error) })
+		uri, err := conn.GetDBConnectionURI()
+		if err != nil {
+			return err
+		}
+		duck.LockDatabase(uri)
+		defer duck.UnlockDatabase(uri)
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 	}
 	return o.runner.RunIngestr(ctx, args, python.AddExtraPackages(destURI, "mmap://"+file.Name(), nil), repo)
 }

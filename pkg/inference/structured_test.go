@@ -13,6 +13,112 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestPromptCacheBoundaries(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct{ provider, model, marker string }{
+		{"openai", "gpt-6-luna", "prompt_cache_breakpoint"},
+		{"openai", "gpt-5.6-2026-01-01", "prompt_cache_breakpoint"},
+		{"openai", "gpt-5.5", ""},
+		{"openai", "custom-model", ""},
+		{"opencode", "muse-spark-1.3", ""},
+		{"anthropic", "claude-haiku-4-5", "cache_control"},
+		{"google", "gemini-3.8-flash", ""},
+		{"openrouter", "anthropic/claude-haiku-4.5", "cache_control"},
+		{"openrouter", "google/gemini-3.8-flash", "cache_control"},
+		{"openrouter", "qwen/qwen3", "cache_control"},
+		{"openrouter", "openai/gpt-6-luna", "prompt_cache_breakpoint"},
+		{"openrouter", "openai/gpt-4.1", ""},
+	} {
+		t.Run(tc.provider+"/"+tc.model, func(t *testing.T) {
+			t.Parallel()
+			var bodies []map[string]any
+			c := Client{Provider: tc.provider, Model: tc.model, HTTPClient: &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+				var body map[string]any
+				require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
+				bodies = append(bodies, body)
+				// These assertions exercise outbound requests, not response parsing.
+				return response(http.StatusUnauthorized, ""), nil
+			})}}
+			columns := []outputColumn{{Name: "category", Type: "string", Prompt: "Classify the row."}}
+			for _, row := range []string{"row one", "row two"} {
+				_, err := c.CompleteStructured(t.Context(), row, "Shared rubric", columns)
+				require.ErrorContains(t, err, "401")
+				body := bodies[len(bodies)-1]
+				var block map[string]any
+				switch tc.provider {
+				case "openai", "opencode", "openrouter":
+					field, role := "input", "developer"
+					if tc.provider == "openrouter" {
+						field, role = "messages", "system"
+					}
+					messages := body[field].([]any)
+					require.Len(t, messages, 2)
+					prefix := messages[0].(map[string]any)
+					require.Equal(t, role, prefix["role"])
+					block = prefix["content"].([]any)[0].(map[string]any)
+					require.Equal(t, map[string]any{"role": "user", "content": row}, messages[1])
+					body[field] = messages[:1]
+				case "anthropic":
+					block = body["system"].([]any)[0].(map[string]any)
+					require.Equal(t, []any{map[string]any{"role": "user", "content": row}}, body["messages"])
+					delete(body, "messages")
+				case "google":
+					block = body["systemInstruction"].(map[string]any)["parts"].([]any)[0].(map[string]any)
+					require.Equal(t, []any{map[string]any{"role": "user", "parts": []any{map[string]any{"text": row}}}}, body["contents"])
+					delete(body, "contents")
+				}
+				require.Equal(t, "Shared rubric", block["text"])
+				if tc.marker == "prompt_cache_breakpoint" {
+					require.Equal(t, map[string]any{"mode": "explicit"}, body["prompt_cache_options"])
+					require.Equal(t, map[string]any{"mode": "explicit"}, block[tc.marker])
+				} else {
+					require.NotContains(t, body, "prompt_cache_options")
+					require.NotContains(t, block, "prompt_cache_breakpoint")
+				}
+				if tc.marker == "cache_control" {
+					require.Equal(t, map[string]any{"type": "ephemeral"}, block[tc.marker])
+				} else {
+					require.NotContains(t, block, "cache_control")
+				}
+			}
+			require.Equal(t, bodies[0], bodies[1], "changing row data must not change the shared prefix, schema or routing key")
+			if tc.provider == "openrouter" {
+				require.Len(t, bodies[0]["session_id"], 64)
+				columns[0].Prompt = "A different rubric"
+				_, err := c.CompleteStructured(t.Context(), "row one", "Shared rubric", columns)
+				require.Error(t, err)
+				require.NotEqual(t, bodies[0]["session_id"], bodies[2]["session_id"])
+			}
+		})
+	}
+}
+
+func TestIntegerBoundsRemainExact(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		value            string
+		minimum, maximum float64
+		valid            bool
+	}{
+		{"2", 1.5, 2.5, true},
+		{"1", 1.5, 2.5, false},
+		{"3", 1.5, 2.5, false},
+		{"-2", -2.5, -1.5, true},
+		{"-3", -2.5, -1.5, false},
+		{"-1", -2.5, -1.5, false},
+		{"9007199254740992", 0, 9007199254740992, true},
+		{"9007199254740993", 0, 9007199254740992, false},
+	} {
+		got, err := validateStructuredResult(`{"value":`+tc.value+`}`, []outputColumn{{Name: "value", Type: "integer", Minimum: &tc.minimum, Maximum: &tc.maximum}})
+		if tc.valid {
+			require.NoError(t, err)
+			require.Equal(t, tc.value, fmt.Sprint(got["value"]))
+		} else {
+			require.Error(t, err, tc.value)
+		}
+	}
+}
+
 func TestTypeSafeNoulAndScore(t *testing.T) {
 	t.Parallel()
 	threshold := 0.8
@@ -71,7 +177,7 @@ func TestCompleteStructuredWireContracts(t *testing.T) {
 	}{
 		{"opencode", "https://opencode.ai/zen/v1/responses", responseText(`{"category":"a"}`), func(t *testing.T, body map[string]any) {
 			format := body["text"].(map[string]any)["format"].(map[string]any)
-			if format["type"] != "json_schema" || format["strict"] != true || body["input"] != "shared\n\nprivate state" {
+			if format["type"] != "json_schema" || format["strict"] != true {
 				t.Fatalf("unexpected Responses request: %#v", body)
 			}
 		}},

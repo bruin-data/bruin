@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"cloud.google.com/go/civil"
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
 	"github.com/apache/arrow-go/v18/arrow/decimal128"
@@ -26,7 +27,7 @@ var decimalType = regexp.MustCompile(`^(?:decimal|numeric|number)\((\d+),\s*(\d+
 var oracleNumberPrecision = regexp.MustCompile(`^number\((\d+)\)$`)
 
 //nolint:ireturn
-func readRecord(ctx context.Context, conn any, sql string, maxRows int, columns []pipeline.Column) (arrow.RecordBatch, error) {
+func readRecord(ctx context.Context, conn any, platform, sql string, maxRows int, columns []pipeline.Column) (arrow.RecordBatch, error) {
 	q := &query.Query{Query: sql}
 	if reader, ok := conn.(interface {
 		SelectArrow(ctx context.Context, query *query.Query, maxRows int) (arrow.RecordBatch, error)
@@ -46,14 +47,14 @@ func readRecord(ctx context.Context, conn any, sql string, maxRows int, columns 
 	if input != nil && len(input.Rows) > maxRows {
 		return nil, fmt.Errorf("inference input exceeds max_rows (%d)", maxRows)
 	}
-	return recordFromQuery(input, columns)
+	return recordFromQuery(input, columns, platform)
 }
 
 // recordFromQuery is the fallback for connections without native Arrow reads.
 // Unknown or lossy conversions fail rather than silently becoming strings.
 //
 //nolint:ireturn
-func recordFromQuery(input *query.QueryResult, columns []pipeline.Column) (arrow.RecordBatch, error) {
+func recordFromQuery(input *query.QueryResult, columns []pipeline.Column, platform string) (arrow.RecordBatch, error) {
 	if input == nil {
 		return nil, errors.New("inference input query returned no result")
 	}
@@ -63,9 +64,11 @@ func recordFromQuery(input *query.QueryResult, columns []pipeline.Column) (arrow
 		if i < len(input.ColumnTypes) {
 			typeName = input.ColumnTypes[i]
 		}
+		typePlatform := platform
 		// Explicit column declarations can supply precision/scale absent from drivers.
 		for _, column := range columns {
 			if column.Name == name && column.Type != "" {
+				typePlatform = ""
 				typeName = column.Type
 				if strings.EqualFold(typeName, "decimal") || strings.EqualFold(typeName, "numeric") {
 					if column.Precision != nil && column.Scale != nil {
@@ -74,7 +77,7 @@ func recordFromQuery(input *query.QueryResult, columns []pipeline.Column) (arrow
 				}
 			}
 		}
-		dt, err := queryArrowType(typeName)
+		dt, err := driverArrowType(typePlatform, typeName)
 		if err != nil {
 			return nil, fmt.Errorf("inference input column %q: %w", name, err)
 		}
@@ -94,6 +97,25 @@ func recordFromQuery(input *query.QueryResult, columns []pipeline.Column) (arrow
 		}
 	}
 	return builder.NewRecordBatch(), nil
+}
+
+// Driver aliases need not mean the same thing as explicit SQL declarations.
+//
+//nolint:ireturn
+func driverArrowType(platform, name string) (arrow.DataType, error) {
+	if platform == "google_cloud_platform" {
+		switch strings.ToUpper(strings.TrimSpace(name)) {
+		case "INTEGER":
+			return arrow.PrimitiveTypes.Int64, nil
+		case "FLOAT":
+			return arrow.PrimitiveTypes.Float64, nil
+		case "TIMESTAMP":
+			return &arrow.TimestampType{Unit: arrow.Microsecond, TimeZone: "UTC"}, nil
+		case "DATETIME":
+			return &arrow.TimestampType{Unit: arrow.Microsecond}, nil
+		}
+	}
+	return queryArrowType(name)
 }
 
 //nolint:ireturn
@@ -152,8 +174,7 @@ func queryArrowType(name string) (arrow.DataType, error) {
 		return arrow.PrimitiveTypes.Float32, nil
 	case "double", "double precision", "float8", "float64":
 		return arrow.PrimitiveTypes.Float64, nil
-	case "string", "text", "varchar", "char", "character varying", "nvarchar", "utf8",
-		"varchar2", "nvarchar2", "nchar", "clob", "nclob":
+	case "string", "text", "varchar", "char", "character varying", "nvarchar", "utf8":
 		return arrow.BinaryTypes.String, nil
 	case "binary", "varbinary", "blob", "bytea", "bytes":
 		return arrow.BinaryTypes.Binary, nil
@@ -174,7 +195,16 @@ func appendArrowValue(builder array.Builder, value any) error {
 		builder.AppendNull()
 		return nil
 	}
+	if dt, ok := value.(civil.DateTime); ok {
+		// Format wall-clock datetimes through the timestamp path below, which
+		// omits trailing fractional zeros unsupported by microsecond parsing.
+		value = dt.In(time.UTC)
+	}
 	switch b := builder.(type) {
+	case *array.Float32Builder:
+		if v, ok := value.(float64); ok && float64(float32(v)) != v {
+			return errors.New("float32 conversion would round value")
+		}
 	case *array.StringBuilder:
 		switch v := value.(type) {
 		case string:

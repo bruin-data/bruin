@@ -5,9 +5,11 @@ import (
 	"testing"
 	"time"
 
+	"cloud.google.com/go/civil"
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
 	"github.com/apache/arrow-go/v18/arrow/ipc"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/stretchr/testify/require"
 )
@@ -47,7 +49,7 @@ func TestRecordFromQueryWriteArrowRoundTripPreservesValues(t *testing.T) {
 			[]byte{0x00, 0xff, 0x01},
 			nil, "(null)",
 		}},
-	}, nil)
+	}, nil, "")
 	require.NoError(t, err)
 	defer input.Release()
 
@@ -68,7 +70,7 @@ func TestRecordFromQueryWriteArrowRoundTripPreservesSchemaWithZeroRows(t *testin
 	input, err := recordFromQuery(&query.QueryResult{
 		Columns:     []string{"id", "amount"},
 		ColumnTypes: []string{"bigint", "decimal(38,18)"},
-	}, nil)
+	}, nil, "")
 	require.NoError(t, err)
 	defer input.Release()
 
@@ -90,13 +92,14 @@ func TestRecordFromQueryRejectsLossyValuesAndUnknownTypes(t *testing.T) {
 		{name: "unknown type", columnType: "mystery", value: "value"},
 		{name: "floating point decimal", columnType: "decimal(38,18)", value: 1.25},
 		{name: "decimal fractional scale", columnType: "decimal(5,2)", value: "1.234"},
+		{name: "float narrowing", columnType: "float32", value: float64(16777217)},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			_, err := recordFromQuery(&query.QueryResult{
 				Columns: []string{"value"}, ColumnTypes: []string{tt.columnType}, Rows: [][]interface{}{{tt.value}},
-			}, nil)
+			}, nil, "")
 			require.Error(t, err)
 		})
 	}
@@ -117,9 +120,44 @@ func TestQueryArrowTypeMapsOracleNativeTypes(t *testing.T) {
 		Columns:     []string{"name", "age"},
 		ColumnTypes: []string{"VARCHAR2", "NUMBER"},
 		Rows:        [][]any{{"jane", int64(30)}},
-	}, nil)
+	}, nil, "")
 	require.NoError(t, err)
 	defer input.Release()
 	require.Equal(t, arrow.BinaryTypes.String, input.Schema().Field(0).Type)
 	require.Equal(t, arrow.PrimitiveTypes.Int64, input.Schema().Field(1).Type)
+}
+
+func TestBigQueryDriverTypes(t *testing.T) {
+	t.Parallel()
+	stamp := time.Date(2500, 2, 3, 4, 5, 6, 123456000, time.UTC)
+	result := &query.QueryResult{
+		Columns:     []string{"id", "score", "at", "local"},
+		ColumnTypes: []string{"INTEGER", "FLOAT", "TIMESTAMP", "DATETIME"},
+		Rows: [][]any{
+			{int64(3000000000), float64(16777217), stamp, civil.DateTimeOf(stamp)},
+			{int64(9007199254740993), nil, nil, nil},
+		},
+	}
+	input, err := recordFromQuery(result, nil, "google_cloud_platform")
+	require.NoError(t, err)
+	defer input.Release()
+	record := roundTripArrow(t, input, []string{"a", "b"})
+	require.Equal(t, int64(3000000000), record.Column(0).(*array.Int64).Value(0))
+	require.Equal(t, int64(9007199254740993), record.Column(0).(*array.Int64).Value(1))
+	require.Equal(t, float64(16777217), record.Column(1).(*array.Float64).Value(0)) //nolint:testifylint // Exact preservation, not approximate numerical equality.
+	require.Equal(t, arrow.Timestamp(stamp.UnixMicro()), record.Column(2).(*array.Timestamp).Value(0))
+	require.Equal(t, &arrow.TimestampType{Unit: arrow.Microsecond, TimeZone: "UTC"}, record.Schema().Field(2).Type)
+	require.Equal(t, &arrow.TimestampType{Unit: arrow.Microsecond}, record.Schema().Field(3).Type)
+	require.Equal(t, arrow.Timestamp(stamp.UnixMicro()), record.Column(3).(*array.Timestamp).Value(0))
+	require.True(t, record.Column(2).IsNull(1))
+	result.Rows = nil
+	empty, err := recordFromQuery(result, nil, "google_cloud_platform")
+	require.NoError(t, err)
+	defer empty.Release()
+	require.True(t, input.Schema().Equal(empty.Schema()))
+	explicit, err := recordFromQuery(result, []pipeline.Column{{Name: "id", Type: "integer"}, {Name: "score", Type: "float32"}}, "google_cloud_platform")
+	require.NoError(t, err)
+	defer explicit.Release()
+	require.Equal(t, arrow.PrimitiveTypes.Int32, explicit.Schema().Field(0).Type)
+	require.Equal(t, arrow.PrimitiveTypes.Float32, explicit.Schema().Field(1).Type)
 }

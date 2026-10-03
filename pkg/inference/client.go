@@ -28,11 +28,52 @@ type Client struct {
 	APIKey          string
 	MaxOutputTokens int
 	HTTPClient      *http.Client
+	OnCacheUsage    func(readTokens, writtenTokens int64)
 }
 
 type chatMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
+}
+
+// Missing usage is not a zero-token cache miss: some providers omit it.
+// Usage is diagnostic only; malformed accounting must not discard a result.
+func (c *Client) reportCacheUsage(data []byte) {
+	if c.OnCacheUsage == nil {
+		return
+	}
+	type details struct {
+		Read  *int64 `json:"cached_tokens"`
+		Write int64  `json:"cache_write_tokens"`
+	}
+	var response struct {
+		Usage struct {
+			Input  details `json:"input_tokens_details"`
+			Prompt details `json:"prompt_tokens_details"`
+			Read   *int64  `json:"cache_read_input_tokens"`
+			Write  int64   `json:"cache_creation_input_tokens"`
+		} `json:"usage"`
+		Metadata struct {
+			Read *int64 `json:"cachedContentTokenCount"`
+		} `json:"usageMetadata"`
+	}
+	if json.Unmarshal(data, &response) != nil {
+		return
+	}
+	var usage details
+	switch c.Provider {
+	case providerOpenAI, providerOpenCode:
+		usage = response.Usage.Input
+	case providerOpenRouter:
+		usage = response.Usage.Prompt
+	case providerAnthropic:
+		usage = details{Read: response.Usage.Read, Write: response.Usage.Write}
+	case providerGoogle:
+		usage.Read = response.Metadata.Read
+	}
+	if usage.Read != nil {
+		c.OnCacheUsage(*usage.Read, usage.Write)
+	}
 }
 
 func (c *Client) do(ctx context.Context, endpoint string, body []byte) ([]byte, error) {
@@ -71,15 +112,16 @@ func (c *Client) do(ctx context.Context, endpoint string, body []byte) ([]byte, 
 			return nil, errors.New("inference request failed")
 		}
 
-		responseBody, readErr := readBounded(resp.Body)
+		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			responseBody, readErr := readBounded(resp.Body)
+			resp.Body.Close()
+			cancel()
+			return responseBody, readErr
+		}
+		// Error bodies are neither parsed nor surfaced; a truncated body must
+		// not prevent retrying an already-known rate limit or server error.
 		resp.Body.Close()
 		cancel()
-		if readErr != nil {
-			return nil, readErr
-		}
-		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-			return responseBody, nil
-		}
 		if (resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500) && attempt+1 < maxAttempts {
 			if err := waitForRetry(ctx, retryDelay(resp.Header, attempt, time.Now())); err != nil {
 				return nil, err

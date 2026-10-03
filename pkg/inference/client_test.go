@@ -28,6 +28,57 @@ func response(status int, body string, headers ...http.Header) *http.Response {
 
 var testStructuredColumns = []outputColumn{{Name: "category", Type: "string", Choices: map[string]string{"ok": "Valid"}}}
 
+func TestProviderCacheUsage(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		provider, body string
+		read, write    int64
+		reported       bool
+	}{
+		{"openai", `{"usage":{"input_tokens_details":{"cached_tokens":1200,"cache_write_tokens":300}}}`, 1200, 300, true},
+		{"opencode", `{"usage":{"input_tokens_details":{"cached_tokens":256}}}`, 256, 0, true},
+		{"openrouter", `{"usage":{"prompt_tokens_details":{"cached_tokens":1024,"cache_write_tokens":80}}}`, 1024, 80, true},
+		{"anthropic", `{"usage":{"cache_read_input_tokens":0,"cache_creation_input_tokens":2048}}`, 0, 2048, true},
+		{"google", `{"usageMetadata":{"cachedContentTokenCount":4096}}`, 4096, 0, true},
+		{"openai", `{"usage":{"input_tokens_details":{"cached_tokens":0}}}`, 0, 0, true},
+		{"openai", `{"usage":{"input_tokens":700}}`, 0, 0, false},
+		{"typesafe", `{"usage":{"input_tokens":900}}`, 0, 0, false},
+		{"openai", `{"usage":{"input_tokens_details":{"cached_tokens":"invalid"}}}`, 0, 0, false},
+	} {
+		called := false
+		c := Client{Provider: tc.provider, OnCacheUsage: func(read, write int64) {
+			called = true
+			require.Equal(t, tc.read, read)
+			require.Equal(t, tc.write, write)
+		}}
+		c.reportCacheUsage([]byte(tc.body))
+		require.Equal(t, tc.reported, called, tc.body)
+	}
+}
+
+type brokenBody struct{ closed bool }
+
+func (*brokenBody) Read([]byte) (int, error) { return 0, io.ErrUnexpectedEOF }
+func (b *brokenBody) Close() error           { b.closed = true; return nil }
+
+func TestRetryDoesNotRequireErrorBody(t *testing.T) {
+	t.Parallel()
+	body := &brokenBody{}
+	calls := 0
+	c := Client{HTTPClient: &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		calls++
+		if calls == 1 {
+			return &http.Response{StatusCode: http.StatusServiceUnavailable, Header: http.Header{"Retry-After": {"0"}}, Body: body}, nil
+		}
+		return response(200, "success"), nil
+	})}}
+	got, err := c.do(t.Context(), "https://example.test", nil)
+	require.NoError(t, err)
+	require.Equal(t, "success", string(got))
+	require.Equal(t, 2, calls)
+	require.True(t, body.closed)
+}
+
 func TestCompleteStructuredRetriesRetryableStatuses(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {

@@ -166,7 +166,7 @@ Specify exactly one input:
 - `input_asset` names an asset in the same pipeline. Bruin adds its dependency and reads `SELECT * FROM <quoted asset name>`. The source must resolve to the same connection; missing, self-referencing, and cross-connection inputs are rejected.
 - `input_query` supports normal Bruin run-time templating and is useful for projections and filters. Declare `depends` explicitly because Bruin does not infer lineage from query text.
 
-All input columns pass through to the destination. Input names must be unique and cannot collide with generated names. Primary keys must be present, non-null, and unique within the input.
+All input columns pass through to the destination without snake-case normalization: `riskScore` and `risk_score` remain distinct. Input and generated column names must be unique when compared case-insensitively. Primary keys must be present, non-null, and unique within the input.
 
 | Optional parameter | Default | Behavior |
 | --- | --- | --- |
@@ -185,11 +185,34 @@ All input columns pass through to the destination. Input names must be unique an
 
 Results reach ingestr through Arrow IPC. DuckDB inputs use native Arrow reads. Other SQL connections use typed conversion; unknown types and decimal conversions that would round fail. Declare decimal precision/scale when a driver omits it. Destination type support remains subject to ingestr (for example, its DuckDB writer rejects nanosecond timestamps that would lose precision).
 
+BigQuery metadata preserves 64-bit integers and floats, UTC timestamps, and timezone-naive datetimes at microsecond precision. Explicit input column types override driver metadata. DuckDB publishing shares the database write lock with Bruin SQL execution and other inference assets in the same process.
+
 Inference uses a two-layer cache: a run-local, 1,024-entry in-memory LRU, followed by persistent files under `~/.bruin/inference/`. Concurrent identical requests share one in-flight model call. Evicted memory entries remain available on disk. Successful responses are saved before destination loading, so retries after a failed load can reuse them.
 
 Both layers fingerprint the rendered request, not the row's primary key: provider, model, credential connection name, token limit, context, instructions, column prompts, choices, and schema constraints. Rows with different primary keys but identical requests share the same generated values. A primary key affects the cache only if included in a rendered prompt or context. Changing any grouped field, choice, or named account invalidates that group's entry; changing an unrelated input column does not. Cache files remain scoped to the local repository, pipeline, asset, and destination.
 
 The cache stores generated values in owner-only files, not prompts or API keys, but those values may still be sensitive and are not encrypted. Disk entries have no automatic expiration. Previous entries in the OS cache directory are not migrated or reused. Use `cache: false` for fresh independent generations: no cache directories or locks are created, no entries are read or written, and duplicate requests run independently. Re-enabling caching can reuse entries from earlier cache-enabled runs.
+
+### Provider prompt caching
+
+Provider prompt caching reuses computation for a shared input prefix, not generated answers. It is independent of Bruin's result cache: `cache: false` still allows provider prompt caching and makes a new model call for every row/group.
+
+Bruin sends `instructions` separately from the row's `context`, before the row data:
+
+- **OpenAI:** GPT-5.6 and newer GPT model names use explicit-only caching with a breakpoint after the developer instructions, leaving the changing row uncached. Older or unrecognized model names use the same separated messages without explicit cache fields.
+- **Anthropic:** a system-content `cache_control` breakpoint caches the instructions with the default ephemeral TTL.
+- **Google:** `systemInstruction` holds the instructions; supported Gemini models can reuse them through implicit caching. Bruin does not create separately billed cache-storage resources.
+- **OpenRouter:** a stable hash of the model, instructions, and schema supplies `session_id` for provider affinity across rows. Anthropic, Google, and Qwen model IDs receive `cache_control`; supported OpenAI model IDs receive explicit OpenAI breakpoints.
+- **OpenCode Zen:** separated developer/user messages, without undocumented cache controls. Reuse depends on the serving backend.
+- **TypeSafe:** the existing questions/state API is unchanged; Bruin does not assume Jev exposes prompt caching.
+
+Keep shared rules in `instructions` and column prompts, and put changing row values in `context`. Jinja in instructions or column prompts still works, but changing those values changes the prefix or structured-output schema and can prevent reuse. Column order, choices, schema, model, provider routing, expiry, and the model's minimum cacheable length also affect hits. Concurrent cold requests may all miss; Bruin neither serializes them for warm-up nor pads prompts to meet a cache threshold. Cache writes may carry a higher input-token rate than ordinary requests.
+
+Runs report provider-returned cache-read and cache-write token counts, plus how many model calls supplied cache usage. Missing usage is not interpreted as a confirmed cache miss, and unreported writes are not estimated. Calls avoided by Bruin's result cache are counted only as `cached results`, not provider cache hits. The separated-message format uses a new result-cache identity so earlier prompt results are not silently reused.
+
+See the [OpenAI](https://developers.openai.com/api/docs/guides/prompt-caching), [Anthropic](https://platform.claude.com/docs/en/build-with-claude/prompt-caching), [Gemini](https://ai.google.dev/gemini-api/docs/generate-content/caching), and [OpenRouter](https://openrouter.ai/docs/guides/best-practices/prompt-caching) documentation for model-specific thresholds and pricing.
+
+### Failures
 
 HTTP 429 and 5xx responses are retried up to ten total attempts, including the initial call. Bruin honors `Retry-After` (seconds or HTTP date) without truncation, then `Retry-After-Ms`, then OpenAI/Anthropic reset headers for exhausted quotas. Without a usable hint, retries use exponential backoff with jitter, capped at 60 seconds. Each HTTP attempt has a 120-second timeout; retry waits remain subject to the caller's cancellation or deadline, rather than that per-attempt timeout. Authentication, unsupported-API, and invalid structured-output errors fail without a text fallback. On failure, outstanding requests are canceled and destination loading does not start, though providers may have received and billed requests already. A failed load can reuse saved responses on retry.
 

@@ -8,10 +8,13 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
+	"time"
 
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/executor"
+	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -21,7 +24,87 @@ import (
 
 type warehouseGetter struct{ client *duck.Client }
 
-func (g warehouseGetter) GetConnection(string) any { return g.client }
+func (g warehouseGetter) GetConnection(string) any        { return g.client }
+func (g warehouseGetter) GetConnectionType(string) string { return "duckdb" }
+
+type ingestrRunnerFunc func(context.Context, []string, []string, *git.Repo) error
+
+func (f ingestrRunnerFunc) RunIngestr(ctx context.Context, args, packages []string, repo *git.Repo) error {
+	return f(ctx, args, packages, repo)
+}
+
+func TestDuckDBPublishSerializesAndPreservesBigQueryValues(t *testing.T) {
+	t.Parallel()
+	if os.Getenv("BRUIN_INFERENCE_INTEGRATION_TEST") != "1" {
+		t.Skip("set BRUIN_INFERENCE_INTEGRATION_TEST=1 for the DuckDB/ingestr integration test")
+	}
+	ctx := context.WithValue(t.Context(), executor.ContextLogger, zap.NewNop().Sugar())
+	root := t.TempDir()
+	client, err := duck.NewClient(duck.Config{Path: filepath.Join(root, "shared.duckdb")})
+	require.NoError(t, err)
+	t.Cleanup(client.Close)
+	uri, err := client.GetIngestrURI()
+	require.NoError(t, err)
+	stamp := time.Date(2500, 2, 3, 4, 5, 6, 123456000, time.UTC)
+	record, err := recordFromQuery(&query.QueryResult{
+		Columns: []string{"id", "score", "at"}, ColumnTypes: []string{"INTEGER", "FLOAT", "TIMESTAMP"},
+		Rows: [][]any{{int64(9007199254740993), float64(16777217), stamp}},
+	}, nil, "google_cloud_platform")
+	require.NoError(t, err)
+	defer record.Release()
+	op := NewOperator(testProviderConnections(t, warehouseGetter{client}, false))
+	realRunner := op.runner
+	entered := make(chan struct{}, 2)
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	unblock := func() { releaseOnce.Do(func() { close(release) }) }
+	defer unblock()
+	op.runner = ingestrRunnerFunc(func(ctx context.Context, args, packages []string, repo *git.Repo) error {
+		entered <- struct{}{}
+		<-release
+		return realRunner.RunIngestr(ctx, args, packages, repo)
+	})
+	done := make(chan error, 3)
+	publish := func(name string) {
+		asset := testAsset()
+		asset.Name = name
+		done <- op.publish(ctx, asset, &git.Repo{Path: root}, uri, record, []outputColumn{{Name: "category", Type: "string"}}, [][]any{{"billing"}})
+	}
+	go publish("first_result")
+	select {
+	case <-entered:
+	case err := <-done:
+		t.Fatalf("publish stopped before entering runner: %v", err)
+	case <-time.After(10 * time.Second):
+		t.Fatal("publish did not reach runner")
+	}
+	go publish("second_result")
+	go func() {
+		done <- client.RunQueryWithoutResult(ctx, &query.Query{Query: "CREATE TABLE sql_write AS SELECT 42 AS value"})
+	}()
+	select {
+	case <-entered:
+		t.Fatal("second publisher entered while the first held the database lock")
+	case err := <-done:
+		t.Fatalf("SQL write bypassed the publisher's database lock: %v", err)
+	case <-time.After(100 * time.Millisecond):
+	}
+	unblock()
+	for range 3 {
+		require.NoError(t, <-done)
+	}
+	for _, table := range []string{"first_result", "second_result"} {
+		require.NoError(t, client.RunQueryWithoutResult(ctx, &query.Query{Query: `SELECT CASE WHEN
+            (SELECT count(*) = 1 AND bool_and(id = 9007199254740993 AND score = 16777217
+            AND "at" = TIMESTAMPTZ '2500-02-03 04:05:06.123456+00' AND category = 'billing') FROM ` + table + `)
+            THEN true ELSE error('BigQuery values changed during publish') END`}))
+	}
+	require.NoError(t, client.RunQueryWithoutResult(ctx, &query.Query{Query: `SELECT CASE WHEN
+        (SELECT count(*) = 6 FROM information_schema.columns WHERE table_name IN ('first_result', 'second_result')
+        AND ((column_name = 'id' AND data_type = 'BIGINT') OR (column_name = 'score' AND data_type = 'DOUBLE')
+        OR (column_name = 'at' AND data_type = 'TIMESTAMP WITH TIME ZONE')))
+        AND (SELECT value = 42 FROM sql_write) THEN true ELSE error('published types changed') END`}))
+}
 
 // The API transport is the only mocked layer: YAML parsing, provider request /
 // response conversion, Arrow, ingestr, and DuckDB all execute normally.
@@ -293,9 +376,9 @@ func TestGroupedDuckDBMaterialization(t *testing.T) {
 
 	exec("CREATE SCHEMA raw")
 	exec(`CREATE TABLE raw.grouped_tickets AS
-        SELECT 1::BIGINT AS id, 'charged twice after upgrading'::VARCHAR AS body, 'enterprise'::VARCHAR AS customer_tier
+        SELECT 1::BIGINT AS id, 'charged twice after upgrading'::VARCHAR AS body, 'enterprise'::VARCHAR AS customer_tier, 17::BIGINT AS riskScore
         UNION ALL
-        SELECT 2::BIGINT, 'settings page crashes on open'::VARCHAR, NULL::VARCHAR`)
+        SELECT 2::BIGINT, 'settings page crashes on open'::VARCHAR, NULL::VARCHAR, 29::BIGINT`)
 	asset := &pipeline.Asset{
 		Name: "analytics.grouped_classified", Type: pipeline.AssetTypeInference, Connection: "warehouse",
 		Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeTable, Strategy: pipeline.MaterializationStrategyMerge},
@@ -312,7 +395,7 @@ func TestGroupedDuckDBMaterialization(t *testing.T) {
 			{Name: "urgent", Type: "boolean", Inference: &pipeline.ColumnInference{Prompt: "Whether this needs an urgent response"}},
 			{Name: "summary", Type: "string", Inference: &pipeline.ColumnInference{Prompt: "Summarize the ticket briefly"}},
 			{Name: "rank", Type: "integer", Inference: &pipeline.ColumnInference{Prompt: "Rank severity as an integer"}},
-			{Name: "score", Type: "number", Inference: &pipeline.ColumnInference{Prompt: "Give a confidence score"}},
+			{Name: "risk_score", Type: "number", Inference: &pipeline.ColumnInference{Prompt: "Give a confidence score"}},
 		},
 		Parameters: pipeline.ParameterMap{
 			"provider": "opencode", "model": "muse-spark-1.3", "input_asset": "raw.grouped_tickets",
@@ -346,9 +429,9 @@ func TestGroupedDuckDBMaterialization(t *testing.T) {
 		require.Equal(t, "muse-spark-1.3", c.Model)
 		require.Len(t, columns, 4)
 		if state == "charged twice after upgrading" {
-			return map[string]any{"urgent": true, "summary": "duplicate charge", "rank": int64(1), "score": 0.95}, nil
+			return map[string]any{"urgent": true, "summary": "duplicate charge", "rank": int64(1), "risk_score": 0.95}, nil
 		}
-		return map[string]any{"urgent": false, "summary": "settings crash", "rank": int64(2), "score": 0.75}, nil
+		return map[string]any{"urgent": false, "summary": "settings crash", "rank": int64(2), "risk_score": 0.75}, nil
 	}
 
 	require.NoError(t, op.Run(ctx, ti))
@@ -356,9 +439,9 @@ func TestGroupedDuckDBMaterialization(t *testing.T) {
 	require.Equal(t, 2, openCodeCalls)
 	assertSQL(`(SELECT count(*) = 2
         AND count(*) FILTER (WHERE id = 1 AND body = 'charged twice after upgrading' AND customer_tier = 'enterprise'
-            AND category = 'billing' AND priority = 'urgent' AND urgent AND summary = 'duplicate charge' AND rank = 1 AND score = 0.95) = 1
+            AND category = 'billing' AND priority = 'urgent' AND urgent AND summary = 'duplicate charge' AND rank = 1 AND riskScore = 17 AND risk_score = 0.95) = 1
         AND count(*) FILTER (WHERE id = 2 AND body = 'settings page crashes on open' AND customer_tier IS NULL
-            AND category = 'technical' AND priority = 'normal' AND NOT urgent AND summary = 'settings crash' AND rank = 2 AND score = 0.75) = 1
+            AND category = 'technical' AND priority = 'normal' AND NOT urgent AND summary = 'settings crash' AND rank = 2 AND riskScore = 29 AND risk_score = 0.75) = 1
         FROM analytics.grouped_classified)`)
 
 	// Merge one changed source row and ensure the omitted destination row remains.
@@ -380,5 +463,5 @@ func TestGroupedDuckDBMaterialization(t *testing.T) {
         WHERE table_schema = 'analytics' AND table_name = 'grouped_classified'
         AND ((column_name = 'urgent' AND data_type = 'BOOLEAN')
           OR (column_name = 'rank' AND data_type = 'BIGINT')
-          OR (column_name = 'score' AND data_type = 'DOUBLE')))`)
+          OR (column_name = 'risk_score' AND data_type = 'DOUBLE')))`)
 }

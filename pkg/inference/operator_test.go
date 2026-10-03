@@ -1,6 +1,7 @@
 package inference
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/apache/arrow-go/v18/arrow/ipc"
+	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
@@ -20,6 +22,33 @@ import (
 )
 
 type inputConnection struct{ result *query.QueryResult }
+
+func TestPromptCacheUsageIsSeparateFromSavedResults(t *testing.T) {
+	t.Parallel()
+	op, ti, _, _ := fixture(t)
+	ti.Asset.Parameters["extract_parallelism"] = 16
+	op.structured = func(ctx context.Context, c *Client, state, instructions string, columns []outputColumn) (map[string]any, error) {
+		c.HTTPClient = &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+			body := responseText(`{"category":"billing"}`)
+			body = strings.TrimSuffix(body, "}") + `,"usage":{"input_tokens_details":{"cached_tokens":1200,"cache_write_tokens":300}}}`
+			return response(http.StatusOK, body), nil
+		})}
+		return c.CompleteStructured(ctx, state, instructions, columns)
+	}
+	var out bytes.Buffer
+	ctx := context.WithValue(t.Context(), executor.KeyPrinter, &out)
+	require.NoError(t, op.Run(ctx, ti))
+	require.Contains(t, out.String(), "2400 tokens read, 600 tokens written (usage reported by 2/2 model calls)")
+	out.Reset()
+	require.NoError(t, op.Run(ctx, ti))
+	require.Contains(t, out.String(), "0 model calls, 2 cached results")
+	require.NotContains(t, out.String(), "Provider prompt cache")
+	out.Reset()
+	ti.Asset.Parameters["cache"] = false
+	require.NoError(t, op.Run(ctx, ti))
+	require.Contains(t, out.String(), "2400 tokens read, 600 tokens written (usage reported by 2/2 model calls)")
+	require.Contains(t, out.String(), "2 model calls, 0 cached results")
+}
 
 func (c *inputConnection) GetConnection(string) any       { return c }
 func (c *inputConnection) GetIngestrURI() (string, error) { return "duckdb:///test.db", nil }
@@ -171,7 +200,7 @@ func TestOperatorResumesFailureWithoutPublishingPartialResults(t *testing.T) {
 
 func TestOperatorRejectsInvalidInputBeforeCallingModel(t *testing.T) {
 	t.Parallel()
-	for _, name := range []string{"duplicate", "null", "missing", "too many", "collision"} {
+	for _, name := range []string{"duplicate", "null", "missing", "too many", "collision", "case collision", "generated case collision"} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			op, ti, conn, runner := fixture(t)
@@ -186,6 +215,12 @@ func TestOperatorRejectsInvalidInputBeforeCallingModel(t *testing.T) {
 				ti.Asset.Parameters["max_rows"] = 1
 			case "collision":
 				conn.result.Columns[1] = "category"
+			case "case collision":
+				conn.result.Columns[1] = "Category"
+			case "generated case collision":
+				column := ti.Asset.Columns[1]
+				column.Name = "Category"
+				ti.Asset.Columns = append(ti.Asset.Columns, column)
 			}
 			op.structured = func(context.Context, *Client, string, string, []outputColumn) (map[string]any, error) {
 				t.Fatal("unexpected call")

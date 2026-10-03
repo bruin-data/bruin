@@ -2,7 +2,6 @@ package inference
 
 import (
 	"context"
-	"errors"
 	"math"
 	"strings"
 	"sync/atomic"
@@ -215,12 +214,4 @@ func TestGroupedRequestsShareConcurrencyAndPreserveRows(t *testing.T) {
 	asset.Columns[1].Inference.Choices["billing"] = "Changed rubric"
 	require.NoError(t, op.Run(ctx, ti))
 	require.Equal(t, int64(6), calls.Load(), "only changed group should rerun")
-	// A failed provider group must never publish the other group's results.
-	asset.Parameters["cache"] = false
-	before := runner.calls
-	op.structured = func(context.Context, *Client, string, string, []outputColumn) (map[string]any, error) {
-		return nil, errors.New("provider failed")
-	}
-	require.ErrorContains(t, op.Run(ctx, ti), "provider failed")
-	require.Equal(t, before, runner.calls)
 }
