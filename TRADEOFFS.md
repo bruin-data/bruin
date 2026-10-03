@@ -81,10 +81,13 @@ conformance tests point at exactly what changed.
    in sqlglot's `tests/dialects/*` and `tests/fixtures/identity.sql` for the 21 ported dialects
    (15,124 statements), recorded through the real Python implementation: tokens, full parse trees
    and same-dialect regenerated SQL. 100% identical.
-3. **Bruin-level differential** (harness in `.context/harness`, not committed: it needs the deleted
-   Python sources): the same corpus run through every Bruin command, and sqlglot's optimizer/TPC
-   fixtures through lineage/rename/tables with their schemas, comparing the full JSON responses with
-   what the Python command loop returned — 192,450 commands, 100% identical.
+3. **Bruin-level golden tests** (`pkg/sqlparser/golden_test.go`, part of `make test`): the same
+   corpus run through every Bruin command, and sqlglot's optimizer/TPC fixtures through
+   lineage/rename/tables with their schemas, comparing the full JSON responses with what the Python
+   command loop returned. That is 192,450 commands, all identical. The recordings live in
+   `pkg/sqlparser/testdata/golden`. The Python reference and the scripts that recorded them live in
+   `pkg/sqlparser/codegen` (see its README), and `go test -update` rewrites them after intentional
+   changes.
 4. **Mutation fuzzing** against Python (see §5).
 5. Agents also ran per-module differential checks while porting (e.g. all 467 simplify fixtures,
    1,014 annotate_types fixtures, the optimizer pipeline on TPC-H/TPC-DS, 7,099 ISO-date strings
@@ -138,7 +141,9 @@ conformance tests point at exactly what changed.
 
 ## 4. Changes in Bruin
 
-- **Deleted:** `pythonsrc/` (the JSON-over-stdin command server and its Python tests),
+- **Deleted:** `pythonsrc/` (the JSON-over-stdin command server and its Python tests; an unchanged
+  copy of the server is kept in `pkg/sqlparser/codegen/pythonsrc` as the reference for recording the
+  golden tests; it is not built or shipped),
   `internal/data` (≈141 MB of per-platform sqlglot wheels, plus the CPython runtime pulled in via the
   `go-embed-python` module), `internal/generate` (the pip packaging step), the `go-embed-python`
   dependency, and the `make lint-python` target (it only linted `pythonsrc`; `make format` no longer
@@ -163,9 +168,11 @@ conformance tests point at exactly what changed.
 ## 5. Robustness: mutation fuzzing
 
 Bruin feeds arbitrary user SQL to the parser, so malformed input matters as much as valid input.
-`.context/harness/gen_bruin_fuzz.py` derives ~54k mutants from the corpus (truncation, dropped,
-duplicated and swapped tokens) and records Python's answer to 7 Bruin commands for each
-(378,042 commands, 5 s timeout per command); the Go side replays them with a 10 s timeout.
+`pkg/sqlparser/codegen/gen_golden_fuzz.py` derives ~54k mutants from the corpus (truncation,
+dropped, duplicated and swapped tokens) and records Python's answer to 7 Bruin commands for each
+(378,042 commands per seed, 5 s timeout per command). Seed 1 is committed as
+`pkg/sqlparser/testdata/golden/fuzz.json.gz` and replayed by `TestGoldenFuzz` (skipped with
+`-short`).
 
 Findings and decisions:
 

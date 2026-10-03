@@ -19,13 +19,6 @@ type pyErr struct{ msg string }
 
 func (e *pyErr) Error() string { return e.msg }
 
-func errMsg(err error) string {
-	if err == nil {
-		return ""
-	}
-	return err.Error()
-}
-
 // normalizeDialect mirrors normalize_sqlglot_dialect.
 func normalizeDialect(dialect string) string {
 	if dialect == "vertica" {
