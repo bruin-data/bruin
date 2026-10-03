@@ -36,10 +36,22 @@ type MappingSchema struct {
 	dialect            *Dialect
 
 	typeMappingCache     map[string]*Expr
-	normalizedTableCache map[string]*Expr
+	normalizedTableCache map[tableCacheKey]*Expr
 	normalizedNameCache  map[normNameKey]string
-	findCache            map[string]*findCacheEntry
+	findCache            map[findCacheKey]*findCacheEntry
 	depthCache           int
+}
+
+// findCacheKey and tableCacheKey mirror the (hash(table), ...) tuple cache keys.
+type findCacheKey struct {
+	hash            uint64
+	ensureDataTypes bool
+}
+
+type tableCacheKey struct {
+	hash    uint64
+	dialect *Dialect
+	norm    bool
 }
 
 type findCacheEntry struct {
@@ -56,9 +68,9 @@ func NewMappingSchema(schema *SchemaMap, visible *SchemaMap, dialect *Dialect, n
 		normalize:            normalize,
 		dialect:              dialect,
 		typeMappingCache:     map[string]*Expr{},
-		normalizedTableCache: map[string]*Expr{},
+		normalizedTableCache: map[tableCacheKey]*Expr{},
 		normalizedNameCache:  map[normNameKey]string{},
-		findCache:            map[string]*findCacheEntry{},
+		findCache:            map[findCacheKey]*findCacheEntry{},
 	}
 	if s.visible == nil {
 		s.visible = NewSchemaMap()
@@ -177,7 +189,7 @@ func flattenTrie(t *trie) [][]string {
 
 // Find mirrors MappingSchema.find.
 func (s *MappingSchema) Find(table *Expr, raiseOnMissing bool, ensureDataTypes bool) *SchemaMap {
-	key := fmt.Sprintf("%d|%v", table.Hash(), ensureDataTypes)
+	key := findCacheKey{table.Hash(), ensureDataTypes}
 	if e, ok := s.findCache[key]; ok && e.schema != nil {
 		return e.schema
 	}
@@ -242,8 +254,8 @@ func (s *MappingSchema) AddTable(table *Expr, columnMapping *SchemaMap, dialect 
 	parts := s.tableParts(normalizedTable)
 	nestedSet(s.mapping, reversedStrings(parts), normalizedCols)
 	s.mappingTrie.add(parts)
-	delete(s.findCache, fmt.Sprintf("%d|%v", normalizedTable.Hash(), true))
-	delete(s.findCache, fmt.Sprintf("%d|%v", normalizedTable.Hash(), false))
+	delete(s.findCache, findCacheKey{normalizedTable.Hash(), true})
+	delete(s.findCache, findCacheKey{normalizedTable.Hash(), false})
 }
 
 // ColumnNames mirrors MappingSchema.column_names.
@@ -456,7 +468,7 @@ func (s *MappingSchema) normalizeTable(table *Expr, dialect *Dialect, normalize 
 	if normalize != nil {
 		norm = *normalize
 	}
-	key := fmt.Sprintf("%d|%p|%v", table.Hash(), dialect, norm)
+	key := tableCacheKey{table.Hash(), dialect, norm}
 	if c, ok := s.normalizedTableCache[key]; ok && c != nil {
 		return c
 	}
@@ -471,7 +483,7 @@ func (s *MappingSchema) normalizeTable(table *Expr, dialect *Dialect, normalize 
 			}
 		}
 	}
-	s.normalizedTableCache[fmt.Sprintf("%d|%p|%v", normalized.Hash(), dialect, norm)] = normalized
+	s.normalizedTableCache[tableCacheKey{normalized.Hash(), dialect, norm}] = normalized
 	return normalized
 }
 
