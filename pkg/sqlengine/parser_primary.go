@@ -187,12 +187,18 @@ func (p *Parser) buildJsonExtract(this *Expr, pathParts []*Expr) (*Expr, []*Expr
 	return this, pathParts
 }
 
+var selectTokenSet = newTokenSet(TK_SELECT)
+
 // _parse_colon_as_variant_extract (parser.py L6755)
 func (p *Parser) parseColonAsVariantExtract(this *Expr) *Expr {
+	if !p.match(TK_COLON) {
+		// No path: the final _build_json_extract on a lone JSONPathRoot is a no-op.
+		return this
+	}
 	pathParts := []*Expr{New(KJSONPathRoot)}
-	selectTokens := tsPtr(newTokenSet(TK_SELECT))
+	selectTokens := &selectTokenSet
 
-	for p.match(TK_COLON) {
+	for first := true; first || p.match(TK_COLON); first = false {
 		if !p.s.COLON_CHAIN_IS_SINGLE_EXTRACT {
 			this, pathParts = p.buildJsonExtract(this, pathParts)
 		}

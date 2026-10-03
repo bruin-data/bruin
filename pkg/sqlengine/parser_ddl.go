@@ -604,7 +604,8 @@ func (p *Parser) baseParseCreate() *Expr {
 
 // _parse_sequence_properties (parser.py L2673)
 func (p *Parser) parseSequenceProperties() *Expr {
-	seq := New(KSequenceProperties)
+	// The node is created on first use: most calls match nothing and return None.
+	var seq *Expr
 
 	options := []*Expr{}
 	index := p.index
@@ -614,27 +615,27 @@ func (p *Parser) parseSequenceProperties() *Expr {
 		if p.matchTextSeq("INCREMENT") {
 			p.matchTextSeq("BY")
 			p.matchTextSeq("=")
-			seq.Set("increment", p.parseTerm())
+			lazySet(&seq, KSequenceProperties, "increment", p.parseTerm())
 		} else if p.matchTextSeq("MINVALUE") {
-			seq.Set("minvalue", p.parseTerm())
+			lazySet(&seq, KSequenceProperties, "minvalue", p.parseTerm())
 		} else if p.matchTextSeq("MAXVALUE") {
-			seq.Set("maxvalue", p.parseTerm())
+			lazySet(&seq, KSequenceProperties, "maxvalue", p.parseTerm())
 		} else if p.match(TK_START_WITH) || p.matchTextSeq("START") {
 			p.matchTextSeq("=")
-			seq.Set("start", p.parseTerm())
+			lazySet(&seq, KSequenceProperties, "start", p.parseTerm())
 		} else if p.matchTextSeq("CACHE") {
 			// T-SQL allows empty CACHE which is initialized dynamically
 			if n := p.parseNumber(); n != nil {
-				seq.Set("cache", n)
+				lazySet(&seq, KSequenceProperties, "cache", n)
 			} else {
-				seq.Set("cache", true)
+				lazySet(&seq, KSequenceProperties, "cache", true)
 			}
 		} else if p.matchTextSeq("OWNED", "BY") {
 			// "OWNED BY NONE" is the default
 			if p.matchTextSeq("NONE") {
-				seq.Set("owned", nil)
+				lazySet(&seq, KSequenceProperties, "owned", nil)
 			} else {
-				seq.Set("owned", p.parseColumn())
+				lazySet(&seq, KSequenceProperties, "owned", p.parseColumn())
 			}
 		} else {
 			opt := p.parseVarFromOptions(p.s.CREATE_SEQUENCE, false)
@@ -646,15 +647,23 @@ func (p *Parser) parseSequenceProperties() *Expr {
 		}
 	}
 
-	if len(options) > 0 {
-		seq.Set("options", options)
-	} else {
-		seq.Set("options", nil)
-	}
 	if p.index == index {
 		return nil
 	}
+	if len(options) > 0 {
+		lazySet(&seq, KSequenceProperties, "options", options)
+	} else {
+		lazySet(&seq, KSequenceProperties, "options", nil)
+	}
 	return seq
+}
+
+// lazySet sets key on *e, creating the node first if needed.
+func lazySet(e **Expr, kind Kind, key string, v any) {
+	if *e == nil {
+		*e = New(kind)
+	}
+	(*e).Set(key, v)
 }
 
 // _parse_trigger_events (parser.py L2708)
