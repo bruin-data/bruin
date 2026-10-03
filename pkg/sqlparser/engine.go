@@ -40,17 +40,21 @@ func getDialect(name string) (*sqlengine.Dialect, error) {
 
 // dispatch mirrors the command loop of pythonsrc/main.py. It returns the JSON response line.
 // It is safe for concurrent use.
-func dispatch(pc *parserCommand) (resp string) {
+func dispatch(pc *parserCommand) string {
+	return string(encodeResponse(runCommand(pc.Command, pc.Contents)))
+}
+
+// runCommand runs one command and returns the response object: the command's result, or
+// {"error": ...} when it fails.
+func runCommand(command string, c map[string]any) (resp any) {
 	defer func() {
 		if r := recover(); r != nil {
-			b, _ := json.Marshal(map[string]any{"error": fmt.Sprint(r)})
-			resp = string(b)
+			resp = map[string]any{"error": fmt.Sprint(r)}
 		}
 	}()
 	var result any
 	var err error
-	c := pc.Contents
-	switch pc.Command {
+	switch command {
 	case "init":
 		result = map[string]any{}
 	case "lineage":
@@ -81,14 +85,18 @@ func dispatch(pc *parserCommand) (resp string) {
 		err = errors.New("invalid cmd")
 	}
 	if err != nil {
-		b, _ := json.Marshal(map[string]any{"error": err.Error()})
-		return string(b)
+		return map[string]any{"error": err.Error()}
 	}
-	b, merr := json.Marshal(result)
-	if merr != nil {
-		b, _ = json.Marshal(map[string]any{"error": merr.Error()})
+	return result
+}
+
+// encodeResponse serializes a response object like the Python command loop's json.dumps.
+func encodeResponse(resp any) []byte {
+	b, err := json.Marshal(resp)
+	if err != nil {
+		b, _ = json.Marshal(map[string]any{"error": err.Error()})
 	}
-	return string(b)
+	return b
 }
 
 func str(v any) string {

@@ -98,15 +98,11 @@ func (s *SQLParser) ColumnLineage(sql, dialect string, schema Schema) (*Lineage,
 		},
 	}
 
-	resp, err := s.sendCommand(&command)
-	if err != nil {
-		return nil, err
-	}
-
 	var lineage Lineage
-	err = json.Unmarshal([]byte(resp), &lineage)
-	if err != nil {
-		return nil, err
+	if sendErr, decodeErr := s.call(command.Command, command.Contents, &lineage); sendErr != nil {
+		return nil, sendErr
+	} else if decodeErr != nil {
+		return nil, decodeErr
 	}
 
 	return &lineage, nil
@@ -126,18 +122,11 @@ func (s *SQLParser) UsedTables(sql, dialect string) ([]string, error) {
 		},
 	}
 
-	resp, err := s.sendCommand(&command)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to send command")
-	}
-
-	var tables struct {
-		Tables []string `json:"tables"`
-		Error  string   `json:"error"`
-	}
-	err = json.Unmarshal([]byte(resp), &tables)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal response")
+	var tables tablesResponse
+	if sendErr, decodeErr := s.call(command.Command, command.Contents, &tables); sendErr != nil {
+		return nil, errors.Wrap(sendErr, "failed to send command")
+	} else if decodeErr != nil {
+		return nil, errors.Wrap(decodeErr, "failed to unmarshal response")
 	}
 
 	if tables.Error != "" {
@@ -157,17 +146,11 @@ func (s *SQLParser) sendQueryCommand(command string, contents map[string]interfa
 		return "", errors.Wrap(err, "failed to start sql parser")
 	}
 
-	responsePayload, err := s.sendCommand(&parserCommand{Command: command, Contents: contents})
-	if err != nil {
-		return "", errors.Wrap(err, "failed to send command")
-	}
-
-	var resp struct {
-		Query string `json:"query"`
-		Error string `json:"error"`
-	}
-	if err := json.Unmarshal([]byte(responsePayload), &resp); err != nil {
-		return "", errors.Wrap(err, "failed to unmarshal response")
+	var resp queryResponse
+	if sendErr, decodeErr := s.call(command, contents, &resp); sendErr != nil {
+		return "", errors.Wrap(sendErr, "failed to send command")
+	} else if decodeErr != nil {
+		return "", errors.Wrap(decodeErr, "failed to unmarshal response")
 	}
 	if resp.Error != "" {
 		return "", errors.New(resp.Error)
@@ -212,19 +195,11 @@ func (s *SQLParser) HoistDeclaresList(queries []string, assetType pipeline.Asset
 	if err := s.Start(); err != nil {
 		return queries, errors.Wrap(err, "failed to start sql parser")
 	}
-	payload, err := s.sendCommand(&parserCommand{
-		Command:  "hoist-declares-list",
-		Contents: map[string]interface{}{"queries": queries, "dialect": dialect},
-	})
-	if err != nil {
-		return queries, errors.Wrap(err, "failed to hoist declares list")
-	}
-	var resp struct {
-		Queries []string `json:"queries"`
-		Error   string   `json:"error"`
-	}
-	if err := json.Unmarshal([]byte(payload), &resp); err != nil {
-		return queries, errors.Wrap(err, "failed to unmarshal response")
+	var resp queriesResponse
+	if sendErr, decodeErr := s.call("hoist-declares-list", map[string]interface{}{"queries": queries, "dialect": dialect}, &resp); sendErr != nil {
+		return queries, errors.Wrap(sendErr, "failed to hoist declares list")
+	} else if decodeErr != nil {
+		return queries, errors.Wrap(decodeErr, "failed to unmarshal response")
 	}
 	if resp.Error != "" {
 		return queries, errors.New(resp.Error)
@@ -413,18 +388,11 @@ func (s *SQLParser) IsSingleSelectQuery(sql string, dialect string) (bool, error
 		},
 	}
 
-	responsePayload, err := s.sendCommand(&command)
-	if err != nil {
-		return false, errors.Wrap(err, "failed to send command")
-	}
-
-	var resp struct {
-		IsSingleSelect bool   `json:"is_single_select"`
-		Error          string `json:"error"`
-	}
-	err = json.Unmarshal([]byte(responsePayload), &resp)
-	if err != nil {
-		return false, errors.Wrap(err, "failed to unmarshal response")
+	var resp singleSelectResponse
+	if sendErr, decodeErr := s.call(command.Command, command.Contents, &resp); sendErr != nil {
+		return false, errors.Wrap(sendErr, "failed to send command")
+	} else if decodeErr != nil {
+		return false, errors.Wrap(decodeErr, "failed to unmarshal response")
 	}
 
 	if resp.Error != "" {
