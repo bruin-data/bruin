@@ -1020,6 +1020,15 @@ func (e *Expr) FindAncestor(kinds ...Kind) *Expr {
 	return a
 }
 
+// findAncestorIn is FindAncestor for a precomputed kindMatcher set.
+func (e *Expr) findAncestorIn(kinds KindSet) *Expr {
+	a := e.parent
+	for a != nil && !kinds.Has(a.kind) {
+		a = a.parent
+	}
+	return a
+}
+
 // ParentSelect mirrors Expression.parent_select.
 func (e *Expr) ParentSelect() *Expr { return e.FindAncestor(KSelect) }
 

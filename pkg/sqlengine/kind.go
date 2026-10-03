@@ -55,6 +55,27 @@ func (k Kind) IsA(kinds ...Kind) bool {
 	return false
 }
 
+// kindMatcher returns the set of kinds k for which k.IsA(kinds...) holds, so that a fixed
+// isinstance check becomes a single bit test (matcher.Has(k)).
+// It reads the static MRO data directly, so it can initialize package-level variables (which run
+// before the init that fills kindInfo.isa).
+func kindMatcher(kinds ...Kind) KindSet {
+	var want KindSet
+	for _, o := range kinds {
+		want = want.With(o)
+	}
+	var out KindSet
+	for k := range kindInfos {
+		for _, m := range kindInfos[k].mro {
+			if want.Has(m) {
+				out = out.With(Kind(k))
+				break
+			}
+		}
+	}
+	return out
+}
+
 // ArgTypes returns the ordered argument specs.
 func (k Kind) ArgTypes() []argSpec { return kindInfos[k].args }
 

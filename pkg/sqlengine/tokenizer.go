@@ -76,6 +76,18 @@ type tokenizerConfig struct {
 	identEscapes map[string]StrSet
 	// kwText interns the KEYWORDS keys (token texts of keyword tokens).
 	kwText map[string]string
+	// singleASCII mirrors singleTokens for ASCII runes (singleASCIIOk marks presence).
+	singleASCII   [utf8.RuneSelf]TokenType
+	singleASCIIOk [utf8.RuneSelf]bool
+}
+
+// single mirrors `singleTokens[r]` (SINGLE_TOKENS lookup by character).
+func (c *tokenizerConfig) single(r rune) (TokenType, bool) {
+	if r >= 0 && r < utf8.RuneSelf {
+		return c.singleASCII[r], c.singleASCIIOk[r]
+	}
+	tt, ok := c.singleTokens[r]
+	return tt, ok
 }
 
 func newTokenizerConfig(s *TokenizerSettings, d *DialectSettings) *tokenizerConfig {
@@ -108,6 +120,10 @@ func newTokenizerConfig(s *TokenizerSettings, d *DialectSettings) *tokenizerConf
 		r := []rune(k)
 		if len(r) == 1 {
 			c.singleTokens[r[0]] = v
+			if r[0] >= 0 && r[0] < utf8.RuneSelf {
+				c.singleASCII[r[0]] = v
+				c.singleASCIIOk[r[0]] = true
+			}
 		}
 	}
 	for k, v := range s._IDENTIFIERS {
@@ -485,7 +501,7 @@ func (t *tokenizerCore) scanKeywords() {
 	prevSpace := false
 	skip := false
 	tr := t.keywordTrie
-	_, singleToken := t.singleTokens[char]
+	_, singleToken := t.single(char)
 
 	for len(chars) > 0 {
 		if !skip {
@@ -504,7 +520,7 @@ func (t *tokenizerCore) scanKeywords() {
 		if end < t.size {
 			char = t.sql[end]
 			if !singleToken {
-				_, singleToken = t.singleTokens[char]
+				_, singleToken = t.single(char)
 			}
 			isSpace := pyIsSpaceRune(char)
 			if !isSpace || !prevSpace {
@@ -543,7 +559,7 @@ func (t *tokenizerCore) scanKeywords() {
 		}
 	}
 
-	if tt, ok := t.singleTokens[t.char]; ok {
+	if tt, ok := t.single(t.char); ok {
 		t.addS(tt, runeString(t.char))
 		return
 	}
@@ -738,7 +754,7 @@ func (t *tokenizerCore) scanNumber() {
 		} else if t.peek != noChar && pyIsIdentifierRune(t.peek) {
 			numberText = t.text()
 			for t.peek != noChar && !pyIsSpaceRune(t.peek) {
-				if _, ok := t.singleTokens[t.peek]; ok {
+				if _, ok := t.single(t.peek); ok {
 					break
 				}
 				numericLiteral += string(t.peek)
@@ -801,7 +817,7 @@ func (t *tokenizerCore) extractValue() string {
 		if ch == noChar || pyIsSpaceRune(ch) {
 			break
 		}
-		if _, ok := t.singleTokens[ch]; ok {
+		if _, ok := t.single(ch); ok {
 			break
 		}
 		t.advance(1, true)
@@ -926,7 +942,7 @@ func (t *tokenizerCore) scanVar() {
 			break
 		}
 		if !t.varSingleTokens.Has(runeString(peek)) {
-			if _, ok := t.singleTokens[peek]; ok {
+			if _, ok := t.single(peek); ok {
 				break
 			}
 		}

@@ -1,6 +1,9 @@
 package sqlengine
 
-import "unicode/utf8"
+import (
+	"sort"
+	"unicode/utf8"
+)
 
 // trie mirrors sqlglot.trie: nested maps keyed by a single "character" (rune or word),
 // with end marking the presence of a complete key.
@@ -8,8 +11,10 @@ type trie struct {
 	children map[string]*trie
 	order    []string // insertion order of children (Python dict order)
 	end      bool
-	// runeKids indexes the single-rune children by rune (fast path for keyword scanning).
-	runeKids map[rune]*trie
+	// kidRunes/kids index the single-rune children by rune, sorted (fast path for keyword
+	// scanning; most nodes have a handful of children).
+	kidRunes []rune
+	kids     []*trie
 }
 
 type trieResult int
@@ -57,10 +62,13 @@ func (t *trie) add(key []string) {
 			cur.children[c] = next
 			cur.order = append(cur.order, c)
 			if r, size := utf8.DecodeRuneInString(c); size == len(c) && size > 0 {
-				if cur.runeKids == nil {
-					cur.runeKids = map[rune]*trie{}
-				}
-				cur.runeKids[r] = next
+				i := sort.Search(len(cur.kidRunes), func(i int) bool { return cur.kidRunes[i] >= r })
+				cur.kidRunes = append(cur.kidRunes, 0)
+				copy(cur.kidRunes[i+1:], cur.kidRunes[i:])
+				cur.kidRunes[i] = r
+				cur.kids = append(cur.kids, nil)
+				copy(cur.kids[i+1:], cur.kids[i:])
+				cur.kids[i] = next
 			}
 		}
 		cur = next
@@ -70,10 +78,31 @@ func (t *trie) add(key []string) {
 
 // getRune returns the child for the single-character key r.
 func (t *trie) getRune(r rune) *trie {
-	if t == nil || t.runeKids == nil {
+	if t == nil {
 		return nil
 	}
-	return t.runeKids[r]
+	rs := t.kidRunes
+	if len(rs) <= 8 {
+		for i, x := range rs {
+			if x == r {
+				return t.kids[i]
+			}
+		}
+		return nil
+	}
+	lo, hi := 0, len(rs)
+	for lo < hi {
+		m := int(uint(lo+hi) >> 1)
+		if rs[m] < r {
+			lo = m + 1
+		} else {
+			hi = m
+		}
+	}
+	if lo < len(rs) && rs[lo] == r {
+		return t.kids[lo]
+	}
+	return nil
 }
 
 func (t *trie) get(c string) *trie {

@@ -172,7 +172,12 @@ func (s *Scope) Branch(expression *Expr, scopeType ScopeType, sources, cteSource
 	)
 }
 
-var scopeCollectibleTypes = []Kind{KColumn, KDot, KTable, KQuery, KUDTF, KCTE, KStar, KTableColumn, KJoinHint}
+var (
+	scopeCollectibleTypes = []Kind{KColumn, KDot, KTable, KQuery, KUDTF, KCTE, KStar, KTableColumn, KJoinHint}
+	scopeCollectible      = kindMatcher(scopeCollectibleTypes...)
+	columnAncestorKinds   = kindMatcher(KSelect, KQualify, KOrder, KHaving, KHint, KTable, KStar, KDistinct)
+	cteOrQueryKinds       = kindMatcher(KCTE, KQuery)
+)
 
 func (s *Scope) collect() {
 	s.tables = nil
@@ -188,7 +193,7 @@ func (s *Scope) collect() {
 	s.columnIndex = map[*Expr]struct{}{}
 
 	for node := range s.Walk(nil) {
-		if node == s.Expression || !node.IsA(scopeCollectibleTypes...) {
+		if node == s.Expression || !scopeCollectible.Has(node.kind) {
 			continue
 		}
 		switch {
@@ -299,7 +304,7 @@ func (s *Scope) Columns() []*Expr {
 		s.columns = []*Expr{}
 		all := append(append([]*Expr{}, columns...), external...)
 		for _, column := range all {
-			ancestor := column.FindAncestor(KSelect, KQualify, KOrder, KHaving, KHint, KTable, KStar, KDistinct)
+			ancestor := column.findAncestorIn(columnAncestorKinds)
 			if ancestor == nil ||
 				column.Text("table") != "" ||
 				ancestor.IsA(KSelect) ||
@@ -831,7 +836,7 @@ func walkInScopeImpl(expression *Expr, prune func(*Expr) bool, yield func(*Expr)
 		if !yield(node) {
 			return false
 		}
-		if node != expression && node.IsA(KCTE, KQuery) &&
+		if node != expression && node != nil && cteOrQueryKinds.Has(node.kind) &&
 			(node.IsA(KCTE) ||
 				(node.Parent().IsA(KFrom, KJoin) && isDerivedTable(node)) ||
 				node.Parent().IsA(KUDTF) ||
