@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"runtime"
 	"strings"
+	"sync"
 )
 
 // Callable table types mirroring the dict[...]->callable tables of sqlglot.parser.Parser.
@@ -149,7 +150,28 @@ type ParseOptions struct {
 
 // NewParser creates a parser for the dialect.
 func (d *Dialect) NewParser(opts *ParseOptions) *Parser {
-	p := &Parser{
+	p := &Parser{}
+	d.initParser(p, opts)
+	return p
+}
+
+// parserPool recycles parsers for the parses that create and drop their own (Dialect.Parse and
+// ParseOneInto): nothing references a parser once its parse has returned.
+var parserPool = sync.Pool{New: func() any { return new(Parser) }}
+
+func (d *Dialect) pooledParser(opts *ParseOptions) *Parser {
+	p := parserPool.Get().(*Parser)
+	d.initParser(p, opts)
+	return p
+}
+
+func releaseParser(p *Parser) {
+	*p = Parser{}
+	parserPool.Put(p)
+}
+
+func (d *Dialect) initParser(p *Parser, opts *ParseOptions) {
+	*p = Parser{
 		d:                   d,
 		s:                   d.P,
 		errorLevel:          ErrorLevelImmediate,
@@ -172,7 +194,6 @@ func (d *Dialect) NewParser(opts *ParseOptions) *Parser {
 		}
 	}
 	p.reset()
-	return p
 }
 
 func (p *Parser) reset() {
@@ -689,7 +710,9 @@ func (d *Dialect) Parse(sql string, opts *ParseOptions) ([]*Expr, error) {
 	if err != nil {
 		return nil, err
 	}
-	return d.NewParser(opts).ParseTokens(tokens, sql)
+	p := d.pooledParser(opts)
+	defer releaseParser(p)
+	return p.ParseTokens(tokens, sql)
 }
 
 // tokenizeForParse tokenizes sql for a parse that keeps no tokens, into a pooled arena (nil when
@@ -726,7 +749,9 @@ func (d *Dialect) ParseOneInto(kind Kind, sql string, opts *ParseOptions) (*Expr
 	if err != nil {
 		return nil, err
 	}
-	result, err := d.NewParser(opts).ParseInto(kind, tokens, sql)
+	p := d.pooledParser(opts)
+	defer releaseParser(p)
+	result, err := p.ParseInto(kind, tokens, sql)
 	if err != nil {
 		return nil, err
 	}
