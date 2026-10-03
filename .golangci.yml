@@ -178,7 +178,6 @@ linters:
       - .github
       - resources
       - bin
-      - internal/data
       - third_party$
       - builtin$
       - examples$
@@ -197,7 +196,6 @@ formatters:
       - .github
       - resources
       - bin
-      - internal/data
       - third_party$
       - builtin$
       - examples$

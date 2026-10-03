@@ -49,7 +49,6 @@ require (
 	github.com/jedib0t/go-pretty/v6 v6.6.7
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/josephburnett/jd v1.9.2
-	github.com/kluctl/go-embed-python v0.0.0-3.13.1-20241219-1
 	github.com/manifoldco/promptui v0.9.0
 	github.com/microsoft/go-mssqldb v1.8.2
 	github.com/muesli/termenv v0.16.0
@@ -166,7 +165,6 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/jsonpointer v0.21.1 // indirect
 	github.com/go-openapi/swag v0.23.1 // indirect
-	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/godbus/dbus v0.0.0-20190726142602-4481cbc300e2 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.0 // indirect
@@ -291,9 +289,12 @@ require (
 
 require (
 	github.com/99designs/keyring v1.2.2
+	github.com/ajitpratap0/GoSQLX/pkg/sqlglot v0.0.0-00010101000000-000000000000
 	github.com/bruin-data/bruin/semantic-engine v0.0.0
 	github.com/charmbracelet/x/ansi v0.11.6
 	github.com/gofrs/flock v0.13.0
 )
 
 replace github.com/bruin-data/bruin/semantic-engine => ./semantic-engine
+
+replace github.com/ajitpratap0/GoSQLX/pkg/sqlglot => ./.context/gosqlx/pkg/sqlglot

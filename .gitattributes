@@ -37,5 +37,3 @@ docs/** linguist-vendored
 # Exclude internal folder from language statistics
 internal/** linguist-vendored
 
-# Exclude pythonsrc folder from language statistics
-pythonsrc/** linguist-vendored
