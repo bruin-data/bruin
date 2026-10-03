@@ -150,3 +150,26 @@ func BenchmarkOptimizeLineageRules(b *testing.B) {
 func BenchmarkOptimizeDefaultRules(b *testing.B) {
 	benchOptimize(b, nil)
 }
+
+func BenchmarkCopy(b *testing.B) {
+	stmts := corpus(b)
+	var trees []*Expr
+	for _, s := range stmts {
+		ts, err := s.d.Parse(s.sql, nil)
+		if err == nil {
+			for _, t := range ts {
+				if t != nil {
+					trees = append(trees, t)
+				}
+			}
+		}
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		for _, t := range trees {
+			_ = t.Copy()
+		}
+	}
+	b.ReportMetric(float64(b.Elapsed().Nanoseconds())/float64(b.N*len(trees)), "ns/tree")
+}

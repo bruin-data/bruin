@@ -381,7 +381,16 @@ func (p *Parser) isConnected() bool {
 }
 
 func (p *Parser) findSQL(start, end *Token) string {
-	return pySlice(p.sqlRunes, start.Start, end.End+1)
+	return pySlice(p.runes(), start.Start, end.End+1)
+}
+
+// runes returns the SQL as code points (positions are code-point offsets, like Python's),
+// converting lazily: only error reporting and command fallbacks need it.
+func (p *Parser) runes() []rune {
+	if p.sqlRunes == nil {
+		p.sqlRunes = []rune(p.sql)
+	}
+	return p.sqlRunes
 }
 
 type parsePanic struct{ err *ParseError }
@@ -397,7 +406,7 @@ func (p *Parser) raiseError(message string, tok *Token) {
 			}
 		}
 	}
-	formatted, startCtx, highlight, endCtx := highlightSQL(p.sqlRunes, [][2]int{{tok.Start, tok.End}}, p.errorMessageContext)
+	formatted, startCtx, highlight, endCtx := highlightSQL(p.runes(), [][2]int{{tok.Start, tok.End}}, p.errorMessageContext)
 	msg := fmt.Sprintf("%s. Line %d, Col: %d.\n  %s", message, tok.Line, tok.Col, formatted)
 	err := &ParseError{Msg: msg, Errors: []ParseErrorDetail{{
 		Description:  message,
@@ -541,20 +550,30 @@ func (p *Parser) parseBatchStatements(parseMethod func(p *Parser) *Expr, sepFirs
 func (p *Parser) parseImpl(parseMethod func(p *Parser) *Expr, rawTokens []*Token, sql string) []*Expr {
 	p.reset()
 	p.sql = sql
-	p.sqlRunes = []rune(sql)
 	total := len(rawTokens)
-	chunks := [][]*Token{{}}
+	// Split into statement chunks (semicolons separate statements; a semicolon carrying
+	// comments forms its own chunk). Chunks are views into one array.
+	all := make([]*Token, 0, total)
+	type span struct{ a, b int }
+	var spanBuf [4]span
+	spans := append(spanBuf[:0], span{})
 	for i, tok := range rawTokens {
 		if tok.Type == TK_SEMICOLON {
 			if len(tok.Comments) > 0 {
-				chunks = append(chunks, []*Token{tok})
+				all = append(all, tok)
+				spans = append(spans, span{len(all) - 1, len(all)})
 			}
 			if i < total-1 {
-				chunks = append(chunks, []*Token{})
+				spans = append(spans, span{len(all), len(all)})
 			}
 		} else {
-			chunks[len(chunks)-1] = append(chunks[len(chunks)-1], tok)
+			all = append(all, tok)
+			spans[len(spans)-1].b = len(all)
 		}
+	}
+	chunks := make([][]*Token, len(spans))
+	for i, sp := range spans {
+		chunks[i] = all[sp.a:sp.b:sp.b]
 	}
 	p.chunks = chunks
 	return p.parseBatchStatements(parseMethod, false)

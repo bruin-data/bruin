@@ -2,6 +2,7 @@ package sqlengine
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -81,7 +82,7 @@ type Generator struct {
 	escapedQuoteEnd               string
 	escapedByteQuoteEnd           string
 	escapedIdentifierEnd          string
-	nextName                      func() string
+	nextNameIndex                 int
 	identifierStart               string
 	identifierEnd                 string
 	quoteJSONPathKeyUsingBrackets bool
@@ -128,12 +129,10 @@ func (d *Dialect) NewGenerator(opts *GenerateOptions) *Generator {
 	if opts != nil && opts.NormalizeFunctions != nil {
 		g.normalizeFunctions = *opts.NormalizeFunctions
 	}
-	g.escapedQuoteEnd = d.T.STRING_ESCAPES[0] + d.S.QUOTE_END
-	if d.S.BYTE_END != "" {
-		g.escapedByteQuoteEnd = d.T.STRING_ESCAPES[0] + d.S.BYTE_END
-	}
-	g.escapedIdentifierEnd = d.S.IDENTIFIER_END + d.S.IDENTIFIER_END
-	g.nextName = nameSequence("_t")
+	gs := d.generatorStrings()
+	g.escapedQuoteEnd = gs.escapedQuoteEnd
+	g.escapedByteQuoteEnd = gs.escapedByteQuoteEnd
+	g.escapedIdentifierEnd = gs.escapedIdentifierEnd
 	g.identifierStart = d.S.IDENTIFIER_START
 	g.identifierEnd = d.S.IDENTIFIER_END
 	g.quoteJSONPathKeyUsingBrackets = true
@@ -144,6 +143,13 @@ func (d *Dialect) NewGenerator(opts *GenerateOptions) *Generator {
 }
 
 // nameSequence mirrors sqlglot.helper.name_sequence.
+// nextName mirrors the generator's name_sequence("_t").
+func (g *Generator) nextName() string {
+	s := "_t" + strconv.Itoa(g.nextNameIndex)
+	g.nextNameIndex++
+	return s
+}
+
 func nameSequence(prefix string) func() string {
 	i := 0
 	return func() string {

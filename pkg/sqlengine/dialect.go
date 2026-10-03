@@ -41,6 +41,32 @@ type Dialect struct {
 	hooks *dialectHooks
 
 	timeTrie, formatTrie, inverseTimeTrie, inverseFormatTrie *trie
+
+	// genStrs holds the strings every Generator derives from settings; computed once the
+	// prototype is fully set up (copies of a dialect share it).
+	genStrs *genStrings
+}
+
+type genStrings struct {
+	escapedQuoteEnd, escapedByteQuoteEnd, escapedIdentifierEnd string
+}
+
+func computeGenStrings(d *Dialect) *genStrings {
+	gs := &genStrings{
+		escapedQuoteEnd:      d.T.STRING_ESCAPES[0] + d.S.QUOTE_END,
+		escapedIdentifierEnd: d.S.IDENTIFIER_END + d.S.IDENTIFIER_END,
+	}
+	if d.S.BYTE_END != "" {
+		gs.escapedByteQuoteEnd = d.T.STRING_ESCAPES[0] + d.S.BYTE_END
+	}
+	return gs
+}
+
+func (d *Dialect) generatorStrings() *genStrings {
+	if d.genStrs != nil {
+		return d.genStrs
+	}
+	return computeGenStrings(d)
 }
 
 type dialectHooks struct {
@@ -127,6 +153,7 @@ func prototypeLocked(name string) *Dialect {
 	if def.setup != nil {
 		def.setup(d)
 	}
+	d.genStrs = computeGenStrings(d)
 	return d
 }
 
