@@ -19,6 +19,8 @@ type pyError struct{ msg string }
 
 func (e *pyError) Error() string { return e.msg }
 
+const dialectSnowflake = "snowflake"
+
 // normalizeDialect mirrors normalize_sqlglot_dialect.
 func normalizeDialect(dialect string) string {
 	if dialect == "vertica" {

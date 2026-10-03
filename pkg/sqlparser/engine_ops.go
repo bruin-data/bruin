@@ -478,7 +478,7 @@ func isReadOnlyQuery(query, dialectName string) map[string]any {
 	if err != nil {
 		return map[string]any{"is_read_only": false, "error": err.Error()}
 	}
-	if dialectName == "snowflake" {
+	if dialectName == dialectSnowflake {
 		toks, err := d.Tokenize(query)
 		if err != nil {
 			return map[string]any{"is_read_only": false, "error": err.Error()}
@@ -515,7 +515,7 @@ func isReadOnlyQuery(query, dialectName string) map[string]any {
 }
 
 func isReadOnlyStatement(stmt *sqlengine.Expr, d *sqlengine.Dialect, dialectName string) (bool, error) {
-	if stmt.IsA(sqlengine.KCommand) && dialectName == "snowflake" {
+	if stmt.IsA(sqlengine.KCommand) && dialectName == dialectSnowflake {
 		if pyUpper(stmt.Name()) != "EXPLAIN" || !stmt.Expression().IsA(sqlengine.KLiteral) {
 			return false, nil
 		}
@@ -535,7 +535,7 @@ func isReadOnlyStatement(stmt *sqlengine.Expr, d *sqlengine.Dialect, dialectName
 		if node.IsA(readOnlyForbiddenKinds...) {
 			return false, nil
 		}
-		if dialectName != "snowflake" && node.IsA(sqlengine.KAnonymous) {
+		if dialectName != dialectSnowflake && node.IsA(sqlengine.KAnonymous) {
 			return false, nil
 		}
 		if node.IsA(sqlengine.KDynamicIdentifier) && node.Arg("expressions") != nil {
@@ -544,7 +544,7 @@ func isReadOnlyStatement(stmt *sqlengine.Expr, d *sqlengine.Dialect, dialectName
 		if node.IsA(sqlengine.KColumn) && pyUpper(node.Name()) == "NEXTVAL" {
 			return false, nil
 		}
-		if dialectName != "snowflake" && node.IsA(sqlengine.KFunc) && node.Parent().IsA(sqlengine.KDot) {
+		if dialectName != dialectSnowflake && node.IsA(sqlengine.KFunc) && node.Parent().IsA(sqlengine.KDot) {
 			return false, nil
 		}
 	}

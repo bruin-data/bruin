@@ -255,5 +255,5 @@ func TestSQLParserColumnLineageContractBoundaryAndInvalidInputs(t *testing.T) {
 
 // uppercasesIdentifiers reports whether the dialect normalizes unquoted identifiers to upper case.
 func uppercasesIdentifiers(dialect string) bool {
-	return dialect == "oracle" || dialect == "snowflake" //nolint:goconst // dialect names read better inline in the case tables
+	return dialect == "oracle" || dialect == "snowflake"
 }
