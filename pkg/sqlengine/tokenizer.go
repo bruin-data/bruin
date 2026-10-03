@@ -190,6 +190,7 @@ type tokenizerCore struct {
 	ascii         bool
 	kwBuf         []rune
 	slab          []Token
+	arena         *tokenArena
 	size          int
 	tokens        []*Token
 	start         int
@@ -215,6 +216,10 @@ func newTokenizerCore(c *tokenizerConfig) *tokenizerCore {
 
 // release returns the core to the pool; the returned tokens do not reference its buffers.
 func (t *tokenizerCore) release() {
+	if t.arena != nil {
+		t.arena.lastLen = len(t.slab)
+		t.arena = nil
+	}
 	t.tokenizerConfig = nil
 	t.tokens = nil
 	t.comments = nil
@@ -268,7 +273,11 @@ func (t *tokenizerCore) tokenize(sql string) (tokens []*Token, err error) {
 		t.sql = append(t.sql[:0], []rune(sql)...)
 	}
 	t.size = len(t.sql)
-	t.tokens = make([]*Token, 0, t.size/4+4)
+	if t.arena != nil && cap(t.arena.tokens) >= t.size/4+4 {
+		t.tokens = t.arena.tokens[:0]
+	} else {
+		t.tokens = make([]*Token, 0, t.size/4+4)
+	}
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -439,10 +448,78 @@ func (t *tokenizerCore) newToken() *Token {
 		if n > 1024 {
 			n = 1024
 		}
-		t.slab = make([]Token, 0, n)
+		if t.arena != nil {
+			t.slab = t.arena.nextSlab(n)
+		} else {
+			t.slab = make([]Token, 0, n)
+		}
 	}
 	t.slab = t.slab[:len(t.slab)+1]
 	return &t.slab[len(t.slab)-1]
+}
+
+// tokenArena recycles token storage across parses that tokenize their own input. Nothing keeps a
+// *Token once parsing is done: expressions copy positions and texts and take over comment lists
+// (allocated separately from the tokens), and errors hold only strings.
+type tokenArena struct {
+	slabs   [][]Token // storage handed out in order; used counts the ones in use
+	used    int
+	lastLen int // tokens taken from the last slab in use (earlier ones are full)
+	tokens  []*Token
+	nTokens int
+}
+
+const tokenArenaMaxTokens = 1 << 16
+
+var tokenArenaPool = sync.Pool{New: func() any { return &tokenArena{} }}
+
+func (a *tokenArena) nextSlab(n int) []Token {
+	if a.used < len(a.slabs) {
+		s := a.slabs[a.used]
+		if cap(s) < n {
+			s = make([]Token, 0, n)
+			a.slabs[a.used] = s
+		}
+		a.used++
+		return s[:0]
+	}
+	s := make([]Token, 0, n)
+	a.slabs = append(a.slabs, s)
+	a.used++
+	return s
+}
+
+// tokenizeInArena tokenizes into a pooled arena; release the arena once the tokens are unused.
+func (c *tokenizerConfig) tokenizeInArena(sql string) ([]*Token, *tokenArena, error) {
+	a := tokenArenaPool.Get().(*tokenArena)
+	t := newTokenizerCore(c)
+	t.arena = a
+	tokens, err := t.tokenize(sql)
+	if cap(tokens) >= cap(a.tokens) {
+		a.tokens = tokens[:0]
+		a.nTokens = len(tokens)
+	}
+	return tokens, a, err
+}
+
+// release clears what the parse used (so pooled storage keeps no SQL alive) and pools the arena.
+func (a *tokenArena) release() {
+	total := 0
+	for i, s := range a.slabs {
+		switch {
+		case i < a.used-1:
+			clear(s[:cap(s)])
+		case i == a.used-1:
+			clear(s[:a.lastLen])
+		}
+		total += cap(s)
+	}
+	clear(a.tokens[:a.nTokens])
+	a.used, a.lastLen, a.nTokens = 0, 0, 0
+	if total+cap(a.tokens) > tokenArenaMaxTokens {
+		return
+	}
+	tokenArenaPool.Put(a)
 }
 
 func (t *tokenizerCore) push(tt TokenType, txt string) {

@@ -672,11 +672,24 @@ func kindClassRepr(k Kind) string {
 
 // Parse mirrors Dialect.parse(sql).
 func (d *Dialect) Parse(sql string, opts *ParseOptions) ([]*Expr, error) {
-	tokens, err := d.Tokenize(sql)
+	tokens, arena, err := d.tokenizeForParse(sql)
+	if arena != nil {
+		defer arena.release()
+	}
 	if err != nil {
 		return nil, err
 	}
 	return d.NewParser(opts).ParseTokens(tokens, sql)
+}
+
+// tokenizeForParse tokenizes sql for a parse that keeps no tokens, into a pooled arena (nil when
+// a dialect tokenizer hook is in use).
+func (d *Dialect) tokenizeForParse(sql string) ([]*Token, *tokenArena, error) {
+	if d.hooks.tokenize != nil {
+		tokens, err := d.Tokenize(sql)
+		return tokens, nil, err
+	}
+	return d.tok.tokenizeInArena(sql)
 }
 
 // ParseOne mirrors sqlglot.parse_one(sql, read=dialect).
@@ -696,7 +709,10 @@ func (d *Dialect) ParseOne(sql string, opts *ParseOptions) (*Expr, error) {
 
 // ParseOneInto mirrors sqlglot.parse_one(sql, read=dialect, into=kind).
 func (d *Dialect) ParseOneInto(kind Kind, sql string, opts *ParseOptions) (*Expr, error) {
-	tokens, err := d.Tokenize(sql)
+	tokens, arena, err := d.tokenizeForParse(sql)
+	if arena != nil {
+		defer arena.release()
+	}
 	if err != nil {
 		return nil, err
 	}
