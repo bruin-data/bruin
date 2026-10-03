@@ -129,6 +129,11 @@ conformance tests point at exactly what changed.
   `callFuncBuilder` strips immediately) and the parser / `exp.func` ports validate against it.
 - **Python object reprs.** One ClickHouse JSON-path parse stores the Dialect object inside the tree;
   its Python repr contains a memory address, so the parse-tree comparison normalizes it.
+- **`False` inside expression lists.** A couple of malformed property clauses (Oracle `WITH (GLOBAL)`
+  without `TEMPORARY`, Snowflake `USING` without `TEMPLATE`) make SQLGlot put a bare `False` into a
+  `Properties` list, and generating the statement later fails with `<class 'bool'>`. Go expression
+  lists cannot hold a bool, so the port drops it and generation succeeds. Only reachable with
+  malformed DDL.
 
 ## 4. Changes in Bruin
 
