@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/ajitpratap0/GoSQLX/pkg/sqlglot"
+	"github.com/bruin-data/bruin/pkg/sqlengine"
 )
 
 // attrErr mirrors the AttributeError Python raises when calling a Query builder on a non-Query.
-func attrErr(e *sqlglot.Expr, attr string) error {
+func attrErr(e *sqlengine.Expr, attr string) error {
 	name := "NoneType"
 	if e != nil {
 		name = e.Kind().Name()
@@ -76,7 +76,7 @@ func replaceTableReferences(query, dialectName string, mappingAny any) (any, err
 		if pq == nil {
 			return nil, &pyErr{"'NoneType' object has no attribute 'find_all'"}
 		}
-		for tableNode := range pq.FindAll(sqlglot.KTable) {
+		for tableNode := range pq.FindAll(sqlengine.KTable) {
 			if mappingIsNil {
 				return nil, &pyErr{"'NoneType' object has no attribute 'items'"}
 			}
@@ -93,7 +93,7 @@ func replaceTableReferences(query, dialectName string, mappingAny any) (any, err
 					continue
 				}
 				dst := splitTablePath(newTableName)
-				thisNode, ok := tableNode.Arg("this").(*sqlglot.Expr)
+				thisNode, ok := tableNode.Arg("this").(*sqlengine.Expr)
 				if !ok || thisNode == nil {
 					// Python: table_node.this.set(...) on None / a raw string.
 					return nil, &pyErr{fmt.Sprintf("'%s' object has no attribute 'set'", pyTypeName(tableNode.Arg("this")))}
@@ -115,7 +115,7 @@ func replaceTableReferences(query, dialectName string, mappingAny any) (any, err
 			}
 		}
 
-		for columnNode := range pq.FindAll(sqlglot.KColumn) {
+		for columnNode := range pq.FindAll(sqlengine.KColumn) {
 			colTable := columnNode.Text("table")
 			if colTable == "" {
 				continue
@@ -170,20 +170,20 @@ func sortStrings(s []string) {
 }
 
 // preserveTSQLInferredAliasCase mirrors rename._preserve_tsql_inferred_alias_case.
-func preserveTSQLInferredAliasCase(q *sqlglot.Expr) {
-	for _, node := range q.FindAllList(sqlglot.KCTE, sqlglot.KSubquery) {
-		sqlglot.QualifyDerivedTableOutputsTSQL(node)
+func preserveTSQLInferredAliasCase(q *sqlengine.Expr) {
+	for _, node := range q.FindAllList(sqlengine.KCTE, sqlengine.KSubquery) {
+		sqlengine.QualifyDerivedTableOutputsTSQL(node)
 	}
-	for alias := range q.FindAll(sqlglot.KAlias) {
+	for alias := range q.FindAll(sqlengine.KAlias) {
 		aliasIdent := alias.ArgE("alias")
-		if !aliasIdent.IsA(sqlglot.KIdentifier) {
+		if !aliasIdent.IsA(sqlengine.KIdentifier) {
 			continue
 		}
 		source := alias.This()
-		var sourceIdent *sqlglot.Expr
-		if source.IsA(sqlglot.KColumn) && source.This().IsA(sqlglot.KIdentifier) {
+		var sourceIdent *sqlengine.Expr
+		if source.IsA(sqlengine.KColumn) && source.This().IsA(sqlengine.KIdentifier) {
 			sourceIdent = source.This()
-		} else if source.IsA(sqlglot.KIdentifier) {
+		} else if source.IsA(sqlengine.KIdentifier) {
 			sourceIdent = source
 		}
 		if sourceIdent == nil {
@@ -216,10 +216,10 @@ func addLimit(query string, limit int, dialectName string) (any, error) {
 	if err != nil || parsed == nil {
 		return map[string]any{"error": "cannot parse query"}, nil
 	}
-	if !parsed.IsA(sqlglot.KQuery) {
+	if !parsed.IsA(sqlengine.KQuery) {
 		return nil, attrErr(parsed, "limit")
 	}
-	limited, err := sqlglot.QueryLimitBuild(parsed, limit, d)
+	limited, err := sqlengine.QueryLimitBuild(parsed, limit, d)
 	if err != nil {
 		return nil, err
 	}
@@ -247,7 +247,7 @@ func isSingleSelectQuery(query, dialectName string) map[string]any {
 		return map[string]any{"is_single_select": false, "error": "cannot parse query"}
 	}
 	if len(stmts) == 1 {
-		return map[string]any{"is_single_select": stmts[0].IsA(sqlglot.KSelect, sqlglot.KQuery), "error": ""}
+		return map[string]any{"is_single_select": stmts[0].IsA(sqlengine.KSelect, sqlengine.KQuery), "error": ""}
 	}
 	return map[string]any{"is_single_select": false, "error": ""}
 }
@@ -256,7 +256,7 @@ func isSingleSelectQuery(query, dialectName string) map[string]any {
 // extract_select / select_cte / freeze_time / add_ctes
 // ---------------------------------------------------------------------------
 
-func parseOneForUnitTest(query, dialectName string) (*sqlglot.Dialect, *sqlglot.Expr, map[string]any) {
+func parseOneForUnitTest(query, dialectName string) (*sqlengine.Dialect, *sqlengine.Expr, map[string]any) {
 	dialectName = normalizeDialect(dialectName)
 	if pyStrip(query) == "" {
 		return nil, nil, map[string]any{"error": "cannot parse query"}
@@ -275,19 +275,19 @@ func parseOneForUnitTest(query, dialectName string) (*sqlglot.Dialect, *sqlglot.
 	return d, parsed, nil
 }
 
-var writeKinds = []sqlglot.Kind{sqlglot.KInsert, sqlglot.KUpdate, sqlglot.KDelete, sqlglot.KMerge}
+var writeKinds = []sqlengine.Kind{sqlengine.KInsert, sqlengine.KUpdate, sqlengine.KDelete, sqlengine.KMerge}
 
 // preserveFabricDerivedColumnCase mirrors _preserve_fabric_derived_column_case.
-func preserveFabricDerivedColumnCase(e *sqlglot.Expr) {
-	for derived := range e.FindAll(sqlglot.KCTE, sqlglot.KSubquery) {
+func preserveFabricDerivedColumnCase(e *sqlengine.Expr) {
+	for derived := range e.FindAll(sqlengine.KCTE, sqlengine.KSubquery) {
 		alias := derived.ArgE("alias")
-		if alias.IsA(sqlglot.KTableAlias) && len(alias.ArgL("columns")) > 0 {
+		if alias.IsA(sqlengine.KTableAlias) && len(alias.ArgL("columns")) > 0 {
 			continue
 		}
 		for _, projection := range derived.This().Selects() {
-			if projection.IsA(sqlglot.KColumn) && projection.Alias() == "" {
+			if projection.IsA(sqlengine.KColumn) && projection.Alias() == "" {
 				quoted := projection.This().ArgB("quoted")
-				projection.Replace(sqlglot.AliasWithQuote(projection.Copy(), projection.Name(), quoted))
+				projection.Replace(sqlengine.AliasWithQuote(projection.Copy(), projection.Name(), quoted))
 			}
 		}
 	}
@@ -299,13 +299,13 @@ func extractSelect(query, dialectName string) map[string]any {
 		return errResp
 	}
 	inner := parsed
-	if parsed.IsA(sqlglot.KCreate, sqlglot.KInsert) {
+	if parsed.IsA(sqlengine.KCreate, sqlengine.KInsert) {
 		inner = parsed.Expression()
 		if inner == nil {
 			return map[string]any{"error": "asset has no SELECT to unit test"}
 		}
 	}
-	if !inner.IsA(sqlglot.KQuery) {
+	if !inner.IsA(sqlengine.KQuery) {
 		return map[string]any{"error": "asset is not a SELECT and has no inner SELECT to unit test"}
 	}
 	if inner.Arg("into") != nil {
@@ -347,9 +347,9 @@ func selectCTE(query, dialectName, cteName string) map[string]any {
 	if !found {
 		quoted := make([]string, len(available))
 		for i, a := range available {
-			quoted[i] = sqlglot.PyRepr(a)
+			quoted[i] = sqlengine.PyRepr(a)
 		}
-		return map[string]any{"error": fmt.Sprintf("no CTE named %s in the query (available: [%s])", sqlglot.PyRepr(cteName), strings.Join(quoted, ", "))}
+		return map[string]any{"error": fmt.Sprintf("no CTE named %s in the query (available: [%s])", sqlengine.PyRepr(cteName), strings.Join(quoted, ", "))}
 	}
 	withSQL, err := d.Generate(with, nil)
 	if err != nil {
@@ -381,14 +381,14 @@ func freezeTime(query, dialectName, executionTime string) map[string]any {
 	if len(pieces) > 1 {
 		timePart = pieces[1]
 	}
-	frozen := parsed.Transform(func(n *sqlglot.Expr) *sqlglot.Expr {
+	frozen := parsed.Transform(func(n *sqlengine.Expr) *sqlengine.Expr {
 		switch {
-		case n.IsA(sqlglot.KCurrentTimestamp):
-			return sqlglot.CastToType(sqlglot.LiteralString(executionTime), "TIMESTAMP")
-		case n.IsA(sqlglot.KCurrentDate):
-			return sqlglot.CastToType(sqlglot.LiteralString(datePart), "DATE")
-		case n.IsA(sqlglot.KCurrentTime):
-			return sqlglot.CastToType(sqlglot.LiteralString(timePart), "TIME")
+		case n.IsA(sqlengine.KCurrentTimestamp):
+			return sqlengine.CastToType(sqlengine.LiteralString(executionTime), "TIMESTAMP")
+		case n.IsA(sqlengine.KCurrentDate):
+			return sqlengine.CastToType(sqlengine.LiteralString(datePart), "DATE")
+		case n.IsA(sqlengine.KCurrentTime):
+			return sqlengine.CastToType(sqlengine.LiteralString(timePart), "TIME")
 		}
 		return n
 	}, true)
@@ -417,16 +417,16 @@ func addCTEs(query, dialectName string, ctesAny any) map[string]any {
 			ctes = append(ctes, cte{str(m["name"]), str(m["query"])})
 		}
 	}
-	result, err := func() (out *sqlglot.Expr, err error) {
+	result, err := func() (out *sqlengine.Expr, err error) {
 		existing := parsed.ArgE("with_")
 		if existing != nil {
-			var newNodes []*sqlglot.Expr
+			var newNodes []*sqlengine.Expr
 			for _, c := range ctes {
 				body, err := d.ParseOne(c.query, nil)
 				if err != nil {
 					return nil, err
 				}
-				newNodes = append(newNodes, sqlglot.NewCTE(body, c.name))
+				newNodes = append(newNodes, sqlengine.NewCTE(body, c.name))
 			}
 			existing.Set("expressions", append(newNodes, existing.Expressions()...))
 			return parsed, nil
@@ -434,10 +434,10 @@ func addCTEs(query, dialectName string, ctesAny any) map[string]any {
 		cur := parsed
 		for _, c := range ctes {
 			// with_ is defined on Query, Insert and Update.
-			if !cur.IsA(sqlglot.KQuery, sqlglot.KInsert, sqlglot.KUpdate) {
+			if !cur.IsA(sqlengine.KQuery, sqlengine.KInsert, sqlengine.KUpdate) {
 				return nil, attrErr(cur, "with_")
 			}
-			next, err := sqlglot.QueryWithBuild(cur, c.name, c.query, d)
+			next, err := sqlengine.QueryWithBuild(cur, c.name, c.query, d)
 			if err != nil {
 				return nil, err
 			}
@@ -459,14 +459,14 @@ func addCTEs(query, dialectName string, ctesAny any) map[string]any {
 // read-only classification
 // ---------------------------------------------------------------------------
 
-var readOnlyRootKinds = []sqlglot.Kind{
-	sqlglot.KSelect, sqlglot.KUnion, sqlglot.KIntersect, sqlglot.KExcept, sqlglot.KSubquery, sqlglot.KShow, sqlglot.KDescribe,
+var readOnlyRootKinds = []sqlengine.Kind{
+	sqlengine.KSelect, sqlengine.KUnion, sqlengine.KIntersect, sqlengine.KExcept, sqlengine.KSubquery, sqlengine.KShow, sqlengine.KDescribe,
 }
 
-var readOnlyForbiddenKinds = []sqlglot.Kind{
-	sqlglot.KDDL, sqlglot.KDML, sqlglot.KDrop, sqlglot.KAlter, sqlglot.KTruncateTable, sqlglot.KGrant, sqlglot.KRevoke,
-	sqlglot.KExecute, sqlglot.KTransaction, sqlglot.KCommit, sqlglot.KRollback, sqlglot.KUse, sqlglot.KPragma,
-	sqlglot.KInto, sqlglot.KLock, sqlglot.KCommand, sqlglot.KNextValueFor,
+var readOnlyForbiddenKinds = []sqlengine.Kind{
+	sqlengine.KDDL, sqlengine.KDML, sqlengine.KDrop, sqlengine.KAlter, sqlengine.KTruncateTable, sqlengine.KGrant, sqlengine.KRevoke,
+	sqlengine.KExecute, sqlengine.KTransaction, sqlengine.KCommit, sqlengine.KRollback, sqlengine.KUse, sqlengine.KPragma,
+	sqlengine.KInto, sqlengine.KLock, sqlengine.KCommand, sqlengine.KNextValueFor,
 }
 
 func isReadOnlyQuery(query, dialectName string) map[string]any {
@@ -484,7 +484,7 @@ func isReadOnlyQuery(query, dialectName string) map[string]any {
 			return map[string]any{"is_read_only": false, "error": err.Error()}
 		}
 		for _, t := range toks {
-			if t.Type == sqlglot.TK_DARROW {
+			if t.Type == sqlengine.TK_DARROW {
 				return map[string]any{"is_read_only": false, "error": ""}
 			}
 		}
@@ -493,9 +493,9 @@ func isReadOnlyQuery(query, dialectName string) map[string]any {
 	if err != nil {
 		return map[string]any{"is_read_only": false, "error": err.Error()}
 	}
-	var stmts []*sqlglot.Expr
+	var stmts []*sqlengine.Expr
 	for _, s := range parsed {
-		if s != nil && !s.IsA(sqlglot.KSemicolon) {
+		if s != nil && !s.IsA(sqlengine.KSemicolon) {
 			stmts = append(stmts, s)
 		}
 	}
@@ -514,16 +514,16 @@ func isReadOnlyQuery(query, dialectName string) map[string]any {
 	return map[string]any{"is_read_only": true, "error": ""}
 }
 
-func isReadOnlyStatement(stmt *sqlglot.Expr, d *sqlglot.Dialect, dialectName string) (bool, error) {
-	if stmt.IsA(sqlglot.KCommand) && dialectName == "snowflake" {
-		if pyUpper(stmt.Name()) != "EXPLAIN" || !stmt.Expression().IsA(sqlglot.KLiteral) {
+func isReadOnlyStatement(stmt *sqlengine.Expr, d *sqlengine.Dialect, dialectName string) (bool, error) {
+	if stmt.IsA(sqlengine.KCommand) && dialectName == "snowflake" {
+		if pyUpper(stmt.Name()) != "EXPLAIN" || !stmt.Expression().IsA(sqlengine.KLiteral) {
 			return false, nil
 		}
 		explained, err := d.Parse(stmt.Expression().ThisS(), nil)
 		if err != nil {
 			return false, err
 		}
-		if len(explained) != 1 || !explained[0].IsA(sqlglot.KQuery) {
+		if len(explained) != 1 || !explained[0].IsA(sqlengine.KQuery) {
 			return false, nil
 		}
 		return isReadOnlyStatement(explained[0], d, dialectName)
@@ -535,23 +535,23 @@ func isReadOnlyStatement(stmt *sqlglot.Expr, d *sqlglot.Dialect, dialectName str
 		if node.IsA(readOnlyForbiddenKinds...) {
 			return false, nil
 		}
-		if dialectName != "snowflake" && node.IsA(sqlglot.KAnonymous) {
+		if dialectName != "snowflake" && node.IsA(sqlengine.KAnonymous) {
 			return false, nil
 		}
-		if node.IsA(sqlglot.KDynamicIdentifier) && node.Arg("expressions") != nil {
+		if node.IsA(sqlengine.KDynamicIdentifier) && node.Arg("expressions") != nil {
 			return false, nil
 		}
-		if node.IsA(sqlglot.KColumn) && pyUpper(node.Name()) == "NEXTVAL" {
+		if node.IsA(sqlengine.KColumn) && pyUpper(node.Name()) == "NEXTVAL" {
 			return false, nil
 		}
-		if dialectName != "snowflake" && node.IsA(sqlglot.KFunc) && node.Parent().IsA(sqlglot.KDot) {
+		if dialectName != "snowflake" && node.IsA(sqlengine.KFunc) && node.Parent().IsA(sqlengine.KDot) {
 			return false, nil
 		}
 	}
 	return true, nil
 }
 
-func pyUpper(s string) string { return sqlglot.PyUpper(s) }
+func pyUpper(s string) string { return sqlengine.PyUpper(s) }
 
 // pyTypeName mirrors type(v).__name__ for raw argument values.
 func pyTypeName(v any) string {
@@ -560,7 +560,7 @@ func pyTypeName(v any) string {
 		return "NoneType"
 	case string:
 		return "str"
-	case *sqlglot.Expr:
+	case *sqlengine.Expr:
 		return x.Kind().Name()
 	}
 	return fmt.Sprintf("%T", v)

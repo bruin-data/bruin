@@ -13,8 +13,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-// SQLParser analyzes SQL with an in-process Go port of SQLGlot (see the sqlglot package in
-// the gosqlx fork). It used to drive an embedded Python interpreter; the API is unchanged.
+// SQLParser analyzes SQL in-process with pkg/sqlengine. It used to drive an embedded Python
+// interpreter running SQLGlot; the API and behavior are unchanged.
 type SQLParser struct {
 	tmpDir         string
 	started        bool

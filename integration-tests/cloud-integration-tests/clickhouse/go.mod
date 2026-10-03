@@ -22,7 +22,6 @@ require (
 	github.com/ClickHouse/ch-go v0.66.0 // indirect
 	github.com/ClickHouse/clickhouse-go/v2 v2.37.1 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
-	github.com/ajitpratap0/GoSQLX/pkg/sqlglot v0.0.0-00010101000000-000000000000 // indirect
 	github.com/andybalholm/brotli v1.2.0 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.41.5 // indirect
 	github.com/aws/aws-sdk-go-v2/config v1.29.16 // indirect
@@ -113,5 +112,3 @@ require (
 	golang.org/x/text v0.41.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/ajitpratap0/GoSQLX/pkg/sqlglot => ../../../.context/gosqlx/pkg/sqlglot

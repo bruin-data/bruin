@@ -289,12 +289,9 @@ require (
 
 require (
 	github.com/99designs/keyring v1.2.2
-	github.com/ajitpratap0/GoSQLX/pkg/sqlglot v0.0.0-00010101000000-000000000000
 	github.com/bruin-data/bruin/semantic-engine v0.0.0
 	github.com/charmbracelet/x/ansi v0.11.6
 	github.com/gofrs/flock v0.13.0
 )
 
 replace github.com/bruin-data/bruin/semantic-engine => ./semantic-engine
-
-replace github.com/ajitpratap0/GoSQLX/pkg/sqlglot => ./.context/gosqlx/pkg/sqlglot

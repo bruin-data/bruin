@@ -1,14 +1,13 @@
 # Replacing the sqlglot (Python) parser with Go — decisions and tradeoffs
 
 This document records the decisions made while replacing Bruin's embedded-Python SQLGlot parser
-with a pure-Go implementation. It is written for review; nothing has been pushed anywhere (the
-gosqlx work is on the local branch `sqlglot-port` of `.context/gosqlx`, the Bruin work on this branch).
+with a pure-Go implementation. It is written for review; nothing has been pushed anywhere.
 
 ## TL;DR
 
 - Bruin no longer embeds Python. `pkg/sqlparser` keeps its exact public API and now runs an
-  in-process Go port of the old Python command server on top of `pkg/sqlglot`, a faithful Go port
-  of sqlglot 30.13.0 that lives in the gosqlx fork.
+  in-process Go port of the old Python command server on top of `pkg/sqlengine`, a Go port of
+  sqlglot 30.13.0 that lives in this repository (stdlib-only, no new dependencies).
 - Parity evidence (all at 100%):
   - all pre-existing sqlparser tests and the full `test/sqlparser-dialect-contracts` suite
     (latest: `dbe969430`), `make test`, `make integration-test-light`;
@@ -29,20 +28,21 @@ gosqlx work is on the local branch `sqlglot-port` of `.context/gosqlx`, the Brui
 - Size: the stripped darwin/arm64 binary shrinks from 196 MB to 153 MB, and the repository loses
   ~141 MB of vendored wheels.
 
-## 1. Architecture: a faithful Go port of sqlglot inside the gosqlx fork
+## 1. Architecture: a Go port of sqlglot in `pkg/sqlengine`
 
-**Decision:** the Go implementation lives in the gosqlx fork as a new, self-contained package
-`pkg/sqlglot`, its own Go module (`github.com/ajitpratap0/GoSQLX/pkg/sqlglot`, go 1.24, stdlib-only).
-It is a line-by-line port of sqlglot v30.13.0 (the exact version Bruin embedded): tokenizer,
+**Decision:** the Go implementation is `pkg/sqlengine`, a self-contained package in this repository
+(standard library only). It is a line-by-line port of sqlglot v30.13.0 (the exact version Bruin embedded): tokenizer,
 expression model, parser, generator, 21 dialects (the 16 Bruin dialects plus hive, spark2, presto
 as parents and sqlite, which Bruin's tests use), `transforms`, the `dialects/dialect.py` helpers,
 JSON paths, the whole optimizer (qualify, annotate_types incl. per-dialect typing, simplify,
 unnest/merge subqueries, pushdown, normalize, canonicalize, eliminate_*, optimize_joins — i.e. the
 full default rule list, which Bruin's lineage fallback path uses), schema, scope and lineage.
 
-**Why a nested module?** The gosqlx root module requires Go 1.26.1 and pulls in LSP/MCP
-dependencies; Bruin is on Go 1.25. `pkg/sqlglot` has no dependency on the rest of gosqlx, so a
-nested module keeps Bruin's dependency graph to a single stdlib-only module.
+**Why in Bruin, not in the gosqlx fork?** The port was first written inside the gosqlx fork, but it
+never used anything from gosqlx (its tokenizer, parser and AST are untouched and unused), so
+hosting it there only added a cross-repo dependency, a Go-version mismatch (gosqlx requires Go
+1.26.1) and a release/tagging step. It now lives next to its only consumer. It is still a
+derivative of sqlglot, which is MIT licensed: the license is kept in `pkg/sqlengine/LICENSE.sqlglot`.
 
 **Why not extend gosqlx's existing parser/AST?** Bruin's contract tests pin SQLGlot's observable
 behavior very precisely: exact regenerated SQL per dialect (e.g. `CROSS JOIN UNNEST(...) AS x`,
@@ -54,13 +54,13 @@ nodes, comments, function-name spelling, argument order) and its parser accepts/
 language per dialect. Reaching byte-for-byte parity on top of it would have meant re-implementing
 SQLGlot's semantics anyway, while fighting a different design and risking regressions in gosqlx's
 own consumers (LSP, linter, formatter). Mirroring SQLGlot's structure is the only practical way to
-get — and keep — exact parity, and makes future upgrades a mechanical diff against SQLGlot. The
-existing gosqlx packages are untouched.
+get — and keep — exact parity, and makes future upgrades a mechanical diff against SQLGlot.
 
 **Generated vs hand-ported code.** Everything that is pure data in SQLGlot (token types, the 1,038
 expression classes and their argument specs/MRO, data types, every dialect's tokenizer/parser/
 generator settings, keyword tables, token sets, type mappings, unicode case tables) is generated from
-the live Python objects by `tools/sqlglotgen/gen.py` (reproducible, gofmt'ed), so it cannot drift.
+the live Python objects by `pkg/sqlengine/codegen/gen.py` (reproducible, gofumpt'ed like the rest of
+the repo), so it cannot drift.
 Procedural code is ported by hand, keeping Python's structure and names (`_parse_table_parts` ->
 `parseTableParts`, `table_sql` -> `tableSQL`, dialect overrides in `d_<dialect>*.go`) so the two can
 be diffed side by side. Python's virtual dispatch (dialect subclasses overriding parser/generator
@@ -68,7 +68,7 @@ methods) is modelled with per-dialect hook tables; class-level callable tables (
 TRANSFORMS, ...) are per-dialect maps built once.
 
 **Upgrading sqlglot later:** bump the pin in `gen.py`, regenerate tables and the conformance corpus
-(`tools/sqlglotgen/README.md`), then port the procedural diff between the two sqlglot tags — the
+(`pkg/sqlengine/codegen/README.md`), then port the procedural diff between the two sqlglot tags — the
 conformance tests point at exactly what changed.
 
 ## 2. Conformance testing
@@ -76,7 +76,7 @@ conformance tests point at exactly what changed.
 1. **Bruin's own tests**: all pre-existing sqlglot-backed tests plus the contract suite from
    `test/sqlparser-dialect-contracts`, merged into this branch (re-fetched regularly; latest
    `dbe969430`). The contract suite was first validated against the Python implementation.
-2. **SQLGlot's own test-suite corpus** (`pkg/sqlglot/conformance_*_test.go`): every SQL string used
+2. **SQLGlot's own test-suite corpus** (`pkg/sqlengine/conformance_*_test.go`): every SQL string used
    in sqlglot's `tests/dialects/*` and `tests/fixtures/identity.sql` for the 21 ported dialects
    (15,124 statements), recorded through the real Python implementation: tokens, full parse trees
    and same-dialect regenerated SQL. 100% identical.
@@ -103,7 +103,7 @@ conformance tests point at exactly what changed.
   assertions.
 - **Logging.** SQLGlot logs warnings (unsupported syntax falling back to `Command`, unsupported
   generator features); Bruin sent those to `~/.bruin/pylogs`. The port does not log by default
-  (`sqlglot.Logger` is an overridable no-op hook).
+  (`sqlengine.Logger` is an overridable no-op hook).
 - **Concurrency.** SQLGlot's CONNECT BY parsing mutates a class-level table temporarily; the Go port
   keeps that state per parser instance so concurrent parses are safe. `pkg/sqlparser` keeps the old
   semantics of one command at a time per `SQLParser` instance (previously one Python process each)
@@ -145,19 +145,16 @@ conformance tests point at exactly what changed.
 - **`pkg/sqlparser`:** public API unchanged. `sendCommand` still JSON-roundtrips each request (so
   inputs are normalized exactly like before: map key order, nil vs empty maps, numbers) and calls
   `dispatch`, an in-process Go port of `pythonsrc/main.py`, `parser/main.py` and `rename.py`
-  (`glot.go`, `glot_lineage.go`, `glot_ops.go`). `Start`/`Close` are kept as cheap lifecycle no-ops;
+  (`engine.go`, `engine_lineage.go`, `engine_ops.go`). `Start`/`Close` are kept as cheap lifecycle no-ops;
   there is no subprocess anymore, so the parser can no longer hang or desynchronize, and the first
   call no longer pays the CPython extraction/start-up cost.
 - **One test assertion changed:** `TestSQLParser_HoistingStartsLazilyAndPreservesErrors` asserted
   that starting the parser *extracts embedded files* into its temp dir. That is an implementation
   detail of the Python embedding; it now asserts the directory stays empty. Everything else in the
   test (lazy start, hoisting results, error preservation) is unchanged. No other expectation changed.
-- **Dependency wiring (local only for now):** `go.mod` requires
-  `github.com/ajitpratap0/GoSQLX/pkg/sqlglot` with a `replace` to `./.context/gosqlx/pkg/sqlglot`
-  (same in `integration-tests/cloud-integration-tests/clickhouse`, the only nested module that
-  imports `pkg/sqlparser`). **Before shipping:** push the gosqlx branch, tag the nested module
-  (`pkg/sqlglot/vX.Y.Z`), drop the `replace` lines and `go get` the tag — or, if you prefer to keep
-  it in-tree, move `pkg/sqlglot` under Bruin (it has no dependencies, so this is a copy).
+- **Added:** `pkg/sqlengine` (≈95k lines of Go, of which ≈7k generated; 1.5 MB of gzipped
+  conformance testdata; the Python codegen scripts in `pkg/sqlengine/codegen`). No new module
+  dependencies; `go.mod` only loses `go-embed-python`.
 
 ## 5. Robustness: mutation fuzzing
 

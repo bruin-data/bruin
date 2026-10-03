@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ajitpratap0/GoSQLX/pkg/sqlglot"
+	"github.com/bruin-data/bruin/pkg/sqlengine"
 )
 
 // cmdLineage mirrors get_column_lineage(query, schema, dialect) including the error a
@@ -24,7 +24,7 @@ func cmdLineage(c map[string]any) (any, error) {
 // rawSchema is the {"table.path": {"col": "type"}} mapping Bruin passes, preserving order.
 type rawSchema struct {
 	keys   []string
-	tables map[string]*sqlglot.SchemaMap
+	tables map[string]*sqlengine.SchemaMap
 	// nested holds values that are not flat column maps (nested catalog/db dicts).
 	nested map[string]any
 }
@@ -38,7 +38,7 @@ func toRawSchema(v any) (*rawSchema, error) {
 		if s == nil {
 			return nil, &pyErr{"'NoneType' object is not iterable"}
 		}
-		rs := &rawSchema{tables: map[string]*sqlglot.SchemaMap{}, nested: map[string]any{}}
+		rs := &rawSchema{tables: map[string]*sqlengine.SchemaMap{}, nested: map[string]any{}}
 		keys := make([]string, 0, len(s))
 		for k := range s {
 			keys = append(keys, k)
@@ -52,7 +52,7 @@ func toRawSchema(v any) (*rawSchema, error) {
 				rs.tables[k] = nil
 				continue
 			}
-			cols := sqlglot.NewSchemaMap()
+			cols := sqlengine.NewSchemaMap()
 			colKeys := make([]string, 0, len(s[k]))
 			for ck := range s[k] {
 				colKeys = append(colKeys, ck)
@@ -65,7 +65,7 @@ func toRawSchema(v any) (*rawSchema, error) {
 		}
 		return rs, nil
 	case map[string]any:
-		rs := &rawSchema{tables: map[string]*sqlglot.SchemaMap{}, nested: map[string]any{}}
+		rs := &rawSchema{tables: map[string]*sqlengine.SchemaMap{}, nested: map[string]any{}}
 		keys := make([]string, 0, len(s))
 		for k := range s {
 			keys = append(keys, k)
@@ -82,11 +82,11 @@ func toRawSchema(v any) (*rawSchema, error) {
 	return nil, &pyErr{fmt.Sprintf("unsupported schema type %T", v)}
 }
 
-func anyToSchemaMap(v any) *sqlglot.SchemaMap {
+func anyToSchemaMap(v any) *sqlengine.SchemaMap {
 	if v == nil {
 		return nil
 	}
-	m := sqlglot.NewSchemaMap()
+	m := sqlengine.NewSchemaMap()
 	obj, ok := v.(map[string]any)
 	if !ok {
 		if ms, ok := v.(map[string]string); ok {
@@ -118,10 +118,10 @@ func anyToSchemaMap(v any) *sqlglot.SchemaMap {
 }
 
 // alignSchemaCasing mirrors align_schema_casing.
-func alignSchemaCasing(schema *rawSchema, parsed *sqlglot.Expr) *rawSchema {
+func alignSchemaCasing(schema *rawSchema, parsed *sqlengine.Expr) *rawSchema {
 	queryTables := map[string]bool{}
 	var ordered []string
-	for table := range parsed.FindAll(sqlglot.KTable) {
+	for table := range parsed.FindAll(sqlengine.KTable) {
 		var parts []string
 		for _, p := range table.Parts() {
 			parts = append(parts, p.Name())
@@ -138,7 +138,7 @@ func alignSchemaCasing(schema *rawSchema, parsed *sqlglot.Expr) *rawSchema {
 	for _, qt := range ordered {
 		lowerToQuery[pyLower(qt)] = qt
 	}
-	out := &rawSchema{tables: map[string]*sqlglot.SchemaMap{}, nested: map[string]any{}}
+	out := &rawSchema{tables: map[string]*sqlengine.SchemaMap{}, nested: map[string]any{}}
 	for _, k := range schema.keys {
 		out.keys = append(out.keys, k)
 		out.tables[k] = schema.tables[k]
@@ -155,20 +155,20 @@ func alignSchemaCasing(schema *rawSchema, parsed *sqlglot.Expr) *rawSchema {
 }
 
 // schemaDictToSchemaObject mirrors schema_dict_to_schema_object.
-func schemaDictToSchemaObject(schema *rawSchema) *sqlglot.SchemaMap {
-	result := sqlglot.NewSchemaMap()
+func schemaDictToSchemaObject(schema *rawSchema) *sqlengine.SchemaMap {
+	result := sqlengine.NewSchemaMap()
 	for _, path := range schema.keys {
 		current := result
 		parts := strings.Split(path, ".")
 		for _, part := range parts[:len(parts)-1] {
 			v, ok := current.Get(part)
 			if !ok {
-				nm := sqlglot.NewSchemaMap()
+				nm := sqlengine.NewSchemaMap()
 				current.Set(part, nm)
 				current = nm
 				continue
 			}
-			nm, isMap := v.(*sqlglot.SchemaMap)
+			nm, isMap := v.(*sqlengine.SchemaMap)
 			if !isMap {
 				// Python would fail on item assignment into a non-dict.
 				panic(&pyErr{"'str' object does not support item assignment"})
@@ -181,7 +181,7 @@ func schemaDictToSchemaObject(schema *rawSchema) *sqlglot.SchemaMap {
 }
 
 // schemaValue converts a table's column map to a SchemaMap value; a nil map is Python None.
-func schemaValue(m *sqlglot.SchemaMap) any {
+func schemaValue(m *sqlengine.SchemaMap) any {
 	if m == nil {
 		return nil
 	}
@@ -189,8 +189,8 @@ func schemaValue(m *sqlglot.SchemaMap) any {
 }
 
 // flatSchemaMap returns the raw {"a.b": {...}} mapping as a SchemaMap (keys are not split).
-func flatSchemaMap(schema *rawSchema) *sqlglot.SchemaMap {
-	m := sqlglot.NewSchemaMap()
+func flatSchemaMap(schema *rawSchema) *sqlengine.SchemaMap {
+	m := sqlengine.NewSchemaMap()
 	for _, k := range schema.keys {
 		m.Set(k, schemaValue(schema.tables[k]))
 	}
@@ -223,19 +223,19 @@ func getColumnLineage(query string, schema *rawSchema, dialectName string) (out 
 	if perr != nil {
 		return lineageError("Parse error: " + perr.Error()), nil
 	}
-	if !parsed.IsA(sqlglot.KQuery) {
+	if !parsed.IsA(sqlengine.KQuery) {
 		return lineageError("Failed to parse query"), nil
 	}
 
 	aligned := alignSchemaCasing(schema, parsed)
 	nested := schemaDictToSchemaObject(aligned)
 
-	optimized, oerr := sqlglot.OptimizeSafe(parsed, nested, d, []sqlglot.OptimizerRule{
-		sqlglot.RuleQualify, sqlglot.RuleUnnestSubqueries, sqlglot.RuleMergeSubqueries, sqlglot.RuleAnnotateTypes,
+	optimized, oerr := sqlengine.OptimizeSafe(parsed, nested, d, []sqlengine.OptimizerRule{
+		sqlengine.RuleQualify, sqlengine.RuleUnnestSubqueries, sqlengine.RuleMergeSubqueries, sqlengine.RuleAnnotateTypes,
 	})
 	if oerr != nil {
 		base, _ := getDialect("")
-		optimized, oerr = sqlglot.OptimizeSafe(parsed, nested, base, nil)
+		optimized, oerr = sqlengine.OptimizeSafe(parsed, nested, base, nil)
 		if oerr != nil {
 			return lineageError("Schema Error: " + oerr.Error()), nil
 		}
@@ -246,20 +246,20 @@ func getColumnLineage(query string, schema *rawSchema, dialectName string) (out 
 		return map[string]any{"columns": []any{}, "non_selected_columns": []any{}, "errors": []string{}}, nil
 	}
 
-	scope := sqlglot.BuildScope(optimized)
+	scope := sqlengine.BuildScope(optimized)
 	// lineage() builds its MappingSchema from the raw schema; failures make every lineage call fail.
-	var lineageSchema *sqlglot.MappingSchema
+	var lineageSchema *sqlengine.MappingSchema
 	schemaOK := func() (ok bool) {
 		defer func() {
 			if recover() != nil {
 				ok = false
 			}
 		}()
-		lineageSchema = sqlglot.NewMappingSchema(flatSchemaMap(schema), nil, d, true, nil)
+		lineageSchema = sqlengine.NewMappingSchema(flatSchemaMap(schema), nil, d, true, nil)
 		return true
 	}()
 
-	byColumn := map[string]*sqlglot.LineageNode{}
+	byColumn := map[string]*sqlengine.LineageNode{}
 	names := map[string]bool{}
 	unique := true
 	for _, c := range cols {
@@ -269,7 +269,7 @@ func getColumnLineage(query string, schema *rawSchema, dialectName string) (out 
 		names[c.name] = true
 	}
 	if unique && schemaOK {
-		_, nodes, lerr := sqlglot.LineageAll(optimized, sqlglot.LineageOptions{
+		_, nodes, lerr := sqlengine.LineageAll(optimized, sqlengine.LineageOptions{
 			Schema: lineageSchema, Dialect: d, Scope: scope, TrimSelects: false, Copy: false,
 		})
 		if lerr == nil {
@@ -286,7 +286,7 @@ func getColumnLineage(query string, schema *rawSchema, dialectName string) (out 
 				if !schemaOK {
 					return
 				}
-				n, lerr := sqlglot.LineageColumn(col.name, optimized, sqlglot.LineageOptions{
+				n, lerr := sqlengine.LineageColumn(col.name, optimized, sqlengine.LineageOptions{
 					Schema: lineageSchema, Dialect: d, Scope: scope, TrimSelects: false, Copy: false,
 				})
 				if lerr != nil {
@@ -294,7 +294,7 @@ func getColumnLineage(query string, schema *rawSchema, dialectName string) (out 
 				}
 				ll = n
 			}
-			var leaves []*sqlglot.LineageNode
+			var leaves []*sqlengine.LineageNode
 			findLeafNodes(ll, &leaves)
 			type pair struct{ column, table string }
 			seen := map[pair]bool{}
@@ -303,10 +303,10 @@ func getColumnLineage(query string, schema *rawSchema, dialectName string) (out 
 				func() {
 					defer func() { _ = recover() }()
 					this := ds.Expression.This()
-					if this.IsA(sqlglot.KLiteral) || this.IsA(sqlglot.KAnonymous) {
+					if this.IsA(sqlengine.KLiteral) || this.IsA(sqlengine.KAnonymous) {
 						return
 					}
-					if ds.Expression.IsA(sqlglot.KTable) {
+					if ds.Expression.IsA(sqlengine.KTable) {
 						nameParts := strings.Split(ds.Name, ".")
 						colName := strings.Trim(nameParts[len(nameParts)-1], `"`)
 						p := pair{colName, mergeParts(ds.Expression)}
@@ -365,7 +365,7 @@ func sortUpstreamByColumnLower(u []UpstreamColumn) {
 	sort.SliceStable(u, func(i, j int) bool { return pyLower(u[i].Column) < pyLower(u[j].Column) })
 }
 
-func findLeafNodes(n *sqlglot.LineageNode, out *[]*sqlglot.LineageNode) {
+func findLeafNodes(n *sqlengine.LineageNode, out *[]*sqlengine.LineageNode) {
 	if len(n.Downstream) == 0 {
 		*out = append(*out, n)
 		return
@@ -380,18 +380,18 @@ type selectedCol struct {
 }
 
 // extractColumns mirrors extract_columns.
-func extractColumns(parsed *sqlglot.Expr) (cols []selectedCol, err error) {
+func extractColumns(parsed *sqlengine.Expr) (cols []selectedCol, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("%v", r)
 		}
 	}()
-	found := parsed.Find(sqlglot.KSelect)
+	found := parsed.Find(sqlengine.KSelect)
 	if found == nil {
 		return nil, nil
 	}
 	for _, e := range found.Expressions() {
-		if e.IsA(sqlglot.KCTE) {
+		if e.IsA(sqlengine.KCTE) {
 			continue
 		}
 		cols = append(cols, selectedCol{name: e.AliasOrName(), typ: typeString(e.Type())})
@@ -400,17 +400,17 @@ func extractColumns(parsed *sqlglot.Expr) (cols []selectedCol, err error) {
 }
 
 // typeString mirrors str(expression.type).
-func typeString(t *sqlglot.Expr) string {
+func typeString(t *sqlengine.Expr) string {
 	if t == nil {
 		return "None"
 	}
-	return sqlglot.ExprString(t)
+	return sqlengine.ExprString(t)
 }
 
 type tableCol struct{ name, table string }
 
 // extractNonSelectedColumns mirrors extract_non_selected_columns.
-func extractNonSelectedColumns(parsed *sqlglot.Expr) []tableCol {
+func extractNonSelectedColumns(parsed *sqlengine.Expr) []tableCol {
 	tables := extractTables(parsed)
 	tableAlias := map[string]string{}
 	for _, t := range tables {
@@ -424,9 +424,9 @@ func extractNonSelectedColumns(parsed *sqlglot.Expr) []tableCol {
 	}
 	seen := map[tableCol]bool{}
 	var cols []tableCol
-	for _, kind := range []sqlglot.Kind{sqlglot.KWhere, sqlglot.KJoin, sqlglot.KGroup} {
+	for _, kind := range []sqlengine.Kind{sqlengine.KWhere, sqlengine.KJoin, sqlengine.KGroup} {
 		for scope := range parsed.FindAll(kind) {
-			for expr := range sqlglot.FindAllInScope(scope, sqlglot.KColumn) {
+			for expr := range sqlengine.FindAllInScope(scope, sqlengine.KColumn) {
 				tableName := expr.TableName()
 				if a, ok := tableAlias[tableName]; ok {
 					tableName = a
@@ -445,4 +445,4 @@ func extractNonSelectedColumns(parsed *sqlglot.Expr) []tableCol {
 	return cols
 }
 
-func pyLower(s string) string { return sqlglot.PyLower(s) }
+func pyLower(s string) string { return sqlengine.PyLower(s) }

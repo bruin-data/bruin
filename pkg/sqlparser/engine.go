@@ -1,6 +1,7 @@
 package sqlparser
 
-// In-process port of pythonsrc/parser/main.py and rename.py on top of the Go sqlglot port.
+// In-process implementation of the former Python parser server (pythonsrc/parser/main.py and
+// rename.py) on top of pkg/sqlengine.
 // Each handler mirrors the Python function it replaces and returns the same JSON-shaped payload.
 
 import (
@@ -10,7 +11,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ajitpratap0/GoSQLX/pkg/sqlglot"
+	"github.com/bruin-data/bruin/pkg/sqlengine"
 )
 
 // pyErr is an error whose message mirrors str(exception) in the Python implementation.
@@ -33,8 +34,8 @@ func normalizeDialect(dialect string) string {
 	return dialect
 }
 
-func getDialect(name string) (*sqlglot.Dialect, error) {
-	return sqlglot.GetDialect(name)
+func getDialect(name string) (*sqlengine.Dialect, error) {
+	return sqlengine.GetDialect(name)
 }
 
 // dispatch mirrors the command loop of pythonsrc/main.py. It returns the JSON response line.
@@ -128,7 +129,7 @@ func toStrings(v any) []string {
 
 // topLevelSemicolons mirrors _top_level_semicolons: rune offsets of statement separators
 // outside procedural blocks.
-func topLevelSemicolons(query string, d *sqlglot.Dialect) ([]int, error) {
+func topLevelSemicolons(query string, d *sqlengine.Dialect) ([]int, error) {
 	tokens, err := d.TokenizeScript(query)
 	if err != nil {
 		return nil, err
@@ -137,15 +138,15 @@ func topLevelSemicolons(query string, d *sqlglot.Dialect) ([]int, error) {
 	var positions []int
 	for i, tok := range tokens {
 		switch {
-		case tok.Type == sqlglot.TK_L_PAREN:
+		case tok.Type == sqlengine.TK_L_PAREN:
 			parenDepth++
-		case tok.Type == sqlglot.TK_R_PAREN:
+		case tok.Type == sqlengine.TK_R_PAREN:
 			if parenDepth > 0 {
 				parenDepth--
 			}
-		case tok.Type == sqlglot.TK_CASE:
+		case tok.Type == sqlengine.TK_CASE:
 			caseDepth++
-		case (tok.Type == sqlglot.TK_BEGIN || tok.Type == sqlglot.TK_COMMAND) && firstWord(tok.Text) == "BEGIN":
+		case (tok.Type == sqlengine.TK_BEGIN || tok.Type == sqlengine.TK_COMMAND) && firstWord(tok.Text) == "BEGIN":
 			words := strings.Fields(strings.ToUpper(tok.Text))
 			nextIsTransaction := len(words) > 1 && words[1] == "TRANSACTION"
 			if !nextIsTransaction && i+1 < len(tokens) {
@@ -154,13 +155,13 @@ func topLevelSemicolons(query string, d *sqlglot.Dialect) ([]int, error) {
 			if !nextIsTransaction {
 				beginDepth++
 			}
-		case tok.Type == sqlglot.TK_END:
+		case tok.Type == sqlengine.TK_END:
 			if caseDepth > 0 {
 				caseDepth--
 			} else if beginDepth > 0 {
 				beginDepth--
 			}
-		case tok.Type == sqlglot.TK_SEMICOLON && parenDepth == 0 && beginDepth == 0:
+		case tok.Type == sqlengine.TK_SEMICOLON && parenDepth == 0 && beginDepth == 0:
 			positions = append(positions, tok.Start)
 		}
 	}
@@ -189,7 +190,7 @@ func isDeclareStatement(query, dialect string) bool {
 			continue
 		}
 		e, err := d.ParseOne(query, nil)
-		if err == nil && e.IsA(sqlglot.KDeclare) {
+		if err == nil && e.IsA(sqlengine.KDeclare) {
 			return true
 		}
 	}
@@ -277,24 +278,24 @@ func hoistDeclaresList(queries []string, dialect string) map[string]any {
 // ---------------------------------------------------------------------------
 
 // extractTables mirrors extract_tables.
-func extractTables(parsed *sqlglot.Expr) []*sqlglot.Expr {
+func extractTables(parsed *sqlengine.Expr) []*sqlengine.Expr {
 	if parsed == nil {
 		return nil
 	}
 	cteNames := map[string]bool{}
-	if parsed.IsA(sqlglot.KCreate) {
+	if parsed.IsA(sqlengine.KCreate) {
 		if ex := parsed.Expression(); ex != nil {
-			for cte := range ex.FindAll(sqlglot.KCTE) {
+			for cte := range ex.FindAll(sqlengine.KCTE) {
 				cteNames[cte.AliasOrName()] = true
 			}
 		}
 	} else {
-		for cte := range parsed.FindAll(sqlglot.KCTE) {
+		for cte := range parsed.FindAll(sqlengine.KCTE) {
 			cteNames[cte.AliasOrName()] = true
 		}
 	}
-	var refs []*sqlglot.Expr
-	for table := range parsed.FindAll(sqlglot.KTable) {
+	var refs []*sqlengine.Expr
+	for table := range parsed.FindAll(sqlengine.KTable) {
 		if cteNames[table.Name()] && table.DbName() == "" && table.CatalogName() == "" {
 			continue
 		}
@@ -304,20 +305,20 @@ func extractTables(parsed *sqlglot.Expr) []*sqlglot.Expr {
 }
 
 // tableNamePart mirrors the Anonymous-aware table name logic of get_table_name.
-func tableNamePart(table *sqlglot.Expr) string {
+func tableNamePart(table *sqlengine.Expr) string {
 	name := table.Name()
 	if name == "" {
 		this := table.This()
-		if this.IsA(sqlglot.KAnonymous) {
+		if this.IsA(sqlengine.KAnonymous) {
 			inner := this.Arg("this")
-			if ie, ok := inner.(*sqlglot.Expr); ok && ie.IsA(sqlglot.KIdentifier) {
+			if ie, ok := inner.(*sqlengine.Expr); ok && ie.IsA(sqlengine.KIdentifier) {
 				name = ie.Name()
 			} else if s, ok := inner.(string); ok {
 				name = s
 			} else if ie != nil {
-				name = sqlglot.ExprString(ie)
+				name = sqlengine.ExprString(ie)
 			}
-		} else if this.IsA(sqlglot.KIdentifier) {
+		} else if this.IsA(sqlengine.KIdentifier) {
 			name = this.ThisS()
 		}
 	}
@@ -325,7 +326,7 @@ func tableNamePart(table *sqlglot.Expr) string {
 }
 
 // getTableName mirrors get_table_name.
-func getTableName(table *sqlglot.Expr) string {
+func getTableName(table *sqlengine.Expr) string {
 	db := ""
 	if c := table.CatalogName(); c != "" {
 		db = c + "."
@@ -338,7 +339,7 @@ func getTableName(table *sqlglot.Expr) string {
 }
 
 // getTableNameWithContext mirrors get_table_name_with_context.
-func getTableNameWithContext(table *sqlglot.Expr, currentDatabase string) string {
+func getTableNameWithContext(table *sqlengine.Expr, currentDatabase string) string {
 	var db, schema string
 	if c := table.CatalogName(); c != "" {
 		db = c + "."
@@ -380,13 +381,13 @@ func getTablesTSQL(query string) map[string]any {
 	if err != nil {
 		return map[string]any{"tables": []string{}, "error": err.Error()}
 	}
-	var tables []*sqlglot.Expr
+	var tables []*sqlengine.Expr
 	currentDatabase := ""
 	for _, stmt := range parsed {
 		if stmt == nil {
 			continue
 		}
-		if stmt.IsA(sqlglot.KUse) {
+		if stmt.IsA(sqlengine.KUse) {
 			if this := stmt.This(); this != nil {
 				currentDatabase = this.Name()
 			}
@@ -432,19 +433,19 @@ func getTables(query, dialect string) map[string]any {
 }
 
 // mergeParts mirrors merge_parts.
-func mergeParts(table *sqlglot.Expr) string {
+func mergeParts(table *sqlengine.Expr) string {
 	var parts []string
 	for _, part := range table.Parts() {
-		if part.IsA(sqlglot.KIdentifier) {
+		if part.IsA(sqlengine.KIdentifier) {
 			parts = append(parts, part.Name())
-		} else if part.IsA(sqlglot.KAnonymous) {
+		} else if part.IsA(sqlengine.KAnonymous) {
 			inner := part.Arg("this")
-			if ie, ok := inner.(*sqlglot.Expr); ok && ie.IsA(sqlglot.KIdentifier) {
+			if ie, ok := inner.(*sqlengine.Expr); ok && ie.IsA(sqlengine.KIdentifier) {
 				parts = append(parts, ie.Name())
 			} else if s, ok := inner.(string); ok {
 				parts = append(parts, s)
 			} else if ie != nil {
-				parts = append(parts, sqlglot.ExprString(ie))
+				parts = append(parts, sqlengine.ExprString(ie))
 			}
 		}
 	}
