@@ -3,6 +3,7 @@ package sqlengine
 import (
 	"fmt"
 	"iter"
+	"sync"
 )
 
 // Port of sqlglot/optimizer/scope.py.
@@ -187,31 +188,52 @@ var (
 	cteOrQueryKinds       = kindMatcher(KCTE, KQuery)
 )
 
+// Categories of the nodes collect gathers, in the order of their lists in one shared block.
+const (
+	collStars = iota
+	collRawColumns
+	collTables
+	collJoinHints
+	collUDTFs
+	collCTEs
+	collDerivedTables
+	collSubqueries
+	collTableColumns
+	numCollected
+)
+
+type collectedNode struct {
+	cat  uint8
+	node *Expr
+}
+
+// collectBufPool holds scratch lists for collect, which then stores all gathered lists in a
+// single allocation.
+var collectBufPool = sync.Pool{New: func() any { b := make([]collectedNode, 0, 64); return &b }}
+
 func (s *Scope) collect() {
-	s.tables = nil
-	s.ctes = nil
-	s.subqueries = nil
-	s.derivedTables = nil
-	s.udtfs = nil
-	s.rawColumns = nil
-	s.tableColumns = nil
-	s.stars = nil
-	s.joinHints = nil
 	s.semiAntiJoinTables = nil // allocated on the first semi/anti join table
 	s.columnIndex = nil
 
+	bufp := collectBufPool.Get().(*[]collectedNode)
+	items := (*bufp)[:0]
+	var counts [numCollected]int
+	add := func(cat uint8, node *Expr) {
+		items = append(items, collectedNode{cat, node})
+		counts[cat]++
+	}
 	for node := range s.Walk(nil) {
 		if node == s.Expression || !scopeCollectible.Has(node.kind) {
 			continue
 		}
 		switch {
 		case node.IsA(KDot) && node.IsStar():
-			s.stars = append(s.stars, node)
+			add(collStars, node)
 		case node.Is(KColumn):
 			if node.This().IsA(KStar) {
-				s.stars = append(s.stars, node)
+				add(collStars, node)
 			} else {
-				s.rawColumns = append(s.rawColumns, node)
+				add(collRawColumns, node)
 			}
 		case node.IsA(KTable) && !node.Parent().IsA(KJoinHint):
 			parent := node.Parent()
@@ -221,22 +243,49 @@ func (s *Scope) collect() {
 				}
 				s.semiAntiJoinTables.Add(node.AliasOrName())
 			}
-			s.tables = append(s.tables, node)
+			add(collTables, node)
 		case node.IsA(KJoinHint):
-			s.joinHints = append(s.joinHints, node)
+			add(collJoinHints, node)
 		case node.Is(KLateral) || (node.IsA(KUDTF) && node.Parent().IsA(KFrom, KJoin)):
-			s.udtfs = append(s.udtfs, node)
+			add(collUDTFs, node)
 		case node.IsA(KCTE):
-			s.ctes = append(s.ctes, node)
+			add(collCTEs, node)
 		case isDerivedTable(node) && isFromOrJoin(node):
-			s.derivedTables = append(s.derivedTables, node)
+			add(collDerivedTables, node)
 		case node.IsA(KSelect, KSetOperation) && !isFromOrJoin(node):
-			s.subqueries = append(s.subqueries, node)
+			add(collSubqueries, node)
 		case node.IsA(KTableColumn):
-			s.tableColumns = append(s.tableColumns, node)
+			add(collTableColumns, node)
 		case node.IsA(KStar) && (node.ArgB("except_") || !node.Parent().IsA(KCount)):
 			s.scansAllSubscopeColumns = true
 		}
+	}
+
+	var lists [numCollected][]*Expr // nil when empty, like the lists before any append
+	if len(items) > 0 {
+		block := make([]*Expr, len(items))
+		var next [numCollected]int
+		off := 0
+		for c, n := range counts {
+			next[c] = off
+			if n > 0 {
+				lists[c] = block[off : off+n : off+n]
+			}
+			off += n
+		}
+		for _, it := range items {
+			block[next[it.cat]] = it.node
+			next[it.cat]++
+		}
+	}
+	s.stars, s.rawColumns, s.tables = lists[collStars], lists[collRawColumns], lists[collTables]
+	s.joinHints, s.udtfs, s.ctes = lists[collJoinHints], lists[collUDTFs], lists[collCTEs]
+	s.derivedTables, s.subqueries, s.tableColumns = lists[collDerivedTables], lists[collSubqueries], lists[collTableColumns]
+
+	clear(items)
+	if cap(items) <= 4096 {
+		*bufp = items[:0]
+		collectBufPool.Put(bufp)
 	}
 	s.collected = true
 }
