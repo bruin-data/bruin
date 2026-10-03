@@ -63,16 +63,53 @@ func (s *SQLParser) call(command string, contents map[string]any, out any) (send
 	return nil, json.Unmarshal(encodeResponse(result), out)
 }
 
-// normalizeRequest returns what json.Unmarshal(json.Marshal(contents)) would produce.
+// normalizeRequest returns what json.Unmarshal(json.Marshal(contents)) would produce. The request
+// maps are built by the public methods for the call, so the top level is normalized in place
+// (only once every value is known to normalize; nothing is changed otherwise).
 func normalizeRequest(contents map[string]any) (map[string]any, bool) {
 	if contents == nil {
 		return nil, true
 	}
-	v, ok := normalizeValue(contents)
-	if !ok {
-		return nil, false
+	type entry struct {
+		key string
+		val any
 	}
-	return v.(map[string]any), true
+	var buf [8]entry
+	changed := buf[:0]
+	for k, v := range contents {
+		nv, ok := normalizeValue(v)
+		if !ok || !utf8.ValidString(k) {
+			return nil, false
+		}
+		if !sameValue(v, nv) {
+			changed = append(changed, entry{k, nv})
+		}
+	}
+	for _, e := range changed {
+		contents[e.key] = e.val
+	}
+	return contents, true
+}
+
+// sameValue reports whether normalizeValue returned v itself (for the shapes it passes through).
+func sameValue(v, nv any) bool {
+	switch x := v.(type) {
+	case nil:
+		return nv == nil
+	case string:
+		y, ok := nv.(string)
+		return ok && x == y
+	case bool:
+		y, ok := nv.(bool)
+		return ok && x == y
+	case float64:
+		y, ok := nv.(float64)
+		return ok && x == y
+	case Schema:
+		_, ok := nv.(Schema)
+		return ok && x != nil
+	}
+	return false
 }
 
 func normalizeValue(v any) (any, bool) {

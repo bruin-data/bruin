@@ -45,7 +45,12 @@ func AnnotateTypes(expression *Expr, o AnnotateOptions) *Expr {
 	schema := annEnsureSchema(o.Schema, o.SchemaMap, o.Dialect)
 	overwriteTypes := o.OverwriteTypes == nil || *o.OverwriteTypes
 
-	return newTypeAnnotator(schema, o.ExpressionMetadata, o.CoercesTo, nil, overwriteTypes).annotate(expression, true)
+	a := newTypeAnnotator(schema, o.ExpressionMetadata, o.CoercesTo, nil, overwriteTypes)
+	if expression != nil {
+		// Every node ends up visited; presize the set.
+		a.visited = make(map[*Expr]struct{}, expression.nodeCount())
+	}
+	return a.annotate(expression, true)
 }
 
 // annotateTypes mirrors annotate_types(expression, dialect=d) (used by generator/dialect code).

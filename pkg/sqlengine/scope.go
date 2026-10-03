@@ -8,7 +8,7 @@ import (
 // Port of sqlglot/optimizer/scope.py.
 
 // ScopeType mirrors sqlglot.optimizer.scope.ScopeType.
-type ScopeType int
+type ScopeType uint8
 
 const (
 	ScopeRoot ScopeType = iota + 1
@@ -54,40 +54,47 @@ type Scope struct {
 	CTESources         *omap[Source]
 	OuterColumns       []string
 	Parent             *Scope
-	Type               ScopeType
 	SubqueryScopes     []*Scope
 	DerivedTableScopes []*Scope
 	TableScopes        []*Scope
 	CTEScopes          []*Scope
 	UnionScopes        []*Scope
 	UDTFScopes         []*Scope
+	Type               ScopeType
 	CanBeCorrelated    bool
 
 	collected               bool
 	scansAllSubscopeColumns bool
-	rawColumns              []*Expr
-	tableColumns            []*Expr
-	stars                   []*Expr
-	derivedTables           []*Expr
-	udtfs                   []*Expr
-	tables                  []*Expr
-	ctes                    []*Expr
-	subqueries              []*Expr
-	joinHints               []*Expr
-	semiAntiJoinTables      StrSet
-	columnIndex             map[*Expr]struct{}
-	selectedSources         *omap[SelectedSource]
-	columns                 []*Expr
-	columnsSet              bool
-	externalColumns         []*Expr
-	externalColumnsSet      bool
-	localColumns            []*Expr
-	localColumnsSet         bool
-	pivots                  []*Expr
-	pivotsSet               bool
-	references              []scopeRef
-	referencesSet           bool
+	cached                  scopeCache // which lazily computed lists below are set
+
+	rawColumns         []*Expr
+	tableColumns       []*Expr
+	stars              []*Expr
+	derivedTables      []*Expr
+	udtfs              []*Expr
+	tables             []*Expr
+	ctes               []*Expr
+	subqueries         []*Expr
+	joinHints          []*Expr
+	semiAntiJoinTables StrSet
+	columnIndex        map[*Expr]struct{}
+	selectedSources    *omap[SelectedSource]
+	columns            []*Expr
+	externalColumns    []*Expr
+	localColumns       []*Expr
+	pivots             []*Expr
+	references         []scopeRef
 }
+
+type scopeCache uint8
+
+const (
+	cacheColumns scopeCache = 1 << iota
+	cacheExternalColumns
+	cacheLocalColumns
+	cachePivots
+	cacheReferences
+)
 
 // NewScope mirrors Scope(expression, sources, outer_columns, parent, scope_type, lateral_sources, cte_sources, can_be_correlated).
 func NewScope(expression *Expr, sources *omap[Source], outerColumns []string, parent *Scope, scopeType ScopeType,
@@ -106,14 +113,18 @@ func NewScope(expression *Expr, sources *omap[Source], outerColumns []string, pa
 		Type:            scopeType,
 		CanBeCorrelated: canBeCorrelated,
 	}
-	if s.Sources == nil {
-		s.Sources = newOMap[Source]()
-	}
-	if s.LateralSources == nil {
-		s.LateralSources = newOMap[Source]()
-	}
-	if s.CTESources == nil {
-		s.CTESources = newOMap[Source]()
+	if s.Sources == nil || s.LateralSources == nil || s.CTESources == nil {
+		// One allocation for the empty mappings.
+		fresh := new([3]omap[Source])
+		if s.Sources == nil {
+			s.Sources = &fresh[0]
+		}
+		if s.LateralSources == nil {
+			s.LateralSources = &fresh[1]
+		}
+		if s.CTESources == nil {
+			s.CTESources = &fresh[2]
+		}
 	}
 	if s.OuterColumns == nil {
 		s.OuterColumns = []string{}
@@ -141,11 +152,8 @@ func (s *Scope) ClearCache() {
 	s.semiAntiJoinTables = nil
 	s.columnIndex = nil
 	s.selectedSources = nil
-	s.columns, s.columnsSet = nil, false
-	s.externalColumns, s.externalColumnsSet = nil, false
-	s.localColumns, s.localColumnsSet = nil, false
-	s.pivots, s.pivotsSet = nil, false
-	s.references, s.referencesSet = nil, false
+	s.columns, s.externalColumns, s.localColumns, s.pivots, s.references = nil, nil, nil, nil, nil
+	s.cached = 0
 }
 
 // Branch mirrors Scope.branch.
@@ -189,8 +197,8 @@ func (s *Scope) collect() {
 	s.tableColumns = nil
 	s.stars = nil
 	s.joinHints = nil
-	s.semiAntiJoinTables = newStrSet()
-	s.columnIndex = map[*Expr]struct{}{}
+	s.semiAntiJoinTables = nil // allocated on the first semi/anti join table
+	s.columnIndex = nil
 
 	for node := range s.Walk(nil) {
 		if node == s.Expression || !scopeCollectible.Has(node.kind) {
@@ -200,7 +208,6 @@ func (s *Scope) collect() {
 		case node.IsA(KDot) && node.IsStar():
 			s.stars = append(s.stars, node)
 		case node.Is(KColumn):
-			s.columnIndex[node] = struct{}{}
 			if node.This().IsA(KStar) {
 				s.stars = append(s.stars, node)
 			} else {
@@ -209,6 +216,9 @@ func (s *Scope) collect() {
 		case node.IsA(KTable) && !node.Parent().IsA(KJoinHint):
 			parent := node.Parent()
 			if parent.IsA(KJoin) && parent.IsSemiOrAntiJoin() {
+				if s.semiAntiJoinTables == nil {
+					s.semiAntiJoinTables = newStrSet()
+				}
 				s.semiAntiJoinTables.Add(node.AliasOrName())
 			}
 			s.tables = append(s.tables, node)
@@ -273,12 +283,28 @@ func (s *Scope) ScansAllSubscopeColumns() bool { s.ensureCollected(); return s.s
 // Stars mirrors Scope.stars.
 func (s *Scope) Stars() []*Expr { s.ensureCollected(); return s.stars }
 
-// ColumnIndex mirrors Scope.column_index (object identity set).
-func (s *Scope) ColumnIndex() map[*Expr]struct{} { s.ensureCollected(); return s.columnIndex }
+// ColumnIndex mirrors Scope.column_index (object identity set of the collected Column nodes). It is
+// rarely needed, so it is built on first use from the collected columns and column stars.
+func (s *Scope) ColumnIndex() map[*Expr]struct{} {
+	s.ensureCollected()
+	if s.columnIndex == nil {
+		idx := make(map[*Expr]struct{}, len(s.rawColumns))
+		for _, c := range s.rawColumns {
+			idx[c] = struct{}{}
+		}
+		for _, c := range s.stars {
+			if c.Is(KColumn) {
+				idx[c] = struct{}{}
+			}
+		}
+		s.columnIndex = idx
+	}
+	return s.columnIndex
+}
 
 // Columns mirrors Scope.columns.
 func (s *Scope) Columns() []*Expr {
-	if !s.columnsSet {
+	if s.cached&cacheColumns == 0 {
 		s.ensureCollected()
 		columns := s.rawColumns
 
@@ -317,7 +343,7 @@ func (s *Scope) Columns() []*Expr {
 				s.columns = append(s.columns, column)
 			}
 		}
-		s.columnsSet = true
+		s.cached |= cacheColumns
 	}
 	return s.columns
 }
@@ -347,7 +373,7 @@ func (s *Scope) SelectedSources() *omap[SelectedSource] {
 
 // References mirrors Scope.references.
 func (s *Scope) References() []scopeRef {
-	if !s.referencesSet {
+	if s.cached&cacheReferences == 0 {
 		s.references = []scopeRef{}
 		for _, table := range s.Tables() {
 			s.references = append(s.references, scopeRef{table.AliasOrName(), table})
@@ -362,7 +388,7 @@ func (s *Scope) References() []scopeRef {
 			}
 			s.references = append(s.references, scopeRef{getSourceAlias(e), node})
 		}
-		s.referencesSet = true
+		s.cached |= cacheReferences
 	}
 	return s.references
 }
@@ -390,7 +416,7 @@ func (s *Scope) externalColumnsDepth(depth int) []*Expr {
 	if depth > maxScopeDepth {
 		panic(&ValueError{Msg: "maximum recursion depth exceeded"})
 	}
-	if !s.externalColumnsSet {
+	if s.cached&cacheExternalColumns == 0 {
 		if s.Expression.IsA(KSetOperation) {
 			if len(s.UnionScopes) != 2 {
 				panic(&ValueError{Msg: fmt.Sprintf("not enough values to unpack (expected 2, got %d)", len(s.UnionScopes))})
@@ -405,19 +431,19 @@ func (s *Scope) externalColumnsDepth(depth int) []*Expr {
 			s.externalColumns = []*Expr{}
 			for _, c := range s.Columns() {
 				t := c.Text("table")
-				if !local.Has(t) && !s.SemiOrAntiJoinTables().Has(t) {
+				if !local.Has(t) && !s.semiAntiJoinTables.Has(t) {
 					s.externalColumns = append(s.externalColumns, c)
 				}
 			}
 		}
-		s.externalColumnsSet = true
+		s.cached |= cacheExternalColumns
 	}
 	return s.externalColumns
 }
 
 // LocalColumns mirrors Scope.local_columns.
 func (s *Scope) LocalColumns() []*Expr {
-	if !s.localColumnsSet {
+	if s.cached&cacheLocalColumns == 0 {
 		ext := map[*Expr]struct{}{}
 		for _, c := range s.ExternalColumns() {
 			ext[c] = struct{}{}
@@ -428,7 +454,7 @@ func (s *Scope) LocalColumns() []*Expr {
 				s.localColumns = append(s.localColumns, c)
 			}
 		}
-		s.localColumnsSet = true
+		s.cached |= cacheLocalColumns
 	}
 	return s.localColumns
 }
@@ -449,18 +475,24 @@ func (s *Scope) JoinHints() []*Expr { s.ensureCollected(); return s.joinHints }
 
 // Pivots mirrors Scope.pivots.
 func (s *Scope) Pivots() []*Expr {
-	if !s.pivotsSet {
+	if s.cached&cachePivots == 0 {
 		s.pivots = []*Expr{}
 		for _, ref := range s.References() {
 			s.pivots = append(s.pivots, ref.Node.ArgL("pivots")...)
 		}
-		s.pivotsSet = true
+		s.cached |= cachePivots
 	}
 	return s.pivots
 }
 
 // SemiOrAntiJoinTables mirrors Scope.semi_or_anti_join_tables.
-func (s *Scope) SemiOrAntiJoinTables() StrSet { s.ensureCollected(); return s.semiAntiJoinTables }
+func (s *Scope) SemiOrAntiJoinTables() StrSet {
+	s.ensureCollected()
+	if s.semiAntiJoinTables == nil {
+		s.semiAntiJoinTables = newStrSet()
+	}
+	return s.semiAntiJoinTables
+}
 
 // SourceColumns mirrors Scope.source_columns.
 func (s *Scope) SourceColumns(sourceName string) []*Expr {

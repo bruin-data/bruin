@@ -1024,6 +1024,32 @@ func (e *Expr) IterExpressions(reverse bool) []*Expr {
 }
 
 // appendChildren appends e's child expressions (IterExpressions order) to out.
+// nodeCount returns the number of nodes in the tree rooted at e.
+func (e *Expr) nodeCount() int {
+	n := 1
+	for _, a := range e.args {
+		switch v := a.val.(type) {
+		case *Expr:
+			if v != nil {
+				n += v.nodeCount()
+			}
+		case []*Expr:
+			for _, x := range v {
+				if x != nil {
+					n += x.nodeCount()
+				}
+			}
+		case []any:
+			for _, y := range v {
+				if x, ok := y.(*Expr); ok && x != nil {
+					n += x.nodeCount()
+				}
+			}
+		}
+	}
+	return n
+}
+
 func (e *Expr) appendChildren(out []*Expr, reverse bool) []*Expr {
 	if !reverse {
 		for _, a := range e.args {
