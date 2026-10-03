@@ -89,6 +89,21 @@ func (s *SQLParser) ColumnLineage(sql, dialect string, schema Schema) (*Lineage,
 		}, nil
 	}
 
+	var lineage Lineage
+	if normSchema, ok := checkSchema(schema); ok && validUTF8(sql, dialect) {
+		// What cmdLineage does with the normalized request.
+		if decodeErr := s.callDirect(&lineage, func() (any, error) {
+			raw, err := toRawSchema(normSchema)
+			if err != nil {
+				return nil, err
+			}
+			return getColumnLineage(sql, raw, dialect)
+		}); decodeErr != nil {
+			return nil, decodeErr
+		}
+		return &lineage, nil
+	}
+
 	command := parserCommand{
 		Command: "lineage",
 		Contents: map[string]interface{}{
@@ -98,7 +113,6 @@ func (s *SQLParser) ColumnLineage(sql, dialect string, schema Schema) (*Lineage,
 		},
 	}
 
-	var lineage Lineage
 	if sendErr, decodeErr := s.call(command.Command, command.Contents, &lineage); sendErr != nil {
 		return nil, sendErr
 	} else if decodeErr != nil {
@@ -114,16 +128,14 @@ func (s *SQLParser) UsedTables(sql, dialect string) ([]string, error) {
 		return nil, errors.Wrap(err, "failed to start sql parser")
 	}
 
-	command := parserCommand{
-		Command: "get-tables",
-		Contents: map[string]interface{}{
-			"query":   sql,
-			"dialect": dialect,
-		},
-	}
-
 	var tables tablesResponse
-	if sendErr, decodeErr := s.call(command.Command, command.Contents, &tables); sendErr != nil {
+	var sendErr, decodeErr error
+	if validUTF8(sql, dialect) {
+		decodeErr = s.callDirect(&tables, func() (any, error) { return getTables(sql, dialect), nil })
+	} else {
+		sendErr, decodeErr = s.call("get-tables", map[string]interface{}{"query": sql, "dialect": dialect}, &tables)
+	}
+	if sendErr != nil {
 		return nil, errors.Wrap(sendErr, "failed to send command")
 	} else if decodeErr != nil {
 		return nil, errors.Wrap(decodeErr, "failed to unmarshal response")
@@ -142,12 +154,22 @@ func (s *SQLParser) UsedTables(sql, dialect string) ([]string, error) {
 // object and returns the resulting query string. It is the shared body for the
 // SQL-rewriting verbs (rename/limit/transpile).
 func (s *SQLParser) sendQueryCommand(command string, contents map[string]interface{}) (string, error) {
+	return s.queryCommand(func(resp *queryResponse) (error, error) { return s.call(command, contents, resp) })
+}
+
+// sendQueryCommandDirect is sendQueryCommand for a command function taking string-only requests
+// (see callDirect).
+func (s *SQLParser) sendQueryCommandDirect(run func() (any, error)) (string, error) {
+	return s.queryCommand(func(resp *queryResponse) (error, error) { return nil, s.callDirect(resp, run) })
+}
+
+func (s *SQLParser) queryCommand(call func(*queryResponse) (sendErr, decodeErr error)) (string, error) {
 	if err := s.Start(); err != nil {
 		return "", errors.Wrap(err, "failed to start sql parser")
 	}
 
 	var resp queryResponse
-	if sendErr, decodeErr := s.call(command, contents, &resp); sendErr != nil {
+	if sendErr, decodeErr := call(&resp); sendErr != nil {
 		return "", errors.Wrap(sendErr, "failed to send command")
 	} else if decodeErr != nil {
 		return "", errors.Wrap(decodeErr, "failed to unmarshal response")
@@ -309,6 +331,10 @@ func ConnectionTypeToDialect(connectionType string) string {
 }
 
 func (s *SQLParser) AddLimit(sql string, limit int, dialect string) (string, error) {
+	if validUTF8(sql, dialect) {
+		// The limit crosses the JSON round trip as a float64.
+		return s.sendQueryCommandDirect(func() (any, error) { return addLimit(sql, int(float64(limit)), dialect) })
+	}
 	return s.sendQueryCommand("add-limit", map[string]interface{}{
 		"query":   sql,
 		"limit":   limit,
@@ -380,16 +406,14 @@ func (s *SQLParser) IsSingleSelectQuery(sql string, dialect string) (bool, error
 		return false, errors.Wrap(err, "failed to start sql parser")
 	}
 
-	command := parserCommand{
-		Command: "is-single-select",
-		Contents: map[string]interface{}{
-			"query":   sql,
-			"dialect": dialect,
-		},
-	}
-
 	var resp singleSelectResponse
-	if sendErr, decodeErr := s.call(command.Command, command.Contents, &resp); sendErr != nil {
+	var sendErr, decodeErr error
+	if validUTF8(sql, dialect) {
+		decodeErr = s.callDirect(&resp, func() (any, error) { return isSingleSelectQuery(sql, dialect), nil })
+	} else {
+		sendErr, decodeErr = s.call("is-single-select", map[string]interface{}{"query": sql, "dialect": dialect}, &resp)
+	}
+	if sendErr != nil {
 		return false, errors.Wrap(sendErr, "failed to send command")
 	} else if decodeErr != nil {
 		return false, errors.Wrap(decodeErr, "failed to unmarshal response")

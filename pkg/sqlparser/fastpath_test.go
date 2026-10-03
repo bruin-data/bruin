@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"reflect"
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -106,4 +107,77 @@ func expandSchemas(m map[string]any) map[string]any {
 		out[k] = v
 	}
 	return out
+}
+
+// TestDirectPathsMatchJSONRoundTrip checks the public methods' string-only fast paths against the
+// JSON round trip they replace.
+func TestDirectPathsMatchJSONRoundTrip(t *testing.T) {
+	t.Parallel()
+	f, err := os.Open("../sqlengine/testdata/parse.json.gz")
+	if err != nil {
+		t.Skip("missing corpus")
+	}
+	defer f.Close()
+	gz, err := gzip.NewReader(f)
+	require.NoError(t, err)
+	var cases []struct {
+		Dialect string `json:"dialect"`
+		SQL     string `json:"sql"`
+	}
+	require.NoError(t, json.NewDecoder(gz).Decode(&cases))
+
+	p, err := NewSQLParser(false)
+	require.NoError(t, err)
+	require.NoError(t, p.Start())
+	viaJSON := func(command string, contents map[string]any, out any) {
+		payload, err := p.sendCommand(&parserCommand{Command: command, Contents: contents})
+		require.NoError(t, err)
+		require.NoError(t, json.Unmarshal([]byte(payload), out))
+	}
+	errText := func(err error) string {
+		if err == nil {
+			return ""
+		}
+		return err.Error()
+	}
+	schema := Schema{"t": {"a": "int", "b": "varchar"}, "x": nil}
+	for i, c := range cases {
+		if i%3 != 1 {
+			continue
+		}
+		q, d := c.SQL, c.Dialect
+
+		var tables tablesResponse
+		viaJSON("get-tables", map[string]any{"query": q, "dialect": d}, &tables)
+		gotTables, err := p.UsedTables(q, d)
+		if tables.Error != "" {
+			require.EqualError(t, err, tables.Error, q)
+		} else {
+			require.NoError(t, err, q)
+			sort.Strings(tables.Tables)
+			require.Equal(t, tables.Tables, gotTables, q)
+		}
+
+		var single singleSelectResponse
+		viaJSON("is-single-select", map[string]any{"query": q, "dialect": d}, &single)
+		gotSingle, err := p.IsSingleSelectQuery(q, d)
+		require.Equal(t, single.Error, errText(err), q)
+		if single.Error == "" {
+			require.Equal(t, single.IsSingleSelect, gotSingle, q)
+		}
+
+		var limited queryResponse
+		viaJSON("add-limit", map[string]any{"query": q, "dialect": d, "limit": 10}, &limited)
+		gotLimited, err := p.AddLimit(q, 10, d)
+		require.Equal(t, limited.Error, errText(err), q)
+		require.Equal(t, limited.Query, gotLimited, q)
+
+		for _, sch := range []Schema{{}, schema, nil} {
+			var lineage Lineage
+			viaJSON("lineage", map[string]any{"query": q, "dialect": d, "schema": sch}, &lineage)
+			got, err := p.ColumnLineage(q, d, sch)
+			require.NoError(t, err, q)
+			require.Equal(t, &lineage, got, "%s %q", d, q)
+		}
+	}
 }

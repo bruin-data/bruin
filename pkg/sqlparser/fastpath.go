@@ -63,6 +63,28 @@ func (s *SQLParser) call(command string, contents map[string]any, out any) (send
 	return nil, json.Unmarshal(encodeResponse(result), out)
 }
 
+// callDirect runs a command function under the parser lock and decodes its response into out,
+// like call does. It is for requests whose values are all strings: when they are valid UTF-8
+// (see validUTF8) the JSON round trip leaves them unchanged, so the command can take them as is.
+func (s *SQLParser) callDirect(out any, run func() (any, error)) (decodeErr error) {
+	s.mutex.Lock()
+	result := runGuarded(run)
+	s.mutex.Unlock()
+	if decodeResponse(result, out) {
+		return nil
+	}
+	return json.Unmarshal(encodeResponse(result), out)
+}
+
+func validUTF8(ss ...string) bool {
+	for _, s := range ss {
+		if !utf8.ValidString(s) {
+			return false
+		}
+	}
+	return true
+}
+
 // normalizeRequest returns what json.Unmarshal(json.Marshal(contents)) would produce. The request
 // maps are built by the public methods for the call, so the top level is normalized in place
 // (only once every value is known to normalize; nothing is changed otherwise).

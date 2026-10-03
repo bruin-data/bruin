@@ -46,14 +46,25 @@ func dispatch(pc *parserCommand) string {
 
 // runCommand runs one command and returns the response object: the command's result, or
 // {"error": ...} when it fails.
-func runCommand(command string, c map[string]any) (resp any) {
+func runCommand(command string, c map[string]any) any {
+	return runGuarded(func() (any, error) { return runCommandUnguarded(command, c) })
+}
+
+// runGuarded turns a command's error, or panic, into the {"error": ...} response.
+func runGuarded(run func() (any, error)) (resp any) {
 	defer func() {
 		if r := recover(); r != nil {
 			resp = map[string]any{"error": fmt.Sprint(r)}
 		}
 	}()
-	var result any
-	var err error
+	result, err := run()
+	if err != nil {
+		return map[string]any{"error": err.Error()}
+	}
+	return result
+}
+
+func runCommandUnguarded(command string, c map[string]any) (result any, err error) {
 	switch command {
 	case "init":
 		result = map[string]any{}
@@ -84,10 +95,7 @@ func runCommand(command string, c map[string]any) (resp any) {
 	default:
 		err = errors.New("invalid cmd")
 	}
-	if err != nil {
-		return map[string]any{"error": err.Error()}
-	}
-	return result
+	return result, err
 }
 
 // encodeResponse serializes a response object like the Python command loop's json.dumps.
