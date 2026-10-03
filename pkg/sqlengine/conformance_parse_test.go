@@ -33,9 +33,9 @@ func serExpr(v any) any {
 			args = append(args, []any{a.key, serExpr(a.val)})
 		}
 		out := map[string]any{"k": x.kind.Name(), "a": args}
-		if len(x.Comments) > 0 {
-			cs := make([]any, len(x.Comments))
-			for i, c := range x.Comments {
+		if len(x.Comments()) > 0 {
+			cs := make([]any, len(x.Comments()))
+			for i, c := range x.Comments() {
 				cs[i] = c
 			}
 			out["c"] = cs

@@ -224,14 +224,14 @@ func parseJSONPath(path string, d *Dialect) (result *Expr, err error) {
 
 			var end int
 			if i < size {
-				end = tokens[i].End
+				end = int(tokens[i].End)
 			} else {
-				end = tokens[size-1].End
+				end = int(tokens[size-1].End)
 			}
 			if start >= size {
 				panic(jsonPathIndexError{})
 			}
-			text := pySlice(pathRunes, tokens[start].Start, end)
+			text := pySlice(pathRunes, int(tokens[start].Start), end)
 			if script {
 				return New(KJSONPathScript, "this", text)
 			}
@@ -319,14 +319,14 @@ func parseJSONPath(path string, d *Dialect) (result *Expr, err error) {
 
 		start := 0
 		if prevIndex >= 0 {
-			start = tokens[prevIndex].End + 1
+			start = int(tokens[prevIndex].End) + 1
 		}
 
 		if i >= len(tokens) {
 			// This key is the last token for the path, so it's text is the remaining path
 			return pySlice(pathRunes, start, len(pathRunes))
 		}
-		return pySlice(pathRunes, start, tokens[i].Start)
+		return pySlice(pathRunes, start, int(tokens[i].Start))
 	}
 
 	// We canonicalize the JSON path AST so that it always starts with a
@@ -424,7 +424,7 @@ func newJSONPathUnion(indexes []any) *Expr {
 		if xe, ok := x.(*Expr); ok && xe != nil {
 			xe.parent = u
 			xe.argKey = "expressions"
-			xe.index = i
+			xe.index = int32(i)
 		}
 	}
 	return u

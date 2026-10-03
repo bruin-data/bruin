@@ -10,11 +10,11 @@ import (
 // Token mirrors sqlglot.tokens.Token. Positions are in Unicode code points, like Python.
 type Token struct {
 	Type     TokenType
+	Line     int32
+	Col      int32
+	Start    int32
+	End      int32
 	Text     string
-	Line     int
-	Col      int
-	Start    int
-	End      int
 	Comments []string
 }
 
@@ -460,10 +460,10 @@ func (t *tokenizerCore) push(tt TokenType, txt string) {
 	*tok = Token{
 		Type:     tt,
 		Text:     txt,
-		Line:     t.line,
-		Col:      t.col,
-		Start:    t.start,
-		End:      t.current - 1,
+		Line:     int32(t.line),
+		Col:      int32(t.col),
+		Start:    int32(t.start),
+		End:      int32(t.current - 1),
 		Comments: comments,
 	}
 	t.tokens = append(t.tokens, tok)

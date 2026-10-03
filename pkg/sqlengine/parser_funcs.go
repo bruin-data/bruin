@@ -846,7 +846,7 @@ func (p *Parser) baseParseWindow(this *Expr, alias bool) *Expr {
 	fn := this
 	var comments []string
 	if fn != nil {
-		comments = fn.Comments
+		comments = fn.Comments()
 	}
 
 	// T-SQL allows the OVER (...) syntax after WITHIN GROUP.
@@ -1056,8 +1056,8 @@ func (p *Parser) baseParseAlias(this *Expr, explicit bool) *Expr {
 		column := this.This()
 
 		// Moves the comment next to the alias in `expr /* comment */ AS alias`
-		if len(this.Comments) == 0 && column != nil && len(column.Comments) > 0 {
-			this.Comments = column.PopComments()
+		if len(this.Comments()) == 0 && column != nil && len(column.Comments()) > 0 {
+			this.SetComments(column.PopComments())
 		}
 	}
 

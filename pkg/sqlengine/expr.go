@@ -12,23 +12,89 @@ import (
 //
 // Argument values are one of: nil, *Expr, []*Expr, string, bool, int, DType.
 type Expr struct {
-	kind   Kind
-	hashed bool
-	// posSet reports that posLine..posEnd hold the line/col/start/end position metadata
-	// (Python's meta["line"], ...), kept inline instead of in the meta map.
-	posSet   bool
+	kind  Kind
+	flags exprFlags
+	// posLine..posEnd hold the line/col/start/end position metadata (Python's meta["line"], ...)
+	// when flagPosSet is set, kept inline instead of in the meta map.
 	posLine  int32
 	posCol   int32
 	posStart int32
-	args     []arg
-	parent   *Expr
-	argKey   string
-	index    int // -1 means None
-	Comments []string
-	typ      *Expr
+	args   []arg
+	parent *Expr
+	argKey string
+	index  int32 // -1 means None
+	posEnd int32
+	// ext holds the rarely set fields (comments, metadata), keeping Expr at 96 bytes.
+	ext  *exprExt
+	typ  *Expr
+	hash uint64
+}
+
+type exprFlags uint8
+
+const (
+	flagHashed        exprFlags = 1 << iota // hash holds the cached structural hash
+	flagPosSet                              // posLine..posEnd are set
+	flagEmptyComments                       // comments is [] (not None) and ext holds none
+)
+
+func (e *Expr) hashed() bool { return e.flags&flagHashed != 0 }
+func (e *Expr) posSet() bool { return e.flags&flagPosSet != 0 }
+
+func (e *Expr) setFlag(f exprFlags, on bool) {
+	if on {
+		e.flags |= f
+	} else {
+		e.flags &^= f
+	}
+}
+
+// exprExt holds the optional parts of an Expr.
+type exprExt struct {
+	comments []string // nil mirrors Python's None
 	meta     map[string]any
-	hash     uint64
-	posEnd   int32
+}
+
+func (e *Expr) extEnsure() *exprExt {
+	if e.ext == nil {
+		e.ext = &exprExt{}
+	}
+	return e.ext
+}
+
+// Comments returns the attached comments (nil when there are none, like Python's None).
+func (e *Expr) Comments() []string {
+	if e.ext == nil || e.ext.comments == nil {
+		if e.flags&flagEmptyComments != 0 {
+			return []string{}
+		}
+		return nil
+	}
+	return e.ext.comments
+}
+
+// SetComments replaces the attached comments. An empty, non-nil list is kept as a flag.
+func (e *Expr) SetComments(c []string) {
+	e.flags &^= flagEmptyComments
+	if c != nil && len(c) == 0 {
+		e.flags |= flagEmptyComments
+		if e.ext != nil {
+			e.ext.comments = nil
+		}
+		return
+	}
+	if c == nil && e.ext == nil {
+		return
+	}
+	e.extEnsure().comments = c
+}
+
+// metaMap returns the metadata map or nil.
+func (e *Expr) metaMap() map[string]any {
+	if e.ext == nil {
+		return nil
+	}
+	return e.ext.meta
 }
 
 type arg struct {
@@ -229,7 +295,7 @@ func (e *Expr) Parent() *Expr { return e.parent }
 func (e *Expr) ArgKey() string { return e.argKey }
 
 // Index returns the position of e in its parent's list argument, or -1.
-func (e *Expr) Index() int { return e.index }
+func (e *Expr) Index() int { return int(e.index) }
 
 // Args returns the ordered arguments. Callers must not mutate the result.
 func (e *Expr) ArgKeys() []string {
@@ -328,8 +394,8 @@ func (e *Expr) Expression() *Expr { return e.ArgE("expression") }
 func (e *Expr) Expressions() []*Expr { return e.ArgL("expressions") }
 
 func (e *Expr) invalidateHash() {
-	for n := e; n != nil && n.hashed; n = n.parent {
-		n.hashed = false
+	for n := e; n != nil && n.hashed(); n = n.parent {
+		n.flags &^= flagHashed
 	}
 }
 
@@ -420,7 +486,7 @@ func (e *Expr) Append(key string, value *Expr) {
 	if value != nil {
 		value.parent = e
 		value.argKey = key
-		value.index = len(list)
+		value.index = int32(len(list))
 	}
 	list = append(list, value)
 	e.setRaw(key, list)
@@ -431,13 +497,13 @@ func (e *Expr) setParent(key string, value any, index int) {
 	case *Expr:
 		v.parent = e
 		v.argKey = key
-		v.index = index
+		v.index = int32(index)
 	case []*Expr:
 		for i, x := range v {
 			if x != nil {
 				x.parent = e
 				x.argKey = key
-				x.index = i
+				x.index = int32(i)
 			}
 		}
 	case []any:
@@ -445,7 +511,7 @@ func (e *Expr) setParent(key string, value any, index int) {
 			if x, ok := y.(*Expr); ok && x != nil {
 				x.parent = e
 				x.argKey = key
-				x.index = i
+				x.index = int32(i)
 			}
 		}
 	}
@@ -696,21 +762,22 @@ func (e *Expr) IsLeaf() bool {
 
 // Meta returns the metadata map, allocating it if needed.
 func (e *Expr) Meta() map[string]any {
-	if e.meta == nil {
-		e.meta = map[string]any{}
+	x := e.extEnsure()
+	if x.meta == nil {
+		x.meta = map[string]any{}
 	}
-	return e.meta
+	return x.meta
 }
 
 // MetaGet reads a metadata value without allocating. Explicit map entries take precedence over
 // the inline position fields.
 func (e *Expr) MetaGet(key string) any {
-	if e.meta != nil {
-		if v, ok := e.meta[key]; ok {
+	if m := e.metaMap(); m != nil {
+		if v, ok := m[key]; ok {
 			return v
 		}
 	}
-	if e.posSet {
+	if e.posSet() {
 		switch key {
 		case "line":
 			return int(e.posLine)
@@ -728,12 +795,17 @@ func (e *Expr) MetaGet(key string) any {
 // setPositions sets the line/col/start/end position metadata.
 func (e *Expr) setPositions(line, col, start, end int) {
 	e.posLine, e.posCol, e.posStart, e.posEnd = int32(line), int32(col), int32(start), int32(end)
-	e.posSet = true
-	if e.meta != nil {
-		delete(e.meta, "line")
-		delete(e.meta, "col")
-		delete(e.meta, "start")
-		delete(e.meta, "end")
+	e.flags |= flagPosSet
+	e.clearPositionMeta()
+}
+
+// clearPositionMeta drops explicit line/col/start/end metadata entries (the inline fields win).
+func (e *Expr) clearPositionMeta() {
+	if m := e.metaMap(); m != nil {
+		delete(m, "line")
+		delete(m, "col")
+		delete(m, "start")
+		delete(m, "end")
 	}
 }
 
@@ -747,19 +819,22 @@ func (e *Expr) Copy() *Expr {
 
 func (e *Expr) deepCopy() *Expr {
 	c := newExprArgs(len(e.args))
-	c.kind, c.index, c.hash, c.hashed = e.kind, -1, e.hash, e.hashed
-	c.posSet, c.posLine, c.posCol, c.posStart, c.posEnd = e.posSet, e.posLine, e.posCol, e.posStart, e.posEnd
-	if e.Comments != nil {
-		c.Comments = append([]string{}, e.Comments...)
+	c.kind, c.index, c.hash, c.flags = e.kind, -1, e.hash, e.flags
+	c.posLine, c.posCol, c.posStart, c.posEnd = e.posLine, e.posCol, e.posStart, e.posEnd
+	if e.ext != nil {
+		c.ext = &exprExt{}
+		if e.ext.comments != nil {
+			c.ext.comments = append([]string{}, e.ext.comments...)
+		}
+		if e.ext.meta != nil {
+			c.ext.meta = make(map[string]any, len(e.ext.meta))
+			for k, v := range e.ext.meta {
+				c.ext.meta[k] = v
+			}
+		}
 	}
 	if e.typ != nil {
 		c.typ = e.typ.deepCopy()
-	}
-	if e.meta != nil {
-		c.meta = make(map[string]any, len(e.meta))
-		for k, v := range e.meta {
-			c.meta[k] = v
-		}
 	}
 	if len(e.args) > 0 {
 		c.args = c.args[:len(e.args)]
@@ -781,7 +856,7 @@ func (e *Expr) deepCopy() *Expr {
 					cx := x.deepCopy()
 					cx.parent = c
 					cx.argKey = a.key
-					cx.index = j
+					cx.index = int32(j)
 					list[j] = cx
 				}
 				c.args[i].val = list
@@ -794,7 +869,7 @@ func (e *Expr) deepCopy() *Expr {
 						cx := x.deepCopy()
 						cx.parent = c
 						cx.argKey = a.key
-						cx.index = j
+						cx.index = int32(j)
 						list[j] = cx
 					} else {
 						list[j] = y
@@ -813,12 +888,14 @@ const sqlglotMeta = "sqlglot.meta"
 
 // AddComments mirrors Expression.add_comments.
 func (e *Expr) AddComments(comments []string, prepend bool) {
-	if e.Comments == nil {
-		e.Comments = []string{}
-	}
 	if len(comments) == 0 {
+		if e.Comments() == nil {
+			e.SetComments([]string{})
+		}
 		return
 	}
+	e.extEnsure()
+	e.flags &^= flagEmptyComments
 	for _, c := range comments {
 		parts := strings.Split(c, sqlglotMeta)
 		if len(parts) > 1 {
@@ -833,11 +910,11 @@ func (e *Expr) AddComments(comments []string, prepend bool) {
 			}
 		}
 		if !prepend {
-			e.Comments = append(e.Comments, c)
+			e.ext.comments = append(e.ext.comments, c)
 		}
 	}
 	if prepend {
-		e.Comments = append(append([]string{}, comments...), e.Comments...)
+		e.ext.comments = append(append([]string{}, comments...), e.ext.comments...)
 	}
 }
 
@@ -853,8 +930,8 @@ func toBool(v string) any {
 
 // PopComments mirrors Expression.pop_comments.
 func (e *Expr) PopComments() []string {
-	c := e.Comments
-	e.Comments = nil
+	c := e.Comments()
+	e.SetComments(nil)
 	if c == nil {
 		return []string{}
 	}
@@ -1114,7 +1191,7 @@ func (e *Expr) Transform(fn func(*Expr) *Expr, copy bool) *Expr {
 			root = newNode
 		} else if parent != nil && key != "" && newNode != node {
 			if index >= 0 {
-				parent.SetIndex(key, newNode, index, true)
+				parent.SetIndex(key, newNode, int(index), true)
 			} else {
 				parent.Set(key, newNode)
 			}
@@ -1133,9 +1210,9 @@ func (e *Expr) Replace(expression *Expr) *Expr {
 	if key != "" {
 		if e.index >= 0 {
 			if expression == nil {
-				parent.SetIndex(key, nil, e.index, true)
+				parent.SetIndex(key, nil, int(e.index), true)
 			} else {
-				parent.SetIndex(key, expression, e.index, true)
+				parent.SetIndex(key, expression, int(e.index), true)
 			}
 		} else {
 			parent.Set(key, expression)
@@ -1162,7 +1239,7 @@ func (e *Expr) ReplaceWithList(list []*Expr) {
 				v.parent.ReplaceWithList(list)
 			}
 		} else if e.index >= 0 {
-			parent.SetIndex(key, list, e.index, true)
+			parent.SetIndex(key, list, int(e.index), true)
 		} else {
 			parent.Set(key, list)
 		}
@@ -1182,7 +1259,7 @@ var hashSeed = maphash.MakeSeed()
 
 // Hash mirrors Expression.__hash__ (string args are compared case-insensitively).
 func (e *Expr) Hash() uint64 {
-	if e.hashed {
+	if e.hashed() {
 		return e.hash
 	}
 	var h maphash.Hash
@@ -1236,7 +1313,7 @@ func (e *Expr) Hash() uint64 {
 		}
 	}
 	e.hash = h.Sum64()
-	e.hashed = true
+	e.flags |= flagHashed
 	return e.hash
 }
 
@@ -1338,16 +1415,19 @@ func WithValidateArgs(e *Expr, args []*Expr) *Expr {
 // argument list as Python's caller would see it after the call.
 func callFuncBuilder(b FuncBuilder, args []*Expr, d *Dialect) (*Expr, []*Expr) {
 	e := b(args, d)
-	if e == nil || e.meta == nil {
+	if e == nil || e.metaMap() == nil {
 		return e, args
 	}
-	v, ok := e.meta[metaValidateArgs]
+	v, ok := e.ext.meta[metaValidateArgs]
 	if !ok {
 		return e, args
 	}
-	delete(e.meta, metaValidateArgs)
-	if len(e.meta) == 0 {
-		e.meta = nil
+	delete(e.ext.meta, metaValidateArgs)
+	if len(e.ext.meta) == 0 {
+		e.ext.meta = nil
+		if e.ext.comments == nil {
+			e.ext = nil
+		}
 	}
 	return e, v.([]*Expr)
 }

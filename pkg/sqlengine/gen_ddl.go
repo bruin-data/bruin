@@ -1148,7 +1148,7 @@ func (g *Generator) setOperations(expression *Expr) string {
 
 		if n, ok := node.(*Expr); ok && n.IsA(KSetOperation) {
 			stack = append(stack, n.Arg("expression"))
-			stack = append(stack, g.maybeCommentFull(g.setOperation(n), nil, n.Comments, true, true))
+			stack = append(stack, g.maybeCommentFull(g.setOperation(n), nil, n.Comments(), true, true))
 			stack = append(stack, n.Arg("this"))
 		} else {
 			sqls = append(sqls, g.sql(node))

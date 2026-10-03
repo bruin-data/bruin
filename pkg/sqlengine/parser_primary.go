@@ -299,7 +299,7 @@ func (p *Parser) baseParseColumnOps(this *Expr) *Expr {
 
 			// In t.true, t.null we should produce an Identifier node
 			if dot && field.IsA(KNull, KBoolean) {
-				field = p.expressionC(New(KIdentifier, "this", p.prev.Text), field.Comments)
+				field = p.expressionC(New(KIdentifier, "this", p.prev.Text), field.Comments())
 			}
 		}
 
@@ -324,7 +324,7 @@ func (p *Parser) baseParseColumnOps(this *Expr) *Expr {
 				"table", this.Arg("this"),
 				"db", this.Arg("table"),
 				"catalog", this.Arg("db"),
-			), this.Comments)
+			), this.Comments())
 		} else if field.IsA(KWindow) {
 			// Move the exp.Dot's to the window's function
 			windowFunc := p.expression(New(KDot, "this", this, "expression", field.This()))
@@ -334,7 +334,7 @@ func (p *Parser) baseParseColumnOps(this *Expr) *Expr {
 			this = p.expression(New(KDot, "this", this, "expression", field))
 		}
 
-		if field != nil && len(field.Comments) > 0 {
+		if field != nil && len(field.Comments()) > 0 {
 			this.AddComments(field.PopComments(), false)
 		}
 

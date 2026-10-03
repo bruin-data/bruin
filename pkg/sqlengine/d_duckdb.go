@@ -337,7 +337,7 @@ func duckdbParseTable(p *Parser, schema bool, joins bool, aliasTokens *TokenSet,
 	if table != nil && alias.IsA(KTableAlias) {
 		// Moves the comment next to the alias in `alias: table /* comment */`
 		comments = append(comments, table.PopComments()...)
-		alias.Comments = append(alias.PopComments(), comments...)
+		alias.SetComments(append(alias.PopComments(), comments...))
 		table.Set("alias", alias)
 	}
 

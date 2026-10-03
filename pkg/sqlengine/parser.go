@@ -381,7 +381,7 @@ func (p *Parser) isConnected() bool {
 }
 
 func (p *Parser) findSQL(start, end *Token) string {
-	return pySlice(p.runes(), start.Start, end.End+1)
+	return pySlice(p.runes(), int(start.Start), int(end.End)+1)
 }
 
 // runes returns the SQL as code points (positions are code-point offsets, like Python's),
@@ -406,12 +406,12 @@ func (p *Parser) raiseError(message string, tok *Token) {
 			}
 		}
 	}
-	formatted, startCtx, highlight, endCtx := highlightSQL(p.runes(), [][2]int{{tok.Start, tok.End}}, p.errorMessageContext)
+	formatted, startCtx, highlight, endCtx := highlightSQL(p.runes(), [][2]int{{int(tok.Start), int(tok.End)}}, p.errorMessageContext)
 	msg := fmt.Sprintf("%s. Line %d, Col: %d.\n  %s", message, tok.Line, tok.Col, formatted)
 	err := &ParseError{Msg: msg, Errors: []ParseErrorDetail{{
 		Description:  message,
-		Line:         tok.Line,
-		Col:          tok.Col,
+		Line:         int(tok.Line),
+		Col:          int(tok.Col),
 		StartContext: startCtx,
 		Highlight:    highlight,
 		EndContext:   endCtx,
@@ -501,7 +501,9 @@ func (p *Parser) expressionC(e *Expr, comments []string) *Expr {
 }
 
 func (e *Expr) updatePositionsTok(tok *Token) {
-	e.setPositions(tok.Line, tok.Col, tok.Start, tok.End)
+	e.posLine, e.posCol, e.posStart, e.posEnd = tok.Line, tok.Col, tok.Start, tok.End
+	e.flags |= flagPosSet
+	e.clearPositionMeta()
 }
 
 // updatePositionsFrom mirrors update_positions(other_expression).
@@ -509,12 +511,12 @@ func (e *Expr) updatePositionsFrom(other *Expr) *Expr {
 	if other == nil {
 		return e
 	}
-	if other.posSet {
+	if other.posSet() {
 		e.setPositions(int(other.posLine), int(other.posCol), int(other.posStart), int(other.posEnd))
 	}
-	if other.meta != nil {
+	if m := other.metaMap(); m != nil {
 		for _, k := range [...]string{"line", "col", "start", "end"} {
-			if v, ok := other.meta[k]; ok {
+			if v, ok := m[k]; ok {
 				e.Meta()[k] = v
 			}
 		}

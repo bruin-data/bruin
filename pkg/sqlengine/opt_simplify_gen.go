@@ -46,8 +46,8 @@ func (g *smpGenState) gen(expression *Expr, comments bool) string {
 			if x == nil {
 				continue
 			}
-			if comments && len(x.Comments) > 0 {
-				g.push(" /*" + strings.Join(x.Comments, ",") + "*/")
+			if comments && len(x.Comments()) > 0 {
+				g.push(" /*" + strings.Join(x.Comments(), ",") + "*/")
 			}
 
 			if !g.dispatch(x) {

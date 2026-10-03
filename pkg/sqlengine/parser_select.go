@@ -386,7 +386,7 @@ func (p *Parser) parseSelectQuery(nested bool, table bool, parseSubqueryAlias bo
 			"exclude", excludeArg,
 			"operation_modifiers", operationModifiersArg,
 		))
-		this.Comments = comments
+		this.SetComments(comments)
 
 		into := p.parseInto()
 		if into != nil {

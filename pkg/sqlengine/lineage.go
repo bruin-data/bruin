@@ -315,8 +315,8 @@ func (st *lineageState) toNode(column string, columnIdx int, isIdx bool, scope *
 
 	sourceNames := map[string]string{}
 	for _, dt := range derivedTables {
-		if len(dt.Comments) > 0 && strings.HasPrefix(dt.Comments[0], "source: ") {
-			fields := strings.Fields(dt.Comments[0])
+		if len(dt.Comments()) > 0 && strings.HasPrefix(dt.Comments()[0], "source: ") {
+			fields := strings.Fields(dt.Comments()[0])
 			if len(fields) > 1 {
 				sourceNames[dt.Alias()] = fields[1]
 			}

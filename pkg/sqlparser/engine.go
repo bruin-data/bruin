@@ -170,7 +170,7 @@ func topLevelSemicolons(query string, d *sqlengine.Dialect) ([]int, error) {
 				beginDepth--
 			}
 		case tok.Type == sqlengine.TK_SEMICOLON && parenDepth == 0 && beginDepth == 0:
-			positions = append(positions, tok.Start)
+			positions = append(positions, int(tok.Start))
 		}
 	}
 	return positions, nil

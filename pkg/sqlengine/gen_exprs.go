@@ -586,8 +586,8 @@ func (g *Generator) connectorPush(expression *Expr, op string, stack *[]any) str
 		*stack = append(*stack, g.expressions(expression, exprsOpts{sep: strp2(" " + op + " ")}))
 	} else {
 		*stack = append(*stack, expression.Right())
-		if len(expression.Comments) > 0 && g.comments {
-			op = g.maybeCommentC(op, nil, expression.Comments)
+		if len(expression.Comments()) > 0 && g.comments {
+			op = g.maybeCommentC(op, nil, expression.Comments())
 		}
 		*stack = append(*stack, op, expression.Left())
 	}

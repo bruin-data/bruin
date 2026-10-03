@@ -294,7 +294,7 @@ func (g *Generator) maybeCommentFull(sql string, e *Expr, comments []string, has
 		if hasComments {
 			cs = comments
 		} else if e != nil {
-			cs = e.Comments
+			cs = e.Comments()
 		}
 	}
 	if len(cs) == 0 || (e != nil && e.IsA(g.s.EXCLUDE_COMMENTS...)) {
@@ -661,7 +661,7 @@ func (g *Generator) binary(e *Expr, op string) string {
 				op = "OPERATOR(" + g.sql(opFunc) + ")"
 			}
 			stack = append(stack, n.Arg("expression"))
-			stack = append(stack, " "+g.maybeCommentC(op, nil, n.Comments)+" ")
+			stack = append(stack, " "+g.maybeCommentC(op, nil, n.Comments())+" ")
 			stack = append(stack, n.Arg("this"))
 		} else {
 			sqls = append(sqls, g.sql(node))

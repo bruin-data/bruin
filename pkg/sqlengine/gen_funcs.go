@@ -244,7 +244,7 @@ func (g *Generator) embedIgnoreNulls(expression *Expr, text string) string {
 
 		if aggFunc != nil {
 			aggFuncSQL := genEDropLastRune(g.sqlNoComment(aggFunc)) + " " + text + ")"
-			return g.maybeCommentC(aggFuncSQL, nil, aggFunc.Comments)
+			return g.maybeCommentC(aggFuncSQL, nil, aggFunc.Comments())
 		}
 	}
 
