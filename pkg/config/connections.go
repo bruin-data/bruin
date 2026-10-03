@@ -912,6 +912,19 @@ func (c AnthropicConnection) GetName() string {
 	return c.Name
 }
 
+func (c AnthropicConnection) GetAPIKey() string {
+	return c.APIKey
+}
+
+type APIKeyConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
+}
+
+func (c APIKeyConnection) GetAPIKey() string {
+	return c.APIKey
+}
+
 type FacebookAdsConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	AccessToken        string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token" sensitive:"true"`
