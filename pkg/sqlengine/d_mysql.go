@@ -614,7 +614,7 @@ func mysqlParseCharsetName(p *Parser) *Expr {
 	identifier := p.parseIdentifier()
 	if identifier != nil {
 		name := identifier.Name()
-		if SAFE_IDENTIFIER_RE.MatchString(name) {
+		if isSafeIdentifier(name) {
 			return New(KVar, "this", name)
 		}
 		return identifier

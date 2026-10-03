@@ -16,7 +16,7 @@ func newTokenSet(types ...TokenType) TokenSet {
 }
 
 // Has reports whether t is in the set.
-func (s TokenSet) Has(t TokenType) bool { return s.bits[t/64]&(1<<(t%64)) != 0 }
+func (s *TokenSet) Has(t TokenType) bool { return s.bits[t/64]&(1<<(t%64)) != 0 }
 
 // With returns a copy of s with types added.
 func (s TokenSet) With(types ...TokenType) TokenSet {
@@ -109,7 +109,7 @@ func newKindSet(kinds ...Kind) KindSet {
 	return s
 }
 
-func (s KindSet) Has(k Kind) bool { return s.bits[k/64]&(1<<(k%64)) != 0 }
+func (s *KindSet) Has(k Kind) bool { return s.bits[k/64]&(1<<(k%64)) != 0 }
 
 func (s KindSet) With(kinds ...Kind) KindSet {
 	for _, k := range kinds {

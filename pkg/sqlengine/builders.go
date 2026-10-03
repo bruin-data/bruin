@@ -110,9 +110,11 @@ func parsePyDecimal(s string) (*big.Float, bool) {
 
 // ToIdentifier mirrors exp.to_identifier for strings. quoted: nil means auto.
 func ToIdentifier(name string, quoted *bool) *Expr {
-	q := !SAFE_IDENTIFIER_RE.MatchString(name)
+	var q bool
 	if quoted != nil {
 		q = *quoted
+	} else {
+		q = !isSafeIdentifier(name)
 	}
 	return New(KIdentifier, "this", name, "quoted", q)
 }

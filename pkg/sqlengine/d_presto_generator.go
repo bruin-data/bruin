@@ -741,7 +741,7 @@ func prestoJSONExtractSQL(g *Generator, e *Expr) string {
 			continue
 		}
 		key := pathKey.ThisS()
-		if !SAFE_IDENTIFIER_RE.MatchString(key) {
+		if !isSafeIdentifier(key) {
 			key = `"` + key + `"`
 		}
 		segments = append(segments, "."+key)

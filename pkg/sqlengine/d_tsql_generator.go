@@ -139,7 +139,7 @@ func tsqlTableName(table *Expr) string {
 	}
 	out := make([]string, len(parts))
 	for i, part := range parts {
-		if !SAFE_IDENTIFIER_RE.MatchString(part.Name()) {
+		if !isSafeIdentifier(part.Name()) {
 			sql, err := MustDialect("").NewGenerator(&GenerateOptions{Identify: "true", NoComments: true}).Generate(part, false)
 			if err != nil {
 				panic(err)

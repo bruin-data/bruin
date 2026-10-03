@@ -11,6 +11,53 @@ import (
 func itoa(i int) string { return strconv.Itoa(i) }
 
 // pyUpper mirrors str.upper().
+// pyUpperEq reports whether pyUpper(s) == upper, without allocating for ASCII s.
+func pyUpperEq(s, upper string) bool {
+	if len(s) != len(upper) {
+		// An ASCII s uppercases to the same length; only non-ASCII input can change length.
+		for i := 0; i < len(s); i++ {
+			if s[i] >= 0x80 {
+				return pyUpper(s) == upper
+			}
+		}
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c >= 0x80 {
+			return pyUpper(s) == upper
+		}
+		if 'a' <= c && c <= 'z' {
+			c -= 'a' - 'A'
+		}
+		if c != upper[i] {
+			// The rest may still hold non-ASCII text whose uppercase differs in length, but the
+			// prefix already differs and uppercasing never changes ASCII bytes.
+			return false
+		}
+	}
+	return true
+}
+
+// upperASCII writes pyUpper(s) into buf when s is ASCII and fits, for allocation-free map lookups
+// (m[string(b)] does not allocate).
+func upperASCII(buf []byte, s string) ([]byte, bool) {
+	if len(s) > len(buf) {
+		return nil, false
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c >= 0x80 {
+			return nil, false
+		}
+		if 'a' <= c && c <= 'z' {
+			c -= 'a' - 'A'
+		}
+		buf[i] = c
+	}
+	return buf[:len(s)], true
+}
+
 func pyUpper(s string) string {
 	ascii := true
 	for i := 0; i < len(s); i++ {

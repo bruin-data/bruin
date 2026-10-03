@@ -316,9 +316,8 @@ func (p *Parser) matchPairNoAdvance(a, b TokenType) bool {
 func (p *Parser) matchTexts(texts ...string) bool {
 	p.tick()
 	if !p.s.TEXT_MATCH_EXCLUDED_TOKENS.Has(p.curr.Type) {
-		up := pyUpper(p.curr.Text)
 		for _, t := range texts {
-			if up == t {
+			if pyUpperEq(p.curr.Text, t) {
 				p.advance(1)
 				return true
 			}
@@ -327,9 +326,20 @@ func (p *Parser) matchTexts(texts ...string) bool {
 	return false
 }
 
+// hasUpperText reports whether texts holds pyUpper(text).
+func hasUpperText[V any](texts map[string]V, text string) bool {
+	var buf [64]byte
+	if b, ok := upperASCII(buf[:], text); ok {
+		_, found := texts[string(b)]
+		return found
+	}
+	_, found := texts[pyUpper(text)]
+	return found
+}
+
 // matchTextSet mirrors Parser._match_texts with a set/mapping argument.
 func (p *Parser) matchTextSet(texts StrSet) bool {
-	if !p.s.TEXT_MATCH_EXCLUDED_TOKENS.Has(p.curr.Type) && texts.Has(pyUpper(p.curr.Text)) {
+	if !p.s.TEXT_MATCH_EXCLUDED_TOKENS.Has(p.curr.Type) && hasUpperText(texts, p.curr.Text) {
 		p.advance(1)
 		return true
 	}
@@ -337,14 +347,14 @@ func (p *Parser) matchTextSet(texts StrSet) bool {
 }
 
 func (p *Parser) matchTextSetNoAdvance(texts StrSet) bool {
-	return !p.s.TEXT_MATCH_EXCLUDED_TOKENS.Has(p.curr.Type) && texts.Has(pyUpper(p.curr.Text))
+	return !p.s.TEXT_MATCH_EXCLUDED_TOKENS.Has(p.curr.Type) && hasUpperText(texts, p.curr.Text)
 }
 
 func matchTextKeys[V any](p *Parser, m map[string]V) bool {
 	if p.s.TEXT_MATCH_EXCLUDED_TOKENS.Has(p.curr.Type) {
 		return false
 	}
-	if _, ok := m[pyUpper(p.curr.Text)]; ok {
+	if hasUpperText(m, p.curr.Text) {
 		p.advance(1)
 		return true
 	}
@@ -356,7 +366,7 @@ func (p *Parser) matchTextSeq(texts ...string) bool {
 	p.tick()
 	index := p.index
 	for _, text := range texts {
-		if !p.s.TEXT_MATCH_EXCLUDED_TOKENS.Has(p.curr.Type) && pyUpper(p.curr.Text) == text {
+		if !p.s.TEXT_MATCH_EXCLUDED_TOKENS.Has(p.curr.Type) && pyUpperEq(p.curr.Text, text) {
 			p.advance(1)
 		} else {
 			p.retreat(index)

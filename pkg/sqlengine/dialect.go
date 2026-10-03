@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"unicode"
+	"unicode/utf8"
 )
 
 // Normalization strategies mirror sqlglot.dialects.dialect.NormalizationStrategy values.
@@ -291,6 +292,33 @@ func (d *Dialect) CaseSensitive(text string) bool {
 // SAFE_IDENTIFIER_RE mirrors sqlglot.expressions.SAFE_IDENTIFIER_RE.
 var SAFE_IDENTIFIER_RE = regexp.MustCompile(`^[_a-zA-Z][\p{L}\p{N}_]*\n?$`)
 
+// isSafeIdentifier is SAFE_IDENTIFIER_RE.MatchString(s) without the regexp engine.
+func isSafeIdentifier(s string) bool {
+	if s == "" {
+		return false
+	}
+	if c := s[0]; c != '_' && (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') {
+		return false
+	}
+	rest := strings.TrimSuffix(s[1:], "\n")
+	for i := 0; i < len(rest); i++ {
+		c := rest[i]
+		if c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') {
+			continue
+		}
+		if c < utf8.RuneSelf {
+			return false
+		}
+		for _, r := range rest[i:] {
+			if r != '_' && !unicode.IsLetter(r) && !unicode.IsNumber(r) {
+				return false
+			}
+		}
+		return true
+	}
+	return true
+}
+
 // CanQuote mirrors Dialect.can_quote. identify is "true", "false", "safe" or "unsafe".
 func (d *Dialect) CanQuote(id *Expr, identify string) bool {
 	if d.hooks.canQuote != nil {
@@ -312,7 +340,7 @@ func (d *Dialect) baseCanQuote(id *Expr, identify string) bool {
 	if identify == "true" {
 		return true
 	}
-	isSafe := !d.CaseSensitive(id.ThisS()) && SAFE_IDENTIFIER_RE.MatchString(id.ThisS())
+	isSafe := !d.CaseSensitive(id.ThisS()) && isSafeIdentifier(id.ThisS())
 	if identify == "safe" {
 		return isSafe
 	}
