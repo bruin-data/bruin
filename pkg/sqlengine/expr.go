@@ -19,11 +19,11 @@ type Expr struct {
 	posLine  int32
 	posCol   int32
 	posStart int32
-	args   []arg
-	parent *Expr
-	argKey string
-	index  int32 // -1 means None
-	posEnd int32
+	args     []arg
+	parent   *Expr
+	argKey   string
+	index    int32 // -1 means None
+	posEnd   int32
 	// ext holds the rarely set fields (comments, metadata), keeping Expr at 96 bytes.
 	ext  *exprExt
 	typ  *Expr
