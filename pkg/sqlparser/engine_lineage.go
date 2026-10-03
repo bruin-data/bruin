@@ -59,7 +59,7 @@ func toRawSchema(v any) (*rawSchema, error) {
 			}
 			sort.Strings(colKeys)
 			for _, ck := range colKeys {
-				cols.Set(ck, s[k][ck])
+				cols.AppendNew(ck, s[k][ck]) // distinct map keys
 			}
 			rs.tables[k] = cols
 		}
@@ -196,7 +196,7 @@ func schemaValue(m *sqlengine.SchemaMap) any {
 func flatSchemaMap(schema *rawSchema) *sqlengine.SchemaMap {
 	m := sqlengine.NewSchemaMapSize(len(schema.keys))
 	for _, k := range schema.keys {
-		m.Set(k, schemaValue(schema.tables[k]))
+		m.AppendNew(k, schemaValue(schema.tables[k])) // rawSchema keys are distinct
 	}
 	return m
 }

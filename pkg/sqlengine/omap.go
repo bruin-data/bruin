@@ -16,6 +16,9 @@ const omapIndexThreshold = 8
 func newOMap[V any]() *omap[V] { return &omap[V]{} }
 
 func (o *omap[V]) find(key string) int {
+	if o.idx == nil && len(o.keys) > omapIndexThreshold {
+		o.reindex()
+	}
 	if o.idx != nil {
 		if i, ok := o.idx[key]; ok {
 			return i
@@ -84,12 +87,16 @@ func (o *omap[V]) Set(key string, v V) {
 		o.vals[i] = v
 		return
 	}
+	o.AppendNew(key, v)
+}
+
+// AppendNew adds an entry for a key that is known not to be present (the index, if any, is kept
+// up to date; otherwise it is built on the first lookup).
+func (o *omap[V]) AppendNew(key string, v V) {
 	o.keys = append(o.keys, key)
 	o.vals = append(o.vals, v)
 	if o.idx != nil {
 		o.idx[key] = len(o.keys) - 1
-	} else if len(o.keys) > omapIndexThreshold {
-		o.reindex()
 	}
 }
 
@@ -130,9 +137,6 @@ func (o *omap[V]) Copy() *omap[V] {
 	}
 	c.keys = append([]string{}, o.keys...)
 	c.vals = append([]V(nil), o.vals...)
-	if o.idx != nil {
-		c.reindex()
-	}
 	return c
 }
 
