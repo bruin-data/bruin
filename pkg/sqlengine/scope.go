@@ -137,8 +137,9 @@ func (s *Scope) ClearCache() {
 	s.ctes = nil
 	s.subqueries = nil
 	s.joinHints = nil
-	s.semiAntiJoinTables = newStrSet()
-	s.columnIndex = map[*Expr]struct{}{}
+	// Rebuilt by collect before any use.
+	s.semiAntiJoinTables = nil
+	s.columnIndex = nil
 	s.selectedSources = nil
 	s.columns, s.columnsSet = nil, false
 	s.externalColumns, s.externalColumnsSet = nil, false
@@ -540,12 +541,16 @@ func (s *Scope) RefCount() map[any]int {
 }
 
 // TraverseScope mirrors sqlglot.optimizer.scope.traverse_scope.
+//
+// Python's _traverse_scope is a generator that traverse_scope fully consumes into a list; the
+// port appends to that list directly. The bookkeeping Python runs after each yielded child scope
+// (remembering the last child, registering it as a source) is done in the same order once the
+// child traversal returns: none of the child traversals read that state (branches copy their
+// source maps), so the result is identical.
 func TraverseScope(e *Expr) []*Scope {
 	if e.IsA(KQuery, KDDL, KDML) {
 		var out []*Scope
-		for sc := range traverseScopeSeq(NewScope(e, nil, nil, nil, ScopeRoot, nil, nil, false)) {
-			out = append(out, sc)
-		}
+		traverseScopeInto(NewScope(e, nil, nil, nil, ScopeRoot, nil, nil, false), &out)
 		return out
 	}
 	return nil
@@ -560,155 +565,116 @@ func BuildScope(e *Expr) *Scope {
 	return scopes[len(scopes)-1]
 }
 
-func traverseScopeSeq(scope *Scope) iter.Seq[*Scope] {
-	return func(yield func(*Scope) bool) {
-		expression := scope.Expression
-		switch {
-		case expression.IsA(KSelect):
-			if !yieldAll(traverseSelect(scope), yield) {
-				return
-			}
-		case expression.IsA(KSetOperation):
-			if !yieldAll(traverseCTEs(scope), yield) {
-				return
-			}
-			yieldAll(traverseUnion(scope), yield)
-			return
-		case expression.IsA(KSubquery):
-			if scope.IsRoot() {
-				if !yieldAll(traverseSelect(scope), yield) {
-					return
-				}
-			} else if !yieldAll(traverseSubqueries(scope), yield) {
-				return
-			}
-		case expression.IsA(KTable):
-			if !yieldAll(traverseTables(scope), yield) {
-				return
-			}
-		case expression.IsA(KUDTF):
-			if !yieldAll(traverseUDTFs(scope), yield) {
-				return
-			}
-		case expression.IsA(KDDL):
-			ddl := expression.ArgE("expression")
-			if ddl.IsA(KQuery) {
-				if !yieldAll(traverseCTEs(scope), yield) {
-					return
-				}
-				yieldAll(traverseScopeSeq(NewScope(ddl, nil, nil, nil, ScopeRoot, nil, scope.CTESources, false)), yield)
-			}
-			return
-		case expression.IsA(KDML):
-			if !yieldAll(traverseCTEs(scope), yield) {
-				return
-			}
-			for query := range FindAllInScope(expression, KQuery) {
-				if !query.Parent().IsA(KCTE, KSubquery) {
-					if !yieldAll(traverseScopeSeq(NewScope(query, nil, nil, nil, ScopeRoot, nil, scope.CTESources, false)), yield) {
-						return
-					}
-				}
-			}
-			return
-		default:
-			return
-		}
-		yield(scope)
+// lastAdded returns the last scope appended to out after index start, or nil.
+func lastAdded(out []*Scope, start int) *Scope {
+	if len(out) > start {
+		return out[len(out)-1]
 	}
+	return nil
 }
 
-func yieldAll(seq iter.Seq[*Scope], yield func(*Scope) bool) bool {
-	for s := range seq {
-		if !yield(s) {
-			return false
+func traverseScopeInto(scope *Scope, out *[]*Scope) {
+	expression := scope.Expression
+	switch {
+	case expression.IsA(KSelect):
+		traverseSelectInto(scope, out)
+	case expression.IsA(KSetOperation):
+		traverseCTEsInto(scope, out)
+		traverseUnionInto(scope, out)
+		return
+	case expression.IsA(KSubquery):
+		if scope.IsRoot() {
+			traverseSelectInto(scope, out)
+		} else {
+			traverseSubqueriesInto(scope, out)
 		}
+	case expression.IsA(KTable):
+		traverseTablesInto(scope, out)
+	case expression.IsA(KUDTF):
+		traverseUDTFsInto(scope, out)
+	case expression.IsA(KDDL):
+		ddl := expression.ArgE("expression")
+		if ddl.IsA(KQuery) {
+			traverseCTEsInto(scope, out)
+			traverseScopeInto(NewScope(ddl, nil, nil, nil, ScopeRoot, nil, scope.CTESources, false), out)
+		}
+		return
+	case expression.IsA(KDML):
+		traverseCTEsInto(scope, out)
+		for query := range FindAllInScope(expression, KQuery) {
+			if !query.Parent().IsA(KCTE, KSubquery) {
+				traverseScopeInto(NewScope(query, nil, nil, nil, ScopeRoot, nil, scope.CTESources, false), out)
+			}
+		}
+		return
+	default:
+		return
 	}
-	return true
+	*out = append(*out, scope)
 }
 
-func traverseSelect(scope *Scope) iter.Seq[*Scope] {
-	return func(yield func(*Scope) bool) {
-		if !yieldAll(traverseCTEs(scope), yield) {
-			return
-		}
-		if !yieldAll(traverseTables(scope), yield) {
-			return
-		}
-		yieldAll(traverseSubqueries(scope), yield)
-	}
+func traverseSelectInto(scope *Scope, out *[]*Scope) {
+	traverseCTEsInto(scope, out)
+	traverseTablesInto(scope, out)
+	traverseSubqueriesInto(scope, out)
 }
 
-func traverseUnion(scope *Scope) iter.Seq[*Scope] {
-	return func(yield func(*Scope) bool) {
-		var prevScope *Scope
-		last := scope
-		unionScopeStack := []*Scope{scope}
-		setOp := scope.Expression
-		exprStack := []*Expr{setOp.ArgE("expression"), setOp.ArgE("this")}
-		for len(exprStack) > 0 {
-			expression := exprStack[len(exprStack)-1]
-			exprStack = exprStack[:len(exprStack)-1]
-			unionScope := unionScopeStack[len(unionScopeStack)-1]
-			newScope := unionScope.Branch(expression, ScopeUnion, nil, nil, nil, unionScope.OuterColumns)
-			if expression.IsA(KSetOperation) {
-				if !yieldAll(traverseCTEs(newScope), yield) {
-					return
-				}
-				unionScopeStack = append(unionScopeStack, newScope)
-				exprStack = append(exprStack, expression.ArgE("expression"), expression.ArgE("this"))
-				continue
-			}
-			// Python's loop variable `scope` shadows the parameter and keeps its last value across
-			// iterations; when a branch yields no scope (an operand that is not a query), the
-			// previous value — initially the set operation's own scope — is used.
-			for sc := range traverseScopeSeq(newScope) {
-				last = sc
-				if !yield(sc) {
-					return
-				}
-			}
-			if prevScope != nil {
-				unionScopeStack = unionScopeStack[:len(unionScopeStack)-1]
-				unionScope.UnionScopes = []*Scope{prevScope, last}
-				prevScope = unionScope
-				if !yield(unionScope) {
-					return
-				}
-			} else {
-				prevScope = last
-			}
+func traverseUnionInto(scope *Scope, out *[]*Scope) {
+	var prevScope *Scope
+	last := scope
+	unionScopeStack := []*Scope{scope}
+	setOp := scope.Expression
+	exprStack := []*Expr{setOp.ArgE("expression"), setOp.ArgE("this")}
+	for len(exprStack) > 0 {
+		expression := exprStack[len(exprStack)-1]
+		exprStack = exprStack[:len(exprStack)-1]
+		unionScope := unionScopeStack[len(unionScopeStack)-1]
+		newScope := unionScope.Branch(expression, ScopeUnion, nil, nil, nil, unionScope.OuterColumns)
+		if expression.IsA(KSetOperation) {
+			traverseCTEsInto(newScope, out)
+			unionScopeStack = append(unionScopeStack, newScope)
+			exprStack = append(exprStack, expression.ArgE("expression"), expression.ArgE("this"))
+			continue
+		}
+		// Python's loop variable `scope` shadows the parameter and keeps its last value across
+		// iterations; when a branch yields no scope (an operand that is not a query), the
+		// previous value — initially the set operation's own scope — is used.
+		start := len(*out)
+		traverseScopeInto(newScope, out)
+		if sc := lastAdded(*out, start); sc != nil {
+			last = sc
+		}
+		if prevScope != nil {
+			unionScopeStack = unionScopeStack[:len(unionScopeStack)-1]
+			unionScope.UnionScopes = []*Scope{prevScope, last}
+			prevScope = unionScope
+			*out = append(*out, unionScope)
+		} else {
+			prevScope = last
 		}
 	}
 }
 
-func traverseCTEs(scope *Scope) iter.Seq[*Scope] {
-	return func(yield func(*Scope) bool) {
-		sources := newOMap[Source]()
-		for _, cte := range scope.CTEs() {
-			cteName := cte.Alias()
-			with := scope.Expression.ArgE("with_")
-			if with != nil && with.ArgB("recursive") {
-				union := cte.This()
-				if union.IsA(KSetOperation) {
-					sources.Set(cteName, Source{Scope: scope.Branch(union.This(), ScopeCTE, nil, nil, nil, nil)})
-				}
-			}
-			var child *Scope
-			for sc := range traverseScopeSeq(scope.Branch(cte.This(), ScopeCTE, nil, sources, nil, cte.AliasColumnNames())) {
-				child = sc
-				if !yield(sc) {
-					return
-				}
-			}
-			if child != nil {
-				sources.Set(cteName, Source{Scope: child})
-				scope.CTEScopes = append(scope.CTEScopes, child)
+func traverseCTEsInto(scope *Scope, out *[]*Scope) {
+	sources := newOMap[Source]()
+	for _, cte := range scope.CTEs() {
+		cteName := cte.Alias()
+		with := scope.Expression.ArgE("with_")
+		if with != nil && with.ArgB("recursive") {
+			union := cte.This()
+			if union.IsA(KSetOperation) {
+				sources.Set(cteName, Source{Scope: scope.Branch(union.This(), ScopeCTE, nil, nil, nil, nil)})
 			}
 		}
-		scope.Sources.Update(sources)
-		scope.CTESources.Update(sources)
+		start := len(*out)
+		traverseScopeInto(scope.Branch(cte.This(), ScopeCTE, nil, sources, nil, cte.AliasColumnNames()), out)
+		if child := lastAdded(*out, start); child != nil {
+			sources.Set(cteName, Source{Scope: child})
+			scope.CTEScopes = append(scope.CTEScopes, child)
+		}
 	}
+	scope.Sources.Update(sources)
+	scope.CTESources.Update(sources)
 }
 
 // isDerivedTable mirrors scope._is_derived_table.
@@ -738,132 +704,115 @@ func findNewNameOMap(taken func(string) bool, base string) string {
 	return n
 }
 
-func traverseTables(scope *Scope) iter.Seq[*Scope] {
-	return func(yield func(*Scope) bool) {
-		sources := newOMap[Source]()
-		var expressions []*Expr
-		if from := scope.Expression.ArgE("from_"); from != nil {
-			expressions = append(expressions, from.This())
-		}
-		for _, join := range scope.Expression.ArgL("joins") {
-			expressions = append(expressions, join.This())
-		}
-		if scope.Expression.IsA(KTable) {
-			expressions = append(expressions, scope.Expression)
-		}
-		expressions = append(expressions, scope.Expression.ArgL("laterals")...)
+func traverseTablesInto(scope *Scope, out *[]*Scope) {
+	sources := newOMap[Source]()
+	var expressions []*Expr
+	if from := scope.Expression.ArgE("from_"); from != nil {
+		expressions = append(expressions, from.This())
+	}
+	for _, join := range scope.Expression.ArgL("joins") {
+		expressions = append(expressions, join.This())
+	}
+	if scope.Expression.IsA(KTable) {
+		expressions = append(expressions, scope.Expression)
+	}
+	expressions = append(expressions, scope.Expression.ArgL("laterals")...)
 
-		for i := 0; i < len(expressions); i++ {
-			expression := expressions[i]
-			if expression.IsA(KFinal) {
-				expression = expression.This()
-			}
-			if expression.IsA(KTable) {
-				tableName := expression.Name()
-				sourceName := expression.AliasOrName()
-				if scope.Sources.Has(tableName) && expression.DbName() == "" {
-					if pivots := expression.ArgL("pivots"); len(pivots) > 0 {
-						sources.Set(pivots[0].Alias(), Source{Table: expression})
-					} else {
-						src, _ := scope.Sources.Get(tableName)
-						sources.Set(sourceName, src)
-					}
-				} else if sources.Has(sourceName) {
-					sources.Set(findNewNameOMap(sources.Has, tableName), Source{Table: expression})
-				} else {
-					sources.Set(sourceName, Source{Table: expression})
-				}
-				if expression != scope.Expression {
-					for _, join := range expression.ArgL("joins") {
-						expressions = append(expressions, join.This())
-					}
-				}
-				continue
-			}
-			if !expression.IsA(KDerivedTable) {
-				continue
-			}
-			node := expression
-			var lateralSources *omap[Source]
-			var scopeType ScopeType
-			var target *[]*Scope
-			if expression.IsA(KUDTF) {
-				lateralSources = sources
-				scopeType = ScopeUDTF
-				target = &scope.UDTFScopes
-			} else if isDerivedTable(expression) {
-				scopeType = ScopeDerivedTable
-				target = &scope.DerivedTableScopes
-				for _, join := range node.ArgL("joins") {
-					expressions = append(expressions, join.This())
-				}
-			} else {
-				expressions = append(expressions, node.This())
-				for _, join := range node.ArgL("joins") {
-					expressions = append(expressions, join.This())
-				}
-				continue
-			}
-			var child *Scope
-			for sc := range traverseScopeSeq(scope.Branch(node, scopeType, nil, nil, lateralSources, node.AliasColumnNames())) {
-				child = sc
-				if !yield(sc) {
-					return
-				}
-				sources.Set(getSourceAlias(node), Source{Scope: sc})
-			}
-			if child != nil {
-				*target = append(*target, child)
-				scope.TableScopes = append(scope.TableScopes, child)
-			}
+	for i := 0; i < len(expressions); i++ {
+		expression := expressions[i]
+		if expression.IsA(KFinal) {
+			expression = expression.This()
 		}
-		scope.Sources.Update(sources)
+		if expression.IsA(KTable) {
+			tableName := expression.Name()
+			sourceName := expression.AliasOrName()
+			if scope.Sources.Has(tableName) && expression.DbName() == "" {
+				if pivots := expression.ArgL("pivots"); len(pivots) > 0 {
+					sources.Set(pivots[0].Alias(), Source{Table: expression})
+				} else {
+					src, _ := scope.Sources.Get(tableName)
+					sources.Set(sourceName, src)
+				}
+			} else if sources.Has(sourceName) {
+				sources.Set(findNewNameOMap(sources.Has, tableName), Source{Table: expression})
+			} else {
+				sources.Set(sourceName, Source{Table: expression})
+			}
+			if expression != scope.Expression {
+				for _, join := range expression.ArgL("joins") {
+					expressions = append(expressions, join.This())
+				}
+			}
+			continue
+		}
+		if !expression.IsA(KDerivedTable) {
+			continue
+		}
+		node := expression
+		var lateralSources *omap[Source]
+		var scopeType ScopeType
+		var target *[]*Scope
+		if expression.IsA(KUDTF) {
+			lateralSources = sources
+			scopeType = ScopeUDTF
+			target = &scope.UDTFScopes
+		} else if isDerivedTable(expression) {
+			scopeType = ScopeDerivedTable
+			target = &scope.DerivedTableScopes
+			for _, join := range node.ArgL("joins") {
+				expressions = append(expressions, join.This())
+			}
+		} else {
+			expressions = append(expressions, node.This())
+			for _, join := range node.ArgL("joins") {
+				expressions = append(expressions, join.This())
+			}
+			continue
+		}
+		start := len(*out)
+		traverseScopeInto(scope.Branch(node, scopeType, nil, nil, lateralSources, node.AliasColumnNames()), out)
+		for _, sc := range (*out)[start:] {
+			sources.Set(getSourceAlias(node), Source{Scope: sc})
+		}
+		if child := lastAdded(*out, start); child != nil {
+			*target = append(*target, child)
+			scope.TableScopes = append(scope.TableScopes, child)
+		}
+	}
+	scope.Sources.Update(sources)
+}
+
+func traverseSubqueriesInto(scope *Scope, out *[]*Scope) {
+	for _, subquery := range scope.Subqueries() {
+		start := len(*out)
+		traverseScopeInto(scope.Branch(subquery, ScopeSubquery, nil, nil, nil, nil), out)
+		if top := lastAdded(*out, start); top != nil {
+			scope.SubqueryScopes = append(scope.SubqueryScopes, top)
+		}
 	}
 }
 
-func traverseSubqueries(scope *Scope) iter.Seq[*Scope] {
-	return func(yield func(*Scope) bool) {
-		for _, subquery := range scope.Subqueries() {
-			var top *Scope
-			for sc := range traverseScopeSeq(scope.Branch(subquery, ScopeSubquery, nil, nil, nil, nil)) {
-				if !yield(sc) {
-					return
-				}
-				top = sc
+func traverseUDTFsInto(scope *Scope, out *[]*Scope) {
+	var udtfExprs []*Expr
+	if scope.Expression.IsA(KUnnest) {
+		udtfExprs = scope.Expression.Expressions()
+	} else if scope.Expression.IsA(KLateral) {
+		udtfExprs = []*Expr{scope.Expression.This()}
+	}
+	sources := newOMap[Source]()
+	for _, expression := range udtfExprs {
+		if expression.IsA(KSubquery) {
+			start := len(*out)
+			traverseScopeInto(scope.Branch(expression, ScopeSubquery, nil, nil, nil, expression.AliasColumnNames()), out)
+			for _, sc := range (*out)[start:] {
+				sources.Set(getSourceAlias(expression), Source{Scope: sc})
 			}
-			if top != nil {
+			if top := lastAdded(*out, start); top != nil {
 				scope.SubqueryScopes = append(scope.SubqueryScopes, top)
 			}
 		}
 	}
-}
-
-func traverseUDTFs(scope *Scope) iter.Seq[*Scope] {
-	return func(yield func(*Scope) bool) {
-		var udtfExprs []*Expr
-		if scope.Expression.IsA(KUnnest) {
-			udtfExprs = scope.Expression.Expressions()
-		} else if scope.Expression.IsA(KLateral) {
-			udtfExprs = []*Expr{scope.Expression.This()}
-		}
-		sources := newOMap[Source]()
-		for _, expression := range udtfExprs {
-			if expression.IsA(KSubquery) {
-				var top *Scope
-				for sc := range traverseScopeSeq(scope.Branch(expression, ScopeSubquery, nil, nil, nil, expression.AliasColumnNames())) {
-					if !yield(sc) {
-						return
-					}
-					top = sc
-					sources.Set(getSourceAlias(expression), Source{Scope: sc})
-				}
-				if top != nil {
-					scope.SubqueryScopes = append(scope.SubqueryScopes, top)
-				}
-			}
-		}
-		scope.Sources.Update(sources)
-	}
+	scope.Sources.Update(sources)
 }
 
 // WalkInScope mirrors sqlglot.optimizer.scope.walk_in_scope.

@@ -2,12 +2,44 @@ package sqlengine
 
 // omap is an insertion-ordered map mirroring Python dict semantics: updating an existing
 // key keeps its position, deleting removes it, and re-adding appends at the end.
+//
+// Entries live in parallel slices; small maps (the common case: scope sources, schema columns)
+// are searched linearly and an index is only built past omapIndexThreshold entries.
 type omap[V any] struct {
 	keys []string
-	m    map[string]V
+	vals []V
+	idx  map[string]int
 }
 
-func newOMap[V any]() *omap[V] { return &omap[V]{m: map[string]V{}} }
+const omapIndexThreshold = 8
+
+func newOMap[V any]() *omap[V] { return &omap[V]{} }
+
+func (o *omap[V]) find(key string) int {
+	if o.idx != nil {
+		if i, ok := o.idx[key]; ok {
+			return i
+		}
+		return -1
+	}
+	for i, k := range o.keys {
+		if k == key {
+			return i
+		}
+	}
+	return -1
+}
+
+func (o *omap[V]) reindex() {
+	if len(o.keys) <= omapIndexThreshold {
+		o.idx = nil
+		return
+	}
+	o.idx = make(map[string]int, len(o.keys))
+	for i, k := range o.keys {
+		o.idx[k] = i
+	}
+}
 
 // Len returns the number of entries.
 func (o *omap[V]) Len() int {
@@ -23,8 +55,11 @@ func (o *omap[V]) Get(key string) (V, bool) {
 		var zero V
 		return zero, false
 	}
-	v, ok := o.m[key]
-	return v, ok
+	if i := o.find(key); i >= 0 {
+		return o.vals[i], true
+	}
+	var zero V
+	return zero, false
 }
 
 // Has reports whether key is present.
@@ -32,29 +67,34 @@ func (o *omap[V]) Has(key string) bool {
 	if o == nil {
 		return false
 	}
-	_, ok := o.m[key]
-	return ok
+	return o.find(key) >= 0
 }
 
 // Set inserts or updates key.
 func (o *omap[V]) Set(key string, v V) {
-	if _, ok := o.m[key]; !ok {
-		o.keys = append(o.keys, key)
+	if i := o.find(key); i >= 0 {
+		o.vals[i] = v
+		return
 	}
-	o.m[key] = v
+	o.keys = append(o.keys, key)
+	o.vals = append(o.vals, v)
+	if o.idx != nil {
+		o.idx[key] = len(o.keys) - 1
+	} else if len(o.keys) > omapIndexThreshold {
+		o.reindex()
+	}
 }
 
 // Delete removes key (no-op when absent).
 func (o *omap[V]) Delete(key string) {
-	if _, ok := o.m[key]; !ok {
+	i := o.find(key)
+	if i < 0 {
 		return
 	}
-	delete(o.m, key)
-	for i, k := range o.keys {
-		if k == key {
-			o.keys = append(o.keys[:i:i], o.keys[i+1:]...)
-			break
-		}
+	o.keys = append(o.keys[:i:i], o.keys[i+1:]...)
+	o.vals = append(o.vals[:i:i], o.vals[i+1:]...)
+	if o.idx != nil {
+		o.reindex()
 	}
 }
 
@@ -71,11 +111,7 @@ func (o *omap[V]) Values() []V {
 	if o == nil {
 		return nil
 	}
-	out := make([]V, 0, len(o.keys))
-	for _, k := range o.keys {
-		out = append(out, o.m[k])
-	}
-	return out
+	return append(make([]V, 0, len(o.vals)), o.vals...)
 }
 
 // Copy returns a shallow copy.
@@ -85,8 +121,9 @@ func (o *omap[V]) Copy() *omap[V] {
 		return c
 	}
 	c.keys = append([]string{}, o.keys...)
-	for k, v := range o.m {
-		c.m[k] = v
+	c.vals = append([]V(nil), o.vals...)
+	if o.idx != nil {
+		c.reindex()
 	}
 	return c
 }
@@ -96,7 +133,7 @@ func (o *omap[V]) Update(other *omap[V]) {
 	if other == nil {
 		return
 	}
-	for _, k := range other.keys {
-		o.Set(k, other.m[k])
+	for i, k := range other.keys {
+		o.Set(k, other.vals[i])
 	}
 }
