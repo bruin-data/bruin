@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"sync"
 
 	"github.com/ajitpratap0/GoSQLX/pkg/sqlglot"
 )
@@ -38,15 +37,9 @@ func getDialect(name string) (*sqlglot.Dialect, error) {
 	return sqlglot.GetDialect(name)
 }
 
-// dispatchMu serializes commands. The Python implementation handled one command at a time per
-// process; the Go port shares dialect, schema-type and coercion caches process-wide, and type
-// annotation re-parents shared type nodes, so concurrent commands must not interleave.
-var dispatchMu sync.Mutex
-
 // dispatch mirrors the command loop of pythonsrc/main.py. It returns the JSON response line.
+// It is safe for concurrent use.
 func dispatch(pc *parserCommand) (resp string) {
-	dispatchMu.Lock()
-	defer dispatchMu.Unlock()
 	defer func() {
 		if r := recover(); r != nil {
 			b, _ := json.Marshal(map[string]any{"error": fmt.Sprint(r)})

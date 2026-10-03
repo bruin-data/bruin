@@ -21,6 +21,8 @@ type SQLParser struct {
 	randomize      bool
 	MaxQueryLength int
 
+	// mutex serializes commands per instance, like the single-threaded Python process did.
+	mutex      sync.Mutex
 	startMutex sync.Mutex
 }
 
@@ -242,6 +244,8 @@ func (s *SQLParser) sendCommand(pc *parserCommand) (string, error) {
 	if err := dec.Decode(&decoded); err != nil {
 		return "", err
 	}
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
 	return dispatch(&decoded) + "\n", nil
 }
 

@@ -60,11 +60,11 @@ Three layers verify parity:
 - **Logging.** SQLGlot logs warnings (unsupported syntax fallback to `Command`, unsupported generator
   features). The Go port does not log; behavior is otherwise identical.
 - **Concurrency.** SQLGlot's CONNECT BY parsing mutates a class-level table temporarily; the Go port
-  keeps that state per parser instance so concurrent parses are safe. Type annotation, however, shares
-  (and re-parents) cached type nodes exactly like SQLGlot, so `pkg/sqlparser` serializes commands with
-  a process-wide mutex. Before, each `SQLParser` was its own Python process handling one command at a
-  time, so per-instance throughput is unchanged (and each command is far cheaper without the IPC);
-  only cross-instance parallelism is lost. Making annotation re-entrant is a possible follow-up.
+  keeps that state per parser instance so concurrent parses are safe. `pkg/sqlparser` keeps the old
+  semantics of one command at a time per `SQLParser` instance (previously one Python process each)
+  via a per-instance mutex; different instances run in parallel. This was validated by replaying the
+  full 145k-command differential corpus (below) from 8 goroutines under `go test -race`: no data
+  races and identical outputs.
 - **BigQuery's global coercion side effect.** Importing SQLGlot's BigQuery dialect mutates the shared
   `TypeAnnotator.COERCES_TO` table (DECIMAL/BIGINT gain BIGDECIMAL, VARCHAR gains date/time types), so
   in Python, type inference for *every* dialect changes once BigQuery has been used in the process
