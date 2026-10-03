@@ -60,7 +60,14 @@ func TestFastPathMatchesJSONRoundTrip(t *testing.T) {
 			require.NoError(t, err)
 			var viaJSON map[string]any
 			require.NoError(t, json.Unmarshal(b, &viaJSON))
-			require.True(t, reflect.DeepEqual(norm, viaJSON), "request %s %q", cmd.name, q)
+			require.True(t, reflect.DeepEqual(expandSchemas(norm), viaJSON), "request %s %q", cmd.name, q)
+			if s, ok := norm["schema"]; ok {
+				// The lineage command reads a passed-through Schema like its decoded form.
+				fromNorm, err1 := toRawSchema(s)
+				fromJSON, err2 := toRawSchema(viaJSON["schema"])
+				require.Equal(t, err2, err1)
+				require.Equal(t, fromJSON, fromNorm)
+			}
 
 			// Response: typed decoding equals json.Unmarshal of the encoded response.
 			result := runCommand(cmd.name, norm)
@@ -75,4 +82,28 @@ func TestFastPathMatchesJSONRoundTrip(t *testing.T) {
 	}
 	// Every result shape the commands produce must be handled by the fast path.
 	require.Equal(t, total, fast, "responses that fell back to JSON")
+}
+
+// expandSchemas converts Schema values to the map[string]any form encoding/json decodes them into.
+func expandSchemas(m map[string]any) map[string]any {
+	out := make(map[string]any, len(m))
+	for k, v := range m {
+		if s, ok := v.(Schema); ok {
+			tables := make(map[string]any, len(s))
+			for t, cols := range s {
+				if cols == nil {
+					tables[t] = nil
+					continue
+				}
+				c := make(map[string]any, len(cols))
+				for name, typ := range cols {
+					c[name] = typ
+				}
+				tables[t] = c
+			}
+			v = tables
+		}
+		out[k] = v
+	}
+	return out
 }

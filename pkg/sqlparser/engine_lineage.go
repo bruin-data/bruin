@@ -38,21 +38,21 @@ func toRawSchema(v any) (*rawSchema, error) {
 		if s == nil {
 			return nil, &pyErr{"'NoneType' object is not iterable"}
 		}
-		rs := &rawSchema{tables: map[string]*sqlengine.SchemaMap{}, nested: map[string]any{}}
+		rs := &rawSchema{tables: make(map[string]*sqlengine.SchemaMap, len(s)), nested: map[string]any{}}
 		keys := make([]string, 0, len(s))
 		for k := range s {
 			keys = append(keys, k)
 		}
 		// Go's JSON encoder sorts map keys; Python receives them in that order.
 		sort.Strings(keys)
+		rs.keys = keys
 		for _, k := range keys {
-			rs.keys = append(rs.keys, k)
 			if s[k] == nil {
 				// A nil column map is sent as JSON null (Python None).
 				rs.tables[k] = nil
 				continue
 			}
-			cols := sqlengine.NewSchemaMap()
+			cols := sqlengine.NewSchemaMapSize(len(s[k]))
 			colKeys := make([]string, 0, len(s[k]))
 			for ck := range s[k] {
 				colKeys = append(colKeys, ck)
@@ -65,14 +65,14 @@ func toRawSchema(v any) (*rawSchema, error) {
 		}
 		return rs, nil
 	case map[string]any:
-		rs := &rawSchema{tables: map[string]*sqlengine.SchemaMap{}, nested: map[string]any{}}
+		rs := &rawSchema{tables: make(map[string]*sqlengine.SchemaMap, len(s)), nested: map[string]any{}}
 		keys := make([]string, 0, len(s))
 		for k := range s {
 			keys = append(keys, k)
 		}
 		sort.Strings(keys)
+		rs.keys = keys
 		for _, k := range keys {
-			rs.keys = append(rs.keys, k)
 			rs.tables[k] = anyToSchemaMap(s[k])
 		}
 		return rs, nil
@@ -138,7 +138,11 @@ func alignSchemaCasing(schema *rawSchema, parsed *sqlengine.Expr) *rawSchema {
 	for _, qt := range ordered {
 		lowerToQuery[pyLower(qt)] = qt
 	}
-	out := &rawSchema{tables: map[string]*sqlengine.SchemaMap{}, nested: map[string]any{}}
+	out := &rawSchema{
+		keys:   make([]string, 0, len(schema.keys)),
+		tables: make(map[string]*sqlengine.SchemaMap, len(schema.keys)),
+		nested: map[string]any{},
+	}
 	for _, k := range schema.keys {
 		out.keys = append(out.keys, k)
 		out.tables[k] = schema.tables[k]
@@ -190,7 +194,7 @@ func schemaValue(m *sqlengine.SchemaMap) any {
 
 // flatSchemaMap returns the raw {"a.b": {...}} mapping as a SchemaMap (keys are not split).
 func flatSchemaMap(schema *rawSchema) *sqlengine.SchemaMap {
-	m := sqlengine.NewSchemaMap()
+	m := sqlengine.NewSchemaMapSize(len(schema.keys))
 	for _, k := range schema.keys {
 		m.Set(k, schemaValue(schema.tables[k]))
 	}

@@ -90,6 +90,13 @@ func QueryLimitBuild(q *Expr, n int, d *Dialect) (out *Expr, err error) {
 	return q.QueryLimit(limit, true), nil
 }
 
+// QueryLimitBuildOwned is QueryLimitBuild for a query the caller does not use afterwards.
+func QueryLimitBuildOwned(q *Expr, n int, d *Dialect) (out *Expr, err error) {
+	defer recoverToError(&err)
+	limit := MaybeParse(itoa(n), KLimit, "LIMIT", d)
+	return q.Own().QueryLimit(limit, false), nil
+}
+
 // QueryWithBuild mirrors `query.with_(name, as_=sql, dialect=d, copy=False)`.
 func QueryWithBuild(q *Expr, name, sql string, d *Dialect) (out *Expr, err error) {
 	defer recoverToError(&err)

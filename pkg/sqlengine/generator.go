@@ -701,3 +701,8 @@ func (e *Expr) SQL(dialect string, opts *GenerateOptions) (string, error) {
 func (d *Dialect) Generate(e *Expr, opts *GenerateOptions) (string, error) {
 	return d.NewGenerator(opts).Generate(e, true)
 }
+
+// GenerateOwned is Generate for an expression the caller does not use afterwards.
+func (d *Dialect) GenerateOwned(e *Expr, opts *GenerateOptions) (string, error) {
+	return d.NewGenerator(opts).Generate(e.Own(), false)
+}

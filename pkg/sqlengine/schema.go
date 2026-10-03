@@ -17,6 +17,13 @@ type SchemaMap = omap[any]
 // NewSchemaMap creates an empty schema mapping.
 func NewSchemaMap() *SchemaMap { return newOMap[any]() }
 
+// NewSchemaMapSize creates an empty schema mapping with room for n entries.
+func NewSchemaMapSize(n int) *SchemaMap {
+	m := newOMap[any]()
+	m.reserve(n)
+	return m
+}
+
 // MappingSchema mirrors sqlglot.schema.MappingSchema.
 type MappingSchema struct {
 	mapping            *SchemaMap
@@ -369,8 +376,13 @@ func (s *MappingSchema) normalizeUDF(udf *Expr, dialect *Dialect, normalize *boo
 func (s *MappingSchema) normalizeSchema(schema *SchemaMap) *SchemaMap {
 	normalized := NewSchemaMap()
 	flattened := flattenSchema(schema, dictDepth(schema)-1, nil)
+	if len(s.normalizedNameCache) == 0 {
+		s.normalizedNameCache = make(map[normNameKey]string, countSchemaNames(schema))
+	}
+	var path [][2]string
+	var normKeys []string
 	for _, keys := range flattened {
-		var path [][2]string
+		path = path[:0]
 		for _, k := range keys {
 			path = append(path, [2]string{k, k})
 		}
@@ -391,16 +403,32 @@ func (s *MappingSchema) normalizeSchema(schema *SchemaMap) *SchemaMap {
 				panic(&SchemaError{Msg: fmt.Sprintf("Table %s must match the schema's nesting level: %d.", strings.Join(append(append([]string{}, keys...), innerKeys...), "."), len(flattened[0]))})
 			}
 		}
-		normKeys := make([]string, len(keys))
-		for i, k := range keys {
-			normKeys[i] = s.normalizeName(k, nil, true, nil)
+		normKeys = normKeys[:0]
+		for _, k := range keys {
+			normKeys = append(normKeys, s.normalizeName(k, nil, true, nil))
 		}
-		for _, col := range columns.Keys() {
-			ct, _ := columns.Get(col)
-			nestedSet(normalized, append(append([]string{}, normKeys...), s.normalizeName(col, nil, false, nil)), ct)
+		// nested_set(normalized, normKeys + [column], type) for every column; the path is
+		// walked (and created) once per table.
+		table := nestedSubMap(normalized, normKeys)
+		table.reserve(columns.Len())
+		for i, col := range columns.keys {
+			table.Set(s.normalizeName(col, nil, false, nil), columns.vals[i])
 		}
 	}
 	return normalized
+}
+
+// countSchemaNames counts the keys of a nested schema mapping, for presizing name caches.
+func countSchemaNames(m *SchemaMap) int {
+	n := m.Len()
+	if m != nil {
+		for _, v := range m.vals {
+			if sub, ok := v.(*SchemaMap); ok {
+				n += countSchemaNames(sub)
+			}
+		}
+	}
+	return n
 }
 
 func (s *MappingSchema) normalizeUDFs(udfs *SchemaMap) *SchemaMap {
@@ -636,6 +664,22 @@ func nestedGet(d *SchemaMap, path [][2]string, raiseOnMissing bool) any {
 		}
 	}
 	return result
+}
+
+// nestedSubMap walks keys like nested_set's setdefault loop and returns the innermost mapping.
+func nestedSubMap(d *SchemaMap, keys []string) *SchemaMap {
+	sub := d
+	for _, k := range keys {
+		v, ok := sub.Get(k)
+		if !ok {
+			nm := NewSchemaMap()
+			sub.Set(k, nm)
+			sub = nm
+		} else {
+			sub = v.(*SchemaMap)
+		}
+	}
+	return sub
 }
 
 // nestedSet mirrors sqlglot.schema.nested_set.

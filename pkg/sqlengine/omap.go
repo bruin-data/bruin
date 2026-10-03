@@ -35,9 +35,17 @@ func (o *omap[V]) reindex() {
 		o.idx = nil
 		return
 	}
-	o.idx = make(map[string]int, len(o.keys))
+	o.idx = make(map[string]int, cap(o.keys))
 	for i, k := range o.keys {
 		o.idx[k] = i
+	}
+}
+
+// reserve makes room for n more entries without changing contents.
+func (o *omap[V]) reserve(n int) {
+	if need := len(o.keys) + n; need > cap(o.keys) {
+		o.keys = append(make([]string, 0, need), o.keys...)
+		o.vals = append(make([]V, 0, need), o.vals...)
 	}
 }
 

@@ -817,6 +817,86 @@ func (e *Expr) Copy() *Expr {
 	return e.deepCopy()
 }
 
+// Own stands in for e.Copy() when the caller hands e over and never uses it (or any of its
+// nodes) again. A copy of a parentless root whose nodes are each held exactly once, with no types,
+// string-list arguments or non-scalar meta, is indistinguishable from the original, so such trees
+// are returned as they are (with comment lists un-shared, as the copy would have them); anything
+// else is copied.
+func (e *Expr) Own() *Expr {
+	if e == nil {
+		return nil
+	}
+	if e.parent != nil || e.argKey != "" || e.index != -1 || !e.copyEquivalent() {
+		return e.deepCopy()
+	}
+	e.unshareComments()
+	return e
+}
+
+// copyEquivalent reports whether every node below e is held exactly once, by its parent slot,
+// and carries nothing deepCopy would duplicate apart from comment lists.
+func (e *Expr) copyEquivalent() bool {
+	if e.typ != nil {
+		return false
+	}
+	if e.ext != nil {
+		for _, v := range e.ext.meta {
+			switch v.(type) {
+			case nil, bool, string, int, float64:
+			default:
+				return false
+			}
+		}
+	}
+	for _, a := range e.args {
+		switch v := a.val.(type) {
+		case *Expr:
+			if v.parent != e || v.argKey != a.key || v.index != -1 || !v.copyEquivalent() {
+				return false
+			}
+		case []*Expr:
+			for j, x := range v {
+				if x != nil && (x.parent != e || x.argKey != a.key || int(x.index) != j || !x.copyEquivalent()) {
+					return false
+				}
+			}
+		case []any:
+			for j, y := range v {
+				if x, ok := y.(*Expr); ok && x != nil && (x.parent != e || x.argKey != a.key || int(x.index) != j || !x.copyEquivalent()) {
+					return false
+				}
+			}
+		case []string:
+			return false
+		}
+	}
+	return true
+}
+
+func (e *Expr) unshareComments() {
+	if e.ext != nil && e.ext.comments != nil {
+		e.ext.comments = append([]string{}, e.ext.comments...)
+	}
+	for _, a := range e.args {
+		switch v := a.val.(type) {
+		case *Expr:
+			v.unshareComments()
+		case []*Expr:
+			for _, x := range v {
+				if x != nil {
+					x.unshareComments()
+				}
+			}
+		case []any:
+			for _, y := range v {
+				if x, ok := y.(*Expr); ok && x != nil {
+					x.unshareComments()
+				}
+			}
+		}
+	}
+}
+
 func (e *Expr) deepCopy() *Expr {
 	c := newExprArgs(len(e.args))
 	c.kind, c.index, c.hash, c.flags = e.kind, -1, e.hash, e.flags

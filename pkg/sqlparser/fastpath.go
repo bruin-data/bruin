@@ -113,9 +113,9 @@ func normalizeValue(v any) (any, bool) {
 		}
 		return out, true
 	case Schema:
-		return normalizeSchema(x)
+		return checkSchema(x)
 	case map[string]map[string]string:
-		return normalizeSchema(x)
+		return checkSchema(x)
 	case []string:
 		if x == nil {
 			return nil, true
@@ -157,22 +157,24 @@ func normalizeValue(v any) (any, bool) {
 	return nil, false
 }
 
-func normalizeSchema(x map[string]map[string]string) (any, bool) {
+// checkSchema passes a schema through as a Schema instead of its decoded map[string]any form:
+// the lineage command reads both identically (sorted keys, nil column maps as None), so only the
+// UTF-8 coercion of the JSON round trip needs checking.
+func checkSchema(x map[string]map[string]string) (any, bool) {
 	if x == nil {
 		return nil, true
 	}
-	out := make(map[string]any, len(x))
 	for t, cols := range x {
 		if !utf8.ValidString(t) {
 			return nil, false
 		}
-		v, ok := normalizeValue(cols)
-		if !ok {
-			return nil, false
+		for k, v := range cols {
+			if !utf8.ValidString(k) || !utf8.ValidString(v) {
+				return nil, false
+			}
 		}
-		out[t] = v
 	}
-	return out, true
+	return Schema(x), true
 }
 
 // decodeResponse stores result into out like json.Unmarshal(encodeResponse(result), out), for the

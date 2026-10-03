@@ -152,7 +152,7 @@ func replaceTableReferences(query, dialectName string, mappingAny any) (any, err
 
 	outs := make([]string, 0, len(parsed))
 	for _, pq := range parsed {
-		s, err := d.Generate(pq, nil)
+		s, err := d.GenerateOwned(pq, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -219,11 +219,11 @@ func addLimit(query string, limit int, dialectName string) (any, error) {
 	if !parsed.IsA(sqlengine.KQuery) {
 		return nil, attrErr(parsed, "limit")
 	}
-	limited, err := sqlengine.QueryLimitBuild(parsed, limit, d)
+	limited, err := sqlengine.QueryLimitBuildOwned(parsed, limit, d)
 	if err != nil {
 		return nil, err
 	}
-	out, err := d.Generate(limited, nil)
+	out, err := d.GenerateOwned(limited, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -317,7 +317,7 @@ func extractSelect(query, dialectName string) map[string]any {
 	if normalizeDialect(dialectName) == "fabric" {
 		preserveFabricDerivedColumnCase(inner)
 	}
-	out, err := d.Generate(inner, nil)
+	out, err := d.GenerateOwned(inner, nil)
 	if err != nil {
 		return map[string]any{"error": err.Error()}
 	}
@@ -360,7 +360,7 @@ func selectCTE(query, dialectName, cteName string) map[string]any {
 	if err != nil {
 		return map[string]any{"error": err.Error()}
 	}
-	out, err := d.Generate(reparsed, nil)
+	out, err := d.GenerateOwned(reparsed, nil)
 	if err != nil {
 		return map[string]any{"error": err.Error()}
 	}
@@ -392,7 +392,7 @@ func freezeTime(query, dialectName, executionTime string) map[string]any {
 		}
 		return n
 	}, true)
-	out, err := d.Generate(frozen, nil)
+	out, err := d.GenerateOwned(frozen, nil)
 	if err != nil {
 		return map[string]any{"error": err.Error()}
 	}
@@ -448,7 +448,7 @@ func addCTEs(query, dialectName string, ctesAny any) map[string]any {
 	if err != nil {
 		return map[string]any{"error": err.Error()}
 	}
-	out, err := d.Generate(result, nil)
+	out, err := d.GenerateOwned(result, nil)
 	if err != nil {
 		return map[string]any{"error": err.Error()}
 	}
