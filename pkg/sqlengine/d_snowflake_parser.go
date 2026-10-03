@@ -34,7 +34,7 @@ func snowflakeIsDateUnit(e *Expr) bool {
 // Normalizes APPROX_TOP_K arguments to match Snowflake semantics.
 // Snowflake APPROX_TOP_K signature: APPROX_TOP_K(column [, k] [, counters])
 // - k defaults to 1 if omitted (per Snowflake documentation)
-// - counters is optional precision parameter
+// - counters is optional precision parameter.
 func snowflakeBuildApproxTopK(args []*Expr, _ *Dialect) *Expr {
 	// Add default k=1 if only column is provided
 	if len(args) == 1 {
@@ -44,7 +44,7 @@ func snowflakeBuildApproxTopK(args []*Expr, _ *Dialect) *Expr {
 	return WithValidateArgs(FromArgList(KApproxTopK, args), args)
 }
 
-// _build_to_number
+// _build_to_number.
 func snowflakeBuildToNumber(args []*Expr, safe bool) *Expr {
 	secondArg := seqGet(args, 1)
 	var format, precision, scale *Expr
@@ -77,7 +77,7 @@ func snowflakeBuildToNumber(args []*Expr, safe bool) *Expr {
 	)
 }
 
-// _build_date_from_parts
+// _build_date_from_parts.
 func snowflakeBuildDateFromParts(args []*Expr, _ *Dialect) *Expr {
 	return New(
 		KDateFromParts,
@@ -96,7 +96,7 @@ var snowflakeTimestampTypes = map[DType]string{
 	DT_TIMESTAMPTZ:  "TO_TIMESTAMP_TZ",
 }
 
-// _build_datetime
+// _build_datetime.
 func snowflakeBuildDatetime(name string, kind DType, safe bool) FuncBuilder {
 	return func(args []*Expr, d *Dialect) *Expr {
 		value := seqGet(args, 0)
@@ -160,7 +160,7 @@ func snowflakeBuildDatetime(name string, kind DType, safe bool) FuncBuilder {
 	}
 }
 
-// _build_bitwise
+// _build_bitwise.
 func snowflakeBuildBitwise(kind Kind, name string) FuncBuilder {
 	return func(args []*Expr, d *Dialect) *Expr {
 		if len(args) == 3 {
@@ -218,7 +218,7 @@ func snowflakeBuildIfFromZeroIfNull(args []*Expr, _ *Dialect) *Expr {
 	return New(KIf, "this", cond, "true", LiteralInt(0), "false", seqGet(args, 0))
 }
 
-// _build_search
+// _build_search.
 func snowflakeBuildSearch(args []*Expr, _ *Dialect) *Expr {
 	kw := newBuilderKwargs([]any{"this", seqGet(args, 0), "expression", seqGet(args, 1)})
 	for _, arg := range argsFrom(args, 2) {
@@ -236,7 +236,7 @@ func snowflakeBuildIfFromNullIfZero(args []*Expr, _ *Dialect) *Expr {
 	return New(KIf, "this", cond, "true", New(KNull), "false", seqGet(args, 0))
 }
 
-// _build_regexp_replace
+// _build_regexp_replace.
 func snowflakeBuildRegexpReplace(args []*Expr, _ *Dialect) *Expr {
 	regexpReplace := FromArgList(KRegexpReplace, args)
 
@@ -247,7 +247,7 @@ func snowflakeBuildRegexpReplace(args []*Expr, _ *Dialect) *Expr {
 	return regexpReplace
 }
 
-// _build_regexp_like
+// _build_regexp_like.
 func snowflakeBuildRegexpLike(args []*Expr, _ *Dialect) *Expr {
 	return New(
 		KRegexpLike,
@@ -258,7 +258,7 @@ func snowflakeBuildRegexpLike(args []*Expr, _ *Dialect) *Expr {
 	)
 }
 
-// _date_trunc_to_time
+// _date_trunc_to_time.
 func snowflakeDateTruncToTime(args []*Expr, d *Dialect) *Expr {
 	trunc := dateTruncToTime(args, d)
 	unit := mapDatePart(trunc.ArgE("unit"), nil)
@@ -275,7 +275,7 @@ func snowflakeDateTruncToTime(args []*Expr, d *Dialect) *Expr {
 	return trunc
 }
 
-// _build_regexp_extract
+// _build_regexp_extract.
 func snowflakeBuildRegexpExtract(kind Kind) FuncBuilder {
 	return func(args []*Expr, d *Dialect) *Expr {
 		group := seqGet(args, 5)
@@ -301,7 +301,7 @@ func snowflakeBuildRegexpExtract(kind Kind) FuncBuilder {
 //
 // Build TimestampFromParts with support for both syntaxes:
 // 1. TIMESTAMP_FROM_PARTS(year, month, day, hour, minute, second [, nanosecond] [, time_zone])
-// 2. TIMESTAMP_FROM_PARTS(date_expr, time_expr) - Snowflake specific
+// 2. TIMESTAMP_FROM_PARTS(date_expr, time_expr) - Snowflake specific.
 func snowflakeBuildTimestampFromParts(args []*Expr, _ *Dialect) *Expr {
 	if len(args) == 2 {
 		return New(KTimestampFromParts, "this", seqGet(args, 0), "expression", seqGet(args, 1))
@@ -339,7 +339,7 @@ func snowflakeBuildRound(args []*Expr, _ *Dialect) *Expr {
 	return expression
 }
 
-// _build_array_sort
+// _build_array_sort.
 func snowflakeBuildArraySort(args []*Expr, _ *Dialect) *Expr {
 	asc := seqGet(args, 1)
 	nullsFirst := seqGet(args, 2)
@@ -373,7 +373,7 @@ func snowflakeBuildGenerator(args []*Expr, _ *Dialect) *Expr {
 	return New(KGenerator, snowflakeKwargsKV(genArgs)...)
 }
 
-// _show_parser
+// _show_parser.
 func snowflakeShowParser(this string, terse, iceberg bool) parseFn {
 	return func(p *Parser) *Expr {
 		return snowflakeParseShowSnowflake(p, this, terse, iceberg)
@@ -383,7 +383,7 @@ func snowflakeShowParser(this string, terse, iceberg bool) parseFn {
 // snowflakeRankingWindowFunctionsWithFrame mirrors RANKING_WINDOW_FUNCTIONS_WITH_FRAME.
 var snowflakeRankingWindowFunctionsWithFrame = []Kind{KFirstValue, KLastValue, KNthValue}
 
-// build_object_construct
+// build_object_construct.
 func snowflakeBuildObjectConstruct(args []*Expr) *Expr {
 	expression := buildVarMap(args)
 
@@ -974,7 +974,7 @@ func snowflakeBuildDateTimeAdd(kind Kind) FuncBuilder {
 // SnowflakeParser methods
 // ---------------------------------------------------------------------------------------------
 
-// _parse_directory
+// _parse_directory.
 func snowflakeParseDirectory(p *Parser) *Expr {
 	table := p.parseTableParts(false, false, false, false)
 	this := table
@@ -984,7 +984,7 @@ func snowflakeParseDirectory(p *Parser) *Expr {
 	return p.expression(New(KDirectoryStage, "this", this))
 }
 
-// _parse_describe
+// _parse_describe.
 func snowflakeParseDescribe(p *Parser) *Expr {
 	index := p.index
 
@@ -1020,7 +1020,7 @@ func snowflakeParseDescribe(p *Parser) *Expr {
 	return p.baseParseDescribe()
 }
 
-// _parse_use
+// _parse_use.
 func snowflakeParseUse(p *Parser) *Expr {
 	if p.matchTextSeq("SECONDARY", "ROLES") {
 		// self._match_texts(("ALL", "NONE")) and exp.var(...) -> False when unmatched
@@ -1038,7 +1038,7 @@ func snowflakeParseUse(p *Parser) *Expr {
 	return p.baseParseUse()
 }
 
-// _negate_range
+// _negate_range.
 func snowflakeNegateRange(p *Parser, this *Expr) *Expr {
 	if this == nil {
 		return this
@@ -1058,7 +1058,7 @@ func snowflakeNegateRange(p *Parser, this *Expr) *Expr {
 	return p.expression(New(KNot, "this", this))
 }
 
-// _parse_tag
+// _parse_tag.
 func snowflakeParseTag(p *Parser) *Expr {
 	items := parseWrappedAny(p, func() []any {
 		return parseCSVAny(p, p.parseProperty, TK_COMMA, chunkAIsNone)
@@ -1075,7 +1075,7 @@ func snowflakeParseTag(p *Parser) *Expr {
 	return p.expression(New(KTags, "expressions", exprs))
 }
 
-// _parse_property_before
+// _parse_property_before.
 func snowflakeParsePropertyBefore(p *Parser) any {
 	prop := p.baseParsePropertyBefore()
 	if truthy(prop) {
@@ -1092,7 +1092,7 @@ func snowflakeParsePropertyBefore(p *Parser) any {
 	return anyExpr(p.parseKeyValueProperty(func() *Expr { return p.parsePrimaryOrVar() }))
 }
 
-// _parse_with_constraint
+// _parse_with_constraint.
 func snowflakeParseWithConstraint(p *Parser) *Expr {
 	if p.prev.Type != TK_WITH {
 		p.retreat(p.index - 1)
@@ -1126,7 +1126,7 @@ func snowflakeParseWithConstraint(p *Parser) *Expr {
 	return nil
 }
 
-// _parse_with_property
+// _parse_with_property.
 func snowflakeParseWithProperty(p *Parser) any {
 	if p.match(TK_TAG) {
 		return anyExpr(snowflakeParseTag(p))
@@ -1139,7 +1139,7 @@ func snowflakeParseWithProperty(p *Parser) any {
 	return p.baseParseWithProperty()
 }
 
-// _parse_row_access_policy
+// _parse_row_access_policy.
 func snowflakeParseRowAccessPolicy(p *Parser) *Expr {
 	var policy *Expr
 	var expressions any
@@ -1164,7 +1164,7 @@ func snowflakeParseRowAccessPolicy(p *Parser) *Expr {
 	return p.expression(New(KRowAccessProperty, "this", policy, "expressions", expressions))
 }
 
-// _parse_create
+// _parse_create.
 func snowflakeParseCreate(p *Parser) *Expr {
 	expression := p.baseParseCreate()
 	if expression.IsA(KCreate) && p.s.NON_TABLE_CREATABLES.Has(expression.KindText()) {
@@ -1197,7 +1197,7 @@ func snowflakeParseDatePart(p *Parser) *Expr {
 	return p.expression(New(KExtract, "this", mapDatePart(this, p.d), "expression", expression))
 }
 
-// _parse_bracket_key_value
+// _parse_bracket_key_value.
 func snowflakeParseBracketKeyValue(p *Parser, isMap bool) *Expr {
 	if isMap {
 		// Keys are strings in Snowflake's objects, see also:
@@ -1212,7 +1212,7 @@ func snowflakeParseBracketKeyValue(p *Parser, isMap bool) *Expr {
 	return p.parseSlice(p.parseAlias(p.parseAssignment(), true))
 }
 
-// _parse_lateral
+// _parse_lateral.
 func snowflakeParseLateral(p *Parser) *Expr {
 	lateral := p.baseParseLateral()
 	if lateral == nil {
@@ -1239,7 +1239,7 @@ func snowflakeParseLateral(p *Parser) *Expr {
 	return lateral
 }
 
-// _parse_table_parts
+// _parse_table_parts.
 func snowflakeParseTableParts(p *Parser, schema bool, isDbReference bool, wildcard bool, fast bool) *Expr {
 	// https://docs.snowflake.com/en/user-guide/querying-stage
 	var table *Expr
@@ -1276,7 +1276,7 @@ func snowflakeParseTableParts(p *Parser, schema bool, isDbReference bool, wildca
 	return table
 }
 
-// _parse_table
+// _parse_table.
 func snowflakeParseTable(p *Parser, schema bool, joins bool, aliasTokens *TokenSet, parseBracket bool, isDbReference bool, parsePartition bool, consumePipe bool) *Expr {
 	// consume_pipe is not forwarded to super() (it falls back to its default, False)
 	table := p.baseParseTable(schema, joins, aliasTokens, parseBracket, isDbReference, parsePartition, false)
@@ -1294,7 +1294,7 @@ func snowflakeParseTable(p *Parser, schema bool, joins bool, aliasTokens *TokenS
 	return table
 }
 
-// _parse_function_call
+// _parse_function_call.
 func snowflakeParseFunctionCall(p *Parser, functions map[string]FuncBuilder, anonymous bool, optionalParens bool, anyToken bool) *Expr {
 	this := p.baseParseFunctionCall(functions, anonymous, optionalParens, anyToken)
 
@@ -1309,7 +1309,7 @@ func snowflakeParseFunctionCall(p *Parser, functions map[string]FuncBuilder, ano
 	return this
 }
 
-// _parse_id_var
+// _parse_id_var.
 func snowflakeParseIdVar(p *Parser, anyToken bool, tokens *TokenSet) *Expr {
 	if p.matchTextSeq("IDENTIFIER", "(") {
 		identifier := p.baseParseIdVar(anyToken, tokens)
@@ -1323,7 +1323,7 @@ func snowflakeParseIdVar(p *Parser, anyToken bool, tokens *TokenSet) *Expr {
 	return p.baseParseIdVar(anyToken, tokens)
 }
 
-// _parse_show_snowflake
+// _parse_show_snowflake.
 func snowflakeParseShowSnowflake(p *Parser, this string, terse bool, iceberg bool) *Expr {
 	var scope *Expr
 	var scopeKind any
@@ -1394,7 +1394,7 @@ func snowflakeParseShowSnowflake(p *Parser, this string, terse bool, iceberg boo
 	))
 }
 
-// _parse_undrop
+// _parse_undrop.
 func snowflakeParseUndrop(p *Parser) *Expr {
 	start := p.prev
 	kind := p.parseVarFromOptions(p.s.UNDROP_OBJECTS, false)
@@ -1411,7 +1411,7 @@ func snowflakeParseUndrop(p *Parser) *Expr {
 	return p.expression(New(KUndrop, "this", this, "kind", name, "rename", rename))
 }
 
-// _parse_put
+// _parse_put.
 func snowflakeParsePut(p *Parser) *Expr {
 	if p.curr.Type != TK_STRING {
 		return p.parseAsCommand(p.prev)
@@ -1423,7 +1423,7 @@ func snowflakeParsePut(p *Parser) *Expr {
 	return p.expression(New(KPut, "this", this, "target", target, "properties", properties))
 }
 
-// _parse_get
+// _parse_get.
 func snowflakeParseGet(p *Parser) *Expr {
 	start := p.prev
 
@@ -1445,13 +1445,13 @@ func snowflakeParseGet(p *Parser) *Expr {
 	return p.expression(New(KGet, "this", this, "target", target, "properties", properties))
 }
 
-// _parse_location_property
+// _parse_location_property.
 func snowflakeParseLocationProperty(p *Parser) *Expr {
 	p.match(TK_EQ)
 	return p.expression(New(KLocationProperty, "this", snowflakeParseLocationPath(p)))
 }
 
-// _parse_file_location
+// _parse_file_location.
 func snowflakeParseFileLocation(p *Parser) *Expr {
 	// Parse either a subquery or a staged file
 	if p.matchNoAdvance(TK_L_PAREN) {
@@ -1460,7 +1460,7 @@ func snowflakeParseFileLocation(p *Parser) *Expr {
 	return p.parseTableParts(false, false, false, false)
 }
 
-// _parse_location_path
+// _parse_location_path.
 func snowflakeParseLocationPath(p *Parser) *Expr {
 	start := p.curr
 	p.advanceAny(true)
@@ -1475,7 +1475,7 @@ func snowflakeParseLocationPath(p *Parser) *Expr {
 	return VarChecked(p.findSQL(start, p.prev))
 }
 
-// _parse_lambda_arg
+// _parse_lambda_arg.
 func snowflakeParseLambdaArg(p *Parser) *Expr {
 	this := p.baseParseLambdaArg()
 
@@ -1492,7 +1492,7 @@ func snowflakeParseLambdaArg(p *Parser) *Expr {
 	return this
 }
 
-// _parse_foreign_key
+// _parse_foreign_key.
 func snowflakeParseForeignKey(p *Parser) *Expr {
 	// inlineFK, the REFERENCES columns are implied
 	if p.matchNoAdvance(TK_REFERENCES) {
@@ -1503,7 +1503,7 @@ func snowflakeParseForeignKey(p *Parser) *Expr {
 	return p.baseParseForeignKey()
 }
 
-// _parse_file_format_property
+// _parse_file_format_property.
 func snowflakeParseFileFormatProperty(p *Parser) *Expr {
 	p.match(TK_EQ)
 	var expressions []*Expr
@@ -1516,12 +1516,12 @@ func snowflakeParseFileFormatProperty(p *Parser) *Expr {
 	return p.expression(New(KFileFormatProperty, "expressions", expressions))
 }
 
-// _parse_credentials_property
+// _parse_credentials_property.
 func snowflakeParseCredentialsProperty(p *Parser) *Expr {
 	return p.expression(New(KCredentialsProperty, "expressions", p.parseWrappedOptions()))
 }
 
-// _parse_semantic_view
+// _parse_semantic_view.
 func snowflakeParseSemanticView(p *Parser) *Expr {
 	kwargs := newBuilderKwargs([]any{"this", p.parseTableParts(false, false, false, false)})
 
@@ -1540,7 +1540,7 @@ func snowflakeParseSemanticView(p *Parser) *Expr {
 	return p.expression(New(KSemanticView, snowflakeKwargsKV(kwargs)...))
 }
 
-// _parse_set
+// _parse_set.
 func snowflakeParseSet(p *Parser, unset bool, tag bool) *Expr {
 	set := p.baseParseSet(unset, tag)
 
@@ -1554,21 +1554,21 @@ func snowflakeParseSet(p *Parser, unset bool, tag bool) *Expr {
 	return set
 }
 
-// _parse_position
+// _parse_position.
 func snowflakeParsePosition(p *Parser, haystackFirst bool) *Expr {
 	result := p.baseParsePosition(haystackFirst)
 	result.Set("clamp_position", true)
 	return result
 }
 
-// _parse_substring
+// _parse_substring.
 func snowflakeParseSubstring(p *Parser) *Expr {
 	result := p.baseParseSubstring()
 	result.Set("zero_start", true)
 	return result
 }
 
-// build_cast
+// build_cast.
 func snowflakeBuildCast(p *Parser, strict bool, kv ...any) *Expr {
 	var to, this *Expr
 	for i := 0; i+1 < len(kv); i += 2 {
@@ -1593,7 +1593,7 @@ func snowflakeBuildCast(p *Parser, strict bool, kv ...any) *Expr {
 	return cast
 }
 
-// _parse_window
+// _parse_window.
 func snowflakeParseWindow(p *Parser, this *Expr, alias bool) *Expr {
 	if this.IsA(KNthValue) {
 		if p.matchTextSeq("FROM", "FIRST") {

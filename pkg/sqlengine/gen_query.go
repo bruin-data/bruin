@@ -7,12 +7,12 @@ import (
 
 // Generator chunk B (part 2): sqlglot/generator.py L2716-3301 (var_sql .. after_limit_modifiers).
 
-// var_sql (generator.py L2716)
+// var_sql (generator.py L2716).
 func (g *Generator) varSQL(expression *Expr) string {
 	return g.sqlKey(expression, "this")
 }
 
-// into_sql (generator.py L2719)
+// into_sql (generator.py L2719).
 func (g *Generator) baseIntoSQL(expression *Expr) string {
 	// @unsupported_args("expressions")
 	if expression.ArgB("expressions") {
@@ -34,18 +34,18 @@ func (g *Generator) baseIntoSQL(expression *Expr) string {
 	return g.seg("INTO") + tempOrUnlogged + " " + g.sqlKey(expression, "this")
 }
 
-// from_sql (generator.py L2725)
+// from_sql (generator.py L2725).
 func (g *Generator) fromSQL(expression *Expr) string {
 	return g.seg("FROM") + " " + g.sqlKey(expression, "this")
 }
 
-// groupingsets_sql (generator.py L2728)
+// groupingsets_sql (generator.py L2728).
 func (g *Generator) groupingsetsSQL(expression *Expr) string {
 	groupingSets := g.expressions(expression, exprsOpts{noIndent: true})
 	return "GROUPING SETS " + g.wrap(groupingSets)
 }
 
-// rollup_sql (generator.py L2732)
+// rollup_sql (generator.py L2732).
 func (g *Generator) rollupSQL(expression *Expr) string {
 	expressions := g.expressions(expression, exprsOpts{noIndent: true})
 	if expressions != "" {
@@ -54,7 +54,7 @@ func (g *Generator) rollupSQL(expression *Expr) string {
 	return "WITH ROLLUP"
 }
 
-// rollupindex_sql (generator.py L2736)
+// rollupindex_sql (generator.py L2736).
 func (g *Generator) rollupindexSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 
@@ -73,12 +73,12 @@ func (g *Generator) rollupindexSQL(expression *Expr) string {
 	return this + "(" + columns + ")" + fromSQL + propertiesSQL
 }
 
-// rollupproperty_sql (generator.py L2751)
+// rollupproperty_sql (generator.py L2751).
 func (g *Generator) rolluppropertySQL(expression *Expr) string {
 	return "ROLLUP (" + g.expressions(expression, exprsOpts{flat: true}) + ")"
 }
 
-// cube_sql (generator.py L2754)
+// cube_sql (generator.py L2754).
 func (g *Generator) cubeSQL(expression *Expr) string {
 	expressions := g.expressions(expression, exprsOpts{noIndent: true})
 	if expressions != "" {
@@ -87,7 +87,7 @@ func (g *Generator) cubeSQL(expression *Expr) string {
 	return "WITH CUBE"
 }
 
-// group_sql (generator.py L2758)
+// group_sql (generator.py L2758).
 func (g *Generator) groupSQL(expression *Expr) string {
 	modifier := ""
 	if groupByAll, ok := expression.Arg("all").(bool); ok {
@@ -131,13 +131,13 @@ func (g *Generator) groupSQL(expression *Expr) string {
 	return groupBy + groupings
 }
 
-// having_sql (generator.py L2790)
+// having_sql (generator.py L2790).
 func (g *Generator) havingSQL(expression *Expr) string {
 	this := g.indentDefault(g.sqlKey(expression, "this"))
 	return g.seg("HAVING") + g.sep1() + this
 }
 
-// connect_sql (generator.py L2794)
+// connect_sql (generator.py L2794).
 func (g *Generator) connectSQL(expression *Expr) string {
 	start := g.sqlKey(expression, "start")
 	if start != "" {
@@ -152,12 +152,12 @@ func (g *Generator) connectSQL(expression *Expr) string {
 	return start + connect
 }
 
-// prior_sql (generator.py L2802)
+// prior_sql (generator.py L2802).
 func (g *Generator) priorSQL(expression *Expr) string {
 	return "PRIOR " + g.sqlKey(expression, "this")
 }
 
-// join_sql (generator.py L2805)
+// join_sql (generator.py L2805).
 func (g *Generator) baseJoinSQL(expression *Expr) string {
 	var side string
 	if kind := expression.KindText(); !g.s.SEMI_ANTI_JOIN_WITH_SIDE && (kind == "SEMI" || kind == "ANTI") {
@@ -240,7 +240,7 @@ func (g *Generator) baseJoinSQL(expression *Expr) string {
 	return g.seg(opSQL) + " " + thisSQL + matchCond + onSQL + pivots
 }
 
-// lambda_sql (generator.py L2857)
+// lambda_sql (generator.py L2857).
 func (g *Generator) baseLambdaSQL(expression *Expr, arrowSep string, wrap bool) string {
 	args := g.expressions(expression, exprsOpts{flat: true})
 	if wrap && len(strings.Split(args, ",")) > 1 {
@@ -249,7 +249,7 @@ func (g *Generator) baseLambdaSQL(expression *Expr, arrowSep string, wrap bool) 
 	return args + " " + arrowSep + " " + g.sqlKey(expression, "this")
 }
 
-// lateral_op (generator.py L2862)
+// lateral_op (generator.py L2862).
 func (g *Generator) baseLateralOp(expression *Expr) string {
 	// https://www.mssqltips.com/sqlservertip/1958/sql-server-cross-apply-and-outer-apply/
 	op := ""
@@ -264,7 +264,7 @@ func (g *Generator) baseLateralOp(expression *Expr) string {
 	return op + "LATERAL"
 }
 
-// lateral_sql (generator.py L2875)
+// lateral_sql (generator.py L2875).
 func (g *Generator) baseLateralSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 
@@ -300,7 +300,7 @@ func (g *Generator) baseLateralSQL(expression *Expr) string {
 	return g.lateralOp(expression) + " " + this + alias + ordinality
 }
 
-// limit_sql (generator.py L2896)
+// limit_sql (generator.py L2896).
 func (g *Generator) limitSQL(expression *Expr, top bool) string {
 	this := g.sqlKey(expression, "this")
 
@@ -342,7 +342,7 @@ func (g *Generator) limitSQL(expression *Expr, top bool) string {
 	return this + g.seg(kw) + " " + argsSQL + limitOptions + expressions
 }
 
-// offset_sql (generator.py L2913)
+// offset_sql (generator.py L2913).
 func (g *Generator) baseOffsetSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	value := expression.Expression()
@@ -356,7 +356,7 @@ func (g *Generator) baseOffsetSQL(expression *Expr) string {
 	return this + g.seg("OFFSET") + " " + g.sql(value) + expressions
 }
 
-// setitem_sql (generator.py L2921)
+// setitem_sql (generator.py L2921).
 func (g *Generator) baseSetitemSQL(expression *Expr) string {
 	kind := g.sqlKey(expression, "kind")
 	if !g.s.SET_ASSIGNMENT_REQUIRES_VARIABLE_KEYWORD && kind == "VARIABLE" {
@@ -377,7 +377,7 @@ func (g *Generator) baseSetitemSQL(expression *Expr) string {
 	return global + kind + this + expressions + collate
 }
 
-// set_sql (generator.py L2934)
+// set_sql (generator.py L2934).
 func (g *Generator) setSQL(expression *Expr) string {
 	expressions := " " + g.expressions(expression, exprsOpts{flat: true})
 	tag := ""
@@ -391,7 +391,7 @@ func (g *Generator) setSQL(expression *Expr) string {
 	return kw + tag + expressions
 }
 
-// queryband_sql (generator.py L2939)
+// queryband_sql (generator.py L2939).
 func (g *Generator) querybandSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	update := ""
@@ -406,12 +406,12 @@ func (g *Generator) querybandSQL(expression *Expr) string {
 	return "QUERY_BAND = " + this + update + scope
 }
 
-// pragma_sql (generator.py L2947)
+// pragma_sql (generator.py L2947).
 func (g *Generator) pragmaSQL(expression *Expr) string {
 	return "PRAGMA " + g.sqlKey(expression, "this")
 }
 
-// lock_sql (generator.py L2950)
+// lock_sql (generator.py L2950).
 func (g *Generator) lockSQL(expression *Expr) string {
 	if !g.s.LOCKING_READS_SUPPORTED {
 		g.unsupported("Locking reads using 'FOR UPDATE/SHARE' are not supported")
@@ -452,7 +452,7 @@ func (g *Generator) lockSQL(expression *Expr) string {
 	return lockType + expressions + wait
 }
 
-// literal_sql (generator.py L2973)
+// literal_sql (generator.py L2973).
 func (g *Generator) literalSQL(expression *Expr) string {
 	text := expression.ThisS()
 	if expression.IsString() {
@@ -495,7 +495,7 @@ func (g *Generator) escapeStr(text string, escapeBackslash bool, delimiter strin
 	return strings.ReplaceAll(g.replaceLineBreaks(text), delimiter, escapedDelimiter)
 }
 
-// loaddata_sql (generator.py L3003)
+// loaddata_sql (generator.py L3003).
 func (g *Generator) loaddataSQL(expression *Expr) string {
 	isOverwrite := expression.ArgB("overwrite")
 	overwrite := ""
@@ -538,12 +538,12 @@ func (g *Generator) loaddataSQL(expression *Expr) string {
 	return "LOAD DATA" + local + inpath + overwrite + this + partition + inputFormat + serde
 }
 
-// null_sql (generator.py L3031)
+// null_sql (generator.py L3031).
 func (g *Generator) nullSQL(expression ...any) string {
 	return "NULL"
 }
 
-// boolean_sql (generator.py L3034)
+// boolean_sql (generator.py L3034).
 func (g *Generator) baseBooleanSQL(expression *Expr) string {
 	if expression.ArgB("this") {
 		return "TRUE"
@@ -551,17 +551,17 @@ func (g *Generator) baseBooleanSQL(expression *Expr) string {
 	return "FALSE"
 }
 
-// booland_sql (generator.py L3037)
+// booland_sql (generator.py L3037).
 func (g *Generator) boolandSQL(expression *Expr) string {
 	return "((" + g.sqlKey(expression, "this") + ") AND (" + g.sqlKey(expression, "expression") + "))"
 }
 
-// boolor_sql (generator.py L3040)
+// boolor_sql (generator.py L3040).
 func (g *Generator) boolorSQL(expression *Expr) string {
 	return "((" + g.sqlKey(expression, "this") + ") OR (" + g.sqlKey(expression, "expression") + "))"
 }
 
-// order_sql (generator.py L3043)
+// order_sql (generator.py L3043).
 func (g *Generator) orderSQL(expression *Expr, flat bool) string {
 	this := g.sqlKey(expression, "this")
 	if this != "" {
@@ -574,7 +574,7 @@ func (g *Generator) orderSQL(expression *Expr, flat bool) string {
 	return g.opExpressions(this+"ORDER "+siblings+"BY", expression, this != "" || flat)
 }
 
-// withfill_sql (generator.py L3049)
+// withfill_sql (generator.py L3049).
 func (g *Generator) withfillSQL(expression *Expr) string {
 	fromSQL := g.sqlKey(expression, "from_")
 	if fromSQL != "" {
@@ -603,12 +603,12 @@ func (g *Generator) withfillSQL(expression *Expr) string {
 	return "WITH FILL" + fromSQL + toSQL + stepSQL + interpolate
 }
 
-// cluster_sql (generator.py L3067)
+// cluster_sql (generator.py L3067).
 func (g *Generator) clusterSQL(expression *Expr) string {
 	return g.opExpressions("CLUSTER BY", expression, false)
 }
 
-// clusterproperty_sql (generator.py L3070)
+// clusterproperty_sql (generator.py L3070).
 func (g *Generator) baseClusterpropertySQL(expression *Expr) string {
 	if expression.ArgB("this") {
 		g.unsupported("Unsupported CLUSTER BY " + g.sqlKey(expression, "this"))
@@ -618,12 +618,12 @@ func (g *Generator) baseClusterpropertySQL(expression *Expr) string {
 	return "CLUSTER BY (" + expressions + ")"
 }
 
-// distribute_sql (generator.py L3077)
+// distribute_sql (generator.py L3077).
 func (g *Generator) distributeSQL(expression *Expr) string {
 	return g.opExpressions("DISTRIBUTE BY", expression, false)
 }
 
-// sort_sql (generator.py L3080)
+// sort_sql (generator.py L3080).
 func (g *Generator) sortSQL(expression *Expr) string {
 	return g.opExpressions("SORT BY", expression, false)
 }
@@ -673,7 +673,7 @@ func (g *Generator) resolveOrderedForNullOrderingSimulation(expression *Expr) *E
 	return match
 }
 
-// ordered_sql (generator.py L3117)
+// ordered_sql (generator.py L3117).
 func (g *Generator) orderedSQL(expression *Expr) string {
 	descV := expression.Arg("desc")
 	desc := truthy(descV)
@@ -761,7 +761,7 @@ func (g *Generator) orderedSQL(expression *Expr) string {
 	return this + sortOrder + nullsSortChange + withFill
 }
 
-// matchrecognizemeasure_sql (generator.py L3198)
+// matchrecognizemeasure_sql (generator.py L3198).
 func (g *Generator) matchrecognizemeasureSQL(expression *Expr) string {
 	windowFrame := g.sqlKey(expression, "window_frame")
 	if windowFrame != "" {
@@ -773,7 +773,7 @@ func (g *Generator) matchrecognizemeasureSQL(expression *Expr) string {
 	return windowFrame + this
 }
 
-// matchrecognize_sql (generator.py L3206)
+// matchrecognize_sql (generator.py L3206).
 func (g *Generator) matchrecognizeSQL(expression *Expr) string {
 	partition := g.partitionBySQL(expression)
 	order := g.sqlKey(expression, "order")
@@ -810,7 +810,7 @@ func (g *Generator) matchrecognizeSQL(expression *Expr) string {
 	return g.seg("MATCH_RECOGNIZE") + " " + g.wrap(body) + alias
 }
 
-// query_modifiers (generator.py L3238)
+// query_modifiers (generator.py L3238).
 func (g *Generator) queryModifiers(expression *Expr, sqls ...string) string {
 	limit := expression.ArgE("limit")
 
@@ -856,7 +856,7 @@ func (g *Generator) queryModifiers(expression *Expr, sqls ...string) string {
 	return gchunkBCsv("", parts...)
 }
 
-// options_modifier (generator.py L3270)
+// options_modifier (generator.py L3270).
 func (g *Generator) baseOptionsModifier(expression *Expr) string {
 	options := g.expressions(expression, exprsOpts{key: "options"})
 	if options != "" {
@@ -865,7 +865,7 @@ func (g *Generator) baseOptionsModifier(expression *Expr) string {
 	return ""
 }
 
-// forclause_sql (generator.py L3274)
+// forclause_sql (generator.py L3274).
 func (g *Generator) forclauseSQL(expression *Expr) string {
 	kind := expression.Arg("kind")
 	if s, ok := kind.(string); ok && s == "BROWSE" {
@@ -880,13 +880,13 @@ func (g *Generator) forclauseSQL(expression *Expr) string {
 	return g.sep1() + "FOR " + gchunkBPyStr(kind) + g.seg(options)
 }
 
-// queryoption_sql (generator.py L3285)
+// queryoption_sql (generator.py L3285).
 func (g *Generator) baseQueryoptionSQL(expression *Expr) string {
 	g.unsupported("Unsupported query option.")
 	return ""
 }
 
-// offset_limit_modifiers (generator.py L3289)
+// offset_limit_modifiers (generator.py L3289).
 func (g *Generator) baseOffsetLimitModifiers(expression *Expr, fetch bool, limit *Expr) []string {
 	if fetch {
 		first := g.sqlKey(expression, "offset")
@@ -896,7 +896,7 @@ func (g *Generator) baseOffsetLimitModifiers(expression *Expr, fetch bool, limit
 	return []string{first, g.sqlKey(expression, "offset")}
 }
 
-// after_limit_modifiers (generator.py L3297)
+// after_limit_modifiers (generator.py L3297).
 func (g *Generator) baseAfterLimitModifiers(expression *Expr) []string {
 	locks := g.expressions(expression, exprsOpts{key: "locks", sep: strp2(" ")})
 	if locks != "" {

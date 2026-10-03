@@ -19,7 +19,7 @@ const (
 	HIVE_DATEINT_FORMAT = "'yyyyMMdd'"
 )
 
-// The default formats above, as rendered by the lenient rewrite (non-padded month/day)
+// The default formats above, as rendered by the lenient rewrite (non-padded month/day).
 var HIVE_NON_PADDED_TIME_FORMATS = []string{"'yyyy-M-d HH:mm:ss'", "'yyyy-M-d'"}
 
 // Expressions that parse a string with a format (vs. formatting one, like TimeToStr).
@@ -68,7 +68,7 @@ func hiveLenientParseFormat(fmt_ string) string {
 	return b.String()
 }
 
-// (FuncType, Multiplier)
+// (FuncType, Multiplier).
 type hiveDeltaInterval struct {
 	fn         string
 	multiplier int

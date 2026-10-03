@@ -671,7 +671,7 @@ func prestoOffsetLimitModifiers(g *Generator, e *Expr, fetch bool, limit *Expr) 
 // prestoCreateSQL mirrors PrestoGenerator.create_sql.
 //
 // Presto doesn't support CREATE VIEW with expressions (ex: `CREATE VIEW x (cola)` then `(cola)` is the expression),
-// so we need to remove them
+// so we need to remove them.
 func prestoCreateSQL(g *Generator, e *Expr) string {
 	kind := e.Arg("kind")
 	schema := e.This()

@@ -15,7 +15,7 @@ const normalizationDistanceInf = math.MaxInt
 // normal form (or disjunctive normal form when dnf is true). Python defaults: dnf=False,
 // max_distance=128.
 //
-// Example: "(x AND y) OR z" -> "(x OR z) AND (y OR z)"
+// Example: "(x AND y) OR z" -> "(x OR z) AND (y OR z)".
 func NormalizeCNF(expression *Expr, dnf bool, maxDistance int) *Expr {
 	simplifier := normalizeNewSimplifier()
 
@@ -100,7 +100,7 @@ func Normalized(expression *Expr, dnf bool) bool { return normalizedCNF(expressi
 // number of predicates between a given expression and its normalized form. Pass
 // normalizationDistanceInf for Python's default max_=float("inf").
 //
-// Example: normalization_distance("(a AND b) OR (c AND d)") -> 4
+// Example: normalization_distance("(a AND b) OR (c AND d)") -> 4.
 func normalizationDistance(expression *Expr, dnf bool, maxDistance int) int {
 	count := 0
 	for range expression.FindAll(KConnector) {

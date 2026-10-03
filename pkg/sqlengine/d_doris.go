@@ -20,7 +20,7 @@ func init() {
 // ---------------------------------------------------------------------------------------------
 
 // dorisBuildDateTrunc mirrors _build_date_trunc.
-// Accept both DATE_TRUNC(datetime, unit) and DATE_TRUNC(unit, datetime)
+// Accept both DATE_TRUNC(datetime, unit) and DATE_TRUNC(unit, datetime).
 func dorisBuildDateTrunc(args []*Expr, d *Dialect) *Expr {
 	a0, a1 := seqGet(args, 0), seqGet(args, 1)
 

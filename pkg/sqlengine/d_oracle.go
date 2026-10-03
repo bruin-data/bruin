@@ -194,7 +194,7 @@ func oracleBuildToTimestampFmtStr(this *Expr, quotedFmt string, d *Dialect) *Exp
 	return New(KStrToTime, "this", this, "format", d.formatTimeStr(quotedFmt))
 }
 
-// _parse_to_number (parsers/oracle.py L105)
+// _parse_to_number (parsers/oracle.py L105).
 func oracleParseToNumber(p *Parser) *Expr {
 	// https://docs.oracle.com/en/database/oracle/oracle-database/19/sqlrf/TO_NUMBER.html
 	this := p.parseBitwise()
@@ -216,7 +216,7 @@ func oracleParseToNumber(p *Parser) *Expr {
 	return p.expression(New(KToNumber, "this", this, "format", fmt, "nlsparam", nlsparam, "default", def))
 }
 
-// _parse_dbms_random (parsers/oracle.py L125)
+// _parse_dbms_random (parsers/oracle.py L125).
 func oracleParseDbmsRandom(p *Parser) *Expr {
 	if p.matchTextSeq(".", "VALUE") {
 		var lower, upper *Expr
@@ -234,13 +234,13 @@ func oracleParseDbmsRandom(p *Parser) *Expr {
 	return nil
 }
 
-// _parse_oracle_json_array (parsers/oracle.py L138)
+// _parse_oracle_json_array (parsers/oracle.py L138).
 func oracleParseOracleJSONArray(p *Parser) *Expr {
 	expressions := p.parseCSV(func() *Expr { return p.parseFormatJson(p.parseBitwise()) }, TK_COMMA)
 	return oracleParseJSONArray(p, KJSONArray, "expressions", expressions)
 }
 
-// _parse_oracle_json_arrayagg (parsers/oracle.py L144)
+// _parse_oracle_json_arrayagg (parsers/oracle.py L144).
 func oracleParseOracleJSONArrayagg(p *Parser) *Expr {
 	this := p.parseFormatJson(p.parseBitwise())
 	order := p.parseOrder(nil, false)
@@ -260,7 +260,7 @@ func oracleParseJSONArray(p *Parser, kind Kind, kwargs ...any) *Expr {
 	return p.expression(New(kind, args...))
 }
 
-// _parse_hint_function_call (parsers/oracle.py L161)
+// _parse_hint_function_call (parsers/oracle.py L161).
 func oracleParseHintFunctionCall(p *Parser) *Expr {
 	if !p.curr.ok() || !p.next.ok() || p.next.Type != TK_L_PAREN {
 		return nil
@@ -275,7 +275,7 @@ func oracleParseHintFunctionCall(p *Parser) *Expr {
 	return this
 }
 
-// _parse_hint_args (parsers/oracle.py L173)
+// _parse_hint_args (parsers/oracle.py L173).
 func oracleParseHintArgs(p *Parser) []*Expr {
 	args := []*Expr{}
 	result := p.parseVar(false, nil, false)
@@ -288,7 +288,7 @@ func oracleParseHintArgs(p *Parser) []*Expr {
 	return args
 }
 
-// _parse_query_restrictions (parsers/oracle.py L183)
+// _parse_query_restrictions (parsers/oracle.py L183).
 func oracleParseQueryRestrictions(p *Parser) *Expr {
 	kind := p.parseVarFromOptions(p.s.QUERY_RESTRICTIONS, false)
 
@@ -304,7 +304,7 @@ func oracleParseQueryRestrictions(p *Parser) *Expr {
 	return p.expression(New(KQueryOption, "this", kind, "expression", expression))
 }
 
-// _parse_json_exists (parsers/oracle.py L195)
+// _parse_json_exists (parsers/oracle.py L195).
 func oracleParseJSONExists(p *Parser) *Expr {
 	this := p.parseFormatJson(p.parseBitwise())
 	p.match(TK_COMMA)
@@ -324,7 +324,7 @@ func oracleParseJSONExists(p *Parser) *Expr {
 	))
 }
 
-// _parse_into (parsers/oracle.py L208)
+// _parse_into (parsers/oracle.py L208).
 func oracleParseInto(p *Parser) *Expr {
 	// https://docs.oracle.com/en/database/oracle/oracle-database/19/lnpls/SELECT-INTO-statement.html
 	bulkCollect := p.match(TK_BULK_COLLECT_INTO)
@@ -349,12 +349,12 @@ func oracleParseInto(p *Parser) *Expr {
 	return p.expression(New(KInto, "bulk_collect", bc, "expressions", expressions))
 }
 
-// _parse_connect_with_prior (parsers/oracle.py L226)
+// _parse_connect_with_prior (parsers/oracle.py L226).
 func oracleParseConnectWithPrior(p *Parser) *Expr {
 	return p.parseAssignment()
 }
 
-// _parse_column_ops (parsers/oracle.py L229)
+// _parse_column_ops (parsers/oracle.py L229).
 func oracleParseColumnOps(p *Parser, this *Expr) *Expr {
 	this = p.baseParseColumnOps(this)
 
@@ -374,7 +374,7 @@ func oracleParseColumnOps(p *Parser, this *Expr) *Expr {
 	return this
 }
 
-// _parse_insert_table (parsers/oracle.py L245)
+// _parse_insert_table (parsers/oracle.py L245).
 func oracleParseInsertTable(p *Parser) *Expr {
 	// Oracle does not use AS for INSERT INTO alias
 	// https://docs.oracle.com/en/database/oracle/oracle-database/18/sqlrf/INSERT.html
@@ -407,7 +407,7 @@ func oracleFormatTimeArg(g *Generator, e *Expr) any {
 	return nil
 }
 
-// _trim_sql (generators/oracle.py L14)
+// _trim_sql (generators/oracle.py L14).
 func oracleTrimSQL(g *Generator, e *Expr) string {
 	position := e.ArgS("position")
 
@@ -421,7 +421,7 @@ func oracleTrimSQL(g *Generator, e *Expr) string {
 	return trimSQL(g, e, "")
 }
 
-// currenttimestamp_sql (generators/oracle.py L112)
+// currenttimestamp_sql (generators/oracle.py L112).
 func oracleCurrenttimestampSQL(g *Generator, e *Expr) string {
 	if e.ArgB("sysdate") {
 		return "SYSDATE"
@@ -434,17 +434,17 @@ func oracleCurrenttimestampSQL(g *Generator, e *Expr) string {
 	return "CURRENT_TIMESTAMP"
 }
 
-// offset_sql (generators/oracle.py L119)
+// offset_sql (generators/oracle.py L119).
 func oracleOffsetSQL(g *Generator, e *Expr) string {
 	return g.baseOffsetSQL(e) + " ROWS"
 }
 
-// add_column_sql (generators/oracle.py L122)
+// add_column_sql (generators/oracle.py L122).
 func oracleAddColumnSQL(g *Generator, e *Expr) string {
 	return "ADD " + g.sql(e)
 }
 
-// queryoption_sql (generators/oracle.py L125)
+// queryoption_sql (generators/oracle.py L125).
 func oracleQueryoptionSQL(g *Generator, e *Expr) string {
 	option := g.sqlKey(e, "this")
 	value := g.sqlKey(e, "expression")
@@ -455,7 +455,7 @@ func oracleQueryoptionSQL(g *Generator, e *Expr) string {
 	return option + value
 }
 
-// coalesce_sql (generators/oracle.py L132)
+// coalesce_sql (generators/oracle.py L132).
 func oracleCoalesceSQL(g *Generator, e *Expr) string {
 	funcName := "COALESCE"
 	if e.ArgB("is_nvl") {
@@ -464,7 +464,7 @@ func oracleCoalesceSQL(g *Generator, e *Expr) string {
 	return renameFunc(funcName)(g, e)
 }
 
-// into_sql (generators/oracle.py L136)
+// into_sql (generators/oracle.py L136).
 func oracleIntoSQL(g *Generator, e *Expr) string {
 	into := "INTO"
 	if e.ArgB("bulk_collect") {
@@ -477,7 +477,7 @@ func oracleIntoSQL(g *Generator, e *Expr) string {
 	return g.seg(into) + " " + g.expressions(e, exprsOpts{})
 }
 
-// hint_sql (generators/oracle.py L143)
+// hint_sql (generators/oracle.py L143).
 func oracleHintSQL(g *Generator, e *Expr) string {
 	var expressions []any
 
@@ -511,12 +511,12 @@ func oracleHintSQL(g *Generator, e *Expr) string {
 	return " /*+ " + pyStrip(g.expressions(nil, exprsOpts{sqls: expressions, hasSqls: true, sep: strp2(g.s.QUERY_HINT_SEP)})) + " */"
 }
 
-// isascii_sql (generators/oracle.py L155)
+// isascii_sql (generators/oracle.py L155).
 func oracleIsasciiSQL(g *Generator, e *Expr) string {
 	return "NVL(REGEXP_LIKE(" + g.sql(e.Arg("this")) + ", '^[' || CHR(1) || '-' || CHR(127) || ']*$'), TRUE)"
 }
 
-// interval_sql (generators/oracle.py L158)
+// interval_sql (generators/oracle.py L158).
 func oracleIntervalSQL(g *Generator, e *Expr) string {
 	prefix := ""
 	if e.This().IsA(KLiteral) {
@@ -525,7 +525,7 @@ func oracleIntervalSQL(g *Generator, e *Expr) string {
 	return prefix + g.sqlKey(e, "this") + " " + g.sqlKey(e, "unit")
 }
 
-// tonumber_sql (generators/oracle.py L161)
+// tonumber_sql (generators/oracle.py L161).
 func oracleTonumberSQL(g *Generator, e *Expr) string {
 	this := g.sqlKey(e, "this")
 	def := g.sqlKey(e, "default")
@@ -536,7 +536,7 @@ func oracleTonumberSQL(g *Generator, e *Expr) string {
 	return g.fn("TO_NUMBER", this, e.Arg("format"), e.Arg("nlsparam"))
 }
 
-// columndef_sql (generators/oracle.py L171)
+// columndef_sql (generators/oracle.py L171).
 func oracleColumndefSQL(g *Generator, e *Expr, sep string) string {
 	paramConstraint := e.Find(KInOutColumnConstraint)
 	if paramConstraint != nil {

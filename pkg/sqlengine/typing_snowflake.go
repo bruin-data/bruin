@@ -26,7 +26,7 @@ func typingSnowflakeAnnotateReverse(a *TypeAnnotator, expression *Expr) *Expr {
 // typingSnowflakeAnnotateTimestampFromParts annotates TimestampFromParts with the correct type
 // based on arguments:
 // TIMESTAMP_FROM_PARTS with time_zone -> TIMESTAMPTZ
-// TIMESTAMP_FROM_PARTS without time_zone -> TIMESTAMP (defaults to TIMESTAMP_NTZ)
+// TIMESTAMP_FROM_PARTS without time_zone -> TIMESTAMP (defaults to TIMESTAMP_NTZ).
 func typingSnowflakeAnnotateTimestampFromParts(a *TypeAnnotator, expression *Expr) *Expr {
 	if expression.ArgB("zone") {
 		a.setType(expression, DT_TIMESTAMPTZ)

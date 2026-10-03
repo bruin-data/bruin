@@ -131,7 +131,7 @@ func sparkParseGeneratedAsIdentity(p *Parser) *Expr {
 // sparkParsePivotAggregation mirrors SparkParser._parse_pivot_aggregation.
 //
 // Spark 3+ and Databricks support non aggregate functions in PIVOT too, e.g
-// PIVOT (..., 'foo' AS bar FOR col_to_pivot IN (...))
+// PIVOT (..., 'foo' AS bar FOR col_to_pivot IN (...)).
 func sparkParsePivotAggregation(p *Parser) *Expr {
 	aggregateExpr := p.parseFunction(nil, false, true, false)
 	if aggregateExpr == nil {

@@ -71,7 +71,7 @@ func pushdownProjectionsDefaultSelection(isAgg bool) *Expr {
 // default dialect. Python defaults: remove_unused_selections=True.
 //
 // Example: "SELECT y.a AS a FROM (SELECT x.a AS a, x.b AS b FROM x) AS y"
-// -> "SELECT y.a AS a FROM (SELECT x.a AS a FROM x) AS y"
+// -> "SELECT y.a AS a FROM (SELECT x.a AS a FROM x) AS y".
 func PushdownProjections(expression *Expr, schema *MappingSchema, removeUnusedSelections bool, d *Dialect) *Expr {
 	// Map of Scope to all columns being selected by outer queries.
 	if schema == nil {

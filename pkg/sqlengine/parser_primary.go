@@ -8,7 +8,7 @@ import "strings"
 // SQLGLOT_ANONYMOUS mirrors exp.SQLGLOT_ANONYMOUS.
 const chunkDSQLGlotAnonymous = "sqlglot.anonymous"
 
-// _parse_atom (parser.py L6607)
+// _parse_atom (parser.py L6607).
 func (p *Parser) parseAtom() *Expr {
 	if p.s.IDENTIFIER_TOKENS.Has(p.curr.Type) {
 		if column := p.parseColumn(); column != nil {
@@ -36,7 +36,7 @@ func (p *Parser) parseAtom() *Expr {
 	return primaryParser(p, token)
 }
 
-// _parse_column (parser.py L6632)
+// _parse_column (parser.py L6632).
 func (p *Parser) baseParseColumn() *Expr {
 	column := p.parseColumnPartsFast()
 	if column == nil {
@@ -152,7 +152,7 @@ func (p *Parser) parseColumnPartsFast() *Expr {
 	return column
 }
 
-// _parse_column_reference (parser.py L6721)
+// _parse_column_reference (parser.py L6721).
 func (p *Parser) parseColumnReference() *Expr {
 	this := p.parseField(false, nil, false)
 	if this == nil &&
@@ -171,7 +171,7 @@ func (p *Parser) parseColumnReference() *Expr {
 	return this
 }
 
-// _build_json_extract (parser.py L6737)
+// _build_json_extract (parser.py L6737).
 func (p *Parser) buildJsonExtract(this *Expr, pathParts []*Expr) (*Expr, []*Expr) {
 	if len(pathParts) > 1 {
 		this = p.expression(New(
@@ -189,7 +189,7 @@ func (p *Parser) buildJsonExtract(this *Expr, pathParts []*Expr) (*Expr, []*Expr
 
 var selectTokenSet = newTokenSet(TK_SELECT)
 
-// _parse_colon_as_variant_extract (parser.py L6755)
+// _parse_colon_as_variant_extract (parser.py L6755).
 func (p *Parser) parseColonAsVariantExtract(this *Expr) *Expr {
 	if !p.match(TK_COLON) {
 		// No path: the final _build_json_extract on a lone JSONPathRoot is a no-op.
@@ -263,12 +263,12 @@ func (p *Parser) parseColonAsVariantExtract(this *Expr) *Expr {
 	return this
 }
 
-// _parse_dcolon (parser.py L6812)
+// _parse_dcolon (parser.py L6812).
 func (p *Parser) baseParseDcolon() *Expr {
 	return p.parseTypes(false, false, true, false)
 }
 
-// _parse_column_ops (parser.py L6815)
+// _parse_column_ops (parser.py L6815).
 func (p *Parser) baseParseColumnOps(this *Expr) *Expr {
 	for p.s.BRACKETS.Has(p.curr.Type) {
 		this = p.parseBracket(this)
@@ -350,7 +350,7 @@ func (p *Parser) baseParseColumnOps(this *Expr) *Expr {
 	return this
 }
 
-// _parse_paren (parser.py L6883)
+// _parse_paren (parser.py L6883).
 func (p *Parser) parseParen() *Expr {
 	if !p.match(TK_L_PAREN) {
 		return nil
@@ -393,7 +393,7 @@ func (p *Parser) parseParen() *Expr {
 	return this
 }
 
-// _parse_primary (parser.py L6921)
+// _parse_primary (parser.py L6921).
 func (p *Parser) baseParsePrimary() *Expr {
 	if chunkDMatchKey(p, p.s.PRIMARY_PARSERS) {
 		tokenType := p.prev.Type
@@ -429,7 +429,7 @@ func (p *Parser) baseParsePrimary() *Expr {
 	return p.parseParen()
 }
 
-// _parse_field (parser.py L6949)
+// _parse_field (parser.py L6949).
 func (p *Parser) parseField(anyToken bool, tokens *TokenSet, anonymousFunc bool) *Expr {
 	var field *Expr
 	if anonymousFunc {
@@ -449,7 +449,7 @@ func (p *Parser) parseField(anyToken bool, tokens *TokenSet, anonymousFunc bool)
 	return p.parseIdVar(anyToken, tokens)
 }
 
-// _parse_function (parser.py L6966)
+// _parse_function (parser.py L6966).
 func (p *Parser) baseParseFunction(functions map[string]FuncBuilder, anonymous bool, optionalParens bool, anyToken bool) *Expr {
 	// This allows us to also parse {fn <function>} syntax (Snowflake, MySQL support this)
 	// See: https://community.snowflake.com/s/article/SQL-Escape-Sequences
@@ -468,12 +468,12 @@ func (p *Parser) baseParseFunction(functions map[string]FuncBuilder, anonymous b
 	return fn
 }
 
-// _parse_function_args (parser.py L6996)
+// _parse_function_args (parser.py L6996).
 func (p *Parser) parseFunctionArgs(alias bool) []*Expr {
 	return p.parseCSV(func() *Expr { return p.parseLambda(alias) }, TK_COMMA)
 }
 
-// _parse_function_call (parser.py L6999)
+// _parse_function_call (parser.py L6999).
 func (p *Parser) baseParseFunctionCall(functions map[string]FuncBuilder, anonymous bool, optionalParens bool, anyToken bool) *Expr {
 	if !p.curr.ok() {
 		return nil
@@ -605,12 +605,12 @@ func (p *Parser) baseParseFunctionCall(functions map[string]FuncBuilder, anonymo
 	return p.parseWindow(result, false)
 }
 
-// _to_prop_eq (parser.py L7116)
+// _to_prop_eq (parser.py L7116).
 func (p *Parser) baseToPropEq(expression *Expr, index int) *Expr {
 	return expression
 }
 
-// _kv_to_prop_eq (parser.py L7119)
+// _kv_to_prop_eq (parser.py L7119).
 func (p *Parser) kvToPropEq(expressions []*Expr, parseMap bool) []*Expr {
 	transformed := []*Expr{}
 
@@ -647,7 +647,7 @@ func (p *Parser) kvToPropEq(expressions []*Expr, parseMap bool) []*Expr {
 	return transformed
 }
 
-// _parse_function_properties (parser.py L7146)
+// _parse_function_properties (parser.py L7146).
 func (p *Parser) baseParseFunctionProperties() *Expr {
 	// Skip the generic `key = value` fallback in _parse_property since this
 	// runs post-AS where a function body like `name = expr` can be misread
@@ -678,17 +678,17 @@ func (p *Parser) baseParseFunctionProperties() *Expr {
 	return nil
 }
 
-// _parse_user_defined_function_expression (parser.py L7163)
+// _parse_user_defined_function_expression (parser.py L7163).
 func (p *Parser) baseParseUserDefinedFunctionExpression() *Expr {
 	return p.parseStatement()
 }
 
-// _parse_function_parameter (parser.py L7166)
+// _parse_function_parameter (parser.py L7166).
 func (p *Parser) baseParseFunctionParameter() *Expr {
 	return p.parseColumnDef(p.parseIdVar(true, nil), false)
 }
 
-// _parse_user_defined_function (parser.py L7169)
+// _parse_user_defined_function (parser.py L7169).
 func (p *Parser) baseParseUserDefinedFunction(kind TokenType) *Expr {
 	this := p.parseTableParts(true, false, false, false)
 
@@ -701,7 +701,7 @@ func (p *Parser) baseParseUserDefinedFunction(kind TokenType) *Expr {
 	return p.expression(New(KUserDefinedFunction, "this", this, "expressions", expressions, "wrapped", true))
 }
 
-// _parse_macro_overloads (parser.py L7181)
+// _parse_macro_overloads (parser.py L7181).
 func (p *Parser) parseMacroOverloads(this *Expr, firstBody *Expr, firstIsTable bool) *Expr {
 	var firstExpressions any
 	if exprs := this.Expressions(); len(exprs) > 0 {
@@ -739,7 +739,7 @@ func (p *Parser) parseMacroOverloads(this *Expr, firstBody *Expr, firstIsTable b
 	return p.expression(New(KMacroOverloads, "expressions", overloads))
 }
 
-// _parse_introducer (parser.py L7216)
+// _parse_introducer (parser.py L7216).
 func (p *Parser) parseIntroducer(token *Token) *Expr {
 	literal := p.parsePrimary()
 	if literal != nil {
@@ -749,7 +749,7 @@ func (p *Parser) parseIntroducer(token *Token) *Expr {
 	return p.identifierExpression(token, TriNone)
 }
 
-// _parse_session_parameter (parser.py L7223)
+// _parse_session_parameter (parser.py L7223).
 func (p *Parser) parseSessionParameter() *Expr {
 	var kind any
 	this := p.parseIdVar(true, nil)
@@ -768,12 +768,12 @@ func (p *Parser) parseSessionParameter() *Expr {
 	return p.expression(New(KSessionParameter, "this", this, "kind", kind))
 }
 
-// _parse_lambda_arg (parser.py L7233)
+// _parse_lambda_arg (parser.py L7233).
 func (p *Parser) baseParseLambdaArg() *Expr {
 	return p.parseIdVar(true, nil)
 }
 
-// _parse_lambda (parser.py L7236)
+// _parse_lambda (parser.py L7236).
 func (p *Parser) baseParseLambda(alias bool) *Expr {
 	nextTokenType := p.next.Type
 
@@ -824,7 +824,7 @@ func (p *Parser) baseParseLambda(alias bool) *Expr {
 	)
 }
 
-// _parse_schema (parser.py L7283)
+// _parse_schema (parser.py L7283).
 func (p *Parser) parseSchema(this *Expr) *Expr {
 	index := p.index
 	if !p.match(TK_L_PAREN) {
@@ -847,7 +847,7 @@ func (p *Parser) parseSchema(this *Expr) *Expr {
 	return p.expression(New(KSchema, "this", this, "expressions", args))
 }
 
-// _parse_field_def (parser.py L7297)
+// _parse_field_def (parser.py L7297).
 func (p *Parser) parseFieldDef() *Expr {
 	return p.parseColumnDef(p.parseField(true, nil, false), true)
 }

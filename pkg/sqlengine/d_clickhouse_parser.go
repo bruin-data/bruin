@@ -73,7 +73,7 @@ func clickhouseBuildSplit(kind Kind) FuncBuilder {
 
 // clickhouseTimestampTruncUnits mirrors TIMESTAMP_TRUNC_UNITS.
 // Skip the 'week' unit since ClickHouse's toStartOfWeek
-// uses an extra mode argument to specify the first day of the week
+// uses an extra mode argument to specify the first day of the week.
 var clickhouseTimestampTruncUnits = []string{
 	"MICROSECOND",
 	"MILLISECOND",

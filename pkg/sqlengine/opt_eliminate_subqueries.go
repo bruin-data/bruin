@@ -5,7 +5,7 @@ package sqlengine
 // EliminateSubqueries mirrors optimizer.eliminate_subqueries.eliminate_subqueries: rewrites
 // derived tables as CTES, deduplicating if possible.
 //
-// Example: "SELECT a FROM (SELECT * FROM x) AS y" -> "WITH y AS (SELECT * FROM x) SELECT a FROM y AS y"
+// Example: "SELECT a FROM (SELECT * FROM x) AS y" -> "WITH y AS (SELECT * FROM x) SELECT a FROM y AS y".
 func EliminateSubqueries(expression *Expr) *Expr {
 	if expression.IsA(KSubquery) {
 		// It's possible to have subqueries at the root, e.g. (SELECT * FROM x) LIMIT 1

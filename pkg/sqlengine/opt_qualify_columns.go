@@ -187,7 +187,7 @@ func qcSeparatePseudocolumns(scope *Scope, pseudocolumns StrSet) {
 
 // qcPopTableColumnAliases mirrors _pop_table_column_aliases: remove table column aliases.
 //
-// For example, `col1` and `col2` will be dropped in SELECT ... FROM (SELECT ...) AS foo(col1, col2)
+// For example, `col1` and `col2` will be dropped in SELECT ... FROM (SELECT ...) AS foo(col1, col2).
 func qcPopTableColumnAliases(derivedTables []*Expr) {
 	for _, derivedTable := range derivedTables {
 		if derivedTable.Parent().IsA(KWith) && derivedTable.Parent().ArgB("recursive") {

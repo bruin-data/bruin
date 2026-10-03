@@ -9,7 +9,7 @@ var optimizeJoinsJoinAttrs = []string{"on", "side", "kind", "using", "method"}
 // and reorders joins based on predicate dependencies.
 //
 // Example: "SELECT * FROM x CROSS JOIN y JOIN z ON x.a = z.a AND y.a = z.a"
-// -> "SELECT * FROM x JOIN z ON x.a = z.a AND TRUE JOIN y ON y.a = z.a"
+// -> "SELECT * FROM x JOIN z ON x.a = z.a AND TRUE JOIN y ON y.a = z.a".
 func OptimizeJoins(expression *Expr) *Expr {
 	for sel := range expression.FindAll(KSelect) {
 		joins := sel.ArgL("joins")

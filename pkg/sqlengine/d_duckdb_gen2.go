@@ -1095,7 +1095,7 @@ func duckdbPosexplodeSQL(g *Generator, e *Expr) string {
 // Handles three key issues:
 // 1. Float/decimal months: e.g., Snowflake rounds, whereas DuckDB INTERVAL requires integers
 // 2. End-of-month preservation: If input is last day of month, result is last day of result month
-// 3. Type preservation: Maintains DATE/TIMESTAMPTZ types (DuckDB defaults to TIMESTAMP)
+// 3. Type preservation: Maintains DATE/TIMESTAMPTZ types (DuckDB defaults to TIMESTAMP).
 func duckdbAddmonthsSQL(g *Generator, e *Expr) string {
 	this := e.This()
 	if this.Type() == nil {

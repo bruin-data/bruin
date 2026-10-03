@@ -112,7 +112,7 @@ func (p *Parser) chunkFParsePropertyCSV() []*Expr {
 // Transactions
 // ---------------------------------------------------------------------------------------------
 
-// _parse_transaction (parser.py L8721)
+// _parse_transaction (parser.py L8721).
 func (p *Parser) baseParseTransaction() *Expr {
 	var this any
 	if p.matchTextSet(p.s.TRANSACTION_KIND) {
@@ -139,7 +139,7 @@ func (p *Parser) baseParseTransaction() *Expr {
 	return p.expression(New(KTransaction, "this", this, "modes", modes))
 }
 
-// _parse_commit_or_rollback (parser.py L8741)
+// _parse_commit_or_rollback (parser.py L8741).
 func (p *Parser) baseParseCommitOrRollback() *Expr {
 	var chain any
 	var savepoint *Expr
@@ -164,7 +164,7 @@ func (p *Parser) baseParseCommitOrRollback() *Expr {
 	return p.expression(New(KCommit, "chain", chain))
 }
 
-// _parse_refresh (parser.py L8761)
+// _parse_refresh (parser.py L8761).
 func (p *Parser) parseRefresh() *Expr {
 	var kind string
 	if p.match(TK_TABLE) {
@@ -190,7 +190,7 @@ func (p *Parser) parseRefresh() *Expr {
 // ALTER
 // ---------------------------------------------------------------------------------------------
 
-// _parse_column_def_with_exists (parser.py L8775)
+// _parse_column_def_with_exists (parser.py L8775).
 func (p *Parser) parseColumnDefWithExists() *Expr {
 	start := p.index
 	p.match(TK_COLUMN)
@@ -208,7 +208,7 @@ func (p *Parser) parseColumnDefWithExists() *Expr {
 	return expression
 }
 
-// _parse_add_column (parser.py L8790)
+// _parse_add_column (parser.py L8790).
 func (p *Parser) parseAddColumn() *Expr {
 	if !(upperText(p.prev) == "ADD") {
 		return nil
@@ -217,7 +217,7 @@ func (p *Parser) parseAddColumn() *Expr {
 	return p.parseColumnDefWithExists()
 }
 
-// _parse_drop_column (parser.py L8796)
+// _parse_drop_column (parser.py L8796).
 func (p *Parser) baseParseDropColumn() *Expr {
 	var drop *Expr
 	if p.match(TK_DROP) {
@@ -234,7 +234,7 @@ func (p *Parser) baseParseDropColumn() *Expr {
 	return drop
 }
 
-// _parse_alter_drop_action (parser.py L8802)
+// _parse_alter_drop_action (parser.py L8802).
 func (p *Parser) baseParseAlterDropAction() *Expr {
 	return p.parseDropColumn()
 }
@@ -249,7 +249,7 @@ func (p *Parser) parseDropPartition(exists bool) *Expr {
 	))
 }
 
-// _parse_alter_table_add (parser.py L8811)
+// _parse_alter_table_add (parser.py L8811).
 func (p *Parser) parseAlterTableAdd() []*Expr {
 	parseAddAlteration := func() *Expr {
 		p.matchTextSeq("ADD")
@@ -293,7 +293,7 @@ func (p *Parser) parseAlterTableAdd() []*Expr {
 	return p.parseCSV(parseAddAlteration, TK_COMMA)
 }
 
-// _parse_alter_table_alter (parser.py L8850)
+// _parse_alter_table_alter (parser.py L8850).
 func (p *Parser) baseParseAlterTableAlter() *Expr {
 	if matchTextKeys(p, p.s.ALTER_ALTER_PARSERS) {
 		return p.s.ALTER_ALTER_PARSERS[upperText(p.prev)](p)
@@ -341,7 +341,7 @@ func (p *Parser) baseParseAlterTableAlter() *Expr {
 	))
 }
 
-// _parse_alter_diststyle (parser.py L8886)
+// _parse_alter_diststyle (parser.py L8886).
 func (p *Parser) parseAlterDiststyle() *Expr {
 	if p.matchTexts("ALL", "EVEN", "AUTO") {
 		return p.expression(New(KAlterDistStyle, "this", VarExpr(upperText(p.prev))))
@@ -376,7 +376,7 @@ func (p *Parser) parseAlterSortkey(compound bool) *Expr {
 	))
 }
 
-// _parse_alter_table_drop (parser.py L8907)
+// _parse_alter_table_drop (parser.py L8907).
 func (p *Parser) parseAlterTableDrop() []*Expr {
 	index := p.index - 1
 
@@ -389,7 +389,7 @@ func (p *Parser) parseAlterTableDrop() []*Expr {
 	return p.parseCSV(p.parseAlterDropAction, TK_COMMA)
 }
 
-// _parse_alter_table_rename (parser.py L8917)
+// _parse_alter_table_rename (parser.py L8917).
 func (p *Parser) baseParseAlterTableRename() *Expr {
 	if p.match(TK_COLUMN) ||
 		(!p.s.ALTER_RENAME_REQUIRES_COLUMN && !p.matchTextSeqNoAdvance("TO")) {
@@ -409,7 +409,7 @@ func (p *Parser) baseParseAlterTableRename() *Expr {
 	return p.expression(New(KAlterRename, "this", p.parseTable(true, false, nil, false, false, false, false)))
 }
 
-// _parse_alter_table_set (parser.py L8934)
+// _parse_alter_table_set (parser.py L8934).
 func (p *Parser) baseParseAlterTableSet() *Expr {
 	alterSet := p.expression(New(KAlterSet))
 
@@ -462,7 +462,7 @@ func (p *Parser) parseAlterSession() *Expr {
 	return p.expression(New(KAlterSession, "expressions", expressions, "unset", true))
 }
 
-// _parse_alter (parser.py L8982)
+// _parse_alter (parser.py L8982).
 func (p *Parser) parseAlter() *Expr {
 	start := p.prev
 
@@ -535,7 +535,7 @@ func (p *Parser) parseAlter() *Expr {
 // ANALYZE
 // ---------------------------------------------------------------------------------------------
 
-// _parse_analyze (parser.py L9034)
+// _parse_analyze (parser.py L9034).
 func (p *Parser) parseAnalyze() *Expr {
 	start := p.prev
 	// https://duckdb.org/docs/sql/statements/analyze
@@ -697,7 +697,7 @@ func (p *Parser) parseAnalyzeValidate() *Expr {
 	return p.expression(New(KAnalyzeValidate, "kind", kind, "this", this, "expression", expression))
 }
 
-// _parse_analyze_columns (parser.py L9154)
+// _parse_analyze_columns (parser.py L9154).
 func (p *Parser) parseAnalyzeColumns() *Expr {
 	this := upperText(p.prev)
 	if p.matchTextSeq("COLUMNS") {
@@ -706,7 +706,7 @@ func (p *Parser) parseAnalyzeColumns() *Expr {
 	return nil
 }
 
-// _parse_analyze_delete (parser.py L9160)
+// _parse_analyze_delete (parser.py L9160).
 func (p *Parser) parseAnalyzeDelete() *Expr {
 	var kind any
 	if p.matchTextSeq("SYSTEM") {
@@ -718,7 +718,7 @@ func (p *Parser) parseAnalyzeDelete() *Expr {
 	return nil
 }
 
-// _parse_analyze_list (parser.py L9166)
+// _parse_analyze_list (parser.py L9166).
 func (p *Parser) parseAnalyzeList() *Expr {
 	if p.matchTextSeq("CHAINED", "ROWS") {
 		return p.expression(New(KAnalyzeListChainedRows, "expression", p.parseInto()))
@@ -776,7 +776,7 @@ func (p *Parser) parseAnalyzeHistogram() *Expr {
 // MERGE
 // ---------------------------------------------------------------------------------------------
 
-// _parse_merge (parser.py L9211)
+// _parse_merge (parser.py L9211).
 func (p *Parser) parseMerge() *Expr {
 	p.match(TK_INTO)
 	target := p.parseTable(false, false, nil, false, false, false, false)
@@ -803,7 +803,7 @@ func (p *Parser) parseMerge() *Expr {
 	))
 }
 
-// _parse_when_matched (parser.py L9232)
+// _parse_when_matched (parser.py L9232).
 func (p *Parser) parseWhenMatched() *Expr {
 	whens := []*Expr{}
 
@@ -880,7 +880,7 @@ func (p *Parser) parseWhenMatched() *Expr {
 // SHOW / SET
 // ---------------------------------------------------------------------------------------------
 
-// _parse_show (parser.py L9285)
+// _parse_show (parser.py L9285).
 func (p *Parser) parseShow() *Expr {
 	parser := p.findParser(p.s.SHOW_PARSERS, p.s.SHOW_TRIE)
 	if parser != nil {
@@ -921,7 +921,7 @@ func (p *Parser) parseSetItemAssignment(kind string) *Expr {
 	return p.expression(New(KSetItem, "this", this, "kind", chunkFStrOrNil(kind)))
 }
 
-// _parse_set_transaction (parser.py L9311)
+// _parse_set_transaction (parser.py L9311).
 func (p *Parser) parseSetTransaction(global bool) *Expr {
 	p.matchTextSeq("TRANSACTION")
 	characteristics := p.parseCSV(func() *Expr {
@@ -935,7 +935,7 @@ func (p *Parser) parseSetTransaction(global bool) *Expr {
 	))
 }
 
-// _parse_set_item (parser.py L9320)
+// _parse_set_item (parser.py L9320).
 func (p *Parser) parseSetItem() *Expr {
 	parser := p.findParser(p.s.SET_PARSERS, p.s.SET_TRIE)
 	if parser != nil {
@@ -944,7 +944,7 @@ func (p *Parser) parseSetItem() *Expr {
 	return p.parseSetItemAssignment("")
 }
 
-// _parse_set (parser.py L9324)
+// _parse_set (parser.py L9324).
 func (p *Parser) baseParseSet(unset bool, tag bool) *Expr {
 	index := p.index
 	set := p.expression(New(
@@ -962,7 +962,7 @@ func (p *Parser) baseParseSet(unset bool, tag bool) *Expr {
 	return set
 }
 
-// _parse_var_from_options (parser.py L9336)
+// _parse_var_from_options (parser.py L9336).
 func (p *Parser) parseVarFromOptions(options OptionsType, raiseUnmatched bool) *Expr {
 	start := p.curr
 	if !start.ok() {
@@ -1004,7 +1004,7 @@ func (p *Parser) parseVarFromOptions(options OptionsType, raiseUnmatched bool) *
 	return VarChecked(option)
 }
 
-// _parse_as_command (parser.py L9367)
+// _parse_as_command (parser.py L9367).
 func (p *Parser) parseAsCommand(start *Token) *Expr {
 	for p.curr.ok() {
 		p.advance(1)
@@ -1022,7 +1022,7 @@ func (p *Parser) parseAsCommand(start *Token) *Expr {
 // Dictionary properties, comprehensions, heredocs
 // ---------------------------------------------------------------------------------------------
 
-// _parse_dict_property (parser.py L9375)
+// _parse_dict_property (parser.py L9375).
 func (p *Parser) parseDictProperty(this string) *Expr {
 	settings := []*Expr{}
 
@@ -1053,7 +1053,7 @@ func (p *Parser) parseDictProperty(this string) *Expr {
 	return p.expression(New(KDictProperty, "this", this, "kind", kindV, "settings", settings))
 }
 
-// _parse_dict_range (parser.py L9396)
+// _parse_dict_range (parser.py L9396).
 func (p *Parser) parseDictRange(this string) *Expr {
 	p.matchLParen(nil)
 	hasMin := p.matchTextSeq("MIN")
@@ -1079,7 +1079,7 @@ func (p *Parser) parseDictRange(this string) *Expr {
 	return p.expression(New(KDictRange, "this", this, "min", min, "max", max))
 }
 
-// _parse_comprehension (parser.py L9409)
+// _parse_comprehension (parser.py L9409).
 func (p *Parser) parseComprehension(this *Expr) *Expr {
 	index := p.index
 	expression := p.parseColumn()
@@ -1104,7 +1104,7 @@ func (p *Parser) parseComprehension(this *Expr) *Expr {
 	))
 }
 
-// _parse_heredoc (parser.py L9429)
+// _parse_heredoc (parser.py L9429).
 func (p *Parser) parseHeredoc() *Expr {
 	if p.match(TK_HEREDOC_STRING) {
 		return p.expression(New(KHeredoc, "this", p.prev.Text))
@@ -1149,7 +1149,7 @@ func (p *Parser) parseHeredoc() *Expr {
 	return nil
 }
 
-// _replace_lambda (parser.py L9497)
+// _replace_lambda (parser.py L9497).
 func (p *Parser) replaceLambda(node *Expr, expressions []*Expr) *Expr {
 	if node == nil {
 		return node
@@ -1201,7 +1201,7 @@ func (p *Parser) replaceLambda(node *Expr, expressions []*Expr) *Expr {
 // TRUNCATE, index columns, options, COPY
 // ---------------------------------------------------------------------------------------------
 
-// _parse_truncate_table (parser.py L9527)
+// _parse_truncate_table (parser.py L9527).
 func (p *Parser) parseTruncateTable() *Expr {
 	start := p.prev
 
@@ -1262,12 +1262,12 @@ func (p *Parser) parseTruncateTable() *Expr {
 	))
 }
 
-// _parse_indexed_column (parser.py L9578)
+// _parse_indexed_column (parser.py L9578).
 func (p *Parser) parseIndexedColumn() *Expr {
 	return p.parseOrdered(p.parseOpclass)
 }
 
-// _parse_with_operator (parser.py L9581)
+// _parse_with_operator (parser.py L9581).
 func (p *Parser) parseWithOperator() *Expr {
 	this := p.parseIndexedColumn()
 
@@ -1280,7 +1280,7 @@ func (p *Parser) parseWithOperator() *Expr {
 	return p.expression(New(KWithOperator, "this", this, "op", op))
 }
 
-// _parse_wrapped_options (parser.py L9591)
+// _parse_wrapped_options (parser.py L9591).
 func (p *Parser) parseWrappedOptions() []*Expr {
 	p.match(TK_EQ)
 	p.match(TK_L_PAREN)
@@ -1306,7 +1306,7 @@ func (p *Parser) parseWrappedOptions() []*Expr {
 	return opts
 }
 
-// _parse_copy_parameters (parser.py L9612)
+// _parse_copy_parameters (parser.py L9612).
 func (p *Parser) parseCopyParameters() []*Expr {
 	hasSep := p.d.S.COPY_PARAMS_ARE_CSV
 	sep := TK_COMMA
@@ -1349,7 +1349,7 @@ func (p *Parser) parseCopyParameters() []*Expr {
 	return options
 }
 
-// _parse_credentials (parser.py L9651)
+// _parse_credentials (parser.py L9651).
 func (p *Parser) parseCredentials() *Expr {
 	expr := p.expression(New(KCredentials))
 
@@ -1385,12 +1385,12 @@ func (p *Parser) parseCredentials() *Expr {
 	return expr
 }
 
-// _parse_file_location (parser.py L9674)
+// _parse_file_location (parser.py L9674).
 func (p *Parser) baseParseFileLocation() *Expr {
 	return p.parseField(false, nil, false)
 }
 
-// _parse_copy (parser.py L9677)
+// _parse_copy (parser.py L9677).
 func (p *Parser) parseCopy() *Expr {
 	start := p.prev
 
@@ -1439,14 +1439,14 @@ func (p *Parser) parseCopy() *Expr {
 // Misc function parsers
 // ---------------------------------------------------------------------------------------------
 
-// _parse_normalize (parser.py L9712)
+// _parse_normalize (parser.py L9712).
 func (p *Parser) parseNormalize() *Expr {
 	this := p.parseBitwise()
 	form := chunkFAnd(p.match(TK_COMMA), func() *Expr { return p.parseVar(false, nil, false) })
 	return p.expression(New(KNormalize, "this", this, "form", form))
 }
 
-// _parse_ceil_floor (parser.py L9719)
+// _parse_ceil_floor (parser.py L9719).
 func (p *Parser) parseCeilFloor(exprType Kind) *Expr {
 	args := p.parseCSV(func() *Expr { return p.parseLambda(false) }, TK_COMMA)
 
@@ -1460,7 +1460,7 @@ func (p *Parser) parseCeilFloor(exprType Kind) *Expr {
 	return New(exprType, "this", this, "decimals", decimals, "to", to)
 }
 
-// _parse_star_ops (parser.py L9731)
+// _parse_star_ops (parser.py L9731).
 func (p *Parser) parseStarOps() *Expr {
 	starToken := p.prev
 
@@ -1503,7 +1503,7 @@ func chunkFListOrNone(l []*Expr) any {
 // GRANT / REVOKE
 // ---------------------------------------------------------------------------------------------
 
-// _parse_grant_privilege (parser.py L9751)
+// _parse_grant_privilege (parser.py L9751).
 func (p *Parser) parseGrantPrivilege() *Expr {
 	privilegeParts := []string{}
 
@@ -1523,7 +1523,7 @@ func (p *Parser) parseGrantPrivilege() *Expr {
 	return p.expression(New(KGrantPrivilege, "this", this, "expressions", expressions))
 }
 
-// _parse_grant_principal (parser.py L9769)
+// _parse_grant_principal (parser.py L9769).
 func (p *Parser) parseGrantPrincipal() *Expr {
 	var kind any = false
 	if p.matchTexts("ROLE", "GROUP") {
@@ -1556,7 +1556,7 @@ func (p *Parser) parseGrantRevokeCommon() ([]*Expr, string, *Expr) {
 	return privileges, kind, securable
 }
 
-// _parse_grant (parser.py L9792)
+// _parse_grant (parser.py L9792).
 func (p *Parser) parseGrant() *Expr {
 	start := p.prev
 
@@ -1584,7 +1584,7 @@ func (p *Parser) parseGrant() *Expr {
 	))
 }
 
-// _parse_revoke (parser.py L9817)
+// _parse_revoke (parser.py L9817).
 func (p *Parser) parseRevoke() *Expr {
 	start := p.prev
 
@@ -1618,7 +1618,7 @@ func (p *Parser) parseRevoke() *Expr {
 	))
 }
 
-// _parse_overlay (parser.py L9847)
+// _parse_overlay (parser.py L9847).
 func (p *Parser) parseOverlay() *Expr {
 	parseOverlayArg := func(text string) *Expr {
 		if p.match(TK_COMMA) || p.matchTextSeq(text) {
@@ -1640,7 +1640,7 @@ func (p *Parser) parseOverlay() *Expr {
 	))
 }
 
-// _parse_format_name (parser.py L9864)
+// _parse_format_name (parser.py L9864).
 func (p *Parser) parseFormatName() *Expr {
 	// Note: Although not specified in the docs, Snowflake does accept a string/identifier
 	// for FILE_FORMAT = <format_name>
@@ -1651,7 +1651,7 @@ func (p *Parser) parseFormatName() *Expr {
 	return p.expression(New(KProperty, "this", VarExpr("FORMAT_NAME"), "value", value))
 }
 
-// _parse_distinct_arg_function (parser.py L9873)
+// _parse_distinct_arg_function (parser.py L9873).
 func (p *Parser) parseDistinctArgFunction(func_ Kind, distinctIndex int) *Expr {
 	isDistinct := p.match(TK_DISTINCT)
 	if !isDistinct {
@@ -1679,7 +1679,7 @@ func (p *Parser) parseDistinctArgFunction(func_ Kind, distinctIndex int) *Expr {
 // DECLARE, casts, JSON_VALUE, GROUP_CONCAT, INITCAP, OPERATOR
 // ---------------------------------------------------------------------------------------------
 
-// _parse_declareitem (parser.py L10088)
+// _parse_declareitem (parser.py L10088).
 func (p *Parser) parseDeclareitem() *Expr {
 	p.matchTexts("VAR", "VARIABLE")
 
@@ -1700,7 +1700,7 @@ func (p *Parser) parseDeclareitem() *Expr {
 	return p.expression(New(KDeclareItem, "this", vars, "kind", kind, "default", default_))
 }
 
-// _parse_declare (parser.py L10103)
+// _parse_declare (parser.py L10103).
 func (p *Parser) parseDeclare() *Expr {
 	start := p.prev
 	replace := p.matchTextSeq("OR", "REPLACE")
@@ -1751,7 +1751,7 @@ func (p *Parser) baseBuildCast(strict bool, kv ...any) *Expr {
 	return p.expression(New(expClass, kv...))
 }
 
-// _parse_json_value (parser.py L10121)
+// _parse_json_value (parser.py L10121).
 func (p *Parser) parseJsonValue() *Expr {
 	this := p.parseBitwise()
 	p.match(TK_COMMA)
@@ -1770,7 +1770,7 @@ func (p *Parser) parseJsonValue() *Expr {
 	))
 }
 
-// _parse_group_concat (parser.py L10137)
+// _parse_group_concat (parser.py L10137).
 func (p *Parser) baseParseGroupConcat() *Expr {
 	var args []*Expr
 
@@ -1830,7 +1830,7 @@ func (p *Parser) baseParseGroupConcat() *Expr {
 	return p.expression(New(KGroupConcat, "this", this, "separator", separator))
 }
 
-// _parse_initcap (parser.py L10176)
+// _parse_initcap (parser.py L10176).
 func (p *Parser) parseInitcap() *Expr {
 	expr := FromArgList(KInitcap, p.parseFunctionArgs(false))
 
@@ -1842,7 +1842,7 @@ func (p *Parser) parseInitcap() *Expr {
 	return expr
 }
 
-// _parse_operator (parser.py L10185)
+// _parse_operator (parser.py L10185).
 func (p *Parser) parseOperator(this *Expr) *Expr {
 	for {
 		if !p.match(TK_L_PAREN) {

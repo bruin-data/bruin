@@ -5,7 +5,7 @@ import "fmt"
 // Port of sqlglot.parser.Parser (chunk A, part 1): commands, COMMENT, TTL, blocks, statements,
 // DROP, CREATE, sequence properties and triggers (parser.py L1430, L2211-L2793).
 
-// _parse_partitioned_by_bucket_or_truncate (parser.py L1430)
+// _parse_partitioned_by_bucket_or_truncate (parser.py L1430).
 func (p *Parser) parsePartitionedByBucketOrTruncate() *Expr {
 	if !p.matchNoAdvance(TK_L_PAREN) {
 		// Partitioning by bucket or truncate follows the syntax:
@@ -34,7 +34,7 @@ func (p *Parser) parsePartitionedByBucketOrTruncate() *Expr {
 	return p.expression(New(klass, "this", this, "expression", expression))
 }
 
-// _parse_command (parser.py L2211)
+// _parse_command (parser.py L2211).
 func (p *Parser) parseCommand() *Expr {
 	p.warnUnsupported()
 	comments := p.prevComments
@@ -42,7 +42,7 @@ func (p *Parser) parseCommand() *Expr {
 	return p.expressionC(New(KCommand, "this", this, "expression", p.parseString()), comments)
 }
 
-// _parse_comment (parser.py L2219)
+// _parse_comment (parser.py L2219).
 func (p *Parser) parseComment(allowExists bool) *Expr {
 	start := p.prev
 	exists := false
@@ -84,7 +84,7 @@ func (p *Parser) parseComment(allowExists bool) *Expr {
 	))
 }
 
-// _parse_to_table (parser.py L2251)
+// _parse_to_table (parser.py L2251).
 func (p *Parser) parseToTable() *Expr {
 	table := p.parseTableParts(true, false, false, false)
 	return p.expression(New(KToTableProperty, "this", table))
@@ -130,12 +130,12 @@ func (p *Parser) parseTtl() *Expr {
 	))
 }
 
-// _parse_condition (parser.py L2293)
+// _parse_condition (parser.py L2293).
 func (p *Parser) parseCondition() *Expr {
 	return p.parseWrapped(p.parseExpression, true)
 }
 
-// _parse_block (parser.py L2296)
+// _parse_block (parser.py L2296).
 func (p *Parser) parseBlock() *Expr {
 	return p.expression(New(
 		KBlock,
@@ -143,12 +143,12 @@ func (p *Parser) parseBlock() *Expr {
 	))
 }
 
-// _parse_whileblock (parser.py L2305)
+// _parse_whileblock (parser.py L2305).
 func (p *Parser) parseWhileblock() *Expr {
 	return p.expression(New(KWhileBlock, "this", p.parseCondition(), "body", p.parseBlock()))
 }
 
-// _parse_statement (parser.py L2310)
+// _parse_statement (parser.py L2310).
 func (p *Parser) parseStatement() *Expr {
 	p.enter()
 	defer p.leave()
@@ -186,7 +186,7 @@ func (p *Parser) parseStatement() *Expr {
 	return p.parseQueryModifiers(expression)
 }
 
-// _parse_drop (parser.py L2334)
+// _parse_drop (parser.py L2334).
 func (p *Parser) parseDrop(exists bool) *Expr {
 	start := p.prev
 	temporary := p.match(TK_TEMPORARY)
@@ -255,12 +255,12 @@ func (p *Parser) parseDrop(exists bool) *Expr {
 	))
 }
 
-// _parse_exists (parser.py L2380)
+// _parse_exists (parser.py L2380).
 func (p *Parser) parseExists(not bool) bool {
 	return p.matchTextSeq("IF") && (!not || p.match(TK_NOT)) && p.match(TK_EXISTS)
 }
 
-// _parse_create (parser.py L2387)
+// _parse_create (parser.py L2387).
 func (p *Parser) baseParseCreate() *Expr {
 	// Note: this can't be None because we've matched a statement parser
 	start := p.prev
@@ -602,7 +602,7 @@ func (p *Parser) baseParseCreate() *Expr {
 	))
 }
 
-// _parse_sequence_properties (parser.py L2673)
+// _parse_sequence_properties (parser.py L2673).
 func (p *Parser) parseSequenceProperties() *Expr {
 	// The node is created on first use: most calls match nothing and return None.
 	var seq *Expr
@@ -666,7 +666,7 @@ func lazySet(e **Expr, kind Kind, key string, v any) {
 	(*e).Set(key, v)
 }
 
-// _parse_trigger_events (parser.py L2708)
+// _parse_trigger_events (parser.py L2708).
 func (p *Parser) parseTriggerEvents() []*Expr {
 	events := []*Expr{}
 
@@ -696,7 +696,7 @@ func (p *Parser) parseTriggerEvents() []*Expr {
 	return events
 }
 
-// _parse_trigger_deferrable (parser.py L2730)
+// _parse_trigger_deferrable (parser.py L2730).
 func (p *Parser) parseTriggerDeferrable() (string, string) {
 	deferrableVar := p.parseVarFromOptions(p.s.TRIGGER_DEFERRABLE, false)
 	deferrable := ""
@@ -714,7 +714,7 @@ func (p *Parser) parseTriggerDeferrable() (string, string) {
 	return deferrable, initially
 }
 
-// _parse_trigger_referencing_clause (parser.py L2746)
+// _parse_trigger_referencing_clause (parser.py L2746).
 func (p *Parser) parseTriggerReferencingClause(keyword string) *Expr {
 	if !p.matchTextSeq(keyword) {
 		return nil
@@ -726,7 +726,7 @@ func (p *Parser) parseTriggerReferencingClause(keyword string) *Expr {
 	return p.parseIdVar(true, nil)
 }
 
-// _parse_trigger_referencing (parser.py L2754)
+// _parse_trigger_referencing (parser.py L2754).
 func (p *Parser) parseTriggerReferencing() *Expr {
 	if !p.matchTextSeq("REFERENCING") {
 		return nil
@@ -757,7 +757,7 @@ func (p *Parser) parseTriggerReferencing() *Expr {
 	return p.expression(New(KTriggerReferencing, "old", oldAlias, "new", newAlias))
 }
 
-// _parse_trigger_for_each (parser.py L2778)
+// _parse_trigger_for_each (parser.py L2778).
 func (p *Parser) parseTriggerForEach() string {
 	if !p.matchTextSeq("FOR", "EACH") {
 		return ""
@@ -769,7 +769,7 @@ func (p *Parser) parseTriggerForEach() string {
 	return ""
 }
 
-// _parse_trigger_execute (parser.py L2784)
+// _parse_trigger_execute (parser.py L2784).
 func (p *Parser) parseTriggerExecute() *Expr {
 	if !p.match(TK_EXECUTE) {
 		return nil

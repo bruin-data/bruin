@@ -8,7 +8,7 @@ import (
 
 var bigqueryDquotesEscapingJSONFunctions = []string{"JSON_QUERY", "JSON_VALUE", "JSON_QUERY_ARRAY"}
 
-// _derived_table_values_to_unnest
+// _derived_table_values_to_unnest.
 func bigqueryDerivedTableValuesToUnnest(g *Generator, expression *Expr) string {
 	if expression.FindAncestor(KFrom, KJoin) == nil {
 		return g.valuesSQL(expression, true)
@@ -50,7 +50,7 @@ func bigqueryDerivedTableValuesToUnnest(g *Generator, expression *Expr) string {
 	)
 }
 
-// _returnsproperty_sql
+// _returnsproperty_sql.
 func bigqueryReturnspropertySQL(g *Generator, expression *Expr) string {
 	this := expression.This()
 	var thisSQL string
@@ -62,7 +62,7 @@ func bigqueryReturnspropertySQL(g *Generator, expression *Expr) string {
 	return "RETURNS " + thisSQL
 }
 
-// _create_sql
+// _create_sql.
 func bigqueryCreateSQL(g *Generator, expression *Expr) string {
 	returns := expression.Find(KReturnsProperty)
 	if expression.KindText() == "FUNCTION" && returns != nil && returns.ArgB("is_table") {
@@ -84,7 +84,7 @@ func bigqueryCreateSQL(g *Generator, expression *Expr) string {
 // SELECT y + 1 z
 // FROM x
 // GROUP BY x + 1
-// ORDER by z
+// ORDER by z.
 func bigqueryAliasOrderedGroup(expression *Expr) *Expr {
 	if expression.IsA(KSelect) {
 		group := expression.ArgE("group")
@@ -202,7 +202,7 @@ func bigqueryUnnestExplodeGenerateSeries(expression *Expr) *Expr {
 	return expression
 }
 
-// _array_contains_sql
+// _array_contains_sql.
 func bigqueryArrayContainsSQL(g *Generator, expression *Expr) string {
 	unnest := New(KUnnest, "expressions", []*Expr{expression.Left()})
 	unnest = AliasTableExpr(unnest, "_unnest", []any{"_col"}, nil, true)
@@ -212,12 +212,12 @@ func bigqueryArrayContainsSQL(g *Generator, expression *Expr) string {
 	return g.sql(New(KExists, "this", query))
 }
 
-// _ts_or_ds_add_sql
+// _ts_or_ds_add_sql.
 func bigqueryTsOrDsAddSQL(g *Generator, expression *Expr) string {
 	return dateAddIntervalSQL("DATE", "ADD")(g, tsOrDsAddCast(expression))
 }
 
-// _ts_or_ds_diff_sql
+// _ts_or_ds_diff_sql.
 func bigqueryTsOrDsDiffSQL(g *Generator, expression *Expr) string {
 	expression.This().Replace(CastExpr(expression.This(), DT_TIMESTAMP, true, nil))
 	expression.Expression().Replace(CastExpr(expression.Expression(), DT_TIMESTAMP, true, nil))
@@ -225,7 +225,7 @@ func bigqueryTsOrDsDiffSQL(g *Generator, expression *Expr) string {
 	return g.fn("DATE_DIFF", expression.Arg("this"), expression.Arg("expression"), unit)
 }
 
-// _unix_to_time_sql
+// _unix_to_time_sql.
 func bigqueryUnixToTimeSQL(g *Generator, expression *Expr) string {
 	scale := expression.ArgE("scale")
 	timestamp := expression.This()
@@ -254,7 +254,7 @@ func bigqueryFmtArg(s string) any {
 	return s
 }
 
-// _str_to_datetime_sql
+// _str_to_datetime_sql.
 func bigqueryStrToDatetimeSQL(g *Generator, expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	dtype := "TIMESTAMP"
@@ -274,7 +274,7 @@ func bigqueryStrToDatetimeSQL(g *Generator, expression *Expr) string {
 	return g.fn("PARSE_"+dtype, bigqueryFmtArg(fmtStr), this, expression.Arg("zone"))
 }
 
-// _levenshtein_sql
+// _levenshtein_sql.
 func bigqueryLevenshteinSQL(g *Generator, expression *Expr) string {
 	dhUnsupportedArgs(g, expression, "ins_cost", "del_cost", "sub_cost")
 	var maxDist any = expression.Arg("max_dist")
@@ -285,7 +285,7 @@ func bigqueryLevenshteinSQL(g *Generator, expression *Expr) string {
 	return g.fn("EDIT_DISTANCE", expression.Arg("this"), expression.Arg("expression"), maxDist)
 }
 
-// _json_extract_sql
+// _json_extract_sql.
 func bigqueryJSONExtractSQL(g *Generator, expression *Expr) string {
 	name, _ := expression.MetaGet("name").(string)
 	if name == "" {
@@ -489,7 +489,7 @@ func customizeBigQueryGenerator(d *Dialect) {
 	G.h.clusterpropertySQL = bigqueryClusterpropertySQL
 }
 
-// datetrunc_sql
+// datetrunc_sql.
 func bigqueryDatetruncSQL(g *Generator, expression *Expr) string {
 	unit := expression.ArgE("unit")
 	var unitSQL string
@@ -501,7 +501,7 @@ func bigqueryDatetruncSQL(g *Generator, expression *Expr) string {
 	return g.fn("DATE_TRUNC", expression.Arg("this"), unitSQL, expression.Arg("zone"))
 }
 
-// mod_sql
+// mod_sql.
 func bigqueryModSQL(g *Generator, expression *Expr) string {
 	this := expression.This()
 	expr := expression.Expression()
@@ -514,7 +514,7 @@ func bigqueryModSQL(g *Generator, expression *Expr) string {
 	return g.fn("MOD", this, expr)
 }
 
-// column_parts
+// column_parts.
 func bigqueryColumnParts(g *Generator, expression *Expr) string {
 	if truthy(expression.MetaGet("quoted_column")) {
 		// If a column reference is of the form `dataset.table`.name, we need
@@ -531,7 +531,7 @@ func bigqueryColumnParts(g *Generator, expression *Expr) string {
 	return g.baseColumnParts(expression)
 }
 
-// table_parts
+// table_parts.
 func bigqueryTableParts(g *Generator, expression *Expr) string {
 	// Depending on the context, `x.y` may not resolve to the same data source as `x`.`y`, so
 	// we need to make sure the correct quoting is used in each case.
@@ -549,7 +549,7 @@ func bigqueryTableParts(g *Generator, expression *Expr) string {
 	return g.baseTableParts(expression)
 }
 
-// timetostr_sql
+// timetostr_sql.
 func bigqueryTimetostrSQL(g *Generator, expression *Expr) string {
 	this := expression.This()
 	var funcName string
@@ -572,7 +572,7 @@ func bigqueryTimetostrSQL(g *Generator, expression *Expr) string {
 	)
 }
 
-// eq_sql
+// eq_sql.
 func bigqueryEqSQL(g *Generator, expression *Expr) string {
 	// Operands of = cannot be NULL in BigQuery
 	if expression.Left().IsA(KNull) || expression.Right().IsA(KNull) {
@@ -584,7 +584,7 @@ func bigqueryEqSQL(g *Generator, expression *Expr) string {
 	return g.binary(expression, "=")
 }
 
-// attimezone_sql
+// attimezone_sql.
 func bigqueryAttimezoneSQL(g *Generator, expression *Expr) string {
 	parent := expression.Parent()
 
@@ -599,7 +599,7 @@ func bigqueryAttimezoneSQL(g *Generator, expression *Expr) string {
 	return g.baseAttimezoneSQL(expression)
 }
 
-// trycast_sql
+// trycast_sql.
 func bigqueryTrycastSQL(g *Generator, expression *Expr) string {
 	return g.castSQL(expression, "SAFE_")
 }
@@ -618,7 +618,7 @@ func bigqueryIntArg(v any) (int, bool) {
 	return 0, false
 }
 
-// bracket_sql
+// bracket_sql.
 func bigqueryBracketSQL(g *Generator, expression *Expr) string {
 	this := expression.This()
 	expressions := expression.Expressions()
@@ -653,12 +653,12 @@ func bigqueryBracketSQL(g *Generator, expression *Expr) string {
 	return g.sql(this) + "[" + expressionsSQL + "]"
 }
 
-// in_unnest_op
+// in_unnest_op.
 func bigqueryInUnnestOp(g *Generator, expression *Expr) string {
 	return g.sql(expression)
 }
 
-// version_sql
+// version_sql.
 func bigqueryVersionSQL(g *Generator, expression *Expr) string {
 	if expression.Name() == "TIMESTAMP" {
 		expression.Set("this", "SYSTEM_TIME")
@@ -666,7 +666,7 @@ func bigqueryVersionSQL(g *Generator, expression *Expr) string {
 	return g.baseVersionSQL(expression)
 }
 
-// contains_sql
+// contains_sql.
 func bigqueryContainsSQL(g *Generator, expression *Expr) string {
 	this := expression.This()
 	expr := expression.Expression()
@@ -679,7 +679,7 @@ func bigqueryContainsSQL(g *Generator, expression *Expr) string {
 	return g.fn("CONTAINS_SUBSTR", this, expr, expression.Arg("json_scope"))
 }
 
-// cast_sql
+// cast_sql.
 func bigqueryCastSQL(g *Generator, expression *Expr, safePrefix string) string {
 	this := expression.This()
 
@@ -696,7 +696,7 @@ func bigqueryCastSQL(g *Generator, expression *Expr, safePrefix string) string {
 	return g.baseCastSQL(expression, safePrefix)
 }
 
-// clusterproperty_sql
+// clusterproperty_sql.
 func bigqueryClusterpropertySQL(g *Generator, expression *Expr) string {
 	if expression.ArgB("this") {
 		g.unsupported("Unsupported CLUSTER BY " + g.sqlKey(expression, "this"))

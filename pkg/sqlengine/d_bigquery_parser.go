@@ -6,14 +6,14 @@ import (
 
 // Port of sqlglot/parsers/bigquery.py (module-level builders and BigQueryParser).
 
-// _build_contains_substring
+// _build_contains_substring.
 func bigqueryBuildContainsSubstring(args []*Expr, _ *Dialect) *Expr {
 	this := New(KLower, "this", seqGet(args, 0))
 	expr := New(KLower, "this", seqGet(args, 1))
 	return New(KContains, "this", this, "expression", expr, "json_scope", seqGet(args, 2))
 }
 
-// _build_date
+// _build_date.
 func bigqueryBuildDate(args []*Expr, _ *Dialect) *Expr {
 	exprType := KDate
 	if len(args) == 3 {
@@ -22,7 +22,7 @@ func bigqueryBuildDate(args []*Expr, _ *Dialect) *Expr {
 	return FromArgList(exprType, args)
 }
 
-// build_date_diff
+// build_date_diff.
 func bigqueryBuildDateDiff(exprType Kind) FuncBuilder {
 	return func(args []*Expr, _ *Dialect) *Expr {
 		expr := New(
@@ -42,7 +42,7 @@ func bigqueryBuildDateDiff(exprType Kind) FuncBuilder {
 	}
 }
 
-// _build_datetime
+// _build_datetime.
 func bigqueryBuildDatetime(args []*Expr, _ *Dialect) *Expr {
 	if len(args) == 1 {
 		return FromArgList(KTsOrDsToDatetime, args)
@@ -53,7 +53,7 @@ func bigqueryBuildDatetime(args []*Expr, _ *Dialect) *Expr {
 	return FromArgList(KTimestampFromParts, args)
 }
 
-// _build_extract_json_with_default_path
+// _build_extract_json_with_default_path.
 func bigqueryBuildExtractJSONWithDefaultPath(exprType Kind) FuncBuilder {
 	return func(args []*Expr, d *Dialect) *Expr {
 		if len(args) == 1 {
@@ -65,7 +65,7 @@ func bigqueryBuildExtractJSONWithDefaultPath(exprType Kind) FuncBuilder {
 	}
 }
 
-// _build_format_time
+// _build_format_time.
 func bigqueryBuildFormatTime(exprType Kind) FuncBuilder {
 	return func(args []*Expr, d *Dialect) *Expr {
 		formattedTime := buildFormattedTime(KTimeToStr, "", nil)(
@@ -76,7 +76,7 @@ func bigqueryBuildFormatTime(exprType Kind) FuncBuilder {
 	}
 }
 
-// _build_json_strip_nulls
+// _build_json_strip_nulls.
 func bigqueryBuildJSONStripNulls(args []*Expr, _ *Dialect) *Expr {
 	expression := New(KJSONStripNulls, "this", seqGet(args, 0))
 	for _, a := range argsFrom(args, 1) {
@@ -89,7 +89,7 @@ func bigqueryBuildJSONStripNulls(args []*Expr, _ *Dialect) *Expr {
 	return expression
 }
 
-// _build_levenshtein
+// _build_levenshtein.
 func bigqueryBuildLevenshtein(args []*Expr, _ *Dialect) *Expr {
 	maxDist := seqGet(args, 2)
 	var md *Expr
@@ -104,14 +104,14 @@ func bigqueryBuildLevenshtein(args []*Expr, _ *Dialect) *Expr {
 	)
 }
 
-// _build_parse_date
+// _build_parse_date.
 func bigqueryBuildParseDate(args []*Expr, d *Dialect) *Expr {
 	this := buildFormattedTime(KStrToDate, "", nil)([]*Expr{seqGet(args, 1), seqGet(args, 0)}, d)
 	this.Set("default_year", LiteralInt(1970))
 	return this
 }
 
-// _build_parse_timestamp
+// _build_parse_timestamp.
 func bigqueryBuildParseTimestamp(args []*Expr, d *Dialect) *Expr {
 	this := buildFormattedTime(KStrToTime, "", nil)([]*Expr{seqGet(args, 1), seqGet(args, 0)}, d)
 	this.Set("zone", seqGet(args, 2))
@@ -119,7 +119,7 @@ func bigqueryBuildParseTimestamp(args []*Expr, d *Dialect) *Expr {
 	return this
 }
 
-// _build_parse_datetime
+// _build_parse_datetime.
 func bigqueryBuildParseDatetime(args []*Expr, d *Dialect) *Expr {
 	this := buildFormattedTime(KParseDatetime, "", nil)([]*Expr{seqGet(args, 1), seqGet(args, 0)}, d)
 	this.Set("default_year", LiteralInt(1970))
@@ -376,7 +376,7 @@ func bigqueryPyRegexGroups(pattern string) (int, bool) {
 	return groups, true
 }
 
-// _build_time
+// _build_time.
 func bigqueryBuildTime(args []*Expr, _ *Dialect) *Expr {
 	if len(args) == 1 {
 		return New(KTsOrDsToTime, "this", args[0])
@@ -387,14 +387,14 @@ func bigqueryBuildTime(args []*Expr, _ *Dialect) *Expr {
 	return FromArgList(KTimeFromParts, args)
 }
 
-// _build_timestamp
+// _build_timestamp.
 func bigqueryBuildTimestamp(args []*Expr, _ *Dialect) *Expr {
 	timestamp := FromArgList(KTimestamp, args)
 	timestamp.Set("with_tz", true)
 	return timestamp
 }
 
-// _build_to_hex
+// _build_to_hex.
 func bigqueryBuildToHex(args []*Expr, _ *Dialect) *Expr {
 	arg := seqGet(args, 0)
 	if arg.IsA(KMD5Digest) {
@@ -403,7 +403,7 @@ func bigqueryBuildToHex(args []*Expr, _ *Dialect) *Expr {
 	return New(KLowerHex, "this", arg)
 }
 
-// _DOMAIN_DOT: placeholder; cannot occur in a SQL identifier
+// _DOMAIN_DOT: placeholder; cannot occur in a SQL identifier.
 const bigqueryDomainDot = "\x00"
 
 // bigquerySplitNumWords mirrors helper.split_num_words(value, sep, min_num_words) (fill_from_start=True).
@@ -421,7 +421,7 @@ func bigquerySplitNumWords(value, sep string, minNumWords int) []*string {
 	return out
 }
 
-// _split_qualified_name
+// _split_qualified_name.
 func bigquerySplitQualifiedName(name string, minNumWords int) []*string {
 	// A dotted reference (e.g. `project.dataset.table`) is split into a fixed number of parts,
 	// the first of which is the project. Domain-scoped (legacy) project IDs have the form
@@ -465,7 +465,7 @@ func bigqueryJoinPartNames(parts []*Expr) string {
 
 var bigqueryMakeIntervalKwargs = []string{"year", "month", "day", "hour", "minute", "second"}
 
-// BRACKET_OFFSETS
+// BRACKET_OFFSETS.
 var bigqueryBracketOffsets = map[string]struct {
 	offset int
 	safe   bool
@@ -646,7 +646,7 @@ func customizeBigQueryParser(d *Dialect) {
 	P.h.parseColumnOps = bigqueryParseColumnOps
 }
 
-// _parse_for_in
+// _parse_for_in.
 func bigqueryParseForIn(p *Parser) *Expr {
 	index := p.index
 	this := p.parseRange(nil)
@@ -658,7 +658,7 @@ func bigqueryParseForIn(p *Parser) *Expr {
 	return p.expression(New(KForIn, "this", this, "expression", p.parseStatement()))
 }
 
-// _parse_table_part
+// _parse_table_part.
 func bigqueryParseTablePart(p *Parser, schema bool) *Expr {
 	this := p.baseParseTablePart(schema)
 	if this == nil {
@@ -695,7 +695,7 @@ func bigqueryParseTablePart(p *Parser, schema bool) *Expr {
 	return this
 }
 
-// _parse_table_parts
+// _parse_table_parts.
 func bigqueryParseTableParts(p *Parser, schema bool, isDbReference bool, wildcard bool, fast bool) *Expr {
 	table := p.baseParseTableParts(schema, isDbReference, true, fast)
 
@@ -791,7 +791,7 @@ func bigqueryParseTableParts(p *Parser, schema bool, isDbReference bool, wildcar
 	return table
 }
 
-// _parse_column
+// _parse_column.
 func bigqueryParseColumn(p *Parser) *Expr {
 	column := p.baseParseColumn()
 	if column.IsA(KColumn) {
@@ -820,7 +820,7 @@ func bigqueryParseColumn(p *Parser) *Expr {
 	return column
 }
 
-// _parse_cluster_property
+// _parse_cluster_property.
 func bigqueryParseClusterProperty(p *Parser) *Expr {
 	return p.expression(New(
 		KClusterProperty,
@@ -828,7 +828,7 @@ func bigqueryParseClusterProperty(p *Parser) *Expr {
 	))
 }
 
-// _parse_json_object
+// _parse_json_object.
 func bigqueryParseJsonObject(p *Parser, agg bool) *Expr {
 	jsonObject := p.baseParseJsonObject(false)
 	arrayKVPair := seqGet(jsonObject.Expressions(), 0)
@@ -852,7 +852,7 @@ func bigqueryParseJsonObject(p *Parser, agg bool) *Expr {
 	return jsonObject
 }
 
-// _parse_bracket
+// _parse_bracket.
 func bigqueryParseBracket(p *Parser, this *Expr) *Expr {
 	bracket := p.baseParseBracket(this)
 
@@ -884,7 +884,7 @@ func bigqueryParseBracket(p *Parser, this *Expr) *Expr {
 	return bracket
 }
 
-// _parse_unnest
+// _parse_unnest.
 func bigqueryParseUnnest(p *Parser, withAlias bool) *Expr {
 	unnest := p.baseParseUnnest(withAlias)
 
@@ -915,7 +915,7 @@ func bigqueryParseUnnest(p *Parser, withAlias bool) *Expr {
 	return unnest
 }
 
-// _parse_make_interval
+// _parse_make_interval.
 func bigqueryParseMakeInterval(p *Parser) *Expr {
 	expr := New(KMakeInterval)
 
@@ -961,7 +961,7 @@ func bigqueryParseML(p *Parser, exprType Kind, kwargs ...any) *Expr {
 	return p.expression(New(exprType, kv...))
 }
 
-// _parse_generate
+// _parse_generate.
 func bigqueryParseGenerate(p *Parser, exprType Kind, kwargs ...any) *Expr {
 	p.matchTextSeq("MODEL")
 	this := p.parseTable(false, false, nil, false, false, false, false)
@@ -999,7 +999,7 @@ func bigqueryTokenAt(p *Parser, i int) *Token {
 	return p.tokens[i]
 }
 
-// _parse_translate
+// _parse_translate.
 func bigqueryParseTranslate(p *Parser) *Expr {
 	// Check if this is ML.TRANSLATE by looking at previous tokens
 	token := bigqueryTokenAt(p, p.index-4)
@@ -1010,7 +1010,7 @@ func bigqueryParseTranslate(p *Parser) *Expr {
 	return FromArgList(KTranslate, p.parseFunctionArgs(false))
 }
 
-// _parse_forecast
+// _parse_forecast.
 func bigqueryParseForecast(p *Parser) *Expr {
 	// Check if this is ML.FORECAST by looking at previous tokens.
 	token := bigqueryTokenAt(p, p.index-4)
@@ -1048,7 +1048,7 @@ func bigqueryPyStrExpr(e *Expr) string {
 	return exprSQL(e)
 }
 
-// _parse_features_at_time
+// _parse_features_at_time.
 func bigqueryParseFeaturesAtTime(p *Parser) *Expr {
 	p.match(TK_TABLE)
 	this := p.parseTable(false, false, nil, false, false, false, false)
@@ -1068,7 +1068,7 @@ func bigqueryParseFeaturesAtTime(p *Parser) *Expr {
 	return expr
 }
 
-// _parse_vector_search
+// _parse_vector_search.
 func bigqueryParseVectorSearch(p *Parser) *Expr {
 	p.match(TK_TABLE)
 	baseTable := p.parseTable(false, false, nil, false, false, false, false)
@@ -1104,7 +1104,7 @@ func bigqueryParseVectorSearch(p *Parser) *Expr {
 	return expr
 }
 
-// _parse_export_data
+// _parse_export_data.
 func bigqueryParseExportData(p *Parser) *Expr {
 	p.matchTextSeq("DATA")
 
@@ -1127,7 +1127,7 @@ func bigqueryParseExportData(p *Parser) *Expr {
 	))
 }
 
-// _parse_column_ops
+// _parse_column_ops.
 func bigqueryParseColumnOps(p *Parser, this *Expr) *Expr {
 	funcIndex := p.index + 1
 	this = p.baseParseColumnOps(this)

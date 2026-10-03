@@ -7,7 +7,7 @@ import (
 
 // Generator chunk B (part 1): sqlglot/generator.py L2254-2715 (insert_sql .. values_sql).
 
-// insert_sql (generator.py L2254)
+// insert_sql (generator.py L2254).
 func (g *Generator) insertSQL(expression *Expr) string {
 	hint := g.sqlKey(expression, "hint")
 	overwrite := expression.ArgB("overwrite")
@@ -91,12 +91,12 @@ func (g *Generator) insertSQL(expression *Expr) string {
 	return g.prependCtes(expression, sql)
 }
 
-// introducer_sql (generator.py L2299)
+// introducer_sql (generator.py L2299).
 func (g *Generator) introducerSQL(expression *Expr) string {
 	return g.sqlKey(expression, "this") + " " + g.sqlKey(expression, "expression")
 }
 
-// kill_sql (generator.py L2302)
+// kill_sql (generator.py L2302).
 func (g *Generator) killSQL(expression *Expr) string {
 	kind := g.sqlKey(expression, "kind")
 	if kind != "" {
@@ -109,17 +109,17 @@ func (g *Generator) killSQL(expression *Expr) string {
 	return "KILL" + kind + this
 }
 
-// pseudotype_sql (generator.py L2309)
+// pseudotype_sql (generator.py L2309).
 func (g *Generator) pseudotypeSQL(expression *Expr) string {
 	return expression.Name()
 }
 
-// objectidentifier_sql (generator.py L2312)
+// objectidentifier_sql (generator.py L2312).
 func (g *Generator) objectidentifierSQL(expression *Expr) string {
 	return expression.Name()
 }
 
-// onconflict_sql (generator.py L2315)
+// onconflict_sql (generator.py L2315).
 func (g *Generator) onconflictSQL(expression *Expr) string {
 	conflict := "ON CONFLICT"
 	if expression.ArgB("duplicate") {
@@ -154,12 +154,12 @@ func (g *Generator) onconflictSQL(expression *Expr) string {
 	return conflict + constraint + conflictKeys + action + expressions + where
 }
 
-// returning_sql (generator.py L2338)
+// returning_sql (generator.py L2338).
 func (g *Generator) baseReturningSQL(expression *Expr) string {
 	return g.seg("RETURNING") + " " + g.expressions(expression, exprsOpts{flat: true})
 }
 
-// rowformatdelimitedproperty_sql (generator.py L2341)
+// rowformatdelimitedproperty_sql (generator.py L2341).
 func (g *Generator) rowformatdelimitedpropertySQL(expression *Expr) string {
 	fields := g.sqlKey(expression, "fields")
 	if fields != "" {
@@ -188,12 +188,12 @@ func (g *Generator) rowformatdelimitedpropertySQL(expression *Expr) string {
 	return "ROW FORMAT DELIMITED" + fields + escaped + items + keys + lines + null
 }
 
-// withtablehint_sql (generator.py L2356)
+// withtablehint_sql (generator.py L2356).
 func (g *Generator) withtablehintSQL(expression *Expr) string {
 	return "WITH (" + g.expressions(expression, exprsOpts{flat: true}) + ")"
 }
 
-// indextablehint_sql (generator.py L2359)
+// indextablehint_sql (generator.py L2359).
 func (g *Generator) indextablehintSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this") + " INDEX"
 	target := g.sqlKey(expression, "target")
@@ -203,7 +203,7 @@ func (g *Generator) indextablehintSQL(expression *Expr) string {
 	return this + target + " (" + g.expressions(expression, exprsOpts{flat: true}) + ")"
 }
 
-// historicaldata_sql (generator.py L2365)
+// historicaldata_sql (generator.py L2365).
 func (g *Generator) historicaldataSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	kind := g.sqlKey(expression, "kind")
@@ -211,7 +211,7 @@ func (g *Generator) historicaldataSQL(expression *Expr) string {
 	return this + " (" + kind + " => " + expr + ")"
 }
 
-// table_parts (generator.py L2371)
+// table_parts (generator.py L2371).
 func (g *Generator) baseTableParts(expression *Expr) string {
 	var parts []string
 	for _, k := range []string{"catalog", "db", "this"} {
@@ -222,7 +222,7 @@ func (g *Generator) baseTableParts(expression *Expr) string {
 	return strings.Join(parts, ".")
 }
 
-// table_sql (generator.py L2382)
+// table_sql (generator.py L2382).
 func (g *Generator) baseTableSQL(expression *Expr, sep string) string {
 	table := g.tableParts(expression)
 	only := ""
@@ -318,7 +318,7 @@ func (g *Generator) baseTableSQL(expression *Expr, sep string) string {
 	return only + table + changes + partition + fileFormat + preAlias + alias + indexed + hints + pivots + postAlias + joins + laterals + ordinality
 }
 
-// tablefromrows_sql (generator.py L2449)
+// tablefromrows_sql (generator.py L2449).
 func (g *Generator) baseTablefromrowsSQL(expression *Expr) string {
 	table := g.fn("TABLE", expression.Arg("this"))
 	alias := g.sqlKey(expression, "alias")
@@ -331,7 +331,7 @@ func (g *Generator) baseTablefromrowsSQL(expression *Expr) string {
 	return table + alias + pivots + sample + joins
 }
 
-// tablesample_sql (generator.py L2460)
+// tablesample_sql (generator.py L2460).
 func (g *Generator) baseTablesampleSQL(expression *Expr, tablesampleKeyword string) string {
 	method := g.sqlKey(expression, "method")
 	if method != "" && g.s.TABLESAMPLE_WITH_METHOD {
@@ -376,7 +376,7 @@ func (g *Generator) baseTablesampleSQL(expression *Expr, tablesampleKeyword stri
 	return " " + keyword + " " + method + expr + seed
 }
 
-// _pivot_in_value_aliases (generator.py L2489)
+// _pivot_in_value_aliases (generator.py L2489).
 func (g *Generator) pivotInValueAliases(expression *Expr) []*Expr {
 	// Returns the rewritten field.expressions list with PivotAlias wrappers injected where
 	// the stored column name differs from the target dialect's natural output.
@@ -488,7 +488,7 @@ func (g *Generator) pivotInValueAliases(expression *Expr) []*Expr {
 	return nil
 }
 
-// pivot_sql (generator.py L2564)
+// pivot_sql (generator.py L2564).
 func (g *Generator) pivotSQL(expression *Expr) string {
 	expressions := g.expressions(expression, exprsOpts{flat: true})
 	direction := "PIVOT"
@@ -557,7 +557,7 @@ func (g *Generator) pivotSQL(expression *Expr) string {
 	return g.prependCtes(expression, sql)
 }
 
-// version_sql (generator.py L2613)
+// version_sql (generator.py L2613).
 func (g *Generator) baseVersionSQL(expression *Expr) string {
 	this := "FOR " + expression.Name()
 	kind := expression.Text("kind")
@@ -565,7 +565,7 @@ func (g *Generator) baseVersionSQL(expression *Expr) string {
 	return this + " " + kind + " " + expr
 }
 
-// tuple_sql (generator.py L2619)
+// tuple_sql (generator.py L2619).
 func (g *Generator) tupleSQL(expression *Expr) string {
 	return "(" + g.expressions(expression, exprsOpts{dynamic: true, newLine: true, skipFirst: true, skipLast: true}) + ")"
 }
@@ -612,7 +612,7 @@ func (g *Generator) updateFromJoinsSQL(expression *Expr) (string, string) {
 	return joinSQL, ""
 }
 
-// update_sql (generator.py L2654)
+// update_sql (generator.py L2654).
 func (g *Generator) updateSQL(expression *Expr) string {
 	hint := g.sqlKey(expression, "hint")
 	this := g.sqlKey(expression, "this")
@@ -636,7 +636,7 @@ func (g *Generator) updateSQL(expression *Expr) string {
 	return g.prependCtes(expression, sql)
 }
 
-// values_sql (generator.py L2672)
+// values_sql (generator.py L2672).
 func (g *Generator) baseValuesSQL(expression *Expr, valuesAsTable bool) string {
 	valuesAsTable = valuesAsTable && g.s.VALUES_AS_TABLE
 

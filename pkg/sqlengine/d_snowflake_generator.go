@@ -33,7 +33,7 @@ func snowflakeKindSetItems(s KindSet) []Kind {
 	return out
 }
 
-// _regexpilike_sql
+// _regexpilike_sql.
 func snowflakeRegexpILikeSQL(g *Generator, e *Expr) string {
 	flag := e.Text("flag")
 
@@ -71,7 +71,7 @@ func snowflakeUnqualifyPivotColumns(expression *Expr) *Expr {
 	return expression
 }
 
-// _flatten_structured_types_unless_iceberg
+// _flatten_structured_types_unless_iceberg.
 func snowflakeFlattenStructuredTypesUnlessIceberg(expression *Expr) *Expr {
 	if !expression.IsA(KCreate) {
 		panic(&ValueError{Msg: "AssertionError"})
@@ -101,7 +101,7 @@ func snowflakeFlattenStructuredTypesUnlessIceberg(expression *Expr) *Expr {
 	return expression
 }
 
-// _unnest_generate_date_array
+// _unnest_generate_date_array.
 func snowflakeUnnestGenerateDateArray(unnest *Expr) {
 	generateDateArray := unnest.Expressions()[0]
 	start := generateDateArray.ArgE("start")
@@ -181,7 +181,7 @@ func snowflakeUnnestGenerateDateArray(unnest *Expr) {
 	}
 }
 
-// _transform_generate_date_array
+// _transform_generate_date_array.
 func snowflakeTransformGenerateDateArray(expression *Expr) *Expr {
 	if expression.IsA(KSelect) {
 		for generateDateArray := range expression.FindAll(KGenerateDateArray) {
@@ -206,7 +206,7 @@ func snowflakeTransformGenerateDateArray(expression *Expr) *Expr {
 	return expression
 }
 
-// _regexpextract_sql
+// _regexpextract_sql.
 func snowflakeRegexpExtractSQL(g *Generator, e *Expr) string {
 	// Other dialects don't support all of the following parameters, so we need to
 	// generate default values as necessary to ensure the transpilation is correct
@@ -238,7 +238,7 @@ func snowflakeRegexpExtractSQL(g *Generator, e *Expr) string {
 	return g.fn(name, e.Arg("this"), e.Arg("expression"), position, occurrence, parameters, group)
 }
 
-// _json_extract_value_array_sql
+// _json_extract_value_array_sql.
 func snowflakeJSONExtractValueArraySQL(g *Generator, e *Expr) string {
 	jsonExtract := New(KJSONExtract, "this", e.This(), "expression", e.Expression())
 	ident := ToIdentifier("x", nil)
@@ -255,7 +255,7 @@ func snowflakeJSONExtractValueArraySQL(g *Generator, e *Expr) string {
 	return g.fn("TRANSFORM", jsonExtract, transformLambda)
 }
 
-// _qualify_unnested_columns
+// _qualify_unnested_columns.
 func snowflakeQualifyUnnestedColumns(expression *Expr) *Expr {
 	if !expression.IsA(KSelect) {
 		return expression
@@ -394,7 +394,7 @@ func snowflakeQualifyUnnestedColumns(expression *Expr) *Expr {
 	return expression
 }
 
-// _eliminate_dot_variant_lookup
+// _eliminate_dot_variant_lookup.
 func snowflakeEliminateDotVariantLookup(expression *Expr) *Expr {
 	if expression.IsA(KSelect) {
 		// This transformation is used to facilitate transpilation of BigQuery `UNNEST` operations
@@ -755,7 +755,7 @@ func customizeSnowflakeGenerator(d *Dialect) {
 // SnowflakeGenerator methods
 // ---------------------------------------------------------------------------------------------
 
-// dynamicidentifier_sql
+// dynamicidentifier_sql.
 func snowflakeDynamicidentifierSQL(g *Generator, e *Expr) string {
 	this := g.fn("IDENTIFIER", e.Arg("this"))
 	if e.HasArgKey("expressions") {
@@ -769,7 +769,7 @@ func snowflakeDynamicidentifierSQL(g *Generator, e *Expr) string {
 	return this
 }
 
-// sortarray_sql
+// sortarray_sql.
 func snowflakeSortarraySQL(g *Generator, e *Expr) string {
 	asc := e.ArgE("asc")
 	nullsFirst := e.ArgE("nulls_first")
@@ -779,7 +779,7 @@ func snowflakeSortarraySQL(g *Generator, e *Expr) string {
 	return g.fn("ARRAY_SORT", e.Arg("this"), asc, nullsFirst)
 }
 
-// nthvalue_sql
+// nthvalue_sql.
 func snowflakeNthvalueSQL(g *Generator, e *Expr) string {
 	result := g.fn("NTH_VALUE", e.Arg("this"), e.Arg("offset"))
 
@@ -796,12 +796,12 @@ func snowflakeNthvalueSQL(g *Generator, e *Expr) string {
 	return result
 }
 
-// with_properties
+// with_properties.
 func snowflakeWithProperties(g *Generator, properties *Expr) string {
 	return g.properties(properties, g.sep(""), " ", "", false)
 }
 
-// values_sql
+// values_sql.
 func snowflakeValuesSQL(g *Generator, e *Expr, valuesAsTable bool) string {
 	if e.Find(snowflakeKindSetItems(g.s.UNSUPPORTED_VALUES_EXPRESSIONS)...) != nil {
 		valuesAsTable = false
@@ -810,7 +810,7 @@ func snowflakeValuesSQL(g *Generator, e *Expr, valuesAsTable bool) string {
 	return g.baseValuesSQL(e, valuesAsTable)
 }
 
-// datatype_sql
+// datatype_sql.
 func snowflakeDatatypeSQL(g *Generator, e *Expr) string {
 	// Check if this is a FLOAT type nested inside a VECTOR type
 	// VECTOR only accepts FLOAT (not DOUBLE), INT, and STRING as element types
@@ -845,7 +845,7 @@ func snowflakeDatatypeSQL(g *Generator, e *Expr) string {
 	return g.baseDatatypeSQL(e)
 }
 
-// tonumber_sql
+// tonumber_sql.
 func snowflakeTonumberSQL(g *Generator, e *Expr) string {
 	precision := e.ArgE("precision")
 	scale := e.ArgE("scale")
@@ -868,7 +868,7 @@ func snowflakeTonumberSQL(g *Generator, e *Expr) string {
 	return g.fn(funcName, e.Arg("this"), e.Arg("format"), precision, scale)
 }
 
-// timestampfromparts_sql
+// timestampfromparts_sql.
 func snowflakeTimestampfrompartsSQL(g *Generator, e *Expr) string {
 	milli := e.ArgE("milli")
 	if milli != nil {
@@ -879,7 +879,7 @@ func snowflakeTimestampfrompartsSQL(g *Generator, e *Expr) string {
 	return renameFunc("TIMESTAMP_FROM_PARTS")(g, e)
 }
 
-// cast_sql
+// cast_sql.
 func snowflakeCastSQL(g *Generator, e *Expr, safePrefix string) string {
 	if dhIsType(e, DT_GEOGRAPHY) {
 		return g.fn("TO_GEOGRAPHY", e.Arg("this"))
@@ -891,7 +891,7 @@ func snowflakeCastSQL(g *Generator, e *Expr, safePrefix string) string {
 	return g.baseCastSQL(e, safePrefix)
 }
 
-// trycast_sql
+// trycast_sql.
 func snowflakeTrycastSQL(g *Generator, e *Expr) string {
 	value := e.This()
 
@@ -909,7 +909,7 @@ func snowflakeTrycastSQL(g *Generator, e *Expr) string {
 	return g.castSQL(e, "")
 }
 
-// log_sql
+// log_sql.
 func snowflakeLogSQL(g *Generator, e *Expr) string {
 	if e.Expression() == nil {
 		return g.fn("LN", e.Arg("this"))
@@ -918,7 +918,7 @@ func snowflakeLogSQL(g *Generator, e *Expr) string {
 	return g.baseLogSQL(e)
 }
 
-// greatest_sql
+// greatest_sql.
 func snowflakeGreatestSQL(g *Generator, e *Expr) string {
 	name := "GREATEST"
 	if e.ArgB("ignore_nulls") {
@@ -931,7 +931,7 @@ func snowflakeGreatestSQL(g *Generator, e *Expr) string {
 	return g.fn(name, args...)
 }
 
-// least_sql
+// least_sql.
 func snowflakeLeastSQL(g *Generator, e *Expr) string {
 	name := "LEAST"
 	if e.ArgB("ignore_nulls") {
@@ -944,7 +944,7 @@ func snowflakeLeastSQL(g *Generator, e *Expr) string {
 	return g.fn(name, args...)
 }
 
-// generator_sql
+// generator_sql.
 func snowflakeGeneratorSQL(g *Generator, e *Expr) string {
 	var args []any
 	rowcount := e.ArgE("rowcount")
@@ -960,7 +960,7 @@ func snowflakeGeneratorSQL(g *Generator, e *Expr) string {
 	return g.fn("GENERATOR", args...)
 }
 
-// unnest_sql
+// unnest_sql.
 func snowflakeUnnestSQL(g *Generator, e *Expr) string {
 	unnestAlias := e.ArgE("alias")
 	offset := e.Arg("offset")
@@ -1021,7 +1021,7 @@ func snowflakeUnnestSQL(g *Generator, e *Expr) string {
 	return valueSQL + explode + alias
 }
 
-// undrop_sql
+// undrop_sql.
 func snowflakeUndropSQL(g *Generator, e *Expr) string {
 	this := g.sqlKey(e, "this")
 	kind := e.ArgS("kind")
@@ -1032,7 +1032,7 @@ func snowflakeUndropSQL(g *Generator, e *Expr) string {
 	return "UNDROP " + kind + " " + this + rename
 }
 
-// show_sql
+// show_sql.
 func snowflakeShowSQL(g *Generator, e *Expr) string {
 	terse := ""
 	if e.ArgB("terse") {
@@ -1081,7 +1081,7 @@ func snowflakeShowSQL(g *Generator, e *Expr) string {
 	return "SHOW " + terse + iceberg + e.Name() + history + like + scopeKind + scope + startsWith + limit + from + privileges
 }
 
-// rowaccessproperty_sql
+// rowaccessproperty_sql.
 func snowflakeRowaccesspropertySQL(g *Generator, e *Expr) string {
 	if e.This() == nil {
 		return "ROW ACCESS"
@@ -1093,7 +1093,7 @@ func snowflakeRowaccesspropertySQL(g *Generator, e *Expr) string {
 	return "WITH ROW ACCESS POLICY " + g.sqlKey(e, "this") + on
 }
 
-// describe_sql
+// describe_sql.
 func snowflakeDescribeSQL(g *Generator, e *Expr) string {
 	kindValue := e.ArgS("kind")
 	if kindValue == "" {
@@ -1117,7 +1117,7 @@ func snowflakeDescribeSQL(g *Generator, e *Expr) string {
 	return "DESCRIBE" + kind + this + expressions
 }
 
-// generatedasidentitycolumnconstraint_sql
+// generatedasidentitycolumnconstraint_sql.
 func snowflakeGeneratedasidentitycolumnconstraintSQL(g *Generator, e *Expr) string {
 	start := ""
 	if s := e.ArgE("start"); s != nil {
@@ -1140,7 +1140,7 @@ func snowflakeGeneratedasidentitycolumnconstraintSQL(g *Generator, e *Expr) stri
 	return "AUTOINCREMENT" + start + increment + orderClause
 }
 
-// struct_sql
+// struct_sql.
 func snowflakeStructSQL(g *Generator, e *Expr) string {
 	if len(e.Expressions()) == 1 {
 		arg := e.Expressions()[0]
@@ -1168,13 +1168,13 @@ func snowflakeStructSQL(g *Generator, e *Expr) string {
 	return g.fn("OBJECT_CONSTRUCT", args...)
 }
 
-// approxquantile_sql
+// approxquantile_sql.
 func snowflakeApproxquantileSQL(g *Generator, e *Expr) string {
 	dhUnsupportedArgs(g, e, "weight", "accuracy")
 	return g.fn("APPROX_PERCENTILE", e.Arg("this"), e.Arg("quantile"))
 }
 
-// alterset_sql
+// alterset_sql.
 func snowflakeAltersetSQL(g *Generator, e *Expr) string {
 	exprs := g.expressions(e, exprsOpts{flat: true})
 	if exprs != "" {
@@ -1196,7 +1196,7 @@ func snowflakeAltersetSQL(g *Generator, e *Expr) string {
 	return "SET" + exprs + fileFormat + copyOptions + tag
 }
 
-// strtotime_sql
+// strtotime_sql.
 func snowflakeStrtotimeSQL(g *Generator, e *Expr) string {
 	// target_type is stored as a DataType instance
 	targetType := e.ArgE("target_type")
@@ -1225,7 +1225,7 @@ func snowflakeStrtotimeSQL(g *Generator, e *Expr) string {
 	return g.fn(prefix+funcName, e.Arg("this"), snowflakeStrOrNone(g.formatTime(e, nil, nil)))
 }
 
-// timestampsub_sql
+// timestampsub_sql.
 func snowflakeTimestampsubSQL(g *Generator, e *Expr) string {
 	return g.sql(New(
 		KTimestampAdd,
@@ -1235,7 +1235,7 @@ func snowflakeTimestampsubSQL(g *Generator, e *Expr) string {
 	))
 }
 
-// jsonextract_sql
+// jsonextract_sql.
 func snowflakeJsonextractSQL(g *Generator, e *Expr) string {
 	this := e.This()
 
@@ -1248,7 +1248,7 @@ func snowflakeJsonextractSQL(g *Generator, e *Expr) string {
 	return g.fn("GET_PATH", this, e.Arg("expression"))
 }
 
-// timetostr_sql
+// timetostr_sql.
 func snowflakeTimetostrSQL(g *Generator, e *Expr) string {
 	this := e.This()
 	if this.IsString() {
@@ -1258,7 +1258,7 @@ func snowflakeTimetostrSQL(g *Generator, e *Expr) string {
 	return g.fn("TO_CHAR", this, snowflakeStrOrNone(g.formatTime(e, nil, nil)))
 }
 
-// datesub_sql
+// datesub_sql.
 func snowflakeDatesubSQL(g *Generator, e *Expr) string {
 	value := e.Expression()
 	if value != nil {
@@ -1270,7 +1270,7 @@ func snowflakeDatesubSQL(g *Generator, e *Expr) string {
 	return dateDeltaSQL("DATEADD", false)(g, e)
 }
 
-// select_sql
+// select_sql.
 func snowflakeSelectSQL(g *Generator, e *Expr) string {
 	limit := e.Arg("limit")
 	offset := e.Arg("offset")
@@ -1280,7 +1280,7 @@ func snowflakeSelectSQL(g *Generator, e *Expr) string {
 	return g.baseSelectSQL(e)
 }
 
-// createable_sql
+// createable_sql.
 func snowflakeCreateableSQL(g *Generator, e *Expr, locations propLocations) string {
 	isMaterialized := e.Find(KMaterializedProperty)
 	copyGrantsProperty := e.Find(KCopyGrantsProperty)
@@ -1318,7 +1318,7 @@ func snowflakeCreateableSQL(g *Generator, e *Expr, locations propLocations) stri
 	return g.baseCreateableSQL(e, locations)
 }
 
-// arrayagg_sql
+// arrayagg_sql.
 func snowflakeArrayaggSQL(g *Generator, e *Expr) string {
 	this := e.This()
 
@@ -1341,7 +1341,7 @@ func snowflakeArrayaggSQL(g *Generator, e *Expr) string {
 	return exprSQLStr
 }
 
-// arraydistinct_sql
+// arraydistinct_sql.
 func snowflakeArraydistinctSQL(g *Generator, e *Expr) string {
 	if e.ArgB("check_null") {
 		return g.fn("ARRAY_DISTINCT", e.Arg("this"))
@@ -1349,12 +1349,12 @@ func snowflakeArraydistinctSQL(g *Generator, e *Expr) string {
 	return g.fn("ARRAY_DISTINCT", New(KArrayCompact, "this", e.Arg("this")))
 }
 
-// arraytostring_sql
+// arraytostring_sql.
 func snowflakeArraytostringSQL(g *Generator, e *Expr) string {
 	return g.fn("ARRAY_TO_STRING", e.Arg("this"), e.Arg("expression"))
 }
 
-// array_sql
+// array_sql.
 func snowflakeArraySQL(g *Generator, e *Expr) string {
 	expressions := e.Expressions()
 
@@ -1386,7 +1386,7 @@ func snowflakeArraySQL(g *Generator, e *Expr) string {
 	return inlineArraySQL(g, e)
 }
 
-// currentdate_sql
+// currentdate_sql.
 func snowflakeCurrentdateSQL(g *Generator, e *Expr) string {
 	zone := g.sqlKey(e, "this")
 	if zone == "" {
@@ -1401,7 +1401,7 @@ func snowflakeCurrentdateSQL(g *Generator, e *Expr) string {
 	return g.sql(expr)
 }
 
-// dot_sql
+// dot_sql.
 func snowflakeDotSQL(g *Generator, e *Expr) string {
 	this := e.argAttr("this", "type")
 
@@ -1417,12 +1417,12 @@ func snowflakeDotSQL(g *Generator, e *Expr) string {
 	return g.baseDotSQL(e)
 }
 
-// modelattribute_sql
+// modelattribute_sql.
 func snowflakeModelattributeSQL(g *Generator, e *Expr) string {
 	return g.sqlKey(e, "this") + "!" + g.sqlKey(e, "expression")
 }
 
-// format_sql
+// format_sql.
 func snowflakeFormatSQL(g *Generator, e *Expr) string {
 	if pyLower(e.Name()) == "%s" && len(e.Expressions()) == 1 {
 		return g.fn("TO_CHAR", e.Expressions()[0])
@@ -1431,7 +1431,7 @@ func snowflakeFormatSQL(g *Generator, e *Expr) string {
 	return g.functionFallbackSQL(e)
 }
 
-// splitpart_sql
+// splitpart_sql.
 func snowflakeSplitpartSQL(g *Generator, e *Expr) string {
 	// Set part_index to 1 if missing
 	if !e.ArgB("delimiter") {
@@ -1445,7 +1445,7 @@ func snowflakeSplitpartSQL(g *Generator, e *Expr) string {
 	return renameFunc("SPLIT_PART")(g, e)
 }
 
-// uniform_sql
+// uniform_sql.
 func snowflakeUniformSQL(g *Generator, e *Expr) string {
 	gen := e.ArgE("gen")
 	seed := e.ArgE("seed")
@@ -1463,7 +1463,7 @@ func snowflakeUniformSQL(g *Generator, e *Expr) string {
 	return g.fn("UNIFORM", e.Arg("this"), e.Arg("expression"), gen)
 }
 
-// window_sql
+// window_sql.
 func snowflakeWindowSQL(g *Generator, e *Expr) string {
 	spec := e.ArgE("spec")
 	this := e.This()
@@ -1482,7 +1482,7 @@ func snowflakeWindowSQL(g *Generator, e *Expr) string {
 	return g.baseWindowSQL(e)
 }
 
-// filter_sql
+// filter_sql.
 func snowflakeFilterSQL(g *Generator, e *Expr) string {
 	// Snowflake doesn't support FILTER (WHERE cond), so we rewrite it into an
 	// equivalent conditional aggregation, i.e. wrap the input values in an IFF
@@ -1552,7 +1552,7 @@ func snowflakeFilterSQL(g *Generator, e *Expr) string {
 	return g.sql(agg)
 }
 
-// withingroup_sql
+// withingroup_sql.
 func snowflakeWithingroupSQL(g *Generator, e *Expr) string {
 	// Snowflake's MODE doesn't support the ordered-set syntax, i.e. it only
 	// accepts the value to aggregate as an argument: MODE(<expr>)

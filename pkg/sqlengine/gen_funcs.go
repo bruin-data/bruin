@@ -7,7 +7,7 @@ import (
 	"regexp"
 )
 
-// dateadd_sql (generator.py L5170)
+// dateadd_sql (generator.py L5170).
 func (g *Generator) dateaddSQL(expression *Expr) string {
 	return g.fn(
 		"DATE_ADD",
@@ -17,7 +17,7 @@ func (g *Generator) dateaddSQL(expression *Expr) string {
 	)
 }
 
-// arrayany_sql (generator.py L5180)
+// arrayany_sql (generator.py L5180).
 func (g *Generator) arrayanySQL(expression *Expr) string {
 	if g.s.CAN_IMPLEMENT_ARRAY_ANY {
 		filtered := New(KArrayFilter, "this", expression.This(), "expression", expression.Expression())
@@ -34,7 +34,7 @@ func (g *Generator) arrayanySQL(expression *Expr) string {
 	return g.functionFallbackSQL(expression)
 }
 
-// struct_sql (generator.py L5195)
+// struct_sql (generator.py L5195).
 func (g *Generator) baseStructSQL(expression *Expr) string {
 	var exprs []*Expr
 	for _, e := range expression.Expressions() {
@@ -55,7 +55,7 @@ func (g *Generator) baseStructSQL(expression *Expr) string {
 	return g.functionFallbackSQL(expression)
 }
 
-// partitionrange_sql (generator.py L5208)
+// partitionrange_sql (generator.py L5208).
 func (g *Generator) basePartitionrangeSQL(expression *Expr) string {
 	low := g.sqlKey(expression, "this")
 	high := g.sqlKey(expression, "expression")
@@ -63,7 +63,7 @@ func (g *Generator) basePartitionrangeSQL(expression *Expr) string {
 	return low + " TO " + high
 }
 
-// truncatetable_sql (generator.py L5214)
+// truncatetable_sql (generator.py L5214).
 func (g *Generator) truncatetableSQL(expression *Expr) string {
 	target := "TABLE"
 	if expression.ArgB("is_database") {
@@ -157,7 +157,7 @@ func (g *Generator) baseConvertSQL(expression *Expr) string {
 	return g.sql(transformed)
 }
 
-// _jsonpathkey_sql (generator.py L5278)
+// _jsonpathkey_sql (generator.py L5278).
 func (g *Generator) baseJsonpathkeySQL(expression *Expr) string {
 	if thisE := expression.This(); thisE.IsA(KJSONPathWildcard) {
 		this := g.jsonPathPart(thisE)
@@ -188,7 +188,7 @@ func (g *Generator) baseJsonpathkeySQL(expression *Expr) string {
 	return "." + this
 }
 
-// _jsonpathsubscript_sql (generator.py L5304)
+// _jsonpathsubscript_sql (generator.py L5304).
 func (g *Generator) baseJsonpathsubscriptSQL(expression *Expr) string {
 	this := g.jsonPathPart(expression.Arg("this"))
 	if this != "" {
@@ -197,7 +197,7 @@ func (g *Generator) baseJsonpathsubscriptSQL(expression *Expr) string {
 	return ""
 }
 
-// _simplify_unless_literal (generator.py L5308)
+// _simplify_unless_literal (generator.py L5308).
 func (g *Generator) simplifyUnlessLiteral(expression *Expr) *Expr {
 	if !expression.IsA(KLiteral) {
 		expression = simplifyExpr(expression, g.d)
@@ -206,7 +206,7 @@ func (g *Generator) simplifyUnlessLiteral(expression *Expr) *Expr {
 	return expression
 }
 
-// _embed_ignore_nulls (generator.py L5316)
+// _embed_ignore_nulls (generator.py L5316).
 func (g *Generator) embedIgnoreNulls(expression *Expr, text string) string {
 	this := expression.This()
 	if len(g.s.RESPECT_IGNORE_NULLS_UNSUPPORTED_EXPRESSIONS) > 0 && this.IsA(g.s.RESPECT_IGNORE_NULLS_UNSUPPORTED_EXPRESSIONS...) {
@@ -251,7 +251,7 @@ func (g *Generator) embedIgnoreNulls(expression *Expr, text string) string {
 	return g.sqlKey(expression, "this") + " " + text
 }
 
-// copyparameter_sql (generator.py L5357)
+// copyparameter_sql (generator.py L5357).
 func (g *Generator) copyparameterSQL(expression *Expr) string {
 	option := g.sqlKey(expression, "this")
 
@@ -287,7 +287,7 @@ func (g *Generator) copyparameterSQL(expression *Expr) string {
 	return option + op + value
 }
 
-// credentials_sql (generator.py L5380)
+// credentials_sql (generator.py L5380).
 func (g *Generator) credentialsSQL(expression *Expr) string {
 	credExpr := expression.Arg("credentials")
 	var credentials string
@@ -330,7 +330,7 @@ func (g *Generator) credentialsSQL(expression *Expr) string {
 	return credentials + storage + encryption + iamRole + region
 }
 
-// copy_sql (generator.py L5405)
+// copy_sql (generator.py L5405).
 func (g *Generator) copySQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	if g.s.COPY_HAS_INTO_KEYWORD {
@@ -377,12 +377,12 @@ func (g *Generator) copySQL(expression *Expr) string {
 	return "COPY" + this + kind + " " + files + credentials + params
 }
 
-// semicolon_sql (generator.py L5433)
+// semicolon_sql (generator.py L5433).
 func (g *Generator) semicolonSQL(expression *Expr) string {
 	return ""
 }
 
-// datadeletionproperty_sql (generator.py L5436)
+// datadeletionproperty_sql (generator.py L5436).
 func (g *Generator) datadeletionpropertySQL(expression *Expr) string {
 	onSQL := "OFF"
 	if expression.ArgB("on") {
@@ -404,7 +404,7 @@ func (g *Generator) datadeletionpropertySQL(expression *Expr) string {
 	return "DATA_DELETION=" + onSQL
 }
 
-// maskingpolicycolumnconstraint_sql (generator.py L5448)
+// maskingpolicycolumnconstraint_sql (generator.py L5448).
 func (g *Generator) maskingpolicycolumnconstraintSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	expressions := g.expressions(expression, exprsOpts{flat: true})
@@ -414,7 +414,7 @@ func (g *Generator) maskingpolicycolumnconstraintSQL(expression *Expr) string {
 	return "MASKING POLICY " + this + expressions
 }
 
-// gapfill_sql (generator.py L5456)
+// gapfill_sql (generator.py L5456).
 func (g *Generator) gapfillSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	this = "TABLE " + this
@@ -427,7 +427,7 @@ func (g *Generator) gapfillSQL(expression *Expr) string {
 	return g.fn("GAP_FILL", args...)
 }
 
-// scope_resolution (generator.py L5461)
+// scope_resolution (generator.py L5461).
 func (g *Generator) baseScopeResolution(rhs string, scopeName string) string {
 	var scope any
 	if scopeName != "" {
@@ -436,7 +436,7 @@ func (g *Generator) baseScopeResolution(rhs string, scopeName string) string {
 	return g.fn("SCOPE_RESOLUTION", scope, rhs)
 }
 
-// scoperesolution_sql (generator.py L5464)
+// scoperesolution_sql (generator.py L5464).
 func (g *Generator) scoperesolutionSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	exprE := expression.Expression()
@@ -456,7 +456,7 @@ func (g *Generator) scoperesolutionSQL(expression *Expr) string {
 	return g.scopeResolution(expr, this)
 }
 
-// parsejson_sql (generator.py L5476)
+// parsejson_sql (generator.py L5476).
 func (g *Generator) baseParsejsonSQL(expression *Expr) string {
 	// PARSE_JSON_NAME = None is represented by ""
 	if g.s.PARSE_JSON_NAME == "" {
@@ -466,7 +466,7 @@ func (g *Generator) baseParsejsonSQL(expression *Expr) string {
 	return g.fn(g.s.PARSE_JSON_NAME, expression.Arg("this"), expression.Arg("expression"))
 }
 
-// rand_sql (generator.py L5482)
+// rand_sql (generator.py L5482).
 func (g *Generator) baseRandSQL(expression *Expr) string {
 	lower := g.sqlKey(expression, "lower")
 	upper := g.sqlKey(expression, "upper")
@@ -477,7 +477,7 @@ func (g *Generator) baseRandSQL(expression *Expr) string {
 	return g.fn("RAND", expression.Arg("this"))
 }
 
-// changes_sql (generator.py L5490)
+// changes_sql (generator.py L5490).
 func (g *Generator) changesSQL(expression *Expr) string {
 	information := g.sqlKey(expression, "information")
 	information = "INFORMATION => " + information
@@ -493,7 +493,7 @@ func (g *Generator) changesSQL(expression *Expr) string {
 	return "CHANGES (" + information + ")" + atBefore + end
 }
 
-// pad_sql (generator.py L5500)
+// pad_sql (generator.py L5500).
 func (g *Generator) basePadSQL(expression *Expr) string {
 	prefix := "R"
 	if expression.ArgB("is_left") {
@@ -511,7 +511,7 @@ func (g *Generator) basePadSQL(expression *Expr) string {
 	return g.fn(prefix+"PAD", expression.Arg("this"), expression.Arg("expression"), fillPattern)
 }
 
-// summarize_sql (generator.py L5509)
+// summarize_sql (generator.py L5509).
 func (g *Generator) summarizeSQL(expression *Expr) string {
 	table := ""
 	if expression.ArgB("table") {
@@ -520,7 +520,7 @@ func (g *Generator) summarizeSQL(expression *Expr) string {
 	return "SUMMARIZE" + table + " " + g.sql(expression.Arg("this"))
 }
 
-// explodinggenerateseries_sql (generator.py L5513)
+// explodinggenerateseries_sql (generator.py L5513).
 func (g *Generator) explodinggenerateseriesSQL(expression *Expr) string {
 	kv := make([]any, 0, 2*len(expression.ArgKeys()))
 	for _, k := range expression.ArgKeys() {
@@ -544,7 +544,7 @@ func (g *Generator) explodinggenerateseriesSQL(expression *Expr) string {
 	return g.sql(generateSeries)
 }
 
-// converttimezone_sql (generator.py L5528)
+// converttimezone_sql (generator.py L5528).
 func (g *Generator) baseConverttimezoneSQL(expression *Expr) string {
 	if g.s.SUPPORTS_CONVERT_TIMEZONE {
 		return g.functionFallbackSQL(expression)
@@ -563,7 +563,7 @@ func (g *Generator) baseConverttimezoneSQL(expression *Expr) string {
 	return g.sql(expr)
 }
 
-// json_sql (generator.py L5545)
+// json_sql (generator.py L5545).
 func (g *Generator) jsonSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	if this != "" {
@@ -589,7 +589,7 @@ func (g *Generator) jsonSQL(expression *Expr) string {
 	return "JSON" + this + withSQL + uniqueSQL
 }
 
-// jsonvalue_sql (generator.py L5562)
+// jsonvalue_sql (generator.py L5562).
 func (g *Generator) jsonvalueSQL(expression *Expr) string {
 	path := g.sqlKey(expression, "path")
 	returning := g.sqlKey(expression, "returning")
@@ -605,7 +605,7 @@ func (g *Generator) jsonvalueSQL(expression *Expr) string {
 	return g.fn("JSON_VALUE", expression.Arg("this"), path+returning+onCondition)
 }
 
-// skipjsoncolumn_sql (generator.py L5572)
+// skipjsoncolumn_sql (generator.py L5572).
 func (g *Generator) skipjsoncolumnSQL(expression *Expr) string {
 	regexpSQL := ""
 	if expression.ArgB("regexp") {
@@ -614,7 +614,7 @@ func (g *Generator) skipjsoncolumnSQL(expression *Expr) string {
 	return "SKIP" + regexpSQL + " " + g.sql(expression.Arg("expression"))
 }
 
-// conditionalinsert_sql (generator.py L5576)
+// conditionalinsert_sql (generator.py L5576).
 func (g *Generator) conditionalinsertSQL(expression *Expr) string {
 	else_ := ""
 	if expression.ArgB("else_") {
@@ -635,7 +635,7 @@ func (g *Generator) conditionalinsertSQL(expression *Expr) string {
 	return condition + insert
 }
 
-// multitableinserts_sql (generator.py L5583)
+// multitableinserts_sql (generator.py L5583).
 func (g *Generator) multitableinsertsSQL(expression *Expr) string {
 	kind := g.sqlKey(expression, "kind")
 	expressions := g.seg(g.expressions(expression, exprsOpts{sep: strp2(" ")}))
@@ -643,7 +643,7 @@ func (g *Generator) multitableinsertsSQL(expression *Expr) string {
 	return res
 }
 
-// oncondition_sql (generator.py L5589)
+// oncondition_sql (generator.py L5589).
 func (g *Generator) onconditionSQL(expression *Expr) string {
 	// Static options like "NULL ON ERROR" are stored as strings, in contrast to "DEFAULT <expr> ON ERROR"
 	var empty string
@@ -674,7 +674,7 @@ func (g *Generator) onconditionSQL(expression *Expr) string {
 	return empty + errorSQL + null
 }
 
-// jsonextractquote_sql (generator.py L5617)
+// jsonextractquote_sql (generator.py L5617).
 func (g *Generator) jsonextractquoteSQL(expression *Expr) string {
 	scalar := ""
 	if expression.ArgB("scalar") {
@@ -683,7 +683,7 @@ func (g *Generator) jsonextractquoteSQL(expression *Expr) string {
 	return g.sqlKey(expression, "option") + " QUOTES" + scalar
 }
 
-// jsonexists_sql (generator.py L5621)
+// jsonexists_sql (generator.py L5621).
 func (g *Generator) jsonexistsSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	path := g.sqlKey(expression, "path")
@@ -732,7 +732,7 @@ func (g *Generator) addArrayaggNullFilter(arrayAggSQL string, arrayAggExpr *Expr
 	return arrayAggSQL
 }
 
-// arrayagg_sql (generator.py L5675)
+// arrayagg_sql (generator.py L5675).
 func (g *Generator) baseArrayaggSQL(expression *Expr) string {
 	arrayAgg := g.functionFallbackSQL(expression)
 	return g.addArrayaggNullFilter(arrayAgg, expression, expression.This())

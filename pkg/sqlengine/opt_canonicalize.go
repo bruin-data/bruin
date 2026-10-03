@@ -282,7 +282,7 @@ func canonicalizeReplaceCast(node *Expr, to any) {
 // this was originally designed for presto, there is a similar transform for tsql
 // this is different in that it only operates on int types, this is because
 // presto has a boolean type whereas tsql doesn't (people use bits)
-// with y as (select true as x) select x = 0 FROM y -- illegal presto query
+// with y as (select true as x) select x = 0 FROM y -- illegal presto query.
 func canonicalizeReplaceIntPredicate(expression *Expr) {
 	if expression.IsA(KCoalesce) {
 		for _, child := range expression.IterExpressions(false) {

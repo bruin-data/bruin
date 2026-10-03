@@ -13,7 +13,7 @@ import (
 	"strings"
 )
 
-// uncache_sql (generator.py L1120)
+// uncache_sql (generator.py L1120).
 func (g *Generator) uncacheSQL(expression *Expr) string {
 	table := g.sqlKey(expression, "this")
 	existsSQL := ""
@@ -23,7 +23,7 @@ func (g *Generator) uncacheSQL(expression *Expr) string {
 	return "UNCACHE TABLE" + existsSQL + " " + table
 }
 
-// cache_sql (generator.py L1125)
+// cache_sql (generator.py L1125).
 func (g *Generator) cacheSQL(expression *Expr) string {
 	lazy := ""
 	if expression.ArgB("lazy") {
@@ -42,7 +42,7 @@ func (g *Generator) cacheSQL(expression *Expr) string {
 	return g.prependCtes(expression, sql)
 }
 
-// characterset_sql (generator.py L1135)
+// characterset_sql (generator.py L1135).
 func (g *Generator) charactersetSQL(expression *Expr) string {
 	def := ""
 	if expression.ArgB("default") {
@@ -51,7 +51,7 @@ func (g *Generator) charactersetSQL(expression *Expr) string {
 	return def + "CHARACTER SET=" + g.sqlKey(expression, "this")
 }
 
-// column_parts (generator.py L1139)
+// column_parts (generator.py L1139).
 func (g *Generator) baseColumnParts(expression *Expr) string {
 	var parts []string
 	for _, k := range []string{"catalog", "db", "table", "this"} {
@@ -62,7 +62,7 @@ func (g *Generator) baseColumnParts(expression *Expr) string {
 	return strings.Join(parts, ".")
 }
 
-// column_sql (generator.py L1151)
+// column_sql (generator.py L1151).
 func (g *Generator) columnSQL(expression *Expr) string {
 	joinMark := ""
 	if expression.ArgB("join_mark") {
@@ -75,12 +75,12 @@ func (g *Generator) columnSQL(expression *Expr) string {
 	return g.columnParts(expression) + joinMark
 }
 
-// pseudocolumn_sql (generator.py L1160)
+// pseudocolumn_sql (generator.py L1160).
 func (g *Generator) pseudocolumnSQL(expression *Expr) string {
 	return g.columnSQL(expression)
 }
 
-// columnposition_sql (generator.py L1163)
+// columnposition_sql (generator.py L1163).
 func (g *Generator) columnpositionSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	if this != "" {
@@ -90,7 +90,7 @@ func (g *Generator) columnpositionSQL(expression *Expr) string {
 	return position + this
 }
 
-// columndef_sql (generator.py L1169)
+// columndef_sql (generator.py L1169).
 func (g *Generator) baseColumndefSQL(expression *Expr, sep string) string {
 	column := g.sqlKey(expression, "this")
 	kind := g.sqlKey(expression, "kind")
@@ -117,7 +117,7 @@ func (g *Generator) baseColumndefSQL(expression *Expr, sep string) string {
 	return exists + column + kind + constraints + position
 }
 
-// columnconstraint_sql (generator.py L1184)
+// columnconstraint_sql (generator.py L1184).
 func (g *Generator) columnconstraintSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	kindSQL := pyStrip(g.sqlKey(expression, "kind"))
@@ -127,7 +127,7 @@ func (g *Generator) columnconstraintSQL(expression *Expr) string {
 	return kindSQL
 }
 
-// computedcolumnconstraint_sql (generator.py L1189)
+// computedcolumnconstraint_sql (generator.py L1189).
 func (g *Generator) baseComputedcolumnconstraintSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	var persisted string
@@ -141,12 +141,12 @@ func (g *Generator) baseComputedcolumnconstraintSQL(expression *Expr) string {
 	return "AS " + this + persisted
 }
 
-// autoincrementcolumnconstraint_sql (generator.py L1200)
+// autoincrementcolumnconstraint_sql (generator.py L1200).
 func (g *Generator) baseAutoincrementcolumnconstraintSQL(expression *Expr) string {
 	return g.tokenSQL(TK_AUTO_INCREMENT)
 }
 
-// compresscolumnconstraint_sql (generator.py L1203)
+// compresscolumnconstraint_sql (generator.py L1203).
 func (g *Generator) compresscolumnconstraintSQL(expression *Expr) string {
 	var this string
 	if _, ok := expression.Arg("this").([]*Expr); ok {
@@ -157,7 +157,7 @@ func (g *Generator) compresscolumnconstraintSQL(expression *Expr) string {
 	return "COMPRESS " + this
 }
 
-// generatedasidentitycolumnconstraint_sql (generator.py L1211)
+// generatedasidentitycolumnconstraint_sql (generator.py L1211).
 func (g *Generator) baseGeneratedasidentitycolumnconstraintSQL(expression *Expr) string {
 	this := ""
 	if thisV := expression.Arg("this"); thisV != nil {
@@ -218,7 +218,7 @@ func (g *Generator) baseGeneratedasidentitycolumnconstraintSQL(expression *Expr)
 	return "GENERATED" + this + " AS " + expr + sequenceOpts
 }
 
-// generatedasrowcolumnconstraint_sql (generator.py L1244)
+// generatedasrowcolumnconstraint_sql (generator.py L1244).
 func (g *Generator) generatedasrowcolumnconstraintSQL(expression *Expr) string {
 	start := "END"
 	if expression.ArgB("start") {
@@ -231,12 +231,12 @@ func (g *Generator) generatedasrowcolumnconstraintSQL(expression *Expr) string {
 	return "GENERATED ALWAYS AS ROW " + start + hidden
 }
 
-// periodforsystemtimeconstraint_sql (generator.py L1251)
+// periodforsystemtimeconstraint_sql (generator.py L1251).
 func (g *Generator) periodforsystemtimeconstraintSQL(expression *Expr) string {
 	return "PERIOD FOR SYSTEM_TIME (" + g.sqlKey(expression, "this") + ", " + g.sqlKey(expression, "expression") + ")"
 }
 
-// notnullcolumnconstraint_sql (generator.py L1256)
+// notnullcolumnconstraint_sql (generator.py L1256).
 func (g *Generator) notnullcolumnconstraintSQL(expression *Expr) string {
 	if expression.ArgB("allow_null") {
 		return "NULL"
@@ -244,7 +244,7 @@ func (g *Generator) notnullcolumnconstraintSQL(expression *Expr) string {
 	return "NOT NULL"
 }
 
-// primarykeycolumnconstraint_sql (generator.py L1259)
+// primarykeycolumnconstraint_sql (generator.py L1259).
 func (g *Generator) primarykeycolumnconstraintSQL(expression *Expr) string {
 	desc := expression.Arg("desc")
 	if desc != nil {
@@ -260,7 +260,7 @@ func (g *Generator) primarykeycolumnconstraintSQL(expression *Expr) string {
 	return "PRIMARY KEY" + options
 }
 
-// uniquecolumnconstraint_sql (generator.py L1267)
+// uniquecolumnconstraint_sql (generator.py L1267).
 func (g *Generator) uniquecolumnconstraintSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	if this != "" {
@@ -285,7 +285,7 @@ func (g *Generator) uniquecolumnconstraintSQL(expression *Expr) string {
 	return "UNIQUE" + nullsSQL + this + indexType + onConflict + options
 }
 
-// inoutcolumnconstraint_sql (generator.py L1279)
+// inoutcolumnconstraint_sql (generator.py L1279).
 func (g *Generator) inoutcolumnconstraintSQL(expression *Expr) string {
 	input := expression.ArgB("input_")
 	output := expression.ArgB("output")
@@ -309,12 +309,12 @@ func (g *Generator) inoutcolumnconstraintSQL(expression *Expr) string {
 	return ""
 }
 
-// createable_sql (generator.py L1297)
+// createable_sql (generator.py L1297).
 func (g *Generator) baseCreateableSQL(expression *Expr, locations propLocations) string {
 	return g.sqlKey(expression, "this")
 }
 
-// create_sql (generator.py L1300)
+// create_sql (generator.py L1300).
 func (g *Generator) baseCreateSQL(expression *Expr) string {
 	kind := g.sqlKey(expression, "kind")
 	if mapped := g.d.S.INVERSE_CREATABLE_KIND_MAPPING[kind]; mapped != "" {
@@ -465,7 +465,7 @@ func (g *Generator) baseCreateSQL(expression *Expr) string {
 	return g.prependCtes(expression, expressionSQL)
 }
 
-// sequenceproperties_sql (generator.py L1421)
+// sequenceproperties_sql (generator.py L1421).
 func (g *Generator) sequencepropertiesSQL(expression *Expr) string {
 	start := g.sqlKey(expression, "start")
 	if start != "" {
@@ -506,7 +506,7 @@ func (g *Generator) sequencepropertiesSQL(expression *Expr) string {
 	return strings.TrimLeftFunc(start+increment+minvalue+maxvalue+cacheStr+options+owned, pyIsSpaceRune)
 }
 
-// triggerproperties_sql (generator.py L1446)
+// triggerproperties_sql (generator.py L1446).
 func (g *Generator) triggerpropertiesSQL(expression *Expr) string {
 	// expression.args.get("timing", "")
 	var timing any = ""
@@ -554,7 +554,7 @@ func (g *Generator) triggerpropertiesSQL(expression *Expr) string {
 	return strings.Join(parts, g.sep1())
 }
 
-// triggerreferencing_sql (generator.py L1475)
+// triggerreferencing_sql (generator.py L1475).
 func (g *Generator) triggerreferencingSQL(expression *Expr) string {
 	var parts []string
 
@@ -569,7 +569,7 @@ func (g *Generator) triggerreferencingSQL(expression *Expr) string {
 	return "REFERENCING " + strings.Join(parts, " ")
 }
 
-// triggerevent_sql (generator.py L1486)
+// triggerevent_sql (generator.py L1486).
 func (g *Generator) triggereventSQL(expression *Expr) string {
 	if expression.ArgB("columns") {
 		return chunkAPyStr(expression.Arg("this")) + " OF " + g.expressions(expression, exprsOpts{key: "columns", flat: true})
@@ -578,7 +578,7 @@ func (g *Generator) triggereventSQL(expression *Expr) string {
 	return g.sqlKey(expression, "this")
 }
 
-// clone_sql (generator.py L1493)
+// clone_sql (generator.py L1493).
 func (g *Generator) cloneSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	shallow := ""
@@ -592,7 +592,7 @@ func (g *Generator) cloneSQL(expression *Expr) string {
 	return shallow + keyword + " " + this
 }
 
-// describe_sql (generator.py L1499)
+// describe_sql (generator.py L1499).
 func (g *Generator) baseDescribeSQL(expression *Expr) string {
 	style := ""
 	if v := expression.Arg("style"); truthy(v) {
@@ -614,13 +614,13 @@ func (g *Generator) baseDescribeSQL(expression *Expr) string {
 	return "DESCRIBE" + style + format + " " + g.sqlKey(expression, "this") + partition + asJSON
 }
 
-// heredoc_sql (generator.py L1510)
+// heredoc_sql (generator.py L1510).
 func (g *Generator) heredocSQL(expression *Expr) string {
 	tag := g.sqlKey(expression, "tag")
 	return "$" + tag + "$" + g.sqlKey(expression, "this") + "$" + tag + "$"
 }
 
-// prepend_ctes (generator.py L1514)
+// prepend_ctes (generator.py L1514).
 func (g *Generator) prependCtes(expression *Expr, sql_ string) string {
 	with := g.sqlKey(expression, "with_")
 	if with != "" {
@@ -629,7 +629,7 @@ func (g *Generator) prependCtes(expression *Expr, sql_ string) string {
 	return sql_
 }
 
-// with_sql (generator.py L1520)
+// with_sql (generator.py L1520).
 func (g *Generator) withSQL(expression *Expr) string {
 	sql := g.expressions(expression, exprsOpts{flat: true})
 	recursive := ""
@@ -644,7 +644,7 @@ func (g *Generator) withSQL(expression *Expr) string {
 	return "WITH " + recursive + sql + search
 }
 
-// cte_sql (generator.py L1532)
+// cte_sql (generator.py L1532).
 func (g *Generator) baseCteSQL(expression *Expr) string {
 	alias := expression.ArgE("alias")
 	if alias != nil {
@@ -669,7 +669,7 @@ func (g *Generator) baseCteSQL(expression *Expr) string {
 	return aliasSQL + keyExpressions + " AS " + materialized + g.wrap(expression)
 }
 
-// tablealias_sql (generator.py L1550)
+// tablealias_sql (generator.py L1550).
 func (g *Generator) tablealiasSQL(expression *Expr) string {
 	alias := g.sqlKey(expression, "this")
 	columns := g.expressions(expression, exprsOpts{key: "columns", flat: true})
@@ -691,7 +691,7 @@ func (g *Generator) tablealiasSQL(expression *Expr) string {
 	return alias + columns
 }
 
-// bitstring_sql (generator.py L1568)
+// bitstring_sql (generator.py L1568).
 func (g *Generator) bitstringSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	if g.d.S.BIT_START != "" {
@@ -728,7 +728,7 @@ func (g *Generator) baseHexstringSQL(expression *Expr, binaryFunctionRepr string
 	return g.d.S.HEX_START + this + g.d.S.HEX_END
 }
 
-// bytestring_sql (generator.py L1599)
+// bytestring_sql (generator.py L1599).
 func (g *Generator) bytestringSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	if g.d.S.BYTE_START != "" {
@@ -756,7 +756,7 @@ func (g *Generator) bytestringSQL(expression *Expr) string {
 // chunkAEscapedUnicodeRE mirrors generator.ESCAPED_UNICODE_RE = re.compile(r"\\(\d+)").
 var chunkAEscapedUnicodeRE = regexp.MustCompile(`\\(\p{Nd}+)`)
 
-// unicodestring_sql (generator.py L1630)
+// unicodestring_sql (generator.py L1630).
 func (g *Generator) unicodestringSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	escape := expression.ArgE("escape")
@@ -802,7 +802,7 @@ func (g *Generator) unicodestringSQL(expression *Expr) string {
 	return leftQuote + this + rightQuote + escapeSQL
 }
 
-// rawstring_sql (generator.py L1653)
+// rawstring_sql (generator.py L1653).
 func (g *Generator) rawstringSQL(expression *Expr) string {
 	str := expression.ThisS()
 	if slices.Contains(g.d.T.STRING_ESCAPES, "\\") {
@@ -813,7 +813,7 @@ func (g *Generator) rawstringSQL(expression *Expr) string {
 	return g.d.S.QUOTE_START + str + g.d.S.QUOTE_END
 }
 
-// datatypeparam_sql (generator.py L1661)
+// datatypeparam_sql (generator.py L1661).
 func (g *Generator) datatypeparamSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	specifier := g.sqlKey(expression, "expression")
@@ -825,7 +825,7 @@ func (g *Generator) datatypeparamSQL(expression *Expr) string {
 	return this + specifier
 }
 
-// datatype_param_bound_limiter (generator.py L1667)
+// datatype_param_bound_limiter (generator.py L1667).
 func (g *Generator) datatypeParamBoundLimiter(expression *Expr, typeValue DType, defaults []int, bounds []int) *Expr {
 	params := expression.Expressions()
 
@@ -875,7 +875,7 @@ func (g *Generator) datatypeParamBoundLimiter(expression *Expr, typeValue DType,
 	return expression
 }
 
-// datatype_sql (generator.py L1706)
+// datatype_sql (generator.py L1706).
 func (g *Generator) baseDatatypeSQL(expression *Expr) string {
 	nested := ""
 	values := ""
@@ -952,7 +952,7 @@ func (g *Generator) baseDatatypeSQL(expression *Expr) string {
 	return typeSQL
 }
 
-// directory_sql (generator.py L1770)
+// directory_sql (generator.py L1770).
 func (g *Generator) directorySQL(expression *Expr) string {
 	local := ""
 	if expression.ArgB("local") {
@@ -965,7 +965,7 @@ func (g *Generator) directorySQL(expression *Expr) string {
 	return local + "DIRECTORY " + g.sqlKey(expression, "this") + rowFormat
 }
 
-// delete_sql (generator.py L1776)
+// delete_sql (generator.py L1776).
 func (g *Generator) baseDeleteSQL(expression *Expr) string {
 	hint := g.sqlKey(expression, "hint")
 	this := g.sqlKey(expression, "this")
@@ -997,7 +997,7 @@ func (g *Generator) baseDeleteSQL(expression *Expr) string {
 	return g.prependCtes(expression, "DELETE"+hint+tables+expressionSQL)
 }
 
-// drop_sql (generator.py L1796)
+// drop_sql (generator.py L1796).
 func (g *Generator) baseDropSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	expressions := g.expressions(expression, exprsOpts{flat: true})
@@ -1059,7 +1059,7 @@ func (g *Generator) baseDropSQL(expression *Expr) string {
 		onCluster + expressions + cascade + restrict + constraints + purge + sync
 }
 
-// set_operation (generator.py L1820)
+// set_operation (generator.py L1820).
 func (g *Generator) setOperation(expression *Expr) string {
 	opType := expression.Kind()
 	opName := pyUpper(expression.Key())
@@ -1115,7 +1115,7 @@ func (g *Generator) setOperation(expression *Expr) string {
 	return sideKind + opName + distinctOrAll + byName + on
 }
 
-// set_operations (generator.py L1853)
+// set_operations (generator.py L1853).
 func (g *Generator) setOperations(expression *Expr) string {
 	if !g.s.SET_OP_MODIFIERS {
 		limit := expression.ArgE("limit")
@@ -1160,7 +1160,7 @@ func (g *Generator) setOperations(expression *Expr) string {
 	return g.prependCtes(expression, this)
 }
 
-// fetch_sql (generator.py L1890)
+// fetch_sql (generator.py L1890).
 func (g *Generator) fetchSQL(expression *Expr) string {
 	direction := ""
 	if v := expression.Arg("direction"); truthy(v) {
@@ -1177,7 +1177,7 @@ func (g *Generator) fetchSQL(expression *Expr) string {
 	return g.seg("FETCH") + direction + count + limitOptions
 }
 
-// limitoptions_sql (generator.py L1899)
+// limitoptions_sql (generator.py L1899).
 func (g *Generator) limitoptionsSQL(expression *Expr) string {
 	percent := ""
 	if expression.ArgB("percent") {
@@ -1197,14 +1197,14 @@ func (g *Generator) limitoptionsSQL(expression *Expr) string {
 	return percent + rows + withTies
 }
 
-// filter_sql (generator.py L1907)
+// filter_sql (generator.py L1907).
 func (g *Generator) baseFilterSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	where := pyStrip(g.sqlKey(expression, "expression"))
 	return this + " FILTER(" + where + ")"
 }
 
-// hint_sql (generator.py L1912)
+// hint_sql (generator.py L1912).
 func (g *Generator) baseHintSQL(expression *Expr) string {
 	if !g.s.QUERY_HINTS {
 		g.unsupported("Hints are not supported")
@@ -1214,7 +1214,7 @@ func (g *Generator) baseHintSQL(expression *Expr) string {
 	return " /*+ " + pyStrip(g.expressions(expression, exprsOpts{sep: strp2(g.s.QUERY_HINT_SEP)})) + " */"
 }
 
-// indexparameters_sql (generator.py L1919)
+// indexparameters_sql (generator.py L1919).
 func (g *Generator) indexparametersSQL(expression *Expr) string {
 	using := g.sqlKey(expression, "using")
 	if using != "" {
@@ -1249,7 +1249,7 @@ func (g *Generator) indexparametersSQL(expression *Expr) string {
 	return using + columns + include + withStorage + tablespace + partitionBy + where + on
 }
 
-// index_sql (generator.py L1939)
+// index_sql (generator.py L1939).
 func (g *Generator) indexSQL(expression *Expr) string {
 	unique := ""
 	if expression.ArgB("unique") {
@@ -1281,7 +1281,7 @@ func (g *Generator) indexSQL(expression *Expr) string {
 	return unique + primary + amp + index + name + table + params
 }
 
-// dynamicidentifier_sql (generator.py L1953)
+// dynamicidentifier_sql (generator.py L1953).
 func (g *Generator) baseDynamicidentifierSQL(expression *Expr) string {
 	this := expression.This()
 	if this != nil && this.IsString() {
@@ -1305,7 +1305,7 @@ func (g *Generator) baseDynamicidentifierSQL(expression *Expr) string {
 	return g.fn("IDENTIFIER", this)
 }
 
-// identifier_sql (generator.py L1967)
+// identifier_sql (generator.py L1967).
 func (g *Generator) baseIdentifierSQL(expression *Expr) string {
 	text := expression.Name()
 	lower := pyLower(text)
@@ -1327,7 +1327,7 @@ func (g *Generator) baseIdentifierSQL(expression *Expr) string {
 	return text
 }
 
-// hex_sql (generator.py L1984)
+// hex_sql (generator.py L1984).
 func (g *Generator) baseHexSQL(expression *Expr) string {
 	text := g.fn(g.s.HEX_FUNC, g.sqlKey(expression, "this"))
 	if g.d.S.HEX_LOWERCASE {
@@ -1337,7 +1337,7 @@ func (g *Generator) baseHexSQL(expression *Expr) string {
 	return text
 }
 
-// lowerhex_sql (generator.py L1991)
+// lowerhex_sql (generator.py L1991).
 func (g *Generator) lowerhexSQL(expression *Expr) string {
 	text := g.fn(g.s.HEX_FUNC, g.sqlKey(expression, "this"))
 	if !g.d.S.HEX_LOWERCASE {
@@ -1346,7 +1346,7 @@ func (g *Generator) lowerhexSQL(expression *Expr) string {
 	return text
 }
 
-// inputoutputformat_sql (generator.py L1997)
+// inputoutputformat_sql (generator.py L1997).
 func (g *Generator) inputoutputformatSQL(expression *Expr) string {
 	inputFormat := g.sqlKey(expression, "input_format")
 	if inputFormat != "" {
@@ -1359,13 +1359,13 @@ func (g *Generator) inputoutputformatSQL(expression *Expr) string {
 	return inputFormat + g.sep1() + outputFormat
 }
 
-// national_sql (generator.py L2004)
+// national_sql (generator.py L2004).
 func (g *Generator) nationalSQL(expression *Expr, prefix string) string {
 	str := g.sql(LiteralString(expression.Name()))
 	return prefix + str
 }
 
-// partition_sql (generator.py L2008)
+// partition_sql (generator.py L2008).
 func (g *Generator) basePartitionSQL(expression *Expr) string {
 	partitionKeyword := "PARTITION"
 	if expression.ArgB("subpartition") {

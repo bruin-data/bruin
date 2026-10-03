@@ -8,7 +8,7 @@ package sqlengine
 // This only removes joins when we know that the join condition doesn't produce duplicate rows.
 //
 // Example: "SELECT x.a FROM x LEFT JOIN (SELECT DISTINCT y.b FROM y) AS y ON x.b = y.b"
-// -> "SELECT x.a FROM x"
+// -> "SELECT x.a FROM x".
 func EliminateJoins(expression *Expr) *Expr {
 	for _, scope := range TraverseScope(expression) {
 		joins := scope.Expression.ArgL("joins")

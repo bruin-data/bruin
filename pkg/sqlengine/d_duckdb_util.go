@@ -350,16 +350,16 @@ func (t *duckdbLazyTemplate) get() *Expr {
 
 func duckdbTemplate(sql string) *duckdbLazyTemplate { return &duckdbLazyTemplate{sql: sql} }
 
-// RANDSTR transpilation constants
+// RANDSTR transpilation constants.
 const (
 	duckdbRandstrCharPool = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 	duckdbRandstrSeed     = 123456
 )
 
 var (
-	// SEQ function constants
+	// SEQ function constants.
 	duckdbSeqBase = duckdbTemplate("(ROW_NUMBER() OVER (ORDER BY 1) - 1)")
-	// Template for generating signed and unsigned SEQ values within a specified range
+	// Template for generating signed and unsigned SEQ values within a specified range.
 	duckdbSeqUnsigned = duckdbTemplate(":base % :max_val")
 	duckdbSeqSigned   = duckdbTemplate(
 		"(CASE WHEN :base % :max_val >= :half " +
@@ -367,7 +367,7 @@ var (
 			"ELSE :base % :max_val END)",
 	)
 
-	// Template for ZIPF transpilation - placeholders get replaced with actual parameters
+	// Template for ZIPF transpilation - placeholders get replaced with actual parameters.
 	duckdbZipfTemplate = duckdbTemplate(`
         WITH rand AS (SELECT :random_expr AS r),
         weights AS (
@@ -384,18 +384,18 @@ var (
         `)
 
 	// Template for NORMAL transpilation using Box-Muller transform
-	// mean + (stddev * sqrt(-2 * ln(u1)) * cos(2 * pi * u2))
+	// mean + (stddev * sqrt(-2 * ln(u1)) * cos(2 * pi * u2)).
 	duckdbNormalTemplate = duckdbTemplate(
 		":mean + (:stddev * SQRT(-2 * LN(GREATEST(:u1, 1e-10))) * COS(2 * PI() * :u2))",
 	)
 
-	// Template for generating a seeded pseudo-random value in [0, 1) from a hash
+	// Template for generating a seeded pseudo-random value in [0, 1) from a hash.
 	duckdbSeededRandomTemplate = duckdbTemplate("(ABS(HASH(:seed)) % 1000000) / 1000000.0")
 
 	// Template for MAP_CAT transpilation - Snowflake semantics:
 	// 1. Returns NULL if either input is NULL
 	// 2. For duplicate keys, prefers non-NULL value (COALESCE(m2[k], m1[k]))
-	// 3. Filters out entries with NULL values from the result
+	// 3. Filters out entries with NULL values from the result.
 	duckdbMapcatTemplate = duckdbTemplate(`
         CASE
             WHEN :map1 IS NULL OR :map2 IS NULL THEN NULL
@@ -406,7 +406,7 @@ var (
         END
         `)
 
-	// Template for BITMAP_CONSTRUCT_AGG transpilation (see generators/duckdb.py for the format)
+	// Template for BITMAP_CONSTRUCT_AGG transpilation (see generators/duckdb.py for the format).
 	duckdbBitmapConstructAggTemplate = duckdbTemplate(`
         SELECT CASE
             WHEN l IS NULL OR LENGTH(l) = 0 THEN NULL
@@ -423,7 +423,7 @@ var (
         )
         `)
 
-	// Template for RANDSTR transpilation - placeholders get replaced with actual parameters
+	// Template for RANDSTR transpilation - placeholders get replaced with actual parameters.
 	duckdbRandstrTemplate = duckdbTemplate(`
         SELECT LISTAGG(
             SUBSTRING(
@@ -439,7 +439,7 @@ var (
         )
         `)
 
-	// Template for MINHASH transpilation
+	// Template for MINHASH transpilation.
 	duckdbMinhashTemplate = duckdbTemplate(`
         SELECT JSON_OBJECT('state', LIST(min_h ORDER BY seed), 'type', 'minhash', 'version', 1)
         FROM (
@@ -448,7 +448,7 @@ var (
         )
         `)
 
-	// Template for MINHASH_COMBINE transpilation
+	// Template for MINHASH_COMBINE transpilation.
 	duckdbMinhashCombineTemplate = duckdbTemplate(`
         SELECT JSON_OBJECT('state', LIST(min_h ORDER BY idx), 'type', 'minhash', 'version', 1)
         FROM (
@@ -462,7 +462,7 @@ var (
         )
         `)
 
-	// Template for APPROXIMATE_SIMILARITY transpilation
+	// Template for APPROXIMATE_SIMILARITY transpilation.
 	duckdbApproximateSimilarityTemplate = duckdbTemplate(`
         SELECT CAST(SUM(CASE WHEN num_distinct = 1 THEN 1 ELSE 0 END) AS DOUBLE) / COUNT(*)
         FROM (
@@ -476,7 +476,7 @@ var (
         )
         `)
 
-	// Template for ARRAYS_ZIP transpilation
+	// Template for ARRAYS_ZIP transpilation.
 	duckdbArraysZipTemplate = duckdbTemplate(`
         CASE WHEN :null_check THEN NULL
         WHEN :all_empty_check THEN [:empty_struct]
@@ -541,7 +541,7 @@ var (
         ) END
         `)
 
-	// Template for STRTOK function transpilation
+	// Template for STRTOK function transpilation.
 	duckdbStrtokTemplate = duckdbTemplate(`
         CASE
             WHEN :delimiter = '' AND :string = '' THEN NULL

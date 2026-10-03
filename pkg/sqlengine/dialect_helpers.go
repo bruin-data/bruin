@@ -473,7 +473,7 @@ func varMapSQL(g *Generator, e *Expr, mapFuncName string /*="MAP"*/) string {
 // monthsBetweenSQL mirrors dialect.months_between_sql.
 //
 // Transpile MONTHS_BETWEEN to dialects that don't have native support.
-// Formula: DATEDIFF('month', date2, date1) + (DAY(date1) - DAY(date2)) / 31.0
+// Formula: DATEDIFF('month', date2, date1) + (DAY(date1) - DAY(date2)) / 31.0.
 func monthsBetweenSQL(g *Generator, e *Expr) string {
 	date1 := e.This()
 	date2 := e.Expression()
@@ -735,7 +735,7 @@ func datestrtodateSQL(g *Generator, e *Expr) string {
 }
 
 // encodeDecodeSQL mirrors dialect.encode_decode_sql(self, expression, name, replace=True).
-// Used for Presto and Duckdb which use functions that don't support charset, and assume utf-8
+// Used for Presto and Duckdb which use functions that don't support charset, and assume utf-8.
 func encodeDecodeSQL(g *Generator, e *Expr, name string, replace bool /*=True*/) string {
 	charset := e.ArgE("charset")
 	if charset != nil {
@@ -898,7 +898,7 @@ func binaryFromFunction(kind Kind) FuncBuilder {
 }
 
 // buildTimestampTrunc mirrors dialect.build_timestamp_trunc.
-// Used to represent DATE_TRUNC in Doris, Postgres and Starrocks dialects
+// Used to represent DATE_TRUNC in Doris, Postgres and Starrocks dialects.
 func buildTimestampTrunc(args []*Expr, d *Dialect) *Expr {
 	return New(KTimestampTrunc, "this", seqGet(args, 1), "unit", seqGet(args, 0))
 }
@@ -1103,7 +1103,7 @@ func unitToVar(e *Expr, def string /*="DAY"*/) *Expr {
 
 // WEEK_START_DAY_TO_DOW mirrors dialect.WEEK_START_DAY_TO_DOW.
 // Days of week to ISO 8601 day-of-week numbers
-// ISO 8601 standard: Monday=1, Tuesday=2, Wednesday=3, Thursday=4, Friday=5, Saturday=6, Sunday=7
+// ISO 8601 standard: Monday=1, Tuesday=2, Wednesday=3, Thursday=4, Friday=5, Saturday=6, Sunday=7.
 var WEEK_START_DAY_TO_DOW = map[string]int{
 	"MONDAY":    1,
 	"TUESDAY":   2,
@@ -1749,7 +1749,7 @@ func dhIsZero(e *Expr) bool {
 //
 // Generates SQL for Getbit according to DuckDB and Postgres, transpiling it if either:
 // 1. The zero index corresponds to the least-significant bit
-// 2. The input type is an integer value
+// 2. The input type is an integer value.
 func getbitSQL(g *Generator, e *Expr) string {
 	value := e.This()
 	position := e.Expression()
@@ -1944,7 +1944,7 @@ func dhApplyIndexOffset(this *Expr, expressions []*Expr, offset int, d *Dialect)
 // dhSubsecondPrecision mirrors sqlglot.time.subsecond_precision (datetime.fromisoformat semantics).
 //
 // Given an ISO-8601 timestamp literal, eg '2023-01-01 12:13:14.123456+00:00'
-// figure out its subsecond precision so we can construct types like DATETIME(6)
+// figure out its subsecond precision so we can construct types like DATETIME(6).
 func dhSubsecondPrecision(timestampLiteral string) int {
 	microsecond, ok := dhFromISOFormatMicrosecond(timestampLiteral)
 	if !ok {

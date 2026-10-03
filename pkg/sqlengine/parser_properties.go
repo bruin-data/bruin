@@ -4,7 +4,7 @@ import "fmt"
 
 // Port of sqlglot.parser.Parser (chunk A, part 2): property parsing (parser.py L2794-L3442).
 
-// _parse_property_before (parser.py L2794)
+// _parse_property_before (parser.py L2794).
 func (p *Parser) baseParsePropertyBefore() any {
 	// only used for teradata currently
 	p.match(TK_COMMA)
@@ -56,7 +56,7 @@ func (p *Parser) parseWrappedProperties() []*Expr {
 	return out
 }
 
-// _parse_property (parser.py L2822)
+// _parse_property (parser.py L2822).
 func (p *Parser) parseProperty() any {
 	if matchTextKeys(p, p.s.PROPERTY_PARSERS) {
 		return chunkANormAny(p.s.PROPERTY_PARSERS[upperText(p.prev)](p, propKwargs{}))
@@ -84,7 +84,7 @@ func (p *Parser) parseProperty() any {
 	return chunkANormAny(p.parseKeyValueProperty(nil))
 }
 
-// _parse_key_value_property (parser.py L2844)
+// _parse_key_value_property (parser.py L2844).
 func (p *Parser) parseKeyValueProperty(parseValue func() *Expr) *Expr {
 	index := p.index
 	key := p.parseColumn()
@@ -121,7 +121,7 @@ func (p *Parser) parseKeyValueProperty(parseValue func() *Expr) *Expr {
 	return p.expression(New(KProperty, "this", key, "value", value))
 }
 
-// _parse_stored (parser.py L2870)
+// _parse_stored (parser.py L2870).
 func (p *Parser) parseStored() *Expr {
 	if p.matchTextSeq("BY") {
 		return p.expression(New(KStorageHandlerProperty, "this", p.parseVarOrString(false)))
@@ -156,7 +156,7 @@ func (p *Parser) parseStored() *Expr {
 	return p.expression(New(KFileFormatProperty, "this", this, "hive_format", true))
 }
 
-// _parse_unquoted_field (parser.py L2893)
+// _parse_unquoted_field (parser.py L2893).
 func (p *Parser) parseUnquotedField() *Expr {
 	field := p.parseField(false, nil, false)
 	if field.IsA(KIdentifier) && !field.ArgB("quoted") {
@@ -167,7 +167,7 @@ func (p *Parser) parseUnquotedField() *Expr {
 	return field
 }
 
-// _parse_property_assignment (parser.py L2900)
+// _parse_property_assignment (parser.py L2900).
 func (p *Parser) parsePropertyAssignment(expClass Kind, kv ...any) *Expr {
 	p.match(TK_EQ)
 	p.match(TK_ALIAS)
@@ -176,7 +176,7 @@ func (p *Parser) parsePropertyAssignment(expClass Kind, kv ...any) *Expr {
 	return p.expression(New(expClass, args...))
 }
 
-// _parse_properties (parser.py L2906)
+// _parse_properties (parser.py L2906).
 func (p *Parser) parseProperties(before bool) *Expr {
 	properties := []*Expr{}
 	for {
@@ -199,12 +199,12 @@ func (p *Parser) parseProperties(before bool) *Expr {
 	return nil
 }
 
-// _parse_fallback (parser.py L2923)
+// _parse_fallback (parser.py L2923).
 func (p *Parser) parseFallback(no bool) *Expr {
 	return p.expression(New(KFallbackProperty, "no", no, "protection", p.matchTextSeq("PROTECTION")))
 }
 
-// _parse_sql_security (parser.py L2928)
+// _parse_sql_security (parser.py L2928).
 func (p *Parser) parseSqlSecurity() *Expr {
 	// self._match_texts(...) and self._prev.text.upper() -> False when unmatched
 	var this any = false
@@ -214,12 +214,12 @@ func (p *Parser) parseSqlSecurity() *Expr {
 	return p.expression(New(KSqlSecurityProperty, "this", this))
 }
 
-// _parse_settings_property (parser.py L2935)
+// _parse_settings_property (parser.py L2935).
 func (p *Parser) parseSettingsProperty() *Expr {
 	return p.expression(New(KSettingsProperty, "expressions", p.parseCSV(p.parseAssignment, TK_COMMA)))
 }
 
-// _parse_called_on_null_input_property (parser.py L2940)
+// _parse_called_on_null_input_property (parser.py L2940).
 func (p *Parser) parseCalledOnNullInputProperty() *Expr {
 	if !p.matchTextSeq("ON", "NULL", "INPUT") {
 		p.retreat(p.index - 1)
@@ -229,7 +229,7 @@ func (p *Parser) parseCalledOnNullInputProperty() *Expr {
 	return p.expression(New(KCalledOnNullInputProperty))
 }
 
-// _parse_volatile_property (parser.py L2947)
+// _parse_volatile_property (parser.py L2947).
 func (p *Parser) parseVolatileProperty() *Expr {
 	var preVolatileToken *Token
 	if p.index >= 2 {
@@ -243,7 +243,7 @@ func (p *Parser) parseVolatileProperty() *Expr {
 	return p.expression(New(KStabilityProperty, "this", LiteralString("VOLATILE")))
 }
 
-// _parse_retention_period (parser.py L2958)
+// _parse_retention_period (parser.py L2958).
 func (p *Parser) parseRetentionPeriod() *Expr {
 	// Parse TSQL's HISTORY_RETENTION_PERIOD: {INFINITE | <number> DAY | DAYS | MONTH ...}
 	number := p.parseNumber()
@@ -259,7 +259,7 @@ func (p *Parser) parseRetentionPeriod() *Expr {
 	return chunkAVar(numberStr + unitStr)
 }
 
-// _parse_system_versioning_property (parser.py L2965)
+// _parse_system_versioning_property (parser.py L2965).
 func (p *Parser) parseSystemVersioningProperty(with bool) *Expr {
 	p.match(TK_EQ)
 	prop := p.expression(New(KWithSystemVersioningProperty, "on", true, "with_", with))
@@ -291,7 +291,7 @@ func (p *Parser) parseSystemVersioningProperty(with bool) *Expr {
 	return prop
 }
 
-// _parse_data_deletion_property (parser.py L2989)
+// _parse_data_deletion_property (parser.py L2989).
 func (p *Parser) parseDataDeletionProperty() *Expr {
 	p.match(TK_EQ)
 	on := p.matchTextSeq("ON") || !p.matchTextSeq("OFF")
@@ -312,7 +312,7 @@ func (p *Parser) parseDataDeletionProperty() *Expr {
 	return prop
 }
 
-// _parse_distributed_property (parser.py L3005)
+// _parse_distributed_property (parser.py L3005).
 func (p *Parser) parseDistributedProperty() *Expr {
 	kind := "HASH"
 	var expressions any
@@ -337,14 +337,14 @@ func (p *Parser) parseDistributedProperty() *Expr {
 	))
 }
 
-// _parse_composite_key_property (parser.py L3024)
+// _parse_composite_key_property (parser.py L3024).
 func (p *Parser) parseCompositeKeyProperty(exprType Kind) *Expr {
 	p.matchTextSeq("KEY")
 	expressions := p.parseWrappedIdVars(false)
 	return p.expression(New(exprType, "expressions", expressions))
 }
 
-// _parse_with_property (parser.py L3029)
+// _parse_with_property (parser.py L3029).
 func (p *Parser) baseParseWithProperty() any {
 	if p.matchTextSeq("(", "SYSTEM_VERSIONING") {
 		prop := p.parseSystemVersioningProperty(true)
@@ -398,7 +398,7 @@ func (p *Parser) baseParseWithProperty() any {
 	return chunkANormAny(p.parseWithisolatedloading())
 }
 
-// _parse_procedure_option (parser.py L3072)
+// _parse_procedure_option (parser.py L3072).
 func (p *Parser) parseProcedureOption() *Expr {
 	if p.matchTextSeq("EXECUTE", "AS") {
 		this := p.parseVarFromOptions(p.s.EXECUTE_AS_OPTIONS, false)
@@ -436,24 +436,24 @@ func (p *Parser) baseParseDefiner() *Expr {
 	return New(KDefinerProperty, "this", exprSQL(user)+"@"+hostStr)
 }
 
-// _parse_withjournaltable (parser.py L3098)
+// _parse_withjournaltable (parser.py L3098).
 func (p *Parser) parseWithjournaltable() *Expr {
 	p.match(TK_TABLE)
 	p.match(TK_EQ)
 	return p.expression(New(KWithJournalTableProperty, "this", p.parseTableParts(false, false, false, false)))
 }
 
-// _parse_log (parser.py L3103)
+// _parse_log (parser.py L3103).
 func (p *Parser) parseLog(no bool) *Expr {
 	return p.expression(New(KLogProperty, "no", no))
 }
 
-// _parse_journal (parser.py L3106)
+// _parse_journal (parser.py L3106).
 func (p *Parser) parseJournal(kw propKwargs) *Expr {
 	return p.expression(New(KJournalProperty, chunkAPropKwargsPairs(kw)...))
 }
 
-// _parse_checksum (parser.py L3109)
+// _parse_checksum (parser.py L3109).
 func (p *Parser) parseChecksum() *Expr {
 	p.match(TK_EQ)
 
@@ -467,13 +467,13 @@ func (p *Parser) parseChecksum() *Expr {
 	return p.expression(New(KChecksumProperty, "on", on, "default", p.match(TK_DEFAULT)))
 }
 
-// _parse_cluster (parser.py L3120)
+// _parse_cluster (parser.py L3120).
 func (p *Parser) parseCluster() *Expr {
 	p.match(TK_CLUSTER_BY)
 	return p.expression(New(KCluster, "expressions", p.parseCSV(p.parseColumn, TK_COMMA)))
 }
 
-// _parse_cluster_property (parser.py L3128)
+// _parse_cluster_property (parser.py L3128).
 func (p *Parser) baseParseClusterProperty() *Expr {
 	return p.expression(New(
 		KClusterProperty,
@@ -481,7 +481,7 @@ func (p *Parser) baseParseClusterProperty() *Expr {
 	))
 }
 
-// _parse_clustered_by (parser.py L3135)
+// _parse_clustered_by (parser.py L3135).
 func (p *Parser) parseClusteredBy() *Expr {
 	p.matchTextSeq("BY")
 
@@ -508,7 +508,7 @@ func (p *Parser) parseClusteredBy() *Expr {
 	))
 }
 
-// _parse_copy_property (parser.py L3157)
+// _parse_copy_property (parser.py L3157).
 func (p *Parser) parseCopyProperty() *Expr {
 	if !p.matchTextSeq("GRANTS") {
 		p.retreat(p.index - 1)
@@ -518,7 +518,7 @@ func (p *Parser) parseCopyProperty() *Expr {
 	return p.expression(New(KCopyGrantsProperty))
 }
 
-// _parse_freespace (parser.py L3164)
+// _parse_freespace (parser.py L3164).
 func (p *Parser) parseFreespace() *Expr {
 	p.match(TK_EQ)
 	this := p.parseNumber()
@@ -526,7 +526,7 @@ func (p *Parser) parseFreespace() *Expr {
 	return p.expression(New(KFreespaceProperty, "this", this, "percent", percent))
 }
 
-// _parse_mergeblockratio (parser.py L3170)
+// _parse_mergeblockratio (parser.py L3170).
 func (p *Parser) parseMergeblockratio(no bool, default_ bool) *Expr {
 	if p.match(TK_EQ) {
 		this := p.parseNumber()
@@ -537,7 +537,7 @@ func (p *Parser) parseMergeblockratio(no bool, default_ bool) *Expr {
 	return p.expression(New(KMergeBlockRatioProperty, "no", no, "default", default_))
 }
 
-// _parse_datablocksize (parser.py L3182)
+// _parse_datablocksize (parser.py L3182).
 func (p *Parser) parseDatablocksize(default_ bool, minimum bool, maximum bool) *Expr {
 	p.match(TK_EQ)
 	size := p.parseNumber()
@@ -557,7 +557,7 @@ func (p *Parser) parseDatablocksize(default_ bool, minimum bool, maximum bool) *
 	))
 }
 
-// _parse_blockcompression (parser.py L3201)
+// _parse_blockcompression (parser.py L3201).
 func (p *Parser) parseBlockcompression() *Expr {
 	p.match(TK_EQ)
 	always := p.matchTextSeq("ALWAYS")
@@ -580,7 +580,7 @@ func (p *Parser) parseBlockcompression() *Expr {
 	))
 }
 
-// _parse_withisolatedloading (parser.py L3218)
+// _parse_withisolatedloading (parser.py L3218).
 func (p *Parser) parseWithisolatedloading() *Expr {
 	index := p.index
 	no := p.matchTextSeq("NO")
@@ -600,7 +600,7 @@ func (p *Parser) parseWithisolatedloading() *Expr {
 	))
 }
 
-// _parse_locking (parser.py L3232)
+// _parse_locking (parser.py L3232).
 func (p *Parser) parseLocking() *Expr {
 	kind := ""
 	if p.match(TK_TABLE) {
@@ -652,7 +652,7 @@ func (p *Parser) parseLocking() *Expr {
 	))
 }
 
-// _parse_partition_by (parser.py L3279)
+// _parse_partition_by (parser.py L3279).
 func (p *Parser) parsePartitionBy() []*Expr {
 	if p.match(TK_PARTITION_BY) {
 		return p.parseCSV(p.parseDisjunction, TK_COMMA)
@@ -660,7 +660,7 @@ func (p *Parser) parsePartitionBy() []*Expr {
 	return []*Expr{}
 }
 
-// _parse_partition_bound_spec (parser.py L3284)
+// _parse_partition_bound_spec (parser.py L3284).
 func (p *Parser) parsePartitionBoundSpec() *Expr {
 	parsePartitionBoundExpr := func() *Expr {
 		if p.matchTextSeq("MINVALUE") {
@@ -725,7 +725,7 @@ func (p *Parser) parsePartitionedOf() *Expr {
 	return p.expression(New(KPartitionedOfProperty, "this", this, "expression", expression))
 }
 
-// _parse_partitioned_by (parser.py L3337)
+// _parse_partitioned_by (parser.py L3337).
 func (p *Parser) baseParsePartitionedBy() *Expr {
 	p.match(TK_EQ)
 	this := p.parseSchema(nil)
@@ -735,7 +735,7 @@ func (p *Parser) baseParsePartitionedBy() *Expr {
 	return p.expression(New(KPartitionedByProperty, "this", this))
 }
 
-// _parse_withdata (parser.py L3345)
+// _parse_withdata (parser.py L3345).
 func (p *Parser) parseWithdata(no bool) *Expr {
 	var statistics any
 	if p.matchTextSeq("AND", "STATISTICS") {
@@ -747,7 +747,7 @@ func (p *Parser) parseWithdata(no bool) *Expr {
 	return p.expression(New(KWithDataProperty, "no", no, "statistics", statistics))
 }
 
-// _parse_contains_property (parser.py L3355)
+// _parse_contains_property (parser.py L3355).
 func (p *Parser) parseContainsProperty() *Expr {
 	if p.matchTextSeq("SQL") {
 		return p.expression(New(KSqlReadWriteProperty, "this", "CONTAINS SQL"))
@@ -755,7 +755,7 @@ func (p *Parser) parseContainsProperty() *Expr {
 	return nil
 }
 
-// _parse_modifies_property (parser.py L3360)
+// _parse_modifies_property (parser.py L3360).
 func (p *Parser) parseModifiesProperty() *Expr {
 	if p.matchTextSeq("SQL", "DATA") {
 		return p.expression(New(KSqlReadWriteProperty, "this", "MODIFIES SQL DATA"))
@@ -763,7 +763,7 @@ func (p *Parser) parseModifiesProperty() *Expr {
 	return nil
 }
 
-// _parse_no_property (parser.py L3365)
+// _parse_no_property (parser.py L3365).
 func (p *Parser) parseNoProperty() *Expr {
 	if p.matchTextSeq("PRIMARY", "INDEX") {
 		return New(KNoPrimaryIndexProperty)
@@ -774,7 +774,7 @@ func (p *Parser) parseNoProperty() *Expr {
 	return nil
 }
 
-// _parse_on_property (parser.py L3372)
+// _parse_on_property (parser.py L3372).
 func (p *Parser) baseParseOnProperty() *Expr {
 	if p.matchTextSeq("COMMIT", "PRESERVE", "ROWS") {
 		return New(KOnCommitProperty)
@@ -785,7 +785,7 @@ func (p *Parser) baseParseOnProperty() *Expr {
 	return p.expression(New(KOnProperty, "this", p.parseSchema(p.parseIdVar(true, nil))))
 }
 
-// _parse_reads_property (parser.py L3379)
+// _parse_reads_property (parser.py L3379).
 func (p *Parser) parseReadsProperty() *Expr {
 	if p.matchTextSeq("SQL", "DATA") {
 		return p.expression(New(KSqlReadWriteProperty, "this", "READS SQL DATA"))
@@ -793,7 +793,7 @@ func (p *Parser) parseReadsProperty() *Expr {
 	return nil
 }
 
-// _parse_distkey (parser.py L3384)
+// _parse_distkey (parser.py L3384).
 func (p *Parser) parseDistkey() *Expr {
 	return p.expression(New(
 		KDistKeyProperty,
@@ -801,7 +801,7 @@ func (p *Parser) parseDistkey() *Expr {
 	))
 }
 
-// _parse_create_like (parser.py L3387)
+// _parse_create_like (parser.py L3387).
 func (p *Parser) parseCreateLike() *Expr {
 	table := p.parseTable(true, false, nil, false, false, false, false)
 
@@ -824,7 +824,7 @@ func (p *Parser) parseCreateLike() *Expr {
 	return p.expression(New(KLikeProperty, "this", table, "expressions", options))
 }
 
-// _parse_sortkey (parser.py L3404)
+// _parse_sortkey (parser.py L3404).
 func (p *Parser) parseSortkey(compound bool) *Expr {
 	return p.expression(New(
 		KSortKeyProperty,
@@ -833,7 +833,7 @@ func (p *Parser) parseSortkey(compound bool) *Expr {
 	))
 }
 
-// _parse_character_set (parser.py L3409)
+// _parse_character_set (parser.py L3409).
 func (p *Parser) parseCharacterSet(default_ bool) *Expr {
 	p.match(TK_EQ)
 	return p.expression(New(
@@ -843,7 +843,7 @@ func (p *Parser) parseCharacterSet(default_ bool) *Expr {
 	))
 }
 
-// _parse_remote_with_connection (parser.py L3415)
+// _parse_remote_with_connection (parser.py L3415).
 func (p *Parser) parseRemoteWithConnection() *Expr {
 	p.matchTextSeq("WITH", "CONNECTION")
 	return p.expression(New(
@@ -852,7 +852,7 @@ func (p *Parser) parseRemoteWithConnection() *Expr {
 	))
 }
 
-// _parse_returns (parser.py L3421)
+// _parse_returns (parser.py L3421).
 func (p *Parser) baseParseReturns() *Expr {
 	var value *Expr
 	var null any

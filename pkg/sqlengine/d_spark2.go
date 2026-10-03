@@ -251,7 +251,7 @@ func spark2UnqualifyPivotColumns(expression *Expr) *Expr {
 }
 
 // spark2TemporaryStorageProvider mirrors generators.spark2.temporary_storage_provider.
-// spark2, spark, Databricks require a storage provider for temporary tables
+// spark2, spark, Databricks require a storage provider for temporary tables.
 func spark2TemporaryStorageProvider(expression *Expr) *Expr {
 	provider := New(KFileFormatProperty, "this", LiteralString("parquet"))
 	expression.ArgE("properties").Append("expressions", provider)

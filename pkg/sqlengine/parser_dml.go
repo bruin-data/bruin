@@ -28,7 +28,7 @@ func (k *chunkBKwargs) set(key string, v any) {
 	k.kv = append(k.kv, key, v)
 }
 
-// _parse_describe (parser.py L3443)
+// _parse_describe (parser.py L3443).
 func (p *Parser) baseParseDescribe() *Expr {
 	var kind any
 	if p.matchSet(p.s.CREATABLES) {
@@ -74,7 +74,7 @@ func (p *Parser) baseParseDescribe() *Expr {
 	))
 }
 
-// _parse_multitable_inserts (parser.py L3474)
+// _parse_multitable_inserts (parser.py L3474).
 func (p *Parser) parseMultitableInserts(comments []string) *Expr {
 	kind := upperText(p.prev)
 	expressions := []*Expr{}
@@ -116,7 +116,7 @@ func (p *Parser) parseMultitableInserts(comments []string) *Expr {
 	)
 }
 
-// _parse_insert (parser.py L3513)
+// _parse_insert (parser.py L3513).
 func (p *Parser) parseInsert() *Expr {
 	comments := []string{}
 	hint := p.parseHint()
@@ -207,7 +207,7 @@ func (p *Parser) parseInsert() *Expr {
 	), comments)
 }
 
-// _parse_insert_table (parser.py L3571)
+// _parse_insert_table (parser.py L3571).
 func (p *Parser) baseParseInsertTable() *Expr {
 	this := p.parseTable(true, false, nil, false, false, true, false)
 	if this.IsA(KTable) && p.matchNoAdvance(TK_ALIAS) {
@@ -216,7 +216,7 @@ func (p *Parser) baseParseInsertTable() *Expr {
 	return this
 }
 
-// _parse_kill (parser.py L3577)
+// _parse_kill (parser.py L3577).
 func (p *Parser) parseKill() *Expr {
 	var kind *Expr
 	if p.matchTexts("CONNECTION", "QUERY") {
@@ -226,7 +226,7 @@ func (p *Parser) parseKill() *Expr {
 	return p.expression(New(KKill, "this", p.parsePrimary(), "kind", kind))
 }
 
-// _parse_on_conflict (parser.py L3582)
+// _parse_on_conflict (parser.py L3582).
 func (p *Parser) parseOnConflict() *Expr {
 	conflict := p.matchTextSeq("ON", "CONFLICT")
 	duplicate := p.matchTextSeq("ON", "DUPLICATE", "KEY")
@@ -269,7 +269,7 @@ func (p *Parser) parseOnConflict() *Expr {
 	))
 }
 
-// _parse_returning (parser.py L3620)
+// _parse_returning (parser.py L3620).
 func (p *Parser) parseReturning() *Expr {
 	if !p.match(TK_RETURNING) {
 		return nil
@@ -279,7 +279,7 @@ func (p *Parser) parseReturning() *Expr {
 	return p.expression(New(KReturning, "expressions", expressions, "into", into))
 }
 
-// _parse_row (parser.py L3630)
+// _parse_row (parser.py L3630).
 func (p *Parser) parseRow() *Expr {
 	if !p.match(TK_FORMAT) {
 		return nil
@@ -287,7 +287,7 @@ func (p *Parser) parseRow() *Expr {
 	return p.parseRowFormat(false)
 }
 
-// _parse_serde_properties (parser.py L3635)
+// _parse_serde_properties (parser.py L3635).
 func (p *Parser) parseSerdeProperties(with bool) *Expr {
 	index := p.index
 	with = with || p.matchTextSeq("WITH")
@@ -303,7 +303,7 @@ func (p *Parser) parseSerdeProperties(with bool) *Expr {
 	))
 }
 
-// _parse_row_format (parser.py L3646)
+// _parse_row_format (parser.py L3646).
 func (p *Parser) parseRowFormat(matchRow bool) *Expr {
 	if matchRow && !p.matchPair(TK_ROW, TK_FORMAT) {
 		return nil
@@ -347,7 +347,7 @@ func (p *Parser) parseRowFormat(matchRow bool) *Expr {
 	return p.expression(New(KRowFormatDelimitedProperty, kwargs...))
 }
 
-// _parse_load (parser.py L3680)
+// _parse_load (parser.py L3680).
 func (p *Parser) parseLoad() *Expr {
 	if p.matchTextSeq("DATA") {
 		local := p.matchTextSeq("LOCAL")
@@ -385,7 +385,7 @@ func (p *Parser) parseLoad() *Expr {
 	return p.parseAsCommand(p.prev)
 }
 
-// _parse_delete (parser.py L3707)
+// _parse_delete (parser.py L3707).
 func (p *Parser) parseDelete() *Expr {
 	hint := p.parseHint()
 
@@ -433,7 +433,7 @@ func (p *Parser) parseDelete() *Expr {
 	))
 }
 
-// _parse_update (parser.py L3733)
+// _parse_update (parser.py L3733).
 func (p *Parser) baseParseUpdate() *Expr {
 	hint := p.parseHint()
 	kwargs := &chunkBKwargs{}
@@ -477,14 +477,14 @@ func (p *Parser) baseParseUpdate() *Expr {
 	return p.expression(New(KUpdate, kwargs.kv...))
 }
 
-// _parse_use (parser.py L3762)
+// _parse_use (parser.py L3762).
 func (p *Parser) baseParseUse() *Expr {
 	kind := p.parseVarFromOptions(p.s.USABLES, false)
 	this := p.parseTable(false, false, nil, false, false, false, false)
 	return p.expression(New(KUse, "kind", kind, "this", this))
 }
 
-// _parse_uncache (parser.py L3770)
+// _parse_uncache (parser.py L3770).
 func (p *Parser) parseUncache() *Expr {
 	if !p.match(TK_TABLE) {
 		p.raiseError("Expecting TABLE after UNCACHE", nil)
@@ -495,7 +495,7 @@ func (p *Parser) parseUncache() *Expr {
 	return p.expression(New(KUncache, "exists", exists, "this", this))
 }
 
-// _parse_cache (parser.py L3778)
+// _parse_cache (parser.py L3778).
 func (p *Parser) parseCache() *Expr {
 	lazy := p.matchTextSeq("LAZY")
 	p.match(TK_TABLE)

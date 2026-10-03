@@ -171,7 +171,7 @@ func chunkBParseOneInto(d *Dialect, kind Kind, sql string) *Expr {
 	return e
 }
 
-// _parse_partition (parser.py L3799)
+// _parse_partition (parser.py L3799).
 func (p *Parser) baseParsePartition() *Expr {
 	if !p.matchTextSet(p.s.PARTITION_KEYWORDS) {
 		return nil
@@ -185,7 +185,7 @@ func (p *Parser) baseParsePartition() *Expr {
 	))
 }
 
-// _parse_value (parser.py L3810)
+// _parse_value (parser.py L3810).
 func (p *Parser) baseParseValue(values bool) *Expr {
 	parseValueExpression := func() *Expr {
 		if p.d.S.SUPPORTS_VALUES_DEFAULT && p.match(TK_DEFAULT) {
@@ -208,12 +208,12 @@ func (p *Parser) baseParseValue(values bool) *Expr {
 	return nil
 }
 
-// _parse_projections (parser.py L3827)
+// _parse_projections (parser.py L3827).
 func (p *Parser) baseParseProjections() ([]*Expr, []*Expr) {
 	return p.parseExpressions(), nil
 }
 
-// _parse_wrapped_select (parser.py L3832)
+// _parse_wrapped_select (parser.py L3832).
 func (p *Parser) baseParseWrappedSelect(table bool) *Expr {
 	var this *Expr
 	if p.matchAny(TK_PIVOT, TK_UNPIVOT) {
@@ -251,7 +251,7 @@ func (p *Parser) baseParseWrappedSelect(table bool) *Expr {
 	return this
 }
 
-// _parse_select (parser.py L3865)
+// _parse_select (parser.py L3865).
 func (p *Parser) parseSelect(nested bool, table bool, parseSubqueryAlias bool, parseSetOperation bool, consumePipe bool, from *Expr) *Expr {
 	p.enter()
 	defer p.leave()
@@ -273,7 +273,7 @@ func (p *Parser) parseSelect(nested bool, table bool, parseSubqueryAlias bool, p
 	return query
 }
 
-// _parse_select_query (parser.py L3890)
+// _parse_select_query (parser.py L3890).
 func (p *Parser) parseSelectQuery(nested bool, table bool, parseSubqueryAlias bool, parseSetOperation bool) *Expr {
 	cte := p.parseWith(false)
 
@@ -441,7 +441,7 @@ func (p *Parser) parseSelectQuery(nested bool, table bool, parseSubqueryAlias bo
 	return this
 }
 
-// _parse_recursive_with_search (parser.py L4032)
+// _parse_recursive_with_search (parser.py L4032).
 func (p *Parser) parseRecursiveWithSearch() *Expr {
 	p.matchTextSeq("SEARCH")
 
@@ -468,7 +468,7 @@ func (p *Parser) parseRecursiveWithSearch() *Expr {
 	))
 }
 
-// _parse_with (parser.py L4051)
+// _parse_with (parser.py L4051).
 func (p *Parser) parseWith(skipWithToken bool) *Expr {
 	if !skipWithToken && !p.match(TK_WITH) {
 		return nil
@@ -510,7 +510,7 @@ func (p *Parser) parseWith(skipWithToken bool) *Expr {
 	), comments)
 }
 
-// _parse_cte (parser.py L4083)
+// _parse_cte (parser.py L4083).
 func (p *Parser) baseParseCte() *Expr {
 	index := p.index
 
@@ -555,7 +555,7 @@ func (p *Parser) baseParseCte() *Expr {
 	return cte
 }
 
-// _values_to_select (parser.py L4123)
+// _values_to_select (parser.py L4123).
 func (p *Parser) valuesToSelect(values *Expr) *Expr {
 	if values.Alias() != "" {
 		return chunkBSelectFrom(chunkBSelectStar(), values)
@@ -563,7 +563,7 @@ func (p *Parser) valuesToSelect(values *Expr) *Expr {
 	return chunkBSelectFrom(chunkBSelectStar(), chunkBAlias(values, "_values", true, true))
 }
 
-// _parse_table_alias (parser.py L4128)
+// _parse_table_alias (parser.py L4128).
 func (p *Parser) parseTableAlias(aliasTokens *TokenSet) *Expr {
 	// In some dialects, LIMIT and OFFSET can act as both identifiers and keywords (clauses)
 	// so this section tries to parse the clause version and if it fails, it treats the token
@@ -609,7 +609,7 @@ func (p *Parser) parseTableAlias(aliasTokens *TokenSet) *Expr {
 	return tableAlias
 }
 
-// _parse_subquery (parser.py L4161)
+// _parse_subquery (parser.py L4161).
 func (p *Parser) parseSubquery(this *Expr, parseAlias bool) *Expr {
 	if this == nil {
 		return nil
@@ -633,7 +633,7 @@ func (p *Parser) parseSubquery(this *Expr, parseAlias bool) *Expr {
 	))
 }
 
-// _implicit_unnests_to_explicit (parser.py L4176)
+// _implicit_unnests_to_explicit (parser.py L4176).
 func (p *Parser) implicitUnnestsToExplicit(this *Expr) *Expr {
 	refs := map[string]bool{
 		chunkBNormalizeIdentifiers(this.ArgE("from_").This().Copy(), p.d).AliasOrName(): true,
@@ -667,7 +667,7 @@ func (p *Parser) implicitUnnestsToExplicit(this *Expr) *Expr {
 	return this
 }
 
-// _parse_query_modifiers (parser.py L4209)
+// _parse_query_modifiers (parser.py L4209).
 func (p *Parser) parseQueryModifiers(this *Expr) *Expr {
 	if this.IsA(p.s.MODIFIABLES...) {
 		for join := range p.parseJoins(nil) {
@@ -720,7 +720,7 @@ func (p *Parser) parseQueryModifiers(this *Expr) *Expr {
 	return this
 }
 
-// _parse_hint_fallback_to_string (parser.py L4249)
+// _parse_hint_fallback_to_string (parser.py L4249).
 func (p *Parser) parseHintFallbackToString() *Expr {
 	start := p.curr
 	for p.curr.ok() {
@@ -736,12 +736,12 @@ func (p *Parser) parseHintFallbackToString() *Expr {
 	return New(KHint, "expressions", []string{p.findSQL(start, end)})
 }
 
-// _parse_hint_function_call (parser.py L4257)
+// _parse_hint_function_call (parser.py L4257).
 func (p *Parser) baseParseHintFunctionCall() *Expr {
 	return p.parseFunctionCall(nil, false, true, false)
 }
 
-// _parse_hint_body (parser.py L4260)
+// _parse_hint_body (parser.py L4260).
 func (p *Parser) parseHintBody() *Expr {
 	startIndex := p.index
 	shouldFallbackToString := false
@@ -780,7 +780,7 @@ func (p *Parser) parseHintBody() *Expr {
 	return p.expression(New(KHint, "expressions", hints))
 }
 
-// _parse_hint (parser.py L4282)
+// _parse_hint (parser.py L4282).
 func (p *Parser) parseHint() *Expr {
 	if p.match(TK_HINT) && len(p.prevComments) > 0 {
 		return chunkBParseOneInto(p.d, KHint, p.prevComments[0])
@@ -789,7 +789,7 @@ func (p *Parser) parseHint() *Expr {
 	return nil
 }
 
-// _parse_into (parser.py L4288)
+// _parse_into (parser.py L4288).
 func (p *Parser) baseParseInto() *Expr {
 	if !p.match(TK_INTO) {
 		return nil
@@ -803,7 +803,7 @@ func (p *Parser) baseParseInto() *Expr {
 	return p.expression(New(KInto, "this", this, "temporary", temp, "unlogged", unlogged))
 }
 
-// _parse_from (parser.py L4300)
+// _parse_from (parser.py L4300).
 func (p *Parser) parseFrom(joins bool, skipFromToken bool, consumePipe bool) *Expr {
 	if !skipFromToken && !p.match(TK_FROM) {
 		return nil

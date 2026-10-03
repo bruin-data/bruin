@@ -11,7 +11,7 @@ import (
 var duckdbConnectByArgsToSkip = newStrSet("connect", "where", "from_", "with_", "expressions")
 
 // Regex to detect time zones in timestamps of the form [+|-]TT[:tt]
-// The pattern matches timezone offsets that appear after the time portion
+// The pattern matches timezone offsets that appear after the time portion.
 var duckdbTimezonePattern = regexp.MustCompile(`:\d{2}.*?[+\-]\d{2}(?::\d{2})?`)
 
 // Characters that must be escaped when building regex expressions in INITCAP (ordered).
@@ -32,7 +32,7 @@ func duckdbRegexEscapeReplacement(ch string) (string, bool) {
 	return "", false
 }
 
-// Whitespace control characters that DuckDB must process with `CHR({val})` calls
+// Whitespace control characters that DuckDB must process with `CHR({val})` calls.
 var duckdbWSControlCharsToDuck = map[rune]int{
 	'\u000b': 11,
 	'\u001c': 28,
@@ -270,7 +270,7 @@ func duckdbTimediffSQL(g *Generator, e *Expr) string {
 //
 // DuckDB override to handle:
 // 1. NANOSECOND operations (DuckDB doesn't support INTERVAL ... NANOSECOND)
-// 2. Float/decimal interval values (DuckDB INTERVAL requires integers)
+// 2. Float/decimal interval values (DuckDB INTERVAL requires integers).
 func duckdbDateDeltaToBinaryIntervalOp(cast bool) GenFunc {
 	baseImpl := dateDeltaToBinaryIntervalOp(cast)
 
@@ -1024,7 +1024,7 @@ func duckdbPrepareBinaryBitwiseArgs(e *Expr) {
 //
 // Formulas:
 // - NEXT_DAY: (target_dow - current_dow + 6) % 7 + 1
-// - PREVIOUS_DAY: (current_dow - target_dow + 6) % 7 + 1
+// - PREVIOUS_DAY: (current_dow - target_dow + 6) % 7 + 1.
 func duckdbDayNavigationSQL(g *Generator, e *Expr) string {
 	dateExpr := e.This()
 	dayNameExpr := e.Expression()
@@ -1097,7 +1097,7 @@ func duckdbAnyvalueSQL(g *Generator, e *Expr) string {
 //
 // DuckDB's bitwise aggregate functions only accept integer types. For other types:
 // - DECIMAL/STRING: Use CAST(arg AS INT) to convert directly, will round to nearest int
-// - FLOAT/DOUBLE: Use ROUND(arg)::INT to round to nearest integer, required due to float precision loss
+// - FLOAT/DOUBLE: Use ROUND(arg)::INT to round to nearest integer, required due to float precision loss.
 func duckdbBitwiseAggSQL(g *Generator, e *Expr) string {
 	var funcName string
 	if e.IsA(KBitwiseOrAgg) {
@@ -1304,7 +1304,7 @@ func duckdbBitshiftSQL(g *Generator, e *Expr) string {
 // duckdbScaleRoundingSQL mirrors _scale_rounding_sql. ok=false mirrors a None result.
 //
 // DuckDB doesn't support the scale parameter for certain functions (e.g., FLOOR, CEIL),
-// so we transform: FUNC(x, n) to ROUND(FUNC(x * 10^n) / 10^n, n)
+// so we transform: FUNC(x, n) to ROUND(FUNC(x * 10^n) / 10^n, n).
 func duckdbScaleRoundingSQL(g *Generator, e *Expr, roundingFunc Kind) (string, bool) {
 	decimals := e.ArgE("decimals")
 

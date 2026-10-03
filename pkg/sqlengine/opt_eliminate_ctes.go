@@ -5,7 +5,7 @@ package sqlengine
 // EliminateCTEs mirrors optimizer.eliminate_ctes.eliminate_ctes: removes unused CTEs from an
 // expression.
 //
-// Example: "WITH y AS (SELECT a FROM x) SELECT a FROM z" -> "SELECT a FROM z"
+// Example: "WITH y AS (SELECT a FROM x) SELECT a FROM z" -> "SELECT a FROM z".
 func EliminateCTEs(expression *Expr) *Expr {
 	root := BuildScope(expression)
 

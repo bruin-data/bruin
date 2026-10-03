@@ -211,7 +211,7 @@ func chunkCProduct(lists [][]string) [][]string {
 	return result
 }
 
-// _parse_match_recognize_measure (parser.py L4315)
+// _parse_match_recognize_measure (parser.py L4315).
 func (p *Parser) parseMatchRecognizeMeasure() *Expr {
 	var windowFrame any = false
 	if p.matchTexts("FINAL", "RUNNING") {
@@ -234,7 +234,7 @@ func chunkCAdvanceAnyText(p *Parser) string {
 	return tok.Text
 }
 
-// _parse_match_recognize (parser.py L4323)
+// _parse_match_recognize (parser.py L4323).
 func (p *Parser) parseMatchRecognize() *Expr {
 	if !p.match(TK_MATCH_RECOGNIZE) {
 		return nil
@@ -331,7 +331,7 @@ func (p *Parser) parseMatchRecognize() *Expr {
 	))
 }
 
-// _parse_lateral (parser.py L4412)
+// _parse_lateral (parser.py L4412).
 func (p *Parser) baseParseLateral() *Expr {
 	var crossApply any // bool | None
 	if p.matchPair(TK_CROSS, TK_APPLY) {
@@ -401,7 +401,7 @@ func (p *Parser) baseParseLateral() *Expr {
 	))
 }
 
-// _parse_stream (parser.py L4469)
+// _parse_stream (parser.py L4469).
 func (p *Parser) parseStream() *Expr {
 	index := p.index
 	if p.match(TK_STREAM) {
@@ -415,7 +415,7 @@ func (p *Parser) parseStream() *Expr {
 	return nil
 }
 
-// _parse_join_parts (parser.py L4477)
+// _parse_join_parts (parser.py L4477).
 func (p *Parser) baseParseJoinParts() (*Token, *Token, *Token) {
 	var method, side, kind *Token
 	if p.matchSet(p.s.JOIN_METHODS) {
@@ -430,7 +430,7 @@ func (p *Parser) baseParseJoinParts() (*Token, *Token, *Token) {
 	return method, side, kind
 }
 
-// _parse_using_identifiers (parser.py L4486)
+// _parse_using_identifiers (parser.py L4486).
 func (p *Parser) parseUsingIdentifiers() []*Expr {
 	parseColumnAsIdentifier := func() *Expr {
 		this := p.parseColumn()
@@ -443,7 +443,7 @@ func (p *Parser) parseUsingIdentifiers() []*Expr {
 	return p.parseWrappedCSV(parseColumnAsIdentifier, TK_COMMA, true)
 }
 
-// _parse_join (parser.py L4495)
+// _parse_join (parser.py L4495).
 func (p *Parser) baseParseJoin(skipJoinToken bool, parseBracket bool, aliasTokens *TokenSet) *Expr {
 	if p.match(TK_COMMA) {
 		table := p.tryParseExpr(func() *Expr {
@@ -568,7 +568,7 @@ func (p *Parser) baseParseJoin(skipJoinToken bool, parseBracket bool, aliasToken
 	return p.expressionC(New(KJoin, kwargs.kv()...), comments)
 }
 
-// _parse_opclass (parser.py L4591)
+// _parse_opclass (parser.py L4591).
 func (p *Parser) parseOpclass() *Expr {
 	this := p.parseDisjunction()
 
@@ -583,7 +583,7 @@ func (p *Parser) parseOpclass() *Expr {
 	return this
 }
 
-// _parse_index_params (parser.py L4602)
+// _parse_index_params (parser.py L4602).
 func (p *Parser) parseIndexParams() *Expr {
 	var using *Expr
 	if p.match(TK_USING) {
@@ -628,7 +628,7 @@ func (p *Parser) parseIndexParams() *Expr {
 	))
 }
 
-// _parse_index (parser.py L4635)
+// _parse_index (parser.py L4635).
 func (p *Parser) parseIndex(index *Expr, anonymous bool) *Expr {
 	var unique, primary, amp any
 	var table *Expr
@@ -667,7 +667,7 @@ func (p *Parser) parseIndex(index *Expr, anonymous bool) *Expr {
 	))
 }
 
-// _parse_table_hints (parser.py L4665)
+// _parse_table_hints (parser.py L4665).
 func (p *Parser) parseTableHints() []*Expr {
 	hints := []*Expr{}
 	if p.matchPair(TK_WITH, TK_L_PAREN) {
@@ -707,7 +707,7 @@ func (p *Parser) parseTableHints() []*Expr {
 	return hints
 }
 
-// _parse_table_part (parser.py L4693)
+// _parse_table_part (parser.py L4693).
 func (p *Parser) baseParseTablePart(schema bool) *Expr {
 	if !schema {
 		if f := p.parseFunction(nil, false, false, false); f != nil {
@@ -723,7 +723,7 @@ func (p *Parser) baseParseTablePart(schema bool) *Expr {
 	return p.parsePlaceholder()
 }
 
-// _parse_table_parts_fast (parser.py L4701)
+// _parse_table_parts_fast (parser.py L4701).
 func (p *Parser) parseTablePartsFast() *Expr {
 	index := p.index
 	var parts []*Expr // None until the first part
@@ -796,7 +796,7 @@ func (p *Parser) parseTablePartsFast() *Expr {
 	return table
 }
 
-// _parse_table_parts (parser.py L4764)
+// _parse_table_parts (parser.py L4764).
 func (p *Parser) baseParseTableParts(schema bool, isDbReference bool, wildcard bool, fast bool) *Expr {
 	if fast {
 		return p.parseTablePartsFast()
@@ -875,7 +875,7 @@ func (p *Parser) baseParseTableParts(schema bool, isDbReference bool, wildcard b
 	return result
 }
 
-// _parse_table (parser.py L4835)
+// _parse_table (parser.py L4835).
 func (p *Parser) baseParseTable(schema bool, joins bool, aliasTokens *TokenSet, parseBracket bool, isDbReference bool, parsePartition bool, consumePipe bool) *Expr {
 	if !schema && !isDbReference && !consumePipe && !joins {
 		index := p.index
@@ -1045,7 +1045,7 @@ func (p *Parser) baseParseTable(schema bool, joins bool, aliasTokens *TokenSet, 
 	return this
 }
 
-// _parse_version (parser.py L4975)
+// _parse_version (parser.py L4975).
 func (p *Parser) parseVersion() *Expr {
 	var this string
 	if p.match(TK_TIMESTAMP_SNAPSHOT) {
@@ -1079,7 +1079,7 @@ func (p *Parser) parseVersion() *Expr {
 	return p.expression(New(KVersion, "this", this, "expression", expression, "kind", kind))
 }
 
-// _parse_historical_data (parser.py L5004)
+// _parse_historical_data (parser.py L5004).
 func (p *Parser) parseHistoricalData() *Expr {
 	// https://docs.snowflake.com/en/sql-reference/constructs/at-before
 	index := p.index
@@ -1106,7 +1106,7 @@ func (p *Parser) parseHistoricalData() *Expr {
 	return historicalData
 }
 
-// _parse_changes (parser.py L5027)
+// _parse_changes (parser.py L5027).
 func (p *Parser) parseChanges() *Expr {
 	if !p.matchTextSeq("CHANGES", "(", "INFORMATION", "=>") {
 		return nil
@@ -1125,7 +1125,7 @@ func (p *Parser) parseChanges() *Expr {
 	))
 }
 
-// _parse_unnest (parser.py L5042)
+// _parse_unnest (parser.py L5042).
 func (p *Parser) baseParseUnnest(withAlias bool) *Expr {
 	if !p.matchPairNoAdvance(TK_UNNEST, TK_L_PAREN) {
 		return nil
@@ -1171,7 +1171,7 @@ func (p *Parser) baseParseUnnest(withAlias bool) *Expr {
 	return p.expression(New(KUnnest, "expressions", expressions, "alias", alias, "offset", offset))
 }
 
-// _parse_derived_table_values (parser.py L5073)
+// _parse_derived_table_values (parser.py L5073).
 func (p *Parser) parseDerivedTableValues() *Expr {
 	isDerived := p.matchPair(TK_L_PAREN, TK_VALUES)
 	// ClickHouse's `FORMAT Values` is equivalent to `VALUES`
@@ -1192,7 +1192,7 @@ func (p *Parser) parseDerivedTableValues() *Expr {
 	return p.expression(New(KValues, "expressions", expressions, "alias", alias))
 }
 
-// _parse_table_sample (parser.py L5091)
+// _parse_table_sample (parser.py L5091).
 func (p *Parser) baseParseTableSample(asModifier bool) *Expr {
 	if !p.match(TK_TABLE_SAMPLE) && !(asModifier && p.matchTextSeq("USING", "SAMPLE")) {
 		return nil
@@ -1268,7 +1268,7 @@ func (p *Parser) baseParseTableSample(asModifier bool) *Expr {
 	))
 }
 
-// _parse_pivots (parser.py L5157)
+// _parse_pivots (parser.py L5157).
 func (p *Parser) parsePivots() []*Expr {
 	if !p.matchAnyNoAdvance(TK_PIVOT, TK_UNPIVOT) {
 		return nil
@@ -1287,7 +1287,7 @@ func (p *Parser) parsePivots() []*Expr {
 	return pivots
 }
 
-// _parse_joins (parser.py L5162)
+// _parse_joins (parser.py L5162).
 func (p *Parser) parseJoins(aliasTokens *TokenSet) iter.Seq[*Expr] {
 	return func(yield func(*Expr) bool) {
 		for {
@@ -1302,7 +1302,7 @@ func (p *Parser) parseJoins(aliasTokens *TokenSet) iter.Seq[*Expr] {
 	}
 }
 
-// _parse_unpivot_columns (parser.py L5167)
+// _parse_unpivot_columns (parser.py L5167).
 func (p *Parser) parseUnpivotColumns() *Expr {
 	if !p.match(TK_INTO) {
 		return nil
@@ -1361,7 +1361,7 @@ func (p *Parser) parseSimplifiedPivot(isUnpivot any) *Expr {
 	))
 }
 
-// _parse_pivot_in (parser.py L5211)
+// _parse_pivot_in (parser.py L5211).
 func (p *Parser) parsePivotIn() *Expr {
 	parseAliasedExpression := func() *Expr {
 		this := p.parseSelectOrExpression(false)
@@ -1398,7 +1398,7 @@ func (p *Parser) parsePivotIn() *Expr {
 	return p.expression(New(KIn, "this", value, "field", p.parseIdVar(true, nil)))
 }
 
-// _parse_pivot_aggregation (parser.py L5239)
+// _parse_pivot_aggregation (parser.py L5239).
 func (p *Parser) baseParsePivotAggregation() *Expr {
 	fn := p.parseFunction(nil, false, true, false)
 	if fn == nil {
@@ -1411,7 +1411,7 @@ func (p *Parser) baseParsePivotAggregation() *Expr {
 	return p.parseAlias(fn, false)
 }
 
-// _parse_pivot (parser.py L5248)
+// _parse_pivot (parser.py L5248).
 func (p *Parser) parsePivot() *Expr {
 	index := p.index
 	var includeNulls any // bool | None
@@ -1551,7 +1551,7 @@ func (p *Parser) parsePivot() *Expr {
 	return pivot
 }
 
-// _pivot_column_names (parser.py L5359)
+// _pivot_column_names (parser.py L5359).
 func (p *Parser) basePivotColumnNames(aggregations []*Expr) []string {
 	out := []string{}
 	for _, agg := range aggregations {

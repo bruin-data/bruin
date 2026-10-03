@@ -6,7 +6,7 @@ package sqlengine
 
 import "fmt"
 
-// Value ranges for byte-sized signed/unsigned integers
+// Value ranges for byte-sized signed/unsigned integers.
 const (
 	smpTINYINT_MIN  = -128
 	smpTINYINT_MAX  = 127
@@ -98,7 +98,7 @@ var smpDATETRUNCS = []Kind{KDateTrunc, KTimestampTrunc}
 
 // CROSS joins result in an empty table if the right table is empty.
 // So we can only simplify certain types of joins to CROSS.
-// Or in other words, LEFT JOIN x ON TRUE != CROSS JOIN x
+// Or in other words, LEFT JOIN x ON TRUE != CROSS JOIN x.
 var smpJOINS = map[[2]string]bool{
 	{"", ""}:           true,
 	{"", "INNER"}:      true,

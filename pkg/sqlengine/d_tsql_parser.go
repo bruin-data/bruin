@@ -48,7 +48,7 @@ var tsqlTRANSPILE_SAFE_NUMBER_FMT = newStrSet("N", "C")
 // tsqlOPTIONS mirrors parsers/tsql.py OPTIONS.
 // Unsupported options:
 // - OPTIMIZE FOR ( @variable_name { UNKNOWN | = <literal_constant> } [ , ...n ] )
-// - TABLE HINT
+// - TABLE HINT.
 var tsqlOPTIONS = OptionsType{
 	"DISABLE_OPTIMIZED_PLAN_FORCING":        {},
 	"FAST":                                  {},
@@ -87,7 +87,7 @@ var tsqlFOR_XML_OPTIONS = OptionsType{
 }
 
 // tsqlFOR_JSON_OPTIONS mirrors parsers/tsql.py FOR_JSON_OPTIONS.
-// FOR JSON { AUTO | PATH } [, ROOT [ ( 'name' ) ] ] [, INCLUDE_NULL_VALUES ] [, WITHOUT_ARRAY_WRAPPER ]
+// FOR JSON { AUTO | PATH } [, ROOT [ ( 'name' ) ] ] [, INCLUDE_NULL_VALUES ] [, WITHOUT_ARRAY_WRAPPER ].
 var tsqlFOR_JSON_OPTIONS = OptionsType{
 	"AUTO":                  {},
 	"PATH":                  {},
@@ -730,7 +730,7 @@ func tsqlParseCommitOrRollback(p *Parser) *Expr {
 // BEGIN { TRAN | TRANSACTION }
 // [ { transaction_name | @tran_name_variable }
 // [ WITH MARK [ 'description' ] ]
-// ]
+// ].
 func tsqlParseTransaction(p *Parser) *Expr {
 	if p.matchTexts("TRAN", "TRANSACTION") {
 		transaction := p.expression(New(KTransaction, "this", p.parseIdVar(true, nil)))

@@ -4,7 +4,7 @@ package sqlengine
 // EXTRACT, TRIM, JSON/XML functions, ...), windows, aliases and primitive values
 // (parser.py L7714-L8720).
 
-// _parse_bracket_key_value (parser.py L7714)
+// _parse_bracket_key_value (parser.py L7714).
 func (p *Parser) baseParseBracketKeyValue(isMap bool) *Expr {
 	return p.parseSlice(p.parseAlias(p.parseDisjunction(), true))
 }
@@ -29,7 +29,7 @@ func (p *Parser) parseOdbcDatetimeLiteral() *Expr {
 	return expression
 }
 
-// _parse_bracket (parser.py L7733)
+// _parse_bracket (parser.py L7733).
 func (p *Parser) baseParseBracket(this *Expr) *Expr {
 	if !p.matchSet(p.s.BRACKETS) {
 		return this
@@ -77,7 +77,7 @@ func (p *Parser) baseParseBracket(this *Expr) *Expr {
 	return p.parseBracket(this)
 }
 
-// _parse_slice (parser.py L7792)
+// _parse_slice (parser.py L7792).
 func (p *Parser) parseSlice(this *Expr) *Expr {
 	if !p.match(TK_COLON) {
 		return this
@@ -97,7 +97,7 @@ func (p *Parser) parseSlice(this *Expr) *Expr {
 	return p.expression(New(KSlice, "this", this, "expression", end, "step", step))
 }
 
-// _parse_case (parser.py L7804)
+// _parse_case (parser.py L7804).
 func (p *Parser) parseCase() *Expr {
 	if p.matchNoAdvance(TK_DOT) {
 		// Avoid raising on valid expressions like case.*, supported by, e.g., spark & snowflake
@@ -133,7 +133,7 @@ func (p *Parser) parseCase() *Expr {
 	return p.expressionC(New(KCase, "this", expression, "ifs", ifs, "default", default_), comments)
 }
 
-// _parse_if (parser.py L7835)
+// _parse_if (parser.py L7835).
 func (p *Parser) baseParseIf() *Expr {
 	var this *Expr
 	if p.match(TK_L_PAREN) {
@@ -169,7 +169,7 @@ func (p *Parser) baseParseIf() *Expr {
 	return this
 }
 
-// _parse_next_value_for (parser.py L7862)
+// _parse_next_value_for (parser.py L7862).
 func (p *Parser) parseNextValueFor() *Expr {
 	if !p.matchTextSeq("VALUE", "FOR") {
 		p.retreat(p.index - 1)
@@ -185,7 +185,7 @@ func (p *Parser) parseNextValueFor() *Expr {
 	return p.expression(New(KNextValueFor, "this", this, "order", order))
 }
 
-// _parse_extract (parser.py L7874)
+// _parse_extract (parser.py L7874).
 func (p *Parser) baseParseExtract() *Expr {
 	this := p.parseFunction(nil, false, true, false)
 	if this == nil {
@@ -203,7 +203,7 @@ func (p *Parser) baseParseExtract() *Expr {
 	return p.expression(New(KExtract, "this", this, "expression", p.parseBitwise()))
 }
 
-// _parse_gap_fill (parser.py L7885)
+// _parse_gap_fill (parser.py L7885).
 func (p *Parser) parseGapFill() *Expr {
 	p.match(TK_TABLE)
 	this := p.parseTable(false, false, nil, false, false, false, false)
@@ -215,7 +215,7 @@ func (p *Parser) parseGapFill() *Expr {
 	return p.validateExpression(gapFill, args)
 }
 
-// _parse_char (parser.py L7895)
+// _parse_char (parser.py L7895).
 func (p *Parser) parseChar() *Expr {
 	expressions := p.parseCSV(p.parseAssignment, TK_COMMA)
 	// self._match(TokenType.USING) and self._parse_charset_name() -> False when unmatched
@@ -317,7 +317,7 @@ func (p *Parser) parseCast(strict bool, safe bool) *Expr {
 	)
 }
 
-// _parse_string_agg (parser.py L7970)
+// _parse_string_agg (parser.py L7970).
 func (p *Parser) parseStringAgg() *Expr {
 	var args []*Expr
 	if p.match(TK_DISTINCT) {
@@ -392,7 +392,7 @@ func (p *Parser) baseParseConvert(strict bool, safe bool) *Expr {
 	return p.buildCast(strict, "this", this, "to", to, "safe", safeV)
 }
 
-// _parse_xml_element (parser.py L8036)
+// _parse_xml_element (parser.py L8036).
 func (p *Parser) parseXmlElement() *Expr {
 	var evalname any
 	var this *Expr
@@ -413,7 +413,7 @@ func (p *Parser) parseXmlElement() *Expr {
 	return p.expression(New(KXMLElement, "this", this, "expressions", expressions, "evalname", evalname))
 }
 
-// _parse_xml_table (parser.py L8053)
+// _parse_xml_table (parser.py L8053).
 func (p *Parser) parseXmlTable() *Expr {
 	var namespaces, passing, columns any
 
@@ -440,7 +440,7 @@ func (p *Parser) parseXmlTable() *Expr {
 		"this", this, "namespaces", namespaces, "passing", passing, "columns", columns, "by_ref", byRef))
 }
 
-// _parse_xml_namespace (parser.py L8080)
+// _parse_xml_namespace (parser.py L8080).
 func (p *Parser) parseXmlNamespace() []*Expr {
 	namespaces := []*Expr{}
 
@@ -460,7 +460,7 @@ func (p *Parser) parseXmlNamespace() []*Expr {
 	return namespaces
 }
 
-// _parse_decode (parser.py L8094)
+// _parse_decode (parser.py L8094).
 func (p *Parser) parseDecode() *Expr {
 	args := p.parseCSV(p.parseDisjunction, TK_COMMA)
 
@@ -471,7 +471,7 @@ func (p *Parser) parseDecode() *Expr {
 	return p.expression(New(KDecodeCase, "expressions", args))
 }
 
-// _parse_json_key_value (parser.py L8102)
+// _parse_json_key_value (parser.py L8102).
 func (p *Parser) parseJsonKeyValue() *Expr {
 	p.matchTextSeq("KEY")
 	key := p.parseColumn()
@@ -485,7 +485,7 @@ func (p *Parser) parseJsonKeyValue() *Expr {
 	return p.expression(New(KJSONKeyValue, "this", key, "expression", value))
 }
 
-// _parse_format_json (parser.py L8113)
+// _parse_format_json (parser.py L8113).
 func (p *Parser) parseFormatJson(this *Expr) *Expr {
 	if this == nil || !p.matchTextSeq("FORMAT", "JSON") {
 		return this
@@ -494,7 +494,7 @@ func (p *Parser) parseFormatJson(this *Expr) *Expr {
 	return p.expression(New(KFormatJson, "this", this))
 }
 
-// _parse_on_condition (parser.py L8119)
+// _parse_on_condition (parser.py L8119).
 func (p *Parser) parseOnCondition() *Expr {
 	// MySQL uses "X ON EMPTY Y ON ERROR" (e.g. JSON_VALUE) while Oracle uses the opposite (e.g. JSON_EXISTS)
 	tokens := p.s.ON_CONDITION_TOKENS.Sorted()
@@ -543,7 +543,7 @@ func (p *Parser) parseOnHandling(on string, values ...string) any {
 	return nil
 }
 
-// _parse_json_object (parser.py L8157)
+// _parse_json_object (parser.py L8157).
 func (p *Parser) baseParseJsonObject(agg bool) *Expr {
 	star := p.parseStar()
 	var expressions []*Expr
@@ -589,7 +589,7 @@ func (p *Parser) baseParseJsonObject(agg bool) *Expr {
 
 // _parse_json_column_def (parser.py L8190)
 //
-// Note: this is currently incomplete; it only implements the "JSON_value_column" part
+// Note: this is currently incomplete; it only implements the "JSON_value_column" part.
 func (p *Parser) parseJsonColumnDef() *Expr {
 	var this, kind *Expr
 	var ordinality, nested any
@@ -623,14 +623,14 @@ func (p *Parser) parseJsonColumnDef() *Expr {
 	))
 }
 
-// _parse_json_schema (parser.py L8217)
+// _parse_json_schema (parser.py L8217).
 func (p *Parser) parseJsonSchema() *Expr {
 	p.matchTextSeq("COLUMNS")
 	return p.expression(New(KJSONSchema,
 		"expressions", p.parseWrappedCSV(p.parseJsonColumnDef, TK_COMMA, true)))
 }
 
-// _parse_json_table (parser.py L8225)
+// _parse_json_table (parser.py L8225).
 func (p *Parser) parseJsonTable() *Expr {
 	this := p.parseFormatJson(p.parseBitwise())
 	// self._match(TokenType.COMMA) and self._parse_string() -> False when unmatched
@@ -652,7 +652,7 @@ func (p *Parser) parseJsonTable() *Expr {
 	)
 }
 
-// _parse_match_against (parser.py L8240)
+// _parse_match_against (parser.py L8240).
 func (p *Parser) parseMatchAgainst() *Expr {
 	var expressions []*Expr
 	if p.matchTextSeq("TABLE") {
@@ -716,7 +716,7 @@ func (p *Parser) parseOpenJson() *Expr {
 	return p.expression(New(KOpenJSON, "this", this, "path", path, "expressions", expressions))
 }
 
-// _parse_position (parser.py L8292)
+// _parse_position (parser.py L8292).
 func (p *Parser) baseParsePosition(haystackFirst bool) *Expr {
 	args := p.parseCSV(p.parseBitwise, TK_COMMA)
 
@@ -736,13 +736,13 @@ func (p *Parser) baseParsePosition(haystackFirst bool) *Expr {
 	return p.expression(New(KStrPosition, "this", haystack, "substr", needle, "position", seqGet(args, 2)))
 }
 
-// _parse_join_hint (parser.py L8311)
+// _parse_join_hint (parser.py L8311).
 func (p *Parser) parseJoinHint(funcName string) *Expr {
 	args := p.parseCSV(func() *Expr { return p.parseTable(false, false, nil, false, false, false, false) }, TK_COMMA)
 	return New(KJoinHint, "this", pyUpper(funcName), "expressions", args)
 }
 
-// _parse_substring (parser.py L8315)
+// _parse_substring (parser.py L8315).
 func (p *Parser) baseParseSubstring() *Expr {
 	// Postgres supports the form: substring(string [from int] [for int])
 	// (despite being undocumented, the reverse order also works)
@@ -775,7 +775,7 @@ func (p *Parser) baseParseSubstring() *Expr {
 	return p.validateExpression(chunkEFromArgList(KSubstring, args), args)
 }
 
-// _parse_trim (parser.py L8341)
+// _parse_trim (parser.py L8341).
 func (p *Parser) parseTrim() *Expr {
 	// https://www.w3resource.com/sql/character-functions/trim.php
 	// https://docs.oracle.com/javadb/10.8.3.0/ref/rreftrimfunc.html
@@ -804,7 +804,7 @@ func (p *Parser) parseTrim() *Expr {
 	return p.expression(New(KTrim, "this", this, "position", position, "expression", expression, "collation", collation))
 }
 
-// _parse_window_clause (parser.py L8367)
+// _parse_window_clause (parser.py L8367).
 func (p *Parser) parseWindowClause() []*Expr {
 	if p.match(TK_WINDOW) {
 		return p.parseCSV(p.parseNamedWindow, TK_COMMA)
@@ -812,12 +812,12 @@ func (p *Parser) parseWindowClause() []*Expr {
 	return nil
 }
 
-// _parse_named_window (parser.py L8370)
+// _parse_named_window (parser.py L8370).
 func (p *Parser) parseNamedWindow() *Expr {
 	return p.parseWindow(p.parseIdVar(true, nil), true)
 }
 
-// _parse_respect_or_ignore_nulls (parser.py L8373)
+// _parse_respect_or_ignore_nulls (parser.py L8373).
 func (p *Parser) parseRespectOrIgnoreNulls(this *Expr) *Expr {
 	if p.curr.Type == TK_VAR {
 		if p.matchTextSeq("IGNORE", "NULLS") {
@@ -830,7 +830,7 @@ func (p *Parser) parseRespectOrIgnoreNulls(this *Expr) *Expr {
 	return this
 }
 
-// _parse_having_max (parser.py L8381)
+// _parse_having_max (parser.py L8381).
 func (p *Parser) parseHavingMax(this *Expr) *Expr {
 	if p.match(TK_HAVING) {
 		p.matchTexts("MAX", "MIN")
@@ -841,7 +841,7 @@ func (p *Parser) parseHavingMax(this *Expr) *Expr {
 	return this
 }
 
-// _parse_window (parser.py L8391)
+// _parse_window (parser.py L8391).
 func (p *Parser) baseParseWindow(this *Expr, alias bool) *Expr {
 	fn := this
 	var comments []string
@@ -976,14 +976,14 @@ func chunkEWindowSide(ws windowSpec) any {
 	return nil
 }
 
-// _parse_partition_and_order (parser.py L8504)
+// _parse_partition_and_order (parser.py L8504).
 func (p *Parser) baseParsePartitionAndOrder() ([]*Expr, *Expr) {
 	partition := p.parsePartitionBy()
 	order := p.parseOrder(nil, false)
 	return partition, order
 }
 
-// _parse_window_spec (parser.py L8509)
+// _parse_window_spec (parser.py L8509).
 func (p *Parser) parseWindowSpec() windowSpec {
 	p.match(TK_BETWEEN)
 
@@ -1004,7 +1004,7 @@ func (p *Parser) parseWindowSpec() windowSpec {
 	return ws
 }
 
-// _parse_alias (parser.py L8521)
+// _parse_alias (parser.py L8521).
 func (p *Parser) baseParseAlias(this *Expr, explicit bool) *Expr {
 	// In some dialects, LIMIT and OFFSET can act as both identifiers and keywords (clauses)
 	// so this section tries to parse the clause version and if it fails, it treats the token
@@ -1064,7 +1064,7 @@ func (p *Parser) baseParseAlias(this *Expr, explicit bool) *Expr {
 	return this
 }
 
-// _parse_id_var (parser.py L8564)
+// _parse_id_var (parser.py L8564).
 func (p *Parser) baseParseIdVar(anyToken bool, tokens *TokenSet) *Expr {
 	expression := p.parseIdentifier()
 	if expression == nil {
@@ -1085,7 +1085,7 @@ func (p *Parser) baseParseIdVar(anyToken bool, tokens *TokenSet) *Expr {
 	return expression
 }
 
-// _parse_string (parser.py L8578)
+// _parse_string (parser.py L8578).
 func (p *Parser) parseString() *Expr {
 	if fn, ok := p.s.STRING_PARSERS[p.curr.Type]; ok {
 		p.advance(1)
@@ -1094,7 +1094,7 @@ func (p *Parser) parseString() *Expr {
 	return p.parsePlaceholder()
 }
 
-// _parse_string_as_identifier (parser.py L8583)
+// _parse_string_as_identifier (parser.py L8583).
 func (p *Parser) parseStringAsIdentifier() *Expr {
 	if !p.match(TK_STRING) {
 		return nil
@@ -1104,7 +1104,7 @@ func (p *Parser) parseStringAsIdentifier() *Expr {
 	return output
 }
 
-// _parse_number (parser.py L8590)
+// _parse_number (parser.py L8590).
 func (p *Parser) parseNumber() *Expr {
 	if fn, ok := p.s.NUMERIC_PARSERS[p.curr.Type]; ok {
 		p.advance(1)
@@ -1113,7 +1113,7 @@ func (p *Parser) parseNumber() *Expr {
 	return p.parsePlaceholder()
 }
 
-// _parse_identifier (parser.py L8595)
+// _parse_identifier (parser.py L8595).
 func (p *Parser) parseIdentifier() *Expr {
 	if p.match(TK_IDENTIFIER) {
 		return p.identifierExpression(nil, TriTrue)
@@ -1121,7 +1121,7 @@ func (p *Parser) parseIdentifier() *Expr {
 	return p.parsePlaceholder()
 }
 
-// _parse_var (parser.py L8600)
+// _parse_var (parser.py L8600).
 func (p *Parser) parseVar(anyToken bool, tokens *TokenSet, upper bool) *Expr {
 	if (anyToken && p.advanceAny(false) != nil) ||
 		p.match(TK_VAR) ||
@@ -1135,7 +1135,7 @@ func (p *Parser) parseVar(anyToken bool, tokens *TokenSet, upper bool) *Expr {
 	return p.parsePlaceholder()
 }
 
-// _parse_var_or_string (parser.py L8622)
+// _parse_var_or_string (parser.py L8622).
 func (p *Parser) parseVarOrString(upper bool) *Expr {
 	if s := p.parseString(); s != nil {
 		return s
@@ -1143,7 +1143,7 @@ func (p *Parser) parseVarOrString(upper bool) *Expr {
 	return p.parseVar(true, nil, upper)
 }
 
-// _parse_primary_or_var (parser.py L8625)
+// _parse_primary_or_var (parser.py L8625).
 func (p *Parser) parsePrimaryOrVar() *Expr {
 	if e := p.parsePrimary(); e != nil {
 		return e
@@ -1151,7 +1151,7 @@ func (p *Parser) parsePrimaryOrVar() *Expr {
 	return p.parseVar(true, nil, false)
 }
 
-// _parse_null (parser.py L8628)
+// _parse_null (parser.py L8628).
 func (p *Parser) parseNull() *Expr {
 	if p.matchAny(TK_NULL, TK_UNKNOWN) {
 		return p.s.PRIMARY_PARSERS[TK_NULL](p, p.prev)
@@ -1159,7 +1159,7 @@ func (p *Parser) parseNull() *Expr {
 	return p.parsePlaceholder()
 }
 
-// _parse_star (parser.py L8640)
+// _parse_star (parser.py L8640).
 func (p *Parser) parseStar() *Expr {
 	if p.match(TK_STAR) {
 		return p.s.PRIMARY_PARSERS[TK_STAR](p, p.prev)
@@ -1167,7 +1167,7 @@ func (p *Parser) parseStar() *Expr {
 	return p.parsePlaceholder()
 }
 
-// _parse_parameter (parser.py L8645)
+// _parse_parameter (parser.py L8645).
 func (p *Parser) baseParseParameter() *Expr {
 	this := p.parseIdentifier()
 	if this == nil {
@@ -1176,7 +1176,7 @@ func (p *Parser) baseParseParameter() *Expr {
 	return p.expression(New(KParameter, "this", this))
 }
 
-// _parse_placeholder (parser.py L8649)
+// _parse_placeholder (parser.py L8649).
 func (p *Parser) parsePlaceholder() *Expr {
 	if fn, ok := p.s.PLACEHOLDER_PARSERS[p.curr.Type]; ok {
 		p.advance(1)
@@ -1189,7 +1189,7 @@ func (p *Parser) parsePlaceholder() *Expr {
 	return nil
 }
 
-// _parse_star_op (parser.py L8657)
+// _parse_star_op (parser.py L8657).
 func (p *Parser) parseStarOp(keywords ...string) []*Expr {
 	if !p.matchTexts(keywords...) {
 		return nil
@@ -1205,7 +1205,7 @@ func (p *Parser) parseStarOp(keywords ...string) []*Expr {
 	return nil
 }
 
-// _parse_select_or_expression (parser.py L8706)
+// _parse_select_or_expression (parser.py L8706).
 func (p *Parser) parseSelectOrExpression(alias bool) *Expr {
 	var this *Expr
 	if alias {
@@ -1219,7 +1219,7 @@ func (p *Parser) parseSelectOrExpression(alias bool) *Expr {
 	return p.parseSelect(false, false, true, true, true, nil)
 }
 
-// _parse_ddl_select (parser.py L8716)
+// _parse_ddl_select (parser.py L8716).
 func (p *Parser) parseDdlSelect() *Expr {
 	return p.parseQueryModifiers(
 		p.parseSetOperations(p.parseSelect(true, false, false, true, true, nil)),

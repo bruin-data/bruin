@@ -7,7 +7,7 @@ import (
 
 // Port of sqlglot/parser.py (chunk F, part 2): the BigQuery-style pipe syntax (`|>`).
 
-// _build_pipe_cte (parser.py L9894)
+// _build_pipe_cte (parser.py L9894).
 func (p *Parser) buildPipeCte(query *Expr, expressions []*Expr, aliasCte *Expr) *Expr {
 	// new_cte is either the given TableAlias or the string "__tmpN"; sqlglot's builders run
 	// strings through maybe_parse, so the string form is parsed here (default dialect).
@@ -38,7 +38,7 @@ func (p *Parser) buildPipeCte(query *Expr, expressions []*Expr, aliasCte *Expr) 
 	return newSelect.QueryWith(aliasArg, query, nil, nil, true, false, nil)
 }
 
-// _parse_pipe_syntax_select (parser.py L9916)
+// _parse_pipe_syntax_select (parser.py L9916).
 func (p *Parser) parsePipeSyntaxSelect(query *Expr) *Expr {
 	sel := p.parseSelect(false, false, true, true, false, nil)
 	if sel == nil {
@@ -48,7 +48,7 @@ func (p *Parser) parsePipeSyntaxSelect(query *Expr) *Expr {
 	return p.buildPipeCte(query.QuerySelect(sel.Expressions(), false, true), []*Expr{Star()}, nil)
 }
 
-// _parse_pipe_syntax_limit (parser.py L9925)
+// _parse_pipe_syntax_limit (parser.py L9925).
 func (p *Parser) parsePipeSyntaxLimit(query *Expr) *Expr {
 	limit := p.parseLimit(nil, false, false)
 	offset := p.parseOffset(nil)
@@ -73,7 +73,7 @@ func (p *Parser) parsePipeSyntaxLimit(query *Expr) *Expr {
 	return query
 }
 
-// _parse_pipe_syntax_aggregate_fields (parser.py L9939)
+// _parse_pipe_syntax_aggregate_fields (parser.py L9939).
 func (p *Parser) parsePipeSyntaxAggregateFields() *Expr {
 	this := p.parseDisjunction()
 	if p.matchTextSeqNoAdvance("GROUP", "AND") {
@@ -89,7 +89,7 @@ func (p *Parser) parsePipeSyntaxAggregateFields() *Expr {
 	return this
 }
 
-// _parse_pipe_syntax_aggregate_group_order_by (parser.py L9951)
+// _parse_pipe_syntax_aggregate_group_order_by (parser.py L9951).
 func (p *Parser) parsePipeSyntaxAggregateGroupOrderBy(query *Expr, groupByExists bool) *Expr {
 	expr := p.parseCSV(p.parsePipeSyntaxAggregateFields, TK_COMMA)
 	aggregatesOrGroups, orders := []*Expr{}, []*Expr{}
@@ -131,7 +131,7 @@ func (p *Parser) parsePipeSyntaxAggregateGroupOrderBy(query *Expr, groupByExists
 	return query
 }
 
-// _parse_pipe_syntax_aggregate (parser.py L9981)
+// _parse_pipe_syntax_aggregate (parser.py L9981).
 func (p *Parser) parsePipeSyntaxAggregate(query *Expr) *Expr {
 	p.matchTextSeq("AGGREGATE")
 	query = p.parsePipeSyntaxAggregateGroupOrderBy(query, false)
@@ -143,7 +143,7 @@ func (p *Parser) parsePipeSyntaxAggregate(query *Expr) *Expr {
 	return p.buildPipeCte(query, []*Expr{Star()}, nil)
 }
 
-// _parse_pipe_syntax_set_operator (parser.py L9992)
+// _parse_pipe_syntax_set_operator (parser.py L9992).
 func (p *Parser) parsePipeSyntaxSetOperator(query *Expr) *Expr {
 	firstSetop := p.parseSetOperation(query, false)
 	if firstSetop == nil {
@@ -195,7 +195,7 @@ func (p *Parser) parsePipeSyntaxSetOperator(query *Expr) *Expr {
 	return p.buildPipeCte(query, []*Expr{Star()}, nil)
 }
 
-// _parse_pipe_syntax_join (parser.py L10023)
+// _parse_pipe_syntax_join (parser.py L10023).
 func (p *Parser) parsePipeSyntaxJoin(query *Expr) *Expr {
 	join := p.parseJoin(false, false, nil)
 	if join == nil {
@@ -209,7 +209,7 @@ func (p *Parser) parsePipeSyntaxJoin(query *Expr) *Expr {
 	return query
 }
 
-// _parse_pipe_syntax_pivot (parser.py L10033)
+// _parse_pipe_syntax_pivot (parser.py L10033).
 func (p *Parser) parsePipeSyntaxPivot(query *Expr) *Expr {
 	pivots := p.parsePivots()
 	if len(pivots) == 0 {
@@ -223,14 +223,14 @@ func (p *Parser) parsePipeSyntaxPivot(query *Expr) *Expr {
 	return p.buildPipeCte(query, []*Expr{Star()}, nil)
 }
 
-// _parse_pipe_syntax_extend (parser.py L10044)
+// _parse_pipe_syntax_extend (parser.py L10044).
 func (p *Parser) parsePipeSyntaxExtend(query *Expr) *Expr {
 	p.matchTextSeq("EXTEND")
 	query.QuerySelect(append([]*Expr{Star()}, p.parseExpressions()...), false, false)
 	return p.buildPipeCte(query, []*Expr{Star()}, nil)
 }
 
-// _parse_pipe_syntax_tablesample (parser.py L10049)
+// _parse_pipe_syntax_tablesample (parser.py L10049).
 func (p *Parser) parsePipeSyntaxTablesample(query *Expr) *Expr {
 	sample := p.parseTableSample(false)
 
@@ -244,7 +244,7 @@ func (p *Parser) parsePipeSyntaxTablesample(query *Expr) *Expr {
 	return query
 }
 
-// _parse_pipe_syntax_query (parser.py L10060)
+// _parse_pipe_syntax_query (parser.py L10060).
 func (p *Parser) parsePipeSyntaxQuery(query *Expr) *Expr {
 	if query.IsA(KSubquery) {
 		query = SelectExpr(MaybeParse("*", KExpr, "", nil)).SelectFrom(query, false)

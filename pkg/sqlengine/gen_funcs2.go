@@ -4,7 +4,7 @@ package sqlengine
 
 import "fmt"
 
-// slice_sql (generator.py L5679)
+// slice_sql (generator.py L5679).
 func (g *Generator) sliceSQL(expression *Expr) string {
 	step := g.sqlKey(expression, "step")
 	end := g.sql(expression.Arg("expression"))
@@ -20,7 +20,7 @@ func (g *Generator) sliceSQL(expression *Expr) string {
 	return begin + ":"
 }
 
-// apply_sql (generator.py L5687)
+// apply_sql (generator.py L5687).
 func (g *Generator) applySQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	expr := g.sqlKey(expression, "expression")
@@ -28,7 +28,7 @@ func (g *Generator) applySQL(expression *Expr) string {
 	return this + " APPLY(" + expr + ")"
 }
 
-// _grant_or_revoke_sql (generator.py L5693)
+// _grant_or_revoke_sql (generator.py L5693).
 func (g *Generator) grantOrRevokeSQL(expression *Expr, keyword string, preposition string, grantOptionPrefix string, grantOptionSuffix string) string {
 	privilegesSQL := g.expressions(expression, exprsOpts{key: "privileges", flat: true})
 
@@ -57,17 +57,17 @@ func (g *Generator) grantOrRevokeSQL(expression *Expr, keyword string, prepositi
 	return keyword + " " + grantOptionPrefix + privilegesSQL + " ON" + kind + securable + " " + preposition + " " + principals + grantOptionSuffix + cascade
 }
 
-// grant_sql (generator.py L5720)
+// grant_sql (generator.py L5720).
 func (g *Generator) grantSQL(expression *Expr) string {
 	return g.grantOrRevokeSQL(expression, "GRANT", "TO", "", " WITH GRANT OPTION")
 }
 
-// revoke_sql (generator.py L5728)
+// revoke_sql (generator.py L5728).
 func (g *Generator) revokeSQL(expression *Expr) string {
 	return g.grantOrRevokeSQL(expression, "REVOKE", "FROM", "GRANT OPTION FOR ", "")
 }
 
-// grantprivilege_sql (generator.py L5736)
+// grantprivilege_sql (generator.py L5736).
 func (g *Generator) grantprivilegeSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	columns := g.expressions(expression, exprsOpts{flat: true})
@@ -78,7 +78,7 @@ func (g *Generator) grantprivilegeSQL(expression *Expr) string {
 	return this + columns
 }
 
-// grantprincipal_sql (generator.py L5743)
+// grantprincipal_sql (generator.py L5743).
 func (g *Generator) grantprincipalSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 
@@ -90,7 +90,7 @@ func (g *Generator) grantprincipalSQL(expression *Expr) string {
 	return kind + this
 }
 
-// columns_sql (generator.py L5751)
+// columns_sql (generator.py L5751).
 func (g *Generator) columnsSQL(expression *Expr) string {
 	fn := g.functionFallbackSQL(expression)
 	if expression.ArgB("unpack") {
@@ -100,7 +100,7 @@ func (g *Generator) columnsSQL(expression *Expr) string {
 	return fn
 }
 
-// overlay_sql (generator.py L5758)
+// overlay_sql (generator.py L5758).
 func (g *Generator) overlaySQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	expr := g.sqlKey(expression, "expression")
@@ -114,7 +114,7 @@ func (g *Generator) overlaySQL(expression *Expr) string {
 }
 
 // todouble_sql (generator.py L5767)
-// @unsupported_args("format")
+// @unsupported_args("format").
 func (g *Generator) todoubleSQL(expression *Expr) string {
 	if expression.ArgB("format") {
 		g.unsupported(fmt.Sprintf("Argument '%s' is not supported for expression '%s' when targeting %s.", "format", expression.Kind().Name(), g.d.ClassName))
@@ -127,7 +127,7 @@ func (g *Generator) todoubleSQL(expression *Expr) string {
 	return g.sql(New(castKind, "this", expression.This(), "to", NewDataType(DT_DOUBLE)))
 }
 
-// string_sql (generator.py L5772)
+// string_sql (generator.py L5772).
 func (g *Generator) stringSQL(expression *Expr) string {
 	this := expression.This()
 	zone := expression.ArgE("zone")
@@ -142,7 +142,7 @@ func (g *Generator) stringSQL(expression *Expr) string {
 	return g.sql(genECast(this, DT_VARCHAR, nil))
 }
 
-// median_sql (generator.py L5786)
+// median_sql (generator.py L5786).
 func (g *Generator) medianSQL(expression *Expr) string {
 	if !g.s.SUPPORTS_MEDIAN {
 		return g.sql(New(KPercentileCont, "this", expression.This(), "expression", LiteralNumber("0.5")))
@@ -151,7 +151,7 @@ func (g *Generator) medianSQL(expression *Expr) string {
 	return g.functionFallbackSQL(expression)
 }
 
-// overflowtruncatebehavior_sql (generator.py L5794)
+// overflowtruncatebehavior_sql (generator.py L5794).
 func (g *Generator) overflowtruncatebehaviorSQL(expression *Expr) string {
 	filler := g.sqlKey(expression, "this")
 	if filler != "" {
@@ -164,7 +164,7 @@ func (g *Generator) overflowtruncatebehaviorSQL(expression *Expr) string {
 	return "TRUNCATE" + filler + " " + withCount
 }
 
-// unixseconds_sql (generator.py L5800)
+// unixseconds_sql (generator.py L5800).
 func (g *Generator) unixsecondsSQL(expression *Expr) string {
 	if g.s.SUPPORTS_UNIX_SECONDS {
 		return g.functionFallbackSQL(expression)
@@ -177,7 +177,7 @@ func (g *Generator) unixsecondsSQL(expression *Expr) string {
 	)
 }
 
-// arraysize_sql (generator.py L5810)
+// arraysize_sql (generator.py L5810).
 func (g *Generator) arraysizeSQL(expression *Expr) string {
 	dim := expression.Expression()
 
@@ -197,7 +197,7 @@ func (g *Generator) arraysizeSQL(expression *Expr) string {
 	return g.fn(g.s.ARRAY_SIZE_NAME, expression.Arg("this"), dim)
 }
 
-// attach_sql (generator.py L5825)
+// attach_sql (generator.py L5825).
 func (g *Generator) attachSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	existsSQL := ""
@@ -212,7 +212,7 @@ func (g *Generator) attachSQL(expression *Expr) string {
 	return "ATTACH" + existsSQL + " " + this + expressions
 }
 
-// detach_sql (generator.py L5833)
+// detach_sql (generator.py L5833).
 func (g *Generator) detachSQL(expression *Expr) string {
 	kind := g.sqlKey(expression, "kind")
 	if kind != "" {
@@ -249,7 +249,7 @@ func (g *Generator) detachSQL(expression *Expr) string {
 	return "DETACH" + kind + exists + this + cluster + permanent + sync
 }
 
-// attachoption_sql (generator.py L5850)
+// attachoption_sql (generator.py L5850).
 func (g *Generator) attachoptionSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	value := g.sqlKey(expression, "expression")
@@ -259,12 +259,12 @@ func (g *Generator) attachoptionSQL(expression *Expr) string {
 	return this + value
 }
 
-// watermarkcolumnconstraint_sql (generator.py L5856)
+// watermarkcolumnconstraint_sql (generator.py L5856).
 func (g *Generator) watermarkcolumnconstraintSQL(expression *Expr) string {
 	return "WATERMARK FOR " + g.sqlKey(expression, "this") + " AS " + g.sqlKey(expression, "expression")
 }
 
-// encodeproperty_sql (generator.py L5861)
+// encodeproperty_sql (generator.py L5861).
 func (g *Generator) encodepropertySQL(expression *Expr) string {
 	encode := "ENCODE"
 	if expression.ArgB("key") {
@@ -280,7 +280,7 @@ func (g *Generator) encodepropertySQL(expression *Expr) string {
 	return encode
 }
 
-// includeproperty_sql (generator.py L5871)
+// includeproperty_sql (generator.py L5871).
 func (g *Generator) includepropertySQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	include := "INCLUDE " + this
@@ -298,7 +298,7 @@ func (g *Generator) includepropertySQL(expression *Expr) string {
 	return include
 }
 
-// xmlelement_sql (generator.py L5885)
+// xmlelement_sql (generator.py L5885).
 func (g *Generator) xmlelementSQL(expression *Expr) string {
 	prefix := "NAME"
 	if expression.ArgB("evalname") {
@@ -312,7 +312,7 @@ func (g *Generator) xmlelementSQL(expression *Expr) string {
 	return g.fn("XMLELEMENT", args...)
 }
 
-// xmlkeyvalueoption_sql (generator.py L5890)
+// xmlkeyvalueoption_sql (generator.py L5890).
 func (g *Generator) xmlkeyvalueoptionSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	expr := g.sqlKey(expression, "expression")
@@ -322,14 +322,14 @@ func (g *Generator) xmlkeyvalueoptionSQL(expression *Expr) string {
 	return this + expr
 }
 
-// partitionbyrangeproperty_sql (generator.py L5896)
+// partitionbyrangeproperty_sql (generator.py L5896).
 func (g *Generator) basePartitionbyrangepropertySQL(expression *Expr) string {
 	partitions := g.expressions(expression, exprsOpts{key: "partition_expressions"})
 	create := g.expressions(expression, exprsOpts{key: "create_expressions"})
 	return "PARTITION BY RANGE " + g.wrap(partitions) + " " + g.wrap(create)
 }
 
-// partitionbyrangepropertydynamic_sql (generator.py L5901)
+// partitionbyrangepropertydynamic_sql (generator.py L5901).
 func (g *Generator) basePartitionbyrangepropertydynamicSQL(expression *Expr) string {
 	start := g.sqlKey(expression, "start")
 	end := g.sqlKey(expression, "end")
@@ -346,7 +346,7 @@ func (g *Generator) basePartitionbyrangepropertydynamicSQL(expression *Expr) str
 	return "START " + g.wrap(start) + " END " + g.wrap(end) + " EVERY " + g.wrap(g.sql(every))
 }
 
-// unpivotcolumns_sql (generator.py L5913)
+// unpivotcolumns_sql (generator.py L5913).
 func (g *Generator) unpivotcolumnsSQL(expression *Expr) string {
 	name := g.sqlKey(expression, "this")
 	values := g.expressions(expression, exprsOpts{flat: true})
@@ -354,14 +354,14 @@ func (g *Generator) unpivotcolumnsSQL(expression *Expr) string {
 	return "NAME " + name + " VALUE " + values
 }
 
-// analyzesample_sql (generator.py L5919)
+// analyzesample_sql (generator.py L5919).
 func (g *Generator) analyzesampleSQL(expression *Expr) string {
 	kind := g.sqlKey(expression, "kind")
 	sample := g.sqlKey(expression, "sample")
 	return "SAMPLE " + sample + " " + kind
 }
 
-// analyzestatistics_sql (generator.py L5924)
+// analyzestatistics_sql (generator.py L5924).
 func (g *Generator) analyzestatisticsSQL(expression *Expr) string {
 	kind := g.sqlKey(expression, "kind")
 	option := g.sqlKey(expression, "option")
@@ -379,7 +379,7 @@ func (g *Generator) analyzestatisticsSQL(expression *Expr) string {
 	return kind + option + " STATISTICS" + this + columns
 }
 
-// analyzehistogram_sql (generator.py L5934)
+// analyzehistogram_sql (generator.py L5934).
 func (g *Generator) analyzehistogramSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	columns := g.expressions(expression, exprsOpts{})
@@ -394,7 +394,7 @@ func (g *Generator) analyzehistogramSQL(expression *Expr) string {
 	return this + " HISTOGRAM ON " + columns + innerExpression + updateOptions
 }
 
-// analyzedelete_sql (generator.py L5943)
+// analyzedelete_sql (generator.py L5943).
 func (g *Generator) analyzedeleteSQL(expression *Expr) string {
 	kind := g.sqlKey(expression, "kind")
 	if kind != "" {
@@ -403,13 +403,13 @@ func (g *Generator) analyzedeleteSQL(expression *Expr) string {
 	return "DELETE" + kind + " STATISTICS"
 }
 
-// analyzelistchainedrows_sql (generator.py L5948)
+// analyzelistchainedrows_sql (generator.py L5948).
 func (g *Generator) analyzelistchainedrowsSQL(expression *Expr) string {
 	innerExpression := g.sqlKey(expression, "expression")
 	return "LIST CHAINED ROWS" + innerExpression
 }
 
-// analyzevalidate_sql (generator.py L5952)
+// analyzevalidate_sql (generator.py L5952).
 func (g *Generator) analyzevalidateSQL(expression *Expr) string {
 	kind := g.sqlKey(expression, "kind")
 	this := g.sqlKey(expression, "this")
@@ -420,7 +420,7 @@ func (g *Generator) analyzevalidateSQL(expression *Expr) string {
 	return "VALIDATE " + kind + this + innerExpression
 }
 
-// analyze_sql (generator.py L5959)
+// analyze_sql (generator.py L5959).
 func (g *Generator) analyzeSQL(expression *Expr) string {
 	options := g.expressions(expression, exprsOpts{key: "options", sep: strp2(" ")})
 	if options != "" {
@@ -453,7 +453,7 @@ func (g *Generator) analyzeSQL(expression *Expr) string {
 	return "ANALYZE" + options + kind + this + partition + mode + innerExpression + properties
 }
 
-// xmltable_sql (generator.py L5976)
+// xmltable_sql (generator.py L5976).
 func (g *Generator) xmltableSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	namespaces := g.expressions(expression, exprsOpts{key: "namespaces"})
@@ -475,7 +475,7 @@ func (g *Generator) xmltableSQL(expression *Expr) string {
 	return "XMLTABLE(" + g.sep("") + g.indentDefault(namespaces+this+passing+byRef+columns) + g.segSep(")", "")
 }
 
-// xmlnamespace_sql (generator.py L5987)
+// xmlnamespace_sql (generator.py L5987).
 func (g *Generator) xmlnamespaceSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	if expression.This().IsA(KAlias) {
@@ -484,7 +484,7 @@ func (g *Generator) xmlnamespaceSQL(expression *Expr) string {
 	return "DEFAULT " + this
 }
 
-// export_sql (generator.py L5991)
+// export_sql (generator.py L5991).
 func (g *Generator) exportSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	connection := g.sqlKey(expression, "connection")
@@ -495,7 +495,7 @@ func (g *Generator) exportSQL(expression *Expr) string {
 	return "EXPORT DATA " + connection + options + " AS " + this
 }
 
-// declare_sql (generator.py L5998)
+// declare_sql (generator.py L5998).
 func (g *Generator) declareSQL(expression *Expr) string {
 	replace := ""
 	if expression.ArgB("replace") {
@@ -504,7 +504,7 @@ func (g *Generator) declareSQL(expression *Expr) string {
 	return "DECLARE " + replace + g.expressions(expression, exprsOpts{flat: true})
 }
 
-// declareitem_sql (generator.py L6002)
+// declareitem_sql (generator.py L6002).
 func (g *Generator) declareitemSQL(expression *Expr) string {
 	variables := g.expressions(expression, exprsOpts{key: "this"})
 	def := g.sqlKey(expression, "default")
@@ -524,7 +524,7 @@ func (g *Generator) declareitemSQL(expression *Expr) string {
 	return variables + kind + def
 }
 
-// recursivewithsearch_sql (generator.py L6015)
+// recursivewithsearch_sql (generator.py L6015).
 func (g *Generator) recursivewithsearchSQL(expression *Expr) string {
 	kind := g.sqlKey(expression, "kind")
 	this := g.sqlKey(expression, "this")
@@ -542,40 +542,40 @@ func (g *Generator) recursivewithsearchSQL(expression *Expr) string {
 	return kindSQL + " " + this + " SET " + set + using
 }
 
-// parameterizedagg_sql (generator.py L6026)
+// parameterizedagg_sql (generator.py L6026).
 func (g *Generator) parameterizedaggSQL(expression *Expr) string {
 	params := g.expressions(expression, exprsOpts{key: "params", flat: true})
 	return g.fn(expression.Name(), genEExprArgs(expression.Expressions())...) + "(" + params + ")"
 }
 
-// anonymousaggfunc_sql (generator.py L6030)
+// anonymousaggfunc_sql (generator.py L6030).
 func (g *Generator) anonymousaggfuncSQL(expression *Expr) string {
 	return g.fn(expression.Name(), genEExprArgs(expression.Expressions())...)
 }
 
-// combinedaggfunc_sql (generator.py L6033)
+// combinedaggfunc_sql (generator.py L6033).
 func (g *Generator) combinedaggfuncSQL(expression *Expr) string {
 	return g.anonymousaggfuncSQL(expression)
 }
 
-// combinedparameterizedagg_sql (generator.py L6036)
+// combinedparameterizedagg_sql (generator.py L6036).
 func (g *Generator) combinedparameterizedaggSQL(expression *Expr) string {
 	return g.parameterizedaggSQL(expression)
 }
 
-// show_sql (generator.py L6039)
+// show_sql (generator.py L6039).
 func (g *Generator) baseShowSQL(expression *Expr) string {
 	g.unsupported("Unsupported SHOW statement")
 	return ""
 }
 
-// install_sql (generator.py L6043)
+// install_sql (generator.py L6043).
 func (g *Generator) baseInstallSQL(expression *Expr) string {
 	g.unsupported("Unsupported INSTALL statement")
 	return ""
 }
 
-// get_put_sql (generator.py L6047)
+// get_put_sql (generator.py L6047).
 func (g *Generator) getPutSQL(expression *Expr) string {
 	// Snowflake GET/PUT statements:
 	//   PUT <file> <internalStage> <properties>
@@ -594,7 +594,7 @@ func (g *Generator) getPutSQL(expression *Expr) string {
 	return "GET " + target + " " + this + propsSQL
 }
 
-// translatecharacters_sql (generator.py L6061)
+// translatecharacters_sql (generator.py L6061).
 func (g *Generator) translatecharactersSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	expr := g.sqlKey(expression, "expression")
@@ -605,7 +605,7 @@ func (g *Generator) translatecharactersSQL(expression *Expr) string {
 	return "TRANSLATE(" + this + " USING " + expr + withError + ")"
 }
 
-// decodecase_sql (generator.py L6067)
+// decodecase_sql (generator.py L6067).
 func (g *Generator) decodecaseSQL(expression *Expr) string {
 	if g.s.SUPPORTS_DECODE_CASE {
 		return g.fn("DECODE", genEExprArgs(expression.Expressions())...)
@@ -651,7 +651,7 @@ func (g *Generator) decodecaseSQL(expression *Expr) string {
 	return g.sql(caseExpr)
 }
 
-// semanticview_sql (generator.py L6093)
+// semanticview_sql (generator.py L6093).
 func (g *Generator) semanticviewSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	this = g.segSep(this, "")
@@ -675,7 +675,7 @@ func (g *Generator) semanticviewSQL(expression *Expr) string {
 	return "SEMANTIC_VIEW(" + body + g.segSep(")", "")
 }
 
-// getextract_sql (generator.py L6111)
+// getextract_sql (generator.py L6111).
 func (g *Generator) getextractSQL(expression *Expr) string {
 	this := expression.This()
 	expr := expression.Expression()
@@ -691,7 +691,7 @@ func (g *Generator) getextractSQL(expression *Expr) string {
 	return g.sql(New(KJSONExtract, "this", this, "expression", g.d.toJSONPath(expr)))
 }
 
-// datefromunixdate_sql (generator.py L6125)
+// datefromunixdate_sql (generator.py L6125).
 func (g *Generator) datefromunixdateSQL(expression *Expr) string {
 	return g.sql(
 		New(
@@ -703,17 +703,17 @@ func (g *Generator) datefromunixdateSQL(expression *Expr) string {
 	)
 }
 
-// space_sql (generator.py L6134)
+// space_sql (generator.py L6134).
 func (g *Generator) baseSpaceSQL(expression *Expr) string {
 	return g.sql(New(KRepeat, "this", LiteralString(" "), "times", expression.This()))
 }
 
-// buildproperty_sql (generator.py L6137)
+// buildproperty_sql (generator.py L6137).
 func (g *Generator) buildpropertySQL(expression *Expr) string {
 	return "BUILD " + g.sqlKey(expression, "this")
 }
 
-// refreshtriggerproperty_sql (generator.py L6140)
+// refreshtriggerproperty_sql (generator.py L6140).
 func (g *Generator) baseRefreshtriggerpropertySQL(expression *Expr) string {
 	method := g.sqlKey(expression, "method")
 	kind := expression.Arg("kind")
@@ -734,18 +734,18 @@ func (g *Generator) baseRefreshtriggerpropertySQL(expression *Expr) string {
 	return "REFRESH " + method + " ON " + genEPyStr(kind) + every + starts
 }
 
-// modelattribute_sql (generator.py L6154)
+// modelattribute_sql (generator.py L6154).
 func (g *Generator) baseModelattributeSQL(expression *Expr) string {
 	g.unsupported("The model!attribute syntax is not supported")
 	return ""
 }
 
-// directorystage_sql (generator.py L6158)
+// directorystage_sql (generator.py L6158).
 func (g *Generator) directorystageSQL(expression *Expr) string {
 	return g.fn("DIRECTORY", expression.Arg("this"))
 }
 
-// uuid_sql (generator.py L6161)
+// uuid_sql (generator.py L6161).
 func (g *Generator) baseUuidSQL(expression *Expr) string {
 	isString := expression.ArgB("is_string")
 	uuidFuncSQL := g.fn("UUID")
@@ -762,7 +762,7 @@ func (g *Generator) baseUuidSQL(expression *Expr) string {
 	return uuidFuncSQL
 }
 
-// initcap_sql (generator.py L6170)
+// initcap_sql (generator.py L6170).
 func (g *Generator) initcapSQL(expression *Expr) string {
 	delimiters := expression.Expression()
 
@@ -779,7 +779,7 @@ func (g *Generator) initcapSQL(expression *Expr) string {
 	return g.fn("INITCAP", expression.Arg("this"), delimiters)
 }
 
-// localtime_sql (generator.py L6186)
+// localtime_sql (generator.py L6186).
 func (g *Generator) localtimeSQL(expression *Expr) string {
 	this := expression.This()
 	if this != nil {
@@ -788,7 +788,7 @@ func (g *Generator) localtimeSQL(expression *Expr) string {
 	return "LOCALTIME"
 }
 
-// localtimestamp_sql (generator.py L6190)
+// localtimestamp_sql (generator.py L6190).
 func (g *Generator) localtimestampSQL(expression *Expr) string {
 	this := expression.This()
 	if this != nil {
@@ -797,7 +797,7 @@ func (g *Generator) localtimestampSQL(expression *Expr) string {
 	return "LOCALTIMESTAMP"
 }
 
-// weekstart_sql (generator.py L6194)
+// weekstart_sql (generator.py L6194).
 func (g *Generator) weekstartSQL(expression *Expr) string {
 	this := pyUpper(expression.This().Name())
 	if g.d.S.WEEK_OFFSET == -1 && this == "SUNDAY" {
@@ -808,7 +808,7 @@ func (g *Generator) weekstartSQL(expression *Expr) string {
 	return g.fn("WEEK", expression.Arg("this"))
 }
 
-// chr_sql (generator.py L6202)
+// chr_sql (generator.py L6202).
 func (g *Generator) baseChrSQL(expression *Expr, name string) string {
 	this := g.expressions(expression, exprsOpts{})
 	charset := g.sqlKey(expression, "charset")
@@ -819,7 +819,7 @@ func (g *Generator) baseChrSQL(expression *Expr, name string) string {
 	return g.fn(name, this+using)
 }
 
-// block_sql (generator.py L6208)
+// block_sql (generator.py L6208).
 func (g *Generator) blockSQL(expression *Expr) string {
 	expressions := g.expressions(expression, exprsOpts{sep: strp2("; "), flat: true})
 	if expressions != "" {
@@ -828,49 +828,49 @@ func (g *Generator) blockSQL(expression *Expr) string {
 	return ""
 }
 
-// storedprocedure_sql (generator.py L6212)
+// storedprocedure_sql (generator.py L6212).
 func (g *Generator) baseStoredprocedureSQL(expression *Expr) string {
 	g.unsupported("Unsupported Stored Procedure syntax")
 	return ""
 }
 
-// ifblock_sql (generator.py L6216)
+// ifblock_sql (generator.py L6216).
 func (g *Generator) baseIfblockSQL(expression *Expr) string {
 	g.unsupported("Unsupported If block syntax")
 	return ""
 }
 
-// whileblock_sql (generator.py L6220)
+// whileblock_sql (generator.py L6220).
 func (g *Generator) baseWhileblockSQL(expression *Expr) string {
 	g.unsupported("Unsupported While block syntax")
 	return ""
 }
 
-// execute_sql (generator.py L6224)
+// execute_sql (generator.py L6224).
 func (g *Generator) baseExecuteSQL(expression *Expr) string {
 	g.unsupported("Unsupported Execute syntax")
 	return ""
 }
 
-// executesql_sql (generator.py L6228)
+// executesql_sql (generator.py L6228).
 func (g *Generator) baseExecutesqlSQL(expression *Expr) string {
 	g.unsupported("Unsupported Execute syntax")
 	return ""
 }
 
-// altermodifysqlsecurity_sql (generator.py L6232)
+// altermodifysqlsecurity_sql (generator.py L6232).
 func (g *Generator) altermodifysqlsecuritySQL(expression *Expr) string {
 	props := g.expressions(expression, exprsOpts{sep: strp2(" ")})
 	return "MODIFY " + props
 }
 
-// usingproperty_sql (generator.py L6236)
+// usingproperty_sql (generator.py L6236).
 func (g *Generator) baseUsingpropertySQL(expression *Expr) string {
 	kind := expression.Arg("kind")
 	return "USING " + genEPyStr(kind) + " " + g.sqlKey(expression, "this")
 }
 
-// renameindex_sql (generator.py L6240)
+// renameindex_sql (generator.py L6240).
 func (g *Generator) renameindexSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	to := g.sqlKey(expression, "to")

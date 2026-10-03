@@ -3,7 +3,7 @@ package sqlengine
 // Ports of sqlglot.parser.Parser column definition and column/table constraint parsing
 // (parser.py L7300-L7713).
 
-// _parse_column_def (parser.py L7300)
+// _parse_column_def (parser.py L7300).
 func (p *Parser) baseParseColumnDef(this *Expr, computedColumn bool) *Expr {
 	// column defs are not really columns, they're identifiers
 	if this.IsA(KColumn) {
@@ -80,7 +80,7 @@ func (p *Parser) baseParseColumnDef(this *Expr, computedColumn bool) *Expr {
 	return p.expression(New(KColumnDef, "this", this, "kind", kind, "constraints", constraints, "position", position))
 }
 
-// _parse_auto_increment (parser.py L7377)
+// _parse_auto_increment (parser.py L7377).
 func (p *Parser) parseAutoIncrement() *Expr {
 	var start, increment *Expr
 	var order any // None / True / False
@@ -115,7 +115,7 @@ func (p *Parser) parseAutoIncrement() *Expr {
 	return New(KAutoIncrementColumnConstraint)
 }
 
-// _parse_check_constraint (parser.py L7410)
+// _parse_check_constraint (parser.py L7410).
 func (p *Parser) baseParseCheckConstraint() *Expr {
 	if !p.matchNoAdvance(TK_L_PAREN) {
 		return nil
@@ -126,7 +126,7 @@ func (p *Parser) baseParseCheckConstraint() *Expr {
 	return p.expression(New(KCheckColumnConstraint, "this", this, "enforced", enforced))
 }
 
-// _parse_auto_property (parser.py L7421)
+// _parse_auto_property (parser.py L7421).
 func (p *Parser) parseAutoProperty() *Expr {
 	if !p.matchTextSeq("REFRESH") {
 		p.retreat(p.index - 1)
@@ -135,7 +135,7 @@ func (p *Parser) parseAutoProperty() *Expr {
 	return p.expression(New(KAutoRefreshProperty, "this", p.parseVar(false, nil, true)))
 }
 
-// _parse_compress (parser.py L7427)
+// _parse_compress (parser.py L7427).
 func (p *Parser) parseCompress() *Expr {
 	if p.matchNoAdvance(TK_L_PAREN) {
 		return p.expression(New(KCompressColumnConstraint,
@@ -145,7 +145,7 @@ func (p *Parser) parseCompress() *Expr {
 	return p.expression(New(KCompressColumnConstraint, "this", p.parseBitwise()))
 }
 
-// _parse_generated_as_identity (parser.py L7435)
+// _parse_generated_as_identity (parser.py L7435).
 func (p *Parser) baseParseGeneratedAsIdentity() *Expr {
 	var this *Expr
 	if p.matchTextSeq("BY", "DEFAULT") {
@@ -203,13 +203,13 @@ func (p *Parser) baseParseGeneratedAsIdentity() *Expr {
 	return this
 }
 
-// _parse_inline (parser.py L7488)
+// _parse_inline (parser.py L7488).
 func (p *Parser) parseInline() *Expr {
 	p.matchTextSeq("LENGTH")
 	return p.expression(New(KInlineLengthColumnConstraint, "this", p.parseBitwise()))
 }
 
-// _parse_not_constraint (parser.py L7492)
+// _parse_not_constraint (parser.py L7492).
 func (p *Parser) parseNotConstraint() *Expr {
 	if p.matchTextSeq("NULL") {
 		return p.expression(New(KNotNullColumnConstraint))
@@ -226,7 +226,7 @@ func (p *Parser) parseNotConstraint() *Expr {
 	return nil
 }
 
-// _parse_column_constraint (parser.py L7504)
+// _parse_column_constraint (parser.py L7504).
 func (p *Parser) parseColumnConstraint() *Expr {
 	var this *Expr
 	if p.match(TK_CONSTRAINT) {
@@ -251,7 +251,7 @@ func (p *Parser) parseColumnConstraint() *Expr {
 	return this
 }
 
-// _parse_constraint (parser.py L7523)
+// _parse_constraint (parser.py L7523).
 func (p *Parser) baseParseConstraint() *Expr {
 	if !p.match(TK_CONSTRAINT) {
 		return p.parseUnnamedConstraint(p.s.SCHEMA_UNNAMED_CONSTRAINTS)
@@ -261,7 +261,7 @@ func (p *Parser) baseParseConstraint() *Expr {
 	return p.expression(New(KConstraint, "this", this, "expressions", p.parseUnnamedConstraints()))
 }
 
-// _parse_unnamed_constraints (parser.py L7531)
+// _parse_unnamed_constraints (parser.py L7531).
 func (p *Parser) parseUnnamedConstraints() []*Expr {
 	constraints := []*Expr{}
 	for {
@@ -278,7 +278,7 @@ func (p *Parser) parseUnnamedConstraints() []*Expr {
 	return constraints
 }
 
-// _parse_unnamed_constraint (parser.py L7541)
+// _parse_unnamed_constraint (parser.py L7541).
 func (p *Parser) parseUnnamedConstraint(constraints StrSet) *Expr {
 	index := p.index
 
@@ -311,7 +311,7 @@ func (p *Parser) parseUnnamedConstraint(constraints StrSet) *Expr {
 	return result
 }
 
-// _parse_unique_key (parser.py L7559)
+// _parse_unique_key (parser.py L7559).
 func (p *Parser) baseParseUniqueKey() *Expr {
 	if p.curr.ok() && p.curr.Type != TK_IDENTIFIER {
 		if _, ok := p.s.CONSTRAINT_PARSERS[upperText(p.curr)]; ok {
@@ -321,7 +321,7 @@ func (p *Parser) baseParseUniqueKey() *Expr {
 	return p.parseIdVar(false, nil)
 }
 
-// _parse_unique (parser.py L7568)
+// _parse_unique (parser.py L7568).
 func (p *Parser) baseParseUnique() *Expr {
 	p.matchTexts("KEY", "INDEX")
 	nulls := p.matchTextSeq("NULLS", "NOT", "DISTINCT")
@@ -392,7 +392,7 @@ func (p *Parser) parseKeyConstraintOptions() []string {
 	return options
 }
 
-// _parse_references (parser.py L7614)
+// _parse_references (parser.py L7614).
 func (p *Parser) parseReferences(match bool) *Expr {
 	if match && !p.match(TK_REFERENCES) {
 		return nil
@@ -404,7 +404,7 @@ func (p *Parser) parseReferences(match bool) *Expr {
 	return p.expression(New(KReference, "this", this, "expressions", expressions, "options", options))
 }
 
-// _parse_foreign_key (parser.py L7623)
+// _parse_foreign_key (parser.py L7623).
 func (p *Parser) baseParseForeignKey() *Expr {
 	var expressions any // None unless the column list is present
 	if !p.matchNoAdvance(TK_REFERENCES) {
@@ -449,12 +449,12 @@ func (p *Parser) baseParseForeignKey() *Expr {
 	return p.expression(New(KForeignKey, kv...))
 }
 
-// _parse_primary_key_part (parser.py L7658)
+// _parse_primary_key_part (parser.py L7658).
 func (p *Parser) baseParsePrimaryKeyPart() *Expr {
 	return p.parseField(false, nil, false)
 }
 
-// _parse_period_for_system_time (parser.py L7661)
+// _parse_period_for_system_time (parser.py L7661).
 func (p *Parser) parsePeriodForSystemTime() *Expr {
 	if !p.match(TK_TIMESTAMP_SNAPSHOT) {
 		p.retreat(p.index - 1)
@@ -466,7 +466,7 @@ func (p *Parser) parsePeriodForSystemTime() *Expr {
 		"this", seqGet(idVars, 0), "expression", seqGet(idVars, 1)))
 }
 
-// _parse_primary_key (parser.py L7673)
+// _parse_primary_key (parser.py L7673).
 func (p *Parser) baseParsePrimaryKey(wrappedOptional bool, inProps bool, namedPrimaryKey bool) *Expr {
 	var desc any // None / True / False
 	if p.matchAny(TK_ASC, TK_DESC) {

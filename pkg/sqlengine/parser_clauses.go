@@ -6,7 +6,7 @@ import "fmt"
 // CONNECT BY, INTERPOLATE, ORDER BY, LIMIT / OFFSET / FETCH, named window detection, locks
 // and set operations.
 
-// _parse_prewhere (parser.py L5362)
+// _parse_prewhere (parser.py L5362).
 func (p *Parser) parsePrewhere(skipWhereToken bool) *Expr {
 	if !skipWhereToken && !p.match(TK_PREWHERE) {
 		return nil
@@ -16,7 +16,7 @@ func (p *Parser) parsePrewhere(skipWhereToken bool) *Expr {
 	return p.expressionC(New(KPreWhere, "this", p.parseDisjunction()), comments)
 }
 
-// _parse_where (parser.py L5372)
+// _parse_where (parser.py L5372).
 func (p *Parser) parseWhere(skipWhereToken bool) *Expr {
 	if !skipWhereToken && !p.match(TK_WHERE) {
 		return nil
@@ -26,7 +26,7 @@ func (p *Parser) parseWhere(skipWhereToken bool) *Expr {
 	return p.expressionC(New(KWhere, "this", p.parseDisjunction()), comments)
 }
 
-// _parse_group (parser.py L5382)
+// _parse_group (parser.py L5382).
 func (p *Parser) parseGroup(skipGroupByToken bool) *Expr {
 	if !skipGroupByToken && !p.match(TK_GROUP_BY) {
 		return nil
@@ -84,7 +84,7 @@ func (p *Parser) parseGroup(skipGroupByToken bool) *Expr {
 	return p.expressionC(New(KGroup, elements.kv()...), comments)
 }
 
-// _parse_cube_or_rollup (parser.py L5430)
+// _parse_cube_or_rollup (parser.py L5430).
 func (p *Parser) parseCubeOrRollup(withPrefix bool) *Expr {
 	var kind Kind
 	if p.match(TK_CUBE) {
@@ -104,7 +104,7 @@ func (p *Parser) parseCubeOrRollup(withPrefix bool) *Expr {
 	return p.expression(New(kind, "expressions", expressions))
 }
 
-// _parse_grouping_sets (parser.py L5442)
+// _parse_grouping_sets (parser.py L5442).
 func (p *Parser) parseGroupingSets() *Expr {
 	if p.match(TK_GROUPING_SETS) {
 		return p.expression(New(
@@ -115,7 +115,7 @@ func (p *Parser) parseGroupingSets() *Expr {
 	return nil
 }
 
-// _parse_grouping_set (parser.py L5449)
+// _parse_grouping_set (parser.py L5449).
 func (p *Parser) parseGroupingSet() *Expr {
 	if e := p.parseGroupingSets(); e != nil {
 		return e
@@ -126,7 +126,7 @@ func (p *Parser) parseGroupingSet() *Expr {
 	return p.parseBitwise()
 }
 
-// _parse_having (parser.py L5452)
+// _parse_having (parser.py L5452).
 func (p *Parser) parseHaving(skipHavingToken bool) *Expr {
 	if !skipHavingToken && !p.match(TK_HAVING) {
 		return nil
@@ -135,7 +135,7 @@ func (p *Parser) parseHaving(skipHavingToken bool) *Expr {
 	return p.expressionC(New(KHaving, "this", p.parseDisjunction()), comments)
 }
 
-// _parse_qualify (parser.py L5461)
+// _parse_qualify (parser.py L5461).
 func (p *Parser) parseQualify() *Expr {
 	if !p.match(TK_QUALIFY) {
 		return nil
@@ -159,7 +159,7 @@ func (p *Parser) baseParseConnectWithPrior() *Expr {
 	return connect
 }
 
-// _parse_connect (parser.py L5474)
+// _parse_connect (parser.py L5474).
 func (p *Parser) parseConnect(skipStartToken bool) *Expr {
 	var start *Expr
 	if skipStartToken {
@@ -181,7 +181,7 @@ func (p *Parser) parseConnect(skipStartToken bool) *Expr {
 	return p.expression(New(KConnect, "start", start, "connect", connect, "nocycle", nocycle))
 }
 
-// _parse_name_as_expression (parser.py L5491)
+// _parse_name_as_expression (parser.py L5491).
 func (p *Parser) parseNameAsExpression() *Expr {
 	this := p.parseIdVar(true, nil)
 	if p.match(TK_ALIAS) {
@@ -190,7 +190,7 @@ func (p *Parser) parseNameAsExpression() *Expr {
 	return this
 }
 
-// _parse_interpolate (parser.py L5497)
+// _parse_interpolate (parser.py L5497).
 func (p *Parser) parseInterpolate() []*Expr {
 	if p.matchTextSeq("INTERPOLATE") {
 		return p.parseWrappedCSV(p.parseNameAsExpression, TK_COMMA, false)
@@ -198,7 +198,7 @@ func (p *Parser) parseInterpolate() []*Expr {
 	return nil
 }
 
-// _parse_order (parser.py L5502)
+// _parse_order (parser.py L5502).
 func (p *Parser) parseOrder(this *Expr, skipOrderToken bool) *Expr {
 	var siblings any // True | None
 	if !skipOrderToken && !p.match(TK_ORDER_BY) {
@@ -218,7 +218,7 @@ func (p *Parser) parseOrder(this *Expr, skipOrderToken bool) *Expr {
 	), comments)
 }
 
-// _parse_sort (parser.py L5522)
+// _parse_sort (parser.py L5522).
 func (p *Parser) parseSort(expClass Kind, token TokenType) *Expr {
 	if !p.match(token) {
 		return nil
@@ -226,7 +226,7 @@ func (p *Parser) parseSort(expClass Kind, token TokenType) *Expr {
 	return p.expression(New(expClass, "expressions", p.parseCSV(func() *Expr { return p.parseOrdered(nil) }, TK_COMMA)))
 }
 
-// _parse_ordered (parser.py L5527)
+// _parse_ordered (parser.py L5527).
 func (p *Parser) parseOrdered(parseMethod func() *Expr) *Expr {
 	var this *Expr
 	if parseMethod != nil {
@@ -293,7 +293,7 @@ func (p *Parser) parseOrdered(parseMethod func() *Expr) *Expr {
 	return p.expression(New(KOrdered, "this", this, "desc", desc, "nulls_first", nullsFirst, "with_fill", withFill))
 }
 
-// _parse_limit_options (parser.py L5572)
+// _parse_limit_options (parser.py L5572).
 func (p *Parser) parseLimitOptions() *Expr {
 	percent := p.matchAny(TK_PERCENT, TK_MOD)
 	rows := p.matchAny(TK_ROW, TK_ROWS)
@@ -307,7 +307,7 @@ func (p *Parser) parseLimitOptions() *Expr {
 	return p.expression(New(KLimitOptions, "percent", percent, "rows", rows, "with_ties", withTies))
 }
 
-// _parse_limit (parser.py L5583)
+// _parse_limit (parser.py L5583).
 func (p *Parser) parseLimit(this *Expr, top bool, skipLimitToken bool) *Expr {
 	limitToken := TK_LIMIT
 	if top {
@@ -388,7 +388,7 @@ func (p *Parser) parseLimit(this *Expr, top bool, skipLimitToken bool) *Expr {
 	return this
 }
 
-// _parse_offset (parser.py L5654)
+// _parse_offset (parser.py L5654).
 func (p *Parser) parseOffset(this *Expr) *Expr {
 	if !p.match(TK_OFFSET) {
 		return this
@@ -405,7 +405,7 @@ func (p *Parser) parseOffset(this *Expr) *Expr {
 	))
 }
 
-// _can_parse_limit_or_offset (parser.py L5665)
+// _can_parse_limit_or_offset (parser.py L5665).
 func (p *Parser) canParseLimitOrOffset() bool {
 	if !p.matchAnyNoAdvance(p.s.AMBIGUOUS_ALIAS_TOKENS...) {
 		return false
@@ -424,7 +424,7 @@ func (p *Parser) canParseLimitOrOffset() bool {
 	return result
 }
 
-// _can_parse_named_window (parser.py L5682)
+// _can_parse_named_window (parser.py L5682).
 func (p *Parser) canParseNamedWindow() bool {
 	// `WINDOW` is in ID_VAR_TOKENS so it could be mistakenly consumed as an implicit alias.
 	// Refuse only when the following tokens look like a named-window clause: `WINDOW <id> AS (`.
@@ -455,7 +455,7 @@ func (p *Parser) canParseNamedWindow() bool {
 	return body != nil && body.Type == TK_L_PAREN
 }
 
-// _parse_limit_by (parser.py L5699)
+// _parse_limit_by (parser.py L5699).
 func (p *Parser) parseLimitBy() []*Expr {
 	if p.matchTextSeq("BY") {
 		return p.parseCSV(p.parseBitwise, TK_COMMA)
@@ -463,7 +463,7 @@ func (p *Parser) parseLimitBy() []*Expr {
 	return nil
 }
 
-// _parse_locks (parser.py L5702)
+// _parse_locks (parser.py L5702).
 func (p *Parser) parseLocks() []*Expr {
 	locks := []*Expr{}
 	for {
@@ -508,7 +508,7 @@ func (p *Parser) parseLocks() []*Expr {
 	return locks
 }
 
-// parse_set_operation (parser.py L5739)
+// parse_set_operation (parser.py L5739).
 func (p *Parser) parseSetOperation(this *Expr, consumePipe bool) *Expr {
 	start := p.index
 	_, sideToken, kindToken := p.parseJoinParts()
@@ -597,7 +597,7 @@ func (p *Parser) parseSetOperation(this *Expr, consumePipe bool) *Expr {
 	), comments)
 }
 
-// _parse_set_operations (parser.py L5810)
+// _parse_set_operations (parser.py L5810).
 func (p *Parser) parseSetOperations(this *Expr) *Expr {
 	for this != nil {
 		setop := p.parseSetOperation(this, false)

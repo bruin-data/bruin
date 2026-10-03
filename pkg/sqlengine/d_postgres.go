@@ -251,7 +251,7 @@ func customizePostgresParser(d *Dialect) {
 //
 // Disambiguates between mode keywords and identifiers with the same name:
 // - MODE TYPE      -> keyword is identifier (e.g., "out INT")
-// - MODE NAME TYPE -> keyword is mode (e.g., "OUT x INT")
+// - MODE NAME TYPE -> keyword is mode (e.g., "OUT x INT").
 func postgresParseParameterMode(p *Parser) (TokenType, bool) {
 	if !p.matchSetNoAdvance(p.s.ARG_MODE_TOKENS) || !p.next.ok() {
 		return 0, false

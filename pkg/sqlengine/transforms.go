@@ -1255,7 +1255,7 @@ func transformEliminateJoinMarks(expression *Expr) *Expr {
 //   - Spark: SELECT * FROM tbl WHERE EXISTS(tbl.col, x -> x < 5)
 //
 // Both ANY and EXISTS accept queries but currently only array expressions are supported for this
-// transformation
+// transformation.
 func transformAnyToExists(expression *Expr) *Expr {
 	if expression.IsA(KSelect) {
 		for anyExpr := range expression.FindAll(KAny) {

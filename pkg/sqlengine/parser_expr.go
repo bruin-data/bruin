@@ -43,12 +43,12 @@ func chunkDMatchKey[V any](p *Parser, m map[TokenType]V) bool {
 	return false
 }
 
-// _parse_expression (parser.py L5828)
+// _parse_expression (parser.py L5828).
 func (p *Parser) baseParseExpression() *Expr {
 	return p.parseAlias(p.parseAssignment(), false)
 }
 
-// _parse_assignment (parser.py L5831)
+// _parse_assignment (parser.py L5831).
 func (p *Parser) baseParseAssignment() *Expr {
 	this := p.parseDisjunction()
 	if this == nil {
@@ -75,7 +75,7 @@ func (p *Parser) baseParseAssignment() *Expr {
 	return this
 }
 
-// _parse_disjunction (parser.py L5853)
+// _parse_disjunction (parser.py L5853).
 func (p *Parser) parseDisjunction() *Expr {
 	this := p.parseConjunction()
 	for chunkDMatchKey(p, p.s.DISJUNCTION) {
@@ -86,7 +86,7 @@ func (p *Parser) parseDisjunction() *Expr {
 	return this
 }
 
-// _parse_conjunction (parser.py L5865)
+// _parse_conjunction (parser.py L5865).
 func (p *Parser) parseConjunction() *Expr {
 	this := p.parseEquality()
 	for chunkDMatchKey(p, p.s.CONJUNCTION) {
@@ -97,7 +97,7 @@ func (p *Parser) parseConjunction() *Expr {
 	return this
 }
 
-// _parse_equality (parser.py L5877)
+// _parse_equality (parser.py L5877).
 func (p *Parser) parseEquality() *Expr {
 	this := p.parseComparison()
 	for chunkDMatchKey(p, p.s.EQUALITY) {
@@ -108,7 +108,7 @@ func (p *Parser) parseEquality() *Expr {
 	return this
 }
 
-// _parse_comparison (parser.py L5889)
+// _parse_comparison (parser.py L5889).
 func (p *Parser) parseComparison() *Expr {
 	this := p.parseRange(nil)
 	for chunkDMatchKey(p, p.s.COMPARISON) {
@@ -119,7 +119,7 @@ func (p *Parser) parseComparison() *Expr {
 	return this
 }
 
-// _parse_range (parser.py L5899)
+// _parse_range (parser.py L5899).
 func (p *Parser) parseRange(this *Expr) *Expr {
 	if this == nil {
 		this = p.parseBitwise()
@@ -162,7 +162,7 @@ func (p *Parser) parseRange(this *Expr) *Expr {
 	return this
 }
 
-// _negate_range (parser.py L5932)
+// _negate_range (parser.py L5932).
 func (p *Parser) baseNegateRange(this *Expr) *Expr {
 	if this == nil {
 		return this
@@ -180,7 +180,7 @@ func (p *Parser) baseNegateRange(this *Expr) *Expr {
 	return p.expression(New(KNot, "this", this))
 }
 
-// _parse_is (parser.py L5943)
+// _parse_is (parser.py L5943).
 func (p *Parser) parseIs(this *Expr) *Expr {
 	index := p.index - 1
 	negate := p.match(TK_NOT)
@@ -228,7 +228,7 @@ func (p *Parser) parseIs(this *Expr) *Expr {
 	return p.parseColumnOps(this)
 }
 
-// _parse_in (parser.py L5976)
+// _parse_in (parser.py L5976).
 func (p *Parser) parseIn(this *Expr, alias bool) *Expr {
 	unnest := p.parseUnnest(false)
 	if unnest != nil {
@@ -256,7 +256,7 @@ func (p *Parser) parseIn(this *Expr, alias bool) *Expr {
 	return this
 }
 
-// _parse_between (parser.py L6000)
+// _parse_between (parser.py L6000).
 func (p *Parser) parseBetween(this *Expr) *Expr {
 	var symmetric any
 	if p.matchTextSeq("SYMMETRIC") {
@@ -272,7 +272,7 @@ func (p *Parser) parseBetween(this *Expr) *Expr {
 	return p.expression(New(KBetween, "this", this, "low", low, "high", high, "symmetric", symmetric))
 }
 
-// _parse_escape (parser.py L6013)
+// _parse_escape (parser.py L6013).
 func (p *Parser) parseEscape(this *Expr) *Expr {
 	if !p.match(TK_ESCAPE) {
 		return this
@@ -284,7 +284,7 @@ func (p *Parser) parseEscape(this *Expr) *Expr {
 	return p.expression(New(KEscape, "this", this, "expression", expression))
 }
 
-// _parse_interval_span (parser.py L6020)
+// _parse_interval_span (parser.py L6020).
 func (p *Parser) parseIntervalSpan(this *Expr) *Expr {
 	// handle day-time format interval span with omitted units:
 	//   INTERVAL '<number days> hh[:][mm[:ss[.ff]]]' <maybe `unit TO unit`>
@@ -342,7 +342,7 @@ func (p *Parser) parseIntervalSpan(this *Expr) *Expr {
 	return p.expression(New(KInterval, "this", this, "unit", unit))
 }
 
-// _parse_interval (parser.py L6078)
+// _parse_interval (parser.py L6078).
 func (p *Parser) parseInterval(requireInterval bool) *Expr {
 	index := p.index
 
@@ -380,7 +380,7 @@ func (p *Parser) parseInterval(requireInterval bool) *Expr {
 	return interval
 }
 
-// _parse_bitwise (parser.py L6111)
+// _parse_bitwise (parser.py L6111).
 func (p *Parser) parseBitwise() *Expr {
 	this := p.parseTerm()
 
@@ -409,7 +409,7 @@ func (p *Parser) parseBitwise() *Expr {
 	return this
 }
 
-// _parse_term (parser.py L6144)
+// _parse_term (parser.py L6144).
 func (p *Parser) parseTerm() *Expr {
 	this := p.parseFactor()
 
@@ -441,7 +441,7 @@ func (p *Parser) parseTerm() *Expr {
 	return this
 }
 
-// _parse_factor (parser.py L6166)
+// _parse_factor (parser.py L6166).
 func (p *Parser) parseFactor() *Expr {
 	parseMethod := p.parseUnary
 	if len(p.s.EXPONENT) > 0 {
@@ -483,7 +483,7 @@ func chunkDIsAlpha(s string) bool {
 	return true
 }
 
-// _parse_exponent (parser.py L6187)
+// _parse_exponent (parser.py L6187).
 func (p *Parser) parseExponent() *Expr {
 	this := p.parseUnary()
 	for chunkDMatchKey(p, p.s.EXPONENT) {
@@ -494,7 +494,7 @@ func (p *Parser) parseExponent() *Expr {
 	return this
 }
 
-// _parse_unary (parser.py L6197)
+// _parse_unary (parser.py L6197).
 func (p *Parser) parseUnary() *Expr {
 	if chunkDMatchKey(p, p.s.UNARY_PARSERS) {
 		return p.s.UNARY_PARSERS[p.prev.Type](p)
@@ -502,7 +502,7 @@ func (p *Parser) parseUnary() *Expr {
 	return p.parseType(true, false)
 }
 
-// _parse_type (parser.py L6202)
+// _parse_type (parser.py L6202).
 func (p *Parser) baseParseType(parseInterval bool, fallbackToIdentifier bool) *Expr {
 	if !fallbackToIdentifier {
 		if atom := p.parseAtom(); atom != nil {
@@ -576,7 +576,7 @@ func (p *Parser) baseParseType(parseInterval bool, fallbackToIdentifier bool) *E
 	return p.parseColumn()
 }
 
-// _parse_type_size (parser.py L6266)
+// _parse_type_size (parser.py L6266).
 func (p *Parser) parseTypeSize() *Expr {
 	this := p.parseType(true, false)
 	if this == nil {
@@ -590,7 +590,7 @@ func (p *Parser) parseTypeSize() *Expr {
 	return p.expression(New(KDataTypeParam, "this", this, "expression", p.parseVar(true, nil, false)))
 }
 
-// _parse_user_defined_type (parser.py L6278)
+// _parse_user_defined_type (parser.py L6278).
 func (p *Parser) baseParseUserDefinedType(identifier *Expr) *Expr {
 	typeName := identifier.Name()
 
@@ -605,7 +605,7 @@ func (p *Parser) baseParseUserDefinedType(identifier *Expr) *Expr {
 	return chunkDDataTypeFromStr(typeName, p.d, true)
 }
 
-// _parse_types (parser.py L6286)
+// _parse_types (parser.py L6286).
 func (p *Parser) baseParseTypes(checkFunc bool, schema bool, allowIdentifiers bool, withCollation bool) *Expr {
 	index := p.index
 	var this *Expr
@@ -949,13 +949,13 @@ func (p *Parser) parseJsonTypeArg() *Expr {
 	return p.expression(New(KColumnDef, "this", col, "kind", kind))
 }
 
-// _parse_vector_expressions (parser.py L6567)
+// _parse_vector_expressions (parser.py L6567).
 func (p *Parser) parseVectorExpressions(expressions []*Expr) []*Expr {
 	out := []*Expr{chunkDDataTypeFromStr(expressions[0].Name(), p.d, false)}
 	return append(out, expressions[1:]...)
 }
 
-// _parse_struct_types (parser.py L6570)
+// _parse_struct_types (parser.py L6570).
 func (p *Parser) baseParseStructTypes(typeRequired bool) *Expr {
 	index := p.index
 
@@ -986,7 +986,7 @@ func (p *Parser) baseParseStructTypes(typeRequired bool) *Expr {
 	return p.parseColumnDef(this, true)
 }
 
-// _parse_at_time_zone (parser.py L6600)
+// _parse_at_time_zone (parser.py L6600).
 func (p *Parser) parseAtTimeZone(this *Expr) *Expr {
 	if !p.matchTextSeq("AT", "TIME", "ZONE") {
 		return this

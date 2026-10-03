@@ -6,7 +6,7 @@ package sqlengine
 // to pushdown predicates in FROMS and JOINS. d == nil means the default dialect.
 //
 // Example: "SELECT y.a AS a FROM (SELECT x.a AS a FROM x AS x) AS y WHERE y.a = 1"
-// -> "SELECT y.a AS a FROM (SELECT x.a AS a FROM x AS x WHERE x.a = 1) AS y WHERE TRUE"
+// -> "SELECT y.a AS a FROM (SELECT x.a AS a FROM x AS x WHERE x.a = 1) AS y WHERE TRUE".
 func PushdownPredicates(expression *Expr, d *Dialect) *Expr {
 	root := BuildScope(expression)
 
