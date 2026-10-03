@@ -22,7 +22,8 @@ with a pure-Go implementation. It is written for review; nothing has been pushed
   - mutation fuzzing (756k commands on malformed variants of the corpus) — identical except where
     Python itself is nondeterministic or hangs (§5).
 - Speed: the 145k-command differential takes ~4 s single-threaded in Go vs ~55 CPU-seconds in
-  Python (plus IPC); the sqlparser test package went from ~42 s to <1 s;
+  Python (plus IPC), and a later allocation/CPU pass made the Go engine another 2.4–3.4× faster on
+  Bruin's command mix (§6); the sqlparser test package went from ~42 s to <1 s;
   `bruin internal parse-pipeline -c` on the lineage integration pipeline: 0.03 s vs 0.2 s warm
   (6.2 s vs 3.8 s on a cold first run), byte-identical output.
 - Size: the stripped darwin/arm64 binary shrinks from 196 MB to 153 MB, and the repository loses
@@ -142,10 +143,13 @@ conformance tests point at exactly what changed.
   `go-embed-python` module), `internal/generate` (the pip packaging step), the `go-embed-python`
   dependency, and the `make lint-python` target (it only linted `pythonsrc`; `make format` no longer
   depends on it). Doc references (AGENTS.md), `.gitattributes` and `.golangci.yml` exclusions updated.
-- **`pkg/sqlparser`:** public API unchanged. `sendCommand` still JSON-roundtrips each request (so
-  inputs are normalized exactly like before: map key order, nil vs empty maps, numbers) and calls
-  `dispatch`, an in-process Go port of `pythonsrc/main.py`, `parser/main.py` and `rename.py`
-  (`engine.go`, `engine_lineage.go`, `engine_ops.go`). `Start`/`Close` are kept as cheap lifecycle no-ops;
+- **`pkg/sqlparser`:** public API unchanged. Commands run in-process through `dispatch`/`runCommand`,
+  a Go port of `pythonsrc/main.py`, `parser/main.py` and `rename.py` (`engine.go`,
+  `engine_lineage.go`, `engine_ops.go`). Requests and responses keep the semantics of the old JSON
+  round trip (map key order, nil vs empty maps and slices, numbers as float64, UTF-8 coercion) without
+  serializing: `fastpath.go` normalizes requests and decodes results directly and falls back to the
+  real JSON round trip (`sendCommand`) for anything outside the shapes it handles, such as invalid
+  UTF-8; tests check it against the round trip over the corpus. `Start`/`Close` are kept as cheap lifecycle no-ops;
   there is no subprocess anymore, so the parser can no longer hang or desynchronize, and the first
   call no longer pays the CPython extraction/start-up cost.
 - **One test assertion changed:** `TestSQLParser_HoistingStartsLazilyAndPreservesErrors` asserted
@@ -196,7 +200,46 @@ Go, except a single response whose message embeds a Python `set` (hash-order dep
 above). The 93 commands on which Python hangs (13 distinct inputs) return the no-progress error
 in Go.
 
-## 6. Follow-ups worth considering
+## 6. Performance
+
+A dedicated pass reduced allocations and CPU without changing behavior. Each step was checked with
+the full conformance corpus, the 192k-command differential and both fuzz seeds before committing.
+Benchmarks: `pkg/sqlparser` (`BenchmarkCommandMix`: tables + lineage + single-select + limit per
+corpus statement; `BenchmarkLineageTPC`: TPC-H/TPC-DS lineage with schemas) and `pkg/sqlengine`
+(per-stage). Apple M2 Pro, GOMAXPROCS=12, `benchstat` over 6 runs:
+
+| benchmark | before | after | allocs/op |
+|---|---|---|---|
+| CommandMix (per query, 4 commands) | 92.1 µs | 38.5 µs (−58%) | −75% |
+| LineageTPC (per query) | 3.36 ms | 1.00 ms (−70%) | −83% |
+| Tokenize / Parse / Generate (per stmt) | 2.8 / 8.8 / 6.4 µs | 1.3 / 4.6 / 4.1 µs | −96% / −73% / −51% |
+| Optimize, lineage rules / all rules (per query) | 1.94 / 3.05 ms | 0.61 / 1.33 ms | −80% / −68% |
+
+Main changes: smaller nodes (an `Expr` is allocated together with its argument array, with
+positions inline and comments/meta in a side struct only when present); 64-byte tokens whose text
+is a substring of the input; token storage and parsers recycled across parses; scope
+construction and collection with fewer, batched allocations; schema normalization memoized per name
+and presized; walks that don't allocate; `isinstance` checks as precomputed bitsets; a
+regexp-free safe-identifier check; allocation-free keyword matching and hashing; skipping the JSON
+round trip in `pkg/sqlparser`; and `Expr.Own`, which stands in for the defensive `copy()` in
+`optimize`/`sql()`/builders when a caller passes on a tree it never touches again, provided the
+tree is one a copy could not tell apart from the original (a parentless root whose nodes each have
+exactly one parent and hold no types or shared lists; anything else is still copied).
+
+**How close to the limit is this?** With one core, about 40–45% of CPU is now Go memory management
+(malloc, GC, and macOS page reuse via `madvise`). With all cores, most GC work runs in parallel:
+disabling GC entirely (`GOGC=off`) no longer makes the benchmarks measurably faster. The rest of
+the profile is flat: no function in the engine takes more than ~4% self time. About 37% of the
+remaining bytes are AST nodes that sqlglot's algorithms create by design (the trees themselves,
+plus the qualified columns, aliases and types the optimizer adds) and ~11% are scopes, which every
+optimizer rule rebuilds, as sqlglot does. What is left would take architectural changes, each
+worth an estimated 3–10%:
+interned argument keys (≈20% smaller nodes), recycling scopes between optimizer rules, sharing
+immutable `DataType` nodes, or caching parse results across Bruin's commands for the same SQL.
+Each would add aliasing risk that the current faithful-port structure deliberately avoids, so they
+were not done.
+
+## 7. Follow-ups worth considering
 
 - Replace the verbatim Python exception texts with clearer messages (contract assertions pin some).
 - Teradata and other sqlglot dialects Bruin does not map to are not ported (Presto's `TO_CHAR` embeds
