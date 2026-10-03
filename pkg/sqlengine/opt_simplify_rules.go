@@ -200,6 +200,7 @@ func (s *Simplifier) Simplify(expression *Expr, constantPropagation, coalesceSim
 func (s *Simplifier) simplifyOnce(expression *Expr, constantPropagation, coalesceSimplification bool) *Expr {
 	type postItem struct{ node, parent *Expr }
 	preTransformationStack := []*Expr{expression}
+	var children []*Expr
 	var postTransformationStack []postItem
 	var node *Expr
 
@@ -232,7 +233,8 @@ func (s *Simplifier) simplifyOnce(expression *Expr, constantPropagation, coalesc
 			original.Replace(node)
 		}
 
-		for _, n := range node.IterExpressions(true) {
+		children = node.appendChildren(children[:0], true)
+		for _, n := range children {
 			if !truthy(n.MetaGet(smpFINAL)) {
 				preTransformationStack = append(preTransformationStack, n)
 			}

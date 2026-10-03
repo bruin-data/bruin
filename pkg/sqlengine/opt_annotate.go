@@ -632,6 +632,7 @@ type annStackItem struct {
 // annotateExpression mirrors TypeAnnotator._annotate_expression. scope may be nil.
 func (a *TypeAnnotator) annotateExpression(expression *Expr, scope *Scope) {
 	stack := []annStackItem{{expression, false}}
+	var children []*Expr
 
 	for len(stack) > 0 {
 		item := stack[len(stack)-1]
@@ -645,7 +646,8 @@ func (a *TypeAnnotator) annotateExpression(expression *Expr, scope *Scope) {
 
 		if !item.childrenAnnotated {
 			stack = append(stack, annStackItem{expr, true})
-			for _, childExpr := range expr.IterExpressions(false) {
+			children = expr.appendChildren(children[:0], false)
+			for _, childExpr := range children {
 				stack = append(stack, annStackItem{childExpr, false})
 			}
 			continue

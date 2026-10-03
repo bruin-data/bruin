@@ -13,6 +13,11 @@ type omap[V any] struct {
 
 const omapIndexThreshold = 8
 
+type omapBlock[V any] struct {
+	keys [4]string
+	vals [4]V
+}
+
 func newOMap[V any]() *omap[V] { return &omap[V]{} }
 
 func (o *omap[V]) find(key string) int {
@@ -93,6 +98,11 @@ func (o *omap[V]) Set(key string, v V) {
 // AppendNew adds an entry for a key that is known not to be present (the index, if any, is kept
 // up to date; otherwise it is built on the first lookup).
 func (o *omap[V]) AppendNew(key string, v V) {
+	if cap(o.keys) == 0 {
+		// Most maps are small: start both slices in one allocation.
+		b := new(omapBlock[V])
+		o.keys, o.vals = b.keys[:0], b.vals[:0]
+	}
 	o.keys = append(o.keys, key)
 	o.vals = append(o.vals, v)
 	if o.idx != nil {

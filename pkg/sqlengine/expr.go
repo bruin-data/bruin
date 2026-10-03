@@ -3,8 +3,8 @@ package sqlengine
 import (
 	"hash/maphash"
 	"iter"
-	"sort"
 	"strings"
+	"unicode/utf8"
 )
 
 // Expr is a node of a sqlglot syntax tree. It mirrors sqlglot.expressions.Expression:
@@ -1023,7 +1023,6 @@ func (e *Expr) IterExpressions(reverse bool) []*Expr {
 	return e.appendChildren(nil, reverse)
 }
 
-// appendChildren appends e's child expressions (IterExpressions order) to out.
 // nodeCount returns the number of nodes in the tree rooted at e.
 func (e *Expr) nodeCount() int {
 	n := 1
@@ -1050,6 +1049,7 @@ func (e *Expr) nodeCount() int {
 	return n
 }
 
+// appendChildren appends e's child expressions (IterExpressions order) to out.
 func (e *Expr) appendChildren(out []*Expr, reverse bool) []*Expr {
 	if !reverse {
 		for _, a := range e.args {
@@ -1371,11 +1371,20 @@ func (e *Expr) Hash() uint64 {
 	var h maphash.Hash
 	h.SetSeed(hashSeed)
 	h.WriteString(e.kind.Key())
-	keys := make([]int, len(e.args))
+	// Visit args in key order (keys are distinct, so any sort gives the same order).
+	var buf [16]int
+	var keys []int
+	if len(e.args) <= len(buf) {
+		keys = buf[:len(e.args)]
+	} else {
+		keys = make([]int, len(e.args))
+	}
 	for i := range keys {
 		keys[i] = i
+		for j := i; j > 0 && e.args[keys[j]].key < e.args[keys[j-1]].key; j-- {
+			keys[j], keys[j-1] = keys[j-1], keys[j]
+		}
 	}
-	sort.Slice(keys, func(a, b int) bool { return e.args[keys[a]].key < e.args[keys[b]].key })
 	raw := e.kind.hashRawArgs()
 	for _, i := range keys {
 		a := e.args[i]
@@ -1400,7 +1409,7 @@ func (e *Expr) Hash() uint64 {
 			for _, x := range v {
 				h.WriteByte(1)
 				h.WriteString(a.key)
-				h.WriteString(strings.ToLower(x))
+				writeLower(&h, x)
 			}
 		case []any:
 			for _, x := range v {
@@ -1423,6 +1432,30 @@ func (e *Expr) Hash() uint64 {
 	return e.hash
 }
 
+// writeLower writes strings.ToLower(s) without allocating for ASCII s.
+func writeLower(h *maphash.Hash, s string) {
+	var buf [64]byte
+	n := 0
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c >= utf8.RuneSelf {
+			h.Write(buf[:n])
+			h.WriteString(strings.ToLower(s[i:]))
+			return
+		}
+		if 'A' <= c && c <= 'Z' {
+			c += 'a' - 'A'
+		}
+		buf[n] = c
+		n++
+		if n == len(buf) {
+			h.Write(buf[:n])
+			n = 0
+		}
+	}
+	h.Write(buf[:n])
+}
+
 func writeU64(h *maphash.Hash, v uint64) {
 	var b [8]byte
 	for i := 0; i < 8; i++ {
@@ -1438,7 +1471,7 @@ func hashValue(h *maphash.Hash, v any, lower bool) {
 	case string:
 		h.WriteByte('s')
 		if lower {
-			h.WriteString(strings.ToLower(x))
+			writeLower(h, x)
 		} else {
 			h.WriteString(x)
 		}
