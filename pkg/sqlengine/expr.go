@@ -41,14 +41,6 @@ const (
 func (e *Expr) hashed() bool { return e.flags&flagHashed != 0 }
 func (e *Expr) posSet() bool { return e.flags&flagPosSet != 0 }
 
-func (e *Expr) setFlag(f exprFlags, on bool) {
-	if on {
-		e.flags |= f
-	} else {
-		e.flags &^= f
-	}
-}
-
 // exprExt holds the optional parts of an Expr.
 type exprExt struct {
 	comments []string // nil mirrors Python's None

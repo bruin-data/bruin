@@ -33,6 +33,7 @@ func loadGz(t testing.TB, path string, v any) {
 }
 
 func TestConformanceTokens(t *testing.T) {
+	t.Parallel()
 	var cases []tokenCase
 	loadGz(t, "testdata/tokens.json.gz", &cases)
 	failures := map[string]int{}

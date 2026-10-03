@@ -7,6 +7,7 @@ import (
 )
 
 func TestSelectFromCTEContract(t *testing.T) {
+	t.Parallel()
 	query := "WITH a AS (SELECT 1 AS id), b AS (SELECT id + 1 AS id FROM a) SELECT id * 9 AS marker FROM b"
 	want := "WITH a AS (SELECT 1 AS id), b AS (SELECT id + 1 AS id FROM a) SELECT * FROM a"
 	for _, dialect := range contractDialects {
@@ -50,6 +51,7 @@ func TestSelectFromCTEContract(t *testing.T) {
 		{"invalid dialect wins over malformed query", "SELECT * FROM", "not-a-dialect", "a", "Unknown dialect 'not-a-dialect'."},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := sharedSQLParser.SelectFromCTE(tc.query, tc.dialect, tc.cte)
 			require.EqualError(t, err, tc.errorText)
 			require.Empty(t, got)
@@ -58,6 +60,7 @@ func TestSelectFromCTEContract(t *testing.T) {
 }
 
 func TestPrependCTEsContract(t *testing.T) {
+	t.Parallel()
 	query := "WITH e AS (SELECT id FROM seed) SELECT id * 9 AS marker FROM e"
 	want := map[string]string{}
 	for _, d := range contractDialects {
@@ -118,6 +121,7 @@ func TestPrependCTEsContract(t *testing.T) {
 		{"invalid dialect wins over malformed query", "SELECT * FROM", "not-a-dialect", nil, "Unknown dialect 'not-a-dialect'."},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := sharedSQLParser.PrependCTEs(tc.query, tc.dialect, tc.ctes)
 			require.EqualError(t, err, tc.errorText)
 			require.Empty(t, got)

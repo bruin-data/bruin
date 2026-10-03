@@ -13,7 +13,7 @@ func attrErr(e *sqlengine.Expr, attr string) error {
 	if e != nil {
 		name = e.Kind().Name()
 	}
-	return &pyErr{fmt.Sprintf("'%s' object has no attribute '%s'", name, attr)}
+	return &pyError{fmt.Sprintf("'%s' object has no attribute '%s'", name, attr)}
 }
 
 // ---------------------------------------------------------------------------
@@ -74,11 +74,11 @@ func replaceTableReferences(query, dialectName string, mappingAny any) (any, err
 
 	for _, pq := range parsed {
 		if pq == nil {
-			return nil, &pyErr{"'NoneType' object has no attribute 'find_all'"}
+			return nil, &pyError{"'NoneType' object has no attribute 'find_all'"}
 		}
 		for tableNode := range pq.FindAll(sqlengine.KTable) {
 			if mappingIsNil {
-				return nil, &pyErr{"'NoneType' object has no attribute 'items'"}
+				return nil, &pyError{"'NoneType' object has no attribute 'items'"}
 			}
 			for _, tableName := range keys {
 				newTableName := mapping[tableName]
@@ -96,7 +96,7 @@ func replaceTableReferences(query, dialectName string, mappingAny any) (any, err
 				thisNode, ok := tableNode.Arg("this").(*sqlengine.Expr)
 				if !ok || thisNode == nil {
 					// Python: table_node.this.set(...) on None / a raw string.
-					return nil, &pyErr{fmt.Sprintf("'%s' object has no attribute 'set'", pyTypeName(tableNode.Arg("this")))}
+					return nil, &pyError{fmt.Sprintf("'%s' object has no attribute 'set'", pyTypeName(tableNode.Arg("this")))}
 				}
 				thisNode.Set("this", *dst.table)
 				if dst.schema != nil {
@@ -126,7 +126,7 @@ func replaceTableReferences(query, dialectName string, mappingAny any) (any, err
 				continue
 			}
 			if mappingIsNil {
-				return nil, &pyErr{"'NoneType' object is not iterable"}
+				return nil, &pyError{"'NoneType' object is not iterable"}
 			}
 			for _, tableName := range keys {
 				src := splitTablePath(tableName)
@@ -210,11 +210,11 @@ func addLimit(query string, limit int, dialectName string) (any, error) {
 	dialectName = normalizeDialect(dialectName)
 	d, err := getDialect(dialectName)
 	if err != nil {
-		return map[string]any{"error": "cannot parse query"}, nil
+		return map[string]any{"error": "cannot parse query"}, nil //nolint:nilerr // reported in the response, like the Python command
 	}
 	parsed, err := d.ParseOne(query, nil)
 	if err != nil || parsed == nil {
-		return map[string]any{"error": "cannot parse query"}, nil
+		return map[string]any{"error": "cannot parse query"}, nil //nolint:nilerr // reported in the response, like the Python command
 	}
 	if !parsed.IsA(sqlengine.KQuery) {
 		return nil, attrErr(parsed, "limit")

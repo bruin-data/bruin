@@ -33,6 +33,7 @@ func TestSQLParserContractLifecycleAndErrorRecovery(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // the steps run in order on purpose: each must see no state from the previous ones
 func TestSQLParserContractRequestIsolation(t *testing.T) {
 	t.Parallel()
 	// Reuse the same SQL across schemas and dialects, then repeat the original.

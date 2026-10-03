@@ -51,6 +51,7 @@ func TestMissingDependenciesContractRenderingAndErrors(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			asset := &pipeline.Asset{Name: "result_table", Type: tc.assetType, ExecutableFile: pipeline.ExecutableFile{Content: tc.query}}
 			pl := &pipeline.Pipeline{Assets: []*pipeline.Asset{asset, {Name: "raw.orders"}, {Name: "raw_orders"}}, Macros: tc.macros}
 			got, err := sharedSQLParser.GetMissingDependenciesForAsset(asset, pl, jinja.NewRendererWithYesterday("contract", "test"))

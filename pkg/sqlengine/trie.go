@@ -105,13 +105,6 @@ func (t *trie) getRune(r rune) *trie {
 	return nil
 }
 
-func (t *trie) get(c string) *trie {
-	if t == nil {
-		return nil
-	}
-	return t.children[c]
-}
-
 // inTrie mirrors sqlglot.trie.in_trie.
 func inTrie(t *trie, key []string) (trieResult, *trie) {
 	if len(key) == 0 {

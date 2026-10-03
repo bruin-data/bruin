@@ -97,6 +97,7 @@ func TestRenameTablesContractPlatformFeatures(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.dialect+"/"+tc.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := sharedSQLParser.RenameTables(tc.query, tc.dialect, tc.mapping)
 			require.NoError(t, err)
 			require.Equal(t, tc.want, got)
@@ -116,17 +117,20 @@ func TestRenameTablesContractInvalidInputs(t *testing.T) {
 		{"vertica alias unsupported", "SELECT 1", "vertica", "Unknown dialect 'vertica'."},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := sharedSQLParser.RenameTables(tc.query, tc.dialect, map[string]string{})
 			require.EqualError(t, err, tc.errorText)
 			require.Empty(t, got)
 		})
 	}
 	t.Run("nil mapping with table differs from empty mapping", func(t *testing.T) {
+		t.Parallel()
 		got, err := sharedSQLParser.RenameTables("SELECT * FROM orders", "postgres", nil)
 		require.EqualError(t, err, "'NoneType' object has no attribute 'items'")
 		require.Empty(t, got)
 	})
 	t.Run("nil mapping without table succeeds", func(t *testing.T) {
+		t.Parallel()
 		got, err := sharedSQLParser.RenameTables("SELECT 1", "postgres", nil)
 		require.NoError(t, err)
 		require.Equal(t, "SELECT 1", got)

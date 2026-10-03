@@ -129,9 +129,7 @@ func replayGolden(t *testing.T, name string) {
 		_ = json.Unmarshal(recs[i].Cmd, &pc)
 		failed[fmt.Sprintf("%s/%v", pc.Command, pc.Contents["dialect"])]++
 		if len(examples) < 20 {
-			wantJSON, _ := json.Marshal(recs[i].Want)
-			gotJSON, _ := json.Marshal(got[i])
-			examples = append(examples, fmt.Sprintf("%s\n  want: %s\n   got: %s", recs[i].Cmd, wantJSON, gotJSON))
+			examples = append(examples, fmt.Sprintf("%s\n  want: %s\n   got: %s", recs[i].Cmd, mustJSON(recs[i].Want), mustJSON(got[i])))
 		}
 	}
 	if len(failed) == 0 {
@@ -158,10 +156,18 @@ func sameResponse(got, want any) bool {
 	if reflect.DeepEqual(got, want) {
 		return true
 	}
-	g, _ := json.Marshal(got)
-	w, _ := json.Marshal(want)
 	const anyKeyword = "Required keyword: '*' missing for"
-	return requiredKeywordRE.ReplaceAllString(string(g), anyKeyword) == requiredKeywordRE.ReplaceAllString(string(w), anyKeyword)
+	return requiredKeywordRE.ReplaceAllString(string(mustJSON(got)), anyKeyword) ==
+		requiredKeywordRE.ReplaceAllString(string(mustJSON(want)), anyKeyword)
+}
+
+// mustJSON encodes a decoded JSON value, which always encodes.
+func mustJSON(v any) []byte {
+	b, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+	return b
 }
 
 func readGolden(t *testing.T, path string) []goldenRecord {

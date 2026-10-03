@@ -57,6 +57,7 @@ func diffFalse(w, g any, kind string, out map[string]int) {
 // TestFalseDiff (FALSEDIFF=1) lists parse-tree differences that are only False vs None, grouped
 // by (class, arg); a diagnostic for the exact comparison in TestConformanceParse.
 func TestFalseDiff(t *testing.T) {
+	t.Parallel()
 	if os.Getenv("FALSEDIFF") == "" {
 		t.Skip()
 	}
@@ -102,4 +103,4 @@ func TestFalseDiff(t *testing.T) {
 	}
 }
 
-func canonRaw(v any) []byte { b, _ := json.Marshal(v); return b }
+func canonRaw(v any) []byte { return mustJSON(v) }

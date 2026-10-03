@@ -75,11 +75,18 @@ func serExpr(v any) any {
 // differently in Expr.error_messages); SQLGLOT_CONF_LOOSE_FALSE=1 treats them as equal.
 func canon(v any) string {
 	if os.Getenv("SQLGLOT_CONF_LOOSE_FALSE") != "" {
-		b, _ := json.Marshal(normFalse(v))
-		return string(b)
+		return string(mustJSON(normFalse(v)))
 	}
-	b, _ := json.Marshal(normRepr(v))
-	return string(b)
+	return string(mustJSON(normRepr(v)))
+}
+
+// mustJSON encodes values decoded from JSON (or built from such values), which always encode.
+func mustJSON(v any) []byte {
+	b, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+	return b
 }
 
 // normRepr only normalizes Python object reprs (see normFalse).
@@ -218,6 +225,7 @@ func safeGenerate(d *Dialect, e *Expr) (out string, err error) {
 }
 
 func TestConformanceParse(t *testing.T) {
+	t.Parallel()
 	var cases []parseCase
 	loadGz(t, "testdata/parse.json.gz", &cases)
 	only := os.Getenv("SQLGLOT_CONF_DIALECT")

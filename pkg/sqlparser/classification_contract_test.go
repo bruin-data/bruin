@@ -56,6 +56,7 @@ func TestIsSingleSelectQueryContractStatementShape(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := sharedSQLParser.IsSingleSelectQuery(tc.query, "snowflake")
 			if tc.wantError == "" {
 				require.NoError(t, err)
@@ -90,6 +91,7 @@ func TestClassificationContractParserEdges(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := sharedSQLParser.IsSingleSelectQuery(tc.query, tc.dialect)
 			require.Equal(t, tc.single, got)
 			if tc.singleError == "" {
@@ -186,6 +188,7 @@ func TestIsReadOnlyQueryContractPlatformStatements(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := sharedSQLParser.IsReadOnlyQuery(tc.query, tc.dialect)
 			require.NoError(t, err)
 			require.Equal(t, tc.want, got)

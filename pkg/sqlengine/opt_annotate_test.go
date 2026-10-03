@@ -57,6 +57,7 @@ func loadAnnotateFixture(t *testing.T) *annotateFixture {
 }
 
 func TestAnnotateTypingMetadataParity(t *testing.T) {
+	t.Parallel()
 	fx := loadAnnotateFixture(t)
 	for dialect, want := range fx.Meta {
 		d := MustDialect(dialect)
@@ -114,6 +115,7 @@ func annDumpCoerces(m map[DType]DTypeSet) map[string][]string {
 }
 
 func TestAnnotateCoercesToParity(t *testing.T) {
+	t.Parallel()
 	fx := loadAnnotateFixture(t)
 	annInitCoercions()
 	tables := map[string]map[DType]DTypeSet{
@@ -129,8 +131,7 @@ func TestAnnotateCoercesToParity(t *testing.T) {
 			continue // the port does not reproduce BigQuery's mutation of the base table
 		}
 		got := annDumpCoerces(tables[name])
-		wantJSON, _ := json.Marshal(want)
-		gotJSON, _ := json.Marshal(got)
+		wantJSON, gotJSON := mustJSON(want), mustJSON(got)
 		if string(wantJSON) != string(gotJSON) {
 			t.Errorf("%s:\nwant %s\ngot  %s", name, wantJSON, gotJSON)
 		}
@@ -138,6 +139,7 @@ func TestAnnotateCoercesToParity(t *testing.T) {
 }
 
 func TestAnnotateISODateHelpers(t *testing.T) {
+	t.Parallel()
 	fx := loadAnnotateFixture(t)
 	for _, c := range fx.ISO {
 		text := c[0].(string)
@@ -188,6 +190,7 @@ func annNodeTypes(e *Expr) []string {
 }
 
 func TestAnnotateTypesParity(t *testing.T) {
+	t.Parallel()
 	fx := loadAnnotateFixture(t)
 	// The fixtures were produced after importing the Hive family and then BigQuery (which
 	// mutates the base COERCES_TO table).
@@ -197,7 +200,6 @@ func TestAnnotateTypesParity(t *testing.T) {
 
 	failures := 0
 	for _, c := range fx.Cases {
-
 		name := fmt.Sprintf("%s/%v/%s", c.Dialect, c.Schema, c.SQL)
 		func() {
 			defer func() {

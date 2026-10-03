@@ -7,6 +7,7 @@ import (
 )
 
 func TestFreezeTimeContract(t *testing.T) {
+	t.Parallel()
 	want := map[string]string{
 		"athena":     "SELECT CAST('2024-02-03 04:05:06' AS TIMESTAMP) AS ts, CAST('2024-02-03' AS DATE) AS d, CAST('04:05:06' AS TIME) AS tm",
 		"bigquery":   "SELECT CAST('2024-02-03 04:05:06' AS DATETIME) AS ts, CAST('2024-02-03' AS DATE) AS d, CAST('04:05:06' AS TIME) AS tm",
@@ -69,6 +70,7 @@ func TestFreezeTimeContract(t *testing.T) {
 		{"invalid dialect wins over malformed query", "SELECT * FROM", "not-a-dialect", "2024-01-01", "Unknown dialect 'not-a-dialect'."},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := sharedSQLParser.FreezeTime(tc.query, tc.dialect, tc.at)
 			require.EqualError(t, err, tc.errorText)
 			require.Empty(t, got)

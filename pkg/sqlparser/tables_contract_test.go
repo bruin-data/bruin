@@ -31,12 +31,14 @@ func TestUsedTablesContractAcrossDialects(t *testing.T) {
 			t.Parallel()
 			for _, tc := range cases {
 				t.Run(tc.name, func(t *testing.T) {
+					t.Parallel()
 					got, err := sharedSQLParser.UsedTables(tc.query, dialect)
 					require.NoError(t, err)
 					require.Equal(t, tc.want, got)
 				})
 			}
 			t.Run("malformed is not an empty dependency set", func(t *testing.T) {
+				t.Parallel()
 				got, err := sharedSQLParser.UsedTables("SELECT * FROM", dialect)
 				require.EqualError(t, err, contractSelectStarFromError)
 				require.Nil(t, got)
@@ -146,6 +148,7 @@ func TestUsedTablesContractPlatformFeatures(t *testing.T) {
 		{"trino inline function rejected", "WITH FUNCTION f(x bigint) RETURNS bigint RETURN x+1 SELECT * FROM t", "trino", "Expecting (. Line 1, Col: 15.\n  WITH FUNCTION \x1b[4mf\x1b[0m(x bigint) RETURNS bigint RETURN x+1 SELECT * FROM t"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := sharedSQLParser.UsedTables(tc.query, tc.dialect)
 			require.EqualError(t, err, tc.errorText)
 			require.Nil(t, got)

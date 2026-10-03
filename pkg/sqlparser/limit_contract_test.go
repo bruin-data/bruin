@@ -7,6 +7,7 @@ import (
 )
 
 func TestAddLimitContract(t *testing.T) {
+	t.Parallel()
 	want := map[string]string{
 		"athena": "SELECT id FROM orders OFFSET 2 LIMIT 7", "bigquery": "SELECT id FROM orders LIMIT 7 OFFSET 2",
 		"clickhouse": "SELECT id FROM orders LIMIT 7 OFFSET 2", "databricks": "SELECT id FROM orders LIMIT 7 OFFSET 2",
@@ -66,6 +67,7 @@ func TestAddLimitContract(t *testing.T) {
 		{"clickhouse per-key and global limit", "SELECT * FROM t LIMIT 2 BY id LIMIT 9", "clickhouse", "cannot parse query"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := sharedSQLParser.AddLimit(tc.query, 1, tc.dialect)
 			require.EqualError(t, err, tc.errorText)
 			require.Empty(t, got)

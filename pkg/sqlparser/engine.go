@@ -14,10 +14,10 @@ import (
 	"github.com/bruin-data/bruin/pkg/sqlengine"
 )
 
-// pyErr is an error whose message mirrors str(exception) in the Python implementation.
-type pyErr struct{ msg string }
+// pyError is an error whose message mirrors str(exception) in the Python implementation.
+type pyError struct{ msg string }
 
-func (e *pyErr) Error() string { return e.msg }
+func (e *pyError) Error() string { return e.msg }
 
 // normalizeDialect mirrors normalize_sqlglot_dialect.
 func normalizeDialect(dialect string) string {
@@ -95,7 +95,7 @@ func runCommandUnguarded(command string, c map[string]any) (result any, err erro
 func encodeResponse(resp any) []byte {
 	b, err := json.Marshal(resp)
 	if err != nil {
-		b, _ = json.Marshal(map[string]any{"error": err.Error()})
+		b, _ = json.Marshal(map[string]string{"error": err.Error()}) //nolint:errchkjson // a map of strings always encodes
 	}
 	return b
 }

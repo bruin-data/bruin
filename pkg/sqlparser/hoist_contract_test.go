@@ -23,7 +23,7 @@ func TestHoistDeclaresContractAcrossMappedDialects(t *testing.T) {
 func TestHoistDeclaresContractBlocksAndPreservation(t *testing.T) {
 	t.Parallel()
 	cases := []struct{ name, in, want string }{
-		{"nested block", "SELECT 0;\nBEGIN\n BEGIN\n  DECLARE nested INT;\n END;\nEND;\nDECLARE top_level INT;", "DECLARE top_level INT;\nSELECT 0;\nBEGIN\n BEGIN\n  DECLARE nested INT;\n END;\nEND;"},
+		{"nested block", "SELECT 0;\nBEGIN\n BEGIN\n  DECLARE nested INT;\n END;\nEND;\nDECLARE top_level INT;", "DECLARE top_level INT;\nSELECT 0;\nBEGIN\n BEGIN\n  DECLARE nested INT;\n END;\nEND;"}, //nolint:dupword // nested END; END; is the point of the case
 		{"already ordered is byte stable", "DECLARE x INT64;\n-- π;\nSELECT ';' AS semi;", "DECLARE x INT64;\n-- π;\nSELECT ';' AS semi;"},
 		{"nil text", "", ""},
 		{"declaration remains attached to initial IF slice", "SELECT 1; IF TRUE THEN DECLARE x INT64; END IF; DECLARE y INT64;", "DECLARE y INT64;\nSELECT 1;\nIF TRUE THEN DECLARE x INT64;\nEND IF;"},
@@ -34,6 +34,7 @@ func TestHoistDeclaresContractBlocksAndPreservation(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := sharedSQLParser.HoistDeclares(tc.in, pipeline.AssetTypeBigqueryQuery)
 			require.NoError(t, err)
 			require.Equal(t, tc.want, got)
@@ -58,6 +59,7 @@ func TestHoistDeclaresContractNativeDialectTokens(t *testing.T) {
 		{"tsql table variable", "SELECT 1; DECLARE @t TABLE(id INT); SELECT * FROM @t; DECLARE @x INT;", "DECLARE @t TABLE(id INT);\nDECLARE @x INT;\nSELECT 1;\nSELECT * FROM @t;", pipeline.AssetTypeMsSQLQuery},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := sharedSQLParser.HoistDeclares(tc.query, tc.assetType)
 			require.NoError(t, err)
 			require.Equal(t, tc.want, got)

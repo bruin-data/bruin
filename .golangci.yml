@@ -170,6 +170,40 @@ linters:
           - dupl
           - gosec
         path: (.+)_test.go
+      # pkg/sqlengine is a line-by-line port of sqlglot, kept structurally close to the Python
+      # source so that sqlglot upgrades can be ported by diffing the two side by side. Rewrites
+      # these linters ask for (if/elif chains to switches, De Morgan, renaming `copy=` parameters,
+      # changing signatures shared across dialects, errors.As instead of isinstance-style checks
+      # on errors that are never wrapped) would break that correspondence.
+      - linters:
+          - dogsled
+          - dupword
+          - errname
+          - errorlint
+          - exhaustive
+          - gochecknoinits
+          - goconst
+          - gocritic
+          - ireturn
+          - mirror
+          - nakedret
+          - prealloc
+          - predeclared
+          - recvcheck
+          - unparam
+          - wastedassign
+        path: pkg/sqlengine/
+      # Style suggestions, and code paths that mirror sqlglot's own (a loop that returns its first
+      # item, an argument overwritten like the Python parameter, a value assigned and unused).
+      - linters:
+          - staticcheck
+        path: pkg/sqlengine/
+        text: "^(QF|ST|S1)|^SA400[469]"
+      # Bounded narrowing conversions (positions, ASCII bytes, hash bytes) and guarded indexes.
+      - linters:
+          - gosec
+        path: pkg/sqlengine/
+        text: "^G(115|602)"
     paths:
       - vendor
       - .git

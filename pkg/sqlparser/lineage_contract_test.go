@@ -18,7 +18,7 @@ func TestSQLParserColumnLineageContractCTEAndUnionAcrossDialects(t *testing.T) {
 	for _, dialect := range contractDialects {
 		t.Run(dialect, func(t *testing.T) {
 			want := []ColumnLineage{{"result", []UpstreamColumn{{"a", "left_rows"}, {"b", "left_rows"}, {"c", "right_rows"}}, "BIGINT"}}
-			if dialect == "oracle" || dialect == "snowflake" {
+			if uppercasesIdentifiers(dialect) {
 				want = []ColumnLineage{{"RESULT", []UpstreamColumn{{"A", "LEFT_ROWS"}, {"B", "LEFT_ROWS"}, {"C", "RIGHT_ROWS"}}, "BIGINT"}}
 			}
 			got, err := sharedSQLParser.ColumnLineage(query, dialect, schema)
@@ -38,7 +38,7 @@ func TestSQLParserColumnLineageContractAllDialects(t *testing.T) {
 		t.Run(dialect, func(t *testing.T) {
 			got, err := sharedSQLParser.ColumnLineage(query, dialect, schema)
 			require.NoError(t, err)
-			upper := dialect == "oracle" || dialect == "snowflake"
+			upper := uppercasesIdentifiers(dialect)
 			customerType := "VARCHAR(40)"
 			if dialect == "databricks" || dialect == "duckdb" || dialect == "spark" {
 				customerType = "TEXT"
@@ -123,11 +123,11 @@ func TestSQLParserNonSelectedLineageContractAllDialects(t *testing.T) {
 			got, err := sharedSQLParser.ColumnLineage(query, dialect, schema)
 			require.NoError(t, err)
 			want := []ColumnLineage{{"active", uc("active", "sales.orders"), ""}, {"amount", uc("amount", "sales.orders"), ""}, {"customer_id", uc("customer_id", "sales.orders"), ""}, {"id", uc("id", "crm.customers"), ""}}
-			if dialect == "oracle" || dialect == "snowflake" {
+			if uppercasesIdentifiers(dialect) {
 				want = []ColumnLineage{{"ACTIVE", uc("ACTIVE", "SALES.ORDERS"), ""}, {"AMOUNT", uc("AMOUNT", "SALES.ORDERS"), ""}, {"CUSTOMER_ID", uc("CUSTOMER_ID", "SALES.ORDERS"), ""}, {"ID", uc("ID", "CRM.CUSTOMERS"), ""}}
 			}
 			columns := []ColumnLineage{{"amount", uc("amount", "sales.orders"), "DOUBLE"}}
-			if dialect == "oracle" || dialect == "snowflake" {
+			if uppercasesIdentifiers(dialect) {
 				columns = []ColumnLineage{{"AMOUNT", uc("AMOUNT", "SALES.ORDERS"), "DOUBLE"}}
 			}
 			require.Equal(t, &Lineage{Columns: columns, NonSelectedColumns: want, Errors: []string{}}, got)
@@ -251,4 +251,9 @@ func TestSQLParserColumnLineageContractBoundaryAndInvalidInputs(t *testing.T) {
 	unknown, err := sharedSQLParser.ColumnLineage("SELECT 1", "not-a-dialect", Schema{})
 	require.NoError(t, err)
 	require.Equal(t, &Lineage{Columns: []ColumnLineage{}, NonSelectedColumns: []ColumnLineage{}, Errors: []string{"Parse error: Unknown dialect 'not-a-dialect'."}}, unknown)
+}
+
+// uppercasesIdentifiers reports whether the dialect normalizes unquoted identifiers to upper case.
+func uppercasesIdentifiers(dialect string) bool {
+	return dialect == "oracle" || dialect == "snowflake" //nolint:goconst // dialect names read better inline in the case tables
 }

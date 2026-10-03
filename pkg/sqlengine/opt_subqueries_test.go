@@ -839,6 +839,7 @@ var optSubqueriesCases = []struct {
 }
 
 func TestOptSubqueriesParity(t *testing.T) {
+	t.Parallel()
 	d := MustDialect("")
 	for i, c := range optSubqueriesCases {
 		func() {
@@ -870,6 +871,7 @@ func TestOptSubqueriesParity(t *testing.T) {
 // Python raises AttributeError here (`select.parent` is None after wrapping a set operation that
 // must be MAX-aggregated); the port must fail too rather than silently produce SQL.
 func TestUnnestSubqueriesSetOperationHavingPanics(t *testing.T) {
+	t.Parallel()
 	d := MustDialect("")
 	e, err := d.ParseOne("SELECT x.a AS a FROM x AS x GROUP BY x.a HAVING x.a = (SELECT y.a AS a FROM y AS y UNION SELECT z.a AS a FROM z AS z)", nil)
 	if err != nil {

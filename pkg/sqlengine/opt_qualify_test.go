@@ -81,6 +81,7 @@ func runQualifyTestCase(c qualifyTestCase) (out string, errMsg string) {
 }
 
 func TestQualifyMatchesPython(t *testing.T) {
+	t.Parallel()
 	s1 := qtSchema(
 		"t", qtSchema("a", "INT", "b", "INT"),
 		"u", qtSchema("a", "INT", "c", "INT"),
@@ -135,6 +136,7 @@ func TestQualifyMatchesPython(t *testing.T) {
 // TestQualifyLineageDefaults checks the options lineage uses (Defaults with
 // validate_qualify_columns=False, identify=False).
 func TestQualifyLineageDefaults(t *testing.T) {
+	t.Parallel()
 	d := MustDialect("")
 	e, err := d.ParseOne("SELECT zz, a AS x FROM t ORDER BY x", nil)
 	if err != nil {

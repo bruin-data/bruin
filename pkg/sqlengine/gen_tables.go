@@ -329,7 +329,7 @@ func cloneGeneratorData(d *GeneratorData) *GeneratorData {
 	}
 	c := *d
 	v := reflect.ValueOf(&c).Elem()
-	for i := 0; i < v.NumField(); i++ {
+	for i := range v.NumField() {
 		f := v.Field(i)
 		if !f.CanSet() {
 			continue

@@ -33,10 +33,10 @@ func toRawSchema(v any) (*rawSchema, error) {
 	switch s := v.(type) {
 	case nil:
 		// Python: dict(None) -> TypeError
-		return nil, &pyErr{"'NoneType' object is not iterable"}
+		return nil, &pyError{"'NoneType' object is not iterable"}
 	case Schema:
 		if s == nil {
-			return nil, &pyErr{"'NoneType' object is not iterable"}
+			return nil, &pyError{"'NoneType' object is not iterable"}
 		}
 		rs := &rawSchema{tables: make(map[string]*sqlengine.SchemaMap, len(s)), nested: map[string]any{}}
 		keys := make([]string, 0, len(s))
@@ -79,7 +79,7 @@ func toRawSchema(v any) (*rawSchema, error) {
 	case map[string]map[string]string:
 		return toRawSchema(Schema(s))
 	}
-	return nil, &pyErr{fmt.Sprintf("unsupported schema type %T", v)}
+	return nil, &pyError{fmt.Sprintf("unsupported schema type %T", v)}
 }
 
 func anyToSchemaMap(v any) *sqlengine.SchemaMap {
@@ -175,7 +175,7 @@ func schemaDictToSchemaObject(schema *rawSchema) *sqlengine.SchemaMap {
 			nm, isMap := v.(*sqlengine.SchemaMap)
 			if !isMap {
 				// Python would fail on item assignment into a non-dict.
-				panic(&pyErr{"'str' object does not support item assignment"})
+				panic(&pyError{"'str' object does not support item assignment"})
 			}
 			current = nm
 		}
@@ -221,11 +221,11 @@ func getColumnLineage(query string, schema *rawSchema, dialectName string) (out 
 
 	d, derr := getDialect(dialectName)
 	if derr != nil {
-		return lineageError("Parse error: " + derr.Error()), nil
+		return lineageError("Parse error: " + derr.Error()), nil //nolint:nilerr // reported in the response, like the Python command
 	}
 	parsed, perr := d.ParseOne(query, nil)
 	if perr != nil {
-		return lineageError("Parse error: " + perr.Error()), nil
+		return lineageError("Parse error: " + perr.Error()), nil //nolint:nilerr // reported in the response, like the Python command
 	}
 	if !parsed.IsA(sqlengine.KQuery) {
 		return lineageError("Failed to parse query"), nil
@@ -241,13 +241,13 @@ func getColumnLineage(query string, schema *rawSchema, dialectName string) (out 
 		base, _ := getDialect("")
 		optimized, oerr = sqlengine.OptimizeSafe(parsed, nested, base, nil)
 		if oerr != nil {
-			return lineageError("Schema Error: " + oerr.Error()), nil
+			return lineageError("Schema Error: " + oerr.Error()), nil //nolint:nilerr // reported in the response, like the Python command
 		}
 	}
 
 	cols, cerr := extractColumns(optimized)
 	if cerr != nil {
-		return map[string]any{"columns": []any{}, "non_selected_columns": []any{}, "errors": []string{}}, nil
+		return map[string]any{"columns": []any{}, "non_selected_columns": []any{}, "errors": []string{}}, nil //nolint:nilerr // reported in the response, like the Python command
 	}
 
 	scope := sqlengine.BuildScope(optimized)

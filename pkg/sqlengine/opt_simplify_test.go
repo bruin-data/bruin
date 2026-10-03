@@ -194,9 +194,11 @@ func smpTestSQL(t *testing.T, d *Dialect, e *Expr) string {
 }
 
 func TestSimplifyFixtures(t *testing.T) {
+	t.Parallel()
 	for _, c := range simplifyFixtureCases {
 		dialect, sql, want := c[0], c[1], c[2]
 		t.Run(sql, func(t *testing.T) {
+			t.Parallel()
 			d, e := smpTestParse(t, dialect, sql)
 			e = AnnotateTypes(e, AnnotateOptions{SchemaMap: simplifyTestSchema()})
 			got := smpTestSQL(t, d, Simplify(e, SimplifyOptions{ConstantPropagation: true, Coalesce: true, Dialect: d}))
@@ -208,6 +210,7 @@ func TestSimplifyFixtures(t *testing.T) {
 }
 
 func TestSimplifyAPI(t *testing.T) {
+	t.Parallel()
 	// Stress test with huge union query
 	union := strings.Repeat("SELECT 1 UNION ALL ", 1000) + "SELECT 1"
 	d, e := smpTestParse(t, "", union)
@@ -270,6 +273,7 @@ func TestSimplifyAPI(t *testing.T) {
 }
 
 func TestSimplifyNested(t *testing.T) {
+	t.Parallel()
 	d, e := smpTestParse(t, "", `
         SELECT x, 1 + 1
         FROM foo
@@ -291,6 +295,7 @@ func TestSimplifyNested(t *testing.T) {
 }
 
 func TestSimplifyGen(t *testing.T) {
+	t.Parallel()
 	_, e := smpTestParse(t, "", "anonymous(x, y)")
 	if got := smpGen(e, false); got != "ANONYMOUS(x,y)" {
 		t.Errorf("got %s", got)
@@ -349,6 +354,7 @@ func TestSimplifyGen(t *testing.T) {
 }
 
 func TestSimplifyNumbersAndDates(t *testing.T) {
+	t.Parallel()
 	cases := [][2]string{
 		{"SELECT 1e5 * 1", "SELECT 1E+5"},
 		{"SELECT 1e5 + 1", "SELECT 100001"},

@@ -7,6 +7,7 @@ import (
 )
 
 func TestExtractSelectContract(t *testing.T) {
+	t.Parallel()
 	base := "WITH a AS (SELECT AccountDimId FROM dbo.DimAccount) SELECT AccountDimId FROM a"
 	for _, dialect := range contractDialects {
 		t.Run("dialect/"+dialect, func(t *testing.T) {
@@ -66,6 +67,7 @@ func TestExtractSelectContract(t *testing.T) {
 		{"invalid dialect wins over malformed query", "SELECT * FROM", "not-a-dialect", "Unknown dialect 'not-a-dialect'."},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := sharedSQLParser.ExtractSelect(tc.query, tc.dialect)
 			require.EqualError(t, err, tc.errorText)
 			require.Empty(t, got)
