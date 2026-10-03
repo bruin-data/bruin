@@ -16,7 +16,7 @@ type tokenCase struct {
 	Error   string  `json:"error"`
 }
 
-func loadGz(t *testing.T, path string, v any) {
+func loadGz(t testing.TB, path string, v any) {
 	t.Helper()
 	f, err := os.Open(path)
 	if err != nil {
