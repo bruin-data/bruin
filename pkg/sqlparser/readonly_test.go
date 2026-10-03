@@ -159,3 +159,35 @@ func TestValidateReadOnlyQueryAlwaysUsesPython(t *testing.T) {
 	require.ErrorContains(t, ValidateReadOnlyQuery("DELETE FROM t", "snowflake"), "read-only")
 	require.ErrorContains(t, ValidateReadOnlyQuery("SELECT FROM", "snowflake"), "read-only")
 }
+
+func TestDecodeReadOnlyResponseContract(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name, payload, wantError string
+		want                     bool
+	}{
+		{"true", `{"is_read_only":true}`, "", true},
+		{"false", `{"is_read_only":false}`, "", false},
+		{"missing field defaults false", `{}`, "", false},
+		{"null object defaults false", `null`, "", false},
+		{"null field defaults false", `{"is_read_only":null}`, "", false},
+		{"error overrides true", `{"is_read_only":true,"error":"bad query"}`, "cannot determine whether query is read-only: bad query", false},
+		{"unknown fields ignored", `{"is_read_only":true,"errors":["ignored"]}`, "", true},
+		{"duplicate field last wins", `{"is_read_only":true,"is_read_only":false}`, "", false},
+		{"wrong boolean type", `{"is_read_only":"true"}`, "failed to unmarshal read-only response: json: cannot unmarshal string into Go struct field .is_read_only of type bool", false},
+		{"wrong error type", `{"error":42}`, "failed to unmarshal read-only response: json: cannot unmarshal number into Go struct field .error of type string", false},
+		{"incomplete JSON", `{"is_read_only":`, "failed to unmarshal read-only response: unexpected end of JSON input", false},
+		{"extra response", `{} {}`, "failed to unmarshal read-only response: invalid character '{' after top-level value", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := decodeReadOnlyResponse(tc.payload)
+			require.Equal(t, tc.want, got)
+			if tc.wantError == "" {
+				require.NoError(t, err)
+			} else {
+				require.EqualError(t, err, tc.wantError)
+			}
+		})
+	}
+}

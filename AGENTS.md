@@ -119,7 +119,6 @@ make integration-test-cloud    # Cloud-specific integration tests
 
 #### Development Utilities
 ```bash
-make lint-python                     # Format and lint Python code
 make refresh-integration-expectations # Update integration test expectations
 ```
 
@@ -225,11 +224,6 @@ Tools automatically installed and run via `make format`:
 - **`gofumpt`**: Stricter Go formatting
 - **`golangci-lint`**: Fast changed-package linting; `make lint-full` runs the comprehensive suite
 - **`govet`**: Enabled through `golangci-lint`
-
-#### Python Code
-Tools run via `make lint-python`:
-- **`ruff format`**: Code formatting
-- **`ruff check --fix`**: Linting with auto-fixes
 
 ### Secrets, Credentials, and Generated Files
 

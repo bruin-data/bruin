@@ -15,6 +15,7 @@ LINT_MERGE_BASE ?= origin/main
 GCI_VERSION ?= v0.14.0
 GOFUMPT_VERSION ?= v0.10.0
 RUFF_VERSION ?= 0.15.4
+PY_FORMAT_PATHS := pkg/sqlengine/codegen pkg/sqlparser/codegen
 # Pinned, not @latest. v2.12.x made its cache checkout-independent, but cached
 # diagnostics still contain absolute paths from the checkout that produced
 # them. That makes shared-cache results unsafe across worktrees. Re-test before
@@ -199,14 +200,12 @@ tools-update:
 	$(GOLANGCI_LINT_INSTALL)
 	@go mod tidy
 
+# Formats and lints the Python codegen scripts (they record the parser test fixtures).
 lint-python:
-	@[ -d .venv ] || uv venv --quiet
-	@uv pip install --quiet sqlglot==30.13.0
 	@echo "$(OK_COLOR)==> Running Python formatting with ruff...$(NO_COLOR)"
-	@uvx ruff@$(RUFF_VERSION) format ./pythonsrc
-
+	@uvx ruff@$(RUFF_VERSION) format $(PY_FORMAT_PATHS)
 	@echo "$(OK_COLOR)==> Running Python linting with ruff...$(NO_COLOR)"
-	@uvx ruff@$(RUFF_VERSION) check --fix ./pythonsrc
+	@uvx ruff@$(RUFF_VERSION) check --fix $(PY_FORMAT_PATHS)
 
 refresh-integration-expectations: build
 	@echo "$(OK_COLOR)==> Refreshing integration expectations...$(NO_COLOR)"

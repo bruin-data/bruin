@@ -240,9 +240,10 @@ func TestSQLParser_HoistingStartsLazilyAndPreservesErrors(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []string{"DECLARE x INT64", "SELECT 17"}, got)
 	require.True(t, parser.started)
+	// The parser runs in-process and never extracts embedded files, even once started.
 	files, err = os.ReadDir(root)
 	require.NoError(t, err)
-	require.NotEmpty(t, files)
+	require.Empty(t, files)
 	require.NoError(t, parser.Close())
 	got, err = parser.HoistDeclaresList([]string{"SELECT 29", "DECLARE y INT64"}, pipeline.AssetTypeBigqueryQuery)
 	require.NoError(t, err)
