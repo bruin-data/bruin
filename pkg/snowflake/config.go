@@ -15,6 +15,8 @@ import (
 type Config struct {
 	ReadOnly   bool
 	Account    string
+	Host       string
+	Port       int
 	Username   string
 	Password   string
 	Region     string
@@ -46,6 +48,8 @@ func (c Config) DSN() (string, error) {
 	snowflakeConfig := gosnowflake.Config{
 		Authenticator: authType,
 		Account:       c.Account,
+		Host:          c.Host,
+		Port:          c.Port,
 		User:          c.Username,
 		Password:      c.Password,
 		Region:        c.Region,

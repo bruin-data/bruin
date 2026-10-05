@@ -5322,6 +5322,12 @@
         "account": {
           "type": "string"
         },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
         "username": {
           "type": "string"
         },
