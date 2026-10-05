@@ -100,11 +100,14 @@
     },
     "noteDimension": {
       "type": "object",
-      "required": ["name"],
+      "required": ["name", "type"],
       "properties": {
         "name": {
           "type": "string",
           "minLength": 1
+        },
+        "type": {
+          "enum": ["select", "date-range", "date", "number", "boolean", "text"]
         },
         "required": {
           "type": "boolean",
@@ -115,6 +118,17 @@
           "type": "boolean",
           "default": false,
           "description": "Whether the note may target multiple values of this dimension."
+        }
+      },
+      "if": {
+        "required": ["type"],
+        "properties": {
+          "type": { "enum": ["boolean", "date-range"] }
+        }
+      },
+      "then": {
+        "properties": {
+          "multiselect": { "const": false }
         }
       },
       "patternProperties": {

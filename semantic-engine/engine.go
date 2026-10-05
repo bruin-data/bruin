@@ -154,6 +154,14 @@ func (e *Engine) validate() error {
 				return fmt.Errorf("note %q: duplicate dimension %q", note.ID, dimension.Name)
 			}
 			dimensionNames[dimension.Name] = true
+			switch dimension.Type {
+			case "select", "date-range", "date", "number", "boolean", "text":
+			default:
+				return fmt.Errorf("note %q: dimension %q has invalid type %q", note.ID, dimension.Name, dimension.Type)
+			}
+			if dimension.Multiselect && (dimension.Type == "boolean" || dimension.Type == "date-range") {
+				return fmt.Errorf("note %q: dimension %q: multiselect is not supported for type %s", note.ID, dimension.Name, dimension.Type)
+			}
 		}
 	}
 
@@ -177,6 +185,37 @@ func (e *Engine) validate() error {
 		}
 	}
 	return nil
+}
+
+// ValidateNote resolves the dimension names of the note with the given ID the
+// same way a semantic query dimension is resolved, so joined names need an
+// engine built with NewEngineWithModels.
+func (e *Engine) ValidateNote(id string) error {
+	for _, note := range e.model.Notes {
+		if note.ID != id {
+			continue
+		}
+
+		type resolvedKey struct {
+			model     *Model
+			relation  string
+			dimension string
+		}
+		resolved := make(map[resolvedKey]bool, len(note.Dimensions))
+		for _, dimension := range note.Dimensions {
+			binding, err := e.resolveDimension(DimensionRef{Name: dimension.Name})
+			if err != nil {
+				return fmt.Errorf("note %q: %w", note.ID, err)
+			}
+			key := resolvedKey{model: binding.model, relation: binding.relationName, dimension: binding.dimension.Name}
+			if resolved[key] {
+				return fmt.Errorf("note %q: duplicate dimension %q", note.ID, dimension.Name)
+			}
+			resolved[key] = true
+		}
+		return nil
+	}
+	return fmt.Errorf("note not found: %s", id)
 }
 
 // isMixedExpression reports whether a metric expression contains both {refs}
