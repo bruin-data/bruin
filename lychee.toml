@@ -33,6 +33,9 @@ exclude = [
   '^https://docs\.google\.com/spreadsheets/d/1VTtCiw7UM1sadasdfas',
   '^https://dev\.shopify\.com/dashboard',
   '^https://developers\.facebook\.com/',
+  # lychee reports an HTTP/2 protocol error for these hosts
+  '^https://quickbooks\.intuit\.com/',
+  '^https://finance\.yahoo\.com/',
   # Template tag manager URL with the id appended at runtime
   '^https://www\.googletagmanager\.com/gtm\.js',
 ]

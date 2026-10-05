@@ -70,7 +70,7 @@ This module introduces Bruin as a unified data platform that combines **data ing
 ### Video Tutorial
 
 
-[![Bruin Core Concepts](https://img.youtube.com/vi/LzdcyheqpC0/hqdefault.jpg)](https://youtu.be/LzdcyheqpC0)
+[![Bruin Core Concepts: Projects](https://img.youtube.com/vi/YWDjnSxbBtY/hqdefault.jpg)](https://youtu.be/YWDjnSxbBtY)
 
 [![Part 1: What is a Data Platform?](https://img.youtube.com/vi/f6vg7lGqZx0/hqdefault.jpg)](https://youtu.be/f6vg7lGqZx0)
 
