@@ -336,8 +336,11 @@ notes:
   - id: region_note
     dimensions:
       - name: region
+        type: select
         required: true
 ```
+
+For a semantic-model note, every note dimension requires a `type`, and its `name` is resolved like a semantic-query dimension. An unqualified name first matches a dimension on the note's model, then a uniquely matching dimension reachable through a safe join. Use `join_name.dimension` or `model_name.dimension` to select a joined dimension explicitly; ambiguous or unknown names fail dashboard validation for widgets that reference the note. The note reuses the semantic dimension's metadata and can add note-specific `required` or `multiselect` behavior (`multiselect` isn't supported for `boolean` or `date-range`).
 
 Then reference its ID from a widget that resolves to that model:
 
