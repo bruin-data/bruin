@@ -58,6 +58,59 @@ func TestConnectionReuseDatabaseAndSessionIsolation(t *testing.T) {
 	require.Nil(t, conn.lock.database)
 }
 
+func TestConnectionReuseAttachmentKeywordsInData(t *testing.T) {
+	t.Parallel()
+	ctx, cleanup := WithConnectionReuse(t.Context())
+	t.Cleanup(cleanup)
+	conn, err := NewEphemeralConnection(Config{Path: ":memory:"})
+	require.NoError(t, err)
+	_, err = conn.ExecContext(ctx, "CREATE TABLE numbers AS SELECT 43 AS n")
+	require.NoError(t, err)
+	for _, sql := range []string{
+		"SELECT 'ATTACH'",
+		"SELECT 'it''s DETACH'",
+		`SELECT E'it\'s ATTACH'`,
+		"SELECT $$; ATTACH ':memory:' AS source;$$",
+		"SELECT $sql$DETACH source;$sql$",
+		`SELECT 'ok' AS "ATTACH"`,
+		"-- ATTACH ':memory:' AS source\nSELECT 'ok'",
+		"/* outer /* ATTACH */ DETACH */ SELECT 'ok'",
+	} {
+		var value string
+		require.NoError(t, conn.QueryRowContext(ctx, sql).Scan(&value), sql)
+		var n int
+		require.NoError(t, conn.QueryRowContext(ctx, "SELECT n FROM numbers").Scan(&n), sql)
+		require.Equal(t, 43, n)
+	}
+	// A lexical error must not discard the engine either.
+	_, err = conn.ExecContext(ctx, "SELECT 'ATTACH")
+	require.Error(t, err)
+	var n int
+	require.NoError(t, conn.QueryRowContext(ctx, "SELECT n FROM numbers").Scan(&n))
+	require.Equal(t, 43, n)
+}
+
+func TestHasAttachmentStatement(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		sql  string
+		want bool
+	}{
+		{"ATTACH ':memory:' AS source", true},
+		{"SELECT ';'; /* comment */ aTtAcH ':memory:' AS source", true},
+		{"SELECT $$; DETACH source;$$; ATTACH ':memory:' AS source", true},
+		{"-- comment\n DETACH source", true},
+		{"SELECT 1; DETACH source", true},
+		{"SELECT 'ATTACH'", false},
+		{"SELECT attach FROM numbers", false},
+		{"SELECT 1 -- ; ATTACH ':memory:' AS source", false},
+	} {
+		got, err := hasAttachmentStatement(tt.sql)
+		require.NoError(t, err)
+		require.Equal(t, tt.want, got, tt.sql)
+	}
+}
+
 func TestConnectionReuseUserAttachments(t *testing.T) {
 	t.Parallel()
 	for _, api := range []string{"exec", "query", "row"} {
