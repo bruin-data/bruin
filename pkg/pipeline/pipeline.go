@@ -260,6 +260,7 @@ var defaultMapping = map[string]string{
 	"cassandra":             "cassandra-default",
 	"clickup":               "clickup-default",
 	"couchbase":             "couchbase-default",
+	"couchdb":               "couchdb-default",
 	"cratedb":               "cratedb-default",
 	"csv":                   "csv-default",
 	"cursor":                "cursor-default",

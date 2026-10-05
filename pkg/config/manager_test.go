@@ -132,6 +132,16 @@ func TestLoadFromFile(t *testing.T) {
 					SSL:                false,
 				},
 			},
+			CouchDB: []CouchDBConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "couchdb1"},
+					Username:           "couchdbuser",
+					Password:           "couchdbpass",
+					Host:               "couchdbhost",
+					Port:               5984,
+					SSL:                true,
+				},
+			},
 			Cursor: []CursorConnection{
 				{
 					ConnectionMetadata: ConnectionMetadata{Name: "cursor1"},
@@ -1864,6 +1874,20 @@ func TestConfig_AddConnection(t *testing.T) {
 			expectedErr: false,
 		},
 		{
+			name:     "Add CouchDB connection",
+			envName:  "default",
+			connType: "couchdb",
+			connName: "couchdb-conn",
+			creds: map[string]interface{}{
+				"username": "admin",
+				"password": "password",
+				"host":     "localhost",
+				"port":     5984,
+				"ssl":      true,
+			},
+			expectedErr: false,
+		},
+		{
 			name:     "Add AbraFlexi connection",
 			envName:  "default",
 			connType: "abraflexi",
@@ -2259,6 +2283,25 @@ func TestDeleteConnection(t *testing.T) {
 							Connections: &Connections{
 								Sklik: []SklikConnection{
 									{ConnectionMetadata: ConnectionMetadata{Name: "sklik-conn"}, Token: "token-123"},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Delete existing CouchDB connection",
+			envName:  "default",
+			connName: "couchdb-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{
+						"default": {
+							Connections: &Connections{
+								CouchDB: []CouchDBConnection{
+									{ConnectionMetadata: ConnectionMetadata{Name: "couchdb-conn"}, Host: "localhost", Port: 5984},
 								},
 							},
 						},
@@ -3278,6 +3321,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Mongo:               []MongoConnection{{ConnectionMetadata: ConnectionMetadata{Name: "mongo1"}}},
 				Cassandra:           []CassandraConnection{{ConnectionMetadata: ConnectionMetadata{Name: "cassandra1"}}},
 				Couchbase:           []CouchbaseConnection{{ConnectionMetadata: ConnectionMetadata{Name: "couchbase1"}}},
+				CouchDB:             []CouchDBConnection{{ConnectionMetadata: ConnectionMetadata{Name: "couchdb1"}}},
 				CrateDB:             []CrateDBConnection{{ConnectionMetadata: ConnectionMetadata{Name: "cratedb1"}}},
 				CSV:                 []CSVConnection{{ConnectionMetadata: ConnectionMetadata{Name: "csv1"}}},
 				Cursor:              []CursorConnection{{ConnectionMetadata: ConnectionMetadata{Name: "cursor1"}}},
@@ -3430,6 +3474,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Mongo:               []MongoConnection{{ConnectionMetadata: ConnectionMetadata{Name: "mongo1"}}},
 				Cassandra:           []CassandraConnection{{ConnectionMetadata: ConnectionMetadata{Name: "cassandra1"}}},
 				Couchbase:           []CouchbaseConnection{{ConnectionMetadata: ConnectionMetadata{Name: "couchbase1"}}},
+				CouchDB:             []CouchDBConnection{{ConnectionMetadata: ConnectionMetadata{Name: "couchdb1"}}},
 				CrateDB:             []CrateDBConnection{{ConnectionMetadata: ConnectionMetadata{Name: "cratedb1"}}},
 				CSV:                 []CSVConnection{{ConnectionMetadata: ConnectionMetadata{Name: "csv1"}}},
 				Cursor:              []CursorConnection{{ConnectionMetadata: ConnectionMetadata{Name: "cursor1"}}},

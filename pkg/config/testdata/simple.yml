@@ -79,6 +79,14 @@ environments:
           bucket: "mybucket"
           ssl: false
 
+      couchdb:
+        - name: couchdb1
+          username: "couchdbuser"
+          password: "couchdbpass"
+          host: "couchdbhost"
+          port: 5984
+          ssl: true
+
       cursor:
         - name: cursor1
           api_key: "cursorapikey"

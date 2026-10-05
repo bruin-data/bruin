@@ -307,6 +307,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                                     {text: "ClickUp", link: "/ingestion/clickup"},
                                     {text: "Cloudflare Radar", link: "/ingestion/cloudflare-radar"},
                                     {text: "Couchbase", link: "/ingestion/couchbase"},
+                                    {text: "CouchDB", link: "/ingestion/couchdb"},
                                     {text: "Cursor", link: "/ingestion/cursor"},
                                     {text: "Customer.io", link: "/ingestion/customerio"},
                                     {text: "DB2", link: "/ingestion/db2"},

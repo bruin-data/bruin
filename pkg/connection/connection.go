@@ -41,6 +41,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/cloudflareradar"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/couchbase"
+	"github.com/bruin-data/bruin/pkg/couchdb"
 	"github.com/bruin-data/bruin/pkg/cratedb"
 	csvsource "github.com/bruin-data/bruin/pkg/csv"
 	"github.com/bruin-data/bruin/pkg/cursor"
@@ -183,6 +184,7 @@ type Manager struct {
 	Mongo                map[string]*mongo.DB
 	Cassandra            map[string]*cassandra.Client
 	Couchbase            map[string]*couchbase.DB
+	CouchDB              map[string]*couchdb.Client
 	CrateDB              map[string]*cratedb.Client
 	CSV                  map[string]*csvsource.Client
 	Cursor               map[string]*cursor.Client
@@ -1275,6 +1277,33 @@ func (m *Manager) AddCouchbaseConnectionFromConfig(connection *config.CouchbaseC
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Couchbase[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddCouchDBConnectionFromConfig(connection *config.CouchDBConnection) error {
+	m.mutex.Lock()
+	if m.CouchDB == nil {
+		m.CouchDB = make(map[string]*couchdb.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := couchdb.NewClient(&couchdb.Config{
+		Username: connection.Username,
+		Password: connection.Password,
+		Host:     connection.Host,
+		Port:     connection.Port,
+		SSL:      connection.SSL,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.CouchDB[connection.Name] = client
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 
@@ -4552,6 +4581,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Mongo, connectionManager.AddMongoConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Cassandra, connectionManager.AddCassandraConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Couchbase, connectionManager.AddCouchbaseConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.CouchDB, connectionManager.AddCouchDBConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.CrateDB, connectionManager.AddCrateDBConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.CSV, connectionManager.AddCSVConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Cursor, connectionManager.AddCursorConnectionFromConfig, &wg, &errList, &mu)

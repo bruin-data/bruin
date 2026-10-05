@@ -437,6 +437,11 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 	// Couchbase - NoSQL database (user-defined tables)
 	"couchbase": {},
 
+	// CouchDB - Document database. source_table is the database name; full scan, no incremental keys.
+	"couchdb": {
+		{Name: "<database_name>", PrimaryKey: "_id", IncKey: "", IncStrategy: "replace"},
+	},
+
 	// Cassandra - Wide-column database (user-defined tables)
 	"cassandra": {},
 
