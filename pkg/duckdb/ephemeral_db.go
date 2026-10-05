@@ -14,6 +14,7 @@ import (
 	"github.com/apache/arrow-adbc/go/adbc/drivermgr"
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
+	"github.com/bruin-data/bruin/pkg/config"
 )
 
 // EphemeralConnection uses the ADBC low-level API to query DuckDB directly,
@@ -68,12 +69,23 @@ func transactionError(err error) error {
 	return err
 }
 
+func (e *EphemeralConnection) canReuseDatabase() bool {
+	cfg, ok := e.config.(Config)
+	if !ok || !cfg.HasLakehouse() || cfg.Lakehouse.Format != config.LakehouseFormatDuckLake {
+		return true
+	}
+	// Ingestr's ducklake:// URI does not identify our engine file. A local
+	// catalog can retain a separate file lock, so do not cache that attachment.
+	return cfg.Lakehouse.Catalog.Type != config.CatalogTypeDuckDB &&
+		cfg.Lakehouse.Catalog.Type != config.CatalogTypeSQLite
+}
+
 // openADBC leases a fresh session. Cleanup releases the session before allowing
 // an external process or run cleanup to close the database.
 //
 //nolint:ireturn
 func (e *EphemeralConnection) openADBC(ctx context.Context) (adbc.Connection, func(), error) {
-	if databases := connectionReuse(ctx); databases != nil {
+	if databases := connectionReuse(ctx); databases != nil && e.canReuseDatabase() {
 		databases.Store(e.lock, struct{}{})
 		for {
 			if err := ctx.Err(); err != nil {

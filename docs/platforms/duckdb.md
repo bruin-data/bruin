@@ -32,6 +32,8 @@ For ingestr into or out of a local DuckDB file, Bruin waits for active SQL opera
 
 Runs that schedule Python or R assets keep the previous per-operation database lifetime, as do commands outside a pipeline run. Scripts can open arbitrary DuckDB paths without declaring them; retaining file locks would prevent those scripts from opening the files. Connection reuse currently applies to runs without these script assets.
 
+DuckLake connections with a local DuckDB or SQLite catalog also keep per-operation connections. The catalog is a separate file from the engine, and ingestr's `ducklake://` connection does not participate in the engine-file handoff. PostgreSQL-backed DuckLake connections can reuse the engine and attachment.
+
 DuckLake can support multiple writer processes using **separate DuckDB engine files** and a catalog that supports concurrent writers, such as PostgreSQL. Sharing a DuckDB engine file across writer processes still fails with a file-lock error. Conflicting updates can return a `Transaction conflict` error. Bruin surfaces this as a retryable transaction conflict; retry the failed transaction after the competing writer completes. Bruin does not automatically replay an entire SQL batch because earlier statements may already have committed. Reduce `max_concurrent_assets` for a connection if its assets intentionally contend on the same data.
 
 ### Read-Only Mode
