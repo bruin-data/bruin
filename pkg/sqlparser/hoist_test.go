@@ -164,10 +164,10 @@ func TestSQLParser_HoistDeclares(t *testing.T) {
 		t.Parallel()
 		// The parser subprocess must decode its pipes as UTF-8; Windows
 		// defaults to the locale code page and returns 'é›ª' instead.
-		in := "SELECT 'pre; 雪' AS message;\nDECLARE y INT64;"
+		in := "SELECT 'pre; \u96ea' AS message;\nDECLARE y INT64;"
 		got, err := parser.HoistDeclares(in, pipeline.AssetTypeBigqueryQuery)
 		require.NoError(t, err)
-		require.Equal(t, "DECLARE y INT64;\nSELECT 'pre; 雪' AS message;", got)
+		require.Equal(t, "DECLARE y INT64;\nSELECT 'pre; \u96ea' AS message;", got)
 	})
 
 	t.Run("unmapped asset type returns error and input unchanged", func(t *testing.T) {
@@ -202,10 +202,10 @@ func TestSQLParser_HoistDeclaresList(t *testing.T) {
 
 	t.Run("non-ASCII text survives the round trip", func(t *testing.T) {
 		t.Parallel()
-		in := []string{"SELECT 'pre; 雪' AS message", "DECLARE y INT64"}
+		in := []string{"SELECT 'pre; \u96ea' AS message", "DECLARE y INT64"}
 		got, err := parser.HoistDeclaresList(in, pipeline.AssetTypeBigqueryQuery)
 		require.NoError(t, err)
-		require.Equal(t, []string{"DECLARE y INT64", "SELECT 'pre; 雪' AS message"}, got)
+		require.Equal(t, []string{"DECLARE y INT64", "SELECT 'pre; \u96ea' AS message"}, got)
 	})
 
 	t.Run("unsupported asset preserves list", func(t *testing.T) {
