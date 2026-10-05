@@ -5888,9 +5888,9 @@ func cloudScheduledAgentsList() *cli.Command {
 
 			t := table.NewWriter()
 			t.SetOutputMirror(os.Stdout)
-			t.AppendHeader(table.Row{"ID", "Title", "Active", "Cron", "Next Run"})
+			t.AppendHeader(table.Row{"ID", "Title", "Active", "Cron", "Next Run", "Notify"})
 			for _, r := range runs {
-				t.AppendRow(table.Row{r.ID, derefString(r.Title), r.IsActive, derefString(r.ScheduleCron), derefString(r.NextRunAt)})
+				t.AppendRow(table.Row{r.ID, derefString(r.Title), r.IsActive, derefString(r.ScheduleCron), derefString(r.NextRunAt), notificationChannels(r.NotificationIntegrations)})
 			}
 			t.Render()
 			return nil
@@ -6240,15 +6240,19 @@ func printScheduledAgent(run *bruincloud.ScheduledAgent) {
 	fmt.Printf("  Next run:  %s\n", derefString(run.NextRunAt))
 	fmt.Printf("  Last run:  %s\n", derefString(run.LastRunAt))
 	if len(run.NotificationIntegrations) > 0 {
-		channels := make([]string, 0, len(run.NotificationIntegrations))
-		for _, n := range run.NotificationIntegrations {
-			channels = append(channels, fmt.Sprintf("%s (%s)", n.DisplayName, n.Platform))
-		}
-		fmt.Printf("  Notify:    %s\n", strings.Join(channels, ", "))
+		fmt.Printf("  Notify:    %s\n", notificationChannels(run.NotificationIntegrations))
 	}
 	if run.Instructions != nil && *run.Instructions != "" {
 		fmt.Printf("  Instructions:\n%s\n", *run.Instructions)
 	}
+}
+
+func notificationChannels(integrations []bruincloud.ScheduledAgentNotification) string {
+	channels := make([]string, 0, len(integrations))
+	for _, n := range integrations {
+		channels = append(channels, fmt.Sprintf("%s (%s)", n.DisplayName, n.Platform))
+	}
+	return strings.Join(channels, ", ")
 }
 
 func derefString(s *string) string {
