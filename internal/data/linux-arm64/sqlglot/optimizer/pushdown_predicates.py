@@ -46,23 +46,35 @@ def pushdown_predicates(expression: E, dialect: DialectType = None) -> E:
         for scope in reversed(list(root.traverse())):
             select = scope.expression
             where: exp.Expr | None = select.args.get("where")
-            joins: list[exp.Expr] = select.args.get("joins") or []
+            joins: list[exp.Join] = select.args.get("joins") or []
             if where:
                 selected_sources: Sources = scope.selected_sources
                 join_index = {join.alias_or_name: i for i, join in enumerate(joins)}
 
-                # a right join can only push down to itself and not the source FROM table
-                # presto, trino and athena don't support inner joins where the RHS is an UNNEST expression
+                # A RIGHT or FULL join null-extends everything joined before it, and an outer WHERE filter
+                # removes those rows, so a source can only be pushed into if no such join comes after it.
+                last_null_extending = max(
+                    (i for i, join in enumerate(joins) if join.side in ("RIGHT", "FULL")),
+                    default=-1,
+                )
+
+                # Presto, trino and athena don't support inner joins where the RHS is an UNNEST expression
                 pushdown_allowed = True
+                reachable: dict[str, tuple[exp.Selectable, exp.Table | Scope]] = {}
                 for k, (node, source) in selected_sources.items():
                     parent = node.find_ancestor(exp.Join, exp.From)
                     if isinstance(parent, exp.Join):
-                        if parent.side == "RIGHT":
-                            selected_sources = {k: (node, source)}
-                            break
                         if isinstance(node, exp.Unnest) and unnest_requires_cross_join:
                             pushdown_allowed = False
                             break
+                        position = join_index.get(parent.alias_or_name, -1)
+                    else:
+                        position = -1
+
+                    if position >= last_null_extending:
+                        reachable[k] = (node, source)
+
+                selected_sources = reachable
 
                 if pushdown_allowed:
                     pushdown(where.this, selected_sources, scope_ref_count, dialect, join_index)
@@ -71,6 +83,10 @@ def pushdown_predicates(expression: E, dialect: DialectType = None) -> E:
             # so we limit the selected sources to only itself
             for join in joins:
                 name = join.alias_or_name
+
+                if join.side in ("RIGHT", "FULL"):
+                    continue
+
                 if name in scope.selected_sources:
                     pushdown(
                         join.args.get("on"),
@@ -227,13 +243,23 @@ def nodes_for_predicate(
             node = source.expression
 
         if isinstance(node, exp.Join):
-            if node.side and node.side != "RIGHT":
-                return {}
-            nodes[table] = node
-        elif isinstance(node, exp.Select) and len(tables) == 1:
+            if node.side:
+                # A right join preserves its own source, so a WHERE predicate on it can only be
+                # pushed into that source, never into the match-only ON clause.
+                pushable_source = (
+                    source if node.side == "RIGHT" and not isinstance(source, exp.Table) else None
+                )
+                if not pushable_source:
+                    return {}
+
+                node = pushable_source.expression
+            else:
+                nodes[table] = node
+
+        if isinstance(node, exp.Select) and len(tables) == 1:
             # We can't push down window expressions
             has_window_expression = any(
-                select for select in node.selects if select.find(exp.Window)
+                select for select in node.selects if find_in_scope(select, exp.Window)
             )
             # we can't push down predicates to select statements if they are referenced in
             # multiple places.
@@ -250,6 +276,9 @@ def nodes_for_predicate(
     return nodes
 
 
+OPERATOR_EXPRESSIONS = (exp.Binary, exp.Unary, exp.Predicate)
+
+
 def replace_aliases(source: exp.Select, predicate: exp.Expr) -> exp.Expr:
     aliases: dict[str, exp.Expr] = {}
 
@@ -261,7 +290,12 @@ def replace_aliases(source: exp.Select, predicate: exp.Expr) -> exp.Expr:
 
     def _replace_alias(column: exp.Expr) -> exp.Expr:
         if isinstance(column, exp.Column) and column.name in aliases:
-            return aliases[column.name].copy()
+            replaced = aliases[column.name].copy()
+            if isinstance(replaced, OPERATOR_EXPRESSIONS) and isinstance(
+                column.parent, OPERATOR_EXPRESSIONS
+            ):
+                replaced = exp.paren(replaced, copy=False)
+            return replaced
         return column
 
     return predicate.transform(_replace_alias)

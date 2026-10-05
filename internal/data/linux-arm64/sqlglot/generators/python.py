@@ -43,7 +43,7 @@ def _case_sql(self, expression):
         condition = f"{this} = ({condition})" if this else condition
         chain = f"{true} if {condition} else ({chain})"
 
-    return chain
+    return f"({chain})"
 
 
 def _lambda_sql(self, e: exp.Lambda) -> str:
@@ -58,6 +58,15 @@ def _lambda_sql(self, e: exp.Lambda) -> str:
     return f"lambda {self.expressions(e, flat=True)}: {self.sql(e, 'this')}"
 
 
+def _like_sql(self: generator.Generator, e: exp.Like | exp.ILike) -> str:
+    sql = self.func(e.key, e.this, e.expression)
+
+    if e.args.get("negate"):
+        sql = f"NOT({sql})"
+
+    return sql
+
+
 def _div_sql(self: generator.Generator, e: exp.Div) -> str:
     denominator = self.sql(e, "expression")
 
@@ -66,10 +75,28 @@ def _div_sql(self: generator.Generator, e: exp.Div) -> str:
 
     sql = f"DIV({self.sql(e, 'this')}, {denominator})"
 
-    if e.args.get("typed"):
-        sql = f"int({sql})"
+    if e.args.get("typed") and not (
+        e.this.is_type(*exp.DataType.REAL_TYPES) or e.expression.is_type(*exp.DataType.REAL_TYPES)
+    ):
+        sql = f"INT({sql})"
 
     return sql
+
+
+def _dpipe_sql(self: generator.Generator, e: exp.DPipe) -> str:
+    if e.this.is_type(exp.DataType.Type.ARRAY) or e.expression.is_type(exp.DataType.Type.ARRAY):
+        return self.func("ARRAYCONCAT", e.this, e.expression)
+
+    return self.func("SAFECONCAT" if e.args.get("safe") else "CONCAT", e.this, e.expression)
+
+
+def _distinct_sql(self, e: exp.Distinct) -> str:
+    this = self.expressions(e, flat=True)
+
+    if len(e.expressions) == 1:
+        return f"set({this})"
+
+    return f"set(ZIPNOTNULL({this}))"
 
 
 class PythonGenerator(generator.Generator):
@@ -79,7 +106,7 @@ class PythonGenerator(generator.Generator):
         exp.Case: _case_sql,
         exp.Alias: lambda self, e: self.sql(e.this),
         exp.Array: inline_array_sql,
-        exp.And: lambda self, e: self.binary(e, "and"),
+        exp.And: lambda self, e: f"AND(lambda: {self.sql(e.left)}, lambda: {self.sql(e.right)})",
         exp.Between: _rename,
         exp.Boolean: lambda self, e: "True" if e.this else "False",
         exp.Cast: lambda self, e: f"CAST({self.sql(e.this)}, exp.DType.{e.args['to']})",
@@ -87,22 +114,27 @@ class PythonGenerator(generator.Generator):
         exp.Concat: lambda self, e: self.func(
             "SAFECONCAT" if e.args.get("safe") else "CONCAT", *e.expressions
         ),
-        exp.Distinct: lambda self, e: f"set({self.sql(e, 'this')})",
+        exp.Distinct: _distinct_sql,
         exp.Div: _div_sql,
+        exp.DPipe: _dpipe_sql,
         exp.Extract: lambda self, e: f"EXTRACT('{e.name.lower()}', {self.sql(e, 'expression')})",
-        exp.In: lambda self, e: f"{self.sql(e, 'this')} in {{{self.expressions(e, flat=True)}}}",
+        exp.ILike: _like_sql,
+        exp.In: lambda self, e: self.func("IN", e.this, *e.expressions),
         exp.Interval: lambda self, e: f"INTERVAL({self.sql(e.this)}, '{self.sql(e.unit)}')",
         exp.Is: lambda self, e: (
-            self.binary(e, "==") if isinstance(e.this, exp.Literal) else self.binary(e, "is")
+            self.binary(e, "!=" if e.args.get("negate") else "==")
+            if isinstance(e.this, exp.Literal)
+            else self.binary(e, "is not" if e.args.get("negate") else "is")
         ),
         exp.JSONExtract: lambda self, e: self.func(e.key, e.this, e.expression, *e.expressions),
         exp.JSONPath: lambda self, e: f"[{','.join(self.sql(p) for p in e.expressions[1:])}]",
         exp.JSONPathKey: lambda self, e: f"'{self.sql(e.this)}'",
         exp.JSONPathSubscript: lambda self, e: f"'{e.this}'",
         exp.Lambda: _lambda_sql,
-        exp.Not: lambda self, e: f"not {self.sql(e.this)}",
+        exp.Like: _like_sql,
+        exp.Not: lambda self, e: self.func("NOT", e.this),
         exp.Null: lambda *_: "None",
-        exp.Or: lambda self, e: self.binary(e, "or"),
+        exp.Or: lambda self, e: f"OR(lambda: {self.sql(e.left)}, lambda: {self.sql(e.right)})",
         exp.Ordered: _ordered_py,
         exp.Star: lambda *_: "1",
     }

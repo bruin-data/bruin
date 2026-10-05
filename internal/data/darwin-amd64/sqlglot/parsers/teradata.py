@@ -17,7 +17,7 @@ class TeradataParser(parser.Parser):
         TokenType.SEMI,
     }
 
-    CHARSET_TRANSLATORS = {
+    CHARSET_TRANSLATORS: t.ClassVar = {
         "GRAPHIC_TO_KANJISJIS",
         "GRAPHIC_TO_LATIN",
         "GRAPHIC_TO_UNICODE",
@@ -52,7 +52,7 @@ class TeradataParser(parser.Parser):
         "UNICODE_TO_UNICODE_NFKD",
     }
 
-    FUNC_TOKENS = parser.Parser.FUNC_TOKENS - {TokenType.REPLACE}
+    FUNC_TOKENS = (parser.Parser.FUNC_TOKENS - {TokenType.REPLACE}) | {TokenType.MOD}
 
     STATEMENT_PARSERS = {
         **parser.Parser.STATEMENT_PARSERS,
@@ -120,7 +120,8 @@ class TeradataParser(parser.Parser):
             exp.Update(
                 this=self._parse_table(alias_tokens=self.UPDATE_ALIAS_TOKENS),
                 from_=self._parse_from(joins=True),
-                expressions=self._match(TokenType.SET) and self._parse_csv(self._parse_equality),
+                expressions=self._match(TokenType.SET)
+                and self._parse_csv(self._parse_update_assignment),
                 where=self._parse_where(),
             )
         )

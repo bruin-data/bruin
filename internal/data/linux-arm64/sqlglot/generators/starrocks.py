@@ -1,16 +1,18 @@
 from __future__ import annotations
 
+import typing as t
 
 from sqlglot import exp, transforms
 from sqlglot.dialects.dialect import (
     approx_count_distinct_sql,
     arrow_json_extract_sql,
     rename_func,
-    unit_to_str,
+    weekstart_unit_to_str,
     inline_array_sql,
     property_sql,
     var_map_sql,
 )
+from sqlglot.generator import Generator
 from sqlglot.generators.mysql import MySQLGenerator
 
 
@@ -66,7 +68,7 @@ class StarRocksGenerator(MySQLGenerator):
     # StarRocks doesn't support renaming a table with a database.
     RENAME_TABLE_WITH_DB = False
 
-    CAST_MAPPING = {}
+    CAST_MAPPING: t.ClassVar[dict[exp.DType, str]] = {}
 
     TYPE_MAPPING = {
         **MySQLGenerator.TYPE_MAPPING,
@@ -76,7 +78,7 @@ class StarRocksGenerator(MySQLGenerator):
         exp.DType.TIMESTAMPTZ: "DATETIME",
     }
 
-    SQL_SECURITY_VIEW_LOCATION = exp.Properties.Location.POST_SCHEMA
+    SQL_SECURITY_VIEW_LOCATION: t.ClassVar = exp.Properties.Location.POST_SCHEMA
 
     PROPERTIES_LOCATION = {
         **MySQLGenerator.PROPERTIES_LOCATION,
@@ -103,7 +105,9 @@ class StarRocksGenerator(MySQLGenerator):
         exp.ArrayToString: rename_func("ARRAY_JOIN"),
         exp.ApproxDistinct: approx_count_distinct_sql,
         exp.CurrentVersion: lambda *_: "CURRENT_VERSION()",
-        exp.DateDiff: lambda self, e: self.func("DATE_DIFF", unit_to_str(e), e.this, e.expression),
+        exp.DateDiff: lambda self, e: self.func(
+            "DATE_DIFF", weekstart_unit_to_str(self, e), e.this, e.expression
+        ),
         exp.Delete: transforms.preprocess([_eliminate_between_in_delete]),
         exp.Flatten: rename_func("ARRAY_FLATTEN"),
         exp.JSONExtractScalar: arrow_json_extract_sql,
@@ -125,7 +129,9 @@ class StarRocksGenerator(MySQLGenerator):
         exp.SqlSecurityProperty: lambda self, e: f"SECURITY {self.sql(e.this)}",
         exp.StDistance: st_distance_sphere,
         exp.StrToUnix: lambda self, e: self.func("UNIX_TIMESTAMP", e.this, self.format_time(e)),
-        exp.TimestampTrunc: lambda self, e: self.func("DATE_TRUNC", unit_to_str(e), e.this),
+        exp.TimestampTrunc: lambda self, e: self.func(
+            "DATE_TRUNC", weekstart_unit_to_str(self, e), e.this
+        ),
         exp.TimeStrToDate: rename_func("TO_DATE"),
         exp.UnixToStr: lambda self, e: self.func("FROM_UNIXTIME", e.this, self.format_time(e)),
         exp.UnixToTime: rename_func("FROM_UNIXTIME"),
@@ -286,6 +292,24 @@ class StarRocksGenerator(MySQLGenerator):
         "where",
         "with",
     }
+
+    def ignorenulls_sql(self, expression: exp.IgnoreNulls) -> str:
+        # IGNORE NULLS follows the first argument, e.g. LAG(x IGNORE NULLS, 1, 0)
+        # https://docs.starrocks.io/docs/sql-reference/sql-functions/Window_function/
+        func = expression.this
+        if isinstance(func, (exp.FirstValue, exp.LastValue, exp.Lag, exp.Lead)):
+            return self.func(
+                func.sql_name(),
+                Generator.ignorenulls_sql(self, exp.IgnoreNulls(this=func.this)),
+                func.args.get("offset"),
+                func.args.get("default"),
+            )
+
+        return super().ignorenulls_sql(expression)
+
+    def respectnulls_sql(self, expression: exp.RespectNulls) -> str:
+        # RESPECT NULLS is the default behavior, and StarRocks rejects the keyword
+        return self.sql(expression, "this")
 
     def create_sql(self, expression: exp.Create) -> str:
         # Starrocks' primary key is defined outside of the schema, so we need to move it there

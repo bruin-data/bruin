@@ -12,10 +12,14 @@ from sqlglot.typing.tsql import EXPRESSION_METADATA
 
 
 class TSQL(Dialect):
+    # Week truncation follows @@DATEFIRST, which defaults to 7 (Sunday)
+    WEEK_OFFSET = -1
+
     LOG_BASE_FIRST = False
     TYPED_DIVISION = True
     CONCAT_COALESCE = True
     CONCAT_WS_COALESCE = True
+    JSON_EXTRACT_SCALAR_SCALAR_ONLY = True
     NORMALIZATION_STRATEGY = NormalizationStrategy.CASE_INSENSITIVE
     ALTER_TABLE_ADD_REQUIRED_FOR_EACH_COLUMN = False
 
@@ -160,7 +164,6 @@ class TSQL(Dialect):
             "DATETIMEOFFSET": TokenType.TIMESTAMPTZ,
             "DECLARE": TokenType.DECLARE,
             "EXEC": TokenType.EXECUTE,
-            "FOR SYSTEM_TIME": TokenType.TIMESTAMP_SNAPSHOT,
             "GO": TokenType.COMMAND,
             "IMAGE": TokenType.IMAGE,
             "MONEY": TokenType.MONEY,

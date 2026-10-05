@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from sqlglot import exp, transforms
 from sqlglot.generators.tsql import TSQLGenerator
+from sqlglot.optimizer.scope import find_in_scope
 
 
 def _cap_data_type_precision(expression: exp.DataType, max_precision: int = 6) -> exp.DataType:
@@ -52,22 +53,22 @@ class FabricGenerator(TSQLGenerator):
         **TSQLGenerator.TYPE_MAPPING,
         exp.DType.DATETIME: "DATETIME2",
         exp.DType.DECIMAL: "DECIMAL",
-        exp.DType.IMAGE: "VARBINARY",
+        exp.DType.IMAGE: "VARBINARY(MAX)",
         exp.DType.INT: "INT",
-        exp.DType.JSON: "VARCHAR",
-        exp.DType.MONEY: "DECIMAL",
+        exp.DType.JSON: "VARCHAR(MAX)",
+        exp.DType.MONEY: "DECIMAL(19, 4)",
         exp.DType.NCHAR: "CHAR",
         exp.DType.NVARCHAR: "VARCHAR",
         exp.DType.ROWVERSION: "ROWVERSION",
         exp.DType.SMALLDATETIME: "DATETIME2",
-        exp.DType.SMALLMONEY: "DECIMAL",
+        exp.DType.SMALLMONEY: "DECIMAL(10, 4)",
         exp.DType.TIMESTAMP: "DATETIME2",
         exp.DType.TIMESTAMPNTZ: "DATETIME2",
         exp.DType.TIMESTAMPTZ: "DATETIME2",
         exp.DType.TINYINT: "SMALLINT",
         exp.DType.UTINYINT: "SMALLINT",
         exp.DType.UUID: "UNIQUEIDENTIFIER",
-        exp.DType.XML: "VARCHAR",
+        exp.DType.XML: "VARCHAR(MAX)",
     }
 
     TRANSFORMS = {
@@ -109,7 +110,7 @@ class FabricGenerator(TSQLGenerator):
     def attimezone_sql(self, expression: exp.AtTimeZone) -> str:
         # Wrap the AT TIME ZONE expression in a cast to DATETIME2 if it contains a TIMESTAMPTZ
         ## https://learn.microsoft.com/en-us/sql/t-sql/data-types/datetimeoffset-transact-sql#microsoft-fabric-support
-        timestamptz_cast = expression.find(exp.Cast)
+        timestamptz_cast = find_in_scope(expression, exp.Cast)
         if timestamptz_cast and timestamptz_cast.to.is_type(exp.DType.TIMESTAMPTZ):
             # Get the precision from the original TIMESTAMPTZ cast and cap it to 6
             data_type = timestamptz_cast.to

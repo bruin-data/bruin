@@ -22,6 +22,7 @@ class Snowflake(Dialect):
     TIME_FORMAT = "'YYYY-MM-DD HH24:MI:SS'"
     SUPPORTS_USER_DEFINED_TYPES = False
     PREFER_CTE_ALIAS_COLUMN = True
+    SUPPORTS_POSITIONAL_COLUMN_REFS = True
     TABLESAMPLE_SIZE_IS_PERCENT = True
     COPY_PARAMS_ARE_CSV = False
     ARRAY_AGG_INCLUDES_NULLS = None
@@ -31,6 +32,7 @@ class Snowflake(Dialect):
     SUPPORTS_ALIAS_REFS_IN_JOIN_CONDITIONS = True
     LEAST_GREATEST_IGNORES_NULLS = False
     UUID_IS_STRING_TYPE = True
+    STAR_ILIKE_BACKSLASH_ESCAPE = True
 
     EXPRESSION_METADATA = EXPRESSION_METADATA.copy()
 
@@ -134,6 +136,8 @@ class Snowflake(Dialect):
 
     class Tokenizer(tokens.Tokenizer):
         STRING_ESCAPES = ["\\", "'"]
+        NUMERIC_ESCAPES = {"x": (16, 2, 2, 0xFF), "u": (16, 4, 4, 0xFFFF), "0": (8, 1, 3, 0xFF)}
+        DROP_UNKNOWN_ESCAPES = True
         HEX_STRINGS = [("x'", "'"), ("X'", "'")]
         RAW_STRINGS = ["$$"]
         COMMENTS = ["--", "//", ("/*", "*/")]
