@@ -129,6 +129,7 @@ func TestConnectionReuseExternalProcessHandoff(t *testing.T) {
 }
 
 func TestDuckDBProcessHelper(t *testing.T) {
+	t.Parallel()
 	path := os.Getenv("BRUIN_TEST_DUCKDB_PATH")
 	if path == "" {
 		return
@@ -246,7 +247,7 @@ func TestConnectionReuseTransactionConflict(t *testing.T) {
 	var conflict *TransactionConflictError
 	require.ErrorAs(t, err, &conflict)
 	require.ErrorContains(t, err, "retryable")
-	require.NotNil(t, errors.Unwrap(conflict))
+	require.Error(t, errors.Unwrap(conflict))
 	require.NoError(t, execADBCStatement(ctx, session, "COMMIT"))
 	_, err = conn.ExecContext(ctx, "UPDATE numbers SET n = n + 7")
 	require.NoError(t, err)
@@ -263,7 +264,7 @@ func TestTransactionError(t *testing.T) {
 	require.ErrorIs(t, conflict, err)
 	fileLock := errors.New("IO Error: Could not set lock on file")
 	require.Same(t, fileLock, transactionError(fileLock))
-	require.Nil(t, transactionError(nil))
+	require.NoError(t, transactionError(nil))
 }
 
 func BenchmarkConnectionReuse(b *testing.B) {
