@@ -100,7 +100,7 @@
     },
     "noteDimension": {
       "type": "object",
-      "required": ["name", "type"],
+      "required": ["name"],
       "properties": {
         "name": {
           "type": "string",

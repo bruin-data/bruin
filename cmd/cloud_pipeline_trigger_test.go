@@ -125,3 +125,16 @@ func TestScheduledAgentPlanRejectsPipelineTrigger(t *testing.T) {
 		require.ErrorContains(t, runCLI(t.Context(), cmd, []string{"plan", "--state", state}), "pipeline-trigger set or delete")
 	}
 }
+
+func TestScheduledAgentPlanRejectsNotificationIntegrations(t *testing.T) {
+	t.Parallel()
+	cmd := &cli.Command{
+		Name:  "plan",
+		Flags: scheduledAgentPlanFlags(),
+		Action: func(_ context.Context, c *cli.Command) error {
+			_, err := buildScheduledAgentFields(c)
+			return err
+		},
+	}
+	require.ErrorContains(t, runCLI(t.Context(), cmd, []string{"plan", "--state", `{"notification_integrations":[]}`}), "under Notifications")
+}

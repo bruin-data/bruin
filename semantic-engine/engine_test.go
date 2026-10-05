@@ -325,6 +325,28 @@ notes:
 	}
 }
 
+func TestLoadFile_AcceptsUntypedNoteDimension(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "sales.yml")
+	body := "name: sales\nsource:\n  table: sales\ndimensions:\n  - {name: region, type: string}\nnotes:\n  - id: regional_rollout\n    dimensions:\n      - {name: region, multiselect: true}\n"
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+
+	model, err := LoadFile(path)
+	if err != nil {
+		t.Fatalf("load model: %v", err)
+	}
+	encoded, err := json.Marshal(model.Notes[0])
+	if err != nil {
+		t.Fatalf("marshal note: %v", err)
+	}
+	if want := `{"id":"regional_rollout","dimensions":[{"name":"region","multiselect":true}]}`; string(encoded) != want {
+		t.Fatalf("unexpected note JSON:\n got: %s\nwant: %s", encoded, want)
+	}
+}
+
 func TestLoadFile_RejectsInvalidNoteDimensionConfiguration(t *testing.T) {
 	t.Parallel()
 
@@ -333,11 +355,6 @@ func TestLoadFile_RejectsInvalidNoteDimensionConfiguration(t *testing.T) {
 		dimension string
 		message   string
 	}{
-		{
-			name:      "missing type",
-			dimension: "{name: region}",
-			message:   "type",
-		},
 		{
 			name:      "invalid type",
 			dimension: "{name: region, type: dropdown}",
@@ -1037,16 +1054,6 @@ func TestNewEngine_ValidationErrors(t *testing.T) {
 				Notes:  []Note{{ID: "rollout"}},
 			},
 			want: "dimensions is required",
-		},
-		{
-			name: "note dimension without type",
-			model: Model{
-				Name:       "m",
-				Source:     Source{Table: "t"},
-				Dimensions: []Dimension{{Name: "region", Type: "string"}},
-				Notes:      []Note{{ID: "rollout", Dimensions: []NoteDimension{{Name: "region"}}}},
-			},
-			want: `note "rollout": dimension "region" has invalid type ""`,
 		},
 		{
 			name: "note boolean dimension with multiselect",

@@ -1169,6 +1169,37 @@ func TestManager_AddInfluxDBConnectionFromConfigStoresConnectionDetails(t *testi
 	assert.Same(t, configuration, m.GetConnectionDetails("test"))
 }
 
+func TestManager_AddCouchDBConnectionFromConfig(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
+
+	assert.Nil(t, m.GetConnection("test"))
+
+	configuration := &config.CouchDBConnection{
+		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
+		Username:           "admin",
+		Password:           "password",
+		Host:               "localhost",
+		Port:               5984,
+	}
+
+	err := m.AddCouchDBConnectionFromConfig(configuration)
+	require.NoError(t, err)
+
+	res := m.GetConnection("test")
+	require.NotNil(t, res)
+	assert.Same(t, m.CouchDB["test"], res)
+	assert.Same(t, configuration, m.GetConnectionDetails("test"))
+
+	uri, err := m.CouchDB["test"].GetIngestrURI()
+	require.NoError(t, err)
+	assert.Equal(t, "couchdb://admin:password@localhost:5984", uri)
+}
+
 func TestManager_AddAwsConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
