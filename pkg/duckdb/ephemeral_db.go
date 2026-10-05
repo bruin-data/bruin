@@ -8,6 +8,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 
 	"github.com/apache/arrow-adbc/go/adbc"
@@ -80,13 +81,19 @@ func (e *EphemeralConnection) canReuseDatabase() bool {
 		cfg.Lakehouse.Catalog.Type != config.CatalogTypeSQLite
 }
 
+// User-managed attachments must not leak into other assets. Match conservatively
+// (including comments and literals) rather than attempting to parse arbitrary SQL.
+var attachmentStatement = regexp.MustCompile(`(?i)\b(attach|detach)\b`)
+
 // openADBC leases a fresh session. Cleanup releases the session before allowing
 // an external process or run cleanup to close the database.
 //
 //nolint:ireturn
-func (e *EphemeralConnection) openADBC(ctx context.Context) (adbc.Connection, func(), error) {
-	if databases := connectionReuse(ctx); databases != nil && e.canReuseDatabase() {
-		databases.Store(e.lock, struct{}{})
+func (e *EphemeralConnection) openADBC(ctx context.Context, sqlStr string) (adbc.Connection, func(), error) {
+	if scope := connectionReuse(ctx); scope != nil && e.canReuseDatabase() && !attachmentStatement.MatchString(sqlStr) {
+		if !scope.register(e.lock) {
+			return nil, nil, context.Canceled
+		}
 		for {
 			if err := ctx.Err(); err != nil {
 				return nil, nil, err
@@ -143,6 +150,10 @@ func (e *EphemeralConnection) openADBC(ctx context.Context) (adbc.Connection, fu
 	}
 
 	e.lock.Lock()
+	if err := ctx.Err(); err != nil {
+		e.lock.Unlock()
+		return nil, nil, err
+	}
 	e.lock.closeDatabase()
 	adb, conn, err := e.createADBC(ctx)
 	if err != nil {
@@ -231,7 +242,7 @@ func execADBCStatement(ctx context.Context, conn adbc.Connection, sqlStr string)
 
 //nolint:ireturn
 func (e *EphemeralConnection) QueryContext(ctx context.Context, queryStr string, args ...any) (Rows, error) {
-	conn, cleanup, err := e.openADBC(ctx)
+	conn, cleanup, err := e.openADBC(ctx, queryStr)
 	if err != nil {
 		return nil, err
 	}
@@ -264,7 +275,7 @@ func (e *EphemeralConnection) QueryContext(ctx context.Context, queryStr string,
 }
 
 func (e *EphemeralConnection) ExecContext(ctx context.Context, sqlStr string, arguments ...any) (sql.Result, error) {
-	conn, cleanup, err := e.openADBC(ctx)
+	conn, cleanup, err := e.openADBC(ctx, sqlStr)
 	if err != nil {
 		return nil, err
 	}
@@ -293,7 +304,7 @@ func (e *EphemeralConnection) ExecContext(ctx context.Context, sqlStr string, ar
 
 //nolint:ireturn
 func (e *EphemeralConnection) QueryRowContext(ctx context.Context, queryStr string, args ...any) Row {
-	conn, cleanup, err := e.openADBC(ctx)
+	conn, cleanup, err := e.openADBC(ctx, queryStr)
 	if err != nil {
 		return &errorRow{err: err}
 	}

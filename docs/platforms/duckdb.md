@@ -28,6 +28,8 @@ During `bruin run`, SQL assets and quality checks share a DuckDB database instan
 
 Each operation gets a fresh session: temporary tables, open transactions, and session settings do not carry over to the next operation. The lakehouse catalog is selected in each session. Bruin closes the shared instance when the run ends.
 
+SQL containing `ATTACH` or `DETACH` uses a separate, per-operation instance so user-managed attachments do not leak between assets or conflict when assets reuse the same alias. Detection is conservative: those words in comments or string literals also disable reuse for that operation. Bruin's configured lakehouse attachment is still initialized on that instance.
+
 For ingestr into or out of a local DuckDB file, Bruin waits for active SQL operations and closes the shared instance before starting the ingestion subprocess. SQL operations wait until ingestion finishes, then reopen the instance. Ingestion therefore requires another lakehouse setup if it uses the same engine file. These locks coordinate work within one Bruin process, not unrelated applications or separate Bruin runs.
 
 Runs that schedule Python or R assets keep the previous per-operation database lifetime, as do commands outside a pipeline run. Scripts can open arbitrary DuckDB paths without declaring them; retaining file locks would prevent those scripts from opening the files. Connection reuse currently applies to runs without these script assets.
