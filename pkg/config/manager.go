@@ -40,6 +40,7 @@ type Connections struct {
 	Mongo               []MongoConnection               `yaml:"mongo,omitempty" json:"mongo,omitempty" mapstructure:"mongo"`
 	Cassandra           []CassandraConnection           `yaml:"cassandra,omitempty" json:"cassandra,omitempty" mapstructure:"cassandra"`
 	Couchbase           []CouchbaseConnection           `yaml:"couchbase,omitempty" json:"couchbase,omitempty" mapstructure:"couchbase"`
+	CouchDB             []CouchDBConnection             `yaml:"couchdb,omitempty" json:"couchdb,omitempty" mapstructure:"couchdb"`
 	CrateDB             []CrateDBConnection             `yaml:"cratedb,omitempty" json:"cratedb,omitempty" mapstructure:"cratedb"`
 	CSV                 []CSVConnection                 `yaml:"csv,omitempty" json:"csv,omitempty" mapstructure:"csv"`
 	Cursor              []CursorConnection              `yaml:"cursor,omitempty" json:"cursor,omitempty" mapstructure:"cursor"`
@@ -956,6 +957,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Cassandra = append(env.Connections.Cassandra, conn)
+	case "couchdb":
+		var conn CouchDBConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.CouchDB = append(env.Connections.CouchDB, conn)
 	case "mongo_atlas":
 		var conn MongoAtlasConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -2043,6 +2051,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Mongo = removeConnection(env.Connections.Mongo, connectionName)
 	case "cassandra":
 		env.Connections.Cassandra = removeConnection(env.Connections.Cassandra, connectionName)
+	case "couchdb":
+		env.Connections.CouchDB = removeConnection(env.Connections.CouchDB, connectionName)
 	case "mongo_atlas":
 		env.Connections.MongoAtlas = removeConnection(env.Connections.MongoAtlas, connectionName)
 	case "cratedb":
@@ -2456,6 +2466,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Mongo, source.Mongo)
 	mergeConnectionList(&c.Cassandra, source.Cassandra)
 	mergeConnectionList(&c.Couchbase, source.Couchbase)
+	mergeConnectionList(&c.CouchDB, source.CouchDB)
 	mergeConnectionList(&c.CrateDB, source.CrateDB)
 	mergeConnectionList(&c.CSV, source.CSV)
 	mergeConnectionList(&c.Cursor, source.Cursor)

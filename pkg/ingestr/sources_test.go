@@ -463,3 +463,18 @@ func TestYFinanceSourceTables(t *testing.T) {
 	require.Contains(t, tables, "quotes:AAPL,MSFT")
 	require.Equal(t, "replace", tables["quotes:AAPL,MSFT"].IncStrategy)
 }
+
+func TestCouchDBSourceTables(t *testing.T) {
+	t.Parallel()
+
+	source, err := GetSourceTables("couchdb")
+	require.NoError(t, err)
+	require.Equal(t, "couchdb", source.Name)
+	require.Len(t, source.Tables, 1)
+
+	table := source.Tables[0]
+	require.Equal(t, "<database_name>", table.Name)
+	require.Equal(t, "_id", table.PrimaryKey)
+	require.Empty(t, table.IncKey)
+	require.Equal(t, "replace", table.IncStrategy)
+}
