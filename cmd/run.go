@@ -1416,6 +1416,16 @@ func Run(isDebug *bool) *cli.Command {
 				InteractivePythonLogs: interactivePythonLogs,
 			}
 
+			// Scripts can open hard-coded DuckDB paths without declaring a
+			// connection. Retaining file locks in those runs would break them.
+			// Ingestr declares its source/destination, so it can safely hand off
+			// the specific files it needs to its subprocess.
+			if !s.WillRunTaskOfType(pipeline.AssetTypePython) && !s.WillRunTaskOfType(pipeline.AssetTypeR) {
+				var closeDuckDB func()
+				runCtx, closeDuckDB = duck.WithConnectionReuse(runCtx)
+				defer closeDuckDB()
+			}
+
 			// Create a context with timeout. A streaming asset is meant to run
 			// indefinitely, so skip the default timeout unless the user set one
 			// explicitly; SIGINT/SIGTERM remains the way to stop it.

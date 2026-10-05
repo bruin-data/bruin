@@ -509,10 +509,8 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 	extraPackages = AddExtraPackages(destURI, "", extraPackages)
 
 	if strings.HasPrefix(destURI, "duckdb://") {
-		if dbURIGetter, ok := u.conn.GetConnection(destConnectionName).(interface{ GetDBConnectionURI() string }); ok {
-			duck.LockDatabase(dbURIGetter.GetDBConnectionURI())
-			defer duck.UnlockDatabase(dbURIGetter.GetDBConnectionURI())
-		}
+		duck.LockDatabase(destURI)
+		defer duck.UnlockDatabase(destURI)
 	}
 
 	ingestrCtx := ctx

@@ -3,6 +3,7 @@ package main_test
 import (
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -4609,6 +4610,131 @@ func TestIngestrTasks(t *testing.T) {
 			err := tt.task.Run()
 			require.NoError(t, err, "Task %s failed: %v", tt.task.Name, err)
 		})
+	}
+}
+
+func TestIngestrTasksInterleavedDuckDB(t *testing.T) {
+	t.Parallel()
+	cwd, err := os.Getwd()
+	require.NoError(t, err)
+	dir := t.TempDir()
+	require.NoError(t, exec.CommandContext(t.Context(), "git", "init", dir).Run())
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "assets"), 0o755))
+	files := map[string]string{
+		".bruin.yml": `default_environment: test
+environments:
+  test:
+    connections:
+      duckdb:
+        - name: local
+          path: interleaved.duckdb
+      csv:
+        - name: first_csv
+          path: first.csv
+        - name: second_csv
+          path: second.csv
+`,
+		"pipeline.yml": "name: interleaved_duckdb\ndefault_connections:\n  duckdb: local\n",
+		"first.csv":    "id,value\n1,11\n2,23\n",
+		"second.csv":   "id,value\n1,3\n2,5\n3,13\n",
+		"assets/start.sql": `/* @bruin
+name: handoff.start
+type: duckdb.sql
+materialization:
+  type: table
+columns:
+  - name: value
+    type: integer
+    checks:
+      - name: not_null
+@bruin */
+SELECT 7 AS value
+`,
+		"assets/first.asset.yml": `name: handoff.first
+type: ingestr
+depends: [handoff.start]
+parameters:
+  source_connection: first_csv
+  source_table: sample
+  destination: duckdb
+  incremental_strategy: replace
+columns:
+  - name: id
+    type: integer
+    checks:
+      - name: unique
+      - name: not_null
+`,
+		"assets/middle.sql": `/* @bruin
+name: handoff.middle
+type: duckdb.sql
+depends: [handoff.first, handoff.start]
+materialization:
+  type: table
+columns:
+  - name: value
+    type: integer
+    checks:
+      - name: not_null
+@bruin */
+SELECT CAST(SUM(CAST(f.value AS INTEGER)) + s.value AS INTEGER) AS value
+FROM handoff.first f CROSS JOIN handoff.start s
+GROUP BY s.value
+`,
+		"assets/second.asset.yml": `name: handoff.second
+type: ingestr
+depends: [handoff.middle]
+parameters:
+  source_connection: second_csv
+  source_table: sample
+  destination: duckdb
+  incremental_strategy: replace
+columns:
+  - name: id
+    type: integer
+    checks:
+      - name: unique
+      - name: not_null
+`,
+		"assets/final.sql": `/* @bruin
+name: handoff.final
+type: duckdb.sql
+depends: [handoff.second, handoff.middle]
+materialization:
+  type: table
+columns:
+  - name: total
+    type: integer
+    checks:
+      - name: not_null
+custom_checks:
+  - name: exact_result
+    query: SELECT COUNT(*) FROM handoff.final WHERE total != 62
+    value: 0
+@bruin */
+SELECT CAST(m.value + SUM(CAST(s.value AS INTEGER)) AS INTEGER) AS total
+FROM handoff.middle m CROSS JOIN handoff.second s
+GROUP BY m.value
+`,
+	}
+	for path, contents := range files {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, path), []byte(contents), 0o600))
+	}
+	for run := range 3 {
+		command := exec.CommandContext(t.Context(), bruinBinary(cwd), "run", "--workers", "8", "--no-color", dir)
+		command.Dir = dir
+		output, err := command.CombinedOutput()
+		require.NoError(t, err, "run %d: %s", run+1, output)
+		require.Contains(t, string(output), "bruin run completed successfully")
+		// Check values and row counts independently of the pipeline's checks,
+		// including on repeat runs where ingestion must replace previous rows.
+		command = exec.CommandContext(t.Context(), bruinBinary(cwd), "query", "--connection", "local", "--query",
+			"SELECT (SELECT COUNT(*) FROM handoff.first) AS first_count, (SELECT COUNT(*) FROM handoff.second) AS second_count, total FROM handoff.final", "--output", "csv")
+		command.Dir = dir
+		output, err = command.CombinedOutput()
+		require.NoError(t, err, "%s", output)
+		require.Equal(t, "first_count,second_count,total\n2,3,62", strings.TrimSpace(string(output)))
+		t.Logf("run %d: five alternating SQL/ingestr assets, eight checks, workers=8; counts=2,3 total=62", run+1)
 	}
 }
 
