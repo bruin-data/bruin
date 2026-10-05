@@ -71,9 +71,9 @@ bruin validate .
 bruin run --full-refresh .
 ```
 
-The per-platform marts load incrementally, and an incremental run writes into an existing table without creating it. On a new database a plain `bruin run` fails because those tables don't exist yet. `--full-refresh` creates them, loading the previous UTC day. Use `--full-refresh` only for this first run: a later full refresh replaces the loaded history with whatever interval that run covers.
+The per-platform marts load incrementally, and an incremental run writes into an existing table without creating it. On a new database a plain `bruin run` fails because those tables don't exist yet. `--full-refresh` creates them, loading the previous day. Use `--full-refresh` only for this first run: a later full refresh replaces the loaded history with whatever interval that run covers.
 
-After that, run without the flag. With no dates, each run loads the previous UTC day:
+After that, run without the flag. With no dates, each run loads the previous day:
 
 ```shell
 bruin run .
