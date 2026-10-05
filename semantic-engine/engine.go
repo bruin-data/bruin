@@ -154,8 +154,9 @@ func (e *Engine) validate() error {
 				return fmt.Errorf("note %q: duplicate dimension %q", note.ID, dimension.Name)
 			}
 			dimensionNames[dimension.Name] = true
+			// An empty type is treated as text.
 			switch dimension.Type {
-			case "select", "date-range", "date", "number", "boolean", "text":
+			case "", "select", "date-range", "date", "number", "boolean", "text":
 			default:
 				return fmt.Errorf("note %q: dimension %q has invalid type %q", note.ID, dimension.Name, dimension.Type)
 			}
