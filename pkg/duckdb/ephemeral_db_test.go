@@ -57,8 +57,8 @@ func TestConnectionReuseDatabaseAndSessionIsolation(t *testing.T) {
 func TestConnectionReuseAllowsConcurrentClients(t *testing.T) {
 	t.Parallel()
 	ctx, cleanup := WithConnectionReuse(t.Context())
-	t.Cleanup(cleanup)
 	cfg := Config{Path: filepath.Join(t.TempDir(), "parallel.db")}
+	t.Cleanup(cleanup) // Close the file before TempDir cleanup, including on Windows.
 	first, err := NewClient(cfg)
 	require.NoError(t, err)
 	second, err := NewClient(cfg)
@@ -96,8 +96,8 @@ func TestConnectionReuseAllowsConcurrentClients(t *testing.T) {
 func TestConnectionReuseExternalProcessHandoff(t *testing.T) {
 	t.Parallel()
 	ctx, cleanup := WithConnectionReuse(t.Context())
-	t.Cleanup(cleanup)
 	cfg := Config{Path: filepath.Join(t.TempDir(), "handoff.db")}
+	t.Cleanup(cleanup)
 	conn, err := NewEphemeralConnection(cfg)
 	require.NoError(t, err)
 	_, err = conn.ExecContext(ctx, "CREATE TABLE numbers AS SELECT 7 AS n")
@@ -112,7 +112,9 @@ func TestConnectionReuseExternalProcessHandoff(t *testing.T) {
 	// handoff used by ingestr releases it for a different process.
 	output, err := runChild()
 	require.Error(t, err)
-	require.Contains(t, string(output), "Could not set lock")
+	// DuckDB reports a different file-lock message on Windows and Unix.
+	// The same child must succeed once the parent releases the file below.
+	require.Contains(t, string(output), "IO Error")
 	unlock := LockDatabases(cfg.GetIngestrURI(), cfg.Path)
 	output, err = runChild()
 	unlock()
@@ -140,8 +142,8 @@ func TestDuckDBProcessHelper(t *testing.T) {
 func TestConnectionReuseReadOnlyConfiguration(t *testing.T) {
 	t.Parallel()
 	ctx, cleanup := WithConnectionReuse(t.Context())
-	t.Cleanup(cleanup)
 	cfg := Config{Path: filepath.Join(t.TempDir(), "readonly.db")}
+	t.Cleanup(cleanup)
 	writer, err := NewEphemeralConnection(cfg)
 	require.NoError(t, err)
 	_, err = writer.ExecContext(ctx, "CREATE TABLE numbers AS SELECT 5 AS n")
@@ -210,8 +212,8 @@ func TestConnectionReuseLakehouseSessionCatalog(t *testing.T) {
 func TestConnectionReuseConcurrentSchemaCreation(t *testing.T) {
 	t.Parallel()
 	ctx, cleanup := WithConnectionReuse(t.Context())
-	t.Cleanup(cleanup)
 	cfg := Config{Path: filepath.Join(t.TempDir(), "schemas.db")}
+	t.Cleanup(cleanup)
 	const workers = 8
 	ready := make(chan struct{})
 	done := make(chan error, workers)
@@ -271,13 +273,14 @@ func BenchmarkConnectionReuse(b *testing.B) {
 			name = "run-scoped"
 		}
 		b.Run(name, func(b *testing.B) {
+			path := filepath.Join(b.TempDir(), "benchmark.db")
 			ctx := b.Context()
 			if reuse {
 				var cleanup func()
 				ctx, cleanup = WithConnectionReuse(ctx)
 				b.Cleanup(cleanup)
 			}
-			conn, err := NewEphemeralConnection(Config{Path: filepath.Join(b.TempDir(), "benchmark.db")})
+			conn, err := NewEphemeralConnection(Config{Path: path})
 			require.NoError(b, err)
 			var n int
 			require.NoError(b, conn.QueryRowContext(ctx, "SELECT 17").Scan(&n))
