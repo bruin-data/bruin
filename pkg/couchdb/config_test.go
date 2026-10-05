@@ -72,6 +72,29 @@ func TestConfig_GetIngestrURI(t *testing.T) {
 			want: "couchdb://[::1]:5984",
 		},
 		{
+			name: "ipv6 host without port",
+			config: Config{
+				Host: "::1",
+			},
+			want: "couchdb://[::1]",
+		},
+		{
+			name: "bracketed ipv6 host with port",
+			config: Config{
+				Host: "[::1]",
+				Port: 5984,
+			},
+			want: "couchdb://[::1]:5984",
+		},
+		{
+			name: "bracketed ipv6 host without port",
+			config: Config{
+				Host: "[2001:db8::1]",
+				SSL:  true,
+			},
+			want: "couchdb+https://[2001:db8::1]",
+		},
+		{
 			name:    "missing host",
 			config:  Config{Username: "admin", Password: "password"},
 			wantErr: "couchdb: host must be provided",

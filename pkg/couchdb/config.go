@@ -33,12 +33,20 @@ func (c *Config) GetIngestrURI() (string, error) {
 		scheme = "couchdb+https"
 	}
 
+	// Accept IPv6 hosts with or without brackets; they must be bracketed in the URI.
+	if strings.HasPrefix(host, "[") && strings.HasSuffix(host, "]") {
+		host = host[1 : len(host)-1]
+	}
+
 	u := &url.URL{
 		Scheme: scheme,
 		Host:   host,
 	}
-	if c.Port != 0 {
+	switch {
+	case c.Port != 0:
 		u.Host = net.JoinHostPort(host, strconv.Itoa(c.Port))
+	case strings.Contains(host, ":"):
+		u.Host = "[" + host + "]"
 	}
 
 	if c.Username != "" || c.Password != "" {
