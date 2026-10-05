@@ -531,7 +531,7 @@ func analyzeResults(results []*scheduler.TaskExecutionResult, s *scheduler.Sched
 }
 
 var (
-	yesterday            = time.Now().AddDate(0, 0, -1)
+	yesterday            = time.Now().UTC().AddDate(0, 0, -1)
 	defaultStartDate     = time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 0, 0, 0, 0, time.UTC)
 	defaultEndDate       = time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 0, time.UTC)
 	defaultExecutionDate = time.Now().UTC()
