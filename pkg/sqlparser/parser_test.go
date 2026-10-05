@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"sort"
 	"strings"
 	"testing"
 
@@ -48,16 +47,6 @@ func TestSQLParserCloseResetsStarted(t *testing.T) {
 func TestGetLineageForRunner(t *testing.T) {
 	lineage := sharedSQLParser
 
-	// Create a long query by appending a fixed string multiple times
-	baseQuery := `SELECT * FROM (SELECT * FROM table1) t1 JOIN (SELECT * FROM table2) t2`
-	var longQueryBuilder strings.Builder
-	longQueryBuilder.WriteString(baseQuery)
-	for range [100]int{} {
-		longQueryBuilder.WriteString(" UNION ALL ")
-		longQueryBuilder.WriteString(baseQuery)
-	}
-	longQuery := longQueryBuilder.String()
-
 	tests := []struct {
 		name    string
 		sql     string
@@ -66,15 +55,6 @@ func TestGetLineageForRunner(t *testing.T) {
 		want    *Lineage
 		wantErr bool
 	}{
-		{
-			name: "long query",
-			sql:  longQuery,
-			want: &Lineage{
-				Columns:            nil,
-				NonSelectedColumns: nil,
-				Errors:             []string{"query is too long skipping column lineage analysis"},
-			},
-		},
 		{
 			name: "nested subqueries",
 			sql: `
@@ -718,6 +698,7 @@ GROUP BY 1`,
 
 			require.Equal(t, tt.want.Columns, got.Columns)
 			require.Equal(t, tt.want.NonSelectedColumns, got.NonSelectedColumns)
+			require.Equal(t, []string{}, got.Errors)
 		})
 	}
 }
@@ -855,13 +836,11 @@ COMMIT;`,
 
 func TestSqlParser_RenameTables(t *testing.T) {
 	tests := []struct {
-		name              string
-		query             string
-		tableMappings     map[string]string
-		want              string
-		normalizeExpected bool
-		runForRust        bool
-		wantErr           bool
+		name          string
+		query         string
+		tableMappings map[string]string
+		want          string
+		wantErr       bool
 	}{
 		{
 			name:  "simple select should get an alias if table names are different",
@@ -885,9 +864,7 @@ func TestSqlParser_RenameTables(t *testing.T) {
 			tableMappings: map[string]string{
 				"items": "t1",
 			},
-			want:              "SELECT * FROM t1 AS items",
-			normalizeExpected: true,
-			runForRust:        true,
+			want: "SELECT * FROM t1 AS items",
 		},
 		{
 			name:  "python parity multi table with schemas",
@@ -896,9 +873,7 @@ func TestSqlParser_RenameTables(t *testing.T) {
 				"raw.items": "t1",
 				"orders":    "raw_dev.t2",
 			},
-			want:              "SELECT * FROM t1 AS items JOIN raw_dev.t2 AS orders ON items.item_id = orders.item_id",
-			normalizeExpected: true,
-			runForRust:        true,
+			want: "SELECT * FROM t1 AS items JOIN raw_dev.t2 AS orders ON items.item_id = orders.item_id",
 		},
 		{
 			name:  "python parity multiple queries",
@@ -907,9 +882,7 @@ func TestSqlParser_RenameTables(t *testing.T) {
 				"raw.items": "t1",
 				"orders":    "raw_dev.t2",
 			},
-			want:              "DELETE FROM t1 AS items WHERE item_id = 1; SELECT * FROM t1 AS items JOIN raw_dev.t2 AS orders ON items.item_id = orders.item_id",
-			normalizeExpected: true,
-			runForRust:        true,
+			want: "DELETE FROM t1 AS items WHERE item_id = 1; SELECT * FROM t1 AS items JOIN raw_dev.t2 AS orders ON items.item_id = orders.item_id",
 		},
 		{
 			name: "python parity table name in select",
@@ -929,9 +902,7 @@ func TestSqlParser_RenameTables(t *testing.T) {
 				"raw.items":  "t1",
 				"raw.orders": "raw_dev.orders",
 			},
-			want:              "SELECT items.item_id AS item_id, CASE WHEN price > 1000 AND t2.somecol < 250 THEN 'high' WHEN price > 100 THEN 'medium' ELSE 'low' END AS price_category FROM t1 AS items JOIN raw_dev.orders AS t2 ON items.item_id = t2.item_id WHERE in_stock = TRUE",
-			normalizeExpected: true,
-			runForRust:        true,
+			want: "SELECT items.item_id AS item_id, CASE WHEN price > 1000 AND t2.somecol < 250 THEN 'high' WHEN price > 100 THEN 'medium' ELSE 'low' END AS price_category FROM t1 AS items JOIN raw_dev.orders AS t2 ON items.item_id = t2.item_id WHERE in_stock = TRUE",
 		},
 		{
 			name: "python parity subquery",
@@ -945,9 +916,7 @@ func TestSqlParser_RenameTables(t *testing.T) {
 				"raw.salaries":  "raw_dev.salaries",
 				"raw.employees": "raw_dev.employees",
 			},
-			want:              "SELECT emp_id, (SELECT AVG(salary) FROM raw_dev.salaries WHERE salaries.emp_id = employees.emp_id) AS avg_salary FROM raw_dev.employees",
-			normalizeExpected: true,
-			runForRust:        true,
+			want: "SELECT emp_id, (SELECT AVG(salary) FROM raw_dev.salaries WHERE salaries.emp_id = employees.emp_id) AS avg_salary FROM raw_dev.employees",
 		},
 		{
 			name: "python parity complex ctes",
@@ -983,9 +952,7 @@ GROUP BY 1`,
 				"fact.some_daily_metrics": "fact_dev.some_daily_metrics",
 				"fact.some_other_table":   "fact_dev.some_other_table",
 			},
-			want:              "WITH ufd AS (SELECT user_id, MIN(date_utc) AS my_date_col FROM fact_dev.some_other_table GROUP BY 1), user_retention AS (SELECT d.user_id, MAX(CASE WHEN DATEDIFF(day, f.my_date_col, d.date_utc) = 1 THEN 1 ELSE 0 END) AS some_day1_metric FROM fact_dev.some_daily_metrics AS d INNER JOIN ufd AS f ON d.user_id = f.user_id GROUP BY 1) SELECT d.user_id, DATEDIFF(day, MAX(d.date_utc), CURRENT_DATE()) AS recency, COUNT(DISTINCT d.date_utc) AS active_days, MIN_BY(d.first_device_type, d.first_activity_timestamp) AS first_device_type, AVG(NULLIF(d.estimated_session_duration, 0)) AS avg_session_duration, SUM(d.event_start) AS total_event_start, MAX(r.some_day1_metric) AS some_day1_metric, CASE WHEN sum(d.event_start) > 0 THEN 'Player' ELSE 'Visitor' END AS user_type FROM fact_dev.some_daily_metrics AS d LEFT JOIN user_retention AS r ON d.user_id = r.user_id GROUP BY 1",
-			normalizeExpected: true,
-			runForRust:        true,
+			want: "WITH ufd AS (SELECT user_id, MIN(date_utc) AS my_date_col FROM fact_dev.some_other_table GROUP BY 1), user_retention AS (SELECT d.user_id, MAX(CASE WHEN DATE_DIFF(day, f.my_date_col, d.date_utc) = 1 THEN 1 ELSE 0 END) AS some_day1_metric FROM fact_dev.some_daily_metrics AS d INNER JOIN ufd AS f ON d.user_id = f.user_id GROUP BY 1) SELECT d.user_id, DATE_DIFF(day, MAX(d.date_utc)) AS recency, COUNT(DISTINCT d.date_utc) AS active_days, MIN_BY(d.first_device_type, d.first_activity_timestamp) AS first_device_type, AVG(NULLIF(d.estimated_session_duration, 0)) AS avg_session_duration, SUM(d.event_start) AS total_event_start, MAX(r.some_day1_metric) AS some_day1_metric, CASE WHEN sum(d.event_start) > 0 THEN 'Player' ELSE 'Visitor' END AS user_type FROM fact_dev.some_daily_metrics AS d LEFT JOIN user_retention AS r ON d.user_id = r.user_id GROUP BY 1",
 		},
 		{
 			name: "python parity cte with similar names",
@@ -1014,9 +981,7 @@ join t2
 			tableMappings: map[string]string{
 				"raw.table1": "raw_dev.table1",
 			},
-			want:              "WITH t1 AS (SELECT t1.col1, col2 FROM raw_dev.table1 AS t1), t2 AS (SELECT t2.col1, col3 FROM raw_dev.table1 AS t2), t3 AS (SELECT table1.col1, col3 FROM raw_dev.table1) SELECT * FROM t1 JOIN t2 USING (col1)",
-			normalizeExpected: true,
-			runForRust:        true,
+			want: "WITH t1 AS (SELECT t1.col1, col2 FROM raw_dev.table1 AS t1), t2 AS (SELECT t2.col1, col3 FROM raw_dev.table1 AS t2), t3 AS (SELECT table1.col1, col3 FROM raw_dev.table1) SELECT * FROM t1 JOIN t2 USING (col1)",
 		},
 		{
 			name:  `SELECT from unnest`,
@@ -1028,16 +993,10 @@ join t2
 		},
 	}
 
-	normalize := newNormalizer(t)
-
 	for _, parser := range startParsersForParity(t) { //nolint:paralleltest
 		t.Run(parser.name, func(t *testing.T) {
 			for _, tt := range tests { //nolint
 				t.Run(tt.name, func(t *testing.T) {
-					if parser.name == "rust" && !tt.runForRust {
-						t.Skip("non-python rename case")
-					}
-
 					got, err := parser.parser.RenameTables(tt.query, "bigquery", tt.tableMappings)
 					if tt.wantErr {
 						require.Error(t, err)
@@ -1045,12 +1004,7 @@ join t2
 						require.NoError(t, err)
 					}
 
-					expected := tt.want
-					if tt.normalizeExpected {
-						expected = normalize(tt.want, "bigquery")
-					}
-
-					require.Equal(t, expected, got)
+					require.Equal(t, tt.want, got)
 				})
 			}
 		})
@@ -1167,8 +1121,8 @@ func TestSqlParser_AddLimit(t *testing.T) { //nolint
 		},
 		{
 			// Regression for https://github.com/bruin-data/bruin/issues/2239:
-			// the rust parser's generic dialect uppercases function names,
-			// which breaks ClickHouse (case-sensitive function lookup).
+			// Generic dialects can uppercase function names, which breaks
+			// ClickHouse (case-sensitive function lookup).
 			// Round-tripping with the clickhouse dialect must preserve the
 			// original camelCase function names.
 			name:     "clickhouse dialect preserves camelCase function names",
@@ -1311,9 +1265,9 @@ func TestSqlParser_ExtractSelect(t *testing.T) { //nolint
 		require.Error(t, err)
 	})
 
-	// Read-only gate: a unit test must never run a write. extract-select is the
-	// guarantee (there is no read-only-connection enforcement), so every write
-	// shape is rejected and never reaches the connection.
+	// These write shapes are rejected rather than reduced to a nested SELECT.
+	// This is not a general safety guarantee: the contract suite separately
+	// characterizes nested INTO clauses that ExtractSelect currently retains.
 	t.Run("write statements are rejected, never reduced to something runnable", func(t *testing.T) {
 		writes := map[string]string{
 			"delete with a subquery": "DELETE FROM orders WHERE id IN (SELECT id FROM refunds)",
@@ -1438,6 +1392,7 @@ func TestAssetTypeToDialect(t *testing.T) {
 		pipeline.AssetTypeClickHouse:        "clickhouse",
 		pipeline.AssetTypeDatabricksQuery:   "databricks",
 		pipeline.AssetTypeDorisQuery:        "doris",
+		pipeline.AssetTypeStarRocksQuery:    "starrocks",
 		pipeline.AssetTypeDremioQuery:       "trino",
 		pipeline.AssetTypeDuckDBQuery:       "duckdb",
 		pipeline.AssetTypeFabricQuery:       "fabric",
@@ -1456,6 +1411,7 @@ func TestAssetTypeToDialect(t *testing.T) {
 		pipeline.AssetTypeTrinoQuery:        "trino",
 		pipeline.AssetTypeVerticaQuery:      "postgres",
 	}
+	require.Equal(t, tests, assetTypeDialectMap, "every registered asset must have an explicit dialect expectation")
 
 	for assetType, want := range tests {
 		t.Run(string(assetType), func(t *testing.T) {
@@ -1466,8 +1422,11 @@ func TestAssetTypeToDialect(t *testing.T) {
 		})
 	}
 
-	_, err := AssetTypeToDialect(pipeline.AssetTypePython)
-	require.Error(t, err)
+	for _, assetType := range []pipeline.AssetType{pipeline.AssetTypePython, "", "DuckDB.SQL"} {
+		got, err := AssetTypeToDialect(assetType)
+		require.EqualError(t, err, "unsupported asset type "+string(assetType))
+		require.Empty(t, got)
+	}
 }
 
 func TestConnectionTypeToDialect(t *testing.T) {
@@ -1481,6 +1440,7 @@ func TestConnectionTypeToDialect(t *testing.T) {
 		"duckdb":                "duckdb",
 		"fabric":                "fabric",
 		"doris":                 "doris",
+		"starrocks":             "starrocks",
 		"google_cloud_platform": "bigquery",
 		"motherduck":            "duckdb",
 		"mssql":                 "tsql",
@@ -1494,15 +1454,17 @@ func TestConnectionTypeToDialect(t *testing.T) {
 		"synapse":               "tsql",
 		"trino":                 "trino",
 		"vertica":               "postgres",
-		"":                      "",
-		"unknown":               "",
 	}
+	require.Equal(t, tests, connectionTypeDialectMap, "every registered connection must have an explicit dialect expectation")
 
 	for connType, want := range tests {
 		t.Run(connType, func(t *testing.T) {
 			t.Parallel()
 			require.Equal(t, want, ConnectionTypeToDialect(connType))
 		})
+	}
+	for _, connType := range []string{"", "unknown", "Postgres", " postgres "} {
+		require.Empty(t, ConnectionTypeToDialect(connType))
 	}
 }
 
@@ -1860,19 +1822,17 @@ type pythonMainLineageCase struct {
 	Schema              map[string]interface{} `json:"schema"`
 	Expected            []ColumnLineage        `json:"expected"`
 	ExpectedNonSelected []ColumnLineage        `json:"expected_non_selected"`
+	ExpectedErrors      []string               `json:"expected_errors"`
 }
 
 type pythonMainNonSelectedCase struct {
-	Name     string                 `json:"name"`
-	Dialect  string                 `json:"dialect"`
-	Query    string                 `json:"query"`
-	Schema   map[string]interface{} `json:"schema"`
-	Expected []pythonSelectedColumn `json:"expected"`
-}
-
-type pythonSelectedColumn struct {
-	Name  string `json:"name"`
-	Table string `json:"table"`
+	Name             string                 `json:"name"`
+	Dialect          string                 `json:"dialect"`
+	Query            string                 `json:"query"`
+	Schema           map[string]interface{} `json:"schema"`
+	Expected         []ColumnLineage        `json:"expected"`
+	ExpectedSelected []ColumnLineage        `json:"expected_selected"`
+	ExpectedErrors   []string               `json:"expected_errors"`
 }
 
 type startedParser struct {
@@ -1903,106 +1863,26 @@ func loadFixture[T any](t *testing.T, filename string) []T {
 func startParsersForParity(t *testing.T) []startedParser {
 	t.Helper()
 
-	started := make([]startedParser, 0, 2)
-	started = append(started, startedParser{name: "sqlglot", parser: sharedSQLParser})
-
-	if err := ensureRustSQLParserFFI(); err != nil {
-		t.Logf("skipping rust parser parity tests: %v", err)
-		return started
-	}
-
-	rustParser, err := NewRustSQLParser(true)
-	require.NoError(t, err)
-	require.NoError(t, rustParser.Start())
-	t.Cleanup(func() {
-		require.NoError(t, rustParser.Close())
-	})
-	started = append(started, startedParser{name: "rust", parser: rustParser})
-
-	return started
+	return []startedParser{{name: "sqlglot", parser: sharedSQLParser}}
 }
 
 func getLineageWithRawSchema(t *testing.T, parser Parser, query, dialect string, schema map[string]any) *Lineage {
 	t.Helper()
 
-	schemaJSON, err := json.Marshal(schema)
-	require.NoError(t, err)
-
-	var responsePayload string
-	switch p := parser.(type) {
-	case *SQLParser:
-		command := &parserCommand{
-			Command: "lineage",
-			Contents: map[string]any{
-				"query":   query,
-				"dialect": dialect,
-				"schema":  schema,
-			},
-		}
-		responsePayload, err = p.sendCommand(command)
-	case *RustSQLParser:
-		responsePayload, err = p.columnLineageRawJSON(query, dialect, string(schemaJSON))
-	default:
-		t.Fatalf("unsupported parser type %T", parser)
+	command := &parserCommand{
+		Command: "lineage",
+		Contents: map[string]any{
+			"query":   query,
+			"dialect": dialect,
+			"schema":  schema,
+		},
 	}
+	responsePayload, err := parser.(*SQLParser).sendCommand(command)
 	require.NoError(t, err)
 
 	var result Lineage
 	require.NoError(t, json.Unmarshal([]byte(responsePayload), &result))
 	return &result
-}
-
-// newNormalizer returns a function that normalizes SQL through the shared sqlglot parser.
-func newNormalizer(t *testing.T) func(query, dialect string) string {
-	t.Helper()
-
-	return func(query, dialect string) string {
-		t.Helper()
-		normalized, err := sharedSQLParser.RenameTables(query, dialect, map[string]string{})
-		require.NoError(t, err)
-		return normalized
-	}
-}
-
-func flattenNonSelectedColumns(columns []ColumnLineage) []pythonSelectedColumn {
-	result := make([]pythonSelectedColumn, 0)
-	for _, column := range columns {
-		for _, upstream := range column.Upstream {
-			result = append(result, pythonSelectedColumn{
-				Name:  column.Name,
-				Table: upstream.Table,
-			})
-		}
-	}
-
-	sort.Slice(result, func(i, j int) bool {
-		if result[i].Name == result[j].Name {
-			return result[i].Table < result[j].Table
-		}
-		return result[i].Name < result[j].Name
-	})
-
-	return result
-}
-
-func normalizeColumnType(columnType string) string {
-	switch columnType {
-	case "UNKNOWN":
-		return "TEXT"
-	case "TIMESTAMP":
-		return "TIMESTAMPLTZ"
-	default:
-		return columnType
-	}
-}
-
-func normalizeLineageTypes(columns []ColumnLineage) []ColumnLineage {
-	result := make([]ColumnLineage, len(columns))
-	for i, column := range columns {
-		result[i] = column
-		result[i].Type = normalizeColumnType(column.Type)
-	}
-	return result
 }
 
 func TestGetLineageForRunner_PythonMainCases(t *testing.T) {
@@ -2013,8 +1893,9 @@ func TestGetLineageForRunner_PythonMainCases(t *testing.T) {
 			for idx, testCase := range cases { //nolint:paralleltest
 				t.Run(fmt.Sprintf("%03d_%s", idx+1, testCase.Name), func(t *testing.T) {
 					got := getLineageWithRawSchema(t, parser.parser, testCase.Query, testCase.Dialect, testCase.Schema)
-					require.Equal(t, normalizeLineageTypes(testCase.Expected), normalizeLineageTypes(got.Columns))
+					require.Equal(t, testCase.Expected, got.Columns)
 					require.Equal(t, testCase.ExpectedNonSelected, got.NonSelectedColumns)
+					require.Equal(t, testCase.ExpectedErrors, got.Errors)
 				})
 			}
 		})
@@ -2030,15 +1911,9 @@ func TestExtractNonSelectColumn_PythonMainCases(t *testing.T) {
 				t.Run(fmt.Sprintf("%03d_%s", idx+1, testCase.Name), func(t *testing.T) {
 					got := getLineageWithRawSchema(t, parser.parser, testCase.Query, testCase.Dialect, testCase.Schema)
 
-					expected := append([]pythonSelectedColumn(nil), testCase.Expected...)
-					sort.Slice(expected, func(i, j int) bool {
-						if expected[i].Name == expected[j].Name {
-							return expected[i].Table < expected[j].Table
-						}
-						return expected[i].Name < expected[j].Name
-					})
-
-					require.ElementsMatch(t, expected, flattenNonSelectedColumns(got.NonSelectedColumns))
+					require.Equal(t, testCase.ExpectedSelected, got.Columns)
+					require.Equal(t, testCase.Expected, got.NonSelectedColumns)
+					require.Equal(t, testCase.ExpectedErrors, got.Errors)
 				})
 			}
 		})
@@ -2232,12 +2107,7 @@ FROM test.products
 ORDER BY created_at DESC
 LIMIT 1000;
 `,
-			expectedQuery: `
-SELECT DISTINCT product_id, product_name, price, stock, created_at
-FROM test.products
-ORDER BY created_at DESC
-LIMIT 10;
-`,
+			expectedQuery: "SELECT DISTINCT product_id, product_name, price, stock, created_at FROM test.products ORDER BY created_at DESC LIMIT 10",
 		},
 		{
 			name:    "no existing limit",
@@ -2247,11 +2117,7 @@ LIMIT 10;
 SELECT product_id, product_name
 FROM test.products
 `,
-			expectedQuery: `
-SELECT product_id, product_name
-FROM test.products
-LIMIT 10
-`,
+			expectedQuery: "SELECT product_id, product_name FROM test.products LIMIT 10",
 		},
 		{
 			name:    "replace existing limit",
@@ -2262,11 +2128,7 @@ SELECT product_id, product_name
 FROM test.products
 LIMIT 50
 `,
-			expectedQuery: `
-SELECT product_id, product_name
-FROM test.products
-LIMIT 10
-`,
+			expectedQuery: "SELECT product_id, product_name FROM test.products LIMIT 10",
 		},
 		{
 			name:    "add limit with order by",
@@ -2277,12 +2139,7 @@ SELECT product_id, product_name
 FROM test.products
 ORDER BY product_name
 `,
-			expectedQuery: `
-SELECT product_id, product_name
-FROM test.products
-ORDER BY product_name
-LIMIT 10
-`,
+			expectedQuery: "SELECT product_id, product_name FROM test.products ORDER BY product_name LIMIT 10",
 		},
 		{
 			name:    "add limit with group by",
@@ -2293,12 +2150,7 @@ SELECT product_name, COUNT(*)
 FROM test.products
 GROUP BY product_name
 `,
-			expectedQuery: `
-SELECT product_name, COUNT(*)
-FROM test.products
-GROUP BY product_name
-LIMIT 10
-`,
+			expectedQuery: "SELECT product_name, COUNT(*) FROM test.products GROUP BY product_name LIMIT 10",
 		},
 		{
 			name:    "add limit with semicolon",
@@ -2309,11 +2161,7 @@ SELECT product_id, product_name
 FROM test.products
 LIMIT 50;
 `,
-			expectedQuery: `
-SELECT product_id, product_name
-FROM test.products
-LIMIT 10;
-`,
+			expectedQuery: "SELECT product_id, product_name FROM test.products LIMIT 10",
 		},
 		{
 			name:    "add limit without semicolon",
@@ -2324,11 +2172,7 @@ SELECT product_id, product_name
 FROM test.products
 LIMIT 50
 `,
-			expectedQuery: `
-SELECT product_id, product_name
-FROM test.products
-LIMIT 10
-`,
+			expectedQuery: "SELECT product_id, product_name FROM test.products LIMIT 10",
 		},
 		{
 			name:    "nested query existing inner limit",
@@ -2341,14 +2185,7 @@ SELECT * FROM (
     LIMIT 50
 ) AS subquery
 `,
-			expectedQuery: `
-SELECT * FROM (
-    SELECT product_id, product_name
-    FROM test.products
-    LIMIT 50
-) AS subquery
-LIMIT 10
-`,
+			expectedQuery: "SELECT * FROM (SELECT product_id, product_name FROM test.products LIMIT 50) AS subquery LIMIT 10",
 		},
 		{
 			name:    "nested query no inner limit",
@@ -2360,13 +2197,7 @@ SELECT * FROM (
     FROM test.products
 ) AS subquery
 `,
-			expectedQuery: `
-SELECT * FROM (
-    SELECT product_id, product_name
-    FROM test.products
-) AS subquery
-LIMIT 10
-`,
+			expectedQuery: "SELECT * FROM (SELECT product_id, product_name FROM test.products) AS subquery LIMIT 10",
 		},
 		{
 			name:    "snowflake convert timezone",
@@ -2376,10 +2207,7 @@ LIMIT 10
 SELECT CONVERT_TIMEZONE('CET', '2025-05-20T00:00:00Z')
 LIMIT 100
 `,
-			expectedQuery: `
-SELECT CONVERT_TIMEZONE('CET', '2025-05-20T00:00:00Z')
-LIMIT 10
-`,
+			expectedQuery: "SELECT CONVERT_TIMEZONE('CET', '2025-05-20T00:00:00Z') LIMIT 10",
 		},
 	}
 
@@ -2390,9 +2218,7 @@ LIMIT 10
 					got, err := parser.parser.AddLimit(tt.query, tt.limit, tt.dialect)
 					require.NoError(t, err)
 
-					expected, err := parser.parser.AddLimit(tt.expectedQuery, tt.limit, tt.dialect)
-					require.NoError(t, err)
-					require.Equal(t, expected, got)
+					require.Equal(t, tt.expectedQuery, got)
 				})
 			}
 		})

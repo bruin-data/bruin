@@ -384,6 +384,19 @@ func (c CouchbaseConnection) GetName() string {
 	return c.Name
 }
 
+type CouchDBConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	Username           string `yaml:"username,omitempty" json:"username,omitempty" mapstructure:"username"`
+	Password           string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password" sensitive:"true"`
+	Host               string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
+	Port               int    `yaml:"port,omitempty" json:"port,omitempty" mapstructure:"port"`
+	SSL                bool   `yaml:"ssl,omitempty" json:"ssl,omitempty" mapstructure:"ssl"`
+}
+
+func (c CouchDBConnection) GetName() string {
+	return c.Name
+}
+
 type CassandraConnection struct {
 	ConnectionMetadata       `yaml:",inline" mapstructure:",squash"`
 	Username                 string   `yaml:"username,omitempty" json:"username" mapstructure:"username"`

@@ -149,6 +149,37 @@ func TestBuildWarehouseQuery(t *testing.T) {
 		require.Contains(t, f.gotCTEs[0].Query, `CAST(1 AS BIGINT) AS id`)
 	})
 
+	t.Run("nested values become JSON text, parsed with PARSE_JSON on BigQuery", func(t *testing.T) {
+		t.Parallel()
+		invoices := pipeline.UnitTestInput{
+			Asset: "raw.invoices",
+			Rows: []map[string]interface{}{
+				{"id": "1", "customer_ref": map[string]interface{}{"value": "7"}, "line": []interface{}{map[string]interface{}{"Amount": 10}}},
+				{"id": "2", "customer_ref": nil, "line": []interface{}{map[string]interface{}{"Description": `say "hi"`, "Note": "it's"}}},
+				{"id": "3", "customer_ref": 7, "line": "[]"},
+			},
+		}
+		schemas := map[string][]pipeline.Column{
+			"raw.invoices": {{Name: "id", Type: "varchar"}, {Name: "customer_ref", Type: "json"}, {Name: "line", Type: "json"}},
+		}
+		f := &fakeRewriter{used: []string{"raw.invoices"}}
+		_, err := BuildWarehouseQuery(f, "bigquery", "SELECT id FROM raw.invoices",
+			pipeline.UnitTest{Inputs: []pipeline.UnitTestInput{invoices}}, schemas)
+		require.NoError(t, err)
+		require.Equal(t,
+			`SELECT PARSE_JSON('{"value":"7"}') AS customer_ref, CAST('1' AS varchar) AS id, PARSE_JSON('[{"Amount":10}]') AS line`+
+				` UNION ALL SELECT NULL, '2', PARSE_JSON('[{"Description":"say \\"hi\\"","Note":"it\'s"}]')`+
+				` UNION ALL SELECT PARSE_JSON('7'), '3', PARSE_JSON('[]')`,
+			f.gotCTEs[0].Query)
+
+		// Other dialects keep the portable CAST, now over JSON text.
+		f = &fakeRewriter{used: []string{"raw.invoices"}}
+		_, err = BuildWarehouseQuery(f, "duckdb", "SELECT id FROM raw.invoices",
+			pipeline.UnitTest{Inputs: []pipeline.UnitTestInput{invoices}}, schemas)
+		require.NoError(t, err)
+		require.Contains(t, f.gotCTEs[0].Query, `CAST('{"value":"7"}' AS json) AS customer_ref`)
+	})
+
 	t.Run("unmocked read with a declared schema becomes an empty typed CTE", func(t *testing.T) {
 		t.Parallel()
 		f := &fakeRewriter{used: []string{"analytics.orders", "analytics.dim"}}

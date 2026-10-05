@@ -15,6 +15,7 @@ LINT_MERGE_BASE ?= origin/main
 GCI_VERSION ?= v0.14.0
 GOFUMPT_VERSION ?= v0.10.0
 RUFF_VERSION ?= 0.15.4
+PY_FORMAT_PATHS := pkg/sqlengine/codegen pkg/sqlparser/codegen
 # Pinned, not @latest. v2.12.x made its cache checkout-independent, but cached
 # diagnostics still contain absolute paths from the checkout that produced
 # them. That makes shared-cache results unsafe across worktrees. Re-test before
@@ -47,13 +48,20 @@ SPARK_INTEGRATION_TEST = cd integration-tests/cloud-integration-tests/spark && e
 .PHONY: all clean test test-full test-unit build build-no-duckdb docs-app format format-ci lint lint-fast lint-full lint-ci pre-commit refresh-integration-expectations integration-test integration-test-light integration-test-backfill integration-test-cloud integration-test-spark integration-test-mssql validate-links sync-template-docs setup tools-update
 all: clean deps test build
 
-deps: 
+deps: ingestr-hashes
 	@printf "$(OK_COLOR)==> Installing dependencies$(NO_COLOR)\n"
 	@go mod tidy
 
+.PHONY: ingestr-hashes
+ingestr-hashes:
+	@if [ "$(INGESTR_HASHES_PREVERIFIED)" = "1" ]; then \
+		test -s pkg/python/ingestr_hashes.json || { echo "preverified ingestr hash manifest is missing" >&2; exit 1; }; \
+	else \
+		python3 scripts/generate_ingestr_hashes.py; \
+	fi
+
 build: deps
 	@echo "$(OK_COLOR)==> Building the application...$(NO_COLOR)"
-	@$(MAKE) rustsqlparser-lib
 	@CGO_ENABLED=1 go build -v -tags="no_duckdb_arrow" -ldflags="-s -w -X main.Version=$(or $(tag), dev-$(shell git describe --tags --abbrev=0)) -X main.telemetryKey=$(TELEMETRY_KEY)" -o "$(BUILD_DIR)/$(NAME)" "$(BUILD_SRC)"
 
 build-no-duckdb: deps
@@ -125,27 +133,19 @@ clean:
 
 test: test-unit
 
-test-unit:
+test-unit: ingestr-hashes
 	@echo "$(OK_COLOR)==> Running the unit tests (fast)$(NO_COLOR)"
-	@$(MAKE) rustsqlparser-lib
-	@env SF_DISABLE_MINICORE=true go test -tags="no_duckdb_arrow" -p "$(TEST_CONCURRENCY)" -vet=off -timeout 10m ./cmd/... ./pkg/... ./templates/...
+	@python3 -m unittest discover -s scripts -p 'test_generate_ingestr_hashes.py'
+	@env SF_DISABLE_MINICORE=true go test -tags="no_duckdb_arrow" -p "$(TEST_CONCURRENCY)" -vet=off -timeout 10m ./cmd/... ./pkg/... ./templates/... ./docs/...
 	@echo "$(OK_COLOR)==> Running the semantic-engine module tests$(NO_COLOR)"
 	@cd semantic-engine && env SF_DISABLE_MINICORE=true go test -p "$(TEST_CONCURRENCY)" -timeout 10m ./...
 
-test-full:
+test-full: ingestr-hashes
 	@echo "$(OK_COLOR)==> Running the unit tests (full)$(NO_COLOR)"
-	@$(MAKE) rustsqlparser-lib
-	@env SF_DISABLE_MINICORE=true go test -tags="no_duckdb_arrow" -race -p "$(TEST_CONCURRENCY)" -vet=off -timeout 10m ./cmd/... ./pkg/... ./templates/...
+	@python3 -m unittest discover -s scripts -p 'test_generate_ingestr_hashes.py'
+	@env SF_DISABLE_MINICORE=true go test -tags="no_duckdb_arrow" -race -p "$(TEST_CONCURRENCY)" -vet=off -timeout 10m ./cmd/... ./pkg/... ./templates/... ./docs/...
 	@echo "$(OK_COLOR)==> Running the semantic-engine module tests with race detection$(NO_COLOR)"
 	@cd semantic-engine && env SF_DISABLE_MINICORE=true go test -race -p "$(TEST_CONCURRENCY)" -timeout 10m ./...
-
-RUST_LIB = pkg/sqlparser/rustffi/target/release/libbruin_rustsqlparser.a
-
-rustsqlparser-lib: $(RUST_LIB)
-
-$(RUST_LIB): pkg/sqlparser/rustffi/Cargo.toml $(wildcard pkg/sqlparser/rustffi/src/*.rs)
-	@echo "$(OK_COLOR)==> Building Rust SQL parser static library$(NO_COLOR)"
-	@cargo build --release --manifest-path pkg/sqlparser/rustffi/Cargo.toml
 
 format: lint-python
 	@echo "$(OK_COLOR)>> [gci] formatting$(NO_COLOR)"
@@ -156,7 +156,7 @@ format: lint-python
 
 # Fast edit-loop check on changed Go packages. `go vet` is deliberately absent
 # because govet is already enabled by golangci-lint.
-lint:
+lint: ingestr-hashes
 	@echo "$(OK_COLOR)==> Running fast linters on packages changed since $(LINT_MERGE_BASE)$(NO_COLOR)"
 	@set -e; \
 	for module in $(LINT_MODULES); do \
@@ -168,7 +168,7 @@ lint:
 lint-fast: lint
 
 # Full check for CI and pre-merge validation.
-lint-full:
+lint-full: ingestr-hashes
 	@echo "$(OK_COLOR)==> Running all linters across the repository$(NO_COLOR)"
 	@golangci-lint run --timeout "$(LINT_TIMEOUT)" --concurrency "$(LINT_CONCURRENCY)" $(LINT_PARALLEL_FLAGS) --build-tags="$(LINT_BUILD_TAGS)" ./...
 	@cd semantic-engine && golangci-lint run --timeout "$(LINT_TIMEOUT)" --concurrency "$(LINT_CONCURRENCY)" $(LINT_PARALLEL_FLAGS) ./...
@@ -200,14 +200,12 @@ tools-update:
 	$(GOLANGCI_LINT_INSTALL)
 	@go mod tidy
 
+# Formats and lints the Python codegen scripts (they record the parser test fixtures).
 lint-python:
-	@[ -d .venv ] || uv venv --quiet
-	@uv pip install --quiet sqlglot==30.13.0
 	@echo "$(OK_COLOR)==> Running Python formatting with ruff...$(NO_COLOR)"
-	@uvx ruff@$(RUFF_VERSION) format ./pythonsrc
-
+	@uvx ruff@$(RUFF_VERSION) format $(PY_FORMAT_PATHS)
 	@echo "$(OK_COLOR)==> Running Python linting with ruff...$(NO_COLOR)"
-	@uvx ruff@$(RUFF_VERSION) check --fix ./pythonsrc
+	@uvx ruff@$(RUFF_VERSION) check --fix $(PY_FORMAT_PATHS)
 
 refresh-integration-expectations: build
 	@echo "$(OK_COLOR)==> Refreshing integration expectations...$(NO_COLOR)"
@@ -238,12 +236,8 @@ refresh-integration-expectations: build
 	@echo "$(OK_COLOR)==> Integration expectations refreshed successfully!$(NO_COLOR)"
 
 validate-links:
-	@echo "$(OK_COLOR)==> Validating web links in repository...$(NO_COLOR)"
-	@if ! command -v python3 > /dev/null 2>&1; then \
-		echo "$(ERROR_COLOR)Python 3 not found. Please install Python 3 to validate links.$(NO_COLOR)"; \
-		exit 1; \
-	fi
-	@python3 scripts/validate_links.py . || (echo "$(ERROR_COLOR)Link validation found broken links. Please fix them.$(NO_COLOR)" && exit 1)
+	@echo "$(OK_COLOR)==> Validating external links in docs...$(NO_COLOR)"
+	@scripts/check_docs_links.sh --external || (echo "$(ERROR_COLOR)Link validation found broken links. Please fix them.$(NO_COLOR)" && exit 1)
 
 # sometimes vendoring doesn't move the precompiled library
 duck-db-static-lib:

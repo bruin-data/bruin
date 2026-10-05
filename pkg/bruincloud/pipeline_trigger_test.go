@@ -35,3 +35,19 @@ func TestScheduledAgentIncludesPipelineTrigger(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(data), `"pipeline_trigger":{"id":"daily-etl","project_id":"analytics"}`)
 }
+
+func TestScheduledAgentIncludesNotificationIntegrations(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(t, w, map[string]any{"id": 42, "notification_integrations": []map[string]any{
+			{"platform": "slack", "display_name": "on-call", "post_directly_to_channel": true},
+		}})
+	})
+	agent, err := client.GetScheduledAgent(t.Context(), 42)
+	require.NoError(t, err)
+	require.Len(t, agent.NotificationIntegrations, 1)
+	assert.Equal(t, ScheduledAgentNotification{Platform: "slack", DisplayName: "on-call", PostDirectlyToChannel: true}, agent.NotificationIntegrations[0])
+	data, err := json.Marshal(agent)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), `"notification_integrations":[{"platform":"slack","display_name":"on-call","post_directly_to_channel":true}]`)
+}

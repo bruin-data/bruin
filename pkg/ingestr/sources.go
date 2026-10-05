@@ -437,6 +437,11 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 	// Couchbase - NoSQL database (user-defined tables)
 	"couchbase": {},
 
+	// CouchDB - Document database. source_table is the database name; full scan, no incremental keys.
+	"couchdb": {
+		{Name: "<database_name>", PrimaryKey: "_id", IncKey: "", IncStrategy: "replace"},
+	},
+
 	// Cassandra - Wide-column database (user-defined tables)
 	"cassandra": {},
 
@@ -619,6 +624,22 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "example-resources", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
 	},
 
+	// Yahoo Finance - Public market data. Every table takes Yahoo ticker symbols after a
+	// colon (e.g. "history:AAPL,MSFT"); options go in URL query format ("?interval=1h").
+	"yfinance": {
+		{Name: "history:AAPL,MSFT", PrimaryKey: "symbol,interval,date", IncKey: "timestamp", IncStrategy: "merge"},
+		{Name: "history:AAPL,MSFT?interval=1h", PrimaryKey: "symbol,interval,timestamp", IncKey: "timestamp", IncStrategy: "merge"},
+		{Name: "dividends:AAPL,MSFT", PrimaryKey: "symbol,date", IncKey: "date", IncStrategy: "merge"},
+		{Name: "splits:AAPL,MSFT", PrimaryKey: "symbol,date", IncKey: "date", IncStrategy: "merge"},
+		{Name: "quotes:AAPL,MSFT", PrimaryKey: "symbol", IncKey: "", IncStrategy: "replace"},
+		{Name: "info:AAPL,MSFT", PrimaryKey: "symbol", IncKey: "", IncStrategy: "replace"},
+		{Name: "options:AAPL", PrimaryKey: "contractSymbol", IncKey: "", IncStrategy: "replace"},
+		{Name: "income_statement:AAPL,MSFT", PrimaryKey: "symbol,frequency,as_of_date,metric", IncKey: "", IncStrategy: "merge"},
+		{Name: "balance_sheet:AAPL,MSFT", PrimaryKey: "symbol,frequency,as_of_date,metric", IncKey: "", IncStrategy: "merge"},
+		{Name: "cash_flow:AAPL,MSFT", PrimaryKey: "symbol,frequency,as_of_date,metric", IncKey: "", IncStrategy: "merge"},
+		{Name: "news:AAPL,MSFT", PrimaryKey: "uuid", IncKey: "providerPublishTime", IncStrategy: "merge"},
+	},
+
 	// Freshdesk - Customer service platform
 	"freshdesk": {
 		{Name: "agents", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
@@ -683,8 +704,10 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 
 	// Gorgias - E-commerce helpdesk
 	"gorgias": {
-		{Name: "customers", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
-		{Name: "tickets", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "customers", PrimaryKey: "id", IncKey: "updated_datetime", IncStrategy: "merge"},
+		{Name: "tickets", PrimaryKey: "id", IncKey: "updated_datetime", IncStrategy: "merge"},
+		{Name: "ticket_messages", PrimaryKey: "id", IncKey: "updated_datetime", IncStrategy: "merge"},
+		{Name: "satisfaction_surveys", PrimaryKey: "id", IncKey: "updated_datetime", IncStrategy: "merge"},
 	},
 
 	// Granola - AI meeting notes
@@ -1305,6 +1328,7 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 	// Paddle - Billing and subscriptions
 	"paddle": {
 		{Name: "customers", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "addresses", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
 		{Name: "products", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
 		{Name: "prices", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
 		{Name: "discounts", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},

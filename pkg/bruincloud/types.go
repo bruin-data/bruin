@@ -406,6 +406,15 @@ type ScheduledAgent struct {
 	Memory            json.RawMessage                `json:"memory,omitempty"`
 	MonitorsDashboard json.RawMessage                `json:"monitors_dashboard,omitempty"`
 	RecentExecutions  json.RawMessage                `json:"recent_executions,omitempty"`
+	// Not omitempty: [] means no channels, null means an older server.
+	NotificationIntegrations []ScheduledAgentNotification `json:"notification_integrations"`
+}
+
+// ScheduledAgentNotification is a channel that receives each run's result.
+type ScheduledAgentNotification struct {
+	Platform              string `json:"platform"`
+	DisplayName           string `json:"display_name"`
+	PostDirectlyToChannel bool   `json:"post_directly_to_channel"`
 }
 
 // ScheduledAgentExecution is the execution a trigger stands up: the run that was

@@ -9,11 +9,32 @@ permissions:
   contents: write
 
 env:
+  GH_TOKEN: ${{ github.token }}
+  INGESTR_HASHES_PREVERIFIED: 1
   REGISTRY: ghcr.io
   IMAGE_NAME: bruin-data/bruin
 
 jobs:
+  verify-ingestr:
+    # Use GitHub's maintained runner image for trusted gh provisioning.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Authenticate pinned ingestr and generate embedded hashes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/generate_ingestr_hashes.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ingestr-hashes
+          path: pkg/python/ingestr_hashes.json
+          if-no-files-found: error
+          retention-days: 1
+
   integration-tests:
+    needs: [verify-ingestr]
     strategy:
       matrix:
         platform: [ depot-ubuntu-latest-4, depot-macos-15, depot-windows-latest-4 ]
@@ -27,29 +48,15 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ingestr-hashes
+          path: pkg/python
       - name: Setup Go
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: 'go.mod'
           cache-dependency-path: "go.sum"
-      - name: Cache Rust artifacts
-        id: rust-cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            pkg/sqlparser/rustffi/target
-          key: rust-${{ runner.os }}-${{ hashFiles('pkg/sqlparser/rustffi/Cargo.lock', 'pkg/sqlparser/rustffi/Cargo.toml', 'pkg/sqlparser/rustffi/src/**/*.rs') }}
-          restore-keys: |
-            rust-${{ runner.os }}-
-      - name: Touch cached Rust lib
-        if: steps.rust-cache.outputs.cache-hit == 'true'
-        shell: bash
-        run: touch pkg/sqlparser/rustffi/target/release/libbruin_rustsqlparser.a
-      - name: Setup Rust
-        if: steps.rust-cache.outputs.cache-hit != 'true'
-        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
       - name: Wait for R (Ubuntu)
         if: matrix.suite == 'integration-test' && startsWith(matrix.platform, 'depot-ubuntu')
         run: |
@@ -84,35 +91,22 @@ jobs:
 
   cloud-integration-tests:
     name: Cloud Integration Tests (BigQuery)
+    needs: [verify-ingestr]
     runs-on: depot-ubuntu-latest-4
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ingestr-hashes
+          path: pkg/python
 
       - name: Setup Go
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: 'go.mod'
           cache-dependency-path: "go.sum"
-      - name: Cache Rust artifacts
-        id: rust-cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            pkg/sqlparser/rustffi/target
-          key: rust-${{ runner.os }}-${{ hashFiles('pkg/sqlparser/rustffi/Cargo.lock', 'pkg/sqlparser/rustffi/Cargo.toml', 'pkg/sqlparser/rustffi/src/**/*.rs') }}
-          restore-keys: |
-            rust-${{ runner.os }}-
-      - name: Touch cached Rust lib
-        if: steps.rust-cache.outputs.cache-hit == 'true'
-        run: touch pkg/sqlparser/rustffi/target/release/libbruin_rustsqlparser.a
-      - name: Setup Rust
-        if: steps.rust-cache.outputs.cache-hit != 'true'
-        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
-
       - name: Build Bruin
         run: make build
 
@@ -145,11 +139,16 @@ jobs:
           go test -v -timeout 30m ./...
 
   prepare-darwin:
+    needs: [verify-ingestr]
     runs-on: depot-ubuntu-latest-8
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ingestr-hashes
+          path: pkg/python
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: 'go.mod'
@@ -168,11 +167,16 @@ jobs:
 
 
   prepare-linux:
+    needs: [verify-ingestr]
     runs-on: depot-ubuntu-latest-8
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ingestr-hashes
+          path: pkg/python
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: 'go.mod'
@@ -226,6 +230,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ingestr-hashes
+          path: pkg/python
 
       - uses: msys2/setup-msys2@66cd2cce69caa17b53920067426061ca1de3a884 # v2
         with:
@@ -275,6 +283,7 @@ jobs:
           prerelease: false
 
   dockerBuild:
+    needs: [verify-ingestr]
     runs-on: depot-ubuntu-latest
     name: Docker Build
     permissions:
@@ -285,6 +294,10 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ingestr-hashes
+          path: pkg/python
 
       - name: Log in to the Container registry
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3

@@ -49,6 +49,7 @@ func Import(isDebug *bool) *cli.Command {
 			ImportScheduledQueries(),
 			ImportSnowflakeTasks(),
 			ImportODI(),
+			ImportSSIS(),
 			ImportTableauDashboards(),
 			ImportQuickSightAssets(),
 		},

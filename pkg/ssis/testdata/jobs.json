@@ -1,0 +1,27 @@
+[
+  {
+    "name": "Mexico Extract",
+    "enabled": 1,
+    "start_step_id": 1,
+    "steps": [
+      {
+        "step_id": 2,
+        "step_name": "Extract Pupil",
+        "subsystem": "TSQL",
+        "database_name": "source",
+        "command": "INSERT INTO dbo.pupils EXEC sp_execute_external_script @language=N'Python', @script=N'import pandas as pd\nOutputDataSet = pd.DataFrame({\"name\": [\"O''Brien\"]})';",
+        "on_success_action": 1,
+        "on_fail_action": 2
+      },
+      {
+        "step_id": 1,
+        "step_name": "Truncate",
+        "subsystem": "TSQL",
+        "database_name": "source",
+        "command": "TRUNCATE TABLE dbo.pupils;",
+        "on_success_action": 3,
+        "on_fail_action": 2
+      }
+    ]
+  }
+]

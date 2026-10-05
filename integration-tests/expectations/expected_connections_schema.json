@@ -1012,6 +1012,12 @@
           },
           "type": "array"
         },
+        "couchdb": {
+          "items": {
+            "$ref": "#/$defs/CouchDBConnection"
+          },
+          "type": "array"
+        },
         "cratedb": {
           "items": {
             "$ref": "#/$defs/CrateDBConnection"
@@ -1879,6 +1885,37 @@
       },
       "additionalProperties": false,
       "type": "object"
+    },
+    "CouchDBConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "ssl": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "host"
+      ]
     },
     "CouchbaseConnection": {
       "properties": {

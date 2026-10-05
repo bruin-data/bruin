@@ -3,7 +3,7 @@
 name: staging.cursor_usage_events
 type: duckdb.sql
 
-description: Typed Cursor request events with token and USD cost fields extracted from the tokenUsage JSON object.
+description: Typed Cursor request events with token fields extracted from the tokenUsage JSON object and charged USD cost.
 
 materialization:
   type: table
@@ -34,7 +34,7 @@ columns:
       - name: non_negative
   - name: estimated_cost_usd
     type: double
-    description: Token-based request cost converted from cents to US dollars.
+    description: Charged request cost in US dollars, from chargedCents (model cost plus any Cursor Token Rate), falling back to tokenUsage.totalCents.
     checks:
       - name: non_negative
 
@@ -44,8 +44,10 @@ WITH typed AS (
   SELECT
     CASE
       WHEN TRY_CAST("timestamp" AS BIGINT) IS NOT NULL
-        THEN TO_TIMESTAMP(TRY_CAST("timestamp" AS BIGINT) / 1000.0)
-      ELSE TRY_CAST("timestamp" AS TIMESTAMPTZ)
+        THEN EPOCH_MS(TRY_CAST("timestamp" AS BIGINT))
+      WHEN REGEXP_MATCHES(CAST("timestamp" AS VARCHAR), '[T ]\d{2}:\d{2}.*(Z|[+-]\d{2}(:?\d{2})?)$')
+        THEN TRY_CAST("timestamp" AS TIMESTAMPTZ) AT TIME ZONE 'UTC'
+      ELSE TRY_CAST("timestamp" AS TIMESTAMP)
     END AS event_timestamp,
     LOWER(TRIM(CAST("userEmail" AS VARCHAR))) AS user_id,
     CAST(model AS VARCHAR) AS model,
@@ -54,6 +56,7 @@ WITH typed AS (
     COALESCE(TRY_CAST("requestsCosts" AS DOUBLE), 0.0) AS request_cost_units,
     COALESCE(TRY_CAST("isTokenBasedCall" AS BOOLEAN), FALSE) AS is_token_based_call,
     COALESCE(TRY_CAST("isFreeBugbot" AS BOOLEAN), FALSE) AS is_free_bugbot,
+    TRY_CAST("chargedCents" AS DOUBLE) AS charged_cents,
     TRY_CAST("tokenUsage" AS JSON) AS token_usage
   FROM raw.cursor_usage_events
 )
@@ -76,6 +79,9 @@ SELECT
     + COALESCE(TRY_CAST(JSON_EXTRACT_STRING(token_usage, '$.outputTokens') AS BIGINT), 0)
     + COALESCE(TRY_CAST(JSON_EXTRACT_STRING(token_usage, '$.cacheReadTokens') AS BIGINT), 0)
     + COALESCE(TRY_CAST(JSON_EXTRACT_STRING(token_usage, '$.cacheWriteTokens') AS BIGINT), 0) AS total_tokens,
-  COALESCE(TRY_CAST(JSON_EXTRACT_STRING(token_usage, '$.totalCents') AS DOUBLE), 0.0)
-    / 100.0 AS estimated_cost_usd
+  COALESCE(
+    charged_cents,
+    TRY_CAST(JSON_EXTRACT_STRING(token_usage, '$.totalCents') AS DOUBLE),
+    0.0
+  ) / 100.0 AS estimated_cost_usd
 FROM typed;

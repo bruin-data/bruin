@@ -26,6 +26,7 @@ bruin validate --help
 | [`run`](/commands/run) | Execute pipelines or individual assets |
 | [`backfill`](/commands/backfill) | Execute and resume partitioned historical ranges |
 | [`validate`](/commands/validate) | Check pipeline configuration and syntax without executing |
+| [`unit-test`](/commands/unit-test) | Run asset unit tests against mocked input tables |
 
 ### Project Management
 
@@ -47,7 +48,9 @@ bruin validate --help
 | Command | Description |
 |---------|-------------|
 | [`render`](/commands/render) | Preview rendered Jinja templates |
+| [`render-ddl`](/commands/render-ddl) | Print the `CREATE TABLE` statement for a SQL asset |
 | [`lineage`](/commands/lineage) | Visualize asset dependencies |
+| [`docs`](/commands/docs) | Generate a self-contained HTML documentation site for your pipelines |
 | [`query`](/commands/query) | Execute ad-hoc queries against connections |
 | [`curl`](/commands/curl) | Call remote services with connection-aware Jinja rendering |
 | [`data-diff`](/commands/data-diff) | Compare data between connections |
@@ -65,13 +68,15 @@ bruin validate --help
 
 | Command | Description |
 |---------|-------------|
-| [`upgrade`](/commands/update) | Upgrade Bruin CLI to the latest version or a specific version |
+| [`upgrade`](/commands/upgrade) | Upgrade Bruin CLI to the latest version or a specific version |
+| [`version`](/commands/version) | Show the installed and latest Bruin CLI versions |
 
 ### Bruin Cloud
 
 | Command | Description |
 |---------|-------------|
 | [`cloud`](/commands/cloud) | Interact with Bruin Cloud: list projects, manage pipelines, diagnose runs, and more |
+| [`cloud login`, `auth status`, `logout`](/commands/login) | Sign in to Bruin Cloud, check the active login, and sign out |
 
 ## Common Workflows
 

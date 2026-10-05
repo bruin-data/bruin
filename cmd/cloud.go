@@ -5888,9 +5888,9 @@ func cloudScheduledAgentsList() *cli.Command {
 
 			t := table.NewWriter()
 			t.SetOutputMirror(os.Stdout)
-			t.AppendHeader(table.Row{"ID", "Title", "Active", "Cron", "Next Run"})
+			t.AppendHeader(table.Row{"ID", "Title", "Active", "Cron", "Next Run", "Notify"})
 			for _, r := range runs {
-				t.AppendRow(table.Row{r.ID, derefString(r.Title), r.IsActive, derefString(r.ScheduleCron), derefString(r.NextRunAt)})
+				t.AppendRow(table.Row{r.ID, derefString(r.Title), r.IsActive, derefString(r.ScheduleCron), derefString(r.NextRunAt), notificationChannels(r.NotificationIntegrations)})
 			}
 			t.Render()
 			return nil
@@ -6195,6 +6195,9 @@ func buildScheduledAgentFields(c *cli.Command) (map[string]any, error) {
 	if _, exists := fields["pipeline_trigger"]; exists {
 		return nil, errors.New("pipeline_trigger is not a plan field; use bruin cloud scheduled-agents pipeline-trigger set or delete")
 	}
+	if _, exists := fields["notification_integrations"]; exists {
+		return nil, errors.New("notification_integrations is not a plan field; the user sets channels under Notifications on the scheduled agent page")
+	}
 
 	if c.IsSet("title") {
 		fields["title"] = c.String("title")
@@ -6236,9 +6239,20 @@ func printScheduledAgent(run *bruincloud.ScheduledAgent) {
 	fmt.Printf("  Timezone:  %s\n", derefString(run.ScheduleTimezone))
 	fmt.Printf("  Next run:  %s\n", derefString(run.NextRunAt))
 	fmt.Printf("  Last run:  %s\n", derefString(run.LastRunAt))
+	if len(run.NotificationIntegrations) > 0 {
+		fmt.Printf("  Notify:    %s\n", notificationChannels(run.NotificationIntegrations))
+	}
 	if run.Instructions != nil && *run.Instructions != "" {
 		fmt.Printf("  Instructions:\n%s\n", *run.Instructions)
 	}
+}
+
+func notificationChannels(integrations []bruincloud.ScheduledAgentNotification) string {
+	channels := make([]string, 0, len(integrations))
+	for _, n := range integrations {
+		channels = append(channels, fmt.Sprintf("%s (%s)", n.DisplayName, n.Platform))
+	}
+	return strings.Join(channels, ", ")
 }
 
 func derefString(s *string) string {

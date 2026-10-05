@@ -1,0 +1,513 @@
+name: QuickBooks Finance
+description: Revenue, spend, cash, receivables, and the expense review queue from the quickbooks_reports layer.
+connection: gcp-default
+
+filters:
+  - name: date_range
+    type: date-range
+    default: all_time
+
+queries:
+  latest_kpis:
+    sql: |
+      SELECT *
+      FROM `quickbooks_reports.monthly_kpis`
+      QUALIFY month = MAX(month) OVER ()
+
+  monthly_kpis:
+    sql: |
+      SELECT *
+      FROM `quickbooks_reports.monthly_kpis`
+      WHERE month >= DATE_TRUNC(CAST('{{ filters.date_range.start }}' AS DATE), MONTH)
+        AND month <= CAST('{{ filters.date_range.end }}' AS DATE)
+      ORDER BY month
+
+  runway:
+    sql: SELECT * FROM `quickbooks_reports.cash_runway`
+
+  mrr_bridge:
+    sql: |
+      SELECT
+        month,
+        new_mrr AS `New`,
+        expansion_mrr AS `Expansion`,
+        reactivation_mrr AS `Reactivation`,
+        contraction_mrr AS `Contraction`,
+        churned_mrr AS `Churn`
+      FROM `quickbooks_reports.monthly_kpis`
+      WHERE month >= DATE_TRUNC(CAST('{{ filters.date_range.start }}' AS DATE), MONTH)
+        AND month <= CAST('{{ filters.date_range.end }}' AS DATE)
+        AND month > (SELECT MIN(month) FROM `quickbooks_reports.monthly_kpis`)
+      ORDER BY month
+
+  revenue_costs_burn:
+    sql: |
+      SELECT
+        month,
+        revenue AS `Revenue`,
+        gross_margin,
+        cost_of_revenue AS `Cost of revenue`,
+        operating_expenses AS `Operating expenses`,
+        net_burn AS `Net burn`
+      FROM `quickbooks_reports.monthly_kpis`
+      WHERE month >= DATE_TRUNC(CAST('{{ filters.date_range.start }}' AS DATE), MONTH)
+        AND month <= CAST('{{ filters.date_range.end }}' AS DATE)
+        AND month >= (
+          SELECT MIN(month)
+          FROM `quickbooks_reports.monthly_kpis`
+          WHERE cost_of_revenue + operating_expenses > 0
+        )
+      ORDER BY month
+
+  monthly_costs_by_category:
+    sql: |
+      SELECT month, category, SUM(amount) AS amount
+      FROM `quickbooks_reports.monthly_pnl`
+      WHERE pnl_group IN ('cogs', 'operating_expense')
+        AND month >= DATE_TRUNC(CAST('{{ filters.date_range.start }}' AS DATE), MONTH)
+        AND month <= CAST('{{ filters.date_range.end }}' AS DATE)
+      GROUP BY month, category
+      ORDER BY month, category
+
+  pnl_lines:
+    sql: |
+      SELECT
+        FORMAT_DATE('%Y-%m', month) AS month,
+        CASE pnl_group
+          WHEN 'revenue' THEN '1 Revenue'
+          WHEN 'cogs' THEN '2 Cost of revenue'
+          WHEN 'operating_expense' THEN '3 Operating expenses'
+          WHEN 'other_income' THEN '4 Other income'
+          ELSE '5 Other expenses'
+        END AS section,
+        category,
+        ROUND(amount) AS amount
+      FROM `quickbooks_reports.monthly_pnl`
+      WHERE month >= DATE_TRUNC(CAST('{{ filters.date_range.start }}' AS DATE), MONTH)
+        AND month <= CAST('{{ filters.date_range.end }}' AS DATE)
+
+rows:
+  # ---------------------------------------------------------------- Overview
+  - tab: Overview
+    widgets:
+      - name: About this dashboard
+        type: text
+        content: |
+          **QuickBooks finance overview.** Numbers come from the `quickbooks_reports` tables, which cover complete months only; the latest month is preliminary until 10 days after it ends, while bills and card charges come in. Revenue and costs are on an accrual basis; net burn is costs less cash collected, and runway divides the bank balance by the last three months' average burn, so treat both as estimates.
+        col: 12
+
+  - tab: Overview
+    widgets:
+      - name: MRR
+        type: metric
+        query: latest_kpis
+        value: { field: mrr, type: number, format: "$,.0f" }
+        col: 2
+      - name: ARR
+        type: metric
+        query: latest_kpis
+        value: { field: arr, type: number, format: "$,.0f" }
+        col: 2
+      - name: Paying Customers
+        type: metric
+        query: latest_kpis
+        value: { field: paying_customers, type: number, format: ",.0f" }
+        col: 2
+      - name: MRR Growth (MoM)
+        type: metric
+        query: latest_kpis
+        value: { field: mrr_growth_rate, type: number, format: ".1%" }
+        col: 2
+      - name: Cash in Bank
+        type: metric
+        query: runway
+        value: { field: cash_balance, type: number, format: "$,.0f" }
+        col: 2
+      - name: Runway (months)
+        type: metric
+        query: runway
+        value: { field: runway_months, type: number, format: ",.1f" }
+        col: 2
+
+  - tab: Overview
+    widgets:
+      - name: Monthly Recurring Revenue
+        type: chart
+        chart: area
+        query: monthly_kpis
+        x: { field: month, type: date }
+        y: { field: [mrr], type: number, format: "$,.0f", beginAtZero: true, curve: straight }
+        col: 6
+      - name: Revenue, Costs, and Net Burn
+        type: chart
+        chart: combo
+        query: revenue_costs_burn
+        lines: [Net burn]
+        x: { field: month, type: date }
+        y: { field: [Revenue, Cost of revenue, Operating expenses, Net burn], type: number, format: "$,.0f", curve: straight }
+        series:
+          Revenue: { color: "#4F46E5" }
+          Cost of revenue: { color: "#D97706" }
+          Operating expenses: { color: "#DB2777" }
+          Net burn: { color: "#DC2626" }
+        col: 6
+
+  - tab: Overview
+    widgets:
+      - name: Gross Margin
+        type: chart
+        chart: line
+        query: revenue_costs_burn
+        x: { field: month, type: date }
+        y: { field: [gross_margin], type: number, format: ".0%", curve: straight, beginAtZero: true }
+        col: 6
+      - name: Paying Customers by Month
+        type: chart
+        chart: bar
+        query: monthly_kpis
+        x: { field: month, type: date }
+        y: { field: [paying_customers], type: number, format: ",.0f" }
+        col: 6
+
+  # ---------------------------------------------------------------- Revenue
+  - tab: Revenue
+    widgets:
+      - name: MRR Bridge
+        type: chart
+        chart: bar
+        query: mrr_bridge
+        x: { field: month, type: date }
+        y: { field: [New, Expansion, Reactivation, Contraction, Churn], type: number, format: "$,.0f" }
+        series:
+          New: { color: "#16A34A" }
+          Expansion: { color: "#4F46E5" }
+          Reactivation: { color: "#0891B2" }
+          Contraction: { color: "#D97706" }
+          Churn: { color: "#DC2626" }
+        col: 8
+      - name: New vs Churned Customers
+        type: chart
+        chart: bar
+        sql: |
+          SELECT month, new_customers AS `New`, churned_customers AS `Churned`
+          FROM `quickbooks_reports.monthly_kpis`
+          WHERE month >= DATE_TRUNC(CAST('{{ filters.date_range.start }}' AS DATE), MONTH)
+            AND month <= CAST('{{ filters.date_range.end }}' AS DATE)
+            AND month > (SELECT MIN(month) FROM `quickbooks_reports.monthly_kpis`)
+          ORDER BY month
+        x: { field: month, type: date }
+        y: { field: [New, Churned], type: number, format: ",.0f" }
+        series:
+          New: { color: "#16A34A" }
+          Churned: { color: "#DC2626" }
+        col: 4
+
+  - tab: Revenue
+    widgets:
+      - name: Top Customers by MRR
+        type: table
+        sql: |
+          SELECT
+            mrr_rank AS rank,
+            customer_name,
+            mrr,
+            share_of_mrr,
+            cumulative_share,
+            FORMAT_DATE('%b %Y', customer_since) AS customer_since,
+            trailing_12m_revenue,
+            open_balance
+          FROM `quickbooks_reports.customer_concentration`
+          ORDER BY mrr_rank
+          LIMIT 25
+        columns:
+          - { name: rank, label: "#" }
+          - { name: customer_name, label: Customer }
+          - { name: mrr, label: MRR, number: "$,.0f" }
+          - { name: share_of_mrr, label: Share, number: ".1%" }
+          - { name: cumulative_share, label: Cumulative, number: ".1%" }
+          - { name: customer_since, label: Since }
+          - { name: trailing_12m_revenue, label: "Revenue (12m)", number: "$,.0f" }
+          - name: open_balance
+            label: Owes Now
+            number: "$,.0f"
+            format:
+              - { if: greater_than, value: 0, textColor: amber, bold: true }
+        col: 12
+  - tab: Revenue
+    widgets:
+      - name: Latest Month MRR Changes
+        type: table
+        sql: |
+          SELECT customer_name, movement, previous_mrr, mrr, mrr_change
+          FROM `quickbooks_reports.customer_mrr_movements`
+          WHERE month = (SELECT MAX(month) FROM `quickbooks_reports.customer_mrr_movements`)
+            AND movement NOT IN ('retained', 'opening')
+          ORDER BY ABS(mrr_change) DESC, customer_name
+        columns:
+          - { name: customer_name, label: Customer }
+          - name: movement
+            label: Movement
+            format:
+              - { if: text_is_exactly, value: churn, textColor: red, bold: true }
+              - { if: text_is_exactly, value: contraction, textColor: amber }
+              - { if: text_is_exactly, value: new, textColor: green }
+          - { name: previous_mrr, label: Before, number: "$,.0f" }
+          - { name: mrr, label: After, number: "$,.0f" }
+          - name: mrr_change
+            label: Change
+            number: "$,.0f"
+            format:
+              - { if: less_than, value: 0, textColor: red }
+              - { if: greater_than, value: 0, textColor: green }
+        col: 12
+
+  # ---------------------------------------------------------------- Spend
+  - tab: Spend
+    widgets:
+      - name: Monthly Costs by Category
+        type: chart
+        chart: bar
+        query: monthly_costs_by_category
+        x: { field: month, type: date }
+        y: { field: [amount], type: number, format: "$,.0f" }
+        color: { field: category }
+        stacked: true
+        col: 12
+
+  - tab: Spend
+    widgets:
+      - name: Profit and Loss
+        type: pivot_table
+        query: pnl_lines
+        pivot:
+          rows:
+            - { field: section, order: asc, showTotals: true }
+            - { field: category, order: asc }
+          columns:
+            - { field: month, order: asc }
+          values:
+            - { field: amount, summarize: sum, label: Amount }
+        col: 12
+
+  - tab: Spend
+    widgets:
+      - name: Software Tools
+        type: table
+        sql: |
+          SELECT payee_name, estimated_annual_cost, spend_last_90_days, active_months, is_recurring, is_new_vendor, last_spend_date
+          FROM `quickbooks_reports.vendor_spend`
+          WHERE primary_category = 'Software'
+          ORDER BY estimated_annual_cost DESC
+        columns:
+          - { name: payee_name, label: Tool }
+          - name: estimated_annual_cost
+            label: Est. Annual Cost
+            number: "$,.0f"
+            format:
+              - { backgroundColor: [white, indigo] }
+          - { name: spend_last_90_days, label: "Last 90 Days", number: "$,.0f" }
+          - { name: active_months, label: Months Paid }
+          - { name: is_recurring, label: Recurring }
+          - name: is_new_vendor
+            label: New
+            format:
+              - { if: text_is_exactly, value: "true", textColor: amber, bold: true }
+          - { name: last_spend_date, label: Last Charge }
+        col: 6
+      - name: Top Vendors
+        type: table
+        sql: |
+          SELECT payee_name, primary_category, total_spend, spend_last_90_days, spend_prior_90_days
+          FROM `quickbooks_reports.vendor_spend`
+          ORDER BY spend_last_90_days DESC
+          LIMIT 15
+        columns:
+          - { name: payee_name, label: Vendor }
+          - { name: primary_category, label: Category }
+          - { name: total_spend, label: Total, number: "$,.0f" }
+          - { name: spend_last_90_days, label: "Last 90 Days", number: "$,.0f" }
+          - { name: spend_prior_90_days, label: "Prior 90 Days", number: "$,.0f" }
+        col: 6
+
+  # ---------------------------------------------------------------- Cash & AR
+  - tab: Cash & AR
+    widgets:
+      - name: Cash in Bank
+        type: metric
+        query: runway
+        value: { field: cash_balance, type: number, format: "$,.0f" }
+        col: 2
+      - name: Card Balance Owed
+        type: metric
+        query: runway
+        value: { field: credit_card_balance, type: number, format: "$,.0f" }
+        col: 2
+      - name: Accounts Receivable
+        type: metric
+        query: runway
+        value: { field: accounts_receivable, type: number, format: "$,.0f" }
+        col: 2
+      - name: Accounts Payable
+        type: metric
+        query: runway
+        value: { field: accounts_payable, type: number, format: "$,.0f" }
+        col: 2
+      - name: Avg Monthly Net Burn
+        type: metric
+        query: runway
+        value: { field: avg_monthly_net_burn, type: number, format: "$,.0f" }
+        col: 2
+      - name: Runway (months)
+        type: metric
+        query: runway
+        value: { field: runway_months, type: number, format: ",.1f" }
+        col: 2
+
+  - tab: Cash & AR
+    widgets:
+      - name: Receivables by Age
+        type: chart
+        chart: bar
+        sql: |
+          SELECT bucket AS aging_bucket, IFNULL(SUM(open_balance), 0) AS open_balance
+          FROM UNNEST(['current', '1-30', '31-60', '61-90', '90+']) AS bucket WITH OFFSET AS position
+          LEFT JOIN `quickbooks_reports.ar_aging` ON aging_bucket = bucket
+          GROUP BY bucket, position
+          ORDER BY position
+        x: { field: aging_bucket, type: category }
+        y: { field: [open_balance], type: number, format: "$,.0f" }
+        series:
+          open_balance: { color: "#D97706" }
+        col: 4
+      - name: Invoiced vs Collected
+        type: chart
+        chart: bar
+        sql: |
+          SELECT month, invoiced_amount AS `Invoiced`, collected_amount AS `Collected`
+          FROM `quickbooks_reports.monthly_collections`
+          WHERE month >= DATE_TRUNC(CAST('{{ filters.date_range.start }}' AS DATE), MONTH)
+            AND month <= CAST('{{ filters.date_range.end }}' AS DATE)
+          ORDER BY month
+        x: { field: month, type: date }
+        y: { field: [Invoiced, Collected], type: number, format: "$,.0f" }
+        col: 4
+      - name: DSO and Days to Pay
+        type: chart
+        chart: line
+        sql: |
+          SELECT month, dso_days AS `DSO`, avg_days_to_pay AS `Avg days to pay`
+          FROM `quickbooks_reports.monthly_collections`
+          WHERE month >= DATE_TRUNC(CAST('{{ filters.date_range.start }}' AS DATE), MONTH)
+            AND month <= CAST('{{ filters.date_range.end }}' AS DATE)
+          ORDER BY month
+        x: { field: month, type: date }
+        y: { field: [DSO, Avg days to pay], type: number, format: ",.0f", beginAtZero: true, curve: straight }
+        col: 4
+
+  - tab: Cash & AR
+    widgets:
+      - name: Overdue Invoices
+        type: table
+        sql: |
+          SELECT customer_name, customer_email, invoice_number, due_date, days_overdue, aging_bucket, open_balance
+          FROM `quickbooks_reports.ar_aging`
+          WHERE days_overdue > 0
+          ORDER BY days_overdue DESC, open_balance DESC
+        columns:
+          - { name: customer_name, label: Customer }
+          - { name: customer_email, label: Email }
+          - { name: invoice_number, label: Invoice }
+          - { name: due_date, label: Due }
+          - name: days_overdue
+            label: Days Overdue
+            format:
+              - { if: greater_than, value: 60, backgroundColor: red, textColor: white, bold: true }
+              - { if: greater_than, value: 30, backgroundColor: amber }
+          - { name: aging_bucket, label: Bucket }
+          - { name: open_balance, label: Owed, number: "$,.0f" }
+        col: 12
+
+  # ---------------------------------------------------------------- Review
+  - tab: Review Queue
+    widgets:
+      - name: About the review queue
+        type: text
+        content: |
+          **Expense review queue.** Spend lines flagged for a bookkeeper: uncategorized, possible duplicates, amount spikes against the payee's last three transactions, lines coded away from the payee's usual account, and first charges from new vendors. Uncategorized lines stay until they are fixed; the other flags cover the last 90 days. The flags are heuristics, so check each description before recategorizing or deleting anything in QuickBooks.
+        col: 12
+
+  - tab: Review Queue
+    widgets:
+      - name: Uncategorized
+        type: metric
+        sql: |
+          SELECT COUNTIF(is_uncategorized) AS n
+          FROM `quickbooks_reports.expense_review_queue`
+          WHERE transaction_date >= CAST('{{ filters.date_range.start }}' AS DATE)
+            AND transaction_date <= CAST('{{ filters.date_range.end }}' AS DATE)
+        value: { field: n, type: number, format: ",.0f" }
+        col: 3
+      - name: Possible Duplicates
+        type: metric
+        sql: |
+          SELECT COUNTIF(is_possible_duplicate) AS n
+          FROM `quickbooks_reports.expense_review_queue`
+          WHERE transaction_date >= CAST('{{ filters.date_range.start }}' AS DATE)
+            AND transaction_date <= CAST('{{ filters.date_range.end }}' AS DATE)
+        value: { field: n, type: number, format: ",.0f" }
+        col: 3
+      - name: Amount Spikes
+        type: metric
+        sql: |
+          SELECT COUNTIF(is_amount_spike) AS n
+          FROM `quickbooks_reports.expense_review_queue`
+          WHERE transaction_date >= CAST('{{ filters.date_range.start }}' AS DATE)
+            AND transaction_date <= CAST('{{ filters.date_range.end }}' AS DATE)
+        value: { field: n, type: number, format: ",.0f" }
+        col: 3
+      - name: Unusual Accounts
+        type: metric
+        sql: |
+          SELECT COUNTIF(is_unusual_account) AS n
+          FROM `quickbooks_reports.expense_review_queue`
+          WHERE transaction_date >= CAST('{{ filters.date_range.start }}' AS DATE)
+            AND transaction_date <= CAST('{{ filters.date_range.end }}' AS DATE)
+        value: { field: n, type: number, format: ",.0f" }
+        col: 3
+
+  - tab: Review Queue
+    widgets:
+      - name: Lines to Review
+        type: table
+        sql: |
+          SELECT
+            transaction_date,
+            payee_name,
+            IF(LENGTH(description) > 38, CONCAT(SUBSTR(description, 1, 36), '…'), description) AS description,
+            amount,
+            account_name,
+            review_reasons,
+            CASE
+              WHEN suggested_account_name IS NOT NULL
+                THEN CONCAT(suggested_account_name, ' (', CAST(ROUND(suggestion_confidence * 100) AS INT64), '%)')
+              WHEN is_possible_duplicate THEN CONCAT('Duplicate of transaction ', duplicate_of_transaction_id)
+              WHEN is_amount_spike THEN CONCAT('Typical amount $', CAST(CAST(ROUND(typical_amount) AS INT64) AS STRING))
+            END AS note
+          FROM `quickbooks_reports.expense_review_queue`
+          WHERE transaction_date >= CAST('{{ filters.date_range.start }}' AS DATE)
+            AND transaction_date <= CAST('{{ filters.date_range.end }}' AS DATE)
+          ORDER BY transaction_date DESC, amount DESC
+        columns:
+          - { name: transaction_date, label: Date }
+          - { name: payee_name, label: Payee }
+          - { name: description, label: Description }
+          - { name: amount, label: Amount, number: "$,.2f" }
+          - { name: account_name, label: Coded To }
+          - name: review_reasons
+            label: Why
+            format:
+              - { if: text_contains, value: duplicate, backgroundColor: red, textColor: white, bold: true }
+              - { if: text_contains, value: uncategorized, backgroundColor: amber }
+              - { if: text_contains, value: unusual_account, backgroundColor: indigo, textColor: white }
+          - { name: note, label: Suggestion or Detail }
+        col: 12

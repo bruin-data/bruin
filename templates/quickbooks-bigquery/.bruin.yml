@@ -1,0 +1,17 @@
+default_environment: default
+
+environments:
+  default:
+    connections:
+      google_cloud_platform:
+        - name: gcp-default
+          project_id: your-gcp-project-id
+          location: your-gcp-region
+          use_application_default_credentials: true
+      quickbooks:
+        - name: quickbooks-default
+          company_id: ${QUICKBOOKS_COMPANY_ID}
+          client_id: ${QUICKBOOKS_CLIENT_ID}
+          client_secret: ${QUICKBOOKS_CLIENT_SECRET}
+          refresh_token: ${QUICKBOOKS_REFRESH_TOKEN}
+          environment: production

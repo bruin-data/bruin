@@ -22,13 +22,15 @@ environments:
             google_cloud_platform:
                 - name: "gcp-default"
                   service_account_file: "<Path to your Google Cloud service account JSON file>"
-                  project_id: "bruin-common-health-check"
+                  project_id: "<Your Google Cloud project ID>"
             google_sheets:
                 - name: "gsheet-default"
-                  credentials_path: "<Path to your Google Sheets credentials JSON file>"
+                  service_account_file: "<Path to your Google service account JSON file>"
 ```
 
 ## Running the pipeline
+
+Run these commands from the pipeline directory.
 
 Bruin CLI can run the whole pipeline or any task with the downstreams:
 

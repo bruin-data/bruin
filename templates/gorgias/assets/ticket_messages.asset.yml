@@ -5,5 +5,5 @@ depends:
 
 parameters:
   source_connection: gorgias
-  source_table: tickets
+  source_table: ticket_messages
   destination: bigquery

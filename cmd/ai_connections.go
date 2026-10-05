@@ -12,7 +12,9 @@ import (
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/manifoldco/promptui"
+	"github.com/spf13/afero"
 	"golang.org/x/term"
 	"gopkg.in/yaml.v3"
 )
@@ -80,7 +82,7 @@ func ensureAIConnections(ctx context.Context, targetRoot string, required []aiCo
 	if err != nil {
 		return result, fmt.Errorf("could not marshal .bruin.yml: %w", err)
 	}
-	if err := os.WriteFile(configPath, configBytes, 0o644); err != nil { //nolint:gosec
+	if err := path.WriteSecretFile(afero.NewOsFs(), configPath, configBytes); err != nil {
 		return result, fmt.Errorf("could not write .bruin.yml: %w", err)
 	}
 

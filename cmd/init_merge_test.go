@@ -411,7 +411,7 @@ func TestWriteFileAtomicallyPreservesExistingPermissions(t *testing.T) {
 	require.Equal(t, os.FileMode(0o600), info.Mode().Perm())
 }
 
-func TestWriteFileAtomicallyUsesDefaultPermissionsForNewFiles(t *testing.T) {
+func TestWriteFileAtomicallyCreatesOwnerOnlyFiles(t *testing.T) {
 	if runtime.GOOS == osWindows {
 		t.Skip("file modes are not meaningful on Windows")
 	}
@@ -423,5 +423,5 @@ func TestWriteFileAtomicallyUsesDefaultPermissionsForNewFiles(t *testing.T) {
 
 	info, err := os.Stat(path)
 	require.NoError(t, err)
-	require.Equal(t, os.FileMode(0o644), info.Mode().Perm())
+	require.Equal(t, os.FileMode(0o600), info.Mode().Perm())
 }

@@ -1,0 +1,33 @@
+account_name,pnl_group,category,department,is_recurring_revenue
+Subscription Revenue,revenue,Subscription Revenue,,true
+Professional Services Revenue,revenue,Services Revenue,,false
+Services,revenue,Services Revenue,,false
+Discounts given,revenue,Discounts,,false
+Billable Expense Income,revenue,Other Revenue,,false
+Uncategorized Income,revenue,Uncategorized,,false
+Hosting & Infrastructure,cogs,Hosting & Infrastructure,,false
+Third-Party APIs,cogs,Third-Party APIs,,false
+Customer Support Tools,cogs,Customer Support Tools,,false
+Payment Processing Fees,cogs,Payment Processing,,false
+Payroll - Customer Success,cogs,Payroll,Customer Success,false
+Payroll - Engineering,operating_expense,Payroll,Research & Development,false
+Payroll - Sales & Marketing,operating_expense,Payroll,Sales & Marketing,false
+Payroll - General & Administrative,operating_expense,Payroll,General & Administrative,false
+Contractors,operating_expense,Contractors,Research & Development,false
+Sales Commissions,operating_expense,Sales Commissions,Sales & Marketing,false
+Advertising & Marketing,operating_expense,Marketing,Sales & Marketing,false
+Events & Conferences,operating_expense,Events & Conferences,Sales & Marketing,false
+Software & SaaS Tools,operating_expense,Software,General & Administrative,false
+Travel,operating_expense,Travel & Meals,General & Administrative,false
+Meals & Entertainment,operating_expense,Travel & Meals,General & Administrative,false
+Rent & Office,operating_expense,Rent & Office,General & Administrative,false
+Rent or Lease,operating_expense,Rent & Office,General & Administrative,false
+Office Supplies & Equipment,operating_expense,Office & Equipment,General & Administrative,false
+Utilities,operating_expense,Rent & Office,General & Administrative,false
+Telephone,operating_expense,Rent & Office,General & Administrative,false
+Accounting & Bookkeeping,operating_expense,Professional Fees,General & Administrative,false
+Legal Fees,operating_expense,Professional Fees,General & Administrative,false
+Recruiting,operating_expense,Recruiting,General & Administrative,false
+Insurance,operating_expense,Insurance,General & Administrative,false
+Bank Charges,operating_expense,Bank & Finance Fees,General & Administrative,false
+Uncategorized Expense,operating_expense,Uncategorized,,false

@@ -17,6 +17,6 @@ type Parser interface {
 }
 
 var (
-	_ Parser = (*SQLParser)(nil)
-	_ Parser = (*RustSQLParser)(nil)
+	_ Parser                  = (*SQLParser)(nil)
+	_ pipeline.DeclareHoister = (*SQLParser)(nil)
 )

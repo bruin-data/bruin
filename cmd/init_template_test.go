@@ -103,6 +103,125 @@ func TestInitShopifyClickHouseCopiesPipelineTemplate(t *testing.T) {
 	require.Contains(t, string(orderLinesAsset), "incremental_key: order_id")
 }
 
+func TestEcommerceTemplateEstimatesRevenueWithoutDateOnlyAttribution(t *testing.T) {
+	t.Parallel()
+
+	for _, warehouse := range []string{warehouseClickHouse, warehouseBigQuery, warehouseSnowflake} {
+		t.Run(warehouse, func(t *testing.T) {
+			t.Parallel()
+
+			files, err := buildEcommerceFiles(&EcommerceChoices{
+				Warehouse: warehouse,
+				Payments:  paymentsStripe,
+				Marketing: marketingKlaviyo,
+				Ads:       []string{adsFacebook},
+				Analytics: analyticsGA4,
+			})
+			require.NoError(t, err)
+
+			report := files["assets/reports/rpt_marketing_roi.sql"]
+			require.Contains(t, report, "daily_sessions AS (")
+			require.Contains(t, report, "daily_revenue AS (")
+			require.Contains(t, report, "report_channels AS (")
+			require.Contains(t, report, "total_revenue * sess.sessions")
+			require.Contains(t, report, "estimated_attributed_revenue")
+			require.Contains(t, report, "estimated_roas")
+			require.NotContains(t, report, "JOIN staging.stg_web_sessions")
+		})
+	}
+}
+
+func TestEcommerceTemplateReconcilesEstimatedRevenueAcrossAllChannels(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	if runtime.GOOS == osWindows {
+		t.Skip("skipping on Windows due to DuckDB file locking")
+	}
+	if err := duck.EnsureADBCDriverInstalled(t.Context()); err != nil {
+		t.Skipf("skipping test: ADBC DuckDB driver not available: %v", err)
+	}
+
+	files, err := buildEcommerceFiles(&EcommerceChoices{
+		Warehouse: warehouseSnowflake,
+		Payments:  paymentsStripe,
+		Marketing: marketingKlaviyo,
+		Ads:       []string{adsFacebook},
+		Analytics: analyticsGA4,
+	})
+	require.NoError(t, err)
+
+	db := openTestDuckDB(t, filepath.Join(t.TempDir(), "ecommerce.duckdb"))
+	defer db.Close()
+
+	execTestDuckDB(t, db, "CREATE SCHEMA staging")
+	execTestDuckDB(t, db, `CREATE TABLE staging.stg_marketing_spend (
+        spend_date DATE, channel VARCHAR, spend DECIMAL(12,2),
+        impressions INTEGER, clicks INTEGER, conversions INTEGER
+    )`)
+	execTestDuckDB(t, db, `INSERT INTO staging.stg_marketing_spend VALUES
+        ('2026-01-01', 'paid_ads', 20, 100, 10, 2)`)
+	execTestDuckDB(t, db, `CREATE TABLE staging.stg_web_sessions (
+        session_date DATE, channel VARCHAR, total_sessions INTEGER,
+        new_users INTEGER, purchase_events INTEGER
+    )`)
+	execTestDuckDB(t, db, `INSERT INTO staging.stg_web_sessions VALUES
+        ('2026-01-01', 'paid_ads', 30, 10, 2),
+        ('2026-01-01', 'direct', 70, 30, 8)`)
+	execTestDuckDB(t, db, `CREATE TABLE staging.stg_orders (
+        order_date TIMESTAMP, order_total DECIMAL(12,2), payment_status VARCHAR
+    )`)
+	execTestDuckDB(t, db, `INSERT INTO staging.stg_orders VALUES
+        ('2026-01-01 10:00:00', 40, 'paid'),
+        ('2026-01-01 11:00:00', 60, 'paid'),
+        ('2026-01-01 12:00:00', 999, 'pending')`)
+
+	report := strings.TrimSpace(stripBruinHeaderForTest(files["assets/reports/rpt_marketing_roi.sql"]))
+	execTestDuckDB(t, db, "CREATE TABLE marketing_roi AS "+report)
+
+	rows, err := db.QueryContext(t.Context(), `
+        SELECT
+            channel,
+            CAST(total_spend AS DOUBLE),
+            CAST(estimated_attributed_revenue AS DOUBLE),
+            CAST(estimated_roas AS DOUBLE)
+        FROM marketing_roi
+        ORDER BY channel`)
+	require.NoError(t, err)
+	defer rows.Close()
+
+	type result struct {
+		channel           string
+		spend             float64
+		attributedRevenue float64
+		roas              sql.NullFloat64
+	}
+	var results []result
+	for rows.Next() {
+		var current result
+		require.NoError(t, rows.Scan(
+			&current.channel,
+			&current.spend,
+			&current.attributedRevenue,
+			&current.roas,
+		))
+		current.channel = strings.Clone(current.channel)
+		results = append(results, current)
+	}
+	require.NoError(t, rows.Err())
+	require.Equal(t, []result{
+		{channel: "direct", spend: 0, attributedRevenue: 70},
+		{channel: "paid_ads", spend: 20, attributedRevenue: 30, roas: sql.NullFloat64{Float64: 1.5, Valid: true}},
+	}, results)
+
+	var totalAttributedRevenue float64
+	require.NoError(t, db.QueryRowContext(
+		t.Context(),
+		"SELECT CAST(sum(estimated_attributed_revenue) AS DOUBLE) FROM marketing_roi",
+	).Scan(&totalAttributedRevenue))
+	require.InDelta(t, 100.0, totalAttributedRevenue, 0.001)
+}
+
 func TestInitPaymentsClickHouseCopiesDemoTemplate(t *testing.T) {
 	targetRoot := t.TempDir()
 	t.Chdir(targetRoot)
@@ -374,6 +493,96 @@ func TestChargebeeBigQueryStarterTemplateHasFocusedAssetSet(t *testing.T) {
 	readme, err := templates.Templates.ReadFile("chargebee-bigquery/README.md")
 	require.NoError(t, err)
 	require.Contains(t, string(readme), "Chargebee to BigQuery")
+}
+
+func TestInitQuickBooksBigQueryCopiesStarterTemplate(t *testing.T) {
+	targetRoot := t.TempDir()
+	t.Chdir(targetRoot)
+
+	gitInit := exec.CommandContext(t.Context(), "git", "init")
+	gitInit.Dir = targetRoot
+	out, err := gitInit.CombinedOutput()
+	require.NoError(t, err, string(out))
+
+	err = Init().Run(t.Context(), []string{"init", "quickbooks-bigquery"})
+	require.NoError(t, err)
+
+	pipelineRoot := filepath.Join(targetRoot, "quickbooks-bigquery")
+	require.FileExists(t, filepath.Join(pipelineRoot, "pipeline.yml"))
+	require.FileExists(t, filepath.Join(pipelineRoot, ".gitignore"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "assets", "quickbooks_raw", "invoices.asset.yml"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "assets", "quickbooks_stage", "account_mapping.csv"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "dashboards", "quickbooks-finance.yml"))
+	require.FileExists(t, filepath.Join(pipelineRoot, "AGENTS.md"))
+
+	pipeline, err := os.ReadFile(filepath.Join(pipelineRoot, "pipeline.yml"))
+	require.NoError(t, err)
+	require.Contains(t, string(pipeline), "name: quickbooks-bigquery")
+
+	configContent, err := os.ReadFile(filepath.Join(targetRoot, ".bruin.yml"))
+	require.NoError(t, err)
+	require.Contains(t, string(configContent), "name: gcp-default")
+	require.Contains(t, string(configContent), "name: quickbooks-default")
+}
+
+func TestQuickBooksBigQueryStarterTemplateHasFocusedAssetSet(t *testing.T) {
+	t.Parallel()
+
+	expectedAssets := []string{
+		"quickbooks_raw/accounts.asset.yml",
+		"quickbooks_raw/bills.asset.yml",
+		"quickbooks_raw/customers.asset.yml",
+		"quickbooks_raw/invoices.asset.yml",
+		"quickbooks_raw/payments.asset.yml",
+		"quickbooks_raw/purchases.asset.yml",
+		"quickbooks_raw/vendors.asset.yml",
+		"quickbooks_reports/ar_aging.sql",
+		"quickbooks_reports/cash_runway.sql",
+		"quickbooks_reports/customer_concentration.sql",
+		"quickbooks_reports/customer_mrr_movements.sql",
+		"quickbooks_reports/expense_review_queue.sql",
+		"quickbooks_reports/monthly_collections.sql",
+		"quickbooks_reports/monthly_kpis.sql",
+		"quickbooks_reports/monthly_pnl.sql",
+		"quickbooks_reports/vendor_spend.sql",
+		"quickbooks_stage/account_categories.sql",
+		"quickbooks_stage/account_mapping.asset.yml",
+		"quickbooks_stage/account_mapping.csv",
+		"quickbooks_stage/accounts.sql",
+		"quickbooks_stage/bills.sql",
+		"quickbooks_stage/customers.sql",
+		"quickbooks_stage/expense_lines.sql",
+		"quickbooks_stage/invoice_lines.sql",
+		"quickbooks_stage/invoices.sql",
+		"quickbooks_stage/payment_applications.sql",
+		"quickbooks_stage/payments.sql",
+		"quickbooks_stage/vendors.sql",
+	}
+
+	var actualAssets []string
+	err := iofs.WalkDir(templates.Templates, "quickbooks-bigquery/assets", func(path string, entry iofs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+
+		actualAssets = append(actualAssets, strings.TrimPrefix(path, "quickbooks-bigquery/assets/"))
+		return nil
+	})
+	require.NoError(t, err)
+	require.ElementsMatch(t, expectedAssets, actualAssets)
+
+	pipeline, err := templates.Templates.ReadFile("quickbooks-bigquery/pipeline.yml")
+	require.NoError(t, err)
+	require.Contains(t, string(pipeline), "name: quickbooks-bigquery")
+	require.Contains(t, string(pipeline), "source_connection: quickbooks-default")
+	require.Contains(t, string(pipeline), "destination: bigquery")
+
+	readme, err := templates.Templates.ReadFile("quickbooks-bigquery/README.md")
+	require.NoError(t, err)
+	require.Contains(t, string(readme), "QuickBooks to BigQuery")
 }
 
 func TestInitGoogleWebAnalyticsCopiesStarterTemplate(t *testing.T) {

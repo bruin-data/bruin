@@ -138,7 +138,7 @@ You can hold a limited number of personal tokens at a time (per-run agent tokens
 
 ## Use cases
 
-- **Cloud MCP** — `mcp:token` is the only required scope. See [Cloud MCP](/cloud/mcp-setup) for the connection setup in Cursor, Claude Code, and Codex.
+- **Cloud MCP** — grant the concrete permissions required by the tools you want to use, such as `pipeline:list` for listing pipelines or `pipeline:run:trigger` for triggering runs. Personal tokens are also limited by your current team role. See [Cloud MCP](/cloud/mcp-setup) for the full tool-to-permission mapping.
 - **CI / CD** — a team token with `pipeline:run:trigger` (and `pipeline:run:list` if you poll for status). Don't grant `pipeline:delete`.
 - **Bruin CLI** — a personal token scoped to your team with the abilities for the commands you run (e.g. `pipeline:run:trigger`, `agent:message:send`). See [`bruin cloud`](/commands/cloud).
 - **External monitoring** — `pipeline:run:list`, `pipeline:asset:show`, and `audit-log:list` are usually enough.

@@ -98,13 +98,9 @@ for executable in node npm npx corepack; do
 done
 done_step
 
-step "Installing Rust and uv"
+step "Installing uv"
 mkdir -p "$HOME/.local/bin"
-export PATH="$go_root/bin:$HOME/.cargo/bin:$HOME/.local/bin:$PATH"
-if ! command -v cargo >/dev/null 2>&1; then
-  curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error \
-    https://sh.rustup.rs | sh -s -- -y --profile minimal
-fi
+export PATH="$go_root/bin:$HOME/.local/bin:$PATH"
 if ! command -v uv >/dev/null 2>&1; then
   curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error \
     https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="$HOME/.local/bin" sh
@@ -114,14 +110,18 @@ done_step
 step "Configuring login shells"
 profile_marker="# Bruin orb toolchains"
 profile_end_marker="# End Bruin orb toolchains"
-profile_export="export PATH=\"$go_root/bin:$node_root/bin:\$HOME/.cargo/bin:\$HOME/.local/bin:\$PATH\""
-previous_profile_export="export PATH=\"$HOME/.local/share/go/1.25.0/bin:$node_root/bin:\$HOME/.cargo/bin:\$HOME/.local/bin:\$PATH\""
+profile_export="export PATH=\"$go_root/bin:$node_root/bin:\$HOME/.local/bin:\$PATH\""
 touch "$HOME/.bash_profile"
 profile_tmp="$(mktemp)"
 trap 'rm -f "$profile_tmp"' EXIT
-awk -v marker="$profile_marker" -v end_marker="$profile_end_marker" \
-  -v current="$profile_export" -v previous="$previous_profile_export" \
-  '$0 != marker && $0 != end_marker && $0 != current && $0 != previous' \
+awk -v marker="$profile_marker" -v end_marker="$profile_end_marker" '
+  # Buffer managed blocks so incomplete markers never discard user settings.
+  $0 == marker { printf "%s", block; block=$0 ORS; in_block=1; next }
+  $0 == end_marker && in_block { block=""; in_block=0; next }
+  in_block { block=block $0 ORS; next }
+  { print }
+  END { printf "%s", block }
+' \
   "$HOME/.bash_profile" > "$profile_tmp"
 cat "$profile_tmp" > "$HOME/.bash_profile"
 rm -f "$profile_tmp"
@@ -136,10 +136,9 @@ done_step
 
 cd "$repo_root"
 
-step "Downloading Go and Rust dependencies"
+step "Downloading Go dependencies"
 go mod download
 (cd semantic-engine && go mod download)
-cargo fetch --locked --manifest-path pkg/sqlparser/rustffi/Cargo.toml
 done_step
 
 step "Installing development tools"
@@ -150,8 +149,6 @@ if [[ "$current_lint_version" != "$golangci_lint_version" ]]; then
     "https://raw.githubusercontent.com/golangci/golangci-lint/${golangci_lint_version}/install.sh" |
     sh -s -- -b "$HOME/.local/bin" "$golangci_lint_version"
 fi
-[[ -d .venv ]] || uv venv --quiet
-uv pip install --quiet sqlglot==30.13.0
 uvx ruff@0.15.4 --version >/dev/null
 done_step
 

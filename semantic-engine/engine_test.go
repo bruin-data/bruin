@@ -147,6 +147,30 @@ func TestLoadDir_LoadsNestedModelFiles(t *testing.T) {
 	}
 }
 
+func TestLoadFile_AcceptsJoinedNoteDimensions(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "orders.yml")
+	body := `name: orders
+source:
+  table: analytics.orders
+joins:
+  - { name: customers, relationship: many_to_one, foreign_key: customer_id }
+notes:
+  - id: customer_context
+    dimensions:
+      - { name: customers.country, type: select }
+      - { name: region, type: select }
+`
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+
+	if _, err := LoadFile(path); err != nil {
+		t.Fatalf("load standalone model with joined note dimensions: %v", err)
+	}
+}
+
 func TestLoadDirPartial_ReportsParseErrorsByFile(t *testing.T) {
 	t.Parallel()
 
@@ -367,19 +391,24 @@ func TestSourceRelation_QuotesUnsafeAliases(t *testing.T) {
 	}
 }
 
-func TestLoadFile_PreservesNoteDimensionOptions(t *testing.T) {
+func TestLoadFile_PreservesNoteDimensionReferences(t *testing.T) {
 	t.Parallel()
 
 	path := filepath.Join(t.TempDir(), "sales.yml")
 	body := `name: sales
 source:
   table: sales
+dimensions:
+  - { name: region, type: string }
+  - { name: channel, type: string }
 notes:
   - id: regional_rollout
     dimensions:
       - name: region
+        type: select
         required: true
       - name: channel
+        type: select
         multiselect: true
 `
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
@@ -394,8 +423,8 @@ notes:
 		t.Fatalf("unexpected notes: %#v", model.Notes)
 	}
 	required := model.Notes[0].Dimensions[0]
-	if !required.Required {
-		t.Fatal("expected required: true")
+	if !required.Required || required.Type != "select" {
+		t.Fatalf("expected required select dimension, got %#v", required)
 	}
 	multi := model.Notes[0].Dimensions[1]
 	if multi.Required {
@@ -403,6 +432,15 @@ notes:
 	}
 	if !multi.Multiselect {
 		t.Fatal("expected multiselect: true")
+	}
+
+	encoded, err := json.Marshal(model.Notes[0])
+	if err != nil {
+		t.Fatalf("marshal note: %v", err)
+	}
+	want := `{"id":"regional_rollout","dimensions":[{"name":"region","type":"select","required":true},{"name":"channel","type":"select","multiselect":true}]}`
+	if string(encoded) != want {
+		t.Fatalf("unexpected note JSON:\n got: %s\nwant: %s", encoded, want)
 	}
 }
 
@@ -437,25 +475,71 @@ notes:
 	}
 }
 
-func TestLoadFile_RejectsInvalidNoteDimensionOptions(t *testing.T) {
+func TestLoadFile_AcceptsUntypedNoteDimension(t *testing.T) {
 	t.Parallel()
 
 	path := filepath.Join(t.TempDir(), "sales.yml")
-	body := `name: sales
-source:
-  table: sales
-notes:
-  - id: regional_rollout
-    dimensions:
-      - name: region
-        required: mandatory
-`
+	body := "name: sales\nsource:\n  table: sales\ndimensions:\n  - {name: region, type: string}\nnotes:\n  - id: regional_rollout\n    dimensions:\n      - {name: region, multiselect: true}\n"
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		t.Fatalf("write fixture: %v", err)
 	}
 
-	if _, err := LoadFile(path); err == nil || !strings.Contains(err.Error(), "required") {
-		t.Fatalf("expected required validation error, got %v", err)
+	model, err := LoadFile(path)
+	if err != nil {
+		t.Fatalf("load model: %v", err)
+	}
+	encoded, err := json.Marshal(model.Notes[0])
+	if err != nil {
+		t.Fatalf("marshal note: %v", err)
+	}
+	if want := `{"id":"regional_rollout","dimensions":[{"name":"region","multiselect":true}]}`; string(encoded) != want {
+		t.Fatalf("unexpected note JSON:\n got: %s\nwant: %s", encoded, want)
+	}
+}
+
+func TestLoadFile_RejectsInvalidNoteDimensionConfiguration(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		dimension string
+		message   string
+	}{
+		{
+			name:      "invalid type",
+			dimension: "{name: region, type: dropdown}",
+			message:   "type",
+		},
+		{
+			name:      "required is not a boolean",
+			dimension: "{name: region, type: select, required: mandatory}",
+			message:   "required",
+		},
+		{
+			name:      "multiselect boolean",
+			dimension: "{name: region, type: boolean, multiselect: true}",
+			message:   "multiselect",
+		},
+		{
+			name:      "multiselect date-range",
+			dimension: "{name: region, type: date-range, multiselect: true}",
+			message:   "multiselect",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			path := filepath.Join(t.TempDir(), "sales.yml")
+			body := "name: sales\nsource:\n  table: sales\ndimensions:\n  - {name: region, type: string}\nnotes:\n  - id: regional_rollout\n    dimensions:\n      - " + test.dimension + "\n"
+			if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+				t.Fatalf("write fixture: %v", err)
+			}
+
+			if _, err := LoadFile(path); err == nil || !strings.Contains(err.Error(), test.message) {
+				t.Fatalf("expected error containing %q, got %v", test.message, err)
+			}
+		})
 	}
 }
 
@@ -471,9 +555,9 @@ func TestLoadFile_RejectsDuplicateNoteIdentifiers(t *testing.T) {
 			name: "note ids",
 			notes: `
   - id: rollout
-    dimensions: [{name: region}]
+    dimensions: [{name: region, type: select}]
   - id: rollout
-    dimensions: [{name: channel}]
+    dimensions: [{name: channel, type: select}]
 `,
 			message: "duplicate note id: rollout",
 		},
@@ -482,8 +566,8 @@ func TestLoadFile_RejectsDuplicateNoteIdentifiers(t *testing.T) {
 			notes: `
   - id: rollout
     dimensions:
-      - {name: region}
-      - {name: region}
+      - {name: region, type: select}
+      - {name: region, type: select}
 `,
 			message: `note "rollout": duplicate dimension "region"`,
 		},
@@ -493,7 +577,7 @@ func TestLoadFile_RejectsDuplicateNoteIdentifiers(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			path := filepath.Join(t.TempDir(), "sales.yml")
-			body := "name: sales\nsource:\n  table: sales\nnotes:" + test.notes
+			body := "name: sales\nsource:\n  table: sales\ndimensions:\n  - {name: region, type: string}\n  - {name: channel, type: string}\nnotes:" + test.notes
 			if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 				t.Fatalf("write fixture: %v", err)
 			}
@@ -1130,6 +1214,16 @@ func TestNewEngine_ValidationErrors(t *testing.T) {
 			want: "dimensions is required",
 		},
 		{
+			name: "note boolean dimension with multiselect",
+			model: Model{
+				Name:       "m",
+				Source:     Source{Table: "t"},
+				Dimensions: []Dimension{{Name: "active", Type: "boolean"}},
+				Notes:      []Note{{ID: "rollout", Dimensions: []NoteDimension{{Name: "active", Type: "boolean", Multiselect: true}}}},
+			},
+			want: `note "rollout": dimension "active": multiselect is not supported for type boolean`,
+		},
+		{
 			name: "duplicate name across dim and metric",
 			model: Model{
 				Name:   "m",
@@ -1554,6 +1648,157 @@ func TestStructuredFilterValidationRejectsInvalidOperatorAndValue(t *testing.T) 
 				t.Fatalf("expected error containing %q, got %q", tc.want, err.Error())
 			}
 		})
+	}
+}
+
+func TestEngine_ValidateNote(t *testing.T) {
+	t.Parallel()
+
+	customers := &Model{
+		Name:       "customers",
+		Source:     Source{Table: "customers"},
+		PrimaryKey: "customer_id",
+		Dimensions: []Dimension{{Name: "country", Type: "string"}, {Name: "region", Type: "string"}},
+	}
+	stores := &Model{
+		Name:       "stores",
+		Source:     Source{Table: "stores"},
+		PrimaryKey: "store_id",
+		Dimensions: []Dimension{{Name: "region", Type: "string"}},
+	}
+
+	tests := []struct {
+		name  string
+		joins []Join
+		note  string
+		extra string
+		want  string
+	}{
+		{name: "local dimension", note: "status"},
+		{
+			name:  "qualified joined dimension",
+			joins: []Join{{Name: "customers", Relationship: "many_to_one", ForeignKey: "customer_id"}},
+			note:  "customers.country",
+		},
+		{
+			name:  "unqualified joined dimension",
+			joins: []Join{{Name: "customers", Relationship: "many_to_one", ForeignKey: "customer_id"}},
+			note:  "region",
+		},
+		{name: "unknown dimension", note: "country", want: `note "context": dimension not found: country`},
+		{
+			name:  "unknown joined dimension",
+			joins: []Join{{Name: "customers", Relationship: "many_to_one", ForeignKey: "customer_id"}},
+			note:  "customers.segment",
+			want:  `note "context": dimension not found: customers.segment`,
+		},
+		{
+			name: "ambiguous joined dimension",
+			joins: []Join{
+				{Name: "customers", Relationship: "many_to_one", ForeignKey: "customer_id"},
+				{Name: "stores", Relationship: "many_to_one", ForeignKey: "store_id"},
+			},
+			note: "region",
+			want: `note "context": ambiguous dimension "region"; use join_name.dimension`,
+		},
+		{
+			name:  "same joined dimension under two names",
+			joins: []Join{{Name: "customers", Relationship: "many_to_one", ForeignKey: "customer_id"}},
+			note:  "region",
+			extra: "customers.region",
+			want:  `note "context": duplicate dimension "customers.region"`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			orders := &Model{
+				Name:       "orders",
+				Source:     Source{Table: "orders"},
+				Joins:      test.joins,
+				Dimensions: []Dimension{{Name: "status", Type: "string"}},
+				Notes:      []Note{{ID: "context", Dimensions: []NoteDimension{{Name: test.note, Type: "select"}}}},
+			}
+			if test.extra != "" {
+				orders.Notes[0].Dimensions = append(orders.Notes[0].Dimensions, NoteDimension{Name: test.extra, Type: "select"})
+			}
+			engine, err := NewEngineWithModels(orders, map[string]*Model{"orders": orders, "customers": customers, "stores": stores})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = engine.ValidateNote("context")
+			if test.want == "" {
+				if err != nil {
+					t.Fatalf("expected note to resolve, got %v", err)
+				}
+				return
+			}
+			if err == nil || err.Error() != test.want {
+				t.Fatalf("expected %q, got %v", test.want, err)
+			}
+		})
+	}
+}
+
+func TestEngine_ValidateNoteOnlyChecksRequestedNote(t *testing.T) {
+	t.Parallel()
+
+	engine, err := NewEngine(&Model{
+		Name:       "orders",
+		Source:     Source{Table: "orders"},
+		Dimensions: []Dimension{{Name: "status", Type: "string"}},
+		Notes: []Note{
+			{ID: "valid", Dimensions: []NoteDimension{{Name: "status", Type: "select"}}},
+			{ID: "broken", Dimensions: []NoteDimension{{Name: "missing", Type: "select"}}},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := engine.ValidateNote("valid"); err != nil {
+		t.Fatalf("expected valid note to resolve, got %v", err)
+	}
+	if err := engine.ValidateNote("broken"); err == nil || err.Error() != `note "broken": dimension not found: missing` {
+		t.Fatalf("expected broken note error, got %v", err)
+	}
+	if err := engine.ValidateNote("ghost"); err == nil || err.Error() != "note not found: ghost" {
+		t.Fatalf("expected unknown note error, got %v", err)
+	}
+}
+
+func TestEngine_ValidateNoteAllowsSameJoinNameToDifferentModels(t *testing.T) {
+	t.Parallel()
+
+	orders := &Model{
+		Name:   "orders",
+		Source: Source{Table: "orders"},
+		Joins: []Join{
+			{Name: "owner", Model: "users", Relationship: "many_to_one", ForeignKey: "owner_id"},
+			{Name: "stores", Relationship: "many_to_one", ForeignKey: "store_id"},
+		},
+		Notes: []Note{{ID: "context", Dimensions: []NoteDimension{
+			{Name: "users.name", Type: "select"},
+			{Name: "employees.name", Type: "select"},
+		}}},
+	}
+	stores := &Model{
+		Name:       "stores",
+		Source:     Source{Table: "stores"},
+		PrimaryKey: "store_id",
+		Joins:      []Join{{Name: "owner", Model: "employees", Relationship: "many_to_one", ForeignKey: "owner_id"}},
+	}
+	users := &Model{Name: "users", Source: Source{Table: "users"}, PrimaryKey: "owner_id", Dimensions: []Dimension{{Name: "name", Type: "string"}}}
+	employees := &Model{Name: "employees", Source: Source{Table: "employees"}, PrimaryKey: "owner_id", Dimensions: []Dimension{{Name: "name", Type: "string"}}}
+
+	engine, err := NewEngineWithModels(orders, map[string]*Model{"orders": orders, "stores": stores, "users": users, "employees": employees})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := engine.ValidateNote("context"); err != nil {
+		t.Fatalf("expected distinct joined dimensions to resolve, got %v", err)
 	}
 }
 

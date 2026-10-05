@@ -23,10 +23,12 @@ environments:
                   path: "<Path to your DuckDB database file>"
             google_sheets:
                 - name: "gsheet-default"
-                  credentials_path: "<Path to your Google Sheets credentials JSON file>"
+                  service_account_file: "<Path to your Google service account JSON file>"
 ```
 
 ## Running the pipeline
+
+Run these commands from the pipeline directory.
 
 bruin CLI can run the whole pipeline or any task with the downstreams:
 

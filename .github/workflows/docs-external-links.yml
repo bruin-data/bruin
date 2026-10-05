@@ -1,0 +1,74 @@
+name: Docs External Links
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  external-links:
+    name: Check external links
+    runs-on: depot-ubuntu-latest
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 1
+
+
+      # Same flags as scripts/check_docs_links.sh --external; keep them in sync.
+      - name: Check external links
+        id: lychee
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          lycheeVersion: v0.24.2
+          fail: false
+          output: lychee-report.md
+          args: >-
+            --config lychee.toml --scheme https --scheme http
+            --root-dir ${{ github.workspace }}/docs
+            '*.md' 'docs/**/*.md' 'templates/**/*.md'
+
+
+      - name: Open or update the broken links issue
+        if: steps.lychee.outputs.exit_code != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TITLE: 'Broken external links in docs'
+        run: |
+          {
+            echo "The weekly [external link check](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}) found broken links."
+            echo "Fix the link, or add a pattern to \`lychee.toml\` if the URL is a placeholder or blocks automated checkers."
+            echo
+            if [ -s lychee-report.md ]; then
+              head -c 60000 lychee-report.md
+            else
+              echo "lychee did not produce a report; see the run logs."
+            fi
+          } > issue.md
+          number=$(gh issue list --state open --author app/github-actions --search "in:title \"${TITLE}\"" \
+            --json number,title --jq '[.[] | select(.title == env.TITLE)][0].number // empty')
+          if [ -n "${number}" ]; then
+            gh issue edit "${number}" --body-file issue.md
+          else
+            gh issue create --title "${TITLE}" --body-file issue.md
+          fi
+
+
+      - name: Close the broken links issue
+        if: steps.lychee.outputs.exit_code == '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TITLE: 'Broken external links in docs'
+        run: |
+          number=$(gh issue list --state open --author app/github-actions --search "in:title \"${TITLE}\"" \
+            --json number,title --jq '[.[] | select(.title == env.TITLE)][0].number // empty')
+          if [ -n "${number}" ]; then
+            gh issue close "${number}" --comment "All external links pass as of ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}."
+          fi

@@ -64,17 +64,25 @@ Change both DuckDB paths if you want the database file stored elsewhere. The pip
 
 ## Run the pipeline
 
-Validate and run the previous UTC day's data:
+Validate the pipeline, then do the first run with `--full-refresh`:
 
 ```shell
 bruin validate .
+bruin run --full-refresh .
+```
+
+The per-platform marts load incrementally, and an incremental run writes into an existing table without creating it. On a new database a plain `bruin run` fails because those tables don't exist yet. `--full-refresh` creates them, loading the previous day. Use `--full-refresh` only for this first run: a later full refresh replaces the loaded history with whatever interval that run covers.
+
+After that, run without the flag. With no dates, each run loads the previous day:
+
+```shell
 bruin run .
 ```
 
 Use an explicit interval to backfill historical data:
 
 ```shell
-bruin run . --start-date 2025-01-01 --end-date 2025-01-30
+bruin run . --start-date 2026-08-01 --end-date 2026-08-30
 ```
 
 Cursor limits each analytics request to 30 days. For longer backfills, run multiple non-overlapping intervals of at most 30 days. The per-platform marts use interval-aware materialization, so each run updates only its requested dates while preserving previously loaded history. Both APIs return UTC data.
@@ -130,7 +138,17 @@ dac build --dir dashboards --dashboard "AI Coding Usage" --output build
 ## Metric notes
 
 - User email addresses are lowercased so the same person can be joined across Anthropic and Cursor. Anthropic API actors retain their API key name and use `user_type = 'api_key'`.
-- Anthropic costs and Cursor token-based event costs are converted from cents to US dollars.
+- Anthropic costs and Cursor event costs are converted from cents to US dollars. Cursor costs use the event's `chargedCents` (model cost plus any Cursor Token Rate), which reconciles with Cursor billing; older events without it fall back to `tokenUsage.totalCents`.
+- Cursor dates and timestamps are converted to UTC regardless of the DuckDB session time zone; ISO timestamps without an offset are treated as UTC.
+- Earlier versions of this template could store Cursor rows one day early when DuckDB ran west of UTC. If you loaded data with an earlier version, rebuild the staging and mart tables once from the existing raw data, covering your full loaded history:
+
+  ```shell
+  bruin run --full-refresh \
+    --start-date <first-loaded-date> --end-date <last-loaded-date> \
+    --selector "path:assets/staging path:assets/marts" .
+  ```
+
+  The selector skips the raw ingestion assets, so nothing is re-fetched from the APIs. Without an explicit date range, the incremental marts are recreated with only the default one-day interval.
 - Cursor model rows use each request event's exact model. The Anthropic ingestr source currently exposes exact totals for single-model records and aggregate totals plus a comma-separated model set for multi-model records; the model dashboard labels those aggregate rows as `model_set` instead of duplicating or estimating their tokens and cost.
 - Cursor request totals prefer daily Composer, chat, and agent counts; usage-event counts are used when daily request totals are unavailable.
 - Cursor total line changes and accepted AI line changes are kept separately.
