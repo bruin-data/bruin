@@ -434,15 +434,16 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		return errors.Wrap(err, "failed to find repo to run Ingestr")
 	}
 
+	var duckDBPaths []string
 	if strings.HasPrefix(destURI, "duckdb://") {
-		duck.LockDatabase(destURI)
-		defer duck.UnlockDatabase(destURI)
+		duckDBPaths = append(duckDBPaths, destURI)
 	}
 
-	if strings.HasPrefix(sourceURI, "duckdb://") && sourceURI != destURI {
-		duck.LockDatabase(sourceURI)
-		defer duck.UnlockDatabase(sourceURI)
+	if strings.HasPrefix(sourceURI, "duckdb://") {
+		duckDBPaths = append(duckDBPaths, sourceURI)
 	}
+	unlockDuckDB := duck.LockDatabases(duckDBPaths...)
+	defer unlockDuckDB()
 
 	if err := ensureFabricEngineSupport(engine, sourceURI, destURI); err != nil {
 		return err

@@ -1,7 +1,12 @@
 package duck
 
 import (
+	"context"
+	"io"
 	"math/rand/v2"
+	"path/filepath"
+	"slices"
+	"strings"
 	"sync"
 	"time"
 )
@@ -89,13 +94,89 @@ func NewCustomizedMapMutex(mRetry int, mDelay, bDelay, factor, jitter float64) *
 	}
 }
 
-var databaseLocks = NewMapMutex()
+// SQL sessions share a database instance. External processes need exclusive
+// access and must release that instance's file lock before opening the file.
+type databaseLock struct {
+	sync.RWMutex
+	database io.Closer
+	schema   sync.Mutex
+}
 
-func LockDatabase(path string) {
-	for !databaseLocks.TryLock(path) {
+func (d *databaseLock) closeDatabase() {
+	if d.database != nil {
+		_ = d.database.Close()
+		d.database = nil
 	}
 }
 
+var databaseLocks sync.Map
+
+func databaseLockKey(path string) string {
+	// GetIngestrURI adds duckdb:/// to the configured path, including when
+	// that path is absolute. Use the same key as native SQL operations.
+	path = strings.TrimPrefix(path, "duckdb:///")
+	if path != "" && path != ":memory:" && !strings.HasPrefix(path, "md:") {
+		if absolute, err := filepath.Abs(path); err == nil {
+			path = absolute
+		}
+	}
+	return path
+}
+
+func databaseLockFor(path string) *databaseLock {
+	lock, _ := databaseLocks.LoadOrStore(databaseLockKey(path), &databaseLock{})
+	return lock.(*databaseLock)
+}
+
+func LockDatabase(path string) {
+	lock := databaseLockFor(path)
+	lock.Lock()
+	lock.closeDatabase()
+}
+
 func UnlockDatabase(path string) {
-	databaseLocks.Unlock(path)
+	databaseLockFor(path).Unlock()
+}
+
+// LockDatabases acquires source/destination files once, in a consistent order,
+// including when different URIs refer to the same file.
+func LockDatabases(paths ...string) func() {
+	keys := make([]string, len(paths))
+	for i, path := range paths {
+		keys[i] = databaseLockKey(path)
+	}
+	slices.Sort(keys)
+	keys = slices.Compact(keys)
+	for _, key := range keys {
+		LockDatabase(key)
+	}
+	return func() {
+		for _, key := range keys {
+			UnlockDatabase(key)
+		}
+	}
+}
+
+type connectionReuseKey struct{}
+
+// WithConnectionReuse keeps DuckDB instances (including lakehouse attachments)
+// alive for a pipeline run. Call cleanup after all workers have stopped. SQL
+// sessions remain operation-local, so transaction and session state cannot leak
+// between assets. Outside this scope, connections remain ephemeral.
+func WithConnectionReuse(ctx context.Context) (context.Context, func()) {
+	databases := &sync.Map{}
+	return context.WithValue(ctx, connectionReuseKey{}, databases), func() {
+		databases.Range(func(key, _ any) bool {
+			lock := key.(*databaseLock)
+			lock.Lock()
+			lock.closeDatabase()
+			lock.Unlock()
+			return true
+		})
+	}
+}
+
+func connectionReuse(ctx context.Context) *sync.Map {
+	databases, _ := ctx.Value(connectionReuseKey{}).(*sync.Map)
+	return databases
 }

@@ -17,16 +17,28 @@ Bruin supports using a local DuckDB database.
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `path` | string | Yes | | Path to an existing or new DuckDB database file |
-| `read_only` | boolean | No | `false` | Open the database in read-only mode, enabling parallel read queries |
+| `read_only` | boolean | No | `false` | Open the database in read-only mode, rejecting writes |
 
 > [!WARNING]
-> DuckDB does not allow concurrency between different processes, which means other clients should not be connected to the database while Bruin is running.
+> Only one process can open a DuckDB file for writing. Other processes must not open that file while Bruin holds it. Multiple processes can share a file only when all open it read-only.
+
+### Concurrency and connection lifetime
+
+During `bruin run`, SQL assets and quality checks share a DuckDB database instance for the same connection configuration. Lakehouse extensions, secrets, and catalog attachments are initialized once, rather than for each statement. Workers use separate sessions on that instance, allowing checks and independent SQL work to run concurrently without a process-wide write lock. You do not need `read_only: true` to run checks concurrently.
+
+Each operation gets a fresh session: temporary tables, open transactions, and session settings do not carry over to the next operation. The lakehouse catalog is selected in each session. Bruin closes the shared instance when the run ends.
+
+For ingestr into or out of a local DuckDB file, Bruin waits for active SQL operations and closes the shared instance before starting the ingestion subprocess. SQL operations wait until ingestion finishes, then reopen the instance. Ingestion therefore requires another lakehouse setup if it uses the same engine file. These locks coordinate work within one Bruin process, not unrelated applications or separate Bruin runs.
+
+Runs that schedule Python or R assets keep the previous per-operation database lifetime, as do commands outside a pipeline run. Scripts can open arbitrary DuckDB paths without declaring them; retaining file locks would prevent those scripts from opening the files. Connection reuse currently applies to runs without these script assets.
+
+DuckLake can support multiple writer processes using **separate DuckDB engine files** and a catalog that supports concurrent writers, such as PostgreSQL. Sharing a DuckDB engine file across writer processes still fails with a file-lock error. Conflicting updates can return a `Transaction conflict` error. Bruin surfaces this as a retryable transaction conflict; retry the failed transaction after the competing writer completes. Bruin does not automatically replay an entire SQL batch because earlier statements may already have committed. Reduce `max_concurrent_assets` for a connection if its assets intentionally contend on the same data.
 
 ### Read-Only Mode
 
 When `read_only` is set to `true`, the connection opens the DuckDB database in read-only access mode. This has two effects:
-- DuckDB does not acquire a write lock on the database file, allowing other processes to access it concurrently.
-- Multiple Bruin queries on the same connection can run in parallel instead of being serialized.
+- DuckDB does not acquire a write lock on the database file, allowing other read-only processes to access it concurrently.
+- Write statements are rejected by DuckDB.
 
 This is useful when you only need to read from a shared DuckDB database and want to maximize query throughput.
 
