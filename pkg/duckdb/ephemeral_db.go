@@ -16,6 +16,7 @@ import (
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/sqlengine"
 )
 
 // EphemeralConnection uses the ADBC low-level API to query DuckDB directly,
@@ -81,16 +82,43 @@ func (e *EphemeralConnection) canReuseDatabase() bool {
 		cfg.Lakehouse.Catalog.Type != config.CatalogTypeSQLite
 }
 
-// User-managed attachments must not leak into other assets. Match conservatively
-// (including comments and literals) rather than attempting to parse arbitrary SQL.
-var attachmentStatement = regexp.MustCompile(`(?i)\b(attach|detach)\b`)
+var attachmentKeyword = regexp.MustCompile(`(?i)\b(attach|detach)\b`)
+
+func hasAttachmentStatement(sqlStr string) (bool, error) {
+	if !attachmentKeyword.MatchString(sqlStr) {
+		return false, nil
+	}
+	// Tokenization distinguishes statements from comments, quoted identifiers,
+	// and literals (including DuckDB's dollar-quoted and escaped strings).
+	tokens, err := sqlengine.MustDialect("duckdb").Tokenize(sqlStr)
+	if err != nil {
+		return false, fmt.Errorf("failed to tokenize DuckDB query: %w", err)
+	}
+	statementStart := true
+	for _, token := range tokens {
+		if statementStart && (token.Type == sqlengine.TK_ATTACH || token.Type == sqlengine.TK_DETACH) {
+			return true, nil
+		}
+		statementStart = token.Type == sqlengine.TK_SEMICOLON
+	}
+	return false, nil
+}
 
 // openADBC leases a fresh session. Cleanup releases the session before allowing
 // an external process or run cleanup to close the database.
 //
 //nolint:ireturn
 func (e *EphemeralConnection) openADBC(ctx context.Context, sqlStr string) (adbc.Connection, func(), error) {
-	if scope := connectionReuse(ctx); scope != nil && e.canReuseDatabase() && !attachmentStatement.MatchString(sqlStr) {
+	scope := connectionReuse(ctx)
+	reuse := scope != nil && e.canReuseDatabase()
+	if reuse {
+		attachment, err := hasAttachmentStatement(sqlStr)
+		if err != nil {
+			return nil, nil, err
+		}
+		reuse = !attachment
+	}
+	if reuse {
 		if !scope.register(e.lock) {
 			return nil, nil, context.Canceled
 		}
