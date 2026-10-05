@@ -1,0 +1,19 @@
+{
+  "description": "Expected deterministic outcomes for the demo fixtures with default variables. tests/evaluate_demo.py compares these with the warehouse after `bruin run`.",
+  "cases": [
+    {"source": "reddit", "external_id": "t3_p1", "category": "true_positive", "expect": {"accepted_match": true, "eligible": true, "routed": true}},
+    {"source": "reddit", "external_id": "t3_p2", "category": "competitor_context", "expect": {"accepted_match": true, "eligible": true, "routed": true}},
+    {"source": "hackernews", "external_id": "9004", "category": "competitor_context", "expect": {"accepted_match": true, "eligible": true, "routed": true}},
+    {"source": "hackernews", "external_id": "9002", "category": "true_positive", "expect": {"accepted_match": true, "eligible": true, "routed": true}},
+    {"source": "reddit", "external_id": "t3_p5", "category": "false_positive", "note": "'example co-op' matches the brand phrase on a word boundary; scoring keeps it below the routing threshold.", "expect": {"accepted_match": true, "eligible": true, "routed": false}},
+    {"source": "hackernews", "external_id": "9001", "category": "false_positive", "note": "A launch post with no request; below threshold.", "expect": {"accepted_match": true, "eligible": true, "routed": false}},
+    {"source": "reddit", "external_id": "t3_p3", "category": "ambiguous_term", "note": "'social listening' in a relationship context is rejected by the context rule.", "expect": {"accepted_match": false, "exclusion_reason": "no_accepted_term_match", "routed": false}},
+    {"source": "hackernews", "external_id": "9005", "category": "ambiguous_term", "note": "'social listening' with workflow context is accepted.", "expect": {"accepted_match": true, "eligible": true}},
+    {"source": "reddit", "external_id": "t3_p4", "category": "excluded_self", "expect": {"accepted_match": true, "exclusion_reason": "team_or_self_content", "routed": false}},
+    {"source": "reddit", "external_id": "t3_p6", "category": "excluded_duplicate", "expect": {"accepted_match": true, "exclusion_reason": "syndicated_duplicate", "routed": false}},
+    {"source": "reddit", "external_id": "t3_p7", "category": "excluded_bot", "expect": {"accepted_match": true, "exclusion_reason": "bot_or_automated_author", "routed": false}},
+    {"source": "hackernews", "external_id": "9003", "category": "excluded_term", "expect": {"accepted_match": true, "exclusion_reason": "excluded_term", "routed": false}},
+    {"source": "hackernews", "external_id": "9006", "category": "redacted", "expect": {"present": false}},
+    {"source": "reddit", "external_id": "t3_p8", "category": "outside_window", "expect": {"present": false}}
+  ]
+}

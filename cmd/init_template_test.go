@@ -16,6 +16,7 @@ import (
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/templates"
 	"github.com/spf13/afero"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -2079,4 +2080,145 @@ func academySQLAdvancedQueryInts(t *testing.T, db *sql.DB, query string) []int {
 	}
 	require.NoError(t, rows.Err())
 	return values
+}
+
+func TestInitSocialListeningTemplate(t *testing.T) {
+	targetRoot := t.TempDir()
+	t.Chdir(targetRoot)
+
+	gitInit := exec.CommandContext(t.Context(), "git", "init")
+	gitInit.Dir = targetRoot
+	out, err := gitInit.CombinedOutput()
+	require.NoError(t, err, string(out))
+
+	err = Init().Run(t.Context(), []string{"init", "social-listening"})
+	require.NoError(t, err)
+
+	pipelineRoot := filepath.Join(targetRoot, "social-listening")
+	for _, rel := range []string{
+		"pipeline.yml",
+		"README.md",
+		".bruin.yml.example",
+		"requirements.txt",
+		"assets/config/settings.py",
+		"assets/raw/raw_reddit_content.py",
+		"assets/staging/stg_content_item.sql",
+		"macros/social_listening.sql",
+		"macros/terms.sql",
+		"agents/README.md",
+		"docs/index.md",
+		"fixtures/evaluation_cases.json",
+		"tests/run_demo.sh",
+		"scripts/social_listening/__init__.py",
+		"scripts/social_listening/sources/__init__.py",
+		"tests/__init__.py",
+	} {
+		assert.FileExists(t, filepath.Join(pipelineRoot, filepath.FromSlash(rel)))
+	}
+
+	// The template's .bruin.yml is merged into the project config, not copied.
+	require.NoFileExists(t, filepath.Join(pipelineRoot, ".bruin.yml"))
+
+	configContent, err := os.ReadFile(filepath.Join(targetRoot, ".bruin.yml"))
+	require.NoError(t, err)
+	require.Contains(t, string(configContent), "social-listening-warehouse")
+	require.Contains(t, string(configContent), "path: social-listening.duckdb")
+	require.Contains(t, string(configContent), "max_concurrent_assets: 1")
+	require.Contains(t, string(configContent), "sl-reddit-client-id")
+}
+
+func TestSocialListeningTemplateIsSafeByDefault(t *testing.T) {
+	t.Parallel()
+
+	pipeline, err := templates.Templates.ReadFile("social-listening/pipeline.yml")
+	require.NoError(t, err)
+
+	for _, variable := range []string{
+		"brand_name",
+		"competitors",
+		"tracked_terms",
+		"reddit_communities_include",
+		"reddit_communities_exclude",
+		"reddit_poll_minutes",
+		"hackernews_enabled",
+		"min_relevance",
+		"min_priority",
+		"llm_enabled",
+		"notification_dry_run",
+		"reply_drafts_enabled",
+		"require_human_approval",
+	} {
+		require.Regexp(t, `(?m)^  `+regexp.QuoteMeta(variable)+`:\s*$`, string(pipeline),
+			"pipeline.yml should declare variable %q", variable)
+	}
+
+	// Cloud schedules are opt-in: the template must not ship one.
+	require.NotRegexp(t, `(?m)^schedule:`, string(pipeline))
+
+	secretPatterns := []*regexp.Regexp{
+		regexp.MustCompile(`xox[bpa]-[0-9A-Za-z-]{10,}`),
+		regexp.MustCompile(`hooks\.slack\.com/services/T[0-9A-Z]+`),
+		regexp.MustCompile(`\bghp_[0-9A-Za-z]{20,}`),
+		regexp.MustCompile(`\bsk-[0-9A-Za-z_-]{16,}`),
+		regexp.MustCompile(`\bAKIA[0-9A-Z]{16}\b`),
+	}
+
+	var files int
+	err = iofs.WalkDir(templates.Templates, "social-listening", func(path string, entry iofs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		files++
+
+		content, err := templates.Templates.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		for _, pattern := range secretPatterns {
+			require.NotRegexp(t, pattern, string(content), "%s looks like it contains a secret", path)
+		}
+		return nil
+	})
+	require.NoError(t, err)
+	require.Positive(t, files)
+}
+
+// Go's embed directive silently drops files whose names start with "." or "_" (such as
+// __init__.py and .bruin.yml.example) unless templates.go lists them. Every
+// file in the template directory, other than Python bytecode caches, must ship.
+func TestSocialListeningTemplateEmbedsEveryFile(t *testing.T) {
+	t.Parallel()
+
+	root := filepath.Join("..", "templates", "social-listening")
+	var missing []string
+	err := filepath.WalkDir(root, func(path string, entry iofs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			switch entry.Name() {
+			case "__pycache__", ".ruff_cache", ".pytest_cache", ".venv":
+				// Local tool caches; git ignores them and they never ship.
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if strings.HasSuffix(entry.Name(), ".pyc") || entry.Name() == ".DS_Store" {
+			return nil
+		}
+
+		rel, err := filepath.Rel(filepath.Join("..", "templates"), path)
+		if err != nil {
+			return err
+		}
+		if _, err := iofs.Stat(templates.Templates, filepath.ToSlash(rel)); err != nil {
+			missing = append(missing, filepath.ToSlash(rel))
+		}
+		return nil
+	})
+	require.NoError(t, err)
+	require.Empty(t, missing, "add these files to templates/templates.go with an explicit //go:embed line")
 }

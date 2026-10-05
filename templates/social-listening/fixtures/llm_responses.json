@@ -1,0 +1,79 @@
+{
+ "reddit:t3_p1": {
+  "relevance": 0.92,
+  "intent": "seeking_recommendation",
+  "fit": 0.85,
+  "confidence": 0.8,
+  "reasons": [
+   "asks for alternatives",
+   "small data team with a warehouse"
+  ],
+  "evidence": [
+   "Any suggestions?",
+   "our small data team"
+  ]
+ },
+ "reddit:t3_p2": {
+  "relevance": 0.9,
+  "intent": "comparison",
+  "fit": 0.8,
+  "confidence": 0.75,
+  "reasons": [
+   "direct comparison with a competitor"
+  ],
+  "evidence": [
+   "Rival Suite versus Example Co"
+  ]
+ },
+ "reddit:t3_p5": {
+  "relevance": 0.03,
+  "intent": "general_discussion",
+  "fit": 0.0,
+  "confidence": 0.9,
+  "reasons": [
+   "'example co-op' is a grocery, not the brand"
+  ],
+  "evidence": [
+   "example co-op"
+  ]
+ },
+ "hackernews:9001": {
+  "relevance": 0.7,
+  "intent": "general_discussion",
+  "fit": 0.6,
+  "confidence": 0.7,
+  "reasons": [
+   "launch announcement, no question"
+  ],
+  "evidence": [
+   "Example Co now supports warehouse alerts"
+  ]
+ },
+ "hackernews:9002": {
+  "relevance": 0.88,
+  "intent": "problem_report",
+  "fit": 0.75,
+  "confidence": 0.7,
+  "reasons": [
+   "existing user reporting failures"
+  ],
+  "evidence": [
+   "It keeps failing on the second step."
+  ]
+ },
+ "hackernews:9004": {
+  "relevance": 0.85,
+  "intent": "seeking_recommendation",
+  "fit": 0.8,
+  "confidence": 0.8,
+  "reasons": [
+   "competitor user asking for alternatives"
+  ],
+  "evidence": [
+   "Our team switched to Example Co last year"
+  ]
+ },
+ "hackernews:9005": {
+  "error": "timeout after 30s (recorded failure)"
+ }
+}

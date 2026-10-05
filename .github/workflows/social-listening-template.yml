@@ -1,0 +1,84 @@
+# CI for the social-listening built-in template.
+#
+# build-test.yml ignores templates/**, so this workflow is the template's only
+# CI. It builds bruin from source and runs the template's own test suite
+# (bruin validate, unit tests and the DuckDB fixture pipeline end to end).
+
+name: Social Listening Template
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'templates/social-listening/**'
+      - '.github/workflows/social-listening-template.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'templates/social-listening/**'
+      - '.github/workflows/social-listening-template.yml'
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || (github.ref == 'refs/heads/main' && github.sha || github.ref) }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  demo:
+    name: Demo pipeline
+    runs-on: depot-ubuntu-latest-4
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 1
+          fetch-tags: true
+      - name: Setup Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: 'go.mod'
+          cache-dependency-path: "go.sum"
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.11'
+      - name: Install uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - name: Cache Rust artifacts
+        id: rust-cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            pkg/sqlparser/rustffi/target
+          key: rust-${{ runner.os }}-${{ hashFiles('pkg/sqlparser/rustffi/Cargo.lock', 'pkg/sqlparser/rustffi/Cargo.toml', 'pkg/sqlparser/rustffi/src/**/*.rs') }}
+          restore-keys: |
+            rust-${{ runner.os }}-
+      - name: Touch cached Rust lib
+        if: steps.rust-cache.outputs.cache-hit == 'true'
+        run: touch pkg/sqlparser/rustffi/target/release/libbruin_rustsqlparser.a
+      - name: Setup Rust
+        if: steps.rust-cache.outputs.cache-hit != 'true'
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
+      - name: Build bruin
+        run: make build
+      - name: Run template demo and tests
+        run: bash templates/social-listening/tests/run_demo.sh "$GITHUB_WORKSPACE/bin/bruin"
+  lint:
+    name: Python lint
+    runs-on: depot-ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 1
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.11'
+      - name: Install ruff
+        # Keep in step with RUFF_VERSION in the Makefile.
+        run: pip install ruff==0.15.4
+      - name: Check formatting
+        run: ruff format --check templates/social-listening
+      - name: Lint
+        run: ruff check templates/social-listening

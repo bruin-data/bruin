@@ -1,0 +1,4 @@
+# Used by the Python assets. The library in scripts/ is standard-library only.
+bruin-sdk[duckdb,motherduck]==0.5.2
+# MotherDuck supports DuckDB releases with a short lag; keep this at a version it accepts.
+duckdb==1.5.5

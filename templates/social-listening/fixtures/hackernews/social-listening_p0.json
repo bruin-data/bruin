@@ -1,0 +1,46 @@
+{
+ "hits": [
+  {
+   "objectID": "9005",
+   "_tags": [
+    "comment",
+    "author_ops_olga",
+    "story_9100"
+   ],
+   "author": "ops_olga",
+   "created_at_i": -6000,
+   "title": null,
+   "url": null,
+   "story_text": null,
+   "comment_text": "We run social listening alerts as a small workflow on top of our warehouse. Happy to share the setup.",
+   "points": null,
+   "num_comments": null,
+   "parent_id": 9100,
+   "story_id": 9100,
+   "story_title": "How do you monitor brand mentions?"
+  },
+  {
+   "objectID": "9006",
+   "_tags": [
+    "comment",
+    "author_private_pia",
+    "story_9100"
+   ],
+   "author": "private_pia",
+   "created_at_i": -6500,
+   "title": null,
+   "url": null,
+   "story_text": null,
+   "comment_text": "Our social listening tool thread: I asked for this comment to be removed.",
+   "points": null,
+   "num_comments": null,
+   "parent_id": 9100,
+   "story_id": 9100,
+   "story_title": "How do you monitor brand mentions?"
+  }
+ ],
+ "nbHits": 2,
+ "nbPages": 1,
+ "page": 0,
+ "hitsPerPage": 100
+}

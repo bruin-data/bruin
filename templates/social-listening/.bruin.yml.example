@@ -1,0 +1,68 @@
+# Production example. Copy the parts you need into your project's .bruin.yml
+# (or recreate them as Bruin Cloud connections with the same names).
+#
+# Rules:
+#   * Secrets come from environment variables or your secrets backend. Never
+#     paste a secret into this file, pipeline.yml, a prompt, or an agent plan.
+#   * Keep the connection names: assets refer to them by name.
+#   * Leave a value empty (or unset its variable) for sources you do not use.
+default_environment: default
+environments:
+  default:
+    connections:
+      # Local development: DuckDB file.
+      duckdb:
+        - name: social-listening-warehouse
+          path: social-listening.duckdb
+          # A DuckDB file allows one writer at a time; serialise assets on it.
+          max_concurrent_assets: 1
+      generic:
+        # Reddit "script" or "web" app registered under your account; application-only OAuth.
+        - name: sl-reddit-client-id
+          value: "${SL_REDDIT_CLIENT_ID}"
+        - name: sl-reddit-client-secret
+          value: "${SL_REDDIT_CLIENT_SECRET}"
+        # Reddit requires a descriptive User-Agent, e.g. "<platform>:<app id>:<version> (by /u/<your account>)".
+        - name: sl-reddit-user-agent
+          value: "${SL_REDDIT_USER_AGENT}"
+        # Fine-grained token with public-repository read access only.
+        - name: sl-github-token
+          value: "${SL_GITHUB_TOKEN}"
+        # Optional Stack Exchange app key (raises the daily quota).
+        - name: sl-stackexchange-key
+          value: "${SL_STACKEXCHANGE_KEY}"
+        # Delivery targets. The webhook URL itself is the credential for Slack incoming webhooks.
+        - name: sl-webhook-url
+          value: "${SL_WEBHOOK_URL}"
+        - name: sl-slack-webhook-url
+          value: "${SL_SLACK_WEBHOOK_URL}"
+        # Only needed when llm_enabled=true with a real provider.
+        - name: sl-llm-api-key
+          value: "${SL_LLM_API_KEY}"
+
+  # Cloud-warehouse deployment path: MotherDuck runs the same DuckDB SQL unchanged.
+  # Remove the duckdb entry above in this environment and declare the warehouse
+  # under the same name, then run with `--environment production --force`.
+  production:
+    connections:
+      motherduck:
+        - name: social-listening-warehouse
+          token: "${MOTHERDUCK_TOKEN}"
+          database: social_listening
+      generic:
+        - name: sl-reddit-client-id
+          value: "${SL_REDDIT_CLIENT_ID}"
+        - name: sl-reddit-client-secret
+          value: "${SL_REDDIT_CLIENT_SECRET}"
+        - name: sl-reddit-user-agent
+          value: "${SL_REDDIT_USER_AGENT}"
+        - name: sl-github-token
+          value: "${SL_GITHUB_TOKEN}"
+        - name: sl-stackexchange-key
+          value: "${SL_STACKEXCHANGE_KEY}"
+        - name: sl-webhook-url
+          value: "${SL_WEBHOOK_URL}"
+        - name: sl-slack-webhook-url
+          value: "${SL_SLACK_WEBHOOK_URL}"
+        - name: sl-llm-api-key
+          value: "${SL_LLM_API_KEY}"

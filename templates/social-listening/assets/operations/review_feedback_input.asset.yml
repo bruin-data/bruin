@@ -1,0 +1,43 @@
+name: operations.review_feedback_input
+type: duckdb.seed
+description: |
+  Reviewer outcomes, recorded by people. Add a row per reviewed item and commit
+  it; the next run loads it into operations.fct_human_feedback. Feedback is
+  for evaluation and threshold review only: nothing in the pipeline reads it
+  to change rules, scores or source data.
+tags: [enrich, review]
+parameters:
+  path: ./review/human_feedback.csv
+columns:
+  - name: feedback_id
+    type: varchar
+    checks:
+      - name: not_null
+      - name: unique
+  - name: source
+    type: varchar
+    checks:
+      - name: not_null
+  - name: external_id
+    type: varchar
+    checks:
+      - name: not_null
+  - name: reviewer
+    type: varchar
+    checks:
+      - name: not_null
+  - name: reviewed_at
+    type: varchar
+  - name: outcome
+    type: varchar
+    checks:
+      - name: accepted_values
+        value: [useful, not_useful, replied_manually, ignored, escalated]
+  - name: corrected_relevance
+    type: double
+  - name: corrected_intent
+    type: varchar
+  - name: is_false_positive
+    type: boolean
+  - name: notes
+    type: varchar

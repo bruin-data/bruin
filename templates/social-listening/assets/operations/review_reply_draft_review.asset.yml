@@ -1,0 +1,23 @@
+name: operations.review_reply_draft_review
+type: duckdb.seed
+description: |
+  Human review decisions for reply drafts (approved, rejected,
+  changes_requested). Approval only records that a person accepted the text;
+  the person then posts it manually on the source platform.
+tags: [enrich, review]
+parameters:
+  path: ./review/reply_draft_reviews.csv
+columns:
+  - name: draft_id
+    type: varchar
+  - name: decision
+    type: varchar
+    checks:
+      - name: accepted_values
+        value: [approved, rejected, changes_requested]
+  - name: reviewer
+    type: varchar
+  - name: reviewed_at
+    type: varchar
+  - name: notes
+    type: varchar
