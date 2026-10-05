@@ -1,14 +1,17 @@
 package connection
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"net"
 	"os"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/abraflexi"
 	"github.com/bruin-data/bruin/pkg/adapty"
@@ -1432,6 +1435,48 @@ func TestManagerMapsStayPaired(t *testing.T) {
 		if _, ok := m.AllConnectionDetails[name]; !ok {
 			t.Errorf("connection %q is usable by the embedder but missing from AllConnectionDetails; the masker cannot see it", name)
 		}
+	}
+}
+
+func TestSnowflakeCustomEndpoint(t *testing.T) {
+	t.Parallel()
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, listener.Close()) })
+	addr, ok := listener.Addr().(*net.TCPAddr)
+	require.True(t, ok)
+
+	db, err := newSnowflakeDBFromConnection(&config.SnowflakeConnection{
+		Account:  "test-account",
+		Username: "test-user",
+		Password: "test-password",
+		Region:   "eu-west-1",
+		Host:     addr.IP.String(),
+		Port:     addr.Port,
+	})
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	reached := make(chan struct{})
+	go func() {
+		conn, err := listener.Accept()
+		if err != nil {
+			return
+		}
+		close(reached)
+		cancel()
+		_ = conn.Close()
+	}()
+
+	// Stop at the TCP connection: this tests endpoint routing without needing
+	// Snowflake credentials, a trusted TLS certificate, or a login response.
+	require.Error(t, db.Ping(ctx))
+	select {
+	case <-reached:
+	default:
+		t.Fatal("Snowflake did not connect to the configured host and port")
 	}
 }
 
