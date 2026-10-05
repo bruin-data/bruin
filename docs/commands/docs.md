@@ -25,7 +25,7 @@ bruin docs [flags] [path to a repo, pipeline, or asset]
 | `--output` | `-o` | `bruin-docs.html` | Path to write the generated HTML file. |
 | `--title` | | `Bruin Docs` | Title shown in the generated site. |
 | `--variant` | | | For [variant pipelines](/pipelines/variants), only materialize the given variant. |
-| `--exclude-code` | | `false` | Leave asset source code out of the generated site. Custom check queries are still included. |
+| `--exclude-code` | | `false` | Leave asset source code out of the generated site. Custom check queries, hook SQL, and unit test inputs are still included. |
 | `--open` | | `false` | Open the generated file in your default browser. |
 
 ## Examples
@@ -51,6 +51,8 @@ Share docs without the assets' SQL or Python source:
 ```bash
 bruin docs --exclude-code -o public/data-docs.html
 ```
+
+`--exclude-code` only removes the asset's own SQL or Python body. The HTML file still embeds each asset's custom check queries, [hook](/assets/definition-schema#hooks) SQL, and [unit test](/quality/unit-tests) input rows, so review those before sharing the file outside your team.
 
 ## Related
 

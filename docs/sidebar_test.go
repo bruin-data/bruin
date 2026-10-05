@@ -27,6 +27,34 @@ var unlistedPages = map[string]string{
 
 var sidebarLink = regexp.MustCompile(`link:\s*"(/[^"#]*)`)
 
+// sidebarSection returns the `sidebar: [...]` array from the VitePress config,
+// so links in `nav` or elsewhere do not count as sidebar entries. It matches
+// brackets naively, which holds as long as no sidebar label contains one.
+func sidebarSection(t *testing.T, config string) string {
+	t.Helper()
+
+	start := strings.Index(config, "sidebar:")
+	require.NotEqual(t, -1, start, "no sidebar in config.mjs")
+	open := strings.Index(config[start:], "[")
+	require.NotEqual(t, -1, open, "sidebar is not an array")
+	start += open
+
+	depth := 0
+	for i := start; i < len(config); i++ {
+		switch config[i] {
+		case '[':
+			depth++
+		case ']':
+			depth--
+			if depth == 0 {
+				return config[start : i+1]
+			}
+		}
+	}
+	require.FailNow(t, "sidebar array is not closed")
+	return ""
+}
+
 // TestEveryPageIsInSidebar catches pages that ship without a sidebar entry,
 // which leaves them reachable only through search or a stray link.
 func TestEveryPageIsInSidebar(t *testing.T) {
@@ -36,7 +64,7 @@ func TestEveryPageIsInSidebar(t *testing.T) {
 	require.NoError(t, err)
 
 	linked := map[string]bool{}
-	for _, match := range sidebarLink.FindAllStringSubmatch(string(config), -1) {
+	for _, match := range sidebarLink.FindAllStringSubmatch(sidebarSection(t, string(config)), -1) {
 		page := strings.Trim(match[1], "/")
 		if page == "" {
 			page = "index"
