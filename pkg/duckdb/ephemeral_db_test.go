@@ -160,6 +160,32 @@ func TestConnectionReuseReadOnlyConfiguration(t *testing.T) {
 	require.Equal(t, 17, n)
 }
 
+func TestConnectionReuseCatalogPolicy(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name  string
+		cfg   DuckDBConfig
+		reuse bool
+	}{
+		{"native", Config{Path: "data.db"}, true},
+		{"motherduck", MotherDuckConfig{Database: "test"}, true},
+		{"postgres", Config{Lakehouse: validDuckLakePostgresConfig()}, true},
+		{"iceberg", Config{Lakehouse: validIcebergLakehouseConfig()}, true},
+		{"duckdb catalog", Config{Lakehouse: &config.LakehouseConfig{
+			Format: config.LakehouseFormatDuckLake, Catalog: config.CatalogConfig{Type: config.CatalogTypeDuckDB},
+		}}, false},
+		{"sqlite catalog", Config{Lakehouse: &config.LakehouseConfig{
+			Format: config.LakehouseFormatDuckLake, Catalog: config.CatalogConfig{Type: config.CatalogTypeSQLite},
+		}}, false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			conn := EphemeralConnection{config: tt.cfg}
+			require.Equal(t, tt.reuse, conn.canReuseDatabase())
+		})
+	}
+}
+
 func TestConnectionReuseLakehouseSessionCatalog(t *testing.T) {
 	t.Parallel()
 	ctx, cleanup := WithConnectionReuse(t.Context())
