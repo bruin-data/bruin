@@ -1391,7 +1391,6 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			// Share the parser between hook hoisting and dev-mode rewriting.
-			// Its subprocess starts lazily when either operation needs it.
 			var parser *sqlparser.SQLParser
 			var hoister pipeline.DeclareHoister
 			if p, parserErr := sqlparser.NewSQLParser(false); parserErr == nil {

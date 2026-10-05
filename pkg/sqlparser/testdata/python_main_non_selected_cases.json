@@ -4,156 +4,551 @@
     "dialect": "bigquery",
     "query": "\n\t        select * from orders\n\t    ",
     "schema": {
+      "customers": {
+        "age": "bigint",
+        "country": "string",
+        "id": "bigint",
+        "name": "string"
+      },
       "orders": {
+        "customer_id": "bigint",
         "id": "bigint",
         "order_number": "string",
-        "customer_id": "bigint",
         "shipping_country": "string"
-      },
-      "customers": {
-        "id": "bigint",
-        "name": "string",
-        "age": "bigint",
-        "country": "string"
       }
     },
-    "expected": []
+    "expected": [],
+    "expected_selected": [
+      {
+        "name": "customer_id",
+        "type": "BIGINT",
+        "upstream": [
+          {
+            "column": "customer_id",
+            "table": "orders"
+          }
+        ]
+      },
+      {
+        "name": "id",
+        "type": "BIGINT",
+        "upstream": [
+          {
+            "column": "id",
+            "table": "orders"
+          }
+        ]
+      },
+      {
+        "name": "order_number",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "order_number",
+            "table": "orders"
+          }
+        ]
+      },
+      {
+        "name": "shipping_country",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "shipping_country",
+            "table": "orders"
+          }
+        ]
+      }
+    ],
+    "expected_errors": []
   },
   {
     "name": "Select orders with id greater than 10",
     "dialect": "bigquery",
     "query": "\n\t        select * from orders where id > 10\n\t    ",
     "schema": {
+      "customers": {
+        "age": "bigint",
+        "country": "string",
+        "id": "bigint",
+        "name": "string"
+      },
       "orders": {
+        "customer_id": "bigint",
         "id": "bigint",
         "order_number": "string",
-        "customer_id": "bigint",
         "shipping_country": "string"
-      },
-      "customers": {
-        "id": "bigint",
-        "name": "string",
-        "age": "bigint",
-        "country": "string"
       }
     },
     "expected": [
       {
         "name": "id",
-        "table": "orders"
+        "upstream": [
+          {
+            "column": "id",
+            "table": "orders"
+          }
+        ],
+        "type": ""
       }
-    ]
+    ],
+    "expected_selected": [
+      {
+        "name": "customer_id",
+        "type": "BIGINT",
+        "upstream": [
+          {
+            "column": "customer_id",
+            "table": "orders"
+          }
+        ]
+      },
+      {
+        "name": "id",
+        "type": "BIGINT",
+        "upstream": [
+          {
+            "column": "id",
+            "table": "orders"
+          }
+        ]
+      },
+      {
+        "name": "order_number",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "order_number",
+            "table": "orders"
+          }
+        ]
+      },
+      {
+        "name": "shipping_country",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "shipping_country",
+            "table": "orders"
+          }
+        ]
+      }
+    ],
+    "expected_errors": []
   },
   {
     "name": "Join orders and customers with id filter",
     "dialect": "bigquery",
     "query": "\n\t        select * from orders join customers on customers.id = orders.customer_id where orders.id > 10;\n\t    ",
     "schema": {
+      "customers": {
+        "age": "bigint",
+        "country": "string",
+        "id": "bigint",
+        "name": "string"
+      },
       "orders": {
+        "customer_id": "bigint",
         "id": "bigint",
         "order_number": "string",
-        "customer_id": "bigint",
         "shipping_country": "string"
-      },
-      "customers": {
-        "id": "bigint",
-        "name": "string",
-        "age": "bigint",
-        "country": "string"
       }
     },
     "expected": [
       {
         "name": "customer_id",
-        "table": "orders"
+        "upstream": [
+          {
+            "column": "customer_id",
+            "table": "orders"
+          }
+        ],
+        "type": ""
       },
       {
         "name": "id",
-        "table": "customers"
-      },
-      {
-        "name": "id",
-        "table": "orders"
+        "upstream": [
+          {
+            "column": "id",
+            "table": "customers"
+          },
+          {
+            "column": "id",
+            "table": "orders"
+          }
+        ],
+        "type": ""
       }
-    ]
+    ],
+    "expected_selected": [
+      {
+        "name": "age",
+        "type": "BIGINT",
+        "upstream": [
+          {
+            "column": "age",
+            "table": "customers"
+          }
+        ]
+      },
+      {
+        "name": "country",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "country",
+            "table": "customers"
+          }
+        ]
+      },
+      {
+        "name": "customer_id",
+        "type": "BIGINT",
+        "upstream": [
+          {
+            "column": "customer_id",
+            "table": "orders"
+          }
+        ]
+      },
+      {
+        "name": "id",
+        "type": "BIGINT",
+        "upstream": [
+          {
+            "column": "id",
+            "table": "orders"
+          }
+        ]
+      },
+      {
+        "name": "id",
+        "type": "BIGINT",
+        "upstream": [
+          {
+            "column": "id",
+            "table": "orders"
+          }
+        ]
+      },
+      {
+        "name": "name",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "name",
+            "table": "customers"
+          }
+        ]
+      },
+      {
+        "name": "order_number",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "order_number",
+            "table": "orders"
+          }
+        ]
+      },
+      {
+        "name": "shipping_country",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "shipping_country",
+            "table": "orders"
+          }
+        ]
+      }
+    ],
+    "expected_errors": []
   },
   {
     "name": "Join orders and customers with country filter",
     "dialect": "bigquery",
     "query": "\n\t        select * from orders join customers on customers.id = orders.customer_id where orders.id > 10 and customers.country = \"UK\";\n\t    ",
     "schema": {
+      "customers": {
+        "age": "bigint",
+        "country": "string",
+        "id": "bigint",
+        "name": "string"
+      },
       "orders": {
+        "customer_id": "bigint",
         "id": "bigint",
         "order_number": "string",
-        "customer_id": "bigint",
         "shipping_country": "string"
-      },
-      "customers": {
-        "id": "bigint",
-        "name": "string",
-        "age": "bigint",
-        "country": "string"
       }
     },
     "expected": [
       {
         "name": "country",
-        "table": "customers"
+        "upstream": [
+          {
+            "column": "country",
+            "table": "customers"
+          }
+        ],
+        "type": ""
       },
       {
         "name": "customer_id",
-        "table": "orders"
+        "upstream": [
+          {
+            "column": "customer_id",
+            "table": "orders"
+          }
+        ],
+        "type": ""
       },
       {
         "name": "id",
-        "table": "customers"
-      },
-      {
-        "name": "id",
-        "table": "orders"
+        "upstream": [
+          {
+            "column": "id",
+            "table": "customers"
+          },
+          {
+            "column": "id",
+            "table": "orders"
+          }
+        ],
+        "type": ""
       }
-    ]
+    ],
+    "expected_selected": [
+      {
+        "name": "age",
+        "type": "BIGINT",
+        "upstream": [
+          {
+            "column": "age",
+            "table": "customers"
+          }
+        ]
+      },
+      {
+        "name": "country",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "country",
+            "table": "customers"
+          }
+        ]
+      },
+      {
+        "name": "customer_id",
+        "type": "BIGINT",
+        "upstream": [
+          {
+            "column": "customer_id",
+            "table": "orders"
+          }
+        ]
+      },
+      {
+        "name": "id",
+        "type": "BIGINT",
+        "upstream": [
+          {
+            "column": "id",
+            "table": "orders"
+          }
+        ]
+      },
+      {
+        "name": "id",
+        "type": "BIGINT",
+        "upstream": [
+          {
+            "column": "id",
+            "table": "orders"
+          }
+        ]
+      },
+      {
+        "name": "name",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "name",
+            "table": "customers"
+          }
+        ]
+      },
+      {
+        "name": "order_number",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "order_number",
+            "table": "orders"
+          }
+        ]
+      },
+      {
+        "name": "shipping_country",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "shipping_country",
+            "table": "orders"
+          }
+        ]
+      }
+    ],
+    "expected_errors": []
   },
   {
     "name": "Join with additional condition on shipping country",
     "dialect": "bigquery",
     "query": "\n\t        select * from orders join customers on customers.id = orders.customer_id where orders.id > 10 and customers.country = \"UK\" and concat(customers.country, orders.shipping_country)=\"UKUK\";\n\t    ",
     "schema": {
+      "customers": {
+        "age": "bigint",
+        "country": "string",
+        "id": "bigint",
+        "name": "string"
+      },
       "orders": {
+        "customer_id": "bigint",
         "id": "bigint",
         "order_number": "string",
-        "customer_id": "bigint",
         "shipping_country": "string"
-      },
-      "customers": {
-        "id": "bigint",
-        "name": "string",
-        "age": "bigint",
-        "country": "string"
       }
     },
     "expected": [
       {
         "name": "country",
-        "table": "customers"
+        "upstream": [
+          {
+            "column": "country",
+            "table": "customers"
+          }
+        ],
+        "type": ""
       },
       {
         "name": "customer_id",
-        "table": "orders"
+        "upstream": [
+          {
+            "column": "customer_id",
+            "table": "orders"
+          }
+        ],
+        "type": ""
       },
       {
         "name": "id",
-        "table": "customers"
-      },
-      {
-        "name": "id",
-        "table": "orders"
+        "upstream": [
+          {
+            "column": "id",
+            "table": "customers"
+          },
+          {
+            "column": "id",
+            "table": "orders"
+          }
+        ],
+        "type": ""
       },
       {
         "name": "shipping_country",
-        "table": "orders"
+        "upstream": [
+          {
+            "column": "shipping_country",
+            "table": "orders"
+          }
+        ],
+        "type": ""
       }
-    ]
+    ],
+    "expected_selected": [
+      {
+        "name": "age",
+        "type": "BIGINT",
+        "upstream": [
+          {
+            "column": "age",
+            "table": "customers"
+          }
+        ]
+      },
+      {
+        "name": "country",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "country",
+            "table": "customers"
+          }
+        ]
+      },
+      {
+        "name": "customer_id",
+        "type": "BIGINT",
+        "upstream": [
+          {
+            "column": "customer_id",
+            "table": "orders"
+          }
+        ]
+      },
+      {
+        "name": "id",
+        "type": "BIGINT",
+        "upstream": [
+          {
+            "column": "id",
+            "table": "orders"
+          }
+        ]
+      },
+      {
+        "name": "id",
+        "type": "BIGINT",
+        "upstream": [
+          {
+            "column": "id",
+            "table": "orders"
+          }
+        ]
+      },
+      {
+        "name": "name",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "name",
+            "table": "customers"
+          }
+        ]
+      },
+      {
+        "name": "order_number",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "order_number",
+            "table": "orders"
+          }
+        ]
+      },
+      {
+        "name": "shipping_country",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "shipping_country",
+            "table": "orders"
+          }
+        ]
+      }
+    ],
+    "expected_errors": []
   },
   {
     "name": "CTE with cross join",
@@ -161,17 +556,51 @@
     "query": "\n\t        with t1 as (\n\t            select col1, count(*) as cnt1 from table1 group by col1\n\t        ), t2 as (\n\t            select avg(col3) as col3_avg from table1 group by col1\n\t        )\n\t        select col1, cnt1, col3_avg from t1 cross join t2\n\t    ",
     "schema": {
       "table1": {
-        "col3": "int",
         "col1": "int",
-        "col2": "int"
+        "col2": "int",
+        "col3": "int"
       }
     },
     "expected": [
       {
         "name": "col1",
-        "table": "table1"
+        "upstream": [
+          {
+            "column": "col1",
+            "table": "table1"
+          }
+        ],
+        "type": ""
       }
-    ]
+    ],
+    "expected_selected": [
+      {
+        "name": "cnt1",
+        "type": "BIGINT",
+        "upstream": []
+      },
+      {
+        "name": "col1",
+        "type": "INT",
+        "upstream": [
+          {
+            "column": "col1",
+            "table": "table1"
+          }
+        ]
+      },
+      {
+        "name": "col3_avg",
+        "type": "DOUBLE",
+        "upstream": [
+          {
+            "column": "col3",
+            "table": "table1"
+          }
+        ]
+      }
+    ],
+    "expected_errors": []
   },
   {
     "name": "CTE with cross",
@@ -179,24 +608,53 @@
     "query": "\n            SELECT t1.col1, t2.col2 \t\t\t\t\n            FROM table1 t1 \t\t\t\t\n            JOIN table2 t2 \n                ON t1.id = t2.id\n\t",
     "schema": {
       "table1": {
-        "id": "str",
-        "col1": "int64"
+        "col1": "int64",
+        "id": "str"
       },
       "table2": {
-        "id": "str",
-        "col2": "int64"
+        "col2": "int64",
+        "id": "str"
       }
     },
     "expected": [
       {
         "name": "id",
-        "table": "table1"
+        "upstream": [
+          {
+            "column": "id",
+            "table": "table1"
+          },
+          {
+            "column": "id",
+            "table": "table2"
+          }
+        ],
+        "type": ""
+      }
+    ],
+    "expected_selected": [
+      {
+        "name": "col1",
+        "type": "BIGINT",
+        "upstream": [
+          {
+            "column": "col1",
+            "table": "table1"
+          }
+        ]
       },
       {
-        "name": "id",
-        "table": "table2"
+        "name": "col2",
+        "type": "BIGINT",
+        "upstream": [
+          {
+            "column": "col2",
+            "table": "table2"
+          }
+        ]
       }
-    ]
+    ],
+    "expected_errors": []
   },
   {
     "name": "CTE with cross test 2 ",
@@ -214,13 +672,42 @@
     "expected": [
       {
         "name": "emp_id",
-        "table": "employees"
+        "upstream": [
+          {
+            "column": "emp_id",
+            "table": "employees"
+          },
+          {
+            "column": "emp_id",
+            "table": "salaries"
+          }
+        ],
+        "type": ""
+      }
+    ],
+    "expected_selected": [
+      {
+        "name": "avg_salary",
+        "type": "DOUBLE",
+        "upstream": [
+          {
+            "column": "salary",
+            "table": "salaries"
+          }
+        ]
       },
       {
         "name": "emp_id",
-        "table": "salaries"
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "emp_id",
+            "table": "employees"
+          }
+        ]
       }
-    ]
+    ],
+    "expected_errors": []
   },
   {
     "name": "complex CTEs with aliases",
@@ -229,21 +716,114 @@
     "schema": {
       "fact": {
         "some_daily_metrics": {
-          "user_id": "STRING",
           "date_utc": "DATE",
-          "first_device_type": "STRING",
-          "first_activity_timestamp": "TIMESTAMP",
           "estimated_session_duration": "INT64",
-          "event_start": "INT64"
+          "event_start": "INT64",
+          "first_activity_timestamp": "TIMESTAMP",
+          "first_device_type": "STRING",
+          "user_id": "STRING"
         }
       }
     },
     "expected": [
       {
         "name": "USER_ID",
-        "table": "FACT.SOME_DAILY_METRICS"
+        "upstream": [
+          {
+            "column": "USER_ID",
+            "table": "FACT.SOME_DAILY_METRICS"
+          }
+        ],
+        "type": ""
       }
-    ]
+    ],
+    "expected_selected": [
+      {
+        "name": "ACTIVE_DAYS",
+        "type": "BIGINT",
+        "upstream": [
+          {
+            "column": "DATE_UTC",
+            "table": "FACT.SOME_DAILY_METRICS"
+          }
+        ]
+      },
+      {
+        "name": "AVG_SESSION_DURATION",
+        "type": "DOUBLE",
+        "upstream": [
+          {
+            "column": "ESTIMATED_SESSION_DURATION",
+            "table": "FACT.SOME_DAILY_METRICS"
+          }
+        ]
+      },
+      {
+        "name": "FIRST_DEVICE_TYPE",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "FIRST_ACTIVITY_TIMESTAMP",
+            "table": "FACT.SOME_DAILY_METRICS"
+          },
+          {
+            "column": "FIRST_DEVICE_TYPE",
+            "table": "FACT.SOME_DAILY_METRICS"
+          }
+        ]
+      },
+      {
+        "name": "RECENCY",
+        "type": "INT",
+        "upstream": [
+          {
+            "column": "DATE_UTC",
+            "table": "FACT.SOME_DAILY_METRICS"
+          }
+        ]
+      },
+      {
+        "name": "SOME_DAY1_METRIC",
+        "type": "INT",
+        "upstream": [
+          {
+            "column": "DATE_UTC",
+            "table": "FACT.SOME_DAILY_METRICS"
+          }
+        ]
+      },
+      {
+        "name": "TOTAL_EVENT_START",
+        "type": "BIGINT",
+        "upstream": [
+          {
+            "column": "EVENT_START",
+            "table": "FACT.SOME_DAILY_METRICS"
+          }
+        ]
+      },
+      {
+        "name": "USER_ID",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "USER_ID",
+            "table": "FACT.SOME_DAILY_METRICS"
+          }
+        ]
+      },
+      {
+        "name": "USER_TYPE",
+        "type": "VARCHAR",
+        "upstream": [
+          {
+            "column": "EVENT_START",
+            "table": "FACT.SOME_DAILY_METRICS"
+          }
+        ]
+      }
+    ],
+    "expected_errors": []
   },
   {
     "name": "dashboard.report",
@@ -292,53 +872,281 @@
     "expected": [
       {
         "name": "col1",
-        "table": "dataset1.table1"
-      },
-      {
-        "name": "col1",
-        "table": "dataset2.table2"
-      },
-      {
-        "name": "col1",
-        "table": "dataset4.table4"
-      },
-      {
-        "name": "col2",
-        "table": "dataset2.table2"
-      },
-      {
-        "name": "col2",
-        "table": "dataset3.table3"
-      },
-      {
-        "name": "col2",
-        "table": "dataset5.table5"
+        "upstream": [
+          {
+            "column": "col1",
+            "table": "dataset1.table1"
+          },
+          {
+            "column": "col1",
+            "table": "dataset2.table2"
+          },
+          {
+            "column": "col1",
+            "table": "dataset4.table4"
+          }
+        ],
+        "type": ""
       },
       {
         "name": "col2",
-        "table": "dataset6.table6"
+        "upstream": [
+          {
+            "column": "col2",
+            "table": "dataset2.table2"
+          },
+          {
+            "column": "col2",
+            "table": "dataset3.table3"
+          },
+          {
+            "column": "col2",
+            "table": "dataset5.table5"
+          },
+          {
+            "column": "col2",
+            "table": "dataset6.table6"
+          }
+        ],
+        "type": ""
       },
       {
         "name": "col3",
-        "table": "dataset1.table1"
-      },
-      {
-        "name": "col3",
-        "table": "dataset5.table5"
+        "upstream": [
+          {
+            "column": "col3",
+            "table": "dataset1.table1"
+          },
+          {
+            "column": "col3",
+            "table": "dataset5.table5"
+          }
+        ],
+        "type": ""
       },
       {
         "name": "col4",
-        "table": "dataset1.table1"
+        "upstream": [
+          {
+            "column": "col4",
+            "table": "dataset1.table1"
+          }
+        ],
+        "type": ""
       },
       {
         "name": "col5",
-        "table": "dataset1.table1"
-      },
-      {
-        "name": "col5",
-        "table": "dataset7.table7"
+        "upstream": [
+          {
+            "column": "col5",
+            "table": "dataset1.table1"
+          },
+          {
+            "column": "col5",
+            "table": "dataset7.table7"
+          }
+        ],
+        "type": ""
       }
-    ]
+    ],
+    "expected_selected": [
+      {
+        "name": "ai_credits",
+        "type": "INT",
+        "upstream": []
+      },
+      {
+        "name": "ai_credits_used",
+        "type": "INT",
+        "upstream": [
+          {
+            "column": "col1",
+            "table": "dataset5.table5"
+          }
+        ]
+      },
+      {
+        "name": "col1",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col1",
+            "table": "dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col1",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col1",
+            "table": "dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col2",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col2",
+            "table": "dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col2",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col2",
+            "table": "dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col3",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col3",
+            "table": "dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col3",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col3",
+            "table": "dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col3",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col3",
+            "table": "dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col4",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col4",
+            "table": "dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col4",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col4",
+            "table": "dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col4",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col4",
+            "table": "dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col5",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col5",
+            "table": "dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col6",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col6",
+            "table": "dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "is_refunded",
+        "type": "BOOLEAN",
+        "upstream": [
+          {
+            "column": "col7",
+            "table": "dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "organization",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col1",
+            "table": "dataset3.table3"
+          }
+        ]
+      },
+      {
+        "name": "organizationid",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col2",
+            "table": "dataset3.table3"
+          }
+        ]
+      },
+      {
+        "name": "programname",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col1",
+            "table": "dataset2.table2"
+          }
+        ]
+      },
+      {
+        "name": "teamid",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col2",
+            "table": "dataset6.table6"
+          }
+        ]
+      },
+      {
+        "name": "teamname",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col1",
+            "table": "dataset6.table6"
+          }
+        ]
+      }
+    ],
+    "expected_errors": []
   },
   {
     "name": "project_report",
@@ -387,52 +1195,280 @@
     "expected": [
       {
         "name": "col1",
-        "table": "project1.dataset1.table1"
-      },
-      {
-        "name": "col1",
-        "table": "project2.dataset2.table2"
-      },
-      {
-        "name": "col1",
-        "table": "project4.dataset4.table4"
-      },
-      {
-        "name": "col2",
-        "table": "project2.dataset2.table2"
-      },
-      {
-        "name": "col2",
-        "table": "project3.dataset3.table3"
-      },
-      {
-        "name": "col2",
-        "table": "project5.dataset5.table5"
+        "upstream": [
+          {
+            "column": "col1",
+            "table": "project1.dataset1.table1"
+          },
+          {
+            "column": "col1",
+            "table": "project2.dataset2.table2"
+          },
+          {
+            "column": "col1",
+            "table": "project4.dataset4.table4"
+          }
+        ],
+        "type": ""
       },
       {
         "name": "col2",
-        "table": "project6.dataset6.table6"
+        "upstream": [
+          {
+            "column": "col2",
+            "table": "project2.dataset2.table2"
+          },
+          {
+            "column": "col2",
+            "table": "project3.dataset3.table3"
+          },
+          {
+            "column": "col2",
+            "table": "project5.dataset5.table5"
+          },
+          {
+            "column": "col2",
+            "table": "project6.dataset6.table6"
+          }
+        ],
+        "type": ""
       },
       {
         "name": "col3",
-        "table": "project1.dataset1.table1"
-      },
-      {
-        "name": "col3",
-        "table": "project5.dataset5.table5"
+        "upstream": [
+          {
+            "column": "col3",
+            "table": "project1.dataset1.table1"
+          },
+          {
+            "column": "col3",
+            "table": "project5.dataset5.table5"
+          }
+        ],
+        "type": ""
       },
       {
         "name": "col4",
-        "table": "project1.dataset1.table1"
+        "upstream": [
+          {
+            "column": "col4",
+            "table": "project1.dataset1.table1"
+          }
+        ],
+        "type": ""
       },
       {
         "name": "col5",
-        "table": "project1.dataset1.table1"
-      },
-      {
-        "name": "col5",
-        "table": "project7.dataset7.table7"
+        "upstream": [
+          {
+            "column": "col5",
+            "table": "project1.dataset1.table1"
+          },
+          {
+            "column": "col5",
+            "table": "project7.dataset7.table7"
+          }
+        ],
+        "type": ""
       }
-    ]
+    ],
+    "expected_selected": [
+      {
+        "name": "col1",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col1",
+            "table": "project1.dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col1",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col1",
+            "table": "project1.dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col2",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col2",
+            "table": "project1.dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col2",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col2",
+            "table": "project1.dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col3",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col3",
+            "table": "project1.dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col3",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col3",
+            "table": "project1.dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col3",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col3",
+            "table": "project1.dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col4",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col4",
+            "table": "project1.dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col4",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col4",
+            "table": "project1.dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col4",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col4",
+            "table": "project1.dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col5",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col5",
+            "table": "project1.dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col6",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col6",
+            "table": "project1.dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "credits_used",
+        "type": "INT",
+        "upstream": [
+          {
+            "column": "col1",
+            "table": "project5.dataset5.table5"
+          }
+        ]
+      },
+      {
+        "name": "department",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col1",
+            "table": "project3.dataset3.table3"
+          }
+        ]
+      },
+      {
+        "name": "departmentid",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col2",
+            "table": "project3.dataset3.table3"
+          }
+        ]
+      },
+      {
+        "name": "is_active",
+        "type": "BOOLEAN",
+        "upstream": [
+          {
+            "column": "col7",
+            "table": "project1.dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "programname",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col1",
+            "table": "project2.dataset2.table2"
+          }
+        ]
+      },
+      {
+        "name": "project_credits",
+        "type": "INT",
+        "upstream": []
+      },
+      {
+        "name": "projectid",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col2",
+            "table": "project6.dataset6.table6"
+          }
+        ]
+      },
+      {
+        "name": "projectname",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col1",
+            "table": "project6.dataset6.table6"
+          }
+        ]
+      }
+    ],
+    "expected_errors": []
   }
 ]

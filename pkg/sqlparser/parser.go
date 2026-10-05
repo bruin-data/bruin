@@ -1,39 +1,28 @@
 package sqlparser
 
 import (
-	"bufio"
-	"crypto/rand"
+	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
-	"time"
 
-	"github.com/bruin-data/bruin/internal/data"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
-	"github.com/bruin-data/bruin/pythonsrc"
-	"github.com/kluctl/go-embed-python/embed_util"
-	"github.com/kluctl/go-embed-python/python"
 	"github.com/pkg/errors"
 )
 
+// SQLParser analyzes SQL in-process with pkg/sqlengine. It used to drive an embedded Python
+// interpreter running SQLGlot; the API and behavior are unchanged.
 type SQLParser struct {
 	tmpDir         string
 	started        bool
 	randomize      bool
 	MaxQueryLength int
 
-	stdout io.ReadCloser
-	stdin  io.WriteCloser
-	cmd    *exec.Cmd
-	mutex  sync.Mutex
-
+	// mutex serializes commands per instance, like the single-threaded Python process did.
+	mutex      sync.Mutex
 	startMutex sync.Mutex
 }
 
@@ -41,100 +30,31 @@ func NewSQLParser(randomize bool) (*SQLParser, error) {
 	return NewSQLParserWithConfig(randomize, 10000)
 }
 
-// NewSQLParserCached creates a SQLParser that reuses previously extracted embedded files
-// from a stable temp directory path. This is significantly faster when files already exist
-// (skips ~3s of file extraction) and is safe for concurrent reads across test packages.
+// NewSQLParserCached creates a SQLParser. It is kept for API compatibility: parsing no longer
+// needs any extracted files, so cached and uncached parsers are equivalent.
 func NewSQLParserCached() (*SQLParser, error) {
 	return newSQLParserInternal("bruin-cli-embedded-cached", false, 10000), nil
 }
 
 func NewSQLParserWithConfig(randomize bool, maxQueryLength int) (*SQLParser, error) {
-	randomInt := 0
-	if randomize {
-		b := make([]byte, 4)
-		_, err := rand.Read(b)
-		if err != nil {
-			return nil, err
-		}
-		randomInt = int(b[0])
-	}
-	tmpDirName := fmt.Sprintf("bruin-cli-embedded_%d", randomInt)
+	tmpDirName := "bruin-cli-embedded_0"
 	return newSQLParserInternal(tmpDirName, randomize, maxQueryLength), nil
 }
 
 func newSQLParserInternal(tmpDirName string, randomize bool, maxQueryLength int) *SQLParser {
 	return &SQLParser{
-		tmpDir:         filepath.Join(os.TempDir(), tmpDirName),
+		tmpDir:         tmpDirName,
 		randomize:      randomize,
 		MaxQueryLength: maxQueryLength,
 	}
 }
 
+// Start marks the parser as started. There is no subprocess to launch anymore.
 func (s *SQLParser) Start() error {
 	s.startMutex.Lock()
 	defer s.startMutex.Unlock()
-	if s.started {
-		return nil
-	}
-
-	// Extract only when parsing is needed, not when an unused hook hoister is
-	// constructed. Keep preparation under the same lock as subprocess startup.
-	withHashInDir := s.randomize // randomized instances use hash-suffixed dirs; others reuse cached dirs.
-
-	ep, err := python.NewEmbeddedPythonWithTmpDir(s.tmpDir+"-python", withHashInDir)
-	if err != nil {
-		return err
-	}
-	sqlglotDir, err := embed_util.NewEmbeddedFilesWithTmpDir(data.Data, s.tmpDir+"-sqlglot-lib", withHashInDir)
-	if err != nil {
-		return err
-	}
-	ep.AddPythonPath(sqlglotDir.GetExtractedPath())
-
-	// Keep the parser source content-hashed so cached parser instances cannot reuse
-	// stale Python code after pythonsrc changes. This directory is small compared to
-	// the embedded Python/runtime directories above.
-	rendererSrc, err := embed_util.NewEmbeddedFilesWithTmpDir(pythonsrc.RendererSource, s.tmpDir+"-jinja2-renderer", true)
-	if err != nil {
-		return err
-	}
-
-	args := []string{filepath.Join(rendererSrc.GetExtractedPath(), "main.py")}
-	s.cmd, err = ep.PythonCmd(args...)
-	if err != nil {
-		return err
-	}
-	// s.cmd.Stderr = os.Stderr
-
-	s.stdout, err = s.cmd.StdoutPipe()
-	if err != nil {
-		return err
-	}
-
-	s.stdin, err = s.cmd.StdinPipe()
-	if err != nil {
-		return err
-	}
-
-	err = s.cmd.Start()
-	if err != nil {
-		return err
-	}
-
-	// Retry init command to handle race condition in release pipeline
-	const maxRetries = 3
-
-	for attempt := range maxRetries {
-		if _, err := s.sendCommand(&parserCommand{Command: "init"}); err == nil {
-			s.started = true
-			return nil
-		}
-		if attempt < maxRetries-1 {
-			time.Sleep(time.Duration(attempt+1) * 100 * time.Millisecond)
-		}
-	}
-
-	return errors.New("failed to send init command after retries")
+	s.started = true
+	return nil
 }
 
 type parserCommand struct {
@@ -169,6 +89,21 @@ func (s *SQLParser) ColumnLineage(sql, dialect string, schema Schema) (*Lineage,
 		}, nil
 	}
 
+	var lineage Lineage
+	if normSchema, ok := checkSchema(schema); ok && validUTF8(sql, dialect) {
+		// What cmdLineage does with the normalized request.
+		if decodeErr := s.callDirect(&lineage, func() (any, error) {
+			raw, err := toRawSchema(normSchema)
+			if err != nil {
+				return nil, err
+			}
+			return getColumnLineage(sql, raw, dialect)
+		}); decodeErr != nil {
+			return nil, decodeErr
+		}
+		return &lineage, nil
+	}
+
 	command := parserCommand{
 		Command: "lineage",
 		Contents: map[string]interface{}{
@@ -178,15 +113,10 @@ func (s *SQLParser) ColumnLineage(sql, dialect string, schema Schema) (*Lineage,
 		},
 	}
 
-	resp, err := s.sendCommand(&command)
-	if err != nil {
-		return nil, err
-	}
-
-	var lineage Lineage
-	err = json.Unmarshal([]byte(resp), &lineage)
-	if err != nil {
-		return nil, err
+	if sendErr, decodeErr := s.call(command.Command, command.Contents, &lineage); sendErr != nil {
+		return nil, sendErr
+	} else if decodeErr != nil {
+		return nil, decodeErr
 	}
 
 	return &lineage, nil
@@ -198,26 +128,17 @@ func (s *SQLParser) UsedTables(sql, dialect string) ([]string, error) {
 		return nil, errors.Wrap(err, "failed to start sql parser")
 	}
 
-	command := parserCommand{
-		Command: "get-tables",
-		Contents: map[string]interface{}{
-			"query":   sql,
-			"dialect": dialect,
-		},
+	var tables tablesResponse
+	var sendErr, decodeErr error
+	if validUTF8(sql, dialect) {
+		decodeErr = s.callDirect(&tables, func() (any, error) { return getTables(sql, dialect), nil })
+	} else {
+		sendErr, decodeErr = s.call("get-tables", map[string]interface{}{"query": sql, "dialect": dialect}, &tables)
 	}
-
-	resp, err := s.sendCommand(&command)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to send command")
-	}
-
-	var tables struct {
-		Tables []string `json:"tables"`
-		Error  string   `json:"error"`
-	}
-	err = json.Unmarshal([]byte(resp), &tables)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal response")
+	if sendErr != nil {
+		return nil, errors.Wrap(sendErr, "failed to send command")
+	} else if decodeErr != nil {
+		return nil, errors.Wrap(decodeErr, "failed to unmarshal response")
 	}
 
 	if tables.Error != "" {
@@ -233,21 +154,25 @@ func (s *SQLParser) UsedTables(sql, dialect string) ([]string, error) {
 // object and returns the resulting query string. It is the shared body for the
 // SQL-rewriting verbs (rename/limit/transpile).
 func (s *SQLParser) sendQueryCommand(command string, contents map[string]interface{}) (string, error) {
+	return s.queryCommand(func(resp *queryResponse) (error, error) { return s.call(command, contents, resp) })
+}
+
+// sendQueryCommandDirect is sendQueryCommand for a command function taking string-only requests
+// (see callDirect).
+func (s *SQLParser) sendQueryCommandDirect(run func() (any, error)) (string, error) {
+	return s.queryCommand(func(resp *queryResponse) (error, error) { return nil, s.callDirect(resp, run) })
+}
+
+func (s *SQLParser) queryCommand(call func(*queryResponse) (sendErr, decodeErr error)) (string, error) {
 	if err := s.Start(); err != nil {
 		return "", errors.Wrap(err, "failed to start sql parser")
 	}
 
-	responsePayload, err := s.sendCommand(&parserCommand{Command: command, Contents: contents})
-	if err != nil {
-		return "", errors.Wrap(err, "failed to send command")
-	}
-
-	var resp struct {
-		Query string `json:"query"`
-		Error string `json:"error"`
-	}
-	if err := json.Unmarshal([]byte(responsePayload), &resp); err != nil {
-		return "", errors.Wrap(err, "failed to unmarshal response")
+	var resp queryResponse
+	if sendErr, decodeErr := call(&resp); sendErr != nil {
+		return "", errors.Wrap(sendErr, "failed to send command")
+	} else if decodeErr != nil {
+		return "", errors.Wrap(decodeErr, "failed to unmarshal response")
 	}
 	if resp.Error != "" {
 		return "", errors.New(resp.Error)
@@ -292,19 +217,11 @@ func (s *SQLParser) HoistDeclaresList(queries []string, assetType pipeline.Asset
 	if err := s.Start(); err != nil {
 		return queries, errors.Wrap(err, "failed to start sql parser")
 	}
-	payload, err := s.sendCommand(&parserCommand{
-		Command:  "hoist-declares-list",
-		Contents: map[string]interface{}{"queries": queries, "dialect": dialect},
-	})
-	if err != nil {
-		return queries, errors.Wrap(err, "failed to hoist declares list")
-	}
-	var resp struct {
-		Queries []string `json:"queries"`
-		Error   string   `json:"error"`
-	}
-	if err := json.Unmarshal([]byte(payload), &resp); err != nil {
-		return queries, errors.Wrap(err, "failed to unmarshal response")
+	var resp queriesResponse
+	if sendErr, decodeErr := s.call("hoist-declares-list", map[string]interface{}{"queries": queries, "dialect": dialect}, &resp); sendErr != nil {
+		return queries, errors.Wrap(sendErr, "failed to hoist declares list")
+	} else if decodeErr != nil {
+		return queries, errors.Wrap(decodeErr, "failed to unmarshal response")
 	}
 	if resp.Error != "" {
 		return queries, errors.New(resp.Error)
@@ -313,68 +230,26 @@ func (s *SQLParser) HoistDeclaresList(queries []string, assetType pipeline.Asset
 }
 
 func (s *SQLParser) sendCommand(pc *parserCommand) (string, error) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	jsonCommand, err := json.Marshal(pc)
+	// Round-trip through JSON so that handlers observe exactly what the Python process received
+	// (map key order, null for nil maps/slices, numbers as float64).
+	payload, err := json.Marshal(pc)
 	if err != nil {
 		return "", err
 	}
-
-	jsonCommand = append(jsonCommand, '\n')
-
-	_, err = s.stdin.Write(jsonCommand)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to write command to stdin")
+	var decoded parserCommand
+	dec := json.NewDecoder(bytes.NewReader(payload))
+	if err := dec.Decode(&decoded); err != nil {
+		return "", err
 	}
-
-	reader := bufio.NewReader(s.stdout)
-	resp, err := reader.ReadString(byte('\n'))
-	return resp, err
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	return dispatch(&decoded) + "\n", nil
 }
 
 func (s *SQLParser) Close() error {
 	s.startMutex.Lock()
 	defer s.startMutex.Unlock()
-
 	s.started = false
-
-	if s.stdin != nil {
-		s.sendCommand(&parserCommand{ //nolint
-			Command: "exit",
-		})
-		_ = s.stdin.Close()
-		s.stdin = nil
-	}
-
-	if s.stdout != nil {
-		_ = s.stdout.Close()
-		s.stdout = nil
-	}
-
-	if s.cmd != nil {
-		if s.cmd.Process != nil {
-			timer := time.AfterFunc(5*time.Second, func() {
-				_ = s.cmd.Process.Kill()
-			})
-			_ = s.cmd.Wait()
-			timer.Stop()
-		}
-		s.cmd = nil
-	}
-
-	if !s.randomize {
-		return nil
-	}
-
-	files, err := filepath.Glob(s.tmpDir + "*")
-	if err != nil {
-		return fmt.Errorf("failed to get temp files: %w", err)
-	}
-	for _, file := range files {
-		os.RemoveAll(file)
-	}
-
 	return nil
 }
 
@@ -456,6 +331,10 @@ func ConnectionTypeToDialect(connectionType string) string {
 }
 
 func (s *SQLParser) AddLimit(sql string, limit int, dialect string) (string, error) {
+	if validUTF8(sql, dialect) {
+		// The limit crosses the JSON round trip as a float64.
+		return s.sendQueryCommandDirect(func() (any, error) { return addLimit(sql, int(float64(limit)), dialect) })
+	}
 	return s.sendQueryCommand("add-limit", map[string]interface{}{
 		"query":   sql,
 		"limit":   limit,
@@ -527,26 +406,17 @@ func (s *SQLParser) IsSingleSelectQuery(sql string, dialect string) (bool, error
 		return false, errors.Wrap(err, "failed to start sql parser")
 	}
 
-	command := parserCommand{
-		Command: "is-single-select",
-		Contents: map[string]interface{}{
-			"query":   sql,
-			"dialect": dialect,
-		},
+	var resp singleSelectResponse
+	var sendErr, decodeErr error
+	if validUTF8(sql, dialect) {
+		decodeErr = s.callDirect(&resp, func() (any, error) { return isSingleSelectQuery(sql, dialect), nil })
+	} else {
+		sendErr, decodeErr = s.call("is-single-select", map[string]interface{}{"query": sql, "dialect": dialect}, &resp)
 	}
-
-	responsePayload, err := s.sendCommand(&command)
-	if err != nil {
-		return false, errors.Wrap(err, "failed to send command")
-	}
-
-	var resp struct {
-		IsSingleSelect bool   `json:"is_single_select"`
-		Error          string `json:"error"`
-	}
-	err = json.Unmarshal([]byte(responsePayload), &resp)
-	if err != nil {
-		return false, errors.Wrap(err, "failed to unmarshal response")
+	if sendErr != nil {
+		return false, errors.Wrap(sendErr, "failed to send command")
+	} else if decodeErr != nil {
+		return false, errors.Wrap(decodeErr, "failed to unmarshal response")
 	}
 
 	if resp.Error != "" {

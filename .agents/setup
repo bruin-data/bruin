@@ -149,8 +149,6 @@ if [[ "$current_lint_version" != "$golangci_lint_version" ]]; then
     "https://raw.githubusercontent.com/golangci/golangci-lint/${golangci_lint_version}/install.sh" |
     sh -s -- -b "$HOME/.local/bin" "$golangci_lint_version"
 fi
-[[ -d .venv ]] || uv venv --quiet
-uv pip install --quiet sqlglot==30.13.0
 uvx ruff@0.15.4 --version >/dev/null
 done_step
 

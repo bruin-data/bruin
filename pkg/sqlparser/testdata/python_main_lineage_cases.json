@@ -61,9 +61,11 @@
             "column": "a",
             "table": "table2"
           }
-        ]
+        ],
+        "type": ""
       }
-    ]
+    ],
+    "expected_errors": []
   },
   {
     "name": "case-when",
@@ -114,7 +116,8 @@
             "column": "in_stock",
             "table": "items"
           }
-        ]
+        ],
+        "type": ""
       },
       {
         "name": "item_id",
@@ -127,9 +130,11 @@
             "column": "item_id",
             "table": "orders"
           }
-        ]
+        ],
+        "type": ""
       }
-    ]
+    ],
+    "expected_errors": []
   },
   {
     "name": "simple join",
@@ -179,9 +184,11 @@
             "column": "id",
             "table": "table2"
           }
-        ]
+        ],
+        "type": ""
       }
-    ]
+    ],
+    "expected_errors": []
   },
   {
     "name": "aggregate function",
@@ -223,9 +230,11 @@
             "column": "customer_id",
             "table": "orders"
           }
-        ]
+        ],
+        "type": ""
       }
-    ]
+    ],
+    "expected_errors": []
   },
   {
     "name": "subquery in select",
@@ -274,9 +283,11 @@
             "column": "emp_id",
             "table": "salaries"
           }
-        ]
+        ],
+        "type": ""
       }
-    ]
+    ],
+    "expected_errors": []
   },
   {
     "name": "union all",
@@ -322,7 +333,8 @@
         ]
       }
     ],
-    "expected_non_selected": []
+    "expected_non_selected": [],
+    "expected_errors": []
   },
   {
     "name": "self join",
@@ -364,7 +376,8 @@
             "column": "id",
             "table": "employees"
           }
-        ]
+        ],
+        "type": ""
       },
       {
         "name": "manager_id",
@@ -373,9 +386,11 @@
             "column": "manager_id",
             "table": "employees"
           }
-        ]
+        ],
+        "type": ""
       }
-    ]
+    ],
+    "expected_errors": []
   },
   {
     "name": "complex case-when",
@@ -430,8 +445,8 @@
       },
       {
         "name": "updated_at",
-        "upstream": [],
-        "type": "UNKNOWN"
+        "type": "UNKNOWN",
+        "upstream": []
       }
     ],
     "expected_non_selected": [
@@ -442,7 +457,8 @@
             "column": "id",
             "table": "regions"
           }
-        ]
+        ],
+        "type": ""
       },
       {
         "name": "region_id",
@@ -451,9 +467,11 @@
             "column": "region_id",
             "table": "sales"
           }
-        ]
+        ],
+        "type": ""
       }
-    ]
+    ],
+    "expected_errors": []
   },
   {
     "name": "aggregate functions with multiple columns",
@@ -516,9 +534,11 @@
             "column": "customer_id",
             "table": "orders"
           }
-        ]
+        ],
+        "type": ""
       }
-    ]
+    ],
+    "expected_errors": []
   },
   {
     "name": "upper function",
@@ -541,7 +561,8 @@
         ]
       }
     ],
-    "expected_non_selected": []
+    "expected_non_selected": [],
+    "expected_errors": []
   },
   {
     "name": "lower function",
@@ -564,7 +585,8 @@
         ]
       }
     ],
-    "expected_non_selected": []
+    "expected_non_selected": [],
+    "expected_errors": []
   },
   {
     "name": "length function",
@@ -587,7 +609,8 @@
         ]
       }
     ],
-    "expected_non_selected": []
+    "expected_non_selected": [],
+    "expected_errors": []
   },
   {
     "name": "trim function",
@@ -610,7 +633,8 @@
         ]
       }
     ],
-    "expected_non_selected": []
+    "expected_non_selected": [],
+    "expected_errors": []
   },
   {
     "name": "round function",
@@ -633,7 +657,8 @@
         ]
       }
     ],
-    "expected_non_selected": []
+    "expected_non_selected": [],
+    "expected_errors": []
   },
   {
     "name": "coalesce function",
@@ -656,7 +681,8 @@
         ]
       }
     ],
-    "expected_non_selected": []
+    "expected_non_selected": [],
+    "expected_errors": []
   },
   {
     "name": "cast function",
@@ -679,7 +705,8 @@
         ]
       }
     ],
-    "expected_non_selected": []
+    "expected_non_selected": [],
+    "expected_errors": []
   },
   {
     "name": "date function",
@@ -702,7 +729,8 @@
         ]
       }
     ],
-    "expected_non_selected": []
+    "expected_non_selected": [],
+    "expected_errors": []
   },
   {
     "name": "extract function",
@@ -725,7 +753,8 @@
         ]
       }
     ],
-    "expected_non_selected": []
+    "expected_non_selected": [],
+    "expected_errors": []
   },
   {
     "name": "substring function",
@@ -748,7 +777,8 @@
         ]
       }
     ],
-    "expected_non_selected": []
+    "expected_non_selected": [],
+    "expected_errors": []
   },
   {
     "name": "floor function",
@@ -771,7 +801,8 @@
         ]
       }
     ],
-    "expected_non_selected": []
+    "expected_non_selected": [],
+    "expected_errors": []
   },
   {
     "name": "ceil function",
@@ -794,7 +825,8 @@
         ]
       }
     ],
-    "expected_non_selected": []
+    "expected_non_selected": [],
+    "expected_errors": []
   },
   {
     "name": "mysql date_format function",
@@ -817,7 +849,8 @@
         ]
       }
     ],
-    "expected_non_selected": []
+    "expected_non_selected": [],
+    "expected_errors": []
   },
   {
     "name": "snowflake to_timestamp function",
@@ -840,7 +873,8 @@
         ]
       }
     ],
-    "expected_non_selected": []
+    "expected_non_selected": [],
+    "expected_errors": []
   },
   {
     "name": "duckdb current_timestamp function",
@@ -868,7 +902,8 @@
         ]
       }
     ],
-    "expected_non_selected": []
+    "expected_non_selected": [],
+    "expected_errors": []
   },
   {
     "name": "redshift date_trunc function",
@@ -891,7 +926,8 @@
         ]
       }
     ],
-    "expected_non_selected": []
+    "expected_non_selected": [],
+    "expected_errors": []
   },
   {
     "name": "dashboard.report",
@@ -1150,7 +1186,8 @@
             "column": "col1",
             "table": "dataset4.table4"
           }
-        ]
+        ],
+        "type": ""
       },
       {
         "name": "col2",
@@ -1171,7 +1208,8 @@
             "column": "col2",
             "table": "dataset6.table6"
           }
-        ]
+        ],
+        "type": ""
       },
       {
         "name": "col3",
@@ -1184,7 +1222,8 @@
             "column": "col3",
             "table": "dataset5.table5"
           }
-        ]
+        ],
+        "type": ""
       },
       {
         "name": "col4",
@@ -1193,7 +1232,8 @@
             "column": "col4",
             "table": "dataset1.table1"
           }
-        ]
+        ],
+        "type": ""
       },
       {
         "name": "col5",
@@ -1206,9 +1246,11 @@
             "column": "col5",
             "table": "dataset7.table7"
           }
-        ]
+        ],
+        "type": ""
       }
-    ]
+    ],
+    "expected_errors": []
   },
   {
     "name": "project_report",
@@ -1467,7 +1509,8 @@
             "column": "col1",
             "table": "project4.dataset4.table4"
           }
-        ]
+        ],
+        "type": ""
       },
       {
         "name": "col2",
@@ -1488,7 +1531,8 @@
             "column": "col2",
             "table": "project6.dataset6.table6"
           }
-        ]
+        ],
+        "type": ""
       },
       {
         "name": "col3",
@@ -1501,7 +1545,8 @@
             "column": "col3",
             "table": "project5.dataset5.table5"
           }
-        ]
+        ],
+        "type": ""
       },
       {
         "name": "col4",
@@ -1510,7 +1555,8 @@
             "column": "col4",
             "table": "project1.dataset1.table1"
           }
-        ]
+        ],
+        "type": ""
       },
       {
         "name": "col5",
@@ -1523,9 +1569,11 @@
             "column": "col5",
             "table": "project7.dataset7.table7"
           }
-        ]
+        ],
+        "type": ""
       }
-    ]
+    ],
+    "expected_errors": []
   },
   {
     "name": "simple nested table references",
@@ -1548,7 +1596,8 @@
         ]
       }
     ],
-    "expected_non_selected": []
+    "expected_non_selected": [],
+    "expected_errors": []
   },
   {
     "name": "simple nested table references",
@@ -1601,7 +1650,8 @@
             "column": "id",
             "table": "raw.Organizations"
           }
-        ]
+        ],
+        "type": ""
       },
       {
         "name": "organizationid",
@@ -1610,9 +1660,11 @@
             "column": "organizationid",
             "table": "raw.Users"
           }
-        ]
+        ],
+        "type": ""
       }
-    ]
+    ],
+    "expected_errors": []
   },
   {
     "name": "failing scenario for CTEs and case-sensitive fields",
@@ -1670,7 +1722,8 @@
             "column": "id",
             "table": "raw.Teams"
           }
-        ]
+        ],
+        "type": ""
       },
       {
         "name": "name",
@@ -1679,7 +1732,8 @@
             "column": "name",
             "table": "raw.Teams"
           }
-        ]
+        ],
+        "type": ""
       },
       {
         "name": "teamid",
@@ -1688,9 +1742,11 @@
             "column": "teamid",
             "table": "raw.TeamMemberships"
           }
-        ]
+        ],
+        "type": ""
       }
-    ]
+    ],
+    "expected_errors": []
   },
   {
     "name": "snowflake function call",
@@ -1729,7 +1785,7 @@
       },
       {
         "name": "FIRST_DEVICE_TYPE",
-        "type": "UNKNOWN",
+        "type": "TEXT",
         "upstream": [
           {
             "column": "FIRST_ACTIVITY_TIMESTAMP",
@@ -1800,9 +1856,11 @@
             "column": "USER_ID",
             "table": "FACT.SOME_DAILY_METRICS"
           }
-        ]
+        ],
+        "type": ""
       }
-    ]
+    ],
+    "expected_errors": []
   },
   {
     "name": "snowflake test",
@@ -1821,7 +1879,7 @@
     "expected": [
       {
         "name": "CREATED_AT",
-        "type": "TIMESTAMP",
+        "type": "TIMESTAMPLTZ",
         "upstream": []
       },
       {
@@ -1893,7 +1951,8 @@
             "column": "EVENT_DATE",
             "table": "ANALYTICS.DAILY_CUSTOMER_METRICS"
           }
-        ]
+        ],
+        "type": ""
       },
       {
         "name": "LOCATION_CODE",
@@ -1902,7 +1961,8 @@
             "column": "LOCATION_CODE",
             "table": "ANALYTICS.DAILY_CUSTOMER_METRICS"
           }
-        ]
+        ],
+        "type": ""
       },
       {
         "name": "SESSION_ID",
@@ -1911,9 +1971,11 @@
             "column": "SESSION_ID",
             "table": "ANALYTICS.DAILY_CUSTOMER_METRICS"
           }
-        ]
+        ],
+        "type": ""
       }
-    ]
+    ],
+    "expected_errors": []
   },
   {
     "name": "snowflake example with condition",
@@ -1962,6 +2024,7 @@
         ]
       }
     ],
-    "expected_non_selected": []
+    "expected_non_selected": [],
+    "expected_errors": []
   }
 ]

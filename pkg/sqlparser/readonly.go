@@ -34,24 +34,26 @@ func (s *SQLParser) IsReadOnlyQuery(query, dialect string) (bool, error) {
 	if err := s.Start(); err != nil {
 		return false, fmt.Errorf("failed to start sql parser: %w", err)
 	}
-	payload, err := s.sendCommand(&parserCommand{
-		Command:  "is-read-only",
-		Contents: map[string]interface{}{"query": query, "dialect": dialect},
-	})
-	if err != nil {
-		return false, fmt.Errorf("failed to validate read-only query: %w", err)
+	var response readOnlyResponse
+	sendErr, decodeErr := s.call("is-read-only", map[string]interface{}{"query": query, "dialect": dialect}, &response)
+	if sendErr != nil {
+		return false, fmt.Errorf("failed to validate read-only query: %w", sendErr)
 	}
-	return decodeReadOnlyResponse(payload)
+	if decodeErr != nil {
+		return false, fmt.Errorf("failed to unmarshal read-only response: %w", decodeErr)
+	}
+	return checkReadOnlyResponse(response)
 }
 
 func decodeReadOnlyResponse(payload string) (bool, error) {
-	var response struct {
-		ReadOnly bool   `json:"is_read_only"`
-		Error    string `json:"error"`
-	}
+	var response readOnlyResponse
 	if err := json.Unmarshal([]byte(payload), &response); err != nil {
 		return false, fmt.Errorf("failed to unmarshal read-only response: %w", err)
 	}
+	return checkReadOnlyResponse(response)
+}
+
+func checkReadOnlyResponse(response readOnlyResponse) (bool, error) {
 	if response.Error != "" {
 		return false, fmt.Errorf("cannot determine whether query is read-only: %s", response.Error)
 	}

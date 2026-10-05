@@ -1,7 +1,0 @@
-{
-  "files": [
-    "pyproject.toml",
-    "MANIFEST.in",
-    "setup.py"
-  ]
-}
