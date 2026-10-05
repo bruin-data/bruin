@@ -25,12 +25,18 @@ os.makedirs(log_dir, exist_ok=True)
 logging.basicConfig(
     filename=f"{log_dir}/parser_debug.log",
     filemode="a",
+    encoding="utf-8",
     format="%(asctime)s {%(filename)s:%(lineno)d} %(levelname)s - %(message)s",
     level=logging.DEBUG,
 )
 
 
 def main():
+    # The Go side speaks UTF-8; without this, Windows decodes the pipes with the
+    # locale code page (e.g. cp1252) and mangles non-ASCII SQL.
+    sys.stdin.reconfigure(encoding="utf-8")
+    sys.stdout.reconfigure(encoding="utf-8")
+
     logging.info("starting the loop")
     while True:
         try:
