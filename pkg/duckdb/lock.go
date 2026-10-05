@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -100,6 +101,7 @@ type databaseLock struct {
 	sync.RWMutex
 	database io.Closer
 	schema   sync.Mutex
+	scopes   atomic.Int64
 }
 
 func (d *databaseLock) closeDatabase() {
@@ -159,6 +161,30 @@ func LockDatabases(paths ...string) func() {
 
 type connectionReuseKey struct{}
 
+type connectionReuseScope struct {
+	sync.Mutex
+	databases map[*databaseLock]struct{}
+}
+
+func (s *connectionReuseScope) register(lock *databaseLock) bool {
+	s.Lock()
+	defer s.Unlock()
+	if s.databases == nil {
+		return false
+	}
+	if _, ok := s.databases[lock]; !ok {
+		lock.scopes.Add(1)
+		s.databases[lock] = struct{}{}
+	}
+	return true
+}
+
+func (d *databaseLock) releaseScope() {
+	if d.scopes.Add(-1) == 0 {
+		d.closeDatabase()
+	}
+}
+
 // WithConnectionReuse keeps DuckDB instances (including lakehouse attachments)
 // alive for a pipeline run. Cleanup cancels the scope and closes idle databases;
 // active sessions are closed asynchronously once their workers release them.
@@ -166,30 +192,29 @@ type connectionReuseKey struct{}
 // Outside this scope, connections remain ephemeral.
 func WithConnectionReuse(ctx context.Context) (context.Context, func()) {
 	ctx, cancel := context.WithCancel(ctx)
-	databases := &sync.Map{}
-	var once sync.Once
-	return context.WithValue(ctx, connectionReuseKey{}, databases), func() {
-		once.Do(func() {
-			cancel()
-			databases.Range(func(key, _ any) bool {
-				lock := key.(*databaseLock)
-				if lock.TryLock() {
-					lock.closeDatabase()
-					lock.Unlock()
-				} else {
-					go func() {
-						lock.Lock()
-						defer lock.Unlock()
-						lock.closeDatabase()
-					}()
-				}
-				return true
-			})
-		})
+	scope := &connectionReuseScope{databases: make(map[*databaseLock]struct{})}
+	return context.WithValue(ctx, connectionReuseKey{}, scope), func() {
+		scope.Lock()
+		cancel()
+		databases := scope.databases
+		scope.databases = nil
+		scope.Unlock()
+		for lock := range databases {
+			if lock.TryLock() {
+				lock.releaseScope()
+				lock.Unlock()
+			} else {
+				go func() {
+					lock.Lock()
+					defer lock.Unlock()
+					lock.releaseScope()
+				}()
+			}
+		}
 	}
 }
 
-func connectionReuse(ctx context.Context) *sync.Map {
-	databases, _ := ctx.Value(connectionReuseKey{}).(*sync.Map)
-	return databases
+func connectionReuse(ctx context.Context) *connectionReuseScope {
+	scope, _ := ctx.Value(connectionReuseKey{}).(*connectionReuseScope)
+	return scope
 }

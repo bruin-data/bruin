@@ -27,7 +27,10 @@ func TestConnectionReuseDatabaseAndSessionIsolation(t *testing.T) {
 
 	// An in-memory attachment cannot survive reopening the engine. It must
 	// remain visible across all three operation APIs, as lakehouse catalogs do.
-	_, err = conn.ExecContext(ctx, "ATTACH ':memory:' AS attached; CREATE TABLE attached.values_table AS SELECT 17 AS n")
+	session, release, err := conn.openADBC(ctx, "")
+	require.NoError(t, err)
+	err = execADBCStatement(ctx, session, "ATTACH ':memory:' AS attached; CREATE TABLE attached.values_table AS SELECT 17 AS n")
+	release()
 	require.NoError(t, err)
 	rows, err := conn.QueryContext(ctx, "SELECT n FROM attached.values_table")
 	require.NoError(t, err)
@@ -55,6 +58,88 @@ func TestConnectionReuseDatabaseAndSessionIsolation(t *testing.T) {
 	require.Nil(t, conn.lock.database)
 }
 
+func TestConnectionReuseUserAttachments(t *testing.T) {
+	t.Parallel()
+	for _, api := range []string{"exec", "query", "row"} {
+		t.Run(api, func(t *testing.T) {
+			t.Parallel()
+			ctx, cleanup := WithConnectionReuse(t.Context())
+			cfg := Config{Path: filepath.Join(t.TempDir(), "attachments.db")}
+			t.Cleanup(cleanup)
+			conn, err := NewEphemeralConnection(cfg)
+			require.NoError(t, err)
+			for range 2 {
+				var n int
+				// Warm the shared engine before each user-managed attachment.
+				require.NoError(t, conn.QueryRowContext(ctx, "SELECT 7").Scan(&n))
+				sql := "SELECT 1; -- an asset's private source\n aTtAcH ':memory:' AS source; CREATE TABLE source.numbers AS SELECT 19 AS n; CREATE OR REPLACE TABLE main.result AS SELECT n FROM source.numbers; SELECT n FROM main.result"
+				switch api {
+				case "exec":
+					_, err = conn.ExecContext(ctx, sql)
+					require.NoError(t, err)
+				case "query":
+					rows, err := conn.QueryContext(ctx, sql)
+					require.NoError(t, err)
+					require.True(t, rows.Next())
+					require.NoError(t, rows.Scan(&n))
+					require.Equal(t, 19, n)
+					require.NoError(t, rows.Close())
+				case "row":
+					require.NoError(t, conn.QueryRowContext(ctx, sql).Scan(&n))
+					require.Equal(t, 19, n)
+				}
+				require.NoError(t, conn.QueryRowContext(ctx, "SELECT n FROM result").Scan(&n))
+				require.Equal(t, 19, n)
+				require.NoError(t, conn.QueryRowContext(ctx, "SELECT COUNT(*) FROM duckdb_databases() WHERE database_name = 'source'").Scan(&n))
+				require.Zero(t, n, "user attachments must not leak to the next operation")
+			}
+		})
+	}
+}
+
+func TestConnectionReuseOverlappingScopes(t *testing.T) {
+	t.Parallel()
+	for _, mode := range []string{"idle", "active"} {
+		t.Run(mode, func(t *testing.T) {
+			t.Parallel()
+			cfg := Config{Path: filepath.Join(t.TempDir(), "scopes.db")}
+			firstCtx, firstCleanup := WithConnectionReuse(t.Context())
+			t.Cleanup(firstCleanup)
+			secondCtx, secondCleanup := WithConnectionReuse(t.Context())
+			t.Cleanup(secondCleanup)
+			conn, err := NewEphemeralConnection(cfg)
+			require.NoError(t, err)
+			_, err = conn.ExecContext(firstCtx, "CREATE TABLE numbers AS SELECT 37 AS n")
+			require.NoError(t, err)
+			database := conn.lock.database
+			var n int
+			require.NoError(t, conn.QueryRowContext(secondCtx, "SELECT n FROM numbers").Scan(&n))
+			require.Equal(t, 37, n)
+			if mode == "active" {
+				_, release, err := conn.openADBC(secondCtx, "")
+				require.NoError(t, err)
+				firstCleanup()
+				release()
+			} else {
+				firstCleanup()
+			}
+			require.Eventually(t, func() bool {
+				return conn.lock.scopes.Load() == 1
+			}, 5*time.Second, time.Millisecond)
+			conn.lock.RLock()
+			remaining := conn.lock.database
+			conn.lock.RUnlock()
+			require.Same(t, database, remaining, "one run must not close another run's cached engine")
+			require.NoError(t, conn.QueryRowContext(secondCtx, "SELECT n FROM numbers").Scan(&n))
+			require.Equal(t, 37, n)
+			secondCleanup()
+			secondCleanup()
+			require.Nil(t, conn.lock.database)
+			require.Zero(t, conn.lock.scopes.Load())
+		})
+	}
+}
+
 func TestConnectionReuseAllowsConcurrentClients(t *testing.T) {
 	t.Parallel()
 	ctx, cleanup := WithConnectionReuse(t.Context())
@@ -65,7 +150,7 @@ func TestConnectionReuseAllowsConcurrentClients(t *testing.T) {
 	second, err := NewClient(cfg)
 	require.NoError(t, err)
 	conn := first.connection.(*EphemeralConnection)
-	session, release, err := conn.openADBC(ctx)
+	session, release, err := conn.openADBC(ctx, "")
 	require.NoError(t, err)
 	var once sync.Once
 	defer once.Do(release)
@@ -100,7 +185,7 @@ func TestConnectionReuseCleanupWithActiveSession(t *testing.T) {
 	t.Cleanup(cleanup)
 	conn, err := NewEphemeralConnection(Config{Path: ":memory:"})
 	require.NoError(t, err)
-	session, release, err := conn.openADBC(ctx)
+	session, release, err := conn.openADBC(ctx, "")
 	require.NoError(t, err)
 	var once sync.Once
 	defer once.Do(release)
@@ -231,7 +316,10 @@ func TestConnectionReuseLakehouseSessionCatalog(t *testing.T) {
 	t.Cleanup(cleanup)
 	conn, err := NewEphemeralConnection(Config{Path: ":memory:"})
 	require.NoError(t, err)
-	_, err = conn.ExecContext(ctx, "ATTACH ':memory:' AS ducklake_catalog; CREATE TABLE ducklake_catalog.numbers AS SELECT 31 AS n")
+	session, release, err := conn.openADBC(ctx, "")
+	require.NoError(t, err)
+	err = execADBCStatement(ctx, session, "ATTACH ':memory:' AS ducklake_catalog; CREATE TABLE ducklake_catalog.numbers AS SELECT 31 AS n")
+	release()
 	require.NoError(t, err)
 
 	// Stand in for an already attached lakehouse without network credentials.
@@ -274,7 +362,7 @@ func TestConnectionReuseTransactionConflict(t *testing.T) {
 	t.Cleanup(cleanup)
 	conn, err := NewEphemeralConnection(Config{Path: ":memory:"})
 	require.NoError(t, err)
-	session, release, err := conn.openADBC(ctx)
+	session, release, err := conn.openADBC(ctx, "")
 	require.NoError(t, err)
 	defer release()
 	require.NoError(t, execADBCStatement(ctx, session, "CREATE TABLE numbers AS SELECT 10 AS n; BEGIN; UPDATE numbers SET n = 20"))
