@@ -92,6 +92,10 @@ func (e *EphemeralConnection) openADBC(ctx context.Context) (adbc.Connection, fu
 				return nil, nil, err
 			}
 			e.lock.RLock()
+			if err := ctx.Err(); err != nil {
+				e.lock.RUnlock()
+				return nil, nil, err
+			}
 			db, ok := e.lock.database.(*cachedDatabase)
 			if ok && reflect.DeepEqual(db.config, e.config) {
 				conn, err := db.Open(ctx)
@@ -117,6 +121,10 @@ func (e *EphemeralConnection) openADBC(ctx context.Context) (adbc.Connection, fu
 			e.lock.RUnlock()
 
 			e.lock.Lock()
+			if err := ctx.Err(); err != nil {
+				e.lock.Unlock()
+				return nil, nil, err
+			}
 			// Another worker may have initialized the database while we
 			// waited. Different configurations must never share an engine.
 			db, ok = e.lock.database.(*cachedDatabase)

@@ -3,6 +3,7 @@
 package duck
 
 import (
+	"context"
 	"errors"
 	"os"
 	"os/exec"
@@ -93,6 +94,41 @@ func TestConnectionReuseAllowsConcurrentClients(t *testing.T) {
 	}
 }
 
+func TestConnectionReuseCleanupWithActiveSession(t *testing.T) {
+	t.Parallel()
+	ctx, cleanup := WithConnectionReuse(t.Context())
+	t.Cleanup(cleanup)
+	conn, err := NewEphemeralConnection(Config{Path: ":memory:"})
+	require.NoError(t, err)
+	session, release, err := conn.openADBC(ctx)
+	require.NoError(t, err)
+	var once sync.Once
+	defer once.Do(release)
+
+	done := make(chan struct{})
+	go func() {
+		cleanup()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		once.Do(release)
+		<-done
+		t.Fatal("run cleanup waited for an active DuckDB worker")
+	}
+	require.ErrorIs(t, ctx.Err(), context.Canceled)
+	require.ErrorIs(t, conn.QueryRowContext(ctx, "SELECT 1").Err(), context.Canceled)
+	// Cleanup must not close a database underneath the active worker.
+	require.NoError(t, execADBCStatement(t.Context(), session, "SELECT 17"))
+	once.Do(release)
+	require.Eventually(t, func() bool {
+		conn.lock.RLock()
+		defer conn.lock.RUnlock()
+		return conn.lock.database == nil
+	}, 5*time.Second, time.Millisecond)
+}
+
 func TestConnectionReuseExternalProcessHandoff(t *testing.T) {
 	t.Parallel()
 	ctx, cleanup := WithConnectionReuse(t.Context())
@@ -104,7 +140,7 @@ func TestConnectionReuseExternalProcessHandoff(t *testing.T) {
 	require.NoError(t, err)
 
 	runChild := func() ([]byte, error) {
-		cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestDuckDBProcessHelper$")
+		cmd := exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestDuckDBProcessHelper$")
 		cmd.Env = append(os.Environ(), "BRUIN_TEST_DUCKDB_PATH="+cfg.Path)
 		return cmd.CombinedOutput()
 	}
