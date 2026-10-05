@@ -160,18 +160,31 @@ func LockDatabases(paths ...string) func() {
 type connectionReuseKey struct{}
 
 // WithConnectionReuse keeps DuckDB instances (including lakehouse attachments)
-// alive for a pipeline run. Call cleanup after all workers have stopped. SQL
-// sessions remain operation-local, so transaction and session state cannot leak
-// between assets. Outside this scope, connections remain ephemeral.
+// alive for a pipeline run. Cleanup cancels the scope and closes idle databases;
+// active sessions are closed asynchronously once their workers release them.
+// This preserves bounded CLI shutdown when a worker ignores cancellation.
+// Outside this scope, connections remain ephemeral.
 func WithConnectionReuse(ctx context.Context) (context.Context, func()) {
+	ctx, cancel := context.WithCancel(ctx)
 	databases := &sync.Map{}
+	var once sync.Once
 	return context.WithValue(ctx, connectionReuseKey{}, databases), func() {
-		databases.Range(func(key, _ any) bool {
-			lock := key.(*databaseLock)
-			lock.Lock()
-			lock.closeDatabase()
-			lock.Unlock()
-			return true
+		once.Do(func() {
+			cancel()
+			databases.Range(func(key, _ any) bool {
+				lock := key.(*databaseLock)
+				if lock.TryLock() {
+					lock.closeDatabase()
+					lock.Unlock()
+				} else {
+					go func() {
+						lock.Lock()
+						defer lock.Unlock()
+						lock.closeDatabase()
+					}()
+				}
+				return true
+			})
 		})
 	}
 }
