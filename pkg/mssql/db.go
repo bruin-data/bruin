@@ -52,7 +52,9 @@ func (db *DB) GetIngestrURI() (string, error) {
 }
 
 func (db *DB) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
-	_, err := db.Select(ctx, query)
+	// Exec consumes the entire batch, including errors after intermediate result
+	// sets, and preserves driver error numbers for deadlock handling.
+	_, err := db.conn.ExecContext(ctx, query.String(), query.Args...)
 	return err
 }
 
