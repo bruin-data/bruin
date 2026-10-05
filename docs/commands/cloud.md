@@ -1108,6 +1108,8 @@ bruin cloud scheduled-agents get --scheduled-agent-id 42
 bruin cloud scheduled-agents get --scheduled-agent-id 42 --output json
 ```
 
+`get` includes `notification_integrations`: the channels (Slack, email, ...) that receive each run's result. They're set under Notifications on the scheduled agent page, not through the plan.
+
 #### `create`
 
 Create a scheduled agent from a plan. A plan with a cron activates immediately; without a cron it stays an inactive **draft**. Pass the plan with convenience flags, or via `--state-file` (JSON or YAML with `schedule`, `instructions`, `verified_sqls`, `memory`, ...). Manage pipeline triggers separately with `pipeline-trigger set`; do not put `pipeline_trigger` in the plan.

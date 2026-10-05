@@ -6195,6 +6195,9 @@ func buildScheduledAgentFields(c *cli.Command) (map[string]any, error) {
 	if _, exists := fields["pipeline_trigger"]; exists {
 		return nil, errors.New("pipeline_trigger is not a plan field; use bruin cloud scheduled-agents pipeline-trigger set or delete")
 	}
+	if _, exists := fields["notification_integrations"]; exists {
+		return nil, errors.New("notification_integrations is not a plan field; the user sets channels under Notifications on the scheduled agent page")
+	}
 
 	if c.IsSet("title") {
 		fields["title"] = c.String("title")
@@ -6236,6 +6239,13 @@ func printScheduledAgent(run *bruincloud.ScheduledAgent) {
 	fmt.Printf("  Timezone:  %s\n", derefString(run.ScheduleTimezone))
 	fmt.Printf("  Next run:  %s\n", derefString(run.NextRunAt))
 	fmt.Printf("  Last run:  %s\n", derefString(run.LastRunAt))
+	if len(run.NotificationIntegrations) > 0 {
+		channels := make([]string, 0, len(run.NotificationIntegrations))
+		for _, n := range run.NotificationIntegrations {
+			channels = append(channels, fmt.Sprintf("%s (%s)", n.DisplayName, n.Platform))
+		}
+		fmt.Printf("  Notify:    %s\n", strings.Join(channels, ", "))
+	}
 	if run.Instructions != nil && *run.Instructions != "" {
 		fmt.Printf("  Instructions:\n%s\n", *run.Instructions)
 	}
