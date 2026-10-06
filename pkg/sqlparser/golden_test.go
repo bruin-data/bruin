@@ -9,6 +9,9 @@ package sqlparser
 //     and rename, with their schemas, for every Bruin dialect.
 //   - fuzz.json.gz: malformed variants of the corpus (truncated, dropped, duplicated and swapped
 //     tokens). Skipped with -short.
+//   - hoist.json.gz: multi-statement scripts and hook lists composed around DECLAREs (procedural
+//     blocks, comments, separators, malformed variants) through hoist-declares and
+//     hoist-declares-list, in every dialect Bruin hoists for.
 //
 // After an intentional behavior change, rewrite them from the Go output with
 //
@@ -42,7 +45,7 @@ type goldenRecord struct {
 
 func TestGoldenCommands(t *testing.T) {
 	t.Parallel()
-	for _, name := range []string{"commands", "fixtures"} {
+	for _, name := range []string{"commands", "fixtures", "hoist"} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			replayGolden(t, name)
