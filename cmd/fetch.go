@@ -466,9 +466,6 @@ func validateFlags(connection, query, asset, pipelinePath string, hasSemanticFla
 		if !hasAsset && !hasPipeline {
 			return errors.New("semantic query mode requires --asset or --pipeline")
 		}
-		if hasPipeline && !hasConnection && !hasAsset {
-			return errors.New("semantic query mode with --pipeline requires --connection")
-		}
 		return nil
 	}
 
@@ -769,7 +766,7 @@ func prepareSemanticQueryExecution(ctx context.Context, c *cli.Command, fs afero
 		return "", nil, "", "", nil, errors.Wrap(err, "failed to compile semantic query")
 	}
 
-	connName, conn, err := getSemanticQueryConnection(ctx, pipelineInfo, env, connectionName, assetPath != "")
+	connName, conn, err := getSemanticQueryConnection(ctx, pipelineInfo, env, connectionName, model.Source.Connection, assetPath != "")
 	if err != nil {
 		return "", nil, "", "", nil, err
 	}
@@ -814,14 +811,20 @@ func prepareSemanticQueryExecution(ctx context.Context, c *cli.Command, fs afero
 	}
 }
 
-func getSemanticQueryConnection(ctx context.Context, pipelineInfo *ppInfo, env, connectionName string, hasAsset bool) (string, interface{}, error) {
+// getSemanticQueryConnection picks the connection for a semantic query:
+// --connection wins, then the anchor asset's connection, then the model's
+// source.connection when querying from a pipeline directory.
+func getSemanticQueryConnection(ctx context.Context, pipelineInfo *ppInfo, env, connectionName, modelConnection string, hasAsset bool) (string, interface{}, error) {
 	if connectionName != "" {
 		return getConnectionByNameFromPipelineInfoWithContext(ctx, pipelineInfo, env, connectionName)
 	}
 	if hasAsset {
 		return getConnectionFromPipelineInfoWithContext(ctx, pipelineInfo, env)
 	}
-	return "", nil, errors.New("semantic query mode with --pipeline requires --connection")
+	if modelConnection = strings.TrimSpace(modelConnection); modelConnection != "" {
+		return getConnectionByNameFromPipelineInfoWithContext(ctx, pipelineInfo, env, modelConnection)
+	}
+	return "", nil, errors.New("semantic query mode with --pipeline requires --connection or source.connection on the semantic model")
 }
 
 func loadRepoSemanticModels(fs afero.Fs, configFilePath, inputPath string) (map[string]*semantic.Model, string, error) {
@@ -1551,6 +1554,16 @@ func applySchemaPrefix(_ context.Context, queryStr, dialect string, parser *sqlp
 		return queryStr, nil
 	}
 
+	// Check if connection supports getting database summary for schema validation
+	// Note: This could be extended in the future to validate table existence
+	_ = conn
+
+	return prefixTableSchemas(queryStr, dialect, env.SchemaPrefix, parser)
+}
+
+// prefixTableSchemas rewrites every schema.table reference in the query to
+// <schemaPrefix>schema.table.
+func prefixTableSchemas(queryStr, dialect, schemaPrefix string, parser *sqlparser.SQLParser) (string, error) {
 	// Get used tables
 	usedTables, err := parser.UsedTables(queryStr, dialect)
 	if err != nil {
@@ -1562,10 +1575,6 @@ func applySchemaPrefix(_ context.Context, queryStr, dialect string, parser *sqlp
 		return queryStr, nil
 	}
 
-	// Check if connection supports getting database summary for schema validation
-	// Note: This could be extended in the future to validate table existence
-	_ = conn
-
 	renameMapping := map[string]string{}
 
 	// Build rename mapping for tables that should use prefixed schema
@@ -1576,7 +1585,7 @@ func applySchemaPrefix(_ context.Context, queryStr, dialect string, parser *sqlp
 		}
 		schema := parts[0]
 		table := parts[1]
-		devSchema := env.SchemaPrefix + schema
+		devSchema := schemaPrefix + schema
 		devTable := fmt.Sprintf("%s.%s", devSchema, table)
 
 		// For now, we'll rename all schema.table references to prefix_schema.table

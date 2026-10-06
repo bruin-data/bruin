@@ -176,7 +176,7 @@ bruin query \
   --output json
 ```
 
-Use a pipeline path when there is no anchor asset. In this mode, pass the connection explicitly:
+Use a pipeline path when there is no anchor asset. In this mode, pass the connection explicitly, or set `source.connection` on the semantic model and leave out `--connection`:
 
 ```bash
 bruin query \
@@ -189,4 +189,4 @@ bruin query \
   --output csv
 ```
 
-Semantic query mode cannot be combined with `--query`.
+Semantic query mode cannot be combined with `--query`. To validate semantic models or run their quality checks, see the [`semantic` command](/commands/semantic).

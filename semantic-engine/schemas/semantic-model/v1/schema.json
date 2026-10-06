@@ -57,6 +57,12 @@
       "items": {
         "$ref": "#/$defs/note"
       }
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/model_check"
+      }
     }
   },
   "patternProperties": {
@@ -69,6 +75,10 @@
       "required": ["table"],
       "properties": {
         "table": {
+          "type": "string",
+          "minLength": 1
+        },
+        "connection": {
           "type": "string",
           "minLength": 1
         }
@@ -197,6 +207,12 @@
         },
         "group": {
           "type": "string"
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/check"
+          }
         }
       },
       "patternProperties": {
@@ -236,6 +252,12 @@
         },
         "window": {
           "$ref": "#/$defs/window"
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/check"
+          }
         }
       },
       "patternProperties": {
@@ -304,6 +326,167 @@
         "filter": {
           "type": "string",
           "minLength": 1
+        }
+      },
+      "patternProperties": {
+        "^x-": true
+      },
+      "additionalProperties": false
+    },
+    "check": {
+      "comment": "Built-in quality check on a dimension or metric. Supported names are validated by the engine.",
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string"
+        },
+        "value": {}
+      },
+      "patternProperties": {
+        "^x-": true
+      },
+      "additionalProperties": false
+    },
+    "model_check": {
+      "comment": "Custom model-level quality check expressed as a semantic query; value and count are mutually exclusive.",
+      "type": "object",
+      "required": ["name", "query"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string"
+        },
+        "query": {
+          "$ref": "#/$defs/query"
+        },
+        "value": {},
+        "count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "patternProperties": {
+        "^x-": true
+      },
+      "additionalProperties": false
+    },
+    "query": {
+      "type": "object",
+      "properties": {
+        "dimensions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/dimension_ref"
+          }
+        },
+        "metrics": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "filters": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/filter"
+          }
+        },
+        "segments": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "sort": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sort_ref"
+          }
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "patternProperties": {
+        "^x-": true
+      },
+      "additionalProperties": false
+    },
+    "dimension_ref": {
+      "comment": "Either the name:granularity shorthand or an object.",
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "object",
+          "required": ["name"],
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "granularity": {
+              "type": "string"
+            }
+          },
+          "patternProperties": {
+            "^x-": true
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "sort_ref": {
+      "comment": "Either the name:direction shorthand or an object.",
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "object",
+          "required": ["name"],
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "direction": {
+              "enum": ["asc", "desc"]
+            }
+          },
+          "patternProperties": {
+            "^x-": true
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "filter": {
+      "type": "object",
+      "properties": {
+        "dimension": {
+          "type": "string"
+        },
+        "operator": {
+          "enum": ["equals", "not_equals", "gt", "gte", "lt", "lte", "in", "not_in", "between", "is_null", "is_not_null"]
+        },
+        "value": {},
+        "expression": {
+          "type": "string"
         }
       },
       "patternProperties": {
