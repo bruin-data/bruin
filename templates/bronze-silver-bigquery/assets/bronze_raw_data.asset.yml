@@ -1,0 +1,45 @@
+name: bronze.frankfurter_rates
+type: ingestr
+
+description: |
+  Ingests daily exchange rate data from the public Frankfurter API into BigQuery
+  without requiring credentials. The bronze layer captures the raw payload so
+  downstream transformations can compute rolling trends and quality metrics.
+
+columns:
+  - name: date
+    type: timestamp
+    description: "UTC timestamp returned by the Frankfurter exchange rate feed"
+    checks:
+      - name: not_null
+  - name: currency_code
+    type: string
+    description: "ISO 4217 code for the quoted currency in the rates dataset"
+    checks:
+      - name: not_null
+  - name: base_currency
+    type: string
+    description: "ISO 4217 code of the base currency (EUR by default in Frankfurter)"
+    checks:
+      - name: not_null
+  - name: rate
+    type: numeric
+    description: "Exchange rate value for currency_code relative to base_currency"
+    checks:
+      - name: not_null
+      - name: positive
+
+custom_checks:
+  - name: ensure_eur_reference
+    description: "Verify that the base currency remains EUR for the raw snapshot"
+    value: 0
+    query: |
+      SELECT COUNT(*) AS mismatch_count
+      FROM bronze.frankfurter_rates
+      WHERE base_currency != 'EUR'
+
+parameters:
+  source_connection: frankfurter-default
+  source_table: exchange_rates
+  destination: bigquery
+  destination_table: bronze.frankfurter_rates
