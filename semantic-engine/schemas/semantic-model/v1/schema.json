@@ -117,7 +117,8 @@
           "minLength": 1
         },
         "type": {
-          "enum": ["select", "date-range", "date", "number", "boolean", "text"]
+          "enum": ["select", "date-range", "date", "number", "boolean", "text"],
+          "default": "select"
         },
         "required": {
           "type": "boolean",
