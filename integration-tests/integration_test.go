@@ -936,6 +936,80 @@ func TestIndividualTasks(t *testing.T) {
 			},
 		},
 		{
+			name: "query-semantic-model-connection",
+			task: e2e.Task{
+				Name:    "query-semantic-model-connection",
+				Command: binary,
+				Args: []string{
+					"query",
+					"--config-file", filepath.Join(currentFolder, ".bruin.yml"),
+					"--env", "env-semantic-query",
+					"--pipeline", filepath.Join(currentFolder, "test-pipelines/semantic-query-pipeline"),
+					"--semantic-model", "orders",
+					"--dimension", "country",
+					"--metric", "revenue",
+					"--segment", "completed",
+					"--sort", "revenue:desc",
+					"--output", "csv",
+				},
+				Env: []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					CSVFile:  filepath.Join(currentFolder, "test-pipelines/semantic-query-pipeline/expectations/expected-country.csv"),
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByCSV,
+				},
+			},
+		},
+		{
+			name: "semantic-validate",
+			task: e2e.Task{
+				Name:    "semantic-validate",
+				Command: binary,
+				Args: []string{
+					"semantic", "validate",
+					"--config-file", filepath.Join(currentFolder, ".bruin.yml"),
+					"--env", "env-semantic-query",
+					"--output", "json",
+				},
+				Env:           []string{},
+				SkipJSONNodes: []string{`"path"`, `"duration_ms"`},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/semantic-query-pipeline/expectations/expected-semantic-validate.json")),
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByOutputJSON,
+				},
+			},
+		},
+		{
+			name: "semantic-check",
+			task: e2e.Task{
+				Name:    "semantic-check",
+				Command: binary,
+				Args: []string{
+					"semantic", "check",
+					"--config-file", filepath.Join(currentFolder, ".bruin.yml"),
+					"--env", "env-semantic-query",
+					"--output", "json",
+				},
+				Env:           []string{},
+				SkipJSONNodes: []string{`"path"`, `"duration_ms"`},
+				Expected: e2e.Output{
+					ExitCode: 1,
+					Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/semantic-query-pipeline/expectations/expected-semantic-check.json")),
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByOutputJSON,
+				},
+			},
+		},
+		{
 			name: "query-semantic-unknown-metric",
 			task: e2e.Task{
 				Name:    "query-semantic-unknown-metric",

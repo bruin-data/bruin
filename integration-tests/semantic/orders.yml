@@ -3,6 +3,7 @@ name: orders
 label: Orders
 description: Semantic model used by bruin query integration tests
 source:
+  connection: duckdb-semantic-query
   table: |
     (
       SELECT 1 AS order_id, 101 AS customer_id, DATE '2025-01-15' AS order_date, 'US' AS country, 'completed' AS status, 'electronics' AS category, 100 AS amount
@@ -20,6 +21,13 @@ joins:
     foreign_key: customer_id
 
 dimensions:
+  - name: order_id
+    type: number
+    hidden: true
+    checks:
+      - name: not_null
+      - name: unique
+      - name: positive
   - name: order_date
     type: time
     granularities:
@@ -27,18 +35,46 @@ dimensions:
       month: date_trunc('month', order_date)
   - name: country
     type: string
+    checks:
+      - name: accepted_values
+        value: [US, DE]
+      - name: pattern
+        value: "^[A-Z]{2}$"
   - name: status
     type: string
+    checks:
+      - name: not_null
   - name: category
     type: string
+  - name: amount
+    type: number
+    hidden: true
+    checks:
+      - name: non_negative
+      - name: min
+        value: 10
+      - name: max
+        value: 300
 
 metrics:
   - name: revenue
     expression: sum(amount)
+    checks:
+      - name: positive
+      - name: equals
+        value: 810
   - name: order_count
     expression: count(distinct order_id)
+    checks:
+      - name: not_null
+      - name: max
+        description: intentionally failing check used by the integration tests
+        value: 6
   - name: avg_order_value
     expression: "{revenue} / {order_count}"
+    checks:
+      - name: min
+        value: 100
   - name: completed_revenue
     expression: sum(amount)
     filter: "status = 'completed'"
@@ -57,3 +93,62 @@ segments:
     filter: "country = 'US'"
   - name: high_value
     filter: "amount >= 100"
+
+checks:
+  - name: completed_revenue
+    description: completed orders add up to 730
+    query:
+      metrics: [revenue]
+      segments: [completed]
+    value: 730
+  - name: customer_countries
+    query:
+      dimensions: [customers.country]
+      metrics: [revenue]
+      sort: [revenue:desc]
+    count: 2
+  - name: monthly_revenue_positive
+    query:
+      dimensions: [order_date:month]
+      metrics: [revenue]
+      filters:
+        - expression: "{revenue} <= 0"
+    count: 0
+  - name: no_negative_amounts
+    query:
+      dimensions: [order_id]
+      filters:
+        - dimension: amount
+          operator: lt
+          value: 0
+    count: 0
+  - name: revenue_by_country
+    query:
+      dimensions: [country]
+      metrics: [revenue, order_count]
+      sort: [revenue:desc]
+    value:
+      - country: US
+        revenue: 600
+        order_count: 5
+      - country: DE
+        revenue: 210
+        order_count: 2
+  - name: revenue_by_country_mismatch
+    description: intentionally failing check used by the integration tests
+    query:
+      dimensions: [customers.country]
+      metrics: [revenue]
+    value:
+      - customers.country: US
+        revenue: 600
+      - customers.country: DE
+        revenue: 200
+  - name: orders_without_customers
+    description: intentionally failing check used by the integration tests
+    query:
+      dimensions: [order_id]
+      filters:
+        - dimension: customers.country
+          operator: is_null
+    count: 1

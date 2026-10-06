@@ -52,6 +52,7 @@ bruin validate --help
 | [`lineage`](/commands/lineage) | Visualize asset dependencies |
 | [`docs`](/commands/docs) | Generate a self-contained HTML documentation site for your pipelines |
 | [`query`](/commands/query) | Execute ad-hoc queries against connections |
+| [`semantic`](/commands/semantic) | Validate semantic models and run their quality checks |
 | [`curl`](/commands/curl) | Call remote services with connection-aware Jinja rendering |
 | [`data-diff`](/commands/data-diff) | Compare data between connections |
 
