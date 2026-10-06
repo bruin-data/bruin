@@ -49,13 +49,17 @@ func checkHoistDeclaresListInvariants(t *testing.T, queries []string, dialect st
 	res := hoistDeclaresList(queries, dialect)
 	require.Empty(t, res["error"])
 	got, _ := res["queries"].([]string)
-	require.ElementsMatch(t, queries, got, "hoisting must permute the entries")
-	sawStatement := false
-	for _, q := range got {
-		isDeclare := isDeclareStatement(pyStrip(q), normalizeDialect(dialect))
-		require.False(t, isDeclare && sawStatement, "declaration %q after a statement in %q", q, got)
-		sawStatement = sawStatement || !isDeclare
+	// A stable partition: declarations first, each group in its original order.
+	var declares, rest []string
+	for _, q := range queries {
+		if isDeclareStatement(pyStrip(q), normalizeDialect(dialect)) {
+			declares = append(declares, q)
+		} else {
+			rest = append(rest, q)
+		}
 	}
+	// append normalizes an empty result to nil, like the expected value.
+	require.Equal(t, append(declares, rest...), append([]string(nil), got...), "hoisting must stably partition %q", queries)
 	require.Equal(t, got, hoistDeclaresList(got, dialect)["queries"], "hoisting is not idempotent for %q", queries)
 }
 
