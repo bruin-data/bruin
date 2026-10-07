@@ -78,6 +78,29 @@ func TestSetupVariables(t *testing.T) {
 			},
 		},
 		{
+			name: "with interval modifiers and selected environment",
+			setupCtx: func() context.Context {
+				ctx := t.Context()
+				ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
+				ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC))
+				ctx = context.WithValue(ctx, pipeline.RunConfigExecutionDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
+				ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run")
+				ctx = context.WithValue(ctx, pipeline.RunConfigFullRefresh, false)
+				ctx = context.WithValue(ctx, config.EnvironmentNameContextKey, "production")
+				return ctx
+			},
+			asset: &pipeline.Asset{
+				IntervalModifiers: pipeline.IntervalModifiers{
+					Start: pipeline.TimeModifier{Days: 1},
+				},
+			},
+			expectedEnv: map[string]string{
+				"BRUIN_START_DATE":  "2024-01-02",
+				"BRUIN_ENVIRONMENT": "production",
+				"BRUIN_PIPELINE":    "test-pipeline",
+			},
+		},
+		{
 			name: "with hours modifier",
 			setupCtx: func() context.Context {
 				ctx := t.Context()
