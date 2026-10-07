@@ -2,7 +2,11 @@ package mask
 
 import (
 	"bytes"
+	cryptorand "crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/base64"
+	"encoding/pem"
 	"math/rand"
 	"net/url"
 	"os"
@@ -777,5 +781,27 @@ func TestEmptyMaskerWriter(t *testing.T) {
 	}
 	if out.String() != "hello\n" {
 		t.Fatalf("got %q", out.String())
+	}
+}
+
+// TestMaskConvertedPKCS8Key covers Snowflake: a PKCS#1 key is converted to
+// PKCS#8 before it goes into the ingestr URI that --debug prints.
+func TestMaskConvertedPKCS8Key(t *testing.T) {
+	t.Parallel()
+	key, err := rsa.GenerateKey(cryptorand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pkcs1 := string(pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)}))
+	der, err := x509.MarshalPKCS8PrivateKey(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pkcs8 := string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}))
+
+	got := New([]string{pkcs1}).Mask("--source-uri snowflake://u@acct/db?private_key=" + url.QueryEscape(pkcs8) + "&warehouse=WH")
+	want := "--source-uri snowflake://u@acct/db?private_key=" + Mask + "&warehouse=WH"
+	if got != want {
+		t.Errorf("converted PKCS#8 key not masked:\n got: %s\nwant: %s", got, want)
 	}
 }

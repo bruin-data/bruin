@@ -4,11 +4,14 @@ package mask
 
 import (
 	"bytes"
+	"crypto/x509"
 	"encoding/base64"
+	"encoding/pem"
 	"io"
 	"net/url"
 	"os"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -202,9 +205,18 @@ type Masker struct {
 // New builds a Masker from raw secret values, expanding each into the forms
 // it can appear as (raw, query/path/userinfo-escaped, base64).
 func New(values []string) *Masker {
+	// Snowflake re-encodes PKCS#1 keys as PKCS#8 before use, which changes every
+	// byte of the PEM, so the converted key is masked alongside the configured one.
+	all := slices.Clone(values)
+	for _, v := range values {
+		if pkcs8 := pkcs1ToPKCS8(v); pkcs8 != "" {
+			all = append(all, pkcs8)
+		}
+	}
+
 	seen := map[string]struct{}{}
 	var ordered []string
-	for _, v := range values {
+	for _, v := range all {
 		for _, f := range forms(v) {
 			if _, ok := seen[f]; ok {
 				continue
@@ -225,6 +237,25 @@ func New(values []string) *Masker {
 		m.firstByteSet[f[0]>>6] |= 1 << (f[0] & 63)
 	}
 	return m
+}
+
+// pkcs1ToPKCS8 re-encodes a PKCS#1 PEM key as PKCS#8 the same way the Snowflake
+// connection does (convertPKCS1ToPKCS8 in pkg/connection), or returns "" for
+// anything else.
+func pkcs1ToPKCS8(secret string) string {
+	block, _ := pem.Decode([]byte(secret))
+	if block == nil || block.Type != "RSA PRIVATE KEY" {
+		return ""
+	}
+	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		return ""
+	}
+	der, err := x509.MarshalPKCS8PrivateKey(key)
+	if err != nil {
+		return ""
+	}
+	return string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}))
 }
 
 // Empty reports whether there is nothing to mask.
