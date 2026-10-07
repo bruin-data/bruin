@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/date"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/nikolalohinski/gonja/v2"
 	"github.com/nikolalohinski/gonja/v2/exec"
@@ -187,9 +188,8 @@ func defaultContext(startDate, endDate, executionDate *time.Time, pipelineName, 
 }
 
 func NewRendererWithYesterday(pipelineName, runID string) *Renderer {
-	yesterday := time.Now().AddDate(0, 0, -1)
-	startDate := time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 0, 0, 0, 0, time.UTC)
-	endDate := time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 999999999, time.UTC)
+	startDate := date.StartOfYesterdayUTC(time.Now())
+	endDate := time.Date(startDate.Year(), startDate.Month(), startDate.Day(), 23, 59, 59, 999999999, time.UTC)
 	now := time.Now().UTC()
 	ctx := defaultContext(&startDate, &endDate, &now, pipelineName, runID, false)
 	ctx["var"] = nil
