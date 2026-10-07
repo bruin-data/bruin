@@ -728,17 +728,13 @@ func TestTailBufferDropsUnfinishedLongLine(t *testing.T) {
 	assert.Equal(t, "[earlier ingestr output omitted]\n", out.String())
 }
 
-func TestTailBufferSkipsRestOfCutLine(t *testing.T) {
+func TestTailBufferKeepsOtherPipeLineAfterUnfinishedLine(t *testing.T) {
 	t.Parallel()
-	const secret = "SECRETabcdefghij0123456789"
 	tb := newTailBuffer(64)
-	_, _ = tb.Write([]byte(strings.Repeat("x", 100) + "password=" + secret[:10]))
-	_, _ = tb.Write([]byte(secret[10:] + "\nnext line\n"))
+	_, _ = tb.Write([]byte(strings.Repeat("x", 100)))
+	_, _ = tb.Write([]byte(">> stderr: ingestion failed\n"))
 
 	var out bytes.Buffer
-	w := mask.New([]string{secret}).Writer(&out)
-	tb.flushTo(w)
-	require.NoError(t, w.Flush())
-
-	assert.Equal(t, "[earlier ingestr output omitted]\nnext line\n", out.String())
+	tb.flushTo(&out)
+	assert.Equal(t, "[earlier ingestr output omitted]\n>> stderr: ingestion failed\n", out.String())
 }
