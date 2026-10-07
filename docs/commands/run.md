@@ -36,8 +36,8 @@ table td:first-child {
 |------|------|---------|-------------|
 | `--downstream` | bool | `false` | Run all downstream assets as well. |
 | `--workers` | int | `16` | Number of workers to run assets in parallel. |
-| `--start-date` | str | Beginning of yesterday | The start date of the range the pipeline will run for. Format: `YYYY-MM-DD`, `YYYY-MM-DD HH:MM:SS`, or `YYYY-MM-DD HH:MM:SS.ffffff` |
-| `--end-date` | str | End of yesterday | The end date of the range the pipeline will run for. Format: `YYYY-MM-DD`, `YYYY-MM-DD HH:MM:SS`, or `YYYY-MM-DD HH:MM:SS.ffffff` |
+| `--start-date` | str | Beginning of the previous UTC day | The start date of the range the pipeline will run for. Format: `YYYY-MM-DD`, `YYYY-MM-DD HH:MM:SS`, or `YYYY-MM-DD HH:MM:SS.ffffff` |
+| `--end-date` | str | End of the previous UTC day | The end date of the range the pipeline will run for. Format: `YYYY-MM-DD`, `YYYY-MM-DD HH:MM:SS`, or `YYYY-MM-DD HH:MM:SS.ffffff` |
 | `--environment` | str | - | The environment to use. |
 | `--push-metadata` | bool | `false` | Push metadata to the destination database if supported (currently BigQuery). |
 | `--force` | bool | `false` | Do not ask for confirmation in a production environment. |

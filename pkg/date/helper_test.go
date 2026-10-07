@@ -8,6 +8,31 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestStartOfYesterdayUTC(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		now  time.Time
+	}{
+		{
+			name: "local date is ahead of UTC",
+			now:  time.Date(2026, time.October, 6, 5, 20, 0, 0, time.FixedZone("UTC+14", 14*60*60)),
+		},
+		{
+			name: "local date is behind UTC",
+			now:  time.Date(2026, time.October, 4, 16, 20, 0, 0, time.FixedZone("UTC-10", -10*60*60)),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, time.Date(2026, time.October, 4, 0, 0, 0, 0, time.UTC), StartOfYesterdayUTC(tt.now))
+		})
+	}
+}
+
 func Test_parseTime(t *testing.T) {
 	t.Parallel()
 

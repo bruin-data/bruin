@@ -105,7 +105,7 @@ func RenderDDL() *cli.Command {
 			}
 
 			// For DDL rendering, we use a default start/end date since DDL doesn't depend on time ranges
-			startDate := time.Now().AddDate(0, 0, -1) // Yesterday as default
+			startDate := date.StartOfYesterdayUTC(time.Now())
 			if c.String("start-date") != "" {
 				startDate, err = date.ParseTime(c.String("start-date"))
 				if err != nil {
