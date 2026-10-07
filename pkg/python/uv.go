@@ -634,6 +634,8 @@ type tailBuffer struct {
 	data      []byte
 	maxBytes  int
 	truncated bool
+	// midLine is set while the line a cut landed in is still being written.
+	midLine bool
 }
 
 func newTailBuffer(maxBytes int) *tailBuffer {
@@ -643,12 +645,21 @@ func newTailBuffer(maxBytes int) *tailBuffer {
 func (t *tailBuffer) Write(p []byte) (int, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	n := len(p)
+	if t.midLine {
+		i := bytes.IndexByte(p, '\n')
+		if i < 0 {
+			return n, nil
+		}
+		p = p[i+1:]
+		t.midLine = false
+	}
 	if len(p) >= t.maxBytes {
 		// Single write larger than cap: keep only the tail.
 		t.data = append(t.data[:0], p[len(p)-t.maxBytes:]...)
 		t.truncated = true
 		t.dropPartialFirstLine()
-		return len(p), nil
+		return n, nil
 	}
 	t.data = append(t.data, p...)
 	if len(t.data) > t.maxBytes {
@@ -658,15 +669,19 @@ func (t *tailBuffer) Write(p []byte) (int, error) {
 		t.truncated = true
 		t.dropPartialFirstLine()
 	}
-	return len(p), nil
+	return n, nil
 }
 
 // dropPartialFirstLine keeps the tail from starting mid-secret, which the log
 // masker could not recognize.
 func (t *tailBuffer) dropPartialFirstLine() {
-	if i := bytes.IndexByte(t.data, '\n'); i >= 0 {
-		t.data = append(t.data[:0], t.data[i+1:]...)
+	i := bytes.IndexByte(t.data, '\n')
+	if i < 0 {
+		t.data = t.data[:0]
+		t.midLine = true
+		return
 	}
+	t.data = append(t.data[:0], t.data[i+1:]...)
 }
 
 func (t *tailBuffer) flushTo(w io.Writer) {

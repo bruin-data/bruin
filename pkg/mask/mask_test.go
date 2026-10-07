@@ -811,7 +811,8 @@ func TestMaskQuotedForms(t *testing.T) {
 	t.Parallel()
 	const pw = `Pa&ss\w0rd"x<y>Z`
 	const nonASCII = `pä\ss-wörd`
-	r := New([]string{pw, nonASCII})
+	const emoji = "password😀"
+	r := New([]string{pw, nonASCII, emoji})
 
 	tests := []struct{ name, in, want string }{
 		{"Go json.Marshal", `"password":"Pa\u0026ss\\w0rd\"x\u003cy\u003eZ"`, `"password":"****"`},
@@ -819,6 +820,7 @@ func TestMaskQuotedForms(t *testing.T) {
 		{"Python repr", `{'password': 'Pa&ss\\w0rd"x<y>Z'}`, `{'password': '****'}`},
 		{"Go %q", fmt.Sprintf("parse %q: invalid", pw), `parse "****": invalid`},
 		{"Python json.dumps, non-ASCII", `{"password": "p\u00e4\\ss-w\u00f6rd"}`, `{"password": "****"}`},
+		{"Python json.dumps, emoji", `{"password": "password\ud83d\ude00"}`, `{"password": "****"}`},
 		{"Go json.Marshal, non-ASCII", `"password":"pä\\ss-wörd"`, `"password":"****"`},
 	}
 	for _, tt := range tests {

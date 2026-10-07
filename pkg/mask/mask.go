@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
+	"fmt"
 	"io"
 	"net/url"
 	"os"
@@ -17,6 +18,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"unicode/utf16"
+	"unicode/utf8"
 )
 
 // Mask is the placeholder written in place of a credential value.
@@ -51,7 +54,7 @@ func forms(secret string) []string {
 	add(jsonEscape(secret, true))
 	add(jsonEscape(secret, false))
 	add(unquote(strconv.Quote(secret)))
-	add(unquote(strconv.QuoteToASCII(secret)))
+	add(pythonJSONEscape(secret))
 	add(strings.ReplaceAll(secret, `\`, `\\`))
 	return out
 }
@@ -64,6 +67,22 @@ func jsonEscape(secret string, escapeHTML bool) string {
 		return ""
 	}
 	return unquote(strings.TrimSuffix(b.String(), "\n"))
+}
+
+// pythonJSONEscape matches Python's json.dumps, which writes non-ASCII as \uXXXX
+// and characters outside the BMP as surrogate pairs.
+func pythonJSONEscape(secret string) string {
+	var b strings.Builder
+	for _, r := range jsonEscape(secret, false) {
+		if r < utf8.RuneSelf {
+			b.WriteRune(r)
+			continue
+		}
+		for _, u := range utf16.Encode([]rune{r}) {
+			fmt.Fprintf(&b, "\\u%04x", u)
+		}
+	}
+	return b.String()
 }
 
 func unquote(quoted string) string {
