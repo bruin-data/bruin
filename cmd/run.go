@@ -1407,7 +1407,7 @@ func Run(isDebug *bool) *cli.Command {
 				printError(parserErr, c.String("output"), "Could not initialize sql parser")
 			}
 
-			mainExecutors, err := SetupExecutors(s, connectionManager, startDate, endDate, defaultExecutionDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.SensorMode, renderer, parser, hoister, foundPipeline.Commit)
+			mainExecutors, err := SetupExecutors(s, connectionManager, startDate, endDate, defaultExecutionDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.SensorMode, renderer, parser, hoister, foundPipeline.Commit, cm.SelectedEnvironmentName)
 			if err != nil {
 				errorPrinter.Println(err.Error())
 				return cli.Exit("", 1)
@@ -1984,6 +1984,7 @@ func SetupExecutors(
 	parser *sqlparser.SQLParser,
 	hoister pipeline.DeclareHoister,
 	commitHash string,
+	environment string,
 ) (map[pipeline.AssetType]executor.Config, error) {
 	mainExecutors := executor.DefaultExecutorsV2
 
@@ -1996,7 +1997,7 @@ func SetupExecutors(
 		return nil, err
 	}
 
-	jinjaVariables := jinja.PythonEnvVariables(&startDate, &endDate, &executionDate, pipelineName, runID, fullRefresh, commitHash)
+	jinjaVariables := jinja.PythonEnvVariables(&startDate, &endDate, &executionDate, pipelineName, runID, fullRefresh, commitHash, environment)
 	if s.WillRunTaskOfType(pipeline.AssetTypePython) {
 		mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(conn, jinjaVariables)
 	}
