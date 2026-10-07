@@ -312,7 +312,7 @@ rows:
           - channel_context
 ```
 
-Each definition has a unique `id` and a `dimensions` list. Dimension values are optional and single-select by default. Set `required: true` when a value must be selected, and `multiselect: true` when the note may target multiple values (not supported for `boolean` or `date-range`). A dimension can set a `type` of `select`, `date-range`, `date`, `number`, `boolean`, or `text`; it defaults to `select`. A `select` reads its values from the same-named dimension in the dashboard's `model`, so a dashboard without a `model` must give every dimension a non-`select` type. Note content is written in the dashboard UI.
+Each definition has a unique `id` and a `dimensions` list. Dimension values are optional and single-select by default. Set `required: true` when a value must be selected, and `multiselect: true` when the note may target multiple values (not supported for `boolean`). A dimension can set a `type` of `select`, `date`, `number`, `boolean`, or `text`; it defaults to `select`. A `select` reads its values from the same-named dimension in the dashboard's `model`, so a dashboard without a `model` must give every dimension a non-`select` type. Note content is written in the dashboard UI.
 
 Widgets can also reference note definitions from their resolved [semantic model](/core-concepts/semantic-layer). Define the reusable note alongside the model's dimensions and metrics:
 
@@ -340,7 +340,7 @@ notes:
         required: true
 ```
 
-For a semantic-model note, `type` is optional and defaults to `select`, and each dimension `name` is resolved like a semantic-query dimension. An unqualified name first matches a dimension on the note's model, then a uniquely matching dimension reachable through a safe join. Use `join_name.dimension` or `model_name.dimension` to select a joined dimension explicitly; ambiguous or unknown names fail dashboard validation for widgets that reference the note. The note reuses the semantic dimension's metadata and can add note-specific `required` or `multiselect` behavior (`multiselect` isn't supported for `boolean` or `date-range`).
+For a semantic-model note, `type` is optional and defaults to `select`, and each dimension `name` is resolved like a semantic-query dimension. An unqualified name first matches a dimension on the note's model, then a uniquely matching dimension reachable through a safe join. Use `join_name.dimension` or `model_name.dimension` to select a joined dimension explicitly; ambiguous or unknown names fail dashboard validation for widgets that reference the note. The note reuses the semantic dimension's metadata and can add note-specific `required` or `multiselect` behavior (`multiselect` isn't supported for `boolean`).
 
 Then reference its ID from a widget that resolves to that model:
 

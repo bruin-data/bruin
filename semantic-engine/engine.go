@@ -159,11 +159,11 @@ func (e *Engine) validate() error {
 			dimensionNames[dimension.Name] = true
 			// An empty type defaults to select.
 			switch dimension.Type {
-			case "", "select", "date-range", "date", "number", "boolean", "text":
+			case "", "select", "date", "number", "boolean", "text":
 			default:
 				return fmt.Errorf("note %q: dimension %q has invalid type %q", note.ID, dimension.Name, dimension.Type)
 			}
-			if dimension.Multiselect && (dimension.Type == "boolean" || dimension.Type == "date-range") {
+			if dimension.Multiselect && dimension.Type == "boolean" {
 				return fmt.Errorf("note %q: dimension %q: multiselect is not supported for type %s", note.ID, dimension.Name, dimension.Type)
 			}
 		}
