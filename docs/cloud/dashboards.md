@@ -189,6 +189,7 @@ SQL and semantic filter values support Jinja templating. Use the `bruin.user_ema
 ```yaml
 name: Revenue overview
 connection: warehouse
+model: sales
 
 queries:
   monthly_revenue:
@@ -312,7 +313,27 @@ rows:
           - channel_context
 ```
 
+The dashboard-level `model` is required for `select` note dimensions. In this example, `region` and `channel` must resolve to dimensions on the `sales` semantic model (directly or through one of its joins). Cloud queries those semantic dimensions to populate the choices in the note composer.
+
 Each definition has a unique `id` and a `dimensions` list. Dimension values are optional and single-select by default. Set `required: true` when a value must be selected, and `multiselect: true` when the note may target multiple values (not supported for `boolean`). A dimension can set a `type` of `select`, `date`, `number`, `boolean`, or `text`; it defaults to `select`. A `select` reads its values from the same-named dimension in the dashboard's `model`, so a dashboard without a `model` must give every dimension a non-`select` type. Note content is written in the dashboard UI.
+
+### Create and manage note types
+
+Open the dashboard's **Notes** panel and switch to **Types** to see dashboard and semantic-model note types. Dashboard note types can be created, edited, or deleted while the dashboard is in edit mode; outside edit mode, their definitions are visible but cannot be changed. Semantic-model note types are always read-only in the dashboard and must be changed in their model YAML.
+
+Top-level dashboard note types are always available from the dashboard notes panel. A widget's `notes` list controls which types people can choose when they add a note from that widget.
+
+### How notes are matched
+
+A note with `dimensions: []`, or a note created without dimension values, applies to the whole dashboard. A scoped note appears on a widget when the widget result contains matching dimension columns and at least one row matches all shared values. On charts, matching notes are also attached to the corresponding points or marks. Applied dashboard filters further narrow notes when the widget query uses those filters.
+
+A widget's `notes` list controls which note types can be created from that widget. Notes belong to the dashboard, so an existing note may also appear on other widgets when its dimension values match their data.
+
+### Publishing and definition changes
+
+Dashboard note type changes are part of the dashboard draft. Publish the dashboard before using a new or changed type to create notes.
+
+Cloud stores the type's ID and dimension schema with each note when it is created. If the type ID, dimension names, input types, required settings, or multiselect settings later change, existing notes remain visible but become read-only. Deleting a type has the same result: its existing notes remain visible with their previous definition details, but cannot be edited.
 
 Widgets can also reference note definitions from their resolved [semantic model](/core-concepts/semantic-layer). Define the reusable note alongside the model's dimensions and metrics:
 
@@ -360,8 +381,6 @@ rows:
 ```
 
 The model is resolved from the named query, widget, or dashboard-level `model`. Without a resolved model, only dashboard-level note definitions are available.
-
-Dashboard changes are saved as a draft. After adding or changing a note definition, publish the dashboard before trying to create notes with it.
 
 ## Threads and chat history
 
