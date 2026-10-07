@@ -1219,12 +1219,9 @@ func Run(isDebug *bool) *cli.Command {
 			var connectionManager config.ConnectionAndDetailsGetter
 			var errs []error
 
+			// Errors are printed below, once credential masking is installed: a
+			// connection error can echo the DSN or URI it failed on, password included.
 			connectionManager, errs = connectionManagerFromConfig(runCtx, cm, logger)
-
-			if len(errs) > 0 {
-				printErrors(errs, runConfig.Output, "Errors occurred while initializing connection manager")
-				return cli.Exit("", 1)
-			}
 
 			foundPipeline := pipelineInfo.Pipeline
 
@@ -1314,6 +1311,11 @@ func Run(isDebug *bool) *cli.Command {
 				}
 				defer fn()
 				color.Output = os.Stdout
+			}
+
+			if len(errs) > 0 {
+				printErrors(errs, runConfig.Output, "Errors occurred while initializing connection manager")
+				return cli.Exit("", 1)
 			}
 
 			err = ensurePythonCacheGitignore(afero.NewOsFs(), repoRoot.Path)
