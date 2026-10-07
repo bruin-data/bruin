@@ -189,7 +189,6 @@ SQL and semantic filter values support Jinja templating. Use the `bruin.user_ema
 ```yaml
 name: Revenue overview
 connection: warehouse
-model: sales
 
 queries:
   monthly_revenue:
@@ -283,6 +282,7 @@ Before users can write a note, its reusable definition must exist in the dashboa
 ```yaml
 name: Revenue overview
 connection: warehouse
+model: sales
 
 notes:
   - id: revenue_context
