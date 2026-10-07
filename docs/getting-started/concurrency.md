@@ -78,7 +78,7 @@ This means memory-intensive pipelines naturally run fewer assets in parallel.
 | `--workers` | Assets running simultaneously | 16 | Single run |
 | `max_concurrent_assets` | Assets using one connection simultaneously | Unlimited | Single run |
 | `concurrency` | Pipeline runs overlapping | 1 | Cloud only |
-| `instance` | CPU/memory per asset | b1.nano | Cloud only |
+| `instance` | CPU/memory per asset | Depends on asset type ([defaults](/cloud/instance-types)) | Cloud only |
 
 ## Platform Notes
 
