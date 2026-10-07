@@ -327,6 +327,19 @@ func TestSetupVariables(t *testing.T) {
 		assert.Equal(t, "dev_", result["BRUIN_SCHEMA_PREFIX"])
 	})
 
+	t.Run("BRUIN_ENVIRONMENT is set from environment name in context", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := t.Context()
+		ctx = context.WithValue(ctx, pipeline.RunConfigApplyIntervalModifiers, false)
+		ctx = context.WithValue(ctx, config.EnvironmentNameContextKey, "production")
+
+		result, err := env.SetupVariables(ctx, &pipeline.Pipeline{Name: "test-pipeline"}, &pipeline.Asset{}, map[string]string{})
+		require.NoError(t, err)
+
+		assert.Equal(t, "production", result["BRUIN_ENVIRONMENT"])
+	})
+
 	t.Run("BRUIN_FULL_REFRESH is set from asset parameters", func(t *testing.T) {
 		t.Parallel()
 
