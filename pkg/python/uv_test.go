@@ -1,6 +1,7 @@
 package python
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"regexp"
@@ -8,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/mask"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -682,4 +684,32 @@ func Test_uvPythonRunner_Run_UsesRequiresPython(t *testing.T) {
 			cmd.AssertExpectations(t)
 		})
 	}
+}
+
+func TestTailBufferNeverKeepsPartOfASecret(t *testing.T) {
+	t.Parallel()
+	const secret = "SECRETabcdefghij0123456789"
+	const capBytes = 64
+	tb := newTailBuffer(capBytes)
+	rest := secret[10:] + "\n"
+	filler := strings.Repeat("x", capBytes-len(rest)-1) + "\n"
+	_, _ = tb.Write([]byte("password=" + secret + "\n" + filler))
+
+	var out bytes.Buffer
+	w := mask.New([]string{secret}).Writer(&out)
+	tb.flushTo(w)
+	require.NoError(t, w.Flush())
+
+	assert.NotContains(t, out.String(), secret[10:])
+	assert.Equal(t, "[earlier ingestr output omitted]\n"+filler, out.String())
+}
+
+func TestTailBufferKeepsWholeLinesUntilTruncated(t *testing.T) {
+	t.Parallel()
+	tb := newTailBuffer(64)
+	_, _ = tb.Write([]byte("first line\nsecond line\n"))
+
+	var out bytes.Buffer
+	tb.flushTo(&out)
+	assert.Equal(t, "first line\nsecond line\n", out.String())
 }

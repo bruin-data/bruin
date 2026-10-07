@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/json"
 	"encoding/pem"
 	"io"
 	"net/url"
@@ -13,6 +14,7 @@ import (
 	"reflect"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -45,7 +47,30 @@ func forms(secret string) []string {
 	add(url.QueryEscape(b64))
 	add(url.PathEscape(b64))
 	add(strings.TrimPrefix(url.UserPassword("", b64).String(), ":"))
+	// Escaped inside quoted strings: Go/Python JSON, Go %q, Python repr.
+	add(jsonEscape(secret, true))
+	add(jsonEscape(secret, false))
+	add(unquote(strconv.Quote(secret)))
+	add(unquote(strconv.QuoteToASCII(secret)))
+	add(strings.ReplaceAll(secret, `\`, `\\`))
 	return out
+}
+
+func jsonEscape(secret string, escapeHTML bool) string {
+	var b bytes.Buffer
+	enc := json.NewEncoder(&b)
+	enc.SetEscapeHTML(escapeHTML)
+	if err := enc.Encode(secret); err != nil {
+		return ""
+	}
+	return unquote(strings.TrimSuffix(b.String(), "\n"))
+}
+
+func unquote(quoted string) string {
+	if len(quoted) < 2 {
+		return ""
+	}
+	return quoted[1 : len(quoted)-1]
 }
 
 // SensitiveValues returns inline `sensitive:"true"` values and the CONTENTS of

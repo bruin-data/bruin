@@ -1,6 +1,7 @@
 package python
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -646,6 +647,7 @@ func (t *tailBuffer) Write(p []byte) (int, error) {
 		// Single write larger than cap: keep only the tail.
 		t.data = append(t.data[:0], p[len(p)-t.maxBytes:]...)
 		t.truncated = true
+		t.dropPartialFirstLine()
 		return len(p), nil
 	}
 	t.data = append(t.data, p...)
@@ -654,8 +656,17 @@ func (t *tailBuffer) Write(p []byte) (int, error) {
 		copy(t.data, t.data[excess:])
 		t.data = t.data[:t.maxBytes]
 		t.truncated = true
+		t.dropPartialFirstLine()
 	}
 	return len(p), nil
+}
+
+// dropPartialFirstLine keeps the tail from starting mid-secret, which the log
+// masker could not recognize.
+func (t *tailBuffer) dropPartialFirstLine() {
+	if i := bytes.IndexByte(t.data, '\n'); i >= 0 {
+		t.data = append(t.data[:0], t.data[i+1:]...)
+	}
 }
 
 func (t *tailBuffer) flushTo(w io.Writer) {
