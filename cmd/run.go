@@ -539,14 +539,14 @@ var (
 	startDateFlag = &cli.StringFlag{
 		Name:        "start-date",
 		Usage:       "the start date of the range the pipeline will run for in YYYY-MM-DD, YYYY-MM-DD HH:MM:SS or YYYY-MM-DD HH:MM:SS.ffffff format",
-		DefaultText: "beginning of yesterday, e.g. " + defaultStartDate.Format("2006-01-02 15:04:05.000000"),
+		DefaultText: "beginning of the previous UTC day, e.g. " + defaultStartDate.Format("2006-01-02 15:04:05.000000"),
 		Value:       defaultStartDate.Format("2006-01-02 15:04:05.000000"),
 		Sources:     cli.EnvVars("BRUIN_START_DATE"),
 	}
 	endDateFlag = &cli.StringFlag{
 		Name:        "end-date",
 		Usage:       "the end date of the range the pipeline will run for in YYYY-MM-DD, YYYY-MM-DD HH:MM:SS or YYYY-MM-DD HH:MM:SS.ffffff format",
-		DefaultText: "end of yesterday, e.g. " + defaultEndDate.Format("2006-01-02 15:04:05") + ".999999",
+		DefaultText: "end of the previous UTC day, e.g. " + defaultEndDate.Format("2006-01-02 15:04:05") + ".999999",
 		Value:       defaultEndDate.Format("2006-01-02 15:04:05") + ".999999",
 		Sources:     cli.EnvVars("BRUIN_END_DATE"),
 	}

@@ -1123,7 +1123,7 @@ INSERT INTO analytics.product_stock <query>;
 
 With `time_granularity: timestamp`, the delete uses `{{ start_timestamp }}` and `{{ end_timestamp }}` instead.
 
-The window comes from the run's start and end dates. By default, that is yesterday, from `00:00:00.000000` to `23:59:59.999999`. Pass a different range to backfill:
+The window comes from the run's start and end dates. By default, that is the previous UTC day, from `00:00:00.000000` to `23:59:59.999999`. Pass a different range to backfill:
 
 ```bash
 bruin run --start-date "2024-03-01" --end-date "2024-03-31" path/to/asset.sql

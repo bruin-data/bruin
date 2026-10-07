@@ -23,5 +23,5 @@ The command exits non-zero if any test fails.
 |------|------|---------|-------------|
 | `--environment` | str | - | Environment whose connections to use, from `.bruin.yml`. |
 | `--var` | str | - | Override a pipeline variable for the run. Same syntax as `bruin run`'s `--var`; repeatable. |
-| `--start-date` | str | today | Start date passed to the asset's Jinja render. |
-| `--end-date` | str | today | End date passed to the asset's Jinja render. |
+| `--start-date` | str | Beginning of the previous UTC day | Start date passed to the asset's Jinja render. |
+| `--end-date` | str | End of the previous UTC day | End date passed to the asset's Jinja render. |
