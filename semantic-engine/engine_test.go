@@ -371,9 +371,9 @@ func TestLoadFile_RejectsInvalidNoteDimensionConfiguration(t *testing.T) {
 			message:   "multiselect",
 		},
 		{
-			name:      "multiselect date-range",
-			dimension: "{name: region, type: date-range, multiselect: true}",
-			message:   "multiselect",
+			name:      "date-range type",
+			dimension: "{name: region, type: date-range}",
+			message:   "type",
 		},
 	}
 
@@ -1064,6 +1064,15 @@ func TestNewEngine_ValidationErrors(t *testing.T) {
 				Notes:      []Note{{ID: "rollout", Dimensions: []NoteDimension{{Name: "active", Type: "boolean", Multiselect: true}}}},
 			},
 			want: `note "rollout": dimension "active": multiselect is not supported for type boolean`,
+		},
+		{
+			name: "note date-range dimension",
+			model: Model{
+				Name:   "m",
+				Source: Source{Table: "t"},
+				Notes:  []Note{{ID: "rollout", Dimensions: []NoteDimension{{Name: "region", Type: "date-range"}}}},
+			},
+			want: `note "rollout": dimension "region" has invalid type "date-range"`,
 		},
 		{
 			name: "duplicate name across dim and metric",
