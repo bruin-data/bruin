@@ -1240,7 +1240,9 @@ func Run(isDebug *bool) *cli.Command {
 				!noColor
 
 			// Use the interactive TUI only when explicitly requested via --interactive flag
-			useTUI := c.Bool("interactive") && interactiveTerminal
+			// A run with connection errors exits before the TUI starts, so keep the
+			// terminal output for it: the TUI would discard the error printed below.
+			useTUI := c.Bool("interactive") && interactiveTerminal && len(errs) == 0
 
 			// Build the masker up front so both the log-file and no-log-file paths below
 			// install it as the output sink.
