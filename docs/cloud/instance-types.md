@@ -33,7 +33,6 @@ If you don't set `instance`, Bruin Cloud picks one based on the asset type:
 | Python | `b1.nano` (`b1.small` when materialized as a table) |
 | Ingestr | `b1.medium` |
 | SQL | `b1.nano` |
-| dbt | `b1.nano` |
 | Sensors | `b1.pico` |
 
 Notes:
