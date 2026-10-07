@@ -213,7 +213,7 @@ AS SELECT id, created_at, version FROM raw.events
 - `ttl` is the SQL TTL expression, without the `TTL` keyword.
 - `settings` is a mapping of table-engine setting names to SQL values. Bruin sorts setting names for stable SQL output. Numeric values can be written as `index_granularity: "8192"`; string literals need SQL quotes, for example `storage_policy: "'default'"`. For query settings, use the [connection's settings map](#query-settings).
 
-When both a primary key and `order_by` are provided, the primary-key columns must be a prefix of the sorting key, in column declaration order. For example, primary key `(id)` can use sorting key `(id, created_at)`. This follows the [ClickHouse MergeTree key requirements](https://clickhouse.com/docs/engines/table-engines/mergetree-family/mergetree). When only primary-key columns are declared, Bruin continues to emit `PRIMARY KEY` without an explicit `ORDER BY`.
+When both a primary key and `order_by` are provided, the primary-key columns must be a prefix of the sorting key, in column declaration order. For example, primary key `(id)` can use sorting key `(id, created_at)`. This follows the [ClickHouse MergeTree key requirements](https://clickhouse.com/docs/reference/engines/table-engines/mergetree-family/mergetree). When only primary-key columns are declared, Bruin continues to emit `PRIMARY KEY` without an explicit `ORDER BY`.
 
 All of these clauses, including `partition_by`, apply when `create+replace`, the implicit table strategy, or `ddl` creates the target table. A full refresh uses the same options. `ddl` uses `CREATE TABLE IF NOT EXISTS`, so changing options does not alter an existing table. Normal `append`, `delete+insert`, `merge`, `time_interval`, and `truncate+insert` runs keep the existing target definition. Internal staging tables use MergeTree and do not inherit the target's options. Views and other asset types reject the `clickhouse` options.
 
@@ -248,7 +248,7 @@ connections:
       cluster: analytics_cluster
 ```
 
-Use an existing `Atomic` database on every node, with the same cluster configuration, a working ClickHouse Keeper or ZooKeeper service, and permissions to execute distributed DDL. For data refreshes, the configured host must belong to the named cluster, and that cluster must contain every replica of the target's single shard. Otherwise, dropping and recreating replicas can leave old data outside the cluster. Bruin does not provision the cluster, databases, replicas, or sharding. See [ClickHouse's distributed DDL requirements](https://clickhouse.com/docs/sql-reference/distributed-ddl).
+Use an existing `Atomic` database on every node, with the same cluster configuration, a working ClickHouse Keeper or ZooKeeper service, and permissions to execute distributed DDL. For data refreshes, the configured host must belong to the named cluster, and that cluster must contain every replica of the target's single shard. Otherwise, dropping and recreating replicas can leave old data outside the cluster. Bruin does not provision the cluster, databases, replicas, or sharding. See [ClickHouse's distributed DDL requirements](https://clickhouse.com/docs/reference/statements/distributed-ddl).
 
 | Operation | Supported topology and behavior |
 | --- | --- |
@@ -259,7 +259,7 @@ Use an existing `Atomic` database on every node, with the same cluster configura
 | `time_interval` | Supports an existing local replicated table in a single shard. Uses `ALTER TABLE ... ON CLUSTER ... DELETE WHERE ... SETTINGS mutations_sync = 2`, then inserts once with `insert_deduplicate = 0`. |
 | `delete+insert`, `merge`, `scd2_by_column` and `scd2_by_time` | Normal runs are rejected. Their staging-table and key-subquery operations require a consistent staged dataset on every replica; Bruin does not yet coordinate this. An unrestricted full refresh instead uses the cluster `create+replace` path. |
 
-`INSERT` has no `ON CLUSTER` clause. Bruin assumes that its one insert reaches the intended data: local replicated tables replicate that write within one shard; a `Distributed` target handles sharding itself. For replicated shards behind a `Distributed` table, configure `internal_replication: true` in ClickHouse. The asset query runs through the connected host and must select the complete input dataset. Bruin does not run one insert per node or automatically convert a local source into a distributed query. See [ClickHouse's distributed writes](https://clickhouse.com/docs/engines/table-engines/special/distributed#writing-data).
+`INSERT` has no `ON CLUSTER` clause. Bruin assumes that its one insert reaches the intended data: local replicated tables replicate that write within one shard; a `Distributed` target handles sharding itself. For replicated shards behind a `Distributed` table, configure `internal_replication: true` in ClickHouse. The asset query runs through the connected host and must select the complete input dataset. Bruin does not run one insert per node or automatically convert a local source into a distributed query. See [ClickHouse's distributed writes](https://clickhouse.com/docs/reference/engines/table-engines/special/distributed#distributed-writing-data).
 
 Multi-shard refreshes of local tables, refreshes or mutations through `Distributed` targets, and data materializations into independent non-replicated tables are unsupported. An explicitly non-replicated engine is rejected for cluster `truncate+insert` and `time_interval`; omitting the engine for these strategies assumes the existing target is a replicated local table. Bruin does not inspect the deployed topology or existing engine. Append through a `Distributed` table is supported, but Bruin does not create or maintain the underlying local tables automatically.
 
@@ -271,7 +271,7 @@ clickhouse:
   order_by: [id]
 ```
 
-Bruin preserves the engine expression, including all arguments; it does not prepend replication parameters or convert engines. The Keeper path must be unique per table and shard and identical across that shard's replicas. The replica name must differ per replica, normally through the `{replica}` server macro. `ReplicatedMergeTree()` and variants with omitted replication arguments use the server's `default_replica_path` and `default_replica_name`; configure these consistently. See [replicated engine arguments](https://clickhouse.com/docs/engines/table-engines/mergetree-family/replication#replicatedmergetree-parameters).
+Bruin preserves the engine expression, including all arguments; it does not prepend replication parameters or convert engines. The Keeper path must be unique per table and shard and identical across that shard's replicas. The replica name must differ per replica, normally through the `{replica}` server macro. `ReplicatedMergeTree()` and variants with omitted replication arguments use the server's `default_replica_path` and `default_replica_name`; configure these consistently. See [replicated engine arguments](https://clickhouse.com/docs/reference/engines/table-engines/mergetree-family/replication#replicatedmergetree-parameters).
 
 For example, a cluster `create+replace` emits:
 
@@ -286,7 +286,7 @@ INSERT INTO analytics.events SELECT id FROM raw.events;
 
 `EMPTY AS SELECT` infers the schema without inserting the source data on every node. It requires ClickHouse 22.7 or newer, and the schema query's sources must be accessible on every node. The synchronous drop allows recreation with a fixed Keeper path. This refresh is **not atomic**: readers can see a missing or empty table, and a failure can leave a partially rebuilt target. The source query must not read the target being dropped, truncated, or deleted from.
 
-Bruin waits for distributed DDL completion with `distributed_ddl_output_mode = 'throw'` and a 180-second `distributed_ddl_task_timeout`. `TRUNCATE ... SYNC` waits across replicas; interval deletion uses synchronous [mutation processing](https://clickhouse.com/docs/sql-reference/statements/alter/delete). A DDL error or timeout stops subsequent statements, but a timeout does not cancel queued DDL: restore cluster health and check its completion before retrying. Inserts retain ClickHouse's replication and durability settings; completion does not guarantee immediate visibility on every replica.
+Bruin waits for distributed DDL completion with `distributed_ddl_output_mode = 'throw'` and a 180-second `distributed_ddl_task_timeout`. `TRUNCATE ... SYNC` waits across replicas; interval deletion uses synchronous [mutation processing](https://clickhouse.com/docs/reference/statements/alter/delete). A DDL error or timeout stops subsequent statements, but a timeout does not cancel queued DDL: restore cluster health and check its completion before retrying. Inserts retain ClickHouse's replication and durability settings; completion does not guarantee immediate visibility on every replica.
 
 The connection's `cluster` applies only to Bruin-generated native SQL materializations. Raw SQL scripts are executed as written, and seeds and ingestr assets do not gain cluster support from this field.
 
@@ -349,7 +349,7 @@ Running `bruin run --full-refresh` changes every ClickHouse table materializatio
 
 ### Column data types
 
-Bruin does not translate or validate ClickHouse column types against its own allowlist. For `ddl` materializations, it passes `columns[].type` through to ClickHouse. `precision`/`scale` or `length` are added to an unparameterized type when you provide them separately. ClickHouse is therefore the authority for whether a type is available on your server version and configuration; see its [data type reference](https://clickhouse.com/docs/sql-reference/data-types) for the complete, current list.
+Bruin does not translate or validate ClickHouse column types against its own allowlist. For `ddl` materializations, it passes `columns[].type` through to ClickHouse. `precision`/`scale` or `length` are added to an unparameterized type when you provide them separately. ClickHouse is therefore the authority for whether a type is available on your server version and configuration; see its [data type reference](https://clickhouse.com/docs/reference/data-types) for the complete, current list.
 
 For `create+replace`, `delete+insert`, and a `--full-refresh`, ClickHouse derives a new table's column types from the asset query's `SELECT` result. For `append`, `truncate+insert`, and normal `time_interval` runs, ClickHouse uses the existing target table's schema.
 
