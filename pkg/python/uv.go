@@ -643,20 +643,26 @@ func newTailBuffer(maxBytes int) *tailBuffer {
 func (t *tailBuffer) Write(p []byte) (int, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if len(p) >= t.maxBytes {
+	if len(p) > t.maxBytes {
 		// Single write larger than cap: keep only the tail.
+		cutMidLine := p[len(p)-t.maxBytes-1] != '\n'
 		t.data = append(t.data[:0], p[len(p)-t.maxBytes:]...)
 		t.truncated = true
-		t.dropPartialFirstLine()
+		if cutMidLine {
+			t.dropPartialFirstLine()
+		}
 		return len(p), nil
 	}
 	t.data = append(t.data, p...)
 	if len(t.data) > t.maxBytes {
 		excess := len(t.data) - t.maxBytes
+		cutMidLine := t.data[excess-1] != '\n'
 		copy(t.data, t.data[excess:])
 		t.data = t.data[:t.maxBytes]
 		t.truncated = true
-		t.dropPartialFirstLine()
+		if cutMidLine {
+			t.dropPartialFirstLine()
+		}
 	}
 	return len(p), nil
 }

@@ -686,55 +686,132 @@ func Test_uvPythonRunner_Run_UsesRequiresPython(t *testing.T) {
 	}
 }
 
-func TestTailBufferNeverKeepsPartOfASecret(t *testing.T) {
+func TestTailBuffer(t *testing.T) {
+	t.Parallel()
+	const omitted = "[earlier ingestr output omitted]\n"
+	tests := []struct {
+		name   string
+		writes []string
+		want   string
+	}{
+		{
+			name:   "under the cap is kept as is",
+			writes: []string{"one\n", "two\n"},
+			want:   "one\ntwo\n",
+		},
+		{
+			name:   "exactly the cap is kept as is",
+			writes: []string{"0123456789\n", "abcd\n"},
+			want:   "0123456789\nabcd\n",
+		},
+		{
+			name:   "single write of exactly the cap is kept as is",
+			writes: []string{"0123456789abcde\n"},
+			want:   "0123456789abcde\n",
+		},
+		{
+			name:   "cut mid-line drops the rest of that line",
+			writes: []string{"aaaaaaaa\n", "bbbbbbbbbbbb\n"},
+			want:   omitted + "bbbbbbbbbbbb\n",
+		},
+		{
+			name:   "cut at a line boundary keeps every line",
+			writes: []string{"aaaaa\n", "bbbbbbb\n", "ccccccc\n"},
+			want:   omitted + "bbbbbbb\nccccccc\n",
+		},
+		{
+			name:   "cut mid-line with no newline left drops everything",
+			writes: []string{"aaaa\n", "bbbbbbbbbbbbbbbbbb"},
+			want:   omitted,
+		},
+		{
+			name:   "single oversized write cut mid-line drops the rest of that line",
+			writes: []string{"aaaaaaaaaaaaaaaaaaaa\nbbbb\n"},
+			want:   omitted + "bbbb\n",
+		},
+		{
+			name:   "single oversized write cut at a line boundary keeps every line",
+			writes: []string{"aaaa\nbbbbbbb\nccccccc\n"},
+			want:   omitted + "bbbbbbb\nccccccc\n",
+		},
+		{
+			name:   "single oversized write with no newline drops everything",
+			writes: []string{"aaaaaaaaaaaaaaaaaaaaaaaa"},
+			want:   omitted,
+		},
+		{
+			name:   "single write of exactly the cap after earlier output",
+			writes: []string{"old\n", "0123456789abcde\n"},
+			want:   omitted + "0123456789abcde\n",
+		},
+		{
+			name:   "line from the other pipe after an unfinished cut line is kept",
+			writes: []string{"xxxxxxxxxxxxxxxxxxxxxxxx", "err: failed\n"},
+			want:   omitted + "err: failed\n",
+		},
+		{
+			name:   "repeated cuts print the notice once",
+			writes: []string{"aaaaaaa\n", "bbbbbbb\n", "ccccccc\n", "ddddddd\n"},
+			want:   omitted + "ccccccc\nddddddd\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			tb := newTailBuffer(16)
+			for _, w := range tt.writes {
+				n, err := tb.Write([]byte(w))
+				require.NoError(t, err)
+				require.Equal(t, len(w), n)
+			}
+			var out bytes.Buffer
+			tb.flushTo(&out)
+			assert.Equal(t, tt.want, out.String())
+		})
+	}
+}
+
+func TestTailBufferNeverPrintsPartOfASecret(t *testing.T) {
 	t.Parallel()
 	const secret = "SECRETabcdefghij0123456789"
-	const capBytes = 64
-	tb := newTailBuffer(capBytes)
-	rest := secret[10:] + "\n"
-	filler := strings.Repeat("x", capBytes-len(rest)-1) + "\n"
-	_, _ = tb.Write([]byte("password=" + secret + "\n" + filler))
-
-	var out bytes.Buffer
-	w := mask.New([]string{secret}).Writer(&out)
-	tb.flushTo(w)
-	require.NoError(t, w.Flush())
-
-	assert.NotContains(t, out.String(), secret[10:])
-	assert.Equal(t, "[earlier ingestr output omitted]\n"+filler, out.String())
-}
-
-func TestTailBufferKeepsWholeLinesUntilTruncated(t *testing.T) {
-	t.Parallel()
-	tb := newTailBuffer(64)
-	_, _ = tb.Write([]byte("first line\nsecond line\n"))
-
-	var out bytes.Buffer
-	tb.flushTo(&out)
-	assert.Equal(t, "first line\nsecond line\n", out.String())
-}
-
-func TestTailBufferDropsUnfinishedLongLine(t *testing.T) {
-	t.Parallel()
-	const secret = "SECRETabcdefghij0123456789"
-	tb := newTailBuffer(64)
-	_, _ = tb.Write([]byte("error: password=" + secret + strings.Repeat("x", 60)))
-
-	var out bytes.Buffer
-	w := mask.New([]string{secret}).Writer(&out)
-	tb.flushTo(w)
-	require.NoError(t, w.Flush())
-
-	assert.Equal(t, "[earlier ingestr output omitted]\n", out.String())
-}
-
-func TestTailBufferKeepsOtherPipeLineAfterUnfinishedLine(t *testing.T) {
-	t.Parallel()
-	tb := newTailBuffer(64)
-	_, _ = tb.Write([]byte(strings.Repeat("x", 100)))
-	_, _ = tb.Write([]byte(">> stderr: ingestion failed\n"))
-
-	var out bytes.Buffer
-	tb.flushTo(&out)
-	assert.Equal(t, "[earlier ingestr output omitted]\n>> stderr: ingestion failed\n", out.String())
+	tests := []struct {
+		name   string
+		writes []string
+		want   string
+	}{
+		{
+			name:   "secret cut across writes",
+			writes: []string{"password=" + secret + "\n", strings.Repeat("x", 50) + "\n"},
+			want:   "[earlier ingestr output omitted]\n" + strings.Repeat("x", 50) + "\n",
+		},
+		{
+			name:   "secret cut in a single oversized write",
+			writes: []string{"password=" + secret + "\n" + strings.Repeat("x", 50) + "\n"},
+			want:   "[earlier ingestr output omitted]\n" + strings.Repeat("x", 50) + "\n",
+		},
+		{
+			name:   "secret cut in an unfinished last line",
+			writes: []string{"error: password=" + secret + strings.Repeat("x", 60)},
+			want:   "[earlier ingestr output omitted]\n",
+		},
+		{
+			name:   "whole secret in a kept line is masked",
+			writes: []string{strings.Repeat("x", 70) + "\n", "password=" + secret + "\n"},
+			want:   "[earlier ingestr output omitted]\npassword=****\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			tb := newTailBuffer(64)
+			for _, w := range tt.writes {
+				_, _ = tb.Write([]byte(w))
+			}
+			var out bytes.Buffer
+			w := mask.New([]string{secret}).Writer(&out)
+			tb.flushTo(w)
+			require.NoError(t, w.Flush())
+			assert.Equal(t, tt.want, out.String())
+		})
+	}
 }
