@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
+	"fmt"
 	"math/rand"
 	"net/url"
 	"os"
@@ -803,5 +804,28 @@ func TestMaskConvertedPKCS8Key(t *testing.T) {
 	want := "--source-uri snowflake://u@acct/db?private_key=" + Mask + "&warehouse=WH"
 	if got != want {
 		t.Errorf("converted PKCS#8 key not masked:\n got: %s\nwant: %s", got, want)
+	}
+}
+
+func TestMaskQuotedForms(t *testing.T) {
+	t.Parallel()
+	const pw = `Pa&ss\w0rd"x<y>Z`
+	const nonASCII = `pä\ss-wörd`
+	const emoji = "password😀"
+	r := New([]string{pw, nonASCII, emoji})
+
+	tests := []struct{ name, in, want string }{
+		{"Go json.Marshal", `"password":"Pa\u0026ss\\w0rd\"x\u003cy\u003eZ"`, `"password":"****"`},
+		{"Python json.dumps", `{"password": "Pa&ss\\w0rd\"x<y>Z"}`, `{"password": "****"}`},
+		{"Python repr", `{'password': 'Pa&ss\\w0rd"x<y>Z'}`, `{'password': '****'}`},
+		{"Go %q", fmt.Sprintf("parse %q: invalid", pw), `parse "****": invalid`},
+		{"Python json.dumps, non-ASCII", `{"password": "p\u00e4\\ss-w\u00f6rd"}`, `{"password": "****"}`},
+		{"Python json.dumps, emoji", `{"password": "password\ud83d\ude00"}`, `{"password": "****"}`},
+		{"Go json.Marshal, non-ASCII", `"password":"pä\\ss-wörd"`, `"password":"****"`},
+	}
+	for _, tt := range tests {
+		if got := r.Mask(tt.in); got != tt.want {
+			t.Errorf("%s:\n got: %s\nwant: %s", tt.name, got, tt.want)
+		}
 	}
 }
