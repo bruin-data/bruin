@@ -645,37 +645,30 @@ func (t *tailBuffer) Write(p []byte) (int, error) {
 	defer t.mu.Unlock()
 	if len(p) > t.maxBytes {
 		// Single write larger than cap: keep only the tail.
-		cutMidLine := p[len(p)-t.maxBytes-1] != '\n'
-		t.data = append(t.data[:0], p[len(p)-t.maxBytes:]...)
+		t.data = append(t.data[:0], p[nextLineStart(p, len(p)-t.maxBytes):]...)
 		t.truncated = true
-		if cutMidLine {
-			t.dropPartialFirstLine()
-		}
 		return len(p), nil
 	}
 	t.data = append(t.data, p...)
 	if len(t.data) > t.maxBytes {
-		excess := len(t.data) - t.maxBytes
-		cutMidLine := t.data[excess-1] != '\n'
-		copy(t.data, t.data[excess:])
-		t.data = t.data[:t.maxBytes]
+		cut := nextLineStart(t.data, len(t.data)-t.maxBytes)
+		t.data = t.data[:copy(t.data, t.data[cut:])]
 		t.truncated = true
-		if cutMidLine {
-			t.dropPartialFirstLine()
-		}
 	}
 	return len(p), nil
 }
 
-// dropPartialFirstLine keeps the tail from starting mid-secret, which the log
-// masker could not recognize.
-func (t *tailBuffer) dropPartialFirstLine() {
-	i := bytes.IndexByte(t.data, '\n')
-	if i < 0 {
-		t.data = t.data[:0]
-		return
+// nextLineStart moves a cut that lands mid-line to the start of the next line,
+// so the kept tail never begins with part of a secret the log masker could not
+// recognize.
+func nextLineStart(b []byte, cut int) int {
+	if b[cut-1] == '\n' {
+		return cut
 	}
-	t.data = append(t.data[:0], t.data[i+1:]...)
+	if i := bytes.IndexByte(b[cut:], '\n'); i >= 0 {
+		return cut + i + 1
+	}
+	return len(b)
 }
 
 func (t *tailBuffer) flushTo(w io.Writer) {
