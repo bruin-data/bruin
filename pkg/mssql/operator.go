@@ -2,6 +2,8 @@ package mssql
 
 import (
 	"context"
+	"math/rand/v2"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/config"
@@ -11,6 +13,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
+	mssqldb "github.com/microsoft/go-mssqldb"
 	"github.com/pkg/errors"
 )
 
@@ -109,7 +112,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 
 	if o.devEnv == nil {
 		ansisql.LogQueryIfVerbose(ctx, writer, q.Query)
-		return conn.RunQueryWithoutResult(ctx, q)
+		return runMaterializedQuery(ctx, conn, t, q)
 	}
 
 	q, err = o.devEnv.Modify(ctx, p, t, q)
@@ -119,7 +122,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 
 	ansisql.LogQueryIfVerbose(ctx, writer, q.Query)
 
-	err = conn.RunQueryWithoutResult(ctx, q)
+	err = runMaterializedQuery(ctx, conn, t, q)
 	if err != nil {
 		return err
 	}
@@ -130,6 +133,53 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	}
 
 	return nil
+}
+
+func runMaterializedQuery(ctx context.Context, conn MsClient, asset *pipeline.Asset, q *query.Query) error {
+	// Error 1205 rolls back the victim transaction. Replay only materializations
+	// that use one transaction or one statement. Hooks, arbitrary scripts, and
+	// DDL or append batches can commit work before a later statement deadlocks.
+	retryable := false
+	if len(asset.Hooks.Pre) == 0 && len(asset.Hooks.Post) == 0 {
+		switch asset.Materialization.Type {
+		case pipeline.MaterializationTypeView:
+			retryable = true
+		case pipeline.MaterializationTypeTable:
+			switch asset.Materialization.Strategy {
+			case pipeline.MaterializationStrategyNone, pipeline.MaterializationStrategyCreateReplace,
+				pipeline.MaterializationStrategyMerge,
+				pipeline.MaterializationStrategyDeleteInsert, pipeline.MaterializationStrategyTimeInterval,
+				pipeline.MaterializationStrategyTruncateInsert:
+				retryable = true
+			default:
+				// Only the explicitly listed strategies are safe to replay.
+			}
+		default:
+			// Unmaterialized scripts may contain independently committed statements.
+		}
+	}
+
+	for attempt := 0; ; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		err := conn.RunQueryWithoutResult(ctx, q)
+		var sqlErr mssqldb.Error
+		if !retryable || attempt == 10 || !errors.As(err, &sqlErr) || sqlErr.Number != 1205 {
+			return err
+		}
+
+		// Exponential backoff with jitter keeps concurrent victims from retrying
+		// in lockstep. Cancellation also interrupts the wait.
+		delay := (250 * time.Millisecond << attempt) + time.Duration(rand.IntN(250))*time.Millisecond //nolint:gosec // Retry jitter does not require cryptographic randomness.
+		timer := time.NewTimer(delay)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
 }
 
 func NewColumnCheckOperator(manager config.ConnectionGetter) *ansisql.ColumnCheckOperator {

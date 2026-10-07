@@ -80,6 +80,9 @@ func newEngine(m *Model, models map[string]*Model) (*Engine, error) {
 	if err := validateJoinTargets(modelSet); err != nil {
 		return nil, err
 	}
+	if err := e.validateChecks(); err != nil {
+		return nil, err
+	}
 	return e, nil
 }
 
@@ -154,7 +157,7 @@ func (e *Engine) validate() error {
 				return fmt.Errorf("note %q: duplicate dimension %q", note.ID, dimension.Name)
 			}
 			dimensionNames[dimension.Name] = true
-			// An empty type is treated as text.
+			// An empty type defaults to select.
 			switch dimension.Type {
 			case "", "select", "date-range", "date", "number", "boolean", "text":
 			default:

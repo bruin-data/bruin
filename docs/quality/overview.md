@@ -45,3 +45,7 @@ Quality checks can also be executed on their own without running the asset again
 ```bash
 bruin run --only checks assets/my_asset.sql
 ```
+
+## Semantic layer checks
+
+Semantic models can have their own quality checks on dimensions, metrics, and the model as a whole. `bruin run` does not run these checks. Use `bruin semantic check` instead. See [semantic layer quality checks](../core-concepts/semantic-layer.md#quality-checks) for details.

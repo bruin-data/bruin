@@ -6,7 +6,7 @@ import (
 )
 
 // DeclareHoister reorders a multi-statement SQL script so DECLARE statements
-// appear before any other statements, using a real SQL parser (sqlglot) so
+// appear before any other statements, using a real SQL parser (pkg/sqlparser) so
 // nested DECLAREs inside stored procedure / BEGIN..END blocks are left in
 // place. Implementations must return the input unchanged when no reordering
 // is needed, and should return (input, err) on failure so callers can fall

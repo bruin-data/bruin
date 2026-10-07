@@ -4,14 +4,22 @@ package mask
 
 import (
 	"bytes"
+	"crypto/x509"
 	"encoding/base64"
+	"encoding/json"
+	"encoding/pem"
+	"fmt"
 	"io"
 	"net/url"
 	"os"
 	"reflect"
+	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
+	"unicode/utf16"
+	"unicode/utf8"
 )
 
 // Mask is the placeholder written in place of a credential value.
@@ -42,7 +50,46 @@ func forms(secret string) []string {
 	add(url.QueryEscape(b64))
 	add(url.PathEscape(b64))
 	add(strings.TrimPrefix(url.UserPassword("", b64).String(), ":"))
+	// Escaped inside quoted strings: Go/Python JSON, Go %q, Python repr.
+	add(jsonEscape(secret, true))
+	add(jsonEscape(secret, false))
+	add(unquote(strconv.Quote(secret)))
+	add(pythonJSONEscape(secret))
+	add(strings.ReplaceAll(secret, `\`, `\\`))
 	return out
+}
+
+func jsonEscape(secret string, escapeHTML bool) string {
+	var b bytes.Buffer
+	enc := json.NewEncoder(&b)
+	enc.SetEscapeHTML(escapeHTML)
+	if err := enc.Encode(secret); err != nil {
+		return ""
+	}
+	return unquote(strings.TrimSuffix(b.String(), "\n"))
+}
+
+// pythonJSONEscape matches Python's json.dumps, which writes non-ASCII as \uXXXX
+// and characters outside the BMP as surrogate pairs.
+func pythonJSONEscape(secret string) string {
+	var b strings.Builder
+	for _, r := range jsonEscape(secret, false) {
+		if r < utf8.RuneSelf {
+			b.WriteRune(r)
+			continue
+		}
+		for _, u := range utf16.Encode([]rune{r}) {
+			fmt.Fprintf(&b, "\\u%04x", u)
+		}
+	}
+	return b.String()
+}
+
+func unquote(quoted string) string {
+	if len(quoted) < 2 {
+		return ""
+	}
+	return quoted[1 : len(quoted)-1]
 }
 
 // SensitiveValues returns inline `sensitive:"true"` values and the CONTENTS of
@@ -202,9 +249,18 @@ type Masker struct {
 // New builds a Masker from raw secret values, expanding each into the forms
 // it can appear as (raw, query/path/userinfo-escaped, base64).
 func New(values []string) *Masker {
+	// Snowflake re-encodes PKCS#1 keys as PKCS#8 before use, which changes every
+	// byte of the PEM, so the converted key is masked alongside the configured one.
+	all := slices.Clone(values)
+	for _, v := range values {
+		if pkcs8 := pkcs1ToPKCS8(v); pkcs8 != "" {
+			all = append(all, pkcs8)
+		}
+	}
+
 	seen := map[string]struct{}{}
 	var ordered []string
-	for _, v := range values {
+	for _, v := range all {
 		for _, f := range forms(v) {
 			if _, ok := seen[f]; ok {
 				continue
@@ -225,6 +281,25 @@ func New(values []string) *Masker {
 		m.firstByteSet[f[0]>>6] |= 1 << (f[0] & 63)
 	}
 	return m
+}
+
+// pkcs1ToPKCS8 re-encodes a PKCS#1 PEM key as PKCS#8 the same way the Snowflake
+// connection does (convertPKCS1ToPKCS8 in pkg/connection), or returns "" for
+// anything else.
+func pkcs1ToPKCS8(secret string) string {
+	block, _ := pem.Decode([]byte(secret))
+	if block == nil || block.Type != "RSA PRIVATE KEY" {
+		return ""
+	}
+	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		return ""
+	}
+	der, err := x509.MarshalPKCS8PrivateKey(key)
+	if err != nil {
+		return ""
+	}
+	return string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}))
 }
 
 // Empty reports whether there is nothing to mask.

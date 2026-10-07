@@ -1412,7 +1412,7 @@ func TestPythonEnvVariables_FullRefresh(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			envVars := PythonEnvVariables(&startDate, &endDate, &executionDate, "test-pipeline", "test-run-id", tt.fullRefresh, "abc123")
+			envVars := PythonEnvVariables(&startDate, &endDate, &executionDate, "test-pipeline", "test-run-id", tt.fullRefresh, "abc123", "test-env")
 
 			// Verify BRUIN_FULL_REFRESH is set correctly
 			require.Equal(t, tt.expectedFullRefreshEnvVar, envVars["BRUIN_FULL_REFRESH"])
@@ -1422,6 +1422,7 @@ func TestPythonEnvVariables_FullRefresh(t *testing.T) {
 			require.Equal(t, "2024-01-02", envVars["BRUIN_END_DATE"])
 			require.Equal(t, "test-run-id", envVars["BRUIN_RUN_ID"])
 			require.Equal(t, "test-pipeline", envVars["BRUIN_PIPELINE"])
+			require.Equal(t, "test-env", envVars["BRUIN_ENVIRONMENT"])
 			require.Equal(t, "1", envVars["PYTHONUNBUFFERED"])
 		})
 	}

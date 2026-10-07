@@ -1,6 +1,7 @@
 package python
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -44,7 +45,7 @@ const (
 	// IngestrVersionV0 is the legacy ingestr release pinned for parameters.version=v0.
 	IngestrVersionV0 = "0.14.155"
 	// IngestrVersionV1 is the current ingestr release used by default and for parameters.version=v1.
-	IngestrVersionV1 = "1.1.62"
+	IngestrVersionV1 = "1.1.63"
 	sqlfluffVersion  = "3.4.1"
 )
 
@@ -642,20 +643,32 @@ func newTailBuffer(maxBytes int) *tailBuffer {
 func (t *tailBuffer) Write(p []byte) (int, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if len(p) >= t.maxBytes {
+	if len(p) > t.maxBytes {
 		// Single write larger than cap: keep only the tail.
-		t.data = append(t.data[:0], p[len(p)-t.maxBytes:]...)
+		t.data = append(t.data[:0], p[nextLineStart(p, len(p)-t.maxBytes):]...)
 		t.truncated = true
 		return len(p), nil
 	}
 	t.data = append(t.data, p...)
 	if len(t.data) > t.maxBytes {
-		excess := len(t.data) - t.maxBytes
-		copy(t.data, t.data[excess:])
-		t.data = t.data[:t.maxBytes]
+		cut := nextLineStart(t.data, len(t.data)-t.maxBytes)
+		t.data = t.data[:copy(t.data, t.data[cut:])]
 		t.truncated = true
 	}
 	return len(p), nil
+}
+
+// nextLineStart moves a cut that lands mid-line to the start of the next line,
+// so the kept tail never begins with part of a secret the log masker could not
+// recognize.
+func nextLineStart(b []byte, cut int) int {
+	if b[cut-1] == '\n' {
+		return cut
+	}
+	if i := bytes.IndexByte(b[cut:], '\n'); i >= 0 {
+		return cut + i + 1
+	}
+	return len(b)
 }
 
 func (t *tailBuffer) flushTo(w io.Writer) {

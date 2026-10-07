@@ -1219,12 +1219,9 @@ func Run(isDebug *bool) *cli.Command {
 			var connectionManager config.ConnectionAndDetailsGetter
 			var errs []error
 
+			// Errors are printed below, once credential masking is installed: a
+			// connection error can echo the DSN or URI it failed on, password included.
 			connectionManager, errs = connectionManagerFromConfig(runCtx, cm, logger)
-
-			if len(errs) > 0 {
-				printErrors(errs, runConfig.Output, "Errors occurred while initializing connection manager")
-				return cli.Exit("", 1)
-			}
 
 			foundPipeline := pipelineInfo.Pipeline
 
@@ -1243,7 +1240,9 @@ func Run(isDebug *bool) *cli.Command {
 				!noColor
 
 			// Use the interactive TUI only when explicitly requested via --interactive flag
-			useTUI := c.Bool("interactive") && interactiveTerminal
+			// A run with connection errors exits before the TUI starts, so keep the
+			// terminal output for it: the TUI would discard the error printed below.
+			useTUI := c.Bool("interactive") && interactiveTerminal && len(errs) == 0
 
 			// Build the masker up front so both the log-file and no-log-file paths below
 			// install it as the output sink.
@@ -1314,6 +1313,11 @@ func Run(isDebug *bool) *cli.Command {
 				}
 				defer fn()
 				color.Output = os.Stdout
+			}
+
+			if len(errs) > 0 {
+				printErrors(errs, runConfig.Output, "Errors occurred while initializing connection manager")
+				return cli.Exit("", 1)
 			}
 
 			err = ensurePythonCacheGitignore(afero.NewOsFs(), repoRoot.Path)
@@ -1391,7 +1395,6 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			// Share the parser between hook hoisting and dev-mode rewriting.
-			// Its subprocess starts lazily when either operation needs it.
 			var parser *sqlparser.SQLParser
 			var hoister pipeline.DeclareHoister
 			if p, parserErr := sqlparser.NewSQLParser(false); parserErr == nil {
@@ -1404,7 +1407,7 @@ func Run(isDebug *bool) *cli.Command {
 				printError(parserErr, c.String("output"), "Could not initialize sql parser")
 			}
 
-			mainExecutors, err := SetupExecutors(s, connectionManager, startDate, endDate, defaultExecutionDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.SensorMode, renderer, parser, hoister, foundPipeline.Commit)
+			mainExecutors, err := SetupExecutors(s, connectionManager, startDate, endDate, defaultExecutionDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.SensorMode, renderer, parser, hoister, foundPipeline.Commit, cm.SelectedEnvironmentName)
 			if err != nil {
 				errorPrinter.Println(err.Error())
 				return cli.Exit("", 1)
@@ -1981,6 +1984,7 @@ func SetupExecutors(
 	parser *sqlparser.SQLParser,
 	hoister pipeline.DeclareHoister,
 	commitHash string,
+	environment string,
 ) (map[pipeline.AssetType]executor.Config, error) {
 	mainExecutors := executor.DefaultExecutorsV2
 
@@ -1993,7 +1997,7 @@ func SetupExecutors(
 		return nil, err
 	}
 
-	jinjaVariables := jinja.PythonEnvVariables(&startDate, &endDate, &executionDate, pipelineName, runID, fullRefresh, commitHash)
+	jinjaVariables := jinja.PythonEnvVariables(&startDate, &endDate, &executionDate, pipelineName, runID, fullRefresh, commitHash, environment)
 	if s.WillRunTaskOfType(pipeline.AssetTypePython) {
 		mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(conn, jinjaVariables)
 	}

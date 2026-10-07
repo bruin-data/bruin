@@ -119,7 +119,6 @@ make integration-test-cloud    # Cloud-specific integration tests
 
 #### Development Utilities
 ```bash
-make lint-python                     # Format and lint Python code
 make refresh-integration-expectations # Update integration test expectations
 ```
 
@@ -226,11 +225,6 @@ Tools automatically installed and run via `make format`:
 - **`golangci-lint`**: Fast changed-package linting; `make lint-full` runs the comprehensive suite
 - **`govet`**: Enabled through `golangci-lint`
 
-#### Python Code
-Tools run via `make lint-python`:
-- **`ruff format`**: Code formatting
-- **`ruff check --fix`**: Linting with auto-fixes
-
 ### Secrets, Credentials, and Generated Files
 
 - Do not commit local credentials, tokens, keys, or personal environment files.
@@ -310,6 +304,12 @@ listed in `SYNCED` in `scripts/sync_template_docs.py`, the docs page is instead
 generated from the README: edit `templates/<name>/README.md`, run
 `make sync-template-docs`, and commit both. Those pages open with a
 `<!-- Generated from … -->` comment; `make test` fails if one has drifted.
+
+### Adding Docs Pages
+
+Every page under `docs/` needs a sidebar entry in `docs/.vitepress/config.mjs`.
+`make test` fails on a page without one (`docs/sidebar_test.go`). For a page that
+is deliberately hidden, such as a redirect, add it to `unlistedPages` in that test.
 
 ### Checking Docs Links
 ```bash

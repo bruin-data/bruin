@@ -80,6 +80,7 @@ func main() {
 			cmd.Environments(&isDebug),
 			cmd.Connections(),
 			cmd.Query(),
+			cmd.Semantic(&isDebug),
 			cmd.Patch(),
 			cmd.DataDiffCmd(),
 			cmd.Import(&isDebug),
