@@ -19,7 +19,7 @@ responses recorded from the original Python implementation.
 | `commands.json.gz` | every statement of the sqlglot conformance corpus (`../../sqlengine/testdata/parse.json.gz`) in a Bruin dialect, through every command `pkg/sqlparser` sends | 145,326 |
 | `fixtures.json.gz` | sqlglot's optimizer fixtures (TPC-H, TPC-DS, optimizer.sql, ...) through lineage (with and without their schemas), tables and rename, in every Bruin dialect | 47,124 |
 | `fuzz.json.gz` | up to 4 malformed variants per corpus statement (truncated, dropped, duplicated and swapped tokens; seed 1) through 7 commands | 378,042 |
-| `hoist.json.gz` | scripts and hook lists composed from DECLAREs, statements, procedural blocks (BEGIN, IF, LOOP, WHILE, TRY, `$$` bodies, ...), comments and separators, plus one malformed variant per script (seed 1), through `hoist-declares` and `hoist-declares-list` in every Bruin dialect | 32,506 |
+| `hoist.json.gz` | scripts and hook lists composed from DECLAREs, statements, procedural blocks (BEGIN, IF, LOOP, WHILE, TRY, `$$` bodies, ...), comments and separators, plus one malformed variant per script (seed 1), through `hoist-declares` and `hoist-declares-list` in every Bruin dialect | 32,559 |
 
 Each record is `{"cmd": {"command": ..., "contents": ...}, "want": <response>}`. The test replays
 `cmd` through `dispatch` and compares the response.

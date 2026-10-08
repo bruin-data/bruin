@@ -3,6 +3,7 @@ package sqlparser
 import (
 	"encoding/json"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -23,6 +24,9 @@ func hoistSkeleton(s string) string {
 	return string(runes)
 }
 
+// lineCommentAbsorbsSemicolon matches a line whose trailing ';' may sit inside a line comment (-- or #).
+var lineCommentAbsorbsSemicolon = regexp.MustCompile(`(?m)(--|#)[^\n]*;[ \t\r]*$`)
+
 func checkHoistDeclaresInvariants(t *testing.T, query, dialect string) {
 	t.Helper()
 	res := hoistDeclares(query, dialect)
@@ -35,7 +39,7 @@ func checkHoistDeclaresInvariants(t *testing.T, query, dialect string) {
 		return
 	}
 	require.Equal(t, hoistSkeleton(query), hoistSkeleton(got), "hoisting changed more than whitespace and separators:\n%q\n%q", query, got)
-	if strings.Contains(query, "--") {
+	if lineCommentAbsorbsSemicolon.MatchString(got) {
 		// Known issue: a statement ending in a line comment absorbs the ';' that hoisting appends,
 		// so its output can split differently the second time.
 		return

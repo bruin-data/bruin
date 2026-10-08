@@ -54,6 +54,7 @@ DECLARES = [
     "DECLARE res RESULTSET DEFAULT (SELECT 1)",
     "DECLARE c CURSOR FOR SELECT 1",
     "DECLARE x INT -- trailing comment",
+    "DECLARE x INT64 # trailing comment",
     "/* lead; */ DECLARE x INT",
     "-- lead\nDECLARE x INT",
     "DECLARE\n  multi_line\n  INT64",
@@ -288,7 +289,9 @@ def commands(seed):
             script(rnd, corpus) for _ in range(SCRIPTS_PER_DIALECT)
         ]
         for s in list(scripts[len(FIXED_SCRIPTS) :]):
-            scripts.extend(m for m in mutants(s, rnd)[:1] if m.strip())
+            variants = [m for m in mutants(s, rnd) if m.strip()]
+            if variants:
+                scripts.append(rnd.choice(variants))
         for s in scripts:
             cmds.append(
                 {"command": "hoist-declares", "contents": {"query": s, "dialect": d}}
