@@ -101,22 +101,27 @@ func TestBasePathPrefix(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name string
-		host string
-		want string
+		name        string
+		host        string
+		wantDecoded string
+		wantEscaped string
 	}{
-		{name: "no path", host: "https://vault.example.com:8200", want: ""},
-		{name: "root path", host: "https://vault.example.com/", want: ""},
-		{name: "single segment", host: "https://cloud.getbruin.com/vault", want: "/vault"},
-		{name: "nested path", host: "https://cloud.getbruin.com/api/vault", want: "/api/vault"},
-		{name: "trailing slash trimmed", host: "https://cloud.getbruin.com/api/vault/", want: "/api/vault"},
-		{name: "unix socket ignored", host: "unix:///var/run/vault.sock", want: ""},
+		{name: "no path", host: "https://vault.example.com:8200"},
+		{name: "root path", host: "https://vault.example.com/"},
+		{name: "single segment", host: "https://cloud.getbruin.com/vault", wantDecoded: "/vault", wantEscaped: "/vault"},
+		{name: "nested path", host: "https://cloud.getbruin.com/api/vault", wantDecoded: "/api/vault", wantEscaped: "/api/vault"},
+		{name: "trailing slash trimmed", host: "https://cloud.getbruin.com/api/vault/", wantDecoded: "/api/vault", wantEscaped: "/api/vault"},
+		{name: "collides with v1 prefix", host: "https://proxy.example.com/v1", wantDecoded: "/v1", wantEscaped: "/v1"},
+		{name: "escaped slash preserved", host: "https://proxy.example.com/api%2Fvault", wantDecoded: "/api/vault", wantEscaped: "/api%2Fvault"},
+		{name: "unix socket ignored", host: "unix:///var/run/vault.sock"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			require.Equal(t, tt.want, basePathPrefix(tt.host))
+			decoded, escaped := basePathPrefix(tt.host)
+			require.Equal(t, tt.wantDecoded, decoded)
+			require.Equal(t, tt.wantEscaped, escaped)
 		})
 	}
 }
@@ -139,6 +144,44 @@ func TestClient_PreservesHostBasePath(t *testing.T) {
 	_, err = client.ResolveConnection("test-connection")
 	require.NoError(t, err)
 	require.Equal(t, "/api/vault/v1/mount/data/path/test-connection", gotPath.Load())
+}
+
+func TestClient_PreservesHostBasePathColliding(t *testing.T) {
+	t.Parallel()
+
+	var gotPath atomic.Value
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		gotPath.Store(request.URL.Path)
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(`{"data":{"data":{"details":{"value":"somevalue"},"type":"generic"}}}`))
+	}))
+	defer server.Close()
+
+	client, err := newVaultClientWithToken(t.Context(), server.URL+"/v1", "token", "mount", &mockLogger{}, "path", defaultVaultClientConfig())
+	require.NoError(t, err)
+
+	_, err = client.ResolveConnection("test-connection")
+	require.NoError(t, err)
+	require.Equal(t, "/v1/v1/mount/data/path/test-connection", gotPath.Load())
+}
+
+func TestClient_PreservesEscapedHostBasePath(t *testing.T) {
+	t.Parallel()
+
+	var gotRequestURI atomic.Value
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		gotRequestURI.Store(request.RequestURI)
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(`{"data":{"data":{"details":{"value":"somevalue"},"type":"generic"}}}`))
+	}))
+	defer server.Close()
+
+	client, err := newVaultClientWithToken(t.Context(), server.URL+"/api%2Fvault", "token", "mount", &mockLogger{}, "path", defaultVaultClientConfig())
+	require.NoError(t, err)
+
+	_, err = client.ResolveConnection("test-connection")
+	require.NoError(t, err)
+	require.Equal(t, "/api%2Fvault/v1/mount/data/path%2Ftest-connection", gotRequestURI.Load())
 }
 
 func TestVaultClientConfigFromEnv(t *testing.T) { //nolint:paralleltest // mutates process environment via t.Setenv
