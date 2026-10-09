@@ -4628,15 +4628,33 @@ environments:
       duckdb:
         - name: local
           path: interleaved.duckdb
+        - name: reuse
+          path: reuse.duckdb
       csv:
         - name: first_csv
           path: first.csv
         - name: second_csv
           path: second.csv
 `,
-		"pipeline.yml": "name: interleaved_duckdb\ndefault_connections:\n  duckdb: local\n",
-		"first.csv":    "id,value\n1,11\n2,23\n",
-		"second.csv":   "id,value\n1,3\n2,5\n3,13\n",
+		"pipeline.yml":     "name: interleaved_duckdb\ndefault_connections:\n  duckdb: local\n",
+		"requirements.txt": "duckdb==1.5.2\n",
+		"first.csv":        "id,value\n1,11\n2,23\n",
+		"second.csv":       "id,value\n1,3\n2,5\n3,13\n",
+		"assets/reuse_start.sql": `/* @bruin
+name: handoff.reuse_start
+type: duckdb.sql
+connection: reuse
+@bruin */
+SET GLOBAL default_null_order = 'NULLS_FIRST'
+`,
+		"assets/reuse_check.sql": `/* @bruin
+name: handoff.reuse_check
+type: duckdb.sql
+connection: reuse
+depends: [handoff.reuse_start]
+@bruin */
+SELECT CASE WHEN current_setting('default_null_order') = 'NULLS_FIRST' THEN 1 ELSE error('engine was not reused') END
+`,
 		"assets/start.sql": `/* @bruin
 name: handoff.start
 type: duckdb.sql
@@ -4681,9 +4699,20 @@ SELECT CAST(SUM(CAST(f.value AS INTEGER)) + s.value AS INTEGER) AS value
 FROM handoff.first f CROSS JOIN handoff.start s
 GROUP BY s.value
 `,
+		"assets/script.py": `"""@bruin
+name: handoff.script
+type: python
+depends: [handoff.middle, handoff.reuse_check]
+@bruin"""
+import duckdb
+
+with duckdb.connect("interleaved.duckdb") as conn:
+    assert conn.execute("SELECT value FROM handoff.middle").fetchone()[0] == 41
+    conn.execute("UPDATE handoff.middle SET value = value + 17")
+`,
 		"assets/second.asset.yml": `name: handoff.second
 type: ingestr
-depends: [handoff.middle]
+depends: [handoff.script]
 parameters:
   source_connection: second_csv
   source_table: sample
@@ -4709,7 +4738,7 @@ columns:
       - name: not_null
 custom_checks:
   - name: exact_result
-    query: SELECT COUNT(*) FROM handoff.final WHERE total != 62
+    query: SELECT COUNT(*) FROM handoff.final WHERE total != 79
     value: 0
 @bruin */
 SELECT CAST(m.value + SUM(CAST(s.value AS INTEGER)) AS INTEGER) AS total
@@ -4733,8 +4762,8 @@ GROUP BY m.value
 		command.Dir = dir
 		output, err = command.CombinedOutput()
 		require.NoError(t, err, "%s", output)
-		require.Equal(t, "first_count,second_count,total\n2,3,62", strings.TrimSpace(string(output)))
-		t.Logf("run %d: five alternating SQL/ingestr assets, eight checks, workers=8; counts=2,3 total=62", run+1)
+		require.Equal(t, "first_count,second_count,total\n2,3,79", strings.TrimSpace(string(output)))
+		t.Logf("run %d: SQL/ingestr/Python assets, engine reuse asserted, eight checks, workers=8; counts=2,3 total=79", run+1)
 	}
 }
 

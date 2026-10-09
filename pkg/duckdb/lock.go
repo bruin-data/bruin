@@ -104,6 +104,8 @@ type databaseLock struct {
 	scopes   atomic.Int64
 }
 
+// Cache access requires the per-file lock followed by connectionReuseGate.RLock,
+// or just connectionReuseGate.Lock during a process-wide cache handoff.
 func (d *databaseLock) closeDatabase() {
 	if d.database != nil {
 		_ = d.database.Close()
@@ -112,6 +114,31 @@ func (d *databaseLock) closeDatabase() {
 }
 
 var databaseLocks sync.Map
+
+// Cached sessions hold the read side for their full lifetime. Always acquire
+// per-file locks before this gate; never wait for a file while holding the gate.
+// The write side drains cached sessions and protects all cache pointers without
+// waiting on file locks held by ingestion or uncached SQL execution.
+var connectionReuseGate sync.RWMutex
+
+var activeScripts atomic.Int64
+
+// SuspendConnectionReuse releases cached file locks for arbitrary Python/R code.
+// SQL continues with ephemeral connections until every overlapping script exits.
+// Scripts must still declare dependencies when sharing files with other work.
+func SuspendConnectionReuse(ctx context.Context) func() {
+	if connectionReuse(ctx) == nil {
+		return func() {}
+	}
+	connectionReuseGate.Lock()
+	activeScripts.Add(1)
+	databaseLocks.Range(func(_, value any) bool {
+		value.(*databaseLock).closeDatabase()
+		return true
+	})
+	connectionReuseGate.Unlock()
+	return func() { activeScripts.Add(-1) }
+}
 
 func databaseLockKey(path string) string {
 	// GetIngestrURI adds duckdb:/// to the configured path, including when
@@ -133,7 +160,9 @@ func databaseLockFor(path string) *databaseLock {
 func LockDatabase(path string) {
 	lock := databaseLockFor(path)
 	lock.Lock()
+	connectionReuseGate.RLock()
 	lock.closeDatabase()
+	connectionReuseGate.RUnlock()
 }
 
 func UnlockDatabase(path string) {
@@ -201,15 +230,21 @@ func WithConnectionReuse(ctx context.Context) (context.Context, func()) {
 		scope.Unlock()
 		for lock := range databases {
 			if lock.TryLock() {
-				lock.releaseScope()
-				lock.Unlock()
-			} else {
-				go func() {
-					lock.Lock()
-					defer lock.Unlock()
+				if connectionReuseGate.TryRLock() {
 					lock.releaseScope()
-				}()
+					connectionReuseGate.RUnlock()
+					lock.Unlock()
+					continue
+				}
+				lock.Unlock()
 			}
+			go func() {
+				lock.Lock()
+				defer lock.Unlock()
+				connectionReuseGate.RLock()
+				defer connectionReuseGate.RUnlock()
+				lock.releaseScope()
+			}()
 		}
 	}
 }

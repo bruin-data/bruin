@@ -111,6 +111,10 @@ func hasAttachmentStatement(sqlStr string) (bool, error) {
 func (e *EphemeralConnection) openADBC(ctx context.Context, sqlStr string) (adbc.Connection, func(), error) {
 	scope := connectionReuse(ctx)
 	reuse := scope != nil && e.canReuseDatabase()
+	// A subprocess cannot access this process's in-memory database, so those
+	// engines need no handoff (and must not lose their data during a script).
+	path := e.config.ToDBConnectionURI()
+	inMemory := path == "" || path == ":memory:"
 	if reuse {
 		attachment, err := hasAttachmentStatement(sqlStr)
 		if err != nil {
@@ -127,9 +131,16 @@ func (e *EphemeralConnection) openADBC(ctx context.Context, sqlStr string) (adbc
 				return nil, nil, err
 			}
 			e.lock.RLock()
+			connectionReuseGate.RLock()
 			if err := ctx.Err(); err != nil {
+				connectionReuseGate.RUnlock()
 				e.lock.RUnlock()
 				return nil, nil, err
+			}
+			if !inMemory && activeScripts.Load() > 0 {
+				connectionReuseGate.RUnlock()
+				e.lock.RUnlock()
+				break
 			}
 			db, ok := e.lock.database.(*cachedDatabase)
 			if ok && reflect.DeepEqual(db.config, e.config) {
@@ -145,20 +156,30 @@ func (e *EphemeralConnection) openADBC(ctx context.Context, sqlStr string) (adbc
 					if conn != nil {
 						conn.Close()
 					}
+					connectionReuseGate.RUnlock()
 					e.lock.RUnlock()
 					return nil, nil, err
 				}
 				return conn, func() {
 					conn.Close()
+					connectionReuseGate.RUnlock()
 					e.lock.RUnlock()
 				}, nil
 			}
+			connectionReuseGate.RUnlock()
 			e.lock.RUnlock()
 
 			e.lock.Lock()
+			connectionReuseGate.RLock()
 			if err := ctx.Err(); err != nil {
+				connectionReuseGate.RUnlock()
 				e.lock.Unlock()
 				return nil, nil, err
+			}
+			if !inMemory && activeScripts.Load() > 0 {
+				connectionReuseGate.RUnlock()
+				e.lock.Unlock()
+				break
 			}
 			// Another worker may have initialized the database while we
 			// waited. Different configurations must never share an engine.
@@ -167,12 +188,14 @@ func (e *EphemeralConnection) openADBC(ctx context.Context, sqlStr string) (adbc
 				e.lock.closeDatabase()
 				adb, conn, err := e.createADBC(ctx)
 				if err != nil {
+					connectionReuseGate.RUnlock()
 					e.lock.Unlock()
 					return nil, nil, err
 				}
 				conn.Close()
 				e.lock.database = &cachedDatabase{Database: adb, config: e.config}
 			}
+			connectionReuseGate.RUnlock()
 			e.lock.Unlock()
 		}
 	}
@@ -182,7 +205,9 @@ func (e *EphemeralConnection) openADBC(ctx context.Context, sqlStr string) (adbc
 		e.lock.Unlock()
 		return nil, nil, err
 	}
+	connectionReuseGate.RLock()
 	e.lock.closeDatabase()
+	connectionReuseGate.RUnlock()
 	adb, conn, err := e.createADBC(ctx)
 	if err != nil {
 		e.lock.Unlock()

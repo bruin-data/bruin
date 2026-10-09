@@ -286,7 +286,13 @@ func (u *UvPythonRunner) runWithNoMaterialization(ctx context.Context, execCtx *
 		EnvVars: execCtx.envVariables,
 	}
 
-	return u.Cmd.Run(ctx, execCtx.repo, noDependencyCommand)
+	return u.runAssetScript(ctx, execCtx.repo, noDependencyCommand)
+}
+
+func (u *UvPythonRunner) runAssetScript(ctx context.Context, repo *git.Repo, command *CommandInstance) error {
+	resume := duck.SuspendConnectionReuse(ctx)
+	defer resume()
+	return u.Cmd.Run(ctx, repo, command)
 }
 
 // lockPyprojectDeps runs `uv lock` in the project directory to ensure uv.lock is up to date.
@@ -326,7 +332,7 @@ func (u *UvPythonRunner) runWithPyproject(ctx context.Context, execCtx *executio
 		EnvVars: execCtx.envVariables,
 	}
 
-	return u.Cmd.Run(ctx, projectRepo, command)
+	return u.runAssetScript(ctx, projectRepo, command)
 }
 
 // calculateModuleFromProjectRoot calculates the module path relative to the project root.
@@ -432,7 +438,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		flags = append(flags, tempPyScript.Name())
 	}
 
-	err = u.Cmd.Run(ctx, runRepo, &CommandInstance{
+	err = u.runAssetScript(ctx, runRepo, &CommandInstance{
 		Name:    u.binaryFullPath,
 		Args:    flags,
 		EnvVars: execCtx.envVariables,
