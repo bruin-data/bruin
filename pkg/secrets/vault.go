@@ -218,7 +218,44 @@ func newVaultAPIClient(host string, clientConfig vaultClientConfig) (*vault.Clie
 		return nil, err
 	}
 
+	// The SDK resolves absolute request paths against the base address, discarding its path prefix; re-prepend it.
+	if decoded, escaped := basePathPrefix(host); decoded != "" {
+		if err := client.SetRequestCallbacks(prependBasePathCallback(decoded, escaped)); err != nil {
+			return nil, errors.Wrap(err, "failed to configure Vault base path")
+		}
+	}
+
 	return client, nil
+}
+
+// basePathPrefix returns the decoded and escaped path prefix of an http(s) Vault host.
+func basePathPrefix(host string) (decoded, escaped string) {
+	parsed, err := url.Parse(host)
+	if err != nil {
+		return "", ""
+	}
+	// Unix socket addresses encode the socket path, not an HTTP base path.
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return "", ""
+	}
+	decoded = strings.TrimRight(parsed.Path, "/")
+	if decoded == "" {
+		return "", ""
+	}
+	return decoded, strings.TrimRight(parsed.EscapedPath(), "/")
+}
+
+type basePathAppliedKey struct{}
+
+func prependBasePathCallback(decoded, escaped string) vault.RequestCallback {
+	return func(req *http.Request) {
+		if req == nil || req.URL == nil || req.Context().Value(basePathAppliedKey{}) != nil {
+			return
+		}
+		req.URL.RawPath = escaped + req.URL.EscapedPath()
+		req.URL.Path = decoded + req.URL.Path
+		*req = *req.WithContext(context.WithValue(req.Context(), basePathAppliedKey{}, struct{}{}))
+	}
 }
 
 func vaultRetryBackoff(minimum, maximum time.Duration, attempt int, response *http.Response) time.Duration {
