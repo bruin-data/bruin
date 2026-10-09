@@ -366,20 +366,27 @@ func TestConnectionReuseScriptHandoff(t *testing.T) {
 }
 
 //nolint:paralleltest // Script handoffs deliberately affect process-wide caches.
-func TestConnectionReuseScriptDoesNotWaitForUncachedWork(t *testing.T) {
-	for _, mode := range []string{"ingestr", "ephemeral SQL"} {
+func TestConnectionReuseScriptDoesNotWaitForUnrelatedWork(t *testing.T) {
+	for _, mode := range []string{"ingestr", "ephemeral SQL", "in-memory SQL"} {
 		t.Run(mode, func(t *testing.T) {
 			ctx, cleanup := WithConnectionReuse(t.Context())
 			cfg := Config{Path: filepath.Join(t.TempDir(), "busy.db")}
 			t.Cleanup(cleanup)
+			if mode == "in-memory SQL" {
+				cfg.Path = ":memory:"
+			}
 			conn, err := NewEphemeralConnection(cfg)
 			require.NoError(t, err)
 			var release func()
-			if mode == "ingestr" {
+			switch mode {
+			case "ingestr":
 				LockDatabase(cfg.Path)
 				release = func() { UnlockDatabase(cfg.Path) }
-			} else {
+			case "ephemeral SQL":
 				_, release, err = conn.openADBC(t.Context(), "")
+				require.NoError(t, err)
+			case "in-memory SQL":
+				_, release, err = conn.openADBC(ctx, "")
 				require.NoError(t, err)
 			}
 			var once sync.Once
@@ -399,11 +406,15 @@ func TestConnectionReuseScriptDoesNotWaitForUncachedWork(t *testing.T) {
 				resume := <-suspended
 				resume()
 				<-queued
-				t.Fatal("script handoff waited for unrelated uncached work")
+				t.Fatal("script handoff waited for unrelated work")
 			}
 			once.Do(release)
 			require.NoError(t, <-queued)
-			require.Nil(t, conn.lock.database, "queued SQL must observe the active script after acquiring its file")
+			if mode == "in-memory SQL" {
+				require.NotNil(t, conn.lock.database, "in-memory engines stay cached during scripts")
+			} else {
+				require.Nil(t, conn.lock.database, "queued SQL must observe the active script after acquiring its file")
+			}
 		})
 	}
 }

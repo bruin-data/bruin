@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/apache/arrow-adbc/go/adbc"
 	"github.com/apache/arrow-adbc/go/adbc/drivermgr"
@@ -34,7 +35,7 @@ func NewEphemeralConnection(c DuckDBConfig) (*EphemeralConnection, error) {
 
 	lock := databaseLockFor(c.ToDBConnectionURI())
 	if c.ToDBConnectionURI() == "" || c.ToDBConnectionURI() == ":memory:" {
-		lock = &databaseLock{}
+		lock = &databaseLock{gate: &sync.RWMutex{}}
 	}
 	return &EphemeralConnection{
 		config: c,
@@ -131,14 +132,14 @@ func (e *EphemeralConnection) openADBC(ctx context.Context, sqlStr string) (adbc
 				return nil, nil, err
 			}
 			e.lock.RLock()
-			connectionReuseGate.RLock()
+			e.lock.gate.RLock()
 			if err := ctx.Err(); err != nil {
-				connectionReuseGate.RUnlock()
+				e.lock.gate.RUnlock()
 				e.lock.RUnlock()
 				return nil, nil, err
 			}
 			if !inMemory && activeScripts.Load() > 0 {
-				connectionReuseGate.RUnlock()
+				e.lock.gate.RUnlock()
 				e.lock.RUnlock()
 				break
 			}
@@ -156,28 +157,28 @@ func (e *EphemeralConnection) openADBC(ctx context.Context, sqlStr string) (adbc
 					if conn != nil {
 						conn.Close()
 					}
-					connectionReuseGate.RUnlock()
+					e.lock.gate.RUnlock()
 					e.lock.RUnlock()
 					return nil, nil, err
 				}
 				return conn, func() {
 					conn.Close()
-					connectionReuseGate.RUnlock()
+					e.lock.gate.RUnlock()
 					e.lock.RUnlock()
 				}, nil
 			}
-			connectionReuseGate.RUnlock()
+			e.lock.gate.RUnlock()
 			e.lock.RUnlock()
 
 			e.lock.Lock()
-			connectionReuseGate.RLock()
+			e.lock.gate.RLock()
 			if err := ctx.Err(); err != nil {
-				connectionReuseGate.RUnlock()
+				e.lock.gate.RUnlock()
 				e.lock.Unlock()
 				return nil, nil, err
 			}
 			if !inMemory && activeScripts.Load() > 0 {
-				connectionReuseGate.RUnlock()
+				e.lock.gate.RUnlock()
 				e.lock.Unlock()
 				break
 			}
@@ -188,14 +189,14 @@ func (e *EphemeralConnection) openADBC(ctx context.Context, sqlStr string) (adbc
 				e.lock.closeDatabase()
 				adb, conn, err := e.createADBC(ctx)
 				if err != nil {
-					connectionReuseGate.RUnlock()
+					e.lock.gate.RUnlock()
 					e.lock.Unlock()
 					return nil, nil, err
 				}
 				conn.Close()
 				e.lock.database = &cachedDatabase{Database: adb, config: e.config}
 			}
-			connectionReuseGate.RUnlock()
+			e.lock.gate.RUnlock()
 			e.lock.Unlock()
 		}
 	}
@@ -205,9 +206,9 @@ func (e *EphemeralConnection) openADBC(ctx context.Context, sqlStr string) (adbc
 		e.lock.Unlock()
 		return nil, nil, err
 	}
-	connectionReuseGate.RLock()
+	e.lock.gate.RLock()
 	e.lock.closeDatabase()
-	connectionReuseGate.RUnlock()
+	e.lock.gate.RUnlock()
 	adb, conn, err := e.createADBC(ctx)
 	if err != nil {
 		e.lock.Unlock()

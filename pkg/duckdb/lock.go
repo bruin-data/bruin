@@ -102,10 +102,12 @@ type databaseLock struct {
 	database io.Closer
 	schema   sync.Mutex
 	scopes   atomic.Int64
+	gate     *sync.RWMutex
 }
 
-// Cache access requires the per-file lock followed by connectionReuseGate.RLock,
-// or just connectionReuseGate.Lock during a process-wide cache handoff.
+// Cache access requires the per-file lock followed by gate.RLock, or just
+// gate.Lock during a handoff. Registered file-backed engines share the process
+// gate; private in-memory engines have an independent gate.
 func (d *databaseLock) closeDatabase() {
 	if d.database != nil {
 		_ = d.database.Close()
@@ -153,16 +155,16 @@ func databaseLockKey(path string) string {
 }
 
 func databaseLockFor(path string) *databaseLock {
-	lock, _ := databaseLocks.LoadOrStore(databaseLockKey(path), &databaseLock{})
+	lock, _ := databaseLocks.LoadOrStore(databaseLockKey(path), &databaseLock{gate: &connectionReuseGate})
 	return lock.(*databaseLock)
 }
 
 func LockDatabase(path string) {
 	lock := databaseLockFor(path)
 	lock.Lock()
-	connectionReuseGate.RLock()
+	lock.gate.RLock()
 	lock.closeDatabase()
-	connectionReuseGate.RUnlock()
+	lock.gate.RUnlock()
 }
 
 func UnlockDatabase(path string) {
@@ -230,9 +232,9 @@ func WithConnectionReuse(ctx context.Context) (context.Context, func()) {
 		scope.Unlock()
 		for lock := range databases {
 			if lock.TryLock() {
-				if connectionReuseGate.TryRLock() {
+				if lock.gate.TryRLock() {
 					lock.releaseScope()
-					connectionReuseGate.RUnlock()
+					lock.gate.RUnlock()
 					lock.Unlock()
 					continue
 				}
@@ -241,8 +243,8 @@ func WithConnectionReuse(ctx context.Context) (context.Context, func()) {
 			go func() {
 				lock.Lock()
 				defer lock.Unlock()
-				connectionReuseGate.RLock()
-				defer connectionReuseGate.RUnlock()
+				lock.gate.RLock()
+				defer lock.gate.RUnlock()
 				lock.releaseScope()
 			}()
 		}
