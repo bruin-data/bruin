@@ -95,7 +95,17 @@ Requirements:
 
 - PlanetScale credentials with read access to the branch/keyspace.
 - Source tables must have primary keys, or `primary_key` must be set on the asset columns.
-- Source tables must not contain `ENUM`, `SET`, or `BIT` columns.
+- Source tables must not contain spatial columns such as `GEOMETRY` or `POINT`.
+
+CDC supports the following types in both the initial snapshot and subsequent changes:
+
+| Source type | Ingested value |
+|-------------|----------------|
+| `ENUM` | String containing the enum label |
+| `SET` | Comma-separated string of selected members in their declaration order |
+| `BIT(n)` | Binary value preserving all bytes and leading zeros, including `BIT(1)` and `BIT(64)` |
+
+SQL `NULL` values remain null for all three types.
 
 > [!NOTE]
 > When CDC is enabled, primary key columns do not need to be specified in the asset definition — they are determined automatically from the source table. PlanetScale delivers only the primary keys of deleted rows; the destination marks them deleted without disturbing the other columns.
