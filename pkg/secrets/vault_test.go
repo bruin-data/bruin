@@ -97,6 +97,50 @@ func TestValidateVaultAddress(t *testing.T) {
 	}
 }
 
+func TestBasePathPrefix(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		host string
+		want string
+	}{
+		{name: "no path", host: "https://vault.example.com:8200", want: ""},
+		{name: "root path", host: "https://vault.example.com/", want: ""},
+		{name: "single segment", host: "https://cloud.getbruin.com/vault", want: "/vault"},
+		{name: "nested path", host: "https://cloud.getbruin.com/api/vault", want: "/api/vault"},
+		{name: "trailing slash trimmed", host: "https://cloud.getbruin.com/api/vault/", want: "/api/vault"},
+		{name: "unix socket ignored", host: "unix:///var/run/vault.sock", want: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			require.Equal(t, tt.want, basePathPrefix(tt.host))
+		})
+	}
+}
+
+func TestClient_PreservesHostBasePath(t *testing.T) {
+	t.Parallel()
+
+	var gotPath atomic.Value
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		gotPath.Store(request.URL.Path)
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(`{"data":{"data":{"details":{"value":"somevalue"},"type":"generic"}}}`))
+	}))
+	defer server.Close()
+
+	clientConfig := defaultVaultClientConfig()
+	client, err := newVaultClientWithToken(t.Context(), server.URL+"/api/vault", "token", "mount", &mockLogger{}, "path", clientConfig)
+	require.NoError(t, err)
+
+	_, err = client.ResolveConnection("test-connection")
+	require.NoError(t, err)
+	require.Equal(t, "/api/vault/v1/mount/data/path/test-connection", gotPath.Load())
+}
+
 func TestVaultClientConfigFromEnv(t *testing.T) { //nolint:paralleltest // mutates process environment via t.Setenv
 	environmentVariables := []string{
 		"BRUIN_VAULT_TIMEOUT",

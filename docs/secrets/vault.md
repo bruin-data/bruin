@@ -20,7 +20,7 @@ export BRUIN_SECRETS_BACKEND=vault
 
 Bruin connects to Vault using environment variables. The following are required:
 
-- `BRUIN_VAULT_HOST`: The URL of your Vault server (e.g., `https://vault.example.com:8200`)
+- `BRUIN_VAULT_HOST`: The URL of your Vault server (e.g., `https://vault.example.com:8200`). A base path is preserved, so a host behind a reverse proxy such as `https://cloud.getbruin.com/api/vault` is supported.
 - `BRUIN_VAULT_MOUNT_PATH`: The path of the kv secrets engine
 - `BRUIN_VAULT_PATH`: The subpath within the engine to where the secrets are
 - either `BRUIN_VAULT_TOKEN` or `BRUIN_VAULT_ROLE`: The authentication token for Vault access, or if you are running Bruin inside a Kubernetes cluster, you can use a Kubernetes role for authentication with Vault by setting the `BRUIN_VAULT_ROLE` environment variable in your pod or deployment.
