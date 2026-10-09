@@ -314,6 +314,100 @@ func TestDuckDBProcessHelper(t *testing.T) {
 	require.NoError(t, err)
 }
 
+//nolint:paralleltest // Script handoffs deliberately affect process-wide caches.
+func TestConnectionReuseScriptHandoff(t *testing.T) {
+	ctx, cleanup := WithConnectionReuse(t.Context())
+	cfg := Config{Path: filepath.Join(t.TempDir(), "scripts.db")}
+	t.Cleanup(cleanup)
+	conn, err := NewEphemeralConnection(cfg)
+	require.NoError(t, err)
+	_, err = conn.ExecContext(ctx, "CREATE TABLE numbers AS SELECT 7 AS n")
+	require.NoError(t, err)
+	require.NotNil(t, conn.lock.database)
+	memory, err := NewEphemeralConnection(Config{Path: ":memory:"})
+	require.NoError(t, err)
+	_, err = memory.ExecContext(ctx, "CREATE TABLE numbers AS SELECT 19 AS n")
+	require.NoError(t, err)
+
+	runChild := func() {
+		t.Helper()
+		cmd := exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestDuckDBProcessHelper$")
+		cmd.Env = append(os.Environ(), "BRUIN_TEST_DUCKDB_PATH="+cfg.Path)
+		output, err := cmd.CombinedOutput()
+		require.NoError(t, err, "%s", output)
+	}
+	resumeFirst := SuspendConnectionReuse(ctx)
+	var firstOnce sync.Once
+	defer firstOnce.Do(resumeFirst)
+	require.Nil(t, conn.lock.database)
+	runChild()
+	resumeSecond := SuspendConnectionReuse(ctx)
+	var secondOnce sync.Once
+	defer secondOnce.Do(resumeSecond)
+	firstOnce.Do(resumeFirst)
+
+	// One script finishing must not resume caching while another is active.
+	var total int
+	require.NoError(t, conn.QueryRowContext(ctx, "SELECT CAST(SUM(n) AS BIGINT) FROM numbers").Scan(&total))
+	require.Equal(t, 48, total)
+	require.Nil(t, conn.lock.database)
+	runChild() // Native SQL above must have released the file again.
+	require.NoError(t, memory.QueryRowContext(ctx, "SELECT n FROM numbers").Scan(&total))
+	require.Equal(t, 19, total)
+	secondOnce.Do(resumeSecond)
+
+	require.NoError(t, conn.QueryRowContext(ctx, "SELECT CAST(SUM(n) AS BIGINT) FROM numbers").Scan(&total))
+	require.Equal(t, 89, total)
+	database := conn.lock.database
+	require.NotNil(t, database)
+	require.NoError(t, conn.QueryRowContext(ctx, "SELECT CAST(SUM(n) AS BIGINT) FROM numbers").Scan(&total))
+	require.Equal(t, 89, total)
+	require.Same(t, database, conn.lock.database, "reuse must resume after the last script")
+}
+
+//nolint:paralleltest // Script handoffs deliberately affect process-wide caches.
+func TestConnectionReuseScriptDoesNotWaitForUncachedWork(t *testing.T) {
+	for _, mode := range []string{"ingestr", "ephemeral SQL"} {
+		t.Run(mode, func(t *testing.T) {
+			ctx, cleanup := WithConnectionReuse(t.Context())
+			cfg := Config{Path: filepath.Join(t.TempDir(), "busy.db")}
+			t.Cleanup(cleanup)
+			conn, err := NewEphemeralConnection(cfg)
+			require.NoError(t, err)
+			var release func()
+			if mode == "ingestr" {
+				LockDatabase(cfg.Path)
+				release = func() { UnlockDatabase(cfg.Path) }
+			} else {
+				_, release, err = conn.openADBC(t.Context(), "")
+				require.NoError(t, err)
+			}
+			var once sync.Once
+			defer once.Do(release)
+			queued := make(chan error, 1)
+			go func() {
+				_, err := conn.ExecContext(ctx, "SELECT 17")
+				queued <- err
+			}()
+			suspended := make(chan func(), 1)
+			go func() { suspended <- SuspendConnectionReuse(ctx) }()
+			select {
+			case resume := <-suspended:
+				defer resume()
+			case <-time.After(5 * time.Second):
+				once.Do(release)
+				resume := <-suspended
+				resume()
+				<-queued
+				t.Fatal("script handoff waited for unrelated uncached work")
+			}
+			once.Do(release)
+			require.NoError(t, <-queued)
+			require.Nil(t, conn.lock.database, "queued SQL must observe the active script after acquiring its file")
+		})
+	}
+}
+
 func TestConnectionReuseReadOnlyConfiguration(t *testing.T) {
 	t.Parallel()
 	ctx, cleanup := WithConnectionReuse(t.Context())
