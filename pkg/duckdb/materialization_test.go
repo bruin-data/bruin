@@ -734,7 +734,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				"\tt._valid_from,\n" +
 				"\t\tCASE\n" +
 				"\t\t\tWHEN _matched_by_source IS NOT NULL AND (t.col1 != s.col1 OR t.col2 != s.col2) THEN (SELECT now FROM time_now)\n" +
-				"\t\t\tWHEN _matched_by_source IS NULL THEN (SELECT now FROM time_now)\n" +
+				"\t\t\tWHEN _matched_by_source IS NULL AND t._is_current THEN (SELECT now FROM time_now)\n" +
 				"\t\t\tELSE t._valid_until\n" +
 				"\t\tEND AS _valid_until,\n" +
 				"\t\tCASE\n" +
@@ -800,7 +800,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				"\tt._valid_from,\n" +
 				"\t\tCASE\n" +
 				"\t\t\tWHEN _matched_by_source IS NOT NULL AND (t.name != s.name) THEN (SELECT now FROM time_now)\n" +
-				"\t\t\tWHEN _matched_by_source IS NULL THEN (SELECT now FROM time_now)\n" +
+				"\t\t\tWHEN _matched_by_source IS NULL AND t._is_current THEN (SELECT now FROM time_now)\n" +
 				"\t\t\tELSE t._valid_until\n" +
 				"\t\tEND AS _valid_until,\n" +
 				"\t\tCASE\n" +
@@ -867,7 +867,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				"\tt._valid_from,\n" +
 				"\t\tCASE\n" +
 				"\t\t\tWHEN _matched_by_source IS NOT NULL AND (t.col1 != s.col1 OR t.updated_at != s.updated_at) THEN CAST(s.updated_at AS TIMESTAMP) AT TIME ZONE 'UTC'\n" +
-				"\t\t\tWHEN _matched_by_source IS NULL THEN (SELECT now FROM time_now)\n" +
+				"\t\t\tWHEN _matched_by_source IS NULL AND t._is_current THEN (SELECT now FROM time_now)\n" +
 				"\t\t\tELSE t._valid_until\n" +
 				"\t\tEND AS _valid_until,\n" +
 				"\t\tCASE\n" +
@@ -1212,7 +1212,7 @@ func TestBuildSCD2ByTimeQuery(t *testing.T) {
 				"\tt._valid_from,\n" +
 				"\t\tCASE\n" +
 				"\t\t\tWHEN _matched_by_source IS NOT NULL AND (CAST(s.ts AS TIMESTAMP) AT TIME ZONE 'UTC' > t._valid_from) THEN CAST(s.ts AS TIMESTAMP) AT TIME ZONE 'UTC'\n" +
-				"\t\t\tWHEN _matched_by_source IS NULL THEN (SELECT now FROM time_now)\n" +
+				"\t\t\tWHEN _matched_by_source IS NULL AND t._is_current THEN (SELECT now FROM time_now)\n" +
 				"\t\t\tELSE t._valid_until\n" +
 				"\t\tEND AS _valid_until,\n" +
 				"\t\tCASE\n" +
@@ -1279,7 +1279,7 @@ func TestBuildSCD2ByTimeQuery(t *testing.T) {
 				"\tt._valid_from,\n" +
 				"\t\tCASE\n" +
 				"\t\t\tWHEN _matched_by_source IS NOT NULL AND (CAST(s.ts AS TIMESTAMP) AT TIME ZONE 'UTC' > t._valid_from) THEN CAST(s.ts AS TIMESTAMP) AT TIME ZONE 'UTC'\n" +
-				"\t\t\tWHEN _matched_by_source IS NULL THEN (SELECT now FROM time_now)\n" +
+				"\t\t\tWHEN _matched_by_source IS NULL AND t._is_current THEN (SELECT now FROM time_now)\n" +
 				"\t\t\tELSE t._valid_until\n" +
 				"\t\tEND AS _valid_until,\n" +
 				"\t\tCASE\n" +
