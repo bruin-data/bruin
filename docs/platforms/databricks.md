@@ -107,6 +107,12 @@ Ensure the service principal has `CAN USE` permission on the SQL warehouse you w
 
 For more details on OAuth M2M authentication, see the [Databricks documentation](https://docs.databricks.com/en/dev-tools/auth/oauth-m2m.html).
 
+## Data ingestion
+
+Use an [Ingestr asset](/assets/ingestr) to copy Databricks tables or [custom SQL query results](/assets/ingestr#custom-sql-queries) into another destination. Set `source_connection` to a Databricks connection configured with a personal access token and SQL warehouse HTTP path using [Option 1](#option-1-personal-access-token-pat).
+
+Ingestion reads large tables and custom query results in Arrow chunks through temporary download links, allowing results beyond the inline response size limit. Nulls, microsecond timestamp precision, and binary values are preserved. Chunk retrieval is automatic; the machine running Bruin needs HTTPS access to the storage endpoints in the download links as well as the Databricks workspace.
+
 ## Databricks Assets
 
 ### `databricks.sql`
