@@ -8,8 +8,8 @@ responses recorded from the original Python implementation.
   ports it to Go. It runs on sqlglot 30.13.0.
 - `golden_common.py`: shared helpers. Runs a command the way `main.py` did, loads the corpus and
   writes golden files.
-- `gen_golden_commands.py`, `gen_golden_fixtures.py`, `gen_golden_fuzz.py`: record
-  `../testdata/golden/{commands,fixtures,fuzz}.json.gz`.
+- `gen_golden_commands.py`, `gen_golden_fixtures.py`, `gen_golden_fuzz.py`, `gen_golden_hoist.py`:
+  record `../testdata/golden/{commands,fixtures,fuzz,hoist}.json.gz`.
 - `golden_diff.py`: summarizes how two versions of a golden file differ.
 
 ## Golden files
@@ -19,6 +19,7 @@ responses recorded from the original Python implementation.
 | `commands.json.gz` | every statement of the sqlglot conformance corpus (`../../sqlengine/testdata/parse.json.gz`) in a Bruin dialect, through every command `pkg/sqlparser` sends | 145,326 |
 | `fixtures.json.gz` | sqlglot's optimizer fixtures (TPC-H, TPC-DS, optimizer.sql, ...) through lineage (with and without their schemas), tables and rename, in every Bruin dialect | 47,124 |
 | `fuzz.json.gz` | up to 4 malformed variants per corpus statement (truncated, dropped, duplicated and swapped tokens; seed 1) through 7 commands | 378,042 |
+| `hoist.json.gz` | scripts and hook lists composed from DECLAREs, statements, procedural blocks (BEGIN, IF, LOOP, WHILE, TRY, `$$` bodies, ...), comments and separators, plus one malformed variant per script (seed 1), through `hoist-declares` and `hoist-declares-list` in every Bruin dialect | 32,559 |
 
 Each record is `{"cmd": {"command": ..., "contents": ...}, "want": <response>}`. The test replays
 `cmd` through `dispatch` and compares the response.
@@ -38,12 +39,13 @@ From the repository root:
 venv/bin/python pkg/sqlparser/codegen/gen_golden_commands.py               # ~10 s on 12 cores
 venv/bin/python pkg/sqlparser/codegen/gen_golden_fixtures.py sqlglot-src   # ~15 s
 venv/bin/python pkg/sqlparser/codegen/gen_golden_fuzz.py                   # ~2 min
+venv/bin/python pkg/sqlparser/codegen/gen_golden_hoist.py                  # ~10 s
 ```
 
 Each script writes to `pkg/sqlparser/testdata/golden/` by default; pass an output path to write
 elsewhere.
 
-- **commands and fixtures** regenerate exactly.
+- **commands, fixtures and hoist** regenerate exactly.
 - **fuzz** has about 1,500 responses whose text depends on `PYTHONHASHSEED`. When several
   required arguments are missing, sqlglot names the first one in a set's iteration order. The Go
   test ignores that keyword when comparing (Go reports them in definition order).
