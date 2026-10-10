@@ -82,5 +82,5 @@ This means memory-intensive pipelines naturally run fewer assets in parallel.
 
 ## Platform Notes
 
-- **DuckDB:** Cannot share database files across parallel processes. Use `--workers 1` for shared files.
+- **DuckDB:** SQL assets and checks share a database instance within a run and can use multiple workers. Bruin releases the file for ingestr subprocesses and reopens it afterward. Python/R execution temporarily suspends file-backed reuse; reuse resumes when the last script finishes. Declare dependencies when scripts and SQL share a file. Only one process may write to a given DuckDB file; `--workers 1` does not coordinate separate runs. DuckLake writer processes need separate engine files and a concurrent catalog. See [DuckDB concurrency](../platforms/duckdb.md#concurrency-and-connection-lifetime).
 - **Cloud warehouses (BigQuery, Snowflake):** Handle high concurrency well since computation happens on their infrastructure.

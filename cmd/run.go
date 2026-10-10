@@ -1420,6 +1420,10 @@ func Run(isDebug *bool) *cli.Command {
 				InteractivePythonLogs: interactivePythonLogs,
 			}
 
+			var closeDuckDB func()
+			runCtx, closeDuckDB = duck.WithConnectionReuse(runCtx)
+			defer closeDuckDB()
+
 			// Create a context with timeout. A streaming asset is meant to run
 			// indefinitely, so skip the default timeout unless the user set one
 			// explicitly; SIGINT/SIGTERM remains the way to stop it.

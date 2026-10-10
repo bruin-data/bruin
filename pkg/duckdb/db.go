@@ -205,11 +205,6 @@ func NewClient(c DuckDBConfig) (*Client, error) {
 		readOnly = cfg.ReadOnly
 	}
 
-	if !readOnly {
-		LockDatabase(c.ToDBConnectionURI())
-		defer UnlockDatabase(c.ToDBConnectionURI())
-	}
-
 	conn, err := NewEphemeralConnection(c)
 	if err != nil {
 		return nil, err
@@ -224,21 +219,7 @@ func NewClient(c DuckDBConfig) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) lockIfNeeded() {
-	if !c.readOnly {
-		LockDatabase(c.config.ToDBConnectionURI())
-	}
-}
-
-func (c *Client) unlockIfNeeded() {
-	if !c.readOnly {
-		UnlockDatabase(c.config.ToDBConnectionURI())
-	}
-}
-
 func (c *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
-	c.lockIfNeeded()
-	defer c.unlockIfNeeded()
 	_, err := c.connection.ExecContext(ctx, query.String())
 	if err != nil {
 		return err
@@ -260,9 +241,6 @@ func (c *Client) GetDBConnectionURI() (string, error) {
 
 // Select runs a query and returns the results.
 func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{}, error) {
-	c.lockIfNeeded()
-	defer c.unlockIfNeeded()
-
 	rows, err := c.connection.QueryContext(ctx, query.String())
 	if err != nil {
 		return nil, err
@@ -324,9 +302,6 @@ func (c *Client) DryRunQuery(ctx context.Context, q *query.Query) (*query.DryRun
 }
 
 func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query) (*query.QueryResult, error) {
-	c.lockIfNeeded()
-	defer c.unlockIfNeeded()
-
 	if !query.IsLikelyResultQuery(queryObject.String()) {
 		execResult, err := c.connection.ExecContext(ctx, queryObject.String())
 		if err != nil {
@@ -476,13 +451,15 @@ func copyString(s string) string {
 }
 
 func (c *Client) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
+	// CREATE SCHEMA IF NOT EXISTS can still conflict when two transactions
+	// create the same schema. Coordinate aliases of the same database too.
+	lock := databaseLockFor(c.config.ToDBConnectionURI())
+	lock.schema.Lock()
+	defer lock.schema.Unlock()
 	return c.schemaCreator.CreateSchemaIfNotExist(ctx, c, asset)
 }
 
 func (c *Client) GetTableSummary(ctx context.Context, tableName string, schemaOnly bool) (*diff.TableSummaryResult, error) {
-	c.lockIfNeeded()
-	defer c.unlockIfNeeded()
-
 	var rowCount int64
 
 	// Get row count only if not in schema-only mode
@@ -771,9 +748,6 @@ func (c *Client) fetchJSONStats(ctx context.Context, tableName, columnName strin
 }
 
 func (c *Client) GetDatabases(ctx context.Context) ([]string, error) {
-	c.lockIfNeeded()
-	defer c.unlockIfNeeded()
-
 	q := `
 SELECT DISTINCT table_schema
 FROM information_schema.tables
@@ -807,9 +781,6 @@ func (c *Client) GetTables(ctx context.Context, databaseName string) ([]string, 
 	if databaseName == "" {
 		return nil, errors.New("database name cannot be empty")
 	}
-
-	c.lockIfNeeded()
-	defer c.unlockIfNeeded()
 
 	q := `
 SELECT table_name
@@ -848,9 +819,6 @@ func (c *Client) GetColumns(ctx context.Context, databaseName, tableName string)
 	if tableName == "" {
 		return nil, errors.New("table name cannot be empty")
 	}
-
-	c.lockIfNeeded()
-	defer c.unlockIfNeeded()
 
 	q := `
 SELECT
@@ -900,13 +868,11 @@ ORDER BY ordinal_position;
 	return columns, nil
 }
 
-// Close is a no-op since connections are opened and closed per operation.
+// Close is a no-op: sessions close per operation; WithConnectionReuse owns
+// database cleanup for a run, not individual assets using this shared client.
 func (c *Client) Close() {}
 
 func (c *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
-	c.lockIfNeeded()
-	defer c.unlockIfNeeded()
-
 	// DuckDB uses a catalog approach, we'll use the INFORMATION_SCHEMA
 	// First, let's get all schemas and tables with view definitions
 	q := `

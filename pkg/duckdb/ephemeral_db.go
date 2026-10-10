@@ -8,19 +8,24 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/apache/arrow-adbc/go/adbc"
 	"github.com/apache/arrow-adbc/go/adbc/drivermgr"
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
+	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/sqlengine"
 )
 
 // EphemeralConnection uses the ADBC low-level API to query DuckDB directly,
 // bypassing the database/sql adapter which doesn't support complex Arrow types
-// (LIST, STRUCT, MAP).
+// (LIST, STRUCT, MAP). During a pipeline run, sessions share a cached database.
 type EphemeralConnection struct {
 	config DuckDBConfig
+	lock   *databaseLock
 }
 
 func NewEphemeralConnection(c DuckDBConfig) (*EphemeralConnection, error) {
@@ -28,16 +33,199 @@ func NewEphemeralConnection(c DuckDBConfig) (*EphemeralConnection, error) {
 		return nil, fmt.Errorf("failed to ensure ADBC driver is installed: %w", err)
 	}
 
+	lock := databaseLockFor(c.ToDBConnectionURI())
+	if c.ToDBConnectionURI() == "" || c.ToDBConnectionURI() == ":memory:" {
+		lock = &databaseLock{gate: &sync.RWMutex{}}
+	}
 	return &EphemeralConnection{
 		config: c,
+		lock:   lock,
 	}, nil
 }
 
-// openADBC creates an ADBC database and connection, including lakehouse setup.
+type cachedDatabase struct {
+	adbc.Database
+	config DuckDBConfig
+}
+
+// TransactionConflictError identifies a transaction that can be retried after
+// a competing writer completes. Bruin does not replay arbitrary SQL batches:
+// statements before the failed transaction may already have committed.
+type TransactionConflictError struct {
+	Err error
+}
+
+func (e *TransactionConflictError) Error() string {
+	return "retryable DuckDB transaction conflict; retry the failed transaction after the competing writer completes: " + e.Err.Error()
+}
+
+func (e *TransactionConflictError) Unwrap() error { return e.Err }
+
+func transactionError(err error) error {
+	if err != nil {
+		message := strings.ToLower(err.Error())
+		if strings.Contains(message, "transaction conflict") ||
+			(strings.Contains(message, "transactioncontext") && strings.Contains(message, "conflict")) {
+			return &TransactionConflictError{Err: err}
+		}
+	}
+	return err
+}
+
+func (e *EphemeralConnection) canReuseDatabase() bool {
+	cfg, ok := e.config.(Config)
+	if !ok || !cfg.HasLakehouse() || cfg.Lakehouse.Format != config.LakehouseFormatDuckLake {
+		return true
+	}
+	// Ingestr's ducklake:// URI does not identify our engine file. A local
+	// catalog can retain a separate file lock, so do not cache that attachment.
+	return cfg.Lakehouse.Catalog.Type != config.CatalogTypeDuckDB &&
+		cfg.Lakehouse.Catalog.Type != config.CatalogTypeSQLite
+}
+
+var attachmentKeyword = regexp.MustCompile(`(?i)\b(attach|detach)\b`)
+
+func hasAttachmentStatement(sqlStr string) (bool, error) {
+	if !attachmentKeyword.MatchString(sqlStr) {
+		return false, nil
+	}
+	// Tokenization distinguishes statements from comments, quoted identifiers,
+	// and literals (including DuckDB's dollar-quoted and escaped strings).
+	tokens, err := sqlengine.MustDialect("duckdb").Tokenize(sqlStr)
+	if err != nil {
+		return false, fmt.Errorf("failed to tokenize DuckDB query: %w", err)
+	}
+	statementStart := true
+	for _, token := range tokens {
+		if statementStart && (token.Type == sqlengine.TK_ATTACH || token.Type == sqlengine.TK_DETACH) {
+			return true, nil
+		}
+		statementStart = token.Type == sqlengine.TK_SEMICOLON
+	}
+	return false, nil
+}
+
+// openADBC leases a fresh session. Cleanup releases the session before allowing
+// an external process or run cleanup to close the database.
+//
+//nolint:ireturn
+func (e *EphemeralConnection) openADBC(ctx context.Context, sqlStr string) (adbc.Connection, func(), error) {
+	scope := connectionReuse(ctx)
+	reuse := scope != nil && e.canReuseDatabase()
+	// A subprocess cannot access this process's in-memory database, so those
+	// engines need no handoff (and must not lose their data during a script).
+	path := e.config.ToDBConnectionURI()
+	inMemory := path == "" || path == ":memory:"
+	if reuse {
+		attachment, err := hasAttachmentStatement(sqlStr)
+		if err != nil {
+			return nil, nil, err
+		}
+		reuse = !attachment
+	}
+	if reuse {
+		if !scope.register(e.lock) {
+			return nil, nil, context.Canceled
+		}
+		for {
+			if err := ctx.Err(); err != nil {
+				return nil, nil, err
+			}
+			e.lock.RLock()
+			e.lock.gate.RLock()
+			if err := ctx.Err(); err != nil {
+				e.lock.gate.RUnlock()
+				e.lock.RUnlock()
+				return nil, nil, err
+			}
+			if !inMemory && activeScripts.Load() > 0 {
+				e.lock.gate.RUnlock()
+				e.lock.RUnlock()
+				break
+			}
+			db, ok := e.lock.database.(*cachedDatabase)
+			if ok && reflect.DeepEqual(db.config, e.config) {
+				conn, err := db.Open(ctx)
+				if err == nil {
+					// Attachments and secrets are database-wide, but USE is
+					// session-local and must be applied on each fresh session.
+					if cfg, ok := e.config.(Config); ok && cfg.HasLakehouse() {
+						err = execADBCStatement(ctx, conn, "USE "+cfg.GetLakehouseAlias())
+					}
+				}
+				if err != nil {
+					if conn != nil {
+						conn.Close()
+					}
+					e.lock.gate.RUnlock()
+					e.lock.RUnlock()
+					return nil, nil, err
+				}
+				return conn, func() {
+					conn.Close()
+					e.lock.gate.RUnlock()
+					e.lock.RUnlock()
+				}, nil
+			}
+			e.lock.gate.RUnlock()
+			e.lock.RUnlock()
+
+			e.lock.Lock()
+			e.lock.gate.RLock()
+			if err := ctx.Err(); err != nil {
+				e.lock.gate.RUnlock()
+				e.lock.Unlock()
+				return nil, nil, err
+			}
+			if !inMemory && activeScripts.Load() > 0 {
+				e.lock.gate.RUnlock()
+				e.lock.Unlock()
+				break
+			}
+			// Another worker may have initialized the database while we
+			// waited. Different configurations must never share an engine.
+			db, ok = e.lock.database.(*cachedDatabase)
+			if !ok || !reflect.DeepEqual(db.config, e.config) {
+				e.lock.closeDatabase()
+				adb, conn, err := e.createADBC(ctx)
+				if err != nil {
+					e.lock.gate.RUnlock()
+					e.lock.Unlock()
+					return nil, nil, err
+				}
+				conn.Close()
+				e.lock.database = &cachedDatabase{Database: adb, config: e.config}
+			}
+			e.lock.gate.RUnlock()
+			e.lock.Unlock()
+		}
+	}
+
+	e.lock.Lock()
+	if err := ctx.Err(); err != nil {
+		e.lock.Unlock()
+		return nil, nil, err
+	}
+	e.lock.gate.RLock()
+	e.lock.closeDatabase()
+	e.lock.gate.RUnlock()
+	adb, conn, err := e.createADBC(ctx)
+	if err != nil {
+		e.lock.Unlock()
+		return nil, nil, err
+	}
+	return conn, func() {
+		conn.Close()
+		adb.Close()
+		e.lock.Unlock()
+	}, nil
+}
+
+// createADBC creates an ADBC database and connection, including lakehouse setup.
 // The caller must close both the connection and database when done.
 //
 //nolint:ireturn
-func (e *EphemeralConnection) openADBC(ctx context.Context) (adbc.Database, adbc.Connection, error) {
+func (e *EphemeralConnection) createADBC(ctx context.Context) (adbc.Database, adbc.Connection, error) {
 	opts := e.databaseOptions()
 
 	var drv drivermgr.Driver
@@ -108,12 +296,11 @@ func execADBCStatement(ctx context.Context, conn adbc.Connection, sqlStr string)
 
 //nolint:ireturn
 func (e *EphemeralConnection) QueryContext(ctx context.Context, queryStr string, args ...any) (Rows, error) {
-	adb, conn, err := e.openADBC(ctx)
+	conn, cleanup, err := e.openADBC(ctx, queryStr)
 	if err != nil {
 		return nil, err
 	}
-	defer adb.Close()
-	defer conn.Close()
+	defer cleanup()
 
 	stmt, err := conn.NewStatement()
 	if err != nil {
@@ -122,12 +309,12 @@ func (e *EphemeralConnection) QueryContext(ctx context.Context, queryStr string,
 	defer stmt.Close()
 
 	if err := stmt.SetSqlQuery(inlineQueryArgs(queryStr, args)); err != nil {
-		return nil, err
+		return nil, transactionError(err)
 	}
 
 	reader, _, err := stmt.ExecuteQuery(ctx)
 	if err != nil {
-		return nil, err
+		return nil, transactionError(err)
 	}
 	if reader == nil {
 		return &bufferedRows{
@@ -142,12 +329,11 @@ func (e *EphemeralConnection) QueryContext(ctx context.Context, queryStr string,
 }
 
 func (e *EphemeralConnection) ExecContext(ctx context.Context, sqlStr string, arguments ...any) (sql.Result, error) {
-	adb, conn, err := e.openADBC(ctx)
+	conn, cleanup, err := e.openADBC(ctx, sqlStr)
 	if err != nil {
 		return nil, err
 	}
-	defer adb.Close()
-	defer conn.Close()
+	defer cleanup()
 
 	stmt, err := conn.NewStatement()
 	if err != nil {
@@ -156,12 +342,12 @@ func (e *EphemeralConnection) ExecContext(ctx context.Context, sqlStr string, ar
 	defer stmt.Close()
 
 	if err := stmt.SetSqlQuery(inlineQueryArgs(sqlStr, arguments)); err != nil {
-		return nil, err
+		return nil, transactionError(err)
 	}
 
 	reader, _, err := stmt.ExecuteQuery(ctx)
 	if err != nil {
-		return nil, err
+		return nil, transactionError(err)
 	}
 	if reader != nil {
 		reader.Release()
@@ -172,12 +358,11 @@ func (e *EphemeralConnection) ExecContext(ctx context.Context, sqlStr string, ar
 
 //nolint:ireturn
 func (e *EphemeralConnection) QueryRowContext(ctx context.Context, queryStr string, args ...any) Row {
-	adb, conn, err := e.openADBC(ctx)
+	conn, cleanup, err := e.openADBC(ctx, queryStr)
 	if err != nil {
 		return &errorRow{err: err}
 	}
-	defer adb.Close()
-	defer conn.Close()
+	defer cleanup()
 
 	stmt, err := conn.NewStatement()
 	if err != nil {
@@ -186,12 +371,12 @@ func (e *EphemeralConnection) QueryRowContext(ctx context.Context, queryStr stri
 	defer stmt.Close()
 
 	if err := stmt.SetSqlQuery(inlineQueryArgs(queryStr, args)); err != nil {
-		return &errorRow{err: err}
+		return &errorRow{err: transactionError(err)}
 	}
 
 	reader, _, err := stmt.ExecuteQuery(ctx)
 	if err != nil {
-		return &errorRow{err: err}
+		return &errorRow{err: transactionError(err)}
 	}
 	if reader == nil {
 		return &errorRow{err: sql.ErrNoRows}
