@@ -1,0 +1,35 @@
+version: 2
+
+# Group security fixes without enabling routine version-update PRs.
+# The required schedule applies to version updates, not security updates.
+# These rules do not suppress vulnerability alerts for fixtures or other paths.
+updates:
+  - package-ecosystem: "gomod"
+    directories:
+      - "/"
+      - "/semantic-engine"
+      # Runnable integration-test modules, not synthetic manifest fixtures.
+      - "/integration-tests/cloud-integration-tests/clickhouse"
+      - "/integration-tests/cloud-integration-tests/doris"
+      - "/integration-tests/cloud-integration-tests/sail"
+      - "/integration-tests/cloud-integration-tests/spark"
+      - "/integration-tests/cloud-integration-tests/starrocks"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0
+    groups:
+      go-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0
+    groups:
+      npm-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
