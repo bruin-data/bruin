@@ -594,6 +594,8 @@ type SnowflakeConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	CloudRouting       `yaml:",inline" mapstructure:",squash"`
 	Account            string `yaml:"account,omitempty" json:"account" mapstructure:"account"`
+	Host               string `yaml:"host,omitempty" json:"host,omitempty" mapstructure:"host"`
+	Port               int    `yaml:"port,omitempty" json:"port,omitempty" mapstructure:"port"`
 	Username           string `yaml:"username,omitempty" json:"username,omitempty" mapstructure:"username"`
 	Password           string `yaml:"password,omitempty" json:"password,omitempty" jsonschema:"oneof_required=password" mapstructure:"password" sensitive:"true"`
 	Region             string `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
@@ -633,6 +635,12 @@ func (c SnowflakeConnection) MarshalJSON() ([]byte, error) {
 		"private_key": c.PrivateKey,
 		"token":       c.Token,
 	}
+	if c.Host != "" {
+		payload["host"] = c.Host
+	}
+	if c.Port != 0 {
+		payload["port"] = c.Port
+	}
 	if c.ReadOnly {
 		payload["read_only"] = true
 	}
@@ -667,6 +675,20 @@ func (c SnowflakeConnection) MarshalYAML() (interface{}, error) {
 			node.Content,
 			&yaml.Node{Kind: yaml.ScalarNode, Value: "account"},
 			&yaml.Node{Kind: yaml.ScalarNode, Value: c.Account},
+		)
+	}
+	if c.Host != "" {
+		node.Content = append(
+			node.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "host"},
+			&yaml.Node{Kind: yaml.ScalarNode, Value: c.Host},
+		)
+	}
+	if c.Port != 0 {
+		node.Content = append(
+			node.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "port"},
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!int", Value: strconv.Itoa(c.Port)},
 		)
 	}
 	if c.Username != "" {
