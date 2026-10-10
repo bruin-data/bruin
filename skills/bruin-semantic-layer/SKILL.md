@@ -104,7 +104,9 @@ checks:
 
 ## Default Model Behavior
 
-- `source.table` is required and can be a relation name or a parenthesized SQL subquery with an alias.
+- Exactly one of `source.table` or `source.query` is required.
+- `source.table` can be a relation name or a parenthesized SQL subquery with an alias.
+- `source.query` is compiled as `(query) AS <model_name>`.
 - `source.connection` is optional. `bruin semantic validate`, `bruin semantic check`, and `bruin query --pipeline` use it when `--connection` is not passed.
 - `label`, `description`, `group`, `hidden`, and `format` metadata help consumers but do not change SQL generation.
 - Dimension `expression` defaults to the dimension `name`.
@@ -202,7 +204,8 @@ Semantic query mode requires at least one dimension or metric and cannot be comb
 
 ## Validation Notes
 
-- Required model fields: `name` and `source.table`.
+- Required model fields: `name` and exactly one of `source.table` or `source.query`.
+- `bruin validate` loads `semantic/` next to `.bruin.yml` (`semantic-layer-valid`, fast) and dry-runs query sources (`semantic-query-dry-run`).
 - Required item fields: dimension `name`, metric `name` and `expression`, segment `name` and `filter`.
 - Window metrics must reference exactly one metric, for example `expression: "{revenue}"`.
 - Window `order_by` and `partition_by` values must reference dimensions on the model.
