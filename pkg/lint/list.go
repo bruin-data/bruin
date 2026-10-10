@@ -311,6 +311,13 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser sqlpa
 			ApplicableLevels: []Level{LevelPipeline},
 		},
 		&SimpleRule{
+			Identifier:       "valid-variable-schemas",
+			Fast:             true,
+			Severity:         ValidatorSeverityWarning,
+			Validator:        ValidateVariableSchemas,
+			ApplicableLevels: []Level{LevelPipeline},
+		},
+		&SimpleRule{
 			Identifier:       "valid-pipeline-concurrency",
 			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
