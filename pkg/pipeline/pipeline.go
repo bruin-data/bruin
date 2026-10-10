@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"math"
 	"path/filepath"
 	"reflect"
@@ -32,6 +33,7 @@ const (
 	CommentTask TaskDefinitionType = "comment"
 	YamlTask    TaskDefinitionType = "yaml"
 
+	AssetTypeInference                 = AssetType("inference")
 	AssetTypeAgentClaudeCode           = AssetType("agent.claude_code")
 	AssetTypeAthenaQuery               = AssetType("athena.sql")
 	AssetTypeAthenaSeed                = AssetType("athena.seed")
@@ -860,7 +862,21 @@ type ColumnReference struct {
 	Column string `json:"column" yaml:"column,omitempty" mapstructure:"column"`
 }
 
+// ColumnInference describes a generated value in an inference asset.
+type ColumnInference struct {
+	Provider   string            `json:"provider,omitempty" yaml:"provider,omitempty" mapstructure:"provider"`
+	Model      string            `json:"model,omitempty" yaml:"model,omitempty" mapstructure:"model"`
+	Connection string            `json:"connection,omitempty" yaml:"connection,omitempty" mapstructure:"connection"`
+	Prompt     string            `json:"prompt" yaml:"prompt" mapstructure:"prompt"`
+	Choices    map[string]string `json:"choices,omitempty" yaml:"choices,omitempty" mapstructure:"choices"`
+	Minimum    *float64          `json:"minimum,omitempty" yaml:"minimum,omitempty" mapstructure:"minimum"`
+	Maximum    *float64          `json:"maximum,omitempty" yaml:"maximum,omitempty" mapstructure:"maximum"`
+	Levels     []string          `json:"levels,omitempty" yaml:"levels,omitempty" mapstructure:"levels"`
+	Threshold  *float64          `json:"threshold,omitempty" yaml:"threshold,omitempty" mapstructure:"threshold"`
+}
+
 type Column struct {
+	Inference       *ColumnInference  `json:"inference,omitempty" yaml:"inference,omitempty" mapstructure:"inference"`
 	EntityAttribute *EntityAttribute  `json:"entity_attribute" yaml:"-" mapstructure:"-"`
 	Name            string            `json:"name" yaml:"name,omitempty" mapstructure:"name"`
 	SourceColumn    string            `json:"source_column" yaml:"source_column,omitempty" mapstructure:"source_column"`
@@ -2499,9 +2515,46 @@ func (p *Pipeline) GetCompatibilityHash() string {
 	return hex.EncodeToString(hash.Sum(nil))
 }
 
+// InferenceProviderConnection applies column overrides without resolving pipeline defaults.
+func (a *Asset) InferenceProviderConnection(column *ColumnInference) (string, string) {
+	provider, _ := a.Parameters.GetString("provider")
+	connection, _ := a.Parameters.GetString("inference_connection")
+	if column.Provider != "" && column.Provider != provider {
+		provider, connection = column.Provider, ""
+	}
+	if column.Connection != "" {
+		connection = column.Connection
+	}
+	return provider, connection
+}
+
+func (p *Pipeline) GetInferenceConnectionName(provider, name string) string {
+	if name != "" {
+		return name
+	}
+	if p != nil && p.DefaultConnections[provider] != "" {
+		return p.DefaultConnections[provider]
+	}
+	return provider + "-default"
+}
+
 func (p *Pipeline) GetAllConnectionNamesForAsset(asset *Asset) ([]string, error) {
 	assetType := asset.Type
-	if assetType == AssetTypePython { //nolint
+	switch assetType {
+	case AssetTypeInference:
+		connectionNames := []string{asset.Connection}
+		for _, column := range asset.Columns {
+			if column.Inference == nil {
+				continue
+			}
+			provider, connection := asset.InferenceProviderConnection(column.Inference)
+			name := p.GetInferenceConnectionName(provider, connection)
+			if !slices.Contains(connectionNames, name) {
+				connectionNames = append(connectionNames, name)
+			}
+		}
+		return connectionNames, nil
+	case AssetTypePython: //nolint
 		connectionNames := assetSecretConnectionNames(asset)
 		if asset.Connection != "" {
 			connectionNames = append(connectionNames, asset.Connection)
@@ -2513,13 +2566,13 @@ func (p *Pipeline) GetAllConnectionNamesForAsset(asset *Asset) ([]string, error)
 			connectionNames = append(connectionNames, conn)
 		}
 		return connectionNames, nil
-	} else if assetType == AssetTypeR {
+	case AssetTypeR:
 		connectionNames := assetSecretConnectionNames(asset)
 		if asset.Connection != "" {
 			connectionNames = append(connectionNames, asset.Connection)
 		}
 		return connectionNames, nil
-	} else if assetType == AssetTypeIngestr {
+	case AssetTypeIngestr:
 		ingestrSource, ok := asset.Parameters.GetString("source_connection")
 		if !ok {
 			return []string{}, errors.Errorf("No source connection in asset")
@@ -2537,9 +2590,10 @@ func (p *Pipeline) GetAllConnectionNamesForAsset(asset *Asset) ([]string, error)
 		}
 
 		return []string{ingestrDestination, ingestrSource}, nil
-	} else if assetMainTaskIsConnectionless(asset) {
-		return nil, nil
-	} else {
+	default:
+		if assetMainTaskIsConnectionless(asset) {
+			return nil, nil
+		}
 		conn, err := p.GetConnectionNameForAsset(asset)
 		if err != nil {
 			return []string{}, err
@@ -3073,6 +3127,10 @@ func (b *Builder) CreatePipelineFromPath(ctx context.Context, pathToPipeline str
 		pipeline.TasksByType[task.Type] = append(pipeline.TasksByType[task.Type], task)
 		pipeline.tasksByName[task.Name] = task
 	}
+
+	if err := registerImplicitInputAssetDependencies(pipeline); err != nil {
+		return nil, err
+	}
 	var entities []*glossary.Entity
 	if b.GlossaryReader != nil {
 		entities, err = b.GlossaryReader.GetEntities(pathToPipeline)
@@ -3124,6 +3182,32 @@ func (b *Builder) CreatePipelineFromPath(ctx context.Context, pathToPipeline str
 	}
 
 	return pipeline, nil
+}
+
+// registerImplicitInputAssetDependencies keeps inference's input_asset contract
+// visible to scheduling and lineage without introducing a pipeline->inference cycle.
+func registerImplicitInputAssetDependencies(pipe *Pipeline) error {
+	for _, asset := range pipe.Assets {
+		if asset.Type != AssetTypeInference {
+			continue
+		}
+		raw, exists := asset.Parameters["input_asset"]
+		if !exists {
+			continue
+		}
+		name, ok := raw.(string)
+		if !ok || strings.TrimSpace(name) == "" {
+			continue // inference validation owns parameter shape errors
+		}
+		if name == asset.Name {
+			return fmt.Errorf("inference input_asset %q cannot reference itself", name)
+		}
+		if pipe.GetAssetByName(name) == nil {
+			return fmt.Errorf("inference input_asset %q does not exist in pipeline", name)
+		}
+		asset.Upstreams = appendMissingUpstreams(asset.Upstreams, []Upstream{{Value: name, Type: selectorAssetDependencyType, Mode: UpstreamModeFull}})
+	}
+	return nil
 }
 
 type assetFromFileResult struct {
@@ -3616,6 +3700,9 @@ func findColumnIndex(columns []Column, name string) int {
 }
 
 func mergeColumnDefault(target *Column, defaults Column, assetName string) {
+	if target.Inference == nil {
+		target.Inference = cloneColumnInference(defaults.Inference)
+	}
 	if target.EntityAttribute == nil {
 		target.EntityAttribute = cloneEntityAttribute(defaults.EntityAttribute)
 	}
@@ -3659,6 +3746,7 @@ func mergeColumnDefault(target *Column, defaults Column, assetName string) {
 
 func cloneColumnForAsset(column Column, assetName string) Column {
 	clone := column
+	clone.Inference = cloneColumnInference(column.Inference)
 	clone.EntityAttribute = cloneEntityAttribute(column.EntityAttribute)
 	clone.Tags = append(EmptyStringArray(nil), column.Tags...)
 	clone.Nullable = cloneDefaultTrueBool(column.Nullable)
@@ -3671,6 +3759,28 @@ func cloneColumnForAsset(column Column, assetName string) Column {
 	clone.Checks = cloneColumnChecksForAsset(column.Checks, assetName, column.Name)
 	clone.Upstreams = cloneColumnUpstreams(column.Upstreams)
 	return clone
+}
+
+func cloneColumnInference(value *ColumnInference) *ColumnInference {
+	if value == nil {
+		return nil
+	}
+	clone := *value
+	clone.Levels = slices.Clone(value.Levels)
+	if value.Threshold != nil {
+		threshold := *value.Threshold
+		clone.Threshold = &threshold
+	}
+	clone.Choices = maps.Clone(value.Choices)
+	if value.Minimum != nil {
+		minimum := *value.Minimum
+		clone.Minimum = &minimum
+	}
+	if value.Maximum != nil {
+		maximum := *value.Maximum
+		clone.Maximum = &maximum
+	}
+	return &clone
 }
 
 func cloneEntityAttribute(value *EntityAttribute) *EntityAttribute {

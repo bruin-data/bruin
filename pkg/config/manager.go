@@ -61,6 +61,11 @@ type Connections struct {
 	Adjust              []AdjustConnection              `yaml:"adjust,omitempty" json:"adjust,omitempty" mapstructure:"adjust"`
 	Adapty              []AdaptyConnection              `yaml:"adapty,omitempty" json:"adapty,omitempty" mapstructure:"adapty"`
 	Anthropic           []AnthropicConnection           `yaml:"anthropic,omitempty" json:"anthropic,omitempty" mapstructure:"anthropic"`
+	OpenAI              []APIKeyConnection              `yaml:"openai,omitempty" json:"openai,omitempty" mapstructure:"openai"`
+	OpenCode            []APIKeyConnection              `yaml:"opencode,omitempty" json:"opencode,omitempty" mapstructure:"opencode"`
+	OpenRouter          []APIKeyConnection              `yaml:"openrouter,omitempty" json:"openrouter,omitempty" mapstructure:"openrouter"`
+	Google              []APIKeyConnection              `yaml:"google,omitempty" json:"google,omitempty" mapstructure:"google"`
+	Typesafe            []APIKeyConnection              `yaml:"typesafe,omitempty" json:"typesafe,omitempty" mapstructure:"typesafe"`
 	Generic             []GenericConnection             `yaml:"generic,omitempty" json:"generic,omitempty" mapstructure:"generic"`
 	FacebookAds         []FacebookAdsConnection         `yaml:"facebookads,omitempty" json:"facebookads,omitempty" mapstructure:"facebookads"`
 	Stripe              []StripeConnection              `yaml:"stripe,omitempty" json:"stripe,omitempty" mapstructure:"stripe"`
@@ -1097,6 +1102,24 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Anthropic = append(env.Connections.Anthropic, conn)
+	case "openai", "opencode", "openrouter", "google", "typesafe":
+		var conn APIKeyConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		switch connType {
+		case "openai":
+			env.Connections.OpenAI = append(env.Connections.OpenAI, conn)
+		case "opencode":
+			env.Connections.OpenCode = append(env.Connections.OpenCode, conn)
+		case "openrouter":
+			env.Connections.OpenRouter = append(env.Connections.OpenRouter, conn)
+		case "google":
+			env.Connections.Google = append(env.Connections.Google, conn)
+		case "typesafe":
+			env.Connections.Typesafe = append(env.Connections.Typesafe, conn)
+		}
 	case "intercom":
 		var conn IntercomConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -2107,6 +2130,16 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Adapty = removeConnection(env.Connections.Adapty, connectionName)
 	case "anthropic":
 		env.Connections.Anthropic = removeConnection(env.Connections.Anthropic, connectionName)
+	case "openai":
+		env.Connections.OpenAI = removeConnection(env.Connections.OpenAI, connectionName)
+	case "opencode":
+		env.Connections.OpenCode = removeConnection(env.Connections.OpenCode, connectionName)
+	case "openrouter":
+		env.Connections.OpenRouter = removeConnection(env.Connections.OpenRouter, connectionName)
+	case "google":
+		env.Connections.Google = removeConnection(env.Connections.Google, connectionName)
+	case "typesafe":
+		env.Connections.Typesafe = removeConnection(env.Connections.Typesafe, connectionName)
 	case "intercom":
 		env.Connections.Intercom = removeConnection(env.Connections.Intercom, connectionName)
 	case "generic":
@@ -2487,6 +2520,11 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Adjust, source.Adjust)
 	mergeConnectionList(&c.Adapty, source.Adapty)
 	mergeConnectionList(&c.Anthropic, source.Anthropic)
+	mergeConnectionList(&c.OpenAI, source.OpenAI)
+	mergeConnectionList(&c.OpenCode, source.OpenCode)
+	mergeConnectionList(&c.OpenRouter, source.OpenRouter)
+	mergeConnectionList(&c.Google, source.Google)
+	mergeConnectionList(&c.Typesafe, source.Typesafe)
 	mergeConnectionList(&c.Generic, source.Generic)
 	mergeConnectionList(&c.FacebookAds, source.FacebookAds)
 	mergeConnectionList(&c.Stripe, source.Stripe)

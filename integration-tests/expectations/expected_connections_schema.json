@@ -71,6 +71,25 @@
         "api_key"
       ]
     },
+    "APIKeyConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
+      ]
+    },
     "AbraFlexiConnection": {
       "properties": {
         "name": {
@@ -1135,6 +1154,36 @@
         "anthropic": {
           "items": {
             "$ref": "#/$defs/AnthropicConnection"
+          },
+          "type": "array"
+        },
+        "openai": {
+          "items": {
+            "$ref": "#/$defs/APIKeyConnection"
+          },
+          "type": "array"
+        },
+        "opencode": {
+          "items": {
+            "$ref": "#/$defs/APIKeyConnection"
+          },
+          "type": "array"
+        },
+        "openrouter": {
+          "items": {
+            "$ref": "#/$defs/APIKeyConnection"
+          },
+          "type": "array"
+        },
+        "google": {
+          "items": {
+            "$ref": "#/$defs/APIKeyConnection"
+          },
+          "type": "array"
+        },
+        "typesafe": {
+          "items": {
+            "$ref": "#/$defs/APIKeyConnection"
           },
           "type": "array"
         },
