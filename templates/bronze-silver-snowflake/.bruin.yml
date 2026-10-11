@@ -1,0 +1,15 @@
+default_environment: default
+environments:
+  default:
+    connections:
+      frankfurter:
+        - name: "frankfurter-default"
+      snowflake:
+        - name: "snowflake-default"
+          account: "<your-account-identifier>"
+          username: "<your-username>"
+          password: "<your-password>"
+          database: "<your-database>"
+          schema: "BRONZE"
+          warehouse: "COMPUTE_WH"
+          role: "ANALYST"
