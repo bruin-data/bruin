@@ -2,7 +2,7 @@
   <img alt="Bruin Logo" src="./resources/logo-horizontal.svg" width="500" />
 </p>
 
-Bruin is a data pipeline tool that brings together data ingestion, data transformation with SQL, Python & R, and data quality into a single framework. It works with all the major data platforms and runs on your local machine, an EC2 instance, or GitHub Actions.
+Bruin is an open-source data pipeline tool that brings together data ingestion, data transformation with SQL, Python & R, data quality checks and lineage in a single CLI, so you don't need separate tools for ingestion, transformation, orchestration and testing. It works with all the major data platforms and runs on your local machine, an EC2 instance, GitHub Actions, or Bruin Cloud.
 
 <img alt="Bruin CLI - Demo" src="./resources/demo.gif" width="1200" />
 
