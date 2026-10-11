@@ -3,7 +3,9 @@ name: Release
 on:
   push:
     tags:
-      - '*'
+      # CLI version tags only (e.g. v0.11.656). Prefixed tags for nested
+      # modules such as semantic-engine/v0.1.0 must NOT trigger a CLI release.
+      - 'v[0-9]*'
 
 permissions:
   contents: write
