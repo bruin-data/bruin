@@ -558,9 +558,11 @@ func TestDB_Limit(t *testing.T) {
 }
 
 const expectedDatabaseSummaryQuery = `
-SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE
-FROM INFORMATION_SCHEMA.TABLES
-WHERE TABLE_SCHEMA NOT IN ('sys', 'INFORMATION_SCHEMA')
+SELECT t.TABLE_SCHEMA, t.TABLE_NAME, t.TABLE_TYPE, v.VIEW_DEFINITION
+FROM INFORMATION_SCHEMA.TABLES t
+LEFT JOIN INFORMATION_SCHEMA.VIEWS v
+    ON t.TABLE_SCHEMA = v.TABLE_SCHEMA AND t.TABLE_NAME = v.TABLE_NAME
+WHERE t.TABLE_SCHEMA NOT IN ('sys', 'INFORMATION_SCHEMA')
 `
 
 func TestDB_GetDatabaseSummary(t *testing.T) {
@@ -572,9 +574,10 @@ func TestDB_GetDatabaseSummary(t *testing.T) {
 
 	// Asserts the case-sensitive uppercase INFORMATION_SCHEMA.TABLES query.
 	mock.ExpectQuery(expectedDatabaseSummaryQuery).
-		WillReturnRows(sqlmock.NewRows([]string{"TABLE_SCHEMA", "TABLE_NAME", "TABLE_TYPE"}).
-			AddRow("dbo", "customers", "BASE TABLE").
-			AddRow("dbo", "v_orders", "VIEW"))
+		WillReturnRows(sqlmock.NewRows([]string{"TABLE_SCHEMA", "TABLE_NAME", "TABLE_TYPE", "VIEW_DEFINITION"}).
+			AddRow("dbo", "customers", "BASE TABLE", nil).
+			AddRow("dbo", "v_orders", "VIEW", "CREATE VIEW [dbo].[v_orders] AS SELECT * FROM [dbo].[orders]").
+			AddRow("dbo", "v_renamed", "VIEW", "CREATE OR ALTER VIEW [dbo].[v_renamed] ([renamed]) AS SELECT [original] FROM [dbo].[orders]"))
 
 	db := &DB{
 		conn:   sqlx.NewDb(mockDB, "sqlmock"),
@@ -586,10 +589,14 @@ func TestDB_GetDatabaseSummary(t *testing.T) {
 	assert.Equal(t, "warehouse", got.Name)
 	require.Len(t, got.Schemas, 1)
 	assert.Equal(t, "dbo", got.Schemas[0].Name)
-	require.Len(t, got.Schemas[0].Tables, 2)
+	require.Len(t, got.Schemas[0].Tables, 3)
 	assert.Equal(t, "customers", got.Schemas[0].Tables[0].Name)
 	assert.Equal(t, ansisql.DBTableTypeTable, got.Schemas[0].Tables[0].Type)
 	assert.Equal(t, "v_orders", got.Schemas[0].Tables[1].Name)
 	assert.Equal(t, ansisql.DBTableTypeView, got.Schemas[0].Tables[1].Type)
+	assert.Equal(t, "SELECT * FROM [dbo].[orders]", got.Schemas[0].Tables[1].ViewDefinition)
+	assert.Equal(t, "v_renamed", got.Schemas[0].Tables[2].Name)
+	assert.Equal(t, ansisql.DBTableTypeView, got.Schemas[0].Tables[2].Type)
+	assert.Empty(t, got.Schemas[0].Tables[2].ViewDefinition)
 	require.NoError(t, mock.ExpectationsWereMet())
 }

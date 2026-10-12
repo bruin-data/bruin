@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/dremio"
+	"github.com/bruin-data/bruin/pkg/fabric"
 	"github.com/bruin-data/bruin/pkg/mongo"
 	mongoatlas "github.com/bruin-data/bruin/pkg/mongo_atlas"
 	"github.com/bruin-data/bruin/pkg/mssql"
@@ -232,6 +234,50 @@ func TestCreateAsset(t *testing.T) {
 			},
 		},
 		{
+			name:        "dremio view asset creation",
+			schemaName:  "analytics",
+			tableName:   "active_users",
+			assetType:   pipeline.AssetTypeDremioSource,
+			fillColumns: false,
+			table: &ansisql.DBTable{
+				Name:           "active_users",
+				Type:           ansisql.DBTableTypeView,
+				ViewDefinition: "SELECT * FROM analytics.users WHERE active",
+			},
+			want: &pipeline.Asset{
+				Name: "analytics.active_users",
+				Type: pipeline.AssetTypeDremioQuery,
+				ExecutableFile: pipeline.ExecutableFile{
+					Name:    "active_users.sql",
+					Path:    filepath.Join(testAssetsPath, "analytics", "active_users.sql"),
+					Content: "SELECT * FROM analytics.users WHERE active",
+				},
+				Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeView},
+			},
+		},
+		{
+			name:        "fabric view asset creation",
+			schemaName:  "dbo",
+			tableName:   "active_users",
+			assetType:   pipeline.AssetTypeFabricSource,
+			fillColumns: false,
+			table: &ansisql.DBTable{
+				Name:           "active_users",
+				Type:           ansisql.DBTableTypeView,
+				ViewDefinition: "SELECT * FROM dbo.users WHERE active = 1",
+			},
+			want: &pipeline.Asset{
+				Name: "dbo.active_users",
+				Type: pipeline.AssetTypeFabricQuery,
+				ExecutableFile: pipeline.ExecutableFile{
+					Name:    "active_users.sql",
+					Path:    filepath.Join(testAssetsPath, "dbo", "active_users.sql"),
+					Content: "SELECT * FROM dbo.users WHERE active = 1",
+				},
+				Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeView},
+			},
+		},
+		{
 			name:        "asset with database description and owner",
 			schemaName:  "public",
 			tableName:   "customers",
@@ -414,6 +460,18 @@ func TestDetermineAssetTypeFromConnection(t *testing.T) {
 			want:           pipeline.AssetTypeMsSQLSource,
 		},
 		{
+			name:           "fabric connection type overrides name",
+			connectionName: "prod",
+			conn:           &fabric.DB{},
+			want:           pipeline.AssetTypeFabricSource,
+		},
+		{
+			name:           "dremio connection type overrides name",
+			connectionName: "prod",
+			conn:           &dremio.Client{},
+			want:           pipeline.AssetTypeDremioSource,
+		},
+		{
 			name:           "postgres connection type overrides name",
 			connectionName: "prod",
 			conn:           &postgres.Client{},
@@ -536,6 +594,18 @@ func TestDetermineAssetTypeFromConnection(t *testing.T) {
 			want:           pipeline.AssetTypeMsSQLSource,
 		},
 		{
+			name:           "fabric by name",
+			connectionName: "fabric-warehouse",
+			conn:           &mockConnection{},
+			want:           pipeline.AssetTypeFabricSource,
+		},
+		{
+			name:           "dremio by name",
+			connectionName: "dremio-lakehouse",
+			conn:           &mockConnection{},
+			want:           pipeline.AssetTypeDremioSource,
+		},
+		{
 			name:           "mongo connection type overrides name",
 			connectionName: "prod",
 			conn:           &mongo.DB{},
@@ -567,6 +637,26 @@ func TestDetermineAssetTypeFromConnection(t *testing.T) {
 
 			got := determineAssetTypeFromConnection(tt.connectionName, tt.conn)
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestConvertSourceTypeToQueryType(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		source pipeline.AssetType
+		query  pipeline.AssetType
+	}{
+		{source: pipeline.AssetTypeDremioSource, query: pipeline.AssetTypeDremioQuery},
+		{source: pipeline.AssetTypeFabricSource, query: pipeline.AssetTypeFabricQuery},
+		{source: pipeline.AssetTypeMsSQLSource, query: pipeline.AssetTypeMsSQLQuery},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.source), func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.query, convertSourceTypeToQueryType(tt.source))
 		})
 	}
 }

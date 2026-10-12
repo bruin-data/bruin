@@ -3,6 +3,7 @@ package fabric
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/tablename"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/microsoft/go-mssqldb"
@@ -22,6 +24,8 @@ type DB struct {
 	schemaCreator *SchemaCreator
 	typeMapper    *diff.DatabaseTypeMapper
 }
+
+var viewWithColumnListPattern = regexp.MustCompile(`(?is)^\s*CREATE\s+(?:OR\s+ALTER\s+)?VIEW\s+(?:(?:\[[^]]+\]|"(?:[^"]|"")*"|[^\s.(]+)\s*\.\s*)*(?:\[[^]]+\]|"(?:[^"]|"")*"|[^\s.(]+)\s*\(`)
 
 // QuoteIdentifier quotes a Fabric identifier using square brackets.
 // Fabric is case-sensitive, so proper quoting is important.
@@ -408,9 +412,11 @@ func (db *DB) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, erro
 	}
 
 	const schemaQuery = `
-SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE
-FROM INFORMATION_SCHEMA.TABLES
-WHERE TABLE_SCHEMA NOT IN ('sys', 'INFORMATION_SCHEMA')
+SELECT t.TABLE_SCHEMA, t.TABLE_NAME, t.TABLE_TYPE, v.VIEW_DEFINITION
+FROM INFORMATION_SCHEMA.TABLES t
+LEFT JOIN INFORMATION_SCHEMA.VIEWS v
+    ON t.TABLE_SCHEMA = v.TABLE_SCHEMA AND t.TABLE_NAME = v.TABLE_NAME
+WHERE t.TABLE_SCHEMA NOT IN ('sys', 'INFORMATION_SCHEMA')
 `
 
 	tables, err := db.Select(ctx, &query.Query{Query: schemaQuery})
@@ -422,10 +428,16 @@ WHERE TABLE_SCHEMA NOT IN ('sys', 'INFORMATION_SCHEMA')
 		Name:    currentDB,
 		Schemas: []*ansisql.DBSchema{},
 	}
+	parser, err := sqlparser.NewSQLParser(false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create SQL parser: %w", err)
+	}
+	defer parser.Close()
+
 	schemaCache := make(map[string]*ansisql.DBSchema)
 
 	for _, row := range tables {
-		if len(row) < 3 {
+		if len(row) < 4 {
 			continue
 		}
 
@@ -440,6 +452,15 @@ WHERE TABLE_SCHEMA NOT IN ('sys', 'INFORMATION_SCHEMA')
 		tableType, ok := fromFabricValue(row[2])
 		if !ok {
 			continue
+		}
+		viewDefinition, _ := fromFabricValue(row[3])
+		if viewDefinition != "" {
+			if viewWithColumnListPattern.MatchString(viewDefinition) {
+				viewDefinition = ""
+			} else if viewDefinition, err = parser.ExtractSelect(viewDefinition, "fabric"); err != nil {
+				// Keep an unparseable or truncated view as a non-executable source asset.
+				viewDefinition = ""
+			}
 		}
 
 		schema, ok := schemaCache[schemaName]
@@ -458,8 +479,9 @@ WHERE TABLE_SCHEMA NOT IN ('sys', 'INFORMATION_SCHEMA')
 		}
 
 		schema.Tables = append(schema.Tables, &ansisql.DBTable{
-			Name: tableName,
-			Type: dbTableType,
+			Name:           tableName,
+			Type:           dbTableType,
+			ViewDefinition: viewDefinition,
 		})
 	}
 

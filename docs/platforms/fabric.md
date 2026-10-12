@@ -72,6 +72,7 @@ environments:
 ## Asset types
 
 - `fabric.sql`
+- `fabric.source`
 - `fabric.spark_sql`
 - `fabric.seed`
 - `fabric.sensor.query`
@@ -102,6 +103,21 @@ SELECT
     CAST(GETDATE() AS DATETIME2(6)) as updated_at
 FROM source_table
 WHERE modified_date > '{{ start_date }}'
+```
+
+## Source assets
+
+Use `fabric.source` to document an existing Fabric Warehouse table or view for metadata and lineage without executing it.
+
+```yaml
+name: dbo.customers
+type: fabric.source
+description: Customer data managed outside Bruin
+columns:
+  - name: customer_id
+    type: BIGINT
+  - name: full_name
+    type: VARCHAR(200)
 ```
 
 ## Sensors
