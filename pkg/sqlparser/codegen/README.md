@@ -46,9 +46,9 @@ Each script writes to `pkg/sqlparser/testdata/golden/` by default; pass an outpu
 elsewhere.
 
 - **commands, fixtures and hoist** regenerate exactly.
-- **fuzz** has about 1,500 responses whose text depends on `PYTHONHASHSEED`. When several
-  required arguments are missing, sqlglot names the first one in a set's iteration order. The Go
-  test ignores that keyword when comparing (Go reports them in definition order).
+- **fuzz** has about 1,500 error messages whose text depends on `PYTHONHASHSEED`. When several
+  required arguments are missing, sqlglot names the first one in a set's iteration order. That does
+  not matter to the Go test, which checks that an error occurs but not its message.
 - **Hangs:** commands on which Python ran longer than 5 s are recorded as
   `{"__timeout__": true}` (49 in seed 1) and are not compared. Go returns a "no progress" error for
   them instead of hanging (see TRADEOFFS.md §5).
@@ -58,8 +58,9 @@ Record from Python again when the reference itself changes, for example after up
 
 ## Intentional behavior changes
 
-Once Bruin deliberately departs from the Python behavior (say, clearer error messages), the
-reference can no longer produce the expected output. Rewrite the golden files from the Go output
+Error messages are not compared, so rewording them needs no golden update. Once Bruin
+deliberately departs from the reference's results, the reference can no longer produce the
+expected output. Rewrite the golden files from the Go output
 instead, then review the diff:
 
 ```bash

@@ -20,7 +20,7 @@ func typingSparkMetadata() ExprMetadataType {
 		KRandstr,
 	)
 	m.annotators(
-		"typing/spark.py:30", func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "this") },
+		func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "this") },
 		KArrayCompact,
 		KArrayInsert,
 		KBitwiseAndAgg,

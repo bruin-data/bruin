@@ -22,7 +22,7 @@ func typingTSQLMetadata() ExprMetadataType {
 		KStuff,
 	)
 	m.annotators(
-		"typing/tsql.py:29", func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "this") },
+		func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "this") },
 		KDegrees,
 		KRadians,
 	)

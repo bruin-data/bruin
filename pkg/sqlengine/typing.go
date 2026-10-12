@@ -11,9 +11,6 @@ type ExprMetadata struct {
 	Annotator func(a *TypeAnnotator, e *Expr)
 	// Returns is a DType or a DataType *Expr (shared, like the Python object).
 	Returns any
-	// src is the Python source location ("typing/<module>.py:<line>") of the annotator, used
-	// by parity tests.
-	src string
 }
 
 // ExprMetadataType mirrors sqlglot.typing.ExprMetadataType: metadata keyed by exact expression class.
@@ -29,8 +26,8 @@ func (m ExprMetadataType) copy() ExprMetadataType {
 }
 
 // annotators mirrors `**{expr_type: {"annotator": fn} for expr_type in kinds}`.
-func (m ExprMetadataType) annotators(src string, fn func(a *TypeAnnotator, e *Expr), kinds ...Kind) {
-	spec := &ExprMetadata{Annotator: fn, src: src}
+func (m ExprMetadataType) annotators(fn func(a *TypeAnnotator, e *Expr), kinds ...Kind) {
+	spec := &ExprMetadata{Annotator: fn}
 	for _, k := range kinds {
 		m[k] = spec
 	}
@@ -75,8 +72,8 @@ var typingUnarySubclasses = []Kind{
 func typingBaseMetadata() ExprMetadataType {
 	m := ExprMetadataType{}
 
-	m.annotators("typing/__init__.py:20", func(a *TypeAnnotator, e *Expr) { a.annotateBinary(e) }, typingBinarySubclasses...)
-	m.annotators("typing/__init__.py:24", func(a *TypeAnnotator, e *Expr) { a.annotateUnary(e) }, typingUnarySubclasses...)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { a.annotateBinary(e) }, typingBinarySubclasses...)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { a.annotateUnary(e) }, typingUnarySubclasses...)
 	m.returns(
 		DT_BIGINT,
 		KApproxDistinct,
@@ -280,7 +277,7 @@ func typingBaseMetadata() ExprMetadataType {
 		KUpper,
 	)
 	m.annotators(
-		"typing/__init__.py:260", func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "this") },
+		func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "this") },
 		KAbs,
 		KAnyValue,
 		KArrayConcatAgg,
@@ -297,7 +294,7 @@ func typingBaseMetadata() ExprMetadataType {
 		KWindow,
 	)
 	m.annotators(
-		"typing/__init__.py:279", func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "this", "expressions") },
+		func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "this", "expressions") },
 		KArrayConcat,
 		KCoalesce,
 		KGreatest,
@@ -306,37 +303,37 @@ func typingBaseMetadata() ExprMetadataType {
 		KMin,
 	)
 	m.annotators(
-		"typing/__init__.py:290", func(a *TypeAnnotator, e *Expr) { a.annotateByArrayElement(e) },
+		func(a *TypeAnnotator, e *Expr) { a.annotateByArrayElement(e) },
 		KArrayFirst,
 		KArrayLast,
 	)
-	m.annotators("typing/__init__.py:296", func(a *TypeAnnotator, e *Expr) {
+	m.annotators(func(a *TypeAnnotator, e *Expr) {
 		a.setType(e, annT(a.schema.GetUDFType(e, nil, nil)))
 	}, KAnonymous)
 	m.annotators(
-		"typing/__init__.py:298", func(a *TypeAnnotator, e *Expr) { a.annotateTimeunit(e) },
+		func(a *TypeAnnotator, e *Expr) { a.annotateTimeunit(e) },
 		KDateAdd,
 		KDateSub,
 		KDateTrunc,
 	)
 	m.annotators(
-		"typing/__init__.py:306", func(a *TypeAnnotator, e *Expr) { a.setType(e, annT(e.ArgE("to"))) },
+		func(a *TypeAnnotator, e *Expr) { a.setType(e, annT(e.ArgE("to"))) },
 		KCast,
 		KTryCast,
 	)
 	m.annotators(
-		"typing/__init__.py:313", func(a *TypeAnnotator, e *Expr) { a.annotateMap(e) },
+		func(a *TypeAnnotator, e *Expr) { a.annotateMap(e) },
 		KMap,
 		KVarMap,
 	)
-	m.annotators("typing/__init__.py:319", func(a *TypeAnnotator, e *Expr) {
+	m.annotators(func(a *TypeAnnotator, e *Expr) {
 		a.annotateByArgsFull(e, false, true, "expressions")
 	}, KArray)
-	m.annotators("typing/__init__.py:320", func(a *TypeAnnotator, e *Expr) {
+	m.annotators(func(a *TypeAnnotator, e *Expr) {
 		a.annotateByArgsFull(e, false, true, "this")
 	}, KArrayAgg)
-	m.annotators("typing/__init__.py:321", func(a *TypeAnnotator, e *Expr) { a.annotateBracket(e) }, KBracket)
-	m.annotators("typing/__init__.py:323", func(a *TypeAnnotator, e *Expr) {
+	m.annotators(func(a *TypeAnnotator, e *Expr) { a.annotateBracket(e) }, KBracket)
+	m.annotators(func(a *TypeAnnotator, e *Expr) {
 		var args []any
 		for _, ifExpr := range e.ArgL("ifs") {
 			args = append(args, annT(ifExpr.ArgE("true")))
@@ -344,64 +341,64 @@ func typingBaseMetadata() ExprMetadataType {
 		args = append(args, "default")
 		a.annotateByArgs(e, args...)
 	}, KCase)
-	m.annotators("typing/__init__.py:328", func(a *TypeAnnotator, e *Expr) {
+	m.annotators(func(a *TypeAnnotator, e *Expr) {
 		if e.ArgB("big_int") {
 			a.setType(e, DT_BIGINT)
 		} else {
 			a.setType(e, DT_INT)
 		}
 	}, KCount)
-	m.annotators("typing/__init__.py:333", func(a *TypeAnnotator, e *Expr) {
+	m.annotators(func(a *TypeAnnotator, e *Expr) {
 		if e.ArgB("big_int") {
 			a.setType(e, DT_BIGINT)
 		} else {
 			a.setType(e, DT_INT)
 		}
 	}, KDateDiff)
-	m.annotators("typing/__init__.py:337", func(a *TypeAnnotator, e *Expr) {}, KDataType)
-	m.annotators("typing/__init__.py:338", func(a *TypeAnnotator, e *Expr) { a.annotateDiv(e) }, KDiv)
-	m.annotators("typing/__init__.py:339", func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "expressions") }, KDistinct)
-	m.annotators("typing/__init__.py:340", func(a *TypeAnnotator, e *Expr) { a.annotateDot(e) }, KDot)
-	m.annotators("typing/__init__.py:341", func(a *TypeAnnotator, e *Expr) { a.annotateExplode(e) }, KExplode)
-	m.annotators("typing/__init__.py:342", func(a *TypeAnnotator, e *Expr) { a.annotateExtract(e) }, KExtract)
-	m.annotators("typing/__init__.py:344", func(a *TypeAnnotator, e *Expr) {
+	m.annotators(func(a *TypeAnnotator, e *Expr) {}, KDataType)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { a.annotateDiv(e) }, KDiv)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "expressions") }, KDistinct)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { a.annotateDot(e) }, KDot)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { a.annotateExplode(e) }, KExplode)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { a.annotateExtract(e) }, KExtract)
+	m.annotators(func(a *TypeAnnotator, e *Expr) {
 		if e.ArgB("is_integer") {
 			a.setType(e, DT_BIGINT)
 		} else {
 			a.setType(e, DT_BINARY)
 		}
 	}, KHexString)
-	m.annotators("typing/__init__.py:350", func(a *TypeAnnotator, e *Expr) {
+	m.annotators(func(a *TypeAnnotator, e *Expr) {
 		a.annotateByArgsFull(e, false, true, "start", "end", "step")
 	}, KGenerateSeries)
-	m.annotators("typing/__init__.py:353", func(a *TypeAnnotator, e *Expr) {
+	m.annotators(func(a *TypeAnnotator, e *Expr) {
 		a.setType(e, DataTypeBuild("ARRAY<DATE>", nil, false, true))
 	}, KGenerateDateArray)
-	m.annotators("typing/__init__.py:356", func(a *TypeAnnotator, e *Expr) {
+	m.annotators(func(a *TypeAnnotator, e *Expr) {
 		a.setType(e, DataTypeBuild("ARRAY<TIMESTAMP>", nil, false, true))
 	}, KGenerateTimestampArray)
-	m.annotators("typing/__init__.py:358", func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "true", "false") }, KIf)
-	m.annotators("typing/__init__.py:359", func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "this", "default") }, KLag)
-	m.annotators("typing/__init__.py:360", func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "this", "default") }, KLead)
-	m.annotators("typing/__init__.py:361", func(a *TypeAnnotator, e *Expr) { a.annotateLiteral(e) }, KLiteral)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "true", "false") }, KIf)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "this", "default") }, KLag)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "this", "default") }, KLead)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { a.annotateLiteral(e) }, KLiteral)
 	m.returns(DT_NULL, KNull)
-	m.annotators("typing/__init__.py:363", func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "this", "expression") }, KNullif)
-	m.annotators("typing/__init__.py:364", func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "expression") }, KPropertyEQ)
-	m.annotators("typing/__init__.py:365", func(a *TypeAnnotator, e *Expr) { a.annotateStruct(e) }, KStruct)
-	m.annotators("typing/__init__.py:367", func(a *TypeAnnotator, e *Expr) {
+	m.annotators(func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "this", "expression") }, KNullif)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "expression") }, KPropertyEQ)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { a.annotateStruct(e) }, KStruct)
+	m.annotators(func(a *TypeAnnotator, e *Expr) {
 		a.annotateByArgsFull(e, true, false, "this", "expressions")
 	}, KSum)
-	m.annotators("typing/__init__.py:370", func(a *TypeAnnotator, e *Expr) {
+	m.annotators(func(a *TypeAnnotator, e *Expr) {
 		if e.ArgB("with_tz") {
 			a.setType(e, DT_TIMESTAMPTZ)
 		} else {
 			a.setType(e, DT_TIMESTAMP)
 		}
 	}, KTimestamp)
-	m.annotators("typing/__init__.py:375", func(a *TypeAnnotator, e *Expr) { a.annotateToMap(e) }, KToMap)
-	m.annotators("typing/__init__.py:376", func(a *TypeAnnotator, e *Expr) { a.annotateUnnest(e) }, KUnnest)
-	m.annotators("typing/__init__.py:377", func(a *TypeAnnotator, e *Expr) { a.annotateWithinGroup(e) }, KWithinGroup)
-	m.annotators("typing/__init__.py:378", func(a *TypeAnnotator, e *Expr) { a.annotateSubquery(e) }, KSubquery)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { a.annotateToMap(e) }, KToMap)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { a.annotateUnnest(e) }, KUnnest)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { a.annotateWithinGroup(e) }, KWithinGroup)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { a.annotateSubquery(e) }, KSubquery)
 
 	return m
 }

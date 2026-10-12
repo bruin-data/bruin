@@ -17,7 +17,7 @@ func TestAthenaGeneratedSQLParsesWithSQLGlot(t *testing.T) {
 func testBruinGeneratedSQLParsesWithSQLGlot(t *testing.T, platform jinja.Platform, dialect string) {
 	t.Helper()
 
-	parser, err := sqlparser.NewSQLParserCached()
+	parser, err := sqlparser.NewSQLParser()
 	require.NoError(t, err)
 	require.NoError(t, parser.Start())
 

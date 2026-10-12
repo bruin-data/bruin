@@ -1,7 +1,7 @@
 package sqlengine
 
 // Port of sqlglot/dialects/oracle.py, sqlglot/parsers/oracle.py and sqlglot/generators/oracle.py
-// (sqlglot v30.13.0). Data-only class attributes live in the generated zz_*_settings.go files.
+// (sqlglot v30.13.0). Data-only class attributes live in the *_settings.go files.
 
 func init() { registerCustomizer("oracle", customizeOracle) }
 

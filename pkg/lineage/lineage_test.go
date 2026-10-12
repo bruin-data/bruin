@@ -28,7 +28,7 @@ func TestMain(m *testing.M) {
 func SetupSQLParser() error {
 	if SQLParser == nil {
 		var err error
-		sqlParser, err := sqlparser.NewSQLParserCached()
+		sqlParser, err := sqlparser.NewSQLParser()
 		if err != nil {
 			return err
 		}

@@ -79,7 +79,7 @@ func UnitTest() *cli.Command {
 				return nil
 			}
 
-			parser, err := sqlparser.NewSQLParser(false)
+			parser, err := sqlparser.NewSQLParser()
 			if err != nil {
 				printError(err, "", "Failed to initialize the SQL parser:")
 				return cli.Exit("", 1)

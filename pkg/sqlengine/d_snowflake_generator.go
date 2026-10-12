@@ -8,7 +8,7 @@ import (
 
 // Port of sqlglot/generators/snowflake.py (sqlglot v30.13.0): module-level helpers/transforms,
 // the TRANSFORMS table edits and the SnowflakeGenerator method overrides. Data-only class
-// attributes (TYPE_MAPPING, PROPERTIES_LOCATION, flags, ...) live in zz_generator_settings.go.
+// attributes (TYPE_MAPPING, PROPERTIES_LOCATION, flags, ...) live in generator_settings.go.
 
 // ---------------------------------------------------------------------------------------------
 // Module-level helpers

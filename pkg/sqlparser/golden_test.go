@@ -1,7 +1,9 @@
 package sqlparser
 
-// Golden tests: Bruin's parser commands replayed against the responses recorded from the original
-// Python implementation (pythonsrc on sqlglot 30.13.0), see codegen/README.md.
+// Golden tests: Bruin's parser commands replayed against the responses recorded from the reference
+// implementation (Bruin's former Python parser, pythonsrc on sqlglot 30.13.0), see
+// codegen/README.md. Results must match exactly; errors must occur on the same commands, with any
+// message.
 //
 //   - commands.json.gz: every statement of the sqlglot conformance corpus (Bruin dialects) through
 //     every command Bruin issues.
@@ -28,7 +30,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"regexp"
 	"runtime"
 	"sort"
 	"strings"
@@ -151,17 +152,36 @@ func replayGolden(t *testing.T, name string) {
 		name, total, checked, path, strings.Join(keys, ", "), strings.Join(examples, "\n"))
 }
 
-// requiredKeywordRE matches the message naming one of several missing required arguments. Python
-// picks the keyword from a set, so which one it named depends on PYTHONHASHSEED.
-var requiredKeywordRE = regexp.MustCompile(`Required keyword: '[^']*' missing for`)
-
+// sameResponse compares responses with every error message replaced by a placeholder: an error must
+// occur exactly when the reference implementation reported one, but its wording is ours.
 func sameResponse(got, want any) bool {
-	if reflect.DeepEqual(got, want) {
-		return true
+	return reflect.DeepEqual(maskErrors(got), maskErrors(want))
+}
+
+// maskErrors replaces the non-empty "error" strings and the "errors" list entries of a decoded
+// response with "<error>".
+func maskErrors(v any) any {
+	m, ok := v.(map[string]any)
+	if !ok {
+		return v
 	}
-	const anyKeyword = "Required keyword: '*' missing for"
-	return requiredKeywordRE.ReplaceAllString(string(mustJSON(got)), anyKeyword) ==
-		requiredKeywordRE.ReplaceAllString(string(mustJSON(want)), anyKeyword)
+	out := make(map[string]any, len(m))
+	for k, x := range m {
+		switch {
+		case k == "error" && x != "" && x != nil:
+			x = "<error>"
+		case k == "errors":
+			if list, ok := x.([]any); ok {
+				masked := make([]any, len(list))
+				for i := range list {
+					masked[i] = "<error>"
+				}
+				x = masked
+			}
+		}
+		out[k] = x
+	}
+	return out
 }
 
 // mustJSON encodes a decoded JSON value, which always encodes.

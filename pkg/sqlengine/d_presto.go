@@ -4,7 +4,7 @@ import "sync"
 
 // Port of sqlglot/dialects/presto.py and sqlglot/parsers/presto.py (sqlglot v30.13.0).
 // The generator (sqlglot/generators/presto.py) lives in d_presto_generator.go.
-// Data-only class attributes live in the generated zz_*_settings.go files.
+// Data-only class attributes live in the *_settings.go files.
 
 func init() { registerCustomizer("presto", customizePresto) }
 

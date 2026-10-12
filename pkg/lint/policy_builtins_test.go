@@ -31,7 +31,7 @@ func TestMain(m *testing.M) {
 func setupSharedSQLParser() error {
 	if sharedSQLParser == nil {
 		var err error
-		sharedSQLParser, err = sqlparser.NewSQLParserCached()
+		sharedSQLParser, err = sqlparser.NewSQLParser()
 		if err != nil {
 			return err
 		}

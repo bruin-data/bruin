@@ -215,7 +215,7 @@ func TestSQLParserNonSelectedLineageClauseContracts(t *testing.T) {
 }
 
 func TestSQLParserColumnLineageContractBoundaryAndInvalidInputs(t *testing.T) {
-	parser, err := NewSQLParserCached()
+	parser, err := NewSQLParser()
 	require.NoError(t, err)
 	parser.MaxQueryLength = 8
 	t.Cleanup(func() { require.NoError(t, parser.Close()) })
@@ -230,14 +230,13 @@ func TestSQLParserColumnLineageContractBoundaryAndInvalidInputs(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, &Lineage{Columns: []ColumnLineage{}, NonSelectedColumns: []ColumnLineage{}, Errors: []string{"query is too long skipping column lineage analysis"}}, overBoundary)
 
-	// nil serializes to null. Python fails before producing a lineage response;
-	// Go ignores the singular "error" field and returns the zero value, not a Go error.
+	// A nil schema is the same as an empty one.
 	nilSchema, err := sharedSQLParser.ColumnLineage("SELECT 1 AS one", "postgres", nil)
 	require.NoError(t, err)
-	require.Equal(t, &Lineage{}, nilSchema)
 	emptySchema, err := sharedSQLParser.ColumnLineage("SELECT 1 AS one", "postgres", Schema{})
 	require.NoError(t, err)
 	require.Equal(t, &Lineage{Columns: []ColumnLineage{{"one", []UpstreamColumn{}, "INT"}}, NonSelectedColumns: []ColumnLineage{}, Errors: []string{}}, emptySchema)
+	require.Equal(t, emptySchema, nilSchema)
 
 	malformed, err := sharedSQLParser.ColumnLineage("SELECT FROM", "postgres", Schema{})
 	require.NoError(t, err)

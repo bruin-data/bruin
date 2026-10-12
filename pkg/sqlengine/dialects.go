@@ -2,7 +2,7 @@ package sqlengine
 
 // dialectCustomizers holds per-dialect customization functions (ports of the dialect's
 // Parser/Generator/Dialect class bodies). They run after the parent's settings were cloned
-// and the generated data tables for the dialect were installed.
+// and the data tables for the dialect were installed.
 var dialectCustomizers = map[string]func(d *Dialect){}
 
 func registerCustomizer(name string, fn func(d *Dialect)) { dialectCustomizers[name] = fn }
@@ -55,7 +55,7 @@ func init() {
 }
 
 // setupDialectSettings builds the parser/generator settings of a dialect by cloning its
-// parent's (Python class inheritance), installing the generated data tables and applying
+// parent's (Python class inheritance), installing the data tables and applying
 // the dialect's customizer. Called with dialectMu held.
 func setupDialectSettings(d *Dialect, sp dialectSpec) {
 	if sp.name == "" {

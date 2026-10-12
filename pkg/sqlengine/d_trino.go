@@ -2,7 +2,7 @@ package sqlengine
 
 // Port of sqlglot/dialects/trino.py, sqlglot/parsers/trino.py and sqlglot/generators/trino.py
 // (sqlglot v30.13.0). Trino inherits from Presto (d_presto*.go). Data-only class attributes
-// live in the generated zz_*_settings.go files.
+// live in the *_settings.go files.
 
 func init() { registerCustomizer("trino", customizeTrino) }
 

@@ -2,7 +2,7 @@ package sqlengine
 
 // Port of sqlglot/dialects/snowflake.py (sqlglot v30.13.0). The Snowflake JSONPathTokenizer lives
 // in jsonpath.go; the parser and generator class bodies live in d_snowflake_parser.go and
-// d_snowflake_generator.go. Data-only class attributes are in the generated zz_*_settings.go files.
+// d_snowflake_generator.go. Data-only class attributes are in the *_settings.go files.
 
 func init() { registerCustomizer("snowflake", customizeSnowflake) }
 

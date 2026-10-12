@@ -259,7 +259,7 @@ func Patch() *cli.Command {
 						variantOpts = append(variantOpts, pipeline.WithVariant(variantName))
 					}
 
-					sqlParserInstance, err := sqlparser.NewSQLParser(false)
+					sqlParserInstance, err := sqlparser.NewSQLParser()
 					if err != nil {
 						printErrorForOutput(output, fmt.Errorf("failed to create sql parser: %w", err))
 						return cli.Exit("", 1)

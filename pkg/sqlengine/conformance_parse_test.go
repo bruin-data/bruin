@@ -1,162 +1,44 @@
 package sqlengine
 
 import (
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"os"
-	"regexp"
 	"sort"
 	"strings"
 	"testing"
 )
 
+// Parse conformance: for every statement of the corpus (sqlglot's test-suite SQL, recorded by
+// codegen/gen_parse_expected.py), the engine must fail to parse exactly when sqlglot does, and
+// otherwise generate the same SQL back in the same dialect.
+//
+// CONFORMANCE_DIALECT=<d> restricts the run to one dialect; CONFORMANCE_DUMP=<prefix> writes the
+// mismatches to <prefix>.<check>.txt.
+
 type parseCase struct {
 	Dialect  string    `json:"dialect"`
 	SQL      string    `json:"sql"`
-	Trees    []any     `json:"trees"`
 	Out      []*string `json:"out"`
 	Error    string    `json:"error"`
 	GenError string    `json:"gen_error"`
 }
 
-// serExpr mirrors gen_parse_expected.py:ser.
-func serExpr(v any) any {
-	switch x := v.(type) {
-	case nil:
-		return nil
-	case *Expr:
-		if x == nil {
-			return nil
-		}
-		args := make([]any, 0, len(x.args))
-		for _, a := range x.args {
-			args = append(args, []any{a.key, serExpr(a.val)})
-		}
-		out := map[string]any{"k": x.kind.Name(), "a": args}
-		if len(x.Comments()) > 0 {
-			cs := make([]any, len(x.Comments()))
-			for i, c := range x.Comments() {
-				cs[i] = c
-			}
-			out["c"] = cs
-		}
-		return out
-	case []*Expr:
-		out := make([]any, len(x))
-		for i, y := range x {
-			out[i] = serExpr(y)
-		}
-		return out
-	case []string:
-		out := make([]any, len(x))
-		for i, y := range x {
-			out[i] = y
-		}
-		return out
-	case []any:
-		out := make([]any, len(x))
-		for i, y := range x {
-			out[i] = serExpr(y)
-		}
-		return out
-	case string, bool:
-		return x
-	case int:
-		return map[string]any{"int": x}
-	case DType:
-		return map[string]any{"dt": dtypeNames[x]}
-	case *Dialect:
-		return map[string]any{"repr": "<dialect " + x.Name + ">"}
-	}
-	return map[string]any{"repr": fmt.Sprintf("%T:%v", v, v)}
-}
-
-// canon serializes a tree for comparison. False and None are compared exactly (they behave
-// differently in Expr.error_messages); SQLGLOT_CONF_LOOSE_FALSE=1 treats them as equal.
-func canon(v any) string {
-	if os.Getenv("SQLGLOT_CONF_LOOSE_FALSE") != "" {
-		return string(mustJSON(normFalse(v)))
-	}
-	return string(mustJSON(normRepr(v)))
-}
-
-// mustJSON encodes values decoded from JSON (or built from such values), which always encode.
-func mustJSON(v any) []byte {
-	b, err := json.Marshal(v)
+func loadGz(t testing.TB, path string, v any) {
+	t.Helper()
+	f, err := os.Open(path)
 	if err != nil {
-		panic(err)
+		t.Skipf("missing %s: %v", path, err)
 	}
-	return b
-}
-
-// normRepr only normalizes Python object reprs (see normFalse).
-func normRepr(v any) any {
-	switch x := v.(type) {
-	case string:
-		if m := pyObjectRepr.FindStringSubmatch(x); m != nil {
-			return "<dialect " + m[1] + ">"
-		}
-		return x
-	case []any:
-		out := make([]any, len(x))
-		for i, y := range x {
-			out[i] = normRepr(y)
-		}
-		return out
-	case map[string]any:
-		out := make(map[string]any, len(x))
-		for k, y := range x {
-			out[k] = normRepr(y)
-		}
-		return out
+	defer f.Close()
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		t.Fatal(err)
 	}
-	return v
-}
-
-// pyObjectRepr matches the repr of a Dialect instance stored as an argument value (e.g. the
-// `dialect` arg of DataType.into_expr), which embeds a memory address.
-var pyObjectRepr = regexp.MustCompile(`^<sqlglot\.dialects\.(\w+)\.\w+ object at 0x[0-9a-f]+>$`)
-
-func normFalse(v any) any {
-	switch x := v.(type) {
-	case string:
-		if m := pyObjectRepr.FindStringSubmatch(x); m != nil {
-			return "<dialect " + m[1] + ">"
-		}
-		return x
-	case bool:
-		if !x {
-			return nil
-		}
-		return x
-	case []any:
-		out := make([]any, len(x))
-		for i, y := range x {
-			out[i] = normFalse(y)
-		}
-		return out
-	case map[string]any:
-		out := make(map[string]any, len(x))
-		for k, y := range x {
-			out[k] = normFalse(y)
-		}
-		return out
+	if err := json.NewDecoder(gz).Decode(v); err != nil {
+		t.Fatal(err)
 	}
-	return v
-}
-
-func errorTypeName(err error) string {
-	switch err.(type) {
-	case *ParseError:
-		return "ParseError"
-	case *TokenError:
-		return "TokenError"
-	case *ValueError:
-		return "ValueError"
-	case *UnsupportedError:
-		return "UnsupportedError"
-	}
-	return "Error"
 }
 
 type confStats struct {
@@ -178,6 +60,7 @@ func (s *confStats) add(dialect string, ok bool, sample string) {
 }
 
 func (s *confStats) report(t *testing.T, name string) {
+	t.Helper()
 	var ds []string
 	for d := range s.total {
 		ds = append(ds, d)
@@ -190,8 +73,7 @@ func (s *confStats) report(t *testing.T, name string) {
 		pass += s.pass[d]
 		fmt.Fprintf(&b, "  %-12s %5d/%5d\n", d, s.pass[d], s.total[d])
 	}
-	t.Logf("%s: %d/%d (%.1f%%)\n%s", name, pass, tot, 100*float64(pass)/float64(tot), b.String())
-	if path := os.Getenv("SQLGLOT_CONF_DUMP"); path != "" {
+	if path := os.Getenv("CONFORMANCE_DUMP"); path != "" {
 		var out strings.Builder
 		for _, d := range ds {
 			for _, smp := range s.samples[d] {
@@ -201,9 +83,19 @@ func (s *confStats) report(t *testing.T, name string) {
 		}
 		_ = os.WriteFile(path+"."+name+".txt", []byte(out.String()), 0o644)
 	}
-	if pass != tot && os.Getenv("SQLGLOT_CONF_STRICT") != "" {
-		t.Fail()
+	if pass == tot {
+		t.Logf("%s: %d/%d", name, pass, tot)
+		return
 	}
+	var examples []string
+	for _, d := range ds {
+		for _, smp := range s.samples[d] {
+			if len(examples) < 10 {
+				examples = append(examples, smp)
+			}
+		}
+	}
+	t.Errorf("%s: %d/%d statements match\n%s\n%s", name, pass, tot, b.String(), strings.Join(examples, "\n----\n"))
 }
 
 func safeParse(d *Dialect, sql string) (trees []*Expr, err error) {
@@ -228,7 +120,7 @@ func TestConformanceParse(t *testing.T) {
 	t.Parallel()
 	var cases []parseCase
 	loadGz(t, "testdata/parse.json.gz", &cases)
-	only := os.Getenv("SQLGLOT_CONF_DIALECT")
+	only := os.Getenv("CONFORMANCE_DIALECT")
 	parseStats, genStats := newConfStats(), newConfStats()
 	for _, c := range cases {
 		if only != "" && c.Dialect != only {
@@ -240,25 +132,11 @@ func TestConformanceParse(t *testing.T) {
 		}
 		trees, err := safeParse(d, c.SQL)
 		if c.Error != "" {
-			got := ""
-			if err != nil {
-				got = errorTypeName(err) + ": " + err.Error()
-			}
-			ok := err != nil && firstLine(got) == firstLine(c.Error)
-			parseStats.add(c.Dialect, ok, fmt.Sprintf("[%s] %s\nwant error: %s\n got: %s", c.Dialect, c.SQL, firstLine(c.Error), firstLine(got)))
+			parseStats.add(c.Dialect, err != nil, fmt.Sprintf("[%s] %s\nwant an error (%s), parsed fine", c.Dialect, c.SQL, firstLine(c.Error)))
 			continue
 		}
+		parseStats.add(c.Dialect, err == nil, fmt.Sprintf("[%s] %s\nunexpected error: %v", c.Dialect, c.SQL, err))
 		if err != nil {
-			parseStats.add(c.Dialect, false, fmt.Sprintf("[%s] %s\nunexpected error: %v", c.Dialect, c.SQL, firstLine(err.Error())))
-			continue
-		}
-		got := make([]any, len(trees))
-		for i, tr := range trees {
-			got[i] = serExpr(tr)
-		}
-		gs, ws := canon(got), canon(c.Trees)
-		parseStats.add(c.Dialect, gs == ws, fmt.Sprintf("[%s] %s\nwant: %s\n got: %s", c.Dialect, c.SQL, trunc(ws, 3000), trunc(gs, 3000)))
-		if gs != ws || c.GenError != "" {
 			continue
 		}
 		var outs []string
@@ -274,6 +152,10 @@ func TestConformanceParse(t *testing.T) {
 				break
 			}
 			outs = append(outs, o)
+		}
+		if c.GenError != "" {
+			genStats.add(c.Dialect, gerr != nil, fmt.Sprintf("[%s] %s\nwant a generation error (%s), got %q", c.Dialect, c.SQL, firstLine(c.GenError), outs))
+			continue
 		}
 		var want []string
 		for _, o := range c.Out {

@@ -187,7 +187,7 @@ func typingBigQueryMetadata() ExprMetadataType {
 	m := typingMetadata("").copy()
 
 	m.annotators(
-		"typing/bigquery.py:199", func(a *TypeAnnotator, e *Expr) { typingBigQueryAnnotateMathFunctions(a, e) },
+		func(a *TypeAnnotator, e *Expr) { typingBigQueryAnnotateMathFunctions(a, e) },
 		KAvg,
 		KCeil,
 		KExp,
@@ -198,7 +198,7 @@ func typingBigQueryMetadata() ExprMetadataType {
 		KSqrt,
 	)
 	m.annotators(
-		"typing/bigquery.py:212", func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "this") },
+		func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "this") },
 		KArgMax,
 		KArgMin,
 		KGroupConcat,
@@ -224,7 +224,7 @@ func typingBigQueryMetadata() ExprMetadataType {
 		KTrim,
 		KUpper,
 	)
-	m.annotators("typing/bigquery.py:241", func(a *TypeAnnotator, e *Expr) { typingBigQueryAnnotateDateFunc(a, e) },
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingBigQueryAnnotateDateFunc(a, e) },
 		typingBigQueryDateFuncKinds...)
 	m.returns(
 		DT_BIGINT,
@@ -311,7 +311,7 @@ func typingBigQueryMetadata() ExprMetadataType {
 		KUuid,
 	)
 	m.annotators(
-		"typing/bigquery.py:345", func(a *TypeAnnotator, e *Expr) { typingBigQueryAnnotateByArgsWithCoerce(a, e) },
+		func(a *TypeAnnotator, e *Expr) { typingBigQueryAnnotateByArgsWithCoerce(a, e) },
 		KPercentileCont,
 		KSafeAdd,
 		KSafeDivide,
@@ -319,38 +319,38 @@ func typingBigQueryMetadata() ExprMetadataType {
 		KSafeSubtract,
 	)
 	m.annotators(
-		"typing/bigquery.py:355", func(a *TypeAnnotator, e *Expr) { a.annotateByArgsFull(e, false, true, "this") },
+		func(a *TypeAnnotator, e *Expr) { a.annotateByArgsFull(e, false, true, "this") },
 		KApproxQuantiles,
 		KJSONExtractArray,
 		KRegexpExtractAll,
 		KSplit,
 	)
 	m.returns(DT_TIMESTAMPTZ, typingTIMESTAMP_EXPRESSIONS...)
-	m.annotators("typing/bigquery.py:364", func(a *TypeAnnotator, e *Expr) { typingBigQueryAnnotateByArgsApproxTop(a, e) }, KApproxTopK)
-	m.annotators("typing/bigquery.py:365", func(a *TypeAnnotator, e *Expr) { typingBigQueryAnnotateByArgsApproxTop(a, e) }, KApproxTopSum)
-	m.annotators("typing/bigquery.py:127", func(a *TypeAnnotator, e *Expr) { typingBigQueryAnnotateArray(a, e) }, KArray)
-	m.annotators("typing/bigquery.py:116", func(a *TypeAnnotator, e *Expr) { typingBigQueryAnnotateConcat(a, e) }, KConcat)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingBigQueryAnnotateByArgsApproxTop(a, e) }, KApproxTopK)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingBigQueryAnnotateByArgsApproxTop(a, e) }, KApproxTopSum)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingBigQueryAnnotateArray(a, e) }, KArray)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingBigQueryAnnotateConcat(a, e) }, KConcat)
 	m.returns(DT_DATE, KDateFromUnixDate)
-	m.annotators("typing/bigquery.py:370", func(a *TypeAnnotator, e *Expr) {
+	m.annotators(func(a *TypeAnnotator, e *Expr) {
 		a.setType(e, DataTypeBuild("ARRAY<TIMESTAMP>", MustDialect("bigquery"), false, true))
 	}, KGenerateTimestampArray)
-	m.annotators("typing/bigquery.py:375", func(a *TypeAnnotator, e *Expr) {
+	m.annotators(func(a *TypeAnnotator, e *Expr) {
 		if e.ArgB("to_json") {
 			a.setType(e, DT_JSON)
 		} else {
 			a.setType(e, DT_VARCHAR)
 		}
 	}, KJSONFormat)
-	m.annotators("typing/bigquery.py:380", func(a *TypeAnnotator, e *Expr) {
+	m.annotators(func(a *TypeAnnotator, e *Expr) {
 		a.setType(e, DataTypeBuild("ARRAY<VARCHAR>", MustDialect("bigquery"), false, true))
 	}, KJSONKeysAtDepth)
-	m.annotators("typing/bigquery.py:385", func(a *TypeAnnotator, e *Expr) {
+	m.annotators(func(a *TypeAnnotator, e *Expr) {
 		a.setType(e, DataTypeBuild("ARRAY<VARCHAR>", MustDialect("bigquery"), false, true))
 	}, KJSONValueArray)
 	m.returns(DT_BIGDECIMAL, KParseBignumeric)
 	m.returns(DT_DECIMAL, KParseNumeric)
-	m.annotators("typing/bigquery.py:391", func(a *TypeAnnotator, e *Expr) { typingBigQueryAnnotateSafeDivide(a, e) }, KSafeDivide)
-	m.annotators("typing/bigquery.py:393", func(a *TypeAnnotator, e *Expr) {
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingBigQueryAnnotateSafeDivide(a, e) }, KSafeDivide)
+	m.annotators(func(a *TypeAnnotator, e *Expr) {
 		a.setType(e, DataTypeBuild("ARRAY<BIGINT>", MustDialect("bigquery"), false, true))
 	}, KToCodePoints)
 
