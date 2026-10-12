@@ -170,7 +170,7 @@ func TestBruinHomeMigrationPreservesConcurrentDestination(t *testing.T) {
 	t.Setenv("USERPROFILE", home)
 	destination := filepath.Join(t.TempDir(), "bruin")
 	old := filepath.Join(home, ".bruin")
-	// The memory filesystem exercises the exclusive-copy fallback without
+	// The memory filesystem exercises the rename fallback without
 	// hardlinks, including a destination that appears during migration.
 	for _, fs := range []afero.Fs{afero.NewOsFs(), afero.NewMemMapFs()} {
 		t.Run(fs.Name(), func(t *testing.T) {
@@ -211,4 +211,54 @@ func TestBruinHomeInsideLegacyHome(t *testing.T) {
 	require.NoError(t, err)
 	assert.FileExists(t, filepath.Join(destination, "uv"))
 	assert.NoDirExists(t, filepath.Join(destination, "new"))
+}
+
+type observedReadFs struct {
+	afero.Fs
+	observe func()
+}
+
+func (fs observedReadFs) Open(name string) (afero.File, error) { //nolint:ireturn // implements afero.Fs
+	file, err := fs.Fs.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	return observedReadFile{File: file, observe: fs.observe}, nil
+}
+
+type observedReadFile struct {
+	afero.File
+	observe func()
+}
+
+func (f observedReadFile) Read(p []byte) (int, error) {
+	f.observe()
+	return f.File.Read(p)
+}
+
+func TestBruinHomeMigrationPublishesCompleteFiles(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	destination := filepath.Join(t.TempDir(), "bruin")
+	t.Setenv("BRUIN_HOME", destination)
+	fs := afero.NewMemMapFs() // Exercise migration without hardlink support.
+	old := filepath.Join(home, ".bruin")
+	require.NoError(t, fs.MkdirAll(old, 0o755))
+	payload := strings.Repeat("complete binary", 10000)
+	require.NoError(t, afero.WriteFile(fs, filepath.Join(old, "ingestr"), []byte(payload), 0o755))
+	target := filepath.Join(destination, "ingestr")
+	partialFileVisible := false
+	observed := observedReadFs{Fs: fs, observe: func() {
+		contents, err := afero.ReadFile(fs, target)
+		if err == nil && string(contents) != payload {
+			partialFileVisible = true
+		}
+	}}
+	_, err := NewConfigManager(observed).EnsureAndGetBruinHomeDir()
+	require.NoError(t, err)
+	assert.False(t, partialFileVisible, "stopping migration must never leave an incomplete file at the final path")
+	contents, err := afero.ReadFile(fs, target)
+	require.NoError(t, err)
+	assert.Equal(t, payload, string(contents))
 }

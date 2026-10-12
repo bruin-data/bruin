@@ -1,7 +1,6 @@
 package user
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -125,7 +124,8 @@ func copyHomeFile(fs afero.Fs, source, destination string, mode os.FileMode) err
 	if err != nil {
 		return err
 	}
-	defer func() { _ = fs.Remove(out.Name()) }()
+	temporary := out.Name()
+	defer func() { _ = fs.Remove(temporary) }()
 	_, copyErr := io.Copy(out, in)
 	closeErr := out.Close()
 	if copyErr != nil {
@@ -134,37 +134,25 @@ func copyHomeFile(fs afero.Fs, source, destination string, mode os.FileMode) err
 	if closeErr != nil {
 		return closeErr
 	}
-	if err := fs.Chmod(out.Name(), mode); err != nil {
+	if err := fs.Chmod(temporary, mode); err != nil {
 		return err
 	}
 	if fs.Name() == "OsFs" {
 		// Publish the completed file atomically without replacing a destination
 		// created by another process while we were copying.
-		err := os.Link(out.Name(), destination)
+		err := os.Link(temporary, destination)
 		if err == nil || os.IsExist(err) {
 			return nil
 		}
 	}
-	// Filesystems such as exFAT cannot create hardlinks. Exclusive creation
-	// still preserves destination-wins; the home lock keeps other Bruin
-	// initializers from using the file before this copy finishes.
-	staged, err := fs.Open(out.Name())
-	if err != nil {
-		return err
-	}
-	defer staged.Close()
-	target, err := fs.OpenFile(destination, os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode)
-	if os.IsExist(err) {
+	// Filesystems such as exFAT cannot create hardlinks. The shared home lock
+	// serializes Bruin migrations, so recheck the destination and rename the
+	// completed file. Never copy into the final path: interruption would leave
+	// a partial tool that the next run mistakes for an existing installation.
+	if _, err := lstat(fs, destination); err == nil {
 		return nil
-	}
-	if err != nil {
+	} else if !os.IsNotExist(err) {
 		return err
 	}
-	_, copyErr = io.Copy(target, staged)
-	modeErr := fs.Chmod(destination, mode)
-	closeErr = target.Close()
-	if err := errors.Join(copyErr, modeErr, closeErr); err != nil {
-		return errors.Join(err, fs.Remove(destination))
-	}
-	return nil
+	return fs.Rename(temporary, destination)
 }
