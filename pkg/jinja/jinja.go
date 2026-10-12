@@ -1,10 +1,7 @@
 package jinja
 
 import (
-	"bytes"
 	"context"
-	"crypto/sha256"
-	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -14,10 +11,10 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/date"
+	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/nikolalohinski/gonja/v2"
 	"github.com/nikolalohinski/gonja/v2/exec"
-	"github.com/nikolalohinski/gonja/v2/loaders"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 )
@@ -26,6 +23,7 @@ type Renderer struct {
 	context         *exec.Context
 	queryRenderLock *sync.Mutex
 	macroContent    string
+	repositoryRoot  string
 }
 
 func init() { //nolint: gochecknoinits
@@ -158,6 +156,14 @@ func (r *Renderer) SetContextValue(key string, value any) {
 	r.context.Set(key, value)
 }
 
+// WithRepositoryRoot enables repository-relative template files. The root must
+// come from the caller's trusted checkout location, never from template input.
+// Without a root, all template file access is denied.
+func (r *Renderer) WithRepositoryRoot(root string) *Renderer {
+	r.repositoryRoot = root
+	return r
+}
+
 // NewRendererWithStartEndDatesAndMacros creates a new Renderer with the given dates, context, and macro content.
 func NewRendererWithStartEndDatesAndMacros(startDate, endDate, executionDate *time.Time, pipelineName, runID string, vars Context, macroContent string) *Renderer {
 	ctx := defaultContext(startDate, endDate, executionDate, pipelineName, runID, false)
@@ -205,6 +211,15 @@ func NewRendererWithYesterday(pipelineName, runID string) *Renderer {
 }
 
 func (r *Renderer) Render(query string) (string, error) {
+	var root *os.Root
+	if r.repositoryRoot != "" {
+		var err error
+		root, err = openRepositoryRoot(r.repositoryRoot)
+		if err != nil {
+			return "", errors.Wrap(err, "failed to open template repository")
+		}
+		defer root.Close()
+	}
 	r.queryRenderLock.Lock()
 
 	// Prepend macro content so its definitions are available to the query, separated
@@ -219,7 +234,7 @@ func (r *Renderer) Render(query string) (string, error) {
 		fullQuery = preamble + query
 	}
 
-	tpl, err := compileTemplate(fullQuery)
+	tpl, err := templateFromString(fullQuery, root)
 	if err != nil {
 		customError := findParserErrorType(err)
 		if customError != "" && outputMarker != "" {
@@ -227,7 +242,7 @@ func (r *Renderer) Render(query string) (string, error) {
 			// Parse the query by itself after a recognized EOF error so the location we
 			// return refers to the template the user supplied. If the query parses on its
 			// own, keep the original error because it came from the macro preamble.
-			if _, queryErr := compileTemplate(query); queryErr != nil {
+			if _, queryErr := templateFromString(query, root); queryErr != nil {
 				if queryCustomError := findParserErrorType(queryErr); queryCustomError != "" {
 					customError = queryCustomError
 				}
@@ -297,100 +312,9 @@ func hideMacroOutputMarker(err error, marker string) error {
 	return errors.New(strings.ReplaceAll(err.Error(), marker, ""))
 }
 
-// RestrictTemplateFilesystemEnv, set to "true", confines template loading to the working directory tree.
+// RestrictTemplateFilesystemEnv is retained for source compatibility.
+// Deprecated: template file access is always repository-scoped, regardless of this environment variable.
 const RestrictTemplateFilesystemEnv = "BRUIN_RESTRICT_TEMPLATE_FILESYSTEM"
-
-var errTemplateFileAccessDenied = errors.New("loading templates outside the working directory is disabled")
-
-func templateFilesystemRestricted() bool {
-	return strings.EqualFold(os.Getenv(RestrictTemplateFilesystemEnv), "true")
-}
-
-func compileTemplate(source string) (*exec.Template, error) {
-	if !templateFilesystemRestricted() {
-		return gonja.FromString(source)
-	}
-
-	sub, err := newScopedLoader()
-	if err != nil {
-		return nil, err
-	}
-
-	content := []byte(source)
-	rootID := "root-" + string(sha256.New().Sum(content))
-	loader, err := loaders.NewShiftedLoader(rootID, bytes.NewReader(content), sub)
-	if err != nil {
-		return nil, err
-	}
-
-	return exec.NewTemplate(rootID, gonja.DefaultConfig, loader, gonja.DefaultEnvironment)
-}
-
-// scopedLoader resolves templates under root and rejects any path that escapes it.
-type scopedLoader struct {
-	root string
-	dir  string
-}
-
-func newScopedLoader() (*scopedLoader, error) {
-	root, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
-	root, err = filepath.Abs(root)
-	if err != nil {
-		return nil, err
-	}
-	if realPath, err := filepath.EvalSymlinks(root); err == nil {
-		root = realPath
-	}
-	return &scopedLoader{root: root, dir: root}, nil
-}
-
-func (l *scopedLoader) within(path string) bool {
-	return path == l.root || strings.HasPrefix(path, l.root+string(os.PathSeparator))
-}
-
-func (l *scopedLoader) resolve(name string) (string, error) {
-	candidate := name
-	if !filepath.IsAbs(candidate) {
-		candidate = filepath.Join(l.dir, candidate)
-	}
-	candidate = filepath.Clean(candidate)
-	if !l.within(candidate) {
-		return "", errTemplateFileAccessDenied
-	}
-	// Reject symlinks whose real target escapes root; os.ReadFile would follow them.
-	if realPath, err := filepath.EvalSymlinks(candidate); err == nil && !l.within(realPath) {
-		return "", errTemplateFileAccessDenied
-	}
-	return candidate, nil
-}
-
-func (l *scopedLoader) Read(name string) (io.Reader, error) {
-	resolved, err := l.resolve(name)
-	if err != nil {
-		return nil, err
-	}
-	content, err := os.ReadFile(resolved)
-	if err != nil {
-		return nil, err
-	}
-	return bytes.NewReader(content), nil
-}
-
-func (l *scopedLoader) Resolve(name string) (string, error) {
-	return l.resolve(name)
-}
-
-//nolint:ireturn
-func (l *scopedLoader) Inherit(from string) (loaders.Loader, error) {
-	resolved, err := l.resolve(from)
-	if err != nil {
-		return nil, err
-	}
-	return &scopedLoader{root: l.root, dir: filepath.Dir(resolved)}, nil
-}
 
 //nolint:ireturn
 func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, asset *pipeline.Asset) (RendererInterface, error) {
@@ -416,6 +340,13 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 		macroContent = pipelineMacroContent(pipe)
 	}
 
+	repositoryRoot := r.repositoryRoot
+	if repositoryRoot == "" && pipe.DefinitionFile.Path != "" {
+		if repo, err := git.FindRepoFromPath(filepath.Dir(pipe.DefinitionFile.Path)); err == nil {
+			repositoryRoot = repo.Path
+		}
+	}
+
 	applyModifiers, ok := ctx.Value(pipeline.RunConfigApplyIntervalModifiers).(bool)
 	if ok && applyModifiers {
 		tempContext := defaultContext(&startDate, &endDate, &executionDate, pipe.Name, ctx.Value(pipeline.RunConfigRunID).(string), fullRefresh)
@@ -425,6 +356,7 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 			context:         exec.NewContext(tempContext),
 			queryRenderLock: &sync.Mutex{},
 			macroContent:    macroContent,
+			repositoryRoot:  repositoryRoot,
 		}
 		// Use non-mutating template resolution to avoid modifying the original asset
 		resolvedStartModifier, err := asset.IntervalModifiers.Start.ResolveTemplateToNew(tempRenderer)
@@ -455,15 +387,12 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 		context:         exec.NewContext(jinjaContext),
 		queryRenderLock: &sync.Mutex{},
 		macroContent:    macroContent,
+		repositoryRoot:  repositoryRoot,
 	}, nil
 }
 
 func findRenderErrorType(err error) string {
 	message := err.Error()
-	if strings.Contains(message, errTemplateFileAccessDenied.Error()) {
-		return errTemplateFileAccessDenied.Error()
-	}
-
 	errorBits := strings.Split(message, ": ")
 	innermostErr := errorBits[len(errorBits)-1]
 
@@ -483,10 +412,6 @@ func findRenderErrorType(err error) string {
 
 func findParserErrorType(err error) string {
 	message := err.Error()
-
-	if strings.Contains(message, errTemplateFileAccessDenied.Error()) {
-		return errTemplateFileAccessDenied.Error()
-	}
 
 	if strings.Contains(message, "Unexpected EOF, expected tag else or endfor") {
 		match := locationRegex.FindString(message)
