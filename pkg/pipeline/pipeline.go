@@ -90,6 +90,7 @@ const (
 	AssetTypeMsSQLSource               = AssetType("ms.source")
 	AssetTypeMsSQLTableSensor          = AssetType("ms.sensor.table")
 	AssetTypeFabricQuery               = AssetType("fabric.sql")
+	AssetTypeFabricSource              = AssetType("fabric.source")
 	AssetTypeFabricSparkQuery          = AssetType("fabric.spark_sql")
 	AssetTypeFabricQuerySensor         = AssetType("fabric.sensor.query")
 	AssetTypeFabricSeed                = AssetType("fabric.seed")
@@ -151,6 +152,7 @@ const (
 	AssetTypeTrinoQuerySensor          = AssetType("trino.sensor.query")
 	AssetTypeDremioQuery               = AssetType("dremio.sql")
 	AssetTypeDremioQuerySensor         = AssetType("dremio.sensor.query")
+	AssetTypeDremioSource              = AssetType("dremio.source")
 	AssetTypeSailQuery                 = AssetType("sail.sql")
 	AssetTypeSailQuerySensor           = AssetType("sail.sensor.query")
 	AssetTypeSparkQuery                = AssetType("spark.sql")
@@ -966,6 +968,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeMsSQLTableSensor:          "mssql",
 	AssetTypeMsSQLSource:               "mssql",
 	AssetTypeFabricQuery:               "fabric",
+	AssetTypeFabricSource:              "fabric",
 	AssetTypeFabricSparkQuery:          "fabric",
 	AssetTypeFabricSeed:                "fabric",
 	AssetTypeFabricQuerySensor:         "fabric",
@@ -1008,6 +1011,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeTrinoQuerySensor:          "trino",
 	AssetTypeDremioQuery:               "dremio",
 	AssetTypeDremioQuerySensor:         "dremio",
+	AssetTypeDremioSource:              "dremio",
 	AssetTypeSailQuery:                 "sail",
 	AssetTypeSailQuerySensor:           "sail",
 	AssetTypeSparkQuery:                "spark",
@@ -2559,10 +2563,12 @@ func assetMainTaskIsConnectionless(asset *Asset) bool {
 		AssetTypeClickHouseSource,
 		AssetTypeDorisSource,
 		AssetTypeDatabricksSource,
+		AssetTypeDremioSource,
 		AssetTypeSparkSource,
 		AssetTypeDuckDBSource,
 		AssetTypeMongoSource,
 		AssetTypeMsSQLSource,
+		AssetTypeFabricSource,
 		AssetTypeOracleSource,
 		AssetTypePostgresSource,
 		AssetTypeRedshiftSource,

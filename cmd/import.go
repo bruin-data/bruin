@@ -952,6 +952,8 @@ func convertSourceTypeToQueryType(sourceType pipeline.AssetType) pipeline.AssetT
 		return pipeline.AssetTypeRedshiftQuery
 	case pipeline.AssetTypeMsSQLSource:
 		return pipeline.AssetTypeMsSQLQuery
+	case pipeline.AssetTypeFabricSource:
+		return pipeline.AssetTypeFabricQuery
 	case pipeline.AssetTypeSynapseSource:
 		return pipeline.AssetTypeSynapseQuery
 	case pipeline.AssetTypeDatabricksSource:
@@ -966,6 +968,8 @@ func convertSourceTypeToQueryType(sourceType pipeline.AssetType) pipeline.AssetT
 		return pipeline.AssetTypeClickHouse
 	case pipeline.AssetTypeOracleSource:
 		return pipeline.AssetTypeOracleQuery
+	case pipeline.AssetTypeDremioSource:
+		return pipeline.AssetTypeDremioQuery
 	default:
 		// For types without a query equivalent, return the original
 		return sourceType
@@ -1022,6 +1026,12 @@ func determineAssetTypeFromConnection(connectionName string, conn interface{}) p
 		if strings.Contains(connType, "mssql") {
 			return pipeline.AssetTypeMsSQLSource
 		}
+		if strings.Contains(connType, "fabric") {
+			return pipeline.AssetTypeFabricSource
+		}
+		if strings.Contains(connType, "dremio") {
+			return pipeline.AssetTypeDremioSource
+		}
 		if strings.Contains(connType, "synapse") {
 			return pipeline.AssetTypeSynapseSource
 		}
@@ -1071,6 +1081,12 @@ func determineAssetTypeFromConnection(connectionName string, conn interface{}) p
 	}
 	if strings.Contains(connectionLower, "mssql") || strings.Contains(connectionLower, "sqlserver") {
 		return pipeline.AssetTypeMsSQLSource
+	}
+	if strings.Contains(connectionLower, "fabric") {
+		return pipeline.AssetTypeFabricSource
+	}
+	if strings.Contains(connectionLower, "dremio") {
+		return pipeline.AssetTypeDremioSource
 	}
 	if strings.Contains(connectionLower, "oracle") {
 		return pipeline.AssetTypeOracleSource

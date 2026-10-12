@@ -483,6 +483,7 @@ var assetTypePlatform = map[pipeline.AssetType]Platform{
 	pipeline.AssetTypeOracleSource: PlatformOracle,
 
 	pipeline.AssetTypeFabricQuery:             PlatformFabric,
+	pipeline.AssetTypeFabricSource:            PlatformFabric,
 	pipeline.AssetTypeFabricSeed:              PlatformFabric,
 	pipeline.AssetTypeFabricQuerySensor:       PlatformFabric,
 	pipeline.AssetTypeFabricTableSensor:       PlatformFabric,

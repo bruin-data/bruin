@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/dremio"
+	"github.com/bruin-data/bruin/pkg/fabric"
 	"github.com/bruin-data/bruin/pkg/mongo"
 	mongoatlas "github.com/bruin-data/bruin/pkg/mongo_atlas"
 	"github.com/bruin-data/bruin/pkg/mssql"
@@ -414,6 +416,18 @@ func TestDetermineAssetTypeFromConnection(t *testing.T) {
 			want:           pipeline.AssetTypeMsSQLSource,
 		},
 		{
+			name:           "fabric connection type overrides name",
+			connectionName: "prod",
+			conn:           &fabric.DB{},
+			want:           pipeline.AssetTypeFabricSource,
+		},
+		{
+			name:           "dremio connection type overrides name",
+			connectionName: "prod",
+			conn:           &dremio.Client{},
+			want:           pipeline.AssetTypeDremioSource,
+		},
+		{
 			name:           "postgres connection type overrides name",
 			connectionName: "prod",
 			conn:           &postgres.Client{},
@@ -536,6 +550,18 @@ func TestDetermineAssetTypeFromConnection(t *testing.T) {
 			want:           pipeline.AssetTypeMsSQLSource,
 		},
 		{
+			name:           "fabric by name",
+			connectionName: "fabric-warehouse",
+			conn:           &mockConnection{},
+			want:           pipeline.AssetTypeFabricSource,
+		},
+		{
+			name:           "dremio by name",
+			connectionName: "dremio-lakehouse",
+			conn:           &mockConnection{},
+			want:           pipeline.AssetTypeDremioSource,
+		},
+		{
 			name:           "mongo connection type overrides name",
 			connectionName: "prod",
 			conn:           &mongo.DB{},
@@ -567,6 +593,26 @@ func TestDetermineAssetTypeFromConnection(t *testing.T) {
 
 			got := determineAssetTypeFromConnection(tt.connectionName, tt.conn)
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestConvertSourceTypeToQueryType(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		source pipeline.AssetType
+		query  pipeline.AssetType
+	}{
+		{source: pipeline.AssetTypeDremioSource, query: pipeline.AssetTypeDremioQuery},
+		{source: pipeline.AssetTypeFabricSource, query: pipeline.AssetTypeFabricQuery},
+		{source: pipeline.AssetTypeMsSQLSource, query: pipeline.AssetTypeMsSQLQuery},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.source), func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.query, convertSourceTypeToQueryType(tt.source))
 		})
 	}
 }

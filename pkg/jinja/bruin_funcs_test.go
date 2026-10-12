@@ -741,6 +741,7 @@ func TestPlatformForAssetType(t *testing.T) {
 		{pipeline.AssetTypeSynapseQuery, PlatformSynapse},
 		{pipeline.AssetTypeOracleQuery, PlatformOracle},
 		{pipeline.AssetTypeFabricQuery, PlatformFabric},
+		{pipeline.AssetTypeFabricSource, PlatformFabric},
 		{pipeline.AssetTypeVerticaQuery, PlatformVertica},
 		{pipeline.AssetTypePython, PlatformDefault},
 	}

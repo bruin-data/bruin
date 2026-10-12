@@ -977,6 +977,30 @@ func TestPipeline_GetConnectionNameForAsset(t *testing.T) {
 	})
 }
 
+func TestPipeline_GetConnectionNameForAsset_SQLSources(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		assetType pipeline.AssetType
+		platform  string
+	}{
+		{assetType: pipeline.AssetTypeDremioSource, platform: "dremio"},
+		{assetType: pipeline.AssetTypeFabricSource, platform: "fabric"},
+		{assetType: pipeline.AssetTypeMsSQLSource, platform: "mssql"},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.assetType), func(t *testing.T) {
+			t.Parallel()
+
+			p := &pipeline.Pipeline{DefaultConnections: map[string]string{tt.platform: "source-default"}}
+			found, err := p.GetConnectionNameForAsset(&pipeline.Asset{Type: tt.assetType})
+			require.NoError(t, err)
+			assert.Equal(t, "source-default", found)
+		})
+	}
+}
+
 func intPointer(i int) *int {
 	return &i
 }
@@ -3929,4 +3953,23 @@ func TestPipeline_GetAllConnectionNamesForAsset_ConnectionlessIngestr(t *testing
 	names, err = p.GetAllConnectionNamesForAsset(withConn)
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []string{"duck", "my-sf"}, names)
+}
+
+func TestPipeline_GetAllConnectionNamesForAsset_SourceAssetsAreConnectionless(t *testing.T) {
+	t.Parallel()
+
+	p := &pipeline.Pipeline{}
+	for _, assetType := range []pipeline.AssetType{
+		pipeline.AssetTypeDremioSource,
+		pipeline.AssetTypeFabricSource,
+		pipeline.AssetTypeMsSQLSource,
+	} {
+		t.Run(string(assetType), func(t *testing.T) {
+			t.Parallel()
+
+			names, err := p.GetAllConnectionNamesForAsset(&pipeline.Asset{Type: assetType})
+			require.NoError(t, err)
+			assert.Empty(t, names)
+		})
+	}
 }
