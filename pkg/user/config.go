@@ -11,10 +11,13 @@ import (
 )
 
 const (
-	bruinHomeDir       = ".bruin"
-	homeDirPermissions = 0o755
-	virtualEnvsPath    = "virtualenvs"
+	bruinHomeDir        = ".bruin"
+	homeDirPermissions  = 0o755
+	virtualEnvsPath     = "virtualenvs"
+	homeMigrationMarker = ".home-migrated"
 )
+
+var homeMigrationMu sync.Mutex
 
 type ConfigManager struct {
 	fs afero.Fs
@@ -26,6 +29,9 @@ type ConfigManager struct {
 }
 
 func NewConfigManager(fs afero.Fs) *ConfigManager {
+	if fs == nil {
+		fs = afero.NewOsFs()
+	}
 	return &ConfigManager{
 		fs: fs,
 	}
@@ -34,6 +40,9 @@ func NewConfigManager(fs afero.Fs) *ConfigManager {
 func (c *ConfigManager) RecreateHomeDir() error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
+	homeMigrationMu.Lock()
+	defer homeMigrationMu.Unlock()
+
 	err := c.ensureHomeDirSet()
 	if err != nil {
 		return err
@@ -44,9 +53,13 @@ func (c *ConfigManager) RecreateHomeDir() error {
 		return errors.Wrap(err, "failed to remove bruin home directory")
 	}
 
-	err = c.EnsureHomeDirExists()
+	// Do not restore the legacy cache immediately after cleaning it.
+	err = c.fs.MkdirAll(c.bruinHomeDir, homeDirPermissions)
 	if err != nil {
 		return err
+	}
+	if os.Getenv("BRUIN_HOME") != "" {
+		return afero.WriteFile(c.fs, filepath.Join(c.bruinHomeDir, homeMigrationMarker), nil, 0o600)
 	}
 
 	return nil
@@ -65,6 +78,9 @@ func (c *ConfigManager) EnsureAndGetBruinHomeDir() (string, error) {
 }
 
 func (c *ConfigManager) EnsureHomeDirExists() error {
+	homeMigrationMu.Lock()
+	defer homeMigrationMu.Unlock()
+
 	err := c.ensureHomeDirSet()
 	if err != nil {
 		return err
@@ -77,16 +93,39 @@ func (c *ConfigManager) EnsureHomeDirExists() error {
 		}
 	}
 
+	if os.Getenv("BRUIN_HOME") != "" {
+		marker := filepath.Join(c.bruinHomeDir, homeMigrationMarker)
+		if _, err := c.fs.Stat(marker); os.IsNotExist(err) {
+			if c.userHomeDir != "" {
+				if err := copyHomeFiles(c.fs, filepath.Join(c.userHomeDir, bruinHomeDir), c.bruinHomeDir); err != nil {
+					return errors.Wrap(err, "failed to copy previous bruin home")
+				}
+			}
+			return afero.WriteFile(c.fs, marker, nil, 0o600)
+		} else if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
 func (c *ConfigManager) ensureHomeDirSet() error {
 	homeDir, err := os.UserHomeDir()
+	c.userHomeDir = homeDir
+	if override := os.Getenv("BRUIN_HOME"); override != "" {
+		c.bruinHomeDir, err = filepath.Abs(override)
+		if err != nil {
+			return err
+		}
+		if c.bruinHomeDir == filepath.Dir(c.bruinHomeDir) || c.bruinHomeDir == homeDir {
+			return errors.New("BRUIN_HOME must be a dedicated directory, not the filesystem root or user home")
+		}
+		return nil
+	}
 	if err != nil {
 		return err
 	}
 	c.bruinHomeDir = filepath.Join(homeDir, bruinHomeDir)
-	c.userHomeDir = homeDir
 	return nil
 }
 

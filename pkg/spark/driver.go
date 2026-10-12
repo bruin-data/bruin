@@ -16,6 +16,7 @@ import (
 	"github.com/apache/arrow-adbc/go/adbc"
 	"github.com/apache/arrow-adbc/go/adbc/drivermgr"
 	"github.com/apache/arrow-adbc/go/adbc/sqldriver"
+	"github.com/bruin-data/bruin/pkg/user"
 	"github.com/columnar-tech/dbc"
 	"github.com/columnar-tech/dbc/config"
 )
@@ -48,6 +49,9 @@ func EnsureADBCDriverInstalled(ctx context.Context) error {
 }
 
 func ensureDriverInstalledInternal(ctx context.Context) error {
+	if _, err := user.EnsureADBCDriverConfig(dbcDriverName); err != nil {
+		return err
+	}
 	if sparkDriverVersionIsActive() {
 		if err := tryLoadDriver(); err == nil {
 			return nil
@@ -69,6 +73,14 @@ func ensureDriverInstalledInternal(ctx context.Context) error {
 }
 
 func sparkDriverVersionIsActive() bool {
+	if os.Getenv("BRUIN_HOME") != "" {
+		cfg, err := user.EnsureADBCDriverConfig(dbcDriverName)
+		if err != nil {
+			return false
+		}
+		driver, err := config.GetDriver(cfg, dbcDriverName)
+		return err == nil && driver.Version != nil && driver.Version.String() == sparkDriverVersion
+	}
 	configs := config.Get()
 	for _, level := range []config.ConfigLevel{
 		config.ConfigEnv,
@@ -94,8 +106,12 @@ func newADBCDatabase(options map[string]string) (adbc.Database, error) { //nolin
 }
 
 func tryLoadDriver() error {
+	driverPath, err := user.ADBCDriverPath(dbcDriverName)
+	if err != nil {
+		return err
+	}
 	database, err := newADBCDatabase(map[string]string{
-		"driver": dbcDriverName,
+		"driver": driverPath,
 		"uri":    "spark://localhost:1?auth_type=none&api=connect",
 	})
 	if err != nil {
@@ -144,9 +160,9 @@ func installSparkADBCDriver(ctx context.Context) error {
 		cleanup()
 	}()
 
-	cfg := config.Config{
-		Level:    config.ConfigUser,
-		Location: config.ConfigUser.ConfigLocation(),
+	cfg, err := user.EnsureADBCDriverConfig(dbcDriverName)
+	if err != nil {
+		return err
 	}
 	manifest, err := config.InstallDriver(cfg, dbcDriverName, downloaded)
 	if err != nil {

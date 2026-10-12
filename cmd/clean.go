@@ -14,6 +14,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/bruin-data/bruin/pkg/user"
+	"github.com/bruin-data/bruin/pkg/uv"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
@@ -135,6 +136,11 @@ func (r *CleanCommand) cleanUvCache(bruinHomeDirAbsPath string) error {
 	infoPrinter.Println("Cleaning uv caches...")
 
 	cleanCmd := exec.CommandContext(context.Background(), uvBinaryPath, "cache", "clean")
+	env, err := uv.Environment()
+	if err != nil {
+		return err
+	}
+	cleanCmd.Env = env
 	output, err := cleanCmd.CombinedOutput()
 	if err != nil {
 		return errors.Wrapf(err, "failed to clean uv cache: %s", string(output))

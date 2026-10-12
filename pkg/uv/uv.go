@@ -31,6 +31,30 @@ type Checker struct {
 	mut sync.Mutex
 }
 
+// Environment keeps uv-managed caches and Python installations in BRUIN_HOME
+// when configured. Explicit UV_* settings continue to take precedence.
+func Environment() ([]string, error) {
+	env := os.Environ()
+	if os.Getenv("BRUIN_HOME") == "" {
+		return env, nil
+	}
+	home, err := user.NewConfigManager(nil).EnsureAndGetBruinHomeDir()
+	if err != nil {
+		return nil, err
+	}
+	for key, dir := range map[string]string{
+		"UV_CACHE_DIR":          "uv-cache",
+		"UV_PYTHON_INSTALL_DIR": "python",
+		"UV_TOOL_DIR":           "uv-tools",
+		"UV_TOOL_BIN_DIR":       "bin",
+	} {
+		if os.Getenv(key) == "" {
+			env = append(env, key+"="+filepath.Join(home, dir))
+		}
+	}
+	return env, nil
+}
+
 // EnsureUvInstalled checks if uv is installed and installs it if not present, then returns the full path of the binary.
 func (u *Checker) EnsureUvInstalled(ctx context.Context) (string, error) {
 	u.mut.Lock()
@@ -90,10 +114,13 @@ func (u *Checker) installUvCommand(ctx context.Context, dest string) error {
 	var commandInstance *exec.Cmd
 	if runtime.GOOS == "windows" {
 		shell := windowsShell()
-		commandInstance = exec.CommandContext(ctx, shell, "-ExecutionPolicy", "ByPass", "-c", fmt.Sprintf("$env:NO_MODIFY_PATH=1 ; $env:UV_INSTALL_DIR='~/.bruin' ; irm https://astral.sh/uv/%s/install.ps1 | iex", Version)) //nolint:gosec
+		commandInstance = exec.CommandContext(ctx, shell, "-ExecutionPolicy", "ByPass", "-c", fmt.Sprintf("irm https://astral.sh/uv/%s/install.ps1 | iex", Version)) //nolint:gosec
 	} else {
-		commandInstance = exec.CommandContext(ctx, Shell, ShellSubcommandFlag, fmt.Sprintf("set -e; curl -LsSf https://astral.sh/uv/%s/install.sh | UV_INSTALL_DIR=\"%s\" NO_MODIFY_PATH=1 sh", Version, dest)) //nolint:gosec
+		commandInstance = exec.CommandContext(ctx, Shell, ShellSubcommandFlag, fmt.Sprintf("set -e; curl -LsSf https://astral.sh/uv/%s/install.sh | sh", Version)) //nolint:gosec
 	}
+	// Bruin manages this pinned binary; uv must not write shell profiles or
+	// installation receipts elsewhere in the user's (possibly read-only) home.
+	commandInstance.Env = append(os.Environ(), "UV_UNMANAGED_INSTALL="+dest)
 
 	commandInstance.Stdout = output
 	commandInstance.Stderr = output

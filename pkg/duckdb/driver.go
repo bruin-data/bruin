@@ -15,6 +15,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/apache/arrow-adbc/go/adbc/drivermgr"
 	"github.com/apache/arrow-adbc/go/adbc/sqldriver"
+	"github.com/bruin-data/bruin/pkg/user"
 	"github.com/columnar-tech/dbc"
 	"github.com/columnar-tech/dbc/config"
 )
@@ -50,6 +51,9 @@ func EnsureADBCDriverInstalled(ctx context.Context) error {
 }
 
 func ensureDriverInstalledInternal(ctx context.Context) error {
+	if _, err := user.EnsureADBCDriverConfig(dbcDriverName); err != nil {
+		return err
+	}
 	if err := tryLoadDriver(); err == nil { //nolint:contextcheck
 		return nil
 	}
@@ -106,9 +110,9 @@ func installDuckDBADBCDriver(ctx context.Context) error {
 		cleanup()
 	}()
 
-	cfg := config.Config{
-		Level:    config.ConfigUser,
-		Location: config.ConfigUser.ConfigLocation(),
+	cfg, err := user.EnsureADBCDriverConfig(dbcDriverName)
+	if err != nil {
+		return err
 	}
 	manifest, err := config.InstallDriver(cfg, dbcDriverName, downloaded)
 	if err != nil {
@@ -203,15 +207,20 @@ func verifyDBCDriverSignature(manifest config.Manifest) error {
 }
 
 func tryLoadDriver() error {
-	db, err := sql.Open("adbc_duckdb", "driver=duckdb;path=:memory:")
+	driverPath, err := user.ADBCDriverPath(dbcDriverName)
+	if err != nil {
+		return err
+	}
+	var driver drivermgr.Driver
+	db, err := driver.NewDatabase(map[string]string{"driver": driverPath, "path": ":memory:"})
 	if err != nil {
 		return fmt.Errorf("failed to open duckdb adbc driver: %w", err)
 	}
 	defer db.Close()
 
-	if err := db.PingContext(context.Background()); err != nil {
+	conn, err := db.Open(context.Background())
+	if err != nil {
 		return fmt.Errorf("failed to ping duckdb adbc driver: %w", err)
 	}
-
-	return nil
+	return conn.Close()
 }
