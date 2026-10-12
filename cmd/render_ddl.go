@@ -92,7 +92,7 @@ func RenderDDL() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			pl, err := pipeline.PipelineFromPath(pipelineDefinitionFullPath, fs)
+			pl, err := pipeline.PipelineFromPath(pipelineDefinitionFullPath, pipelineBuilderFs)
 			if err != nil {
 				printError(err, c.String("output"), "Failed to read the pipeline definition file:")
 				return cli.Exit("", 1)
