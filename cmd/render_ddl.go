@@ -197,7 +197,7 @@ func RenderDDL() *cli.Command {
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigApplyIntervalModifiers, c.Bool("apply-interval-modifiers"))
 
 			// Load macros from the pipeline's macros directory
-			macroContent, err := jinja.LoadMacros(fs, pl.MacrosPath)
+			macroContent, err := jinja.LoadMacros(pipelineBuilderFs, pl.MacrosPath)
 			if err != nil {
 				printError(err, c.String("output"), "Failed to load macros:")
 				return cli.Exit("", 1)
