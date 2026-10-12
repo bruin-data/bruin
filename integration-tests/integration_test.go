@@ -335,6 +335,32 @@ func TestIndividualTasks(t *testing.T) {
 			},
 		},
 		{
+			name: "render-macros",
+			task: e2e.Task{
+				Name:    "render-macros",
+				Command: binary,
+				Args:    []string{"render", filepath.Join(currentFolder, "test-pipelines/macros-pipeline/assets/test_basic_macro.sql")},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"test_basic_macro", "SELECT 1 as id, 'test' as name"},
+				},
+				Asserts: []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByContains},
+			},
+		},
+		{
+			name: "render-ddl-macros",
+			task: e2e.Task{
+				Name:    "render-ddl-macros",
+				Command: binary,
+				Args:    []string{"render-ddl", filepath.Join(currentFolder, "test-pipelines/macros-pipeline/assets/test_basic_macro.sql")},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"CREATE TABLE IF NOT EXISTS test_basic_macro"},
+				},
+				Asserts: []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByContains},
+			},
+		},
+		{
 			name: "render-variables",
 			task: e2e.Task{
 				Name:          "render-variables",
