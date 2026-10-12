@@ -10,6 +10,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/tablename"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/microsoft/go-mssqldb"
@@ -424,6 +425,12 @@ WHERE t.TABLE_SCHEMA NOT IN ('sys', 'INFORMATION_SCHEMA')
 		Name:    currentDB,
 		Schemas: []*ansisql.DBSchema{},
 	}
+	parser, err := sqlparser.NewSQLParser(false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create SQL parser: %w", err)
+	}
+	defer parser.Close()
+
 	schemaCache := make(map[string]*ansisql.DBSchema)
 
 	for _, row := range tables {
@@ -444,6 +451,13 @@ WHERE t.TABLE_SCHEMA NOT IN ('sys', 'INFORMATION_SCHEMA')
 			continue
 		}
 		viewDefinition, _ := fromFabricValue(row[3])
+		if viewDefinition != "" {
+			viewDefinition, err = parser.ExtractSelect(viewDefinition, "fabric")
+			if err != nil {
+				// Keep an unparseable or truncated view as a non-executable source asset.
+				viewDefinition = ""
+			}
+		}
 
 		schema, ok := schemaCache[schemaName]
 		if !ok {

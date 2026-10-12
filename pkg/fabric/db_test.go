@@ -576,7 +576,7 @@ func TestDB_GetDatabaseSummary(t *testing.T) {
 	mock.ExpectQuery(expectedDatabaseSummaryQuery).
 		WillReturnRows(sqlmock.NewRows([]string{"TABLE_SCHEMA", "TABLE_NAME", "TABLE_TYPE", "VIEW_DEFINITION"}).
 			AddRow("dbo", "customers", "BASE TABLE", nil).
-			AddRow("dbo", "v_orders", "VIEW", "SELECT * FROM dbo.orders"))
+			AddRow("dbo", "v_orders", "VIEW", "CREATE VIEW [dbo].[v_orders] AS SELECT * FROM [dbo].[orders]"))
 
 	db := &DB{
 		conn:   sqlx.NewDb(mockDB, "sqlmock"),
@@ -593,6 +593,6 @@ func TestDB_GetDatabaseSummary(t *testing.T) {
 	assert.Equal(t, ansisql.DBTableTypeTable, got.Schemas[0].Tables[0].Type)
 	assert.Equal(t, "v_orders", got.Schemas[0].Tables[1].Name)
 	assert.Equal(t, ansisql.DBTableTypeView, got.Schemas[0].Tables[1].Type)
-	assert.Equal(t, "SELECT * FROM dbo.orders", got.Schemas[0].Tables[1].ViewDefinition)
+	assert.Equal(t, "SELECT * FROM [dbo].[orders]", got.Schemas[0].Tables[1].ViewDefinition)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
