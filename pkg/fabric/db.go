@@ -3,6 +3,7 @@ package fabric
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -23,6 +24,8 @@ type DB struct {
 	schemaCreator *SchemaCreator
 	typeMapper    *diff.DatabaseTypeMapper
 }
+
+var viewWithColumnListPattern = regexp.MustCompile(`(?is)^\s*CREATE\s+(?:OR\s+ALTER\s+)?VIEW\s+(?:(?:\[[^]]+\]|"(?:[^"]|"")*"|[^\s.(]+)\s*\.\s*)*(?:\[[^]]+\]|"(?:[^"]|"")*"|[^\s.(]+)\s*\(`)
 
 // QuoteIdentifier quotes a Fabric identifier using square brackets.
 // Fabric is case-sensitive, so proper quoting is important.
@@ -452,8 +455,9 @@ WHERE t.TABLE_SCHEMA NOT IN ('sys', 'INFORMATION_SCHEMA')
 		}
 		viewDefinition, _ := fromFabricValue(row[3])
 		if viewDefinition != "" {
-			viewDefinition, err = parser.ExtractSelect(viewDefinition, "fabric")
-			if err != nil {
+			if viewWithColumnListPattern.MatchString(viewDefinition) {
+				viewDefinition = ""
+			} else if viewDefinition, err = parser.ExtractSelect(viewDefinition, "fabric"); err != nil {
 				// Keep an unparseable or truncated view as a non-executable source asset.
 				viewDefinition = ""
 			}
