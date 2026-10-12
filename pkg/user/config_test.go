@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/spf13/afero"
@@ -99,7 +100,12 @@ func TestBruinHomeMigration(t *testing.T) {
 	}
 	require.NoError(t, cm.EnsureVirtualenvDirExists())
 	assert.DirExists(t, cm.MakeVirtualenvPath(""))
+	lockBefore, err := os.Stat(filepath.Join(destination, homeMigrationLock))
+	require.NoError(t, err)
 	require.NoError(t, cm.RecreateHomeDir())
+	lockAfter, err := os.Stat(filepath.Join(destination, homeMigrationLock))
+	require.NoError(t, err)
+	assert.True(t, os.SameFile(lockBefore, lockAfter), "clean must preserve the lock for waiting processes")
 	_, err = NewConfigManager(nil).EnsureAndGetBruinHomeDir()
 	require.NoError(t, err)
 	assert.NoFileExists(t, filepath.Join(destination, "ingestr", "v1", "ingestr"))
@@ -117,17 +123,29 @@ func TestBruinHomeWithoutUserHome(t *testing.T) {
 	assert.DirExists(t, got)
 }
 
-func TestBruinHomeRejectsUserHomeWithTrailingSeparator(t *testing.T) {
+func TestBruinHomeRejectsUserHome(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home+string(filepath.Separator))
-	t.Setenv("USERPROFILE", home+string(filepath.Separator))
-	t.Setenv("BRUIN_HOME", home)
-	file := filepath.Join(home, "keep-me")
-	require.NoError(t, os.WriteFile(file, []byte("keep"), 0o600))
-	cm := NewConfigManager(nil)
-	assert.ErrorContains(t, cm.EnsureHomeDirExists(), "dedicated directory")
-	assert.ErrorContains(t, cm.RecreateHomeDir(), "dedicated directory")
-	assert.FileExists(t, file)
+	alias := strings.ToUpper(home)
+	if runtime.GOOS != "windows" {
+		alias = filepath.Join(t.TempDir(), "home-alias")
+		require.NoError(t, os.Symlink(home, alias))
+	}
+	for name, userHome := range map[string]string{
+		"trailing separator": home + string(filepath.Separator),
+		"same directory":     alias,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Setenv("HOME", userHome)
+			t.Setenv("USERPROFILE", userHome)
+			t.Setenv("BRUIN_HOME", home)
+			file := filepath.Join(home, "keep-me")
+			require.NoError(t, os.WriteFile(file, []byte("keep"), 0o600))
+			cm := NewConfigManager(nil)
+			require.ErrorContains(t, cm.EnsureHomeDirExists(), "dedicated directory")
+			require.ErrorContains(t, cm.RecreateHomeDir(), "dedicated directory")
+			assert.FileExists(t, file)
+		})
+	}
 }
 
 // Simulate another process publishing a file after migration has checked for
@@ -137,7 +155,7 @@ type destinationAppearingFs struct {
 	source, destination string
 }
 
-func (fs destinationAppearingFs) Open(name string) (afero.File, error) {
+func (fs destinationAppearingFs) Open(name string) (afero.File, error) { //nolint:ireturn // implements afero.Fs
 	if name == fs.source {
 		if err := afero.WriteFile(fs.Fs, fs.destination, []byte("newer"), 0o600); err != nil {
 			return nil, err
@@ -151,20 +169,33 @@ func TestBruinHomeMigrationPreservesConcurrentDestination(t *testing.T) {
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
 	destination := filepath.Join(t.TempDir(), "bruin")
-	t.Setenv("BRUIN_HOME", destination)
 	old := filepath.Join(home, ".bruin")
-	require.NoError(t, os.MkdirAll(old, 0o755))
-	source := filepath.Join(old, "uv")
-	target := filepath.Join(destination, "uv")
-	require.NoError(t, os.WriteFile(source, []byte("legacy"), 0o755))
-	source, err := filepath.EvalSymlinks(source)
-	require.NoError(t, err)
-	fs := destinationAppearingFs{Fs: afero.NewOsFs(), source: source, destination: target}
-	_, err = NewConfigManager(fs).EnsureAndGetBruinHomeDir()
-	require.NoError(t, err)
-	contents, err := os.ReadFile(target)
-	require.NoError(t, err)
-	assert.Equal(t, "newer", string(contents))
+	// The memory filesystem exercises the exclusive-copy fallback without
+	// hardlinks, including a destination that appears during migration.
+	for _, fs := range []afero.Fs{afero.NewOsFs(), afero.NewMemMapFs()} {
+		t.Run(fs.Name(), func(t *testing.T) {
+			t.Setenv("BRUIN_HOME", destination)
+			require.NoError(t, fs.MkdirAll(old, 0o755))
+			source := filepath.Join(old, "uv")
+			target := filepath.Join(destination, "uv")
+			require.NoError(t, afero.WriteFile(fs, source, []byte("legacy"), 0o755))
+			require.NoError(t, afero.WriteFile(fs, filepath.Join(old, "another-tool"), []byte("complete"), 0o755))
+			if fs.Name() == "OsFs" {
+				var err error
+				source, err = filepath.EvalSymlinks(source)
+				require.NoError(t, err)
+			}
+			concurrent := destinationAppearingFs{Fs: fs, source: source, destination: target}
+			_, err := NewConfigManager(concurrent).EnsureAndGetBruinHomeDir()
+			require.NoError(t, err)
+			contents, err := afero.ReadFile(fs, target)
+			require.NoError(t, err)
+			assert.Equal(t, "newer", string(contents))
+			contents, err = afero.ReadFile(fs, filepath.Join(destination, "another-tool"))
+			require.NoError(t, err)
+			assert.Equal(t, "complete", string(contents))
+		})
+	}
 }
 
 func TestBruinHomeInsideLegacyHome(t *testing.T) {

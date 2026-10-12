@@ -48,21 +48,33 @@ func (c *ConfigManager) RecreateHomeDir() error {
 		return err
 	}
 
-	err = c.fs.RemoveAll(c.bruinHomeDir)
-	if err != nil {
-		return errors.Wrap(err, "failed to remove bruin home directory")
+	if os.Getenv("BRUIN_HOME") == "" {
+		return errors.Wrap(c.fs.RemoveAll(c.bruinHomeDir), "failed to remove bruin home directory")
 	}
-
-	// Do not restore the legacy cache immediately after cleaning it.
 	err = c.fs.MkdirAll(c.bruinHomeDir, homeDirPermissions)
 	if err != nil {
 		return err
 	}
-	if os.Getenv("BRUIN_HOME") != "" {
-		return afero.WriteFile(c.fs, filepath.Join(c.bruinHomeDir, homeMigrationMarker), nil, 0o600)
+	unlock, err := lockHomeMigration(c.fs, c.bruinHomeDir)
+	if err != nil {
+		return err
 	}
-
-	return nil
+	defer unlock()
+	entries, err := afero.ReadDir(c.fs, c.bruinHomeDir)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		// Keep the same lockfile for processes waiting on this cleanup.
+		if entry.Name() == homeMigrationLock {
+			continue
+		}
+		if err := c.fs.RemoveAll(filepath.Join(c.bruinHomeDir, entry.Name())); err != nil {
+			return errors.Wrap(err, "failed to remove bruin home contents")
+		}
+	}
+	// Do not restore the legacy cache immediately after cleaning it.
+	return afero.WriteFile(c.fs, filepath.Join(c.bruinHomeDir, homeMigrationMarker), nil, 0o600)
 }
 
 func (c *ConfigManager) EnsureAndGetBruinHomeDir() (string, error) {
@@ -94,6 +106,11 @@ func (c *ConfigManager) EnsureHomeDirExists() error {
 	}
 
 	if os.Getenv("BRUIN_HOME") != "" {
+		unlock, err := lockHomeMigration(c.fs, c.bruinHomeDir)
+		if err != nil {
+			return err
+		}
+		defer unlock()
 		marker := filepath.Join(c.bruinHomeDir, homeMigrationMarker)
 		if _, err := c.fs.Stat(marker); os.IsNotExist(err) {
 			if c.userHomeDir != "" {
@@ -123,7 +140,19 @@ func (c *ConfigManager) ensureHomeDirSet() error {
 		if err != nil {
 			return err
 		}
-		if c.bruinHomeDir == filepath.Dir(c.bruinHomeDir) || c.bruinHomeDir == homeDir {
+		sameHome := c.bruinHomeDir == homeDir
+		if !sameHome && homeDir != "" {
+			homeInfo, homeErr := c.fs.Stat(homeDir)
+			targetInfo, targetErr := c.fs.Stat(c.bruinHomeDir)
+			sameHome = homeErr == nil && targetErr == nil && os.SameFile(homeInfo, targetInfo)
+		}
+		target := c.bruinHomeDir
+		if c.fs.Name() == "OsFs" {
+			if resolved, err := filepath.EvalSymlinks(target); err == nil {
+				target = resolved
+			}
+		}
+		if target == filepath.Dir(target) || sameHome {
 			return errors.New("BRUIN_HOME must be a dedicated directory, not the filesystem root or user home")
 		}
 		return nil

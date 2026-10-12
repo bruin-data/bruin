@@ -1,17 +1,34 @@
 package user
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/gofrs/flock"
 	"github.com/spf13/afero"
 )
 
+const homeMigrationLock = ".home-migration.lock"
+
+// Keep the lockfile in place: unlinking it would let waiters lock different
+// inodes. Memory filesystems are already protected by homeMigrationMu.
+func lockHomeMigration(fs afero.Fs, home string) (func(), error) {
+	if fs.Name() != "OsFs" {
+		return func() {}, nil
+	}
+	lock := flock.New(filepath.Join(home, homeMigrationLock))
+	if err := lock.Lock(); err != nil {
+		return nil, fmt.Errorf("failed to lock bruin home migration: %w", err)
+	}
+	return func() { _ = lock.Unlock() }, nil
+}
+
 // copyHomeFiles merges a legacy directory without replacing destination files.
-// Files are published only after a successful copy, so failed copies can retry.
+// Callers hold the home migration lock until all files and markers are ready.
 func copyHomeFiles(fs afero.Fs, source, destination string) error {
 	if _, err := fs.Stat(source); os.IsNotExist(err) {
 		return nil
@@ -39,8 +56,8 @@ func copyHomeFiles(fs afero.Fs, source, destination string) error {
 		if name == destination {
 			return filepath.SkipDir
 		}
-		// Only the destination may mark its own migration complete.
-		if name == filepath.Join(source, homeMigrationMarker) {
+		// Migration state and locks belong to the destination itself.
+		if name == filepath.Join(source, homeMigrationMarker) || name == filepath.Join(source, homeMigrationLock) {
 			return nil
 		}
 		rel, err := filepath.Rel(source, name)
@@ -122,14 +139,32 @@ func copyHomeFile(fs afero.Fs, source, destination string, mode os.FileMode) err
 	}
 	if fs.Name() == "OsFs" {
 		// Publish the completed file atomically without replacing a destination
-		// created by another process while we were copying. The temporary file
-		// is in the same directory, so the hard link stays on one filesystem.
+		// created by another process while we were copying.
 		err := os.Link(out.Name(), destination)
-		if os.IsExist(err) {
+		if err == nil || os.IsExist(err) {
 			return nil
 		}
+	}
+	// Filesystems such as exFAT cannot create hardlinks. Exclusive creation
+	// still preserves destination-wins; the home lock keeps other Bruin
+	// initializers from using the file before this copy finishes.
+	staged, err := fs.Open(out.Name())
+	if err != nil {
 		return err
 	}
-	// In-memory filesystems are protected by homeMigrationMu.
-	return fs.Rename(out.Name(), destination)
+	defer staged.Close()
+	target, err := fs.OpenFile(destination, os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode)
+	if os.IsExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	_, copyErr = io.Copy(target, staged)
+	modeErr := fs.Chmod(destination, mode)
+	closeErr = target.Close()
+	if err := errors.Join(copyErr, modeErr, closeErr); err != nil {
+		return errors.Join(err, fs.Remove(destination))
+	}
+	return nil
 }

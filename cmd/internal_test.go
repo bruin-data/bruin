@@ -358,8 +358,8 @@ print("hello")
 	}
 }
 
-func TestLockAssetDependenciesBruinHome(t *testing.T) {
-	if runtime.GOOS == "windows" {
+func TestLockAssetDependenciesBruinHome(t *testing.T) { //nolint:paralleltest // subprocesses inherit the parent's t.Setenv values
+	if runtime.GOOS == osWindows {
 		t.Skip("uses a shell executable to report the child environment")
 	}
 	t.Setenv("HOME", t.TempDir())
@@ -377,7 +377,7 @@ else
 fi
 `, uv.Version)
 	require.NoError(t, os.WriteFile(filepath.Join(home, "uv"), []byte(script), 0o755))
-	for _, name := range []string{"requirements.txt", "pyproject.toml"} {
+	for _, name := range []string{"requirements.txt", "pyproject.toml"} { //nolint:paralleltest // subprocesses inherit the parent's environment
 		t.Run(name, func(t *testing.T) {
 			project := t.TempDir()
 			require.NoError(t, os.Mkdir(filepath.Join(project, ".git"), 0o755))

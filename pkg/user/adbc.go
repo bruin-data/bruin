@@ -37,6 +37,11 @@ func EnsureADBCDriverConfig(name string) (config.Config, error) {
 	cfg := config.Config{Level: config.ConfigEnv, Location: filepath.Join(home, "adbc")}
 	homeMigrationMu.Lock()
 	defer homeMigrationMu.Unlock()
+	unlock, err := lockHomeMigration(afero.NewOsFs(), home)
+	if err != nil {
+		return cfg, err
+	}
+	defer unlock()
 	manifest := filepath.Join(cfg.Location, name+".toml")
 	if _, err := os.Lstat(manifest); err == nil {
 		return cfg, nil
