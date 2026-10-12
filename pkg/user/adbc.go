@@ -69,8 +69,17 @@ func EnsureADBCDriverConfig(name string) (config.Config, error) {
 	// Clear scalar paths as well as platform tables before rebasing the manifest.
 	driver.Driver.Shared = (config.DriverInfo{}).Driver.Shared
 	driver.Driver.Shared.Set(config.PlatformTuple(), newLibrary)
-	if err := config.CreateManifest(cfg, driver); err != nil {
+	staging, err := os.MkdirTemp(home, ".adbc-migration-*")
+	if err != nil {
+		return cfg, err
+	}
+	defer func() { _ = os.RemoveAll(staging) }()
+	// dbc also creates a compatibility symlink above Location. Keep both
+	// outputs inside staging, then publish the manifest without replacing a
+	// newer installation produced by another process during migration.
+	stagedConfig := config.Config{Level: config.ConfigEnv, Location: filepath.Join(staging, "drivers")}
+	if err := config.CreateManifest(stagedConfig, driver); err != nil {
 		return cfg, fmt.Errorf("failed to relocate %s ADBC manifest: %w", name, err)
 	}
-	return cfg, nil
+	return cfg, copyHomeFile(afero.NewOsFs(), filepath.Join(stagedConfig.Location, name+".toml"), manifest, 0o644)
 }

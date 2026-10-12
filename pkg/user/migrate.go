@@ -77,7 +77,11 @@ func copyHomeFiles(fs afero.Fs, source, destination string) error {
 					link = filepath.Join(destination, rel)
 				}
 			}
-			return fs.(afero.Linker).SymlinkIfPossible(link, target)
+			err = fs.(afero.Linker).SymlinkIfPossible(link, target)
+			if os.IsExist(err) {
+				return nil
+			}
+			return err
 		}
 		if !info.Mode().IsRegular() {
 			return nil
@@ -116,5 +120,16 @@ func copyHomeFile(fs afero.Fs, source, destination string, mode os.FileMode) err
 	if err := fs.Chmod(out.Name(), mode); err != nil {
 		return err
 	}
+	if fs.Name() == "OsFs" {
+		// Publish the completed file atomically without replacing a destination
+		// created by another process while we were copying. The temporary file
+		// is in the same directory, so the hard link stays on one filesystem.
+		err := os.Link(out.Name(), destination)
+		if os.IsExist(err) {
+			return nil
+		}
+		return err
+	}
+	// In-memory filesystems are protected by homeMigrationMu.
 	return fs.Rename(out.Name(), destination)
 }

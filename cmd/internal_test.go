@@ -1,14 +1,18 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/uv"
 	"github.com/spf13/afero"
+	"github.com/stretchr/testify/require"
 )
 
 func TestConnectionDatabase(t *testing.T) {
@@ -351,5 +355,39 @@ print("hello")
 
 	if !strings.Contains(err.Error(), "no dependency configuration found") {
 		t.Errorf("FindDependencyPath() error = %v, want error containing 'no dependency configuration found'", err)
+	}
+}
+
+func TestLockAssetDependenciesBruinHome(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses a shell executable to report the child environment")
+	}
+	t.Setenv("HOME", t.TempDir())
+	home := t.TempDir()
+	t.Setenv("BRUIN_HOME", home)
+	t.Setenv("UV_CACHE_DIR", "")
+	t.Setenv("UV_PYTHON_INSTALL_DIR", "/explicit-python")
+	// Stand in for the installed uv binary, reporting the environment used by
+	// the public locking command without downloading tools or dependencies.
+	script := fmt.Sprintf(`#!/bin/sh
+if [ "$1" = self ]; then
+  printf '%%s\n' '{"version":"%s"}'
+else
+  printf '%%s\n' "$UV_CACHE_DIR" "$UV_PYTHON_INSTALL_DIR" > lock-env
+fi
+`, uv.Version)
+	require.NoError(t, os.WriteFile(filepath.Join(home, "uv"), []byte(script), 0o755))
+	for _, name := range []string{"requirements.txt", "pyproject.toml"} {
+		t.Run(name, func(t *testing.T) {
+			project := t.TempDir()
+			require.NoError(t, os.Mkdir(filepath.Join(project, ".git"), 0o755))
+			dependency := filepath.Join(project, name)
+			require.NoError(t, os.WriteFile(dependency, nil, 0o600))
+			err := LockAssetDependencies().Run(t.Context(), []string{"lock-asset-dependencies", dependency})
+			require.NoError(t, err)
+			contents, err := os.ReadFile(filepath.Join(project, "lock-env"))
+			require.NoError(t, err)
+			require.Equal(t, filepath.Join(home, "uv-cache")+"\n/explicit-python\n", string(contents))
+		})
 	}
 }

@@ -111,6 +111,12 @@ func (c *ConfigManager) EnsureHomeDirExists() error {
 
 func (c *ConfigManager) ensureHomeDirSet() error {
 	homeDir, err := os.UserHomeDir()
+	if homeDir != "" {
+		homeDir, err = filepath.Abs(homeDir)
+		if err != nil {
+			return err
+		}
+	}
 	c.userHomeDir = homeDir
 	if override := os.Getenv("BRUIN_HOME"); override != "" {
 		c.bruinHomeDir, err = filepath.Abs(override)

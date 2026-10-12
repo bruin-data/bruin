@@ -117,6 +117,56 @@ func TestBruinHomeWithoutUserHome(t *testing.T) {
 	assert.DirExists(t, got)
 }
 
+func TestBruinHomeRejectsUserHomeWithTrailingSeparator(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home+string(filepath.Separator))
+	t.Setenv("USERPROFILE", home+string(filepath.Separator))
+	t.Setenv("BRUIN_HOME", home)
+	file := filepath.Join(home, "keep-me")
+	require.NoError(t, os.WriteFile(file, []byte("keep"), 0o600))
+	cm := NewConfigManager(nil)
+	assert.ErrorContains(t, cm.EnsureHomeDirExists(), "dedicated directory")
+	assert.ErrorContains(t, cm.RecreateHomeDir(), "dedicated directory")
+	assert.FileExists(t, file)
+}
+
+// Simulate another process publishing a file after migration has checked for
+// its existence but before it has read the legacy contents.
+type destinationAppearingFs struct {
+	afero.Fs
+	source, destination string
+}
+
+func (fs destinationAppearingFs) Open(name string) (afero.File, error) {
+	if name == fs.source {
+		if err := afero.WriteFile(fs.Fs, fs.destination, []byte("newer"), 0o600); err != nil {
+			return nil, err
+		}
+	}
+	return fs.Fs.Open(name)
+}
+
+func TestBruinHomeMigrationPreservesConcurrentDestination(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	destination := filepath.Join(t.TempDir(), "bruin")
+	t.Setenv("BRUIN_HOME", destination)
+	old := filepath.Join(home, ".bruin")
+	require.NoError(t, os.MkdirAll(old, 0o755))
+	source := filepath.Join(old, "uv")
+	target := filepath.Join(destination, "uv")
+	require.NoError(t, os.WriteFile(source, []byte("legacy"), 0o755))
+	source, err := filepath.EvalSymlinks(source)
+	require.NoError(t, err)
+	fs := destinationAppearingFs{Fs: afero.NewOsFs(), source: source, destination: target}
+	_, err = NewConfigManager(fs).EnsureAndGetBruinHomeDir()
+	require.NoError(t, err)
+	contents, err := os.ReadFile(target)
+	require.NoError(t, err)
+	assert.Equal(t, "newer", string(contents))
+}
+
 func TestBruinHomeInsideLegacyHome(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
