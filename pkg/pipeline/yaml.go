@@ -287,6 +287,7 @@ type columnForeignKey struct {
 }
 
 type column struct {
+	Inference     *ColumnInference  `yaml:"inference"`
 	Extends       string            `yaml:"extends"`
 	Name          string            `yaml:"name"`
 	SourceColumn  string            `yaml:"source_column"`
@@ -585,6 +586,7 @@ func taskDefinitionToAsset(definition taskDefinition) (*Asset, error) {
 		}
 
 		columns[index] = Column{
+			Inference:       column.Inference,
 			Name:            column.Name,
 			SourceColumn:    column.SourceColumn,
 			Type:            strings.TrimSpace(column.Type),
