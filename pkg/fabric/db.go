@@ -408,9 +408,11 @@ func (db *DB) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, erro
 	}
 
 	const schemaQuery = `
-SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE
-FROM INFORMATION_SCHEMA.TABLES
-WHERE TABLE_SCHEMA NOT IN ('sys', 'INFORMATION_SCHEMA')
+SELECT t.TABLE_SCHEMA, t.TABLE_NAME, t.TABLE_TYPE, v.VIEW_DEFINITION
+FROM INFORMATION_SCHEMA.TABLES t
+LEFT JOIN INFORMATION_SCHEMA.VIEWS v
+    ON t.TABLE_SCHEMA = v.TABLE_SCHEMA AND t.TABLE_NAME = v.TABLE_NAME
+WHERE t.TABLE_SCHEMA NOT IN ('sys', 'INFORMATION_SCHEMA')
 `
 
 	tables, err := db.Select(ctx, &query.Query{Query: schemaQuery})
@@ -425,7 +427,7 @@ WHERE TABLE_SCHEMA NOT IN ('sys', 'INFORMATION_SCHEMA')
 	schemaCache := make(map[string]*ansisql.DBSchema)
 
 	for _, row := range tables {
-		if len(row) < 3 {
+		if len(row) < 4 {
 			continue
 		}
 
@@ -441,6 +443,7 @@ WHERE TABLE_SCHEMA NOT IN ('sys', 'INFORMATION_SCHEMA')
 		if !ok {
 			continue
 		}
+		viewDefinition, _ := fromFabricValue(row[3])
 
 		schema, ok := schemaCache[schemaName]
 		if !ok {
@@ -458,8 +461,9 @@ WHERE TABLE_SCHEMA NOT IN ('sys', 'INFORMATION_SCHEMA')
 		}
 
 		schema.Tables = append(schema.Tables, &ansisql.DBTable{
-			Name: tableName,
-			Type: dbTableType,
+			Name:           tableName,
+			Type:           dbTableType,
+			ViewDefinition: viewDefinition,
 		})
 	}
 

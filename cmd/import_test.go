@@ -234,6 +234,50 @@ func TestCreateAsset(t *testing.T) {
 			},
 		},
 		{
+			name:        "dremio view asset creation",
+			schemaName:  "analytics",
+			tableName:   "active_users",
+			assetType:   pipeline.AssetTypeDremioSource,
+			fillColumns: false,
+			table: &ansisql.DBTable{
+				Name:           "active_users",
+				Type:           ansisql.DBTableTypeView,
+				ViewDefinition: "SELECT * FROM analytics.users WHERE active",
+			},
+			want: &pipeline.Asset{
+				Name: "analytics.active_users",
+				Type: pipeline.AssetTypeDremioQuery,
+				ExecutableFile: pipeline.ExecutableFile{
+					Name:    "active_users.sql",
+					Path:    filepath.Join(testAssetsPath, "analytics", "active_users.sql"),
+					Content: "SELECT * FROM analytics.users WHERE active",
+				},
+				Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeView},
+			},
+		},
+		{
+			name:        "fabric view asset creation",
+			schemaName:  "dbo",
+			tableName:   "active_users",
+			assetType:   pipeline.AssetTypeFabricSource,
+			fillColumns: false,
+			table: &ansisql.DBTable{
+				Name:           "active_users",
+				Type:           ansisql.DBTableTypeView,
+				ViewDefinition: "SELECT * FROM dbo.users WHERE active = 1",
+			},
+			want: &pipeline.Asset{
+				Name: "dbo.active_users",
+				Type: pipeline.AssetTypeFabricQuery,
+				ExecutableFile: pipeline.ExecutableFile{
+					Name:    "active_users.sql",
+					Path:    filepath.Join(testAssetsPath, "dbo", "active_users.sql"),
+					Content: "SELECT * FROM dbo.users WHERE active = 1",
+				},
+				Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeView},
+			},
+		},
+		{
 			name:        "asset with database description and owner",
 			schemaName:  "public",
 			tableName:   "customers",
