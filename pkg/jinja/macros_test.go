@@ -3,6 +3,8 @@ package jinja
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -11,6 +13,70 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 )
+
+func TestMacroLoadersRejectSymlinks(t *testing.T) {
+	t.Parallel()
+	for _, kind := range []string{"file", "directory", "root", "ancestor"} {
+		t.Run(kind, func(t *testing.T) {
+			t.Parallel()
+			root, err := filepath.EvalSymlinks(t.TempDir())
+			require.NoError(t, err)
+			outside := filepath.Join(root, "outside")
+			require.NoError(t, os.Mkdir(outside, 0o700))
+			require.NoError(t, os.WriteFile(filepath.Join(outside, "secret.sql"), []byte("outside-secret-sentinel"), 0o600))
+			macrosPath := filepath.Join(root, "repo", "macros")
+			require.NoError(t, os.MkdirAll(macrosPath, 0o700))
+			switch kind {
+			case "file":
+				require.NoError(t, os.Symlink(filepath.Join(outside, "secret.sql"), filepath.Join(macrosPath, "leak.sql")))
+			case "directory":
+				require.NoError(t, os.Symlink(outside, filepath.Join(macrosPath, "linked")))
+			case "root":
+				require.NoError(t, os.Remove(macrosPath))
+				require.NoError(t, os.Symlink(outside, macrosPath))
+			case "ancestor":
+				require.NoError(t, os.Mkdir(filepath.Join(outside, "macros"), 0o700))
+				require.NoError(t, os.WriteFile(filepath.Join(outside, "macros", "secret.sql"), []byte("outside-secret-sentinel"), 0o600))
+				require.NoError(t, os.Symlink(outside, filepath.Join(root, "repo", "linked")))
+				macrosPath = filepath.Join(root, "repo", "linked", "macros")
+			}
+			macros, err := pipeline.LoadMacrosFromPath(macrosPath, afero.NewOsFs())
+			require.Error(t, err)
+			require.Empty(t, macros)
+			content, err := LoadMacros(afero.NewOsFs(), macrosPath)
+			require.Error(t, err)
+			require.Empty(t, content)
+			definition := filepath.Join(filepath.Dir(macrosPath), "pipeline.yml")
+			require.NoError(t, os.WriteFile(definition, []byte("name: test\n"), 0o600))
+			pipe, err := pipeline.PipelineFromPath(definition, afero.NewOsFs())
+			require.Error(t, err)
+			require.Nil(t, pipe)
+		})
+	}
+}
+
+func TestMacroLoadersPreserveDirectoryScope(t *testing.T) {
+	t.Parallel()
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, os.Mkdir(filepath.Join(root, "nested"), 0o700))
+	require.NoError(t, os.Mkdir(filepath.Join(root, ".git"), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "a.sql"), []byte("top-level"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "nested", "b.sql"), []byte("nested"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(root, ".git", "ignored.sql"), []byte("ignored"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "ignored.txt"), []byte("ignored"), 0o600))
+	macros, err := pipeline.LoadMacrosFromPath(root, afero.NewOsFs())
+	require.NoError(t, err)
+	require.Equal(t, []pipeline.Macro{"top-level", "nested"}, macros)
+	content, err := LoadMacros(afero.NewOsFs(), root)
+	require.NoError(t, err)
+	require.Equal(t, "top-level\n", content)
+	// CacheOnReadFs cannot report symlink metadata, so it must fail closed.
+	cache := afero.NewCacheOnReadFs(afero.NewOsFs(), afero.NewMemMapFs(), 0)
+	content, err = LoadMacros(cache, root)
+	require.Error(t, err)
+	require.Empty(t, content)
+}
 
 func TestLoadMacros(t *testing.T) {
 	t.Parallel()

@@ -41,32 +41,14 @@ type Context map[string]any
 
 // LoadMacros loads all macro files from the given directory and returns them as a single string.
 func LoadMacros(fs afero.Fs, macrosPath string) (string, error) {
-	exists, err := afero.DirExists(fs, macrosPath)
+	macros, err := pipeline.LoadMacros(fs, macrosPath, false)
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to check if macros directory exists: %s", macrosPath)
-	}
-	if !exists {
-		return "", nil
-	}
-
-	entries, err := afero.ReadDir(fs, macrosPath)
-	if err != nil {
-		return "", errors.Wrapf(err, "failed to read macros directory: %s", macrosPath)
+		return "", errors.Wrapf(err, "failed to load macros from %s", macrosPath)
 	}
 
 	var macroContent strings.Builder
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".sql") {
-			continue
-		}
-
-		filePath := filepath.Join(macrosPath, entry.Name())
-		content, err := afero.ReadFile(fs, filePath)
-		if err != nil {
-			return "", errors.Wrapf(err, "failed to read macro file: %s", filePath)
-		}
-
-		macroContent.Write(content)
+	for _, macro := range macros {
+		macroContent.WriteString(string(macro))
 		macroContent.WriteString("\n")
 	}
 

@@ -103,7 +103,7 @@ func UnitTest() *cli.Command {
 			passed, failed := 0, 0
 			for _, target := range targets {
 				// Macros are per-pipeline, so load them for each pipeline tested.
-				macroContent, err := jinja.LoadMacros(fs, target.pipeline.MacrosPath)
+				macroContent, err := jinja.LoadMacros(pipelineBuilderFs, target.pipeline.MacrosPath)
 				if err != nil {
 					printError(err, "", "Failed to load macros:")
 					return cli.Exit("", 1)
