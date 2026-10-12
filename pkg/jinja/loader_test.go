@@ -13,6 +13,7 @@ import (
 )
 
 func TestRepositoryTemplates(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(root, "parts"), 0o755))
 	for name, source := range map[string]string{
@@ -25,7 +26,6 @@ func TestRepositoryTemplates(t *testing.T) {
 	} {
 		require.NoError(t, os.WriteFile(filepath.Join(root, name), []byte(source), 0o600))
 	}
-	r := NewRenderer(Context{}).WithRepositoryRoot(root)
 	for source, expected := range map[string]string{
 		`{% include 'parts/parent.sql' %}`:                                  "shared-value",
 		`{% include 'parts/value.sql' %}`:                                   "repo-value",
@@ -35,6 +35,8 @@ func TestRepositoryTemplates(t *testing.T) {
 		`{% extends 'parts/base.sql' %}{% block body %}child{% endblock %}`: "before:child:after",
 	} {
 		t.Run(source, func(t *testing.T) {
+			t.Parallel()
+			r := NewRenderer(Context{}).WithRepositoryRoot(root)
 			actual, err := r.Render(source)
 			require.NoError(t, err)
 			require.Equal(t, expected, actual)
@@ -43,6 +45,7 @@ func TestRepositoryTemplates(t *testing.T) {
 }
 
 func TestTemplateFileAccessDenied(t *testing.T) {
+	t.Parallel()
 	parent := t.TempDir()
 	root := filepath.Join(parent, "repo")
 	require.NoError(t, os.MkdirAll(filepath.Join(root, "parts"), 0o755))
@@ -61,6 +64,7 @@ func TestTemplateFileAccessDenied(t *testing.T) {
 		} {
 			source := fmt.Sprintf(directive, path)
 			t.Run(source, func(t *testing.T) {
+				t.Parallel()
 				out, err := NewRenderer(Context{}).WithRepositoryRoot(root).Render(source)
 				require.Error(t, err)
 				require.Empty(t, out)
@@ -76,13 +80,19 @@ func TestTemplateFileAccessDenied(t *testing.T) {
 	out, err = NewRenderer(Context{}).WithRepositoryRoot(rootLink).Render(`{% include 'local.sql' %}`)
 	require.Error(t, err)
 	require.Empty(t, out)
-	for _, render := range []pipeline.RenderFunc{NewRenderer(Context{}).Render, VariantRendererFactory(nil, "test")} {
-		out, err := render(fmt.Sprintf("{%% include %q %%}", secret))
-		require.Error(t, err)
-		require.Empty(t, out)
-		out, err = render("{{ 2 + 3 }}")
-		require.NoError(t, err)
-		require.Equal(t, "5", out)
+	out, err = NewRenderer(Context{}).WithRepositoryRoot(rootLink).Render(`SELECT {{ 2 + 3 }}`)
+	require.NoError(t, err)
+	require.Equal(t, "SELECT 5", out)
+	for name, render := range map[string]pipeline.RenderFunc{"default": NewRenderer(Context{}).Render, "variant": VariantRendererFactory(nil, "test")} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			out, err := render(fmt.Sprintf("{%% include %q %%}", secret))
+			require.Error(t, err)
+			require.Empty(t, out)
+			out, err = render("{{ 2 + 3 }}")
+			require.NoError(t, err)
+			require.Equal(t, "5", out)
+		})
 	}
 	pipe := &pipeline.Pipeline{
 		Name:     fmt.Sprintf("{%% include %q %%}", secret),
@@ -93,15 +103,17 @@ func TestTemplateFileAccessDenied(t *testing.T) {
 }
 
 func TestCloneForAssetRepositoryScope(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	require.NoError(t, os.Mkdir(filepath.Join(root, ".git"), 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(root, "value.sql"), []byte("repo-value"), 0o600))
 	pipe := &pipeline.Pipeline{Name: "test"}
 	pipe.DefinitionFile.Path = filepath.Join(root, "pipelines", "pipeline.yml")
 	ctx := context.Background()
-	for _, key := range []pipeline.RunConfig{pipeline.RunConfigStartDate, pipeline.RunConfigEndDate, pipeline.RunConfigExecutionDate} {
-		ctx = context.WithValue(ctx, key, time.Now())
-	}
+	now := time.Now()
+	ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, now)
+	ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, now)
+	ctx = context.WithValue(ctx, pipeline.RunConfigExecutionDate, now)
 	ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test")
 	r, err := NewRenderer(Context{}).CloneForAsset(ctx, pipe, &pipeline.Asset{})
 	require.NoError(t, err)

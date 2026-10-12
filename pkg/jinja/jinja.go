@@ -158,10 +158,12 @@ func (r *Renderer) SetContextValue(key string, value any) {
 
 // WithRepositoryRoot enables repository-relative template files. The root must
 // come from the caller's trusted checkout location, never from template input.
-// Without a root, all template file access is denied.
+// Without a root, all template file access is denied. It returns a copy so
+// independently scoped renders do not change the original renderer.
 func (r *Renderer) WithRepositoryRoot(root string) *Renderer {
-	r.repositoryRoot = root
-	return r
+	clone := *r
+	clone.repositoryRoot = root
+	return &clone
 }
 
 // NewRendererWithStartEndDatesAndMacros creates a new Renderer with the given dates, context, and macro content.
@@ -213,12 +215,12 @@ func NewRendererWithYesterday(pipelineName, runID string) *Renderer {
 func (r *Renderer) Render(query string) (string, error) {
 	var root *os.Root
 	if r.repositoryRoot != "" {
-		var err error
-		root, err = openRepositoryRoot(r.repositoryRoot)
-		if err != nil {
-			return "", errors.Wrap(err, "failed to open template repository")
+		// An unavailable or symlinked root disables file access, but must not
+		// prevent rendering inline SQL that needs no filesystem access.
+		root, _ = openRepositoryRoot(r.repositoryRoot)
+		if root != nil {
+			defer root.Close()
 		}
-		defer root.Close()
 	}
 	r.queryRenderLock.Lock()
 
