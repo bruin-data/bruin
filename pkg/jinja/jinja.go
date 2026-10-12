@@ -2,6 +2,7 @@ package jinja
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/date"
+	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/nikolalohinski/gonja/v2"
 	"github.com/nikolalohinski/gonja/v2/exec"
@@ -21,6 +23,7 @@ type Renderer struct {
 	context         *exec.Context
 	queryRenderLock *sync.Mutex
 	macroContent    string
+	repositoryRoot  string
 }
 
 func init() { //nolint: gochecknoinits
@@ -153,6 +156,14 @@ func (r *Renderer) SetContextValue(key string, value any) {
 	r.context.Set(key, value)
 }
 
+// WithRepositoryRoot enables repository-relative template files. The root must
+// come from the caller's trusted checkout location, never from template input.
+// Without a root, all template file access is denied.
+func (r *Renderer) WithRepositoryRoot(root string) *Renderer {
+	r.repositoryRoot = root
+	return r
+}
+
 // NewRendererWithStartEndDatesAndMacros creates a new Renderer with the given dates, context, and macro content.
 func NewRendererWithStartEndDatesAndMacros(startDate, endDate, executionDate *time.Time, pipelineName, runID string, vars Context, macroContent string) *Renderer {
 	ctx := defaultContext(startDate, endDate, executionDate, pipelineName, runID, false)
@@ -200,6 +211,15 @@ func NewRendererWithYesterday(pipelineName, runID string) *Renderer {
 }
 
 func (r *Renderer) Render(query string) (string, error) {
+	var root *os.Root
+	if r.repositoryRoot != "" {
+		var err error
+		root, err = openRepositoryRoot(r.repositoryRoot)
+		if err != nil {
+			return "", errors.Wrap(err, "failed to open template repository")
+		}
+		defer root.Close()
+	}
 	r.queryRenderLock.Lock()
 
 	// Prepend macro content so its definitions are available to the query, separated
@@ -214,7 +234,7 @@ func (r *Renderer) Render(query string) (string, error) {
 		fullQuery = preamble + query
 	}
 
-	tpl, err := gonja.FromString(fullQuery)
+	tpl, err := templateFromString(fullQuery, root)
 	if err != nil {
 		customError := findParserErrorType(err)
 		if customError != "" && outputMarker != "" {
@@ -222,7 +242,7 @@ func (r *Renderer) Render(query string) (string, error) {
 			// Parse the query by itself after a recognized EOF error so the location we
 			// return refers to the template the user supplied. If the query parses on its
 			// own, keep the original error because it came from the macro preamble.
-			if _, queryErr := gonja.FromString(query); queryErr != nil {
+			if _, queryErr := templateFromString(query, root); queryErr != nil {
 				if queryCustomError := findParserErrorType(queryErr); queryCustomError != "" {
 					customError = queryCustomError
 				}
@@ -316,6 +336,13 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 		macroContent = pipelineMacroContent(pipe)
 	}
 
+	repositoryRoot := r.repositoryRoot
+	if repositoryRoot == "" && pipe.DefinitionFile.Path != "" {
+		if repo, err := git.FindRepoFromPath(filepath.Dir(pipe.DefinitionFile.Path)); err == nil {
+			repositoryRoot = repo.Path
+		}
+	}
+
 	applyModifiers, ok := ctx.Value(pipeline.RunConfigApplyIntervalModifiers).(bool)
 	if ok && applyModifiers {
 		tempContext := defaultContext(&startDate, &endDate, &executionDate, pipe.Name, ctx.Value(pipeline.RunConfigRunID).(string), fullRefresh)
@@ -325,6 +352,7 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 			context:         exec.NewContext(tempContext),
 			queryRenderLock: &sync.Mutex{},
 			macroContent:    macroContent,
+			repositoryRoot:  repositoryRoot,
 		}
 		// Use non-mutating template resolution to avoid modifying the original asset
 		resolvedStartModifier, err := asset.IntervalModifiers.Start.ResolveTemplateToNew(tempRenderer)
@@ -355,6 +383,7 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 		context:         exec.NewContext(jinjaContext),
 		queryRenderLock: &sync.Mutex{},
 		macroContent:    macroContent,
+		repositoryRoot:  repositoryRoot,
 	}, nil
 }
 

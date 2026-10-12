@@ -60,6 +60,18 @@ GROUP BY 1,2
 
 You can read more about [Jinja here](https://jinja.palletsprojects.com/en/3.1.x/).
 
+## Template files
+
+SQL asset templates can use `include`, `import`, `from`, and `extends` to load
+regular files inside the asset's Git repository. Paths in the asset template
+are relative to the repository root; paths in loaded templates are relative to
+that template's directory. Absolute paths, paths outside the repository, and
+symlinked files or directories are not allowed.
+
+Renderers without a repository root cannot load template files. This includes
+build-time variant rendering. Go callers can explicitly scope a renderer with
+`WithRepositoryRoot(root)`, where `root` is the trusted checkout directory.
+
 ## Builtin variables
 
 Bruin injects various variables by default, including date/time values (`start_date`, `end_date`, `execution_date` and their `_datetime`, `_timestamp`, and `_nodash` variants), pipeline metadata (`pipeline`, `run_id`, `commit_hash`), and the `full_refresh` flag.
