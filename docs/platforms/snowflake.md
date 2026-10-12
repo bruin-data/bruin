@@ -255,6 +255,30 @@ cat rsa_key.p8
           region: "eu-west1" # required
 ```
 
+### Custom Host and Port
+
+For native Snowflake SQL assets and built-in column checks, you can override the
+endpoint with optional `host` and `port` fields:
+
+```yaml
+    connections:
+      snowflake:
+        - name: "connection_name"
+          account: "organization-account"
+          username: "sfuser"
+          password: "your-password"
+          region: "eu-west1"
+          database: "dev"
+          host: "snowflake.example.com"
+          port: 8443
+```
+
+Set `host` to a hostname or IP address without a URL scheme or port. The `account`
+field is still required for authentication. If omitted, `host` is derived from
+the account and region, and `port` defaults to `443`. Connections use HTTPS;
+these options do not enable plain HTTP endpoints. They apply to the native Go
+driver, not `ingestr` assets.
+
 ### Key-Pair Authentication
 
 For key-pair authentication, first generate a private/public key pair and register the public key with your Snowflake user. Then configure Bruin with the private key. Bruin can read the private key from a file path or directly from the `.bruin.yml` file. If the private key is encrypted, put the passphrase in `password`.

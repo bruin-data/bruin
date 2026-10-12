@@ -99,6 +99,8 @@ def run(cmd):
             r = m.freeze_time(c["query"], c.get("dialect"), c.get("execution_time"))
         elif k == "hoist-declares":
             r = m.hoist_declares(c["query"], c.get("dialect"))
+        elif k == "hoist-declares-list":
+            r = m.hoist_declares_list(c["queries"], c.get("dialect"))
         else:
             raise Exception("invalid cmd")
         # Normalize through JSON exactly like the command loop.
