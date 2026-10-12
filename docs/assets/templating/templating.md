@@ -61,7 +61,7 @@ GROUP BY 1,2
 You can read more about [Jinja here](https://jinja.palletsprojects.com/en/3.1.x/).
 
 ::: info Reusing templates
-You can include other templates or import macros into your SQL assets, as long as the files are in the same repository. Use paths relative to the repository root. Symlinks are not supported.
+You can include other templates or import macros into your SQL assets, as long as the files are in the same repository. Symlinks are not supported.
 :::
 
 ## Builtin variables
