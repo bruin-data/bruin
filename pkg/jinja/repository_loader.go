@@ -2,6 +2,7 @@ package jinja
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -28,14 +29,14 @@ func openRepositoryRoot(path string) (*os.Root, error) {
 		return nil, err
 	}
 	if info.Mode()&os.ModeSymlink != 0 {
-		return nil, fmt.Errorf("symlinks are not allowed in the template repository root")
+		return nil, errors.New("symlinks are not allowed in the template repository root")
 	}
 	return os.OpenRoot(path)
 }
 
 func (l *repositoryLoader) Resolve(name string) (string, error) {
 	if l.root == nil {
-		return "", fmt.Errorf("template file access requires a repository root")
+		return "", errors.New("template file access requires a repository root")
 	}
 	var relative string
 	if strings.HasPrefix(name, templateFileID) {
