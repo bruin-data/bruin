@@ -21,6 +21,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/urfave/cli/v3"
 )
 
 func TestParseQueryVars(t *testing.T) {
@@ -1162,4 +1163,59 @@ func TestCloudQuerierSelectWithSchema(t *testing.T) {
 		require.NoError(t, err)
 		assert.Len(t, res.Rows, 2)
 	})
+}
+
+func writeCloudQueryConfig(t *testing.T, bruinConnections string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), ".bruin.yml")
+	content := "environments:\n  default:\n    connections:\n      postgres:\n        - name: warehouse\n          use_cloud: true\n" + bruinConnections
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
+	return path
+}
+
+func runCloudQuery(t *testing.T, configPath string, extraArgs ...string) (string, error) {
+	t.Helper()
+	var authorization string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authorization = r.Header.Get("Authorization")
+		_ = json.NewEncoder(w).Encode(map[string]any{"columns": []string{"n"}, "rows": [][]any{{1}}})
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
+	t.Setenv("BRUIN_CLOUD_AGENT_ID", "9")
+	t.Setenv("BRUIN_CLOUD_API_KEY", "")
+
+	args := append([]string{"query", "--config-file", configPath, "--connection", "warehouse", "--query", "SELECT 1", "--output", "json"}, extraArgs...)
+	cmd := Query()
+	cmd.ExitErrHandler = func(context.Context, *cli.Command, error) {}
+	err := cmd.Run(t.Context(), args)
+	return authorization, err
+}
+
+func TestCloudQueryAPIKey(t *testing.T) { //nolint:paralleltest // uses t.Setenv
+	bruinToken := "      bruin:\n        - name: agent-cloud-cli-token\n          api_token: yml-token\n"
+
+	tests := []struct {
+		name          string
+		bruin         string
+		args          []string
+		authorization string
+	}{
+		{name: "falls back to the bruin connection in .bruin.yml", bruin: bruinToken, authorization: "Bearer yml-token"},
+		{name: "the flag wins over .bruin.yml", bruin: bruinToken, args: []string{"--cloud-api-key", "flag-token"}, authorization: "Bearer flag-token"},
+		{name: "fails without any key"},
+		{name: "does not send the token to a different Cloud API", bruin: bruinToken + "          api_url: https://other.example.com\n"},
+	}
+
+	for _, tt := range tests { //nolint:paralleltest
+		t.Run(tt.name, func(t *testing.T) {
+			authorization, err := runCloudQuery(t, writeCloudQueryConfig(t, tt.bruin), tt.args...)
+			if tt.authorization == "" {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, tt.authorization, authorization)
+		})
+	}
 }
