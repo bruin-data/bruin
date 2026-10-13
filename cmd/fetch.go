@@ -20,6 +20,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/bruincloud"
+	"github.com/bruin-data/bruin/pkg/cloudauth"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
@@ -540,7 +541,7 @@ func (q *cloudQuerier) SelectWithSchema(ctx context.Context, qq *query.Query) (*
 // The SQL is sent verbatim: cloud query mode does not accept template variables
 // (--var is ignored), so there is nothing to render or interpolate. The agent id
 // and API key come from --cloud-agent-id / --cloud-api-key (or their env vars).
-func prepareCloudQueryExecution(c *cli.Command) (string, interface{}, string, string, *ppInfo, error) {
+func prepareCloudQueryExecution(c *cli.Command, cm *config.Config) (string, interface{}, string, string, *ppInfo, error) {
 	if hasSemanticQueryFlags(c) {
 		return "", nil, "", "", nil, errors.New("semantic queries are not supported in cloud query mode")
 	}
@@ -551,9 +552,9 @@ func prepareCloudQueryExecution(c *cli.Command) (string, interface{}, string, st
 		return "", nil, "", "", nil, errors.New("cloud query mode requires both --connection and --query")
 	}
 
-	apiKey := c.String("cloud-api-key")
-	if apiKey == "" {
-		return "", nil, "", "", nil, errors.New("cloud query mode requires a Bruin Cloud API key (--cloud-api-key or BRUIN_CLOUD_API_KEY)")
+	apiKey, err := cloudQueryAPIKey(c, cm)
+	if err != nil {
+		return "", nil, "", "", nil, err
 	}
 
 	agentID := c.Int("cloud-agent-id")
@@ -570,9 +571,29 @@ func prepareCloudQueryExecution(c *cli.Command) (string, interface{}, string, st
 	return connectionName, querier, queryStr, "", nil, nil
 }
 
+// cloudQueryAPIKey falls back to the bruin connection in .bruin.yml, like the cloud commands do.
+func cloudQueryAPIKey(c *cli.Command, cm *config.Config) (string, error) {
+	if apiKey := c.String("cloud-api-key"); apiKey != "" {
+		return apiKey, nil
+	}
+	if cm != nil {
+		ref, err := cm.ResolveCloudConnection()
+		if err != nil {
+			return "", err
+		}
+		if ref != nil {
+			if err := cloudauth.CheckDestination(ref.Connection.APIURL, cloudauth.APIURL()); err != nil {
+				return "", err
+			}
+			return ref.Connection.APIToken, nil
+		}
+	}
+	return "", errors.New("cloud query mode requires a Bruin Cloud API key (--cloud-api-key, BRUIN_CLOUD_API_KEY, or a bruin connection in .bruin.yml)")
+}
+
 func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, vars map[string]any) (string, interface{}, string, string, *ppInfo, error) {
 	if c.Bool("cloud") {
-		return prepareCloudQueryExecution(c)
+		return prepareCloudQueryExecution(c, nil)
 	}
 
 	assetPath := c.String("asset")
@@ -602,12 +623,12 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, var
 		// A connection marked use_cloud: true routes through the Bruin Cloud query
 		// service. Detect it before building the connection manager, since a
 		// cloud-only connection may omit local credentials.
-		useCloud, err := connectionUsesCloud(fs, env, connectionName, c.String("config-file"))
+		cm, useCloud, err := connectionUsesCloud(fs, env, connectionName, c.String("config-file"))
 		if err != nil {
 			return "", nil, "", "", nil, err
 		}
 		if useCloud {
-			return prepareCloudQueryExecution(c)
+			return prepareCloudQueryExecution(c, cm)
 		}
 
 		conn, connType, err := getConnectionAndTypeFromConfigWithContext(ctx, env, connectionName, fs, c.String("config-file"))
@@ -1063,18 +1084,18 @@ func loadQueryConfig(fs afero.Fs, env string, configFilePath string) (*config.Co
 // credentials and would otherwise fail credential validation. A missing config
 // or unknown connection is not an error here: the caller falls through to the
 // local path, which produces the appropriate not-found error.
-func connectionUsesCloud(fs afero.Fs, env string, connectionName string, configFilePath string) (bool, error) {
+func connectionUsesCloud(fs afero.Fs, env string, connectionName string, configFilePath string) (*config.Config, bool, error) {
 	cm, _, err := loadQueryConfig(fs, env, configFilePath)
 	if err != nil {
-		return false, err
+		return nil, false, err
 	}
 	if cm.SelectedEnvironment == nil || cm.SelectedEnvironment.Connections == nil {
-		return false, nil
+		return cm, false, nil
 	}
 	if cc, ok := cm.SelectedEnvironment.Connections.GetConnection(connectionName).(interface{ IsCloud() bool }); ok {
-		return cc.IsCloud(), nil
+		return cm, cc.IsCloud(), nil
 	}
-	return false, nil
+	return cm, false, nil
 }
 
 func getConnectionAndTypeFromConfigWithContext(ctx context.Context, env string, connectionName string, fs afero.Fs, configFilePath string) (interface{}, string, error) {
