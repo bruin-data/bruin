@@ -233,3 +233,29 @@ func TestVariableOverridesMutator_VariantWinsOnOverlap(t *testing.T) {
 		assert.ErrorContains(t, err, `no such variable "nope"`)
 	})
 }
+
+func TestPythonImageMutator(t *testing.T) {
+	t.Parallel()
+
+	mutator, err := pythonImageMutator("python:3.12")
+	require.NoError(t, err)
+
+	pythonAsset := &pipeline.Asset{Name: "py", Type: pipeline.AssetTypePython, Image: "python:3.11"}
+	mutated, err := mutator(t.Context(), pythonAsset, &pipeline.Pipeline{})
+	require.NoError(t, err)
+	assert.Equal(t, "python:3.12", mutated.Image)
+
+	sqlAsset := &pipeline.Asset{Name: "sql", Type: pipeline.AssetTypeBigqueryQuery}
+	mutated, err = mutator(t.Context(), sqlAsset, &pipeline.Pipeline{})
+	require.NoError(t, err)
+	assert.Empty(t, mutated.Image)
+}
+
+func TestPythonImageMutatorRejectsUnknownImages(t *testing.T) {
+	t.Parallel()
+
+	for _, image := range []string{"3.12", "python:3.12-slim", "python:2.7", "node:20"} {
+		_, err := pythonImageMutator(image)
+		require.Error(t, err, image)
+	}
+}
