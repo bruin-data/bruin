@@ -849,16 +849,9 @@ func getSemanticQueryConnection(ctx context.Context, pipelineInfo *ppInfo, env, 
 }
 
 func loadRepoSemanticModels(fs afero.Fs, configFilePath, inputPath string) (map[string]*semantic.Model, string, error) {
-	semanticRoot := ""
-	if configFilePath != "" {
-		semanticRoot = filepath.Dir(configFilePath)
-	}
-	if semanticRoot == "" {
-		repoRoot, err := git.FindRepoFromPath(inputPath)
-		if err != nil {
-			return nil, "", err
-		}
-		semanticRoot = repoRoot.Path
+	semanticRoot, err := semanticRootDir(configFilePath, inputPath)
+	if err != nil {
+		return nil, "", err
 	}
 
 	semanticPath := filepath.Join(semanticRoot, "semantic")
@@ -867,6 +860,18 @@ func loadRepoSemanticModels(fs afero.Fs, configFilePath, inputPath string) (map[
 		return nil, semanticPath, err
 	}
 	return models, semanticPath, nil
+}
+
+// semanticRootDir returns the directory whose semantic/ folder holds the models.
+func semanticRootDir(configFilePath, inputPath string) (string, error) {
+	if configFilePath != "" {
+		return filepath.Dir(configFilePath), nil
+	}
+	repoRoot, err := git.FindRepoFromPath(inputPath)
+	if err != nil {
+		return "", err
+	}
+	return repoRoot.Path, nil
 }
 
 func semanticQueryContext(ctx context.Context, pipelineInfo *ppInfo, startDate time.Time, endDate time.Time) context.Context {
