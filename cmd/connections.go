@@ -19,6 +19,8 @@ import (
 	"golang.org/x/term"
 )
 
+const defaultEnvironmentName = "default"
+
 func Connections() *cli.Command {
 	return &cli.Command{
 		Name: "connections",
@@ -62,7 +64,9 @@ func ListConnections() *cli.Command {
 			}
 
 			configFilePath := c.String("config-file")
-			if configFilePath == "" {
+			// A secrets backend lists connections from the backend itself, so skip
+			// local .bruin.yml discovery (which would otherwise require a git repo).
+			if configFilePath == "" && secretsBackendFromContext(ctx) == "" {
 				repoRoot, err := git.FindRepoFromPath(path)
 				if err != nil {
 					printErrorForOutput(c.String("output"), errors2.Wrap(err, "failed to find the git repository root"))
@@ -389,7 +393,7 @@ func loadConfigFromSecretsBackend(ctx context.Context, environment string) (*con
 
 	lister, ok := manager.(config.ConnectionsConfigGetter)
 	if !ok {
-		return nil, fmt.Errorf("the configured secrets backend does not support listing connections")
+		return nil, errors.New("the configured secrets backend does not support listing connections")
 	}
 
 	connections, err := lister.GetConnectionsConfig()
@@ -399,7 +403,7 @@ func loadConfigFromSecretsBackend(ctx context.Context, environment string) (*con
 
 	envName := environment
 	if envName == "" {
-		envName = "default"
+		envName = defaultEnvironmentName
 	}
 	env := config.Environment{Connections: connections}
 

@@ -919,11 +919,11 @@ func TestConnectionsCommand_ListConnections(t *testing.T) {
 func TestListConnections_VaultBackend(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		require.True(t, strings.HasPrefix(r.URL.Path, "/api/vault/v1/secret/"),
+		assert.True(t, strings.HasPrefix(r.URL.Path, "/api/vault/v1/secret/"),
 			"unexpected path %q", r.URL.Path)
 
 		if r.URL.Query().Get("list") == "true" {
-			require.Contains(t, r.URL.Path, "/metadata/clients/acme")
+			assert.Contains(t, r.URL.Path, "/metadata/clients/acme")
 			_, _ = w.Write([]byte(`{"data":{"keys":["analytics","prod-db"]}}`))
 			return
 		}
@@ -958,4 +958,19 @@ func TestListConnections_VaultBackend(t *testing.T) {
 
 	r := ConnectionsCommand{}
 	require.NoError(t, r.ListConnections(ctx, ".", "json", "", "", false))
+
+	// Run the full command from a directory without .git: the vault backend must
+	// not trigger local config discovery (which requires a git repo).
+	t.Chdir(t.TempDir())
+
+	app := &cli.Command{
+		Name:   "bruin",
+		Flags:  []cli.Flag{SecretsBackendFlag()},
+		Before: WithSecretsBackendContext,
+		Commands: []*cli.Command{
+			Connections(),
+		},
+	}
+	require.NoError(t, app.Run(context.Background(),
+		[]string{"bruin", "--secrets-backend", "vault", "connections", "list", "-o", "json"}))
 }
