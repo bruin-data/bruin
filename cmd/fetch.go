@@ -849,16 +849,9 @@ func getSemanticQueryConnection(ctx context.Context, pipelineInfo *ppInfo, env, 
 }
 
 func loadRepoSemanticModels(fs afero.Fs, configFilePath, inputPath string) (map[string]*semantic.Model, string, error) {
-	semanticRoot := ""
-	if configFilePath != "" {
-		semanticRoot = filepath.Dir(configFilePath)
-	}
-	if semanticRoot == "" {
-		repoRoot, err := git.FindRepoFromPath(inputPath)
-		if err != nil {
-			return nil, "", err
-		}
-		semanticRoot = repoRoot.Path
+	semanticRoot, err := semanticRootDir(fs, configFilePath, inputPath)
+	if err != nil {
+		return nil, "", err
 	}
 
 	semanticPath := filepath.Join(semanticRoot, "semantic")
@@ -867,6 +860,43 @@ func loadRepoSemanticModels(fs afero.Fs, configFilePath, inputPath string) (map[
 		return nil, semanticPath, err
 	}
 	return models, semanticPath, nil
+}
+
+// semanticRootDir returns the directory whose semantic/ folder holds the
+// models: the config file's directory, unless the config lives outside the
+// input's git repo (e.g. one .bruin.yml shared by several cloned repos) and
+// that repo has its own semantic/ folder.
+func semanticRootDir(fs afero.Fs, configFilePath, inputPath string) (string, error) {
+	repoRoot, err := git.FindRepoFromPath(inputPath)
+	if configFilePath == "" {
+		if err != nil {
+			return "", err
+		}
+		return repoRoot.Path, nil
+	}
+
+	configDir := filepath.Dir(configFilePath)
+	if err == nil && !isWithinDir(repoRoot.Path, configDir) {
+		if info, statErr := fs.Stat(filepath.Join(repoRoot.Path, "semantic")); statErr == nil && info.IsDir() {
+			return repoRoot.Path, nil
+		}
+	}
+	return configDir, nil
+}
+
+func isWithinDir(parent, path string) bool {
+	rel, err := filepath.Rel(resolvePath(parent), resolvePath(path))
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+}
+
+func resolvePath(path string) string {
+	if abs, err := filepath.Abs(path); err == nil {
+		path = abs
+	}
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		return resolved
+	}
+	return path
 }
 
 func semanticQueryContext(ctx context.Context, pipelineInfo *ppInfo, startDate time.Time, endDate time.Time) context.Context {
