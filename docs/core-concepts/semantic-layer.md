@@ -19,6 +19,8 @@ my-repo/
 
 Bruin loads every `.yml` and `.yaml` file in this directory tree when a semantic query runs. Model names must be unique across the repository.
 
+If `.bruin.yml` lives outside the repository (for example, passed with `--config-file` or `BRUIN_CONFIG_FILE`), `bruin query` uses the `semantic` directory of the repository that contains the `--pipeline` or `--asset` path, and falls back to the one next to `.bruin.yml` when the repository has none.
+
 ## Example
 
 ```yaml
