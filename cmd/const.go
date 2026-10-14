@@ -12,6 +12,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/lint"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/python"
 	"github.com/fatih/color"
 	"github.com/spf13/afero"
 )
@@ -165,6 +166,22 @@ func renderPipelineHooks(ctx context.Context, p *pipeline.Pipeline, renderer jin
 	}
 
 	return nil
+}
+
+// pythonImageMutator runs every Python asset on the given image, e.g. python:3.12, instead of
+// its own. The image picks the Python version, so it must name one that is available.
+func pythonImageMutator(image string) (pipeline.AssetMutator, error) {
+	version, ok := strings.CutPrefix(image, "python:")
+	if !ok || !python.AvailablePythonVersions[version] {
+		return nil, fmt.Errorf("invalid Python image %q, expected python:<version> with one of the versions %s", image, strings.Join(python.SortedPythonVersions, ", "))
+	}
+
+	return func(ctx context.Context, a *pipeline.Asset, p *pipeline.Pipeline) (*pipeline.Asset, error) {
+		if a.Type == pipeline.AssetTypePython {
+			a.Image = image
+		}
+		return a, nil
+	}, nil
 }
 
 func variableOverridesMutator(variables []string) pipeline.PipelineMutator {

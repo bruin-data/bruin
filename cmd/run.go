@@ -720,6 +720,11 @@ func Run(isDebug *bool) *cli.Command {
 				Name:  "variant",
 				Usage: "name of the variant to materialize for a variant pipeline",
 			},
+			&cli.StringFlag{
+				Name:   "python-image",
+				Usage:  "run the Python assets on this image instead of their own, e.g. python:3.12",
+				Hidden: true,
+			},
 			&cli.IntFlag{
 				Name:  "timeout",
 				Usage: "timeout for the entire pipeline run in seconds",
@@ -838,6 +843,14 @@ func Run(isDebug *bool) *cli.Command {
 			vars := c.StringSlice("var")
 			if len(vars) > 0 {
 				DefaultPipelineBuilder.AddPipelineMutator(variableOverridesMutator(vars))
+			}
+			if pythonImage := c.String("python-image"); pythonImage != "" {
+				mutator, err := pythonImageMutator(pythonImage)
+				if err != nil {
+					printError(err, c.String("output"), "Invalid --python-image")
+					return cli.Exit("", 1)
+				}
+				DefaultPipelineBuilder.AddAssetMutator(mutator)
 			}
 			variantOpts := []pipeline.CreatePipelineOption{}
 			if variantName != "" {
