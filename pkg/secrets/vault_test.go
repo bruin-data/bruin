@@ -244,10 +244,13 @@ func TestVaultClientConfigFromEnv(t *testing.T) { //nolint:paralleltest // mutat
 // Create a mock vault client that implements kvV2Reader
 // and returns a mock *vault.Response[schema.KvV2ReadResponse].
 type mockVaultClient struct {
-	response *vault.Response[schema.KvV2ReadResponse]
-	err      error
-	handler  func(context.Context, string) (*vault.Response[schema.KvV2ReadResponse], error)
-	calls    atomic.Int32
+	response     *vault.Response[schema.KvV2ReadResponse]
+	err          error
+	handler      func(context.Context, string) (*vault.Response[schema.KvV2ReadResponse], error)
+	calls        atomic.Int32
+	listResponse *vault.Response[schema.StandardListResponse]
+	listErr      error
+	listHandler  func(context.Context, string) (*vault.Response[schema.StandardListResponse], error)
 }
 
 func (m *mockVaultClient) KvV2Read(ctx context.Context, path string, opts ...vault.RequestOption) (*vault.Response[schema.KvV2ReadResponse], error) {
@@ -256,6 +259,13 @@ func (m *mockVaultClient) KvV2Read(ctx context.Context, path string, opts ...vau
 		return m.handler(ctx, path)
 	}
 	return m.response, m.err
+}
+
+func (m *mockVaultClient) KvV2List(ctx context.Context, path string, opts ...vault.RequestOption) (*vault.Response[schema.StandardListResponse], error) {
+	if m.listHandler != nil {
+		return m.listHandler(ctx, path)
+	}
+	return m.listResponse, m.listErr
 }
 
 // Additional tests for newVaultClientWithToken and newVaultClientWithKubernetesAuth would require
@@ -666,4 +676,94 @@ func genericVaultResponse() *vault.Response[schema.KvV2ReadResponse] {
 			},
 		},
 	}
+}
+
+func TestClient_ListConnections(t *testing.T) {
+	t.Parallel()
+
+	client := newClient(t.Context(), &mockVaultClient{
+		listResponse: &vault.Response[schema.StandardListResponse]{
+			Data: schema.StandardListResponse{
+				Keys: []string{"prod-db", "analytics", "nested/", "", "app-cache"},
+			},
+		},
+	}, "mount", &mockLogger{}, "path", time.Second)
+
+	names, err := client.ListConnections()
+	require.NoError(t, err)
+	require.Equal(t, []string{"analytics", "app-cache", "prod-db"}, names)
+}
+
+func TestClient_ListConnections_NotFound(t *testing.T) {
+	t.Parallel()
+
+	client := newClient(t.Context(), &mockVaultClient{
+		listErr: &vault.ResponseError{StatusCode: http.StatusNotFound, Errors: []string{}},
+	}, "mount", &mockLogger{}, "path", time.Second)
+
+	_, err := client.ListConnections()
+	require.Error(t, err)
+	require.ErrorContains(t, err, "no secrets found under Vault path 'path'")
+}
+
+func TestClient_ListConnections_RedactsErrorBody(t *testing.T) {
+	t.Parallel()
+
+	client := newClient(t.Context(), &mockVaultClient{
+		listErr: &vault.ResponseError{
+			StatusCode: http.StatusInternalServerError,
+			Errors:     []string{"sensitive backend diagnostic"},
+		},
+	}, "mount", &mockLogger{}, "path", time.Second)
+
+	_, err := client.ListConnections()
+	require.Error(t, err)
+	require.ErrorContains(t, err, fmt.Sprintf("HTTP status %d", http.StatusInternalServerError))
+	require.NotContains(t, err.Error(), "sensitive backend diagnostic")
+}
+
+func TestClient_GetConnectionsConfig(t *testing.T) {
+	t.Parallel()
+
+	mock := &mockVaultClient{
+		listResponse: &vault.Response[schema.StandardListResponse]{
+			Data: schema.StandardListResponse{Keys: []string{"pg", "gen"}},
+		},
+		handler: func(_ context.Context, path string) (*vault.Response[schema.KvV2ReadResponse], error) {
+			switch path {
+			case "path/pg":
+				return &vault.Response[schema.KvV2ReadResponse]{
+					Data: schema.KvV2ReadResponse{
+						Data: map[string]any{
+							"type": "postgres",
+							"details": map[string]any{
+								"username": "u", "password": "p", "host": "h",
+								"port": 5432, "database": "d", "schema": "s",
+							},
+						},
+					},
+				}, nil
+			case "path/gen":
+				return &vault.Response[schema.KvV2ReadResponse]{
+					Data: schema.KvV2ReadResponse{
+						Data: map[string]any{
+							"type":    "generic",
+							"details": map[string]any{"value": "somevalue"},
+						},
+					},
+				}, nil
+			default:
+				return nil, &vault.ResponseError{StatusCode: http.StatusNotFound, Errors: []string{}}
+			}
+		},
+	}
+
+	client := newClient(t.Context(), mock, "mount", &mockLogger{}, "path", time.Second)
+
+	connections, err := client.GetConnectionsConfig()
+	require.NoError(t, err)
+	require.NotNil(t, connections)
+
+	summary := connections.ConnectionsSummaryList()
+	require.Equal(t, map[string]string{"pg": "postgres", "gen": "generic"}, summary)
 }
