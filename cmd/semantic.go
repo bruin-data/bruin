@@ -187,15 +187,19 @@ func loadSemanticCommandCatalog(ctx context.Context, c *cli.Command, isDebug boo
 		}
 	}
 
+	fs := afero.NewOsFs()
 	semanticPath := pathArg
 	if semanticPath == "" {
-		semanticPath = filepath.Join(filepath.Dir(configFilePath), "semantic")
+		semanticRoot, err := semanticRootDir(fs, configFilePath, ".")
+		if err != nil {
+			return nil, err
+		}
+		semanticPath = filepath.Join(semanticRoot, "semantic")
 	}
 	if abs, err := filepath.Abs(semanticPath); err == nil {
 		semanticPath = abs
 	}
 
-	fs := afero.NewOsFs()
 	// The loader treats a missing directory as "no models", which would make a
 	// mistyped path silently report success. A path the user typed must exist;
 	// the default '<repo>/semantic' may legitimately be absent.
