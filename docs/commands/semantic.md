@@ -4,6 +4,8 @@ The `semantic` command validates the models in your repository's [semantic layer
 
 Semantic models live in the `semantic` directory next to `.bruin.yml`. Both subcommands load every model in that directory, so joins and model checks can reference other models.
 
+If `.bruin.yml` lives outside the current repository (for example, passed with `--config-file` or `BRUIN_CONFIG_FILE`) and no path is given, the commands use the current repository's `semantic` directory, falling back to the one next to `.bruin.yml` when the repository has none.
+
 ## `semantic validate`
 
 Validates every semantic model and its quality check definitions. If a model has a connection, Bruin also validates it against the warehouse.
