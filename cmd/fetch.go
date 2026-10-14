@@ -849,7 +849,7 @@ func getSemanticQueryConnection(ctx context.Context, pipelineInfo *ppInfo, env, 
 }
 
 func loadRepoSemanticModels(fs afero.Fs, configFilePath, inputPath string) (map[string]*semantic.Model, string, error) {
-	semanticRoot, err := semanticRootDir(configFilePath, inputPath)
+	semanticRoot, err := semanticRootDir(fs, configFilePath, inputPath)
 	if err != nil {
 		return nil, "", err
 	}
@@ -862,16 +862,35 @@ func loadRepoSemanticModels(fs afero.Fs, configFilePath, inputPath string) (map[
 	return models, semanticPath, nil
 }
 
-// semanticRootDir returns the directory whose semantic/ folder holds the models.
-func semanticRootDir(configFilePath, inputPath string) (string, error) {
-	if configFilePath != "" {
-		return filepath.Dir(configFilePath), nil
-	}
+// semanticRootDir returns the directory whose semantic/ folder holds the
+// models: the config file's directory, unless the config lives outside the
+// input's git repo (e.g. one .bruin.yml shared by several cloned repos) and
+// that repo has its own semantic/ folder.
+func semanticRootDir(fs afero.Fs, configFilePath, inputPath string) (string, error) {
 	repoRoot, err := git.FindRepoFromPath(inputPath)
-	if err != nil {
-		return "", err
+	if configFilePath == "" {
+		if err != nil {
+			return "", err
+		}
+		return repoRoot.Path, nil
 	}
-	return repoRoot.Path, nil
+
+	configDir := filepath.Dir(configFilePath)
+	if err == nil && !isWithinDir(repoRoot.Path, configDir) {
+		if info, statErr := fs.Stat(filepath.Join(repoRoot.Path, "semantic")); statErr == nil && info.IsDir() {
+			return repoRoot.Path, nil
+		}
+	}
+	return configDir, nil
+}
+
+func isWithinDir(parent, path string) bool {
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return false
+	}
+	rel, err := filepath.Rel(parent, absPath)
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
 func semanticQueryContext(ctx context.Context, pipelineInfo *ppInfo, startDate time.Time, endDate time.Time) context.Context {
