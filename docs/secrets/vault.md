@@ -60,3 +60,7 @@ The content of the secret should follow a certain format. For example for a post
 ```
 
 As you see the schema is the same as in [`bruin.yml`](../getting-started/introduction/quickstart.md#setting-up-your-bruin-yml-file). It's required that the data is inside a `details` attribute and `type` contains a valid connection type, that can take the same values as the types in the connection lists in [`bruin.yml`](../getting-started/introduction/quickstart.md#setting-up-your-bruin-yml-file), e.g `databricks`, `postgres`, `athena`....
+
+## Listing Secrets
+
+`bruin connections list --secrets-backend vault` enumerates the connections stored under `BRUIN_VAULT_PATH` without a local `.bruin.yml`. This issues a KV v2 list under `{BRUIN_VAULT_MOUNT_PATH}/metadata/{BRUIN_VAULT_PATH}`, so the token or role must be allowed to **list** that path in addition to reading the individual secrets. See [Connections → Listing from a secrets backend](../commands/connections.md#listing-from-a-secrets-backend).

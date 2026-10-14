@@ -33,6 +33,19 @@ Environment: someother
 +---------+-----------+---------------+
 ```
 
+### Listing from a secrets backend
+
+With `--secrets-backend vault`, connections are listed directly from [Vault](../secrets/vault.md) instead of `.bruin.yml`, so no local config file or git repository is required:
+
+```bash
+bruin connections list --secrets-backend vault -o json
+```
+
+This uses the same `BRUIN_VAULT_*` settings as `bruin run` (see [Vault](../secrets/vault.md)), and the token must be allowed to **list** the keys under `BRUIN_VAULT_PATH` in addition to reading them.
+
+> [!NOTE]
+> Only the `vault` backend supports listing today. The other backends (`doppler`, `aws`, `azure`) return an "unsupported" error for `connections list`.
+
 ### Flags
 
 | Flag | Type | Default | Description |
@@ -40,6 +53,7 @@ Environment: someother
 | `--output`, `-o` | str | `plain` | Output format: `plain` or `json`. |
 | `--environment`, `-e`, `--env` | str | - | The environment to list connections for. |
 | `--config-file` | str | - | The path to the .bruin.yml file. |
+| `--secrets-backend` | str | - | List connections from a secrets backend instead of `.bruin.yml`. Only `vault` is supported. |
 
 ## Add Connection
 

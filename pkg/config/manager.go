@@ -218,6 +218,16 @@ type ConnectionResolver interface {
 	ResolveConnection(name string) (any, error)
 }
 
+// ConnectionLister is implemented by secrets backends that can enumerate the connection names they hold.
+type ConnectionLister interface {
+	ListConnections() ([]string, error)
+}
+
+// ConnectionsConfigGetter is implemented by secrets backends that can return their full set of connections.
+type ConnectionsConfigGetter interface {
+	GetConnectionsConfig() (*Connections, error)
+}
+
 func (c *Connections) ConnectionsSummaryList() map[string]string {
 	if c.typeNameMap == nil {
 		c.buildConnectionKeyMap()
