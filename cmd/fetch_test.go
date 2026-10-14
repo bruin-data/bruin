@@ -662,6 +662,35 @@ metrics:
 	assert.Contains(t, models, "orders")
 }
 
+func TestLoadRepoSemanticModelsTreatsSymlinkedConfigInsideRepoAsInside(t *testing.T) {
+	t.Parallel()
+
+	realDir := t.TempDir()
+	linkDir := filepath.Join(t.TempDir(), "link")
+	require.NoError(t, os.Symlink(realDir, linkDir))
+
+	repoDir := filepath.Join(realDir, "repo")
+	projectDir := filepath.Join(repoDir, "project")
+	require.NoError(t, os.MkdirAll(filepath.Join(repoDir, ".git"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(repoDir, "semantic"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(projectDir, "semantic"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(projectDir, "semantic", "orders.yml"), []byte(`schema: v1
+name: orders
+source:
+  table: orders
+metrics:
+  - name: revenue
+    expression: sum(amount)
+`), 0o644))
+
+	configPath := filepath.Join(linkDir, "repo", "project", ".bruin.yml")
+	models, semanticPath, err := loadRepoSemanticModels(afero.NewOsFs(), configPath, filepath.Join(projectDir, "pipelines", "daily"))
+	require.NoError(t, err)
+
+	assert.Equal(t, filepath.Join(linkDir, "repo", "project", "semantic"), semanticPath)
+	assert.Contains(t, models, "orders")
+}
+
 func TestQueryRendererRendersPipelineMacroWithListArgument(t *testing.T) {
 	t.Parallel()
 

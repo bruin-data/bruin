@@ -885,12 +885,18 @@ func semanticRootDir(fs afero.Fs, configFilePath, inputPath string) (string, err
 }
 
 func isWithinDir(parent, path string) bool {
-	absPath, err := filepath.Abs(path)
-	if err != nil {
-		return false
-	}
-	rel, err := filepath.Rel(parent, absPath)
+	rel, err := filepath.Rel(resolvePath(parent), resolvePath(path))
 	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+}
+
+func resolvePath(path string) string {
+	if abs, err := filepath.Abs(path); err == nil {
+		path = abs
+	}
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		return resolved
+	}
+	return path
 }
 
 func semanticQueryContext(ctx context.Context, pipelineInfo *ppInfo, startDate time.Time, endDate time.Time) context.Context {
