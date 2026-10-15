@@ -233,7 +233,7 @@ The `clickhouse` block applies only to native SQL assets. Ingestr destinations u
 
 #### Self-hosted clusters
 
-Set the connection's `cluster` to a ClickHouse cluster name to add `ON CLUSTER` to generated native SQL materialization DDL. Leave it unset for ClickHouse Cloud, standalone servers, and databases that already distribute DDL implicitly. There is no per-asset cluster override: select a different connection on an asset when it needs a different cluster or local execution.
+Set the connection's `cluster` to a ClickHouse cluster name to add `ON CLUSTER` to generated native SQL materialization DDL and to the tables ingestr and seed assets create on this connection. Leave it unset for ClickHouse Cloud, standalone servers, and databases that already distribute DDL implicitly. There is no per-asset cluster override: select a different connection on an asset when it needs a different cluster or local execution.
 
 ```yaml
 connections:
@@ -288,7 +288,7 @@ INSERT INTO analytics.events SELECT id FROM raw.events;
 
 Bruin waits for distributed DDL completion with `distributed_ddl_output_mode = 'throw'` and a 180-second `distributed_ddl_task_timeout`. `TRUNCATE ... SYNC` waits across replicas; interval deletion uses synchronous [mutation processing](https://clickhouse.com/docs/reference/statements/alter/delete). A DDL error or timeout stops subsequent statements, but a timeout does not cancel queued DDL: restore cluster health and check its completion before retrying. Inserts retain ClickHouse's replication and durability settings; completion does not guarantee immediate visibility on every replica.
 
-The connection's `cluster` applies only to Bruin-generated native SQL materializations. Raw SQL scripts are executed as written, and seeds and ingestr assets do not gain cluster support from this field.
+The connection's `cluster` applies to Bruin-generated native SQL materializations and to the tables ingestr and seed assets create. Raw SQL scripts are executed as written.
 
 #### `delete+insert` example
 

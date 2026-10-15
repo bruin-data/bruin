@@ -186,3 +186,12 @@ func TestConfigClusterSettings(t *testing.T) {
 		}
 	}
 }
+
+func TestConfigGetIngestrURICluster(t *testing.T) {
+	t.Parallel()
+	c := Config{Username: "user", Password: "pw", Host: "localhost", Port: 9000}
+	require.Equal(t, "clickhouse://user:pw@localhost:9000", c.GetIngestrURI())
+
+	c.Cluster = "analytics cluster"
+	require.Equal(t, "clickhouse://user:pw@localhost:9000?cluster=analytics+cluster", c.GetIngestrURI())
+}
