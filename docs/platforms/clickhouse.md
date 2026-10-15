@@ -233,7 +233,7 @@ The `clickhouse` block applies only to native SQL assets. Ingestr destinations u
 
 #### Self-hosted clusters
 
-Set the connection's `cluster` to a ClickHouse cluster name to add `ON CLUSTER` to generated native SQL materialization DDL. Leave it unset for ClickHouse Cloud, standalone servers, and databases that already distribute DDL implicitly. There is no per-asset cluster override: select a different connection on an asset when it needs a different cluster or local execution.
+Set the connection's `cluster` to a ClickHouse cluster name to add `ON CLUSTER` to generated native SQL materialization DDL and to the tables ingestr assets create on this connection. Leave it unset for ClickHouse Cloud, standalone servers, and databases that already distribute DDL implicitly. There is no per-asset cluster override: select a different connection on an asset when it needs a different cluster or local execution.
 
 ```yaml
 connections:

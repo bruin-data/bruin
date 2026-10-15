@@ -83,6 +83,9 @@ func (c *Config) GetIngestrURI() string {
 	if c.Secure != nil {
 		query.Set("secure", strconv.Itoa(*c.Secure))
 	}
+	if c.Cluster != "" {
+		query.Set("cluster", c.Cluster)
+	}
 
 	uri.RawQuery = query.Encode()
 
