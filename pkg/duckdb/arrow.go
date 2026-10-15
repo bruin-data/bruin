@@ -18,29 +18,26 @@ import (
 //
 //nolint:ireturn
 func (c *Client) SelectArrow(ctx context.Context, q *query.Query, maxRows int) (arrow.RecordBatch, error) {
-	c.lockIfNeeded()
-	defer c.unlockIfNeeded()
 	e, ok := c.connection.(*EphemeralConnection)
 	if !ok {
 		return nil, errors.New("arrow queries require an ADBC connection")
 	}
-	db, conn, err := e.openADBC(ctx)
+	conn, cleanup, err := e.openADBC(ctx, q.String())
 	if err != nil {
 		return nil, err
 	}
-	defer db.Close()
-	defer conn.Close()
+	defer cleanup()
 	stmt, err := conn.NewStatement()
 	if err != nil {
 		return nil, err
 	}
 	defer stmt.Close()
 	if err := stmt.SetSqlQuery(q.String()); err != nil {
-		return nil, err
+		return nil, transactionError(err)
 	}
 	reader, _, err := stmt.ExecuteQuery(ctx)
 	if err != nil {
-		return nil, err
+		return nil, transactionError(err)
 	}
 	if reader == nil {
 		return nil, errors.New("input query did not return an Arrow schema")
