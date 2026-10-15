@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"strings"
 
+	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/logger"
@@ -49,23 +50,19 @@ func (l *localRRunner) Run(ctx context.Context, execCtx *executionContext) error
 	// If there's no renv.lock, just run the R script directly
 	if execCtx.renvLock == "" {
 		log(ctx, "No renv.lock found, executing R script directly...")
-		return l.cmd.Run(ctx, execCtx.repo, &CommandInstance{
-			Name:    l.pathToRscript,
-			Args:    []string{scriptPath},
-			EnvVars: execCtx.envVariables,
-		})
+	} else {
+		// If renv.lock exists, ensure dependencies are installed
+		log(ctx, "renv.lock found, setting up the isolated R environment...")
+		log(ctx, "renv.lock path: "+execCtx.renvLock)
+
+		if err := l.renvInstaller.EnsureRenvExists(ctx, execCtx.repo, execCtx.renvLock); err != nil {
+			return err
+		}
+		log(ctx, "renv dependencies ready, executing R script...")
 	}
 
-	// If renv.lock exists, ensure dependencies are installed
-	log(ctx, "renv.lock found, setting up the isolated R environment...")
-	log(ctx, "renv.lock path: "+execCtx.renvLock)
-
-	err := l.renvInstaller.EnsureRenvExists(ctx, execCtx.repo, execCtx.renvLock)
-	if err != nil {
-		return err
-	}
-
-	log(ctx, "renv dependencies ready, executing R script...")
+	resume := duck.SuspendConnectionReuse(ctx)
+	defer resume()
 	return l.cmd.Run(ctx, execCtx.repo, &CommandInstance{
 		Name:    l.pathToRscript,
 		Args:    []string{scriptPath},

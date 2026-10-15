@@ -1,8 +1,14 @@
 package duck
 
 import (
+	"context"
+	"io"
 	"math/rand/v2"
+	"path/filepath"
+	"slices"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -89,13 +95,163 @@ func NewCustomizedMapMutex(mRetry int, mDelay, bDelay, factor, jitter float64) *
 	}
 }
 
-var databaseLocks = NewMapMutex()
+// SQL sessions share a database instance. External processes need exclusive
+// access and must release that instance's file lock before opening the file.
+type databaseLock struct {
+	sync.RWMutex
+	database io.Closer
+	schema   sync.Mutex
+	scopes   atomic.Int64
+	gate     *sync.RWMutex
+}
 
-func LockDatabase(path string) {
-	for !databaseLocks.TryLock(path) {
+// Cache access requires the per-file lock followed by gate.RLock, or just
+// gate.Lock during a handoff. Registered file-backed engines share the process
+// gate; private in-memory engines have an independent gate.
+func (d *databaseLock) closeDatabase() {
+	if d.database != nil {
+		_ = d.database.Close()
+		d.database = nil
 	}
 }
 
+var databaseLocks sync.Map
+
+// Cached sessions hold the read side for their full lifetime. Always acquire
+// per-file locks before this gate; never wait for a file while holding the gate.
+// The write side drains cached sessions and protects all cache pointers without
+// waiting on file locks held by ingestion or uncached SQL execution.
+var connectionReuseGate sync.RWMutex
+
+var activeScripts atomic.Int64
+
+// SuspendConnectionReuse releases cached file locks for arbitrary Python/R code.
+// SQL continues with ephemeral connections until every overlapping script exits.
+// Scripts must still declare dependencies when sharing files with other work.
+func SuspendConnectionReuse(ctx context.Context) func() {
+	if connectionReuse(ctx) == nil {
+		return func() {}
+	}
+	connectionReuseGate.Lock()
+	activeScripts.Add(1)
+	databaseLocks.Range(func(_, value any) bool {
+		value.(*databaseLock).closeDatabase()
+		return true
+	})
+	connectionReuseGate.Unlock()
+	return func() { activeScripts.Add(-1) }
+}
+
+func databaseLockKey(path string) string {
+	// GetIngestrURI adds duckdb:/// to the configured path, including when
+	// that path is absolute. Use the same key as native SQL operations.
+	path = strings.TrimPrefix(path, "duckdb:///")
+	if path != "" && path != ":memory:" && !strings.HasPrefix(path, "md:") {
+		if absolute, err := filepath.Abs(path); err == nil {
+			path = absolute
+		}
+	}
+	return path
+}
+
+func databaseLockFor(path string) *databaseLock {
+	lock, _ := databaseLocks.LoadOrStore(databaseLockKey(path), &databaseLock{gate: &connectionReuseGate})
+	return lock.(*databaseLock)
+}
+
+func LockDatabase(path string) {
+	lock := databaseLockFor(path)
+	lock.Lock()
+	lock.gate.RLock()
+	lock.closeDatabase()
+	lock.gate.RUnlock()
+}
+
 func UnlockDatabase(path string) {
-	databaseLocks.Unlock(path)
+	databaseLockFor(path).Unlock()
+}
+
+// LockDatabases acquires source/destination files once, in a consistent order,
+// including when different URIs refer to the same file.
+func LockDatabases(paths ...string) func() {
+	keys := make([]string, len(paths))
+	for i, path := range paths {
+		keys[i] = databaseLockKey(path)
+	}
+	slices.Sort(keys)
+	keys = slices.Compact(keys)
+	for _, key := range keys {
+		LockDatabase(key)
+	}
+	return func() {
+		for _, key := range keys {
+			UnlockDatabase(key)
+		}
+	}
+}
+
+type connectionReuseKey struct{}
+
+type connectionReuseScope struct {
+	sync.Mutex
+	databases map[*databaseLock]struct{}
+}
+
+func (s *connectionReuseScope) register(lock *databaseLock) bool {
+	s.Lock()
+	defer s.Unlock()
+	if s.databases == nil {
+		return false
+	}
+	if _, ok := s.databases[lock]; !ok {
+		lock.scopes.Add(1)
+		s.databases[lock] = struct{}{}
+	}
+	return true
+}
+
+func (d *databaseLock) releaseScope() {
+	if d.scopes.Add(-1) == 0 {
+		d.closeDatabase()
+	}
+}
+
+// WithConnectionReuse keeps DuckDB instances (including lakehouse attachments)
+// alive for a pipeline run. Cleanup cancels the scope and closes idle databases;
+// active sessions are closed asynchronously once their workers release them.
+// This preserves bounded CLI shutdown when a worker ignores cancellation.
+// Outside this scope, connections remain ephemeral.
+func WithConnectionReuse(ctx context.Context) (context.Context, func()) {
+	ctx, cancel := context.WithCancel(ctx)
+	scope := &connectionReuseScope{databases: make(map[*databaseLock]struct{})}
+	return context.WithValue(ctx, connectionReuseKey{}, scope), func() {
+		scope.Lock()
+		cancel()
+		databases := scope.databases
+		scope.databases = nil
+		scope.Unlock()
+		for lock := range databases {
+			if lock.TryLock() {
+				if lock.gate.TryRLock() {
+					lock.releaseScope()
+					lock.gate.RUnlock()
+					lock.Unlock()
+					continue
+				}
+				lock.Unlock()
+			}
+			go func() {
+				lock.Lock()
+				defer lock.Unlock()
+				lock.gate.RLock()
+				defer lock.gate.RUnlock()
+				lock.releaseScope()
+			}()
+		}
+	}
+}
+
+func connectionReuse(ctx context.Context) *connectionReuseScope {
+	scope, _ := ctx.Value(connectionReuseKey{}).(*connectionReuseScope)
+	return scope
 }
