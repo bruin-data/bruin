@@ -68,7 +68,13 @@ func EnsureADBCDriverConfig(name string) (config.Config, error) {
 		return cfg, err
 	}
 	newLibrary := filepath.Join(cfg.Location, rel)
-	if err := copyHomeFiles(afero.NewOsFs(), filepath.Dir(oldLibrary), filepath.Dir(newLibrary)); err != nil {
+	// A flat installation shares its directory with driver manifests. Copy
+	// libraries and their supporting files, but let each driver publish its
+	// own rewritten manifest instead of importing any legacy absolute paths.
+	skipManifest := func(path string) bool {
+		return filepath.Dir(rel) == "." && filepath.Dir(path) == "." && strings.EqualFold(filepath.Ext(path), ".toml")
+	}
+	if err := copyHomeFiles(afero.NewOsFs(), filepath.Dir(oldLibrary), filepath.Dir(newLibrary), skipManifest); err != nil {
 		return cfg, fmt.Errorf("failed to copy legacy %s ADBC driver: %w", name, err)
 	}
 	// Clear scalar paths as well as platform tables before rebasing the manifest.

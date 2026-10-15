@@ -114,7 +114,7 @@ func (c *ConfigManager) EnsureHomeDirExists() error {
 		marker := filepath.Join(c.bruinHomeDir, homeMigrationMarker)
 		if _, err := c.fs.Stat(marker); os.IsNotExist(err) {
 			if c.userHomeDir != "" {
-				if err := copyHomeFiles(c.fs, filepath.Join(c.userHomeDir, bruinHomeDir), c.bruinHomeDir); err != nil {
+				if err := copyHomeFiles(c.fs, filepath.Join(c.userHomeDir, bruinHomeDir), c.bruinHomeDir, nil); err != nil {
 					return errors.Wrap(err, "failed to copy previous bruin home")
 				}
 			}

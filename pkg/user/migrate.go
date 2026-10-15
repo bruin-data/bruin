@@ -28,7 +28,8 @@ func lockHomeMigration(fs afero.Fs, home string) (func(), error) {
 
 // copyHomeFiles merges a legacy directory without replacing destination files.
 // Callers hold the home migration lock until all files and markers are ready.
-func copyHomeFiles(fs afero.Fs, source, destination string) error {
+// skip, when provided, receives paths relative to source.
+func copyHomeFiles(fs afero.Fs, source, destination string, skip func(string) bool) error {
 	if _, err := fs.Stat(source); os.IsNotExist(err) {
 		return nil
 	} else if err != nil {
@@ -62,6 +63,12 @@ func copyHomeFiles(fs afero.Fs, source, destination string) error {
 		rel, err := filepath.Rel(source, name)
 		if err != nil {
 			return err
+		}
+		if skip != nil && skip(rel) {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
 		}
 		target := filepath.Join(destination, rel)
 		existing, err := lstat(fs, target)
