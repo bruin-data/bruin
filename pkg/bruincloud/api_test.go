@@ -1948,7 +1948,7 @@ func TestDeleteRunState(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestRunAgentQuery_Success(t *testing.T) {
+func TestRunConnectionSetQuery_Success(t *testing.T) {
 	t.Parallel()
 	var gotPath, gotMethod string
 	var gotBody map[string]any
@@ -1964,11 +1964,11 @@ func TestRunAgentQuery_Success(t *testing.T) {
 		})
 	})
 
-	res, err := client.RunAgentQuery(t.Context(), 42, "warehouse_prod", "SELECT 1 AS n")
+	res, err := client.RunConnectionSetQuery(t.Context(), 42, "warehouse_prod", "SELECT 1 AS n")
 	require.NoError(t, err)
 
 	assert.Equal(t, http.MethodPost, gotMethod)
-	assert.Equal(t, "/agents/42/query", gotPath)
+	assert.Equal(t, "/connection-sets/42/query", gotPath)
 	assert.Equal(t, "warehouse_prod", gotBody["connection"])
 	assert.Equal(t, "SELECT 1 AS n", gotBody["query"])
 	// Cloud query mode never sends template variables.
@@ -1981,7 +1981,7 @@ func TestRunAgentQuery_Success(t *testing.T) {
 	assert.Equal(t, "SELECT 1 AS n", res.RenderedSQL)
 }
 
-func TestRunAgentQuery_SurfacesAPIError(t *testing.T) {
+func TestRunConnectionSetQuery_SurfacesAPIError(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnprocessableEntity)
@@ -1991,7 +1991,7 @@ func TestRunAgentQuery_SurfacesAPIError(t *testing.T) {
 		})
 	})
 
-	_, err := client.RunAgentQuery(t.Context(), 42, "conn", "DROP TABLE users")
+	_, err := client.RunConnectionSetQuery(t.Context(), 42, "conn", "DROP TABLE users")
 	require.Error(t, err)
 
 	var apiErr *APIError
@@ -2001,14 +2001,14 @@ func TestRunAgentQuery_SurfacesAPIError(t *testing.T) {
 	assert.Contains(t, apiErr.Message, "read-only")
 }
 
-func TestRunAgentQuery_PreservesLargeIntegerPrecision(t *testing.T) {
+func TestRunConnectionSetQuery_PreservesLargeIntegerPrecision(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		// 2^53+1 cannot be represented as float64; default decoding would round it.
 		_, _ = w.Write([]byte(`{"columns":["id"],"rows":[[9007199254740993]]}`))
 	})
 
-	res, err := client.RunAgentQuery(t.Context(), 1, "c", "SELECT id")
+	res, err := client.RunConnectionSetQuery(t.Context(), 1, "c", "SELECT id")
 	require.NoError(t, err)
 	require.Len(t, res.Rows, 1)
 	assert.Equal(t, json.Number("9007199254740993"), res.Rows[0][0])

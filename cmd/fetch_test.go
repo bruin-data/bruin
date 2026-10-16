@@ -1212,7 +1212,7 @@ func TestWriteAggregatedQueryLogCapsRows(t *testing.T) {
 func TestCloudQuerierSelectWithSchema(t *testing.T) {
 	t.Run("maps the columnar result", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			assert.Equal(t, "/agents/9/query", r.URL.Path)
+			assert.Equal(t, "/connection-sets/9/query", r.URL.Path)
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"columns":      []string{"n"},
 				"column_types": []string{"INT8"},
@@ -1222,7 +1222,7 @@ func TestCloudQuerierSelectWithSchema(t *testing.T) {
 		defer server.Close()
 		t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
 
-		q := &cloudQuerier{client: bruincloud.NewAPIClient("k"), agentID: 9, connectionName: "c"}
+		q := &cloudQuerier{client: bruincloud.NewAPIClient("k"), connectionSetID: 9, connectionName: "c"}
 		res, err := q.SelectWithSchema(context.Background(), &query.Query{Query: "SELECT 1 AS n"})
 		require.NoError(t, err)
 		assert.Equal(t, []string{"n"}, res.Columns)
@@ -1241,7 +1241,7 @@ func TestCloudQuerierSelectWithSchema(t *testing.T) {
 		defer server.Close()
 		t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
 
-		q := &cloudQuerier{client: bruincloud.NewAPIClient("k"), agentID: 1, connectionName: "c"}
+		q := &cloudQuerier{client: bruincloud.NewAPIClient("k"), connectionSetID: 1, connectionName: "c"}
 		res, err := q.SelectWithSchema(context.Background(), &query.Query{Query: "SELECT * FROM t"})
 		require.NoError(t, err)
 		assert.Equal(t, []string{"a", "b", "c"}, res.Columns)
@@ -1258,7 +1258,7 @@ func TestCloudQuerierSelectWithSchema(t *testing.T) {
 		defer server.Close()
 		t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
 
-		q := &cloudQuerier{client: bruincloud.NewAPIClient("k"), agentID: 1, connectionName: "c", limit: 2}
+		q := &cloudQuerier{client: bruincloud.NewAPIClient("k"), connectionSetID: 1, connectionName: "c", limit: 2}
 		res, err := q.SelectWithSchema(context.Background(), &query.Query{Query: "SELECT n FROM t"})
 		require.NoError(t, err)
 		assert.Len(t, res.Rows, 2)
@@ -1277,12 +1277,13 @@ func runCloudQuery(t *testing.T, configPath string, extraArgs ...string) (string
 	t.Helper()
 	var authorization string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/connection-sets/9/query", r.URL.Path)
 		authorization = r.Header.Get("Authorization")
 		_ = json.NewEncoder(w).Encode(map[string]any{"columns": []string{"n"}, "rows": [][]any{{1}}})
 	}))
 	t.Cleanup(server.Close)
 	t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
-	t.Setenv("BRUIN_CLOUD_AGENT_ID", "9")
+	t.Setenv("BRUIN_CLOUD_CONNECTION_SET_ID", "9")
 	t.Setenv("BRUIN_CLOUD_API_KEY", "")
 
 	args := append([]string{"query", "--config-file", configPath, "--connection", "warehouse", "--query", "SELECT 1", "--output", "json"}, extraArgs...)
@@ -1290,6 +1291,13 @@ func runCloudQuery(t *testing.T, configPath string, extraArgs ...string) (string
 	cmd.ExitErrHandler = func(context.Context, *cli.Command, error) {}
 	err := cmd.Run(t.Context(), args)
 	return authorization, err
+}
+
+func TestCloudQueryRequiresConnectionSetID(t *testing.T) { //nolint:paralleltest // uses t.Setenv
+	bruinToken := "      bruin:\n        - name: agent-cloud-cli-token\n          api_token: yml-token\n"
+	authorization, err := runCloudQuery(t, writeCloudQueryConfig(t, bruinToken), "--cloud-connection-set-id", "0")
+	require.Error(t, err)
+	assert.Empty(t, authorization, "no request should be sent without a connection set id")
 }
 
 func TestCloudQueryAPIKey(t *testing.T) { //nolint:paralleltest // uses t.Setenv

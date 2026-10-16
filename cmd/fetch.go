@@ -168,18 +168,18 @@ func Query() *cli.Command {
 				// Deprecated: prefer marking the connection with `use_cloud: true` in
 				// .bruin.yml. Kept working but hidden so it is not surfaced to users or
 				// agents. Forces cloud routing regardless of the connection config:
-				// uses --connection against the agent's connections, ignores .bruin.yml,
+				// uses --connection against the connection set, ignores .bruin.yml,
 				// and does not apply --var.
 				Hidden:  true,
 				Sources: cli.EnvVars("BRUIN_CLOUD_QUERY"),
 			},
 			&cli.IntFlag{
-				Name: "cloud-agent-id",
+				Name: "cloud-connection-set-id",
 				// Hidden: supplied by the Bruin Cloud sandbox environment via
-				// BRUIN_CLOUD_AGENT_ID; not surfaced to users or agents.
+				// BRUIN_CLOUD_CONNECTION_SET_ID; not surfaced to users or agents.
 				Hidden:  true,
-				Usage:   "Bruin Cloud agent id whose connections back the query when the connection runs in the cloud",
-				Sources: cli.EnvVars("BRUIN_CLOUD_AGENT_ID"),
+				Usage:   "Bruin Cloud connection set id whose connections back the query when the connection runs in the cloud",
+				Sources: cli.EnvVars("BRUIN_CLOUD_CONNECTION_SET_ID"),
 			},
 			&cli.StringFlag{
 				Name: "cloud-api-key",
@@ -497,18 +497,18 @@ func validateFlags(connection, query, asset, pipelinePath string, hasSemanticFla
 	}
 }
 
-// cloudQuerier runs queries against an agent's connection through the Bruin Cloud
-// API. It implements schemaQuerier so the rest of the query command (output,
+// cloudQuerier runs queries against a connection in a connection set through the
+// Bruin Cloud API. It implements schemaQuerier so the rest of the query command (output,
 // export, query-log) works unchanged.
 type cloudQuerier struct {
-	client         *bruincloud.APIClient
-	agentID        int
-	connectionName string
-	limit          int64
+	client          *bruincloud.APIClient
+	connectionSetID int
+	connectionName  string
+	limit           int64
 }
 
 func (q *cloudQuerier) SelectWithSchema(ctx context.Context, qq *query.Query) (*query.QueryResult, error) {
-	res, err := q.client.RunAgentQuery(ctx, q.agentID, q.connectionName, qq.Query)
+	res, err := q.client.RunConnectionSetQuery(ctx, q.connectionSetID, q.connectionName, qq.Query)
 	if err != nil {
 		return nil, err
 	}
@@ -539,8 +539,9 @@ func (q *cloudQuerier) SelectWithSchema(ctx context.Context, qq *query.Query) (*
 // through the Bruin Cloud query service. It is used both when the connection is
 // marked use_cloud: true and when the hidden --cloud flag forces cloud routing.
 // The SQL is sent verbatim: cloud query mode does not accept template variables
-// (--var is ignored), so there is nothing to render or interpolate. The agent id
-// and API key come from --cloud-agent-id / --cloud-api-key (or their env vars).
+// (--var is ignored), so there is nothing to render or interpolate. The connection
+// set id and API key come from --cloud-connection-set-id / --cloud-api-key (or
+// their env vars).
 func prepareCloudQueryExecution(c *cli.Command, cm *config.Config) (string, interface{}, string, string, *ppInfo, error) {
 	if hasSemanticQueryFlags(c) {
 		return "", nil, "", "", nil, errors.New("semantic queries are not supported in cloud query mode")
@@ -557,16 +558,16 @@ func prepareCloudQueryExecution(c *cli.Command, cm *config.Config) (string, inte
 		return "", nil, "", "", nil, err
 	}
 
-	agentID := c.Int("cloud-agent-id")
-	if agentID <= 0 {
-		return "", nil, "", "", nil, errors.New("cloud query mode requires a Bruin Cloud agent id (--cloud-agent-id or BRUIN_CLOUD_AGENT_ID)")
+	connectionSetID := c.Int("cloud-connection-set-id")
+	if connectionSetID <= 0 {
+		return "", nil, "", "", nil, errors.New("cloud query mode requires a Bruin Cloud connection set id (--cloud-connection-set-id or BRUIN_CLOUD_CONNECTION_SET_ID)")
 	}
 
 	querier := &cloudQuerier{
-		client:         bruincloud.NewAPIClient(apiKey),
-		agentID:        agentID,
-		connectionName: connectionName,
-		limit:          c.Int64("limit"),
+		client:          bruincloud.NewAPIClient(apiKey),
+		connectionSetID: connectionSetID,
+		connectionName:  connectionName,
+		limit:           c.Int64("limit"),
 	}
 	return connectionName, querier, queryStr, "", nil, nil
 }
