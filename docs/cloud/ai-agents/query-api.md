@@ -86,8 +86,7 @@ Go to **Team Settings → API Keys**. Type a name for the token, select **Custom
 
 | Ability | Needed for |
 |---|---|
-| `connection:query` | Run queries |
-| `connection-set:list` | Use a connection set |
+| `connection-set:cloud-query` | Run queries on a connection set through Bruin Cloud |
 | `semantic:list` | List semantic models |
 
 ![Creating a team API token](/cloud/query-api/04-team-api-token.png)
@@ -343,7 +342,7 @@ Base URL: `https://cloud.getbruin.com`. Runs one read-only query on a connection
 
 | Header | Required | Value |
 |---|---|---|
-| `Authorization` | yes | `Bearer <token>`. The token needs the `connection:query` and `connection-set:list` abilities. |
+| `Authorization` | yes | `Bearer <token>`. The token needs the `connection-set:cloud-query` ability. |
 | `Content-Type` | yes | `application/json` |
 | `X-Bruin-Team` | for multi-team personal tokens | The team. Team tokens do not need it. |
 
@@ -427,7 +426,7 @@ Each error has a `message` that tells what is wrong.
 | Status | `error` | When |
 |---|---|---|
 | 401 | — | The token is missing, not valid or expired. |
-| 403 | `forbidden` | The token does not have `connection:query` or `connection-set:list`. |
+| 403 | `forbidden` | The token does not have `connection-set:cloud-query`. |
 | 404 | `not_found` | Your team has no connection set with this ID. |
 | 422 | *(validation)* | The body is not valid. `errors` shows the problem for each field. |
 | 422 | `connection_required` | The request has no `connection`, and the model has no `source.connection`. |
@@ -499,7 +498,7 @@ Example query error:
 
 | Endpoint | Ability | Returns |
 |---|---|---|
-| `POST /api/v1/connection-sets/{id}/query` | `connection:query`, `connection-set:list` | Runs a query and returns the rows |
+| `POST /api/v1/connection-sets/{id}/query` | `connection-set:cloud-query` | Runs a query and returns the rows |
 | `GET /api/v1/semantic-models` | `semantic:list` | The semantic models of the team |
 | `GET /api/v1/connection-sets` | `connection-set:list` | The connection sets, with their IDs |
 | `GET /api/v1/connection-sets/{id}/connections` | `connection-set:list` | The connection names and types in a set |
