@@ -270,7 +270,7 @@ func Render() *cli.Command {
 			// Hoisting only parses when the SQL contains DECLARE. On failure,
 			// hook wrapping preserves the original SQL.
 			var hoister pipeline.DeclareHoister
-			if p, parserErr := sqlparser.NewSQLParser(false); parserErr == nil {
+			if p, parserErr := sqlparser.NewSQLParser(); parserErr == nil {
 				defer p.Close()
 				hoister = p
 			}

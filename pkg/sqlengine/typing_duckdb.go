@@ -45,8 +45,8 @@ func typingDuckDBMetadata() ExprMetadataType {
 		DT_VARBINARY,
 		KEncode,
 	)
-	m.annotators("typing/duckdb.py:58", func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "expression") }, KDateBin)
-	m.annotators("typing/duckdb.py:59", func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "this") }, KPercentileDisc)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "expression") }, KDateBin)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "this") }, KPercentileDisc)
 	m.returns(DT_TIMESTAMP, KLocaltimestamp)
 	m.returns(DT_INTERVAL, KToDays)
 	m.returns(DT_TIME, KTimeFromParts)

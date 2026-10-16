@@ -53,13 +53,13 @@ func typingMySQLMetadata() ExprMetadataType {
 		KTimeFromParts,
 	)
 	m.annotators(
-		"typing/mysql.py:70", func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "this") },
+		func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "this") },
 		KPad,
 		KLeft,
 		KRight,
 	)
-	m.annotators("typing/mysql.py:12", func(a *TypeAnnotator, e *Expr) { typingMySQLAnnotateReverse(a, e) }, KReverse)
-	m.annotators("typing/mysql.py:21", func(a *TypeAnnotator, e *Expr) { typingMySQLAnnotateTruncate(a, e) }, KTrunc)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingMySQLAnnotateReverse(a, e) }, KReverse)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingMySQLAnnotateTruncate(a, e) }, KTrunc)
 
 	return m
 }

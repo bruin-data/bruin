@@ -1,7 +1,7 @@
 package sqlengine
 
 // Port of sqlglot/dialects/sqlite.py, sqlglot/parsers/sqlite.py and sqlglot/generators/sqlite.py
-// (sqlglot v30.13.0). Data-only class attributes live in the generated zz_*_settings.go files.
+// (sqlglot v30.13.0). Data-only class attributes live in the *_settings.go files.
 
 func init() { registerCustomizer("sqlite", customizeSQLite) }
 

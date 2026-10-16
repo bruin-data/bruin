@@ -6,7 +6,7 @@ import (
 )
 
 // Port of sqlglot/dialects/clickhouse.py (ClickHouse dialect class body). The tokenizer and the
-// data-only class attributes are generated (zz_*_settings.go).
+// data-only class attributes are in the *_settings.go files.
 
 func init() { registerCustomizer("clickhouse", customizeClickHouse) }
 

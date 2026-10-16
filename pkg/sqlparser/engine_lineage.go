@@ -8,19 +8,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/sqlengine"
 )
 
-// cmdLineage mirrors get_column_lineage(query, schema, dialect) including the error a
-// missing (null) schema produces in Python.
-func cmdLineage(c map[string]any) (any, error) {
-	query := str(c["query"])
-	dialect := str(c["dialect"])
-	rawSchema := c["schema"]
-	schema, err := toRawSchema(rawSchema)
-	if err != nil {
-		return nil, err
-	}
-	return getColumnLineage(query, schema, dialect)
-}
-
 // rawSchema is the {"table.path": {"col": "type"}} mapping Bruin passes, preserving order.
 type rawSchema struct {
 	keys   []string

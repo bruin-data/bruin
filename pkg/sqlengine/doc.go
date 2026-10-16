@@ -3,23 +3,24 @@
 // optimizer rules (qualify, type annotation, simplification, subquery unnesting/merging, ...) and
 // column lineage.
 //
-// It is a Go port of the Python library sqlglot (v30.13.0, MIT licensed; see LICENSE.sqlglot),
-// which Bruin previously embedded. The port keeps sqlglot's structure and naming so it can be
-// compared against the Python source and upgraded mechanically: `_parse_table_parts` is
-// parseTableParts, `table_sql` is tableSQL, dialect overrides live in d_<dialect>*.go. Pure-data
-// tables (token types, expression classes, dialect settings, type mappings) are generated from the
-// Python objects by codegen/gen.py into zz_*.go.
+// It started as a Go fork of the Python library sqlglot (v30.13.0, MIT licensed; see
+// LICENSE.sqlglot) and is maintained here as regular Go code; it does not track sqlglot's source.
+// Much of it still follows sqlglot's structure and naming (`_parse_table_parts` became
+// parseTableParts, dialect overrides live in d_<dialect>*.go), which is not a constraint on
+// changes.
+//
+// sqlglot remains the reference for behavior. The conformance tests (conformance_parse_test.go,
+// annotate_conformance_test.go) replay golden files recorded from sqlglot by the scripts in
+// codegen/ (see codegen/README.md): the engine must fail to parse the same statements, generate the
+// same SQL back and infer the same column types. Internals (token streams, tree shapes, tables)
+// are free to differ.
 //
 // Supported dialects: the base dialect (""), athena, bigquery, clickhouse, databricks, doris,
 // duckdb, fabric, hive, mysql, oracle, postgres, presto, redshift, snowflake, spark, spark2,
 // sqlite, starrocks, trino and tsql.
 //
-// Conformance is verified against sqlglot's own test-suite corpus (see conformance_*_test.go and
-// codegen/README.md): tokens, full parse trees and regenerated SQL match Python exactly.
-//
 // Errors: entry points return ParseError, TokenError, ValueError, OptimizeError, SchemaError or
-// UnsupportedError values whose messages match sqlglot's. Where sqlglot itself fails with a plain
-// Python exception (AttributeError, KeyError, ...), a ValueError carrying the same message is used.
+// UnsupportedError values.
 //
 // The package is safe for concurrent use; dialect prototypes are built once and shared read-only.
 package sqlengine

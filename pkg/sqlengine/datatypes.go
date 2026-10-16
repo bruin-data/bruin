@@ -6,7 +6,7 @@ package sqlengine
 //     (DataTypeBuild, dataTypeFromStr, DataTypeIsType) and are reused here.
 //   - Expression.is_type (with the DataType and Cast overrides) -> (*Expr).IsTypeOf
 //   - the Expression.type setter                                 -> (*Expr).SetTypeAny
-//   - DataType.Type sets (TEXT_TYPES, ...) are generated in zz_dtypes.go (DataType_TEXT_TYPES, ...).
+//   - DataType.Type sets (TEXT_TYPES, ...) are in dtypes.go (DataType_TEXT_TYPES, ...).
 
 // IsTypeOf mirrors Expr.is_type(*dtypes), dispatching like Python does on the receiver class:
 //   - DataType (and subclasses): DataType.is_type, i.e. structural comparison of the node itself;
