@@ -52,8 +52,6 @@ connections:
 
 A connection with `endpoint_url` must set `access_key_id` and `secret_access_key` or a `profile`. Bruin does not fall back to the default AWS credential chain for custom endpoints.
 
-`endpoint_url` applies to `athena.sql` assets and quality checks. It is not passed to `ingestr` or `athena.seed` assets, which load data through ingestr.
-
 ## Athena Assets
 
 ### `athena.sql`
