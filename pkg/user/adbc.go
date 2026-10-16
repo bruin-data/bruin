@@ -13,14 +13,23 @@ import (
 // ADBCDriverPath selects Bruin's manifest without changing the process-wide
 // ADBC search path. With no override, the driver manager keeps its usual lookup.
 func ADBCDriverPath(name string) (string, error) {
+	dir, err := ADBCDriverDir()
+	if err != nil || dir == "" {
+		return name, err
+	}
+	return filepath.Join(dir, name+".toml"), nil
+}
+
+// ADBCDriverDir returns Bruin's driver directory, or "" when BRUIN_HOME is unset.
+func ADBCDriverDir() (string, error) {
 	if os.Getenv("BRUIN_HOME") == "" {
-		return name, nil
+		return "", nil
 	}
 	c := NewConfigManager(nil)
 	if err := c.ensureHomeDirSet(); err != nil {
 		return "", err
 	}
-	return filepath.Join(c.bruinHomeDir, "adbc", name+".toml"), nil
+	return filepath.Join(c.bruinHomeDir, "adbc"), nil
 }
 
 // EnsureADBCDriverConfig relocates Bruin-managed drivers on first use. ConfigEnv

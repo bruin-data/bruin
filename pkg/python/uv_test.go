@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -58,12 +59,29 @@ func (f fakeIngestrConnection) GetIngestrURI() (string, error) {
 }
 
 func Test_ingestrEnvVars_DisablesTelemetry(t *testing.T) {
-	t.Parallel()
+	t.Setenv("BRUIN_HOME", "")
 
+	env, err := ingestrEnvVars()
+	require.NoError(t, err)
 	assert.Equal(t, map[string]string{
 		"INGESTR_DISABLE_TELEMETRY": "true",
 		"PYTHONUNBUFFERED":          "1",
-	}, ingestrEnvVars())
+	}, env)
+}
+
+func Test_ingestrEnvVars_BruinHome(t *testing.T) {
+	home := filepath.Join(t.TempDir(), "bruin home")
+	t.Setenv("BRUIN_HOME", home)
+
+	t.Setenv("ADBC_DRIVER_PATH", "")
+	env, err := ingestrEnvVars()
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(home, "adbc"), env["ADBC_DRIVER_PATH"])
+
+	t.Setenv("ADBC_DRIVER_PATH", "/explicit-drivers")
+	env, err = ingestrEnvVars()
+	require.NoError(t, err)
+	assert.NotContains(t, env, "ADBC_DRIVER_PATH")
 }
 
 func Test_uvPythonRunner_RunIngestr_UsesReleasedBinaryAndDisablesTelemetry(t *testing.T) {

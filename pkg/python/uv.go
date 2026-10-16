@@ -20,6 +20,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/ingestruri"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/user"
 	"github.com/bruin-data/bruin/pkg/uv"
 	"github.com/pkg/errors"
 	"github.com/sourcegraph/conc/pool"
@@ -49,11 +50,23 @@ const (
 	sqlfluffVersion  = "3.4.1"
 )
 
-func ingestrEnvVars() map[string]string {
-	return map[string]string{
+func ingestrEnvVars() (map[string]string, error) {
+	env := map[string]string{
 		"INGESTR_DISABLE_TELEMETRY": "true",
 		"PYTHONUNBUFFERED":          "1",
 	}
+	if os.Getenv("ADBC_DRIVER_PATH") != "" {
+		return env, nil
+	}
+	// ingestr installs its own ADBC drivers; keep them out of a read-only HOME.
+	dir, err := user.ADBCDriverDir()
+	if err != nil {
+		return nil, err
+	}
+	if dir != "" {
+		env["ADBC_DRIVER_PATH"] = dir
+	}
+	return env, nil
 }
 
 type streamingContextKey struct{}
@@ -590,10 +603,14 @@ func (u *UvPythonRunner) ingestrCommand(ctx context.Context, extraPackages, args
 		if err != nil {
 			return nil, err
 		}
+		envVars, err := ingestrEnvVars()
+		if err != nil {
+			return nil, err
+		}
 		return &CommandInstance{
 			Name:    binaryFullPath,
 			Args:    u.uvIngestrRunCmd(ctx, extraPackages, args),
-			EnvVars: ingestrEnvVars(),
+			EnvVars: envVars,
 		}, nil
 	}
 
@@ -605,10 +622,14 @@ func (u *UvPythonRunner) ingestrCommand(ctx context.Context, extraPackages, args
 	if err != nil {
 		return nil, err
 	}
+	envVars, err := ingestrEnvVars()
+	if err != nil {
+		return nil, err
+	}
 	return &CommandInstance{
 		Name:    binaryFullPath,
 		Args:    args,
-		EnvVars: ingestrEnvVars(),
+		EnvVars: envVars,
 	}, nil
 }
 
