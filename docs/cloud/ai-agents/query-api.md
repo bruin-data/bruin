@@ -495,10 +495,11 @@ Example query error:
 }
 ```
 
-### Related endpoints
+### All endpoints
 
 | Endpoint | Ability | Returns |
 |---|---|---|
+| `POST /api/v1/connection-sets/{id}/query` | `connection:query`, `connection-set:list` | Runs a query and returns the rows |
 | `GET /api/v1/semantic-models` | `semantic:list` | The semantic models of the team |
 | `GET /api/v1/connection-sets` | `connection-set:list` | The connection sets, with their IDs |
 | `GET /api/v1/connection-sets/{id}/connections` | `connection-set:list` | The connection names and types in a set |
