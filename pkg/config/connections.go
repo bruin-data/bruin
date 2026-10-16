@@ -205,6 +205,7 @@ type AthenaConnection struct { //nolint:recvcheck
 	Region             string `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
 	Database           string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
 	Profile            string `yaml:"profile,omitempty" json:"profile,omitempty" mapstructure:"profile"`
+	EndpointURL        string `yaml:"endpoint_url,omitempty" json:"endpoint_url,omitempty" mapstructure:"endpoint_url"`
 
 	regionSetFromProfile bool
 }
@@ -266,6 +267,10 @@ func (c AthenaConnection) MarshalYAML() (interface{}, error) {
 
 	if c.Region != "" && !c.regionSetFromProfile {
 		m["region"] = c.Region
+	}
+
+	if c.EndpointURL != "" {
+		m["endpoint_url"] = c.EndpointURL
 	}
 
 	if c.Profile != "" {
