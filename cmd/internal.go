@@ -1785,6 +1785,11 @@ func LockAssetDependencies() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
+			execCmd.Env, err = uv.Environment()
+			if err != nil {
+				printErrorJSON(errors2.Wrap(err, "failed to configure uv environment"))
+				return cli.Exit("", 1)
+			}
 			execCmd.Stdout = os.Stdout
 			execCmd.Stderr = os.Stderr
 

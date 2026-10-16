@@ -18,6 +18,7 @@ import (
 	"github.com/apache/arrow-go/v18/arrow/array"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/sqlengine"
+	"github.com/bruin-data/bruin/pkg/user"
 )
 
 // EphemeralConnection uses the ADBC low-level API to query DuckDB directly,
@@ -227,6 +228,11 @@ func (e *EphemeralConnection) openADBC(ctx context.Context, sqlStr string) (adbc
 //nolint:ireturn
 func (e *EphemeralConnection) createADBC(ctx context.Context) (adbc.Database, adbc.Connection, error) {
 	opts := e.databaseOptions()
+	driverPath, err := user.ADBCDriverPath(dbcDriverName)
+	if err != nil {
+		return nil, nil, err
+	}
+	opts["driver"] = driverPath
 
 	var drv drivermgr.Driver
 	adb, err := drv.NewDatabase(opts)

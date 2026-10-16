@@ -13,6 +13,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/logger"
+	"github.com/bruin-data/bruin/pkg/uv"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 )
@@ -52,9 +53,13 @@ func (l *CommandRunner) Run(ctx context.Context, repo *git.Repo, command *Comman
 
 	// Build environment: start with parent environment to inherit PATH, CC, CFLAGS, etc.
 	envMap := make(map[string]string)
+	environment, err := uv.Environment()
+	if err != nil {
+		return err
+	}
 
 	// First, parse parent environment into a map
-	for _, envVar := range os.Environ() {
+	for _, envVar := range environment {
 		parts := strings.SplitN(envVar, "=", 2)
 		if len(parts) == 2 {
 			envMap[parts[0]] = parts[1]
