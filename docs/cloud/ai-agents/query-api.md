@@ -1,8 +1,8 @@
 # Use Bruin Cloud as Your Agent's Query Backend
 
-Use Bruin Cloud as the query backend for your own AI agent. Your agent sends an HTTP request. Bruin gets the warehouse credentials, runs the query and returns the rows. Your agent does not need a database password or a database driver.
+If you are building your own AI agent, Bruin Cloud can act as its query backend. You store your warehouse credentials in Bruin once. Your agent then calls a small HTTP API, and Bruin takes care of the rest: it connects with the stored credentials, runs the query safely, and returns the rows. The agent never handles a database password and never needs a database driver.
 
-With a [semantic layer](/core-concepts/semantic-layer), your agent does not write SQL. It asks for metrics and dimensions by name, for example "average price by month on weekdays". Bruin compiles the request into SQL from your model definitions.
+Pair it with a [semantic layer](/core-concepts/semantic-layer) and your agent doesn't have to write SQL at all. It asks for metrics and dimensions by name, for example "average price by month on weekdays", and Bruin compiles that request into SQL from your model definitions.
 
 ```mermaid
 sequenceDiagram
