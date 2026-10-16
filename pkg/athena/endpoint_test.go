@@ -59,7 +59,9 @@ func (f *fakeAthena) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	_ = json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func newEndpointTestDB(t *testing.T, fake *fakeAthena) *DB {
@@ -203,10 +205,16 @@ func TestEndpointHTTPClientRejectsBlockedAddressAtDial(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	// Plain http to loopback is allowed; a metadata address is refused before any bytes are sent.
-	resp, err := newEndpointHTTPClient(true).Get(server.URL)
-	require.NoError(t, err)
-	require.NoError(t, resp.Body.Close())
+	get := func(client *http.Client, url string) error {
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, url, nil)
+		require.NoError(t, err)
+		resp, err := client.Do(req)
+		if err != nil {
+			return err
+		}
+		return resp.Body.Close()
+	}
 
-	_, err = newEndpointHTTPClient(false).Get("http://169.254.169.254/latest/meta-data/")
-	require.ErrorContains(t, err, "not allowed")
+	require.NoError(t, get(newEndpointHTTPClient(true), server.URL))
+	require.ErrorContains(t, get(newEndpointHTTPClient(false), "http://169.254.169.254/latest/meta-data/"), "not allowed")
 }

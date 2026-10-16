@@ -155,9 +155,12 @@ func (c *endpointConn) run(ctx context.Context, query string) (string, error) {
 
 		select {
 		case <-ctx.Done():
-			_, _ = api.StopQueryExecutionWithContext(context.Background(), &athena.StopQueryExecutionInput{
+			// ctx is already done, so stop the query on a detached context with its own deadline.
+			stopCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+			_, _ = api.StopQueryExecutionWithContext(stopCtx, &athena.StopQueryExecutionInput{
 				QueryExecutionId: aws.String(queryID),
 			})
+			cancel()
 			return "", ctx.Err()
 		case <-time.After(config.GetResultPollIntervalSeconds()):
 		}
