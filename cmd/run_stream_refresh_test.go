@@ -31,7 +31,7 @@ func TestValidateStreamingRunRefresh(t *testing.T) { //nolint:paralleltest // Ru
 		{name: "selector remains invalid", args: []string{"--full-refresh", "--selector", "tag:finance"}, wantErr: "cannot be combined with --selector"},
 		{name: "sensor remains invalid", args: []string{"--full-refresh", "--sensor-mode", "wait"}, wantErr: "cannot be combined with --sensor-mode"},
 	}
-	for _, tt := range tests {
+	for _, tt := range tests { //nolint:paralleltest // Run uses shared CLI date flags.
 		t.Run(tt.name, func(t *testing.T) {
 			parameters := pipeline.ParameterMap{"stream": true, "cdc": true}
 			for key, value := range tt.parameters {
