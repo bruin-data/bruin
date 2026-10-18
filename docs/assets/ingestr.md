@@ -75,6 +75,7 @@ parameters:
   sql_exclude_columns: string
   no_inference: true|false
   full_refresh: true|false
+  refresh_id: string
   mask: string
   trim_whitespace: true|false
   pipelines_dir: string
@@ -136,7 +137,8 @@ parameters:
 | `sql_limit` | No | `--sql-limit` | Applies a `LIMIT` clause when extracting from the source. |
 | `sql_exclude_columns` | No | `--sql-exclude-columns` | List of columns to skip during extraction. |
 | `no_inference` | No | `--no-inference` | Uses `columns` as the source schema for schema-less sources instead of inferring types. |
-| `full_refresh` | No | `--full-refresh` | Runs this asset in full-refresh mode on every run. The run-level `--full-refresh` flag still applies to all assets. |
+| `full_refresh` | No | `--full-refresh` | Requests a full refresh. For streaming CDC assets, refreshes once before continuing replication. The run-level `--full-refresh` flag still applies to all assets. |
+| `refresh_id` | No | `--refresh-id` | Stable identifier for a streaming full-refresh request. Requires `full_refresh` and `stream`; reuse the identifier when retrying the same request. The CLI `--refresh-id` value takes precedence. |
 | `mask` | No | `--mask` | Adds a column masking rule such as `email:hash`. |
 | `pipelines_dir` | No | `--pipelines-dir` | Directory where Ingestr stores pipeline metadata. |
 | `staging_bucket` | No | `--staging-bucket` | Overrides the staging bucket that Ingestr uses for intermediate files. |
@@ -259,7 +261,8 @@ Pipeline run options propagate to ingestr automatically:
 
 * When a run defines an interval start or end date, Bruin appends `--interval-start` and `--interval-end` with the resolved timestamps (including interval modifiers, when enabled).
 * Running with `--full-refresh`, or setting `parameters.full_refresh: true` on the asset, adds the `--full-refresh` flag to Ingestr.
-* For a streaming asset (`stream: true`), Bruin omits `--interval-end` so the live tail is not truncated, and does not pass `--full-refresh`.
+* For a streaming asset (`stream: true`), Bruin omits `--interval-end` so the live tail is not truncated. A full refresh rebuilds the selected destination tables before continuing with live changes.
+* `--refresh-id` or `parameters.refresh_id` supplies a stable identifier for a streaming full-refresh request. The CLI value takes precedence. An identifier requires both streaming and full refresh to be enabled; `refresh_restricted: true` prevents that refresh.
 
 ## Streaming assets
 
@@ -278,9 +281,34 @@ bruin run --stream assets/my_stream.asset.yml
 
 * The run targets exactly one streaming asset and keeps it running in the foreground until you stop it with `Ctrl+C` (`SIGINT`/`SIGTERM`). Ingestr flushes buffered records and advances its offset before exiting, so the next run resumes cleanly.
 * A normal `bruin run <pipeline>` skips streaming assets and prints a notice; downstream assets read whatever the stream has landed so far.
-* `--stream` runs only the main task — column/custom checks and metadata push do not run for a stream. It cannot be combined with `--downstream`, `--continue`, `--modified`, `--selector`, `--interactive`, `--sensor-mode`, or `--full-refresh`.
+* `--stream` runs only the main task — column/custom checks and metadata push do not run for a stream. It cannot be combined with `--downstream`, `--continue`, `--modified`, `--selector`, `--interactive`, or `--sensor-mode`.
 * Resume state (replication offset) is managed by ingestr in the destination's staging namespace. For CDC assets it is keyed by `cdc_state_id`. Bruin does not store offsets.
 * For CDC assets, merge applies updates and deletes correctly only when the source table has a usable primary key / replica identity. For PostgreSQL, an unconsumed replication slot retains WAL on the source, so monitor replication lag via `cdc_stream_metrics_addr` (`/debug/vars`). See [PostgreSQL CDC](../platforms/postgres.md#cdc-change-data-capture).
+
+### Refreshing a stream
+
+For CDC connectors and destinations that support streaming full refresh, start a new process with:
+
+```bash
+bruin run --stream --full-refresh --refresh-id refresh-2026-10-18 assets/my_stream.asset.yml
+```
+
+Use the same identifier when restarting or retrying that request. Ingestr records its progress durably, so a completed request resumes replication without refreshing again. Use a new identifier to request another refresh. Without an identifier, `--full-refresh` requests a new refresh on every invocation.
+
+The asset parameters provide the same behavior when the command remains `bruin run --stream`:
+
+```yaml
+parameters:
+  source_connection: source_db
+  source_table: public.orders
+  destination: postgres
+  cdc: true
+  stream: true
+  full_refresh: true
+  refresh_id: refresh-2026-10-18
+```
+
+The selected ingestr version must support `--full-refresh --stream` and `--refresh-id`. Ingestr validates connector and destination support. Refresh replaces the tables selected by the asset; it does not remove destination tables from earlier source selections or destination configurations.
 
 ## Examples
 

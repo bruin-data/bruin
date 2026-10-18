@@ -170,6 +170,7 @@ const (
 	RunConfigApplyIntervalModifiers    = RunConfig("apply-interval-modifiers")
 	RunConfigEndDate                   = RunConfig("end-date")
 	RunConfigFullRefresh               = RunConfig("full-refresh")
+	RunConfigRefreshID                 = RunConfig("refresh-id")
 	RunConfigQueryAnnotations          = RunConfig("query-annotations")
 	RunConfigRunID                     = RunConfig("run-id")
 	RunConfigStartDate                 = RunConfig("start-date")

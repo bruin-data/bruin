@@ -1358,6 +1358,35 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 			},
 		},
 		{
+			name: "CDC full refresh ID survives the cdc_mode stream alias",
+			asset: &pipeline.Asset{
+				Name:       "cdc-stream-refresh",
+				Connection: "bq",
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "pg",
+					"source_table":      "public.users",
+					"destination":       "bigquery",
+					"cdc":               true,
+					"cdc_mode":          "stream",
+					"full_refresh":      true,
+					"refresh_id":        "request / 1",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "postgres+cdc://user:pass@localhost:5432/db",
+				"--source-table", "public.users",
+				"--dest-uri", "bigquery://uri-here",
+				"--dest-table", "cdc-stream-refresh",
+				"--yes",
+				"--progress", "log",
+				"--incremental-strategy", "merge",
+				"--stream",
+				"--refresh-id", "request / 1",
+				"--full-refresh",
+			},
+		},
+		{
 			name: "CDC mode with cdc_mode stream",
 			asset: &pipeline.Asset{
 				Name:       "cdc-asset-stream-mode",

@@ -36,6 +36,8 @@ table td:first-child {
 |------|------|---------|-------------|
 | `--downstream` | bool | `false` | Run all downstream assets as well. |
 | `--workers` | int | `16` | Number of workers to run assets in parallel. |
+| `--stream` | bool | `false` | Run one streaming ingestr asset continuously. |
+| `--refresh-id` | str | - | Stable identifier for a streaming full refresh. Requires `--stream` and either `--full-refresh` or `parameters.full_refresh: true`. Reuse it when retrying the same request. |
 | `--start-date` | str | Beginning of the previous UTC day | The start date of the range the pipeline will run for. Format: `YYYY-MM-DD`, `YYYY-MM-DD HH:MM:SS`, or `YYYY-MM-DD HH:MM:SS.ffffff` |
 | `--end-date` | str | End of the previous UTC day | The end date of the range the pipeline will run for. Format: `YYYY-MM-DD`, `YYYY-MM-DD HH:MM:SS`, or `YYYY-MM-DD HH:MM:SS.ffffff` |
 | `--environment` | str | - | The environment to use. |
@@ -43,7 +45,7 @@ table td:first-child {
 | `--force` | bool | `false` | Do not ask for confirmation in a production environment. |
 | `--no-log-file` | bool | `false` | Do not create a log file for this run. |
 | `--sensor-mode` | str | `'once'` | Set sensor mode: `skip`, `once`, or `wait`. |
-| `--full-refresh` | bool | `false` | Truncate tables before running. Also sets the `full_refresh` Jinja variable to `True` and `BRUIN_FULL_REFRESH` to `1`. A single asset can opt in on every run with `parameters.full_refresh: true`. |
+| `--full-refresh` | bool | `false` | Rebuild destination data before running. Streaming CDC assets refresh once before continuing replication. Also sets the `full_refresh` Jinja variable to `True` and `BRUIN_FULL_REFRESH` to `1`. A single asset can opt in with `parameters.full_refresh: true`. |
 | `--apply-interval-modifiers` | bool | `false` | Apply [interval modifiers](/assets/interval-modifiers). Off by default on the CLI because you pass the dates yourself; Bruin Cloud applies them automatically. Ignored together with `--full-refresh`. |
 | `--continue` | bool | `false` | Continue from the last failed asset. |
 | `--selector` | str | - | Select assets with dbt-style syntax. Supports `tag:`, `path:`, `file:`, `fqn:`, `+`, `n+`, `@`, space unions, and comma intersections. |

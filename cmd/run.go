@@ -571,6 +571,33 @@ func disableColorIfRequested(noColor bool) {
 	}
 }
 
+func validateStreamingRun(c *cli.Command, asset *pipeline.Asset, runningForAsset bool) error {
+	if !runningForAsset || c.Args().Len() != 1 || asset == nil {
+		return errors.New("--stream requires a single streaming asset, e.g. bruin run --stream path/to/asset.yml")
+	}
+	if !ingestr.IsStreamingAsset(asset) {
+		return fmt.Errorf("asset %q is not a streaming asset; --stream requires an ingestr CDC asset with cdc_mode: stream (or a message-broker source with stream: true)", asset.Name)
+	}
+	for _, incompatible := range []string{"downstream", "continue", "modified", "interactive"} {
+		if c.Bool(incompatible) {
+			return fmt.Errorf("--stream cannot be combined with --%s", incompatible)
+		}
+	}
+	for _, incompatible := range []string{"selector", "sensor-mode"} {
+		if c.String(incompatible) != "" {
+			return fmt.Errorf("--stream cannot be combined with --%s", incompatible)
+		}
+	}
+	refreshID := c.String("refresh-id")
+	if refreshID == "" {
+		refreshID, _ = asset.Parameters.GetString("refresh_id")
+	}
+	if refreshID != "" && !asset.FullRefreshEnabled(c.Bool("full-refresh")) {
+		return errors.New("--refresh-id or parameters.refresh_id requires full refresh to be enabled")
+	}
+	return nil
+}
+
 func Run(isDebug *bool) *cli.Command {
 	return &cli.Command{
 		Name:      "run",
@@ -614,8 +641,12 @@ func Run(isDebug *bool) *cli.Command {
 			&cli.BoolFlag{
 				Name:    "full-refresh",
 				Aliases: []string{"r"},
-				Usage:   "truncate the table before running",
+				Usage:   "rebuild destination data before running; streaming CDC assets refresh once, then continue streaming",
 				Sources: cli.EnvVars("BRUIN_FULL_REFRESH"),
+			},
+			&cli.StringFlag{
+				Name:  "refresh-id",
+				Usage: "stable request ID for a streaming full refresh; reuse it when retrying the same refresh",
 			},
 			&cli.BoolFlag{
 				Name:        "apply-interval-modifiers",
@@ -769,6 +800,9 @@ func Run(isDebug *bool) *cli.Command {
 				return cli.Exit(errUsePipDeprecated, 1)
 			}
 			fullRefresh := c.Bool("full-refresh")
+			if c.String("refresh-id") != "" && !c.Bool("stream") {
+				return errors.New("--refresh-id requires --stream and full refresh")
+			}
 			applyIntervalModifiers := setApplyIntervalModifiers(c)
 
 			runConfig := &scheduler.RunConfig{
@@ -874,6 +908,7 @@ func Run(isDebug *bool) *cli.Command {
 				runID = BackfillRunID(backfillID, startDate)
 			}
 			runCtx := context.WithValue(ctx, pipeline.RunConfigFullRefresh, runConfig.FullRefresh)
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigRefreshID, c.String("refresh-id"))
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigExecutionDate, defaultExecutionDate)
@@ -959,22 +994,8 @@ func Run(isDebug *bool) *cli.Command {
 			// assume a finite, multi-asset batch run.
 			streamMode := c.Bool("stream")
 			if streamMode {
-				if !preview.RunningForAnAsset || c.Args().Len() != 1 || task == nil {
-					printError(errors.New("--stream requires a single streaming asset, e.g. bruin run --stream path/to/asset.yml"), c.String("output"), "Invalid --stream usage")
-					return cli.Exit("", 1)
-				}
-				if !ingestr.IsStreamingAsset(task) {
-					printError(fmt.Errorf("asset %q is not a streaming asset; --stream requires an ingestr CDC asset with cdc_mode: stream (or a message-broker source with stream: true)", task.Name), c.String("output"), "Invalid --stream usage")
-					return cli.Exit("", 1)
-				}
-				for _, incompatible := range []string{"downstream", "continue", "modified", "selector", "interactive", "full-refresh"} {
-					if c.Bool(incompatible) || (incompatible == "selector" && c.String("selector") != "") {
-						printError(fmt.Errorf("--stream cannot be combined with --%s", incompatible), c.String("output"), "Invalid --stream usage")
-						return cli.Exit("", 1)
-					}
-				}
-				if runConfig.SensorMode != "" {
-					printError(errors.New("--stream cannot be combined with --sensor-mode"), c.String("output"), "Invalid --stream usage")
+				if err := validateStreamingRun(c, task, preview.RunningForAnAsset); err != nil {
+					printError(err, c.String("output"), "Invalid --stream usage")
 					return cli.Exit("", 1)
 				}
 				// A stream never "succeeds", so its column/custom checks and metadata

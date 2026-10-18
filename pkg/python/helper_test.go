@@ -275,6 +275,51 @@ func TestConsolidatedParameters_FullRefreshParameter(t *testing.T) {
 	}, result)
 }
 
+func TestConsolidatedParameters_StreamRefresh(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		parameters     pipeline.ParameterMap
+		runFullRefresh bool
+		runRefreshID   string
+		restricted     bool
+		wantID         string
+		wantErr        bool
+	}{
+		{name: "CLI full refresh", parameters: pipeline.ParameterMap{"stream": true}, runFullRefresh: true},
+		{name: "asset full refresh", parameters: pipeline.ParameterMap{"stream": true, "full_refresh": true}},
+		{name: "asset refresh ID", parameters: pipeline.ParameterMap{"stream": true, "full_refresh": true, "refresh_id": "request / $1"}, wantID: "request / $1"},
+		{name: "CLI ID overrides asset ID", parameters: pipeline.ParameterMap{"stream": true, "refresh_id": "asset-id"}, runFullRefresh: true, runRefreshID: "cli-id", wantID: "cli-id"},
+		{name: "CLI ID with asset refresh", parameters: pipeline.ParameterMap{"stream": true, "full_refresh": true}, runRefreshID: "cli-id", wantID: "cli-id"},
+		{name: "ID requires refresh", parameters: pipeline.ParameterMap{"stream": true, "refresh_id": "request-1"}, wantErr: true},
+		{name: "ID requires streaming", parameters: pipeline.ParameterMap{"full_refresh": true, "refresh_id": "request-1"}, wantErr: true},
+		{name: "ID cannot bypass restriction", parameters: pipeline.ParameterMap{"stream": true, "full_refresh": true, "refresh_id": "request-1"}, restricted: true, wantErr: true},
+		{name: "ID cannot target reverse ETL", parameters: pipeline.ParameterMap{"stream": true, "full_refresh": true, "refresh_id": "request-1", "destination": "attio"}, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			asset := &pipeline.Asset{Name: "public.orders", Parameters: tt.parameters, RefreshRestricted: &tt.restricted}
+			ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, tt.runFullRefresh)
+			ctx = context.WithValue(ctx, pipeline.RunConfigRefreshID, tt.runRefreshID)
+			ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Now())
+			result, err := ConsolidatedParameters(ctx, asset, nil, nil)
+			if tt.wantErr {
+				require.ErrorContains(t, err, "requires full refresh and streaming")
+				return
+			}
+			require.NoError(t, err)
+			want := []string{"--stream"}
+			if tt.wantID != "" {
+				want = append(want, "--refresh-id", tt.wantID)
+			}
+			want = append(want, "--full-refresh")
+			assert.Equal(t, want, result)
+		})
+	}
+}
+
 func TestConsolidatedParameters_TrimWhitespace(t *testing.T) {
 	t.Parallel()
 

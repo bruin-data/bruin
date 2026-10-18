@@ -2,6 +2,7 @@ package python
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -113,11 +114,20 @@ func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs 
 		}
 	}
 
-	// A full refresh on a stream would reset ingestr's own CDC state; the run
-	// command rejects the combination up front, but guard here as well.
 	// Reverse-ETL destinations have no table to rebuild, so they run as usual.
 	destination, _ := asset.Parameters.GetString("destination")
-	if fullRefresh && !streaming && !IsReverseETLIngestrDestination(destination) {
+	fullRefresh = fullRefresh && !IsReverseETLIngestrDestination(destination)
+	refreshID, _ := ctx.Value(pipeline.RunConfigRefreshID).(string)
+	if refreshID == "" {
+		refreshID, _ = asset.Parameters.GetString("refresh_id")
+	}
+	if refreshID != "" {
+		if !fullRefresh || !streaming {
+			return nil, fmt.Errorf("refresh_id requires full refresh and streaming to be enabled for asset %q", asset.Name)
+		}
+		cmdArgs = append(cmdArgs, "--refresh-id", refreshID)
+	}
+	if fullRefresh {
 		cmdArgs = append(cmdArgs, "--full-refresh")
 	}
 
