@@ -14,6 +14,7 @@ type Config struct {
 	SecretAccessKey string
 	SessionToken    string
 	Database        string
+	Endpoint        string
 }
 
 func (c *Config) ToDBConnectionURI() (string, error) {
