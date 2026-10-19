@@ -1,9 +1,10 @@
+//go:build !windows
+
 package user
 
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/spf13/afero"
@@ -13,9 +14,6 @@ import (
 
 func TestCopyHomeFilesRelocatesAliasedSymlinks(t *testing.T) {
 	t.Parallel()
-	if runtime.GOOS == "windows" {
-		t.Skip("symlinks require elevated privileges on Windows")
-	}
 	base, err := filepath.EvalSymlinks(t.TempDir())
 	require.NoError(t, err)
 	physical := filepath.Join(base, "physical")
