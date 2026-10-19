@@ -165,7 +165,8 @@ CDC is enabled by setting `cdc: "true"` on an ingestr asset with a MySQL source 
 | Parameter | Required | Description |
 |-----------|----------|-------------|
 | `cdc` | Yes | Set to `"true"` to enable CDC mode |
-| `cdc_mode` | No | **Deprecated** — use `stream` instead. MySQL binary-log CDC only supports batch (read up to the current binlog position and exit), so leave `stream` unset; `stream: true` is rejected by ingestr |
+| `stream` | No | Set to `true` for continuous replication with a compatible destination, including [StarRocks](/ingestion/starrocks#cdc-replication). Launch with `bruin run --stream`. Omit to catch up to the current binlog position and exit. |
+| `cdc_mode` | No | **Deprecated** — use `stream` instead. `cdc_mode: stream` is equivalent to `stream: true`; batch is the default. |
 | `cdc_server_id` | No | Replication server identifier for MySQL binary-log CDC |
 | `cdc_dest_schema` | No | Destination schema to use for multi-table CDC runs |
 | `incremental_strategy` | No | Defaults to `"merge"` when CDC is enabled. CDC assets must use `"merge"`; Bruin rejects other strategies. |
@@ -173,6 +174,7 @@ CDC is enabled by setting `cdc: "true"` on an ingestr asset with a MySQL source 
 Requirements:
 
 - For MySQL binary-log CDC, the server must have `log_bin=ON`, `binlog_format=ROW`, and `binlog_row_image=FULL`.
+- MySQL requires `gtid_mode=ON`, and `binlog_row_value_options` must not include `PARTIAL_JSON`.
 - Source tables must have primary keys, or `primary_key` must be set on the asset columns.
 - Source tables must not contain `ENUM`, `SET`, or `BIT` columns.
 

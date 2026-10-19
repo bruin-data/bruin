@@ -94,7 +94,7 @@ As a result of this command, Bruin will ingest data from the given StarRocks tab
 
 ## Using StarRocks as a destination
 
-StarRocks can also be the destination of an Ingestr asset. Set `destination: starrocks` and point `connection` (or `destination_connection`) at the StarRocks connection; the `name` of the asset is the fully qualified `database.table` written into StarRocks' internal catalog.
+StarRocks can also be the destination of an Ingestr asset. Set `destination: starrocks` and point `connection` (or `destination_connection`) at the StarRocks connection. The asset `name` sets the destination `database.table` in StarRocks' internal catalog.
 
 ```yaml
 name: analytics.events
@@ -108,3 +108,72 @@ parameters:
 ```
 
 Bruin creates the destination table if it does not exist and loads rows via StarRocks [Stream Load](https://docs.starrocks.io/docs/loading/StreamLoad/). The `replace`, `append`, and `merge` strategies are supported; `merge` requires a primary key and produces a StarRocks PRIMARY KEY table. Only the internal catalog is writable — external lakehouse catalogs (Iceberg/Hudi/Hive) are read-only, so they can be used as a source but not a destination.
+
+### CDC replication
+
+StarRocks supports PostgreSQL and MySQL CDC snapshots, incremental catch-up, continuous streaming, and full refresh. Configure the source for [PostgreSQL CDC](/platforms/postgres#cdc-change-data-capture) or [MySQL CDC](/platforms/mysql#cdc-change-data-capture) before running these assets.
+
+For a batch PostgreSQL sync, save this asset as `assets/starrocks_events.yml`:
+
+```yaml
+name: analytics.events
+type: ingestr
+connection: my_starrocks
+
+parameters:
+  source_connection: my_postgres
+  source_table: public.events
+  destination: starrocks
+  cdc: "true"
+```
+
+```bash
+bruin run assets/starrocks_events.yml
+```
+
+The first run snapshots `public.events` into `analytics.events`; later runs resume from the stored checkpoint, catch up, and exit. Bruin automatically selects `merge` for CDC, and ingestr obtains keys from the source. For keyed sources, an existing destination must be a PRIMARY KEY table with matching key columns. Use `bruin run --full-refresh assets/starrocks_events.yml` to rebuild it from a fresh snapshot.
+
+For continuous MySQL replication, save this asset as `assets/starrocks_orders.yml`:
+
+```yaml
+name: analytics.orders
+type: ingestr
+connection: my_starrocks
+
+parameters:
+  source_connection: my_mysql
+  source_table: orders
+  destination: starrocks
+  cdc: "true"
+  cdc_server_id: "23001"
+  stream: true
+  cdc_stream_flush_interval: 5s
+  cdc_stream_flush_records: 10000
+```
+
+```bash
+bruin run --stream assets/starrocks_orders.yml
+```
+
+The same streaming parameters work with PostgreSQL. Streaming assets run until interrupted and require `bruin run --stream`; normal runs skip them. See [Refreshing a stream](/assets/ingestr#refreshing-a-stream) for full refresh while streaming.
+
+### Multiple CDC tables
+
+Set `source_table: "*"` to replicate all eligible source tables, or use a comma-separated list such as `source_table: public.events,public.orders` to select a subset. Set `cdc_dest_schema: analytics` to choose the destination database, or set `database: analytics` on the StarRocks connection. Multi-table CDC requires one of these database settings.
+
+In multi-table mode, ingestr chooses each target name from the source schema and table: PostgreSQL `sales.events` becomes `analytics.sales_events`. PostgreSQL's `public` schema is omitted, so `public.events` becomes `analytics.events`. The asset `name` does not select the individual targets. For a single source table, the asset `name` selects the target and `cdc_dest_schema` is ignored.
+
+### CDC keys, deletes, and requirements
+
+Keyed tables keep one row per source key, including composite keys. Source deletes remain as rows with `_cdc_deleted = true`; query the current mirror with:
+
+```sql
+SELECT * FROM analytics.events WHERE NOT _cdc_deleted;
+```
+
+- StarRocks PRIMARY KEY restrictions apply, including the cluster's encoded key size limit (128 bytes by default). PostgreSQL tables without keys but with `REPLICA IDENTITY FULL` become append-only change logs and can contain replayed events. Filtering `_cdc_deleted` does not turn those logs into a current-state mirror.
+- Ingestr stores checkpoints and ownership metadata in `_bruin_staging`. Preserve its tables and views across runs. The destination user needs permission to create databases, tables, and views, inspect metadata and load transactions, and select, insert, alter, delete, truncate, and drop managed tables.
+- The client must reach both the SQL query port and the Stream Load HTTP endpoint, including the backend address returned by the frontend's redirect. Configure `http_port` and `replication_num` on the existing StarRocks connection as needed.
+- Keep one writer per target and avoid external destination schema changes during ingestion. Multi-table replication does not apply changes atomically across all tables. MySQL changes to a captured table's schema stop replication and require a full refresh.
+
+See the [ingestr StarRocks reference](https://getbruin.com/docs/ingestr/supported-sources/starrocks.html#postgresql-cdc) for source schema changes, PostgreSQL TOAST handling, and destination limits.

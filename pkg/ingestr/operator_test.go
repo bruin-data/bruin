@@ -12,6 +12,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/python"
 	"github.com/bruin-data/bruin/pkg/scheduler"
+	"github.com/bruin-data/bruin/pkg/starrocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -1271,11 +1272,25 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 	mockPg.On("GetIngestrURI").Return("postgresql://user:pass@localhost:5432/db", nil)
 	mockBq := new(mockConnection)
 	mockBq.On("GetIngestrURI").Return("bigquery://uri-here", nil)
+	mockMySQL := new(mockConnection)
+	mockMySQL.On("GetIngestrURI").Return("mysql+pymysql://user:pass@localhost:3306/db", nil)
+	mockStarRocks := new(mockConnection)
+	mockStarRocks.On("GetIngestrURI").Return((starrocks.Config{
+		Username:       "root",
+		Password:       "pass",
+		Host:           "localhost",
+		Database:       "analytics",
+		HTTPPort:       8040,
+		ReplicationNum: 1,
+		SSL:            "true",
+	}).GetIngestrURI(), nil)
 
 	fetcher := simpleConnectionFetcher{
 		connections: map[string]*mockConnection{
-			"pg": mockPg,
-			"bq": mockBq,
+			"pg":        mockPg,
+			"bq":        mockBq,
+			"mysql":     mockMySQL,
+			"starrocks": mockStarRocks,
 		},
 	}
 
@@ -1289,6 +1304,88 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 		want        []string
 		wantErr     string
 	}{
+		{
+			name: "PostgreSQL CDC to StarRocks preserves destination options without explicit keys",
+			asset: &pipeline.Asset{
+				Name:       "analytics.users",
+				Type:       pipeline.AssetTypeIngestr,
+				Connection: "starrocks",
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "pg",
+					"source_table":      "public.users",
+					"destination":       "starrocks",
+					"cdc":               true,
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "postgres+cdc://user:pass@localhost:5432/db",
+				"--source-table", "public.users",
+				"--dest-uri", "starrocks://root:pass@localhost:9030/analytics?http_port=8040&replication_num=1&ssl=true",
+				"--dest-table", "analytics.users",
+				"--yes",
+				"--progress", "log",
+				"--incremental-strategy", "merge",
+			},
+		},
+		{
+			name: "PostgreSQL CDC to StarRocks routes multiple tables to a destination database",
+			asset: &pipeline.Asset{
+				Name:       "analytics.replica",
+				Type:       pipeline.AssetTypeIngestr,
+				Connection: "starrocks",
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "pg",
+					"source_table":      "*",
+					"destination":       "starrocks",
+					"cdc":               true,
+					"cdc_dest_schema":   "replica",
+					"cdc_state_id":      "pg-starrocks",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "postgres+cdc://user:pass@localhost:5432/db?dest_schema=replica&state_id=pg-starrocks",
+				"--dest-uri", "starrocks://root:pass@localhost:9030/analytics?http_port=8040&replication_num=1&ssl=true",
+				"--dest-table", "analytics.replica",
+				"--yes",
+				"--progress", "log",
+				"--incremental-strategy", "merge",
+			},
+		},
+		{
+			name:        "MySQL CDC to StarRocks streams with full refresh",
+			fullRefresh: true,
+			refreshID:   "starrocks-refresh",
+			asset: &pipeline.Asset{
+				Name:       "analytics.users",
+				Type:       pipeline.AssetTypeIngestr,
+				Connection: "starrocks",
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "mysql",
+					"source_table":      "db.users",
+					"destination":       "starrocks",
+					"cdc":               true,
+					"cdc_server_id":     "23001",
+					"stream":            true,
+					"flush_interval":    "5s",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "mysql+pymysql+cdc://user:pass@localhost:3306/db?server_id=23001",
+				"--source-table", "db.users",
+				"--dest-uri", "starrocks://root:pass@localhost:9030/analytics?http_port=8040&replication_num=1&ssl=true",
+				"--dest-table", "analytics.users",
+				"--yes",
+				"--progress", "log",
+				"--incremental-strategy", "merge",
+				"--stream",
+				"--flush-interval", "5s",
+				"--refresh-id", "starrocks-refresh",
+				"--full-refresh",
+			},
+		},
 		{
 			name: "CDC mode transforms URI and auto-sets merge strategy",
 			asset: &pipeline.Asset{
@@ -1572,6 +1669,7 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
+			runner.AssertExpectations(t)
 		})
 	}
 }
