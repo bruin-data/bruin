@@ -44,6 +44,29 @@ func TestRepositoryTemplates(t *testing.T) {
 	}
 }
 
+func TestCloneForAssetDoesNotRetainPreviousRepository(t *testing.T) {
+	t.Parallel()
+	var renderer RendererInterface = NewRenderer(Context{})
+	for _, value := range []string{"first-repo", "second-repo"} {
+		root := t.TempDir()
+		require.NoError(t, os.Mkdir(filepath.Join(root, ".git"), 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(root, "value.sql"), []byte(value), 0o600))
+		pipe := &pipeline.Pipeline{Name: value}
+		pipe.DefinitionFile.Path = filepath.Join(root, "pipeline.yml")
+		var err error
+		renderer, err = renderer.CloneForAsset(t.Context(), pipe, &pipeline.Asset{})
+		require.NoError(t, err)
+		out, err := renderer.Render(`{% include 'value.sql' %}`)
+		require.NoError(t, err)
+		require.Equal(t, value, out)
+	}
+	renderer, err := renderer.CloneForAsset(t.Context(), &pipeline.Pipeline{}, &pipeline.Asset{})
+	require.NoError(t, err)
+	out, err := renderer.Render(`{% include 'value.sql' %}`)
+	require.Error(t, err)
+	require.Empty(t, out)
+}
+
 func TestTemplateFileAccessDenied(t *testing.T) {
 	t.Parallel()
 	parent := t.TempDir()
@@ -111,14 +134,14 @@ func TestCloneForAssetRepositoryScope(t *testing.T) {
 	pipe.DefinitionFile.Path = filepath.Join(root, "pipelines", "pipeline.yml")
 	ctx := context.Background()
 	now := time.Now()
-	contexts := []context.Context{ctx}
+	contexts := [4]context.Context{ctx}
 	ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, now)
-	contexts = append(contexts, ctx)
+	contexts[1] = ctx
 	ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, now)
-	contexts = append(contexts, ctx)
+	contexts[2] = ctx
 	ctx = context.WithValue(ctx, pipeline.RunConfigExecutionDate, now)
 	ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test")
-	contexts = append(contexts, ctx)
+	contexts[3] = ctx
 	for dates, ctx := range contexts {
 		t.Run(fmt.Sprintf("run_dates=%d", dates), func(t *testing.T) {
 			t.Parallel()

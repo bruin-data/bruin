@@ -297,13 +297,16 @@ func hideMacroOutputMarker(err error, marker string) error {
 }
 
 // RestrictTemplateFilesystemEnv is retained for source compatibility.
+//
 // Deprecated: template file access is always repository-scoped, regardless of this environment variable.
 const RestrictTemplateFilesystemEnv = "BRUIN_RESTRICT_TEMPLATE_FILESYSTEM"
 
 //nolint:ireturn
 func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, asset *pipeline.Asset) (RendererInterface, error) {
-	repositoryRoot := r.repositoryRoot
-	if repositoryRoot == "" && pipe.DefinitionFile.Path != "" {
+	// A renderer can be reused across pipelines; only the current pipeline may
+	// grant file access, never the previous clone's repository.
+	repositoryRoot := ""
+	if pipe.DefinitionFile.Path != "" {
 		if repo, err := git.FindRepoFromPath(filepath.Dir(pipe.DefinitionFile.Path)); err == nil {
 			repositoryRoot = repo.Path
 		}
