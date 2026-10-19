@@ -287,6 +287,7 @@ require (
 
 require (
 	cloud.google.com/go v0.123.0
+	code.dny.dev/ssrf v0.3.0
 	github.com/99designs/keyring v1.2.2
 	github.com/aws/aws-sdk-go v1.55.6
 	github.com/bruin-data/bruin/semantic-engine v0.0.0

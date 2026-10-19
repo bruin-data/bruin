@@ -5,16 +5,35 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"slices"
 	"syscall"
 	"time"
+
+	"code.dny.dev/ssrf"
 )
 
-// Cloud metadata services that are not covered by the link-local range check.
-var metadataIPs = []net.IP{
-	net.ParseIP("fd00:ec2::254"),   // AWS IMDS over IPv6
-	net.ParseIP("100.100.100.200"), // Alibaba Cloud metadata
+// endpointGuardian denies the IANA special-purpose ranges (link-local and cloud metadata,
+// reserved, documentation, multicast, ...) except loopback and private networks, which local
+// emulators and self-hosted endpoints use.
+var endpointGuardian = ssrf.New(
+	ssrf.WithAnyPort(),
+	ssrf.WithAllowedV4Prefixes(
+		netip.MustParsePrefix("127.0.0.0/8"),
+		netip.MustParsePrefix("10.0.0.0/8"),
+		netip.MustParsePrefix("172.16.0.0/12"),
+		netip.MustParsePrefix("192.168.0.0/16"),
+	),
+	ssrf.WithAllowedV6Prefixes(
+		netip.MustParsePrefix("::1/128"),
+		netip.MustParsePrefix("fc00::/7"),
+	),
+)
+
+// Metadata services inside the allowed private ranges, which the guardian would let through.
+var metadataAddrs = []netip.Addr{
+	netip.MustParseAddr("fd00:ec2::254"), // AWS IMDS over IPv6
 }
 
 // parseEndpointURL accepts only a bare scheme://host[:port] so that the value cannot
@@ -38,12 +57,13 @@ func parseEndpointURL(raw string) (*url.URL, error) {
 
 // checkEndpointIP rejects addresses a custom endpoint must never reach. It runs on the
 // resolved IP at dial time, so a hostname cannot pass validation and later resolve elsewhere.
-func checkEndpointIP(ip net.IP, plainHTTP bool) error {
-	if ip.IsUnspecified() || ip.IsMulticast() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+func checkEndpointIP(ip netip.Addr, plainHTTP bool) error {
+	ip = ip.Unmap()
+	if slices.Contains(metadataAddrs, ip) {
 		return fmt.Errorf("endpoint_url resolves to %s, which is not allowed", ip)
 	}
-	if slices.ContainsFunc(metadataIPs, ip.Equal) {
-		return fmt.Errorf("endpoint_url resolves to %s, which is not allowed", ip)
+	if err := endpointGuardian.SafeAddr(ip); err != nil {
+		return fmt.Errorf("endpoint_url resolves to %s, which is not allowed: %w", ip, err)
 	}
 	if plainHTTP && !ip.IsLoopback() {
 		return fmt.Errorf("endpoint_url resolves to %s; http:// is only allowed for loopback addresses, use https:// instead", ip)
@@ -59,15 +79,11 @@ func newEndpointHTTPClient(plainHTTP bool) *http.Client {
 		Timeout:   30 * time.Second,
 		KeepAlive: 30 * time.Second,
 		Control: func(_, address string, _ syscall.RawConn) error {
-			host, _, err := net.SplitHostPort(address)
+			addrPort, err := netip.ParseAddrPort(address)
 			if err != nil {
-				return err
+				return fmt.Errorf("endpoint_url dialed an invalid address %q: %w", address, err)
 			}
-			ip := net.ParseIP(host)
-			if ip == nil {
-				return fmt.Errorf("endpoint_url dialed a non-IP address %q", host)
-			}
-			return checkEndpointIP(ip, plainHTTP)
+			return checkEndpointIP(addrPort.Addr(), plainHTTP)
 		},
 	}
 
