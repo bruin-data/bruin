@@ -85,8 +85,11 @@ func TestCopyHomeFilesRelocatesAliasedSymlinks(t *testing.T) {
 			assert.Equal(t, link.contents, string(contents), link.name)
 		}
 	}
-	assert.DirExists(t, filepath.Join(destination, "bin-link"))
-	assert.NoFileExists(t, filepath.Join(destination, "dangling"))
+	info, err := os.Stat(filepath.Join(destination, "bin-link"))
+	require.NoError(t, err)
+	assert.True(t, info.IsDir())
+	_, err = os.Stat(filepath.Join(destination, "dangling"))
+	require.ErrorIs(t, err, os.ErrNotExist)
 	require.NoError(t, os.MkdirAll(filepath.Join(destination, "pending"), 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(destination, "pending", "tool"), []byte("new binary"), 0o755))
 	contents, err := os.ReadFile(filepath.Join(destination, "dangling"))
