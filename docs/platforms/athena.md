@@ -32,6 +32,26 @@ The field `database` is optional, if not provided, it will default to `default`.
 > [!WARNING]
 > The results of the materialization as well as any temporary tables Bruin needs to create will be stored at the location defined by `query_results_path`. This location must be writable and might be required to be empty at the beginning.
 
+### Custom Endpoint
+
+To send Athena requests to an Athena-compatible endpoint other than AWS, set the optional `endpoint_url` field:
+
+```yaml
+connections:
+    athena:
+        - name: "connection_name"
+          region: "us-east-1"
+          database: "some_database"
+          access_key_id: "XXXXXXXX"
+          secret_access_key: "YYYYYYYY"
+          query_results_path: "s3://some-bucket/some-path"
+          endpoint_url: "https://athena.example.com"
+```
+
+`endpoint_url` must be a bare `https://host[:port]` URL, without a path, query, or credentials. `http://` is only accepted when the host resolves to a loopback address, such as `http://localhost:4566`. Bruin rejects endpoints that resolve to link-local or cloud metadata addresses, does not follow redirects, and does not use proxy settings for these requests.
+
+A connection with `endpoint_url` must set `access_key_id` and `secret_access_key` or a `profile`. Bruin does not fall back to the default AWS credential chain for custom endpoints.
+
 ## Athena Assets
 
 ### `athena.sql`

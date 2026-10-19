@@ -459,6 +459,9 @@
         },
         "profile": {
           "type": "string"
+        },
+        "endpoint_url": {
+          "type": "string"
         }
       },
       "additionalProperties": false,

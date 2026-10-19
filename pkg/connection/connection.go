@@ -573,6 +573,7 @@ func (m *Manager) AddAthenaConnectionFromConfig(connection *config.AthenaConnect
 		SecretAccessKey: connection.SecretKey,
 		SessionToken:    connection.SessionToken,
 		Database:        connection.Database,
+		Endpoint:        connection.EndpointURL,
 	})
 	m.availableConnections[connection.Name] = m.Athena[connection.Name]
 	m.AllConnectionDetails[connection.Name] = connection
