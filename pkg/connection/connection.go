@@ -3876,6 +3876,7 @@ func (m *Manager) AddJiraConnectionFromConfig(connection *config.JiraConnection)
 		Domain:   connection.Domain,
 		Email:    connection.Email,
 		APIToken: connection.APIToken,
+		CloudID:  connection.CloudID,
 	})
 	if err != nil {
 		return err
