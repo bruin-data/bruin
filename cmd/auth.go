@@ -51,7 +51,7 @@ func logoutCommand(deps logoutDependencies) *cli.Command {
 	return &cli.Command{Name: "logout", Usage: "Remove a repository or global Bruin Cloud login", Flags: []cli.Flag{
 		&cli.BoolFlag{Name: "repo", Usage: "Remove the selected repository bruin connection"},
 		&cli.BoolFlag{Name: cloudAuthGlobal, Usage: "Remove the global login and its OS credential-store token"},
-		&cli.BoolFlag{Name: "revoke", Usage: "Also revoke the personal token in Cloud"},
+		&cli.BoolFlag{Name: "revoke", Usage: "Also revoke the token in Bruin Cloud"},
 	}, Action: func(ctx context.Context, c *cli.Command) error {
 		if c.Bool("repo") && c.Bool(cloudAuthGlobal) {
 			return errors.New("--repo and --global cannot be used together")
@@ -121,8 +121,9 @@ func logoutCommand(deps logoutDependencies) *cli.Command {
 					return err
 				}
 				if err := cloudauth.Revoke(ctx, &cloudauth.Credential{Token: ref.Connection.APIToken, APIURL: cloudauth.APIURL()}); err != nil {
-					return err
+					return fmt.Errorf("repository login was not removed: %w", err)
 				}
+				_, _ = fmt.Fprintln(output, "Token revoked in Bruin Cloud. Other copies of this token are now invalid.")
 			}
 			if err := config.RemoveCloudConnection(afero.NewOsFs(), path, expected, *ref); err != nil {
 				return err
@@ -143,8 +144,9 @@ func logoutCommand(deps logoutDependencies) *cli.Command {
 				return errors.New("no global login found")
 			}
 			if err := cloudauth.Revoke(ctx, credential); err != nil {
-				return err
+				return fmt.Errorf("global login was not removed: %w", err)
 			}
+			_, _ = fmt.Fprintln(output, "Token revoked in Bruin Cloud. Other copies of this token are now invalid.")
 		}
 		if err := store.Delete(); err != nil {
 			return err

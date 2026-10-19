@@ -84,11 +84,13 @@ Remove your global login:
 bruin cloud logout --global
 ```
 
-Add `--revoke` to also invalidate the token in Cloud, including any other copies:
+By default, logout only removes the local login; it does not revoke the token in Cloud. Add `--revoke` to also invalidate the selected token:
 
 ```bash
-bruin cloud logout --global --revoke
+bruin cloud logout --revoke
 ```
+
+This still opens the repository/global selection menu. Combine `--revoke` with `--repo` or `--global` to skip the menu. Bruin revokes the token before removing the local login and reports both steps. Other copies of the same token also stop working. If revocation fails, the local login is kept so you can retry.
 
 Without an interactive terminal, specify `--repo` or `--global`.
 
