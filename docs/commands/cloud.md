@@ -81,7 +81,13 @@ bruin cloud logout --repo
 bruin cloud logout --global
 ```
 
-See [Sign out](./login#sign-out) for revoking the token in Cloud.
+By default, logout only removes the local login. To also revoke the token in Bruin Cloud, run:
+
+```bash
+bruin cloud logout --revoke
+```
+
+The selection menu still opens. Bruin reports token revocation and local login removal separately. Other copies of the revoked token also stop working. If revocation fails, the local login is kept. See [Sign out](./login#sign-out) for details.
 
 ### `auth status`
 
