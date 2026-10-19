@@ -890,6 +890,11 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 		return err
 	}
 
+	if strings.HasPrefix(destURI, "duckdb://") {
+		unlockDuckDB := duck.LockDatabases(destURI)
+		defer unlockDuckDB()
+	}
+
 	return o.runner.RunIngestr(ctx, cmdArgs, extraPackages, repo)
 }
 
