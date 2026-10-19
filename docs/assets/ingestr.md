@@ -225,6 +225,8 @@ For `truncate+insert`, ingestr truncates the target table before loading new row
 
 Each source-specific ingestion page in this documentation lists that source's supported tables with primary keys, incremental keys, and default incremental strategies. The upstream ingestr docs remain the source of truth for destination-specific strategy limits.
 
+For PostgreSQL or MySQL CDC into StarRocks, see [StarRocks CDC replication](/ingestion/starrocks#cdc-replication) for batch and streaming examples, destination naming, and requirements.
+
 ### Column metadata
 
 Define columns on the asset to enrich the metadata passed to Ingestr. Columns flagged as `primary_key: true` are translated into repeated `--primary-key` flags, columns with `mask` are translated into repeated `--mask` flags, and date-typed incremental keys automatically surface through `--columns`. See [Column metadata](./columns.md) for the syntax.
@@ -266,7 +268,7 @@ Pipeline run options propagate to ingestr automatically:
 
 Some ingestr sources can ingest **continuously** and never finish on their own:
 
-* CDC sources (PostgreSQL, Vitess, PlanetScale) with `cdc: true` and `stream: true`.
+* CDC sources (such as PostgreSQL, MySQL, Vitess, and PlanetScale) with `cdc: true` and `stream: true`, using a destination that supports the source's CDC requirements.
 * Message-broker sources (Kafka, Kinesis) with `stream: true`.
 
 A continuous asset does not fit a normal batch `bruin run` (which expects every asset to complete), so Bruin keeps streaming assets out of ordinary runs and gives them a dedicated run mode.
