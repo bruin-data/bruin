@@ -14,7 +14,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/cloudauth"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/git"
-	bruinpath "github.com/bruin-data/bruin/pkg/path"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -44,7 +43,7 @@ func loginCommand(deps loginDependencies) *cli.Command {
 		Name:  "login",
 		Usage: "Sign in to Bruin Cloud",
 		Flags: []cli.Flag{
-			&cli.BoolFlag{Name: "repo", Usage: "Save a bruin connection in this Bruin project repository"},
+			&cli.BoolFlag{Name: "repo", Usage: "Save a bruin connection in this Git repository, creating .bruin.yml if needed"},
 			&cli.BoolFlag{Name: cloudAuthGlobal, Usage: "Save the token in the OS credential store"},
 			&cli.BoolFlag{Name: "no-browser", Usage: "Print the authorization URL without opening a browser"},
 			&cli.BoolFlag{Name: "reauth", Usage: "Explicitly replace the selected login after browser approval"},
@@ -199,23 +198,27 @@ func runOAuthLogin(ctx context.Context, c *cli.Command, deps loginDependencies) 
 		target = cloudAuthGlobal
 	case c.Bool("repo"):
 		if path == "" {
-			return errors.New("--repo requires a Bruin project in a Git repository (.bruin.yml or pipeline.yml/pipeline.yaml); use --global")
+			return errors.New("--repo requires a Git repository; run from a Git repository or use --global")
 		}
 	default:
 		if !prompt.interactive {
 			return errors.New("specify --repo or --global in a non-interactive terminal")
 		}
 		if path == "" {
+			return errors.New("no Git repository found; run from a Git repository or use --global")
+		}
+		repositoryOption := "This repository"
+		if _, err := os.Lstat(path); errors.Is(err, os.ErrNotExist) {
+			repositoryOption += " (create .bruin.yml)"
+		} else if err != nil {
+			return err
+		}
+		choice, err := prompt.choose(ctx, "Where should Bruin save this login?", []string{repositoryOption, "Global"})
+		if err != nil {
+			return err
+		}
+		if choice == 1 {
 			target = cloudAuthGlobal
-			_, _ = fmt.Fprintln(output, "No Bruin project found; using global login.")
-		} else {
-			choice, err := prompt.choose(ctx, "Where should Bruin save this login?", []string{"This repository", "Global"})
-			if err != nil {
-				return err
-			}
-			if choice == 1 {
-				target = cloudAuthGlobal
-			}
 		}
 	}
 	if target == cloudAuthGlobal && (c.String("connection") != "" || c.String("environment") != "") {
@@ -334,22 +337,7 @@ func repoLoginConfigPath() (string, error) {
 	if errors.Is(err, git.ErrNoGitRepoFound) {
 		return "", nil
 	}
-	if err != nil {
-		return "", err
-	}
-	if _, err := os.Lstat(path); err == nil {
-		return path, nil
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return "", err
-	}
-	pipelines, err := bruinpath.GetPipelinePaths(filepath.Dir(path), PipelineDefinitionFiles)
-	if err != nil {
-		return "", fmt.Errorf("could not find Bruin pipelines: %w", err)
-	}
-	if len(pipelines) == 0 {
-		return "", nil
-	}
-	return path, nil
+	return path, err
 }
 
 func chooseLoginConnection(ctx context.Context, c *cli.Command, cm *config.Config, prompt authPrompt) (config.CloudConnectionRef, bool, error) {

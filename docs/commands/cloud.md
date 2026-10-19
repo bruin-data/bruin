@@ -15,7 +15,7 @@ bruin cloud login
 bruin cloud projects list
 ```
 
-Outside a Bruin project, or to sign in across projects, use `bruin cloud login --global`.
+In a Git repository, login offers to create `.bruin.yml` if it is missing. Outside a Git repository, or to sign in across projects, use `bruin cloud login --global`.
 
 For CI or an existing API token, set `BRUIN_CLOUD_API_KEY` or pass `--api-key`:
 
