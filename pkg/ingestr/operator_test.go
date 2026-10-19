@@ -1282,10 +1282,12 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 	finder := new(mockFinder)
 
 	tests := []struct {
-		name    string
-		asset   *pipeline.Asset
-		want    []string
-		wantErr string
+		name        string
+		asset       *pipeline.Asset
+		fullRefresh bool
+		refreshID   string
+		want        []string
+		wantErr     string
 	}{
 		{
 			name: "CDC mode transforms URI and auto-sets merge strategy",
@@ -1358,7 +1360,9 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 			},
 		},
 		{
-			name: "CDC full refresh ID survives the cdc_mode stream alias",
+			name:        "runtime CDC full refresh ID survives the cdc_mode stream alias",
+			fullRefresh: true,
+			refreshID:   "request / 1",
 			asset: &pipeline.Asset{
 				Name:       "cdc-stream-refresh",
 				Connection: "bq",
@@ -1368,8 +1372,6 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 					"destination":       "bigquery",
 					"cdc":               true,
 					"cdc_mode":          "stream",
-					"full_refresh":      true,
-					"refresh_id":        "request / 1",
 				},
 			},
 			want: []string{
@@ -1561,7 +1563,8 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 				Asset:    tt.asset,
 			}
 
-			ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, false)
+			ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, tt.fullRefresh)
+			ctx = context.WithValue(ctx, pipeline.RunConfigRefreshID, tt.refreshID)
 
 			err := o.Run(ctx, &ti)
 			if tt.wantErr != "" {

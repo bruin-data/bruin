@@ -588,12 +588,8 @@ func validateStreamingRun(c *cli.Command, asset *pipeline.Asset, runningForAsset
 			return fmt.Errorf("--stream cannot be combined with --%s", incompatible)
 		}
 	}
-	refreshID := c.String("refresh-id")
-	if refreshID == "" {
-		refreshID, _ = asset.Parameters.GetString("refresh_id")
-	}
-	if refreshID != "" && !asset.FullRefreshEnabled(c.Bool("full-refresh")) {
-		return errors.New("--refresh-id or parameters.refresh_id requires full refresh to be enabled")
+	if c.String("refresh-id") != "" && !asset.FullRefreshEnabled(c.Bool("full-refresh")) {
+		return errors.New("--refresh-id requires full refresh to be enabled")
 	}
 	return nil
 }

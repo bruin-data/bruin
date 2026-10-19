@@ -37,7 +37,7 @@ table td:first-child {
 | `--downstream` | bool | `false` | Run all downstream assets as well. |
 | `--workers` | int | `16` | Number of workers to run assets in parallel. |
 | `--stream` | bool | `false` | Run one streaming ingestr asset continuously. |
-| `--refresh-id` | str | - | Stable identifier for a streaming full refresh. Requires `--stream` and either `--full-refresh` or `parameters.full_refresh: true`. Reuse it when retrying the same request. |
+| `--refresh-id` | str | - | Identifier supplied for this run's streaming full refresh. Requires `--stream` and either `--full-refresh` or `parameters.full_refresh: true`. Supply it on the command line for each invocation, reusing it when retrying the same request. |
 | `--start-date` | str | Beginning of the previous UTC day | The start date of the range the pipeline will run for. Format: `YYYY-MM-DD`, `YYYY-MM-DD HH:MM:SS`, or `YYYY-MM-DD HH:MM:SS.ffffff` |
 | `--end-date` | str | End of the previous UTC day | The end date of the range the pipeline will run for. Format: `YYYY-MM-DD`, `YYYY-MM-DD HH:MM:SS`, or `YYYY-MM-DD HH:MM:SS.ffffff` |
 | `--environment` | str | - | The environment to use. |
@@ -290,6 +290,14 @@ Run with full refresh to reprocess all historical data:
 ```bash
 bruin run --full-refresh
 ```
+
+For a streaming CDC asset, supply a refresh identifier for the run:
+
+```bash
+bruin run --stream --full-refresh --refresh-id refresh-2026-10-18 assets/my_stream.asset.yml
+```
+
+Reuse the identifier when restarting the same request so a completed refresh resumes streaming. Use a new identifier to request another refresh. If the asset sets `parameters.full_refresh: true`, the command can omit `--full-refresh`; `--refresh-id` remains a command-line option.
 
 > [!TIP]
 > You can protect assets from being dropped during full refresh by setting `full_refresh_restricted: true` in an asset definition, or for an entire environment under `.bruin.yml` `config.full_refresh_restricted`. Asset-level `refresh_restricted` is still supported as an alias. See [Materialization](../assets/materialization.md#full-refresh-and-full-refresh-restricted) for more details.

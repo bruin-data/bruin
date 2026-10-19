@@ -289,13 +289,14 @@ func TestConsolidatedParameters_StreamRefresh(t *testing.T) {
 	}{
 		{name: "CLI full refresh", parameters: pipeline.ParameterMap{"stream": true}, runFullRefresh: true},
 		{name: "asset full refresh", parameters: pipeline.ParameterMap{"stream": true, "full_refresh": true}},
-		{name: "asset refresh ID", parameters: pipeline.ParameterMap{"stream": true, "full_refresh": true, "refresh_id": "request / $1"}, wantID: "request / $1"},
-		{name: "CLI ID overrides asset ID", parameters: pipeline.ParameterMap{"stream": true, "refresh_id": "asset-id"}, runFullRefresh: true, runRefreshID: "cli-id", wantID: "cli-id"},
+		{name: "CLI refresh ID", parameters: pipeline.ParameterMap{"stream": true}, runFullRefresh: true, runRefreshID: "request / $1", wantID: "request / $1"},
+		{name: "asset refresh ID is ignored", parameters: pipeline.ParameterMap{"stream": true, "full_refresh": true, "refresh_id": "asset-id"}},
+		{name: "CLI ID is independent of asset parameters", parameters: pipeline.ParameterMap{"stream": true, "refresh_id": "asset-id"}, runFullRefresh: true, runRefreshID: "cli-id", wantID: "cli-id"},
 		{name: "CLI ID with asset refresh", parameters: pipeline.ParameterMap{"stream": true, "full_refresh": true}, runRefreshID: "cli-id", wantID: "cli-id"},
-		{name: "ID requires refresh", parameters: pipeline.ParameterMap{"stream": true, "refresh_id": "request-1"}, wantErr: true},
-		{name: "ID requires streaming", parameters: pipeline.ParameterMap{"full_refresh": true, "refresh_id": "request-1"}, wantErr: true},
-		{name: "ID cannot bypass restriction", parameters: pipeline.ParameterMap{"stream": true, "full_refresh": true, "refresh_id": "request-1"}, restricted: true, wantErr: true},
-		{name: "ID cannot target reverse ETL", parameters: pipeline.ParameterMap{"stream": true, "full_refresh": true, "refresh_id": "request-1", "destination": "attio"}, wantErr: true},
+		{name: "ID requires refresh", parameters: pipeline.ParameterMap{"stream": true}, runRefreshID: "request-1", wantErr: true},
+		{name: "ID requires streaming", parameters: pipeline.ParameterMap{"full_refresh": true}, runRefreshID: "request-1", wantErr: true},
+		{name: "ID cannot bypass restriction", parameters: pipeline.ParameterMap{"stream": true, "full_refresh": true}, runRefreshID: "request-1", restricted: true, wantErr: true},
+		{name: "ID cannot target reverse ETL", parameters: pipeline.ParameterMap{"stream": true, "full_refresh": true, "destination": "attio"}, runRefreshID: "request-1", wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -318,6 +319,17 @@ func TestConsolidatedParameters_StreamRefresh(t *testing.T) {
 			assert.Equal(t, want, result)
 		})
 	}
+}
+
+func TestConsolidatedParameters_AssetRefreshIDDoesNotRequestRefresh(t *testing.T) {
+	t.Parallel()
+	asset := &pipeline.Asset{
+		Name:       "public.orders",
+		Parameters: pipeline.ParameterMap{"stream": true, "refresh_id": "asset-value"},
+	}
+	result, err := ConsolidatedParameters(t.Context(), asset, nil, nil)
+	require.NoError(t, err)
+	require.Equal(t, []string{"--stream"}, result)
 }
 
 func TestConsolidatedParameters_TrimWhitespace(t *testing.T) {

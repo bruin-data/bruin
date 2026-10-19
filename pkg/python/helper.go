@@ -118,12 +118,9 @@ func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs 
 	destination, _ := asset.Parameters.GetString("destination")
 	fullRefresh = fullRefresh && !IsReverseETLIngestrDestination(destination)
 	refreshID, _ := ctx.Value(pipeline.RunConfigRefreshID).(string)
-	if refreshID == "" {
-		refreshID, _ = asset.Parameters.GetString("refresh_id")
-	}
 	if refreshID != "" {
 		if !fullRefresh || !streaming {
-			return nil, fmt.Errorf("refresh_id requires full refresh and streaming to be enabled for asset %q", asset.Name)
+			return nil, fmt.Errorf("--refresh-id requires full refresh and streaming to be enabled for asset %q", asset.Name)
 		}
 		cmdArgs = append(cmdArgs, "--refresh-id", refreshID)
 	}
