@@ -1,14 +1,17 @@
 package athena
 
 import (
+	"context"
 	"encoding/json"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/stretchr/testify/require"
@@ -21,16 +24,32 @@ type fakeAthena struct {
 	state     string
 	reason    string
 	operation []string
+	// hangStatus makes GetQueryExecution wait until the client gives up on the request.
+	hangStatus bool
+}
+
+func (f *fakeAthena) ops() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.operation)
 }
 
 func (f *fakeAthena) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
 	var body map[string]any
 	_ = json.NewDecoder(r.Body).Decode(&body)
 	op := strings.TrimPrefix(r.Header.Get("X-Amz-Target"), "AmazonAthena.")
+
+	f.mu.Lock()
 	f.operation = append(f.operation, op)
+	hang := f.hangStatus && op == "GetQueryExecution"
+	f.mu.Unlock()
+	if hang {
+		<-r.Context().Done()
+		return
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
 
 	w.Header().Set("Content-Type", "application/x-amz-json-1.1")
 	var resp any
@@ -44,6 +63,8 @@ func (f *fakeAthena) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			"StatementType":    "DML",
 			"Status":           map[string]any{"State": f.state, "StateChangeReason": f.reason},
 		}}
+	case "StopQueryExecution":
+		resp = map[string]any{}
 	case "GetQueryResults":
 		resp = map[string]any{"ResultSet": map[string]any{
 			"ResultSetMetadata": map[string]any{"ColumnInfo": []map[string]any{
@@ -100,6 +121,40 @@ func TestDB_CustomEndpointQueryFailure(t *testing.T) {
 
 	err := db.RunQueryWithoutResult(t.Context(), &query.Query{Query: "SELECT * FROM t"})
 	require.EqualError(t, err, "TABLE_NOT_FOUND: t")
+}
+
+func TestDB_CustomEndpointStopsQueryOnCancel(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name string
+		fake *fakeAthena
+	}{
+		// ctx ends while waiting for the next poll.
+		{name: "between polls", fake: &fakeAthena{state: "RUNNING"}},
+		// ctx ends while a GetQueryExecution request is in flight.
+		{name: "during status request", fake: &fakeAthena{hangStatus: true}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			db := newEndpointTestDB(t, tt.fake)
+			ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
+			defer cancel()
+
+			err := db.RunQueryWithoutResult(ctx, &query.Query{Query: "SELECT 1"})
+			require.ErrorContains(t, err, context.DeadlineExceeded.Error())
+			require.Contains(t, tt.fake.ops(), "StopQueryExecution")
+		})
+	}
+}
+
+func TestDB_CustomEndpointRejectsIngestr(t *testing.T) {
+	t.Parallel()
+
+	db := NewDB(&Config{Endpoint: "https://athena.example.com"})
+	_, err := db.GetIngestrURI()
+	require.ErrorContains(t, err, "endpoint_url is not supported for ingestr")
 }
 
 func TestParseEndpointURL(t *testing.T) {

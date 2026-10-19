@@ -140,6 +140,11 @@ func (c *endpointConn) run(ctx context.Context, query string) (string, error) {
 			QueryExecutionId: aws.String(queryID),
 		})
 		if err != nil {
+			// The query may still be running, e.g. when ctx was canceled mid-request.
+			c.stop(ctx, queryID)
+			if ctx.Err() != nil {
+				return "", ctx.Err()
+			}
 			return "", err
 		}
 
@@ -155,14 +160,19 @@ func (c *endpointConn) run(ctx context.Context, query string) (string, error) {
 
 		select {
 		case <-ctx.Done():
-			// ctx is already done, so stop the query on a detached context with its own deadline.
-			stopCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
-			_, _ = api.StopQueryExecutionWithContext(stopCtx, &athena.StopQueryExecutionInput{
-				QueryExecutionId: aws.String(queryID),
-			})
-			cancel()
+			c.stop(ctx, queryID)
 			return "", ctx.Err()
 		case <-time.After(config.GetResultPollIntervalSeconds()):
 		}
 	}
+}
+
+// stop makes a best-effort attempt to stop an unfinished query. ctx may already be done,
+// so the request runs on a detached context with its own deadline.
+func (c *endpointConn) stop(ctx context.Context, queryID string) {
+	stopCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+	defer cancel()
+	_, _ = c.connector.api.StopQueryExecutionWithContext(stopCtx, &athena.StopQueryExecutionInput{
+		QueryExecutionId: aws.String(queryID),
+	})
 }
