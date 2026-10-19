@@ -505,4 +505,4 @@ Example query error:
 | `GET /api/v1/connection-sets/{id}/connections` | `connection-set:list` | The connection names and types in a set |
 | `POST /api/v1/connection-sets` | `connection-set:create` | Creates a connection set |
 
-For all endpoints, see the [API reference](https://cloud.getbruin.com/docs/api). You can also send test requests there.
+For all endpoints, see the [API reference](https://cloud.getbruin.com/docs/api?utm_source=docs&utm_medium=referral&utm_campaign=bruin-cli&utm_content=query-api). You can also send test requests there.

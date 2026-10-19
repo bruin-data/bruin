@@ -107,7 +107,7 @@ Bruin Cloud has two tracks. Pick the one that matches what you want to do first 
 
 ## Before you start
 
-**Sign up** at [cloud.getbruin.com/register](https://cloud.getbruin.com/register) with email and password, or sign in with Google. Right after sign-up, Bruin Cloud asks which track you want — pick **AI Data Analyst** or **ETL/ELT Pipeline**.
+**Sign up** at [cloud.getbruin.com/register](https://cloud.getbruin.com/register?utm_source=docs&utm_medium=referral&utm_campaign=bruin-cli&utm_content=cloud-getting-started) with email and password, or sign in with Google. Right after sign-up, Bruin Cloud asks which track you want — pick **AI Data Analyst** or **ETL/ELT Pipeline**.
 
 If you'd rather start in code, the open-source [Bruin CLI](/getting-started/introduction/installation) defines the same pipelines, assets, and connections Bruin Cloud runs. Start with the [Quickstart](/getting-started/introduction/quickstart), then connect your repo to Cloud.
 
