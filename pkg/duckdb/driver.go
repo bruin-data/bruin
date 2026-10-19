@@ -11,6 +11,7 @@ import (
 	"path"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/apache/arrow-adbc/go/adbc/drivermgr"
@@ -18,6 +19,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/user"
 	"github.com/columnar-tech/dbc"
 	"github.com/columnar-tech/dbc/config"
+	"github.com/gofrs/flock"
 )
 
 var (
@@ -51,25 +53,52 @@ func EnsureADBCDriverInstalled(ctx context.Context) error {
 }
 
 func ensureDriverInstalledInternal(ctx context.Context) error {
-	if _, err := user.EnsureADBCDriverConfig(dbcDriverName); err != nil {
+	cfg, err := user.EnsureADBCDriverConfig(dbcDriverName)
+	if err != nil {
 		return err
 	}
 	if err := tryLoadDriver(); err == nil { //nolint:contextcheck
 		return nil
 	}
 
-	if err := installDuckDBADBCDriver(ctx); err != nil {
-		return err
-	}
+	return withDriverInstallLock(ctx, cfg, func() error {
+		// Another process may have installed the driver while we waited.
+		if err := tryLoadDriver(); err == nil { //nolint:contextcheck
+			return nil
+		}
 
-	if err := tryLoadDriver(); err != nil { //nolint:contextcheck
-		return fmt.Errorf("DuckDB ADBC driver still not available after installation: %w", err)
-	}
+		if err := installDuckDBADBCDriver(ctx, cfg); err != nil {
+			return err
+		}
 
-	return nil
+		if err := tryLoadDriver(); err != nil { //nolint:contextcheck
+			return fmt.Errorf("DuckDB ADBC driver still not available after installation: %w", err)
+		}
+
+		return nil
+	})
 }
 
-func installDuckDBADBCDriver(ctx context.Context) error {
+func withDriverInstallLock(ctx context.Context, cfg config.Config, install func() error) error {
+	location, err := config.EnsureLocation(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to prepare DuckDB ADBC driver directory: %w", err)
+	}
+
+	// Keep the lock outside the version directory removed on verification failure.
+	// Leave it in place so all processes continue to lock the same file.
+	lock := flock.New(filepath.Join(location, ".duckdb-install.lock"))
+	defer func() { _ = lock.Close() }()
+	if locked, err := lock.TryLockContext(ctx, 100*time.Millisecond); err != nil {
+		return fmt.Errorf("failed to lock DuckDB ADBC driver installation: %w", err)
+	} else if !locked {
+		return fmt.Errorf("failed to lock DuckDB ADBC driver installation")
+	}
+
+	return install()
+}
+
+func installDuckDBADBCDriver(ctx context.Context, cfg config.Config) error {
 	client, err := dbc.NewClient()
 	if err != nil {
 		return fmt.Errorf("failed to create dbc client: %w", err)
@@ -110,10 +139,6 @@ func installDuckDBADBCDriver(ctx context.Context) error {
 		cleanup()
 	}()
 
-	cfg, err := user.EnsureADBCDriverConfig(dbcDriverName)
-	if err != nil {
-		return err
-	}
 	manifest, err := config.InstallDriver(cfg, dbcDriverName, downloaded)
 	if err != nil {
 		return fmt.Errorf("failed to install dbc driver %s=%s: %w", dbcDriverName, duckdbDriverVersion, err)
