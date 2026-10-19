@@ -160,6 +160,8 @@ jobs:
         with:
           path: dist/darwin
           key: darwin-${{ env.sha_short }}
+      - name: Keep regenerated hashes out of GoReleaser's dirty-tree check
+        run: git update-index --skip-worktree pkg/python/ingestr_hashes.json
       - name: Run GoReleaser
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
@@ -188,6 +190,8 @@ jobs:
         with:
           path: dist/linux
           key: linux-${{ env.sha_short }}
+      - name: Keep regenerated hashes out of GoReleaser's dirty-tree check
+        run: git update-index --skip-worktree pkg/python/ingestr_hashes.json
       - name: Run GoReleaser
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
@@ -250,6 +254,9 @@ jobs:
         with:
           go-version-file: 'go.mod'
           cache-dependency-path: "go.sum"
+
+      - name: Keep regenerated hashes out of GoReleaser's dirty-tree check
+        run: git update-index --skip-worktree pkg/python/ingestr_hashes.json
 
       - name: Release
         uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
