@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/gofrs/flock"
 	"github.com/spf13/afero"
@@ -30,6 +29,7 @@ func lockHomeMigration(fs afero.Fs, home string) (func(), error) {
 // Callers hold the home migration lock until all files and markers are ready.
 // skip, when provided, receives paths relative to source.
 func copyHomeFiles(fs afero.Fs, source, destination string, skip func(string) bool) error {
+	linkDestination := destination
 	if _, err := fs.Stat(source); os.IsNotExist(err) {
 		return nil
 	} else if err != nil {
@@ -95,11 +95,7 @@ func copyHomeFiles(fs afero.Fs, source, destination string, skip func(string) bo
 			if err != nil {
 				return err
 			}
-			if filepath.IsAbs(link) {
-				if rel, err := filepath.Rel(source, link); err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-					link = filepath.Join(destination, rel)
-				}
-			}
+			link = relocateHomeSymlink(fs, source, linkDestination, link)
 			err = fs.(afero.Linker).SymlinkIfPossible(link, target)
 			if os.IsExist(err) {
 				return nil
@@ -111,6 +107,41 @@ func copyHomeFiles(fs afero.Fs, source, destination string, skip func(string) bo
 		}
 		return copyHomeFile(fs, name, target, info.Mode().Perm())
 	})
+}
+
+func relocateHomeSymlink(fs afero.Fs, source, destination, link string) string {
+	if !filepath.IsAbs(link) {
+		return link
+	}
+	var prefixes []string
+	for prefix := link; ; prefix = filepath.Dir(prefix) {
+		prefixes = append(prefixes, prefix)
+		if filepath.Dir(prefix) == prefix {
+			break
+		}
+	}
+	// Resolve only up to the source root so aliases of its ancestors match.
+	// The remaining suffix may contain symlink chains or nonexistent paths.
+	for i := len(prefixes) - 1; i >= 0; i-- {
+		prefix := prefixes[i]
+		resolved := prefix
+		if fs.Name() == "OsFs" {
+			var err error
+			resolved, err = filepath.EvalSymlinks(prefix)
+			if err != nil {
+				return link
+			}
+		}
+		if resolved != source {
+			continue
+		}
+		rel, err := filepath.Rel(prefix, link)
+		if err != nil {
+			return link
+		}
+		return filepath.Join(destination, rel)
+	}
+	return link
 }
 
 func lstat(fs afero.Fs, name string) (os.FileInfo, error) {
