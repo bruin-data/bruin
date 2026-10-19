@@ -158,6 +158,8 @@ parameters:
 > [!WARNING]
 > When using a URL path, column validation is skipped during `bruin validate`. Column mismatches will be caught at runtime.
 
+Declared column types follow DuckDB semantics: `integer` loads as `INTEGER`, and `timestamp`/`datetime` load as a naive `TIMESTAMP` that keeps the wall time from the file. Use `timestamptz` for timezone-aware columns.
+
 #### Examples: Load csv into a Duckdb database
 
 The examples below show how to load a CSV into a DuckDB database.
