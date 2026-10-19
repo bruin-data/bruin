@@ -6,7 +6,7 @@ Sign in to Bruin Cloud:
 bruin cloud login
 ```
 
-1. Choose **This repository** to use the login for your current project, or **Global** to use it across projects. Outside a Bruin project, use Global.
+1. Choose **This repository** to save the login in your Git repository, or **Global** to use it across projects. If `.bruin.yml` is missing, the repository option offers to create it. Outside a Git repository, use `bruin cloud login --global`.
 2. Sign in to your Cloud account in the browser.
 3. Select your teams, [access level](/cloud/api-tokens#permissions), and access duration. If you select multiple teams, choose a default team.
 4. Click **Authorize**, then return to the terminal.
@@ -21,11 +21,15 @@ bruin cloud projects list
 
 ## Choose where to sign in
 
-From your Bruin project directory, save the login for that repository:
+From any directory in your Git repository, save the login for that repository:
 
 ```bash
 bruin cloud login --repo
 ```
+
+Repository login works in any Git repository, including worktrees. Existing `.bruin.yml` or pipeline files are not required. When `.bruin.yml` is missing, `bruin cloud login` offers **This repository (create .bruin.yml)** and **Global**. Choosing repository login creates the file at the repository or worktree root after successful authorization and adds it to `.gitignore`. All pipelines in that repository share the login.
+
+`--repo` selects repository login directly and also creates `.bruin.yml` if needed. Outside a Git repository, Bruin asks you to run from one or explicitly use `--global`; it does not automatically switch to global login.
 
 To use the login across projects:
 
@@ -98,7 +102,7 @@ Without an interactive terminal, specify `--repo` or `--global`.
 
 | Flag | Use |
 |------|-----|
-| `--repo` | Sign in for the current Bruin project repository. |
+| `--repo` | Save the login in the current Git repository, creating `.bruin.yml` if needed. |
 | `--global` | Sign in across projects. |
 | `--no-browser` | Open the printed authorization URL yourself. |
 | `--reauth` | Replace an existing login. |
@@ -117,5 +121,5 @@ Without an interactive terminal, specify `--repo` or `--global`; add `--reauth` 
 
 - **Browser did not open:** rerun with `--no-browser`, then open the printed URL on the same computer.
 - **Access expired or permissions are insufficient:** sign in again with `--reauth` and choose the access you need.
-- **No Bruin project found:** run from a Bruin project in a Git repository, or use `--global`.
+- **No Git repository found:** run from a Git repository, or use `--global`. Existing Bruin project files are not required for repository login.
 - **Global credential store unavailable:** unlock your operating system's credential store and retry, or use `--repo` from your project.
