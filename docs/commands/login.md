@@ -48,7 +48,7 @@ Use `--global --reauth` to replace a global login.
 See which login and default team you are using:
 
 ```bash
-bruin auth status
+bruin cloud auth status
 ```
 
 If the result is unexpected, check for `--api-key` or `BRUIN_CLOUD_API_KEY`, which override saved logins. A repository login takes precedence over a global login.
@@ -64,23 +64,33 @@ To save a default team for your current repository, run `bruin cloud config set-
 
 ## Sign out
 
-Remove the login for your current repository:
+Choose which login to sign out of:
 
 ```bash
-bruin logout --repo
+bruin cloud logout
+```
+
+Select **This repository** or **Global** with ↑/↓ and Enter. Outside a Git repository, only **Global** is offered. Press Esc or Ctrl+C to cancel without removing either login.
+
+To skip the menu, remove the login for your current repository:
+
+```bash
+bruin cloud logout --repo
 ```
 
 Remove your global login:
 
 ```bash
-bruin logout --global
+bruin cloud logout --global
 ```
 
 Add `--revoke` to also invalidate the token in Cloud, including any other copies:
 
 ```bash
-bruin logout --global --revoke
+bruin cloud logout --global --revoke
 ```
+
+Without an interactive terminal, specify `--repo` or `--global`.
 
 ## Options
 

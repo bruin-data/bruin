@@ -116,7 +116,7 @@ environments:
           api_token: "your-token-here"
 ```
 
-Run `bruin auth status` to check which login you are using. For command options, see the [Cloud command reference](/commands/cloud#authentication).
+Run `bruin cloud auth status` to check which login you are using. For command options, see the [Cloud command reference](/commands/cloud#authentication).
 
 If you're using a personal token scoped to more than one team, tell the CLI which team to act on with `--team <company_prefix>` (run `bruin cloud teams list` to see the prefixes), or set a default once so you can skip it:
 

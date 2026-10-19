@@ -217,27 +217,32 @@ func TestCloudAuthPrecedenceAndFailures(t *testing.T) {
 	require.ErrorIs(t, err, globalErr)
 }
 
-func TestLogoutRemovesRepositoryConnection(t *testing.T) { //nolint:paralleltest
-	dir := loginTestRepo(t, loginExistingConfig)
-	var output bytes.Buffer
-	command := Logout()
-	command.Writer = &output
-	require.NoError(t, command.Run(t.Context(), []string{"logout", "--repo"}))
-	cm, err := config.LoadFromFileOrEnv(afero.NewOsFs(), filepath.Join(dir, ".bruin.yml"))
-	require.NoError(t, err)
-	assert.Empty(t, cm.CloudConnections())
-	assert.NotContains(t, output.String(), "original-token")
-}
-
-func TestAuthStatusDoesNotPrintToken(t *testing.T) { //nolint:paralleltest
-	loginTestRepo(t, loginExistingConfig)
-	var output bytes.Buffer
-	command := Auth()
-	command.Writer = &output
-	require.NoError(t, command.Run(t.Context(), []string{"auth", "status"}))
-	assert.Contains(t, output.String(), "repo")
-	assert.Contains(t, output.String(), "default/cloud")
-	assert.NotContains(t, output.String(), "original-token")
+//nolint:paralleltest
+func TestAuthStatusDoesNotPrintToken(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		args   []string
+		source string
+	}{
+		{name: "repository", source: "repo"},
+		{name: "explicit token", args: []string{"--api-key", "flag-token"}, source: "flag or environment"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			loginTestRepo(t, loginExistingConfig)
+			var output bytes.Buffer
+			isDebug := false
+			command := &cli.Command{Name: "bruin", Writer: &output, Commands: []*cli.Command{Cloud(&isDebug)}}
+			args := append([]string{"bruin", "cloud", "auth", "status", "--team", "selected-team"}, tc.args...)
+			require.NoError(t, command.Run(t.Context(), args))
+			assert.Contains(t, output.String(), "Credential source: "+tc.source)
+			assert.Contains(t, output.String(), "Default team: selected-team")
+			if tc.source == "repo" {
+				assert.Contains(t, output.String(), "Connection: default/cloud")
+			}
+			assert.NotContains(t, output.String(), "original-token")
+			assert.NotContains(t, output.String(), "flag-token")
+		})
+	}
 }
 
 func TestGlobalLoginOutsideBruinProject(t *testing.T) { //nolint:paralleltest

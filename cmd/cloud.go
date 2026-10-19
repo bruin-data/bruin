@@ -32,6 +32,8 @@ func Cloud(isDebug *bool) *cli.Command {
 		Usage: "Interact with Bruin Cloud API",
 		Commands: []*cli.Command{
 			CloudLogin(),
+			CloudLogout(),
+			CloudAuth(),
 			CloudTeams(),
 			CloudProjects(),
 			CloudPipelines(),
@@ -65,7 +67,7 @@ func addTeamFlag(cmd *cli.Command) {
 	for _, sub := range cmd.Commands {
 		// "cloud config" manages the default team itself; it doesn't act on a
 		// team, so it neither takes --team nor reads the default.
-		if sub.Name == "config" || sub.Name == "login" {
+		if sub.Name == "config" || sub.Name == "login" || sub.Name == "logout" {
 			continue
 		}
 		if sub.Action != nil || len(sub.Commands) == 0 {
