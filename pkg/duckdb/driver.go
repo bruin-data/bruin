@@ -5,6 +5,7 @@ package duck
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -92,7 +93,7 @@ func withDriverInstallLock(ctx context.Context, cfg config.Config, install func(
 	if locked, err := lock.TryLockContext(ctx, 100*time.Millisecond); err != nil {
 		return fmt.Errorf("failed to lock DuckDB ADBC driver installation: %w", err)
 	} else if !locked {
-		return fmt.Errorf("failed to lock DuckDB ADBC driver installation")
+		return errors.New("failed to lock DuckDB ADBC driver installation")
 	}
 
 	return install()
