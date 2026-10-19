@@ -1,7 +1,11 @@
 package jinja
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"io"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -13,6 +17,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/nikolalohinski/gonja/v2"
 	"github.com/nikolalohinski/gonja/v2/exec"
+	"github.com/nikolalohinski/gonja/v2/loaders"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 )
@@ -214,7 +219,7 @@ func (r *Renderer) Render(query string) (string, error) {
 		fullQuery = preamble + query
 	}
 
-	tpl, err := gonja.FromString(fullQuery)
+	tpl, err := compileTemplate(fullQuery)
 	if err != nil {
 		customError := findParserErrorType(err)
 		if customError != "" && outputMarker != "" {
@@ -222,7 +227,7 @@ func (r *Renderer) Render(query string) (string, error) {
 			// Parse the query by itself after a recognized EOF error so the location we
 			// return refers to the template the user supplied. If the query parses on its
 			// own, keep the original error because it came from the macro preamble.
-			if _, queryErr := gonja.FromString(query); queryErr != nil {
+			if _, queryErr := compileTemplate(query); queryErr != nil {
 				if queryCustomError := findParserErrorType(queryErr); queryCustomError != "" {
 					customError = queryCustomError
 				}
@@ -290,6 +295,101 @@ func hideMacroOutputMarker(err error, marker string) error {
 	}
 
 	return errors.New(strings.ReplaceAll(err.Error(), marker, ""))
+}
+
+// RestrictTemplateFilesystemEnv, set to "true", confines template loading to the working directory tree.
+const RestrictTemplateFilesystemEnv = "BRUIN_RESTRICT_TEMPLATE_FILESYSTEM"
+
+var errTemplateFileAccessDenied = errors.New("loading templates outside the working directory is disabled")
+
+func templateFilesystemRestricted() bool {
+	return strings.EqualFold(os.Getenv(RestrictTemplateFilesystemEnv), "true")
+}
+
+func compileTemplate(source string) (*exec.Template, error) {
+	if !templateFilesystemRestricted() {
+		return gonja.FromString(source)
+	}
+
+	sub, err := newScopedLoader()
+	if err != nil {
+		return nil, err
+	}
+
+	content := []byte(source)
+	rootID := "root-" + string(sha256.New().Sum(content))
+	loader, err := loaders.NewShiftedLoader(rootID, bytes.NewReader(content), sub)
+	if err != nil {
+		return nil, err
+	}
+
+	return exec.NewTemplate(rootID, gonja.DefaultConfig, loader, gonja.DefaultEnvironment)
+}
+
+// scopedLoader resolves templates under root and rejects any path that escapes it.
+type scopedLoader struct {
+	root string
+	dir  string
+}
+
+func newScopedLoader() (*scopedLoader, error) {
+	root, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	root, err = filepath.Abs(root)
+	if err != nil {
+		return nil, err
+	}
+	if realPath, err := filepath.EvalSymlinks(root); err == nil {
+		root = realPath
+	}
+	return &scopedLoader{root: root, dir: root}, nil
+}
+
+func (l *scopedLoader) within(path string) bool {
+	return path == l.root || strings.HasPrefix(path, l.root+string(os.PathSeparator))
+}
+
+func (l *scopedLoader) resolve(name string) (string, error) {
+	candidate := name
+	if !filepath.IsAbs(candidate) {
+		candidate = filepath.Join(l.dir, candidate)
+	}
+	candidate = filepath.Clean(candidate)
+	if !l.within(candidate) {
+		return "", errTemplateFileAccessDenied
+	}
+	// Reject symlinks whose real target escapes root; os.ReadFile would follow them.
+	if realPath, err := filepath.EvalSymlinks(candidate); err == nil && !l.within(realPath) {
+		return "", errTemplateFileAccessDenied
+	}
+	return candidate, nil
+}
+
+func (l *scopedLoader) Read(name string) (io.Reader, error) {
+	resolved, err := l.resolve(name)
+	if err != nil {
+		return nil, err
+	}
+	content, err := os.ReadFile(resolved)
+	if err != nil {
+		return nil, err
+	}
+	return bytes.NewReader(content), nil
+}
+
+func (l *scopedLoader) Resolve(name string) (string, error) {
+	return l.resolve(name)
+}
+
+//nolint:ireturn
+func (l *scopedLoader) Inherit(from string) (loaders.Loader, error) {
+	resolved, err := l.resolve(from)
+	if err != nil {
+		return nil, err
+	}
+	return &scopedLoader{root: l.root, dir: filepath.Dir(resolved)}, nil
 }
 
 //nolint:ireturn
@@ -360,6 +460,10 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 
 func findRenderErrorType(err error) string {
 	message := err.Error()
+	if strings.Contains(message, errTemplateFileAccessDenied.Error()) {
+		return errTemplateFileAccessDenied.Error()
+	}
+
 	errorBits := strings.Split(message, ": ")
 	innermostErr := errorBits[len(errorBits)-1]
 
@@ -379,6 +483,10 @@ func findRenderErrorType(err error) string {
 
 func findParserErrorType(err error) string {
 	message := err.Error()
+
+	if strings.Contains(message, errTemplateFileAccessDenied.Error()) {
+		return errTemplateFileAccessDenied.Error()
+	}
 
 	if strings.Contains(message, "Unexpected EOF, expected tag else or endfor") {
 		match := locationRegex.FindString(message)
