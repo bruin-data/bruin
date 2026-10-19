@@ -8,12 +8,16 @@ type Config struct {
 	Domain   string
 	Email    string
 	APIToken string
+	CloudID  string
 }
 
 func (c *Config) GetIngestrURI() string {
 	params := url.Values{}
 	params.Set("email", c.Email)
 	params.Set("api_token", c.APIToken)
+	if c.CloudID != "" {
+		params.Set("cloud_id", c.CloudID)
+	}
 	uri := url.URL{
 		Scheme:   "jira",
 		Host:     c.Domain,

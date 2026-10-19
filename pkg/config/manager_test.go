@@ -965,6 +965,7 @@ func TestLoadFromFile(t *testing.T) {
 					Domain:             "company.atlassian.net",
 					Email:              "user@company.com",
 					APIToken:           "test-api-token",
+					CloudID:            "test-cloud-id",
 				},
 			},
 			Monday: []MondayConnection{
