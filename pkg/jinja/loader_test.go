@@ -111,13 +111,31 @@ func TestCloneForAssetRepositoryScope(t *testing.T) {
 	pipe.DefinitionFile.Path = filepath.Join(root, "pipelines", "pipeline.yml")
 	ctx := context.Background()
 	now := time.Now()
+	contexts := []context.Context{ctx}
 	ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, now)
+	contexts = append(contexts, ctx)
 	ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, now)
+	contexts = append(contexts, ctx)
 	ctx = context.WithValue(ctx, pipeline.RunConfigExecutionDate, now)
 	ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test")
-	r, err := NewRenderer(Context{}).CloneForAsset(ctx, pipe, &pipeline.Asset{})
-	require.NoError(t, err)
-	out, err := r.Render(`{% include 'value.sql' %}`)
-	require.NoError(t, err)
-	require.Equal(t, "repo-value", out)
+	contexts = append(contexts, ctx)
+	for dates, ctx := range contexts {
+		t.Run(fmt.Sprintf("run_dates=%d", dates), func(t *testing.T) {
+			t.Parallel()
+			base := NewRenderer(Context{"start_date": "existing-date"})
+			r, err := base.CloneForAsset(ctx, pipe, &pipeline.Asset{})
+			require.NoError(t, err)
+			out, err := r.Render(`{% include 'value.sql' %}:{{ start_date }}`)
+			require.NoError(t, err)
+			wantDate := "existing-date"
+			if dates == 3 {
+				wantDate = now.Format("2006-01-02")
+			}
+			require.Equal(t, "repo-value:"+wantDate, out)
+			// Scoping the clone must not grant filesystem access to its parent.
+			out, err = base.Render(`{% include 'value.sql' %}`)
+			require.Error(t, err)
+			require.Empty(t, out)
+		})
+	}
 }

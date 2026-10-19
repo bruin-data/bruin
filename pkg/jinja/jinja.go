@@ -302,19 +302,26 @@ const RestrictTemplateFilesystemEnv = "BRUIN_RESTRICT_TEMPLATE_FILESYSTEM"
 
 //nolint:ireturn
 func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, asset *pipeline.Asset) (RendererInterface, error) {
+	repositoryRoot := r.repositoryRoot
+	if repositoryRoot == "" && pipe.DefinitionFile.Path != "" {
+		if repo, err := git.FindRepoFromPath(filepath.Dir(pipe.DefinitionFile.Path)); err == nil {
+			repositoryRoot = repo.Path
+		}
+	}
+
 	startDate, ok := ctx.Value(pipeline.RunConfigStartDate).(time.Time)
 	if !ok {
-		return r, nil
+		return r.WithRepositoryRoot(repositoryRoot), nil
 	}
 
 	endDate, ok := ctx.Value(pipeline.RunConfigEndDate).(time.Time)
 	if !ok {
-		return r, nil
+		return r.WithRepositoryRoot(repositoryRoot), nil
 	}
 
 	executionDate, ok := ctx.Value(pipeline.RunConfigExecutionDate).(time.Time)
 	if !ok {
-		return r, nil
+		return r.WithRepositoryRoot(repositoryRoot), nil
 	}
 
 	runFullRefresh, _ := ctx.Value(pipeline.RunConfigFullRefresh).(bool)
@@ -322,13 +329,6 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 	macroContent := r.macroContent
 	if macroContent == "" {
 		macroContent = pipelineMacroContent(pipe)
-	}
-
-	repositoryRoot := r.repositoryRoot
-	if repositoryRoot == "" && pipe.DefinitionFile.Path != "" {
-		if repo, err := git.FindRepoFromPath(filepath.Dir(pipe.DefinitionFile.Path)); err == nil {
-			repositoryRoot = repo.Path
-		}
 	}
 
 	applyModifiers, ok := ctx.Value(pipeline.RunConfigApplyIntervalModifiers).(bool)
