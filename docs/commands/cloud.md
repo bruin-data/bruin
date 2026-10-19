@@ -24,7 +24,7 @@ export BRUIN_CLOUD_API_KEY="your-api-key-here"
 bruin cloud projects list
 ```
 
-Authentication priority is `--api-key` → `BRUIN_CLOUD_API_KEY` → repository login → global login. Run `bruin auth status` to check which one you are using. If your repository has multiple `bruin` connections, specify the token with `--api-key` or `BRUIN_CLOUD_API_KEY`.
+Authentication priority is `--api-key` → `BRUIN_CLOUD_API_KEY` → repository login → global login. Run `bruin cloud auth status` to check which one you are using. If your repository has multiple `bruin` connections, specify the token with `--api-key` or `BRUIN_CLOUD_API_KEY`.
 
 To save an existing token for a repository, add a `bruin` connection to its `.bruin.yml`:
 
@@ -46,7 +46,7 @@ bruin cloud projects list
 
 ## Global Flags
 
-These flags are available on Cloud API subcommands. `cloud login` has its own [login options](./login#options).
+These flags are available on Cloud API subcommands. `cloud login` and `cloud logout` have their own flags; see [login options](./login#options) and [Sign out](./login#sign-out).
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
@@ -65,6 +65,33 @@ bruin cloud login
 ```
 
 See the [login instructions](./login) for repository and global login options.
+
+### `logout`
+
+Choose a repository or global login to sign out of:
+
+```bash
+bruin cloud logout
+```
+
+Use a flag to skip the selection menu:
+
+```bash
+bruin cloud logout --repo
+bruin cloud logout --global
+```
+
+See [Sign out](./login#sign-out) for revoking the token in Cloud.
+
+### `auth status`
+
+Show the active credential source, repository connection, and default team without printing the token:
+
+```bash
+bruin cloud auth status
+```
+
+Use `--api-key` or `--team` to inspect an explicit override. This checks local credentials; Cloud validates the token and permissions when an API command runs.
 
 ### `teams`
 

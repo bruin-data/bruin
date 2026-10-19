@@ -331,13 +331,15 @@ func TestCloudCommand_Help(t *testing.T) {
 	cmd := Cloud(&isDebug)
 	require.NotNil(t, cmd)
 	assert.Equal(t, "cloud", cmd.Name)
-	assert.Len(t, cmd.Commands, 19)
+	assert.Len(t, cmd.Commands, 21)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
 		subNames[i] = sub.Name
 	}
 	assert.Contains(t, subNames, "login")
+	assert.Contains(t, subNames, "logout")
+	assert.Contains(t, subNames, "auth")
 	assert.Contains(t, subNames, "teams")
 	assert.Contains(t, subNames, "cost")
 	assert.Contains(t, subNames, "projects")
@@ -404,21 +406,21 @@ func TestCloudLeafCommandsHaveTeamFlag(t *testing.T) {
 		for _, sub := range c.Commands {
 			// "cloud config" manages the default team itself and doesn't act on a
 			// team, so its commands intentionally omit --team.
-			if sub.Name == "config" || sub.Name == "login" {
+			if sub.Name == "config" || sub.Name == "login" || sub.Name == "logout" {
 				continue
 			}
 			// Every runnable command (a leaf, or a parent like "agents
 			// connections" that has its own action) must carry --team.
 			if sub.Action != nil || len(sub.Commands) == 0 {
-				has := false
+				teamFlags := 0
 				for _, f := range sub.Flags {
 					for _, n := range f.Names() {
 						if n == "team" {
-							has = true
+							teamFlags++
 						}
 					}
 				}
-				assert.Truef(t, has, "cloud command %q should have --team", sub.Name)
+				assert.Equalf(t, 1, teamFlags, "cloud command %q should have exactly one --team", sub.Name)
 				checked++
 			}
 			if len(sub.Commands) > 0 {

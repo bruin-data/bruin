@@ -55,24 +55,29 @@ func loginCommand(deps loginDependencies) *cli.Command {
 	}
 }
 
-type loginPrompt struct {
+type authPrompt struct {
 	reader      io.Reader
 	writer      io.Writer
 	interactive bool
+	operation   string
 }
 
-func (p loginPrompt) choose(ctx context.Context, message string, options []string) (int, error) {
+func (p authPrompt) choose(ctx context.Context, message string, options []string) (int, error) {
 	if !p.interactive {
-		return 0, errors.New("login needs an interactive terminal; specify --repo or --global, and --connection/--environment if needed; use --reauth to replace an existing login")
+		hint := "specify --repo or --global"
+		if p.operation == "login" {
+			hint += ", and --connection/--environment if needed; use --reauth to replace an existing login"
+		}
+		return 0, fmt.Errorf("%s needs an interactive terminal; %s", p.operation, hint)
 	}
 	program := tea.NewProgram(newLoginMenu(message, options), tea.WithInput(p.reader), tea.WithOutput(p.writer), tea.WithContext(ctx), tea.WithoutSignalHandler())
 	result, err := program.Run()
 	if err != nil {
-		return 0, fmt.Errorf("login cancelled: %w", err)
+		return 0, fmt.Errorf("%s cancelled: %w", p.operation, err)
 	}
 	selected := result.(loginMenu)
 	if !selected.accepted {
-		return 0, errors.New("login cancelled")
+		return 0, fmt.Errorf("%s cancelled", p.operation)
 	}
 	return selected.list.Index(), nil
 }
@@ -179,7 +184,7 @@ func runOAuthLogin(ctx context.Context, c *cli.Command, deps loginDependencies) 
 	if output == nil {
 		output = os.Stdout
 	}
-	prompt := loginPrompt{reader: input, writer: output, interactive: deps.interactive()}
+	prompt := authPrompt{reader: input, writer: output, interactive: deps.interactive(), operation: "login"}
 	var path string
 	if !c.Bool(cloudAuthGlobal) {
 		var err error
@@ -347,7 +352,7 @@ func repoLoginConfigPath() (string, error) {
 	return path, nil
 }
 
-func chooseLoginConnection(ctx context.Context, c *cli.Command, cm *config.Config, prompt loginPrompt) (config.CloudConnectionRef, bool, error) {
+func chooseLoginConnection(ctx context.Context, c *cli.Command, cm *config.Config, prompt authPrompt) (config.CloudConnectionRef, bool, error) {
 	refs := cm.CloudConnections()
 	seen := make(map[string]bool)
 	for _, ref := range refs {
