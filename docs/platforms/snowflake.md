@@ -396,7 +396,7 @@ Set `password` to the passphrase you used when generating the key. This works wi
             -----END ENCRYPTED PRIVATE KEY-----
 ```
 
-For more details on how to set up key-pair authentication, see [this guide](https://select.dev/docs/snowflake-developer-guide/snowflake-key-pair).
+For more details on how to set up key-pair authentication, see [Snowflake's key-pair authentication guide](https://docs.snowflake.com/en/user-guide/key-pair-auth).
 
 ## Query Tags
 
