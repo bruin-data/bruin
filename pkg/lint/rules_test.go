@@ -2452,7 +2452,7 @@ func TestValidateSensorTimeout(t *testing.T) {
 func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 	t.Parallel()
 
-	expectedErr := "Ingestr assets require the following parameters: source_connection, source_table, destination"
+	expectedErr := "Ingestr assets require the following parameters: source_connection, source_table"
 	tests := []struct {
 		name           string
 		asset          *pipeline.Asset
@@ -2507,6 +2507,44 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 					"destination":            "destination",
 					"destination_connection": "destination_connection",
 					"destination_table":      "destination_table",
+				},
+			},
+			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "asset without destination or connection",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "source_connection",
+					"source_table":      "source_table",
+				},
+			},
+			wantErrMessage: "Ingestr assets require either a `destination` parameter or a connection to write to, set via `connection` or the `destination_connection` parameter",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "asset with connection instead of destination",
+			asset: &pipeline.Asset{
+				Type:       pipeline.AssetTypeIngestr,
+				Connection: "bigquery-prod",
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "source_connection",
+					"source_table":      "source_table",
+				},
+			},
+			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "asset with destination_connection instead of destination",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection":      "source_connection",
+					"source_table":           "source_table",
+					"destination_connection": "bigquery-prod",
 				},
 			},
 			wantErrMessage: "",

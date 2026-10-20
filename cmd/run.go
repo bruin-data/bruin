@@ -1351,6 +1351,13 @@ func Run(isDebug *bool) *cli.Command {
 				return cli.Exit("", 1)
 			}
 
+			// The pipeline was built before the connections were available, so infer the
+			// ingestr destinations here; the mutator covers the rebuild done by validation.
+			for _, asset := range foundPipeline.Assets {
+				python.InferIngestrDestination(asset, foundPipeline, connectionManager)
+			}
+			DefaultPipelineBuilder.AddAssetMutator(ingestrDestinationMutator(connectionManager))
+
 			err = ensurePythonCacheGitignore(afero.NewOsFs(), repoRoot.Path)
 			if err != nil {
 				errorPrinter.Printf("Failed to add Python cache patterns to .gitignore: %v\n", err)

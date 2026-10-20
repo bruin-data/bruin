@@ -269,7 +269,7 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 		return issues, nil
 	}
 
-	requiredKeys := []string{"source_connection", "source_table", "destination"}
+	requiredKeys := []string{"source_connection", "source_table"}
 	for _, key := range requiredKeys {
 		if asset.Parameters == nil {
 			issues = append(issues, &Issue{
@@ -291,9 +291,20 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 		}
 	}
 
+	// Without a `destination`, the asset's connection decides where the data goes.
+	destination, _ := asset.Parameters.GetString("destination")
+	destinationConnection, _ := asset.Parameters.GetString("destination_connection")
+	if destination == "" && destinationConnection == "" && asset.Connection == "" {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: "Ingestr assets require either a `destination` parameter or a connection to write to, set via `connection` or the `destination_connection` parameter",
+		})
+
+		return issues, nil
+	}
+
 	effectiveStrategy := ""
 	if value, exists := asset.Parameters.GetString("incremental_strategy"); exists && value != "" {
-		destination, _ := asset.Parameters.GetString("destination")
 		switch {
 		case python.ReverseETLDestinationSupportsStrategy(destination, value):
 			effectiveStrategy = value

@@ -187,6 +187,7 @@ func Lint(isDebug *bool) *cli.Command {
 			}
 
 			logger.Debugf("built the connection manager instance")
+			DefaultPipelineBuilder.AddAssetMutator(ingestrDestinationMutator(connectionManager))
 
 			var parser sqlparser.Parser
 			var hookHoister pipeline.DeclareHoister

@@ -184,6 +184,15 @@ func pythonImageMutator(image string) (pipeline.AssetMutator, error) {
 	}, nil
 }
 
+// ingestrDestinationMutator infers the `destination` of ingestr assets that omit it from the
+// type of the connection they write to, so code that keys off `destination` keeps working.
+func ingestrDestinationMutator(connections python.ConnectionTypeGetter) pipeline.AssetMutator {
+	return func(ctx context.Context, a *pipeline.Asset, p *pipeline.Pipeline) (*pipeline.Asset, error) {
+		python.InferIngestrDestination(a, p, connections)
+		return a, nil
+	}
+}
+
 func variableOverridesMutator(variables []string) pipeline.PipelineMutator {
 	return func(ctx context.Context, p *pipeline.Pipeline) (*pipeline.Pipeline, error) {
 		overrides := map[string]any{}
