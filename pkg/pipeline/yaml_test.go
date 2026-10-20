@@ -944,3 +944,41 @@ func TestUpstreamModeJSONRoundTrip(t *testing.T) {
 		assert.Equal(t, mode, decoded.Mode)
 	}
 }
+
+func TestValidateAssetYAML_CustomCheckUnknownField(t *testing.T) {
+	t.Parallel()
+
+	fs := afero.NewMemMapFs()
+	content := strings.TrimSpace(`
+/* @bruin
+name: analytics.people
+type: duckdb.sql
+custom_checks:
+  - name: no_duplicates
+    qurey: SELECT 1
+@bruin */
+
+SELECT 1`)
+	require.NoError(t, afero.WriteFile(fs, "people.sql", []byte(content), 0o644))
+
+	// Recording check lines must not stop strict decoding from rejecting unknown check fields.
+	require.ErrorContains(t, pipeline.ValidateAssetYAML(fs, "people.sql", pipeline.CommentTask), "qurey")
+}
+
+func TestConvertYamlToTask_CustomCheckLines(t *testing.T) {
+	t.Parallel()
+
+	task, err := pipeline.ConvertYamlToTask([]byte(strings.TrimSpace(`
+name: analytics.people
+type: duckdb.sql
+custom_checks:
+  - name: first
+    query: SELECT 0
+  - name: second
+    query: SELECT 0
+`)))
+	require.NoError(t, err)
+	require.Len(t, task.CustomChecks, 2)
+	require.Equal(t, 4, task.CustomChecks[0].Line)
+	require.Equal(t, 6, task.CustomChecks[1].Line)
+}
