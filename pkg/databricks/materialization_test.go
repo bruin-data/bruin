@@ -742,3 +742,31 @@ func TestColumnMetadataDDL(t *testing.T) {
 	require.Contains(t, rendered, "decimal(10, 2)")
 	require.Contains(t, rendered, "varchar(255)")
 }
+
+func TestMaterializer_RenderFullRefreshRejectsDataVault(t *testing.T) {
+	t.Parallel()
+
+	for _, strategy := range []pipeline.MaterializationStrategy{
+		pipeline.MaterializationStrategyDataVaultHub,
+		pipeline.MaterializationStrategyDataVaultLink,
+		pipeline.MaterializationStrategyDataVaultSatellite,
+	} {
+		t.Run(string(strategy), func(t *testing.T) {
+			t.Parallel()
+
+			asset := &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: strategy,
+				},
+				Columns: []pipeline.Column{
+					{Name: "customer_hk", Type: "varchar", PrimaryKey: true},
+				},
+			}
+
+			_, err := NewMaterializer(true).Render(asset, "SELECT 1")
+			require.ErrorContains(t, err, "unsupported materialization type - strategy combination")
+		})
+	}
+}

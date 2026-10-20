@@ -38,7 +38,10 @@ func (m *Materializer) Render(asset *pipeline.Asset, query string) ([]string, er
 			return buildSCD2ByColumnFullRefreshQuery(asset, query)
 		}
 		if mat.Strategy != pipeline.MaterializationStrategyDDL {
-			strategy = pipeline.MaterializationStrategyCreateReplace
+			_, dataVaultSupported := m.MaterializationMap[mat.Type][mat.Strategy]
+			if !mat.Strategy.IsDataVault() || dataVaultSupported {
+				strategy = pipeline.MaterializationStrategyCreateReplace
+			}
 		}
 	}
 

@@ -28,7 +28,10 @@ func (m *Materializer) Render(asset *pipeline.Asset, query, location string) ([]
 	strategy := mat.Strategy
 	if asset.FullRefreshEnabled(m.fullRefresh) && mat.Type == pipeline.MaterializationTypeTable {
 		if mat.Strategy != pipeline.MaterializationStrategyDDL {
-			strategy = pipeline.MaterializationStrategyCreateReplace
+			_, dataVaultSupported := m.MaterializationMap[mat.Type][mat.Strategy]
+			if !mat.Strategy.IsDataVault() || dataVaultSupported {
+				strategy = pipeline.MaterializationStrategyCreateReplace
+			}
 		}
 	}
 

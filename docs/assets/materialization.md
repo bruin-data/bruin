@@ -1347,7 +1347,7 @@ SCD2 tables created before these columns became timezone-aware are upgraded on t
 
 ### Data Vault
 
-Bruin provides three strategies for loading a Raw Data Vault: `datavault_hub`, `datavault_link`, and `datavault_satellite`. They are supported for PostgreSQL and DuckDB SQL assets with `type: table`. On other platforms, including Redshift, an incremental run fails with an unsupported strategy error, which `bruin validate` does not flag.
+Bruin provides three strategies for loading a Raw Data Vault: `datavault_hub`, `datavault_link`, and `datavault_satellite`. They are supported for PostgreSQL and DuckDB SQL assets with `type: table`. On other platforms, including Redshift, a run fails with an unsupported strategy error, including with `--full-refresh`, which `bruin validate` does not flag.
 
 The asset query must calculate the hash keys and hashdiff and return every column declared in `columns`. Bruin applies the loading rules to those values but does not calculate hashes. Every declared column needs a `name` and a database-compatible `type`.
 
