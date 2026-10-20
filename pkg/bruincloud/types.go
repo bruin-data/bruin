@@ -350,6 +350,29 @@ type Dashboard struct {
 	IsPublished *bool           `json:"is_published,omitempty"`
 }
 
+type DashboardNote struct {
+	ID            int             `json:"id"`
+	DashboardID   *int            `json:"dashboard_id"`
+	SemanticModel *string         `json:"semantic_model"`
+	Dimensions    json.RawMessage `json:"dimensions"`
+	Content       string          `json:"content"`
+	Author        *string         `json:"author"`
+	CreatedBy     *int            `json:"created_by"`
+	CreatedAt     string          `json:"created_at"`
+}
+
+// DashboardNoteModelContext lists the dimensions a note can reference for one semantic model.
+type DashboardNoteModelContext struct {
+	Name       string                   `json:"name"`
+	Dimensions []DashboardNoteDimension `json:"dimensions"`
+}
+
+// DashboardNoteDimension is a model dimension or dashboard filter usable in note dimensions.
+type DashboardNoteDimension struct {
+	Name string `json:"name"`
+	Type string `json:"type"`
+}
+
 // DashboardFolder groups dashboards within a team. Folders can nest: ParentID is
 // the enclosing folder (nil at the top level) and Path is the full "A / B" path.
 type DashboardFolder struct {

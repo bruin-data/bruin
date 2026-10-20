@@ -955,6 +955,53 @@ bruin cloud dashboards get --dashboard-id 42 --state published
 bruin cloud dashboards get --dashboard-id 42 --output json
 ```
 
+#### `notes list`
+
+List notes for a dashboard. Both note commands require `--dashboard-id` and support the standard `--team`, `--api-key`, and `--output` flags.
+
+```bash
+bruin cloud dashboards notes list --dashboard-id 123
+bruin cloud dashboards notes list --dashboard-id 123 --output json
+```
+
+Plain output shows each note's model, saved dimension values in the Scope column, content, author, and creation time. It then lists the names accepted by `notes create`: each model used by the dashboard or its widgets with its dimensions (the dashboard's model is marked `(default)`), and, when the dashboard has no model of its own, the filters notes accept without `--model`.
+
+JSON output includes `notes`, `definitions`, `dashboard_model`, `model_contexts`, and `filters`, preserving all note details such as authors, timestamps, and edit/delete permissions. `model_contexts` maps each model name to its dimensions; `filters` lists the dashboard filters.
+
+#### `notes create`
+
+Create a note with required `--content`. Creation requires a **user-scoped token** with the `dashboard:update` ability; team-owned tokens cannot create notes. With `--model`, the CLI first checks the model name against the dashboard; tokens without `dashboard:list` skip this check and rely on server-side validation. Notes cannot be created on dashboards defined in code (DAC).
+
+```bash
+bruin cloud dashboards notes create \
+  --dashboard-id 123 \
+  --content "Revenue excludes refunds."
+
+bruin cloud dashboards notes create \
+  --dashboard-id 123 \
+  --content "US campaign launched." \
+  --dimensions '{"country":"US"}'
+
+bruin cloud dashboards notes create \
+  --dashboard-id 123 \
+  --content "North American revenue increased after the campaign." \
+  --model orders \
+  --dimensions '{"country":["US","CA"],"created_at":["2026-10-20"]}' \
+  --output json
+
+bruin cloud dashboards notes create \
+  --dashboard-id 123 \
+  --model payments \
+  --content "Card payment context." \
+  --dimensions '{"method":"card"}'
+```
+
+`--model` and `--dimensions` are optional. Notes use the dashboard's model by default. Use `--model` to choose another model used by the dashboard or one of its widgets.
+
+Use `--dimensions` to attach context as a JSON object. Values are non-empty strings or numbers, or lists of them for model dimensions and multi-select filters. Booleans are accepted only for boolean dashboard filters, and date filters take `YYYY-MM-DD`. Dimension names must belong to the note's model: the `--model` value, or the dashboard's model when `--model` is omitted. On a dashboard without a model, use its filter names instead. Run `notes list` to see the available models, dimensions, and filters. With `--model`, an unknown model name produces an error listing the available models; Cloud rejects unknown dimension names.
+
+Notes associated with a model are shared across dashboards using that model within the same team.
+
 #### `versions`
 
 List a dashboard's version history — each snapshot's id, kind (draft/published),

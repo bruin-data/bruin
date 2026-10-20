@@ -4850,6 +4850,7 @@ func CloudDashboards() *cli.Command {
 			cloudDashboardsUpdate(),
 			cloudDashboardsPublish(),
 			cloudDashboardsDelete(),
+			cloudDashboardsNotes(),
 		},
 	}
 }
