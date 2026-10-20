@@ -240,11 +240,16 @@ The list of assets this asset depends on. This list determines the execution ord
 
 - `asset` : The name of the asset. Must be on the same pipeline
 - `uri` : The URI of the upstream asset. This is used in [cloud](../cloud/overview.md) when you want to have an upstream on a different pipeline. See [uri](#uri) above
-- `mode`: can be `full` (a normal dependency) or `symbolic`. The latter being just for the purpose of showing lineage without the downstream actually depending or having to wait on the upstream to run.
+- `mode`: how the dependency is evaluated. Defaults to `full`.
+  - `full`: a normal dependency. For a cross-pipeline `uri` dependency, the upstream must have succeeded for the whole interval of the downstream run.
+  - `symbolic`: only shows lineage, the downstream does not wait on the upstream to run.
+  - `last`, `first`, `any`: for cross-pipeline `uri` dependencies whose schedule does not line up with the downstream's. Among the upstream runs that overlap the downstream run's interval, the downstream proceeds when the chronologically last (`last`) or first (`first`) of them succeeded, or when any (`any`) of them succeeded. `last` does not fall back to an earlier successful run. No overlapping run means the downstream keeps waiting. Unlike `symbolic` they still gate the downstream, and unlike [interval modifiers](./interval-modifiers.md) they do not change the interval the asset processes. On a dependency within the same pipeline they behave like `full`.
 
 ```yaml
   - asset: asset_name
     mode: symbolic
+  - uri: bigquery://project.dataset/table
+    mode: last
 ```
 
 ## `start_date`

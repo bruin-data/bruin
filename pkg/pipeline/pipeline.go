@@ -1221,7 +1221,7 @@ func (u Upstream) MarshalYAML() (interface{}, error) {
 	}
 	val[id] = u.Value
 
-	if u.Mode == UpstreamModeSymbolic {
+	if u.Mode != UpstreamModeFull {
 		val["mode"] = u.Mode.String()
 	}
 
@@ -3148,7 +3148,7 @@ func (b *Builder) CreatePipelineFromPath(ctx context.Context, pathToPipeline str
 
 	for _, asset := range pipeline.Assets {
 		for _, upstream := range asset.Upstreams {
-			if upstream.Mode != UpstreamModeFull && upstream.Mode != UpstreamModeSymbolic {
+			if !upstream.Mode.IsValid() {
 				upstream.Mode = UpstreamModeFull
 			}
 
