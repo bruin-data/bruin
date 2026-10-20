@@ -1,6 +1,6 @@
 # Bruin Cloud
 
-[Bruin Cloud](https://cloud.getbruin.com/register) is a managed platform built on top of the open-source [Bruin CLI](/getting-started/introduction/installation). It runs your pipelines on a schedule, stores your connections securely, gives you a UI for monitoring runs and lineage, and ships an AI layer that can chat with your data, build dashboards, and answer questions in tools like Slack and Teams.
+[Bruin Cloud](https://cloud.getbruin.com/register?utm_source=docs&utm_medium=referral&utm_campaign=bruin-cli&utm_content=cloud-overview) is a managed platform built on top of the open-source [Bruin CLI](/getting-started/introduction/installation). It runs your pipelines on a schedule, stores your connections securely, gives you a UI for monitoring runs and lineage, and ships an AI layer that can chat with your data, build dashboards, and answer questions in tools like Slack and Teams.
 
 > [!INFO]
 > This section of the documentation covers Bruin Cloud. If you are looking for the open-source CLI, start at the [Quickstart](/getting-started/introduction/quickstart).
@@ -47,4 +47,4 @@ From there:
 
 ---
 
-[Sign up for Bruin Cloud →](https://cloud.getbruin.com/register)
+[Sign up for Bruin Cloud →](https://cloud.getbruin.com/register?utm_source=docs&utm_medium=referral&utm_campaign=bruin-cli&utm_content=cloud-overview)

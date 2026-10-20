@@ -25,7 +25,7 @@ To connect to Bruin Cloud, you need to add a configuration item to the connectio
 
 ### How to get your API token
 
-1. Go to [cloud.getbruin.com](https://cloud.getbruin.com)
+1. Go to [cloud.getbruin.com](https://cloud.getbruin.com/?utm_source=docs&utm_medium=referral&utm_campaign=bruin-cli&utm_content=ingestion-bruin)
 2. Navigate to **Teams** section
 3. Click on **Create API Token**
 4. Make sure **Pipeline List** is selected as the permission

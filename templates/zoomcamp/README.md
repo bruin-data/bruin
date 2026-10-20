@@ -6,7 +6,7 @@ Checkout our [Zoomcamp Project Prize](https://getbruin.com/zoomcamp-project) to 
 
 Please reach out to us via our [Slack Community](https://join.slack.com/t/bruindatacommunity/shared_invite/zt-3oaskee9f-YbvwEEdMgQ1elmKzqmIHTg) to ask questions, share feedback, or report issues.
 
-Register for [Bruin Cloud](https://cloud.getbruin.com/register) to deploy your pipelines: registration is free (no credit card required) and includes complimentary credits to get started.
+Register for [Bruin Cloud](https://cloud.getbruin.com/register?utm_source=github&utm_medium=referral&utm_campaign=zoomcamp&utm_content=zoomcamp-readme) to deploy your pipelines: registration is free (no credit card required) and includes complimentary credits to get started.
 
 ### YouTube Video Tutorial Playlist
 - [Video Tutorials Playlist](https://www.youtube.com/playlist?list=PLnRr-L-cuxO4lUUdkXV5YPHT5ZEcEeXQD)
