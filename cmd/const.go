@@ -184,13 +184,25 @@ func pythonImageMutator(image string) (pipeline.AssetMutator, error) {
 	}, nil
 }
 
-// ingestrDestinationMutator infers the `destination` of ingestr assets that omit it from the
-// type of the connection they write to, so code that keys off `destination` keeps working.
-func ingestrDestinationMutator(connections python.ConnectionTypeGetter) pipeline.AssetMutator {
-	return func(ctx context.Context, a *pipeline.Asset, p *pipeline.Pipeline) (*pipeline.Asset, error) {
-		python.InferIngestrDestination(a, p, connections)
-		return a, nil
+// ingestrDestinationBuilder infers the `destination` of ingestr assets that omit it from the type
+// of the connection they write to, so code that keys off `destination` keeps working. It runs on the
+// fully built pipeline because variant rendering, which resolves templated connections, comes after
+// the asset mutators.
+type ingestrDestinationBuilder struct {
+	inner interface {
+		CreatePipelineFromPath(ctx context.Context, path string, opts ...pipeline.CreatePipelineOption) (*pipeline.Pipeline, error)
 	}
+	connections python.ConnectionTypeGetter
+}
+
+func (b *ingestrDestinationBuilder) CreatePipelineFromPath(ctx context.Context, path string, opts ...pipeline.CreatePipelineOption) (*pipeline.Pipeline, error) {
+	p, err := b.inner.CreatePipelineFromPath(ctx, path, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	python.InferIngestrDestinations(p, b.connections)
+	return p, nil
 }
 
 func variableOverridesMutator(variables []string) pipeline.PipelineMutator {

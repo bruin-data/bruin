@@ -58,3 +58,12 @@ func InferIngestrDestination(asset *pipeline.Asset, p *pipeline.Pipeline, connec
 	}
 	asset.Parameters["destination"] = destination
 }
+
+// InferIngestrDestinations runs InferIngestrDestination on every asset of a
+// fully built pipeline. It must run after variant rendering, which resolves
+// templated connections.
+func InferIngestrDestinations(p *pipeline.Pipeline, connections ConnectionTypeGetter) {
+	for _, asset := range p.Assets {
+		InferIngestrDestination(asset, p, connections)
+	}
+}
