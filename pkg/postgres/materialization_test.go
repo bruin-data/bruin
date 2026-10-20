@@ -1438,11 +1438,6 @@ func TestBuildRedshiftSCD2QueryByTime(t *testing.T) {
 				"WHERE NOT EXISTS \\(\n" +
 				"  SELECT 1 FROM \"my\"\\.\"asset\" AS target \n" +
 				"  WHERE target\\.\"id\" = source\\.\"id\" AND target\\._is_current = TRUE\n" +
-				"\\)\n" +
-				"OR EXISTS \\(\n" +
-				"  SELECT 1 FROM \"my\"\\.\"asset\" AS target\n" +
-				"  WHERE target\\.\"id\" = source\\.\"id\" AND target\\._is_current = FALSE \n" +
-				"  AND target\\._valid_until = source\\.\"ts\"\n" +
 				"\\);\n\n" +
 				"DROP TABLE __bruin_scd2_time_tmp_.+;\n" +
 				"COMMIT;$",
@@ -1492,11 +1487,6 @@ func TestBuildRedshiftSCD2QueryByTime(t *testing.T) {
 				"WHERE NOT EXISTS \\(\n" +
 				"  SELECT 1 FROM \"my\"\\.\"asset\" AS target \n" +
 				"  WHERE target\\.\"id\" = source\\.\"id\" AND target\\.\"event_type\" = source\\.\"event_type\" AND target\\._is_current = TRUE\n" +
-				"\\)\n" +
-				"OR EXISTS \\(\n" +
-				"  SELECT 1 FROM \"my\"\\.\"asset\" AS target\n" +
-				"  WHERE target\\.\"id\" = source\\.\"id\" AND target\\.\"event_type\" = source\\.\"event_type\" AND target\\._is_current = FALSE \n" +
-				"  AND target\\._valid_until = source\\.\"ts\"\n" +
 				"\\);\n\n" +
 				"DROP TABLE __bruin_scd2_time_tmp_.+;\n" +
 				"COMMIT;$",

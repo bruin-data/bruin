@@ -703,10 +703,6 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				"WHERE NOT EXISTS (\n" +
 				"  SELECT 1 FROM my.asset AS target \n" +
 				"  WHERE target.id = source.id AND target._is_current = TRUE\n" +
-				")\n" +
-				"OR EXISTS (\n" +
-				"  SELECT 1 FROM my.asset AS target\n" +
-				"  WHERE target.id = source.id AND target._is_current = FALSE AND target._valid_until = CAST(source.updated_at AS TIMESTAMP_TZ)\n" +
 				");\n\n" +
 				"COMMIT;",
 		},
