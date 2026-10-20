@@ -1055,6 +1055,25 @@ func (c *APIClient) GetDashboardVersion(ctx context.Context, dashboardID, versio
 	return &result, nil
 }
 
+// ListDashboardNotes returns the dashboard's notes API response.
+func (c *APIClient) ListDashboardNotes(ctx context.Context, dashboardID int) (json.RawMessage, error) {
+	var result json.RawMessage
+	err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/dashboards/%d/notes", dashboardID), nil, &result)
+	return result, err
+}
+
+// CreateDashboardNote requires a user-scoped token; the server enforces token
+// ownership, dashboard access, and model/dimension validation.
+func (c *APIClient) CreateDashboardNote(ctx context.Context, dashboardID int, fields map[string]any) (json.RawMessage, error) {
+	var result struct {
+		Note json.RawMessage `json:"note"`
+	}
+	if err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/dashboards/%d/notes", dashboardID), fields, &result); err != nil {
+		return nil, err
+	}
+	return result.Note, nil
+}
+
 func (c *APIClient) ListScheduledAgents(ctx context.Context) ([]ScheduledAgent, error) {
 	var resp struct {
 		ScheduledAgents []ScheduledAgent `json:"scheduled_agents"`

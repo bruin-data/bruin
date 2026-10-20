@@ -686,7 +686,7 @@ func TestCloudDashboardsCommand_Help(t *testing.T) {
 	cmd := CloudDashboards()
 	require.NotNil(t, cmd)
 	assert.Equal(t, "dashboards", cmd.Name)
-	require.Len(t, cmd.Commands, 9)
+	require.Len(t, cmd.Commands, 10)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
@@ -701,6 +701,7 @@ func TestCloudDashboardsCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "publish")
 	assert.Contains(t, subNames, "delete")
 	assert.Contains(t, subNames, "folders")
+	assert.Contains(t, subNames, "notes")
 }
 
 // cliRunMu serializes cli.Command.Run: urfave/cli's ensureHelp resets the
