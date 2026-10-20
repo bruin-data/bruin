@@ -141,3 +141,32 @@ func TestIngestrDestinationsByConnectionTypeIsUnambiguous(t *testing.T) {
 		seen[connectionType] = destination
 	}
 }
+
+type countingConnectionTypes struct {
+	types mockConnectionTypes
+	calls map[string]int
+}
+
+func (c *countingConnectionTypes) GetConnectionType(name string) string {
+	c.calls[name]++
+	return c.types[name]
+}
+
+func TestInferIngestrDestinationsLooksUpEachConnectionOnce(t *testing.T) {
+	t.Parallel()
+
+	connections := &countingConnectionTypes{types: mockConnectionTypes{"pg": "postgres"}, calls: map[string]int{}}
+	assets := []*pipeline.Asset{
+		{Name: "a", Type: pipeline.AssetTypeIngestr, Connection: "pg"},
+		{Name: "b", Type: pipeline.AssetTypeIngestr, Connection: "pg"},
+		{Name: "c", Type: pipeline.AssetTypeIngestr, Connection: "pg"},
+	}
+
+	InferIngestrDestinations(&pipeline.Pipeline{Assets: assets}, connections)
+
+	for _, asset := range assets {
+		destination, _ := asset.Parameters.GetString("destination")
+		assert.Equal(t, "postgres", destination)
+	}
+	assert.Equal(t, 1, connections.calls["pg"])
+}

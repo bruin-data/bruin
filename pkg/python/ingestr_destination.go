@@ -63,7 +63,28 @@ func InferIngestrDestination(asset *pipeline.Asset, p *pipeline.Pipeline, connec
 // fully built pipeline. It must run after variant rendering, which resolves
 // templated connections.
 func InferIngestrDestinations(p *pipeline.Pipeline, connections ConnectionTypeGetter) {
-	for _, asset := range p.Assets {
-		InferIngestrDestination(asset, p, connections)
+	if connections == nil {
+		return
 	}
+
+	// Some secrets backends fetch the secret on every lookup, so resolve each connection once.
+	cached := &cachedConnectionTypes{inner: connections, types: map[string]string{}}
+	for _, asset := range p.Assets {
+		InferIngestrDestination(asset, p, cached)
+	}
+}
+
+type cachedConnectionTypes struct {
+	inner ConnectionTypeGetter
+	types map[string]string
+}
+
+func (c *cachedConnectionTypes) GetConnectionType(name string) string {
+	if connectionType, ok := c.types[name]; ok {
+		return connectionType
+	}
+
+	connectionType := c.inner.GetConnectionType(name)
+	c.types[name] = connectionType
+	return connectionType
 }

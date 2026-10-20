@@ -291,13 +291,23 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 		}
 	}
 
-	// Without a `destination`, the asset's connection decides where the data goes.
 	destination, _ := asset.Parameters.GetString("destination")
-	destinationConnection, _ := asset.Parameters.GetString("destination_connection")
-	if destination == "" && destinationConnection == "" && asset.Connection == "" {
+	if destination == "" {
+		connectionName := asset.Connection
+		if connectionName == "" {
+			connectionName, _ = asset.Parameters.GetString("destination_connection")
+		}
+
+		description := "Ingestr assets require either a `destination` parameter or a connection to write to, set via `connection` or the `destination_connection` parameter"
+		if connectionName != "" {
+			// validate and run infer `destination` from the connection before linting, so it is
+			// only still empty when the connection could not be resolved to a destination.
+			description = fmt.Sprintf("Could not determine the destination platform from connection '%s': it is not defined in the selected environment or its type is not a supported ingestr destination. Set the `destination` parameter", connectionName)
+		}
+
 		issues = append(issues, &Issue{
 			Task:        asset,
-			Description: "Ingestr assets require either a `destination` parameter or a connection to write to, set via `connection` or the `destination_connection` parameter",
+			Description: description,
 		})
 
 		return issues, nil
