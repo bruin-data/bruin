@@ -1,6 +1,7 @@
 package pipeline_test
 
 import (
+	"encoding/json"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -9,6 +10,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/spf13/afero"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -892,5 +894,53 @@ hooks:
 			require.Equal(t, tt.want.pre, task.Hooks.Pre)
 			require.Equal(t, tt.want.post, task.Hooks.Post)
 		})
+	}
+}
+
+func TestUpstreamModes(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		mode string
+		want pipeline.UpstreamMode
+	}{
+		{name: "full", mode: "full", want: pipeline.UpstreamModeFull},
+		{name: "symbolic", mode: "symbolic", want: pipeline.UpstreamModeSymbolic},
+		{name: "last", mode: "last", want: pipeline.UpstreamModeLast},
+		{name: "first", mode: "first", want: pipeline.UpstreamModeFirst},
+		{name: "any", mode: "any", want: pipeline.UpstreamModeAny},
+		{name: "case insensitive", mode: "LAST", want: pipeline.UpstreamModeLast},
+		{name: "unknown falls back to full", mode: "lst", want: pipeline.UpstreamModeFull},
+		{name: "not a string falls back to full", mode: "[last]", want: pipeline.UpstreamModeFull},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			fs := afero.NewOsFs()
+			assetPath := filepath.Join(t.TempDir(), "asset.yml")
+			content := "name: some.asset\ntype: python\ndepends:\n  - uri: bigquery://project.dataset/table\n    mode: " + tt.mode + "\n"
+			require.NoError(t, afero.WriteFile(fs, assetPath, []byte(content), 0o644))
+
+			got, err := pipeline.CreateTaskFromYamlDefinition(fs)(assetPath)
+			require.NoError(t, err)
+			require.Len(t, got.Upstreams, 1)
+			assert.Equal(t, tt.want, got.Upstreams[0].Mode)
+		})
+	}
+}
+
+func TestUpstreamModeJSONRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	for _, mode := range []pipeline.UpstreamMode{pipeline.UpstreamModeFull, pipeline.UpstreamModeSymbolic, pipeline.UpstreamModeLast, pipeline.UpstreamModeFirst, pipeline.UpstreamModeAny} {
+		raw, err := json.Marshal(&pipeline.Upstream{Type: "uri", Value: "some://uri", Mode: mode})
+		require.NoError(t, err)
+		assert.Contains(t, string(raw), `"mode":"`+mode.String()+`"`)
+
+		var decoded pipeline.Upstream
+		require.NoError(t, json.Unmarshal(raw, &decoded))
+		assert.Equal(t, mode, decoded.Mode)
 	}
 }
