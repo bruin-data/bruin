@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/fatih/color"
@@ -106,20 +107,22 @@ func TestCloudDashboardNotes(t *testing.T) {
 				} else {
 					assert.Equal(t, []string{method}, requests)
 				}
-				if output == "json" {
+				switch {
+				case output == "json":
 					if command == "list" {
 						assert.JSONEq(t, list, data)
 					} else {
 						assert.JSONEq(t, expectedNote, data)
 					}
-				} else if command == "list" {
+				case command == "list":
 					assert.Contains(t, data, "US campaign launched.")
 					assert.Contains(t, data, "Revenue excludes refunds.")
 					assert.Contains(t, data, "Ada")
+					assert.Contains(t, data, `{"country":["US","CA"]}`)
 					assert.Contains(t, data, "Available dimensions for --model and --dimensions:")
 					assert.Contains(t, data, "orders (default)")
 					assert.Contains(t, data, "created_at")
-				} else {
+				default:
 					assert.Contains(t, data, "Created note")
 				}
 			})
@@ -212,6 +215,7 @@ func TestCloudDashboardNotesInvalidContext(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // CLI runs share process-wide stdout and environment.
 func TestCloudDashboardNotesInvalidFlags(t *testing.T) {
 	requests := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { requests++ }))
@@ -235,8 +239,10 @@ func TestCloudDashboardNotesInvalidFlags(t *testing.T) {
 		{"create", "--dashboard-id", "123", "--content", "Note", "--widget-id", "payments-table"},
 		{"create", "--dashboard-id", "123", "--content", "Note", "--note-type", "campaign"},
 	} {
-		_, err := runDashboardNotesCLI(t, args...)
-		require.Error(t, err)
+		t.Run(args[0]+"/"+strings.Join(args[1:], " "), func(t *testing.T) {
+			_, err := runDashboardNotesCLI(t, args...)
+			require.Error(t, err)
+		})
 	}
 	assert.Zero(t, requests)
 }
@@ -268,7 +274,8 @@ func TestCloudDashboardNotesBackendErrors(t *testing.T) {
 				}))
 				defer server.Close()
 				t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
-				args := append(command.args, "--dashboard-id", "123", "--api-key", "team-key", "--output", "json")
+				args := append([]string(nil), command.args...)
+				args = append(args, "--dashboard-id", "123", "--api-key", "team-key", "--output", "json")
 				data, err := runDashboardNotesCLI(t, args...)
 				require.Error(t, err)
 				var exit cli.ExitCoder

@@ -964,7 +964,7 @@ bruin cloud dashboards notes list --dashboard-id 123
 bruin cloud dashboards notes list --dashboard-id 123 --output json
 ```
 
-Plain output shows the notes followed by the names accepted by `notes create`: each model used by the dashboard or its widgets with its dimensions (the dashboard's model is marked `(default)`), and, when the dashboard has no model of its own, the filters notes accept without `--model`.
+Plain output shows each note's model, saved dimension values in the Scope column, content, author, and creation time. It then lists the names accepted by `notes create`: each model used by the dashboard or its widgets with its dimensions (the dashboard's model is marked `(default)`), and, when the dashboard has no model of its own, the filters notes accept without `--model`.
 
 JSON output includes `notes`, `definitions`, `dashboard_model`, `model_contexts`, and `filters`, preserving all note details such as authors, timestamps, and edit/delete permissions. `model_contexts` maps each model name to its dimensions; `filters` lists the dashboard filters.
 

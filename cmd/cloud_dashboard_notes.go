@@ -94,16 +94,24 @@ func printDashboardNotes(notes []bruincloud.DashboardNote) {
 	}
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
-	t.AppendHeader(table.Row{"ID", "Model", "Content", "Author", "Created At"})
+	t.AppendHeader(table.Row{"ID", "Model", "Scope", "Content", "Author", "Created At"})
 	for _, note := range notes {
-		model, author := "-", "-"
+		model, scope, author := "-", "-", "-"
 		if note.SemanticModel != nil {
 			model = *note.SemanticModel
 		}
 		if note.Author != nil {
 			author = *note.Author
 		}
-		t.AppendRow(table.Row{note.ID, model, note.Content, author, note.CreatedAt})
+		var compact bytes.Buffer
+		if err := json.Compact(&compact, note.Dimensions); err == nil {
+			switch compact.String() {
+			case "null", "[]", "{}":
+			default:
+				scope = compact.String()
+			}
+		}
+		t.AppendRow(table.Row{note.ID, model, scope, note.Content, author, note.CreatedAt})
 	}
 	t.Render()
 }
