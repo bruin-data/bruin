@@ -269,7 +269,7 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 		return issues, nil
 	}
 
-	requiredKeys := []string{"source_connection", "source_table", "destination"}
+	requiredKeys := []string{"source_connection", "source_table"}
 	for _, key := range requiredKeys {
 		if asset.Parameters == nil {
 			issues = append(issues, &Issue{
@@ -291,9 +291,30 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 		}
 	}
 
+	destination, _ := asset.Parameters.GetString("destination")
+	if destination == "" {
+		connectionName := asset.Connection
+		if connectionName == "" {
+			connectionName, _ = asset.Parameters.GetString("destination_connection")
+		}
+
+		description := "Ingestr assets require either a `destination` parameter or a connection to write to, set via `connection` or the `destination_connection` parameter"
+		if connectionName != "" {
+			// validate and run infer `destination` from the connection before linting, so it is
+			// only still empty when the connection could not be resolved to a destination.
+			description = fmt.Sprintf("Could not determine the destination platform from connection '%s': it is not defined in the selected environment or its type is not a supported ingestr destination. Set the `destination` parameter", connectionName)
+		}
+
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: description,
+		})
+
+		return issues, nil
+	}
+
 	effectiveStrategy := ""
 	if value, exists := asset.Parameters.GetString("incremental_strategy"); exists && value != "" {
-		destination, _ := asset.Parameters.GetString("destination")
 		switch {
 		case python.ReverseETLDestinationSupportsStrategy(destination, value):
 			effectiveStrategy = value

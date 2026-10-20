@@ -1255,6 +1255,10 @@ func Run(isDebug *bool) *cli.Command {
 			connectionManager, errs = connectionManagerFromConfig(runCtx, cm, logger)
 
 			foundPipeline := pipelineInfo.Pipeline
+			// The pipeline was built before the connections were available, so infer the ingestr
+			// destinations before anything reads them, credential masking included. Validation
+			// lints this same pipeline.
+			python.InferIngestrDestinations(foundPipeline, connectionManager)
 
 			if runConfig.Downstream {
 				infoPrinter.Println("The downstream tasks will be executed as well.")

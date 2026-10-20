@@ -2452,7 +2452,7 @@ func TestValidateSensorTimeout(t *testing.T) {
 func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 	t.Parallel()
 
-	expectedErr := "Ingestr assets require the following parameters: source_connection, source_table, destination"
+	expectedErr := "Ingestr assets require the following parameters: source_connection, source_table"
 	tests := []struct {
 		name           string
 		asset          *pipeline.Asset
@@ -2510,6 +2510,58 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 				},
 			},
 			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "asset without destination or connection",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "source_connection",
+					"source_table":      "source_table",
+				},
+			},
+			wantErrMessage: "Ingestr assets require either a `destination` parameter or a connection to write to, set via `connection` or the `destination_connection` parameter",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "connection whose destination was inferred",
+			asset: &pipeline.Asset{
+				Type:       pipeline.AssetTypeIngestr,
+				Connection: "bigquery-prod",
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "source_connection",
+					"source_table":      "source_table",
+					"destination":       "bigquery",
+				},
+			},
+			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "connection whose destination could not be inferred",
+			asset: &pipeline.Asset{
+				Type:       pipeline.AssetTypeIngestr,
+				Connection: "bigquery-prod",
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "source_connection",
+					"source_table":      "source_table",
+				},
+			},
+			wantErrMessage: "Could not determine the destination platform from connection 'bigquery-prod': it is not defined in the selected environment or its type is not a supported ingestr destination. Set the `destination` parameter",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "destination_connection whose destination could not be inferred",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection":      "source_connection",
+					"source_table":           "source_table",
+					"destination_connection": "pg-prod",
+				},
+			},
+			wantErrMessage: "Could not determine the destination platform from connection 'pg-prod': it is not defined in the selected environment or its type is not a supported ingestr destination. Set the `destination` parameter",
 			wantErr:        assert.NoError,
 		},
 		{
