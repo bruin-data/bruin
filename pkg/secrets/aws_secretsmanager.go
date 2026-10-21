@@ -101,7 +101,7 @@ func newAWSSecretsManagerClientFromConfig(logger logger.Logger, cfg aws.Config) 
 func (c *AWSSecretsManagerClient) GetConnection(name string) any {
 	conn, err := c.ResolveConnection(name)
 	if err != nil {
-		c.logger.Errorf("%v", err)
+		c.logger.Debugf("%v", err)
 		return nil
 	}
 
@@ -142,7 +142,7 @@ func (c *AWSSecretsManagerClient) GetConnectionDetails(name string) any {
 
 	manager, err := c.getAWSSecretsManager(name)
 	if err != nil {
-		c.logger.Errorf("%v", err)
+		c.logger.Debugf("%v", err)
 		return nil
 	}
 

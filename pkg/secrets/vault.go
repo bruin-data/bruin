@@ -357,7 +357,7 @@ func newClient(ctx context.Context, client kvV2Reader, mountPath string, logger 
 func (c *Client) GetConnection(name string) any {
 	conn, err := c.ResolveConnection(name)
 	if err != nil {
-		c.logger.Errorf("%v", err)
+		c.logger.Debugf("%v", err)
 		return nil
 	}
 
@@ -399,7 +399,7 @@ func (c *Client) GetConnectionDetails(name string) any {
 
 	manager, err := c.getVaultManager(name)
 	if err != nil {
-		c.logger.Errorf("%v", err)
+		c.logger.Debugf("%v", err)
 		return nil
 	}
 

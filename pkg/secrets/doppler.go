@@ -132,7 +132,7 @@ func NewDopplerClient(logger logger.Logger, token, project, config string) (*Dop
 func (c *DopplerClient) GetConnection(name string) any {
 	conn, err := c.ResolveConnection(name)
 	if err != nil {
-		c.logger.Errorf("%v", err)
+		c.logger.Debugf("%v", err)
 		return nil
 	}
 
@@ -164,7 +164,7 @@ func (c *DopplerClient) GetConnectionDetails(name string) any {
 
 	manager, err := c.getDopplerManager(name)
 	if err != nil {
-		c.logger.Errorf("%v", err)
+		c.logger.Debugf("%v", err)
 		return nil
 	}
 

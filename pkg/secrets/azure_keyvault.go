@@ -176,7 +176,7 @@ func newAzureKeyVaultClientWithCredential(logger logger.Logger, vaultURL string,
 func (c *AzureKeyVaultClient) GetConnection(name string) any {
 	conn, err := c.ResolveConnection(name)
 	if err != nil {
-		c.logger.Errorf("%v", err)
+		c.logger.Debugf("%v", err)
 		return nil
 	}
 
@@ -217,7 +217,7 @@ func (c *AzureKeyVaultClient) GetConnectionDetails(name string) any {
 
 	manager, err := c.getAzureKeyVaultManager(name)
 	if err != nil {
-		c.logger.Errorf("%v", err)
+		c.logger.Debugf("%v", err)
 		return nil
 	}
 
