@@ -1863,4 +1863,49 @@ func TestBuildRedshiftSCD2ByColumnQuery(t *testing.T) {
 	}
 }
 
+func TestRedshiftSCD2InsertSkipsOnlyKeysWithCurrentVersion(t *testing.T) {
+	t.Parallel()
+
+	// The final INSERT must check current versions only. Also matching a closed
+	// version whose _valid_until equals the source's incremental_key re-inserted
+	// every changed record as a second current row on each later run (#2770).
+	tests := []struct {
+		name           string
+		strategy       pipeline.MaterializationStrategy
+		incrementalKey string
+	}{
+		{name: "scd2_by_time", strategy: pipeline.MaterializationStrategySCD2ByTime, incrementalKey: "ts"},
+		{name: "scd2_by_column", strategy: pipeline.MaterializationStrategySCD2ByColumn},
+		{name: "scd2_by_column_with_incremental_key", strategy: pipeline.MaterializationStrategySCD2ByColumn, incrementalKey: "ts"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			asset := &pipeline.Asset{
+				Name: "my.asset",
+				Type: pipeline.AssetTypeRedshiftQuery,
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       tt.strategy,
+					IncrementalKey: tt.incrementalKey,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true, Type: "INTEGER"},
+					{Name: "name", Type: "VARCHAR"},
+					{Name: "ts", Type: "TIMESTAMP"},
+				},
+			}
+
+			render, err := NewMaterializer(false).Render(asset, "SELECT id, name, ts from source_table")
+			require.NoError(t, err)
+
+			_, insert, found := strings.Cut(render, "INSERT INTO")
+			require.True(t, found, "no INSERT in:\n%s", render)
+			assert.Contains(t, insert, "target._is_current = TRUE")
+			assert.NotContains(t, insert, "target._is_current = FALSE")
+		})
+	}
+}
+
 func intp(i int) *int { return &i }
