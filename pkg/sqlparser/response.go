@@ -2,6 +2,8 @@ package sqlparser
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 	"unicode/utf8"
 )
@@ -10,28 +12,28 @@ import (
 // typed responses.
 
 type tablesResponse struct {
-	Tables []string
-	Error  string
+	Tables []string `json:"tables"`
+	Error  string   `json:"error"`
 }
 
 type queryResponse struct {
-	Query string
-	Error string
+	Query string `json:"query"`
+	Error string `json:"error"`
 }
 
 type queriesResponse struct {
-	Queries []string
-	Error   string
+	Queries []string `json:"queries"`
+	Error   string   `json:"error"`
 }
 
 type singleSelectResponse struct {
-	IsSingleSelect bool
-	Error          string
+	IsSingleSelect bool   `json:"is_single_select"`
+	Error          string `json:"error"`
 }
 
 type readOnlyResponse struct {
-	ReadOnly bool
-	Error    string
+	ReadOnly bool   `json:"is_read_only"`
+	Error    string `json:"error"`
 }
 
 // run runs a command handler, turning its error or panic into the response's error field, and
@@ -166,18 +168,21 @@ func validUTF8Strings(m map[string]string) bool {
 	return true
 }
 
+// validUTF8Map returns m with invalid UTF-8 replaced. Of keys that become equal, the greatest
+// original key wins, as it did when m went through a JSON round trip.
 func validUTF8Map(m map[string]string) map[string]string {
 	if validUTF8Strings(m) {
 		return m
 	}
 	out := make(map[string]string, len(m))
-	for k, v := range m {
-		out[validUTF8(k)] = validUTF8(v)
+	for _, k := range slices.Sorted(maps.Keys(m)) {
+		out[validUTF8(k)] = validUTF8(m[k])
 	}
 	return out
 }
 
-// validUTF8Schema returns s with invalid UTF-8 replaced, and an empty schema for nil.
+// validUTF8Schema returns s with invalid UTF-8 replaced, and an empty schema for nil. Name
+// collisions resolve like validUTF8Map's.
 func validUTF8Schema(s Schema) Schema {
 	if s == nil {
 		return Schema{}
@@ -193,8 +198,8 @@ func validUTF8Schema(s Schema) Schema {
 		return s
 	}
 	out := make(Schema, len(s))
-	for t, cols := range s {
-		out[validUTF8(t)] = validUTF8Map(cols)
+	for _, t := range slices.Sorted(maps.Keys(s)) {
+		out[validUTF8(t)] = validUTF8Map(s[t])
 	}
 	return out
 }

@@ -46,3 +46,27 @@ func TestPublicMethodsReplaceInvalidUTF8(t *testing.T) {
 	require.NotEmpty(t, gotLineage.Columns)
 	require.Equal(t, Schema{"t\uFFFD": {"a": "int", "b\uFFFD": "text"}}, validUTF8Schema(schema))
 }
+
+func TestValidUTF8MapCollisionsMatchJSONRoundTrip(t *testing.T) {
+	t.Parallel()
+	// Twenty keys that all become "t\uFFFD", plus a valid one, so a nondeterministic winner shows.
+	m := map[string]string{"t": "valid"}
+	schema := Schema{"t": {"a": "valid"}}
+	for b := byte(0x80); b < 0x94; b++ {
+		m["t"+string([]byte{b})] = "v" + string([]byte{b + 1})
+		schema["t"+string([]byte{b})] = map[string]string{"c" + string([]byte{b}): "int", "a": string(rune('a' + b - 0x80))}
+	}
+	roundTrip := func(v, out any) {
+		b, err := json.Marshal(v)
+		require.NoError(t, err)
+		require.NoError(t, json.Unmarshal(b, out))
+	}
+	var wantMap map[string]string
+	roundTrip(m, &wantMap)
+	var wantSchema Schema
+	roundTrip(schema, &wantSchema)
+	for range 20 {
+		require.Equal(t, wantMap, validUTF8Map(m))
+		require.Equal(t, wantSchema, validUTF8Schema(schema))
+	}
+}
