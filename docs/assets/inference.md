@@ -26,7 +26,7 @@ Because the result is a regular table, you can test it, join it, and build on it
 
 1. Bruin reads the input rows from `input_asset` or `input_query`.
 2. For each row, it renders `context` (and optional `instructions`) with the row's values.
-3. It sends one request per row to each provider/model used by your columns, asking for all of that model's columns at once in a strict JSON schema.
+3. It sends one request per row for each provider, model, and credential connection used by your columns, asking for all of that group's columns at once in a strict JSON schema.
 4. It validates every answer against its column type, choices, and bounds.
 5. It writes the input columns plus the generated columns to the destination table.
 
@@ -109,7 +109,7 @@ Every column with an `inference` block is generated; every other column comes fr
 
 | Field | Required | Description |
 | --- | --- | --- |
-| `prompt` | Yes | The question for this column. Can use `{{ row.<column> }}`. |
+| `prompt` | Yes | The question for this column. Can use <code v-pre>{{ row.&lt;column&gt; }}</code>. |
 | `choices` | No | `string` only. Map of allowed values to their descriptions. The model must return one of the keys. |
 | `minimum` / `maximum` | No | `integer` / `number` only. Inclusive bounds. |
 | `provider` | No | Use a different provider for this column. Requires `model` too. |
@@ -124,7 +124,7 @@ Things to know:
 
 - **Prompts only see the input row.** `context`, `instructions`, and column prompts are rendered per row with only `row` in scope. Run dates and pipeline variables are not available there; select them into the input if you need them.
 - **Generated columns can't depend on each other.** All columns for a row are generated independently. Chain two inference assets if one answer needs another.
-- **Columns sharing a provider and model share a request.** Mixing providers costs one extra request per row per provider/model.
+- **Columns sharing a provider, model, and credential connection share a request.** Each additional combination costs one extra request per row.
 - **Input columns pass through as-is.** Names are not normalized, but input and generated names must be unique case-insensitively.
 
 ## Inputs
@@ -132,7 +132,7 @@ Things to know:
 Set exactly one of these:
 
 - **`input_asset`**: an asset in the same pipeline, on the same connection. Bruin reads the whole table and adds the dependency for you.
-- **`input_query`**: any SQL on the asset's connection. Use it to select columns, filter rows, or join. It supports Bruin's usual templating, such as `{{ start_date }}`. Declare `depends` yourself, since Bruin does not infer lineage from the query.
+- **`input_query`**: any SQL on the asset's connection. Use it to select columns, filter rows, or join. It supports Bruin's usual templating, such as <code v-pre>{{ start_date }}</code>. Declare `depends` yourself, since Bruin does not infer lineage from the query.
 
 The primary key must be present, non-null, and unique in the input. Input column types are preserved; if a driver does not report decimal precision and scale, declare the column's type explicitly.
 
@@ -241,7 +241,7 @@ A Noul number is a probability, not a severity; use `levels` when you want a sca
 
 ## Caching
 
-Bruin caches each successful answer locally, in memory during a run and on disk under `~/.bruin/inference/`. The cache key is the rendered request: provider, model, connection, prompts, context, instructions, choices, and schema. So:
+Bruin caches each successful answer locally, in memory during a run and on disk under `~/.bruin/inference/`. The cache key is the rendered request: provider, model, connection, `max_output_tokens`, prompts, context, instructions, choices, and schema. So:
 
 - Re-running an unchanged asset makes no model calls.
 - Editing one row's text re-generates only that row.
