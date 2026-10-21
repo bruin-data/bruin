@@ -3,6 +3,7 @@ package secrets
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"net/url"
 	"os"
 	"strings"
@@ -176,7 +177,7 @@ func newAzureKeyVaultClientWithCredential(logger logger.Logger, vaultURL string,
 func (c *AzureKeyVaultClient) GetConnection(name string) any {
 	conn, err := c.ResolveConnection(name)
 	if err != nil {
-		c.logger.Debugf("%v", err)
+		logLookupFailure(c.logger, err)
 		return nil
 	}
 
@@ -217,7 +218,7 @@ func (c *AzureKeyVaultClient) GetConnectionDetails(name string) any {
 
 	manager, err := c.getAzureKeyVaultManager(name)
 	if err != nil {
-		c.logger.Debugf("%v", err)
+		logLookupFailure(c.logger, err)
 		return nil
 	}
 
@@ -245,6 +246,10 @@ func (c *AzureKeyVaultClient) getAzureKeyVaultManager(name string) (config.Conne
 	// Empty string for version gets the latest version
 	result, err := c.client.GetSecret(ctx, name, "", nil)
 	if err != nil {
+		var respErr *azcore.ResponseError
+		if errors.As(err, &respErr) && respErr.StatusCode == http.StatusNotFound {
+			return nil, newSecretNotFoundError("secret '%s' not found in Azure Key Vault", name)
+		}
 		return nil, errors.Wrapf(err, "failed to read secret '%s' from Azure Key Vault", name)
 	}
 

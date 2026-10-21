@@ -11,6 +11,7 @@ import (
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/logger"
@@ -101,7 +102,7 @@ func newAWSSecretsManagerClientFromConfig(logger logger.Logger, cfg aws.Config) 
 func (c *AWSSecretsManagerClient) GetConnection(name string) any {
 	conn, err := c.ResolveConnection(name)
 	if err != nil {
-		c.logger.Debugf("%v", err)
+		logLookupFailure(c.logger, err)
 		return nil
 	}
 
@@ -142,7 +143,7 @@ func (c *AWSSecretsManagerClient) GetConnectionDetails(name string) any {
 
 	manager, err := c.getAWSSecretsManager(name)
 	if err != nil {
-		c.logger.Debugf("%v", err)
+		logLookupFailure(c.logger, err)
 		return nil
 	}
 
@@ -171,6 +172,10 @@ func (c *AWSSecretsManagerClient) getAWSSecretsManager(name string) (config.Conn
 		SecretId: aws.String(name),
 	})
 	if err != nil {
+		var notFound *types.ResourceNotFoundException
+		if errors.As(err, &notFound) {
+			return nil, newSecretNotFoundError("secret '%s' not found in AWS Secrets Manager", name)
+		}
 		return nil, errors.Wrapf(err, "failed to read secret '%s' from AWS Secrets Manager", name)
 	}
 

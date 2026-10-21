@@ -357,7 +357,7 @@ func newClient(ctx context.Context, client kvV2Reader, mountPath string, logger 
 func (c *Client) GetConnection(name string) any {
 	conn, err := c.ResolveConnection(name)
 	if err != nil {
-		c.logger.Debugf("%v", err)
+		logLookupFailure(c.logger, err)
 		return nil
 	}
 
@@ -399,7 +399,7 @@ func (c *Client) GetConnectionDetails(name string) any {
 
 	manager, err := c.getVaultManager(name)
 	if err != nil {
-		c.logger.Debugf("%v", err)
+		logLookupFailure(c.logger, err)
 		return nil
 	}
 
@@ -555,7 +555,7 @@ func (c *Client) readConnections(name string) (*config.Connections, error) {
 	if err != nil {
 		var respErr *vault.ResponseError
 		if errors.As(err, &respErr) && respErr.StatusCode == http.StatusNotFound {
-			return nil, errors.Errorf("secret '%s' not found in Vault", name)
+			return nil, newSecretNotFoundError("secret '%s' not found in Vault", name)
 		}
 		return nil, sanitizedVaultError(err, fmt.Sprintf("failed to read secret '%s' from Vault", name))
 	}
