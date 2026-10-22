@@ -33,6 +33,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/okta"
 	"github.com/bruin-data/bruin/pkg/personio"
 	"github.com/bruin-data/bruin/pkg/postgres"
+	"github.com/bruin-data/bruin/pkg/quack"
 	"github.com/bruin-data/bruin/pkg/satismeter"
 	"github.com/bruin-data/bruin/pkg/sharepoint"
 	"github.com/bruin-data/bruin/pkg/shopify"
@@ -816,6 +817,36 @@ func Test_AddDeelConnectionFromConfig(t *testing.T) {
 	assert.Contains(t, uri, "api_key=deel_abc123")
 	assert.Contains(t, uri, "environment=sandbox")
 	assert.Equal(t, configuration, m.GetConnectionDetails("test"))
+}
+
+func Test_AddQuackConnectionFromConfig(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
+
+	disableSSL := true
+	configuration := &config.QuackConnection{
+		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
+		Host:               "duckdb.internal",
+		Port:               9494,
+		Token:              "test-token",
+		DisableSSL:         &disableSSL,
+	}
+
+	err := m.AddQuackConnectionFromConfig(configuration)
+	require.NoError(t, err)
+
+	res, ok := m.GetConnection("test").(*quack.Client)
+	require.True(t, ok)
+	require.NotNil(t, res)
+	assert.Equal(t, configuration, m.AllConnectionDetails["test"])
+
+	uri, err := res.GetIngestrURI()
+	require.NoError(t, err)
+	assert.Equal(t, "quack://duckdb.internal:9494?disable_ssl=true&token=test-token", uri)
 }
 
 func Test_AddCleverTapConnectionFromConfig(t *testing.T) {
