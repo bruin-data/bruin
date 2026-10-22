@@ -190,6 +190,26 @@ bruin cloud projects list
 +--------------------+------+--------+
 ```
 
+#### `projects create`
+
+Connect a Git repository as a new project, authenticated with a personal access token. The token needs read access to the repository; your Bruin Cloud API token needs the `team:update` permission.
+
+```bash
+export BRUIN_CLOUD_GIT_TOKEN="ghp_..."
+bruin cloud projects create --name analytics --repo-url https://github.com/acme/analytics --branch main
+```
+
+| Flag | Description |
+|------|-------------|
+| `--name` | Project name (required) |
+| `--repo-url` | HTTPS URL of the repository (required) |
+| `--branch` | Branch to track (default: `main`) |
+| `--git-token` | Personal access token. Prefer the `BRUIN_CLOUD_GIT_TOKEN` environment variable so the token stays out of your shell history (required) |
+| `--provider` | `github`, `gitlab` or `bitbucket`. Inferred for github.com, gitlab.com and bitbucket.org URLs; required for self-hosted Git |
+| `--do-not-parse` | Create the project without parsing its pipelines |
+
+The command prints the new project ID, which you can pass to other commands as `--project-id`.
+
 ---
 
 ### `pipelines`

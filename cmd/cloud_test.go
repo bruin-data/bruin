@@ -438,8 +438,75 @@ func TestCloudProjectsCommand_Help(t *testing.T) {
 	cmd := CloudProjects()
 	require.NotNil(t, cmd)
 	assert.Equal(t, "projects", cmd.Name)
-	require.Len(t, cmd.Commands, 1)
+	require.Len(t, cmd.Commands, 2)
 	assert.Equal(t, "list", cmd.Commands[0].Name)
+	assert.Equal(t, "create", cmd.Commands[1].Name)
+}
+
+func TestResolveGitProvider(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		provider string
+		repoURL  string
+		want     string
+		wantErr  bool
+	}{
+		{name: "github inferred", repoURL: "https://github.com/acme/repo", want: "github"},
+		{name: "gitlab inferred with www", repoURL: "https://www.gitlab.com/acme/repo.git", want: "gitlab"},
+		{name: "bitbucket inferred", repoURL: "https://bitbucket.org/acme/repo", want: "bitbucket"},
+		{name: "explicit wins for self-hosted", provider: "gitlab", repoURL: "https://git.acme.internal/repo", want: "gitlab"},
+		{name: "self-hosted without provider", repoURL: "https://git.acme.internal/repo", wantErr: true},
+		{name: "unknown provider", provider: "gitea", repoURL: "https://github.com/acme/repo", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := resolveGitProvider(tt.provider, tt.repoURL)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestCloudProjectsCreate_SendsRequest(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	var gotMethod, gotPath string
+	var gotBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotMethod, gotPath = r.Method, r.URL.Path
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&gotBody))
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"id":"01jabc","name":"analytics","repo_url":"https://github.com/acme/analytics","repo_branch":"main","provider":"github"}`))
+	}))
+	t.Cleanup(server.Close)
+
+	t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
+	t.Setenv("BRUIN_CLOUD_TEAM", "")
+	t.Setenv("BRUIN_CLOUD_GIT_TOKEN", "ghp_secret")
+	t.Chdir(writeTempConfigRepo(t, configWithoutCloudYML))
+
+	cmd := cloudProjectsCreate()
+	require.NoError(t, cmd.Run(t.Context(), []string{
+		"create", "--api-key", "test-key", "--name", "analytics",
+		"--repo-url", "https://github.com/acme/analytics", "--output", "json",
+	}))
+
+	assert.Equal(t, http.MethodPost, gotMethod)
+	assert.Equal(t, "/projects", gotPath)
+	assert.Equal(t, map[string]any{
+		"name":         "analytics",
+		"repo_url":     "https://github.com/acme/analytics",
+		"repo_branch":  "main",
+		"git_token":    "ghp_secret",
+		"provider":     "github",
+		"do_not_parse": false,
+	}, gotBody)
 }
 
 func TestCloudPipelinesCommand_Help(t *testing.T) {

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	path2 "path"
 	"path/filepath"
@@ -472,6 +473,7 @@ func CloudProjects() *cli.Command {
 		Usage: "Manage Bruin Cloud projects",
 		Commands: []*cli.Command{
 			cloudProjectsList(),
+			cloudProjectsCreate(),
 		},
 	}
 }
@@ -513,6 +515,111 @@ func cloudProjectsList() *cli.Command {
 				t.AppendRow(table.Row{p.ID, p.Name, p.Repo.URL, p.Repo.Branch})
 			}
 			t.Render()
+			return nil
+		},
+	}
+}
+
+var gitProviderHosts = map[string]string{
+	"github.com":    "github",
+	"gitlab.com":    "gitlab",
+	"bitbucket.org": "bitbucket",
+}
+
+// resolveGitProvider validates an explicit --provider, or infers it from a
+// github.com/gitlab.com/bitbucket.org repo URL. Self-hosted URLs need it explicitly.
+func resolveGitProvider(provider, repoURL string) (string, error) {
+	if provider != "" {
+		for _, p := range gitProviderHosts {
+			if provider == p {
+				return provider, nil
+			}
+		}
+		return "", fmt.Errorf("provider must be 'github', 'gitlab' or 'bitbucket', got %q", provider)
+	}
+
+	u, err := url.Parse(repoURL)
+	if err == nil {
+		if p, ok := gitProviderHosts[strings.TrimPrefix(strings.ToLower(u.Hostname()), "www.")]; ok {
+			return p, nil
+		}
+	}
+	return "", fmt.Errorf("could not infer the Git provider from %q, pass --provider github, gitlab or bitbucket", repoURL)
+}
+
+func cloudProjectsCreate() *cli.Command {
+	return &cli.Command{
+		Name:  "create",
+		Usage: "Connect a Git repository as a new project using a personal access token",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.StringFlag{
+				Name:     "name",
+				Usage:    "the project name",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:     "repo-url",
+				Usage:    "HTTPS URL of the Git repository, e.g. https://github.com/acme/analytics",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:  "branch",
+				Usage: "the branch Bruin Cloud should track",
+				Value: "main",
+			},
+			&cli.StringFlag{
+				Name:     "git-token",
+				Usage:    "personal access token with read access to the repository",
+				Sources:  cli.EnvVars("BRUIN_CLOUD_GIT_TOKEN"),
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:  "provider",
+				Usage: "Git provider: github, gitlab or bitbucket (inferred from the repo URL when omitted)",
+			},
+			&cli.BoolFlag{
+				Name:  "do-not-parse",
+				Usage: "create the project without parsing the repository's pipelines",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			provider, err := resolveGitProvider(c.String("provider"), c.String("repo-url"))
+			if err != nil {
+				printError(err, output, "Invalid --provider")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			project, err := client.CreateProject(ctx, bruincloud.CreateProjectInput{
+				Name:       c.String("name"),
+				RepoURL:    c.String("repo-url"),
+				RepoBranch: c.String("branch"),
+				GitToken:   c.String("git-token"),
+				Provider:   provider,
+				DoNotParse: c.Bool("do-not-parse"),
+			})
+			if err != nil {
+				printError(err, output, "Failed to create project")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(project, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			infoPrinter.Printf("Created project %s (%s)\n", project.ID, project.Name)
 			return nil
 		},
 	}
