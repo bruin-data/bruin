@@ -35,7 +35,7 @@ func (db *DB) GetResultsLocation() string {
 
 func (db *DB) GetIngestrURI() (string, error) {
 	if db.config.Endpoint != "" {
-		if _, err := parseEndpointURL(db.config.Endpoint); err != nil {
+		if _, err := db.config.validateEndpoint(); err != nil {
 			return "", err
 		}
 	}
