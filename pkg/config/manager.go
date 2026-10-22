@@ -179,6 +179,7 @@ type Connections struct {
 	Indeed              []IndeedConnection              `yaml:"indeed,omitempty" json:"indeed,omitempty" mapstructure:"indeed"`
 	CustomerIo          []CustomerIoConnection          `yaml:"customerio,omitempty" json:"customerio,omitempty" mapstructure:"customerio"`
 	CleverTap           []CleverTapConnection           `yaml:"clevertap,omitempty" json:"clevertap,omitempty" mapstructure:"clevertap"`
+	Quack               []QuackConnection               `yaml:"quack,omitempty" json:"quack,omitempty" mapstructure:"quack"`
 	Sendgrid            []SendgridConnection            `yaml:"sendgrid,omitempty" json:"sendgrid,omitempty" mapstructure:"sendgrid"`
 	Twilio              []TwilioConnection              `yaml:"twilio,omitempty" json:"twilio,omitempty" mapstructure:"twilio"`
 	Braze               []BrazeConnection               `yaml:"braze,omitempty" json:"braze,omitempty" mapstructure:"braze"`
@@ -1902,6 +1903,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.CustomerIo = append(env.Connections.CustomerIo, conn)
+	case "quack":
+		var conn QuackConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Quack = append(env.Connections.Quack, conn)
 	case "clevertap":
 		var conn CleverTapConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -2368,6 +2376,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Indeed = removeConnection(env.Connections.Indeed, connectionName)
 	case "customerio":
 		env.Connections.CustomerIo = removeConnection(env.Connections.CustomerIo, connectionName)
+	case "quack":
+		env.Connections.Quack = removeConnection(env.Connections.Quack, connectionName)
 	case "clevertap":
 		env.Connections.CleverTap = removeConnection(env.Connections.CleverTap, connectionName)
 	case "sendgrid":
@@ -2648,6 +2658,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Indeed, source.Indeed)
 	mergeConnectionList(&c.CustomerIo, source.CustomerIo)
 	mergeConnectionList(&c.CleverTap, source.CleverTap)
+	mergeConnectionList(&c.Quack, source.Quack)
 	mergeConnectionList(&c.Sendgrid, source.Sendgrid)
 	mergeConnectionList(&c.Twilio, source.Twilio)
 	mergeConnectionList(&c.Braze, source.Braze)

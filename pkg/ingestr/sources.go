@@ -998,6 +998,9 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 	// MySQL - Relational database (user-defined tables)
 	"mysql": {},
 
+	// Quack - remote DuckDB server (user-defined tables)
+	"quack": {},
+
 	// Vitess - MySQL-compatible sharded database (user-defined tables)
 	"vitess": {},
 

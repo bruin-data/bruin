@@ -1017,6 +1017,15 @@ func TestLoadFromFile(t *testing.T) {
 					Timezone:           "Asia/Kolkata",
 				},
 			},
+			Quack: []QuackConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "quack-1"},
+					Host:               "duckdb.internal",
+					Port:               9494,
+					Token:              "test-token",
+					DisableSSL:         func() *bool { b := true; return &b }(),
+				},
+			},
 			Okta: []OktaConnection{
 				{
 					ConnectionMetadata: ConnectionMetadata{Name: "okta-1"},
@@ -3449,6 +3458,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Indeed:              []IndeedConnection{{ConnectionMetadata: ConnectionMetadata{Name: "indeed1"}}},
 				CustomerIo:          []CustomerIoConnection{{ConnectionMetadata: ConnectionMetadata{Name: "customerio1"}}},
 				CleverTap:           []CleverTapConnection{{ConnectionMetadata: ConnectionMetadata{Name: "clevertap1"}}},
+				Quack:               []QuackConnection{{ConnectionMetadata: ConnectionMetadata{Name: "quack1"}}},
 				Okta:                []OktaConnection{{ConnectionMetadata: ConnectionMetadata{Name: "okta1"}}},
 				Sendgrid:            []SendgridConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sendgrid1"}}},
 				Twilio:              []TwilioConnection{{ConnectionMetadata: ConnectionMetadata{Name: "twilio1"}}},
@@ -3602,6 +3612,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Indeed:              []IndeedConnection{{ConnectionMetadata: ConnectionMetadata{Name: "indeed1"}}},
 				CustomerIo:          []CustomerIoConnection{{ConnectionMetadata: ConnectionMetadata{Name: "customerio1"}}},
 				CleverTap:           []CleverTapConnection{{ConnectionMetadata: ConnectionMetadata{Name: "clevertap1"}}},
+				Quack:               []QuackConnection{{ConnectionMetadata: ConnectionMetadata{Name: "quack1"}}},
 				Okta:                []OktaConnection{{ConnectionMetadata: ConnectionMetadata{Name: "okta1"}}},
 				Sendgrid:            []SendgridConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sendgrid1"}}},
 				Twilio:              []TwilioConnection{{ConnectionMetadata: ConnectionMetadata{Name: "twilio1"}}},

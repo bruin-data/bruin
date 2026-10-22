@@ -641,6 +641,12 @@ environments:
           passcode: "test-passcode"
           region: "eu1"
           timezone: "Asia/Kolkata"
+      quack:
+        - name: "quack-1"
+          host: "duckdb.internal"
+          port: 9494
+          token: "test-token"
+          disable_ssl: true
       okta:
         - name: "okta-1"
           domain: "dev-123456.okta.com"
