@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"os"
 	path2 "path"
@@ -2552,6 +2553,7 @@ func CloudAgents() *cli.Command {
 			cloudAgentsDelete(),
 			cloudAgentsSend(),
 			cloudAgentsStatus(),
+			cloudAgentsSteer(),
 			cloudAgentsThreads(),
 			cloudAgentsMessages(),
 			cloudAgentsGetPrompt(),
@@ -3382,6 +3384,132 @@ func cloudAgentsStatus() *cli.Command {
 			return nil
 		},
 	}
+}
+
+// IDs are flags (only defaulting to the run env) so an agent can steer another's turn.
+func cloudAgentsSteer() *cli.Command {
+	return &cli.Command{
+		Name:  "steer",
+		Usage: "Steer a running agent message mid-turn (defaults to the thread's running message)",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:    "agent-id",
+				Usage:   "agent ID (defaults to the current agent run's agent)",
+				Sources: cli.EnvVars("BRUIN_CLOUD_AGENT_ID"),
+			},
+			&cli.IntFlag{
+				Name:    "thread-id",
+				Usage:   "thread ID (defaults to the current agent run's thread)",
+				Sources: cli.EnvVars("BRUIN_THREAD_ID"),
+			},
+			&cli.IntFlag{
+				Name:  "message-id",
+				Usage: "message pair ID to steer (defaults to the thread's running message)",
+			},
+			&cli.StringFlag{
+				Name:     "message",
+				Usage:    "the follow-up for the running agent",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:  "steer-id",
+				Usage: "optional UUID for safe retries; a repeated ID returns the saved steer instead of steering twice",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			agentID, threadID := c.Int("agent-id"), c.Int("thread-id")
+			if agentID <= 0 || threadID <= 0 {
+				printError(fmt.Errorf("--agent-id and --thread-id must be positive integers (they default to BRUIN_CLOUD_AGENT_ID and BRUIN_THREAD_ID), got %d and %d", agentID, threadID), output, "Invalid agent or thread")
+				return cli.Exit("", 1)
+			}
+			if c.IsSet("message-id") && c.Int("message-id") <= 0 {
+				printError(fmt.Errorf("--message-id must be a positive integer, got %d", c.Int("message-id")), output, "Invalid --message-id")
+				return cli.Exit("", 1)
+			}
+			message := strings.TrimSpace(c.String("message"))
+			if message == "" {
+				printError(errors.New("--message is required"), output, "Missing --message")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			messageID := c.Int("message-id")
+			if !c.IsSet("message-id") {
+				messageID, err = runningMessageID(ctx, client, agentID, threadID)
+				if err != nil {
+					printError(err, output, "Failed to find the running message")
+					return cli.Exit("", 1)
+				}
+				if messageID == 0 {
+					printError(fmt.Errorf("thread %d has no running message to steer; send a normal message instead: %s", threadID, steerSendCommand(agentID, threadID)), output, "Nothing to steer")
+					return cli.Exit("", 1)
+				}
+			}
+
+			steer, err := client.SteerAgentMessage(ctx, agentID, threadID, messageID, message, c.String("steer-id"))
+			if err != nil {
+				var apiErr *bruincloud.APIError
+				if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusConflict {
+					// The API message already says to send a new message; add the command.
+					err = fmt.Errorf("%w: %s", err, steerSendCommand(agentID, threadID))
+				}
+				printError(err, output, "Failed to steer message")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				// Include the ids so a caller that let the message default can follow it with 'status'.
+				data, _ := json.MarshalIndent(map[string]any{
+					"agent_id":   agentID,
+					"thread_id":  threadID,
+					"message_id": messageID,
+					"steer":      steer,
+				}, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			printSuccessForOutput(output, fmt.Sprintf("Steered message %d in thread %d (steer %s, status: %s)", messageID, threadID, steer.ID, steer.Status))
+			return nil
+		},
+	}
+}
+
+// runningMessageID returns the thread's latest steerable message, or 0 if none.
+// Messages come oldest first, so it reads the last page.
+func runningMessageID(ctx context.Context, client *bruincloud.APIClient, agentID, threadID int) (int, error) {
+	const pageSize = 100 // the API's max
+	msgs, total, err := client.ListAgentMessagesWithTotal(ctx, agentID, threadID, pageSize, 0)
+	if err != nil {
+		return 0, err
+	}
+	if total > len(msgs) {
+		msgs, _, err = client.ListAgentMessagesWithTotal(ctx, agentID, threadID, pageSize, max(0, total-pageSize))
+		if err != nil {
+			return 0, err
+		}
+	}
+	running := 0
+	for _, m := range msgs {
+		if m.Steerable {
+			running = m.ID
+		}
+	}
+	return running, nil
+}
+
+func steerSendCommand(agentID, threadID int) string {
+	return fmt.Sprintf(`bruin cloud agents send --agent-id %d --thread-id %d --message "<message>"`, agentID, threadID)
 }
 
 func cloudAgentsThreads() *cli.Command {

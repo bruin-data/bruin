@@ -193,8 +193,20 @@ type AgentMessage struct {
 	AgentLogs         json.RawMessage `json:"agent_logs"`
 	QueryLogs         json.RawMessage `json:"query_logs"`
 	OutputAttachments json.RawMessage `json:"output_attachments"`
-	CreatedAt         string          `json:"created_at"`
-	UpdatedAt         string          `json:"updated_at"`
+	// Steerable is true while the turn is running on an agent that accepts steers.
+	Steerable bool         `json:"steerable"`
+	Steers    []AgentSteer `json:"steers,omitempty"`
+	CreatedAt string       `json:"created_at"`
+	UpdatedAt string       `json:"updated_at"`
+}
+
+// AgentSteer is a follow-up sent into a running message.
+type AgentSteer struct {
+	ID        string  `json:"id"`
+	Message   string  `json:"message"`
+	Status    string  `json:"status"`
+	Reason    *string `json:"reason"`
+	CreatedAt string  `json:"created_at"`
 }
 
 // PipelineValidationError represents a pipeline validation error.

@@ -737,6 +737,21 @@ func (c *APIClient) GetAgentMessageStatus(ctx context.Context, agentID, threadID
 	return &resp.Data, nil
 }
 
+// SteerAgentMessage sends a follow-up into a running message. id is an optional
+// UUID that makes retries idempotent; the server generates one when empty.
+func (c *APIClient) SteerAgentMessage(ctx context.Context, agentID, threadID, messagePairID int, message, id string) (*AgentSteer, error) {
+	body := map[string]any{"message": message}
+	if id != "" {
+		body["id"] = id
+	}
+	var result AgentSteer
+	err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/agents/%d/threads/%d/messages/%d/steer", agentID, threadID, messagePairID), body, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 func (c *APIClient) ListAgentThreads(ctx context.Context, agentID int, limit, offset int, archived bool) ([]AgentThread, error) {
 	params := url.Values{}
 	if limit > 0 {
@@ -826,6 +841,12 @@ func (c *APIClient) ExportThread(ctx context.Context, agentID, threadID int) (js
 }
 
 func (c *APIClient) ListAgentMessages(ctx context.Context, agentID, threadID int, limit, offset int) ([]AgentMessage, error) {
+	messages, _, err := c.ListAgentMessagesWithTotal(ctx, agentID, threadID, limit, offset)
+	return messages, err
+}
+
+// ListAgentMessagesWithTotal also returns the thread's total message count.
+func (c *APIClient) ListAgentMessagesWithTotal(ctx context.Context, agentID, threadID int, limit, offset int) ([]AgentMessage, int, error) {
 	params := url.Values{}
 	if limit > 0 {
 		params.Set("limit", strconv.Itoa(limit))
@@ -838,10 +859,11 @@ func (c *APIClient) ListAgentMessages(ctx context.Context, agentID, threadID int
 		path += "?" + params.Encode()
 	}
 	var resp struct {
-		Messages []AgentMessage `json:"messages"`
+		Messages   []AgentMessage `json:"messages"`
+		TotalCount int            `json:"total_count"`
 	}
 	err := c.doRequest(ctx, http.MethodGet, path, nil, &resp)
-	return resp.Messages, err
+	return resp.Messages, resp.TotalCount, err
 }
 
 // --- Connections ---

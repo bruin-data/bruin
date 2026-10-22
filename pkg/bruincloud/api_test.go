@@ -1195,6 +1195,57 @@ func TestGetAgentMessageStatus(t *testing.T) {
 	assert.Equal(t, "completed", msg.Status)
 }
 
+func TestSteerAgentMessage(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/agents/1/threads/10/messages/100/steer", r.URL.Path)
+
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, map[string]any{"message": "focus on EU", "id": "5f0c6b1e-8f7a-4c1e-9d2b-3a4b5c6d7e8f"}, body)
+
+		w.WriteHeader(http.StatusAccepted)
+		writeJSON(t, w, map[string]any{"id": "5f0c6b1e-8f7a-4c1e-9d2b-3a4b5c6d7e8f", "message": "focus on EU", "status": "accepted", "reason": nil, "created_at": "2026-10-22T10:00:00+00:00"})
+	})
+
+	steer, err := client.SteerAgentMessage(t.Context(), 1, 10, 100, "focus on EU", "5f0c6b1e-8f7a-4c1e-9d2b-3a4b5c6d7e8f")
+	require.NoError(t, err)
+	assert.Equal(t, "5f0c6b1e-8f7a-4c1e-9d2b-3a4b5c6d7e8f", steer.ID)
+	assert.Equal(t, "accepted", steer.Status)
+	assert.Nil(t, steer.Reason)
+}
+
+func TestSteerAgentMessageOmitsEmptyID(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		_, hasID := body["id"]
+		assert.False(t, hasID) // the server generates one
+		w.WriteHeader(http.StatusAccepted)
+		writeJSON(t, w, map[string]any{"id": "generated", "status": "pending"})
+	})
+
+	steer, err := client.SteerAgentMessage(t.Context(), 1, 10, 100, "focus on EU", "")
+	require.NoError(t, err)
+	assert.Equal(t, "generated", steer.ID)
+}
+
+func TestSteerAgentMessageNotSteerable(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusConflict)
+		_, _ = w.Write([]byte(`{"message":"This message is not running or its agent cannot be steered; send a new message instead","error":"not_steerable"}`))
+	})
+
+	_, err := client.SteerAgentMessage(t.Context(), 1, 10, 100, "focus on EU", "")
+	var apiErr *APIError
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, http.StatusConflict, apiErr.StatusCode)
+	assert.Equal(t, "not_steerable", apiErr.Code)
+}
+
 func TestListInstances(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {

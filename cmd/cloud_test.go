@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"testing"
 
@@ -646,7 +647,7 @@ func TestCloudAgentsCommand_Help(t *testing.T) {
 	cmd := CloudAgents()
 	require.NotNil(t, cmd)
 	assert.Equal(t, "agents", cmd.Name)
-	require.Len(t, cmd.Commands, 19)
+	require.Len(t, cmd.Commands, 20)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
@@ -661,6 +662,7 @@ func TestCloudAgentsCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "clear-memory")
 	assert.Contains(t, subNames, "export-thread")
 	assert.Contains(t, subNames, "request-connection")
+	assert.Contains(t, subNames, "steer")
 }
 
 // runRequestConnection runs "cloud agents request-connection" against a stub
@@ -727,6 +729,157 @@ func TestCloudAgentsRequestConnection_HasNoIDFlagsToOverrideTheRunBinding(t *tes
 	path, _, err := runRequestConnection(t, "--reason", "x", "--agent-id", "999")
 	require.Error(t, err) // unknown flag
 	assert.Empty(t, path, "the API must not be called")
+}
+
+func runSteer(t *testing.T, handler http.HandlerFunc, args ...string) (string, error) {
+	t.Helper()
+
+	server := httptest.NewServer(handler)
+	t.Cleanup(server.Close)
+
+	t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
+	t.Setenv("BRUIN_CLOUD_API_KEY", "test-key")
+	t.Setenv("BRUIN_CLOUD_TEAM", "")
+	t.Chdir(writeTempConfigRepo(t, configWithoutCloudYML))
+
+	return runCloudCLI(t, append([]string{"agents", "steer"}, args...)...)
+}
+
+func setRunEnv(t *testing.T, agentID, threadID string) {
+	t.Helper()
+	for k, v := range map[string]string{"BRUIN_CLOUD_AGENT_ID": agentID, "BRUIN_THREAD_ID": threadID} {
+		t.Setenv(k, v)
+		if v == "" {
+			require.NoError(t, os.Unsetenv(k))
+		}
+	}
+}
+
+func TestCloudAgentsSteer_ExplicitIDs(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	setRunEnv(t, "1", "2")
+
+	var body map[string]any
+	out, err := runSteer(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/agents/7/threads/42/messages/99/steer", r.URL.Path)
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = w.Write([]byte(`{"id":"abc","message":"focus on EU","status":"accepted","reason":null,"created_at":"2026-10-22T10:00:00+00:00"}`))
+	}, "--agent-id", "7", "--thread-id", "42", "--message-id", "99", "--message", "focus on EU", "--steer-id", "abc")
+
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"message": "focus on EU", "id": "abc"}, body)
+	assert.Contains(t, out, "Steered message 99 in thread 42")
+}
+
+func TestCloudAgentsSteer_DefaultsToRunningMessageFromEnv(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	setRunEnv(t, "7", "42")
+
+	// 150 messages: the running one is on the last page, and an older steerable
+	// one on the first page must be ignored.
+	messages := make([]bruincloud.AgentMessage, 150)
+	for i := range messages {
+		messages[i] = bruincloud.AgentMessage{ID: i + 1, Status: "completed"}
+	}
+	messages[9].Steerable = true
+	messages[148].Steerable = true
+
+	var offsets []string
+	var steeredPath string
+	out, err := runSteer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			assert.Equal(t, "/agents/7/threads/42/messages", r.URL.Path)
+			assert.Equal(t, "100", r.URL.Query().Get("limit"))
+			offsets = append(offsets, r.URL.Query().Get("offset"))
+			offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+			_ = json.NewEncoder(w).Encode(map[string]any{"messages": messages[offset:min(offset+100, len(messages))], "total_count": len(messages)})
+			return
+		}
+		steeredPath = r.URL.Path
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = w.Write([]byte(`{"id":"abc","status":"accepted"}`))
+	}, "--message", "focus on EU", "--output", "json")
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"", "50"}, offsets)
+	assert.Equal(t, "/agents/7/threads/42/messages/149/steer", steeredPath)
+
+	var resp struct {
+		MessageID int                   `json:"message_id"`
+		Steer     bruincloud.AgentSteer `json:"steer"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(out), &resp))
+	assert.Equal(t, 149, resp.MessageID)
+	assert.Equal(t, "abc", resp.Steer.ID)
+}
+
+func TestCloudAgentsSteer_NoRunningMessage(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	setRunEnv(t, "7", "42")
+
+	steered := false
+	out, err := runSteer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			steered = true
+		}
+		_, _ = w.Write([]byte(`{"messages":[{"id":1,"status":"completed","steerable":false}]}`))
+	}, "--message", "focus on EU")
+
+	require.Error(t, err)
+	assert.False(t, steered)
+	assert.Contains(t, out, "thread 42 has no running message to steer")
+	assert.Contains(t, out, "bruin cloud agents send --agent-id 7 --thread-id 42")
+}
+
+func TestCloudAgentsSteer_ConflictPointsToSend(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	setRunEnv(t, "", "")
+
+	out, err := runSteer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusConflict)
+		_, _ = w.Write([]byte(`{"message":"This message is not running or its agent cannot be steered; send a new message instead","error":"not_steerable"}`))
+	}, "--agent-id", "7", "--thread-id", "42", "--message-id", "99", "--message", "focus on EU", "--output", "json")
+
+	require.Error(t, err)
+	var resp map[string]string
+	require.NoError(t, json.Unmarshal([]byte(out), &resp))
+	assert.Contains(t, resp["error"], "not running or its agent cannot be steered")
+	assert.Contains(t, resp["error"], "bruin cloud agents send --agent-id 7 --thread-id 42")
+}
+
+func TestCloudAgentsSteer_OtherErrorsHaveNoSendHint(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	setRunEnv(t, "7", "42")
+
+	out, err := runSteer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"message":"Message not found","error":"not_found"}`))
+	}, "--message-id", "99", "--message", "focus on EU")
+
+	require.Error(t, err)
+	assert.Contains(t, out, "Message not found")
+	assert.NotContains(t, out, "agents send")
+}
+
+func TestCloudAgentsSteer_RejectsNonPositiveMessageID(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	setRunEnv(t, "7", "42")
+
+	called := false
+	_, err := runSteer(t, func(w http.ResponseWriter, r *http.Request) {
+		called = true
+	}, "--message-id", "0", "--message", "focus on EU")
+
+	require.Error(t, err)
+	assert.False(t, called)
+}
+
+func TestCloudAgentsSteer_RequiresAgentAndThread(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	setRunEnv(t, "", "")
+
+	called := false
+	_, err := runSteer(t, func(w http.ResponseWriter, r *http.Request) {
+		called = true
+	}, "--message", "focus on EU")
+
+	require.Error(t, err)
+	assert.False(t, called, "the API must not be called without an agent and thread")
 }
 
 func TestCloudAgentsThreadsCommand_Help(t *testing.T) {
