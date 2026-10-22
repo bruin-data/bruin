@@ -897,9 +897,10 @@ func runStop(t *testing.T, handler http.HandlerFunc, args ...string) (string, er
 	return runCloudCLI(t, append([]string{"agents", "stop"}, args...)...)
 }
 
-func TestCloudAgentsStop_ExplicitIDs(t *testing.T) { //nolint:paralleltest
+//nolint:paralleltest
+func TestCloudAgentsStop_ExplicitIDs(t *testing.T) {
 	for _, status := range []string{"silenced", "completed", "failed"} {
-		t.Run(status, func(t *testing.T) { //nolint:paralleltest
+		t.Run(status, func(t *testing.T) {
 			setRunEnv(t, "1", "2")
 			out, err := runStop(t, func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, http.MethodPost, r.Method)
@@ -915,7 +916,8 @@ func TestCloudAgentsStop_ExplicitIDs(t *testing.T) { //nolint:paralleltest
 	}
 }
 
-func TestCloudAgentsStop_DefaultsToActiveMessageFromEnv(t *testing.T) { //nolint:paralleltest
+//nolint:paralleltest
+func TestCloudAgentsStop_DefaultsToActiveMessageFromEnv(t *testing.T) {
 	for _, tc := range []struct {
 		name         string
 		messageCount int
@@ -928,7 +930,7 @@ func TestCloudAgentsStop_DefaultsToActiveMessageFromEnv(t *testing.T) { //nolint
 		{name: "processing on middle page", messageCount: 250, messageID: 149, status: "processing", offsets: []string{"", "150", "50"}},
 		{name: "pending on first page", messageCount: 250, messageID: 49, status: "pending", offsets: []string{"", "150", "50"}},
 	} {
-		t.Run(tc.name, func(t *testing.T) { //nolint:paralleltest
+		t.Run(tc.name, func(t *testing.T) {
 			setRunEnv(t, "7", "42")
 			messages := make([]bruincloud.AgentMessage, tc.messageCount)
 			for i := range messages {
@@ -980,7 +982,8 @@ func TestCloudAgentsStop_NoActiveMessage(t *testing.T) { //nolint:paralleltest
 	assert.Contains(t, resp["error"], "thread 42 has no pending or processing message to stop")
 }
 
-func TestCloudAgentsStop_APIErrors(t *testing.T) { //nolint:paralleltest
+//nolint:paralleltest
+func TestCloudAgentsStop_APIErrors(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
 		args       []string
@@ -992,7 +995,7 @@ func TestCloudAgentsStop_APIErrors(t *testing.T) { //nolint:paralleltest
 		{name: "list", statusCode: http.StatusForbidden, message: "Missing permission"},
 		{name: "last page", statusCode: http.StatusForbidden, message: "Missing permission", lastPage: true},
 	} {
-		t.Run(tc.name, func(t *testing.T) { //nolint:paralleltest
+		t.Run(tc.name, func(t *testing.T) {
 			setRunEnv(t, "7", "42")
 			calls := 0
 			out, err := runStop(t, func(w http.ResponseWriter, r *http.Request) {
@@ -1021,7 +1024,8 @@ func TestCloudAgentsStop_APIErrors(t *testing.T) { //nolint:paralleltest
 	}
 }
 
-func TestCloudAgentsStop_InvalidIDs(t *testing.T) { //nolint:paralleltest
+//nolint:paralleltest
+func TestCloudAgentsStop_InvalidIDs(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
 		agentID  string
@@ -1035,7 +1039,7 @@ func TestCloudAgentsStop_InvalidIDs(t *testing.T) { //nolint:paralleltest
 		{name: "zero message", agentID: "7", threadID: "42", args: []string{"--message-id", "0"}},
 		{name: "negative message", agentID: "7", threadID: "42", args: []string{"--message-id", "-1"}},
 	} {
-		t.Run(tc.name, func(t *testing.T) { //nolint:paralleltest
+		t.Run(tc.name, func(t *testing.T) {
 			setRunEnv(t, tc.agentID, tc.threadID)
 			called := false
 			_, err := runStop(t, func(w http.ResponseWriter, r *http.Request) {
