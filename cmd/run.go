@@ -1045,7 +1045,7 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			// Load macros from the pipeline's macros directory
-			macroContent, err := jinja.LoadMacros(fs, preview.Pipeline.MacrosPath)
+			macroContent, err := jinja.LoadMacros(pipelineBuilderFs, preview.Pipeline.MacrosPath)
 			if err != nil {
 				logger.Error("Failed to load macros", "error", err)
 				return cli.Exit("", 1)
