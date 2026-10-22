@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"slices"
 	"strings"
 	"sync"
@@ -149,12 +150,22 @@ func TestDB_CustomEndpointStopsQueryOnCancel(t *testing.T) {
 	}
 }
 
-func TestDB_CustomEndpointRejectsIngestr(t *testing.T) {
+func TestDB_CustomEndpointIngestrURI(t *testing.T) {
 	t.Parallel()
 
-	db := NewDB(&Config{Endpoint: "https://athena.example.com"})
-	_, err := db.GetIngestrURI()
-	require.ErrorContains(t, err, "endpoint_url is not supported for ingestr")
+	db := NewDB(&Config{OutputBucket: "s3://results/path", Region: "us-east-1", Endpoint: "https://athena.example.com:8443"})
+	uri, err := db.GetIngestrURI()
+	require.NoError(t, err)
+	parsed, err := url.Parse(uri)
+	require.NoError(t, err)
+	require.Equal(t, "https://athena.example.com:8443", parsed.Query().Get("endpoint_url"))
+
+	_, err = NewDB(&Config{Endpoint: "https://athena.example.com/path?x=1"}).GetIngestrURI()
+	require.ErrorContains(t, err, "endpoint_url must only contain a scheme, host, and optional port")
+
+	uri, err = NewDB(&Config{OutputBucket: "s3://results/path", Region: "us-east-1"}).GetIngestrURI()
+	require.NoError(t, err)
+	require.NotContains(t, uri, "endpoint_url")
 }
 
 func TestParseEndpointURL(t *testing.T) {

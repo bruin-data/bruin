@@ -46,5 +46,8 @@ func (c *Config) GetIngestrURI() string {
 	if c.SessionToken != "" {
 		q.Set("session_token", c.SessionToken)
 	}
+	if c.Endpoint != "" {
+		q.Set("endpoint_url", c.Endpoint)
+	}
 	return "athena://?" + q.Encode()
 }

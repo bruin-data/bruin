@@ -34,9 +34,10 @@ func (db *DB) GetResultsLocation() string {
 }
 
 func (db *DB) GetIngestrURI() (string, error) {
-	// ingestr cannot target a custom endpoint yet; fail instead of silently using AWS.
 	if db.config.Endpoint != "" {
-		return "", errors.New("endpoint_url is not supported for ingestr and seed assets on Athena connections yet")
+		if _, err := parseEndpointURL(db.config.Endpoint); err != nil {
+			return "", err
+		}
 	}
 	return db.config.GetIngestrURI(), nil
 }

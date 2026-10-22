@@ -257,8 +257,7 @@ cat rsa_key.p8
 
 ### Custom Host and Port
 
-For native Snowflake SQL assets and built-in column checks, you can override the
-endpoint with optional `host` and `port` fields:
+You can override the Snowflake endpoint with optional `host` and `port` fields:
 
 ```yaml
     connections:
@@ -276,8 +275,7 @@ endpoint with optional `host` and `port` fields:
 Set `host` to a hostname or IP address without a URL scheme or port. The `account`
 field is still required for authentication. If omitted, `host` is derived from
 the account and region, and `port` defaults to `443`. Connections use HTTPS;
-these options do not enable plain HTTP endpoints. They apply to the native Go
-driver, not `ingestr` assets.
+these options do not enable plain HTTP endpoints.
 
 ### Key-Pair Authentication
 

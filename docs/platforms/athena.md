@@ -48,7 +48,7 @@ connections:
           endpoint_url: "https://athena.example.com"
 ```
 
-`endpoint_url` must be a bare `https://host[:port]` URL, without a path, query, or credentials. `http://` is only accepted when the host resolves to a loopback address, such as `http://localhost:4566`. Bruin rejects endpoints that resolve to link-local or cloud metadata addresses, does not follow redirects, and does not use proxy settings for these requests.
+`endpoint_url` must be a bare `https://host[:port]` URL, without a path, query, or credentials. `http://` is only accepted when the host resolves to a loopback address, such as `http://localhost:4566`. For SQL assets and quality checks, Bruin also rejects endpoints that resolve to link-local or cloud metadata addresses, does not follow redirects, and does not use proxy settings for these requests.
 
 A connection with `endpoint_url` must set `access_key_id` and `secret_access_key` or a `profile`. Bruin does not fall back to the default AWS credential chain for custom endpoints.
 
