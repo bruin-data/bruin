@@ -988,7 +988,7 @@ func (s *SqlfluffRunner) installSqlfluff(ctx context.Context, repo *git.Repo) er
 	return cmdRunner.Run(ctx, repo, cmd)
 }
 
-var rendererFs = afero.NewCacheOnReadFs(afero.NewOsFs(), afero.NewMemMapFs(), 0)
+var rendererFs = afero.NewOsFs()
 
 type PyprojectToml struct {
 	Tool struct {

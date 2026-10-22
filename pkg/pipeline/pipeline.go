@@ -2246,27 +2246,7 @@ func PipelineFromPath(filePath string, fs afero.Fs) (*Pipeline, error) {
 }
 
 func LoadMacrosFromPath(macrosPath string, fs afero.Fs) ([]Macro, error) {
-	// Check if the path exists and is a directory
-	info, err := fs.Stat(macrosPath)
-	if err != nil || !info.IsDir() {
-		return []Macro{}, nil //nolint:nilerr
-	}
-
-	macros := []Macro{}
-	files, err := path.GetAllFilesRecursive(macrosPath, []string{".sql"})
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to read macros folder file at '%s'", macrosPath)
-	}
-
-	for _, file := range files {
-		content, err := afero.ReadFile(fs, file)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to read macro file at '%s'", file)
-		}
-		macros = append(macros, Macro(string(content)))
-	}
-
-	return macros, nil
+	return LoadMacros(fs, macrosPath, true)
 }
 
 type MetadataPush struct {

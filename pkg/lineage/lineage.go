@@ -3,9 +3,11 @@ package lineage
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
@@ -156,7 +158,13 @@ func (p *LineageExtractor) parseLineage(foundPipeline *pipeline.Pipeline, asset 
 		}
 	}
 
-	query, err := p.renderer.Render(asset.ExecutableFile.Content)
+	renderer := p.renderer
+	if foundPipeline.DefinitionFile.Path != "" {
+		if repo, err := git.FindRepoFromPath(filepath.Dir(foundPipeline.DefinitionFile.Path)); err == nil {
+			renderer = renderer.WithRepositoryRoot(repo.Path)
+		}
+	}
+	query, err := renderer.Render(asset.ExecutableFile.Content)
 	if err != nil {
 		return &LineageIssue{
 			Task:        asset,
