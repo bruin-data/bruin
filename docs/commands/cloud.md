@@ -1210,12 +1210,27 @@ bruin cloud scheduled-agents update --scheduled-agent-id 42 --cron "0 8 * * 1"
 bruin cloud scheduled-agents update --scheduled-agent-id 42 --state-file ./plan.yaml
 ```
 
+`--same-thread` (`same_thread` in the plan) makes every run continue one thread, so the agent sees its earlier runs. A new thread starts after 30 runs, after a failed run, or when the agent or owner changes; runs started by someone other than the owner get their own thread.
+
+```bash
+bruin cloud scheduled-agents update --scheduled-agent-id 42 --same-thread
+bruin cloud scheduled-agents update --scheduled-agent-id 42 --same-thread=false
+```
+
 #### `trigger`
 
 Run a scheduled agent now, off its schedule — the "Run now" action. The schedule is untouched (the next scheduled run still fires as planned). Refused while a run is already in progress. Prints the execution and thread ids.
 
 ```bash
 bruin cloud scheduled-agents trigger --scheduled-agent-id 42
+```
+
+#### `reset-thread`
+
+Make a same-thread scheduled agent's next run start a new thread. The previous thread is kept.
+
+```bash
+bruin cloud scheduled-agents reset-thread --scheduled-agent-id 42
 ```
 
 #### `delete`

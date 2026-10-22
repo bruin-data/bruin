@@ -1131,6 +1131,17 @@ func (c *APIClient) TriggerScheduledAgent(ctx context.Context, scheduledAgentID 
 	return &result, nil
 }
 
+// ResetScheduledAgentThread makes a same-thread scheduled agent's next run start
+// a new thread instead of continuing the current one.
+func (c *APIClient) ResetScheduledAgentThread(ctx context.Context, scheduledAgentID int) (*ScheduledAgent, error) {
+	var result ScheduledAgent
+	err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/scheduled-agents/%d/reset-thread", scheduledAgentID), nil, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 // --- Notification rules ---
 
 func (c *APIClient) GetNotificationRuleSchema(ctx context.Context) (json.RawMessage, error) {
