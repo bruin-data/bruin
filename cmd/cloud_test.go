@@ -647,7 +647,7 @@ func TestCloudAgentsCommand_Help(t *testing.T) {
 	cmd := CloudAgents()
 	require.NotNil(t, cmd)
 	assert.Equal(t, "agents", cmd.Name)
-	require.Len(t, cmd.Commands, 20)
+	require.Len(t, cmd.Commands, 21)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
@@ -663,6 +663,7 @@ func TestCloudAgentsCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "export-thread")
 	assert.Contains(t, subNames, "request-connection")
 	assert.Contains(t, subNames, "steer")
+	assert.Contains(t, subNames, "stop")
 }
 
 // runRequestConnection runs "cloud agents request-connection" against a stub
@@ -880,6 +881,175 @@ func TestCloudAgentsSteer_RequiresAgentAndThread(t *testing.T) { //nolint:parall
 
 	require.Error(t, err)
 	assert.False(t, called, "the API must not be called without an agent and thread")
+}
+
+func runStop(t *testing.T, handler http.HandlerFunc, args ...string) (string, error) {
+	t.Helper()
+
+	server := httptest.NewServer(handler)
+	t.Cleanup(server.Close)
+
+	t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
+	t.Setenv("BRUIN_CLOUD_API_KEY", "test-key")
+	t.Setenv("BRUIN_CLOUD_TEAM", "")
+	t.Chdir(writeTempConfigRepo(t, configWithoutCloudYML))
+
+	return runCloudCLI(t, append([]string{"agents", "stop"}, args...)...)
+}
+
+//nolint:paralleltest
+func TestCloudAgentsStop_ExplicitIDs(t *testing.T) {
+	for _, status := range []string{"silenced", "completed", "failed"} {
+		t.Run(status, func(t *testing.T) {
+			setRunEnv(t, "1", "2")
+			out, err := runStop(t, func(w http.ResponseWriter, r *http.Request) {
+				assert.Equal(t, http.MethodPost, r.Method)
+				assert.Equal(t, "/agents/7/threads/42/messages/99/stop", r.URL.Path)
+				assert.Equal(t, "Bearer test-key", r.Header.Get("Authorization"))
+				w.WriteHeader(http.StatusAccepted)
+				_ = json.NewEncoder(w).Encode(map[string]any{"thread_id": 42, "message_pair_id": 99, "status": status})
+			}, "--agent-id", "7", "--thread-id", "42", "--message-id", "99")
+
+			require.NoError(t, err)
+			assert.Contains(t, out, "Stop request accepted for message 99 in thread 42 (status: "+status+")")
+		})
+	}
+}
+
+//nolint:paralleltest
+func TestCloudAgentsStop_DefaultsToActiveMessageFromEnv(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		messageCount int
+		messageID    int
+		status       string
+		offsets      []string
+	}{
+		{name: "pending", messageCount: 3, messageID: 2, status: "pending", offsets: []string{""}},
+		{name: "processing on last page", messageCount: 250, messageID: 249, status: "processing", offsets: []string{"", "150"}},
+		{name: "processing on middle page", messageCount: 250, messageID: 149, status: "processing", offsets: []string{"", "150", "50"}},
+		{name: "pending on first page", messageCount: 250, messageID: 49, status: "pending", offsets: []string{"", "150", "50"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			setRunEnv(t, "7", "42")
+			messages := make([]bruincloud.AgentMessage, tc.messageCount)
+			for i := range messages {
+				messages[i] = bruincloud.AgentMessage{ID: i + 1, Status: "completed"}
+			}
+			messages[0].Status = "processing"
+			messages[tc.messageID-1].Status = tc.status
+			messages[len(messages)-1].Steerable = true
+
+			var offsets []string
+			var stoppedPath string
+			out, err := runStop(t, func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodGet {
+					assert.Equal(t, "/agents/7/threads/42/messages", r.URL.Path)
+					assert.Equal(t, "100", r.URL.Query().Get("limit"))
+					offsets = append(offsets, r.URL.Query().Get("offset"))
+					offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+					_ = json.NewEncoder(w).Encode(map[string]any{"messages": messages[offset:min(offset+100, len(messages))], "total_count": len(messages)})
+					return
+				}
+				assert.Equal(t, http.MethodPost, r.Method)
+				stoppedPath = r.URL.Path
+				w.WriteHeader(http.StatusAccepted)
+				_ = json.NewEncoder(w).Encode(map[string]any{"thread_id": 42, "message_pair_id": tc.messageID, "status": "silenced"})
+			}, "--output", "json")
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.offsets, offsets)
+			assert.Equal(t, "/agents/7/threads/42/messages/"+strconv.Itoa(tc.messageID)+"/stop", stoppedPath)
+			assert.JSONEq(t, `{"agent_id":7,"thread_id":42,"message_id":`+strconv.Itoa(tc.messageID)+`,"status":"silenced"}`, out)
+		})
+	}
+}
+
+func TestCloudAgentsStop_NoActiveMessage(t *testing.T) { //nolint:paralleltest
+	setRunEnv(t, "7", "42")
+	stopped := false
+	out, err := runStop(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			stopped = true
+		}
+		_, _ = w.Write([]byte(`{"messages":[{"id":1,"status":"completed"},{"id":2,"status":"failed"},{"id":3,"status":"silenced"}]}`))
+	}, "--output", "json")
+
+	require.Error(t, err)
+	assert.False(t, stopped)
+	var resp map[string]string
+	require.NoError(t, json.Unmarshal([]byte(out), &resp))
+	assert.Contains(t, resp["error"], "thread 42 has no pending or processing message to stop")
+}
+
+//nolint:paralleltest
+func TestCloudAgentsStop_APIErrors(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		args       []string
+		statusCode int
+		message    string
+		lastPage   bool
+	}{
+		{name: "stop", args: []string{"--message-id", "99"}, statusCode: http.StatusNotFound, message: "Message not found"},
+		{name: "list", statusCode: http.StatusForbidden, message: "Missing permission"},
+		{name: "last page", statusCode: http.StatusForbidden, message: "Missing permission", lastPage: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			setRunEnv(t, "7", "42")
+			calls := 0
+			out, err := runStop(t, func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				if len(tc.args) == 0 {
+					assert.Equal(t, http.MethodGet, r.Method)
+				}
+				if tc.lastPage && calls == 1 {
+					_, _ = w.Write([]byte(`{"messages":[],"total_count":150}`))
+					return
+				}
+				w.WriteHeader(tc.statusCode)
+				_ = json.NewEncoder(w).Encode(map[string]any{"message": tc.message})
+			}, append(tc.args, "--output", "json")...)
+
+			require.Error(t, err)
+			var resp map[string]string
+			require.NoError(t, json.Unmarshal([]byte(out), &resp))
+			assert.Contains(t, resp["error"], tc.message)
+			if tc.lastPage {
+				assert.Equal(t, 2, calls)
+			} else {
+				assert.Equal(t, 1, calls)
+			}
+		})
+	}
+}
+
+//nolint:paralleltest
+func TestCloudAgentsStop_InvalidIDs(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		agentID  string
+		threadID string
+		args     []string
+	}{
+		{name: "missing IDs"},
+		{name: "missing thread", agentID: "7"},
+		{name: "negative agent", agentID: "-1", threadID: "42"},
+		{name: "zero thread", agentID: "7", threadID: "0"},
+		{name: "zero message", agentID: "7", threadID: "42", args: []string{"--message-id", "0"}},
+		{name: "negative message", agentID: "7", threadID: "42", args: []string{"--message-id", "-1"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			setRunEnv(t, tc.agentID, tc.threadID)
+			called := false
+			_, err := runStop(t, func(w http.ResponseWriter, r *http.Request) {
+				called = true
+			}, tc.args...)
+
+			require.Error(t, err)
+			assert.False(t, called)
+		})
+	}
 }
 
 func TestCloudAgentsThreadsCommand_Help(t *testing.T) {

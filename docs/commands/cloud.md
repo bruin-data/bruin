@@ -788,6 +788,22 @@ bruin cloud agents steer \
 
 The API token needs the `agent:message:send` permission, plus `agent:message:status` when `--message-id` is omitted. If the message isn't running or its agent can't be steered, the command fails and suggests sending a normal message with `bruin cloud agents send` instead.
 
+#### `stop`
+
+Stop a pending or processing agent message:
+
+```bash
+bruin cloud agents stop \
+  --agent-id <agent-id> \
+  --thread-id <thread-id>
+```
+
+- `--message-id` picks a specific message; without it, the command finds the thread's latest pending or processing message, including across paginated history. It fails if there is no message to stop.
+- `--agent-id` and `--thread-id` default to `BRUIN_CLOUD_AGENT_ID` and `BRUIN_THREAD_ID`, which are set inside Bruin Cloud agent runs.
+- `--output json` returns `agent_id`, `thread_id`, `message_id`, and the status returned by the API.
+
+The API token needs the `agent:message:send` permission, plus `agent:message:status` when `--message-id` is omitted. Active messages become `silenced`; stopping a message that has already settled returns its existing status unchanged. The stop request is asynchronous, so acceptance does not confirm that the underlying turn has finished shutting down.
+
 #### `threads`
 
 List an agent's threads (active by default; pass `--archived` for archived ones):
