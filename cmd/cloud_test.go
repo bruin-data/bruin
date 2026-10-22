@@ -904,12 +904,13 @@ func TestCloudScheduledAgentsCommand_Help(t *testing.T) {
 	cmd := CloudScheduledAgents()
 	require.NotNil(t, cmd)
 	assert.Equal(t, "scheduled-agents", cmd.Name)
-	require.Len(t, cmd.Commands, 8)
+	require.Len(t, cmd.Commands, 9)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
 		subNames[i] = sub.Name
 	}
+	assert.Contains(t, subNames, "reset-thread")
 	assert.Contains(t, subNames, "list")
 	assert.Contains(t, subNames, "get")
 	assert.Contains(t, subNames, "create")
@@ -1364,4 +1365,29 @@ func TestPrintFolderTree(t *testing.T) {
 	var empty bytes.Buffer
 	printFolderTree(&empty, nil)
 	assert.Empty(t, empty.String())
+}
+
+func TestScheduledAgentPlanSameThreadFlag(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		args []string
+		want any
+	}{
+		{[]string{"plan", "--same-thread"}, true},
+		{[]string{"plan", "--same-thread=false"}, false},
+		{[]string{"plan"}, nil},
+	} {
+		var fields map[string]any
+		cmd := &cli.Command{
+			Name:  "plan",
+			Flags: scheduledAgentPlanFlags(),
+			Action: func(_ context.Context, c *cli.Command) error {
+				var err error
+				fields, err = buildScheduledAgentFields(c)
+				return err
+			},
+		}
+		require.NoError(t, runCLI(t.Context(), cmd, tc.args))
+		assert.Equal(t, tc.want, fields["same_thread"], tc.args)
+	}
 }

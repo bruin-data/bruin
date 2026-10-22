@@ -427,6 +427,8 @@ type ScheduledAgent struct {
 	OutputFormatting  *string                        `json:"output_formatting"`
 	VerifiedSqls      json.RawMessage                `json:"verified_sqls,omitempty"`
 	Memory            json.RawMessage                `json:"memory,omitempty"`
+	SameThread        *bool                          `json:"same_thread"`
+	ExecutionThreadID *int                           `json:"execution_thread_id"`
 	MonitorsDashboard json.RawMessage                `json:"monitors_dashboard,omitempty"`
 	RecentExecutions  json.RawMessage                `json:"recent_executions,omitempty"`
 	// Not omitempty: [] means no channels, null means an older server.

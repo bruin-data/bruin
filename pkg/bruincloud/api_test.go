@@ -1731,6 +1731,22 @@ func TestTriggerScheduledAgent(t *testing.T) {
 	assert.Equal(t, 99, execution.ThreadID)
 }
 
+func TestResetScheduledAgentThread(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/scheduled-agents/11/reset-thread", r.URL.Path)
+
+		writeJSON(t, w, map[string]any{"id": 11, "same_thread": true, "execution_thread_id": nil})
+	})
+
+	run, err := client.ResetScheduledAgentThread(t.Context(), 11)
+	require.NoError(t, err)
+	require.NotNil(t, run.SameThread)
+	assert.True(t, *run.SameThread)
+	assert.Nil(t, run.ExecutionThreadID)
+}
+
 func TestDeleteScheduledAgent(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {

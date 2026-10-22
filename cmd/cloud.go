@@ -5743,6 +5743,7 @@ func CloudScheduledAgents() *cli.Command {
 			cloudScheduledAgentsCreate(),
 			cloudScheduledAgentsUpdate(),
 			cloudScheduledAgentsTrigger(),
+			cloudScheduledAgentsResetThread(),
 			cloudScheduledAgentsDelete(),
 			cloudScheduledAgentsRunStates(),
 			cloudScheduledAgentsPipelineTrigger(),
@@ -6136,7 +6137,7 @@ func cloudScheduledAgentsUpdate() *cli.Command {
 				fields["is_active"] = c.Bool("active")
 			}
 			if len(fields) == 0 {
-				printError(errors.New("provide at least one field to update (e.g. --title, --cron, --instructions, --active or --state-file)"), output, "Nothing to update")
+				printError(errors.New("provide at least one field to update (e.g. --title, --cron, --instructions, --same-thread, --active or --state-file)"), output, "Nothing to update")
 				return cli.Exit("", 1)
 			}
 
@@ -6205,6 +6206,51 @@ func cloudScheduledAgentsTrigger() *cli.Command {
 	}
 }
 
+func cloudScheduledAgentsResetThread() *cli.Command {
+	return &cli.Command{
+		Name:  "reset-thread",
+		Usage: "Make a same-thread scheduled agent's next run start a new thread",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "scheduled-agent-id",
+				Usage:    "scheduled agent ID",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			run, err := client.ResetScheduledAgentThread(ctx, c.Int("scheduled-agent-id"))
+			if err != nil {
+				printError(err, output, "Failed to reset scheduled agent thread")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(run, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			if run.SameThread == nil || !*run.SameThread {
+				infoPrinter.Printf("Scheduled agent %d doesn't have same-thread on; every run already starts a new thread.\n", run.ID)
+				return nil
+			}
+			successPrinter.Printf("Scheduled agent %d will start a new thread on its next run.\n", run.ID)
+			return nil
+		},
+	}
+}
+
 func cloudScheduledAgentsDelete() *cli.Command {
 	return &cli.Command{
 		Name:  "delete",
@@ -6255,6 +6301,7 @@ func scheduledAgentPlanFlags() []cli.Flag {
 		&cli.StringFlag{Name: "instructions", Usage: "what the run should do"},
 		&cli.StringFlag{Name: "output-formatting", Usage: "how the result should be formatted"},
 		&cli.StringFlag{Name: "connection", Usage: "the data connection to query"},
+		&cli.BoolFlag{Name: "same-thread", Usage: "continue one thread across runs (true) or start a new thread each run (false)"},
 		&cli.StringFlag{Name: "state", Usage: "the full plan as a JSON or YAML object string"},
 		&cli.StringFlag{Name: "state-file", Usage: "path to a file with the full plan as JSON or YAML"},
 	}
@@ -6321,6 +6368,9 @@ func buildScheduledAgentFields(c *cli.Command) (map[string]any, error) {
 	if c.IsSet("connection") {
 		fields["connection"] = c.String("connection")
 	}
+	if c.IsSet("same-thread") {
+		fields["same_thread"] = c.Bool("same-thread")
+	}
 	// --cron / --timezone are shorthand for the nested schedule object.
 	if c.IsSet("cron") || c.IsSet("timezone") {
 		schedule, _ := fields["schedule"].(map[string]any)
@@ -6349,6 +6399,13 @@ func printScheduledAgent(run *bruincloud.ScheduledAgent) {
 	fmt.Printf("  Timezone:  %s\n", derefString(run.ScheduleTimezone))
 	fmt.Printf("  Next run:  %s\n", derefString(run.NextRunAt))
 	fmt.Printf("  Last run:  %s\n", derefString(run.LastRunAt))
+	if run.SameThread != nil && *run.SameThread {
+		thread := "next run starts one"
+		if run.ExecutionThreadID != nil {
+			thread = strconv.Itoa(*run.ExecutionThreadID)
+		}
+		fmt.Printf("  Thread:    same every run (%s)\n", thread)
+	}
 	if len(run.NotificationIntegrations) > 0 {
 		fmt.Printf("  Notify:    %s\n", notificationChannels(run.NotificationIntegrations))
 	}
