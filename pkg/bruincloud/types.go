@@ -209,6 +209,12 @@ type AgentSteer struct {
 	CreatedAt string  `json:"created_at"`
 }
 
+type StopAgentMessageResponse struct {
+	ThreadID      int    `json:"thread_id"`
+	MessagePairID int    `json:"message_pair_id"`
+	Status        string `json:"status"`
+}
+
 // PipelineValidationError represents a pipeline validation error.
 // The API returns dynamic JSON structures.
 type PipelineValidationError struct {

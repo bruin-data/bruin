@@ -752,6 +752,15 @@ func (c *APIClient) SteerAgentMessage(ctx context.Context, agentID, threadID, me
 	return &result, nil
 }
 
+func (c *APIClient) StopAgentMessage(ctx context.Context, agentID, threadID, messagePairID int) (*StopAgentMessageResponse, error) {
+	var result StopAgentMessageResponse
+	err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/agents/%d/threads/%d/messages/%d/stop", agentID, threadID, messagePairID), nil, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 func (c *APIClient) ListAgentThreads(ctx context.Context, agentID int, limit, offset int, archived bool) ([]AgentThread, error) {
 	params := url.Values{}
 	if limit > 0 {

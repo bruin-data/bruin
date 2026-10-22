@@ -2554,6 +2554,7 @@ func CloudAgents() *cli.Command {
 			cloudAgentsSend(),
 			cloudAgentsStatus(),
 			cloudAgentsSteer(),
+			cloudAgentsStop(),
 			cloudAgentsThreads(),
 			cloudAgentsMessages(),
 			cloudAgentsGetPrompt(),
@@ -3510,6 +3511,110 @@ func runningMessageID(ctx context.Context, client *bruincloud.APIClient, agentID
 
 func steerSendCommand(agentID, threadID int) string {
 	return fmt.Sprintf(`bruin cloud agents send --agent-id %d --thread-id %d --message "<message>"`, agentID, threadID)
+}
+
+func cloudAgentsStop() *cli.Command {
+	return &cli.Command{
+		Name:  "stop",
+		Usage: "Stop an agent message (defaults to the thread's latest pending or processing message)",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:    "agent-id",
+				Usage:   "agent ID (defaults to the current agent run's agent)",
+				Sources: cli.EnvVars("BRUIN_CLOUD_AGENT_ID"),
+			},
+			&cli.IntFlag{
+				Name:    "thread-id",
+				Usage:   "thread ID (defaults to the current agent run's thread)",
+				Sources: cli.EnvVars("BRUIN_THREAD_ID"),
+			},
+			&cli.IntFlag{
+				Name:  "message-id",
+				Usage: "message pair ID to stop (defaults to the thread's latest pending or processing message)",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			agentID, threadID := c.Int("agent-id"), c.Int("thread-id")
+			if agentID <= 0 || threadID <= 0 {
+				printError(fmt.Errorf("--agent-id and --thread-id must be positive integers (they default to BRUIN_CLOUD_AGENT_ID and BRUIN_THREAD_ID), got %d and %d", agentID, threadID), output, "Invalid agent or thread")
+				return cli.Exit("", 1)
+			}
+			if c.IsSet("message-id") && c.Int("message-id") <= 0 {
+				printError(fmt.Errorf("--message-id must be a positive integer, got %d", c.Int("message-id")), output, "Invalid --message-id")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			messageID := c.Int("message-id")
+			if !c.IsSet("message-id") {
+				messageID, err = stoppableMessageID(ctx, client, agentID, threadID)
+				if err != nil {
+					printError(err, output, "Failed to find a message to stop")
+					return cli.Exit("", 1)
+				}
+				if messageID == 0 {
+					printError(fmt.Errorf("thread %d has no pending or processing message to stop", threadID), output, "Nothing to stop")
+					return cli.Exit("", 1)
+				}
+			}
+
+			result, err := client.StopAgentMessage(ctx, agentID, threadID, messageID)
+			if err != nil {
+				printError(err, output, "Failed to stop message")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(map[string]any{
+					"agent_id":   agentID,
+					"thread_id":  result.ThreadID,
+					"message_id": result.MessagePairID,
+					"status":     result.Status,
+				}, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			printSuccessForOutput(output, fmt.Sprintf("Stop request accepted for message %d in thread %d (status: %s)", result.MessagePairID, result.ThreadID, result.Status))
+			return nil
+		},
+	}
+}
+
+func stoppableMessageID(ctx context.Context, client *bruincloud.APIClient, agentID, threadID int) (int, error) {
+	const pageSize = 100
+	firstPage, total, err := client.ListAgentMessagesWithTotal(ctx, agentID, threadID, pageSize, 0)
+	if err != nil {
+		return 0, err
+	}
+
+	for offset := max(0, total-pageSize); ; offset = max(0, offset-pageSize) {
+		messages := firstPage
+		if offset > 0 {
+			messages, _, err = client.ListAgentMessagesWithTotal(ctx, agentID, threadID, pageSize, offset)
+			if err != nil {
+				return 0, err
+			}
+		}
+		for i := len(messages) - 1; i >= 0; i-- {
+			if messages[i].Status == "pending" || messages[i].Status == "processing" {
+				return messages[i].ID, nil
+			}
+		}
+		if offset == 0 {
+			return 0, nil
+		}
+	}
 }
 
 func cloudAgentsThreads() *cli.Command {

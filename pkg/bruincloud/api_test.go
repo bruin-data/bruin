@@ -2,6 +2,7 @@ package bruincloud
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -1244,6 +1245,43 @@ func TestSteerAgentMessageNotSteerable(t *testing.T) {
 	require.ErrorAs(t, err, &apiErr)
 	assert.Equal(t, http.StatusConflict, apiErr.StatusCode)
 	assert.Equal(t, "not_steerable", apiErr.Code)
+}
+
+func TestStopAgentMessage(t *testing.T) {
+	t.Parallel()
+	for _, status := range []string{"silenced", "completed", "failed"} {
+		t.Run(status, func(t *testing.T) {
+			t.Parallel()
+			client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				assert.Equal(t, http.MethodPost, r.Method)
+				assert.Equal(t, "/agents/1/threads/10/messages/100/stop", r.URL.Path)
+				body, err := io.ReadAll(r.Body)
+				assert.NoError(t, err)
+				assert.Empty(t, body)
+				w.WriteHeader(http.StatusAccepted)
+				writeJSON(t, w, map[string]any{"thread_id": 10, "message_pair_id": 100, "status": status})
+			})
+
+			result, err := client.StopAgentMessage(t.Context(), 1, 10, 100)
+			require.NoError(t, err)
+			assert.Equal(t, &StopAgentMessageResponse{ThreadID: 10, MessagePairID: 100, Status: status}, result)
+		})
+	}
+}
+
+func TestStopAgentMessageError(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		writeJSON(t, w, map[string]any{"message": "Message not found", "error": "not_found"})
+	})
+
+	result, err := client.StopAgentMessage(t.Context(), 1, 10, 100)
+	require.Nil(t, result)
+	var apiErr *APIError
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, http.StatusNotFound, apiErr.StatusCode)
+	assert.Equal(t, "not_found", apiErr.Code)
 }
 
 func TestListInstances(t *testing.T) {
