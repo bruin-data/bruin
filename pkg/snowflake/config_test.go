@@ -1,6 +1,7 @@
 package snowflake
 
 import (
+	"net/url"
 	"testing"
 
 	"github.com/snowflakedb/gosnowflake"
@@ -42,6 +43,34 @@ func TestConfig_DSNEndpoint(t *testing.T) {
 			require.Equal(t, "my-account", parsed.Account)
 			require.Equal(t, "eu-west-1", parsed.Region)
 			require.Equal(t, "https", parsed.Protocol)
+		})
+	}
+}
+
+func TestConfig_GetIngestrURIEndpoint(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name     string
+		host     string
+		port     int
+		wantHost string
+		wantPort string
+	}{
+		{name: "defaults"},
+		{name: "host only", host: "snowflake.example.com", wantHost: "snowflake.example.com"},
+		{name: "host and port", host: "127.0.0.1", port: 8443, wantHost: "127.0.0.1", wantPort: "8443"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			uri, err := Config{Account: "my-account", Username: "my-user", Password: "test-password", Host: tt.host, Port: tt.port}.GetIngestrURI()
+			require.NoError(t, err)
+			parsed, err := url.Parse(uri)
+			require.NoError(t, err)
+			require.Equal(t, "my-account", parsed.Host)
+			require.Equal(t, tt.wantHost, parsed.Query().Get("host"))
+			require.Equal(t, tt.wantPort, parsed.Query().Get("port"))
 		})
 	}
 }

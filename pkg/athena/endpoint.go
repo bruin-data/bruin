@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql/driver"
 	"errors"
+	"net/url"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -23,15 +24,25 @@ type endpointConnector struct {
 	tracer *drv.DriverTracer
 }
 
-func newEndpointConnector(c *Config) (*endpointConnector, error) {
+// validateEndpoint checks the custom endpoint and its credentials for every path that uses it.
+func (c *Config) validateEndpoint() (*url.URL, error) {
 	endpoint, err := parseEndpointURL(c.Endpoint)
 	if err != nil {
 		return nil, err
 	}
 	// Never fall back to the default credential chain: it would sign requests to an arbitrary
-	// host with ambient credentials, such as an instance role.
+	// host with ambient credentials, such as an instance role. A profile is resolved into
+	// these keys when the connection is created.
 	if c.AccessID == "" || c.SecretAccessKey == "" {
 		return nil, errors.New("endpoint_url requires access_key_id and secret_access_key, or a profile")
+	}
+	return endpoint, nil
+}
+
+func newEndpointConnector(c *Config) (*endpointConnector, error) {
+	endpoint, err := c.validateEndpoint()
+	if err != nil {
+		return nil, err
 	}
 
 	dsn, err := c.ToDBConnectionURI()

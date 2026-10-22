@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strconv"
 
 	"github.com/snowflakedb/gosnowflake"
 	"github.com/youmark/pkcs8"
@@ -87,6 +88,12 @@ func (c Config) GetIngestrURI() (string, error) {
 	}
 	if c.Role != "" {
 		values.Add("role", c.Role)
+	}
+	if c.Host != "" {
+		values.Add("host", c.Host)
+	}
+	if c.Port != 0 {
+		values.Add("port", strconv.Itoa(c.Port))
 	}
 
 	if c.PrivateKey != "" {

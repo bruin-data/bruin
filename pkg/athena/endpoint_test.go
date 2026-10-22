@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"slices"
 	"strings"
 	"sync"
@@ -149,12 +150,30 @@ func TestDB_CustomEndpointStopsQueryOnCancel(t *testing.T) {
 	}
 }
 
-func TestDB_CustomEndpointRejectsIngestr(t *testing.T) {
+func TestDB_CustomEndpointIngestrURI(t *testing.T) {
 	t.Parallel()
 
-	db := NewDB(&Config{Endpoint: "https://athena.example.com"})
-	_, err := db.GetIngestrURI()
-	require.ErrorContains(t, err, "endpoint_url is not supported for ingestr")
+	config := func(endpoint, accessID, secret string) *Config {
+		return &Config{OutputBucket: "s3://results/path", Region: "us-east-1", AccessID: accessID, SecretAccessKey: secret, Endpoint: endpoint}
+	}
+
+	uri, err := NewDB(config("https://athena.example.com:8443", "id", "secret")).GetIngestrURI()
+	require.NoError(t, err)
+	parsed, err := url.Parse(uri)
+	require.NoError(t, err)
+	require.Equal(t, "https://athena.example.com:8443", parsed.Query().Get("endpoint_url"))
+
+	_, err = NewDB(config("https://athena.example.com/path?x=1", "id", "secret")).GetIngestrURI()
+	require.ErrorContains(t, err, "endpoint_url must only contain a scheme, host, and optional port")
+
+	for _, creds := range [][2]string{{"", ""}, {"id", ""}, {"", "secret"}} {
+		_, err = NewDB(config("https://athena.example.com", creds[0], creds[1])).GetIngestrURI()
+		require.ErrorContains(t, err, "endpoint_url requires access_key_id and secret_access_key, or a profile", creds)
+	}
+
+	uri, err = NewDB(&Config{OutputBucket: "s3://results/path", Region: "us-east-1"}).GetIngestrURI()
+	require.NoError(t, err)
+	require.NotContains(t, uri, "endpoint_url")
 }
 
 func TestParseEndpointURL(t *testing.T) {
