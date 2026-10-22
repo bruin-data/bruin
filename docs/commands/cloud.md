@@ -771,6 +771,23 @@ bruin cloud agents status \
   --message-id <message-id>
 ```
 
+#### `steer`
+
+Send a follow-up into a message the agent is still working on, so it changes course without waiting for the reply:
+
+```bash
+bruin cloud agents steer \
+  --agent-id <agent-id> \
+  --thread-id <thread-id> \
+  --message "Only look at EU customers"
+```
+
+- `--message-id` picks the message to steer; without it, the command steers the thread's running message.
+- `--agent-id` and `--thread-id` default to `BRUIN_CLOUD_AGENT_ID` and `BRUIN_THREAD_ID`, which are set inside Bruin Cloud agent runs.
+- `--steer-id` takes a UUID to make retries safe: repeating it returns the saved steer instead of steering twice.
+
+The API token needs the `agent:message:send` permission, plus `agent:message:status` when `--message-id` is omitted. If the message isn't running or its agent can't be steered, the command fails and suggests sending a normal message with `bruin cloud agents send` instead.
+
 #### `threads`
 
 List an agent's threads (active by default; pass `--archived` for archived ones):

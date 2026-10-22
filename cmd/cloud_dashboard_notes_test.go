@@ -20,6 +20,12 @@ const dashboardNotesContext = `{"dashboard_model":"orders","model_contexts":{"pa
 
 func runDashboardNotesCLI(t *testing.T, args ...string) (string, error) {
 	t.Helper()
+	return runCloudCLI(t, append([]string{"dashboards", "notes"}, args...)...)
+}
+
+// runCloudCLI runs "bruin cloud <args>" and returns what it printed.
+func runCloudCLI(t *testing.T, args ...string) (string, error) {
+	t.Helper()
 	reader, writer, err := os.Pipe()
 	require.NoError(t, err)
 	original := os.Stdout
@@ -33,7 +39,7 @@ func runDashboardNotesCLI(t *testing.T, args ...string) (string, error) {
 	debug := false
 	cmd := Cloud(&debug)
 	cmd.ExitErrHandler = func(context.Context, *cli.Command, error) {}
-	runErr := runCLI(t.Context(), cmd, append([]string{"cloud", "dashboards", "notes"}, args...))
+	runErr := runCLI(t.Context(), cmd, append([]string{"cloud"}, args...))
 	require.NoError(t, writer.Close())
 	os.Stdout = original
 	color.Output = originalColorOutput
