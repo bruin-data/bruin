@@ -149,6 +149,33 @@ func (c *APIClient) ListProjects(ctx context.Context) ([]Project, error) {
 	return projects, err
 }
 
+// CreateProjectInput connects a Git repository as a project, authenticated
+// with a personal access token. Provider is one of github, gitlab or bitbucket.
+type CreateProjectInput struct {
+	Name       string `json:"name"`
+	RepoURL    string `json:"repo_url"`
+	RepoBranch string `json:"repo_branch"`
+	GitToken   string `json:"git_token"`
+	Provider   string `json:"provider"`
+	DoNotParse bool   `json:"do_not_parse"`
+}
+
+type CreateProjectResult struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	RepoURL    string `json:"repo_url"`
+	RepoBranch string `json:"repo_branch"`
+	Provider   string `json:"provider"`
+}
+
+func (c *APIClient) CreateProject(ctx context.Context, input CreateProjectInput) (*CreateProjectResult, error) {
+	var result CreateProjectResult
+	if err := c.doRequest(ctx, http.MethodPost, "/projects", input, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 // --- Pipelines ---
 
 func (c *APIClient) ListPipelines(ctx context.Context) ([]Pipeline, error) {

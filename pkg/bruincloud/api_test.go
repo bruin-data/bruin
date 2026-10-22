@@ -218,6 +218,47 @@ func TestListProjects(t *testing.T) {
 	assert.Equal(t, "main", projects[0].Repo.Branch)
 }
 
+func TestCreateProject(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/projects", r.URL.Path)
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, map[string]any{
+			"name":         "analytics",
+			"repo_url":     "https://github.com/acme/analytics",
+			"repo_branch":  "main",
+			"git_token":    "ghp_secret",
+			"provider":     "github",
+			"do_not_parse": true,
+		}, readJSON(t, r))
+		w.WriteHeader(http.StatusCreated)
+		writeJSON(t, w, map[string]any{
+			"id":          "01jabc",
+			"name":        "analytics",
+			"repo_url":    "https://github.com/acme/analytics",
+			"repo_branch": "main",
+			"provider":    "github",
+		})
+	})
+
+	project, err := client.CreateProject(t.Context(), CreateProjectInput{
+		Name:       "analytics",
+		RepoURL:    "https://github.com/acme/analytics",
+		RepoBranch: "main",
+		GitToken:   "ghp_secret",
+		Provider:   "github",
+		DoNotParse: true,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, &CreateProjectResult{
+		ID:         "01jabc",
+		Name:       "analytics",
+		RepoURL:    "https://github.com/acme/analytics",
+		RepoBranch: "main",
+		Provider:   "github",
+	}, project)
+}
+
 func TestListPipelines(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
