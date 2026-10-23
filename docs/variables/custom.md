@@ -29,7 +29,11 @@ variables:
 
 ## Supported JSON Schema Keywords
 
-Bruin accepts [JSON Schema draft-07](https://json-schema.org/draft-07/json-schema-release-notes.html) keywords in variable definitions. At parse time, it currently enforces that each variable has a `default` value; full schema validation is not yet enforced.
+Bruin accepts [JSON Schema draft-07](https://json-schema.org/draft-07/json-schema-release-notes.html) keywords in variable definitions. At parse time, it enforces that each variable has a `default` value. `bruin validate` also checks each variable's schema and value independently, reporting problems as warnings without failing validation. Values passed with `--var` or selected with `--variant` are checked in place of the declared defaults. These new checks do not run during `bruin run`, and do not change variable overrides or the schemas and values passed to live jobs. Use `bruin validate --exclude-warnings` to skip warning checks.
+
+For this initial rollout, a variable whose schema contains `$ref` (including local references) receives a warning that schema and value validation were skipped. References are not resolved or fetched, avoiding network/file access and recursive-reference failures. Other variables are still checked.
+
+Variable schema validation uses an embedded Draft 7 meta-schema and blocks external loading at the schema loader itself. It cannot fetch schemas over HTTP or read referenced files.
 
 | `type` value | Description | Example default |
 |--------------|-------------|-----------------|
@@ -39,9 +43,15 @@ Bruin accepts [JSON Schema draft-07](https://json-schema.org/draft-07/json-schem
 | `boolean`    | `true` / `false` flags | `false` |
 | `object`     | Maps with nested schemas | `{ "region": "us-east-1" }` |
 | `array`      | Lists of values | `["alice", "bob"]` |
-| `null`       | Explicitly nullable values | `null` |
+| `"null"`     | Explicitly nullable values | `null` |
 
 Additional keywords: `enum`, `const`, `minimum`, `maximum`, `pattern`, `items`, `properties`, `required`.
+
+Use the canonical JSON Schema type `integer` for whole numbers. The warning check treats the legacy `int` spelling as `integer` on a private copy and reports a warning; the declared schema remains unchanged.
+
+Quote `"null"` when using it as a type. The warning check treats an unquoted YAML `null` in the `type` field as the JSON Schema type `"null"` on its private copy and reports a warning. Actual values such as `default: null`, `const: null`, and `enum: [null]` remain null values.
+
+Quote date and time defaults used with `format`, for example `default: "2024-01-01"`. YAML reads an unquoted `2024-01-01` as a timestamp, which is passed to jobs as `2024-01-01T00:00:00Z` and does not match `format: date`.
 
 ## Complex Variable Examples
 

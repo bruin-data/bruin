@@ -7,23 +7,20 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestVariables(t *testing.T) {
 	t.Parallel()
 
-	// TODO: restore this test when meta-schema validation is implemented
-	// t.Run("Should return an error if the variables are not valid JSONSchema object", func(t *testing.T) {
-	// 	t.Parallel()
-	// 	vars := pipeline.Variables{
-	// 		"user": {
-	// 			"type": "complex",
-	// 		},
-	// 	}
-	// 	err := vars.Validate()
-	// 	require.Error(t, err)
-	// 	assert.Contains(t, err.Error(), "invalid variables schema")
-	// })
+	t.Run("runtime validation does not enforce schemas", func(t *testing.T) {
+		t.Parallel()
+		vars := pipeline.Variables{"user": {"type": "complex", "default": "alice"}}
+		require.NoError(t, vars.Validate())
+		require.NoError(t, vars.Merge(map[string]any{"user": 42}))
+		require.NoError(t, vars.Validate())
+		assert.Equal(t, 42, vars.Value()["user"])
+	})
 	t.Run("Should return an error if the default is not set", func(t *testing.T) {
 		t.Parallel()
 		vars := pipeline.Variables{
@@ -153,6 +150,148 @@ func TestVariables_SchemaMap(t *testing.T) {
 		vars := pipeline.Variables{}
 		schema := vars.SchemaMap()
 		assert.Empty(t, schema)
+	})
+
+	t.Run("preserves legacy integer types in runtime schemas", func(t *testing.T) {
+		t.Parallel()
+		vars := pipeline.Variables{
+			"aggregate_days": {
+				"type": "array",
+				"items": map[string]any{
+					"type": "int",
+				},
+				"default": []any{1, 2, 3},
+			},
+		}
+
+		schema := vars.SchemaMap()
+		items := schema["aggregate_days"].(map[string]any)["items"].(map[string]any)
+		assert.Equal(t, "int", items["type"])
+		assert.Equal(t, "int", vars["aggregate_days"]["items"].(map[string]any)["type"])
+	})
+
+	t.Run("preserves YAML null in runtime schemas", func(t *testing.T) {
+		t.Parallel()
+		vars := pipeline.Variables{
+			"nullable_count": {
+				"type":    []any{"integer", nil},
+				"enum":    []any{1, nil},
+				"default": nil,
+			},
+		}
+
+		schema := vars.SchemaMap()["nullable_count"].(map[string]any)
+		assert.Equal(t, []any{"integer", nil}, schema["type"])
+		assert.Equal(t, []any{1, nil}, schema["enum"])
+	})
+
+	t.Run("distinguishes schema type keywords from object fields named type", func(t *testing.T) {
+		t.Parallel()
+		vars := pipeline.Variables{
+			"config": {
+				"type": "object",
+				"properties": map[string]any{
+					"type": map[string]any{"type": "int"},
+				},
+				"enum": []any{
+					map[string]any{"type": "int"},
+				},
+				"default": map[string]any{"type": "int"},
+			},
+		}
+
+		schema := vars.SchemaMap()["config"].(map[string]any)
+		properties := schema["properties"].(map[string]any)
+		assert.Equal(t, "int", properties["type"].(map[string]any)["type"])
+		assert.Equal(t, "int", schema["enum"].([]any)[0].(map[string]any)["type"])
+	})
+}
+
+func TestVariables_SchemaDiagnostics(t *testing.T) {
+	t.Parallel()
+
+	t.Run("warns for legacy int types but validates their defaults", func(t *testing.T) {
+		t.Parallel()
+		var p pipeline.Pipeline
+		err := yaml.Unmarshal([]byte(`
+name: ua_data
+variables:
+  aggregate_days:
+    type: array
+    items:
+      type: int
+    default: [1, 2, 3, 7]
+  engagement_days:
+    type: array
+    items:
+      type: int
+    default: [0, 1, 2, 3, 7]
+`), &p)
+		require.NoError(t, err)
+
+		diagnostics := p.Variables.SchemaDiagnostics()
+		assert.Equal(t, []string{
+			`variables.aggregate_days.items.type: legacy type "int" is treated as "integer"`,
+			`variables.engagement_days.items.type: legacy type "int" is treated as "integer"`,
+		}, diagnostics)
+	})
+
+	t.Run("warns when a schema is invalid", func(t *testing.T) {
+		t.Parallel()
+		vars := pipeline.Variables{
+			"user": {
+				"type":    "complex",
+				"default": "alice",
+			},
+		}
+
+		diagnostics := vars.SchemaDiagnostics()
+		require.Len(t, diagnostics, 1)
+		assert.Contains(t, diagnostics[0], "invalid schema")
+		assert.NotContains(t, diagnostics[0], "\n")
+	})
+
+	t.Run("warns for YAML null types but keeps null defaults valid", func(t *testing.T) {
+		t.Parallel()
+		vars := pipeline.Variables{
+			"optional_count": {
+				"type":    []any{"integer", nil},
+				"default": nil,
+			},
+		}
+
+		assert.Equal(t, []string{
+			`variables.optional_count.type[1]: YAML null is treated as JSON Schema type "null"`,
+		}, vars.SchemaDiagnostics())
+	})
+
+	t.Run("warns when defaults do not satisfy a valid schema", func(t *testing.T) {
+		t.Parallel()
+		vars := pipeline.Variables{
+			"environment": {
+				"type":    "string",
+				"enum":    []any{"dev", "prod"},
+				"default": "staging",
+			},
+		}
+
+		diagnostics := vars.SchemaDiagnostics()
+		assert.Equal(t, []string{
+			`variables.environment: value does not satisfy its schema: value must be one of the following: "dev", "prod"`,
+		}, diagnostics)
+	})
+
+	t.Run("returns no diagnostics for valid schemas and defaults", func(t *testing.T) {
+		t.Parallel()
+		vars := pipeline.Variables{
+			"count": {
+				"type":    "integer",
+				"minimum": 1,
+				"default": 3,
+			},
+		}
+
+		assert.Empty(t, vars.SchemaDiagnostics())
 	})
 }
 
