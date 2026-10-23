@@ -154,6 +154,7 @@ func Test_createTaskFromFile(t *testing.T) {
 						Name:  "check1",
 						Query: "select * from table1",
 						Value: 16,
+						Line:  27,
 					},
 				},
 				Hooks: pipeline.Hooks{
@@ -318,12 +319,14 @@ func Test_createTaskFromFile(t *testing.T) {
 						Query:    "select 5",
 						Value:    16,
 						Blocking: pipeline.DefaultTrueBool{Value: &falseValue},
+						Line:     35,
 					},
 					{
 						ID:    "cc1040bd694dcb5fae26300d2c0f721e4c4304cb16b9dce3b4ddcaa44498b940",
 						Name:  "check2",
 						Query: "select 5",
 						Value: 16,
+						Line:  40,
 					},
 				},
 				Hooks: pipeline.Hooks{
