@@ -174,7 +174,7 @@ Bruin resolves the destination connection in this order:
 2. `parameters.destination_connection`, when set.
 3. The pipeline default connection for `parameters.destination`.
 
-When Bruin infers a destination connection from `parameters.destination`, the built-in destination values are `athena`, `bigquery`, `clickhouse`, `databricks`, `doris`, `duckdb`, `dynamodb`, `elasticsearch`, `fabric`, `gsheets`, `iceberg`, `motherduck`, `mssql`, `oracle`, `postgres`, `quack`, `redshift`, `snowflake`, `starrocks`, `synapse`, and `vertica`. Other ingestr destinations can still be used when you set `connection` or `destination_connection` to a compatible Bruin connection.
+When Bruin infers a destination connection from `parameters.destination`, the built-in destination values are `athena`, `bigquery`, `clickhouse`, `databricks`, `doris`, `duckdb`, `dynamodb`, `elasticsearch`, `fabric`, `gsheets`, `iceberg`, `motherduck`, `mssql`, `oracle`, `postgres`, `redshift`, `snowflake`, `starrocks`, `synapse`, and `vertica`. Other ingestr destinations can still be used when you set `connection` or `destination_connection` to a compatible Bruin connection.
 
 Bruin forwards these write strategies to ingestr:
 
@@ -214,7 +214,6 @@ Destination support depends on ingestr's destination implementation:
 | OneLake / `onelake` | No, set `connection` | `replace`, `append`, `merge`, `delete+insert` |
 | Oracle / `oracle` | Yes | `replace`, `append`, `merge`, `delete+insert`, `truncate+insert` |
 | PostgreSQL / `postgres` | Yes | `replace`, `append`, `merge`, `delete+insert`, `truncate+insert` |
-| Quack (DuckDB server) / `quack` | Yes | `replace`, `append`, `merge`, `delete+insert` |
 | Redshift / `redshift` | Yes | `replace`, `append`, `merge`, `delete+insert`, `truncate+insert` |
 | Snowflake / `snowflake` | Yes | `replace`, `append`, `merge`, `delete+insert`, `truncate+insert` |
 | SQLite / `sqlite` | No, set `connection` | `replace`, `append`, `merge`, `delete+insert`, `truncate+insert` |

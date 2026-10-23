@@ -2402,18 +2402,6 @@ func (c CustomerIoConnection) GetName() string {
 	return c.Name
 }
 
-type QuackConnection struct {
-	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
-	Host               string `yaml:"host" json:"host" mapstructure:"host"`
-	Port               int    `yaml:"port,omitempty" json:"port,omitempty" mapstructure:"port"`
-	Token              string `yaml:"token,omitempty" json:"token,omitempty" mapstructure:"token" sensitive:"true"`
-	DisableSSL         *bool  `yaml:"disable_ssl,omitempty" json:"disable_ssl,omitempty" mapstructure:"disable_ssl"`
-}
-
-func (c QuackConnection) GetName() string {
-	return c.Name
-}
-
 type CleverTapConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	AccountID          string `yaml:"account_id,omitempty" json:"account_id" mapstructure:"account_id"`

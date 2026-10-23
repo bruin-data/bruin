@@ -122,7 +122,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/posthog"
 	"github.com/bruin-data/bruin/pkg/primer"
-	"github.com/bruin-data/bruin/pkg/quack"
 	"github.com/bruin-data/bruin/pkg/quickbooks"
 	"github.com/bruin-data/bruin/pkg/quicksight"
 	"github.com/bruin-data/bruin/pkg/rabbitmq"
@@ -323,7 +322,6 @@ type Manager struct {
 	Vertica              map[string]*vertica.DB
 	CustomerIo           map[string]*customerio.Client
 	CleverTap            map[string]*clevertap.Client
-	Quack                map[string]*quack.Client
 	Sendgrid             map[string]*sendgrid.Client
 	Twilio               map[string]*twilio.Client
 	Braze                map[string]*braze.Client
@@ -4007,28 +4005,6 @@ func (m *Manager) AddCustomerIoConnectionFromConfig(connection *config.CustomerI
 	return nil
 }
 
-func (m *Manager) AddQuackConnectionFromConfig(connection *config.QuackConnection) error {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-	if m.Quack == nil {
-		m.Quack = make(map[string]*quack.Client)
-	}
-
-	client, err := quack.NewClient(quack.Config{
-		Host:       connection.Host,
-		Port:       connection.Port,
-		Token:      connection.Token,
-		DisableSSL: connection.DisableSSL,
-	})
-	if err != nil {
-		return err
-	}
-	m.Quack[connection.Name] = client
-	m.availableConnections[connection.Name] = client
-	m.AllConnectionDetails[connection.Name] = connection
-	return nil
-}
-
 func (m *Manager) AddCleverTapConnectionFromConfig(connection *config.CleverTapConnection) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -4761,7 +4737,6 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Vertica, connectionManager.AddVerticaConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.CustomerIo, connectionManager.AddCustomerIoConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.CleverTap, connectionManager.AddCleverTapConnectionFromConfig, &wg, &errList, &mu)
-	processConnections(cm.SelectedEnvironment.Connections.Quack, connectionManager.AddQuackConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Sendgrid, connectionManager.AddSendgridConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Twilio, connectionManager.AddTwilioConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Braze, connectionManager.AddBrazeConnectionFromConfig, &wg, &errList, &mu)
