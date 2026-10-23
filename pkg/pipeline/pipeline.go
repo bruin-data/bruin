@@ -77,7 +77,6 @@ const (
 	AssetTypeGoodData                  = AssetType("gooddata")
 	AssetTypeIceberg                   = AssetType("ingestr.iceberg")   // ingestr-only mapping key (not an executable asset type)
 	AssetTypeCleverTap                 = AssetType("ingestr.clevertap") // ingestr-only mapping key (not an executable asset type)
-	AssetTypeQuack                     = AssetType("ingestr.quack")     // ingestr-only mapping key (not an executable asset type)
 	AssetTypeGoogleSheets              = AssetType("gsheets")
 	AssetTypeGrafana                   = AssetType("grafana")
 	AssetTypeIngestr                   = AssetType("ingestr")
@@ -251,7 +250,6 @@ var defaultMapping = map[string]string{
 	"smartsheet":            "smartsheet-default",
 	"sftp":                  "sftp-default",
 	"motherduck":            "motherduck-default",
-	"quack":                 "quack-default",
 	"elasticsearch":         "elasticsearch-default",
 	"vertica":               "vertica-default",
 	"adls":                  "adls-default",
@@ -1014,7 +1012,6 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeDuckDBQuery:               "duckdb",
 	AssetTypeIceberg:                   "iceberg",
 	AssetTypeCleverTap:                 "clevertap",
-	AssetTypeQuack:                     "quack",
 	AssetTypeDuckDBSeed:                "duckdb",
 	AssetTypeDuckDBQuerySensor:         "duckdb",
 	AssetTypeDuckDBSource:              "duckdb",
@@ -1103,7 +1100,6 @@ var IngestrTypeConnectionMapping = map[string]AssetType{
 	"vertica":       AssetTypeVerticaQuery,
 	"iceberg":       AssetTypeIceberg,
 	"clevertap":     AssetTypeCleverTap,
-	"quack":         AssetTypeQuack,
 }
 
 type SecretMapping struct {

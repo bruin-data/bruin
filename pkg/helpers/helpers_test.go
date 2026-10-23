@@ -61,15 +61,6 @@ func TestGetIngestrDestinationType(t *testing.T) {
 			want: pipeline.AssetTypeCleverTap,
 		},
 		{
-			name: "quack",
-			asset: &pipeline.Asset{
-				Parameters: pipeline.ParameterMap{
-					"destination": "quack",
-				},
-			},
-			want: pipeline.AssetTypeQuack,
-		},
-		{
 			name: "not found",
 			asset: &pipeline.Asset{
 				Parameters: pipeline.ParameterMap{
