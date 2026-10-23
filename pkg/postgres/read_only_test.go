@@ -121,6 +121,7 @@ type unreachableConnection struct {
 	t *testing.T
 }
 
+//nolint:ireturn
 func (c unreachableConnection) Query(context.Context, string, ...any) (pgx.Rows, error) {
 	c.t.Fatal("read-only validation must reject the query before it reaches the database")
 	return nil, nil
@@ -185,6 +186,7 @@ func TestClientReadOnlyValidation(t *testing.T) {
 				"SELECT jsonb_build_object('a', 1), age(now(), ts) FROM t",
 				"SELECT my_udf(1), analytics.my_udf(2)",
 				"SELECT pg_advisory_xact_lock(1)",
+				"EXPLAIN SELECT a FROM t",
 			} {
 				expectedSQL := sql
 				if method.expected != nil {

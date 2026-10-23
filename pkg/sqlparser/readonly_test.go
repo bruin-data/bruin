@@ -204,6 +204,11 @@ func TestValidateReadOnlyQueryWithBlockedFunctions(t *testing.T) {
 		"WITH x AS (SELECT dblink('x', 'q')) SELECT * FROM x",
 		"DELETE FROM t",
 		"SELECT 1; DROP TABLE t",
+		`SELECT U&"ab"(1)`,
+		"EXPLAIN ANALYZE SELECT 1",
+		"EXPLAIN (ANALYZE) SELECT 1",
+		"EXPLAIN SELECT dblink_exec('x', 'q')",
+		"EXPLAIN DELETE FROM t",
 	} {
 		require.Error(t, ValidateReadOnlyQueryWithBlockedFunctions(query, "postgres", blocked), query)
 	}
@@ -211,6 +216,8 @@ func TestValidateReadOnlyQueryWithBlockedFunctions(t *testing.T) {
 		"SELECT 1",
 		"SELECT my_udf(1), analytics.my_udf(2), btrim(a), pg_cancel_backend(1) FROM t",
 		"SELECT my_dblink(1)",
+		`SELECT u & "ab" FROM t`,
+		"EXPLAIN SELECT a FROM t",
 	} {
 		require.NoError(t, ValidateReadOnlyQueryWithBlockedFunctions(query, "postgres", blocked), query)
 	}

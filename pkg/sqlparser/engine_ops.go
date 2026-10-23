@@ -510,6 +510,15 @@ func checkReadOnlyQuery(query, dialectName string, blocked blockedFunctions) map
 			}
 		}
 	}
+	if blocked != nil {
+		toks, err := d.Tokenize(query)
+		if err != nil {
+			return map[string]any{"is_read_only": false, "error": err.Error()}
+		}
+		if hasUnicodeEscapePrefix(toks) {
+			return map[string]any{"is_read_only": false, "error": ""}
+		}
+	}
 	parsed, err := d.Parse(query, nil)
 	if err != nil {
 		return map[string]any{"is_read_only": false, "error": err.Error()}
@@ -535,8 +544,19 @@ func checkReadOnlyQuery(query, dialectName string, blocked blockedFunctions) map
 	return map[string]any{"is_read_only": true, "error": ""}
 }
 
+// hasUnicodeEscapePrefix reports a U& prefix, which PostgreSQL decodes into names the parser cannot match.
+func hasUnicodeEscapePrefix(toks []*sqlengine.Token) bool {
+	for i := 0; i+2 < len(toks); i++ {
+		if toks[i].Type == sqlengine.TK_VAR && strings.EqualFold(toks[i].Text, "u") &&
+			toks[i+1].Type == sqlengine.TK_AMP && toks[i].End+1 == toks[i+1].Start && toks[i+1].End+1 == toks[i+2].Start {
+			return true
+		}
+	}
+	return false
+}
+
 func isReadOnlyStatement(stmt *sqlengine.Expr, d *sqlengine.Dialect, dialectName string, blocked blockedFunctions) (bool, error) {
-	if stmt.IsA(sqlengine.KCommand) && dialectName == dialectSnowflake {
+	if stmt.IsA(sqlengine.KCommand) && (dialectName == dialectSnowflake || blocked != nil) {
 		if pyUpper(stmt.Name()) != "EXPLAIN" || !stmt.Expression().IsA(sqlengine.KLiteral) {
 			return false, nil
 		}
