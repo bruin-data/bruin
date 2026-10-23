@@ -2,7 +2,7 @@ package sqlengine
 
 // Port of sqlglot/parsers/snowflake.py (sqlglot v30.13.0): module-level builders, the callable
 // tables of SnowflakeParser and its method overrides. Data-only class attributes (token sets,
-// flags, FLATTEN_COLUMNS, UNDROP_OBJECTS, ...) live in the generated zz_parser_settings.go.
+// flags, FLATTEN_COLUMNS, UNDROP_OBJECTS, ...) live in parser_settings.go.
 
 // ---------------------------------------------------------------------------------------------
 // Module-level helpers

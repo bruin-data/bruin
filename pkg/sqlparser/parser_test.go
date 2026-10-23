@@ -22,7 +22,7 @@ var sharedSQLParser *SQLParser
 
 func TestMain(m *testing.M) {
 	var err error
-	sharedSQLParser, err = NewSQLParserCached()
+	sharedSQLParser, err = NewSQLParser()
 	if err != nil {
 		log.Fatalf("failed to create shared SQL parser: %v", err)
 	}
@@ -34,14 +34,6 @@ func TestMain(m *testing.M) {
 
 	sharedSQLParser.Close()
 	os.Exit(code)
-}
-
-func TestSQLParserCloseResetsStarted(t *testing.T) {
-	parser := &SQLParser{started: true}
-
-	require.NoError(t, parser.Close())
-	require.False(t, parser.started)
-	require.NoError(t, parser.Close())
 }
 
 func TestGetLineageForRunner(t *testing.T) {
@@ -1866,7 +1858,9 @@ func startParsersForParity(t *testing.T) []startedParser {
 	return []startedParser{{name: "sqlglot", parser: sharedSQLParser}}
 }
 
-func getLineageWithRawSchema(t *testing.T, parser Parser, query, dialect string, schema map[string]any) *Lineage {
+// getLineageWithRawSchema runs lineage with a raw (possibly nested) schema, which the public
+// ColumnLineage cannot express.
+func getLineageWithRawSchema(t *testing.T, query, dialect string, schema map[string]any) *Lineage {
 	t.Helper()
 
 	command := &parserCommand{
@@ -1877,11 +1871,9 @@ func getLineageWithRawSchema(t *testing.T, parser Parser, query, dialect string,
 			"schema":  schema,
 		},
 	}
-	responsePayload, err := parser.(*SQLParser).sendCommand(command)
-	require.NoError(t, err)
 
 	var result Lineage
-	require.NoError(t, json.Unmarshal([]byte(responsePayload), &result))
+	require.NoError(t, json.Unmarshal([]byte(dispatch(command)), &result))
 	return &result
 }
 
@@ -1892,7 +1884,7 @@ func TestGetLineageForRunner_PythonMainCases(t *testing.T) {
 		t.Run(parser.name, func(t *testing.T) {
 			for idx, testCase := range cases { //nolint:paralleltest
 				t.Run(fmt.Sprintf("%03d_%s", idx+1, testCase.Name), func(t *testing.T) {
-					got := getLineageWithRawSchema(t, parser.parser, testCase.Query, testCase.Dialect, testCase.Schema)
+					got := getLineageWithRawSchema(t, testCase.Query, testCase.Dialect, testCase.Schema)
 					require.Equal(t, testCase.Expected, got.Columns)
 					require.Equal(t, testCase.ExpectedNonSelected, got.NonSelectedColumns)
 					require.Equal(t, testCase.ExpectedErrors, got.Errors)
@@ -1909,7 +1901,7 @@ func TestExtractNonSelectColumn_PythonMainCases(t *testing.T) {
 		t.Run(parser.name, func(t *testing.T) {
 			for idx, testCase := range cases { //nolint:paralleltest
 				t.Run(fmt.Sprintf("%03d_%s", idx+1, testCase.Name), func(t *testing.T) {
-					got := getLineageWithRawSchema(t, parser.parser, testCase.Query, testCase.Dialect, testCase.Schema)
+					got := getLineageWithRawSchema(t, testCase.Query, testCase.Dialect, testCase.Schema)
 
 					require.Equal(t, testCase.ExpectedSelected, got.Columns)
 					require.Equal(t, testCase.Expected, got.NonSelectedColumns)

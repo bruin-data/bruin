@@ -265,7 +265,7 @@ func typingSnowflakeMetadata() ExprMetadataType {
 	m := typingMetadata("").copy()
 
 	m.annotators(
-		"typing/snowflake.py:245", func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "this") },
+		func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "this") },
 		KAddMonths,
 		KCeil,
 		KDateTrunc,
@@ -353,7 +353,7 @@ func typingSnowflakeMetadata() ExprMetadataType {
 		KPreviousDay,
 	)
 	m.annotators(
-		"typing/snowflake.py:346", func(a *TypeAnnotator, e *Expr) {
+		func(a *TypeAnnotator, e *Expr) {
 			a.setType(e, DataTypeBuild("NUMBER", MustDialect("snowflake"), false, true))
 		},
 		KBitwiseAndAgg,
@@ -376,14 +376,14 @@ func typingSnowflakeMetadata() ExprMetadataType {
 		KMonthsBetween,
 		KNormal,
 	)
-	m.annotators("typing/snowflake.py:189", func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateKurtosis(a, e) }, KKurtosis)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateKurtosis(a, e) }, KKurtosis)
 	m.returns(
 		DT_DECFLOAT,
 		KToDecfloat,
 		KTryToDecfloat,
 	)
 	m.annotators(
-		"typing/snowflake.py:212", func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateMathWithFloatDecfloat(a, e) },
+		func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateMathWithFloatDecfloat(a, e) },
 		KAcos,
 		KAsin,
 		KAtan,
@@ -519,31 +519,31 @@ func typingSnowflakeMetadata() ExprMetadataType {
 		KMinhashCombine,
 	)
 	m.annotators(
-		"typing/snowflake.py:149", func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateVariance(a, e) },
+		func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateVariance(a, e) },
 		KVariance,
 		KVariancePop,
 	)
-	m.annotators("typing/snowflake.py:83", func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateArgMaxMin(a, e) }, KArgMax)
-	m.annotators("typing/snowflake.py:83", func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateArgMaxMin(a, e) }, KArgMin)
-	m.annotators("typing/snowflake.py:547", func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "expressions") }, KConcatWs)
-	m.annotators("typing/snowflake.py:549", func(a *TypeAnnotator, e *Expr) {
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateArgMaxMin(a, e) }, KArgMax)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateArgMaxMin(a, e) }, KArgMin)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "expressions") }, KConcatWs)
+	m.annotators(func(a *TypeAnnotator, e *Expr) {
 		if e.ArgB("source_tz") {
 			a.setType(e, DT_TIMESTAMPNTZ)
 		} else {
 			a.setType(e, DT_TIMESTAMPTZ)
 		}
 	}, KConvertTimezone)
-	m.annotators("typing/snowflake.py:43", func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateDateOrTimeAdd(a, e) }, KDateAdd)
-	m.annotators("typing/snowflake.py:54", func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateDecodeCase(a, e) }, KDecodeCase)
-	m.annotators("typing/snowflake.py:557", func(a *TypeAnnotator, e *Expr) {
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateDateOrTimeAdd(a, e) }, KDateAdd)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateDecodeCase(a, e) }, KDecodeCase)
+	m.annotators(func(a *TypeAnnotator, e *Expr) {
 		a.setType(e, DataTypeBuild("NUMBER(19, 0)", MustDialect("snowflake"), false, true))
 	}, KHashAgg)
-	m.annotators("typing/snowflake.py:111", func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateMedian(a, e) }, KMedian)
-	m.annotators("typing/snowflake.py:19", func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateReverse(a, e) }, KReverse)
-	m.annotators("typing/snowflake.py:232", func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateStrToTime(a, e) }, KStrToTime)
-	m.annotators("typing/snowflake.py:43", func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateDateOrTimeAdd(a, e) }, KTimeAdd)
-	m.annotators("typing/snowflake.py:28", func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateTimestampFromParts(a, e) }, KTimestampFromParts)
-	m.annotators("typing/snowflake.py:91", func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateWithinGroup(a, e) }, KWithinGroup)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateMedian(a, e) }, KMedian)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateReverse(a, e) }, KReverse)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateStrToTime(a, e) }, KStrToTime)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateDateOrTimeAdd(a, e) }, KTimeAdd)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateTimestampFromParts(a, e) }, KTimestampFromParts)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateWithinGroup(a, e) }, KWithinGroup)
 
 	return m
 }

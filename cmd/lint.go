@@ -192,7 +192,7 @@ func Lint(isDebug *bool) *cli.Command {
 
 			var parser sqlparser.Parser
 			var hookHoister pipeline.DeclareHoister
-			if p, err := sqlparser.NewSQLParser(false); err != nil {
+			if p, err := sqlparser.NewSQLParser(); err != nil {
 				printError(err, c.String("output"), "Could not initialize sql parser")
 			} else {
 				parser = p

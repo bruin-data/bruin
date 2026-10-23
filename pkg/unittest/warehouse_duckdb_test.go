@@ -24,7 +24,7 @@ import (
 func TestBuildWarehouseQuery_RunsOnDuckDB(t *testing.T) {
 	t.Parallel()
 
-	parser, err := sqlparser.NewSQLParser(false)
+	parser, err := sqlparser.NewSQLParser()
 	require.NoError(t, err)
 	require.NoError(t, parser.Start())
 	defer parser.Close()

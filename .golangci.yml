@@ -170,11 +170,11 @@ linters:
           - dupl
           - gosec
         path: (.+)_test.go
-      # pkg/sqlengine is a line-by-line port of sqlglot, kept structurally close to the Python
-      # source so that sqlglot upgrades can be ported by diffing the two side by side. Rewrites
-      # these linters ask for (if/elif chains to switches, De Morgan, renaming `copy=` parameters,
-      # changing signatures shared across dialects, errors.As instead of isinstance-style checks
-      # on errors that are never wrapped) would break that correspondence.
+      # pkg/sqlengine started as a line-by-line port of sqlglot and still follows its structure.
+      # These linters ask for rewrites across most of the package (if/elif chains to switches,
+      # De Morgan, renaming `copy=` parameters, changing signatures shared across dialects,
+      # errors.As instead of isinstance-style checks on errors that are never wrapped); enable them
+      # as the code is reworked.
       - linters:
           - dogsled
           - dupword

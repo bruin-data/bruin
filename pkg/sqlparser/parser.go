@@ -1,65 +1,28 @@
 package sqlparser
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
-	"sync"
 
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/pkg/errors"
 )
 
-// SQLParser analyzes SQL in-process with pkg/sqlengine. It used to drive an embedded Python
-// interpreter running SQLGlot; the API and behavior are unchanged.
+// SQLParser analyzes SQL in-process with pkg/sqlengine. It is safe for concurrent use.
 type SQLParser struct {
-	tmpDir         string
-	started        bool
-	randomize      bool
+	// MaxQueryLength is the longest query, in bytes, ColumnLineage analyzes.
 	MaxQueryLength int
-
-	// mutex serializes commands per instance, like the single-threaded Python process did.
-	mutex      sync.Mutex
-	startMutex sync.Mutex
 }
 
-func NewSQLParser(randomize bool) (*SQLParser, error) {
-	return NewSQLParserWithConfig(randomize, 10000)
+func NewSQLParser() (*SQLParser, error) {
+	return &SQLParser{MaxQueryLength: 10000}, nil
 }
 
-// NewSQLParserCached creates a SQLParser. It is kept for API compatibility: parsing no longer
-// needs any extracted files, so cached and uncached parsers are equivalent.
-func NewSQLParserCached() (*SQLParser, error) {
-	return newSQLParserInternal("bruin-cli-embedded-cached", false, 10000), nil
-}
-
-func NewSQLParserWithConfig(randomize bool, maxQueryLength int) (*SQLParser, error) {
-	tmpDirName := "bruin-cli-embedded_0"
-	return newSQLParserInternal(tmpDirName, randomize, maxQueryLength), nil
-}
-
-func newSQLParserInternal(tmpDirName string, randomize bool, maxQueryLength int) *SQLParser {
-	return &SQLParser{
-		tmpDir:         tmpDirName,
-		randomize:      randomize,
-		MaxQueryLength: maxQueryLength,
-	}
-}
-
-// Start marks the parser as started. There is no subprocess to launch anymore.
+// Start is a no-op; the parser needs no setup.
 func (s *SQLParser) Start() error {
-	s.startMutex.Lock()
-	defer s.startMutex.Unlock()
-	s.started = true
 	return nil
-}
-
-type parserCommand struct {
-	Command  string                 `json:"command"`
-	Contents map[string]interface{} `json:"contents"`
 }
 
 type Schema map[string]map[string]string
@@ -80,6 +43,8 @@ type Lineage struct {
 	Errors             []string        `json:"errors"`
 }
 
+// ColumnLineage returns the upstream columns of each column the query selects. A nil schema is
+// the same as an empty one.
 func (s *SQLParser) ColumnLineage(sql, dialect string, schema Schema) (*Lineage, error) {
 	if len(sql) > s.MaxQueryLength {
 		return &Lineage{
@@ -89,58 +54,25 @@ func (s *SQLParser) ColumnLineage(sql, dialect string, schema Schema) (*Lineage,
 		}, nil
 	}
 
+	sql, dialect, schema = validUTF8(sql), validUTF8(dialect), validUTF8Schema(schema)
 	var lineage Lineage
-	if normSchema, ok := checkSchema(schema); ok && validUTF8(sql, dialect) {
-		// What cmdLineage does with the normalized request.
-		if decodeErr := s.callDirect(&lineage, func() (any, error) {
-			raw, err := toRawSchema(normSchema)
-			if err != nil {
-				return nil, err
-			}
-			return getColumnLineage(sql, raw, dialect)
-		}); decodeErr != nil {
-			return nil, decodeErr
+	if err := run(&lineage, func() (any, error) {
+		raw, err := toRawSchema(schema)
+		if err != nil {
+			return nil, err
 		}
-		return &lineage, nil
+		return getColumnLineage(sql, raw, dialect)
+	}); err != nil {
+		return nil, err
 	}
-
-	command := parserCommand{
-		Command: "lineage",
-		Contents: map[string]interface{}{
-			"query":   sql,
-			"dialect": dialect,
-			"schema":  schema,
-		},
-	}
-
-	if sendErr, decodeErr := s.call(command.Command, command.Contents, &lineage); sendErr != nil {
-		return nil, sendErr
-	} else if decodeErr != nil {
-		return nil, decodeErr
-	}
-
 	return &lineage, nil
 }
 
 func (s *SQLParser) UsedTables(sql, dialect string) ([]string, error) {
-	err := s.Start()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to start sql parser")
-	}
-
 	var tables tablesResponse
-	var sendErr, decodeErr error
-	if validUTF8(sql, dialect) {
-		decodeErr = s.callDirect(&tables, func() (any, error) { return getTables(sql, dialect), nil })
-	} else {
-		sendErr, decodeErr = s.call("get-tables", map[string]interface{}{"query": sql, "dialect": dialect}, &tables)
+	if err := run(&tables, func() (any, error) { return getTables(validUTF8(sql), validUTF8(dialect)), nil }); err != nil {
+		return nil, err
 	}
-	if sendErr != nil {
-		return nil, errors.Wrap(sendErr, "failed to send command")
-	} else if decodeErr != nil {
-		return nil, errors.Wrap(decodeErr, "failed to unmarshal response")
-	}
-
 	if tables.Error != "" {
 		return nil, errors.New(tables.Error)
 	}
@@ -150,29 +82,12 @@ func (s *SQLParser) UsedTables(sql, dialect string) ([]string, error) {
 	return tables.Tables, nil
 }
 
-// sendQueryCommand runs a parser command whose response is a {query, error}
-// object and returns the resulting query string. It is the shared body for the
-// SQL-rewriting verbs (rename/limit/transpile).
-func (s *SQLParser) sendQueryCommand(command string, contents map[string]interface{}) (string, error) {
-	return s.queryCommand(func(resp *queryResponse) (error, error) { return s.call(command, contents, resp) })
-}
-
-// sendQueryCommandDirect is sendQueryCommand for a command function taking string-only requests
-// (see callDirect).
-func (s *SQLParser) sendQueryCommandDirect(run func() (any, error)) (string, error) {
-	return s.queryCommand(func(resp *queryResponse) (error, error) { return nil, s.callDirect(resp, run) })
-}
-
-func (s *SQLParser) queryCommand(call func(*queryResponse) (sendErr, decodeErr error)) (string, error) {
-	if err := s.Start(); err != nil {
-		return "", errors.Wrap(err, "failed to start sql parser")
-	}
-
+// queryCommand runs a command whose response is a {query, error} object and returns the resulting
+// query string. It is the shared body for the SQL-rewriting methods.
+func queryCommand(cmd func() (any, error)) (string, error) {
 	var resp queryResponse
-	if sendErr, decodeErr := call(&resp); sendErr != nil {
-		return "", errors.Wrap(sendErr, "failed to send command")
-	} else if decodeErr != nil {
-		return "", errors.Wrap(decodeErr, "failed to unmarshal response")
+	if err := run(&resp, cmd); err != nil {
+		return "", err
 	}
 	if resp.Error != "" {
 		return "", errors.New(resp.Error)
@@ -181,11 +96,8 @@ func (s *SQLParser) queryCommand(call func(*queryResponse) (sendErr, decodeErr e
 }
 
 func (s *SQLParser) RenameTables(sql string, dialect string, tableMapping map[string]string) (string, error) {
-	return s.sendQueryCommand("replace-table-references", map[string]interface{}{
-		"query":         sql,
-		"dialect":       dialect,
-		"table_mapping": tableMapping,
-	})
+	sql, dialect, tableMapping = validUTF8(sql), validUTF8(dialect), validUTF8Map(tableMapping)
+	return queryCommand(func() (any, error) { return replaceTableReferences(sql, dialect, tableMapping) })
 }
 
 // HoistDeclares moves top-level declarations ahead of other statements without
@@ -195,10 +107,7 @@ func (s *SQLParser) HoistDeclares(sql string, assetType pipeline.AssetType) (str
 	if err != nil {
 		return sql, err
 	}
-	query, err := s.sendQueryCommand("hoist-declares", map[string]interface{}{
-		"query":   sql,
-		"dialect": dialect,
-	})
+	query, err := queryCommand(func() (any, error) { return hoistDeclares(validUTF8(sql), dialect), nil })
 	if err != nil {
 		return sql, err
 	}
@@ -214,14 +123,9 @@ func (s *SQLParser) HoistDeclaresList(queries []string, assetType pipeline.Asset
 	if len(queries) == 0 {
 		return queries, nil
 	}
-	if err := s.Start(); err != nil {
-		return queries, errors.Wrap(err, "failed to start sql parser")
-	}
 	var resp queriesResponse
-	if sendErr, decodeErr := s.call("hoist-declares-list", map[string]interface{}{"queries": queries, "dialect": dialect}, &resp); sendErr != nil {
-		return queries, errors.Wrap(sendErr, "failed to hoist declares list")
-	} else if decodeErr != nil {
-		return queries, errors.Wrap(decodeErr, "failed to unmarshal response")
+	if err := run(&resp, func() (any, error) { return hoistDeclaresList(validUTF8Slice(queries), dialect), nil }); err != nil {
+		return queries, err
 	}
 	if resp.Error != "" {
 		return queries, errors.New(resp.Error)
@@ -229,27 +133,8 @@ func (s *SQLParser) HoistDeclaresList(queries []string, assetType pipeline.Asset
 	return resp.Queries, nil
 }
 
-func (s *SQLParser) sendCommand(pc *parserCommand) (string, error) {
-	// Round-trip through JSON so that handlers observe exactly what the Python process received
-	// (map key order, null for nil maps/slices, numbers as float64).
-	payload, err := json.Marshal(pc)
-	if err != nil {
-		return "", err
-	}
-	var decoded parserCommand
-	dec := json.NewDecoder(bytes.NewReader(payload))
-	if err := dec.Decode(&decoded); err != nil {
-		return "", err
-	}
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	return dispatch(&decoded) + "\n", nil
-}
-
+// Close is a no-op; the parser holds no resources.
 func (s *SQLParser) Close() error {
-	s.startMutex.Lock()
-	defer s.startMutex.Unlock()
-	s.started = false
 	return nil
 }
 
@@ -331,15 +216,8 @@ func ConnectionTypeToDialect(connectionType string) string {
 }
 
 func (s *SQLParser) AddLimit(sql string, limit int, dialect string) (string, error) {
-	if validUTF8(sql, dialect) {
-		// The limit crosses the JSON round trip as a float64.
-		return s.sendQueryCommandDirect(func() (any, error) { return addLimit(sql, int(float64(limit)), dialect) })
-	}
-	return s.sendQueryCommand("add-limit", map[string]interface{}{
-		"query":   sql,
-		"limit":   limit,
-		"dialect": dialect,
-	})
+	sql, dialect = validUTF8(sql), validUTF8(dialect)
+	return queryCommand(func() (any, error) { return addLimit(sql, limit, dialect) })
 }
 
 // ExtractSelect reduces an asset statement to the SELECT that produces its
@@ -350,10 +228,8 @@ func (s *SQLParser) AddLimit(sql string, limit int, dialect string) (string, err
 // keeping the test a single read-only SELECT. It errors when the statement has
 // no SELECT to test (e.g. a CREATE TABLE with a column list).
 func (s *SQLParser) ExtractSelect(sql string, dialect string) (string, error) {
-	return s.sendQueryCommand("extract-select", map[string]interface{}{
-		"query":   sql,
-		"dialect": dialect,
-	})
+	sql, dialect = validUTF8(sql), validUTF8(dialect)
+	return queryCommand(func() (any, error) { return extractSelect(sql, dialect), nil })
 }
 
 // SelectFromCTE rewrites a query so it returns all rows of one of its own named
@@ -361,27 +237,19 @@ func (s *SQLParser) ExtractSelect(sql string, dialect string) (string, error) {
 // lets a unit test assert the output of an intermediate CTE. Errors if the
 // query has no WITH clause or no CTE with that name.
 func (s *SQLParser) SelectFromCTE(sql string, dialect string, cteName string) (string, error) {
-	return s.sendQueryCommand("select-cte", map[string]interface{}{
-		"query":    sql,
-		"dialect":  dialect,
-		"cte_name": cteName,
-	})
+	sql, dialect, cteName = validUTF8(sql), validUTF8(dialect), validUTF8(cteName)
+	return queryCommand(func() (any, error) { return selectCTE(sql, dialect, cteName), nil })
 }
 
 // FreezeTime replaces CURRENT_TIMESTAMP / CURRENT_DATE / CURRENT_TIME in a query
 // with literals fixed at executionTime, so a unit test of a time-dependent
 // asset is deterministic instead of reading the warehouse clock.
 func (s *SQLParser) FreezeTime(sql string, dialect string, executionTime string) (string, error) {
-	return s.sendQueryCommand("freeze-time", map[string]interface{}{
-		"query":          sql,
-		"dialect":        dialect,
-		"execution_time": executionTime,
-	})
+	sql, dialect, executionTime = validUTF8(sql), validUTF8(dialect), validUTF8(executionTime)
+	return queryCommand(func() (any, error) { return freezeTime(sql, dialect, executionTime), nil })
 }
 
-// CTE is a named common table expression to prepend to a query. The JSON tags
-// match the keys the parser's add-ctes verb reads, so a []CTE serializes
-// directly onto the wire.
+// CTE is a named common table expression to prepend to a query.
 type CTE struct {
 	Name  string `json:"name"`
 	Query string `json:"query"`
@@ -393,32 +261,22 @@ type CTE struct {
 // unit tests, which substitute the tables a query reads with inline fixture CTEs
 // so the test runs as a single read-only SELECT with no DDL.
 func (s *SQLParser) PrependCTEs(sql string, dialect string, ctes []CTE) (string, error) {
-	return s.sendQueryCommand("add-ctes", map[string]interface{}{
-		"query":   sql,
-		"dialect": dialect,
-		"ctes":    ctes,
-	})
+	sql, dialect = validUTF8(sql), validUTF8(dialect)
+	var valid []CTE
+	if ctes != nil {
+		valid = make([]CTE, len(ctes))
+		for i, c := range ctes {
+			valid[i] = CTE{Name: validUTF8(c.Name), Query: validUTF8(c.Query)}
+		}
+	}
+	return queryCommand(func() (any, error) { return addCTEs(sql, dialect, valid), nil })
 }
 
 func (s *SQLParser) IsSingleSelectQuery(sql string, dialect string) (bool, error) {
-	err := s.Start()
-	if err != nil {
-		return false, errors.Wrap(err, "failed to start sql parser")
-	}
-
 	var resp singleSelectResponse
-	var sendErr, decodeErr error
-	if validUTF8(sql, dialect) {
-		decodeErr = s.callDirect(&resp, func() (any, error) { return isSingleSelectQuery(sql, dialect), nil })
-	} else {
-		sendErr, decodeErr = s.call("is-single-select", map[string]interface{}{"query": sql, "dialect": dialect}, &resp)
+	if err := run(&resp, func() (any, error) { return isSingleSelectQuery(validUTF8(sql), validUTF8(dialect)), nil }); err != nil {
+		return false, err
 	}
-	if sendErr != nil {
-		return false, errors.Wrap(sendErr, "failed to send command")
-	} else if decodeErr != nil {
-		return false, errors.Wrap(decodeErr, "failed to unmarshal response")
-	}
-
 	if resp.Error != "" {
 		return false, errors.New(resp.Error)
 	}

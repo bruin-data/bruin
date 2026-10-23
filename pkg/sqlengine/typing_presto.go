@@ -17,14 +17,14 @@ func typingPrestoMetadata() ExprMetadataType {
 		KWidthBucket,
 	)
 	m.annotators(
-		"typing/presto.py:22", func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "this") },
+		func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "this") },
 		KCeil,
 		KFloor,
 		KRound,
 		KSign,
 	)
-	m.annotators("typing/presto.py:30", func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "this", "expression") }, KMod)
-	m.annotators("typing/presto.py:32", func(a *TypeAnnotator, e *Expr) {
+	m.annotators(func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "this", "expression") }, KMod)
+	m.annotators(func(a *TypeAnnotator, e *Expr) {
 		if e.This() != nil {
 			a.annotateByArgs(e, "this")
 		} else {

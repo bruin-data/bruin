@@ -2533,7 +2533,7 @@ func fillDependenciesForImportedAssets(ctx context.Context, pipelinePath string,
 		return errors2.Wrapf(err, "failed to build pipeline at '%s'", pipelinePath)
 	}
 
-	sqlParserInstance, err := sqlparser.NewSQLParser(false)
+	sqlParserInstance, err := sqlparser.NewSQLParser()
 	if err != nil {
 		return errors2.Wrap(err, "failed to create sql parser")
 	}

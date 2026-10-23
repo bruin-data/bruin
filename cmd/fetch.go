@@ -217,7 +217,7 @@ func Query() *cli.Command {
 			needsParser := !cloudMode && (c.IsSet("limit") || (pipelineInfo != nil && pipelineInfo.Config.SelectedEnvironment.SchemaPrefix != ""))
 
 			if needsParser {
-				parser, err = sqlparser.NewSQLParser(false)
+				parser, err = sqlparser.NewSQLParser()
 				if err != nil {
 					return handleError(c.String("output"), errors.Wrap(err, "failed to initialize SQL parser"))
 				}

@@ -252,6 +252,35 @@ were not done.
 
 - Replace the verbatim Python exception texts with clearer messages (contract assertions pin some).
 - Teradata and other sqlglot dialects Bruin does not map to are not ported (Presto's `TO_CHAR` embeds
-  Teradata's time-format table instead). Adding a dialect is mechanical: codegen + `d_<dialect>.go`.
+  Teradata's time-format table instead). Adding a dialect means adding its settings and `d_<dialect>.go`.
 - Several agents wrote small private copies of the same helpers (`is_type`, `_binop`, `exp.func`,
   `list.remove` with structural equality); they are correct but could be unified.
+
+## 8. Update (2026-10): maintained as a Go fork
+
+`pkg/sqlengine` no longer tracks sqlglot's source. sqlglot stays the reference for *behavior*, through
+golden files recorded from it, but the Go code is ours to restructure. This supersedes the parts of
+§1, §2 and §4 about generated code, structural parity and the JSON round trip:
+
+- **No generated code.** `codegen/gen.py` is deleted. The former `zz_*.go` files are regular source
+  (the `zz_` prefix and `DO NOT EDIT` headers are gone, and they are now linted), and 17 unused
+  generated tables were dropped.
+- **Behavior-only conformance.** The goldens record whether each corpus statement parses, the SQL
+  generated back and the inferred output column types. Token streams, parse-tree shapes, the typing
+  metadata table (and its `typing/<module>.py:<line>` source tags), coercion tables and helper
+  outputs are no longer compared; `tokens.json.gz` and `falsediff_test.go` are deleted. The
+  conformance tests fail on any mismatch (previously only with `SQLGLOT_CONF_STRICT=1`). Every golden
+  file can be regenerated from sqlglot: the missing generators for `annotate.json.gz` (now from a
+  committed input corpus) and `tpc.json.gz` were added. See `pkg/sqlengine/codegen/README.md`.
+- **Error messages are ours.** The sqlparser goldens check that an error occurs on the same
+  commands, not its text, so the Python exception texts in §3 can be replaced freely.
+- **`pkg/sqlparser` without the process emulation.** The public methods call the command handlers
+  directly. Gone: the per-instance mutex (a shared parser now runs commands in parallel: 4 goroutines
+  run column lineage over the corpus 2.2× faster than 1, where they used to be slower), the JSON
+  request normalization and fallback round trip (`fastpath.go`, `sendCommand`), and the unused
+  `randomize`/temp-dir/started state. Invalid UTF-8 is still replaced with U+FFFD byte by byte, as the
+  JSON boundary did. The name-addressed command table (`dispatch`) is test-only, for golden replay.
+- **API changes.** `NewSQLParser()` takes no arguments; `NewSQLParserCached` and
+  `NewSQLParserWithConfig` are removed. `ColumnLineage` treats a nil schema like an empty one (it used
+  to return an empty `Lineage`, a leftover of Python failing on `null`); Bruin's callers always pass a
+  non-nil schema.

@@ -400,7 +400,7 @@ func (p *semanticSchemaPrefixer) rewrite(sql, dialect string) (string, error) {
 		return sql, nil
 	}
 	if p.parser == nil && p.err == nil {
-		parser, err := sqlparser.NewSQLParser(false)
+		parser, err := sqlparser.NewSQLParser()
 		if err != nil {
 			p.err = errors.Wrap(err, "failed to initialize SQL parser")
 		} else if err := parser.Start(); err != nil {

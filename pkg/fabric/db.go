@@ -428,7 +428,7 @@ WHERE t.TABLE_SCHEMA NOT IN ('sys', 'INFORMATION_SCHEMA')
 		Name:    currentDB,
 		Schemas: []*ansisql.DBSchema{},
 	}
-	parser, err := sqlparser.NewSQLParser(false)
+	parser, err := sqlparser.NewSQLParser()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create SQL parser: %w", err)
 	}

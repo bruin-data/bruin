@@ -1,7 +1,9 @@
 package sqlparser
 
-// Golden tests: Bruin's parser commands replayed against the responses recorded from the original
-// Python implementation (pythonsrc on sqlglot 30.13.0), see codegen/README.md.
+// Golden tests: Bruin's parser commands replayed against the responses recorded from the reference
+// implementation (Bruin's former Python parser, pythonsrc on sqlglot 30.13.0), see
+// codegen/README.md. Results must match exactly; errors must occur on the same commands, with any
+// message.
 //
 //   - commands.json.gz: every statement of the sqlglot conformance corpus (Bruin dialects) through
 //     every command Bruin issues.
@@ -28,12 +30,13 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"regexp"
 	"runtime"
 	"sort"
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
 var updateGolden = flag.Bool("update", false, "rewrite testdata/golden/*.json.gz from the current output")
@@ -151,17 +154,36 @@ func replayGolden(t *testing.T, name string) {
 		name, total, checked, path, strings.Join(keys, ", "), strings.Join(examples, "\n"))
 }
 
-// requiredKeywordRE matches the message naming one of several missing required arguments. Python
-// picks the keyword from a set, so which one it named depends on PYTHONHASHSEED.
-var requiredKeywordRE = regexp.MustCompile(`Required keyword: '[^']*' missing for`)
-
+// sameResponse compares responses with every error message replaced by a placeholder: an error must
+// occur exactly when the reference implementation reported one, but its wording is ours.
 func sameResponse(got, want any) bool {
-	if reflect.DeepEqual(got, want) {
-		return true
+	return reflect.DeepEqual(maskErrors(got), maskErrors(want))
+}
+
+// maskErrors replaces the non-empty "error" strings and the "errors" list entries of a decoded
+// response with "<error>".
+func maskErrors(v any) any {
+	m, ok := v.(map[string]any)
+	if !ok {
+		return v
 	}
-	const anyKeyword = "Required keyword: '*' missing for"
-	return requiredKeywordRE.ReplaceAllString(string(mustJSON(got)), anyKeyword) ==
-		requiredKeywordRE.ReplaceAllString(string(mustJSON(want)), anyKeyword)
+	out := make(map[string]any, len(m))
+	for k, x := range m {
+		switch {
+		case k == "error" && x != "" && x != nil:
+			x = "<error>"
+		case k == "errors":
+			if list, ok := x.([]any); ok {
+				masked := make([]any, len(list))
+				for i := range list {
+					masked[i] = "<error>"
+				}
+				x = masked
+			}
+		}
+		out[k] = x
+	}
+	return out
 }
 
 // mustJSON encodes a decoded JSON value, which always encodes.
@@ -214,4 +236,136 @@ func writeGolden(t *testing.T, path string, recs []goldenRecord) {
 		t.Fatal(err)
 	}
 	t.Logf("rewrote %s (%d commands)", path, len(recs))
+}
+
+// TestPublicMethodsMatchCommands checks, over the golden corpora, that each public method returns
+// what decoding its command's JSON response gives. The goldens check the commands; this checks the
+// typed responses the methods build from them.
+func TestPublicMethodsMatchCommands(t *testing.T) {
+	t.Parallel()
+	p, err := NewSQLParser()
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.MaxQueryLength = 1 << 30 // the length cutoff is not part of the commands
+
+	hoistType := map[string]pipeline.AssetType{}
+	for typ, d := range assetTypeDialectMap {
+		hoistType[d] = typ
+	}
+
+	for _, name := range []string{"commands", "fixtures", "hoist"} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			// Every third command keeps the test fast and still covers each command and dialect.
+			step := 3
+			if raceEnabled {
+				step = 25
+			}
+			recs := readGolden(t, filepath.Join("testdata", "golden", name+".json.gz"))
+			checked := 0
+			for i := 0; i < len(recs); i += step {
+				if reflect.DeepEqual(recs[i].Want, pythonTimeout) {
+					continue
+				}
+				var pc parserCommand
+				if err := json.Unmarshal(recs[i].Cmd, &pc); err != nil {
+					t.Fatal(err)
+				}
+				c := pc.Contents
+				q, d := str(c["query"]), str(c["dialect"])
+				if pc.Command == "lineage" && c["schema"] == nil {
+					// ColumnLineage reads a nil schema as an empty one; the command rejects null.
+					c["schema"] = map[string]any{}
+				}
+				// decode runs the command and json.Unmarshals its response into want.
+				decode := func(want any) {
+					if err := json.Unmarshal([]byte(dispatch(&pc)), want); err != nil {
+						t.Fatal(err)
+					}
+				}
+				var got, want any
+				var gotErr error
+				var wantErr string
+				switch pc.Command {
+				case "lineage":
+					var r Lineage
+					decode(&r)
+					var schema Schema
+					if err := json.Unmarshal(mustJSON(c["schema"]), &schema); err != nil {
+						t.Fatal(err)
+					}
+					want = &r
+					got, gotErr = p.ColumnLineage(q, d, schema)
+				case "get-tables":
+					var r tablesResponse
+					decode(&r)
+					sort.Strings(r.Tables)
+					want, wantErr = r.Tables, r.Error
+					got, gotErr = p.UsedTables(q, d)
+				case "is-read-only":
+					var r readOnlyResponse
+					decode(&r)
+					want, wantErr = r.ReadOnly, r.Error
+					got, gotErr = p.IsReadOnlyQuery(q, d)
+				case "is-single-select":
+					var r singleSelectResponse
+					decode(&r)
+					want, wantErr = r.IsSingleSelect, r.Error
+					got, gotErr = p.IsSingleSelectQuery(q, d)
+				case "hoist-declares-list":
+					typ, ok := hoistType[d]
+					if !ok {
+						continue
+					}
+					var r queriesResponse
+					decode(&r)
+					want, wantErr = r.Queries, r.Error
+					got, gotErr = p.HoistDeclaresList(toStrings(c["queries"]), typ)
+				default:
+					var r queryResponse
+					decode(&r)
+					want, wantErr = r.Query, r.Error
+					switch pc.Command {
+					case "replace-table-references":
+						var mapping map[string]string
+						if err := json.Unmarshal(mustJSON(c["table_mapping"]), &mapping); err != nil {
+							t.Fatal(err)
+						}
+						got, gotErr = p.RenameTables(q, d, mapping)
+					case "add-limit":
+						got, gotErr = p.AddLimit(q, toInt(c["limit"]), d)
+					case "add-ctes":
+						var ctes []CTE
+						if err := json.Unmarshal(mustJSON(c["ctes"]), &ctes); err != nil {
+							t.Fatal(err)
+						}
+						got, gotErr = p.PrependCTEs(q, d, ctes)
+					case "extract-select":
+						got, gotErr = p.ExtractSelect(q, d)
+					case "select-cte":
+						got, gotErr = p.SelectFromCTE(q, d, str(c["cte_name"]))
+					case "freeze-time":
+						got, gotErr = p.FreezeTime(q, d, str(c["execution_time"]))
+					case "hoist-declares":
+						typ, ok := hoistType[d]
+						if !ok {
+							continue
+						}
+						got, gotErr = p.HoistDeclares(q, typ)
+					default:
+						t.Fatalf("no public method for command %q", pc.Command)
+					}
+				}
+				checked++
+				if (gotErr != nil) != (wantErr != "") {
+					t.Fatalf("%s: error %v, command error %q", recs[i].Cmd, gotErr, wantErr)
+				}
+				if gotErr == nil && !reflect.DeepEqual(got, want) {
+					t.Fatalf("%s\n  command: %s\n   method: %s", recs[i].Cmd, mustJSON(want), mustJSON(got))
+				}
+			}
+			t.Logf("%s: %d commands match their public methods", name, checked)
+		})
+	}
 }

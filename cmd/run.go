@@ -1432,7 +1432,7 @@ func Run(isDebug *bool) *cli.Command {
 			// Share the parser between hook hoisting and dev-mode rewriting.
 			var parser *sqlparser.SQLParser
 			var hoister pipeline.DeclareHoister
-			if p, parserErr := sqlparser.NewSQLParser(false); parserErr == nil {
+			if p, parserErr := sqlparser.NewSQLParser(); parserErr == nil {
 				defer p.Close()
 				hoister = p
 				if cm.SelectedEnvironment.SchemaPrefix != "" {

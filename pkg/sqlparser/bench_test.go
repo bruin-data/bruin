@@ -51,7 +51,7 @@ func benchQueries(b *testing.B) []benchQuery {
 }
 
 func newBenchParser(b *testing.B) *SQLParser {
-	p, err := NewSQLParser(false)
+	p, err := NewSQLParser()
 	if err != nil {
 		b.Fatal(err)
 	}

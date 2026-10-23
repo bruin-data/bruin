@@ -8,7 +8,7 @@ import (
 
 func TestSQLParserContractLifecycleAndErrorRecovery(t *testing.T) {
 	t.Parallel()
-	parser, err := NewSQLParserCached()
+	parser, err := NewSQLParser()
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, parser.Close()) })
 	require.NoError(t, parser.Close()) // unused instances need not extract or start Python
@@ -129,7 +129,7 @@ func TestSQLParserContractSameInputRewriteIsolation(t *testing.T) {
 
 func TestSQLParserContractLineageLengthCountsBytes(t *testing.T) {
 	t.Parallel()
-	parser, err := NewSQLParserCached()
+	parser, err := NewSQLParser()
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, parser.Close()) })
 	require.NoError(t, parser.Start())

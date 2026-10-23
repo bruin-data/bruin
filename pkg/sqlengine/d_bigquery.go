@@ -2,7 +2,7 @@ package sqlengine
 
 // Port of sqlglot/dialects/bigquery.py (class BigQuery), the class bodies of
 // sqlglot/parsers/bigquery.py (BigQueryParser) and sqlglot/generators/bigquery.py
-// (BigQueryGenerator). Data-only class attributes are generated (zz_*_settings.go); this file
+// (BigQueryGenerator). Data-only class attributes are in the *_settings.go files; this file
 // wires the callable tables and method overrides. Parser code lives in d_bigquery_parser.go and
 // generator code in d_bigquery_generator.go.
 
