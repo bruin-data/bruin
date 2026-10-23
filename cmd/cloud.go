@@ -548,10 +548,33 @@ func resolveGitProvider(provider, repoURL string) (string, error) {
 	return "", fmt.Errorf("could not infer the Git provider from %q, pass --provider github, gitlab or bitbucket", repoURL)
 }
 
+// Without a git token, Bruin Cloud connects the repo through the user's GitHub App access.
+func createProjectInput(name, repoURL, branch, gitToken, provider string, doNotParse bool) (bruincloud.CreateProjectInput, error) {
+	input := bruincloud.CreateProjectInput{Name: name, RepoURL: repoURL, RepoBranch: branch, DoNotParse: doNotParse}
+
+	if gitToken == "" {
+		if provider != "" && provider != "github" {
+			return input, fmt.Errorf("--provider %s needs --git-token; only GitHub repositories connect without one", provider)
+		}
+		return input, nil
+	}
+
+	resolved, err := resolveGitProvider(provider, repoURL)
+	if err != nil {
+		return input, err
+	}
+	input.GitToken = gitToken
+	input.Provider = resolved
+	if input.RepoBranch == "" {
+		input.RepoBranch = "main"
+	}
+	return input, nil
+}
+
 func cloudProjectsCreate() *cli.Command {
 	return &cli.Command{
 		Name:  "create",
-		Usage: "Connect a Git repository as a new project using a personal access token",
+		Usage: "Connect a Git repository as a new project, through your GitHub App access or a personal access token",
 		Flags: []cli.Flag{
 			apiKeyFlag(),
 			outputFlag(),
@@ -562,19 +585,17 @@ func cloudProjectsCreate() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:     "repo-url",
-				Usage:    "HTTPS URL of the Git repository, e.g. https://github.com/acme/analytics",
+				Usage:    "URL of the Git repository, e.g. https://github.com/acme/analytics; without --git-token also an SSH URL or acme/analytics",
 				Required: true,
 			},
 			&cli.StringFlag{
 				Name:  "branch",
-				Usage: "the branch Bruin Cloud should track",
-				Value: "main",
+				Usage: "the branch Bruin Cloud should track (default: the repository's default branch, or main with --git-token)",
 			},
 			&cli.StringFlag{
-				Name:     "git-token",
-				Usage:    "personal access token with read access to the repository",
-				Sources:  cli.EnvVars("BRUIN_CLOUD_GIT_TOKEN"),
-				Required: true,
+				Name:    "git-token",
+				Usage:   "personal access token with read access to the repository; omit it (and unset BRUIN_CLOUD_GIT_TOKEN) to connect a GitHub repository through the Bruin GitHub App",
+				Sources: cli.EnvVars("BRUIN_CLOUD_GIT_TOKEN"),
 			},
 			&cli.StringFlag{
 				Name:  "provider",
@@ -589,9 +610,9 @@ func cloudProjectsCreate() *cli.Command {
 			defer RecoverFromPanic()
 			output := c.String("output")
 
-			provider, err := resolveGitProvider(c.String("provider"), c.String("repo-url"))
+			input, err := createProjectInput(c.String("name"), c.String("repo-url"), c.String("branch"), c.String("git-token"), c.String("provider"), c.Bool("do-not-parse"))
 			if err != nil {
-				printError(err, output, "Invalid --provider")
+				printError(err, output, "Invalid flags")
 				return cli.Exit("", 1)
 			}
 
@@ -601,14 +622,7 @@ func cloudProjectsCreate() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			project, err := client.CreateProject(ctx, bruincloud.CreateProjectInput{
-				Name:       c.String("name"),
-				RepoURL:    c.String("repo-url"),
-				RepoBranch: c.String("branch"),
-				GitToken:   c.String("git-token"),
-				Provider:   provider,
-				DoNotParse: c.Bool("do-not-parse"),
-			})
+			project, err := client.CreateProject(ctx, input)
 			if err != nil {
 				printError(err, output, "Failed to create project")
 				return cli.Exit("", 1)
