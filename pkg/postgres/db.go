@@ -20,11 +20,12 @@ import (
 )
 
 type Client struct {
-	connection    connection
-	config        PgConfig
-	schemaCreator *ansisql.SchemaCreator
-	schemaCache   *sync.Map // Cache for created schemas to avoid repeated CREATE SCHEMA calls
-	typeMapper    *diff.DatabaseTypeMapper
+	connection      connection
+	config          PgConfig
+	readOnlyDialect string
+	schemaCreator   *ansisql.SchemaCreator
+	schemaCache     *sync.Map // Cache for created schemas to avoid repeated CREATE SCHEMA calls
+	typeMapper      *diff.DatabaseTypeMapper
 }
 
 type PgConfig interface {
@@ -45,20 +46,25 @@ func NewClient(ctx context.Context, c PgConfig) (*Client, error) {
 	}
 
 	var queryConn connection = conn
-	if cfg, ok := c.(interface{ IsReadOnly() bool }); ok && cfg.IsReadOnly() {
+	dialect := readOnlyDialect(c)
+	if dialect != "" {
 		queryConn = &readOnlyConnection{pool: conn}
 	}
 
 	return &Client{
-		connection:    queryConn,
-		config:        c,
-		schemaCreator: ansisql.NewSchemaCreator(),
-		schemaCache:   &sync.Map{},
-		typeMapper:    diff.NewPostgresTypeMapper(),
+		connection:      queryConn,
+		config:          c,
+		readOnlyDialect: dialect,
+		schemaCreator:   ansisql.NewSchemaCreator(),
+		schemaCache:     &sync.Map{},
+		typeMapper:      diff.NewPostgresTypeMapper(),
 	}, nil
 }
 
 func (c *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
+	if err := c.validateReadOnlyQuery(query.String()); err != nil {
+		return err
+	}
 	_, err := c.connection.Exec(ctx, query.String())
 	if err != nil {
 		return err
@@ -76,6 +82,9 @@ func (c *Client) GetIngestrURI() (string, error) {
 
 // Select runs a query and returns the results.
 func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{}, error) {
+	if err := c.validateReadOnlyQuery(query.String()); err != nil {
+		return nil, err
+	}
 	rows, err := c.connection.Query(ctx, query.String(), query.Args...)
 	if err != nil {
 		return nil, err
@@ -98,6 +107,13 @@ func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 }
 
 func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {
+	if err := c.validateReadOnlyQuery(queryObj.String()); err != nil {
+		return nil, err
+	}
+	return c.selectWithSchema(ctx, queryObj)
+}
+
+func (c *Client) selectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {
 	rows, err := c.connection.Query(ctx, queryObj.String())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to execute query")
@@ -176,6 +192,9 @@ func (c *Client) Ping(ctx context.Context) error {
 }
 
 func (c *Client) IsValid(ctx context.Context, query *query.Query) (bool, error) {
+	if err := c.validateReadOnlyQuery(query.String()); err != nil {
+		return false, err
+	}
 	// Wrap the query in a PostgreSQL test pattern that doesn't execute
 	testQuery := fmt.Sprintf(`DO $TEST$ BEGIN RETURN;
     %s
@@ -194,8 +213,11 @@ END; $TEST$;`, query.String())
 }
 
 func (c *Client) DryRunQuery(ctx context.Context, q *query.Query) (*query.DryRunResult, error) {
+	if err := c.validateReadOnlyQuery(q.String()); err != nil {
+		return nil, err
+	}
 	explainQuery := &query.Query{Query: "EXPLAIN " + q.String()}
-	explainResult, err := c.SelectWithSchema(ctx, explainQuery)
+	explainResult, err := c.selectWithSchema(ctx, explainQuery)
 	if err != nil {
 		return nil, fmt.Errorf("EXPLAIN failed: %w", err)
 	}

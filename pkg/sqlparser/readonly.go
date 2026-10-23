@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 )
 
@@ -28,6 +29,44 @@ func ValidateReadOnlyQuery(query, dialect string) error {
 		return errors.New("query is not allowed on a read-only connection")
 	}
 	return nil
+}
+
+// ValidateReadOnlyQueryWithBlockedFunctions allows function calls except the blocked names, matched
+// case-insensitively without schema; a trailing "*" matches a prefix. Use it only where the
+// database also enforces read-only transactions, since unlisted functions are not inspected.
+func ValidateReadOnlyQueryWithBlockedFunctions(query, dialect string, blocked []string) error {
+	readOnlyParserOnce.Do(func() {
+		readOnlyParser, errReadOnlyParser = NewSQLParserCached()
+	})
+	if errReadOnlyParser != nil {
+		return fmt.Errorf("read-only query validation failed: %w", errReadOnlyParser)
+	}
+	readOnly, err := readOnlyParser.isReadOnlyQueryWithBlockedFunctions(query, dialect, blocked)
+	if err != nil {
+		return fmt.Errorf("read-only query validation failed: %w", err)
+	}
+	if !readOnly {
+		return errors.New("query is not allowed on a read-only connection")
+	}
+	return nil
+}
+
+func (s *SQLParser) isReadOnlyQueryWithBlockedFunctions(query, dialect string, blocked []string) (bool, error) {
+	if err := s.Start(); err != nil {
+		return false, fmt.Errorf("failed to start sql parser: %w", err)
+	}
+	if !validUTF8(query, dialect) {
+		return false, nil
+	}
+	list := make(blockedFunctions, len(blocked))
+	for i, name := range blocked {
+		list[i] = strings.ToLower(name)
+	}
+	var response readOnlyResponse
+	if err := s.callDirect(&response, func() (any, error) { return checkReadOnlyQuery(query, dialect, list), nil }); err != nil {
+		return false, fmt.Errorf("failed to unmarshal read-only response: %w", err)
+	}
+	return checkReadOnlyResponse(response)
 }
 
 func (s *SQLParser) IsReadOnlyQuery(query, dialect string) (bool, error) {
