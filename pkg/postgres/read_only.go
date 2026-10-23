@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/pkg/errors"
@@ -12,6 +13,27 @@ import (
 
 type transactionPool interface {
 	BeginTx(ctx context.Context, options pgx.TxOptions) (pgx.Tx, error)
+}
+
+func readOnlyDialect(c PgConfig) string {
+	cfg, ok := c.(interface{ IsReadOnly() bool })
+	if !ok || !cfg.IsReadOnly() {
+		return ""
+	}
+	if _, ok := c.(RedShiftConfig); ok {
+		return "redshift"
+	}
+	return "postgres"
+}
+
+// Functions that run SQL through another session, outside the read-only transaction.
+var readOnlyBlockedFunctions = []string{"dblink*", "pg_background*"}
+
+func (c *Client) validateReadOnlyQuery(query string) error {
+	if c.readOnlyDialect == "" {
+		return nil
+	}
+	return sqlparser.ValidateReadOnlyQueryWithBlockedFunctions(query, c.readOnlyDialect, readOnlyBlockedFunctions)
 }
 
 type readOnlyConnection struct {

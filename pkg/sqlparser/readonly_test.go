@@ -191,3 +191,28 @@ func TestDecodeReadOnlyResponseContract(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateReadOnlyQueryWithBlockedFunctions(t *testing.T) {
+	t.Parallel()
+
+	blocked := []string{"dblink*", "PG_TERMINATE_BACKEND"}
+	for _, query := range []string{
+		"SELECT dblink_exec('x', 'DELETE FROM t')",
+		"SELECT public.DBLINK('x', 'SELECT 1')",
+		`SELECT "dblink_connect"('x')`,
+		"SELECT * FROM t WHERE a = (SELECT pg_terminate_backend(1))",
+		"WITH x AS (SELECT dblink('x', 'q')) SELECT * FROM x",
+		"DELETE FROM t",
+		"SELECT 1; DROP TABLE t",
+	} {
+		require.Error(t, ValidateReadOnlyQueryWithBlockedFunctions(query, "postgres", blocked), query)
+	}
+	for _, query := range []string{
+		"SELECT 1",
+		"SELECT my_udf(1), analytics.my_udf(2), btrim(a), pg_cancel_backend(1) FROM t",
+		"SELECT my_dblink(1)",
+	} {
+		require.NoError(t, ValidateReadOnlyQueryWithBlockedFunctions(query, "postgres", blocked), query)
+	}
+	require.Error(t, ValidateReadOnlyQuery("SELECT my_udf(1)", "postgres"))
+}

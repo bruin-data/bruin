@@ -23,7 +23,7 @@ In order to set up a PostgreSQL connection, you need to add a configuration item
 
 ### Read-only connections
 
-Set `read_only: true` to run SQL queries in read-only mode (default: `false`). Ingestr assets and seeds do not support this option.
+Set `read_only: true` to run SQL queries in read-only transactions (default: `false`). Functions that run SQL through another session, such as `dblink` and `pg_background`, are not covered by the transaction, so Bruin also validates each query before execution and rejects writes and calls to those functions. Other functions, including UDFs and extension functions, are allowed and run under the read-only transaction. Bruin does not inspect view or function definitions, so use a restricted database role for full protection. Ingestr assets and seeds do not support this option.
 
 > [!NOTE]
 > `ssl_mode` should be one of the modes describe in the [documentation](https://www.postgresql.org/docs/current/libpq-ssl.html#LIBPQ-SSL-PROTECTION).
