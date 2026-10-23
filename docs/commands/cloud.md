@@ -192,7 +192,15 @@ bruin cloud projects list
 
 #### `projects create`
 
-Connect a Git repository as a new project, authenticated with a personal access token. The token needs read access to the repository; your Bruin Cloud API token needs the `team:update` permission.
+Connect a Git repository as a new project. Your Bruin Cloud API token needs the `team:update` permission, or `project:create` for the GitHub App.
+
+**GitHub, through the Bruin GitHub App.** Without `--git-token`, Bruin Cloud connects a GitHub repository through your own GitHub App access, so connect GitHub to Bruin Cloud and install the Bruin GitHub app on the repository's owner first. This needs a personal Bruin Cloud API token, not a team token. Unset `BRUIN_CLOUD_GIT_TOKEN` if you exported it. The branch defaults to the repository's default branch.
+
+```bash
+bruin cloud projects create --name analytics --repo-url acme/analytics
+```
+
+**Any provider, with a personal access token.** The token needs read access to the repository.
 
 ```bash
 export BRUIN_CLOUD_GIT_TOKEN="ghp_..."
@@ -202,11 +210,13 @@ bruin cloud projects create --name analytics --repo-url https://github.com/acme/
 | Flag | Description |
 |------|-------------|
 | `--name` | Project name (required) |
-| `--repo-url` | HTTPS URL of the repository (required) |
-| `--branch` | Branch to track (default: `main`) |
-| `--git-token` | Personal access token. Prefer the `BRUIN_CLOUD_GIT_TOKEN` environment variable so the token stays out of your shell history (required) |
-| `--provider` | `github`, `gitlab` or `bitbucket`. Inferred for github.com, gitlab.com and bitbucket.org URLs; required for self-hosted Git |
+| `--repo-url` | Repository URL (required). Without `--git-token` it can also be an SSH URL or `owner/name` |
+| `--branch` | Branch to track. Defaults to the repository's default branch, or `main` with `--git-token` |
+| `--git-token` | Personal access token. Prefer the `BRUIN_CLOUD_GIT_TOKEN` environment variable so the token stays out of your shell history. Omit it to use the Bruin GitHub App |
+| `--provider` | `github`, `gitlab` or `bitbucket`. Inferred for github.com, gitlab.com and bitbucket.org URLs; required for self-hosted Git with `--git-token`. Without `--git-token` only `github` is accepted |
 | `--do-not-parse` | Create the project without parsing its pipelines |
+
+Through the GitHub App, the command fails if GitHub isn't connected to Bruin Cloud, the connection expired, or none of your GitHub App installations can reach the repository. The error message says which.
 
 The command prints the new project ID, which you can pass to other commands as `--project-id`.
 

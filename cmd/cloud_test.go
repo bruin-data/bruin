@@ -317,13 +317,15 @@ func TestCloudCommand_NoTeamHeaderWhenUnset(t *testing.T) { //nolint:paralleltes
 	assert.False(t, present, "no X-Bruin-Team header should be sent when neither --team nor a default is set")
 }
 
-func TestTeamErrorHint(t *testing.T) {
+func TestAPIErrorHint(t *testing.T) {
 	t.Parallel()
 
-	assert.Contains(t, teamErrorHint(&bruincloud.APIError{Code: "team_required", StatusCode: 409}), "set-team")
-	assert.Contains(t, teamErrorHint(&bruincloud.APIError{Code: "team_not_in_scope", StatusCode: 403}), "unset-team")
-	assert.Empty(t, teamErrorHint(&bruincloud.APIError{Code: "something_else", StatusCode: 400}))
-	assert.Empty(t, teamErrorHint(errors.New("plain error")))
+	assert.Contains(t, apiErrorHint(&bruincloud.APIError{Code: "team_required", StatusCode: 409}), "set-team")
+	assert.Contains(t, apiErrorHint(&bruincloud.APIError{Code: "team_not_in_scope", StatusCode: 403}), "unset-team")
+	assert.Contains(t, apiErrorHint(&bruincloud.APIError{Code: "reconnect_required", StatusCode: 409}), "--git-token")
+	assert.Contains(t, apiErrorHint(&bruincloud.APIError{Code: "repo_not_accessible", StatusCode: 422}), "GitHub App")
+	assert.Empty(t, apiErrorHint(&bruincloud.APIError{Code: "something_else", StatusCode: 400}))
+	assert.Empty(t, apiErrorHint(errors.New("plain error")))
 }
 
 func TestCloudCommand_Help(t *testing.T) {
@@ -508,6 +510,66 @@ func TestCloudProjectsCreate_SendsRequest(t *testing.T) { //nolint:paralleltest 
 		"provider":     "github",
 		"do_not_parse": false,
 	}, gotBody)
+}
+
+func TestCloudProjectsCreate_GithubAppWithoutToken(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	var gotBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&gotBody))
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"id":"01jabc","name":"analytics","repo_url":"https://github.com/acme/analytics.git","repo_branch":"develop","provider":"github"}`))
+	}))
+	t.Cleanup(server.Close)
+
+	t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
+	t.Setenv("BRUIN_CLOUD_TEAM", "")
+	t.Setenv("BRUIN_CLOUD_GIT_TOKEN", "")
+	t.Chdir(writeTempConfigRepo(t, configWithoutCloudYML))
+
+	cmd := cloudProjectsCreate()
+	require.NoError(t, cmd.Run(t.Context(), []string{
+		"create", "--api-key", "test-key", "--name", "analytics",
+		"--repo-url", "acme/analytics", "--output", "json",
+	}))
+
+	assert.Equal(t, map[string]any{
+		"name":         "analytics",
+		"repo_url":     "acme/analytics",
+		"do_not_parse": false,
+	}, gotBody)
+}
+
+func TestCreateProjectInput(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		repoURL  string
+		branch   string
+		token    string
+		provider string
+		want     bruincloud.CreateProjectInput
+		wantErr  bool
+	}{
+		{name: "github app keeps branch empty", repoURL: "acme/repo", want: bruincloud.CreateProjectInput{RepoURL: "acme/repo"}},
+		{name: "github app with branch", repoURL: "git@github.com:acme/repo.git", branch: "dev", provider: "github", want: bruincloud.CreateProjectInput{RepoURL: "git@github.com:acme/repo.git", RepoBranch: "dev"}},
+		{name: "github app rejects other providers", repoURL: "https://gitlab.com/acme/repo", provider: "gitlab", wantErr: true},
+		{name: "token defaults branch to main", repoURL: "https://gitlab.com/acme/repo", token: "glpat", want: bruincloud.CreateProjectInput{RepoURL: "https://gitlab.com/acme/repo", RepoBranch: "main", GitToken: "glpat", Provider: "gitlab"}},
+		{name: "token needs a known provider", repoURL: "https://git.acme.internal/repo", token: "pat", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := createProjectInput("", tt.repoURL, tt.branch, tt.token, tt.provider, false)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }
 
 func TestCloudPipelinesCommand_Help(t *testing.T) {
