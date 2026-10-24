@@ -1138,7 +1138,7 @@ func TestCloudDashboardsCommand_Help(t *testing.T) {
 	cmd := CloudDashboards()
 	require.NotNil(t, cmd)
 	assert.Equal(t, "dashboards", cmd.Name)
-	require.Len(t, cmd.Commands, 10)
+	require.Len(t, cmd.Commands, 11)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
@@ -1154,6 +1154,87 @@ func TestCloudDashboardsCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "delete")
 	assert.Contains(t, subNames, "folders")
 	assert.Contains(t, subNames, "notes")
+	assert.Contains(t, subNames, "apply-filters")
+}
+
+func TestCloudDashboardsApplyFilters(t *testing.T) { //nolint:paralleltest // uses t.Setenv
+	const parameters = `{"period":{"start":"2026-10-19","end":"2026-10-23"},"regions":[],"limit":5,"active":true,"country":"TR"}`
+	t.Setenv("BRUIN_THREAD_ID", "")
+	t.Setenv("BRUIN_CLOUD_TEAM", "")
+
+	for _, tc := range []struct {
+		name       string
+		parameters string
+		args       []string
+		status     int
+		wantError  bool
+	}{
+		{name: "applies filters", parameters: parameters, status: http.StatusOK},
+		{name: "forbidden", parameters: parameters, status: http.StatusForbidden, wantError: true},
+		{name: "invalid filter", parameters: parameters, status: http.StatusUnprocessableEntity, wantError: true},
+		{name: "zero dashboard", parameters: parameters, args: []string{"--dashboard-id", "0"}, wantError: true},
+		{name: "negative dashboard", parameters: parameters, args: []string{"--dashboard-id", "-1"}, wantError: true},
+		{name: "null", parameters: "null", wantError: true},
+		{name: "empty object", parameters: "{}", wantError: true},
+		{name: "array", parameters: "[]", wantError: true},
+		{name: "malformed JSON", parameters: "{", wantError: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			called := false
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				called = true
+				assert.Equal(t, http.MethodPost, r.Method)
+				assert.Equal(t, "/dashboards/42/filters", r.URL.Path)
+				assert.Equal(t, "Bearer test-key", r.Header.Get("Authorization"))
+				var body map[string]any
+				assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+				expected := `{"parameters":` + parameters + `}`
+				encoded, err := json.Marshal(body)
+				assert.NoError(t, err)
+				assert.JSONEq(t, expected, string(encoded))
+				w.WriteHeader(tc.status)
+				if tc.status == http.StatusOK {
+					_, _ = w.Write([]byte(`{"parameters":` + parameters + `}`))
+				} else {
+					_, _ = w.Write([]byte(`{"message":"Cannot apply filters"}`))
+				}
+			}))
+			t.Cleanup(server.Close)
+			t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
+			command := CloudDashboards()
+			command.ExitErrHandler = func(context.Context, *cli.Command, error) {}
+			args := []string{"dashboards", "apply-filters", "--api-key", "test-key", "--dashboard-id", "42", "--parameters", tc.parameters, "--output", "json"}
+			err := runCLI(t.Context(), command, append(args, tc.args...))
+			if tc.wantError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, tc.status != 0, called)
+		})
+	}
+}
+
+func TestCloudDashboardsApplyFilters_ReportsIgnoredFilters(t *testing.T) { //nolint:paralleltest // uses t.Setenv
+	t.Setenv("BRUIN_THREAD_ID", "")
+	t.Setenv("BRUIN_CLOUD_TEAM", "")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		assert.NoError(t, err)
+		assert.Contains(t, string(body), `"limit":9007199254740993`)
+		_, _ = w.Write([]byte(`{"parameters":{"period":"2026-10-23"}}`))
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
+
+	args := []string{"dashboards", "apply-filters", "--api-key", "test-key", "--dashboard-id", "42", "--parameters", `{"period":"2026-10-23","regoins":["Europe"],"limit":9007199254740993}`}
+	out, err := runCloudCLI(t, append(args, "--output", "json")...)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"parameters":{"period":"2026-10-23"},"ignored":["limit","regoins"]}`, out)
+
+	out, err = runCloudCLI(t, args...)
+	require.NoError(t, err)
+	assert.Contains(t, out, "Ignored filters not declared on the dashboard: limit, regoins")
 }
 
 // cliRunMu serializes cli.Command.Run: urfave/cli's ensureHelp resets the

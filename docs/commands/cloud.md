@@ -1221,6 +1221,19 @@ bruin cloud dashboards update --dashboard-id 42 --folder "Finance"
 bruin cloud dashboards update --dashboard-id 42 --folder none
 ```
 
+#### `apply-filters`
+
+Update your dashboard filters and refresh charts automatically.
+
+```bash
+bruin cloud dashboards apply-filters --dashboard-id 42 \
+  --parameters '{"period":{"start":"2026-10-19","end":"2026-10-23"},"regions":["Europe"]}'
+```
+
+`--parameters` takes a JSON object mapping the filter names to change to their values: strings for date/text/single-select, numbers or booleans, string arrays for multi-select (`[]` means all), and `{"start":"YYYY-MM-DD","end":"YYYY-MM-DD"}` for date ranges. Names the dashboard doesn't declare are skipped and listed as a warning (`ignored` in JSON output). If none are recognized, the command fails.
+
+Updates are scoped to your user and dashboard and work in View and Edit mode. Supports the standard `--team`, `--api-key`, and `--output json` flags. Use a user-scoped token.
+
 #### `publish`
 
 Publish a dashboard's pending draft so it goes live — the same as clicking Publish in the Bruin Cloud UI. `create` and `update` only ever write the draft, so this is how a dashboard built or edited from the CLI becomes visible to the team. Requires edit rights on the dashboard; errors if there is no draft to publish, and repo (DAC) dashboards are published from the repo.

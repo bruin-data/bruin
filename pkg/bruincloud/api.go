@@ -1074,6 +1074,16 @@ func (c *APIClient) UpdateDashboard(ctx context.Context, dashboardID int, fields
 	return &result, nil
 }
 
+// ApplyDashboardFilters updates the dashboard's active filter selection. The
+// response lists only the filters that were applied.
+func (c *APIClient) ApplyDashboardFilters(ctx context.Context, dashboardID int, parameters map[string]json.RawMessage) (json.RawMessage, error) {
+	var result json.RawMessage
+	err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/dashboards/%d/filters", dashboardID), map[string]any{
+		"parameters": parameters,
+	}, &result)
+	return result, err
+}
+
 // DeleteDashboard deletes a dashboard so it stops appearing (soft-deleted
 // server-side, mirroring the UI). Requires an owner or team admin.
 func (c *APIClient) DeleteDashboard(ctx context.Context, dashboardID int) error {
