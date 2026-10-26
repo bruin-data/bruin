@@ -1238,6 +1238,83 @@ func TestCloudDashboardsApplyFilters_ReportsIgnoredFilters(t *testing.T) { //nol
 	assert.Contains(t, out, "Ignored filters not declared on the dashboard: limit, regoins")
 }
 
+func TestCloudSemanticLayersCreateUpdate(t *testing.T) { //nolint:paralleltest // uses t.Setenv
+	t.Setenv("BRUIN_THREAD_ID", "")
+	t.Setenv("BRUIN_CLOUD_TEAM", "")
+	yamlFile := filepath.Join(t.TempDir(), "model.yaml")
+	require.NoError(t, os.WriteFile(yamlFile, []byte("source:\n  table: raw.sales\n"), 0o600))
+	missingFile := filepath.Join(t.TempDir(), "missing.yaml")
+
+	for _, tc := range []struct {
+		name       string
+		args       []string
+		wantMethod string
+		wantPath   string
+		wantBody   string
+		wantError  bool
+	}{
+		{
+			name:       "create with JSON state",
+			args:       []string{"create", "--name", "sales", "--state", `{"source":{"table":"raw.sales"}}`},
+			wantMethod: http.MethodPost,
+			wantPath:   "/semantic-layers",
+			wantBody:   `{"name":"sales","state":{"source":{"table":"raw.sales"}}}`,
+		},
+		{
+			name:       "create with YAML file",
+			args:       []string{"create", "--name", "sales", "--state-file", yamlFile},
+			wantMethod: http.MethodPost,
+			wantPath:   "/semantic-layers",
+			wantBody:   `{"name":"sales","state":{"source":{"table":"raw.sales"}}}`,
+		},
+		{
+			name:       "update name only omits state",
+			args:       []string{"update", "--semantic-layer-id", "3", "--name", "sales_v2"},
+			wantMethod: http.MethodPatch,
+			wantPath:   "/semantic-layers/3",
+			wantBody:   `{"name":"sales_v2"}`,
+		},
+		{
+			name:       "update state only omits name",
+			args:       []string{"update", "--semantic-layer-id", "3", "--state-file", yamlFile},
+			wantMethod: http.MethodPatch,
+			wantPath:   "/semantic-layers/3",
+			wantBody:   `{"state":{"source":{"table":"raw.sales"}}}`,
+		},
+		{name: "both state flags", args: []string{"create", "--name", "sales", "--state", "{}", "--state-file", yamlFile}, wantError: true},
+		{name: "unreadable state file", args: []string{"create", "--name", "sales", "--state-file", missingFile}, wantError: true},
+		{name: "state not an object", args: []string{"create", "--name", "sales", "--state", "[]"}, wantError: true},
+		{name: "update with nothing", args: []string{"update", "--semantic-layer-id", "3"}, wantError: true},
+		{name: "update non-positive id", args: []string{"update", "--semantic-layer-id", "0", "--name", "x"}, wantError: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			called := false
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				called = true
+				assert.Equal(t, tc.wantMethod, r.Method)
+				assert.Equal(t, tc.wantPath, r.URL.Path)
+				body, err := io.ReadAll(r.Body)
+				assert.NoError(t, err)
+				assert.JSONEq(t, tc.wantBody, string(body))
+				_, _ = w.Write([]byte(`{"id":3,"name":"sales"}`))
+			}))
+			t.Cleanup(server.Close)
+			t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
+
+			command := CloudSemanticLayers()
+			command.ExitErrHandler = func(context.Context, *cli.Command, error) {}
+			args := append([]string{"semantic-layers"}, tc.args...)
+			err := runCLI(t.Context(), command, append(args, "--api-key", "test-key", "--output", "json"))
+			if tc.wantError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, !tc.wantError, called)
+		})
+	}
+}
+
 // cliRunMu serializes cli.Command.Run: urfave/cli's ensureHelp resets the
 // package-level cli.HelpFlag on every run, so concurrent runs race on it.
 var cliRunMu sync.Mutex
