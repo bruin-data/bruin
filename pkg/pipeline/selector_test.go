@@ -178,6 +178,34 @@ func TestResolveSelectorAssets_Invalid(t *testing.T) {
 	assert.Contains(t, err.Error(), "matched no assets")
 }
 
+func TestResolveSelectorAssets_PathDoesNotMatchSiblingWithSamePrefix(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	p := &Pipeline{
+		Name:           "selector_pipeline",
+		DefinitionFile: DefinitionFile{Path: filepath.Join(root, "pipeline.yml")},
+		Assets: []*Asset{
+			{
+				Name:           "orders",
+				Type:           AssetTypeBigqueryQuery,
+				DefinitionFile: TaskDefinitionFile{Path: filepath.Join(root, "assets", "sales", "orders.sql")},
+			},
+			{
+				Name:           "archived_orders",
+				Type:           AssetTypeBigqueryQuery,
+				DefinitionFile: TaskDefinitionFile{Path: filepath.Join(root, "assets", "sales_archive", "archived_orders.sql")},
+			},
+		},
+	}
+
+	for _, selector := range []string{"path:assets/sales", "assets/sales"} {
+		assets, err := ResolveSelectorAssets(selector, p)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"orders"}, selectorAssetNames(assets), selector)
+	}
+}
+
 func newSelectorTestPipeline(t *testing.T) *Pipeline {
 	t.Helper()
 
