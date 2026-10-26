@@ -258,7 +258,7 @@ func TestOperatorRejectsInvalidOutputAndEmptyReplace(t *testing.T) {
 func TestValidateAsset(t *testing.T) {
 	t.Parallel()
 	require.NoError(t, ValidateAsset(testAsset()))
-	for _, name := range []string{"provider", "context", "max_rows", "inference", "key", "view", "append", "connection", "output", "unknown"} {
+	for _, name := range []string{"provider", "context", "max_rows", "inference", "key", "view", "append", "connection", "output", "unknown", "hooks"} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			a := testAsset()
@@ -283,10 +283,64 @@ func TestValidateAsset(t *testing.T) {
 				a.Columns[1].Type = "integer"
 			case "unknown":
 				a.Parameters["max_row"] = 10
+			case "hooks":
+				a.Hooks.Post = []pipeline.Hook{{Query: "select 1"}}
 			}
 			require.Error(t, ValidateAsset(a))
 		})
 	}
+}
+
+func TestValidateAssetAcceptsQualityChecks(t *testing.T) {
+	t.Parallel()
+	a := testAsset()
+	// destination is inferred from the warehouse connection to route the checks.
+	a.Parameters["destination"] = "duckdb"
+	a.Columns[0].Checks = []pipeline.ColumnCheck{{Name: "not_null"}, {Name: "unique"}}
+	a.Columns[1].Checks = []pipeline.ColumnCheck{{Name: "accepted_values", Value: pipeline.ColumnCheckValue{StringArray: &[]string{"billing", "technical"}}}}
+	a.CustomChecks = []pipeline.CustomCheck{{Name: "has rows", Query: "select count(*) > 0 from analytics.classified", Value: 1}}
+	require.NoError(t, ValidateAsset(a))
+}
+
+type typedInputConnection struct {
+	*inputConnection
+	platform string
+}
+
+func (c typedInputConnection) GetConnectionType(string) string { return c.platform }
+
+func TestOperatorRejectsChecksWithoutCheckPlatformBeforeRequests(t *testing.T) {
+	t.Parallel()
+	for platform, want := range map[string]string{
+		"":           `could not determine the platform of connection "warehouse"`,
+		"mysql":      `inference quality checks are not supported on "mysql" connections`,
+		"motherduck": `inference quality checks are not supported on "motherduck" connections`,
+		// Supported, but the destination was not inferred when the pipeline was built.
+		"duckdb": "cannot route inference quality checks",
+	} {
+		t.Run(platform, func(t *testing.T) {
+			t.Parallel()
+			op, ti, conn, runner := fixture(t)
+			op.conn = testProviderConnections(t, typedInputConnection{conn, platform}, false)
+			ti.Asset.Columns[0].Checks = []pipeline.ColumnCheck{{Name: "not_null"}}
+			op.structured = func(context.Context, *Client, string, string, []outputColumn) (map[string]any, error) {
+				t.Fatal("no request may be sent")
+				return nil, nil
+			}
+			require.ErrorContains(t, op.Run(t.Context(), ti), want)
+			require.Empty(t, runner.args)
+		})
+	}
+}
+
+func TestValidateQualityCheckPlatform(t *testing.T) {
+	t.Parallel()
+	a := testAsset()
+	require.NoError(t, ValidateQualityCheckPlatform(a, "mysql"), "assets without checks are not restricted")
+	a.CustomChecks = []pipeline.CustomCheck{{Name: "has rows", Query: "select 1", Value: 1}}
+	require.NoError(t, ValidateQualityCheckPlatform(a, "duckdb"))
+	require.NoError(t, ValidateQualityCheckPlatform(a, "google_cloud_platform"))
+	require.Error(t, ValidateQualityCheckPlatform(a, "trino"))
 }
 
 func TestOperatorParallelFailureCancelsRequests(t *testing.T) {

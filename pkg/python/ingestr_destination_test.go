@@ -22,6 +22,7 @@ func TestInferIngestrDestination(t *testing.T) {
 		"hubspot-prod":  "hubspot",
 		"sheets":        "google_sheets",
 		"shopify-prod":  "shopify",
+		"mysql-prod":    "mysql",
 	}
 
 	tests := []struct {
@@ -106,6 +107,41 @@ func TestInferIngestrDestination(t *testing.T) {
 			asset: &pipeline.Asset{
 				Type:       pipeline.AssetTypeBigqueryQuery,
 				Connection: "bigquery-prod",
+				Parameters: pipeline.ParameterMap{},
+			},
+		},
+		{
+			name: "infers the destination of an inference asset from its connection",
+			asset: &pipeline.Asset{
+				Type:       pipeline.AssetTypeInference,
+				Connection: "pg",
+				Parameters: pipeline.ParameterMap{"provider": "openai"},
+			},
+			wantDestination: "postgres",
+			wantSet:         true,
+		},
+		{
+			name: "overrides a destination that disagrees with the inference connection",
+			asset: &pipeline.Asset{
+				Type:       pipeline.AssetTypeInference,
+				Connection: "bigquery-prod",
+				Parameters: pipeline.ParameterMap{"destination": "postgres"},
+			},
+			wantDestination: "bigquery",
+			wantSet:         true,
+		},
+		{
+			name: "drops a user-set destination when the inference connection has none",
+			asset: &pipeline.Asset{
+				Type:       pipeline.AssetTypeInference,
+				Connection: "mysql-prod",
+				Parameters: pipeline.ParameterMap{"destination": "postgres"},
+			},
+		},
+		{
+			name: "leaves an inference asset without a connection alone",
+			asset: &pipeline.Asset{
+				Type:       pipeline.AssetTypeInference,
 				Parameters: pipeline.ParameterMap{},
 			},
 		},

@@ -6,6 +6,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/jinja"
+	"github.com/bruin-data/bruin/pkg/python"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/samber/lo"
 	"github.com/spf13/afero"
@@ -376,6 +377,16 @@ func GetCustomCheckQueryDryRunRule(connectionManager connectionManager, renderer
 		Fast:             false,
 		Severity:         ValidatorSeverityCritical,
 		AssetValidator:   ValidateCustomCheckQueryDryRun(connectionManager, renderer),
+		ApplicableLevels: []Level{LevelAsset},
+	}
+}
+
+func GetInferenceCheckPlatformRule(connections python.ConnectionTypeGetter) *SimpleRule {
+	return &SimpleRule{
+		Identifier:       "inference-check-platform",
+		Fast:             true,
+		Severity:         ValidatorSeverityCritical,
+		AssetValidator:   ValidateInferenceCheckPlatform(connections),
 		ApplicableLevels: []Level{LevelAsset},
 	}
 }

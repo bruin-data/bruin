@@ -2042,7 +2042,11 @@ func SetupExecutors(
 	}
 
 	if s.WillRunTaskOfType(pipeline.AssetTypeInference) {
+		// Inference results land in the asset's warehouse, so checks run there, like for ingestr.
 		mainExecutors[pipeline.AssetTypeInference][scheduler.TaskInstanceTypeMain] = inference.NewOperator(conn)
+		mainExecutors[pipeline.AssetTypeInference][scheduler.TaskInstanceTypeColumnCheck] = ingestr.NewColumnCheckOperator(&mainExecutors)
+		mainExecutors[pipeline.AssetTypeInference][scheduler.TaskInstanceTypeCustomCheck] = ingestr.NewCustomCheckOperator(&mainExecutors)
+		mainExecutors[pipeline.AssetTypeInference][scheduler.TaskInstanceTypeMetadataPush] = ingestr.NewMetadataPushOperator(&mainExecutors, conn)
 	}
 
 	if s.WillRunTaskOfType(pipeline.AssetTypeR) {

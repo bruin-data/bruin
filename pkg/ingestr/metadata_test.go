@@ -29,6 +29,7 @@ func TestIngestrMetadataPushOperator(t *testing.T) {
 		wantPushed  bool
 		wantSkipped bool
 		connPresent bool
+		assetType   pipeline.AssetType
 		destination string
 		configs     map[pipeline.AssetType]executor.Config
 	}{
@@ -81,6 +82,12 @@ func TestIngestrMetadataPushOperator(t *testing.T) {
 			wantError:   true,
 			configs:     map[pipeline.AssetType]executor.Config{},
 		},
+		{
+			name:        "skips an inference asset whose connection has no destination",
+			assetType:   pipeline.AssetTypeInference,
+			wantSkipped: true,
+			configs:     map[pipeline.AssetType]executor.Config{},
+		},
 	}
 
 	for _, tt := range tests {
@@ -99,12 +106,17 @@ func TestIngestrMetadataPushOperator(t *testing.T) {
 			}
 
 			op := NewMetadataPushOperator(&tt.configs, stubConn{present: tt.connPresent})
+			assetType := tt.assetType
+			if assetType == "" {
+				assetType = pipeline.AssetTypeIngestr
+			}
+			parameters := pipeline.ParameterMap{}
+			if tt.destination != "" {
+				parameters["destination"] = tt.destination
+			}
 			asset := scheduler.AssetInstance{
 				Pipeline: &pipeline.Pipeline{},
-				Asset: &pipeline.Asset{
-					Type:       "ingestr",
-					Parameters: pipeline.ParameterMap{"destination": tt.destination},
-				},
+				Asset:    &pipeline.Asset{Type: assetType, Parameters: parameters},
 			}
 
 			err := op.Run(context.Background(), &asset)

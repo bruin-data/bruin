@@ -16,6 +16,7 @@ import (
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/ingestruri"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/python"
@@ -68,6 +69,15 @@ func (o *Operator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
 	destURI, err := ingestruri.ForConnection(ctx, o.conn, "destination", asset.Connection)
 	if err != nil {
 		return err
+	}
+	if err := ValidateQualityCheckPlatform(asset, o.conn.GetConnectionType(asset.Connection)); err != nil {
+		return err
+	}
+	// Checks route by the `destination` inferred when the pipeline was built, which may have failed.
+	if asset.CheckCount() > 0 {
+		if _, err := helpers.GetIngestrDestinationType(asset); err != nil {
+			return fmt.Errorf("cannot route inference quality checks: %w", err)
+		}
 	}
 	repo, err := (&git.RepoFinder{}).Repo(asset.DefinitionFile.Path)
 	if err != nil {
