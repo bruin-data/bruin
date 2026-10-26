@@ -15,7 +15,7 @@ type Config struct {
 	ClientSecret              string
 	SASToken                  string
 	UseAzureDefaultCredential bool
-	SQLEndpoint               string
+	SQLAnalyticsEndpoint      string
 }
 
 // GetIngestrURI builds the URI ingestr expects for a Microsoft OneLake

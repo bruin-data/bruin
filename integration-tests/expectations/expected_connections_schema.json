@@ -4219,7 +4219,7 @@
         "use_azure_default_credential": {
           "type": "boolean"
         },
-        "sql_endpoint": {
+        "sql_analytics_endpoint": {
           "type": "string"
         }
       },

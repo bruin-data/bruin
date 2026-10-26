@@ -29,13 +29,13 @@ To connect to OneLake, you need to add a configuration item to the connections s
           # sas_token: "sv=..."
           # Option 3: DefaultAzureCredential (env vars, managed identity, or Azure CLI login)
           # use_azure_default_credential: true
-          # Optional: the lakehouse's SQL analytics endpoint, required for quality checks
-          # sql_endpoint: "xxxx.datawarehouse.fabric.microsoft.com"
+          # Optional: only needed to run quality checks
+          # sql_analytics_endpoint: "xxxx.datawarehouse.fabric.microsoft.com"
 ```
 
 - `workspace_name`: The Fabric workspace name or GUID.
 - `lakehouse_name`: The lakehouse name or GUID (the `.Lakehouse` suffix is added automatically).
-- `sql_endpoint`: Optional. The host of the lakehouse's SQL analytics endpoint, found under the lakehouse's SQL analytics endpoint settings in Fabric. Required to run [quality checks](#quality-checks) on the asset.
+- `sql_analytics_endpoint`: Optional, only needed to run [quality checks](#quality-checks). The host of the lakehouse's SQL analytics endpoint, found under the lakehouse's SQL analytics endpoint settings in Fabric.
 
 OneLake requires Microsoft Entra ID authentication — shared account keys are not accepted. Provide **one** of the following authentication methods:
 
@@ -84,7 +84,7 @@ As a result of this command, Bruin will ingest data from the given source into y
 
 ## Quality checks
 
-Column checks and custom checks on OneLake assets run through the lakehouse's SQL analytics endpoint, so set `sql_endpoint` on the connection. It uses the same service principal or DefaultAzureCredential authentication as the connection; SAS tokens cannot query the SQL endpoint.
+Column checks and custom checks on OneLake assets run through the lakehouse's SQL analytics endpoint. To use them, set `sql_analytics_endpoint` on the connection; ingestion works without it. It uses the same service principal or DefaultAzureCredential authentication as the connection; SAS tokens cannot query the SQL endpoint.
 
 Column checks query the table by the asset name, so name the asset `schema.table` (e.g. `silver.orders`) to use them. Custom checks can query any table the endpoint can see.
 
