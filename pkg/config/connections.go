@@ -340,6 +340,7 @@ type OneLakeConnection struct {
 	ClientSecret              string `yaml:"client_secret,omitempty" json:"client_secret,omitempty" mapstructure:"client_secret" sensitive:"true"`
 	SASToken                  string `yaml:"sas_token,omitempty" json:"sas_token,omitempty" mapstructure:"sas_token" sensitive:"true"`
 	UseAzureDefaultCredential bool   `yaml:"use_azure_default_credential,omitempty" json:"use_azure_default_credential,omitempty" mapstructure:"use_azure_default_credential"`
+	SQLEndpoint               string `yaml:"sql_endpoint,omitempty" json:"sql_endpoint,omitempty" mapstructure:"sql_endpoint"`
 }
 
 func (c OneLakeConnection) GetName() string {

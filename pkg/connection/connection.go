@@ -1188,6 +1188,7 @@ func (m *Manager) AddOneLakeConnectionFromConfig(connection *config.OneLakeConne
 		ClientSecret:              connection.ClientSecret,
 		SASToken:                  connection.SASToken,
 		UseAzureDefaultCredential: connection.UseAzureDefaultCredential,
+		SQLEndpoint:               connection.SQLEndpoint,
 	})
 	if err != nil {
 		return err

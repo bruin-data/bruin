@@ -4218,6 +4218,9 @@
         },
         "use_azure_default_credential": {
           "type": "boolean"
+        },
+        "sql_endpoint": {
+          "type": "string"
         }
       },
       "additionalProperties": false,

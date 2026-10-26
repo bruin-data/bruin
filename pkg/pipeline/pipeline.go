@@ -1102,6 +1102,12 @@ var IngestrTypeConnectionMapping = map[string]AssetType{
 	"clevertap":     AssetTypeCleverTap,
 }
 
+// IngestrCheckTypeMapping covers destinations that only accept SQL for quality checks,
+// so they stay out of IngestrTypeConnectionMapping's connection inference.
+var IngestrCheckTypeMapping = map[string]AssetType{
+	"onelake": AssetTypeFabricQuery,
+}
+
 type SecretMapping struct {
 	SecretKey   string `json:"secret_key"`
 	InjectedKey string `json:"injected_key"`
