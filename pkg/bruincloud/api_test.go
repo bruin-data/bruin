@@ -2209,13 +2209,13 @@ func TestCreateSemanticLayer(t *testing.T) {
 		assert.NotNil(t, body["state"])
 
 		w.WriteHeader(http.StatusCreated)
-		writeJSON(t, w, SemanticLayer{ID: 9, Name: "sales", URL: "https://cloud.getbruin.com/acme/semantic-layers/9"})
+		writeJSON(t, w, SemanticLayer{ID: 9, Name: "sales"})
 	})
 
 	layer, err := client.CreateSemanticLayer(t.Context(), "sales", map[string]any{"source": map[string]any{"table": "raw.sales"}})
 	require.NoError(t, err)
 	assert.Equal(t, 9, layer.ID)
-	assert.Equal(t, "https://cloud.getbruin.com/acme/semantic-layers/9", layer.URL)
+	assert.Equal(t, "sales", layer.Name)
 }
 
 func TestCreateSemanticLayerOmitsStateWhenNil(t *testing.T) {
