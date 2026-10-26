@@ -5202,6 +5202,7 @@ func CloudDashboards() *cli.Command {
 			cloudDashboardsVersion(),
 			cloudDashboardsCreate(),
 			cloudDashboardsUpdate(),
+			cloudDashboardsApplyFilters(),
 			cloudDashboardsPublish(),
 			cloudDashboardsDelete(),
 			cloudDashboardsNotes(),
@@ -5876,6 +5877,73 @@ func cloudDashboardsUpdate() *cli.Command {
 				infoPrinter.Printf("Updated dashboard %d (%s) — open it to review and publish: %s\n", dashboard.ID, title, dashboard.URL)
 			} else {
 				infoPrinter.Printf("Updated dashboard %d (%s).\n", dashboard.ID, title)
+			}
+			return nil
+		},
+	}
+}
+
+func cloudDashboardsApplyFilters() *cli.Command {
+	return &cli.Command{
+		Name:  "apply-filters",
+		Usage: "Update the dashboard's filter selection",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{Name: "dashboard-id", Usage: "dashboard ID", Required: true},
+			&cli.StringFlag{Name: "parameters", Usage: "JSON object mapping filter names to typed values", Required: true},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+			dashboardID := c.Int("dashboard-id")
+			if dashboardID <= 0 {
+				printError(errors.New("--dashboard-id must be a positive integer"), output, "Invalid dashboard ID")
+				return cli.Exit("", 1)
+			}
+
+			var parameters map[string]json.RawMessage
+			if err := json.Unmarshal([]byte(c.String("parameters")), &parameters); err != nil || len(parameters) == 0 || len(parameters) > 100 {
+				printError(errors.New("--parameters must be a JSON object containing 1 to 100 filter names"), output, "Invalid parameters")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			result, err := client.ApplyDashboardFilters(ctx, dashboardID, parameters)
+			if err != nil {
+				printError(err, output, "Failed to apply dashboard filters")
+				return cli.Exit("", 1)
+			}
+
+			// The server applies only filters the dashboard declares and drops the rest.
+			var applied struct {
+				Parameters map[string]json.RawMessage `json:"parameters"`
+			}
+			if err := json.Unmarshal(result, &applied); err != nil {
+				printError(err, output, "Failed to parse response")
+				return cli.Exit("", 1)
+			}
+			ignored := make([]string, 0)
+			for name := range parameters {
+				if _, ok := applied.Parameters[name]; !ok {
+					ignored = append(ignored, name)
+				}
+			}
+			sort.Strings(ignored)
+
+			if output == "json" {
+				data, _ := json.Marshal(map[string]any{"parameters": applied.Parameters, "ignored": ignored})
+				fmt.Println(string(data))
+				return nil
+			}
+			successPrinter.Println("Updated dashboard filter selection.")
+			if len(ignored) > 0 {
+				warningPrinter.Printf("Ignored filters not declared on the dashboard: %s\n", strings.Join(ignored, ", "))
 			}
 			return nil
 		},
