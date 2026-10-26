@@ -39,3 +39,11 @@ func TestNewClient_SQLEndpointWithServicePrincipal(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, client.sql)
 }
+
+func TestSQLEndpointConfig_TrimsLakehouseAndEndpoint(t *testing.T) {
+	t.Parallel()
+
+	cfg := sqlEndpointConfig(Config{LakehouseName: "  lh  ", SQLEndpoint: " x.datawarehouse.fabric.microsoft.com "})
+	require.Equal(t, "lh", cfg.Database)
+	require.Equal(t, "x.datawarehouse.fabric.microsoft.com", cfg.Host)
+}

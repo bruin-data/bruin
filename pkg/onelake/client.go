@@ -24,20 +24,24 @@ func NewClient(c Config) (*Client, error) {
 		return nil, errors.New("onelake: sql_endpoint requires service principal or use_azure_default_credential authentication, a SAS token cannot query the SQL endpoint")
 	}
 
-	db, err := fabric.NewDB(&fabric.Config{
-		Host:                      endpoint,
-		Database:                  c.LakehouseName,
-		TenantID:                  c.TenantID,
-		ClientID:                  c.ClientID,
-		ClientSecret:              c.ClientSecret,
-		UseAzureDefaultCredential: c.UseAzureDefaultCredential,
-	})
+	db, err := fabric.NewDB(sqlEndpointConfig(c))
 	if err != nil {
 		return nil, err
 	}
 	client.sql = db
 
 	return client, nil
+}
+
+func sqlEndpointConfig(c Config) *fabric.Config {
+	return &fabric.Config{
+		Host:                      strings.TrimSpace(c.SQLEndpoint),
+		Database:                  strings.TrimSpace(c.LakehouseName),
+		TenantID:                  c.TenantID,
+		ClientID:                  c.ClientID,
+		ClientSecret:              c.ClientSecret,
+		UseAzureDefaultCredential: c.UseAzureDefaultCredential,
+	}
 }
 
 func (c *Client) GetIngestrURI() (string, error) {
