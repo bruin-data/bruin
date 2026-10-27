@@ -17,7 +17,7 @@ type IngestrCheckOperator struct {
 
 func (i IngestrCheckOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
 	asset := ti.GetAsset()
-	assetType, err := helpers.GetIngestrDestinationType(asset)
+	assetType, err := helpers.GetIngestrCheckType(asset)
 	if err != nil {
 		return err
 	}
@@ -42,7 +42,7 @@ type IngestrCustomCheckOperator struct {
 
 func (i IngestrCustomCheckOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
 	asset := ti.GetAsset()
-	assetType, err := helpers.GetIngestrDestinationType(asset)
+	assetType, err := helpers.GetIngestrCheckType(asset)
 	if err != nil {
 		return err
 	}

@@ -1102,6 +1102,12 @@ var IngestrTypeConnectionMapping = map[string]AssetType{
 	"clevertap":     AssetTypeCleverTap,
 }
 
+// IngestrCheckTypeMapping covers destinations that only accept SQL for quality checks,
+// so they stay out of IngestrTypeConnectionMapping's connection inference.
+var IngestrCheckTypeMapping = map[string]AssetType{
+	"onelake": AssetTypeFabricQuery,
+}
+
 type SecretMapping struct {
 	SecretKey   string `json:"secret_key"`
 	InjectedKey string `json:"injected_key"`
@@ -2643,6 +2649,7 @@ func assetMainTaskIsConnectionless(asset *Asset) bool {
 // ConnectionlessIngestrSources maps public, credential-less ingestr sources to
 // their base URI, keyed by canonical domain name so short names stay connections.
 var ConnectionlessIngestrSources = map[string]string{
+	"allratestoday.com": "allratestoday://",
 	"chess.com":         "chess://",
 	"frankfurter.dev":   "frankfurter://",
 	"stat.ripe.net":     "ripestat://",

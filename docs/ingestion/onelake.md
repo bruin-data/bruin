@@ -78,3 +78,32 @@ bruin run assets/stripe_onelake.yml
 ```
 
 As a result of this command, Bruin will ingest data from the given source into your Microsoft OneLake lakehouse.
+
+## Quality checks
+
+Column checks and custom checks on OneLake assets run through the lakehouse's SQL analytics endpoint, which Bruin finds automatically from the workspace and lakehouse names. No extra configuration is needed, but checks require service principal or DefaultAzureCredential authentication (SAS tokens cannot query the SQL endpoint), and the identity must be allowed to use Fabric APIs in your tenant settings.
+
+Column checks query the table by the asset name, so name the asset `schema.table` (e.g. `silver.orders`) to use them. Custom checks can query any table the endpoint can see.
+
+```yaml
+name: silver.orders
+type: ingestr
+connection: my-onelake
+
+parameters:
+  source_connection: stripe
+  source_table: 'event'
+  destination: onelake
+
+columns:
+  - name: id
+    checks:
+      - name: not_null
+
+custom_checks:
+  - name: has rows
+    query: SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM silver.orders
+    value: 1
+```
+
+The SQL analytics endpoint can take a short while to reflect newly written data, so checks that run right after ingestion may briefly see the previous state of the table.

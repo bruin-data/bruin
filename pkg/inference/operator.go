@@ -75,7 +75,7 @@ func (o *Operator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
 	}
 	// Checks route by the `destination` inferred when the pipeline was built, which may have failed.
 	if asset.CheckCount() > 0 {
-		if _, err := helpers.GetIngestrDestinationType(asset); err != nil {
+		if _, err := helpers.GetIngestrCheckType(asset); err != nil {
 			return fmt.Errorf("cannot route inference quality checks: %w", err)
 		}
 	}
