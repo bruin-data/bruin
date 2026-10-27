@@ -752,6 +752,11 @@ func Run(isDebug *bool) *cli.Command {
 				Usage:  "run the Python assets on this image instead of their own, e.g. python:3.12",
 				Hidden: true,
 			},
+			&cli.StringFlag{
+				Name:   "connection-override",
+				Usage:  "run the asset, and its checks, on this connection instead of its own",
+				Hidden: true,
+			},
 			&cli.IntFlag{
 				Name:  "timeout",
 				Usage: "timeout for the entire pipeline run in seconds",
@@ -1255,6 +1260,16 @@ func Run(isDebug *bool) *cli.Command {
 			connectionManager, errs = connectionManagerFromConfig(runCtx, cm, logger)
 
 			foundPipeline := pipelineInfo.Pipeline
+			if connectionOverride := c.String("connection-override"); connectionOverride != "" {
+				var connectionTypes connectionTypeGetter
+				if connectionManager != nil {
+					connectionTypes = connectionManager
+				}
+				if err := applyConnectionOverride(foundPipeline, task, connectionOverride, connectionTypes); err != nil {
+					printError(err, c.String("output"), "Invalid --connection-override")
+					return cli.Exit("", 1)
+				}
+			}
 			// The pipeline was built before the connections were available, so infer the ingestr
 			// destinations before anything reads them, credential masking included. Validation
 			// lints this same pipeline.
