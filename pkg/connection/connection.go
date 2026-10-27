@@ -16,6 +16,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/adls"
 	"github.com/bruin-data/bruin/pkg/airtable"
 	"github.com/bruin-data/bruin/pkg/allium"
+	"github.com/bruin-data/bruin/pkg/allratestoday"
 	"github.com/bruin-data/bruin/pkg/amplitude"
 	"github.com/bruin-data/bruin/pkg/anthropic"
 	"github.com/bruin-data/bruin/pkg/apifootball"
@@ -269,6 +270,7 @@ type Manager struct {
 	Wise                 map[string]*wise.Client
 	Wistia               map[string]*wistia.Client
 	Zoom                 map[string]*zoom.Client
+	AllRatesToday        map[string]*allratestoday.Client
 	Frankfurter          map[string]*frankfurter.Client
 	Fluxx                map[string]*fluxx.Client
 	Freshdesk            map[string]*freshdesk.Client
@@ -3715,6 +3717,25 @@ func (m *Manager) AddElasticsearchConnectionFromConfig(connection *config.Elasti
 	return nil
 }
 
+func (m *Manager) AddAllRatesTodayConnectionFromConfig(connection *config.AllRatesTodayConnection) error {
+	m.mutex.Lock()
+	if m.AllRatesToday == nil {
+		m.AllRatesToday = make(map[string]*allratestoday.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := allratestoday.NewClient(allratestoday.Config{})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.AllRatesToday[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddFrankfurterConnectionFromConfig(connection *config.FrankfurterConnection) error {
 	m.mutex.Lock()
 	if m.Frankfurter == nil {
@@ -4697,6 +4718,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.BambooHR, connectionManager.AddBambooHRConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.SatisMeter, connectionManager.AddSatisMeterConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Deel, connectionManager.AddDeelConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.AllRatesToday, connectionManager.AddAllRatesTodayConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Frankfurter, connectionManager.AddFrankfurterConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Fluxx, connectionManager.AddFluxxConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Freshdesk, connectionManager.AddFreshdeskConnectionFromConfig, &wg, &errList, &mu)

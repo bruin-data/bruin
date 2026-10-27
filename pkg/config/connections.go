@@ -1855,6 +1855,14 @@ func (c DeelConnection) GetName() string {
 	return c.Name
 }
 
+type AllRatesTodayConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+}
+
+func (c AllRatesTodayConnection) GetName() string {
+	return c.Name
+}
+
 type FrankfurterConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 }

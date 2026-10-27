@@ -513,6 +513,8 @@ environments:
           environment: "sandbox"
       frankfurter:
         - name: "frankfurter-1"
+      allratestoday:
+        - name: "allratestoday-1"
       salesforce:
         - name: "salesforce-1"
           username: "username-123"

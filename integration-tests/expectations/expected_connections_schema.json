@@ -203,6 +203,21 @@
         "access_token"
       ]
     },
+    "AllRatesTodayConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name"
+      ]
+    },
     "AlliumConnection": {
       "properties": {
         "name": {
@@ -1649,6 +1664,12 @@
         "deel": {
           "items": {
             "$ref": "#/$defs/DeelConnection"
+          },
+          "type": "array"
+        },
+        "allratestoday": {
+          "items": {
+            "$ref": "#/$defs/AllRatesTodayConnection"
           },
           "type": "array"
         },
