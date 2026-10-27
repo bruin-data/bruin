@@ -33,6 +33,15 @@ func GetIngestrDestinationType(asset *pipeline.Asset) (pipeline.AssetType, error
 	return value, nil
 }
 
+func GetIngestrCheckType(asset *pipeline.Asset) (pipeline.AssetType, error) {
+	ingestrDestination, _ := asset.Parameters.GetString("destination")
+	if value, ok := pipeline.IngestrCheckTypeMapping[ingestrDestination]; ok {
+		return value, nil
+	}
+
+	return GetIngestrDestinationType(asset)
+}
+
 func PrefixGenerator() string {
 	// Always return same when testing
 	if flag.Lookup("test.v") != nil {
