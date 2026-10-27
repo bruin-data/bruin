@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"sync"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
@@ -28,12 +27,12 @@ type Client struct {
 	apiURL     string
 	credential azcore.TokenCredential
 
-	mu  sync.Mutex
-	sql *fabric.DB
+	sqlLock chan struct{}
+	sql     *fabric.DB
 }
 
 func NewClient(c Config) (*Client, error) {
-	return &Client{config: c, apiURL: fabricAPIURL}, nil
+	return &Client{config: c, apiURL: fabricAPIURL, sqlLock: make(chan struct{}, 1)}, nil
 }
 
 func (c *Client) GetIngestrURI() (string, error) {
@@ -51,8 +50,12 @@ func (c *Client) Select(ctx context.Context, q *query.Query) ([][]interface{}, e
 }
 
 func (c *Client) sqlDB(ctx context.Context) (*fabric.DB, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	select {
+	case c.sqlLock <- struct{}{}:
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+	defer func() { <-c.sqlLock }()
 
 	if c.sql != nil {
 		return c.sql, nil
@@ -129,6 +132,7 @@ func (c *Client) findSQLAnalyticsEndpoint(ctx context.Context) (string, string, 
 	return endpoint.ConnectionString, lakehouse.DisplayName, nil
 }
 
+//nolint:ireturn
 func (c *Client) tokenCredential() (azcore.TokenCredential, error) {
 	if c.credential != nil {
 		return c.credential, nil

@@ -99,3 +99,16 @@ func TestClient_Select_WithSASToken_ReturnsError(t *testing.T) {
 	_, err = client.Select(context.Background(), &query.Query{Query: "SELECT 1"})
 	require.ErrorContains(t, err, "a SAS token cannot query")
 }
+
+func TestClient_Select_WaitingForLookupRespectsContext(t *testing.T) {
+	t.Parallel()
+
+	client, err := NewClient(Config{WorkspaceName: "ws", LakehouseName: "lh", ClientID: "c", TenantID: "t", ClientSecret: "s"})
+	require.NoError(t, err)
+	client.sqlLock <- struct{}{}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err = client.Select(ctx, &query.Query{Query: "SELECT 1"})
+	require.ErrorIs(t, err, context.Canceled)
+}
