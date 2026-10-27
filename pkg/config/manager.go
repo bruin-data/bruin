@@ -143,7 +143,6 @@ type Connections struct {
 	BambooHR            []BambooHRConnection            `yaml:"bamboohr,omitempty" json:"bamboohr,omitempty" mapstructure:"bamboohr"`
 	SatisMeter          []SatisMeterConnection          `yaml:"satismeter,omitempty" json:"satismeter,omitempty" mapstructure:"satismeter"`
 	Deel                []DeelConnection                `yaml:"deel,omitempty" json:"deel,omitempty" mapstructure:"deel"`
-	AllRatesToday       []AllRatesTodayConnection       `yaml:"allratestoday,omitempty" json:"allratestoday,omitempty" mapstructure:"allratestoday"`
 	Frankfurter         []FrankfurterConnection         `yaml:"frankfurter,omitempty" json:"frankfurter,omitempty" mapstructure:"frankfurter"`
 	Salesforce          []SalesforceConnection          `yaml:"salesforce,omitempty" json:"salesforce,omitempty" mapstructure:"salesforce"`
 	SQLite              []SQLiteConnection              `yaml:"sqlite,omitempty" json:"sqlite,omitempty" mapstructure:"sqlite"`
@@ -1643,13 +1642,6 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Okta = append(env.Connections.Okta, conn)
-	case "allratestoday":
-		var conn AllRatesTodayConnection
-		if err := mapstructure.Decode(creds, &conn); err != nil {
-			return fmt.Errorf("failed to decode credentials: %w", err)
-		}
-		conn.Name = name
-		env.Connections.AllRatesToday = append(env.Connections.AllRatesToday, conn)
 	case "frankfurter":
 		var conn FrankfurterConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -2324,8 +2316,6 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Freshdesk = removeConnection(env.Connections.Freshdesk, connectionName)
 	case "okta":
 		env.Connections.Okta = removeConnection(env.Connections.Okta, connectionName)
-	case "allratestoday":
-		env.Connections.AllRatesToday = removeConnection(env.Connections.AllRatesToday, connectionName)
 	case "frankfurter":
 		env.Connections.Frankfurter = removeConnection(env.Connections.Frankfurter, connectionName)
 	case "salesforce":
@@ -2622,7 +2612,6 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.BambooHR, source.BambooHR)
 	mergeConnectionList(&c.SatisMeter, source.SatisMeter)
 	mergeConnectionList(&c.Deel, source.Deel)
-	mergeConnectionList(&c.AllRatesToday, source.AllRatesToday)
 	mergeConnectionList(&c.Frankfurter, source.Frankfurter)
 	mergeConnectionList(&c.Salesforce, source.Salesforce)
 	mergeConnectionList(&c.SQLite, source.SQLite)

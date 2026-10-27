@@ -2,25 +2,13 @@
 
 [AllRatesToday](https://allratestoday.com/) serves the official exchange rate tables that central banks and tax authorities publish, such as the ECB reference rates, the RBI reference rate, the NBP table A middle rates or the Bank of England spot rates.
 
-Bruin supports AllRatesToday as a source for ingestr assets, allowing you to ingest official exchange rates directly into your data warehouse. No account or API key is needed.
+Bruin supports AllRatesToday as a source for ingestr assets, allowing you to ingest official exchange rates directly into your data warehouse.
 
-To set up AllRatesToday as a data source and perform data ingestion, follow the instructions provided below.
+## Public source, no connection required
 
-## Configuration
+AllRatesToday is a public API and needs no credentials, so there is no `.bruin.yml` connection to configure. Point the asset at the public source by setting `source_connection: allratestoday.com`.
 
-### Step 1: Add a connection to .bruin.yml file
-
-Add or modify the `.bruin.yml` file as follows:
-
-```yaml
-environments:
-  default:
-    connections:
-      allratestoday:
-        - name: allratestoday
-```
-
-### Step 2: Create an asset file for data ingestion
+### Step 1: Create an asset file for data ingestion
 
 To ingest data from AllRatesToday, create an `ingestr` asset with the file `assets/rbi_rates.asset.yml`. This file defines the data flow from the source to the destination.
 
@@ -30,7 +18,7 @@ type: ingestr
 connection: duckdb-default
 
 parameters:
-  source_connection: allratestoday
+  source_connection: allratestoday.com
   source_table: 'central_bank_rates:rbi'
 
   destination: duckdb
@@ -39,7 +27,7 @@ parameters:
 - `name`: The name of the asset. This must be unique within the pipeline.
 - `type`: Specifies the type of the asset. As AllRatesToday is an `ingestr` asset, this should be set to `ingestr`.
 - `connection`: The destination connection where the data will be stored. Here `duckdb-default` refers to the database defined in `.bruin.yml`.
-- `source_connection`: The name of the AllRatesToday connection defined in `.bruin.yml`.
+- `source_connection`: Use the public source identifier `allratestoday.com`. No `.bruin.yml` entry is required for it.
 - `source_table`: The name of the AllRatesToday table you want to ingest.
 
 ## Available Source Tables
@@ -54,7 +42,7 @@ Each row of `central_bank_rates` reads as "1 `base` = `rate` `quote`" on `date`,
 > [!NOTE]
 > Only the **latest** table each institution has published is available, so this source cannot backfill history. Schedule the asset daily and the `merge` strategy keeps one set of rows per published date. The data is free to use, including commercially, with a visible link to allratestoday.com wherever the rates are shown; see the [open API terms](https://allratestoday.com/open-api/).
 
-### Step 3: [Run](/commands/run) asset to ingest data
+### Step 2: [Run](/commands/run) asset to ingest data
 
 ```bash
 bruin run assets/rbi_rates.asset.yml

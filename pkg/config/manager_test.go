@@ -733,11 +733,6 @@ func TestLoadFromFile(t *testing.T) {
 					ConnectionMetadata: ConnectionMetadata{Name: "frankfurter-1"},
 				},
 			},
-			AllRatesToday: []AllRatesTodayConnection{
-				{
-					ConnectionMetadata: ConnectionMetadata{Name: "allratestoday-1"},
-				},
-			},
 			AppLovin: []AppLovinConnection{
 				{
 					ConnectionMetadata: ConnectionMetadata{Name: "applovin-1"},
@@ -3423,7 +3418,6 @@ func TestConnections_MergeFrom(t *testing.T) {
 				SatisMeter:          []SatisMeterConnection{{ConnectionMetadata: ConnectionMetadata{Name: "satismeter1"}}},
 				Deel:                []DeelConnection{{ConnectionMetadata: ConnectionMetadata{Name: "deel1"}}},
 				Frankfurter:         []FrankfurterConnection{{ConnectionMetadata: ConnectionMetadata{Name: "frankfurter1"}}},
-				AllRatesToday:       []AllRatesTodayConnection{{ConnectionMetadata: ConnectionMetadata{Name: "allratestoday1"}}},
 				Salesforce:          []SalesforceConnection{{ConnectionMetadata: ConnectionMetadata{Name: "salesforce1"}}},
 				SQLite:              []SQLiteConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sqlite1"}}},
 				DB2:                 []DB2Connection{{ConnectionMetadata: ConnectionMetadata{Name: "db21"}}},
@@ -3577,7 +3571,6 @@ func TestConnections_MergeFrom(t *testing.T) {
 				SatisMeter:          []SatisMeterConnection{{ConnectionMetadata: ConnectionMetadata{Name: "satismeter1"}}},
 				Deel:                []DeelConnection{{ConnectionMetadata: ConnectionMetadata{Name: "deel1"}}},
 				Frankfurter:         []FrankfurterConnection{{ConnectionMetadata: ConnectionMetadata{Name: "frankfurter1"}}},
-				AllRatesToday:       []AllRatesTodayConnection{{ConnectionMetadata: ConnectionMetadata{Name: "allratestoday1"}}},
 				Salesforce:          []SalesforceConnection{{ConnectionMetadata: ConnectionMetadata{Name: "salesforce1"}}},
 				SQLite:              []SQLiteConnection{{ConnectionMetadata: ConnectionMetadata{Name: "sqlite1"}}},
 				DB2:                 []DB2Connection{{ConnectionMetadata: ConnectionMetadata{Name: "db21"}}},
