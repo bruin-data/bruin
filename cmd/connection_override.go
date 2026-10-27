@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/pkg/errors"
@@ -47,6 +48,40 @@ func applyConnectionOverride(p *pipeline.Pipeline, target *pipeline.Asset, conne
 				a.Secrets[i].SecretKey = connection
 			}
 		}
+		// Python and R assets are told their connection's name in BRUIN_CONNECTION, and their
+		// helpers read its credentials by that name, so it's injected under its own name too.
+		if readsSecret(a, connection) && !injectsAs(a, connection) {
+			a.Secrets = append(a.Secrets, pipeline.SecretMapping{SecretKey: connection, InjectedKey: connection})
+		}
+		// An ingestr asset may name the connection it writes to in its parameters, which some
+		// checks read directly, e.g. the BigQuery credentials check before the run.
+		if destination, ok := a.Parameters.GetString("destination_connection"); ok && destination == current {
+			a.Parameters["destination_connection"] = connection
+		}
 	}
 	return nil
+}
+
+// continuedConnectionOverride returns the connection to run on: the given one, or when continuing a
+// run, the one it was started on, if any. Continuing on another connection than the run started on
+// is rejected, since the assets that already ran wrote to that one.
+func continuedConnectionOverride(given string, continuing bool, saved string) (string, error) {
+	if !continuing {
+		return given, nil
+	}
+	if given != "" && given != saved {
+		if saved == "" {
+			return "", fmt.Errorf("the run was started without --connection-override, so it can't continue on '%s'", given)
+		}
+		return "", fmt.Errorf("the run was started with --connection-override %s, so it can't continue on '%s'", saved, given)
+	}
+	return saved, nil
+}
+
+func readsSecret(a *pipeline.Asset, name string) bool {
+	return slices.ContainsFunc(a.Secrets, func(s pipeline.SecretMapping) bool { return s.SecretKey == name })
+}
+
+func injectsAs(a *pipeline.Asset, name string) bool {
+	return slices.ContainsFunc(a.Secrets, func(s pipeline.SecretMapping) bool { return s.InjectedKey == name })
 }

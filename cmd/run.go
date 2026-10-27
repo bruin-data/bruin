@@ -1260,7 +1260,13 @@ func Run(isDebug *bool) *cli.Command {
 			connectionManager, errs = connectionManagerFromConfig(runCtx, cm, logger)
 
 			foundPipeline := pipelineInfo.Pipeline
-			if connectionOverride := c.String("connection-override"); connectionOverride != "" {
+			connectionOverride, err := continuedConnectionOverride(c.String("connection-override"), c.Bool("continue"), runConfig.ConnectionOverride)
+			if err != nil {
+				printError(err, c.String("output"), "Invalid --connection-override")
+				return cli.Exit("", 1)
+			}
+			runConfig.ConnectionOverride = connectionOverride
+			if connectionOverride != "" {
 				var connectionTypes connectionTypeGetter
 				if connectionManager != nil {
 					connectionTypes = connectionManager
