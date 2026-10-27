@@ -109,9 +109,9 @@ func (c *Client) findSQLAnalyticsEndpoint(ctx context.Context) (string, string, 
 	if err != nil {
 		return "", "", err
 	}
-	workspace, ok := findItem(workspaces, workspaceName)
-	if !ok {
-		return "", "", fmt.Errorf("onelake: workspace %q not found or not accessible", workspaceName)
+	workspace, err := findItem(workspaces, "workspace", workspaceName)
+	if err != nil {
+		return "", "", err
 	}
 
 	lakehouseName := strings.TrimSuffix(strings.TrimSpace(c.config.LakehouseName), ".Lakehouse")
@@ -119,9 +119,9 @@ func (c *Client) findSQLAnalyticsEndpoint(ctx context.Context) (string, string, 
 	if err != nil {
 		return "", "", err
 	}
-	lakehouse, ok := findItem(lakehouses, lakehouseName)
-	if !ok {
-		return "", "", fmt.Errorf("onelake: lakehouse %q not found in workspace %q", lakehouseName, workspaceName)
+	lakehouse, err := findItem(lakehouses, "lakehouse", lakehouseName)
+	if err != nil {
+		return "", "", err
 	}
 
 	endpoint := lakehouse.Properties.SQLEndpointProperties
@@ -184,12 +184,24 @@ func (c *Client) listItems(ctx context.Context, token, nextURL string) ([]fabric
 	return items, nil
 }
 
-func findItem(items []fabricItem, nameOrID string) (fabricItem, bool) {
+// findItem prefers an exact name or ID match and only falls back to a case-insensitive one when it is unique.
+func findItem(items []fabricItem, kind, nameOrID string) (fabricItem, error) {
+	var caseInsensitive []fabricItem
 	for _, item := range items {
+		if item.ID == nameOrID || item.DisplayName == nameOrID {
+			return item, nil
+		}
 		if strings.EqualFold(item.ID, nameOrID) || strings.EqualFold(item.DisplayName, nameOrID) {
-			return item, true
+			caseInsensitive = append(caseInsensitive, item)
 		}
 	}
 
-	return fabricItem{}, false
+	switch len(caseInsensitive) {
+	case 0:
+		return fabricItem{}, fmt.Errorf("onelake: %s %q not found or not accessible", kind, nameOrID)
+	case 1:
+		return caseInsensitive[0], nil
+	default:
+		return fabricItem{}, fmt.Errorf("onelake: %s name %q is ambiguous, use the %s ID instead", kind, nameOrID, kind)
+	}
 }

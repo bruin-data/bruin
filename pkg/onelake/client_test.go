@@ -112,3 +112,27 @@ func TestClient_Select_WaitingForLookupRespectsContext(t *testing.T) {
 	_, err = client.Select(ctx, &query.Query{Query: "SELECT 1"})
 	require.ErrorIs(t, err, context.Canceled)
 }
+
+func TestFindItem(t *testing.T) {
+	t.Parallel()
+
+	items := []fabricItem{
+		{ID: "id-1", DisplayName: "Sales"},
+		{ID: "id-2", DisplayName: "sales"},
+		{ID: "id-3", DisplayName: "Finance"},
+	}
+
+	item, err := findItem(items, "workspace", "sales")
+	require.NoError(t, err)
+	require.Equal(t, "id-2", item.ID)
+
+	item, err = findItem(items, "workspace", "FINANCE")
+	require.NoError(t, err)
+	require.Equal(t, "id-3", item.ID)
+
+	_, err = findItem(items, "workspace", "SALES")
+	require.ErrorContains(t, err, `workspace name "SALES" is ambiguous`)
+
+	_, err = findItem(items, "workspace", "marketing")
+	require.ErrorContains(t, err, `workspace "marketing" not found`)
+}
