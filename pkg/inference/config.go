@@ -25,10 +25,17 @@ func ValidateAsset(asset *pipeline.Asset) error {
 	return err
 }
 
+// checkDestinations are the ingestr destinations whose warehouses have column
+// and custom check executors. Keep in sync with SetupExecutors and the docs.
+var checkDestinations = map[string]bool{
+	"athena": true, "bigquery": true, "clickhouse": true, "databricks": true, "doris": true,
+	"duckdb": true, "fabric": true, "mssql": true, "oracle": true, "postgres": true,
+	"redshift": true, "snowflake": true, "starrocks": true, "synapse": true, "vertica": true,
+}
+
 // ValidateQualityCheckPlatform rejects quality checks on an asset whose
-// connection type is unknown, has no ingestr destination, or is MotherDuck.
-// Checks run on the platform of the `destination` inferred from the connection,
-// as for ingestr.
+// connection type is unknown or has no check executor. Checks run on the
+// platform of the `destination` inferred from the connection, as for ingestr.
 func ValidateQualityCheckPlatform(asset *pipeline.Asset, connectionType string) error {
 	if asset.CheckCount() == 0 {
 		return nil
@@ -36,8 +43,7 @@ func ValidateQualityCheckPlatform(asset *pipeline.Asset, connectionType string) 
 	if connectionType == "" {
 		return fmt.Errorf("could not determine the platform of connection %q to run inference quality checks", asset.Connection)
 	}
-	// MotherDuck has an ingestr destination but no check executor.
-	if destination, ok := python.IngestrDestinationForConnectionType(connectionType); !ok || destination == "motherduck" {
+	if destination, _ := python.IngestrDestinationForConnectionType(connectionType); !checkDestinations[destination] {
 		return fmt.Errorf("inference quality checks are not supported on %q connections; define checks on a downstream SQL asset", connectionType)
 	}
 	return nil

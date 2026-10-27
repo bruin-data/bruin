@@ -340,7 +340,14 @@ func TestValidateQualityCheckPlatform(t *testing.T) {
 	a.CustomChecks = []pipeline.CustomCheck{{Name: "has rows", Query: "select 1", Value: 1}}
 	require.NoError(t, ValidateQualityCheckPlatform(a, "duckdb"))
 	require.NoError(t, ValidateQualityCheckPlatform(a, "google_cloud_platform"))
-	require.Error(t, ValidateQualityCheckPlatform(a, "trino"))
+	for _, connectionType := range []string{"trino", "motherduck", "google_sheets", "dynamodb", "elasticsearch", "hubspot"} {
+		require.Error(t, ValidateQualityCheckPlatform(a, connectionType), connectionType)
+	}
+	for destination := range checkDestinations {
+		assetType, ok := pipeline.IngestrTypeConnectionMapping[destination]
+		require.True(t, ok, destination)
+		require.NoError(t, ValidateQualityCheckPlatform(a, pipeline.AssetTypeConnectionMapping[assetType]), destination)
+	}
 }
 
 func TestOperatorParallelFailureCancelsRequests(t *testing.T) {
