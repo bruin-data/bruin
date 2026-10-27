@@ -2643,6 +2643,7 @@ func assetMainTaskIsConnectionless(asset *Asset) bool {
 // ConnectionlessIngestrSources maps public, credential-less ingestr sources to
 // their base URI, keyed by canonical domain name so short names stay connections.
 var ConnectionlessIngestrSources = map[string]string{
+	"allratestoday.com": "allratestoday://",
 	"chess.com":         "chess://",
 	"frankfurter.dev":   "frankfurter://",
 	"stat.ripe.net":     "ripestat://",

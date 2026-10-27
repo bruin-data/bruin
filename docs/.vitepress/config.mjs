@@ -298,6 +298,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                                     {text: "Amplitude", link: "/ingestion/amplitude"},
                                     {text: "Anthropic", link: "/ingestion/anthropic"},
                                     {text: "Allium", link: "/ingestion/allium"},
+                                    {text: "AllRatesToday", link: "/ingestion/allratestoday"},
                                     {text: "API-Football", link: "/ingestion/api-football"},
                                     {text: "Apple Ads", link: "/ingestion/apple-ads"},
                                     {text: "AppStore", link: "/ingestion/appstore"},

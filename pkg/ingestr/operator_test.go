@@ -716,6 +716,19 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 			want: []string{"ingest", "--source-uri", "frankfurter://", "--source-table", "latest:USD", "--dest-uri", "duckdb:////some/path", "--dest-table", "asset-name", "--yes", "--progress", "log"},
 		},
 		{
+			name: "public allratestoday source via domain name (no connection defined)",
+			asset: &pipeline.Asset{
+				Name:       "asset-name",
+				Connection: "duck",
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "allratestoday.com",
+					"source_table":      "central_bank_rates:rbi",
+					"destination":       "duckdb",
+				},
+			},
+			want: []string{"ingest", "--source-uri", "allratestoday://", "--source-table", "central_bank_rates:rbi", "--dest-uri", "duckdb:////some/path", "--dest-table", "asset-name", "--yes", "--progress", "log"},
+		},
+		{
 			name: "public ripestat source via domain name (no connection defined)",
 			asset: &pipeline.Asset{
 				Name:       "asset-name",
