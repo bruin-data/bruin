@@ -13,6 +13,8 @@ To set up AllRatesToday as a data source and perform data ingestion, follow the 
 Add or modify the `.bruin.yml` file as follows:
 
 ```yaml
+environments:
+  default:
     connections:
       allratestoday:
         - name: allratestoday
